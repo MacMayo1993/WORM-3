@@ -29,7 +29,28 @@ Worm3 Puzzle is a web-based 3D puzzle game that implements a Rubik's Cube with u
 - Node.js 16.x or higher
 - npm 7.x or higher
 
-## Installation
+## Quick Start with GitHub Codespaces
+
+The easiest way to get started is using GitHub Codespaces:
+
+1. Click the **Code** button on the repository
+2. Select **Codespaces** tab
+3. Click **Create codespace on main** (or your branch)
+4. Wait for the container to build (dependencies will auto-install)
+5. Once ready, run:
+```bash
+npm run dev
+```
+6. Click **Open in Browser** when the port forwarding notification appears
+7. Your app will open automatically in your local browser!
+
+The `.devcontainer` configuration automatically:
+- Sets up Node.js 18 environment
+- Installs all dependencies
+- Configures port forwarding for the Vite dev server
+- Opens the app in your browser when ready
+
+## Local Installation
 
 1. Clone the repository:
 ```bash
