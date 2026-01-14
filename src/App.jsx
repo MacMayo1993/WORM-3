@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import './App.css';
 
 /* ---------- Constants ---------- */
-const COLORS={ red:'#ef4444', blue:'#3b82f6', yellow:'#eab308', white:'#ffffff', orange:'#f97316', green:'#22c55e', black:'#121212', wormhole:'#a855f7' };
+const COLORS={ red:'#ef4444', blue:'#3b82f6', yellow:'#eab308', white:'#ffffff', orange:'#f97316', green:'#22c55e', black:'#121212', wormhole:'#dda15e' };
 const FACE_COLORS={1:COLORS.red,2:COLORS.green,3:COLORS.white,4:COLORS.orange,5:COLORS.blue,6:COLORS.yellow};
 const ANTIPODAL_COLOR={1:4,4:1,2:5,5:2,3:6,6:3};
 const DIR_TO_VEC={PX:[1,0,0],NX:[-1,0,0],PY:[0,1,0],NY:[0,-1,0],PZ:[0,0,1],NZ:[0,0,-1]};
@@ -510,37 +510,104 @@ const ArrivalBurst = ({ position, color, startTime, currentTime }) => {
   );
 };
 
-const IntroSticker = ({ pos, rot, color, emissive = 0 }) => (
+const IntroSticker = ({ pos, rot, color, emissive = 0, isBack = false }) => (
   <mesh position={pos} rotation={rot}>
     <planeGeometry args={[0.82, 0.82]} />
     <meshStandardMaterial
       color={color}
-      roughness={0.18}
-      metalness={0}
+      roughness={isBack ? 0.4 : 0.18}
+      metalness={isBack ? 0.1 : 0}
       side={THREE.DoubleSide}
       emissive={color}
-      emissiveIntensity={emissive}
+      emissiveIntensity={isBack ? 0.08 : emissive}
+      transparent={isBack}
+      opacity={isBack ? 0.85 : 1}
     />
   </mesh>
 );
 
-const IntroCubie = React.forwardRef(({ position, size }, ref) => {
+const IntroCubie = React.forwardRef(({ position, size, explosionFactor = 0 }, ref) => {
   const limit = (size - 1) / 2;
-  const x = position[0] + limit;
-  const y = position[1] + limit;
-  const z = position[2] + limit;
-  
+  const x = Math.round(position[0] / (1 + explosionFactor * 1.8) + limit);
+  const y = Math.round(position[1] / (1 + explosionFactor * 1.8) + limit);
+  const z = Math.round(position[2] / (1 + explosionFactor * 1.8) + limit);
+
+  // When exploded, show all faces; when collapsed, only show outer faces
+  const showAllFaces = explosionFactor > 0.1;
+
+  // Determine which faces should show based on position (outer faces of the cube)
+  const isOuterPZ = z === size - 1;
+  const isOuterNZ = z === 0;
+  const isOuterPX = x === size - 1;
+  const isOuterNX = x === 0;
+  const isOuterPY = y === size - 1;
+  const isOuterNY = y === 0;
+
   return (
     <group position={position} ref={ref}>
       <RoundedBox args={[0.98, 0.98, 0.98]} radius={0.05} smoothness={4}>
-        <meshStandardMaterial color="#12151f" roughness={0.5} />
+        <meshStandardMaterial color="#3d3225" roughness={0.6} metalness={0.1} />
       </RoundedBox>
-      {z === size - 1 && <IntroSticker pos={[0, 0, 0.51]} rot={[0, 0, 0]} color={FACE_COLORS[1]} />}
-      {z === 0 && <IntroSticker pos={[0, 0, -0.51]} rot={[0, Math.PI, 0]} color={FACE_COLORS[4]} />}
-      {x === size - 1 && <IntroSticker pos={[0.51, 0, 0]} rot={[0, Math.PI / 2, 0]} color={FACE_COLORS[5]} />}
-      {x === 0 && <IntroSticker pos={[-0.51, 0, 0]} rot={[0, -Math.PI / 2, 0]} color={FACE_COLORS[2]} />}
-      {y === size - 1 && <IntroSticker pos={[0, 0.51, 0]} rot={[-Math.PI / 2, 0, 0]} color={FACE_COLORS[3]} />}
-      {y === 0 && <IntroSticker pos={[0, -0.51, 0]} rot={[Math.PI / 2, 0, 0]} color={FACE_COLORS[6]} />}
+
+      {/* Front face (PZ) - Red */}
+      {(showAllFaces || isOuterPZ) && (
+        <IntroSticker
+          pos={[0, 0, 0.51]}
+          rot={[0, 0, 0]}
+          color={FACE_COLORS[1]}
+          isBack={!isOuterPZ && showAllFaces}
+        />
+      )}
+
+      {/* Back face (NZ) - Orange */}
+      {(showAllFaces || isOuterNZ) && (
+        <IntroSticker
+          pos={[0, 0, -0.51]}
+          rot={[0, Math.PI, 0]}
+          color={FACE_COLORS[4]}
+          isBack={!isOuterNZ && showAllFaces}
+        />
+      )}
+
+      {/* Right face (PX) - Blue */}
+      {(showAllFaces || isOuterPX) && (
+        <IntroSticker
+          pos={[0.51, 0, 0]}
+          rot={[0, Math.PI / 2, 0]}
+          color={FACE_COLORS[5]}
+          isBack={!isOuterPX && showAllFaces}
+        />
+      )}
+
+      {/* Left face (NX) - Green */}
+      {(showAllFaces || isOuterNX) && (
+        <IntroSticker
+          pos={[-0.51, 0, 0]}
+          rot={[0, -Math.PI / 2, 0]}
+          color={FACE_COLORS[2]}
+          isBack={!isOuterNX && showAllFaces}
+        />
+      )}
+
+      {/* Top face (PY) - White */}
+      {(showAllFaces || isOuterPY) && (
+        <IntroSticker
+          pos={[0, 0.51, 0]}
+          rot={[-Math.PI / 2, 0, 0]}
+          color={FACE_COLORS[3]}
+          isBack={!isOuterPY && showAllFaces}
+        />
+      )}
+
+      {/* Bottom face (NY) - Yellow */}
+      {(showAllFaces || isOuterNY) && (
+        <IntroSticker
+          pos={[0, -0.51, 0]}
+          rot={[Math.PI / 2, 0, 0]}
+          color={FACE_COLORS[6]}
+          isBack={!isOuterNY && showAllFaces}
+        />
+      )}
     </group>
   );
 });
@@ -728,6 +795,7 @@ const IntroScene = ({ time, onComplete }) => {
             ref={el => (cubieRefs.current[idx] = el)}
             position={explodedPos}
             size={size}
+            explosionFactor={explosionFactor}
           />
         );
       })}
@@ -779,35 +847,35 @@ const IntroScene = ({ time, onComplete }) => {
 const TextOverlay = ({ time }) => {
   const messages = useMemo(() => {
     const msgs = [];
-    
+
     if (time >= 3 && time < 10) {
-      msgs.push({ text: '> TOPOLOGY DETECTED', fade: time >= 3 && time < 3.3 ? (time - 3) / 0.3 : 1 });
+      msgs.push({ text: 'Welcome to the Wormhole Cube!', fade: time >= 3 && time < 3.3 ? (time - 3) / 0.3 : 1 });
     }
     if (time >= 3.5 && time < 10) {
-      msgs.push({ text: '> INITIALIZING MANIFOLD ANALYSIS...', fade: time >= 3.5 && time < 3.8 ? (time - 3.5) / 0.3 : 1 });
+      msgs.push({ text: 'Discovering opposite pairs...', fade: time >= 3.5 && time < 3.8 ? (time - 3.5) / 0.3 : 1 });
     }
     if (time >= 6 && time < 10) {
-      msgs.push({ text: '> ANTIPODAL PAIR DETECTION: COMPLETE', fade: time >= 6 && time < 6.3 ? (time - 6) / 0.3 : 1 });
+      msgs.push({ text: 'Each color has a partner across the cube', fade: time >= 6 && time < 6.3 ? (time - 6) / 0.3 : 1 });
     }
     if (time >= 6.5 && time < 7.5) {
-      msgs.push({ text: '> RED ↔ ORANGE', fade: time >= 6.5 && time < 6.8 ? (time - 6.5) / 0.3 : 1, color: '#ef4444' });
+      msgs.push({ text: 'Red ↔ Orange', fade: time >= 6.5 && time < 6.8 ? (time - 6.5) / 0.3 : 1, color: '#ef4444' });
     }
     if (time >= 7.5 && time < 8.5) {
-      msgs.push({ text: '> BLUE ↔ GREEN', fade: time >= 7.5 && time < 7.8 ? (time - 7.5) / 0.3 : 1, color: '#3b82f6' });
+      msgs.push({ text: 'Blue ↔ Green', fade: time >= 7.5 && time < 7.8 ? (time - 7.5) / 0.3 : 1, color: '#3b82f6' });
     }
     if (time >= 8.5 && time < 9.5) {
-      msgs.push({ text: '> YELLOW ↔ WHITE', fade: time >= 8.5 && time < 8.8 ? (time - 8.5) / 0.3 : 1, color: '#eab308' });
+      msgs.push({ text: 'Yellow ↔ White', fade: time >= 8.5 && time < 8.8 ? (time - 8.5) / 0.3 : 1, color: '#eab308' });
     }
     if (time >= 9.5) {
-      msgs.push({ text: '> MANIFOLD COHERENCE: STABLE', fade: time >= 9.5 && time < 9.8 ? (time - 9.5) / 0.3 : 1 });
+      msgs.push({ text: 'Ready to explore!', fade: time >= 9.5 && time < 9.8 ? (time - 9.5) / 0.3 : 1 });
     }
-    
+
     return msgs;
   }, [time]);
-  
+
   const showFinal = time >= 10;
   const finalFade = time >= 10 && time < 10.5 ? (time - 10) / 0.5 : time >= 10.5 ? 1 : 0;
-  
+
   return (
     <div className="intro-text-overlay">
       <div className="intro-messages">
@@ -817,23 +885,23 @@ const TextOverlay = ({ time }) => {
             className="intro-message"
             style={{
               opacity: msg.fade,
-              color: msg.color || '#00ff41'
+              color: msg.color || '#8b6f47'
             }}
           >
             {msg.text}
           </div>
         ))}
       </div>
-      
+
       {showFinal && (
         <div className="intro-final-card" style={{ opacity: finalFade }}>
           <div className="intro-title-box">
-            <h1>WORM³</h1>
-            <p>Non-Orientable Topology Puzzle</p>
+            <h1>The Wormhole Cube</h1>
+            <p>An Interactive Topology Puzzle</p>
           </div>
           <div className="intro-instructions">
-            <p>Click any sticker to flip</p>
-            <p>Drag to rotate • Explode to explore</p>
+            <p>Click any sticker to flip to its opposite color</p>
+            <p>Drag to rotate • Explore and discover!</p>
           </div>
         </div>
       )}
@@ -1131,20 +1199,152 @@ const ChaosWave = ({ from, to, color = "#ff0080", onComplete }) => {
   );
 };
 
+/* Tally Marks Component - Shows flip journey history on each sticker */
+const TallyMarks = ({ flips, radius, origColor }) => {
+  // Calculate full cycles and half cycles
+  // Each flip is a half-cycle through the antipodal tunnel
+  // 2 flips = 1 complete round-trip cycle
+  const halfCycles = flips; // Each flip is a half-cycle
+  const fullTallies = Math.floor(halfCycles / 2); // Full tally = 2 half-cycles
+  const hasHalfTally = halfCycles % 2 === 1; // Odd parity = half tally
+
+  // Determine contrasting color for tally marks
+  // Use dark marks on light colors, light marks on dark colors
+  const isLightColor = ['#ffffff', '#eab308', '#f97316'].includes(origColor);
+  const tallyColor = isLightColor ? '#1a1a1a' : '#ffffff';
+
+  // Scale tallies to fit within the tracker circle
+  const baseScale = Math.min(radius * 1.4, 0.28);
+  const lineHeight = baseScale * 0.7;
+  const lineSpacing = baseScale * 0.18;
+  const strokeWidth = 1.8;
+
+  // Group tallies in sets of 5 (traditional tally: |||| with diagonal)
+  const tallyGroups = [];
+  let remaining = fullTallies;
+  while (remaining > 0) {
+    const groupSize = Math.min(remaining, 5);
+    tallyGroups.push(groupSize);
+    remaining -= groupSize;
+  }
+
+  // If no full tallies but has half, we still show something
+  if (tallyGroups.length === 0 && hasHalfTally) {
+    tallyGroups.push(0);
+  }
+
+  // Calculate total width to center the tallies
+  const groupWidth = lineSpacing * 5;
+  const totalGroups = tallyGroups.length;
+  const totalWidth = totalGroups * groupWidth;
+  const startX = -totalWidth / 2 + lineSpacing;
+
+  return (
+    <group position={[0, 0, 0.015]}>
+      {tallyGroups.map((count, groupIndex) => {
+        const groupX = startX + groupIndex * groupWidth;
+        const lines = [];
+
+        // Draw vertical tally lines for this group
+        for (let i = 0; i < count; i++) {
+          const x = groupX + i * lineSpacing;
+          lines.push(
+            <Line
+              key={`tally-${groupIndex}-${i}`}
+              points={[[x, -lineHeight / 2, 0], [x, lineHeight / 2, 0]]}
+              color={tallyColor}
+              lineWidth={strokeWidth}
+              transparent
+              opacity={0.9}
+            />
+          );
+        }
+
+        // Draw diagonal line for groups of 5
+        if (count === 5) {
+          lines.push(
+            <Line
+              key={`diag-${groupIndex}`}
+              points={[
+                [groupX - lineSpacing * 0.3, -lineHeight / 2 - 0.01, 0],
+                [groupX + lineSpacing * 4.3, lineHeight / 2 + 0.01, 0]
+              ]}
+              color={tallyColor}
+              lineWidth={strokeWidth}
+              transparent
+              opacity={0.9}
+            />
+          );
+        }
+
+        return <group key={`group-${groupIndex}`}>{lines}</group>;
+      })}
+
+      {/* Half tally - shown as a shorter, slightly faded line */}
+      {hasHalfTally && (
+        <group>
+          <Line
+            points={[
+              [startX + fullTallies % 5 * lineSpacing + (fullTallies >= 5 ? Math.floor(fullTallies / 5) * groupWidth : 0),
+               -lineHeight / 4, 0],
+              [startX + fullTallies % 5 * lineSpacing + (fullTallies >= 5 ? Math.floor(fullTallies / 5) * groupWidth : 0),
+               lineHeight / 4, 0]
+            ]}
+            color={tallyColor}
+            lineWidth={strokeWidth * 0.8}
+            transparent
+            opacity={0.6}
+          />
+          {/* Small dot at top to indicate "incomplete" journey */}
+          <mesh position={[
+            startX + fullTallies % 5 * lineSpacing + (fullTallies >= 5 ? Math.floor(fullTallies / 5) * groupWidth : 0),
+            lineHeight / 4 + 0.02,
+            0
+          ]}>
+            <circleGeometry args={[0.015, 8]} />
+            <meshBasicMaterial color={tallyColor} transparent opacity={0.6} />
+          </mesh>
+        </group>
+      )}
+
+      {/* Show flip count as small text for high counts */}
+      {flips > 10 && (
+        <Text
+          position={[0, -radius * 0.6, 0.005]}
+          fontSize={0.06}
+          color={tallyColor}
+          anchorX="center"
+          anchorY="middle"
+          fontWeight="bold"
+        >
+          ×{flips}
+        </Text>
+      )}
+    </group>
+  );
+};
+
 const StickerPlane=React.memo(function StickerPlane({ meta, pos, rot=[0,0,0], overlay, mode }) {
   const groupRef = useRef();
+  const meshRef = useRef();
   const ringRef = useRef();
   const glowRef = useRef();
   const spinT = useRef(0);
+  const shakeT = useRef(0);
   const pulseT = useRef(0);
+  const flipFromColor = useRef(null);
+  const flipToColor = useRef(null);
 
   const prevCurr = useRef(meta?.curr ?? 0);
   useEffect(() => {
     const curr = meta?.curr ?? 0;
     const prevVal = prevCurr.current;
-    
+
     // Only trigger flip animation if the color actually changed to its antipodal
     if (curr !== prevVal && meta?.flips > 0 && ANTIPODAL_COLOR[prevVal] === curr) {
+      // Store the colors for the flip animation
+      flipFromColor.current = FACE_COLORS[prevVal];
+      flipToColor.current = FACE_COLORS[curr];
       spinT.current = 1;
       play('/sounds/flip.mp3');
       vibrate(16);
@@ -1153,36 +1353,80 @@ const StickerPlane=React.memo(function StickerPlane({ meta, pos, rot=[0,0,0], ov
   }, [meta?.curr, meta?.flips]);
 
   useFrame((_, delta) => {
+    // Flip animation
     if (spinT.current > 0 && groupRef.current) {
       const dt = Math.min(delta * 4, spinT.current);
       spinT.current -= dt;
       const p = 1 - spinT.current;
-      
+
       let angle;
       if (p < 0.5) {
+        // First half: rotate towards the "portal"
         angle = Math.sin(p * Math.PI * 2) * Math.PI;
       } else {
+        // Second half: emerge from portal with overshoot
         const overshoot = Math.sin((p - 0.5) * Math.PI * 4) * 0.15;
         angle = Math.PI + overshoot;
       }
-      
+
       groupRef.current.rotation.y = rot[1] + angle;
-      
+
       const scale = 1 + Math.sin(p * Math.PI) * 0.15;
       groupRef.current.scale.set(scale, scale, 1);
-      
+
+      // Animate color through the antipodal color during flip
+      if (meshRef.current && flipFromColor.current && flipToColor.current) {
+        const antipodalColor = flipToColor.current; // The destination IS the antipodal
+        if (p < 0.4) {
+          // Fade from original color
+          meshRef.current.material.color.set(flipFromColor.current);
+        } else if (p < 0.6) {
+          // At midpoint, flash the antipodal color brightly
+          meshRef.current.material.color.set(antipodalColor);
+          meshRef.current.material.emissive.set(antipodalColor);
+          meshRef.current.material.emissiveIntensity = 0.6 * (1 - Math.abs(p - 0.5) * 5);
+        } else {
+          // Settle into the new color
+          meshRef.current.material.color.set(flipToColor.current);
+          meshRef.current.material.emissiveIntensity = 0.15 * (1 - p);
+        }
+      }
+
       if (spinT.current <= 0) {
         groupRef.current.rotation.y = rot[1];
         groupRef.current.scale.set(1, 1, 1);
+        // Start shake animation after flip completes
+        shakeT.current = 0.5;
+        flipFromColor.current = null;
+        flipToColor.current = null;
+        if (meshRef.current) {
+          meshRef.current.material.emissiveIntensity = 0;
+        }
       }
     }
-    
+
+    // Shake animation for parity indicator
+    if (shakeT.current > 0 && groupRef.current) {
+      const dt = Math.min(delta * 2, shakeT.current);
+      shakeT.current -= dt;
+      const intensity = shakeT.current * 2; // Decay from 1 to 0
+      const shakeFreq = 25;
+      const shakeX = Math.sin(shakeT.current * shakeFreq * Math.PI) * 0.03 * intensity;
+      const shakeZ = Math.cos(shakeT.current * shakeFreq * Math.PI * 1.3) * 0.02 * intensity;
+      groupRef.current.position.x = pos[0] + shakeX;
+      groupRef.current.position.z = pos[2] + shakeZ;
+
+      if (shakeT.current <= 0) {
+        groupRef.current.position.set(pos[0], pos[1], pos[2]);
+      }
+    }
+
     pulseT.current += delta * 2.1;
     if (ringRef.current) {
       const s = 1 + (Math.sin(pulseT.current) * 0.08);
       ringRef.current.scale.setScalar(s);
     }
-    
+
     if (glowRef.current) {
       const glowIntensity = 0.3 + Math.sin(pulseT.current * 1.5) * 0.2;
       glowRef.current.material.opacity = glowIntensity;
@@ -1201,7 +1445,7 @@ const StickerPlane=React.memo(function StickerPlane({ meta, pos, rot=[0,0,0], ov
 
   return (
     <group position={pos} rotation={rot} ref={groupRef}>
-      <mesh>
+      <mesh ref={meshRef}>
         <planeGeometry args={[0.82,0.82]} />
         <meshStandardMaterial
           color={baseColor}
@@ -1228,26 +1472,35 @@ const StickerPlane=React.memo(function StickerPlane({ meta, pos, rot=[0,0,0], ov
       {!isSudokube && hasFlipHistory && (
         <mesh position={[0,0,0.01]}>
           <circleGeometry args={[trackerRadius,32]} />
-          <meshBasicMaterial 
+          <meshBasicMaterial
             color={origColor}
             opacity={isWormhole ? 1.0 : 0.5}
             transparent={!isWormhole}
           />
         </mesh>
       )}
-      
+
+      {/* Tally Marks - showing flip journey history */}
+      {!isSudokube && hasFlipHistory && (
+        <TallyMarks
+          flips={meta?.flips ?? 0}
+          radius={trackerRadius}
+          origColor={origColor}
+        />
+      )}
+
       {!isSudokube && isWormhole && (
         <>
           <mesh ref={ringRef} position={[0,0,0.02]}>
             <ringGeometry args={[0.36,0.40,32]} />
-            <meshBasicMaterial color="#00ffff" transparent opacity={0.85} />
+            <meshBasicMaterial color="#dda15e" transparent opacity={0.85} />
           </mesh>
           <mesh ref={glowRef} position={[0,0,0.015]}>
             <circleGeometry args={[0.44,32]} />
-            <meshBasicMaterial 
-              color="#00ffff" 
-              transparent 
-              opacity={0.2}
+            <meshBasicMaterial
+              color="#bc6c25"
+              transparent
+              opacity={0.25}
               blending={THREE.AdditiveBlending}
             />
           </mesh>
@@ -1492,6 +1745,376 @@ const DragGuide=({ position, activeDir })=>{
   );
 };
 
+/* Top Menu Bar - Summer 1978 Library Archive Style */
+const TopMenuBar = ({
+  moves,
+  metrics,
+  size,
+  visualMode,
+  flipMode,
+  chaosMode,
+  chaosLevel,
+  cubies,
+  onShowHelp,
+  onShowSettings
+}) => {
+  const [time, setTime] = useState(0);
+  const startTime = useRef(Date.now());
+
+  // Retro color palette
+  const colors = {
+    ink: '#582f0e',
+    inkMedium: '#7f5539',
+    inkLight: '#9c6644',
+    burntOrange: '#bc6c25',
+    burntOrangeLight: '#dda15e',
+    avocado: '#606c38',
+    mustard: '#d4a373',
+    paper: '#f2e8cf',
+    paperCream: '#fefae0',
+    divider: 'rgba(188, 108, 37, 0.25)'
+  };
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTime(Math.floor((Date.now() - startTime.current) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Calculate parity (even/odd flips)
+  const parity = metrics.flips % 2 === 0 ? 'EVEN' : 'ODD';
+  const parityColor = parity === 'EVEN' ? colors.avocado : colors.burntOrange;
+
+  // Calculate face completion
+  const faceStats = useMemo(() => {
+    const faces = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
+    const faceTargets = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
+
+    for (const L of cubies) {
+      for (const R of L) {
+        for (const c of R) {
+          for (const [dir, st] of Object.entries(c.stickers)) {
+            const targetFace = dir === 'PZ' ? 1 : dir === 'NX' ? 2 : dir === 'PY' ? 3 :
+                              dir === 'NZ' ? 4 : dir === 'PX' ? 5 : 6;
+            faceTargets[targetFace]++;
+            if (st.curr === targetFace) faces[targetFace]++;
+          }
+        }
+      }
+    }
+
+    return Object.keys(faces).map(f => ({
+      face: parseInt(f),
+      complete: faces[f],
+      total: faceTargets[f],
+      percent: Math.round((faces[f] / faceTargets[f]) * 100)
+    }));
+  }, [cubies]);
+
+  const totalComplete = faceStats.reduce((sum, f) => sum + f.complete, 0);
+  const totalStickers = faceStats.reduce((sum, f) => sum + f.total, 0);
+  const overallProgress = Math.round((totalComplete / totalStickers) * 100);
+
+  const formatTime = (s) => {
+    const mins = Math.floor(s / 60);
+    const secs = s % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const modeLabel = visualMode === 'classic' ? 'Classic' :
+                   visualMode === 'grid' ? 'Grid' :
+                   visualMode === 'sudokube' ? 'Sudoku' : 'Wire';
+
+  return (
+    <div style={{
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      width: '100%',
+      gap: '16px',
+      pointerEvents: 'auto'
+    }}>
+      {/* Left Section - Archive Header */}
+      <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+        {/* Logo Box - Library Archive Style */}
+        <div className="bauhaus-box ui-element" style={{ padding: '12px 20px' }}>
+          <h1 style={{
+            margin: 0,
+            fontSize: '28px',
+            fontFamily: 'Georgia, serif',
+            fontStyle: 'italic',
+            fontWeight: 700,
+            color: colors.ink,
+            letterSpacing: '0.02em',
+            lineHeight: 1
+          }}>WORM³</h1>
+          <p style={{
+            margin: '4px 0 0',
+            fontSize: '9px',
+            color: colors.burntOrange,
+            letterSpacing: '0.2em',
+            textTransform: 'uppercase',
+            fontStyle: 'normal'
+          }}>Mayo Manifold Machine • 1978</p>
+        </div>
+
+        {/* Stats Panel - Library Checkout Card */}
+        <div className="ui-element stats-panel" style={{
+          padding: '8px 4px',
+          display: 'flex',
+          gap: '1px',
+          background: colors.paperCream,
+          border: `1px solid ${colors.divider}`
+        }}>
+          {[
+            { label: 'Moves', val: moves, color: colors.avocado },
+            { label: 'Flips', val: metrics.flips, color: colors.burntOrange },
+            { label: 'Worms', val: metrics.wormholes, color: colors.mustard },
+            { label: 'Time', val: formatTime(time), color: colors.ink }
+          ].map((stat, i) => (
+            <div key={stat.label} style={{
+              padding: '4px 14px',
+              borderRight: i < 3 ? `1px solid ${colors.divider}` : 'none',
+              textAlign: 'center'
+            }}>
+              <div style={{
+                fontSize: '9px',
+                textTransform: 'uppercase',
+                color: colors.inkLight,
+                letterSpacing: '0.1em',
+                marginBottom: '2px'
+              }}>{stat.label}</div>
+              <div style={{
+                fontSize: '18px',
+                fontFamily: "'Courier New', monospace",
+                fontWeight: 600,
+                color: stat.color
+              }}>{stat.val}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Center Section - Mode & Status Tags */}
+      <div style={{
+        display: 'flex',
+        gap: '8px',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        justifyContent: 'center'
+      }}>
+        {/* Parity Tag */}
+        <div className="ui-element" style={{
+          padding: '5px 12px',
+          background: `linear-gradient(135deg, ${parityColor}18, ${parityColor}08)`,
+          borderColor: parityColor,
+          borderWidth: '1px 2px 2px 1px'
+        }}>
+          <span style={{
+            fontSize: '11px',
+            fontWeight: 600,
+            color: parityColor,
+            letterSpacing: '0.1em',
+            fontFamily: 'Georgia, serif'
+          }}>
+            ⟲ {parity}
+          </span>
+        </div>
+
+        {/* Dimension Tag */}
+        <div className="ui-element" style={{ padding: '5px 12px' }}>
+          <span style={{
+            fontSize: '11px',
+            fontWeight: 600,
+            color: colors.ink,
+            letterSpacing: '0.05em',
+            fontFamily: "'Courier New', monospace"
+          }}>
+            {size}×{size}×{size}
+          </span>
+        </div>
+
+        {/* Mode Tag */}
+        <div className="ui-element" style={{
+          padding: '5px 12px',
+          background: `linear-gradient(135deg, ${colors.inkLight}15, transparent)`
+        }}>
+          <span style={{
+            fontSize: '11px',
+            fontWeight: 600,
+            color: colors.inkMedium,
+            fontStyle: 'italic',
+            fontFamily: 'Georgia, serif'
+          }}>
+            {modeLabel}
+          </span>
+        </div>
+
+        {/* Active Mode: Flip */}
+        {flipMode && (
+          <div className="ui-element" style={{
+            padding: '5px 12px',
+            background: `linear-gradient(135deg, ${colors.burntOrange}20, ${colors.burntOrange}08)`,
+            borderColor: colors.burntOrange
+          }}>
+            <span style={{
+              fontSize: '11px',
+              fontWeight: 600,
+              color: colors.burntOrange,
+              letterSpacing: '0.1em'
+            }}>⚡ Flip</span>
+          </div>
+        )}
+
+        {/* Active Mode: Chaos */}
+        {chaosMode && (
+          <div className="ui-element" style={{
+            padding: '5px 12px',
+            background: 'linear-gradient(135deg, #9c4a1a25, #9c4a1a10)',
+            borderColor: '#9c4a1a',
+            animation: 'chaos-pulse 1.5s ease-in-out infinite'
+          }}>
+            <span style={{
+              fontSize: '11px',
+              fontWeight: 600,
+              color: '#9c4a1a',
+              letterSpacing: '0.1em'
+            }}>☢ Chaos L{chaosLevel}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Right Section - Progress & Actions */}
+      <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+        {/* Progress Dial */}
+        <div className="ui-element" style={{
+          padding: '10px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          background: colors.paperCream
+        }}>
+          <div style={{ position: 'relative', width: '42px', height: '42px' }}>
+            <svg width="42" height="42" viewBox="0 0 42 42">
+              <circle
+                cx="21" cy="21" r="17"
+                fill="none"
+                stroke="rgba(88, 47, 14, 0.15)"
+                strokeWidth="3"
+              />
+              <circle
+                cx="21" cy="21" r="17"
+                fill="none"
+                stroke={overallProgress === 100 ? colors.avocado : colors.burntOrange}
+                strokeWidth="3"
+                strokeDasharray={`${overallProgress * 1.07} ${107 - overallProgress * 1.07}`}
+                strokeDashoffset="26.75"
+                strokeLinecap="round"
+                transform="rotate(-90 21 21)"
+              />
+            </svg>
+            <div style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              fontSize: '10px',
+              fontWeight: 700,
+              fontFamily: "'Courier New', monospace",
+              color: overallProgress === 100 ? colors.avocado : colors.ink
+            }}>
+              {overallProgress}%
+            </div>
+          </div>
+          <div>
+            <div style={{
+              fontSize: '10px',
+              fontWeight: 600,
+              color: colors.ink,
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase'
+            }}>Solved</div>
+            <div style={{
+              fontSize: '11px',
+              color: colors.inkLight,
+              fontFamily: "'Courier New', monospace"
+            }}>{totalComplete}/{totalStickers}</div>
+          </div>
+        </div>
+
+        {/* Face Progress - Vintage Bar Chart */}
+        <div className="ui-element" style={{ padding: '8px 12px', background: colors.paperCream }}>
+          <div style={{
+            fontSize: '9px',
+            color: colors.inkLight,
+            marginBottom: '6px',
+            letterSpacing: '0.15em',
+            textTransform: 'uppercase'
+          }}>Faces</div>
+          <div style={{ display: 'flex', gap: '4px' }}>
+            {faceStats.map(f => (
+              <div key={f.face} style={{
+                width: '7px',
+                height: '26px',
+                background: 'rgba(88, 47, 14, 0.1)',
+                border: '1px solid rgba(88, 47, 14, 0.15)',
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column-reverse'
+              }}>
+                <div style={{
+                  width: '100%',
+                  height: `${f.percent}%`,
+                  background: FACE_COLORS[f.face],
+                  transition: 'height 0.3s ease',
+                  opacity: 0.85
+                }} />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Quick Actions - Vintage Buttons */}
+        <div style={{ display: 'flex', gap: '6px' }}>
+          <button
+            onClick={onShowHelp}
+            className="btn-compact"
+            style={{
+              width: '34px',
+              height: '34px',
+              padding: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '14px',
+              fontWeight: 700,
+              fontFamily: 'Georgia, serif'
+            }}
+          >
+            ?
+          </button>
+          <button
+            onClick={onShowSettings}
+            className="btn-compact"
+            style={{
+              width: '34px',
+              height: '34px',
+              padding: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '13px'
+            }}
+          >
+            ⚙
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const InstabilityTracker = ({ entropy, wormholes, chaosLevel }) => {
   const [pulse, setPulse] = useState(0);
   
@@ -1526,6 +2149,353 @@ const InstabilityTracker = ({ entropy, wormholes, chaosLevel }) => {
   );
 };
 
+const MainMenu = ({ onStart }) => {
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0, left: 0, right: 0, bottom: 0,
+      background: 'linear-gradient(135deg, #f5f1e8, #e8dcc8)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 2000
+    }}>
+      <div style={{
+        textAlign: 'center',
+        maxWidth: '650px',
+        padding: '48px',
+        background: '#fdfbf7',
+        borderRadius: '8px',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+        border: '1px solid #d4c5a9'
+      }}>
+        <h1 style={{
+          fontSize: '56px',
+          fontWeight: 600,
+          margin: '0 0 12px 0',
+          color: '#6b4423',
+          fontFamily: 'Georgia, serif',
+          letterSpacing: '1px'
+        }}>The Wormhole Cube</h1>
+
+        <p style={{
+          fontSize: '18px',
+          color: '#8b6f47',
+          marginBottom: '32px',
+          lineHeight: 1.7,
+          fontFamily: 'Georgia, serif',
+          fontStyle: 'italic'
+        }}>
+          An Interactive Journey into Topology
+        </p>
+
+        <div style={{
+          background: '#f9f5ed',
+          border: '2px solid #d4c5a9',
+          borderRadius: '6px',
+          padding: '28px',
+          marginBottom: '36px',
+          textAlign: 'left',
+          fontSize: '15px',
+          lineHeight: 1.9,
+          color: '#5a4a3a'
+        }}>
+          <p style={{ margin: '0 0 16px 0' }}>
+            Welcome! This puzzle helps you explore <strong style={{ color: '#8b6f47' }}>quotient spaces</strong> –
+            a beautiful concept from topology where we identify opposite points as the same.
+          </p>
+          <p style={{ margin: '0 0 16px 0' }}>
+            Think of it like this: if you could walk far enough in one direction, you'd find yourself
+            coming back from the opposite side, but flipped! The colorful tunnels help you visualize
+            these special connections.
+          </p>
+          <p style={{ margin: '0' }}>
+            Don't worry if it sounds complex – learning happens through play. Click, drag, and discover!
+          </p>
+        </div>
+
+        <button onClick={onStart} style={{
+          background: 'linear-gradient(135deg, #c19a6b, #a67c52)',
+          border: '2px solid #8b6f47',
+          color: '#fdfbf7',
+          fontSize: '20px',
+          fontWeight: 600,
+          padding: '16px 48px',
+          borderRadius: '6px',
+          cursor: 'pointer',
+          boxShadow: '0 3px 12px rgba(107,68,35,0.2)',
+          transition: 'all 0.2s',
+          fontFamily: 'Georgia, serif'
+        }}
+        onMouseEnter={e => {
+          e.target.style.transform = 'translateY(-2px)';
+          e.target.style.boxShadow = '0 6px 20px rgba(107,68,35,0.3)';
+        }}
+        onMouseLeave={e => {
+          e.target.style.transform = 'translateY(0)';
+          e.target.style.boxShadow = '0 3px 12px rgba(107,68,35,0.2)';
+        }}>
+          Begin Learning
+        </button>
+
+        <div style={{
+          marginTop: '32px',
+          fontSize: '13px',
+          color: '#9b8b7a',
+          fontStyle: 'italic'
+        }}>
+          Press <strong style={{ color: '#6b4423' }}>H</strong> anytime to see helpful controls
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const SettingsMenu = ({ onClose, settings, onSettingsChange }) => {
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0, left: 0, right: 0, bottom: 0,
+      background: 'rgba(245,241,232,0.92)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1000,
+      backdropFilter: 'blur(4px)'
+    }} onClick={onClose}>
+      <div style={{
+        background: '#fdfbf7',
+        border: '2px solid #d4c5a9',
+        borderRadius: '8px',
+        padding: '32px',
+        maxWidth: '500px',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
+      }} onClick={e => e.stopPropagation()}>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '24px'
+        }}>
+          <h2 style={{
+            margin: 0,
+            fontSize: '28px',
+            fontWeight: 600,
+            color: '#6b4423',
+            fontFamily: 'Georgia, serif'
+          }}>Settings</h2>
+          <button onClick={onClose} style={{
+            background: '#e8dcc8',
+            border: '1px solid #d4c5a9',
+            color: '#6b4423',
+            fontSize: '24px',
+            width: '36px',
+            height: '36px',
+            borderRadius: '50%',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.2s'
+          }}>×</button>
+        </div>
+
+        <div style={{ color: '#5a4a3a' }}>
+          <div style={{
+            padding: '16px',
+            background: '#f9f5ed',
+            borderRadius: '6px',
+            marginBottom: '16px',
+            border: '2px solid #e8dcc8'
+          }}>
+            <p style={{ margin: 0, fontSize: '14px', fontStyle: 'italic', color: '#8b6f47', fontFamily: 'Georgia, serif' }}>
+              More customization options are on the way! We're adding features like sound, animation controls, and color themes.
+            </p>
+          </div>
+
+          <div style={{ fontSize: '14px', lineHeight: 2, fontFamily: 'Georgia, serif' }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '12px',
+              background: '#f9f5ed',
+              borderRadius: '6px',
+              marginBottom: '8px'
+            }}>
+              <span>🔊 Sound Effects</span>
+              <span style={{ color: '#a89178', fontSize: '13px' }}>Coming Soon</span>
+            </div>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '12px',
+              background: '#f9f5ed',
+              borderRadius: '6px',
+              marginBottom: '8px'
+            }}>
+              <span>⚡ Animation Speed</span>
+              <span style={{ color: '#a89178', fontSize: '13px' }}>Coming Soon</span>
+            </div>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '12px',
+              background: '#f9f5ed',
+              borderRadius: '6px',
+              marginBottom: '8px'
+            }}>
+              <span>💾 Auto-Save Progress</span>
+              <span style={{ color: '#a89178', fontSize: '13px' }}>Coming Soon</span>
+            </div>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '12px',
+              background: '#f9f5ed',
+              borderRadius: '6px'
+            }}>
+              <span>🎨 Custom Colors</span>
+              <span style={{ color: '#a89178', fontSize: '13px' }}>Coming Soon</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const HelpMenu = ({ onClose }) => {
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0, left: 0, right: 0, bottom: 0,
+      background: 'rgba(245,241,232,0.92)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1000,
+      backdropFilter: 'blur(4px)'
+    }} onClick={onClose}>
+      <div style={{
+        background: '#fdfbf7',
+        border: '2px solid #d4c5a9',
+        borderRadius: '8px',
+        padding: '32px',
+        maxWidth: '600px',
+        maxHeight: '80vh',
+        overflowY: 'auto',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
+      }} onClick={e => e.stopPropagation()}>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '24px'
+        }}>
+          <h2 style={{
+            margin: 0,
+            fontSize: '28px',
+            fontWeight: 600,
+            color: '#6b4423',
+            fontFamily: 'Georgia, serif'
+          }}>How to Play</h2>
+          <button onClick={onClose} style={{
+            background: '#e8dcc8',
+            border: '1px solid #d4c5a9',
+            color: '#6b4423',
+            fontSize: '24px',
+            width: '36px',
+            height: '36px',
+            borderRadius: '50%',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.2s'
+          }}>×</button>
+        </div>
+
+        <div style={{ color: '#5a4a3a', lineHeight: 1.7, fontFamily: 'Georgia, serif' }}>
+          <section style={{ marginBottom: '24px' }}>
+            <h3 style={{ color: '#8b6f47', marginBottom: '12px', fontSize: '18px', fontWeight: 600 }}>🎮 Moving the Cube</h3>
+            <div style={{ paddingLeft: '16px', fontSize: '14px' }}>
+              <p style={{ margin: '8px 0' }}><strong>Drag normally:</strong> Rotates a slice (like a Rubik's Cube)</p>
+              <p style={{ margin: '8px 0' }}><strong>Hold Shift + Drag:</strong> Twists the face itself</p>
+              <p style={{ margin: '8px 0' }}><strong>Click a sticker:</strong> Flips it to its "opposite" color</p>
+            </div>
+          </section>
+
+          <section style={{ marginBottom: '24px' }}>
+            <h3 style={{ color: '#a67c52', marginBottom: '12px', fontSize: '18px', fontWeight: 600 }}>🌀 Special Features</h3>
+            <div style={{ paddingLeft: '16px', fontSize: '14px' }}>
+              <p style={{ margin: '8px 0' }}><strong>Wormholes:</strong> The colorful tunnels show connections between opposite points</p>
+              <p style={{ margin: '8px 0' }}><strong>Flip Mode:</strong> Turn color flipping on or off</p>
+              <p style={{ margin: '8px 0' }}><strong>Chaos Mode:</strong> Watch instability spread across the cube!</p>
+            </div>
+          </section>
+
+          <section style={{ marginBottom: '24px' }}>
+            <h3 style={{ color: '#c19a6b', marginBottom: '12px', fontSize: '18px', fontWeight: 600 }}>👁️ Different Views</h3>
+            <div style={{ paddingLeft: '16px', fontSize: '14px' }}>
+              <p style={{ margin: '8px 0' }}><strong>Classic:</strong> The standard colorful cube</p>
+              <p style={{ margin: '8px 0' }}><strong>Grid:</strong> Shows position labels (M1-001, etc.)</p>
+              <p style={{ margin: '8px 0' }}><strong>Sudokube:</strong> Numbers instead of colors</p>
+              <p style={{ margin: '8px 0' }}><strong>Wireframe:</strong> See-through edges with lights</p>
+              <p style={{ margin: '8px 0' }}><strong>Explode:</strong> Spreads the cube apart to see all sides</p>
+              <p style={{ margin: '8px 0' }}><strong>Tunnels:</strong> Hide or show the wormhole connections</p>
+            </div>
+          </section>
+
+          <section style={{ marginBottom: '24px' }}>
+            <h3 style={{ color: '#8b6f47', marginBottom: '12px', fontSize: '18px', fontWeight: 600 }}>📊 What the Numbers Mean</h3>
+            <div style={{ paddingLeft: '16px', fontSize: '14px' }}>
+              <p style={{ margin: '8px 0' }}><strong>M:</strong> How many moves you've made</p>
+              <p style={{ margin: '8px 0' }}><strong>F:</strong> How many times you've flipped colors</p>
+              <p style={{ margin: '8px 0' }}><strong>W:</strong> How many wormholes are currently active</p>
+              <p style={{ margin: '8px 0' }}><strong>Instability Bar:</strong> Shows how chaotic things are getting!</p>
+            </div>
+          </section>
+
+          <section>
+            <h3 style={{ color: '#a67c52', marginBottom: '12px', fontSize: '18px', fontWeight: 600 }}>⌨️ Keyboard Shortcuts</h3>
+            <div style={{ paddingLeft: '16px', fontSize: '14px' }}>
+              <p style={{ margin: '8px 0' }}><strong>H</strong> or <strong>?</strong> — Open/close this help menu</p>
+              <p style={{ margin: '8px 0' }}><strong>Space</strong> — Shuffle the cube randomly</p>
+              <p style={{ margin: '8px 0' }}><strong>R</strong> — Reset everything</p>
+              <p style={{ margin: '8px 0' }}><strong>F</strong> — Turn flip mode on/off</p>
+              <p style={{ margin: '8px 0' }}><strong>T</strong> — Show/hide tunnels</p>
+              <p style={{ margin: '8px 0' }}><strong>E</strong> — Toggle explosion view</p>
+              <p style={{ margin: '8px 0' }}><strong>V</strong> — Change view mode</p>
+              <p style={{ margin: '8px 0' }}><strong>C</strong> — Turn chaos mode on/off</p>
+              <p style={{ margin: '8px 0' }}><strong>Esc</strong> — Close menus</p>
+            </div>
+          </section>
+        </div>
+
+        <div style={{
+          marginTop: '24px',
+          padding: '16px',
+          background: '#f9f5ed',
+          borderRadius: '6px',
+          fontSize: '14px',
+          color: '#6b4423',
+          fontStyle: 'italic',
+          border: '2px solid #e8dcc8',
+          fontFamily: 'Georgia, serif'
+        }}>
+          💡 <strong>What you're learning:</strong> This puzzle demonstrates a special kind of mathematical space
+          where opposite points are treated as the same location. When you flip a color, you're creating a connection
+          through this space – that's what the wormholes represent!
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const CubeAssembly=({ 
   size, cubies, onMove, onTapFlip, visualMode, animState, onAnimComplete, 
   showTunnels, explosionFactor, cascades, onCascadeComplete, manifoldMap 
@@ -1553,10 +2523,21 @@ const CubeAssembly=({
   
   const sgn=v=>v>=0?1:-1;
   
-  const mapSwipe=(faceN,dx,dy)=>{
+  const mapSwipe=(faceN,dx,dy,isFaceTwist=false)=>{
+    // If face twist mode, rotate around the face normal itself
+    if(isFaceTwist){
+      const ax=Math.abs(faceN.x), ay=Math.abs(faceN.y), az=Math.abs(faceN.z);
+      const m=Math.max(ax,ay,az);
+      let axis, twistDir;
+      if(m===ax){ axis='col'; twistDir=-sgn(faceN.x)*sgn(dx); } // Flipped
+      else if(m===ay){ axis='row'; twistDir=-sgn(faceN.y)*sgn(-dy); } // Flipped
+      else{ axis='depth'; twistDir=-sgn(faceN.z)*sgn(dx); } // Flipped
+      return {axis,dir:twistDir};
+    }
+    // Normal slice rotation
     const {right,upScreen}=getBasis();
-    const sw=new THREE.Vector3().addScaledVector(right,dx).addScaledVector(upScreen,-dy);
-    const t=sw.clone().projectOnPlane(faceN); 
+    const sw=new THREE.Vector3().addScaledVector(right,dx).addScaledVector(upScreen,dy); // Fixed: removed negative sign
+    const t=sw.clone().projectOnPlane(faceN);
     if(t.lengthSq()<1e-6) return null;
     const ra=new THREE.Vector3().crossVectors(t,faceN).normalize();
     const ax=Math.abs(ra.x), ay=Math.abs(ra.y), az=Math.abs(ra.z);
@@ -1574,11 +2555,12 @@ const CubeAssembly=({
 
   const onPointerDown=({pos,worldPos,event})=>{
     if(animState) return;
-    setDragStart({ 
-      pos, worldPos, event, 
-      screenX:event.clientX, 
-      screenY:event.clientY, 
-      n:normalFromEvent(event) 
+    setDragStart({
+      pos, worldPos, event,
+      screenX:event.clientX,
+      screenY:event.clientY,
+      n:normalFromEvent(event),
+      shiftKey:event.shiftKey // Track if Shift was held
     });
     if(controlsRef.current) controlsRef.current.enabled=false;
   };
@@ -1596,14 +2578,14 @@ const CubeAssembly=({
       const dx=e.clientX-dragStart.screenX, dy=e.clientY-dragStart.screenY;
       const dist=Math.hypot(dx,dy);
       if(dist>=10){
-        const m=mapSwipe(dragStart.n,dx,dy);
+        const m=mapSwipe(dragStart.n,dx,dy,dragStart.shiftKey); // Pass shiftKey for face twist
         if(m) onMove(m.axis,m.dir,dragStart.pos);
       }else{
         const dirKey=dirFromNormal(dragStart.n);
         onTapFlip(dragStart.pos,dirKey);
       }
-      setDragStart(null); 
-      setActiveDir(null); 
+      setDragStart(null);
+      setActiveDir(null);
       if(controlsRef.current) controlsRef.current.enabled=true;
     };
     window.addEventListener('pointermove',move);
@@ -1750,6 +2732,273 @@ const Tutorial = ({ onClose }) => {
   );
 };
 
+/* First Flip Tutorial - Explains the core concepts after user's first flip */
+const FirstFlipTutorial = ({ onClose }) => {
+  const [step, setStep] = useState(0);
+
+  const colors = {
+    ink: '#582f0e',
+    inkMedium: '#7f5539',
+    burntOrange: '#bc6c25',
+    avocado: '#606c38',
+    paper: '#f2e8cf',
+    paperCream: '#fefae0'
+  };
+
+  return (
+    <div style={{
+      position: 'fixed',
+      inset: 0,
+      background: 'rgba(88, 47, 14, 0.7)',
+      backdropFilter: 'blur(4px)',
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      zIndex: 2000,
+      fontFamily: 'Georgia, serif'
+    }}>
+      <div style={{
+        background: colors.paper,
+        border: `3px solid ${colors.burntOrange}`,
+        borderRadius: '4px',
+        padding: '32px 40px',
+        maxWidth: '580px',
+        width: '90%',
+        maxHeight: '85vh',
+        overflow: 'auto',
+        boxShadow: `4px 4px 0 rgba(88, 47, 14, 0.2), 0 12px 40px rgba(88, 47, 14, 0.4)`
+      }}>
+        <h2 style={{
+          margin: '0 0 8px 0',
+          fontSize: '28px',
+          fontStyle: 'italic',
+          fontWeight: 700,
+          color: colors.ink,
+          textAlign: 'center'
+        }}>
+          {step === 0 && "You Just Traveled Through a Wormhole!"}
+          {step === 1 && "Antipodal Pairs"}
+          {step === 2 && "Parity & Orientation"}
+          {step === 3 && "Chaos Mode"}
+          {step === 4 && "The Art of Solving"}
+        </h2>
+
+        <p style={{
+          textAlign: 'center',
+          fontSize: '11px',
+          letterSpacing: '0.15em',
+          textTransform: 'uppercase',
+          color: colors.burntOrange,
+          margin: '0 0 24px 0'
+        }}>
+          {step === 0 && "Your first flip through the manifold"}
+          {step === 1 && "Every point has an opposite"}
+          {step === 2 && "The mathematics of flipping"}
+          {step === 3 && "When the manifold fights back"}
+          {step === 4 && "Speed, strategy & elegance"}
+        </p>
+
+        <div style={{
+          background: colors.paperCream,
+          border: `1px solid rgba(188, 108, 37, 0.3)`,
+          padding: '20px 24px',
+          marginBottom: '24px',
+          fontSize: '15px',
+          lineHeight: 1.8,
+          color: colors.inkMedium
+        }}>
+          {step === 0 && (
+            <>
+              <p style={{ margin: '0 0 16px 0' }}>
+                That color flip you just witnessed? You sent a sticker through an <strong style={{ color: colors.ink }}>antipodal tunnel</strong> —
+                a path connecting opposite points on the cube's surface.
+              </p>
+              <p style={{ margin: '0 0 16px 0' }}>
+                In the <strong style={{ color: colors.ink }}>Real Projective Plane</strong>, opposite points are considered
+                <em> the same point</em>. Walking infinitely far in any direction brings you back — but <em>inverted</em>.
+              </p>
+              <p style={{ margin: 0, fontStyle: 'italic', color: colors.burntOrange }}>
+                "Imagine walking so far you return from the other side..."
+              </p>
+            </>
+          )}
+
+          {step === 1 && (
+            <>
+              <p style={{ margin: '0 0 16px 0' }}>
+                Each face has a partner on the opposite side of the cube:
+              </p>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'center',
+                gap: '24px',
+                margin: '16px 0',
+                fontSize: '14px'
+              }}>
+                <span><span style={{ color: FACE_COLORS[1] }}>■</span> Red ↔ Orange <span style={{ color: FACE_COLORS[4] }}>■</span></span>
+                <span><span style={{ color: FACE_COLORS[5] }}>■</span> Blue ↔ Green <span style={{ color: FACE_COLORS[2] }}>■</span></span>
+                <span><span style={{ color: FACE_COLORS[3] }}>■</span> White ↔ Yellow <span style={{ color: FACE_COLORS[6] }}>■</span></span>
+              </div>
+              <p style={{ margin: '16px 0 0 0' }}>
+                When you flip a sticker, it transforms into its <strong style={{ color: colors.ink }}>antipodal color</strong>.
+                The small circle on flipped tiles shows their <em>original</em> color — a breadcrumb trail of their journey.
+              </p>
+            </>
+          )}
+
+          {step === 2 && (
+            <>
+              <p style={{ margin: '0 0 16px 0' }}>
+                Notice the <strong style={{ color: colors.avocado }}>EVEN</strong> / <strong style={{ color: colors.burntOrange }}>ODD</strong> indicator?
+                That's <strong style={{ color: colors.ink }}>parity</strong> — the mathematical signature of your flips.
+              </p>
+              <p style={{ margin: '0 0 16px 0' }}>
+                • <strong>Even parity:</strong> The cube can return to its original state<br />
+                • <strong>Odd parity:</strong> Something is fundamentally "twisted"
+              </p>
+              <p style={{ margin: '0 0 16px 0' }}>
+                The <strong style={{ color: colors.ink }}>tally marks</strong> on each sticker count its journeys through the manifold.
+                A tile flipped 1000 times carries a different history than a fresh tile — even if they show the same color!
+              </p>
+              <p style={{ margin: 0, fontStyle: 'italic' }}>
+                This is <em>orientation</em>: the hidden memory of transformation.
+              </p>
+            </>
+          )}
+
+          {step === 3 && (
+            <>
+              <p style={{ margin: '0 0 16px 0' }}>
+                <strong style={{ color: '#9c4a1a' }}>Chaos Mode</strong> introduces <em>instability</em>.
+                Flipped tiles at the cube's edges can spontaneously cascade to their neighbors!
+              </p>
+              <p style={{ margin: '0 0 16px 0' }}>
+                <strong>Levels 1-4</strong> control how aggressively chaos spreads:
+              </p>
+              <ul style={{ margin: '0 0 16px 0', paddingLeft: '24px' }}>
+                <li>L1: Gentle — occasional cascades</li>
+                <li>L2: Moderate — regular spreading</li>
+                <li>L3: Aggressive — rapid propagation</li>
+                <li>L4: Maximum entropy — constant chaos</li>
+              </ul>
+              <p style={{ margin: 0 }}>
+                Watch the <strong>Instability Tracker</strong> — when it goes critical, expect fireworks!
+              </p>
+            </>
+          )}
+
+          {step === 4 && (
+            <>
+              <p style={{ margin: '0 0 16px 0' }}>
+                <strong style={{ color: colors.ink }}>Solving faster</strong> isn't just about speed — it's about <em>understanding the structure</em>.
+              </p>
+              <p style={{ margin: '0 0 16px 0' }}>
+                <strong>Tips for mastery:</strong>
+              </p>
+              <ul style={{ margin: '0 0 16px 0', paddingLeft: '24px' }}>
+                <li>Use <strong>EXPLODE</strong> view to see all antipodal connections</li>
+                <li>Track parity — plan flips to maintain even state when possible</li>
+                <li>In Chaos Mode, work from center outward to minimize cascades</li>
+                <li>The <strong>face progress bars</strong> show which colors need attention</li>
+              </ul>
+              <p style={{ margin: 0, fontStyle: 'italic', color: colors.burntOrange }}>
+                The topology is your friend once you learn to see it. Good luck, explorer!
+              </p>
+            </>
+          )}
+        </div>
+
+        {/* Step indicators */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          gap: '8px',
+          marginBottom: '20px'
+        }}>
+          {[0, 1, 2, 3, 4].map(i => (
+            <div
+              key={i}
+              onClick={() => setStep(i)}
+              style={{
+                width: '10px',
+                height: '10px',
+                borderRadius: '50%',
+                background: step === i ? colors.burntOrange : 'rgba(188, 108, 37, 0.3)',
+                cursor: 'pointer',
+                transition: 'background 0.2s'
+              }}
+            />
+          ))}
+        </div>
+
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          gap: '12px'
+        }}>
+          <button
+            onClick={onClose}
+            style={{
+              padding: '10px 24px',
+              background: 'transparent',
+              border: `2px solid ${colors.burntOrange}`,
+              color: colors.burntOrange,
+              fontFamily: 'Georgia, serif',
+              fontSize: '14px',
+              fontWeight: 600,
+              letterSpacing: '0.1em',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+          >
+            Skip
+          </button>
+
+          {step < 4 ? (
+            <button
+              onClick={() => setStep(s => s + 1)}
+              style={{
+                padding: '10px 32px',
+                background: colors.burntOrange,
+                border: 'none',
+                color: colors.paperCream,
+                fontFamily: 'Georgia, serif',
+                fontSize: '14px',
+                fontWeight: 600,
+                letterSpacing: '0.1em',
+                cursor: 'pointer',
+                boxShadow: `0 2px 0 #9c4a1a`,
+                transition: 'all 0.2s'
+              }}
+            >
+              Next →
+            </button>
+          ) : (
+            <button
+              onClick={onClose}
+              style={{
+                padding: '10px 32px',
+                background: colors.avocado,
+                border: 'none',
+                color: colors.paperCream,
+                fontFamily: 'Georgia, serif',
+                fontSize: '14px',
+                fontWeight: 600,
+                letterSpacing: '0.1em',
+                cursor: 'pointer',
+                boxShadow: `0 2px 0 #283618`,
+                transition: 'all 0.2s'
+              }}
+            >
+              Start Exploring!
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 /* Main App */
 export default function WORM3(){
   const [showWelcome, setShowWelcome] = useState(true);
@@ -1760,13 +3009,20 @@ export default function WORM3(){
   const [visualMode,setVisualMode]=useState('classic');
   const [flipMode,setFlipMode]=useState(true);
   const [chaosLevel,setChaosLevel]=useState(0);
+  const [showHelp,setShowHelp]=useState(false);
+  const [showSettings,setShowSettings]=useState(false);
+  const [showMainMenu,setShowMainMenu]=useState(true);
   const chaosMode=chaosLevel>0;
 
   const [animState,setAnimState]=useState(null);
   const [pendingMove,setPendingMove]=useState(null);
 
   const [showTutorial, setShowTutorial] = useState(false);
-  
+  const [hasFlippedOnce, setHasFlippedOnce] = useState(() => {
+    try { return localStorage.getItem('worm3_first_flip_done') === '1'; } catch { return false; }
+  });
+  const [showFirstFlipTutorial, setShowFirstFlipTutorial] = useState(false);
+
   const [showTunnels, setShowTunnels] = useState(true);
   const [exploded, setExploded] = useState(false);
   const [explosionT, setExplosionT] = useState(0);
@@ -1916,8 +3172,16 @@ export default function WORM3(){
   };
 
   const onTapFlip=(pos,dirKey)=>{
-    setCubies(prev=>flipStickerPair(prev,size,pos.x,pos.y,pos.z,dirKey, manifoldMap)); 
+    setCubies(prev=>flipStickerPair(prev,size,pos.x,pos.y,pos.z,dirKey, manifoldMap));
     setMoves(m=>m+1);
+
+    // Trigger first-flip tutorial
+    if (!hasFlippedOnce) {
+      setHasFlippedOnce(true);
+      try { localStorage.setItem('worm3_first_flip_done', '1'); } catch {}
+      // Small delay so user sees the flip animation first
+      setTimeout(() => setShowFirstFlipTutorial(true), 600);
+    }
   };
 
   const onCascadeComplete = (id) => {
@@ -1942,6 +3206,55 @@ export default function WORM3(){
     play('/sounds/rotate.mp3');
   };
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Don't trigger if typing in an input
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+      switch(e.key.toLowerCase()) {
+        case 'h':
+        case '?':
+          setShowHelp(h => !h);
+          break;
+        case ' ':
+          e.preventDefault();
+          shuffle();
+          break;
+        case 'r':
+          reset();
+          break;
+        case 'f':
+          setFlipMode(f => !f);
+          break;
+        case 't':
+          setShowTunnels(t => !t);
+          break;
+        case 'e':
+          setExploded(e => !e);
+          break;
+        case 'v':
+          setVisualMode(v =>
+            v==='classic'?'grid':
+            v==='grid'?'sudokube':
+            v==='sudokube'?'wireframe':
+            'classic'
+          );
+          break;
+        case 'c':
+          setChaosLevel(l => l > 0 ? 0 : 1);
+          break;
+        case 'escape':
+          setShowHelp(false);
+          setShowSettings(false);
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const cameraZ = ({2:8,3:10,4:14,5:18}[size] || 10);
   
   if (showWelcome) {
@@ -1959,9 +3272,9 @@ export default function WORM3(){
           <pointLight position={[-10,-10,-10]} intensity={visualMode === 'wireframe' ? 0.2 : 1.0}/>
           {visualMode === 'wireframe' && (
             <>
-              <pointLight position={[0,0,0]} intensity={0.5} color="#ffffff" distance={15} decay={2}/>
-              <pointLight position={[5,5,5]} intensity={0.2} color="#00ffff" />
-              <pointLight position={[-5,-5,-5]} intensity={0.2} color="#ff00ff" />
+              <pointLight position={[0,0,0]} intensity={0.5} color="#fefae0" distance={15} decay={2}/>
+              <pointLight position={[5,5,5]} intensity={0.25} color="#dda15e" />
+              <pointLight position={[-5,-5,-5]} intensity={0.2} color="#bc6c25" />
             </>
           )}
           <Suspense fallback={null}>
@@ -1978,95 +3291,115 @@ export default function WORM3(){
               explosionFactor={explosionT}
               cascades={cascades}
               onCascadeComplete={onCascadeComplete}
-              manifoldMap={manifoldMap} 
+              manifoldMap={manifoldMap}
+              showInvitation={!hasFlippedOnce}
             />
           </Suspense>
         </Canvas>
       </div>
 
       <div className="ui-layer">
-        <div className="flex justify-between items-start">
-          <div className="bauhaus-box ui-element compact">
-            <h1>WORM³</h1>
-            <div className="stats-compact">
-              <span>M:{moves}</span>
-              <span>F:{metrics.flips}</span>
-              <span style={{color:'#a855f7'}}>W:{metrics.wormholes}</span>
+        <TopMenuBar
+          moves={moves}
+          metrics={metrics}
+          size={size}
+          visualMode={visualMode}
+          flipMode={flipMode}
+          chaosMode={chaosMode}
+          chaosLevel={chaosLevel}
+          cubies={cubies}
+          onShowHelp={() => setShowHelp(true)}
+          onShowSettings={() => setShowSettings(true)}
+        />
+
+        {/* Bottom Section - Controls & Manifold Selector */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+          <div className="controls-compact ui-element">
+            <div className="controls-row">
+              <button
+                className={`btn-compact text ${flipMode?'active':''}`}
+                onClick={()=>setFlipMode(!flipMode)}
+              >
+                FLIP
+              </button>
+              <button
+                className={`btn-compact text ${chaosMode?'chaos':''}`}
+                onClick={()=>setChaosLevel(l=>l>0?0:1)}
+              >
+                CHAOS
+              </button>
+              {chaosMode && (
+                <div className="chaos-levels">
+                  {[1,2,3,4].map(l=>(
+                    <button
+                      key={l}
+                      className={`btn-level ${chaosLevel===l?'active':''}`}
+                      onClick={()=>setChaosLevel(l)}
+                    >
+                      L{l}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <button
+                className={`btn-compact text ${exploded?'active':''}`}
+                onClick={()=>setExploded(!exploded)}
+              >
+                EXPLODE
+              </button>
+              <button
+                className={`btn-compact text ${showTunnels?'active':''}`}
+                onClick={()=>setShowTunnels(!showTunnels)}
+              >
+                TUNNELS
+              </button>
+              <button
+                className="btn-compact text"
+                onClick={()=>setVisualMode(v=>
+                  v==='classic'?'grid':
+                  v==='grid'?'sudokube':
+                  v==='sudokube'?'wireframe':
+                  'classic'
+                )}
+              >
+                {visualMode.toUpperCase()}
+              </button>
+              <select
+                className="btn-compact"
+                value={size}
+                onChange={e=>setSize(Number(e.target.value))}
+                style={{ fontFamily: "'Courier New', monospace" }}
+              >
+                {[3,4,5].map(n=><option key={n} value={n}>{n}×{n}</option>)}
+              </select>
+              <button className="btn-compact shuffle text" onClick={shuffle}>
+                SHUFFLE
+              </button>
+              <button className="btn-compact reset text" onClick={reset}>
+                RESET
+              </button>
             </div>
           </div>
-          <InstabilityTracker 
-            entropy={metrics.entropy} 
-            wormholes={metrics.wormholes}
-            chaosLevel={chaosLevel}
-          />
-        </div>
 
-        <div className="controls-compact ui-element">
-          <div className="controls-row">
-            <button 
-              className={`btn-compact text ${flipMode?'active':''}`} 
-              onClick={()=>setFlipMode(!flipMode)}
-            >
-              FLIP
-            </button>
-            <button 
-              className={`btn-compact text ${chaosMode?'chaos':''}`} 
-              onClick={()=>setChaosLevel(l=>l>0?0:1)}
-            >
-              CHAOS
-            </button>
-            {chaosMode && (
-              <div className="chaos-levels">
-                {[1,2,3,4].map(l=>(
-                  <button 
-                    key={l} 
-                    className={`btn-level ${chaosLevel===l?'active':''}`} 
-                    onClick={()=>setChaosLevel(l)}
-                  >
-                    L{l}
-                  </button>
-                ))}
-              </div>
-            )}
-            <button 
-              className={`btn-compact text ${exploded?'active':''}`} 
-              onClick={()=>setExploded(!exploded)}
-            >
-              EXPLODE
-            </button>
-            <button 
-              className={`btn-compact text ${showTunnels?'active':''}`} 
-              onClick={()=>setShowTunnels(!showTunnels)}
-            >
-              TUNNELS
-            </button>
-            <button 
-              className="btn-compact text" 
-              onClick={()=>setVisualMode(v=>
-                v==='classic'?'grid':
-                v==='grid'?'sudokube':
-                v==='sudokube'?'wireframe':
-                'classic'
-              )}
-            >
-              {visualMode.toUpperCase()}
-            </button>
-            <select 
-              className="btn-compact" 
-              value={size} 
-              onChange={e=>setSize(Number(e.target.value))}
-            >
-              {[3,4,5].map(n=><option key={n} value={n}>{n}×{n}</option>)}
-            </select>
-            <button className="btn-compact shuffle text" onClick={shuffle}>
-              SHUFFLE
-            </button>
-            <button className="btn-compact reset text" onClick={reset}>
-              RESET
-            </button>
+          {/* Manifold Selector - Vintage Educational Footer */}
+          <div className="manifold-selector" style={{
+            fontFamily: 'Georgia, serif',
+            fontSize: '10px',
+            color: '#9c6644',
+            letterSpacing: '0.2em',
+            textTransform: 'uppercase',
+            opacity: 0.6,
+            pointerEvents: 'auto'
+          }}>
+            Standard Euclidean ——— <span style={{ color: '#bc6c25', fontWeight: 600 }}>Antipodal Projection</span> ——— Real Projective Plane
           </div>
         </div>
       </div>
+
+      {showMainMenu && <MainMenu onStart={() => setShowMainMenu(false)} />}
+      {showSettings && <SettingsMenu onClose={() => setShowSettings(false)} />}
+      {showHelp && <HelpMenu onClose={() => setShowHelp(false)} />}
+      {showFirstFlipTutorial && <FirstFlipTutorial onClose={() => setShowFirstFlipTutorial(false)} />}
     </div>
   );
 }
