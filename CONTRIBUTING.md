@@ -1,144 +1,44 @@
-# Contributing to Worm3 Puzzle
+# Contributing to Worm3-puzzle
 
-Thank you for your interest in contributing to Worm3 Puzzle! This document provides guidelines and instructions for contributing to the project.
+First off, thanks for taking the time to contribute! 🎉
+
+The following is a set of guidelines for contributing to Worm3-puzzle. These are mostly guidelines, not rules. Use your best judgment, and feel free to propose changes to this document in a pull request.
 
 ## Code of Conduct
 
-By participating in this project, you agree to maintain a respectful and inclusive environment for all contributors.
+This project and everyone participating in it is governed by a Code of Conduct. By participating, you are expected to uphold this code.
 
 ## How Can I Contribute?
 
 ### Reporting Bugs
 
-Before creating bug reports, please check existing issues to avoid duplicates. When creating a bug report, include:
-
-- **Clear descriptive title**
-- **Detailed description** of the issue
-- **Steps to reproduce** the problem
-- **Expected behavior** vs actual behavior
-- **Screenshots** if applicable
-- **Environment details** (browser, OS, Node version)
+- **Ensure the bug was not already reported** by searching on GitHub under [Issues](https://github.com/your-username/worm3-puzzle/issues).
+- If you're unable to find an open issue addressing the problem, [open a new one](https://github.com/your-username/worm3-puzzle/issues/new). Be sure to include a **title and clear description**, as much relevant information as possible, and a **code sample** or an **executable test case** demonstrating the expected behavior that is not occurring.
 
 ### Suggesting Enhancements
 
-Enhancement suggestions are welcome! Please provide:
-
-- **Clear descriptive title**
-- **Detailed description** of the proposed feature
-- **Use cases** and examples
-- **Mockups or diagrams** if applicable
+- Open a new issue and clearly describe your suggestion.
+- Explain why this enhancement would be useful to most users.
 
 ### Pull Requests
 
-1. **Fork the repository** and create your branch from `main`
-2. **Install dependencies**: `npm install`
-3. **Make your changes** following the coding standards
-4. **Test thoroughly** to ensure nothing breaks
-5. **Commit your changes** with clear, descriptive messages
-6. **Push to your fork** and submit a pull request
+1.  Fork the repo and create your branch from `main`.
+2.  If you've added code that should be tested, add tests.
+3.  Ensure the test suite passes.
+4.  Make sure your code lints.
+5.  Issue that pull request!
 
-#### Pull Request Guidelines
+## Styleguides
 
-- Follow the existing code style and conventions
-- Keep changes focused - one feature/fix per PR
-- Update documentation if needed
-- Add comments for complex logic
-- Ensure the build passes: `npm run build`
-- Write clear commit messages
+### Git Commit Messages
 
-#### Commit Message Format
+- Use the present tense ("Add feature" not "Added feature").
+- Use the imperative mood ("Move cursor to..." not "Moves cursor to...").
+- Limit the first line to 72 characters or less.
+- Reference issues and pull requests liberally after the first line.
 
-```
-<type>: <subject>
+### JavaScript Styleguide
 
-<body>
-```
-
-**Types:**
-- `feat`: New feature
-- `fix`: Bug fix
-- `docs`: Documentation changes
-- `style`: Code style changes (formatting, etc.)
-- `refactor`: Code refactoring
-- `test`: Adding or updating tests
-- `chore`: Maintenance tasks
-
-**Example:**
-```
-feat: add undo/redo functionality for cube moves
-
-Implemented a move history stack that allows users to undo
-and redo their cube rotations using keyboard shortcuts.
-```
-
-## Development Setup
-
-1. Clone your fork:
-```bash
-git clone https://github.com/YOUR_USERNAME/Worm3-puzzle.git
-cd Worm3-puzzle
-```
-
-2. Install dependencies:
-```bash
-npm install
-```
-
-3. Start development server:
-```bash
-npm run dev
-```
-
-4. Make changes and test in your browser at `http://localhost:5173`
-
-## Coding Standards
-
-### JavaScript/React
-
-- Use **functional components** with hooks
-- Follow **React best practices**
-- Use **meaningful variable names**
-- Add **comments** for complex algorithms
-- Keep **components focused** and single-purpose
-- Use **destructuring** where appropriate
-- Prefer **const** over **let**, avoid **var**
-
-### File Organization
-
-- Components in `src/` directory
-- Styles in corresponding `.css` files
-- Keep files focused and manageable in size
-- Use clear, descriptive file names
-
-### Code Style
-
-- Use **2 spaces** for indentation
-- Use **semicolons**
-- Use **single quotes** for strings (unless template literals)
-- Max line length: **100 characters** (flexible)
-- Add trailing commas in multi-line objects/arrays
-
-## Testing
-
-Currently, the project doesn't have automated tests, but you should:
-
-- Manually test all cube rotations
-- Verify UI responsiveness
-- Test in multiple browsers (Chrome, Firefox, Safari)
-- Check for console errors
-- Ensure smooth animations and performance
-
-## Documentation
-
-- Update README.md if you change functionality
-- Add JSDoc comments for complex functions
-- Document any new dependencies
-- Update this CONTRIBUTING.md if you change the contribution process
-
-## Questions?
-
-Feel free to open an issue with the `question` label if you need help or clarification.
-
-## Attribution
-
-Contributors will be acknowledged in the project. Thank you for helping make Worm3 Puzzle better!
+- All JavaScript must adhere to [Standard JS](https://standardjs.com/).
+- Prefer `const` over `let`. Ditch `var`.
+- Use async/await over promises.
