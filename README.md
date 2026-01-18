@@ -27,8 +27,8 @@ Welcome to **Worm3-puzzle**, an interactive 3D visualization exploring the conce
 
 1.  Clone the repository:
     ```bash
-    git clone https://github.com/your-username/worm3-puzzle.git
-    cd worm3-puzzle
+    git clone https://github.com/MacMayo1993/Worm3-puzzle.git
+    cd Worm3-puzzle
     ```
 
 2.  Install dependencies:
@@ -43,12 +43,28 @@ Welcome to **Worm3-puzzle**, an interactive 3D visualization exploring the conce
 
 4.  Open your browser at `http://localhost:5173`.
 
+### Building for Production
+
+To build the project for production:
+
+```bash
+npm run build
+```
+
+This will generate optimized files in the `dist/` directory.
+
 ## 📦 Deployment
 
 This project is configured for automated deployment to **GitHub Pages**.
-- Push changes to the `main` branch.
-- The GitHub Action will automatically build and deploy to the `gh-pages` branch.
-- Access the live site at `https://your-username.github.io/worm3-puzzle/`.
+
+- Push changes to the `main` branch
+- GitHub Actions automatically builds and deploys the site
+- Access the live site at **https://macmayo1993.github.io/Worm3-puzzle/**
+
+The deployment workflow:
+1. Installs dependencies
+2. Builds the project with `npm run build`
+3. Deploys the `dist/` folder to GitHub Pages
 
 ## 🤝 Contributing
 
