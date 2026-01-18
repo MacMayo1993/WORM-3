@@ -27,8 +27,8 @@ Welcome to **Worm3-puzzle**, an interactive 3D visualization exploring the conce
 
 1.  Clone the repository:
     ```bash
-    git clone https://github.com/MacMayo1993/Worm3-puzzle.git
-    cd Worm3-puzzle
+    git clone https://github.com/MacMayo1993/WORM-3.git
+    cd WORM-3
     ```
 
 2.  Install dependencies:
@@ -59,7 +59,7 @@ This project is configured for automated deployment to **GitHub Pages**.
 
 - Push changes to the `main` branch
 - GitHub Actions automatically builds and deploys the site
-- Access the live site at **https://macmayo1993.github.io/Worm3-puzzle/**
+- Access the live site at **https://macmayo1993.github.io/WORM-3/**
 
 The deployment workflow:
 1. Installs dependencies
