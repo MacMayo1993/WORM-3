@@ -80,6 +80,8 @@ out
 
 # Nuxt.js build / generate output
 .nuxt
+
+# Vite build output (project-specific)
 dist
 
 # Gatsby files
