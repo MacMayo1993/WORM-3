@@ -187,7 +187,15 @@ const StickerPlane = function StickerPlane({ meta, pos, rot=[0,0,0], overlay, mo
       )}
 
       {overlay && (
-        <Text position={[0,0,0.03]} fontSize={0.17} color="black" anchorX="center" anchorY="middle">
+        <Text
+          position={[0,0,0.03]}
+          fontSize={0.17}
+          color="black"
+          anchorX="center"
+          anchorY="middle"
+          maxWidth={0.8}
+          overflowWrap="normal"
+        >
           {overlay}
         </Text>
       )}

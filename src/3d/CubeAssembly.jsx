@@ -148,11 +148,12 @@ const CubeAssembly = ({
   const k = (size - 1) / 2;
   const items = useMemo(() => {
     const arr = []; let i = 0;
+    const center = (size - 1) / 2;
     for (let x = 0; x < size; x++) for (let y = 0; y < size; y++) for (let z = 0; z < size; z++) {
-      arr.push({ key: i++, pos: [x - k, y - k, z - k], cubie: cubies[x][y][z] });
+      arr.push({ key: i++, pos: [x - center, y - center, z - center], cubie: cubies[x][y][z] });
     }
     return arr;
-  }, [cubies, size, k]);
+  }, [cubies, size]);
 
   useEffect(() => {
     if (!animState) {
