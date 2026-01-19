@@ -12,6 +12,127 @@ const ANTIPODAL_COLOR={1:4,4:1,2:5,5:2,3:6,6:3};
 const DIR_TO_VEC={PX:[1,0,0],NX:[-1,0,0],PY:[0,1,0],NY:[0,-1,0],PZ:[0,0,1],NZ:[0,0,-1]};
 const VEC_TO_DIR=(x,y,z)=>(x===1&&y===0&&z===0)?'PX':(x===-1&&y===0&&z===0)?'NX':(x===0&&y===1&&z===0)?'PY':(x===0&&y===-1&&z===0)?'NY':(x===0&&y===0&&z===1)?'PZ':'NZ';
 
+/* ---------- Manifold Grid Background ---------- */
+const ManifoldGrid = ({ color = '#3d5a3d', opacity = 0.2 }) => {
+  const materialRef = useRef();
+
+  const vertexShader = `
+    varying vec3 vPosition;
+    varying vec3 vNormal;
+    varying vec2 vUv;
+
+    void main() {
+      vPosition = position;
+      vNormal = normal;
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `;
+
+  const fragmentShader = `
+    uniform float uTime;
+    uniform vec3 uColor;
+    uniform float uOpacity;
+
+    varying vec3 vPosition;
+    varying vec3 vNormal;
+    varying vec2 vUv;
+
+    #define PI 3.14159265359
+
+    // Grid line function
+    float gridLine(float coord, float width) {
+      float line = abs(fract(coord - 0.5) - 0.5);
+      return 1.0 - smoothstep(0.0, width, line);
+    }
+
+    // Projective plane coordinate transformation
+    // Maps sphere to RP2 by identifying antipodal points
+    vec2 projectiveCoords(vec3 p) {
+      // Normalize to sphere
+      vec3 n = normalize(p);
+
+      // Use absolute values to identify antipodal points
+      // This creates the "fold" of the projective plane
+      float theta = atan(length(n.xy), abs(n.z));
+      float phi = atan(abs(n.y), abs(n.x));
+
+      return vec2(phi / PI, theta / PI * 2.0);
+    }
+
+    void main() {
+      vec3 pos = normalize(vPosition);
+
+      // Get projective coordinates (identifies opposite points)
+      vec2 pCoord = projectiveCoords(vPosition);
+
+      // Latitude/longitude grid on sphere
+      float theta = acos(pos.y); // 0 to PI
+      float phi = atan(pos.z, pos.x); // -PI to PI
+
+      // Grid lines - latitude and longitude
+      float latLines = gridLine(theta * 6.0 / PI, 0.02);
+      float lonLines = gridLine(phi * 6.0 / PI, 0.02);
+
+      // Finer grid
+      float fineLatLines = gridLine(theta * 18.0 / PI, 0.015) * 0.4;
+      float fineLonLines = gridLine(phi * 18.0 / PI, 0.015) * 0.4;
+
+      // Combine grids
+      float grid = max(latLines, lonLines) + max(fineLatLines, fineLonLines);
+
+      // Animated "flow" lines showing antipodal connection
+      float flow = sin(theta * 4.0 + phi * 4.0 + uTime * 0.5) * 0.5 + 0.5;
+      float flowLines = smoothstep(0.48, 0.5, flow) * smoothstep(0.52, 0.5, flow) * 0.5;
+
+      // Equator highlight (shows the "seam" of projective plane)
+      float equator = smoothstep(0.1, 0.0, abs(pos.y)) * 0.3;
+
+      // Meridian highlights at 90 degree intervals
+      float meridianHighlight = smoothstep(0.05, 0.0, abs(fract(phi / PI * 2.0 + 0.25) - 0.5)) * 0.2;
+
+      // Cross-cap singularity hints at poles
+      float poleGlow = smoothstep(0.3, 0.0, abs(abs(pos.y) - 1.0)) * 0.15;
+
+      // Combine everything
+      float total = grid + flowLines + equator + meridianHighlight + poleGlow;
+
+      vec3 finalColor = uColor * total;
+      float alpha = total * uOpacity;
+
+      // Add slight color variation based on hemisphere (shows identification)
+      finalColor += vec3(0.1, 0.05, 0.0) * (pos.y > 0.0 ? 0.1 : 0.0) * grid;
+
+      gl_FragColor = vec4(finalColor, alpha);
+    }
+  `;
+
+  useFrame((state) => {
+    if (materialRef.current) {
+      materialRef.current.uniforms.uTime.value = state.clock.elapsedTime;
+    }
+  });
+
+  return (
+    <mesh renderOrder={-1}>
+      <sphereGeometry args={[30, 64, 64]} />
+      <shaderMaterial
+        ref={materialRef}
+        uniforms={{
+          uTime: { value: 0 },
+          uColor: { value: new THREE.Color(color) },
+          uOpacity: { value: opacity },
+        }}
+        vertexShader={vertexShader}
+        fragmentShader={fragmentShader}
+        transparent
+        depthWrite={false}
+        side={THREE.BackSide}
+      />
+    </mesh>
+  );
+};
+
 /* ---------- Helpers: cube state ---------- */
 
 // Get grid (r,c) position for a sticker based on its original position
@@ -237,6 +358,109 @@ const faceValue=(dirKey,x,y,z,size)=>{
 
 const play = (src) => { try { const a = new Audio(src); a.currentTime = 0; a.volume = 0.5; a.play().catch(()=>{}); } catch(_){} };
 const vibrate = (ms=18) => { if (typeof navigator !== 'undefined' && 'vibrate' in navigator) try{ navigator.vibrate(ms); }catch(_){} };
+
+/* ---------- WIN CONDITION DETECTION ---------- */
+
+// Check if classic Rubik's cube is solved (all faces uniform color)
+const checkRubiksSolved = (cubies, size) => {
+  // Map direction to expected face color
+  const DIR_TO_FACE = { PZ: 1, NX: 2, PY: 3, NZ: 4, PX: 5, NY: 6 };
+
+  for (let x = 0; x < size; x++) {
+    for (let y = 0; y < size; y++) {
+      for (let z = 0; z < size; z++) {
+        const c = cubies[x][y][z];
+        for (const [dirKey, st] of Object.entries(c.stickers)) {
+          const expectedColor = DIR_TO_FACE[dirKey];
+          if (st.curr !== expectedColor) return false;
+        }
+      }
+    }
+  }
+  return true;
+};
+
+// Check if a single face is a valid Latin square (Sudokube condition)
+const checkFaceLatinSquare = (faceGrid, size) => {
+  // Check rows
+  for (let r = 0; r < size; r++) {
+    const seen = new Set();
+    for (let c = 0; c < size; c++) {
+      const val = faceGrid[r][c];
+      if (val < 1 || val > size || seen.has(val)) return false;
+      seen.add(val);
+    }
+  }
+  // Check columns
+  for (let c = 0; c < size; c++) {
+    const seen = new Set();
+    for (let r = 0; r < size; r++) {
+      const val = faceGrid[r][c];
+      if (seen.has(val)) return false;
+      seen.add(val);
+    }
+  }
+  return true;
+};
+
+// Extract face grid for Sudokube checking
+const extractFaceGrid = (cubies, size, faceDir) => {
+  const grid = Array.from({ length: size }, () => Array(size).fill(0));
+
+  for (let x = 0; x < size; x++) {
+    for (let y = 0; y < size; y++) {
+      for (let z = 0; z < size; z++) {
+        const c = cubies[x][y][z];
+        const st = c.stickers[faceDir];
+        if (st) {
+          const { r, col } = faceRCFor(faceDir, x, y, z, size);
+          // Calculate Latin square value based on current color position
+          // The value is derived from where this sticker's current color originated
+          const val = faceValue(faceDir, x, y, z, size);
+          grid[r][col] = val;
+        }
+      }
+    }
+  }
+  return grid;
+};
+
+// Check if Sudokube is solved (all faces are valid Latin squares based on current positions)
+const checkSudokubeSolved = (cubies, size) => {
+  const FACE_DIRS = ['PZ', 'NZ', 'PX', 'NX', 'PY', 'NY'];
+
+  for (const faceDir of FACE_DIRS) {
+    // Build the actual value grid based on sticker positions
+    const grid = Array.from({ length: size }, () => Array(size).fill(0));
+
+    for (let x = 0; x < size; x++) {
+      for (let y = 0; y < size; y++) {
+        for (let z = 0; z < size; z++) {
+          const c = cubies[x][y][z];
+          const st = c.stickers[faceDir];
+          if (st) {
+            const { r, c: col } = faceRCFor(faceDir, x, y, z, size);
+            // Get the Latin square value from original position
+            const origVal = faceValue(st.origDir, st.origPos.x, st.origPos.y, st.origPos.z, size);
+            grid[r][col] = origVal;
+          }
+        }
+      }
+    }
+
+    if (!checkFaceLatinSquare(grid, size)) return false;
+  }
+  return true;
+};
+
+// Main win detection function - returns { rubiks, sudokube, ultimate }
+const detectWinConditions = (cubies, size) => {
+  const rubiks = checkRubiksSolved(cubies, size);
+  const sudokube = checkSudokubeSolved(cubies, size);
+  const ultimate = rubiks && sudokube;
+
+  return { rubiks, sudokube, ultimate };
+};
 
 /* ---------- NEW: Smart tunnel routing that avoids blocks ---------- */
 const calculateSmartControlPoint = (start, end, size) => {
@@ -849,7 +1073,7 @@ const TextOverlay = ({ time }) => {
     const msgs = [];
 
     if (time >= 3 && time < 10) {
-      msgs.push({ text: 'Welcome to the Wormhole Cube!', fade: time >= 3 && time < 3.3 ? (time - 3) / 0.3 : 1 });
+      msgs.push({ text: 'Welcome to WORM^3!', fade: time >= 3 && time < 3.3 ? (time - 3) / 0.3 : 1 });
     }
     if (time >= 3.5 && time < 10) {
       msgs.push({ text: 'Discovering opposite pairs...', fade: time >= 3.5 && time < 3.8 ? (time - 3.5) / 0.3 : 1 });
@@ -896,7 +1120,7 @@ const TextOverlay = ({ time }) => {
       {showFinal && (
         <div className="intro-final-card" style={{ opacity: finalFade }}>
           <div className="intro-title-box">
-            <h1>The Wormhole Cube</h1>
+            <h1>WORM^3</h1>
             <p>An Interactive Topology Puzzle</p>
           </div>
           <div className="intro-instructions">
@@ -1324,7 +1548,7 @@ const TallyMarks = ({ flips, radius, origColor }) => {
   );
 };
 
-const StickerPlane=React.memo(function StickerPlane({ meta, pos, rot=[0,0,0], overlay, mode }) {
+const StickerPlane=function StickerPlane({ meta, pos, rot=[0,0,0], overlay, mode }) {
   const groupRef = useRef();
   const meshRef = useRef();
   const ringRef = useRef();
@@ -1374,21 +1598,12 @@ const StickerPlane=React.memo(function StickerPlane({ meta, pos, rot=[0,0,0], ov
       const scale = 1 + Math.sin(p * Math.PI) * 0.15;
       groupRef.current.scale.set(scale, scale, 1);
 
-      // Animate color through the antipodal color during flip
+      // Animate color through the flip
       if (meshRef.current && flipFromColor.current && flipToColor.current) {
-        const antipodalColor = flipToColor.current; // The destination IS the antipodal
-        if (p < 0.4) {
-          // Fade from original color
+        if (p < 0.5) {
           meshRef.current.material.color.set(flipFromColor.current);
-        } else if (p < 0.6) {
-          // At midpoint, flash the antipodal color brightly
-          meshRef.current.material.color.set(antipodalColor);
-          meshRef.current.material.emissive.set(antipodalColor);
-          meshRef.current.material.emissiveIntensity = 0.6 * (1 - Math.abs(p - 0.5) * 5);
         } else {
-          // Settle into the new color
           meshRef.current.material.color.set(flipToColor.current);
-          meshRef.current.material.emissiveIntensity = 0.15 * (1 - p);
         }
       }
 
@@ -1399,9 +1614,6 @@ const StickerPlane=React.memo(function StickerPlane({ meta, pos, rot=[0,0,0], ov
         shakeT.current = 0.5;
         flipFromColor.current = null;
         flipToColor.current = null;
-        if (meshRef.current) {
-          meshRef.current.material.emissiveIntensity = 0;
-        }
       }
     }
 
@@ -1437,39 +1649,30 @@ const StickerPlane=React.memo(function StickerPlane({ meta, pos, rot=[0,0,0], ov
   const baseColor = isSudokube ? COLORS.white : (meta?.curr ? FACE_COLORS[meta.curr] : COLORS.black);
   const isWormhole = meta?.flips>0 && meta?.curr!==meta?.orig;
   const hasFlipHistory = meta?.flips > 0;
-  
+
   const trackerRadius = Math.min(0.35, 0.06 + (meta?.flips ?? 0) * 0.012);
   const origColor = meta?.orig ? FACE_COLORS[meta.orig] : COLORS.black;
-  
+  const antipodalColor = meta?.orig ? FACE_COLORS[ANTIPODAL_COLOR[meta.orig]] : COLORS.black;
+
+  // Check if colors are white - don't show white indicators on non-white tiles
+  const currIsWhite = meta?.curr === 3;
+  const origIsWhite = meta?.orig === 3;
+  const antipodalIsWhite = ANTIPODAL_COLOR[meta?.orig] === 3;
+
   const shadowIntensity = Math.min(0.5, (meta?.flips ?? 0) * 0.03);
 
   return (
     <group position={pos} rotation={rot} ref={groupRef}>
       <mesh ref={meshRef}>
         <planeGeometry args={[0.82,0.82]} />
-        <meshStandardMaterial
+        <meshBasicMaterial
           color={baseColor}
-          roughness={0.18}
-          metalness={0}
           side={THREE.DoubleSide}
-          emissive={mode === 'wireframe' ? baseColor : (isWormhole ? baseColor : (hasFlipHistory ? '#000000' : 'black'))}
-          emissiveIntensity={mode === 'wireframe' ? 0.4 : (isWormhole ? 0.15 : 0)}
         />
       </mesh>
-      
-      {!isSudokube && hasFlipHistory && (
-        <mesh position={[0,0,0.005]}>
-          <planeGeometry args={[0.82,0.82]} />
-          <meshBasicMaterial 
-            color="#000000" 
-            transparent 
-            opacity={shadowIntensity}
-            blending={THREE.MultiplyBlending}
-          />
-        </mesh>
-      )}
-      
-      {!isSudokube && hasFlipHistory && (
+
+      {/* Origin color circle - skip if it would be white on a non-white tile */}
+      {!isSudokube && hasFlipHistory && !(origIsWhite && !currIsWhite) && (
         <mesh position={[0,0,0.01]}>
           <circleGeometry args={[trackerRadius,32]} />
           <meshBasicMaterial
@@ -1480,13 +1683,31 @@ const StickerPlane=React.memo(function StickerPlane({ meta, pos, rot=[0,0,0], ov
         </mesh>
       )}
 
-      {/* Tally Marks - showing flip journey history */}
-      {!isSudokube && hasFlipHistory && (
+      {/* Tally Marks - skip if origColor is white on non-white tile */}
+      {!isSudokube && hasFlipHistory && !(origIsWhite && !currIsWhite) && (
         <TallyMarks
           flips={meta?.flips ?? 0}
           radius={trackerRadius}
           origColor={origColor}
         />
+      )}
+
+      {/* Flipped tile border - skip white rings on non-white tiles */}
+      {!isSudokube && hasFlipHistory && (
+        <>
+          {!(origIsWhite && !currIsWhite) && (
+            <mesh position={[0,0,0.006]}>
+              <ringGeometry args={[0.38, 0.41, 32]} />
+              <meshBasicMaterial color={origColor} />
+            </mesh>
+          )}
+          {!(antipodalIsWhite && !currIsWhite) && (
+            <mesh position={[0,0,0.007]}>
+              <ringGeometry args={[0.35, 0.38, 32]} />
+              <meshBasicMaterial color={antipodalColor} />
+            </mesh>
+          )}
+        </>
       )}
 
       {!isSudokube && isWormhole && (
@@ -1506,6 +1727,7 @@ const StickerPlane=React.memo(function StickerPlane({ meta, pos, rot=[0,0,0], ov
           </mesh>
         </>
       )}
+
       {overlay && (
         <Text position={[0,0,0.03]} fontSize={0.17} color="black" anchorX="center" anchorY="middle">
           {overlay}
@@ -1513,7 +1735,7 @@ const StickerPlane=React.memo(function StickerPlane({ meta, pos, rot=[0,0,0], ov
       )}
     </group>
   );
-});
+};
 
 const WireframeEdge = ({ start, end, color, intensity = 1, pulsePhase = 0 }) => {
   const lineRef = useRef();
@@ -1756,7 +1978,8 @@ const TopMenuBar = ({
   chaosLevel,
   cubies,
   onShowHelp,
-  onShowSettings
+  onShowSettings,
+  achievedWins = { rubiks: false, sudokube: false, ultimate: false }
 }) => {
   const [time, setTime] = useState(0);
   const startTime = useRef(Date.now());
@@ -1870,7 +2093,7 @@ const TopMenuBar = ({
           {[
             { label: 'Moves', val: moves, color: colors.avocado },
             { label: 'Flips', val: metrics.flips, color: colors.burntOrange },
-            { label: 'Worms', val: metrics.wormholes, color: colors.mustard },
+            { label: 'Pairs', val: metrics.wormholes, color: colors.mustard },
             { label: 'Time', val: formatTime(time), color: colors.ink }
           ].map((stat, i) => (
             <div key={stat.label} style={{
@@ -1981,6 +2204,60 @@ const TopMenuBar = ({
               color: '#9c4a1a',
               letterSpacing: '0.1em'
             }}>☢ Chaos L{chaosLevel}</span>
+          </div>
+        )}
+
+        {/* Achievement Badges */}
+        {(achievedWins.rubiks || achievedWins.sudokube || achievedWins.ultimate) && (
+          <div style={{
+            display: 'flex',
+            gap: '6px',
+            alignItems: 'center'
+          }}>
+            {achievedWins.ultimate ? (
+              <div className="ui-element" style={{
+                padding: '5px 12px',
+                background: 'linear-gradient(135deg, #eab30830, #eab30815)',
+                borderColor: '#eab308',
+                animation: 'pulse 2s ease-in-out infinite'
+              }}>
+                <span style={{
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  color: '#ca8a04',
+                  letterSpacing: '0.05em'
+                }}>👑 ULTIMATE</span>
+              </div>
+            ) : (
+              <>
+                {achievedWins.rubiks && (
+                  <div className="ui-element" style={{
+                    padding: '5px 10px',
+                    background: 'linear-gradient(135deg, #22c55e25, #22c55e10)',
+                    borderColor: '#22c55e'
+                  }}>
+                    <span style={{
+                      fontSize: '10px',
+                      fontWeight: 600,
+                      color: '#16a34a'
+                    }}>🎲 Colors</span>
+                  </div>
+                )}
+                {achievedWins.sudokube && (
+                  <div className="ui-element" style={{
+                    padding: '5px 10px',
+                    background: 'linear-gradient(135deg, #3b82f625, #3b82f610)',
+                    borderColor: '#3b82f6'
+                  }}>
+                    <span style={{
+                      fontSize: '10px',
+                      fontWeight: 600,
+                      color: '#2563eb'
+                    }}>🔢 Latin</span>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
       </div>
@@ -2149,6 +2426,288 @@ const InstabilityTracker = ({ entropy, wormholes, chaosLevel }) => {
   );
 };
 
+/* ---------- VICTORY SCREEN ---------- */
+const VictoryScreen = ({ winType, moves, time, onContinue, onNewGame }) => {
+  const [showConfetti, setShowConfetti] = useState(true);
+
+  const formatTime = (s) => {
+    const mins = Math.floor(s / 60);
+    const secs = s % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const winConfig = {
+    rubiks: {
+      title: 'Cube Solved!',
+      subtitle: 'Classic Victory',
+      description: 'You\'ve arranged all faces with uniform colors!',
+      color: '#22c55e',
+      gradientFrom: '#22c55e',
+      gradientTo: '#16a34a',
+      icon: '🎲',
+      bgGradient: 'linear-gradient(135deg, #dcfce7, #bbf7d0)'
+    },
+    sudokube: {
+      title: 'Sudokube Complete!',
+      subtitle: 'Latin Square Master',
+      description: 'Every face is a perfect Latin square - no repeated numbers in any row or column!',
+      color: '#3b82f6',
+      gradientFrom: '#3b82f6',
+      gradientTo: '#2563eb',
+      icon: '🔢',
+      bgGradient: 'linear-gradient(135deg, #dbeafe, #bfdbfe)'
+    },
+    ultimate: {
+      title: 'ULTIMATE VICTORY!',
+      subtitle: 'Topology Grandmaster',
+      description: 'Incredible! You\'ve achieved the impossible - solving both the colors AND the Latin squares simultaneously!',
+      color: '#eab308',
+      gradientFrom: '#eab308',
+      gradientTo: '#ca8a04',
+      icon: '👑',
+      bgGradient: 'linear-gradient(135deg, #fef9c3, #fde047)'
+    }
+  };
+
+  const config = winConfig[winType] || winConfig.rubiks;
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0, left: 0, right: 0, bottom: 0,
+      background: config.bgGradient,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 3000,
+      animation: 'fadeIn 0.5s ease-out'
+    }}>
+      {/* Confetti particles for ultimate win */}
+      {winType === 'ultimate' && showConfetti && (
+        <div style={{
+          position: 'absolute',
+          top: 0, left: 0, right: 0, bottom: 0,
+          overflow: 'hidden',
+          pointerEvents: 'none'
+        }}>
+          {Array.from({ length: 50 }).map((_, i) => (
+            <div key={i} style={{
+              position: 'absolute',
+              width: '10px',
+              height: '10px',
+              background: ['#ef4444', '#22c55e', '#3b82f6', '#eab308', '#f97316', '#ffffff'][i % 6],
+              left: `${Math.random() * 100}%`,
+              top: '-20px',
+              borderRadius: i % 2 === 0 ? '50%' : '0',
+              animation: `confetti-fall ${2 + Math.random() * 3}s linear infinite`,
+              animationDelay: `${Math.random() * 2}s`
+            }} />
+          ))}
+        </div>
+      )}
+
+      <div style={{
+        textAlign: 'center',
+        maxWidth: '550px',
+        padding: '48px',
+        background: '#fdfbf7',
+        borderRadius: '16px',
+        boxShadow: `0 8px 40px rgba(0,0,0,0.15), 0 0 0 4px ${config.color}40`,
+        border: `2px solid ${config.color}`,
+        position: 'relative',
+        overflow: 'hidden'
+      }}>
+        {/* Decorative top bar */}
+        <div style={{
+          position: 'absolute',
+          top: 0, left: 0, right: 0,
+          height: '6px',
+          background: `linear-gradient(90deg, ${config.gradientFrom}, ${config.gradientTo})`
+        }} />
+
+        {/* Icon */}
+        <div style={{
+          fontSize: '64px',
+          marginBottom: '16px',
+          filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.1))'
+        }}>
+          {config.icon}
+        </div>
+
+        {/* Title */}
+        <h1 style={{
+          fontSize: winType === 'ultimate' ? '42px' : '36px',
+          fontWeight: 700,
+          margin: '0 0 8px 0',
+          color: config.color,
+          fontFamily: 'Georgia, serif',
+          letterSpacing: '1px',
+          textShadow: winType === 'ultimate' ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
+        }}>
+          {config.title}
+        </h1>
+
+        {/* Subtitle */}
+        <p style={{
+          fontSize: '16px',
+          color: '#8b6f47',
+          marginBottom: '20px',
+          fontFamily: 'Georgia, serif',
+          fontStyle: 'italic',
+          letterSpacing: '0.1em',
+          textTransform: 'uppercase'
+        }}>
+          {config.subtitle}
+        </p>
+
+        {/* Description */}
+        <p style={{
+          fontSize: '16px',
+          color: '#5a4a3a',
+          marginBottom: '28px',
+          lineHeight: 1.7,
+          fontFamily: 'Georgia, serif'
+        }}>
+          {config.description}
+        </p>
+
+        {/* Stats */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          gap: '32px',
+          marginBottom: '32px',
+          padding: '20px',
+          background: 'rgba(0,0,0,0.03)',
+          borderRadius: '8px',
+          border: '1px solid rgba(0,0,0,0.06)'
+        }}>
+          <div>
+            <div style={{
+              fontSize: '11px',
+              textTransform: 'uppercase',
+              color: '#9b8b7a',
+              letterSpacing: '0.1em',
+              marginBottom: '4px'
+            }}>Moves</div>
+            <div style={{
+              fontSize: '28px',
+              fontWeight: 700,
+              color: '#6b4423',
+              fontFamily: "'Courier New', monospace"
+            }}>{moves}</div>
+          </div>
+          <div style={{
+            width: '1px',
+            background: 'rgba(0,0,0,0.1)'
+          }} />
+          <div>
+            <div style={{
+              fontSize: '11px',
+              textTransform: 'uppercase',
+              color: '#9b8b7a',
+              letterSpacing: '0.1em',
+              marginBottom: '4px'
+            }}>Time</div>
+            <div style={{
+              fontSize: '28px',
+              fontWeight: 700,
+              color: '#6b4423',
+              fontFamily: "'Courier New', monospace"
+            }}>{formatTime(time)}</div>
+          </div>
+        </div>
+
+        {/* Buttons */}
+        <div style={{ display: 'flex', gap: '16px', justifyContent: 'center' }}>
+          <button
+            onClick={onContinue}
+            style={{
+              background: 'transparent',
+              border: `2px solid ${config.color}`,
+              color: config.color,
+              fontSize: '16px',
+              fontWeight: 600,
+              padding: '12px 28px',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontFamily: 'Georgia, serif',
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={e => {
+              e.target.style.background = `${config.color}10`;
+            }}
+            onMouseLeave={e => {
+              e.target.style.background = 'transparent';
+            }}
+          >
+            Keep Playing
+          </button>
+          <button
+            onClick={onNewGame}
+            style={{
+              background: `linear-gradient(135deg, ${config.gradientFrom}, ${config.gradientTo})`,
+              border: 'none',
+              color: '#ffffff',
+              fontSize: '16px',
+              fontWeight: 600,
+              padding: '12px 28px',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              boxShadow: `0 4px 12px ${config.color}40`,
+              fontFamily: 'Georgia, serif',
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={e => {
+              e.target.style.transform = 'translateY(-2px)';
+              e.target.style.boxShadow = `0 6px 20px ${config.color}50`;
+            }}
+            onMouseLeave={e => {
+              e.target.style.transform = 'translateY(0)';
+              e.target.style.boxShadow = `0 4px 12px ${config.color}40`;
+            }}
+          >
+            New Puzzle
+          </button>
+        </div>
+
+        {/* Achievement hint for non-ultimate wins */}
+        {winType !== 'ultimate' && (
+          <div style={{
+            marginTop: '24px',
+            padding: '12px 16px',
+            background: 'rgba(234,179,8,0.1)',
+            borderRadius: '6px',
+            border: '1px solid rgba(234,179,8,0.3)'
+          }}>
+            <p style={{
+              margin: 0,
+              fontSize: '13px',
+              color: '#92400e',
+              fontStyle: 'italic'
+            }}>
+              {winType === 'rubiks'
+                ? '🎯 Challenge: Can you also solve the Sudokube (Latin squares) for the Ultimate Victory?'
+                : '🎯 Challenge: Can you also solve the colors for the Ultimate Victory?'}
+            </p>
+          </div>
+        )}
+      </div>
+
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: scale(0.95); }
+          to { opacity: 1; transform: scale(1); }
+        }
+        @keyframes confetti-fall {
+          0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+          100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+        }
+      `}</style>
+    </div>
+  );
+};
+
 const MainMenu = ({ onStart }) => {
   return (
     <div style={{
@@ -2176,7 +2735,7 @@ const MainMenu = ({ onStart }) => {
           color: '#6b4423',
           fontFamily: 'Georgia, serif',
           letterSpacing: '1px'
-        }}>The Wormhole Cube</h1>
+        }}>WORM^3</h1>
 
         <p style={{
           fontSize: '18px',
@@ -2432,7 +2991,7 @@ const HelpMenu = ({ onClose }) => {
           <section style={{ marginBottom: '24px' }}>
             <h3 style={{ color: '#a67c52', marginBottom: '12px', fontSize: '18px', fontWeight: 600 }}>🌀 Special Features</h3>
             <div style={{ paddingLeft: '16px', fontSize: '14px' }}>
-              <p style={{ margin: '8px 0' }}><strong>Wormholes:</strong> The colorful tunnels show connections between opposite points</p>
+              <p style={{ margin: '8px 0' }}><strong>Tunnels:</strong> The colorful tunnels show connections between opposite points</p>
               <p style={{ margin: '8px 0' }}><strong>Flip Mode:</strong> Turn color flipping on or off</p>
               <p style={{ margin: '8px 0' }}><strong>Chaos Mode:</strong> Watch instability spread across the cube!</p>
             </div>
@@ -2446,7 +3005,7 @@ const HelpMenu = ({ onClose }) => {
               <p style={{ margin: '8px 0' }}><strong>Sudokube:</strong> Numbers instead of colors</p>
               <p style={{ margin: '8px 0' }}><strong>Wireframe:</strong> See-through edges with lights</p>
               <p style={{ margin: '8px 0' }}><strong>Explode:</strong> Spreads the cube apart to see all sides</p>
-              <p style={{ margin: '8px 0' }}><strong>Tunnels:</strong> Hide or show the wormhole connections</p>
+              <p style={{ margin: '8px 0' }}><strong>Tunnels:</strong> Hide or show the antipodal connections</p>
             </div>
           </section>
 
@@ -2455,23 +3014,35 @@ const HelpMenu = ({ onClose }) => {
             <div style={{ paddingLeft: '16px', fontSize: '14px' }}>
               <p style={{ margin: '8px 0' }}><strong>M:</strong> How many moves you've made</p>
               <p style={{ margin: '8px 0' }}><strong>F:</strong> How many times you've flipped colors</p>
-              <p style={{ margin: '8px 0' }}><strong>W:</strong> How many wormholes are currently active</p>
+              <p style={{ margin: '8px 0' }}><strong>W:</strong> How many flipped pairs are currently active</p>
               <p style={{ margin: '8px 0' }}><strong>Instability Bar:</strong> Shows how chaotic things are getting!</p>
             </div>
           </section>
 
+          <section style={{ marginBottom: '24px' }}>
+            <h3 style={{ color: '#a67c52', marginBottom: '12px', fontSize: '18px', fontWeight: 600 }}>🎯 Speedcube Controls</h3>
+            <div style={{ paddingLeft: '16px', fontSize: '14px' }}>
+              <p style={{ margin: '8px 0' }}><strong>Arrow Keys</strong> — Move cursor to select a tile</p>
+              <p style={{ margin: '8px 0' }}><strong>W / S</strong> — Rotate selected row up / down</p>
+              <p style={{ margin: '8px 0' }}><strong>A / D</strong> — Rotate selected column left / right</p>
+              <p style={{ margin: '8px 0' }}><strong>Q / E</strong> — Rotate face counter-clockwise / clockwise</p>
+              <p style={{ margin: '8px 0' }}><strong>F</strong> — Flip the selected tile (antipodal)</p>
+              <p style={{ margin: '8px 0', color: '#9b8b7a', fontStyle: 'italic' }}>Cursor appears when you use keyboard controls</p>
+            </div>
+          </section>
+
           <section>
-            <h3 style={{ color: '#a67c52', marginBottom: '12px', fontSize: '18px', fontWeight: 600 }}>⌨️ Keyboard Shortcuts</h3>
+            <h3 style={{ color: '#a67c52', marginBottom: '12px', fontSize: '18px', fontWeight: 600 }}>⌨️ Other Shortcuts</h3>
             <div style={{ paddingLeft: '16px', fontSize: '14px' }}>
               <p style={{ margin: '8px 0' }}><strong>H</strong> or <strong>?</strong> — Open/close this help menu</p>
               <p style={{ margin: '8px 0' }}><strong>Space</strong> — Shuffle the cube randomly</p>
               <p style={{ margin: '8px 0' }}><strong>R</strong> — Reset everything</p>
-              <p style={{ margin: '8px 0' }}><strong>F</strong> — Turn flip mode on/off</p>
+              <p style={{ margin: '8px 0' }}><strong>G</strong> — Toggle flip mode for mouse</p>
               <p style={{ margin: '8px 0' }}><strong>T</strong> — Show/hide tunnels</p>
-              <p style={{ margin: '8px 0' }}><strong>E</strong> — Toggle explosion view</p>
+              <p style={{ margin: '8px 0' }}><strong>X</strong> — Toggle explosion view</p>
               <p style={{ margin: '8px 0' }}><strong>V</strong> — Change view mode</p>
               <p style={{ margin: '8px 0' }}><strong>C</strong> — Turn chaos mode on/off</p>
-              <p style={{ margin: '8px 0' }}><strong>Esc</strong> — Close menus</p>
+              <p style={{ margin: '8px 0' }}><strong>Esc</strong> — Close menus / hide cursor</p>
             </div>
           </section>
         </div>
@@ -2489,16 +3060,131 @@ const HelpMenu = ({ onClose }) => {
         }}>
           💡 <strong>What you're learning:</strong> This puzzle demonstrates a special kind of mathematical space
           where opposite points are treated as the same location. When you flip a color, you're creating a connection
-          through this space – that's what the wormholes represent!
+          through this space – that's what the tunnels represent!
         </div>
       </div>
     </div>
   );
 };
 
-const CubeAssembly=({ 
-  size, cubies, onMove, onTapFlip, visualMode, animState, onAnimComplete, 
-  showTunnels, explosionFactor, cascades, onCascadeComplete, manifoldMap 
+/* ---------- CURSOR HIGHLIGHT ---------- */
+const CursorHighlight = ({ cursor, size, explosionFactor = 0 }) => {
+  const meshRef = useRef();
+  const glowRef = useRef();
+
+  // Convert cursor to world position
+  const getWorldPos = () => {
+    const { face, row, col } = cursor;
+    const k = (size - 1) / 2;
+    const maxIdx = size - 1;
+
+    let x, y, z;
+    switch (face) {
+      case 'PZ': x = col - k; y = (maxIdx - row) - k; z = maxIdx - k; break;
+      case 'NZ': x = (maxIdx - col) - k; y = (maxIdx - row) - k; z = -k; break;
+      case 'PX': x = maxIdx - k; y = (maxIdx - row) - k; z = (maxIdx - col) - k; break;
+      case 'NX': x = -k; y = (maxIdx - row) - k; z = col - k; break;
+      case 'PY': x = col - k; y = maxIdx - k; z = row - k; break;
+      case 'NY': x = col - k; y = -k; z = (maxIdx - row) - k; break;
+      default: x = 0; y = 0; z = k;
+    }
+
+    // Apply explosion factor
+    const exploded = [
+      x * (1 + explosionFactor * 1.8),
+      y * (1 + explosionFactor * 1.8),
+      z * (1 + explosionFactor * 1.8)
+    ];
+
+    // Offset slightly outward from face
+    const offset = 0.53;
+    switch (face) {
+      case 'PZ': return [exploded[0], exploded[1], exploded[2] + offset];
+      case 'NZ': return [exploded[0], exploded[1], exploded[2] - offset];
+      case 'PX': return [exploded[0] + offset, exploded[1], exploded[2]];
+      case 'NX': return [exploded[0] - offset, exploded[1], exploded[2]];
+      case 'PY': return [exploded[0], exploded[1] + offset, exploded[2]];
+      case 'NY': return [exploded[0], exploded[1] - offset, exploded[2]];
+      default: return exploded;
+    }
+  };
+
+  // Get rotation for the highlight to face outward
+  const getRotation = () => {
+    const { face } = cursor;
+    switch (face) {
+      case 'PZ': return [0, 0, 0];
+      case 'NZ': return [0, Math.PI, 0];
+      case 'PX': return [0, Math.PI / 2, 0];
+      case 'NX': return [0, -Math.PI / 2, 0];
+      case 'PY': return [-Math.PI / 2, 0, 0];
+      case 'NY': return [Math.PI / 2, 0, 0];
+      default: return [0, 0, 0];
+    }
+  };
+
+  // Animate glow
+  useFrame((state) => {
+    if (meshRef.current) {
+      const pulse = Math.sin(state.clock.elapsedTime * 3) * 0.15 + 0.85;
+      meshRef.current.material.opacity = 0.4 * pulse;
+    }
+    if (glowRef.current) {
+      const pulse = Math.sin(state.clock.elapsedTime * 3) * 0.1 + 0.9;
+      glowRef.current.scale.setScalar(pulse);
+    }
+  });
+
+  const position = getWorldPos();
+  const rotation = getRotation();
+
+  return (
+    <group position={position} rotation={rotation}>
+      {/* Inner glow ring */}
+      <mesh ref={meshRef}>
+        <ringGeometry args={[0.35, 0.48, 32]} />
+        <meshBasicMaterial
+          color="#fbbf24"
+          transparent
+          opacity={0.5}
+          side={THREE.DoubleSide}
+          blending={THREE.AdditiveBlending}
+        />
+      </mesh>
+      {/* Outer glow */}
+      <mesh ref={glowRef}>
+        <ringGeometry args={[0.3, 0.55, 32]} />
+        <meshBasicMaterial
+          color="#f59e0b"
+          transparent
+          opacity={0.25}
+          side={THREE.DoubleSide}
+          blending={THREE.AdditiveBlending}
+        />
+      </mesh>
+      {/* Corner indicators */}
+      {[0, 1, 2, 3].map(i => (
+        <mesh key={i} position={[
+          Math.cos(i * Math.PI / 2 + Math.PI / 4) * 0.42,
+          Math.sin(i * Math.PI / 2 + Math.PI / 4) * 0.42,
+          0.01
+        ]}>
+          <circleGeometry args={[0.06, 16]} />
+          <meshBasicMaterial
+            color="#fbbf24"
+            transparent
+            opacity={0.7}
+          />
+        </mesh>
+      ))}
+    </group>
+  );
+};
+
+const CubeAssembly=({
+  size, cubies, onMove, onTapFlip, visualMode, animState, onAnimComplete,
+  showTunnels, explosionFactor, cascades, onCascadeComplete, manifoldMap,
+  cursor, showCursor, flipMode, onSelectTile
 })=>{
   const cubieRefs=useRef([]); 
   const controlsRef=useRef(); 
@@ -2555,12 +3241,15 @@ const CubeAssembly=({
 
   const onPointerDown=({pos,worldPos,event})=>{
     if(animState) return;
+    // Prevent context menu on right click
+    if(event.button === 2) event.preventDefault();
     setDragStart({
       pos, worldPos, event,
       screenX:event.clientX,
       screenY:event.clientY,
       n:normalFromEvent(event),
-      shiftKey:event.shiftKey // Track if Shift was held
+      shiftKey:event.shiftKey,
+      isRightClick: event.button === 2 // Track right click
     });
     if(controlsRef.current) controlsRef.current.enabled=false;
   };
@@ -2582,7 +3271,13 @@ const CubeAssembly=({
         if(m) onMove(m.axis,m.dir,dragStart.pos);
       }else{
         const dirKey=dirFromNormal(dragStart.n);
-        onTapFlip(dragStart.pos,dirKey);
+        if(dragStart.isRightClick){
+          // Right click = flip (only if flipMode is on)
+          if(flipMode) onTapFlip(dragStart.pos,dirKey);
+        }else{
+          // Left click = select tile
+          if(onSelectTile) onSelectTile(dragStart.pos, dirKey);
+        }
       }
       setDragStart(null);
       setActiveDir(null);
@@ -2590,11 +3285,11 @@ const CubeAssembly=({
     };
     window.addEventListener('pointermove',move);
     window.addEventListener('pointerup',up);
-    return ()=>{ 
-      window.removeEventListener('pointermove',move); 
-      window.removeEventListener('pointerup',up); 
+    return ()=>{
+      window.removeEventListener('pointermove',move);
+      window.removeEventListener('pointerup',up);
     };
-  },[dragStart,onMove,onTapFlip]);
+  },[dragStart,onMove,onTapFlip,flipMode,onSelectTile]);
 
   useFrame((_,delta)=>{
     if(!animState) return;
@@ -2666,17 +3361,24 @@ const CubeAssembly=({
         />
       ))}
       {items.map((it,idx)=>(
-        <Cubie 
-          key={it.key} 
-          ref={el=> (cubieRefs.current[idx]=el)} 
-          position={it.pos} 
-          cubie={it.cubie} 
-          size={size} 
-          visualMode={visualMode} 
+        <Cubie
+          key={it.key}
+          ref={el=> (cubieRefs.current[idx]=el)}
+          position={it.pos}
+          cubie={it.cubie}
+          size={size}
+          visualMode={visualMode}
           onPointerDown={onPointerDown}
           explosionFactor={explosionFactor}
         />
       ))}
+      {showCursor && cursor && (
+        <CursorHighlight
+          cursor={cursor}
+          size={size}
+          explosionFactor={explosionFactor}
+        />
+      )}
       {dragStart && !animState && <DragGuide position={dragStart.worldPos} activeDir={activeDir}/>}
       <OrbitControls 
         ref={controlsRef} 
@@ -2717,7 +3419,7 @@ const Tutorial = ({ onClose }) => {
         )}
         {step===3 && (
           <>
-            <p>Chaos Mode spreads wormholes to <b>N-S-E-W neighbors</b>—fight the cascade.</p>
+            <p>Chaos Mode spreads flips to <b>N-S-E-W neighbors</b>—fight the cascade.</p>
             <p><b>Explode</b> view reveals the structure. Good luck, topologist!</p>
           </>
         )}
@@ -2776,7 +3478,7 @@ const FirstFlipTutorial = ({ onClose }) => {
           color: colors.ink,
           textAlign: 'center'
         }}>
-          {step === 0 && "You Just Traveled Through a Wormhole!"}
+          {step === 0 && "You Just Made an Antipodal Flip!"}
           {step === 1 && "Antipodal Pairs"}
           {step === 2 && "Parity & Orientation"}
           {step === 3 && "Chaos Mode"}
@@ -3002,7 +3704,7 @@ const FirstFlipTutorial = ({ onClose }) => {
 /* Main App */
 export default function WORM3(){
   const [showWelcome, setShowWelcome] = useState(true);
-  
+
   const [size,setSize]=useState(3);
   const [cubies,setCubies]=useState(()=>makeCubies(size));
   const [moves,setMoves]=useState(0);
@@ -3012,6 +3714,20 @@ export default function WORM3(){
   const [showHelp,setShowHelp]=useState(false);
   const [showSettings,setShowSettings]=useState(false);
   const [showMainMenu,setShowMainMenu]=useState(true);
+
+  // Win condition state
+  const [victory, setVictory] = useState(null); // null, 'rubiks', 'sudokube', or 'ultimate'
+  const [achievedWins, setAchievedWins] = useState({ rubiks: false, sudokube: false, ultimate: false });
+  const [gameTime, setGameTime] = useState(0);
+  const gameStartTime = useRef(Date.now());
+  const [hasShuffled, setHasShuffled] = useState(false); // Only check wins after shuffle
+
+  // Keyboard cursor state for speedcube controls
+  // face: which face the cursor is on (PZ, NZ, PX, NX, PY, NY)
+  // row/col: position on that face (0 to size-1)
+  const [cursor, setCursor] = useState({ face: 'PZ', row: 1, col: 1 });
+  const [showCursor, setShowCursor] = useState(false); // Show cursor when keyboard is used
+
   const chaosMode=chaosLevel>0;
 
   const [animState,setAnimState]=useState(null);
@@ -3068,10 +3784,47 @@ export default function WORM3(){
     return { flips, wormholes, entropy: Math.round((off/total)*100) };
   },[cubies]);
 
-  useEffect(()=>{ 
-    setCubies(makeCubies(size)); 
-    setMoves(0); 
-    setAnimState(null); 
+  // Game timer
+  useEffect(() => {
+    if (victory) return; // Pause timer when victory screen is showing
+    const interval = setInterval(() => {
+      setGameTime(Math.floor((Date.now() - gameStartTime.current) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [victory]);
+
+  // Win condition detection
+  useEffect(() => {
+    // Only check for wins after the puzzle has been shuffled
+    if (!hasShuffled) return;
+    // Don't check if victory screen is already showing
+    if (victory) return;
+
+    const wins = detectWinConditions(cubies, size);
+
+    // Prioritize ultimate win, then check individual wins
+    if (wins.ultimate && !achievedWins.ultimate) {
+      setVictory('ultimate');
+      setAchievedWins(prev => ({ ...prev, ultimate: true, rubiks: true, sudokube: true }));
+    } else if (wins.rubiks && !achievedWins.rubiks) {
+      setVictory('rubiks');
+      setAchievedWins(prev => ({ ...prev, rubiks: true }));
+    } else if (wins.sudokube && !achievedWins.sudokube) {
+      setVictory('sudokube');
+      setAchievedWins(prev => ({ ...prev, sudokube: true }));
+    }
+  }, [cubies, size, hasShuffled, victory, achievedWins]);
+
+  useEffect(()=>{
+    setCubies(makeCubies(size));
+    setMoves(0);
+    setAnimState(null);
+    // Reset win tracking when size changes
+    setVictory(null);
+    setAchievedWins({ rubiks: false, sudokube: false, ultimate: false });
+    gameStartTime.current = Date.now();
+    setGameTime(0);
+    setHasShuffled(false); // Require shuffle for new size
   },[size]);
 
   useEffect(()=>{
@@ -3080,20 +3833,23 @@ export default function WORM3(){
     const period=[0,1000,750,500,350][chaosLevel];
 
     const step=(state)=>{
-      const S=state.length; 
+      const S=state.length;
       const unstable=[];
-      
+
       for(let x=0;x<S;x++)for(let y=0;y<S;y++)for(let z=0;z<S;z++){
         const c=state[x][y][z];
         for(const dirKey of Object.keys(c.stickers)){
           const st=c.stickers[dirKey];
           const onEdge=(dirKey==='PX'&&x===S-1)||(dirKey==='NX'&&x===0)||(dirKey==='PY'&&y===S-1)||(dirKey==='NY'&&y===0)||(dirKey==='PZ'&&z===S-1)||(dirKey==='NZ'&&z===0);
-          if(st.flips>0 && st.curr!==st.orig && onEdge) 
+          if(st.flips>0 && st.curr!==st.orig && onEdge)
             unstable.push({x,y,z,dirKey,flips:st.flips});
         }
       }
-      
+
       if(!unstable.length) return state;
+
+      // Compute manifoldMap from current state to avoid stale closure
+      const currentManifoldMap = buildManifoldGridMap(state, S);
 
       const src=unstable[Math.floor(Math.random()*unstable.length)];
       const base=[0,0.10,0.20,0.35,0.50][chaosLevel];
@@ -3101,32 +3857,32 @@ export default function WORM3(){
 
       let next=state;
       if (Math.random()<pSelf) {
-        next=flipStickerPair(next,S,src.x,src.y,src.z,src.dirKey, manifoldMap); 
+        next=flipStickerPair(next,S,src.x,src.y,src.z,src.dirKey, currentManifoldMap);
       }
 
       const neighbors=(()=>{
         const N=[];
-        if(src.dirKey==='PX'||src.dirKey==='NX'){ 
-          const xi=src.dirKey==='PX'?S-1:0; 
+        if(src.dirKey==='PX'||src.dirKey==='NX'){
+          const xi=src.dirKey==='PX'?S-1:0;
           const add=(yy,zz)=>{ if(yy>=0&&yy<S&&zz>=0&&zz<S)N.push([xi,yy,zz]); };
-          add(src.y-1,src.z); add(src.y+1,src.z); add(src.y,src.z-1); add(src.y,src.z+1); 
+          add(src.y-1,src.z); add(src.y+1,src.z); add(src.y,src.z-1); add(src.y,src.z+1);
         }
-        else if(src.dirKey==='PY'||src.dirKey==='NY'){ 
-          const yi=src.dirKey==='PY'?S-1:0; 
+        else if(src.dirKey==='PY'||src.dirKey==='NY'){
+          const yi=src.dirKey==='PY'?S-1:0;
           const add=(xx,zz)=>{ if(xx>=0&&xx<S&&zz>=0&&zz<S)N.push([xx,yi,zz]); };
-          add(src.x-1,src.z); add(src.x+1,src.z); add(src.x,src.z-1); add(src.x,src.z+1); 
+          add(src.x-1,src.z); add(src.x+1,src.z); add(src.x,src.z-1); add(src.x,src.z+1);
         }
-        else { 
-          const zi=src.dirKey==='PZ'?S-1:0; 
+        else {
+          const zi=src.dirKey==='PZ'?S-1:0;
           const add=(xx,yy)=>{ if(xx>=0&&xx<S&&yy>=0&&yy<S)N.push([xx,yy,zi]); };
-          add(src.x-1,src.y); add(src.x+1,src.y); add(src.x,src.y-1); add(src.x,src.y+1); 
+          add(src.x-1,src.y); add(src.x+1,src.y); add(src.x,src.y-1); add(src.x,src.y+1);
         }
         return N;
       })();
 
       for(const [nx,ny,nz] of neighbors) {
         if(Math.random()<pN) {
-          next=flipStickerPair(next,S,nx,ny,nz,src.dirKey, manifoldMap); 
+          next=flipStickerPair(next,S,nx,ny,nz,src.dirKey, currentManifoldMap); 
           
           const fromPos = getStickerWorldPos(src.x, src.y, src.z, src.dirKey, S, explosionT);
           const toPos = getStickerWorldPos(nx, ny, nz, src.dirKey, S, explosionT);
@@ -3152,7 +3908,7 @@ export default function WORM3(){
     };
     raf=requestAnimationFrame(loop);
     return ()=>cancelAnimationFrame(raf);
-  },[chaosMode,chaosLevel,explosionT, manifoldMap]); 
+  },[chaosMode,chaosLevel,explosionT]); 
 
   const handleAnimComplete=()=>{
     if(pendingMove){
@@ -3172,7 +3928,11 @@ export default function WORM3(){
   };
 
   const onTapFlip=(pos,dirKey)=>{
-    setCubies(prev=>flipStickerPair(prev,size,pos.x,pos.y,pos.z,dirKey, manifoldMap));
+    setCubies(prev=>{
+      // Compute manifoldMap from current state to avoid stale closure
+      const currentManifoldMap = buildManifoldGridMap(prev, size);
+      return flipStickerPair(prev,size,pos.x,pos.y,pos.z,dirKey, currentManifoldMap);
+    });
     setMoves(m=>m+1);
 
     // Trigger first-flip tutorial
@@ -3196,14 +3956,277 @@ export default function WORM3(){
       const dir=Math.random()>0.5?1:-1;
       state=rotateSliceCubies(state,size,ax,slice,dir);
     }
-    setCubies(state); 
+    setCubies(state);
     setMoves(0);
+    // Reset win tracking for new game
+    setVictory(null);
+    setAchievedWins({ rubiks: false, sudokube: false, ultimate: false });
+    gameStartTime.current = Date.now();
+    setGameTime(0);
+    setHasShuffled(true); // Enable win detection
   };
 
   const reset=()=>{
     setCubies(makeCubies(size));
     setMoves(0);
     play('/sounds/rotate.mp3');
+    // Reset win tracking
+    setVictory(null);
+    setAchievedWins({ rubiks: false, sudokube: false, ultimate: false });
+    gameStartTime.current = Date.now();
+    setGameTime(0);
+    setHasShuffled(false); // Disable win detection until next shuffle
+  };
+
+  // Victory screen handlers
+  const handleVictoryContinue = () => {
+    // Dismiss victory screen but keep playing
+    setVictory(null);
+  };
+
+  const handleVictoryNewGame = () => {
+    // Start a fresh shuffled game
+    setVictory(null);
+    shuffle();
+  };
+
+  // Convert cursor (face, row, col) to cube coordinates (x, y, z) and dirKey
+  const cursorToCubePos = (cur) => {
+    const { face, row, col } = cur;
+    const maxIdx = size - 1;
+
+    switch (face) {
+      case 'PZ': // Front face (red) - z = maxIdx
+        return { x: col, y: maxIdx - row, z: maxIdx, dirKey: 'PZ' };
+      case 'NZ': // Back face (orange) - z = 0
+        return { x: maxIdx - col, y: maxIdx - row, z: 0, dirKey: 'NZ' };
+      case 'PX': // Right face (blue) - x = maxIdx
+        return { x: maxIdx, y: maxIdx - row, z: maxIdx - col, dirKey: 'PX' };
+      case 'NX': // Left face (green) - x = 0
+        return { x: 0, y: maxIdx - row, z: col, dirKey: 'NX' };
+      case 'PY': // Top face (white) - y = maxIdx
+        return { x: col, y: maxIdx, z: row, dirKey: 'PY' };
+      case 'NY': // Bottom face (yellow) - y = 0
+        return { x: col, y: 0, z: maxIdx - row, dirKey: 'NY' };
+      default:
+        return { x: 1, y: 1, z: maxIdx, dirKey: 'PZ' };
+    }
+  };
+
+  // Convert cube coordinates (x, y, z) + dirKey to cursor (face, row, col)
+  const cubePosToCursor = (pos, dirKey) => {
+    const { x, y, z } = pos;
+    const maxIdx = size - 1;
+
+    switch (dirKey) {
+      case 'PZ': // Front face - z = maxIdx
+        return { face: 'PZ', row: maxIdx - y, col: x };
+      case 'NZ': // Back face - z = 0
+        return { face: 'NZ', row: maxIdx - y, col: maxIdx - x };
+      case 'PX': // Right face - x = maxIdx
+        return { face: 'PX', row: maxIdx - y, col: maxIdx - z };
+      case 'NX': // Left face - x = 0
+        return { face: 'NX', row: maxIdx - y, col: z };
+      case 'PY': // Top face - y = maxIdx
+        return { face: 'PY', row: z, col: x };
+      case 'NY': // Bottom face - y = 0
+        return { face: 'NY', row: maxIdx - z, col: x };
+      default:
+        return { face: 'PZ', row: 1, col: 1 };
+    }
+  };
+
+  // Handle tile selection (left click)
+  const handleSelectTile = (pos, dirKey) => {
+    const newCursor = cubePosToCursor(pos, dirKey);
+    setCursor(newCursor);
+    setShowCursor(true);
+  };
+
+  // Move cursor with face wrapping
+  const moveCursor = (direction) => {
+    setCursor(cur => {
+      const { face, row, col } = cur;
+      const maxIdx = size - 1;
+
+      // Define face adjacencies for wrapping
+      // Format: { direction: [newFace, transformRow, transformCol] }
+      const adjacencies = {
+        'PZ': { // Front
+          up: ['PY', (r, c) => [maxIdx, c]],
+          down: ['NY', (r, c) => [0, c]],
+          left: ['NX', (r, c) => [r, maxIdx]],
+          right: ['PX', (r, c) => [r, 0]]
+        },
+        'NZ': { // Back
+          up: ['PY', (r, c) => [0, maxIdx - c]],
+          down: ['NY', (r, c) => [maxIdx, maxIdx - c]],
+          left: ['PX', (r, c) => [r, maxIdx]],
+          right: ['NX', (r, c) => [r, 0]]
+        },
+        'PX': { // Right
+          up: ['PY', (r, c) => [maxIdx - c, maxIdx]],
+          down: ['NY', (r, c) => [c, maxIdx]],
+          left: ['PZ', (r, c) => [r, maxIdx]],
+          right: ['NZ', (r, c) => [r, 0]]
+        },
+        'NX': { // Left
+          up: ['PY', (r, c) => [c, 0]],
+          down: ['NY', (r, c) => [maxIdx - c, 0]],
+          left: ['NZ', (r, c) => [r, maxIdx]],
+          right: ['PZ', (r, c) => [r, 0]]
+        },
+        'PY': { // Top
+          up: ['NZ', (r, c) => [0, maxIdx - c]],
+          down: ['PZ', (r, c) => [0, c]],
+          left: ['NX', (r, c) => [0, c]],
+          right: ['PX', (r, c) => [0, maxIdx - c]]
+        },
+        'NY': { // Bottom
+          up: ['PZ', (r, c) => [maxIdx, c]],
+          down: ['NZ', (r, c) => [maxIdx, maxIdx - c]],
+          left: ['NX', (r, c) => [maxIdx, maxIdx - c]],
+          right: ['PX', (r, c) => [maxIdx, c]]
+        }
+      };
+
+      let newRow = row, newCol = col, newFace = face;
+
+      switch (direction) {
+        case 'up':
+          if (row > 0) { newRow = row - 1; }
+          else {
+            const [nf, transform] = adjacencies[face].up;
+            newFace = nf;
+            [newRow, newCol] = transform(row, col);
+          }
+          break;
+        case 'down':
+          if (row < maxIdx) { newRow = row + 1; }
+          else {
+            const [nf, transform] = adjacencies[face].down;
+            newFace = nf;
+            [newRow, newCol] = transform(row, col);
+          }
+          break;
+        case 'left':
+          if (col > 0) { newCol = col - 1; }
+          else {
+            const [nf, transform] = adjacencies[face].left;
+            newFace = nf;
+            [newRow, newCol] = transform(row, col);
+          }
+          break;
+        case 'right':
+          if (col < maxIdx) { newCol = col + 1; }
+          else {
+            const [nf, transform] = adjacencies[face].right;
+            newFace = nf;
+            [newRow, newCol] = transform(row, col);
+          }
+          break;
+      }
+
+      return { face: newFace, row: newRow, col: newCol };
+    });
+    setShowCursor(true);
+  };
+
+  // Perform rotation based on cursor position
+  // Rotations are relative to looking at the face the cursor is on
+  const performCursorRotation = (rotationType) => {
+    if (animState) return; // Don't allow rotation during animation
+
+    const pos = cursorToCubePos(cursor);
+    const { face } = cursor;
+
+    // Determine axis and direction based on face and rotation type
+    // W/S move the row (horizontal slice) up/down visually
+    // A/D move the column (vertical slice) left/right visually
+    // Q/E rotate the face itself CCW/CW
+
+    let axis, dir;
+
+    switch (rotationType) {
+      case 'up': // W - move pieces upward on screen
+        // Rotates the column slice that the cursor is on
+        switch (face) {
+          case 'PZ': axis = 'col'; dir = -1; break;
+          case 'NZ': axis = 'col'; dir = 1; break;
+          case 'PX': axis = 'depth'; dir = 1; break;
+          case 'NX': axis = 'depth'; dir = -1; break;
+          case 'PY': axis = 'depth'; dir = -1; break;
+          case 'NY': axis = 'depth'; dir = 1; break;
+        }
+        break;
+
+      case 'down': // S - move pieces downward on screen
+        switch (face) {
+          case 'PZ': axis = 'col'; dir = 1; break;
+          case 'NZ': axis = 'col'; dir = -1; break;
+          case 'PX': axis = 'depth'; dir = -1; break;
+          case 'NX': axis = 'depth'; dir = 1; break;
+          case 'PY': axis = 'depth'; dir = 1; break;
+          case 'NY': axis = 'depth'; dir = -1; break;
+        }
+        break;
+
+      case 'left': // A - move pieces leftward on screen
+        switch (face) {
+          case 'PZ': axis = 'row'; dir = -1; break;
+          case 'NZ': axis = 'row'; dir = -1; break;
+          case 'PX': axis = 'row'; dir = -1; break;
+          case 'NX': axis = 'row'; dir = -1; break;
+          case 'PY': axis = 'col'; dir = -1; break;
+          case 'NY': axis = 'col'; dir = 1; break;
+        }
+        break;
+
+      case 'right': // D - move pieces rightward on screen
+        switch (face) {
+          case 'PZ': axis = 'row'; dir = 1; break;
+          case 'NZ': axis = 'row'; dir = 1; break;
+          case 'PX': axis = 'row'; dir = 1; break;
+          case 'NX': axis = 'row'; dir = 1; break;
+          case 'PY': axis = 'col'; dir = 1; break;
+          case 'NY': axis = 'col'; dir = -1; break;
+        }
+        break;
+
+      case 'ccw': // Q - rotate face counter-clockwise (from viewer's perspective looking at cube)
+        switch (face) {
+          case 'PZ': axis = 'depth'; dir = 1; break;
+          case 'NZ': axis = 'depth'; dir = 1; break;   // same as PZ from front view
+          case 'PX': axis = 'col'; dir = 1; break;     // flipped for side view
+          case 'NX': axis = 'col'; dir = -1; break;    // flipped for side view
+          case 'PY': axis = 'row'; dir = -1; break;    // flipped for top view
+          case 'NY': axis = 'row'; dir = 1; break;     // flipped for bottom view
+        }
+        break;
+
+      case 'cw': // E - rotate face clockwise (from viewer's perspective looking at cube)
+        switch (face) {
+          case 'PZ': axis = 'depth'; dir = -1; break;
+          case 'NZ': axis = 'depth'; dir = -1; break;  // same as PZ from front view
+          case 'PX': axis = 'col'; dir = -1; break;    // flipped for side view
+          case 'NX': axis = 'col'; dir = 1; break;     // flipped for side view
+          case 'PY': axis = 'row'; dir = 1; break;     // flipped for top view
+          case 'NY': axis = 'row'; dir = -1; break;    // flipped for bottom view
+        }
+        break;
+    }
+
+    if (axis && dir !== undefined) {
+      onMove(axis, dir, pos);
+    }
+    setShowCursor(true);
+  };
+
+  // Flip the tile at cursor position
+  const performCursorFlip = () => {
+    const pos = cursorToCubePos(cursor);
+    onTapFlip({ x: pos.x, y: pos.y, z: pos.z }, pos.dirKey);
+    setShowCursor(true);
   };
 
   // Keyboard shortcuts
@@ -3212,26 +4235,39 @@ export default function WORM3(){
       // Don't trigger if typing in an input
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
-      switch(e.key.toLowerCase()) {
+      const key = e.key.toLowerCase();
+
+      // Arrow keys - cursor movement
+      if (e.key === 'ArrowUp') { e.preventDefault(); moveCursor('up'); return; }
+      if (e.key === 'ArrowDown') { e.preventDefault(); moveCursor('down'); return; }
+      if (e.key === 'ArrowLeft') { e.preventDefault(); moveCursor('left'); return; }
+      if (e.key === 'ArrowRight') { e.preventDefault(); moveCursor('right'); return; }
+
+      // WASDQE - rotation controls
+      if (key === 'w') { e.preventDefault(); performCursorRotation('up'); return; }
+      if (key === 's') { e.preventDefault(); performCursorRotation('down'); return; }
+      if (key === 'a') { e.preventDefault(); performCursorRotation('left'); return; }
+      if (key === 'd') { e.preventDefault(); performCursorRotation('right'); return; }
+      if (key === 'q') { e.preventDefault(); performCursorRotation('ccw'); return; }
+      if (key === 'e') { e.preventDefault(); performCursorRotation('cw'); return; }
+
+      // F - flip at cursor (only if flipMode is on)
+      if (key === 'f') { e.preventDefault(); if(flipMode) performCursorFlip(); return; }
+
+      // Other shortcuts
+      switch(key) {
         case 'h':
         case '?':
           setShowHelp(h => !h);
           break;
-        case ' ':
-          e.preventDefault();
-          shuffle();
-          break;
-        case 'r':
-          reset();
-          break;
-        case 'f':
+        case 'g': // Changed from 'f' - toggle flip mode for mouse
           setFlipMode(f => !f);
           break;
         case 't':
           setShowTunnels(t => !t);
           break;
-        case 'e':
-          setExploded(e => !e);
+        case 'x': // Changed from 'e' - toggle exploded view
+          setExploded(ex => !ex);
           break;
         case 'v':
           setVisualMode(v =>
@@ -3247,13 +4283,14 @@ export default function WORM3(){
         case 'escape':
           setShowHelp(false);
           setShowSettings(false);
+          setShowCursor(false); // Hide cursor on escape
           break;
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [cursor, animState, size]);
 
   const cameraZ = ({2:8,3:10,4:14,5:18}[size] || 10);
   
@@ -3265,7 +4302,7 @@ export default function WORM3(){
     <div className="full-screen">
       {showTutorial && <Tutorial onClose={closeTutorial} />}
 
-      <div className="canvas-container">
+      <div className="canvas-container" onContextMenu={e => e.preventDefault()}>
         <Canvas camera={{ position:[0,0,cameraZ], fov:40 }}>
           <ambientLight intensity={visualMode === 'wireframe' ? 0.2 : 1.25}/>
           <pointLight position={[10,10,10]} intensity={visualMode === 'wireframe' ? 0.3 : 1.35}/>
@@ -3279,6 +4316,7 @@ export default function WORM3(){
           )}
           <Suspense fallback={null}>
             <Environment preset="city"/>
+            <ManifoldGrid color="#3d5a3d" opacity={0.12} />
             <CubeAssembly
               size={size}
               cubies={cubies}
@@ -3293,6 +4331,10 @@ export default function WORM3(){
               onCascadeComplete={onCascadeComplete}
               manifoldMap={manifoldMap}
               showInvitation={!hasFlippedOnce}
+              cursor={cursor}
+              showCursor={showCursor}
+              flipMode={flipMode}
+              onSelectTile={handleSelectTile}
             />
           </Suspense>
         </Canvas>
@@ -3310,6 +4352,7 @@ export default function WORM3(){
           cubies={cubies}
           onShowHelp={() => setShowHelp(true)}
           onShowSettings={() => setShowSettings(true)}
+          achievedWins={achievedWins}
         />
 
         {/* Bottom Section - Controls & Manifold Selector */}
@@ -3396,10 +4439,21 @@ export default function WORM3(){
         </div>
       </div>
 
-      {showMainMenu && <MainMenu onStart={() => setShowMainMenu(false)} />}
+      {showMainMenu && <MainMenu onStart={() => { setShowMainMenu(false); shuffle(); }} />}
       {showSettings && <SettingsMenu onClose={() => setShowSettings(false)} />}
       {showHelp && <HelpMenu onClose={() => setShowHelp(false)} />}
       {showFirstFlipTutorial && <FirstFlipTutorial onClose={() => setShowFirstFlipTutorial(false)} />}
+
+      {/* Victory Screen - highest z-index */}
+      {victory && (
+        <VictoryScreen
+          winType={victory}
+          moves={moves}
+          time={gameTime}
+          onContinue={handleVictoryContinue}
+          onNewGame={handleVictoryNewGame}
+        />
+      )}
     </div>
   );
 }
