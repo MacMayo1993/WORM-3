@@ -103,8 +103,14 @@ const CubeAssembly = ({
           // Right click = flip (only if flipMode is on)
           if (flipMode) onTapFlip(dragStart.pos, dirKey);
         } else {
-          // Left click = select tile
-          if (onSelectTile) onSelectTile(dragStart.pos, dirKey);
+          // Left click/tap behavior depends on flipMode
+          if (flipMode) {
+            // When flip mode is enabled, tap/left-click performs flip (mobile-friendly)
+            onTapFlip(dragStart.pos, dirKey);
+          } else {
+            // When flip mode is disabled, tap/left-click selects tile
+            if (onSelectTile) onSelectTile(dragStart.pos, dirKey);
+          }
         }
       }
       setDragStart(null);
