@@ -157,18 +157,6 @@ const StickerPlane = function StickerPlane({ meta, pos, rot=[0,0,0], overlay, mo
         />
       </mesh>
 
-      {/* Origin color circle - skip if it would be white on a non-white tile */}
-      {!isSudokube && hasFlipHistory && !(origIsWhite && !currIsWhite) && (
-        <mesh position={[0,0,0.01]}>
-          <circleGeometry args={[trackerRadius,32]} />
-          <meshBasicMaterial
-            color={origColor}
-            opacity={isWormhole ? 1.0 : 0.5}
-            transparent={!isWormhole}
-          />
-        </mesh>
-      )}
-
       {/* Tally Marks - skip if origColor is white on non-white tile */}
       {!isSudokube && hasFlipHistory && !(origIsWhite && !currIsWhite) && (
         <TallyMarks
