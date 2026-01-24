@@ -12,20 +12,22 @@ const FlipParticles = ({ active, color, onComplete }) => {
   const groupRef = useRef();
   const progressRef = useRef(0);
   const velocitiesRef = useRef([]);
-  const PARTICLE_COUNT = 16;
+  const PARTICLE_COUNT = 24;
 
   // Initialize particle velocities on activation
   useEffect(() => {
     if (active) {
       progressRef.current = 0;
       velocitiesRef.current = Array.from({ length: PARTICLE_COUNT }, (_, i) => {
-        const angle = (i / PARTICLE_COUNT) * Math.PI * 2 + Math.random() * 0.3;
-        const speed = 1.5 + Math.random() * 1.5;
+        const angle = (i / PARTICLE_COUNT) * Math.PI * 2 + Math.random() * 0.4;
+        const speed = 2.5 + Math.random() * 2.0;
+        const size = 0.06 + Math.random() * 0.06; // Varied sizes
         return {
           x: Math.cos(angle) * speed,
           y: Math.sin(angle) * speed,
-          z: (Math.random() - 0.5) * 2,
-          rotSpeed: (Math.random() - 0.5) * 10
+          z: (Math.random() - 0.5) * 1.5,
+          rotSpeed: (Math.random() - 0.5) * 15,
+          size
         };
       });
     }
@@ -34,7 +36,8 @@ const FlipParticles = ({ active, color, onComplete }) => {
   useFrame((_, delta) => {
     if (!active || !groupRef.current) return;
 
-    progressRef.current += delta * 2.5;
+    // Slower progression for longer-lasting particles
+    progressRef.current += delta * 1.8;
     const p = progressRef.current;
 
     if (p >= 1) {
@@ -42,30 +45,31 @@ const FlipParticles = ({ active, color, onComplete }) => {
       return;
     }
 
-    // Ease out cubic for smooth deceleration
-    const easeOut = 1 - Math.pow(1 - p, 3);
-    const opacity = 1 - easeOut;
+    // Ease out quart for explosive start, slow fade
+    const easeOut = 1 - Math.pow(1 - p, 4);
+    // Fade out slower - stay bright longer
+    const opacity = Math.pow(1 - p, 0.5);
 
     particlesRef.current.forEach((mesh, i) => {
       if (!mesh) return;
       const vel = velocitiesRef.current[i];
       if (!vel) return;
 
-      // Position with easing
-      mesh.position.x = vel.x * easeOut * 0.5;
-      mesh.position.y = vel.y * easeOut * 0.5;
-      mesh.position.z = vel.z * easeOut * 0.3 + 0.02;
+      // Position - travel much farther
+      mesh.position.x = vel.x * easeOut * 0.8;
+      mesh.position.y = vel.y * easeOut * 0.8;
+      mesh.position.z = vel.z * easeOut * 0.4 + 0.05;
 
       // Rotation
       mesh.rotation.z = vel.rotSpeed * p;
 
-      // Scale down as they fly out
-      const scale = (1 - easeOut * 0.7) * 0.08;
-      mesh.scale.set(scale, scale, scale);
+      // Scale - start big, shrink as they fly
+      const baseScale = vel.size * (1 - easeOut * 0.5);
+      mesh.scale.set(baseScale, baseScale, baseScale * 0.5);
 
-      // Update opacity
+      // Update opacity - bright and visible
       if (mesh.material) {
-        mesh.material.opacity = opacity * 0.9;
+        mesh.material.opacity = opacity;
       }
     });
   });
@@ -73,18 +77,20 @@ const FlipParticles = ({ active, color, onComplete }) => {
   if (!active) return null;
 
   return (
-    <group ref={groupRef} position={[0, 0, 0.03]}>
+    <group ref={groupRef} position={[0, 0, 0.05]}>
       {Array.from({ length: PARTICLE_COUNT }, (_, i) => (
         <mesh
           key={i}
           ref={el => particlesRef.current[i] = el}
         >
-          <boxGeometry args={[1, 1, 0.3]} />
+          <planeGeometry args={[1, 1]} />
           <meshBasicMaterial
             color={color}
             transparent
-            opacity={0.9}
+            opacity={1}
             blending={THREE.AdditiveBlending}
+            side={THREE.DoubleSide}
+            depthWrite={false}
           />
         </mesh>
       ))}
