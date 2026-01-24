@@ -14,9 +14,12 @@ const WormholeTunnel = ({ meshIdx1, meshIdx2, dirKey1, dirKey2, cubieRefs, inten
     return Array.from({ length: count }, (_, i) => {
       const angle = (i / count) * Math.PI * 4;
       const radiusFactor = Math.sqrt(i / count);
+      // Alternate sides: even indices go positive, odd go negative
+      const side = i % 2 === 0 ? 1 : -1;
       return {
         id: i,
         angle,
+        side, // Which side of the cube this strand curves towards
         radius: (0.1 + radiusFactor * 0.25) * 1.25, // 25% thicker
         baseOpacity: flips > 0 ? (0.4 + (1 - radiusFactor) * 0.6) : (0.2 + (1 - radiusFactor) * 0.4), // More vibrant
         lineWidth: Math.max(0.375, (1.5 - radiusFactor * 1.2) * 1.25), // 25% thicker lines
@@ -54,8 +57,6 @@ const WormholeTunnel = ({ meshIdx1, meshIdx2, dirKey1, dirKey2, cubieRefs, inten
     const vStart = new THREE.Vector3(...pos1);
     const vEnd = new THREE.Vector3(...pos2);
 
-    const baseControlPoint = calculateSmartControlPoint(pos1, pos2, size);
-
     pulseT.current += delta * (2 + intensity * 0.5);
     const pulse = Math.sin(pulseT.current) * 0.1 + 0.9;
 
@@ -69,6 +70,9 @@ const WormholeTunnel = ({ meshIdx1, meshIdx2, dirKey1, dirKey2, cubieRefs, inten
         const spark = sparkPulse > 0.9 ? (sparkPulse - 0.9) * 10 : 0; // Random bright flashes
         line.material.opacity = config.baseOpacity * pulse * (1 + spark * 0.5);
       }
+
+      // Calculate control point for this strand's side (balanced left/right)
+      const baseControlPoint = calculateSmartControlPoint(pos1, pos2, size, config.side);
 
       const offsetX = Math.cos(config.angle) * config.radius;
       const offsetY = Math.sin(config.angle) * config.radius;
