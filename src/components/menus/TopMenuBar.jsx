@@ -17,18 +17,18 @@ const TopMenuBar = ({
   const [time, setTime] = useState(0);
   const startTime = useRef(Date.now());
 
-  // Retro color palette
+  // Modern color palette - blue and white theme
   const colors = {
-    ink: '#582f0e',
-    inkMedium: '#7f5539',
-    inkLight: '#9c6644',
-    burntOrange: '#bc6c25',
-    burntOrangeLight: '#dda15e',
-    avocado: '#606c38',
-    mustard: '#d4a373',
-    paper: '#f2e8cf',
-    paperCream: '#fefae0',
-    divider: 'rgba(188, 108, 37, 0.25)'
+    primary: '#3b82f6',
+    primaryLight: '#60a5fa',
+    primaryDark: '#2563eb',
+    secondary: '#8b5cf6',
+    accent: '#06b6d4',
+    text: 'rgba(255, 255, 255, 0.95)',
+    textMuted: 'rgba(255, 255, 255, 0.7)',
+    textDim: 'rgba(255, 255, 255, 0.5)',
+    background: 'rgba(30, 35, 50, 0.9)',
+    divider: 'rgba(255, 255, 255, 0.12)'
   };
 
   useEffect(() => {
@@ -40,7 +40,7 @@ const TopMenuBar = ({
 
   // Calculate parity (even/odd flips)
   const parity = metrics.flips % 2 === 0 ? 'EVEN' : 'ODD';
-  const parityColor = parity === 'EVEN' ? colors.avocado : colors.burntOrange;
+  const parityColor = parity === 'EVEN' ? colors.accent : colors.secondary;
 
   // Calculate face completion
   const faceStats = useMemo(() => {
@@ -98,10 +98,13 @@ const TopMenuBar = ({
           <h1 style={{
             margin: 0,
             fontSize: '28px',
-            fontFamily: 'Georgia, serif',
-            fontStyle: 'italic',
+            fontFamily: '"Product Sans", "Google Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+            fontStyle: 'normal',
             fontWeight: 700,
-            color: colors.ink,
+            background: `linear-gradient(135deg, ${colors.primary} 0%, ${colors.primaryLight} 100%)`,
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
             letterSpacing: '0.02em',
             lineHeight: 1
           }}>WORM³</h1>
@@ -112,14 +115,14 @@ const TopMenuBar = ({
           padding: '8px 4px',
           display: 'flex',
           gap: '1px',
-          background: colors.paperCream,
+          background: colors.background,
           border: `1px solid ${colors.divider}`
         }}>
           {[
-            { label: 'Moves', val: moves, color: colors.avocado },
-            { label: 'Flips', val: metrics.flips, color: colors.burntOrange },
-            { label: 'Pairs', val: metrics.wormholes, color: colors.mustard },
-            { label: 'Time', val: formatTime(time), color: colors.ink }
+            { label: 'Moves', val: moves, color: colors.primaryLight },
+            { label: 'Flips', val: metrics.flips, color: colors.accent },
+            { label: 'Pairs', val: metrics.wormholes, color: colors.secondary },
+            { label: 'Time', val: formatTime(time), color: colors.text }
           ].map((stat, i) => (
             <div key={stat.label} style={{
               padding: '4px 14px',
@@ -129,13 +132,14 @@ const TopMenuBar = ({
               <div style={{
                 fontSize: '9px',
                 textTransform: 'uppercase',
-                color: colors.inkLight,
+                color: colors.textMuted,
                 letterSpacing: '0.1em',
-                marginBottom: '2px'
+                marginBottom: '2px',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
               }}>{stat.label}</div>
               <div style={{
                 fontSize: '18px',
-                fontFamily: "'Courier New', monospace",
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
                 fontWeight: 600,
                 color: stat.color
               }}>{stat.val}</div>
@@ -155,18 +159,17 @@ const TopMenuBar = ({
         {/* Parity Tag */}
         <div className="ui-element" style={{
           padding: '5px 12px',
-          background: `linear-gradient(135deg, ${parityColor}18, ${parityColor}08)`,
-          borderColor: parityColor,
-          borderWidth: '1px 2px 2px 1px'
+          background: `linear-gradient(135deg, ${parityColor}30, ${parityColor}10)`,
+          borderColor: parityColor
         }}>
           <span style={{
             fontSize: '11px',
             fontWeight: 600,
             color: parityColor,
-            letterSpacing: '0.1em',
-            fontFamily: 'Georgia, serif'
+            letterSpacing: '0.08em',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
           }}>
-            ⟲ {parity}
+            {parity}
           </span>
         </div>
 
@@ -175,9 +178,9 @@ const TopMenuBar = ({
           <span style={{
             fontSize: '11px',
             fontWeight: 600,
-            color: colors.ink,
+            color: colors.text,
             letterSpacing: '0.05em',
-            fontFamily: "'Courier New', monospace"
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
           }}>
             {size}×{size}×{size}
           </span>
@@ -186,14 +189,14 @@ const TopMenuBar = ({
         {/* Mode Tag */}
         <div className="ui-element" style={{
           padding: '5px 12px',
-          background: `linear-gradient(135deg, ${colors.inkLight}15, transparent)`
+          background: `linear-gradient(135deg, ${colors.primaryLight}20, transparent)`
         }}>
           <span style={{
             fontSize: '11px',
             fontWeight: 600,
-            color: colors.inkMedium,
-            fontStyle: 'italic',
-            fontFamily: 'Georgia, serif'
+            color: colors.primaryLight,
+            fontStyle: 'normal',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
           }}>
             {modeLabel}
           </span>
@@ -203,15 +206,16 @@ const TopMenuBar = ({
         {flipMode && (
           <div className="ui-element" style={{
             padding: '5px 12px',
-            background: `linear-gradient(135deg, ${colors.burntOrange}20, ${colors.burntOrange}08)`,
-            borderColor: colors.burntOrange
+            background: `linear-gradient(135deg, ${colors.primary}30, ${colors.primary}10)`,
+            borderColor: colors.primary
           }}>
             <span style={{
               fontSize: '11px',
               fontWeight: 600,
-              color: colors.burntOrange,
-              letterSpacing: '0.1em'
-            }}>⚡ Flip</span>
+              color: colors.primary,
+              letterSpacing: '0.08em',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+            }}>Flip</span>
           </div>
         )}
 
@@ -219,16 +223,17 @@ const TopMenuBar = ({
         {chaosMode && (
           <div className="ui-element" style={{
             padding: '5px 12px',
-            background: 'linear-gradient(135deg, #9c4a1a25, #9c4a1a10)',
-            borderColor: '#9c4a1a',
+            background: 'linear-gradient(135deg, #ef444430, #ef444410)',
+            borderColor: '#ef4444',
             animation: 'chaos-pulse 1.5s ease-in-out infinite'
           }}>
             <span style={{
               fontSize: '11px',
               fontWeight: 600,
-              color: '#9c4a1a',
-              letterSpacing: '0.1em'
-            }}>☢ Chaos L{chaosLevel}</span>
+              color: '#ef4444',
+              letterSpacing: '0.08em',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+            }}>Chaos L{chaosLevel}</span>
           </div>
         )}
 
@@ -242,43 +247,46 @@ const TopMenuBar = ({
             {achievedWins.ultimate ? (
               <div className="ui-element" style={{
                 padding: '5px 12px',
-                background: 'linear-gradient(135deg, #eab30830, #eab30815)',
-                borderColor: '#eab308',
+                background: 'linear-gradient(135deg, #fbbf2430, #fbbf2415)',
+                borderColor: '#fbbf24',
                 animation: 'pulse 2s ease-in-out infinite'
               }}>
                 <span style={{
                   fontSize: '11px',
                   fontWeight: 600,
-                  color: '#ca8a04',
-                  letterSpacing: '0.05em'
-                }}>👑 ULTIMATE</span>
+                  color: '#fbbf24',
+                  letterSpacing: '0.08em',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+                }}>ULTIMATE</span>
               </div>
             ) : (
               <>
                 {achievedWins.rubiks && (
                   <div className="ui-element" style={{
                     padding: '5px 10px',
-                    background: 'linear-gradient(135deg, #22c55e25, #22c55e10)',
-                    borderColor: '#22c55e'
+                    background: 'linear-gradient(135deg, #10b98130, #10b98115)',
+                    borderColor: '#10b981'
                   }}>
                     <span style={{
                       fontSize: '10px',
                       fontWeight: 600,
-                      color: '#16a34a'
-                    }}>🎲 Colors</span>
+                      color: '#10b981',
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+                    }}>Colors</span>
                   </div>
                 )}
                 {achievedWins.sudokube && (
                   <div className="ui-element" style={{
                     padding: '5px 10px',
-                    background: 'linear-gradient(135deg, #3b82f625, #3b82f610)',
-                    borderColor: '#3b82f6'
+                    background: `linear-gradient(135deg, ${colors.primary}30, ${colors.primary}15)`,
+                    borderColor: colors.primary
                   }}>
                     <span style={{
                       fontSize: '10px',
                       fontWeight: 600,
-                      color: '#2563eb'
-                    }}>🔢 Latin</span>
+                      color: colors.primary,
+                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+                    }}>Latin</span>
                   </div>
                 )}
               </>
@@ -295,20 +303,20 @@ const TopMenuBar = ({
           display: 'flex',
           alignItems: 'center',
           gap: '12px',
-          background: colors.paperCream
+          background: colors.background
         }}>
           <div style={{ position: 'relative', width: '42px', height: '42px' }}>
             <svg width="42" height="42" viewBox="0 0 42 42">
               <circle
                 cx="21" cy="21" r="17"
                 fill="none"
-                stroke="rgba(88, 47, 14, 0.15)"
+                stroke="rgba(255, 255, 255, 0.1)"
                 strokeWidth="3"
               />
               <circle
                 cx="21" cy="21" r="17"
                 fill="none"
-                stroke={overallProgress === 100 ? colors.avocado : colors.burntOrange}
+                stroke={overallProgress === 100 ? '#10b981' : colors.primary}
                 strokeWidth="3"
                 strokeDasharray={`${overallProgress * 1.07} ${107 - overallProgress * 1.07}`}
                 strokeDashoffset="26.75"
@@ -323,8 +331,8 @@ const TopMenuBar = ({
               transform: 'translate(-50%, -50%)',
               fontSize: '10px',
               fontWeight: 700,
-              fontFamily: "'Courier New', monospace",
-              color: overallProgress === 100 ? colors.avocado : colors.ink
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+              color: overallProgress === 100 ? '#10b981' : colors.text
             }}>
               {overallProgress}%
             </div>
@@ -333,34 +341,37 @@ const TopMenuBar = ({
             <div style={{
               fontSize: '10px',
               fontWeight: 600,
-              color: colors.ink,
-              letterSpacing: '0.1em',
-              textTransform: 'uppercase'
+              color: colors.text,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
             }}>Solved</div>
             <div style={{
               fontSize: '11px',
-              color: colors.inkLight,
-              fontFamily: "'Courier New', monospace"
+              color: colors.textMuted,
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
             }}>{totalComplete}/{totalStickers}</div>
           </div>
         </div>
 
-        {/* Face Progress - Vintage Bar Chart */}
-        <div className="ui-element" style={{ padding: '8px 12px', background: colors.paperCream }}>
+        {/* Face Progress - Modern Bar Chart */}
+        <div className="ui-element" style={{ padding: '8px 12px', background: colors.background }}>
           <div style={{
             fontSize: '9px',
-            color: colors.inkLight,
+            color: colors.textMuted,
             marginBottom: '6px',
-            letterSpacing: '0.15em',
-            textTransform: 'uppercase'
+            letterSpacing: '0.1em',
+            textTransform: 'uppercase',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
           }}>Faces</div>
           <div style={{ display: 'flex', gap: '4px' }}>
             {faceStats.map(f => (
               <div key={f.face} style={{
                 width: '7px',
                 height: '26px',
-                background: 'rgba(88, 47, 14, 0.1)',
-                border: '1px solid rgba(88, 47, 14, 0.15)',
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                borderRadius: '3px',
                 overflow: 'hidden',
                 display: 'flex',
                 flexDirection: 'column-reverse'
@@ -370,14 +381,14 @@ const TopMenuBar = ({
                   height: `${f.percent}%`,
                   background: FACE_COLORS[f.face],
                   transition: 'height 0.3s ease',
-                  opacity: 0.85
+                  opacity: 0.9
                 }} />
               </div>
             ))}
           </div>
         </div>
 
-        {/* Quick Actions - Vintage Buttons */}
+        {/* Quick Actions - Modern Buttons */}
         <div style={{ display: 'flex', gap: '6px' }}>
           <button
             onClick={onShowHelp}
@@ -390,8 +401,8 @@ const TopMenuBar = ({
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: '14px',
-              fontWeight: 700,
-              fontFamily: 'Georgia, serif'
+              fontWeight: 600,
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
             }}
           >
             ?
@@ -406,10 +417,11 @@ const TopMenuBar = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '13px'
+              fontSize: '18px',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
             }}
           >
-            ⚙
+            •••
           </button>
         </div>
       </div>

@@ -41,7 +41,7 @@ const TextOverlay = ({ time }) => {
             className="intro-message"
             style={{
               opacity: msg.fade,
-              color: msg.color || '#8b6f47'
+              color: msg.color || 'rgba(255, 255, 255, 0.9)'
             }}
           >
             {msg.text}
@@ -52,12 +52,12 @@ const TextOverlay = ({ time }) => {
       {showFinal && (
         <div className="intro-final-card" style={{ opacity: finalFade }}>
           <div className="intro-title-box">
-            <h1>WORM^3</h1>
+            <h1>WORM³</h1>
             <p>An Interactive Topology Puzzle</p>
           </div>
           <div className="intro-instructions">
             <p>Click any sticker to flip to its opposite color</p>
-            <p>Drag to rotate • Explore and discover!</p>
+            <p>Drag to rotate and explore!</p>
           </div>
         </div>
       )}

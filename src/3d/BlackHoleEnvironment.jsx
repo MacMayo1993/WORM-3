@@ -73,41 +73,85 @@ export default function BlackHoleEnvironment({ flipTrigger = 0 }) {
           // Distance from center (event horizon)
           float dist = length(coord - center);
 
-          // Rotating accretion disk
-          float angle = theta + time * 0.15;
-          float diskPattern = sin(angle * 8.0 + dist * 20.0) * 0.5 + 0.5;
-          float diskGlow = smoothstep(0.6, 0.3, dist) * diskPattern;
+          // Stars - scattered throughout space
+          float stars = 0.0;
+          for (int i = 0; i < 3; i++) {
+            vec2 starCoord = coord * (8.0 + float(i) * 4.0);
+            float starNoise = hash(floor(starCoord + float(i) * 100.0));
+            if (starNoise > 0.98) {
+              float starDist = length(fract(starCoord) - 0.5);
+              stars += smoothstep(0.05, 0.0, starDist) * (0.3 + starNoise * 0.7);
+            }
+          }
 
-          // Subtle turbulence
-          float turbulence = noise(coord * 8.0 + time * 0.1) * 0.15;
+          // Gravitational lensing - warp space near event horizon
+          float lensing = smoothstep(0.5, 0.1, dist);
+          float warpAngle = theta + lensing * sin(time * 0.2 + dist * 10.0) * 0.5;
 
-          // Gradient from event horizon
-          float gradient = smoothstep(0.0, 0.7, dist);
+          // Event horizon - absolute darkness at center
+          float eventHorizon = smoothstep(0.25, 0.15, dist);
 
-          // Deep space colors - very dark, subtle purples and blues
-          vec3 deepSpace = vec3(0.02, 0.01, 0.03);
-          vec3 eventHorizon = vec3(0.08, 0.04, 0.12);
-          vec3 accretionGlow = vec3(0.25, 0.12, 0.15);
+          // Accretion disk - rotating matter being pulled in
+          float angle = warpAngle + time * 0.2;
+          float diskPattern = sin(angle * 12.0 + dist * 25.0) * 0.5 + 0.5;
+          float diskRadius = smoothstep(0.45, 0.2, dist) * smoothstep(0.15, 0.22, dist);
+          float diskGlow = diskRadius * diskPattern;
 
-          // Mix colors
-          vec3 color = mix(eventHorizon, deepSpace, gradient);
-          color += accretionGlow * diskGlow * 0.3;
-          color += vec3(turbulence * 0.05);
+          // Photon sphere - light bending around the singularity
+          float photonSphere = smoothstep(0.18, 0.16, abs(dist - 0.17)) * 0.8;
 
-          // Very subtle vignette
-          float vignette = smoothstep(0.0, 0.5, dist);
-          color *= 0.7 + vignette * 0.3;
+          // Hawking radiation glow at event horizon edge
+          float hawkingGlow = smoothstep(0.2, 0.16, abs(dist - 0.18)) * 0.6;
 
-          // Pulse effect on flip - brightens the black hole
+          // Turbulence in the accretion disk
+          float turbulence = noise(coord * 15.0 + time * 0.15) * 0.2;
+
+          // Gradient from event horizon to deep space
+          float gradient = smoothstep(0.0, 0.8, dist);
+
+          // Color scheme
+          vec3 deepSpace = vec3(0.01, 0.01, 0.02); // Nearly black
+          vec3 eventHorizonColor = vec3(0.0, 0.0, 0.0); // Pure black
+          vec3 accretionOrange = vec3(0.9, 0.4, 0.1); // Hot orange
+          vec3 accretionBlue = vec3(0.3, 0.5, 1.0); // Blue-shifted light
+          vec3 photonYellow = vec3(1.0, 0.9, 0.5); // Yellow photon ring
+          vec3 starColor = vec3(0.9, 0.95, 1.0); // Cool white stars
+
+          // Build the final color
+          vec3 color = mix(eventHorizonColor, deepSpace, gradient);
+
+          // Add stars (dimmed near event horizon)
+          color += starColor * stars * gradient * 0.8;
+
+          // Add accretion disk glow
+          color += accretionOrange * diskGlow * 0.7;
+          color += accretionBlue * diskGlow * diskPattern * 0.3;
+
+          // Add photon sphere
+          color += photonYellow * photonSphere;
+
+          // Add Hawking radiation
+          color += accretionOrange * hawkingGlow * 0.5;
+
+          // Add turbulence
+          color += vec3(turbulence * 0.1);
+
+          // Darken the event horizon
+          color *= (1.0 - eventHorizon * 0.95);
+
+          // Pulse effect on flip - brightens the entire black hole
           if (pulseIntensity > 0.0) {
             // Pulse is stronger near the event horizon
-            float pulseFalloff = smoothstep(0.7, 0.0, dist);
-            vec3 pulseColor = vec3(0.8, 0.4, 0.6); // Purple-orange glow
-            float pulseStrength = pulseIntensity * pulseFalloff * 0.6;
+            float pulseFalloff = smoothstep(0.8, 0.0, dist);
+            vec3 pulseColor = vec3(1.0, 0.6, 0.3); // Bright orange-white flash
+            float pulseStrength = pulseIntensity * pulseFalloff * 0.8;
             color += pulseColor * pulseStrength;
 
-            // Add a bright flash to the accretion disk
-            color += accretionGlow * diskGlow * pulseIntensity * 1.5;
+            // Intensify accretion disk during pulse
+            color += accretionOrange * diskGlow * pulseIntensity * 2.0;
+
+            // Brighten photon sphere
+            color += photonYellow * photonSphere * pulseIntensity * 1.5;
           }
 
           gl_FragColor = vec4(color, 1.0);
