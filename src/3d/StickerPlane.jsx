@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { COLORS, FACE_COLORS, ANTIPODAL_COLOR } from '../utils/constants.js';
 import { play, vibrate } from '../utils/audio.js';
 import TallyMarks from '../manifold/TallyMarks.jsx';
+import { ChaosHeatMap } from '../manifold/FlipPropagationWave.jsx';
 
 // Particle system for flip effect
 const FlipParticles = ({ active, color, onComplete }) => {
@@ -389,6 +390,15 @@ const StickerPlane = function StickerPlane({ meta, pos, rot=[0,0,0], overlay, mo
           envMapIntensity={0.3}
         />
       </mesh>
+
+      {/* Chaos heat map overlay - shows flip intensity */}
+      {!isSudokube && (
+        <ChaosHeatMap
+          position={[0, 0, 0.005]}
+          flips={meta?.flips ?? 0}
+          maxFlips={8}
+        />
+      )}
 
       {/* Tally Marks - skip if origColor is white on non-white tile */}
       {!isSudokube && hasFlipHistory && !(origIsWhite && !currIsWhite) && (

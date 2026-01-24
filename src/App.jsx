@@ -10,9 +10,10 @@ import { play } from './utils/audio.js';
 // Game logic
 import { makeCubies } from './game/cubeState.js';
 import { rotateSliceCubies } from './game/cubeRotation.js';
-import { buildManifoldGridMap, flipStickerPair } from './game/manifoldLogic.js';
+import { buildManifoldGridMap, flipStickerPair, findAntipodalStickerByGrid } from './game/manifoldLogic.js';
 import { detectWinConditions } from './game/winDetection.js';
 import { getStickerWorldPos } from './game/coordinates.js';
+import { FACE_COLORS, ANTIPODAL_COLOR } from './utils/constants.js';
 
 // 3D components
 import CubeAssembly from './3d/CubeAssembly.jsx';
@@ -74,6 +75,7 @@ export default function WORM3() {
   const [explosionT, setExplosionT] = useState(0);
   const [cascades, setCascades] = useState([]);
   const [blackHolePulse, setBlackHolePulse] = useState(0); // Timestamp of last flip for black hole pulse
+  const [flipWaveOrigins, setFlipWaveOrigins] = useState([]); // Origins for propagation wave effect
 
   const handleWelcomeComplete = () => {
     setShowWelcome(false);
@@ -300,10 +302,58 @@ export default function WORM3() {
   };
 
   const onTapFlip = (pos, dirKey) => {
+    // Calculate wave origins before updating state
+    const currentManifoldMap = buildManifoldGridMap(cubies, size);
+    const sticker = cubies[pos.x]?.[pos.y]?.[pos.z]?.stickers?.[dirKey];
+
+    if (sticker) {
+      // Get the antipodal sticker location
+      const antipodalLoc = findAntipodalStickerByGrid(currentManifoldMap, sticker, size);
+
+      // Calculate rotation based on face direction
+      const getRotationForDir = (dir) => {
+        switch (dir) {
+          case 'PX': return [0, Math.PI / 2, 0];
+          case 'NX': return [0, -Math.PI / 2, 0];
+          case 'PY': return [-Math.PI / 2, 0, 0];
+          case 'NY': return [Math.PI / 2, 0, 0];
+          case 'PZ': return [0, 0, 0];
+          case 'NZ': return [0, Math.PI, 0];
+          default: return [0, 0, 0];
+        }
+      };
+
+      // Build wave origins from both positions
+      const origins = [];
+      const antipodalColor = FACE_COLORS[ANTIPODAL_COLOR[sticker.curr]];
+
+      // Origin 1: The clicked sticker
+      origins.push({
+        position: getStickerWorldPos(pos.x, pos.y, pos.z, dirKey, size, explosionT),
+        rotation: getRotationForDir(dirKey),
+        color: antipodalColor,
+        id: Date.now()
+      });
+
+      // Origin 2: The antipodal pair
+      if (antipodalLoc) {
+        const antipodalSticker = cubies[antipodalLoc.x]?.[antipodalLoc.y]?.[antipodalLoc.z]?.stickers?.[antipodalLoc.dirKey];
+        const pairAntipodalColor = FACE_COLORS[ANTIPODAL_COLOR[antipodalSticker?.curr || 1]];
+        origins.push({
+          position: getStickerWorldPos(antipodalLoc.x, antipodalLoc.y, antipodalLoc.z, antipodalLoc.dirKey, size, explosionT),
+          rotation: getRotationForDir(antipodalLoc.dirKey),
+          color: pairAntipodalColor,
+          id: Date.now() + 1
+        });
+      }
+
+      setFlipWaveOrigins(origins);
+    }
+
     setCubies((prev) => {
       // Compute manifoldMap from current state to avoid stale closure
-      const currentManifoldMap = buildManifoldGridMap(prev, size);
-      return flipStickerPair(prev, size, pos.x, pos.y, pos.z, dirKey, currentManifoldMap);
+      const freshManifoldMap = buildManifoldGridMap(prev, size);
+      return flipStickerPair(prev, size, pos.x, pos.y, pos.z, dirKey, freshManifoldMap);
     });
     setMoves((m) => m + 1);
 
@@ -319,6 +369,10 @@ export default function WORM3() {
       // Small delay so user sees the flip animation first
       setTimeout(() => setShowFirstFlipTutorial(true), 600);
     }
+  };
+
+  const onFlipWaveComplete = () => {
+    setFlipWaveOrigins([]);
   };
 
   const onCascadeComplete = (id) => {
@@ -873,6 +927,8 @@ export default function WORM3() {
               showCursor={showCursor}
               flipMode={flipMode}
               onSelectTile={handleSelectTile}
+              flipWaveOrigins={flipWaveOrigins}
+              onFlipWaveComplete={onFlipWaveComplete}
             />
           </Suspense>
         </Canvas>
