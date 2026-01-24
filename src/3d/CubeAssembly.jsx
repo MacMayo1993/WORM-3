@@ -129,7 +129,7 @@ const CubeAssembly = ({
   useFrame((_, delta) => {
     if (!animState) return;
     const { axis, dir, sliceIndex, t } = animState;
-    const speed = 1.8, newT = Math.min(1, (t ?? 0) + delta * speed);
+    const speed = 2.52, newT = Math.min(1, (t ?? 0) + delta * speed);
     const ease = newT < 0.5 ? 4 * newT ** 3 : 1 - (-2 * newT + 2) ** 3 / 2;
     const prev = (t ?? 0) < 0.5 ? 4 * (t ?? 0) ** 3 : 1 - (-2 * (t ?? 0) + 2) ** 3 / 2;
     const dRot = (ease - prev) * (Math.PI / 2);
