@@ -28,6 +28,7 @@ import WelcomeScreen from './components/screens/WelcomeScreen.jsx';
 import VictoryScreen from './components/screens/VictoryScreen.jsx';
 import Tutorial from './components/screens/Tutorial.jsx';
 import FirstFlipTutorial from './components/screens/FirstFlipTutorial.jsx';
+import RotationPreview from './components/overlays/RotationPreview.jsx';
 
 export default function WORM3() {
   const [showWelcome, setShowWelcome] = useState(true);
@@ -76,6 +77,13 @@ export default function WORM3() {
   const [cascades, setCascades] = useState([]);
   const [blackHolePulse, setBlackHolePulse] = useState(0); // Timestamp of last flip for black hole pulse
   const [flipWaveOrigins, setFlipWaveOrigins] = useState([]); // Origins for propagation wave effect
+
+  // Auto-rotate mode state
+  const [autoRotateEnabled, setAutoRotateEnabled] = useState(false);
+  const [upcomingRotation, setUpcomingRotation] = useState(null); // { axis, dir, sliceIndex }
+  const [rotationCountdown, setRotationCountdown] = useState(0); // Time until next rotation (ms)
+  const cubiesRef = useRef(cubies); // Ref to track current cubies for auto-rotate effect
+  cubiesRef.current = cubies; // Keep ref updated
 
   const handleWelcomeComplete = () => {
     setShowWelcome(false);
@@ -183,8 +191,19 @@ export default function WORM3() {
     if (!chaosMode) return;
     let raf = 0,
       last = performance.now(),
-      acc = 0;
-    const period = [0, 1000, 750, 500, 350][chaosLevel];
+      tickAcc = 0,
+      burstAcc = 0;
+
+    // Propagation speed stays constant (350ms between ticks)
+    const tickPeriod = 350;
+    // Burst duration scales with level: 1s, 2s, 3s, 4s
+    const burstDuration = chaosLevel * 1000;
+    // Cooldown between bursts (same as burst duration for balance)
+    const cooldownDuration = burstDuration;
+    // Base probability scales with level: 1%, 2%, 3%, 4% per flip tally
+    const basePerTally = chaosLevel * 0.01;
+
+    let inBurst = true; // Start in active burst
 
     const step = (state) => {
       const S = state.length;
@@ -213,9 +232,9 @@ export default function WORM3() {
       const currentManifoldMap = buildManifoldGridMap(state, S);
 
       const src = unstable[Math.floor(Math.random() * unstable.length)];
-      const base = [0, 0.1, 0.2, 0.35, 0.5][chaosLevel];
-      const pSelf = base * Math.log(src.flips + 1),
-        pN = base * 0.6;
+      // Probability scales with flip tally: level% per tally
+      const pSelf = basePerTally * src.flips;
+      const pN = basePerTally * src.flips * 0.6;
 
       let next = state;
       if (Math.random() < pSelf) {
@@ -250,16 +269,132 @@ export default function WORM3() {
     const loop = (now) => {
       const dt = now - last;
       last = now;
-      acc += dt;
-      if (acc >= period) {
-        setCubies((prev) => step(prev));
-        acc = 0;
+      burstAcc += dt;
+
+      // Toggle between burst and cooldown phases
+      if (inBurst && burstAcc >= burstDuration) {
+        inBurst = false;
+        burstAcc = 0;
+      } else if (!inBurst && burstAcc >= cooldownDuration) {
+        inBurst = true;
+        burstAcc = 0;
       }
+
+      // Only tick propagation during active burst
+      if (inBurst) {
+        tickAcc += dt;
+        if (tickAcc >= tickPeriod) {
+          setCubies((prev) => step(prev));
+          tickAcc = 0;
+        }
+      }
+
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
   }, [chaosMode, chaosLevel, explosionT]);
+
+  // Helper: count stickers where curr !== orig (disparity)
+  const countDisparity = (state) => {
+    let count = 0;
+    const S = state.length;
+    for (let x = 0; x < S; x++)
+      for (let y = 0; y < S; y++)
+        for (let z = 0; z < S; z++) {
+          const c = state[x][y][z];
+          for (const dirKey of Object.keys(c.stickers)) {
+            const st = c.stickers[dirKey];
+            // Only count visible stickers (on face edges)
+            const onEdge =
+              (dirKey === 'PX' && x === S - 1) ||
+              (dirKey === 'NX' && x === 0) ||
+              (dirKey === 'PY' && y === S - 1) ||
+              (dirKey === 'NY' && y === 0) ||
+              (dirKey === 'PZ' && z === S - 1) ||
+              (dirKey === 'NZ' && z === 0);
+            if (onEdge && st.curr !== st.orig) count++;
+          }
+        }
+    return count;
+  };
+
+  // Helper: generate a random rotation
+  const generateRandomRotation = (cubeSize) => {
+    const axes = ['col', 'row', 'depth'];
+    const axis = axes[Math.floor(Math.random() * axes.length)];
+    const dir = Math.random() < 0.5 ? 1 : -1;
+    const sliceIndex = Math.floor(Math.random() * cubeSize);
+    return { axis, dir, sliceIndex };
+  };
+
+  // Auto-rotate effect: disparity-based random rotations
+  useEffect(() => {
+    if (!autoRotateEnabled || !chaosMode) {
+      setUpcomingRotation(null);
+      setRotationCountdown(0);
+      return;
+    }
+
+    // Initialize upcoming rotation if not set
+    if (!upcomingRotation) {
+      setUpcomingRotation(generateRandomRotation(size));
+    }
+
+    let raf = 0;
+    let last = performance.now();
+
+    const loop = (now) => {
+      const dt = now - last;
+      last = now;
+
+      // Skip if animation is in progress
+      if (animState) {
+        raf = requestAnimationFrame(loop);
+        return;
+      }
+
+      // Calculate interval based on disparity (use ref for current state)
+      const disparity = countDisparity(cubiesRef.current);
+      const maxDisparity = size * size * 6; // Total visible stickers
+      const disparityRatio = Math.min(1, disparity / maxDisparity);
+
+      // 20s at 0 disparity, 2s at 100% disparity
+      const maxInterval = 20000;
+      const minInterval = 2000;
+      const targetInterval = maxInterval - disparityRatio * (maxInterval - minInterval);
+
+      setRotationCountdown((prev) => {
+        const newCountdown = prev - dt;
+
+        if (newCountdown <= 0) {
+          // Execute the rotation
+          if (upcomingRotation) {
+            const { axis, dir, sliceIndex } = upcomingRotation;
+            setAnimState({ axis, dir, sliceIndex, t: 0 });
+            setPendingMove({ axis, dir, sliceIndex });
+          }
+          // Generate next rotation
+          setUpcomingRotation(generateRandomRotation(size));
+          return targetInterval;
+        }
+
+        return newCountdown;
+      });
+
+      raf = requestAnimationFrame(loop);
+    };
+
+    // Initialize countdown based on current disparity (use ref for current state)
+    const disparity = countDisparity(cubiesRef.current);
+    const maxDisparity = size * size * 6;
+    const disparityRatio = Math.min(1, disparity / maxDisparity);
+    const initialInterval = 20000 - disparityRatio * 18000;
+    setRotationCountdown(initialInterval);
+
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [autoRotateEnabled, chaosMode, size, animState, upcomingRotation]);
 
   const handleAnimComplete = () => {
     if (pendingMove) {
@@ -926,6 +1061,16 @@ export default function WORM3() {
           achievedWins={achievedWins}
         />
 
+        {/* Auto-rotate Preview */}
+        {autoRotateEnabled && chaosMode && (
+          <RotationPreview
+            upcomingRotation={upcomingRotation}
+            countdown={rotationCountdown}
+            maxCountdown={20000}
+            size={size}
+          />
+        )}
+
         {/* Bottom Section - Controls & Manifold Selector */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
           <div className="controls-compact ui-element">
@@ -937,13 +1082,22 @@ export default function WORM3() {
                 CHAOS
               </button>
               {chaosMode && (
-                <div className="chaos-levels">
-                  {[1, 2, 3, 4].map((l) => (
-                    <button key={l} className={`btn-level ${chaosLevel === l ? 'active' : ''}`} onClick={() => setChaosLevel(l)}>
-                      L{l}
-                    </button>
-                  ))}
-                </div>
+                <>
+                  <div className="chaos-levels">
+                    {[1, 2, 3, 4].map((l) => (
+                      <button key={l} className={`btn-level ${chaosLevel === l ? 'active' : ''}`} onClick={() => setChaosLevel(l)}>
+                        L{l}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    className={`btn-compact text ${autoRotateEnabled ? 'active' : ''}`}
+                    onClick={() => setAutoRotateEnabled(!autoRotateEnabled)}
+                    title="Auto-rotate based on disparity"
+                  >
+                    AUTO
+                  </button>
+                </>
               )}
               <button className={`btn-compact text ${exploded ? 'active' : ''}`} onClick={() => setExploded(!exploded)}>
                 EXPLODE
