@@ -200,8 +200,8 @@ export default function WORM3() {
     const burstDuration = chaosLevel * 1000;
     // Cooldown between bursts (same as burst duration for balance)
     const cooldownDuration = burstDuration;
-    // Base probability scales with level: 1%, 2%, 3%, 4% per flip tally
-    const basePerTally = chaosLevel * 0.01;
+    // Base probability scales with level: 3%, 6%, 9%, 12% per flip tally
+    const basePerTally = chaosLevel * 0.03;
 
     let inBurst = true; // Start in active burst
 
@@ -359,9 +359,9 @@ export default function WORM3() {
       const maxDisparity = size * size * 6; // Total visible stickers
       const disparityRatio = Math.min(1, disparity / maxDisparity);
 
-      // 20s at 0 disparity, 2s at 100% disparity
-      const maxInterval = 20000;
-      const minInterval = 2000;
+      // 10s at 0 disparity, 0.75s at 100% disparity - Level 4 should be intense
+      const maxInterval = 10000;
+      const minInterval = 750;
       const targetInterval = maxInterval - disparityRatio * (maxInterval - minInterval);
 
       setRotationCountdown((prev) => {
@@ -389,7 +389,7 @@ export default function WORM3() {
     const disparity = countDisparity(cubiesRef.current);
     const maxDisparity = size * size * 6;
     const disparityRatio = Math.min(1, disparity / maxDisparity);
-    const initialInterval = 20000 - disparityRatio * 18000;
+    const initialInterval = 10000 - disparityRatio * 9250;
     setRotationCountdown(initialInterval);
 
     raf = requestAnimationFrame(loop);
@@ -1066,7 +1066,7 @@ export default function WORM3() {
           <RotationPreview
             upcomingRotation={upcomingRotation}
             countdown={rotationCountdown}
-            maxCountdown={20000}
+            maxCountdown={10000}
             size={size}
           />
         )}
