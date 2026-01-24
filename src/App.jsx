@@ -106,7 +106,11 @@ export default function WORM3() {
     return () => cancelAnimationFrame(raf);
   }, [exploded]);
 
-  const manifoldMap = useMemo(() => buildManifoldGridMap(cubies, size), [cubies, size]);
+  const manifoldMap = useMemo(() => {
+    // Guard against size/cubies mismatch during size transitions
+    if (cubies.length !== size) return new Map();
+    return buildManifoldGridMap(cubies, size);
+  }, [cubies, size]);
 
   const metrics = useMemo(() => {
     let flips = 0,
@@ -142,6 +146,8 @@ export default function WORM3() {
     if (!hasShuffled) return;
     // Don't check if victory screen is already showing
     if (victory) return;
+    // Guard: ensure cubies matches expected size (prevents race condition on size change)
+    if (cubies.length !== size) return;
 
     const wins = detectWinConditions(cubies, size);
 
