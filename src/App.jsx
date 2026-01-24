@@ -75,6 +75,7 @@ export default function WORM3() {
   const [exploded, setExploded] = useState(false);
   const [explosionT, setExplosionT] = useState(0);
   const [cascades, setCascades] = useState([]);
+  const [flipPulse, setFlipPulse] = useState(false);
 
   const handleWelcomeComplete = () => {
     setShowWelcome(false);
@@ -307,6 +308,10 @@ export default function WORM3() {
       return flipStickerPair(prev, size, pos.x, pos.y, pos.z, dirKey, currentManifoldMap);
     });
     setMoves((m) => m + 1);
+
+    // Trigger black hole pulse effect
+    setFlipPulse(true);
+    setTimeout(() => setFlipPulse(false), 600);
 
     // Trigger first-flip tutorial
     if (!hasFlippedOnce) {
@@ -833,7 +838,7 @@ export default function WORM3() {
   }
 
   return (
-    <div className="full-screen">
+    <div className={`full-screen ${flipPulse ? 'flip-pulse' : ''}`}>
       {showTutorial && <Tutorial onClose={closeTutorial} />}
 
       <div className="canvas-container" onContextMenu={(e) => e.preventDefault()}>
