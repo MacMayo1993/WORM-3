@@ -14,9 +14,6 @@ import { buildManifoldGridMap, flipStickerPair } from './game/manifoldLogic.js';
 import { detectWinConditions } from './game/winDetection.js';
 import { getStickerWorldPos } from './game/coordinates.js';
 
-// Manifold components
-import ManifoldGrid from './manifold/ManifoldGrid.jsx';
-
 // 3D components
 import CubeAssembly from './3d/CubeAssembly.jsx';
 import BlackHoleEnvironment from './3d/BlackHoleEnvironment.jsx';
@@ -858,7 +855,6 @@ export default function WORM3() {
           <Suspense fallback={null}>
             <BlackHoleEnvironment flipTrigger={blackHolePulse} />
             <Environment preset="city" />
-            <ManifoldGrid color="#3d5a3d" opacity={0.12} />
             <CubeAssembly
               size={size}
               cubies={cubies}
