@@ -44,8 +44,8 @@ export default function WORM3() {
   const [showMainMenu, setShowMainMenu] = useState(true);
 
   // Win condition state
-  const [victory, setVictory] = useState(null); // null, 'rubiks', 'sudokube', or 'ultimate'
-  const [achievedWins, setAchievedWins] = useState({ rubiks: false, sudokube: false, ultimate: false });
+  const [victory, setVictory] = useState(null); // null, 'rubiks', 'sudokube', 'ultimate', or 'worm'
+  const [achievedWins, setAchievedWins] = useState({ rubiks: false, sudokube: false, ultimate: false, worm: false });
   const [gameTime, setGameTime] = useState(0);
   const gameStartTime = useRef(Date.now());
   const [hasShuffled, setHasShuffled] = useState(false); // Only check wins after shuffle
@@ -144,8 +144,11 @@ export default function WORM3() {
 
     const wins = detectWinConditions(cubies, size);
 
-    // Prioritize ultimate win, then check individual wins
-    if (wins.ultimate && !achievedWins.ultimate) {
+    // Prioritize worm victory (rarest), then ultimate, then individual wins
+    if (wins.worm && !achievedWins.worm) {
+      setVictory('worm');
+      setAchievedWins((prev) => ({ ...prev, worm: true }));
+    } else if (wins.ultimate && !achievedWins.ultimate) {
       setVictory('ultimate');
       setAchievedWins((prev) => ({ ...prev, ultimate: true, rubiks: true, sudokube: true }));
     } else if (wins.rubiks && !achievedWins.rubiks) {
@@ -163,7 +166,7 @@ export default function WORM3() {
     setAnimState(null);
     // Reset win tracking when size changes
     setVictory(null);
-    setAchievedWins({ rubiks: false, sudokube: false, ultimate: false });
+    setAchievedWins({ rubiks: false, sudokube: false, ultimate: false, worm: false });
     gameStartTime.current = Date.now();
     setGameTime(0);
     setHasShuffled(false); // Require shuffle for new size
@@ -332,7 +335,7 @@ export default function WORM3() {
     setMoves(0);
     // Reset win tracking for new game
     setVictory(null);
-    setAchievedWins({ rubiks: false, sudokube: false, ultimate: false });
+    setAchievedWins({ rubiks: false, sudokube: false, ultimate: false, worm: false });
     gameStartTime.current = Date.now();
     setGameTime(0);
     setHasShuffled(true); // Enable win detection
@@ -344,7 +347,7 @@ export default function WORM3() {
     play('/sounds/rotate.mp3');
     // Reset win tracking
     setVictory(null);
-    setAchievedWins({ rubiks: false, sudokube: false, ultimate: false });
+    setAchievedWins({ rubiks: false, sudokube: false, ultimate: false, worm: false });
     gameStartTime.current = Date.now();
     setGameTime(0);
     setHasShuffled(false); // Disable win detection until next shuffle

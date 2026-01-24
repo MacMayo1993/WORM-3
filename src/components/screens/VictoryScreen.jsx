@@ -39,6 +39,16 @@ const VictoryScreen = ({ winType, moves, time, onContinue, onNewGame }) => {
       gradientTo: '#ca8a04',
       icon: '👑',
       bgGradient: 'linear-gradient(135deg, #fef9c3, #fde047)'
+    },
+    worm: {
+      title: 'WORM³ COMPLETE!',
+      subtitle: '🪱 Secret Achievement Unlocked 🪱',
+      description: 'You\'ve solved the ENTIRE CUBE through the WORMHOLES! Every single sticker traveled through antipodal space. You are a true master of manifold topology!',
+      color: '#bc6c25',
+      gradientFrom: '#bc6c25',
+      gradientTo: '#9c4a1a',
+      icon: '🪱',
+      bgGradient: 'linear-gradient(135deg, #dda15e, #bc6c25)'
     }
   };
 
@@ -79,6 +89,29 @@ const VictoryScreen = ({ winType, moves, time, onContinue, onNewGame }) => {
         </div>
       )}
 
+      {/* WORM particles for worm victory */}
+      {winType === 'worm' && showConfetti && (
+        <div style={{
+          position: 'absolute',
+          top: 0, left: 0, right: 0, bottom: 0,
+          overflow: 'hidden',
+          pointerEvents: 'none'
+        }}>
+          {Array.from({ length: 30 }).map((_, i) => (
+            <div key={i} style={{
+              position: 'absolute',
+              fontSize: '24px',
+              left: `${Math.random() * 100}%`,
+              top: '-40px',
+              animation: `worm-wiggle ${2 + Math.random() * 3}s linear infinite`,
+              animationDelay: `${Math.random() * 2}s`
+            }}>
+              🪱
+            </div>
+          ))}
+        </div>
+      )}
+
       <div style={{
         textAlign: 'center',
         maxWidth: '550px',
@@ -109,13 +142,13 @@ const VictoryScreen = ({ winType, moves, time, onContinue, onNewGame }) => {
 
         {/* Title */}
         <h1 style={{
-          fontSize: winType === 'ultimate' ? '42px' : '36px',
+          fontSize: winType === 'ultimate' || winType === 'worm' ? '42px' : '36px',
           fontWeight: 700,
           margin: '0 0 8px 0',
           color: config.color,
           fontFamily: 'Georgia, serif',
           letterSpacing: '1px',
-          textShadow: winType === 'ultimate' ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
+          textShadow: winType === 'ultimate' || winType === 'worm' ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
         }}>
           {config.title}
         </h1>
@@ -245,7 +278,7 @@ const VictoryScreen = ({ winType, moves, time, onContinue, onNewGame }) => {
         </div>
 
         {/* Achievement hint for non-ultimate wins */}
-        {winType !== 'ultimate' && (
+        {winType !== 'ultimate' && winType !== 'worm' && (
           <div style={{
             marginTop: '24px',
             padding: '12px 16px',
@@ -265,6 +298,30 @@ const VictoryScreen = ({ winType, moves, time, onContinue, onNewGame }) => {
             </p>
           </div>
         )}
+
+        {/* Secret achievement message for worm victory */}
+        {winType === 'worm' && (
+          <div style={{
+            marginTop: '24px',
+            padding: '16px 20px',
+            background: 'rgba(188, 108, 37, 0.15)',
+            borderRadius: '8px',
+            border: '2px solid rgba(188, 108, 37, 0.4)'
+          }}>
+            <p style={{
+              margin: 0,
+              fontSize: '14px',
+              color: '#7f2d0e',
+              fontWeight: 600,
+              textAlign: 'center'
+            }}>
+              🌟 You've discovered the SECRET WORM VICTORY! 🌟<br/>
+              <span style={{ fontSize: '12px', fontWeight: 'normal', fontStyle: 'italic' }}>
+                The rarest achievement - solving through pure manifold chaos!
+              </span>
+            </p>
+          </div>
+        )}
       </div>
 
       <style>{`
@@ -275,6 +332,13 @@ const VictoryScreen = ({ winType, moves, time, onContinue, onNewGame }) => {
         @keyframes confetti-fall {
           0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
           100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+        }
+        @keyframes worm-wiggle {
+          0% { transform: translateY(-40px) rotate(0deg) translateX(0px); opacity: 1; }
+          25% { transform: translateY(25vh) rotate(15deg) translateX(20px); opacity: 1; }
+          50% { transform: translateY(50vh) rotate(-15deg) translateX(-20px); opacity: 1; }
+          75% { transform: translateY(75vh) rotate(10deg) translateX(15px); opacity: 1; }
+          100% { transform: translateY(100vh) rotate(0deg) translateX(0px); opacity: 0; }
         }
       `}</style>
     </div>

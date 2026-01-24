@@ -94,11 +94,46 @@ export const checkSudokubeSolved = (cubies, size) => {
   return true;
 };
 
-// Main win detection function - returns { rubiks, sudokube, ultimate }
+// Check if WORM³ victory - entire cube solved but every sticker is in disparity (flipped)
+export const checkWormVictory = (cubies, size) => {
+  const DIR_TO_FACE = { PZ: 1, NX: 2, PY: 3, NZ: 4, PX: 5, NY: 6 };
+
+  let allCorrectPosition = true;
+  let allFlipped = true;
+  let totalStickers = 0;
+
+  for (let x = 0; x < size; x++) {
+    for (let y = 0; y < size; y++) {
+      for (let z = 0; z < size; z++) {
+        const c = cubies[x][y][z];
+        for (const [dirKey, st] of Object.entries(c.stickers)) {
+          totalStickers++;
+          const expectedColor = DIR_TO_FACE[dirKey];
+
+          // Check if sticker shows the correct color for its position
+          if (st.curr !== expectedColor) {
+            allCorrectPosition = false;
+          }
+
+          // Check if sticker has been flipped (curr !== orig)
+          if (st.curr === st.orig) {
+            allFlipped = false;
+          }
+        }
+      }
+    }
+  }
+
+  // WORM³ victory: cube is solved AND every single sticker is flipped
+  return allCorrectPosition && allFlipped && totalStickers > 0;
+};
+
+// Main win detection function - returns { rubiks, sudokube, ultimate, worm }
 export const detectWinConditions = (cubies, size) => {
   const rubiks = checkRubiksSolved(cubies, size);
   const sudokube = checkSudokubeSolved(cubies, size);
   const ultimate = rubiks && sudokube;
+  const worm = checkWormVictory(cubies, size);
 
-  return { rubiks, sudokube, ultimate };
+  return { rubiks, sudokube, ultimate, worm };
 };

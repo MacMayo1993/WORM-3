@@ -6,6 +6,34 @@ import { COLORS, FACE_COLORS, ANTIPODAL_COLOR } from '../utils/constants.js';
 import { play, vibrate } from '../utils/audio.js';
 import TallyMarks from '../manifold/TallyMarks.jsx';
 
+// Worm component for disparity visualization
+const Worm = ({ position, rotation, scale = 1 }) => {
+  const wormRef = useRef();
+
+  useFrame((state) => {
+    if (wormRef.current) {
+      // Wiggle animation
+      const time = state.clock.elapsedTime;
+      wormRef.current.rotation.z = Math.sin(time * 3 + rotation) * 0.2;
+    }
+  });
+
+  return (
+    <group position={position} ref={wormRef}>
+      {/* Worm body - curved shape */}
+      <mesh position={[0, 0, 0.015]}>
+        <capsuleGeometry args={[0.02 * scale, 0.08 * scale, 4, 8]} />
+        <meshBasicMaterial color="#bc6c25" />
+      </mesh>
+      {/* Worm head highlight */}
+      <mesh position={[0, 0.05 * scale, 0.015]}>
+        <sphereGeometry args={[0.025 * scale, 8, 8]} />
+        <meshBasicMaterial color="#dda15e" />
+      </mesh>
+    </group>
+  );
+};
+
 const StickerPlane = function StickerPlane({ meta, pos, rot=[0,0,0], overlay, mode }) {
   const groupRef = useRef();
   const meshRef = useRef();
@@ -183,6 +211,12 @@ const StickerPlane = function StickerPlane({ meta, pos, rot=[0,0,0], overlay, mo
               blending={THREE.AdditiveBlending}
             />
           </mesh>
+
+          {/* WORM creatures crawling on disparity stickers */}
+          <Worm position={[0.25, 0.25, 0]} rotation={0} scale={0.8} />
+          <Worm position={[-0.25, 0.25, 0]} rotation={Math.PI / 4} scale={0.7} />
+          <Worm position={[0.25, -0.25, 0]} rotation={Math.PI / 2} scale={0.75} />
+          <Worm position={[-0.25, -0.25, 0]} rotation={Math.PI * 0.75} scale={0.7} />
         </>
       )}
 
