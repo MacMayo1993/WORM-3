@@ -1,4 +1,4 @@
-import React, { useRef, useMemo } from 'react';
+import React, { useRef, useMemo, useState, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
@@ -6,9 +6,17 @@ import * as THREE from 'three';
  * BlackHoleEnvironment - A dynamic 3D black hole background
  * Provides an immersive, panoramic black hole effect as part of the 3D scene
  */
-export default function BlackHoleEnvironment() {
+export default function BlackHoleEnvironment({ flipTrigger = 0 }) {
   const sphereRef = useRef();
   const materialRef = useRef();
+  const [pulseIntensity, setPulseIntensity] = useState(0);
+
+  // Trigger pulse animation when flip occurs
+  useEffect(() => {
+    if (flipTrigger > 0) {
+      setPulseIntensity(1.0); // Start at full intensity
+    }
+  }, [flipTrigger]);
 
   // Custom shader for smooth black hole effect
   const shaderMaterial = useMemo(() => {
@@ -16,6 +24,7 @@ export default function BlackHoleEnvironment() {
       side: THREE.BackSide,
       uniforms: {
         time: { value: 0 },
+        pulseIntensity: { value: 0 },
       },
       vertexShader: `
         varying vec3 vPosition;
@@ -29,6 +38,7 @@ export default function BlackHoleEnvironment() {
       `,
       fragmentShader: `
         uniform float time;
+        uniform float pulseIntensity;
         varying vec3 vPosition;
         varying vec2 vUv;
 
@@ -88,15 +98,33 @@ export default function BlackHoleEnvironment() {
           float vignette = smoothstep(0.0, 0.5, dist);
           color *= 0.7 + vignette * 0.3;
 
+          // Pulse effect on flip - brightens the black hole
+          if (pulseIntensity > 0.0) {
+            // Pulse is stronger near the event horizon
+            float pulseFalloff = smoothstep(0.7, 0.0, dist);
+            vec3 pulseColor = vec3(0.8, 0.4, 0.6); // Purple-orange glow
+            float pulseStrength = pulseIntensity * pulseFalloff * 0.6;
+            color += pulseColor * pulseStrength;
+
+            // Add a bright flash to the accretion disk
+            color += accretionGlow * diskGlow * pulseIntensity * 1.5;
+          }
+
           gl_FragColor = vec4(color, 1.0);
         }
       `,
     });
   }, []);
 
-  useFrame((state) => {
+  useFrame((state, delta) => {
     if (materialRef.current) {
       materialRef.current.uniforms.time.value = state.clock.elapsedTime;
+      materialRef.current.uniforms.pulseIntensity.value = pulseIntensity;
+    }
+
+    // Decay pulse intensity smoothly
+    if (pulseIntensity > 0) {
+      setPulseIntensity((prev) => Math.max(0, prev - delta * 2.5)); // Decay over ~0.4 seconds
     }
   });
 

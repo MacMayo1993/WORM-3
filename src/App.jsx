@@ -76,6 +76,7 @@ export default function WORM3() {
   const [exploded, setExploded] = useState(false);
   const [explosionT, setExplosionT] = useState(0);
   const [cascades, setCascades] = useState([]);
+  const [blackHolePulse, setBlackHolePulse] = useState(0); // Timestamp of last flip for black hole pulse
 
   const handleWelcomeComplete = () => {
     setShowWelcome(false);
@@ -308,6 +309,9 @@ export default function WORM3() {
       return flipStickerPair(prev, size, pos.x, pos.y, pos.z, dirKey, currentManifoldMap);
     });
     setMoves((m) => m + 1);
+
+    // Trigger black hole pulse effect
+    setBlackHolePulse(Date.now());
 
     // Trigger first-flip tutorial
     if (!hasFlippedOnce) {
@@ -852,7 +856,7 @@ export default function WORM3() {
             </>
           )}
           <Suspense fallback={null}>
-            <BlackHoleEnvironment />
+            <BlackHoleEnvironment flipTrigger={blackHolePulse} />
             <Environment preset="city" />
             <ManifoldGrid color="#3d5a3d" opacity={0.12} />
             <CubeAssembly
