@@ -7,6 +7,8 @@ import { findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
 const WormholeNetwork = ({ cubies, size, showTunnels, manifoldMap, cubieRefs }) => {
   const tunnelData = useMemo(() => {
     if (!showTunnels) return [];
+    // Guard against size/cubies mismatch during size transitions
+    if (cubies.length !== size) return [];
 
     const connections = [];
     const processed = new Set();
