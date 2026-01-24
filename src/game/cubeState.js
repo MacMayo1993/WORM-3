@@ -18,5 +18,17 @@ export const makeCubies = (size) =>
     )
   );
 
-// Deep clone 3D cube array
-export const clone3D = (arr) => arr.map(L => L.map(R => R.slice()));
+// Deep clone a cubie object
+const cloneCubie = (cubie) => ({
+  ...cubie,
+  stickers: Object.fromEntries(
+    Object.entries(cubie.stickers).map(([k, st]) => [
+      k,
+      { ...st, origPos: { ...st.origPos } }
+    ])
+  )
+});
+
+// Deep clone 3D cube array (properly clones cubie objects)
+export const clone3D = (arr) =>
+  arr.map(L => L.map(R => R.map(cubie => cloneCubie(cubie))));
