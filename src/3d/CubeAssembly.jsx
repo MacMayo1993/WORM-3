@@ -7,12 +7,13 @@ import DragGuide from './DragGuide.jsx';
 import CursorHighlight from '../components/overlays/CursorHighlight.jsx';
 import WormholeNetwork from '../manifold/WormholeNetwork.jsx';
 import ChaosWave from '../manifold/ChaosWave.jsx';
+import FlipPropagationWave from '../manifold/FlipPropagationWave.jsx';
 import { vibrate } from '../utils/audio.js';
 
 const CubeAssembly = ({
   size, cubies, onMove, onTapFlip, visualMode, animState, onAnimComplete,
   showTunnels, explosionFactor, cascades, onCascadeComplete, manifoldMap,
-  cursor, showCursor, flipMode, onSelectTile
+  cursor, showCursor, flipMode, onSelectTile, flipWaveOrigins, onFlipWaveComplete
 }) => {
   const cubieRefs = useRef([]);
   const controlsRef = useRef();
@@ -194,6 +195,12 @@ const CubeAssembly = ({
           onComplete={() => onCascadeComplete(c.id)}
         />
       ))}
+      {flipWaveOrigins && flipWaveOrigins.length > 0 && (
+        <FlipPropagationWave
+          origins={flipWaveOrigins}
+          onComplete={onFlipWaveComplete}
+        />
+      )}
       {items.map((it, idx) => (
         <Cubie
           key={it.key}
