@@ -612,35 +612,83 @@ body {
 
 @media (max-width: 768px) {
   .ui-layer {
-    padding: 0.75rem;
+    padding: 0.5rem;
+    gap: 8px;
   }
 
   .controls-row {
-    gap: 0.4rem;
-    padding: 0.5rem 0.75rem;
+    gap: 0.3rem;
+    padding: 0.4rem 0.5rem;
   }
 
   .btn-compact {
-    padding: 0.4rem 0.6rem;
+    padding: 0.35rem 0.5rem;
+    font-size: 0.55rem;
+    min-width: auto;
+  }
+
+  .btn-compact.text {
+    min-width: 50px;
+  }
+
+  .btn-level {
+    padding: 0.2rem 0.4rem;
     font-size: 0.6rem;
   }
 
   .bauhaus-box {
-    padding: 0.5rem;
+    padding: 0.4rem 0.8rem;
+  }
+
+  .bauhaus-box h1 {
+    font-size: 20px !important;
   }
 
   .stats-compact {
-    gap: 0.5rem;
+    gap: 0.4rem;
+    font-size: 0.7rem;
   }
 
   .ui-layer > div:first-child {
     flex-direction: column;
     align-items: stretch;
+    gap: 6px;
   }
 
   .ui-layer > div:first-child > div {
     justify-content: center;
     flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  /* Hide less essential info on mobile */
+  .ui-layer > div:first-child > div:last-child {
+    display: none !important; /* Hide right section with progress dials on mobile */
+  }
+
+  /* Make center tags smaller */
+  .ui-layer > div:first-child > div:nth-child(2) > div {
+    padding: 3px 8px !important;
+    font-size: 9px !important;
+  }
+
+  /* Compact stats panel on mobile */
+  .stats-panel > div {
+    padding: 3px 8px !important;
+  }
+
+  .stats-panel > div > div:first-child {
+    font-size: 7px !important;
+  }
+
+  .stats-panel > div > div:last-child {
+    font-size: 14px !important;
+  }
+
+  /* Manifold selector smaller text */
+  .manifold-selector {
+    font-size: 7px !important;
+    padding-bottom: 0.3rem;
   }
 }
 

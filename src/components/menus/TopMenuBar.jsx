@@ -105,14 +105,6 @@ const TopMenuBar = ({
             letterSpacing: '0.02em',
             lineHeight: 1
           }}>WORM³</h1>
-          <p style={{
-            margin: '4px 0 0',
-            fontSize: '9px',
-            color: colors.burntOrange,
-            letterSpacing: '0.2em',
-            textTransform: 'uppercase',
-            fontStyle: 'normal'
-          }}>Mayo Manifold Machine • 1978</p>
         </div>
 
         {/* Stats Panel - Library Checkout Card */}
