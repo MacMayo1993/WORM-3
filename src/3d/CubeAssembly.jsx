@@ -223,6 +223,8 @@ const CubeAssembly = ({
         enableDamping={true}
         dampingFactor={0.05}
         rotateSpeed={0.8}
+        minPolarAngle={0}
+        maxPolarAngle={Math.PI}
       />
     </group>
   );
