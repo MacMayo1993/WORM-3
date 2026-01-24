@@ -200,11 +200,23 @@ const StickerPlane = function StickerPlane({ meta, pos, rot=[0,0,0], overlay, mo
             />
           </mesh>
 
-          {/* WORM creatures crawling on disparity stickers */}
-          <Worm position={[0.25, 0.25, 0]} rotation={0} scale={0.8} />
-          <Worm position={[-0.25, 0.25, 0]} rotation={Math.PI / 4} scale={0.7} />
-          <Worm position={[0.25, -0.25, 0]} rotation={Math.PI / 2} scale={0.75} />
-          <Worm position={[-0.25, -0.25, 0]} rotation={Math.PI * 0.75} scale={0.7} />
+          {/* WORM creatures - number equals flip count (max 12) */}
+          {Array.from({ length: Math.min(meta?.flips ?? 0, 12) }, (_, i) => {
+            const count = Math.min(meta?.flips ?? 0, 12);
+            const angle = (i / count) * Math.PI * 2;
+            const radius = count <= 4 ? 0.25 : 0.28; // Spread out more if many worms
+            const x = Math.cos(angle) * radius;
+            const y = Math.sin(angle) * radius;
+            const scale = count <= 4 ? 0.7 + (i % 2) * 0.1 : 0.6; // Smaller if crowded
+            return (
+              <Worm
+                key={i}
+                position={[x, y, 0]}
+                rotation={angle}
+                scale={scale}
+              />
+            );
+          })}
         </>
       )}
 
