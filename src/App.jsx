@@ -10,7 +10,7 @@ import { play } from './utils/audio.js';
 // Game logic
 import { makeCubies } from './game/cubeState.js';
 import { rotateSliceCubies } from './game/cubeRotation.js';
-import { buildManifoldGridMap, flipStickerPair, findAntipodalStickerByGrid } from './game/manifoldLogic.js';
+import { buildManifoldGridMap, flipStickerPair, findAntipodalStickerByGrid, getManifoldNeighbors } from './game/manifoldLogic.js';
 import { detectWinConditions } from './game/winDetection.js';
 import { getStickerWorldPos } from './game/coordinates.js';
 import { FACE_COLORS, ANTIPODAL_COLOR } from './utils/constants.js';
@@ -222,45 +222,16 @@ export default function WORM3() {
         next = flipStickerPair(next, S, src.x, src.y, src.z, src.dirKey, currentManifoldMap);
       }
 
-      const neighbors = (() => {
-        const N = [];
-        if (src.dirKey === 'PX' || src.dirKey === 'NX') {
-          const xi = src.dirKey === 'PX' ? S - 1 : 0;
-          const add = (yy, zz) => {
-            if (yy >= 0 && yy < S && zz >= 0 && zz < S) N.push([xi, yy, zz]);
-          };
-          add(src.y - 1, src.z);
-          add(src.y + 1, src.z);
-          add(src.y, src.z - 1);
-          add(src.y, src.z + 1);
-        } else if (src.dirKey === 'PY' || src.dirKey === 'NY') {
-          const yi = src.dirKey === 'PY' ? S - 1 : 0;
-          const add = (xx, zz) => {
-            if (xx >= 0 && xx < S && zz >= 0 && zz < S) N.push([xx, yi, zz]);
-          };
-          add(src.x - 1, src.z);
-          add(src.x + 1, src.z);
-          add(src.x, src.z - 1);
-          add(src.x, src.z + 1);
-        } else {
-          const zi = src.dirKey === 'PZ' ? S - 1 : 0;
-          const add = (xx, yy) => {
-            if (xx >= 0 && xx < S && yy >= 0 && yy < S) N.push([xx, yy, zi]);
-          };
-          add(src.x - 1, src.y);
-          add(src.x + 1, src.y);
-          add(src.x, src.y - 1);
-          add(src.x, src.y + 1);
-        }
-        return N;
-      })();
+      // Get manifold neighbors (includes cross-face neighbors at edges)
+      const neighbors = getManifoldNeighbors(src.x, src.y, src.z, src.dirKey, S);
 
-      for (const [nx, ny, nz] of neighbors) {
+      for (const neighbor of neighbors) {
         if (Math.random() < pN) {
-          next = flipStickerPair(next, S, nx, ny, nz, src.dirKey, currentManifoldMap);
+          // Use the neighbor's dirKey (may be different face for cross-face propagation)
+          next = flipStickerPair(next, S, neighbor.x, neighbor.y, neighbor.z, neighbor.dirKey, currentManifoldMap);
 
           const fromPos = getStickerWorldPos(src.x, src.y, src.z, src.dirKey, S, explosionT);
-          const toPos = getStickerWorldPos(nx, ny, nz, src.dirKey, S, explosionT);
+          const toPos = getStickerWorldPos(neighbor.x, neighbor.y, neighbor.z, neighbor.dirKey, S, explosionT);
 
           setCascades((prev) => [
             ...prev,

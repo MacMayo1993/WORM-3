@@ -4,6 +4,105 @@ import { ANTIPODAL_COLOR } from '../utils/constants.js';
 import { getGridRC, getManifoldGridId } from './coordinates.js';
 import { clone3D } from './cubeState.js';
 
+// Get manifold neighbors for a sticker - includes cross-face neighbors at edges
+// Returns array of {x, y, z, dirKey} for each neighbor
+export const getManifoldNeighbors = (x, y, z, dirKey, size) => {
+  const S = size;
+  const neighbors = [];
+
+  // Helper to add a neighbor if valid
+  const add = (nx, ny, nz, nDir) => {
+    if (nx >= 0 && nx < S && ny >= 0 && ny < S && nz >= 0 && nz < S) {
+      neighbors.push({ x: nx, y: ny, z: nz, dirKey: nDir });
+    }
+  };
+
+  if (dirKey === 'PX' || dirKey === 'NX') {
+    // X faces: stickers vary in y,z
+    const xi = dirKey === 'PX' ? S - 1 : 0;
+
+    // Same-face neighbors
+    add(xi, y - 1, z, dirKey); // down
+    add(xi, y + 1, z, dirKey); // up
+    add(xi, y, z - 1, dirKey); // back
+    add(xi, y, z + 1, dirKey); // front
+
+    // Cross-face neighbors at edges
+    if (y === S - 1) {
+      // Top edge → PY face
+      add(x, S - 1, z, 'PY');
+    }
+    if (y === 0) {
+      // Bottom edge → NY face
+      add(x, 0, z, 'NY');
+    }
+    if (z === S - 1) {
+      // Front edge → PZ face
+      add(x, y, S - 1, 'PZ');
+    }
+    if (z === 0) {
+      // Back edge → NZ face
+      add(x, y, 0, 'NZ');
+    }
+  } else if (dirKey === 'PY' || dirKey === 'NY') {
+    // Y faces: stickers vary in x,z
+    const yi = dirKey === 'PY' ? S - 1 : 0;
+
+    // Same-face neighbors
+    add(x - 1, yi, z, dirKey); // left
+    add(x + 1, yi, z, dirKey); // right
+    add(x, yi, z - 1, dirKey); // back
+    add(x, yi, z + 1, dirKey); // front
+
+    // Cross-face neighbors at edges
+    if (x === S - 1) {
+      // Right edge → PX face
+      add(S - 1, y, z, 'PX');
+    }
+    if (x === 0) {
+      // Left edge → NX face
+      add(0, y, z, 'NX');
+    }
+    if (z === S - 1) {
+      // Front edge → PZ face
+      add(x, y, S - 1, 'PZ');
+    }
+    if (z === 0) {
+      // Back edge → NZ face
+      add(x, y, 0, 'NZ');
+    }
+  } else {
+    // PZ or NZ: stickers vary in x,y
+    const zi = dirKey === 'PZ' ? S - 1 : 0;
+
+    // Same-face neighbors
+    add(x - 1, y, zi, dirKey); // left
+    add(x + 1, y, zi, dirKey); // right
+    add(x, y - 1, zi, dirKey); // down
+    add(x, y + 1, zi, dirKey); // up
+
+    // Cross-face neighbors at edges
+    if (x === S - 1) {
+      // Right edge → PX face
+      add(S - 1, y, z, 'PX');
+    }
+    if (x === 0) {
+      // Left edge → NX face
+      add(0, y, z, 'NX');
+    }
+    if (y === S - 1) {
+      // Top edge → PY face
+      add(x, S - 1, z, 'PY');
+    }
+    if (y === 0) {
+      // Bottom edge → NY face
+      add(x, 0, z, 'NY');
+    }
+  }
+
+  return neighbors;
+};
+
 // Build map from manifold-grid ID to current location
 export const buildManifoldGridMap = (cubies, size) => {
   const map = new Map();
