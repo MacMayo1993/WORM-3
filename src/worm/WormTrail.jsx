@@ -8,8 +8,11 @@ import { getSegmentWorldPos } from './wormLogic.js';
 
 // Worm segment colors - gradient from head to tail
 const HEAD_COLOR = '#00ff88';
-const BODY_COLOR = '#00cc66';
 const TAIL_COLOR = '#009944';
+
+// Pre-create color objects to avoid GC pressure
+const HEAD_COLOR_OBJ = new THREE.Color(HEAD_COLOR);
+const TAIL_COLOR_OBJ = new THREE.Color(TAIL_COLOR);
 
 export default function WormTrail({ segments, size, explosionFactor = 0, alive = true }) {
   const groupRef = useRef();
@@ -19,6 +22,14 @@ export default function WormTrail({ segments, size, explosionFactor = 0, alive =
   const positions = useMemo(() => {
     return segments.map(seg => getSegmentWorldPos(seg, size, explosionFactor));
   }, [segments, size, explosionFactor]);
+
+  // Pre-calculate segment colors to avoid creating objects in render
+  const segmentColors = useMemo(() => {
+    return positions.map((_, i) => {
+      const t = positions.length > 1 ? i / (positions.length - 1) : 0;
+      return HEAD_COLOR_OBJ.clone().lerp(TAIL_COLOR_OBJ, t);
+    });
+  }, [positions.length]);
 
   // Animate pulse effect
   useFrame((state, delta) => {
@@ -34,10 +45,8 @@ export default function WormTrail({ segments, size, explosionFactor = 0, alive =
         const isTail = i === positions.length - 1;
         const t = positions.length > 1 ? i / (positions.length - 1) : 0;
 
-        // Interpolate color from head to tail
-        const headCol = new THREE.Color(HEAD_COLOR);
-        const tailCol = new THREE.Color(TAIL_COLOR);
-        const segColor = headCol.clone().lerp(tailCol, t);
+        // Use pre-calculated color
+        const segColor = segmentColors[i] || HEAD_COLOR_OBJ;
 
         // Size decreases from head to tail
         const baseSize = isHead ? 0.35 : isTail ? 0.2 : 0.28 - (t * 0.08);
@@ -128,8 +137,8 @@ export default function WormTrail({ segments, size, explosionFactor = 0, alive =
         const up = new THREE.Vector3(0, 1, 0);
         const quaternion = new THREE.Quaternion().setFromUnitVectors(up, direction);
 
-        const t = i / (positions.length - 1);
-        const tubeColor = new THREE.Color(HEAD_COLOR).lerp(new THREE.Color(TAIL_COLOR), t);
+        // Use pre-calculated color for tube
+        const tubeColor = segmentColors[i] || HEAD_COLOR_OBJ;
 
         return (
           <mesh key={`tube-${i}`} position={midPoint} quaternion={quaternion}>

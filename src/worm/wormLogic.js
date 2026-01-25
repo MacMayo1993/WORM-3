@@ -216,14 +216,16 @@ export const isPositionFlipped = (pos, cubies) => {
  * @param {Object} pos - Current position {x, y, z, dirKey}
  * @param {Array} cubies - Cube state
  * @param {number} size - Cube size
+ * @param {Map} manifoldMap - Pre-computed manifold map (optional, will build if not provided)
  * @returns {Object|null} Antipodal position or null
  */
-export const getAntipodalPosition = (pos, cubies, size) => {
+export const getAntipodalPosition = (pos, cubies, size, manifoldMap = null) => {
   const sticker = cubies[pos.x]?.[pos.y]?.[pos.z]?.stickers?.[pos.dirKey];
   if (!sticker) return null;
 
-  const manifoldMap = buildManifoldGridMap(cubies, size);
-  const antipodal = findAntipodalStickerByGrid(manifoldMap, sticker, size);
+  // Use provided manifoldMap or build one (expensive fallback)
+  const map = manifoldMap || buildManifoldGridMap(cubies, size);
+  const antipodal = findAntipodalStickerByGrid(map, sticker, size);
 
   if (!antipodal) return null;
 

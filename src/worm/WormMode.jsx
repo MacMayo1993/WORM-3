@@ -14,8 +14,7 @@ import {
   checkSelfCollision,
   positionKey,
   spawnOrbs,
-  updateWormAfterRotation,
-  calculateScore
+  updateWormAfterRotation
 } from './wormLogic.js';
 import { play } from '../utils/audio.js';
 
@@ -45,16 +44,22 @@ export function useWormGame(cubies, size, animState, onRotate) {
   const lastMoveTime = useRef(0);
   const rotationQueue = useRef([]);
 
+  // Ref for current worm state (avoids stale closures in event handlers)
+  const wormRef = useRef(worm);
+  wormRef.current = worm;
+
   // Calculate current speed
   const speed = useMemo(() => {
     const s = CONFIG.baseSpeed + (worm.length * CONFIG.speedIncrement);
     return Math.min(s, CONFIG.maxSpeed);
   }, [worm.length]);
 
-  // Initialize orbs on mount
+  // Initialize orbs on mount only (intentionally empty deps)
+  // Orbs should only spawn once when the game starts, not on every cubies/size change
   useEffect(() => {
     const initialOrbs = spawnOrbs(cubies, size, CONFIG.initialOrbs, worm, []);
     setOrbs(initialOrbs);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Restart handler
@@ -106,7 +111,8 @@ export function useWormGame(cubies, size, animState, onRotate) {
         }
       };
 
-      const head = worm[0];
+      // Use ref to get current worm state (avoids stale closure)
+      const head = wormRef.current[0];
       if (!head) return;
 
       switch (key) {
@@ -147,7 +153,7 @@ export function useWormGame(cubies, size, animState, onRotate) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [gameState, worm, restart]);
+  }, [gameState, restart]); // worm accessed via wormRef to avoid stale closure
 
   // Process rotation queue
   useEffect(() => {
@@ -287,13 +293,11 @@ export function WormGameLoop({
     }
 
     let finalPos = nextPos;
-    let warped = false;
 
     if (isPositionFlipped(nextPos, cubies)) {
       const antipodalPos = getAntipodalPosition(nextPos, cubies, size);
       if (antipodalPos) {
         finalPos = { ...antipodalPos, moveDir: moveDir };
-        warped = true;
         setWarps(w => w + 1);
         setScore(s => s + CONFIG.warpBonus);
         play('/sounds/warp.mp3');

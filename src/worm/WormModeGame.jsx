@@ -47,9 +47,31 @@ export function WormModeCanvasElements({ size, explosionFactor, animState, cubie
 }
 
 // HUD elements - render in UI layer
-export function WormModeHUD({ onQuit }) {
-  const game = useWormGameContext();
-  if (!game) return null;
+// NOTE: This component tries to use context first, but can also receive props directly
+// when rendered outside the WormModeProvider (which is inside Canvas)
+export function WormModeHUD({ onQuit, gameData }) {
+  const contextGame = useWormGameContext();
+  // Use context if available, otherwise fall back to props
+  const game = contextGame || gameData;
+
+  if (!game) {
+    // No game data available - show minimal HUD
+    return (
+      <WormHUD
+        score={0}
+        length={3}
+        orbsRemaining={15}
+        orbsTotal={15}
+        warps={0}
+        gameState="playing"
+        speed={0.8}
+        onPause={() => {}}
+        onResume={() => {}}
+        onRestart={() => {}}
+        onQuit={onQuit}
+      />
+    );
+  }
 
   const {
     gameState,
