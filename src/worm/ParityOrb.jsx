@@ -1,10 +1,11 @@
 // src/worm/ParityOrb.jsx
 // Collectible parity orbs with pulsing glow effect
+// Supports both surface mode and tunnel mode
 
 import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { getSegmentWorldPos } from './wormLogic.js';
+import { getSegmentWorldPos, getTunnelWorldPos } from './wormLogic.js';
 
 // Orb colors - radiant energy
 const ORB_COLORS = [
@@ -15,9 +16,10 @@ const ORB_COLORS = [
   '#f97316'  // Orange
 ];
 
-function SingleOrb({ position, colorIndex = 0, collected = false }) {
+function SingleOrb({ position, colorIndex = 0, collected = false, isTarget = false }) {
   const meshRef = useRef();
   const glowRef = useRef();
+  const targetGlowRef = useRef();
   const timeOffset = useMemo(() => Math.random() * Math.PI * 2, []);
 
   const color = ORB_COLORS[colorIndex % ORB_COLORS.length];
@@ -27,20 +29,30 @@ function SingleOrb({ position, colorIndex = 0, collected = false }) {
 
     const t = state.clock.elapsedTime + timeOffset;
 
-    // Floating bob animation
-    meshRef.current.position.y = position[1] + Math.sin(t * 2) * 0.05;
+    // Floating bob animation - more intense if target
+    const bobIntensity = isTarget ? 0.12 : 0.05;
+    meshRef.current.position.y = position[1] + Math.sin(t * 2) * bobIntensity;
 
-    // Rotation
-    meshRef.current.rotation.y = t * 0.5;
+    // Rotation - faster if target
+    const rotSpeed = isTarget ? 1.5 : 0.5;
+    meshRef.current.rotation.y = t * rotSpeed;
     meshRef.current.rotation.x = Math.sin(t * 0.3) * 0.2;
 
-    // Pulse scale
-    const pulse = 1 + Math.sin(t * 4) * 0.15;
+    // Pulse scale - larger pulse if target
+    const pulseIntensity = isTarget ? 0.3 : 0.15;
+    const pulse = 1 + Math.sin(t * 4) * pulseIntensity;
     meshRef.current.scale.setScalar(pulse);
 
     // Glow intensity pulse
     if (glowRef.current) {
-      glowRef.current.material.opacity = 0.3 + Math.sin(t * 4) * 0.15;
+      const baseOpacity = isTarget ? 0.5 : 0.3;
+      glowRef.current.material.opacity = baseOpacity + Math.sin(t * 4) * 0.15;
+    }
+
+    // Target highlight glow
+    if (targetGlowRef.current && isTarget) {
+      targetGlowRef.current.scale.setScalar(1 + Math.sin(t * 6) * 0.2);
+      targetGlowRef.current.material.opacity = 0.2 + Math.sin(t * 6) * 0.1;
     }
   });
 
@@ -50,11 +62,11 @@ function SingleOrb({ position, colorIndex = 0, collected = false }) {
     <group position={[position[0], position[1], position[2]]}>
       {/* Core orb */}
       <mesh ref={meshRef}>
-        <icosahedronGeometry args={[0.18, 1]} />
+        <icosahedronGeometry args={[isTarget ? 0.22 : 0.18, 1]} />
         <meshStandardMaterial
           color={color}
           emissive={color}
-          emissiveIntensity={1.2}
+          emissiveIntensity={isTarget ? 1.8 : 1.2}
           metalness={0.3}
           roughness={0.2}
         />
@@ -62,35 +74,73 @@ function SingleOrb({ position, colorIndex = 0, collected = false }) {
 
       {/* Outer glow */}
       <mesh ref={glowRef}>
-        <sphereGeometry args={[0.35, 16, 16]} />
+        <sphereGeometry args={[isTarget ? 0.45 : 0.35, 16, 16]} />
         <meshBasicMaterial
           color={color}
           transparent
-          opacity={0.3}
+          opacity={isTarget ? 0.5 : 0.3}
           side={THREE.BackSide}
         />
       </mesh>
 
-      {/* Inner sparkle */}
+      {/* Target highlight ring */}
+      {isTarget && (
+        <mesh ref={targetGlowRef}>
+          <torusGeometry args={[0.4, 0.05, 8, 32]} />
+          <meshBasicMaterial
+            color="#ffffff"
+            transparent
+            opacity={0.3}
+          />
+        </mesh>
+      )}
+
+      {/* Inner sparkle - brighter for target */}
       <pointLight
         color={color}
-        intensity={0.5}
-        distance={2}
+        intensity={isTarget ? 1.0 : 0.5}
+        distance={isTarget ? 3 : 2}
         decay={2}
       />
     </group>
   );
 }
 
-export default function ParityOrbs({ orbs, size, explosionFactor = 0 }) {
+/**
+ * @param {Object} props
+ * @param {Array} props.orbs - Orb positions (surface or tunnel)
+ * @param {number} props.size - Cube size
+ * @param {number} props.explosionFactor - Explosion animation factor
+ * @param {string} props.mode - 'surface' or 'tunnel'
+ * @param {string} props.targetTunnelId - ID of tunnel to highlight (for tunnel mode)
+ */
+export default function ParityOrbs({ orbs, size, explosionFactor = 0, mode = 'surface', targetTunnelId = null }) {
+  const isTunnelMode = mode === 'tunnel';
+
   // Calculate world positions for all orbs
   const orbData = useMemo(() => {
-    return orbs.map((orb, i) => ({
-      position: getSegmentWorldPos(orb, size, explosionFactor),
-      colorIndex: i,
-      key: `${orb.x}-${orb.y}-${orb.z}-${orb.dirKey}`
-    }));
-  }, [orbs, size, explosionFactor]);
+    return orbs.map((orb, i) => {
+      let position;
+      let key;
+
+      if (isTunnelMode && orb.tunnel) {
+        // Tunnel mode: use tunnel position
+        position = getTunnelWorldPos(orb.tunnel, orb.t, size, explosionFactor);
+        key = `${orb.tunnelId}-${orb.t}`;
+      } else {
+        // Surface mode: use grid position
+        position = getSegmentWorldPos(orb, size, explosionFactor);
+        key = `${orb.x}-${orb.y}-${orb.z}-${orb.dirKey}`;
+      }
+
+      return {
+        position,
+        colorIndex: i,
+        key,
+        isTarget: isTunnelMode && orb.tunnelId === targetTunnelId
+      };
+    });
+  }, [orbs, size, explosionFactor, isTunnelMode, targetTunnelId]);
 
   return (
     <group>
@@ -99,6 +149,7 @@ export default function ParityOrbs({ orbs, size, explosionFactor = 0 }) {
           key={data.key}
           position={data.position}
           colorIndex={data.colorIndex}
+          isTarget={data.isTarget}
         />
       ))}
     </group>

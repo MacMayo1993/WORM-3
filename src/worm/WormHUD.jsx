@@ -9,14 +9,17 @@ export default function WormHUD({
   orbsRemaining,
   orbsTotal,
   warps,
+  warpsLabel = 'WARPS', // 'WARPS' for surface mode, 'TUNNELS' for tunnel mode
   gameState, // 'playing', 'paused', 'gameover', 'victory'
   speed,
   wormCameraEnabled = false,
+  mode = 'surface', // 'surface' or 'tunnel'
   onPause,
   onResume,
   onRestart,
   onQuit
 }) {
+  const isTunnelMode = mode === 'tunnel';
   const isPlaying = gameState === 'playing';
   const isGameOver = gameState === 'gameover';
   const isVictory = gameState === 'victory';
@@ -41,7 +44,7 @@ export default function WormHUD({
           </span>
         </div>
         <div style={styles.statGroup}>
-          <span style={styles.statLabel}>WARPS</span>
+          <span style={styles.statLabel}>{warpsLabel}</span>
           <span style={styles.statValue}>{warps}</span>
         </div>
         <div style={styles.statGroup}>
@@ -59,7 +62,9 @@ export default function WormHUD({
       {/* Control hint */}
       {isPlaying && (
         <div style={styles.hint}>
-          WASD/QE to rotate | C for worm cam | Space to pause
+          {isTunnelMode
+            ? 'WASD/QE to align tunnels | C for worm cam | Space to pause'
+            : 'WASD/QE to rotate | C for worm cam | Space to pause'}
         </div>
       )}
 
@@ -88,12 +93,14 @@ export default function WormHUD({
         <div style={styles.overlay}>
           <div style={styles.overlayContent}>
             <h2 style={{...styles.overlayTitle, color: '#ef4444'}}>GAME OVER</h2>
-            <p style={styles.overlayMessage}>You collided with yourself!</p>
+            <p style={styles.overlayMessage}>
+              {isTunnelMode ? 'Lost in the manifold!' : 'You collided with yourself!'}
+            </p>
             <div style={styles.finalStats}>
               <div>Final Score: <strong>{score.toLocaleString()}</strong></div>
               <div>Length: <strong>{length}</strong></div>
               <div>Orbs Collected: <strong>{orbsTotal - orbsRemaining}</strong></div>
-              <div>Wormhole Warps: <strong>{warps}</strong></div>
+              <div>{isTunnelMode ? 'Tunnels Traversed' : 'Wormhole Warps'}: <strong>{warps}</strong></div>
             </div>
             <div style={styles.buttonGroup}>
               <button style={styles.button} onClick={onRestart}>
@@ -112,11 +119,13 @@ export default function WormHUD({
         <div style={styles.overlay}>
           <div style={styles.overlayContent}>
             <h2 style={{...styles.overlayTitle, color: '#22c55e'}}>VICTORY!</h2>
-            <p style={styles.overlayMessage}>All orbs collected!</p>
+            <p style={styles.overlayMessage}>
+              {isTunnelMode ? 'You conquered the wormhole network!' : 'All orbs collected!'}
+            </p>
             <div style={styles.finalStats}>
               <div>Final Score: <strong>{score.toLocaleString()}</strong></div>
               <div>Final Length: <strong>{length}</strong></div>
-              <div>Wormhole Warps: <strong>{warps}</strong></div>
+              <div>{isTunnelMode ? 'Tunnels Traversed' : 'Wormhole Warps'}: <strong>{warps}</strong></div>
             </div>
             <div style={styles.buttonGroup}>
               <button style={styles.button} onClick={onRestart}>
