@@ -5,6 +5,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber';
 import WormTrail from './WormTrail.jsx';
 import ParityOrbs from './ParityOrb.jsx';
+import WormTunnelNetwork from './WormTunnelNetwork.jsx';
 import {
   createInitialWorm,
   getNextSurfacePosition,
@@ -250,10 +251,25 @@ export function WormMode3D({
   explosionFactor,
   gameState,
   mode = 'surface',
-  targetTunnelId = null
+  targetTunnelId = null,
+  tunnels = []
 }) {
+  const isTunnelMode = mode === 'tunnel';
+  const wormTunnelId = isTunnelMode && worm[0] ? worm[0].tunnelId : null;
+
   return (
     <>
+      {/* Tunnel network visualization (only in tunnel mode) */}
+      {isTunnelMode && tunnels.length > 0 && (
+        <WormTunnelNetwork
+          tunnels={tunnels}
+          size={size}
+          explosionFactor={explosionFactor}
+          targetTunnelId={targetTunnelId}
+          wormTunnelId={wormTunnelId}
+        />
+      )}
+
       <WormTrail
         segments={worm}
         size={size}

@@ -32,6 +32,7 @@ export function WormModeProvider({ children, cubies, size, animState, onRotate, 
         score: game.score,
         warps: game.warps || 0,
         tunnelsTraversed: game.tunnelsTraversed || 0,
+        tunnels: game.tunnels || [],
         speed: game.speed,
         orbsTotal: game.orbsTotal,
         wormCameraEnabled: game.wormCameraEnabled,
@@ -50,6 +51,7 @@ export function WormModeProvider({ children, cubies, size, animState, onRotate, 
     game.score,
     game.warps,
     game.tunnelsTraversed,
+    game.tunnels,
     game.speed,
     game.orbsTotal,
     game.wormCameraEnabled,
@@ -86,6 +88,7 @@ export function WormModeCanvasElements({ size, explosionFactor, animState, cubie
         gameState={game.gameState}
         mode={isTunnelMode ? 'tunnel' : 'surface'}
         targetTunnelId={game.targetTunnelId}
+        tunnels={game.tunnels || []}
       />
       <GameLoop
         cubies={cubies}
@@ -177,10 +180,15 @@ export function WormModeHUD({ onQuit, gameData }) {
   );
 }
 
-// Start screen overlay
+// Start screen overlay with mode selection
 export function WormModeStartScreen({ onStart, onCancel }) {
+  const [selectedMode, setSelectedMode] = React.useState('surface');
   // Detect mobile/touch device
   const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+  const handleStart = () => {
+    onStart(selectedMode);
+  };
 
   return (
     <div style={styles.overlay}>
@@ -188,32 +196,81 @@ export function WormModeStartScreen({ onStart, onCancel }) {
         <h1 style={styles.title}>WORM MODE</h1>
         <p style={styles.subtitle}>Slither across the manifold!</p>
 
+        {/* Mode Selection */}
+        <div style={styles.modeSelector}>
+          <button
+            style={{
+              ...styles.modeButton,
+              ...(selectedMode === 'surface' ? styles.modeButtonActive : {})
+            }}
+            onClick={() => setSelectedMode('surface')}
+          >
+            <div style={styles.modeTitle}>SURFACE</div>
+            <div style={styles.modeDesc}>Classic - crawl on cube faces</div>
+          </button>
+          <button
+            style={{
+              ...styles.modeButton,
+              ...(selectedMode === 'tunnel' ? styles.modeButtonActive : {}),
+              ...styles.modeButtonTunnel
+            }}
+            onClick={() => setSelectedMode('tunnel')}
+          >
+            <div style={styles.modeTitle}>TUNNEL</div>
+            <div style={styles.modeDesc}>NEW - travel inside wormholes!</div>
+          </button>
+        </div>
+
         <div style={styles.instructions}>
-          <h3 style={styles.instructionsTitle}>How to Play</h3>
+          <h3 style={styles.instructionsTitle}>
+            {selectedMode === 'tunnel' ? 'Tunnel Mode' : 'Surface Mode'}
+          </h3>
           <ul style={styles.list}>
-            <li>The worm auto-advances across cube surfaces</li>
-            {isTouchDevice ? (
+            {selectedMode === 'tunnel' ? (
               <>
-                <li><strong>Swipe</strong> - Rotate layers to steer</li>
-                <li><strong>Q/E buttons</strong> - Rotate the face</li>
-                <li><strong>📷 button</strong> - Toggle first-person worm cam</li>
+                <li>Worm travels INSIDE the cube through wormhole tunnels</li>
+                <li>Requires flipped stickers to create tunnels</li>
+                {isTouchDevice ? (
+                  <>
+                    <li><strong>Swipe</strong> - Rotate layers to align tunnels</li>
+                    <li><strong>📷 button</strong> - Toggle first-person view</li>
+                  </>
+                ) : (
+                  <>
+                    <li><strong>WASD/QE</strong> - Rotate to align tunnel exits</li>
+                    <li><strong>C</strong> - Toggle first-person worm cam</li>
+                  </>
+                )}
+                <li>Collect orbs floating inside tunnels</li>
+                <li>Exit leads to nearest tunnel entrance</li>
               </>
             ) : (
               <>
-                <li><strong>WASD</strong> - Rotate layers to steer</li>
-                <li><strong>Q/E</strong> - Rotate the face</li>
-                <li><strong>C</strong> - Toggle first-person worm cam (trippy!)</li>
+                <li>The worm auto-advances across cube surfaces</li>
+                {isTouchDevice ? (
+                  <>
+                    <li><strong>Swipe</strong> - Rotate layers to steer</li>
+                    <li><strong>Q/E buttons</strong> - Rotate the face</li>
+                    <li><strong>📷 button</strong> - Toggle first-person worm cam</li>
+                  </>
+                ) : (
+                  <>
+                    <li><strong>WASD</strong> - Rotate layers to steer</li>
+                    <li><strong>Q/E</strong> - Rotate the face</li>
+                    <li><strong>C</strong> - Toggle first-person worm cam</li>
+                  </>
+                )}
+                <li>Collect glowing orbs to grow longer</li>
+                <li>Hit a flipped tile = wormhole teleport!</li>
               </>
             )}
-            <li>Collect glowing orbs to grow longer</li>
-            <li>Hit a flipped tile = wormhole teleport!</li>
             <li>Don't collide with yourself!</li>
           </ul>
         </div>
 
         <div style={styles.buttons}>
-          <button style={styles.startButton} onClick={onStart}>
-            START GAME
+          <button style={styles.startButton} onClick={handleStart}>
+            START {selectedMode.toUpperCase()}
           </button>
           <button style={styles.cancelButton} onClick={onCancel}>
             CANCEL
@@ -311,5 +368,43 @@ const styles = {
     cursor: 'pointer',
     letterSpacing: '0.1em',
     transition: 'all 0.2s ease'
+  },
+  // Mode selector styles
+  modeSelector: {
+    display: 'flex',
+    gap: '12px',
+    justifyContent: 'center',
+    marginBottom: '24px'
+  },
+  modeButton: {
+    flex: 1,
+    padding: '16px 20px',
+    background: 'rgba(255, 255, 255, 0.05)',
+    border: '2px solid #444',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    textAlign: 'center',
+    maxWidth: '180px'
+  },
+  modeButtonActive: {
+    borderColor: '#00ff88',
+    background: 'rgba(0, 255, 136, 0.15)',
+    boxShadow: '0 0 20px rgba(0, 255, 136, 0.3)'
+  },
+  modeButtonTunnel: {
+    // Special styling for tunnel mode button when active is handled via modeButtonActive
+  },
+  modeTitle: {
+    fontSize: '16px',
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: '4px',
+    letterSpacing: '0.1em'
+  },
+  modeDesc: {
+    fontSize: '11px',
+    color: '#888',
+    lineHeight: '1.3'
   }
 };
