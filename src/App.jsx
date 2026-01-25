@@ -19,6 +19,14 @@ import { FACE_COLORS, ANTIPODAL_COLOR } from './utils/constants.js';
 import CubeAssembly from './3d/CubeAssembly.jsx';
 import BlackHoleEnvironment from './3d/BlackHoleEnvironment.jsx';
 
+// WORM mode
+import {
+  WormModeProvider,
+  WormModeCanvasElements,
+  WormModeHUD,
+  WormModeStartScreen
+} from './worm/WormModeGame.jsx';
+
 // UI components
 import TopMenuBar from './components/menus/TopMenuBar.jsx';
 import MainMenu from './components/menus/MainMenu.jsx';
@@ -80,6 +88,11 @@ export default function WORM3() {
 
   // Auto-rotate mode state
   const [autoRotateEnabled, setAutoRotateEnabled] = useState(false);
+
+  // WORM mode state
+  const [wormModeActive, setWormModeActive] = useState(false);
+  const [showWormModeStart, setShowWormModeStart] = useState(false);
+
   const [upcomingRotation, setUpcomingRotation] = useState(null); // { axis, dir, sliceIndex }
   const [rotationCountdown, setRotationCountdown] = useState(0); // Time until next rotation (ms)
   const cubiesRef = useRef(cubies); // Ref to track current cubies for auto-rotate effect
@@ -519,6 +532,23 @@ export default function WORM3() {
     gameStartTime.current = Date.now();
     setGameTime(0);
     setHasShuffled(false); // Disable win detection until next shuffle
+  };
+
+  // WORM mode handlers
+  const handleWormModeStart = () => {
+    setShowWormModeStart(false);
+    setWormModeActive(true);
+    // Reset the cube for a fresh worm game
+    setCubies(makeCubies(size));
+  };
+
+  const handleWormModeQuit = () => {
+    setWormModeActive(false);
+  };
+
+  const onWormRotate = (axis, dir, sliceIndex) => {
+    setAnimState({ axis, dir, sliceIndex, t: 0 });
+    setPendingMove({ axis, dir, sliceIndex });
   };
 
   // Victory screen handlers
@@ -1021,7 +1051,45 @@ export default function WORM3() {
           <Suspense fallback={null}>
             <BlackHoleEnvironment flipTrigger={blackHolePulse} />
             <Environment preset="city" />
-            <CubeAssembly
+
+            {/* WORM Mode - wraps everything when active */}
+            {wormModeActive ? (
+              <WormModeProvider
+                cubies={cubies}
+                size={size}
+                animState={animState}
+                onRotate={onWormRotate}
+              >
+                <WormModeCanvasElements
+                  size={size}
+                  explosionFactor={explosionT}
+                  animState={animState}
+                  cubies={cubies}
+                />
+                <CubeAssembly
+                  size={size}
+                  cubies={cubies}
+                  onMove={onMove}
+                  onTapFlip={onTapFlip}
+                  visualMode={visualMode}
+                  animState={animState}
+                  onAnimComplete={handleAnimComplete}
+                  showTunnels={showTunnels}
+                  explosionFactor={explosionT}
+                  cascades={cascades}
+                  onCascadeComplete={onCascadeComplete}
+                  manifoldMap={manifoldMap}
+                  showInvitation={false}
+                  cursor={cursor}
+                  showCursor={false}
+                  flipMode={false}
+                  onSelectTile={handleSelectTile}
+                  flipWaveOrigins={flipWaveOrigins}
+                  onFlipWaveComplete={onFlipWaveComplete}
+                />
+              </WormModeProvider>
+            ) : (
+              <CubeAssembly
               size={size}
               cubies={cubies}
               onMove={onMove}
@@ -1042,6 +1110,7 @@ export default function WORM3() {
               flipWaveOrigins={flipWaveOrigins}
               onFlipWaveComplete={onFlipWaveComplete}
             />
+            )}
           </Suspense>
         </Canvas>
       </div>
@@ -1126,6 +1195,13 @@ export default function WORM3() {
               <button className="btn-compact reset text" onClick={reset}>
                 RESET
               </button>
+              <button
+                className={`btn-compact text ${wormModeActive ? 'active' : ''}`}
+                onClick={() => setShowWormModeStart(true)}
+                style={{ color: '#00ff88', borderColor: wormModeActive ? '#00ff88' : undefined }}
+              >
+                WORM
+              </button>
             </div>
           </div>
 
@@ -1161,6 +1237,17 @@ export default function WORM3() {
 
       {/* Victory Screen - highest z-index */}
       {victory && <VictoryScreen winType={victory} moves={moves} time={gameTime} onContinue={handleVictoryContinue} onNewGame={handleVictoryNewGame} />}
+
+      {/* WORM Mode Overlays */}
+      {showWormModeStart && (
+        <WormModeStartScreen
+          onStart={handleWormModeStart}
+          onCancel={() => setShowWormModeStart(false)}
+        />
+      )}
+      {wormModeActive && (
+        <WormModeHUD onQuit={handleWormModeQuit} />
+      )}
     </div>
   );
 }
