@@ -1,8 +1,364 @@
 // src/worm/wormLogic.js
-// Core game logic for WORM mode - surface navigation, collision, teleportation
+// Core game logic for WORM mode - surface navigation AND tunnel navigation
+// Supports two modes: surface crawling (classic) and inside-tunnel traversal (new)
 
 import { getManifoldNeighbors, findAntipodalStickerByGrid, buildManifoldGridMap } from '../game/manifoldLogic.js';
 import { getStickerWorldPos } from '../game/coordinates.js';
+import * as THREE from 'three';
+import { calculateSmartControlPoint } from '../utils/smartRouting.js';
+
+// ============================================================================
+// TUNNEL MODE - Worm travels INSIDE the cube through antipodal wormhole tunnels
+// ============================================================================
+
+/**
+ * Tunnel segment position - represents a position inside a tunnel
+ * @typedef {Object} TunnelPosition
+ * @property {string} tunnelId - Unique ID for the tunnel (e.g., "PZ-1-1")
+ * @property {number} t - Progress through tunnel (0 = entry portal, 1 = exit portal)
+ * @property {Object} entry - Entry portal position {x, y, z, dirKey}
+ * @property {Object} exit - Exit portal position {x, y, z, dirKey}
+ */
+
+/**
+ * Get all active tunnels (connections between flipped stickers and their antipodals)
+ * @param {Array} cubies - Cube state
+ * @param {number} size - Cube size
+ * @returns {Array} Array of tunnel objects {id, entry, exit, flips}
+ */
+export const getActiveTunnels = (cubies, size) => {
+  const tunnels = [];
+  const seen = new Set();
+  const manifoldMap = buildManifoldGridMap(cubies, size);
+
+  for (let x = 0; x < size; x++) {
+    for (let y = 0; y < size; y++) {
+      for (let z = 0; z < size; z++) {
+        const cubie = cubies[x]?.[y]?.[z];
+        if (!cubie) continue;
+
+        for (const dirKey of Object.keys(cubie.stickers || {})) {
+          const sticker = cubie.stickers[dirKey];
+          if (!sticker) continue;
+
+          // Check if sticker is on surface and flipped
+          const isVisible = (
+            (dirKey === 'PX' && x === size - 1) ||
+            (dirKey === 'NX' && x === 0) ||
+            (dirKey === 'PY' && y === size - 1) ||
+            (dirKey === 'NY' && y === 0) ||
+            (dirKey === 'PZ' && z === size - 1) ||
+            (dirKey === 'NZ' && z === 0)
+          );
+
+          if (!isVisible) continue;
+
+          const isFlipped = sticker.curr !== sticker.orig;
+          if (!isFlipped) continue;
+
+          // Create tunnel ID (use sorted positions to avoid duplicates)
+          const entryKey = `${x},${y},${z},${dirKey}`;
+          if (seen.has(entryKey)) continue;
+
+          // Find antipodal
+          const antipodal = findAntipodalStickerByGrid(manifoldMap, sticker, size);
+          if (!antipodal) continue;
+
+          const exitKey = `${antipodal.x},${antipodal.y},${antipodal.z},${antipodal.dirKey}`;
+
+          // Mark both ends as seen
+          seen.add(entryKey);
+          seen.add(exitKey);
+
+          // Count flips for intensity
+          const flips = (sticker.flips || 0) + (antipodal.sticker?.flips || 0);
+
+          tunnels.push({
+            id: `tunnel-${x}-${y}-${z}-${dirKey}`,
+            entry: { x, y, z, dirKey },
+            exit: { x: antipodal.x, y: antipodal.y, z: antipodal.z, dirKey: antipodal.dirKey },
+            flips: Math.max(1, flips),
+            entryColor: sticker.curr,
+            exitColor: antipodal.sticker?.curr || sticker.curr
+          });
+        }
+      }
+    }
+  }
+
+  return tunnels;
+};
+
+/**
+ * Get world position along a tunnel at parameter t (0-1)
+ * @param {Object} tunnel - Tunnel object with entry/exit positions
+ * @param {number} t - Parameter along tunnel (0 = entry, 1 = exit)
+ * @param {number} size - Cube size
+ * @param {number} explosionFactor - Explosion animation factor
+ * @returns {Array} [x, y, z] world coordinates
+ */
+export const getTunnelWorldPos = (tunnel, t, size, explosionFactor = 0) => {
+  const entryPos = getStickerWorldPos(
+    tunnel.entry.x, tunnel.entry.y, tunnel.entry.z,
+    tunnel.entry.dirKey, size, explosionFactor
+  );
+  const exitPos = getStickerWorldPos(
+    tunnel.exit.x, tunnel.exit.y, tunnel.exit.z,
+    tunnel.exit.dirKey, size, explosionFactor
+  );
+
+  // Use smart control point for curved path through center
+  const controlPoint = calculateSmartControlPoint(entryPos, exitPos, size, 0);
+
+  // Quadratic Bezier interpolation
+  const vStart = new THREE.Vector3(...entryPos);
+  const vControl = controlPoint;
+  const vEnd = new THREE.Vector3(...exitPos);
+
+  // B(t) = (1-t)²P₀ + 2(1-t)tP₁ + t²P₂
+  const oneMinusT = 1 - t;
+  const result = new THREE.Vector3()
+    .addScaledVector(vStart, oneMinusT * oneMinusT)
+    .addScaledVector(vControl, 2 * oneMinusT * t)
+    .addScaledVector(vEnd, t * t);
+
+  return [result.x, result.y, result.z];
+};
+
+/**
+ * Create initial worm inside a random tunnel
+ * @param {Array} tunnels - Available tunnels
+ * @param {number} initialLength - Initial worm length (segments)
+ * @returns {Array} Initial worm segments with tunnel positions
+ */
+export const createInitialTunnelWorm = (tunnels, initialLength = 3) => {
+  if (tunnels.length === 0) {
+    // No tunnels yet - return empty (game will need to create tunnels first)
+    return [];
+  }
+
+  // Pick a random tunnel to start in
+  const startTunnel = tunnels[Math.floor(Math.random() * tunnels.length)];
+
+  const segments = [];
+  const spacing = 0.15; // Space between segments along tunnel
+
+  for (let i = 0; i < initialLength; i++) {
+    // Head at t=0.5, body segments behind
+    const t = Math.max(0.05, 0.5 - (i * spacing));
+    segments.push({
+      tunnelId: startTunnel.id,
+      t,
+      tunnel: startTunnel
+    });
+  }
+
+  return segments;
+};
+
+/**
+ * Find the closest tunnel entrance to a given exit position
+ * @param {Object} exitPos - Exit position {x, y, z, dirKey}
+ * @param {Array} tunnels - Available tunnels
+ * @param {string} excludeTunnelId - Tunnel to exclude (the one we're exiting)
+ * @param {number} size - Cube size
+ * @returns {Object|null} Best next tunnel or null if none available
+ */
+export const findNextTunnel = (exitPos, tunnels, excludeTunnelId, size) => {
+  // Get world position of exit
+  const exitWorld = getStickerWorldPos(exitPos.x, exitPos.y, exitPos.z, exitPos.dirKey, size, 0);
+  const exitVec = new THREE.Vector3(...exitWorld);
+
+  let bestTunnel = null;
+  let bestDist = Infinity;
+
+  for (const tunnel of tunnels) {
+    if (tunnel.id === excludeTunnelId) continue;
+
+    // Check distance to this tunnel's entry
+    const entryWorld = getStickerWorldPos(
+      tunnel.entry.x, tunnel.entry.y, tunnel.entry.z,
+      tunnel.entry.dirKey, size, 0
+    );
+    const entryVec = new THREE.Vector3(...entryWorld);
+    const dist = exitVec.distanceTo(entryVec);
+
+    if (dist < bestDist) {
+      bestDist = dist;
+      bestTunnel = { tunnel, enterFromEntry: true };
+    }
+
+    // Also check distance to tunnel's exit (can enter from either end)
+    const exitWorld2 = getStickerWorldPos(
+      tunnel.exit.x, tunnel.exit.y, tunnel.exit.z,
+      tunnel.exit.dirKey, size, 0
+    );
+    const exitVec2 = new THREE.Vector3(...exitWorld2);
+    const dist2 = exitVec.distanceTo(exitVec2);
+
+    if (dist2 < bestDist) {
+      bestDist = dist2;
+      bestTunnel = { tunnel, enterFromEntry: false };
+    }
+  }
+
+  // Only return if within reasonable distance (adjacent or nearby)
+  if (bestTunnel && bestDist < 3.0) {
+    return bestTunnel;
+  }
+
+  return null;
+};
+
+/**
+ * Check if worm collides with itself in tunnel mode
+ * @param {Object} newHead - New head segment {tunnelId, t}
+ * @param {Array} segments - Body segments (excluding head)
+ * @returns {boolean} True if collision
+ */
+export const checkTunnelSelfCollision = (newHead, segments) => {
+  const collisionThreshold = 0.1; // How close segments can be before collision
+
+  for (let i = 1; i < segments.length; i++) {
+    const seg = segments[i];
+    if (seg.tunnelId === newHead.tunnelId) {
+      if (Math.abs(seg.t - newHead.t) < collisionThreshold) {
+        return true;
+      }
+    }
+  }
+  return false;
+};
+
+/**
+ * Spawn orbs inside tunnels at midpoints
+ * @param {Array} tunnels - Available tunnels
+ * @param {number} count - Number of orbs to spawn
+ * @param {Array} wormSegments - Current worm positions to avoid
+ * @returns {Array} Array of orb positions {tunnelId, t, tunnel}
+ */
+export const spawnTunnelOrbs = (tunnels, count, wormSegments = []) => {
+  if (tunnels.length === 0) return [];
+
+  const orbs = [];
+  const usedTunnels = new Set();
+
+  // Mark tunnels with worm segments as partially occupied
+  const wormTunnelTs = new Map(); // tunnelId -> array of t values
+  for (const seg of wormSegments) {
+    if (!wormTunnelTs.has(seg.tunnelId)) {
+      wormTunnelTs.set(seg.tunnelId, []);
+    }
+    wormTunnelTs.get(seg.tunnelId).push(seg.t);
+  }
+
+  // Shuffle tunnels for random placement
+  const shuffledTunnels = [...tunnels].sort(() => Math.random() - 0.5);
+
+  for (const tunnel of shuffledTunnels) {
+    if (orbs.length >= count) break;
+
+    // Try to place orb at midpoint (t=0.5) or nearby
+    const possibleTs = [0.5, 0.3, 0.7, 0.2, 0.8];
+
+    for (const t of possibleTs) {
+      // Check if worm is near this position
+      const wormTs = wormTunnelTs.get(tunnel.id) || [];
+      const tooClose = wormTs.some(wt => Math.abs(wt - t) < 0.2);
+
+      if (!tooClose && !usedTunnels.has(`${tunnel.id}-${t}`)) {
+        orbs.push({
+          tunnelId: tunnel.id,
+          t,
+          tunnel
+        });
+        usedTunnels.add(`${tunnel.id}-${t}`);
+        break;
+      }
+    }
+  }
+
+  // If we need more orbs, allow multiple per tunnel
+  while (orbs.length < count && shuffledTunnels.length > 0) {
+    const tunnel = shuffledTunnels[orbs.length % shuffledTunnels.length];
+    const t = 0.3 + Math.random() * 0.4; // Random position in middle section
+    orbs.push({
+      tunnelId: tunnel.id,
+      t,
+      tunnel
+    });
+  }
+
+  return orbs.slice(0, count);
+};
+
+/**
+ * Update tunnel worm positions after cube rotation
+ * Tunnels may change, so we need to remap worm segments
+ * @param {Array} segments - Current worm segments
+ * @param {Array} newTunnels - New tunnel configuration after rotation
+ * @param {Array} oldTunnels - Old tunnel configuration before rotation
+ * @returns {Array} Updated worm segments
+ */
+export const updateTunnelWormAfterRotation = (segments, newTunnels, oldTunnels) => {
+  // Create lookup for old tunnels
+  const oldTunnelMap = new Map();
+  for (const t of oldTunnels) {
+    oldTunnelMap.set(t.id, t);
+  }
+
+  // Create lookup for new tunnels by entry/exit positions
+  const newTunnelByEntry = new Map();
+  const newTunnelByExit = new Map();
+  for (const t of newTunnels) {
+    const entryKey = `${t.entry.x},${t.entry.y},${t.entry.z},${t.entry.dirKey}`;
+    const exitKey = `${t.exit.x},${t.exit.y},${t.exit.z},${t.exit.dirKey}`;
+    newTunnelByEntry.set(entryKey, t);
+    newTunnelByExit.set(exitKey, t);
+  }
+
+  return segments.map(seg => {
+    // Try to find the same tunnel in new configuration
+    const newTunnel = newTunnels.find(t => t.id === seg.tunnelId);
+    if (newTunnel) {
+      return { ...seg, tunnel: newTunnel };
+    }
+
+    // Tunnel disappeared - find nearest new tunnel
+    if (newTunnels.length > 0) {
+      const randomTunnel = newTunnels[Math.floor(Math.random() * newTunnels.length)];
+      return {
+        tunnelId: randomTunnel.id,
+        t: seg.t,
+        tunnel: randomTunnel
+      };
+    }
+
+    // No tunnels available
+    return seg;
+  });
+};
+
+/**
+ * Get the target tunnel that contains an orb (for highlighting)
+ * @param {Array} orbs - Current orbs
+ * @param {Object} wormHead - Worm head segment
+ * @returns {string|null} Target tunnel ID or null
+ */
+export const getTargetTunnelId = (orbs, wormHead) => {
+  if (orbs.length === 0) return null;
+
+  // Prioritize orbs in the same tunnel as the worm
+  const sameTunnelOrb = orbs.find(o => o.tunnelId === wormHead?.tunnelId);
+  if (sameTunnelOrb) return sameTunnelOrb.tunnelId;
+
+  // Otherwise return first orb's tunnel
+  return orbs[0]?.tunnelId || null;
+};
+
+// ============================================================================
+// SURFACE MODE (Original) - Worm crawls on cube surface
+// ============================================================================
 
 // Direction vectors for each face - defines "forward/back/left/right" relative to each face
 // When looking at the face head-on, these are the local coordinate axes

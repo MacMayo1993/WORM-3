@@ -1,35 +1,61 @@
 // src/worm/WormTrail.jsx
 // Visual worm body using connected spheres with glow effect
+// Supports both surface mode and tunnel mode
 
 import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { getSegmentWorldPos } from './wormLogic.js';
+import { getSegmentWorldPos, getTunnelWorldPos } from './wormLogic.js';
 
 // Worm segment colors - gradient from head to tail
 const HEAD_COLOR = '#00ff88';
 const TAIL_COLOR = '#009944';
+// Tunnel mode uses brighter neon colors
+const HEAD_COLOR_TUNNEL = '#00ffaa';
+const TAIL_COLOR_TUNNEL = '#00cc66';
 
 // Pre-create color objects to avoid GC pressure
 const HEAD_COLOR_OBJ = new THREE.Color(HEAD_COLOR);
 const TAIL_COLOR_OBJ = new THREE.Color(TAIL_COLOR);
+const HEAD_COLOR_TUNNEL_OBJ = new THREE.Color(HEAD_COLOR_TUNNEL);
+const TAIL_COLOR_TUNNEL_OBJ = new THREE.Color(TAIL_COLOR_TUNNEL);
 
-export default function WormTrail({ segments, size, explosionFactor = 0, alive = true }) {
+/**
+ * @param {Object} props
+ * @param {Array} props.segments - Worm segments (surface or tunnel positions)
+ * @param {number} props.size - Cube size
+ * @param {number} props.explosionFactor - Explosion animation factor
+ * @param {boolean} props.alive - Is the worm alive
+ * @param {string} props.mode - 'surface' or 'tunnel'
+ */
+export default function WormTrail({ segments, size, explosionFactor = 0, alive = true, mode = 'surface' }) {
   const groupRef = useRef();
   const timeRef = useRef(0);
 
+  const isTunnelMode = mode === 'tunnel';
+  const headColorObj = isTunnelMode ? HEAD_COLOR_TUNNEL_OBJ : HEAD_COLOR_OBJ;
+  const tailColorObj = isTunnelMode ? TAIL_COLOR_TUNNEL_OBJ : TAIL_COLOR_OBJ;
+
   // Calculate world positions for all segments
   const positions = useMemo(() => {
-    return segments.map(seg => getSegmentWorldPos(seg, size, explosionFactor));
-  }, [segments, size, explosionFactor]);
+    return segments.map(seg => {
+      if (isTunnelMode && seg.tunnel) {
+        // Tunnel mode: use tunnel position
+        return getTunnelWorldPos(seg.tunnel, seg.t, size, explosionFactor);
+      } else {
+        // Surface mode: use grid position
+        return getSegmentWorldPos(seg, size, explosionFactor);
+      }
+    });
+  }, [segments, size, explosionFactor, isTunnelMode]);
 
   // Pre-calculate segment colors to avoid creating objects in render
   const segmentColors = useMemo(() => {
     return positions.map((_, i) => {
       const t = positions.length > 1 ? i / (positions.length - 1) : 0;
-      return HEAD_COLOR_OBJ.clone().lerp(TAIL_COLOR_OBJ, t);
+      return headColorObj.clone().lerp(tailColorObj, t);
     });
-  }, [positions.length]);
+  }, [positions.length, headColorObj, tailColorObj]);
 
   // Animate pulse effect
   useFrame((state, delta) => {
@@ -74,11 +100,11 @@ export default function WormTrail({ segments, size, explosionFactor = 0, alive =
             {/* Glow halo for head */}
             {isHead && alive && (
               <mesh>
-                <sphereGeometry args={[finalSize * 1.5, 16, 16]} />
+                <sphereGeometry args={[finalSize * (isTunnelMode ? 1.8 : 1.5), 16, 16]} />
                 <meshBasicMaterial
-                  color={HEAD_COLOR}
+                  color={isTunnelMode ? HEAD_COLOR_TUNNEL : HEAD_COLOR}
                   transparent
-                  opacity={0.2 + Math.sin(timeRef.current * 8) * 0.1}
+                  opacity={(isTunnelMode ? 0.3 : 0.2) + Math.sin(timeRef.current * 8) * 0.1}
                   side={THREE.BackSide}
                 />
               </mesh>

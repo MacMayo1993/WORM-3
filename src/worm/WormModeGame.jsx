@@ -1,8 +1,9 @@
 // src/worm/WormModeGame.jsx
 // Complete WORM mode game - wraps all components with shared state
+// Supports both surface mode (classic) and tunnel mode (new inside-the-cube mode)
 
 import React, { createContext, useContext, useCallback } from 'react';
-import { useWormGame, WormMode3D, WormGameLoop } from './WormMode.jsx';
+import { useWormGame, useTunnelWormGame, WormMode3D, WormGameLoop, TunnelWormGameLoop } from './WormMode.jsx';
 import WormHUD from './WormHUD.jsx';
 import WormCamera from './WormCamera.jsx';
 
@@ -14,8 +15,12 @@ export function useWormGameContext() {
 }
 
 // Provider component - place this high in the component tree
-export function WormModeProvider({ children, cubies, size, animState, onRotate, onGameStateChange }) {
-  const game = useWormGame(cubies, size, animState, onRotate);
+// mode: 'surface' (classic) or 'tunnel' (inside the cube through wormholes)
+export function WormModeProvider({ children, cubies, size, animState, onRotate, onGameStateChange, mode = 'surface' }) {
+  // Use appropriate hook based on mode
+  const surfaceGame = useWormGame(cubies, size, animState, onRotate);
+  const tunnelGame = useTunnelWormGame(cubies, size, animState, onRotate);
+  const game = mode === 'tunnel' ? tunnelGame : surfaceGame;
 
   // Report game state changes to parent (for UI outside Canvas)
   React.useEffect(() => {
@@ -25,10 +30,13 @@ export function WormModeProvider({ children, cubies, size, animState, onRotate, 
         worm: game.worm,
         orbs: game.orbs,
         score: game.score,
-        warps: game.warps,
+        warps: game.warps || 0,
+        tunnelsTraversed: game.tunnelsTraversed || 0,
         speed: game.speed,
         orbsTotal: game.orbsTotal,
         wormCameraEnabled: game.wormCameraEnabled,
+        targetTunnelId: game.targetTunnelId || null,
+        mode: mode,
         setGameState: game.setGameState,
         setWormCameraEnabled: game.setWormCameraEnabled,
         restart: game.restart
@@ -41,12 +49,15 @@ export function WormModeProvider({ children, cubies, size, animState, onRotate, 
     game.orbs,
     game.score,
     game.warps,
+    game.tunnelsTraversed,
     game.speed,
     game.orbsTotal,
     game.wormCameraEnabled,
+    game.targetTunnelId,
     game.setGameState,
     game.setWormCameraEnabled,
-    game.restart
+    game.restart,
+    mode
   ]);
 
   return (
@@ -57,9 +68,13 @@ export function WormModeProvider({ children, cubies, size, animState, onRotate, 
 }
 
 // Canvas elements - render inside Canvas
-export function WormModeCanvasElements({ size, explosionFactor, animState, cubies }) {
+// Supports both surface and tunnel modes
+export function WormModeCanvasElements({ size, explosionFactor, animState, cubies, mode = 'surface' }) {
   const game = useWormGameContext();
   if (!game) return null;
+
+  const isTunnelMode = mode === 'tunnel' || game.mode === 'tunnel';
+  const GameLoop = isTunnelMode ? TunnelWormGameLoop : WormGameLoop;
 
   return (
     <>
@@ -69,8 +84,10 @@ export function WormModeCanvasElements({ size, explosionFactor, animState, cubie
         size={size}
         explosionFactor={explosionFactor}
         gameState={game.gameState}
+        mode={isTunnelMode ? 'tunnel' : 'surface'}
+        targetTunnelId={game.targetTunnelId}
       />
-      <WormGameLoop
+      <GameLoop
         cubies={cubies}
         size={size}
         animState={animState}
@@ -121,9 +138,11 @@ export function WormModeHUD({ onQuit, gameData }) {
     orbs,
     score,
     warps,
+    tunnelsTraversed,
     speed,
     orbsTotal,
     wormCameraEnabled,
+    mode,
     setGameState,
     restart
   } = game;
@@ -136,16 +155,20 @@ export function WormModeHUD({ onQuit, gameData }) {
     setGameState('playing');
   }, [setGameState]);
 
+  const isTunnelMode = mode === 'tunnel';
+
   return (
     <WormHUD
       score={score}
       length={worm.length}
       orbsRemaining={orbs.length}
       orbsTotal={orbsTotal}
-      warps={warps}
+      warps={isTunnelMode ? tunnelsTraversed : warps}
+      warpsLabel={isTunnelMode ? 'TUNNELS' : 'WARPS'}
       gameState={gameState}
       speed={speed}
       wormCameraEnabled={wormCameraEnabled}
+      mode={mode}
       onPause={handlePause}
       onResume={handleResume}
       onRestart={restart}
