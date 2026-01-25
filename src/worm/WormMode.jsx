@@ -40,6 +40,9 @@ export function useWormGame(cubies, size, animState, onRotate) {
   const [orbsEaten, setOrbsEaten] = useState(0);
   const [pendingGrowth, setPendingGrowth] = useState(0);
 
+  // Camera mode - first-person worm view
+  const [wormCameraEnabled, setWormCameraEnabled] = useState(false);
+
   // Timing
   const lastMoveTime = useRef(0);
   const rotationQueue = useRef([]);
@@ -148,6 +151,11 @@ export function useWormGame(cubies, size, animState, onRotate) {
           e.preventDefault();
           setMoveDir(prev => turnWorm(prev, 'right'));
           break;
+        case 'c':
+          // Toggle worm camera (first-person view)
+          e.preventDefault();
+          setWormCameraEnabled(prev => !prev);
+          break;
       }
     };
 
@@ -190,6 +198,7 @@ export function useWormGame(cubies, size, animState, onRotate) {
     speed,
     pendingGrowth,
     orbsTotal: CONFIG.initialOrbs,
+    wormCameraEnabled,
 
     // Setters for game loop
     setGameState,
@@ -199,6 +208,7 @@ export function useWormGame(cubies, size, animState, onRotate) {
     setScore,
     setWarps,
     setPendingGrowth,
+    setWormCameraEnabled,
 
     // Refs
     lastMoveTime,

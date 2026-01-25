@@ -4,6 +4,7 @@
 import React, { createContext, useContext, useCallback } from 'react';
 import { useWormGame, WormMode3D, WormGameLoop } from './WormMode.jsx';
 import WormHUD from './WormHUD.jsx';
+import WormCamera from './WormCamera.jsx';
 
 // Context for sharing game state between Canvas and UI
 const WormGameContext = createContext(null);
@@ -41,6 +42,14 @@ export function WormModeCanvasElements({ size, explosionFactor, animState, cubie
         size={size}
         animState={animState}
         game={game}
+      />
+      {/* First-person worm camera - toggle with 'C' key */}
+      <WormCamera
+        worm={game.worm}
+        moveDir={game.moveDir}
+        size={size}
+        explosionFactor={explosionFactor}
+        enabled={game.wormCameraEnabled}
       />
     </>
   );
@@ -81,6 +90,7 @@ export function WormModeHUD({ onQuit, gameData }) {
     warps,
     speed,
     orbsTotal,
+    wormCameraEnabled,
     setGameState,
     restart
   } = game;
@@ -102,6 +112,7 @@ export function WormModeHUD({ onQuit, gameData }) {
       warps={warps}
       gameState={gameState}
       speed={speed}
+      wormCameraEnabled={wormCameraEnabled}
       onPause={handlePause}
       onResume={handleResume}
       onRestart={restart}
@@ -124,6 +135,7 @@ export function WormModeStartScreen({ onStart, onCancel }) {
             <li>The worm auto-advances across cube surfaces</li>
             <li><strong>WASD</strong> - Rotate layers to steer</li>
             <li><strong>Q/E</strong> - Rotate the face</li>
+            <li><strong>C</strong> - Toggle first-person worm cam (trippy!)</li>
             <li>Collect glowing orbs to grow longer</li>
             <li>Hit a flipped tile = wormhole teleport!</li>
             <li>Don't collide with yourself!</li>

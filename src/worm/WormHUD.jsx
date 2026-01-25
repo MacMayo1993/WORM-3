@@ -11,6 +11,7 @@ export default function WormHUD({
   warps,
   gameState, // 'playing', 'paused', 'gameover', 'victory'
   speed,
+  wormCameraEnabled = false,
   onPause,
   onResume,
   onRestart,
@@ -47,12 +48,18 @@ export default function WormHUD({
           <span style={styles.statLabel}>SPEED</span>
           <span style={styles.statValue}>{speed.toFixed(1)}x</span>
         </div>
+        {wormCameraEnabled && (
+          <div style={{...styles.statGroup, ...styles.cameraIndicator}}>
+            <span style={styles.statLabel}>CAM</span>
+            <span style={{...styles.statValue, color: '#ff6b6b'}}>WORM</span>
+          </div>
+        )}
       </div>
 
       {/* Control hint */}
       {isPlaying && (
         <div style={styles.hint}>
-          WASD/QE to rotate layers | Space to pause
+          WASD/QE to rotate | C for worm cam | Space to pause
         </div>
       )}
 
@@ -160,6 +167,12 @@ const styles = {
     color: '#00ff88',
     fontWeight: 'bold',
     textShadow: '0 0 10px #00ff88'
+  },
+  cameraIndicator: {
+    background: 'rgba(255, 107, 107, 0.2)',
+    padding: '4px 8px',
+    borderRadius: '4px',
+    border: '1px solid #ff6b6b'
   },
   hint: {
     position: 'absolute',
