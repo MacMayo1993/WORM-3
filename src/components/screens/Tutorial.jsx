@@ -243,7 +243,7 @@ const Tutorial = ({ onClose }) => {
 
   return (
     <div className="tutorial-overlay">
-      <div className="tutorial-card" style={{ maxWidth: '620px', maxHeight: '80vh', overflowY: 'auto' }}>
+      <div className="tutorial-card" style={{ maxWidth: '620px' }}>
         <h2 style={{ marginBottom: '4px', color: 'rgba(255, 255, 255, 0.95)', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>{currentStep.title}</h2>
         <div style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.5)', marginBottom: '16px', letterSpacing: '0.08em', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
           Step {step} of {totalSteps}

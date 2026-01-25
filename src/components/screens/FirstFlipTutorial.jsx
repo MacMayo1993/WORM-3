@@ -23,7 +23,10 @@ const FirstFlipTutorial = ({ onClose }) => {
       justifyContent: 'center',
       alignItems: 'center',
       zIndex: 2000,
-      fontFamily: 'Georgia, serif'
+      fontFamily: 'Georgia, serif',
+      height: '100dvh',
+      padding: 'env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px)',
+      boxSizing: 'border-box'
     }}>
       <div style={{
         background: colors.paper,
@@ -32,9 +35,10 @@ const FirstFlipTutorial = ({ onClose }) => {
         padding: '32px 40px',
         maxWidth: '580px',
         width: '90%',
-        maxHeight: '85vh',
+        maxHeight: 'calc(100dvh - 60px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))',
         overflow: 'auto',
-        boxShadow: `4px 4px 0 rgba(88, 47, 14, 0.2), 0 12px 40px rgba(88, 47, 14, 0.4)`
+        boxShadow: `4px 4px 0 rgba(88, 47, 14, 0.2), 0 12px 40px rgba(88, 47, 14, 0.4)`,
+        boxSizing: 'border-box'
       }}>
         <h2 style={{
           margin: '0 0 8px 0',
