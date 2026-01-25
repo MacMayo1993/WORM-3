@@ -58,12 +58,15 @@ const VictoryScreen = ({ winType, moves, time, onContinue, onNewGame }) => {
     <div style={{
       position: 'fixed',
       top: 0, left: 0, right: 0, bottom: 0,
+      height: '100dvh',
       background: config.bgGradient,
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       zIndex: 3000,
-      animation: 'fadeIn 0.5s ease-out'
+      animation: 'fadeIn 0.5s ease-out',
+      padding: 'env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px)',
+      boxSizing: 'border-box'
     }}>
       {/* Confetti particles for ultimate win */}
       {winType === 'ultimate' && showConfetti && (
@@ -115,13 +118,16 @@ const VictoryScreen = ({ winType, moves, time, onContinue, onNewGame }) => {
       <div style={{
         textAlign: 'center',
         maxWidth: '550px',
+        width: '90%',
         padding: '48px',
+        maxHeight: 'calc(100dvh - 40px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))',
+        overflowY: 'auto',
         background: '#fdfbf7',
         borderRadius: '16px',
         boxShadow: `0 8px 40px rgba(0,0,0,0.15), 0 0 0 4px ${config.color}40`,
         border: `2px solid ${config.color}`,
         position: 'relative',
-        overflow: 'hidden'
+        boxSizing: 'border-box'
       }}>
         {/* Decorative top bar */}
         <div style={{

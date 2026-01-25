@@ -142,8 +142,8 @@ export function WormOrientationIndicator({ worm, moveDir }) {
   return (
     <div style={{
       position: 'absolute',
-      bottom: '80px',
-      right: '20px',
+      bottom: 'calc(80px + env(safe-area-inset-bottom, 0px))',
+      right: 'calc(20px + env(safe-area-inset-right, 0px))',
       background: 'rgba(0, 0, 0, 0.7)',
       border: '2px solid #00ff88',
       borderRadius: '8px',

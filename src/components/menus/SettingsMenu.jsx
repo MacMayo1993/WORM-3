@@ -5,12 +5,15 @@ const SettingsMenu = ({ onClose, settings, onSettingsChange }) => {
     <div style={{
       position: 'fixed',
       top: 0, left: 0, right: 0, bottom: 0,
+      height: '100dvh',
       background: 'rgba(245,241,232,0.92)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       zIndex: 1000,
-      backdropFilter: 'blur(4px)'
+      backdropFilter: 'blur(4px)',
+      padding: 'env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px)',
+      boxSizing: 'border-box'
     }} onClick={onClose}>
       <div style={{
         background: '#fdfbf7',
@@ -18,7 +21,11 @@ const SettingsMenu = ({ onClose, settings, onSettingsChange }) => {
         borderRadius: '8px',
         padding: '32px',
         maxWidth: '500px',
-        boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
+        width: '90%',
+        maxHeight: 'calc(100dvh - 60px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))',
+        overflowY: 'auto',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+        boxSizing: 'border-box'
       }} onClick={e => e.stopPropagation()}>
         <div style={{
           display: 'flex',

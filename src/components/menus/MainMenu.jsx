@@ -5,21 +5,28 @@ const MainMenu = ({ onStart }) => {
     <div style={{
       position: 'fixed',
       top: 0, left: 0, right: 0, bottom: 0,
+      height: '100dvh',
       background: 'rgba(0, 0, 0, 0.85)',
       backdropFilter: 'blur(20px)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      zIndex: 2000
+      zIndex: 2000,
+      padding: 'env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px)',
+      boxSizing: 'border-box'
     }}>
       <div style={{
         textAlign: 'center',
         maxWidth: '650px',
+        width: '90%',
         padding: '48px',
+        maxHeight: 'calc(100dvh - 60px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))',
+        overflowY: 'auto',
         background: 'rgba(30, 35, 50, 0.95)',
         borderRadius: '16px',
         boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
-        border: '1px solid rgba(255, 255, 255, 0.12)'
+        border: '1px solid rgba(255, 255, 255, 0.12)',
+        boxSizing: 'border-box'
       }}>
         <h1 style={{
           fontSize: '72px',
