@@ -26,6 +26,7 @@ import {
   WormModeHUD,
   WormModeStartScreen
 } from './worm/WormModeGame.jsx';
+import WormTouchControls from './worm/WormTouchControls.jsx';
 
 // UI components
 import TopMenuBar from './components/menus/TopMenuBar.jsx';
@@ -92,6 +93,7 @@ export default function WORM3() {
   // WORM mode state
   const [wormModeActive, setWormModeActive] = useState(false);
   const [showWormModeStart, setShowWormModeStart] = useState(false);
+  const [wormGameData, setWormGameData] = useState(null); // Game state from inside Canvas
 
   const [upcomingRotation, setUpcomingRotation] = useState(null); // { axis, dir, sliceIndex }
   const [rotationCountdown, setRotationCountdown] = useState(0); // Time until next rotation (ms)
@@ -1059,6 +1061,7 @@ export default function WORM3() {
                 size={size}
                 animState={animState}
                 onRotate={onWormRotate}
+                onGameStateChange={setWormGameData}
               >
                 <WormModeCanvasElements
                   size={size}
@@ -1246,7 +1249,19 @@ export default function WORM3() {
         />
       )}
       {wormModeActive && (
-        <WormModeHUD onQuit={handleWormModeQuit} />
+        <>
+          <WormModeHUD onQuit={handleWormModeQuit} gameData={wormGameData} />
+          {/* Touch controls for mobile */}
+          <WormTouchControls
+            onRotate={onWormRotate}
+            wormHead={wormGameData?.worm?.[0]}
+            onCameraToggle={() => wormGameData?.setWormCameraEnabled?.(prev => !prev)}
+            wormCameraEnabled={wormGameData?.wormCameraEnabled}
+            gameState={wormGameData?.gameState || 'playing'}
+            onPause={() => wormGameData?.setGameState?.('paused')}
+            onResume={() => wormGameData?.setGameState?.('playing')}
+          />
+        </>
       )}
     </div>
   );

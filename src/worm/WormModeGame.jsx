@@ -4,6 +4,7 @@
 import React, { createContext, useContext, useCallback } from 'react';
 import { useWormGame, WormMode3D, WormGameLoop } from './WormMode.jsx';
 import WormHUD from './WormHUD.jsx';
+import WormCamera from './WormCamera.jsx';
 
 // Context for sharing game state between Canvas and UI
 const WormGameContext = createContext(null);
@@ -13,8 +14,41 @@ export function useWormGameContext() {
 }
 
 // Provider component - place this high in the component tree
-export function WormModeProvider({ children, cubies, size, animState, onRotate }) {
+export function WormModeProvider({ children, cubies, size, animState, onRotate, onGameStateChange }) {
   const game = useWormGame(cubies, size, animState, onRotate);
+
+  // Report game state changes to parent (for UI outside Canvas)
+  React.useEffect(() => {
+    if (onGameStateChange) {
+      onGameStateChange({
+        gameState: game.gameState,
+        worm: game.worm,
+        orbs: game.orbs,
+        score: game.score,
+        warps: game.warps,
+        speed: game.speed,
+        orbsTotal: game.orbsTotal,
+        wormCameraEnabled: game.wormCameraEnabled,
+        setGameState: game.setGameState,
+        setWormCameraEnabled: game.setWormCameraEnabled,
+        restart: game.restart
+      });
+    }
+  }, [
+    onGameStateChange,
+    game.gameState,
+    game.worm,
+    game.orbs,
+    game.score,
+    game.warps,
+    game.speed,
+    game.orbsTotal,
+    game.wormCameraEnabled,
+    game.setGameState,
+    game.setWormCameraEnabled,
+    game.restart
+  ]);
+
   return (
     <WormGameContext.Provider value={game}>
       {children}
@@ -42,14 +76,44 @@ export function WormModeCanvasElements({ size, explosionFactor, animState, cubie
         animState={animState}
         game={game}
       />
+      {/* First-person worm camera - toggle with 'C' key */}
+      <WormCamera
+        worm={game.worm}
+        moveDir={game.moveDir}
+        size={size}
+        explosionFactor={explosionFactor}
+        enabled={game.wormCameraEnabled}
+      />
     </>
   );
 }
 
 // HUD elements - render in UI layer
-export function WormModeHUD({ onQuit }) {
-  const game = useWormGameContext();
-  if (!game) return null;
+// NOTE: This component tries to use context first, but can also receive props directly
+// when rendered outside the WormModeProvider (which is inside Canvas)
+export function WormModeHUD({ onQuit, gameData }) {
+  const contextGame = useWormGameContext();
+  // Use context if available, otherwise fall back to props
+  const game = contextGame || gameData;
+
+  if (!game) {
+    // No game data available - show minimal HUD
+    return (
+      <WormHUD
+        score={0}
+        length={3}
+        orbsRemaining={15}
+        orbsTotal={15}
+        warps={0}
+        gameState="playing"
+        speed={0.8}
+        onPause={() => {}}
+        onResume={() => {}}
+        onRestart={() => {}}
+        onQuit={onQuit}
+      />
+    );
+  }
 
   const {
     gameState,
@@ -59,6 +123,7 @@ export function WormModeHUD({ onQuit }) {
     warps,
     speed,
     orbsTotal,
+    wormCameraEnabled,
     setGameState,
     restart
   } = game;
@@ -80,6 +145,7 @@ export function WormModeHUD({ onQuit }) {
       warps={warps}
       gameState={gameState}
       speed={speed}
+      wormCameraEnabled={wormCameraEnabled}
       onPause={handlePause}
       onResume={handleResume}
       onRestart={restart}
@@ -90,6 +156,9 @@ export function WormModeHUD({ onQuit }) {
 
 // Start screen overlay
 export function WormModeStartScreen({ onStart, onCancel }) {
+  // Detect mobile/touch device
+  const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
   return (
     <div style={styles.overlay}>
       <div style={styles.content}>
@@ -100,8 +169,19 @@ export function WormModeStartScreen({ onStart, onCancel }) {
           <h3 style={styles.instructionsTitle}>How to Play</h3>
           <ul style={styles.list}>
             <li>The worm auto-advances across cube surfaces</li>
-            <li><strong>WASD</strong> - Rotate layers to steer</li>
-            <li><strong>Q/E</strong> - Rotate the face</li>
+            {isTouchDevice ? (
+              <>
+                <li><strong>Swipe</strong> - Rotate layers to steer</li>
+                <li><strong>Q/E buttons</strong> - Rotate the face</li>
+                <li><strong>📷 button</strong> - Toggle first-person worm cam</li>
+              </>
+            ) : (
+              <>
+                <li><strong>WASD</strong> - Rotate layers to steer</li>
+                <li><strong>Q/E</strong> - Rotate the face</li>
+                <li><strong>C</strong> - Toggle first-person worm cam (trippy!)</li>
+              </>
+            )}
             <li>Collect glowing orbs to grow longer</li>
             <li>Hit a flipped tile = wormhole teleport!</li>
             <li>Don't collide with yourself!</li>
