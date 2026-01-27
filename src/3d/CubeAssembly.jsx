@@ -232,8 +232,8 @@ const CubeAssembly = ({
         enableDamping={true}
         dampingFactor={0.05}
         rotateSpeed={0.8}
-        minPolarAngle={0.01}
-        maxPolarAngle={Math.PI - 0.01}
+        minPolarAngle={-Infinity}
+        maxPolarAngle={Infinity}
         minAzimuthAngle={-Infinity}
         maxAzimuthAngle={Infinity}
       />
