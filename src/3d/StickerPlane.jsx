@@ -7,22 +7,56 @@ import { play, vibrate } from '../utils/audio.js';
 import TallyMarks from '../manifold/TallyMarks.jsx';
 import { ChaosHeatMap } from '../manifold/FlipPropagationWave.jsx';
 
-// Particle system for flip effect
+// Shared geometries for all particle/glow systems (created once, reused globally)
+const sharedParticleGeometry = new THREE.PlaneGeometry(1, 1);
+const sharedOuterRingGeometry = new THREE.RingGeometry(0.4, 0.5, 32);
+const sharedMainRingGeometry = new THREE.RingGeometry(0.2, 0.45, 32);
+const sharedInnerCircleGeometry = new THREE.CircleGeometry(0.48, 32);
+
+// Particle system for flip effect - uses persistent meshes, no recreation
 const FlipParticles = ({ active, color, onComplete }) => {
   const particlesRef = useRef([]);
   const groupRef = useRef();
   const progressRef = useRef(0);
   const velocitiesRef = useRef([]);
+  const isActiveRef = useRef(false);
   const PARTICLE_COUNT = 24;
 
-  // Initialize particle velocities on activation
+  // Create materials once and cache them
+  const materialsRef = useRef([]);
+
+  // Initialize materials on first render only
   useEffect(() => {
-    if (active) {
+    if (materialsRef.current.length === 0) {
+      materialsRef.current = Array.from({ length: PARTICLE_COUNT }, () =>
+        new THREE.MeshBasicMaterial({
+          color: '#ffffff',
+          transparent: true,
+          opacity: 0,
+          blending: THREE.AdditiveBlending,
+          side: THREE.DoubleSide,
+          depthWrite: false
+        })
+      );
+    }
+    // Cleanup materials on unmount
+    return () => {
+      materialsRef.current.forEach(mat => mat.dispose());
+      materialsRef.current = [];
+    };
+  }, []);
+
+  // Handle activation - reset state and generate velocities
+  useEffect(() => {
+    if (active && !isActiveRef.current) {
+      isActiveRef.current = true;
       progressRef.current = 0;
+
+      // Generate new velocities
       velocitiesRef.current = Array.from({ length: PARTICLE_COUNT }, (_, i) => {
         const angle = (i / PARTICLE_COUNT) * Math.PI * 2 + Math.random() * 0.4;
         const speed = 2.5 + Math.random() * 2.0;
-        const size = 0.06 + Math.random() * 0.06; // Varied sizes
+        const size = 0.06 + Math.random() * 0.06;
         return {
           x: Math.cos(angle) * speed,
           y: Math.sin(angle) * speed,
@@ -31,24 +65,37 @@ const FlipParticles = ({ active, color, onComplete }) => {
           size
         };
       });
+
+      // Update material colors
+      materialsRef.current.forEach(mat => {
+        mat.color.set(color);
+        mat.opacity = 1;
+      });
+    } else if (!active) {
+      isActiveRef.current = false;
     }
-  }, [active]);
+  }, [active, color]);
 
   useFrame((_, delta) => {
-    if (!active || !groupRef.current) return;
+    if (!isActiveRef.current || !groupRef.current) return;
 
-    // Slower progression for longer-lasting particles
     progressRef.current += delta * 1.8;
     const p = progressRef.current;
 
     if (p >= 1) {
+      isActiveRef.current = false;
+      // Hide all particles
+      particlesRef.current.forEach((mesh) => {
+        if (mesh) {
+          mesh.scale.set(0, 0, 0);
+          if (mesh.material) mesh.material.opacity = 0;
+        }
+      });
       onComplete?.();
       return;
     }
 
-    // Ease out quart for explosive start, slow fade
     const easeOut = 1 - Math.pow(1 - p, 4);
-    // Fade out slower - stay bright longer
     const opacity = Math.pow(1 - p, 0.5);
 
     particlesRef.current.forEach((mesh, i) => {
@@ -56,137 +103,136 @@ const FlipParticles = ({ active, color, onComplete }) => {
       const vel = velocitiesRef.current[i];
       if (!vel) return;
 
-      // Position - travel much farther
       mesh.position.x = vel.x * easeOut * 0.8;
       mesh.position.y = vel.y * easeOut * 0.8;
       mesh.position.z = vel.z * easeOut * 0.4 + 0.05;
-
-      // Rotation
       mesh.rotation.z = vel.rotSpeed * p;
 
-      // Scale - start big, shrink as they fly
       const baseScale = vel.size * (1 - easeOut * 0.5);
       mesh.scale.set(baseScale, baseScale, baseScale * 0.5);
 
-      // Update opacity - bright and visible
       if (mesh.material) {
         mesh.material.opacity = opacity;
       }
     });
   });
 
-  if (!active) return null;
-
+  // Always render the group, just hide particles when not active
   return (
     <group ref={groupRef} position={[0, 0, 0.05]}>
       {Array.from({ length: PARTICLE_COUNT }, (_, i) => (
         <mesh
           key={i}
           ref={el => particlesRef.current[i] = el}
-        >
-          <planeGeometry args={[1, 1]} />
-          <meshBasicMaterial
-            color={color}
-            transparent
-            opacity={1}
-            blending={THREE.AdditiveBlending}
-            side={THREE.DoubleSide}
-            depthWrite={false}
-          />
-        </mesh>
+          geometry={sharedParticleGeometry}
+          material={materialsRef.current[i]}
+          scale={[0, 0, 0]}
+        />
       ))}
     </group>
   );
 };
 
 // Antipodal glow fill effect - glows from outside and fills inward
+// Uses persistent meshes with shared geometries
 const AntipodalGlowFill = ({ active, color }) => {
   const ringRef = useRef();
   const innerGlowRef = useRef();
   const outerRingRef = useRef();
   const progressRef = useRef(0);
+  const isActiveRef = useRef(false);
 
-  // Reset progress when activated
+  // Create materials once and cache them
+  const outerMatRef = useRef(null);
+  const ringMatRef = useRef(null);
+  const innerMatRef = useRef(null);
+
   useEffect(() => {
-    if (active) {
-      progressRef.current = 0;
+    if (!outerMatRef.current) {
+      outerMatRef.current = new THREE.MeshBasicMaterial({
+        color: '#ffffff',
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide
+      });
     }
-  }, [active]);
+    if (!ringMatRef.current) {
+      ringMatRef.current = new THREE.MeshBasicMaterial({
+        color: '#ffffff',
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide
+      });
+    }
+    if (!innerMatRef.current) {
+      innerMatRef.current = new THREE.MeshBasicMaterial({
+        color: '#ffffff',
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending
+      });
+    }
+    return () => {
+      outerMatRef.current?.dispose();
+      ringMatRef.current?.dispose();
+      innerMatRef.current?.dispose();
+    };
+  }, []);
+
+  // Handle activation
+  useEffect(() => {
+    if (active && !isActiveRef.current) {
+      isActiveRef.current = true;
+      progressRef.current = 0;
+      // Update colors
+      if (outerMatRef.current) outerMatRef.current.color.set(color);
+      if (ringMatRef.current) ringMatRef.current.color.set(color);
+      if (innerMatRef.current) innerMatRef.current.color.set(color);
+    } else if (!active) {
+      isActiveRef.current = false;
+      // Hide materials
+      if (outerMatRef.current) outerMatRef.current.opacity = 0;
+      if (ringMatRef.current) ringMatRef.current.opacity = 0;
+      if (innerMatRef.current) innerMatRef.current.opacity = 0;
+    }
+  }, [active, color]);
 
   useFrame((_, delta) => {
-    if (!active) return;
+    if (!isActiveRef.current) return;
 
-    // Progress the animation (matches flip speed)
     progressRef.current = Math.min(1, progressRef.current + delta * 5);
     const progress = progressRef.current;
-
-    // Snappy easing - fast start, smooth end
     const snappyProgress = 1 - Math.pow(1 - progress, 3);
 
-    // Update outer shrinking ring
     if (ringRef.current) {
-      // Ring shrinks from outside (full size) to inside (zero)
       const ringScale = Math.max(0.01, 1 - snappyProgress);
       ringRef.current.scale.set(ringScale, ringScale, 1);
-
-      // Pulsing glow opacity
       const glowPulse = Math.sin(progress * Math.PI * 4) * 0.3 + 0.7;
-      ringRef.current.material.opacity = (1 - snappyProgress * 0.3) * glowPulse * 0.9;
+      ringMatRef.current.opacity = (1 - snappyProgress * 0.3) * glowPulse * 0.9;
     }
 
-    // Update outer edge glow ring
     if (outerRingRef.current) {
       const edgeScale = Math.max(0.01, 1.1 - snappyProgress * 0.8);
       outerRingRef.current.scale.set(edgeScale, edgeScale, 1);
-      outerRingRef.current.material.opacity = (1 - snappyProgress) * 0.6;
+      outerMatRef.current.opacity = (1 - snappyProgress) * 0.6;
     }
 
-    // Inner fill glow expands to fill the tile
     if (innerGlowRef.current) {
       const fillScale = snappyProgress * 0.95;
       innerGlowRef.current.scale.set(fillScale, fillScale, 1);
-      // Fade in then out
       const fillOpacity = Math.sin(progress * Math.PI) * 0.7;
-      innerGlowRef.current.material.opacity = fillOpacity;
+      innerMatRef.current.opacity = fillOpacity;
     }
   });
 
-  if (!active) return null;
-
+  // Always render, just hidden when not active
   return (
     <group position={[0, 0, 0.025]}>
-      {/* Outer edge glow - starts larger */}
-      <mesh ref={outerRingRef}>
-        <ringGeometry args={[0.4, 0.5, 32]} />
-        <meshBasicMaterial
-          color={color}
-          transparent
-          opacity={0.6}
-          blending={THREE.AdditiveBlending}
-          side={THREE.DoubleSide}
-        />
-      </mesh>
-      {/* Main shrinking glow ring */}
-      <mesh ref={ringRef}>
-        <ringGeometry args={[0.2, 0.45, 32]} />
-        <meshBasicMaterial
-          color={color}
-          transparent
-          opacity={0.8}
-          blending={THREE.AdditiveBlending}
-          side={THREE.DoubleSide}
-        />
-      </mesh>
-      {/* Inner expanding fill */}
-      <mesh ref={innerGlowRef} position={[0, 0, -0.005]}>
-        <circleGeometry args={[0.48, 32]} />
-        <meshBasicMaterial
-          color={color}
-          transparent
-          opacity={0}
-          blending={THREE.AdditiveBlending}
-        />
-      </mesh>
+      <mesh ref={outerRingRef} geometry={sharedOuterRingGeometry} material={outerMatRef.current} scale={[0, 0, 0]} />
+      <mesh ref={ringRef} geometry={sharedMainRingGeometry} material={ringMatRef.current} scale={[0, 0, 0]} />
+      <mesh ref={innerGlowRef} position={[0, 0, -0.005]} geometry={sharedInnerCircleGeometry} material={innerMatRef.current} scale={[0, 0, 0]} />
     </group>
   );
 };

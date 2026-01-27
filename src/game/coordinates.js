@@ -90,29 +90,32 @@ export const getStickerWorldPos = (x, y, z, dirKey, size, explosionFactor = 0) =
   }
 };
 
+// Cached vectors for getStickerWorldPosFromMesh - avoids GC pressure in hot paths
+const _worldPos = new THREE.Vector3();
+const _worldQuat = new THREE.Quaternion();
+const _localOffset = new THREE.Vector3();
+
 // Get sticker world position from Three.js mesh
+// Note: Returns array to avoid exposing cached vector
 export const getStickerWorldPosFromMesh = (meshRef, dirKey) => {
   if (!meshRef) return null;
 
-  const worldPos = new THREE.Vector3();
-  meshRef.getWorldPosition(worldPos);
+  meshRef.getWorldPosition(_worldPos);
+  meshRef.getWorldQuaternion(_worldQuat);
 
-  const worldQuat = new THREE.Quaternion();
-  meshRef.getWorldQuaternion(worldQuat);
-
-  const localOffset = new THREE.Vector3();
   const offset = 0.52;
   switch (dirKey) {
-    case 'PX': localOffset.set(offset, 0, 0); break;
-    case 'NX': localOffset.set(-offset, 0, 0); break;
-    case 'PY': localOffset.set(0, offset, 0); break;
-    case 'NY': localOffset.set(0, -offset, 0); break;
-    case 'PZ': localOffset.set(0, 0, offset); break;
-    case 'NZ': localOffset.set(0, 0, -offset); break;
+    case 'PX': _localOffset.set(offset, 0, 0); break;
+    case 'NX': _localOffset.set(-offset, 0, 0); break;
+    case 'PY': _localOffset.set(0, offset, 0); break;
+    case 'NY': _localOffset.set(0, -offset, 0); break;
+    case 'PZ': _localOffset.set(0, 0, offset); break;
+    case 'NZ': _localOffset.set(0, 0, -offset); break;
+    default: _localOffset.set(0, 0, 0); break;
   }
 
-  localOffset.applyQuaternion(worldQuat);
-  worldPos.add(localOffset);
+  _localOffset.applyQuaternion(_worldQuat);
+  _worldPos.add(_localOffset);
 
-  return [worldPos.x, worldPos.y, worldPos.z];
+  return [_worldPos.x, _worldPos.y, _worldPos.z];
 };

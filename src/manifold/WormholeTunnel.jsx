@@ -1,30 +1,45 @@
-import React, { useRef, useMemo } from 'react';
+import React, { useRef, useMemo, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { FACE_COLORS } from '../utils/constants.js';
 import { getStickerWorldPosFromMesh } from '../game/coordinates.js';
 import { calculateSmartControlPoint } from '../utils/smartRouting.js';
 
+// Cached vectors for reuse across all tunnel instances - avoids GC pressure
+const _vStart = new THREE.Vector3();
+const _vEnd = new THREE.Vector3();
+const _dir = new THREE.Vector3();
+const _up = new THREE.Vector3(0, 1, 0);
+const _right = new THREE.Vector3();
+const _trueUp = new THREE.Vector3();
+const _offsetVec = new THREE.Vector3();
+const _controlPoint = new THREE.Vector3();
+
 const WormholeTunnel = ({ meshIdx1, meshIdx2, dirKey1, dirKey2, cubieRefs, intensity, flips, color1, color2, size }) => {
   const linesRef = useRef([]);
   const pulseT = useRef(Math.random() * Math.PI * 2);
+  // Cache curve object to avoid recreation
+  const curveRef = useRef(new THREE.QuadraticBezierCurve3(
+    new THREE.Vector3(),
+    new THREE.Vector3(),
+    new THREE.Vector3()
+  ));
 
   const strandConfig = useMemo(() => {
     const count = Math.min(Math.max(1, flips), 50);
     return Array.from({ length: count }, (_, i) => {
       const angle = (i / count) * Math.PI * 4;
       const radiusFactor = Math.sqrt(i / count);
-      // Alternate sides: even indices go positive, odd go negative
       const side = i % 2 === 0 ? 1 : -1;
       return {
         id: i,
         angle,
-        side, // Which side of the cube this strand curves towards
-        radius: (0.1 + radiusFactor * 0.25) * 1.25, // 25% thicker
-        baseOpacity: flips > 0 ? (0.4 + (1 - radiusFactor) * 0.6) : (0.2 + (1 - radiusFactor) * 0.4), // More vibrant
-        lineWidth: Math.max(0.375, (1.5 - radiusFactor * 1.2) * 1.25), // 25% thicker lines
+        side,
+        radius: (0.1 + radiusFactor * 0.25) * 1.25,
+        baseOpacity: flips > 0 ? (0.4 + (1 - radiusFactor) * 0.6) : (0.2 + (1 - radiusFactor) * 0.4),
+        lineWidth: Math.max(0.375, (1.5 - radiusFactor * 1.2) * 1.25),
         colors: new Float32Array(30 * 3),
-        sparkOffset: Math.random() * Math.PI * 2 // Random spark timing
+        sparkOffset: Math.random() * Math.PI * 2
       };
     });
   }, [flips]);
@@ -45,6 +60,16 @@ const WormholeTunnel = ({ meshIdx1, meshIdx2, dirKey1, dirKey2, cubieRefs, inten
     });
   }, [color1, color2, strandConfig]);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      linesRef.current.forEach(line => {
+        if (line?.geometry) line.geometry.dispose();
+        if (line?.material) line.material.dispose();
+      });
+    };
+  }, []);
+
   useFrame((state, delta) => {
     const mesh1 = cubieRefs[meshIdx1];
     const mesh2 = cubieRefs[meshIdx2];
@@ -54,8 +79,9 @@ const WormholeTunnel = ({ meshIdx1, meshIdx2, dirKey1, dirKey2, cubieRefs, inten
     const pos2 = getStickerWorldPosFromMesh(mesh2, dirKey2);
     if (!pos1 || !pos2) return;
 
-    const vStart = new THREE.Vector3(...pos1);
-    const vEnd = new THREE.Vector3(...pos2);
+    // Reuse cached vectors instead of creating new ones
+    _vStart.set(pos1[0], pos1[1], pos1[2]);
+    _vEnd.set(pos2[0], pos2[1], pos2[2]);
 
     pulseT.current += delta * (2 + intensity * 0.5);
     const pulse = Math.sin(pulseT.current) * 0.1 + 0.9;
@@ -65,31 +91,35 @@ const WormholeTunnel = ({ meshIdx1, meshIdx2, dirKey1, dirKey2, cubieRefs, inten
       const config = strandConfig[i];
 
       if (line.material) {
-        // Add occasional electrical spark effect
         const sparkPulse = Math.sin(pulseT.current * 3 + config.sparkOffset);
-        const spark = sparkPulse > 0.9 ? (sparkPulse - 0.9) * 10 : 0; // Random bright flashes
+        const spark = sparkPulse > 0.9 ? (sparkPulse - 0.9) * 10 : 0;
         line.material.opacity = config.baseOpacity * pulse * (1 + spark * 0.5);
       }
 
-      // Calculate control point for this strand's side (balanced left/right)
+      // Get base control point (smartRouting now uses cached vectors too)
       const baseControlPoint = calculateSmartControlPoint(pos1, pos2, size, config.side);
 
       const offsetX = Math.cos(config.angle) * config.radius;
       const offsetY = Math.sin(config.angle) * config.radius;
 
-      const dir = new THREE.Vector3().subVectors(vEnd, vStart).normalize();
-      const up = new THREE.Vector3(0, 1, 0);
-      const right = new THREE.Vector3().crossVectors(dir, up).normalize();
-      const trueUp = new THREE.Vector3().crossVectors(right, dir).normalize();
+      // Reuse cached vectors for direction calculations
+      _dir.subVectors(_vEnd, _vStart).normalize();
+      _up.set(0, 1, 0);
+      _right.crossVectors(_dir, _up).normalize();
+      _trueUp.crossVectors(_right, _dir).normalize();
 
-      const offsetVec = new THREE.Vector3()
-        .addScaledVector(right, offsetX)
-        .addScaledVector(trueUp, offsetY);
+      _offsetVec.set(0, 0, 0)
+        .addScaledVector(_right, offsetX)
+        .addScaledVector(_trueUp, offsetY);
 
-      const controlPoint = baseControlPoint.clone().add(offsetVec);
+      _controlPoint.copy(baseControlPoint).add(_offsetVec);
 
-      const curve = new THREE.QuadraticBezierCurve3(vStart, controlPoint, vEnd);
-      const points = curve.getPoints(29);
+      // Reuse curve object by updating its control points
+      curveRef.current.v0.copy(_vStart);
+      curveRef.current.v1.copy(_controlPoint);
+      curveRef.current.v2.copy(_vEnd);
+
+      const points = curveRef.current.getPoints(29);
 
       const positions = line.geometry.attributes.position.array;
       for (let j = 0; j < points.length; j++) {

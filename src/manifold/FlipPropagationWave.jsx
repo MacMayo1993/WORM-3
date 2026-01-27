@@ -3,6 +3,14 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { FACE_COLORS, ANTIPODAL_COLOR } from '../utils/constants.js';
 
+// Shared geometries for wave effects - created once, reused
+const sharedWaveRingGeometry = new THREE.RingGeometry(0.8, 1.0, 32);
+const sharedInnerRingGeometry = new THREE.RingGeometry(0.3, 0.6, 32);
+const sharedTrailCircleGeometry = new THREE.CircleGeometry(0.15, 16);
+// Shared geometries for heat map
+const sharedHeatOuterCircle = new THREE.CircleGeometry(0.55, 32);
+const sharedHeatInnerCircle = new THREE.CircleGeometry(0.3, 32);
+
 /**
  * FlipPropagationWave - Visual wave that propagates from flip origins across the cube
  * Shows the "ripple" of chaos spreading through the manifold
@@ -11,10 +19,19 @@ const FlipPropagationWave = ({ origins, onComplete }) => {
   const [progress, setProgress] = useState(0);
   const ringsRef = useRef([]);
   const trailsRef = useRef([]);
+  const materialsRef = useRef([]);
 
   useEffect(() => {
     setProgress(0);
   }, [origins]);
+
+  // Cleanup materials on unmount
+  useEffect(() => {
+    return () => {
+      materialsRef.current.forEach(mat => mat?.dispose?.());
+      materialsRef.current = [];
+    };
+  }, []);
 
   useFrame((_, delta) => {
     if (progress >= 1) return;
@@ -63,12 +80,12 @@ const FlipPropagationWave = ({ origins, onComplete }) => {
     <group>
       {origins.map((origin, idx) => (
         <group key={idx} position={origin.position}>
-          {/* Main expanding ring */}
+          {/* Main expanding ring - uses shared geometry */}
           <mesh
             ref={el => ringsRef.current[idx] = el}
             rotation={origin.rotation || [0, 0, 0]}
+            geometry={sharedWaveRingGeometry}
           >
-            <ringGeometry args={[0.8, 1.0, 32]} />
             <meshBasicMaterial
               color={origin.color}
               transparent
@@ -79,9 +96,8 @@ const FlipPropagationWave = ({ origins, onComplete }) => {
             />
           </mesh>
 
-          {/* Secondary glow ring */}
-          <mesh rotation={origin.rotation || [0, 0, 0]}>
-            <ringGeometry args={[0.3, 0.6, 32]} />
+          {/* Secondary glow ring - uses shared geometry */}
+          <mesh rotation={origin.rotation || [0, 0, 0]} geometry={sharedInnerRingGeometry}>
             <meshBasicMaterial
               color={origin.color}
               transparent
@@ -92,7 +108,7 @@ const FlipPropagationWave = ({ origins, onComplete }) => {
             />
           </mesh>
 
-          {/* Trail particles showing propagation direction */}
+          {/* Trail particles showing propagation direction - uses shared geometry */}
           {[0, 1, 2, 3, 4, 5].map((t, ti) => {
             const angle = (ti / 6) * Math.PI * 2;
             const dist = progress * 2;
@@ -105,8 +121,8 @@ const FlipPropagationWave = ({ origins, onComplete }) => {
                   Math.sin(angle) * dist,
                   0.05
                 ]}
+                geometry={sharedTrailCircleGeometry}
               >
-                <circleGeometry args={[0.15, 16]} />
                 <meshBasicMaterial
                   color={origin.color}
                   transparent
@@ -166,9 +182,8 @@ export const ChaosHeatMap = ({ position, rotation, flips, maxFlips = 10 }) => {
 
   return (
     <group position={position} rotation={rotation}>
-      {/* Outer heat glow */}
-      <mesh ref={glowRef} position={[0, 0, 0.01]}>
-        <circleGeometry args={[0.55, 32]} />
+      {/* Outer heat glow - uses shared geometry */}
+      <mesh ref={glowRef} position={[0, 0, 0.01]} geometry={sharedHeatOuterCircle}>
         <meshBasicMaterial
           color={heatColor}
           transparent
@@ -178,10 +193,9 @@ export const ChaosHeatMap = ({ position, rotation, flips, maxFlips = 10 }) => {
         />
       </mesh>
 
-      {/* Inner core glow for high chaos */}
+      {/* Inner core glow for high chaos - uses shared geometry */}
       {intensity > 0.5 && (
-        <mesh position={[0, 0, 0.015]}>
-          <circleGeometry args={[0.3, 32]} />
+        <mesh position={[0, 0, 0.015]} geometry={sharedHeatInnerCircle}>
           <meshBasicMaterial
             color="#ffffff"
             transparent
