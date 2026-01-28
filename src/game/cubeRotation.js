@@ -17,13 +17,18 @@ export const rotateVec90 = (vx, vy, vz, axis, dir) => {
   return [nx, ny, vz];
 };
 
-// Rotate stickers on a cubie
-export const rotateStickers = (stickers, axis, dir) => {
+// Rotate stickers on a cubie - updates origDir and origPos to match new orientation
+export const rotateStickers = (stickers, axis, dir, newPos) => {
   const next = {};
   for (const [k, st] of Object.entries(stickers)) {
     const [vx, vy, vz] = DIR_TO_VEC[k];
     const [rx, ry, rz] = rotateVec90(vx, vy, vz, axis, dir);
-    next[VEC_TO_DIR(rx, ry, rz)] = st;
+    const newDir = VEC_TO_DIR(rx, ry, rz);
+    next[newDir] = {
+      ...st,
+      origPos: newPos,
+      origDir: newDir
+    };
   }
   return next;
 };
@@ -64,10 +69,11 @@ export const rotateSliceCubies = (cubies, size, axis, sliceIndex, dir) => {
 
   for (const m of moves) {
     const src = originals.get(m.from.join(','));
+    const newPos = { x: m.to[0], y: m.to[1], z: m.to[2] };
     next[m.to[0]][m.to[1]][m.to[2]] = {
       ...src,
       x: m.to[0], y: m.to[1], z: m.to[2],
-      stickers: rotateStickers(src.stickers, axis, dir)
+      stickers: rotateStickers(src.stickers, axis, dir, newPos)
     };
   }
 
