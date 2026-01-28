@@ -149,7 +149,9 @@ const CubeAssembly = ({
         g.rotateOnWorldAxis(worldAxis, dRot * dir);
       }
     });
-    if (newT >= 1) { onAnimComplete(); vibrate(14); } else animState.t = newT;
+    const wasComplete = (t ?? 0) >= 1;
+    animState.t = newT;
+    if (newT >= 1 && !wasComplete) { onAnimComplete(); vibrate(14); }
   });
 
   const k = (size - 1) / 2;
