@@ -216,4 +216,4 @@ const Cubie = React.forwardRef(function Cubie({
   );
 });
 
-export default Cubie;
+export default React.memo(Cubie);

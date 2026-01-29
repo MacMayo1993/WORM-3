@@ -277,6 +277,10 @@ const StickerPlane = function StickerPlane({ meta, pos, rot=[0,0,0], overlay, mo
   const flipToColor = useRef(null);
   const flipProgress = useRef(0);
 
+  // Track if we're currently in a flip animation - prevents race condition
+  // between React state updates and Three.js imperative rendering
+  const isFlipping = useRef(false);
+
   // State for triggering particle and glow effects (needs re-render)
   const [particlesActive, setParticlesActive] = useState(false);
   const [glowActive, setGlowActive] = useState(false);
@@ -290,6 +294,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot=[0,0,0], overlay, mo
 
     // Only trigger flip animation if the color actually changed to its antipodal
     if (curr !== prevVal && meta?.flips > 0 && ANTIPODAL_COLOR[prevVal] === curr) {
+      // Mark as animating to prevent React state from interrupting
+      isFlipping.current = true;
       // Store the colors for the flip animation
       // flipToColor is the ANTIPODAL color (what we're flipping TO)
       flipFromColor.current = FACE_COLORS[prevVal];
@@ -369,6 +375,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot=[0,0,0], overlay, mo
       }
 
       if (spinT.current <= 0) {
+        // Release animation lock - allow React state to control color again
+        isFlipping.current = false;
         groupRef.current.rotation.y = rot[1];
         groupRef.current.scale.set(1, 1, 1);
         // Start shake animation after flip completes
@@ -377,7 +385,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot=[0,0,0], overlay, mo
         flipFromColor.current = null;
         flipToColor.current = null;
         flipProgress.current = 0;
-        // Reset material color to baseColor to fix color flash after animation
+        // Force set the final color correctly using current meta value
         if (meshRef.current) {
           meshRef.current.material.color.set(baseColorRef.current);
         }
@@ -420,9 +428,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot=[0,0,0], overlay, mo
   baseColorRef.current = baseColor;
 
   // Sync material color when meta.curr changes (e.g., during cube rotation)
-  // This ensures the color updates even after imperative changes during animation
+  // Only apply if not currently in a flip animation to prevent race condition
   useEffect(() => {
-    if (meshRef.current && spinT.current <= 0) {
+    if (meshRef.current && !isFlipping.current) {
       meshRef.current.material.color.set(baseColor);
     }
   }, [baseColor]);
@@ -547,4 +555,4 @@ const StickerPlane = function StickerPlane({ meta, pos, rot=[0,0,0], overlay, mo
   );
 };
 
-export default StickerPlane;
+export default React.memo(StickerPlane);
