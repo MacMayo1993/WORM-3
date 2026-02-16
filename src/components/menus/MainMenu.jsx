@@ -1,21 +1,96 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { Environment } from '@react-three/drei';
 import IntroCubie from '../intro/IntroCubie.jsx';
 
-// Rotating cube background component
+// Rotating cube background component with flip animations
 const MenuCubeBackground = () => {
   const size = 3;
-  const items = [];
-  const k = (size - 1) / 2;
+  const [flipStates, setFlipStates] = useState({});
 
-  for (let x = 0; x < size; x++) {
-    for (let y = 0; y < size; y++) {
-      for (let z = 0; z < size; z++) {
-        items.push({ key: `${x}-${y}-${z}`, pos: [x - k, y - k, z - k] });
+  const items = useMemo(() => {
+    const k = (size - 1) / 2;
+    const result = [];
+    for (let x = 0; x < size; x++) {
+      for (let y = 0; y < size; y++) {
+        for (let z = 0; z < size; z++) {
+          result.push({ key: `${x}-${y}-${z}`, pos: [x - k, y - k, z - k], x, y, z });
+        }
       }
     }
-  }
+    return result;
+  }, [size]);
+
+  // Animate flip rotations smoothly
+  useEffect(() => {
+    const flipDuration = 800; // ms for a complete flip
+    const timeBetweenFlips = 2500; // ms between flip triggers
+    const activeFlips = new Map(); // key -> { face, startTime, endTime }
+    let animationId;
+
+    const triggerRandomFlips = () => {
+      // Pick 2-3 random tiles to flip
+      const numFlips = Math.floor(Math.random() * 2) + 2;
+      const selectedItems = [];
+      for (let i = 0; i < numFlips; i++) {
+        const randomItem = items[Math.floor(Math.random() * items.length)];
+        selectedItems.push(randomItem);
+      }
+
+      // Schedule flip animations for selected tiles
+      const now = Date.now();
+      selectedItems.forEach((item) => {
+        // Randomly choose a face to flip
+        const faces = ['PZ', 'NZ', 'PX', 'NX', 'PY', 'NY'];
+        const face = faces[Math.floor(Math.random() * faces.length)];
+        activeFlips.set(item.key, {
+          face,
+          startTime: now,
+          endTime: now + flipDuration,
+        });
+      });
+    };
+
+    const animate = () => {
+      const now = Date.now();
+      const newFlips = {};
+
+      // Update flip rotations based on time
+      activeFlips.forEach((flip, key) => {
+        if (now >= flip.endTime) {
+          // Flip animation complete - remove from active flips
+          activeFlips.delete(key);
+        } else {
+          // Calculate flip progress (0 to 1)
+          const progress = (now - flip.startTime) / flipDuration;
+          // Ease-in-out for smooth animation
+          const eased = progress < 0.5
+            ? 2 * progress * progress
+            : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+          // Animate from 0 to π (180 degrees)
+          const rotation = eased * Math.PI;
+          newFlips[key] = { [flip.face]: rotation };
+        }
+      });
+
+      setFlipStates(newFlips);
+      animationId = requestAnimationFrame(animate);
+    };
+
+    // Start animation loop
+    animate();
+
+    // Trigger flips periodically
+    const flipInterval = setInterval(triggerRandomFlips, timeBetweenFlips);
+    // Trigger initial flips after a short delay
+    const initialTimer = setTimeout(triggerRandomFlips, 500);
+
+    return () => {
+      cancelAnimationFrame(animationId);
+      clearInterval(flipInterval);
+      clearTimeout(initialTimer);
+    };
+  }, [items]);
 
   return (
     <group rotation={[0.3, 0, 0]}>
@@ -25,6 +100,7 @@ const MenuCubeBackground = () => {
           position={it.pos}
           size={size}
           explosionFactor={0}
+          cubieFlips={flipStates[it.key] || {}}
         />
       ))}
     </group>
@@ -122,7 +198,7 @@ const MainMenu = ({ onPlay, onLevels, onFreeplay, onCoop, onSettings, onHelp }) 
     <div style={{
       position: 'fixed',
       inset: 0,
-      background: 'linear-gradient(to right, #e5e5e5 1px, transparent 1px), linear-gradient(to bottom, #e5e5e5 1px, transparent 1px), #f5f5f5',
+      background: 'linear-gradient(to right, #90caf9 1px, transparent 1px), linear-gradient(to bottom, #90caf9 1px, transparent 1px), #e3f2fd',
       backgroundSize: '20px 20px',
       zIndex: 9999,
       overflow: 'hidden',
@@ -146,7 +222,7 @@ const MainMenu = ({ onPlay, onLevels, onFreeplay, onCoop, onSettings, onHelp }) 
       <div style={{
         position: 'absolute',
         inset: 0,
-        background: 'radial-gradient(ellipse at center, rgba(245,245,245,0.3) 0%, rgba(245,245,245,0.6) 70%, rgba(245,245,245,0.85) 100%)',
+        background: 'radial-gradient(ellipse at center, rgba(227,242,253,0.3) 0%, rgba(227,242,253,0.6) 70%, rgba(227,242,253,0.85) 100%)',
         pointerEvents: 'none',
       }} />
 

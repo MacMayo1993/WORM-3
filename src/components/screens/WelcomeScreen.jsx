@@ -56,7 +56,7 @@ const WelcomeScreen = ({ onEnter }) => {
 
   return (
     <div className="welcome-screen" style={{
-      background: 'linear-gradient(to right, #e5e5e5 1px, transparent 1px), linear-gradient(to bottom, #e5e5e5 1px, transparent 1px), #f5f5f5',
+      background: 'linear-gradient(to right, #90caf9 1px, transparent 1px), linear-gradient(to bottom, #90caf9 1px, transparent 1px), #e3f2fd',
       backgroundSize: '20px 20px'
     }}>
       <div className="welcome-canvas">
