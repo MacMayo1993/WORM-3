@@ -227,11 +227,22 @@ const Cubie = React.forwardRef(function Cubie({
     return edgeList;
   }, [visualMode, cubie, isOnEdge, size]);
 
-  // Mirror mode: compute unique box dimensions for this piece based on its grid position.
-  const mirrorDims = useMemo(
-    () => mirrorMode ? getMirrorDimensions(cubie.x, cubie.y, cubie.z, size) : null,
-    [mirrorMode, cubie.x, cubie.y, cubie.z, size]
-  );
+  // Mirror mode: derive this piece's intrinsic box dimensions from its *original*
+  // home position (origPos), not its current grid slot.  rotateSliceCubies writes
+  // new x/y/z on every move, but origPos is set once in makeCubies and preserved
+  // by the {...src} spread in rotateSliceCubies.  Using origPos means each piece
+  // keeps its own unique shape as it travels around the lattice — the core
+  // mechanic of a mirror cube.  Interior pieces (no stickers) use current
+  // position as a safe fallback; they're not part of the scramble identity.
+  const mirrorDims = useMemo(() => {
+    if (!mirrorMode) return null;
+    const stickerList = Object.values(cubie.stickers);
+    const home = stickerList.length > 0
+      ? stickerList[0].origPos
+      : { x: cubie.x, y: cubie.y, z: cubie.z };
+    return getMirrorDimensions(home.x, home.y, home.z, size);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mirrorMode, cubie.stickers, size]);
 
   return (
     <group position={explodedPos} ref={ref}>
