@@ -21,7 +21,7 @@ const MenuCubeBackground = () => {
     return result;
   }, [size]);
 
-  // Animate flip rotations smoothly
+  // Animate flip rotations smoothly and track antipodal swaps
   useEffect(() => {
     const flipDuration = 800; // ms for a complete flip
     const timeBetweenFlips = 2500; // ms between flip triggers
@@ -69,7 +69,14 @@ const MenuCubeBackground = () => {
             : 1 - Math.pow(-2 * progress + 2, 2) / 2;
           // Animate from 0 to π (180 degrees)
           const rotation = eased * Math.PI;
-          newFlips[key] = { [flip.face]: rotation };
+
+          // Show antipodal swap when past halfway point (sticker has flipped over)
+          const showAntipodal = progress > 0.5;
+
+          newFlips[key] = {
+            rotation: { [flip.face]: rotation },
+            antipodal: showAntipodal ? { [flip.face]: true } : {}
+          };
         }
       });
 
@@ -94,15 +101,19 @@ const MenuCubeBackground = () => {
 
   return (
     <group rotation={[0.3, 0, 0]}>
-      {items.map((it) => (
-        <IntroCubie
-          key={it.key}
-          position={it.pos}
-          size={size}
-          explosionFactor={0}
-          cubieFlips={flipStates[it.key] || {}}
-        />
-      ))}
+      {items.map((it) => {
+        const flipState = flipStates[it.key];
+        return (
+          <IntroCubie
+            key={it.key}
+            position={it.pos}
+            size={size}
+            explosionFactor={0}
+            cubieFlips={flipState?.rotation || {}}
+            antipodalSwaps={flipState?.antipodal || {}}
+          />
+        );
+      })}
     </group>
   );
 };
@@ -210,6 +221,7 @@ const MainMenu = ({ onPlay, onLevels, onFreeplay, onCoop, onSettings, onHelp }) 
         opacity: 0.3,
       }}>
         <Canvas camera={{ position: [0, 2, 10], fov: 45 }}>
+          <color attach="background" args={['#90caf9']} />
           <ambientLight intensity={0.8} />
           <directionalLight position={[5, 8, 5]} intensity={1.2} />
           <pointLight position={[10, 10, 10]} intensity={0.6} />
