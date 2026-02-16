@@ -156,47 +156,56 @@ export default function ParityOrbs({ orbs, size, explosionFactor = 0, mode = 'su
   );
 }
 
+// Shared geometry for collect-effect particles (one sphere, used by all instances).
+const _collectSphere = new THREE.SphereGeometry(0.08, 8, 8);
+// Scratch Object3D for matrix updates.
+const _collectDummy = new THREE.Object3D();
+const COLLECT_PARTICLE_COUNT = 12;
+
 // Explosion effect when orb is collected
 export function OrbCollectEffect({ position, color = '#ffd700' }) {
-  const particlesRef = useRef();
+  const meshRef = useRef();
   const timeRef = useRef(0);
-  const particleCount = 12;
 
-  // Generate random velocities for particles
-  const velocities = useMemo(() => {
-    return Array.from({ length: particleCount }, () => ({
-      x: (Math.random() - 0.5) * 2,
-      y: (Math.random() - 0.5) * 2,
-      z: (Math.random() - 0.5) * 2
-    }));
-  }, []);
+  // Random velocities are stable for the lifetime of this effect.
+  const velocities = useMemo(
+    () =>
+      Array.from({ length: COLLECT_PARTICLE_COUNT }, () => ({
+        x: (Math.random() - 0.5) * 2,
+        y: (Math.random() - 0.5) * 2,
+        z: (Math.random() - 0.5) * 2
+      })),
+    []
+  );
 
-  useFrame((state, delta) => {
+  useFrame((_state, delta) => {
+    const mesh = meshRef.current;
+    if (!mesh || timeRef.current >= 0.5) return;
+
     timeRef.current += delta;
+    const t = timeRef.current;
+    const alpha = Math.max(0, 1 - t * 2);
 
-    if (particlesRef.current && timeRef.current < 0.5) {
-      const t = timeRef.current;
-      particlesRef.current.children.forEach((particle, i) => {
-        const v = velocities[i];
-        particle.position.x = v.x * t * 3;
-        particle.position.y = v.y * t * 3;
-        particle.position.z = v.z * t * 3;
-        particle.scale.setScalar(1 - t * 2);
-        particle.material.opacity = 1 - t * 2;
-      });
+    for (let i = 0; i < COLLECT_PARTICLE_COUNT; i++) {
+      const v = velocities[i];
+      _collectDummy.position.set(v.x * t * 3, v.y * t * 3, v.z * t * 3);
+      _collectDummy.scale.setScalar(alpha);
+      _collectDummy.updateMatrix();
+      mesh.setMatrixAt(i, _collectDummy.matrix);
     }
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.material.opacity = alpha;
   });
 
   if (timeRef.current > 0.5) return null;
 
   return (
-    <group ref={particlesRef} position={position}>
-      {Array.from({ length: particleCount }).map((_, i) => (
-        <mesh key={i}>
-          <sphereGeometry args={[0.08, 8, 8]} />
-          <meshBasicMaterial color={color} transparent opacity={1} />
-        </mesh>
-      ))}
-    </group>
+    <instancedMesh
+      ref={meshRef}
+      args={[_collectSphere, null, COLLECT_PARTICLE_COUNT]}
+      position={position}
+    >
+      <meshBasicMaterial color={color} transparent opacity={1} />
+    </instancedMesh>
   );
 }
