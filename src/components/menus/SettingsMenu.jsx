@@ -453,6 +453,9 @@ function ModesPanel() {
   const hollowMode = useGameStore((state) => state.hollowMode);
   const setHollowMode = useGameStore((state) => state.setHollowMode);
 
+  const mirrorMode = useGameStore((state) => state.mirrorMode);
+  const setMirrorMode = useGameStore((state) => state.setMirrorMode);
+
   return (
     <>
       {/* Hollow Void Cube Mode */}
@@ -472,6 +475,29 @@ function ModesPanel() {
             <span className="toggle-label">Enable Hollow Mode</span>
             <div className={`toggle-switch${hollowMode ? ' on' : ''}`}
               onClick={() => setHollowMode(!hollowMode)}>
+              <div className="toggle-knob" />
+            </div>
+          </label>
+        </div>
+      </section>
+
+      {/* Mirror Blocks Mode */}
+      <section className="settings-section">
+        <h3 className="settings-section-title">Mirror Blocks Mode</h3>
+        <p style={{
+          fontSize: '13px',
+          color: 'rgba(255, 255, 255, 0.6)',
+          marginBottom: '16px',
+          lineHeight: '1.5'
+        }}>
+          Each piece has a unique size instead of colored stickers. Solve the puzzle by restoring the cube to its perfect rectangular form.
+        </p>
+
+        <div className="settings-toggles">
+          <label className="settings-toggle-row">
+            <span className="toggle-label">Enable Mirror Mode</span>
+            <div className={`toggle-switch${mirrorMode ? ' on' : ''}`}
+              onClick={() => setMirrorMode(!mirrorMode)}>
               <div className="toggle-knob" />
             </div>
           </label>

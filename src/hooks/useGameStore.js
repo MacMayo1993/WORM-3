@@ -349,6 +349,7 @@ export const useGameStore = create(
     // HOLLOW VOID CUBE MODE
     // ========================================================================
     hollowMode: false,
+    mirrorMode: false,
     parityCurrent: 0,      // 0-1, smoothly lerped
     parityTarget: 0,       // 0 or 1
     chaosCurrent: 0,       // 0-1, smoothly lerped
@@ -356,6 +357,9 @@ export const useGameStore = create(
 
     setHollowMode: (hollowMode) => set({ hollowMode }),
     toggleHollowMode: () => set((state) => ({ hollowMode: !state.hollowMode })),
+
+    setMirrorMode: (mirrorMode) => set({ mirrorMode }),
+    toggleMirrorMode: () => set((state) => ({ mirrorMode: !state.mirrorMode })),
 
     setParityTarget: (parityTarget) => set({ parityTarget }),
     setChaosTarget: (chaosTarget) => set({ chaosTarget }),

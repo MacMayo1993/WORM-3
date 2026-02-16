@@ -12,6 +12,7 @@ import ChaosWave from '../manifold/ChaosWave.jsx';
 import FlipPropagationWave from '../manifold/FlipPropagationWave.jsx';
 import { vibrate } from '../utils/audio.js';
 import { updateSharedTime } from './TileStyleMaterials.jsx';
+import { getMirrorPosition } from '../game/mirrorBlocks.js';
 
 // Reusable axis vectors and quaternion (allocated once, never recreated)
 const _axisCol = new THREE.Vector3(1, 0, 0);
@@ -542,16 +543,17 @@ const CubeAssembly = React.memo(({
   }, [maxCubies]);
 
   const k = (size - 1) / 2;
+  const mirrorMode = useGameStore((state) => state.mirrorMode);
 
   // Cache position arrays so they're stable references across cubies updates.
-  // Only recomputed when size changes, not on every rotation.
+  // Only recomputed when size or mirrorMode changes, not on every rotation.
   const positionCache = useMemo(() => {
     const cache = [];
     for (let x = 0; x < size; x++) for (let y = 0; y < size; y++) for (let z = 0; z < size; z++) {
-      cache.push([x - k, y - k, z - k]);
+      cache.push(mirrorMode ? getMirrorPosition(x, y, z, size) : [x - k, y - k, z - k]);
     }
     return cache;
-  }, [size, k]);
+  }, [size, k, mirrorMode]);
 
   const items = useMemo(() => {
     // Guard against size/cubies mismatch during size transitions

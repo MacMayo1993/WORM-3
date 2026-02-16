@@ -6,6 +6,7 @@ import { getEdgeFlags } from '../game/cubeUtils.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import StickerPlane from './StickerPlane.jsx';
 import WireframeEdge from './WireframeEdge.jsx';
+import { getMirrorDimensions } from '../game/mirrorBlocks.js';
 
 // Hollow cube edge beams — 12 beams forming a skeletal cube frame
 const EDGE_H = 0.49; // half of cube size
@@ -86,6 +87,7 @@ const Cubie = React.forwardRef(function Cubie({
   position, cubie, size, onPointerDown, visualMode, explosionFactor = 0, faceColors, faceTextures, manifoldStyles
 }, ref) {
   const hollowMode = useGameStore((state) => state.hollowMode);
+  const mirrorMode = useGameStore((state) => state.mirrorMode);
   const limit = (size - 1) / 2;
   const isEdge = (p, v) => Math.abs(p - v) < 0.01;
 
@@ -101,8 +103,7 @@ const Cubie = React.forwardRef(function Cubie({
 
   const handleDown = (e) => {
     e.stopPropagation();
-    const rX = Math.round(position[0] + limit), rY = Math.round(position[1] + limit), rZ = Math.round(position[2] + limit);
-    onPointerDown({ pos: { x: rX, y: rY, z: rZ }, worldPos: new THREE.Vector3(...position), event: e });
+    onPointerDown({ pos: { x: cubie.x, y: cubie.y, z: cubie.z }, worldPos: new THREE.Vector3(...position), event: e });
   };
 
   const meta = (d) => cubie.stickers[d] || null;
@@ -227,10 +228,21 @@ const Cubie = React.forwardRef(function Cubie({
     return edgeList;
   }, [visualMode, cubie, isOnEdge, size]);
 
+  // Mirror mode: compute unique box dimensions for this piece based on its grid position.
+  const mirrorDims = useMemo(
+    () => mirrorMode ? getMirrorDimensions(cubie.x, cubie.y, cubie.z, size) : null,
+    [mirrorMode, cubie.x, cubie.y, cubie.z, size]
+  );
+
   return (
     <group position={explodedPos} ref={ref}>
-      {/* Cubie body: hollow edge-beam frame OR standard RoundedBox */}
-      {hollowMode ? (
+      {/* Mirror mode: plain asymmetric box with chrome material, no stickers */}
+      {mirrorMode ? (
+        <mesh onPointerDown={handleDown}>
+          <boxGeometry args={mirrorDims} />
+          <meshStandardMaterial color="#c8c8c8" roughness={0.08} metalness={0.92} envMapIntensity={1.2} />
+        </mesh>
+      ) : hollowMode ? (
         <>
           {/* Invisible hit box for pointer events */}
           <mesh onPointerDown={handleDown} visible={false}>
@@ -265,8 +277,8 @@ const Cubie = React.forwardRef(function Cubie({
         </RoundedBox>
       )}
 
-      {/* LED Wireframe edges ONLY in wireframe mode (skip in hollow mode — beams are the frame) */}
-      {visualMode === 'wireframe' && !hollowMode && wireframeEdges.map((edge, idx) => (
+      {/* LED Wireframe edges ONLY in wireframe mode (skip in hollow/mirror mode) */}
+      {visualMode === 'wireframe' && !hollowMode && !mirrorMode && wireframeEdges.map((edge, idx) => (
         <WireframeEdge
           key={idx}
           start={edge.start}
@@ -277,8 +289,8 @@ const Cubie = React.forwardRef(function Cubie({
         />
       ))}
 
-      {/* Stickers — frame-shaped when hollow, solid plane otherwise */}
-      {visualMode !== 'wireframe' && (
+      {/* Stickers — frame-shaped when hollow, solid plane otherwise; none in mirror mode */}
+      {visualMode !== 'wireframe' && !mirrorMode && (
         <>
           {isEdge(position[2], (size - 1) / 2) && meta('PZ') && <StickerPlane meta={meta('PZ')} pos={STICKER_POS.PZ} rot={STICKER_ROT.PZ} mode={visualMode} overlay={overlay('PZ')} faceColors={faceColors} faceTextures={faceTextures} faceSize={size} {...gridPos('PZ')} manifoldStyles={manifoldStyles} hollow={hollowMode} />}
           {isEdge(position[2], -(size - 1) / 2) && meta('NZ') && <StickerPlane meta={meta('NZ')} pos={STICKER_POS.NZ} rot={STICKER_ROT.NZ} mode={visualMode} overlay={overlay('NZ')} faceColors={faceColors} faceTextures={faceTextures} faceSize={size} {...gridPos('NZ')} manifoldStyles={manifoldStyles} hollow={hollowMode} />}
