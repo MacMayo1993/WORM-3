@@ -13,6 +13,7 @@ import FlipPropagationWave from '../manifold/FlipPropagationWave.jsx';
 import { vibrate } from '../utils/audio.js';
 import { updateSharedTime } from './TileStyleMaterials.jsx';
 import { getMirrorPosition } from '../game/mirrorBlocks.js';
+import { useGameStore } from '../hooks/useGameStore.js';
 
 // Reusable axis vectors and quaternion (allocated once, never recreated)
 const _axisCol = new THREE.Vector3(1, 0, 0);

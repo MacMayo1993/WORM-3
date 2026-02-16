@@ -88,7 +88,6 @@ const Cubie = React.forwardRef(function Cubie({
 }, ref) {
   const hollowMode = useGameStore((state) => state.hollowMode);
   const mirrorMode = useGameStore((state) => state.mirrorMode);
-  const limit = (size - 1) / 2;
   const isEdge = (p, v) => Math.abs(p - v) < 0.01;
 
   const explodedPos = useMemo(() => {
