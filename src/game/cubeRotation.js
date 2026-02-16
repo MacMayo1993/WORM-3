@@ -25,11 +25,20 @@ export const rotateStickers = (stickers, axis, dir) => {
     const [rx, ry, rz] = rotateVec90(vx, vy, vz, axis, dir);
     const newKey = VEC_TO_DIR(rx, ry, rz);
 
-    // If sticker stays on same face (in-plane rotation), increment/decrement uvRotation based on direction
+    // If sticker stays on same face (in-plane rotation), apply UV rotation
+    // Direction must be adjusted based on which face we're on relative to rotation axis
     const stayedOnSameFace = newKey === k;
+    let uvDir = dir;
+    if (stayedOnSameFace) {
+      // Faces on opposite sides of rotation axis need opposite UV rotation directions
+      if (axis === 'col' && k === 'NX') uvDir = -dir;       // X-axis: NX face is opposite direction
+      else if (axis === 'row' && k === 'NY') uvDir = -dir;  // Y-axis: NY face is opposite direction
+      else if (axis === 'depth' && k === 'NZ') uvDir = -dir; // Z-axis: NZ face is opposite direction
+    }
+
     next[newKey] = {
       ...st,
-      uvRotation: stayedOnSameFace ? ((st.uvRotation || 0) + dir + 4) % 4 : (st.uvRotation || 0)
+      uvRotation: stayedOnSameFace ? ((st.uvRotation || 0) + uvDir + 4) % 4 : (st.uvRotation || 0)
     };
   }
   return next;
