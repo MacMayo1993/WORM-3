@@ -521,11 +521,12 @@ const CubeAssembly = React.memo(({
 
     const dRot = deltaProgress * (Math.PI / 2);
 
-    // Apply rotation to cubies in the slice
+    // Apply rotation only to cubies in the slice (avoid iterating all 125 to skip 88%)
     const sliceSet = sliceIndicesRef.current;
     if (sliceSet && Math.abs(dRot) > 0.0001) {
-      cubieRefs.current.forEach((g, idx) => {
-        if (!g || !sliceSet.has(idx)) return;
+      sliceSet.forEach(idx => {
+        const g = cubieRefs.current[idx];
+        if (!g) return;
         g.position.applyAxisAngle(worldAxis, dRot * dir);
         g.rotateOnWorldAxis(worldAxis, dRot * dir);
       });
