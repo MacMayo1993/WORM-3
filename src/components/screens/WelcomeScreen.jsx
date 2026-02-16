@@ -55,7 +55,10 @@ const WelcomeScreen = ({ onEnter }) => {
   };
 
   return (
-    <div className="welcome-screen">
+    <div className="welcome-screen" style={{
+      background: 'linear-gradient(to right, #e5e5e5 1px, transparent 1px), linear-gradient(to bottom, #e5e5e5 1px, transparent 1px), #f5f5f5',
+      backgroundSize: '20px 20px'
+    }}>
       <div className="welcome-canvas">
         <ErrorBoundary>
           <Canvas camera={{ position: [0, 3, 12], fov: 40 }}>

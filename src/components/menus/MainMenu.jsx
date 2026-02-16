@@ -122,7 +122,8 @@ const MainMenu = ({ onPlay, onLevels, onFreeplay, onCoop, onTeach, onSettings, o
     <div style={{
       position: 'fixed',
       inset: 0,
-      background: 'linear-gradient(135deg, #f8f9fa 0%, #ffffff 50%, #f1f3f4 100%)',
+      background: 'linear-gradient(to right, #e5e5e5 1px, transparent 1px), linear-gradient(to bottom, #e5e5e5 1px, transparent 1px), #f5f5f5',
+      backgroundSize: '20px 20px',
       zIndex: 9999,
       overflow: 'hidden',
     }}>
@@ -145,7 +146,7 @@ const MainMenu = ({ onPlay, onLevels, onFreeplay, onCoop, onTeach, onSettings, o
       <div style={{
         position: 'absolute',
         inset: 0,
-        background: 'radial-gradient(ellipse at center, rgba(248,249,250,0.5) 0%, rgba(241,243,244,0.8) 70%, rgba(248,249,250,0.95) 100%)',
+        background: 'radial-gradient(ellipse at center, rgba(245,245,245,0.3) 0%, rgba(245,245,245,0.6) 70%, rgba(245,245,245,0.85) 100%)',
         pointerEvents: 'none',
       }} />
 
@@ -216,13 +217,10 @@ const MainMenu = ({ onPlay, onLevels, onFreeplay, onCoop, onTeach, onSettings, o
           <MenuButton onClick={onCoop} delay={1000} icon="&#9775;">
             Co-op Crawler
           </MenuButton>
-          <MenuButton onClick={onTeach} delay={1100} icon="&#9733;">
-            Teach
-          </MenuButton>
-          <MenuButton onClick={onSettings} delay={1250} icon="⚙">
+          <MenuButton onClick={onSettings} delay={1100} icon="⚙">
             Settings
           </MenuButton>
-          <MenuButton onClick={onHelp} delay={1400} icon="?">
+          <MenuButton onClick={onHelp} delay={1250} icon="?">
             How to Play
           </MenuButton>
         </div>
