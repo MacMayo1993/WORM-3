@@ -9,6 +9,7 @@
 import React, { useState, useRef, useEffect, useCallback, Suspense } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Environment, Html } from '@react-three/drei';
+import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import './App.css';
 
 // Utils
@@ -753,7 +754,7 @@ export default function WORM3() {
       <div className="canvas-container" onContextMenu={(e) => e.preventDefault()}>
         <Canvas camera={{ position: [0, 0, cameraZ], fov: 40 }}>
           <ambientLight intensity={visualMode === 'wireframe' ? 0.2 : visualMode === 'glass' ? 0.5 : 0.8} />
-          <directionalLight position={[5, 8, 5]} intensity={visualMode === 'wireframe' ? 0.3 : visualMode === 'glass' ? 1.6 : 1.2} castShadow />
+          <directionalLight position={[5, 8, 5]} intensity={visualMode === 'wireframe' ? 0.3 : visualMode === 'glass' ? 1.6 : 1.2} castShadow shadow-mapSize={[2048, 2048]} />
           <pointLight position={[10, 10, 10]} intensity={visualMode === 'wireframe' ? 0.3 : visualMode === 'glass' ? 1.0 : 0.8} />
           <pointLight position={[-10, -10, -10]} intensity={visualMode === 'wireframe' ? 0.2 : visualMode === 'glass' ? 0.5 : 0.6} />
           {visualMode === 'wireframe' && (
@@ -845,6 +846,14 @@ export default function WORM3() {
             )}
             <AntipodalModeEffects />
           </Suspense>
+
+          {/* Bloom — makes emissive stickers, worm glow, and orbs actually glow.
+              Disabled in wireframe mode (black background, emissives are already dominant). */}
+          {visualMode !== 'wireframe' && (
+            <EffectComposer>
+              <Bloom luminanceThreshold={0.4} luminanceSmoothing={0.2} intensity={0.7} mipmapBlur />
+            </EffectComposer>
+          )}
         </Canvas>
       </div>
 

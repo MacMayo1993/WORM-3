@@ -248,9 +248,17 @@ const Cubie = React.forwardRef(function Cubie({
     <group position={explodedPos} ref={ref}>
       {/* Mirror mode: plain asymmetric box with chrome material, no stickers */}
       {mirrorMode ? (
-        <mesh onPointerDown={handleDown}>
+        // Chrome mirror pieces — MeshPhysicalMaterial gives a more accurate conductor BRDF.
+        <mesh onPointerDown={handleDown} castShadow receiveShadow>
           <boxGeometry args={mirrorDims} />
-          <meshStandardMaterial color="#c8c8c8" roughness={0.08} metalness={0.92} envMapIntensity={1.2} />
+          <meshPhysicalMaterial
+            color="#c8c8c8"
+            roughness={0.06}
+            metalness={0.95}
+            envMapIntensity={1.4}
+            clearcoat={1.0}
+            clearcoatRoughness={0.0}
+          />
         </mesh>
       ) : hollowMode ? (
         <>
@@ -261,13 +269,15 @@ const Cubie = React.forwardRef(function Cubie({
 
           {/* 12 edge beams forming a hollow cube frame */}
           {HOLLOW_EDGES.map((edge, idx) => (
-            <mesh key={idx} position={edge.pos}>
+            <mesh key={idx} position={edge.pos} castShadow receiveShadow>
               <boxGeometry args={BEAM_DIMS[edge.geo]} />
-              <meshStandardMaterial
+              <meshPhysicalMaterial
                 color={visualMode === 'wireframe' ? '#000000' : visualMode === 'glass' ? '#111111' : '#0a0a0a'}
                 roughness={visualMode === 'wireframe' ? 0.9 : visualMode === 'glass' ? 0.05 : 0.25}
                 metalness={visualMode === 'wireframe' ? 0 : visualMode === 'glass' ? 0.3 : 0.15}
                 envMapIntensity={visualMode === 'glass' ? 0.8 : 0.4}
+                clearcoat={visualMode === 'glass' ? 0.8 : 0.5}
+                clearcoatRoughness={visualMode === 'glass' ? 0.05 : 0.15}
                 transparent={visualMode === 'glass'}
                 opacity={visualMode === 'glass' ? 0.12 : 1.0}
               />
@@ -275,12 +285,15 @@ const Cubie = React.forwardRef(function Cubie({
           ))}
         </>
       ) : (
-        <RoundedBox args={[0.98, 0.98, 0.98]} radius={0.08} smoothness={4} onPointerDown={handleDown}>
-          <meshStandardMaterial
+        // Standard solid cubie — clearcoat gives the high-gloss plastic puzzle look.
+        <RoundedBox args={[0.98, 0.98, 0.98]} radius={0.08} smoothness={4} onPointerDown={handleDown} castShadow receiveShadow>
+          <meshPhysicalMaterial
             color={visualMode === 'wireframe' ? "#000000" : visualMode === 'glass' ? "#111111" : "#0a0a0a"}
             roughness={visualMode === 'wireframe' ? 0.9 : visualMode === 'glass' ? 0.05 : 0.25}
             metalness={visualMode === 'wireframe' ? 0 : visualMode === 'glass' ? 0.3 : 0.15}
             envMapIntensity={visualMode === 'glass' ? 0.8 : 0.4}
+            clearcoat={visualMode === 'wireframe' ? 0 : visualMode === 'glass' ? 0.8 : 0.5}
+            clearcoatRoughness={visualMode === 'wireframe' ? 0 : visualMode === 'glass' ? 0.05 : 0.15}
             transparent={visualMode === 'glass'}
             opacity={visualMode === 'glass' ? 0.12 : 1.0}
           />
