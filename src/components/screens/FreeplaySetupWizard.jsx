@@ -17,19 +17,19 @@ const SCHEME_LABELS = {
 };
 
 const BG_OPTIONS = [
-  { value: 'blackhole', label: 'Black Hole' },
-  { value: 'cave', label: 'Cave' },
-  { value: 'beach', label: 'Beach' },
-  { value: 'forest', label: 'Forest' },
-  { value: 'park', label: 'Park' },
-  { value: 'night', label: 'Night Sky' },
-  { value: 'city', label: 'City Skyline' },
-  { value: 'apartment', label: 'Apartment' },
-  { value: 'lobby', label: 'Modern Lobby' },
-  { value: 'warehouse', label: 'Warehouse' },
-  { value: 'studio', label: 'Photo Studio' },
-  { value: 'dark', label: 'Dark' },
-  { value: 'midnight', label: 'Midnight Blue' },
+  { value: 'blackhole', label: 'Black Hole', preview: 'radial-gradient(circle, #1a0033 0%, #000000 100%)' },
+  { value: 'cave', label: 'Cave', preview: 'linear-gradient(135deg, #3d2817 0%, #1a120a 100%)' },
+  { value: 'beach', label: 'Beach', preview: 'linear-gradient(180deg, #87ceeb 0%, #f4e4c1 70%, #c2b280 100%)' },
+  { value: 'forest', label: 'Forest', preview: 'linear-gradient(180deg, #6b8e23 0%, #2d5016 50%, #1a2f0f 100%)' },
+  { value: 'park', label: 'Park', preview: 'linear-gradient(180deg, #a8d5ba 0%, #7cb89d 50%, #4a7c59 100%)' },
+  { value: 'night', label: 'Night Sky', preview: 'linear-gradient(180deg, #0f0f23 0%, #1a1a3e 50%, #050510 100%)' },
+  { value: 'city', label: 'City Skyline', preview: 'linear-gradient(180deg, #4a5568 0%, #2d3748 50%, #1a202c 100%)' },
+  { value: 'apartment', label: 'Apartment', preview: 'linear-gradient(135deg, #f5f5dc 0%, #deb887 50%, #cd853f 100%)' },
+  { value: 'lobby', label: 'Modern Lobby', preview: 'linear-gradient(135deg, #e8e8e8 0%, #b8b8b8 50%, #707070 100%)' },
+  { value: 'warehouse', label: 'Warehouse', preview: 'linear-gradient(180deg, #6e6e6e 0%, #4a4a4a 50%, #2c2c2c 100%)' },
+  { value: 'studio', label: 'Photo Studio', preview: 'linear-gradient(180deg, #ffffff 0%, #f0f0f0 50%, #d0d0d0 100%)' },
+  { value: 'dark', label: 'Dark', preview: 'linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%)' },
+  { value: 'midnight', label: 'Midnight Blue', preview: 'linear-gradient(135deg, #191970 0%, #0c0c38 100%)' },
 ];
 
 const CLASSIC_STYLE_KEYS = ['solid', 'glossy', 'matte', 'metallic', 'carbonFiber', 'hexGrid', 'comic', 'cafeWall', 'hermanGrid', 'opticSpin', 'ouchi'];
@@ -217,11 +217,14 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     },
     {
       title: 'Choose Your Background',
-      subtitle: 'Pick the scene where you want to play',
+      subtitle: 'Scroll to explore all scenes',
       key: 'backgroundTheme',
       options: BG_OPTIONS.map(opt => ({
         value: opt.value,
         label: opt.label,
+        preview: (
+          <div className="wizard-bg-preview" style={{ background: opt.preview }} />
+        ),
       })),
     },
   ];
