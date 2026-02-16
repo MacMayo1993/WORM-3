@@ -2,7 +2,7 @@
 // Visual worm body using connected spheres with glow effect
 // Supports both surface mode and tunnel mode
 
-import React, { useRef, useMemo } from 'react';
+import React, { useRef, useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { getSegmentWorldPos, getTunnelWorldPos } from './wormLogic.js';
@@ -20,6 +20,19 @@ const TAIL_COLOR_OBJ = new THREE.Color(TAIL_COLOR);
 const HEAD_COLOR_TUNNEL_OBJ = new THREE.Color(HEAD_COLOR_TUNNEL);
 const TAIL_COLOR_TUNNEL_OBJ = new THREE.Color(TAIL_COLOR_TUNNEL);
 
+// Module-level shared geometry and scratch object.
+// SphereGeometry / CylinderGeometry are plain CPU buffers — no GL context needed.
+const _unitSphere = new THREE.SphereGeometry(1, 16, 16);
+// Cylinder: fixed radii 0.15/0.18, unit height — scale Y per instance for length.
+const _unitCylinder = new THREE.CylinderGeometry(0.15, 0.18, 1, 8);
+// Single Object3D used as scratch for matrix math — never added to a scene.
+const _dummy = new THREE.Object3D();
+// Maximum instanced segments (enough for any realistic worm length).
+const MAX_WORM_INSTANCES = 100;
+// Pre-computed midpoint emissive colors (avoid per-render allocation).
+const _MID_GREEN = new THREE.Color(HEAD_COLOR).lerp(new THREE.Color(TAIL_COLOR), 0.5);
+const _MID_GREEN_TUNNEL = new THREE.Color(HEAD_COLOR_TUNNEL).lerp(new THREE.Color(TAIL_COLOR_TUNNEL), 0.5);
+
 /**
  * @param {Object} props
  * @param {Array} props.segments - Worm segments (surface or tunnel positions)
@@ -29,156 +42,214 @@ const TAIL_COLOR_TUNNEL_OBJ = new THREE.Color(TAIL_COLOR_TUNNEL);
  * @param {string} props.mode - 'surface' or 'tunnel'
  */
 export default function WormTrail({ segments, size, explosionFactor = 0, alive = true, mode = 'surface' }) {
-  const groupRef = useRef();
+  const headMeshRef = useRef();
+  const headGlowRef = useRef();
+  const bodyMeshRef = useRef();
+  const tubeMeshRef = useRef();
   const timeRef = useRef(0);
 
   const isTunnelMode = mode === 'tunnel';
   const headColorObj = isTunnelMode ? HEAD_COLOR_TUNNEL_OBJ : HEAD_COLOR_OBJ;
   const tailColorObj = isTunnelMode ? TAIL_COLOR_TUNNEL_OBJ : TAIL_COLOR_OBJ;
 
-  // Calculate world positions for all segments
-  const positions = useMemo(() => {
-    return segments.map(seg => {
-      if (isTunnelMode && seg.tunnel) {
-        // Tunnel mode: use tunnel position
-        return getTunnelWorldPos(seg.tunnel, seg.t, size, explosionFactor);
-      } else {
-        // Surface mode: use grid position
-        return getSegmentWorldPos(seg, size, explosionFactor);
-      }
-    });
-  }, [segments, size, explosionFactor, isTunnelMode]);
+  // ── Derived data (memoised to avoid recomputation on unrelated re-renders) ──
 
-  // Pre-calculate segment colors to avoid creating objects in render
-  const segmentColors = useMemo(() => {
-    return positions.map((_, i) => {
+  const positions = useMemo(() => segments.map(seg => {
+    if (isTunnelMode && seg.tunnel) {
+      return getTunnelWorldPos(seg.tunnel, seg.t, size, explosionFactor);
+    }
+    return getSegmentWorldPos(seg, size, explosionFactor);
+  }), [segments, size, explosionFactor, isTunnelMode]);
+
+  const segmentColors = useMemo(() => positions.map((_, i) => {
+    const t = positions.length > 1 ? i / (positions.length - 1) : 0;
+    return headColorObj.clone().lerp(tailColorObj, t);
+  }), [positions, headColorObj, tailColorObj]);
+
+  const bodyCount = Math.max(0, positions.length - 1); // segments index 1..n
+  const tubeCount = bodyCount; // one tube between every pair of adjacent segments
+
+  // ── Update body-sphere InstancedMesh ──────────────────────────────────────
+  useEffect(() => {
+    const mesh = bodyMeshRef.current;
+    if (!mesh) return;
+
+    // Sync material opacity/transparency with alive prop
+    mesh.material.transparent = !alive;
+    mesh.material.opacity = alive ? 1 : 0.5;
+    mesh.material.needsUpdate = true;
+
+    for (let i = 1; i < positions.length; i++) {
+      const idx = i - 1;
+      const pos = positions[i];
+      const isTail = i === positions.length - 1;
       const t = positions.length > 1 ? i / (positions.length - 1) : 0;
-      return headColorObj.clone().lerp(tailColorObj, t);
-    });
-  }, [positions, headColorObj, tailColorObj]);
+      const radius = isTail ? 0.2 : 0.28 - t * 0.08; // same formula as original
 
-  // Animate pulse effect
-  useFrame((state, delta) => {
+      _dummy.position.set(pos[0], pos[1], pos[2]);
+      _dummy.scale.setScalar(radius);
+      _dummy.rotation.set(0, 0, 0);
+      _dummy.updateMatrix();
+      mesh.setMatrixAt(idx, _dummy.matrix);
+      mesh.setColorAt(idx, segmentColors[i]);
+    }
+
+    // Hide unused slots
+    for (let i = bodyCount; i < mesh.count; i++) {
+      _dummy.position.set(0, 0, 0);
+      _dummy.scale.setScalar(0);
+      _dummy.updateMatrix();
+      mesh.setMatrixAt(i, _dummy.matrix);
+    }
+
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  }, [positions, segmentColors, bodyCount, alive]);
+
+  // ── Update tube InstancedMesh ─────────────────────────────────────────────
+  useEffect(() => {
+    const mesh = tubeMeshRef.current;
+    if (!mesh) return;
+
+    mesh.material.transparent = !alive;
+    mesh.material.opacity = alive ? 1 : 0.5;
+    mesh.material.needsUpdate = true;
+
+    let tubeIdx = 0;
+    for (let i = 1; i < positions.length; i++) {
+      const pos = positions[i];
+      const prev = positions[i - 1];
+      const dx = pos[0] - prev[0];
+      const dy = pos[1] - prev[1];
+      const dz = pos[2] - prev[2];
+      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+      if (dist < 0.1 || dist > 2) {
+        // Collapse this instance so it's invisible
+        _dummy.position.set(0, 0, 0);
+        _dummy.scale.setScalar(0);
+        _dummy.updateMatrix();
+        mesh.setMatrixAt(tubeIdx, _dummy.matrix);
+        tubeIdx++;
+        continue;
+      }
+
+      _dummy.position.set((pos[0] + prev[0]) / 2, (pos[1] + prev[1]) / 2, (pos[2] + prev[2]) / 2);
+      _dummy.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        new THREE.Vector3(dx, dy, dz).normalize()
+      );
+      _dummy.scale.set(1, dist * 0.8, 1); // Y scale = tube length
+      _dummy.updateMatrix();
+      mesh.setMatrixAt(tubeIdx, _dummy.matrix);
+      mesh.setColorAt(tubeIdx, segmentColors[i]);
+      tubeIdx++;
+    }
+
+    // Hide unused slots
+    for (let i = tubeIdx; i < mesh.count; i++) {
+      _dummy.position.set(0, 0, 0);
+      _dummy.scale.setScalar(0);
+      _dummy.updateMatrix();
+      mesh.setMatrixAt(i, _dummy.matrix);
+    }
+
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  }, [positions, segmentColors, tubeCount, alive]);
+
+  // ── Per-frame: animate head pulse + glow ─────────────────────────────────
+  useFrame((_state, delta) => {
     timeRef.current += delta;
+    const t = timeRef.current;
+
+    if (headMeshRef.current && positions.length > 0) {
+      // Pulse the head sphere scale
+      const pulseScale = 0.35 * (1 + Math.sin(t * 8) * 0.1);
+      headMeshRef.current.scale.setScalar(pulseScale);
+    }
+
+    if (headGlowRef.current) {
+      headGlowRef.current.material.opacity = (isTunnelMode ? 0.3 : 0.2) + Math.sin(t * 8) * 0.1;
+    }
   });
 
   if (segments.length === 0) return null;
 
+  const headPos = positions[0];
+  const headColor = segmentColors[0] || HEAD_COLOR_OBJ;
+
   return (
-    <group ref={groupRef}>
-      {positions.map((pos, i) => {
-        const isHead = i === 0;
-        const isTail = i === positions.length - 1;
-        const t = positions.length > 1 ? i / (positions.length - 1) : 0;
+    <group>
+      {/* ── Head: kept as individual meshes (unique glow + eyes) ── */}
+      <group position={headPos}>
+        {/* Head body sphere — scale driven by useFrame */}
+        <mesh ref={headMeshRef}>
+          <sphereGeometry args={[1, 16, 16]} />
+          <meshStandardMaterial
+            color={headColor}
+            emissive={headColor}
+            emissiveIntensity={0.8}
+            transparent={!alive}
+            opacity={alive ? 1 : 0.5}
+          />
+        </mesh>
 
-        // Use pre-calculated color
-        const segColor = segmentColors[i] || HEAD_COLOR_OBJ;
-
-        // Size decreases from head to tail
-        const baseSize = isHead ? 0.35 : isTail ? 0.2 : 0.28 - (t * 0.08);
-        // Pulse animation for head
-        const pulseScale = isHead ? 1 + Math.sin(timeRef.current * 8) * 0.1 : 1;
-        const finalSize = baseSize * pulseScale;
-
-        // Opacity for dead state
-        const opacity = alive ? 1 : 0.5;
-
-        return (
-          <group key={i} position={pos}>
-            {/* Main segment sphere */}
-            <mesh>
-              <sphereGeometry args={[finalSize, 16, 16]} />
-              <meshStandardMaterial
-                color={segColor}
-                emissive={segColor}
-                emissiveIntensity={isHead ? 0.8 : 0.4}
-                transparent={!alive}
-                opacity={opacity}
-              />
-            </mesh>
-
-            {/* Glow halo for head */}
-            {isHead && alive && (
-              <mesh>
-                <sphereGeometry args={[finalSize * (isTunnelMode ? 1.8 : 1.5), 16, 16]} />
-                <meshBasicMaterial
-                  color={isTunnelMode ? HEAD_COLOR_TUNNEL : HEAD_COLOR}
-                  transparent
-                  opacity={(isTunnelMode ? 0.3 : 0.2) + Math.sin(timeRef.current * 8) * 0.1}
-                  side={THREE.BackSide}
-                />
-              </mesh>
-            )}
-
-            {/* Eyes on head */}
-            {isHead && (
-              <>
-                <mesh position={[0.12, 0.1, 0.25]}>
-                  <sphereGeometry args={[0.08, 8, 8]} />
-                  <meshBasicMaterial color="#ffffff" />
-                </mesh>
-                <mesh position={[-0.12, 0.1, 0.25]}>
-                  <sphereGeometry args={[0.08, 8, 8]} />
-                  <meshBasicMaterial color="#ffffff" />
-                </mesh>
-                {/* Pupils */}
-                <mesh position={[0.12, 0.1, 0.32]}>
-                  <sphereGeometry args={[0.04, 8, 8]} />
-                  <meshBasicMaterial color="#000000" />
-                </mesh>
-                <mesh position={[-0.12, 0.1, 0.32]}>
-                  <sphereGeometry args={[0.04, 8, 8]} />
-                  <meshBasicMaterial color="#000000" />
-                </mesh>
-              </>
-            )}
-          </group>
-        );
-      })}
-
-      {/* Connecting tubes between segments */}
-      {positions.length > 1 && positions.map((pos, i) => {
-        if (i === 0) return null;
-        const prevPos = positions[i - 1];
-        const midPoint = [
-          (pos[0] + prevPos[0]) / 2,
-          (pos[1] + prevPos[1]) / 2,
-          (pos[2] + prevPos[2]) / 2
-        ];
-        const distance = Math.sqrt(
-          Math.pow(pos[0] - prevPos[0], 2) +
-          Math.pow(pos[1] - prevPos[1], 2) +
-          Math.pow(pos[2] - prevPos[2], 2)
-        );
-
-        // Skip if segments are at same position or too far apart
-        if (distance < 0.1 || distance > 2) return null;
-
-        // Calculate rotation to align cylinder
-        const direction = new THREE.Vector3(
-          pos[0] - prevPos[0],
-          pos[1] - prevPos[1],
-          pos[2] - prevPos[2]
-        ).normalize();
-        const up = new THREE.Vector3(0, 1, 0);
-        const quaternion = new THREE.Quaternion().setFromUnitVectors(up, direction);
-
-        // Use pre-calculated color for tube
-        const tubeColor = segmentColors[i] || HEAD_COLOR_OBJ;
-
-        return (
-          <mesh key={`tube-${i}`} position={midPoint} quaternion={quaternion}>
-            <cylinderGeometry args={[0.15, 0.18, distance * 0.8, 8]} />
-            <meshStandardMaterial
-              color={tubeColor}
-              emissive={tubeColor}
-              emissiveIntensity={0.3}
-              transparent={!alive}
-              opacity={alive ? 1 : 0.5}
+        {/* Head glow halo */}
+        {alive && (
+          <mesh ref={headGlowRef}>
+            <sphereGeometry args={[isTunnelMode ? 0.63 : 0.525, 16, 16]} />
+            <meshBasicMaterial
+              color={isTunnelMode ? HEAD_COLOR_TUNNEL : HEAD_COLOR}
+              transparent
+              opacity={0.2}
+              side={THREE.BackSide}
             />
           </mesh>
-        );
-      })}
+        )}
+
+        {/* Eyes */}
+        <mesh position={[0.12, 0.1, 0.25]}>
+          <sphereGeometry args={[0.08, 8, 8]} />
+          <meshBasicMaterial color="#ffffff" />
+        </mesh>
+        <mesh position={[-0.12, 0.1, 0.25]}>
+          <sphereGeometry args={[0.08, 8, 8]} />
+          <meshBasicMaterial color="#ffffff" />
+        </mesh>
+        {/* Pupils */}
+        <mesh position={[0.12, 0.1, 0.32]}>
+          <sphereGeometry args={[0.04, 8, 8]} />
+          <meshBasicMaterial color="#000000" />
+        </mesh>
+        <mesh position={[-0.12, 0.1, 0.32]}>
+          <sphereGeometry args={[0.04, 8, 8]} />
+          <meshBasicMaterial color="#000000" />
+        </mesh>
+      </group>
+
+      {/* ── Body segments: 1 draw call for all spheres ── */}
+      {bodyCount > 0 && (
+        <instancedMesh ref={bodyMeshRef} args={[_unitSphere, null, MAX_WORM_INSTANCES]} frustumCulled={false}>
+          {/* color="#ffffff" so instanceColor passes through unmodified */}
+          <meshStandardMaterial
+            color="#ffffff"
+            emissive={isTunnelMode ? _MID_GREEN_TUNNEL : _MID_GREEN}
+            emissiveIntensity={0.4}
+          />
+        </instancedMesh>
+      )}
+
+      {/* ── Connecting tubes: 1 draw call for all cylinders ── */}
+      {tubeCount > 0 && (
+        <instancedMesh ref={tubeMeshRef} args={[_unitCylinder, null, MAX_WORM_INSTANCES]} frustumCulled={false}>
+          <meshStandardMaterial
+            color="#ffffff"
+            emissive={isTunnelMode ? _MID_GREEN_TUNNEL : _MID_GREEN}
+            emissiveIntensity={0.3}
+          />
+        </instancedMesh>
+      )}
     </group>
   );
 }
