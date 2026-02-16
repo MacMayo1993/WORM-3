@@ -2673,3 +2673,52 @@ select.btn-compact:disabled {
     background: linear-gradient(135deg, #00f2fe 0%, #4facfe 25%, #f093fb 50%, #764ba2 75%, #667eea 100%);
   }
 }
+
+.wizard-bg-preview {
+  width: 120px;
+  height: 80px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  transition: transform 0.2s ease;
+}
+
+.wizard-option:hover .wizard-bg-preview {
+  transform: scale(1.05);
+}
+
+/* Make background options scrollable - only when bg previews present */
+.wizard-body .wizard-options:has(.wizard-bg-preview) {
+  overflow-x: auto;
+  overflow-y: hidden;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 12px;
+  padding-bottom: 12px;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+
+.wizard-body .wizard-options:has(.wizard-bg-preview)::-webkit-scrollbar {
+  height: 6px;
+}
+
+.wizard-body .wizard-options:has(.wizard-bg-preview)::-webkit-scrollbar-track {
+  background: rgba(255,255,255,0.05);
+  border-radius: 3px;
+}
+
+.wizard-body .wizard-options:has(.wizard-bg-preview)::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.2);
+  border-radius: 3px;
+}
+
+.wizard-body .wizard-options:has(.wizard-bg-preview)::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.3);
+}
+
+/* Background option cards - only when in background step */
+.wizard-options:has(.wizard-bg-preview) .wizard-option {
+  flex-shrink: 0;
+  min-width: 140px;
+  scroll-snap-align: start;
+}
