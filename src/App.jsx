@@ -338,7 +338,15 @@ export default function WORM3() {
     // Apply tile style to all faces
     if (wizardSettings.tileStyle) {
       const manifoldStyles = {};
-      [1, 2, 3, 4, 5, 6].forEach(id => { manifoldStyles[id] = wizardSettings.tileStyle; });
+      if (wizardSettings.tileStyle === 'random') {
+        // Pick random style for each face
+        const allStyles = ['solid', 'glossy', 'matte', 'metallic', 'carbonFiber', 'hexGrid', 'comic', 'cafeWall', 'hermanGrid', 'opticSpin', 'ouchi', 'grass', 'ice', 'sand', 'water', 'wood', 'circuit', 'holographic', 'pulse', 'lava', 'galaxy', 'neural'];
+        [1, 2, 3, 4, 5, 6].forEach(id => {
+          manifoldStyles[id] = allStyles[Math.floor(Math.random() * allStyles.length)];
+        });
+      } else {
+        [1, 2, 3, 4, 5, 6].forEach(id => { manifoldStyles[id] = wizardSettings.tileStyle; });
+      }
       newSettings.manifoldStyles = manifoldStyles;
     }
     setSettings(newSettings);

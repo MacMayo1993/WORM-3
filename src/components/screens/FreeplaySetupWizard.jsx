@@ -185,6 +185,8 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     };
   });
 
+  const allTileStyles = [...CLASSIC_STYLE_KEYS, ...LIVING_STYLE_KEYS];
+
   const steps = [
     {
       title: 'Choose Your Colors',
@@ -196,11 +198,22 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       title: 'Choose Your Tile Style',
       subtitle: 'Select how your cube faces should look',
       key: 'tileStyle',
-      options: [...CLASSIC_STYLE_KEYS, ...LIVING_STYLE_KEYS].map(key => ({
-        value: key,
-        label: TILE_STYLES[key]?.label || key,
-        preview: <TilePreviewCanvas styleKey={key} size={56} />,
-      })),
+      options: [
+        {
+          value: 'random',
+          label: 'Random Mix',
+          preview: (
+            <div className="wizard-random-tile-preview">
+              <span style={{ fontSize: '28px' }}>🎲</span>
+            </div>
+          ),
+        },
+        ...allTileStyles.map(key => ({
+          value: key,
+          label: TILE_STYLES[key]?.label || key,
+          preview: <TilePreviewCanvas styleKey={key} size={56} />,
+        })),
+      ],
     },
     {
       title: 'Choose Your Background',
