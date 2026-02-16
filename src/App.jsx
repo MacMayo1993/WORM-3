@@ -84,6 +84,7 @@ import FirstFlipTutorial from './components/screens/FirstFlipTutorial.jsx';
 import LevelSelectScreen from './components/screens/LevelSelectScreen.jsx';
 import Level10Cutscene from './components/screens/Level10Cutscene.jsx';
 import LevelTutorial from './components/screens/LevelTutorial.jsx';
+import FreeplaySetupWizard from './components/screens/FreeplaySetupWizard.jsx';
 import RotationPreview from './components/overlays/RotationPreview.jsx';
 import FaceRotationButtons from './components/overlays/FaceRotationButtons.jsx';
 import TileRotationSelector from './components/overlays/TileRotationSelector.jsx';
@@ -260,6 +261,9 @@ export default function WORM3() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetMode, setSheetMode] = useState('more'); // 'more' or 'views'
 
+  // Freeplay setup wizard
+  const [showFreeplayWizard, setShowFreeplayWizard] = useState(false);
+
   // ========================================================================
   // EXPLOSION ANIMATION
   // ========================================================================
@@ -316,9 +320,33 @@ export default function WORM3() {
 
   const handleMenuFreeplay = useCallback(() => {
     useGameStore.getState().setShowMainMenu(false);
+    setShowFreeplayWizard(true);
+  }, []);
+
+  const handleWizardComplete = useCallback((wizardSettings) => {
+    setShowFreeplayWizard(false);
+    // Apply wizard settings
+    const newSettings = {
+      ...settings,
+      colorScheme: wizardSettings.colorScheme,
+      backgroundTheme: wizardSettings.backgroundTheme,
+    };
+    // Apply tile style to all faces
+    if (wizardSettings.tileStyle) {
+      const manifoldStyles = {};
+      [1, 2, 3, 4, 5, 6].forEach(id => { manifoldStyles[id] = wizardSettings.tileStyle; });
+      newSettings.manifoldStyles = manifoldStyles;
+    }
+    setSettings(newSettings);
+    // Clear level and shuffle
     useGameStore.getState().clearLevel();
     shuffle();
-  }, [shuffle]);
+  }, [settings, setSettings, shuffle]);
+
+  const handleWizardCancel = useCallback(() => {
+    setShowFreeplayWizard(false);
+    useGameStore.getState().setShowMainMenu(true);
+  }, []);
 
   const handleMenuSettings = useCallback(() => {
     setShowSettings(true);
@@ -966,6 +994,7 @@ export default function WORM3() {
       )}
       {showLevelSelect && <LevelSelectScreen onSelectLevel={handleLevelSelect} onBack={handleBackToMainMenu} />}
       {showSettings && <SettingsMenu onClose={() => setShowSettings(false)} settings={settings} onSettingsChange={setSettings} faceImages={faceImages} onFaceImage={handleFaceImage} />}
+      {showFreeplayWizard && <FreeplaySetupWizard onComplete={handleWizardComplete} onCancel={handleWizardCancel} initialSettings={settings} />}
       {showHelp && <HelpMenu onClose={() => setShowHelp(false)} />}
       {showFirstFlipTutorial && <FirstFlipTutorial onClose={() => setShowFirstFlipTutorial(false)} />}
 
