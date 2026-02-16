@@ -224,14 +224,14 @@ body {
   background: transparent;
   border-radius: 50%;
   cursor: pointer;
-  transition: background 0.2s ease;
+  transition: background 0.2s ease, color 0.2s ease;
   padding: 0;
-  color: var(--text-secondary);
+  color: #202124;
 }
 
 .top-bar-icon-btn:hover {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
+  background: rgba(0, 0, 0, 0.08);
+  color: #000000;
 }
 
 /* ========================================
@@ -1760,7 +1760,7 @@ body {
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
-  color: rgba(0, 0, 0, 0.5);
+  color: #202124;
   font-size: 12px;
   font-weight: 600;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -1773,11 +1773,11 @@ body {
 }
 
 .settings-tab:hover {
-  color: rgba(0, 0, 0, 0.8);
+  color: #000000;
 }
 
 .settings-tab.active {
-  color: #202124;
+  color: #000000;
   border-bottom-color: #3b82f6;
 }
 
