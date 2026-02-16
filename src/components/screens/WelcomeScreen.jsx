@@ -62,6 +62,7 @@ const WelcomeScreen = ({ onEnter }) => {
       <div className="welcome-canvas">
         <ErrorBoundary>
           <Canvas camera={{ position: [0, 3, 12], fov: 40 }}>
+            <color attach="background" args={['#90caf9']} />
             <ambientLight intensity={1.25} />
             <pointLight position={[10, 10, 10]} intensity={1.35} />
             <pointLight position={[-10, -10, -10]} intensity={1.0} />
