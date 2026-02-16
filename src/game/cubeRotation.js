@@ -67,7 +67,7 @@ export const rotateSliceCubies = (cubies, size, axis, sliceIndex, dir) => {
     next[m.to[0]][m.to[1]][m.to[2]] = {
       ...src,
       x: m.to[0], y: m.to[1], z: m.to[2],
-      stickers: src.stickers // Keep stickers in their original orientation
+      stickers: rotateStickers(src.stickers, axis, dir)
     };
   }
 
