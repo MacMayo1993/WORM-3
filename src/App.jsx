@@ -847,11 +847,13 @@ export default function WORM3() {
             <AntipodalModeEffects />
           </Suspense>
 
-          {/* Bloom — makes emissive stickers, worm glow, and orbs actually glow.
-              Disabled in wireframe mode (black background, emissives are already dominant). */}
+          {/* Bloom — only triggers on near-white/emissive pixels (worm glow, orbs, lava/galaxy
+              tile styles).  disableNormalPass skips the normal-buffer pre-pass (only needed
+              for SSAO/SSR) saving one full-screen render per frame.  height=256 limits the
+              bloom downscale chain so GPU cost stays low. */}
           {visualMode !== 'wireframe' && (
-            <EffectComposer>
-              <Bloom luminanceThreshold={0.4} luminanceSmoothing={0.025} intensity={0.7} />
+            <EffectComposer disableNormalPass>
+              <Bloom luminanceThreshold={0.85} luminanceSmoothing={0.025} intensity={0.35} height={256} />
             </EffectComposer>
           )}
         </Canvas>
