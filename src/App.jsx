@@ -851,7 +851,7 @@ export default function WORM3() {
               Disabled in wireframe mode (black background, emissives are already dominant). */}
           {visualMode !== 'wireframe' && (
             <EffectComposer>
-              <Bloom luminanceThreshold={0.4} luminanceSmoothing={0.2} intensity={0.7} mipmapBlur />
+              <Bloom luminanceThreshold={0.4} luminanceSmoothing={0.025} intensity={0.7} />
             </EffectComposer>
           )}
         </Canvas>
