@@ -27,41 +27,41 @@ const VictoryScreen = ({
       title: 'Cube Solved!',
       subtitle: 'Classic Victory',
       description: 'You\'ve arranged all faces with uniform colors!',
-      color: '#22c55e',
-      gradientFrom: '#22c55e',
-      gradientTo: '#16a34a',
+      color: '#43a047',
+      gradientFrom: '#43a047',
+      gradientTo: '#2e7d32',
       icon: '🎲',
-      bgGradient: 'linear-gradient(135deg, #dcfce7, #bbf7d0)'
+      bgGradient: 'linear-gradient(135deg, #f1f8e9, #c5e1a5)'
     },
     sudokube: {
       title: 'Sudokube Complete!',
       subtitle: 'Latin Square Master',
       description: 'Every face is a perfect Latin square - no repeated numbers in any row or column!',
-      color: '#3b82f6',
-      gradientFrom: '#3b82f6',
-      gradientTo: '#2563eb',
+      color: '#1e88e5',
+      gradientFrom: '#1e88e5',
+      gradientTo: '#1565c0',
       icon: '🔢',
-      bgGradient: 'linear-gradient(135deg, #dbeafe, #bfdbfe)'
+      bgGradient: 'linear-gradient(135deg, #e3f2fd, #90caf9)'
     },
     ultimate: {
       title: 'ULTIMATE VICTORY!',
       subtitle: 'Topology Grandmaster',
       description: 'Incredible! You\'ve achieved the impossible - solving both the colors AND the Latin squares simultaneously!',
-      color: '#eab308',
-      gradientFrom: '#eab308',
-      gradientTo: '#ca8a04',
+      color: '#fdd835',
+      gradientFrom: '#fdd835',
+      gradientTo: '#f9a825',
       icon: '👑',
-      bgGradient: 'linear-gradient(135deg, #fef9c3, #fde047)'
+      bgGradient: 'linear-gradient(135deg, #fffde7, #fff59d)'
     },
     worm: {
       title: 'WORM³ COMPLETE!',
       subtitle: '🪱 Secret Achievement Unlocked 🪱',
       description: 'You\'ve solved the ENTIRE CUBE through the WORMHOLES! Every single sticker traveled through antipodal space. You are a true master of manifold topology!',
-      color: '#bc6c25',
-      gradientFrom: '#bc6c25',
-      gradientTo: '#9c4a1a',
+      color: '#fb8c00',
+      gradientFrom: '#fb8c00',
+      gradientTo: '#f57c00',
       icon: '🪱',
-      bgGradient: 'linear-gradient(135deg, #dda15e, #bc6c25)'
+      bgGradient: 'linear-gradient(135deg, #fff3e0, #ffcc80)'
     }
   };
 
@@ -135,10 +135,10 @@ const VictoryScreen = ({
         padding: '48px',
         maxHeight: 'calc(100dvh - 40px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))',
         overflowY: 'auto',
-        background: '#fdfbf7',
+        background: '#ffffff',
         borderRadius: '16px',
-        boxShadow: `0 8px 40px rgba(0,0,0,0.15), 0 0 0 4px ${config.color}40`,
-        border: `2px solid ${config.color}`,
+        boxShadow: '0 2px 6px 2px rgba(60, 64, 67, 0.15), 0 8px 24px 4px rgba(60, 64, 67, 0.15)',
+        border: `3px solid ${config.color}`,
         position: 'relative',
         boxSizing: 'border-box'
       }}>
@@ -174,12 +174,12 @@ const VictoryScreen = ({
 
         {/* Subtitle */}
         <p style={{
-          fontSize: '16px',
-          color: '#8b6f47',
+          fontSize: '14px',
+          color: '#5f6368',
           marginBottom: '20px',
-          fontFamily: 'Georgia, serif',
-          fontStyle: 'italic',
-          letterSpacing: '0.1em',
+          fontFamily: "'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+          fontWeight: 500,
+          letterSpacing: '0.05em',
           textTransform: 'uppercase'
         }}>
           {config.subtitle}
@@ -188,10 +188,10 @@ const VictoryScreen = ({
         {/* Description */}
         <p style={{
           fontSize: '16px',
-          color: '#5a4a3a',
+          color: '#202124',
           marginBottom: '28px',
           lineHeight: 1.7,
-          fontFamily: 'Georgia, serif'
+          fontFamily: "'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
         }}>
           {levelWinMessage || config.description}
         </p>
@@ -226,42 +226,44 @@ const VictoryScreen = ({
           gap: '32px',
           marginBottom: '32px',
           padding: '20px',
-          background: 'rgba(0,0,0,0.03)',
-          borderRadius: '8px',
-          border: '1px solid rgba(0,0,0,0.06)'
+          background: '#f8f9fa',
+          borderRadius: '12px',
+          border: '1px solid #e8eaed'
         }}>
           <div>
             <div style={{
               fontSize: '11px',
               textTransform: 'uppercase',
-              color: '#9b8b7a',
+              color: '#5f6368',
               letterSpacing: '0.1em',
-              marginBottom: '4px'
+              marginBottom: '4px',
+              fontWeight: 600
             }}>Moves</div>
             <div style={{
               fontSize: '28px',
               fontWeight: 700,
-              color: '#6b4423',
-              fontFamily: "'Courier New', monospace"
+              color: '#202124',
+              fontFamily: "'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
             }}>{moves}</div>
           </div>
           <div style={{
             width: '1px',
-            background: 'rgba(0,0,0,0.1)'
+            background: '#e8eaed'
           }} />
           <div>
             <div style={{
               fontSize: '11px',
               textTransform: 'uppercase',
-              color: '#9b8b7a',
+              color: '#5f6368',
               letterSpacing: '0.1em',
-              marginBottom: '4px'
+              marginBottom: '4px',
+              fontWeight: 600
             }}>Time</div>
             <div style={{
               fontSize: '28px',
               fontWeight: 700,
-              color: '#6b4423',
-              fontFamily: "'Courier New', monospace"
+              color: '#202124',
+              fontFamily: "'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
             }}>{formatTime(time)}</div>
           </div>
         </div>
@@ -271,22 +273,25 @@ const VictoryScreen = ({
           <button
             onClick={onContinue}
             style={{
-              background: 'transparent',
-              border: `2px solid ${config.color}`,
-              color: config.color,
-              fontSize: '16px',
-              fontWeight: 600,
-              padding: '12px 28px',
-              borderRadius: '6px',
+              background: '#ffffff',
+              border: `1px solid #e8eaed`,
+              color: '#202124',
+              fontSize: '14px',
+              fontWeight: 500,
+              padding: '12px 24px',
+              borderRadius: '8px',
               cursor: 'pointer',
-              fontFamily: 'Georgia, serif',
-              transition: 'all 0.2s'
+              fontFamily: "'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+              transition: 'all 0.2s',
+              boxShadow: '0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15)'
             }}
             onMouseEnter={e => {
-              e.target.style.background = `${config.color}10`;
+              e.target.style.background = '#f8f9fa';
+              e.target.style.boxShadow = '0 1px 3px 0 rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15)';
             }}
             onMouseLeave={e => {
-              e.target.style.background = 'transparent';
+              e.target.style.background = '#ffffff';
+              e.target.style.boxShadow = '0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15)';
             }}
           >
             Keep Playing
@@ -296,16 +301,16 @@ const VictoryScreen = ({
             <button
               onClick={onNextLevel}
               style={{
-                background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+                background: '#1e88e5',
                 border: 'none',
                 color: '#ffffff',
-                fontSize: '16px',
-                fontWeight: 600,
-                padding: '12px 28px',
-                borderRadius: '6px',
+                fontSize: '14px',
+                fontWeight: 500,
+                padding: '12px 24px',
+                borderRadius: '8px',
                 cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.4)',
-                fontFamily: 'Georgia, serif',
+                boxShadow: '0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15)',
+                fontFamily: "'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
                 transition: 'all 0.2s',
                 display: 'flex',
                 alignItems: 'center',
@@ -313,11 +318,13 @@ const VictoryScreen = ({
               }}
               onMouseEnter={e => {
                 e.target.style.transform = 'translateY(-2px)';
-                e.target.style.boxShadow = '0 6px 20px rgba(59, 130, 246, 0.5)';
+                e.target.style.boxShadow = '0 1px 3px 0 rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15)';
+                e.target.style.background = '#1565c0';
               }}
               onMouseLeave={e => {
                 e.target.style.transform = 'translateY(0)';
-                e.target.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.4)';
+                e.target.style.boxShadow = '0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15)';
+                e.target.style.background = '#1e88e5';
               }}
             >
               Next Level
@@ -328,32 +335,26 @@ const VictoryScreen = ({
             onClick={onNewGame}
             style={{
               background: hasNextLevel
-                ? 'rgba(100, 116, 139, 0.7)'
-                : `linear-gradient(135deg, ${config.gradientFrom}, ${config.gradientTo})`,
-              border: 'none',
-              color: '#ffffff',
-              fontSize: '16px',
-              fontWeight: 600,
-              padding: '12px 28px',
-              borderRadius: '6px',
+                ? '#f8f9fa'
+                : config.color,
+              border: hasNextLevel ? '1px solid #e8eaed' : 'none',
+              color: hasNextLevel ? '#202124' : '#ffffff',
+              fontSize: '14px',
+              fontWeight: 500,
+              padding: '12px 24px',
+              borderRadius: '8px',
               cursor: 'pointer',
-              boxShadow: hasNextLevel
-                ? '0 4px 12px rgba(100, 116, 139, 0.3)'
-                : `0 4px 12px ${config.color}40`,
-              fontFamily: 'Georgia, serif',
+              boxShadow: '0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15)',
+              fontFamily: "'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
               transition: 'all 0.2s'
             }}
             onMouseEnter={e => {
               e.target.style.transform = 'translateY(-2px)';
-              e.target.style.boxShadow = hasNextLevel
-                ? '0 6px 20px rgba(100, 116, 139, 0.4)'
-                : `0 6px 20px ${config.color}50`;
+              e.target.style.boxShadow = '0 1px 3px 0 rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15)';
             }}
             onMouseLeave={e => {
               e.target.style.transform = 'translateY(0)';
-              e.target.style.boxShadow = hasNextLevel
-                ? '0 4px 12px rgba(100, 116, 139, 0.3)'
-                : `0 4px 12px ${config.color}40`;
+              e.target.style.boxShadow = '0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15)';
             }}
           >
             {currentLevel ? 'Retry Level' : 'New Puzzle'}

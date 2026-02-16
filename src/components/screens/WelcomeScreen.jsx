@@ -73,13 +73,29 @@ const WelcomeScreen = ({ onEnter }) => {
       <TextOverlay time={time} />
 
       {canSkip && (
-        <button className="skip-intro-btn" onClick={handleSkip}>
+        <button
+          className="skip-intro-btn"
+          onClick={handleSkip}
+          style={{
+            background: '#ffffff',
+            color: '#202124',
+            border: '1px solid #e8eaed',
+          }}
+        >
           Skip ►
         </button>
       )}
 
       {time >= 10 && (
-        <button className="enter-btn" onClick={handleEnter}>
+        <button
+          className="enter-btn"
+          onClick={handleEnter}
+          style={{
+            background: '#1e88e5',
+            border: 'none',
+            color: '#ffffff',
+          }}
+        >
           ENTER
         </button>
       )}

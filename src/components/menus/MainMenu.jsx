@@ -70,35 +70,26 @@ const MenuButton = ({ children, onClick, delay, icon, primary }) => {
     justifyContent: 'center',
     gap: '12px',
     width: '280px',
-    padding: '18px 32px',
-    fontSize: '18px',
-    fontWeight: 600,
-    fontFamily: "'Courier New', monospace",
-    letterSpacing: '0.1em',
-    textTransform: 'uppercase',
-    border: primary
-      ? '2px solid rgba(59, 130, 246, 0.8)'
-      : '2px solid rgba(255, 255, 255, 0.3)',
+    padding: '16px 32px',
+    fontSize: '16px',
+    fontWeight: 500,
+    fontFamily: "'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    letterSpacing: '0.02em',
+    border: 'none',
     borderRadius: '8px',
-    background: hovered
-      ? primary
-        ? 'rgba(59, 130, 246, 0.4)'
-        : 'rgba(255, 255, 255, 0.15)'
-      : primary
-        ? 'rgba(59, 130, 246, 0.2)'
-        : 'rgba(255, 255, 255, 0.05)',
-    color: primary ? '#60a5fa' : 'rgba(255, 255, 255, 0.9)',
+    background: primary
+      ? (hovered ? '#1565c0' : '#1e88e5')
+      : (hovered ? '#f1f3f4' : '#ffffff'),
+    color: primary ? '#ffffff' : '#202124',
     cursor: 'pointer',
-    transition: 'all 0.3s ease',
+    transition: 'all 0.2s ease',
     opacity: visible ? 1 : 0,
     transform: visible
-      ? hovered ? 'translateY(-2px) scale(1.02)' : 'translateY(0)'
+      ? hovered ? 'translateY(-2px)' : 'translateY(0)'
       : 'translateY(20px)',
     boxShadow: hovered
-      ? primary
-        ? '0 0 30px rgba(59, 130, 246, 0.5), inset 0 0 20px rgba(59, 130, 246, 0.1)'
-        : '0 0 20px rgba(255, 255, 255, 0.2), inset 0 0 15px rgba(255, 255, 255, 0.05)'
-      : 'none',
+      ? '0 2px 8px 0 rgba(60, 64, 67, 0.3), 0 4px 12px 3px rgba(60, 64, 67, 0.15)'
+      : '0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15)',
   };
 
   return (
@@ -131,7 +122,7 @@ const MainMenu = ({ onPlay, onLevels, onFreeplay, onCoop, onTeach, onSettings, o
     <div style={{
       position: 'fixed',
       inset: 0,
-      background: '#000000',
+      background: 'linear-gradient(135deg, #f8f9fa 0%, #ffffff 50%, #f1f3f4 100%)',
       zIndex: 9999,
       overflow: 'hidden',
     }}>
@@ -139,22 +130,22 @@ const MainMenu = ({ onPlay, onLevels, onFreeplay, onCoop, onTeach, onSettings, o
       <div style={{
         position: 'absolute',
         inset: 0,
-        opacity: 0.6,
+        opacity: 0.3,
       }}>
         <Canvas camera={{ position: [0, 2, 10], fov: 45 }}>
-          <ambientLight intensity={0.5} />
-          <directionalLight position={[5, 8, 5]} intensity={1} />
-          <pointLight position={[10, 10, 10]} intensity={0.5} />
+          <ambientLight intensity={0.8} />
+          <directionalLight position={[5, 8, 5]} intensity={1.2} />
+          <pointLight position={[10, 10, 10]} intensity={0.6} />
           <RotatingCube />
           <Environment preset="city" />
         </Canvas>
       </div>
 
-      {/* Gradient Overlay */}
+      {/* Subtle Gradient Overlay */}
       <div style={{
         position: 'absolute',
         inset: 0,
-        background: 'radial-gradient(ellipse at center, transparent 0%, rgba(0,0,0,0.7) 70%, rgba(0,0,0,0.9) 100%)',
+        background: 'radial-gradient(ellipse at center, rgba(248,249,250,0.5) 0%, rgba(241,243,244,0.8) 70%, rgba(248,249,250,0.95) 100%)',
         pointerEvents: 'none',
       }} />
 
@@ -181,24 +172,23 @@ const MainMenu = ({ onPlay, onLevels, onFreeplay, onCoop, onTeach, onSettings, o
             fontSize: 'clamp(48px, 12vw, 96px)',
             fontWeight: 700,
             margin: 0,
-            background: 'linear-gradient(135deg, #3b82f6 0%, #60a5fa 40%, #93c5fd 70%, #60a5fa 100%)',
+            background: 'linear-gradient(135deg, #e53935 0%, #fb8c00 20%, #fdd835 40%, #43a047 60%, #1e88e5 80%, #e53935 100%)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
             backgroundClip: 'text',
-            fontFamily: "'Courier New', monospace",
-            letterSpacing: '0.15em',
-            textShadow: '0 0 60px rgba(59, 130, 246, 0.5)',
-            filter: 'drop-shadow(0 0 30px rgba(59, 130, 246, 0.4))',
+            fontFamily: "'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+            letterSpacing: '0.08em',
+            filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1))',
           }}>
             WORM-3
           </h1>
           <p style={{
             fontSize: 'clamp(14px, 3vw, 18px)',
-            color: 'rgba(255, 255, 255, 0.6)',
+            color: '#5f6368',
             margin: '16px 0 0 0',
-            fontFamily: "'Courier New', monospace",
-            letterSpacing: '0.3em',
-            textTransform: 'uppercase',
+            fontFamily: "'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+            letterSpacing: '0.05em',
+            fontWeight: 400,
             opacity: subtitleVisible ? 1 : 0,
             transform: subtitleVisible ? 'translateY(0)' : 'translateY(10px)',
             transition: 'all 0.6s ease-out',
@@ -244,11 +234,10 @@ const MainMenu = ({ onPlay, onLevels, onFreeplay, onCoop, onTeach, onSettings, o
           left: 0,
           right: 0,
           textAlign: 'center',
-          opacity: 0.4,
           fontSize: '12px',
-          fontFamily: "'Courier New', monospace",
-          color: 'rgba(255, 255, 255, 0.6)',
-          letterSpacing: '0.1em',
+          fontFamily: "'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+          color: '#80868b',
+          letterSpacing: '0.02em',
         }}>
           Explore the topology of quotient spaces
         </div>
