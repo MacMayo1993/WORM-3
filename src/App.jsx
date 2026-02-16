@@ -903,28 +903,6 @@ export default function WORM3() {
           currentLevelData={currentLevelData}
         />
 
-        {/* Game Title - Top Center */}
-        <div style={{
-          position: 'fixed',
-          top: '20px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          fontSize: 'clamp(28px, 6vw, 48px)',
-          fontWeight: 700,
-          background: 'linear-gradient(135deg, #e53935 0%, #fb8c00 20%, #fdd835 40%, #43a047 60%, #1e88e5 80%, #e53935 100%)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          backgroundClip: 'text',
-          fontFamily: "'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-          letterSpacing: '0.12em',
-          filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3))',
-          zIndex: 1000,
-          pointerEvents: 'none',
-          userSelect: 'none',
-        }}>
-          WORM³
-        </div>
-
         {/* Undo Indicator - desktop only (mobile uses MobileControls) */}
         {moveHistory.length > 0 && !isMobile && (
           <div
