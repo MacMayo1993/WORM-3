@@ -20,6 +20,12 @@ const sharedParticleGeometry = new THREE.PlaneGeometry(1, 1);
 const sharedOuterRingGeometry = new THREE.RingGeometry(0.4, 0.5, 16);
 const sharedMainRingGeometry = new THREE.RingGeometry(0.2, 0.45, 16);
 const sharedInnerCircleGeometry = new THREE.CircleGeometry(0.48, 16);
+// Shared sticker plane geometry for stickers that don't need per-instance UV customisation.
+// (Stickers with face textures — Sudokube mode — still create their own geometry so UVs can
+// be patched per-sticker via geoRef.  All others share this one buffer.)
+const _sharedStickerGeo = new THREE.PlaneGeometry(0.85, 0.85);
+// Scratch Object3D for FlipParticles matrix math — never added to a scene.
+const _particleDummy = new THREE.Object3D();
 
 // Frame-shaped sticker Shape for hollow cube mode (square with rectangular hole).
 // Store the Shape, not the Geometry — each sticker creates its own ShapeGeometry
@@ -43,123 +49,101 @@ const _stickerFrameShape = (() => {
   return shape;
 })();
 
-// Particle system for flip effect - uses persistent meshes, no recreation
+// Particle system for flip effect — single InstancedMesh, 1 draw call for all 12 particles.
 const FlipParticles = ({ active, color, onComplete }) => {
-  const particlesRef = useRef([]);
-  const groupRef = useRef();
+  const meshRef = useRef();
   const progressRef = useRef(0);
   const velocitiesRef = useRef([]);
   const isActiveRef = useRef(false);
   const PARTICLE_COUNT = 12;
 
-  // Create materials once and cache them
-  const materialsRef = useRef([]);
-
-  // Initialize materials on first render only
+  // Zero-scale all instances on mount so they're invisible before first activation.
   useEffect(() => {
-    if (materialsRef.current.length === 0) {
-      materialsRef.current = Array.from({ length: PARTICLE_COUNT }, () =>
-        new THREE.MeshBasicMaterial({
-          color: '#ffffff',
-          transparent: true,
-          opacity: 0,
-          blending: THREE.AdditiveBlending,
-          side: THREE.DoubleSide,
-          depthWrite: false
-        })
-      );
-    }
-    // Cleanup materials on unmount
-    return () => {
-      materialsRef.current.forEach(mat => mat.dispose());
-      materialsRef.current = [];
-    };
+    const mesh = meshRef.current;
+    if (!mesh) return;
+    _particleDummy.scale.set(0, 0, 0);
+    _particleDummy.updateMatrix();
+    for (let i = 0; i < PARTICLE_COUNT; i++) mesh.setMatrixAt(i, _particleDummy.matrix);
+    mesh.instanceMatrix.needsUpdate = true;
   }, []);
 
-  // Handle activation - reset state and generate velocities
+  // Handle activation — reset progress and generate per-particle velocities/sizes.
   useEffect(() => {
     if (active && !isActiveRef.current) {
       isActiveRef.current = true;
       progressRef.current = 0;
-
-      // Generate new velocities
       velocitiesRef.current = Array.from({ length: PARTICLE_COUNT }, (_, i) => {
         const angle = (i / PARTICLE_COUNT) * Math.PI * 2 + Math.random() * 0.4;
         const speed = 2.5 + Math.random() * 2.0;
-        const size = 0.06 + Math.random() * 0.06;
         return {
           x: Math.cos(angle) * speed,
           y: Math.sin(angle) * speed,
           z: (Math.random() - 0.5) * 1.5,
           rotSpeed: (Math.random() - 0.5) * 15,
-          size
+          size: 0.06 + Math.random() * 0.06
         };
       });
-
-      // Update material colors
-      materialsRef.current.forEach(mat => {
-        mat.color.set(color);
-        mat.opacity = 1;
-      });
+      // All particles share one material — update color + opacity together.
+      if (meshRef.current?.material) {
+        meshRef.current.material.color.set(color);
+        meshRef.current.material.opacity = 1;
+      }
     } else if (!active) {
       isActiveRef.current = false;
     }
   }, [active, color]);
 
   useFrame((_, delta) => {
-    if (!isActiveRef.current || !groupRef.current) return;
+    const mesh = meshRef.current;
+    if (!mesh || !isActiveRef.current) return;
 
     progressRef.current += delta * 1.8;
     const p = progressRef.current;
 
     if (p >= 1) {
       isActiveRef.current = false;
-      // Hide all particles
-      particlesRef.current.forEach((mesh) => {
-        if (mesh) {
-          mesh.scale.set(0, 0, 0);
-          if (mesh.material) mesh.material.opacity = 0;
-        }
-      });
+      // Collapse all instances to hide them.
+      _particleDummy.scale.set(0, 0, 0);
+      _particleDummy.updateMatrix();
+      for (let i = 0; i < PARTICLE_COUNT; i++) mesh.setMatrixAt(i, _particleDummy.matrix);
+      mesh.instanceMatrix.needsUpdate = true;
+      if (mesh.material) mesh.material.opacity = 0;
       onComplete?.();
       return;
     }
 
     const easeOut = 1 - Math.pow(1 - p, 4);
     const opacity = Math.pow(1 - p, 0.5);
+    if (mesh.material) mesh.material.opacity = opacity;
 
-    particlesRef.current.forEach((mesh, i) => {
-      if (!mesh) return;
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
       const vel = velocitiesRef.current[i];
-      if (!vel) return;
-
-      mesh.position.x = vel.x * easeOut * 0.8;
-      mesh.position.y = vel.y * easeOut * 0.8;
-      mesh.position.z = vel.z * easeOut * 0.4 + 0.05;
-      mesh.rotation.z = vel.rotSpeed * p;
-
+      if (!vel) continue;
+      _particleDummy.position.set(vel.x * easeOut * 0.8, vel.y * easeOut * 0.8, vel.z * easeOut * 0.4);
+      _particleDummy.rotation.set(0, 0, vel.rotSpeed * p);
       const baseScale = vel.size * (1 - easeOut * 0.5);
-      mesh.scale.set(baseScale, baseScale, baseScale * 0.5);
-
-      if (mesh.material) {
-        mesh.material.opacity = opacity;
-      }
-    });
+      _particleDummy.scale.set(baseScale, baseScale, baseScale * 0.5);
+      _particleDummy.updateMatrix();
+      mesh.setMatrixAt(i, _particleDummy.matrix);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
   });
 
-  // Always render the group, just hide particles when not active
+  // Single instancedMesh — 1 draw call replaces 12 individual meshes.
   return (
-    <group ref={groupRef} position={[0, 0, 0.05]}>
-      {Array.from({ length: PARTICLE_COUNT }, (_, i) => (
-        <mesh
-          key={i}
-          ref={el => particlesRef.current[i] = el}
-          geometry={sharedParticleGeometry}
-          material={materialsRef.current[i]}
-          scale={[0, 0, 0]}
-        />
-      ))}
-    </group>
+    <instancedMesh
+      ref={meshRef}
+      args={[sharedParticleGeometry, null, PARTICLE_COUNT]}
+      position={[0, 0, 0.05]}
+    >
+      <meshBasicMaterial
+        transparent
+        opacity={0}
+        blending={THREE.AdditiveBlending}
+        side={THREE.DoubleSide}
+        depthWrite={false}
+      />
+    </instancedMesh>
   );
 };
 
@@ -731,8 +715,12 @@ const StickerPlane = function StickerPlane({ meta, pos, rot=[0,0,0], overlay, mo
       <mesh ref={meshRef} key={hollow ? 'frame' : 'plane'}>
         {hollow ? (
           <shapeGeometry args={[_stickerFrameShape]} />
+        ) : faceRow != null ? (
+          // Face-texture mode (Sudokube): per-instance geometry so UVs can be patched.
+          <planeGeometry ref={geoRef} args={[0.85, 0.85]} />
         ) : (
-          <planeGeometry ref={geoRef} args={[0.85,0.85]} />
+          // No texture atlas — share the module-level geometry to avoid per-sticker alloc.
+          <primitive object={_sharedStickerGeo} attach="geometry" />
         )}
         {useGlassStyle && glassMaterial ? (
           <primitive object={glassMaterial} attach="material" />
