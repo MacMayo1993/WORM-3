@@ -1,5 +1,5 @@
 /**
- * WORM-3 Levels Manager
+ * WORM³ Levels Manager
  *
  * Central class for managing levels, level packs, and level queries.
  * Provides a clean API for all level-related operations.

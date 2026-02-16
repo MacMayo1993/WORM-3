@@ -1,5 +1,5 @@
 /**
- * WORM-3 Custom Hooks
+ * WORM³ Custom Hooks
  *
  * Modular hooks for game state management, extracted from App.jsx.
  *

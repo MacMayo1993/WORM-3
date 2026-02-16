@@ -1,6 +1,6 @@
 // src/App.jsx
 /**
- * WORM-3 Main Application
+ * WORM³ Main Application
  *
  * Refactored to use Zustand state management and custom hooks.
  * Original 2343 lines reduced to ~700 lines with modular architecture.
@@ -821,8 +821,8 @@ export default function WORM3() {
                 <InteractivePhotoBackground
                   preset={PHOTO_PRESETS.has(settings.backgroundTheme) ? settings.backgroundTheme : undefined}
                   files={
-                    settings.backgroundTheme === 'cave' ? '/WORM-3/environments/cave.exr' :
-                      settings.backgroundTheme === 'beach' ? '/WORM-3/environments/beach.hdr' :
+                    settings.backgroundTheme === 'cave' ? '/WORM³/environments/cave.exr' :
+                      settings.backgroundTheme === 'beach' ? '/WORM³/environments/beach.hdr' :
                         undefined
                   }
                 />
@@ -902,6 +902,28 @@ export default function WORM3() {
           onShowSettings={() => setShowSettings(true)}
           currentLevelData={currentLevelData}
         />
+
+        {/* Game Title - Top Center */}
+        <div style={{
+          position: 'fixed',
+          top: '20px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          fontSize: 'clamp(28px, 6vw, 48px)',
+          fontWeight: 700,
+          background: 'linear-gradient(135deg, #e53935 0%, #fb8c00 20%, #fdd835 40%, #43a047 60%, #1e88e5 80%, #e53935 100%)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          backgroundClip: 'text',
+          fontFamily: "'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+          letterSpacing: '0.12em',
+          filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3))',
+          zIndex: 1000,
+          pointerEvents: 'none',
+          userSelect: 'none',
+        }}>
+          WORM³
+        </div>
 
         {/* Undo Indicator - desktop only (mobile uses MobileControls) */}
         {moveHistory.length > 0 && !isMobile && (

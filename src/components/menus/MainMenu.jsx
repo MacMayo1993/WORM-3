@@ -393,7 +393,7 @@ const MainMenu = ({ onPlay, onLevels, onFreeplay, onCoop, onSettings, onHelp }) 
             letterSpacing: '0.08em',
             filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1))',
           }}>
-            WORM-3
+            WORM³
           </h1>
           <p style={{
             fontSize: 'clamp(14px, 3vw, 18px)',

@@ -1,5 +1,5 @@
 /**
- * WORM-3 Level Schema Definitions
+ * WORM³ Level Schema Definitions
  *
  * This module defines the structure and constants for level definitions.
  * All levels must conform to these schemas.
@@ -165,7 +165,7 @@ export function createLevel(overrides) {
     // Metadata
     difficulty: overrides.difficulty || DIFFICULTY.MEDIUM,
     tags: overrides.tags || [],
-    author: overrides.author || 'WORM-3 Team',
+    author: overrides.author || 'WORM³ Team',
     version: overrides.version || '1.0.0',
 
     // Optional constraints
@@ -189,7 +189,7 @@ export function createLevelPack(overrides) {
     id: overrides.id,
     name: overrides.name || 'Unnamed Pack',
     description: overrides.description || '',
-    author: overrides.author || 'WORM-3 Team',
+    author: overrides.author || 'WORM³ Team',
     version: overrides.version || '1.0.0',
     levels: overrides.levels || [],
 
