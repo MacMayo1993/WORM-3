@@ -710,9 +710,15 @@ const StickerPlane = function StickerPlane({ meta, pos, rot=[0,0,0], overlay, mo
   const origIsWhite = meta?.orig === 3;
   const antipodalIsWhite = ANTIPODAL_COLOR[meta?.orig] === 3;
 
+  // UV rotation: accumulated in-plane rotations when sticker stays on same face
+  const uvRotation = meta?.uvRotation ?? 0;
+  const uvRotationAngle = (uvRotation * Math.PI) / 2; // 0, 90, 180, or 270 degrees
+
   return (
     <group position={pos} rotation={rot} ref={groupRef}>
-      <mesh ref={meshRef} key={hollow ? 'frame' : 'plane'}>
+      {/* Inner group for UV rotation - rotates the mesh + 3D volume styles around face normal (Z axis) */}
+      <group rotation={[0, 0, uvRotationAngle]}>
+        <mesh ref={meshRef} key={hollow ? 'frame' : 'plane'}>
         {hollow ? (
           <shapeGeometry args={[_stickerFrameShape]} />
         ) : faceRow != null ? (
@@ -777,6 +783,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot=[0,0,0], overlay, mo
       {tileStyle === 'wood' && !isGlass && !isSudokube && !currTexture && (
         <WoodVolume faceColor={baseColor} />
       )}
+      </group>
 
       {/* Tally Marks - skip if origColor is white on non-white tile */}
       {!isSudokube && hasFlipHistory && !(origIsWhite && !currIsWhite) && (
