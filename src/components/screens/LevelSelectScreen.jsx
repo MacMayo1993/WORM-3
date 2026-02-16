@@ -47,7 +47,7 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
       position: 'fixed',
       top: 0, left: 0, right: 0, bottom: 0,
       height: '100dvh',
-      background: 'rgba(0, 0, 0, 0.9)',
+      background: 'rgba(0, 0, 0, 0.6)',
       backdropFilter: 'blur(20px)',
       display: 'flex',
       alignItems: 'center',
@@ -63,10 +63,10 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
         padding: '32px',
         maxHeight: 'calc(100dvh - 40px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))',
         overflowY: 'auto',
-        background: 'rgba(20, 25, 40, 0.95)',
+        background: '#ffffff',
         borderRadius: '16px',
-        boxShadow: '0 20px 60px rgba(0,0,0,0.6), 0 0 100px rgba(59, 130, 246, 0.1)',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
+        boxShadow: '0 2px 6px 2px rgba(60, 64, 67, 0.15), 0 8px 24px 4px rgba(60, 64, 67, 0.15)',
+        border: '1px solid #e8eaed',
         boxSizing: 'border-box'
       }}>
         {/* Header */}
@@ -74,19 +74,19 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
           fontSize: 'clamp(28px, 6vw, 42px)',
           fontWeight: 700,
           margin: '0 0 8px 0',
-          background: 'linear-gradient(135deg, #3b82f6 0%, #60a5fa 50%, #93c5fd 100%)',
+          background: 'linear-gradient(135deg, #e53935 0%, #fb8c00 20%, #fdd835 40%, #43a047 60%, #1e88e5 80%, #e53935 100%)',
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent',
           backgroundClip: 'text',
-          fontFamily: '"Product Sans", "Google Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-          letterSpacing: '0.05em'
+          fontFamily: '"Roboto", "Product Sans", "Google Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+          letterSpacing: '0.02em'
         }}>Select Level</h1>
 
         <p style={{
-          fontSize: '13px',
-          color: 'rgba(255, 255, 255, 0.5)',
+          fontSize: '14px',
+          color: '#5f6368',
           marginBottom: '24px',
-          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+          fontFamily: '"Roboto", "Product Sans", "Google Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
         }}>
           Master topology one concept at a time
         </p>
