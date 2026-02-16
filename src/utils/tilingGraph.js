@@ -1,5 +1,5 @@
 // src/utils/tilingGraph.js
-// Tiling graph representation for WORM-3 RP² Rubik's cube.
+// Tiling graph representation for WORM³ RP² Rubik's cube.
 //
 // Reframes the cube surface as an abstract graph:
 //   Vertices  = sticker positions (54 for 3×3)

@@ -11,7 +11,7 @@ export default createLevelPack({
   id: 'story-campaign',
   name: 'Life Journey',
   description: 'Progress through life from Daycare to the Singularity. Master topology one step at a time.',
-  author: 'WORM-3 Team',
+  author: 'WORM³ Team',
   version: '1.0.0',
   levels: STORY_LEVELS,
 

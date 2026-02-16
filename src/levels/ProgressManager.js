@@ -1,5 +1,5 @@
 /**
- * WORM-3 Progress Manager
+ * WORM³ Progress Manager
  *
  * Handles all progress-related operations: save/load, completion tracking,
  * star ratings, achievements, and unlock logic.

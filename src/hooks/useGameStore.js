@@ -1,7 +1,7 @@
 /**
  * useGameStore - Zustand State Management
  *
- * Central state store for WORM-3, extracted from App.jsx.
+ * Central state store for WORM³, extracted from App.jsx.
  * Manages all game state including cube, UI, settings, and level system.
  */
 

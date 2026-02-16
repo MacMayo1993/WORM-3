@@ -1,5 +1,5 @@
 /**
- * WORM-3 Level Definitions
+ * WORM³ Level Definitions
  *
  * @deprecated This file is deprecated. Use the new levels manager system instead:
  *

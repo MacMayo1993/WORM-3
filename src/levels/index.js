@@ -1,5 +1,5 @@
 /**
- * WORM-3 Levels Manager System
+ * WORM³ Levels Manager System
  *
  * A comprehensive system for managing game levels, progress, and level packs.
  *

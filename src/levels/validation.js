@@ -1,5 +1,5 @@
 /**
- * WORM-3 Level Validation
+ * WORM³ Level Validation
  *
  * Utilities for validating level definitions and level packs.
  * Ensures levels conform to the expected schema.
