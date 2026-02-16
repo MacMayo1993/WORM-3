@@ -3,12 +3,12 @@ import React, { useMemo } from 'react';
 /**
  * TopMenuBar - Thin 48dp Google-inspired top app bar
  *
- * Left: Parity pill (EVEN/ODD)
- * Center: Current mode + dimension label
+ * Left: Mode label (Classic 3×3) + Completion percentage
+ * Center: WORM³ title
  * Right: Settings gear icon
  */
 const TopMenuBar = ({
-  metrics,
+  metrics: _metrics,
   size,
   visualMode,
   flipMode,
@@ -18,9 +18,6 @@ const TopMenuBar = ({
   onShowSettings,
   currentLevelData
 }) => {
-  const parity = metrics.flips % 2 === 0 ? 'EVEN' : 'ODD';
-  const parityBg = parity === 'EVEN' ? '#4CAF50' : '#FF9800';
-
   const modeLabel = visualMode === 'classic' ? 'Classic' :
                    visualMode === 'grid' ? 'Grid' :
                    visualMode === 'sudokube' ? 'Sudoku' :
@@ -55,25 +52,33 @@ const TopMenuBar = ({
 
   return (
     <div className="top-app-bar">
-      {/* Left: Parity pill */}
+      {/* Left: Mode label + Percentage */}
       <div className="top-bar-left">
-        <span className="parity-pill" style={{ background: parityBg }}>
-          {parity}
-        </span>
+        <span className="top-bar-title">{centerText}</span>
+        <span className="top-bar-progress" style={{ marginLeft: '12px' }}>{faceStats.percent}%</span>
         {chaosMode && (
-          <span className="chaos-pill">
+          <span className="chaos-pill" style={{ marginLeft: '12px' }}>
             CHAOS L{chaosLevel}
           </span>
         )}
         {flipMode && (
-          <span className="flip-pill">FLIP</span>
+          <span className="flip-pill" style={{ marginLeft: '12px' }}>FLIP</span>
         )}
       </div>
 
-      {/* Center: Mode / Level */}
+      {/* Center: WORM³ Title */}
       <div className="top-bar-center">
-        <span className="top-bar-title">{centerText}</span>
-        <span className="top-bar-progress">{faceStats.percent}%</span>
+        <span style={{
+          fontSize: '24px',
+          fontWeight: 700,
+          background: 'linear-gradient(135deg, #e53935 0%, #fb8c00 20%, #fdd835 40%, #43a047 60%, #1e88e5 80%, #e53935 100%)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          backgroundClip: 'text',
+          letterSpacing: '0.12em',
+        }}>
+          WORM³
+        </span>
       </div>
 
       {/* Right: Settings gear */}
