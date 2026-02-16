@@ -23,10 +23,7 @@ export const rotateStickers = (stickers, axis, dir) => {
   for (const [k, st] of Object.entries(stickers)) {
     const [vx, vy, vz] = DIR_TO_VEC[k];
     const [rx, ry, rz] = rotateVec90(vx, vy, vz, axis, dir);
-    // Increment rotation for tile pattern (in 90-degree units)
-    // dir = 1 (clockwise): add 1; dir = -1 (counter-clockwise): subtract 1
-    const newRotation = ((st.rotation || 0) + dir + 4) % 4;
-    next[VEC_TO_DIR(rx, ry, rz)] = { ...st, rotation: newRotation };
+    next[VEC_TO_DIR(rx, ry, rz)] = st;
   }
   return next;
 };

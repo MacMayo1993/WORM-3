@@ -710,13 +710,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot=[0,0,0], overlay, mo
   const origIsWhite = meta?.orig === 3;
   const antipodalIsWhite = ANTIPODAL_COLOR[meta?.orig] === 3;
 
-  // Apply accumulated rotation from layer turns to tile patterns
-  // rotation is in 90-degree units (0-3), convert to radians and add to Z rotation
-  const tileRotation = (meta?.rotation || 0) * Math.PI / 2;
-  const combinedRot = [rot[0], rot[1], rot[2] + tileRotation];
-
   return (
-    <group position={pos} rotation={combinedRot} ref={groupRef}>
+    <group position={pos} rotation={rot} ref={groupRef}>
       <mesh ref={meshRef} key={hollow ? 'frame' : 'plane'}>
         {hollow ? (
           <shapeGeometry args={[_stickerFrameShape]} />

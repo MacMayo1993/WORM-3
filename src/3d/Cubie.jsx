@@ -49,11 +49,11 @@ const STICKER_POS = {
 };
 const STICKER_ROT = {
   PZ: [0, 0, 0],
-  NZ: [0, Math.PI, 0],
-  PX: [0, Math.PI / 2, 0],
-  NX: [0, -Math.PI / 2, 0],
-  PY: [-Math.PI / 2, 0, 0],
-  NY: [Math.PI / 2, 0, 0],
+  NZ: [0, 0, 0],
+  PX: [0, 0, 0],
+  NX: [0, 0, 0],
+  PY: [0, 0, 0],
+  NY: [0, 0, 0],
 };
 
 // Helper functions for grid and sudokube modes
