@@ -11,10 +11,16 @@ const FACE_LABELS = { 1: 'Front', 2: 'Left', 3: 'Top', 4: 'Back', 5: 'Right', 6:
 
 const SCHEME_LABELS = {
   standard: 'Standard',
-  neon: 'Neon',
+  neon: 'Neon Glow',
   pastel: 'Pastel',
-  mono: 'Mono',
-  custom: 'Custom',
+  mono: 'Monochrome',
+  spiderman: 'Spiderman',
+  ocean: 'Ocean Depths',
+  sunset: 'Sunset',
+  forest: 'Forest',
+  candy: 'Candy Pop',
+  retro: 'Retro',
+  custom: 'Custom Upload',
 };
 
 const BG_OPTIONS = [

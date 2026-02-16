@@ -4,10 +4,16 @@ import { registerTilePreview, updateTilePreview, unregisterTilePreview } from '.
 
 const SCHEME_LABELS = {
   standard: 'Standard',
-  neon: 'Neon',
+  neon: 'Neon Glow',
   pastel: 'Pastel',
-  mono: 'Mono',
-  custom: 'Custom',
+  mono: 'Monochrome',
+  spiderman: 'Spiderman',
+  ocean: 'Ocean Depths',
+  sunset: 'Sunset',
+  forest: 'Forest',
+  candy: 'Candy Pop',
+  retro: 'Retro',
+  custom: 'Custom Upload',
 };
 
 const BG_OPTIONS = [
