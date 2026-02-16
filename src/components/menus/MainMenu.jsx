@@ -105,7 +105,7 @@ const MenuButton = ({ children, onClick, delay, icon, primary }) => {
   );
 };
 
-const MainMenu = ({ onPlay, onLevels, onFreeplay, onCoop, onTeach, onSettings, onHelp }) => {
+const MainMenu = ({ onPlay, onLevels, onFreeplay, onCoop, onSettings, onHelp }) => {
   const [titleVisible, setTitleVisible] = useState(false);
   const [subtitleVisible, setSubtitleVisible] = useState(false);
 
