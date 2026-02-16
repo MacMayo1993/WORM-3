@@ -331,6 +331,10 @@ export default function WORM3() {
       colorScheme: wizardSettings.colorScheme,
       backgroundTheme: wizardSettings.backgroundTheme,
     };
+    // Apply custom colors if provided
+    if (wizardSettings.customColors) {
+      newSettings.customColors = wizardSettings.customColors;
+    }
     // Apply tile style to all faces
     if (wizardSettings.tileStyle) {
       const manifoldStyles = {};

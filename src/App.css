@@ -1437,7 +1437,7 @@ body {
 
 .settings-radio-label {
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.9);
+  color: #202124;
   font-family: 'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   flex: 1;
 }
@@ -1711,7 +1711,7 @@ body {
 
 .toggle-label {
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.9);
+  color: #202124;
   font-family: 'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
@@ -2635,4 +2635,21 @@ select.btn-compact:disabled {
   .wizard-footer {
     padding: 16px 20px;
   }
+}
+
+.wizard-upload-placeholder {
+  width: 64px;
+  height: 64px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px dashed rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.wizard-option:hover .wizard-upload-placeholder {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.5);
 }
