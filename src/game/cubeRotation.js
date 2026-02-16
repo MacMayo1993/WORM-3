@@ -23,7 +23,10 @@ export const rotateStickers = (stickers, axis, dir) => {
   for (const [k, st] of Object.entries(stickers)) {
     const [vx, vy, vz] = DIR_TO_VEC[k];
     const [rx, ry, rz] = rotateVec90(vx, vy, vz, axis, dir);
-    next[VEC_TO_DIR(rx, ry, rz)] = st;
+    // Increment rotation for tile pattern (in 90-degree units)
+    // dir = 1 (clockwise): add 1; dir = -1 (counter-clockwise): subtract 1
+    const newRotation = ((st.rotation || 0) + dir + 4) % 4;
+    next[VEC_TO_DIR(rx, ry, rz)] = { ...st, rotation: newRotation };
   }
   return next;
 };
@@ -67,7 +70,7 @@ export const rotateSliceCubies = (cubies, size, axis, sliceIndex, dir) => {
     next[m.to[0]][m.to[1]][m.to[2]] = {
       ...src,
       x: m.to[0], y: m.to[1], z: m.to[2],
-      stickers: src.stickers // Keep stickers in their original orientation
+      stickers: rotateStickers(src.stickers, axis, dir)
     };
   }
 
