@@ -91,6 +91,7 @@ export function useChaosMode() {
     let currentChainTile = null;
     let chainStrength = 1.0;
     let inCooldown = false;
+    let visitedSet = new Set();
 
     const findChainStart = (state) => {
       const S = state.length;
@@ -133,6 +134,8 @@ export function useChaosMode() {
         if (!start) return state;
         currentChainTile = start.tile;
         chainStrength = start.strength;
+        visitedSet = new Set();
+        visitedSet.add(`${start.tile.x},${start.tile.y},${start.tile.z},${start.tile.dirKey}`);
       }
 
       const next = flipStickerPair(
@@ -146,6 +149,7 @@ export function useChaosMode() {
       if (chainStrength < 0.1) {
         currentChainTile = null;
         chainStrength = 1.0;
+        visitedSet = new Set();
         inCooldown = true;
         cooldownAcc = 0;
         return next;
@@ -158,6 +162,10 @@ export function useChaosMode() {
 
       const validNeighbors = [];
       for (const neighbor of neighbors) {
+        // Skip already-visited tiles so the chain spreads outward, not back
+        const nKey = `${neighbor.x},${neighbor.y},${neighbor.z},${neighbor.dirKey}`;
+        if (visitedSet.has(nKey)) continue;
+
         const nc = next[neighbor.x]?.[neighbor.y]?.[neighbor.z];
         if (!nc) continue;
         const nst = nc.stickers[neighbor.dirKey];
@@ -201,9 +209,10 @@ export function useChaosMode() {
               neighbor.x, neighbor.y, neighbor.z,
               neighbor.dirKey, S, explosionT
             );
+            const crossFace = isCrossFaceNeighbor(currentChainTile.dirKey, neighbor.dirKey);
             setCascades((prev) => [
               ...prev,
-              { id: Date.now() + Math.random(), from: fromPos, to: toPos }
+              { id: Date.now() + Math.random(), from: fromPos, to: toPos, crossFace }
             ]);
 
             nextTile = neighbor;
@@ -213,10 +222,12 @@ export function useChaosMode() {
       }
 
       if (nextTile) {
+        visitedSet.add(`${nextTile.x},${nextTile.y},${nextTile.z},${nextTile.dirKey}`);
         currentChainTile = nextTile;
       } else {
         currentChainTile = null;
         chainStrength = 1.0;
+        visitedSet = new Set();
         inCooldown = true;
         cooldownAcc = 0;
       }

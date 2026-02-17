@@ -607,6 +607,7 @@ const CubeAssembly = React.memo(({
           key={c.id}
           from={c.from}
           to={c.to}
+          crossFace={c.crossFace}
           onComplete={() => onCascadeComplete(c.id)}
         />
       ))}
