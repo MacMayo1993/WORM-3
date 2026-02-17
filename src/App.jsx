@@ -73,6 +73,7 @@ import TopMenuBar from './components/menus/TopMenuBar.jsx';
 import BottomNavBar from './components/menus/BottomNavBar.jsx';
 import SecondaryModesSheet from './components/menus/SecondaryModesSheet.jsx';
 import FloatingHUD from './components/menus/FloatingHUD.jsx';
+import TileLeaderboard from './components/menus/TileLeaderboard.jsx';
 import MainMenu from './components/menus/MainMenu.jsx';
 import SettingsMenu from './components/menus/SettingsMenu.jsx';
 import HelpMenu from './components/menus/HelpMenu.jsx';
@@ -927,6 +928,9 @@ export default function WORM3() {
 
         {/* Floating HUD — auto-fade parity/chaos notifications */}
         <FloatingHUD metrics={metrics} chaosLevel={chaosLevel} chaosMode={chaosMode} />
+
+        {/* Tile Leaderboard — live flip stats in chaos mode */}
+        <TileLeaderboard cubies={cubies} size={size} chaosMode={chaosMode} />
 
         {/* Bottom Navigation Bar */}
         <BottomNavBar
