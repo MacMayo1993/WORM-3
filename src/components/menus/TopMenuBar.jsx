@@ -1,4 +1,13 @@
 import React, { useMemo } from 'react';
+import { FLIP_CAP } from '../../utils/constants.js';
+
+// Compact stat chip used in the chaos stats strip
+const ChaosStatItem = ({ label, value, color, title }) => (
+  <span title={title} style={{ display: 'inline-flex', alignItems: 'baseline', gap: '4px', cursor: 'default' }}>
+    <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '9px', letterSpacing: '0.08em', textTransform: 'uppercase' }}>{label}</span>
+    <span style={{ color, fontWeight: 700, fontSize: '12px' }}>{value}</span>
+  </span>
+);
 
 /**
  * TopMenuBar - Thin 48dp Google-inspired top app bar
@@ -50,8 +59,44 @@ const TopMenuBar = ({
     return { totalComplete, totalStickers, percent: Math.round((totalComplete / totalStickers) * 100) };
   }, [cubies]);
 
+  // Chaos flip stats — only computed when chaos mode is active
+  const chaosStats = useMemo(() => {
+    if (!chaosMode) return null;
+    let totalFlips = 0;
+    let flipActive = 0; // stickers with flips > 0
+    let deadTiles = 0;  // stickers at FLIP_CAP
+    let disparate = 0;  // stickers where curr !== orig
+    let edgeTotal = 0;
+    const S = size;
+
+    for (const L of cubies) {
+      for (const R of L) {
+        for (const c of R) {
+          for (const [dir, st] of Object.entries(c.stickers)) {
+            const onEdge =
+              (dir === 'PX' && c.x === S - 1) || (dir === 'NX' && c.x === 0) ||
+              (dir === 'PY' && c.y === S - 1) || (dir === 'NY' && c.y === 0) ||
+              (dir === 'PZ' && c.z === S - 1) || (dir === 'NZ' && c.z === 0);
+            if (!onEdge) continue;
+            edgeTotal++;
+            const flips = st.flips || 0;
+            totalFlips += flips;
+            if (flips > 0) flipActive++;
+            if (flips >= FLIP_CAP) deadTiles++;
+            if (st.curr !== st.orig) disparate++;
+          }
+        }
+      }
+    }
+
+    const flipPct = edgeTotal > 0 ? Math.round((flipActive / edgeTotal) * 100) : 0;
+    const disparityPct = edgeTotal > 0 ? Math.round((disparate / edgeTotal) * 100) : 0;
+    const deadPct = edgeTotal > 0 ? Math.round((deadTiles / edgeTotal) * 100) : 0;
+    return { totalFlips, flipActive, deadTiles, disparate, flipPct, disparityPct, deadPct, edgeTotal };
+  }, [chaosMode, cubies, size]);
+
   return (
-    <div className="top-app-bar">
+    <div className="top-app-bar" style={chaosMode ? { flexWrap: 'wrap', height: 'auto', minHeight: '48px' } : {}}>
       {/* Left: Mode label + Percentage */}
       <div className="top-bar-left">
         <span className="top-bar-title">{centerText}</span>
@@ -90,6 +135,54 @@ const TopMenuBar = ({
           </svg>
         </button>
       </div>
+
+      {/* Chaos Stats Strip — visible when chaos mode is active */}
+      {chaosMode && chaosStats && (
+        <div style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '18px',
+          padding: '3px 16px 5px',
+          borderTop: '1px solid rgba(0, 217, 255, 0.15)',
+          fontSize: '11px',
+          fontFamily: "'Courier New', monospace",
+          color: 'rgba(255,255,255,0.65)',
+          flexWrap: 'wrap',
+        }}>
+          <ChaosStatItem
+            label="FLIPS"
+            value={chaosStats.totalFlips}
+            color="#00d9ff"
+            title={`${chaosStats.flipActive} of ${chaosStats.edgeTotal} tiles have been flipped at least once`}
+          />
+          <ChaosStatItem
+            label="ACTIVE"
+            value={`${chaosStats.flipPct}%`}
+            color={chaosStats.flipPct > 50 ? '#ff6b6b' : chaosStats.flipPct > 20 ? '#ffa94d' : '#00d9ff'}
+            title={`${chaosStats.flipActive} tiles with flips > 0`}
+          />
+          <ChaosStatItem
+            label="DISPARITY"
+            value={`${chaosStats.disparityPct}%`}
+            color={chaosStats.disparityPct > 60 ? '#ff6b6b' : chaosStats.disparityPct > 30 ? '#ffa94d' : '#69db7c'}
+            title={`${chaosStats.disparate} of ${chaosStats.edgeTotal} stickers are off their home face`}
+          />
+          {chaosStats.deadTiles > 0 && (
+            <ChaosStatItem
+              label="DEAD"
+              value={`${chaosStats.deadPct}%`}
+              color="#868e96"
+              title={`${chaosStats.deadTiles} tiles burned out at flip cap (${FLIP_CAP})`}
+            />
+          )}
+          {chaosStats.flipActive === 0 && (
+            <span style={{ color: '#ff6b6b', fontStyle: 'italic', fontSize: '10px' }} title="Chaos engine needs at least one flipped sticker to bootstrap cascade propagation">
+              ⚡ no seed — flip a tile to ignite
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 };
