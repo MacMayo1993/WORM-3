@@ -54,11 +54,16 @@ export const useGameStore = create(
     // ========================================================================
     size: 3,
     cubies: makeCubies(3),
+    rotationEpoch: 0,
 
-    setSize: (size) => set({ size, cubies: makeCubies(size) }),
+    setSize: (size) => set((state) => ({ size, cubies: makeCubies(size), rotationEpoch: state.rotationEpoch + 1 })),
     setCubies: (cubies) => set(typeof cubies === 'function'
       ? (state) => ({ cubies: cubies(state.cubies) })
       : { cubies }),
+    // Like setCubies but also increments rotationEpoch so manifoldMap rebuilds
+    setRotatedCubies: (cubies) => set(typeof cubies === 'function'
+      ? (state) => ({ cubies: cubies(state.cubies), rotationEpoch: state.rotationEpoch + 1 })
+      : (state) => ({ cubies, rotationEpoch: state.rotationEpoch + 1 })),
 
     // ========================================================================
     // GAME SESSION STATE

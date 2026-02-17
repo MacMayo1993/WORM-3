@@ -23,7 +23,7 @@ import {
  */
 export function useAnimation() {
   const size = useGameStore((state) => state.size);
-  const setCubies = useGameStore((state) => state.setCubies);
+  const setRotatedCubies = useGameStore((state) => state.setRotatedCubies);
   const setMoves = useGameStore((state) => state.setMoves);
   const animState = useGameStore((state) => state.animState);
   const pendingMove = useGameStore((state) => state.pendingMove);
@@ -56,7 +56,7 @@ export function useAnimation() {
     const pm = pendingMoveRef.current;
     if (pm) {
       const { axis, dir, sliceIndex, isEcho } = pm;
-      setCubies((prev) => rotateSliceCubies(prev, size, axis, sliceIndex, dir));
+      setRotatedCubies((prev) => rotateSliceCubies(prev, size, axis, sliceIndex, dir));
 
       // Only increment moves and play full sound for user-initiated rotations
       if (!isEcho) {
@@ -122,7 +122,7 @@ export function useAnimation() {
     pendingMoveRef.current = null;
   }, [
     size,
-    setCubies,
+    setRotatedCubies,
     setMoves,
     clearAnimation,
     addToHistory,
@@ -145,7 +145,7 @@ export function useAnimation() {
       startAnimation(axis, dir, sliceIndex);
     } else {
       // Apply all quarter-turns directly to cubies without an animation pass.
-      setCubies((prev) => {
+      setRotatedCubies((prev) => {
         let c = prev;
         for (let i = 0; i < numTurns; i++) c = rotateSliceCubies(c, size, axis, sliceIndex, dir);
         return c;
@@ -154,7 +154,7 @@ export function useAnimation() {
       play('/sounds/rotate.mp3');
       addToHistory({ type: 'rotation', axis, dir, sliceIndex, timestamp: Date.now() });
     }
-  }, [startAnimation, setCubies, setMoves, addToHistory, size]);
+  }, [startAnimation, setRotatedCubies, setMoves, addToHistory, size]);
 
   return {
     // State
