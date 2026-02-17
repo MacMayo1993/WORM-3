@@ -1,121 +1,205 @@
-import React, { useState, useRef, useMemo } from 'react';
+/**
+ * ChaosWave — lightning bolt that travels from one tile to the next.
+ *
+ * Visual language:
+ *  • White jagged core bolt that DRAWS ITSELF along the propagation path
+ *  • Electric-blue / cyan glow halo around the bolt (color depends on face)
+ *  • Bright white spark HEAD riding the bolt tip — makes direction obvious
+ *  • Blue ghost trail behind the head, shrinking + fading with distance
+ *  • White seam-flash at the midpoint for cross-face (manifold gap) hops
+ *  • Impact pop at the destination tile when the bolt arrives
+ */
+
+import React, { useRef, useMemo, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
-// Shared geometries — created once, reused by all instances
-const sharedSphereGeo = new THREE.SphereGeometry(0.15, 16, 16);
-const sharedGhostGeo = new THREE.SphereGeometry(0.12, 12, 12);
-const sharedGapGlowGeo = new THREE.SphereGeometry(0.22, 16, 16);
+// ─── Shared geometries (no per-instance path data, safe to reuse) ─────────────
+const headGeo = new THREE.SphereGeometry(0.11, 8, 8);
+const ghostGeo = new THREE.SphereGeometry(0.065, 6, 6);
+const impactGeo = new THREE.SphereGeometry(0.26, 8, 8);
+const seamGlowGeo = new THREE.SphereGeometry(0.2, 8, 8);
 
-// Temp vectors for per-frame math (avoids GC pressure)
-const _from = new THREE.Vector3();
-const _to = new THREE.Vector3();
-const _pos = new THREE.Vector3();
-const _mid = new THREE.Vector3();
+// Reusable vectors — avoids per-frame GC pressure
+const _a = new THREE.Vector3();
+const _b = new THREE.Vector3();
 
-const GHOST_COUNT = 5;
-const GHOST_SPACING = 0.12; // fraction of path behind the head
+// ─── Constants ────────────────────────────────────────────────────────────────
+const JITTER_SEGS = 10; // points in the jagged path (including endpoints)
+const GHOST_COUNT = 4;
+const GHOST_GAP = 0.09; // fraction of path length between ghost positions
 
-const ChaosWave = ({ from, to, crossFace = false, color = '#ff0080', onComplete }) => {
-  const [progress, setProgress] = useState(0);
-  const meshRef = useRef();
-  const ghostRefs = useRef([]);
-  const gapGlowRef = useRef();
-  const beamRef = useRef();
+// ─── Pure path helpers ────────────────────────────────────────────────────────
+
+/**
+ * Build a jagged polyline from `from` to `to` using random perpendicular jitter.
+ * Jitter tapers to zero at both endpoints so the bolt always starts and ends
+ * exactly on the tile surface positions.
+ */
+const makePath = (from, to, segs = JITTER_SEGS, jitter = 0.22) => {
+  const f = new THREE.Vector3(...from);
+  const t = new THREE.Vector3(...to);
+  const along = new THREE.Vector3().subVectors(t, f);
+  const len = along.length();
+
+  if (len < 0.01) return [f.clone(), t.clone()]; // degenerate guard
+
+  along.normalize();
+
+  // Two stable perpendicular axes for 3-D jitter
+  const ref = Math.abs(along.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
+  const p1 = new THREE.Vector3().crossVectors(along, ref).normalize();
+  const p2 = new THREE.Vector3().crossVectors(along, p1).normalize();
+
+  const pts = [f.clone()];
+  for (let i = 1; i < segs; i++) {
+    const frac = i / segs;
+    const pt = new THREE.Vector3().lerpVectors(f, t, frac);
+    // sin-taper: max jitter at midpoint, zero at both ends
+    const taper = Math.sin(frac * Math.PI);
+    const j = jitter * taper * len;
+    pt.addScaledVector(p1, (Math.random() - 0.5) * 2 * j);
+    pt.addScaledVector(p2, (Math.random() - 0.5) * 2 * j);
+    pts.push(pt);
+  }
+  pts.push(t.clone());
+  return pts;
+};
+
+/**
+ * Interpolate a position along a polyline at fraction t ∈ [0, 1].
+ * Writes into `out` (THREE.Vector3) and returns it.
+ */
+const pathAt = (pts, t, out) => {
+  const maxSeg = pts.length - 1;
+  const s = Math.min(t * maxSeg, maxSeg - 1e-6);
+  const si = Math.floor(s);
+  out.lerpVectors(pts[si], pts[si + 1], s - si);
+  return out;
+};
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+const ChaosWave = ({ from, to, crossFace = false, onComplete }) => {
+  const progressRef = useRef(0);
   const completedRef = useRef(false);
 
-  // Pre-compute beam line points (from → to)
-  const beamPoints = useMemo(() => {
-    const f = new THREE.Vector3(...from);
-    const t = new THREE.Vector3(...to);
-    const pts = [];
-    const segments = 12;
-    for (let i = 0; i <= segments; i++) {
-      pts.push(new THREE.Vector3().lerpVectors(f, t, i / segments));
-    }
-    return pts;
-  }, [from, to]);
+  const headRef = useRef();
+  const ghostRefs = useRef([]);
+  const coreRef = useRef();   // white bolt (line)
+  const glowRef = useRef();   // blue/cyan halo (line, lags behind core)
+  const impactRef = useRef(); // destination flash
+  const seamRef = useRef();   // seam glow (cross-face only)
 
-  const beamGeometry = useMemo(() => {
-    return new THREE.BufferGeometry().setFromPoints(beamPoints);
-  }, [beamPoints]);
+  // ── Stable jagged path — one generation per cascade ──────────────────────
+  const path = useMemo(() => makePath(from, to), [from, to]);
 
-  // The midpoint between from/to — the "gap" between tiles/manifolds
-  const midpoint = useMemo(() => {
-    return new THREE.Vector3(...from).lerp(new THREE.Vector3(...to), 0.5);
-  }, [from, to]);
+  // ── Per-instance line geometries (unique path, so cannot be shared) ───────
+  const coreGeo = useMemo(() => {
+    const g = new THREE.BufferGeometry().setFromPoints(path);
+    g.setDrawRange(0, 0); // invisible until the first useFrame tick
+    return g;
+  }, [path]);
 
-  // Use a slightly slower speed for cross-face (manifold gap) transitions
-  // so the gap illumination is more visible
-  const speed = crossFace ? 2.2 : 3.0;
+  const glowGeo = useMemo(() => {
+    const g = new THREE.BufferGeometry().setFromPoints(path);
+    g.setDrawRange(0, 0);
+    return g;
+  }, [path]);
+
+  // Dispose per-instance geometries when the component unmounts
+  useEffect(() => () => { coreGeo.dispose(); glowGeo.dispose(); }, [coreGeo, glowGeo]);
+
+  // ── Color palette ─────────────────────────────────────────────────────────
+  // Same-face:   white core, electric-blue glow
+  // Cross-face:  white core, cyan glow (the manifold "jump" feels colder)
+  const glowColor = crossFace ? '#00ccff' : '#3377ff';
+  const ghostColor = crossFace ? '#80eeff' : '#6699ff';
+
+  // Cross-face bolts travel through the manifold gap → slight speed reduction
+  // so the seam glow has time to read
+  const speed = crossFace ? 1.8 : 2.5;
 
   useFrame((_, delta) => {
     if (completedRef.current) return;
 
-    const newP = Math.min(1, progress + delta * speed);
-    setProgress(newP);
+    const p = Math.min(1, progressRef.current + delta * speed);
+    progressRef.current = p;
 
-    _from.set(...from);
-    _to.set(...to);
+    const N = path.length;
 
-    // Main head position
-    _pos.lerpVectors(_from, _to, newP);
-    if (meshRef.current) {
-      meshRef.current.position.copy(_pos);
-      meshRef.current.material.opacity = Math.max(0, 1 - newP * 0.6);
+    // ── Core white bolt: grow from source toward head via drawRange ──────────
+    if (coreRef.current) {
+      const count = Math.max(2, Math.ceil(p * (N - 1)) + 1);
+      coreRef.current.geometry.setDrawRange(0, count);
+      // Tail fades slightly after the head passes its half-way mark
+      const tailFade = p < 0.5 ? 1.0 : Math.max(0.2, 1 - (p - 0.5) * 1.2);
+      coreRef.current.material.opacity = tailFade * 0.9;
     }
 
-    // Ghost echoes trail behind the head
+    // ── Blue/cyan glow halo: same path, lags 0.08 s behind the core ─────────
+    if (glowRef.current) {
+      const gp = Math.max(0, p - 0.08);
+      const gc = Math.max(2, Math.ceil(gp * (N - 1)) + 1);
+      glowRef.current.geometry.setDrawRange(0, gc);
+      glowRef.current.material.opacity = Math.max(0, 0.55 - p * 0.45);
+    }
+
+    // ── Spark head: bright white sphere at the bolt tip ───────────────────────
+    if (headRef.current) {
+      pathAt(path, p, _a);
+      headRef.current.position.copy(_a);
+      headRef.current.material.opacity = Math.max(0, 1 - p * 0.35);
+    }
+
+    // ── Ghost trail: shrinking + fading blue spheres behind the head ──────────
     for (let i = 0; i < GHOST_COUNT; i++) {
-      const ghost = ghostRefs.current[i];
-      if (!ghost) continue;
-      const ghostT = Math.max(0, newP - (i + 1) * GHOST_SPACING);
-      _pos.lerpVectors(_from, _to, ghostT);
-      ghost.position.copy(_pos);
-      // Each successive ghost is more faded and slightly smaller
-      const fade = Math.max(0, (1 - newP * 0.5) * (1 - (i + 1) / (GHOST_COUNT + 1)));
-      ghost.material.opacity = fade * 0.5;
-      const s = 1 - (i + 1) * 0.12;
-      ghost.scale.setScalar(s);
+      const g = ghostRefs.current[i];
+      if (!g) continue;
+      const gp = Math.max(0, p - (i + 1) * GHOST_GAP);
+      pathAt(path, gp, _b);
+      g.position.copy(_b);
+      const fade = Math.max(0, (1 - p * 0.55) * (1 - (i + 1) / (GHOST_COUNT + 1)));
+      g.material.opacity = fade * 0.55;
+      g.scale.setScalar(Math.max(0.1, 1 - (i + 1) * 0.18));
     }
 
-    // Gap glow — brightest when the head is near the midpoint
-    if (gapGlowRef.current) {
-      _mid.copy(midpoint);
-      gapGlowRef.current.position.copy(_mid);
-      // Gaussian brightness centered on progress=0.5
-      const distFromMid = Math.abs(newP - 0.5);
-      const gapIntensity = Math.exp(-(distFromMid * distFromMid) / 0.04);
-      // Cross-face gaps glow brighter and wider
-      const gapScale = crossFace ? 1.8 + gapIntensity * 1.5 : 1.0 + gapIntensity * 0.8;
-      gapGlowRef.current.scale.setScalar(gapScale);
-      gapGlowRef.current.material.opacity = gapIntensity * (crossFace ? 0.6 : 0.35);
+    // ── Seam glow: white flash at the midpoint on cross-face hops ────────────
+    // Gaussian peak when the head crosses the midpoint (p ≈ 0.5)
+    if (crossFace && seamRef.current) {
+      const d = Math.abs(p - 0.5);
+      const intensity = Math.exp(-(d * d) / 0.025);
+      seamRef.current.material.opacity = intensity * 0.75;
+      seamRef.current.scale.setScalar(0.6 + intensity * 1.8);
     }
 
-    // Beam trail — fade in then out
-    if (beamRef.current) {
-      const beamOpacity = newP < 0.15
-        ? newP / 0.15 * 0.35
-        : Math.max(0, 0.35 * (1 - (newP - 0.15) / 0.85));
-      beamRef.current.material.opacity = beamOpacity;
+    // ── Impact flash: sin-bell centered just before arrival ───────────────────
+    // Rises from p=0.65, peaks at p=0.825, back to 0 at p=1.0
+    if (impactRef.current) {
+      const t0 = 0.65;
+      const bang = p > t0 ? Math.sin(Math.min(1, (p - t0) / (1 - t0)) * Math.PI) : 0;
+      impactRef.current.material.opacity = bang * (crossFace ? 0.85 : 0.6);
+      impactRef.current.scale.setScalar(1 + bang * (crossFace ? 2.2 : 1.4));
     }
 
-    if (newP >= 1 && !completedRef.current) {
+    if (p >= 1 && !completedRef.current) {
       completedRef.current = true;
       if (onComplete) onComplete();
     }
   });
 
-  if (progress >= 1 && completedRef.current) return null;
-
-  const ghostColor = crossFace ? '#c060ff' : color;
+  // Midpoint for the seam glow sphere (cross-face only)
+  const midPos = useMemo(
+    () => new THREE.Vector3(...from).lerp(new THREE.Vector3(...to), 0.5).toArray(),
+    [from, to]
+  );
 
   return (
     <group>
-      {/* Beam trail line connecting from → to */}
-      <line ref={beamRef} geometry={beamGeometry}>
+      {/* Blue/cyan glow halo — grows just behind the core bolt */}
+      <line ref={glowRef} geometry={glowGeo}>
         <lineBasicMaterial
-          color={crossFace ? '#a040ff' : color}
+          color={glowColor}
           transparent
           opacity={0}
           blending={THREE.AdditiveBlending}
@@ -123,24 +207,20 @@ const ChaosWave = ({ from, to, crossFace = false, color = '#ff0080', onComplete 
         />
       </line>
 
-      {/* Gap glow — illuminates the seam between tiles/manifolds */}
-      <mesh ref={gapGlowRef} geometry={sharedGapGlowGeo} position={midpoint.toArray()}>
-        <meshBasicMaterial
-          color={crossFace ? '#d080ff' : '#ff80c0'}
+      {/* White core bolt — grows from source tile toward destination */}
+      <line ref={coreRef} geometry={coreGeo}>
+        <lineBasicMaterial
+          color="#ffffff"
           transparent
           opacity={0}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
         />
-      </mesh>
+      </line>
 
-      {/* Ghost echo trail — faded copies trailing behind the head */}
+      {/* Ghost trail — blue/cyan spheres following the spark head */}
       {Array.from({ length: GHOST_COUNT }, (_, i) => (
-        <mesh
-          key={i}
-          ref={(el) => { ghostRefs.current[i] = el; }}
-          geometry={sharedGhostGeo}
-        >
+        <mesh key={i} ref={(el) => { ghostRefs.current[i] = el; }} geometry={ghostGeo}>
           <meshBasicMaterial
             color={ghostColor}
             transparent
@@ -151,14 +231,38 @@ const ChaosWave = ({ from, to, crossFace = false, color = '#ff0080', onComplete 
         </mesh>
       ))}
 
-      {/* Main lightning head */}
-      <mesh ref={meshRef} geometry={sharedSphereGeo}>
+      {/* Spark head — bright white sphere at the leading edge of the bolt */}
+      <mesh ref={headRef} geometry={headGeo}>
         <meshBasicMaterial
-          color={color}
+          color="#ffffff"
           transparent
           opacity={1}
-          emissive={color}
-          emissiveIntensity={2}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+        />
+      </mesh>
+
+      {/* Seam glow — white pulse at the manifold crossing (cross-face only) */}
+      {crossFace && (
+        <mesh ref={seamRef} geometry={seamGlowGeo} position={midPos}>
+          <meshBasicMaterial
+            color="#ffffff"
+            transparent
+            opacity={0}
+            blending={THREE.AdditiveBlending}
+            depthWrite={false}
+          />
+        </mesh>
+      )}
+
+      {/* Impact flash — glow burst at the destination tile on arrival */}
+      <mesh ref={impactRef} geometry={impactGeo} position={to}>
+        <meshBasicMaterial
+          color={glowColor}
+          transparent
+          opacity={0}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
         />
       </mesh>
     </group>
