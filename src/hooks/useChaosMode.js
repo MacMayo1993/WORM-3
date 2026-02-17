@@ -291,9 +291,13 @@ export function useChaosMode() {
               neighbor.dirKey, S, explosionT
             );
             const crossFace = isCrossFaceNeighbor(currentChainTile.dirKey, neighbor.dirKey);
+            // A2: deduplicate — skip if an identical source→dest bolt already queued.
+            // Rounds world positions to 1 dp to handle float jitter in getStickerWorldPos.
+            const boltKey = `${fromPos.map(v => v.toFixed(1)).join(',')}→${toPos.map(v => v.toFixed(1)).join(',')}`;
             // A1: cap concurrent bolts — drop oldest when queue is full
             setCascades((prev) => {
-              const next = [...prev, { id: Date.now() + Math.random(), from: fromPos, to: toPos, crossFace }];
+              if (prev.some(c => c.key === boltKey)) return prev; // A2 dedup
+              const next = [...prev, { id: Date.now() + Math.random(), key: boltKey, from: fromPos, to: toPos, crossFace }];
               return next.length > MAX_CASCADES ? next.slice(-MAX_CASCADES) : next;
             });
 
