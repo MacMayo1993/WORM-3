@@ -211,7 +211,7 @@ export default function WORM3() {
   // ========================================================================
   const {
     size, cubies, manifoldMap, metrics, resolvedColors,
-    setCubies, changeSize, shuffle, reset, flipSticker
+    setCubies, setRotatedCubies, changeSize, shuffle, reset, flipSticker
   } = useCubeState();
 
   const { moves, gameTime, victory, achievedWins: _achievedWins, setVictory } = useGameSession();
@@ -511,10 +511,10 @@ export default function WORM3() {
       const dir = Math.random() > 0.5 ? 1 : -1;
       state = rotateSliceCubies(state, levelSize, ax, slice, dir);
     }
-    setCubies(state);
+    setRotatedCubies(state);
     useGameStore.getState().resetGame();
     useGameStore.getState().setHasShuffled(true);
-  }, [currentLevelData, currentLevel, size, setCubies]);
+  }, [currentLevelData, currentLevel, size, setRotatedCubies]);
 
   // Tutorial close handler
   const handleTutorialClose = useCallback(() => {
@@ -565,11 +565,11 @@ export default function WORM3() {
       default: break;
     }
 
-    setCubies(state);
+    setRotatedCubies(state);
     useGameStore.getState().setMoves(moveCount);
     useGameStore.getState().clearHistory();
     useGameStore.getState().setHasShuffled(true);
-  }, [size, setCubies]);
+  }, [size, setRotatedCubies]);
 
   const handleInstantChaos = useCallback((targetDisparity) => {
     const totalStickers = size * size * 6;
@@ -614,10 +614,10 @@ export default function WORM3() {
       alert(`Saved state is for ${savedCubeState.size}×${savedCubeState.size} cube.`);
       return;
     }
-    setCubies(savedCubeState.cubies);
+    setRotatedCubies(savedCubeState.cubies);
     useGameStore.getState().setMoves(savedCubeState.moves);
     useGameStore.getState().clearHistory();
-  }, [savedCubeState, size, setCubies]);
+  }, [savedCubeState, size, setRotatedCubies]);
 
   // ========================================================================
   // KEYBOARD HANDLER

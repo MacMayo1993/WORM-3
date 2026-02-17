@@ -21,7 +21,9 @@ import { isInRefractory, markFlipped, clearRefractory } from '../game/refractory
 export function useCubeState() {
   const size = useGameStore((state) => state.size);
   const cubies = useGameStore((state) => state.cubies);
+  const rotationEpoch = useGameStore((state) => state.rotationEpoch);
   const setCubies = useGameStore((state) => state.setCubies);
+  const setRotatedCubies = useGameStore((state) => state.setRotatedCubies);
   const setSize = useGameStore((state) => state.setSize);
   const settings = useGameStore((state) => state.settings);
   const explosionT = useGameStore((state) => state.explosionT);
@@ -49,12 +51,16 @@ export function useCubeState() {
   resolvedColorsRef.current = resolvedColors;
 
   // Build manifold map.
-  // Kept in a ref so flipSticker can read the latest value without calling
-  // buildManifoldGridMap a second time on the same cubies snapshot.
+  // Only rebuilds when cube geometry changes (rotations/size changes), not on
+  // sticker flips. rotationEpoch is bumped by setRotatedCubies/setSize.
+  // We read from cubiesRef.current so we always get the post-rotation snapshot
+  // even if React hasn't re-rendered yet.
   const manifoldMap = useMemo(() => {
-    if (cubies.length !== size) return new Map();
-    return buildManifoldGridMap(cubies, size);
-  }, [cubies, size]);
+    const c = cubiesRef.current;
+    if (!c || c.length !== size) return new Map();
+    return buildManifoldGridMap(c, size);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rotationEpoch, size]);
   const manifoldMapRef = useRef(manifoldMap);
   manifoldMapRef.current = manifoldMap;
 
@@ -93,11 +99,11 @@ export function useCubeState() {
 
   // Apply rotation to cubies
   const rotateSlice = useCallback((axis, sliceIndex, dir) => {
-    setCubies((prev) => rotateSliceCubies(prev, size, axis, sliceIndex, dir));
+    setRotatedCubies((prev) => rotateSliceCubies(prev, size, axis, sliceIndex, dir));
     setMoves((m) => m + 1);
     play('/sounds/rotate.mp3');
     addToHistory({ type: 'rotation', axis, dir, sliceIndex, timestamp: Date.now() });
-  }, [size, setCubies, setMoves, addToHistory]);
+  }, [size, setRotatedCubies, setMoves, addToHistory]);
 
   // Flip sticker pair
   const flipSticker = useCallback((pos, dirKey) => {
@@ -168,21 +174,21 @@ export function useCubeState() {
       const dir = Math.random() > 0.5 ? 1 : -1;
       state = rotateSliceCubies(state, size, ax, slice, dir);
     }
-    setCubies(state);
+    setRotatedCubies(state);
     resetGame();
     clearHistory();
     clearRefractory();
     setHasShuffled(true);
-  }, [size, setCubies, resetGame, clearHistory, setHasShuffled]);
+  }, [size, setRotatedCubies, resetGame, clearHistory, setHasShuffled]);
 
   // Reset to solved state
   const reset = useCallback(() => {
-    setCubies(makeCubies(size));
+    setRotatedCubies(makeCubies(size));
     resetGame();
     clearHistory();
     clearRefractory();
     play('/sounds/rotate.mp3');
-  }, [size, setCubies, resetGame, clearHistory]);
+  }, [size, setRotatedCubies, resetGame, clearHistory]);
 
   // Change cube size
   const changeSize = useCallback((newSize) => {
@@ -207,6 +213,7 @@ export function useCubeState() {
 
     // Actions
     setCubies,
+    setRotatedCubies,
     changeSize,
     rotateSlice,
     flipSticker,
