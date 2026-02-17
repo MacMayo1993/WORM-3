@@ -2,14 +2,68 @@
  * useChaosMode Hook
  *
  * Manages chaos cascade system and auto-rotate effects.
+ *
+ * Performance optimisations applied:
+ *  #1 – Disparity counter kept in a ref, updated once per chaos tick instead
+ *       of being re-computed on every RAF frame (was 60×/s O(N³) scan).
+ *  #7 – Effective tick period scales with ACTIVE %: the engine breathes when
+ *       the board is already saturated and doesn't freeze trying to flip dead
+ *       tiles at full speed.
+ *  #8 – Surface-cubie list pre-computed once per cube size.  All inner loops
+ *       iterate only the ~78 % of cubies that actually carry stickers, and
+ *       the redundant isOnEdge() guard is dropped because every sticker that
+ *       exists on a surface cubie is by construction an edge sticker.
  */
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useMemo } from 'react';
 import { useGameStore } from './useGameStore.js';
 import { buildManifoldGridMap, flipStickerPair, getManifoldNeighbors, isOnSeam, isCrossFaceNeighbor } from '../game/manifoldLogic.js';
 import { getStickerWorldPos } from '../game/coordinates.js';
-import { isOnEdge } from '../game/cubeUtils.js';
 import { FLIP_CAP } from '../utils/constants.js';
+
+// ─── Module-level pure helpers ────────────────────────────────────────────────
+
+/**
+ * Build a flat list of [x, y, z] triples for every surface cubie in an S×S×S
+ * cube.  Interior cubies carry no stickers and are permanently excluded.
+ *
+ * For S=5: 125 cubies total → 98 surface cubies (22 % saving per scan pass).
+ * For S=3:  27 cubies total → 26 surface cubies.
+ */
+const buildSurfaceCoords = (S) => {
+  const coords = [];
+  for (let x = 0; x < S; x++)
+    for (let y = 0; y < S; y++)
+      for (let z = 0; z < S; z++)
+        if (x === 0 || x === S - 1 || y === 0 || y === S - 1 || z === 0 || z === S - 1)
+          coords.push([x, y, z]);
+  return coords;
+};
+
+/**
+ * Single-pass scan over surface cubies only.
+ *
+ * Returns { disparity, flipActive, edgeTotal } without calling isOnEdge()
+ * because every sticker on a surface cubie is guaranteed to be an edge sticker
+ * (makeCubies only adds stickers for outward-facing directions).
+ */
+const computeChaosMetrics = (state, surfCoords) => {
+  let disparity = 0;
+  let flipActive = 0;
+  let edgeTotal = 0;
+  for (const [x, y, z] of surfCoords) {
+    const c = state[x][y][z];
+    for (const key of Object.keys(c.stickers)) {
+      const st = c.stickers[key];
+      edgeTotal++;
+      if (st.curr !== st.orig) disparity++;
+      if ((st.flips || 0) > 0) flipActive++;
+    }
+  }
+  return { disparity, flipActive, edgeTotal };
+};
+
+// ─── Hook ─────────────────────────────────────────────────────────────────────
 
 /**
  * Hook for chaos mode management
@@ -47,21 +101,15 @@ export function useChaosMode() {
   const animStateRef = useRef(animState);
   animStateRef.current = animState;
 
-  // Helper: count stickers where curr !== orig (disparity)
-  const countDisparity = useCallback((state) => {
-    let count = 0;
-    const S = state.length;
-    for (let x = 0; x < S; x++)
-      for (let y = 0; y < S; y++)
-        for (let z = 0; z < S; z++) {
-          const c = state[x][y][z];
-          for (const dirKey of Object.keys(c.stickers)) {
-            const st = c.stickers[dirKey];
-            if (isOnEdge(x, y, z, dirKey, S) && st.curr !== st.orig) count++;
-          }
-        }
-    return count;
-  }, []);
+  // ── Opt #8: surface coords list, rebuilt only when cube size changes ────────
+  const surfaceCoords = useMemo(() => buildSurfaceCoords(size), [size]);
+  const surfaceCoordsRef = useRef(surfaceCoords);
+  surfaceCoordsRef.current = surfaceCoords;
+
+  // ── Opt #1: disparity + flipPct stored in refs, updated once per tick ──────
+  // The auto-rotate RAF reads these refs instead of scanning the full cube.
+  const disparityRef = useRef(0);
+  const flipPctRef = useRef(0); // 0-100
 
   // Generate a random rotation
   const generateRandomRotation = useCallback((cubeSize) => {
@@ -75,6 +123,14 @@ export function useChaosMode() {
   // Chaos chain propagation effect
   useEffect(() => {
     if (!chaosMode) return;
+
+    // ── Opt #1: seed metrics once at activation (surface scan, not RAF scan) ─
+    {
+      const sc = surfaceCoordsRef.current;
+      const { disparity, flipActive, edgeTotal } = computeChaosMetrics(cubiesRef.current, sc);
+      disparityRef.current = disparity;
+      flipPctRef.current = edgeTotal > 0 ? Math.round((flipActive / edgeTotal) * 100) : 0;
+    }
 
     let raf = 0, last = performance.now(), tickAcc = 0, cooldownAcc = 0;
     let wasAnimating = !!animStateRef.current;
@@ -94,36 +150,30 @@ export function useChaosMode() {
     let inCooldown = false;
     let visitedSet = new Set();
 
+    // ── Opt #8: iterate surface coords only, no isOnEdge() guard needed ──────
     const findChainStart = (state) => {
-      const S = state.length;
+      const surfCoords = surfaceCoordsRef.current;
       const candidates = [];
 
-      for (let x = 0; x < S; x++)
-        for (let y = 0; y < S; y++)
-          for (let z = 0; z < S; z++) {
-            const c = state[x][y][z];
-            for (const dirKey of Object.keys(c.stickers)) {
-              const st = c.stickers[dirKey];
-              if (st.flips > 0 && st.flips < FLIP_CAP && isOnEdge(x, y, z, dirKey, S)) {
-                candidates.push({ x, y, z, dirKey, flips: st.flips });
-              }
-            }
+      for (const [x, y, z] of surfCoords) {
+        const c = state[x][y][z];
+        for (const [dirKey, st] of Object.entries(c.stickers)) {
+          if (st.flips > 0 && st.flips < FLIP_CAP) {
+            candidates.push({ x, y, z, dirKey, flips: st.flips });
           }
+        }
+      }
 
       if (!candidates.length) {
-        // No flipped tiles exist yet — auto-seed one random edge sticker so the
-        // chaos engine can bootstrap itself without requiring a manual player flip.
+        // No flipped tiles exist yet — auto-seed one random surface sticker so
+        // chaos bootstraps itself without needing a manual player flip.
         const freshPool = [];
-        for (let x = 0; x < S; x++)
-          for (let y = 0; y < S; y++)
-            for (let z = 0; z < S; z++) {
-              const c = state[x][y][z];
-              for (const dirKey of Object.keys(c.stickers)) {
-                if (isOnEdge(x, y, z, dirKey, S)) {
-                  freshPool.push({ x, y, z, dirKey, flips: 1 });
-                }
-              }
-            }
+        for (const [x, y, z] of surfCoords) {
+          const c = state[x][y][z];
+          for (const dirKey of Object.keys(c.stickers)) {
+            freshPool.push({ x, y, z, dirKey, flips: 1 });
+          }
+        }
         if (!freshPool.length) return null;
         return { tile: freshPool[Math.floor(Math.random() * freshPool.length)], strength: 1.0 };
       }
@@ -189,14 +239,21 @@ export function useChaosMode() {
         if (!nst) continue;
         // Skip dead tiles — they can no longer participate in cascades
         if ((nst.flips || 0) >= FLIP_CAP) continue;
-        if (isOnEdge(neighbor.x, neighbor.y, neighbor.z, neighbor.dirKey, S)) {
-          // Seam Lightning: cross-face neighbors and on-seam tiles get a weight boost
-          const crossFace = isCrossFaceNeighbor(currentChainTile.dirKey, neighbor.dirKey);
-          const onSeam = isOnSeam(neighbor.x, neighbor.y, neighbor.z, neighbor.dirKey, S);
-          // Cross-face = 4x weight, on-seam = 2x weight, interior = 1x
-          const seamWeight = crossFace ? 4 : onSeam ? 2 : 1;
-          validNeighbors.push({ ...neighbor, flips: nst.flips || 0, seamWeight });
-        }
+        // Surface check: neighbor must be an outward-facing sticker (guaranteed
+        // by makeCubies, so this just guards against cross-face lookup errors)
+        const { x: nx, y: ny, z: nz, dirKey: nd } = neighbor;
+        const S1 = S - 1;
+        const onEdge = (nd === 'PX' && nx === S1) || (nd === 'NX' && nx === 0) ||
+                       (nd === 'PY' && ny === S1) || (nd === 'NY' && ny === 0) ||
+                       (nd === 'PZ' && nz === S1) || (nd === 'NZ' && nz === 0);
+        if (!onEdge) continue;
+
+        // Seam Lightning: cross-face neighbors and on-seam tiles get a weight boost
+        const crossFace = isCrossFaceNeighbor(currentChainTile.dirKey, neighbor.dirKey);
+        const onSeam = isOnSeam(neighbor.x, neighbor.y, neighbor.z, neighbor.dirKey, S);
+        // Cross-face = 4x weight, on-seam = 2x weight, interior = 1x
+        const seamWeight = crossFace ? 4 : onSeam ? 2 : 1;
+        validNeighbors.push({ ...neighbor, flips: nst.flips || 0, seamWeight });
       }
 
       let nextTile = null;
@@ -273,11 +330,27 @@ export function useChaosMode() {
         }
       } else {
         tickAcc += dt;
-        if (tickAcc >= tickPeriod) {
+
+        // ── Opt #7: adaptive tick period — slows down when board is saturated ─
+        // Formula: effectivePeriod = baseTick × (1 + flipPct/100)
+        //   0 % active  → 1.0× base  (full speed, conquering fresh surface)
+        //  50 % active  → 1.5× base  (moderate throttle)
+        // 100 % active  → 2.0× base  (half speed, board is already saturated)
+        const effectivePeriod = tickPeriod * (1 + flipPctRef.current / 100);
+
+        if (tickAcc >= effectivePeriod) {
           // Pre-compute outside Zustand's setter so clone3D/chain work happens
           // in the RAF callback, not inside React's state reconciliation.
           const next = stepChain(cubiesRef.current);
-          if (next !== cubiesRef.current) setCubies(next);
+          if (next !== cubiesRef.current) {
+            // ── Opt #1: update metrics here (once per tick) so the auto-rotate
+            // RAF never has to scan the cube itself.
+            const sc = surfaceCoordsRef.current;
+            const { disparity, flipActive, edgeTotal } = computeChaosMetrics(next, sc);
+            disparityRef.current = disparity;
+            flipPctRef.current = edgeTotal > 0 ? Math.round((flipActive / edgeTotal) * 100) : 0;
+            setCubies(next);
+          }
           tickAcc = 0;
         }
       }
@@ -313,7 +386,8 @@ export function useChaosMode() {
         return;
       }
 
-      const disparity = countDisparity(cubiesRef.current);
+      // ── Opt #1: read pre-computed disparity from ref — zero cube scan ───────
+      const disparity = disparityRef.current;
       const maxDisparity = size * size * 6;
       const disparityRatio = Math.min(1, disparity / maxDisparity);
 
@@ -342,7 +416,8 @@ export function useChaosMode() {
       raf = requestAnimationFrame(loop);
     };
 
-    const disparity = countDisparity(cubiesRef.current);
+    // ── Opt #1: read pre-computed disparity ref for initial countdown ─────────
+    const disparity = disparityRef.current;
     const maxDisparity = size * size * 6;
     const disparityRatio = Math.min(1, disparity / maxDisparity);
     const initialInterval = 10000 - disparityRatio * 9250;
@@ -350,7 +425,7 @@ export function useChaosMode() {
 
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [autoRotateEnabled, chaosMode, size, animState, upcomingRotation, generateRandomRotation, countDisparity, setAnimState, setPendingMove, setUpcomingRotation, setRotationCountdown]);
+  }, [autoRotateEnabled, chaosMode, size, animState, upcomingRotation, generateRandomRotation, setAnimState, setPendingMove, setUpcomingRotation, setRotationCountdown]);
 
   // Cascade completion handler
   const onCascadeComplete = useCallback((id) => {
