@@ -901,8 +901,13 @@ export function getTileStyleMaterial(style, colorHex, useTexture = false, textur
   const safeStyle = style || 'solid';
   const safeColorHex = colorHex || '#888888';
 
-  // Don't cache materials - color schemes can change dynamically
-  // Creating new materials is fine since Three.js handles GPU resources efficiently
+  // Cache by style+color: shader compilation is expensive (~200ms GPU block per
+  // unique pair).  Repeated calls with the same style+color return instantly.
+  const cacheKey = `${safeStyle}_${safeColorHex}`;
+  if (materialCache.has(cacheKey)) {
+    return materialCache.get(cacheKey);
+  }
+
   const fragmentShader = fragmentShaders[safeStyle] || fragmentShaders.solid;
 
   let color;
@@ -928,6 +933,7 @@ export function getTileStyleMaterial(style, colorHex, useTexture = false, textur
     blending: isGlass ? THREE.NormalBlending : THREE.NormalBlending,
   });
 
+  materialCache.set(cacheKey, material);
   return material;
 }
 
@@ -947,10 +953,13 @@ export function clearMaterialCache() {
   materialCache.clear();
 }
 
+// Module-level Set: O(1) lookup instead of allocating an array + O(N) includes
+// every time isAnimatedStyle is called (which happens per sticker per render).
+const ANIMATED_STYLES = new Set(['holographic', 'pulse', 'lava', 'galaxy', 'circuit', 'grass', 'ice', 'sand', 'water', 'neural']);
+
 /**
  * Check if a style needs time updates (animated)
  */
 export function isAnimatedStyle(style) {
-  const animated = ['holographic', 'pulse', 'lava', 'galaxy', 'circuit', 'grass', 'ice', 'sand', 'water', 'neural'];
-  return animated.includes(style);
+  return ANIMATED_STYLES.has(style);
 }
