@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { FLIP_CAP } from '../../utils/constants.js';
 
 // Convert a hex color string to an rgba() string
@@ -51,26 +51,38 @@ const TopMenuBar = ({
 
   const centerText = levelLabel || `${modeLabel} ${size}×${size}`;
 
-  // Compact face completion for the bar
-  const faceStats = useMemo(() => {
-    const faces = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
-    const faceTargets = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
-    for (const L of cubies) {
-      for (const R of L) {
-        for (const c of R) {
-          for (const [dir, st] of Object.entries(c.stickers)) {
-            const targetFace = dir === 'PZ' ? 1 : dir === 'NX' ? 2 : dir === 'PY' ? 3 :
-                              dir === 'NZ' ? 4 : dir === 'PX' ? 5 : 6;
-            faceTargets[targetFace]++;
-            if (st.curr === targetFace) faces[targetFace]++;
+  // ── Opt: faceStats polled at 200 ms instead of O(N³) on every cubies change.
+  // During chaos mode this cuts from 12×/s to 5×/s; during normal play the
+  // 200ms lag after each move is imperceptible.  cubies is always read fresh
+  // via the ref already kept for chaosStats above.
+  const [faceStats, setFaceStats] = useState(() => ({ totalComplete: 0, totalStickers: 1, percent: 0 }));
+
+  useEffect(() => {
+    const compute = () => {
+      const cur = cubiesStatRef.current;
+      const faces = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
+      const faceTargets = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
+      for (const L of cur) {
+        for (const R of L) {
+          for (const c of R) {
+            for (const [dir, st] of Object.entries(c.stickers)) {
+              const targetFace = dir === 'PZ' ? 1 : dir === 'NX' ? 2 : dir === 'PY' ? 3 :
+                                dir === 'NZ' ? 4 : dir === 'PX' ? 5 : 6;
+              faceTargets[targetFace]++;
+              if (st.curr === targetFace) faces[targetFace]++;
+            }
           }
         }
       }
-    }
-    const totalComplete = Object.values(faces).reduce((a, b) => a + b, 0);
-    const totalStickers = Object.values(faceTargets).reduce((a, b) => a + b, 0);
-    return { totalComplete, totalStickers, percent: Math.round((totalComplete / totalStickers) * 100) };
-  }, [cubies]);
+      const totalComplete = Object.values(faces).reduce((a, b) => a + b, 0);
+      const totalStickers = Object.values(faceTargets).reduce((a, b) => a + b, 0);
+      setFaceStats({ totalComplete, totalStickers, percent: Math.round((totalComplete / totalStickers) * 100) });
+    };
+
+    compute(); // immediate snapshot on mount / size change
+    const id = setInterval(compute, 200);
+    return () => clearInterval(id);
+  }, [size]); // cubies intentionally NOT a dep — read via cubiesStatRef
 
   // ── Opt #5: chaosStats polled at 500 ms instead of recomputing on every
   // cubies update (which fires every 80–250 ms during chaos mode).

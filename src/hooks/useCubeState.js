@@ -48,11 +48,15 @@ export function useCubeState() {
   const resolvedColorsRef = useRef(resolvedColors);
   resolvedColorsRef.current = resolvedColors;
 
-  // Build manifold map
+  // Build manifold map.
+  // Kept in a ref so flipSticker can read the latest value without calling
+  // buildManifoldGridMap a second time on the same cubies snapshot.
   const manifoldMap = useMemo(() => {
     if (cubies.length !== size) return new Map();
     return buildManifoldGridMap(cubies, size);
   }, [cubies, size]);
+  const manifoldMapRef = useRef(manifoldMap);
+  manifoldMapRef.current = manifoldMap;
 
   // Calculate metrics
   const metrics = useMemo(() => {
@@ -103,7 +107,9 @@ export function useCubeState() {
     const currentCubies = cubiesRef.current;
     const currentSize = currentCubies.length;
     const currentExplosionT = explosionTRef.current;
-    const currentManifoldMap = buildManifoldGridMap(currentCubies, currentSize);
+    // Re-use the manifold map already computed by useMemo — sticker flips don't
+    // change cube geometry so the cached map is always valid here.
+    const currentManifoldMap = manifoldMapRef.current;
     const sticker = currentCubies[pos.x]?.[pos.y]?.[pos.z]?.stickers?.[dirKey];
 
     if (sticker) {
