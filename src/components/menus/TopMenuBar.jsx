@@ -1,6 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { FLIP_CAP } from '../../utils/constants.js';
 
+// Must match MAX_CASCADES in useChaosMode.js — keeps the bolt display accurate
+const MAX_CASCADES = 6;
+
 // Convert a hex color string to an rgba() string
 const hexToRgba = (hex, alpha = 1) => {
   if (!hex || hex.length < 7) return `rgba(128,128,128,${alpha})`;
@@ -37,6 +40,7 @@ const TopMenuBar = ({
   chaosLevel,
   cubies,
   faceColors,
+  cascadeCount = 0,
   onShowSettings,
   currentLevelData
 }) => {
@@ -245,6 +249,25 @@ const TopMenuBar = ({
                 dimColor={dimColor}
                 title={`${chaosStats.deadTiles} tiles burned out at flip cap (${FLIP_CAP})`}
               />
+            )}
+            {/* A1/Stats: live lightning-bolt count shows cascade queue depth */}
+            {chaosMode && (
+              <ChaosStatItem
+                label="BOLTS"
+                value={`${cascadeCount}/${MAX_CASCADES}`}
+                color={cascadeCount >= MAX_CASCADES ? fc[1] : cascadeCount > 0 ? fc[5] : hexToRgba(fc[5], 0.35)}
+                dimColor={dimColor}
+                title={`${cascadeCount} of ${MAX_CASCADES} lightning bolt slots active (A1 cap)`}
+              />
+            )}
+            {/* C3/Stats: saturation-brake indicator — appears when tick is throttled */}
+            {chaosStats.flipPct > 85 && (
+              <span
+                style={{ color: fc[4], fontStyle: 'italic', fontSize: '10px', letterSpacing: '0.04em' }}
+                title={`Saturation brake active — tick period slowed ${Math.round(1 + ((chaosStats.flipPct - 85) / 15) * 2)}× (C3)`}
+              >
+                ◼ brake
+              </span>
             )}
             {chaosStats.flipActive === 0 && (
               <span

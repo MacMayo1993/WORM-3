@@ -4,6 +4,13 @@ import { FACE_COLORS, FLIP_CAP } from '../utils/constants.js';
 import { getManifoldGridId } from '../game/coordinates.js';
 import { findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
 
+// B2: Cap the number of rendered tunnels.
+// At peak 5×5 chaos there can be ~75 active antipodal pairs; each renders
+// up to 50 animated strands × 30 pts = 1 125 GPU line vertices per tunnel.
+// Keeping only the most active MAX_TUNNELS connections bounds GPU work to a
+// fixed budget and keeps the visually interesting pairs on screen.
+const MAX_TUNNELS = 24;
+
 const WormholeNetwork = ({ cubies, size, showTunnels, manifoldMap, cubieRefs, faceColors, explosionFactor = 0 }) => {
   const fc = faceColors || FACE_COLORS;
 
@@ -61,8 +68,18 @@ const WormholeNetwork = ({ cubies, size, showTunnels, manifoldMap, cubieRefs, fa
         }
       }
     }
-    return connections;
+    // B2: sort by activity (flip count) descending and take the top MAX_TUNNELS.
+    // Most-active pairs stay visible; low-activity tail is dropped silently.
+    connections.sort((a, b) => b.flips - a.flips);
+    return connections.slice(0, MAX_TUNNELS);
   }, [debouncedCubies, size, showTunnels, manifoldMap, fc]);
+
+  // B3: adaptive strand-count LOD based on how many tunnels are visible.
+  // With more tunnels each tunnel needs fewer strands to maintain a playable
+  // frame rate — the total GPU line-vertex budget stays roughly constant.
+  //  1–12 tunnels  → full density (50 strands max)
+  // 13–24 tunnels  → half density (25 strands max)
+  const maxStrands = tunnelData.length > 12 ? 25 : 50;
 
   if (!showTunnels) return null;
 
@@ -82,6 +99,7 @@ const WormholeNetwork = ({ cubies, size, showTunnels, manifoldMap, cubieRefs, fa
           color2={t.color2}
           size={size}
           explosionFactor={explosionFactor}
+          maxStrands={maxStrands}
         />
       ))}
     </group>

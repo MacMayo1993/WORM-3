@@ -903,6 +903,7 @@ export default function WORM3() {
           chaosLevel={chaosLevel}
           cubies={cubies}
           faceColors={resolvedColors}
+          cascadeCount={cascades.length}
           onShowSettings={() => setShowSettings(true)}
           currentLevelData={currentLevelData}
         />

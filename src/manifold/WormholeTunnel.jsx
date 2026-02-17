@@ -19,7 +19,7 @@ const _c1 = new THREE.Color();
 const _c2 = new THREE.Color();
 const _cTemp = new THREE.Color();
 
-const WormholeTunnel = ({ meshIdx1, meshIdx2, dirKey1, dirKey2, cubieRefs, intensity, flips, color1, color2, size, explosionFactor = 0 }) => {
+const WormholeTunnel = ({ meshIdx1, meshIdx2, dirKey1, dirKey2, cubieRefs, intensity, flips, color1, color2, size, explosionFactor = 0, maxStrands = 50 }) => {
   // B1: simple-line ref used only in explode mode — avoids mounting/ticking the
   // full strand geometry while the cube is fanned out (prevents crash at high flip counts)
   const simpleLineRef = useRef();
@@ -33,7 +33,8 @@ const WormholeTunnel = ({ meshIdx1, meshIdx2, dirKey1, dirKey2, cubieRefs, inten
   ));
 
   const strandConfig = useMemo(() => {
-    const count = Math.min(Math.max(1, flips), 50);
+    // B3: respect LOD cap from WormholeNetwork — fewer strands under high load
+    const count = Math.min(Math.max(1, flips), maxStrands);
     return Array.from({ length: count }, (_, i) => {
       const angle = (i / count) * Math.PI * 4;
       const radiusFactor = Math.sqrt(i / count);
@@ -49,7 +50,7 @@ const WormholeTunnel = ({ meshIdx1, meshIdx2, dirKey1, dirKey2, cubieRefs, inten
         sparkOffset: Math.random() * Math.PI * 2
       };
     });
-  }, [flips]);
+  }, [flips, maxStrands]);
 
   useMemo(() => {
     const c1 = new THREE.Color(color1);
