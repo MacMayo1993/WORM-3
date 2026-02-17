@@ -9,7 +9,7 @@ import { useGameStore } from './useGameStore.js';
 import { buildManifoldGridMap, flipStickerPair, getManifoldNeighbors, isOnSeam, isCrossFaceNeighbor } from '../game/manifoldLogic.js';
 import { getStickerWorldPos } from '../game/coordinates.js';
 import { isOnEdge } from '../game/cubeUtils.js';
-import { FLIP_CAP, getHalfLifeMultiplier } from '../utils/constants.js';
+import { FLIP_CAP } from '../utils/constants.js';
 
 /**
  * Hook for chaos mode management
@@ -79,15 +79,15 @@ export function useChaosMode() {
     let raf = 0, last = performance.now(), tickAcc = 0, cooldownAcc = 0;
     let wasAnimating = !!animStateRef.current;
 
-    const delayByLevel = [0, 500, 350, 200, 100];
-    const baseChanceByLevel = [0, 0.03, 0.05, 0.08, 0.12];
-    const decayByLevel = [0, 0.7, 0.8, 0.85, 0.9];
-    const cooldownByLevel = [0, 3000, 2000, 1500, 1000];
+    const delayByLevel = [0, 350, 250, 150, 80];
+    const basePropByLevel = [0, 0.50, 0.65, 0.80, 0.92];
+    const decayByLevel = [0, 0.70, 0.78, 0.84, 0.90];
+    const cooldownByLevel = [0, 1500, 1000, 700, 400];
 
-    const tickPeriod = delayByLevel[chaosLevel] || 350;
-    const basePerTally = baseChanceByLevel[chaosLevel] || 0.05;
-    const strengthDecay = decayByLevel[chaosLevel] || 0.8;
-    const chainCooldown = cooldownByLevel[chaosLevel] || 2000;
+    const tickPeriod = delayByLevel[chaosLevel] || 250;
+    const basePropagation = basePropByLevel[chaosLevel] || 0.65;
+    const strengthDecay = decayByLevel[chaosLevel] || 0.78;
+    const chainCooldown = cooldownByLevel[chaosLevel] || 1000;
 
     let currentChainTile = null;
     let chainStrength = 1.0;
@@ -104,7 +104,7 @@ export function useChaosMode() {
             const c = state[x][y][z];
             for (const dirKey of Object.keys(c.stickers)) {
               const st = c.stickers[dirKey];
-              if (st.flips > 0 && st.flips < FLIP_CAP && st.curr !== st.orig && isOnEdge(x, y, z, dirKey, S)) {
+              if (st.flips > 0 && st.flips < FLIP_CAP && isOnEdge(x, y, z, dirKey, S)) {
                 candidates.push({ x, y, z, dirKey, flips: st.flips });
               }
             }
@@ -199,11 +199,9 @@ export function useChaosMode() {
         }
 
         for (const neighbor of sorted) {
-          const tallyBonus = Math.max(1, neighbor.flips);
-          // Half-life acceleration: tiles closer to death get flipped faster
-          const halfLifeMult = getHalfLifeMultiplier(neighbor.flips);
-          // Seam Lightning: seam weight also boosts propagation chance
-          const propagateChance = chainStrength * basePerTally * tallyBonus * (neighbor.seamWeight * 0.5 + 0.5) * halfLifeMult;
+          // Propagation chance: high base scaled by chain strength + small boost for flipped tiles
+          const flipBoost = neighbor.flips > 0 ? 1.15 : 1.0;
+          const propagateChance = chainStrength * basePropagation * flipBoost;
 
           if (Math.random() < propagateChance) {
             const fromPos = getStickerWorldPos(
