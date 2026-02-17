@@ -175,7 +175,6 @@ export function useChaosMode() {
       let nextTile = null;
       if (validNeighbors.length > 0) {
         // Seam Lightning: weighted shuffle — seam neighbors get picked first
-        const totalWeight = validNeighbors.reduce((s, n) => s + n.seamWeight, 0);
         const sorted = [];
         const pool = [...validNeighbors];
         while (pool.length > 0) {
