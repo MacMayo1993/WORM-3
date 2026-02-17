@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import WormholeTunnel from './WormholeTunnel.jsx';
-import { FACE_COLORS } from '../utils/constants.js';
+import { FACE_COLORS, FLIP_CAP } from '../utils/constants.js';
 import { getManifoldGridId } from '../game/coordinates.js';
 import { findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
 
@@ -21,6 +21,8 @@ const WormholeNetwork = ({ cubies, size, showTunnels, manifoldMap, cubieRefs, fa
 
           Object.entries(cubie.stickers).forEach(([dirKey, sticker]) => {
             if (sticker.flips === 0) return;
+            // Dead tiles — sever the tunnel, connection is gone
+            if (sticker.flips >= FLIP_CAP) return;
 
             const gridId = getManifoldGridId(sticker, size);
             if (processed.has(gridId)) return;
@@ -28,6 +30,8 @@ const WormholeNetwork = ({ cubies, size, showTunnels, manifoldMap, cubieRefs, fa
 
             const antipodalLoc = findAntipodalStickerByGrid(manifoldMap, sticker, size);
             if (!antipodalLoc) return;
+            // Also sever if the antipodal side is dead
+            if ((antipodalLoc.sticker?.flips || 0) >= FLIP_CAP) return;
 
             const idx1 = ((x * size) + y) * size + z;
             const idx2 = ((antipodalLoc.x * size) + antipodalLoc.y) * size + antipodalLoc.z;

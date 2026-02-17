@@ -25,8 +25,8 @@ const faceColors = {
 /**
  * TileLeaderboard - Live stats showing antipodal pairs with most flips
  *
- * Groups tiles by antipodal pairs and displays combined flip counts.
- * Visibility controlled via Views bottom sheet toggle.
+ * Groups tiles by antipodal pairs and displays the highest individual
+ * tile flip count per pair (not the sum). Shows DEAD when a tile hits cap.
  */
 const TileLeaderboard = ({ cubies, size, chaosMode, visible, onClose }) => {
   const topPairs = useMemo(() => {
@@ -45,7 +45,7 @@ const TileLeaderboard = ({ cubies, size, chaosMode, visible, onClose }) => {
               const manifoldId = getManifoldGridId(sticker, size);
               byId[manifoldId] = {
                 manifoldId,
-                flips: sticker.flips,
+                flips: Math.min(sticker.flips, FLIP_CAP),
                 faceColor: sticker.orig,
                 antipodalFace: ANTIPODAL_COLOR[sticker.orig]
               };
@@ -62,16 +62,16 @@ const TileLeaderboard = ({ cubies, size, chaosMode, visible, onClose }) => {
       const b = Math.max(tile.faceColor, tile.antipodalFace);
       const pairKey = `${a}-${b}`;
       if (!pairMap[pairKey]) {
-        pairMap[pairKey] = { faceA: a, faceB: b, totalFlips: 0, deadCount: 0, tiles: [] };
+        pairMap[pairKey] = { faceA: a, faceB: b, maxFlips: 0, deadCount: 0, tileCount: 0 };
       }
-      pairMap[pairKey].totalFlips += tile.flips;
+      pairMap[pairKey].tileCount++;
+      if (tile.flips > pairMap[pairKey].maxFlips) pairMap[pairKey].maxFlips = tile.flips;
       if (tile.flips >= FLIP_CAP) pairMap[pairKey].deadCount++;
-      pairMap[pairKey].tiles.push(tile);
     }
 
-    // Sort pairs by total flips descending, take top 4
+    // Sort pairs by max flips descending, take top 4
     return Object.values(pairMap)
-      .sort((a, b) => b.totalFlips - a.totalFlips)
+      .sort((a, b) => b.maxFlips - a.maxFlips)
       .slice(0, 4);
   }, [cubies, size]);
 
@@ -92,27 +92,29 @@ const TileLeaderboard = ({ cubies, size, chaosMode, visible, onClose }) => {
       ) : (
         <div className="leaderboard-entries">
           {topPairs.map((pair, idx) => (
-            <div key={`${pair.faceA}-${pair.faceB}`} className="leaderboard-entry">
+            <div key={`${pair.faceA}-${pair.faceB}`} className={`leaderboard-entry${pair.deadCount > 0 ? ' entry-row-dead' : ''}`}>
               <span className="entry-rank">#{idx + 1}</span>
               <div className="entry-pair">
                 <span
                   className="tile-indicator"
-                  style={{ backgroundColor: faceColors[pair.faceA] }}
+                  style={{ backgroundColor: pair.deadCount > 0 ? '#555' : faceColors[pair.faceA] }}
                   title={faceNames[pair.faceA]}
                 />
                 <span className="pair-arrow">&#8596;</span>
                 <span
                   className="tile-indicator"
-                  style={{ backgroundColor: faceColors[pair.faceB] }}
+                  style={{ backgroundColor: pair.deadCount > 0 ? '#555' : faceColors[pair.faceB] }}
                   title={faceNames[pair.faceB]}
                 />
                 <span className="pair-label">
                   {faceNames[pair.faceA]}/{faceNames[pair.faceB]}
                 </span>
               </div>
-              <span className={`entry-flips${pair.deadCount > 0 ? ' entry-dead' : ''}`}>
-                {pair.deadCount > 0 ? 'DEAD' : pair.totalFlips}
-              </span>
+              {pair.deadCount > 0 ? (
+                <span className="entry-flips entry-dead">DEAD</span>
+              ) : (
+                <span className="entry-flips">{pair.maxFlips}/{FLIP_CAP}</span>
+              )}
             </div>
           ))}
         </div>
