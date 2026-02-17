@@ -38,6 +38,8 @@ const SecondaryModesSheet = ({
   // Advanced
   handsMode, onToggleHands,
   antipodalIntegrityMode, onToggleIntegrity,
+  // Leaderboard
+  showLeaderboard, onToggleLeaderboard,
   // Level
   currentLevelData, onShowLevels, onFreeplay
 }) => {
@@ -77,6 +79,7 @@ const SecondaryModesSheet = ({
                 <SheetItem label="Net" active={showNetPanel} onClick={onToggleNet} color="#FF9800" locked={netLocked} />
                 <SheetItem label="Hollow" active={hollowMode} onClick={onToggleHollow} color="#ff9500" />
                 <SheetItem label="Tunnels" active={showTunnels} onClick={onToggleTunnels} color="#FF9800" locked={tunnelsLocked} />
+                <SheetItem label="Leaders" active={showLeaderboard} onClick={onToggleLeaderboard} color="#764ba2" />
               </div>
             </div>
 

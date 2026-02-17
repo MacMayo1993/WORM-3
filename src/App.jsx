@@ -168,6 +168,8 @@ export default function WORM3() {
   const showLevelTutorial = useGameStore((state) => state.showLevelTutorial);
   const showNetPanel = useGameStore((state) => state.showNetPanel);
   const setShowNetPanel = useGameStore((state) => state.setShowNetPanel);
+  const showLeaderboard = useGameStore((state) => state.showLeaderboard);
+  const toggleLeaderboard = useGameStore((state) => state.toggleLeaderboard);
   const showMobileTouchHint = useGameStore((state) => state.showMobileTouchHint);
   const markMobileHintShown = useGameStore((state) => state.markMobileHintShown);
   const markIntroSeen = useGameStore((state) => state.markIntroSeen);
@@ -929,8 +931,8 @@ export default function WORM3() {
         {/* Floating HUD — auto-fade parity/chaos notifications */}
         <FloatingHUD metrics={metrics} chaosLevel={chaosLevel} chaosMode={chaosMode} />
 
-        {/* Tile Leaderboard — live flip stats in chaos mode */}
-        <TileLeaderboard cubies={cubies} size={size} chaosMode={chaosMode} />
+        {/* Tile Leaderboard — live flip stats in chaos mode, toggled via Views sheet */}
+        <TileLeaderboard cubies={cubies} size={size} chaosMode={chaosMode} visible={showLeaderboard} onClose={toggleLeaderboard} />
 
         {/* Bottom Navigation Bar */}
         <BottomNavBar
@@ -940,7 +942,7 @@ export default function WORM3() {
           teachModeActive={teachMode.active}
           onToggleSolve={() => { setSolveModeActive(!solveModeActive); if (!solveModeActive) setSolveFocusedStep(null); else setSolveHighlights([]); }}
           onToggleTeach={() => { if (teachMode.active) teachMode.exitTeachMode(); else if (size === 3) teachMode.enterTeachMode(); }}
-          hasActiveView={exploded || showTunnels || showNetPanel || hollowMode}
+          hasActiveView={exploded || showTunnels || showNetPanel || hollowMode || showLeaderboard}
           onToggleViews={() => { setSheetMode('views'); setSheetOpen(!sheetOpen || sheetMode !== 'views'); }}
           onToggleMore={() => { setSheetMode('more'); setSheetOpen(!sheetOpen || sheetMode !== 'more'); }}
           moreOpen={sheetOpen && sheetMode === 'more'}
@@ -984,6 +986,8 @@ export default function WORM3() {
         onToggleHands={() => { setHandsMode(!handsMode); if (!handsMode) { setHandsMoveHistory([]); setHandsMoveQueue([]); setHandsTps(0); handsMoveTimestamps.current = []; } }}
         antipodalIntegrityMode={antipodalIntegrityMode}
         onToggleIntegrity={() => setAntipodalIntegrityMode(!antipodalIntegrityMode)}
+        showLeaderboard={showLeaderboard}
+        onToggleLeaderboard={toggleLeaderboard}
         currentLevelData={currentLevelData}
         onShowLevels={() => { setShowLevelSelect(true); setSheetOpen(false); }}
         onFreeplay={() => { useGameStore.getState().clearLevel(); setSheetOpen(false); }}

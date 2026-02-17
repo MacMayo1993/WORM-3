@@ -3,7 +3,7 @@
 // Shared across hooks (useCubeState, useParityDecay) via module-level Map.
 
 const _map = new Map();
-const REFRACTORY_MS = 7000; // 7-second cooldown per tile
+const REFRACTORY_MS = 3000; // 3-second cooldown per tile
 
 /** Returns true if the tile is still in its refractory window. */
 export const isInRefractory = (x, y, z, dirKey) => {
