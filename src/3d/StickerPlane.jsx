@@ -712,7 +712,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot=[0,0,0], overlay, mo
 
   // UV rotation: accumulated in-plane rotations when sticker stays on same face
   const uvRotation = meta?.uvRotation ?? 0;
-  const uvRotationAngle = (uvRotation * Math.PI) / 2; // 0, 90, 180, or 270 degrees
+  const uvRotationAngle = -(uvRotation * Math.PI) / 2; // Negate for correct Three.js coordinate system
 
   return (
     <group position={pos} rotation={rot} ref={groupRef}>
