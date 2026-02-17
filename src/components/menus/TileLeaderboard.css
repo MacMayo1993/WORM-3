@@ -159,6 +159,17 @@
   letter-spacing: 0.08em;
 }
 
+.leaderboard-entry.entry-row-dead {
+  background: rgba(80, 80, 80, 0.15);
+  border: 1px solid rgba(80, 80, 80, 0.2);
+  opacity: 0.7;
+}
+
+.leaderboard-entry.entry-row-dead .pair-label {
+  text-decoration: line-through;
+  color: rgba(255, 255, 255, 0.3);
+}
+
 /* Medal highlights for top 3 */
 .leaderboard-entry:nth-child(1) {
   background: linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(255, 215, 0, 0.03) 100%);

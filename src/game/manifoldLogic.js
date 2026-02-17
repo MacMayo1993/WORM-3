@@ -159,13 +159,14 @@ export const flipStickerPair = (state, size, x, y, z, dirKey, manifoldMap) => {
     if (!loc) return;
     const c = next[loc.x][loc.y][loc.z];
     const st = c.stickers[loc.dirKey];
+    const currentFlips = st.flips || 0;
     // Dead tiles (at flip cap) can no longer be flipped
-    if ((st.flips || 0) >= FLIP_CAP) return;
+    if (currentFlips >= FLIP_CAP) return;
     const stickers = { ...c.stickers };
     stickers[loc.dirKey] = {
       ...st,
       curr: ANTIPODAL_COLOR[st.curr],
-      flips: (st.flips || 0) + 1
+      flips: Math.min(FLIP_CAP, currentFlips + 1)
     };
     next[loc.x][loc.y][loc.z] = { ...c, stickers };
   };

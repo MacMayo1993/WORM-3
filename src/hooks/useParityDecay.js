@@ -14,6 +14,7 @@ import { useGameStore } from './useGameStore.js';
 import { buildManifoldGridMap, flipStickerPair, findAntipodalStickerByGrid, getManifoldNeighbors } from '../game/manifoldLogic.js';
 import { isOnEdge } from '../game/cubeUtils.js';
 import { isInRefractory, markFlipped } from '../game/refractoryMap.js';
+import { FLIP_CAP } from '../utils/constants.js';
 
 // Tuning constants
 const TICK_MS = 2500;            // check interval
@@ -58,7 +59,7 @@ export function useParityDecay() {
             const c = state[x][y][z];
             for (const dirKey of Object.keys(c.stickers)) {
               const st = c.stickers[dirKey];
-              if (st.flips > 0 && isOnEdge(x, y, z, dirKey, S)) {
+              if (st.flips > 0 && st.flips < FLIP_CAP && isOnEdge(x, y, z, dirKey, S)) {
                 candidates.push({ x, y, z, dirKey, flips: st.flips });
               }
             }
@@ -99,6 +100,7 @@ export function useParityDecay() {
           if (!nc) continue;
           const nst = nc.stickers[nb.dirKey];
           if (!nst || !isOnEdge(nb.x, nb.y, nb.z, nb.dirKey, S)) continue;
+          if ((nst.flips || 0) >= FLIP_CAP) continue;
 
           // Propagation chance scales with source flip count
           const propChance = Math.min(tile.flips * PROPAGATE_CHANCE, MAX_PROPAGATE);

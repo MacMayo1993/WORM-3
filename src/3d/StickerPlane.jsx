@@ -789,8 +789,38 @@ const StickerPlane = function StickerPlane({ meta, pos, rot=[0,0,0], overlay, mo
       )}
       </group>
 
+      {/* Dead tile headstone — replaces all live overlays */}
+      {isDead && (
+        <group position={[0, 0, 0.02]}>
+          {/* Headstone body — rounded rectangle */}
+          <mesh position={[0, 0.06, 0]}>
+            <planeGeometry args={[0.28, 0.34]} />
+            <meshStandardMaterial color="#777777" roughness={0.8} metalness={0.1} />
+          </mesh>
+          {/* Headstone arch top */}
+          <mesh position={[0, 0.24, 0.001]}>
+            <circleGeometry args={[0.14, 16, 0, Math.PI]} />
+            <meshStandardMaterial color="#777777" roughness={0.8} metalness={0.1} />
+          </mesh>
+          {/* Cross etching */}
+          <mesh position={[0, 0.1, 0.003]}>
+            <planeGeometry args={[0.03, 0.16]} />
+            <meshBasicMaterial color="#444444" />
+          </mesh>
+          <mesh position={[0, 0.14, 0.003]}>
+            <planeGeometry args={[0.1, 0.03]} />
+            <meshBasicMaterial color="#444444" />
+          </mesh>
+          {/* Ground base */}
+          <mesh position={[0, -0.12, -0.001]}>
+            <planeGeometry args={[0.36, 0.06]} />
+            <meshStandardMaterial color="#555555" roughness={0.9} />
+          </mesh>
+        </group>
+      )}
+
       {/* Tally Marks - skip if origColor is white on non-white tile */}
-      {!isSudokube && hasFlipHistory && !(origIsWhite && !currIsWhite) && (
+      {!isDead && !isSudokube && hasFlipHistory && !(origIsWhite && !currIsWhite) && (
         <TallyMarks
           flips={meta?.flips ?? 0}
           radius={trackerRadius}
@@ -799,7 +829,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot=[0,0,0], overlay, mo
       )}
 
       {/* Flipped tile border - skip white rings on non-white tiles */}
-      {!isSudokube && hasFlipHistory && (
+      {!isDead && !isSudokube && hasFlipHistory && (
         <>
           {!(origIsWhite && !currIsWhite) && (
             <mesh position={[0,0,0.006]}>
@@ -816,7 +846,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot=[0,0,0], overlay, mo
         </>
       )}
 
-      {!isSudokube && isWormhole && (
+      {!isDead && !isSudokube && isWormhole && (
         <>
           {/* Parity breakthrough — original color trying to push through */}
           <ParityBreakthrough origColor={origColor} flipCount={meta?.flips ?? 1} />
