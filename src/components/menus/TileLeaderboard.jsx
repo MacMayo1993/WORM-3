@@ -23,10 +23,9 @@ const faceColors = {
 };
 
 /**
- * TileLeaderboard - Live stats showing antipodal pairs with most flips
- *
- * Groups tiles by antipodal pairs and displays the highest individual
- * tile flip count per pair (not the sum). Shows DEAD when a tile hits cap.
+ * TileLeaderboard - Shows individual tiles paired with their antipodal twin.
+ * Each row is one manifold pair: tile A flips ↔ tile B flips.
+ * Sorted by the higher of the two flip counts, top 5.
  */
 const TileLeaderboard = ({ cubies, size, chaosMode, visible, onClose }) => {
   const topPairs = useMemo(() => {
@@ -34,7 +33,6 @@ const TileLeaderboard = ({ cubies, size, chaosMode, visible, onClose }) => {
 
     // Collect all flipped edge stickers keyed by manifold ID
     const byId = {};
-
     for (let x = 0; x < size; x++) {
       for (let y = 0; y < size; y++) {
         for (let z = 0; z < size; z++) {
@@ -46,8 +44,7 @@ const TileLeaderboard = ({ cubies, size, chaosMode, visible, onClose }) => {
               byId[manifoldId] = {
                 manifoldId,
                 flips: Math.min(sticker.flips, FLIP_CAP),
-                faceColor: sticker.orig,
-                antipodalFace: ANTIPODAL_COLOR[sticker.orig]
+                face: sticker.orig
               };
             }
           }
@@ -55,24 +52,46 @@ const TileLeaderboard = ({ cubies, size, chaosMode, visible, onClose }) => {
       }
     }
 
-    // Group into antipodal pairs using a canonical key (lower face ID first)
+    // Build 1:1 antipodal pairs using canonical key (lower manifold ID first)
     const pairMap = {};
     for (const tile of Object.values(byId)) {
-      const a = Math.min(tile.faceColor, tile.antipodalFace);
-      const b = Math.max(tile.faceColor, tile.antipodalFace);
-      const pairKey = `${a}-${b}`;
+      const antipodalFace = ANTIPODAL_COLOR[tile.face];
+      // Derive antipodal manifold ID — same positional index, opposite face
+      const posIdx = tile.manifoldId.split('-')[1];
+      const antipodalId = `M${antipodalFace}-${posIdx}`;
+
+      // Canonical key: alphabetically lower ID first to avoid duplicates
+      const keyA = tile.manifoldId < antipodalId ? tile.manifoldId : antipodalId;
+      const keyB = tile.manifoldId < antipodalId ? antipodalId : tile.manifoldId;
+      const pairKey = `${keyA}|${keyB}`;
+
       if (!pairMap[pairKey]) {
-        pairMap[pairKey] = { faceA: a, faceB: b, maxFlips: 0, deadCount: 0, tileCount: 0 };
+        const faceA = tile.manifoldId < antipodalId ? tile.face : antipodalFace;
+        const faceB = tile.manifoldId < antipodalId ? antipodalFace : tile.face;
+        pairMap[pairKey] = {
+          key: pairKey,
+          faceA,
+          faceB,
+          flipsA: 0,
+          flipsB: 0,
+          idA: keyA,
+          idB: keyB
+        };
       }
-      pairMap[pairKey].tileCount++;
-      if (tile.flips > pairMap[pairKey].maxFlips) pairMap[pairKey].maxFlips = tile.flips;
-      if (tile.flips >= FLIP_CAP) pairMap[pairKey].deadCount++;
+
+      // Assign flips to the correct side
+      if (tile.manifoldId === pairMap[pairKey].idA) {
+        pairMap[pairKey].flipsA = tile.flips;
+      } else {
+        pairMap[pairKey].flipsB = tile.flips;
+      }
     }
 
-    // Sort pairs by max flips descending, take top 4
+    // Sort by highest flip in the pair, take top 5
     return Object.values(pairMap)
+      .map((p) => ({ ...p, maxFlips: Math.max(p.flipsA, p.flipsB) }))
       .sort((a, b) => b.maxFlips - a.maxFlips)
-      .slice(0, 4);
+      .slice(0, 5);
   }, [cubies, size]);
 
   if (!visible) return null;
@@ -80,7 +99,7 @@ const TileLeaderboard = ({ cubies, size, chaosMode, visible, onClose }) => {
   return (
     <div className="tile-leaderboard">
       <div className="leaderboard-header">
-        <span className="leaderboard-title">Flip Leaderboard</span>
+        <span className="leaderboard-title">Flip Pairs</span>
         <button className="leaderboard-close-btn" onClick={onClose} title="Hide Leaderboard">
           x
         </button>
@@ -91,32 +110,45 @@ const TileLeaderboard = ({ cubies, size, chaosMode, visible, onClose }) => {
         </div>
       ) : (
         <div className="leaderboard-entries">
-          {topPairs.map((pair, idx) => (
-            <div key={`${pair.faceA}-${pair.faceB}`} className={`leaderboard-entry${pair.deadCount > 0 ? ' entry-row-dead' : ''}`}>
-              <span className="entry-rank">#{idx + 1}</span>
-              <div className="entry-pair">
-                <span
-                  className="tile-indicator"
-                  style={{ backgroundColor: pair.deadCount > 0 ? '#555' : faceColors[pair.faceA] }}
-                  title={faceNames[pair.faceA]}
-                />
-                <span className="pair-arrow">&#8596;</span>
-                <span
-                  className="tile-indicator"
-                  style={{ backgroundColor: pair.deadCount > 0 ? '#555' : faceColors[pair.faceB] }}
-                  title={faceNames[pair.faceB]}
-                />
-                <span className="pair-label">
-                  {faceNames[pair.faceA]}/{faceNames[pair.faceB]}
-                </span>
+          {topPairs.map((pair, idx) => {
+            const deadA = pair.flipsA >= FLIP_CAP;
+            const deadB = pair.flipsB >= FLIP_CAP;
+            const bothDead = deadA && deadB;
+            const eitherDead = deadA || deadB;
+            return (
+              <div key={pair.key} className={`leaderboard-entry${bothDead ? ' entry-row-dead' : ''}`}>
+                <span className="entry-rank">#{idx + 1}</span>
+                <div className="entry-pair-detail">
+                  {/* Side A */}
+                  <div className={`pair-side${deadA ? ' side-dead' : ''}`}>
+                    <span
+                      className="tile-indicator"
+                      style={{ backgroundColor: deadA ? '#555' : faceColors[pair.faceA] }}
+                      title={faceNames[pair.faceA]}
+                    />
+                    <span className="side-flips">
+                      {deadA ? 'X' : pair.flipsA}
+                    </span>
+                  </div>
+                  {/* Arrow */}
+                  <span className={`pair-arrow-detail${eitherDead ? ' arrow-severed' : ''}`}>
+                    {bothDead ? '//': '\u2194'}
+                  </span>
+                  {/* Side B */}
+                  <div className={`pair-side${deadB ? ' side-dead' : ''}`}>
+                    <span className="side-flips">
+                      {deadB ? 'X' : pair.flipsB}
+                    </span>
+                    <span
+                      className="tile-indicator"
+                      style={{ backgroundColor: deadB ? '#555' : faceColors[pair.faceB] }}
+                      title={faceNames[pair.faceB]}
+                    />
+                  </div>
+                </div>
               </div>
-              {pair.deadCount > 0 ? (
-                <span className="entry-flips entry-dead">DEAD</span>
-              ) : (
-                <span className="entry-flips">{pair.maxFlips}/{FLIP_CAP}</span>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
