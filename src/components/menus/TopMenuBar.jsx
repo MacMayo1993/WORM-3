@@ -1,4 +1,22 @@
 import React, { useMemo } from 'react';
+import { FLIP_CAP } from '../../utils/constants.js';
+
+// Convert a hex color string to an rgba() string
+const hexToRgba = (hex, alpha = 1) => {
+  if (!hex || hex.length < 7) return `rgba(128,128,128,${alpha})`;
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+};
+
+// Compact stat chip — colors drawn from the cube's own face palette
+const ChaosStatItem = ({ label, value, color, dimColor, title }) => (
+  <span title={title} style={{ display: 'inline-flex', alignItems: 'baseline', gap: '4px', cursor: 'default' }}>
+    <span style={{ color: dimColor, fontSize: '9px', letterSpacing: '0.08em', textTransform: 'uppercase' }}>{label}</span>
+    <span style={{ color, fontWeight: 700, fontSize: '12px' }}>{value}</span>
+  </span>
+);
 
 /**
  * TopMenuBar - Thin 48dp Google-inspired top app bar
@@ -6,6 +24,9 @@ import React, { useMemo } from 'react';
  * Left: Mode label (Classic 3×3) + Completion percentage
  * Center: WORM³ title
  * Right: Settings gear icon
+ *
+ * When chaos mode is active a second row shows live flip stats and a
+ * Chaos Pressure bar whose gradient is drawn from the cube's face colors.
  */
 const TopMenuBar = ({
   metrics: _metrics,
@@ -15,6 +36,7 @@ const TopMenuBar = ({
   chaosMode,
   chaosLevel,
   cubies,
+  faceColors,
   onShowSettings,
   currentLevelData
 }) => {
@@ -50,8 +72,67 @@ const TopMenuBar = ({
     return { totalComplete, totalStickers, percent: Math.round((totalComplete / totalStickers) * 100) };
   }, [cubies]);
 
+  // Chaos flip stats — only computed when chaos mode is active
+  const chaosStats = useMemo(() => {
+    if (!chaosMode) return null;
+    let totalFlips = 0;
+    let flipActive = 0; // stickers with flips > 0
+    let deadTiles = 0;  // stickers at FLIP_CAP
+    let disparate = 0;  // stickers where curr !== orig
+    let edgeTotal = 0;
+    const S = size;
+
+    for (const L of cubies) {
+      for (const R of L) {
+        for (const c of R) {
+          for (const [dir, st] of Object.entries(c.stickers)) {
+            const onEdge =
+              (dir === 'PX' && c.x === S - 1) || (dir === 'NX' && c.x === 0) ||
+              (dir === 'PY' && c.y === S - 1) || (dir === 'NY' && c.y === 0) ||
+              (dir === 'PZ' && c.z === S - 1) || (dir === 'NZ' && c.z === 0);
+            if (!onEdge) continue;
+            edgeTotal++;
+            const flips = st.flips || 0;
+            totalFlips += flips;
+            if (flips > 0) flipActive++;
+            if (flips >= FLIP_CAP) deadTiles++;
+            if (st.curr !== st.orig) disparate++;
+          }
+        }
+      }
+    }
+
+    const flipPct = edgeTotal > 0 ? Math.round((flipActive / edgeTotal) * 100) : 0;
+    const disparityPct = edgeTotal > 0 ? Math.round((disparate / edgeTotal) * 100) : 0;
+    const deadPct = edgeTotal > 0 ? Math.round((deadTiles / edgeTotal) * 100) : 0;
+    return { totalFlips, flipActive, deadTiles, disparate, flipPct, disparityPct, deadPct, edgeTotal };
+  }, [chaosMode, cubies, size]);
+
+  // Resolved face palette — safe fallbacks if faceColors not yet loaded
+  const fc = faceColors || { 1: '#ef4444', 2: '#22c55e', 3: '#ffffff', 4: '#f97316', 5: '#3b82f6', 6: '#eab308' };
+
+  // Pick stat colors based on the cube's face palette:
+  //   FLIPS     → face 5 (right/blue in standard) — a cool metric readout
+  //   ACTIVE %  → face 2 calm → face 4 warm → face 1 hot (threshold-stepped)
+  //   DISPARITY → face 3 calm → face 4 warn → face 1 danger (threshold-stepped)
+  //   DEAD %    → face 6 at reduced opacity
+  //   NO-SEED   → face 1 (the "danger" face in every scheme)
+  const dimColor = hexToRgba(fc[5], 0.45);
+
+  const activeColor = chaosStats
+    ? (chaosStats.flipPct > 50 ? fc[1] : chaosStats.flipPct > 20 ? fc[4] : fc[2])
+    : fc[2];
+
+  const disparityColor = chaosStats
+    ? (chaosStats.disparityPct > 60 ? fc[1] : chaosStats.disparityPct > 30 ? fc[4] : fc[3])
+    : fc[3];
+
+  // Pressure bar: gradient from face 2 (calm) through face 6 (tension) to face 1 (danger)
+  const pressureGradient = `linear-gradient(to right, ${fc[2]}, ${fc[6]}, ${fc[1]})`;
+  const pressureTrack = hexToRgba(fc[2], 0.15);
+
   return (
-    <div className="top-app-bar">
+    <div className="top-app-bar" style={chaosMode ? { flexWrap: 'wrap', height: 'auto', minHeight: '48px' } : {}}>
       {/* Left: Mode label + Percentage */}
       <div className="top-bar-left">
         <span className="top-bar-title">{centerText}</span>
@@ -90,6 +171,83 @@ const TopMenuBar = ({
           </svg>
         </button>
       </div>
+
+      {/* Chaos Stats Strip + Pressure Bar — visible when chaos mode is active */}
+      {chaosMode && chaosStats && (
+        <>
+          {/* Stats row */}
+          <div style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '18px',
+            padding: '3px 16px 4px',
+            borderTop: `1px solid ${hexToRgba(fc[5], 0.18)}`,
+            fontSize: '11px',
+            fontFamily: "'Courier New', monospace",
+            flexWrap: 'wrap',
+          }}>
+            <ChaosStatItem
+              label="FLIPS"
+              value={chaosStats.totalFlips}
+              color={fc[5]}
+              dimColor={dimColor}
+              title={`${chaosStats.flipActive} of ${chaosStats.edgeTotal} tiles have been flipped at least once`}
+            />
+            <ChaosStatItem
+              label="ACTIVE"
+              value={`${chaosStats.flipPct}%`}
+              color={activeColor}
+              dimColor={dimColor}
+              title={`${chaosStats.flipActive} tiles with flips > 0`}
+            />
+            <ChaosStatItem
+              label="DISPARITY"
+              value={`${chaosStats.disparityPct}%`}
+              color={disparityColor}
+              dimColor={dimColor}
+              title={`${chaosStats.disparate} of ${chaosStats.edgeTotal} stickers are off their home face`}
+            />
+            {chaosStats.deadTiles > 0 && (
+              <ChaosStatItem
+                label="DEAD"
+                value={`${chaosStats.deadPct}%`}
+                color={hexToRgba(fc[6], 0.6)}
+                dimColor={dimColor}
+                title={`${chaosStats.deadTiles} tiles burned out at flip cap (${FLIP_CAP})`}
+              />
+            )}
+            {chaosStats.flipActive === 0 && (
+              <span
+                style={{ color: fc[1], fontStyle: 'italic', fontSize: '10px' }}
+                title="Chaos engine seeding — first ignition is automatic"
+              >
+                ⚡ igniting…
+              </span>
+            )}
+          </div>
+
+          {/* Chaos Pressure Bar — full-width gradient fill tracking ACTIVE % */}
+          <div style={{
+            width: '100%',
+            height: '4px',
+            background: pressureTrack,
+            position: 'relative',
+            overflow: 'hidden',
+          }}>
+            <div style={{
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              height: '100%',
+              width: `${chaosStats.flipPct}%`,
+              background: pressureGradient,
+              transition: 'width 0.6s ease',
+              boxShadow: chaosStats.flipPct > 0 ? `0 0 6px ${hexToRgba(fc[1], 0.7)}` : 'none',
+            }} />
+          </div>
+        </>
+      )}
     </div>
   );
 };
