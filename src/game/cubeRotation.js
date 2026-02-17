@@ -27,13 +27,14 @@ export const rotateStickers = (stickers, axis, dir) => {
 
     // If sticker stays on same face (in-plane rotation), apply UV rotation
     // Direction must be adjusted based on which face we're on relative to rotation axis
+    // NOTE: Due to Three.js coordinate system, positive faces need negated direction
     const stayedOnSameFace = newKey === k;
     let uvDir = dir;
     if (stayedOnSameFace) {
-      // Faces on opposite sides of rotation axis need opposite UV rotation directions
-      if (axis === 'col' && k === 'NX') uvDir = -dir;       // X-axis: NX face is opposite direction
-      else if (axis === 'row' && k === 'NY') uvDir = -dir;  // Y-axis: NY face is opposite direction
-      else if (axis === 'depth' && k === 'NZ') uvDir = -dir; // Z-axis: NZ face is opposite direction
+      // Positive faces (PX, PY, PZ) need opposite direction due to viewing angle
+      if (axis === 'col' && k === 'PX') uvDir = -dir;       // X-axis: PX face needs negated direction
+      else if (axis === 'row' && k === 'PY') uvDir = -dir;  // Y-axis: PY face needs negated direction
+      else if (axis === 'depth' && k === 'PZ') uvDir = -dir; // Z-axis: PZ face needs negated direction
     }
 
     next[newKey] = {
