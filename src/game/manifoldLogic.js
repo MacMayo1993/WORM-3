@@ -1,6 +1,6 @@
 // src/game/manifoldLogic.js
 // Manifold topology and antipodal flipping logic
-import { ANTIPODAL_COLOR } from '../utils/constants.js';
+import { ANTIPODAL_COLOR, FLIP_CAP } from '../utils/constants.js';
 import { getGridRC, getManifoldGridId } from './coordinates.js';
 import { clone3D } from './cubeState.js';
 
@@ -159,6 +159,8 @@ export const flipStickerPair = (state, size, x, y, z, dirKey, manifoldMap) => {
     if (!loc) return;
     const c = next[loc.x][loc.y][loc.z];
     const st = c.stickers[loc.dirKey];
+    // Dead tiles (at flip cap) can no longer be flipped
+    if ((st.flips || 0) >= FLIP_CAP) return;
     const stickers = { ...c.stickers };
     stickers[loc.dirKey] = {
       ...st,

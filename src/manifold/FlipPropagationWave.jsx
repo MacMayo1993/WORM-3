@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import { FACE_COLORS, ANTIPODAL_COLOR } from '../utils/constants.js';
+import { FACE_COLORS, ANTIPODAL_COLOR, FLIP_CAP, getHalfLifeMultiplier } from '../utils/constants.js';
 import WormParticle from './WormParticle.jsx';
 
 // Shared geometries for wave effects - created once, reused
@@ -117,43 +117,74 @@ const FlipPropagationWave = ({ origins, onComplete }) => {
 };
 
 /**
- * ChaosHeatMap - Overlay showing cumulative flip intensity on each sticker
- * Rendered as a glowing aura around high-chaos tiles
+ * ChaosHeatMap - Overlay showing cumulative flip intensity on each sticker.
+ * Heartbeat pulse rate tied to half-life acceleration:
+ *   0-49 flips = slow breath, 50+ = 2x, 75+ = 4x, etc.
+ * At FLIP_CAP the tile is dead — flat gray, no pulse.
  */
 export const ChaosHeatMap = ({ position, rotation, flips, maxFlips = 10 }) => {
   const glowRef = useRef();
   const pulseRef = useRef(0);
+  const dead = flips >= FLIP_CAP;
 
-  useFrame((state, delta) => {
+  useFrame((_state, delta) => {
     if (!glowRef.current) return;
 
-    pulseRef.current += delta * 2;
+    if (dead) {
+      // Dead tile: static dim gray glow, no pulse
+      glowRef.current.material.opacity = 0.4;
+      glowRef.current.scale.setScalar(1);
+      return;
+    }
 
-    // Pulse intensity based on flip count
+    // Heartbeat rate scales with half-life multiplier
+    const halfLife = getHalfLifeMultiplier(flips);
+    const baseRate = 1.5; // resting heartbeat ~1.5 Hz
+    const heartRate = baseRate * halfLife;
+    pulseRef.current += delta * heartRate;
+
+    // Double-bump heartbeat waveform: two sharp peaks per cycle
+    const t = pulseRef.current % (Math.PI * 2);
+    const bump1 = Math.exp(-Math.pow((t - 1.0) * 3, 2));
+    const bump2 = Math.exp(-Math.pow((t - 1.8) * 4, 2)) * 0.6;
+    const heartbeat = bump1 + bump2;
+
     const intensity = Math.min(1, flips / maxFlips);
-    const pulse = Math.sin(pulseRef.current * (1 + intensity * 2)) * 0.2 + 0.8;
+    glowRef.current.material.opacity = intensity * (0.3 + heartbeat * 0.5);
 
-    glowRef.current.material.opacity = intensity * pulse * 0.6;
-
-    // Slight scale pulse
-    const scale = 1 + intensity * 0.1 * Math.sin(pulseRef.current);
+    // Scale pulse follows heartbeat
+    const scale = 1 + heartbeat * 0.15 * intensity;
     glowRef.current.scale.set(scale, scale, 1);
   });
 
   if (flips === 0) return null;
+
+  // Dead tile: flat gray
+  if (dead) {
+    return (
+      <group position={position} rotation={rotation}>
+        <mesh ref={glowRef} position={[0, 0, 0.01]} geometry={sharedHeatOuterCircle}>
+          <meshBasicMaterial
+            color="#555555"
+            transparent
+            opacity={0.4}
+            blending={THREE.NormalBlending}
+            depthWrite={false}
+          />
+        </mesh>
+      </group>
+    );
+  }
 
   // Color gradient from cool (low flips) to hot (high flips)
   const intensity = Math.min(1, flips / maxFlips);
   const heatColor = new THREE.Color();
 
   if (intensity < 0.33) {
-    // Blue to cyan
     heatColor.setHSL(0.55 - intensity * 0.5, 1, 0.5);
   } else if (intensity < 0.66) {
-    // Cyan to yellow
     heatColor.setHSL(0.15, 1, 0.5);
   } else {
-    // Yellow to red/white hot
     heatColor.setHSL(0.05 - (intensity - 0.66) * 0.15, 1, 0.5 + intensity * 0.3);
   }
 

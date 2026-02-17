@@ -1,7 +1,7 @@
 import React, { useRef, useMemo, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { FACE_COLORS } from '../utils/constants.js';
+import { FACE_COLORS, FLIP_CAP, getHalfLifeMultiplier } from '../utils/constants.js';
 import { getStickerWorldPosFromMesh } from '../game/coordinates.js';
 import { calculateSmartControlPoint } from '../utils/smartRouting.js';
 
@@ -87,32 +87,47 @@ const WormholeTunnel = ({ meshIdx1, meshIdx2, dirKey1, dirKey2, cubieRefs, inten
     _vEnd.set(pos2[0], pos2[1], pos2[2]);
 
     const t = state.clock.elapsedTime;
+    const dead = flips >= FLIP_CAP;
 
-    // Surge signal — synced with tile persistent tremor (StickerPlane.jsx:632-634)
-    const raw = Math.sin(t * 1.5) * 0.45 + Math.sin(t * 2.7) * 0.3 + Math.sin(t * 0.6) * 0.25;
-    const surge = Math.pow(Math.max(0, raw), 2.0);
+    // Heartbeat-synced breathing: half-life multiplier drives the rate
+    const halfLife = getHalfLifeMultiplier(flips);
+    const breathRate = dead ? 0 : halfLife;
 
-    // Tug-of-war bias: oscillates at the dominant tremor frequency, amplified during surge
-    const tugRaw = Math.sin(t * 1.5);
+    // Surge signal — synced with tile persistent tremor, scaled by heartbeat rate
+    const surgeFreq = 1.5 * Math.max(1, breathRate);
+    const raw = Math.sin(t * surgeFreq) * 0.45 + Math.sin(t * surgeFreq * 1.8) * 0.3 + Math.sin(t * surgeFreq * 0.4) * 0.25;
+    const surge = dead ? 0 : Math.pow(Math.max(0, raw), 2.0);
+
+    // Tug-of-war bias: oscillates at heartbeat frequency, amplified during surge
+    const tugRaw = dead ? 0 : Math.sin(t * surgeFreq);
     const tugBias = tugRaw * (0.3 + surge * 0.4);
 
-    pulseT.current += delta * (2 + intensity * 0.5);
-    const pulse = Math.sin(pulseT.current) * 0.1 + 0.9;
+    pulseT.current += delta * (2 + intensity * 0.5) * Math.max(1, breathRate);
+    const pulse = dead ? 0.3 : Math.sin(pulseT.current) * 0.1 + 0.9;
 
-    // Set up colors for transference animation
-    _c1.set(color1);
-    _c2.set(color2);
+    // Set up colors for transference animation — dead tunnels desaturate to gray
+    if (dead) {
+      _c1.set('#555555');
+      _c2.set('#444444');
+    } else {
+      _c1.set(color1);
+      _c2.set(color2);
+    }
 
     linesRef.current.forEach((line, i) => {
       if (!line) return;
       const config = strandConfig[i];
 
-      // Opacity with surge glow boost
+      // Opacity with surge glow boost — dead tunnels dim to faint gray
       if (line.material) {
-        const sparkPulse = Math.sin(pulseT.current * 3 + config.sparkOffset);
-        const spark = sparkPulse > 0.9 ? (sparkPulse - 0.9) * 10 : 0;
-        const surgeGlow = surge * 0.3;
-        line.material.opacity = Math.min(1, config.baseOpacity * pulse * (1 + spark * 0.5) + surgeGlow);
+        if (dead) {
+          line.material.opacity = 0.12;
+        } else {
+          const sparkPulse = Math.sin(pulseT.current * 3 + config.sparkOffset);
+          const spark = sparkPulse > 0.9 ? (sparkPulse - 0.9) * 10 : 0;
+          const surgeGlow = surge * 0.3;
+          line.material.opacity = Math.min(1, config.baseOpacity * pulse * (1 + spark * 0.5) + surgeGlow);
+        }
       }
 
       // Smart control point with tug-of-war shift (scaled for explosion)

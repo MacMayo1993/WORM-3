@@ -9,6 +9,7 @@ import { useGameStore } from './useGameStore.js';
 import { buildManifoldGridMap, flipStickerPair, getManifoldNeighbors, isOnSeam, isCrossFaceNeighbor } from '../game/manifoldLogic.js';
 import { getStickerWorldPos } from '../game/coordinates.js';
 import { isOnEdge } from '../game/cubeUtils.js';
+import { FLIP_CAP, getHalfLifeMultiplier } from '../utils/constants.js';
 
 /**
  * Hook for chaos mode management
@@ -103,7 +104,7 @@ export function useChaosMode() {
             const c = state[x][y][z];
             for (const dirKey of Object.keys(c.stickers)) {
               const st = c.stickers[dirKey];
-              if (st.flips > 0 && st.curr !== st.orig && isOnEdge(x, y, z, dirKey, S)) {
+              if (st.flips > 0 && st.flips < FLIP_CAP && st.curr !== st.orig && isOnEdge(x, y, z, dirKey, S)) {
                 candidates.push({ x, y, z, dirKey, flips: st.flips });
               }
             }
@@ -170,6 +171,8 @@ export function useChaosMode() {
         if (!nc) continue;
         const nst = nc.stickers[neighbor.dirKey];
         if (!nst) continue;
+        // Skip dead tiles — they can no longer participate in cascades
+        if ((nst.flips || 0) >= FLIP_CAP) continue;
         if (isOnEdge(neighbor.x, neighbor.y, neighbor.z, neighbor.dirKey, S)) {
           // Seam Lightning: cross-face neighbors and on-seam tiles get a weight boost
           const crossFace = isCrossFaceNeighbor(currentChainTile.dirKey, neighbor.dirKey);
@@ -197,8 +200,10 @@ export function useChaosMode() {
 
         for (const neighbor of sorted) {
           const tallyBonus = Math.max(1, neighbor.flips);
+          // Half-life acceleration: tiles closer to death get flipped faster
+          const halfLifeMult = getHalfLifeMultiplier(neighbor.flips);
           // Seam Lightning: seam weight also boosts propagation chance
-          const propagateChance = chainStrength * basePerTally * tallyBonus * (neighbor.seamWeight * 0.5 + 0.5);
+          const propagateChance = chainStrength * basePerTally * tallyBonus * (neighbor.seamWeight * 0.5 + 0.5) * halfLifeMult;
 
           if (Math.random() < propagateChance) {
             const fromPos = getStickerWorldPos(
