@@ -110,7 +110,23 @@ export function useChaosMode() {
             }
           }
 
-      if (!candidates.length) return null;
+      if (!candidates.length) {
+        // No flipped tiles exist yet — auto-seed one random edge sticker so the
+        // chaos engine can bootstrap itself without requiring a manual player flip.
+        const freshPool = [];
+        for (let x = 0; x < S; x++)
+          for (let y = 0; y < S; y++)
+            for (let z = 0; z < S; z++) {
+              const c = state[x][y][z];
+              for (const dirKey of Object.keys(c.stickers)) {
+                if (isOnEdge(x, y, z, dirKey, S)) {
+                  freshPool.push({ x, y, z, dirKey, flips: 1 });
+                }
+              }
+            }
+        if (!freshPool.length) return null;
+        return { tile: freshPool[Math.floor(Math.random() * freshPool.length)], strength: 1.0 };
+      }
 
       const totalWeight = candidates.reduce((sum, c) => sum + c.flips, 0);
       let roll = Math.random() * totalWeight;
