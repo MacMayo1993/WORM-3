@@ -30,7 +30,7 @@ const faceColors = {
  */
 const TileLeaderboard = ({ cubies, size, chaosMode, visible, onClose }) => {
   const topPairs = useMemo(() => {
-    if (!chaosMode || !cubies) return [];
+    if (!cubies) return [];
 
     // Collect all flipped edge stickers keyed by manifold ID
     const byId = {};
@@ -72,9 +72,9 @@ const TileLeaderboard = ({ cubies, size, chaosMode, visible, onClose }) => {
     return Object.values(pairMap)
       .sort((a, b) => b.totalFlips - a.totalFlips)
       .slice(0, 4);
-  }, [cubies, size, chaosMode]);
+  }, [cubies, size]);
 
-  if (!visible || !chaosMode || topPairs.length === 0) return null;
+  if (!visible) return null;
 
   return (
     <div className="tile-leaderboard">
@@ -84,30 +84,36 @@ const TileLeaderboard = ({ cubies, size, chaosMode, visible, onClose }) => {
           x
         </button>
       </div>
-      <div className="leaderboard-entries">
-        {topPairs.map((pair, idx) => (
-          <div key={`${pair.faceA}-${pair.faceB}`} className="leaderboard-entry">
-            <span className="entry-rank">#{idx + 1}</span>
-            <div className="entry-pair">
-              <span
-                className="tile-indicator"
-                style={{ backgroundColor: faceColors[pair.faceA] }}
-                title={faceNames[pair.faceA]}
-              />
-              <span className="pair-arrow">&#8596;</span>
-              <span
-                className="tile-indicator"
-                style={{ backgroundColor: faceColors[pair.faceB] }}
-                title={faceNames[pair.faceB]}
-              />
-              <span className="pair-label">
-                {faceNames[pair.faceA]}/{faceNames[pair.faceB]}
-              </span>
+      {topPairs.length === 0 ? (
+        <div className="leaderboard-empty">
+          {chaosMode ? 'Waiting for flips...' : 'No flips yet'}
+        </div>
+      ) : (
+        <div className="leaderboard-entries">
+          {topPairs.map((pair, idx) => (
+            <div key={`${pair.faceA}-${pair.faceB}`} className="leaderboard-entry">
+              <span className="entry-rank">#{idx + 1}</span>
+              <div className="entry-pair">
+                <span
+                  className="tile-indicator"
+                  style={{ backgroundColor: faceColors[pair.faceA] }}
+                  title={faceNames[pair.faceA]}
+                />
+                <span className="pair-arrow">&#8596;</span>
+                <span
+                  className="tile-indicator"
+                  style={{ backgroundColor: faceColors[pair.faceB] }}
+                  title={faceNames[pair.faceB]}
+                />
+                <span className="pair-label">
+                  {faceNames[pair.faceA]}/{faceNames[pair.faceB]}
+                </span>
+              </div>
+              <span className="entry-flips">{pair.totalFlips}</span>
             </div>
-            <span className="entry-flips">{pair.totalFlips}</span>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

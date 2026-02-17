@@ -61,6 +61,15 @@
   color: rgba(255, 255, 255, 0.8);
 }
 
+/* Empty state */
+.leaderboard-empty {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.35);
+  text-align: center;
+  padding: 10px 0 6px;
+  font-style: italic;
+}
+
 /* Entries */
 .leaderboard-entries {
   display: flex;
