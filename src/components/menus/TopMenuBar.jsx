@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { FLIP_CAP } from '../../utils/constants.js';
 
 // Convert a hex color string to an rgba() string
@@ -72,41 +72,58 @@ const TopMenuBar = ({
     return { totalComplete, totalStickers, percent: Math.round((totalComplete / totalStickers) * 100) };
   }, [cubies]);
 
-  // Chaos flip stats — only computed when chaos mode is active
-  const chaosStats = useMemo(() => {
-    if (!chaosMode) return null;
-    let totalFlips = 0;
-    let flipActive = 0; // stickers with flips > 0
-    let deadTiles = 0;  // stickers at FLIP_CAP
-    let disparate = 0;  // stickers where curr !== orig
-    let edgeTotal = 0;
-    const S = size;
+  // ── Opt #5: chaosStats polled at 500 ms instead of recomputing on every
+  // cubies update (which fires every 80–250 ms during chaos mode).
+  // cubies is read through a ref so the interval callback is never stale.
+  const cubiesStatRef = useRef(cubies);
+  cubiesStatRef.current = cubies;
+  const sizeStatRef = useRef(size);
+  sizeStatRef.current = size;
 
-    for (const L of cubies) {
-      for (const R of L) {
-        for (const c of R) {
-          for (const [dir, st] of Object.entries(c.stickers)) {
-            const onEdge =
-              (dir === 'PX' && c.x === S - 1) || (dir === 'NX' && c.x === 0) ||
-              (dir === 'PY' && c.y === S - 1) || (dir === 'NY' && c.y === 0) ||
-              (dir === 'PZ' && c.z === S - 1) || (dir === 'NZ' && c.z === 0);
-            if (!onEdge) continue;
-            edgeTotal++;
-            const flips = st.flips || 0;
-            totalFlips += flips;
-            if (flips > 0) flipActive++;
-            if (flips >= FLIP_CAP) deadTiles++;
-            if (st.curr !== st.orig) disparate++;
+  const [chaosStats, setChaosStats] = useState(null);
+
+  useEffect(() => {
+    if (!chaosMode) {
+      setChaosStats(null);
+      return;
+    }
+
+    const compute = () => {
+      const cur = cubiesStatRef.current;
+      const S = sizeStatRef.current;
+      let totalFlips = 0;
+      let flipActive = 0;
+      let deadTiles = 0;
+      let disparate = 0;
+      let edgeTotal = 0;
+
+      for (const L of cur) {
+        for (const R of L) {
+          for (const c of R) {
+            // Every key in c.stickers is an outward-facing (edge) sticker by
+            // construction — no isOnEdge guard needed.
+            for (const [_dir, st] of Object.entries(c.stickers)) {
+              edgeTotal++;
+              const flips = st.flips || 0;
+              totalFlips += flips;
+              if (flips > 0) flipActive++;
+              if (flips >= FLIP_CAP) deadTiles++;
+              if (st.curr !== st.orig) disparate++;
+            }
           }
         }
       }
-    }
 
-    const flipPct = edgeTotal > 0 ? Math.round((flipActive / edgeTotal) * 100) : 0;
-    const disparityPct = edgeTotal > 0 ? Math.round((disparate / edgeTotal) * 100) : 0;
-    const deadPct = edgeTotal > 0 ? Math.round((deadTiles / edgeTotal) * 100) : 0;
-    return { totalFlips, flipActive, deadTiles, disparate, flipPct, disparityPct, deadPct, edgeTotal };
-  }, [chaosMode, cubies, size]);
+      const flipPct = edgeTotal > 0 ? Math.round((flipActive / edgeTotal) * 100) : 0;
+      const disparityPct = edgeTotal > 0 ? Math.round((disparate / edgeTotal) * 100) : 0;
+      const deadPct = edgeTotal > 0 ? Math.round((deadTiles / edgeTotal) * 100) : 0;
+      setChaosStats({ totalFlips, flipActive, deadTiles, disparate, flipPct, disparityPct, deadPct, edgeTotal });
+    };
+
+    compute(); // immediate first snapshot when chaos activates
+    const id = setInterval(compute, 500);
+    return () => clearInterval(id);
+  }, [chaosMode, size]); // cubies intentionally NOT a dep — read via ref
 
   // Resolved face palette — safe fallbacks if faceColors not yet loaded
   const fc = faceColors || { 1: '#ef4444', 2: '#22c55e', 3: '#ffffff', 4: '#f97316', 5: '#3b82f6', 6: '#eab308' };
