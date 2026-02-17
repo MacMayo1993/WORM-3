@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { getManifoldGridId } from '../../game/coordinates.js';
 import { isOnEdge } from '../../game/cubeUtils.js';
-import { ANTIPODAL_COLOR } from '../../utils/constants.js';
+import { ANTIPODAL_COLOR, FLIP_CAP } from '../../utils/constants.js';
 import './TileLeaderboard.css';
 
 const faceNames = {
@@ -62,9 +62,10 @@ const TileLeaderboard = ({ cubies, size, chaosMode, visible, onClose }) => {
       const b = Math.max(tile.faceColor, tile.antipodalFace);
       const pairKey = `${a}-${b}`;
       if (!pairMap[pairKey]) {
-        pairMap[pairKey] = { faceA: a, faceB: b, totalFlips: 0, tiles: [] };
+        pairMap[pairKey] = { faceA: a, faceB: b, totalFlips: 0, deadCount: 0, tiles: [] };
       }
       pairMap[pairKey].totalFlips += tile.flips;
+      if (tile.flips >= FLIP_CAP) pairMap[pairKey].deadCount++;
       pairMap[pairKey].tiles.push(tile);
     }
 
@@ -109,7 +110,9 @@ const TileLeaderboard = ({ cubies, size, chaosMode, visible, onClose }) => {
                   {faceNames[pair.faceA]}/{faceNames[pair.faceB]}
                 </span>
               </div>
-              <span className="entry-flips">{pair.totalFlips}</span>
+              <span className={`entry-flips${pair.deadCount > 0 ? ' entry-dead' : ''}`}>
+                {pair.deadCount > 0 ? 'DEAD' : pair.totalFlips}
+              </span>
             </div>
           ))}
         </div>

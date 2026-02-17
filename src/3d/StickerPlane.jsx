@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useLayoutEffect, useMemo, useState } from 're
 import { useFrame } from '@react-three/fiber';
 import { Text } from '@react-three/drei';
 import * as THREE from 'three';
-import { COLORS, FACE_COLORS, ANTIPODAL_COLOR } from '../utils/constants.js';
+import { COLORS, FACE_COLORS, ANTIPODAL_COLOR, FLIP_CAP } from '../utils/constants.js';
 import { play, vibrate } from '../utils/audio.js';
 import TallyMarks from '../manifold/TallyMarks.jsx';
 import { getTileStyleMaterial, getGlassMaterial } from './TileStyleMaterials.jsx';
@@ -438,6 +438,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot=[0,0,0], overlay, mo
   // between React state updates and Three.js imperative rendering
   const isFlipping = useRef(false);
 
+  // Dead tiles (at flip cap) are inert gray — used in useFrame and rendering
+  const isDead = (meta?.flips ?? 0) >= FLIP_CAP;
+
   // State for triggering particle and glow effects (needs re-render)
   const [particlesActive, setParticlesActive] = useState(false);
   const [glowActive, setGlowActive] = useState(false);
@@ -600,7 +603,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot=[0,0,0], overlay, mo
     }
 
     // Persistent tremor for flipped tiles — the parity violation makes the tile unstable
-    if (wormhole && groupRef.current && spinT.current <= 0 && shakeT.current <= 0) {
+    // Dead tiles (flips >= FLIP_CAP) are inert — no tremor
+    if (wormhole && !isDead && groupRef.current && spinT.current <= 0 && shakeT.current <= 0) {
       const t = state.clock.elapsedTime;
       const flips = Math.min(meta?.flips ?? 1, 5);
       const tremIntensity = 0.004 + flips * 0.003;
@@ -627,8 +631,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot=[0,0,0], overlay, mo
   const isGlass = mode==='glass';
   // Texture and style follow the CURRENT displayed face (meta.curr)
   // So M1 tiles always get M1's texture/style, M4 tiles get M4's, etc.
-  const currTexture = faceTextures?.[meta?.curr] || null;
-  const baseColor = isSudokube ? COLORS.white : (meta?.curr ? fc[meta.curr] : COLORS.black);
+  const currTexture = isDead ? null : (faceTextures?.[meta?.curr] || null);
+  const baseColor = isDead ? '#555555' : isSudokube ? COLORS.white : (meta?.curr ? fc[meta.curr] : COLORS.black);
   const materialColor = currTexture ? '#ffffff' : baseColor;
 
   // Store baseColor in ref for access in useFrame animation callbacks

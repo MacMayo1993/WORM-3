@@ -150,6 +150,15 @@
   background-clip: text;
 }
 
+.entry-flips.entry-dead {
+  background: linear-gradient(135deg, #666 0%, #444 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
 /* Medal highlights for top 3 */
 .leaderboard-entry:nth-child(1) {
   background: linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(255, 215, 0, 0.03) 100%);
