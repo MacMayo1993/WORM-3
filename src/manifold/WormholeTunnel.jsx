@@ -20,6 +20,9 @@ const _c2 = new THREE.Color();
 const _cTemp = new THREE.Color();
 
 const WormholeTunnel = ({ meshIdx1, meshIdx2, dirKey1, dirKey2, cubieRefs, intensity, flips, color1, color2, size, explosionFactor = 0 }) => {
+  // B1: simple-line ref used only in explode mode — avoids mounting/ticking the
+  // full strand geometry while the cube is fanned out (prevents crash at high flip counts)
+  const simpleLineRef = useRef();
   const linesRef = useRef([]);
   const pulseT = useRef(Math.random() * Math.PI * 2);
   // Cache curve object to avoid recreation
@@ -85,6 +88,17 @@ const WormholeTunnel = ({ meshIdx1, meshIdx2, dirKey1, dirKey2, cubieRefs, inten
 
     _vStart.set(pos1[0], pos1[1], pos1[2]);
     _vEnd.set(pos2[0], pos2[1], pos2[2]);
+
+    // B1: in explode mode, only update the single 2-point line and skip all strand work
+    if (explosionFactor > 0) {
+      if (simpleLineRef.current) {
+        const arr = simpleLineRef.current.geometry.attributes.position.array;
+        arr[0] = _vStart.x; arr[1] = _vStart.y; arr[2] = _vStart.z;
+        arr[3] = _vEnd.x;   arr[4] = _vEnd.y;   arr[5] = _vEnd.z;
+        simpleLineRef.current.geometry.attributes.position.needsUpdate = true;
+      }
+      return;
+    }
 
     const t = state.clock.elapsedTime;
     const dead = flips >= FLIP_CAP;
@@ -214,6 +228,24 @@ const WormholeTunnel = ({ meshIdx1, meshIdx2, dirKey1, dirKey2, cubieRefs, inten
       line.geometry.attributes.color.needsUpdate = true;
     });
   });
+
+  // B1: render a single low-cost line while the cube is exploded
+  if (explosionFactor > 0) {
+    return (
+      <line ref={simpleLineRef}>
+        <bufferGeometry>
+          <bufferAttribute
+            attach="attributes-position"
+            count={2}
+            array={new Float32Array(6)}
+            itemSize={3}
+            usage={THREE.DynamicDrawUsage}
+          />
+        </bufferGeometry>
+        <lineBasicMaterial color={color1} transparent opacity={0.45} depthWrite={false} />
+      </line>
+    );
+  }
 
   return (
     <group>

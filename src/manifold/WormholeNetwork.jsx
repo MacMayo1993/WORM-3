@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import WormholeTunnel from './WormholeTunnel.jsx';
 import { FACE_COLORS, FLIP_CAP } from '../utils/constants.js';
 import { getManifoldGridId } from '../game/coordinates.js';
@@ -6,10 +6,20 @@ import { findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
 
 const WormholeNetwork = ({ cubies, size, showTunnels, manifoldMap, cubieRefs, faceColors, explosionFactor = 0 }) => {
   const fc = faceColors || FACE_COLORS;
+
+  // B4: debounce cubies so tunnel geometry only rebuilds at most every 150ms
+  // instead of on every sticker flip (~12×/s at L4 chaos).
+  const [debouncedCubies, setDebouncedCubies] = useState(cubies);
+  useEffect(() => {
+    if (!showTunnels) return;
+    const timer = setTimeout(() => setDebouncedCubies(cubies), 150);
+    return () => clearTimeout(timer);
+  }, [cubies, showTunnels]);
+
   const tunnelData = useMemo(() => {
     if (!showTunnels) return [];
     // Guard against size/cubies mismatch during size transitions
-    if (cubies.length !== size) return [];
+    if (debouncedCubies.length !== size) return [];
 
     const connections = [];
     const processed = new Set();
@@ -17,7 +27,7 @@ const WormholeNetwork = ({ cubies, size, showTunnels, manifoldMap, cubieRefs, fa
     for (let x = 0; x < size; x++) {
       for (let y = 0; y < size; y++) {
         for (let z = 0; z < size; z++) {
-          const cubie = cubies[x][y][z];
+          const cubie = debouncedCubies[x][y][z];
 
           Object.entries(cubie.stickers).forEach(([dirKey, sticker]) => {
             if (sticker.flips === 0) return;
@@ -52,7 +62,7 @@ const WormholeNetwork = ({ cubies, size, showTunnels, manifoldMap, cubieRefs, fa
       }
     }
     return connections;
-  }, [cubies, size, showTunnels, manifoldMap, fc]);
+  }, [debouncedCubies, size, showTunnels, manifoldMap, fc]);
 
   if (!showTunnels) return null;
 

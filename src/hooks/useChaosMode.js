@@ -23,6 +23,11 @@ import { FLIP_CAP } from '../utils/constants.js';
 
 // ─── Module-level pure helpers ────────────────────────────────────────────────
 
+// A1: Maximum concurrent lightning bolts rendered at once.
+// Oldest cascades are dropped when the queue exceeds this limit, ensuring
+// useFrame count stays bounded and animations remain visible.
+const MAX_CASCADES = 6;
+
 /**
  * Build a flat list of [x, y, z] triples for every surface cubie in an S×S×S
  * cube.  Interior cubies carry no stickers and are permanently excluded.
@@ -286,10 +291,11 @@ export function useChaosMode() {
               neighbor.dirKey, S, explosionT
             );
             const crossFace = isCrossFaceNeighbor(currentChainTile.dirKey, neighbor.dirKey);
-            setCascades((prev) => [
-              ...prev,
-              { id: Date.now() + Math.random(), from: fromPos, to: toPos, crossFace }
-            ]);
+            // A1: cap concurrent bolts — drop oldest when queue is full
+            setCascades((prev) => {
+              const next = [...prev, { id: Date.now() + Math.random(), from: fromPos, to: toPos, crossFace }];
+              return next.length > MAX_CASCADES ? next.slice(-MAX_CASCADES) : next;
+            });
 
             nextTile = neighbor;
             break;
@@ -331,12 +337,19 @@ export function useChaosMode() {
       } else {
         tickAcc += dt;
 
-        // ── Opt #7: adaptive tick period — slows down when board is saturated ─
-        // Formula: effectivePeriod = baseTick × (1 + flipPct/100)
+        // ── Opt #7 + C3: adaptive tick period — slows down when board is saturated ─
+        // Opt #7 formula: effectivePeriod = baseTick × (1 + flipPct/100)
         //   0 % active  → 1.0× base  (full speed, conquering fresh surface)
         //  50 % active  → 1.5× base  (moderate throttle)
         // 100 % active  → 2.0× base  (half speed, board is already saturated)
-        const effectivePeriod = tickPeriod * (1 + flipPctRef.current / 100);
+        //
+        // C3 — saturation brake: above 85% active, add a further linear ramp
+        // so the engine breathes at extreme saturation and animations stay visible.
+        //  85 % → 1.0× extra,  100 % → 3.0× extra
+        //  Combined at 100 % flip + 100 % active: 2.0 × 3.0 = 6× base period
+        const pct = flipPctRef.current;
+        const satBrake = pct > 85 ? 1 + ((pct - 85) / 15) * 2 : 1.0;
+        const effectivePeriod = tickPeriod * (1 + pct / 100) * satBrake;
 
         if (tickAcc >= effectivePeriod) {
           // Pre-compute outside Zustand's setter so clone3D/chain work happens
