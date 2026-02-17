@@ -114,6 +114,7 @@ export const useGameStore = create(
     exploded: false,
     explosionT: 0,
     showNetPanel: false,
+    showLeaderboard: false,
 
     setVisualMode: (visualMode) => set(typeof visualMode === 'function'
       ? (state) => ({ visualMode: visualMode(state.visualMode) })
@@ -133,6 +134,11 @@ export const useGameStore = create(
     setShowNetPanel: (showNetPanel) => set(typeof showNetPanel === 'function'
       ? (state) => ({ showNetPanel: showNetPanel(state.showNetPanel) })
       : { showNetPanel }),
+
+    setShowLeaderboard: (showLeaderboard) => set(typeof showLeaderboard === 'function'
+      ? (state) => ({ showLeaderboard: showLeaderboard(state.showLeaderboard) })
+      : { showLeaderboard }),
+    toggleLeaderboard: () => set((state) => ({ showLeaderboard: !state.showLeaderboard })),
 
     toggleFlipMode: () => set((state) => ({ flipMode: !state.flipMode })),
     toggleTunnels: () => set((state) => ({ showTunnels: !state.showTunnels })),

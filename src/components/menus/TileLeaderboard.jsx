@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { getManifoldGridId } from '../../game/coordinates.js';
 import { isOnEdge } from '../../game/cubeUtils.js';
 import { ANTIPODAL_COLOR } from '../../utils/constants.js';
@@ -23,14 +23,12 @@ const faceColors = {
 };
 
 /**
- * TileLeaderboard - Toggleable live stats showing antipodal pairs with most flips
+ * TileLeaderboard - Live stats showing antipodal pairs with most flips
  *
  * Groups tiles by antipodal pairs and displays combined flip counts.
- * Hidden by default; toggled via a small button.
+ * Visibility controlled via Views bottom sheet toggle.
  */
-const TileLeaderboard = ({ cubies, size, chaosMode }) => {
-  const [open, setOpen] = useState(false);
-
+const TileLeaderboard = ({ cubies, size, chaosMode, visible, onClose }) => {
   const topPairs = useMemo(() => {
     if (!chaosMode || !cubies) return [];
 
@@ -76,22 +74,13 @@ const TileLeaderboard = ({ cubies, size, chaosMode }) => {
       .slice(0, 4);
   }, [cubies, size, chaosMode]);
 
-  if (!chaosMode || topPairs.length === 0) return null;
-
-  // Toggle button only when closed
-  if (!open) {
-    return (
-      <button className="leaderboard-toggle-btn" onClick={() => setOpen(true)} title="Show Flip Leaderboard">
-        <span className="toggle-icon">LB</span>
-      </button>
-    );
-  }
+  if (!visible || !chaosMode || topPairs.length === 0) return null;
 
   return (
     <div className="tile-leaderboard">
       <div className="leaderboard-header">
         <span className="leaderboard-title">Flip Leaderboard</span>
-        <button className="leaderboard-close-btn" onClick={() => setOpen(false)} title="Hide Leaderboard">
+        <button className="leaderboard-close-btn" onClick={onClose} title="Hide Leaderboard">
           x
         </button>
       </div>

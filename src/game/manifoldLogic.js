@@ -103,6 +103,21 @@ export const getManifoldNeighbors = (x, y, z, dirKey, size) => {
   return neighbors;
 };
 
+// Check if a sticker sits on the seam (edge boundary between two faces).
+// Returns true if any of its grid coordinates are at 0 or size-1 within its face.
+export const isOnSeam = (x, y, z, dirKey, size) => {
+  const S = size - 1;
+  if (dirKey === 'PX' || dirKey === 'NX') return y === 0 || y === S || z === 0 || z === S;
+  if (dirKey === 'PY' || dirKey === 'NY') return x === 0 || x === S || z === 0 || z === S;
+  return x === 0 || x === S || y === 0 || y === S; // PZ, NZ
+};
+
+// Check if a neighbor is a cross-face (seam-crossing) neighbor.
+// Cross-face neighbors have a different dirKey than the source tile.
+export const isCrossFaceNeighbor = (sourceDirKey, neighborDirKey) => {
+  return sourceDirKey !== neighborDirKey;
+};
+
 // Build map from manifold-grid ID to current location
 export const buildManifoldGridMap = (cubies, size) => {
   const map = new Map();

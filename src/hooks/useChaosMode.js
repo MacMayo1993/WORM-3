@@ -6,7 +6,7 @@
 
 import { useEffect, useRef, useCallback } from 'react';
 import { useGameStore } from './useGameStore.js';
-import { buildManifoldGridMap, flipStickerPair, getManifoldNeighbors } from '../game/manifoldLogic.js';
+import { buildManifoldGridMap, flipStickerPair, getManifoldNeighbors, isOnSeam, isCrossFaceNeighbor } from '../game/manifoldLogic.js';
 import { getStickerWorldPos } from '../game/coordinates.js';
 import { isOnEdge } from '../game/cubeUtils.js';
 
@@ -163,17 +163,35 @@ export function useChaosMode() {
         const nst = nc.stickers[neighbor.dirKey];
         if (!nst) continue;
         if (isOnEdge(neighbor.x, neighbor.y, neighbor.z, neighbor.dirKey, S)) {
-          validNeighbors.push({ ...neighbor, flips: nst.flips || 0 });
+          // Seam Lightning: cross-face neighbors and on-seam tiles get a weight boost
+          const crossFace = isCrossFaceNeighbor(currentChainTile.dirKey, neighbor.dirKey);
+          const onSeam = isOnSeam(neighbor.x, neighbor.y, neighbor.z, neighbor.dirKey, S);
+          // Cross-face = 4x weight, on-seam = 2x weight, interior = 1x
+          const seamWeight = crossFace ? 4 : onSeam ? 2 : 1;
+          validNeighbors.push({ ...neighbor, flips: nst.flips || 0, seamWeight });
         }
       }
 
       let nextTile = null;
       if (validNeighbors.length > 0) {
-        validNeighbors.sort(() => Math.random() - 0.5);
+        // Seam Lightning: weighted shuffle — seam neighbors get picked first
+        const totalWeight = validNeighbors.reduce((s, n) => s + n.seamWeight, 0);
+        const sorted = [];
+        const pool = [...validNeighbors];
+        while (pool.length > 0) {
+          let roll = Math.random() * pool.reduce((s, n) => s + n.seamWeight, 0);
+          let pick = pool.length - 1;
+          for (let i = 0; i < pool.length; i++) {
+            roll -= pool[i].seamWeight;
+            if (roll <= 0) { pick = i; break; }
+          }
+          sorted.push(pool.splice(pick, 1)[0]);
+        }
 
-        for (const neighbor of validNeighbors) {
+        for (const neighbor of sorted) {
           const tallyBonus = Math.max(1, neighbor.flips);
-          const propagateChance = chainStrength * basePerTally * tallyBonus;
+          // Seam Lightning: seam weight also boosts propagation chance
+          const propagateChance = chainStrength * basePerTally * tallyBonus * (neighbor.seamWeight * 0.5 + 0.5);
 
           if (Math.random() < propagateChance) {
             const fromPos = getStickerWorldPos(
