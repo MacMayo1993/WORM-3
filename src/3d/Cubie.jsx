@@ -108,14 +108,16 @@ const Cubie = React.forwardRef(function Cubie({
   const meta = (d) => cubie.stickers[d] || null;
 
   const gridPos = (dirKey) => {
-    const { r, c } = faceRCFor(dirKey, cubie.x, cubie.y, cubie.z, size);
+    const m = meta(dirKey);
+    if (!m?.origPos) return {};
+    const { r, c } = faceRCFor(m.origDir, m.origPos.x, m.origPos.y, m.origPos.z, size);
     return { faceRow: r, faceCol: c };
   };
 
   const overlay = (dirKey) => {
     const m = meta(dirKey); if (!m) return '';
     if (visualMode === 'grid') {
-      const { r, c } = faceRCFor(dirKey, cubie.x, cubie.y, cubie.z, size);
+      const { r, c } = faceRCFor(m.origDir, m.origPos.x, m.origPos.y, m.origPos.z, size);
       const idx = r * size + c + 1;
       const idStr = String(idx).padStart(3, '0');
       return `M${m.curr}-${idStr}`;
