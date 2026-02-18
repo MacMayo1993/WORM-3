@@ -720,7 +720,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot=[0,0,0], overlay, mo
 
   return (
     <group position={pos} rotation={rot} ref={groupRef}>
-      {/* Inner group for UV rotation - rotates only the flat sticker mesh around face normal (Z axis) */}
+      {/* Inner group for UV rotation - rotates the sticker mesh and 3D volume overlays together around face normal (Z axis) */}
       <group rotation={[0, 0, uvRotationAngle]}>
         <mesh ref={meshRef} key={hollow ? 'frame' : 'plane'}>
         {hollow ? (
@@ -747,7 +747,6 @@ const StickerPlane = function StickerPlane({ meta, pos, rot=[0,0,0], overlay, mo
           />
         )}
       </mesh>
-      </group>
 
       {/* 3D grass blades overlay */}
       {tileStyle === 'grass' && !isGlass && !isSudokube && !currTexture && (
@@ -788,6 +787,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot=[0,0,0], overlay, mo
       {tileStyle === 'wood' && !isGlass && !isSudokube && !currTexture && (
         <WoodVolume faceColor={baseColor} />
       )}
+      </group>
 
       {/* Dead tile headstone — replaces all live overlays */}
       {isDead && (
