@@ -37,6 +37,7 @@ import {
 import CubeAssembly from './3d/CubeAssembly.jsx';
 import BlackHoleEnvironment from './3d/BlackHoleEnvironment.jsx';
 import { getLevelBackground } from './3d/LifeJourneyBackgrounds.jsx';
+import { BACKGROUNDS, getBackgroundUrl } from './utils/backgrounds.js';
 
 // Photo environment presets available from @react-three/drei (real HDR panoramas)
 const PHOTO_PRESETS = new Set([
@@ -819,24 +820,33 @@ export default function WORM3() {
             {/* Free play: Black Hole (animated favorite) */}
             {!currentLevelData && settings.backgroundTheme === 'blackhole' && <BlackHoleEnvironment flipTrigger={blackHolePulse} />}
             {/* Free play: interactive photo panoramas - orbit to look around, auto-drifts when idle */}
-            {!currentLevelData && (PHOTO_PRESETS.has(settings.backgroundTheme) || ['cave', 'beach'].includes(settings.backgroundTheme)) && (
-              <ErrorBoundary>
-                <InteractivePhotoBackground
-                  preset={PHOTO_PRESETS.has(settings.backgroundTheme) ? settings.backgroundTheme : undefined}
-                  files={
-                    settings.backgroundTheme === 'cave' ? '/WORM³/environments/cave.exr' :
-                      settings.backgroundTheme === 'beach' ? '/WORM³/environments/beach.hdr' :
-                        undefined
-                  }
-                />
-              </ErrorBoundary>
+            {!currentLevelData && (
+              (() => {
+                const bgConfig = BACKGROUNDS.find(b => b.id === settings.backgroundTheme);
+                // IF we have a custom file in backgrounds.js, use it
+                if (bgConfig && bgConfig.file) {
+                  return (
+                    <ErrorBoundary>
+                      <InteractivePhotoBackground files={getBackgroundUrl(bgConfig.file)} />
+                    </ErrorBoundary>
+                  );
+                }
+                // ELSE if it's a known preset for @react-three/drei
+                if (PHOTO_PRESETS.has(settings.backgroundTheme)) {
+                  return (
+                    <ErrorBoundary>
+                      <InteractivePhotoBackground preset={settings.backgroundTheme} />
+                    </ErrorBoundary>
+                  );
+                }
+                // Fallback for Black Hole or others
+                if (settings.backgroundTheme === 'blackhole' || !bgConfig) {
+                  return <BlackHoleEnvironment flipTrigger={blackHolePulse} />;
+                }
+                return null;
+              })()
             )}
-            {/* Free play: fallback for unknown/legacy themes (e.g. old sunrise/sunset in localStorage) */}
-            {!currentLevelData && !PHOTO_PRESETS.has(settings.backgroundTheme) &&
-              settings.backgroundTheme !== 'blackhole' &&
-              !['cave', 'beach'].includes(settings.backgroundTheme) && (
-                <BlackHoleEnvironment flipTrigger={blackHolePulse} />
-              )}
+            {/* Free play: fallback for unknown/legacy themes is handled above */}
             {/* Default environment for lighting/reflections when in a level with no custom background */}
             {currentLevelData && !currentLevelData.background && (
               <Environment preset="city" />
