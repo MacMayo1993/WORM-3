@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { COLOR_SCHEMES, TILE_STYLES } from '../../utils/colorSchemes.js';
+import { BACKGROUNDS } from '../../utils/backgrounds.js';
 import {
   registerTilePreview,
   updateTilePreview,
@@ -23,22 +24,10 @@ const SCHEME_LABELS = {
   custom: 'Custom Upload',
 };
 
-const BG_OPTIONS = [
-  { value: 'blackhole', label: 'Black Hole' },
-  { value: 'cave', label: 'Cave' },
-  { value: 'beach', label: 'Beach' },
-  // 7 Wonders removed as per user request
-  { value: 'forest', label: 'Forest' },
-  { value: 'park', label: 'Park' },
-  { value: 'night', label: 'Night Sky' },
-  { value: 'city', label: 'City Skyline' },
-  { value: 'apartment', label: 'Apartment' },
-  { value: 'lobby', label: 'Modern Lobby' },
-  { value: 'warehouse', label: 'Warehouse' },
-  { value: 'studio', label: 'Photo Studio' },
-  { value: 'dark', label: 'Dark' },
-  { value: 'midnight', label: 'Midnight Blue' },
-];
+const BG_OPTIONS = BACKGROUNDS.map(bg => ({
+  value: bg.id,
+  label: bg.label
+}));
 
 // Styles shown in the Classic (2D) section
 const CLASSIC_STYLE_KEYS = ['solid', 'glossy', 'matte', 'metallic', 'carbonFiber', 'hexGrid', 'comic', 'cafeWall', 'hermanGrid', 'opticSpin', 'ouchi'];
