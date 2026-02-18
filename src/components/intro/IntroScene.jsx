@@ -8,118 +8,52 @@ import { FACE_COLORS } from '../../utils/constants.js';
 import { play, vibrate } from '../../utils/audio.js';
 import { updateSharedTime } from '../../3d/TileStyleMaterials.jsx';
 
-// ─── Tile style assignment for each cube face ─────────────────────────────────
-// Six visually distinct living styles — one per face colour.
-// These will cycle through different styles during the animation
+// ─── Tile style assignment ─────────────────────────────────────────────────────
 const STYLE_SEQUENCE = ['lava', 'circuit', 'holographic', 'galaxy', 'neural', 'pulse'];
 
-const INITIAL_FACE_STYLES = {
-  PZ: 'lava',        // Front  — red    — molten drama
-  NX: 'circuit',     // Left   — green  — techy PCB traces
-  PY: 'holographic', // Top    — white  — rainbow iridescence
-  NZ: 'galaxy',      // Back   — orange — deep-space starfield
-  PX: 'neural',      // Right  — blue   — firing neuron web
-  NY: 'pulse',       // Bottom — yellow — radial energy wave
-};
-
 // ─── Timing constants ─────────────────────────────────────────────────────────
-// Phase 1  0 – 4.5 s  Layer rotations (famous Rubik's algorithms) + tile flips
-// Phase 2  4.5 – 5 s  Cube stabilizes, tunnels start forming
-// Phase 3  5 – 7 s    Explosion → antipodal topology transformation
-// Phase 4  7 – 9 s    Tunnel groups highlighted in sequence, worms traverse
-// Phase 5  9 – 10 s   Cube implodes, camera returns
+// Phase 0:  0.0 – 1.5s   Black cube emerges, slow rotation
+// Phase 1:  1.5 – 3.2s   Blue face (PX) gently reveals as cube rotates to show it
+// Phase 2:  3.2 – 4.8s   Center blue tile (manifold center of PX face) hints at tilt
+// Phase 3:  4.8 – 6.5s   Cube rotates to show green face (NX = blue's antipodal pair)
+//                         Blue tile is now the center of the green face
+// Phase 4:  6.5 – 8.2s   Center tile does full Rummikub flip — reveals antipodal back
+// Phase 5:  8.2 – 8.7s   Brief pause, then explosion begins
+// Phase 6:  8.7 – 10.5s  Explosion → antipodal showcase
+// Phase 7: 10.5 – 12.0s  Tunnel highlights
+// Phase 8: 12.0 – 13.5s  Worm traversal
+// Phase 9: 13.5 – 15.0s  Implode
 
-// Layer rotations — famous Rubik's cube algorithms
-// Each targets specific cubies based on their position
-const LAYER_ROTATIONS = [
-  // R move (right face clockwise)
-  { start: 0.3, dur: 0.4, layer: 'x', value: 1, angle: Math.PI / 2 },
-  // U move (top face clockwise)
-  { start: 0.9, dur: 0.4, layer: 'y', value: 1, angle: Math.PI / 2 },
-  // F move (front face clockwise)
-  { start: 1.5, dur: 0.4, layer: 'z', value: 1, angle: Math.PI / 2 },
-  // R' (right face counter-clockwise)
-  { start: 2.1, dur: 0.4, layer: 'x', value: 1, angle: -Math.PI / 2 },
-  // U' (top face counter-clockwise)
-  { start: 2.7, dur: 0.4, layer: 'y', value: 1, angle: -Math.PI / 2 },
-  // F' (front face counter-clockwise)
-  { start: 3.3, dur: 0.4, layer: 'z', value: 1, angle: -Math.PI / 2 },
-  // Sexy move: R U R' U'
-  { start: 3.9, dur: 0.25, layer: 'x', value: 1, angle: Math.PI / 2 },
-  { start: 4.2, dur: 0.25, layer: 'y', value: 1, angle: Math.PI / 2 },
-];
+const BLUE_REVEAL_START   = 1.5;
+const BLUE_REVEAL_END     = 3.2;
+const HINT_TILT_START     = 3.2;
+const HINT_TILT_END       = 4.8;
+const GREEN_SHOW_START    = 4.8;
+const GREEN_SHOW_END      = 6.5;
+const FULL_FLIP_START     = 6.5;
+const FULL_FLIP_END       = 8.2;
+const TUNNEL_FORM_START   = 8.5;
+const EXPLOSION_START     = 8.7;
+const EXPLOSION_END       = 10.5;
+const WORM_START          = 11.0;
+const IMPLODE_START       = 12.5;
+const IMPLODE_END         = 14.5;
 
-const TUNNEL_FORM_START = 4.5;
-const EXPLOSION_START   = 5;
-const EXPLOSION_END     = 7;
-const WORM_START        = 7.5;
-const IMPLODE_START     = 9;
-const IMPLODE_END       = 10;
-
-// Antipodal face mapping - shows which faces are antipodal pairs
+// Antipodal pairs
 const ANTIPODAL_PAIRS = {
-  PZ: 'NZ',  // Front ↔ Back
-  NZ: 'PZ',
-  PX: 'NX',  // Right ↔ Left
-  NX: 'PX',
-  PY: 'NY',  // Top ↔ Bottom
-  NY: 'PY',
+  PZ: 'NZ', NZ: 'PZ',
+  PX: 'NX', NX: 'PX',
+  PY: 'NY', NY: 'PY',
 };
 
-// Individual tile flipping — tiles flip to show antipodal pairs
-const getTileFlips = () => {
-  const flips = [];
-  const numFlips = 24; // More tiles flip to showcase the mechanic
-  for (let i = 0; i < numFlips; i++) {
-    const face = ['PZ', 'NZ', 'PX', 'NX', 'PY', 'NY'][Math.floor(Math.random() * 6)];
-    flips.push({
-      start: 0.3 + Math.random() * 3.8,
-      dur: 0.4 + Math.random() * 0.3,
-      x: Math.floor(Math.random() * 3),
-      y: Math.floor(Math.random() * 3),
-      z: Math.floor(Math.random() * 3),
-      face,
-      antipodalFace: ANTIPODAL_PAIRS[face],
-    });
-  }
-  return flips;
-};
+// Face color indices (matching FACE_COLORS)
+// PZ=1(red), NZ=4(orange), PX=5(blue), NX=2(green), PY=3(white), NY=6(yellow)
+const FACE_COLOR_IDX = { PZ: 1, NZ: 4, PX: 5, NX: 2, PY: 3, NY: 6 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
 const ease = t => t < 0.5 ? 4 * t ** 3 : 1 - Math.pow(-2 * t + 2, 3) / 2;
-
-// Calculate rotation for a specific cubie based on active layer rotations
-const getCubieLayerRotation = (x, y, z, time, size) => {
-  const k = (size - 1) / 2;
-  const cubeX = x - k;
-  const cubeY = y - k;
-  const cubeZ = z - k;
-
-  let rotX = 0, rotY = 0, rotZ = 0;
-
-  LAYER_ROTATIONS.forEach(rot => {
-    const elapsed = time - rot.start;
-    if (elapsed <= 0 || elapsed > rot.dur) return;
-
-    const progress = ease(elapsed / rot.dur);
-    const angle = rot.angle * progress;
-
-    // Check if this cubie is in the rotating layer
-    let inLayer = false;
-    if (rot.layer === 'x' && Math.abs(cubeX - rot.value) < 0.1) inLayer = true;
-    if (rot.layer === 'y' && Math.abs(cubeY - rot.value) < 0.1) inLayer = true;
-    if (rot.layer === 'z' && Math.abs(cubeZ - rot.value) < 0.1) inLayer = true;
-
-    if (inLayer) {
-      if (rot.layer === 'x') rotX += angle;
-      if (rot.layer === 'y') rotY += angle;
-      if (rot.layer === 'z') rotZ += angle;
-    }
-  });
-
-  return { rotX, rotY, rotZ };
-};
+const clamp01 = t => Math.max(0, Math.min(1, t));
+const progress = (t, start, end) => clamp01((t - start) / (end - start));
 
 const getStickerWorldPos = (x, y, z, dirKey, size, ef = 0) => {
   const k = (size - 1) / 2;
@@ -137,7 +71,6 @@ const getStickerWorldPos = (x, y, z, dirKey, size, ef = 0) => {
 };
 
 // ─── Component ───────────────────────────────────────────────────────────────
-
 const IntroScene = ({ time, onComplete }) => {
   const cubeGroupRef = useRef();
   const cubieRefs    = useRef([]);
@@ -145,10 +78,8 @@ const IntroScene = ({ time, onComplete }) => {
   const size = 3;
   const completedRef = useRef(false);
 
-  // Automatically transition to menu after recomposition
   if (time >= IMPLODE_END && !completedRef.current && onComplete) {
     completedRef.current = true;
-    // Small delay to let the final frame render
     setTimeout(() => onComplete(), 100);
   }
 
@@ -156,14 +87,55 @@ const IntroScene = ({ time, onComplete }) => {
   const [showBurst,    setShowBurst]    = useState({});
   const [burstTimes,   setBurstTimes]   = useState({});
 
-  // Generate tile flips once
-  const tileFlips = useMemo(() => getTileFlips(), []);
+  // ── Face reveal intensities ─────────────────────────────────────────────────
+  // PX (blue) reveals between BLUE_REVEAL_START and BLUE_REVEAL_END
+  // NX (green) reveals between GREEN_SHOW_START and GREEN_SHOW_END
+  // All other faces stay black until explosion (then snap fully on)
+  const getFaceReveal = (faceKey) => {
+    if (time >= EXPLOSION_START) return 1.0; // explosion = all faces lit
 
-  // Dynamic style cycling - styles rotate through the sequence from the start
+    if (faceKey === 'PX') {
+      // Blue face reveals smoothly
+      return ease(progress(time, BLUE_REVEAL_START, BLUE_REVEAL_END));
+    }
+    if (faceKey === 'NX') {
+      // Green face reveals smoothly
+      return ease(progress(time, GREEN_SHOW_START, GREEN_SHOW_END));
+    }
+    return 0; // all other faces: black
+  };
+
+  // ── Center tile Rummikub flip ───────────────────────────────────────────────
+  // The center cubie of PX face is at x=2, y=1, z=1 (size=3, so x=size-1=2 is PX face)
+  // During hint phase: tilt forward 25° then back
+  // During full flip: rotate all the way to PI (show back = green/NX color)
+  const getCenterTileFlip = () => {
+    const hintP = progress(time, HINT_TILT_START, HINT_TILT_END);
+    if (hintP > 0 && hintP < 1) {
+      // Gentle hint: sine wave, peaks at 30°
+      return Math.sin(hintP * Math.PI) * (Math.PI / 6);
+    }
+    const flipP = progress(time, FULL_FLIP_START, FULL_FLIP_END);
+    if (flipP > 0) {
+      // Full Rummikub flip: 0 → PI with easing, then hold
+      return ease(clamp01(flipP)) * Math.PI;
+    }
+    return 0;
+  };
+
+  // ── Dynamic faceStyles ──────────────────────────────────────────────────────
   const faceStyles = useMemo(() => {
-    const cycleSpeed = 0.3; // Complete cycle every ~3.3 seconds (slower, more visible)
+    if (time < EXPLOSION_START) {
+      // During reveal phases, use one specific style per face
+      return {
+        PX: 'holographic', // blue face
+        NX: 'circuit',     // green face
+        PZ: 'lava', NZ: 'galaxy', PY: 'neural', NY: 'pulse',
+      };
+    }
+    // Post-explosion: cycle styles
+    const cycleSpeed = 0.3;
     const cycleIndex = Math.floor(time * cycleSpeed) % STYLE_SEQUENCE.length;
-
     return {
       PZ: STYLE_SEQUENCE[(cycleIndex + 0) % STYLE_SEQUENCE.length],
       NX: STYLE_SEQUENCE[(cycleIndex + 1) % STYLE_SEQUENCE.length],
@@ -174,81 +146,85 @@ const IntroScene = ({ time, onComplete }) => {
     };
   }, [time]);
 
-  // ── Explosion factor + topological twist ────────────────────────────────────
+  // ── Explosion factor ────────────────────────────────────────────────────────
   let explosionFactor = 0;
-  let antipodalTwist = 0; // Twist factor for antipodal pairs
+  let antipodalTwist = 0;
 
   if (time >= EXPLOSION_START && time < EXPLOSION_END) {
     const t = (time - EXPLOSION_START) / (EXPLOSION_END - EXPLOSION_START);
     explosionFactor = ease(t) * 1.5;
-    // During explosion, antipodal pairs twist through each other
-    antipodalTwist = Math.sin(t * Math.PI) * Math.PI; // 0 → π → 0
+    antipodalTwist = Math.sin(t * Math.PI) * Math.PI;
   } else if (time >= EXPLOSION_END && time < IMPLODE_START) {
     explosionFactor = 1.5;
-    antipodalTwist = 0;
   } else if (time >= IMPLODE_START && time < IMPLODE_END) {
     const t = (time - IMPLODE_START) / (IMPLODE_END - IMPLODE_START);
     explosionFactor = (1 - ease(t)) * 1.5;
-    antipodalTwist = 0;
   }
 
-  // ── Camera + cube rotation ──────────────────────────────────────────────────
+  // ── Camera choreography ─────────────────────────────────────────────────────
   useFrame(({ clock }) => {
-    // Keep tile shaders animated during the intro
     updateSharedTime(clock.getElapsedTime());
 
-    // ── Camera path ──
-    let radius  = 12;
-    let camY    = 4;
-    let speed   = 0.18;
-
-    if (time < 0.8) {
-      // Swoop-in: start far above, pull down to close orbit
-      const t    = time / 0.8;
-      const e    = 1 - Math.pow(1 - t, 3);
-      radius     = 18 - e * 8;   // 18 → 10 (closer start)
-      camY       = 7  - e * 4;   // 7  → 3
-      speed      = 0.15;
-    } else if (time < EXPLOSION_START) {
-      // Close, slightly elevated orbit — perfect angle to watch the colorful tiles and flips
-      radius     = 10;
-      camY       = 2.5 + Math.sin((time - 0.8) * 1.1) * 1.5;
-      speed      = 0.25;
-    } else if (time < EXPLOSION_START + 1.5) {
-      // Pull back as the cube explodes
-      const t    = (time - EXPLOSION_START) / 1.5;
-      const e    = ease(t);
-      radius     = 11 + e * 11;  // 11 → 22
-      camY       = 3  + e * 4;   // 3  → 7
-      speed      = 0.14;
-    } else if (time < IMPLODE_START) {
-      // Wide orbit watching tunnels + worms
-      radius     = 22;
-      camY       = 7;
-      speed      = 0.10;
-    } else if (time < IMPLODE_END) {
-      // Glide back in as cube reassembles
-      const t    = (time - IMPLODE_START) / (IMPLODE_END - IMPLODE_START);
-      const e    = ease(t);
-      radius     = 22 - e * 10;  // 22 → 12
-      camY       = 7  - e * 3;   // 7  → 4
-      speed      = 0.16;
-    } else {
-      radius     = 12;
-      camY       = 4;
-      speed      = 0.18;
+    // The cube group slowly auto-rotates on Y axis for the reveal phases
+    // Then freezes during the flip, then explosion takes over
+    if (cubeGroupRef.current) {
+      if (time < FULL_FLIP_START) {
+        // Slow auto-rotation — chosen so:
+        //   t=0:        face NZ toward camera (black start)
+        //   t≈1.5:      PX (blue) rotates into view
+        //   t≈4.8:      NX (green) comes into view
+        // Speed ≈ 0.28 rad/s → at t=1.5, rotY≈0.42 rad (≈24°, PX visible)
+        //                    → at t=4.8, rotY≈1.34 rad (≈77°, NX visible)
+        const baseRot = time * 0.28;
+        cubeGroupRef.current.rotation.y = baseRot;
+        cubeGroupRef.current.rotation.x = Math.sin(time * 0.15) * 0.12;
+      } else if (time < EXPLOSION_START) {
+        // Hold orientation during the full flip, just gentle wobble
+        cubeGroupRef.current.rotation.y = FULL_FLIP_START * 0.28 + Math.sin((time - FULL_FLIP_START) * 0.5) * 0.05;
+        cubeGroupRef.current.rotation.x = Math.sin(time * 0.15) * 0.08;
+      } else {
+        // During explosion/implode, stop group rotation — individual cubies handle it
+        cubeGroupRef.current.rotation.set(0, 0, 0);
+      }
     }
 
-    const angle        = time * speed;
+    // Camera: close and slightly elevated, orbiting slowly
+    let radius = 9;
+    let camY   = 2.5;
+    let angle  = 0;
+
+    if (time < 1.0) {
+      // Swoop in from far
+      const t = ease(time / 1.0);
+      radius = 18 - t * 9;
+      camY   = 6  - t * 3.5;
+      angle  = 0.3;
+    } else if (time < EXPLOSION_START) {
+      // Steady close orbit — camera stays near the blue/green faces
+      radius = 9;
+      camY   = 2.5 + Math.sin((time - 1.0) * 0.6) * 0.8;
+      angle  = 0.3 + (time - 1.0) * 0.04; // slow pan
+    } else if (time < EXPLOSION_START + 1.5) {
+      // Pull back for explosion
+      const t = ease((time - EXPLOSION_START) / 1.5);
+      radius = 9 + t * 13;
+      camY   = 2.5 + t * 4.5;
+      angle  = 0.3 + (time - 1.0) * 0.04;
+    } else if (time < IMPLODE_START) {
+      radius = 22;
+      camY   = 7;
+      angle  = 0.3 + (time - 1.0) * 0.08;
+    } else {
+      const t = ease((time - IMPLODE_START) / (IMPLODE_END - IMPLODE_START));
+      radius = 22 - t * 10;
+      camY   = 7  - t * 3;
+      angle  = 0.3 + (time - 1.0) * 0.08;
+    }
+
     camera.position.x  = Math.sin(angle) * radius;
     camera.position.z  = Math.cos(angle) * radius;
     camera.position.y  = camY;
     camera.lookAt(0, 0, 0);
-
-    // ── Cube group stays at identity — individual cubies rotate via layers ──
-    if (cubeGroupRef.current) {
-      cubeGroupRef.current.rotation.set(0, 0, 0);
-    }
   });
 
   // ── Cubies layout ───────────────────────────────────────────────────────────
@@ -259,7 +235,7 @@ const IntroScene = ({ time, onComplete }) => {
     for (let x = 0; x < size; x++) {
       for (let y = 0; y < size; y++) {
         for (let z = 0; z < size; z++) {
-          arr.push({ key: i++, pos: [x - k, y - k, z - k] });
+          arr.push({ key: i++, pos: [x - k, y - k, z - k], gx: x, gy: y, gz: z });
         }
       }
     }
@@ -290,28 +266,24 @@ const IntroScene = ({ time, onComplete }) => {
     return pairs;
   }, [explosionFactor, size]);
 
-  // Tunnel formation animation - they grow from both endpoints
   const tunnelFormation = useMemo(() => {
     if (time < TUNNEL_FORM_START) return 0;
-    if (time < EXPLOSION_START) {
-      return ease((time - TUNNEL_FORM_START) / (EXPLOSION_START - TUNNEL_FORM_START));
-    }
+    if (time < EXPLOSION_START) return ease(progress(time, TUNNEL_FORM_START, EXPLOSION_START));
     return 1;
   }, [time]);
 
   const tunnelOpacity = useMemo(() => {
-    if (time < TUNNEL_FORM_START)           return 0;
-    if (time < EXPLOSION_START)             return (time - TUNNEL_FORM_START) / (EXPLOSION_START - TUNNEL_FORM_START) * 0.7;
-    if (time < EXPLOSION_START + 0.5)       return 0.7 + (time - EXPLOSION_START) / 0.5 * 0.3;
-    if (time >= IMPLODE_START)              return 1 - (time - IMPLODE_START) / (IMPLODE_END - IMPLODE_START) * 0.7;
+    if (time < TUNNEL_FORM_START)             return 0;
+    if (time < EXPLOSION_START)               return progress(time, TUNNEL_FORM_START, EXPLOSION_START) * 0.7;
+    if (time < EXPLOSION_START + 0.5)         return 0.7 + progress(time, EXPLOSION_START, EXPLOSION_START + 0.5) * 0.3;
+    if (time >= IMPLODE_START)                return 1 - progress(time, IMPLODE_START, IMPLODE_END) * 0.7;
     return 1;
   }, [time]);
 
-  // Highlight one axis group at a time during the worm phase
   const highlightedGroup = useMemo(() => {
-    if (time >= 6.5 && time < 7.5) return 0;
-    if (time >= 7.5 && time < 8.5) return 1;
-    if (time >= 8.5 && time < 9.5) return 2;
+    if (time >= EXPLOSION_END   && time < EXPLOSION_END + 1.0) return 0;
+    if (time >= EXPLOSION_END + 1.0 && time < EXPLOSION_END + 2.0) return 1;
+    if (time >= EXPLOSION_END + 2.0 && time < EXPLOSION_END + 3.0) return 2;
     return -1;
   }, [time]);
 
@@ -338,41 +310,60 @@ const IntroScene = ({ time, onComplete }) => {
     if (id === '1-1') { play('/sounds/flip.mp3'); vibrate(20); }
   };
 
+  // ── Pre-compute the center tile flip ───────────────────────────────────────
+  const centerFlipAngle = getCenterTileFlip();
+
+  // Center cubie of PX face (right face): gx=2, gy=1, gz=1 in a 3×3
+  const CENTER_X = size - 1;  // 2
+  const CENTER_Y = 1;
+  const CENTER_Z = 1;
+
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <group>
-      {/* Cube group — individual cubies rotate via layers */}
       <group ref={cubeGroupRef}>
         {items.map((it, idx) => {
+          const { pos, gx, gy, gz } = it;
           const k = (size - 1) / 2;
-          const x = it.pos[0] + k;
-          const y = it.pos[1] + k;
-          const z = it.pos[2] + k;
 
-          // Layer rotation for this cubie
-          const layerRot = getCubieLayerRotation(x, y, z, time, size);
+          // Per-face reveal for this cubie
+          const faceReveal = {
+            PZ: getFaceReveal('PZ'),
+            NZ: getFaceReveal('NZ'),
+            PX: getFaceReveal('PX'),
+            NX: getFaceReveal('NX'),
+            PY: getFaceReveal('PY'),
+            NY: getFaceReveal('NY'),
+          };
 
-          // Antipodal topology transformation during explosion
-          let topoPos = [...it.pos];
+          // Rummikub center tile flip — only applies to the PX face center sticker
+          // and the corresponding NX face center sticker (they are antipodal)
+          const cubieFlips = {};
+          const antipodalSwaps = {};
+
+          const isCenterPX = (gx === CENTER_X && gy === CENTER_Y && gz === CENTER_Z);
+          const isCenterNX = (gx === 0 && gy === CENTER_Y && gz === CENTER_Z);
+
+          if (isCenterPX && centerFlipAngle > 0) {
+            // The PX face sticker flips
+            cubieFlips['PX'] = centerFlipAngle;
+            // After 90°, it's "edge-on" — after 180°, show antipodal (green)
+            antipodalSwaps['PX'] = centerFlipAngle > Math.PI * 0.5;
+          }
+
+          // Explosion topology twist
+          let topoPos = [...pos];
           let topoRot = 0;
 
           if (antipodalTwist > 0) {
-            // Calculate antipodal pair (opposite corner)
-            const antipodal = [-it.pos[0], -it.pos[1], -it.pos[2]];
-            const dist = Math.sqrt(
-              it.pos[0] ** 2 + it.pos[1] ** 2 + it.pos[2] ** 2
-            );
-
-            // Twist toward antipodal position based on distance from center
+            const antipodal = [-pos[0], -pos[1], -pos[2]];
+            const dist = Math.sqrt(pos[0] ** 2 + pos[1] ** 2 + pos[2] ** 2);
             const twistFactor = antipodalTwist * (dist / (k * Math.sqrt(3)));
-
             topoPos = [
-              it.pos[0] * Math.cos(twistFactor) - antipodal[0] * Math.sin(twistFactor) * 0.3,
-              it.pos[1] * Math.cos(twistFactor) - antipodal[1] * Math.sin(twistFactor) * 0.3,
-              it.pos[2] * Math.cos(twistFactor) - antipodal[2] * Math.sin(twistFactor) * 0.3,
+              pos[0] * Math.cos(twistFactor) - antipodal[0] * Math.sin(twistFactor) * 0.3,
+              pos[1] * Math.cos(twistFactor) - antipodal[1] * Math.sin(twistFactor) * 0.3,
+              pos[2] * Math.cos(twistFactor) - antipodal[2] * Math.sin(twistFactor) * 0.3,
             ];
-
-            // Add helical rotation
             topoRot = twistFactor * 2;
           }
 
@@ -383,29 +374,11 @@ const IntroScene = ({ time, onComplete }) => {
             topoPos[2] * (1 + ef * 1.8),
           ];
 
-          // Calculate individual tile flips for this cubie
-          const cubieFlips = {};
-          const antipodalSwaps = {};
-
-          tileFlips.forEach(flip => {
-            if (flip.x === x && flip.y === y && flip.z === z) {
-              const elapsed = time - flip.start;
-              if (elapsed > 0 && elapsed < flip.dur) {
-                const progress = ease(elapsed / flip.dur);
-                const rotation = progress * Math.PI * 2; // Full 360° flip
-                cubieFlips[flip.face] = rotation;
-
-                // After 180° (π radians), show antipodal color/style
-                antipodalSwaps[flip.face] = rotation > Math.PI && rotation < Math.PI * 2;
-              }
-            }
-          });
-
           return (
             <group
               key={it.key}
               position={explodedPos}
-              rotation={[layerRot.rotX + topoRot, layerRot.rotY + topoRot, layerRot.rotZ + topoRot]}
+              rotation={[topoRot, topoRot, topoRot]}
             >
               <IntroCubie
                 ref={el => (cubieRefs.current[idx] = el)}
@@ -415,7 +388,7 @@ const IntroScene = ({ time, onComplete }) => {
                 faceStyles={faceStyles}
                 cubieFlips={cubieFlips}
                 antipodalSwaps={antipodalSwaps}
-                time={time}
+                faceReveal={faceReveal}
               />
             </group>
           );
