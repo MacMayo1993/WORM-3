@@ -1,21 +1,8 @@
 import React, { useState, useRef } from 'react';
-import { COLOR_SCHEMES, TILE_STYLES } from '../../utils/colorSchemes.js';
+import { COLOR_SCHEMES, TILE_STYLES, SCHEME_LABELS } from '../../utils/colorSchemes.js';
 import { BACKGROUNDS, getBackgroundUrl } from '../../utils/backgrounds.js';
 import { registerTilePreview, updateTilePreview, unregisterTilePreview } from '../../3d/TilePreviewRenderer.js';
 
-const SCHEME_LABELS = {
-  standard: 'Standard',
-  neon: 'Neon Glow',
-  pastel: 'Pastel',
-  mono: 'Monochrome',
-  spiderman: 'Spiderman',
-  ocean: 'Ocean Depths',
-  sunset: 'Sunset',
-  forest: 'Forest',
-  candy: 'Candy Pop',
-  retro: 'Retro',
-  custom: 'Custom Upload',
-};
 
 const BG_PREVIEWS = {
   blackhole: 'radial-gradient(circle, #1a0033 0%, #000000 100%)',
