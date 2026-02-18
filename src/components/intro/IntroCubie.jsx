@@ -16,10 +16,19 @@ import { FACE_COLORS } from '../../utils/constants.js';
  *   PY (top,    y=max): pos=[0,+0.53,0]  rot=[+PI/2,0,0]       — rotate +90° X to face +Y
  *   NY (bottom, y=min): pos=[0,-0.53,0]  rot=[-PI/2,0,0]       — rotate -90° X to face -Y
  *
- * faceReveal — object { PZ, NZ, PX, NX, PY, NY } each 0→1, controls glow/visibility
+ * faceReveal — object { PZ, NZ, PX, NX, PY, NY } each 0→1, controls glow/visibility.
+ *
+ * DEFAULT is fully revealed (all faces = 1) so the component works correctly
+ * when used outside the intro sequence (e.g. title screen background cube).
+ * The intro scene always passes an explicit faceReveal computed from time.
+ *
  * cubieFlips — object { face: radians } for the Rummikub tile-flip animation
  * antipodalSwaps — object { face: bool } true = show antipodal color
  */
+
+// Canonical "all faces fully revealed" object — shared reference avoids allocations
+const FULL_REVEAL = { PZ: 1, NZ: 1, PX: 1, NX: 1, PY: 1, NY: 1 };
+
 const IntroCubie = React.forwardRef(({
   position,
   size,
@@ -27,7 +36,7 @@ const IntroCubie = React.forwardRef(({
   faceStyles = {},
   cubieFlips = {},
   antipodalSwaps = {},
-  faceReveal = {},    // NEW: per-face 0→1 reveal intensity
+  faceReveal = FULL_REVEAL,   // default = fully revealed, never black
 }, ref) => {
   const limit = (size - 1) / 2;
   const x = Math.round(position[0] / (1 + explosionFactor * 1.8) + limit);
@@ -50,14 +59,14 @@ const IntroCubie = React.forwardRef(({
     if (antipodalSwaps[face]) {
       return FACE_COLORS[colorMap[antipodalMap[face]]];
     }
-    const reveal = faceReveal[face] || 0;
-    if (reveal < 0.01) return '#0a0a0a'; // black — unrevealed
+    const reveal = faceReveal[face] ?? 1; // undefined → treat as fully revealed
+    if (reveal < 0.01) return '#0a0a0a';  // black — unrevealed (intro only)
     return FACE_COLORS[colorMap[face]];
   };
 
   const getDisplayStyle = (face) => {
-    const reveal = faceReveal[face] || 0;
-    if (reveal < 0.5) return undefined; // no shader until revealed
+    const reveal = faceReveal[face] ?? 1;
+    if (reveal < 0.5) return undefined;
     if (antipodalSwaps[face]) {
       return faceStyles[antipodalMap[face]];
     }
@@ -65,7 +74,7 @@ const IntroCubie = React.forwardRef(({
   };
 
   const getGlow = (face) => {
-    return (faceReveal[face] || 0);
+    return faceReveal[face] ?? 1;
   };
 
   // Face definitions: [dirKey, outerFlag, pos, rot]
