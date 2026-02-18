@@ -4,18 +4,31 @@ import IntroSticker from './IntroSticker.jsx';
 import { FACE_COLORS } from '../../utils/constants.js';
 
 /**
- * faceStyles — optional object mapping face keys to tile style names:
- *   { PZ, NZ, PX, NX, PY, NY }
- * When provided, the outer sticker for that face renders the live shader
- * instead of a plain colour swatch.
+ * IntroCubie — a single small cube piece in the intro scene.
  *
- * cubieFlips — optional object mapping face keys to flip rotations (radians):
- *   { PZ, NZ, PX, NX, PY, NY }
+ * FACE GEOMETRY (how planeGeometry maps to cube faces):
+ *   planeGeometry default normal = +Z (faces toward camera when unrotated)
  *
- * antipodalSwaps — optional object indicating which faces show antipodal colors:
- *   { PZ: true/false, ... } - true means showing antipodal pair's properties
+ *   PZ (front,  z=max): pos=[0,0,+0.53]  rot=[0,0,0]          — already faces +Z ✓
+ *   NZ (back,   z=min): pos=[0,0,-0.53]  rot=[0,PI,0]          — flip around Y to face -Z
+ *   PX (right,  x=max): pos=[+0.53,0,0]  rot=[0,-PI/2,0]       — rotate -90° Y to face +X
+ *   NX (left,   x=min): pos=[-0.53,0,0]  rot=[0,+PI/2,0]       — rotate +90° Y to face -X
+ *   PY (top,    y=max): pos=[0,+0.53,0]  rot=[+PI/2,0,0]       — rotate +90° X to face +Y
+ *   NY (bottom, y=min): pos=[0,-0.53,0]  rot=[-PI/2,0,0]       — rotate -90° X to face -Y
+ *
+ * faceReveal — object { PZ, NZ, PX, NX, PY, NY } each 0→1, controls glow/visibility
+ * cubieFlips — object { face: radians } for the Rummikub tile-flip animation
+ * antipodalSwaps — object { face: bool } true = show antipodal color
  */
-const IntroCubie = React.forwardRef(({ position, size, explosionFactor = 0, faceStyles = {}, cubieFlips = {}, antipodalSwaps = {} }, ref) => {
+const IntroCubie = React.forwardRef(({
+  position,
+  size,
+  explosionFactor = 0,
+  faceStyles = {},
+  cubieFlips = {},
+  antipodalSwaps = {},
+  faceReveal = {},    // NEW: per-face 0→1 reveal intensity
+}, ref) => {
   const limit = (size - 1) / 2;
   const x = Math.round(position[0] / (1 + explosionFactor * 1.8) + limit);
   const y = Math.round(position[1] / (1 + explosionFactor * 1.8) + limit);
@@ -30,112 +43,68 @@ const IntroCubie = React.forwardRef(({ position, size, explosionFactor = 0, face
   const isOuterPY = y === size - 1;
   const isOuterNY = y === 0;
 
-  // Antipodal color mapping - when a tile flips, it shows its antipodal pair's color
-  const getDisplayColor = (face) => {
-    const colorMap = { PZ: 1, NZ: 4, PX: 5, NX: 2, PY: 3, NY: 6 };
-    const antipodalMap = { PZ: 'NZ', NZ: 'PZ', PX: 'NX', NX: 'PX', PY: 'NY', NY: 'PY' };
+  const colorMap = { PZ: 1, NZ: 4, PX: 5, NX: 2, PY: 3, NY: 6 };
+  const antipodalMap = { PZ: 'NZ', NZ: 'PZ', PX: 'NX', NX: 'PX', PY: 'NY', NY: 'PY' };
 
+  const getDisplayColor = (face) => {
     if (antipodalSwaps[face]) {
-      const antipodalFace = antipodalMap[face];
-      return FACE_COLORS[colorMap[antipodalFace]];
+      return FACE_COLORS[colorMap[antipodalMap[face]]];
     }
+    const reveal = faceReveal[face] || 0;
+    if (reveal < 0.01) return '#0a0a0a'; // black — unrevealed
     return FACE_COLORS[colorMap[face]];
   };
 
-  // Antipodal style mapping
   const getDisplayStyle = (face) => {
-    const antipodalMap = { PZ: 'NZ', NZ: 'PZ', PX: 'NX', NX: 'PX', PY: 'NY', NY: 'PY' };
-
+    const reveal = faceReveal[face] || 0;
+    if (reveal < 0.5) return undefined; // no shader until revealed
     if (antipodalSwaps[face]) {
-      const antipodalFace = antipodalMap[face];
-      return faceStyles[antipodalFace];
+      return faceStyles[antipodalMap[face]];
     }
     return faceStyles[face];
   };
 
+  const getGlow = (face) => {
+    return (faceReveal[face] || 0);
+  };
+
+  // Face definitions: [dirKey, outerFlag, pos, rot]
+  const FACE_DEFS = [
+    { key: 'PZ', outer: isOuterPZ, pos: [0, 0,  0.53], rot: [0, 0, 0] },
+    { key: 'NZ', outer: isOuterNZ, pos: [0, 0, -0.53], rot: [0, Math.PI, 0] },
+    { key: 'PX', outer: isOuterPX, pos: [ 0.53, 0, 0], rot: [0, -Math.PI / 2, 0] },
+    { key: 'NX', outer: isOuterNX, pos: [-0.53, 0, 0], rot: [0,  Math.PI / 2, 0] },
+    { key: 'PY', outer: isOuterPY, pos: [0,  0.53, 0], rot: [ Math.PI / 2, 0, 0] },
+    { key: 'NY', outer: isOuterNY, pos: [0, -0.53, 0], rot: [-Math.PI / 2, 0, 0] },
+  ];
+
   return (
     <group position={position} ref={ref}>
-      {/* Cubie body — solid dark cube matching main game style */}
-      <RoundedBox args={[0.98, 0.98, 0.98]} radius={0.08} smoothness={4}>
+      {/* Cubie body */}
+      <RoundedBox args={[0.98, 0.98, 0.98]} radius={0.06} smoothness={4}>
         <meshStandardMaterial
-          color="#0a0a0a"
-          roughness={0.25}
-          metalness={0.15}
-          envMapIntensity={0.4}
+          color="#080808"
+          roughness={0.15}
+          metalness={0.3}
+          envMapIntensity={0.5}
         />
       </RoundedBox>
 
-      {/* Front (PZ) */}
-      {(showAllFaces || isOuterPZ) && (
-        <IntroSticker
-          pos={[0, 0, 0.53]}
-          rot={[0, 0, 0]}
-          color={getDisplayColor('PZ')}
-          styleKey={isOuterPZ ? getDisplayStyle('PZ') : undefined}
-          isBack={!isOuterPZ && showAllFaces}
-          flipRotation={cubieFlips.PZ || 0}
-        />
-      )}
-
-      {/* Back (NZ) */}
-      {(showAllFaces || isOuterNZ) && (
-        <IntroSticker
-          pos={[0, 0, -0.53]}
-          rot={[0, Math.PI, 0]}
-          color={getDisplayColor('NZ')}
-          styleKey={isOuterNZ ? getDisplayStyle('NZ') : undefined}
-          isBack={!isOuterNZ && showAllFaces}
-          flipRotation={cubieFlips.NZ || 0}
-        />
-      )}
-
-      {/* Right (PX) */}
-      {(showAllFaces || isOuterPX) && (
-        <IntroSticker
-          pos={[0.53, 0, 0]}
-          rot={[0, Math.PI / 2, 0]}
-          color={getDisplayColor('PX')}
-          styleKey={isOuterPX ? getDisplayStyle('PX') : undefined}
-          isBack={!isOuterPX && showAllFaces}
-          flipRotation={cubieFlips.PX || 0}
-        />
-      )}
-
-      {/* Left (NX) */}
-      {(showAllFaces || isOuterNX) && (
-        <IntroSticker
-          pos={[-0.53, 0, 0]}
-          rot={[0, -Math.PI / 2, 0]}
-          color={getDisplayColor('NX')}
-          styleKey={isOuterNX ? getDisplayStyle('NX') : undefined}
-          isBack={!isOuterNX && showAllFaces}
-          flipRotation={cubieFlips.NX || 0}
-        />
-      )}
-
-      {/* Top (PY) */}
-      {(showAllFaces || isOuterPY) && (
-        <IntroSticker
-          pos={[0, 0.53, 0]}
-          rot={[-Math.PI / 2, 0, 0]}
-          color={getDisplayColor('PY')}
-          styleKey={isOuterPY ? getDisplayStyle('PY') : undefined}
-          isBack={!isOuterPY && showAllFaces}
-          flipRotation={cubieFlips.PY || 0}
-        />
-      )}
-
-      {/* Bottom (NY) */}
-      {(showAllFaces || isOuterNY) && (
-        <IntroSticker
-          pos={[0, -0.53, 0]}
-          rot={[Math.PI / 2, 0, 0]}
-          color={getDisplayColor('NY')}
-          styleKey={isOuterNY ? getDisplayStyle('NY') : undefined}
-          isBack={!isOuterNY && showAllFaces}
-          flipRotation={cubieFlips.NY || 0}
-        />
-      )}
+      {FACE_DEFS.map(({ key, outer, pos, rot }) => {
+        if (!showAllFaces && !outer) return null;
+        return (
+          <IntroSticker
+            key={key}
+            pos={pos}
+            rot={rot}
+            color={getDisplayColor(key)}
+            styleKey={outer ? getDisplayStyle(key) : undefined}
+            isBack={!outer && showAllFaces}
+            flipRotation={cubieFlips[key] || 0}
+            glowIntensity={outer ? getGlow(key) : 0}
+          />
+        );
+      })}
     </group>
   );
 });
