@@ -2413,14 +2413,14 @@ select.btn-compact:disabled {
 }
 
 /* ========================================
-   Freeplay Setup Wizard
+   Freeplay Setup Wizard — Gameboy Screen
    ======================================== */
 
 .wizard-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.85);
-  backdrop-filter: blur(8px);
+  background: rgba(40, 40, 36, 0.72);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2429,108 +2429,134 @@ select.btn-compact:disabled {
   animation: fadeIn 0.3s ease;
 }
 
+/* Outer casing: raised Gameboy body */
 .wizard-container {
-  background: linear-gradient(135deg, rgba(20, 24, 38, 0.98) 0%, rgba(30, 35, 50, 0.98) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 20px;
+  background: #c2c2ba;
+  border-radius: 16px 16px 24px 24px;
   max-width: 600px;
   width: 100%;
   max-height: 90vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  box-shadow:
+    0 16px 48px rgba(0, 0, 0, 0.55),
+    0 6px 16px rgba(0, 0, 0, 0.35),
+    inset 2px 2px 0 #deded6,
+    inset -2px -2px 0 #888880;
   overflow: hidden;
 }
 
+/* Header: device top panel */
 .wizard-header {
-  padding: 32px 32px 24px;
+  padding: 28px 32px 20px;
   text-align: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: #b8b8b0;
+  border-bottom: 2px solid #8a8a82;
+  box-shadow: 0 2px 0 #d2d2ca;
 }
 
 .wizard-progress {
   display: flex;
   gap: 8px;
   justify-content: center;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .wizard-progress-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.2);
+  background: #909088;
+  box-shadow: inset 1px 1px 0 #6a6a62, inset -1px -1px 0 #acacA4;
   transition: all 0.3s ease;
 }
 
 .wizard-progress-dot.active {
-  background: rgba(59, 130, 246, 0.6);
+  background: #6a7a5a;
+  box-shadow: inset 1px 1px 0 #4a5a3a, inset -1px -1px 0 #8a9a7a;
 }
 
 .wizard-progress-dot.current {
-  background: #3b82f6;
   width: 12px;
   height: 12px;
-  box-shadow: 0 0 12px rgba(59, 130, 246, 0.6);
+  background: #4a5a3a;
+  box-shadow:
+    inset 1px 1px 0 #3a4a2a,
+    0 0 0 2px #b8b8b0,
+    0 0 0 3px #6a7a5a;
 }
 
 .wizard-title {
-  margin: 0 0 8px;
-  font-size: 28px;
-  font-weight: 600;
-  color: #ffffff;
+  margin: 0 0 6px;
+  font-size: 26px;
+  font-weight: 700;
+  color: #1e1e18;
   font-family: 'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  text-shadow:
-    -1px -1px 0 #000,
-    1px -1px 0 #000,
-    -1px 1px 0 #000,
-    1px 1px 0 #000,
-    0 0 3px rgba(0, 0, 0, 0.8);
+  letter-spacing: 0.4px;
+  text-shadow: 1px 1px 0 rgba(255, 255, 255, 0.55);
 }
 
 .wizard-subtitle {
   margin: 0;
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+  color: #58584e;
   font-family: 'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
+/* Screen area: recessed LCD panel */
 .wizard-body {
   flex: 1;
-  padding: 24px 32px;
+  padding: 18px 20px;
   overflow-y: auto;
+  background: #d0d4c6;
+  margin: 14px 18px;
+  border-radius: 8px;
+  box-shadow:
+    inset 3px 3px 8px rgba(0, 0, 0, 0.28),
+    inset -1px -1px 3px rgba(255, 255, 255, 0.55);
 }
 
 .wizard-options {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 12px;
+  gap: 10px;
 }
 
+/* Option cards: raised buttons on the screen */
 .wizard-option {
-  background: rgba(255, 255, 255, 0.05);
-  border: 2px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  padding: 16px 12px;
+  background: #c8c8c0;
+  border: none;
+  border-radius: 8px;
+  padding: 14px 10px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.1s ease;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   min-height: 120px;
+  box-shadow:
+    2px 2px 0 #80807a,
+    inset 1px 1px 0 #e8e8e0,
+    inset -1px -1px 0 #aaaaA2;
 }
 
 .wizard-option:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.2);
-  transform: translateY(-2px);
+  background: #d0d0c8;
+  transform: translateY(-1px);
+  box-shadow:
+    3px 3px 0 #80807a,
+    inset 1px 1px 0 #ececec,
+    inset -1px -1px 0 #b4b4ac;
 }
 
+/* Selected: pressed-in / depressed state */
 .wizard-option.selected {
-  background: rgba(59, 130, 246, 0.15);
-  border-color: #3b82f6;
-  box-shadow: 0 0 16px rgba(59, 130, 246, 0.4);
+  background: #b0b8a8;
+  transform: translateY(1px);
+  box-shadow:
+    inset 2px 2px 5px rgba(0, 0, 0, 0.22),
+    inset -1px -1px 0 rgba(255, 255, 255, 0.45);
 }
 
 .wizard-option-preview {
@@ -2541,11 +2567,12 @@ select.btn-compact:disabled {
 }
 
 .wizard-option-label {
-  font-size: 13px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.9);
+  font-size: 12px;
+  font-weight: 600;
+  color: #1e1e18;
   text-align: center;
   font-family: 'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
 .wizard-color-preview {
@@ -2556,15 +2583,19 @@ select.btn-compact:disabled {
 }
 
 .wizard-color-dot {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.4);
 }
 
+/* Footer: device bottom panel with action buttons */
 .wizard-footer {
-  padding: 20px 32px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 14px 24px 18px;
+  background: #b8b8b0;
+  border-top: 2px solid #8a8a82;
+  box-shadow: 0 -1px 0 #d2d2ca;
   display: flex;
   gap: 12px;
   justify-content: space-between;
@@ -2572,36 +2603,66 @@ select.btn-compact:disabled {
 
 .wizard-btn {
   flex: 1;
-  padding: 12px 24px;
-  font-size: 15px;
-  font-weight: 500;
+  padding: 11px 20px;
+  font-size: 14px;
+  font-weight: 700;
   font-family: 'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.1s ease;
+  letter-spacing: 0.4px;
 }
 
+/* Primary: dark olive raised button (Gameboy A/B button style) */
 .wizard-btn-primary {
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  color: #ffffff;
+  background: #586848;
+  color: #e8e8d8;
+  box-shadow:
+    2px 2px 0 #283818,
+    inset 1px 1px 0 #788868,
+    inset -1px -1px 0 #384828;
 }
 
 .wizard-btn-primary:hover {
-  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  background: #687858;
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+  box-shadow:
+    3px 3px 0 #283818,
+    inset 1px 1px 0 #889878,
+    inset -1px -1px 0 #384828;
 }
 
+.wizard-btn-primary:active {
+  transform: translateY(1px);
+  box-shadow:
+    0 0 0 #283818,
+    inset 2px 2px 5px rgba(0, 0, 0, 0.3);
+}
+
+/* Secondary: light raised button */
 .wizard-btn-secondary {
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: #aeaeA6;
+  color: #1e1e18;
+  box-shadow:
+    2px 2px 0 #6e6e66,
+    inset 1px 1px 0 #cecec6,
+    inset -1px -1px 0 #888880;
 }
 
 .wizard-btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: rgba(255, 255, 255, 0.3);
+  background: #b8b8b0;
+  box-shadow:
+    3px 3px 0 #6e6e66,
+    inset 1px 1px 0 #d8d8d0,
+    inset -1px -1px 0 #888880;
+}
+
+.wizard-btn-secondary:active {
+  transform: translateY(1px);
+  box-shadow:
+    0 0 0 #6e6e66,
+    inset 2px 2px 5px rgba(0, 0, 0, 0.2);
 }
 
 /* Mobile adjustments */
@@ -2611,58 +2672,61 @@ select.btn-compact:disabled {
   }
 
   .wizard-header {
-    padding: 24px 20px 20px;
+    padding: 22px 18px 18px;
   }
 
   .wizard-title {
-    font-size: 24px;
+    font-size: 22px;
   }
 
   .wizard-body {
-    padding: 20px 16px;
+    padding: 14px 14px;
+    margin: 10px 12px;
   }
 
   .wizard-options {
     grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-    gap: 10px;
+    gap: 8px;
   }
 
   .wizard-option {
-    padding: 12px 8px;
+    padding: 10px 8px;
     min-height: 100px;
   }
 
   .wizard-footer {
-    padding: 16px 20px;
+    padding: 12px 18px 16px;
   }
 }
 
 .wizard-upload-placeholder {
   width: 64px;
   height: 64px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 2px dashed rgba(255, 255, 255, 0.3);
-  border-radius: 8px;
+  background: #d0d0c8;
+  border: 2px dashed #888880;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
+  box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.15);
+  transition: all 0.1s ease;
 }
 
 .wizard-option:hover .wizard-upload-placeholder {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.5);
+  background: #d8d8d0;
+  border-color: #585850;
 }
 
 .wizard-random-tile-preview {
   width: 56px;
   height: 56px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #4facfe 75%, #00f2fe 100%);
-  border-radius: 8px;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
   animation: rainbow-shift 3s ease infinite;
+  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.3), 1px 1px 0 rgba(0,0,0,0.2);
 }
 
 @keyframes rainbow-shift {
@@ -2677,13 +2741,13 @@ select.btn-compact:disabled {
 .wizard-bg-preview {
   width: 120px;
   height: 80px;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-  transition: transform 0.2s ease;
+  border-radius: 6px;
+  box-shadow: 2px 2px 0 #80807a, inset 1px 1px 0 rgba(255, 255, 255, 0.15);
+  transition: transform 0.1s ease;
 }
 
 .wizard-option:hover .wizard-bg-preview {
-  transform: scale(1.05);
+  transform: scale(1.04);
 }
 
 /* Make background options scrollable - only when bg previews present */
@@ -2703,17 +2767,17 @@ select.btn-compact:disabled {
 }
 
 .wizard-body .wizard-options:has(.wizard-bg-preview)::-webkit-scrollbar-track {
-  background: rgba(255,255,255,0.05);
+  background: #b8b8b0;
   border-radius: 3px;
 }
 
 .wizard-body .wizard-options:has(.wizard-bg-preview)::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,0.2);
+  background: #808078;
   border-radius: 3px;
 }
 
 .wizard-body .wizard-options:has(.wizard-bg-preview)::-webkit-scrollbar-thumb:hover {
-  background: rgba(255,255,255,0.3);
+  background: #606058;
 }
 
 /* Background option cards - only when in background step */
