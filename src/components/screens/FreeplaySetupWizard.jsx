@@ -31,7 +31,6 @@ const BG_PREVIEWS = {
   studio: 'linear-gradient(180deg, #ffffff 0%, #f0f0f0 50%, #d0d0d0 100%)',
   dark: 'linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%)',
   midnight: 'linear-gradient(135deg, #191970 0%, #0c0c38 100%)',
-  // New backgrounds fallback gradients
   cobblestone: 'linear-gradient(135deg, #8b8b8b 0%, #555555 100%)',
   desert: 'linear-gradient(180deg, #edc9af 0%, #d2b48c 100%)',
   fireplace: 'linear-gradient(135deg, #5c2c2c 0%, #2a1a1a 100%)',
@@ -54,7 +53,6 @@ const BG_OPTIONS = BACKGROUNDS.map(bg => ({
 const CLASSIC_STYLE_KEYS = ['solid', 'glossy', 'matte', 'metallic', 'carbonFiber', 'hexGrid', 'comic', 'cafeWall', 'hermanGrid', 'opticSpin', 'ouchi'];
 const LIVING_STYLE_KEYS = ['grass', 'ice', 'sand', 'water', 'wood', 'circuit', 'holographic', 'pulse', 'lava', 'galaxy', 'neural'];
 
-// Extract colors from uploaded image
 function extractColorsFromImage(img, count = 6) {
   const canvas = document.createElement('canvas');
   const size = 64;
@@ -63,14 +61,12 @@ function extractColorsFromImage(img, count = 6) {
   const ctx = canvas.getContext('2d');
   ctx.drawImage(img, 0, 0, size, size);
   const data = ctx.getImageData(0, 0, size, size).data;
-
   const pixels = [];
   for (let i = 0; i < data.length; i += 4) {
     const r = data[i], g = data[i + 1], b = data[i + 2];
     const brightness = r * 0.299 + g * 0.587 + b * 0.114;
     if (brightness > 20 && brightness < 240) pixels.push([r, g, b]);
   }
-
   if (pixels.length < count) {
     const fallback = [];
     for (let i = 0; i < count; i++) {
@@ -79,7 +75,6 @@ function extractColorsFromImage(img, count = 6) {
     }
     return fallback.map(([r, g, b]) => '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join(''));
   }
-
   const centroids = [];
   for (let i = 0; i < count; i++) {
     centroids.push([...pixels[Math.floor((i / count) * pixels.length)]]);
@@ -89,10 +84,8 @@ function extractColorsFromImage(img, count = 6) {
     for (const px of pixels) {
       let minDist = Infinity, best = 0;
       for (let c = 0; c < count; c++) {
-        const dr = px[0] - centroids[c][0];
-        const dg = px[1] - centroids[c][1];
-        const db = px[2] - centroids[c][2];
-        if (dr * dr + dg * dg + db * db < minDist) { minDist = dr * dr + dg * dg + db * db; best = c; }
+        const dr = px[0] - centroids[c][0], dg = px[1] - centroids[c][1], db = px[2] - centroids[c][2];
+        if (dr*dr+dg*dg+db*db < minDist) { minDist = dr*dr+dg*dg+db*db; best = c; }
       }
       clusters[best].push(px);
     }
@@ -100,51 +93,298 @@ function extractColorsFromImage(img, count = 6) {
       if (!clusters[c].length) continue;
       const sum = [0, 0, 0];
       for (const px of clusters[c]) { sum[0] += px[0]; sum[1] += px[1]; sum[2] += px[2]; }
-      centroids[c] = [
-        Math.round(sum[0] / clusters[c].length),
-        Math.round(sum[1] / clusters[c].length),
-        Math.round(sum[2] / clusters[c].length),
-      ];
+      centroids[c] = [Math.round(sum[0]/clusters[c].length), Math.round(sum[1]/clusters[c].length), Math.round(sum[2]/clusters[c].length)];
     }
   }
   centroids.sort((a, b) => {
-    const hA = Math.atan2(Math.sqrt(3) * (a[1] - a[2]), 2 * a[0] - a[1] - a[2]);
-    const hB = Math.atan2(Math.sqrt(3) * (b[1] - b[2]), 2 * b[0] - b[1] - b[2]);
+    const hA = Math.atan2(Math.sqrt(3)*(a[1]-a[2]), 2*a[0]-a[1]-a[2]);
+    const hB = Math.atan2(Math.sqrt(3)*(b[1]-b[2]), 2*b[0]-b[1]-b[2]);
     return hA - hB;
   });
-  return centroids.map(([r, g, b]) =>
-    '#' + [r, g, b].map(v => Math.max(0, Math.min(255, v)).toString(16).padStart(2, '0')).join('')
-  );
+  return centroids.map(([r, g, b]) => '#' + [r, g, b].map(v => Math.max(0, Math.min(255, v)).toString(16).padStart(2, '0')).join(''));
 }
 
-function TilePreviewCanvas({ styleKey, colorHex = '#4a7fa5', size = 48, className = '' }) {
+function TilePreviewCanvas({ styleKey, colorHex = '#4a7fa5', size = 48 }) {
   const canvasRef = useRef(null);
   const idRef = useRef(null);
-
   React.useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     canvas.width = size;
     canvas.height = size;
     idRef.current = registerTilePreview(canvas, styleKey, colorHex);
-    return () => {
-      if (idRef.current !== null) unregisterTilePreview(idRef.current);
-    };
+    return () => { if (idRef.current !== null) unregisterTilePreview(idRef.current); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
   React.useEffect(() => {
     if (idRef.current !== null) updateTilePreview(idRef.current, styleKey, colorHex);
   }, [styleKey, colorHex]);
-
-  return (
-    <canvas
-      ref={canvasRef}
-      width={size}
-      height={size}
-      className={`tile-preview-canvas${className ? ` ${className}` : ''}`}
-    />
-  );
+  return <canvas ref={canvasRef} width={size} height={size} style={{ display: 'block', borderRadius: '8px' }} />;
 }
+
+// ── Inline styles (zero className dependencies) ──────────────────────────────
+
+const S = {
+  overlay: {
+    position: 'fixed',
+    inset: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'rgba(0,0,0,0.55)',
+    backdropFilter: 'blur(20px)',
+    WebkitBackdropFilter: 'blur(20px)',
+    zIndex: 1000,
+    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif',
+  },
+
+  sheet: {
+    background: 'rgba(255,255,255,0.96)',
+    borderRadius: '24px',
+    width: 'min(640px, 96vw)',
+    maxHeight: '88vh',
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+    boxShadow: '0 32px 80px rgba(0,0,0,0.28), 0 0 0 1px rgba(0,0,0,0.06)',
+  },
+
+  header: {
+    padding: '36px 40px 0',
+    flexShrink: 0,
+  },
+
+  stepIndicator: {
+    display: 'flex',
+    gap: '6px',
+    marginBottom: '28px',
+  },
+
+  dot: (active, current) => ({
+    height: '3px',
+    borderRadius: '2px',
+    background: current ? '#000' : active ? 'rgba(0,0,0,0.35)' : 'rgba(0,0,0,0.12)',
+    flex: current ? '2' : '1',
+    transition: 'all 0.35s cubic-bezier(0.4,0,0.2,1)',
+  }),
+
+  title: {
+    fontSize: '26px',
+    fontWeight: '700',
+    letterSpacing: '-0.5px',
+    color: '#0a0a0a',
+    margin: '0 0 6px',
+    lineHeight: 1.15,
+  },
+
+  subtitle: {
+    fontSize: '14px',
+    color: 'rgba(0,0,0,0.42)',
+    margin: '0 0 24px',
+    letterSpacing: '0.01em',
+    fontWeight: '400',
+  },
+
+  body: {
+    padding: '0 40px',
+    overflowY: 'auto',
+    flex: 1,
+    // Custom scrollbar
+    scrollbarWidth: 'thin',
+    scrollbarColor: 'rgba(0,0,0,0.15) transparent',
+  },
+
+  // Color scheme grid — 2 per row, tall enough to feel considered
+  colorGrid: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '10px',
+    paddingBottom: '8px',
+  },
+
+  colorCard: (selected) => ({
+    display: 'flex',
+    alignItems: 'center',
+    gap: '14px',
+    padding: '14px 16px',
+    borderRadius: '14px',
+    border: selected ? '2px solid #000' : '2px solid transparent',
+    background: selected ? 'rgba(0,0,0,0.04)' : 'rgba(0,0,0,0.025)',
+    cursor: 'pointer',
+    transition: 'all 0.18s ease',
+    textAlign: 'left',
+    outline: 'none',
+    WebkitTapHighlightColor: 'transparent',
+  }),
+
+  colorDots: {
+    display: 'flex',
+    gap: '3px',
+    flexWrap: 'wrap',
+    width: '52px',
+    flexShrink: 0,
+  },
+
+  dot6: (color) => ({
+    width: '14px',
+    height: '14px',
+    borderRadius: '50%',
+    background: color,
+    boxShadow: '0 1px 3px rgba(0,0,0,0.18)',
+  }),
+
+  cardLabel: (selected) => ({
+    fontSize: '13px',
+    fontWeight: selected ? '600' : '400',
+    color: selected ? '#0a0a0a' : 'rgba(0,0,0,0.6)',
+    letterSpacing: '-0.1px',
+  }),
+
+  checkmark: {
+    marginLeft: 'auto',
+    width: '18px',
+    height: '18px',
+    borderRadius: '50%',
+    background: '#000',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+
+  // Tile style — horizontal scroll strip
+  styleSection: {
+    marginBottom: '20px',
+  },
+
+  styleSectionLabel: {
+    fontSize: '11px',
+    fontWeight: '600',
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    color: 'rgba(0,0,0,0.35)',
+    marginBottom: '10px',
+  },
+
+  styleStrip: {
+    display: 'flex',
+    gap: '8px',
+    overflowX: 'auto',
+    paddingBottom: '8px',
+    scrollbarWidth: 'none',
+    msOverflowStyle: 'none',
+  },
+
+  styleChip: (selected) => ({
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '7px',
+    padding: '10px 10px 8px',
+    borderRadius: '14px',
+    border: selected ? '2px solid #000' : '2px solid transparent',
+    background: selected ? 'rgba(0,0,0,0.05)' : 'rgba(0,0,0,0.03)',
+    cursor: 'pointer',
+    flexShrink: 0,
+    transition: 'all 0.18s ease',
+    outline: 'none',
+    WebkitTapHighlightColor: 'transparent',
+    minWidth: '72px',
+  }),
+
+  styleLabel: (selected) => ({
+    fontSize: '10px',
+    fontWeight: selected ? '600' : '400',
+    color: selected ? '#0a0a0a' : 'rgba(0,0,0,0.5)',
+    letterSpacing: '0.01em',
+    textAlign: 'center',
+    lineHeight: 1.2,
+  }),
+
+  // Background — tighter grid
+  bgGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(3, 1fr)',
+    gap: '8px',
+    paddingBottom: '8px',
+  },
+
+  bgCard: (selected) => ({
+    borderRadius: '12px',
+    overflow: 'hidden',
+    border: selected ? '2px solid #000' : '2px solid transparent',
+    cursor: 'pointer',
+    transition: 'all 0.18s ease',
+    outline: 'none',
+    position: 'relative',
+    aspectRatio: '4/3',
+    WebkitTapHighlightColor: 'transparent',
+  }),
+
+  bgLabel: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: '18px 8px 7px',
+    background: 'linear-gradient(to top, rgba(0,0,0,0.72) 0%, transparent 100%)',
+    fontSize: '11px',
+    fontWeight: '500',
+    color: '#fff',
+    textAlign: 'center',
+    letterSpacing: '0.01em',
+  },
+
+  footer: {
+    padding: '20px 40px 28px',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexShrink: 0,
+    borderTop: '1px solid rgba(0,0,0,0.07)',
+  },
+
+  btnSecondary: {
+    background: 'none',
+    border: 'none',
+    fontSize: '15px',
+    fontWeight: '500',
+    color: 'rgba(0,0,0,0.45)',
+    cursor: 'pointer',
+    padding: '10px 16px',
+    borderRadius: '10px',
+    transition: 'color 0.15s ease',
+    fontFamily: 'inherit',
+    letterSpacing: '-0.1px',
+  },
+
+  btnPrimary: {
+    background: '#0a0a0a',
+    border: 'none',
+    fontSize: '15px',
+    fontWeight: '600',
+    color: '#fff',
+    cursor: 'pointer',
+    padding: '12px 28px',
+    borderRadius: '12px',
+    transition: 'opacity 0.15s ease, transform 0.12s ease',
+    fontFamily: 'inherit',
+    letterSpacing: '-0.2px',
+  },
+
+  uploadPlaceholder: {
+    width: '52px',
+    height: '30px',
+    borderRadius: '8px',
+    background: 'rgba(0,0,0,0.07)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '18px',
+    flexShrink: 0,
+  },
+};
+
+// ── Component ─────────────────────────────────────────────────────────────────
 
 const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
   const [step, setStep] = useState(0);
@@ -167,187 +407,222 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       const colors = extractColorsFromImage(img, 6);
       const customColors = {};
       colors.forEach((c, i) => { customColors[i + 1] = c; });
-      setSettings({
-        ...settings,
-        colorScheme: 'custom',
-        customColors
-      });
+      setSettings(s => ({ ...s, colorScheme: 'custom', customColors }));
     };
     img.src = url;
   };
 
-  const colorOptions = Object.keys(SCHEME_LABELS).map(key => {
-    if (key === 'custom') {
-      return {
-        value: key,
-        label: SCHEME_LABELS[key],
-        isCustom: true,
-        preview: customPreview ? (
-          <img src={customPreview} alt="Custom" style={{ width: '64px', height: '64px', objectFit: 'cover', borderRadius: '8px' }} />
-        ) : (
-          <div className="wizard-upload-placeholder">
-            <span style={{ fontSize: '32px' }}>📷</span>
-          </div>
-        ),
-      };
-    }
-    return {
-      value: key,
-      label: SCHEME_LABELS[key],
-      preview: (
-        <div className="wizard-color-preview">
-          {Object.values(COLOR_SCHEMES[key]).map((c, i) => (
-            <div key={i} className="wizard-color-dot" style={{ background: c }} />
-          ))}
-        </div>
-      ),
-    };
-  });
-
-  const allTileStyles = [...CLASSIC_STYLE_KEYS, ...LIVING_STYLE_KEYS];
-
-  const steps = [
-    {
-      title: 'Choose Your Colors',
-      subtitle: 'Pick a color scheme or upload an image',
-      key: 'colorScheme',
-      options: colorOptions,
-    },
-    {
-      title: 'Choose Your Tile Style',
-      subtitle: 'Select how your cube faces should look',
-      key: 'tileStyle',
-      options: [
-        {
-          value: 'random',
-          label: 'Random Mix',
-          preview: (
-            <div className="wizard-random-tile-preview">
-              <span style={{ fontSize: '28px' }}>🎲</span>
-            </div>
-          ),
-        },
-        ...allTileStyles.map(key => ({
-          value: key,
-          label: TILE_STYLES[key]?.label || key,
-          preview: <TilePreviewCanvas styleKey={key} size={56} />,
-        })),
-      ],
-    },
-    {
-      title: 'Choose Your Background',
-      subtitle: 'Scroll to explore all scenes',
-      key: 'backgroundTheme',
-      options: BG_OPTIONS.map(opt => ({
-        value: opt.value,
-        label: opt.label,
-        preview: opt.thumbnail ? (
-          <img
-            src={opt.thumbnail}
-            alt={opt.label}
-            className="wizard-bg-thumb"
-            style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '8px' }}
-          />
-        ) : (
-          <div className="wizard-bg-preview" style={{ background: opt.gradient }} />
-        ),
-      })),
-    },
-  ];
-
-  const currentStep = steps[step];
-
-  const optionsRef = useRef(null);
-
-  const scrollMap = (direction) => {
-    if (optionsRef.current) {
-      const scrollAmount = 300;
-      optionsRef.current.scrollBy({
-        left: direction === 'left' ? -scrollAmount : scrollAmount,
-        behavior: 'smooth'
-      });
-    }
-  };
-
-  const handleSelect = (value, option) => {
-    if (option?.isCustom) {
-      fileInputRef.current?.click();
-    } else {
-      setSettings({ ...settings, [currentStep.key]: value });
-    }
-  };
+  const STEPS = ['Colors', 'Style', 'Scene'];
+  const totalSteps = 3;
 
   const handleNext = () => {
-    if (step < steps.length - 1) {
-      setStep(step + 1);
-    } else {
-      onComplete(settings);
-    }
+    if (step < totalSteps - 1) setStep(step + 1);
+    else onComplete(settings);
   };
 
   const handleBack = () => {
-    if (step > 0) {
-      setStep(step - 1);
-    } else {
-      onCancel();
-    }
+    if (step > 0) setStep(step - 1);
+    else onCancel();
   };
 
-  return (
-    <div className="wizard-overlay">
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        onChange={handleImageUpload}
-        style={{ display: 'none' }}
-      />
-      <div className="wizard-container">
-        {/* Header */}
-        <div className="wizard-header">
-          <div className="wizard-progress">
-            {steps.map((_, i) => (
-              <div
-                key={i}
-                className={`wizard-progress-dot${i <= step ? ' active' : ''}${i === step ? ' current' : ''}`}
-              />
-            ))}
-          </div>
-          <h2 className="wizard-title">{currentStep.title}</h2>
-          <p className="wizard-subtitle">{currentStep.subtitle}</p>
+  const select = (key, value) => setSettings(s => ({ ...s, [key]: value }));
+
+  // ── Step 0: Colors ─────────────────────────────────────────────────────────
+  const renderColors = () => {
+    const schemeKeys = Object.keys(SCHEME_LABELS);
+    return (
+      <div style={S.colorGrid}>
+        {schemeKeys.map(key => {
+          const selected = settings.colorScheme === key;
+          const isCustom = key === 'custom';
+          const colors = !isCustom ? Object.values(COLOR_SCHEMES[key] || {}) : [];
+
+          return (
+            <button
+              key={key}
+              style={S.colorCard(selected)}
+              onClick={() => {
+                if (isCustom) fileInputRef.current?.click();
+                else select('colorScheme', key);
+              }}
+            >
+              {/* Color preview */}
+              {isCustom ? (
+                customPreview ? (
+                  <img src={customPreview} alt="Custom"
+                    style={{ width: '52px', height: '30px', objectFit: 'cover', borderRadius: '6px', flexShrink: 0 }} />
+                ) : (
+                  <div style={S.uploadPlaceholder}>📷</div>
+                )
+              ) : (
+                <div style={S.colorDots}>
+                  {colors.slice(0, 6).map((c, i) => (
+                    <div key={i} style={S.dot6(c)} />
+                  ))}
+                </div>
+              )}
+
+              <span style={S.cardLabel(selected)}>{SCHEME_LABELS[key]}</span>
+
+              {selected && (
+                <div style={S.checkmark}>
+                  <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                    <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    );
+  };
+
+  // ── Step 1: Tile Style ─────────────────────────────────────────────────────
+  const renderStyles = () => {
+    const schemeColor = settings.colorScheme !== 'custom'
+      ? Object.values(COLOR_SCHEMES[settings.colorScheme] || {})[0] || '#4a7fa5'
+      : '#4a7fa5';
+
+    const renderStrip = (keys, label) => (
+      <div style={S.styleSection}>
+        <div style={S.styleSectionLabel}>{label}</div>
+        <div style={{ ...S.styleStrip, WebkitOverflowScrolling: 'touch' }}>
+          {keys.map(key => {
+            const selected = settings.tileStyle === key;
+            const label2 = TILE_STYLES[key]?.label || key;
+            return (
+              <button key={key} style={S.styleChip(selected)} onClick={() => select('tileStyle', key)}>
+                <TilePreviewCanvas styleKey={key} colorHex={schemeColor} size={56} />
+                <span style={S.styleLabel(selected)}>{label2}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+
+    return (
+      <>
+        {/* Random option */}
+        <div style={{ marginBottom: '16px' }}>
+          <button
+            style={{
+              ...S.colorCard(settings.tileStyle === 'random'),
+              width: '100%',
+              justifyContent: 'flex-start',
+            }}
+            onClick={() => select('tileStyle', 'random')}
+          >
+            <div style={{ ...S.uploadPlaceholder, fontSize: '22px', width: '56px', height: '56px', borderRadius: '10px' }}>🎲</div>
+            <div>
+              <div style={S.cardLabel(settings.tileStyle === 'random')}>Random Mix</div>
+              <div style={{ fontSize: '12px', color: 'rgba(0,0,0,0.38)', marginTop: '2px' }}>Different style on every face</div>
+            </div>
+            {settings.tileStyle === 'random' && (
+              <div style={{ ...S.checkmark, marginLeft: 'auto' }}>
+                <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                  <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+            )}
+          </button>
         </div>
 
-        {/* Options */}
-        <div className="wizard-body">
-          {currentStep.key === 'backgroundTheme' && (
-            <button className="wizard-scroll-btn left" onClick={() => scrollMap('left')}>‹</button>
-          )}
+        {renderStrip(CLASSIC_STYLE_KEYS, 'Classic')}
+        {renderStrip(LIVING_STYLE_KEYS, 'Living')}
+      </>
+    );
+  };
 
-          <div className="wizard-options" ref={optionsRef}>
-            {currentStep.options.map((option) => (
-              <button
-                key={option.value}
-                className={`wizard-option${settings[currentStep.key] === option.value ? ' selected' : ''} ${currentStep.key === 'backgroundTheme' ? 'compact' : ''}`}
-                onClick={() => handleSelect(option.value, option)}
-              >
-                {option.preview && <div className="wizard-option-preview">{option.preview}</div>}
-                <div className="wizard-option-label">{option.label}</div>
-              </button>
+  // ── Step 2: Background ─────────────────────────────────────────────────────
+  const renderBackgrounds = () => (
+    <div style={S.bgGrid}>
+      {BG_OPTIONS.map(opt => {
+        const selected = settings.backgroundTheme === opt.value;
+        return (
+          <button
+            key={opt.value}
+            style={S.bgCard(selected)}
+            onClick={() => select('backgroundTheme', opt.value)}
+          >
+            {opt.thumbnail ? (
+              <img src={opt.thumbnail} alt={opt.label}
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+            ) : (
+              <div style={{ width: '100%', height: '100%', background: opt.gradient }} />
+            )}
+            <div style={S.bgLabel}>{opt.label}</div>
+            {selected && (
+              <div style={{
+                position: 'absolute', top: '8px', right: '8px',
+                width: '20px', height: '20px', borderRadius: '50%',
+                background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: '0 1px 6px rgba(0,0,0,0.25)',
+              }}>
+                <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                  <path d="M1 4L3.5 6.5L9 1" stroke="#0a0a0a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  const stepContent = [renderColors, renderStyles, renderBackgrounds];
+  const stepTitles = ['Choose Colors', 'Choose Style', 'Choose Scene'];
+  const stepSubtitles = [
+    'Set the color palette for your cube',
+    'Pick how your tiles look and feel',
+    'Select your play environment',
+  ];
+
+  return (
+    <div style={S.overlay}>
+      <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
+
+      <div style={S.sheet}>
+        {/* Header */}
+        <div style={S.header}>
+          {/* Step indicator — segmented bar */}
+          <div style={S.stepIndicator}>
+            {STEPS.map((_, i) => (
+              <div key={i} style={S.dot(i <= step, i === step)} />
             ))}
           </div>
+          <h2 style={S.title}>{stepTitles[step]}</h2>
+          <p style={S.subtitle}>{stepSubtitles[step]}</p>
+        </div>
 
-          {currentStep.key === 'backgroundTheme' && (
-            <button className="wizard-scroll-btn right" onClick={() => scrollMap('right')}>›</button>
-          )}
+        {/* Scrollable body */}
+        <div style={S.body}>
+          <div style={{ paddingBottom: '24px' }}>
+            {stepContent[step]()}
+          </div>
         </div>
 
         {/* Footer */}
-        <div className="wizard-footer">
-          <button className="wizard-btn wizard-btn-secondary" onClick={handleBack}>
+        <div style={S.footer}>
+          <button
+            style={S.btnSecondary}
+            onClick={handleBack}
+            onMouseEnter={e => e.currentTarget.style.color = 'rgba(0,0,0,0.8)'}
+            onMouseLeave={e => e.currentTarget.style.color = 'rgba(0,0,0,0.45)'}
+          >
             {step === 0 ? 'Cancel' : 'Back'}
           </button>
-          <button className="wizard-btn wizard-btn-primary" onClick={handleNext}>
-            {step === steps.length - 1 ? 'Start Playing!' : 'Next'}
+
+          <button
+            style={S.btnPrimary}
+            onClick={handleNext}
+            onMouseEnter={e => { e.currentTarget.style.opacity = '0.82'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+            onMouseLeave={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = 'none'; }}
+            onMouseDown={e => { e.currentTarget.style.transform = 'scale(0.97)'; }}
+            onMouseUp={e => { e.currentTarget.style.transform = 'translateY(-1px)'; }}
+          >
+            {step === totalSteps - 1 ? 'Start Playing' : 'Continue'}
           </button>
         </div>
       </div>
