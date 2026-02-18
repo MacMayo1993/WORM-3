@@ -342,7 +342,6 @@ const IntroScene = ({ time, onComplete }) => {
           const antipodalSwaps = {};
 
           const isCenterPX = (gx === CENTER_X && gy === CENTER_Y && gz === CENTER_Z);
-          const isCenterNX = (gx === 0 && gy === CENTER_Y && gz === CENTER_Z);
 
           if (isCenterPX && centerFlipAngle > 0) {
             // The PX face sticker flips
