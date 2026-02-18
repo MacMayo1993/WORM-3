@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { COLOR_SCHEMES, TILE_STYLES } from '../../utils/colorSchemes.js';
+import { BACKGROUNDS, getBackgroundUrl } from '../../utils/backgrounds.js';
 import { registerTilePreview, updateTilePreview, unregisterTilePreview } from '../../3d/TilePreviewRenderer.js';
 
 const SCHEME_LABELS = {
@@ -16,21 +17,39 @@ const SCHEME_LABELS = {
   custom: 'Custom Upload',
 };
 
-const BG_OPTIONS = [
-  { value: 'blackhole', label: 'Black Hole', preview: 'radial-gradient(circle, #1a0033 0%, #000000 100%)' },
-  { value: 'cave', label: 'Cave', preview: 'linear-gradient(135deg, #3d2817 0%, #1a120a 100%)' },
-  { value: 'beach', label: 'Beach', preview: 'linear-gradient(180deg, #87ceeb 0%, #f4e4c1 70%, #c2b280 100%)' },
-  { value: 'forest', label: 'Forest', preview: 'linear-gradient(180deg, #6b8e23 0%, #2d5016 50%, #1a2f0f 100%)' },
-  { value: 'park', label: 'Park', preview: 'linear-gradient(180deg, #a8d5ba 0%, #7cb89d 50%, #4a7c59 100%)' },
-  { value: 'night', label: 'Night Sky', preview: 'linear-gradient(180deg, #0f0f23 0%, #1a1a3e 50%, #050510 100%)' },
-  { value: 'city', label: 'City Skyline', preview: 'linear-gradient(180deg, #4a5568 0%, #2d3748 50%, #1a202c 100%)' },
-  { value: 'apartment', label: 'Apartment', preview: 'linear-gradient(135deg, #f5f5dc 0%, #deb887 50%, #cd853f 100%)' },
-  { value: 'lobby', label: 'Modern Lobby', preview: 'linear-gradient(135deg, #e8e8e8 0%, #b8b8b8 50%, #707070 100%)' },
-  { value: 'warehouse', label: 'Warehouse', preview: 'linear-gradient(180deg, #6e6e6e 0%, #4a4a4a 50%, #2c2c2c 100%)' },
-  { value: 'studio', label: 'Photo Studio', preview: 'linear-gradient(180deg, #ffffff 0%, #f0f0f0 50%, #d0d0d0 100%)' },
-  { value: 'dark', label: 'Dark', preview: 'linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%)' },
-  { value: 'midnight', label: 'Midnight Blue', preview: 'linear-gradient(135deg, #191970 0%, #0c0c38 100%)' },
-];
+const BG_PREVIEWS = {
+  blackhole: 'radial-gradient(circle, #1a0033 0%, #000000 100%)',
+  cave: 'linear-gradient(135deg, #3d2817 0%, #1a120a 100%)',
+  beach: 'linear-gradient(180deg, #87ceeb 0%, #f4e4c1 70%, #c2b280 100%)',
+  forest: 'linear-gradient(180deg, #6b8e23 0%, #2d5016 50%, #1a2f0f 100%)',
+  park: 'linear-gradient(180deg, #a8d5ba 0%, #7cb89d 50%, #4a7c59 100%)',
+  night: 'linear-gradient(180deg, #0f0f23 0%, #1a1a3e 50%, #050510 100%)',
+  city: 'linear-gradient(180deg, #4a5568 0%, #2d3748 50%, #1a202c 100%)',
+  apartment: 'linear-gradient(135deg, #f5f5dc 0%, #deb887 50%, #cd853f 100%)',
+  lobby: 'linear-gradient(135deg, #e8e8e8 0%, #b8b8b8 50%, #707070 100%)',
+  warehouse: 'linear-gradient(180deg, #6e6e6e 0%, #4a4a4a 50%, #2c2c2c 100%)',
+  studio: 'linear-gradient(180deg, #ffffff 0%, #f0f0f0 50%, #d0d0d0 100%)',
+  dark: 'linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%)',
+  midnight: 'linear-gradient(135deg, #191970 0%, #0c0c38 100%)',
+  // New backgrounds fallback gradients
+  cobblestone: 'linear-gradient(135deg, #8b8b8b 0%, #555555 100%)',
+  desert: 'linear-gradient(180deg, #edc9af 0%, #d2b48c 100%)',
+  fireplace: 'linear-gradient(135deg, #5c2c2c 0%, #2a1a1a 100%)',
+  lounge: 'linear-gradient(135deg, #4a3b2a 0%, #2a221a 100%)',
+  paris: 'linear-gradient(180deg, #aaddff 0%, #dceeff 100%)',
+  shanghai: 'linear-gradient(180deg, #1a2a6c 0%, #b21f1f 100%)',
+  snow: 'linear-gradient(180deg, #eef7ff 0%, #cceeff 100%)',
+  stadium: 'linear-gradient(180deg, #3a7bd5 0%, #3a6073 100%)',
+  sunset: 'linear-gradient(180deg, #ff7e5f 0%, #feb47b 100%)',
+  umbrella: 'linear-gradient(135deg, #ff9966 0%, #ff5e62 100%)',
+};
+
+const BG_OPTIONS = BACKGROUNDS.map(bg => ({
+  value: bg.id,
+  label: bg.label,
+  thumbnail: bg.thumbnail ? getBackgroundUrl(bg.thumbnail) : null,
+  gradient: BG_PREVIEWS[bg.id] || 'linear-gradient(135deg, #333 0%, #000 100%)'
+}));
 
 const CLASSIC_STYLE_KEYS = ['solid', 'glossy', 'matte', 'metallic', 'carbonFiber', 'hexGrid', 'comic', 'cafeWall', 'hermanGrid', 'opticSpin', 'ouchi'];
 const LIVING_STYLE_KEYS = ['grass', 'ice', 'sand', 'water', 'wood', 'circuit', 'holographic', 'pulse', 'lava', 'galaxy', 'neural'];
@@ -222,14 +241,33 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       options: BG_OPTIONS.map(opt => ({
         value: opt.value,
         label: opt.label,
-        preview: (
-          <div className="wizard-bg-preview" style={{ background: opt.preview }} />
+        preview: opt.thumbnail ? (
+          <img
+            src={opt.thumbnail}
+            alt={opt.label}
+            className="wizard-bg-thumb"
+            style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '8px' }}
+          />
+        ) : (
+          <div className="wizard-bg-preview" style={{ background: opt.gradient }} />
         ),
       })),
     },
   ];
 
   const currentStep = steps[step];
+
+  const optionsRef = useRef(null);
+
+  const scrollMap = (direction) => {
+    if (optionsRef.current) {
+      const scrollAmount = 300;
+      optionsRef.current.scrollBy({
+        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        behavior: 'smooth'
+      });
+    }
+  };
 
   const handleSelect = (value, option) => {
     if (option?.isCustom) {
@@ -281,11 +319,15 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
 
         {/* Options */}
         <div className="wizard-body">
-          <div className="wizard-options">
+          {currentStep.key === 'backgroundTheme' && (
+            <button className="wizard-scroll-btn left" onClick={() => scrollMap('left')}>‹</button>
+          )}
+
+          <div className="wizard-options" ref={optionsRef}>
             {currentStep.options.map((option) => (
               <button
                 key={option.value}
-                className={`wizard-option${settings[currentStep.key] === option.value ? ' selected' : ''}`}
+                className={`wizard-option${settings[currentStep.key] === option.value ? ' selected' : ''} ${currentStep.key === 'backgroundTheme' ? 'compact' : ''}`}
                 onClick={() => handleSelect(option.value, option)}
               >
                 {option.preview && <div className="wizard-option-preview">{option.preview}</div>}
@@ -293,6 +335,10 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
               </button>
             ))}
           </div>
+
+          {currentStep.key === 'backgroundTheme' && (
+            <button className="wizard-scroll-btn right" onClick={() => scrollMap('right')}>›</button>
+          )}
         </div>
 
         {/* Footer */}
