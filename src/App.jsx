@@ -36,6 +36,7 @@ import {
 // 3D components
 import CubeAssembly from './3d/CubeAssembly.jsx';
 import BlackHoleEnvironment from './3d/BlackHoleEnvironment.jsx';
+import { getLevelBackground } from './3d/LifeJourneyBackgrounds.jsx';
 import { BACKGROUNDS, getBackgroundUrl } from './utils/backgrounds.js';
 
 // Photo environment presets available from @react-three/drei (real HDR panoramas)
