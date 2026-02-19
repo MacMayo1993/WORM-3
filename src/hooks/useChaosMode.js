@@ -118,7 +118,7 @@ export function useChaosMode() {
   upcomingRotationRef.current = upcomingRotation;
   // Countdown held in a ref so the RAF body mutates it without triggering React
   // re-renders on every frame; setRotationCountdown is called only at key events.
-  const rotationCountdownRef = useRef(0);
+  const _rotationCountdownRef = useRef(0);
 
   // ── Opt #8: surface coords list, rebuilt only when cube size changes ────────
   const surfaceCoords = useMemo(() => buildSurfaceCoords(size), [size]);
