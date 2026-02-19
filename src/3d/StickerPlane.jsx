@@ -548,19 +548,32 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
       // Animate color/texture through the flip - switch at midpoint
       // Only for standard materials (shader materials handle color via uniforms)
-      if (meshRef.current?.material?.color && flipFromColor.current && flipToColor.current) {
-        if (rawP < 0.5) {
-          const tex = flipFromTexture.current;
-          meshRef.current.material.map = tex || null;
-          meshRef.current.material.color.set(tex ? '#ffffff' : flipFromColor.current);
-          meshRef.current.material.needsUpdate = true;
-        } else {
-          const tex = flipToTexture.current;
-          meshRef.current.material.map = tex || null;
-          meshRef.current.material.color.set(tex ? '#ffffff' : flipToColor.current);
-          meshRef.current.material.needsUpdate = true;
-        }
-      }
+      if (flipFromColor.current && flipToColor.current) {
+  const mat = meshRef.current?.material;
+  if (!mat) {
+    // no-op
+  } else if (mat.color) {
+    if (rawP < 0.5) {
+      const tex = flipFromTexture.current;
+      mat.map = tex || null;
+      mat.color.set(tex ? '#ffffff' : flipFromColor.current);
+      mat.needsUpdate = true;
+    } else {
+      const tex = flipToTexture.current;
+      mat.map = tex || null;
+      mat.color.set(tex ? '#ffffff' : flipToColor.current);
+      mat.needsUpdate = true;
+    }
+  } else if (mat.uniforms?.uColor) {
+    mat.uniforms.uColor.value.set(
+      rawP < 0.5 ? flipFromColor.current : flipToColor.current
+    );
+  } else if (mat.uniforms?.uBaseColor) {
+    mat.uniforms.uBaseColor.value.set(
+      rawP < 0.5 ? flipFromColor.current : flipToColor.current
+    );
+  }
+}
 
       if (spinT.current <= 0) {
         // Release animation lock - allow React state to control color again
@@ -578,12 +591,17 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         // Force set the final color/texture correctly
         // Only for standard materials (shader materials handle color via uniforms)
         // Texture follows the displayed face (meta.curr)
-        if (meshRef.current?.material?.color) {
-          const currTex = faceTextures?.[meta?.curr] || null;
-          meshRef.current.material.map = currTex;
-          meshRef.current.material.color.set(currTex ? '#ffffff' : baseColorRef.current);
-          meshRef.current.material.needsUpdate = true;
-        }
+        const mat = meshRef.current?.material;
+if (mat?.color) {
+  const currTex = faceTextures?.[meta?.curr] || null;
+  mat.map = currTex;
+  mat.color.set(currTex ? '#ffffff' : baseColorRef.current);
+  mat.needsUpdate = true;
+} else if (mat?.uniforms?.uColor) {
+  mat.uniforms.uColor.value.set(baseColorRef.current);
+} else if (mat?.uniforms?.uBaseColor) {
+  mat.uniforms.uBaseColor.value.set(baseColorRef.current);
+}
       }
     }
 
@@ -704,15 +722,22 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // Uses useLayoutEffect so the color updates BEFORE the browser paints,
   // preventing a 1-frame flash of the wrong color after rotation.
   useLayoutEffect(() => {
-    if (meshRef.current && meshRef.current.material && !isFlipping.current) {
-      // Only update color for standard materials (not shader materials)
-      if (meshRef.current.material.color) {
-        meshRef.current.material.color.set(materialColor);
-        meshRef.current.material.map = currTexture;
-        meshRef.current.material.needsUpdate = true;
+  if (meshRef.current && meshRef.current.material && !isFlipping.current) {
+    const mat = meshRef.current.material;
+    if (mat.color) {
+      mat.color.set(materialColor);
+      mat.map = currTexture;
+      mat.needsUpdate = true;
+    } else if (mat.uniforms) {
+      if (mat.uniforms.uColor) {
+        mat.uniforms.uColor.value.set(materialColor);
+      }
+      if (mat.uniforms.uBaseColor) {
+        mat.uniforms.uBaseColor.value.set(materialColor);
       }
     }
-  }, [materialColor, currTexture]);
+  }
+}, [materialColor, currTexture]);
   const isWormhole = meta?.flips > 0 && meta?.curr !== meta?.orig;
   const hasFlipHistory = meta?.flips > 0;
 
