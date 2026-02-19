@@ -339,19 +339,29 @@ export default function WORM3() {
     if (wizardSettings.customColors) {
       newSettings.customColors = wizardSettings.customColors;
     }
-    // Apply tile style to all faces
-    if (wizardSettings.tileStyle) {
-      const manifoldStyles = {};
-      if (wizardSettings.tileStyle === 'random') {
-        // Pick random style for each face
-        const allStyles = ['solid', 'glossy', 'matte', 'metallic', 'carbonFiber', 'hexGrid', 'comic', 'cafeWall', 'hermanGrid', 'opticSpin', 'ouchi', 'grass', 'ice', 'sand', 'water', 'wood', 'circuit', 'holographic', 'pulse', 'lava', 'galaxy', 'neural'];
-        [1, 2, 3, 4, 5, 6].forEach(id => {
-          manifoldStyles[id] = allStyles[Math.floor(Math.random() * allStyles.length)];
-        });
-      } else {
-        [1, 2, 3, 4, 5, 6].forEach(id => { manifoldStyles[id] = wizardSettings.tileStyle; });
+    // Apply biome mode settings if provided
+    if (wizardSettings.biomeMode?.enabled) {
+      newSettings.biomeMode = wizardSettings.biomeMode;
+      if (wizardSettings.manifoldStyles) {
+        newSettings.manifoldStyles = wizardSettings.manifoldStyles;
       }
-      newSettings.manifoldStyles = manifoldStyles;
+    } else {
+      // Clear biome mode for standard play
+      newSettings.biomeMode = { enabled: false, faceAssignment: null };
+      // Apply tile style to all faces
+      if (wizardSettings.tileStyle) {
+        const manifoldStyles = {};
+        if (wizardSettings.tileStyle === 'random') {
+          // Pick random style for each face
+          const allStyles = ['solid', 'glossy', 'matte', 'metallic', 'carbonFiber', 'hexGrid', 'comic', 'cafeWall', 'hermanGrid', 'opticSpin', 'ouchi', 'grass', 'ice', 'sand', 'water', 'wood', 'circuit', 'holographic', 'pulse', 'lava', 'galaxy', 'neural'];
+          [1, 2, 3, 4, 5, 6].forEach(id => {
+            manifoldStyles[id] = allStyles[Math.floor(Math.random() * allStyles.length)];
+          });
+        } else {
+          [1, 2, 3, 4, 5, 6].forEach(id => { manifoldStyles[id] = wizardSettings.tileStyle; });
+        }
+        newSettings.manifoldStyles = manifoldStyles;
+      }
     }
     setSettings(newSettings);
     // Clear level and shuffle
@@ -732,7 +742,7 @@ export default function WORM3() {
           const modes = ['classic', 'grid', 'sudokube', 'wireframe', 'glass'];
           return modes[(modes.indexOf(v) + 1) % modes.length];
         }); break;
-        case 'c': if (!currentLevelData || currentLevelData.features.chaos) setChaosLevel(l => l > 0 ? 0 : 1); break;
+        case 'c': if (!settings.biomeMode?.enabled && (!currentLevelData || currentLevelData.features.chaos)) setChaosLevel(l => l > 0 ? 0 : 1); break;
         case 'i': setAntipodalIntegrityMode(!antipodalIntegrityMode); break;
         case 'm': toggleHollowMode(); break;
         case 'p':
@@ -880,6 +890,8 @@ export default function WORM3() {
               solveHighlights={solveModeActive ? solveHighlights : teachMode.active ? solveHighlights : []}
               onFaceRotationMode={handleFaceRotationMode}
               handsMode={handsMode}
+              isBiomeMode={settings.biomeMode?.enabled ?? false}
+              biomeFaceAssign={settings.biomeMode?.faceAssignment ?? null}
             />
             {teachMode.active && teachMode.layerHighlight && (
               <LayerHighlight
@@ -972,7 +984,7 @@ export default function WORM3() {
         flipLocked={!!(currentLevelData && !currentLevelData.features.flips)}
         chaosMode={chaosMode}
         chaosLevel={chaosLevel}
-        onToggleChaos={() => { if (!currentLevelData || currentLevelData.features.chaos) setChaosLevel(l => l > 0 ? 0 : 1); }}
+        onToggleChaos={() => { if (!settings.biomeMode?.enabled && (!currentLevelData || currentLevelData.features.chaos)) setChaosLevel(l => l > 0 ? 0 : 1); }}
         onSetChaosLevel={(l) => setChaosLevel(l)}
         chaosLocked={!!(currentLevelData && !currentLevelData.features.chaos)}
         maxChaosLevel={currentLevelData?.chaosLevel || 4}

@@ -2,6 +2,8 @@ import React, { useState, useRef } from 'react';
 import { COLOR_SCHEMES, TILE_STYLES, SCHEME_LABELS } from '../../utils/colorSchemes.js';
 import { BACKGROUNDS, getBackgroundUrl } from '../../utils/backgrounds.js';
 import { registerTilePreview, updateTilePreview, unregisterTilePreview } from '../../3d/TilePreviewRenderer.js';
+import { BiomeModeSetup } from '../../ui/BiomeModeSetup.jsx';
+import { resolveBiomeManifoldStyles } from '../../modes/CityBiomeMode.js';
 
 
 const BG_PREVIEWS = {
@@ -374,6 +376,8 @@ const S = {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
+  const [gameMode, setGameMode] = useState('standard'); // 'standard' | 'cityBiome'
+  const [biomeFaceAssignment, setBiomeFaceAssignment] = useState(null);
   const [step, setStep] = useState(0);
   const [settings, setSettings] = useState({
     colorScheme: initialSettings?.colorScheme || 'standard',
@@ -399,12 +403,27 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     img.src = url;
   };
 
-  const STEPS = ['Colors', 'Style', 'Scene'];
-  const totalSteps = 3;
+  // Steps differ by mode: City Biome inserts a city-assignment step
+  const isBiome = gameMode === 'cityBiome';
+  const STEPS = isBiome ? ['Mode', 'Cities', 'Colors', 'Scene'] : ['Mode', 'Colors', 'Style', 'Scene'];
+  const totalSteps = STEPS.length;
 
   const handleNext = () => {
-    if (step < totalSteps - 1) setStep(step + 1);
-    else onComplete(settings);
+    if (step < totalSteps - 1) {
+      setStep(step + 1);
+    } else {
+      // Complete — build final settings
+      const finalSettings = { ...settings };
+      if (isBiome) {
+        // Resolve manifoldStyles from face assignment, override tileStyle
+        const manifoldStyles = resolveBiomeManifoldStyles(biomeFaceAssignment);
+        finalSettings.manifoldStyles = manifoldStyles;
+        finalSettings.biomeMode = { enabled: true, faceAssignment: biomeFaceAssignment };
+        // Remove individual tileStyle since biome drives it per-face
+        delete finalSettings.tileStyle;
+      }
+      onComplete(finalSettings);
+    }
   };
 
   const handleBack = () => {
@@ -558,13 +577,59 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     </div>
   );
 
-  const stepContent = [renderColors, renderStyles, renderBackgrounds];
-  const stepTitles = ['Choose Colors', 'Choose Style', 'Choose Scene'];
-  const stepSubtitles = [
-    'Set the color palette for your cube',
-    'Pick how your tiles look and feel',
-    'Select your play environment',
-  ];
+  // ── Step: Mode picker ──────────────────────────────────────────────────────
+  const renderMode = () => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      {[
+        { key: 'standard', label: 'Standard', desc: 'Classic free-play with all tile styles' },
+        { key: 'cityBiome', label: 'City Biome', desc: 'Living 3D cities on each face — exploratory, no win state' },
+      ].map(({ key, label, desc }) => {
+        const selected = gameMode === key;
+        return (
+          <button
+            key={key}
+            style={{ ...S.colorCard(selected), width: '100%', justifyContent: 'flex-start', gap: '14px' }}
+            onClick={() => setGameMode(key)}
+          >
+            <div style={{ ...S.uploadPlaceholder, fontSize: '22px', width: '52px', height: '52px', borderRadius: '10px' }}>
+              {key === 'cityBiome' ? '🏙' : '🎲'}
+            </div>
+            <div style={{ textAlign: 'left' }}>
+              <div style={S.cardLabel(selected)}>{label}</div>
+              <div style={{ fontSize: '12px', color: 'rgba(0,0,0,0.38)', marginTop: '2px' }}>{desc}</div>
+            </div>
+            {selected && (
+              <div style={{ ...S.checkmark, marginLeft: 'auto' }}>
+                <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                  <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  // ── Step: City assignment (biome mode only) ─────────────────────────────────
+  const renderBiomeSetup = () => (
+    <BiomeModeSetup
+      value={biomeFaceAssignment}
+      onChange={setBiomeFaceAssignment}
+    />
+  );
+
+  const stepContent = isBiome
+    ? [renderMode, renderBiomeSetup, renderColors, renderBackgrounds]
+    : [renderMode, renderColors, renderStyles, renderBackgrounds];
+
+  const stepTitles = isBiome
+    ? ['Choose Mode', 'Assign Cities', 'Choose Colors', 'Choose Scene']
+    : ['Choose Mode', 'Choose Colors', 'Choose Style', 'Choose Scene'];
+
+  const stepSubtitles = isBiome
+    ? ['Select a game mode', 'Place a city on each face', 'Set the color palette for your cube', 'Select your play environment']
+    : ['Select a game mode', 'Set the color palette for your cube', 'Pick how your tiles look and feel', 'Select your play environment'];
 
   return (
     <div style={S.overlay}>

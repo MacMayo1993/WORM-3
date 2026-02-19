@@ -7,6 +7,8 @@ import { useGameStore } from '../hooks/useGameStore.js';
 import StickerPlane from './StickerPlane.jsx';
 import WireframeEdge from './WireframeEdge.jsx';
 import { getMirrorDimensions } from '../game/mirrorBlocks.js';
+import { CityBuildings } from './CityBuildings.jsx';
+import { FACE_CITIES } from '../modes/CityBiomeMode.js';
 
 // Hollow cube edge beams — 12 beams forming a skeletal cube frame
 const EDGE_H = 0.49; // half of cube size
@@ -84,7 +86,8 @@ const faceValue = (dirKey, x, y, z, size) => {
 };
 
 const Cubie = React.forwardRef(function Cubie({
-  position, cubie, size, onPointerDown, visualMode, explosionFactor = 0, faceColors, faceTextures, manifoldStyles
+  position, cubie, size, onPointerDown, visualMode, explosionFactor = 0, faceColors, faceTextures, manifoldStyles,
+  isBiomeMode, biomeFaceAssign
 }, ref) {
   const hollowMode = useGameStore((state) => state.hollowMode);
   const mirrorMode = useGameStore((state) => state.mirrorMode);
@@ -106,6 +109,23 @@ const Cubie = React.forwardRef(function Cubie({
   };
 
   const meta = (d) => cubie.stickers[d] || null;
+
+  // Compute tileIndex (row * size + col) for biome buildings from meta.origPos
+  const biomeTileIndex = (dirKey) => {
+    const m = meta(dirKey);
+    if (!m?.origPos) return 0;
+    const { r, c } = faceRCFor(m.origDir, m.origPos.x, m.origPos.y, m.origPos.z, size);
+    return r * size + c;
+  };
+
+  // Lookup city key for this sticker — drives which building type renders.
+  // CRITICAL: use meta.orig (original face) not meta.curr so buildings travel with stickers.
+  const biomeCityKey = (dirKey) => {
+    const m = meta(dirKey);
+    if (!m) return null;
+    const faceAssign = biomeFaceAssign ?? FACE_CITIES;
+    return faceAssign[m.orig] ?? FACE_CITIES[m.orig] ?? null;
+  };
 
   const gridPos = (dirKey) => {
     const m = meta(dirKey);
@@ -305,11 +325,17 @@ const Cubie = React.forwardRef(function Cubie({
       {visualMode !== 'wireframe' && !mirrorMode && (
         <>
           {isEdge(position[2], (size - 1) / 2) && meta('PZ') && <StickerPlane meta={meta('PZ')} pos={STICKER_POS.PZ} rot={STICKER_ROT.PZ} mode={visualMode} overlay={overlay('PZ')} faceColors={faceColors} faceTextures={faceTextures} faceSize={size} {...gridPos('PZ')} manifoldStyles={manifoldStyles} hollow={hollowMode} />}
+          {isEdge(position[2], (size - 1) / 2) && meta('PZ') && isBiomeMode && biomeCityKey('PZ') && <group position={STICKER_POS.PZ} rotation={STICKER_ROT.PZ}><CityBuildings cityKey={biomeCityKey('PZ')} tileIndex={biomeTileIndex('PZ')} faceId={meta('PZ').orig} gridDim={size} scale={1} /></group>}
           {isEdge(position[2], -(size - 1) / 2) && meta('NZ') && <StickerPlane meta={meta('NZ')} pos={STICKER_POS.NZ} rot={STICKER_ROT.NZ} mode={visualMode} overlay={overlay('NZ')} faceColors={faceColors} faceTextures={faceTextures} faceSize={size} {...gridPos('NZ')} manifoldStyles={manifoldStyles} hollow={hollowMode} />}
+          {isEdge(position[2], -(size - 1) / 2) && meta('NZ') && isBiomeMode && biomeCityKey('NZ') && <group position={STICKER_POS.NZ} rotation={STICKER_ROT.NZ}><CityBuildings cityKey={biomeCityKey('NZ')} tileIndex={biomeTileIndex('NZ')} faceId={meta('NZ').orig} gridDim={size} scale={1} /></group>}
           {isEdge(position[0], (size - 1) / 2) && meta('PX') && <StickerPlane meta={meta('PX')} pos={STICKER_POS.PX} rot={STICKER_ROT.PX} mode={visualMode} overlay={overlay('PX')} faceColors={faceColors} faceTextures={faceTextures} faceSize={size} {...gridPos('PX')} manifoldStyles={manifoldStyles} hollow={hollowMode} />}
+          {isEdge(position[0], (size - 1) / 2) && meta('PX') && isBiomeMode && biomeCityKey('PX') && <group position={STICKER_POS.PX} rotation={STICKER_ROT.PX}><CityBuildings cityKey={biomeCityKey('PX')} tileIndex={biomeTileIndex('PX')} faceId={meta('PX').orig} gridDim={size} scale={1} /></group>}
           {isEdge(position[0], -(size - 1) / 2) && meta('NX') && <StickerPlane meta={meta('NX')} pos={STICKER_POS.NX} rot={STICKER_ROT.NX} mode={visualMode} overlay={overlay('NX')} faceColors={faceColors} faceTextures={faceTextures} faceSize={size} {...gridPos('NX')} manifoldStyles={manifoldStyles} hollow={hollowMode} />}
+          {isEdge(position[0], -(size - 1) / 2) && meta('NX') && isBiomeMode && biomeCityKey('NX') && <group position={STICKER_POS.NX} rotation={STICKER_ROT.NX}><CityBuildings cityKey={biomeCityKey('NX')} tileIndex={biomeTileIndex('NX')} faceId={meta('NX').orig} gridDim={size} scale={1} /></group>}
           {isEdge(position[1], (size - 1) / 2) && meta('PY') && <StickerPlane meta={meta('PY')} pos={STICKER_POS.PY} rot={STICKER_ROT.PY} mode={visualMode} overlay={overlay('PY')} faceColors={faceColors} faceTextures={faceTextures} faceSize={size} {...gridPos('PY')} manifoldStyles={manifoldStyles} hollow={hollowMode} />}
+          {isEdge(position[1], (size - 1) / 2) && meta('PY') && isBiomeMode && biomeCityKey('PY') && <group position={STICKER_POS.PY} rotation={STICKER_ROT.PY}><CityBuildings cityKey={biomeCityKey('PY')} tileIndex={biomeTileIndex('PY')} faceId={meta('PY').orig} gridDim={size} scale={1} /></group>}
           {isEdge(position[1], -(size - 1) / 2) && meta('NY') && <StickerPlane meta={meta('NY')} pos={STICKER_POS.NY} rot={STICKER_ROT.NY} mode={visualMode} overlay={overlay('NY')} faceColors={faceColors} faceTextures={faceTextures} faceSize={size} {...gridPos('NY')} manifoldStyles={manifoldStyles} hollow={hollowMode} />}
+          {isEdge(position[1], -(size - 1) / 2) && meta('NY') && isBiomeMode && biomeCityKey('NY') && <group position={STICKER_POS.NY} rotation={STICKER_ROT.NY}><CityBuildings cityKey={biomeCityKey('NY')} tileIndex={biomeTileIndex('NY')} faceId={meta('NY').orig} gridDim={size} scale={1} /></group>}
         </>
       )}
     </group>

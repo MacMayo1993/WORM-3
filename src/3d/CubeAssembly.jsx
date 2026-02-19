@@ -12,6 +12,57 @@ import ChaosWave from '../manifold/ChaosWave.jsx';
 import FlipPropagationWave from '../manifold/FlipPropagationWave.jsx';
 import { vibrate } from '../utils/audio.js';
 import { updateSharedTime, updateSharedTremor, warmUpDefaultStyles } from './styles/TileStyleMaterials.jsx';
+import { SeamPulse } from './SeamPulse.jsx';
+
+// ─── Biome mode seam helpers ──────────────────────────────────────────────────
+
+// Face ID to rotation mapping (matches Cubie.jsx STICKER_ROT conventions)
+const FACE_ID_TO_ROT = {
+  1: [0, 0, 0],                // PZ (front)
+  2: [0, -Math.PI / 2, 0],    // NX (left)
+  3: [-Math.PI / 2, 0, 0],    // PY (top)
+  4: [0, Math.PI, 0],         // NZ (back)
+  5: [0, Math.PI / 2, 0],     // PX (right)
+  6: [Math.PI / 2, 0, 0],     // NY (bottom)
+};
+
+// All 12 non-antipodal face-pair seams (adjacency is fixed on a cube)
+const ALL_ADJACENT_SEAMS = [
+  [1, 2], [1, 3], [1, 5], [1, 6],
+  [2, 3], [2, 4], [2, 6],
+  [3, 4], [3, 5],
+  [4, 5], [4, 6],
+  [5, 6],
+];
+
+// Compute the border tile indices for a dim×dim face grid (4 edge rows/cols)
+function getBorderTileIndices(dim) {
+  const set = new Set();
+  for (let c = 0; c < dim; c++) {
+    set.add(0 * dim + c);           // top row
+    set.add((dim - 1) * dim + c);   // bottom row
+  }
+  for (let r = 0; r < dim; r++) {
+    set.add(r * dim + 0);           // left col
+    set.add(r * dim + (dim - 1));   // right col
+  }
+  return [...set];
+}
+
+// Compute tile local positions for a face (uniform across all face IDs due to rotation symmetry)
+// In face-local space: x = c - k, y = k - r, z = k + 0.522 (sticker + overlay offset)
+function buildFaceTilePositions(dim) {
+  const k = (dim - 1) / 2;
+  const positions = {};
+  for (let r = 0; r < dim; r++) {
+    for (let c = 0; c < dim; c++) {
+      positions[r * dim + c] = { x: c - k, y: k - r, z: k + 0.522 };
+    }
+  }
+  return positions;
+}
+
+// ─── End biome helpers ────────────────────────────────────────────────────────
 
 // Reusable axis vectors and quaternion (allocated once, never recreated)
 const _axisCol = new THREE.Vector3(1, 0, 0);
@@ -41,7 +92,8 @@ const CubeAssembly = React.memo(({
   cursor, showCursor, flipMode, onSelectTile, onClearTileSelection, flipWaveOrigins, onFlipWaveComplete,
   faceColors, faceTextures, manifoldStyles, solveHighlights,
   onFaceRotationMode,
-  handsMode
+  handsMode,
+  isBiomeMode, biomeFaceAssign
 }) => {
   const cubieRefs = useRef([]);
   const controlsRef = useRef();
@@ -586,6 +638,20 @@ const CubeAssembly = React.memo(({
     return arr;
   }, [cubies, size, positionCache]);
 
+  // ─── Biome seam pulse data ───────────────────────────────────────────────────
+  // Tile positions in face-local space (same for every face due to rotation symmetry)
+  const biomeFaceTilePositions = useMemo(() => {
+    if (!isBiomeMode) return null;
+    return buildFaceTilePositions(size);
+  }, [isBiomeMode, size]);
+
+  // Border tile indices for the current grid size
+  const biomeBorderTiles = useMemo(() => {
+    if (!isBiomeMode) return null;
+    return getBorderTileIndices(size);
+  }, [isBiomeMode, size]);
+  // ─── End biome data ──────────────────────────────────────────────────────────
+
   // Reset cubie positions/rotations when animation ends or cubies change.
   // Uses useLayoutEffect so the reset happens BEFORE the browser paints,
   // preventing a 1-frame glitch where cubies show new colors at old positions.
@@ -648,6 +714,8 @@ const CubeAssembly = React.memo(({
           faceColors={faceColors}
           faceTextures={faceTextures}
           manifoldStyles={manifoldStyles}
+          isBiomeMode={isBiomeMode}
+          biomeFaceAssign={biomeFaceAssign}
         />
       ))}
       {showCursor && cursor && (
@@ -664,6 +732,68 @@ const CubeAssembly = React.memo(({
           explosionFactor={explosionFactor}
         />
       )}
+      {/* Biome mode: active seam pulses — all 12 adjacent face pairs */}
+      {isBiomeMode && biomeFaceTilePositions && biomeBorderTiles && ALL_ADJACENT_SEAMS.map(([a, b]) => (
+        <React.Fragment key={`seam-${a}-${b}`}>
+          <group rotation={FACE_ID_TO_ROT[a]}>
+            <SeamPulse
+              faceId={a}
+              neighborFaceId={b}
+              borderTiles={biomeBorderTiles}
+              tilePositions={biomeFaceTilePositions}
+              tileScale={1}
+              isAdjacent={true}
+              enabled={true}
+              biomeFaceAssign={biomeFaceAssign}
+            />
+          </group>
+          <group rotation={FACE_ID_TO_ROT[b]}>
+            <SeamPulse
+              faceId={b}
+              neighborFaceId={a}
+              borderTiles={biomeBorderTiles}
+              tilePositions={biomeFaceTilePositions}
+              tileScale={1}
+              isAdjacent={true}
+              enabled={true}
+              biomeFaceAssign={biomeFaceAssign}
+            />
+          </group>
+        </React.Fragment>
+      ))}
+
+      {/* Biome mode: ambient antipodal pulses (low intensity, always on) */}
+      {isBiomeMode && biomeFaceTilePositions && biomeBorderTiles && [[1, 4], [2, 5], [3, 6]].map(([a, b]) => (
+        !ALL_ADJACENT_SEAMS.some(s => (s[0] === a && s[1] === b) || (s[0] === b && s[1] === a)) && (
+          <React.Fragment key={`ambient-${a}-${b}`}>
+            <group rotation={FACE_ID_TO_ROT[a]}>
+              <SeamPulse
+                faceId={a}
+                neighborFaceId={b}
+                borderTiles={biomeBorderTiles}
+                tilePositions={biomeFaceTilePositions}
+                tileScale={1}
+                isAdjacent={false}
+                enabled={true}
+                biomeFaceAssign={biomeFaceAssign}
+              />
+            </group>
+            <group rotation={FACE_ID_TO_ROT[b]}>
+              <SeamPulse
+                faceId={b}
+                neighborFaceId={a}
+                borderTiles={biomeBorderTiles}
+                tilePositions={biomeFaceTilePositions}
+                tileScale={1}
+                isAdjacent={false}
+                enabled={true}
+                biomeFaceAssign={biomeFaceAssign}
+              />
+            </group>
+          </React.Fragment>
+        )
+      ))}
+
       {/* DragGuide removed - real-time cube rotation provides visual feedback */}
       <TrackballControls
         ref={controlsRef}
