@@ -5,15 +5,15 @@ import * as THREE from 'three';
 import { COLORS, FACE_COLORS, ANTIPODAL_COLOR, FLIP_CAP } from '../utils/constants.js';
 import { play, vibrate } from '../utils/audio.js';
 import TallyMarks from '../manifold/TallyMarks.jsx';
-import { getTileStyleMaterial, getGlassMaterial } from './TileStyleMaterials.jsx';
-import GrassBlades from './GrassBlades.jsx';
-import WaterVolume from './WaterVolume.jsx';
-import LavaVolume from './LavaVolume.jsx';
-import IceVolume from './IceVolume.jsx';
-import GalaxyVolume from './GalaxyVolume.jsx';
-import NeuralVolume from './NeuralVolume.jsx';
-import CircuitVolume from './CircuitVolume.jsx';
-import WoodVolume from './WoodVolume.jsx';
+import { getTileStyleMaterial, getGlassMaterial, sharedTremorState } from './styles/TileStyleMaterials.jsx';
+import GrassBlades from './styles/GrassBlades.jsx';
+import WaterVolume from './styles/WaterVolume.jsx';
+import LavaVolume from './styles/LavaVolume.jsx';
+import IceVolume from './styles/IceVolume.jsx';
+import GalaxyVolume from './styles/GalaxyVolume.jsx';
+import NeuralVolume from './styles/NeuralVolume.jsx';
+import CircuitVolume from './styles/CircuitVolume.jsx';
+import WoodVolume from './styles/WoodVolume.jsx';
 
 // Shared geometries for all particle/glow systems (created once, reused globally)
 const sharedParticleGeometry = new THREE.PlaneGeometry(1, 1);
@@ -264,9 +264,10 @@ const ParityBreakthrough = ({ origColor, flipCount }) => {
     const t = state.clock.elapsedTime;
     const intensity = Math.min(0.4 + flipCount * 0.25, 1.5);
 
-    // Surge: multiple sin waves align periodically for dramatic peaks
-    const raw = Math.sin(t * 1.5) * 0.45 + Math.sin(t * 2.7) * 0.3 + Math.sin(t * 0.6) * 0.25;
-    const surge = Math.pow(Math.max(0, raw), 2.0);
+    // Surge is pre-computed once per frame by CubeAssembly via updateSharedTremor.
+    // Reading the shared value avoids 3×sin + pow + max per ParityBreakthrough
+    // instance (one per wormhole sticker) every frame.
+    const surge = sharedTremorState.surge;
 
     // Back glow — fills the cubie face, light bleeds through grid gaps
     if (backGlowRef.current) {
@@ -418,7 +419,7 @@ const Worm = ({ position, rotation, scale = 1 }) => {
   );
 };
 
-const StickerPlane = function StickerPlane({ meta, pos, rot=[0,0,0], overlay, mode, faceColors, faceTextures, faceRow, faceCol, faceSize, manifoldStyles, hollow }) {
+const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay, mode, faceColors, faceTextures, faceRow, faceCol, faceSize, manifoldStyles, hollow }) {
   const fc = faceColors || FACE_COLORS;
   const groupRef = useRef();
   const meshRef = useRef();
@@ -428,6 +429,10 @@ const StickerPlane = function StickerPlane({ meta, pos, rot=[0,0,0], overlay, mo
   const spinT = useRef(0);
   const shakeT = useRef(0);
   const pulseT = useRef(0);
+  // Single boolean gate: skip the entire useFrame body on idle frames.
+  // Cleared when all transient effects (flip, shake, tremor) finish, avoiding
+  // the multi-condition bail-out that evaluated several ref lookups every frame.
+  const isActiveRef = useRef(false);
   const flipFromColor = useRef(null);
   const flipToColor = useRef(null);
   const flipFromTexture = useRef(null);
@@ -483,8 +488,15 @@ const StickerPlane = function StickerPlane({ meta, pos, rot=[0,0,0], overlay, mo
     // Detect flipped tiles for persistent tremor
     const wormhole = (meta?.flips ?? 0) > 0 && meta?.curr !== meta?.orig;
 
-    // Fast bail-out: skip when nothing is animating AND tile isn't flipped
-    if (spinT.current <= 0 && shakeT.current <= 0 && !ringRef.current && !glowRef.current && !wormhole) return;
+    // Single-boolean gate: skip the entire body on idle frames.
+    // ringRef / glowRef are only mounted when wormhole is true, so the
+    // original multi-condition check collapsed to this equivalent.
+    const anyActive = spinT.current > 0 || shakeT.current > 0 || wormhole;
+    if (!anyActive) {
+      isActiveRef.current = false;
+      return;
+    }
+    isActiveRef.current = true;
 
     // Flip animation with SNAPPY acceleration
     if (spinT.current > 0 && groupRef.current) {
@@ -611,15 +623,14 @@ const StickerPlane = function StickerPlane({ meta, pos, rot=[0,0,0], overlay, mo
 
       // Multi-frequency vibration for organic feel
       const jX = Math.sin(t * 19 + pos[0] * 7) * tremIntensity
-               + Math.sin(t * 33 + pos[1] * 11) * tremIntensity * 0.5;
+        + Math.sin(t * 33 + pos[1] * 11) * tremIntensity * 0.5;
       const jY = Math.cos(t * 17 + pos[2] * 8) * tremIntensity * 0.3;
       const jZ = Math.cos(t * 24 + pos[1] * 9) * tremIntensity * 0.8
-               + Math.cos(t * 41 + pos[0] * 13) * tremIntensity * 0.4;
+        + Math.cos(t * 41 + pos[0] * 13) * tremIntensity * 0.4;
 
-      // Surge amplification — tremor intensifies during breakthrough moments
-      const raw = Math.sin(t * 1.5) * 0.45 + Math.sin(t * 2.7) * 0.3 + Math.sin(t * 0.6) * 0.25;
-      const surge = Math.pow(Math.max(0, raw), 2.0);
-      const mult = 1 + surge * 4;
+      // Surge multiplier is pre-computed once per frame by CubeAssembly.
+      // Reading the shared value saves 3×sin + pow + max per wormhole sticker.
+      const { mult } = sharedTremorState;
 
       groupRef.current.position.x = pos[0] + jX * mult;
       groupRef.current.position.y = pos[1] + jY * mult;
@@ -627,8 +638,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot=[0,0,0], overlay, mo
     }
   });
 
-  const isSudokube = mode==='sudokube';
-  const isGlass = mode==='glass';
+  const isSudokube = mode === 'sudokube';
+  const isGlass = mode === 'glass';
   // Texture and style follow the CURRENT displayed face (meta.curr)
   // So M1 tiles always get M1's texture/style, M4 tiles get M4's, etc.
   const currTexture = isDead ? null : (faceTextures?.[meta?.curr] || null);
@@ -702,7 +713,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot=[0,0,0], overlay, mo
       }
     }
   }, [materialColor, currTexture]);
-  const isWormhole = meta?.flips>0 && meta?.curr!==meta?.orig;
+  const isWormhole = meta?.flips > 0 && meta?.curr !== meta?.orig;
   const hasFlipHistory = meta?.flips > 0;
 
   const trackerRadius = Math.min(0.25, 0.06 + (meta?.flips ?? 0) * 0.012);
@@ -723,70 +734,70 @@ const StickerPlane = function StickerPlane({ meta, pos, rot=[0,0,0], overlay, mo
       {/* Inner group for UV rotation - rotates the sticker mesh and 3D volume overlays together around face normal (Z axis) */}
       <group rotation={[0, 0, uvRotationAngle]}>
         <mesh ref={meshRef} key={hollow ? 'frame' : 'plane'}>
-        {hollow ? (
-          <shapeGeometry args={[_stickerFrameShape]} />
-        ) : faceRow != null ? (
-          // Face-texture mode (Sudokube): per-instance geometry so UVs can be patched.
-          <planeGeometry ref={geoRef} args={[0.85, 0.85]} />
-        ) : (
-          // No texture atlas — share the module-level geometry to avoid per-sticker alloc.
-          <primitive object={_sharedStickerGeo} attach="geometry" />
+          {hollow ? (
+            <shapeGeometry args={[_stickerFrameShape]} />
+          ) : faceRow != null ? (
+            // Face-texture mode (Sudokube): per-instance geometry so UVs can be patched.
+            <planeGeometry ref={geoRef} args={[0.85, 0.85]} />
+          ) : (
+            // No texture atlas — share the module-level geometry to avoid per-sticker alloc.
+            <primitive object={_sharedStickerGeo} attach="geometry" />
+          )}
+          {useGlassStyle && glassMaterial ? (
+            <primitive object={glassMaterial} attach="material" />
+          ) : useShaderStyle && styleMaterial ? (
+            <primitive object={styleMaterial} attach="material" />
+          ) : (
+            <meshStandardMaterial
+              color={materialColor}
+              map={hollow ? null : currTexture}
+              side={THREE.DoubleSide}
+              roughness={0.3}
+              metalness={0.05}
+              envMapIntensity={0.3}
+            />
+          )}
+        </mesh>
+
+        {/* 3D grass blades overlay */}
+        {tileStyle === 'grass' && !isGlass && !isSudokube && !currTexture && (
+          <GrassBlades faceColor={baseColor} />
         )}
-        {useGlassStyle && glassMaterial ? (
-          <primitive object={glassMaterial} attach="material" />
-        ) : useShaderStyle && styleMaterial ? (
-          <primitive object={styleMaterial} attach="material" />
-        ) : (
-          <meshStandardMaterial
-            color={materialColor}
-            map={hollow ? null : currTexture}
-            side={THREE.DoubleSide}
-            roughness={0.3}
-            metalness={0.05}
-            envMapIntensity={0.3}
-          />
+
+        {/* 3D water volume — transparent box + animated rippling surface */}
+        {tileStyle === 'water' && !isGlass && !isSudokube && !currTexture && (
+          <WaterVolume faceColor={baseColor} />
         )}
-      </mesh>
 
-      {/* 3D grass blades overlay */}
-      {tileStyle === 'grass' && !isGlass && !isSudokube && !currTexture && (
-        <GrassBlades faceColor={baseColor} />
-      )}
+        {/* 3D lava volume — bubbling molten surface + floating embers */}
+        {tileStyle === 'lava' && !isGlass && !isSudokube && !currTexture && (
+          <LavaVolume faceColor={baseColor} />
+        )}
 
-      {/* 3D water volume — transparent box + animated rippling surface */}
-      {tileStyle === 'water' && !isGlass && !isSudokube && !currTexture && (
-        <WaterVolume faceColor={baseColor} />
-      )}
+        {/* 3D ice volume — crystal depth + sparkle frost surface */}
+        {tileStyle === 'ice' && !isGlass && !isSudokube && !currTexture && (
+          <IceVolume faceColor={baseColor} />
+        )}
 
-      {/* 3D lava volume — bubbling molten surface + floating embers */}
-      {tileStyle === 'lava' && !isGlass && !isSudokube && !currTexture && (
-        <LavaVolume faceColor={baseColor} />
-      )}
+        {/* 3D galaxy volume — parallax star-field depth layers */}
+        {tileStyle === 'galaxy' && !isGlass && !isSudokube && !currTexture && (
+          <GalaxyVolume faceColor={baseColor} />
+        )}
 
-      {/* 3D ice volume — crystal depth + sparkle frost surface */}
-      {tileStyle === 'ice' && !isGlass && !isSudokube && !currTexture && (
-        <IceVolume faceColor={baseColor} />
-      )}
+        {/* 3D neural volume — floating soma nodes + traveling signal arcs */}
+        {tileStyle === 'neural' && !isGlass && !isSudokube && !currTexture && (
+          <NeuralVolume faceColor={baseColor} />
+        )}
 
-      {/* 3D galaxy volume — parallax star-field depth layers */}
-      {tileStyle === 'galaxy' && !isGlass && !isSudokube && !currTexture && (
-        <GalaxyVolume faceColor={baseColor} />
-      )}
+        {/* 3D circuit volume — raised PCB board + glowing trace pulses */}
+        {tileStyle === 'circuit' && !isGlass && !isSudokube && !currTexture && (
+          <CircuitVolume faceColor={baseColor} />
+        )}
 
-      {/* 3D neural volume — floating soma nodes + traveling signal arcs */}
-      {tileStyle === 'neural' && !isGlass && !isSudokube && !currTexture && (
-        <NeuralVolume faceColor={baseColor} />
-      )}
-
-      {/* 3D circuit volume — raised PCB board + glowing trace pulses */}
-      {tileStyle === 'circuit' && !isGlass && !isSudokube && !currTexture && (
-        <CircuitVolume faceColor={baseColor} />
-      )}
-
-      {/* 3D wood volume — lacquered grain-ridge surface with deep specular sheen */}
-      {tileStyle === 'wood' && !isGlass && !isSudokube && !currTexture && (
-        <WoodVolume faceColor={baseColor} />
-      )}
+        {/* 3D wood volume — lacquered grain-ridge surface with deep specular sheen */}
+        {tileStyle === 'wood' && !isGlass && !isSudokube && !currTexture && (
+          <WoodVolume faceColor={baseColor} />
+        )}
       </group>
 
       {/* Dead tile headstone — replaces all live overlays */}
@@ -832,13 +843,13 @@ const StickerPlane = function StickerPlane({ meta, pos, rot=[0,0,0], overlay, mo
       {!isDead && !isSudokube && hasFlipHistory && (
         <>
           {!(origIsWhite && !currIsWhite) && (
-            <mesh position={[0,0,0.006]}>
+            <mesh position={[0, 0, 0.006]}>
               <ringGeometry args={[0.38, 0.41, 16]} />
               <meshBasicMaterial color={origColor} />
             </mesh>
           )}
           {!(antipodalIsWhite && !currIsWhite) && (
-            <mesh position={[0,0,0.007]}>
+            <mesh position={[0, 0, 0.007]}>
               <ringGeometry args={[0.35, 0.38, 16]} />
               <meshBasicMaterial color={antipodalColor} />
             </mesh>
@@ -851,12 +862,12 @@ const StickerPlane = function StickerPlane({ meta, pos, rot=[0,0,0], overlay, mo
           {/* Parity breakthrough — original color trying to push through */}
           <ParityBreakthrough origColor={origColor} flipCount={meta?.flips ?? 1} />
 
-          <mesh ref={ringRef} position={[0,0,0.02]}>
-            <ringGeometry args={[0.36,0.40,16]} />
+          <mesh ref={ringRef} position={[0, 0, 0.02]}>
+            <ringGeometry args={[0.36, 0.40, 16]} />
             <meshBasicMaterial color="#dda15e" transparent opacity={0.85} />
           </mesh>
-          <mesh ref={glowRef} position={[0,0,0.015]}>
-            <circleGeometry args={[0.44,16]} />
+          <mesh ref={glowRef} position={[0, 0, 0.015]}>
+            <circleGeometry args={[0.44, 16]} />
             <meshBasicMaterial
               color="#bc6c25"
               transparent
@@ -903,7 +914,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot=[0,0,0], overlay, mo
       )}
 
       {overlay && (
-        <Text position={[0,0,0.03]} fontSize={0.17} color="black" anchorX="center" anchorY="middle">
+        <Text position={[0, 0, 0.03]} fontSize={0.17} color="black" anchorX="center" anchorY="middle">
           {overlay}
         </Text>
       )}
