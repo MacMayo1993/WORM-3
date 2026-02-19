@@ -106,6 +106,20 @@ export function useChaosMode() {
   const animStateRef = useRef(animState);
   animStateRef.current = animState;
 
+  // ── Auto-rotate refs — kept up-to-date every render so the merged RAF loop
+  // can read current values without re-subscribing on every state change.
+  // Previously these were closed over inside a second RAF, causing the loop to
+  // restart (and reset lastTimestamp) on every upcomingRotation / animState change.
+  const autoRotateEnabledRef = useRef(autoRotateEnabled);
+  autoRotateEnabledRef.current = autoRotateEnabled;
+  const sizeRef = useRef(size);
+  sizeRef.current = size;
+  const upcomingRotationRef = useRef(upcomingRotation);
+  upcomingRotationRef.current = upcomingRotation;
+  // Countdown held in a ref so the RAF body mutates it without triggering React
+  // re-renders on every frame; setRotationCountdown is called only at key events.
+  const rotationCountdownRef = useRef(0);
+
   // ── Opt #8: surface coords list, rebuilt only when cube size changes ────────
   const surfaceCoords = useMemo(() => buildSurfaceCoords(size), [size]);
   const surfaceCoordsRef = useRef(surfaceCoords);
