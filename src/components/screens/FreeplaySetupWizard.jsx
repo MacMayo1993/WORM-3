@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { COLOR_SCHEMES, TILE_STYLES, SCHEME_LABELS } from '../../utils/colorSchemes.js';
 import { BACKGROUNDS, getBackgroundUrl } from '../../utils/backgrounds.js';
 import { registerTilePreview, updateTilePreview, unregisterTilePreview } from '../../3d/TilePreviewRenderer.js';
+import { resolveBiomeManifoldStyles } from '../../modes/CityBiomeMode.js';
 
 
 const BG_PREVIEWS = {
@@ -375,6 +376,7 @@ const S = {
 
 const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
   const [step, setStep] = useState(0);
+  const [gameMode, setGameMode] = useState('freeplay'); // 'freeplay' | 'biome'
   const [settings, setSettings] = useState({
     colorScheme: initialSettings?.colorScheme || 'standard',
     customColors: initialSettings?.customColors || null,
@@ -399,12 +401,21 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     img.src = url;
   };
 
-  const STEPS = ['Colors', 'Style', 'Scene'];
-  const totalSteps = 3;
+  const STEPS = ['Mode', 'Colors', 'Style', 'Scene'];
+  const totalSteps = 4;
 
   const handleNext = () => {
-    if (step < totalSteps - 1) setStep(step + 1);
-    else onComplete(settings);
+    if (step < totalSteps - 1) {
+      setStep(step + 1);
+    } else {
+      const finalSettings = { ...settings };
+      if (gameMode === 'biome') {
+        finalSettings.biomeMode = { enabled: true, faceAssignment: null };
+        finalSettings.colorScheme = 'biome';
+        finalSettings.manifoldStyles = resolveBiomeManifoldStyles(null);
+      }
+      onComplete(finalSettings);
+    }
   };
 
   const handleBack = () => {
@@ -414,7 +425,105 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
 
   const select = (key, value) => setSettings(s => ({ ...s, [key]: value }));
 
-  // ── Step 0: Colors ─────────────────────────────────────────────────────────
+  // ── Step 0: Mode ───────────────────────────────────────────────────────────
+  const renderMode = () => {
+    const modes = [
+      {
+        key: 'freeplay',
+        icon: '∞',
+        title: 'Free Play',
+        description: 'Classic puzzle with your choice of colors, tile styles, and background.',
+        accent: '#0a0a0a',
+      },
+      {
+        key: 'biome',
+        icon: '🏙',
+        title: 'City Biome',
+        description: 'Six living cities — one per face. Procedural 3D buildings, seam pulses, and manifold entanglement.',
+        accent: '#4a00e0',
+      },
+    ];
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingBottom: '8px' }}>
+        {modes.map(m => {
+          const selected = gameMode === m.key;
+          return (
+            <button
+              key={m.key}
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '18px',
+                padding: '20px 20px',
+                borderRadius: '16px',
+                border: selected ? `2px solid ${m.accent}` : '2px solid transparent',
+                background: selected ? (m.key === 'biome' ? 'rgba(74,0,224,0.05)' : 'rgba(0,0,0,0.04)') : 'rgba(0,0,0,0.025)',
+                cursor: 'pointer',
+                textAlign: 'left',
+                outline: 'none',
+                WebkitTapHighlightColor: 'transparent',
+                transition: 'all 0.18s ease',
+                width: '100%',
+              }}
+              onClick={() => {
+                setGameMode(m.key);
+                if (m.key === 'biome') {
+                  setSettings(s => ({ ...s, colorScheme: 'biome' }));
+                } else if (gameMode === 'biome') {
+                  setSettings(s => ({ ...s, colorScheme: initialSettings?.colorScheme || 'standard' }));
+                }
+              }}
+            >
+              <div style={{
+                width: '52px', height: '52px', borderRadius: '14px',
+                background: selected ? m.accent : 'rgba(0,0,0,0.07)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '24px', flexShrink: 0,
+                transition: 'all 0.18s ease',
+              }}>
+                <span style={selected && m.key === 'biome' ? { filter: 'none' } : {}}>{m.icon}</span>
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{
+                  fontSize: '16px', fontWeight: selected ? '700' : '500',
+                  color: selected ? m.accent : '#0a0a0a',
+                  marginBottom: '4px', letterSpacing: '-0.2px',
+                }}>
+                  {m.title}
+                </div>
+                <div style={{ fontSize: '13px', color: 'rgba(0,0,0,0.5)', lineHeight: 1.45 }}>
+                  {m.description}
+                </div>
+              </div>
+              {selected && (
+                <div style={{
+                  width: '20px', height: '20px', borderRadius: '50%',
+                  background: m.accent, display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', flexShrink: 0, marginTop: '2px',
+                }}>
+                  <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                    <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+              )}
+            </button>
+          );
+        })}
+        {gameMode === 'biome' && (
+          <div style={{
+            padding: '12px 16px', borderRadius: '12px',
+            background: 'rgba(74,0,224,0.06)', border: '1px solid rgba(74,0,224,0.15)',
+            fontSize: '12px', color: 'rgba(74,0,224,0.8)', lineHeight: 1.5,
+          }}>
+            City-to-face assignment will be available in a future update. For now, cities are assigned by face color (White → Frozen Citadel, Blue → Deep Station, Red → Volcanic Foundry, Yellow → Solar Arcology, Green → Bio-Dome, Orange → Neural Hub).
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // ── Step 1: Colors ─────────────────────────────────────────────────────────
   const renderColors = () => {
     const schemeKeys = Object.keys(SCHEME_LABELS);
     return (
@@ -558,9 +667,10 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     </div>
   );
 
-  const stepContent = [renderColors, renderStyles, renderBackgrounds];
-  const stepTitles = ['Choose Colors', 'Choose Style', 'Choose Scene'];
+  const stepContent = [renderMode, renderColors, renderStyles, renderBackgrounds];
+  const stepTitles = ['Choose Mode', 'Choose Colors', 'Choose Style', 'Choose Scene'];
   const stepSubtitles = [
+    'Pick how you want to play',
     'Set the color palette for your cube',
     'Pick how your tiles look and feel',
     'Select your play environment',

@@ -339,19 +339,26 @@ export default function WORM3() {
     if (wizardSettings.customColors) {
       newSettings.customColors = wizardSettings.customColors;
     }
-    // Apply tile style to all faces
-    if (wizardSettings.tileStyle) {
-      const manifoldStyles = {};
-      if (wizardSettings.tileStyle === 'random') {
-        // Pick random style for each face
-        const allStyles = ['solid', 'glossy', 'matte', 'metallic', 'carbonFiber', 'hexGrid', 'comic', 'cafeWall', 'hermanGrid', 'opticSpin', 'ouchi', 'grass', 'ice', 'sand', 'water', 'wood', 'circuit', 'holographic', 'pulse', 'lava', 'galaxy', 'neural'];
-        [1, 2, 3, 4, 5, 6].forEach(id => {
-          manifoldStyles[id] = allStyles[Math.floor(Math.random() * allStyles.length)];
-        });
-      } else {
-        [1, 2, 3, 4, 5, 6].forEach(id => { manifoldStyles[id] = wizardSettings.tileStyle; });
+    // Biome mode: manifoldStyles are pre-computed per-face by the wizard
+    if (wizardSettings.biomeMode?.enabled) {
+      newSettings.biomeMode = wizardSettings.biomeMode;
+      newSettings.manifoldStyles = wizardSettings.manifoldStyles;
+    } else {
+      newSettings.biomeMode = { enabled: false, faceAssignment: null };
+      // Apply tile style to all faces
+      if (wizardSettings.tileStyle) {
+        const manifoldStyles = {};
+        if (wizardSettings.tileStyle === 'random') {
+          // Pick random style for each face
+          const allStyles = ['solid', 'glossy', 'matte', 'metallic', 'carbonFiber', 'hexGrid', 'comic', 'cafeWall', 'hermanGrid', 'opticSpin', 'ouchi', 'grass', 'ice', 'sand', 'water', 'wood', 'circuit', 'holographic', 'pulse', 'lava', 'galaxy', 'neural'];
+          [1, 2, 3, 4, 5, 6].forEach(id => {
+            manifoldStyles[id] = allStyles[Math.floor(Math.random() * allStyles.length)];
+          });
+        } else {
+          [1, 2, 3, 4, 5, 6].forEach(id => { manifoldStyles[id] = wizardSettings.tileStyle; });
+        }
+        newSettings.manifoldStyles = manifoldStyles;
       }
-      newSettings.manifoldStyles = manifoldStyles;
     }
     setSettings(newSettings);
     // Clear level and shuffle
