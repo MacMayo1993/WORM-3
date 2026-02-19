@@ -728,13 +728,9 @@ if (mat?.color) {
       mat.color.set(materialColor);
       mat.map = currTexture;
       mat.needsUpdate = true;
-    } else if (mat.uniforms) {
-      if (mat.uniforms.uColor) {
-        mat.uniforms.uColor.value.set(materialColor);
-      }
-      if (mat.uniforms.uBaseColor) {
-        mat.uniforms.uBaseColor.value.set(materialColor);
-      }
+    } else if (mat.uniforms?.baseColor) {
+      const newMat = getTileStyleMaterial(tileStyle, materialColor, false, null);
+      meshRef.current.material = newMat;
     }
   }
 }, [materialColor, currTexture]);
