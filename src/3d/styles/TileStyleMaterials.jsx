@@ -13,6 +13,32 @@ export function updateSharedTime(elapsed) {
   sharedUniforms.time.value = elapsed;
 }
 
+// ─── Shared tremor state ─────────────────────────────────────────────────────
+// Pre-computed ONCE per frame by CubeAssembly, then read by every StickerPlane
+// and ParityBreakthrough instance.  Eliminates the identical 3×sin + pow + max
+// that was previously duplicated across every wormhole sticker per frame.
+// At 54 flipped stickers on a 3×3 @ 60 fps this removes ~32 k redundant trig
+// calls / second before scaling to 4×4 or 5×5.
+export const sharedTremorState = {
+  surge: 0, // Math.pow(Math.max(0, raw), 2) — pure magnitude in [0, 1]
+  mult: 1,  // 1 + surge * 4 — position scale-factor used by tremor code
+};
+
+/**
+ * Recompute tremor state from the current elapsed clock time.
+ * Must be called once per frame from CubeAssembly's useFrame, before any
+ * StickerPlane reads sharedTremorState.
+ */
+export function updateSharedTremor(elapsedTime) {
+  const raw =
+    Math.sin(elapsedTime * 1.5) * 0.45 +
+    Math.sin(elapsedTime * 2.7) * 0.3 +
+    Math.sin(elapsedTime * 0.6) * 0.25;
+  const surge = Math.pow(Math.max(0, raw), 2.0);
+  sharedTremorState.surge = surge;
+  sharedTremorState.mult = 1 + surge * 4;
+}
+
 // Common vertex shader for all styles
 const baseVertexShader = `
   varying vec2 vUv;
@@ -962,4 +988,55 @@ const ANIMATED_STYLES = new Set(['holographic', 'pulse', 'lava', 'galaxy', 'circ
  */
 export function isAnimatedStyle(style) {
   return ANIMATED_STYLES.has(style);
+}
+
+// ─── Shader warm-up ──────────────────────────────────────────────────────────
+// The first time a ShaderMaterial is rendered the browser blocks ~200 ms to
+// compile the GLSL.  Pre-compiling before the user interacts eliminates that
+// stall.  renderer.compile() triggers the GPU pipeline without producing any
+// visible output.
+
+const DEFAULT_WARMUP_STYLES = ['solid', 'glossy', 'matte', 'metallic', 'circuit', 'holographic'];
+
+/**
+ * Pre-compile the 6 most-used tile styles for every face colour.
+ * Call once on mount inside the Canvas context (CubeAssembly useEffect).
+ *
+ * @param {THREE.WebGLRenderer} renderer
+ * @param {THREE.Camera}        camera
+ * @param {string[]}            colorHexArray - one hex per cube face (length 6)
+ */
+export function warmUpDefaultStyles(renderer, camera, colorHexArray) {
+  const scene = new THREE.Scene();
+  const geo = new THREE.PlaneGeometry(0.1, 0.1);
+  for (const style of DEFAULT_WARMUP_STYLES) {
+    for (const colorHex of colorHexArray) {
+      scene.add(new THREE.Mesh(geo, getTileStyleMaterial(style, colorHex)));
+    }
+  }
+  renderer.compile(scene, camera);
+  scene.clear(); // remove dummy meshes; materials stay cached
+  geo.dispose();
+}
+
+/**
+ * Pre-compile ALL tile styles for every face colour.
+ * Call lazily on the first time the Tiles settings panel is opened so that
+ * subsequent style selections incur zero compile stalls.
+ *
+ * @param {THREE.WebGLRenderer} renderer
+ * @param {THREE.Camera}        camera
+ * @param {string[]}            colorHexArray
+ */
+export function warmUpAllStyles(renderer, camera, colorHexArray) {
+  const scene = new THREE.Scene();
+  const geo = new THREE.PlaneGeometry(0.1, 0.1);
+  for (const style of Object.keys(fragmentShaders)) {
+    for (const colorHex of colorHexArray) {
+      scene.add(new THREE.Mesh(geo, getTileStyleMaterial(style, colorHex)));
+    }
+  }
+  renderer.compile(scene, camera);
+  scene.clear();
+  geo.dispose();
 }
