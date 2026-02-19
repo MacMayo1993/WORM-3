@@ -301,6 +301,7 @@ export const TILE_STYLES = {
   water:       { label: 'Water',        cost: 'med', type: '3d' },
   wood:        { label: 'Wood',         cost: 'med', type: '3d' },
   neural:      { label: 'Neural',       cost: 'med', type: '3d' },
+  solar:       { label: 'Solar',        cost: 'med', type: 'animated' },
 };
 
 export const DEFAULT_SETTINGS = {
@@ -317,6 +318,10 @@ export const DEFAULT_SETTINGS = {
     4: 'solid',
     5: 'solid',
     6: 'solid',
+  },
+  biomeMode: {
+    enabled: false,
+    faceAssignment: null, // null = use FACE_CITIES default from CityBiomeMode.js
   },
 };
 
