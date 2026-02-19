@@ -3,7 +3,7 @@
 // Uses a single Three.js renderer to avoid hitting browser WebGL context limits.
 
 import * as THREE from 'three';
-import { getTileStyleMaterial } from './TileStyleMaterials.jsx';
+import { getTileStyleMaterial } from './styles/TileStyleMaterials.jsx';
 
 const PREVIEW_SIZE = 64;
 
