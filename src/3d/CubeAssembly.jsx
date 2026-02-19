@@ -388,7 +388,7 @@ const CubeAssembly = React.memo(({
     const colors = faceColors ? Object.values(faceColors) : [];
     if (colors.length === 0) return;
     warmUpDefaultStyles(gl, camera, colors);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps — intentional one-shot on mount
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- intentional one-shot on mount
 
   // Camera auto-zoom: keep the entire cube in view during explosion
   const preExplodeDist = useRef(0);
