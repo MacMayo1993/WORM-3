@@ -5,6 +5,9 @@ import * as THREE from 'three';
 import { COLORS, FACE_COLORS, ANTIPODAL_COLOR, FLIP_CAP } from '../utils/constants.js';
 import { play, vibrate } from '../utils/audio.js';
 import TallyMarks from '../manifold/TallyMarks.jsx';
+import { useGameStore } from '../hooks/useGameStore.js';
+import { FACE_CITIES } from '../modes/CityBiomeMode.js';
+import CityBuildings from './CityBuildings.jsx';
 import { getTileStyleMaterial, getGlassMaterial, sharedTremorState } from './styles/TileStyleMaterials.jsx';
 import GrassBlades from './styles/GrassBlades.jsx';
 import WaterVolume from './styles/WaterVolume.jsx';
@@ -421,6 +424,7 @@ const Worm = ({ position, rotation, scale = 1 }) => {
 
 const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay, mode, faceColors, faceTextures, faceRow, faceCol, faceSize, manifoldStyles, hollow }) {
   const fc = faceColors || FACE_COLORS;
+  const biomeEnabled = useGameStore((s) => s.settings?.biomeMode?.enabled ?? false);
   const groupRef = useRef();
   const meshRef = useRef();
   const geoRef = useRef();
@@ -817,6 +821,16 @@ if (mat?.color) {
           <WoodVolume faceColor={baseColor} />
         )}
       </group>
+
+      {/* City Biome buildings — mounted per tile when biome mode is active */}
+      {biomeEnabled && faceRow != null && faceCol != null && !isDead && (
+        <CityBuildings
+          cityKey={FACE_CITIES[meta?.orig]}
+          tileIndex={(faceRow ?? 0) * (faceSize ?? 3) + (faceCol ?? 0)}
+          faceId={meta?.orig ?? 1}
+          gridDim={faceSize ?? 3}
+        />
+      )}
 
       {/* Dead tile headstone — replaces all live overlays */}
       {isDead && (
