@@ -11,7 +11,7 @@ import WormholeNetwork from '../manifold/WormholeNetwork.jsx';
 import ChaosWave from '../manifold/ChaosWave.jsx';
 import FlipPropagationWave from '../manifold/FlipPropagationWave.jsx';
 import { vibrate } from '../utils/audio.js';
-import { updateSharedTime } from './TileStyleMaterials.jsx';
+import { updateSharedTime, updateSharedTremor, warmUpDefaultStyles } from './styles/TileStyleMaterials.jsx';
 
 // Reusable axis vectors and quaternion (allocated once, never recreated)
 const _axisCol = new THREE.Vector3(1, 0, 0);
@@ -49,7 +49,7 @@ const CubeAssembly = React.memo(({
   const cubeGroupRef = useRef(null);
   const gsapAnimRef = useRef(null);
   const animProgressRef = useRef({ value: 0 });
-  const { camera } = useThree();
+  const { camera, gl } = useThree();
   const [dragStart, setDragStart] = useState(null);
   const dragStartRef = useRef(null); // Ref version for immediate access in listeners
   const longPressTimerRef = useRef(null);
@@ -218,8 +218,8 @@ const CubeAssembly = React.memo(({
             const y = Math.floor(idx / sizeRef.current) % sizeRef.current;
             const x = Math.floor(idx / (sizeRef.current * sizeRef.current));
             if ((m.axis === 'col' && x === sliceIndex) ||
-                (m.axis === 'row' && y === sliceIndex) ||
-                (m.axis === 'depth' && z === sliceIndex)) {
+              (m.axis === 'row' && y === sliceIndex) ||
+              (m.axis === 'depth' && z === sliceIndex)) {
               sliceIndices.add(idx);
             }
           }
@@ -381,6 +381,15 @@ const CubeAssembly = React.memo(({
   const explosionFactorRef = useRef(explosionFactor);
   explosionFactorRef.current = explosionFactor;
 
+  // Pre-compile default tile style shaders on mount to prevent first-use stalls.
+  // warmUpDefaultStyles calls renderer.compile() which triggers GLSL compilation
+  // before any user interaction, eliminating the ~200 ms hitch on first style pick.
+  useEffect(() => {
+    const colors = faceColors ? Object.values(faceColors) : [];
+    if (colors.length === 0) return;
+    warmUpDefaultStyles(gl, camera, colors);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps — intentional one-shot on mount
+
   // Camera auto-zoom: keep the entire cube in view during explosion
   const preExplodeDist = useRef(0);
   const wasExploding = useRef(false);
@@ -470,6 +479,9 @@ const CubeAssembly = React.memo(({
   useFrame((state) => {
     // Update shared time uniform for animated tile styles
     updateSharedTime(state.clock.elapsedTime);
+    // Pre-compute tremor surge once so all StickerPlane instances read a shared
+    // value instead of each independently running 3×sin + pow + max per frame.
+    updateSharedTremor(state.clock.elapsedTime);
 
     // Apply live drag rotation - instant, follows finger
     if (liveDragRef.current && liveDragRef.current.basePositions) {
@@ -507,8 +519,8 @@ const CubeAssembly = React.memo(({
         const y = Math.floor(idx / size) % size;
         const x = Math.floor(idx / (size * size));
         const inSlice = (axis === 'col' && x === sliceIndex) ||
-                        (axis === 'row' && y === sliceIndex) ||
-                        (axis === 'depth' && z === sliceIndex);
+          (axis === 'row' && y === sliceIndex) ||
+          (axis === 'depth' && z === sliceIndex);
         if (inSlice) indices.add(idx);
       }
       sliceIndicesRef.current = indices;
