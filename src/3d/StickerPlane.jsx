@@ -665,6 +665,7 @@ if (mat?.color) {
 
   // Get the tile style for the current displayed face
   const tileStyle = manifoldStyles?.[meta?.curr] || 'solid';
+  const tileStyleRef = useRef(tileStyle);
 
   // Glass mode overrides all tile styles with glass material
   const useGlassStyle = isGlass && !isSudokube;
@@ -717,18 +718,19 @@ if (mat?.color) {
   // Uses useLayoutEffect so the color updates BEFORE the browser paints,
   // preventing a 1-frame flash of the wrong color after rotation.
   useLayoutEffect(() => {
-  if (meshRef.current && meshRef.current.material && !isFlipping.current) {
+  tileStyleRef.current = tileStyle;
+  if (meshRef.current && meshRef.current.material && !isFlipping.current && spinT.current <= 0) {
     const mat = meshRef.current.material;
     if (mat.color) {
       mat.color.set(materialColor);
       mat.map = currTexture;
       mat.needsUpdate = true;
     } else if (mat.uniforms?.baseColor) {
-      const newMat = getTileStyleMaterial(tileStyle, materialColor, false, null);
+      const newMat = getTileStyleMaterial(tileStyleRef.current, materialColor, false, null);
       meshRef.current.material = newMat;
     }
   }
-}, [materialColor, currTexture]);
+}, [materialColor, currTexture, tileStyle]);
   const isWormhole = meta?.flips > 0 && meta?.curr !== meta?.orig;
   const hasFlipHistory = meta?.flips > 0;
 
