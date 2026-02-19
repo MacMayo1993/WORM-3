@@ -2,6 +2,8 @@
 // Face antipodal pairs: 1↔4  |  2↔5  |  3↔6
 // High contrast within each pair is essential — the manifold flip reveals the opposite face
 
+import { CITY_CONFIG, FACE_CITIES } from '../modes/CityBiomeMode.js';
+
 export const COLOR_SCHEMES = {
 
   // ── ORIGINAL SCHEMES ────────────────────────────────────────────────────────
@@ -219,6 +221,19 @@ export const COLOR_SCHEMES = {
     3: '#2C2C2C',  // charcoal
     6: '#FFD700',  // spark gold              ← charcoal ↔ spark
   },
+
+  // ── BIOME SCHEME ─────────────────────────────────────────────────────────────
+  // Default city biome palette — each face uses the pulse color of its assigned city.
+  // Faces: 1=Frozen Citadel, 2=Deep Station, 3=Volcanic Foundry,
+  //        4=Solar Arcology, 5=Bio-Dome, 6=Neural Hub
+  biome: {
+    1: CITY_CONFIG[FACE_CITIES[1]].pulseColor,  // frozenCitadel   → #B8E4FF
+    2: CITY_CONFIG[FACE_CITIES[2]].pulseColor,  // deepStation     → #00CED1
+    3: CITY_CONFIG[FACE_CITIES[3]].pulseColor,  // volcanicFoundry → #FF4500
+    4: CITY_CONFIG[FACE_CITIES[4]].pulseColor,  // solarArcology   → #FFD700
+    5: CITY_CONFIG[FACE_CITIES[5]].pulseColor,  // bioDome         → #39FF14
+    6: CITY_CONFIG[FACE_CITIES[6]].pulseColor,  // neuralHub       → #8B00FF
+  },
 };
 
 // ── LABELS ───────────────────────────────────────────────────────────────────
@@ -255,6 +270,8 @@ export const SCHEME_LABELS = {
   desert:       'Desert Dusk',
   arctic:       'Arctic',
   ember:        'Ember & Ash',
+  // Biome
+  biome:        'City Biome',
   // Custom always last
   custom:       'Custom Upload',
 };
@@ -303,9 +320,23 @@ export const DEFAULT_SETTINGS = {
   },
 };
 
-export function resolveColors(settings) {
+// Returns a face→hex color map for biome mode, using each city's pulse color.
+// Pass a custom userFaceAssignment (faceId→cityKey) to override the default FACE_CITIES mapping.
+export function resolveBiomeColors(userFaceAssignment = null) {
+  const assignment = userFaceAssignment ?? FACE_CITIES;
+  const colors = {};
+  for (const [faceId, cityKey] of Object.entries(assignment)) {
+    colors[Number(faceId)] = CITY_CONFIG[cityKey]?.pulseColor ?? '#ffffff';
+  }
+  return colors;
+}
+
+export function resolveColors(settings, biomeAssignment = null) {
   if (settings.colorScheme === 'custom' && settings.customColors) {
     return { ...COLOR_SCHEMES.standard, ...settings.customColors };
+  }
+  if (settings.colorScheme === 'biome') {
+    return resolveBiomeColors(biomeAssignment);
   }
   return COLOR_SCHEMES[settings.colorScheme] || COLOR_SCHEMES.standard;
 }
