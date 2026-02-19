@@ -340,8 +340,12 @@ const CubeAssembly = React.memo(({
       // Handle tap
       const { clientX, clientY } = getClientCoords(e);
       const dx = clientX - ds.screenX, dy = clientY - ds.screenY;
-      if (Math.hypot(dx, dy) < DRAG_THRESHOLD && flipModeRef.current) {
-        onTapFlipRef.current(ds.pos, dirFromNormal(ds.n));
+      if (Math.hypot(dx, dy) < DRAG_THRESHOLD) {
+        if (flipModeRef.current) {
+          onTapFlipRef.current(ds.pos, dirFromNormal(ds.n));
+        } else if (onSelectTileRef.current) {
+          onSelectTileRef.current(ds.pos, dirFromNormal(ds.n));
+        }
       }
 
       dragStartRef.current = null;
