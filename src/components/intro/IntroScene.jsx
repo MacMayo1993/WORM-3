@@ -6,7 +6,7 @@ import WormParticle from '../../manifold/WormParticle.jsx';
 import ArrivalBurst from '../../manifold/ArrivalBurst.jsx';
 import { FACE_COLORS } from '../../utils/constants.js';
 import { play, vibrate } from '../../utils/audio.js';
-import { updateSharedTime } from '../../3d/TileStyleMaterials.jsx';
+import { updateSharedTime } from '../../3d/styles/TileStyleMaterials.jsx';
 
 // ─── Tile style assignment ─────────────────────────────────────────────────────
 const STYLE_SEQUENCE = ['lava', 'circuit', 'holographic', 'galaxy', 'neural', 'pulse'];
