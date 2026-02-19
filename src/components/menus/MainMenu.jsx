@@ -316,7 +316,7 @@ const MenuButton = ({ children, onClick, delay, icon, primary }) => {
   );
 };
 
-const MainMenu = ({ onPlay, onLevels, onFreeplay, onCoop, onSettings, onHelp }) => {
+const MainMenu = ({ onPlay, onLevels, onFreeplay, onCoop, onSettings, onBiome }) => {
   const [titleVisible, setTitleVisible] = useState(false);
   const [subtitleVisible, setSubtitleVisible] = useState(false);
 
@@ -432,8 +432,8 @@ const MainMenu = ({ onPlay, onLevels, onFreeplay, onCoop, onSettings, onHelp }) 
           <MenuButton onClick={onSettings} delay={1100} icon="⚙">
             Settings
           </MenuButton>
-          <MenuButton onClick={onHelp} delay={1250} icon="?">
-            How to Play
+          <MenuButton onClick={onBiome} delay={1250} icon="🏙">
+            City Biome
           </MenuButton>
         </div>
 

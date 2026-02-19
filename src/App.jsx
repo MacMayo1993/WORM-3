@@ -396,6 +396,18 @@ export default function WORM3() {
     setShowTutorial(true);
   }, [setShowTutorial]);
 
+  const handleMenuBiome = useCallback(() => {
+    useGameStore.getState().setShowMainMenu(false);
+    setSettings({
+      ...settings,
+      biomeMode: { enabled: true, faceAssignment: null },
+      manifoldStyles: { 1: 'solid', 2: 'solid', 3: 'solid', 4: 'solid', 5: 'solid', 6: 'solid' },
+      colorScheme: 'biome',
+    });
+    useGameStore.getState().clearLevel();
+    shuffle();
+  }, [settings, setSettings, shuffle]);
+
   const closeTutorial = useCallback(() => {
     setShowTutorial(false);
     markTutorialDone();
@@ -1028,7 +1040,7 @@ export default function WORM3() {
           onCoop={handleMenuCoop}
           onTeach={handleMenuTeach}
           onSettings={handleMenuSettings}
-          onHelp={handleMenuHelp}
+          onBiome={handleMenuBiome}
         />
       )}
       {showLevelSelect && <LevelSelectScreen onSelectLevel={handleLevelSelect} onBack={handleBackToMainMenu} />}
