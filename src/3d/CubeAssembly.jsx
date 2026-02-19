@@ -135,6 +135,7 @@ const CubeAssembly = React.memo(({
 
   const onPointerDown = useCallback(({ pos, worldPos, event }) => {
     if (animStateRef.current) return;
+    if (gsapAnimRef.current) return;
 
     // Get the native event - R3F wraps it
     const nativeEvent = event.nativeEvent || event;
@@ -207,6 +208,7 @@ const CubeAssembly = React.memo(({
 
       // Start live drag if threshold exceeded
       if (!liveDragRef.current && dist >= DRAG_THRESHOLD) {
+        if (gsapAnimRef.current) return;
         const m = mapSwipe(ds.n, dx, dy, ds.shiftKey);
         if (m) {
           if (onClearTileSelectionRef.current) onClearTileSelectionRef.current();
