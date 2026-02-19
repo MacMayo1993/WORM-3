@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import * as THREE from 'three';
-import { getTileStyleMaterial } from '../../3d/TileStyleMaterials.jsx';
+import { getTileStyleMaterial } from '../../3d/styles/TileStyleMaterials.jsx';
 
 // Module-level cache so all cubies sharing the same style+color reuse one material
 const _matCache = new Map();
