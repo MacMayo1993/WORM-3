@@ -564,14 +564,10 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       mat.color.set(tex ? '#ffffff' : flipToColor.current);
       mat.needsUpdate = true;
     }
-  } else if (mat.uniforms?.uColor) {
-    mat.uniforms.uColor.value.set(
-      rawP < 0.5 ? flipFromColor.current : flipToColor.current
-    );
-  } else if (mat.uniforms?.uBaseColor) {
-    mat.uniforms.uBaseColor.value.set(
-      rawP < 0.5 ? flipFromColor.current : flipToColor.current
-    );
+  } else if (mat.uniforms?.baseColor) {
+    const targetColor = rawP < 0.5 ? flipFromColor.current : flipToColor.current;
+    const newMat = getTileStyleMaterial(tileStyle, targetColor, false, null);
+    meshRef.current.material = newMat;
   }
 }
 
@@ -597,10 +593,9 @@ if (mat?.color) {
   mat.map = currTex;
   mat.color.set(currTex ? '#ffffff' : baseColorRef.current);
   mat.needsUpdate = true;
-} else if (mat?.uniforms?.uColor) {
-  mat.uniforms.uColor.value.set(baseColorRef.current);
-} else if (mat?.uniforms?.uBaseColor) {
-  mat.uniforms.uBaseColor.value.set(baseColorRef.current);
+} else if (mat?.uniforms?.baseColor) {
+  const newMat = getTileStyleMaterial(tileStyle, baseColorRef.current, false, null);
+  meshRef.current.material = newMat;
 }
       }
     }
