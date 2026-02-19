@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { COLOR_SCHEMES, TILE_STYLES } from '../../utils/colorSchemes.js';
+import { COLOR_SCHEMES, SCHEME_LABELS, TILE_STYLES } from '../../utils/colorSchemes.js';
 import { BACKGROUNDS } from '../../utils/backgrounds.js';
 import {
   registerTilePreview,
@@ -10,19 +10,6 @@ import { useGameStore } from '../../hooks/useGameStore.js';
 
 const FACE_LABELS = { 1: 'Front', 2: 'Left', 3: 'Top', 4: 'Back', 5: 'Right', 6: 'Bottom' };
 
-const SCHEME_LABELS = {
-  standard: 'Standard',
-  neon: 'Neon Glow',
-  pastel: 'Pastel',
-  mono: 'Monochrome',
-  spiderman: 'Spiderman',
-  ocean: 'Ocean Depths',
-  sunset: 'Sunset',
-  forest: 'Forest',
-  candy: 'Candy Pop',
-  retro: 'Retro',
-  custom: 'Custom Upload',
-};
 
 const BG_OPTIONS = BACKGROUNDS.map(bg => ({
   value: bg.id,
