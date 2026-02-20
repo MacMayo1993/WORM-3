@@ -19,7 +19,6 @@ import NeuralVolume from './styles/NeuralVolume.jsx';
 import CircuitVolume from './styles/CircuitVolume.jsx';
 import WoodVolume from './styles/WoodVolume.jsx';
 import { BIOME_GROUND_TEXTURES } from './BiomeGroundTextures.js';
-import { FACE_CITIES } from '../modes/CityBiomeMode.js';
 
 // Shared geometries for all particle/glow systems (created once, reused globally)
 const sharedParticleGeometry = new THREE.PlaneGeometry(1, 1);
