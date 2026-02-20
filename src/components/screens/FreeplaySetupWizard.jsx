@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { resolveBiomeManifoldStyles } from '../../modes/CityBiomeMode.js';
 import { COLOR_SCHEMES, TILE_STYLES, SCHEME_LABELS } from '../../utils/colorSchemes.js';
 import { BACKGROUNDS, getBackgroundUrl } from '../../utils/backgrounds.js';
 import { registerTilePreview, updateTilePreview, unregisterTilePreview } from '../../3d/TilePreviewRenderer.js';
@@ -411,8 +412,7 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       if (gameMode === 'biome') {
         finalSettings.biomeMode = { enabled: true, faceAssignment: null };
         finalSettings.colorScheme = 'biome';
-        // Biome mode renders 3D city buildings per tile — no volumetric tile styles.
-        finalSettings.manifoldStyles = { 1: 'solid', 2: 'solid', 3: 'solid', 4: 'solid', 5: 'solid', 6: 'solid' };
+        finalSettings.manifoldStyles = resolveBiomeManifoldStyles(null);
       }
       onComplete(finalSettings);
     }
