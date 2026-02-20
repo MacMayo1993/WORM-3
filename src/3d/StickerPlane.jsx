@@ -714,8 +714,9 @@ if (mat?.color) {
   // Skip for hollow frame geometry (different UV layout, textures not applicable)
   useLayoutEffect(() => {
     if (hollow) return;
+    if (biomeGroundTexture) return; // ground texture is full-tile, don't slice UVs
     if (!geoRef.current || faceRow == null || faceCol == null || !faceSize) return;
-    const uvs = geoRef.current.attributes.uv;
+    const uvs = geoRef.current.attributes.uv;;
     if (!currTexture) {
       // Reset to default UVs
       uvs.setXY(0, 0, 1); uvs.setXY(1, 1, 1);
