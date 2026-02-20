@@ -660,9 +660,17 @@ if (mat?.color) {
 
   const isSudokube = mode === 'sudokube';
   const isGlass = mode === 'glass';
-  // Texture and style follow the CURRENT displayed face (meta.curr)
-  // So M1 tiles always get M1's texture/style, M4 tiles get M4's, etc.
-  const currTexture = isDead ? null : (faceTextures?.[meta?.curr] || null);
+
+  // Biome mode: use city ground texture on the base sticker mesh.
+  // CRITICAL: keyed on meta?.orig (not curr) so city identity travels with the
+  // sticker's home face through rotations, not the face it currently sits on.
+  const biomeGroundTexture = biomeEnabled && !isDead && meta?.orig
+    ? (BIOME_GROUND_TEXTURES[FACE_CITIES[meta.orig]] ?? null)
+    : null;
+
+  // Texture and style follow the CURRENT displayed face (meta.curr).
+  // Biome ground texture takes priority over face textures.
+  const currTexture = isDead ? null : biomeGroundTexture ?? (faceTextures?.[meta?.curr] || null);
   const baseColor = isDead ? '#555555' : isSudokube ? COLORS.white : (meta?.curr ? fc[meta.curr] : COLORS.black);
   const materialColor = currTexture ? '#ffffff' : baseColor;
 
@@ -670,8 +678,9 @@ if (mat?.color) {
   const baseColorRef = useRef(materialColor);
   baseColorRef.current = materialColor;
 
-  // Get the tile style for the current displayed face
-  const tileStyle = manifoldStyles?.[meta?.curr] || 'solid';
+  // In biome mode the ground texture IS the tile style — force solid so no
+  // shader layer renders underneath the buildings.
+  const tileStyle = biomeGroundTexture ? 'solid' : (manifoldStyles?.[meta?.curr] || 'solid');
   const tileStyleRef = useRef(tileStyle);
 
   // Glass mode overrides all tile styles with glass material
