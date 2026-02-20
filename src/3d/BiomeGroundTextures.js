@@ -74,21 +74,6 @@ function buildVoronoi(rng, numPoints = 24) {
   };
 }
 
-// Hex string to [r,g,b] ints
-function hex(h) {
-  const v = parseInt(h.replace('#', ''), 16);
-  return [(v >> 16) & 255, (v >> 8) & 255, v & 255];
-}
-
-// Lerp between two hex colors by t∈[0,1]
-function lerpColor(a, b, t) {
-  const [ar, ag, ab] = hex(a);
-  const [br, bg, bb] = hex(b);
-  const r = Math.round(ar + (br - ar) * t);
-  const g = Math.round(ag + (bg - ag) * t);
-  const bl = Math.round(ab + (bb - ab) * t);
-  return `rgb(${r},${g},${bl})`;
-}
 
 // ── 1. Frozen Citadel ─────────────────────────────────────────────────────────
 // Snow-pack ground with frost-crack Voronoi and embedded ice crystal glints.
