@@ -785,7 +785,7 @@ if (mat?.color) {
             <meshStandardMaterial
               color={materialColor}
               map={hollow ? null : currTexture}
-              side={THREE.DoubleSide}
+              side={THREE.FrontSide}
               roughness={0.3}
               metalness={0.05}
               envMapIntensity={0.3}
