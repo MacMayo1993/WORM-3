@@ -712,7 +712,7 @@ if (mat?.color) {
 
   // In biome mode the ground texture IS the tile style — force solid so no
   // shader layer renders underneath the buildings.
-  const styleKey = biomeEnabled ? meta?.orig : meta?.curr;
+  const _styleKey = biomeEnabled ? meta?.orig : meta?.curr;
   const tileStyle = biomeGroundTexture
   ? 'solid'
   : stableCity
