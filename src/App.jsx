@@ -391,11 +391,6 @@ export default function WORM3() {
     setTimeout(() => teachMode.enterTeachMode(), 0);
   }, [size, changeSize, shuffle, teachMode]);
 
-  const handleMenuHelp = useCallback(() => {
-    useGameStore.getState().setShowMainMenu(false);
-    setShowTutorial(true);
-  }, [setShowTutorial]);
-
   const handleMenuBiome = useCallback(() => {
     useGameStore.getState().setShowMainMenu(false);
     setSettings({

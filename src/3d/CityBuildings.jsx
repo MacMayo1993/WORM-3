@@ -577,7 +577,7 @@ export function CityBuildings({ cityKey, tileIndex, faceId, gridDim, scale = 1 }
     if (!builder) return { meshes: [], geos: [], mats: [] };
     const rng = mulberry32(seed);
     return builder(rng, count, scale);
-  }, [cityKey, tileIndex, faceId, gridDim, scale, seed, count]);
+  }, [cityKey, scale, seed, count]);
 
   useEffect(() => {
     return () => {
