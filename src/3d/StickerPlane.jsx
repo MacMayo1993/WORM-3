@@ -835,11 +835,11 @@ if (mat?.color) {
       </group>
 
       {/* City Biome buildings — mounted per tile when biome mode is active */}
-      {biomeEnabled && faceRow != null && faceCol != null && !isDead && (
+      {biomeEnabled && !isDead && (
         <CityBuildings
-          cityKey={FACE_CITIES[meta?.curr]}
+          cityKey={FACE_CITIES[meta?.orig]}
           tileIndex={(faceRow ?? 0) * (faceSize ?? 3) + (faceCol ?? 0)}
-          faceId={meta?.curr ?? 1}
+          faceId={meta?.orig ?? 1}
           gridDim={faceSize ?? 3}
         />
       )}
