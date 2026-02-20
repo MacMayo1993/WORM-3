@@ -31,6 +31,9 @@ const sharedInnerCircleGeometry = new THREE.CircleGeometry(0.48, 16);
 const _sharedStickerGeo = new THREE.PlaneGeometry(0.85, 0.85);
 // Scratch Object3D for FlipParticles matrix math — never added to a scene.
 const _particleDummy = new THREE.Object3D();
+// Scratch vectors for biome edge-on fade — allocated once, reused every frame.
+const _normal = new THREE.Vector3();
+const _worldQuat = new THREE.Quaternion();
 
 // Frame-shaped sticker Shape for hollow cube mode (square with rectangular hole).
 // Store the Shape, not the Geometry — each sticker creates its own ShapeGeometry
@@ -491,8 +494,19 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   }, [meta?.curr, meta?.flips]);
 
   useFrame((state, delta) => {
+    // Biome mode: hide sticker ground plane when edge-on to camera during rotation.
+    // Prevents the bold canvas ground texture from blooming outward mid-slice-rotation.
+    if (biomeEnabled && meshRef.current?.material && groupRef.current) {
+      groupRef.current.getWorldQuaternion(_worldQuat);
+      _normal.set(0, 0, 1).applyQuaternion(_worldQuat);
+      const dot = Math.abs(_normal.dot(state.camera.position) / state.camera.position.length());
+      const mat = meshRef.current.material;
+      mat.transparent = true;
+      mat.opacity = dot < 0.20 ? 0 : 1;
+    }
+
     // Detect flipped tiles for persistent tremor
-    const wormhole = (meta?.flips ?? 0) > 0 && meta?.curr !== meta?.orig;
+    const wormhole = (meta?.flips ?? 0) > 0 && meta?.curr !== meta?.orig;;
 
     // Single-boolean gate: skip the entire body on idle frames.
     // ringRef / glowRef are only mounted when wormhole is true, so the
