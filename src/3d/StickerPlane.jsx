@@ -690,9 +690,9 @@ if (mat?.color) {
   // CRITICAL: keyed on meta?.orig (not curr) so city identity travels with the
   // sticker's home face through rotations, not the face it currently sits on.
   const stableCity = biomeEnabled ? getStableCity(meta) : null;
-  const biomeGroundTexture = biomeEnabled && !isDead && meta?.orig
-    ? (BIOME_GROUND_TEXTURES[FACE_CITIES[meta.orig]] ?? null)
-    : null;
+  const biomeGroundTexture = biomeEnabled && !isDead && stableCity
+  ? (BIOME_GROUND_TEXTURES[stableCity] ?? null)
+  : null;
 
   // Texture and style follow the CURRENT displayed face (meta.curr).
   // Biome ground texture takes priority over face textures.
@@ -713,7 +713,11 @@ if (mat?.color) {
   // In biome mode the ground texture IS the tile style — force solid so no
   // shader layer renders underneath the buildings.
   const styleKey = biomeEnabled ? meta?.orig : meta?.curr;
-  const tileStyle = biomeGroundTexture ? 'solid' : (manifoldStyles?.[styleKey] || 'solid');
+  const tileStyle = biomeGroundTexture
+  ? 'solid'
+  : stableCity
+    ? (CITY_CONFIG[stableCity]?.tileStyle ?? 'solid')
+    : (manifoldStyles?.[meta?.curr] || 'solid');
   const tileStyleRef = useRef(tileStyle);
 
   // Glass mode overrides all tile styles with glass material
@@ -869,14 +873,14 @@ if (mat?.color) {
       </group>
 
       {/* City Biome buildings — mounted per tile when biome mode is active */}
-      {biomeEnabled && !isDead && (
+      {biomeEnabled && !isDead && stableCity && (
         <CityBuildings
-          cityKey={FACE_CITIES[meta?.orig]}
-          tileIndex={(faceRow ?? 0) * (faceSize ?? 3) + (faceCol ?? 0)}
-          faceId={meta?.orig ?? 1}
-          gridDim={faceSize ?? 3}
-        />
-      )}
+        cityKey={stableCity}
+        tileIndex={(faceRow ?? 0) * (faceSize ?? 3) + (faceCol ?? 0)}
+        faceId={meta?.orig ?? 1}
+        gridDim={faceSize ?? 3}
+  />
+)}
 
       {/* Seam pulse overlay — border tiles only, biome mode only */}
       {(() => {
