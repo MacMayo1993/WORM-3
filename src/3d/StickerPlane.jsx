@@ -40,16 +40,7 @@ const _worldQuat = new THREE.Quaternion();
 // instance via declarative <shapeGeometry>, so R3F can safely dispose per-instance.
 // Stable city cache — keyed on origDir + origPos which are truly permanent.
 // Populated on first render before any rotation can corrupt meta.orig.
-const _stableCityCache = new Map();
 
-function getStableCity(meta) {
-  if (!meta?.origDir || !meta?.origPos) return null;
-  const key = `${meta.origDir}-${meta.origPos.x}-${meta.origPos.y}-${meta.origPos.z}`;
-  if (!_stableCityCache.has(key) && meta.orig) {
-    _stableCityCache.set(key, FACE_CITIES[meta.orig] ?? null);
-  }
-  return _stableCityCache.get(key) ?? FACE_CITIES[meta.orig] ?? null;
-}
 const _stickerFrameShape = (() => {
   const outer = 0.425; // half of 0.85 sticker size
   const inner = 0.34;  // inner hole half-size — wider opening, thinner colour border
@@ -689,7 +680,9 @@ if (mat?.color) {
   // Biome mode: use city ground texture on the base sticker mesh.
   // CRITICAL: keyed on meta?.orig (not curr) so city identity travels with the
   // sticker's home face through rotations, not the face it currently sits on.
-  const stableCity = biomeEnabled ? getStableCity(meta) : null;
+  const stableCity = biomeEnabled && meta?.orig
+  ? (FACE_CITIES[meta.orig] ?? null)
+  : null;
   const biomeGroundTexture = biomeEnabled && !isDead && stableCity
   ? (BIOME_GROUND_TEXTURES[stableCity] ?? null)
   : null;
