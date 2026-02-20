@@ -12,6 +12,7 @@ import { Environment, Html } from '@react-three/drei';
 import './App.css';
 
 // Utils
+import { resolveBiomeManifoldStyles } from './modes/CityBiomeMode.js';
 import { completeLevel } from './utils/levels.js';
 import { keyToMove } from './game/handsInput.js';
 import { makeCubies } from './game/cubeState.js';
@@ -396,7 +397,7 @@ export default function WORM3() {
     setSettings({
       ...settings,
       biomeMode: { enabled: true, faceAssignment: null },
-      manifoldStyles: { 1: 'solid', 2: 'solid', 3: 'solid', 4: 'solid', 5: 'solid', 6: 'solid' },
+      manifoldStyles: resolveBiomeManifoldStyles(null),
       colorScheme: 'biome',
     });
     useGameStore.getState().clearLevel();
