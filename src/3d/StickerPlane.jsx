@@ -8,6 +8,7 @@ import TallyMarks from '../manifold/TallyMarks.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { FACE_CITIES } from '../modes/CityBiomeMode.js';
 import CityBuildings from './CityBuildings.jsx';
+import { SeamPulseOverlay, getAdjacentFaceId } from './SeamPulseOverlay.jsx';
 import { getTileStyleMaterial, getGlassMaterial, sharedTremorState } from './styles/TileStyleMaterials.jsx';
 import GrassBlades from './styles/GrassBlades.jsx';
 import WaterVolume from './styles/WaterVolume.jsx';
@@ -422,7 +423,7 @@ const Worm = ({ position, rotation, scale = 1 }) => {
   );
 };
 
-const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay, mode, faceColors, faceTextures, faceRow, faceCol, faceSize, manifoldStyles, hollow }) {
+const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay, mode, faceColors, faceTextures, faceRow, faceCol, faceSize, manifoldStyles, hollow, currentDir }) {
   const fc = faceColors || FACE_COLORS;
   const biomeEnabled = useGameStore((s) => s.settings?.biomeMode?.enabled ?? false);
   const groupRef = useRef();
@@ -825,12 +826,20 @@ if (mat?.color) {
       {/* City Biome buildings — mounted per tile when biome mode is active */}
       {biomeEnabled && faceRow != null && faceCol != null && !isDead && (
         <CityBuildings
-          cityKey={FACE_CITIES[meta?.orig]}
+          cityKey={FACE_CITIES[meta?.curr]}
           tileIndex={(faceRow ?? 0) * (faceSize ?? 3) + (faceCol ?? 0)}
-          faceId={meta?.orig ?? 1}
+          faceId={meta?.curr ?? 1}
           gridDim={faceSize ?? 3}
         />
       )}
+
+      {/* Seam pulse overlay — border tiles only, biome mode only */}
+      {(() => {
+        if (!biomeEnabled || !currentDir || faceRow == null || faceCol == null || isDead) return null;
+        const adjFaceId = getAdjacentFaceId(currentDir, faceRow, faceCol, faceSize ?? 3);
+        if (adjFaceId == null || meta?.orig == null) return null;
+        return <SeamPulseOverlay origFaceId={meta.orig} adjFaceId={adjFaceId} />;
+      })()}
 
       {/* Dead tile headstone — replaces all live overlays */}
       {isDead && (
