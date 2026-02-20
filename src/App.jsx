@@ -362,10 +362,14 @@ export default function WORM3() {
       }
     }
     setSettings(newSettings);
-    // Clear level and shuffle
     useGameStore.getState().clearLevel();
-    shuffle();
-  }, [settings, setSettings, shuffle]);
+    // Biome mode starts solved so the stable city cache populates correctly
+    if (!wizardSettings.biomeMode?.enabled) {
+      shuffle();
+    } else {
+      useGameStore.getState().resetGame();
+      useGameStore.getState().setHasShuffled(true);
+    }
 
   const handleWizardCancel = useCallback(() => {
     setShowFreeplayWizard(false);
@@ -401,8 +405,10 @@ export default function WORM3() {
       colorScheme: 'biome',
     });
     useGameStore.getState().clearLevel();
-    shuffle();
-  }, [settings, setSettings, shuffle]);
+    // Start solved so stable city cache populates before any rotation
+    useGameStore.getState().resetGame();
+    useGameStore.getState().setHasShuffled(true);
+  }, [settings, setSettings]);
 
   const closeTutorial = useCallback(() => {
     setShowTutorial(false);
