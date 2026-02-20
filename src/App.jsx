@@ -370,7 +370,8 @@ export default function WORM3() {
       useGameStore.getState().resetGame();
       useGameStore.getState().setHasShuffled(true);
     }
-
+  }, [settings, setSettings, shuffle]);
+  
   const handleWizardCancel = useCallback(() => {
     setShowFreeplayWizard(false);
     useGameStore.getState().setShowMainMenu(true);
