@@ -235,8 +235,8 @@ function buildFrozenCitadel(rng, _count, sc) {
   const instances = [];
 
   // Primary tower — slim crystal box extending in +Z
-  const tW = rr(rng, 0.08, 0.16) * sc;
-  const tH = rr(rng, 0.28, 0.54) * sc;
+  const tW = rr(rng, 0.14, 0.24) * sc;
+  const tH = rr(rng, 0.36, 0.58) * sc;
   const towerGeo = new THREE.BoxGeometry(tW, tW, tH);
   geos.push(towerGeo);
   const towerX = rr(rng, -0.10, 0.10) * sc;
@@ -256,13 +256,13 @@ function buildFrozenCitadel(rng, _count, sc) {
   meshes.push({ geo: pinGeo, mat: M.frozen.glow, pos: [towerX, towerY, tH + capH + tW * 0.22], rot: [0, 0, 0] });
 
   // Crystal shards — hexagonal cones as InstancedMesh (tip in +Z via IG.cone)
-  const shardCount = 2 + Math.floor(rng() * 4);
+  const shardCount = 3 + Math.floor(rng() * 5);
   const shardMatrices = [];
   for (let i = 0; i < shardCount; i++) {
-    const sH = rr(rng, 0.10, 0.28) * sc;
-    const sR = rr(rng, 0.024, 0.044) * sc;
-    const sx = rr(rng, -0.35, 0.35) * sc;
-    const sy = rr(rng, -0.35, 0.35) * sc;
+    const sH = rr(rng, 0.16, 0.36) * sc;
+    const sR = rr(rng, 0.034, 0.058) * sc;
+    const sx = rr(rng, -0.30, 0.30) * sc;
+    const sy = rr(rng, -0.30, 0.30) * sc;
     const leanX = rr(rng, -0.18, 0.18);
     const leanY = rr(rng, -0.18, 0.18);
     // Base at Z=0, tip at Z=sH — center the mesh at sH/2
@@ -298,7 +298,7 @@ function buildDeepStation(rng, _count, sc) {
   // Pressure dome — hemisphere with clearcoat glass, dome extends in +Z
   // SphereGeometry thetaStart=0, thetaLength=PI/2 gives top hemisphere (+Y pole to equator).
   // After rotateX(PI/2): flat base at Z=0, dome bulges toward +Z. ✓
-  const domeR = rr(rng, 0.09, 0.14) * sc;
+  const domeR = rr(rng, 0.14, 0.20) * sc;
   const domeGeo = new THREE.SphereGeometry(domeR, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2);
   domeGeo.rotateX(Math.PI / 2);
   geos.push(domeGeo);
@@ -331,8 +331,8 @@ function buildDeepStation(rng, _count, sc) {
   const pBY = rr(rng, -0.28, 0.28) * sc;
   const pipeMatrices = [];
   for (let i = 0; i < pipeCount; i++) {
-    const pH = rr(rng, 0.10, 0.38) * sc;
-    const pR = 0.012 * sc;
+    const pH = rr(rng, 0.18, 0.46) * sc;
+    const pR = 0.018 * sc;
     const px = pBX + rr(rng, -0.08, 0.08) * sc;
     const py = pBY + rr(rng, -0.08, 0.08) * sc;
     const leanX = rr(rng, -0.10, 0.10);
@@ -354,9 +354,9 @@ function buildVolcanicFoundry(rng, _count, sc) {
   const instances = [];
 
   // Brutalist block — wide, low, heavy (box extends in Z ✓)
-  const bW = rr(rng, 0.20, 0.36) * sc;
-  const bD = rr(rng, 0.14, 0.28) * sc;
-  const bH = rr(rng, 0.08, 0.20) * sc;
+  const bW = rr(rng, 0.28, 0.44) * sc;
+  const bD = rr(rng, 0.20, 0.34) * sc;
+  const bH = rr(rng, 0.12, 0.26) * sc;
   const blockGeo = new THREE.BoxGeometry(bW, bD, bH);
   geos.push(blockGeo);
   meshes.push({
@@ -380,15 +380,15 @@ function buildVolcanicFoundry(rng, _count, sc) {
   });
 
   // Smokestacks — InstancedMesh cylinders + inverted vent caps on each
-  const stackCount = 2 + Math.floor(rng() * 3);
+  const stackCount = 3 + Math.floor(rng() * 3);
   const sBX = rr(rng, 0.0, 0.24) * sc;
   const sBY = rr(rng, -0.20, 0.20) * sc;
   const stackMatrices = [];
   const ventMatrices = [];
   const capH = 0.06 * sc;
   for (let i = 0; i < stackCount; i++) {
-    const sH = rr(rng, 0.20, 0.50) * sc;
-    const sR = rr(rng, 0.025, 0.044) * sc;
+    const sH = rr(rng, 0.30, 0.58) * sc;
+    const sR = rr(rng, 0.034, 0.054) * sc;
     const sx = sBX + rr(rng, -0.12, 0.12) * sc;
     const sy = sBY + rr(rng, -0.12, 0.12) * sc;
     // Stack cylinder: base on surface, top at sH
@@ -424,7 +424,7 @@ function buildSolarArcology(rng, _count, sc) {
   // Lattice tower(s) — slim bronze core + gold wireframe cage, 1-2 towers
   const tCount = 1 + Math.floor(rng() * 2);
   for (let i = 0; i < tCount; i++) {
-    const tH = rr(rng, 0.30, 0.56) * sc;
+    const tH = rr(rng, 0.40, 0.60) * sc;
     const tx = rr(rng, -0.28, 0.28) * sc;
     const ty = rr(rng, -0.28, 0.28) * sc;
     const tGeo = new THREE.BoxGeometry(0.022 * sc, 0.022 * sc, tH);
@@ -437,7 +437,7 @@ function buildSolarArcology(rng, _count, sc) {
 
   // Parabolic dish on a stem — hemisphere facing viewer (+Z)
   // After rotateX(PI/2): flat base at Z=0 relative to mesh origin, dome at +Z.
-  const dishR = rr(rng, 0.08, 0.13) * sc;
+  const dishR = rr(rng, 0.12, 0.18) * sc;
   const dishGeo = new THREE.SphereGeometry(dishR, 10, 7, 0, Math.PI * 2, 0, Math.PI / 2);
   dishGeo.rotateX(Math.PI / 2);
   geos.push(dishGeo);
@@ -452,10 +452,10 @@ function buildSolarArcology(rng, _count, sc) {
   meshes.push({ geo: dishGeo, mat: M.solar.gold, pos: [dX, dY, stemH], rot: [0, 0, 0] });
 
   // Light spires — slim gold cones pointing outward, InstancedMesh (tip in +Z via IG.cone)
-  const spireCount = 1 + Math.floor(rng() * 3);
+  const spireCount = 2 + Math.floor(rng() * 3);
   const spireMatrices = [];
   for (let i = 0; i < spireCount; i++) {
-    const spH = rr(rng, 0.20, 0.40) * sc;
+    const spH = rr(rng, 0.28, 0.52) * sc;
     const spR = 0.012 * sc;
     const spX = rr(rng, -0.34, 0.34) * sc;
     const spY = rr(rng, -0.34, 0.34) * sc;
@@ -485,18 +485,16 @@ function buildBioDome(rng, _count, sc) {
 
   // Spiral tower — stacked cylinder segments as InstancedMesh.
   // Each segment shrinks in radius going up; a rotZ twist is applied per segment.
-  const segCount = 6 + Math.floor(rng() * 4);
-  const segH = rr(rng, 0.04, 0.07) * sc;
+  const segCount = 8 + Math.floor(rng() * 4);
+  const segH = rr(rng, 0.05, 0.08) * sc;
   const towerX = rr(rng, -0.18, 0.18) * sc;
   const towerY = rr(rng, -0.18, 0.18) * sc;
   const spiralMatrices = [];
   for (let i = 0; i < segCount; i++) {
     const shrink = Math.max(1 - i * 0.045, 0.08);
-    const topR = 0.04 * sc * Math.max(shrink - 0.04, 0.05);
     const botR = 0.05 * sc * shrink;
-    const avgR = (topR + botR) / 2;
     const rotZ = (i * 18 * Math.PI) / 180;
-    spiralMatrices.push(mat4(towerX, towerY, i * segH + segH / 2, 0, 0, rotZ, avgR, avgR, segH));
+    spiralMatrices.push(mat4(towerX, towerY, i * segH + segH / 2, 0, 0, rotZ, botR, botR, segH));
   }
   instances.push({ geo: IG.cyl, mat: M.bio.foliage, matrices: spiralMatrices });
   const towerTopZ = segCount * segH;
@@ -553,7 +551,7 @@ function buildNeuralHub(rng, _count, sc) {
   // Signal towers — pair of tapered cylinders extending in +Z
   const towerPositions = [];
   for (let i = 0; i < 2; i++) {
-    const tH = rr(rng, 0.30, 0.50) * sc;
+    const tH = rr(rng, 0.38, 0.58) * sc;
     const tGeo = new THREE.CylinderGeometry(0.014 * sc, 0.018 * sc, tH, 6);
     tGeo.rotateX(Math.PI / 2); // axis → +Z
     geos.push(tGeo);
@@ -583,12 +581,12 @@ function buildNeuralHub(rng, _count, sc) {
   }
 
   // Antenna cluster — InstancedMesh thin orange-glow rods (IG.cyl)
-  const antCount = 4 + Math.floor(rng() * 4);
+  const antCount = 6 + Math.floor(rng() * 5);
   const aBX = rr(rng, -0.26, 0.26) * sc;
   const aBY = rr(rng, -0.26, 0.26) * sc;
   const antMatrices = [];
   for (let i = 0; i < antCount; i++) {
-    const aH = rr(rng, 0.14, 0.30) * sc;
+    const aH = rr(rng, 0.20, 0.38) * sc;
     const aR = 0.005 * sc;
     const ax = aBX + rr(rng, -0.07, 0.07) * sc;
     const ay = aBY + rr(rng, -0.07, 0.07) * sc;
