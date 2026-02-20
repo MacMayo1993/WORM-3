@@ -729,7 +729,7 @@ if (mat?.color) {
       uvs.setXY(2, u0, v0); uvs.setXY(3, u1, v0);
     }
     uvs.needsUpdate = true;
-  }, [hollow, currTexture, faceRow, faceCol, faceSize]);
+  }, [hollow, biomeGroundTexture, currTexture, faceRow, faceCol, faceSize]);
 
   // Sync material color/texture when meta.curr changes (e.g., during cube rotation).
   // Uses useLayoutEffect so the color updates BEFORE the browser paints,
