@@ -313,17 +313,19 @@ function buildDeepStation(rng, _count, sc) {
 
   // Hab-rings — glowing teal halos floating at various heights (flat, normal=+Z ✓)
   const ringCount = 1 + Math.floor(rng() * 2);
-  for (let i = 0; i < ringCount; i++) {
-    const ringR = rr(rng, 0.09, 0.14) * sc;
-    const ringGeo = new THREE.TorusGeometry(ringR, 0.019 * sc, 8, 20);
-    geos.push(ringGeo);
-    meshes.push({
-      geo: ringGeo,
-      mat: M.deep.glow,
-      pos: [rr(rng, -0.24, 0.24) * sc, rr(rng, -0.24, 0.24) * sc, rr(rng, 0.05, 0.22) * sc],
-      rot: [0, 0, rng() * Math.PI],
-    });
-  }
+    for (let i = 0; i < ringCount; i++) {
+      const ringR = rr(rng, 0.09, 0.14) * sc;
+      const ringGeo = new THREE.TorusGeometry(ringR, 0.019 * sc, 8, 20);
+      geos.push(ringGeo);
+      // Rotate PI/2 around X so the torus stands upright as a vertical orbital ring
+      // rather than lying flat like a horizontal disc
+      meshes.push({
+        geo: ringGeo,
+        mat: M.deep.glow,
+        pos: [rr(rng, -0.24, 0.24) * sc, rr(rng, -0.24, 0.24) * sc, rr(rng, 0.08, 0.28) * sc],
+        rot: [Math.PI / 2, 0, rng() * Math.PI],
+      });
+    }
 
   // Pipe cluster — InstancedMesh cylinders extending outward in +Z (via IG.cyl)
   const pipeCount = 3 + Math.floor(rng() * 3);
