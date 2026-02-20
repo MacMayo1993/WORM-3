@@ -6,7 +6,7 @@ import { COLORS, FACE_COLORS, ANTIPODAL_COLOR, FLIP_CAP } from '../utils/constan
 import { play, vibrate } from '../utils/audio.js';
 import TallyMarks from '../manifold/TallyMarks.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
-import { FACE_CITIES } from '../modes/CityBiomeMode.js';
+import { FACE_CITIES, CITY_CONFIG } from '../modes/CityBiomeMode.js';
 import CityBuildings from './CityBuildings.jsx';
 import { SeamPulseOverlay, getAdjacentFaceId } from './SeamPulseOverlay.jsx';
 import { getTileStyleMaterial, getGlassMaterial, sharedTremorState } from './styles/TileStyleMaterials.jsx';
@@ -38,6 +38,18 @@ const _worldQuat = new THREE.Quaternion();
 // Frame-shaped sticker Shape for hollow cube mode (square with rectangular hole).
 // Store the Shape, not the Geometry — each sticker creates its own ShapeGeometry
 // instance via declarative <shapeGeometry>, so R3F can safely dispose per-instance.
+// Stable city cache — keyed on origDir + origPos which are truly permanent.
+// Populated on first render before any rotation can corrupt meta.orig.
+const _stableCityCache = new Map();
+
+function getStableCity(meta) {
+  if (!meta?.origDir || !meta?.origPos) return null;
+  const key = `${meta.origDir}-${meta.origPos.x}-${meta.origPos.y}-${meta.origPos.z}`;
+  if (!_stableCityCache.has(key) && meta.orig) {
+    _stableCityCache.set(key, FACE_CITIES[meta.orig] ?? null);
+  }
+  return _stableCityCache.get(key) ?? FACE_CITIES[meta.orig] ?? null;
+}
 const _stickerFrameShape = (() => {
   const outer = 0.425; // half of 0.85 sticker size
   const inner = 0.34;  // inner hole half-size — wider opening, thinner colour border
@@ -677,6 +689,7 @@ if (mat?.color) {
   // Biome mode: use city ground texture on the base sticker mesh.
   // CRITICAL: keyed on meta?.orig (not curr) so city identity travels with the
   // sticker's home face through rotations, not the face it currently sits on.
+  const stableCity = biomeEnabled ? getStableCity(meta) : null;
   const biomeGroundTexture = biomeEnabled && !isDead && meta?.orig
     ? (BIOME_GROUND_TEXTURES[FACE_CITIES[meta.orig]] ?? null)
     : null;
