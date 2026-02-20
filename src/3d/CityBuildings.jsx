@@ -427,10 +427,11 @@ function buildSolarArcology(rng, _count, sc) {
     const tH = rr(rng, 0.40, 0.60) * sc;
     const tx = rr(rng, -0.28, 0.28) * sc;
     const ty = rr(rng, -0.28, 0.28) * sc;
-    const tGeo = new THREE.BoxGeometry(0.022 * sc, 0.022 * sc, tH);
+    const tGeo = new THREE.BoxGeometry(0.028 * sc, 0.028 * sc, tH);
     geos.push(tGeo);
     meshes.push({ geo: tGeo, mat: M.solar.bronze, pos: [tx, ty, tH / 2], rot: [0, 0, 0] });
-    const wGeo = new THREE.BoxGeometry(0.068 * sc, 0.068 * sc, tH * 0.88);
+    // Wireframe cage is 3× wider than core so no z-fighting, reads as skeletal lattice
+    const wGeo = new THREE.BoxGeometry(0.088 * sc, 0.088 * sc, tH * 0.92);
     geos.push(wGeo);
     meshes.push({ geo: wGeo, mat: M.solar.wire, pos: [tx, ty, tH / 2], rot: [0, 0, 0] });
   }
