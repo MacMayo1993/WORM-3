@@ -1,11 +1,12 @@
-// Face color to city mapping — permanent, driven by base Rubik's palette
+// Face color to city mapping — driven by actual codebase face IDs (CLAUDE.md):
+//   1=PZ(Red), 2=NX(Green), 3=PY(White), 4=NZ(Orange), 5=PX(Blue), 6=NY(Yellow)
 export const FACE_CITIES = {
-  1: 'frozenCitadel',   // White
-  2: 'deepStation',     // Blue
-  3: 'volcanicFoundry', // Red
-  4: 'solarArcology',   // Yellow
-  5: 'bioDome',         // Green
-  6: 'neuralHub',       // Orange
+  1: 'volcanicFoundry', // Face 1 = PZ = Red
+  2: 'bioDome',         // Face 2 = NX = Green
+  3: 'frozenCitadel',   // Face 3 = PY = White
+  4: 'neuralHub',       // Face 4 = NZ = Orange
+  5: 'deepStation',     // Face 5 = PX = Blue
+  6: 'solarArcology',   // Face 6 = NY = Yellow
 };
 
 export const CITY_CONFIG = {
@@ -20,23 +21,26 @@ export const CITY_CONFIG = {
 // Antipodal face pairs
 export const ANTIPODAL_FACES = { 1: 4, 2: 5, 3: 6, 4: 1, 5: 2, 6: 3 };
 
-// Seam interaction table — key is sorted pair "A-B" where A < B (face IDs)
+// Seam interaction table — key is sorted pair "A-B" where A < B (real face IDs)
+// Antipodal pairs (per CLAUDE.md): 1↔4 (Red↔Orange), 2↔5 (Green↔Blue), 3↔6 (White↔Yellow)
 export const SEAM_INTERACTIONS = {
-  '1-4': { type: 'antipodal-thermal-max',    frequency: 2.4, shape: 'hard-alternate'   },
-  '2-5': { type: 'antipodal-cool-harmony',   frequency: 0.8, shape: 'soft-breathe'     },
-  '3-6': { type: 'antipodal-warm-ambiguous', frequency: 3.2, shape: 'chaotic-flicker'  },
-  '1-2': { type: 'cross-cool',               frequency: 1.0, shape: 'gentle-overlap'   },
-  '1-5': { type: 'luminance-bridge',         frequency: 1.2, shape: 'lead-follow'      },
-  '1-6': { type: 'cold-compute',             frequency: 2.0, shape: 'hard-alternate'   },
-  '3-4': { type: 'thermal-clash',            frequency: 2.8, shape: 'hot-overlap'      },
-  '4-6': { type: 'luminance-compute',        frequency: 2.2, shape: 'gold-violet'      },
-  '2-4': { type: 'cross-temperature',        frequency: 1.8, shape: 'warm-cool-inter'  },
-  '4-5': { type: 'warm-organic',             frequency: 1.0, shape: 'soft-breathe'     },
-  '2-6': { type: 'cool-compute',             frequency: 1.4, shape: 'deep-interference'},
-  '2-3': { type: 'cross-temperature',        frequency: 3.0, shape: 'third-color'      },
-  '3-5': { type: 'thermal-organic',          frequency: 2.0, shape: 'gentle-overlap'   },
-  '5-6': { type: 'organic-compute',          frequency: 1.6, shape: 'slow-build'       },
-  '1-3': { type: 'cross-temperature',        frequency: 2.5, shape: 'warm-cool-inter'  },
+  // Antipodal pairs
+  '1-4': { type: 'antipodal-warm-ambiguous', frequency: 3.2, shape: 'chaotic-flicker'   }, // volcanic(Red) ↔ neural(Orange)
+  '2-5': { type: 'antipodal-cool-harmony',   frequency: 0.8, shape: 'soft-breathe'      }, // bio(Green) ↔ deep(Blue)
+  '3-6': { type: 'antipodal-thermal-max',    frequency: 2.4, shape: 'hard-alternate'    }, // frozen(White) ↔ solar(Yellow)
+  // Adjacent pairs
+  '1-2': { type: 'thermal-organic',          frequency: 2.0, shape: 'gentle-overlap'    }, // volcanic ↔ bio
+  '1-3': { type: 'cross-temperature',        frequency: 2.5, shape: 'warm-cool-inter'   }, // volcanic ↔ frozen
+  '1-5': { type: 'cross-temperature',        frequency: 3.0, shape: 'third-color'       }, // volcanic ↔ deep
+  '1-6': { type: 'thermal-clash',            frequency: 2.8, shape: 'hot-overlap'       }, // volcanic ↔ solar
+  '2-3': { type: 'luminance-bridge',         frequency: 1.2, shape: 'lead-follow'       }, // bio ↔ frozen
+  '2-4': { type: 'organic-compute',          frequency: 1.6, shape: 'slow-build'        }, // bio ↔ neural
+  '2-6': { type: 'warm-organic',             frequency: 1.0, shape: 'soft-breathe'      }, // bio ↔ solar
+  '3-4': { type: 'cold-compute',             frequency: 2.0, shape: 'hard-alternate'    }, // frozen ↔ neural
+  '3-5': { type: 'cross-cool',               frequency: 1.0, shape: 'gentle-overlap'    }, // frozen ↔ deep
+  '4-5': { type: 'cool-compute',             frequency: 1.4, shape: 'deep-interference' }, // neural ↔ deep
+  '4-6': { type: 'luminance-compute',        frequency: 2.2, shape: 'gold-violet'       }, // neural ↔ solar
+  '5-6': { type: 'cross-temperature',        frequency: 1.8, shape: 'warm-cool-inter'   }, // deep ↔ solar
 };
 
 export function getSeamInteraction(faceA, faceB) {
