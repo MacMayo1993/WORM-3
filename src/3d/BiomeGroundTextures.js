@@ -95,7 +95,7 @@ function lerpColor(a, b, t) {
 function generateFrozenGround() {
   const canvas = makeCanvas();
   const ctx = canvas.getContext('2d');
-  const rng = mulberry32(0x1CE0_F1CE);
+  const rng = mulberry32(0x1CE0F1CE);
 
   const noise = buildValueNoise(rng, 12);
   const voronoi = buildVoronoi(rng, 30);
@@ -151,7 +151,7 @@ function generateFrozenGround() {
 function generateDeepGround() {
   const canvas = makeCanvas();
   const ctx = canvas.getContext('2d');
-  const rng = mulberry32(0xDEEP_5E4);
+  const rng = mulberry32(0xDEEA5EE4);
 
   const noise = buildValueNoise(rng, 10);
   const noise2 = buildValueNoise(rng, 6);
@@ -206,7 +206,7 @@ function generateDeepGround() {
 function generateVolcanicGround() {
   const canvas = makeCanvas();
   const ctx = canvas.getContext('2d');
-  const rng = mulberry32(0xVOLC_4N0);
+  const rng = mulberry32(0xC0C14C40);
 
   const voronoi = buildVoronoi(rng, 20);
   const noise = buildValueNoise(rng, 8);
@@ -255,7 +255,7 @@ function generateVolcanicGround() {
 function generateSolarGround() {
   const canvas = makeCanvas();
   const ctx = canvas.getContext('2d');
-  const rng = mulberry32(0x501A_4C01);
+  const rng = mulberry32(0x501A4C01);
 
   const noise = buildValueNoise(rng, 10);
   const noise2 = buildValueNoise(rng, 20);
@@ -316,7 +316,7 @@ function generateSolarGround() {
 function generateBioGround() {
   const canvas = makeCanvas();
   const ctx = canvas.getContext('2d');
-  const rng = mulberry32(0xB10_D0_1E);
+  const rng = mulberry32(0xB10D011E);
 
   const noise = buildValueNoise(rng, 8);
   const noise2 = buildValueNoise(rng, 16);
@@ -378,7 +378,7 @@ function generateBioGround() {
 function generateNeuralGround() {
   const canvas = makeCanvas();
   const ctx = canvas.getContext('2d');
-  const rng = mulberry32(0xNEUR_4L77);
+  const rng = mulberry32(0xEA174177);
 
   const imgData = ctx.createImageData(SIZE, SIZE);
   const d = imgData.data;
