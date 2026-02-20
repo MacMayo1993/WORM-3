@@ -683,8 +683,14 @@ if (mat?.color) {
 
   // Texture and style follow the CURRENT displayed face (meta.curr).
   // Biome ground texture takes priority over face textures.
-  const currTexture = isDead ? null : biomeGroundTexture ?? (faceTextures?.[meta?.curr] || null);
-  const baseColor = isDead ? '#555555' : isSudokube ? COLORS.white : (meta?.curr ? fc[meta.curr] : COLORS.black);
+  const currTexture = isDead ? null
+  : biomeGroundTexture
+  ?? (biomeEnabled ? null : (faceTextures?.[meta?.curr] || null));
+  const baseColor = isDead ? '#555555'
+  : isSudokube ? COLORS.white
+  : biomeEnabled
+    ? (meta?.orig ? fc[meta.orig] : COLORS.black)   // city identity travels with sticker
+    : (meta?.curr ? fc[meta.curr] : COLORS.black);  // normal mode: show current face color
   const materialColor = currTexture ? '#ffffff' : baseColor;
 
   // Store baseColor in ref for access in useFrame animation callbacks
@@ -693,7 +699,8 @@ if (mat?.color) {
 
   // In biome mode the ground texture IS the tile style — force solid so no
   // shader layer renders underneath the buildings.
-  const tileStyle = biomeGroundTexture ? 'solid' : (manifoldStyles?.[meta?.curr] || 'solid');
+  const styleKey = biomeEnabled ? meta?.orig : meta?.curr;
+  const tileStyle = biomeGroundTexture ? 'solid' : (manifoldStyles?.[styleKey] || 'solid');
   const tileStyleRef = useRef(tileStyle);
 
   // Glass mode overrides all tile styles with glass material
