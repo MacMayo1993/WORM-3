@@ -275,7 +275,7 @@ function BiomeModel({ path, seed, scale, cityKey }) {
     }
 
     return result;
-  }, [scene, autoScale, zOffset, seed, scale, SECONDARY_COUNT]);
+  }, [scene, autoScale, zOffset, cx, cz, seed, scale, SECONDARY_COUNT]);
 
   return (
     <group>
