@@ -9,7 +9,7 @@ import { useGameStore } from '../hooks/useGameStore.js';
 import { FACE_CITIES, CITY_CONFIG } from '../modes/CityBiomeMode.js';
 import CityBuildings from './CityBuildings.jsx';
 import { BiomeGLBCluster, isGLBActive, isGLBFullFace } from './BiomeGLBCluster.jsx';
-import { SeamPulseOverlay, getAdjacentFaceId } from './SeamPulseOverlay.jsx';
+import { SeamPulseOverlay } from './SeamPulseOverlay.jsx';
 import { getTileStyleMaterial, getGlassMaterial, sharedTremorState } from './styles/TileStyleMaterials.jsx';
 import GrassBlades from './styles/GrassBlades.jsx';
 import WaterVolume from './styles/WaterVolume.jsx';
@@ -424,7 +424,7 @@ const Worm = ({ position, rotation, scale = 1 }) => {
   );
 };
 
-const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay, mode, faceColors, faceTextures, faceRow, faceCol, faceSize, manifoldStyles, hollow, currentDir }) {
+const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay, mode, faceColors, faceTextures, faceRow, faceCol, faceSize, manifoldStyles, hollow, currentDir: _currentDir }) {
   const fc = faceColors || FACE_COLORS;
   const biomeEnabled = useGameStore((s) => s.settings?.biomeMode?.enabled ?? false);
   const groupRef = useRef();
