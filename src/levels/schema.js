@@ -1,0 +1,274 @@
+/**
+ * WORM³ Level Schema Definitions
+ *
+ * This module defines the structure and constants for level definitions.
+ * All levels must conform to these schemas.
+ */
+
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
+/**
+ * Available game modes
+ */
+export const GAME_MODES = {
+  CLASSIC: 'classic',      // Match all face colors
+  SUDOKUBE: 'sudokube',    // Latin squares on each face
+  ULTIMATE: 'ultimate',    // Both color + sudoku constraints
+};
+
+/**
+ * Available win conditions
+ */
+export const WIN_CONDITIONS = {
+  CLASSIC: 'classic',
+  SUDOKUBE: 'sudokube',
+  ULTIMATE: 'ultimate',
+};
+
+/**
+ * Available background environments
+ */
+export const BACKGROUNDS = {
+  DAYCARE: 'daycare',
+  ELEMENTARY: 'elementary',
+  MIDDLESCHOOL: 'middleschool',
+  HIGHSCHOOL: 'highschool',
+  COLLEGE: 'college',
+  JOB: 'job',
+  NASA: 'nasa',
+  ROCKET: 'rocket',
+  MOON: 'moon',
+  BLACKHOLE: 'blackhole',
+  // Extensible for custom backgrounds
+  SPACE: 'space',
+  FOREST: 'forest',
+  OCEAN: 'ocean',
+  CITY: 'city',
+  ABSTRACT: 'abstract',
+};
+
+/**
+ * Difficulty ratings
+ */
+export const DIFFICULTY = {
+  TUTORIAL: 'tutorial',
+  EASY: 'easy',
+  MEDIUM: 'medium',
+  HARD: 'hard',
+  EXPERT: 'expert',
+  MASTER: 'master',
+};
+
+/**
+ * Level categories/tags
+ */
+export const LEVEL_TAGS = {
+  STORY: 'story',
+  TUTORIAL: 'tutorial',
+  CHALLENGE: 'challenge',
+  SPEEDRUN: 'speedrun',
+  PUZZLE: 'puzzle',
+  BONUS: 'bonus',
+  COMMUNITY: 'community',
+};
+
+// ============================================================================
+// FEATURE FLAGS
+// ============================================================================
+
+/**
+ * Default feature flags - all disabled
+ */
+export const DEFAULT_FEATURES = {
+  rotations: true,   // Basic rotation (always on)
+  tunnels: false,    // Wormhole visualization
+  flips: false,      // Antipodal flip mechanic
+  chaos: false,      // Chaos cascade system
+  explode: false,    // Explode view
+  parity: false,     // Parity indicators
+  net: false,        // Net/unfolded view
+};
+
+/**
+ * Feature unlock order (for progressive unlocking)
+ */
+export const FEATURE_UNLOCK_ORDER = [
+  'rotations',
+  'tunnels',
+  'flips',
+  'chaos',
+  'parity',
+  'explode',
+  'net',
+];
+
+/**
+ * Feature display names for UI
+ */
+export const FEATURE_NAMES = {
+  rotations: 'Rotations',
+  tunnels: 'Wormhole Tunnels (T)',
+  flips: 'Antipodal Flip (Click)',
+  chaos: 'Chaos Mode',
+  explode: 'Explode View (X)',
+  parity: 'Parity Indicators',
+  net: 'Net View (N)',
+};
+
+// ============================================================================
+// LEVEL STRUCTURE
+// ============================================================================
+
+/**
+ * Create a level definition with defaults
+ * @param {Partial<LevelDefinition>} overrides - Level properties to override
+ * @returns {LevelDefinition} Complete level definition
+ */
+export function createLevel(overrides) {
+  return {
+    // Required fields (must be provided)
+    id: overrides.id,
+    name: overrides.name || `Level ${overrides.id}`,
+    description: overrides.description || '',
+
+    // Gameplay settings
+    cubeSize: overrides.cubeSize || 3,
+    chaosLevel: overrides.chaosLevel || 0,
+    mode: overrides.mode || GAME_MODES.CLASSIC,
+
+    // Visual settings
+    background: overrides.background || BACKGROUNDS.ABSTRACT,
+
+    // Feature flags (merge with defaults)
+    features: {
+      ...DEFAULT_FEATURES,
+      ...(overrides.features || {}),
+    },
+
+    // Tutorial content
+    tutorial: {
+      title: overrides.tutorial?.title || overrides.name || `Level ${overrides.id}`,
+      text: overrides.tutorial?.text || '',
+      tip: overrides.tutorial?.tip || '',
+    },
+
+    // Win conditions
+    winCondition: overrides.winCondition || WIN_CONDITIONS.CLASSIC,
+    winMessage: overrides.winMessage || 'Level Complete!',
+
+    // Story/cutscene
+    cutsceneText: overrides.cutsceneText || '',
+    hasCutscene: overrides.hasCutscene || false,
+
+    // Metadata
+    difficulty: overrides.difficulty || DIFFICULTY.MEDIUM,
+    tags: overrides.tags || [],
+    author: overrides.author || 'WORM³ Team',
+    version: overrides.version || '1.0.0',
+
+    // Optional constraints
+    timeLimit: overrides.timeLimit || null,  // In seconds, null = no limit
+    moveLimit: overrides.moveLimit || null,  // Max moves, null = no limit
+
+    // Unlock requirements
+    requirements: overrides.requirements || {
+      previousLevel: overrides.id > 1 ? overrides.id - 1 : null,
+      stars: 0,
+      achievements: [],
+    },
+  };
+}
+
+/**
+ * Level pack metadata structure
+ */
+export function createLevelPack(overrides) {
+  return {
+    id: overrides.id,
+    name: overrides.name || 'Unnamed Pack',
+    description: overrides.description || '',
+    author: overrides.author || 'WORM³ Team',
+    version: overrides.version || '1.0.0',
+    levels: overrides.levels || [],
+
+    // Pack metadata
+    difficulty: overrides.difficulty || DIFFICULTY.MEDIUM,
+    tags: overrides.tags || [],
+    thumbnail: overrides.thumbnail || null,
+
+    // Unlock requirements
+    requirements: overrides.requirements || {
+      completedPacks: [],
+      totalStars: 0,
+    },
+  };
+}
+
+// ============================================================================
+// TYPE DEFINITIONS (JSDoc for IDE support)
+// ============================================================================
+
+/**
+ * @typedef {Object} Features
+ * @property {boolean} rotations - Basic rotation enabled
+ * @property {boolean} tunnels - Wormhole visualization
+ * @property {boolean} flips - Antipodal flip mechanic
+ * @property {boolean} chaos - Chaos cascade system
+ * @property {boolean} explode - Explode view
+ * @property {boolean} parity - Parity indicators
+ * @property {boolean} net - Net/unfolded view
+ */
+
+/**
+ * @typedef {Object} Tutorial
+ * @property {string} title - Tutorial title
+ * @property {string} text - Main tutorial text
+ * @property {string} tip - Helpful tip
+ */
+
+/**
+ * @typedef {Object} Requirements
+ * @property {number|null} previousLevel - Previous level ID required
+ * @property {number} stars - Minimum stars required
+ * @property {string[]} achievements - Required achievement IDs
+ */
+
+/**
+ * @typedef {Object} LevelDefinition
+ * @property {number} id - Unique level ID
+ * @property {string} name - Display name
+ * @property {string} description - Short description
+ * @property {number} cubeSize - Cube dimension (2-5)
+ * @property {number} chaosLevel - Chaos intensity (0-4)
+ * @property {string} mode - Game mode
+ * @property {string} background - Background environment
+ * @property {Features} features - Enabled features
+ * @property {Tutorial} tutorial - Tutorial content
+ * @property {string} winCondition - Win condition type
+ * @property {string} winMessage - Victory message
+ * @property {string} cutsceneText - Story cutscene text
+ * @property {boolean} hasCutscene - Whether to show cutscene
+ * @property {string} difficulty - Difficulty rating
+ * @property {string[]} tags - Level tags
+ * @property {string} author - Level author
+ * @property {string} version - Level version
+ * @property {number|null} timeLimit - Time limit in seconds
+ * @property {number|null} moveLimit - Move limit
+ * @property {Requirements} requirements - Unlock requirements
+ */
+
+/**
+ * @typedef {Object} LevelPack
+ * @property {string} id - Unique pack ID
+ * @property {string} name - Pack name
+ * @property {string} description - Pack description
+ * @property {string} author - Pack author
+ * @property {string} version - Pack version
+ * @property {LevelDefinition[]} levels - Levels in pack
+ * @property {string} difficulty - Overall difficulty
+ * @property {string[]} tags - Pack tags
+ * @property {string|null} thumbnail - Thumbnail image URL
+ * @property {Object} requirements - Unlock requirements
+ */

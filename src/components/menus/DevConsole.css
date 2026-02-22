@@ -1,0 +1,264 @@
+.dev-console-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 20px;
+}
+
+.dev-console {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border-radius: 12px;
+  border: 2px solid #0f3460;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  max-width: 900px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  font-family: 'Courier New', monospace;
+}
+
+.dev-console-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 2px solid #0f3460;
+  background: rgba(15, 52, 96, 0.3);
+}
+
+.dev-console-header h2 {
+  margin: 0;
+  color: #00d9ff;
+  font-size: 24px;
+  text-shadow: 0 0 10px rgba(0, 217, 255, 0.5);
+}
+
+.close-btn {
+  background: none;
+  border: 2px solid #ff4757;
+  color: #ff4757;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 5px 12px;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.close-btn:hover {
+  background: #ff4757;
+  color: white;
+  transform: scale(1.1);
+}
+
+.dev-console-content {
+  padding: 20px;
+}
+
+.dev-section {
+  margin-bottom: 30px;
+}
+
+.dev-section h3 {
+  color: #00d9ff;
+  font-size: 16px;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border-bottom: 1px solid #0f3460;
+  padding-bottom: 8px;
+}
+
+/* State Presets Grid */
+.preset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.preset-btn {
+  background: #0f3460;
+  border: 2px solid #00d9ff;
+  color: white;
+  padding: 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s;
+  font-family: 'Courier New', monospace;
+}
+
+.preset-btn:hover {
+  background: #00d9ff;
+  color: #1a1a2e;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 217, 255, 0.4);
+}
+
+.preset-name {
+  font-weight: bold;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.preset-desc {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+/* Chaos Grid */
+.chaos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.chaos-btn {
+  background: #e94560;
+  border: 2px solid #ff6b81;
+  color: white;
+  padding: 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+  transition: all 0.2s;
+}
+
+.chaos-btn:hover {
+  background: #ff6b81;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 107, 129, 0.4);
+}
+
+/* State Management */
+.state-controls {
+  display: flex;
+  gap: 10px;
+}
+
+.state-btn {
+  flex: 1;
+  background: #533483;
+  border: 2px solid #8b5cf6;
+  color: white;
+  padding: 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+  transition: all 0.2s;
+}
+
+.state-btn:hover:not(:disabled) {
+  background: #8b5cf6;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+}
+
+.state-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Level Grid */
+.level-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+}
+
+.level-btn {
+  background: #2d3436;
+  border: 2px solid #00b894;
+  color: white;
+  padding: 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+  transition: all 0.2s;
+}
+
+.level-btn:hover {
+  background: #00b894;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 184, 148, 0.4);
+}
+
+/* Shortcuts List */
+.shortcuts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.shortcut-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  background: rgba(15, 52, 96, 0.3);
+  border-radius: 6px;
+}
+
+.shortcut-item.disabled {
+  opacity: 0.4;
+}
+
+.shortcut-key {
+  background: #0f3460;
+  border: 2px solid #00d9ff;
+  color: #00d9ff;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+  font-size: 12px;
+  min-width: 100px;
+  text-align: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.shortcut-desc {
+  flex: 1;
+  color: #ddd;
+  font-size: 14px;
+}
+
+.shortcut-badge {
+  background: #ff6b81;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .dev-console {
+    max-width: 100%;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+
+  .preset-grid,
+  .chaos-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .level-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .state-controls {
+    flex-direction: column;
+  }
+}
