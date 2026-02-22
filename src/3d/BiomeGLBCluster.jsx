@@ -64,7 +64,7 @@ export const BIOME_GLB_PATHS = {
 // Secondary per-tile structure — one instance placed alongside the main GLB cluster.
 // null = no secondary structure for this biome.
 export const BIOME_CABIN_PATHS = {
-  bioDome:         '/WORM-3/models/biomes/Green/cabin.glb',
+  bioDome:         null, // cabin.glb is a 1-byte placeholder — not a valid GLB
   frozenCitadel:   null,
   deepStation:     null,
   volcanicFoundry: null,
@@ -117,17 +117,27 @@ const BIOME_VARIATION = {
   solarArcology:   { rotateZ: false, scaleRange: [0.90, 1.10], jitter: 0.03 },
 };
 
-// Kick off network requests at module init — assets are in browser cache by
-// the time any tile mounts. No-ops if the path is null.
-Object.values(BIOME_GLB_PATHS).forEach(path => {
-  if (path) useGLTF.preload(path);
-});
-Object.values(BIOME_CABIN_PATHS).forEach(path => {
-  if (path) useGLTF.preload(path);
-});
-Object.values(BIOME_BASE_PATHS).forEach(path => {
-  if (path) useGLTF.preload(path);
-});
+// Called once when the player activates biome mode (from App.jsx).
+// Preloading here — not at module init — avoids kicking off ~100 MB of
+// network requests on every page load regardless of whether biome mode is used.
+// On mobile, base-layer GLBs (grass 13 MB, oceanwave 25 MB, cloud 5 MB) are
+// skipped because they're large, squished flat, and invisible at mobile resolution.
+export function preloadBiomeAssets() {
+  const isMobile = typeof window !== 'undefined' &&
+    (window.innerWidth < 768 || (navigator.hardwareConcurrency ?? 4) <= 2);
+
+  Object.values(BIOME_GLB_PATHS).forEach(path => {
+    if (path) useGLTF.preload(path);
+  });
+  Object.values(BIOME_CABIN_PATHS).forEach(path => {
+    if (path) useGLTF.preload(path);
+  });
+  if (!isMobile) {
+    Object.values(BIOME_BASE_PATHS).forEach(path => {
+      if (path) useGLTF.preload(path);
+    });
+  }
+}
 
 // ── BiomeModel ─────────────────────────────────────────────────────────────────
 // Inner component — only rendered inside a Suspense boundary once the GLB is
@@ -155,9 +165,11 @@ export function isGLBFullFace(cityKey) {
   return (BIOME_MODEL_CONFIG[cityKey] ?? _DEFAULT_CFG).cover === true;
 }
 
-function BiomeModel({ path, seed, scale, cityKey }) {
+function BiomeModel({ path, seed, scale, cityKey, secondaryCap }) {
   const { scene } = useGLTF(path);
-  const { targetXY, targetZ, secondary: SECONDARY_COUNT, cover, zAdjust = 0, forceOpaque = false } = BIOME_MODEL_CONFIG[cityKey] ?? _DEFAULT_CFG;
+  const { targetXY, targetZ, secondary: _secondary, cover, zAdjust = 0, forceOpaque = false } = BIOME_MODEL_CONFIG[cityKey] ?? _DEFAULT_CFG;
+  // secondaryCap lets BiomeGLBCluster throttle clone count on mobile/low-end devices.
+  const SECONDARY_COUNT = secondaryCap != null ? Math.min(_secondary, secondaryCap) : _secondary;
 
   // Compute normalising scale from bounding box — runs once per unique GLB.
   // GLB/glTF uses Y-up (Blender default). The tile face normal is +Z, so we
@@ -424,23 +436,51 @@ class GLBErrorBoundary extends Component {
 //     (CityBuildings procedural fallback takes over — zero overhead)
 //   - Returns null during load (Suspense fallback={null})
 //   - Returns null on load error (GLBErrorBoundary catches → no Canvas crash)
-//   - Renders the cloned GLB scene once loaded
+//   - Each sub-model (base, main, cabin) has its own error boundary so a failed
+//     cabin or base layer cannot kill the main model for the entire tile.
+//   - On mobile, base layers are skipped (they're large flat carpets invisible
+//     at mobile resolution) and the secondary clone count is capped at 4.
 export function BiomeGLBCluster({ cityKey, tileIndex, faceId, scale = 1 }) {
   const path = BIOME_GLB_PATHS[cityKey];
   if (!path) return null;
 
-  const seed       = faceId * 10000 + tileIndex;
-  const cabinPath  = BIOME_CABIN_PATHS[cityKey] ?? null;
-  const basePath   = BIOME_BASE_PATHS[cityKey] ?? null;
+  const seed      = faceId * 10000 + tileIndex;
+  const cabinPath = BIOME_CABIN_PATHS[cityKey] ?? null;
+  const basePath  = BIOME_BASE_PATHS[cityKey] ?? null;
+  const isMobile  = typeof window !== 'undefined' &&
+    (window.innerWidth < 768 || (navigator.hardwareConcurrency ?? 4) <= 2);
 
   return (
-    <GLBErrorBoundary>
-      <Suspense fallback={null}>
-        {basePath && <BiomeBase path={basePath} scale={scale} cityKey={cityKey} />}
-        <BiomeModel path={path} seed={seed} scale={scale} cityKey={cityKey} />
-        {cabinPath && <BiomeCabin path={cabinPath} seed={seed} scale={scale} />}
-      </Suspense>
-    </GLBErrorBoundary>
+    <group>
+      {/* Base layer — skipped on mobile (large files, invisible at small scale) */}
+      {basePath && !isMobile && (
+        <GLBErrorBoundary>
+          <Suspense fallback={null}>
+            <BiomeBase path={basePath} scale={scale} cityKey={cityKey} />
+          </Suspense>
+        </GLBErrorBoundary>
+      )}
+      {/* Main model — always attempted; failure returns null for this tile only */}
+      <GLBErrorBoundary>
+        <Suspense fallback={null}>
+          <BiomeModel
+            path={path}
+            seed={seed}
+            scale={scale}
+            cityKey={cityKey}
+            secondaryCap={isMobile ? 4 : undefined}
+          />
+        </Suspense>
+      </GLBErrorBoundary>
+      {/* Cabin / secondary structure — independent boundary, never kills main model */}
+      {cabinPath && (
+        <GLBErrorBoundary>
+          <Suspense fallback={null}>
+            <BiomeCabin path={cabinPath} seed={seed} scale={scale} />
+          </Suspense>
+        </GLBErrorBoundary>
+      )}
+    </group>
   );
 }
 
