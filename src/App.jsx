@@ -37,6 +37,7 @@ import {
 // 3D components
 import CubeAssembly from './3d/CubeAssembly.jsx';
 import BlackHoleEnvironment from './3d/BlackHoleEnvironment.jsx';
+import { preloadBiomeAssets } from './3d/BiomeGLBCluster.jsx';
 import { getLevelBackground } from './3d/LifeJourneyBackgrounds.jsx';
 import { BACKGROUNDS, getBackgroundUrl } from './utils/backgrounds.js';
 
@@ -344,6 +345,7 @@ export default function WORM3() {
     if (wizardSettings.biomeMode?.enabled) {
       newSettings.biomeMode = wizardSettings.biomeMode;
       newSettings.manifoldStyles = wizardSettings.manifoldStyles;
+      preloadBiomeAssets(); // kick off GLB downloads only when biome mode is actually used
     } else {
       newSettings.biomeMode = { enabled: false, faceAssignment: null };
       // Apply tile style to all faces
