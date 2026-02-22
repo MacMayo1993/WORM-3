@@ -360,7 +360,7 @@ function generateBioGround() {
 
 // ── 6. Neural Hub ─────────────────────────────────────────────────────────────
 // Dark circuit-board floor — near-black with orthogonal trace lines, node pads, violet pulses.
-function generateNeuralGround() {
+function _generateNeuralGround() {
   const canvas = makeCanvas();
   const ctx = canvas.getContext('2d');
   const rng = mulberry32(0xEA174177);
