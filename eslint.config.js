@@ -51,10 +51,12 @@ export default [
       // - setState in useEffect (prop-driven animations)
       // - Math.random in initialization (stable per-instance randomness)
       // - modifying refs/camera in Three.js/R3F patterns
+      // - preserve-manual-memoization is for React Compiler projects only
       'react-hooks/refs': 'off',
       'react-hooks/set-state-in-effect': 'off',
       'react-hooks/purity': 'off',
       'react-hooks/immutability': 'off',
+      'react-hooks/preserve-manual-memoization': 'off',
       'no-useless-assignment': 'off',
 
       // Warnings - code smells but won't fail CI
