@@ -51,7 +51,7 @@ const FirstFlipTutorial = ({ onClose }) => {
           {step === 0 && "You Just Made an Antipodal Flip!"}
           {step === 1 && "Antipodal Pairs"}
           {step === 2 && "Parity & Orientation"}
-          {step === 3 && "Chaos Mode"}
+          {step === 3 && "Disparity Mode"}
           {step === 4 && "The Art of Solving"}
         </h2>
 
@@ -141,7 +141,7 @@ const FirstFlipTutorial = ({ onClose }) => {
           {step === 3 && (
             <>
               <p style={{ margin: '0 0 16px 0' }}>
-                <strong style={{ color: '#9c4a1a' }}>Chaos Mode</strong> introduces <em>instability</em>.
+                <strong style={{ color: '#9c4a1a' }}>Disparity Mode</strong> introduces <em>instability</em>.
                 Flipped tiles at the cube's edges can spontaneously cascade to their neighbors!
               </p>
               <p style={{ margin: '0 0 16px 0' }}>
@@ -170,7 +170,7 @@ const FirstFlipTutorial = ({ onClose }) => {
               <ul style={{ margin: '0 0 16px 0', paddingLeft: '24px' }}>
                 <li>Use <strong>EXPLODE</strong> view to see all antipodal connections</li>
                 <li>Track parity — plan flips to maintain even state when possible</li>
-                <li>In Chaos Mode, work from center outward to minimize cascades</li>
+                <li>In Disparity Mode, work from center outward to minimize cascades</li>
                 <li>The <strong>face progress bars</strong> show which colors need attention</li>
               </ul>
               <p style={{ margin: 0, fontStyle: 'italic', color: colors.burntOrange }}>

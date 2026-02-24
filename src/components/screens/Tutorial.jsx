@@ -171,10 +171,10 @@ const Tutorial = ({ onClose }) => {
       )
     },
     7: {
-      title: "Chaos Mode",
+      title: "Disparity Mode",
       content: (
         <>
-          <p><b>CHAOS Mode</b> makes unstable flipped stickers spread to their neighbors!</p>
+          <p><b>DISPARITY Mode</b> makes unstable flipped stickers spread to their neighbors!</p>
           <ul style={{ margin: '6px 0', paddingLeft: '20px', fontSize: '13px', lineHeight: '1.7' }}>
             <li><b>Level 1:</b> 1-second bursts, 3% spread per flip tally</li>
             <li><b>Level 2:</b> 2-second bursts, 6% spread per flip tally</li>
@@ -207,7 +207,7 @@ const Tutorial = ({ onClose }) => {
           <ul style={{ margin: '4px 0', paddingLeft: '20px', fontSize: '13px' }}>
             <li><b>F</b> - Flip sticker at cursor</li>
             <li><b>G</b> - Toggle flip mode</li>
-            <li><b>C</b> - Toggle chaos mode</li>
+            <li><b>C</b> - Toggle Disparity Mode</li>
             <li><b>X</b> - Toggle explode view</li>
             <li><b>T</b> - Toggle tunnels</li>
             <li><b>V</b> - Cycle visual modes</li>
