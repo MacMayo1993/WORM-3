@@ -869,7 +869,7 @@ export default function WORM3() {
 
   return (
     <div className={`full-screen${settings.backgroundTheme === 'dark' ? ' bg-dark' : settings.backgroundTheme === 'midnight' ? ' bg-midnight' : ''}`}>
-      {showTutorial && <Tutorial onClose={closeTutorial} />}
+      {showTutorial && <Tutorial onClose={closeTutorial} onMainMenu={() => { closeTutorial(); handleBackToMainMenu(); }} />}
 
       <div className="canvas-container" onContextMenu={(e) => e.preventDefault()}>
         <Canvas camera={{ position: [0, 0, cameraZ], fov: 40 }} dpr={[1, 1.5]} gl={{ powerPreference: 'high-performance', antialias: true }}>
@@ -1139,7 +1139,7 @@ export default function WORM3() {
         </div>
       )}
       {showHelp && <HelpMenu onClose={() => setShowHelp(false)} />}
-      {showFirstFlipTutorial && <FirstFlipTutorial onClose={() => setShowFirstFlipTutorial(false)} />}
+      {showFirstFlipTutorial && <FirstFlipTutorial onClose={() => setShowFirstFlipTutorial(false)} onMainMenu={() => { setShowFirstFlipTutorial(false); handleBackToMainMenu(); }} />}
 
       {solveModeActive && (
         <SolveMode cubies={cubies} size={size} onClose={() => { setSolveModeActive(false); setSolveHighlights([]); }}
@@ -1178,11 +1178,12 @@ export default function WORM3() {
         <VictoryScreen winType={victory} moves={moves} time={gameTime}
           onContinue={handleVictoryContinue} onNewGame={handleVictoryNewGame}
           currentLevel={currentLevel} levelData={currentLevelData}
-          onNextLevel={handleNextLevel} hasNextLevel={currentLevel && currentLevel < 10} />
+          onNextLevel={handleNextLevel} hasNextLevel={currentLevel && currentLevel < 10}
+          onMainMenu={() => { setVictory(null); handleBackToMainMenu(); }} />
       )}
 
       {showCutscene && currentLevel === 10 && <Level10Cutscene onComplete={handleCutsceneComplete} onSkip={handleCutsceneComplete} />}
-      {showLevelTutorial && currentLevelData && <LevelTutorial level={currentLevelData} onClose={handleTutorialClose} />}
+      {showLevelTutorial && currentLevelData && <LevelTutorial level={currentLevelData} onClose={handleTutorialClose} onMainMenu={() => { levelTutorialClose(); handleBackToMainMenu(); }} />}
       {showNetPanel && <CubeNet cubies={cubies} size={size} onTapFlip={onTapFlip} flipMode={flipMode} onClose={() => setShowNetPanel(false)} faceColors={resolvedColors} faceTextures={faceTextures} />}
 
       {isMobile && !showWelcome && !showTutorial && (

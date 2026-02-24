@@ -9,7 +9,8 @@ const VictoryScreen = ({
   currentLevel = null,
   levelData = null,
   onNextLevel = null,
-  hasNextLevel = false
+  hasNextLevel = false,
+  onMainMenu = null
 }) => {
   const [showConfetti, _setShowConfetti] = useState(true);
 
@@ -360,6 +361,22 @@ const VictoryScreen = ({
             {currentLevel ? 'Retry Level' : 'New Puzzle'}
           </button>
         </div>
+
+        {/* Main Menu escape hatch */}
+        {onMainMenu && (
+          <div style={{ marginTop: '14px', textAlign: 'center' }}>
+            <button
+              onClick={onMainMenu}
+              style={{
+                background: 'transparent', border: 'none', cursor: 'pointer',
+                color: '#5f6368', fontSize: '13px', padding: '4px 8px',
+                fontFamily: "'Roboto', 'Product Sans', 'Google Sans', -apple-system, sans-serif",
+              }}
+            >
+              ← Main Menu
+            </button>
+          </div>
+        )}
 
         {/* Achievement hint for non-ultimate wins */}
         {winType !== 'ultimate' && winType !== 'worm' && (

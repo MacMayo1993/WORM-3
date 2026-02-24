@@ -5,7 +5,7 @@ import { getNewFeatures } from '../../utils/levels.js';
  * Level Tutorial Overlay
  * Shows when starting a new level to explain the mechanics
  */
-const LevelTutorial = ({ level, onClose }) => {
+const LevelTutorial = ({ level, onClose, onMainMenu }) => {
   if (!level || !level.tutorial) return null;
 
   const { tutorial } = level;
@@ -224,6 +224,20 @@ const LevelTutorial = ({ level, onClose }) => {
         }}>
           Press <span style={{ color: 'rgba(255, 255, 255, 0.5)' }}>SPACE</span> or <span style={{ color: 'rgba(255, 255, 255, 0.5)' }}>ENTER</span> to continue
         </div>
+
+        {onMainMenu && (
+          <button
+            onClick={onMainMenu}
+            style={{
+              marginTop: '12px', background: 'transparent', border: 'none',
+              color: 'rgba(255, 255, 255, 0.35)', fontSize: '12px',
+              cursor: 'pointer', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+              padding: '4px',
+            }}
+          >
+            ← Main Menu
+          </button>
+        )}
       </div>
     </div>
   );
