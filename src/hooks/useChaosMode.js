@@ -325,7 +325,7 @@ export function useChaosMode() {
             const boltKey = `${fromPos.map(v => v.toFixed(1)).join(',')}→${toPos.map(v => v.toFixed(1)).join(',')}`;
             setCascades((prev) => {
               if (prev.some(c => c.key === boltKey)) return prev;
-              const n2 = [...prev, { id: Date.now() + Math.random(), key: boltKey, from: fromPos, to: toPos, crossFace }];
+              const n2 = [...prev, { id: Date.now() + Math.random(), key: boltKey, from: fromPos, to: toPos, crossFace: neighbor.crossFace }];
               return n2.length > MAX_CASCADES ? n2.slice(-MAX_CASCADES) : n2;
             });
             nextTile = neighbor;
