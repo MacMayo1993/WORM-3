@@ -681,7 +681,7 @@ const CubeAssembly = React.memo(({
         noZoom={handsMode && explosionFactor === 0}
         noRotate={handsMode ? true : false}
         minDistance={5}
-        maxDistance={28}
+        maxDistance={{ 2: 28, 3: 28, 4: 38, 5: 52 }[size] || 28}
         enabled={(!handsMode || explosionFactor > 0) && !animState && !dragStart && controlsEnabledRef.current}
         staticMoving={false}
         dynamicDampingFactor={isTouchDevice ? 0.15 : 0.08}
