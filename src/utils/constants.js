@@ -73,10 +73,10 @@ export const AXIS_TO_ANTIPODAL_FACES = {
 };
 
 // Flip cap — tiles "die" at this many flips
-export const FLIP_CAP = 50;
+export const FLIP_CAP = 25;
 
 // Half-life acceleration: each halving of remaining distance doubles the rate.
-// 0-24 = 1x, 25-37 = 2x, 38-43 = 4x, 44-46 = 8x, 47-48 = 16x, 49 = 32x
+// 0-12 = 1x, 13-18 = 2x, 19-21 = 4x, 22-23 = 8x, 24 = 16x
 export const getHalfLifeMultiplier = (flips) => {
   if (flips >= FLIP_CAP) return 0; // dead tile
   const remaining = FLIP_CAP - flips;
