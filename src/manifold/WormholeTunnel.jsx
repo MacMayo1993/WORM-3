@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { FACE_COLORS, FLIP_CAP, getHalfLifeMultiplier } from '../utils/constants.js';
 import { getStickerWorldPosFromMesh } from '../game/coordinates.js';
 import { calculateSmartControlPoint } from '../utils/smartRouting.js';
+import { flipBurstMap } from '../3d/styles/TileStyleMaterials.jsx';
 
 // Cached vectors for reuse across all tunnel instances - avoids GC pressure
 const _vStart = new THREE.Vector3();
@@ -19,7 +20,7 @@ const _c1 = new THREE.Color();
 const _c2 = new THREE.Color();
 const _cTemp = new THREE.Color();
 
-const WormholeTunnel = ({ meshIdx1, meshIdx2, dirKey1, dirKey2, cubieRefs, intensity, flips, color1, color2, size, explosionFactor = 0, maxStrands = 50 }) => {
+const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2, cubieRefs, intensity, flips, color1, color2, size, explosionFactor = 0, maxStrands = 50 }) => {
   const linesRef = useRef([]);
   const pulseT = useRef(Math.random() * Math.PI * 2);
   // Cache curve object to avoid recreation
@@ -115,6 +116,12 @@ const WormholeTunnel = ({ meshIdx1, meshIdx2, dirKey1, dirKey2, cubieRefs, inten
       _c2.set(color2);
     }
 
+    // Flip burst — computed once per frame, shared across all strands.
+    // sin(rawP*π) gives a 0→1→0 envelope that crests at the squish midpoint
+    // when the two antipodal identities are swapping.
+    const burstRaw = Math.max(flipBurstMap.get(gridId1) ?? 0, flipBurstMap.get(gridId2) ?? 0);
+    const burstEnv = Math.sin(burstRaw * Math.PI);
+
     linesRef.current.forEach((line, i) => {
       if (!line) return;
       const config = strandConfig[i];
@@ -127,7 +134,9 @@ const WormholeTunnel = ({ meshIdx1, meshIdx2, dirKey1, dirKey2, cubieRefs, inten
           const sparkPulse = Math.sin(pulseT.current * 3 + config.sparkOffset);
           const spark = sparkPulse > 0.9 ? (sparkPulse - 0.9) * 10 : 0;
           const surgeGlow = surge * 0.3;
-          line.material.opacity = Math.min(1, config.baseOpacity * pulse * (1 + spark * 0.5) + surgeGlow);
+          // Flip burst: flare the strands as the two identities swap
+          const flipGlow = burstEnv * 0.9;
+          line.material.opacity = Math.min(1, config.baseOpacity * pulse * (1 + spark * 0.5) + surgeGlow + flipGlow);
         }
       }
 
@@ -140,6 +149,12 @@ const WormholeTunnel = ({ meshIdx1, meshIdx2, dirKey1, dirKey2, cubieRefs, inten
       if (Math.abs(tugBias) > 0.01) {
         const tugTarget = tugBias > 0 ? _vEnd : _vStart;
         _controlPoint.lerp(tugTarget, Math.abs(tugBias));
+      }
+
+      // Flip burst: arch rises toward the camera as the two identities swap.
+      if (burstEnv > 0.001) {
+        _controlPoint.y += burstEnv * 1.4;
+        _controlPoint.z += burstEnv * 0.5;
       }
 
       // Apply strand spiral offset

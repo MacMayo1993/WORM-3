@@ -11,7 +11,8 @@ import { FACE_CITIES, CITY_CONFIG } from '../modes/CityBiomeMode.js';
 import CityBuildings from './CityBuildings.jsx';
 import { BiomeGLBCluster, isGLBActive, isGLBFullFace } from './BiomeGLBCluster.jsx';
 import { SeamPulseOverlay } from './SeamPulseOverlay.jsx';
-import { getTileStyleMaterial, getGlassMaterial, sharedTremorState } from './styles/TileStyleMaterials.jsx';
+import { getTileStyleMaterial, getGlassMaterial, sharedTremorState, flipBurstMap } from './styles/TileStyleMaterials.jsx';
+import { getManifoldGridId } from '../game/coordinates.js';
 import GrassBlades from './styles/GrassBlades.jsx';
 import WaterVolume from './styles/WaterVolume.jsx';
 import LavaVolume from './styles/LavaVolume.jsx';
@@ -454,6 +455,10 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const ringFlashRef = useRef(0);
   // Overlay ref for antipodal color bleed during flip transitions.
   const flipOverlayRef = useRef();
+  // Stable gridId for this sticker — written to flipBurstMap during flips so
+  // WormholeTunnel can read the burst progress without prop drilling.
+  // origPos/origDir/orig never change so this is computed once.
+  const stickerGridIdRef = useRef(meta ? getManifoldGridId(meta, faceSize) : null);
   // Live ref to current texture so useFrame closures can access it without stale captures.
   const currTextureRef = useRef(null);
 
@@ -568,6 +573,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       groupRef.current.rotation.y = rot[1]; // fixed — never animates
       groupRef.current.rotation.z = rot[2] + shear;
 
+      // Broadcast flip progress so WormholeTunnel can arch-lift in sync.
+      if (stickerGridIdRef.current) flipBurstMap.set(stickerGridIdRef.current, rawP);
+
       // Vibration: tile strains against the manifold crossing, peaks at midpoint.
       const vibEnv = Math.sin(rawP * Math.PI);
       const jX = Math.sin(rawP * Math.PI * 18) * 0.022 * vibEnv;
@@ -626,6 +634,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           flipOverlayRef.current.material.opacity = 0;
           flipOverlayRef.current.scale.x = 1;
         }
+        if (stickerGridIdRef.current) flipBurstMap.delete(stickerGridIdRef.current);
         shakeT.current = 0.4;
         flipFromColor.current = null;
         flipToColor.current = null;

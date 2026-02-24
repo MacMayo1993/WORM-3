@@ -55,6 +55,7 @@ const WormholeNetwork = ({ cubies, size, showTunnels, manifoldMap, cubieRefs, fa
 
             connections.push({
               id: gridId,
+              gridId2: antipodalLoc.sticker ? getManifoldGridId(antipodalLoc.sticker, size) : null,
               meshIdx1: idx1,
               meshIdx2: idx2,
               dirKey1: dirKey,
@@ -88,6 +89,8 @@ const WormholeNetwork = ({ cubies, size, showTunnels, manifoldMap, cubieRefs, fa
       {tunnelData.map((t) => (
         <WormholeTunnel
           key={t.id}
+          gridId1={t.id}
+          gridId2={t.gridId2}
           meshIdx1={t.meshIdx1}
           meshIdx2={t.meshIdx2}
           dirKey1={t.dirKey1}
