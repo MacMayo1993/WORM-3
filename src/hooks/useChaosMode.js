@@ -409,7 +409,8 @@ export function useChaosMode() {
 
           // ── Disparity Mode: detect newly dead tiles each tick ─────────────
           const S = sizeRef.current;
-          let alive = 0;
+          let neverFlipped = 0;
+          let neverFlippedSt = null;
           const newDeaths = [];
           for (const [x, y, z] of sc) {
             const c = state[x][y][z];
@@ -417,8 +418,10 @@ export function useChaosMode() {
               if ((st.flips || 0) >= FLIP_CAP) {
                 const k = `${x},${y},${z},${dirKey}`;
                 if (!deadTileSet.has(k)) { deadTileSet.add(k); newDeaths.push(st); }
-              } else {
-                alive++;
+              }
+              if ((st.flips || 0) === 0) {
+                neverFlipped++;
+                neverFlippedSt = st;
               }
             }
           }
@@ -430,18 +433,10 @@ export function useChaosMode() {
               store.addDisparityDeath({ id: Date.now() + Math.random(), gridId: getManifoldGridId(st, S), rank: deathRank, pairRank: pairDeathCount, timestamp: Date.now() });
             }
           }
-          if (!winnerAnnounced && alive === 1) {
+          if (!winnerAnnounced && neverFlipped === 1 && neverFlippedSt) {
             winnerAnnounced = true;
-            outer: for (const [x, y, z] of sc) {
-              const c = state[x][y][z];
-              for (const [_dirKey, st] of Object.entries(c.stickers)) {
-                if ((st.flips || 0) < FLIP_CAP) {
-                  useGameStore.getState().setDisparityWinner({ gridId: getManifoldGridId(st, S) });
-                  useGameStore.getState().setChaosLevel(0);
-                  break outer;
-                }
-              }
-            }
+            useGameStore.getState().setDisparityWinner({ gridId: getManifoldGridId(neverFlippedSt, S) });
+            useGameStore.getState().setChaosLevel(0);
           }
 
           setCubies(state);
