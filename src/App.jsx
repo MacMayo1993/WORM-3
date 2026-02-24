@@ -406,18 +406,22 @@ export default function WORM3() {
     setShowDisparityWizard(false);
     useGameStore.getState().clearLevel();
     useGameStore.getState().clearDisparityGame();
-    // Apply wizard settings before resetting cube
-    if (cubeSize !== size) changeSize(cubeSize);
+    // Keep current background/colors; only disable biome mode so the scene renders
+    setSettings({ ...settings, biomeMode: { enabled: false, faceAssignment: null } });
     if (vm) setVisualMode(vm);
     setFlipMode(fm);
     if (st !== undefined) setShowTunnels(st);
-    // Store the desired chaos level — chaos stays OFF until the first flip
+    // Chaos stays OFF until the player makes the first flip
     pendingDisparityLevelRef.current = disparityLevel;
     setChaosLevel(0);
-    // Reset to SOLVED state (not shuffled) so player sees clean cube
-    reset();
+    // Start with a solved cube.  changeSize resets internally; same-size just needs reset().
+    if (cubeSize !== size) {
+      changeSize(cubeSize);
+    } else {
+      reset();
+    }
     setDisparityWaitingFirstFlip(true);
-  }, [size, changeSize, setVisualMode, setFlipMode, setShowTunnels, setChaosLevel, reset]);
+  }, [size, settings, setSettings, changeSize, setVisualMode, setFlipMode, setShowTunnels, setChaosLevel, reset]);
 
   const handleDisparityFirstFlip = useCallback(() => {
     // Pick a random surface sticker and flip it as the opening move
@@ -1121,23 +1125,31 @@ export default function WORM3() {
         <div style={{
           position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'center',
-          background: 'rgba(0,0,0,0.55)', zIndex: 500,
+          background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(6px)', zIndex: 500,
+          fontFamily: "-apple-system, 'Helvetica Neue', Roboto, sans-serif",
         }}>
-          <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '15px', marginBottom: '20px', fontFamily: "'Courier New', monospace", letterSpacing: '0.04em' }}>
-            Cube is solved. Make the first stochastic flip to begin.
+          <div style={{
+            background: '#fff', borderRadius: '20px', padding: '28px 32px',
+            textAlign: 'center', boxShadow: '0 8px 40px rgba(0,0,0,0.18)',
+            maxWidth: '320px', width: '88vw',
+          }}>
+            <div style={{ fontSize: '17px', fontWeight: '600', color: '#1c1c1e', marginBottom: '6px' }}>
+              Ready
+            </div>
+            <div style={{ fontSize: '14px', color: '#8e8e93', marginBottom: '24px', lineHeight: 1.5 }}>
+              The cube is solved. Make the first random flip to start the disparity cascade.
+            </div>
+            <button
+              onClick={handleDisparityFirstFlip}
+              style={{
+                width: '100%', padding: '14px', border: 'none', borderRadius: '12px',
+                fontSize: '16px', fontWeight: '600', background: '#ff3b30', color: '#fff',
+                cursor: 'pointer', boxShadow: '0 4px 14px rgba(255,59,48,0.4)',
+              }}
+            >
+              Make First Flip
+            </button>
           </div>
-          <button
-            onClick={handleDisparityFirstFlip}
-            style={{
-              background: 'rgba(239,68,68,0.2)', color: '#ef4444',
-              border: '2px solid #ef4444', borderRadius: '10px',
-              padding: '14px 40px', fontSize: '18px', fontWeight: 'bold',
-              fontFamily: "'Courier New', monospace", cursor: 'pointer',
-              letterSpacing: '0.06em',
-            }}
-          >
-            ⚡ Make First Flip
-          </button>
         </div>
       )}
       {showHelp && <HelpMenu onClose={() => setShowHelp(false)} />}
