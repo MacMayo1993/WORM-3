@@ -292,7 +292,7 @@ export function useChaosMode() {
         const crossFace = isCrossFaceNeighbor(chain.tile.dirKey, neighbor.dirKey);
         const onSeam = isOnSeam(neighbor.x, neighbor.y, neighbor.z, neighbor.dirKey, S);
         const seamWeight = crossFace ? 4 : onSeam ? 2 : 1;
-        validNeighbors.push({ ...neighbor, flips: nst.flips || 0, seamWeight });
+        validNeighbors.push({ ...neighbor, flips: nst.flips || 0, seamWeight, crossFace });
       }
 
       let nextTile = null;
