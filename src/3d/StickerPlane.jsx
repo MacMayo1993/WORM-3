@@ -36,6 +36,9 @@ const _particleDummy = new THREE.Object3D();
 // Scratch vectors for biome edge-on fade — allocated once, reused every frame.
 const _normal = new THREE.Vector3();
 const _worldQuat = new THREE.Quaternion();
+// Scratch colours for pre-flash lerp — allocated once, reused each flip frame.
+const _scratchColorA = new THREE.Color();
+const _scratchColorB = new THREE.Color();
 
 // Frame-shaped sticker Shape for hollow cube mode (square with rectangular hole).
 // Store the Shape, not the Geometry — each sticker creates its own ShapeGeometry
@@ -542,41 +545,72 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     }
     isActiveRef.current = true;
 
-    // Flip animation — X-axis scale squish (identity collapse, not card rotation)
+    // Flip animation — X-axis scale squish (identity collapse, not card rotation).
+    // Slow enough to read (~0.6 s), works identically for manual AND chaos flips.
     if (spinT.current > 0 && groupRef.current) {
-      const dt = Math.min(delta * 5, spinT.current);
+      const dt = Math.min(delta * 1.8, spinT.current); // ~0.6 s total
       spinT.current -= dt;
       const rawP = 1 - spinT.current;
 
-      // Ease the time variable, not the geometry — expressive control lives here.
+      // Ease the time variable, not the geometry.
       const p = easeInOutCubic(rawP);
 
-      // Nonlinear squish: 0→1→0 triangle over the flip.
-      // Power curve (0.85) slows the approach to zero so collapse feels intentional.
-      const t = p < 0.5 ? p * 2 : (1 - p) * 2;
-      const xScale = Math.pow(t, 0.85);
-      const yPunch = 1 + Math.sin(p * Math.PI) * 0.12;
+      // Z-pop: tile leaps toward the camera, peaks at midpoint.
+      const zPop = Math.sin(p * Math.PI) * 0.22;
+      groupRef.current.position.set(pos[0], pos[1], pos[2] + zPop);
 
-      // Micro z-shear: directional crossing cue without Y-rotation.
-      const shear = Math.sin(p * Math.PI) * 0.04;
+      // Three-phase xScale:
+      //   Phase 1 (0→0.2)  anticipation bulge — tile "charges up"
+      //   Phase 2 (0.2→0.5) squish collapse — identity → zero
+      //   Phase 3 (0.5→1.0) re-expansion as antipodal — sharp snap back
+      let xScale;
+      if (rawP < 0.2) {
+        xScale = 1 + (rawP / 0.2) * 0.18;                          // 1.0 → 1.18
+      } else if (rawP < 0.5) {
+        xScale = Math.max(0.001, 1.18 * (1 - (rawP - 0.2) / 0.3)); // 1.18 → 0
+      } else {
+        xScale = Math.pow((rawP - 0.5) / 0.5, 0.65);               // 0 → 1 (quick)
+      }
+
+      // Bigger squash/stretch — more personality.
+      const yPunch = 1 + Math.sin(p * Math.PI) * 0.28;
+
+      // Anticipation wobble: rapid z-rotation that decays after the bulge phase.
+      const wobble = rawP < 0.38
+        ? Math.sin(rawP * Math.PI * 11) * 0.07 * (1 - rawP / 0.38)
+        : 0;
 
       groupRef.current.scale.set(xScale, yPunch, 1);
       groupRef.current.rotation.y = rot[1]; // fixed — never animates
-      groupRef.current.rotation.z = rot[2] + shear;
+      groupRef.current.rotation.z = rot[2] + wobble;
 
-      // One-shot color swap at the sacred frame: fire exactly when xScale === 0.
+      // Pre-flash: each tile's color bleeds toward its incoming antipodal hue
+      // during the first half — both tiles of the pair visually signal each other.
+      // Skipped when a biome/face texture is active (tinting white looks wrong).
+      const mat = meshRef.current?.material;
+      if (rawP < 0.5 && mat?.color && flipFromColor.current && flipToColor.current
+          && !flipFromTexture.current && !flipToTexture.current) {
+        // Ease-in to 55 % shift — player can clearly see what colour is coming.
+        const preT = Math.pow(rawP / 0.5, 1.2) * 0.55;
+        _scratchColorA.set(flipFromColor.current);
+        _scratchColorB.set(flipToColor.current);
+        _scratchColorA.lerp(_scratchColorB, preT);
+        mat.color.copy(_scratchColorA);
+        mat.needsUpdate = true;
+      }
+
+      // Sacred frame: full color swap exactly when xScale → 0 (tile invisible).
       if (prevRawP.current < 0.5 && rawP >= 0.5) {
-        const mat = meshRef.current?.material;
         if (mat?.color) {
           const tex = flipToTexture.current;
           mat.map = tex || null;
           mat.color.set(tex ? '#ffffff' : flipToColor.current);
-          mat.needsUpdate = true; // single GPU upload, not per-frame
+          mat.needsUpdate = true;
         } else if (mat?.uniforms?.baseColor) {
           const newMat = getTileStyleMaterial(tileStyle, flipToColor.current, false, null);
           meshRef.current.material = newMat;
         }
-        // Ring opacity spike — event horizon signal. Clamp write, no stacking.
+        // Ring opacity spike — event horizon signal; clamped write, no stacking.
         if (ringRef.current) {
           ringRef.current.material.opacity = 0.9;
           ringFlashRef.current = 1;
@@ -589,6 +623,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         groupRef.current.scale.set(1, 1, 1);
         groupRef.current.rotation.y = rot[1];
         groupRef.current.rotation.z = rot[2];
+        groupRef.current.position.set(pos[0], pos[1], pos[2]); // reset z-pop
         shakeT.current = 0.4;
         flipFromColor.current = null;
         flipToColor.current = null;
