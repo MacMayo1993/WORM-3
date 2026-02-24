@@ -5,458 +5,505 @@ import IntroCubie from '../intro/IntroCubie.jsx';
 import IntroTunnel from '../../manifold/IntroTunnel.jsx';
 import { FACE_COLORS } from '../../utils/constants.js';
 
-// Antipodal face mapping
-const ANTIPODAL_FACES = {
-  PZ: 'NZ', NZ: 'PZ',
-  PX: 'NX', NX: 'PX',
-  PY: 'NY', NY: 'PY',
-};
+// ─── Antipodal helpers (same as before) ──────────────────────────────────────
+const ANTIPODAL_FACES = { PZ:'NZ', NZ:'PZ', PX:'NX', NX:'PX', PY:'NY', NY:'PY' };
+const FACE_COLOR_MAP  = { PZ:1, NZ:4, PX:5, NX:2, PY:3, NY:6 };
 
-// Face to color ID mapping
-const FACE_COLOR_MAP = {
-  PZ: 1, // Red
-  NZ: 4, // Orange
-  PX: 5, // Blue
-  NX: 2, // Green
-  PY: 3, // White
-  NY: 6, // Yellow
-};
-
-// Get sticker world position offset from cubie center
 const getStickerOffset = (face) => {
-  const offset = 0.53; // Same as IntroCubie
+  const o = 0.53;
   switch (face) {
-    case 'PZ': return [0, 0, offset];
-    case 'NZ': return [0, 0, -offset];
-    case 'PX': return [offset, 0, 0];
-    case 'NX': return [-offset, 0, 0];
-    case 'PY': return [0, offset, 0];
-    case 'NY': return [0, -offset, 0];
-    default: return [0, 0, 0];
+    case 'PZ': return [0,0,o];   case 'NZ': return [0,0,-o];
+    case 'PX': return [o,0,0];   case 'NX': return [-o,0,0];
+    case 'PY': return [0,o,0];   case 'NY': return [0,-o,0];
+    default:   return [0,0,0];
   }
 };
 
-// Rotating cube background component with flip animations and wormhole tunnels
+// ─── 3-D rotating cube (reused from before, slightly tuned) ──────────────────
 const MenuCubeBackground = () => {
   const size = 3;
   const [flipStates, setFlipStates] = useState({});
-  const [tunnels, setTunnels] = useState([]);
+  const [tunnels, setTunnels]       = useState([]);
   const cubieRefs = useRef({});
 
   const items = useMemo(() => {
     const k = (size - 1) / 2;
     const result = [];
-    for (let x = 0; x < size; x++) {
-      for (let y = 0; y < size; y++) {
-        for (let z = 0; z < size; z++) {
-          result.push({ key: `${x}-${y}-${z}`, pos: [x - k, y - k, z - k], x, y, z });
-        }
-      }
-    }
+    for (let x=0;x<size;x++) for (let y=0;y<size;y++) for (let z=0;z<size;z++)
+      result.push({ key:`${x}-${y}-${z}`, pos:[x-k,y-k,z-k], x,y,z });
     return result;
-  }, [size]);
+  }, []);
 
-  // Animate flip rotations smoothly and track antipodal swaps with wormhole tunnels
   useEffect(() => {
-    const flipDuration = 800; // ms for a complete flip
-    const timeBetweenFlips = 2500; // ms between flip triggers
-    const activeFlips = new Map(); // key -> { face, startTime, endTime, item }
-    const activeTunnels = new Map(); // key -> tunnel data
-    let animationId;
+    const flipDuration  = 900;
+    const interval      = 2800;
+    const activeFlips   = new Map();
+    const activeTunnels = new Map();
+    let animId;
 
-    const triggerRandomFlips = () => {
-      // Pick 2-3 random tiles to flip
-      const numFlips = Math.floor(Math.random() * 2) + 2;
-      const selectedItems = [];
-      for (let i = 0; i < numFlips; i++) {
-        const randomItem = items[Math.floor(Math.random() * items.length)];
-        selectedItems.push(randomItem);
+    const triggerFlips = () => {
+      const n = Math.floor(Math.random()*2)+2;
+      for (let i=0;i<n;i++) {
+        const item   = items[Math.floor(Math.random()*items.length)];
+        const faces  = ['PZ','NZ','PX','NX','PY','NY'];
+        const face   = faces[Math.floor(Math.random()*faces.length)];
+        const antiF  = ANTIPODAL_FACES[face];
+        const antiX  = size-1-item.x, antiY = size-1-item.y, antiZ = size-1-item.z;
+        const antiKey= `${antiX}-${antiY}-${antiZ}`;
+        const now    = Date.now();
+        activeFlips.set(item.key,  { face, startTime:now, endTime:now+flipDuration, item });
+        const tk = `${item.key}-${face}`;
+        activeTunnels.set(tk, {
+          key:tk, cubieKey1:item.key, cubieKey2:antiKey,
+          face1:face, face2:antiF,
+          offset1:getStickerOffset(face), offset2:getStickerOffset(antiF),
+          color1:FACE_COLORS[FACE_COLOR_MAP[face]], color2:FACE_COLORS[FACE_COLOR_MAP[antiF]],
+          startTime:now, endTime:now+flipDuration,
+        });
       }
-
-      // Schedule flip animations and create tunnels for selected tiles
-      const now = Date.now();
-      selectedItems.forEach((item) => {
-        // Randomly choose a face to flip
-        const faces = ['PZ', 'NZ', 'PX', 'NX', 'PY', 'NY'];
-        const face = faces[Math.floor(Math.random() * faces.length)];
-        const antipodalFace = ANTIPODAL_FACES[face];
-
-        // Find antipodal partner cubie (opposite corner of cube)
-        const antiX = size - 1 - item.x;
-        const antiY = size - 1 - item.y;
-        const antiZ = size - 1 - item.z;
-        const antiKey = `${antiX}-${antiY}-${antiZ}`;
-
-        activeFlips.set(item.key, {
-          face,
-          startTime: now,
-          endTime: now + flipDuration,
-          item,
-        });
-
-        // Create tunnel data
-        const tunnelKey = `${item.key}-${face}`;
-        const stickerOffset = getStickerOffset(face);
-        const antiStickerOffset = getStickerOffset(antipodalFace);
-
-        activeTunnels.set(tunnelKey, {
-          key: tunnelKey,
-          cubieKey1: item.key,
-          cubieKey2: antiKey,
-          face1: face,
-          face2: antipodalFace,
-          offset1: stickerOffset,
-          offset2: antiStickerOffset,
-          color1: FACE_COLORS[FACE_COLOR_MAP[face]],
-          color2: FACE_COLORS[FACE_COLOR_MAP[antipodalFace]],
-          startTime: now,
-          endTime: now + flipDuration,
-        });
-      });
     };
 
     const animate = () => {
       const now = Date.now();
       const newFlips = {};
-      const currentTunnels = [];
+      const curTunnels = [];
 
-      // Update flip rotations and tunnels based on time
       activeFlips.forEach((flip, key) => {
-        if (now >= flip.endTime) {
-          // Flip animation complete - remove from active flips
-          activeFlips.delete(key);
-        } else {
-          // Calculate flip progress (0 to 1)
-          const progress = (now - flip.startTime) / flipDuration;
-          // Ease-in-out for smooth animation
-          const eased = progress < 0.5
-            ? 2 * progress * progress
-            : 1 - Math.pow(-2 * progress + 2, 2) / 2;
-          // Animate from 0 to π (180 degrees)
-          const rotation = eased * Math.PI;
-
-          // Show antipodal swap when past halfway point (sticker has flipped over)
-          const showAntipodal = progress > 0.5;
-
-          newFlips[key] = {
-            rotation: { [flip.face]: rotation },
-            antipodal: showAntipodal ? { [flip.face]: true } : {}
-          };
-        }
+        if (now >= flip.endTime) { activeFlips.delete(key); return; }
+        const p = (now-flip.startTime)/flipDuration;
+        const e = p<0.5 ? 2*p*p : 1-Math.pow(-2*p+2,2)/2;
+        newFlips[key] = { rotation:{[flip.face]:e*Math.PI}, antipodal: p>0.5?{[flip.face]:true}:{} };
       });
 
-      // Update tunnels - remove expired ones
-      activeTunnels.forEach((tunnel, key) => {
-        if (now >= tunnel.endTime) {
-          activeTunnels.delete(key);
-        } else {
-          // Calculate tunnel formation progress
-          const progress = (now - tunnel.startTime) / flipDuration;
-          const formation = progress < 0.5 ? progress * 2 : (1 - progress) * 2;
-
-          // Get cubie refs and calculate world positions
-          const cubie1 = cubieRefs.current[tunnel.cubieKey1];
-          const cubie2 = cubieRefs.current[tunnel.cubieKey2];
-
-          if (cubie1 && cubie2) {
-            // Get cubie positions
-            const pos1 = cubie1.position;
-            const pos2 = cubie2.position;
-
-            // Add sticker offsets
-            const start = [
-              pos1.x + tunnel.offset1[0],
-              pos1.y + tunnel.offset1[1],
-              pos1.z + tunnel.offset1[2]
-            ];
-            const end = [
-              pos2.x + tunnel.offset2[0],
-              pos2.y + tunnel.offset2[1],
-              pos2.z + tunnel.offset2[2]
-            ];
-
-            currentTunnels.push({
-              key: tunnel.key,
-              start,
-              end,
-              color1: tunnel.color1,
-              color2: tunnel.color2,
-              formation,
-              opacity: 0.7
-            });
-          }
+      activeTunnels.forEach((t, key) => {
+        if (now >= t.endTime) { activeTunnels.delete(key); return; }
+        const p = (now-t.startTime)/flipDuration;
+        const formation = p<0.5 ? p*2 : (1-p)*2;
+        const c1 = cubieRefs.current[t.cubieKey1];
+        const c2 = cubieRefs.current[t.cubieKey2];
+        if (c1&&c2) {
+          curTunnels.push({
+            key:t.key,
+            start:[c1.position.x+t.offset1[0], c1.position.y+t.offset1[1], c1.position.z+t.offset1[2]],
+            end:  [c2.position.x+t.offset2[0], c2.position.y+t.offset2[1], c2.position.z+t.offset2[2]],
+            color1:t.color1, color2:t.color2, formation, opacity:0.8,
+          });
         }
       });
 
       setFlipStates(newFlips);
-      setTunnels(currentTunnels);
-      animationId = requestAnimationFrame(animate);
+      setTunnels(curTunnels);
+      animId = requestAnimationFrame(animate);
     };
 
-    // Start animation loop
     animate();
-
-    // Trigger flips periodically
-    const flipInterval = setInterval(triggerRandomFlips, timeBetweenFlips);
-    // Trigger initial flips after a short delay
-    const initialTimer = setTimeout(triggerRandomFlips, 500);
-
-    return () => {
-      cancelAnimationFrame(animationId);
-      clearInterval(flipInterval);
-      clearTimeout(initialTimer);
-    };
+    const iv = setInterval(triggerFlips, interval);
+    const init = setTimeout(triggerFlips, 600);
+    return () => { cancelAnimationFrame(animId); clearInterval(iv); clearTimeout(init); };
   }, [items]);
 
   return (
-    <group rotation={[0.3, 0, 0]}>
-      {/* Cubies */}
-      {items.map((it) => {
-        const flipState = flipStates[it.key];
+    <group rotation={[0.25, 0, 0]}>
+      {items.map(it => {
+        const fs = flipStates[it.key];
         return (
           <IntroCubie
             key={it.key}
-            ref={(el) => { cubieRefs.current[it.key] = el; }}
+            ref={el => { cubieRefs.current[it.key] = el; }}
             position={it.pos}
             size={size}
             explosionFactor={0}
-            cubieFlips={flipState?.rotation || {}}
-            antipodalSwaps={flipState?.antipodal || {}}
+            cubieFlips={fs?.rotation||{}}
+            antipodalSwaps={fs?.antipodal||{}}
           />
         );
       })}
-
-      {/* Wormhole Tunnels */}
-      {tunnels.map((tunnel) => (
-        <IntroTunnel
-          key={tunnel.key}
-          start={tunnel.start}
-          end={tunnel.end}
-          color1={tunnel.color1}
-          color2={tunnel.color2}
-          opacity={tunnel.opacity}
-          formation={tunnel.formation}
+      {tunnels.map(t => (
+        <IntroTunnel key={t.key} start={t.start} end={t.end}
+          color1={t.color1} color2={t.color2}
+          opacity={t.opacity} formation={t.formation}
         />
       ))}
     </group>
   );
 };
 
-// Animated rotating wrapper
 const RotatingCube = () => {
-  const groupRef = React.useRef();
-
-  React.useEffect(() => {
-    let animationId;
-    const animate = () => {
+  const groupRef = useRef();
+  useEffect(() => {
+    let id;
+    const tick = () => {
       if (groupRef.current) {
-        groupRef.current.rotation.y += 0.003;
-        groupRef.current.rotation.x = Math.sin(Date.now() * 0.0003) * 0.1 + 0.3;
+        groupRef.current.rotation.y += 0.004;
+        groupRef.current.rotation.x = Math.sin(Date.now()*0.00025)*0.12 + 0.25;
       }
-      animationId = requestAnimationFrame(animate);
+      id = requestAnimationFrame(tick);
     };
-    animate();
-    return () => cancelAnimationFrame(animationId);
+    tick();
+    return () => cancelAnimationFrame(id);
   }, []);
-
-  return (
-    <group ref={groupRef}>
-      <MenuCubeBackground />
-    </group>
-  );
+  return <group ref={groupRef}><MenuCubeBackground /></group>;
 };
 
-const MenuButton = ({ children, onClick, delay, icon, primary }) => {
+// ─── Bottom nav item ──────────────────────────────────────────────────────────
+const NavItem = ({ icon, label, color, onClick, delay }) => {
   const [visible, setVisible] = useState(false);
   const [hovered, setHovered] = useState(false);
-
   useEffect(() => {
-    const timer = setTimeout(() => setVisible(true), delay);
-    return () => clearTimeout(timer);
+    const t = setTimeout(() => setVisible(true), delay);
+    return () => clearTimeout(t);
   }, [delay]);
-
-  const baseStyle = {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '12px',
-    width: '280px',
-    padding: '16px 32px',
-    fontSize: '16px',
-    fontWeight: 500,
-    fontFamily: "'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-    letterSpacing: '0.02em',
-    border: 'none',
-    borderRadius: '8px',
-    background: primary
-      ? (hovered ? '#1565c0' : '#1e88e5')
-      : (hovered ? '#f1f3f4' : '#ffffff'),
-    color: primary ? '#ffffff' : '#202124',
-    cursor: 'pointer',
-    transition: 'all 0.2s ease',
-    opacity: visible ? 1 : 0,
-    transform: visible
-      ? hovered ? 'translateY(-2px)' : 'translateY(0)'
-      : 'translateY(20px)',
-    boxShadow: hovered
-      ? '0 2px 8px 0 rgba(60, 64, 67, 0.3), 0 4px 12px 3px rgba(60, 64, 67, 0.15)'
-      : '0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15)',
-  };
 
   return (
     <button
-      style={baseStyle}
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '6px',
+        padding: '14px 8px',
+        background: hovered
+          ? 'rgba(255,255,255,0.08)'
+          : 'rgba(255,255,255,0.04)',
+        border: '1px solid rgba(255,255,255,0.1)',
+        borderRadius: '16px',
+        cursor: 'pointer',
+        transition: 'all 0.2s ease',
+        opacity: visible ? 1 : 0,
+        transform: visible ? 'translateY(0)' : 'translateY(16px)',
+        boxShadow: hovered ? `0 0 24px ${color}33` : 'none',
+      }}
     >
-      {icon && <span style={{ fontSize: '20px' }}>{icon}</span>}
-      {children}
+      <span style={{ fontSize: '24px', lineHeight: 1 }}>{icon}</span>
+      <span style={{
+        fontSize: '13px',
+        fontWeight: 500,
+        color: hovered ? color : 'rgba(255,255,255,0.7)',
+        fontFamily: "'Courier New', monospace",
+        letterSpacing: '0.05em',
+        transition: 'color 0.2s',
+      }}>
+        {label}
+      </span>
     </button>
   );
 };
 
+// ─── Main component ───────────────────────────────────────────────────────────
 const MainMenu = ({ onPlay, onLevels, onFreeplay, onCoop, onSettings, onBiome, onDisparity }) => {
-  const [titleVisible, setTitleVisible] = useState(false);
+  const [titleVisible,    setTitleVisible]    = useState(false);
   const [subtitleVisible, setSubtitleVisible] = useState(false);
+  const [btnVisible,      setBtnVisible]      = useState(false);
+  const [hoverEnter,      setHoverEnter]      = useState(false);
 
   useEffect(() => {
-    const titleTimer = setTimeout(() => setTitleVisible(true), 100);
-    const subtitleTimer = setTimeout(() => setSubtitleVisible(true), 400);
-    return () => {
-      clearTimeout(titleTimer);
-      clearTimeout(subtitleTimer);
-    };
+    const t1 = setTimeout(() => setTitleVisible(true),    200);
+    const t2 = setTimeout(() => setSubtitleVisible(true), 500);
+    const t3 = setTimeout(() => setBtnVisible(true),      800);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, []);
 
   return (
     <div style={{
       position: 'fixed',
       inset: 0,
-      background: 'linear-gradient(to right, #90caf9 1px, transparent 1px), linear-gradient(to bottom, #90caf9 1px, transparent 1px), #e3f2fd',
-      backgroundSize: '20px 20px',
+      background: '#05050f',
       zIndex: 9999,
       overflow: 'hidden',
+      fontFamily: "'Courier New', 'Lucida Console', monospace",
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
     }}>
-      {/* 3D Cube Background */}
-      <div style={{
-        position: 'absolute',
-        inset: 0,
-        opacity: 0.3,
-      }}>
-        <Canvas camera={{ position: [0, 2, 10], fov: 45 }}>
-          <color attach="background" args={['#90caf9']} />
-          <ambientLight intensity={0.8} />
-          <directionalLight position={[5, 8, 5]} intensity={1.2} />
-          <pointLight position={[10, 10, 10]} intensity={0.6} />
-          <RotatingCube />
-          <Environment preset="city" />
-        </Canvas>
-      </div>
 
-      {/* Subtle Gradient Overlay */}
+      {/* ── Starfield background ── */}
       <div style={{
         position: 'absolute',
         inset: 0,
-        background: 'radial-gradient(ellipse at center, rgba(227,242,253,0.3) 0%, rgba(227,242,253,0.6) 70%, rgba(227,242,253,0.85) 100%)',
+        background:
+          'radial-gradient(ellipse 80% 60% at 50% 20%, rgba(30,20,80,0.7) 0%, transparent 70%),' +
+          'radial-gradient(ellipse 60% 40% at 80% 70%, rgba(80,10,40,0.4) 0%, transparent 60%),' +
+          'radial-gradient(ellipse 50% 50% at 20% 80%, rgba(10,30,80,0.4) 0%, transparent 60%),' +
+          '#05050f',
         pointerEvents: 'none',
       }} />
 
-      {/* Menu Content */}
+      {/* Subtle grid lines */}
+      <div style={{
+        position: 'absolute',
+        inset: 0,
+        backgroundImage:
+          'linear-gradient(rgba(100,120,255,0.04) 1px, transparent 1px),' +
+          'linear-gradient(90deg, rgba(100,120,255,0.04) 1px, transparent 1px)',
+        backgroundSize: '60px 60px',
+        pointerEvents: 'none',
+      }} />
+
+      {/* ── 3D Cube canvas (center stage) ── */}
+      <div style={{
+        position: 'absolute',
+        inset: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        // push cube up slightly so UI doesn't overlap
+        paddingBottom: '80px',
+      }}>
+        {/* Glow halo behind cube */}
+        <div style={{
+          position: 'absolute',
+          width: '420px',
+          height: '420px',
+          borderRadius: '50%',
+          background:
+            'radial-gradient(circle, rgba(180,160,255,0.12) 0%, rgba(60,80,220,0.06) 40%, transparent 70%)',
+          pointerEvents: 'none',
+        }} />
+        {/* Floor reflection line */}
+        <div style={{
+          position: 'absolute',
+          bottom: 'calc(50% - 210px)',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: '300px',
+          height: '1px',
+          background: 'linear-gradient(90deg, transparent, rgba(160,140,255,0.3), transparent)',
+          pointerEvents: 'none',
+        }} />
+
+        <div style={{ width: '440px', height: '440px', maxWidth: '90vw', maxHeight: '50vw' }}>
+          <Canvas camera={{ position: [0, 1.8, 9], fov: 42 }}>
+            <color attach="background" args={['#00000000']} />
+            <ambientLight intensity={0.5} />
+            <pointLight position={[5, 8, 6]}  intensity={1.6} color="#ffffff" />
+            <pointLight position={[-6, -4, 4]} intensity={0.8} color="#7070ff" />
+            <pointLight position={[0, -6, -4]} intensity={0.5} color="#ff4040" />
+            <RotatingCube />
+            <Environment preset="night" />
+          </Canvas>
+        </div>
+      </div>
+
+      {/* ── Header: title + subtitle ── */}
       <div style={{
         position: 'relative',
         zIndex: 10,
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '40px 20px',
+        textAlign: 'center',
+        paddingTop: 'max(40px, env(safe-area-inset-top, 40px))',
+        opacity:    titleVisible ? 1 : 0,
+        transform:  titleVisible ? 'translateY(0)' : 'translateY(-20px)',
+        transition: 'all 0.7s cubic-bezier(0.22,1,0.36,1)',
       }}>
-        {/* Title */}
-        <div style={{
-          textAlign: 'center',
-          marginBottom: '60px',
-          opacity: titleVisible ? 1 : 0,
-          transform: titleVisible ? 'translateY(0)' : 'translateY(-30px)',
-          transition: 'all 0.8s ease-out',
+        {/* WORM³ — rainbow gradient */}
+        <h1 style={{
+          margin: 0,
+          fontSize: 'clamp(52px, 14vw, 88px)',
+          fontWeight: 900,
+          letterSpacing: '0.12em',
+          lineHeight: 1,
+          background:
+            'linear-gradient(90deg, #ef4444 0%, #f97316 18%, #eab308 36%, #22c55e 54%, #3b82f6 72%, #a855f7 90%, #ef4444 100%)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          backgroundClip: 'text',
+          fontFamily: "'Courier New', monospace",
+          filter: 'drop-shadow(0 0 30px rgba(120,100,255,0.4))',
         }}>
-          <h1 style={{
-            fontSize: 'clamp(48px, 12vw, 96px)',
-            fontWeight: 700,
-            margin: 0,
-            background: 'linear-gradient(135deg, #e53935 0%, #fb8c00 20%, #fdd835 40%, #43a047 60%, #1e88e5 80%, #e53935 100%)',
-            WebkitBackgroundClip: 'text',
+          WORM<sup style={{
+            fontSize: '0.45em',
+            verticalAlign: 'super',
             WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text',
-            fontFamily: "'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-            letterSpacing: '0.08em',
-            filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1))',
-          }}>
-            WORM³
-          </h1>
-          <p style={{
-            fontSize: 'clamp(14px, 3vw, 18px)',
-            color: '#5f6368',
-            margin: '16px 0 0 0',
-            fontFamily: "'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-            letterSpacing: '0.05em',
-            fontWeight: 400,
-            opacity: subtitleVisible ? 1 : 0,
-            transform: subtitleVisible ? 'translateY(0)' : 'translateY(10px)',
-            transition: 'all 0.6s ease-out',
-          }}>
-            A Manifold Puzzle Game
-          </p>
-        </div>
+          }}>3</sup>
+        </h1>
 
-        {/* Menu Buttons */}
+        <p style={{
+          margin: '10px 0 0',
+          fontSize: 'clamp(12px, 2.5vw, 16px)',
+          color: 'rgba(200,200,220,0.65)',
+          letterSpacing: '0.22em',
+          textTransform: 'uppercase',
+          fontWeight: 400,
+          opacity: subtitleVisible ? 1 : 0,
+          transform: subtitleVisible ? 'none' : 'translateY(8px)',
+          transition: 'all 0.6s ease 0.1s',
+        }}>
+          — A Cube That Remembers —
+        </p>
+      </div>
+
+      {/* ── ENTER THE CUBE button ── */}
+      <div style={{
+        position: 'absolute',
+        bottom: '110px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        zIndex: 10,
+        width: 'min(480px, 88vw)',
+        opacity: btnVisible ? 1 : 0,
+        transition: 'opacity 0.6s ease',
+      }}>
+        <button
+          onClick={onPlay}
+          onMouseEnter={() => setHoverEnter(true)}
+          onMouseLeave={() => setHoverEnter(false)}
+          style={{
+            width: '100%',
+            padding: '18px 32px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '14px',
+            fontSize: 'clamp(15px, 3vw, 18px)',
+            fontWeight: 700,
+            letterSpacing: '0.18em',
+            fontFamily: "'Courier New', monospace",
+            color: '#ffffff',
+            background: hoverEnter
+              ? 'rgba(255,255,255,0.12)'
+              : 'rgba(20,22,40,0.85)',
+            border: hoverEnter
+              ? '1.5px solid rgba(180,160,255,0.7)'
+              : '1.5px solid rgba(120,100,200,0.4)',
+            borderRadius: '12px',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            backdropFilter: 'blur(12px)',
+            boxShadow: hoverEnter
+              ? '0 0 40px rgba(140,120,255,0.35), inset 0 1px 0 rgba(255,255,255,0.1)'
+              : '0 0 20px rgba(80,60,180,0.2)',
+          }}
+        >
+          {/* Play triangle */}
+          <svg width="16" height="18" viewBox="0 0 16 18" fill="white">
+            <polygon points="0,0 16,9 0,18" />
+          </svg>
+          ENTER THE CUBE
+        </button>
+      </div>
+
+      {/* ── Bottom nav: Watch / Explore / World ── */}
+      <div style={{
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        zIndex: 10,
+        padding: 'env(safe-area-inset-bottom, 0px)',
+      }}>
         <div style={{
           display: 'flex',
-          flexDirection: 'column',
-          gap: '16px',
-          alignItems: 'center',
+          gap: '8px',
+          padding: '8px 16px 16px',
+          background: 'linear-gradient(to top, rgba(5,5,15,0.95) 0%, rgba(5,5,15,0.6) 70%, transparent 100%)',
+          backdropFilter: 'blur(4px)',
         }}>
-          <MenuButton onClick={onPlay} delay={600} icon="▶" primary>
-            Play
-          </MenuButton>
-          <MenuButton onClick={onDisparity} delay={750} icon="⚡" style={{ color: '#ef4444' }}>
-            Disparity Mode
-          </MenuButton>
-          <MenuButton onClick={onLevels} delay={900} icon="◈">
-            Levels
-          </MenuButton>
-          <MenuButton onClick={onFreeplay} delay={1000} icon="∞">
-            Freeplay
-          </MenuButton>
-          <MenuButton onClick={onCoop} delay={1100} icon="&#9775;">
-            Co-op Crawler
-          </MenuButton>
-          <MenuButton onClick={onSettings} delay={1200} icon="⚙">
-            Settings
-          </MenuButton>
-          <MenuButton onClick={onBiome} delay={1300} icon="🏙">
-            City Biome
-          </MenuButton>
-        </div>
-
-        {/* Footer */}
-        <div style={{
-          position: 'absolute',
-          bottom: '30px',
-          left: 0,
-          right: 0,
-          textAlign: 'center',
-          fontSize: '12px',
-          fontFamily: "'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-          color: '#80868b',
-          letterSpacing: '0.02em',
-        }}>
-          Explore the topology of quotient spaces
+          {/* Watch */}
+          <NavItem
+            icon={<WatchIcon />}
+            label="Watch"
+            color="#f59e0b"
+            onClick={onLevels}
+            delay={900}
+          />
+          {/* Explore */}
+          <NavItem
+            icon={<ExploreIcon />}
+            label="Explore"
+            color="#22c55e"
+            onClick={onFreeplay}
+            delay={1050}
+          />
+          {/* World */}
+          <NavItem
+            icon={<WorldIcon />}
+            label="World"
+            color="#60a5fa"
+            onClick={onBiome}
+            delay={1200}
+          />
         </div>
       </div>
+
+      {/* ── Settings gear (bottom-right, above nav) ── */}
+      <button
+        onClick={onSettings}
+        style={{
+          position: 'absolute',
+          bottom: '108px',
+          right: '20px',
+          zIndex: 20,
+          width: '36px',
+          height: '36px',
+          background: 'transparent',
+          border: 'none',
+          cursor: 'pointer',
+          color: 'rgba(255,255,255,0.35)',
+          padding: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          transition: 'color 0.2s',
+        }}
+        onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.8)'}
+        onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.35)'}
+      >
+        <GearIcon />
+      </button>
     </div>
   );
 };
+
+// ─── SVG icons ────────────────────────────────────────────────────────────────
+
+const WatchIcon = () => (
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+    {/* Lightning bolt */}
+    <path d="M13 2L4.5 13.5H11L10 22L20.5 10.5H14L13 2Z"
+      fill="#f59e0b" stroke="#f59e0b" strokeWidth="0.5"
+      strokeLinejoin="round"/>
+  </svg>
+);
+
+const ExploreIcon = () => (
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+    {/* Crystal/gem */}
+    <path d="M12 3L19 8.5L16 21H8L5 8.5L12 3Z"
+      fill="none" stroke="#22c55e" strokeWidth="1.6" strokeLinejoin="round"/>
+    <path d="M5 8.5H19M12 3L8 8.5M12 3L16 8.5M8 8.5L8 21M16 8.5L16 21"
+      stroke="#22c55e" strokeWidth="1" opacity="0.5"/>
+  </svg>
+);
+
+const WorldIcon = () => (
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+    {/* City/dome silhouette */}
+    <rect x="3" y="14" width="4" height="7" rx="0.5" stroke="#60a5fa" strokeWidth="1.5"/>
+    <rect x="10" y="10" width="4" height="11" rx="0.5" stroke="#60a5fa" strokeWidth="1.5"/>
+    <rect x="17" y="13" width="4" height="8" rx="0.5" stroke="#60a5fa" strokeWidth="1.5"/>
+    {/* Dome arc */}
+    <path d="M1 21 Q12 3 23 21" stroke="#60a5fa" strokeWidth="1.5" fill="none" opacity="0.4"/>
+    <line x1="1" y1="21" x2="23" y2="21" stroke="#60a5fa" strokeWidth="1.5"/>
+  </svg>
+);
+
+const GearIcon = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="3"/>
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65
+     1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0
+     9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0
+     0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65
+     1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65
+     1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0
+     1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0
+     0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+  </svg>
+);
 
 export default MainMenu;
