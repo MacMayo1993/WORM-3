@@ -792,7 +792,7 @@ export default function WORM3() {
   // ========================================================================
   // RENDER
   // ========================================================================
-  const cameraZ = { 2: 10, 3: 14, 4: 20, 5: 26 }[size] || 14;
+  const cameraZ = (isMobile ? { 2: 12, 3: 17, 4: 25, 5: 38 } : { 2: 10, 3: 14, 4: 20, 5: 30 })[size] || 14;
 
   if (showWelcome) {
     return <WelcomeScreen onEnter={handleWelcomeComplete} />;
