@@ -573,9 +573,14 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       groupRef.current.position.x = pos[0] + jX;
       groupRef.current.position.y = pos[1] + jY;
 
-      // Antipodal color bleed overlay — both identities visible around the crossing.
+      // Antipodal color bleed overlay — counter-scale so it stays full-width while the
+      // parent squishes. In world space: xScale * (1/xScale) = 1 throughout the flip.
       if (flipOverlayRef.current) {
         const mat = flipOverlayRef.current.material;
+        // Prevent division by zero; at xScale < 0.001 the tile is effectively invisible
+        // so the overlay is the only thing the player sees.
+        const safeX = Math.max(xScale, 0.001);
+        flipOverlayRef.current.scale.x = 1 / safeX;
         if (rawP < 0.5) {
           // Incoming color bleeds through as the tile collapses toward zero width.
           const bleed = Math.pow(rawP * 2, 2.0);
@@ -615,7 +620,10 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         groupRef.current.rotation.y = rot[1];
         groupRef.current.rotation.z = rot[2];
         groupRef.current.position.set(pos[0], pos[1], pos[2]);
-        if (flipOverlayRef.current) flipOverlayRef.current.material.opacity = 0;
+        if (flipOverlayRef.current) {
+          flipOverlayRef.current.material.opacity = 0;
+          flipOverlayRef.current.scale.x = 1;
+        }
         shakeT.current = 0.4;
         flipFromColor.current = null;
         flipToColor.current = null;
