@@ -1001,7 +1001,7 @@ export default function WORM3() {
         onToggleChaos={() => { if (!currentLevelData || currentLevelData.features.chaos) setChaosLevel(l => l > 0 ? 0 : 1); }}
         onSetChaosLevel={(l) => setChaosLevel(l)}
         chaosLocked={!!(currentLevelData && !currentLevelData.features.chaos)}
-        maxChaosLevel={currentLevelData?.chaosLevel || 4}
+        maxChaosLevel={currentLevelData?.chaosLevel || 5}
         autoRotateEnabled={autoRotateEnabled}
         onToggleAutoRotate={() => setAutoRotateEnabled(!autoRotateEnabled)}
         showTunnels={showTunnels}

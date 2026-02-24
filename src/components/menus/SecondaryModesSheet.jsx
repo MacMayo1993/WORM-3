@@ -110,7 +110,7 @@ const SecondaryModesSheet = ({
                 <SheetItem label="Chaos" active={chaosMode} onClick={onToggleChaos} color="#ef4444" locked={chaosLocked} />
                 {chaosMode && !chaosLocked && (
                   <>
-                    {[1, 2, 3, 4].map((l) => (
+                    {[1, 2, 3, 4, 5].map((l) => (
                       <SheetItem
                         key={l}
                         label={`L${l}`}

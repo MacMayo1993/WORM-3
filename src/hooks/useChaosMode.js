@@ -143,7 +143,7 @@ export function useChaosMode() {
   useEffect(() => {
     if (!chaosMode) return;
 
-    // ── Opt #1: seed metrics once at activation (surface scan, not RAF scan) ─
+    // ── Opt #1: seed metrics once at activation ───────────────────────────────
     {
       const sc = surfaceCoordsRef.current;
       const { disparity, flipActive, edgeTotal } = computeChaosMetrics(cubiesRef.current, sc);
@@ -151,25 +151,39 @@ export function useChaosMode() {
       flipPctRef.current = edgeTotal > 0 ? Math.round((flipActive / edgeTotal) * 100) : 0;
     }
 
-    let raf = 0, last = performance.now(), tickAcc = 0, cooldownAcc = 0;
+    let raf = 0, last = performance.now(), tickAcc = 0;
     let wasAnimating = !!animStateRef.current;
 
-    const delayByLevel = [0, 350, 250, 150, 80];
-    const basePropByLevel = [0, 0.50, 0.65, 0.80, 0.92];
-    const decayByLevel = [0, 0.70, 0.78, 0.84, 0.90];
-    const cooldownByLevel = [0, 1500, 1000, 700, 400];
+    // ── Level config: 5 levels (index 0 = off) ───────────────────────────────
+    // L1: single slow chain — intro to the mechanic
+    // L2: single chain, faster propagation
+    // L3: two independent chains, stochastic activation timing
+    // L4: two chains, higher rates
+    // L5: three chains, same rates as L4
+    const numChainsByLevel = [0, 1, 1, 2, 2, 3];
+    const delayByLevel     = [0, 380, 220, 200, 130, 130];
+    const basePropByLevel  = [0, 0.45, 0.72, 0.65, 0.85, 0.85];
+    const decayByLevel     = [0, 0.72, 0.82, 0.78, 0.88, 0.88];
+    const cooldownByLevel  = [0, 1600, 900,  800,  450,  450];
 
-    const tickPeriod = delayByLevel[chaosLevel] || 250;
+    const numChains      = numChainsByLevel[chaosLevel] || 1;
+    const tickPeriod     = delayByLevel[chaosLevel]    || 250;
     const basePropagation = basePropByLevel[chaosLevel] || 0.65;
-    const strengthDecay = decayByLevel[chaosLevel] || 0.78;
-    const chainCooldown = cooldownByLevel[chaosLevel] || 1000;
+    const strengthDecay  = decayByLevel[chaosLevel]    || 0.78;
+    const chainCooldown  = cooldownByLevel[chaosLevel] || 1000;
 
-    let currentChainTile = null;
-    let chainStrength = 1.0;
-    let inCooldown = false;
-    let visitedSet = new Set();
+    // ── Per-chain state objects — each chain is fully independent ─────────────
+    // cooldownDuration is randomised on each restart (stochastic desync for L3+).
+    const chains = Array.from({ length: numChains }, () => ({
+      tile: null,
+      strength: 1.0,
+      visited: new Set(),
+      inCooldown: false,
+      cooldownAcc: 0,
+      cooldownDuration: chainCooldown,
+    }));
 
-    // ── Opt #8: iterate surface coords only, no isOnEdge() guard needed ──────
+    // ── Opt #8: iterate surface coords only ───────────────────────────────────
     const findChainStart = (state) => {
       const surfCoords = surfaceCoordsRef.current;
       const candidates = [];
@@ -184,16 +198,20 @@ export function useChaosMode() {
       }
 
       if (!candidates.length) {
-        // No flipped tiles exist yet — auto-seed one random surface sticker so
-        // chaos bootstraps itself without needing a manual player flip.
+        // No eligible flipped tiles — seed a random unflipped, non-dead sticker
+        // so chaos bootstraps itself on a clean board.
+        // Fix: explicitly exclude dead tiles so 5×5 boards with saturated stickers
+        // don't get stuck picking tiles that can never propagate.
         const freshPool = [];
         for (const [x, y, z] of surfCoords) {
           const c = state[x][y][z];
-          for (const dirKey of Object.keys(c.stickers)) {
-            freshPool.push({ x, y, z, dirKey, flips: 1 });
+          for (const [dirKey, st] of Object.entries(c.stickers)) {
+            if ((st.flips || 0) < FLIP_CAP) {
+              freshPool.push({ x, y, z, dirKey, flips: 1 });
+            }
           }
         }
-        if (!freshPool.length) return null;
+        if (!freshPool.length) return null; // entire board is dead — nothing to do
         return { tile: freshPool[Math.floor(Math.random() * freshPool.length)], strength: 1.0 };
       }
 
@@ -206,60 +224,64 @@ export function useChaosMode() {
       return { tile: candidates[candidates.length - 1], strength: 1.0 };
     };
 
-    const stepChain = (state) => {
+    // Steps one chain forward by one tile and mutates the chain object in place.
+    // Returns the next cubies state (same reference if no flip happened).
+    const stepSingleChain = (state, chain) => {
       const S = state.length;
-      // Use cached manifold map — it only depends on cube geometry (positions/dirs),
-      // not on sticker colors/flips, so it stays valid across all flip operations.
       if (!manifoldMapCacheRef.current) {
         manifoldMapCacheRef.current = buildManifoldGridMap(state, S);
       }
       const currentManifoldMap = manifoldMapCacheRef.current;
 
-      if (!currentChainTile) {
+      if (!chain.tile) {
         const start = findChainStart(state);
-        if (!start) return state;
-        currentChainTile = start.tile;
-        chainStrength = start.strength;
-        visitedSet = new Set();
-        visitedSet.add(`${start.tile.x},${start.tile.y},${start.tile.z},${start.tile.dirKey}`);
+        if (!start) {
+          // Board fully dead — go to cooldown and try again later
+          chain.inCooldown = true;
+          chain.cooldownAcc = 0;
+          chain.cooldownDuration = chainCooldown;
+          return state;
+        }
+        chain.tile = start.tile;
+        chain.strength = start.strength;
+        chain.visited = new Set();
+        chain.visited.add(`${start.tile.x},${start.tile.y},${start.tile.z},${start.tile.dirKey}`);
       }
 
       const next = flipStickerPair(
         state, S,
-        currentChainTile.x, currentChainTile.y, currentChainTile.z,
-        currentChainTile.dirKey, currentManifoldMap
+        chain.tile.x, chain.tile.y, chain.tile.z,
+        chain.tile.dirKey, currentManifoldMap
       );
 
-      chainStrength *= strengthDecay;
+      chain.strength *= strengthDecay;
 
-      if (chainStrength < 0.1) {
-        currentChainTile = null;
-        chainStrength = 1.0;
-        visitedSet = new Set();
-        inCooldown = true;
-        cooldownAcc = 0;
+      if (chain.strength < 0.1) {
+        chain.tile = null;
+        chain.strength = 1.0;
+        chain.visited = new Set();
+        chain.inCooldown = true;
+        chain.cooldownAcc = 0;
+        // Stochastic cooldown: randomise duration so concurrent chains desync naturally
+        chain.cooldownDuration = chainCooldown * (0.6 + Math.random() * 0.8);
         return next;
       }
 
       const neighbors = getManifoldNeighbors(
-        currentChainTile.x, currentChainTile.y, currentChainTile.z,
-        currentChainTile.dirKey, S
+        chain.tile.x, chain.tile.y, chain.tile.z,
+        chain.tile.dirKey, S
       );
 
       const validNeighbors = [];
       for (const neighbor of neighbors) {
-        // Skip already-visited tiles so the chain spreads outward, not back
         const nKey = `${neighbor.x},${neighbor.y},${neighbor.z},${neighbor.dirKey}`;
-        if (visitedSet.has(nKey)) continue;
+        if (chain.visited.has(nKey)) continue;
 
         const nc = next[neighbor.x]?.[neighbor.y]?.[neighbor.z];
         if (!nc) continue;
         const nst = nc.stickers[neighbor.dirKey];
         if (!nst) continue;
-        // Skip dead tiles — they can no longer participate in cascades
         if ((nst.flips || 0) >= FLIP_CAP) continue;
-        // Surface check: neighbor must be an outward-facing sticker (guaranteed
-        // by makeCubies, so this just guards against cross-face lookup errors)
         const { x: nx, y: ny, z: nz, dirKey: nd } = neighbor;
         const S1 = S - 1;
         const onEdge = (nd === 'PX' && nx === S1) || (nd === 'NX' && nx === 0) ||
@@ -267,17 +289,14 @@ export function useChaosMode() {
                        (nd === 'PZ' && nz === S1) || (nd === 'NZ' && nz === 0);
         if (!onEdge) continue;
 
-        // Seam Lightning: cross-face neighbors and on-seam tiles get a weight boost
-        const crossFace = isCrossFaceNeighbor(currentChainTile.dirKey, neighbor.dirKey);
+        const crossFace = isCrossFaceNeighbor(chain.tile.dirKey, neighbor.dirKey);
         const onSeam = isOnSeam(neighbor.x, neighbor.y, neighbor.z, neighbor.dirKey, S);
-        // Cross-face = 4x weight, on-seam = 2x weight, interior = 1x
         const seamWeight = crossFace ? 4 : onSeam ? 2 : 1;
         validNeighbors.push({ ...neighbor, flips: nst.flips || 0, seamWeight });
       }
 
       let nextTile = null;
       if (validNeighbors.length > 0) {
-        // Seam Lightning: weighted shuffle — seam neighbors get picked first
         const sorted = [];
         const pool = [...validNeighbors];
         while (pool.length > 0) {
@@ -291,30 +310,24 @@ export function useChaosMode() {
         }
 
         for (const neighbor of sorted) {
-          // Propagation chance: high base scaled by chain strength + small boost for flipped tiles
           const flipBoost = neighbor.flips > 0 ? 1.15 : 1.0;
-          const propagateChance = chainStrength * basePropagation * flipBoost;
+          const propagateChance = chain.strength * basePropagation * flipBoost;
 
           if (Math.random() < propagateChance) {
             const fromPos = getStickerWorldPos(
-              currentChainTile.x, currentChainTile.y, currentChainTile.z,
-              currentChainTile.dirKey, S, explosionT
+              chain.tile.x, chain.tile.y, chain.tile.z,
+              chain.tile.dirKey, S, explosionT
             );
             const toPos = getStickerWorldPos(
               neighbor.x, neighbor.y, neighbor.z,
               neighbor.dirKey, S, explosionT
             );
-            const crossFace = isCrossFaceNeighbor(currentChainTile.dirKey, neighbor.dirKey);
-            // A2: deduplicate — skip if an identical source→dest bolt already queued.
-            // Rounds world positions to 1 dp to handle float jitter in getStickerWorldPos.
             const boltKey = `${fromPos.map(v => v.toFixed(1)).join(',')}→${toPos.map(v => v.toFixed(1)).join(',')}`;
-            // A1: cap concurrent bolts — drop oldest when queue is full
             setCascades((prev) => {
-              if (prev.some(c => c.key === boltKey)) return prev; // A2 dedup
-              const next = [...prev, { id: Date.now() + Math.random(), key: boltKey, from: fromPos, to: toPos, crossFace }];
-              return next.length > MAX_CASCADES ? next.slice(-MAX_CASCADES) : next;
+              if (prev.some(c => c.key === boltKey)) return prev;
+              const n2 = [...prev, { id: Date.now() + Math.random(), key: boltKey, from: fromPos, to: toPos, crossFace }];
+              return n2.length > MAX_CASCADES ? n2.slice(-MAX_CASCADES) : n2;
             });
-
             nextTile = neighbor;
             break;
           }
@@ -322,14 +335,15 @@ export function useChaosMode() {
       }
 
       if (nextTile) {
-        visitedSet.add(`${nextTile.x},${nextTile.y},${nextTile.z},${nextTile.dirKey}`);
-        currentChainTile = nextTile;
+        chain.visited.add(`${nextTile.x},${nextTile.y},${nextTile.z},${nextTile.dirKey}`);
+        chain.tile = nextTile;
       } else {
-        currentChainTile = null;
-        chainStrength = 1.0;
-        visitedSet = new Set();
-        inCooldown = true;
-        cooldownAcc = 0;
+        chain.tile = null;
+        chain.strength = 1.0;
+        chain.visited = new Set();
+        chain.inCooldown = true;
+        chain.cooldownAcc = 0;
+        chain.cooldownDuration = chainCooldown * (0.6 + Math.random() * 0.8);
       }
 
       return next;
@@ -346,44 +360,45 @@ export function useChaosMode() {
       }
       wasAnimating = isAnimating;
 
-      if (inCooldown) {
-        cooldownAcc += dt;
-        if (cooldownAcc >= chainCooldown) {
-          inCooldown = false;
-          cooldownAcc = 0;
-        }
-      } else {
-        tickAcc += dt;
-
-        // ── Opt #7 + C3: adaptive tick period — slows down when board is saturated ─
-        // Opt #7 formula: effectivePeriod = baseTick × (1 + flipPct/100)
-        //   0 % active  → 1.0× base  (full speed, conquering fresh surface)
-        //  50 % active  → 1.5× base  (moderate throttle)
-        // 100 % active  → 2.0× base  (half speed, board is already saturated)
-        //
-        // C3 — saturation brake: above 85% active, add a further linear ramp
-        // so the engine breathes at extreme saturation and animations stay visible.
-        //  85 % → 1.0× extra,  100 % → 3.0× extra
-        //  Combined at 100 % flip + 100 % active: 2.0 × 3.0 = 6× base period
-        const pct = flipPctRef.current;
-        const satBrake = pct > 85 ? 1 + ((pct - 85) / 15) * 2 : 1.0;
-        const effectivePeriod = tickPeriod * (1 + pct / 100) * satBrake;
-
-        if (tickAcc >= effectivePeriod) {
-          // Pre-compute outside Zustand's setter so clone3D/chain work happens
-          // in the RAF callback, not inside React's state reconciliation.
-          const next = stepChain(cubiesRef.current);
-          if (next !== cubiesRef.current) {
-            // ── Opt #1: update metrics here (once per tick) so the auto-rotate
-            // RAF never has to scan the cube itself.
-            const sc = surfaceCoordsRef.current;
-            const { disparity, flipActive, edgeTotal } = computeChaosMetrics(next, sc);
-            disparityRef.current = disparity;
-            flipPctRef.current = edgeTotal > 0 ? Math.round((flipActive / edgeTotal) * 100) : 0;
-            setCubies(next);
+      // Advance each chain's cooldown independently
+      for (const chain of chains) {
+        if (chain.inCooldown) {
+          chain.cooldownAcc += dt;
+          if (chain.cooldownAcc >= chain.cooldownDuration) {
+            chain.inCooldown = false;
+            chain.cooldownAcc = 0;
           }
-          tickAcc = 0;
         }
+      }
+
+      tickAcc += dt;
+
+      // Gentle adaptive period — slows by at most 1.5× at full saturation.
+      // Replaces the old satBrake which could reach 6× and stall 5×5 boards.
+      const pct = flipPctRef.current;
+      const effectivePeriod = tickPeriod * (1 + pct / 200);
+
+      if (tickAcc >= effectivePeriod) {
+        let state = cubiesRef.current;
+        let changed = false;
+
+        for (const chain of chains) {
+          if (chain.inCooldown) continue;
+          const next = stepSingleChain(state, chain);
+          if (next !== state) {
+            state = next;
+            changed = true;
+          }
+        }
+
+        if (changed) {
+          const sc = surfaceCoordsRef.current;
+          const { disparity, flipActive, edgeTotal } = computeChaosMetrics(state, sc);
+          disparityRef.current = disparity;
+          flipPctRef.current = edgeTotal > 0 ? Math.round((flipActive / edgeTotal) * 100) : 0;
+          setCubies(state);
+        }
+        tickAcc = 0;
       }
 
       raf = requestAnimationFrame(loop);
