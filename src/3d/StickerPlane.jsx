@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import { easeInOutCubic } from '../utils/easing.js';
 import { useFrame } from '@react-three/fiber';
 import { Text } from '@react-three/drei';
 import * as THREE from 'three';
@@ -444,26 +445,22 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const flipToColor = useRef(null);
   const flipFromTexture = useRef(null);
   const flipToTexture = useRef(null);
-  const flipProgress = useRef(0);
-
   // Track if we're currently in a flip animation - prevents race condition
   // between React state updates and Three.js imperative rendering
   const isFlipping = useRef(false);
+  // Previous rawP value — used to detect the exact frame the midpoint is crossed.
+  const prevRawP = useRef(0);
+  // Flash timer for ring opacity spike at midpoint crossing; decays to 0 in useFrame.
+  const ringFlashRef = useRef(0);
   // Live ref to current texture so useFrame closures can access it without stale captures.
   const currTextureRef = useRef(null);
 
   // Dead tiles (at flip cap) are inert gray — used in useFrame and rendering
   const isDead = (meta?.flips ?? 0) >= FLIP_CAP;
 
-  // State for triggering particle and glow effects (needs re-render)
+  // State for triggering particle effects (needs re-render)
   const [particlesActive, setParticlesActive] = useState(false);
-  const [glowActive, setGlowActive] = useState(false);
-  const [currentGlowColor, setCurrentGlowColor] = useState(null);
   const [currentParticleColor, setCurrentParticleColor] = useState(null);
-  // During the flip animation the sticker must be DoubleSide so the new color covers
-  // the exposed cubie body face (dark octagon) during phase 2 (tile facing away).
-  // Restored to FrontSide when the flip completes.
-  const [flipActive, setFlipActive] = useState(false);
 
   const prevCurr = useRef(meta?.curr ?? 0);
   useEffect(() => {
@@ -495,15 +492,10 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         flipToTexture.current = faceTextures?.[curr] || null;
       }
       spinT.current = 1;
-      flipProgress.current = 0;
+      prevRawP.current = 0;
 
-      // Set the glow color to the ANTIPODAL color (what we're becoming)
-      // So if flipping FROM blue, we glow GREEN (the antipodal)
-      setCurrentGlowColor(fc[curr]);
       setCurrentParticleColor(fc[curr]);
       setParticlesActive(true);
-      setGlowActive(true);
-      setFlipActive(true); // switch sticker to DoubleSide for the flip duration
 
       play('/sounds/flip.mp3');
       vibrate(16);
@@ -550,95 +542,61 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     }
     isActiveRef.current = true;
 
-    // Flip animation with SNAPPY acceleration
+    // Flip animation — X-axis scale squish (identity collapse, not card rotation)
     if (spinT.current > 0 && groupRef.current) {
-      // Faster animation speed (5x instead of 4x) for snappier feel
       const dt = Math.min(delta * 5, spinT.current);
       spinT.current -= dt;
       const rawP = 1 - spinT.current;
 
-      // Snappy ease-out-back easing for acceleration
-      // Fast start, slight overshoot, smooth settle
-      const easeOutBack = (t) => {
-        const c1 = 1.70158;
-        const c3 = c1 + 1;
-        return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
-      };
+      // Ease the time variable, not the geometry — expressive control lives here.
+      const p = easeInOutCubic(rawP);
 
-      // Use different easing for different phases
-      let p;
-      if (rawP < 0.5) {
-        // First half: accelerate quickly (ease-out quad)
-        p = rawP * 2;
-        p = 1 - (1 - p) * (1 - p);
-        p = p * 0.5;
-      } else {
-        // Second half: snappy with slight overshoot
-        p = (rawP - 0.5) * 2;
-        p = easeOutBack(p);
-        p = 0.5 + p * 0.5;
-      }
+      // Nonlinear squish: 0→1→0 triangle over the flip.
+      // Power curve (0.85) slows the approach to zero so collapse feels intentional.
+      const t = p < 0.5 ? p * 2 : (1 - p) * 2;
+      const xScale = Math.pow(t, 0.85);
+      const yPunch = 1 + Math.sin(p * Math.PI) * 0.12;
 
-      flipProgress.current = rawP;
+      // Micro z-shear: directional crossing cue without Y-rotation.
+      const shear = Math.sin(p * Math.PI) * 0.04;
 
-      let angle;
-      if (rawP < 0.5) {
-        // First half: quick snap towards the flip
-        angle = p * Math.PI;
-      } else {
-        // Second half: complete with snappy overshoot
-        const overshoot = Math.sin((rawP - 0.5) * Math.PI * 2) * 0.2;
-        angle = Math.PI + overshoot;
-      }
+      groupRef.current.scale.set(xScale, yPunch, 1);
+      groupRef.current.rotation.y = rot[1]; // fixed — never animates
+      groupRef.current.rotation.z = rot[2] + shear;
 
-      groupRef.current.rotation.y = rot[1] + angle;
-
-      // Punchier scale animation - bigger at midpoint
-      const scalePunch = Math.sin(rawP * Math.PI);
-      const scale = 1 + scalePunch * 0.2;
-      groupRef.current.scale.set(scale, scale, 1);
-
-      // Animate color/texture through the flip - switch at midpoint
-      // Only for standard materials (shader materials handle color via uniforms)
-      if (flipFromColor.current && flipToColor.current) {
+      // One-shot color swap at the sacred frame: fire exactly when xScale === 0.
+      if (prevRawP.current < 0.5 && rawP >= 0.5) {
         const mat = meshRef.current?.material;
-        if (!mat) {
-          // no-op
-        } else if (mat.color) {
-          if (rawP < 0.5) {
-            const tex = flipFromTexture.current;
-            mat.map = tex || null;
-            mat.color.set(tex ? '#ffffff' : flipFromColor.current);
-            mat.needsUpdate = true;
-          } else {
-            const tex = flipToTexture.current;
-            mat.map = tex || null;
-            mat.color.set(tex ? '#ffffff' : flipToColor.current);
-            mat.needsUpdate = true;
-          }
-        } else if (mat.uniforms?.baseColor) {
-          const targetColor = rawP < 0.5 ? flipFromColor.current : flipToColor.current;
-          const newMat = getTileStyleMaterial(tileStyle, targetColor, false, null);
+        if (mat?.color) {
+          const tex = flipToTexture.current;
+          mat.map = tex || null;
+          mat.color.set(tex ? '#ffffff' : flipToColor.current);
+          mat.needsUpdate = true; // single GPU upload, not per-frame
+        } else if (mat?.uniforms?.baseColor) {
+          const newMat = getTileStyleMaterial(tileStyle, flipToColor.current, false, null);
           meshRef.current.material = newMat;
         }
+        // Ring opacity spike — event horizon signal. Clamp write, no stacking.
+        if (ringRef.current) {
+          ringRef.current.material.opacity = 0.9;
+          ringFlashRef.current = 1;
+        }
       }
+      prevRawP.current = rawP;
 
       if (spinT.current <= 0) {
-        // Release animation lock - allow React state to control color again
         isFlipping.current = false;
-        groupRef.current.rotation.y = rot[1];
         groupRef.current.scale.set(1, 1, 1);
-        // Start shake animation after flip completes
+        groupRef.current.rotation.y = rot[1];
+        groupRef.current.rotation.z = rot[2];
         shakeT.current = 0.4;
-        setGlowActive(false);
-        setFlipActive(false); // restore FrontSide now that back face is no longer needed
         flipFromColor.current = null;
         flipToColor.current = null;
         flipFromTexture.current = null;
         flipToTexture.current = null;
-        flipProgress.current = 0;
-        // Force set the final color/texture correctly
-        // Use currTextureRef (includes biome ground texture) instead of faceTextures
+        prevRawP.current = 0;
+        // Force set the final color/texture correctly.
+        // Use currTextureRef (includes biome ground texture) instead of faceTextures.
         const mat = meshRef.current?.material;
         if (mat?.color) {
           const finalTex = currTextureRef.current;
@@ -672,6 +630,11 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     if (ringRef.current) {
       const s = 1 + (Math.sin(pulseT.current) * 0.08);
       ringRef.current.scale.setScalar(s);
+      // Midpoint flash decay — frame-rate independent, clamps to base opacity.
+      if (ringFlashRef.current > 0) {
+        ringFlashRef.current = Math.max(0, ringFlashRef.current - delta * 3);
+        ringRef.current.material.opacity = 0.85 + ringFlashRef.current * 0.05;
+      }
     }
 
     if (glowRef.current) {
@@ -862,7 +825,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
             <meshStandardMaterial
               color={materialColor}
               map={hollow ? null : currTexture}
-              side={flipActive ? THREE.DoubleSide : THREE.FrontSide}
+              side={THREE.FrontSide}
               roughness={0.3}
               metalness={0.05}
               envMapIntensity={0.3}
@@ -1045,14 +1008,6 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
             );
           })}
         </>
-      )}
-
-      {/* Antipodal glow fill effect during flip - only mounted when active */}
-      {glowActive && (
-        <AntipodalGlowFill
-          active={glowActive}
-          color={currentGlowColor}
-        />
       )}
 
       {/* Particle burst effect during flip - only mounted when active */}
