@@ -18,7 +18,7 @@
 import { useEffect, useRef, useCallback, useMemo } from 'react';
 import { useGameStore } from './useGameStore.js';
 import { buildManifoldGridMap, flipStickerPair, getManifoldNeighbors, isOnSeam, isCrossFaceNeighbor } from '../game/manifoldLogic.js';
-import { getStickerWorldPos } from '../game/coordinates.js';
+import { getStickerWorldPos, getManifoldGridId } from '../game/coordinates.js';
 import { FLIP_CAP } from '../utils/constants.js';
 
 // ─── Module-level pure helpers ────────────────────────────────────────────────
@@ -151,8 +151,16 @@ export function useChaosMode() {
       flipPctRef.current = edgeTotal > 0 ? Math.round((flipActive / edgeTotal) * 100) : 0;
     }
 
+    // Reset disparity death log each time chaos starts fresh
+    useGameStore.getState().clearDisparityGame();
+
     let raf = 0, last = performance.now(), tickAcc = 0;
     let wasAnimating = !!animStateRef.current;
+
+    // ── Death-tracking state for Disparity Mode ────────────────────────────
+    const deadTileSet = new Set(); // keys of already-dead stickers
+    let deathRank = 0;
+    let winnerAnnounced = false;
 
     // ── Level config: 5 levels (index 0 = off) ───────────────────────────────
     // L1: single slow chain — intro to the mechanic
@@ -397,6 +405,42 @@ export function useChaosMode() {
           const { disparity, flipActive, edgeTotal } = computeChaosMetrics(state, sc);
           disparityRef.current = disparity;
           flipPctRef.current = edgeTotal > 0 ? Math.round((flipActive / edgeTotal) * 100) : 0;
+
+          // ── Disparity Mode: detect newly dead tiles each tick ─────────────
+          const S = sizeRef.current;
+          let alive = 0;
+          const newDeaths = [];
+          for (const [x, y, z] of sc) {
+            const c = state[x][y][z];
+            for (const [dirKey, st] of Object.entries(c.stickers)) {
+              if ((st.flips || 0) >= FLIP_CAP) {
+                const k = `${x},${y},${z},${dirKey}`;
+                if (!deadTileSet.has(k)) { deadTileSet.add(k); newDeaths.push(st); }
+              } else {
+                alive++;
+              }
+            }
+          }
+          if (newDeaths.length > 0) {
+            const store = useGameStore.getState();
+            for (const st of newDeaths) {
+              deathRank++;
+              store.addDisparityDeath({ id: Date.now() + Math.random(), gridId: getManifoldGridId(st, S), rank: deathRank, timestamp: Date.now() });
+            }
+          }
+          if (!winnerAnnounced && alive === 1) {
+            winnerAnnounced = true;
+            outer: for (const [x, y, z] of sc) {
+              const c = state[x][y][z];
+              for (const [dirKey, st] of Object.entries(c.stickers)) {
+                if ((st.flips || 0) < FLIP_CAP) {
+                  useGameStore.getState().setDisparityWinner({ gridId: getManifoldGridId(st, S) });
+                  break outer;
+                }
+              }
+            }
+          }
+
           setCubies(state);
         }
         tickAcc = 0;
