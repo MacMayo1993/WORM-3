@@ -452,6 +452,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const prevRawP = useRef(0);
   // Flash timer for ring opacity spike at midpoint crossing; decays to 0 in useFrame.
   const ringFlashRef = useRef(0);
+  // Overlay ref for antipodal color bleed during flip transitions.
+  const flipOverlayRef = useRef();
   // Live ref to current texture so useFrame closures can access it without stale captures.
   const currTextureRef = useRef(null);
 
@@ -544,7 +546,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
     // Flip animation — X-axis scale squish (identity collapse, not card rotation)
     if (spinT.current > 0 && groupRef.current) {
-      const dt = Math.min(delta * 5, spinT.current);
+      const dt = Math.min(delta * 2, spinT.current);
       spinT.current -= dt;
       const rawP = 1 - spinT.current;
 
@@ -563,6 +565,29 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       groupRef.current.scale.set(xScale, yPunch, 1);
       groupRef.current.rotation.y = rot[1]; // fixed — never animates
       groupRef.current.rotation.z = rot[2] + shear;
+
+      // Vibration: tile strains against the manifold crossing, peaks at midpoint.
+      const vibEnv = Math.sin(rawP * Math.PI);
+      const jX = Math.sin(rawP * Math.PI * 18) * 0.022 * vibEnv;
+      const jY = Math.cos(rawP * Math.PI * 13) * 0.014 * vibEnv;
+      groupRef.current.position.x = pos[0] + jX;
+      groupRef.current.position.y = pos[1] + jY;
+
+      // Antipodal color bleed overlay — both identities visible around the crossing.
+      if (flipOverlayRef.current) {
+        const mat = flipOverlayRef.current.material;
+        if (rawP < 0.5) {
+          // Incoming color bleeds through as the tile collapses toward zero width.
+          const bleed = Math.pow(rawP * 2, 2.0);
+          if (flipToColor.current) mat.color.set(flipToColor.current);
+          mat.opacity = bleed * 0.6;
+        } else {
+          // Original color echoes as the new identity expands out.
+          const echo = 1 - Math.pow((rawP - 0.5) * 2, 0.5);
+          if (flipFromColor.current) mat.color.set(flipFromColor.current);
+          mat.opacity = echo * 0.4;
+        }
+      }
 
       // One-shot color swap at the sacred frame: fire exactly when xScale === 0.
       if (prevRawP.current < 0.5 && rawP >= 0.5) {
@@ -589,6 +614,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         groupRef.current.scale.set(1, 1, 1);
         groupRef.current.rotation.y = rot[1];
         groupRef.current.rotation.z = rot[2];
+        groupRef.current.position.set(pos[0], pos[1], pos[2]);
+        if (flipOverlayRef.current) flipOverlayRef.current.material.opacity = 0;
         shakeT.current = 0.4;
         flipFromColor.current = null;
         flipToColor.current = null;
@@ -876,6 +903,12 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           )}
         </group>
       </group>
+
+      {/* Color bleed overlay — both antipodal colors mix around the manifold crossing */}
+      <mesh ref={flipOverlayRef} position={[0, 0, 0.003]}>
+        <primitive object={_sharedStickerGeo} attach="geometry" />
+        <meshBasicMaterial transparent opacity={0} blending={THREE.AdditiveBlending} depthWrite={false} />
+      </mesh>
 
       {/* City Biome buildings — kept mounted during rotation so they don't pop/glitch */}
       {biomeEnabled && !isDead && stableCity && (
