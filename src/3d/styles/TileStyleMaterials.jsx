@@ -24,6 +24,12 @@ export const sharedTremorState = {
   mult: 1,  // 1 + surge * 4 — position scale-factor used by tremor code
 };
 
+// ─── Flip burst map ───────────────────────────────────────────────────────────
+// Written by StickerPlane during a flip (key = sticker gridId, value = rawP
+// 0→1). Read by WormholeTunnel to drive the arch-lift and opacity burst.
+// Entries are deleted when the flip completes (spinT hits 0).
+export const flipBurstMap = new Map();
+
 /**
  * Recompute tremor state from the current elapsed clock time.
  * Must be called once per frame from CubeAssembly's useFrame, before any
