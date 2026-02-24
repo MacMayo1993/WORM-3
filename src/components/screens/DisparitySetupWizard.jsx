@@ -1,73 +1,14 @@
 import React, { useState } from 'react';
 
-const DISPARITY_LABELS = ['—', 'Low', 'Medium', 'High', 'Extreme', 'Apocalypse'];
-
-const DISPARITY_COLORS = {
-  1: '#4ade80',
-  2: '#facc15',
-  3: '#fb923c',
-  4: '#f87171',
-  5: '#dc2626',
-};
-
-const btnBase = {
-  border: '2px solid rgba(255,255,255,0.15)',
-  borderRadius: '8px',
-  padding: '10px 20px',
-  fontSize: '14px',
-  fontFamily: "'Courier New', monospace",
-  cursor: 'pointer',
-  fontWeight: 'bold',
-  letterSpacing: '0.04em',
-  transition: 'all 0.15s ease',
-};
-
-const SizeButton = ({ value, selected, onClick }) => (
-  <button
-    onClick={onClick}
-    style={{
-      ...btnBase,
-      background: selected ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.05)',
-      borderColor: selected ? '#ef4444' : 'rgba(255,255,255,0.15)',
-      color: selected ? '#fff' : 'rgba(255,255,255,0.6)',
-      minWidth: '64px',
-    }}
-  >
-    {value}×{value}
-  </button>
-);
-
-const Toggle = ({ label, checked, onChange }) => (
-  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', color: 'rgba(255,255,255,0.75)', fontSize: '13px', fontFamily: "'Courier New', monospace" }}>
-    <div
-      onClick={() => onChange(!checked)}
-      style={{
-        width: '36px', height: '20px', borderRadius: '10px',
-        background: checked ? '#ef4444' : 'rgba(255,255,255,0.15)',
-        position: 'relative', cursor: 'pointer', flexShrink: 0, transition: 'background 0.2s',
-      }}
-    >
-      <div style={{
-        position: 'absolute', top: '3px',
-        left: checked ? '19px' : '3px',
-        width: '14px', height: '14px', borderRadius: '50%',
-        background: '#fff', transition: 'left 0.2s',
-      }} />
-    </div>
-    {label}
-  </label>
-);
+const LEVEL_LABELS = { 1: 'Low', 2: 'Medium', 3: 'High', 4: 'Extreme', 5: 'Maximum' };
+const LEVEL_ACCENT = { 1: '#34c759', 2: '#ffcc00', 3: '#ff9500', 4: '#ff3b30', 5: '#af52de' };
 
 /**
- * DisparitySetupWizard — shown when Disparity Mode is launched from the main menu.
+ * DisparitySetupWizard
  *
- * Player selects:
- *   • Cube size (2–5)
- *   • Disparity level (1–5)
- *   • Elements: visual mode, flip mode, show tunnels
- *
- * After confirming, the cube starts SOLVED and the player makes the first
- * stochastic flip to kick off the disparity cascade.
+ * Clean, light-mode setup screen (Apple/Google aesthetic).
+ * Lets the player pick cube size, disparity level, and a few gameplay toggles
+ * before the game starts on a solved cube.
  */
 const DisparitySetupWizard = ({ onStart, onCancel }) => {
   const [cubeSize, setCubeSize] = useState(3);
@@ -76,142 +17,176 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
   const [flipMode, setFlipMode] = useState(true);
   const [showTunnels, setShowTunnels] = useState(true);
 
-  const accentColor = DISPARITY_COLORS[disparityLevel];
-
-  const handleStart = () => {
-    onStart({ cubeSize, disparityLevel, visualMode, flipMode, showTunnels });
-  };
+  const accent = LEVEL_ACCENT[disparityLevel];
 
   return (
     <div style={{
       position: 'fixed', inset: 0,
-      background: 'rgba(0,0,0,0.92)',
+      background: 'rgba(242,242,247,0.96)',
+      backdropFilter: 'blur(20px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       zIndex: 800,
-      fontFamily: "'Courier New', monospace",
+      fontFamily: "-apple-system, 'Helvetica Neue', Roboto, sans-serif",
     }}>
       <div style={{
-        background: 'rgba(10,10,10,0.97)',
-        border: `2px solid ${accentColor}55`,
-        borderRadius: '16px',
-        padding: '36px 40px',
-        maxWidth: '440px',
-        width: '90vw',
-        display: 'flex', flexDirection: 'column', gap: '28px',
-        boxShadow: `0 0 40px ${accentColor}22`,
+        background: '#ffffff',
+        borderRadius: '20px',
+        padding: '32px 28px',
+        maxWidth: '400px',
+        width: '92vw',
+        boxShadow: '0 8px 40px rgba(0,0,0,0.12)',
+        display: 'flex', flexDirection: 'column', gap: '24px',
       }}>
+
         {/* Header */}
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '28px', fontWeight: 'bold', color: accentColor, letterSpacing: '0.1em' }}>
-            ⚡ DISPARITY MODE
+        <div>
+          <div style={{ fontSize: '22px', fontWeight: '700', color: '#1c1c1e', letterSpacing: '-0.3px' }}>
+            Disparity Mode
           </div>
-          <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginTop: '6px', letterSpacing: '0.06em' }}>
-            Last tile standing wins by least observation
+          <div style={{ fontSize: '14px', color: '#8e8e93', marginTop: '4px' }}>
+            Last tile surviving wins by least observation
           </div>
         </div>
 
         {/* Cube Size */}
-        <div>
-          <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.45)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '10px' }}>
-            Cube Size
-          </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
+        <Section label="Cube Size">
+          <div style={{ display: 'flex', background: '#f2f2f7', borderRadius: '10px', padding: '3px', gap: '2px' }}>
             {[2, 3, 4, 5].map(n => (
-              <SizeButton key={n} value={n} selected={cubeSize === n} onClick={() => setCubeSize(n)} />
+              <button
+                key={n}
+                onClick={() => setCubeSize(n)}
+                style={{
+                  flex: 1, padding: '7px 0', border: 'none', borderRadius: '8px', fontSize: '14px',
+                  fontWeight: cubeSize === n ? '600' : '400',
+                  background: cubeSize === n ? '#ffffff' : 'transparent',
+                  color: cubeSize === n ? '#1c1c1e' : '#8e8e93',
+                  cursor: 'pointer',
+                  boxShadow: cubeSize === n ? '0 1px 4px rgba(0,0,0,0.12)' : 'none',
+                  transition: 'all 0.15s',
+                  fontFamily: 'inherit',
+                }}
+              >
+                {n}×{n}
+              </button>
             ))}
           </div>
-        </div>
+        </Section>
 
         {/* Disparity Level */}
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '10px' }}>
-            <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.45)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-              Disparity Level
-            </span>
-            <span style={{ fontSize: '14px', fontWeight: 'bold', color: accentColor }}>
-              {DISPARITY_LABELS[disparityLevel]}
-            </span>
-          </div>
+        <Section label={<span>Disparity Level <span style={{ color: accent, fontWeight: '600' }}>{LEVEL_LABELS[disparityLevel]}</span></span>}>
           <div style={{ display: 'flex', gap: '6px' }}>
             {[1, 2, 3, 4, 5].map(n => (
               <button
                 key={n}
                 onClick={() => setDisparityLevel(n)}
                 style={{
-                  ...btnBase,
-                  flex: 1, padding: '8px 0',
-                  background: disparityLevel >= n ? `${DISPARITY_COLORS[n]}33` : 'rgba(255,255,255,0.04)',
-                  borderColor: disparityLevel === n ? DISPARITY_COLORS[n] : 'rgba(255,255,255,0.1)',
-                  color: disparityLevel >= n ? DISPARITY_COLORS[n] : 'rgba(255,255,255,0.3)',
-                  fontSize: '13px',
+                  flex: 1, padding: '9px 0', border: `1.5px solid ${disparityLevel === n ? LEVEL_ACCENT[n] : '#e5e5ea'}`,
+                  borderRadius: '10px', fontSize: '14px', fontWeight: disparityLevel === n ? '700' : '400',
+                  background: disparityLevel === n ? `${LEVEL_ACCENT[n]}18` : '#f9f9fb',
+                  color: disparityLevel === n ? LEVEL_ACCENT[n] : '#8e8e93',
+                  cursor: 'pointer', transition: 'all 0.15s',
+                  fontFamily: 'inherit',
                 }}
               >
                 {n}
               </button>
             ))}
           </div>
+        </Section>
+
+        {/* Visual Mode */}
+        <Section label="View">
+          <div style={{ display: 'flex', background: '#f2f2f7', borderRadius: '10px', padding: '3px', gap: '2px' }}>
+            {['classic', 'grid', 'sudokube'].map(vm => (
+              <button
+                key={vm}
+                onClick={() => setVisualMode(vm)}
+                style={{
+                  flex: 1, padding: '7px 0', border: 'none', borderRadius: '8px', fontSize: '13px',
+                  fontWeight: visualMode === vm ? '600' : '400',
+                  background: visualMode === vm ? '#ffffff' : 'transparent',
+                  color: visualMode === vm ? '#1c1c1e' : '#8e8e93',
+                  cursor: 'pointer', textTransform: 'capitalize',
+                  boxShadow: visualMode === vm ? '0 1px 4px rgba(0,0,0,0.12)' : 'none',
+                  transition: 'all 0.15s',
+                  fontFamily: 'inherit',
+                }}
+              >
+                {vm}
+              </button>
+            ))}
+          </div>
+        </Section>
+
+        {/* Toggles */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+          <ToggleRow label="Flip Mode" sub="Allow manual tile flips" value={flipMode} onChange={setFlipMode} />
+          <div style={{ height: '1px', background: '#f2f2f7', margin: '0 0 0 0' }} />
+          <ToggleRow label="Wormhole Tunnels" sub="Show antipodal connections" value={showTunnels} onChange={setShowTunnels} />
         </div>
 
-        {/* Elements */}
-        <div>
-          <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.45)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '12px' }}>
-            Elements
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {/* Visual mode row */}
-            <div style={{ display: 'flex', gap: '6px' }}>
-              {['classic', 'grid', 'sudokube'].map(vm => (
-                <button
-                  key={vm}
-                  onClick={() => setVisualMode(vm)}
-                  style={{
-                    ...btnBase,
-                    flex: 1, padding: '6px 0', fontSize: '11px',
-                    background: visualMode === vm ? 'rgba(99,102,241,0.25)' : 'rgba(255,255,255,0.04)',
-                    borderColor: visualMode === vm ? '#6366f1' : 'rgba(255,255,255,0.1)',
-                    color: visualMode === vm ? '#a5b4fc' : 'rgba(255,255,255,0.35)',
-                    textTransform: 'capitalize',
-                  }}
-                >
-                  {vm}
-                </button>
-              ))}
-            </div>
-            <Toggle label="Flip Mode (manual flips enabled)" checked={flipMode} onChange={setFlipMode} />
-            <Toggle label="Show Wormhole Tunnels" checked={showTunnels} onChange={setShowTunnels} />
-          </div>
-        </div>
-
-        {/* Action buttons */}
-        <div style={{ display: 'flex', gap: '12px', marginTop: '4px' }}>
+        {/* Actions */}
+        <div style={{ display: 'flex', gap: '10px' }}>
           <button
             onClick={onCancel}
             style={{
-              ...btnBase,
-              flex: 1,
-              background: 'rgba(255,255,255,0.06)',
-              color: 'rgba(255,255,255,0.5)',
+              flex: 1, padding: '14px', border: '1.5px solid #e5e5ea', borderRadius: '12px',
+              fontSize: '16px', fontWeight: '500', background: '#f9f9fb', color: '#8e8e93',
+              cursor: 'pointer', fontFamily: 'inherit',
             }}
           >
-            ← Back
+            Back
           </button>
           <button
-            onClick={handleStart}
+            onClick={() => onStart({ cubeSize, disparityLevel, visualMode, flipMode, showTunnels })}
             style={{
-              ...btnBase,
-              flex: 2,
-              background: `${accentColor}22`,
-              borderColor: accentColor,
-              color: accentColor,
-              fontSize: '15px',
+              flex: 2, padding: '14px', border: 'none', borderRadius: '12px',
+              fontSize: '16px', fontWeight: '600', background: accent, color: '#fff',
+              cursor: 'pointer', fontFamily: 'inherit',
+              boxShadow: `0 4px 16px ${accent}55`,
             }}
           >
-            ⚡ Begin
+            Begin
           </button>
         </div>
       </div>
     </div>
   );
 };
+
+const Section = ({ label, children }) => (
+  <div>
+    <div style={{ fontSize: '13px', fontWeight: '600', color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>
+      {label}
+    </div>
+    {children}
+  </div>
+);
+
+const ToggleRow = ({ label, sub, value, onChange }) => (
+  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0' }}>
+    <div>
+      <div style={{ fontSize: '15px', fontWeight: '400', color: '#1c1c1e' }}>{label}</div>
+      {sub && <div style={{ fontSize: '12px', color: '#8e8e93', marginTop: '1px' }}>{sub}</div>}
+    </div>
+    <div
+      onClick={() => onChange(!value)}
+      style={{
+        width: '51px', height: '31px', borderRadius: '16px', flexShrink: 0,
+        background: value ? '#34c759' : '#e5e5ea',
+        position: 'relative', cursor: 'pointer', transition: 'background 0.2s',
+      }}
+    >
+      <div style={{
+        position: 'absolute', top: '3px',
+        left: value ? '23px' : '3px',
+        width: '25px', height: '25px', borderRadius: '50%',
+        background: '#fff',
+        boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
+        transition: 'left 0.2s',
+      }} />
+    </div>
+  </div>
+);
 
 export default DisparitySetupWizard;
