@@ -20,6 +20,7 @@ const _up = new THREE.Vector3(0, 1, 0);
 const _right = new THREE.Vector3();
 const _trueUp = new THREE.Vector3();
 const _offsetVec = new THREE.Vector3();
+const _spreadVec = new THREE.Vector3();
 const _c1 = new THREE.Color();
 const _c2 = new THREE.Color();
 const _cTemp = new THREE.Color();
@@ -35,6 +36,11 @@ const FACE_NORM_LOCAL = {
 const OCTAGON_MAX = 8;
 // OCT_RADIUS increased by 18% from 0.30 → 0.354 (ring radius at each tile face, world units)
 const OCT_RADIUS = 0.354;
+// SPREAD_RADIUS: lateral fan radius at interior control points — each strand fans out
+// to its own radial direction through the cube interior, routing along a different
+// inter-cubie gap corridor (cubie gaps are at ±0.5 from each cubie centre).
+// All 8 paths converge back to OCT_RADIUS at the destination, forming the stop sign.
+const SPREAD_RADIUS = 0.5;
 
 // Tile face offset from cubie centre to surface
 const FACE_OFFSET = 0.52;
@@ -207,17 +213,25 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
         }
       }
 
-      // Octagon ring offset — all 4 cubic Bézier points get the same perpendicular
-      // displacement, so the 8 strands form a clean parallel octagonal tube cross-section.
+      // Each strand fans to its own radial direction through the cube interior:
+      // - v0 / v3 (tile endpoints): tight OCT_RADIUS ring → the stop-sign octagon
+      //   at each tile's back face
+      // - v1 / v2 (interior CPs): wider SPREAD_RADIUS fan → strand 0 arcs up, strand 2
+      //   arcs right, strand 4 arcs down, strand 6 arcs left, diagonals in between.
+      //   Depth-test occlusion by solid cubie geometry makes each arc thread visibly
+      //   through a different inter-cubie gap corridor.
       const cosA = Math.cos(config.angle);
       const sinA = Math.sin(config.angle);
       _offsetVec.set(0, 0, 0)
-        .addScaledVector(_right, cosA * config.radius)
-        .addScaledVector(_trueUp, sinA * config.radius);
+        .addScaledVector(_right, cosA * OCT_RADIUS)
+        .addScaledVector(_trueUp, sinA * OCT_RADIUS);
+      _spreadVec.set(0, 0, 0)
+        .addScaledVector(_right, cosA * SPREAD_RADIUS)
+        .addScaledVector(_trueUp, sinA * SPREAD_RADIUS);
 
       curveRef.current.v0.copy(_vStart).add(_offsetVec);
-      curveRef.current.v1.copy(_cp1).add(_offsetVec);
-      curveRef.current.v2.copy(_cp2).add(_offsetVec);
+      curveRef.current.v1.copy(_cp1).add(_spreadVec);
+      curveRef.current.v2.copy(_cp2).add(_spreadVec);
       curveRef.current.v3.copy(_vEnd).add(_offsetVec);
 
       const points = curveRef.current.getPoints(29);
