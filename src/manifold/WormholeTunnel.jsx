@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { FLIP_CAP, getHalfLifeMultiplier } from '../utils/constants.js';
 import { flipBurstMap } from '../3d/styles/TileStyleMaterials.jsx';
+import { calculateSmartControlPoint } from '../utils/smartRouting.js';
 
 // Cached vectors — no per-frame allocations
 const _wPos1 = new THREE.Vector3();
@@ -45,6 +46,10 @@ const SPREAD_RADIUS = 0.5;
 // Tile face offset from cubie centre to surface
 const FACE_OFFSET = 0.52;
 
+// Pre-allocated scratch arrays for calculateSmartControlPoint — avoids per-frame heap allocation
+const _pos1Arr = [0, 0, 0];
+const _pos2Arr = [0, 0, 0];
+
 // Danger zone: escalates from flip 9 to FLIP_CAP-1
 const DANGER_START = 9;
 const DANGER_RANGE = FLIP_CAP - 1 - DANGER_START; // 16
@@ -62,6 +67,15 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
     new THREE.Vector3(),
     new THREE.Vector3()
   ));
+
+  // Deterministic routing side — derived from tile-pair identity so it never
+  // changes as the cube rotates.  Using null here would let calculateSmartControlPoint
+  // auto-detect sign from the world-space midpoint, which flips when the midpoint
+  // crosses zero during rotation and makes the whole tube snap visibly.
+  const side = useMemo(() => {
+    const code = [...(gridId1 + gridId2)].reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+    return code % 2 === 0 ? 1 : -1;
+  }, [gridId1, gridId2]);
 
   // Strands fill the octagon one-by-one (1 → 8) as flips increase
   const strandCount = Math.min(Math.max(1, flips), OCTAGON_MAX);
@@ -156,14 +170,14 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
     const burstRaw = Math.max(flipBurstMap.get(gridId1) ?? 0, flipBurstMap.get(gridId2) ?? 0);
     const burstEnv = Math.sin(burstRaw * Math.PI);
 
-    // --- Interior cubic Bézier control points ---
-    // Each CP dives inward from its tile's inner face along the (negated) face normal.
-    // Depth scales with cube size so paths reach well into the interior for all sizes.
-    // The two inward normals point toward each other (antipodal faces), producing a
-    // symmetric S-curve that threads through the cube without arching around the outside.
-    const inwardDepth = (size - 1) * 0.55 + 0.7;
-    _cp1.copy(_vStart).addScaledVector(_faceNorm1, -inwardDepth);
-    _cp2.copy(_vEnd).addScaledVector(_faceNorm2, -inwardDepth);
+    // --- Shared control point (computed once; all 8 strands follow the same route) ---
+    // side is a stable ±1 keyed to the tile-pair identity — never the world-space
+    // midpoint sign, which flips as the cube rotates and snaps the tube across the cube.
+    _pos1Arr[0] = _vStart.x; _pos1Arr[1] = _vStart.y; _pos1Arr[2] = _vStart.z;
+    _pos2Arr[0] = _vEnd.x;   _pos2Arr[1] = _vEnd.y;   _pos2Arr[2] = _vEnd.z;
+    const baseCP = calculateSmartControlPoint(_pos1Arr, _pos2Arr, size, side, _explosionFactor);
+    _cp1.copy(baseCP);
+    _cp2.copy(baseCP);
 
     // Tug-of-war: the whole tube gently leans toward the dominant endpoint.
     // Reduced multiplier (×0.35) keeps the lean subtle so interior routing is preserved.
