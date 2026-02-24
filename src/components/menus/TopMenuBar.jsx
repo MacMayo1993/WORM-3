@@ -172,7 +172,7 @@ const TopMenuBar = ({
         <span className="top-bar-progress" style={{ marginLeft: '12px' }}>{faceStats.percent}%</span>
         {chaosMode && (
           <span className="chaos-pill" style={{ marginLeft: '12px' }}>
-            CHAOS L{chaosLevel}
+            DISPARITY L{chaosLevel}
           </span>
         )}
         {flipMode && (

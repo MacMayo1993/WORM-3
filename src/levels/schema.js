@@ -111,7 +111,7 @@ export const FEATURE_NAMES = {
   rotations: 'Rotations',
   tunnels: 'Wormhole Tunnels (T)',
   flips: 'Antipodal Flip (Click)',
-  chaos: 'Chaos Mode',
+  chaos: 'Disparity Mode',
   explode: 'Explode View (X)',
   parity: 'Parity Indicators',
   net: 'Net View (N)',

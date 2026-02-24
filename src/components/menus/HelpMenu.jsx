@@ -71,7 +71,7 @@ const HelpMenu = ({ onClose }) => {
             <div style={{ paddingLeft: '16px', fontSize: '14px' }}>
               <p style={{ margin: '8px 0' }}><strong>Tunnels:</strong> The colorful tunnels show connections between opposite points</p>
               <p style={{ margin: '8px 0' }}><strong>Flip Mode:</strong> Turn color flipping on or off</p>
-              <p style={{ margin: '8px 0' }}><strong>Chaos Mode:</strong> Watch instability spread across the cube!</p>
+              <p style={{ margin: '8px 0' }}><strong>Disparity Mode:</strong> Watch instability spread across the cube!</p>
             </div>
           </section>
 
@@ -139,7 +139,7 @@ const HelpMenu = ({ onClose }) => {
               <p style={{ margin: '8px 0' }}><strong>T</strong> — Show/hide tunnels</p>
               <p style={{ margin: '8px 0' }}><strong>X</strong> — Toggle explosion view</p>
               <p style={{ margin: '8px 0' }}><strong>V</strong> — Change view mode</p>
-              <p style={{ margin: '8px 0' }}><strong>C</strong> — Turn chaos mode on/off</p>
+              <p style={{ margin: '8px 0' }}><strong>C</strong> — Turn Disparity Mode on/off</p>
               <p style={{ margin: '8px 0' }}><strong>P</strong> — Toggle Hands Mode</p>
               <p style={{ margin: '8px 0' }}><strong>Esc</strong> — Close menus / hide cursor / exit Hands Mode</p>
             </div>

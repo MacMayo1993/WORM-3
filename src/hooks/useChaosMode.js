@@ -166,7 +166,12 @@ export function useChaosMode() {
     const decayByLevel     = [0, 0.72, 0.82, 0.78, 0.88, 0.88];
     const cooldownByLevel  = [0, 1600, 900,  800,  450,  450];
 
-    const numChains      = numChainsByLevel[chaosLevel] || 1;
+    // Scale chain count proportionally with surface sticker count relative to 3×3.
+    // 3×3=54 stickers → scale 1×; 4×4=96 → 2×; 5×5=150 → 3×.
+    // This keeps chaos density (flips/sec/sticker) consistent across cube sizes.
+    const surfaceStickers = size * size * 6;
+    const sizeScale = Math.max(1, Math.ceil(surfaceStickers / 54));
+    const numChains = (numChainsByLevel[chaosLevel] || 1) * sizeScale;
     const tickPeriod     = delayByLevel[chaosLevel]    || 250;
     const basePropagation = basePropByLevel[chaosLevel] || 0.65;
     const strengthDecay  = decayByLevel[chaosLevel]    || 0.78;
@@ -257,13 +262,11 @@ export function useChaosMode() {
       chain.strength *= strengthDecay;
 
       if (chain.strength < 0.1) {
+        // Chain exhausted — reset immediately so chaos never stalls.
+        // Cooldown is reserved only for the board-fully-dead case (findChainStart returns null).
         chain.tile = null;
         chain.strength = 1.0;
         chain.visited = new Set();
-        chain.inCooldown = true;
-        chain.cooldownAcc = 0;
-        // Stochastic cooldown: randomise duration so concurrent chains desync naturally
-        chain.cooldownDuration = chainCooldown * (0.6 + Math.random() * 0.8);
         return next;
       }
 
@@ -338,12 +341,10 @@ export function useChaosMode() {
         chain.visited.add(`${nextTile.x},${nextTile.y},${nextTile.z},${nextTile.dirKey}`);
         chain.tile = nextTile;
       } else {
+        // No valid neighbor found — reset immediately and pick a new start next tick.
         chain.tile = null;
         chain.strength = 1.0;
         chain.visited = new Set();
-        chain.inCooldown = true;
-        chain.cooldownAcc = 0;
-        chain.cooldownDuration = chainCooldown * (0.6 + Math.random() * 0.8);
       }
 
       return next;
