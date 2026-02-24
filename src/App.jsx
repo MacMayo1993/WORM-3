@@ -426,9 +426,13 @@ export default function WORM3() {
   const handleDisparityFirstFlip = useCallback(() => {
     // Pick a random surface sticker and flip it as the opening move
     const surface = [];
-    for (const c of cubies) {
-      for (const dirKey of Object.keys(c.stickers)) {
-        surface.push({ pos: { x: c.x, y: c.y, z: c.z }, dirKey });
+    for (const L of cubies) {
+      for (const R of L) {
+        for (const c of R) {
+          for (const dirKey of Object.keys(c.stickers)) {
+            surface.push({ pos: { x: c.x, y: c.y, z: c.z }, dirKey });
+          }
+        }
       }
     }
     if (!surface.length) return;
