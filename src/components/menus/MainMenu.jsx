@@ -316,7 +316,7 @@ const MenuButton = ({ children, onClick, delay, icon, primary }) => {
   );
 };
 
-const MainMenu = ({ onPlay, onLevels, onFreeplay, onCoop, onSettings, onBiome }) => {
+const MainMenu = ({ onPlay, onLevels, onFreeplay, onCoop, onSettings, onBiome, onDisparity }) => {
   const [titleVisible, setTitleVisible] = useState(false);
   const [subtitleVisible, setSubtitleVisible] = useState(false);
 
@@ -420,19 +420,22 @@ const MainMenu = ({ onPlay, onLevels, onFreeplay, onCoop, onSettings, onBiome })
           <MenuButton onClick={onPlay} delay={600} icon="▶" primary>
             Play
           </MenuButton>
-          <MenuButton onClick={onLevels} delay={750} icon="◈">
+          <MenuButton onClick={onDisparity} delay={750} icon="⚡" style={{ color: '#ef4444' }}>
+            Disparity Mode
+          </MenuButton>
+          <MenuButton onClick={onLevels} delay={900} icon="◈">
             Levels
           </MenuButton>
-          <MenuButton onClick={onFreeplay} delay={900} icon="∞">
+          <MenuButton onClick={onFreeplay} delay={1000} icon="∞">
             Freeplay
           </MenuButton>
-          <MenuButton onClick={onCoop} delay={1000} icon="&#9775;">
+          <MenuButton onClick={onCoop} delay={1100} icon="&#9775;">
             Co-op Crawler
           </MenuButton>
-          <MenuButton onClick={onSettings} delay={1100} icon="⚙">
+          <MenuButton onClick={onSettings} delay={1200} icon="⚙">
             Settings
           </MenuButton>
-          <MenuButton onClick={onBiome} delay={1250} icon="🏙">
+          <MenuButton onClick={onBiome} delay={1300} icon="🏙">
             City Biome
           </MenuButton>
         </div>

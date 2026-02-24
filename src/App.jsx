@@ -104,6 +104,7 @@ import AntipodalModeEffects from './3d/AntipodalModeEffects.jsx';
 import AntipodalHUD from './components/overlays/AntipodalHUD.jsx';
 import AntipodalModeHUD from './components/overlays/AntipodalModeHUD.jsx';
 import EchoRotationIndicator from './components/overlays/EchoRotationIndicator.jsx';
+import DisparityHUD from './components/overlays/DisparityHUD.jsx';
 import { useAntipodalIntegrity } from './hooks/useAntipodalIntegrity.js';
 const PlatformerWormMode = React.lazy(() => import('./worm/PlatformerWormMode.jsx'));
 const HollowVoidCube = React.lazy(() => import('./3d/HollowVoidCube.jsx'));
@@ -382,6 +383,14 @@ export default function WORM3() {
   const handleMenuSettings = useCallback(() => {
     setShowSettings(true);
   }, [setShowSettings]);
+
+  const handleMenuDisparity = useCallback(() => {
+    useGameStore.getState().setShowMainMenu(false);
+    useGameStore.getState().clearLevel();
+    useGameStore.getState().clearDisparityGame();
+    setChaosLevel(5);
+    shuffle();
+  }, [shuffle, setChaosLevel]);
 
   const handleMenuCoop = useCallback(() => {
     useGameStore.getState().setShowMainMenu(false);
@@ -941,6 +950,7 @@ export default function WORM3() {
           faceColors={resolvedColors}
           cascadeCount={cascades.length}
           onShowSettings={() => setShowSettings(true)}
+          onHome={handleBackToMainMenu}
           currentLevelData={currentLevelData}
         />
 
@@ -968,6 +978,9 @@ export default function WORM3() {
 
         {/* Floating HUD — auto-fade parity/chaos notifications */}
         <FloatingHUD metrics={metrics} chaosLevel={chaosLevel} chaosMode={chaosMode} />
+
+        {/* Disparity HUD — RIP death log + winner announcement */}
+        {chaosMode && <DisparityHUD />}
 
         {/* Tile Leaderboard — live flip stats in chaos mode, toggled via Views sheet */}
         <TileLeaderboard cubies={cubies} size={size} chaosMode={chaosMode} visible={showLeaderboard} onClose={toggleLeaderboard} />
@@ -1048,6 +1061,7 @@ export default function WORM3() {
           onTeach={handleMenuTeach}
           onSettings={handleMenuSettings}
           onBiome={handleMenuBiome}
+          onDisparity={handleMenuDisparity}
         />
       )}
       {showLevelSelect && <LevelSelectScreen onSelectLevel={handleLevelSelect} onBack={handleBackToMainMenu} />}

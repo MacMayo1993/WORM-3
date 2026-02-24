@@ -185,6 +185,18 @@ export const useGameStore = create(
     })),
 
     // ========================================================================
+    // DISPARITY GAME STATE
+    // ========================================================================
+    // Each entry: { id, gridId, rank, timestamp }
+    disparityDeaths: [],
+    // Set when a single tile survives: { gridId }
+    disparityWinner: null,
+
+    addDisparityDeath: (death) => set((state) => ({ disparityDeaths: [...state.disparityDeaths, death] })),
+    setDisparityWinner: (winner) => set({ disparityWinner: winner }),
+    clearDisparityGame: () => set({ disparityDeaths: [], disparityWinner: null }),
+
+    // ========================================================================
     // ANIMATION STATE
     // ========================================================================
     animState: null, // { axis, dir, sliceIndex, t, isEcho? }
