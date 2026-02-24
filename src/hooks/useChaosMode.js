@@ -160,6 +160,7 @@ export function useChaosMode() {
     // ── Death-tracking state for Disparity Mode ────────────────────────────
     const deadTileSet = new Set(); // keys of already-dead stickers
     let deathRank = 0;
+    let pairDeathCount = 0; // one increment per tick that produces deaths (pair grouping)
     let winnerAnnounced = false;
 
     // ── Level config: 5 levels (index 0 = off) ───────────────────────────────
@@ -422,10 +423,11 @@ export function useChaosMode() {
             }
           }
           if (newDeaths.length > 0) {
+            pairDeathCount++;
             const store = useGameStore.getState();
             for (const st of newDeaths) {
               deathRank++;
-              store.addDisparityDeath({ id: Date.now() + Math.random(), gridId: getManifoldGridId(st, S), rank: deathRank, timestamp: Date.now() });
+              store.addDisparityDeath({ id: Date.now() + Math.random(), gridId: getManifoldGridId(st, S), rank: deathRank, pairRank: pairDeathCount, timestamp: Date.now() });
             }
           }
           if (!winnerAnnounced && alive === 1) {

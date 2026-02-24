@@ -426,7 +426,7 @@ const Worm = ({ position, rotation, scale = 1 }) => {
   );
 };
 
-const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay, mode, faceColors, faceTextures, faceRow, faceCol, faceSize, manifoldStyles, hollow, currentDir: _currentDir }) {
+const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay, mode, faceColors, faceTextures, faceRow, faceCol, faceSize, manifoldStyles, hollow, currentDir: _currentDir, deadRankMap }) {
   const fc = faceColors || FACE_COLORS;
   const biomeEnabled = useGameStore((s) => s.settings?.biomeMode?.enabled ?? false);
   const groupRef = useRef();
@@ -464,6 +464,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
   // Dead tiles (at flip cap) are inert gray — used in useFrame and rendering
   const isDead = (meta?.flips ?? 0) >= FLIP_CAP;
+  // Death rank from Disparity Mode — null if not in disparity game or tile not yet dead
+  const deadRank = isDead ? (deadRankMap?.get(stickerGridIdRef.current) ?? null) : null;
 
   // State for triggering particle effects (needs re-render)
   const [particlesActive, setParticlesActive] = useState(false);
@@ -992,6 +994,23 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
             <planeGeometry args={[0.36, 0.06]} />
             <meshStandardMaterial color="#555555" roughness={0.9} />
           </mesh>
+          {/* Disparity Mode: tile identity and death rank in original color */}
+          {deadRank != null && (
+            <>
+              {/* "RIP" in the arch area */}
+              <Text position={[0, 0.22, 0.006]} fontSize={0.075} color={origColor} anchorX="center" anchorY="middle" fontWeight={700} renderOrder={1} depthTest={false}>
+                RIP
+              </Text>
+              {/* Original grid ID below the cross */}
+              <Text position={[0, 0.03, 0.006]} fontSize={0.038} color={origColor} anchorX="center" anchorY="middle" renderOrder={1} depthTest={false}>
+                {stickerGridIdRef.current}
+              </Text>
+              {/* Death rank at the base */}
+              <Text position={[0, -0.09, 0.006]} fontSize={0.062} color={origColor} anchorX="center" anchorY="middle" fontWeight={700} renderOrder={1} depthTest={false}>
+                #{deadRank}
+              </Text>
+            </>
+          )}
         </group>
       )}
 

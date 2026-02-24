@@ -43,6 +43,7 @@ const CubeAssembly = React.memo(({
   onFaceRotationMode,
   handsMode,
   isBiomeMode,
+  deadRankMap,
 }) => {
   const cubieRefs = useRef([]);
   const controlsRef = useRef();
@@ -658,6 +659,7 @@ const CubeAssembly = React.memo(({
           faceColors={faceColors}
           faceTextures={faceTextures}
           manifoldStyles={manifoldStyles}
+          deadRankMap={deadRankMap}
         />
       ))}
       {showCursor && cursor && (

@@ -84,7 +84,7 @@ const faceValue = (dirKey, x, y, z, size) => {
 };
 
 const Cubie = React.forwardRef(function Cubie({
-  position, cubie, size, onPointerDown, visualMode, explosionFactor = 0, faceColors, faceTextures, manifoldStyles
+  position, cubie, size, onPointerDown, visualMode, explosionFactor = 0, faceColors, faceTextures, manifoldStyles, deadRankMap
 }, ref) {
   const hollowMode = useGameStore((state) => state.hollowMode);
   const mirrorMode = useGameStore((state) => state.mirrorMode);
@@ -304,12 +304,12 @@ const Cubie = React.forwardRef(function Cubie({
       {/* Stickers — frame-shaped when hollow, solid plane otherwise; none in mirror mode */}
       {visualMode !== 'wireframe' && !mirrorMode && (
         <>
-          {isEdge(position[2], (size - 1) / 2) && meta('PZ') && <StickerPlane currentDir="PZ" meta={meta('PZ')} pos={STICKER_POS.PZ} rot={STICKER_ROT.PZ} mode={visualMode} overlay={overlay('PZ')} faceColors={faceColors} faceTextures={faceTextures} faceSize={size} {...gridPos('PZ')} manifoldStyles={manifoldStyles} hollow={hollowMode} />}
-          {isEdge(position[2], -(size - 1) / 2) && meta('NZ') && <StickerPlane currentDir="NZ" meta={meta('NZ')} pos={STICKER_POS.NZ} rot={STICKER_ROT.NZ} mode={visualMode} overlay={overlay('NZ')} faceColors={faceColors} faceTextures={faceTextures} faceSize={size} {...gridPos('NZ')} manifoldStyles={manifoldStyles} hollow={hollowMode} />}
-          {isEdge(position[0], (size - 1) / 2) && meta('PX') && <StickerPlane currentDir="PX" meta={meta('PX')} pos={STICKER_POS.PX} rot={STICKER_ROT.PX} mode={visualMode} overlay={overlay('PX')} faceColors={faceColors} faceTextures={faceTextures} faceSize={size} {...gridPos('PX')} manifoldStyles={manifoldStyles} hollow={hollowMode} />}
-          {isEdge(position[0], -(size - 1) / 2) && meta('NX') && <StickerPlane currentDir="NX" meta={meta('NX')} pos={STICKER_POS.NX} rot={STICKER_ROT.NX} mode={visualMode} overlay={overlay('NX')} faceColors={faceColors} faceTextures={faceTextures} faceSize={size} {...gridPos('NX')} manifoldStyles={manifoldStyles} hollow={hollowMode} />}
-          {isEdge(position[1], (size - 1) / 2) && meta('PY') && <StickerPlane currentDir="PY" meta={meta('PY')} pos={STICKER_POS.PY} rot={STICKER_ROT.PY} mode={visualMode} overlay={overlay('PY')} faceColors={faceColors} faceTextures={faceTextures} faceSize={size} {...gridPos('PY')} manifoldStyles={manifoldStyles} hollow={hollowMode} />}
-          {isEdge(position[1], -(size - 1) / 2) && meta('NY') && <StickerPlane currentDir="NY" meta={meta('NY')} pos={STICKER_POS.NY} rot={STICKER_ROT.NY} mode={visualMode} overlay={overlay('NY')} faceColors={faceColors} faceTextures={faceTextures} faceSize={size} {...gridPos('NY')} manifoldStyles={manifoldStyles} hollow={hollowMode} />}
+          {isEdge(position[2], (size - 1) / 2) && meta('PZ') && <StickerPlane currentDir="PZ" meta={meta('PZ')} pos={STICKER_POS.PZ} rot={STICKER_ROT.PZ} mode={visualMode} overlay={overlay('PZ')} faceColors={faceColors} faceTextures={faceTextures} faceSize={size} {...gridPos('PZ')} manifoldStyles={manifoldStyles} hollow={hollowMode} deadRankMap={deadRankMap} />}
+          {isEdge(position[2], -(size - 1) / 2) && meta('NZ') && <StickerPlane currentDir="NZ" meta={meta('NZ')} pos={STICKER_POS.NZ} rot={STICKER_ROT.NZ} mode={visualMode} overlay={overlay('NZ')} faceColors={faceColors} faceTextures={faceTextures} faceSize={size} {...gridPos('NZ')} manifoldStyles={manifoldStyles} hollow={hollowMode} deadRankMap={deadRankMap} />}
+          {isEdge(position[0], (size - 1) / 2) && meta('PX') && <StickerPlane currentDir="PX" meta={meta('PX')} pos={STICKER_POS.PX} rot={STICKER_ROT.PX} mode={visualMode} overlay={overlay('PX')} faceColors={faceColors} faceTextures={faceTextures} faceSize={size} {...gridPos('PX')} manifoldStyles={manifoldStyles} hollow={hollowMode} deadRankMap={deadRankMap} />}
+          {isEdge(position[0], -(size - 1) / 2) && meta('NX') && <StickerPlane currentDir="NX" meta={meta('NX')} pos={STICKER_POS.NX} rot={STICKER_ROT.NX} mode={visualMode} overlay={overlay('NX')} faceColors={faceColors} faceTextures={faceTextures} faceSize={size} {...gridPos('NX')} manifoldStyles={manifoldStyles} hollow={hollowMode} deadRankMap={deadRankMap} />}
+          {isEdge(position[1], (size - 1) / 2) && meta('PY') && <StickerPlane currentDir="PY" meta={meta('PY')} pos={STICKER_POS.PY} rot={STICKER_ROT.PY} mode={visualMode} overlay={overlay('PY')} faceColors={faceColors} faceTextures={faceTextures} faceSize={size} {...gridPos('PY')} manifoldStyles={manifoldStyles} hollow={hollowMode} deadRankMap={deadRankMap} />}
+          {isEdge(position[1], -(size - 1) / 2) && meta('NY') && <StickerPlane currentDir="NY" meta={meta('NY')} pos={STICKER_POS.NY} rot={STICKER_ROT.NY} mode={visualMode} overlay={overlay('NY')} faceColors={faceColors} faceTextures={faceTextures} faceSize={size} {...gridPos('NY')} manifoldStyles={manifoldStyles} hollow={hollowMode} deadRankMap={deadRankMap} />}
         </>
       )}
     </group>
