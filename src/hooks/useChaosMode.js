@@ -437,6 +437,7 @@ export function useChaosMode() {
               for (const [_dirKey, st] of Object.entries(c.stickers)) {
                 if ((st.flips || 0) < FLIP_CAP) {
                   useGameStore.getState().setDisparityWinner({ gridId: getManifoldGridId(st, S) });
+                  useGameStore.getState().setChaosLevel(0);
                   break outer;
                 }
               }

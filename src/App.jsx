@@ -423,26 +423,6 @@ export default function WORM3() {
     setDisparityWaitingFirstFlip(true);
   }, [size, settings, setSettings, changeSize, setVisualMode, setFlipMode, setShowTunnels, setChaosLevel, reset]);
 
-  const handleDisparityFirstFlip = useCallback(() => {
-    // Pick a random surface sticker and flip it as the opening move
-    const surface = [];
-    for (const L of cubies) {
-      for (const R of L) {
-        for (const c of R) {
-          for (const dirKey of Object.keys(c.stickers)) {
-            surface.push({ pos: { x: c.x, y: c.y, z: c.z }, dirKey });
-          }
-        }
-      }
-    }
-    if (!surface.length) return;
-    const pick = surface[Math.floor(Math.random() * surface.length)];
-    flipSticker(pick.pos, pick.dirKey);
-    // Now activate chaos at the chosen level
-    setChaosLevel(pendingDisparityLevelRef.current);
-    setDisparityWaitingFirstFlip(false);
-  }, [cubies, flipSticker, setChaosLevel]);
-
   const handleMenuCoop = useCallback(() => {
     useGameStore.getState().setShowMainMenu(false);
     useGameStore.getState().clearLevel();
@@ -478,22 +458,34 @@ export default function WORM3() {
     markTutorialDone();
   }, [setShowTutorial, markTutorialDone]);
 
-  // Tap flip handler
+  // Tap flip handler — also serves as the "pick first tile" entry point for disparity mode
   const onTapFlip = useCallback((pos, dirKey) => {
+    if (disparityWaitingFirstFlip) {
+      flipSticker(pos, dirKey);
+      setChaosLevel(pendingDisparityLevelRef.current);
+      setDisparityWaitingFirstFlip(false);
+      return;
+    }
     flipSticker(pos, dirKey);
-  }, [flipSticker]);
+  }, [flipSticker, disparityWaitingFirstFlip, setChaosLevel]);
 
   const onFlipWaveComplete = useCallback(() => {
     setFlipWaveOrigins([]);
   }, [setFlipWaveOrigins]);
 
-  // Handle tile selection
+  // Handle tile selection — also catches the "pick first tile" tap when flipMode is off
   const handleSelectTile = useCallback((pos, dirKey) => {
+    if (disparityWaitingFirstFlip) {
+      flipSticker(pos, dirKey);
+      setChaosLevel(pendingDisparityLevelRef.current);
+      setDisparityWaitingFirstFlip(false);
+      return;
+    }
     const newCursor = cubePosToCursor(pos, dirKey);
     useGameStore.getState().setCursor(newCursor);
     setShowCursor(true);
     setSelectedTileForRotation({ pos, dirKey, cursor: newCursor });
-  }, [cubePosToCursor, setShowCursor, setSelectedTileForRotation]);
+  }, [disparityWaitingFirstFlip, flipSticker, setChaosLevel, cubePosToCursor, setShowCursor, setSelectedTileForRotation]);
 
   // Face rotation handlers
   const handleFaceRotationMode = useCallback((target) => {
@@ -1127,32 +1119,21 @@ export default function WORM3() {
       )}
       {disparityWaitingFirstFlip && (
         <div style={{
-          position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center',
-          background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(6px)', zIndex: 500,
+          position: 'fixed', bottom: '110px', left: '50%', transform: 'translateX(-50%)',
+          zIndex: 500, pointerEvents: 'none',
           fontFamily: "-apple-system, 'Helvetica Neue', Roboto, sans-serif",
         }}>
           <div style={{
-            background: '#fff', borderRadius: '20px', padding: '28px 32px',
-            textAlign: 'center', boxShadow: '0 8px 40px rgba(0,0,0,0.18)',
-            maxWidth: '320px', width: '88vw',
+            background: 'rgba(0,0,0,0.78)', borderRadius: '14px', padding: '14px 22px',
+            textAlign: 'center', boxShadow: '0 4px 24px rgba(0,0,0,0.35)',
+            backdropFilter: 'blur(10px)', whiteSpace: 'nowrap',
           }}>
-            <div style={{ fontSize: '17px', fontWeight: '600', color: '#1c1c1e', marginBottom: '6px' }}>
-              Ready
+            <div style={{ fontSize: '15px', fontWeight: '600', color: '#fff', marginBottom: '3px' }}>
+              Tap any tile to begin
             </div>
-            <div style={{ fontSize: '14px', color: '#8e8e93', marginBottom: '24px', lineHeight: 1.5 }}>
-              The cube is solved. Make the first random flip to start the disparity cascade.
+            <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', lineHeight: 1.4 }}>
+              Your chosen tile starts the disparity cascade
             </div>
-            <button
-              onClick={handleDisparityFirstFlip}
-              style={{
-                width: '100%', padding: '14px', border: 'none', borderRadius: '12px',
-                fontSize: '16px', fontWeight: '600', background: '#ff3b30', color: '#fff',
-                cursor: 'pointer', boxShadow: '0 4px 14px rgba(255,59,48,0.4)',
-              }}
-            >
-              Make First Flip
-            </button>
           </div>
         </div>
       )}
