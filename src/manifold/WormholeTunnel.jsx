@@ -20,7 +20,17 @@ const _c1 = new THREE.Color();
 const _c2 = new THREE.Color();
 const _cTemp = new THREE.Color();
 
-const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2, cubieRefs, intensity, flips, color1, color2, size, explosionFactor = 0, maxStrands = 50 }) => {
+// Octagon constants — strands grow 1 → 8 as flips increase, capping at a full octagonal ring
+const OCTAGON_MAX = 8;
+// Ring radius at each tile face (world units). Cubies are ~1 unit wide, so 0.30 keeps
+// the ring comfortably within the sticker face across all supported cube sizes (2–5).
+const OCT_RADIUS = 0.30;
+
+// Danger zone starts at flip 9 (octagon complete) and escalates to FLIP_CAP-1
+const DANGER_START = 9;
+const DANGER_RANGE = FLIP_CAP - 1 - DANGER_START; // 16
+
+const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2, cubieRefs, intensity, flips, color1, color2, size, explosionFactor = 0, _maxStrands = 50 }) => {
   const linesRef = useRef([]);
   const pulseT = useRef(Math.random() * Math.PI * 2);
   // Cache curve object to avoid recreation
@@ -30,25 +40,24 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
     new THREE.Vector3()
   ));
 
+  // Strands fill out the octagon one-by-one as flips increase (1 → 8), then hold at 8.
+  // Each strand is placed at its fixed octagon angle so that at flip 8 the ring is complete.
+  const strandCount = Math.min(Math.max(1, flips), OCTAGON_MAX);
+
   const strandConfig = useMemo(() => {
-    // B3: respect LOD cap from WormholeNetwork — fewer strands under high load
-    const count = Math.min(Math.max(1, flips), maxStrands);
-    return Array.from({ length: count }, (_, i) => {
-      const angle = (i / count) * Math.PI * 4;
-      const radiusFactor = Math.sqrt(i / count);
-      const side = i % 2 === 0 ? 1 : -1;
-      return {
-        id: i,
-        angle,
-        side,
-        radius: (0.1 + radiusFactor * 0.25) * 1.25,
-        baseOpacity: flips > 0 ? (0.4 + (1 - radiusFactor) * 0.6) : (0.2 + (1 - radiusFactor) * 0.4),
-        lineWidth: Math.max(0.375, (1.5 - radiusFactor * 1.2) * 1.25),
-        colors: new Float32Array(30 * 3),
-        sparkOffset: Math.random() * Math.PI * 2
-      };
-    });
-  }, [flips, maxStrands]);
+    return Array.from({ length: strandCount }, (_, i) => ({
+      id: i,
+      // Evenly spaced around a full circle at octagon vertex positions
+      angle: (i / OCTAGON_MAX) * Math.PI * 2,
+      radius: OCT_RADIUS,
+      // Slight alternation (bright / dim) gives the ring visual depth without randomness
+      baseOpacity: 0.5 + (i % 2) * 0.1,
+      lineWidth: 1.5,
+      colors: new Float32Array(30 * 3),
+      // Stagger sparks so they don't all fire simultaneously around the ring
+      sparkOffset: (i / OCTAGON_MAX) * Math.PI * 2
+    }));
+  }, [strandCount]);
 
   useMemo(() => {
     const c1 = new THREE.Color(color1);
@@ -95,19 +104,28 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
     const halfLife = getHalfLifeMultiplier(flips);
     const breathRate = dead ? 0 : halfLife;
 
-    // Surge signal — synced with tile persistent tremor, scaled by heartbeat rate
+    // Surge signal — composite waveform scaled by heartbeat rate
     const surgeFreq = 1.5 * Math.max(1, breathRate);
     const raw = Math.sin(t * surgeFreq) * 0.45 + Math.sin(t * surgeFreq * 1.8) * 0.3 + Math.sin(t * surgeFreq * 0.4) * 0.25;
     const surge = dead ? 0 : Math.pow(Math.max(0, raw), 2.0);
 
-    // Tug-of-war bias: oscillates at heartbeat frequency, amplified during surge
+    // Tug-of-war bias: drives color gradient shift and shared tube lean
     const tugRaw = dead ? 0 : Math.sin(t * surgeFreq);
     const tugBias = tugRaw * (0.3 + surge * 0.4);
 
     pulseT.current += delta * (2 + intensity * 0.5) * Math.max(1, breathRate);
     const pulse = dead ? 0.3 : Math.sin(pulseT.current) * 0.1 + 0.9;
 
-    // Set up colors for transference animation — dead tunnels desaturate to gray
+    // --- Danger zone: flips 9-24 → dangerT goes 0 → 1 ---
+    // At flip 9 the octagon ring is complete; beyond this the tunnel escalates toward death.
+    const dangerT = flips >= DANGER_START && !dead ? Math.max(0, Math.min(1, (flips - DANGER_START) / DANGER_RANGE)) : 0;
+
+    // Danger flash signal: rapid strobe that accelerates as death approaches.
+    // At dangerT≈0: ~2 Hz subtle shimmer. At dangerT=1 (flip 24): ~18 Hz near-strobe.
+    const dangerFlashFreq = dangerT > 0 ? 2 + dangerT * 16 : 0;
+    const dangerFlash = dangerT > 0 ? Math.max(0, Math.sin(t * dangerFlashFreq * Math.PI * 2)) * dangerT : 0;
+
+    // Set up base colors — dead tunnels desaturate to gray
     if (dead) {
       _c1.set('#555555');
       _c2.set('#444444');
@@ -116,17 +134,49 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
       _c2.set(color2);
     }
 
-    // Flip burst — computed once per frame, shared across all strands.
-    // sin(rawP*π) gives a 0→1→0 envelope that crests at the squish midpoint
-    // when the two antipodal identities are swapping.
+    // Flip burst — sin(rawP*π) gives a 0→1→0 envelope cresting at the squish midpoint
     const burstRaw = Math.max(flipBurstMap.get(gridId1) ?? 0, flipBurstMap.get(gridId2) ?? 0);
     const burstEnv = Math.sin(burstRaw * Math.PI);
+
+    // --- Shared control point (computed once; all 8 strands follow the same route) ---
+    const baseControlPoint = calculateSmartControlPoint(pos1, pos2, size, null, explosionFactor);
+    _controlPoint.copy(baseControlPoint);
+
+    // Tug-of-war: the whole tube leans toward the dominant endpoint during surges.
+    // Removed per-strand divergence — all strands stay parallel as a cohesive tube.
+    if (Math.abs(tugBias) > 0.01) {
+      const tugTarget = tugBias > 0 ? _vEnd : _vStart;
+      _controlPoint.lerp(tugTarget, Math.abs(tugBias));
+    }
+
+    // Flip burst: arch rises toward camera as identities swap
+    if (burstEnv > 0.001) {
+      _controlPoint.y += burstEnv * 1.4;
+      _controlPoint.z += burstEnv * 0.5;
+    }
+
+    // --- Octagon ring frame (computed once per frame, shared by all strands) ---
+    // Build a stable perpendicular basis aligned with the tunnel axis.
+    _dir.subVectors(_vEnd, _vStart).normalize();
+    _up.set(0, 1, 0);
+    _right.crossVectors(_dir, _up);
+    if (_right.lengthSq() < 0.001) {
+      // dir is nearly parallel to world Y — fall back to Z as reference
+      _up.set(0, 0, 1);
+      _right.crossVectors(_dir, _up);
+    }
+    _right.normalize();
+    _trueUp.crossVectors(_right, _dir).normalize();
+
+    // Danger color-saturation boost factor (applied per vertex)
+    const colorSatBoost = dangerT * 0.5; // 0 at flip 8, up to 0.5 at flip 24
+    const flashWhite = dangerFlash * 0.85; // white wash that pulses toward death
 
     linesRef.current.forEach((line, i) => {
       if (!line) return;
       const config = strandConfig[i];
 
-      // Opacity with surge glow boost — dead tunnels dim to faint gray
+      // Opacity — dead tunnels dim to faint gray, danger zone adds brightness surges
       if (line.material) {
         if (dead) {
           line.material.opacity = 0.12;
@@ -134,47 +184,25 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
           const sparkPulse = Math.sin(pulseT.current * 3 + config.sparkOffset);
           const spark = sparkPulse > 0.9 ? (sparkPulse - 0.9) * 10 : 0;
           const surgeGlow = surge * 0.3;
-          // Flip burst: flare the strands as the two identities swap
           const flipGlow = burstEnv * 0.9;
-          line.material.opacity = Math.min(1, config.baseOpacity * pulse * (1 + spark * 0.5) + surgeGlow + flipGlow);
+          // Danger: each flash peak spikes opacity; base opacity rises with dangerT
+          const dangerOpacity = dangerT > 0 ? dangerFlash * 0.5 + dangerT * 0.15 : 0;
+          line.material.opacity = Math.min(1, config.baseOpacity * pulse * (1 + spark * 0.5) + surgeGlow + flipGlow + dangerOpacity);
         }
       }
 
-      // Smart control point with tug-of-war shift (scaled for explosion)
-      const baseControlPoint = calculateSmartControlPoint(pos1, pos2, size, config.side, explosionFactor);
-      _controlPoint.copy(baseControlPoint);
-
-      // Tug of war: lerp control point toward the "winning" endpoint
-      // During surge the curve lunges dramatically; at rest it's a subtle lean
-      if (Math.abs(tugBias) > 0.01) {
-        const tugTarget = tugBias > 0 ? _vEnd : _vStart;
-        _controlPoint.lerp(tugTarget, Math.abs(tugBias));
-      }
-
-      // Flip burst: arch rises toward the camera as the two identities swap.
-      if (burstEnv > 0.001) {
-        _controlPoint.y += burstEnv * 1.4;
-        _controlPoint.z += burstEnv * 0.5;
-      }
-
-      // Apply strand spiral offset
-      const offsetX = Math.cos(config.angle) * config.radius;
-      const offsetY = Math.sin(config.angle) * config.radius;
-
-      _dir.subVectors(_vEnd, _vStart).normalize();
-      _up.set(0, 1, 0);
-      _right.crossVectors(_dir, _up).normalize();
-      _trueUp.crossVectors(_right, _dir).normalize();
-
+      // --- Octagon ring offset for this strand ---
+      // All three Bezier points receive the same perpendicular displacement so the
+      // 8 strands run as parallel arcs forming a clean octagonal tube cross-section.
+      const cosA = Math.cos(config.angle);
+      const sinA = Math.sin(config.angle);
       _offsetVec.set(0, 0, 0)
-        .addScaledVector(_right, offsetX)
-        .addScaledVector(_trueUp, offsetY);
+        .addScaledVector(_right, cosA * config.radius)
+        .addScaledVector(_trueUp, sinA * config.radius);
 
-      _controlPoint.add(_offsetVec);
-
-      curveRef.current.v0.copy(_vStart);
-      curveRef.current.v1.copy(_controlPoint);
-      curveRef.current.v2.copy(_vEnd);
+      curveRef.current.v0.copy(_vStart).add(_offsetVec);
+      curveRef.current.v1.copy(_controlPoint).add(_offsetVec);
+      curveRef.current.v2.copy(_vEnd).add(_offsetVec);
 
       const points = curveRef.current.getPoints(29);
 
@@ -189,23 +217,21 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
       // --- Color transference: traveling energy pulses with tug-of-war gradient shift ---
       const colors = line.geometry.attributes.color.array;
 
-      // Pulse speed and tightness scale with surge — faster, sharper bolts during breakthrough
       const pulseSpeed = 1.2 + surge * 2.5;
       const pulseWidth = 0.10 + (1 - surge) * 0.05;
       const pulseIntensity = 0.6 + surge * 0.4;
 
-      // Two traveling pulses per strand, staggered in phase and speed
       const rawP1 = (((t * pulseSpeed + config.sparkOffset) % 1.0) + 1.0) % 1.0;
       const rawP2 = (((t * pulseSpeed * 0.7 + config.sparkOffset + 0.5) % 1.0) + 1.0) % 1.0;
 
-      // Pulse direction follows the tug — energy flows toward the side being pulled
+      // Pulse direction follows the tug — energy flows toward the dominant side
       const p1 = tugRaw > 0 ? rawP1 : 1.0 - rawP1;
       const p2 = tugRaw > 0 ? rawP2 : 1.0 - rawP2;
 
       for (let j = 0; j < 30; j++) {
         const u = j / 29;
 
-        // Tug-of-war gradient shift: dominant side's color bleeds further along the tunnel
+        // Tug-of-war gradient shift: dominant side's color bleeds further along tunnel
         const shiftedU = Math.max(0, Math.min(1, u + tugBias * 0.6));
         _cTemp.lerpColors(_c1, _c2, shiftedU);
 
@@ -221,6 +247,13 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
           _cTemp.r += (1 - _cTemp.r) * brightness;
           _cTemp.g += (1 - _cTemp.g) * brightness;
           _cTemp.b += (1 - _cTemp.b) * brightness;
+        }
+
+        // Danger zone: boost color saturation then overlay the strobe flash
+        if (dangerT > 0) {
+          _cTemp.r = Math.min(1, _cTemp.r * (1 + colorSatBoost) + flashWhite);
+          _cTemp.g = Math.min(1, _cTemp.g * (1 + colorSatBoost) + flashWhite);
+          _cTemp.b = Math.min(1, _cTemp.b * (1 + colorSatBoost) + flashWhite);
         }
 
         colors[j * 3] = _cTemp.r;
