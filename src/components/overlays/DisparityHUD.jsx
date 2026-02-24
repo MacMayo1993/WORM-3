@@ -1,37 +1,53 @@
 import React, { useState, useEffect } from 'react';
 import { useGameStore } from '../../hooks/useGameStore.js';
 
-const NOTIFICATION_LIFETIME = 7000; // ms before a RIP entry fades out
-const MAX_VISIBLE = 8;              // max simultaneous RIP lines shown
+const NOTIFICATION_LIFETIME = 8000; // ms before a death entry fades out
+const MAX_PAIR_GROUPS = 6;           // max simultaneous pair groups visible
 
 /**
  * DisparityHUD
  *
- * Shows a stack of "RIP M1-003 — #6" death notifications as tiles burn out
- * at FLIP_CAP, and a gold winner banner when the last tile survives.
+ * Shows a stack of death notifications as tiles burn out at FLIP_CAP.
+ * Deaths that occur in the same tick (antipodal pairs dying together) are
+ * grouped into one line: "✝✝ M1-003 #1 + M4-003 #2"
+ * Solo deaths show as:  "✝ M1-003 — #1"
  *
+ * A gold "🏆 Winner by least observation" banner appears when one tile survives.
  * Rendered whenever Disparity Mode (chaos) is active.
  */
 const DisparityHUD = () => {
   const disparityDeaths = useGameStore((s) => s.disparityDeaths);
   const disparityWinner = useGameStore((s) => s.disparityWinner);
 
-  const [visibleIds, setVisibleIds] = useState(new Set());
+  const [visiblePairRanks, setVisiblePairRanks] = useState(new Set());
 
-  // When a new death arrives, mark it visible and schedule its removal
+  // When a new death arrives, mark its pairRank visible and schedule removal
   useEffect(() => {
-    if (!disparityDeaths.length) { setVisibleIds(new Set()); return; }
+    if (!disparityDeaths.length) { setVisiblePairRanks(new Set()); return; }
     const latest = disparityDeaths[disparityDeaths.length - 1];
-    setVisibleIds((prev) => new Set([...prev, latest.id]));
+    const pr = latest.pairRank ?? latest.rank;
+    setVisiblePairRanks((prev) => new Set([...prev, pr]));
     const timer = setTimeout(() => {
-      setVisibleIds((prev) => { const next = new Set(prev); next.delete(latest.id); return next; });
+      setVisiblePairRanks((prev) => { const next = new Set(prev); next.delete(pr); return next; });
     }, NOTIFICATION_LIFETIME);
     return () => clearTimeout(timer);
   }, [disparityDeaths]);
 
-  const visible = disparityDeaths.filter((d) => visibleIds.has(d.id)).slice(-MAX_VISIBLE);
+  // Group deaths by pairRank, only include visible groups
+  const groups = {};
+  disparityDeaths.forEach((d) => {
+    const pr = d.pairRank ?? d.rank;
+    if (!visiblePairRanks.has(pr)) return;
+    if (!groups[pr]) groups[pr] = [];
+    groups[pr].push(d);
+  });
 
-  if (!visible.length && !disparityWinner) return null;
+  // Sort groups descending (most recent first) and cap display
+  const sortedGroups = Object.entries(groups)
+    .sort(([a], [b]) => Number(b) - Number(a))
+    .slice(0, MAX_PAIR_GROUPS);
+
+  if (!sortedGroups.length && !disparityWinner) return null;
 
   return (
     <div style={{
@@ -43,11 +59,11 @@ const DisparityHUD = () => {
       gap: '5px',
       zIndex: 200,
       pointerEvents: 'none',
-      maxWidth: '220px',
+      maxWidth: '260px',
     }}>
       {disparityWinner && (
         <div style={{
-          background: 'rgba(30, 20, 0, 0.88)',
+          background: 'rgba(30, 20, 0, 0.90)',
           border: '2px solid rgba(255, 215, 0, 0.75)',
           borderRadius: '10px',
           padding: '12px 18px',
@@ -68,22 +84,40 @@ const DisparityHUD = () => {
           </div>
         </div>
       )}
-      {visible.map((death) => (
-        <div key={death.id} style={{
-          background: 'rgba(40, 0, 0, 0.80)',
-          border: '1px solid rgba(180, 40, 40, 0.5)',
-          borderRadius: '5px',
-          padding: '4px 10px',
-          color: 'rgba(220, 110, 110, 0.95)',
-          fontFamily: "'Courier New', monospace",
-          fontSize: '11px',
-          backdropFilter: 'blur(6px)',
-          whiteSpace: 'nowrap',
-          letterSpacing: '0.04em',
-        }}>
-          ✝ RIP {death.gridId} — #{death.rank}
-        </div>
-      ))}
+      {sortedGroups.map(([pr, deaths]) => {
+        const isPair = deaths.length > 1;
+        return (
+          <div key={pr} style={{
+            background: 'rgba(40, 0, 0, 0.82)',
+            border: `1px solid rgba(180, 40, 40, ${isPair ? '0.7' : '0.45'})`,
+            borderRadius: '5px',
+            padding: '4px 10px',
+            color: 'rgba(220, 110, 110, 0.95)',
+            fontFamily: "'Courier New', monospace",
+            fontSize: '11px',
+            backdropFilter: 'blur(6px)',
+            whiteSpace: 'nowrap',
+            letterSpacing: '0.04em',
+          }}>
+            {isPair ? (
+              // Antipodal pair died together
+              <>
+                <span style={{ marginRight: '4px' }}>✝✝</span>
+                {deaths.map((d, i) => (
+                  <span key={d.id}>
+                    {i > 0 && <span style={{ color: 'rgba(200,80,80,0.6)', margin: '0 4px' }}>+</span>}
+                    <span>{d.gridId} </span>
+                    <span style={{ fontWeight: 'bold' }}>#{d.rank}</span>
+                  </span>
+                ))}
+              </>
+            ) : (
+              // Solo death
+              <>✝ {deaths[0].gridId} — <span style={{ fontWeight: 'bold' }}>#{deaths[0].rank}</span></>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 };

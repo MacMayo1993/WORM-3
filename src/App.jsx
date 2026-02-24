@@ -6,7 +6,7 @@
  * Original 2343 lines reduced to ~700 lines with modular architecture.
  */
 
-import React, { useState, useRef, useEffect, useCallback, Suspense } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo, Suspense } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Environment, Html } from '@react-three/drei';
 import './App.css';
@@ -89,6 +89,7 @@ import LevelSelectScreen from './components/screens/LevelSelectScreen.jsx';
 import Level10Cutscene from './components/screens/Level10Cutscene.jsx';
 import LevelTutorial from './components/screens/LevelTutorial.jsx';
 import FreeplaySetupWizard from './components/screens/FreeplaySetupWizard.jsx';
+import DisparitySetupWizard from './components/screens/DisparitySetupWizard.jsx';
 import RotationPreview from './components/overlays/RotationPreview.jsx';
 import FaceRotationButtons from './components/overlays/FaceRotationButtons.jsx';
 import TileRotationSelector from './components/overlays/TileRotationSelector.jsx';
@@ -271,6 +272,18 @@ export default function WORM3() {
   // Freeplay setup wizard
   const [showFreeplayWizard, setShowFreeplayWizard] = useState(false);
 
+  // Disparity Mode wizard + first-flip gate
+  const [showDisparityWizard, setShowDisparityWizard] = useState(false);
+  const [disparityWaitingFirstFlip, setDisparityWaitingFirstFlip] = useState(false);
+  const pendingDisparityLevelRef = useRef(3);
+
+  // Disparity deaths map: gridId → rank (built from store, used by 3D tile labels)
+  const disparityDeaths = useGameStore((s) => s.disparityDeaths);
+  const deadRankMap = useMemo(
+    () => new Map(disparityDeaths.map((d) => [d.gridId, d.rank])),
+    [disparityDeaths]
+  );
+
   // ========================================================================
   // EXPLOSION ANIMATION
   // ========================================================================
@@ -386,11 +399,41 @@ export default function WORM3() {
 
   const handleMenuDisparity = useCallback(() => {
     useGameStore.getState().setShowMainMenu(false);
+    setShowDisparityWizard(true);
+  }, []);
+
+  const handleDisparitySetupComplete = useCallback(({ cubeSize, disparityLevel, visualMode: vm, flipMode: fm, showTunnels: st }) => {
+    setShowDisparityWizard(false);
     useGameStore.getState().clearLevel();
     useGameStore.getState().clearDisparityGame();
-    setChaosLevel(5);
-    shuffle();
-  }, [shuffle, setChaosLevel]);
+    // Apply wizard settings before resetting cube
+    if (cubeSize !== size) changeSize(cubeSize);
+    if (vm) setVisualMode(vm);
+    setFlipMode(fm);
+    if (st !== undefined) setShowTunnels(st);
+    // Store the desired chaos level — chaos stays OFF until the first flip
+    pendingDisparityLevelRef.current = disparityLevel;
+    setChaosLevel(0);
+    // Reset to SOLVED state (not shuffled) so player sees clean cube
+    reset();
+    setDisparityWaitingFirstFlip(true);
+  }, [size, changeSize, setVisualMode, setFlipMode, setShowTunnels, setChaosLevel, reset]);
+
+  const handleDisparityFirstFlip = useCallback(() => {
+    // Pick a random surface sticker and flip it as the opening move
+    const surface = [];
+    for (const c of cubies) {
+      for (const dirKey of Object.keys(c.stickers)) {
+        surface.push({ pos: { x: c.x, y: c.y, z: c.z }, dirKey });
+      }
+    }
+    if (!surface.length) return;
+    const pick = surface[Math.floor(Math.random() * surface.length)];
+    flipSticker(pick.pos, pick.dirKey);
+    // Now activate chaos at the chosen level
+    setChaosLevel(pendingDisparityLevelRef.current);
+    setDisparityWaitingFirstFlip(false);
+  }, [cubies, flipSticker, setChaosLevel]);
 
   const handleMenuCoop = useCallback(() => {
     useGameStore.getState().setShowMainMenu(false);
@@ -915,6 +958,7 @@ export default function WORM3() {
               solveHighlights={solveModeActive ? solveHighlights : teachMode.active ? solveHighlights : []}
               onFaceRotationMode={handleFaceRotationMode}
               handsMode={handsMode}
+              deadRankMap={deadRankMap}
             />
             {teachMode.active && teachMode.layerHighlight && (
               <LayerHighlight
@@ -1067,6 +1111,35 @@ export default function WORM3() {
       {showLevelSelect && <LevelSelectScreen onSelectLevel={handleLevelSelect} onBack={handleBackToMainMenu} />}
       {showSettings && <SettingsMenu onClose={() => setShowSettings(false)} settings={settings} onSettingsChange={setSettings} faceImages={faceImages} onFaceImage={handleFaceImage} />}
       {showFreeplayWizard && <FreeplaySetupWizard onComplete={handleWizardComplete} onCancel={handleWizardCancel} initialSettings={settings} />}
+      {showDisparityWizard && (
+        <DisparitySetupWizard
+          onStart={handleDisparitySetupComplete}
+          onCancel={() => { setShowDisparityWizard(false); useGameStore.getState().setShowMainMenu(true); }}
+        />
+      )}
+      {disparityWaitingFirstFlip && (
+        <div style={{
+          position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(0,0,0,0.55)', zIndex: 500,
+        }}>
+          <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '15px', marginBottom: '20px', fontFamily: "'Courier New', monospace", letterSpacing: '0.04em' }}>
+            Cube is solved. Make the first stochastic flip to begin.
+          </div>
+          <button
+            onClick={handleDisparityFirstFlip}
+            style={{
+              background: 'rgba(239,68,68,0.2)', color: '#ef4444',
+              border: '2px solid #ef4444', borderRadius: '10px',
+              padding: '14px 40px', fontSize: '18px', fontWeight: 'bold',
+              fontFamily: "'Courier New', monospace", cursor: 'pointer',
+              letterSpacing: '0.06em',
+            }}
+          >
+            ⚡ Make First Flip
+          </button>
+        </div>
+      )}
       {showHelp && <HelpMenu onClose={() => setShowHelp(false)} />}
       {showFirstFlipTutorial && <FirstFlipTutorial onClose={() => setShowFirstFlipTutorial(false)} />}
 
