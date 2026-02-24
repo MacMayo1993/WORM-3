@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { COLORS } from '../../utils/constants.js';
 
-const Tutorial = ({ onClose }) => {
+const Tutorial = ({ onClose, onMainMenu }) => {
   const [step, setStep] = useState(1);
   const totalSteps = 9;
 
@@ -252,7 +252,14 @@ const Tutorial = ({ onClose }) => {
           {currentStep.content}
         </div>
         <div className="tutorial-actions" style={{ marginTop: '20px' }}>
-          <button className="bauhaus-btn" onClick={onClose}>Skip Tutorial</button>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button className="bauhaus-btn" onClick={onClose}>Skip Tutorial</button>
+            {onMainMenu && (
+              <button className="bauhaus-btn" onClick={onMainMenu} style={{ opacity: 0.7 }}>
+                Main Menu
+              </button>
+            )}
+          </div>
           <div style={{ display: 'flex', gap: '8px' }}>
             {step > 1 && (
               <button className="bauhaus-btn" onClick={() => setStep(s => s - 1)}>

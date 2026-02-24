@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { FACE_COLORS } from '../../utils/constants.js';
 
-const FirstFlipTutorial = ({ onClose }) => {
+const FirstFlipTutorial = ({ onClose, onMainMenu }) => {
   const [step, setStep] = useState(0);
 
   const colors = {
@@ -266,6 +266,21 @@ const FirstFlipTutorial = ({ onClose }) => {
             </button>
           )}
         </div>
+
+        {onMainMenu && (
+          <div style={{ textAlign: 'center', marginTop: '12px' }}>
+            <button
+              onClick={onMainMenu}
+              style={{
+                background: 'transparent', border: 'none', cursor: 'pointer',
+                color: colors.inkMedium, fontSize: '12px', opacity: 0.7,
+                fontFamily: 'Georgia, serif', padding: '2px',
+              }}
+            >
+              ← Main Menu
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

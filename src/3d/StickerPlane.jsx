@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import React, { useRef, useEffect, useLayoutEffect, useMemo, useImperativeHandle } from 'react';
 import { easeInOutCubic } from '../utils/easing.js';
 import { useFrame } from '@react-three/fiber';
 import { Text } from '@react-three/drei';
@@ -32,6 +32,11 @@ const sharedInnerCircleGeometry = new THREE.CircleGeometry(0.48, 16);
 // (Stickers with face textures — Sudokube mode — still create their own geometry so UVs can
 // be patched per-sticker via geoRef.  All others share this one buffer.)
 const _sharedStickerGeo = new THREE.PlaneGeometry(0.85, 0.85);
+// Shared ring/circle geometries for wormhole and flip-history indicators (created once, reused globally).
+const sharedRing38_41 = new THREE.RingGeometry(0.38, 0.41, 16); // orig-color border ring
+const sharedRing35_38 = new THREE.RingGeometry(0.35, 0.38, 16); // antipodal-color border ring
+const sharedRing36_40 = new THREE.RingGeometry(0.36, 0.40, 16); // wormhole pulsing ring
+const sharedCircle44 = new THREE.CircleGeometry(0.44, 16);       // wormhole glow fill
 // Scratch Object3D for FlipParticles matrix math — never added to a scene.
 const _particleDummy = new THREE.Object3D();
 // Scratch vectors for biome edge-on fade — allocated once, reused every frame.
@@ -64,26 +69,19 @@ const _stickerFrameShape = (() => {
 })();
 
 // Particle system for flip effect — single InstancedMesh, 1 draw call for all 12 particles.
-const FlipParticles = ({ active, color, onComplete }) => {
+// Uses forwardRef + useImperativeHandle so the parent calls ref.trigger(color) imperatively
+// instead of toggling useState, which caused a full StickerPlane re-render on every flip.
+const FlipParticles = React.forwardRef((_props, ref) => {
   const meshRef = useRef();
   const progressRef = useRef(0);
   const velocitiesRef = useRef([]);
   const isActiveRef = useRef(false);
   const PARTICLE_COUNT = 12;
 
-  // Zero-scale all instances on mount so they're invisible before first activation.
-  useEffect(() => {
-    const mesh = meshRef.current;
-    if (!mesh) return;
-    _particleDummy.scale.set(0, 0, 0);
-    _particleDummy.updateMatrix();
-    for (let i = 0; i < PARTICLE_COUNT; i++) mesh.setMatrixAt(i, _particleDummy.matrix);
-    mesh.instanceMatrix.needsUpdate = true;
-  }, []);
-
-  // Handle activation — reset progress and generate per-particle velocities/sizes.
-  useEffect(() => {
-    if (active && !isActiveRef.current) {
+  // Expose .trigger(color) — called imperatively from the parent's useEffect.
+  useImperativeHandle(ref, () => ({
+    trigger(color) {
+      if (isActiveRef.current) return; // already animating — ignore re-entrant call
       isActiveRef.current = true;
       progressRef.current = 0;
       velocitiesRef.current = Array.from({ length: PARTICLE_COUNT }, (_, i) => {
@@ -97,15 +95,22 @@ const FlipParticles = ({ active, color, onComplete }) => {
           size: 0.06 + Math.random() * 0.06
         };
       });
-      // All particles share one material — update color + opacity together.
       if (meshRef.current?.material) {
         meshRef.current.material.color.set(color);
         meshRef.current.material.opacity = 1;
       }
-    } else if (!active) {
-      isActiveRef.current = false;
     }
-  }, [active, color]);
+  }), []);
+
+  // Zero-scale all instances on mount so they're invisible before first activation.
+  useEffect(() => {
+    const mesh = meshRef.current;
+    if (!mesh) return;
+    _particleDummy.scale.set(0, 0, 0);
+    _particleDummy.updateMatrix();
+    for (let i = 0; i < PARTICLE_COUNT; i++) mesh.setMatrixAt(i, _particleDummy.matrix);
+    mesh.instanceMatrix.needsUpdate = true;
+  }, []);
 
   useFrame((_, delta) => {
     const mesh = meshRef.current;
@@ -122,7 +127,6 @@ const FlipParticles = ({ active, color, onComplete }) => {
       for (let i = 0; i < PARTICLE_COUNT; i++) mesh.setMatrixAt(i, _particleDummy.matrix);
       mesh.instanceMatrix.needsUpdate = true;
       if (mesh.material) mesh.material.opacity = 0;
-      onComplete?.();
       return;
     }
 
@@ -159,7 +163,7 @@ const FlipParticles = ({ active, color, onComplete }) => {
       />
     </instancedMesh>
   );
-};
+});
 
 // Antipodal glow fill effect - glows from outside and fills inward
 // Uses persistent meshes with shared geometries
@@ -467,9 +471,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // Death rank from Disparity Mode — null if not in disparity game or tile not yet dead
   const deadRank = isDead ? (deadRankMap?.get(stickerGridIdRef.current) ?? null) : null;
 
-  // State for triggering particle effects (needs re-render)
-  const [particlesActive, setParticlesActive] = useState(false);
-  const [currentParticleColor, setCurrentParticleColor] = useState(null);
+  // Imperative ref to FlipParticles — avoids re-rendering StickerPlane on every flip.
+  const flipParticlesRef = useRef();
 
   const prevCurr = useRef(meta?.curr ?? 0);
   useEffect(() => {
@@ -503,8 +506,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       spinT.current = 1;
       prevRawP.current = 0;
 
-      setCurrentParticleColor(fc[curr]);
-      setParticlesActive(true);
+      flipParticlesRef.current?.trigger(fc[curr]);
 
       play('/sounds/flip.mp3');
       vibrate(16);
@@ -512,32 +514,24 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     prevCurr.current = curr;
   }, [meta?.curr, meta?.flips]);
 
-  useFrame((state, delta) => {
-    // Biome mode: fade sticker ground plane when edge-on to camera during rotation.
-    // Keeps stickers OPAQUE (opaque render queue, depthWrite=true) when facing the
-    // camera — only enter transparent mode for the narrow edge-on window.
-    // This prevents all 54 stickers from landing in the transparent queue, which
-    // caused the three-blob depth-sort artifact visible during cube rotation.
-    if (biomeEnabled && meshRef.current) {
-      // All building and sticker materials are now fully opaque — nothing goes into
-      // the transparent render queue.  FrontSide culling on the sticker plane handles
-      // back-facing fragments automatically, and depth testing handles building
-      // occlusion.  No manual visibility toggling needed — visible=false was the
-      // original workaround for transparent sort failures and now causes the
-      // octagonal-flash artifact as tiles cross the rawDot=0 threshold mid-rotation.
-
-      // Restore anything left in transparent or hidden state from previous code.
-      if (!meshRef.current.visible) meshRef.current.visible = true;
-      if (cityGroupRef.current && !cityGroupRef.current.visible) cityGroupRef.current.visible = true;
-      const mat = meshRef.current.material;
-      if (mat && mat.transparent) {
-        mat.transparent = false;
-        mat.depthWrite = true;
-        mat.opacity = 1;
-        mat.needsUpdate = true;
-      }
+  // Biome mode: restore anything left in transparent or hidden state from previous code —
+  // runs once when biomeEnabled flips rather than every frame. FrontSide culling on the
+  // sticker plane handles back-facing fragments; depth testing handles building occlusion.
+  // The per-frame version caused the octagonal-flash artifact as tiles crossed rawDot=0.
+  useLayoutEffect(() => {
+    if (!biomeEnabled) return;
+    if (meshRef.current && !meshRef.current.visible) meshRef.current.visible = true;
+    if (cityGroupRef.current && !cityGroupRef.current.visible) cityGroupRef.current.visible = true;
+    const mat = meshRef.current?.material;
+    if (mat && mat.transparent) {
+      mat.transparent = false;
+      mat.depthWrite = true;
+      mat.opacity = 1;
+      mat.needsUpdate = true;
     }
+  }, [biomeEnabled]);
 
+  useFrame((state, delta) => {
     // Detect flipped tiles for persistent tremor
     const wormhole = (meta?.flips ?? 0) > 0 && meta?.curr !== meta?.orig;;
 
@@ -1028,13 +1022,13 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         <>
           {!(origIsWhite && !currIsWhite) && (
             <mesh position={[0, 0, 0.006]}>
-              <ringGeometry args={[0.38, 0.41, 16]} />
+              <primitive object={sharedRing38_41} attach="geometry" />
               <meshBasicMaterial color={origColor} />
             </mesh>
           )}
           {!(antipodalIsWhite && !currIsWhite) && (
             <mesh position={[0, 0, 0.007]}>
-              <ringGeometry args={[0.35, 0.38, 16]} />
+              <primitive object={sharedRing35_38} attach="geometry" />
               <meshBasicMaterial color={antipodalColor} />
             </mesh>
           )}
@@ -1043,15 +1037,16 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
       {!isDead && !isSudokube && isWormhole && (
         <>
-          {/* Parity breakthrough — original color trying to push through */}
-          <ParityBreakthrough origColor={origColor} flipCount={meta?.flips ?? 1} />
+          {/* Parity breakthrough — original color trying to push through.
+              LOD: skip at flips === 1 (6–8 blended meshes saved for the very first wormhole frame). */}
+          {(meta?.flips ?? 1) >= 2 && <ParityBreakthrough origColor={origColor} flipCount={meta?.flips ?? 1} />}
 
           <mesh ref={ringRef} position={[0, 0, 0.02]}>
-            <ringGeometry args={[0.36, 0.40, 16]} />
+            <primitive object={sharedRing36_40} attach="geometry" />
             <meshBasicMaterial color="#dda15e" transparent opacity={0.85} blending={THREE.AdditiveBlending} depthWrite={false} />
           </mesh>
           <mesh ref={glowRef} position={[0, 0, 0.015]}>
-            <circleGeometry args={[0.44, 16]} />
+            <primitive object={sharedCircle44} attach="geometry" />
             <meshBasicMaterial
               color="#bc6c25"
               transparent
@@ -1081,14 +1076,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         </>
       )}
 
-      {/* Particle burst effect during flip - only mounted when active */}
-      {particlesActive && (
-        <FlipParticles
-          active={particlesActive}
-          color={currentParticleColor}
-          onComplete={() => setParticlesActive(false)}
-        />
-      )}
+      {/* Particle burst effect during flip — always mounted, triggered imperatively via ref
+          to avoid re-rendering StickerPlane (and its entire subtree) on every flip. */}
+      <FlipParticles ref={flipParticlesRef} />
 
       {overlay && (
         <Text position={[0, 0, 0.03]} fontSize={0.17} color="black" anchorX="center" anchorY="middle">
