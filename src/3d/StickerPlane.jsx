@@ -553,9 +553,11 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       // Ease the time variable, not the geometry — expressive control lives here.
       const p = easeInOutCubic(rawP);
 
-      // Nonlinear squish: 0→1→0 triangle over the flip.
-      // Power curve (0.85) slows the approach to zero so collapse feels intentional.
-      const t = p < 0.5 ? p * 2 : (1 - p) * 2;
+      // Nonlinear squish: 1→0→1 — tile starts full, collapses to zero at midpoint
+      // where the color swaps, then expands back. Power curve (0.85) keeps the tile
+      // at near-full width for longer then accelerates the collapse, so the snap feels
+      // decisive rather than gradual.
+      const t = p < 0.5 ? 1 - p * 2 : (p - 0.5) * 2;
       const xScale = Math.pow(t, 0.85);
       const yPunch = 1 + Math.sin(p * Math.PI) * 0.12;
 
@@ -585,7 +587,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           // Incoming color bleeds through as the tile collapses toward zero width.
           const bleed = Math.pow(rawP * 2, 2.0);
           if (flipToColor.current) mat.color.set(flipToColor.current);
-          mat.opacity = bleed * 0.6;
+          mat.opacity = bleed * 0.85;
         } else {
           // Original color echoes as the new identity expands out.
           const echo = 1 - Math.pow((rawP - 0.5) * 2, 0.5);
