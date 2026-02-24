@@ -279,6 +279,7 @@ export default function WORM3() {
 
   // Disparity deaths map: gridId → rank (built from store, used by 3D tile labels)
   const disparityDeaths = useGameStore((s) => s.disparityDeaths);
+  const disparityWinner = useGameStore((s) => s.disparityWinner);
   const deadRankMap = useMemo(
     () => new Map(disparityDeaths.map((d) => [d.gridId, d.rank])),
     [disparityDeaths]
@@ -1024,7 +1025,7 @@ export default function WORM3() {
         <FloatingHUD metrics={metrics} chaosLevel={chaosLevel} chaosMode={chaosMode} />
 
         {/* Disparity HUD — RIP death log + winner announcement */}
-        {chaosMode && <DisparityHUD />}
+        {(chaosMode || disparityWinner) && <DisparityHUD />}
 
         {/* Tile Leaderboard — live flip stats in chaos mode, toggled via Views sheet */}
         <TileLeaderboard cubies={cubies} size={size} chaosMode={chaosMode} visible={showLeaderboard} onClose={toggleLeaderboard} />
