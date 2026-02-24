@@ -195,7 +195,7 @@ const NavItem = ({ icon, label, color, onClick, delay }) => {
 };
 
 // ─── Main component ───────────────────────────────────────────────────────────
-const MainMenu = ({ onPlay, onLevels, onFreeplay, onCoop, onSettings, onBiome, onDisparity }) => {
+const MainMenu = ({ onPlay, onLevels, onFreeplay, _onCoop, onSettings, onBiome, _onDisparity }) => {
   const [titleVisible,    setTitleVisible]    = useState(false);
   const [subtitleVisible, setSubtitleVisible] = useState(false);
   const [btnVisible,      setBtnVisible]      = useState(false);
