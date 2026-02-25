@@ -46,9 +46,10 @@ const IntroTunnel = ({
         id: i,
         angle,
         side,
-        radius: (0.1 + radiusFactor * 0.25) * 1.25,
-        baseOpacity: 0.4 + (1 - radiusFactor) * 0.6,
-        lineWidth: Math.max(0.375, (1.5 - radiusFactor * 1.2) * 1.25),
+        direction: i % 2 === 0 ? 1 : -1,               // half travel forward, half backward
+        radius: (0.1 + radiusFactor * 0.25) * 1.5625,   // +25% thickness (was *1.25)
+        baseOpacity: Math.min(1.0, (0.4 + (1 - radiusFactor) * 0.6) * 1.2),  // +20% brightness
+        lineWidth: Math.max(0.375, (1.5 - radiusFactor * 1.2) * 1.5625),      // +25% thickness
         sparkOffset: Math.random() * Math.PI * 2,
       };
     });
@@ -152,13 +153,14 @@ const IntroTunnel = ({
 
       const pulseSpeed    = 1.2 + surge * 2.5;
       const pulseWidth    = 0.10 + (1 - surge) * 0.05;
-      const pulseIntensity = 0.6 + surge * 0.4;
+      const pulseIntensity = (0.6 + surge * 0.4) * 1.2;  // +20% brightness
 
       const rawP1 = (((t * pulseSpeed + config.sparkOffset)           % 1.0) + 1.0) % 1.0;
       const rawP2 = (((t * pulseSpeed * 0.7 + config.sparkOffset + 0.5) % 1.0) + 1.0) % 1.0;
 
-      const p1 = tugRaw > 0 ? rawP1 : 1.0 - rawP1;
-      const p2 = tugRaw > 0 ? rawP2 : 1.0 - rawP2;
+      // Per-strand direction: half travel start→end, other half end→start
+      const p1 = config.direction > 0 ? rawP1 : 1.0 - rawP1;
+      const p2 = config.direction > 0 ? rawP2 : 1.0 - rawP2;
 
       for (let j = 0; j < 30; j++) {
         const u = j / 29;
