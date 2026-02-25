@@ -42,7 +42,6 @@ export default function DisparityWinnerScreen({ onDismiss }) {
   const [glitch, setGlitch] = useState(false);
   const [particleT, setParticleT] = useState(0); // 0-1 animation progress
   const rafRef = useRef(null);
-  const startRef = useRef(null);
 
   // Support both old { gridId } shape and new { pair: [id1, id2] } shape
   const winnerPair = disparityWinner?.pair ?? (disparityWinner?.gridId ? [disparityWinner.gridId] : []);
