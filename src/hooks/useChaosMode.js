@@ -285,8 +285,11 @@ export function useChaosMode() {
       const flippedSt = next[fx]?.[fy]?.[fz]?.stickers?.[fdk];
       const fc = flipCapRef.current;
       if (flippedSt && (flippedSt.flips || 0) >= fc && !deadTileSet.has(flipKey)) {
-        deadTileSet.add(flipKey);
-        newlyDead.push(flippedSt);
+        // Never kill the last surviving pair — they are the winners
+        if (surfaceStickers - deadTileSet.size > 2) {
+          deadTileSet.add(flipKey);
+          newlyDead.push(flippedSt);
+        }
       }
       if (flippedSt) {
         const antiLoc = findAntipodalStickerByGrid(currentManifoldMap, flippedSt, S);
@@ -294,8 +297,11 @@ export function useChaosMode() {
           const antiKey = `${antiLoc.x},${antiLoc.y},${antiLoc.z},${antiLoc.dirKey}`;
           const antiSt = next[antiLoc.x]?.[antiLoc.y]?.[antiLoc.z]?.stickers?.[antiLoc.dirKey];
           if (antiSt && (antiSt.flips || 0) >= fc && !deadTileSet.has(antiKey)) {
-            deadTileSet.add(antiKey);
-            newlyDead.push(antiSt);
+            // Never kill the last surviving pair — they are the winners
+            if (surfaceStickers - deadTileSet.size > 2) {
+              deadTileSet.add(antiKey);
+              newlyDead.push(antiSt);
+            }
           }
         }
       }
@@ -483,24 +489,24 @@ export function useChaosMode() {
             }
           }
 
-          // ── Winner detection: scan for tiles that have never been flipped ──
-          // Because flipStickerPair always flips a sticker and its antipodal
-          // atomically, neverFlipped decreases by 2 each time (never hitting 1).
-          // The winning condition is the last surviving antipodal pair (≤ 2).
-          let neverFlipped = 0;
-          const neverFlippedStickers = [];
-          for (const [x, y, z] of sc) {
-            const c = state[x][y][z];
-            for (const st of Object.values(c.stickers)) {
-              if ((st.flips || 0) === 0) {
-                neverFlipped++;
-                neverFlippedStickers.push(st);
+          // ── Winner detection: last 2 surviving (alive) tiles ──────────────────
+          // Each death reduces alive count by 1 (pairs die together so count drops
+          // by 2 per tick at most). Winner fires once exactly 2 tiles remain alive
+          // and at least one death has already happened.
+          const aliveAfterDeaths = surfaceStickers - deadTileSet.size;
+          if (!winnerAnnounced && aliveAfterDeaths <= 2 && aliveAfterDeaths > 0 && deathRank > 0) {
+            winnerAnnounced = true;
+            // Find the surviving stickers — those still below the flip cap
+            const winnerStickers = [];
+            for (const [wx, wy, wz] of sc) {
+              const wc = state[wx][wy][wz];
+              for (const st of Object.values(wc.stickers)) {
+                if ((st.flips || 0) < flipCapRef.current) {
+                  winnerStickers.push(st);
+                }
               }
             }
-          }
-          if (!winnerAnnounced && neverFlipped > 0 && neverFlipped <= 2 && deathRank > 0) {
-            winnerAnnounced = true;
-            const winnerPair = neverFlippedStickers.map(st => getManifoldGridId(st, S));
+            const winnerPair = winnerStickers.map(st => getManifoldGridId(st, S));
             useGameStore.getState().setDisparityWinner({ pair: winnerPair });
             useGameStore.getState().setShowDisparityWinner(true);
             // Do NOT call setChaosLevel(0) here — the winner screen dismisses it
