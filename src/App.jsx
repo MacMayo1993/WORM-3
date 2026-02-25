@@ -90,6 +90,7 @@ import Level10Cutscene from './components/screens/Level10Cutscene.jsx';
 import LevelTutorial from './components/screens/LevelTutorial.jsx';
 import FreeplaySetupWizard from './components/screens/FreeplaySetupWizard.jsx';
 import DisparitySetupWizard from './components/screens/DisparitySetupWizard.jsx';
+import DisparityWinnerScreen from './components/screens/DisparityWinnerScreen.jsx';
 import RotationPreview from './components/overlays/RotationPreview.jsx';
 import FaceRotationButtons from './components/overlays/FaceRotationButtons.jsx';
 import TileRotationSelector from './components/overlays/TileRotationSelector.jsx';
@@ -280,6 +281,8 @@ export default function WORM3() {
   // Disparity deaths map: gridId → rank (built from store, used by 3D tile labels)
   const disparityDeaths = useGameStore((s) => s.disparityDeaths);
   const disparityWinner = useGameStore((s) => s.disparityWinner);
+  const showDisparityWinner = useGameStore((s) => s.showDisparityWinner);
+  const setShowDisparityWinner = useGameStore((s) => s.setShowDisparityWinner);
   const deadRankMap = useMemo(
     () => new Map(disparityDeaths.map((d) => [d.gridId, d.rank])),
     [disparityDeaths]
@@ -1026,6 +1029,16 @@ export default function WORM3() {
 
         {/* Disparity HUD — RIP death log + winner announcement */}
         {(chaosMode || disparityWinner) && <DisparityHUD />}
+
+        {/* Disparity Winner — cinematic celebration screen */}
+        {showDisparityWinner && (
+          <DisparityWinnerScreen
+            onDismiss={() => {
+              setShowDisparityWinner(false);
+              useGameStore.getState().setChaosLevel(0);
+            }}
+          />
+        )}
 
         {/* Tile Leaderboard — live flip stats in chaos mode, toggled via Views sheet */}
         <TileLeaderboard cubies={cubies} size={size} chaosMode={chaosMode} visible={showLeaderboard} onClose={toggleLeaderboard} />

@@ -191,10 +191,13 @@ export const useGameStore = create(
     disparityDeaths: [],
     // Set when a single tile survives: { gridId }
     disparityWinner: null,
+    // Controls whether the cinematic winner celebration screen is visible
+    showDisparityWinner: false,
 
     addDisparityDeath: (death) => set((state) => ({ disparityDeaths: [...state.disparityDeaths, death] })),
     setDisparityWinner: (winner) => set({ disparityWinner: winner }),
-    clearDisparityGame: () => set({ disparityDeaths: [], disparityWinner: null }),
+    setShowDisparityWinner: (v) => set({ showDisparityWinner: v }),
+    clearDisparityGame: () => set({ disparityDeaths: [], disparityWinner: null, showDisparityWinner: false }),
 
     // ========================================================================
     // ANIMATION STATE
