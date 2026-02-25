@@ -17,7 +17,7 @@
 
 import { useEffect, useRef, useCallback, useMemo } from 'react';
 import { useGameStore } from './useGameStore.js';
-import { buildManifoldGridMap, flipStickerPair, getManifoldNeighbors, isOnSeam, isCrossFaceNeighbor } from '../game/manifoldLogic.js';
+import { buildManifoldGridMap, flipStickerPair, getManifoldNeighbors, isOnSeam, isCrossFaceNeighbor, findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
 import { getStickerWorldPos, getManifoldGridId } from '../game/coordinates.js';
 import { FLIP_CAP } from '../utils/constants.js';
 
@@ -239,8 +239,10 @@ export function useChaosMode() {
     };
 
     // Steps one chain forward by one tile and mutates the chain object in place.
-    // Returns the next cubies state (same reference if no flip happened).
-    const stepSingleChain = (state, chain) => {
+    // Returns { next, newlyDead } — next is the updated cubies state (same reference
+    // as input state if no flip happened), newlyDead is an array of sticker objects
+    // that crossed FLIP_CAP this step.
+    const stepSingleChain = (state, chain, deadTileSet) => {
       const S = state.length;
       if (!manifoldMapCacheRef.current) {
         manifoldMapCacheRef.current = buildManifoldGridMap(state, S);
@@ -254,7 +256,7 @@ export function useChaosMode() {
           chain.inCooldown = true;
           chain.cooldownAcc = 0;
           chain.cooldownDuration = chainCooldown;
-          return state;
+          return { next: state, newlyDead: [] };
         }
         chain.tile = start.tile;
         chain.strength = start.strength;
@@ -268,6 +270,27 @@ export function useChaosMode() {
         chain.tile.dirKey, currentManifoldMap
       );
 
+      // ── Capture deaths at the exact moment of flip ──────────────────────────
+      const newlyDead = [];
+      const { x: fx, y: fy, z: fz, dirKey: fdk } = chain.tile;
+      const flipKey = `${fx},${fy},${fz},${fdk}`;
+      const flippedSt = next[fx]?.[fy]?.[fz]?.stickers?.[fdk];
+      if (flippedSt && (flippedSt.flips || 0) >= FLIP_CAP && !deadTileSet.has(flipKey)) {
+        deadTileSet.add(flipKey);
+        newlyDead.push(flippedSt);
+      }
+      if (flippedSt) {
+        const antiLoc = findAntipodalStickerByGrid(currentManifoldMap, flippedSt, S);
+        if (antiLoc) {
+          const antiKey = `${antiLoc.x},${antiLoc.y},${antiLoc.z},${antiLoc.dirKey}`;
+          const antiSt = next[antiLoc.x]?.[antiLoc.y]?.[antiLoc.z]?.stickers?.[antiLoc.dirKey];
+          if (antiSt && (antiSt.flips || 0) >= FLIP_CAP && !deadTileSet.has(antiKey)) {
+            deadTileSet.add(antiKey);
+            newlyDead.push(antiSt);
+          }
+        }
+      }
+
       chain.strength *= strengthDecay;
 
       if (chain.strength < 0.1) {
@@ -276,7 +299,7 @@ export function useChaosMode() {
         chain.tile = null;
         chain.strength = 1.0;
         chain.visited = new Set();
-        return next;
+        return { next, newlyDead };
       }
 
       const neighbors = getManifoldNeighbors(
@@ -356,7 +379,7 @@ export function useChaosMode() {
         chain.visited = new Set();
       }
 
-      return next;
+      return { next, newlyDead };
     };
 
     const loop = (now) => {
@@ -391,13 +414,15 @@ export function useChaosMode() {
       if (tickAcc >= effectivePeriod) {
         let state = cubiesRef.current;
         let changed = false;
+        const allNewDeaths = [];
 
         for (const chain of chains) {
           if (chain.inCooldown) continue;
-          const next = stepSingleChain(state, chain);
-          if (next !== state) {
-            state = next;
+          const { next: newState, newlyDead } = stepSingleChain(state, chain, deadTileSet);
+          if (newState !== state) {
+            state = newState;
             changed = true;
+            for (const st of newlyDead) allNewDeaths.push(st);
           }
         }
 
@@ -407,36 +432,35 @@ export function useChaosMode() {
           disparityRef.current = disparity;
           flipPctRef.current = edgeTotal > 0 ? Math.round((flipActive / edgeTotal) * 100) : 0;
 
-          // ── Disparity Mode: detect newly dead tiles each tick ─────────────
           const S = sizeRef.current;
+
+          // ── Disparity Mode: record deaths captured inside stepSingleChain ──
+          if (allNewDeaths.length > 0) {
+            pairDeathCount++;
+            const store = useGameStore.getState();
+            for (const st of allNewDeaths) {
+              deathRank++;
+              store.addDisparityDeath({ id: Date.now() + Math.random(), gridId: getManifoldGridId(st, S), rank: deathRank, pairRank: pairDeathCount, timestamp: Date.now() });
+            }
+          }
+
+          // ── Winner detection: scan for tiles that have never been flipped ──
           let neverFlipped = 0;
           let neverFlippedSt = null;
-          const newDeaths = [];
           for (const [x, y, z] of sc) {
             const c = state[x][y][z];
-            for (const [dirKey, st] of Object.entries(c.stickers)) {
-              if ((st.flips || 0) >= FLIP_CAP) {
-                const k = `${x},${y},${z},${dirKey}`;
-                if (!deadTileSet.has(k)) { deadTileSet.add(k); newDeaths.push(st); }
-              }
+            for (const st of Object.values(c.stickers)) {
               if ((st.flips || 0) === 0) {
                 neverFlipped++;
                 neverFlippedSt = st;
               }
             }
           }
-          if (newDeaths.length > 0) {
-            pairDeathCount++;
-            const store = useGameStore.getState();
-            for (const st of newDeaths) {
-              deathRank++;
-              store.addDisparityDeath({ id: Date.now() + Math.random(), gridId: getManifoldGridId(st, S), rank: deathRank, pairRank: pairDeathCount, timestamp: Date.now() });
-            }
-          }
           if (!winnerAnnounced && neverFlipped === 1 && neverFlippedSt) {
             winnerAnnounced = true;
             useGameStore.getState().setDisparityWinner({ gridId: getManifoldGridId(neverFlippedSt, S) });
-            useGameStore.getState().setChaosLevel(0);
+            useGameStore.getState().setShowDisparityWinner(true);
+            // Do NOT call setChaosLevel(0) here — the winner screen dismisses it
           }
 
           setCubies(state);
