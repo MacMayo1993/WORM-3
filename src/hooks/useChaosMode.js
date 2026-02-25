@@ -76,6 +76,7 @@ const computeChaosMetrics = (state, surfCoords) => {
 export function useChaosMode() {
   const chaosLevel = useGameStore((state) => state.chaosLevel);
   const setChaosLevel = useGameStore((state) => state.setChaosLevel);
+  const disparityFlipCap = useGameStore((state) => state.disparityFlipCap);
   const autoRotateEnabled = useGameStore((state) => state.autoRotateEnabled);
   const setAutoRotateEnabled = useGameStore((state) => state.setAutoRotateEnabled);
   const cascades = useGameStore((state) => state.cascades);
@@ -125,6 +126,10 @@ export function useChaosMode() {
   const surfaceCoordsRef = useRef(surfaceCoords);
   surfaceCoordsRef.current = surfaceCoords;
 
+  // Keep disparityFlipCap in a ref so the RAF closure can read it without stale captures
+  const flipCapRef = useRef(disparityFlipCap);
+  flipCapRef.current = disparityFlipCap;
+
   // ── Opt #1: disparity + flipPct stored in refs, updated once per tick ──────
   // The auto-rotate RAF reads these refs instead of scanning the full cube.
   const disparityRef = useRef(0);
@@ -162,6 +167,9 @@ export function useChaosMode() {
     let deathRank = 0;
     let pairDeathCount = 0; // one increment per tick that produces deaths (pair grouping)
     let winnerAnnounced = false;
+    // Track alive tile count per face (faceNum 1-6). Populated on first death scan.
+    const faceAliveMap = new Map([[1, 0], [2, 0], [3, 0], [4, 0], [5, 0], [6, 0]]);
+    const faceSeedDone = { done: false };
 
     // ── Level config: 5 levels (index 0 = off) ───────────────────────────────
     // L1: single slow chain — intro to the mechanic
@@ -205,7 +213,7 @@ export function useChaosMode() {
       for (const [x, y, z] of surfCoords) {
         const c = state[x][y][z];
         for (const [dirKey, st] of Object.entries(c.stickers)) {
-          if (st.flips > 0 && st.flips < FLIP_CAP) {
+          if (st.flips > 0 && st.flips < flipCapRef.current) {
             candidates.push({ x, y, z, dirKey, flips: st.flips });
           }
         }
@@ -220,7 +228,7 @@ export function useChaosMode() {
         for (const [x, y, z] of surfCoords) {
           const c = state[x][y][z];
           for (const [dirKey, st] of Object.entries(c.stickers)) {
-            if ((st.flips || 0) < FLIP_CAP) {
+            if ((st.flips || 0) < flipCapRef.current) {
               freshPool.push({ x, y, z, dirKey, flips: 1 });
             }
           }
@@ -275,7 +283,8 @@ export function useChaosMode() {
       const { x: fx, y: fy, z: fz, dirKey: fdk } = chain.tile;
       const flipKey = `${fx},${fy},${fz},${fdk}`;
       const flippedSt = next[fx]?.[fy]?.[fz]?.stickers?.[fdk];
-      if (flippedSt && (flippedSt.flips || 0) >= FLIP_CAP && !deadTileSet.has(flipKey)) {
+      const fc = flipCapRef.current;
+      if (flippedSt && (flippedSt.flips || 0) >= fc && !deadTileSet.has(flipKey)) {
         deadTileSet.add(flipKey);
         newlyDead.push(flippedSt);
       }
@@ -284,7 +293,7 @@ export function useChaosMode() {
         if (antiLoc) {
           const antiKey = `${antiLoc.x},${antiLoc.y},${antiLoc.z},${antiLoc.dirKey}`;
           const antiSt = next[antiLoc.x]?.[antiLoc.y]?.[antiLoc.z]?.stickers?.[antiLoc.dirKey];
-          if (antiSt && (antiSt.flips || 0) >= FLIP_CAP && !deadTileSet.has(antiKey)) {
+          if (antiSt && (antiSt.flips || 0) >= fc && !deadTileSet.has(antiKey)) {
             deadTileSet.add(antiKey);
             newlyDead.push(antiSt);
           }
@@ -316,7 +325,7 @@ export function useChaosMode() {
         if (!nc) continue;
         const nst = nc.stickers[neighbor.dirKey];
         if (!nst) continue;
-        if ((nst.flips || 0) >= FLIP_CAP) continue;
+        if ((nst.flips || 0) >= flipCapRef.current) continue;
         const { x: nx, y: ny, z: nz, dirKey: nd } = neighbor;
         const S1 = S - 1;
         const onEdge = (nd === 'PX' && nx === S1) || (nd === 'NX' && nx === 0) ||
@@ -409,7 +418,14 @@ export function useChaosMode() {
       // Gentle adaptive period — slows by at most 1.5× at full saturation.
       // Replaces the old satBrake which could reach 6× and stall 5×5 boards.
       const pct = flipPctRef.current;
-      const effectivePeriod = tickPeriod * (1 + pct / 200);
+      // Slow-motion final 5: when only a handful of tiles survive, dramatically
+      // decelerate so each death feels weighty and deliberate.
+      const totalSurface = sizeRef.current * sizeRef.current * 6;
+      const aliveNow = totalSurface - deadTileSet.size;
+      const slowMoPeriodMult = aliveNow <= 5
+        ? 1 / Math.max(0.25, aliveNow / 10)
+        : 1.0;
+      const effectivePeriod = tickPeriod * (1 + pct / 200) * slowMoPeriodMult;
 
       if (tickAcc >= effectivePeriod) {
         let state = cubiesRef.current;
@@ -434,13 +450,36 @@ export function useChaosMode() {
 
           const S = sizeRef.current;
 
+          // ── Disparity Mode: seed faceAliveMap on first tick with deaths ───
+          if (!faceSeedDone.done) {
+            faceSeedDone.done = true;
+            for (const [x, y, z] of surfaceCoordsRef.current) {
+              const c = state[x][y][z];
+              for (const st of Object.values(c.stickers)) {
+                const faceNum = st.orig;
+                if (faceNum) faceAliveMap.set(faceNum, (faceAliveMap.get(faceNum) ?? 0) + 1);
+              }
+            }
+          }
+
           // ── Disparity Mode: record deaths captured inside stepSingleChain ──
           if (allNewDeaths.length > 0) {
             pairDeathCount++;
             const store = useGameStore.getState();
             for (const st of allNewDeaths) {
               deathRank++;
-              store.addDisparityDeath({ id: Date.now() + Math.random(), gridId: getManifoldGridId(st, S), rank: deathRank, pairRank: pairDeathCount, timestamp: Date.now() });
+              const gridId = getManifoldGridId(st, S);
+              store.addDisparityDeath({ id: Date.now() + Math.random(), gridId, rank: deathRank, pairRank: pairDeathCount, timestamp: Date.now() });
+              // Decrement face count and fire elimination event when face hits 0
+              const faceNum = st.orig;
+              if (faceNum) {
+                const prev = faceAliveMap.get(faceNum) ?? 1;
+                const next = Math.max(0, prev - 1);
+                faceAliveMap.set(faceNum, next);
+                if (next === 0) {
+                  store.addDisparityEliminatedFace(faceNum);
+                }
+              }
             }
           }
 

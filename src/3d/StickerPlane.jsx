@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useLayoutEffect, useMemo, useImperativeHandle } from 'react';
+import React, { useRef, useEffect, useLayoutEffect, useMemo, useImperativeHandle, useState } from 'react';
 import { easeInOutCubic } from '../utils/easing.js';
 import { useFrame } from '@react-three/fiber';
 import { Text } from '@react-three/drei';
@@ -430,9 +430,45 @@ const Worm = ({ position, rotation, scale = 1 }) => {
   );
 };
 
+// Thin flip-pressure bar at the bottom edge of a sticker face.
+// Visible only during Disparity Mode on live tiles (not dead/headstoned).
+const DisparityHealthBar = React.memo(function DisparityHealthBar({ flips, flipCap }) {
+  const pct = Math.min(flips / flipCap, 1);
+  if (pct <= 0) return null; // un-flipped tiles show nothing
+
+  const barColor = pct < 0.33 ? '#22c55e' : pct < 0.66 ? '#f97316' : '#ef4444';
+  const isFlashing = pct >= 0.9;
+  const barWidth = pct * 0.82; // max 0.82 units = sticker width minus margin
+
+  return (
+    <group position={[0, -0.41, 0.002]}>
+      {/* Background track */}
+      <mesh>
+        <planeGeometry args={[0.82, 0.05]} />
+        <meshBasicMaterial color="#111111" transparent opacity={0.5} depthWrite={false} />
+      </mesh>
+      {/* Fill bar — left-aligned so it shrinks from right */}
+      <mesh position={[-(0.82 - barWidth) / 2, 0, 0.001]}>
+        <planeGeometry args={[barWidth, 0.05]} />
+        <meshBasicMaterial
+          color={barColor}
+          transparent
+          opacity={isFlashing ? 1.0 : 0.85}
+          depthWrite={false}
+          toneMapped={false}
+        />
+      </mesh>
+    </group>
+  );
+});
+
 const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay, mode, faceColors, faceTextures, faceRow, faceCol, faceSize, manifoldStyles, hollow, currentDir: _currentDir, deadRankMap }) {
   const fc = faceColors || FACE_COLORS;
   const biomeEnabled = useGameStore((s) => s.settings?.biomeMode?.enabled ?? false);
+  const chaosLevel = useGameStore((s) => s.chaosLevel);
+  const disparityFlipCap = useGameStore((s) => s.disparityFlipCap);
+  // In Disparity Mode (chaosLevel > 0), use the configurable flip cap; otherwise the global constant
+  const effectiveFlipCap = chaosLevel > 0 ? disparityFlipCap : FLIP_CAP;
   const groupRef = useRef();
   const meshRef = useRef();
   const cityGroupRef = useRef();
@@ -455,6 +491,11 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const isFlipping = useRef(false);
   // Previous rawP value — used to detect the exact frame the midpoint is crossed.
   const prevRawP = useRef(0);
+  // Death animation: 0 = not started, 0–1 = imploding, 1 = done (show headstone)
+  // Start at 1 so tiles that load already-dead show headstone immediately without animation.
+  const deathAnimT = useRef(isDead ? 1 : 0);
+  const wasDeadRef = useRef(isDead);
+  const [deathAnimDone, setDeathAnimDone] = useState(isDead);
   // Flash timer for ring opacity spike at midpoint crossing; decays to 0 in useFrame.
   const ringFlashRef = useRef(0);
   // Overlay ref for antipodal color bleed during flip transitions.
@@ -467,12 +508,20 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const currTextureRef = useRef(null);
 
   // Dead tiles (at flip cap) are inert gray — used in useFrame and rendering
-  const isDead = (meta?.flips ?? 0) >= FLIP_CAP;
+  const isDead = (meta?.flips ?? 0) >= effectiveFlipCap;
   // Death rank from Disparity Mode — null if not in disparity game or tile not yet dead
   const deadRank = isDead ? (deadRankMap?.get(stickerGridIdRef.current) ?? null) : null;
 
   // Imperative ref to FlipParticles — avoids re-rendering StickerPlane on every flip.
   const flipParticlesRef = useRef();
+
+  // Death detection: trigger implosion animation when tile first hits flip cap
+  useEffect(() => {
+    if (isDead && !wasDeadRef.current) {
+      wasDeadRef.current = true;
+      deathAnimT.current = 0; // start implosion
+    }
+  }, [isDead]);
 
   const prevCurr = useRef(meta?.curr ?? 0);
   useEffect(() => {
@@ -534,6 +583,25 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   useFrame((state, delta) => {
     // Detect flipped tiles for persistent tremor
     const wormhole = (meta?.flips ?? 0) > 0 && meta?.curr !== meta?.orig;;
+
+    // Death implosion animation — runs until deathAnimT reaches 1
+    if (deathAnimT.current < 1 && groupRef.current) {
+      const prev = deathAnimT.current;
+      deathAnimT.current = Math.min(1, prev + delta / 0.5);
+      const t = deathAnimT.current;
+      // Phase 1 (0→0.25): overshoot to 1.15×
+      // Phase 2 (0.25→1): collapse to 0
+      const scl = t < 0.25
+        ? 1 + (t / 0.25) * 0.15
+        : 1.15 * Math.max(0, (1 - (t - 0.25) / 0.75));
+      groupRef.current.scale.set(scl, scl, 1);
+      if (t >= 1 && prev < 1) {
+        // Animation done: restore scale to 1 so the headstone (child of group) renders normally
+        groupRef.current.scale.set(1, 1, 1);
+        setDeathAnimDone(true);
+      }
+      return; // skip other animations while dying
+    }
 
     // Single-boolean gate: skip the entire body on idle frames.
     // ringRef / glowRef are only mounted when wormhole is true, so the
@@ -961,8 +1029,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
       {/* Seam pulse overlay — disabled pending revamp */}
 
-      {/* Dead tile headstone — replaces all live overlays */}
-      {isDead && (
+      {/* Dead tile headstone — appears after death implosion animation completes */}
+      {deathAnimDone && (
         <group position={[0, 0, 0.02]}>
           {/* Headstone body — rounded rectangle */}
           <mesh position={[0, 0.06, 0]}>
@@ -1084,6 +1152,11 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         <Text position={[0, 0, 0.03]} fontSize={0.17} color="black" anchorX="center" anchorY="middle">
           {overlay}
         </Text>
+      )}
+
+      {/* Per-tile health bar — visible in Disparity Mode only, for live tiles */}
+      {chaosLevel > 0 && !isDead && (
+        <DisparityHealthBar flips={meta?.flips ?? 0} flipCap={effectiveFlipCap} />
       )}
     </group>
   );

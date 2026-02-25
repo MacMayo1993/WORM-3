@@ -1,5 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useGameStore } from '../../hooks/useGameStore.js';
+import { FACE_COLORS } from '../../utils/constants.js';
+
+const FACE_NAMES = { 1: 'RED', 2: 'GREEN', 3: 'WHITE', 4: 'ORANGE', 5: 'BLUE', 6: 'YELLOW' };
+const FACE_ELIMINATION_LIFETIME = 2500; // ms to show the face elimination banner
 
 const NOTIFICATION_LIFETIME = 8000; // ms before a death entry fades out
 const MAX_PAIR_GROUPS = 6;           // max simultaneous pair groups visible
@@ -18,6 +22,37 @@ const MAX_PAIR_GROUPS = 6;           // max simultaneous pair groups visible
 const DisparityHUD = () => {
   const disparityDeaths = useGameStore((s) => s.disparityDeaths);
   const disparityWinner = useGameStore((s) => s.disparityWinner);
+  const disparityEliminatedFaces = useGameStore((s) => s.disparityEliminatedFaces);
+  const size = useGameStore((s) => s.size);
+
+  const totalTiles = size * size * 6;
+  const aliveCount = Math.max(0, totalTiles - disparityDeaths.length);
+
+  // Animate the alive counter when it drops
+  const prevAliveRef = useRef(aliveCount);
+  const [counterFlash, setCounterFlash] = useState(false);
+  useEffect(() => {
+    if (aliveCount < prevAliveRef.current) {
+      setCounterFlash(true);
+      const t = setTimeout(() => setCounterFlash(false), 300);
+      prevAliveRef.current = aliveCount;
+      return () => clearTimeout(t);
+    }
+    prevAliveRef.current = aliveCount;
+  }, [aliveCount]);
+
+  // Face elimination banner: show the latest eliminated face for a brief period
+  const [activeFaceElimination, setActiveFaceElimination] = useState(null);
+  const prevEliminatedLengthRef = useRef(0);
+  useEffect(() => {
+    if (disparityEliminatedFaces.length > prevEliminatedLengthRef.current) {
+      const faceNum = disparityEliminatedFaces[disparityEliminatedFaces.length - 1];
+      setActiveFaceElimination(faceNum);
+      const t = setTimeout(() => setActiveFaceElimination(null), FACE_ELIMINATION_LIFETIME);
+      prevEliminatedLengthRef.current = disparityEliminatedFaces.length;
+      return () => clearTimeout(t);
+    }
+  }, [disparityEliminatedFaces]);
 
   const [visiblePairRanks, setVisiblePairRanks] = useState(new Set());
 
@@ -47,7 +82,7 @@ const DisparityHUD = () => {
     .sort(([a], [b]) => Number(b) - Number(a))
     .slice(0, MAX_PAIR_GROUPS);
 
-  if (!sortedGroups.length && !disparityWinner) return null;
+  if (!sortedGroups.length && !disparityWinner && aliveCount === totalTiles) return null;
 
   return (
     <div style={{
@@ -61,6 +96,78 @@ const DisparityHUD = () => {
       pointerEvents: 'none',
       maxWidth: '260px',
     }}>
+      <style>{`
+        @keyframes disparity-pulse-red {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+          50% { box-shadow: 0 0 10px 3px rgba(239,68,68,0.35); }
+        }
+        @keyframes disparity-face-elim {
+          0%   { transform: scale(0.8) translateY(8px); opacity: 0; }
+          60%  { transform: scale(1.04) translateY(-2px); opacity: 1; }
+          100% { transform: scale(1) translateY(0); opacity: 1; }
+        }
+      `}</style>
+      {/* Face elimination banner */}
+      {activeFaceElimination != null && (
+        <div key={activeFaceElimination} style={{
+          background: `${FACE_COLORS[activeFaceElimination] ?? '#888'}22`,
+          border: `2px solid ${FACE_COLORS[activeFaceElimination] ?? '#888'}`,
+          borderRadius: '8px',
+          padding: '8px 14px',
+          fontFamily: "'Courier New', monospace",
+          textAlign: 'center',
+          backdropFilter: 'blur(8px)',
+          marginBottom: '4px',
+          animation: 'disparity-face-elim 0.35s cubic-bezier(0.22,1,0.36,1) forwards',
+        }}>
+          <div style={{ fontSize: '9px', color: 'rgba(200,200,220,0.7)', letterSpacing: '0.12em', marginBottom: '2px' }}>
+            FACE ELIMINATED
+          </div>
+          <div style={{
+            fontSize: '14px',
+            fontWeight: 900,
+            color: FACE_COLORS[activeFaceElimination] ?? '#fff',
+            letterSpacing: '0.08em',
+            textShadow: `0 0 10px ${FACE_COLORS[activeFaceElimination] ?? '#fff'}`,
+          }}>
+            {FACE_NAMES[activeFaceElimination] ?? `FACE ${activeFaceElimination}`}
+          </div>
+        </div>
+      )}
+
+      {/* Alive count — always visible once chaos has started (at least 1 death) */}
+      {!disparityWinner && disparityDeaths.length > 0 && (
+        <div style={{
+          background: 'rgba(0,0,0,0.75)',
+          border: `1.5px solid ${aliveCount <= 5 ? 'rgba(239,68,68,0.8)' : 'rgba(255,255,255,0.2)'}`,
+          borderRadius: '8px',
+          padding: '8px 14px',
+          fontFamily: "'Courier New', monospace",
+          display: 'flex',
+          alignItems: 'baseline',
+          gap: '6px',
+          backdropFilter: 'blur(8px)',
+          marginBottom: '4px',
+          animation: aliveCount <= 5 ? 'disparity-pulse-red 1.2s ease-in-out infinite' : 'none',
+        }}>
+          <span style={{
+            fontSize: counterFlash ? '30px' : '26px',
+            fontWeight: 900,
+            color: aliveCount <= 5 ? '#ef4444' : aliveCount <= 10 ? '#f97316' : '#ffffff',
+            transition: 'font-size 0.15s, color 0.3s',
+            textShadow: aliveCount <= 5 ? '0 0 12px rgba(239,68,68,0.8)' : 'none',
+            lineHeight: 1,
+          }}>
+            {aliveCount}
+          </span>
+          <span style={{ fontSize: '11px', color: 'rgba(180,180,200,0.8)', letterSpacing: '0.06em' }}>
+            ALIVE
+          </span>
+          <span style={{ fontSize: '10px', color: 'rgba(100,100,120,0.8)', marginLeft: 'auto' }}>
+            / {totalTiles}
+          </span>
+        </div>
+      )}
       {disparityWinner && (
         <div style={{
           background: 'rgba(30, 20, 0, 0.90)',
