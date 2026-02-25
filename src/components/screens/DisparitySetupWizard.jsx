@@ -3,6 +3,14 @@ import React, { useState } from 'react';
 const LEVEL_LABELS = { 1: 'Low', 2: 'Medium', 3: 'High', 4: 'Extreme', 5: 'Maximum' };
 const LEVEL_ACCENT = { 1: '#34c759', 2: '#ffcc00', 3: '#ff9500', 4: '#ff3b30', 5: '#af52de' };
 
+// Tile endurance presets — how many flips a tile can absorb before dying
+const FLIP_CAP_PRESETS = [
+  { label: 'Fragile', value: 6, sub: 'Fast massacre' },
+  { label: 'Standard', value: 15, sub: 'Balanced carnage' },
+  { label: 'Endurance', value: 25, sub: 'Slow attrition' },
+  { label: 'Titan', value: 40, sub: 'War of attrition' },
+];
+
 /**
  * DisparitySetupWizard
  *
@@ -13,6 +21,7 @@ const LEVEL_ACCENT = { 1: '#34c759', 2: '#ffcc00', 3: '#ff9500', 4: '#ff3b30', 5
 const DisparitySetupWizard = ({ onStart, onCancel }) => {
   const [cubeSize, setCubeSize] = useState(3);
   const [disparityLevel, setDisparityLevel] = useState(3);
+  const [flipCap, setFlipCap] = useState(15); // default: Standard
   const [visualMode, setVisualMode] = useState('classic');
   const [flipMode, setFlipMode] = useState(true);
   const [showTunnels, setShowTunnels] = useState(true);
@@ -94,6 +103,29 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
           </div>
         </Section>
 
+        {/* Tile Endurance */}
+        <Section label="Tile Endurance">
+          <div style={{ display: 'flex', gap: '6px' }}>
+            {FLIP_CAP_PRESETS.map(p => (
+              <button
+                key={p.value}
+                onClick={() => setFlipCap(p.value)}
+                style={{
+                  flex: 1, padding: '8px 4px', border: `1.5px solid ${flipCap === p.value ? accent : '#e5e5ea'}`,
+                  borderRadius: '10px', fontSize: '11px', fontWeight: flipCap === p.value ? '700' : '400',
+                  background: flipCap === p.value ? `${accent}18` : '#f9f9fb',
+                  color: flipCap === p.value ? accent : '#8e8e93',
+                  cursor: 'pointer', transition: 'all 0.15s',
+                  fontFamily: 'inherit', textAlign: 'center', lineHeight: 1.3,
+                }}
+              >
+                <div>{p.label}</div>
+                <div style={{ fontSize: '9px', marginTop: '2px', opacity: 0.75 }}>{p.sub}</div>
+              </button>
+            ))}
+          </div>
+        </Section>
+
         {/* Visual Mode */}
         <Section label="View">
           <div style={{ display: 'flex', background: '#f2f2f7', borderRadius: '10px', padding: '3px', gap: '2px' }}>
@@ -138,7 +170,7 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
             Back
           </button>
           <button
-            onClick={() => onStart({ cubeSize, disparityLevel, visualMode, flipMode, showTunnels })}
+            onClick={() => onStart({ cubeSize, disparityLevel, flipCap, visualMode, flipMode, showTunnels })}
             style={{
               flex: 2, padding: '14px', border: 'none', borderRadius: '12px',
               fontSize: '16px', fontWeight: '600', background: accent, color: '#fff',

@@ -193,11 +193,20 @@ export const useGameStore = create(
     disparityWinner: null,
     // Controls whether the cinematic winner celebration screen is visible
     showDisparityWinner: false,
+    // Face elimination events: array of faceNum (1-6) values in order they were eliminated
+    disparityEliminatedFaces: [],
+
+    // Configurable flip cap for Disparity Mode (overrides FLIP_CAP constant)
+    disparityFlipCap: 25,
+    setDisparityFlipCap: (v) => set({ disparityFlipCap: v }),
 
     addDisparityDeath: (death) => set((state) => ({ disparityDeaths: [...state.disparityDeaths, death] })),
     setDisparityWinner: (winner) => set({ disparityWinner: winner }),
     setShowDisparityWinner: (v) => set({ showDisparityWinner: v }),
-    clearDisparityGame: () => set({ disparityDeaths: [], disparityWinner: null, showDisparityWinner: false }),
+    addDisparityEliminatedFace: (faceNum) => set((state) => ({
+      disparityEliminatedFaces: [...state.disparityEliminatedFaces, faceNum],
+    })),
+    clearDisparityGame: () => set({ disparityDeaths: [], disparityWinner: null, showDisparityWinner: false, disparityEliminatedFaces: [] }),
 
     // ========================================================================
     // ANIMATION STATE

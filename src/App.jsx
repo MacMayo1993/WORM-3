@@ -277,6 +277,8 @@ export default function WORM3() {
   const [showDisparityWizard, setShowDisparityWizard] = useState(false);
   const [disparityWaitingFirstFlip, setDisparityWaitingFirstFlip] = useState(false);
   const pendingDisparityLevelRef = useRef(3);
+  // Countdown: null = not running, 3/2/1 = ticking, 'GO!' = flash before start
+  const [disparityCountdown, setDisparityCountdown] = useState(null);
 
   // Disparity deaths map: gridId → rank (built from store, used by 3D tile labels)
   const disparityDeaths = useGameStore((s) => s.disparityDeaths);
@@ -320,6 +322,24 @@ export default function WORM3() {
     const timer = setTimeout(() => markMobileHintShown(), 4500);
     return () => clearTimeout(timer);
   }, [showMobileTouchHint, markMobileHintShown]);
+
+  // 3-2-1-GO countdown before chaos begins
+  useEffect(() => {
+    if (disparityCountdown === null) return;
+    if (disparityCountdown === 'GO!') {
+      const t = setTimeout(() => {
+        setDisparityCountdown(null);
+        setChaosLevel(pendingDisparityLevelRef.current);
+      }, 600);
+      return () => clearTimeout(t);
+    }
+    if (typeof disparityCountdown === 'number' && disparityCountdown > 0) {
+      const t = setTimeout(() => {
+        setDisparityCountdown((prev) => (prev === 1 ? 'GO!' : prev - 1));
+      }, 900);
+      return () => clearTimeout(t);
+    }
+  }, [disparityCountdown, setChaosLevel]);
 
   // ========================================================================
   // HANDLERS
@@ -406,10 +426,11 @@ export default function WORM3() {
     setShowDisparityWizard(true);
   }, []);
 
-  const handleDisparitySetupComplete = useCallback(({ cubeSize, disparityLevel, visualMode: vm, flipMode: fm, showTunnels: st }) => {
+  const handleDisparitySetupComplete = useCallback(({ cubeSize, disparityLevel, flipCap, visualMode: vm, flipMode: fm, showTunnels: st }) => {
     setShowDisparityWizard(false);
     useGameStore.getState().clearLevel();
     useGameStore.getState().clearDisparityGame();
+    if (flipCap != null) useGameStore.getState().setDisparityFlipCap(flipCap);
     // Keep current background/colors; only disable biome mode so the scene renders
     setSettings({ ...settings, biomeMode: { enabled: false, faceAssignment: null } });
     if (vm) setVisualMode(vm);
@@ -466,12 +487,12 @@ export default function WORM3() {
   const onTapFlip = useCallback((pos, dirKey) => {
     if (disparityWaitingFirstFlip) {
       flipSticker(pos, dirKey);
-      setChaosLevel(pendingDisparityLevelRef.current);
       setDisparityWaitingFirstFlip(false);
+      setDisparityCountdown(3); // start 3-2-1-GO countdown
       return;
     }
     flipSticker(pos, dirKey);
-  }, [flipSticker, disparityWaitingFirstFlip, setChaosLevel]);
+  }, [flipSticker, disparityWaitingFirstFlip]);
 
   const onFlipWaveComplete = useCallback(() => {
     setFlipWaveOrigins([]);
@@ -481,8 +502,8 @@ export default function WORM3() {
   const handleSelectTile = useCallback((pos, dirKey) => {
     if (disparityWaitingFirstFlip) {
       flipSticker(pos, dirKey);
-      setChaosLevel(pendingDisparityLevelRef.current);
       setDisparityWaitingFirstFlip(false);
+      setDisparityCountdown(3); // start 3-2-1-GO countdown
       return;
     }
     const newCursor = cubePosToCursor(pos, dirKey);
@@ -1029,6 +1050,38 @@ export default function WORM3() {
 
         {/* Disparity HUD — RIP death log + winner announcement */}
         {(chaosMode || disparityWinner) && <DisparityHUD />}
+
+        {/* Disparity countdown — 3-2-1-GO overlay before chaos starts */}
+        {disparityCountdown !== null && (
+          <div style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 8000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            pointerEvents: 'none',
+          }}>
+            <div key={disparityCountdown} style={{
+              fontSize: disparityCountdown === 'GO!' ? '6rem' : '9rem',
+              fontWeight: 900,
+              fontFamily: 'monospace',
+              color: disparityCountdown === 'GO!' ? '#22c55e' : '#ef4444',
+              textShadow: `0 0 40px ${disparityCountdown === 'GO!' ? '#22c55e' : '#ef4444'}`,
+              animation: 'disparity-cd-pop 0.3s cubic-bezier(0.22,1,0.36,1) forwards',
+              letterSpacing: '0.02em',
+            }}>
+              {disparityCountdown}
+            </div>
+            <style>{`
+              @keyframes disparity-cd-pop {
+                0%   { transform: scale(1.6); opacity: 0; }
+                40%  { transform: scale(0.95); opacity: 1; }
+                100% { transform: scale(1); opacity: 0.9; }
+              }
+            `}</style>
+          </div>
+        )}
 
         {/* Disparity Winner — cinematic celebration screen */}
         {showDisparityWinner && (
