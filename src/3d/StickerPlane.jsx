@@ -469,6 +469,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const disparityFlipCap = useGameStore((s) => s.disparityFlipCap);
   // In Disparity Mode (chaosLevel > 0), use the configurable flip cap; otherwise the global constant
   const effectiveFlipCap = chaosLevel > 0 ? disparityFlipCap : FLIP_CAP;
+  // Dead tiles (at flip cap) are inert gray — used in useFrame and rendering
+  const isDead = (meta?.flips ?? 0) >= effectiveFlipCap;
   const groupRef = useRef();
   const meshRef = useRef();
   const cityGroupRef = useRef();
@@ -507,8 +509,6 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // Live ref to current texture so useFrame closures can access it without stale captures.
   const currTextureRef = useRef(null);
 
-  // Dead tiles (at flip cap) are inert gray — used in useFrame and rendering
-  const isDead = (meta?.flips ?? 0) >= effectiveFlipCap;
   // Death rank from Disparity Mode — null if not in disparity game or tile not yet dead
   const deadRank = isDead ? (deadRankMap?.get(stickerGridIdRef.current) ?? null) : null;
 
