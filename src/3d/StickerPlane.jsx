@@ -493,9 +493,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const isFlipping = useRef(false);
   // Previous rawP value — used to detect the exact frame the midpoint is crossed.
   const prevRawP = useRef(0);
-  // Death animation: 0 = not started, 0–1 = imploding, 1 = done (show headstone)
+  // Death animation: -1 = not started (idle), 0–1 = imploding, 1 = done (show headstone)
   // Start at 1 so tiles that load already-dead show headstone immediately without animation.
-  const deathAnimT = useRef(isDead ? 1 : 0);
+  const deathAnimT = useRef(isDead ? 1 : -1);
   const wasDeadRef = useRef(isDead);
   const [deathAnimDone, setDeathAnimDone] = useState(isDead);
   // Flash timer for ring opacity spike at midpoint crossing; decays to 0 in useFrame.
@@ -584,8 +584,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     // Detect flipped tiles for persistent tremor
     const wormhole = (meta?.flips ?? 0) > 0 && meta?.curr !== meta?.orig;;
 
-    // Death implosion animation — runs until deathAnimT reaches 1
-    if (deathAnimT.current < 1 && groupRef.current) {
+    // Death implosion animation — -1 = idle (not started), 0..1 = playing, ≥1 = done
+    if (deathAnimT.current >= 0 && deathAnimT.current < 1 && groupRef.current) {
       const prev = deathAnimT.current;
       deathAnimT.current = Math.min(1, prev + delta / 0.5);
       const t = deathAnimT.current;

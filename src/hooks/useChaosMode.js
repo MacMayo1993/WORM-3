@@ -498,7 +498,7 @@ export function useChaosMode() {
               }
             }
           }
-          if (!winnerAnnounced && neverFlipped > 0 && neverFlipped <= 2) {
+          if (!winnerAnnounced && neverFlipped > 0 && neverFlipped <= 2 && deathRank > 0) {
             winnerAnnounced = true;
             const winnerPair = neverFlippedStickers.map(st => getManifoldGridId(st, S));
             useGameStore.getState().setDisparityWinner({ pair: winnerPair });
