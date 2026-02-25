@@ -44,9 +44,15 @@ export default function DisparityWinnerScreen({ onDismiss }) {
   const rafRef = useRef(null);
   const startRef = useRef(null);
 
-  const winnerGridId = disparityWinner?.gridId ?? '';
+  // Support both old { gridId } shape and new { pair: [id1, id2] } shape
+  const winnerPair = disparityWinner?.pair ?? (disparityWinner?.gridId ? [disparityWinner.gridId] : []);
+  const winnerGridId = winnerPair[0] ?? '';
   const faceNum = faceNumFromGridId(winnerGridId);
   const winnerColor = FACE_COLORS[faceNum] ?? '#ffffff';
+  // Second tile in the pair (the antipodal)
+  const antipodalGridId = winnerPair[1] ?? '';
+  const antipodalFaceNum = faceNumFromGridId(antipodalGridId);
+  const antipodalColor = FACE_COLORS[antipodalFaceNum] ?? '#aaaacc';
 
   // Observations = number of tiles that died before the winner
   const observations = disparityDeaths.length;
@@ -217,6 +223,14 @@ export default function DisparityWinnerScreen({ onDismiss }) {
           }}
         >
           {winnerGridId}
+          {antipodalGridId && (
+            <>
+              <span style={{ color: '#555', fontSize: '3rem', margin: '0 0.2em' }}>↔</span>
+              <span style={{ color: antipodalColor, textShadow: `0 0 40px ${antipodalColor}, 0 0 80px ${antipodalColor}88` }}>
+                {antipodalGridId}
+              </span>
+            </>
+          )}
         </div>
       )}
 
@@ -244,7 +258,7 @@ export default function DisparityWinnerScreen({ onDismiss }) {
             textAlign: 'center',
           }}
         >
-          Survived {observations} observation{observations !== 1 ? 's' : ''}. Never flipped.
+          Surviving antipodal pair — never flipped across {observations} observation{observations !== 1 ? 's' : ''}.
         </div>
       )}
 
@@ -289,7 +303,25 @@ export default function DisparityWinnerScreen({ onDismiss }) {
             <span style={{ color: winnerColor, fontFamily: 'monospace', fontWeight: 700, fontSize: '0.85rem' }}>
               {winnerGridId}
             </span>
-            <span style={{ color: '#667', fontSize: '0.75rem', marginLeft: 'auto' }}>SURVIVOR</span>
+            {antipodalGridId && (
+              <>
+                <span style={{ color: '#555', fontSize: '0.75rem' }}>↔</span>
+                <span
+                  style={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: 2,
+                    background: antipodalColor,
+                    flexShrink: 0,
+                    boxShadow: `0 0 4px ${antipodalColor}`,
+                  }}
+                />
+                <span style={{ color: antipodalColor, fontFamily: 'monospace', fontWeight: 700, fontSize: '0.85rem' }}>
+                  {antipodalGridId}
+                </span>
+              </>
+            )}
+            <span style={{ color: '#667', fontSize: '0.75rem', marginLeft: 'auto' }}>SURVIVORS</span>
           </div>
 
           {deathLog.map((entry) => {

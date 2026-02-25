@@ -445,20 +445,24 @@ export function useChaosMode() {
           }
 
           // ── Winner detection: scan for tiles that have never been flipped ──
+          // Because flipStickerPair always flips a sticker and its antipodal
+          // atomically, neverFlipped decreases by 2 each time (never hitting 1).
+          // The winning condition is the last surviving antipodal pair (≤ 2).
           let neverFlipped = 0;
-          let neverFlippedSt = null;
+          const neverFlippedStickers = [];
           for (const [x, y, z] of sc) {
             const c = state[x][y][z];
             for (const st of Object.values(c.stickers)) {
               if ((st.flips || 0) === 0) {
                 neverFlipped++;
-                neverFlippedSt = st;
+                neverFlippedStickers.push(st);
               }
             }
           }
-          if (!winnerAnnounced && neverFlipped === 1 && neverFlippedSt) {
+          if (!winnerAnnounced && neverFlipped > 0 && neverFlipped <= 2) {
             winnerAnnounced = true;
-            useGameStore.getState().setDisparityWinner({ gridId: getManifoldGridId(neverFlippedSt, S) });
+            const winnerPair = neverFlippedStickers.map(st => getManifoldGridId(st, S));
+            useGameStore.getState().setDisparityWinner({ pair: winnerPair });
             useGameStore.getState().setShowDisparityWinner(true);
             // Do NOT call setChaosLevel(0) here — the winner screen dismisses it
           }

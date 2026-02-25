@@ -78,9 +78,9 @@ const DisparityHUD = () => {
           marginBottom: '4px',
         }}>
           <div style={{ fontSize: '18px', marginBottom: '4px' }}>🏆</div>
-          <div>Winner by least observation</div>
+          <div>Winning antipodal pair</div>
           <div style={{ fontSize: '15px', letterSpacing: '0.06em', marginTop: '4px' }}>
-            {disparityWinner.gridId}
+            {(disparityWinner.pair ?? [disparityWinner.gridId]).join(' ↔ ')}
           </div>
         </div>
       )}
