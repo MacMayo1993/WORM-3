@@ -402,29 +402,57 @@ const ParityBreakthrough = ({ origColor, flipCount }) => {
   );
 };
 
-// Worm component for disparity visualization
+// Worm component for disparity visualization.
+// Lies flat on the tile surface and undulates with a travelling sine wave.
 const Worm = ({ position, rotation, scale = 1 }) => {
-  const wormRef = useRef();
+  const headRef = useRef();
+  const seg1Ref = useRef();
+  const seg2Ref = useRef();
+  const seg3Ref = useRef();
+  const tailRef = useRef();
 
-  useFrame((state) => {
-    if (wormRef.current) {
-      // Wiggle animation
-      const time = state.clock.elapsedTime;
-      wormRef.current.rotation.z = Math.sin(time * 3 + rotation) * 0.2;
-    }
+  useFrame(({ clock }) => {
+    const time = clock.elapsedTime;
+    // Travelling sine wave — each segment is phase-shifted along the body
+    const freq = 3.5;
+    const amp  = 0.020 * scale;
+    const refs = [headRef, seg1Ref, seg2Ref, seg3Ref, tailRef];
+    refs.forEach((ref, i) => {
+      if (!ref.current) return;
+      ref.current.position.y = Math.sin(time * freq - i * 0.70 + rotation) * amp;
+    });
   });
 
+  const sp = 0.025 * scale; // spacing between segments along body axis
+
   return (
-    <group position={position} ref={wormRef}>
-      {/* Worm body - curved shape */}
-      <mesh position={[0, 0, 0.015]}>
-        <capsuleGeometry args={[0.02 * scale, 0.08 * scale, 4, 8]} />
+    // Rotate the group so the worm faces tangentially around the tile circle.
+    // rotation = angle of this worm's orbit position; +PI/2 = 90° = tangent direction.
+    <group position={position} rotation={[0, 0, rotation + Math.PI / 2]}>
+      {/* Head — round, slightly larger and lighter */}
+      <mesh ref={headRef} position={[sp * 2, 0, 0.016]}>
+        <sphereGeometry args={[0.022 * scale, 8, 8]} />
+        <meshBasicMaterial color="#dda15e" />
+      </mesh>
+      {/* Body segment 1 */}
+      <mesh ref={seg1Ref} position={[sp, 0, 0.015]}>
+        <sphereGeometry args={[0.018 * scale, 6, 6]} />
         <meshBasicMaterial color="#bc6c25" />
       </mesh>
-      {/* Worm head highlight */}
-      <mesh position={[0, 0.05 * scale, 0.015]}>
-        <sphereGeometry args={[0.025 * scale, 8, 8]} />
-        <meshBasicMaterial color="#dda15e" />
+      {/* Body segment 2 */}
+      <mesh ref={seg2Ref} position={[0, 0, 0.015]}>
+        <sphereGeometry args={[0.017 * scale, 6, 6]} />
+        <meshBasicMaterial color="#a05c20" />
+      </mesh>
+      {/* Body segment 3 */}
+      <mesh ref={seg3Ref} position={[-sp, 0, 0.015]}>
+        <sphereGeometry args={[0.015 * scale, 6, 6]} />
+        <meshBasicMaterial color="#bc6c25" />
+      </mesh>
+      {/* Tail — smallest segment */}
+      <mesh ref={tailRef} position={[-sp * 2, 0, 0.015]}>
+        <sphereGeometry args={[0.011 * scale, 6, 6]} />
+        <meshBasicMaterial color="#a05c20" />
       </mesh>
     </group>
   );
