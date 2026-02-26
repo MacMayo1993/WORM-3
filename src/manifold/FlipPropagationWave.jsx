@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { FACE_COLORS, ANTIPODAL_COLOR, FLIP_CAP, getHalfLifeMultiplier } from '../utils/constants.js';
@@ -17,26 +17,48 @@ const sharedHeatInnerCircle = new THREE.CircleGeometry(0.3, 32);
  */
 const FlipPropagationWave = ({ origins, onComplete }) => {
   const [progress, setProgress] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
   const ringsRef = useRef([]);
-  const materialsRef = useRef([]);
   const startTimeRef = useRef(null);
   const { clock } = useThree();
+
+  // ── Stable worm destinations — computed ONCE per origins change, not per render ──
+  // If Math.random() is called inside JSX it fires on every re-render and
+  // makes the worm teleport to a new destination each frame.
+  const wormEnds = useMemo(() => {
+    if (!origins) return [];
+    return origins.map((origin) => {
+      // Pick a destination that arcs nicely above the tile surface.
+      // The arc peaks ~1.5 units out from the face in a random radial direction.
+      const angle = Math.random() * Math.PI * 2;
+      const radius = 0.8 + Math.random() * 0.6;   // 0.8 – 1.4 units lateral spread
+      const rise   = 0.6 + Math.random() * 0.5;   // 0.6 – 1.1 units above surface
+      return [
+        origin.position[0] + Math.cos(angle) * radius,
+        origin.position[1] + Math.sin(angle) * radius,
+        origin.position[2] + rise,
+      ];
+    });
+  }, [origins]);  // only recalculated when origins reference changes
 
   useEffect(() => {
     setProgress(0);
     startTimeRef.current = clock.getElapsedTime();
+    setCurrentTime(clock.getElapsedTime());
   }, [origins, clock]);
 
   // Cleanup materials on unmount
   useEffect(() => {
     return () => {
-      materialsRef.current.forEach(mat => mat?.dispose?.());
-      materialsRef.current = [];
+      ringsRef.current = [];
     };
   }, []);
 
-  useFrame((_, delta) => {
+  useFrame((state, delta) => {
     if (progress >= 1) return;
+
+    const now = state.clock.getElapsedTime();
+    setCurrentTime(now);                          // ← pass live clock to WormParticle
 
     const newProgress = Math.min(1, progress + delta * 1.2);
     setProgress(newProgress);
@@ -45,14 +67,12 @@ const FlipPropagationWave = ({ origins, onComplete }) => {
     const easeOut = 1 - Math.pow(1 - newProgress, 3);
 
     // Update each wave ring
-    ringsRef.current.forEach((ring, _i) => {
+    ringsRef.current.forEach((ring) => {
       if (!ring) return;
 
-      // Expand outward
       const scale = easeOut * 4 + 0.5;
       ring.scale.set(scale, scale, scale);
 
-      // Fade out as it expands
       if (ring.material) {
         ring.material.opacity = (1 - easeOut) * 0.8;
       }
@@ -97,20 +117,24 @@ const FlipPropagationWave = ({ origins, onComplete }) => {
             />
           </mesh>
 
-          {/* One animated worm per flip */}
-          <WormParticle
-            start={origin.position}
-            end={[
-              origin.position[0] + (Math.random() - 0.5) * 2,
-              origin.position[1] + (Math.random() - 0.5) * 2,
-              origin.position[2] + 0.5
-            ]}
-            color1={origin.color}
-            color2={origin.color}
-            startTime={startTimeRef.current}
-            onComplete={null}
-          />
+          {/* Worm — positioned at world origin (0,0,0) so start/end are world coords.
+              The group above is at origin.position, so we MUST pass world-space coords
+              to WormParticle rather than local-space offsets. */}
         </group>
+      ))}
+
+      {/* Worms rendered OUTSIDE the positioned groups so start/end coords are world-space */}
+      {origins.map((origin, idx) => (
+        <WormParticle
+          key={`worm-${idx}`}
+          start={origin.position}
+          end={wormEnds[idx] || origin.position}   // stable, pre-computed destination
+          color1={origin.color}
+          color2={origin.color}
+          startTime={startTimeRef.current || 0}
+          currentTime={currentTime}                 // ← the missing prop that froze all worms
+          onComplete={null}
+        />
       ))}
     </group>
   );
