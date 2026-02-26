@@ -1047,8 +1047,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         </mesh>
       )}
 
-      {/* Dead tile headstone — only in Disparity Mode, after death animation completes */}
-      {chaosLevel > 0 && deathAnimDone && (
+      {/* Dead tile headstone — only in Disparity Mode, after tile actually dies and animation completes */}
+      {chaosLevel > 0 && isDead && deathAnimDone && (
         <group position={[0, 0, 0.02]}>
           {/* Headstone body — rounded rectangle */}
           <mesh position={[0, 0.06, 0]}>

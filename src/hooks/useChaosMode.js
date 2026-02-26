@@ -18,7 +18,7 @@
 import { useEffect, useRef, useCallback, useMemo } from 'react';
 import { useGameStore } from './useGameStore.js';
 import { buildManifoldGridMap, flipStickerPair, getManifoldNeighbors, isOnSeam, isCrossFaceNeighbor, findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
-import { getStickerWorldPos, getManifoldGridId } from '../game/coordinates.js';
+import { getStickerWorldPos, getManifoldGridId, faceRCFor } from '../game/coordinates.js';
 import { FLIP_CAP } from '../utils/constants.js';
 
 // ─── Module-level pure helpers ────────────────────────────────────────────────
@@ -288,7 +288,7 @@ export function useChaosMode() {
         // Never kill the last surviving pair — they are the winners
         if (surfaceStickers - deadTileSet.size > 2) {
           deadTileSet.add(flipKey);
-          newlyDead.push(flippedSt);
+          newlyDead.push({ sticker: flippedSt, x: fx, y: fy, z: fz, dirKey: fdk });
         }
       }
       if (flippedSt) {
@@ -300,7 +300,7 @@ export function useChaosMode() {
             // Never kill the last surviving pair — they are the winners
             if (surfaceStickers - deadTileSet.size > 2) {
               deadTileSet.add(antiKey);
-              newlyDead.push(antiSt);
+              newlyDead.push({ sticker: antiSt, x: antiLoc.x, y: antiLoc.y, z: antiLoc.z, dirKey: antiLoc.dirKey });
             }
           }
         }
@@ -472,10 +472,15 @@ export function useChaosMode() {
           if (allNewDeaths.length > 0) {
             pairDeathCount++;
             const store = useGameStore.getState();
-            for (const st of allNewDeaths) {
+            const DIR_TO_FACE = { PZ: 1, NX: 2, PY: 3, NZ: 4, PX: 5, NY: 6 };
+            for (const { sticker: st, x: dx, y: dy, z: dz, dirKey: ddk } of allNewDeaths) {
               deathRank++;
               const gridId = getManifoldGridId(st, S);
-              store.addDisparityDeath({ id: Date.now() + Math.random(), gridId, rank: deathRank, pairRank: pairDeathCount, timestamp: Date.now() });
+              // Compute where the tile physically was when it died (may differ from origin if cube was rotated)
+              const { r, c } = faceRCFor(ddk, dx, dy, dz, S);
+              const endFaceId = DIR_TO_FACE[ddk] ?? st.curr;
+              const endGridId = `M${endFaceId}-${String(r * S + c + 1).padStart(3, '0')}`;
+              store.addDisparityDeath({ id: Date.now() + Math.random(), gridId, endGridId, rank: deathRank, pairRank: pairDeathCount, timestamp: Date.now() });
               // Decrement face count and fire elimination event when face hits 0
               const faceNum = st.orig;
               if (faceNum) {

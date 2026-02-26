@@ -353,6 +353,9 @@ export default function DisparityWinnerScreen({ onDismiss }) {
                 />
                 <span style={{ color: '#8888aa', fontFamily: 'monospace', fontSize: '0.8rem' }}>
                   {entry.gridId}
+                  {entry.endGridId && entry.endGridId !== entry.gridId && (
+                    <span style={{ color: '#555' }}> → {entry.endGridId}</span>
+                  )}
                 </span>
               </div>
             );

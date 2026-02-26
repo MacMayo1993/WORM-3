@@ -1087,8 +1087,9 @@ export default function WORM3() {
         {showDisparityWinner && (
           <DisparityWinnerScreen
             onDismiss={() => {
-              setShowDisparityWinner(false);
+              useGameStore.getState().clearDisparityGame();
               useGameStore.getState().setChaosLevel(0);
+              setShowDisparityWizard(true);
             }}
           />
         )}
