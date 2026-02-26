@@ -284,7 +284,7 @@ export default function WORM3() {
   const disparityDeaths = useGameStore((s) => s.disparityDeaths);
   const disparityWinner = useGameStore((s) => s.disparityWinner);
   const showDisparityWinner = useGameStore((s) => s.showDisparityWinner);
-  const setShowDisparityWinner = useGameStore((s) => s.setShowDisparityWinner);
+  const _setShowDisparityWinner = useGameStore((s) => s.setShowDisparityWinner);
   const deadRankMap = useMemo(
     () => new Map(disparityDeaths.map((d) => [d.gridId, d.rank])),
     [disparityDeaths]
