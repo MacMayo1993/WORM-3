@@ -257,7 +257,7 @@ export default function DisparityWinnerScreen({ onDismiss }) {
             textAlign: 'center',
           }}
         >
-          Surviving antipodal pair — never flipped across {observations} observation{observations !== 1 ? 's' : ''}.
+          Last antipodal pair alive — outlasted {observations} fallen tile{observations !== 1 ? 's' : ''}.
         </div>
       )}
 
@@ -320,7 +320,7 @@ export default function DisparityWinnerScreen({ onDismiss }) {
                 </span>
               </>
             )}
-            <span style={{ color: '#667', fontSize: '0.75rem', marginLeft: 'auto' }}>SURVIVORS</span>
+            <span style={{ color: '#667', fontSize: '0.75rem', marginLeft: 'auto' }}>LAST ALIVE</span>
           </div>
 
           {deathLog.map((entry) => {
@@ -353,6 +353,9 @@ export default function DisparityWinnerScreen({ onDismiss }) {
                 />
                 <span style={{ color: '#8888aa', fontFamily: 'monospace', fontSize: '0.8rem' }}>
                   {entry.gridId}
+                  {entry.endGridId && entry.endGridId !== entry.gridId && (
+                    <span style={{ color: '#555' }}> → {entry.endGridId}</span>
+                  )}
                 </span>
               </div>
             );

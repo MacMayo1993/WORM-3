@@ -467,6 +467,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const biomeEnabled = useGameStore((s) => s.settings?.biomeMode?.enabled ?? false);
   const chaosLevel = useGameStore((s) => s.chaosLevel);
   const disparityFlipCap = useGameStore((s) => s.disparityFlipCap);
+  const disparityWinner = useGameStore((s) => s.disparityWinner);
   // In Disparity Mode (chaosLevel > 0), use the configurable flip cap; otherwise the global constant
   const effectiveFlipCap = chaosLevel > 0 ? disparityFlipCap : FLIP_CAP;
   // Dead tiles (at flip cap) are inert gray — used in useFrame and rendering
@@ -511,15 +512,24 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
   // Death rank from Disparity Mode — null if not in disparity game or tile not yet dead
   const deadRank = isDead ? (deadRankMap?.get(stickerGridIdRef.current) ?? null) : null;
+  // Winner tile — glows gold after the last pair is found
+  const isWinnerTile = chaosLevel > 0 && !!(disparityWinner?.pair?.includes(stickerGridIdRef.current));
 
   // Imperative ref to FlipParticles — avoids re-rendering StickerPlane on every flip.
   const flipParticlesRef = useRef();
 
-  // Death detection: trigger implosion animation when tile first hits flip cap
+  // Death detection: trigger implosion animation when tile first hits flip cap.
+  // Also handles game reset: when isDead goes false (new game), clear all death state
+  // so tombstones from a previous game don't carry over.
   useEffect(() => {
     if (isDead && !wasDeadRef.current) {
       wasDeadRef.current = true;
       deathAnimT.current = 0; // start implosion
+    } else if (!isDead && wasDeadRef.current) {
+      // Game was reset — wipe the death animation so no stale tombstone shows
+      wasDeadRef.current = false;
+      deathAnimT.current = -1;
+      setDeathAnimDone(false);
     }
   }, [isDead]);
 
@@ -1029,8 +1039,16 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
       {/* Seam pulse overlay — disabled pending revamp */}
 
-      {/* Dead tile headstone — appears after death implosion animation completes */}
-      {deathAnimDone && (
+      {/* Winner tile golden glow — last two alive tiles pulse gold when the pair is found */}
+      {isWinnerTile && !isDead && (
+        <mesh position={[0, 0, 0.003]} renderOrder={2}>
+          <planeGeometry args={[1.02, 1.02]} />
+          <meshBasicMaterial color="#ffd700" transparent opacity={0.45} depthTest={false} />
+        </mesh>
+      )}
+
+      {/* Dead tile headstone — only in Disparity Mode, after tile actually dies and animation completes */}
+      {chaosLevel > 0 && isDead && deathAnimDone && (
         <group position={[0, 0, 0.02]}>
           {/* Headstone body — rounded rectangle */}
           <mesh position={[0, 0.06, 0]}>
