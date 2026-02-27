@@ -172,6 +172,7 @@ export function useChaosMode() {
     let deathRank = 0;
     let pairDeathCount = 0; // one increment per tick that produces deaths (pair grouping)
     let winnerAnnounced = false;
+    let stopped = false; // set true on winner to halt rescheduling cleanly
     // Track alive tile count per face (faceNum 1-6). Populated on first death scan.
     const faceAliveMap = new Map([[1, 0], [2, 0], [3, 0], [4, 0], [5, 0], [6, 0]]);
     const faceSeedDone = { done: false };
@@ -517,10 +518,14 @@ export function useChaosMode() {
               }
             }
             const winnerPair = winnerStickers.map(st => getManifoldGridId(st, S));
+            // Stop the RAF from rescheduling — prevents the chaos loop from racing
+            // with React's effect cleanup (calling setChaosLevel inside the RAF
+            // can cancel the wrong frame ID and leave the loop running forever).
+            // chaosLevel intentionally stays > 0 so isWinnerTile stays true and
+            // the gold glow renders on the winning tiles while the screen is up.
+            stopped = true;
             useGameStore.getState().setDisparityWinner({ pair: winnerPair });
             useGameStore.getState().setShowDisparityWinner(true);
-            // Freeze the cascade so the winning tiles are showcased, not flipped further
-            useGameStore.getState().setChaosLevel(0);
           }
 
           setCubies(state);
@@ -528,7 +533,9 @@ export function useChaosMode() {
         tickAcc = 0;
       }
 
-      raf = requestAnimationFrame(loop);
+      if (!stopped) {
+        raf = requestAnimationFrame(loop);
+      }
     };
 
     raf = requestAnimationFrame(loop);
