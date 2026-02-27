@@ -64,13 +64,13 @@ export const rotateSliceCubies = (cubies, size, axis, sliceIndex, dir) => {
     }
   }
 
-  const originals = new Map();
+  // Snapshot each cubie's original reference before any writes happen
   for (const m of moves) {
-    originals.set(m.from.join(','), next[m.from[0]][m.from[1]][m.from[2]]);
+    m.original = next[m.from[0]][m.from[1]][m.from[2]];
   }
 
   for (const m of moves) {
-    const src = originals.get(m.from.join(','));
+    const src = m.original;
     next[m.to[0]][m.to[1]][m.to[2]] = {
       ...src,
       x: m.to[0], y: m.to[1], z: m.to[2],
