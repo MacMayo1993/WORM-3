@@ -35,6 +35,7 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
       backdropFilter: 'blur(20px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       zIndex: 800,
+      pointerEvents: 'auto',
       fontFamily: "-apple-system, 'Helvetica Neue', Roboto, sans-serif",
     }}>
       <div style={{
