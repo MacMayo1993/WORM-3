@@ -99,6 +99,11 @@ export function useChaosMode() {
 
   const cubiesRef = useRef(cubies);
   cubiesRef.current = cubies;
+  // Keep explosionT in a ref so the chaos RAF reads the current value without
+  // the effect needing to re-mount (and wipe disparity state) every time
+  // the explosion factor changes.
+  const explosionTRef = useRef(explosionT);
+  explosionTRef.current = explosionT;
   const pendingMoveRef = useRef(null);
 
   // Cache the manifold map between ticks — it only changes on face rotations,
@@ -366,11 +371,11 @@ export function useChaosMode() {
           if (Math.random() < propagateChance) {
             const fromPos = getStickerWorldPos(
               chain.tile.x, chain.tile.y, chain.tile.z,
-              chain.tile.dirKey, S, explosionT
+              chain.tile.dirKey, S, explosionTRef.current
             );
             const toPos = getStickerWorldPos(
               neighbor.x, neighbor.y, neighbor.z,
-              neighbor.dirKey, S, explosionT
+              neighbor.dirKey, S, explosionTRef.current
             );
             const boltKey = `${fromPos.map(v => v.toFixed(1)).join(',')}→${toPos.map(v => v.toFixed(1)).join(',')}`;
             setCascades((prev) => {
@@ -514,7 +519,8 @@ export function useChaosMode() {
             const winnerPair = winnerStickers.map(st => getManifoldGridId(st, S));
             useGameStore.getState().setDisparityWinner({ pair: winnerPair });
             useGameStore.getState().setShowDisparityWinner(true);
-            // Do NOT call setChaosLevel(0) here — the winner screen dismisses it
+            // Freeze the cascade so the winning tiles are showcased, not flipped further
+            useGameStore.getState().setChaosLevel(0);
           }
 
           setCubies(state);
@@ -527,7 +533,8 @@ export function useChaosMode() {
 
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [chaosMode, chaosLevel, explosionT, setCubies, setCascades]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chaosMode, chaosLevel, setCubies, setCascades]);
 
   // Auto-rotate effect
   useEffect(() => {
