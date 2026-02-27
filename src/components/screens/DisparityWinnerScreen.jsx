@@ -137,6 +137,7 @@ export default function DisparityWinnerScreen({ onDismiss }) {
         position: 'fixed',
         inset: 0,
         zIndex: 9999,
+        pointerEvents: 'auto',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
