@@ -150,10 +150,8 @@ export function useCubeState() {
       setFlipWaveOrigins(origins);
     }
 
-    setCubies((prev) => {
-      const freshManifoldMap = buildManifoldGridMap(prev, prev.length);
-      return flipStickerPair(prev, prev.length, pos.x, pos.y, pos.z, dirKey, freshManifoldMap);
-    });
+    // Sticker flips don't move cubies, so the cached manifold map is still valid here
+    setCubies((prev) => flipStickerPair(prev, prev.length, pos.x, pos.y, pos.z, dirKey, currentManifoldMap));
     setMoves((m) => m + 1);
     addToHistory({ type: 'flip', pos: { ...pos }, dirKey, timestamp: Date.now() });
     setBlackHolePulse(Date.now());

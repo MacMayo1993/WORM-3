@@ -10,6 +10,8 @@ export const checkRubiksSolved = (cubies, size) => {
   for (let x = 0; x < size; x++) {
     for (let y = 0; y < size; y++) {
       for (let z = 0; z < size; z++) {
+        // Interior cubies have no stickers — skip them
+        if (x > 0 && x < size - 1 && y > 0 && y < size - 1 && z > 0 && z < size - 1) continue;
         const c = cubies[x][y][z];
         for (const [dirKey, st] of Object.entries(c.stickers)) {
           const expectedColor = DIR_TO_FACE[dirKey];
@@ -48,21 +50,30 @@ export const checkFaceLatinSquare = (faceGrid, size) => {
 export const extractFaceGrid = (cubies, size, faceDir) => {
   const grid = Array.from({ length: size }, () => Array(size).fill(0));
 
-  for (let x = 0; x < size; x++) {
-    for (let y = 0; y < size; y++) {
-      for (let z = 0; z < size; z++) {
-        const c = cubies[x][y][z];
-        const st = c.stickers[faceDir];
-        if (st) {
-          const { r, c: col } = faceRCFor(faceDir, x, y, z, size);
-          // Calculate Latin square value based on current color position
-          // The value is derived from where this sticker's current color originated
-          const val = faceValue(faceDir, x, y, z, size);
-          grid[r][col] = val;
-        }
-      }
+  // Only iterate the single plane of cubies that can have a sticker for this face
+  const fill = (x, y, z) => {
+    const st = cubies[x][y][z].stickers[faceDir];
+    if (st) {
+      const { r, c: col } = faceRCFor(faceDir, x, y, z, size);
+      grid[r][col] = faceValue(faceDir, x, y, z, size);
     }
+  };
+
+  if (faceDir === 'PX') {
+    for (let y = 0; y < size; y++) for (let z = 0; z < size; z++) fill(size - 1, y, z);
+  } else if (faceDir === 'NX') {
+    for (let y = 0; y < size; y++) for (let z = 0; z < size; z++) fill(0, y, z);
+  } else if (faceDir === 'PY') {
+    for (let x = 0; x < size; x++) for (let z = 0; z < size; z++) fill(x, size - 1, z);
+  } else if (faceDir === 'NY') {
+    for (let x = 0; x < size; x++) for (let z = 0; z < size; z++) fill(x, 0, z);
+  } else if (faceDir === 'PZ') {
+    for (let x = 0; x < size; x++) for (let y = 0; y < size; y++) fill(x, y, size - 1);
+  } else {
+    // NZ
+    for (let x = 0; x < size; x++) for (let y = 0; y < size; y++) fill(x, y, 0);
   }
+
   return grid;
 };
 
@@ -74,19 +85,28 @@ export const checkSudokubeSolved = (cubies, size) => {
     // Build the actual value grid based on sticker positions
     const grid = Array.from({ length: size }, () => Array(size).fill(0));
 
-    for (let x = 0; x < size; x++) {
-      for (let y = 0; y < size; y++) {
-        for (let z = 0; z < size; z++) {
-          const c = cubies[x][y][z];
-          const st = c.stickers[faceDir];
-          if (st) {
-            const { r, c: col } = faceRCFor(faceDir, x, y, z, size);
-            // Get the Latin square value from original position
-            const origVal = faceValue(st.origDir, st.origPos.x, st.origPos.y, st.origPos.z, size);
-            grid[r][col] = origVal;
-          }
-        }
+    // Only iterate the single plane of cubies that carries stickers for this face
+    const fill = (x, y, z) => {
+      const st = cubies[x][y][z].stickers[faceDir];
+      if (st) {
+        const { r, c: col } = faceRCFor(faceDir, x, y, z, size);
+        grid[r][col] = faceValue(st.origDir, st.origPos.x, st.origPos.y, st.origPos.z, size);
       }
+    };
+
+    if (faceDir === 'PX') {
+      for (let y = 0; y < size; y++) for (let z = 0; z < size; z++) fill(size - 1, y, z);
+    } else if (faceDir === 'NX') {
+      for (let y = 0; y < size; y++) for (let z = 0; z < size; z++) fill(0, y, z);
+    } else if (faceDir === 'PY') {
+      for (let x = 0; x < size; x++) for (let z = 0; z < size; z++) fill(x, size - 1, z);
+    } else if (faceDir === 'NY') {
+      for (let x = 0; x < size; x++) for (let z = 0; z < size; z++) fill(x, 0, z);
+    } else if (faceDir === 'PZ') {
+      for (let x = 0; x < size; x++) for (let y = 0; y < size; y++) fill(x, y, size - 1);
+    } else {
+      // NZ
+      for (let x = 0; x < size; x++) for (let y = 0; y < size; y++) fill(x, y, 0);
     }
 
     if (!checkFaceLatinSquare(grid, size)) return false;
@@ -100,28 +120,20 @@ export const checkWormVictory = (cubies, size) => {
   if (!checkRubiksSolved(cubies, size)) return false;
 
   // Then check if EVERY sticker has traveled through a wormhole at least once
-  let allHaveFlipped = true;
-
   for (let x = 0; x < size; x++) {
     for (let y = 0; y < size; y++) {
       for (let z = 0; z < size; z++) {
-        const c = cubies[x][y][z];
-        for (const st of Object.values(c.stickers)) {
+        // Interior cubies have no stickers — skip them
+        if (x > 0 && x < size - 1 && y > 0 && y < size - 1 && z > 0 && z < size - 1) continue;
+        for (const st of Object.values(cubies[x][y][z].stickers)) {
           // If any sticker has never been flipped, WORM³ victory not achieved
-          if ((st.flips ?? 0) === 0) {
-            allHaveFlipped = false;
-            break;
-          }
+          if ((st.flips ?? 0) === 0) return false;
         }
-        if (!allHaveFlipped) break;
       }
-      if (!allHaveFlipped) break;
     }
-    if (!allHaveFlipped) break;
   }
 
-  // WORM³ victory: cube is solved AND every sticker has been through wormhole
-  return allHaveFlipped;
+  return true;
 };
 
 // Main win detection function - returns { rubiks, sudokube, ultimate, worm }
