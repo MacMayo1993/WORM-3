@@ -7,14 +7,16 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback, useMemo, Suspense } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
-import { Environment, Html } from '@react-three/drei';
+import { Canvas, useThree } from '@react-three/fiber';
+import { Environment } from '@react-three/drei';
+import { EffectComposer, Bloom, Vignette, ChromaticAberration } from '@react-three/postprocessing';
+import { BlendFunction } from 'postprocessing';
+import { Vector2 } from 'three';
 import './App.css';
 
 // Utils
 import { resolveBiomeManifoldStyles } from './modes/CityBiomeMode.js';
 import { completeLevel } from './utils/levels.js';
-import { keyToMove } from './game/handsInput.js';
 import { makeCubies } from './game/cubeState.js';
 import { rotateSliceCubies } from './game/cubeRotation.js';
 import { buildManifoldGridMap, flipStickerPair } from './game/manifoldLogic.js';
@@ -32,44 +34,13 @@ import {
   useHandsMode,
   useUndo,
   useParityDecay,
+  useKeyboardControls,
 } from './hooks/index.js';
 
 // 3D components
-import CubeAssembly from './3d/CubeAssembly.jsx';
-import BlackHoleEnvironment from './3d/BlackHoleEnvironment.jsx';
 import { preloadBiomeAssets } from './3d/BiomeGLBCluster.jsx';
-import { getLevelBackground } from './3d/LifeJourneyBackgrounds.jsx';
-import { BACKGROUNDS, getBackgroundUrl } from './utils/backgrounds.js';
-
-// Photo environment presets available from @react-three/drei (real HDR panoramas)
-const PHOTO_PRESETS = new Set([
-  'sunset', 'forest', 'city', 'dawn', 'night',
-  'apartment', 'studio', 'park', 'warehouse', 'lobby',
-]);
-
-/**
- * InteractivePhotoBackground - Real HDR panorama that slowly drifts around you.
- * Orbit the camera (drag empty space) to look around the environment.
- * A gentle auto-rotation keeps the scene alive even when idle.
- */
-function InteractivePhotoBackground({ preset, files }) {
-  useFrame((state, delta) => {
-    // Slow drift: ~6° per second so the panorama feels alive
-    if (state.scene.backgroundRotation) {
-      state.scene.backgroundRotation.y += delta * 0.1;
-    }
-  });
-
-  return (
-    <Environment
-      preset={files ? undefined : preset}
-      files={files}
-      background
-      backgroundBlurriness={0}
-      backgroundIntensity={1.2}
-    />
-  );
-}
+import GameScene from './3d/GameScene.jsx';
+import IntroScene from './components/intro/IntroScene.jsx';
 
 // UI components
 import TopMenuBar from './components/menus/TopMenuBar.jsx';
@@ -89,9 +60,6 @@ import FaceRotationButtons from './components/overlays/FaceRotationButtons.jsx';
 import TileRotationSelector from './components/overlays/TileRotationSelector.jsx';
 import HandsOverlay from './components/overlays/HandsOverlay.jsx';
 import { useTeachMode } from './teach/useTeachMode.js';
-import LayerHighlight from './teach/LayerHighlight.jsx';
-import AntipodalVisualization from './3d/AntipodalVisualization.jsx';
-import AntipodalModeEffects from './3d/AntipodalModeEffects.jsx';
 import AntipodalHUD from './components/overlays/AntipodalHUD.jsx';
 import AntipodalModeHUD from './components/overlays/AntipodalModeHUD.jsx';
 import EchoRotationIndicator from './components/overlays/EchoRotationIndicator.jsx';
@@ -119,39 +87,86 @@ const isMobile = typeof window !== 'undefined' && (
   navigator.maxTouchPoints > 0
 );
 
-// Simple Error Boundary for 3D components
-class ErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error };
-  }
-  componentDidCatch(error, errorInfo) {
-    console.error("3D Component Error:", error);
-    console.error("Component Stack:", errorInfo.componentStack);
-  }
-  render() {
-    if (this.state.hasError) {
-      return (
-        <group>
-          <mesh>
-            <boxGeometry args={[10, 10, 10]} />
-            <meshBasicMaterial color="red" wireframe />
-          </mesh>
-          <Html position={[0, 0, -2]}>
-            <div style={{ color: 'red', background: 'rgba(0,0,0,0.8)', padding: '10px' }}>
-              Error Loading Background
-              <br />
-              {this.state.error?.message}
-            </div>
-          </Html>
-        </group>
-      );
+// ─── Intro timing constants (mirror IntroScene) ──────────────────────────────
+const EXPLOSION_START = 8.7;
+const EXPLOSION_END   = 10.5;
+const IMPLODE_START   = 12.5;
+const IMPLODE_END     = 14.5;
+const _clamp = (t, a = 0, b = 1) => Math.max(a, Math.min(b, t));
+const _ease  = t => t < 0.5 ? 4 * t ** 3 : 1 - Math.pow(-2 * t + 2, 3) / 2;
+const _prog  = (t, s, e) => _clamp((t - s) / (e - s));
+const _chromaticVec = new Vector2(0, 0);
+
+/**
+ * IntroBranch — 3D content rendered inside the Canvas during the welcome/intro.
+ * Contains IntroScene, post-processing, and intro lights.
+ * Unmounting is avoided by conditionally hiding it (never fully unmounting the Canvas).
+ */
+function IntroBranch({ time, onComplete }) {
+  const bloomIntensity = useMemo(() => {
+    if (time < EXPLOSION_START)   return 0.6;
+    if (time < EXPLOSION_END)     return 0.6 + _ease(_prog(time, EXPLOSION_START, EXPLOSION_END)) * 2.4;
+    if (time < IMPLODE_START)     return 3.0;
+    if (time < IMPLODE_END)       return 3.0 - _ease(_prog(time, IMPLODE_START, IMPLODE_END)) * 2.2;
+    return 0.8;
+  }, [time]);
+
+  const chromaticOffset = useMemo(() => {
+    let mag = 0;
+    if (time >= EXPLOSION_START && time < EXPLOSION_START + 0.4) {
+      mag = _ease(_prog(time, EXPLOSION_START, EXPLOSION_START + 0.4)) * 0.008;
+    } else if (time >= EXPLOSION_START + 0.4 && time < EXPLOSION_START + 1.8) {
+      mag = _ease(1 - _prog(time, EXPLOSION_START + 0.4, EXPLOSION_START + 1.8)) * 0.005;
     }
-    return this.props.children;
-  }
+    _chromaticVec.set(mag, mag * 0.4);
+    return _chromaticVec;
+  }, [time]);
+
+  return (
+    <>
+      <color attach="background" args={['#05050f']} />
+      <ambientLight intensity={0.6} />
+      <pointLight position={[10, 10, 10]} intensity={1.8} />
+      <pointLight position={[-10, -10, -10]} intensity={1.2} />
+      <IntroScene time={time} onComplete={onComplete} />
+      <Suspense fallback={null}>
+        <Environment preset="city" />
+      </Suspense>
+      <EffectComposer>
+        <Bloom
+          intensity={bloomIntensity}
+          luminanceThreshold={0.15}
+          luminanceSmoothing={0.85}
+          mipmapBlur
+        />
+        <ChromaticAberration
+          offset={chromaticOffset}
+          blendFunction={BlendFunction.NORMAL}
+        />
+        <Vignette
+          offset={0.35}
+          darkness={0.75}
+          blendFunction={BlendFunction.NORMAL}
+        />
+      </EffectComposer>
+    </>
+  );
+}
+
+/**
+ * CameraManager — teleports the camera when transitioning intro → game.
+ * Must live inside the Canvas to access useThree().
+ */
+function CameraManager({ showWelcome, cameraZ }) {
+  const { camera } = useThree();
+  useEffect(() => {
+    if (!showWelcome) {
+      camera.position.set(0, 0, cameraZ);
+      camera.lookAt(0, 0, 0);
+      camera.updateProjectionMatrix();
+    }
+  }, [showWelcome, camera, cameraZ]);
+  return null;
 }
 
 export default function WORM3() {
@@ -233,7 +248,7 @@ export default function WORM3() {
     setAutoRotateEnabled, onCascadeComplete
   } = useChaosMode();
 
-  const { cursor, showCursor, setShowCursor, moveCursor, cursorToCubePos, cubePosToCursor, getRotationParams } = useCursor();
+  const { cursor, showCursor, setShowCursor, cursorToCubePos, cubePosToCursor } = useCursor();
 
   const {
     currentLevel, currentLevelData, handleLevelSelect,
@@ -264,6 +279,9 @@ export default function WORM3() {
   const hollowMode = useGameStore((state) => state.hollowMode);
   const toggleHollowMode = useGameStore((state) => state.toggleHollowMode);
 
+  // Intro time — drives IntroBranch (3D) and WelcomeScreen DOM overlay in sync
+  const [introTime, setIntroTime] = useState(0);
+
   // Co-op Crawler mode
   const [coopMode, setCoopMode] = useState(false);
 
@@ -290,6 +308,21 @@ export default function WORM3() {
     () => new Map(disparityDeaths.map((d) => [d.gridId, d.rank])),
     [disparityDeaths]
   );
+
+  // ========================================================================
+  // INTRO TIME — drives IntroBranch 3D content + WelcomeScreen DOM overlay
+  // ========================================================================
+  useEffect(() => {
+    if (!showWelcome) return;
+    const start = performance.now();
+    let raf;
+    const tick = (now) => {
+      setIntroTime((now - start) / 1000);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [showWelcome]);
 
   // ========================================================================
   // EXPLOSION ANIMATION
@@ -587,21 +620,6 @@ export default function WORM3() {
     setSelectedTileForRotation(null);
   }, [selectedTileForRotation, cursorToCubePos, startAnimation, setSelectedTileForRotation]);
 
-  // Cursor-based rotation
-  const performCursorRotation = useCallback((rotationType) => {
-    if (animState) return;
-    const { axis, dir, pos } = getRotationParams(rotationType);
-    if (axis && dir !== undefined) {
-      onMove(axis, dir, pos);
-    }
-    setShowCursor(true);
-  }, [animState, getRotationParams, onMove, setShowCursor]);
-
-  const performCursorFlip = useCallback(() => {
-    const pos = cursorToCubePos(cursor);
-    onTapFlip({ x: pos.x, y: pos.y, z: pos.z }, pos.dirKey);
-    setShowCursor(true);
-  }, [cursor, cursorToCubePos, onTapFlip, setShowCursor]);
 
   // Level-specific shuffle
   const shuffleForLevel = useCallback(() => {
@@ -723,158 +741,37 @@ export default function WORM3() {
   }, [savedCubeState, size, setRotatedCubies]);
 
   // ========================================================================
-  // KEYBOARD HANDLER
+  // KEYBOARD HANDLER — consolidated via useKeyboardControls hook
   // ========================================================================
-  useEffect(() => {
-    if (coopMode) return; // Co-op mode handles its own input
+  const handleToggleHandsMode = useCallback(() => {
+    setHandsMode(!handsMode);
+    if (!handsMode) {
+      setHandsMoveHistory([]);
+      setHandsMoveQueue([]);
+      setHandsTps(0);
+      handsMoveTimestamps.current = [];
+    }
+  }, [handsMode, setHandsMode, setHandsMoveHistory, setHandsMoveQueue, setHandsTps]);
 
-    const handleKeyDown = (e) => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  const { performCursorRotation, performCursorFlip } = useKeyboardControls({
+    onMove,
+    onFlip: onTapFlip,
+    onUndo: undo,
+    onReset: reset,
+    onShuffle: () => { reset(); setTimeout(() => shuffle(), 100); },
+    onSaveState: handleSaveState,
+    onLoadState: handleLoadState,
+    onLevelJump: handleLevelSelect,
+    onExecuteHandsMove: executeHandsMove,
+    onToggleHandsMode: handleToggleHandsMode,
+    disabled: coopMode,
+  });
 
-      if (showLevelTutorial && (e.key === ' ' || e.key === 'Enter')) {
-        e.preventDefault();
-        handleTutorialClose();
-        return;
-      }
-
-      const key = e.key.toLowerCase();
-
-      // Hands mode keyboard handler
-      if (handsMode) {
-        if (!['escape', 'h', '?', '`', 'r', 'z', 'v', 'x', 't', 'c', 'p', 'b'].includes(key) && !e.ctrlKey && !e.metaKey) {
-          const moveName = keyToMove(e);
-          if (moveName) {
-            e.preventDefault();
-            executeHandsMove(moveName);
-            return;
-          }
-        }
-      }
-
-      // Arrow keys
-      if (e.key.startsWith('Arrow')) {
-        e.preventDefault();
-        moveCursor(e.key.replace('Arrow', '').toLowerCase());
-        return;
-      }
-
-      // WASDQE rotation
-      if ('wasdqe'.includes(key)) {
-        e.preventDefault();
-        const rotMap = { w: 'up', s: 'down', a: 'left', d: 'right', q: 'ccw', e: 'cw' };
-        performCursorRotation(rotMap[key]);
-        return;
-      }
-
-      // F - flip
-      if (key === 'f') {
-        e.preventDefault();
-        if (flipMode && (!currentLevelData || currentLevelData.features.flips)) {
-          performCursorFlip();
-        }
-        return;
-      }
-
-      // Z - undo
-      if (key === 'z' && !e.ctrlKey && !e.metaKey) {
-        e.preventDefault();
-        undo();
-        return;
-      }
-
-      // Backtick - dev console
-      if (e.key === '`') {
-        e.preventDefault();
-        setShowDevConsole(!showDevConsole);
-        return;
-      }
-
-      // R - reset
-      if (key === 'r') {
-        e.preventDefault();
-        if (e.shiftKey) {
-          reset();
-          setTimeout(() => shuffle(), 100);
-        } else {
-          reset();
-        }
-        return;
-      }
-
-      // Ctrl+S - save
-      if (key === 's' && (e.ctrlKey || e.metaKey)) {
-        e.preventDefault();
-        handleSaveState();
-        return;
-      }
-
-      // Ctrl+L - load
-      if (key === 'l' && (e.ctrlKey || e.metaKey)) {
-        e.preventDefault();
-        handleLoadState();
-        return;
-      }
-
-      // Shift+number - jump to level
-      if (e.shiftKey && /[0-9]/.test(key)) {
-        e.preventDefault();
-        const level = key === '0' ? 10 : parseInt(key);
-        handleLevelSelect(level);
-        return;
-      }
-
-      // Other shortcuts
-      switch (key) {
-        case 'h': case '?': setShowHelp(h => !h); break;
-        case 'g': if (!currentLevelData || currentLevelData.features.flips) setFlipMode(f => !f); break;
-        case 't': if (!currentLevelData || currentLevelData.features.tunnels) setShowTunnels(t => !t); break;
-        case 'x': if (!currentLevelData || currentLevelData.features.explode) setExploded(ex => !ex); break;
-        case 'n': if (!currentLevelData || currentLevelData.features.net) setShowNetPanel(p => !p); break;
-        case 'v': setVisualMode(v => {
-          const modes = ['classic', 'grid', 'sudokube', 'wireframe', 'glass'];
-          return modes[(modes.indexOf(v) + 1) % modes.length];
-        }); break;
-        case 'c': if (!currentLevelData || currentLevelData.features.chaos) setChaosLevel(l => l > 0 ? 0 : 1); break;
-        case 'i': setAntipodalIntegrityMode(!antipodalIntegrityMode); break;
-        case 'm': toggleHollowMode(); break;
-        case 'p':
-          setHandsMode(!handsMode);
-          if (!handsMode) {
-            setHandsMoveHistory([]);
-            setHandsMoveQueue([]);
-            setHandsTps(0);
-            handsMoveTimestamps.current = [];
-          }
-          break;
-        case 'escape':
-          setShowHelp(false);
-          setShowSettings(false);
-          setShowCursor(false);
-          if (handsMode) setHandsMode(false);
-          break;
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [
-    coopMode, cursor, animState, flipMode, showLevelTutorial, currentLevelData, handsMode,
-    moveCursor, performCursorRotation, performCursorFlip, undo, executeHandsMove,
-    handleSaveState, handleLoadState, handleLevelSelect, handleTutorialClose,
-    reset, shuffle, showDevConsole, setShowDevConsole, setShowHelp, setFlipMode,
-    setShowTunnels, setExploded, setShowNetPanel, setVisualMode, setChaosLevel,
-    setHandsMode, setHandsMoveHistory, setHandsMoveQueue, setHandsTps, setShowCursor, setShowSettings,
-    antipodalIntegrityMode, setAntipodalIntegrityMode, toggleHollowMode
-  ]);
 
   // ========================================================================
   // RENDER
   // ========================================================================
   const cameraZ = (isMobile ? { 2: 12, 3: 17, 4: 25, 5: 38 } : { 2: 10, 3: 14, 4: 20, 5: 30 })[size] || 14;
-
-  if (showWelcome) {
-    return <WelcomeScreen onEnter={handleWelcomeComplete} />;
-  }
 
   if (coopMode) {
     return (
@@ -894,120 +791,44 @@ export default function WORM3() {
 
   return (
     <div className={`full-screen${settings.backgroundTheme === 'dark' ? ' bg-dark' : settings.backgroundTheme === 'midnight' ? ' bg-midnight' : ''}`}>
-      {showTutorial && <Tutorial onClose={closeTutorial} onMainMenu={() => { closeTutorial(); handleBackToMainMenu(); }} />}
+      {showTutorial && !showWelcome && <Tutorial onClose={closeTutorial} onMainMenu={() => { closeTutorial(); handleBackToMainMenu(); }} />}
 
+      {/* Single persistent Canvas — never unmounts, eliminates context loss on intro→game */}
       <div className="canvas-container" onContextMenu={(e) => e.preventDefault()}>
-        <Canvas camera={{ position: [0, 0, cameraZ], fov: 40 }} dpr={[1, 1.5]} gl={{ powerPreference: 'high-performance', antialias: true }}>
-          <ambientLight intensity={visualMode === 'wireframe' ? 0.2 : visualMode === 'glass' ? 0.5 : 0.8} />
-          <directionalLight position={[5, 8, 5]} intensity={visualMode === 'wireframe' ? 0.3 : visualMode === 'glass' ? 1.6 : 1.2} castShadow shadow-mapSize={[1024, 1024]} />
-          <pointLight position={[10, 10, 10]} intensity={visualMode === 'wireframe' ? 0.3 : visualMode === 'glass' ? 1.0 : 0.8} />
-          <pointLight position={[-10, -10, -10]} intensity={visualMode === 'wireframe' ? 0.2 : visualMode === 'glass' ? 0.5 : 0.6} />
-          {visualMode === 'wireframe' && (
-            <>
-              <pointLight position={[0, 0, 0]} intensity={0.5} color="#fefae0" distance={15} decay={2} />
-              <pointLight position={[5, 5, 5]} intensity={0.25} color="#dda15e" />
-              <pointLight position={[-5, -5, -5]} intensity={0.2} color="#bc6c25" />
-            </>
-          )}
-          {visualMode === 'glass' && (
-            <>
-              <pointLight position={[-8, 6, 8]} intensity={0.6} color="#ffffff" />
-              <pointLight position={[8, -4, -6]} intensity={0.3} color="#e0e8ff" />
-            </>
-          )}
-          <Suspense fallback={null}>
-            {/* Level backgrounds */}
-            {currentLevelData?.background === 'blackhole' && <BlackHoleEnvironment flipTrigger={blackHolePulse} />}
-            {currentLevelData?.background && currentLevelData.background !== 'blackhole' && getLevelBackground(currentLevelData.background, blackHolePulse)}
-            {/* Free play: Black Hole (animated favorite) */}
-            {!currentLevelData && settings.backgroundTheme === 'blackhole' && <BlackHoleEnvironment flipTrigger={blackHolePulse} />}
-            {/* Free play: interactive photo panoramas - orbit to look around, auto-drifts when idle */}
-            {!currentLevelData && (
-              (() => {
-                const bgConfig = BACKGROUNDS.find(b => b.id === settings.backgroundTheme);
-                // IF we have a custom file in backgrounds.js, use it
-                if (bgConfig && bgConfig.file) {
-                  return (
-                    <ErrorBoundary>
-                      <InteractivePhotoBackground files={getBackgroundUrl(bgConfig.file)} />
-                    </ErrorBoundary>
-                  );
-                }
-                // ELSE if it's a known preset for @react-three/drei
-                if (PHOTO_PRESETS.has(settings.backgroundTheme)) {
-                  return (
-                    <ErrorBoundary>
-                      <InteractivePhotoBackground preset={settings.backgroundTheme} />
-                    </ErrorBoundary>
-                  );
-                }
-                // Fallback for Black Hole or others
-                if (settings.backgroundTheme === 'blackhole' || !bgConfig) {
-                  return <BlackHoleEnvironment flipTrigger={blackHolePulse} />;
-                }
-                return null;
-              })()
-            )}
-            {/* Free play: fallback for unknown/legacy themes is handled above */}
-            {/* Default environment for lighting/reflections when in a level with no custom background */}
-            {currentLevelData && !currentLevelData.background && (
-              <Environment preset="city" />
-            )}
-
-            {/* CubeAssembly — hollowMode is handled per-cubie inside Cubie.jsx */}
-            <CubeAssembly
-              size={size}
-              cubies={cubies}
+        <Canvas
+          camera={{ position: showWelcome ? [0, 3, 12] : [0, 0, cameraZ], fov: 40 }}
+          dpr={[1, 1.5]}
+          gl={{ powerPreference: 'high-performance', antialias: true }}
+        >
+          <CameraManager showWelcome={showWelcome} cameraZ={cameraZ} />
+          {showWelcome ? (
+            <IntroBranch time={introTime} onComplete={handleWelcomeComplete} />
+          ) : (
+            <GameScene
               onMove={onMove}
               onTapFlip={onTapFlip}
-              visualMode={visualMode}
-              animState={animState}
               onAnimComplete={handleAnimComplete}
-              showTunnels={showTunnels}
-              explosionFactor={explosionT}
-              cascades={cascades}
               onCascadeComplete={onCascadeComplete}
-              manifoldMap={manifoldMap}
-              showInvitation={!useGameStore.getState().hasFlippedOnce}
-              cursor={cursor}
-              showCursor={showCursor}
-              flipMode={flipMode}
               onSelectTile={handleSelectTile}
               onClearTileSelection={() => setSelectedTileForRotation(null)}
-              flipWaveOrigins={flipWaveOrigins}
               onFlipWaveComplete={onFlipWaveComplete}
-              faceColors={resolvedColors}
-              faceTextures={faceTextures}
-              manifoldStyles={settings.manifoldStyles}
-              isBiomeMode={settings.biomeMode?.enabled}
-              biomeFaceAssign={settings.biomeMode?.faceAssignment}
-              solveHighlights={solveModeActive ? solveHighlights : teachMode.active ? solveHighlights : []}
               onFaceRotationMode={handleFaceRotationMode}
-              handsMode={handsMode}
-              deadRankMap={deadRankMap}
+              animState={animState}
+              manifoldMap={manifoldMap}
+              antipodalData={antipodalData}
+              teachModeActive={teachMode.active}
+              layerHighlight={teachMode.layerHighlight}
             />
-            {teachMode.active && teachMode.layerHighlight && (
-              <LayerHighlight
-                axis={teachMode.layerHighlight.axis}
-                sliceIndex={teachMode.layerHighlight.sliceIndex}
-                dir={teachMode.layerHighlight.dir}
-                size={size}
-              />
-            )}
-            {antipodalIntegrityMode && (
-              <AntipodalVisualization
-                antipodalData={antipodalData}
-                size={size}
-                explosionFactor={explosionT}
-              />
-            )}
-            <AntipodalModeEffects />
-          </Suspense>
-
-
+          )}
         </Canvas>
       </div>
 
+      {/* Welcome DOM overlay — transparent background, Canvas shows through */}
+      {showWelcome && (
+        <WelcomeScreen onEnter={handleWelcomeComplete} introTime={introTime} />
+      )}
+
+      {!showWelcome && (<>
       <div className="ui-layer">
         <TopMenuBar
           metrics={metrics}
@@ -1149,7 +970,7 @@ export default function WORM3() {
         onChangeSize={(n) => { if (!currentLevelData) changeSize(n); }}
         sizeLocked={!!currentLevelData}
         handsMode={handsMode}
-        onToggleHands={() => { setHandsMode(!handsMode); if (!handsMode) { setHandsMoveHistory([]); setHandsMoveQueue([]); setHandsTps(0); handsMoveTimestamps.current = []; } }}
+        onToggleHands={handleToggleHandsMode}
         antipodalIntegrityMode={antipodalIntegrityMode}
         onToggleIntegrity={() => setAntipodalIntegrityMode(!antipodalIntegrityMode)}
         showLeaderboard={showLeaderboard}
@@ -1297,6 +1118,7 @@ export default function WORM3() {
       <AntipodalModeHUD />
       <EchoRotationIndicator />
       {showDevConsole && <Suspense fallback={null}><DevConsole onClose={() => setShowDevConsole(false)} onPreset={handlePreset} onSaveState={handleSaveState} onLoadState={handleLoadState} hasSavedState={!!savedCubeState} size={size} onJumpToLevel={handleLevelSelect} onInstantChaos={handleInstantChaos} moveHistory={moveHistory} /></Suspense>}
+      </>)}
     </div>
   );
 }
