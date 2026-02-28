@@ -82,23 +82,12 @@ import SettingsMenu from './components/menus/SettingsMenu.jsx';
 import HelpMenu from './components/menus/HelpMenu.jsx';
 import MobileControls from './components/menus/MobileControls.jsx';
 import WelcomeScreen from './components/screens/WelcomeScreen.jsx';
-import VictoryScreen from './components/screens/VictoryScreen.jsx';
 import Tutorial from './components/screens/Tutorial.jsx';
 import FirstFlipTutorial from './components/screens/FirstFlipTutorial.jsx';
-import LevelSelectScreen from './components/screens/LevelSelectScreen.jsx';
-import Level10Cutscene from './components/screens/Level10Cutscene.jsx';
-import LevelTutorial from './components/screens/LevelTutorial.jsx';
-import FreeplaySetupWizard from './components/screens/FreeplaySetupWizard.jsx';
-import DisparitySetupWizard from './components/screens/DisparitySetupWizard.jsx';
-import DisparityWinnerScreen from './components/screens/DisparityWinnerScreen.jsx';
 import RotationPreview from './components/overlays/RotationPreview.jsx';
 import FaceRotationButtons from './components/overlays/FaceRotationButtons.jsx';
 import TileRotationSelector from './components/overlays/TileRotationSelector.jsx';
 import HandsOverlay from './components/overlays/HandsOverlay.jsx';
-import CubeNet from './components/CubeNet.jsx';
-import SolveMode from './components/SolveMode.jsx';
-import DevConsole from './components/menus/DevConsole.jsx';
-import TeachMode from './teach/TeachMode.jsx';
 import { useTeachMode } from './teach/useTeachMode.js';
 import LayerHighlight from './teach/LayerHighlight.jsx';
 import AntipodalVisualization from './3d/AntipodalVisualization.jsx';
@@ -108,8 +97,20 @@ import AntipodalModeHUD from './components/overlays/AntipodalModeHUD.jsx';
 import EchoRotationIndicator from './components/overlays/EchoRotationIndicator.jsx';
 import DisparityHUD from './components/overlays/DisparityHUD.jsx';
 import { useAntipodalIntegrity } from './hooks/useAntipodalIntegrity.js';
+// Lazy-loaded: not needed on initial render, deferred to reduce parse time
 const PlatformerWormMode = React.lazy(() => import('./worm/PlatformerWormMode.jsx'));
 const HollowVoidCube = React.lazy(() => import('./3d/HollowVoidCube.jsx'));
+const VictoryScreen = React.lazy(() => import('./components/screens/VictoryScreen.jsx'));
+const LevelSelectScreen = React.lazy(() => import('./components/screens/LevelSelectScreen.jsx'));
+const Level10Cutscene = React.lazy(() => import('./components/screens/Level10Cutscene.jsx'));
+const LevelTutorial = React.lazy(() => import('./components/screens/LevelTutorial.jsx'));
+const FreeplaySetupWizard = React.lazy(() => import('./components/screens/FreeplaySetupWizard.jsx'));
+const DisparitySetupWizard = React.lazy(() => import('./components/screens/DisparitySetupWizard.jsx'));
+const DisparityWinnerScreen = React.lazy(() => import('./components/screens/DisparityWinnerScreen.jsx'));
+const CubeNet = React.lazy(() => import('./components/CubeNet.jsx'));
+const SolveMode = React.lazy(() => import('./components/SolveMode.jsx'));
+const DevConsole = React.lazy(() => import('./components/menus/DevConsole.jsx'));
+const TeachMode = React.lazy(() => import('./teach/TeachMode.jsx'));
 
 // Mobile detection
 const isMobile = typeof window !== 'undefined' && (
@@ -1085,13 +1086,15 @@ export default function WORM3() {
 
         {/* Disparity Winner — cinematic celebration screen */}
         {showDisparityWinner && (
-          <DisparityWinnerScreen
-            onDismiss={() => {
-              useGameStore.getState().clearDisparityGame();
-              useGameStore.getState().setChaosLevel(0);
-              setShowDisparityWizard(true);
-            }}
-          />
+          <Suspense fallback={null}>
+            <DisparityWinnerScreen
+              onDismiss={() => {
+                useGameStore.getState().clearDisparityGame();
+                useGameStore.getState().setChaosLevel(0);
+                setShowDisparityWizard(true);
+              }}
+            />
+          </Suspense>
         )}
 
         {/* Tile Leaderboard — live flip stats in chaos mode, toggled via Views sheet */}
@@ -1176,14 +1179,16 @@ export default function WORM3() {
           onDisparity={handleMenuDisparity}
         />
       )}
-      {showLevelSelect && <LevelSelectScreen onSelectLevel={handleLevelSelect} onBack={handleBackToMainMenu} />}
+      {showLevelSelect && <Suspense fallback={null}><LevelSelectScreen onSelectLevel={handleLevelSelect} onBack={handleBackToMainMenu} /></Suspense>}
       {showSettings && <SettingsMenu onClose={() => setShowSettings(false)} settings={settings} onSettingsChange={setSettings} faceImages={faceImages} onFaceImage={handleFaceImage} />}
-      {showFreeplayWizard && <FreeplaySetupWizard onComplete={handleWizardComplete} onCancel={handleWizardCancel} initialSettings={settings} />}
+      {showFreeplayWizard && <Suspense fallback={null}><FreeplaySetupWizard onComplete={handleWizardComplete} onCancel={handleWizardCancel} initialSettings={settings} /></Suspense>}
       {showDisparityWizard && (
-        <DisparitySetupWizard
-          onStart={handleDisparitySetupComplete}
-          onCancel={() => { setShowDisparityWizard(false); useGameStore.getState().setShowMainMenu(true); }}
-        />
+        <Suspense fallback={null}>
+          <DisparitySetupWizard
+            onStart={handleDisparitySetupComplete}
+            onCancel={() => { setShowDisparityWizard(false); useGameStore.getState().setShowMainMenu(true); }}
+          />
+        </Suspense>
       )}
       {disparityWaitingFirstFlip && (
         <div style={{
@@ -1209,11 +1214,14 @@ export default function WORM3() {
       {showFirstFlipTutorial && <FirstFlipTutorial onClose={() => setShowFirstFlipTutorial(false)} onMainMenu={() => { setShowFirstFlipTutorial(false); handleBackToMainMenu(); }} />}
 
       {solveModeActive && (
-        <SolveMode cubies={cubies} size={size} onClose={() => { setSolveModeActive(false); setSolveHighlights([]); }}
-          onHighlightChange={setSolveHighlights} focusedStep={solveFocusedStep} onFocusStep={setSolveFocusedStep} />
+        <Suspense fallback={null}>
+          <SolveMode cubies={cubies} size={size} onClose={() => { setSolveModeActive(false); setSolveHighlights([]); }}
+            onHighlightChange={setSolveHighlights} focusedStep={solveFocusedStep} onFocusStep={setSolveFocusedStep} />
+        </Suspense>
       )}
 
       {teachMode.active && (
+        <Suspense fallback={null}>
         <TeachMode
           analysis={teachMode.analysis}
           stages={teachMode.stages}
@@ -1239,19 +1247,22 @@ export default function WORM3() {
           onRetryQuiz={teachMode.retryQuiz}
           onClose={teachMode.exitTeachMode}
         />
+        </Suspense>
       )}
 
       {victory && (
-        <VictoryScreen winType={victory} moves={moves} time={gameTime}
-          onContinue={handleVictoryContinue} onNewGame={handleVictoryNewGame}
-          currentLevel={currentLevel} levelData={currentLevelData}
-          onNextLevel={handleNextLevel} hasNextLevel={currentLevel && currentLevel < 10}
-          onMainMenu={() => { setVictory(null); handleBackToMainMenu(); }} />
+        <Suspense fallback={null}>
+          <VictoryScreen winType={victory} moves={moves} time={gameTime}
+            onContinue={handleVictoryContinue} onNewGame={handleVictoryNewGame}
+            currentLevel={currentLevel} levelData={currentLevelData}
+            onNextLevel={handleNextLevel} hasNextLevel={currentLevel && currentLevel < 10}
+            onMainMenu={() => { setVictory(null); handleBackToMainMenu(); }} />
+        </Suspense>
       )}
 
-      {showCutscene && currentLevel === 10 && <Level10Cutscene onComplete={handleCutsceneComplete} onSkip={handleCutsceneComplete} />}
-      {showLevelTutorial && currentLevelData && <LevelTutorial level={currentLevelData} onClose={handleTutorialClose} onMainMenu={() => { levelTutorialClose(); handleBackToMainMenu(); }} />}
-      {showNetPanel && <CubeNet cubies={cubies} size={size} onTapFlip={onTapFlip} flipMode={flipMode} onClose={() => setShowNetPanel(false)} faceColors={resolvedColors} faceTextures={faceTextures} />}
+      {showCutscene && currentLevel === 10 && <Suspense fallback={null}><Level10Cutscene onComplete={handleCutsceneComplete} onSkip={handleCutsceneComplete} /></Suspense>}
+      {showLevelTutorial && currentLevelData && <Suspense fallback={null}><LevelTutorial level={currentLevelData} onClose={handleTutorialClose} onMainMenu={() => { levelTutorialClose(); handleBackToMainMenu(); }} /></Suspense>}
+      {showNetPanel && <Suspense fallback={null}><CubeNet cubies={cubies} size={size} onTapFlip={onTapFlip} flipMode={flipMode} onClose={() => setShowNetPanel(false)} faceColors={resolvedColors} faceTextures={faceTextures} /></Suspense>}
 
       {isMobile && !showWelcome && !showTutorial && (
         <MobileControls onShowSettings={() => setShowSettings(true)} onShowHelp={() => setShowHelp(true)}
@@ -1285,7 +1296,7 @@ export default function WORM3() {
       )}
       <AntipodalModeHUD />
       <EchoRotationIndicator />
-      {showDevConsole && <DevConsole onClose={() => setShowDevConsole(false)} onPreset={handlePreset} onSaveState={handleSaveState} onLoadState={handleLoadState} hasSavedState={!!savedCubeState} size={size} onJumpToLevel={handleLevelSelect} onInstantChaos={handleInstantChaos} moveHistory={moveHistory} />}
+      {showDevConsole && <Suspense fallback={null}><DevConsole onClose={() => setShowDevConsole(false)} onPreset={handlePreset} onSaveState={handleSaveState} onLoadState={handleLoadState} hasSavedState={!!savedCubeState} size={size} onJumpToLevel={handleLevelSelect} onInstantChaos={handleInstantChaos} moveHistory={moveHistory} /></Suspense>}
     </div>
   );
 }
