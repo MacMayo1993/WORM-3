@@ -35,7 +35,6 @@ export function useAnimation() {
   // Antipodal Mode state
   const antipodalMode = useGameStore((state) => state.antipodalMode);
   const echoDelay = useGameStore((state) => state.echoDelay);
-  const incrementReversalCount = useGameStore((state) => state.incrementReversalCount);
   const addPendingEchoRotation = useGameStore((state) => state.addPendingEchoRotation);
   const removePendingEchoRotation = useGameStore((state) => state.removePendingEchoRotation);
 
@@ -56,17 +55,24 @@ export function useAnimation() {
     const pm = pendingMoveRef.current;
     if (pm) {
       const { axis, dir, sliceIndex, isEcho } = pm;
-      setRotatedCubies((prev) => rotateSliceCubies(prev, size, axis, sliceIndex, dir));
 
-      // Only increment moves and play full sound for user-initiated rotations
+      // Batch all store updates into a single atomic setState (1 re-render instead of 3-4)
       if (!isEcho) {
-        setMoves((m) => m + 1);
         play('/sounds/rotate.mp3');
-        addToHistory({ type: 'rotation', axis, dir, sliceIndex, timestamp: Date.now() });
+        useGameStore.setState((state) => ({
+          cubies: rotateSliceCubies(state.cubies, size, axis, sliceIndex, dir),
+          rotationEpoch: state.rotationEpoch + 1,
+          moves: state.moves + 1,
+          moveHistory: [...state.moveHistory, { type: 'rotation', axis, dir, sliceIndex, timestamp: Date.now() }].slice(-10),
+        }));
       } else {
-        // Echo rotation - quieter sound
+        // Echo rotation - quieter sound; only bump cubies + reversalCount
         play('/sounds/rotate.mp3', 0.7);
-        incrementReversalCount();
+        useGameStore.setState((state) => ({
+          cubies: rotateSliceCubies(state.cubies, size, axis, sliceIndex, dir),
+          rotationEpoch: state.rotationEpoch + 1,
+          reversalCount: state.reversalCount + 1,
+        }));
       }
 
       // Trigger antipodal echo rotation if mode is enabled and this is NOT already an echo
@@ -122,13 +128,9 @@ export function useAnimation() {
     pendingMoveRef.current = null;
   }, [
     size,
-    setRotatedCubies,
-    setMoves,
     clearAnimation,
-    addToHistory,
     antipodalMode,
     echoDelay,
-    incrementReversalCount,
     addPendingEchoRotation,
     removePendingEchoRotation,
     startAnimation,
