@@ -513,7 +513,10 @@ const CubeAssembly = React.memo(({
     };
   }, [animState]);
 
-  // useFrame applies live drag rotation and GSAP-driven animations
+  // useFrame applies live drag rotation and GSAP-driven animations.
+  // Priority -1: runs before all priority-0 subscribers (StickerPlane animations
+  // and StickerInstanceProvider matrix sampling) so that cubieRef positions and
+  // quaternions are fully updated before StickerInstances reads matrixWorld.
   useFrame((state) => {
     // Update shared time uniform for animated tile styles
     updateSharedTime(state.clock.elapsedTime);
@@ -581,7 +584,7 @@ const CubeAssembly = React.memo(({
         g.rotateOnWorldAxis(worldAxis, dRot * dir);
       });
     }
-  });
+  }, -1);
 
   // Stable ref callbacks so that passing ref={fn} doesn't defeat React.memo on Cubie.
   // We create one callback per index, memoized by size.
