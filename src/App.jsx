@@ -159,7 +159,6 @@ export default function WORM3() {
   const setFlipMode = useGameStore((state) => state.setFlipMode);
   const setVisualMode = useGameStore((state) => state.setVisualMode);
   const exploded = useGameStore((state) => state.exploded);
-  const setExploded = useGameStore((state) => state.setExploded);
   const setExplosionT = useGameStore((state) => state.setExplosionT);
   const setShowTunnels = useGameStore((state) => state.setShowTunnels);
   const setFlipWaveOrigins = useGameStore((state) => state.setFlipWaveOrigins);
@@ -787,7 +786,7 @@ export default function WORM3() {
           performCursorRotation={performCursorRotation}
           ui={{
             sheetOpen, setSheetOpen, sheetMode, setSheetMode,
-            showFreeplayWizard, setShowFreeplayWizard,
+            showFreeplayWizard,
             showDisparityWizard, setShowDisparityWizard,
             disparityWaitingFirstFlip, disparityCountdown,
           }}
@@ -829,7 +828,6 @@ export default function WORM3() {
             onTileFaceRotation: handleTileFaceRotation,
             onVictoryContinue: handleVictoryContinue,
             onVictoryNewGame: handleVictoryNewGame,
-            onCloseTutorial: closeTutorial,
           }}
         />
       )}
