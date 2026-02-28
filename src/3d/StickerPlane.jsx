@@ -555,6 +555,10 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // false → individual <mesh> renders (complex / animating sticker, or no ctx)
   const isInstancedRef = useRef(false);
   const instanceIdRef = useRef(-1);
+  // Becomes true only after register() succeeds (returns a non-negative slot id).
+  // Prevents suppressing the per-sticker <mesh> when the pool is exhausted and
+  // no slot was allocated — those stickers must fall back to individual draw calls.
+  const [instancedSlotValid, setInstancedSlotValid] = useState(false);
   const ringRef = useRef();
   const glowRef = useRef();
   const spinT = useRef(0);
@@ -605,11 +609,15 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     if (!instanceCtx) return;
     const id = instanceCtx.register(innerGroupRef, instanceColorRef, isInstancedRef);
     instanceIdRef.current = id;
+    // Only suppress the per-sticker mesh when a slot was actually allocated.
+    // If the pool is exhausted (id === -1) we must fall back to individual rendering.
+    setInstancedSlotValid(id >= 0);
     return () => {
       if (instanceIdRef.current >= 0) {
         instanceCtx.unregister(instanceIdRef.current);
         instanceIdRef.current = -1;
       }
+      setInstancedSlotValid(false);
     };
   }, [instanceCtx]);
 
@@ -1035,6 +1043,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // they modify groupRef / innerGroupRef, and the manager samples matrixWorld.
   const isInstanceable = (
     !!instanceCtx &&
+    instancedSlotValid &&
     !hollow &&
     !isGlass &&
     !isSudokube &&
