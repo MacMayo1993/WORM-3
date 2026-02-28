@@ -28,16 +28,11 @@ export function useCubeState() {
   const settings = useGameStore((state) => state.settings);
   const explosionT = useGameStore((state) => state.explosionT);
 
-  const setMoves = useGameStore((state) => state.setMoves);
   const setHasShuffled = useGameStore((state) => state.setHasShuffled);
   const resetGame = useGameStore((state) => state.resetGame);
-  const addToHistory = useGameStore((state) => state.addToHistory);
   const clearHistory = useGameStore((state) => state.clearHistory);
 
-  const setBlackHolePulse = useGameStore((state) => state.setBlackHolePulse);
-  const setFlipWaveOrigins = useGameStore((state) => state.setFlipWaveOrigins);
   const hasFlippedOnce = useGameStore((state) => state.hasFlippedOnce);
-  const setHasFlippedOnce = useGameStore((state) => state.setHasFlippedOnce);
   const setShowFirstFlipTutorial = useGameStore((state) => state.setShowFirstFlipTutorial);
 
   // Refs for accessing current state in callbacks
@@ -97,13 +92,16 @@ export function useCubeState() {
     }
   }, []);
 
-  // Apply rotation to cubies
+  // Apply rotation to cubies — single atomic setState (1 re-render instead of 3)
   const rotateSlice = useCallback((axis, sliceIndex, dir) => {
-    setRotatedCubies((prev) => rotateSliceCubies(prev, size, axis, sliceIndex, dir));
-    setMoves((m) => m + 1);
     play('/sounds/rotate.mp3');
-    addToHistory({ type: 'rotation', axis, dir, sliceIndex, timestamp: Date.now() });
-  }, [size, setRotatedCubies, setMoves, addToHistory]);
+    useGameStore.setState((state) => ({
+      cubies: rotateSliceCubies(state.cubies, size, axis, sliceIndex, dir),
+      rotationEpoch: state.rotationEpoch + 1,
+      moves: state.moves + 1,
+      moveHistory: [...state.moveHistory, { type: 'rotation', axis, dir, sliceIndex, timestamp: Date.now() }].slice(-10),
+    }));
+  }, [size]);
 
   // Flip sticker pair
   const flipSticker = useCallback((pos, dirKey) => {
@@ -117,10 +115,10 @@ export function useCubeState() {
     // change cube geometry so the cached map is always valid here.
     const currentManifoldMap = manifoldMapRef.current;
     const sticker = currentCubies[pos.x]?.[pos.y]?.[pos.z]?.stickers?.[dirKey];
+    const origins = [];
 
     if (sticker) {
       const antipodalLoc = findAntipodalStickerByGrid(currentManifoldMap, sticker, currentSize);
-      const origins = [];
       const antipodalColor = resolvedColorsRef.current[ANTIPODAL_COLOR[sticker.curr]];
 
       origins.push({
@@ -147,21 +145,25 @@ export function useCubeState() {
         markFlipped(antipodalLoc.x, antipodalLoc.y, antipodalLoc.z, antipodalLoc.dirKey);
       }
 
-      setFlipWaveOrigins(origins);
     }
 
-    // Sticker flips don't move cubies, so the cached manifold map is still valid here
-    setCubies((prev) => flipStickerPair(prev, prev.length, pos.x, pos.y, pos.z, dirKey, currentManifoldMap));
-    setMoves((m) => m + 1);
-    addToHistory({ type: 'flip', pos: { ...pos }, dirKey, timestamp: Date.now() });
-    setBlackHolePulse(Date.now());
+    // Batch all flip state changes into a single atomic setState (1 re-render instead of 5-6)
+    const ts = Date.now();
+    const isFirstFlip = !hasFlippedOnce;
+    useGameStore.setState((state) => ({
+      cubies: flipStickerPair(state.cubies, state.cubies.length, pos.x, pos.y, pos.z, dirKey, currentManifoldMap),
+      moves: state.moves + 1,
+      moveHistory: [...state.moveHistory, { type: 'flip', pos: { ...pos }, dirKey, timestamp: ts }].slice(-10),
+      flipWaveOrigins: origins,
+      blackHolePulse: ts,
+      ...(isFirstFlip ? { hasFlippedOnce: true } : {}),
+    }));
 
-    // First flip tutorial trigger
-    if (!hasFlippedOnce) {
-      setHasFlippedOnce(true);
+    // First flip tutorial trigger (runs after state is set, uses timeout so it fires after render)
+    if (isFirstFlip) {
       setTimeout(() => setShowFirstFlipTutorial(true), 600);
     }
-  }, [setCubies, setMoves, addToHistory, getRotationForDir, setBlackHolePulse, setFlipWaveOrigins, hasFlippedOnce, setHasFlippedOnce, setShowFirstFlipTutorial]);
+  }, [getRotationForDir, hasFlippedOnce, setShowFirstFlipTutorial]);
 
   // Shuffle the cube
   const shuffle = useCallback(() => {
