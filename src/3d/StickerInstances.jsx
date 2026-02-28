@@ -145,12 +145,18 @@ export function StickerInstanceProvider({ children }) {
   }, [instanceMesh]);
 
   // ── Per-frame update ────────────────────────────────────────────────────────
-  // Priority 0 (default). StickerInstanceProvider is the parent of CubeAssembly
-  // and StickerPlane in the React tree, so its useLayoutEffect (which registers
-  // this useFrame) runs AFTER all children's useLayoutEffects. R3F sorts
-  // same-priority subscribers by insertion order (stable sort), so this callback
-  // runs last among priority-0 subscribers — after CubeAssembly and StickerPlane
-  // have already applied their transforms to cubieRefs and groupRef.
+  // Priority 0 (default). Frame ordering is guaranteed as follows:
+  //   -1  CubeAssembly transform useFrame — writes g.position / g.quaternion
+  //        on cubieRefs for live-drag and GSAP snap animations
+  //    0  StickerPlane useFrames — write flip-squish / shake to innerGroupRef
+  //    0  THIS callback runs after StickerPlane because StickerPlane is a
+  //        deeper descendant: its useLayoutEffect fires first (children before
+  //        parents), inserting it into the priority-0 subscriber list first.
+  //        R3F's stable sort preserves that order within the same priority band.
+  //
+  // By the time updateWorldMatrix(true, false) is called here, both the cubie
+  // parent transforms (-1 band) and the inner group transforms (earlier priority-0
+  // StickerPlane callbacks) are already applied for this frame.
   //
   // IMPORTANT: Do NOT use priority > 0 here. In R3F v8, any useFrame with a
   // positive priority increments an internal counter that disables gl.render()
