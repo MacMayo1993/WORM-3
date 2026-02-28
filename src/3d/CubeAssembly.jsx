@@ -19,6 +19,15 @@ const _axisRow = new THREE.Vector3(0, 1, 0);
 const _axisDepth = new THREE.Vector3(0, 0, 1);
 const _rotQuat = new THREE.Quaternion();
 
+// Scratch vectors for getBasis() — pre-allocated to avoid GC pressure during drag events.
+const _basisF = new THREE.Vector3();
+const _basisR = new THREE.Vector3();
+const _basisU = new THREE.Vector3();
+// Scratch vectors for mapSwipe() — avoids per-call allocations.
+const _swipe = new THREE.Vector3();
+const _projected = new THREE.Vector3();
+const _rotAxis = new THREE.Vector3();
+
 // Mobile detection
 const isTouchDevice = typeof window !== 'undefined' && (
   'ontouchstart' in window ||
@@ -70,11 +79,10 @@ const CubeAssembly = React.memo(({
   const sliceIndicesRef = useRef(null);
 
   const getBasis = () => {
-    const f = new THREE.Vector3();
-    camera.getWorldDirection(f).normalize();
-    const r = new THREE.Vector3().crossVectors(camera.up, f).normalize();
-    const u = new THREE.Vector3().crossVectors(f, r).normalize();
-    return { right: r, upScreen: u };
+    camera.getWorldDirection(_basisF).normalize();
+    _basisR.crossVectors(camera.up, _basisF).normalize();
+    _basisU.crossVectors(_basisF, _basisR).normalize();
+    return { right: _basisR, upScreen: _basisU };
   };
 
   const normalFromEvent = e => {
@@ -99,10 +107,11 @@ const CubeAssembly = React.memo(({
     }
     // Normal slice rotation
     const { right, upScreen } = getBasis();
-    const sw = new THREE.Vector3().addScaledVector(right, dx).addScaledVector(upScreen, dy);
-    const t = sw.clone().projectOnPlane(faceN);
-    if (t.lengthSq() < 1e-6) return null;
-    const ra = new THREE.Vector3().crossVectors(t, faceN).normalize();
+    _swipe.set(0, 0, 0).addScaledVector(right, dx).addScaledVector(upScreen, dy);
+    _projected.copy(_swipe).projectOnPlane(faceN);
+    if (_projected.lengthSq() < 1e-6) return null;
+    _rotAxis.crossVectors(_projected, faceN).normalize();
+    const ra = _rotAxis;
     const ax = Math.abs(ra.x), ay = Math.abs(ra.y), az = Math.abs(ra.z);
     if (ax >= ay && ax >= az) return { axis: 'col', dir: sgn(ra.x) };
     if (ay >= ax && ay >= az) return { axis: 'row', dir: sgn(ra.y) };
