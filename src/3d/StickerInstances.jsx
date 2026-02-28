@@ -70,18 +70,27 @@ export function StickerInstanceProvider({ children }) {
     mesh.count = MAX_INSTANCES;
     mesh.frustumCulled = false; // world-space AABB would be wrong anyway
     mesh.name = 'StickerInstanceMesh';
+    // Disable raycasting — zero-scale matrices produce degenerate inverse matrices
+    // that cause Infinity/NaN values in the ray, leading to unpredictable hit results.
+    // This mesh is purely visual; no pointer interaction is needed.
+    mesh.raycast = () => {};
     for (let i = 0; i < MAX_INSTANCES; i++) mesh.setMatrixAt(i, _zeroMatrix);
     mesh.instanceMatrix.needsUpdate = true;
     return mesh;
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Add to scene root; dispose on unmount.
+  // Add to scene root.  Remove on unmount.
+  // NOTE: geometry and material are NOT disposed here.  In React 18 Strict Mode
+  // (development), useLayoutEffect cleanup runs between the first and second
+  // effect invocations.  Disposing here would corrupt the still-live mesh
+  // before the second run re-adds it: instanced colors would be lost, making
+  // all solid stickers invisible for the lifetime of the session.
+  // The Three.js resources are freed implicitly when the WebGL context is
+  // destroyed (i.e. when the persistent Canvas unmounts at app shutdown).
   useLayoutEffect(() => {
     scene.add(instanceMesh);
     return () => {
       scene.remove(instanceMesh);
-      instanceMesh.geometry.dispose();
-      instanceMesh.material.dispose();
     };
   }, [scene, instanceMesh]);
 
