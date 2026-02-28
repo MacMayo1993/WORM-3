@@ -145,10 +145,16 @@ export function StickerInstanceProvider({ children }) {
   }, [instanceMesh]);
 
   // ── Per-frame update ────────────────────────────────────────────────────────
-  // Priority 1 guarantees we run AFTER:
-  //   • CubeAssembly (priority 0) — applies live-drag and GSAP slice rotations to cubieRefs
-  //   • StickerPlane (priority 0)  — applies flip-squish, shake, and tremor to groupRef
-  // So matrixWorld is fully up to date when we sample it here.
+  // Priority 0 (default). StickerInstanceProvider is the parent of CubeAssembly
+  // and StickerPlane in the React tree, so its useLayoutEffect (which registers
+  // this useFrame) runs AFTER all children's useLayoutEffects. R3F sorts
+  // same-priority subscribers by insertion order (stable sort), so this callback
+  // runs last among priority-0 subscribers — after CubeAssembly and StickerPlane
+  // have already applied their transforms to cubieRefs and groupRef.
+  //
+  // IMPORTANT: Do NOT use priority > 0 here. In R3F v8, any useFrame with a
+  // positive priority increments an internal counter that disables gl.render()
+  // entirely, causing the scene to stop rendering (black screen).
   useFrame(() => {
     if (registryRef.current.size === 0) return;
 
@@ -165,7 +171,7 @@ export function StickerInstanceProvider({ children }) {
 
       // updateWorldMatrix(updateParents=true) walks up the scene graph to
       // incorporate GSAP-driven cubie rotations and TrackballControls camera
-      // rotation that occurred this frame before our priority-1 callback.
+      // rotation that occurred this frame before our callback.
       groupRef.current.updateWorldMatrix(true, false);
       instanceMesh.setMatrixAt(slot, groupRef.current.matrixWorld);
       matDirty = true;
@@ -180,7 +186,7 @@ export function StickerInstanceProvider({ children }) {
 
     if (matDirty) instanceMesh.instanceMatrix.needsUpdate = true;
     if (colDirty && instanceMesh.instanceColor) instanceMesh.instanceColor.needsUpdate = true;
-  }, 1);
+  });
 
   const ctx = useMemo(() => ({ register, unregister }), [register, unregister]);
 
