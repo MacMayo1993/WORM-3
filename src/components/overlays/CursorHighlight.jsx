@@ -1,8 +1,17 @@
 import React, { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import { useGameStore } from '../../hooks/useGameStore.js';
+import { useShallow } from 'zustand/react/shallow';
 
-const CursorHighlight = ({ cursor, size, explosionFactor = 0 }) => {
+const CursorHighlight = () => {
+  const { cursor, size, explosionFactor } = useGameStore(
+    useShallow(s => ({
+      cursor: s.cursor,
+      size: s.size,
+      explosionFactor: s.explosionT,
+    }))
+  );
   const meshRef = useRef();
   const glowRef = useRef();
 
