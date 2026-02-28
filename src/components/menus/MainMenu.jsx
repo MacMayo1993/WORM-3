@@ -309,34 +309,39 @@ const RotatingBlackCube = () => {
   );
 };
 
-// ─── Bottom nav item ──────────────────────────────────────────────────────────
-const NavItem = ({ icon, label, color, onClick, delay }) => {
-  const [visible, setVisible] = useState(false);
+// ─── Bottom nav item (inside shared pill) ─────────────────────────────────────
+const NavItem = ({ icon, label, color, onClick }) => {
   const [hovered, setHovered] = useState(false);
-  useEffect(() => {
-    const t = setTimeout(() => setVisible(true), delay);
-    return () => clearTimeout(t);
-  }, [delay]);
   return (
-    <button onClick={onClick} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={{
         flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
-        justifyContent: 'center', gap: '7px', padding: '16px 8px 14px',
-        background: hovered ? 'rgba(18,48,105,0.9)' : 'rgba(10,28,68,0.78)',
-        border: `1px solid ${hovered ? color + '60' : 'rgba(60,100,200,0.28)'}`,
-        borderRadius: '18px', cursor: 'pointer',
-        transition: 'all 0.22s cubic-bezier(0.4,0,0.2,1)',
-        opacity: visible ? 1 : 0,
-        transform: visible ? (hovered ? 'translateY(-3px) scale(1.02)' : 'none') : 'translateY(20px)',
-        backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
-        boxShadow: hovered
-          ? '0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08)'
-          : '0 2px 12px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.04)',
-      }}>
-      <span style={{ fontSize: '26px', lineHeight: 1 }}>{icon}</span>
+        justifyContent: 'center', gap: '8px', padding: '14px 12px 12px',
+        background: hovered ? `${color}12` : 'transparent',
+        border: 'none', cursor: 'pointer',
+        transition: 'background 0.2s ease',
+        position: 'relative',
+      }}
+    >
+      {/* Hover tint overlay */}
+      {hovered && (
+        <div style={{
+          position: 'absolute', inset: 0, borderRadius: 'inherit',
+          background: `radial-gradient(ellipse 80% 120% at 50% 0%, ${color}18 0%, transparent 70%)`,
+          pointerEvents: 'none',
+        }} />
+      )}
+      <span style={{ lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        filter: hovered ? `drop-shadow(0 0 6px ${color}90)` : 'none',
+        transition: 'filter 0.2s ease',
+      }}>{icon}</span>
       <span style={{
-        fontSize: '11px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase',
-        color: hovered ? color : 'rgba(160,190,240,0.6)', transition: 'color 0.22s',
+        fontSize: '10px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase',
+        color: hovered ? color : 'rgba(180,210,255,0.55)',
+        transition: 'color 0.2s ease',
         fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif",
       }}>{label}</span>
     </button>
@@ -462,15 +467,39 @@ const MainMenu = ({ onPlay, _onLevels, onFreeplay, _onCoop, onSettings, onBiome,
           </button>
         </div>
 
-        {/* Bottom nav */}
+        {/* Bottom nav — unified glass pill */}
         <div style={{
           position: 'absolute', bottom: 0, left: 0, right: 0,
-          padding: '0 16px', paddingBottom: 'max(16px, env(safe-area-inset-bottom,16px))',
-          display: 'flex', gap: '10px', pointerEvents: 'all',
+          paddingBottom: 'max(20px, env(safe-area-inset-bottom,20px))',
+          display: 'flex', justifyContent: 'center', pointerEvents: 'all',
+          opacity: btnVisible ? 1 : 0,
+          transform: btnVisible ? 'none' : 'translateY(16px)',
+          transition: 'opacity 0.55s ease 0.1s, transform 0.55s cubic-bezier(0.22,1,0.36,1) 0.1s',
         }}>
-          <NavItem icon={<DisparityIcon />} label="Disparity" color="#f59e0b" onClick={onDisparity} delay={900} />
-          <NavItem icon={<ExploreIcon />}   label="Explore"   color="#22c55e" onClick={onFreeplay}  delay={1050} />
-          <NavItem icon={<WorldIcon />}     label="World"     color="#60a5fa" onClick={onBiome}     delay={1200} />
+          <div style={{
+            display: 'flex', width: 'min(460px,88vw)',
+            background: 'rgba(5,12,35,0.48)',
+            backdropFilter: 'blur(28px)', WebkitBackdropFilter: 'blur(28px)',
+            border: '1.5px solid rgba(100,155,255,0.52)',
+            borderRadius: '100px',
+            boxShadow: [
+              '0 0 0 1px rgba(80,130,255,0.10)',        // outer softening ring
+              '0 0 22px rgba(60,100,255,0.22)',          // diffuse blue glow
+              '0 0 60px rgba(40,70,200,0.10)',           // wide ambient
+              '0 8px 32px rgba(0,0,0,0.55)',             // drop shadow
+              'inset 0 1px 0 rgba(255,255,255,0.13)',    // top inner highlight
+              'inset 0 -1px 0 rgba(80,130,255,0.08)',   // bottom inner tint
+            ].join(', '),
+            overflow: 'hidden',
+          }}>
+            <NavItem icon={<DisparityIcon />} label="Disparity" color="#f59e0b" onClick={onDisparity} />
+            {/* divider */}
+            <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(100,150,255,0.18)' }} />
+            <NavItem icon={<ExploreIcon />}   label="Explore"   color="#22c55e" onClick={onFreeplay} />
+            {/* divider */}
+            <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(100,150,255,0.18)' }} />
+            <NavItem icon={<WorldIcon />}     label="World"     color="#60a5fa" onClick={onBiome} />
+          </div>
         </div>
       </div>
     </div>
