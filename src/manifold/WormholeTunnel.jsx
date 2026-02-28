@@ -5,6 +5,9 @@ import { FLIP_CAP, getHalfLifeMultiplier } from '../utils/constants.js';
 import { flipBurstMap } from '../3d/styles/TileStyleMaterials.jsx';
 import { calculateSmartControlPoint } from '../utils/smartRouting.js';
 
+// Lightning bolt point count — jagged segments between the two tile endpoints
+const LIGHTNING_PTS = 14;
+
 // Cached vectors — no per-frame allocations
 const _wPos1 = new THREE.Vector3();
 const _wPos2 = new THREE.Vector3();
@@ -25,6 +28,7 @@ const _spreadVec = new THREE.Vector3();
 const _c1 = new THREE.Color();
 const _c2 = new THREE.Color();
 const _cTemp = new THREE.Color();
+const _lPt = new THREE.Vector3();   // scratch for lightning bolt point sampling
 
 // Local-space outward face normals, keyed by dirKey
 const FACE_NORM_LOCAL = {
@@ -35,8 +39,8 @@ const FACE_NORM_LOCAL = {
 
 // Octagon ring constants
 const OCTAGON_MAX = 8;
-// OCT_RADIUS increased by 18% from 0.30 → 0.354 (ring radius at each tile face, world units)
-const OCT_RADIUS = 0.354;
+// OCT_RADIUS: ring radius at each tile face (world units)
+const OCT_RADIUS = 0.46;
 // SPREAD_RADIUS: lateral fan radius at interior control points — each strand fans out
 // to its own radial direction through the cube interior, routing along a different
 // inter-cubie gap corridor (cubie gaps are at ±0.5 from each cubie centre).
@@ -81,15 +85,24 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
   const strandCount = Math.min(Math.max(1, flips), OCTAGON_MAX);
 
   const strandConfig = useMemo(() => {
-    return Array.from({ length: strandCount }, (_, i) => ({
-      id: i,
-      angle: (i / OCTAGON_MAX) * Math.PI * 2,
-      radius: OCT_RADIUS,
-      baseOpacity: 0.5 + (i % 2) * 0.1,
+    // Core strand: runs the central bezier axis (no radial offset) — gives the tube a solid spine
+    const core = {
+      id: 'core', isCore: true, angle: 0,
+      baseOpacity: 0.82,
       lineWidth: 1.5,
       colors: new Float32Array(30 * 3),
-      sparkOffset: (i / OCTAGON_MAX) * Math.PI * 2
+      sparkOffset: 1.1,
+    };
+    // Outer ring strands
+    const ring = Array.from({ length: strandCount }, (_, i) => ({
+      id: i, isCore: false,
+      angle: (i / OCTAGON_MAX) * Math.PI * 2,
+      baseOpacity: 0.66 + (i % 2) * 0.08,
+      lineWidth: 1.5,
+      colors: new Float32Array(30 * 3),
+      sparkOffset: (i / OCTAGON_MAX) * Math.PI * 2,
     }));
+    return [core, ...ring];
   }, [strandCount]);
 
   useMemo(() => {
@@ -106,6 +119,11 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
       }
     });
   }, [color1, color2, strandConfig]);
+
+  // Lightning bolt refs
+  const lightningRef = useRef(null);
+  const lightningJagsRef = useRef(new Float32Array(LIGHTNING_PTS * 2)); // (r, u) jag offsets per point
+  const lightningFrameRef = useRef(-1);
 
   useEffect(() => {
     return () => {
@@ -156,8 +174,6 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
     const pulse = dead ? 0.3 : Math.sin(pulseT.current) * 0.1 + 0.9;
 
     const dangerT = flips >= DANGER_START && !dead ? Math.max(0, Math.min(1, (flips - DANGER_START) / DANGER_RANGE)) : 0;
-    const dangerFlashFreq = dangerT > 0 ? 2 + dangerT * 16 : 0;
-    const dangerFlash = dangerT > 0 ? Math.max(0, Math.sin(t * dangerFlashFreq * Math.PI * 2)) * dangerT : 0;
 
     if (dead) {
       _c1.set('#555555');
@@ -207,9 +223,6 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
     _right.normalize();
     _trueUp.crossVectors(_right, _dir).normalize();
 
-    const colorSatBoost = dangerT * 0.5;
-    const flashWhite = dangerFlash * 0.85;
-
     linesRef.current.forEach((line, i) => {
       if (!line) return;
       const config = strandConfig[i];
@@ -218,35 +231,40 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
         if (dead) {
           line.material.opacity = 0.12;
         } else {
-          const sparkPulse = Math.sin(pulseT.current * 3 + config.sparkOffset);
-          const spark = sparkPulse > 0.9 ? (sparkPulse - 0.9) * 10 : 0;
-          const surgeGlow = surge * 0.3;
-          const flipGlow = burstEnv * 0.9;
-          const dangerOpacity = dangerT > 0 ? dangerFlash * 0.5 + dangerT * 0.15 : 0;
-          line.material.opacity = Math.min(1, config.baseOpacity * pulse * (1 + spark * 0.5) + surgeGlow + flipGlow + dangerOpacity);
+          const flipGlow = burstEnv * 0.5;
+          const dangerOpacity = dangerT > 0 ? dangerT * 0.15 : 0;
+          line.material.opacity = Math.min(1, config.baseOpacity * pulse + flipGlow + dangerOpacity);
         }
       }
 
-      // Each strand fans to its own radial direction through the cube interior:
-      // - v0 / v3 (tile endpoints): tight OCT_RADIUS ring → the stop-sign octagon
-      //   at each tile's back face
-      // - v1 / v2 (interior CPs): wider SPREAD_RADIUS fan → strand 0 arcs up, strand 2
-      //   arcs right, strand 4 arcs down, strand 6 arcs left, diagonals in between.
-      //   Depth-test occlusion by solid cubie geometry makes each arc thread visibly
-      //   through a different inter-cubie gap corridor.
-      const cosA = Math.cos(config.angle);
-      const sinA = Math.sin(config.angle);
-      _offsetVec.set(0, 0, 0)
-        .addScaledVector(_right, cosA * OCT_RADIUS)
-        .addScaledVector(_trueUp, sinA * OCT_RADIUS);
-      _spreadVec.set(0, 0, 0)
-        .addScaledVector(_right, cosA * SPREAD_RADIUS)
-        .addScaledVector(_trueUp, sinA * SPREAD_RADIUS);
-
-      curveRef.current.v0.copy(_vStart).add(_offsetVec);
-      curveRef.current.v1.copy(_cp1).add(_spreadVec);
-      curveRef.current.v2.copy(_cp2).add(_spreadVec);
-      curveRef.current.v3.copy(_vEnd).add(_offsetVec);
+      // Core strand runs the central bezier axis; ring strands fan to their radial offset.
+      if (config.isCore) {
+        curveRef.current.v0.copy(_vStart);
+        curveRef.current.v1.copy(_cp1);
+        curveRef.current.v2.copy(_cp2);
+        curveRef.current.v3.copy(_vEnd);
+      } else {
+        // Orbital distribution: each strand bows outward in its own radial direction.
+        // CPs at 35%/65% along start→end axis, pushed radially in the strand's angle.
+        // No shared routing CP — avoids all 8 strands bunching to the same side.
+        const cosA = Math.cos(config.angle);
+        const sinA = Math.sin(config.angle);
+        _offsetVec.set(0, 0, 0)
+          .addScaledVector(_right, cosA * OCT_RADIUS)
+          .addScaledVector(_trueUp, sinA * OCT_RADIUS);
+        curveRef.current.v0.copy(_vStart).add(_offsetVec);
+        curveRef.current.v3.copy(_vEnd).add(_offsetVec);
+        // CP1 at 35% along start→end, bowed outward in this strand's radial direction
+        curveRef.current.v1.copy(_vStart).lerp(_vEnd, 0.35 + tugBias * 0.12)
+          .addScaledVector(_right, cosA * SPREAD_RADIUS)
+          .addScaledVector(_trueUp, sinA * SPREAD_RADIUS);
+        curveRef.current.v1.y += burstEnv * 0.9;
+        // CP2 at 65%, same radial bow
+        curveRef.current.v2.copy(_vStart).lerp(_vEnd, 0.65 + tugBias * 0.12)
+          .addScaledVector(_right, cosA * SPREAD_RADIUS)
+          .addScaledVector(_trueUp, sinA * SPREAD_RADIUS);
+        curveRef.current.v2.y += burstEnv * 0.9;
+      }
 
       const points = curveRef.current.getPoints(29);
 
@@ -258,47 +276,80 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
       }
       line.geometry.attributes.position.needsUpdate = true;
 
-      // --- Color transference: traveling energy pulses with tug-of-war gradient ---
+      // Pure tile color — tug-of-war gradient from color1 to color2, no white
       const colors = line.geometry.attributes.color.array;
-
-      const pulseSpeed = 1.2 + surge * 2.5;
-      const pulseWidth = 0.10 + (1 - surge) * 0.05;
-      const pulseIntensity = 0.6 + surge * 0.4;
-
-      const rawP1 = (((t * pulseSpeed + config.sparkOffset) % 1.0) + 1.0) % 1.0;
-      const rawP2 = (((t * pulseSpeed * 0.7 + config.sparkOffset + 0.5) % 1.0) + 1.0) % 1.0;
-      const p1 = tugRaw > 0 ? rawP1 : 1.0 - rawP1;
-      const p2 = tugRaw > 0 ? rawP2 : 1.0 - rawP2;
-
       for (let j = 0; j < 30; j++) {
         const u = j / 29;
-        const shiftedU = Math.max(0, Math.min(1, u + tugBias * 0.6));
+        const shiftedU = Math.max(0, Math.min(1, u + tugBias * 0.4));
         _cTemp.lerpColors(_c1, _c2, shiftedU);
-
-        const d1 = Math.abs(u - p1);
-        const d2 = Math.abs(u - p2);
-        const b1 = Math.exp(-(d1 * d1) / (2 * pulseWidth * pulseWidth));
-        const b2 = Math.exp(-(d2 * d2) / (2 * pulseWidth * pulseWidth)) * 0.6;
-        const brightness = Math.min(1, (b1 + b2) * pulseIntensity);
-
-        if (brightness > 0.01) {
-          _cTemp.r += (1 - _cTemp.r) * brightness;
-          _cTemp.g += (1 - _cTemp.g) * brightness;
-          _cTemp.b += (1 - _cTemp.b) * brightness;
-        }
-
+        // Danger zone: saturate toward the tile's own hue only (no added white)
         if (dangerT > 0) {
-          _cTemp.r = Math.min(1, _cTemp.r * (1 + colorSatBoost) + flashWhite);
-          _cTemp.g = Math.min(1, _cTemp.g * (1 + colorSatBoost) + flashWhite);
-          _cTemp.b = Math.min(1, _cTemp.b * (1 + colorSatBoost) + flashWhite);
+          _cTemp.r = Math.min(1, _cTemp.r * (1 + dangerT * 0.5));
+          _cTemp.g = Math.min(1, _cTemp.g * (1 + dangerT * 0.5));
+          _cTemp.b = Math.min(1, _cTemp.b * (1 + dangerT * 0.5));
         }
-
-        colors[j * 3] = _cTemp.r;
+        colors[j * 3]     = _cTemp.r;
         colors[j * 3 + 1] = _cTemp.g;
         colors[j * 3 + 2] = _cTemp.b;
       }
       line.geometry.attributes.color.needsUpdate = true;
     });
+
+    // === Lightning bolt: fires along the central bezier when a flip burst is active ===
+    const lightningLine = lightningRef.current;
+    if (lightningLine) {
+      if (burstEnv > 0.03 && !dead) {
+        // Re-randomize jags at ~20 Hz for flicker — only when the bolt is visible
+        const jagFrame = Math.floor(t * 20);
+        if (jagFrame !== lightningFrameRef.current) {
+          lightningFrameRef.current = jagFrame;
+          const jags = lightningJagsRef.current;
+          // Endpoints are always clamped to exact tile positions (no jag)
+          jags[0] = 0; jags[1] = 0;
+          jags[(LIGHTNING_PTS - 1) * 2] = 0; jags[(LIGHTNING_PTS - 1) * 2 + 1] = 0;
+          for (let j = 1; j < LIGHTNING_PTS - 1; j++) {
+            // Jag magnitude is largest near the middle of the bolt, tapers at ends
+            const env = Math.sin((j / (LIGHTNING_PTS - 1)) * Math.PI);
+            const spread = 0.38 * burstEnv * env;
+            jags[j * 2]     = (Math.random() - 0.5) * spread * 2;
+            jags[j * 2 + 1] = (Math.random() - 0.5) * spread * 2;
+          }
+        }
+
+        // Set up the center bezier (no radial offset) for sampling
+        curveRef.current.v0.copy(_vStart);
+        curveRef.current.v1.copy(_cp1);
+        curveRef.current.v2.copy(_cp2);
+        curveRef.current.v3.copy(_vEnd);
+
+        const lPos = lightningLine.geometry.attributes.position.array;
+        const lCol = lightningLine.geometry.attributes.color.array;
+        const jags = lightningJagsRef.current;
+
+        for (let j = 0; j < LIGHTNING_PTS; j++) {
+          const u = j / (LIGHTNING_PTS - 1);
+          curveRef.current.getPoint(u, _lPt);
+          const rx = jags[j * 2];
+          const ry = jags[j * 2 + 1];
+          lPos[j * 3]     = _lPt.x + _right.x * rx + _trueUp.x * ry;
+          lPos[j * 3 + 1] = _lPt.y + _right.y * rx + _trueUp.y * ry;
+          lPos[j * 3 + 2] = _lPt.z + _right.z * rx + _trueUp.z * ry;
+
+          // Color: tile hue at the ends, hot white at the peak of burstEnv near the center
+          _cTemp.lerpColors(_c1, _c2, u);
+          const hotness = burstEnv * Math.sin(u * Math.PI) * 0.85;
+          lCol[j * 3]     = Math.min(1, _cTemp.r + (1 - _cTemp.r) * hotness);
+          lCol[j * 3 + 1] = Math.min(1, _cTemp.g + (1 - _cTemp.g) * hotness);
+          lCol[j * 3 + 2] = Math.min(1, _cTemp.b + (1 - _cTemp.b) * hotness);
+        }
+        lightningLine.geometry.attributes.position.needsUpdate = true;
+        lightningLine.geometry.attributes.color.needsUpdate = true;
+        lightningLine.material.opacity = Math.min(0.97, burstEnv * 1.4);
+        lightningLine.visible = true;
+      } else {
+        lightningLine.visible = false;
+      }
+    }
   });
 
   return (
@@ -329,6 +380,27 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
           />
         </line>
       ))}
+
+      {/* Lightning bolt — single jagged line fired along the bezier axis on flip */}
+      <line ref={lightningRef} visible={false}>
+        <bufferGeometry>
+          <bufferAttribute
+            attach="attributes-position"
+            count={LIGHTNING_PTS}
+            array={new Float32Array(LIGHTNING_PTS * 3)}
+            itemSize={3}
+            usage={THREE.DynamicDrawUsage}
+          />
+          <bufferAttribute
+            attach="attributes-color"
+            count={LIGHTNING_PTS}
+            array={new Float32Array(LIGHTNING_PTS * 3)}
+            itemSize={3}
+            usage={THREE.DynamicDrawUsage}
+          />
+        </bufferGeometry>
+        <lineBasicMaterial vertexColors transparent opacity={0} depthWrite={false} />
+      </line>
     </group>
   );
 };
