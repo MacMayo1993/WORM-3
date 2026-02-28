@@ -13,6 +13,7 @@ import CityBuildings from './CityBuildings.jsx';
 import { BiomeGLBCluster, isGLBActive, isGLBFullFace } from './BiomeGLBCluster.jsx';
 import { SeamPulseOverlay } from './SeamPulseOverlay.jsx';
 import { getTileStyleMaterial, getGlassMaterial, sharedTremorState, flipBurstMap } from './styles/TileStyleMaterials.jsx';
+import { useStickerInstances } from './StickerInstances.jsx';
 import { getManifoldGridId } from '../game/coordinates.js';
 import GrassBlades from './styles/GrassBlades.jsx';
 import WaterVolume from './styles/WaterVolume.jsx';
@@ -540,9 +541,20 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // Dead tiles (at flip cap) are inert gray — used in useFrame and rendering
   const isDead = (meta?.flips ?? 0) >= effectiveFlipCap;
   const groupRef = useRef();
+  const innerGroupRef = useRef(); // inner UV-rotation group — used for InstancedMesh world matrix
   const meshRef = useRef();
   const cityGroupRef = useRef();
   const geoRef = useRef();
+
+  // ── InstancedMesh batch integration ─────────────────────────────────────────
+  const instanceCtx = useStickerInstances();
+  // THREE.Color kept in sync with the current material colour; manager reads it
+  // each frame to upload per-instance colour without any allocation.
+  const instanceColorRef = useRef(new THREE.Color());
+  // true  → this sticker is handled by the InstancedMesh (no individual <mesh>)
+  // false → individual <mesh> renders (complex / animating sticker, or no ctx)
+  const isInstancedRef = useRef(false);
+  const instanceIdRef = useRef(-1);
   const ringRef = useRef();
   const glowRef = useRef();
   const spinT = useRef(0);
@@ -584,6 +596,22 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
   // Imperative ref to FlipParticles — avoids re-rendering StickerPlane on every flip.
   const flipParticlesRef = useRef();
+
+  // Register with the InstancedMesh batch manager.
+  // useLayoutEffect so registration completes before the first WebGL frame —
+  // the provider's useLayoutEffect (runs after children's) will have already
+  // added the InstancedMesh to the scene.
+  useLayoutEffect(() => {
+    if (!instanceCtx) return;
+    const id = instanceCtx.register(innerGroupRef, instanceColorRef, isInstancedRef);
+    instanceIdRef.current = id;
+    return () => {
+      if (instanceIdRef.current >= 0) {
+        instanceCtx.unregister(instanceIdRef.current);
+        instanceIdRef.current = -1;
+      }
+    };
+  }, [instanceCtx]);
 
   // Death detection: trigger implosion animation when tile first hits flip cap.
   // Also handles game reset: when isDead goes false (new game), clear all death state
@@ -747,6 +775,11 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
       // One-shot color swap at the sacred frame: fire exactly when xScale === 0.
       if (prevRawP.current < 0.5 && rawP >= 0.5) {
+        // InstancedMesh path: update the instance colour so the manager uploads
+        // it this frame (manager runs at priority 1, after this priority-0 useFrame).
+        if (isInstancedRef.current && flipToColor.current) {
+          instanceColorRef.current.setStyle(flipToColor.current);
+        }
         const mat = meshRef.current?.material;
         if (mat?.color) {
           const tex = flipToTexture.current;
@@ -784,6 +817,10 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         prevRawP.current = 0;
         // Force set the final color/texture correctly.
         // Use currTextureRef (includes biome ground texture) instead of faceTextures.
+        // InstancedMesh path: restore the final base colour.
+        if (isInstancedRef.current && baseColorRef.current) {
+          instanceColorRef.current.setStyle(baseColorRef.current);
+        }
         const mat = meshRef.current?.material;
         if (mat?.color) {
           const finalTex = currTextureRef.current;
@@ -990,11 +1027,31 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const uvRotation = meta?.uvRotation ?? 0;
   const uvRotationAngle = -(uvRotation * Math.PI) / 2; // Negate for correct Three.js coordinate system
 
+  // ── InstancedMesh eligibility ────────────────────────────────────────────────
+  // A sticker is "instanceable" when it renders as a plain solid-colour quad with
+  // no shader, no special geometry, and no biome overlay.  The manager handles the
+  // draw call; StickerPlane skips its own <mesh> to avoid a redundant render.
+  // All per-sticker animations (flip squish, tremor, shake) still run normally —
+  // they modify groupRef / innerGroupRef, and the manager samples matrixWorld.
+  const isInstanceable = (
+    !!instanceCtx &&
+    !hollow &&
+    !isGlass &&
+    !isSudokube &&
+    !biomeEnabled &&
+    !currTexture &&
+    tileStyle === 'solid'
+  );
+  // Update refs every render so the manager's useFrame always reads fresh values.
+  isInstancedRef.current = isInstanceable;
+  instanceColorRef.current.setStyle(materialColor);
+
   return (
     <group position={pos} rotation={rot} ref={groupRef}>
       {/* Inner group for UV rotation - rotates the sticker mesh and 3D volume overlays together around face normal (Z axis) */}
-      <group rotation={[0, 0, uvRotationAngle]}>
-        <mesh ref={meshRef} key={hollow ? 'frame' : 'plane'}>
+      <group rotation={[0, 0, uvRotationAngle]} ref={innerGroupRef}>
+        {/* Main sticker quad — omitted when the InstancedMesh handles rendering */}
+        {!isInstanceable && <mesh ref={meshRef} key={hollow ? 'frame' : 'plane'}>
           {hollow ? (
             <shapeGeometry args={[_stickerFrameShape]} />
           ) : faceRow != null ? (
@@ -1018,7 +1075,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
               envMapIntensity={0.3}
             />
           )}
-        </mesh>
+        </mesh>}
 
         {/* 3D style volumes — suppressed for full-face GLBs that cover the entire tile */}
         <group visible={!glbFullFace}>

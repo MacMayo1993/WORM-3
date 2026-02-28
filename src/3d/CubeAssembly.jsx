@@ -13,6 +13,7 @@ import ChaosWave from '../manifold/ChaosWave.jsx';
 import FlipPropagationWave from '../manifold/FlipPropagationWave.jsx';
 import { vibrate } from '../utils/audio.js';
 import { updateSharedTime, updateSharedTremor, warmUpDefaultStyles } from './styles/TileStyleMaterials.jsx';
+import { StickerInstanceProvider } from './StickerInstances.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { resolveColors } from '../utils/colorSchemes.js';
 
@@ -641,6 +642,7 @@ const CubeAssembly = React.memo(({
   }, [animState, items, explosionFactor]);
 
   return (
+    <StickerInstanceProvider>
     <group ref={cubeGroupRef}>
       <WormholeNetwork
         manifoldMap={manifoldMap}
@@ -701,6 +703,7 @@ const CubeAssembly = React.memo(({
         rotateSpeed={isTouchDevice ? 0.8 : 1.2}
       />
     </group>
+    </StickerInstanceProvider>
   );
 });
 
