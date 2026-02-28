@@ -102,6 +102,10 @@ export function StickerInstanceProvider({ children }) {
   const freeSlotsRef = useRef(
     Array.from({ length: MAX_INSTANCES }, (_, i) => MAX_INSTANCES - 1 - i)
   );
+  // Set of slot indices that have already had _zeroMatrix written this render
+  // cycle.  Prevents re-uploading an already-blank matrix every frame for slots
+  // that are registered but currently non-instanced (biome, shader, glass, etc.).
+  const zeroedSlotsRef = useRef(new Set());
 
   // ── Public API ──────────────────────────────────────────────────────────────
 
@@ -140,6 +144,7 @@ export function StickerInstanceProvider({ children }) {
     if (!entry) return;
     instanceMesh.setMatrixAt(entry.slot, _zeroMatrix);
     instanceMesh.instanceMatrix.needsUpdate = true;
+    zeroedSlotsRef.current.delete(entry.slot);
     registryRef.current.delete(id);
     freeSlotsRef.current.push(entry.slot);
   }, [instanceMesh]);
@@ -169,11 +174,20 @@ export function StickerInstanceProvider({ children }) {
 
     for (const [, { groupRef, colorRef, isInstancedRef, slot }] of registryRef.current) {
       if (!isInstancedRef.current || !groupRef.current) {
-        // Sticker switched to individual mesh — blank the slot.
-        instanceMesh.setMatrixAt(slot, _zeroMatrix);
-        matDirty = true;
+        // Sticker is handled by its own mesh — blank the slot once so no
+        // ghost instance lingers.  Skip if already zeroed to avoid uploading
+        // an unchanged buffer every frame (common in biome/shader/glass modes).
+        if (!zeroedSlotsRef.current.has(slot)) {
+          instanceMesh.setMatrixAt(slot, _zeroMatrix);
+          matDirty = true;
+          zeroedSlotsRef.current.add(slot);
+        }
         continue;
       }
+
+      // Slot is active — clear any previous "already zeroed" mark so a future
+      // non-instanced transition will write _zeroMatrix exactly once again.
+      zeroedSlotsRef.current.delete(slot);
 
       // updateWorldMatrix(updateParents=true) walks up the scene graph to
       // incorporate GSAP-driven cubie rotations and TrackballControls camera
