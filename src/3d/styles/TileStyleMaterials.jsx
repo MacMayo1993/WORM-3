@@ -912,15 +912,47 @@ const fragmentShaders = {
   `,
 };
 
-// Cache for created materials (key: style_colorHex)
+// ─── LRU material cache ───────────────────────────────────────────────────────
+// Key: "${style}_${colorHex}".  200 slots covers 20 styles × 6 face colors ×
+// several active color schemes with room to spare.  On eviction the GPU program
+// is disposed immediately so memory doesn't accumulate over long sessions.
+//
+// NOTE: clearMaterialCache() disposes everything at once and should be called
+// before a color-scheme change re-renders (e.g. at the top of the Zustand
+// setSettings action that mutates face hex values).  Calling it after the new
+// materials have already been created would dispose them out from under active
+// meshes.  The LRU cap handles slow drift (custom colour pickers, many style
+// previews) without needing precise timing.
+const MAX_MAT_CACHE = 200;
 const materialCache = new Map();
+
+function _matCacheGet(key) {
+  if (!materialCache.has(key)) return undefined;
+  // LRU promotion: move to tail (most-recently-used end)
+  const mat = materialCache.get(key);
+  materialCache.delete(key);
+  materialCache.set(key, mat);
+  return mat;
+}
+
+function _matCachePut(key, mat) {
+  if (materialCache.has(key)) materialCache.delete(key);
+  materialCache.set(key, mat);
+  // Evict the least-recently-used entry when over cap
+  if (materialCache.size > MAX_MAT_CACHE) {
+    const lruKey = materialCache.keys().next().value;
+    materialCache.get(lruKey).dispose();
+    materialCache.delete(lruKey);
+  }
+}
 
 /**
  * Get or create a shader material for a tile style
  * Materials are cached and shared across tiles with the same style+color
  */
 export function getTileStyleMaterial(style, colorHex, useTexture = false, texture = null) {
-  // If using a texture, return standard material
+  // Texture path: currently unused (all callers pass useTexture=false, null).
+  // If activated, cache by texture.uuid to avoid per-call allocations and leaks.
   if (useTexture && texture) {
     return new THREE.MeshStandardMaterial({
       map: texture,
@@ -937,9 +969,8 @@ export function getTileStyleMaterial(style, colorHex, useTexture = false, textur
   // Cache by style+color: shader compilation is expensive (~200ms GPU block per
   // unique pair).  Repeated calls with the same style+color return instantly.
   const cacheKey = `${safeStyle}_${safeColorHex}`;
-  if (materialCache.has(cacheKey)) {
-    return materialCache.get(cacheKey);
-  }
+  const cached = _matCacheGet(cacheKey);
+  if (cached) return cached;
 
   const fragmentShader = fragmentShaders[safeStyle] || fragmentShaders.solid;
 
@@ -966,7 +997,7 @@ export function getTileStyleMaterial(style, colorHex, useTexture = false, textur
     blending: isGlass ? THREE.NormalBlending : THREE.NormalBlending,
   });
 
-  materialCache.set(cacheKey, material);
+  _matCachePut(cacheKey, material);
   return material;
 }
 
