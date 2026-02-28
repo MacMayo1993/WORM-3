@@ -4,9 +4,14 @@
 import React, { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import { useGameStore } from '../../hooks/useGameStore.js';
+import { useShallow } from 'zustand/react/shallow';
 
 // Individual highlight for one piece
-const PieceHighlight = ({ x, y, z, dir, solved, type, size, explosionFactor = 0 }) => {
+const PieceHighlight = ({ x, y, z, dir, solved, type }) => {
+  const { size, explosionFactor } = useGameStore(
+    useShallow(s => ({ size: s.size, explosionFactor: s.explosionT }))
+  );
   const meshRef = useRef();
   const glowRef = useRef();
   const phaseRef = useRef(Math.random() * Math.PI * 2);
@@ -133,7 +138,7 @@ const PieceHighlight = ({ x, y, z, dir, solved, type, size, explosionFactor = 0 
 };
 
 // Main component that renders all highlights
-const SolveHighlight = ({ highlights, size, explosionFactor = 0 }) => {
+const SolveHighlight = ({ highlights }) => {
   if (!highlights || highlights.length === 0) return null;
 
   return (
@@ -147,8 +152,6 @@ const SolveHighlight = ({ highlights, size, explosionFactor = 0 }) => {
           dir={h.dir}
           solved={h.solved}
           type={h.type}
-          size={size}
-          explosionFactor={explosionFactor}
         />
       ))}
     </group>
