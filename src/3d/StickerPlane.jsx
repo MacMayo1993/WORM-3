@@ -7,6 +7,7 @@ import { COLORS, FACE_COLORS, ANTIPODAL_COLOR, FLIP_CAP } from '../utils/constan
 import { play, vibrate } from '../utils/audio.js';
 import TallyMarks from '../manifold/TallyMarks.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
+import { useShallow } from 'zustand/react/shallow';
 import { FACE_CITIES, CITY_CONFIG } from '../modes/CityBiomeMode.js';
 import CityBuildings from './CityBuildings.jsx';
 import { BiomeGLBCluster, isGLBActive, isGLBFullFace } from './BiomeGLBCluster.jsx';
@@ -42,6 +43,54 @@ const _particleDummy = new THREE.Object3D();
 // Scratch vectors for biome edge-on fade — allocated once, reused every frame.
 const _normal = new THREE.Vector3();
 const _worldQuat = new THREE.Quaternion();
+
+// Shared geometries for ParityBreakthrough — one set allocated at module level,
+// reused across all flipped-sticker instances (avoids per-sticker GPU buffer uploads).
+const _pbBackGlowGeo = new THREE.PlaneGeometry(0.84, 0.84);
+const _pbThroughGlowGeo = new THREE.PlaneGeometry(0.82, 0.82);
+const _pbEdgeHGeo = new THREE.PlaneGeometry(0.84, 0.08); // top + bottom bars
+const _pbEdgeVGeo = new THREE.PlaneGeometry(0.08, 0.84); // left + right bars
+// Pre-allocated crack geometries (8 possible sizes, indexed in the same order as the
+// CRACK_DATA array below).
+const _pbCrackGeos = [
+  new THREE.PlaneGeometry(0.38, 0.018),
+  new THREE.PlaneGeometry(0.42, 0.016),
+  new THREE.PlaneGeometry(0.34, 0.017),
+  new THREE.PlaneGeometry(0.36, 0.015),
+  new THREE.PlaneGeometry(0.24, 0.014),
+  new THREE.PlaneGeometry(0.28, 0.013),
+  new THREE.PlaneGeometry(0.20, 0.012),
+  new THREE.PlaneGeometry(0.22, 0.012),
+];
+// Crack definitions — stable module-level constant so useMemo can reference it.
+const _PB_CRACKS_BASE = [
+  { pos: [0.12, 0.40, 0.004], rot: 0.08, geoIdx: 0 },
+  { pos: [-0.08, -0.39, 0.004], rot: -0.12, geoIdx: 1 },
+  { pos: [0.39, 0.06, 0.004], rot: 1.52, geoIdx: 2 },
+  { pos: [-0.38, -0.05, 0.004], rot: 1.62, geoIdx: 3 },
+];
+const _PB_CRACKS_L2 = [
+  { pos: [0.22, -0.18, 0.004], rot: 0.75, geoIdx: 4 },
+  { pos: [-0.18, 0.24, 0.004], rot: -0.6, geoIdx: 5 },
+];
+const _PB_CRACKS_L3 = [
+  { pos: [0.05, 0.12, 0.004], rot: 1.1, geoIdx: 6 },
+  { pos: [-0.1, -0.15, 0.004], rot: -0.9, geoIdx: 7 },
+];
+// Grid-edge glow bar positions — stable module-level constant.
+const _PB_GRID_EDGES = [
+  { pos: [0, 0.44, -0.005], horiz: true },   // top
+  { pos: [0, -0.44, -0.005], horiz: true },  // bottom
+  { pos: [0.44, 0, -0.005], horiz: false },  // right
+  { pos: [-0.44, 0, -0.005], horiz: false }, // left
+];
+
+// Shared geometries for Worm segments (scale=1, the common default).
+const _wormGeoHead = new THREE.SphereGeometry(0.022, 8, 8);
+const _wormGeoSeg1 = new THREE.SphereGeometry(0.018, 6, 6);
+const _wormGeoSeg2 = new THREE.SphereGeometry(0.017, 6, 6);
+const _wormGeoSeg3 = new THREE.SphereGeometry(0.015, 6, 6);
+const _wormGeoTail = new THREE.SphereGeometry(0.011, 6, 6);
 
 // Frame-shaped sticker Shape for hollow cube mode (square with rectangular hole).
 // Store the Shape, not the Geometry — each sticker creates its own ShapeGeometry
@@ -300,36 +349,14 @@ const ParityBreakthrough = ({ origColor, flipCount }) => {
     });
   });
 
-  // Cracks scale with flips — more damage = more fractures
+  // Cracks scale with flips — more damage = more fractures.
+  // Uses module-level _PB_CRACKS_* constants (no per-render allocation).
   const cracks = useMemo(() => {
-    const base = [
-      { pos: [0.12, 0.40, 0.004], rot: 0.08, size: [0.38, 0.018] },
-      { pos: [-0.08, -0.39, 0.004], rot: -0.12, size: [0.42, 0.016] },
-      { pos: [0.39, 0.06, 0.004], rot: 1.52, size: [0.34, 0.017] },
-      { pos: [-0.38, -0.05, 0.004], rot: 1.62, size: [0.36, 0.015] },
-    ];
-    if (flipCount >= 2) base.push(
-      { pos: [0.22, -0.18, 0.004], rot: 0.75, size: [0.24, 0.014] },
-      { pos: [-0.18, 0.24, 0.004], rot: -0.6, size: [0.28, 0.013] },
-    );
-    if (flipCount >= 3) base.push(
-      { pos: [0.05, 0.12, 0.004], rot: 1.1, size: [0.20, 0.012] },
-      { pos: [-0.1, -0.15, 0.004], rot: -0.9, size: [0.22, 0.012] },
-    );
+    const base = [..._PB_CRACKS_BASE];
+    if (flipCount >= 2) base.push(..._PB_CRACKS_L2);
+    if (flipCount >= 3) base.push(..._PB_CRACKS_L3);
     return base;
   }, [flipCount]);
-
-  // Grid-edge glow bars at the sticker border — visible where stickers meet
-  // Bar width trimmed from 0.98 → 0.84 so the bar ends stay within the sticker's
-  // x/y extent (sticker = 0.85). The extreme corners of a 0.98-wide bar at
-  // (±0.49, ±0.48) sit in the RoundedBox corner-curve void (no opaque geometry
-  // to occlude them), creating residual additive blobs at cube corners.
-  const gridEdges = useMemo(() => [
-    { pos: [0, 0.44, -0.005], size: [0.84, 0.08] },   // top edge
-    { pos: [0, -0.44, -0.005], size: [0.84, 0.08] },  // bottom edge
-    { pos: [0.44, 0, -0.005], size: [0.08, 0.84] },   // right edge
-    { pos: [-0.44, 0, -0.005], size: [0.08, 0.84] },  // left edge
-  ], []);
 
   return (
     <group>
@@ -338,7 +365,7 @@ const ParityBreakthrough = ({ origColor, flipCount }) => {
           poke through the RoundedBox corner curves (radius=0.08) into empty space,
           creating visible blobs at cube corners where 3 tiles converge. */}
       <mesh ref={backGlowRef} position={[0, 0, -0.018]}>
-        <planeGeometry args={[0.84, 0.84]} />
+        <primitive object={_pbBackGlowGeo} attach="geometry" />
         <meshBasicMaterial
           color={origColor}
           transparent
@@ -350,13 +377,13 @@ const ParityBreakthrough = ({ origColor, flipCount }) => {
       </mesh>
 
       {/* Grid-edge glow bars — light pouring through the black grid lines */}
-      {gridEdges.map((edge, i) => (
+      {_PB_GRID_EDGES.map((edge, i) => (
         <mesh
           key={`edge-${i}`}
           ref={el => edgesRef.current[i] = el}
           position={edge.pos}
         >
-          <planeGeometry args={edge.size} />
+          <primitive object={edge.horiz ? _pbEdgeHGeo : _pbEdgeVGeo} attach="geometry" />
           <meshBasicMaterial
             color={origColor}
             transparent
@@ -370,7 +397,7 @@ const ParityBreakthrough = ({ origColor, flipCount }) => {
 
       {/* Through-glow — original color bleeding through front during surges */}
       <mesh ref={throughGlowRef} position={[0, 0, 0.002]}>
-        <planeGeometry args={[0.82, 0.82]} />
+        <primitive object={_pbThroughGlowGeo} attach="geometry" />
         <meshBasicMaterial
           color={origColor}
           transparent
@@ -388,7 +415,7 @@ const ParityBreakthrough = ({ origColor, flipCount }) => {
           position={crack.pos}
           rotation={[0, 0, crack.rot]}
         >
-          <planeGeometry args={crack.size} />
+          <primitive object={_pbCrackGeos[crack.geoIdx]} attach="geometry" />
           <meshBasicMaterial
             color={origColor}
             transparent
@@ -431,27 +458,27 @@ const Worm = ({ position, rotation, scale = 1 }) => {
     <group position={position} rotation={[0, 0, rotation + Math.PI / 2]}>
       {/* Head — round, slightly larger and lighter */}
       <mesh ref={headRef} position={[sp * 2, 0, 0.016]}>
-        <sphereGeometry args={[0.022 * scale, 8, 8]} />
+        <primitive object={_wormGeoHead} attach="geometry" />
         <meshBasicMaterial color="#dda15e" />
       </mesh>
       {/* Body segment 1 */}
       <mesh ref={seg1Ref} position={[sp, 0, 0.015]}>
-        <sphereGeometry args={[0.018 * scale, 6, 6]} />
+        <primitive object={_wormGeoSeg1} attach="geometry" />
         <meshBasicMaterial color="#bc6c25" />
       </mesh>
       {/* Body segment 2 */}
       <mesh ref={seg2Ref} position={[0, 0, 0.015]}>
-        <sphereGeometry args={[0.017 * scale, 6, 6]} />
+        <primitive object={_wormGeoSeg2} attach="geometry" />
         <meshBasicMaterial color="#a05c20" />
       </mesh>
       {/* Body segment 3 */}
       <mesh ref={seg3Ref} position={[-sp, 0, 0.015]}>
-        <sphereGeometry args={[0.015 * scale, 6, 6]} />
+        <primitive object={_wormGeoSeg3} attach="geometry" />
         <meshBasicMaterial color="#bc6c25" />
       </mesh>
       {/* Tail — smallest segment */}
       <mesh ref={tailRef} position={[-sp * 2, 0, 0.015]}>
-        <sphereGeometry args={[0.011 * scale, 6, 6]} />
+        <primitive object={_wormGeoTail} attach="geometry" />
         <meshBasicMaterial color="#a05c20" />
       </mesh>
     </group>
@@ -492,10 +519,17 @@ const DisparityHealthBar = React.memo(function DisparityHealthBar({ flips, flipC
 
 const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay, mode, faceColors, faceTextures, faceRow, faceCol, faceSize, manifoldStyles, hollow, currentDir: _currentDir, deadRankMap }) {
   const fc = faceColors || FACE_COLORS;
-  const biomeEnabled = useGameStore((s) => s.settings?.biomeMode?.enabled ?? false);
-  const chaosLevel = useGameStore((s) => s.chaosLevel);
-  const disparityFlipCap = useGameStore((s) => s.disparityFlipCap);
-  const disparityWinner = useGameStore((s) => s.disparityWinner);
+  // Batch all store reads into a single subscription to minimize Zustand overhead.
+  // With 54 stickers on a 3×3 cube, 4 separate selectors = 216 subscriptions;
+  // one combined selector with shallow equality = 54 subscriptions.
+  const { biomeEnabled, chaosLevel, disparityFlipCap, disparityWinner } = useGameStore(
+    useShallow((s) => ({
+      biomeEnabled: s.settings?.biomeMode?.enabled ?? false,
+      chaosLevel: s.chaosLevel,
+      disparityFlipCap: s.disparityFlipCap,
+      disparityWinner: s.disparityWinner,
+    }))
+  );
   // In Disparity Mode (chaosLevel > 0), use the configurable flip cap; otherwise the global constant
   const effectiveFlipCap = chaosLevel > 0 ? disparityFlipCap : FLIP_CAP;
   // Dead tiles (at flip cap) are inert gray — used in useFrame and rendering
