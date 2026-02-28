@@ -203,12 +203,9 @@ export default function WORM3() {
   const setVisualMode = useGameStore((state) => state.setVisualMode);
   const exploded = useGameStore((state) => state.exploded);
   const setExploded = useGameStore((state) => state.setExploded);
-  const explosionT = useGameStore((state) => state.explosionT);
   const setExplosionT = useGameStore((state) => state.setExplosionT);
   const showTunnels = useGameStore((state) => state.showTunnels);
   const setShowTunnels = useGameStore((state) => state.setShowTunnels);
-  const blackHolePulse = useGameStore((state) => state.blackHolePulse);
-  const flipWaveOrigins = useGameStore((state) => state.flipWaveOrigins);
   const setFlipWaveOrigins = useGameStore((state) => state.setFlipWaveOrigins);
 
   const faceRotationTarget = useGameStore((state) => state.faceRotationTarget);
@@ -225,7 +222,6 @@ export default function WORM3() {
   const setSolveModeActive = useGameStore((state) => state.setSolveModeActive);
   const solveFocusedStep = useGameStore((state) => state.solveFocusedStep);
   const setSolveFocusedStep = useGameStore((state) => state.setSolveFocusedStep);
-  const solveHighlights = useGameStore((state) => state.solveHighlights);
   const setSolveHighlights = useGameStore((state) => state.setSolveHighlights);
 
   // ========================================================================
@@ -248,7 +244,7 @@ export default function WORM3() {
     setAutoRotateEnabled, onCascadeComplete
   } = useChaosMode();
 
-  const { cursor, showCursor, setShowCursor, cursorToCubePos, cubePosToCursor } = useCursor();
+  const { setShowCursor, cursorToCubePos, cubePosToCursor } = useCursor();
 
   const {
     currentLevel, currentLevelData, handleLevelSelect,
@@ -300,14 +296,9 @@ export default function WORM3() {
   const [disparityCountdown, setDisparityCountdown] = useState(null);
 
   // Disparity deaths map: gridId → rank (built from store, used by 3D tile labels)
-  const disparityDeaths = useGameStore((s) => s.disparityDeaths);
   const disparityWinner = useGameStore((s) => s.disparityWinner);
   const showDisparityWinner = useGameStore((s) => s.showDisparityWinner);
   const _setShowDisparityWinner = useGameStore((s) => s.setShowDisparityWinner);
-  const deadRankMap = useMemo(
-    () => new Map(disparityDeaths.map((d) => [d.gridId, d.rank])),
-    [disparityDeaths]
-  );
 
   // ========================================================================
   // INTRO TIME — drives IntroBranch 3D content + WelcomeScreen DOM overlay
@@ -753,7 +744,7 @@ export default function WORM3() {
     }
   }, [handsMode, setHandsMode, setHandsMoveHistory, setHandsMoveQueue, setHandsTps]);
 
-  const { performCursorRotation, performCursorFlip } = useKeyboardControls({
+  const { performCursorRotation } = useKeyboardControls({
     onMove,
     onFlip: onTapFlip,
     onUndo: undo,
