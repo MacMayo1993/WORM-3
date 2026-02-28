@@ -83,6 +83,7 @@ const CubeAssembly = React.memo(({
   const sizeRef = useRef(size);
   sizeRef.current = size;
   const skipNextAnimRef = useRef(false); // Skip animState animation after live drag
+  const frozenDragRef = useRef(null); // bridges the gap between GSAP complete and useLayoutEffect reset
 
   // Pre-computed set of ref indices that belong to the current animation slice.
   // Computed ONCE when animation starts from the canonical grid positions,
@@ -333,6 +334,20 @@ const CubeAssembly = React.memo(({
             onUpdate: () => setLiveDragAngle(ld.angle),
             onComplete: () => {
               gsapAnimRef.current = null;
+              // Freeze the final position BEFORE clearing liveDragRef so useFrame
+              // keeps rendering the slice at the correct final angle during the gap
+              // between this GSAP callback and the useLayoutEffect that commits
+              // new cubie positions.
+              const ld = liveDragRef.current;
+              if (ld) {
+                frozenDragRef.current = {
+                  axis: ld.axis,
+                  sliceIndices: ld.sliceIndices,
+                  basePositions: ld.basePositions,
+                  baseRotations: ld.baseRotations,
+                  angle: ld.angle,
+                };
+              }
               liveDragRef.current = null;
               sliceIndicesRef.current = null;
               setLiveDragAngle(0);
@@ -576,6 +591,22 @@ const CubeAssembly = React.memo(({
       return; // Skip animState processing during live drag
     }
 
+    // Bridge the commit gap: liveDrag cleared but new cubies not yet committed.
+    if (frozenDragRef.current) {
+      const fd = frozenDragRef.current;
+      const worldAxis = fd.axis === 'col' ? _axisCol : fd.axis === 'row' ? _axisRow : _axisDepth;
+      fd.sliceIndices.forEach(idx => {
+        const g = cubieRefs.current[idx];
+        if (g && fd.basePositions.has(idx)) {
+          g.position.copy(fd.basePositions.get(idx)).applyAxisAngle(worldAxis, fd.angle);
+          g.quaternion.copy(fd.baseRotations.get(idx));
+          _rotQuat.setFromAxisAngle(worldAxis, fd.angle);
+          g.quaternion.premultiply(_rotQuat);
+        }
+      });
+      return;
+    }
+
     // Handle GSAP snap animation (completing rotation after release)
     if (!animState) return;
 
@@ -658,6 +689,7 @@ const CubeAssembly = React.memo(({
   useLayoutEffect(() => {
     if (!animState) {
       sliceIndicesRef.current = null;
+      frozenDragRef.current = null; // new cubies have landed — stop frozen rendering
       // Reduce explosion distance by 15% for larger cubes (4x4, 5x5)
       const explosionMultiplier = size >= 4 ? 1.53 : 1.8;
       const expansionFactor = 1 + explosionFactor * explosionMultiplier;
