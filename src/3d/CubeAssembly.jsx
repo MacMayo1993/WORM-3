@@ -502,9 +502,13 @@ const CubeAssembly = React.memo(({
     // Skip animation if this came from a drag commit (visual already at target)
     if (skipNextAnimRef.current) {
       skipNextAnimRef.current = false;
-      // Immediately complete without animation
+      // Defer by one frame so the priority -2 useFrame can reset cubie positions
+      // before new cubies land and StickerPlane updates colors, preventing a flash
+      // where rotated colors briefly appear at the old grid positions.
       vibrate(14);
-      onAnimCompleteRef.current();
+      requestAnimationFrame(() => {
+        onAnimCompleteRef.current();
+      });
       return;
     }
 
