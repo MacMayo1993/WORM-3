@@ -87,7 +87,7 @@ export default function UILayer({
 }) {
   const {
     sheetOpen, setSheetOpen, sheetMode, setSheetMode,
-    showFreeplayWizard, setShowFreeplayWizard,
+    showFreeplayWizard,
     showDisparityWizard, setShowDisparityWizard,
     disparityWaitingFirstFlip, disparityCountdown,
   } = ui;
@@ -102,7 +102,7 @@ export default function UILayer({
     onMenuSettings, onMenuBiome, onMenuDisparity,
     onWizardComplete, onWizardCancel, onDisparitySetupComplete,
     onToggleHandsMode, onFaceRotate, onTileRotation, onTileFaceRotation,
-    onVictoryContinue, onVictoryNewGame, onCloseTutorial,
+    onVictoryContinue, onVictoryNewGame,
   } = handlers;
 
   // ── Zustand store reads ──────────────────────────────────────────────────
