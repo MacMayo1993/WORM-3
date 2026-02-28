@@ -56,7 +56,11 @@ export function useAnimation() {
     if (pm) {
       const { axis, dir, sliceIndex, isEcho } = pm;
 
-      // Batch all store updates into a single atomic setState (1 re-render instead of 3-4)
+      // Batch all store updates into a single atomic setState (1 re-render instead of 3-4).
+      // Crucially, animState and pendingMove are cleared in the SAME setState so that the
+      // cubies update and the animation-end signal are atomic: no React render can fire
+      // between them, preventing a frame where new sticker colours appear at old (rotated)
+      // mesh positions (the "colour glitch after rotations").
       if (!isEcho) {
         play('/sounds/rotate.mp3');
         useGameStore.setState((state) => ({
@@ -64,6 +68,8 @@ export function useAnimation() {
           rotationEpoch: state.rotationEpoch + 1,
           moves: state.moves + 1,
           moveHistory: [...state.moveHistory, { type: 'rotation', axis, dir, sliceIndex, timestamp: Date.now() }].slice(-10),
+          animState: null,
+          pendingMove: null,
         }));
       } else {
         // Echo rotation - quieter sound; only bump cubies + reversalCount
@@ -72,6 +78,8 @@ export function useAnimation() {
           cubies: rotateSliceCubies(state.cubies, size, axis, sliceIndex, dir),
           rotationEpoch: state.rotationEpoch + 1,
           reversalCount: state.reversalCount + 1,
+          animState: null,
+          pendingMove: null,
         }));
       }
 
@@ -123,8 +131,10 @@ export function useAnimation() {
           removePendingEchoRotation(nextEcho.echoId);
         }, 50);
       }
+    } else {
+      // No pending move — clear animation state as a safety net.
+      clearAnimation();
     }
-    clearAnimation();
     pendingMoveRef.current = null;
   }, [
     size,
@@ -134,7 +144,6 @@ export function useAnimation() {
     addPendingEchoRotation,
     removePendingEchoRotation,
     startAnimation,
-    animState,
   ]);
 
   // Handle move initiation (from UI interactions).

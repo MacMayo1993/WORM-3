@@ -175,4 +175,161 @@ describe('rotateSliceCubies', () => {
 
     expect(JSON.stringify(cubies)).toBe(originalStr);
   });
+
+  it('should return to original state after 4 rotations (face slice)', () => {
+    let cubies = makeCubies(3);
+    const original = JSON.stringify(cubies);
+
+    for (let i = 0; i < 4; i++) {
+      cubies = rotateSliceCubies(cubies, 3, 'col', 2, 1);
+    }
+
+    expect(JSON.stringify(cubies)).toBe(original);
+  });
+
+  describe('exact sticker positions after depth rotation', () => {
+    // depth=2, dir=1 rotates the front face (z=2 slice).
+    // The mapping is: PX→PY, PY→NX, NX→NY, NY→PX (right→top, top→left, left→bottom, bottom→right)
+    // Adjacent-face stickers at z=2 shift accordingly.
+    let rotated;
+    beforeEach(() => {
+      rotated = rotateSliceCubies(makeCubies(3), 3, 'depth', 2, 1);
+    });
+
+    it('should keep PZ stickers on the front face unchanged', () => {
+      for (let x = 0; x < 3; x++) {
+        for (let y = 0; y < 3; y++) {
+          expect(rotated[x][y][2].stickers.PZ?.curr).toBe(1); // red
+        }
+      }
+    });
+
+    it('should move the bottom-middle PZ edge: NY→PX at (2,1,2)', () => {
+      // old (1,0,2).NY=yellow(6) → PX at (2,1,2)
+      expect(rotated[2][1][2].stickers.PX?.curr).toBe(6);
+    });
+
+    it('should move the right-middle PZ edge: PX→PY at (1,2,2)', () => {
+      // old (2,1,2).PX=blue(5) → PY at (1,2,2)
+      expect(rotated[1][2][2].stickers.PY?.curr).toBe(5);
+    });
+
+    it('should move the top-middle PZ edge: PY→NX at (0,1,2)', () => {
+      // old (1,2,2).PY=white(3) → NX at (0,1,2)
+      expect(rotated[0][1][2].stickers.NX?.curr).toBe(3);
+    });
+
+    it('should move the left-middle PZ edge: NX→NY at (1,0,2)', () => {
+      // old (0,1,2).NX=green(2) → NY at (1,0,2)
+      expect(rotated[1][0][2].stickers.NY?.curr).toBe(2);
+    });
+  });
+
+  describe('exact sticker positions after col rotation', () => {
+    // col=2, dir=1 rotates the right face (x=2 slice).
+    // Mapping: PY→PZ, PZ→NY, NY→NZ, NZ→PY (top→front, front→bottom, bottom→back, back→top)
+    let rotated;
+    beforeEach(() => {
+      rotated = rotateSliceCubies(makeCubies(3), 3, 'col', 2, 1);
+    });
+
+    it('should keep PX stickers on the right face with incremented uvRotation', () => {
+      for (let y = 0; y < 3; y++) {
+        for (let z = 0; z < 3; z++) {
+          expect(rotated[2][y][z].stickers.PX?.curr).toBe(5); // blue
+        }
+      }
+    });
+
+    it('should move the front-middle edge: PZ→NY at (2,0,1)', () => {
+      // old (2,1,2).PZ=red(1) → NY at (2,0,1)
+      expect(rotated[2][0][1].stickers.NY?.curr).toBe(1);
+    });
+
+    it('should move the top-middle edge: PY→PZ at (2,1,2)', () => {
+      // old (2,2,1).PY=white(3) → PZ at (2,1,2)
+      expect(rotated[2][1][2].stickers.PZ?.curr).toBe(3);
+    });
+
+    it('should move the back-middle edge: NZ→PY at (2,2,1)', () => {
+      // old (2,1,0).NZ=orange(4) → PY at (2,2,1)
+      expect(rotated[2][2][1].stickers.PY?.curr).toBe(4);
+    });
+
+    it('should move the bottom-middle edge: NY→NZ at (2,1,0)', () => {
+      // old (2,0,1).NY=yellow(6) → NZ at (2,1,0)
+      expect(rotated[2][1][0].stickers.NZ?.curr).toBe(6);
+    });
+  });
+
+  describe('exact sticker positions after row rotation', () => {
+    // row=2, dir=1 rotates the top face (y=2 slice).
+    // Mapping: PZ→PX, PX→NZ, NZ→NX, NX→PZ (front→right, right→back, back→left, left→front)
+    let rotated;
+    beforeEach(() => {
+      rotated = rotateSliceCubies(makeCubies(3), 3, 'row', 2, 1);
+    });
+
+    it('should keep PY stickers on the top face with incremented uvRotation', () => {
+      for (let x = 0; x < 3; x++) {
+        for (let z = 0; z < 3; z++) {
+          expect(rotated[x][2][z].stickers.PY?.curr).toBe(3); // white
+        }
+      }
+    });
+
+    it('should move the front-middle edge: PZ→PX at (2,2,1)', () => {
+      // old (1,2,2).PZ=red(1) → PX at (2,2,1)
+      expect(rotated[2][2][1].stickers.PX?.curr).toBe(1);
+    });
+
+    it('should move the right-middle edge: PX→NZ at (1,2,0)', () => {
+      // old (2,2,1).PX=blue(5) → NZ at (1,2,0)
+      expect(rotated[1][2][0].stickers.NZ?.curr).toBe(5);
+    });
+
+    it('should move the back-middle edge: NZ→NX at (0,2,1)', () => {
+      // old (1,2,0).NZ=orange(4) → NX at (0,2,1)
+      expect(rotated[0][2][1].stickers.NX?.curr).toBe(4);
+    });
+
+    it('should move the left-middle edge: NX→PZ at (1,2,2)', () => {
+      // old (0,2,1).NX=green(2) → PZ at (1,2,2)
+      expect(rotated[1][2][2].stickers.PZ?.curr).toBe(2);
+    });
+  });
+
+  describe('uvRotation handling', () => {
+    it('should increment uvRotation for face-center sticker on depth rotation', () => {
+      const cubies = makeCubies(3);
+      const rotated = rotateSliceCubies(cubies, 3, 'depth', 2, 1);
+      expect(rotated[1][1][2].stickers.PZ.uvRotation).toBe(1);
+    });
+
+    it('should increment uvRotation for face-center sticker on col rotation', () => {
+      const cubies = makeCubies(3);
+      const rotated = rotateSliceCubies(cubies, 3, 'col', 2, 1);
+      expect(rotated[2][1][1].stickers.PX.uvRotation).toBe(1);
+    });
+
+    it('should increment uvRotation for face-center sticker on row rotation', () => {
+      const cubies = makeCubies(3);
+      const rotated = rotateSliceCubies(cubies, 3, 'row', 2, 1);
+      expect(rotated[1][2][1].stickers.PY.uvRotation).toBe(1);
+    });
+
+    it('should return uvRotation to 0 after 4 face rotations', () => {
+      let cubies = makeCubies(3);
+      for (let i = 0; i < 4; i++) {
+        cubies = rotateSliceCubies(cubies, 3, 'col', 2, 1);
+      }
+      expect(cubies[2][1][1].stickers.PX.uvRotation).toBe(0);
+    });
+
+    it('should decrement uvRotation for dir=-1 rotation', () => {
+      const cubies = makeCubies(3);
+      const rotated = rotateSliceCubies(cubies, 3, 'depth', 2, -1);
+      expect(rotated[1][1][2].stickers.PZ.uvRotation).toBe(3); // (0 + -1 + 4) % 4
+    });
+  });
 });
