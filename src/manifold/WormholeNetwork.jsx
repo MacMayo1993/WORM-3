@@ -3,6 +3,9 @@ import WormholeTunnel from './WormholeTunnel.jsx';
 import { FACE_COLORS, FLIP_CAP } from '../utils/constants.js';
 import { getManifoldGridId } from '../game/coordinates.js';
 import { findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
+import { useGameStore } from '../hooks/useGameStore.js';
+import { useShallow } from 'zustand/react/shallow';
+import { resolveColors } from '../utils/colorSchemes.js';
 
 // B2: Cap the number of rendered tunnels.
 // At peak 5×5 chaos there can be ~75 active antipodal pairs; each renders
@@ -11,8 +14,17 @@ import { findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
 // fixed budget and keeps the visually interesting pairs on screen.
 const MAX_TUNNELS = 24;
 
-const WormholeNetwork = ({ cubies, size, showTunnels, manifoldMap, cubieRefs, faceColors, explosionFactor = 0 }) => {
-  const fc = faceColors || FACE_COLORS;
+const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
+  const { cubies, size, showTunnels, settings, explosionFactor } = useGameStore(
+    useShallow(s => ({
+      cubies: s.cubies,
+      size: s.size,
+      showTunnels: s.showTunnels,
+      settings: s.settings,
+      explosionFactor: s.explosionT,
+    }))
+  );
+  const fc = resolveColors(settings, settings?.biomeMode?.faceAssignment) || FACE_COLORS;
 
   // B4: debounce cubies so tunnel geometry only rebuilds at most every 150ms
   // instead of on every sticker flip (~12×/s at L4 chaos).
