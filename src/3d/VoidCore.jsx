@@ -50,9 +50,7 @@ const _mats = Array.from({ length: RING_COUNT }, () =>
   })
 );
 
-// Scratch colors for color interpolation (avoids GC)
-const _cA = new THREE.Color();
-const _cB = new THREE.Color();
+// Scratch color for ring vertex interpolation (avoids GC)
 const _cMix = new THREE.Color();
 
 function VoidCore() {
@@ -61,7 +59,6 @@ function VoidCore() {
   const size = useGameStore(s => s.size);
 
   const ringsRef = useRef([]);
-  const lightRef = useRef();
   const tRef = useRef(0);
   // Accumulated spin angle for each ring (separate from wobble, never reset)
   const spinRef = useRef([0, 0, 0]);
@@ -148,21 +145,6 @@ function VoidCore() {
       colorAttr.needsUpdate = true;
     }
 
-    // Central point light — slowly cycles through palette to tint nearby cubies
-    if (lightRef.current) {
-      if (!active) {
-        lightRef.current.intensity = 0;
-      } else {
-        const n = palette.length;
-        const lraw = (t * 0.25) * n;
-        const la = ((Math.floor(lraw) % n) + n) % n;
-        const lb = (la + 1) % n;
-        _cA.copy(palette[la]);
-        _cB.copy(palette[lb]);
-        lightRef.current.color.lerpColors(_cA, _cB, lraw - Math.floor(lraw));
-        lightRef.current.intensity = 1.2 + Math.sin(t * 1.8) * 0.35;
-      }
-    }
   });
 
   // No center on even cubes (2×2, 4×4)
@@ -178,8 +160,6 @@ function VoidCore() {
           material={_mats[i]}
         />
       ))}
-      {/* Color-cycling light to tint nearby cubies */}
-      <pointLight ref={lightRef} intensity={0} distance={3} decay={2} color="#ffffff" />
     </group>
   );
 }
