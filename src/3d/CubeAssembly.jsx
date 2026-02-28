@@ -140,6 +140,7 @@ const CubeAssembly = React.memo(({
   // which would defeat React.memo on all Cubie children.
   const animStateRef = useRef(animState);
   animStateRef.current = animState;
+  const prevAnimStateRef = useRef(null); // tracks last frame's animState for transition detection
   const flipModeRef = useRef(flipMode);
   flipModeRef.current = flipMode;
   const onMoveRef = useRef(onMove);
@@ -512,6 +513,36 @@ const CubeAssembly = React.memo(({
       }
     };
   }, [animState]);
+
+  // Priority -2: earliest possible hook — detects the animState → null transition
+  // and snaps all cubies to their grid positions before any other useFrame runs.
+  //
+  // Why this is necessary: StickerPlane writes instanceColorRef.current in the
+  // React render body (not a useLayoutEffect), so in React 18 concurrent mode the
+  // colour ref can be updated by a speculative render before the commit that
+  // carries CubeAssembly's position-reset useLayoutEffect. Without this guard
+  // StickerInstances (priority 0) would sample the new colour with the still-rotated
+  // matrixWorld, producing a one-frame flash of new colours at wrong positions.
+  useFrame(() => {
+    const wasAnimating = prevAnimStateRef.current !== null;
+    const nowAnimating = animStateRef.current !== null;
+    prevAnimStateRef.current = animStateRef.current;
+
+    if (wasAnimating && !nowAnimating) {
+      const explosionMultiplier = size >= 4 ? 1.53 : 1.8;
+      const expansionFactor = 1 + explosionFactorRef.current * explosionMultiplier;
+      for (let idx = 0; idx < positionCache.length; idx++) {
+        const g = cubieRefs.current[idx];
+        if (!g) continue;
+        g.position.set(
+          positionCache[idx][0] * expansionFactor,
+          positionCache[idx][1] * expansionFactor,
+          positionCache[idx][2] * expansionFactor
+        );
+        g.rotation.set(0, 0, 0);
+      }
+    }
+  }, -2);
 
   // useFrame applies live drag rotation and GSAP-driven animations.
   // Priority -1: runs before all priority-0 subscribers (StickerPlane animations
