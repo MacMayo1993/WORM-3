@@ -23,6 +23,7 @@ import NeuralVolume from './styles/NeuralVolume.jsx';
 import CircuitVolume from './styles/CircuitVolume.jsx';
 import WoodVolume from './styles/WoodVolume.jsx';
 import { BIOME_GROUND_TEXTURES } from './BiomeGroundTextures.js';
+import { resolveColors } from '../utils/colorSchemes.js';
 
 // Shared geometries for all particle/glow systems (created once, reused globally)
 const sharedParticleGeometry = new THREE.PlaneGeometry(1, 1);
@@ -517,19 +518,23 @@ const DisparityHealthBar = React.memo(function DisparityHealthBar({ flips, flipC
   );
 });
 
-const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay, mode, faceColors, faceTextures, faceRow, faceCol, faceSize, manifoldStyles, hollow, currentDir: _currentDir, deadRankMap }) {
-  const fc = faceColors || FACE_COLORS;
+const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay, mode, faceRow, faceCol, faceSize, hollow, currentDir: _currentDir }) {
   // Batch all store reads into a single subscription to minimize Zustand overhead.
-  // With 54 stickers on a 3×3 cube, 4 separate selectors = 216 subscriptions;
-  // one combined selector with shallow equality = 54 subscriptions.
-  const { biomeEnabled, chaosLevel, disparityFlipCap, disparityWinner } = useGameStore(
+  // With 54 stickers on a 3×3 cube, separate selectors = many subscriptions;
+  // one combined selector with shallow equality keeps it to 54 subscriptions.
+  const { biomeEnabled, chaosLevel, disparityFlipCap, disparityWinner, settings, faceTextures, disparityDeaths } = useGameStore(
     useShallow((s) => ({
       biomeEnabled: s.settings?.biomeMode?.enabled ?? false,
       chaosLevel: s.chaosLevel,
       disparityFlipCap: s.disparityFlipCap,
       disparityWinner: s.disparityWinner,
+      settings: s.settings,
+      faceTextures: s.faceTextures,
+      disparityDeaths: s.disparityDeaths,
     }))
   );
+  const fc = resolveColors(settings, settings?.biomeMode?.faceAssignment) || FACE_COLORS;
+  const manifoldStyles = settings?.manifoldStyles;
   // In Disparity Mode (chaosLevel > 0), use the configurable flip cap; otherwise the global constant
   const effectiveFlipCap = chaosLevel > 0 ? disparityFlipCap : FLIP_CAP;
   // Dead tiles (at flip cap) are inert gray — used in useFrame and rendering
@@ -573,7 +578,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const currTextureRef = useRef(null);
 
   // Death rank from Disparity Mode — null if not in disparity game or tile not yet dead
-  const deadRank = isDead ? (deadRankMap?.get(stickerGridIdRef.current) ?? null) : null;
+  const deadRank = isDead ? (disparityDeaths?.find(d => d.gridId === stickerGridIdRef.current)?.rank ?? null) : null;
   // Winner tile — glows gold after the last pair is found
   const isWinnerTile = chaosLevel > 0 && !!(disparityWinner?.pair?.includes(stickerGridIdRef.current));
 
