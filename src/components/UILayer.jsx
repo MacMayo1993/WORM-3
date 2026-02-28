@@ -1,0 +1,536 @@
+// src/components/UILayer.jsx
+/**
+ * UILayer — all DOM overlays rendered after the welcome screen dismisses.
+ *
+ * Reads Zustand store state directly for store-backed fields.
+ * Receives hook-derived data and callbacks as props from App.jsx.
+ *
+ * Props shape:
+ *   - Individual data props (metrics, resolvedColors, etc.)
+ *   - `ui`       — local useState values from App.jsx
+ *   - `handlers` — all callbacks / action functions
+ */
+
+import React, { Suspense } from 'react';
+import { useGameStore } from '../hooks/useGameStore.js';
+
+// Always-loaded UI components
+import TopMenuBar from './menus/TopMenuBar.jsx';
+import BottomNavBar from './menus/BottomNavBar.jsx';
+import SecondaryModesSheet from './menus/SecondaryModesSheet.jsx';
+import FloatingHUD from './menus/FloatingHUD.jsx';
+import TileLeaderboard from './menus/TileLeaderboard.jsx';
+import MainMenu from './menus/MainMenu.jsx';
+import SettingsMenu from './menus/SettingsMenu.jsx';
+import HelpMenu from './menus/HelpMenu.jsx';
+import MobileControls from './menus/MobileControls.jsx';
+import FirstFlipTutorial from './screens/FirstFlipTutorial.jsx';
+import RotationPreview from './overlays/RotationPreview.jsx';
+import FaceRotationButtons from './overlays/FaceRotationButtons.jsx';
+import TileRotationSelector from './overlays/TileRotationSelector.jsx';
+import HandsOverlay from './overlays/HandsOverlay.jsx';
+import AntipodalHUD from './overlays/AntipodalHUD.jsx';
+import AntipodalModeHUD from './overlays/AntipodalModeHUD.jsx';
+import EchoRotationIndicator from './overlays/EchoRotationIndicator.jsx';
+import DisparityHUD from './overlays/DisparityHUD.jsx';
+
+// Lazy-loaded — deferred to reduce initial parse time
+const VictoryScreen = React.lazy(() => import('./screens/VictoryScreen.jsx'));
+const LevelSelectScreen = React.lazy(() => import('./screens/LevelSelectScreen.jsx'));
+const Level10Cutscene = React.lazy(() => import('./screens/Level10Cutscene.jsx'));
+const LevelTutorial = React.lazy(() => import('./screens/LevelTutorial.jsx'));
+const FreeplaySetupWizard = React.lazy(() => import('./screens/FreeplaySetupWizard.jsx'));
+const DisparitySetupWizard = React.lazy(() => import('./screens/DisparitySetupWizard.jsx'));
+const DisparityWinnerScreen = React.lazy(() => import('./screens/DisparityWinnerScreen.jsx'));
+const CubeNet = React.lazy(() => import('./CubeNet.jsx'));
+const SolveMode = React.lazy(() => import('./SolveMode.jsx'));
+const DevConsole = React.lazy(() => import('./menus/DevConsole.jsx'));
+const TeachMode = React.lazy(() => import('../teach/TeachMode.jsx'));
+
+const isMobile = typeof window !== 'undefined' && (
+  window.innerWidth <= 768 ||
+  'ontouchstart' in window ||
+  navigator.maxTouchPoints > 0
+);
+
+export default function UILayer({
+  // Hook-derived data (not raw store state)
+  metrics,
+  resolvedColors,
+  faceTextures,
+  faceImages,
+  settings,
+  chaosMode,
+  chaosLevel,
+  cascades,
+  autoRotateEnabled,
+  upcomingRotation,
+  rotationCountdown,
+  moveHistory,
+  undo,
+  canUndo,
+  handsMode,
+  handsMoveHistory,
+  handsTps,
+  victory,
+  moves,
+  gameTime,
+  currentLevel,
+  currentLevelData,
+  antipodalData,
+  teachMode,
+  performCursorRotation,
+  // Local UI state (App.jsx useState values)
+  ui,
+  // All action callbacks
+  handlers,
+}) {
+  const {
+    sheetOpen, setSheetOpen, sheetMode, setSheetMode,
+    showFreeplayWizard, setShowFreeplayWizard,
+    showDisparityWizard, setShowDisparityWizard,
+    disparityWaitingFirstFlip, disparityCountdown,
+  } = ui;
+
+  const {
+    onReset, onShuffle, onShuffleForLevel, onChangeSize,
+    onSetChaosLevel, onSetAutoRotate, onSetSettings, onFaceImage, onSetVictory,
+    onTapFlip, onBackToMainMenu, onLevelSelect, onCutsceneComplete,
+    onTutorialClose, onLevelTutorialClose, onNextLevel,
+    onPreset, onInstantChaos, onSaveState, onLoadState,
+    onMenuPlay, onMenuLevels, onMenuFreeplay, onMenuCoop, onMenuTeach,
+    onMenuSettings, onMenuBiome, onMenuDisparity,
+    onWizardComplete, onWizardCancel, onDisparitySetupComplete,
+    onToggleHandsMode, onFaceRotate, onTileRotation, onTileFaceRotation,
+    onVictoryContinue, onVictoryNewGame, onCloseTutorial,
+  } = handlers;
+
+  // ── Zustand store reads ──────────────────────────────────────────────────
+  const size = useGameStore(s => s.size);
+  const cubies = useGameStore(s => s.cubies);
+  const showMainMenu = useGameStore(s => s.showMainMenu);
+  const showTutorial = useGameStore(s => s.showTutorial);
+  const showLevelSelect = useGameStore(s => s.showLevelSelect);
+  const setShowLevelSelect = useGameStore(s => s.setShowLevelSelect);
+  const showSettings = useGameStore(s => s.showSettings);
+  const setShowSettings = useGameStore(s => s.setShowSettings);
+  const showHelp = useGameStore(s => s.showHelp);
+  const setShowHelp = useGameStore(s => s.setShowHelp);
+  const showFirstFlipTutorial = useGameStore(s => s.showFirstFlipTutorial);
+  const setShowFirstFlipTutorial = useGameStore(s => s.setShowFirstFlipTutorial);
+  const showCutscene = useGameStore(s => s.showCutscene);
+  const showLevelTutorial = useGameStore(s => s.showLevelTutorial);
+  const showNetPanel = useGameStore(s => s.showNetPanel);
+  const setShowNetPanel = useGameStore(s => s.setShowNetPanel);
+  const showLeaderboard = useGameStore(s => s.showLeaderboard);
+  const toggleLeaderboard = useGameStore(s => s.toggleLeaderboard);
+  const showMobileTouchHint = useGameStore(s => s.showMobileTouchHint);
+  const flipMode = useGameStore(s => s.flipMode);
+  const setFlipMode = useGameStore(s => s.setFlipMode);
+  const visualMode = useGameStore(s => s.visualMode);
+  const setVisualMode = useGameStore(s => s.setVisualMode);
+  const exploded = useGameStore(s => s.exploded);
+  const setExploded = useGameStore(s => s.setExploded);
+  const showTunnels = useGameStore(s => s.showTunnels);
+  const setShowTunnels = useGameStore(s => s.setShowTunnels);
+  const faceRotationTarget = useGameStore(s => s.faceRotationTarget);
+  const setFaceRotationTarget = useGameStore(s => s.setFaceRotationTarget);
+  const selectedTileForRotation = useGameStore(s => s.selectedTileForRotation);
+  const setSelectedTileForRotation = useGameStore(s => s.setSelectedTileForRotation);
+  const showDevConsole = useGameStore(s => s.showDevConsole);
+  const setShowDevConsole = useGameStore(s => s.setShowDevConsole);
+  const savedCubeState = useGameStore(s => s.savedCubeState);
+  const solveModeActive = useGameStore(s => s.solveModeActive);
+  const setSolveModeActive = useGameStore(s => s.setSolveModeActive);
+  const solveFocusedStep = useGameStore(s => s.solveFocusedStep);
+  const setSolveFocusedStep = useGameStore(s => s.setSolveFocusedStep);
+  const setSolveHighlights = useGameStore(s => s.setSolveHighlights);
+  const antipodalIntegrityMode = useGameStore(s => s.antipodalIntegrityMode);
+  const setAntipodalIntegrityMode = useGameStore(s => s.setAntipodalIntegrityMode);
+  const hollowMode = useGameStore(s => s.hollowMode);
+  const toggleHollowMode = useGameStore(s => s.toggleHollowMode);
+  const disparityWinner = useGameStore(s => s.disparityWinner);
+  const showDisparityWinner = useGameStore(s => s.showDisparityWinner);
+
+  return (
+    <>
+      <div className="ui-layer">
+        <TopMenuBar
+          metrics={metrics}
+          size={size}
+          visualMode={visualMode}
+          flipMode={flipMode}
+          chaosMode={chaosMode}
+          chaosLevel={chaosLevel}
+          cubies={cubies}
+          faceColors={resolvedColors}
+          cascadeCount={cascades.length}
+          onShowSettings={() => setShowSettings(true)}
+          onHome={onBackToMainMenu}
+          currentLevelData={currentLevelData}
+        />
+
+        {/* Undo Indicator — desktop only (mobile uses MobileControls) */}
+        {moveHistory.length > 0 && !isMobile && (
+          <div
+            style={{
+              position: 'fixed', bottom: '20px', left: '20px',
+              background: 'rgba(0, 217, 255, 0.15)', border: '2px solid rgba(0, 217, 255, 0.4)',
+              borderRadius: '8px', padding: '8px 16px', color: '#00d9ff',
+              fontFamily: "'Courier New', monospace", fontSize: '14px', fontWeight: 'bold',
+              zIndex: 100, backdropFilter: 'blur(10px)', cursor: 'pointer',
+            }}
+            onClick={undo}
+            title="Click or press Z to undo"
+          >
+            Z: Undo ({moveHistory.length})
+          </div>
+        )}
+
+        {/* Auto-rotate Preview */}
+        {autoRotateEnabled && chaosMode && (
+          <RotationPreview upcomingRotation={upcomingRotation} countdown={rotationCountdown} maxCountdown={10000} size={size} />
+        )}
+
+        {/* Floating HUD — auto-fade parity/chaos notifications */}
+        <FloatingHUD metrics={metrics} chaosLevel={chaosLevel} chaosMode={chaosMode} />
+
+        {/* Disparity HUD — RIP death log + winner announcement */}
+        {(chaosMode || disparityWinner) && <DisparityHUD />}
+
+        {/* Disparity countdown — 3-2-1-GO overlay before chaos starts */}
+        {disparityCountdown !== null && (
+          <div style={{
+            position: 'fixed', inset: 0, zIndex: 8000,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            pointerEvents: 'none',
+          }}>
+            <div key={disparityCountdown} style={{
+              fontSize: disparityCountdown === 'GO!' ? '6rem' : '9rem',
+              fontWeight: 900, fontFamily: 'monospace',
+              color: disparityCountdown === 'GO!' ? '#22c55e' : '#ef4444',
+              textShadow: `0 0 40px ${disparityCountdown === 'GO!' ? '#22c55e' : '#ef4444'}`,
+              animation: 'disparity-cd-pop 0.3s cubic-bezier(0.22,1,0.36,1) forwards',
+              letterSpacing: '0.02em',
+            }}>
+              {disparityCountdown}
+            </div>
+            <style>{`
+              @keyframes disparity-cd-pop {
+                0%   { transform: scale(1.6); opacity: 0; }
+                40%  { transform: scale(0.95); opacity: 1; }
+                100% { transform: scale(1); opacity: 0.9; }
+              }
+            `}</style>
+          </div>
+        )}
+
+        {/* Disparity Winner — cinematic celebration screen */}
+        {showDisparityWinner && (
+          <Suspense fallback={null}>
+            <DisparityWinnerScreen
+              onDismiss={() => {
+                useGameStore.getState().clearDisparityGame();
+                useGameStore.getState().setChaosLevel(0);
+                setShowDisparityWizard(true);
+              }}
+            />
+          </Suspense>
+        )}
+
+        {/* Tile Leaderboard — live flip stats in chaos mode, toggled via Views sheet */}
+        <TileLeaderboard cubies={cubies} size={size} chaosMode={chaosMode} visible={showLeaderboard} onClose={toggleLeaderboard} />
+
+        {/* Bottom Navigation Bar */}
+        <BottomNavBar
+          onReset={onReset}
+          onShuffle={currentLevelData ? onShuffleForLevel : onShuffle}
+          solveModeActive={solveModeActive}
+          teachModeActive={teachMode.active}
+          onToggleSolve={() => { setSolveModeActive(!solveModeActive); if (!solveModeActive) setSolveFocusedStep(null); else setSolveHighlights([]); }}
+          onToggleTeach={() => { if (teachMode.active) teachMode.exitTeachMode(); else if (size === 3) teachMode.enterTeachMode(); }}
+          hasActiveView={exploded || showTunnels || showNetPanel || hollowMode || showLeaderboard}
+          onToggleViews={() => { setSheetMode('views'); setSheetOpen(!sheetOpen || sheetMode !== 'views'); }}
+          onToggleMore={() => { setSheetMode('more'); setSheetOpen(!sheetOpen || sheetMode !== 'more'); }}
+          moreOpen={sheetOpen && sheetMode === 'more'}
+          viewsOpen={sheetOpen && sheetMode === 'views'}
+        />
+      </div>
+
+      {/* Secondary Modes Bottom Sheet */}
+      <SecondaryModesSheet
+        open={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        mode={sheetMode}
+        flipMode={flipMode}
+        onToggleFlip={() => { if (!currentLevelData || currentLevelData.features.flips) setFlipMode(!flipMode); }}
+        flipLocked={!!(currentLevelData && !currentLevelData.features.flips)}
+        chaosMode={chaosMode}
+        chaosLevel={chaosLevel}
+        onToggleChaos={() => { if (!currentLevelData || currentLevelData.features.chaos) onSetChaosLevel(l => l > 0 ? 0 : 1); }}
+        onSetChaosLevel={onSetChaosLevel}
+        chaosLocked={!!(currentLevelData && !currentLevelData.features.chaos)}
+        maxChaosLevel={currentLevelData?.chaosLevel || 5}
+        autoRotateEnabled={autoRotateEnabled}
+        onToggleAutoRotate={() => onSetAutoRotate(!autoRotateEnabled)}
+        showTunnels={showTunnels}
+        onToggleTunnels={() => { if (!currentLevelData || currentLevelData.features.tunnels) setShowTunnels(!showTunnels); }}
+        tunnelsLocked={!!(currentLevelData && !currentLevelData.features.tunnels)}
+        exploded={exploded}
+        onToggleExplode={() => { if (!currentLevelData || currentLevelData.features.explode) setExploded(!exploded); }}
+        explodeLocked={!!(currentLevelData && !currentLevelData.features.explode)}
+        showNetPanel={showNetPanel}
+        onToggleNet={() => { if (!currentLevelData || currentLevelData.features.net) setShowNetPanel(!showNetPanel); }}
+        netLocked={!!(currentLevelData && !currentLevelData.features.net)}
+        hollowMode={hollowMode}
+        onToggleHollow={toggleHollowMode}
+        visualMode={visualMode}
+        onCycleVisualMode={setVisualMode}
+        size={size}
+        onChangeSize={(n) => { if (!currentLevelData) onChangeSize(n); }}
+        sizeLocked={!!currentLevelData}
+        handsMode={handsMode}
+        onToggleHands={onToggleHandsMode}
+        antipodalIntegrityMode={antipodalIntegrityMode}
+        onToggleIntegrity={() => setAntipodalIntegrityMode(!antipodalIntegrityMode)}
+        showLeaderboard={showLeaderboard}
+        onToggleLeaderboard={toggleLeaderboard}
+        currentLevelData={currentLevelData}
+        onShowLevels={() => { setShowLevelSelect(true); setSheetOpen(false); }}
+        onFreeplay={() => { useGameStore.getState().clearLevel(); setSheetOpen(false); }}
+      />
+
+      {/* Level Badge */}
+      {currentLevelData && !showMainMenu && !showLevelSelect && !victory && (
+        <div className="level-badge">
+          <span className="level-badge-number">{currentLevel}</span>
+          <span className="level-badge-name">{currentLevelData.name}</span>
+        </div>
+      )}
+
+      {showMainMenu && (
+        <MainMenu
+          onPlay={onMenuPlay}
+          onLevels={onMenuLevels}
+          onFreeplay={onMenuFreeplay}
+          onCoop={onMenuCoop}
+          onTeach={onMenuTeach}
+          onSettings={onMenuSettings}
+          onBiome={onMenuBiome}
+          onDisparity={onMenuDisparity}
+        />
+      )}
+
+      {showLevelSelect && (
+        <Suspense fallback={null}>
+          <LevelSelectScreen onSelectLevel={onLevelSelect} onBack={onBackToMainMenu} />
+        </Suspense>
+      )}
+
+      {showSettings && (
+        <SettingsMenu
+          onClose={() => setShowSettings(false)}
+          settings={settings}
+          onSettingsChange={onSetSettings}
+          faceImages={faceImages}
+          onFaceImage={onFaceImage}
+        />
+      )}
+
+      {showFreeplayWizard && (
+        <Suspense fallback={null}>
+          <FreeplaySetupWizard onComplete={onWizardComplete} onCancel={onWizardCancel} initialSettings={settings} />
+        </Suspense>
+      )}
+
+      {showDisparityWizard && (
+        <Suspense fallback={null}>
+          <DisparitySetupWizard
+            onStart={onDisparitySetupComplete}
+            onCancel={() => { setShowDisparityWizard(false); useGameStore.getState().setShowMainMenu(true); }}
+          />
+        </Suspense>
+      )}
+
+      {/* Disparity "tap to begin" hint */}
+      {disparityWaitingFirstFlip && (
+        <div style={{
+          position: 'fixed', bottom: '110px', left: '50%', transform: 'translateX(-50%)',
+          zIndex: 500, pointerEvents: 'none',
+          fontFamily: "-apple-system, 'Helvetica Neue', Roboto, sans-serif",
+        }}>
+          <div style={{
+            background: 'rgba(0,0,0,0.78)', borderRadius: '14px', padding: '14px 22px',
+            textAlign: 'center', boxShadow: '0 4px 24px rgba(0,0,0,0.35)',
+            backdropFilter: 'blur(10px)', whiteSpace: 'nowrap',
+          }}>
+            <div style={{ fontSize: '15px', fontWeight: '600', color: '#fff', marginBottom: '3px' }}>
+              Tap any tile to begin
+            </div>
+            <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', lineHeight: 1.4 }}>
+              Your chosen tile starts the disparity cascade
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showHelp && <HelpMenu onClose={() => setShowHelp(false)} />}
+
+      {showFirstFlipTutorial && (
+        <FirstFlipTutorial
+          onClose={() => setShowFirstFlipTutorial(false)}
+          onMainMenu={() => { setShowFirstFlipTutorial(false); onBackToMainMenu(); }}
+        />
+      )}
+
+      {solveModeActive && (
+        <Suspense fallback={null}>
+          <SolveMode
+            cubies={cubies} size={size}
+            onClose={() => { setSolveModeActive(false); setSolveHighlights([]); }}
+            onHighlightChange={setSolveHighlights}
+            focusedStep={solveFocusedStep} onFocusStep={setSolveFocusedStep}
+          />
+        </Suspense>
+      )}
+
+      {teachMode.active && (
+        <Suspense fallback={null}>
+          <TeachMode
+            analysis={teachMode.analysis}
+            stages={teachMode.stages}
+            methodName={teachMode.methodName}
+            subMode={teachMode.subMode}
+            onSwitchSubMode={teachMode.switchSubMode}
+            selectedAlgo={teachMode.selectedAlgo}
+            algoMoves={teachMode.algoMoves}
+            currentStep={teachMode.currentStep}
+            isPlaying={teachMode.isPlaying}
+            canExecute={teachMode.canExecute}
+            isAlgoComplete={teachMode.isAlgoComplete}
+            whyOpen={teachMode.whyOpen}
+            onToggleWhy={() => teachMode.setWhyOpen(v => !v)}
+            quizOptions={teachMode.quizOptions}
+            quizAnswered={teachMode.quizAnswered}
+            quizHintShown={teachMode.quizHintShown}
+            onSelectAlgorithm={teachMode.selectAlgorithm}
+            onExecuteStep={teachMode.executeStep}
+            onToggleAutoPlay={teachMode.toggleAutoPlay}
+            onResetAlgorithm={teachMode.resetAlgorithm}
+            onAnswerQuiz={teachMode.answerQuiz}
+            onRetryQuiz={teachMode.retryQuiz}
+            onClose={teachMode.exitTeachMode}
+          />
+        </Suspense>
+      )}
+
+      {victory && (
+        <Suspense fallback={null}>
+          <VictoryScreen
+            winType={victory} moves={moves} time={gameTime}
+            onContinue={onVictoryContinue} onNewGame={onVictoryNewGame}
+            currentLevel={currentLevel} levelData={currentLevelData}
+            onNextLevel={onNextLevel} hasNextLevel={currentLevel && currentLevel < 10}
+            onMainMenu={() => { onSetVictory(null); onBackToMainMenu(); }}
+          />
+        </Suspense>
+      )}
+
+      {showCutscene && currentLevel === 10 && (
+        <Suspense fallback={null}>
+          <Level10Cutscene onComplete={onCutsceneComplete} onSkip={onCutsceneComplete} />
+        </Suspense>
+      )}
+
+      {showLevelTutorial && currentLevelData && (
+        <Suspense fallback={null}>
+          <LevelTutorial
+            level={currentLevelData}
+            onClose={onTutorialClose}
+            onMainMenu={() => { onLevelTutorialClose(); onBackToMainMenu(); }}
+          />
+        </Suspense>
+      )}
+
+      {showNetPanel && (
+        <Suspense fallback={null}>
+          <CubeNet
+            cubies={cubies} size={size} onTapFlip={onTapFlip} flipMode={flipMode}
+            onClose={() => setShowNetPanel(false)} faceColors={resolvedColors} faceTextures={faceTextures}
+          />
+        </Suspense>
+      )}
+
+      {isMobile && !showTutorial && (
+        <MobileControls
+          onShowSettings={() => setShowSettings(true)} onShowHelp={() => setShowHelp(true)}
+          flipMode={flipMode} onToggleFlip={() => setFlipMode(!flipMode)}
+          exploded={exploded} onToggleExplode={() => setExploded(!exploded)}
+          showTunnels={showTunnels} onToggleTunnels={() => setShowTunnels(!showTunnels)}
+          onShuffle={onShuffle} onReset={onReset}
+          showNetPanel={showNetPanel} onToggleNet={() => setShowNetPanel(!showNetPanel)}
+          onRotateCW={() => performCursorRotation('cw')} onRotateCCW={() => performCursorRotation('ccw')}
+          onUndo={undo} canUndo={canUndo} undoCount={moveHistory.length}
+          teachModeActive={teachMode.active}
+          onToggleTeachMode={() => { if (teachMode.active) teachMode.exitTeachMode(); else teachMode.enterTeachMode(); }}
+          cubeSize={size}
+        />
+      )}
+
+      {showMobileTouchHint && !showTutorial && !showMainMenu && (
+        <div className="mobile-touch-hint">Swipe to rotate • Tap tile for options</div>
+      )}
+
+      {faceRotationTarget && (
+        <FaceRotationButtons
+          onRotateCW={() => onFaceRotate('cw')}
+          onRotateCCW={() => onFaceRotate('ccw')}
+          onCancel={() => setFaceRotationTarget(null)}
+        />
+      )}
+
+      {selectedTileForRotation && !flipMode && (
+        <TileRotationSelector
+          onRotate={onTileRotation}
+          onRotateFaceCW={() => onTileFaceRotation('cw')}
+          onRotateFaceCCW={() => onTileFaceRotation('ccw')}
+          onCancel={() => setSelectedTileForRotation(null)}
+        />
+      )}
+
+      {handsMode && (
+        <HandsOverlay
+          recentMoves={handsMoveHistory}
+          lastMove={handsMoveHistory.length > 0 ? handsMoveHistory[handsMoveHistory.length - 1] : null}
+          tps={handsTps}
+        />
+      )}
+
+      {antipodalIntegrityMode && (
+        <AntipodalHUD
+          integrity={antipodalData.integrity}
+          preserved={antipodalData.preserved}
+          total={antipodalData.total}
+          regime={antipodalData.regime}
+          kStar={antipodalData.kStar}
+          onClose={() => setAntipodalIntegrityMode(false)}
+        />
+      )}
+
+      <AntipodalModeHUD />
+      <EchoRotationIndicator />
+
+      {showDevConsole && (
+        <Suspense fallback={null}>
+          <DevConsole
+            onClose={() => setShowDevConsole(false)}
+            onPreset={onPreset} onSaveState={onSaveState} onLoadState={onLoadState}
+            hasSavedState={!!savedCubeState} size={size}
+            onJumpToLevel={onLevelSelect} onInstantChaos={onInstantChaos}
+            moveHistory={moveHistory}
+          />
+        </Suspense>
+      )}
+    </>
+  );
+}
