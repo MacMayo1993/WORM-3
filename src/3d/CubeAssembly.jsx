@@ -4,6 +4,7 @@ import { TrackballControls } from '@react-three/drei';
 import * as THREE from 'three';
 import gsap from 'gsap';
 import Cubie from './Cubie.jsx';
+import VoidCore from './VoidCore.jsx';
 // DragGuide removed - real-time rotation provides visual feedback
 import CursorHighlight from '../components/overlays/CursorHighlight.jsx';
 import SolveHighlight from '../components/overlays/SolveHighlight.jsx';
@@ -12,6 +13,8 @@ import ChaosWave from '../manifold/ChaosWave.jsx';
 import FlipPropagationWave from '../manifold/FlipPropagationWave.jsx';
 import { vibrate } from '../utils/audio.js';
 import { updateSharedTime, updateSharedTremor, warmUpDefaultStyles } from './styles/TileStyleMaterials.jsx';
+import { useGameStore } from '../hooks/useGameStore.js';
+import { resolveColors } from '../utils/colorSchemes.js';
 
 // Reusable axis vectors and quaternion (allocated once, never recreated)
 const _axisCol = new THREE.Vector3(1, 0, 0);
@@ -45,15 +48,22 @@ const PIXELS_PER_90DEG = 100;
 // const LONG_PRESS_DURATION = 500;
 
 const CubeAssembly = React.memo(({
-  size, cubies, onMove, onTapFlip, visualMode, animState, onAnimComplete,
-  showTunnels, explosionFactor, cascades, onCascadeComplete, manifoldMap,
-  cursor, showCursor, flipMode, onSelectTile, onClearTileSelection, flipWaveOrigins, onFlipWaveComplete,
-  faceColors, faceTextures, manifoldStyles, solveHighlights,
+  size, cubies, onMove, onTapFlip, animState, onAnimComplete,
+  onCascadeComplete, manifoldMap,
+  onSelectTile, onClearTileSelection, onFlipWaveComplete,
+  solveHighlights,
   onFaceRotationMode,
-  handsMode,
-  isBiomeMode,
-  deadRankMap,
 }) => {
+  // ── State from store ────────────────────────────────────────────────────────
+  const explosionFactor = useGameStore(s => s.explosionT);
+  const cascades = useGameStore(s => s.cascades);
+  const cursor = useGameStore(s => s.cursor);
+  const showCursor = useGameStore(s => s.showCursor);
+  const flipMode = useGameStore(s => s.flipMode);
+  const flipWaveOrigins = useGameStore(s => s.flipWaveOrigins);
+  const handsMode = useGameStore(s => s.handsMode);
+  const isBiomeMode = useGameStore(s => s.settings?.biomeMode?.enabled);
+  const settings = useGameStore(s => s.settings); // for warmUpDefaultStyles on mount
   const cubieRefs = useRef([]);
   const controlsRef = useRef();
   const controlsEnabledRef = useRef(true); // Track controls state with ref for immediate updates
@@ -402,7 +412,8 @@ const CubeAssembly = React.memo(({
   // warmUpDefaultStyles calls renderer.compile() which triggers GLSL compilation
   // before any user interaction, eliminating the ~200 ms hitch on first style pick.
   useEffect(() => {
-    const colors = faceColors ? Object.values(faceColors) : [];
+    const fc = resolveColors(settings, settings?.biomeMode?.faceAssignment);
+    const colors = fc ? Object.values(fc) : [];
     if (colors.length === 0) return;
     warmUpDefaultStyles(gl, camera, colors);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps -- intentional one-shot on mount
@@ -632,13 +643,8 @@ const CubeAssembly = React.memo(({
   return (
     <group ref={cubeGroupRef}>
       <WormholeNetwork
-        cubies={cubies}
-        size={size}
-        showTunnels={showTunnels}
         manifoldMap={manifoldMap}
         cubieRefs={cubieRefs.current}
-        faceColors={faceColors}
-        explosionFactor={explosionFactor}
       />
       {!isBiomeMode && cascades.map(c => (
         <ChaosWave
@@ -655,34 +661,30 @@ const CubeAssembly = React.memo(({
           onComplete={onFlipWaveComplete}
         />
       )}
-      {items.map((it, idx) => (
-        <Cubie
-          key={it.key}
-          ref={cubieRefCallbacks[idx]}
-          position={it.pos}
-          cubie={it.cubie}
-          size={size}
-          visualMode={visualMode}
-          onPointerDown={onPointerDown}
-          explosionFactor={explosionFactor}
-          faceColors={faceColors}
-          faceTextures={faceTextures}
-          manifoldStyles={manifoldStyles}
-          deadRankMap={deadRankMap}
-        />
-      ))}
+      {/* VoidCore: swirling wormhole-color rings at the cube's hollow center */}
+      <VoidCore />
+      {items.map((it, idx) => {
+        // Skip the center cubie on odd-sized cubes — VoidCore occupies that space
+        const isCenterVoid = size % 2 !== 0 &&
+          it.pos[0] === 0 && it.pos[1] === 0 && it.pos[2] === 0;
+        if (isCenterVoid) return null;
+        return (
+          <Cubie
+            key={it.key}
+            ref={cubieRefCallbacks[idx]}
+            position={it.pos}
+            cubie={it.cubie}
+            size={size}
+            onPointerDown={onPointerDown}
+          />
+        );
+      })}
       {showCursor && cursor && (
-        <CursorHighlight
-          cursor={cursor}
-          size={size}
-          explosionFactor={explosionFactor}
-        />
+        <CursorHighlight />
       )}
       {solveHighlights && solveHighlights.length > 0 && (
         <SolveHighlight
           highlights={solveHighlights}
-          size={size}
-          explosionFactor={explosionFactor}
         />
       )}
       {/* DragGuide removed - real-time cube rotation provides visual feedback */}
