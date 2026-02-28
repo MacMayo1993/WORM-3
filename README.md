@@ -162,6 +162,7 @@ WORM-3 is not a mathematics lesson with a game bolted on. It is designed so that
 | **Slice rotation** (WASD / drag) | Rotates a row, column, or depth slice | Group action on the cube; composing moves is composing permutations |
 | **Antipodal flip** (F key / click) | Flips a sticker and its antipodal partner simultaneously | The quotient map q: S² → RP²; two points identified as one |
 | **Wormhole tunnels** (T key) | Draws Bézier curves connecting antipodal sticker pairs through the cube interior | Visual representation of the identification; topology as geometry |
+| **VoidCore** (center of cube) | Swirling colored orbital rings at the cube's hollow center | The topological interior of the identification space; all active tunnel colors converging at the manifold's fixed point |
 | **Explode view** (X key) | Separates cubies; shows all wormhole connections at once | The full identification diagram; seeing the manifold structure globally |
 | **Net view** (N key) | Unfolds cube into 2D with antipodal edges annotated | The polygon representation of RP²; how gluing instructions encode topology |
 | **Parity indicator** | Cyan (even) or purple (odd) glow on the cube | π₁(RP²) = Z₂; the non-trivial loop class as a solvable invariant |
@@ -209,7 +210,7 @@ The 10-level campaign is structured as an explicit topology curriculum. Each lev
 
 #### Slice Rotations
 
-Drag on the cube or use WASD to rotate a row, column, or depth slice by 90°. Supports cubes from 2×2 to 5×5. On release, the rotation snaps to the nearest 90° with a GSAP animation (0.15s, back.out easing).
+Drag on the cube or use WASD to rotate a row, column, or depth slice by 90°. Supports cubes from 2×2 to 5×5. On release, the rotation snaps to the nearest 90° with a GSAP animation (0.15s, back.out easing). Live drag shows real-time rotation during the drag gesture; multi-quarter-turn commits are applied atomically.
 
 Each rotation is a permutation of the sticker positions. Composing rotations is composing permutations. The manifold identification means that rotating a slice also implicitly affects which stickers are in antipodal correspondence — the map between antipodal pairs updates with each rotation.
 
@@ -222,11 +223,15 @@ Press F or click a sticker (in flip mode) to flip it and its antipodal partner s
 3. Increments the flip counter for both stickers (used by chaos mode).
 4. Changes the topological parity of the cube state if this is the (2n+1)th flip along the non-trivial loop.
 
-Flips have a 7-second refractory period per sticker to prevent degenerate rapid toggling.
+Flips have a 7-second refractory period per sticker to prevent degenerate rapid toggling. On flip, a propagation wave radiates from each tile's world position, and if wormhole tunnels are active, a lightning bolt fires across the antipodal tunnel pair.
 
 #### Wormhole Tunnels
 
-Toggle with T. Draws Bézier curves through the cube interior connecting each antipodal sticker pair. The curves use smart routing to avoid intersecting the cube geometry itself, making the network of identifications legible. In Explode View, the full network is exposed simultaneously.
+Toggle with T. Draws Bézier curves through the cube interior connecting each antipodal sticker pair. Strands are distributed in symmetric orbital rings — like electron orbitals — around the tunnel axis, using the sticker's actual face color rather than any artificial tint. The curves use smart routing to avoid intersecting the cube geometry. In Explode View, the full network is exposed simultaneously.
+
+#### VoidCore
+
+On odd-sized cubes (3×3, 5×5), the center cubie is hollow. In its place, three animated orbital `lineLoop` rings swirl at the cube's geometric center, cycling through all active tunnel colors — every face color that has appeared on a flipped sticker. Each ring occupies a different plane (XY, XZ, YZ) and spins at a different speed. A color-cycling point light at the center casts colored tints onto surrounding cubies. The VoidCore grows more vivid as more antipodal pairs are activated, making the manifold's convergence point visible as a living color clock.
 
 #### Explode View
 
@@ -333,9 +338,16 @@ Score = (worm length × 100) + (orbs eaten × 50) + (warps used × 25)
 | Toggle explode | X | Separate cubies to reveal internal structure |
 | Toggle net view | N | Show unfolded RP² polygon diagram |
 | Cycle visual mode | V | Classic → Grid → Sudokube → Wireframe |
-| Undo | Ctrl+Z | Reverse last move (max 10 history) |
+| Toggle hollow mode | M | Switch to wireframe beam rendering |
+| Toggle hands mode | P | Enable speedcube notation input |
+| Undo | Z or Ctrl+Z | Reverse last move (max 10 history) |
+| Reset | R | Reset to solved state |
+| Shuffle | Shift+R | Apply 25 random rotations |
+| Save state | Ctrl+S | Save current cube state |
+| Load state | Ctrl+L | Restore saved state |
 | Show help | H or ? | Controls reference overlay |
 | Escape | Esc | Close menus, hide cursor |
+| Dev console | ` | Toggle developer console |
 
 ### Mouse
 
@@ -372,10 +384,22 @@ Score = (worm length × 100) + (orbs eaten × 50) + (warps used × 25)
 - **Grid**: Numbered grid overlay showing position indices (useful for understanding the manifold map)
 - **Sudokube**: Large centered numbers for Latin square solving
 - **Wireframe**: Minimalist edge-only rendering with emissive glow
+- **Hollow**: Open-frame cube using beam geometry (12 edges per cubie, no face surfaces)
 
-### Tile Styles (13 per-face customizable)
+### Color Schemes (30 presets + custom)
 
-Each of the six manifold faces can independently use a different material. All implemented as custom GLSL shader materials:
+| Category | Schemes |
+|----------|---------|
+| Classic | Standard, Neon, Pastel, Monochrome, Ocean, Forest, Candy, Retro |
+| Superheroes | Spider-Man, Batman, Iron Man, Wonder Woman, The Joker, Black Panther, Captain America, Thor, Deadpool, Doctor Strange |
+| Thematic | Aurora Borealis, Ink & Washi, Deep Sea, Volcano, Sakura, Cosmic, Candy Shop, Desert Dusk, Arctic, Ember & Ash |
+| Special | City Biome (per-city pulse colors), Custom Upload (image-extracted or manual) |
+
+**Extract from Image**: Upload any photograph and k-means clustering extracts 6 dominant colors, sorted by hue and assigned to cube faces automatically.
+
+### Tile Styles (23 per-face options)
+
+Each of the six manifold faces can independently use a different material. All implemented as custom GLSL shader materials cached by color key for GPU efficiency:
 
 | Style | Type | Description |
 |-------|------|-------------|
@@ -383,15 +407,27 @@ Each of the six manifold faces can independently use a different material. All i
 | Glossy | Static | Specular highlights |
 | Matte | Static | Soft diffuse shading |
 | Metallic | Static | Brushed metal with anisotropic highlights |
-| Carbon Fiber | Static | Woven pattern |
-| Hex Grid | Static | Honeycomb pattern |
-| Glass | Static | Transparent with Fresnel glow |
-| Comic | Static | Halftone dots and bold outlines |
+| Carbon Fiber | Pattern | Woven carbon weave |
+| Hex Grid | Pattern | Honeycomb tessellation |
+| Comic | Pattern | Halftone dots and bold outlines |
+| Café Wall | Pattern | Optical illusion offset rows |
+| Herman Grid | Pattern | Grid with ghost intersections |
+| Optic Spin | Pattern | Rotating radial interference |
+| Ouchi | Pattern | Depth-ambiguous checkerboard |
 | Circuit | Animated | Tech traces with traveling pulse signals |
 | Holographic | Animated | View-dependent rainbow iridescence |
 | Pulse | Animated | Radial brightness waves from sticker center |
 | Lava | Animated | Molten flow via fractal Brownian motion noise |
 | Galaxy | Animated | Stars and nebula field |
+| Grass | 3D | Instanced blade geometry |
+| Ice | 3D | Volumetric crystal with subsurface scatter |
+| Sand | 3D | Grain displacement with normal mapping |
+| Water | 3D | Animated surface ripples |
+| Wood | 3D | Procedural grain rings |
+| Neural | 3D | Synaptic node network with spark pulses |
+| Solar | Animated | Photovoltaic panel array with energy flow |
+
+Antipodal pairs can be given contrasting styles to make the identification visually prominent.
 
 ---
 
@@ -401,7 +437,7 @@ Each of the six manifold faces can independently use a different material. All i
 
 Each level's 3D environment is built from Three.js geometry (no image textures — pure code geometry) and serves as both atmosphere and metaphor.
 
-**Level 1 — Daycare**: Warm afternoon sunlight streams through a window. A rotation-axis mobile hangs from the ceiling with colored arrows labeling the three Cartesian rotation axes (X=Red, Y=Green, Z=Blue). The floor uses a cube-net pattern in all six face colors. A shape-sorter toy and scattered crayons complete the scene. *The rotation axes are made physical and named before any mathematics is spoken.*
+**Level 1 — Daycare**: Warm afternoon sunlight streams through a window. A rotation-axis mobile hangs from the ceiling with colored arrows labeling the three Cartesian rotation axes (X=Red, Y=Green, Z=Blue). The floor uses a cube-net pattern in all six face colors. *The rotation axes are made physical and named before any mathematics is spoken.*
 
 **Level 2 — Elementary Classroom**: A chalkboard reads "Welcome to Miss Cole's Class." Desks in rows, gold stars floating overhead, an alphabet banner. *Learning to read the symbols before reading the map.*
 
@@ -411,19 +447,19 @@ Each level's 3D environment is built from Three.js geometry (no image textures �
 
 **Level 5 — College Dorm**: A desk lamp in darkness, a laptop glow, moonlight, bookshelves. *Late-night mathematics: sitting with parity until you understand it.*
 
-**Level 6 — Office**: A cubicle farm with 12 workstations, grid lighting, floating bar charts. *Structured space that reveals structure in the cube. The explode view makes the internal geometry of the manifold visible for the first time.*
+**Level 6 — Office**: A cubicle farm with 12 workstations, grid lighting, floating bar charts. *Structured space that reveals structure in the cube.*
 
 **Level 7 — NASA Mission Control**: A 30-meter display wall, tiered control consoles with cyan emissive glow, data streams cascading through the air. *The Sudokube constraint is a control problem: managing independent systems simultaneously.*
 
-**Level 8 — Launch Pad**: A rocket on concrete under 200 stars, a red launch tower, engine flame cones. *The moment before the ultimate challenge. Both constraints are active. There is no undoing the launch.*
+**Level 8 — Launch Pad**: A rocket on concrete under 200 stars, a red launch tower, engine flame cones. *The moment before the ultimate challenge.*
 
-**Level 9 — Lunar Surface**: Gray terrain, 500 stars, Earth hanging in the black sky, 20 craters, a lunar module with footprints. *From the Moon, you can see the whole Earth — a sphere, viewed from outside, with its antipodal structure comprehensible from this altitude. The Net View gives you the same perspective on the cube.*
+**Level 9 — Lunar Surface**: Gray terrain, 500 stars, Earth hanging in the black sky, 20 craters, a lunar module with footprints. *From the Moon you can see the whole Earth — a sphere viewed from outside, with its antipodal structure comprehensible from this altitude.*
 
 **Level 10 — Black Hole**: A custom GLSL shader environment featuring procedural gravitational lensing, an accretion disk with flowing temperature bands, a photon sphere ring, and Hawking radiation glow. The environment pulses in response to flip operations. *Orientation does not exist here. The topology completes its argument.*
 
 ### Free Play Backgrounds
 
-Interactive HDR photographic panoramas (actual photographs, not shaders) that wrap the scene in 360°. Orbiting the camera rotates the panorama. Also provides image-based lighting so cube reflections match the environment. Options: Sunset, Forest, Sunrise, Park, Night Sky, City Skyline, Apartment, Modern Lobby, Warehouse, Photo Studio, Dark, Midnight Blue, and the Black Hole procedural shader.
+Interactive HDR photographic panoramas (360° photographs) that wrap the scene with image-based lighting so cube reflections match the environment. Options: Sunset, Forest, Sunrise, Park, Night Sky, City Skyline, Apartment, Modern Lobby, Warehouse, Photo Studio, Dark, Midnight Blue, and the Black Hole procedural shader.
 
 ---
 
@@ -431,25 +467,13 @@ Interactive HDR photographic panoramas (actual photographs, not shaders) that wr
 
 All settings persist to localStorage. Accessible via the gear icon.
 
-### Color Schemes
+### Customization Options
 
-| Scheme | Description |
-|--------|-------------|
-| Standard | Classic Rubik's colors (Red, Green, White, Orange, Blue, Yellow) |
-| Neon | Bright fluorescent variants |
-| Pastel | Soft muted tones |
-| Mono | Grayscale with subtle differentiation |
-| Custom | User-defined colors per face |
-
-**Extract from Image**: Upload any photograph and k-means clustering (10 iterations) extracts 6 dominant colors, sorted by hue and assigned to cube faces automatically.
-
-### Face Textures
-
-Upload images to map onto individual cube faces as Three.js textures.
-
-### Per-Face Tile Styles
-
-Each of the six manifold faces can use a different style from the 13 options. Antipodal pairs can be given contrasting styles to make the identification visually prominent — seeing that the Galaxy face and the Lava face are "the same face" is a useful cognitive jolt.
+- **Color Scheme**: 30 named presets or custom colors per face
+- **Color from Image**: Extract 6 dominant colors from any uploaded photo (k-means, 10 iterations)
+- **Face Textures**: Upload images to map onto individual cube faces
+- **Per-Face Tile Style**: Each of the six faces can independently use any of the 23 tile styles
+- **Biome Mode**: Replace sticker faces with living 3D miniature cities; each city pulses in its signature color
 
 ### UI Toggles
 
@@ -468,88 +492,157 @@ Each of the six manifold faces can use a different style from the 13 options. An
 | React | 18.2 | UI framework |
 | Three.js | 0.159 | 3D rendering |
 | @react-three/fiber | 8.15 | React renderer for Three.js |
-| @react-three/drei | 9.93 | Camera, environment maps, text, shadows |
-| Zustand | 5.0 | State management |
-| GSAP | 3.14 | Animation timelines |
-| Vite | 5.4 | Dev server and bundler |
-| Vitest | 4.0 | Test framework |
+| @react-three/drei | 9.93 | Camera, environment maps, text, controls |
+| Zustand | 5.0 | Global state management |
+| GSAP | 3.14 | Animation timelines and snap easing |
+| Vite | 5.4 | Dev server and bundler with code splitting |
+| Vitest | 4.0 | Unit test framework |
 
 ### Source Structure
 
 ```
 src/
-├── game/                    # Pure game logic (no React dependencies)
-│   ├── cubeState.js         # Cubie generation, deep cloning
-│   ├── cubeRotation.js      # 90° rotations and sticker remapping
-│   ├── manifoldLogic.js     # RP² antipodal identification and flip logic
-│   ├── antipodalMode.js     # Antipodal echo operations
-│   ├── winDetection.js      # Victory conditions (Classic, Sudokube, Ultimate, WORM)
-│   ├── solveDetection.js    # CFOP stage tracking (460 lines)
-│   ├── coordinates.js       # Grid positioning and world-space conversion
-│   ├── cubeUtils.js         # Edge detection and sticker iteration
-│   ├── handsInput.js        # Speedcube notation parsing and combo detection
-│   ├── antipodalIntegrity.js # I(T) metric computation
-│   └── refractoryMap.js     # Per-sticker flip cooldowns
+├── game/                      # Pure game logic — zero React dependencies
+│   ├── cubeState.js           # Cubie generation, deep cloning
+│   ├── cubeRotation.js        # 90° slice rotations and sticker remapping
+│   ├── manifoldLogic.js       # RP² antipodal identification and flip logic
+│   ├── antipodalMode.js       # Antipodal echo rotation operations
+│   ├── winDetection.js        # Victory conditions (Classic, Sudokube, Ultimate, WORM)
+│   ├── solveDetection.js      # CFOP stage tracking
+│   ├── coordinates.js         # Grid positioning and world-space conversion
+│   ├── cubeUtils.js           # Edge detection and sticker iteration
+│   ├── handsInput.js          # Speedcube notation parsing and combo detection
+│   ├── antipodalIntegrity.js  # I(T) metric computation
+│   ├── mirrorBlocks.js        # Mirror/reflection block logic
+│   └── refractoryMap.js       # Per-sticker flip cooldowns
 │
-├── hooks/                   # Custom React hooks
-│   ├── useGameStore.js      # Central Zustand store (340 lines)
-│   ├── useCubeState.js      # Rotate, flip, shuffle operations
-│   ├── useAnimation.js      # Rotation animation with GSAP snap
-│   ├── useGameSession.js    # Timer and win detection loop
-│   ├── useChaosMode.js      # Cascade propagation engine
-│   ├── useCursor.js         # Keyboard navigation with face wrapping
-│   ├── useKeyboardControls.js
-│   ├── useLevelSystem.js    # Level progression and feature gating
-│   ├── useSettings.js       # Preferences and texture loading
-│   ├── useHandsMode.js      # Speedcube control and TPS tracking
-│   └── useUndo.js           # Move reversal (max 10)
+├── hooks/                     # Custom React hooks
+│   ├── useGameStore.js        # Central Zustand store with subscribeWithSelector
+│   ├── useCubeState.js        # Rotate, flip, shuffle — atomic setState batching
+│   ├── useAnimation.js        # Rotation animation with GSAP snap + antipodal echo
+│   ├── useGameSession.js      # Timer and win detection loop
+│   ├── useChaosMode.js        # Cascade propagation engine
+│   ├── useCursor.js           # Keyboard navigation with face wrapping
+│   ├── useKeyboardControls.js # All keyboard shortcuts consolidated
+│   ├── useLevelSystem.js      # Level progression and feature gating
+│   ├── useSettings.js         # Preferences and texture loading
+│   ├── useHandsMode.js        # Speedcube control and TPS tracking
+│   ├── useParityDecay.js      # Spontaneous parity instability
+│   ├── useAntipodalIntegrity.js # Real-time I(T) metric
+│   ├── useTilingMoves.js      # Tiling-based move generation
+│   └── useUndo.js             # Move reversal (max 10)
 │
-├── 3d/                      # Three.js components
-│   ├── CubeAssembly.jsx     # Main cube with drag interactions
-│   ├── Cubie.jsx            # Individual pieces (RoundedBox)
-│   ├── StickerPlane.jsx     # Clickable sticker surfaces
-│   ├── TileStyleMaterials.jsx # 13 custom GLSL shader materials
-│   ├── BlackHoleEnvironment.jsx # GLSL black hole shader
+├── 3d/                        # Three.js / R3F components
+│   ├── GameScene.jsx          # Single persistent scene inside Canvas
+│   ├── CubeAssembly.jsx       # Drag interactions, slice animation, cubie layout
+│   ├── Cubie.jsx              # Individual piece geometry (RoundedBox)
+│   ├── StickerPlane.jsx       # Clickable sticker surfaces with 23 style materials
+│   ├── VoidCore.jsx           # Animated wormhole-color orbital rings at cube center
+│   ├── BlackHoleEnvironment.jsx # GLSL gravitational lensing shader
 │   ├── BackgroundEnvironments.jsx # Procedural shader backgrounds
-│   └── LifeJourneyBackgrounds.jsx # 10 handcrafted 3D scenes
+│   ├── LifeJourneyBackgrounds.jsx # 10 handcrafted level scenes
+│   ├── AntipodalVisualization.jsx # Antipodal mode visual effects
+│   ├── AntipodalModeEffects.jsx   # Echo rotation glow
+│   ├── SeamPulseOverlay.jsx   # RP² seam pulse visualization
+│   └── styles/
+│       └── TileStyleMaterials.jsx # 23 GLSL shader materials, GPU-cached by color key
 │
-├── levels/
-│   ├── schema.js            # Level schema and BACKGROUNDS enum
-│   └── data/                # 10 level definition files
+├── components/
+│   ├── menus/                 # UI menus (MainMenu, TopMenuBar, SettingsMenu, BottomNavBar)
+│   ├── screens/               # Full-screen overlays (Welcome, Victory, Tutorial, LevelSelect)
+│   ├── overlays/              # In-game overlays (Cursor, FaceRotation, HUD panels)
+│   └── intro/                 # Intro animation sequence components
 │
 ├── manifold/
-│   └── smartRouting.js      # Bézier curve routing for wormhole tunnels
+│   ├── WormholeNetwork.jsx    # Renders all active wormhole tunnel pairs
+│   ├── WormholeTunnel.jsx     # Individual tunnel: orbital strands + lightning effect
+│   ├── ChaosWave.jsx          # Manifold cascade wave visualization
+│   ├── FlipPropagationWave.jsx # Radial flip burst from sticker world position
+│   └── ManifoldGrid.jsx       # 2D manifold grid overlay
+│
+├── levels/
+│   ├── schema.js              # Level schema and BACKGROUNDS enum
+│   ├── LevelsManager.js       # Level sequencing and unlock logic
+│   ├── ProgressManager.js     # Persistent progress tracking
+│   └── data/                  # 10 level definition files (level-01 through level-10)
+│
+├── teach/
+│   ├── algorithms.js          # CFOP algorithm library with topology tips
+│   ├── solver3x3.js           # Automated CFOP solver
+│   ├── useTeachMode.js        # Teaching mode state hook
+│   └── LayerHighlight.jsx     # In-scene layer highlighting for guided solving
 │
 ├── worm/
-│   ├── WormGame.jsx         # Surface and tunnel worm logic
-│   └── WormCamera.jsx       # Worm-following camera
+│   ├── wormLogic.js           # Surface traversal and tunnel navigation logic
+│   ├── crawlerPhysics.js      # Platformer physics for crawler mode
+│   ├── WormMode.jsx           # Top-level worm mode switcher
+│   ├── WormModeGame.jsx       # Core worm game loop
+│   └── WormCamera.jsx         # Camera following the worm
 │
-├── teach/                   # CFOP teaching system
-└── utils/
-    ├── constants.js         # Face/color/direction mappings
-    ├── colorSchemes.js      # Color schemes and tile style defaults
-    └── audio.js             # Audio pooling (4 instances per sound)
+├── modes/
+│   └── CityBiomeMode.js       # Six city definitions, colors, and GLB references
+│
+├── utils/
+│   ├── constants.js           # Face/color/direction mappings, ANTIPODAL_COLOR
+│   ├── colorSchemes.js        # 30 color schemes, tile style catalog, resolveColors()
+│   ├── audio.js               # Audio pooling (4 instances per sound)
+│   ├── smartRouting.js        # Bézier control point routing for wormhole tunnels
+│   └── tilingGraph.js         # Manifold adjacency graph construction
+│
+├── App.jsx                    # Hook orchestration + single Canvas render
+└── main.jsx                   # React entry point
 ```
 
 ### Key Algorithms
 
-**Antipodal Mapping — O(1)**: Each sticker is assigned a manifold grid ID (`M{faceId}-{paddedIndex}`). The manifold map provides instant access to any sticker's antipodal partner. Antipodal face pairs: 1↔4, 2↔5, 3↔6.
+**Antipodal Mapping — O(1)**: Each sticker is assigned a manifold grid ID (`M{faceId}-{paddedIndex}`). The manifold map provides instant lookup of any sticker's antipodal partner. Antipodal face pairs: 1↔4 (Red/Orange), 2↔5 (Green/Blue), 3↔6 (White/Yellow).
 
-**Slice Rotation**: `rotateSliceCubies()` computes new 3D positions for all cubies in a slice via 90° vector rotation, then remaps sticker direction keys to maintain correct face assignments after the rotation. Handles the coupling between position and orientation that makes Rubik's group theory non-trivial.
+**Slice Rotation**: `rotateSliceCubies()` computes new 3D grid positions for all cubies in a slice via 90° vector rotation, then remaps sticker direction keys to maintain correct face assignments after rotation. Handles the coupling between position and orientation that makes Rubik's group theory non-trivial.
 
-**Drag-to-Rotate**: Custom pointer handler (not OrbitControls). Drag threshold: 5px mouse / 8px touch. `mapSwipe()` projects the drag vector onto the face plane, crosses it with the face normal to determine the rotation axis, applies real-time rotation during drag, then GSAP-snaps to nearest 90° on release (0.15s, back.out easing).
+**Drag-to-Rotate**: Custom pointer handler (not OrbitControls). Drag threshold: 5px mouse / 8px touch. `mapSwipe()` projects the drag vector onto the face plane, crosses it with the face normal to determine the rotation axis, applies real-time rotation during drag, then GSAP-snaps to nearest 90° on release. Multi-quarter-turn drags are committed atomically to avoid animation queue buildup.
 
-**Chaos Propagation**: Per-sticker tally system. Propagation probability = `tally × chaos_level_factor`. Cascades along manifold neighbors (not Euclidean), making topological adjacency the governing structure for instability.
+**Chaos Propagation**: Per-sticker tally system. Propagation probability = `tally × chaos_level_factor`. Cascades along manifold neighbors (not Euclidean adjacency), making topological adjacency the governing structure for instability.
 
-**Win Detection**: `checkRubiksSolved()` — O(n³) uniform color verification. `checkSudokubeSolved()` — O(n³) Latin square validation (no row/column repeats per face). Ultimate mode runs both. Short-circuit evaluation for performance.
+**Win Detection**: `checkRubiksSolved()` — O(n³) uniform color verification. `checkSudokubeSolved()` — O(n³) Latin square validation per face. Ultimate mode runs both. Short-circuit evaluation stops on first failure for performance.
 
-**CFOP Solver** (460 lines): Tracks white cross edges, F2L corner-edge pairs, OLL orientation, PLL permutation. Provides algorithm suggestions and topology-aware hints for each stage.
+**Wormhole Routing**: Bézier cubic curves connecting antipodal sticker pairs. Ring strands are distributed symmetrically at equal angular intervals — like electron orbitals — with control points placed at 35%/65% along the start→end axis plus a radial outward bow. This ensures even orbital spread regardless of spatial orientation. Core strand runs along the central bezier axis. Lightning bolt fires on flip burst via `Math.sin(burstRaw × π)` envelope.
 
-**Wormhole Routing**: Bézier curves connecting antipodal sticker pairs through the interior. Smart routing pushes control points perpendicular to the main axis to avoid intersecting the cube geometry.
+**VoidCore**: On odd-sized cubes, the geometric center cubie is omitted from render. Three `lineLoop` rings with per-vertex color attributes cycle through the set of all active tunnel colors (face colors present on any flipped sticker) using a slow sweep (0.12 color-units/second) with 120° phase offset between rings. `THREE.AdditiveBlending` allows ring colors to mix luminously.
+
+**State Batching**: All multi-field state changes use a single `useGameStore.setState(fn)` call (Zustand atomic update) rather than sequential `set()` calls, reducing re-renders from 3–6 per operation to 1.
+
+### Architecture Highlights
+
+**Single Canvas**: One `<Canvas>` lives permanently in `App.jsx` and never unmounts. The intro sequence (`IntroScene`) and game scene (`GameScene`) swap inside it via a conditional — eliminating the WebGL context loss crash that occurred when a second Canvas mounted on the intro → game transition.
+
+**Separated Scene / UI**: `GameScene.jsx` owns all Three.js content (lights, CubeAssembly, backgrounds, effects). All DOM overlays (HUD, menus, modals, bottom nav) render outside the Canvas without prop drilling — they read from the Zustand store directly.
+
+**Lazy Loading**: Eleven rarely-used screens (VictoryScreen, LevelSelectScreen, Level10Cutscene, LevelTutorial, FreeplaySetupWizard, DisparitySetupWizard, DisparityWinnerScreen, CubeNet, SolveMode, DevConsole, TeachMode) are `React.lazy()` loaded on first use, keeping the initial bundle small.
+
+**Shared GPU Resources**: Tile style materials are cached at the module level by `${style}_${colorHex}` key — 216 stickers on a 3×3 share at most ~23 material instances. Hollow beam materials are similarly cached by visual mode. Module-level shared geometries are used wherever a shape is repeated (ring geometries, sphere geometries for worm particles, crack geometries for parity breakthrough effects).
+
+**Keyboard Consolidation**: All keyboard shortcuts (50+ keys) are handled exclusively in `useKeyboardControls.js`. No inline `handleKeyDown` in `App.jsx`. The hook accepts callback props for cross-cutting actions and reads mode state directly from the store.
 
 ### State Management
 
-Single Zustand store (`useGameStore.js`, 340 lines) with `subscribeWithSelector` for efficient component updates. Manages: cube state, game session (moves, timer, undo history), visual modes, chaos state, animation queue, UI state, level system, hands mode, and settings.
+Single Zustand store (`useGameStore.js`) with `subscribeWithSelector` for efficient component updates. Manages: cube state (cubies 3D array, size, rotationEpoch), game session (moves, timer, undo history), visual modes, chaos state, animation queue, UI visibility, level system, hands mode, settings, and antipodal mode.
+
+### Testing
+
+```
+src/__tests__/
+├── antipodalIntegrity.test.js
+├── antipodalMode.test.js
+├── cubeRotation.test.js
+├── cubeState.test.js
+├── cubeUtils.test.js
+├── mirrorBlocks.test.js
+├── teach.test.js
+├── tilingGraph.test.js
+└── winDetection.test.js
+```
+
+Framework: Vitest with jsdom environment. Coverage scope: `src/game/**`, `src/utils/**`, `src/levels/**`.
 
 ---
 
@@ -558,19 +651,22 @@ Single Zustand store (`useGameStore.js`, 340 lines) with `subscribeWithSelector`
 ```bash
 git clone https://github.com/MacMayo1993/WORM-3.git
 cd WORM-3
-npm install --legacy-peer-deps
-npm run dev
+npm install --legacy-peer-deps   # --legacy-peer-deps required
+npm run dev                       # Dev server on port 5173
 ```
-
-The dev server starts on port 5173.
 
 ```bash
-npm run build      # Production build to dist/
-npm run preview    # Preview production build
-npm run test       # Run test suite (Vitest)
-npm run lint       # ESLint check
-npm run ci         # Full pipeline: lint → test → build
+npm run build        # Production build to dist/
+npm run preview      # Preview production build
+npm run test         # Run test suite (Vitest)
+npm run test:watch   # Watch mode
+npm run test:coverage # V8 coverage report
+npm run lint         # ESLint check
+npm run lint:fix     # ESLint auto-fix
+npm run ci           # Full pipeline: lint → test → build
 ```
+
+Deploy target: GitHub Pages from `dist/` at `/WORM-3/` base path (configured in `vite.config.js`).
 
 ---
 
@@ -589,42 +685,3 @@ https://mayomanifoldresearch.org
 ---
 
 *WORM-3 exists to make non-orientable geometry tangible and playable. The real projective plane is not an abstraction you learn about. It is a place you go.*
-
----
-
-## Active Development Focus — Biome Mode Visual Polish
-
-**Current sprint: elevating the visual quality of city tiles on the Manifold Biome faces.**
-
-Each face of the cube in Biome Mode renders a living 3D city in miniature — a procedurally generated settlement scaled to fit within a 0.85×0.85 unit sticker tile. The six cities are:
-
-| Face | Color | City | Antipodal Partner |
-|------|-------|------|-------------------|
-| PZ (Front) | Red | Volcanic Foundry | Solar Arcology |
-| NX (Left) | Green | Bio-Dome | Neural Hub |
-| PY (Top) | White | Frozen Citadel | Deep Station |
-| NZ (Back) | Orange | Solar Arcology | Volcanic Foundry |
-| PX (Right) | Blue | Neural Hub | Bio-Dome |
-| NY (Bottom) | Yellow | Deep Station | Frozen Citadel |
-
-Cities are rendered as pure Three.js geometry (no textures) using `InstancedMesh` for performance and `MeshPhysicalMaterial` / `MeshStandardMaterial` with emissive accents. Ground planes are canvas-baked `CanvasTexture` singletons. On every flip the tile transitions to its antipodal city — the parity of `meta.flips % 2` governs which city is currently shown.
-
-### Work in Progress
-
-**Frozen Citadel (white face / top)** — primary focus.
-
-The Citadel uses a Swiss Modernism × Arctic precision design language: one dominant hexagonal obelisk, stepped cap with 30° crystal twist, glow pinnacle, satellite shard cluster, ice-shelf ground anchor, and frost-ring base detail. Materials use `MeshPhysicalMaterial` with `clearcoat: 1.0`, `flatShading: true`, and faint blue emissive to read as faceted crystal glass.
-
-Upcoming improvements:
-- Animated `useFrame` crystal pulse — slow emissive intensity oscillation on the glow pinnacle
-- Shard lean variation — outer shards tilt more aggressively inward for a tighter formation silhouette
-- Frost ring enhancement — double-ring (inner + outer) for more precision-engineering character
-- Material refinement — increase clearcoat roughness differential between obelisk body and glow tip
-- Depth layering — ensure obelisk renders above shelf with correct Z-offset ordering
-
-**Queued (after Citadel)**:
-- Solar Arcology — animated dish rotation, focal-point pulse, panel energy feed
-- Volcanic Foundry — lava pool ripple, smoke column shimmer
-- Bio-Dome — canopy arch glow pulse, spiral tower twist animation
-- Neural Hub — bridge data-packet travel animation, antenna tip flicker
-- Deep Station — hab-ring orbital rotation, dome pressure shimmer
