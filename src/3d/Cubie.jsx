@@ -37,6 +37,24 @@ const HOLLOW_EDGES = [
   { pos: [EDGE_H, EDGE_H, 0], geo: 'z' },
 ];
 
+// Shared hollow beam materials — one per visualMode string.
+// 12 beams × 27 cubies = 324 draws, but only 3 material instances (classic/wireframe/glass).
+// All beams in the same mode share identical properties so one GPU material suffices.
+const _hollowBeamMaterials = {};
+function getHollowBeamMaterial(visualMode) {
+  if (_hollowBeamMaterials[visualMode]) return _hollowBeamMaterials[visualMode];
+  const mat = new THREE.MeshStandardMaterial({
+    color: visualMode === 'wireframe' ? '#000000' : visualMode === 'glass' ? '#111111' : '#0a0a0a',
+    roughness: visualMode === 'wireframe' ? 0.9 : visualMode === 'glass' ? 0.05 : 0.25,
+    metalness: visualMode === 'wireframe' ? 0 : visualMode === 'glass' ? 0.3 : 0.15,
+    envMapIntensity: visualMode === 'glass' ? 0.8 : 0.4,
+    transparent: visualMode === 'glass',
+    opacity: visualMode === 'glass' ? 0.12 : 1.0,
+  });
+  _hollowBeamMaterials[visualMode] = mat;
+  return mat;
+}
+
 // Stable sticker position/rotation arrays (allocated once, never recreated).
 // Prevents StickerPlane from re-rendering due to new array references.
 const STICKER_POS = {
@@ -265,14 +283,7 @@ const Cubie = React.forwardRef(function Cubie({
           {HOLLOW_EDGES.map((edge, idx) => (
             <mesh key={idx} position={edge.pos} castShadow receiveShadow>
               <boxGeometry args={BEAM_DIMS[edge.geo]} />
-              <meshStandardMaterial
-                color={visualMode === 'wireframe' ? '#000000' : visualMode === 'glass' ? '#111111' : '#0a0a0a'}
-                roughness={visualMode === 'wireframe' ? 0.9 : visualMode === 'glass' ? 0.05 : 0.25}
-                metalness={visualMode === 'wireframe' ? 0 : visualMode === 'glass' ? 0.3 : 0.15}
-                envMapIntensity={visualMode === 'glass' ? 0.8 : 0.4}
-                transparent={visualMode === 'glass'}
-                opacity={visualMode === 'glass' ? 0.12 : 1.0}
-              />
+              <primitive object={getHollowBeamMaterial(visualMode)} attach="material" />
             </mesh>
           ))}
         </>
