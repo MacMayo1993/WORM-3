@@ -42,13 +42,15 @@ export function useAnimation() {
   const echoTimeoutsRef = useRef([]);
   const echoQueueRef = useRef([]);
 
-  // Start a new animation
+  // Start a new animation (atomic: animState and pendingMove set in one render)
   const startAnimation = useCallback((axis, dir, sliceIndex, isEcho = false) => {
-    setAnimState({ axis, dir, sliceIndex, t: 0, isEcho });
     const move = { axis, dir, sliceIndex, isEcho };
-    setPendingMove(move);
     pendingMoveRef.current = move;
-  }, [setAnimState, setPendingMove]);
+    useGameStore.setState({
+      animState: { axis, dir, sliceIndex, t: 0, isEcho },
+      pendingMove: move,
+    });
+  }, []);
 
   // Handle animation completion
   const handleAnimComplete = useCallback(() => {
