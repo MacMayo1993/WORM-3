@@ -139,7 +139,17 @@ const CubeAssembly = React.memo(({
   // Stable callback ref pattern: avoids recreating the function on every render,
   // which would defeat React.memo on all Cubie children.
   const animStateRef = useRef(animState);
-  animStateRef.current = animState;
+  // useLayoutEffect (not render body) so animStateRef is only mutated in the commit phase.
+  // In React 18 concurrent mode the render body can run speculatively before the commit,
+  // meaning a rAF could fire between the render body setting animStateRef=null and the
+  // commit running StickerPlane's useLayoutEffect([materialColor]) that updates
+  // instanceColorRef.current.  The priority-2 useFrame would then detect the
+  // animState→null transition and reset cubie positions while instanceColorRef still
+  // holds the old colour — one flash frame of correct positions but wrong colours.
+  // Keeping the ref strictly commit-phase eliminates this race.
+  useLayoutEffect(() => {
+    animStateRef.current = animState;
+  }, [animState]);
   const prevAnimStateRef = useRef(null); // tracks last frame's animState for transition detection
   const flipModeRef = useRef(flipMode);
   flipModeRef.current = flipMode;
