@@ -73,7 +73,7 @@ export function StickerInstanceProvider({ children }) {
     // Disable raycasting — zero-scale matrices produce degenerate inverse matrices
     // that cause Infinity/NaN values in the ray, leading to unpredictable hit results.
     // This mesh is purely visual; no pointer interaction is needed.
-    mesh.raycast = () => {};
+    mesh.raycast = () => { };
     for (let i = 0; i < MAX_INSTANCES; i++) mesh.setMatrixAt(i, _zeroMatrix);
     mesh.instanceMatrix.needsUpdate = true;
     return mesh;
@@ -106,6 +106,10 @@ export function StickerInstanceProvider({ children }) {
   // cycle.  Prevents re-uploading an already-blank matrix every frame for slots
   // that are registered but currently non-instanced (biome, shader, glass, etc.).
   const zeroedSlotsRef = useRef(new Set());
+  // Per-slot cached RGB — 3 floats per slot.  Compared before each setColorAt
+  // call; skipped when unchanged to avoid redundant GPU uploads every frame.
+  // Initialised to NaN so the first upload always fires (NaN !== anything).
+  const lastColorsRef = useRef(new Float32Array(MAX_INSTANCES * 3).fill(NaN));
 
   // ── Public API ──────────────────────────────────────────────────────────────
 
@@ -134,6 +138,12 @@ export function StickerInstanceProvider({ children }) {
     if (colorRef.current) {
       instanceMesh.setColorAt(slot, colorRef.current);
       if (instanceMesh.instanceColor) instanceMesh.instanceColor.needsUpdate = true;
+      // Cache the seeded color so the first useFrame skips the redundant upload.
+      const base = slot * 3;
+      const lc = lastColorsRef.current;
+      lc[base] = colorRef.current.r;
+      lc[base + 1] = colorRef.current.g;
+      lc[base + 2] = colorRef.current.b;
     }
     return id;
   }, [instanceMesh]);
@@ -147,6 +157,9 @@ export function StickerInstanceProvider({ children }) {
     zeroedSlotsRef.current.delete(entry.slot);
     registryRef.current.delete(id);
     freeSlotsRef.current.push(entry.slot);
+    // Invalidate the cached color so the recycled slot uploads correctly on first use.
+    const base = entry.slot * 3;
+    lastColorsRef.current[base] = NaN;
   }, [instanceMesh]);
 
   // ── Per-frame update ────────────────────────────────────────────────────────
@@ -196,11 +209,20 @@ export function StickerInstanceProvider({ children }) {
       instanceMesh.setMatrixAt(slot, groupRef.current.matrixWorld);
       matDirty = true;
 
-      // Upload the current colour (StickerPlane keeps this ref up to date on
-      // every render and at the flip-animation midpoint).
+      // Upload the current colour only when it has changed since the last frame.
+      // Comparing the raw r/g/b floats is cheaper than a setColorAt + GPU upload
+      // every frame when colors are stable (which is the common case at rest).
       if (colorRef.current) {
-        instanceMesh.setColorAt(slot, colorRef.current);
-        colDirty = true;
+        const base = slot * 3;
+        const lc = lastColorsRef.current;
+        const { r, g, b } = colorRef.current;
+        if (lc[base] !== r || lc[base + 1] !== g || lc[base + 2] !== b) {
+          instanceMesh.setColorAt(slot, colorRef.current);
+          lc[base] = r;
+          lc[base + 1] = g;
+          lc[base + 2] = b;
+          colDirty = true;
+        }
       }
     }
 
