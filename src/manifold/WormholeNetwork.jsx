@@ -12,7 +12,7 @@ import { resolveColors } from '../utils/colorSchemes.js';
 // up to 50 animated strands × 30 pts = 1 125 GPU line vertices per tunnel.
 // Keeping only the most active MAX_TUNNELS connections bounds GPU work to a
 // fixed budget and keeps the visually interesting pairs on screen.
-const MAX_TUNNELS = 24;
+const MAX_TUNNELS = 300;
 
 const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
   const { cubies, size, showTunnels, settings, explosionFactor } = useGameStore(
@@ -65,6 +65,13 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
             const idx1 = ((x * size) + y) * size + z;
             const idx2 = ((antipodalLoc.x * size) + antipodalLoc.y) * size + antipodalLoc.z;
 
+            const centerCoord = Math.floor(size / 2);
+            const isCenter = (
+              (x === centerCoord && y === centerCoord) ||
+              (x === centerCoord && z === centerCoord) ||
+              (y === centerCoord && z === centerCoord)
+            );
+
             connections.push({
               id: gridId,
               gridId2: antipodalLoc.sticker ? getManifoldGridId(antipodalLoc.sticker, size) : null,
@@ -73,9 +80,12 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
               dirKey1: dirKey,
               dirKey2: antipodalLoc.dirKey,
               flips: sticker.flips,
+              active1: sticker.curr !== sticker.orig,
+              active2: antipodalLoc.sticker.curr !== antipodalLoc.sticker.orig,
+              isCenter,
               intensity: Math.min(sticker.flips / 10, 1),
-              color1: fc[sticker.orig],
-              color2: fc[antipodalLoc.sticker.orig]
+              color1: fc[sticker.curr],
+              color2: fc[antipodalLoc.sticker.curr]
             });
           });
         }
@@ -112,6 +122,7 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
           flips={t.flips}
           color1={t.color1}
           color2={t.color2}
+          isCenter={t.isCenter}
           size={size}
           explosionFactor={explosionFactor}
           maxStrands={maxStrands}
