@@ -1,7 +1,6 @@
 // src/game/cubeRotation.js
 // Cube rotation logic
 import { DIR_TO_VEC, VEC_TO_DIR } from '../utils/constants.js';
-import { clone3D } from './cubeState.js';
 
 // Rotate a vector 90 degrees around an axis
 export const rotateVec90 = (vx, vy, vz, axis, dir) => {
@@ -35,16 +34,26 @@ export const rotateStickers = (stickers, axis, dir) => {
   return next;
 };
 
-// Rotate a slice of cubies around an axis
+// Rotate a slice of cubies around an axis.
+// Only deep-clones cubies that are IN the rotating slice — cubies outside the
+// slice keep their original object references.  This lets React.memo correctly
+// short-circuit re-renders for non-rotating stickers (corners, opposite face, etc.),
+// preventing a mass concurrent re-render that would corrupt the InstancedMesh
+// color buffer and cause corner stickers to display the wrong color.
 export const rotateSliceCubies = (cubies, size, axis, sliceIndex, dir) => {
-  const k = (size - 1) / 2, next = clone3D(cubies), moves = [];
+  const k = (size - 1) / 2;
+  const moves = [];
+
+  // Shallow-clone only the outer arrays so we can write new cubie refs
+  // without mutating the original state.  Non-slice cubies are shared by reference.
+  const next = cubies.map(L => L.map(R => R.slice()));
 
   for (let x = 0; x < size; x++) {
     for (let y = 0; y < size; y++) {
       for (let z = 0; z < size; z++) {
         const inSlice = (axis === 'col' && x === sliceIndex) ||
-                        (axis === 'row' && y === sliceIndex) ||
-                        (axis === 'depth' && z === sliceIndex);
+          (axis === 'row' && y === sliceIndex) ||
+          (axis === 'depth' && z === sliceIndex);
         if (!inSlice) continue;
 
         let cx = x - k, cy = y - k, cz = z - k;
@@ -66,7 +75,7 @@ export const rotateSliceCubies = (cubies, size, axis, sliceIndex, dir) => {
 
   // Snapshot each cubie's original reference before any writes happen
   for (const m of moves) {
-    m.original = next[m.from[0]][m.from[1]][m.from[2]];
+    m.original = cubies[m.from[0]][m.from[1]][m.from[2]];
   }
 
   for (const m of moves) {
