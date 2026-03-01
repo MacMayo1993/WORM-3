@@ -25,84 +25,26 @@ import CircuitVolume from './styles/CircuitVolume.jsx';
 import WoodVolume from './styles/WoodVolume.jsx';
 import { BIOME_GROUND_TEXTURES } from './BiomeGroundTextures.js';
 import { resolveColors } from '../utils/colorSchemes.js';
+import FlipParticles from './FlipParticles.jsx';
+import AntipodalGlowFill from './AntipodalGlowFill.jsx';
+import ParityBreakthrough from './ParityBreakthrough.jsx';
+import StickerWorm from './StickerWorm.jsx';
+import DisparityHealthBar from './DisparityHealthBar.jsx';
 
-// Shared geometries for all particle/glow systems (created once, reused globally)
-const sharedParticleGeometry = new THREE.PlaneGeometry(1, 1);
-const sharedOuterRingGeometry = new THREE.RingGeometry(0.4, 0.5, 16);
-const sharedMainRingGeometry = new THREE.RingGeometry(0.2, 0.45, 16);
-const sharedInnerCircleGeometry = new THREE.CircleGeometry(0.48, 16);
-// Shared sticker plane geometry for stickers that don't need per-instance UV customisation.
-// (Stickers with face textures — Sudokube mode — still create their own geometry so UVs can
-// be patched per-sticker via geoRef.  All others share this one buffer.)
+// Shared geometries used only by StickerPlane itself (not by extracted sub-components).
 const _sharedStickerGeo = new THREE.PlaneGeometry(0.85, 0.85);
-// Shared ring/circle geometries for wormhole and flip-history indicators (created once, reused globally).
-const sharedRing38_41 = new THREE.RingGeometry(0.38, 0.41, 16); // orig-color border ring
-const sharedRing35_38 = new THREE.RingGeometry(0.35, 0.38, 16); // antipodal-color border ring
-const sharedRing36_40 = new THREE.RingGeometry(0.36, 0.40, 16); // wormhole pulsing ring
-const sharedCircle44 = new THREE.CircleGeometry(0.44, 16);       // wormhole glow fill
-// Scratch Object3D for FlipParticles matrix math — never added to a scene.
-const _particleDummy = new THREE.Object3D();
-// Scratch vectors for biome edge-on fade — allocated once, reused every frame.
+// Shared ring/circle geometries for wormhole and flip-history indicators.
+const sharedRing38_41 = new THREE.RingGeometry(0.38, 0.41, 16);
+const sharedRing35_38 = new THREE.RingGeometry(0.35, 0.38, 16);
+const sharedRing36_40 = new THREE.RingGeometry(0.36, 0.40, 16);
+const sharedCircle44 = new THREE.CircleGeometry(0.44, 16);
+// Scratch vectors for biome edge-on fade.
 const _normal = new THREE.Vector3();
 const _worldQuat = new THREE.Quaternion();
-
-// Shared geometries for ParityBreakthrough — one set allocated at module level,
-// reused across all flipped-sticker instances (avoids per-sticker GPU buffer uploads).
-const _pbBackGlowGeo = new THREE.PlaneGeometry(0.84, 0.84);
-const _pbThroughGlowGeo = new THREE.PlaneGeometry(0.82, 0.82);
-const _pbEdgeHGeo = new THREE.PlaneGeometry(0.84, 0.08); // top + bottom bars
-const _pbEdgeVGeo = new THREE.PlaneGeometry(0.08, 0.84); // left + right bars
-// Pre-allocated crack geometries (8 possible sizes, indexed in the same order as the
-// CRACK_DATA array below).
-const _pbCrackGeos = [
-  new THREE.PlaneGeometry(0.38, 0.018),
-  new THREE.PlaneGeometry(0.42, 0.016),
-  new THREE.PlaneGeometry(0.34, 0.017),
-  new THREE.PlaneGeometry(0.36, 0.015),
-  new THREE.PlaneGeometry(0.24, 0.014),
-  new THREE.PlaneGeometry(0.28, 0.013),
-  new THREE.PlaneGeometry(0.20, 0.012),
-  new THREE.PlaneGeometry(0.22, 0.012),
-];
-// Crack definitions — stable module-level constant so useMemo can reference it.
-const _PB_CRACKS_BASE = [
-  { pos: [0.12, 0.40, 0.004], rot: 0.08, geoIdx: 0 },
-  { pos: [-0.08, -0.39, 0.004], rot: -0.12, geoIdx: 1 },
-  { pos: [0.39, 0.06, 0.004], rot: 1.52, geoIdx: 2 },
-  { pos: [-0.38, -0.05, 0.004], rot: 1.62, geoIdx: 3 },
-];
-const _PB_CRACKS_L2 = [
-  { pos: [0.22, -0.18, 0.004], rot: 0.75, geoIdx: 4 },
-  { pos: [-0.18, 0.24, 0.004], rot: -0.6, geoIdx: 5 },
-];
-const _PB_CRACKS_L3 = [
-  { pos: [0.05, 0.12, 0.004], rot: 1.1, geoIdx: 6 },
-  { pos: [-0.1, -0.15, 0.004], rot: -0.9, geoIdx: 7 },
-];
-// Grid-edge glow bar positions — stable module-level constant.
-const _PB_GRID_EDGES = [
-  { pos: [0, 0.44, -0.005], horiz: true },   // top
-  { pos: [0, -0.44, -0.005], horiz: true },  // bottom
-  { pos: [0.44, 0, -0.005], horiz: false },  // right
-  { pos: [-0.44, 0, -0.005], horiz: false }, // left
-];
-
-// Shared geometries for Worm segments (scale=1, the common default).
-const _wormGeoHead = new THREE.SphereGeometry(0.022, 8, 8);
-const _wormGeoSeg1 = new THREE.SphereGeometry(0.018, 6, 6);
-const _wormGeoSeg2 = new THREE.SphereGeometry(0.017, 6, 6);
-const _wormGeoSeg3 = new THREE.SphereGeometry(0.015, 6, 6);
-const _wormGeoTail = new THREE.SphereGeometry(0.011, 6, 6);
-
-// Frame-shaped sticker Shape for hollow cube mode (square with rectangular hole).
-// Store the Shape, not the Geometry — each sticker creates its own ShapeGeometry
-// instance via declarative <shapeGeometry>, so R3F can safely dispose per-instance.
-// Stable city cache — keyed on origDir + origPos which are truly permanent.
-// Populated on first render before any rotation can corrupt meta.orig.
-
+// Frame-shaped sticker Shape for hollow cube mode.
 const _stickerFrameShape = (() => {
-  const outer = 0.425; // half of 0.85 sticker size
-  const inner = 0.34;  // inner hole half-size — wider opening, thinner colour border
+  const outer = 0.425;
+  const inner = 0.34;
   const shape = new THREE.Shape();
   shape.moveTo(-outer, -outer);
   shape.lineTo(outer, -outer);
@@ -119,405 +61,6 @@ const _stickerFrameShape = (() => {
   return shape;
 })();
 
-// Particle system for flip effect — single InstancedMesh, 1 draw call for all 12 particles.
-// Uses forwardRef + useImperativeHandle so the parent calls ref.trigger(color) imperatively
-// instead of toggling useState, which caused a full StickerPlane re-render on every flip.
-const FlipParticles = React.forwardRef((_props, ref) => {
-  const meshRef = useRef();
-  const progressRef = useRef(0);
-  const velocitiesRef = useRef([]);
-  const isActiveRef = useRef(false);
-  const PARTICLE_COUNT = 12;
-
-  // Expose .trigger(color) — called imperatively from the parent's useEffect.
-  useImperativeHandle(ref, () => ({
-    trigger(color) {
-      if (isActiveRef.current) return; // already animating — ignore re-entrant call
-      isActiveRef.current = true;
-      progressRef.current = 0;
-      velocitiesRef.current = Array.from({ length: PARTICLE_COUNT }, (_, i) => {
-        const angle = (i / PARTICLE_COUNT) * Math.PI * 2 + Math.random() * 0.4;
-        const speed = 2.5 + Math.random() * 2.0;
-        return {
-          x: Math.cos(angle) * speed,
-          y: Math.sin(angle) * speed,
-          z: (Math.random() - 0.5) * 1.5,
-          rotSpeed: (Math.random() - 0.5) * 15,
-          size: 0.06 + Math.random() * 0.06
-        };
-      });
-      if (meshRef.current?.material) {
-        meshRef.current.material.color.set(color);
-        meshRef.current.material.opacity = 1;
-      }
-    }
-  }), []);
-
-  // Zero-scale all instances on mount so they're invisible before first activation.
-  useEffect(() => {
-    const mesh = meshRef.current;
-    if (!mesh) return;
-    _particleDummy.scale.set(0, 0, 0);
-    _particleDummy.updateMatrix();
-    for (let i = 0; i < PARTICLE_COUNT; i++) mesh.setMatrixAt(i, _particleDummy.matrix);
-    mesh.instanceMatrix.needsUpdate = true;
-  }, []);
-
-  useFrame((_, delta) => {
-    const mesh = meshRef.current;
-    if (!mesh || !isActiveRef.current) return;
-
-    progressRef.current += delta * 1.8;
-    const p = progressRef.current;
-
-    if (p >= 1) {
-      isActiveRef.current = false;
-      // Collapse all instances to hide them.
-      _particleDummy.scale.set(0, 0, 0);
-      _particleDummy.updateMatrix();
-      for (let i = 0; i < PARTICLE_COUNT; i++) mesh.setMatrixAt(i, _particleDummy.matrix);
-      mesh.instanceMatrix.needsUpdate = true;
-      if (mesh.material) mesh.material.opacity = 0;
-      return;
-    }
-
-    const easeOut = 1 - Math.pow(1 - p, 4);
-    const opacity = Math.pow(1 - p, 0.5);
-    if (mesh.material) mesh.material.opacity = opacity;
-
-    for (let i = 0; i < PARTICLE_COUNT; i++) {
-      const vel = velocitiesRef.current[i];
-      if (!vel) continue;
-      _particleDummy.position.set(vel.x * easeOut * 0.8, vel.y * easeOut * 0.8, vel.z * easeOut * 0.4);
-      _particleDummy.rotation.set(0, 0, vel.rotSpeed * p);
-      const baseScale = vel.size * (1 - easeOut * 0.5);
-      _particleDummy.scale.set(baseScale, baseScale, baseScale * 0.5);
-      _particleDummy.updateMatrix();
-      mesh.setMatrixAt(i, _particleDummy.matrix);
-    }
-    mesh.instanceMatrix.needsUpdate = true;
-  });
-
-  // Single instancedMesh — 1 draw call replaces 12 individual meshes.
-  return (
-    <instancedMesh
-      ref={meshRef}
-      args={[sharedParticleGeometry, null, PARTICLE_COUNT]}
-      position={[0, 0, 0.05]}
-    >
-      <meshBasicMaterial
-        transparent
-        opacity={0}
-        blending={THREE.AdditiveBlending}
-        side={THREE.DoubleSide}
-        depthWrite={false}
-      />
-    </instancedMesh>
-  );
-});
-
-// Antipodal glow fill effect - glows from outside and fills inward
-// Uses persistent meshes with shared geometries
-const AntipodalGlowFill = ({ active, color }) => {
-  const ringRef = useRef();
-  const innerGlowRef = useRef();
-  const outerRingRef = useRef();
-  const progressRef = useRef(0);
-  const isActiveRef = useRef(false);
-
-  // Create materials immediately so they are available on the first render.
-  // Using useRef(new Material()) guarantees mesh.material is set correctly by
-  // R3F on the very first render — useEffect runs after render so refs initialized
-  // to null leave meshes with null material (skipped by Three.js renderer).
-  const outerMatRef = useRef(new THREE.MeshBasicMaterial({
-    color: '#ffffff', transparent: true, opacity: 0,
-    blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
-  }));
-  const ringMatRef = useRef(new THREE.MeshBasicMaterial({
-    color: '#ffffff', transparent: true, opacity: 0,
-    blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
-  }));
-  const innerMatRef = useRef(new THREE.MeshBasicMaterial({
-    color: '#ffffff', transparent: true, opacity: 0,
-    blending: THREE.AdditiveBlending, depthWrite: false,
-  }));
-
-  useEffect(() => {
-    return () => {
-      outerMatRef.current?.dispose();
-      ringMatRef.current?.dispose();
-      innerMatRef.current?.dispose();
-    };
-  }, []);
-
-  // Handle activation
-  useEffect(() => {
-    if (active && !isActiveRef.current) {
-      isActiveRef.current = true;
-      progressRef.current = 0;
-      // Update colors
-      if (outerMatRef.current) outerMatRef.current.color.set(color);
-      if (ringMatRef.current) ringMatRef.current.color.set(color);
-      if (innerMatRef.current) innerMatRef.current.color.set(color);
-    } else if (!active) {
-      isActiveRef.current = false;
-      // Hide materials
-      if (outerMatRef.current) outerMatRef.current.opacity = 0;
-      if (ringMatRef.current) ringMatRef.current.opacity = 0;
-      if (innerMatRef.current) innerMatRef.current.opacity = 0;
-    }
-  }, [active, color]);
-
-  useFrame((_, delta) => {
-    if (!isActiveRef.current) return;
-
-    progressRef.current = Math.min(1, progressRef.current + delta * 5);
-    const progress = progressRef.current;
-    const snappyProgress = 1 - Math.pow(1 - progress, 3);
-
-    if (ringRef.current) {
-      const ringScale = Math.max(0.01, 1 - snappyProgress);
-      ringRef.current.scale.set(ringScale, ringScale, 1);
-      const glowPulse = Math.sin(progress * Math.PI * 4) * 0.3 + 0.7;
-      ringMatRef.current.opacity = (1 - snappyProgress * 0.3) * glowPulse * 0.9;
-    }
-
-    if (outerRingRef.current) {
-      const edgeScale = Math.max(0.01, 1.1 - snappyProgress * 0.8);
-      outerRingRef.current.scale.set(edgeScale, edgeScale, 1);
-      outerMatRef.current.opacity = (1 - snappyProgress) * 0.6;
-    }
-
-    if (innerGlowRef.current) {
-      const fillScale = snappyProgress * 0.95;
-      innerGlowRef.current.scale.set(fillScale, fillScale, 1);
-      const fillOpacity = Math.sin(progress * Math.PI) * 0.7;
-      innerMatRef.current.opacity = fillOpacity;
-    }
-  });
-
-  // Always render, just hidden when not active
-  return (
-    <group position={[0, 0, 0.025]}>
-      <mesh ref={outerRingRef} geometry={sharedOuterRingGeometry} material={outerMatRef.current} scale={[0, 0, 0]} />
-      <mesh ref={ringRef} geometry={sharedMainRingGeometry} material={ringMatRef.current} scale={[0, 0, 0]} />
-      <mesh ref={innerGlowRef} position={[0, 0, -0.005]} geometry={sharedInnerCircleGeometry} material={innerMatRef.current} scale={[0, 0, 0]} />
-    </group>
-  );
-};
-
-// Persistent "parity breaking through" effect for flipped tiles.
-// Square glow fills the full cubie face (0.98×0.98 > 0.85 sticker) so the
-// original color's light shines outward through the black grid lines.
-const ParityBreakthrough = ({ origColor, flipCount }) => {
-  const backGlowRef = useRef();
-  const throughGlowRef = useRef();
-  const cracksRef = useRef([]);
-  const edgesRef = useRef([]);
-
-  useFrame((state) => {
-    const t = state.clock.elapsedTime;
-    const intensity = Math.min(0.4 + flipCount * 0.25, 1.5);
-
-    // Surge is pre-computed once per frame by CubeAssembly via updateSharedTremor.
-    // Reading the shared value avoids 3×sin + pow + max per ParityBreakthrough
-    // instance (one per wormhole sticker) every frame.
-    const surge = sharedTremorState.surge;
-
-    // Back glow — fills the cubie face, light bleeds through grid gaps
-    if (backGlowRef.current) {
-      backGlowRef.current.material.opacity = (0.2 + surge * 0.5) * intensity;
-      const s = 1.0 + surge * 0.08;
-      backGlowRef.current.scale.set(s, s, 1);
-    }
-
-    // Through-glow on front face during surges
-    if (throughGlowRef.current) {
-      throughGlowRef.current.material.opacity = surge * 0.25 * intensity;
-    }
-
-    // Grid-edge glow bars — these sit right at the sticker borders to
-    // simulate light pouring through the grid lines
-    edgesRef.current.forEach((ref) => {
-      if (!ref) return;
-      ref.material.opacity = (0.15 + surge * 0.55) * intensity;
-    });
-
-    // Surface cracks pulse with staggered timing
-    cracksRef.current.forEach((ref, i) => {
-      if (!ref) return;
-      const crackPulse = Math.pow(Math.max(0, Math.sin(t * 2.0 + i * 1.3)), 3.0);
-      ref.material.opacity = (0.08 + crackPulse * 0.5 + surge * 0.35) * intensity;
-    });
-  });
-
-  // Cracks scale with flips — more damage = more fractures.
-  // Uses module-level _PB_CRACKS_* constants (no per-render allocation).
-  const cracks = useMemo(() => {
-    const base = [..._PB_CRACKS_BASE];
-    if (flipCount >= 2) base.push(..._PB_CRACKS_L2);
-    if (flipCount >= 3) base.push(..._PB_CRACKS_L3);
-    return base;
-  }, [flipCount]);
-
-  return (
-    <group>
-      {/* Back glow — kept within sticker bounds (0.84 < 0.85 sticker) so the opaque
-          sticker fully occludes it via depth test. Corners of a 0.98-wide plane would
-          poke through the RoundedBox corner curves (radius=0.08) into empty space,
-          creating visible blobs at cube corners where 3 tiles converge. */}
-      <mesh ref={backGlowRef} position={[0, 0, -0.018]}>
-        <primitive object={_pbBackGlowGeo} attach="geometry" />
-        <meshBasicMaterial
-          color={origColor}
-          transparent
-          opacity={0.2}
-          blending={THREE.AdditiveBlending}
-          side={THREE.FrontSide}
-          depthWrite={false}
-        />
-      </mesh>
-
-      {/* Grid-edge glow bars — light pouring through the black grid lines */}
-      {_PB_GRID_EDGES.map((edge, i) => (
-        <mesh
-          key={`edge-${i}`}
-          ref={el => edgesRef.current[i] = el}
-          position={edge.pos}
-        >
-          <primitive object={edge.horiz ? _pbEdgeHGeo : _pbEdgeVGeo} attach="geometry" />
-          <meshBasicMaterial
-            color={origColor}
-            transparent
-            opacity={0.15}
-            blending={THREE.AdditiveBlending}
-            side={THREE.FrontSide}
-            depthWrite={false}
-          />
-        </mesh>
-      ))}
-
-      {/* Through-glow — original color bleeding through front during surges */}
-      <mesh ref={throughGlowRef} position={[0, 0, 0.002]}>
-        <primitive object={_pbThroughGlowGeo} attach="geometry" />
-        <meshBasicMaterial
-          color={origColor}
-          transparent
-          opacity={0}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-        />
-      </mesh>
-
-      {/* Surface cracks — light leaking through fractures */}
-      {cracks.map((crack, i) => (
-        <mesh
-          key={i}
-          ref={el => cracksRef.current[i] = el}
-          position={crack.pos}
-          rotation={[0, 0, crack.rot]}
-        >
-          <primitive object={_pbCrackGeos[crack.geoIdx]} attach="geometry" />
-          <meshBasicMaterial
-            color={origColor}
-            transparent
-            opacity={0.08}
-            blending={THREE.AdditiveBlending}
-            depthWrite={false}
-          />
-        </mesh>
-      ))}
-    </group>
-  );
-};
-
-// Worm component for disparity visualization.
-// Lies flat on the tile surface and undulates with a travelling sine wave.
-const Worm = ({ position, rotation, scale = 1 }) => {
-  const headRef = useRef();
-  const seg1Ref = useRef();
-  const seg2Ref = useRef();
-  const seg3Ref = useRef();
-  const tailRef = useRef();
-
-  useFrame(({ clock }) => {
-    const time = clock.elapsedTime;
-    // Travelling sine wave — each segment is phase-shifted along the body
-    const freq = 3.5;
-    const amp  = 0.020 * scale;
-    const refs = [headRef, seg1Ref, seg2Ref, seg3Ref, tailRef];
-    refs.forEach((ref, i) => {
-      if (!ref.current) return;
-      ref.current.position.y = Math.sin(time * freq - i * 0.70 + rotation) * amp;
-    });
-  });
-
-  const sp = 0.025 * scale; // spacing between segments along body axis
-
-  return (
-    // Rotate the group so the worm faces tangentially around the tile circle.
-    // rotation = angle of this worm's orbit position; +PI/2 = 90° = tangent direction.
-    <group position={position} rotation={[0, 0, rotation + Math.PI / 2]}>
-      {/* Head — round, slightly larger and lighter */}
-      <mesh ref={headRef} position={[sp * 2, 0, 0.016]}>
-        <primitive object={_wormGeoHead} attach="geometry" />
-        <meshBasicMaterial color="#dda15e" />
-      </mesh>
-      {/* Body segment 1 */}
-      <mesh ref={seg1Ref} position={[sp, 0, 0.015]}>
-        <primitive object={_wormGeoSeg1} attach="geometry" />
-        <meshBasicMaterial color="#bc6c25" />
-      </mesh>
-      {/* Body segment 2 */}
-      <mesh ref={seg2Ref} position={[0, 0, 0.015]}>
-        <primitive object={_wormGeoSeg2} attach="geometry" />
-        <meshBasicMaterial color="#a05c20" />
-      </mesh>
-      {/* Body segment 3 */}
-      <mesh ref={seg3Ref} position={[-sp, 0, 0.015]}>
-        <primitive object={_wormGeoSeg3} attach="geometry" />
-        <meshBasicMaterial color="#bc6c25" />
-      </mesh>
-      {/* Tail — smallest segment */}
-      <mesh ref={tailRef} position={[-sp * 2, 0, 0.015]}>
-        <primitive object={_wormGeoTail} attach="geometry" />
-        <meshBasicMaterial color="#a05c20" />
-      </mesh>
-    </group>
-  );
-};
-
-// Thin flip-pressure bar at the bottom edge of a sticker face.
-// Visible only during Disparity Mode on live tiles (not dead/headstoned).
-const DisparityHealthBar = React.memo(function DisparityHealthBar({ flips, flipCap }) {
-  const pct = Math.min(flips / flipCap, 1);
-  if (pct <= 0) return null; // un-flipped tiles show nothing
-
-  const barColor = pct < 0.33 ? '#22c55e' : pct < 0.66 ? '#f97316' : '#ef4444';
-  const isFlashing = pct >= 0.9;
-  const barWidth = pct * 0.82; // max 0.82 units = sticker width minus margin
-
-  return (
-    <group position={[0, -0.41, 0.002]}>
-      {/* Background track */}
-      <mesh>
-        <planeGeometry args={[0.82, 0.05]} />
-        <meshBasicMaterial color="#111111" transparent opacity={0.5} depthWrite={false} />
-      </mesh>
-      {/* Fill bar — left-aligned so it shrinks from right */}
-      <mesh position={[-(0.82 - barWidth) / 2, 0, 0.001]}>
-        <planeGeometry args={[barWidth, 0.05]} />
-        <meshBasicMaterial
-          color={barColor}
-          transparent
-          opacity={isFlashing ? 1.0 : 0.85}
-          depthWrite={false}
-          toneMapped={false}
-        />
-      </mesh>
-    </group>
-  );
-});
 
 const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay, mode, faceRow, faceCol, faceSize, hollow, currentDir: _currentDir }) {
   // Batch all store reads into a single subscription to minimize Zustand overhead.
@@ -933,7 +476,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // Use city-specific bgColor so edge gaps match the model's ground material, falling back to near-black.
   const materialColor = currTexture ? '#ffffff'
     : (biomeEnabled && stableCity && isGLBFullFace(stableCity)) ? (CITY_CONFIG[stableCity]?.bgColor ?? '#0d0d0d')
-    : baseColor;
+      : baseColor;
 
   // Store baseColor in ref for access in useFrame animation callbacks
   const baseColorRef = useRef(materialColor);
@@ -949,18 +492,53 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       : (manifoldStyles?.[meta?.curr] || 'solid');
   const tileStyleRef = useRef(tileStyle);
 
-  // Glass mode overrides all tile styles with glass material
+  // Glass mode overrides all tile styles with glass material.
+  // Each StickerPlane owns its own material instance — sharing via the LRU cache
+  // caused disposed materials to linger on corner-sticker meshes when the cache
+  // evicted entries, producing wrong colors after rotations.
   const useGlassStyle = isGlass && !isSudokube;
-  const glassMaterial = useMemo(() => {
-    if (!useGlassStyle) return null;
-    const colorHex = baseColor || '#888888';
-    try {
-      return getGlassMaterial(colorHex);
-    } catch (e) {
-      console.warn('Failed to create glass material:', e);
-      return null;
+  const glassMaterialRef = useRef(null);
+  // Create the material once on mount (or when glass mode turns on).
+  // Subsequent color changes update the uniform in-place — no object reallocation.
+  useEffect(() => {
+    if (!useGlassStyle) {
+      if (glassMaterialRef.current) {
+        glassMaterialRef.current.dispose();
+        glassMaterialRef.current = null;
+      }
+      return;
     }
-  }, [useGlassStyle, baseColor]);
+    const colorHex = baseColor || '#888888';
+    if (!glassMaterialRef.current) {
+      try {
+        // Clone from the shared cache so we get a fresh instance instead of the
+        // shared one that might be evicted / mutated by other stickers.
+        const shared = getGlassMaterial(colorHex);
+        glassMaterialRef.current = shared.clone();
+      } catch (e) {
+        console.warn('Failed to create glass material:', e);
+      }
+    } else {
+      // Update the existing material's color uniform in-place.
+      try {
+        glassMaterialRef.current.uniforms.baseColor.value.set(baseColor || '#888888');
+      } catch (_e) { /* ignore */ }
+    }
+    return () => {
+      glassMaterialRef.current?.dispose();
+      glassMaterialRef.current = null;
+    };
+  }, [useGlassStyle]); // eslint-disable-line react-hooks/exhaustive-deps -- intentional: create once
+
+  // Sync glass material color when baseColor changes (separate from creation)
+  useEffect(() => {
+    if (!glassMaterialRef.current) return;
+    try {
+      glassMaterialRef.current.uniforms.baseColor.value.set(baseColor || '#888888');
+    } catch (_e) { /* ignore */ }
+  }, [baseColor]);
+
+  const glassMaterial = useGlassStyle ? glassMaterialRef.current : null;
 
   // Full-face GLBs (arch, volcano) cover the entire sticker — suppress shader + volumes beneath them.
   const glbFullFace = biomeEnabled && !!stableCity && isGLBFullFace(stableCity);
@@ -1299,7 +877,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
             const y = Math.sin(angle) * radius;
             const scale = count <= 4 ? 0.7 + (i % 2) * 0.1 : 0.6;
             return (
-              <Worm
+              <StickerWorm
                 key={i}
                 position={[x, y, 0]}
                 rotation={angle}
