@@ -95,6 +95,15 @@ export const useGameStore = create(
       achievedWins: { rubiks: false, sudokube: false, ultimate: false, worm: false },
       hasShuffled: false,
       moveHistory: [],
+      // Full wipe of Chaos & Disparity states to ensure a truly fresh cube
+      chaosLevel: 0,
+      disparityDeaths: [],
+      disparityWinner: null,
+      showDisparityWinner: false,
+      disparityEliminatedFaces: [],
+      cascades: [],
+      blackHolePulse: 0,
+      flipWaveOrigins: [],
     }),
 
     // ========================================================================
