@@ -2,7 +2,6 @@
 // Manifold topology and antipodal flipping logic
 import { ANTIPODAL_COLOR, FLIP_CAP } from '../utils/constants.js';
 import { getGridRC, getManifoldGridId } from './coordinates.js';
-import { clone3D } from './cubeState.js';
 
 // Get manifold neighbors for a sticker - includes cross-face neighbors at edges
 // Returns array of {x, y, z, dirKey} for each neighbor
@@ -145,16 +144,22 @@ export const findAntipodalStickerByGrid = (manifoldMap, sticker, size) => {
   return manifoldMap.get(antipodalGridId) || null;
 };
 
-// Flip a sticker pair (sticker and its antipodal counterpart)
+// Flip a sticker pair (sticker and its antipodal counterpart).
+// Shallow-clones the outer arrays and only creates new cubie objects for the
+// two positions that actually change — identical to the pattern in cubeRotation.js.
+// This avoids a full deep-clone of all cubies on every user flip, which was
+// causing unnecessary re-renders of every StickerPlane in the scene.
 export const flipStickerPair = (state, size, x, y, z, dirKey, manifoldMap) => {
-  const next = clone3D(state);
-  const cubie = next[x]?.[y]?.[z];
-  const sticker = cubie?.stickers?.[dirKey];
+  // Shallow-clone: outer arrays are new, cubie objects are shared by reference
+  const next = state.map(L => L.map(R => R.slice()));
+
+  const sticker = state[x]?.[y]?.[z]?.stickers?.[dirKey];
   if (!sticker) return next;
 
-  const sticker1Loc = { x, y, z, dirKey, sticker };
+  const sticker1Loc = { x, y, z, dirKey };
   const sticker2Loc = findAntipodalStickerByGrid(manifoldMap, sticker, size);
 
+  // Create a new cubie object only for the affected position
   const applyFlip = (loc) => {
     if (!loc) return;
     const c = next[loc.x][loc.y][loc.z];
