@@ -139,17 +139,7 @@ const CubeAssembly = React.memo(({
   // Stable callback ref pattern: avoids recreating the function on every render,
   // which would defeat React.memo on all Cubie children.
   const animStateRef = useRef(animState);
-  // useLayoutEffect (not render body) so animStateRef is only mutated in the commit phase.
-  // In React 18 concurrent mode the render body can run speculatively before the commit,
-  // meaning a rAF could fire between the render body setting animStateRef=null and the
-  // commit running StickerPlane's useLayoutEffect([materialColor]) that updates
-  // instanceColorRef.current.  The priority-2 useFrame would then detect the
-  // animState→null transition and reset cubie positions while instanceColorRef still
-  // holds the old colour — one flash frame of correct positions but wrong colours.
-  // Keeping the ref strictly commit-phase eliminates this race.
-  useLayoutEffect(() => {
-    animStateRef.current = animState;
-  }, [animState]);
+  animStateRef.current = animState;
   const prevAnimStateRef = useRef(null); // tracks last frame's animState for transition detection
   const flipModeRef = useRef(flipMode);
   flipModeRef.current = flipMode;
@@ -557,12 +547,15 @@ const CubeAssembly = React.memo(({
   // Priority -2: earliest possible hook — detects the animState → null transition
   // and snaps all cubies to their grid positions before any other useFrame runs.
   //
-  // Why this is necessary: StickerPlane writes instanceColorRef.current in the
-  // React render body (not a useLayoutEffect), so in React 18 concurrent mode the
-  // colour ref can be updated by a speculative render before the commit that
-  // carries CubeAssembly's position-reset useLayoutEffect. Without this guard
-  // StickerInstances (priority 0) would sample the new colour with the still-rotated
-  // matrixWorld, producing a one-frame flash of new colours at wrong positions.
+  // Why this is necessary: in React 18 concurrent mode the render body can run
+  // speculatively before the commit.  animStateRef.current is updated in the
+  // render body, so a rAF could fire between the speculative render (where
+  // animStateRef flips to null) and the commit that carries the
+  // useLayoutEffect([animState,items]) position reset.  Without this guard,
+  // StickerInstances (priority 0) could sample the new instanceColorRef (already
+  // written by StickerPlane's useLayoutEffect in a prior partial commit) against
+  // still-rotated matrixWorld, producing a one-frame flash of new colours at
+  // wrong positions.  Snapping positions at priority -2 closes that window.
   useFrame(() => {
     const wasAnimating = prevAnimStateRef.current !== null;
     const nowAnimating = animStateRef.current !== null;
