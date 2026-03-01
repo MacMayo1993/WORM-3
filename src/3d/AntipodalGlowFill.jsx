@@ -33,10 +33,13 @@ const AntipodalGlowFill = ({ active, color }) => {
     }));
 
     useEffect(() => {
+        const outerMat = outerMatRef.current;
+        const ringMat = ringMatRef.current;
+        const innerMat = innerMatRef.current;
         return () => {
-            outerMatRef.current?.dispose();
-            ringMatRef.current?.dispose();
-            innerMatRef.current?.dispose();
+            outerMat?.dispose();
+            ringMat?.dispose();
+            innerMat?.dispose();
         };
     }, []);
 
