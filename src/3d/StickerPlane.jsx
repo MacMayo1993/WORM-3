@@ -58,8 +58,44 @@ const _stickerFrameShape = (() => {
   hole.lineTo(inner, -inner);
   hole.closePath();
   shape.holes.push(hole);
+  shape.holes.push(hole);
   return shape;
 })();
+
+const spiderVertexShader = `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const spiderFragmentShader = `
+  uniform vec3 uColor;
+  uniform float uTime;
+  uniform float uBurst;
+  varying vec2 vUv;
+  
+  void main() {
+    vec2 uv = vUv - 0.5;
+    float dist = length(uv);
+    if (dist > 0.5) discard;
+    
+    float angle = atan(uv.y, uv.x);
+    
+    float spiral = sin(angle * 6.0 + dist * 30.0 - uTime * 15.0);
+    float lines = smoothstep(0.7, 1.0, spiral);
+    
+    float ripples = sin(dist * 40.0 + uTime * 10.0);
+    float rippleLines = smoothstep(0.8, 1.0, ripples);
+    
+    float activity = max(lines, rippleLines * 0.6);
+    float edgeFade = smoothstep(0.5, 0.2, dist);
+    float intensity = uBurst * activity * edgeFade;
+    
+    gl_FragColor = vec4(uColor * 2.0, intensity * 0.9);
+  }
+`;
 
 
 const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay, mode, faceRow, faceCol, faceSize, hollow, currentDir: _currentDir }) {
@@ -88,6 +124,14 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const meshRef = useRef();
   const cityGroupRef = useRef();
   const geoRef = useRef();
+
+  const spiderPlaneRef = useRef();
+  const spiderMatRef = useRef();
+  const [spiderUniforms] = React.useState(() => ({
+    uColor: { value: new THREE.Color() },
+    uTime: { value: 0 },
+    uBurst: { value: 1.0 }, // Always fully active for ghost tiles
+  }));
 
   // ── InstancedMesh batch integration ─────────────────────────────────────────
   const instanceCtx = useStickerInstances();
@@ -259,15 +303,38 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       return; // skip other animations while dying
     }
 
+    const hasFlips = (meta?.flips ?? 0) > 0;
+    const needsGhostUpdate = hasFlips && spiderMatRef.current && (
+      (wormhole && spiderMatRef.current.uniforms.uBurst.value !== 1.0) ||
+      (!wormhole && spiderMatRef.current.uniforms.uBurst.value !== 0.4) ||
+      (!spiderPlaneRef.current.visible)
+    );
+
     // Single-boolean gate: skip the entire body on idle frames.
-    // ringRef / glowRef are only mounted when wormhole is true, so the
-    // original multi-condition check collapsed to this equivalent.
-    const anyActive = spinT.current > 0 || shakeT.current > 0 || wormhole;
+    // Ensure we trigger animation if the tile is flipped (since ghost tile needs uTime updates).
+    // If we need to transition the ghost tile (e.g. going from active to dormant), run at least one more frame.
+    const anyActive = spinT.current > 0 || shakeT.current > 0 || wormhole || needsGhostUpdate || (spiderPlaneRef.current?.visible && !hasFlips);
     if (!anyActive) {
       isActiveRef.current = false;
       return;
     }
     isActiveRef.current = true;
+
+    // Update Ghost Tile spiral animation if flipped
+    if (hasFlips && spiderPlaneRef.current && spiderMatRef.current) {
+      spiderPlaneRef.current.visible = true;
+      spiderMatRef.current.uniforms.uColor.value.set(baseColorRef.current);
+      if (wormhole) {
+        // Actively spinning disparate tile
+        spiderMatRef.current.uniforms.uTime.value = state.clock.elapsedTime;
+        spiderMatRef.current.uniforms.uBurst.value = 1.0;
+      } else {
+        // Dormant stamp -- stop time, dim it out slightly
+        spiderMatRef.current.uniforms.uBurst.value = 0.4;
+      }
+    } else if (spiderPlaneRef.current) {
+      spiderPlaneRef.current.visible = false;
+    }
 
     // Flip animation — X-axis scale squish (identity collapse, not card rotation)
     if (spinT.current > 0 && groupRef.current) {
@@ -640,7 +707,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     !isSudokube &&
     !biomeEnabled &&
     !currTexture &&
-    tileStyle === 'solid'
+    tileStyle === 'solid' &&
+    !(meta?.flips > 0) // Cannot instance if it has a ghost tile spider web (active or dormant)
   );
   // Update isInstancedRef every render so the manager's useFrame always reads a fresh value.
   // instanceColorRef is updated in useLayoutEffect([materialColor]) below, not here, so that
@@ -650,6 +718,20 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
   return (
     <group position={pos} rotation={rot} ref={groupRef}>
+      {/* Ghost spider web on the back of flipped tiles */}
+      <mesh ref={spiderPlaneRef} position={[0, 0, -1.01]} rotation={[0, Math.PI, 0]} visible={false}>
+        <planeGeometry args={[0.92, 0.92]} />
+        <shaderMaterial
+          ref={spiderMatRef}
+          vertexShader={spiderVertexShader}
+          fragmentShader={spiderFragmentShader}
+          uniforms={spiderUniforms}
+          transparent
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+        />
+      </mesh>
+
       {/* Inner group for UV rotation - rotates the sticker mesh and 3D volume overlays together around face normal (Z axis) */}
       <group rotation={[0, 0, uvRotationAngle]} ref={innerGroupRef}>
         {/* Main sticker quad — omitted when the InstancedMesh handles rendering */}
