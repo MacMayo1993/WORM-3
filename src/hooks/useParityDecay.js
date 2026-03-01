@@ -36,9 +36,9 @@ export function useParityDecay() {
 
   useEffect(() => {
     // Don't run during menus/welcome/animations, or while chaos mode is active.
-    // Chaos already drives sticker propagation at a much higher rate; running
-    // parity decay on top adds a competing RAF loop and periodic clone3D spikes.
-    if (showMainMenu || showWelcome || chaosLevel > 0) return;
+    // DISABLING by default to ensure tile identity stability as requested.
+    return;
+    // if (showMainMenu || showWelcome || chaosLevel > 0) return;
 
     let raf = 0;
     let last = performance.now();
