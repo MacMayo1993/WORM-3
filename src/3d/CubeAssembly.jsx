@@ -64,6 +64,7 @@ const CubeAssembly = React.memo(({
   const flipWaveOrigins = useGameStore(s => s.flipWaveOrigins);
   const handsMode = useGameStore(s => s.handsMode);
   const isBiomeMode = useGameStore(s => s.settings?.biomeMode?.enabled);
+  const rotationEpoch = useGameStore(s => s.rotationEpoch);
   const settings = useGameStore(s => s.settings); // for warmUpDefaultStyles on mount
   const cubieRefs = useRef([]);
   const controlsRef = useRef();
@@ -141,6 +142,7 @@ const CubeAssembly = React.memo(({
   const animStateRef = useRef(animState);
   animStateRef.current = animState;
   const prevAnimStateRef = useRef(null); // tracks last frame's animState for transition detection
+  const prevRotationEpochRef = useRef(rotationEpoch);
   const flipModeRef = useRef(flipMode);
   flipModeRef.current = flipMode;
   const onMoveRef = useRef(onMove);
@@ -318,6 +320,7 @@ const CubeAssembly = React.memo(({
           const targetAngle = quarterTurns * quarterTurn;
 
           // Single-turn: signal the animState useEffect to skip its own GSAP anim,
+          // Single-turn: signal the animState useEffect to skip its own GSAP anim,
           // since we are handling the visual here and will call onMove on complete.
           if (numTurns === 1) skipNextAnimRef.current = true;
 
@@ -344,8 +347,8 @@ const CubeAssembly = React.memo(({
               if (ld) {
                 const worldAxis =
                   ld.axis === 'col' ? _axisCol :
-                  ld.axis === 'row' ? _axisRow :
-                  _axisDepth;
+                    ld.axis === 'row' ? _axisRow :
+                      _axisDepth;
                 ld.sliceIndices.forEach(idx => {
                   const g = cubieRefs.current[idx];
                   if (g && ld.basePositions.has(idx)) {
@@ -362,7 +365,7 @@ const CubeAssembly = React.memo(({
               liveDragRef.current = null;
               sliceIndicesRef.current = null;
               setLiveDragAngle(0);
-              vibrate(14);
+              // trigger onMove (which now always sets animState for 1 turn).
               onMoveRef.current(savedAxis, gameDir, savedPos, numTurns);
             }
           });
@@ -502,13 +505,13 @@ const CubeAssembly = React.memo(({
     // Skip animation if this came from a drag commit (visual already at target)
     if (skipNextAnimRef.current) {
       skipNextAnimRef.current = false;
-      // Defer by one frame so the priority -2 useFrame can reset cubie positions
-      // before new cubies land and StickerPlane updates colors, preventing a flash
-      // where rotated colors briefly appear at the old grid positions.
+      // Reset progress refs so the -1 useFrame doesn't apply a stale delta
+      animProgressRef.current.value = 0;
+      prevProgressRef.current = 0;
+
+      // Immediately complete without animation - handleAnimComplete clears animState
       vibrate(14);
-      requestAnimationFrame(() => {
-        onAnimCompleteRef.current();
-      });
+      onAnimCompleteRef.current();
       return;
     }
 
@@ -544,24 +547,27 @@ const CubeAssembly = React.memo(({
     };
   }, [animState]);
 
-  // Priority -2: earliest possible hook — detects the animState → null transition
-  // and snaps all cubies to their grid positions before any other useFrame runs.
+  // Priority -2: earliest possible hook — detects state changes (via rotationEpoch)
+  // or animState transitions and snaps all cubies to their grid positions
+  // before any other useFrame runs.
   //
-  // Why this is necessary: in React 18 concurrent mode the render body can run
-  // speculatively before the commit.  animStateRef.current is updated in the
-  // render body, so a rAF could fire between the speculative render (where
-  // animStateRef flips to null) and the commit that carries the
-  // useLayoutEffect([animState,items]) position reset.  Without this guard,
-  // StickerInstances (priority 0) could sample the new instanceColorRef (already
-  // written by StickerPlane's useLayoutEffect in a prior partial commit) against
-  // still-rotated matrixWorld, producing a one-frame flash of new colours at
-  // wrong positions.  Snapping positions at priority -2 closes that window.
+  // Why this is necessary: StickerPlane writes instanceColorRef.current in the
+  // React render body (not a useLayoutEffect), so in React 18 concurrent mode the
+  // colour ref can be updated by a speculative render before the commit that
+  // carries CubeAssembly's position-reset useLayoutEffect. Without this guard
+  // StickerInstances (priority 0) would sample the new colour with the still-rotated
+  // matrixWorld, producing a one-frame flash of new colours at wrong positions.
+
   useFrame(() => {
     const wasAnimating = prevAnimStateRef.current !== null;
     const nowAnimating = animStateRef.current !== null;
-    prevAnimStateRef.current = animStateRef.current;
+    const epochChanged = rotationEpoch !== prevRotationEpochRef.current;
 
-    if (wasAnimating && !nowAnimating) {
+    prevAnimStateRef.current = animStateRef.current;
+    prevRotationEpochRef.current = rotationEpoch;
+
+    // Snap if we just finished an animation OR if the logical state jumped (drag snap)
+    if ((wasAnimating && !nowAnimating) || epochChanged) {
       const explosionMultiplier = size >= 4 ? 1.53 : 1.8;
       const expansionFactor = 1 + explosionFactorRef.current * explosionMultiplier;
       for (let idx = 0; idx < positionCache.length; idx++) {
@@ -710,66 +716,66 @@ const CubeAssembly = React.memo(({
 
   return (
     <StickerInstanceProvider>
-    <group ref={cubeGroupRef}>
-      <WormholeNetwork
-        manifoldMap={manifoldMap}
-        cubieRefs={cubieRefs.current}
-      />
-      {!isBiomeMode && cascades.map(c => (
-        <ChaosWave
-          key={c.id}
-          from={c.from}
-          to={c.to}
-          crossFace={c.crossFace}
-          onComplete={() => onCascadeComplete(c.id)}
+      <group ref={cubeGroupRef}>
+        <WormholeNetwork
+          manifoldMap={manifoldMap}
+          cubieRefs={cubieRefs.current}
         />
-      ))}
-      {flipWaveOrigins && flipWaveOrigins.length > 0 && (
-        <FlipPropagationWave
-          origins={flipWaveOrigins}
-          onComplete={onFlipWaveComplete}
-        />
-      )}
-      {/* VoidCore: swirling wormhole-color rings at the cube's hollow center */}
-      <VoidCore />
-      {items.map((it, idx) => {
-        // Skip the center cubie on odd-sized cubes — VoidCore occupies that space
-        const isCenterVoid = size % 2 !== 0 &&
-          it.pos[0] === 0 && it.pos[1] === 0 && it.pos[2] === 0;
-        if (isCenterVoid) return null;
-        return (
-          <Cubie
-            key={it.key}
-            ref={cubieRefCallbacks[idx]}
-            position={it.pos}
-            cubie={it.cubie}
-            size={size}
-            onPointerDown={onPointerDown}
+        {!isBiomeMode && cascades.map(c => (
+          <ChaosWave
+            key={c.id}
+            from={c.from}
+            to={c.to}
+            crossFace={c.crossFace}
+            onComplete={() => onCascadeComplete(c.id)}
           />
-        );
-      })}
-      {showCursor && cursor && (
-        <CursorHighlight />
-      )}
-      {solveHighlights && solveHighlights.length > 0 && (
-        <SolveHighlight
-          highlights={solveHighlights}
+        ))}
+        {flipWaveOrigins && flipWaveOrigins.length > 0 && (
+          <FlipPropagationWave
+            origins={flipWaveOrigins}
+            onComplete={onFlipWaveComplete}
+          />
+        )}
+        {/* VoidCore: swirling wormhole-color rings at the cube's hollow center */}
+        <VoidCore />
+        {items.map((it, idx) => {
+          // Skip the center cubie on odd-sized cubes — VoidCore occupies that space
+          const isCenterVoid = size % 2 !== 0 &&
+            it.pos[0] === 0 && it.pos[1] === 0 && it.pos[2] === 0;
+          if (isCenterVoid) return null;
+          return (
+            <Cubie
+              key={it.key}
+              ref={cubieRefCallbacks[idx]}
+              position={it.pos}
+              cubie={it.cubie}
+              size={size}
+              onPointerDown={onPointerDown}
+            />
+          );
+        })}
+        {showCursor && cursor && (
+          <CursorHighlight />
+        )}
+        {solveHighlights && solveHighlights.length > 0 && (
+          <SolveHighlight
+            highlights={solveHighlights}
+          />
+        )}
+        {/* DragGuide removed - real-time cube rotation provides visual feedback */}
+        <TrackballControls
+          ref={controlsRef}
+          noPan={true}
+          noZoom={handsMode && explosionFactor === 0}
+          noRotate={handsMode ? true : false}
+          minDistance={5}
+          maxDistance={{ 2: 28, 3: 28, 4: 38, 5: 52 }[size] || 28}
+          enabled={(!handsMode || explosionFactor > 0) && !animState && !dragStart && controlsEnabledRef.current}
+          staticMoving={false}
+          dynamicDampingFactor={isTouchDevice ? 0.15 : 0.08}
+          rotateSpeed={isTouchDevice ? 0.8 : 1.2}
         />
-      )}
-      {/* DragGuide removed - real-time cube rotation provides visual feedback */}
-      <TrackballControls
-        ref={controlsRef}
-        noPan={true}
-        noZoom={handsMode && explosionFactor === 0}
-        noRotate={handsMode ? true : false}
-        minDistance={5}
-        maxDistance={{ 2: 28, 3: 28, 4: 38, 5: 52 }[size] || 28}
-        enabled={(!handsMode || explosionFactor > 0) && !animState && !dragStart && controlsEnabledRef.current}
-        staticMoving={false}
-        dynamicDampingFactor={isTouchDevice ? 0.15 : 0.08}
-        rotateSpeed={isTouchDevice ? 0.8 : 1.2}
-      />
-    </group>
+      </group>
     </StickerInstanceProvider>
   );
 });
