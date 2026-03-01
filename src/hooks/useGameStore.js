@@ -206,7 +206,7 @@ export const useGameStore = create(
     addDisparityEliminatedFace: (faceNum) => set((state) => ({
       disparityEliminatedFaces: [...state.disparityEliminatedFaces, faceNum],
     })),
-    clearDisparityGame: () => set({ disparityDeaths: [], disparityWinner: null, showDisparityWinner: false, disparityEliminatedFaces: [] }),
+    clearDisparityGame: () => set({ disparityDeaths: [], disparityWinner: null, showDisparityWinner: false, disparityEliminatedFaces: [], cascades: [] }),
 
     // ========================================================================
     // ANIMATION STATE
@@ -426,7 +426,7 @@ export const useGameStore = create(
     setHasFlippedOnce: (hasFlippedOnce) => {
       try {
         localStorage.setItem('worm3_first_flip_done', hasFlippedOnce ? '1' : '0');
-      } catch {}
+      } catch { }
       set({ hasFlippedOnce });
     },
 
@@ -442,7 +442,7 @@ export const useGameStore = create(
         localStorage.setItem('worm3_settings', JSON.stringify(
           typeof settings === 'function' ? settings(get().settings) : settings
         ));
-      } catch {}
+      } catch { }
       set(typeof settings === 'function'
         ? (state) => ({ settings: settings(state.settings) })
         : { settings });
@@ -458,17 +458,17 @@ export const useGameStore = create(
     markIntroSeen: () => {
       try {
         localStorage.setItem('worm3_intro_seen', '1');
-      } catch {}
+      } catch { }
     },
     markTutorialDone: () => {
       try {
         localStorage.setItem('worm3_tutorial_done', '1');
-      } catch {}
+      } catch { }
     },
     markMobileHintShown: () => {
       try {
         localStorage.setItem('worm3_mobile_hint_shown', '1');
-      } catch {}
+      } catch { }
       set({ showMobileTouchHint: false });
     },
   }))
@@ -480,6 +480,6 @@ useGameStore.subscribe(
   (settings) => {
     try {
       localStorage.setItem('worm3_settings', JSON.stringify(settings));
-    } catch {}
+    } catch { }
   }
 );
