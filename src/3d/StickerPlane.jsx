@@ -1003,8 +1003,21 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // Sync material color/texture when meta.curr changes (e.g., during cube rotation).
   // Uses useLayoutEffect so the color updates BEFORE the browser paints,
   // preventing a 1-frame flash of the wrong color after rotation.
+  //
+  // instanceColorRef is also written here (not in the render body) so that it lands
+  // in the commit phase — the same phase where CubeAssembly's useLayoutEffect resets
+  // cubie positions to the grid.  Writing it in the render body caused a race in
+  // React 18 concurrent mode: the render phase could complete (mutating the ref) and
+  // yield before the commit, letting R3F's frame loop read new colors at still-rotated
+  // positions for one frame (the "sticker color flash" on single-turn drag releases).
   useLayoutEffect(() => {
     tileStyleRef.current = tileStyle;
+    // Always keep the instanced-mesh color ref current, even when this sticker is
+    // temporarily non-instanceable (the manager will zero its slot; the ref stays
+    // ready for when it becomes instanceable again without a re-register).
+    if (!isFlipping.current && spinT.current <= 0) {
+      instanceColorRef.current.setStyle(materialColor);
+    }
     if (meshRef.current && meshRef.current.material && !isFlipping.current && spinT.current <= 0) {
       const mat = meshRef.current.material;
       if (mat.color) {
@@ -1051,9 +1064,11 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     !currTexture &&
     tileStyle === 'solid'
   );
-  // Update refs every render so the manager's useFrame always reads fresh values.
+  // Update isInstancedRef every render so the manager's useFrame always reads a fresh value.
+  // instanceColorRef is updated in useLayoutEffect([materialColor]) below, not here, so that
+  // the color write is atomic with CubeAssembly's position-reset useLayoutEffect and cannot
+  // race with R3F's frame loop in React 18 concurrent mode.
   isInstancedRef.current = isInstanceable;
-  instanceColorRef.current.setStyle(materialColor);
 
   return (
     <group position={pos} rotation={rot} ref={groupRef}>
