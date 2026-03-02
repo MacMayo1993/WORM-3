@@ -691,7 +691,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
   // UV rotation: accumulated in-plane rotations when sticker stays on same face
   const uvRotation = meta?.uvRotation ?? 0;
-  const uvRotationAngle = -(uvRotation * Math.PI) / 2; // Negate for correct Three.js coordinate system
+  const uvRotationAngle = 0; // Non-orientable topology: no orientation correction applied
 
   // ── InstancedMesh eligibility ────────────────────────────────────────────────
   // A sticker is "instanceable" when it renders as a plain solid-colour quad with
