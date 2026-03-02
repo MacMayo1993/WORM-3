@@ -364,4 +364,33 @@ const Cubie = React.forwardRef(function Cubie({
   );
 });
 
-export default React.memo(Cubie);
+// Sticker direction keys — used by propsAreEqual to avoid Object.keys() per comparison.
+const _DIRS = ['PX', 'NX', 'PY', 'NY', 'PZ', 'NZ'];
+
+// Semantic equality for Cubie props.
+// Default React.memo uses reference equality for the `cubie` object, which is
+// correct for rotation (rotateSliceCubies preserves references for non-slice cubies).
+// A custom comparator also handles undo/reset paths where sticker data may be
+// structurally identical despite a new object reference, and makes position
+// comparison element-wise so future refactors can't silently regress it.
+function cubiePropsAreEqual(prev, next) {
+  if (prev.size !== next.size || prev.onPointerDown !== next.onPointerDown) return false;
+  if (
+    prev.position[0] !== next.position[0] ||
+    prev.position[1] !== next.position[1] ||
+    prev.position[2] !== next.position[2]
+  ) return false;
+  const pc = prev.cubie, nc = next.cubie;
+  if (pc === nc) return true;
+  if (pc.x !== nc.x || pc.y !== nc.y || pc.z !== nc.z) return false;
+  for (let i = 0; i < _DIRS.length; i++) {
+    const d = _DIRS[i];
+    const ps = pc.stickers[d], ns = nc.stickers[d];
+    if (ps === ns) continue;
+    if (!ps || !ns) return false;
+    if (ps.curr !== ns.curr || ps.flips !== ns.flips) return false;
+  }
+  return true;
+}
+
+export default React.memo(Cubie, cubiePropsAreEqual);

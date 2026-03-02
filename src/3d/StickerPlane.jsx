@@ -281,10 +281,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   }, [biomeEnabled]);
 
   useFrame((state, delta) => {
-    // Detect flipped tiles for persistent tremor
-    const wormhole = (meta?.flips ?? 0) > 0 && meta?.curr !== meta?.orig;;
-
     // Death implosion animation — -1 = idle (not started), 0..1 = playing, ≥1 = done
+    // Check this FIRST: pure ref reads, no meta prop access, has its own early return.
     if (deathAnimT.current >= 0 && deathAnimT.current < 1 && groupRef.current) {
       const prev = deathAnimT.current;
       deathAnimT.current = Math.min(1, prev + delta / 0.5);
@@ -303,7 +301,11 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       return; // skip other animations while dying
     }
 
+    // Compute flip state once — hasFlips guards wormhole so meta?.flips is only
+    // read once per frame instead of twice (was separate wormhole + hasFlips lines).
     const hasFlips = (meta?.flips ?? 0) > 0;
+    const wormhole = hasFlips && meta?.curr !== meta?.orig;
+
     const needsGhostUpdate = hasFlips && spiderMatRef.current && (
       (wormhole && spiderMatRef.current.uniforms.uBurst.value !== 1.0) ||
       (!wormhole && spiderMatRef.current.uniforms.uBurst.value !== 0.4) ||
