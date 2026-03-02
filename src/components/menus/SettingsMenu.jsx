@@ -138,14 +138,16 @@ function ColorsPanel({ settings, onSettingsChange, faceImages, onFaceImage }) {
               <input type="radio" name="colorScheme" value={key}
                 checked={settings.colorScheme === key}
                 onChange={() => update('colorScheme', key)} />
-              <span className="settings-radio-label">{SCHEME_LABELS[key]}</span>
-              {key !== 'custom' && (
-                <span className="scheme-preview">
-                  {Object.values(COLOR_SCHEMES[key]).map((c, i) => (
-                    <span key={i} className="scheme-dot" style={{ background: c }} />
-                  ))}
-                </span>
-              )}
+              <span className="scheme-info">
+                <span className="settings-radio-label">{SCHEME_LABELS[key]}</span>
+                {key !== 'custom' && (
+                  <span className="scheme-preview">
+                    {Object.values(COLOR_SCHEMES[key]).map((c, i) => (
+                      <span key={i} className="scheme-dot" style={{ background: c }} />
+                    ))}
+                  </span>
+                )}
+              </span>
             </label>
           ))}
         </div>

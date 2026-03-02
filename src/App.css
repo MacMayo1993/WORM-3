@@ -1472,11 +1472,17 @@ body {
   background: var(--rubiks-blue);
 }
 
+.scheme-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
 .settings-radio-label {
   font-size: 14px;
   color: rgba(255, 255, 255, 0.87);
   font-family: 'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  flex: 1;
 }
 
 .scheme-preview {
@@ -1485,10 +1491,10 @@ body {
 }
 
 .scheme-dot {
-  width: 14px;
-  height: 14px;
-  border-radius: 3px;
-  border: 1px solid rgba(0, 0, 0, 0.3);
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.35);
 }
 
 /* Image Upload */
