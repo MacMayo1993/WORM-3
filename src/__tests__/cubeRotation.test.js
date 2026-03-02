@@ -300,22 +300,25 @@ describe('rotateSliceCubies', () => {
   });
 
   describe('uvRotation handling', () => {
-    it('should increment uvRotation for face-center sticker on depth rotation', () => {
+    // uvRotation is always 0: no auto-orientation correction is applied.
+    // Stickers on RP2 accumulate holonomy naturally; a non-contractible loop
+    // returns a sticker with its texture rotated, which is topologically correct.
+    it('should keep uvRotation at 0 for face-center sticker on depth rotation', () => {
       const cubies = makeCubies(3);
       const rotated = rotateSliceCubies(cubies, 3, 'depth', 2, 1);
-      expect(rotated[1][1][2].stickers.PZ.uvRotation).toBe(1);
+      expect(rotated[1][1][2].stickers.PZ.uvRotation).toBe(0);
     });
 
-    it('should increment uvRotation for face-center sticker on col rotation', () => {
+    it('should keep uvRotation at 0 for face-center sticker on col rotation', () => {
       const cubies = makeCubies(3);
       const rotated = rotateSliceCubies(cubies, 3, 'col', 2, 1);
-      expect(rotated[2][1][1].stickers.PX.uvRotation).toBe(1);
+      expect(rotated[2][1][1].stickers.PX.uvRotation).toBe(0);
     });
 
-    it('should increment uvRotation for face-center sticker on row rotation', () => {
+    it('should keep uvRotation at 0 for face-center sticker on row rotation', () => {
       const cubies = makeCubies(3);
       const rotated = rotateSliceCubies(cubies, 3, 'row', 2, 1);
-      expect(rotated[1][2][1].stickers.PY.uvRotation).toBe(1);
+      expect(rotated[1][2][1].stickers.PY.uvRotation).toBe(0);
     });
 
     it('should return uvRotation to 0 after 4 face rotations', () => {
@@ -326,10 +329,10 @@ describe('rotateSliceCubies', () => {
       expect(cubies[2][1][1].stickers.PX.uvRotation).toBe(0);
     });
 
-    it('should decrement uvRotation for dir=-1 rotation', () => {
+    it('should keep uvRotation at 0 for dir=-1 rotation', () => {
       const cubies = makeCubies(3);
       const rotated = rotateSliceCubies(cubies, 3, 'depth', 2, -1);
-      expect(rotated[1][1][2].stickers.PZ.uvRotation).toBe(3); // (0 + -1 + 4) % 4
+      expect(rotated[1][1][2].stickers.PZ.uvRotation).toBe(0);
     });
   });
 });
