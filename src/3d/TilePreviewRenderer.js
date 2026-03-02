@@ -48,8 +48,11 @@ function renderToCanvas(styleKey, colorHex, simTime, targetCanvas) {
   ensureRenderer();
 
   const mat = getTileStyleMaterial(styleKey, colorHex);
-  // Override the time uniform so previews animate relative to our local clock
+  // Temporarily override the time uniform so previews animate on our local clock,
+  // then restore it so the main scene's material is not affected.
+  let savedTime = null;
   if (mat.uniforms && mat.uniforms.time) {
+    savedTime = mat.uniforms.time.value;
     mat.uniforms.time.value = simTime;
   }
   mesh.material = mat;
@@ -59,7 +62,10 @@ function renderToCanvas(styleKey, colorHex, simTime, targetCanvas) {
   const ctx = targetCanvas.getContext('2d');
   ctx.drawImage(renderer.domElement, 0, 0, targetCanvas.width, targetCanvas.height);
 
-  mat.dispose();
+  if (savedTime !== null) {
+    mat.uniforms.time.value = savedTime;
+  }
+  // Do NOT dispose — the LRU cache owns this material instance.
 }
 
 // ── Subscription registry ────────────────────────────────────────────────────
