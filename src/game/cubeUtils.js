@@ -97,3 +97,20 @@ export function forEachEdgeSticker(size, callback) {
 export function countEdgeStickers(size) {
   return 6 * size * size;
 }
+
+
+/**
+ * Export cube state as pretty JSON for verification/debug tooling
+ */
+export const exportCubeState = (cubies) => JSON.stringify(cubies, null, 2);
+
+/**
+ * Import cube state from JSON string
+ */
+export const importCubeState = (jsonStr) => {
+  const parsed = JSON.parse(jsonStr);
+  if (!Array.isArray(parsed)) {
+    throw new Error('Invalid cube JSON: expected a 3D cubie array.');
+  }
+  return parsed;
+};
