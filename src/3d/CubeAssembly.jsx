@@ -15,6 +15,7 @@ import { vibrate } from '../utils/audio.js';
 import { updateSharedTime, updateSharedTremor, warmUpDefaultStyles } from './styles/TileStyleMaterials.jsx';
 import { StickerInstanceProvider } from './StickerInstances.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
+import { useShallow } from 'zustand/react/shallow';
 import { resolveColors } from '../utils/colorSchemes.js';
 
 // Reusable axis vectors and quaternion (allocated once, never recreated)
@@ -42,6 +43,10 @@ const isTouchDevice = typeof window !== 'undefined' && (
 // Drag threshold - small for immediate response
 const DRAG_THRESHOLD = isTouchDevice ? 8 : 5;
 
+// Max camera distance per cube size — defined once at module scope to avoid
+// creating a new object literal on every CubeAssembly render.
+const MAX_DISTANCE_BY_SIZE = { 2: 28, 3: 28, 4: 38, 5: 52 };
+
 // Pixels of drag to complete a 90° rotation
 const PIXELS_PER_90DEG = 100;
 
@@ -55,17 +60,32 @@ const CubeAssembly = React.memo(({
   solveHighlights,
   onFaceRotationMode,
 }) => {
-  // ── State from store ────────────────────────────────────────────────────────
-  const explosionFactor = useGameStore(s => s.explosionT);
-  const cascades = useGameStore(s => s.cascades);
-  const cursor = useGameStore(s => s.cursor);
-  const showCursor = useGameStore(s => s.showCursor);
-  const flipMode = useGameStore(s => s.flipMode);
-  const flipWaveOrigins = useGameStore(s => s.flipWaveOrigins);
-  const handsMode = useGameStore(s => s.handsMode);
-  const isBiomeMode = useGameStore(s => s.settings?.biomeMode?.enabled);
-  const rotationEpoch = useGameStore(s => s.rotationEpoch);
-  const settings = useGameStore(s => s.settings); // for warmUpDefaultStyles on mount
+  // ── State from store (batched with useShallow to reduce subscription count) ──
+  const {
+    explosionFactor,
+    cascades,
+    cursor,
+    showCursor,
+    flipMode,
+    flipWaveOrigins,
+    handsMode,
+    isBiomeMode,
+    rotationEpoch,
+    settings,
+  } = useGameStore(
+    useShallow(s => ({
+      explosionFactor: s.explosionT,
+      cascades: s.cascades,
+      cursor: s.cursor,
+      showCursor: s.showCursor,
+      flipMode: s.flipMode,
+      flipWaveOrigins: s.flipWaveOrigins,
+      handsMode: s.handsMode,
+      isBiomeMode: s.settings?.biomeMode?.enabled,
+      rotationEpoch: s.rotationEpoch,
+      settings: s.settings,
+    }))
+  );
   const cubieRefs = useRef([]);
   const controlsRef = useRef();
   const controlsEnabledRef = useRef(true); // Track controls state with ref for immediate updates
@@ -80,7 +100,6 @@ const CubeAssembly = React.memo(({
 
   // Live drag rotation state - tracks real-time rotation as user drags
   const liveDragRef = useRef(null); // { axis, sliceIndex, angle, dir, basePositions, baseRotations }
-  const [, setLiveDragAngle] = useState(0); // Triggers re-render for useFrame
   const sizeRef = useRef(size);
   sizeRef.current = size;
   const skipNextAnimRef = useRef(false); // Skip animState animation after live drag
@@ -282,7 +301,6 @@ const CubeAssembly = React.memo(({
           ? (dx - ld.startDx) * ld.mappingDir
           : (ld.startDy - dy) * ld.mappingDir;  // Flip Y since screen Y is inverted
         ld.angle = (dragDist / PIXELS_PER_90DEG) * (Math.PI / 2);
-        setLiveDragAngle(ld.angle);
       }
     };
 
@@ -333,7 +351,6 @@ const CubeAssembly = React.memo(({
             angle: targetAngle,
             duration: snapDuration,
             ease: 'power3.out',
-            onUpdate: () => setLiveDragAngle(ld.angle),
             onComplete: () => {
               gsapAnimRef.current = null;
 
@@ -364,7 +381,6 @@ const CubeAssembly = React.memo(({
 
               liveDragRef.current = null;
               sliceIndicesRef.current = null;
-              setLiveDragAngle(0);
               // trigger onMove (which now always sets animState for 1 turn).
               onMoveRef.current(savedAxis, gameDir, savedPos, numTurns);
             }
@@ -376,12 +392,10 @@ const CubeAssembly = React.memo(({
             angle: 0,
             duration: snapBackDuration,
             ease: 'power3.out',
-            onUpdate: () => setLiveDragAngle(ld.angle),
             onComplete: () => {
               gsapAnimRef.current = null;
               liveDragRef.current = null;
               sliceIndicesRef.current = null;
-              setLiveDragAngle(0);
             }
           });
         }
@@ -769,7 +783,7 @@ const CubeAssembly = React.memo(({
           noZoom={handsMode && explosionFactor === 0}
           noRotate={handsMode ? true : false}
           minDistance={5}
-          maxDistance={{ 2: 28, 3: 28, 4: 38, 5: 52 }[size] || 28}
+          maxDistance={MAX_DISTANCE_BY_SIZE[size] || 28}
           enabled={(!handsMode || explosionFactor > 0) && !animState && !dragStart && controlsEnabledRef.current}
           staticMoving={false}
           dynamicDampingFactor={isTouchDevice ? 0.15 : 0.08}

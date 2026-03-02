@@ -165,8 +165,20 @@ const Cubie = React.forwardRef(function Cubie({
     return (faceColors || FACE_COLORS)[sticker.curr];
   };
 
-  // Determine which edges are visible (on cube exterior)
-  const isOnEdge = getEdgeFlags(cubie.x, cubie.y, cubie.z, size);
+  // Memoize edge flags so wireframeEdges dep is stable across renders.
+  // Only recomputes when the cubie's grid position or cube size changes.
+  const isOnEdge = useMemo(
+    () => getEdgeFlags(cubie.x, cubie.y, cubie.z, size),
+    [cubie.x, cubie.y, cubie.z, size]
+  );
+
+  // Primitive fingerprint of each face's current color — a plain string that
+  // React can compare by value. Changes only when sticker colors actually change,
+  // not on every object-reference re-creation during rotation.
+  // Skipped (empty string) when not in wireframe mode to avoid wasted work.
+  const stickerColorKey = visualMode === 'wireframe'
+    ? `${cubie.stickers.PZ?.curr},${cubie.stickers.NZ?.curr},${cubie.stickers.PX?.curr},${cubie.stickers.NX?.curr},${cubie.stickers.PY?.curr},${cubie.stickers.NY?.curr}`
+    : '';
 
   // Generate wireframe edges for wireframe mode ONLY
   const wireframeEdges = useMemo(() => {
@@ -256,7 +268,7 @@ const Cubie = React.forwardRef(function Cubie({
     }
 
     return edgeList;
-  }, [visualMode, cubie, isOnEdge, size]);
+  }, [visualMode, isOnEdge, size, faceColors, stickerColorKey]);
 
   // Mirror mode: derive this piece's intrinsic box dimensions from its *original*
   // home position (origPos), not its current grid slot.  rotateSliceCubies writes
@@ -265,15 +277,17 @@ const Cubie = React.forwardRef(function Cubie({
   // keeps its own unique shape as it travels around the lattice — the core
   // mechanic of a mirror cube.  Interior pieces (no stickers) use current
   // position as a safe fallback; they're not part of the scramble identity.
+  //
+  // Use primitive origPos coordinates as deps instead of `cubie.stickers` (a new
+  // object reference on every rotation) to avoid spurious recalculations.
+  const _firstStickerOrigPos = Object.values(cubie.stickers)[0]?.origPos;
+  const origHomeX = _firstStickerOrigPos?.x ?? cubie.x;
+  const origHomeY = _firstStickerOrigPos?.y ?? cubie.y;
+  const origHomeZ = _firstStickerOrigPos?.z ?? cubie.z;
   const mirrorDims = useMemo(() => {
     if (!mirrorMode) return null;
-    const stickerList = Object.values(cubie.stickers);
-    const home = stickerList.length > 0
-      ? stickerList[0].origPos
-      : { x: cubie.x, y: cubie.y, z: cubie.z };
-    return getMirrorDimensions(home.x, home.y, home.z, size);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mirrorMode, cubie.stickers, size]);
+    return getMirrorDimensions(origHomeX, origHomeY, origHomeZ, size);
+  }, [mirrorMode, origHomeX, origHomeY, origHomeZ, size]);
 
   return (
     <group position={explodedPos} ref={ref}>
