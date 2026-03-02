@@ -551,7 +551,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
   // In biome mode the ground texture IS the tile style — force solid so no
   // shader layer renders underneath the buildings.
-  const _styleKey = biomeEnabled ? cityFace : meta?.curr;
+  const _styleKey = biomeEnabled ? cityFace : meta?.orig;
   const tileStyle = biomeGroundTexture
     ? 'solid'
     : stableCity
