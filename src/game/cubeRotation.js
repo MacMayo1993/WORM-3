@@ -24,11 +24,9 @@ export const rotateStickers = (stickers, axis, dir) => {
     const [rx, ry, rz] = rotateVec90(vx, vy, vz, axis, dir);
     const newKey = VEC_TO_DIR(rx, ry, rz);
 
-    // If sticker stays on same face (in-plane rotation), increment/decrement uvRotation
-    const stayedOnSameFace = newKey === k;
     next[newKey] = {
       ...st,
-      uvRotation: stayedOnSameFace ? ((st.uvRotation || 0) + dir + 4) % 4 : (st.uvRotation || 0)
+      uvRotation: 0
     };
   }
   return next;
