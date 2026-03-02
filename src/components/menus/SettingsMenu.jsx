@@ -132,7 +132,7 @@ function ColorsPanel({ settings, onSettingsChange, faceImages, onFaceImage }) {
       {/* Color Scheme */}
       <section className="settings-section">
         <h3 className="settings-section-title">Color Scheme</h3>
-        <div className="settings-radio-group">
+        <div className="settings-radio-group scheme-grid">
           {Object.keys(SCHEME_LABELS).map(key => (
             <label key={key} className={`settings-radio${settings.colorScheme === key ? ' active' : ''}`}>
               <input type="radio" name="colorScheme" value={key}
