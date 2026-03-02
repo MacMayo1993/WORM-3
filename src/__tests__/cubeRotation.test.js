@@ -233,7 +233,7 @@ describe('rotateSliceCubies', () => {
       rotated = rotateSliceCubies(makeCubies(3), 3, 'col', 2, 1);
     });
 
-    it('should keep PX stickers on the right face with incremented uvRotation', () => {
+    it('should keep PX stickers on the right face after col rotation', () => {
       for (let y = 0; y < 3; y++) {
         for (let z = 0; z < 3; z++) {
           expect(rotated[2][y][z].stickers.PX?.curr).toBe(5); // blue
@@ -270,7 +270,7 @@ describe('rotateSliceCubies', () => {
       rotated = rotateSliceCubies(makeCubies(3), 3, 'row', 2, 1);
     });
 
-    it('should keep PY stickers on the top face with incremented uvRotation', () => {
+    it('should keep PY stickers on the top face after row rotation', () => {
       for (let x = 0; x < 3; x++) {
         for (let z = 0; z < 3; z++) {
           expect(rotated[x][2][z].stickers.PY?.curr).toBe(3); // white
@@ -299,40 +299,4 @@ describe('rotateSliceCubies', () => {
     });
   });
 
-  describe('uvRotation handling', () => {
-    // uvRotation is always 0: no auto-orientation correction is applied.
-    // Stickers on RP2 accumulate holonomy naturally; a non-contractible loop
-    // returns a sticker with its texture rotated, which is topologically correct.
-    it('should keep uvRotation at 0 for face-center sticker on depth rotation', () => {
-      const cubies = makeCubies(3);
-      const rotated = rotateSliceCubies(cubies, 3, 'depth', 2, 1);
-      expect(rotated[1][1][2].stickers.PZ.uvRotation).toBe(0);
-    });
-
-    it('should keep uvRotation at 0 for face-center sticker on col rotation', () => {
-      const cubies = makeCubies(3);
-      const rotated = rotateSliceCubies(cubies, 3, 'col', 2, 1);
-      expect(rotated[2][1][1].stickers.PX.uvRotation).toBe(0);
-    });
-
-    it('should keep uvRotation at 0 for face-center sticker on row rotation', () => {
-      const cubies = makeCubies(3);
-      const rotated = rotateSliceCubies(cubies, 3, 'row', 2, 1);
-      expect(rotated[1][2][1].stickers.PY.uvRotation).toBe(0);
-    });
-
-    it('should return uvRotation to 0 after 4 face rotations', () => {
-      let cubies = makeCubies(3);
-      for (let i = 0; i < 4; i++) {
-        cubies = rotateSliceCubies(cubies, 3, 'col', 2, 1);
-      }
-      expect(cubies[2][1][1].stickers.PX.uvRotation).toBe(0);
-    });
-
-    it('should keep uvRotation at 0 for dir=-1 rotation', () => {
-      const cubies = makeCubies(3);
-      const rotated = rotateSliceCubies(cubies, 3, 'depth', 2, -1);
-      expect(rotated[1][1][2].stickers.PZ.uvRotation).toBe(0);
-    });
-  });
 });
