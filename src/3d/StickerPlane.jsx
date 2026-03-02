@@ -689,9 +689,6 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const origIsWhite = meta?.orig === 3;
   const antipodalIsWhite = ANTIPODAL_COLOR[meta?.orig] === 3;
 
-  // non-orientable: no counter-rotation applied — holonomy from RP2 loops is preserved
-  const uvRotationAngle = 0;
-
   // ── InstancedMesh eligibility ────────────────────────────────────────────────
   // A sticker is "instanceable" when it renders as a plain solid-colour quad with
   // no shader, no special geometry, and no biome overlay.  The manager handles the
@@ -731,8 +728,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         />
       </mesh>
 
-      {/* Inner group for UV rotation - rotates the sticker mesh and 3D volume overlays together around face normal (Z axis) */}
-      <group rotation={[0, 0, uvRotationAngle]} ref={innerGroupRef}>
+      <group ref={innerGroupRef}>
         {/* Main sticker quad — omitted when the InstancedMesh handles rendering */}
         {!isInstanceable && <mesh ref={meshRef} key={hollow ? 'frame' : 'plane'}>
           {hollow ? (

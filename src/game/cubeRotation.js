@@ -24,10 +24,7 @@ export const rotateStickers = (stickers, axis, dir) => {
     const [rx, ry, rz] = rotateVec90(vx, vy, vz, axis, dir);
     const newKey = VEC_TO_DIR(rx, ry, rz);
 
-    next[newKey] = {
-      ...st,
-      uvRotation: 0
-    };
+    next[newKey] = { ...st };
   }
   return next;
 };
