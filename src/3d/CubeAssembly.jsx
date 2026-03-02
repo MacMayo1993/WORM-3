@@ -551,16 +551,18 @@ const CubeAssembly = React.memo(({
     prevProgressRef.current = 0;
 
     // Use GSAP to animate the progress value with snappy easing
-    // Hands mode uses faster, crisper animations (speedcuber feel)
+    // Hands mode and shuffle moves use faster, crisper animations
     const isHands = handsModeRef.current;
+    const isShuffle = !!animState?.isShuffle;
+    const isFast = isHands || isShuffle;
     gsapAnimRef.current = gsap.to(animProgressRef.current, {
       value: 1,
-      duration: isHands ? 0.12 : 0.35,
-      ease: isHands ? "power2.out" : "back.out(1.4)",
+      duration: isFast ? 0.12 : 0.35,
+      ease: isFast ? "power2.out" : "back.out(1.4)",
       onComplete: () => {
         gsapAnimRef.current = null;
         sliceIndicesRef.current = null;
-        vibrate(isHands ? 8 : 14);
+        vibrate(isFast ? 8 : 14);
         onAnimCompleteRef.current();
       }
     });
