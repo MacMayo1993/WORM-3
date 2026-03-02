@@ -39,7 +39,6 @@ import {
 } from './hooks/index.js';
 
 // 3D components
-import { preloadBiomeAssets } from './3d/BiomeGLBCluster.jsx';
 import GameScene from './3d/GameScene.jsx';
 import IntroScene from './components/intro/IntroScene.jsx';
 
