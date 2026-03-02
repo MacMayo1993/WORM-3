@@ -16,15 +16,17 @@ export const rotateVec90 = (vx, vy, vz, axis, dir) => {
   return [nx, ny, vz];
 };
 
-// Rotate stickers on a cubie (remap keys to match new face orientation)
+// Rotate stickers on a cubie (remap keys to match new face orientation).
+// for...in iterates own enumerable string keys in insertion order without
+// allocating a temporary [key,value] tuple array as Object.entries() does
+// (~150 throwaway allocations on a 5×5 rotation).
 export const rotateStickers = (stickers, axis, dir) => {
   const next = {};
-  for (const [k, st] of Object.entries(stickers)) {
+  for (const k in stickers) {
     const [vx, vy, vz] = DIR_TO_VEC[k];
     const [rx, ry, rz] = rotateVec90(vx, vy, vz, axis, dir);
     const newKey = VEC_TO_DIR(rx, ry, rz);
-
-    next[newKey] = { ...st };
+    next[newKey] = { ...stickers[k] };
   }
   return next;
 };
