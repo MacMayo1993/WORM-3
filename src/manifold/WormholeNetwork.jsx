@@ -15,16 +15,25 @@ import { resolveColors } from '../utils/colorSchemes.js';
 const MAX_TUNNELS = 300;
 
 const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
-  const { cubies, size, showTunnels, settings, explosionFactor } = useGameStore(
+  const { cubies, size, showTunnels, settings, explosionFactor, disparityDeaths } = useGameStore(
     useShallow(s => ({
       cubies: s.cubies,
       size: s.size,
       showTunnels: s.showTunnels,
       settings: s.settings,
       explosionFactor: s.explosionT,
+      disparityDeaths: s.disparityDeaths,
     }))
   );
   const fc = resolveColors(settings, settings?.biomeMode?.faceAssignment) || FACE_COLORS;
+
+  // Build a Set of dead grid IDs from disparityDeaths — updated immediately (not debounced)
+  // so tunnels for dead antipodal pairs are severed on the very next render after death,
+  // rather than waiting up to 150ms for the debounced cubies to catch up.
+  const deadGridIds = useMemo(
+    () => new Set(disparityDeaths.map(d => d.gridId)),
+    [disparityDeaths]
+  );
 
   // B4: debounce cubies so tunnel geometry only rebuilds at most every 150ms
   // instead of on every sticker flip (~12×/s at L4 chaos).
@@ -55,12 +64,18 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
 
             const gridId = getManifoldGridId(sticker, size);
             if (processed.has(gridId)) return;
+            // Fast-path: immediately sever tunnels for pairs recorded in disparityDeaths,
+            // without waiting for the 150ms debounce on cubies. Each dead pair's
+            // useFrame stops firing, stopping per-frame TubeGeometry allocation.
+            if (deadGridIds.has(gridId)) return;
             processed.add(gridId);
 
             const antipodalLoc = findAntipodalStickerByGrid(manifoldMap, sticker, size);
             if (!antipodalLoc) return;
             // Also sever if the antipodal side is dead
             if ((antipodalLoc.sticker?.flips || 0) >= FLIP_CAP) return;
+            const gridId2 = antipodalLoc.sticker ? getManifoldGridId(antipodalLoc.sticker, size) : null;
+            if (gridId2 && deadGridIds.has(gridId2)) return;
 
             const idx1 = ((x * size) + y) * size + z;
             const idx2 = ((antipodalLoc.x * size) + antipodalLoc.y) * size + antipodalLoc.z;
@@ -74,7 +89,7 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
 
             connections.push({
               id: gridId,
-              gridId2: antipodalLoc.sticker ? getManifoldGridId(antipodalLoc.sticker, size) : null,
+              gridId2,
               meshIdx1: idx1,
               meshIdx2: idx2,
               dirKey1: dirKey,
@@ -95,7 +110,7 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
     // Most-active pairs stay visible; low-activity tail is dropped silently.
     connections.sort((a, b) => b.flips - a.flips);
     return connections.slice(0, MAX_TUNNELS);
-  }, [debouncedCubies, size, showTunnels, manifoldMap, fc]);
+  }, [debouncedCubies, size, showTunnels, manifoldMap, fc, deadGridIds]);
 
   // B3: adaptive strand-count LOD based on how many tunnels are visible.
   // With more tunnels each tunnel needs fewer strands to maintain a playable
