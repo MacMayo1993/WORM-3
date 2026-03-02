@@ -356,13 +356,16 @@ export default function WORM3() {
     setShowFreeplayWizard(false);
     const allStyles = ['solid', 'glossy', 'matte', 'metallic', 'carbonFiber', 'hexGrid', 'comic', 'cafeWall', 'hermanGrid', 'opticSpin', 'ouchi', 'grass', 'ice', 'sand', 'water', 'wood', 'circuit', 'holographic', 'pulse', 'lava', 'galaxy', 'neural'];
 
-    // Build manifoldStyles — per-face overrides take precedence over the global tileStyle
+    // Build manifoldStyles — explicit per-face overrides take precedence.
+    // Treat 'random' as unset: a per-face entry of 'random' is not a real style key
+    // and would reach the renderer as an unknown style (renders as solid).  This can
+    // happen if a stale perFaceStyles object was seeded from a 'random' global style.
     const manifoldStyles = {};
     [1, 2, 3, 4, 5, 6].forEach(id => {
       const perFace = wizardSettings.perFaceStyles?.[id];
-      if (perFace) {
+      if (perFace && perFace !== 'random') {
         manifoldStyles[id] = perFace;
-      } else if (wizardSettings.tileStyle === 'random') {
+      } else if (wizardSettings.tileStyle === 'random' || perFace === 'random') {
         manifoldStyles[id] = allStyles[Math.floor(Math.random() * allStyles.length)];
       } else {
         manifoldStyles[id] = wizardSettings.tileStyle || 'solid';

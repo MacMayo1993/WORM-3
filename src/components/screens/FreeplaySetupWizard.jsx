@@ -529,7 +529,11 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     };
 
     const applyPerFace = (faceId, key) => {
-      const current = settings.perFaceStyles || Object.fromEntries([1,2,3,4,5,6].map(id => [id, settings.tileStyle || 'solid']));
+      // Only track faces that have been explicitly overridden.
+      // Starting from settings.perFaceStyles || {} avoids copying 'random' (or any
+      // global tileStyle) into entries for untouched faces, which would cause those
+      // faces to get the literal string 'random' written into manifoldStyles.
+      const current = settings.perFaceStyles || {};
       setSettings(s => ({ ...s, perFaceStyles: { ...current, [faceId]: key } }));
     };
 
@@ -588,7 +592,10 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
             {[1, 2, 3, 4, 5, 6].map(faceId => {
-              const faceStyle = perFace?.[faceId] || settings.tileStyle || 'solid';
+              // 'random' is not a selectable per-face option; fall back to 'solid' so the
+              // select box has a valid value when the global style is Random Mix.
+              const globalFallback = settings.tileStyle === 'random' ? 'solid' : (settings.tileStyle || 'solid');
+              const faceStyle = perFace?.[faceId] || globalFallback;
               const faceColor = resolvedColors[faceId] || '#4a7fa5';
               return (
                 <div key={faceId} style={{
