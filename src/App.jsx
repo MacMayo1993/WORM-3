@@ -647,26 +647,46 @@ export default function WORM3() {
   const handleInstantChaos = useCallback((targetDisparity) => {
     const totalStickers = size * size * 6;
     const targetFlips = Math.floor((totalStickers * targetDisparity) / 100);
-    let state = cubies;
-    let flippedCount = 0;
+    if (targetFlips <= 0) return;
 
-    while (flippedCount < targetFlips) {
-      const x = Math.floor(Math.random() * size);
-      const y = Math.floor(Math.random() * size);
-      const z = Math.floor(Math.random() * size);
-      const dirs = ['PX', 'NX', 'PY', 'NY', 'PZ', 'NZ'];
-      const dirKey = dirs[Math.floor(Math.random() * dirs.length)];
-      const onEdge =
-        (dirKey === 'PX' && x === size - 1) || (dirKey === 'NX' && x === 0) ||
-        (dirKey === 'PY' && y === size - 1) || (dirKey === 'NY' && y === 0) ||
-        (dirKey === 'PZ' && z === size - 1) || (dirKey === 'NZ' && z === 0);
-
-      if (onEdge) {
-        const freshManifoldMap = buildManifoldGridMap(state, size);
-        state = flipStickerPair(state, size, x, y, z, dirKey, freshManifoldMap);
-        flippedCount++;
+    // Precompute every valid edge sticker position once.
+    // The old approach probed random (x,y,z,dir) tuples and retried on misses,
+    // which was O(rejects * targetFlips) iterations with no upper bound.
+    const candidates = [];
+    for (let x = 0; x < size; x++) {
+      for (let y = 0; y < size; y++) {
+        for (let z = 0; z < size; z++) {
+          const checks = [
+            ['PX', x === size - 1], ['NX', x === 0],
+            ['PY', y === size - 1], ['NY', y === 0],
+            ['PZ', z === size - 1], ['NZ', z === 0],
+          ];
+          for (const [dirKey, isEdge] of checks) {
+            if (isEdge) candidates.push({ x, y, z, dirKey });
+          }
+        }
       }
     }
+
+    // Fisher-Yates shuffle — unbiased no-replacement sampling
+    for (let i = candidates.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const tmp = candidates[i]; candidates[i] = candidates[j]; candidates[j] = tmp;
+    }
+
+    // Build the manifold map once before the loop.
+    // The map is keyed by origPos/origDir, which never mutate during sticker flips
+    // (only `curr` and `flips` change).  Rebuilding it per flip was O(size³) wasted
+    // work — on a 5×5 at 80 % disparity that was 120 full O(N³) scans.
+    let state = cubies;
+    const manifoldMap = buildManifoldGridMap(state, size);
+
+    const count = Math.min(targetFlips, candidates.length);
+    for (let i = 0; i < count; i++) {
+      const { x, y, z, dirKey } = candidates[i];
+      state = flipStickerPair(state, size, x, y, z, dirKey, manifoldMap);
+    }
+
     setCubies(state);
     useGameStore.getState().setHasShuffled(true);
   }, [cubies, size, setCubies]);

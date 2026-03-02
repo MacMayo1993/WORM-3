@@ -192,6 +192,19 @@ const Cubie = React.forwardRef(function Cubie({
     ? `${cubie.stickers.PZ?.curr},${cubie.stickers.NZ?.curr},${cubie.stickers.PX?.curr},${cubie.stickers.NX?.curr},${cubie.stickers.PY?.curr},${cubie.stickers.NY?.curr}`
     : '';
 
+  // Stable per-cubie pulse phase derived from original position.
+  // Using Math.random() inside useMemo caused a new phase on every deps change
+  // (e.g. each cube rotation), producing visible wireframe flicker.
+  const pulsePhase = useMemo(() => {
+    const s = Object.values(cubie.stickers)[0];
+    const ox = s?.origPos?.x ?? cubie.x;
+    const oy = s?.origPos?.y ?? cubie.y;
+    const oz = s?.origPos?.z ?? cubie.z;
+    return ((ox * 7 + oy * 13 + oz * 17) & 31) * (Math.PI * 2 / 32);
+  // origPos never changes after cube creation — this runs exactly once per cubie mount.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Generate wireframe edges for wireframe mode ONLY
   const wireframeEdges = useMemo(() => {
     if (visualMode !== 'wireframe') return [];
@@ -199,7 +212,6 @@ const Cubie = React.forwardRef(function Cubie({
     const halfSize = 0.49;
     const eps = 0.01;
     const edgeList = [];
-    const pulsePhase = Math.random() * Math.PI * 2;
 
     // Front face (PZ) - 4 edges
     if (isOnEdge.pz) {

@@ -244,6 +244,27 @@ body {
   color: #000000;
 }
 
+.top-bar-icon-btn:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+/* ========================================
+   KEYBOARD FOCUS — visible only for keyboard navigation (not mouse/touch)
+   Uses :focus-visible so touch users are unaffected.
+   ======================================== */
+button:focus-visible,
+[role='button']:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+/* Bottom nav items need a slightly larger offset to clear the icon */
+.nav-item:focus-visible {
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
 /* ========================================
    BOTTOM NAV BAR — Material Design 5-icon
    ======================================== */

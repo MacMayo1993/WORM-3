@@ -13,6 +13,7 @@
 
 import React, { Suspense } from 'react';
 import { useGameStore } from '../hooks/useGameStore.js';
+import { useShallow } from 'zustand/react/shallow';
 
 // Always-loaded UI components
 import TopMenuBar from './menus/TopMenuBar.jsx';
@@ -106,51 +107,83 @@ export default function UILayer({
   } = handlers;
 
   // ── Zustand store reads ──────────────────────────────────────────────────
-  const size = useGameStore(s => s.size);
-  const cubies = useGameStore(s => s.cubies);
-  const showMainMenu = useGameStore(s => s.showMainMenu);
-  const showTutorial = useGameStore(s => s.showTutorial);
-  const showLevelSelect = useGameStore(s => s.showLevelSelect);
-  const setShowLevelSelect = useGameStore(s => s.setShowLevelSelect);
-  const showSettings = useGameStore(s => s.showSettings);
-  const setShowSettings = useGameStore(s => s.setShowSettings);
-  const showHelp = useGameStore(s => s.showHelp);
-  const setShowHelp = useGameStore(s => s.setShowHelp);
-  const showFirstFlipTutorial = useGameStore(s => s.showFirstFlipTutorial);
-  const setShowFirstFlipTutorial = useGameStore(s => s.setShowFirstFlipTutorial);
-  const showCutscene = useGameStore(s => s.showCutscene);
-  const showLevelTutorial = useGameStore(s => s.showLevelTutorial);
-  const showNetPanel = useGameStore(s => s.showNetPanel);
-  const setShowNetPanel = useGameStore(s => s.setShowNetPanel);
-  const showLeaderboard = useGameStore(s => s.showLeaderboard);
-  const toggleLeaderboard = useGameStore(s => s.toggleLeaderboard);
-  const showMobileTouchHint = useGameStore(s => s.showMobileTouchHint);
-  const flipMode = useGameStore(s => s.flipMode);
-  const setFlipMode = useGameStore(s => s.setFlipMode);
-  const visualMode = useGameStore(s => s.visualMode);
-  const setVisualMode = useGameStore(s => s.setVisualMode);
-  const exploded = useGameStore(s => s.exploded);
-  const setExploded = useGameStore(s => s.setExploded);
-  const showTunnels = useGameStore(s => s.showTunnels);
-  const setShowTunnels = useGameStore(s => s.setShowTunnels);
-  const faceRotationTarget = useGameStore(s => s.faceRotationTarget);
-  const setFaceRotationTarget = useGameStore(s => s.setFaceRotationTarget);
-  const selectedTileForRotation = useGameStore(s => s.selectedTileForRotation);
-  const setSelectedTileForRotation = useGameStore(s => s.setSelectedTileForRotation);
-  const showDevConsole = useGameStore(s => s.showDevConsole);
-  const setShowDevConsole = useGameStore(s => s.setShowDevConsole);
-  const savedCubeState = useGameStore(s => s.savedCubeState);
-  const solveModeActive = useGameStore(s => s.solveModeActive);
-  const setSolveModeActive = useGameStore(s => s.setSolveModeActive);
-  const solveFocusedStep = useGameStore(s => s.solveFocusedStep);
-  const setSolveFocusedStep = useGameStore(s => s.setSolveFocusedStep);
-  const setSolveHighlights = useGameStore(s => s.setSolveHighlights);
-  const antipodalIntegrityMode = useGameStore(s => s.antipodalIntegrityMode);
-  const setAntipodalIntegrityMode = useGameStore(s => s.setAntipodalIntegrityMode);
-  const hollowMode = useGameStore(s => s.hollowMode);
-  const toggleHollowMode = useGameStore(s => s.toggleHollowMode);
-  const disparityWinner = useGameStore(s => s.disparityWinner);
-  const showDisparityWinner = useGameStore(s => s.showDisparityWinner);
+  // Batched with useShallow so UILayer only re-renders when a value in the
+  // group actually changes — not once per selector subscription (previously
+  // 46 individual subscriptions, now 5 grouped ones).
+
+  // Core game data — changes on every move
+  const { size, cubies } = useGameStore(useShallow(s => ({ size: s.size, cubies: s.cubies })));
+
+  // UI visibility flags — change rarely, batched to minimise subscriptions
+  const {
+    showMainMenu, showTutorial, showLevelSelect, showSettings, showHelp,
+    showFirstFlipTutorial, showCutscene, showLevelTutorial, showNetPanel,
+    showLeaderboard, showMobileTouchHint, showDevConsole, solveModeActive,
+    showDisparityWinner,
+  } = useGameStore(useShallow(s => ({
+    showMainMenu: s.showMainMenu,
+    showTutorial: s.showTutorial,
+    showLevelSelect: s.showLevelSelect,
+    showSettings: s.showSettings,
+    showHelp: s.showHelp,
+    showFirstFlipTutorial: s.showFirstFlipTutorial,
+    showCutscene: s.showCutscene,
+    showLevelTutorial: s.showLevelTutorial,
+    showNetPanel: s.showNetPanel,
+    showLeaderboard: s.showLeaderboard,
+    showMobileTouchHint: s.showMobileTouchHint,
+    showDevConsole: s.showDevConsole,
+    solveModeActive: s.solveModeActive,
+    showDisparityWinner: s.showDisparityWinner,
+  })));
+
+  // Visual state — change on user preference changes
+  const {
+    flipMode, visualMode, exploded, showTunnels, hollowMode,
+    antipodalIntegrityMode, disparityWinner,
+    faceRotationTarget, selectedTileForRotation,
+    savedCubeState, solveFocusedStep,
+  } = useGameStore(useShallow(s => ({
+    flipMode: s.flipMode,
+    visualMode: s.visualMode,
+    exploded: s.exploded,
+    showTunnels: s.showTunnels,
+    hollowMode: s.hollowMode,
+    antipodalIntegrityMode: s.antipodalIntegrityMode,
+    disparityWinner: s.disparityWinner,
+    faceRotationTarget: s.faceRotationTarget,
+    selectedTileForRotation: s.selectedTileForRotation,
+    savedCubeState: s.savedCubeState,
+    solveFocusedStep: s.solveFocusedStep,
+  })));
+
+  // Store actions — stable references, batched for conciseness
+  const {
+    setShowLevelSelect, setShowSettings, setShowHelp, setShowFirstFlipTutorial,
+    setShowNetPanel, toggleLeaderboard, setFlipMode, setVisualMode,
+    setExploded, setShowTunnels, setFaceRotationTarget, setSelectedTileForRotation,
+    setShowDevConsole, setSolveModeActive, setSolveFocusedStep, setSolveHighlights,
+    setAntipodalIntegrityMode, toggleHollowMode,
+  } = useGameStore(useShallow(s => ({
+    setShowLevelSelect: s.setShowLevelSelect,
+    setShowSettings: s.setShowSettings,
+    setShowHelp: s.setShowHelp,
+    setShowFirstFlipTutorial: s.setShowFirstFlipTutorial,
+    setShowNetPanel: s.setShowNetPanel,
+    toggleLeaderboard: s.toggleLeaderboard,
+    setFlipMode: s.setFlipMode,
+    setVisualMode: s.setVisualMode,
+    setExploded: s.setExploded,
+    setShowTunnels: s.setShowTunnels,
+    setFaceRotationTarget: s.setFaceRotationTarget,
+    setSelectedTileForRotation: s.setSelectedTileForRotation,
+    setShowDevConsole: s.setShowDevConsole,
+    setSolveModeActive: s.setSolveModeActive,
+    setSolveFocusedStep: s.setSolveFocusedStep,
+    setSolveHighlights: s.setSolveHighlights,
+    setAntipodalIntegrityMode: s.setAntipodalIntegrityMode,
+    toggleHollowMode: s.toggleHollowMode,
+  })));
 
   return (
     <>
