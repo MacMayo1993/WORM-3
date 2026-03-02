@@ -33,6 +33,14 @@ const _swipe = new THREE.Vector3();
 const _projected = new THREE.Vector3();
 const _rotAxis = new THREE.Vector3();
 
+// Pre-allocated pool for live drag base positions/rotations.
+// Max slice size = size² = 5² = 25 cubies for a 5×5 cube.
+const _MAX_SLICE = 25;
+const _dragPosPool = Array.from({ length: _MAX_SLICE }, () => new THREE.Vector3());
+const _dragRotPool = Array.from({ length: _MAX_SLICE }, () => new THREE.Quaternion());
+const _dragBasePositions = new Map();
+const _dragBaseRotations = new Map();
+
 // Mobile detection
 const isTouchDevice = typeof window !== 'undefined' && (
   'ontouchstart' in window ||
@@ -269,13 +277,17 @@ const CubeAssembly = React.memo(({
               sliceIndices.add(idx);
             }
           }
-          const basePositions = new Map();
-          const baseRotations = new Map();
+          _dragBasePositions.clear();
+          _dragBaseRotations.clear();
+          let _poolIdx = 0;
           sliceIndices.forEach(idx => {
             const g = cubieRefs.current[idx];
             if (g) {
-              basePositions.set(idx, g.position.clone());
-              baseRotations.set(idx, g.quaternion.clone());
+              _dragPosPool[_poolIdx].copy(g.position);
+              _dragRotPool[_poolIdx].copy(g.quaternion);
+              _dragBasePositions.set(idx, _dragPosPool[_poolIdx]);
+              _dragBaseRotations.set(idx, _dragRotPool[_poolIdx]);
+              _poolIdx++;
             }
           });
           // mappingDir encodes camera/face correction only (not drag direction).
@@ -285,7 +297,7 @@ const CubeAssembly = React.memo(({
           const isDomHoriz = Math.abs(dx) >= Math.abs(dy);
           const mappingDir = isDomHoriz ? m.dir * Math.sign(dx) : m.dir * Math.sign(-dy);
           liveDragRef.current = {
-            axis: m.axis, sliceIndex, sliceIndices, basePositions, baseRotations,
+            axis: m.axis, sliceIndex, sliceIndices, basePositions: _dragBasePositions, baseRotations: _dragBaseRotations,
             startDx: dx, startDy: dy, dir: m.dir, mappingDir
           };
           sliceIndicesRef.current = sliceIndices;
