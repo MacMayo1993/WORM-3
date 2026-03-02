@@ -689,9 +689,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const origIsWhite = meta?.orig === 3;
   const antipodalIsWhite = ANTIPODAL_COLOR[meta?.orig] === 3;
 
-  // UV rotation: accumulated in-plane rotations when sticker stays on same face
-  const uvRotation = meta?.uvRotation ?? 0;
-  const uvRotationAngle = 0; // non-orientable: holonomy from RP2 loops is preserved, no correction applied
+  // non-orientable: no counter-rotation applied — holonomy from RP2 loops is preserved
+  const uvRotationAngle = 0;
 
   // ── InstancedMesh eligibility ────────────────────────────────────────────────
   // A sticker is "instanceable" when it renders as a plain solid-colour quad with
