@@ -22,6 +22,7 @@ import { rotateSliceCubies } from './game/cubeRotation.js';
 import { buildManifoldGridMap, flipStickerPair } from './game/manifoldLogic.js';
 
 // Hooks
+import { useShallow } from 'zustand/react/shallow';
 import {
   useGameStore,
   useCubeState,
@@ -145,31 +146,53 @@ export default function WORM3() {
   // ========================================================================
   // STATE FROM ZUSTAND STORE
   // ========================================================================
-  const showWelcome = useGameStore((state) => state.showWelcome);
-  const setShowWelcome = useGameStore((state) => state.setShowWelcome);
-  const showTutorial = useGameStore((state) => state.showTutorial);
-  const setShowTutorial = useGameStore((state) => state.setShowTutorial);
-  const setShowSettings = useGameStore((state) => state.setShowSettings);
-  const setShowLevelSelect = useGameStore((state) => state.setShowLevelSelect);
-  const showMobileTouchHint = useGameStore((state) => state.showMobileTouchHint);
-  const markMobileHintShown = useGameStore((state) => state.markMobileHintShown);
-  const markIntroSeen = useGameStore((state) => state.markIntroSeen);
-  const markTutorialDone = useGameStore((state) => state.markTutorialDone);
+  // UI navigation state — batched into one subscription (was 10 separate selectors)
+  const {
+    showWelcome, setShowWelcome,
+    showTutorial, setShowTutorial,
+    setShowSettings, setShowLevelSelect,
+    showMobileTouchHint, markMobileHintShown,
+    markIntroSeen, markTutorialDone,
+  } = useGameStore(useShallow(s => ({
+    showWelcome: s.showWelcome,
+    setShowWelcome: s.setShowWelcome,
+    showTutorial: s.showTutorial,
+    setShowTutorial: s.setShowTutorial,
+    setShowSettings: s.setShowSettings,
+    setShowLevelSelect: s.setShowLevelSelect,
+    showMobileTouchHint: s.showMobileTouchHint,
+    markMobileHintShown: s.markMobileHintShown,
+    markIntroSeen: s.markIntroSeen,
+    markTutorialDone: s.markTutorialDone,
+  })));
 
-  const setFlipMode = useGameStore((state) => state.setFlipMode);
-  const setVisualMode = useGameStore((state) => state.setVisualMode);
-  const exploded = useGameStore((state) => state.exploded);
-  const setExplosionT = useGameStore((state) => state.setExplosionT);
-  const setShowTunnels = useGameStore((state) => state.setShowTunnels);
-  const setFlipWaveOrigins = useGameStore((state) => state.setFlipWaveOrigins);
+  // Visual/display state — batched into one subscription (was 6 separate selectors)
+  const {
+    setFlipMode, setVisualMode,
+    exploded, setExplosionT,
+    setShowTunnels, setFlipWaveOrigins,
+  } = useGameStore(useShallow(s => ({
+    setFlipMode: s.setFlipMode,
+    setVisualMode: s.setVisualMode,
+    exploded: s.exploded,
+    setExplosionT: s.setExplosionT,
+    setShowTunnels: s.setShowTunnels,
+    setFlipWaveOrigins: s.setFlipWaveOrigins,
+  })));
 
-  const faceRotationTarget = useGameStore((state) => state.faceRotationTarget);
-  const setFaceRotationTarget = useGameStore((state) => state.setFaceRotationTarget);
-  const selectedTileForRotation = useGameStore((state) => state.selectedTileForRotation);
-  const setSelectedTileForRotation = useGameStore((state) => state.setSelectedTileForRotation);
-
-  const savedCubeState = useGameStore((state) => state.savedCubeState);
-  const setSavedCubeState = useGameStore((state) => state.setSavedCubeState);
+  // Face rotation + saved cube state — batched into one subscription (was 6 separate selectors)
+  const {
+    faceRotationTarget, setFaceRotationTarget,
+    selectedTileForRotation, setSelectedTileForRotation,
+    savedCubeState, setSavedCubeState,
+  } = useGameStore(useShallow(s => ({
+    faceRotationTarget: s.faceRotationTarget,
+    setFaceRotationTarget: s.setFaceRotationTarget,
+    selectedTileForRotation: s.selectedTileForRotation,
+    setSelectedTileForRotation: s.setSelectedTileForRotation,
+    savedCubeState: s.savedCubeState,
+    setSavedCubeState: s.setSavedCubeState,
+  })));
 
   // ========================================================================
   // CUSTOM HOOKS
