@@ -11,7 +11,7 @@ export const COLOR_SCHEMES = {
   standard:  { 1: '#ef4444', 2: '#22c55e', 3: '#ffffff', 4: '#f97316', 5: '#3b82f6', 6: '#eab308' },
   neon:      { 1: '#ff0066', 2: '#00ff99', 3: '#00ffff', 4: '#ff3300', 5: '#0099ff', 6: '#ffff00' },
   pastel:    { 1: '#f9a8b8', 2: '#a8f0c8', 3: '#f0f0f0', 4: '#ffc89a', 5: '#a8c8f0', 6: '#f0e8a0' },
-  mono:      { 1: '#e0e0e0', 2: '#a0a0a0', 3: '#ffffff', 4: '#808080', 5: '#606060', 6: '#404040' },
+  mono:      { 1: '#E8E8E8', 2: '#BBBBBB', 3: '#FFFFFF', 4: '#888888', 5: '#484848', 6: '#111111' },
   ocean:     { 1: '#0ea5e9', 2: '#14b8a6', 3: '#e0f2fe', 4: '#0284c7', 5: '#06b6d4', 6: '#164e63' },
   forest:    { 1: '#a3b18a', 2: '#588157', 3: '#dad7cd', 4: '#6a994e', 5: '#386641', 6: '#bc6c25' },
   candy:     { 1: '#ff006e', 2: '#8338ec', 3: '#ffffff', 4: '#fb5607', 5: '#3a86ff', 6: '#ffbe0b' },
@@ -30,14 +30,14 @@ export const COLOR_SCHEMES = {
     6: '#8B0000',  // dark crimson            ← gold ↔ crimson
   },
 
-  // Batman — cape black vs bat-signal gold / slate vs bone / brass vs void
+  // Batman — cape black vs bat-signal gold / slate vs bone / brass vs dark purple void
   batman: {
     1: '#1C1C1E',  // cape black
     4: '#F5C518',  // bat-signal gold         ← black ↔ gold
     2: '#3A3A3C',  // dark slate
     5: '#E8E0C8',  // parchment bone          ← slate ↔ parchment
     3: '#7A6800',  // aged brass
-    6: '#0A0A0A',  // void                    ← brass ↔ void
+    6: '#1E1435',  // dark purple void        ← brass ↔ void
   },
 
   // Iron Man — armor red vs gold plating / HUD blue vs arc reactor white / titanium vs steel
@@ -50,14 +50,14 @@ export const COLOR_SCHEMES = {
     6: '#2C3E50',  // dark steel              ← titanium ↔ steel
   },
 
-  // Wonder Woman — Amazonian crimson vs tiara gold / Olympian blue vs parchment / war red vs forest
+  // Wonder Woman — Amazonian crimson vs tiara gold / Olympian blue vs parchment / royal purple vs forest
   wonderwoman: {
     1: '#C0001A',  // Amazonian crimson
     4: '#D4A500',  // golden tiara            ← crimson ↔ gold
     2: '#1A3A6B',  // Olympian blue
     5: '#E8D5A3',  // parchment cream         ← blue ↔ cream
-    3: '#8B0000',  // dark war red
-    6: '#2C4A1E',  // amazon forest           ← dark red ↔ forest
+    3: '#5C2E8A',  // royal amazon purple
+    6: '#2C4A1E',  // amazon forest           ← purple ↔ forest
   },
 
   // The Joker — purple suit vs poison green / acid yellow vs blood red / clown white vs shadow black
@@ -100,14 +100,14 @@ export const COLOR_SCHEMES = {
     6: '#1A237E',  // midnight cape           ← silver ↔ midnight
   },
 
-  // Deadpool — merc red vs suit black / white sclera vs gunmetal / dark blood vs katana silver
+  // Deadpool — merc red vs suit black / white sclera vs gunmetal / shadow purple vs katana silver
   deadpool: {
     1: '#CC0000',  // merc red
     4: '#111111',  // suit black              ← red ↔ black
     2: '#F0F0F0',  // eye white
     5: '#555555',  // gunmetal                ← white ↔ gunmetal
-    3: '#8B0000',  // dark blood red
-    6: '#C8C8C8',  // katana silver           ← dark red ↔ silver
+    3: '#2B1F30',  // dark shadow purple
+    6: '#C8C8C8',  // katana silver           ← shadow ↔ silver
   },
 
   // Doctor Strange — cloak maroon vs sling ring gold / astral indigo vs mirror aqua / dark dimension vs rune parchment
@@ -142,44 +142,44 @@ export const COLOR_SCHEMES = {
     6: '#D4A843',  // gold leaf               ← indigo ↔ gold
   },
 
-  // Deep Sea — abyssal black vs bioluminescent cyan / midnight blue vs phosphor green / navy vs coral
+  // Deep Sea — abyssal black vs bioluminescent cyan / cobalt blue vs phosphor green / dark teal vs coral
   abyss: {
     1: '#080C14',  // abyssal black
     4: '#00FFEE',  // bioluminescent cyan     ← abyss ↔ glow
-    2: '#0A1628',  // midnight blue
-    5: '#39FF14',  // phosphor green          ← midnight ↔ phosphor
-    3: '#0D2137',  // deep navy
-    6: '#FF6B6B',  // deep sea coral          ← navy ↔ coral
+    2: '#1C3D6E',  // cobalt blue
+    5: '#39FF14',  // phosphor green          ← cobalt ↔ phosphor
+    3: '#0D3F4A',  // dark teal
+    6: '#FF6B6B',  // deep sea coral          ← teal ↔ coral
   },
 
-  // Volcano — obsidian black vs molten lava / ash grey vs ember orange / dark basalt vs sulfur yellow
+  // Volcano — obsidian black vs molten lava / ash grey vs ember orange / dark slate vs sulfur yellow
   volcano: {
     1: '#1A0A00',  // obsidian black
     4: '#FF4500',  // molten lava orange      ← obsidian ↔ lava
     2: '#696969',  // volcanic ash grey
     5: '#FF8C00',  // ember orange            ← ash ↔ ember
-    3: '#2C1810',  // dark basalt
-    6: '#FFD700',  // sulfur yellow           ← basalt ↔ sulfur
+    3: '#484040',  // dark volcanic slate
+    6: '#FFD700',  // sulfur yellow           ← slate ↔ sulfur
   },
 
-  // Sakura — deep cherry bark vs petal pink / mossy stone vs pale blossom / charcoal vs blush
+  // Sakura — deep cherry bark vs petal pink / mossy stone vs sage blossom / charcoal vs warm cream
   sakura: {
     1: '#5C1A1A',  // dark cherry bark
     4: '#FFB7C5',  // petal pink              ← bark ↔ petal
     2: '#4A5240',  // mossy stone
-    5: '#F8E8EE',  // pale blossom            ← stone ↔ blossom
+    5: '#C8DCC0',  // pale sage blossom       ← stone ↔ sage
     3: '#2C2C2C',  // charcoal branch
-    6: '#FADADD',  // soft blush              ← charcoal ↔ blush
+    6: '#F5E8CC',  // warm parchment cream    ← charcoal ↔ cream
   },
 
-  // Cosmic — black hole vs quasar white / nebula purple vs star yellow / dark matter vs comet blue
+  // Cosmic — black hole vs quasar white / nebula purple vs star yellow / deep indigo vs comet blue
   cosmic: {
     1: '#050508',  // black hole
     4: '#FFF8E7',  // quasar white            ← void ↔ light
     2: '#6B35A8',  // nebula purple
     5: '#FFD60A',  // star yellow             ← nebula ↔ star
-    3: '#0B0F2E',  // dark matter
-    6: '#4FACFE',  // comet blue              ← dark ↔ comet
+    3: '#1C2266',  // deep indigo dark matter
+    6: '#4FACFE',  // comet blue              ← indigo ↔ comet
   },
 
   // Candy Shop — bubblegum pink vs mint green / hot coral vs sky blue / lemon vs grape
@@ -202,13 +202,13 @@ export const COLOR_SCHEMES = {
     6: '#4FA3A5',  // turquoise sky           ← mesa ↔ turquoise
   },
 
-  // Arctic — glacier white vs deep ice blue / snow vs polar teal / frost silver vs arctic night
+  // Arctic — glacier white vs deep ice blue / ocean blue vs polar teal / frost grey vs arctic night
   arctic: {
     1: '#F0F8FF',  // glacier white
     4: '#1C4E7A',  // deep ice blue           ← glacier ↔ deep
-    2: '#E8F4F8',  // fresh snow
-    5: '#006B77',  // polar teal              ← snow ↔ teal
-    3: '#B8D4E0',  // frost silver
+    2: '#7BBCD6',  // ocean ice blue
+    5: '#006B77',  // polar teal              ← ocean blue ↔ teal
+    3: '#C8D4DC',  // frost grey
     6: '#0A1628',  // arctic night            ← frost ↔ night
   },
 
