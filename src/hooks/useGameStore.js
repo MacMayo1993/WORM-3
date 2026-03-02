@@ -470,16 +470,10 @@ export const useGameStore = create(
     faceImages: {},
     faceTextures: {},
 
-    setSettings: (settings) => {
-      try {
-        localStorage.setItem('worm3_settings', JSON.stringify(
-          typeof settings === 'function' ? settings(get().settings) : settings
-        ));
-      } catch { }
-      set(typeof settings === 'function'
-        ? (state) => ({ settings: settings(state.settings) })
-        : { settings });
-    },
+    // Persistence is handled by the subscription below — no inline write needed.
+    setSettings: (settings) => set(typeof settings === 'function'
+      ? (state) => ({ settings: settings(state.settings) })
+      : { settings }),
     setFaceImages: (faceImages) => set(typeof faceImages === 'function'
       ? (state) => ({ faceImages: faceImages(state.faceImages) })
       : { faceImages }),
