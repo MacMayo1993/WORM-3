@@ -39,7 +39,6 @@ import {
 } from './hooks/index.js';
 
 // 3D components
-import { preloadBiomeAssets } from './3d/BiomeGLBCluster.jsx';
 import GameScene from './3d/GameScene.jsx';
 import IntroScene from './components/intro/IntroScene.jsx';
 
@@ -355,48 +354,53 @@ export default function WORM3() {
 
   const handleWizardComplete = useCallback((wizardSettings) => {
     setShowFreeplayWizard(false);
-    // Apply wizard settings
+    const allStyles = ['solid', 'glossy', 'matte', 'metallic', 'carbonFiber', 'hexGrid', 'comic', 'cafeWall', 'hermanGrid', 'opticSpin', 'ouchi', 'grass', 'ice', 'sand', 'water', 'wood', 'circuit', 'holographic', 'pulse', 'lava', 'galaxy', 'neural'];
+
+    // Build manifoldStyles — per-face overrides take precedence over the global tileStyle
+    const manifoldStyles = {};
+    [1, 2, 3, 4, 5, 6].forEach(id => {
+      const perFace = wizardSettings.perFaceStyles?.[id];
+      if (perFace) {
+        manifoldStyles[id] = perFace;
+      } else if (wizardSettings.tileStyle === 'random') {
+        manifoldStyles[id] = allStyles[Math.floor(Math.random() * allStyles.length)];
+      } else {
+        manifoldStyles[id] = wizardSettings.tileStyle || 'solid';
+      }
+    });
+
     const newSettings = {
       ...settings,
       colorScheme: wizardSettings.colorScheme,
       backgroundTheme: wizardSettings.backgroundTheme,
+      manifoldStyles,
+      biomeMode: { enabled: false, faceAssignment: null },
     };
-    // Apply custom colors if provided
     if (wizardSettings.customColors) {
       newSettings.customColors = wizardSettings.customColors;
     }
-    // Biome mode: manifoldStyles are pre-computed per-face by the wizard
-    if (wizardSettings.biomeMode?.enabled) {
-      newSettings.biomeMode = wizardSettings.biomeMode;
-      newSettings.manifoldStyles = wizardSettings.manifoldStyles;
-      preloadBiomeAssets(); // kick off GLB downloads only when biome mode is actually used
-    } else {
-      newSettings.biomeMode = { enabled: false, faceAssignment: null };
-      // Apply tile style to all faces
-      if (wizardSettings.tileStyle) {
-        const manifoldStyles = {};
-        if (wizardSettings.tileStyle === 'random') {
-          // Pick random style for each face
-          const allStyles = ['solid', 'glossy', 'matte', 'metallic', 'carbonFiber', 'hexGrid', 'comic', 'cafeWall', 'hermanGrid', 'opticSpin', 'ouchi', 'grass', 'ice', 'sand', 'water', 'wood', 'circuit', 'holographic', 'pulse', 'lava', 'galaxy', 'neural'];
-          [1, 2, 3, 4, 5, 6].forEach(id => {
-            manifoldStyles[id] = allStyles[Math.floor(Math.random() * allStyles.length)];
-          });
-        } else {
-          [1, 2, 3, 4, 5, 6].forEach(id => { manifoldStyles[id] = wizardSettings.tileStyle; });
-        }
-        newSettings.manifoldStyles = manifoldStyles;
-      }
-    }
+
     setSettings(newSettings);
     useGameStore.getState().clearLevel();
-    // Biome mode starts solved so the stable city cache populates correctly
-    if (!wizardSettings.biomeMode?.enabled) {
-      shuffle();
-    } else {
-      useGameStore.getState().resetGame();
+
+    const targetSize = wizardSettings.cubeSize || size;
+    if (targetSize !== size) {
+      // changeSize resets the cube to solved; we then manually shuffle with the new size
+      // because the `shuffle` callback closes over the old size and would mis-scramble.
+      changeSize(targetSize);
+      let state = makeCubies(targetSize);
+      for (let i = 0; i < 25; i++) {
+        const ax = ['row', 'col', 'depth'][Math.floor(Math.random() * 3)];
+        const slice = Math.floor(Math.random() * targetSize);
+        const dir = Math.random() > 0.5 ? 1 : -1;
+        state = rotateSliceCubies(state, targetSize, ax, slice, dir);
+      }
+      setRotatedCubies(state);
       useGameStore.getState().setHasShuffled(true);
+    } else {
+      shuffle();
     }
-  }, [settings, setSettings, shuffle]);
+  }, [settings, setSettings, shuffle, size, changeSize, setRotatedCubies]);
 
   const handleWizardCancel = useCallback(() => {
     setShowFreeplayWizard(false);

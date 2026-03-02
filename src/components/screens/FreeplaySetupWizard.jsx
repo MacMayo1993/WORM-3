@@ -1,9 +1,7 @@
 import React, { useState, useRef } from 'react';
-import { resolveBiomeManifoldStyles } from '../../modes/CityBiomeMode.js';
 import { COLOR_SCHEMES, TILE_STYLES, SCHEME_LABELS } from '../../utils/colorSchemes.js';
 import { BACKGROUNDS, getBackgroundUrl } from '../../utils/backgrounds.js';
 import { registerTilePreview, updateTilePreview, unregisterTilePreview } from '../../3d/TilePreviewRenderer.js';
-
 
 const BG_PREVIEWS = {
   blackhole: 'radial-gradient(circle, #1a0033 0%, #000000 100%)',
@@ -35,11 +33,16 @@ const BG_OPTIONS = BACKGROUNDS.map(bg => ({
   value: bg.id,
   label: bg.label,
   thumbnail: bg.thumbnail ? getBackgroundUrl(bg.thumbnail) : null,
-  gradient: BG_PREVIEWS[bg.id] || 'linear-gradient(135deg, #333 0%, #000 100%)'
+  gradient: BG_PREVIEWS[bg.id] || 'linear-gradient(135deg, #333 0%, #000 100%)',
 }));
 
 const CLASSIC_STYLE_KEYS = ['solid', 'glossy', 'matte', 'metallic', 'carbonFiber', 'hexGrid', 'comic', 'cafeWall', 'hermanGrid', 'opticSpin', 'ouchi'];
 const LIVING_STYLE_KEYS = ['grass', 'ice', 'sand', 'water', 'wood', 'circuit', 'holographic', 'pulse', 'lava', 'galaxy', 'neural'];
+
+// Color schemes shown in the wizard (biome is a mode, not a palette)
+const WIZARD_SCHEME_KEYS = Object.keys(SCHEME_LABELS).filter(k => k !== 'biome');
+
+const FACE_LABELS = { 1: 'Front', 2: 'Left', 3: 'Top', 4: 'Back', 5: 'Right', 6: 'Bottom' };
 
 function extractColorsFromImage(img, count = 6) {
   const canvas = document.createElement('canvas');
@@ -73,7 +76,7 @@ function extractColorsFromImage(img, count = 6) {
       let minDist = Infinity, best = 0;
       for (let c = 0; c < count; c++) {
         const dr = px[0] - centroids[c][0], dg = px[1] - centroids[c][1], db = px[2] - centroids[c][2];
-        if (dr*dr+dg*dg+db*db < minDist) { minDist = dr*dr+dg*dg+db*db; best = c; }
+        if (dr * dr + dg * dg + db * db < minDist) { minDist = dr * dr + dg * dg + db * db; best = c; }
       }
       clusters[best].push(px);
     }
@@ -81,12 +84,12 @@ function extractColorsFromImage(img, count = 6) {
       if (!clusters[c].length) continue;
       const sum = [0, 0, 0];
       for (const px of clusters[c]) { sum[0] += px[0]; sum[1] += px[1]; sum[2] += px[2]; }
-      centroids[c] = [Math.round(sum[0]/clusters[c].length), Math.round(sum[1]/clusters[c].length), Math.round(sum[2]/clusters[c].length)];
+      centroids[c] = [Math.round(sum[0] / clusters[c].length), Math.round(sum[1] / clusters[c].length), Math.round(sum[2] / clusters[c].length)];
     }
   }
   centroids.sort((a, b) => {
-    const hA = Math.atan2(Math.sqrt(3)*(a[1]-a[2]), 2*a[0]-a[1]-a[2]);
-    const hB = Math.atan2(Math.sqrt(3)*(b[1]-b[2]), 2*b[0]-b[1]-b[2]);
+    const hA = Math.atan2(Math.sqrt(3) * (a[1] - a[2]), 2 * a[0] - a[1] - a[2]);
+    const hB = Math.atan2(Math.sqrt(3) * (b[1] - b[2]), 2 * b[0] - b[1] - b[2]);
     return hA - hB;
   });
   return centroids.map(([r, g, b]) => '#' + [r, g, b].map(v => Math.max(0, Math.min(255, v)).toString(16).padStart(2, '0')).join(''));
@@ -106,10 +109,10 @@ function TilePreviewCanvas({ styleKey, colorHex = '#4a7fa5', size = 48 }) {
   React.useEffect(() => {
     if (idRef.current !== null) updateTilePreview(idRef.current, styleKey, colorHex);
   }, [styleKey, colorHex]);
-  return <canvas ref={canvasRef} width={size} height={size} style={{ display: 'block', borderRadius: '8px' }} />;
+  return <canvas ref={canvasRef} width={size} height={size} style={{ display: 'block', borderRadius: '6px' }} />;
 }
 
-// ── Inline styles (zero className dependencies) ──────────────────────────────
+// ── Shared inline styles ──────────────────────────────────────────────────────
 
 const S = {
   overlay: {
@@ -137,14 +140,14 @@ const S = {
   },
 
   header: {
-    padding: '36px 40px 0',
+    padding: '32px 36px 0',
     flexShrink: 0,
   },
 
   stepIndicator: {
     display: 'flex',
     gap: '6px',
-    marginBottom: '28px',
+    marginBottom: '24px',
   },
 
   dot: (active, current) => ({
@@ -156,139 +159,58 @@ const S = {
   }),
 
   title: {
-    fontSize: '26px',
+    fontSize: '24px',
     fontWeight: '700',
     letterSpacing: '-0.5px',
     color: '#0a0a0a',
-    margin: '0 0 6px',
+    margin: '0 0 4px',
     lineHeight: 1.15,
   },
 
   subtitle: {
-    fontSize: '14px',
+    fontSize: '13px',
     color: 'rgba(0,0,0,0.42)',
-    margin: '0 0 24px',
-    letterSpacing: '0.01em',
+    margin: '0 0 20px',
     fontWeight: '400',
   },
 
   body: {
-    padding: '0 40px',
+    padding: '0 36px',
     overflowY: 'auto',
     flex: 1,
-    // Custom scrollbar
     scrollbarWidth: 'thin',
     scrollbarColor: 'rgba(0,0,0,0.15) transparent',
   },
 
-  // Color scheme grid — 2 per row, tall enough to feel considered
-  colorGrid: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: '10px',
-    paddingBottom: '8px',
-  },
-
-  colorCard: (selected) => ({
+  // Generic card with optional selected state
+  card: (selected) => ({
     display: 'flex',
-    alignItems: 'center',
-    gap: '14px',
     padding: '14px 16px',
     borderRadius: '14px',
-    border: selected ? '2px solid #000' : '2px solid transparent',
-    background: selected ? 'rgba(0,0,0,0.04)' : 'rgba(0,0,0,0.025)',
+    border: selected ? '2px solid #0a0a0a' : '2px solid transparent',
+    background: selected ? 'rgba(0,0,0,0.05)' : 'rgba(0,0,0,0.025)',
     cursor: 'pointer',
     transition: 'all 0.18s ease',
-    textAlign: 'left',
     outline: 'none',
     WebkitTapHighlightColor: 'transparent',
-  }),
-
-  colorDots: {
-    display: 'flex',
-    gap: '3px',
-    flexWrap: 'wrap',
-    width: '52px',
-    flexShrink: 0,
-  },
-
-  dot6: (color) => ({
-    width: '14px',
-    height: '14px',
-    borderRadius: '50%',
-    background: color,
-    boxShadow: '0 1px 3px rgba(0,0,0,0.18)',
-  }),
-
-  cardLabel: (selected) => ({
-    fontSize: '13px',
-    fontWeight: selected ? '600' : '400',
-    color: selected ? '#0a0a0a' : 'rgba(0,0,0,0.6)',
-    letterSpacing: '-0.1px',
+    textAlign: 'left',
+    width: '100%',
+    fontFamily: 'inherit',
+    position: 'relative',
   }),
 
   checkmark: {
-    marginLeft: 'auto',
     width: '18px',
     height: '18px',
     borderRadius: '50%',
-    background: '#000',
+    background: '#0a0a0a',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
   },
 
-  // Tile style — horizontal scroll strip
-  styleSection: {
-    marginBottom: '20px',
-  },
-
-  styleSectionLabel: {
-    fontSize: '11px',
-    fontWeight: '600',
-    letterSpacing: '0.08em',
-    textTransform: 'uppercase',
-    color: 'rgba(0,0,0,0.35)',
-    marginBottom: '10px',
-  },
-
-  styleStrip: {
-    display: 'flex',
-    gap: '8px',
-    overflowX: 'auto',
-    paddingBottom: '8px',
-    scrollbarWidth: 'none',
-    msOverflowStyle: 'none',
-  },
-
-  styleChip: (selected) => ({
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: '7px',
-    padding: '10px 10px 8px',
-    borderRadius: '14px',
-    border: selected ? '2px solid #000' : '2px solid transparent',
-    background: selected ? 'rgba(0,0,0,0.05)' : 'rgba(0,0,0,0.03)',
-    cursor: 'pointer',
-    flexShrink: 0,
-    transition: 'all 0.18s ease',
-    outline: 'none',
-    WebkitTapHighlightColor: 'transparent',
-    minWidth: '72px',
-  }),
-
-  styleLabel: (selected) => ({
-    fontSize: '10px',
-    fontWeight: selected ? '600' : '400',
-    color: selected ? '#0a0a0a' : 'rgba(0,0,0,0.5)',
-    letterSpacing: '0.01em',
-    textAlign: 'center',
-    lineHeight: 1.2,
-  }),
-
-  // Background — tighter grid
+  // Background grid
   bgGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(3, 1fr)',
@@ -299,7 +221,7 @@ const S = {
   bgCard: (selected) => ({
     borderRadius: '12px',
     overflow: 'hidden',
-    border: selected ? '2px solid #000' : '2px solid transparent',
+    border: selected ? '2.5px solid #0a0a0a' : '2.5px solid transparent',
     cursor: 'pointer',
     transition: 'all 0.18s ease',
     outline: 'none',
@@ -315,15 +237,14 @@ const S = {
     right: 0,
     padding: '18px 8px 7px',
     background: 'linear-gradient(to top, rgba(0,0,0,0.72) 0%, transparent 100%)',
-    fontSize: '11px',
+    fontSize: '10px',
     fontWeight: '500',
     color: '#fff',
     textAlign: 'center',
-    letterSpacing: '0.01em',
   },
 
   footer: {
-    padding: '20px 40px 28px',
+    padding: '18px 36px 24px',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -342,7 +263,6 @@ const S = {
     borderRadius: '10px',
     transition: 'color 0.15s ease',
     fontFamily: 'inherit',
-    letterSpacing: '-0.1px',
   },
 
   btnPrimary: {
@@ -356,32 +276,33 @@ const S = {
     borderRadius: '12px',
     transition: 'opacity 0.15s ease, transform 0.12s ease',
     fontFamily: 'inherit',
-    letterSpacing: '-0.2px',
-  },
-
-  uploadPlaceholder: {
-    width: '52px',
-    height: '30px',
-    borderRadius: '8px',
-    background: 'rgba(0,0,0,0.07)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '18px',
-    flexShrink: 0,
   },
 };
+
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+function Checkmark() {
+  return (
+    <div style={S.checkmark}>
+      <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+        <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </div>
+  );
+}
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
   const [step, setStep] = useState(0);
-  const [gameMode, setGameMode] = useState('freeplay'); // 'freeplay' | 'biome'
+  const [cubeSize, setCubeSize] = useState(initialSettings?.size || 3);
   const [settings, setSettings] = useState({
     colorScheme: initialSettings?.colorScheme || 'standard',
     customColors: initialSettings?.customColors || null,
-    tileStyle: initialSettings?.tileStyle || 'solid',
+    tileStyle: 'solid',
     backgroundTheme: initialSettings?.backgroundTheme || 'blackhole',
+    // Per-face tile styles; null means "use global tileStyle"
+    perFaceStyles: null,
   });
   const [customPreview, setCustomPreview] = useState(null);
   const fileInputRef = useRef(null);
@@ -401,20 +322,14 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     img.src = url;
   };
 
-  const STEPS = ['Mode', 'Colors', 'Style', 'Scene'];
+  const STEPS = ['Size', 'Scene', 'Colors', 'Style'];
   const totalSteps = 4;
 
   const handleNext = () => {
     if (step < totalSteps - 1) {
       setStep(step + 1);
     } else {
-      const finalSettings = { ...settings };
-      if (gameMode === 'biome') {
-        finalSettings.biomeMode = { enabled: true, faceAssignment: null };
-        finalSettings.colorScheme = 'biome';
-        finalSettings.manifoldStyles = resolveBiomeManifoldStyles(null);
-      }
-      onComplete(finalSettings);
+      onComplete({ ...settings, cubeSize });
     }
   };
 
@@ -425,146 +340,54 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
 
   const select = (key, value) => setSettings(s => ({ ...s, [key]: value }));
 
-  // ── Step 0: Mode ───────────────────────────────────────────────────────────
-  const renderMode = () => {
-    const modes = [
-      {
-        key: 'freeplay',
-        icon: '∞',
-        title: 'Free Play',
-        description: 'Classic puzzle with your choice of colors, tile styles, and background.',
-        accent: '#0a0a0a',
-      },
-      {
-        key: 'biome',
-        icon: '🏙',
-        title: 'City Biome',
-        description: 'Six living cities — one per face. Procedural 3D buildings, seam pulses, and manifold entanglement.',
-        accent: '#4a00e0',
-      },
+  // ── Step 0: Size ────────────────────────────────────────────────────────────
+
+  const renderSize = () => {
+    const sizes = [
+      { n: 2, name: '2×2×2', tag: 'Mini',    desc: 'Fast & approachable' },
+      { n: 3, name: '3×3×3', tag: 'Classic', desc: 'The original challenge' },
+      { n: 4, name: '4×4×4', tag: 'Master',  desc: 'Expert territory' },
+      { n: 5, name: '5×5×5', tag: 'Ultra',   desc: '150 stickers of chaos' },
     ];
 
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingBottom: '8px' }}>
-        {modes.map(m => {
-          const selected = gameMode === m.key;
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', paddingBottom: '8px' }}>
+        {sizes.map(({ n, name, tag, desc }) => {
+          const selected = cubeSize === n;
           return (
-            <button
-              key={m.key}
-              style={{
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: '18px',
-                padding: '20px 20px',
-                borderRadius: '16px',
-                border: selected ? `2px solid ${m.accent}` : '2px solid transparent',
-                background: selected ? (m.key === 'biome' ? 'rgba(74,0,224,0.05)' : 'rgba(0,0,0,0.04)') : 'rgba(0,0,0,0.025)',
-                cursor: 'pointer',
-                textAlign: 'left',
-                outline: 'none',
-                WebkitTapHighlightColor: 'transparent',
-                transition: 'all 0.18s ease',
-                width: '100%',
-              }}
-              onClick={() => {
-                setGameMode(m.key);
-                if (m.key === 'biome') {
-                  setSettings(s => ({ ...s, colorScheme: 'biome' }));
-                } else if (gameMode === 'biome') {
-                  setSettings(s => ({ ...s, colorScheme: initialSettings?.colorScheme || 'standard' }));
-                }
-              }}
-            >
+            <button key={n} style={{ ...S.card(selected), flexDirection: 'column', gap: '12px', padding: '18px 16px' }}
+              onClick={() => setCubeSize(n)}>
+              {/* Dot-grid thumbnail representing one face of the cube */}
               <div style={{
-                width: '52px', height: '52px', borderRadius: '14px',
-                background: selected ? m.accent : 'rgba(0,0,0,0.07)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '24px', flexShrink: 0,
-                transition: 'all 0.18s ease',
+                display: 'grid',
+                gridTemplateColumns: `repeat(${n}, 1fr)`,
+                gap: '3px',
+                width: '44px',
               }}>
-                <span style={selected && m.key === 'biome' ? { filter: 'none' } : {}}>{m.icon}</span>
+                {Array.from({ length: n * n }).map((_, i) => (
+                  <div key={i} style={{
+                    aspectRatio: '1',
+                    borderRadius: '3px',
+                    background: selected ? '#0a0a0a' : 'rgba(0,0,0,0.15)',
+                    transition: 'background 0.18s ease',
+                  }} />
+                ))}
               </div>
+
               <div style={{ flex: 1 }}>
-                <div style={{
-                  fontSize: '16px', fontWeight: selected ? '700' : '500',
-                  color: selected ? m.accent : '#0a0a0a',
-                  marginBottom: '4px', letterSpacing: '-0.2px',
-                }}>
-                  {m.title}
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '3px' }}>
+                  <span style={{ fontSize: '16px', fontWeight: '700', color: '#0a0a0a', letterSpacing: '-0.4px' }}>{name}</span>
+                  <span style={{
+                    fontSize: '10px', fontWeight: '600', letterSpacing: '0.04em',
+                    textTransform: 'uppercase', color: selected ? '#0a0a0a' : 'rgba(0,0,0,0.38)',
+                  }}>{tag}</span>
                 </div>
-                <div style={{ fontSize: '13px', color: 'rgba(0,0,0,0.5)', lineHeight: 1.45 }}>
-                  {m.description}
-                </div>
+                <div style={{ fontSize: '12px', color: 'rgba(0,0,0,0.45)' }}>{desc}</div>
               </div>
-              {selected && (
-                <div style={{
-                  width: '20px', height: '20px', borderRadius: '50%',
-                  background: m.accent, display: 'flex', alignItems: 'center',
-                  justifyContent: 'center', flexShrink: 0, marginTop: '2px',
-                }}>
-                  <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                    <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </div>
-              )}
-            </button>
-          );
-        })}
-        {gameMode === 'biome' && (
-          <div style={{
-            padding: '12px 16px', borderRadius: '12px',
-            background: 'rgba(74,0,224,0.06)', border: '1px solid rgba(74,0,224,0.15)',
-            fontSize: '12px', color: 'rgba(74,0,224,0.8)', lineHeight: 1.5,
-          }}>
-            City-to-face assignment will be available in a future update. For now, cities are assigned by face color (White → Frozen Citadel, Blue → Deep Station, Red → Volcanic Foundry, Yellow → Solar Arcology, Green → Bio-Dome, Orange → Colosseum).
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  // ── Step 1: Colors ─────────────────────────────────────────────────────────
-  const renderColors = () => {
-    const schemeKeys = Object.keys(SCHEME_LABELS);
-    return (
-      <div style={S.colorGrid}>
-        {schemeKeys.map(key => {
-          const selected = settings.colorScheme === key;
-          const isCustom = key === 'custom';
-          const colors = !isCustom ? Object.values(COLOR_SCHEMES[key] || {}) : [];
-
-          return (
-            <button
-              key={key}
-              style={S.colorCard(selected)}
-              onClick={() => {
-                if (isCustom) fileInputRef.current?.click();
-                else select('colorScheme', key);
-              }}
-            >
-              {/* Color preview */}
-              {isCustom ? (
-                customPreview ? (
-                  <img src={customPreview} alt="Custom"
-                    style={{ width: '52px', height: '30px', objectFit: 'cover', borderRadius: '6px', flexShrink: 0 }} />
-                ) : (
-                  <div style={S.uploadPlaceholder}>📷</div>
-                )
-              ) : (
-                <div style={S.colorDots}>
-                  {colors.slice(0, 6).map((c, i) => (
-                    <div key={i} style={S.dot6(c)} />
-                  ))}
-                </div>
-              )}
-
-              <span style={S.cardLabel(selected)}>{SCHEME_LABELS[key]}</span>
 
               {selected && (
-                <div style={S.checkmark}>
-                  <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                    <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
+                <div style={{ position: 'absolute', top: '12px', right: '12px' }}>
+                  <Checkmark />
                 </div>
               )}
             </button>
@@ -574,90 +397,24 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     );
   };
 
-  // ── Step 1: Tile Style ─────────────────────────────────────────────────────
-  const renderStyles = () => {
-    const schemeColor = settings.colorScheme !== 'custom'
-      ? Object.values(COLOR_SCHEMES[settings.colorScheme] || {})[0] || '#4a7fa5'
-      : '#4a7fa5';
+  // ── Step 1: Background ──────────────────────────────────────────────────────
 
-    const renderStrip = (keys, label) => (
-      <div style={S.styleSection}>
-        <div style={S.styleSectionLabel}>{label}</div>
-        <div style={{ ...S.styleStrip, WebkitOverflowScrolling: 'touch' }}>
-          {keys.map(key => {
-            const selected = settings.tileStyle === key;
-            const label2 = TILE_STYLES[key]?.label || key;
-            return (
-              <button key={key} style={S.styleChip(selected)} onClick={() => select('tileStyle', key)}>
-                <TilePreviewCanvas styleKey={key} colorHex={schemeColor} size={56} />
-                <span style={S.styleLabel(selected)}>{label2}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    );
-
-    return (
-      <>
-        {/* Random option */}
-        <div style={{ marginBottom: '16px' }}>
-          <button
-            style={{
-              ...S.colorCard(settings.tileStyle === 'random'),
-              width: '100%',
-              justifyContent: 'flex-start',
-            }}
-            onClick={() => select('tileStyle', 'random')}
-          >
-            <div style={{ ...S.uploadPlaceholder, fontSize: '22px', width: '56px', height: '56px', borderRadius: '10px' }}>🎲</div>
-            <div>
-              <div style={S.cardLabel(settings.tileStyle === 'random')}>Random Mix</div>
-              <div style={{ fontSize: '12px', color: 'rgba(0,0,0,0.38)', marginTop: '2px' }}>Different style on every face</div>
-            </div>
-            {settings.tileStyle === 'random' && (
-              <div style={{ ...S.checkmark, marginLeft: 'auto' }}>
-                <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                  <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </div>
-            )}
-          </button>
-        </div>
-
-        {renderStrip(CLASSIC_STYLE_KEYS, 'Classic')}
-        {renderStrip(LIVING_STYLE_KEYS, 'Living')}
-      </>
-    );
-  };
-
-  // ── Step 2: Background ─────────────────────────────────────────────────────
   const renderBackgrounds = () => (
     <div style={S.bgGrid}>
       {BG_OPTIONS.map(opt => {
         const selected = settings.backgroundTheme === opt.value;
         return (
-          <button
-            key={opt.value}
-            style={S.bgCard(selected)}
-            onClick={() => select('backgroundTheme', opt.value)}
-          >
+          <button key={opt.value} style={S.bgCard(selected)} onClick={() => select('backgroundTheme', opt.value)}>
             {opt.thumbnail ? (
-              <img src={opt.thumbnail} alt={opt.label}
-                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+              <img src={opt.thumbnail} alt={opt.label} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
             ) : (
               <div style={{ width: '100%', height: '100%', background: opt.gradient }} />
             )}
             <div style={S.bgLabel}>{opt.label}</div>
             {selected && (
-              <div style={{
-                position: 'absolute', top: '8px', right: '8px',
-                width: '20px', height: '20px', borderRadius: '50%',
-                background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: '0 1px 6px rgba(0,0,0,0.25)',
-              }}>
+              <div style={{ position: 'absolute', top: '7px', right: '7px', width: '20px', height: '20px', borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 6px rgba(0,0,0,0.25)' }}>
                 <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                  <path d="M1 4L3.5 6.5L9 1" stroke="#0a0a0a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M1 4L3.5 6.5L9 1" stroke="#0a0a0a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </div>
             )}
@@ -667,13 +424,218 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     </div>
   );
 
-  const stepContent = [renderMode, renderColors, renderStyles, renderBackgrounds];
-  const stepTitles = ['Choose Mode', 'Choose Colors', 'Choose Style', 'Choose Scene'];
+  // ── Step 2: Colors ──────────────────────────────────────────────────────────
+
+  const renderColors = () => {
+    const resolvedCustom = settings.colorScheme === 'custom' && settings.customColors
+      ? settings.customColors
+      : null;
+
+    return (
+      <>
+        {/* Image upload — shown at top, prominent */}
+        <div style={{ marginBottom: '16px' }}>
+          <button
+            style={{
+              ...S.card(settings.colorScheme === 'custom'),
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: '14px',
+            }}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            {/* Preview or placeholder */}
+            {customPreview ? (
+              <img src={customPreview} alt="Uploaded"
+                style={{ width: '56px', height: '36px', objectFit: 'cover', borderRadius: '8px', flexShrink: 0 }} />
+            ) : (
+              <div style={{
+                width: '56px', height: '36px', borderRadius: '8px',
+                background: 'rgba(0,0,0,0.07)', display: 'flex', alignItems: 'center',
+                justifyContent: 'center', fontSize: '20px', flexShrink: 0,
+              }}>📷</div>
+            )}
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: '14px', fontWeight: settings.colorScheme === 'custom' ? '600' : '500', color: '#0a0a0a' }}>
+                Extract from Image
+              </div>
+              <div style={{ fontSize: '12px', color: 'rgba(0,0,0,0.4)', marginTop: '2px' }}>
+                {customPreview ? 'Tap to change image' : 'Upload a photo to auto-generate a palette'}
+              </div>
+            </div>
+            {/* Extracted color dots when active */}
+            {resolvedCustom && (
+              <div style={{ display: 'flex', gap: '3px', flexShrink: 0 }}>
+                {[1, 2, 3, 4, 5, 6].map(i => (
+                  <div key={i} style={{ width: '12px', height: '12px', borderRadius: '50%', background: resolvedCustom[i], boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+                ))}
+              </div>
+            )}
+            {settings.colorScheme === 'custom' && (
+              <div style={{ marginLeft: 'auto' }}><Checkmark /></div>
+            )}
+          </button>
+        </div>
+
+        {/* Divider */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+          <div style={{ flex: 1, height: '1px', background: 'rgba(0,0,0,0.08)' }} />
+          <span style={{ fontSize: '11px', fontWeight: '600', letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(0,0,0,0.28)' }}>Presets</span>
+          <div style={{ flex: 1, height: '1px', background: 'rgba(0,0,0,0.08)' }} />
+        </div>
+
+        {/* Palette grid — name above dots, 2 columns, matching in-game settings */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '7px', paddingBottom: '8px' }}>
+          {WIZARD_SCHEME_KEYS.filter(k => k !== 'custom').map(key => {
+            const selected = settings.colorScheme === key;
+            const colors = Object.values(COLOR_SCHEMES[key] || {});
+            return (
+              <button key={key} style={{ ...S.card(selected), flexDirection: 'column', gap: '6px', padding: '10px 12px' }}
+                onClick={() => select('colorScheme', key)}>
+                <span style={{ fontSize: '12px', fontWeight: selected ? '600' : '400', color: selected ? '#0a0a0a' : 'rgba(0,0,0,0.6)', lineHeight: 1.2 }}>
+                  {SCHEME_LABELS[key]}
+                </span>
+                <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap' }}>
+                  {colors.slice(0, 6).map((c, i) => (
+                    <div key={i} style={{ width: '13px', height: '13px', borderRadius: '50%', background: c, boxShadow: '0 1px 2px rgba(0,0,0,0.18)' }} />
+                  ))}
+                </div>
+                {selected && (
+                  <div style={{ position: 'absolute', top: '8px', right: '8px' }}><Checkmark /></div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </>
+    );
+  };
+
+  // ── Step 3: Tile Style ──────────────────────────────────────────────────────
+
+  const renderStyles = () => {
+    const resolvedColors = settings.colorScheme === 'custom' && settings.customColors
+      ? settings.customColors
+      : COLOR_SCHEMES[settings.colorScheme] || COLOR_SCHEMES.standard;
+
+    // The global style (null when per-face styles diverge)
+    const perFace = settings.perFaceStyles;
+    const faceValues = [1, 2, 3, 4, 5, 6].map(id => (perFace?.[id]) || settings.tileStyle || 'solid');
+    const globalStyle = faceValues.every(v => v === faceValues[0]) ? faceValues[0] : null;
+
+    const applyGlobal = (key) => {
+      select('tileStyle', key);
+      setSettings(s => ({ ...s, tileStyle: key, perFaceStyles: null }));
+    };
+
+    const applyPerFace = (faceId, key) => {
+      const current = settings.perFaceStyles || Object.fromEntries([1,2,3,4,5,6].map(id => [id, settings.tileStyle || 'solid']));
+      setSettings(s => ({ ...s, perFaceStyles: { ...current, [faceId]: key } }));
+    };
+
+    const StyleGrid = ({ keys, label }) => (
+      <div style={{ marginBottom: '20px' }}>
+        <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(0,0,0,0.32)', marginBottom: '8px' }}>
+          {label}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '7px' }}>
+          {keys.map(key => {
+            const sel = globalStyle === key;
+            return (
+              <button key={key} style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
+                padding: '10px 6px 8px', borderRadius: '12px',
+                border: sel ? '2px solid #0a0a0a' : '2px solid transparent',
+                background: sel ? 'rgba(0,0,0,0.05)' : 'rgba(0,0,0,0.025)',
+                cursor: 'pointer', outline: 'none', WebkitTapHighlightColor: 'transparent',
+                transition: 'all 0.15s ease', fontFamily: 'inherit',
+              }} onClick={() => applyGlobal(key)}>
+                <TilePreviewCanvas styleKey={key} colorHex={Object.values(resolvedColors)[0] || '#4a7fa5'} size={48} />
+                <span style={{ fontSize: '10px', fontWeight: sel ? '600' : '400', color: sel ? '#0a0a0a' : 'rgba(0,0,0,0.5)', textAlign: 'center', lineHeight: 1.2 }}>
+                  {TILE_STYLES[key]?.label || key}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+
+    return (
+      <>
+        {/* Random Mix shortcut */}
+        <div style={{ marginBottom: '18px' }}>
+          <button
+            style={{ ...S.card(settings.tileStyle === 'random' && !perFace), flexDirection: 'row', alignItems: 'center', gap: '14px' }}
+            onClick={() => applyGlobal('random')}
+          >
+            <div style={{ width: '48px', height: '48px', borderRadius: '10px', background: 'rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', flexShrink: 0 }}>🎲</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: '14px', fontWeight: '600', color: '#0a0a0a' }}>Random Mix</div>
+              <div style={{ fontSize: '12px', color: 'rgba(0,0,0,0.4)', marginTop: '2px' }}>Different style on every face</div>
+            </div>
+            {settings.tileStyle === 'random' && !perFace && <Checkmark />}
+          </button>
+        </div>
+
+        <StyleGrid keys={CLASSIC_STYLE_KEYS} label="Classic" />
+        <StyleGrid keys={LIVING_STYLE_KEYS} label="Living" />
+
+        {/* Per-face overrides */}
+        <div style={{ marginBottom: '8px' }}>
+          <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(0,0,0,0.32)', marginBottom: '10px' }}>
+            Per Face
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+            {[1, 2, 3, 4, 5, 6].map(faceId => {
+              const faceStyle = perFace?.[faceId] || settings.tileStyle || 'solid';
+              const faceColor = resolvedColors[faceId] || '#4a7fa5';
+              return (
+                <div key={faceId} style={{
+                  display: 'flex', flexDirection: 'column', gap: '6px',
+                  padding: '10px', borderRadius: '12px', background: 'rgba(0,0,0,0.025)',
+                  border: `2px solid ${faceColor}44`,
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: faceColor, flexShrink: 0 }} />
+                    <span style={{ fontSize: '11px', fontWeight: '600', color: 'rgba(0,0,0,0.6)' }}>{FACE_LABELS[faceId]}</span>
+                  </div>
+                  <TilePreviewCanvas styleKey={faceStyle === 'random' ? 'solid' : faceStyle} colorHex={faceColor} size={36} />
+                  <select
+                    value={faceStyle}
+                    onChange={e => applyPerFace(faceId, e.target.value)}
+                    style={{
+                      fontSize: '10px', padding: '4px 6px', borderRadius: '6px',
+                      border: '1px solid rgba(0,0,0,0.15)', background: '#fff',
+                      color: '#0a0a0a', fontFamily: 'inherit', cursor: 'pointer',
+                      appearance: 'none', WebkitAppearance: 'none',
+                    }}
+                  >
+                    <optgroup label="Classic">
+                      {CLASSIC_STYLE_KEYS.map(k => <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>)}
+                    </optgroup>
+                    <optgroup label="Living">
+                      {LIVING_STYLE_KEYS.map(k => <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>)}
+                    </optgroup>
+                  </select>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </>
+    );
+  };
+
+  // ── Step titles ─────────────────────────────────────────────────────────────
+
+  const stepContent = [renderSize, renderBackgrounds, renderColors, renderStyles];
+  const stepTitles = ['Cube Size', 'Background', 'Color Palette', 'Tile Style'];
   const stepSubtitles = [
-    'Pick how you want to play',
-    'Set the color palette for your cube',
-    'Pick how your tiles look and feel',
-    'Select your play environment',
+    'Pick your puzzle dimensions',
+    'Choose your play environment',
+    'Set the colors for your cube faces',
+    'Choose how your tiles look and feel',
   ];
 
   return (
@@ -683,7 +645,6 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       <div style={S.sheet}>
         {/* Header */}
         <div style={S.header}>
-          {/* Step indicator — segmented bar */}
           <div style={S.stepIndicator}>
             {STEPS.map((_, i) => (
               <div key={i} style={S.dot(i <= step, i === step)} />
@@ -705,8 +666,8 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           <button
             style={S.btnSecondary}
             onClick={handleBack}
-            onMouseEnter={e => e.currentTarget.style.color = 'rgba(0,0,0,0.8)'}
-            onMouseLeave={e => e.currentTarget.style.color = 'rgba(0,0,0,0.45)'}
+            onMouseEnter={e => { e.currentTarget.style.color = 'rgba(0,0,0,0.8)'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = 'rgba(0,0,0,0.45)'; }}
           >
             {step === 0 ? 'Cancel' : 'Back'}
           </button>
