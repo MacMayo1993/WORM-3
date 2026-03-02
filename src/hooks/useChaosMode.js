@@ -86,6 +86,8 @@ export function useChaosMode() {
   const animState = useGameStore((state) => state.animState);
   const cubies = useGameStore((state) => state.cubies);
   const setCubies = useGameStore((state) => state.setCubies);
+  const addDisparityDeathsBulk = useGameStore((state) => state.addDisparityDeathsBulk);
+  const addDisparityEliminatedFacesBulk = useGameStore((state) => state.addDisparityEliminatedFacesBulk);
 
   // Auto-rotate state
   const upcomingRotation = useGameStore((state) => state.upcomingRotation);
@@ -477,8 +479,9 @@ export function useChaosMode() {
           // ── Disparity Mode: record deaths captured inside stepSingleChain ──
           if (allNewDeaths.length > 0) {
             pairDeathCount++;
-            const store = useGameStore.getState();
             const DIR_TO_FACE = { PZ: 1, NX: 2, PY: 3, NZ: 4, PX: 5, NY: 6 };
+            const newDeaths = [];
+            const eliminatedFaces = [];
             for (const { sticker: st, x: dx, y: dy, z: dz, dirKey: ddk } of allNewDeaths) {
               deathRank++;
               const gridId = getManifoldGridId(st, S);
@@ -486,7 +489,7 @@ export function useChaosMode() {
               const { r, c } = faceRCFor(ddk, dx, dy, dz, S);
               const endFaceId = DIR_TO_FACE[ddk] ?? st.curr;
               const endGridId = `M${endFaceId}-${String(r * S + c + 1).padStart(3, '0')}`;
-              store.addDisparityDeath({ id: Date.now() + Math.random(), gridId, endGridId, rank: deathRank, pairRank: pairDeathCount, timestamp: Date.now() });
+              newDeaths.push({ id: Date.now() + Math.random(), gridId, endGridId, rank: deathRank, pairRank: pairDeathCount, timestamp: Date.now() });
               // Decrement face count and fire elimination event when face hits 0
               const faceNum = st.orig;
               if (faceNum) {
@@ -494,10 +497,12 @@ export function useChaosMode() {
                 const next = Math.max(0, prev - 1);
                 faceAliveMap.set(faceNum, next);
                 if (next === 0) {
-                  store.addDisparityEliminatedFace(faceNum);
+                  eliminatedFaces.push(faceNum);
                 }
               }
             }
+            addDisparityDeathsBulk(newDeaths);
+            if (eliminatedFaces.length > 0) addDisparityEliminatedFacesBulk(eliminatedFaces);
           }
 
           // ── Winner detection: last 2 surviving (alive) tiles ──────────────────
@@ -541,7 +546,7 @@ export function useChaosMode() {
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chaosMode, chaosLevel, setCubies, setCascades]);
+  }, [chaosMode, chaosLevel, setCubies, setCascades, addDisparityDeathsBulk, addDisparityEliminatedFacesBulk]);
 
   // Auto-rotate effect
   useEffect(() => {
