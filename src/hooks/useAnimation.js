@@ -59,6 +59,11 @@ export function useAnimation() {
   const echoTimeoutsRef = useRef([]);
   const echoQueueRef = useRef([]);
 
+  // Shuffle animation queue
+  const shuffleQueueRef = useRef([]);
+  const shuffleDoneRef = useRef(null);
+  const isShufflingRef = useRef(false);
+
   // Start a new animation (atomic: animState and pendingMove set in one render)
   const startAnimation = useCallback((axis, dir, sliceIndex, isEcho = false) => {
     const move = { axis, dir, sliceIndex, isEcho };
@@ -69,11 +74,50 @@ export function useAnimation() {
     });
   }, []);
 
+  // Start an animated shuffle: plays moves sequentially with fast per-move animations.
+  // Each move is committed silently (no moves counter, no history).
+  // onDone is called after all moves complete.
+  const startAnimatedShuffle = useCallback((moves, onDone) => {
+    if (!moves || !moves.length) { onDone?.(); return; }
+    shuffleQueueRef.current = moves.slice(1);
+    shuffleDoneRef.current = onDone || null;
+    isShufflingRef.current = true;
+    const first = { ...moves[0], isShuffle: true };
+    pendingMoveRef.current = first;
+    useGameStore.setState({ animState: first, pendingMove: first });
+  }, []);
+
   // Handle animation completion
   const handleAnimComplete = useCallback(() => {
     const pm = pendingMoveRef.current;
     if (pm) {
-      const { axis, dir, sliceIndex, isEcho } = pm;
+      const { axis, dir, sliceIndex, isEcho, isShuffle } = pm;
+
+      if (isShuffle) {
+        // Shuffle move: commit silently — no moves counter, no undo history, no echo.
+        play('/sounds/rotate.mp3', 0.6);
+        useGameStore.setState((state) => ({
+          cubies: rotateSliceCubies(state.cubies, size, axis, sliceIndex, dir),
+          rotationEpoch: state.rotationEpoch + 1,
+          animState: null,
+          pendingMove: null,
+        }));
+        pendingMoveRef.current = null;
+
+        if (shuffleQueueRef.current.length > 0) {
+          const next = { ...shuffleQueueRef.current.shift(), isShuffle: true };
+          setTimeout(() => {
+            pendingMoveRef.current = next;
+            useGameStore.setState({ animState: next, pendingMove: next });
+          }, 50);
+        } else {
+          isShufflingRef.current = false;
+          const done = shuffleDoneRef.current;
+          shuffleDoneRef.current = null;
+          done?.();
+        }
+        return;
+      }
 
       // Batch all store updates into a single atomic setState (1 re-render instead of 3-4).
       // Crucially, animState and pendingMove are cleared in the SAME setState so that the
@@ -196,6 +240,7 @@ export function useAnimation() {
 
     // Actions
     startAnimation,
+    startAnimatedShuffle,
     handleAnimComplete,
     onMove,
     setAnimState,

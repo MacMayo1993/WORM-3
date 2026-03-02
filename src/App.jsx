@@ -204,7 +204,7 @@ export default function WORM3() {
   const { moves, gameTime, victory, achievedWins: _achievedWins, setVictory } = useGameSession();
 
   const {
-    animState, startAnimation, handleAnimComplete, onMove
+    animState, startAnimation, handleAnimComplete, onMove, startAnimatedShuffle
   } = useAnimation();
 
   const {
@@ -230,6 +230,23 @@ export default function WORM3() {
   const handsMoveTimestamps = useRef([]);
 
   const { moveHistory, undo, canUndo } = useUndo();
+
+  // Animated shuffle: resets to solved, then plays 15 quick layer rotations visually.
+  // Uses a 50ms delay after reset so React commits the solved layout before animation starts.
+  const animatedShuffle = useCallback(() => {
+    useGameStore.getState().resetGame();
+    const axes = ['row', 'col', 'depth'];
+    const moves = Array.from({ length: 15 }, () => ({
+      axis: axes[Math.floor(Math.random() * 3)],
+      sliceIndex: Math.floor(Math.random() * size),
+      dir: Math.random() > 0.5 ? 1 : -1,
+    }));
+    setTimeout(() => {
+      startAnimatedShuffle(moves, () => {
+        useGameStore.getState().setHasShuffled(true);
+      });
+    }, 50);
+  }, [size, startAnimatedShuffle]);
 
   // Teach Mode — step-by-step algorithm teaching
   const teachMode = useTeachMode();
@@ -401,9 +418,9 @@ export default function WORM3() {
       setRotatedCubies(state);
       useGameStore.getState().setHasShuffled(true);
     } else {
-      shuffle();
+      animatedShuffle();
     }
-  }, [settings, setSettings, shuffle, size, changeSize, setRotatedCubies]);
+  }, [settings, setSettings, animatedShuffle, size, changeSize, setRotatedCubies]);
 
   const handleWizardCancel = useCallback(() => {
     setShowFreeplayWizard(false);
@@ -612,8 +629,8 @@ export default function WORM3() {
     if (currentLevel) completeLevel(currentLevel);
     setVictory(null);
     if (currentLevelData) shuffleForLevel();
-    else shuffle();
-  }, [currentLevel, currentLevelData, setVictory, shuffleForLevel, shuffle]);
+    else animatedShuffle();
+  }, [currentLevel, currentLevelData, setVictory, shuffleForLevel, animatedShuffle]);
 
   const handleNextLevel = useCallback(() => {
     if (currentLevel) completeLevel(currentLevel);
@@ -737,7 +754,7 @@ export default function WORM3() {
     onFlip: onTapFlip,
     onUndo: undo,
     onReset: reset,
-    onShuffle: () => { reset(); setTimeout(() => shuffle(), 100); },
+    onShuffle: animatedShuffle,
     onSaveState: handleSaveState,
     onLoadState: handleLoadState,
     onLevelJump: handleLevelSelect,
@@ -842,7 +859,7 @@ export default function WORM3() {
           }}
           handlers={{
             onReset: reset,
-            onShuffle: shuffle,
+            onShuffle: animatedShuffle,
             onShuffleForLevel: shuffleForLevel,
             onChangeSize: changeSize,
             onSetChaosLevel: setChaosLevel,
