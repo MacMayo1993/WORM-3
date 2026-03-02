@@ -1518,6 +1518,47 @@ button:focus-visible,
   border: 1px solid rgba(0, 0, 0, 0.35);
 }
 
+/* ── Scheme grid: compact 2-column card layout ───────────────────────────── */
+/* Applied only to the color-scheme picker so other radio groups are unaffected */
+.scheme-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.scheme-grid .settings-radio {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  padding: 8px 9px;
+  border: 1.5px solid transparent;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.scheme-grid .settings-radio:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.scheme-grid .settings-radio.active {
+  background: rgba(30, 136, 229, 0.12);
+  border-color: rgba(30, 136, 229, 0.7);
+}
+
+/* Hide the actual radio bullet — the whole card is the selector */
+.scheme-grid .settings-radio input[type="radio"] {
+  display: none;
+}
+
+.scheme-grid .settings-radio-label {
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.scheme-grid .scheme-dot {
+  width: 13px;
+  height: 13px;
+}
+
 /* Image Upload */
 .image-upload-area {
   margin-bottom: 12px;
