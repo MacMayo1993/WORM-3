@@ -102,7 +102,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // Batch all store reads into a single subscription to minimize Zustand overhead.
   // With 54 stickers on a 3×3 cube, separate selectors = many subscriptions;
   // one combined selector with shallow equality keeps it to 54 subscriptions.
-  const { biomeEnabled, chaosLevel, disparityFlipCap, disparityWinner, settings, faceTextures, disparityDeaths } = useGameStore(
+  const { biomeEnabled, chaosLevel, disparityFlipCap, disparityWinner, settings, faceTextures, disparityDeathByGridId } = useGameStore(
     useShallow((s) => ({
       biomeEnabled: s.settings?.biomeMode?.enabled ?? false,
       chaosLevel: s.chaosLevel,
@@ -110,7 +110,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       disparityWinner: s.disparityWinner,
       settings: s.settings,
       faceTextures: s.faceTextures,
-      disparityDeaths: s.disparityDeaths,
+      disparityDeathByGridId: s.disparityDeathByGridId,
     }))
   );
   const fc = resolveColors(settings, settings?.biomeMode?.faceAssignment) || FACE_COLORS;
@@ -181,7 +181,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const currTextureRef = useRef(null);
 
   // Death rank from Disparity Mode — null if not in disparity game or tile not yet dead
-  const deadRank = isDead ? (disparityDeaths?.find(d => d.gridId === stickerGridIdRef.current)?.rank ?? null) : null;
+  const deadRank = isDead ? (disparityDeathByGridId?.[stickerGridIdRef.current]?.rank ?? null) : null;
   // Winner tile — glows gold after the last pair is found
   const isWinnerTile = chaosLevel > 0 && !!(disparityWinner?.pair?.includes(stickerGridIdRef.current));
 
