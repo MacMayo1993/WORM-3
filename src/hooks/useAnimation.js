@@ -7,6 +7,7 @@
 
 import { useCallback, useRef } from 'react';
 import { useGameStore } from './useGameStore.js';
+import { useShallow } from 'zustand/react/shallow';
 import { rotateSliceCubies } from '../game/cubeRotation.js';
 import { play } from '../utils/audio.js';
 import gsap from 'gsap';
@@ -22,21 +23,37 @@ import {
  * Hook for animation management
  */
 export function useAnimation() {
-  const size = useGameStore((state) => state.size);
-  const setRotatedCubies = useGameStore((state) => state.setRotatedCubies);
-  const setMoves = useGameStore((state) => state.setMoves);
-  const animState = useGameStore((state) => state.animState);
-  const pendingMove = useGameStore((state) => state.pendingMove);
-  const setAnimState = useGameStore((state) => state.setAnimState);
-  const setPendingMove = useGameStore((state) => state.setPendingMove);
-  const clearAnimation = useGameStore((state) => state.clearAnimation);
-  const addToHistory = useGameStore((state) => state.addToHistory);
-
-  // Antipodal Mode state
-  const antipodalMode = useGameStore((state) => state.antipodalMode);
-  const echoDelay = useGameStore((state) => state.echoDelay);
-  const addPendingEchoRotation = useGameStore((state) => state.addPendingEchoRotation);
-  const removePendingEchoRotation = useGameStore((state) => state.removePendingEchoRotation);
+  const {
+    size,
+    setRotatedCubies,
+    setMoves,
+    animState,
+    pendingMove,
+    setAnimState,
+    setPendingMove,
+    clearAnimation,
+    addToHistory,
+    antipodalMode,
+    echoDelay,
+    addPendingEchoRotation,
+    removePendingEchoRotation,
+  } = useGameStore(
+    useShallow(s => ({
+      size: s.size,
+      setRotatedCubies: s.setRotatedCubies,
+      setMoves: s.setMoves,
+      animState: s.animState,
+      pendingMove: s.pendingMove,
+      setAnimState: s.setAnimState,
+      setPendingMove: s.setPendingMove,
+      clearAnimation: s.clearAnimation,
+      addToHistory: s.addToHistory,
+      antipodalMode: s.antipodalMode,
+      echoDelay: s.echoDelay,
+      addPendingEchoRotation: s.addPendingEchoRotation,
+      removePendingEchoRotation: s.removePendingEchoRotation,
+    }))
+  );
 
   const pendingMoveRef = useRef(null);
   const echoTimeoutsRef = useRef([]);
