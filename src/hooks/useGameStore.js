@@ -98,6 +98,7 @@ export const useGameStore = create(
       // Full wipe of Chaos & Disparity states to ensure a truly fresh cube
       chaosLevel: 0,
       disparityDeaths: [],
+      disparityDeathByGridId: {},
       disparityWinner: null,
       showDisparityWinner: false,
       disparityEliminatedFaces: [],
@@ -198,6 +199,8 @@ export const useGameStore = create(
     // ========================================================================
     // Each entry: { id, gridId, rank, timestamp }
     disparityDeaths: [],
+    // O(1) lookup table keyed by gridId for fast per-sticker dead-rank reads
+    disparityDeathByGridId: {},
     // Set when a single tile survives: { gridId }
     disparityWinner: null,
     // Controls whether the cinematic winner celebration screen is visible
@@ -209,13 +212,34 @@ export const useGameStore = create(
     disparityFlipCap: 25,
     setDisparityFlipCap: (v) => set({ disparityFlipCap: v }),
 
-    addDisparityDeath: (death) => set((state) => ({ disparityDeaths: [...state.disparityDeaths, death] })),
+     addDisparityDeath: (death) => set((state) => ({
+      disparityDeaths: [...state.disparityDeaths, death],
+      disparityDeathByGridId: {
+        ...state.disparityDeathByGridId,
+        [death.gridId]: death,
+      },
+    })),
+    addDisparityDeathsBulk: (deaths) => set((state) => {
+      if (!deaths?.length) return state;
+      const byGrid = { ...state.disparityDeathByGridId };
+      for (const death of deaths) {
+        byGrid[death.gridId] = death;
+      }
+      return {
+        disparityDeaths: [...state.disparityDeaths, ...deaths],
+        disparityDeathByGridId: byGrid,
+      };
+    }),
     setDisparityWinner: (winner) => set({ disparityWinner: winner }),
     setShowDisparityWinner: (v) => set({ showDisparityWinner: v }),
     addDisparityEliminatedFace: (faceNum) => set((state) => ({
       disparityEliminatedFaces: [...state.disparityEliminatedFaces, faceNum],
     })),
-    clearDisparityGame: () => set({ disparityDeaths: [], disparityWinner: null, showDisparityWinner: false, disparityEliminatedFaces: [], cascades: [] }),
+    addDisparityEliminatedFacesBulk: (faces) => set((state) => {
+      if (!faces?.length) return state;
+      return { disparityEliminatedFaces: [...state.disparityEliminatedFaces, ...faces] };
+    }),
+    clearDisparityGame: () => set({ disparityDeaths: [], disparityDeathByGridId: {}, disparityWinner: null, showDisparityWinner: false, disparityEliminatedFaces: [], cascades: [] }),
 
     // ========================================================================
     // ANIMATION STATE
