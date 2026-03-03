@@ -65,8 +65,8 @@ export function useAnimation() {
   const isShufflingRef = useRef(false);
 
   // Start a new animation (atomic: animState and pendingMove set in one render)
-  const startAnimation = useCallback((axis, dir, sliceIndex, isEcho = false) => {
-    const move = { axis, dir, sliceIndex, isEcho };
+  const startAnimation = useCallback((axis, dir, sliceIndex, isEcho = false, isUndo = false) => {
+    const move = { axis, dir, sliceIndex, isEcho, isUndo };
     pendingMoveRef.current = move;
     useGameStore.setState({
       animState: { axis, dir, sliceIndex, t: 0, isEcho },
