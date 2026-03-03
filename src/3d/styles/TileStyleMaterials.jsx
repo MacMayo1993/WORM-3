@@ -910,6 +910,106 @@ const fragmentShaders = {
       gl_FragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
     }
   `,
+
+  // Scintillating Grid — white discs at every intersection of a bright grid on a
+  // dark background; ghostly dark discs appear to flash at non-fixated junctions
+  // (Lingelbach 1994 variant of the Hermann grid illusion).
+  scintillatingGrid: `
+    uniform vec3 baseColor;
+    varying vec2 vUv;
+
+    void main() {
+      float N  = 6.0;
+      float gw = 0.22;   // gutter (grid-line) width as fraction of cell
+      vec2  uv = vUv * N;
+      vec2  f  = fract(uv);
+
+      float onX = step(1.0 - gw, f.x);
+      float onY = step(1.0 - gw, f.y);
+      float onGrid = max(onX, onY);
+
+      // White disc centered at each intersection, in gutter-local coords [-1, 1]
+      vec2  gutterLocal = (f - vec2(1.0 - gw * 0.5)) / (gw * 0.5);
+      float discDist    = length(gutterLocal);
+      float disc = (1.0 - smoothstep(0.5, 0.85, discDist)) * onX * onY;
+
+      vec3 cellCol = baseColor * 0.07;
+      vec3 gridCol = baseColor * 1.1 + vec3(0.12);
+      vec3 color   = mix(cellCol, gridCol, onGrid);
+      color = mix(color, vec3(1.0), disc);
+
+      gl_FragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
+    }
+  `,
+
+  // Zöllner — long parallel horizontal lines crossed by short hatch marks angled
+  // ±45° on alternating rows; the parallel lines appear to tilt toward or away
+  // from each other (Zöllner 1860).
+  zoellner: `
+    uniform vec3 baseColor;
+    varying vec2 vUv;
+
+    void main() {
+      float nLines = 5.0;
+      float lineW  = 0.06;
+      float fy  = fract(vUv.y * nLines);
+      float row = floor(vUv.y * nLines);
+
+      // Main long horizontal lines
+      float mainLine = smoothstep(lineW, lineW * 0.3, abs(fy - 0.5));
+
+      // Short cross-hatches: direction alternates ±1 per row
+      float dir   = mod(row, 2.0) * 2.0 - 1.0;
+      float hN    = 18.0;
+      float slant = fract(vUv.x * hN + dir * fy * 1.2);
+      float hatch = smoothstep(0.07, 0.0, abs(slant - 0.5));
+      // Restrict hatches to mid-band so they don't overlap the main line
+      hatch *= smoothstep(0.0, 0.14, fy) * smoothstep(1.0, 0.86, fy);
+      hatch *= (1.0 - mainLine);
+
+      float pattern = max(mainLine, hatch * 0.75);
+
+      vec3 light = baseColor * 1.1 + vec3(0.08);
+      vec3 dark  = baseColor * 0.1;
+      gl_FragColor = vec4(clamp(mix(dark, light, pattern), 0.0, 1.0), 1.0);
+    }
+  `,
+
+  // Kanizsa — four pac-man inducers positioned at the corners of an implied
+  // square; the brain fills in the missing edges as an illusory bright contour
+  // even though no actual border is drawn (Kanizsa 1955).
+  kanizsa: `
+    uniform vec3 baseColor;
+    varying vec2 vUv;
+
+    void main() {
+      const float PI = 3.14159265;
+      vec2  c = vUv - 0.5;
+      float r = 0.13;   // pac-man disc radius
+      float d = 0.26;   // distance of each centre from tile centre
+
+      float inducers = 0.0;
+      for (int i = 0; i < 4; i++) {
+        float a    = PI * 0.25 + float(i) * PI * 0.5;   // 45°, 135°, 225°, 315°
+        vec2  pos  = vec2(cos(a), sin(a)) * d;
+        vec2  dp   = c - pos;
+        float dist = length(dp);
+
+        // Mouth opens inward toward the tile centre
+        float mouthDir = atan(-pos.y, -pos.x);
+        float alpha    = atan(dp.y, dp.x);
+        float dA       = abs(mod(alpha - mouthDir + PI, 2.0 * PI) - PI);
+
+        float inDisc  = step(dist, r);
+        float inMouth = step(dA, 0.62);   // ~35° half-angle
+        inducers = max(inducers, inDisc * (1.0 - inMouth));
+      }
+
+      vec3 light = baseColor * 1.1 + vec3(0.08);
+      vec3 dark  = baseColor * 0.08;
+      gl_FragColor = vec4(clamp(mix(dark, light, inducers), 0.0, 1.0), 1.0);
+    }
+  `,
 };
 
 // ─── LRU material cache ───────────────────────────────────────────────────────
