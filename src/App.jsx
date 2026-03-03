@@ -74,25 +74,25 @@ const _chromaticVec = new Vector2(0, 0);
  * Contains IntroScene, post-processing, and intro lights.
  * Unmounting is avoided by conditionally hiding it (never fully unmounting the Canvas).
  */
-function IntroBranch({ time, onComplete }) {
+function IntroBranch({ time, onComplete, reducedMotion = false, performanceMode = false }) {
   const bloomIntensity = useMemo(() => {
-    if (time < EXPLOSION_START)   return 0.6;
-    if (time < EXPLOSION_END)     return 0.6 + _ease(_prog(time, EXPLOSION_START, EXPLOSION_END)) * 2.4;
-    if (time < IMPLODE_START)     return 3.0;
-    if (time < IMPLODE_END)       return 3.0 - _ease(_prog(time, IMPLODE_START, IMPLODE_END)) * 2.2;
-    return 0.8;
-  }, [time]);
+    if (time < EXPLOSION_START)   return reducedMotion ? 0.25 : 0.6;
+    if (time < EXPLOSION_END)     return (reducedMotion ? 0.25 : 0.6) + _ease(_prog(time, EXPLOSION_START, EXPLOSION_END)) * (reducedMotion ? 0.9 : 2.4);
+    if (time < IMPLODE_START)     return reducedMotion ? 1.1 : 3.0;
+    if (time < IMPLODE_END)       return (reducedMotion ? 1.1 : 3.0) - _ease(_prog(time, IMPLODE_START, IMPLODE_END)) * (reducedMotion ? 0.7 : 2.2);
+    return reducedMotion ? 0.3 : 0.8;
+  }, [time, reducedMotion]);
 
   const chromaticOffset = useMemo(() => {
     let mag = 0;
     if (time >= EXPLOSION_START && time < EXPLOSION_START + 0.4) {
-      mag = _ease(_prog(time, EXPLOSION_START, EXPLOSION_START + 0.4)) * 0.008;
+      mag = _ease(_prog(time, EXPLOSION_START, EXPLOSION_START + 0.4)) * (reducedMotion ? 0.0015 : 0.008);
     } else if (time >= EXPLOSION_START + 0.4 && time < EXPLOSION_START + 1.8) {
-      mag = _ease(1 - _prog(time, EXPLOSION_START + 0.4, EXPLOSION_START + 1.8)) * 0.005;
+      mag = _ease(1 - _prog(time, EXPLOSION_START + 0.4, EXPLOSION_START + 1.8)) * (reducedMotion ? 0.001 : 0.005);
     }
     _chromaticVec.set(mag, mag * 0.4);
     return _chromaticVec;
-  }, [time]);
+  }, [time, reducedMotion]);
 
   return (
     <>
@@ -104,7 +104,8 @@ function IntroBranch({ time, onComplete }) {
       <Suspense fallback={null}>
         <Environment preset="city" />
       </Suspense>
-      <EffectComposer>
+      {!performanceMode && (
+        <EffectComposer>
         <Bloom
           intensity={bloomIntensity}
           luminanceThreshold={0.15}
@@ -120,7 +121,8 @@ function IntroBranch({ time, onComplete }) {
           darkness={0.75}
           blendFunction={BlendFunction.NORMAL}
         />
-      </EffectComposer>
+        </EffectComposer>
+      )}
     </>
   );
 }
@@ -777,6 +779,9 @@ export default function WORM3() {
   // RENDER
   // ========================================================================
   const cameraZ = (isMobile ? { 2: 12, 3: 17, 4: 25, 5: 38 } : { 2: 10, 3: 14, 4: 20, 5: 30 })[size] || 14;
+  const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const introPerformanceMode = isMobile || prefersReducedMotion;
+
 
   if (coopMode) {
     return (
@@ -807,7 +812,12 @@ export default function WORM3() {
         >
           <CameraManager showWelcome={showWelcome} cameraZ={cameraZ} />
           {showWelcome ? (
-            <IntroBranch time={introTime} onComplete={handleWelcomeComplete} />
+            <IntroBranch
+              time={introTime}
+              onComplete={handleWelcomeComplete}
+              reducedMotion={prefersReducedMotion}
+              performanceMode={introPerformanceMode}
+            />
           ) : (
             <GameScene
               onMove={onMove}

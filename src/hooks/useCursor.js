@@ -5,17 +5,22 @@
  */
 
 import { useCallback } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from './useGameStore.js';
 
 /**
  * Hook for cursor management
  */
 export function useCursor() {
-  const size = useGameStore((state) => state.size);
-  const cursor = useGameStore((state) => state.cursor);
-  const showCursor = useGameStore((state) => state.showCursor);
-  const setCursor = useGameStore((state) => state.setCursor);
-  const setShowCursor = useGameStore((state) => state.setShowCursor);
+  const { size, cursor, showCursor, setCursor, setShowCursor } = useGameStore(
+    useShallow((state) => ({
+      size: state.size,
+      cursor: state.cursor,
+      showCursor: state.showCursor,
+      setCursor: state.setCursor,
+      setShowCursor: state.setShowCursor,
+    }))
+  );
 
   // Convert cursor (face, row, col) to cube coordinates (x, y, z) and dirKey
   const cursorToCubePos = useCallback((cur) => {

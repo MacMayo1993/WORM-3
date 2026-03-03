@@ -4,7 +4,8 @@
  * Handles keyboard shortcuts and input.
  */
 
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from './useGameStore.js';
 import { useCursor } from './useCursor.js';
 
@@ -15,23 +16,39 @@ import { useCursor } from './useCursor.js';
  * @param {Function} options.onFlip - Callback for flip action
  */
 export function useKeyboardControls({ onMove, onFlip }) {
-  const animState = useGameStore((state) => state.animState);
-  const flipMode = useGameStore((state) => state.flipMode);
-  const currentLevelData = useGameStore((state) => state.currentLevelData);
-  const showLevelTutorial = useGameStore((state) => state.showLevelTutorial);
-  const setShowLevelTutorial = useGameStore((state) => state.setShowLevelTutorial);
-
-  // UI toggles
-  const toggleHelp = useGameStore((state) => state.toggleHelp);
-  const setShowHelp = useGameStore((state) => state.setShowHelp);
-  const setShowSettings = useGameStore((state) => state.setShowSettings);
-  const toggleFlipMode = useGameStore((state) => state.toggleFlipMode);
-  const toggleTunnels = useGameStore((state) => state.toggleTunnels);
-  const toggleExploded = useGameStore((state) => state.toggleExploded);
-  const toggleNetPanel = useGameStore((state) => state.toggleNetPanel);
-  const cycleVisualMode = useGameStore((state) => state.cycleVisualMode);
-  const toggleChaos = useGameStore((state) => state.toggleChaos);
-  const setShowCursor = useGameStore((state) => state.setShowCursor);
+  const {
+    animState,
+    flipMode,
+    currentLevelData,
+    showLevelTutorial,
+    setShowLevelTutorial,
+    toggleHelp,
+    setShowHelp,
+    setShowSettings,
+    toggleFlipMode,
+    toggleTunnels,
+    toggleExploded,
+    toggleNetPanel,
+    cycleVisualMode,
+    toggleChaos,
+    setShowCursor,
+  } = useGameStore(useShallow((state) => ({
+    animState: state.animState,
+    flipMode: state.flipMode,
+    currentLevelData: state.currentLevelData,
+    showLevelTutorial: state.showLevelTutorial,
+    setShowLevelTutorial: state.setShowLevelTutorial,
+    toggleHelp: state.toggleHelp,
+    setShowHelp: state.setShowHelp,
+    setShowSettings: state.setShowSettings,
+    toggleFlipMode: state.toggleFlipMode,
+    toggleTunnels: state.toggleTunnels,
+    toggleExploded: state.toggleExploded,
+    toggleNetPanel: state.toggleNetPanel,
+    cycleVisualMode: state.cycleVisualMode,
+    toggleChaos: state.toggleChaos,
+    setShowCursor: state.setShowCursor,
+  })));
 
   const { cursor, moveCursor, getRotationParams, cursorToCubePos } = useCursor();
 
@@ -55,16 +72,104 @@ export function useKeyboardControls({ onMove, onFlip }) {
     setShowCursor(true);
   }, [cursor, cursorToCubePos, onFlip, setShowCursor]);
 
-  // Keyboard event handler
+  const latestRef = useRef({
+    animState,
+    flipMode,
+    currentLevelData,
+    showLevelTutorial,
+    moveCursor,
+    performCursorRotation,
+    performCursorFlip,
+    toggleHelp,
+    setShowHelp,
+    setShowSettings,
+    toggleFlipMode,
+    toggleTunnels,
+    toggleExploded,
+    toggleNetPanel,
+    cycleVisualMode,
+    toggleChaos,
+    setShowCursor,
+    setShowLevelTutorial,
+  });
+
+  useEffect(() => {
+    latestRef.current = {
+      animState,
+      flipMode,
+      currentLevelData,
+      showLevelTutorial,
+      moveCursor,
+      performCursorRotation,
+      performCursorFlip,
+      toggleHelp,
+      setShowHelp,
+      setShowSettings,
+      toggleFlipMode,
+      toggleTunnels,
+      toggleExploded,
+      toggleNetPanel,
+      cycleVisualMode,
+      toggleChaos,
+      setShowCursor,
+      setShowLevelTutorial,
+    };
+  }, [
+    animState,
+    flipMode,
+    currentLevelData,
+    showLevelTutorial,
+    moveCursor,
+    performCursorRotation,
+    performCursorFlip,
+    toggleHelp,
+    setShowHelp,
+    setShowSettings,
+    toggleFlipMode,
+    toggleTunnels,
+    toggleExploded,
+    toggleNetPanel,
+    cycleVisualMode,
+    toggleChaos,
+    setShowCursor,
+    setShowLevelTutorial,
+  ]);
+
+  // Keyboard event handler (attached once, reads latest state via ref)
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Don't trigger if typing in an input
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      const {
+        flipMode: latestFlipMode,
+        currentLevelData: latestCurrentLevelData,
+        showLevelTutorial: latestShowLevelTutorial,
+        moveCursor: latestMoveCursor,
+        performCursorRotation: latestPerformCursorRotation,
+        performCursorFlip: latestPerformCursorFlip,
+        toggleHelp: latestToggleHelp,
+        setShowHelp: latestSetShowHelp,
+        setShowSettings: latestSetShowSettings,
+        toggleFlipMode: latestToggleFlipMode,
+        toggleTunnels: latestToggleTunnels,
+        toggleExploded: latestToggleExploded,
+        toggleNetPanel: latestToggleNetPanel,
+        cycleVisualMode: latestCycleVisualMode,
+        toggleChaos: latestToggleChaos,
+        setShowCursor: latestSetShowCursor,
+        setShowLevelTutorial: latestSetShowLevelTutorial,
+      } = latestRef.current;
+
+      // Don't trigger if typing in editable controls
+      const target = e.target;
+      if (target instanceof HTMLElement && (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+      )) return;
 
       // Close tutorial with space or enter
-      if (showLevelTutorial && (e.key === ' ' || e.key === 'Enter')) {
+      if (latestShowLevelTutorial && (e.key === ' ' || e.key === 'Enter')) {
         e.preventDefault();
-        setShowLevelTutorial(false);
+        latestSetShowLevelTutorial(false);
         return;
       }
 
@@ -73,62 +178,62 @@ export function useKeyboardControls({ onMove, onFlip }) {
       // Arrow keys - cursor movement
       if (e.key === 'ArrowUp') {
         e.preventDefault();
-        moveCursor('up');
+        latestMoveCursor('up');
         return;
       }
       if (e.key === 'ArrowDown') {
         e.preventDefault();
-        moveCursor('down');
+        latestMoveCursor('down');
         return;
       }
       if (e.key === 'ArrowLeft') {
         e.preventDefault();
-        moveCursor('left');
+        latestMoveCursor('left');
         return;
       }
       if (e.key === 'ArrowRight') {
         e.preventDefault();
-        moveCursor('right');
+        latestMoveCursor('right');
         return;
       }
 
       // WASDQE - rotation controls
       if (key === 'w') {
         e.preventDefault();
-        performCursorRotation('up');
+        latestPerformCursorRotation('up');
         return;
       }
       if (key === 's') {
         e.preventDefault();
-        performCursorRotation('down');
+        latestPerformCursorRotation('down');
         return;
       }
       if (key === 'a') {
         e.preventDefault();
-        performCursorRotation('left');
+        latestPerformCursorRotation('left');
         return;
       }
       if (key === 'd') {
         e.preventDefault();
-        performCursorRotation('right');
+        latestPerformCursorRotation('right');
         return;
       }
       if (key === 'q') {
         e.preventDefault();
-        performCursorRotation('ccw');
+        latestPerformCursorRotation('ccw');
         return;
       }
       if (key === 'e') {
         e.preventDefault();
-        performCursorRotation('cw');
+        latestPerformCursorRotation('cw');
         return;
       }
 
       // F - flip at cursor
       if (key === 'f') {
         e.preventDefault();
-        if (flipMode && (!currentLevelData || currentLevelData.features.flips)) {
-          performCursorFlip();
+        if (latestFlipMode && (!latestCurrentLevelData || latestCurrentLevelData.features.flips)) {
+          latestPerformCursorFlip();
         }
         return;
       }
@@ -137,53 +242,47 @@ export function useKeyboardControls({ onMove, onFlip }) {
       switch (key) {
         case 'h':
         case '?':
-          toggleHelp();
+          latestToggleHelp();
           break;
         case 'g':
-          if (!currentLevelData || currentLevelData.features.flips) {
-            toggleFlipMode();
+          if (!latestCurrentLevelData || latestCurrentLevelData.features.flips) {
+            latestToggleFlipMode();
           }
           break;
         case 't':
-          if (!currentLevelData || currentLevelData.features.tunnels) {
-            toggleTunnels();
+          if (!latestCurrentLevelData || latestCurrentLevelData.features.tunnels) {
+            latestToggleTunnels();
           }
           break;
         case 'x':
-          if (!currentLevelData || currentLevelData.features.explode) {
-            toggleExploded();
+          if (!latestCurrentLevelData || latestCurrentLevelData.features.explode) {
+            latestToggleExploded();
           }
           break;
         case 'n':
-          if (!currentLevelData || currentLevelData.features.net) {
-            toggleNetPanel();
+          if (!latestCurrentLevelData || latestCurrentLevelData.features.net) {
+            latestToggleNetPanel();
           }
           break;
         case 'v':
-          cycleVisualMode();
+          latestCycleVisualMode();
           break;
         case 'c':
-          if (!currentLevelData || currentLevelData.features.chaos) {
-            toggleChaos();
+          if (!latestCurrentLevelData || latestCurrentLevelData.features.chaos) {
+            latestToggleChaos();
           }
           break;
         case 'escape':
-          setShowHelp(false);
-          setShowSettings(false);
-          setShowCursor(false);
+          latestSetShowHelp(false);
+          latestSetShowSettings(false);
+          latestSetShowCursor(false);
           break;
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [
-    cursor, animState, flipMode, showLevelTutorial, currentLevelData,
-    moveCursor, performCursorRotation, performCursorFlip,
-    toggleHelp, toggleFlipMode, toggleTunnels, toggleExploded,
-    toggleNetPanel, cycleVisualMode, toggleChaos,
-    setShowHelp, setShowSettings, setShowCursor, setShowLevelTutorial
-  ]);
+  }, []);
 
   return {
     performCursorRotation,
