@@ -229,7 +229,7 @@ export default function WORM3() {
   } = useHandsMode();
   const handsMoveTimestamps = useRef([]);
 
-  const { moveHistory, undo, canUndo } = useUndo();
+  const { moveHistory, undo, canUndo } = useUndo(startAnimation);
 
   // Animated shuffle: resets to solved, then plays 15 quick layer rotations visually.
   // Uses a 50ms delay after reset so React commits the solved layout before animation starts.

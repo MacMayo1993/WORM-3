@@ -9,9 +9,14 @@ import { useGameStore } from './useGameStore.js';
 import { buildManifoldGridMap, flipStickerPair } from '../game/manifoldLogic.js';
 
 /**
- * Hook for undo functionality
+ * Hook for undo functionality.
+ *
+ * @param {Function} startAnimation - startAnimation from useAnimation.
+ *   Required so that rotation undos go through the proper animation path,
+ *   which sets pendingMoveRef.current in useAnimation.js — the ref that
+ *   handleAnimComplete reads to know what move was committed.
  */
-export function useUndo() {
+export function useUndo(startAnimation) {
   const setCubies = useGameStore((state) => state.setCubies);
   const setMoves = useGameStore((state) => state.setMoves);
   const animState = useGameStore((state) => state.animState);
@@ -26,15 +31,11 @@ export function useUndo() {
     const lastMove = moveHistory[moveHistory.length - 1];
 
     if (lastMove.type === 'rotation') {
-      // Apply inverse rotation (negate direction).
-      // Set animState and pendingMove atomically in one setState call so that
-      // handleAnimComplete (in useAnimation.js) can read pendingMove from the
-      // store when its own pendingMoveRef is null (undo bypasses startAnimation).
+      // Apply inverse rotation via startAnimation so that pendingMoveRef.current
+      // in useAnimation.js is correctly set before handleAnimComplete fires.
+      // The isUndo:true flag tells handleAnimComplete to skip moves/history tracking.
       const { axis, dir, sliceIndex } = lastMove;
-      useGameStore.setState({
-        animState: { axis, dir: -dir, sliceIndex, t: 0 },
-        pendingMove: { axis, dir: -dir, sliceIndex, isUndo: true },
-      });
+      startAnimation(axis, -dir, sliceIndex, false, true);
     } else if (lastMove.type === 'flip') {
       // Flip is its own inverse - just flip again
       const { pos, dirKey } = lastMove;
@@ -47,7 +48,7 @@ export function useUndo() {
     // Remove from history and decrement move counter
     popFromHistory();
     setMoves((m) => Math.max(0, m - 1));
-  }, [moveHistory, animState, setCubies, setMoves, popFromHistory]);
+  }, [moveHistory, animState, startAnimation, setCubies, setMoves, popFromHistory]);
 
   // Check if undo is available
   const canUndo = moveHistory.length > 0 && !animState;
