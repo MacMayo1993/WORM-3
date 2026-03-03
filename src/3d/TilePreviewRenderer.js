@@ -11,6 +11,7 @@ const PREVIEW_SIZE = 64;
 const ANIMATED_STYLE_SET = new Set([
   'holographic', 'pulse', 'lava', 'galaxy', 'circuit',
   'grass', 'ice', 'sand', 'water', 'neural',
+  'moireRings', 'moireLines', 'infinityTunnel', 'vortex', 'shockwave',
 ]);
 
 export function isAnimatedPreviewStyle(styleKey) {
