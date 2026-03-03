@@ -1010,6 +1010,173 @@ const fragmentShaders = {
       gl_FragColor = vec4(clamp(mix(dark, light, inducers), 0.0, 1.0), 1.0);
     }
   `,
+
+  // Fraser Spiral — nested concentric circles with a twisted-cord texture.
+  // The cord markings are tilted off-tangent, so the brain reads the circles
+  // as a tightening inward spiral even though every ring is perfectly circular
+  // (Fraser 1908).
+  fraserSpiral: `
+    uniform vec3 baseColor;
+    varying vec2 vUv;
+
+    void main() {
+      const float PI = 3.14159265;
+      vec2  c    = vUv - 0.5;
+      float r    = length(c);
+      float ang  = atan(c.y, c.x);        // -PI .. PI
+
+      // 8 concentric ring bands with narrow inter-ring gaps
+      float nRings = 8.0;
+      float ringT  = fract(r * nRings * 2.0);
+      float inRing = step(0.14, ringT) * step(ringT, 0.86);
+
+      // Twisted cord phase: angular position PLUS a radial twist term.
+      // The radial term is what fools the visual system into reading a spiral.
+      float nSegs = 38.0;
+      float twist = 2.6;
+      float phase = (ang / (2.0 * PI) + 0.5) * nSegs + r * nRings * twist;
+      float cord  = step(0.5, fract(phase));
+
+      vec3 light = baseColor * 1.10 + vec3(0.08);
+      vec3 dark  = baseColor * 0.08;
+      vec3 bg    = baseColor * 0.44;
+
+      vec3 color = bg;
+      color = mix(color, mix(dark, light, cord), inRing);
+      color *= 1.0 - smoothstep(0.44, 0.52, r);   // circular vignette
+      gl_FragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
+    }
+  `,
+
+  // Müller-Lyer — alternating rows of horizontal lines; one row has outward-
+  // pointing arrow fins (<--->) and the next has inward fins (>---<).  Both
+  // lines span the same width, but the fins make them look longer and shorter
+  // respectively (Müller-Lyer 1889).
+  muellerLyer: `
+    uniform vec3 baseColor;
+    varying vec2 vUv;
+
+    void main() {
+      float nRows    = 4.0;
+      float lineW    = 0.038;   // half-thickness of strokes
+      float finSlope = 0.52;    // gradient of each fin arm
+      float finHalf  = 0.13;    // half-length of a fin arm along x
+
+      float ry  = fract(vUv.y * nRows);
+      float row = floor(vUv.y * nRows);
+      // dir=+1: arrow-in (fins open toward center → looks shorter)
+      // dir=-1: arrow-out (fins open away from center → looks longer)
+      float dir = mod(row, 2.0) * 2.0 - 1.0;
+      float dy  = ry - 0.5;
+
+      // Horizontal line spanning the tile
+      float onLine = step(abs(dy), lineW)
+                   * step(0.08, vUv.x) * step(vUv.x, 0.92);
+
+      // Left fin tip at x = 0.20
+      float dxL  = vUv.x - 0.20;
+      float finL = max(
+        step(abs(dy - finSlope * dxL * dir),  lineW * 1.15),
+        step(abs(dy + finSlope * dxL * dir),  lineW * 1.15)
+      ) * step(abs(dxL), finHalf) * (1.0 - onLine);
+
+      // Right fin tip at x = 0.80
+      float dxR  = vUv.x - 0.80;
+      float finR = max(
+        step(abs(dy - finSlope * dxR * (-dir)), lineW * 1.15),
+        step(abs(dy + finSlope * dxR * (-dir)), lineW * 1.15)
+      ) * step(abs(dxR), finHalf) * (1.0 - onLine);
+
+      float pattern = max(onLine, max(finL, finR));
+      vec3 light = baseColor * 1.10 + vec3(0.08);
+      vec3 dark  = baseColor * 0.10;
+      gl_FragColor = vec4(clamp(mix(dark, light, pattern), 0.0, 1.0), 1.0);
+    }
+  `,
+
+  // Rotating Snakes — concentric ring bands filled with a 4-step asymmetric
+  // luminance ramp (black → dark-grey → white → light-grey).  Alternate rings
+  // use the reversed order.  In peripheral vision the rings appear to spin in
+  // opposite directions even though the image is completely static
+  // (Kitaoka & Ashida 2003 class of peripheral-drift illusions).
+  rotatingSnakes: `
+    uniform vec3 baseColor;
+    varying vec2 vUv;
+
+    void main() {
+      const float PI = 3.14159265;
+      vec2  c    = vUv - 0.5;
+      float r    = length(c);
+      float ang  = atan(c.y, c.x) / (2.0 * PI) + 0.5;  // 0 .. 1
+
+      float nRings  = 5.0;
+      float ringR   = r * nRings * 2.2;
+      float ringT   = fract(ringR);
+      float ringI   = floor(ringR);
+
+      // Narrow ring bands separated by thin gaps
+      float inRing  = step(0.18, ringT) * step(ringT, 0.82);
+
+      // Alternating clockwise / counter-clockwise sector ordering per ring
+      float spinDir = mod(ringI, 2.0) * 2.0 - 1.0;   // +1 or -1
+
+      float nSectors = 12.0;
+      float angOff   = ringI * 0.23;
+      float phase    = fract((ang + angOff) * nSectors * spinDir);
+
+      // 4-band asymmetric ramp — the unequal step sizes drive the motion signal
+      float band = floor(phase * 4.0);
+      float lum  = 0.04;
+      lum = mix(lum, 0.30, step(1.0, band));   // dark grey
+      lum = mix(lum, 0.96, step(2.0, band));   // white
+      lum = mix(lum, 0.68, step(3.0, band));   // light grey
+
+      vec3 color = baseColor * lum * inRing;
+      color *= 1.0 - smoothstep(0.43, 0.51, r);   // vignette
+      gl_FragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
+    }
+  `,
+
+  // Poggendorff — diagonal lines pass behind an opaque vertical band.
+  // The parallel edges of the band misdirect the eye so that the two visible
+  // segments appear to be on different trajectories, even though they form a
+  // single straight line (Zöllner/Poggendorff 1860).
+  poggendorff: `
+    uniform vec3 baseColor;
+    varying vec2 vUv;
+
+    void main() {
+      float lineW = 0.022;    // stroke half-width
+      float bandL = 0.32;     // left edge of occluding band
+      float bandR = 0.68;     // right edge of occluding band
+      float slope = 0.55;     // shallower angle → stronger Poggendorff effect
+
+      float inBand = step(bandL, vUv.x) * step(vUv.x, bandR);
+
+      // Three parallel diagonal lines; occluded where they cross the band
+      float onLine = 0.0;
+      float base0  = slope * (vUv.x - 0.5);
+      onLine = max(onLine, step(abs(vUv.y - (base0 + 0.22)), lineW));
+      onLine = max(onLine, step(abs(vUv.y - (base0 + 0.52)), lineW));
+      onLine = max(onLine, step(abs(vUv.y - (base0 + 0.82)), lineW));
+      onLine *= (1.0 - inBand);   // hide inside the band
+
+      // Band vertical edges — these are the parallel guides that misdirect
+      float edgeW  = 0.009;
+      float onEdge = max(step(abs(vUv.x - bandL), edgeW),
+                         step(abs(vUv.x - bandR), edgeW));
+
+      vec3 bgC   = baseColor * 0.10;
+      vec3 bandC = baseColor * 0.44;
+      vec3 lineC = baseColor * 1.10 + vec3(0.08);
+      vec3 edgeC = mix(bandC, lineC, 0.45);
+
+      vec3 color = mix(bgC, bandC, inBand);
+      color = mix(color, lineC,  onLine);
+      color = mix(color, edgeC,  onEdge);
+      gl_FragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
+    }
+  `,
 };
 
 // ─── LRU material cache ───────────────────────────────────────────────────────
