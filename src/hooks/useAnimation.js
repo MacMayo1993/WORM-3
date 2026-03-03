@@ -89,9 +89,26 @@ export function useAnimation() {
 
   // Handle animation completion
   const handleAnimComplete = useCallback(() => {
-    const pm = pendingMoveRef.current;
+    // pendingMoveRef is set by startAnimation. Undo bypasses startAnimation and
+    // writes directly to the store, so fall back to the store's pendingMove when
+    // the ref is null — this is safe because getState() is always fresh.
+    const pm = pendingMoveRef.current ?? useGameStore.getState().pendingMove;
     if (pm) {
-      const { axis, dir, sliceIndex, isEcho, isShuffle } = pm;
+      const { axis, dir, sliceIndex, isEcho, isShuffle, isUndo } = pm;
+
+      if (isUndo) {
+        // Undo rotation: apply the inverse move to cubies, clear animation.
+        // Do NOT increment moves or add to history — useUndo already handled both.
+        play('/sounds/rotate.mp3');
+        useGameStore.setState((state) => ({
+          cubies: rotateSliceCubies(state.cubies, size, axis, sliceIndex, dir),
+          rotationEpoch: state.rotationEpoch + 1,
+          animState: null,
+          pendingMove: null,
+        }));
+        pendingMoveRef.current = null;
+        return;
+      }
 
       if (isShuffle) {
         // Shuffle move: commit silently — no moves counter, no undo history, no echo.
