@@ -29,6 +29,7 @@ const makeParticles = (count, winnerColor) => {
       size: 4 + Math.random() * 6,
       rotation: Math.random() * 360,
       rotationSpeed: (Math.random() - 0.5) * 720,
+      isCircle: Math.random() > 0.5,
     };
   });
 };
@@ -123,7 +124,7 @@ export default function DisparityWinnerScreen({ onDismiss }) {
       width: p.size,
       height: p.size,
       background: p.color,
-      borderRadius: Math.random() > 0.5 ? '50%' : '2px',
+      borderRadius: p.isCircle ? '50%' : '2px',
       transform: `rotate(${rot}deg)`,
       opacity,
       pointerEvents: 'none',
@@ -166,6 +167,14 @@ export default function DisparityWinnerScreen({ onDismiss }) {
           from { opacity: 0; transform: translateY(12px); }
           to   { opacity: 1; transform: translateY(0); }
         }
+        @keyframes dws-tile-spin {
+          0%   { transform: perspective(400px) rotateY(0deg); }
+          100% { transform: perspective(400px) rotateY(360deg); }
+        }
+        @keyframes dws-tile-in {
+          from { opacity: 0; transform: perspective(400px) rotateY(90deg) scale(0.6); }
+          to   { opacity: 1; transform: perspective(400px) rotateY(0deg) scale(1); }
+        }
       `}</style>
 
       {/* Scanline sweep */}
@@ -206,30 +215,74 @@ export default function DisparityWinnerScreen({ onDismiss }) {
         <div key={p.id} style={particleStyle(p)} />
       ))}
 
-      {/* Winner tile ID */}
+      {/* Spinning winner tile cards */}
       {(phase === 'reveal' || phase === 'celebrate' || phase === 'done') && (
         <div
           style={{
-            fontSize: '6.5rem',
-            fontWeight: 900,
-            letterSpacing: '0.04em',
-            color: winnerColor,
-            textShadow: `0 0 40px ${winnerColor}, 0 0 80px ${winnerColor}88`,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1.5rem',
+            marginBottom: '0.5rem',
             filter: glitch ? 'hue-rotate(60deg) brightness(1.6) blur(1px)' : 'none',
-            fontFamily: 'monospace',
-            lineHeight: 1,
-            marginBottom: '0.25rem',
-            userSelect: 'none',
           }}
         >
-          {winnerGridId}
+          {/* Primary winner tile */}
+          <div
+            style={{
+              width: 140,
+              height: 140,
+              borderRadius: 16,
+              background: winnerColor,
+              boxShadow: `0 0 40px ${winnerColor}, 0 0 80px ${winnerColor}55`,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              animation: phase === 'reveal'
+                ? 'dws-tile-in 0.5s cubic-bezier(0.22,1,0.36,1) forwards'
+                : 'dws-tile-spin 2.4s linear infinite',
+              userSelect: 'none',
+            }}
+          >
+            <span style={{ fontSize: '0.65rem', color: 'rgba(0,0,0,0.5)', fontFamily: 'monospace', letterSpacing: '0.05em', marginBottom: 4 }}>
+              WINNER
+            </span>
+            <span style={{ fontSize: '1.6rem', fontWeight: 900, fontFamily: 'monospace', color: '#000', letterSpacing: '0.03em' }}>
+              {winnerGridId}
+            </span>
+          </div>
+
+          {/* Antipodal connector */}
           {antipodalGridId && (
-            <>
-              <span style={{ color: '#555', fontSize: '3rem', margin: '0 0.2em' }}>↔</span>
-              <span style={{ color: antipodalColor, textShadow: `0 0 40px ${antipodalColor}, 0 0 80px ${antipodalColor}88` }}>
+            <span style={{ color: '#666', fontSize: '2rem', fontWeight: 300, lineHeight: 1 }}>↔</span>
+          )}
+
+          {/* Antipodal winner tile */}
+          {antipodalGridId && (
+            <div
+              style={{
+                width: 140,
+                height: 140,
+                borderRadius: 16,
+                background: antipodalColor,
+                boxShadow: `0 0 40px ${antipodalColor}, 0 0 80px ${antipodalColor}55`,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                animation: phase === 'reveal'
+                  ? 'dws-tile-in 0.5s cubic-bezier(0.22,1,0.36,1) 0.1s forwards'
+                  : 'dws-tile-spin 2.4s linear 0.2s infinite',
+                userSelect: 'none',
+              }}
+            >
+              <span style={{ fontSize: '0.65rem', color: 'rgba(0,0,0,0.5)', fontFamily: 'monospace', letterSpacing: '0.05em', marginBottom: 4 }}>
+                ANTIPODAL
+              </span>
+              <span style={{ fontSize: '1.6rem', fontWeight: 900, fontFamily: 'monospace', color: '#000', letterSpacing: '0.03em' }}>
                 {antipodalGridId}
               </span>
-            </>
+            </div>
           )}
         </div>
       )}
