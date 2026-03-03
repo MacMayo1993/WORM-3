@@ -4,7 +4,7 @@
  * Manages undo functionality for moves.
  */
 
-import { useCallback, useRef } from 'react';
+import { useCallback } from 'react';
 import { useGameStore } from './useGameStore.js';
 import { buildManifoldGridMap, flipStickerPair } from '../game/manifoldLogic.js';
 
@@ -12,18 +12,11 @@ import { buildManifoldGridMap, flipStickerPair } from '../game/manifoldLogic.js'
  * Hook for undo functionality
  */
 export function useUndo() {
-  const cubies = useGameStore((state) => state.cubies);
   const setCubies = useGameStore((state) => state.setCubies);
   const setMoves = useGameStore((state) => state.setMoves);
   const animState = useGameStore((state) => state.animState);
-  const setAnimState = useGameStore((state) => state.setAnimState);
-  const setPendingMove = useGameStore((state) => state.setPendingMove);
   const moveHistory = useGameStore((state) => state.moveHistory);
   const popFromHistory = useGameStore((state) => state.popFromHistory);
-
-  const cubiesRef = useRef(cubies);
-  cubiesRef.current = cubies;
-  const pendingMoveRef = useRef(null);
 
   // Undo last move (rotation or flip)
   const undo = useCallback(() => {
@@ -33,12 +26,15 @@ export function useUndo() {
     const lastMove = moveHistory[moveHistory.length - 1];
 
     if (lastMove.type === 'rotation') {
-      // Apply inverse rotation (negate direction)
+      // Apply inverse rotation (negate direction).
+      // Set animState and pendingMove atomically in one setState call so that
+      // handleAnimComplete (in useAnimation.js) can read pendingMove from the
+      // store when its own pendingMoveRef is null (undo bypasses startAnimation).
       const { axis, dir, sliceIndex } = lastMove;
-      setAnimState({ axis, dir: -dir, sliceIndex, t: 0 });
-      const move = { axis, dir: -dir, sliceIndex };
-      setPendingMove(move);
-      pendingMoveRef.current = move;
+      useGameStore.setState({
+        animState: { axis, dir: -dir, sliceIndex, t: 0 },
+        pendingMove: { axis, dir: -dir, sliceIndex, isUndo: true },
+      });
     } else if (lastMove.type === 'flip') {
       // Flip is its own inverse - just flip again
       const { pos, dirKey } = lastMove;
@@ -51,7 +47,7 @@ export function useUndo() {
     // Remove from history and decrement move counter
     popFromHistory();
     setMoves((m) => Math.max(0, m - 1));
-  }, [moveHistory, animState, setCubies, setMoves, setAnimState, setPendingMove, popFromHistory]);
+  }, [moveHistory, animState, setCubies, setMoves, popFromHistory]);
 
   // Check if undo is available
   const canUndo = moveHistory.length > 0 && !animState;
