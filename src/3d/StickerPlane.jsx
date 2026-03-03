@@ -255,7 +255,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       spinT.current = 1;
       prevRawP.current = 0;
 
-      flipParticlesRef.current?.trigger(fc[curr]);
+      if (!chaosLevel) flipParticlesRef.current?.trigger(fc[curr]);
 
       play('/sounds/flip.mp3');
       vibrate(16);
@@ -947,8 +947,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
             />
           </mesh>
 
-          {/* WORM creatures - number equals flip count (max 4) */}
-          {Array.from({ length: Math.min(meta?.flips ?? 0, 4) }, (_, i) => {
+          {/* WORM creatures - disabled in Disparity Mode (too many instances at 4×4/5×5) */}
+          {!chaosLevel && Array.from({ length: Math.min(meta?.flips ?? 0, 4) }, (_, i) => {
             const count = Math.min(meta?.flips ?? 0, 4);
             const angle = (i / count) * Math.PI * 2;
             const radius = count <= 4 ? 0.25 : 0.28;
@@ -967,9 +967,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         </>
       )}
 
-      {/* Particle burst effect during flip — always mounted, triggered imperatively via ref
-          to avoid re-rendering StickerPlane (and its entire subtree) on every flip. */}
-      <FlipParticles ref={flipParticlesRef} />
+      {/* Particle burst effect during flip — skipped in Disparity Mode where every tile
+          flips repeatedly; the burst volume causes severe GPU stuttering on 4×4 / 5×5. */}
+      {!chaosLevel && <FlipParticles ref={flipParticlesRef} />}
 
       {overlay && (
         <Text position={[0, 0, 0.03]} fontSize={0.17} color="black" anchorX="center" anchorY="middle">
