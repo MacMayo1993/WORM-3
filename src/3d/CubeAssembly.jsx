@@ -80,6 +80,7 @@ const CubeAssembly = React.memo(({
     isBiomeMode,
     rotationEpoch,
     settings,
+    chaosLevel,
   } = useGameStore(
     useShallow(s => ({
       explosionFactor: s.explosionT,
@@ -92,6 +93,7 @@ const CubeAssembly = React.memo(({
       isBiomeMode: s.settings?.biomeMode?.enabled,
       rotationEpoch: s.rotationEpoch,
       settings: s.settings,
+      chaosLevel: s.chaosLevel,
     }))
   );
   const cubieRefs = useRef([]);
@@ -758,7 +760,7 @@ const CubeAssembly = React.memo(({
             onComplete={() => onCascadeComplete(c.id)}
           />
         ))}
-        {flipWaveOrigins && flipWaveOrigins.length > 0 && (
+        {!chaosLevel && flipWaveOrigins && flipWaveOrigins.length > 0 && (
           <FlipPropagationWave
             origins={flipWaveOrigins}
             onComplete={onFlipWaveComplete}
