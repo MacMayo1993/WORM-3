@@ -20,6 +20,7 @@ export function useGameSession() {
   const hasShuffled = useGameStore((state) => state.hasShuffled);
   const victory = useGameStore((state) => state.victory);
   const achievedWins = useGameStore((state) => state.achievedWins);
+  const chaosLevel = useGameStore((state) => state.chaosLevel);
 
   const setGameTime = useGameStore((state) => state.setGameTime);
   const setVictory = useGameStore((state) => state.setVictory);
@@ -45,6 +46,9 @@ export function useGameSession() {
     if (victory) return;
     // Guard: ensure cubies matches expected size
     if (cubies.length !== size) return;
+    // Skip during chaos/disparity mode — cubies update at 100+ Hz and traditional
+    // win conditions don't apply. Re-runs once when chaosLevel drops back to 0.
+    if (chaosLevel > 0) return;
 
     const wins = detectWinConditions(cubies, size);
 
@@ -62,7 +66,7 @@ export function useGameSession() {
       setVictory('sudokube');
       setAchievedWins((prev) => ({ ...prev, sudokube: true }));
     }
-  }, [cubies, size, hasShuffled, victory, achievedWins, setVictory, setAchievedWins]);
+  }, [cubies, size, hasShuffled, victory, achievedWins, chaosLevel, setVictory, setAchievedWins]);
 
   // Format time for display
   const formatTime = useCallback((seconds) => {

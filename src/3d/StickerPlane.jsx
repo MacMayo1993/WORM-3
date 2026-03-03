@@ -985,4 +985,22 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   );
 };
 
-export default React.memo(StickerPlane);
+// Custom memo comparator — prevents un-flipped stickers on the same cubie from
+// re-rendering when a sibling sticker gets a chaos flip. Default memo uses reference
+// equality on `meta`, which always fails (new cubies state = new sticker objects).
+// We only care about the two volatile fields: curr (color) and flips (count).
+// All other meta fields (orig, origPos, origDir) are frozen after cube creation.
+// pos/rot are stable module-level constants so reference equality is sufficient.
+function stickerPropsAreEqual(prev, next) {
+  if (prev.pos !== next.pos || prev.rot !== next.rot) return false;
+  if (prev.mode !== next.mode || prev.hollow !== next.hollow) return false;
+  if (prev.faceSize !== next.faceSize) return false;
+  if (prev.faceRow !== next.faceRow || prev.faceCol !== next.faceCol) return false;
+  if (prev.overlay !== next.overlay) return false;
+  const pm = prev.meta, nm = next.meta;
+  if (pm === nm) return true;
+  if (!pm || !nm) return pm === nm;
+  return pm.curr === nm.curr && pm.flips === nm.flips;
+}
+
+export default React.memo(StickerPlane, stickerPropsAreEqual);
