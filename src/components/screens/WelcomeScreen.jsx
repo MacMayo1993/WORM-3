@@ -6,11 +6,24 @@
  * 3D animation without needing their own RAF loop.
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import TextOverlay from '../intro/TextOverlay.jsx';
 
 const WelcomeScreen = ({ onEnter, introTime }) => {
   const canSkip = introTime >= 2;
+
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      const key = event.key.toLowerCase();
+      if (key === 'enter' || (canSkip && key === 's')) {
+        event.preventDefault();
+        onEnter();
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [canSkip, onEnter]);
 
   return (
     <div
@@ -21,6 +34,8 @@ const WelcomeScreen = ({ onEnter, introTime }) => {
 
       {canSkip && (
         <button
+          type="button"
+          aria-label="Skip intro and enter game"
           className="skip-intro-btn"
           onClick={onEnter}
           style={{
@@ -36,6 +51,8 @@ const WelcomeScreen = ({ onEnter, introTime }) => {
 
       {introTime >= 10 && (
         <button
+          type="button"
+          aria-label="Enter game"
           className="enter-btn"
           onClick={onEnter}
           style={{
@@ -48,6 +65,10 @@ const WelcomeScreen = ({ onEnter, introTime }) => {
           ENTER
         </button>
       )}
+
+      <p className="welcome-hint" aria-live="polite">
+        {canSkip ? 'Press Enter to start instantly.' : 'Intro will be skippable in 2s.'}
+      </p>
     </div>
   );
 };
