@@ -5,9 +5,9 @@
  * Renders 3 orbital lineLoop rings that cycle through all active tunnel
  * colors (stickers that have been flipped at least once).
  *
- * Only visible on odd-sized cubes (3×3, 5×5) which have a true center.
- * The center cubie is skipped in CubeAssembly and this component fills
- * that space with a swirling "wormcolorcircle".
+ * Visible on all cube sizes. For odd-sized cubes (3×3, 5×5) the center
+ * cubie is skipped in CubeAssembly so VoidCore fills that space. For
+ * even-sized cubes (2×2, 4×4) the origin is a natural gap between cubies.
  */
 import React, { useRef, useMemo, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -77,7 +77,6 @@ const coreFragmentShader = `
 function VoidCore() {
   const cubies = useGameStore(s => s.cubies);
   const settings = useGameStore(s => s.settings);
-  const size = useGameStore(s => s.size);
 
   const innerCoreRef = useRef();
   const innerMatRef = useRef();
@@ -126,9 +125,6 @@ function VoidCore() {
     return cols.length > 0 ? cols : [new THREE.Color('#444444'), new THREE.Color('#888888')]; // fallback
   }, [cubies, settings]);
 
-  // Only odd-sized cubes have a true center cubie at [0,0,0]
-  const isOdd = size % 2 !== 0;
-
   // Initialize colors
   useEffect(() => {
     if (!palette || palette.length < 1) return;
@@ -156,9 +152,7 @@ function VoidCore() {
     const t = tRef.current;
 
     // Check if the network is "active" (i.e. we have actual flipped colors)
-    const active = isOdd && palette && palette.length > 0 && !(palette.length === 2 && palette[0].getHexString() === '444444');
-
-    if (!isOdd) return;
+    const active = palette && palette.length > 0 && !(palette.length === 2 && palette[0].getHexString() === '444444');
 
     // Fade in/out logic
     if (active) {
@@ -215,8 +209,6 @@ function VoidCore() {
       mesh.material.opacity = 0;
     }
   });
-
-  if (!isOdd) return null;
 
   return (
     <group>
