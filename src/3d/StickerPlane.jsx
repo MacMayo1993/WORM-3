@@ -228,37 +228,41 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     const curr = meta?.curr ?? 0;
     const prevVal = prevCurr.current;
 
-    // Only trigger flip animation if the color actually changed to its antipodal
+    // Only trigger flip animation if the color actually changed to its antipodal.
+    // In chaos/disparity mode the entire visual-flip block is suppressed — the color
+    // update is handled imperatively in useLayoutEffect([materialColor]) — because
+    // running coin-spin animations and audio on every chaos flip (100+ Hz on 5×5)
+    // overwhelms the browser's audio context and GPU simultaneously.
     if (curr !== prevVal && meta?.flips > 0 && ANTIPODAL_COLOR[prevVal] === curr) {
-      // Mark as animating to prevent React state from interrupting
-      isFlipping.current = true;
-      // Store the colors for the flip animation
-      // flipToColor is the ANTIPODAL color (what we're flipping TO)
-      flipFromColor.current = fc[prevVal];
-      flipToColor.current = fc[curr];
-      // Texture follows city identity — use biome ground textures in biome mode
-      if (biomeEnabled && meta?.orig) {
-        const newFlips = meta?.flips ?? 0;
-        // newFlips is already incremented. Odd = we just flipped TO antipodal; even = flipped back.
-        const fromFace = newFlips % 2 === 1
-          ? meta.orig
-          : (ANTIPODAL_COLOR[meta.orig] ?? meta.orig);
-        const toFace = newFlips % 2 === 1
-          ? (ANTIPODAL_COLOR[meta.orig] ?? meta.orig)
-          : meta.orig;
-        flipFromTexture.current = BIOME_GROUND_TEXTURES[FACE_CITIES[fromFace]] ?? null;
-        flipToTexture.current = BIOME_GROUND_TEXTURES[FACE_CITIES[toFace]] ?? null;
-      } else {
-        flipFromTexture.current = faceTextures?.[prevVal] || null;
-        flipToTexture.current = faceTextures?.[curr] || null;
+      if (!chaosLevel) {
+        // Mark as animating to prevent React state from interrupting
+        isFlipping.current = true;
+        // Store the colors for the flip animation
+        // flipToColor is the ANTIPODAL color (what we're flipping TO)
+        flipFromColor.current = fc[prevVal];
+        flipToColor.current = fc[curr];
+        // Texture follows city identity — use biome ground textures in biome mode
+        if (biomeEnabled && meta?.orig) {
+          const newFlips = meta?.flips ?? 0;
+          // newFlips is already incremented. Odd = we just flipped TO antipodal; even = flipped back.
+          const fromFace = newFlips % 2 === 1
+            ? meta.orig
+            : (ANTIPODAL_COLOR[meta.orig] ?? meta.orig);
+          const toFace = newFlips % 2 === 1
+            ? (ANTIPODAL_COLOR[meta.orig] ?? meta.orig)
+            : meta.orig;
+          flipFromTexture.current = BIOME_GROUND_TEXTURES[FACE_CITIES[fromFace]] ?? null;
+          flipToTexture.current = BIOME_GROUND_TEXTURES[FACE_CITIES[toFace]] ?? null;
+        } else {
+          flipFromTexture.current = faceTextures?.[prevVal] || null;
+          flipToTexture.current = faceTextures?.[curr] || null;
+        }
+        spinT.current = 1;
+        prevRawP.current = 0;
+        flipParticlesRef.current?.trigger(fc[curr]);
+        play('/sounds/flip.mp3');
+        vibrate(16);
       }
-      spinT.current = 1;
-      prevRawP.current = 0;
-
-      if (!chaosLevel) flipParticlesRef.current?.trigger(fc[curr]);
-
-      play('/sounds/flip.mp3');
-      vibrate(16);
     }
     prevCurr.current = curr;
   }, [meta?.curr, meta?.flips]);
