@@ -92,6 +92,10 @@ export function useLevelSystem() {
   const handleBackToMainMenu = useCallback(() => {
     setShowLevelSelect(false);
     setShowMainMenu(true);
+    // Stop any running chaos and wipe disparity state so the cube is clean
+    // when the user starts a new mode from the main menu.
+    useGameStore.getState().setChaosLevel(0);
+    useGameStore.getState().clearDisparityGame();
   }, [setShowLevelSelect, setShowMainMenu]);
 
   // Handle next level

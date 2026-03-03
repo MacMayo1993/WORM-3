@@ -155,6 +155,12 @@ export function useChaosMode() {
   useEffect(() => {
     if (!chaosMode) return;
 
+    // Clear stale manifold map cache so it rebuilds from the current cube geometry.
+    // Without this, a second disparity game reuses the cache from the previous game
+    // (which may reflect a rotated/scrambled cube), causing propagation to reference
+    // wrong tile positions on the freshly-reset cube.
+    manifoldMapCacheRef.current = null;
+
     // ── Opt #1: seed metrics once at activation ───────────────────────────────
     {
       const sc = surfaceCoordsRef.current;

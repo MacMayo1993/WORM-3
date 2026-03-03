@@ -749,11 +749,20 @@ export default function WORM3() {
     }
   }, [handsMode, setHandsMode, setHandsMoveHistory, setHandsMoveQueue, setHandsTps]);
 
+  // Wraps reset() to also cancel any in-flight disparity countdown and clear the
+  // first-flip gate.  Without this, resetting mid-countdown lets the timeout fire
+  // after ~3 s and silently restart chaos on the freshly-solved cube.
+  const handleReset = useCallback(() => {
+    reset();
+    setDisparityCountdown(null);
+    setDisparityWaitingFirstFlip(false);
+  }, [reset]);
+
   const { performCursorRotation } = useKeyboardControls({
     onMove,
     onFlip: onTapFlip,
     onUndo: undo,
-    onReset: reset,
+    onReset: handleReset,
     onShuffle: animatedShuffle,
     onSaveState: handleSaveState,
     onLoadState: handleLoadState,
@@ -858,7 +867,7 @@ export default function WORM3() {
             disparityWaitingFirstFlip, disparityCountdown,
           }}
           handlers={{
-            onReset: reset,
+            onReset: handleReset,
             onShuffle: animatedShuffle,
             onShuffleForLevel: shuffleForLevel,
             onChangeSize: changeSize,
