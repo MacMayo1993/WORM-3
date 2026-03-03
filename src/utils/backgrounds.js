@@ -7,7 +7,6 @@
 
 export const BACKGROUNDS = [
     // Presets removed as per user request
-    // { id: 'blackhole', label: 'Black Hole', file: null },
     // { id: 'night', label: 'Night Sky', file: null },
     // { id: 'city', label: 'City Skyline', file: null },
     // { id: 'apartment', label: 'Apartment', file: null },
@@ -17,7 +16,6 @@ export const BACKGROUNDS = [
     // { id: 'park', label: 'Park', file: null },
 
     // Custom file-based environments
-    { id: 'beach', label: 'Beach', file: 'beach.hdr', thumbnail: 'thumbnails/beach.png' }, // Assuming beach.png exists or will exist
     { id: 'cave', label: 'Cave', file: 'cave.exr', thumbnail: 'thumbnails/cave.png' },
     { id: 'cobblestone', label: 'Cobblestone Street', file: 'cobblestone.exr', thumbnail: 'thumbnails/cobblestone.png' },
     { id: 'desert', label: 'Desert', file: 'desert.exr', thumbnail: 'thumbnails/desert.png' },
@@ -29,7 +27,7 @@ export const BACKGROUNDS = [
     { id: 'shanghai', label: 'Shanghai', file: 'shanghai.exr', thumbnail: 'thumbnails/Shanghai.png' },
     { id: 'snow', label: 'Snow Field', file: 'snow.exr', thumbnail: 'thumbnails/Snow Field.png' },
     { id: 'stadium', label: 'Stadium', file: 'stadium.exr', thumbnail: 'thumbnails/stadium.png' },
-    { id: 'sunset', label: 'Sunset', file: 'sunset.exr', thumbnail: 'thumbnails/sunset.png' }, // Assuming sunset.png exists or will exist
+    { id: 'blackhole', label: 'Black Hole' },
     { id: 'umbrella', label: 'Umbrella', file: 'umbrella.exr', thumbnail: 'thumbnails/umbrella.png' },
 
     // Solid colors/simple themes removed
