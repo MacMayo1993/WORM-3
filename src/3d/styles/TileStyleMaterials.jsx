@@ -1177,6 +1177,164 @@ const fragmentShaders = {
       gl_FragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
     }
   `,
+
+  // ── Animated motion illusions (Living section) ─────────────────────────────
+
+  // Moiré Rings — two sets of concentric rings whose centers drift slowly apart.
+  // Their interference pattern creates shimmering, morphing moiré bands.
+  moireRings: `
+    uniform vec3 baseColor;
+    uniform float time;
+    varying vec2 vUv;
+
+    void main() {
+      const float PI = 3.14159265;
+      float freq = 20.0;
+
+      // Primary rings, fixed at tile center
+      vec2 c1 = vUv - 0.5;
+      float r1 = length(c1) * freq;
+
+      // Secondary rings — center drifts in a slow Lissajous orbit
+      float ox = 0.055 * sin(time * 0.25);
+      float oy = 0.055 * cos(time * 0.18);
+      vec2  c2 = vUv - vec2(0.5 + ox, 0.5 + oy);
+      float r2 = length(c2) * freq;
+
+      // Interference: product of two sine waves
+      float moire = sin(r1 * PI * 2.0) * sin(r2 * PI * 2.0);
+      float bright = moire * 0.5 + 0.5;
+
+      vec3 color = mix(baseColor * 0.08, baseColor * 1.15, bright);
+      // Soft circular vignette
+      color *= 1.0 - smoothstep(0.44, 0.52, length(c1));
+      gl_FragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
+    }
+  `,
+
+  // Moiré Lines — two layers of fine parallel lines at slightly different angles.
+  // As the angle drifts over time the interference bands drift and morph.
+  moireLines: `
+    uniform vec3 baseColor;
+    uniform float time;
+    varying vec2 vUv;
+
+    void main() {
+      const float PI = 3.14159265;
+      float freq = 28.0;
+
+      // Layer 1 — fixed shallow angle
+      float ang1 = 0.05;
+      float proj1 = vUv.x * sin(ang1) + vUv.y * cos(ang1);
+      float lines1 = sin(proj1 * freq * PI * 2.0);
+
+      // Layer 2 — angle drifts slowly, plus a slow phase scroll
+      float ang2 = ang1 + 0.07 + 0.022 * sin(time * 0.14);
+      float proj2 = vUv.x * sin(ang2) + vUv.y * cos(ang2);
+      float lines2 = sin(proj2 * freq * PI * 2.0 + time * 0.12);
+
+      float moire = lines1 * lines2;
+      float bright = moire * 0.5 + 0.5;
+
+      vec3 color = mix(baseColor * 0.06, baseColor * 1.2, bright);
+      gl_FragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
+    }
+  `,
+
+  // Infinity Tunnel — nested square rings scroll toward the viewer, giving the
+  // sensation of falling down a bottomless tunnel (Chebyshev metric + log depth).
+  infinityTunnel: `
+    uniform vec3 baseColor;
+    uniform float time;
+    varying vec2 vUv;
+
+    void main() {
+      vec2  c = vUv - 0.5;
+
+      // Chebyshev distance → square cross-section rings
+      float r = max(abs(c.x), abs(c.y));
+
+      // Logarithmic depth maps small r (center) to large depth values
+      float depth = -log2(r + 0.001) * 0.38;
+
+      // Scroll inward over time
+      float scrolled = fract(depth + time * 0.55);
+
+      // Alternate checkerboard sectors around the tunnel wall
+      float ang   = atan(c.y, c.x) / (2.0 * 3.14159265) + 0.5;
+      float sector = mod(floor(ang * 8.0) + floor(depth + time * 0.55), 2.0);
+
+      float band  = mod(floor(scrolled * 2.0) + sector, 2.0);
+      float fade  = smoothstep(0.5, 0.38, r);   // circular clip at tile edge
+
+      vec3 colA  = baseColor * 1.1;
+      vec3 colB  = baseColor * 0.11;
+      vec3 color = mix(colA, colB, band) * fade;
+
+      // Bright vanishing-point glow at the centre
+      color += baseColor * smoothstep(0.07, 0.0, r) * 0.9;
+
+      gl_FragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
+    }
+  `,
+
+  // Vortex — logarithmic spiral arms spin inward like water draining, stronger
+  // twist near the centre gives convincing depth and rotational velocity.
+  vortex: `
+    uniform vec3 baseColor;
+    uniform float time;
+    varying vec2 vUv;
+
+    void main() {
+      const float PI = 3.14159265;
+      vec2  c = vUv - 0.5;
+      float r = length(c);
+      float ang = atan(c.y, c.x);
+
+      // Twist tightens toward centre (logarithmic)
+      float twist = ang / (PI * 2.0) + log(r + 0.02) * 1.2 - time * 0.55;
+
+      float nArms = 6.0;
+      float spiral = sin(twist * nArms * PI * 2.0);
+      float bright = spiral * 0.5 + 0.5;
+
+      // Subtle luminance depth cue: darker toward edge
+      bright *= 1.0 - r * 0.5;
+
+      float fade  = 1.0 - smoothstep(0.37, 0.51, r);
+      vec3  color = mix(baseColor * 0.05, baseColor * 1.25, bright) * fade;
+
+      // Hot-white centre
+      color = mix(color, baseColor * 1.6, smoothstep(0.06, 0.0, r));
+
+      gl_FragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
+    }
+  `,
+
+  // Shockwave — multiple concentric pulse rings travel outward at different
+  // speeds and frequencies; their overlap creates a sense of depth and motion.
+  shockwave: `
+    uniform vec3 baseColor;
+    uniform float time;
+    varying vec2 vUv;
+
+    void main() {
+      vec2  c = vUv - 0.5;
+      float r = length(c);
+
+      // Three ring families at different spatial / temporal frequencies
+      float w  = sin(r * 38.0 - time * 3.6) * 0.5 + 0.5;
+      w += (sin(r * 22.0 - time * 2.2) * 0.5 + 0.5) * 0.55;
+      w += (sin(r * 14.0 - time * 1.4) * 0.5 + 0.5) * 0.35;
+      w /= 1.9;
+
+      float bright = clamp(w, 0.0, 1.0);
+      float fade   = 1.0 - smoothstep(0.43, 0.51, r);
+
+      vec3 color = mix(baseColor * 0.05, baseColor * 1.3, bright) * fade;
+      gl_FragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
+    }
+  `,
 };
 
 // ─── LRU material cache ───────────────────────────────────────────────────────
@@ -1286,7 +1444,7 @@ export function clearMaterialCache() {
 
 // Module-level Set: O(1) lookup instead of allocating an array + O(N) includes
 // every time isAnimatedStyle is called (which happens per sticker per render).
-const ANIMATED_STYLES = new Set(['holographic', 'pulse', 'lava', 'galaxy', 'circuit', 'grass', 'ice', 'sand', 'water', 'neural']);
+const ANIMATED_STYLES = new Set(['holographic', 'pulse', 'lava', 'galaxy', 'circuit', 'grass', 'ice', 'sand', 'water', 'neural', 'moireRings', 'moireLines', 'infinityTunnel', 'vortex', 'shockwave']);
 
 /**
  * Check if a style needs time updates (animated)
