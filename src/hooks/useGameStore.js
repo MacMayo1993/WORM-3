@@ -207,12 +207,13 @@ export const useGameStore = create(
     showDisparityWinner: false,
     // Face elimination events: array of faceNum (1-6) values in order they were eliminated
     disparityEliminatedFaces: [],
+    wormHealerMode: false,
 
     // Configurable flip cap for Disparity Mode (overrides FLIP_CAP constant)
     disparityFlipCap: 25,
     setDisparityFlipCap: (v) => set({ disparityFlipCap: v }),
 
-     addDisparityDeath: (death) => set((state) => ({
+    addDisparityDeath: (death) => set((state) => ({
       disparityDeaths: [...state.disparityDeaths, death],
       disparityDeathByGridId: {
         ...state.disparityDeathByGridId,
@@ -239,7 +240,8 @@ export const useGameStore = create(
       if (!faces?.length) return state;
       return { disparityEliminatedFaces: [...state.disparityEliminatedFaces, ...faces] };
     }),
-    clearDisparityGame: () => set({ disparityDeaths: [], disparityDeathByGridId: {}, disparityWinner: null, showDisparityWinner: false, disparityEliminatedFaces: [], cascades: [] }),
+    setWormHealerMode: (v) => set({ wormHealerMode: v }),
+    clearDisparityGame: () => set({ disparityDeaths: [], disparityDeathByGridId: {}, disparityWinner: null, showDisparityWinner: false, disparityEliminatedFaces: [], cascades: [], wormHealerMode: false }),
 
     // ========================================================================
     // ANIMATION STATE
