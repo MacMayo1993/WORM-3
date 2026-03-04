@@ -9,6 +9,7 @@ import { useGameStore } from './useGameStore.js';
 import { makeCubies } from '../game/cubeState.js';
 import { rotateSliceCubies } from '../game/cubeRotation.js';
 import { buildManifoldGridMap, flipStickerPair, findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
+import { healSticker as healStickerState } from '../game/cubeState.js';
 import { getStickerWorldPos } from '../game/coordinates.js';
 import { play } from '../utils/audio.js';
 import { ANTIPODAL_COLOR } from '../utils/constants.js';
@@ -165,6 +166,13 @@ export function useCubeState() {
     }
   }, [getRotationForDir, hasFlippedOnce, setShowFirstFlipTutorial]);
 
+  // Heal sticker (reset flips and colors)
+  const healSticker = useCallback((pos, dirKey) => {
+    useGameStore.setState((state) => ({
+      cubies: healStickerState(state.cubies, state.cubies.length, pos.x, pos.y, pos.z, dirKey),
+    }));
+  }, []);
+
   // Shuffle the cube
   const shuffle = useCallback(() => {
     let state = makeCubies(size);
@@ -217,6 +225,7 @@ export function useCubeState() {
     changeSize,
     rotateSlice,
     flipSticker,
+    healSticker,
     shuffle,
     reset,
     getRotationForDir,
