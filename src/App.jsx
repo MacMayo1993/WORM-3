@@ -50,6 +50,8 @@ import { useTeachMode } from './teach/useTeachMode.js';
 import { useAntipodalIntegrity } from './hooks/useAntipodalIntegrity.js';
 // Lazy-loaded: not needed on initial render, deferred to reduce parse time
 const PlatformerWormMode = React.lazy(() => import('./worm/PlatformerWormMode.jsx'));
+const HealerWormMode = React.lazy(() => import('./worm/HealerWormMode.jsx'));
+const WormTouchControls = React.lazy(() => import('./worm/WormTouchControls.jsx'));
 const HollowVoidCube = React.lazy(() => import('./3d/HollowVoidCube.jsx'));
 
 // Mobile detection
@@ -61,12 +63,12 @@ const isMobile = typeof window !== 'undefined' && (
 
 // ─── Intro timing constants (mirror IntroScene) ──────────────────────────────
 const EXPLOSION_START = 8.7;
-const EXPLOSION_END   = 10.5;
-const IMPLODE_START   = 12.5;
-const IMPLODE_END     = 14.5;
+const EXPLOSION_END = 10.5;
+const IMPLODE_START = 12.5;
+const IMPLODE_END = 14.5;
 const _clamp = (t, a = 0, b = 1) => Math.max(a, Math.min(b, t));
-const _ease  = t => t < 0.5 ? 4 * t ** 3 : 1 - Math.pow(-2 * t + 2, 3) / 2;
-const _prog  = (t, s, e) => _clamp((t - s) / (e - s));
+const _ease = t => t < 0.5 ? 4 * t ** 3 : 1 - Math.pow(-2 * t + 2, 3) / 2;
+const _prog = (t, s, e) => _clamp((t - s) / (e - s));
 const _chromaticVec = new Vector2(0, 0);
 
 /**
@@ -76,10 +78,10 @@ const _chromaticVec = new Vector2(0, 0);
  */
 function IntroBranch({ time, onComplete, reducedMotion = false, performanceMode = false }) {
   const bloomIntensity = useMemo(() => {
-    if (time < EXPLOSION_START)   return reducedMotion ? 0.25 : 0.6;
-    if (time < EXPLOSION_END)     return (reducedMotion ? 0.25 : 0.6) + _ease(_prog(time, EXPLOSION_START, EXPLOSION_END)) * (reducedMotion ? 0.9 : 2.4);
-    if (time < IMPLODE_START)     return reducedMotion ? 1.1 : 3.0;
-    if (time < IMPLODE_END)       return (reducedMotion ? 1.1 : 3.0) - _ease(_prog(time, IMPLODE_START, IMPLODE_END)) * (reducedMotion ? 0.7 : 2.2);
+    if (time < EXPLOSION_START) return reducedMotion ? 0.25 : 0.6;
+    if (time < EXPLOSION_END) return (reducedMotion ? 0.25 : 0.6) + _ease(_prog(time, EXPLOSION_START, EXPLOSION_END)) * (reducedMotion ? 0.9 : 2.4);
+    if (time < IMPLODE_START) return reducedMotion ? 1.1 : 3.0;
+    if (time < IMPLODE_END) return (reducedMotion ? 1.1 : 3.0) - _ease(_prog(time, IMPLODE_START, IMPLODE_END)) * (reducedMotion ? 0.7 : 2.2);
     return reducedMotion ? 0.3 : 0.8;
   }, [time, reducedMotion]);
 
@@ -106,21 +108,21 @@ function IntroBranch({ time, onComplete, reducedMotion = false, performanceMode 
       </Suspense>
       {!performanceMode && (
         <EffectComposer>
-        <Bloom
-          intensity={bloomIntensity}
-          luminanceThreshold={0.15}
-          luminanceSmoothing={0.85}
-          mipmapBlur
-        />
-        <ChromaticAberration
-          offset={chromaticOffset}
-          blendFunction={BlendFunction.NORMAL}
-        />
-        <Vignette
-          offset={0.35}
-          darkness={0.75}
-          blendFunction={BlendFunction.NORMAL}
-        />
+          <Bloom
+            intensity={bloomIntensity}
+            luminanceThreshold={0.15}
+            luminanceSmoothing={0.85}
+            mipmapBlur
+          />
+          <ChromaticAberration
+            offset={chromaticOffset}
+            blendFunction={BlendFunction.NORMAL}
+          />
+          <Vignette
+            offset={0.35}
+            darkness={0.75}
+            blendFunction={BlendFunction.NORMAL}
+          />
         </EffectComposer>
       )}
     </>
@@ -200,7 +202,7 @@ export default function WORM3() {
   // ========================================================================
   const {
     size, cubies, manifoldMap, metrics, resolvedColors,
-    setCubies, setRotatedCubies, changeSize, shuffle, reset, flipSticker
+    setCubies, setRotatedCubies, changeSize, shuffle, reset, flipSticker, healSticker
   } = useCubeState();
 
   const { moves, gameTime, victory, achievedWins: _achievedWins, setVictory } = useGameSession();
@@ -475,6 +477,20 @@ export default function WORM3() {
     // Enter teach mode on next tick so cubies are ready
     setTimeout(() => teachMode.enterTeachMode(), 0);
   }, [size, changeSize, shuffle, teachMode]);
+
+  const handleMenuWormHealer = useCallback(() => {
+    useGameStore.getState().setShowMainMenu(false);
+    useGameStore.getState().clearLevel();
+    useGameStore.getState().clearDisparityGame();
+    useGameStore.getState().setWormHealerMode(true);
+    // Use a very high flip cap so tiles never permanently die in WORM mode
+    // (they just keep flipping — the worm heals them back)
+    useGameStore.getState().setDisparityFlipCap(9999);
+    setSettings({ ...settings, biomeMode: { enabled: false, faceAssignment: null } });
+    if (size !== 3) changeSize(3); // Worm healer starts at 3x3
+    reset();
+    setChaosLevel(2); // Start chaos (level 2 = medium flip rate)
+  }, [settings, setSettings, size, changeSize, reset, setChaosLevel]);
 
   const handleMenuBiome = useCallback(() => {
     useGameStore.getState().setShowMainMenu(false);
@@ -833,6 +849,8 @@ export default function WORM3() {
               antipodalData={antipodalData}
               teachModeActive={teachMode.active}
               layerHighlight={teachMode.layerHighlight}
+              onHeal={healSticker}
+              onRotate={startAnimation}
             />
           )}
         </Canvas>
@@ -902,6 +920,7 @@ export default function WORM3() {
             onMenuFreeplay: handleMenuFreeplay,
             onMenuCoop: handleMenuCoop,
             onMenuTeach: handleMenuTeach,
+            onMenuWormHealer: handleMenuWormHealer,
             onMenuSettings: handleMenuSettings,
             onMenuBiome: handleMenuBiome,
             onMenuDisparity: handleMenuDisparity,
