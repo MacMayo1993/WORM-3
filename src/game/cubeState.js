@@ -18,6 +18,20 @@ export const makeCubies = (size) =>
     )
   );
 
+// Heal a sticker (reset flips and restore original color)
+export const healSticker = (cubies, size, x, y, z, dirKey) => {
+  const next = clone3D(cubies);
+  const c = next[x]?.[y]?.[z];
+  if (!c) return next;
+  const st = c.stickers[dirKey];
+  if (!st) return next;
+
+  st.flips = 0;
+  st.curr = st.orig;
+
+  return next;
+};
+
 // Deep clone a cubie object
 const cloneCubie = (cubie) => ({
   ...cubie,
