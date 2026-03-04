@@ -10,7 +10,6 @@ import {
     isPositionFlipped,
     getAntipodalPosition,
     checkSelfCollision,
-    positionKey,
     updateWormAfterRotation
 } from './wormLogic.js';
 import WormTouchControls from './WormTouchControls.jsx'; // Added WormTouchControls import
