@@ -33,6 +33,15 @@ const MAX_WORM_INSTANCES = 100;
 const _MID_GREEN = new THREE.Color(HEAD_COLOR).lerp(new THREE.Color(TAIL_COLOR), 0.5);
 const _MID_GREEN_TUNNEL = new THREE.Color(HEAD_COLOR_TUNNEL).lerp(new THREE.Color(TAIL_COLOR_TUNNEL), 0.5);
 
+// Face-normal direction for each dirKey — used to lift worm segments off tile surface
+const FACE_NORMALS = {
+  PX: [1, 0, 0], NX: [-1, 0, 0],
+  PY: [0, 1, 0], NY: [0, -1, 0],
+  PZ: [0, 0, 1], NZ: [0, 0, -1],
+};
+// How far (units) worm segments float above the tile surface to avoid clipping
+const WORM_LIFT = 0.45;
+
 /**
  * @param {Object} props
  * @param {Array} props.segments - Worm segments (surface or tunnel positions)
@@ -53,14 +62,6 @@ export default function WormTrail({ segments, size, explosionFactor = 0, alive =
   const tailColorObj = isTunnelMode ? TAIL_COLOR_TUNNEL_OBJ : TAIL_COLOR_OBJ;
 
   // ── Derived data (memoised to avoid recomputation on unrelated re-renders) ──
-
-  // Face-normal direction for each dirKey — used to lift segments off tile surface
-  const FACE_NORMALS = {
-    PX: [1, 0, 0], NX: [-1, 0, 0],
-    PY: [0, 1, 0], NY: [0, -1, 0],
-    PZ: [0, 0, 1], NZ: [0, 0, -1],
-  };
-  const WORM_LIFT = 0.45; // units above tile surface (so worm doesn't clip into sticker)
 
   const positions = useMemo(() => segments.map(seg => {
     if (isTunnelMode && seg.tunnel) {
