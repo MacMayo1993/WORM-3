@@ -54,11 +54,26 @@ export default function WormTrail({ segments, size, explosionFactor = 0, alive =
 
   // ── Derived data (memoised to avoid recomputation on unrelated re-renders) ──
 
+  // Face-normal direction for each dirKey — used to lift segments off tile surface
+  const FACE_NORMALS = {
+    PX: [1, 0, 0], NX: [-1, 0, 0],
+    PY: [0, 1, 0], NY: [0, -1, 0],
+    PZ: [0, 0, 1], NZ: [0, 0, -1],
+  };
+  const WORM_LIFT = 0.45; // units above tile surface (so worm doesn't clip into sticker)
+
   const positions = useMemo(() => segments.map(seg => {
     if (isTunnelMode && seg.tunnel) {
       return getTunnelWorldPos(seg.tunnel, seg.t, size, explosionFactor);
     }
-    return getSegmentWorldPos(seg, size, explosionFactor);
+    const base = getSegmentWorldPos(seg, size, explosionFactor);
+    // Push outward along the face normal so the worm sits visibly ON the cube
+    const normal = FACE_NORMALS[seg.dirKey] || [0, 0, 1];
+    return [
+      base[0] + normal[0] * WORM_LIFT,
+      base[1] + normal[1] * WORM_LIFT,
+      base[2] + normal[2] * WORM_LIFT,
+    ];
   }), [segments, size, explosionFactor, isTunnelMode]);
 
   const segmentColors = useMemo(() => positions.map((_, i) => {
