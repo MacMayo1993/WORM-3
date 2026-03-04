@@ -16,7 +16,7 @@ const PULSE_PAIRS = [
   { faces: ['PY', 'NY'] },  // White – Yellow
 ];
 const PAIR_INTERVAL = 1.3;   // seconds per step (pulse + gap)
-const PULSE_DUR     = 0.95;  // animation window within each step
+const PULSE_DUR = 0.95;  // animation window within each step
 
 const FACE_COLOR = {
   PX: '#3b82f6', NX: '#22c55e',
@@ -26,11 +26,11 @@ const FACE_COLOR = {
 // Face centers of a 3×3 cube (cubies at –1,0,+1 → surface at ±1.5)
 // Ring plane faces outward, so we rotate to match the outward normal
 const FACE_CFG = {
-  PX: { pos: [1.52, 0, 0],  rot: [0,  Math.PI / 2, 0] },
+  PX: { pos: [1.52, 0, 0], rot: [0, Math.PI / 2, 0] },
   NX: { pos: [-1.52, 0, 0], rot: [0, -Math.PI / 2, 0] },
-  PY: { pos: [0,  1.52, 0], rot: [-Math.PI / 2, 0, 0] },
-  NY: { pos: [0, -1.52, 0], rot: [ Math.PI / 2, 0, 0] },
-  PZ: { pos: [0, 0,  1.52], rot: [0, 0, 0] },
+  PY: { pos: [0, 1.52, 0], rot: [-Math.PI / 2, 0, 0] },
+  NY: { pos: [0, -1.52, 0], rot: [Math.PI / 2, 0, 0] },
+  PZ: { pos: [0, 0, 1.52], rot: [0, 0, 0] },
   NZ: { pos: [0, 0, -1.52], rot: [0, Math.PI, 0] },
 };
 const FACE_KEYS = Object.keys(FACE_CFG);
@@ -91,7 +91,7 @@ const ScreenGlow = () => {
 // In face-group local space: +Z is outward (face normal), XY is the face plane.
 // Strands originate from the 4 tile gap lines (# positions at ±0.5) and curve outward.
 const RAY_STRANDS = 10;   // per face — distributed across the 4 tile gap lines
-const RAY_PTS     = 16;   // curve sample points per strand
+const RAY_PTS = 16;   // curve sample points per strand
 
 // Pre-computed per-face strand paths — originate from the # grid lines at ±0.5 and
 // curve outward along the face normal (+Z), like light leaking through the tile seams.
@@ -101,34 +101,34 @@ const _faceRayConfigs = (() => {
   FACE_KEYS.forEach(face => {
     result[face] = Array.from({ length: RAY_STRANDS }, (_, i) => {
       // Distribute evenly across the 4 # lines (tile gaps at sx=±0.5 and sy=±0.5)
-      const line         = i % 4;
-      const slot         = Math.floor(i / 4);
+      const line = i % 4;
+      const slot = Math.floor(i / 4);
       const slotsPerLine = Math.ceil(RAY_STRANDS / 4);  // 3 for 10 strands
-      const along        = slotsPerLine > 1
+      const along = slotsPerLine > 1
         ? (slot / (slotsPerLine - 1) - 0.5) * 2.6       // –1.3 … +1.3 along the gap line
         : 0;
 
       let sx, sy;
-      if (line === 0)      { sx = along; sy =  0.5; }
+      if (line === 0) { sx = along; sy = 0.5; }
       else if (line === 1) { sx = along; sy = -0.5; }
-      else if (line === 2) { sx =  0.5; sy = along; }
-      else                 { sx = -0.5; sy = along; }
+      else if (line === 2) { sx = 0.5; sy = along; }
+      else { sx = -0.5; sy = along; }
 
-      const len     = 1.4 + rng() * 1.8;
-      const cpXOff  = (rng() - 0.5) * 0.7;
-      const cpYOff  = (rng() - 0.5) * 0.7;
+      const len = 1.4 + rng() * 1.8;
+      const cpXOff = (rng() - 0.5) * 0.7;
+      const cpYOff = (rng() - 0.5) * 0.7;
       const tipXOff = (rng() - 0.5) * 0.5;
       const tipYOff = (rng() - 0.5) * 0.5;
 
       const curve = new THREE.QuadraticBezierCurve3(
         new THREE.Vector3(sx, sy, 0.06),
-        new THREE.Vector3(sx + cpXOff,  sy + cpYOff,  len * 0.45),
+        new THREE.Vector3(sx + cpXOff, sy + cpYOff, len * 0.45),
         new THREE.Vector3(sx + tipXOff, sy + tipYOff, len)
       );
 
-      const pts    = curve.getPoints(RAY_PTS - 1);
+      const pts = curve.getPoints(RAY_PTS - 1);
       const basePts = new Float32Array(RAY_PTS * 3);
-      pts.forEach((p, j) => { basePts[j*3] = p.x; basePts[j*3+1] = p.y; basePts[j*3+2] = p.z; });
+      pts.forEach((p, j) => { basePts[j * 3] = p.x; basePts[j * 3 + 1] = p.y; basePts[j * 3 + 2] = p.z; });
 
       return { id: i, basePts, sparkOffset: rng() * Math.PI * 2 };
     });
@@ -141,12 +141,12 @@ const _faceColorObj = {};
 FACE_KEYS.forEach(face => { _faceColorObj[face] = new THREE.Color(FACE_COLOR[face]); });
 
 const FacePulses = () => {
-  const lineRefs  = useRef({});   // face → [line, ...]  (arrays)
+  const lineRefs = useRef({});   // face → [line, ...]  (arrays)
   const lightRefs = useRef({});
   const pairState = useRef({ idx: 0, t0: -1 });
 
   useFrame((state) => {
-    const t  = state.clock.elapsedTime;
+    const t = state.clock.elapsedTime;
     const ps = pairState.current;
     if (ps.t0 < 0) ps.t0 = t;
 
@@ -158,7 +158,7 @@ const FacePulses = () => {
     const activeFaces = PULSE_PAIRS[ps.idx].faces;
     const rawP = Math.min((t - ps.t0) / PULSE_DUR, 1.0);
 
-    _pulse.idx  = ps.idx;
+    _pulse.idx = ps.idx;
     _pulse.rawP = rawP;
 
     FACE_KEYS.forEach(face => {
@@ -174,12 +174,12 @@ const FacePulses = () => {
         return;
       }
 
-      const col     = _faceColorObj[face];
+      const col = _faceColorObj[face];
       const configs = _faceRayConfigs[face];
 
       // Strands shoot outward in first half of pulse, then fade out in second half
-      const growth  = Math.min(rawP * 2.2, 1.0);   // 0→1 over ~45% of pulse
-      const fade    = rawP > 0.5 ? 1 - (rawP - 0.5) * 2 : 1.0;
+      const growth = Math.min(rawP * 2.2, 1.0);   // 0→1 over ~45% of pulse
+      const fade = rawP > 0.5 ? 1 - (rawP - 0.5) * 2 : 1.0;
       const overall = Math.max(0, fade) * 0.85;
 
       lines.forEach((line, i) => {
@@ -192,7 +192,7 @@ const FacePulses = () => {
         line.visible = overall > 0.01;
 
         // Growth: clip strand at current growth progress; collapsed points → tip of visible segment
-        const pos  = line.geometry.attributes.position.array;
+        const pos = line.geometry.attributes.position.array;
         const base = cfg.basePts;
         const visibleEnd = growth * (RAY_PTS - 1);  // last visible point index (float)
 
@@ -200,21 +200,21 @@ const FacePulses = () => {
           const clampedJ = Math.min(j, visibleEnd);
           const lo = Math.floor(clampedJ);
           const hi = Math.min(lo + 1, RAY_PTS - 1);
-          const f  = clampedJ - lo;
-          pos[j*3]   = base[lo*3]   + (base[hi*3]   - base[lo*3])   * f;
-          pos[j*3+1] = base[lo*3+1] + (base[hi*3+1] - base[lo*3+1]) * f;
-          pos[j*3+2] = base[lo*3+2] + (base[hi*3+2] - base[lo*3+2]) * f;
+          const f = clampedJ - lo;
+          pos[j * 3] = base[lo * 3] + (base[hi * 3] - base[lo * 3]) * f;
+          pos[j * 3 + 1] = base[lo * 3 + 1] + (base[hi * 3 + 1] - base[lo * 3 + 1]) * f;
+          pos[j * 3 + 2] = base[lo * 3 + 2] + (base[hi * 3 + 2] - base[lo * 3 + 2]) * f;
         }
         line.geometry.attributes.position.needsUpdate = true;
 
         // Vertex colors: bright face color at root → black at tip (Bloom makes it glow)
         const colors = line.geometry.attributes.color.array;
         for (let j = 0; j < RAY_PTS; j++) {
-          const u    = j / (RAY_PTS - 1);
+          const u = j / (RAY_PTS - 1);
           const glow = Math.pow(Math.max(0, 1 - u), 0.55);   // slower fade = longer bright core
-          colors[j*3]   = col.r * glow;
-          colors[j*3+1] = col.g * glow;
-          colors[j*3+2] = col.b * glow;
+          colors[j * 3] = col.r * glow;
+          colors[j * 3 + 1] = col.g * glow;
+          colors[j * 3 + 2] = col.b * glow;
         }
         line.geometry.attributes.color.needsUpdate = true;
       });
@@ -230,9 +230,9 @@ const FacePulses = () => {
     <>
       {FACE_KEYS.map(face => {
         const { pos, rot } = FACE_CFG[face];
-        const col      = FACE_COLOR[face];
+        const col = FACE_COLOR[face];
         const lightPos = pos.map(v => v * 2.6);
-        const configs  = _faceRayConfigs[face];
+        const configs = _faceRayConfigs[face];
         return (
           <group key={face}>
             <pointLight
@@ -272,7 +272,7 @@ const BlackCube = () => {
     for (let x = 0; x < 3; x++)
       for (let y = 0; y < 3; y++)
         for (let z = 0; z < 3; z++)
-          result.push({ key: `${x}-${y}-${z}`, pos: [x-1, y-1, z-1] });
+          result.push({ key: `${x}-${y}-${z}`, pos: [x - 1, y - 1, z - 1] });
     return result;
   }, []);
   return (
@@ -334,7 +334,8 @@ const NavItem = ({ icon, label, color, onClick }) => {
           pointerEvents: 'none',
         }} />
       )}
-      <span style={{ lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      <span style={{
+        lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
         filter: hovered ? `drop-shadow(0 0 6px ${color}90)` : 'none',
         transition: 'filter 0.2s ease',
       }}>{icon}</span>
@@ -349,12 +350,12 @@ const NavItem = ({ icon, label, color, onClick }) => {
 };
 
 // ─── Main component ───────────────────────────────────────────────────────────
-const MainMenu = ({ onPlay, _onLevels, onFreeplay, _onCoop, onSettings, onBiome, onDisparity }) => {
-  const [titleVisible, setTitleVisible]       = useState(false);
+const MainMenu = ({ onPlay, _onLevels, onFreeplay, _onCoop, onSettings, onBiome, onDisparity, onWormHealer }) => {
+  const [titleVisible, setTitleVisible] = useState(false);
   const [subtitleVisible, setSubtitleVisible] = useState(false);
-  const [btnVisible, setBtnVisible]           = useState(false);
-  const [hoverEnter, setHoverEnter]           = useState(false);
-  const [pressEnter, setPressEnter]           = useState(false);
+  const [btnVisible, setBtnVisible] = useState(false);
+  const [hoverEnter, setHoverEnter] = useState(false);
+  const [pressEnter, setPressEnter] = useState(false);
 
   useEffect(() => {
     const t1 = setTimeout(() => setTitleVisible(true), 200);
@@ -495,10 +496,13 @@ const MainMenu = ({ onPlay, _onLevels, onFreeplay, _onCoop, onSettings, onBiome,
             <NavItem icon={<DisparityIcon />} label="Disparity" color="#f59e0b" onClick={onDisparity} />
             {/* divider */}
             <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(100,150,255,0.18)' }} />
-            <NavItem icon={<ExploreIcon />}   label="Explore"   color="#22c55e" onClick={onFreeplay} />
+            <NavItem icon={<WormIcon />} label="WORM" color="#a855f7" onClick={onWormHealer} />
             {/* divider */}
             <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(100,150,255,0.18)' }} />
-            <NavItem icon={<WorldIcon />}     label="World"     color="#60a5fa" onClick={onBiome} />
+            <NavItem icon={<ExploreIcon />} label="Explore" color="#22c55e" onClick={onFreeplay} />
+            {/* divider */}
+            <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(100,150,255,0.18)' }} />
+            <NavItem icon={<WorldIcon />} label="World" color="#60a5fa" onClick={onBiome} />
           </div>
         </div>
       </div>
@@ -514,13 +518,19 @@ const PlayIcon = ({ hovered }) => (
 );
 const DisparityIcon = () => (
   <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
-    <circle cx="5"  cy="5"  r="1.8" fill="#f59e0b" />
-    <circle cx="19" cy="5"  r="1.8" fill="#f59e0b" opacity="0.5" />
+    <circle cx="5" cy="5" r="1.8" fill="#f59e0b" />
+    <circle cx="19" cy="5" r="1.8" fill="#f59e0b" opacity="0.5" />
     <circle cx="12" cy="12" r="1.8" fill="#f59e0b" />
-    <circle cx="5"  cy="19" r="1.8" fill="#f59e0b" opacity="0.5" />
+    <circle cx="5" cy="19" r="1.8" fill="#f59e0b" opacity="0.5" />
     <circle cx="19" cy="19" r="1.8" fill="#f59e0b" />
-    <line x1="5"  y1="5"  x2="19" y2="19" stroke="#f59e0b" strokeWidth="1.2" opacity="0.4" />
-    <line x1="19" y1="5"  x2="5"  y2="19" stroke="#f59e0b" strokeWidth="1.2" opacity="0.4" />
+    <line x1="5" y1="5" x2="19" y2="19" stroke="#f59e0b" strokeWidth="1.2" opacity="0.4" />
+    <line x1="19" y1="5" x2="5" y2="19" stroke="#f59e0b" strokeWidth="1.2" opacity="0.4" />
+  </svg>
+);
+const WormIcon = () => (
+  <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+    <path d="M4 12 Q8 4 12 12 T20 12" stroke="#a855f7" strokeWidth="2" strokeLinecap="round" fill="none" />
+    <circle cx="20" cy="12" r="2.5" fill="#a855f7" />
   </svg>
 );
 const ExploreIcon = () => (
@@ -533,10 +543,10 @@ const ExploreIcon = () => (
 const WorldIcon = () => (
   <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
     <path d="M3 18 Q3 10 12 10 Q21 10 21 18" stroke="#60a5fa" strokeWidth="1.6" fill="none" strokeLinecap="round" />
-    <line x1="3"  y1="18" x2="21" y2="18"   stroke="#60a5fa" strokeWidth="1.6" strokeLinecap="round" />
-    <line x1="6"  y1="18" x2="6"  y2="14"   stroke="#60a5fa" strokeWidth="1.4" strokeLinecap="round" />
+    <line x1="3" y1="18" x2="21" y2="18" stroke="#60a5fa" strokeWidth="1.6" strokeLinecap="round" />
+    <line x1="6" y1="18" x2="6" y2="14" stroke="#60a5fa" strokeWidth="1.4" strokeLinecap="round" />
     <line x1="12" y1="18" x2="12" y2="10.5" stroke="#60a5fa" strokeWidth="1.4" strokeLinecap="round" />
-    <line x1="18" y1="18" x2="18" y2="14"   stroke="#60a5fa" strokeWidth="1.4" strokeLinecap="round" />
+    <line x1="18" y1="18" x2="18" y2="14" stroke="#60a5fa" strokeWidth="1.4" strokeLinecap="round" />
   </svg>
 );
 const GearIcon = () => (
