@@ -486,11 +486,11 @@ export default function WORM3() {
     // Use a very high flip cap so tiles never permanently die in WORM mode
     // (they just keep flipping — the worm heals them back)
     useGameStore.getState().setDisparityFlipCap(9999);
+    useGameStore.getState().setChaosLevel(2); // Start chaos (level 2 = medium flip rate)
     setSettings({ ...settings, biomeMode: { enabled: false, faceAssignment: null } });
     if (size !== 3) changeSize(3); // Worm healer starts at 3x3
     reset();
-    setChaosLevel(2); // Start chaos (level 2 = medium flip rate)
-  }, [settings, setSettings, size, changeSize, reset, setChaosLevel]);
+  }, [settings, setSettings, size, changeSize, reset]);
 
   const handleMenuBiome = useCallback(() => {
     useGameStore.getState().setShowMainMenu(false);
