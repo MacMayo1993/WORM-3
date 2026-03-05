@@ -1,359 +1,679 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useFrame } from '@react-three/fiber';
-import { Html } from '@react-three/drei'; // Added Html import
-import WormTrail from './WormTrail.jsx';
-import ParityOrbs from './ParityOrb.jsx';
-import {
-    createInitialWorm,
-    getNextSurfacePosition,
-    turnWorm,
-    isPositionFlipped,
-    getAntipodalPosition,
-    checkSelfCollision,
-    updateWormAfterRotation
-} from './wormLogic.js';
-import WormTouchControls from './WormTouchControls.jsx'; // Added WormTouchControls import
-import { play } from '../utils/audio.js';
+// src/worm/HealerWormMode.jsx
+// WORM Chase-Cam Mode — complete rewrite.
+// Chase camera follows the worm crawling on the cube exterior.
+// Disparity Level 1 runs in background. Tap a flipped tile to ride the antipodal tunnel.
 
-// Game configuration for surface mode
-const CONFIG = {
-    baseSpeed: 0.8,         // Base tiles per second
-    speedIncrement: 0.05,   // Speed increase per segment
-    maxSpeed: 3.0,          // Maximum speed
-    growthPerHeal: 1,       // Segments gained per heal
-    warpBonus: 25           // Score bonus per warp
+import React, { useRef, useCallback, useEffect } from 'react';
+import { useFrame, useThree } from '@react-three/fiber';
+import * as THREE from 'three';
+import { useGameStore } from '../hooks/useGameStore.js';
+import { getStickerWorldPos } from '../game/coordinates.js';
+import { getNextSurfacePosition, getActiveTunnels, getTunnelWorldPos, turnWorm } from './wormLogic.js';
+import { buildManifoldGridMap, flipStickerPair } from '../game/manifoldLogic.js';
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+const CAM_HEIGHT_BASE = 3.2;  // base height above worm (much further back)
+const CAM_BACK_BASE = 2.8;  // base behind distance
+const LOOK_AHEAD = 1.8;  // look-at ahead of worm
+const CAM_LERP = 6;    // camera smoothing (× delta)
+const WORM_LIFT = 0.08; // worm sits right on tile surface
+const ZOOM_PER_SEG = 0.22; // extra height per tail segment
+const ZOOM_BURST = 2.2;  // instant burst zoom on parity pickup
+
+// Face outward normals
+const FACE_NORMALS = {
+    PX: new THREE.Vector3(1, 0, 0),
+    NX: new THREE.Vector3(-1, 0, 0),
+    PY: new THREE.Vector3(0, 1, 0),
+    NY: new THREE.Vector3(0, -1, 0),
+    PZ: new THREE.Vector3(0, 0, 1),
+    NZ: new THREE.Vector3(0, 0, -1),
 };
 
-// Custom hook for WORM mode game logic
-export function useHealerWormGame(cubies, size, animState, onRotate, onHeal) {
-    // Game state
-    const [gameState, setGameState] = useState('playing');
-    const [worm, setWorm] = useState(() => createInitialWorm(size));
-    const [moveDir, setMoveDir] = useState('up');
-    const [score, setScore] = useState(0);
-    const [warps, setWarps] = useState(0);
-    const [pendingGrowth, setPendingGrowth] = useState(0);
+// Move direction → world forward vector (on each face)
+const DIR_FORWARD = {
+    PZ: { up: [0, 1, 0], down: [0, -1, 0], left: [-1, 0, 0], right: [1, 0, 0] },
+    NZ: { up: [0, 1, 0], down: [0, -1, 0], left: [1, 0, 0], right: [-1, 0, 0] },
+    PX: { up: [0, 1, 0], down: [0, -1, 0], left: [0, 0, 1], right: [0, 0, -1] },
+    NX: { up: [0, 1, 0], down: [0, -1, 0], left: [0, 0, -1], right: [0, 0, 1] },
+    PY: { up: [0, 0, -1], down: [0, 0, 1], left: [-1, 0, 0], right: [1, 0, 0] },
+    NY: { up: [0, 0, 1], down: [0, 0, -1], left: [-1, 0, 0], right: [1, 0, 0] },
+};
 
-    // Camera mode - first-person worm view
-    const [wormCameraEnabled, setWormCameraEnabled] = useState(false);
+const INITIAL_DIR = 'up';
+const INITIAL_POS = (size) => {
+    const c = Math.floor(size / 2);
+    return { x: c, y: c, z: size - 1, dirKey: 'PZ' };
+};
 
-    // Timing
-    const lastMoveTime = useRef(0);
-    const rotationQueue = useRef([]);
+// ─── Worm Crawler Hook ────────────────────────────────────────────────────────
+const MAX_TAIL = 120;
 
-    // Ref for current worm state (avoids stale closures in event handlers)
-    const wormRef = useRef(worm);
-    wormRef.current = worm;
+function useWormCrawler(size, cubies) {
+    const wormSpeed = useGameStore(s => s.wormSpeed ?? 0.4);
+    const healedRef = useRef(0);
 
-    // Calculate current speed
-    const speed = useMemo(() => {
-        const s = CONFIG.baseSpeed + (worm.length * CONFIG.speedIncrement);
-        return Math.min(s, CONFIG.maxSpeed);
-    }, [worm.length]);
+    const pos = useRef(INITIAL_POS(size));
+    const moveDir = useRef(INITIAL_DIR);
+    const phase = useRef('crawling');
+    const tunnelProgress = useRef(0);
+    const activeTunnel = useRef(null);
+    const stepAcc = useRef(0);
+    const pendingTurn = useRef(null);
+    const onFlippedTile = useRef(false);
+    const lastFlippedRef = useRef(false);
+    const prevDirKey = useRef(null);
+    const lastRecordedT = useRef(0);
+    const crossingCorner = useRef(false);
 
-    // Restart handler
-    const restart = useCallback(() => {
-        const newWorm = createInitialWorm(size);
-        setWorm(newWorm);
-        setMoveDir('up');
-        setScore(0);
-        setWarps(0);
-        setPendingGrowth(0);
-        setGameState('playing');
-        lastMoveTime.current = 0;
-        rotationQueue.current = [];
-    }, [size]);
+    // Smooth inter-tile interpolation
+    const interpT = useRef(1);          // 0→1 between prev and current tile
+    const prevWorldPos = useRef(null);       // world pos of previous tile
+    const curWorldPos = useRef(null);       // world pos of current tile
+    const headInterpPos = useRef(new THREE.Vector3());
+    const currentNormal = useRef(new THREE.Vector3(0, 0, 1));
 
-    // Function to queue a rotation, exposed for touch controls
-    const queueRotation = useCallback((axis, dir, sliceIndex) => {
-        if (rotationQueue.current.length < 2) {
-            rotationQueue.current.push({ axis, dir, sliceIndex });
+    // Jump state
+    const jumpT = useRef(0);            // 0 = grounded, >0 = in air
+    const isJumping = useRef(false);
+    const JUMP_HEIGHT = 0.55;
+    const JUMP_SPEED = 3.5;
+
+    // Growing tail
+    const tailLength = useRef(4);
+    const visitedFlipped = useRef(new Set());
+    const stepHistory = useRef([]);  // one world-pos per tile step, used by WormBody
+
+    // Compute world centroid of current grid tile
+    const getWorldPos = (p) => new THREE.Vector3(
+        ...getStickerWorldPos(p.x, p.y, p.z, p.dirKey, size, 0)
+    );
+
+    // Jump offset height at current jumpT
+    const jumpLift = () => isJumping.current
+        ? Math.sin(jumpT.current * Math.PI) * JUMP_HEIGHT
+        : 0;
+
+    // ── Per-frame simulation ──────────────────────────────────────────────────
+    const tick = useCallback((delta) => {
+        const STEP_SEC = 1.0 / wormSpeed;
+
+        // Always advance jump
+        if (isJumping.current) {
+            jumpT.current += delta * JUMP_SPEED;
+            if (jumpT.current >= 1) {
+                jumpT.current = 0;
+                isJumping.current = false;
+            }
         }
-    }, []);
 
-    // Keyboard controls
-    useEffect(() => {
-        const handleKeyDown = (e) => {
-            // Restart on enter/space when game over
-            if (gameState === 'gameover' || gameState === 'victory') {
-                if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    restart();
+        if (phase.current === 'crawling') {
+            // Apply pending turn — RELATIVE to current heading
+            if (pendingTurn.current) {
+                const t = pendingTurn.current;
+                if (t === 'left' || t === 'right') {
+                    moveDir.current = turnWorm(moveDir.current, t);
                 }
-                return;
+                if (t === 'down') moveDir.current = turnWorm(turnWorm(moveDir.current, 'left'), 'left');
+                if (t === 'jump') { isJumping.current = true; jumpT.current = 0.001; }
+                pendingTurn.current = null;
             }
 
-            const key = e.key.toLowerCase();
+            // Advance interpolation
+            if (interpT.current < 1) {
+                interpT.current = Math.min(1, interpT.current + delta / STEP_SEC);
+            }
 
-            // Pause toggle
-            if (key === ' ' || key === 'escape' || key === 'p') {
-                e.preventDefault();
-                if (gameState === 'playing') {
-                    setGameState('paused');
-                } else if (gameState === 'paused') {
-                    setGameState('playing');
+            // --- Continuous path recording for contiguous touching clones ---
+            const pWorld = prevWorldPos.current;
+            const cWorld = curWorldPos.current ?? getWorldPos(pos.current);
+
+            // Function to perfectly mathematically evaluate the worm's ground position and normal at ANY timeframe
+            const evaluatePosAndNormal = (tValue) => {
+                let hPos = cWorld.clone();
+                let cNorm = FACE_NORMALS[pos.current.dirKey] ?? new THREE.Vector3(0, 0, 1);
+
+                if (pWorld && tValue < 1) {
+                    if (crossingCorner.current) {
+                        const oldDirKey = prevDirKey.current;
+                        const newDirKey = pos.current.dirKey;
+                        const oldNormal = FACE_NORMALS[oldDirKey];
+                        const newNormal = FACE_NORMALS[newDirKey];
+                        const cornerVertex = pWorld.clone().addScaledVector(newNormal, 0.52);
+
+                        if (tValue < 0.45) {
+                            hPos = pWorld.clone().lerp(cornerVertex, tValue / 0.45);
+                            cNorm = oldNormal.clone();
+                        } else if (tValue > 0.55) {
+                            hPos = cornerVertex.clone().lerp(cWorld, (tValue - 0.55) / 0.45);
+                            cNorm = newNormal.clone();
+                        } else {
+                            hPos = cornerVertex.clone();
+                            cNorm = new THREE.Vector3().lerpVectors(oldNormal, newNormal, (tValue - 0.45) / 0.10).normalize();
+                        }
+                    } else {
+                        hPos = pWorld.clone().lerp(cWorld, tValue);
+                    }
                 }
-                return;
+                return { hPos, cNorm };
+            };
+
+            const currentEval = evaluatePosAndNormal(interpT.current);
+            headInterpPos.current.copy(currentEval.hPos);
+            currentNormal.current.copy(currentEval.cNorm);
+
+            // Back-fill step history so it is completely framerate independent
+            // If the game lags and skips 0.3 seconds, this perfectly reconstructs the 15 missing physics frames along the true 3D edge curve
+            while (lastRecordedT.current <= interpT.current) {
+                const { hPos: ptPos, cNorm: ptNorm } = evaluatePosAndNormal(lastRecordedT.current);
+                const ptJump = isJumping.current ? Math.sin(jumpT.current * Math.PI) * 0.55 : 0;
+                const ptLifted = ptPos.clone().addScaledVector(ptNorm, WORM_LIFT + ptJump);
+
+                stepHistory.current.unshift({ pos: ptLifted, normal: ptNorm });
+                lastRecordedT.current += 0.02; // A guaranteed resolution of 50 mathematical sub-steps per tile traverse
             }
-
-            if (gameState !== 'playing') return;
-
-            // Use ref to get current worm state (avoids stale closure)
-            const head = wormRef.current[0];
-            if (!head) return;
-
-            switch (key) {
-                case 'w':
-                    e.preventDefault();
-                    queueRotation('col', -1, head.x);
-                    break;
-                case 's':
-                    e.preventDefault();
-                    queueRotation('col', 1, head.x);
-                    break;
-                case 'a':
-                    e.preventDefault();
-                    queueRotation('row', -1, head.y);
-                    break;
-                case 'd':
-                    e.preventDefault();
-                    queueRotation('row', 1, head.y);
-                    break;
-                case 'q':
-                    e.preventDefault();
-                    queueRotation('depth', 1, head.z);
-                    break;
-                case 'e':
-                    e.preventDefault();
-                    queueRotation('depth', -1, head.z);
-                    break;
-                case 'arrowleft':
-                    e.preventDefault();
-                    setMoveDir(prev => turnWorm(prev, 'left'));
-                    break;
-                case 'arrowright':
-                    e.preventDefault();
-                    setMoveDir(prev => turnWorm(prev, 'right'));
-                    break;
-                case 'c':
-                    // Toggle worm camera (first-person view)
-                    e.preventDefault();
-                    setWormCameraEnabled(prev => !prev);
-                    break;
+            if (stepHistory.current.length > 1500) {
+                stepHistory.current.length = 1500;
             }
-        };
+            // -----------------------------------------------------------
 
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [gameState, restart, queueRotation]); // worm accessed via wormRef to avoid stale closure
+            stepAcc.current += delta;
+            // When navigating a corner, traversing double the distance means we should theoretically 
+            // give it more time so the speed looks constant, but the Bezier arc covers it nicely.
+            if (stepAcc.current >= STEP_SEC) {
+                stepAcc.current -= STEP_SEC;
+                interpT.current = 0;
+                lastRecordedT.current = 0;
+                prevWorldPos.current = getWorldPos(pos.current);
+                prevDirKey.current = pos.current.dirKey;
 
-    // Process rotation queue
-    useEffect(() => {
-        if (animState) return;
-        if (rotationQueue.current.length === 0) return;
-        if (gameState !== 'playing') return;
+                const oldDirKey = pos.current.dirKey;
+                const next = getNextSurfacePosition(pos.current, moveDir.current, size);
 
-        const rotation = rotationQueue.current.shift();
-        if (rotation && onRotate) {
-            onRotate(rotation.axis, rotation.dir, rotation.sliceIndex);
+                // We clear the corner navigation flag unless we're about to cross one right now
+                crossingCorner.current = false;
+
+                if (next) {
+                    const crossedFace = next.dirKey !== oldDirKey;
+                    pos.current = { x: next.x, y: next.y, z: next.z, dirKey: next.dirKey };
+                    if (next.moveDir) moveDir.current = next.moveDir;
+
+                    if (crossedFace) {
+                        crossingCorner.current = true;
+                    }
+                } else {
+                    moveDir.current = turnWorm(turnWorm(moveDir.current, 'left'), 'left');
+                }
+
+                // Immediately update curWorldPos so the interpolation target is correct
+                curWorldPos.current = getWorldPos(pos.current);
+
+                // Flipped tile detection
+                const { x, y, z, dirKey } = pos.current;
+                const sticker = cubies?.[x]?.[y]?.[z]?.stickers?.[dirKey];
+                const isFlipped = !!(sticker && sticker.curr !== sticker.orig);
+                onFlippedTile.current = isFlipped;
+
+                // Parity pickup — grow tail AND unflipp the tile (consume it)
+                if (isFlipped) {
+                    const key = `${x},${y},${z},${dirKey}`;
+                    if (!visitedFlipped.current.has(key)) {
+                        visitedFlipped.current.add(key);
+                        // Tail grows 3x faster since steps are much denser now (0.15 vs 1.0)
+                        tailLength.current = Math.min(tailLength.current + 8, MAX_TAIL);
+
+                        // "Eat" the parity orb
+                        useGameStore.setState((state) => {
+                            const mm = buildManifoldGridMap(state.cubies, size);
+                            return {
+                                cubies: flipStickerPair(state.cubies, size, x, y, z, dirKey, mm)
+                            };
+                        });
+
+                        // Reset flipped state immediately so portal disappears
+                        onFlippedTile.current = false;
+                        lastFlippedRef.current = false;
+                        useGameStore.getState().setWormOnFlippedTile(false);
+                    }
+                }
+
+                if (isFlipped !== lastFlippedRef.current) {
+                    lastFlippedRef.current = isFlipped;
+                    useGameStore.getState().setWormOnFlippedTile(isFlipped);
+                }
+            }
+        } else if (phase.current === 'entering') {
+            tunnelProgress.current += delta * 2.5;
+            if (tunnelProgress.current >= 1) {
+                tunnelProgress.current = 0;
+                phase.current = 'tunnel';
+                useGameStore.getState().setWormPhase('tunnel');
+            }
+        } else if (phase.current === 'tunnel') {
+            tunnelProgress.current += delta * 0.65;
+            if (tunnelProgress.current >= 1) {
+                tunnelProgress.current = 0;
+                phase.current = 'exiting';
+                useGameStore.getState().setWormPhase('exiting');
+                if (activeTunnel.current) {
+                    const ex = activeTunnel.current.exit;
+                    pos.current = { x: ex.x, y: ex.y, z: ex.z, dirKey: ex.dirKey };
+                    curWorldPos.current = getWorldPos(pos.current);
+                }
+            }
+        } else if (phase.current === 'exiting') {
+            tunnelProgress.current += delta * 2.0;
+            if (tunnelProgress.current >= 1) {
+                tunnelProgress.current = 0;
+                activeTunnel.current = null;
+                phase.current = 'crawling';
+                useGameStore.getState().setWormPhase('crawling');
+                onFlippedTile.current = false;
+                lastFlippedRef.current = false;
+                useGameStore.getState().setWormOnFlippedTile(false);
+                healedRef.current += 1;
+                useGameStore.getState().setWormHealedCount(healedRef.current);
+            }
         }
-    }, [animState, gameState, onRotate]);
+    }, [size, cubies, wormSpeed]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Update worm after cube rotation
-    const updateAfterRotation = useCallback((axis, sliceIndex, dir) => {
-        setWorm(prev => updateWormAfterRotation(prev, axis, sliceIndex, dir, size));
-    }, [size]);
+    // ── Enter portal ─────────────────────────────────────────────────────────
+    const enterPortal = useCallback(() => {
+        if (phase.current !== 'crawling' || !onFlippedTile.current) return;
+        const tunnels = getActiveTunnels(cubies, size);
+        const { x, y, z, dirKey } = pos.current;
+        const tunnel = tunnels.find(t =>
+            t.entry.x === x && t.entry.y === y &&
+            t.entry.z === z && t.entry.dirKey === dirKey
+        ) || tunnels.find(t =>
+            t.exit.x === x && t.exit.y === y &&
+            t.exit.z === z && t.exit.dirKey === dirKey
+        );
+        if (!tunnel) return;
+        if (tunnel.exit.x === x && tunnel.exit.y === y && tunnel.exit.z === z) {
+            activeTunnel.current = { ...tunnel, entry: tunnel.exit, exit: tunnel.entry };
+        } else {
+            activeTunnel.current = tunnel;
+        }
+        tunnelProgress.current = 0;
+        phase.current = 'entering';
+    }, [cubies, size]);
+
+    const queueTurn = useCallback((dir) => { pendingTurn.current = dir; }, []);
 
     return {
-        // State
-        gameState,
-        worm,
-        moveDir,
-        score,
-        warps,
-        speed,
-        pendingGrowth,
-        wormCameraEnabled,
-
-        // Setters for game loop
-        setGameState,
-        setWorm,
-        setMoveDir,
-        setScore,
-        setWarps,
-        setPendingGrowth,
-        setWormCameraEnabled,
-
-        // Refs
-        lastMoveTime,
-
-        // Actions
-        restart,
-        updateAfterRotation,
-        queueRotation, // Exposed for touch controls
-        onHeal,
-
-        // Config
-        CONFIG
+        pos, moveDir, phase, tunnelProgress, activeTunnel, onFlippedTile,
+        interpT, prevWorldPos, curWorldPos, jumpT, isJumping, jumpLift,
+        headInterpPos, currentNormal,
+        tailLength, stepHistory, tick, enterPortal, queueTurn
     };
 }
 
-// 3D component for rendering worm and orbs inside Canvas
-export function HealerWormMode3D({
-    worm,
-    size,
-    explosionFactor,
-    gameState,
-}) {
-    return (
-        <>
-            <WormTrail
-                segments={worm}
-                size={size}
-                explosionFactor={explosionFactor}
-                alive={gameState === 'playing' || gameState === 'paused'}
-                mode={'surface'}
-            />
-        </>
-    );
-}
+// ─── Chase Camera (dynamic zoom based on tail length) ───────────────────────
+function WormChaseCamera({ worm, size }) {
+    const { camera } = useThree();
+    const camPosRef = useRef(new THREE.Vector3(0, 6, 10));
+    const lookAtRef = useRef(new THREE.Vector3(0, 0, 0));
+    const zoomExtraRef = useRef(0);   // burst zoom accumulated
+    const prevTailLen = useRef(4);   // detect new parity pickups
 
-// Game loop component - must be inside Canvas for useFrame
-export function HealerWormGameLoop({
-    cubies,
-    size,
-    animState,
-    game // from useHealerWormGame
-}) {
-    const {
-        gameState,
-        worm,
-        moveDir,
-        speed,
-        pendingGrowth,
-        lastMoveTime,
-        setGameState,
-        setWorm,
-        setMoveDir,
-        setScore,
-        setWarps,
-        setPendingGrowth,
-        onHeal,
-        CONFIG
-    } = game;
+    useFrame((_, delta) => {
+        const phase = worm.phase.current;
+        const tailLen = worm.tailLength.current;
 
-    useFrame((state, delta) => {
-        if (gameState !== 'playing') return;
-        if (animState) return;
-
-        lastMoveTime.current += delta;
-
-        const moveInterval = 1 / speed;
-        if (lastMoveTime.current < moveInterval) return;
-
-        lastMoveTime.current = 0;
-
-        const head = worm[0];
-        if (!head) return;
-
-        const nextPos = getNextSurfacePosition(
-            { x: head.x, y: head.y, z: head.z, dirKey: head.dirKey },
-            moveDir,
-            size
-        );
-
-        if (!nextPos) {
-            setGameState('gameover');
-            play('/sounds/gameover.mp3');
-            return;
+        // Detect new parity pickup → burst
+        if (tailLen > prevTailLen.current) {
+            prevTailLen.current = tailLen;
+            zoomExtraRef.current = ZOOM_BURST;
+        }
+        // Decay burst zoom over time
+        if (zoomExtraRef.current > 0) {
+            zoomExtraRef.current = Math.max(0, zoomExtraRef.current - delta * 1.8);
         }
 
-        if (nextPos.moveDir && nextPos.moveDir !== moveDir) {
-            setMoveDir(nextPos.moveDir);
-        }
+        const extraZoom = (tailLen - 4) * ZOOM_PER_SEG + zoomExtraRef.current;
+        const camHeight = CAM_HEIGHT_BASE + extraZoom;
+        const camBack = CAM_BACK_BASE + extraZoom * 0.7;
 
-        let finalPos = nextPos;
+        if (phase === 'crawling' || phase === 'entering' || phase === 'exiting') {
+            // Smooth interpolated worm world position
+            const wormWorld = worm.headInterpPos.current.clone();
+            const { dirKey } = worm.pos.current;
+            const normal = worm.currentNormal.current.clone();
+            const fwdArr = DIR_FORWARD[dirKey]?.[worm.moveDir.current] ?? [0, 0, -1];
+            const forward = new THREE.Vector3(...fwdArr);
 
-        if (isPositionFlipped(nextPos, cubies)) {
-            const antipodalPos = getAntipodalPosition(nextPos, cubies, size);
-            if (antipodalPos) {
-                finalPos = { ...antipodalPos, moveDir: moveDir };
-                setWarps(w => w + 1);
-                setScore(s => s + CONFIG.warpBonus);
-                play('/sounds/warp.mp3');
-            }
-        }
+            // Camera position: above worm (along face normal) + behind (backward along forward).
+            // This is correct for all faces and never cuts through the cube.
+            const targetCam = wormWorld.clone()
+                .addScaledVector(normal, camHeight)
+                .addScaledVector(forward, -camBack);
+            const targetLook = wormWorld.clone().addScaledVector(forward, LOOK_AHEAD);
 
-        if (checkSelfCollision(finalPos, worm)) {
-            setGameState('gameover');
-            play('/sounds/gameover.mp3');
-            return;
-        }
+            let liftMult = 1;
+            if (phase === 'entering') liftMult = 1 - worm.tunnelProgress.current;
+            if (phase === 'exiting') liftMult = worm.tunnelProgress.current;
+            targetCam.addScaledVector(normal, (liftMult - 1) * camHeight * 0.4);
 
-        // Check for "healer" collision
-        const targetSticker = cubies[finalPos.x]?.[finalPos.y]?.[finalPos.z]?.stickers?.[finalPos.dirKey];
-        if (targetSticker && targetSticker.flips > 0) {
-            if (onHeal) {
-                onHeal(finalPos, finalPos.dirKey);
-            }
-            setPendingGrowth(g => g + CONFIG.growthPerHeal);
-            setScore(s => s + 50 + (worm.length * 10));
-            play('/sounds/eat.mp3'); // We might want a specific heal sound later
-        }
-
-        let consumedGrowth = false;
-        if (pendingGrowth > 0) {
-            setPendingGrowth(g => g - 1);
-            consumedGrowth = true;
-        }
-
-        setWorm(prev => {
-            const newWorm = [{ ...finalPos, moveDir }, ...prev];
-
-            if (consumedGrowth) {
-                return newWorm;
+            // Camera UP: world-Y for side faces (no roll).
+            // For PY/NY the normal is vertical so we use the face-local 'up' direction
+            // which is perpendicular to both the normal and the movement vector.
+            const absNormalY = Math.abs(normal.y);
+            let cameraUp;
+            if (absNormalY > 0.8) {
+                // Top or bottom face — use face-local 'up' as camera up (avoids gimbal lock)
+                const upArr = DIR_FORWARD[dirKey]?.['up'] ?? [0, 0, -1];
+                cameraUp = new THREE.Vector3(...upArr);
             } else {
-                return newWorm.slice(0, -1);
+                cameraUp = new THREE.Vector3(0, 1, 0);
             }
-        });
 
+            const alpha = Math.min(1, CAM_LERP * delta);
+            camPosRef.current.lerp(targetCam, alpha);
+            lookAtRef.current.lerp(targetLook, alpha);
+            camera.position.copy(camPosRef.current);
+            camera.up.copy(cameraUp);
+            camera.lookAt(lookAtRef.current);
+
+
+
+        } else if (phase === 'tunnel' && worm.activeTunnel.current) {
+            const t = worm.tunnelProgress.current;
+            const t1 = Math.min(t + 0.05, 1);
+            const camPt = getTunnelWorldPos(worm.activeTunnel.current, t, size);
+            const lookPt = getTunnelWorldPos(worm.activeTunnel.current, t1, size);
+
+            const exitNormal = FACE_NORMALS[worm.activeTunnel.current.exit.dirKey] ?? new THREE.Vector3(0, 1, 0);
+            const entryNormal = FACE_NORMALS[worm.activeTunnel.current.entry.dirKey] ?? new THREE.Vector3(0, 1, 0);
+            const upVec = entryNormal.clone().lerp(exitNormal, t).normalize();
+
+            const alpha = Math.min(1, CAM_LERP * delta);
+            camPosRef.current.lerp(new THREE.Vector3(...camPt), alpha * 2);
+            lookAtRef.current.lerp(new THREE.Vector3(...lookPt), alpha * 2);
+            camera.position.copy(camPosRef.current);
+            camera.up.copy(upVec);
+            camera.lookAt(lookAtRef.current);
+        }
     });
 
     return null;
 }
 
-export function HealerWormMode3DWrapper({ cubies, size, explosionFactor, animState, onRotate, onHeal }) {
-    const game = useHealerWormGame(cubies, size, animState, onRotate, onHeal);
+// ─── Swipe Controls ───────────────────────────────────────────────────────────
+function WormSwipeControls({ onTurn }) {
+    const touchStart = useRef(null);
+
+    useEffect(() => {
+        const onTouchStart = (e) => {
+            const t = e.touches[0];
+            touchStart.current = { x: t.clientX, y: t.clientY };
+        };
+        const onTouchEnd = (e) => {
+            if (!touchStart.current) return;
+            const t = e.changedTouches[0];
+            const dx = t.clientX - touchStart.current.x;
+            const dy = t.clientY - touchStart.current.y;
+            touchStart.current = null;
+
+            const adx = Math.abs(dx), ady = Math.abs(dy);
+            if (adx < 12 && ady < 12) return;
+
+            if (adx > ady) {
+                onTurn(dx > 0 ? 'right' : 'left');
+            }
+        };
+        const onKey = (e) => {
+            if (e.key === 'ArrowLeft') { e.preventDefault(); onTurn('left'); }
+            if (e.key === 'ArrowRight') { e.preventDefault(); onTurn('right'); }
+            if (e.key === 'ArrowDown') { e.preventDefault(); onTurn('down'); }
+            if (e.key === ' ') { e.preventDefault(); onTurn('jump'); }
+        };
+        window.addEventListener('touchstart', onTouchStart, { passive: true });
+        window.addEventListener('touchend', onTouchEnd, { passive: true });
+        window.addEventListener('keydown', onKey, { capture: true });
+        return () => {
+            window.removeEventListener('touchstart', onTouchStart);
+            window.removeEventListener('touchend', onTouchEnd);
+            window.removeEventListener('keydown', onKey, { capture: true });
+        };
+    }, [onTurn]);
+
+    return null;
+}
+
+// ─── Worm Body (head = smooth lerp; body = per-step tile history) ─────────────
+const _wormDummy = new THREE.Object3D();
+
+function WormBody({ worm }) {
+    const meshRef = useRef();
+
+    useFrame((state) => {
+        // Pull mathematically exact physics track for the head including the edge rolling arc
+        const headPos = worm.headInterpPos.current.clone();
+        const normal = worm.currentNormal.current.clone();
+
+        const currentJumpVal = worm.isJumping.current ? Math.sin(worm.jumpT.current * Math.PI) * 0.55 : 0;
+        headPos.addScaledVector(normal, WORM_LIFT + currentJumpVal);
+
+        const mesh = meshRef.current;
+        if (!mesh) return;
+
+        const tLen = worm.tailLength.current;
+        const steps = worm.stepHistory.current;
+        const time = state.clock.getElapsedTime();
+
+        // Treat the head and all history points as a single continuous curve
+        const pathPoints = [{ pos: headPos, normal: normal }, ...steps];
+        let walkIndex = 0;
+        let cumulativeDist = 0;
+
+        for (let i = 0; i < MAX_TAIL; i++) {
+            if (i >= tLen) {
+                _wormDummy.scale.setScalar(0);
+                _wormDummy.updateMatrix();
+                mesh.setMatrixAt(i, _wormDummy.matrix);
+                continue;
+            }
+            const fade = 1 - i / tLen;
+
+            if (i === 0) {
+                // Head
+                _wormDummy.position.copy(headPos);
+                _wormDummy.scale.setScalar(0.07);
+            } else {
+                // Clones — parameterically walk backwards along the curve to exact target distance
+                const targetDist = i * 0.14; // Diameter of scale 0.07 sphere
+                let clonePos = headPos.clone();
+                let cloneNormal = normal;
+                let foundPosition = false;
+
+                while (walkIndex < pathPoints.length - 1) {
+                    const ptA = pathPoints[walkIndex];
+                    const ptB = pathPoints[walkIndex + 1];
+                    const distToNext = ptA.pos.distanceTo(ptB.pos);
+
+                    if (cumulativeDist + distToNext >= targetDist) {
+                        // Found the bracket on the curve! Interpolate exact point.
+                        const t = distToNext > 0 ? (targetDist - cumulativeDist) / distToNext : 0;
+                        clonePos = ptA.pos.clone().lerp(ptB.pos, t);
+                        cloneNormal = ptA.normal.clone().lerp(ptB.normal, t).normalize();
+
+                        // Calculate forward/side vector for the wiggle at this exact localized point
+                        const segForward = ptA.pos.clone().sub(ptB.pos).normalize();
+                        const sideVec = new THREE.Vector3().crossVectors(cloneNormal, segForward).normalize();
+
+                        const wiggleAmp = 0.08 * Math.sin(fade * Math.PI);
+                        const wigglePhase = i * 0.8 - time * 6.0;
+                        const wiggleOffset = Math.sin(wigglePhase) * wiggleAmp;
+
+                        clonePos.addScaledVector(sideVec, wiggleOffset);
+                        foundPosition = true;
+                        break;
+                    }
+                    cumulativeDist += distToNext;
+                    walkIndex++;
+                }
+
+                // If the track runs out (just spawned and moving), freeze at the last known point.
+                if (!foundPosition && pathPoints.length > 0) {
+                    clonePos = pathPoints[pathPoints.length - 1].pos.clone();
+                }
+
+                _wormDummy.position.copy(clonePos);
+                // It's a true clone, so KEEP THE SCALE EXACTLY LIKE THE HEAD
+                _wormDummy.scale.setScalar(0.07);
+            }
+
+            _wormDummy.updateMatrix();
+            mesh.setMatrixAt(i, _wormDummy.matrix);
+            mesh.setColorAt(i, new THREE.Color().setHSL(
+                0.38 - i * 0.005,
+                1,
+                0.4 + fade * 0.3
+            ));
+        }
+
+        mesh.instanceMatrix.needsUpdate = true;
+        if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    });
+
+    return (
+        <instancedMesh ref={meshRef} args={[undefined, undefined, MAX_TAIL]} frustumCulled={false}>
+            <sphereGeometry args={[1, 12, 12]} />
+            <meshStandardMaterial emissive="#33ff66" emissiveIntensity={0.8} />
+        </instancedMesh>
+    );
+}
+
+// ─── Portal indicator (glows when on a flipped tile) ─────────────────────────
+function PortalGlow({ worm, size }) {
+    const meshRef = useRef();
+    useFrame((_, _delta) => {
+        if (!meshRef.current) return;
+        const { x, y, z, dirKey } = worm.pos.current;
+        const wp = getStickerWorldPos(x, y, z, dirKey, size, 0);
+        const n = FACE_NORMALS[dirKey] ?? new THREE.Vector3(0, 0, 1);
+        const p = new THREE.Vector3(...wp).addScaledVector(n, 0.2);
+        meshRef.current.position.copy(p);
+        meshRef.current.material.opacity = worm.onFlippedTile.current
+            ? 0.3 + Math.sin(Date.now() * 0.006) * 0.2
+            : 0;
+    });
+
+    return (
+        <mesh ref={meshRef}>
+            <ringGeometry args={[0.4, 0.7, 32]} />
+            <meshBasicMaterial color="#ff00ff" transparent opacity={0} side={THREE.DoubleSide} />
+        </mesh>
+    );
+}
+
+// ─── Worm Face (eyes + smile) ─────────────────────────────────────────────────
+const _faceRight = new THREE.Vector3();
+
+function WormFace({ worm, size }) {
+    const leftEyeRef = useRef();
+    const rightEyeRef = useRef();
+    const smile0 = useRef(), smile1 = useRef(), smile2 = useRef();
+    const smileRefs = [smile0, smile1, smile2];
+
+    useFrame(() => {
+        const { dirKey } = worm.pos.current;
+        const normal = FACE_NORMALS[dirKey] ?? new THREE.Vector3(0, 0, 1);
+        const fwdArr = DIR_FORWARD[dirKey]?.[worm.moveDir.current] ?? [0, 1, 0];
+        const forward = new THREE.Vector3(...fwdArr);
+
+        // Rightward axis in the face plane
+        _faceRight.crossVectors(forward, normal).normalize();
+
+        // Interpolated head world pos
+        const prev = worm.prevWorldPos.current;
+        const cur = worm.curWorldPos.current ?? new THREE.Vector3(
+            ...getStickerWorldPos(worm.pos.current.x, worm.pos.current.y,
+                worm.pos.current.z, dirKey, size, 0)
+        );
+        let headPos;
+        if (prev && worm.interpT.current < 1) {
+            headPos = prev.clone().lerp(cur, worm.interpT.current);
+        } else {
+            headPos = cur.clone();
+        }
+        const jumpLiftVal = worm.isJumping.current
+            ? Math.sin(worm.jumpT.current * Math.PI) * 0.55 : 0;
+        headPos.addScaledVector(normal, WORM_LIFT + jumpLiftVal + 0.09);
+
+        const S = 0.022;
+        if (leftEyeRef.current) {
+            leftEyeRef.current.position.copy(headPos)
+                .addScaledVector(_faceRight, 0.028)
+                .addScaledVector(forward, 0.025);
+            leftEyeRef.current.scale.setScalar(S);
+        }
+        if (rightEyeRef.current) {
+            rightEyeRef.current.position.copy(headPos)
+                .addScaledVector(_faceRight, -0.028)
+                .addScaledVector(forward, 0.025);
+            rightEyeRef.current.scale.setScalar(S);
+        }
+        const smileOffsets = [-0.022, 0, 0.022];
+        smileRefs.forEach((ref, i) => {
+            if (!ref.current) return;
+            const xo = smileOffsets[i];
+            const yo = i === 1 ? -0.028 : -0.022;
+            ref.current.position.copy(headPos)
+                .addScaledVector(_faceRight, xo)
+                .addScaledVector(normal, yo * 0.3)
+                .addScaledVector(forward, 0.025);
+            ref.current.scale.setScalar(S * 0.55);
+        });
+    });
 
     return (
         <>
-            <HealerWormGameLoop cubies={cubies} size={size} animState={animState} game={game} />
-            <HealerWormMode3D
-                worm={game.worm}
-                size={size}
-                explosionFactor={explosionFactor}
-                gameState={game.gameState}
-            />
-            {/* {typeof window !== 'undefined' && (window.innerWidth <= 768 || 'ontouchstart' in window) && (
-                <Html center portal={{ current: document.getElementById('root') || document.body }}>
-                    <WormTouchControls
-                        onRotate={game.queueRotation} // Use the exposed queueRotation function
-                        wormHead={game.worm[0]}
-                        gameState={game.gameState}
-                        onPause={() => game.setGameState('paused')}
-                        onResume={() => game.setGameState('playing')}
-                        onCameraToggle={() => game.setWormCameraEnabled(prev => !prev)}
-                        wormCameraEnabled={game.wormCameraEnabled}
-                    />
-                </Html>
-            )} */}
+            <mesh ref={leftEyeRef}>
+                <sphereGeometry args={[1, 8, 8]} />
+                <meshBasicMaterial color="white" />
+            </mesh>
+            <mesh ref={rightEyeRef}>
+                <sphereGeometry args={[1, 8, 8]} />
+                <meshBasicMaterial color="white" />
+            </mesh>
+            {smileRefs.map((ref, i) => (
+                <mesh key={i} ref={ref}>
+                    <sphereGeometry args={[1, 6, 6]} />
+                    <meshBasicMaterial color="#111" />
+                </mesh>
+            ))}
         </>
     );
 }
 
-export default {
-    useHealerWormGame,
-    HealerWormMode3D,
-    HealerWormGameLoop,
-    HealerWormMode3DWrapper
-};
+// ─── Main exported wrapper ────────────────────────────────────────────────────
+export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animState, _onRotate, _onHeal }) {
+    const worm = useWormCrawler(size, cubies);
+
+    useEffect(() => {
+        useGameStore.setState({
+            _wormEnterPortal: worm.enterPortal,
+            _wormTurn: worm.queueTurn,
+        });
+        return () => {
+            useGameStore.setState({ _wormEnterPortal: null, _wormTurn: null });
+        };
+    }, [worm.enterPortal, worm.queueTurn]);
+
+    useFrame((_, delta) => {
+        worm.tick(delta);
+    });
+
+    return (
+        <>
+            <WormChaseCamera worm={worm} size={size} />
+            <WormSwipeControls onTurn={worm.queueTurn} />
+            <WormBody worm={worm} size={size} />
+            <WormFace worm={worm} size={size} />
+            <PortalGlow worm={worm} size={size} />
+        </>
+    );
+}
+
