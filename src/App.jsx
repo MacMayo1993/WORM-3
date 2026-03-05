@@ -273,6 +273,7 @@ export default function WORM3() {
 
   // Freeplay setup wizard
   const [showFreeplayWizard, setShowFreeplayWizard] = useState(false);
+  const [showWormModeWizard, setShowWormModeWizard] = useState(false);
 
   // Disparity Mode wizard + first-flip gate
   const [showDisparityWizard, setShowDisparityWizard] = useState(false);
@@ -479,16 +480,64 @@ export default function WORM3() {
   }, [size, changeSize, shuffle, teachMode]);
 
   const handleMenuWormHealer = useCallback(() => {
+    console.log('[WORM] handleMenuWormHealer called — opening wizard');
+    useGameStore.getState().setShowMainMenu(false);
+    setShowWormModeWizard(true);
+  }, []);
+
+  const handleWormSetupComplete = useCallback((wizardSettings) => {
+    setShowWormModeWizard(false);
+
+    // Build styling payload
+    const allStyles = ['solid', 'glossy', 'matte', 'metallic', 'carbonFiber', 'hexGrid', 'comic', 'cafeWall', 'hermanGrid', 'opticSpin', 'ouchi', 'scintillatingGrid', 'zoellner', 'kanizsa', 'grass', 'ice', 'sand', 'water', 'wood', 'circuit', 'holographic', 'pulse', 'lava', 'galaxy', 'neural'];
+    const manifoldStyles = {};
+    [1, 2, 3, 4, 5, 6].forEach(id => {
+      const perFace = wizardSettings.perFaceStyles?.[id];
+      if (perFace && perFace !== 'random') {
+        manifoldStyles[id] = perFace;
+      } else if (wizardSettings.tileStyle === 'random' || perFace === 'random') {
+        manifoldStyles[id] = allStyles[Math.floor(Math.random() * allStyles.length)];
+      } else {
+        manifoldStyles[id] = wizardSettings.tileStyle || 'solid';
+      }
+    });
+
+    const newSettings = {
+      ...settings,
+      colorScheme: wizardSettings.colorScheme,
+      backgroundTheme: wizardSettings.backgroundTheme,
+      manifoldStyles,
+      biomeMode: { enabled: false, faceAssignment: null },
+    };
+    if (wizardSettings.customColors) newSettings.customColors = wizardSettings.customColors;
+    setSettings(newSettings);
+
+    // Atomic init — clears disparity fields AND sets wormHealerMode:true in a single
+    // Zustand set() so nothing can clobber it between calls.
+    useGameStore.getState().clearLevel();
+    useGameStore.getState().initWormMode();
+
+    // Resize / reset cube AFTER worm mode is established
+    const targetSize = wizardSettings.cubeSize || 3;
+    if (targetSize !== size) {
+      changeSize(targetSize);
+    } else {
+      reset();
+    }
+  }, [settings, setSettings, reset, size, changeSize]);
+
+  const handleWormWizardCancel = useCallback(() => {
+    setShowWormModeWizard(false);
+    useGameStore.getState().setShowMainMenu(true);
+  }, []);
+
+  const handleMenuHolonomy = useCallback(() => {
     useGameStore.getState().setShowMainMenu(false);
     useGameStore.getState().clearLevel();
     useGameStore.getState().clearDisparityGame();
-    useGameStore.getState().setWormHealerMode(true);
-    // Use a very high flip cap so tiles never permanently die in WORM mode
-    // (they just keep flipping — the worm heals them back)
-    useGameStore.getState().setDisparityFlipCap(9999);
-    useGameStore.getState().setChaosLevel(2); // Start chaos (level 2 = medium flip rate)
+    useGameStore.getState().setHolonomyMode(true);
     setSettings({ ...settings, biomeMode: { enabled: false, faceAssignment: null } });
-    if (size !== 3) changeSize(3); // Worm healer starts at 3x3
+    if (size !== 3) changeSize(3);
     reset();
   }, [settings, setSettings, size, changeSize, reset]);
 
@@ -890,7 +939,7 @@ export default function WORM3() {
           performCursorRotation={performCursorRotation}
           ui={{
             sheetOpen, setSheetOpen, sheetMode, setSheetMode,
-            showFreeplayWizard,
+            showFreeplayWizard, showWormModeWizard,
             showDisparityWizard, setShowDisparityWizard,
             disparityWaitingFirstFlip, disparityCountdown,
           }}
@@ -920,13 +969,19 @@ export default function WORM3() {
             onMenuFreeplay: handleMenuFreeplay,
             onMenuCoop: handleMenuCoop,
             onMenuTeach: handleMenuTeach,
+            onMenuSettings: handleMenuSettings,
+            onMenuBiome: handleMenuBiome,
+            onMenuDisparity: handleMenuDisparity,
             onMenuWormHealer: handleMenuWormHealer,
+            onMenuHolonomy: handleMenuHolonomy,
             onMenuSettings: handleMenuSettings,
             onMenuBiome: handleMenuBiome,
             onMenuDisparity: handleMenuDisparity,
             onWizardComplete: handleWizardComplete,
             onWizardCancel: handleWizardCancel,
             onDisparitySetupComplete: handleDisparitySetupComplete,
+            onWormSetupComplete: handleWormSetupComplete,
+            onWormWizardCancel: handleWormWizardCancel,
             onToggleHandsMode: handleToggleHandsMode,
             onFaceRotate: handleFaceRotate,
             onTileRotation: handleTileRotation,
