@@ -10,6 +10,7 @@ export default function HealerWormHUD() {
     const wormHealerMode = useGameStore(s => s.wormHealerMode);
     const wormPhase = useGameStore(s => s.wormPhase);
     const wormOnFlippedTile = useGameStore(s => s.wormOnFlippedTile);
+    const size = useGameStore(s => s.size);
 
     if (!wormHealerMode) return null;
 
@@ -23,6 +24,7 @@ export default function HealerWormHUD() {
             phase={wormPhase}
             onFlippedTile={wormOnFlippedTile}
             onEnterPortal={handleEnterPortal}
+            cubeSize={size}
         />
     );
 }
