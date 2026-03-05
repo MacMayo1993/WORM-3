@@ -17,6 +17,9 @@ import LayerHighlight from '../teach/LayerHighlight.jsx';
 import AntipodalVisualization from './AntipodalVisualization.jsx';
 import AntipodalModeEffects from './AntipodalModeEffects.jsx';
 
+const HealerWormMode3DWrapper = React.lazy(() => import('../worm/HealerWormMode.jsx').then(m => ({ default: m.HealerWormMode3DWrapper })));
+const HolonomyWrapper = React.lazy(() => import('../holonomy/HolonomyWrapper.jsx'));
+
 const PHOTO_PRESETS = new Set([
   'sunset', 'forest', 'city', 'dawn', 'night',
   'apartment', 'studio', 'park', 'warehouse', 'lobby',
@@ -96,6 +99,8 @@ export default function GameScene({
   onClearTileSelection,
   onFlipWaveComplete,
   onFaceRotationMode,
+  onHeal,
+  onRotate,
   // computed / hook-derived data
   animState,
   manifoldMap,
@@ -114,6 +119,11 @@ export default function GameScene({
   const solveHighlights = useGameStore((s) => s.solveHighlights);
   const size = useGameStore((s) => s.size);
   const cubies = useGameStore((s) => s.cubies);
+  const wormHealerMode = useGameStore((s) => s.wormHealerMode);
+  const holonomyMode = useGameStore((s) => s.holonomyMode);
+
+  // Initialize Worm Healer Game Logic if active
+  const healerGame = null;
 
   return (
     <>
@@ -208,6 +218,22 @@ export default function GameScene({
           />
         )}
         <AntipodalModeEffects />
+
+        {wormHealerMode && (
+          <Suspense fallback={null}>
+            <ErrorBoundary3D>
+              <HealerWormMode3DWrapper
+                cubies={cubies} size={size} explosionFactor={explosionT} animState={animState} onRotate={onRotate} onHeal={onHeal}
+              />
+            </ErrorBoundary3D>
+          </Suspense>
+        )}
+
+        {holonomyMode && (
+          <Suspense fallback={null}>
+            <HolonomyWrapper size={size} />
+          </Suspense>
+        )}
       </Suspense>
     </>
   );
