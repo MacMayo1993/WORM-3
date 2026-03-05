@@ -39,6 +39,7 @@ const BG_OPTIONS = BACKGROUNDS.map(bg => ({
 const CLASSIC_STYLE_KEYS = ['solid', 'glossy', 'matte', 'metallic', 'carbonFiber', 'hexGrid', 'comic', 'cafeWall', 'hermanGrid', 'opticSpin', 'ouchi', 'scintillatingGrid', 'zoellner', 'kanizsa', 'fraserSpiral', 'muellerLyer', 'rotatingSnakes', 'poggendorff'];
 const LIVING_STYLE_KEYS = ['grass', 'ice', 'sand', 'water', 'wood', 'circuit', 'holographic', 'pulse', 'lava', 'galaxy', 'neural', 'moireRings', 'moireLines', 'infinityTunnel', 'vortex', 'shockwave'];
 
+// Color schemes shown in the wizard (biome is a mode, not a palette)
 const WIZARD_SCHEME_KEYS = Object.keys(SCHEME_LABELS).filter(k => k !== 'biome');
 
 const FACE_LABELS = { 1: 'Front', 2: 'Left', 3: 'Top', 4: 'Back', 5: 'Right', 6: 'Bottom' };
@@ -111,6 +112,8 @@ function TilePreviewCanvas({ styleKey, colorHex = '#4a7fa5', size = 48 }) {
   return <canvas ref={canvasRef} width={size} height={size} style={{ display: 'block', borderRadius: '6px' }} />;
 }
 
+// ── Shared inline styles ──────────────────────────────────────────────────────
+
 const S = {
   overlay: {
     position: 'fixed',
@@ -124,6 +127,7 @@ const S = {
     zIndex: 1000,
     fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif',
   },
+
   sheet: {
     background: 'rgba(255,255,255,0.96)',
     borderRadius: '24px',
@@ -134,15 +138,18 @@ const S = {
     overflow: 'hidden',
     boxShadow: '0 32px 80px rgba(0,0,0,0.28), 0 0 0 1px rgba(0,0,0,0.06)',
   },
+
   header: {
     padding: '32px 36px 0',
     flexShrink: 0,
   },
+
   stepIndicator: {
     display: 'flex',
     gap: '6px',
     marginBottom: '24px',
   },
+
   dot: (active, current) => ({
     height: '3px',
     borderRadius: '2px',
@@ -150,6 +157,7 @@ const S = {
     flex: current ? '2' : '1',
     transition: 'all 0.35s cubic-bezier(0.4,0,0.2,1)',
   }),
+
   title: {
     fontSize: '24px',
     fontWeight: '700',
@@ -158,12 +166,14 @@ const S = {
     margin: '0 0 4px',
     lineHeight: 1.15,
   },
+
   subtitle: {
     fontSize: '13px',
     color: 'rgba(0,0,0,0.42)',
     margin: '0 0 20px',
     fontWeight: '400',
   },
+
   body: {
     padding: '0 36px',
     overflowY: 'auto',
@@ -171,6 +181,8 @@ const S = {
     scrollbarWidth: 'thin',
     scrollbarColor: 'rgba(0,0,0,0.15) transparent',
   },
+
+  // Generic card with optional selected state
   card: (selected) => ({
     display: 'flex',
     padding: '14px 16px',
@@ -186,6 +198,7 @@ const S = {
     fontFamily: 'inherit',
     position: 'relative',
   }),
+
   checkmark: {
     width: '18px',
     height: '18px',
@@ -196,12 +209,15 @@ const S = {
     justifyContent: 'center',
     flexShrink: 0,
   },
+
+  // Background grid
   bgGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(3, 1fr)',
     gap: '8px',
     paddingBottom: '8px',
   },
+
   bgCard: (selected) => ({
     borderRadius: '12px',
     overflow: 'hidden',
@@ -213,6 +229,7 @@ const S = {
     aspectRatio: '4/3',
     WebkitTapHighlightColor: 'transparent',
   }),
+
   bgLabel: {
     position: 'absolute',
     bottom: 0,
@@ -225,6 +242,7 @@ const S = {
     color: '#fff',
     textAlign: 'center',
   },
+
   footer: {
     padding: '18px 36px 24px',
     display: 'flex',
@@ -233,6 +251,7 @@ const S = {
     flexShrink: 0,
     borderTop: '1px solid rgba(0,0,0,0.07)',
   },
+
   btnSecondary: {
     background: 'none',
     border: 'none',
@@ -245,6 +264,7 @@ const S = {
     transition: 'color 0.15s ease',
     fontFamily: 'inherit',
   },
+
   btnPrimary: {
     background: '#0a0a0a',
     border: 'none',
@@ -259,6 +279,8 @@ const S = {
   },
 };
 
+// ── Sub-components ────────────────────────────────────────────────────────────
+
 function Checkmark() {
   return (
     <div style={S.checkmark}>
@@ -269,6 +291,8 @@ function Checkmark() {
   );
 }
 
+// ── Component ─────────────────────────────────────────────────────────────────
+
 const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
   const [step, setStep] = useState(0);
   const [cubeSize, setCubeSize] = useState(initialSettings?.size || 3);
@@ -277,6 +301,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     customColors: initialSettings?.customColors || null,
     tileStyle: 'solid',
     backgroundTheme: initialSettings?.backgroundTheme || 'blackhole',
+    // Per-face tile styles; null means "use global tileStyle"
     perFaceStyles: null,
   });
   const [customPreview, setCustomPreview] = useState(null);
@@ -315,13 +340,16 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
 
   const select = (key, value) => setSettings(s => ({ ...s, [key]: value }));
 
+  // ── Step 0: Size ────────────────────────────────────────────────────────────
+
   const renderSize = () => {
     const sizes = [
-      { n: 2, name: '2×2×2', tag: 'Mini',    desc: 'Fast & approachable' },
+      { n: 2, name: '2×2×2', tag: 'Mini', desc: 'Fast & approachable' },
       { n: 3, name: '3×3×3', tag: 'Classic', desc: 'The original challenge' },
-      { n: 4, name: '4×4×4', tag: 'Master',  desc: 'Expert territory' },
-      { n: 5, name: '5×5×5', tag: 'Ultra',   desc: '150 stickers of chaos' },
+      { n: 4, name: '4×4×4', tag: 'Master', desc: 'Expert territory' },
+      { n: 5, name: '5×5×5', tag: 'Ultra', desc: '150 stickers of chaos' },
     ];
+
     return (
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', paddingBottom: '8px' }}>
         {sizes.map(({ n, name, tag, desc }) => {
@@ -329,6 +357,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           return (
             <button key={n} style={{ ...S.card(selected), flexDirection: 'column', gap: '12px', padding: '18px 16px' }}
               onClick={() => setCubeSize(n)}>
+              {/* Dot-grid thumbnail representing one face of the cube */}
               <div style={{
                 display: 'grid',
                 gridTemplateColumns: `repeat(${n}, 1fr)`,
@@ -344,6 +373,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                   }} />
                 ))}
               </div>
+
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '3px' }}>
                   <span style={{ fontSize: '16px', fontWeight: '700', color: '#0a0a0a', letterSpacing: '-0.4px' }}>{name}</span>
@@ -354,6 +384,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                 </div>
                 <div style={{ fontSize: '12px', color: 'rgba(0,0,0,0.45)' }}>{desc}</div>
               </div>
+
               {selected && (
                 <div style={{ position: 'absolute', top: '12px', right: '12px' }}>
                   <Checkmark />
@@ -365,6 +396,8 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       </div>
     );
   };
+
+  // ── Step 1: Background ──────────────────────────────────────────────────────
 
   const renderBackgrounds = () => (
     <div style={S.bgGrid}>
@@ -391,17 +424,27 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     </div>
   );
 
+  // ── Step 2: Colors ──────────────────────────────────────────────────────────
+
   const renderColors = () => {
     const resolvedCustom = settings.colorScheme === 'custom' && settings.customColors
       ? settings.customColors
       : null;
+
     return (
       <>
+        {/* Image upload — shown at top, prominent */}
         <div style={{ marginBottom: '16px' }}>
           <button
-            style={{ ...S.card(settings.colorScheme === 'custom'), flexDirection: 'row', alignItems: 'center', gap: '14px' }}
+            style={{
+              ...S.card(settings.colorScheme === 'custom'),
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: '14px',
+            }}
             onClick={() => fileInputRef.current?.click()}
           >
+            {/* Preview or placeholder */}
             {customPreview ? (
               <img src={customPreview} alt="Uploaded"
                 style={{ width: '56px', height: '36px', objectFit: 'cover', borderRadius: '8px', flexShrink: 0 }} />
@@ -420,6 +463,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                 {customPreview ? 'Tap to change image' : 'Upload a photo to auto-generate a palette'}
               </div>
             </div>
+            {/* Extracted color dots when active */}
             {resolvedCustom && (
               <div style={{ display: 'flex', gap: '3px', flexShrink: 0 }}>
                 {[1, 2, 3, 4, 5, 6].map(i => (
@@ -432,11 +476,15 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
             )}
           </button>
         </div>
+
+        {/* Divider */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
           <div style={{ flex: 1, height: '1px', background: 'rgba(0,0,0,0.08)' }} />
           <span style={{ fontSize: '11px', fontWeight: '600', letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(0,0,0,0.28)' }}>Presets</span>
           <div style={{ flex: 1, height: '1px', background: 'rgba(0,0,0,0.08)' }} />
         </div>
+
+        {/* Palette grid — name above dots, 2 columns, matching in-game settings */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '7px', paddingBottom: '8px' }}>
           {WIZARD_SCHEME_KEYS.filter(k => k !== 'custom').map(key => {
             const selected = settings.colorScheme === key;
@@ -463,11 +511,14 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     );
   };
 
+  // ── Step 3: Tile Style ──────────────────────────────────────────────────────
+
   const renderStyles = () => {
     const resolvedColors = settings.colorScheme === 'custom' && settings.customColors
       ? settings.customColors
       : COLOR_SCHEMES[settings.colorScheme] || COLOR_SCHEMES.standard;
 
+    // The global style (null when per-face styles diverge)
     const perFace = settings.perFaceStyles;
     const faceValues = [1, 2, 3, 4, 5, 6].map(id => (perFace?.[id]) || settings.tileStyle || 'solid');
     const globalStyle = faceValues.every(v => v === faceValues[0]) ? faceValues[0] : null;
@@ -478,6 +529,10 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     };
 
     const applyPerFace = (faceId, key) => {
+      // Only track faces that have been explicitly overridden.
+      // Starting from settings.perFaceStyles || {} avoids copying 'random' (or any
+      // global tileStyle) into entries for untouched faces, which would cause those
+      // faces to get the literal string 'random' written into manifoldStyles.
       const current = settings.perFaceStyles || {};
       setSettings(s => ({ ...s, perFaceStyles: { ...current, [faceId]: key } }));
     };
@@ -512,6 +567,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
 
     return (
       <>
+        {/* Random Mix shortcut */}
         <div style={{ marginBottom: '18px' }}>
           <button
             style={{ ...S.card(settings.tileStyle === 'random' && !perFace), flexDirection: 'row', alignItems: 'center', gap: '14px' }}
@@ -525,14 +581,19 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
             {settings.tileStyle === 'random' && !perFace && <Checkmark />}
           </button>
         </div>
+
         <StyleGrid keys={CLASSIC_STYLE_KEYS} label="Classic" />
         <StyleGrid keys={LIVING_STYLE_KEYS} label="Living" />
+
+        {/* Per-face overrides */}
         <div style={{ marginBottom: '8px' }}>
           <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(0,0,0,0.32)', marginBottom: '10px' }}>
             Per Face
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
             {[1, 2, 3, 4, 5, 6].map(faceId => {
+              // 'random' is not a selectable per-face option; fall back to 'solid' so the
+              // select box has a valid value when the global style is Random Mix.
               const globalFallback = settings.tileStyle === 'random' ? 'solid' : (settings.tileStyle || 'solid');
               const faceStyle = perFace?.[faceId] || globalFallback;
               const faceColor = resolvedColors[faceId] || '#4a7fa5';
@@ -573,6 +634,8 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     );
   };
 
+  // ── Step titles ─────────────────────────────────────────────────────────────
+
   const stepContent = [renderSize, renderBackgrounds, renderColors, renderStyles];
   const stepTitles = ['Cube Size', 'Background', 'Color Palette', 'Tile Style'];
   const stepSubtitles = [
@@ -585,8 +648,20 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
   return (
     <div style={S.overlay}>
       <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
+
       <div style={S.sheet}>
+        {/* Header */}
         <div style={S.header}>
+          {/* Mode identity badge */}
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: '6px',
+            background: 'rgba(168,85,247,0.12)', border: '1.5px solid rgba(168,85,247,0.35)',
+            borderRadius: '20px', padding: '4px 12px', marginBottom: '16px',
+            fontSize: '11px', fontWeight: '700', letterSpacing: '0.12em',
+            textTransform: 'uppercase', color: '#7c3aed',
+          }}>
+            🐍 WORM MODE
+          </div>
           <div style={S.stepIndicator}>
             {STEPS.map((_, i) => (
               <div key={i} style={S.dot(i <= step, i === step)} />
@@ -595,11 +670,15 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           <h2 style={S.title}>{stepTitles[step]}</h2>
           <p style={S.subtitle}>{stepSubtitles[step]}</p>
         </div>
+
+        {/* Scrollable body */}
         <div style={S.body}>
           <div style={{ paddingBottom: '24px' }}>
             {stepContent[step]()}
           </div>
         </div>
+
+        {/* Footer */}
         <div style={S.footer}>
           <button
             style={S.btnSecondary}
@@ -609,6 +688,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           >
             {step === 0 ? 'Cancel' : 'Back'}
           </button>
+
           <button
             style={S.btnPrimary}
             onClick={handleNext}
@@ -617,7 +697,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
             onMouseDown={e => { e.currentTarget.style.transform = 'scale(0.97)'; }}
             onMouseUp={e => { e.currentTarget.style.transform = 'translateY(-1px)'; }}
           >
-            {step === totalSteps - 1 ? 'Start Worm Mode' : 'Continue'}
+            {step === totalSteps - 1 ? 'Start Playing' : 'Continue'}
           </button>
         </div>
       </div>
