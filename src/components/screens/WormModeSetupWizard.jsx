@@ -126,13 +126,15 @@ const S = {
     WebkitBackdropFilter: 'blur(20px)',
     zIndex: 1000,
     fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif',
+    padding: isMobile ? '12px' : '0',
+    boxSizing: 'border-box',
   },
 
   sheet: {
     background: 'rgba(255,255,255,0.96)',
-    borderRadius: '24px',
-    width: 'min(640px, 96vw)',
-    maxHeight: '88vh',
+    borderRadius: isMobile ? '18px' : '24px',
+    width: 'min(640px, 100%)',
+    maxHeight: isMobile ? '92vh' : '88vh',
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
@@ -140,7 +142,7 @@ const S = {
   },
 
   header: {
-    padding: '32px 36px 0',
+    padding: isMobile ? '20px 20px 0' : '32px 36px 0',
     flexShrink: 0,
   },
 
@@ -175,7 +177,7 @@ const S = {
   },
 
   body: {
-    padding: '0 36px',
+    padding: isMobile ? '0 20px' : '0 36px',
     overflowY: 'auto',
     flex: 1,
     scrollbarWidth: 'thin',
@@ -244,7 +246,7 @@ const S = {
   },
 
   footer: {
-    padding: '18px 36px 24px',
+    padding: isMobile ? '14px 20px 20px' : '18px 36px 24px',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -292,6 +294,7 @@ function Checkmark() {
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
+const isMobile = typeof window !== 'undefined' && (window.innerWidth <= 768 || 'ontouchstart' in window);
 
 const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
   const [step, setStep] = useState(0);

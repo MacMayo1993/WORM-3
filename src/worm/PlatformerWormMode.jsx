@@ -25,6 +25,100 @@ import {
 import { rotateSliceCubies } from '../game/cubeRotation.js';
 import { play } from '../utils/audio.js';
 
+const isMobileDevice = typeof window !== 'undefined' && (window.innerWidth <= 768 || 'ontouchstart' in window);
+
+// ============================================================================
+// MOBILE TOUCH CONTROLS
+// ============================================================================
+function MobileCrawlerControls({ inputRef }) {
+  const setInput = (patch) => { inputRef.current = { ...inputRef.current, ...patch }; };
+
+  const btnStyle = (color = '#00ff88') => ({
+    width: '60px', height: '60px', borderRadius: '50%',
+    border: `2px solid ${color}`, background: `rgba(0,0,0,0.7)`,
+    color, fontSize: '22px', display: 'flex', alignItems: 'center',
+    justifyContent: 'center', touchAction: 'manipulation', userSelect: 'none',
+    WebkitUserSelect: 'none', cursor: 'pointer', flexShrink: 0,
+  });
+
+  const onPress = (patch) => (e) => { e.preventDefault(); setInput(patch); };
+  const onRelease = (patch) => (e) => { e.preventDefault(); setInput(patch); };
+
+  return (
+    <div style={{
+      position: 'absolute', bottom: 'calc(16px + env(safe-area-inset-bottom, 0px))',
+      right: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center',
+      gap: '6px', zIndex: 200, pointerEvents: 'auto',
+    }}>
+      {/* Up */}
+      <button style={btnStyle()}
+        onTouchStart={onPress({ thrust: 1 })} onTouchEnd={onRelease({ thrust: 0 })}
+        onMouseDown={onPress({ thrust: 1 })} onMouseUp={onRelease({ thrust: 0 })}>▲</button>
+      {/* Left / Jump / Right row */}
+      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+        <button style={btnStyle()}
+          onTouchStart={onPress({ turnRate: -1 })} onTouchEnd={onRelease({ turnRate: 0 })}
+          onMouseDown={onPress({ turnRate: -1 })} onMouseUp={onRelease({ turnRate: 0 })}>◄</button>
+        <button style={{ ...btnStyle('#ffe066'), width: '64px', height: '64px', fontSize: '16px', fontWeight: 'bold' }}
+          onTouchStart={onPress({ jump: true })} onTouchEnd={onRelease({ jump: false })}
+          onMouseDown={onPress({ jump: true })} onMouseUp={onRelease({ jump: false })}>JUMP</button>
+        <button style={btnStyle()}
+          onTouchStart={onPress({ turnRate: 1 })} onTouchEnd={onRelease({ turnRate: 0 })}
+          onMouseDown={onPress({ turnRate: 1 })} onMouseUp={onRelease({ turnRate: 0 })}>►</button>
+      </div>
+      {/* Down */}
+      <button style={btnStyle()}
+        onTouchStart={onPress({ brake: 1 })} onTouchEnd={onRelease({ brake: 0 })}
+        onMouseDown={onPress({ brake: 1 })} onMouseUp={onRelease({ brake: 0 })}>▼</button>
+    </div>
+  );
+}
+
+function MobileManifoldControls({ onRotate, selectedAxis, selectedSlice, size, onAxisToggle, onSliceChange, gameState }) {
+  if (gameState !== 'playing') return null;
+  const btnStyle = (color = '#60a5fa') => ({
+    padding: '8px 14px', borderRadius: '8px', border: `2px solid ${color}`,
+    background: 'rgba(0,0,0,0.7)', color, fontSize: '18px',
+    touchAction: 'manipulation', userSelect: 'none', WebkitUserSelect: 'none', cursor: 'pointer',
+  });
+  return (
+    <div style={{
+      position: 'absolute', bottom: 'calc(16px + env(safe-area-inset-bottom, 0px))',
+      left: '12px', display: 'flex', flexDirection: 'column', gap: '6px',
+      zIndex: 200, pointerEvents: 'auto', alignItems: 'flex-start',
+    }}>
+      {/* Rotate up/down */}
+      <div style={{ display: 'flex', gap: '6px' }}>
+        <button style={btnStyle()} onClick={() => onRotate(selectedAxis, -1)}>▲</button>
+        <button style={btnStyle()} onClick={() => onRotate(selectedAxis, 1)}>▼</button>
+      </div>
+      {/* Rotate left/right (row) */}
+      <div style={{ display: 'flex', gap: '6px' }}>
+        <button style={btnStyle()} onClick={() => onRotate('row', -1)}>◄</button>
+        <button style={btnStyle()} onClick={() => onRotate('row', 1)}>►</button>
+      </div>
+      {/* Depth + axis/slice info */}
+      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+        <button style={btnStyle('#a78bfa')} onClick={() => onRotate('depth', 1)}>↺</button>
+        <button style={btnStyle('#a78bfa')} onClick={() => onRotate('depth', -1)}>↻</button>
+        <button style={{ ...btnStyle('#888'), fontSize: '12px', padding: '6px 10px' }} onClick={onAxisToggle}>
+          {selectedAxis.toUpperCase()}
+        </button>
+      </div>
+      {/* Slice selector */}
+      <div style={{ display: 'flex', gap: '4px' }}>
+        {Array.from({ length: size }, (_, i) => (
+          <button key={i} style={{
+            ...btnStyle(i === selectedSlice ? '#60a5fa' : '#444'),
+            padding: '6px 10px', fontSize: '13px',
+            background: i === selectedSlice ? 'rgba(96,165,250,0.2)' : 'rgba(0,0,0,0.7)',
+          }} onClick={() => onSliceChange(i)}>{i + 1}</button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ============================================================================
 // GAME CONFIG
 // ============================================================================
@@ -525,6 +619,22 @@ export default function PlatformerWormMode({ cubies: initialCubies, size, faceCo
         onRestart={handleRestart}
         onQuit={onQuit}
       />
+
+      {/* Mobile touch controls */}
+      {isMobileDevice && gameState === 'playing' && (
+        <>
+          <MobileCrawlerControls inputRef={inputRef} />
+          <MobileManifoldControls
+            onRotate={performRotation}
+            selectedAxis={selectedAxis}
+            selectedSlice={selectedSlice}
+            size={size}
+            onAxisToggle={() => setSelectedAxis(prev => { const axes = ['col', 'row', 'depth']; return axes[(axes.indexOf(prev) + 1) % 3]; })}
+            onSliceChange={setSelectedSlice}
+            gameState={gameState}
+          />
+        </>
+      )}
     </div>
   );
 }

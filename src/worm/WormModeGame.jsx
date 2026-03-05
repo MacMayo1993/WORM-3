@@ -282,6 +282,8 @@ export function WormModeStartScreen({ onStart, onCancel }) {
   );
 }
 
+const isMobileStatic = typeof window !== 'undefined' && (window.innerWidth <= 768 || 'ontouchstart' in window);
+
 const styles = {
   overlay: {
     position: 'fixed',
@@ -294,23 +296,28 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000,
-    fontFamily: "'Courier New', monospace"
+    fontFamily: "'Courier New', monospace",
+    overflowY: 'auto',
+    padding: '16px',
+    boxSizing: 'border-box',
   },
   content: {
     textAlign: 'center',
-    padding: '40px 60px',
+    padding: isMobileStatic ? '24px 20px' : '40px 60px',
     background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
     borderRadius: '16px',
     border: '3px solid #00ff88',
-    boxShadow: '0 0 50px rgba(0, 255, 136, 0.3), inset 0 0 30px rgba(0, 255, 136, 0.1)'
+    boxShadow: '0 0 50px rgba(0, 255, 136, 0.3), inset 0 0 30px rgba(0, 255, 136, 0.1)',
+    width: 'min(500px, 100%)',
+    boxSizing: 'border-box',
   },
   title: {
-    fontSize: '48px',
+    fontSize: isMobileStatic ? '32px' : '48px',
     fontWeight: 'bold',
     color: '#00ff88',
     margin: '0 0 8px 0',
     textShadow: '0 0 30px #00ff88, 0 0 60px #00ff88',
-    letterSpacing: '0.2em'
+    letterSpacing: isMobileStatic ? '0.1em' : '0.2em',
   },
   subtitle: {
     fontSize: '18px',
@@ -321,9 +328,9 @@ const styles = {
   instructions: {
     textAlign: 'left',
     background: 'rgba(0, 255, 136, 0.05)',
-    padding: '20px 30px',
+    padding: isMobileStatic ? '14px 16px' : '20px 30px',
     borderRadius: '8px',
-    marginBottom: '30px'
+    marginBottom: '24px',
   },
   instructionsTitle: {
     color: '#00ff88',
