@@ -5,7 +5,7 @@
 import React, { useState, useEffect } from 'react';
 import { useGameStore } from '../hooks/useGameStore.js';
 
-export default function WormCrawlerHUD({ phase, onFlippedTile, onEnterPortal, cubeSize = 3 }) {
+export default function WormCrawlerHUD({ phase, onFlippedTile, onEnterPortal, cubeSize = 3, onHome, onSettings }) {
     const wormSpeed = useGameStore(s => s.wormSpeed ?? 1.0);
     const wormHealedCount = useGameStore(s => s.wormHealedCount ?? 0);
     const wormTilesVisited = useGameStore(s => s.wormTilesVisited ?? 0);
@@ -40,19 +40,36 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, onEnterPortal, cu
             pointerEvents: 'none', zIndex: 600,
             fontFamily: "'Courier New', monospace",
         }}>
-            {/* Top bar — phase + healed count */}
+            {/* Top bar — phase + healed count + home/settings */}
             <div style={{
                 position: 'absolute', top: 0, left: 0, right: 0,
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                padding: '12px 18px',
-                background: 'linear-gradient(180deg, rgba(0,0,0,0.7) 0%, transparent 100%)',
+                padding: '10px 14px',
+                background: 'linear-gradient(180deg, rgba(0,0,0,0.75) 0%, transparent 100%)',
                 pointerEvents: 'none',
             }}>
-                <div style={{
-                    color: phaseColor, fontSize: 13, fontWeight: 800, letterSpacing: 2,
-                    textShadow: `0 0 10px ${phaseColor}`
-                }}>
-                    {phaseLabel}
+                {/* Left: home + settings + phase */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, pointerEvents: 'auto' }}>
+                    {onHome && (
+                        <button onPointerDown={onHome} style={{
+                            background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)',
+                            borderRadius: 8, width: 32, height: 32, cursor: 'pointer',
+                            color: '#fff', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }}>⌂</button>
+                    )}
+                    {onSettings && (
+                        <button onPointerDown={onSettings} style={{
+                            background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.2)',
+                            borderRadius: 8, width: 32, height: 32, cursor: 'pointer',
+                            color: '#fff', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }}>⚙</button>
+                    )}
+                    <div style={{
+                        color: phaseColor, fontSize: 13, fontWeight: 800, letterSpacing: 2,
+                        textShadow: `0 0 10px ${phaseColor}`, pointerEvents: 'none',
+                    }}>
+                        {phaseLabel}
+                    </div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
                     <div style={{ color: '#fff', fontSize: 13, fontWeight: 700 }}>
@@ -62,18 +79,19 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, onEnterPortal, cu
                         </span>
                     </div>
                     {/* Coverage tracker */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <div style={{ width: 80, height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.12)', overflow: 'hidden' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ width: 100, height: 8, borderRadius: 4, background: 'rgba(255,255,255,0.25)', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.15)' }}>
                             <div style={{
-                                height: '100%', borderRadius: 3,
+                                height: '100%', borderRadius: 4,
                                 width: `${coveragePct}%`,
                                 background: coveragePct === 100
                                     ? 'linear-gradient(90deg, #00ff88, #00f5ff)'
-                                    : 'linear-gradient(90deg, #a78bfa, #7c3aed)',
+                                    : 'linear-gradient(90deg, #c084fc, #7c3aed)',
                                 transition: 'width 0.4s ease',
+                                boxShadow: coveragePct > 0 ? '0 0 6px rgba(192,132,252,0.7)' : 'none',
                             }} />
                         </div>
-                        <span style={{ color: '#a78bfa', fontSize: 10, fontWeight: 700, letterSpacing: 0.5, whiteSpace: 'nowrap' }}>
+                        <span style={{ color: '#e9d5ff', fontSize: 12, fontWeight: 800, letterSpacing: 0.5, whiteSpace: 'nowrap', textShadow: '0 0 6px rgba(192,132,252,0.8)' }}>
                             {wormTilesVisited}/{totalTiles}
                         </span>
                     </div>

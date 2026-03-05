@@ -192,7 +192,7 @@ export default function UILayer({
   return (
     <>
       <div className="ui-layer">
-        <TopMenuBar
+        {!wormHealerMode && <TopMenuBar
           metrics={metrics}
           size={size}
           visualMode={visualMode}
@@ -205,7 +205,7 @@ export default function UILayer({
           onShowSettings={() => setShowSettings(true)}
           onHome={onBackToMainMenu}
           currentLevelData={currentLevelData}
-        />
+        />}
 
         {/* Undo Indicator — desktop only (mobile uses MobileControls) */}
         {moveHistory.length > 0 && !isMobile && (
@@ -236,7 +236,7 @@ export default function UILayer({
         {(!wormHealerMode && (chaosMode || disparityWinner)) && <DisparityHUD />}
 
         {/* Healer Worm HUD Overlay */}
-        <HealerWormHUD />
+        <HealerWormHUD onHome={onBackToMainMenu} onSettings={() => setShowSettings(true)} />
 
         {/* Disparity countdown — 3-2-1-GO overlay before chaos starts */}
         {disparityCountdown !== null && (
