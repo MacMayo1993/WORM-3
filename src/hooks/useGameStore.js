@@ -251,10 +251,12 @@ export const useGameStore = create(
     setWormPhase: (v) => set({ wormPhase: v }),
     wormOnFlippedTile: false,
     setWormOnFlippedTile: (v) => set({ wormOnFlippedTile: v }),
-    clearDisparityGame: () => set({ disparityDeaths: [], disparityDeathByGridId: {}, disparityWinner: null, showDisparityWinner: false, disparityEliminatedFaces: [], cascades: [], wormHealerMode: false, holonomyMode: false, wormHealedCount: 0, wormPhase: 'crawling', wormOnFlippedTile: false }),
+    wormTilesVisited: 0,
+    setWormTilesVisited: (v) => set({ wormTilesVisited: v }),
+    clearDisparityGame: () => set({ disparityDeaths: [], disparityDeathByGridId: {}, disparityWinner: null, showDisparityWinner: false, disparityEliminatedFaces: [], cascades: [], wormHealerMode: false, holonomyMode: false, wormHealedCount: 0, wormPhase: 'crawling', wormOnFlippedTile: false, wormTilesVisited: 0 }),
     // Atomic init for Worm Mode — clears disparity state AND enables worm in one set()
     // so wormHealerMode:true can never be clobbered by the reset.
-    initWormMode: (flipCap = 9999, chaosLevel = 1) => set({ disparityDeaths: [], disparityDeathByGridId: {}, disparityWinner: null, showDisparityWinner: false, disparityEliminatedFaces: [], cascades: [], holonomyMode: false, wormHealedCount: 0, wormPhase: 'crawling', wormOnFlippedTile: false, wormHealerMode: true, disparityFlipCap: flipCap, chaosLevel }),
+    initWormMode: (flipCap = 9999, chaosLevel = 1) => set({ disparityDeaths: [], disparityDeathByGridId: {}, disparityWinner: null, showDisparityWinner: false, disparityEliminatedFaces: [], cascades: [], holonomyMode: false, wormHealedCount: 0, wormPhase: 'crawling', wormOnFlippedTile: false, wormTilesVisited: 0, wormHealerMode: true, disparityFlipCap: flipCap, chaosLevel }),
 
     // ========================================================================
     // ANIMATION STATE

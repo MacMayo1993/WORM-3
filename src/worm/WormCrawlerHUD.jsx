@@ -5,10 +5,13 @@
 import React, { useState, useEffect } from 'react';
 import { useGameStore } from '../hooks/useGameStore.js';
 
-export default function WormCrawlerHUD({ phase, onFlippedTile, onEnterPortal }) {
+export default function WormCrawlerHUD({ phase, onFlippedTile, onEnterPortal, cubeSize = 3 }) {
     const wormSpeed = useGameStore(s => s.wormSpeed ?? 1.0);
     const wormHealedCount = useGameStore(s => s.wormHealedCount ?? 0);
+    const wormTilesVisited = useGameStore(s => s.wormTilesVisited ?? 0);
     const setWormSpeed = useGameStore(s => s.setWormSpeed);
+    const totalTiles = 6 * cubeSize * cubeSize;
+    const coveragePct = Math.min(100, Math.round((wormTilesVisited / totalTiles) * 100));
 
     const [showPortalPulse, setShowPortalPulse] = useState(false);
 
@@ -51,11 +54,29 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, onEnterPortal }) 
                 }}>
                     {phaseLabel}
                 </div>
-                <div style={{ color: '#fff', fontSize: 13, fontWeight: 700 }}>
-                    <span style={{ color: '#aaa', fontSize: 10, letterSpacing: 1 }}>HEALED </span>
-                    <span style={{ color: '#00ff88', fontSize: 18, textShadow: '0 0 8px #00ff88' }}>
-                        {wormHealedCount}
-                    </span>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                    <div style={{ color: '#fff', fontSize: 13, fontWeight: 700 }}>
+                        <span style={{ color: '#aaa', fontSize: 10, letterSpacing: 1 }}>HEALED </span>
+                        <span style={{ color: '#00ff88', fontSize: 18, textShadow: '0 0 8px #00ff88' }}>
+                            {wormHealedCount}
+                        </span>
+                    </div>
+                    {/* Coverage tracker */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <div style={{ width: 80, height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.12)', overflow: 'hidden' }}>
+                            <div style={{
+                                height: '100%', borderRadius: 3,
+                                width: `${coveragePct}%`,
+                                background: coveragePct === 100
+                                    ? 'linear-gradient(90deg, #00ff88, #00f5ff)'
+                                    : 'linear-gradient(90deg, #a78bfa, #7c3aed)',
+                                transition: 'width 0.4s ease',
+                            }} />
+                        </div>
+                        <span style={{ color: '#a78bfa', fontSize: 10, fontWeight: 700, letterSpacing: 0.5, whiteSpace: 'nowrap' }}>
+                            {wormTilesVisited}/{totalTiles}
+                        </span>
+                    </div>
                 </div>
             </div>
 

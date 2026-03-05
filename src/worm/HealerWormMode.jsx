@@ -82,6 +82,7 @@ function useWormCrawler(size, cubies) {
     // Growing tail
     const tailLength = useRef(4);
     const visitedFlipped = useRef(new Set());
+    const visitedTiles = useRef(new Set());
     const stepHistory = useRef([]);  // one world-pos per tile step, used by WormBody
 
     // Compute world centroid of current grid tile
@@ -208,8 +209,13 @@ function useWormCrawler(size, cubies) {
                 // Immediately update curWorldPos so the interpolation target is correct
                 curWorldPos.current = getWorldPos(pos.current);
 
-                // Flipped tile detection
+                // Flipped tile detection + coverage tracking
                 const { x, y, z, dirKey } = pos.current;
+                const tileKey = `${x},${y},${z},${dirKey}`;
+                if (!visitedTiles.current.has(tileKey)) {
+                    visitedTiles.current.add(tileKey);
+                    useGameStore.getState().setWormTilesVisited(visitedTiles.current.size);
+                }
                 const sticker = cubies?.[x]?.[y]?.[z]?.stickers?.[dirKey];
                 const isFlipped = !!(sticker && sticker.curr !== sticker.orig);
                 onFlippedTile.current = isFlipped;
