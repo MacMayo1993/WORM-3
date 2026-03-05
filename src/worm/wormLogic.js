@@ -365,87 +365,75 @@ export const getTargetTunnelId = (orbs, wormHead) => {
 const FACE_DIRECTIONS = {
   // PZ (Front/Red): X is right, Y is up
   PZ: {
-    up:    { dx: 0, dy: 1, dz: 0 },
-    down:  { dx: 0, dy: -1, dz: 0 },
-    left:  { dx: -1, dy: 0, dz: 0 },
+    up: { dx: 0, dy: 1, dz: 0 },
+    down: { dx: 0, dy: -1, dz: 0 },
+    left: { dx: -1, dy: 0, dz: 0 },
     right: { dx: 1, dy: 0, dz: 0 }
   },
   // NZ (Back/Orange): X is left (flipped), Y is up
   NZ: {
-    up:    { dx: 0, dy: 1, dz: 0 },
-    down:  { dx: 0, dy: -1, dz: 0 },
-    left:  { dx: 1, dy: 0, dz: 0 },
+    up: { dx: 0, dy: 1, dz: 0 },
+    down: { dx: 0, dy: -1, dz: 0 },
+    left: { dx: 1, dy: 0, dz: 0 },
     right: { dx: -1, dy: 0, dz: 0 }
   },
   // PX (Right/Blue): Z is left, Y is up
   PX: {
-    up:    { dx: 0, dy: 1, dz: 0 },
-    down:  { dx: 0, dy: -1, dz: 0 },
-    left:  { dx: 0, dy: 0, dz: 1 },
+    up: { dx: 0, dy: 1, dz: 0 },
+    down: { dx: 0, dy: -1, dz: 0 },
+    left: { dx: 0, dy: 0, dz: 1 },
     right: { dx: 0, dy: 0, dz: -1 }
   },
   // NX (Left/Green): Z is right, Y is up
   NX: {
-    up:    { dx: 0, dy: 1, dz: 0 },
-    down:  { dx: 0, dy: -1, dz: 0 },
-    left:  { dx: 0, dy: 0, dz: -1 },
+    up: { dx: 0, dy: 1, dz: 0 },
+    down: { dx: 0, dy: -1, dz: 0 },
+    left: { dx: 0, dy: 0, dz: -1 },
     right: { dx: 0, dy: 0, dz: 1 }
   },
   // PY (Top/White): X is right, Z is down (looking from above)
   PY: {
-    up:    { dx: 0, dy: 0, dz: -1 },
-    down:  { dx: 0, dy: 0, dz: 1 },
-    left:  { dx: -1, dy: 0, dz: 0 },
+    up: { dx: 0, dy: 0, dz: -1 },
+    down: { dx: 0, dy: 0, dz: 1 },
+    left: { dx: -1, dy: 0, dz: 0 },
     right: { dx: 1, dy: 0, dz: 0 }
   },
   // NY (Bottom/Yellow): X is right, Z is up (looking from below)
   NY: {
-    up:    { dx: 0, dy: 0, dz: 1 },
-    down:  { dx: 0, dy: 0, dz: -1 },
-    left:  { dx: -1, dy: 0, dz: 0 },
+    up: { dx: 0, dy: 0, dz: 1 },
+    down: { dx: 0, dy: 0, dz: -1 },
+    left: { dx: -1, dy: 0, dz: 0 },
     right: { dx: 1, dy: 0, dz: 0 }
   }
 };
 
-// Map movement direction when crossing face boundaries
-// When you move off the edge of one face onto another, the "forward" direction may need to rotate
 const FACE_TRANSITION_DIR = {
-  // From PZ (front)
-  'PZ->PY': { up: 'down', down: 'up', left: 'left', right: 'right' },
-  'PZ->NY': { up: 'up', down: 'down', left: 'left', right: 'right' },
-  'PZ->PX': { up: 'up', down: 'down', left: 'left', right: 'right' },
-  'PZ->NX': { up: 'up', down: 'down', left: 'left', right: 'right' },
-
-  // From NZ (back)
-  'NZ->PY': { up: 'up', down: 'down', left: 'right', right: 'left' },
-  'NZ->NY': { up: 'down', down: 'up', left: 'right', right: 'left' },
-  'NZ->PX': { up: 'up', down: 'down', left: 'left', right: 'right' },
-  'NZ->NX': { up: 'up', down: 'down', left: 'left', right: 'right' },
-
-  // From PX (right)
-  'PX->PY': { up: 'right', down: 'left', left: 'up', right: 'down' },
-  'PX->NY': { up: 'left', down: 'right', left: 'up', right: 'down' },
-  'PX->PZ': { up: 'up', down: 'down', left: 'left', right: 'right' },
-  'PX->NZ': { up: 'up', down: 'down', left: 'left', right: 'right' },
-
-  // From NX (left)
-  'NX->PY': { up: 'left', down: 'right', left: 'down', right: 'up' },
-  'NX->NY': { up: 'right', down: 'left', left: 'down', right: 'up' },
-  'NX->PZ': { up: 'up', down: 'down', left: 'left', right: 'right' },
-  'NX->NZ': { up: 'up', down: 'down', left: 'left', right: 'right' },
-
-  // From PY (top)
-  'PY->PZ': { up: 'up', down: 'down', left: 'left', right: 'right' },
-  'PY->NZ': { up: 'down', down: 'up', left: 'right', right: 'left' },
-  'PY->PX': { up: 'left', down: 'right', left: 'down', right: 'up' },
-  'PY->NX': { up: 'right', down: 'left', left: 'up', right: 'down' },
-
-  // From NY (bottom)
-  'NY->PZ': { up: 'up', down: 'down', left: 'left', right: 'right' },
-  'NY->NZ': { up: 'down', down: 'up', left: 'right', right: 'left' },
-  'NY->PX': { up: 'right', down: 'left', left: 'up', right: 'down' },
-  'NY->NX': { up: 'left', down: 'right', left: 'down', right: 'up' }
+  'PZ->PY': { up: 'up', down: 'up', left: 'left', right: 'right' },
+  'PZ->NY': { up: 'down', down: 'down', left: 'left', right: 'right' },
+  'PZ->PX': { up: 'up', down: 'down', left: 'right', right: 'right' },
+  'PZ->NX': { up: 'up', down: 'down', left: 'left', right: 'left' },
+  'NZ->PY': { up: 'down', down: 'down', left: 'right', right: 'left' },
+  'NZ->NY': { up: 'up', down: 'up', left: 'right', right: 'left' },
+  'NZ->PX': { up: 'up', down: 'down', left: 'left', right: 'left' },
+  'NZ->NX': { up: 'up', down: 'down', left: 'right', right: 'right' },
+  'PX->PY': { up: 'left', down: 'left', left: 'down', right: 'up' },
+  'PX->NY': { up: 'left', down: 'left', left: 'up', right: 'down' },
+  'PX->PZ': { up: 'up', down: 'down', left: 'left', right: 'left' },
+  'PX->NZ': { up: 'up', down: 'down', left: 'right', right: 'right' },
+  'NX->PY': { up: 'right', down: 'right', left: 'up', right: 'down' },
+  'NX->NY': { up: 'right', down: 'right', left: 'down', right: 'up' },
+  'NX->PZ': { up: 'up', down: 'down', left: 'right', right: 'right' },
+  'NX->NZ': { up: 'up', down: 'down', left: 'left', right: 'left' },
+  'PY->PZ': { up: 'down', down: 'down', left: 'left', right: 'right' },
+  'PY->NZ': { up: 'down', down: 'down', left: 'right', right: 'left' },
+  'PY->PX': { up: 'right', down: 'left', left: 'down', right: 'down' },
+  'PY->NX': { up: 'left', down: 'right', left: 'down', right: 'down' },
+  'NY->PZ': { up: 'up', down: 'up', left: 'left', right: 'right' },
+  'NY->NZ': { up: 'up', down: 'up', left: 'right', right: 'left' },
+  'NY->PX': { up: 'left', down: 'right', left: 'up', right: 'up' },
+  'NY->NX': { up: 'right', down: 'left', left: 'up', right: 'up' },
 };
+
 
 /**
  * Get the next tile position when moving in a direction on the cube surface
@@ -487,49 +475,31 @@ export const getNextSurfacePosition = (pos, moveDir, size) => {
     }
   }
 
-  // Edge crossing - use getManifoldNeighbors to find the correct neighbor
-  const neighbors = getManifoldNeighbors(x, y, z, dirKey, size);
+  // Edge crossing - determine which face we crossed onto based on which coordinate went out of bounds
+  let expectedDirKey = null;
+  if (nx >= size) expectedDirKey = 'PX';
+  else if (nx < 0) expectedDirKey = 'NX';
+  else if (ny >= size) expectedDirKey = 'PY';
+  else if (ny < 0) expectedDirKey = 'NY';
+  else if (nz >= size) expectedDirKey = 'PZ';
+  else if (nz < 0) expectedDirKey = 'NZ';
 
-  // Find the neighbor that matches our intended direction
-  for (const neighbor of neighbors) {
-    // Skip same-face neighbors (we handle those above)
-    if (neighbor.dirKey === dirKey) continue;
+  if (expectedDirKey) {
+    const neighbors = getManifoldNeighbors(x, y, z, dirKey, size);
+    for (const neighbor of neighbors) {
+      if (neighbor.dirKey === expectedDirKey) {
+        const transitionKey = `${dirKey}->${neighbor.dirKey}`;
+        const dirMap = FACE_TRANSITION_DIR[transitionKey];
+        const newMoveDir = dirMap ? dirMap[moveDir] : moveDir;
 
-    // Check if this neighbor is in the direction we're moving
-    const dx = neighbor.x - x;
-    const dy = neighbor.y - y;
-    const dz = neighbor.z - z;
-
-    if (dx === delta.dx && dy === delta.dy && dz === delta.dz) {
-      // Found the cross-face neighbor
-      const transitionKey = `${dirKey}->${neighbor.dirKey}`;
-      const dirMap = FACE_TRANSITION_DIR[transitionKey];
-      const newMoveDir = dirMap ? dirMap[moveDir] : moveDir;
-
-      return {
-        x: neighbor.x,
-        y: neighbor.y,
-        z: neighbor.z,
-        dirKey: neighbor.dirKey,
-        moveDir: newMoveDir
-      };
-    }
-  }
-
-  // Fallback: find any cross-face neighbor (edge case)
-  for (const neighbor of neighbors) {
-    if (neighbor.dirKey !== dirKey) {
-      const transitionKey = `${dirKey}->${neighbor.dirKey}`;
-      const dirMap = FACE_TRANSITION_DIR[transitionKey];
-      const newMoveDir = dirMap ? dirMap[moveDir] : moveDir;
-
-      return {
-        x: neighbor.x,
-        y: neighbor.y,
-        z: neighbor.z,
-        dirKey: neighbor.dirKey,
-        moveDir: newMoveDir
-      };
+        return {
+          x: neighbor.x,
+          y: neighbor.y,
+          z: neighbor.z,
+          dirKey: neighbor.dirKey,
+          moveDir: newMoveDir
+        };
+      }
     }
   }
 
@@ -754,15 +724,21 @@ export const updateWormAfterRotation = (segments, axis, sliceIndex, dir, size) =
     // Rotate the direction key
     const rotateDir = (d, ax, direction) => {
       const rotations = {
-        col: { PY: direction > 0 ? 'NZ' : 'PZ', NZ: direction > 0 ? 'NY' : 'PY',
-               NY: direction > 0 ? 'PZ' : 'NZ', PZ: direction > 0 ? 'PY' : 'NY',
-               PX: 'PX', NX: 'NX' },
-        row: { PX: direction > 0 ? 'PZ' : 'NZ', PZ: direction > 0 ? 'NX' : 'PX',
-               NX: direction > 0 ? 'NZ' : 'PZ', NZ: direction > 0 ? 'PX' : 'NX',
-               PY: 'PY', NY: 'NY' },
-        depth: { PX: direction > 0 ? 'NY' : 'PY', PY: direction > 0 ? 'PX' : 'NX',
-                 NX: direction > 0 ? 'PY' : 'NY', NY: direction > 0 ? 'NX' : 'PX',
-                 PZ: 'PZ', NZ: 'NZ' }
+        col: {
+          PY: direction > 0 ? 'NZ' : 'PZ', NZ: direction > 0 ? 'NY' : 'PY',
+          NY: direction > 0 ? 'PZ' : 'NZ', PZ: direction > 0 ? 'PY' : 'NY',
+          PX: 'PX', NX: 'NX'
+        },
+        row: {
+          PX: direction > 0 ? 'PZ' : 'NZ', PZ: direction > 0 ? 'NX' : 'PX',
+          NX: direction > 0 ? 'NZ' : 'PZ', NZ: direction > 0 ? 'PX' : 'NX',
+          PY: 'PY', NY: 'NY'
+        },
+        depth: {
+          PX: direction > 0 ? 'NY' : 'PY', PY: direction > 0 ? 'PX' : 'NX',
+          NX: direction > 0 ? 'PY' : 'NY', NY: direction > 0 ? 'NX' : 'PX',
+          PZ: 'PZ', NZ: 'NZ'
+        }
       };
       return rotations[ax]?.[d] || d;
     };
