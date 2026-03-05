@@ -186,7 +186,6 @@ export function WormModeStartScreen({ onStart, onCancel }) {
   const [selectedMode, setSelectedMode] = React.useState('surface');
   // Detect mobile/touch device
   const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-  const isMobile = typeof window !== 'undefined' && (window.innerWidth <= 768 || isTouchDevice);
 
   const handleStart = () => {
     onStart(selectedMode);
