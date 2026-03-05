@@ -208,6 +208,7 @@ export const useGameStore = create(
     // Face elimination events: array of faceNum (1-6) values in order they were eliminated
     disparityEliminatedFaces: [],
     wormHealerMode: false,
+    holonomyMode: false,
 
     // Configurable flip cap for Disparity Mode (overrides FLIP_CAP constant)
     disparityFlipCap: 25,
@@ -241,7 +242,19 @@ export const useGameStore = create(
       return { disparityEliminatedFaces: [...state.disparityEliminatedFaces, ...faces] };
     }),
     setWormHealerMode: (v) => set({ wormHealerMode: v }),
-    clearDisparityGame: () => set({ disparityDeaths: [], disparityDeathByGridId: {}, disparityWinner: null, showDisparityWinner: false, disparityEliminatedFaces: [], cascades: [], wormHealerMode: false }),
+    setHolonomyMode: (v) => set({ holonomyMode: v }),
+    wormSpeed: 1.0,
+    setWormSpeed: (v) => set({ wormSpeed: v }),
+    wormHealedCount: 0,
+    setWormHealedCount: (v) => set({ wormHealedCount: v }),
+    wormPhase: 'crawling',
+    setWormPhase: (v) => set({ wormPhase: v }),
+    wormOnFlippedTile: false,
+    setWormOnFlippedTile: (v) => set({ wormOnFlippedTile: v }),
+    clearDisparityGame: () => set({ disparityDeaths: [], disparityDeathByGridId: {}, disparityWinner: null, showDisparityWinner: false, disparityEliminatedFaces: [], cascades: [], wormHealerMode: false, holonomyMode: false, wormHealedCount: 0, wormPhase: 'crawling', wormOnFlippedTile: false }),
+    // Atomic init for Worm Mode — clears disparity state AND enables worm in one set()
+    // so wormHealerMode:true can never be clobbered by the reset.
+    initWormMode: (flipCap = 9999, chaosLevel = 1) => set({ disparityDeaths: [], disparityDeathByGridId: {}, disparityWinner: null, showDisparityWinner: false, disparityEliminatedFaces: [], cascades: [], holonomyMode: false, wormHealedCount: 0, wormPhase: 'crawling', wormOnFlippedTile: false, wormHealerMode: true, disparityFlipCap: flipCap, chaosLevel }),
 
     // ========================================================================
     // ANIMATION STATE
