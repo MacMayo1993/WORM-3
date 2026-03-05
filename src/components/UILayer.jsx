@@ -122,7 +122,7 @@ export default function UILayer({
     showMainMenu, showTutorial, showLevelSelect, showSettings, showHelp,
     showFirstFlipTutorial, showCutscene, showLevelTutorial, showNetPanel,
     showLeaderboard, showMobileTouchHint, showDevConsole, solveModeActive,
-    showDisparityWinner, wormHealerMode, holonomyMode,
+    showDisparityWinner, wormHealerMode,
   } = useGameStore(useShallow(s => ({
     showMainMenu: s.showMainMenu,
     showTutorial: s.showTutorial,
@@ -139,7 +139,6 @@ export default function UILayer({
     solveModeActive: s.solveModeActive,
     showDisparityWinner: s.showDisparityWinner,
     wormHealerMode: s.wormHealerMode,
-    holonomyMode: s.holonomyMode,
   })));
 
   // Visual state — change on user preference changes

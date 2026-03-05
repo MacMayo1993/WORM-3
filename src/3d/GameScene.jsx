@@ -122,9 +122,6 @@ export default function GameScene({
   const wormHealerMode = useGameStore((s) => s.wormHealerMode);
   const holonomyMode = useGameStore((s) => s.holonomyMode);
 
-  // Initialize Worm Healer Game Logic if active
-  const healerGame = null;
-
   return (
     <>
       {/* Lights — intensity varies by visualMode */}
