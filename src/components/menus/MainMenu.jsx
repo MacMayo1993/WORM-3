@@ -350,7 +350,7 @@ const NavItem = ({ icon, label, color, onClick }) => {
 };
 
 // ─── Main component ───────────────────────────────────────────────────────────
-const MainMenu = ({ onPlay, _onLevels, onFreeplay, _onCoop, onSettings, onBiome, onDisparity, onWormHealer }) => {
+const MainMenu = ({ onPlay, _onLevels, onFreeplay, _onCoop, onSettings, onBiome, onDisparity, onWormHealer, onHolonomy }) => {
   const [titleVisible, setTitleVisible] = useState(false);
   const [subtitleVisible, setSubtitleVisible] = useState(false);
   const [btnVisible, setBtnVisible] = useState(false);
@@ -499,6 +499,9 @@ const MainMenu = ({ onPlay, _onLevels, onFreeplay, _onCoop, onSettings, onBiome,
             <NavItem icon={<WormIcon />} label="WORM" color="#a855f7" onClick={onWormHealer} />
             {/* divider */}
             <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(100,150,255,0.18)' }} />
+            <NavItem icon={<HolonomyIcon />} label="∮ Holonomy" color="#00f5ff" onClick={onHolonomy} />
+            {/* divider */}
+            <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(100,150,255,0.18)' }} />
             <NavItem icon={<ExploreIcon />} label="Explore" color="#22c55e" onClick={onFreeplay} />
             {/* divider */}
             <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(100,150,255,0.18)' }} />
@@ -547,6 +550,14 @@ const WorldIcon = () => (
     <line x1="6" y1="18" x2="6" y2="14" stroke="#60a5fa" strokeWidth="1.4" strokeLinecap="round" />
     <line x1="12" y1="18" x2="12" y2="10.5" stroke="#60a5fa" strokeWidth="1.4" strokeLinecap="round" />
     <line x1="18" y1="18" x2="18" y2="14" stroke="#60a5fa" strokeWidth="1.4" strokeLinecap="round" />
+  </svg>
+);
+const HolonomyIcon = () => (
+  <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+    <circle cx="12" cy="12" r="7" stroke="#00f5ff" strokeWidth="1.5" fill="none" />
+    <path d="M12 5 A7 7 0 0 1 19 12" stroke="#00f5ff" strokeWidth="2" strokeLinecap="round" />
+    <polygon points="19,9 22,12 19,15" fill="#00f5ff" opacity="0.8" />
+    <circle cx="12" cy="12" r="1.8" fill="#00f5ff" />
   </svg>
 );
 const GearIcon = () => (
