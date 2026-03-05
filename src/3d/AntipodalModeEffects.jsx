@@ -1,98 +1,221 @@
-// src/3d/AntipodalGlowFill.jsx
-// Antipodal glow fill effect — glows from the outside and fills inward
-// when a sticker crosses the manifold. Uses persistent meshes with shared
-// geometries so no per-sticker geometry allocations occur.
-import { useRef, useEffect } from 'react';
+/**
+ * AntipodalModeEffects.jsx
+ *
+ * Visual effects for Antipodal Mode (Mirror Quotient):
+ * - Echo Tethers: Glowing plasma tubes connecting rotating face to antipodal
+ * - Flow particles showing reverse direction
+ * - Pulse effects during echo delay
+ */
+
+import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import { useGameStore } from '../hooks/useGameStore.js';
 
-const _sharedOuterRingGeometry = new THREE.RingGeometry(0.4, 0.5, 16);
-const _sharedMainRingGeometry = new THREE.RingGeometry(0.2, 0.45, 16);
-const _sharedInnerCircleGeometry = new THREE.CircleGeometry(0.48, 16);
+/**
+ * Get face center position for a given axis and slice
+ */
+function getFaceCenterPosition(axis, sliceIndex, size) {
+  const offset = sliceIndex - (size - 1) / 2;
+  const scale = 1.05; // Slightly outside the cube
 
-const AntipodalGlowFill = ({ active, color }) => {
-    const ringRef = useRef();
-    const innerGlowRef = useRef();
-    const outerRingRef = useRef();
-    const progressRef = useRef(0);
-    const isActiveRef = useRef(false);
+  switch (axis) {
+    case 'row': // Y-axis
+      return [0, offset * scale, 0];
+    case 'col': // X-axis
+      return [offset * scale, 0, 0];
+    case 'depth': // Z-axis
+      return [0, 0, offset * scale];
+    default:
+      return [0, 0, 0];
+  }
+}
 
-    // Materials initialised immediately (not in useEffect) so meshes always
-    // have a valid material on the very first render.
-    const outerMatRef = useRef(new THREE.MeshBasicMaterial({
-        color: '#ffffff', transparent: true, opacity: 0,
-        blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
-    }));
-    const ringMatRef = useRef(new THREE.MeshBasicMaterial({
-        color: '#ffffff', transparent: true, opacity: 0,
-        blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
-    }));
-    const innerMatRef = useRef(new THREE.MeshBasicMaterial({
-        color: '#ffffff', transparent: true, opacity: 0,
-        blending: THREE.AdditiveBlending, depthWrite: false,
-    }));
+/**
+ * EchoTether - A glowing tube connecting original and antipodal rotation points
+ */
+function EchoTether({ echo, size }) {
+  const lineRef = useRef();
+  const materialRef = useRef();
+  const particlesRef = useRef();
 
-    useEffect(() => {
-        const outerMat = outerMatRef.current;
-        const ringMat = ringMatRef.current;
-        const innerMat = innerMatRef.current;
-        return () => {
-            outerMat?.dispose();
-            ringMat?.dispose();
-            innerMat?.dispose();
-        };
-    }, []);
+  const { curve, particlePositions } = useMemo(() => {
+    const posA = new THREE.Vector3(...getFaceCenterPosition(echo.axis, echo.originalSlice, size));
+    const posB = new THREE.Vector3(...getFaceCenterPosition(echo.axis, echo.sliceIndex, size));
 
-    useEffect(() => {
-        if (active && !isActiveRef.current) {
-            isActiveRef.current = true;
-            progressRef.current = 0;
-            if (outerMatRef.current) outerMatRef.current.color.set(color);
-            if (ringMatRef.current) ringMatRef.current.color.set(color);
-            if (innerMatRef.current) innerMatRef.current.color.set(color);
-        } else if (!active) {
-            isActiveRef.current = false;
-            if (outerMatRef.current) outerMatRef.current.opacity = 0;
-            if (ringMatRef.current) ringMatRef.current.opacity = 0;
-            if (innerMatRef.current) innerMatRef.current.opacity = 0;
-        }
-    }, [active, color]);
+    // Create a curved path (quadratic bezier through center)
+    const mid = new THREE.Vector3().lerpVectors(posA, posB, 0.5).multiplyScalar(0.3);
+    const curve = new THREE.QuadraticBezierCurve3(posA, mid, posB);
 
-    useFrame((_, delta) => {
-        if (!isActiveRef.current) return;
+    // Particle positions along the curve
+    const particleCount = 20;
+    const particlePositions = [];
+    for (let i = 0; i < particleCount; i++) {
+      particlePositions.push(curve.getPoint(i / particleCount));
+    }
 
-        progressRef.current = Math.min(1, progressRef.current + delta * 5);
-        const progress = progressRef.current;
-        const snappyProgress = 1 - Math.pow(1 - progress, 3);
+    return { curve, particlePositions };
+  }, [echo.axis, echo.originalSlice, echo.sliceIndex, size]);
 
-        if (ringRef.current) {
-            const ringScale = Math.max(0.01, 1 - snappyProgress);
-            ringRef.current.scale.set(ringScale, ringScale, 1);
-            const glowPulse = Math.sin(progress * Math.PI * 4) * 0.3 + 0.7;
-            ringMatRef.current.opacity = (1 - snappyProgress * 0.3) * glowPulse * 0.9;
-        }
+  // Animate tether appearance and particles
+  useFrame(() => {
+    if (!materialRef.current) return;
 
-        if (outerRingRef.current) {
-            const edgeScale = Math.max(0.01, 1.1 - snappyProgress * 0.8);
-            outerRingRef.current.scale.set(edgeScale, edgeScale, 1);
-            outerMatRef.current.opacity = (1 - snappyProgress) * 0.6;
-        }
+    const elapsed = (Date.now() - echo.startTime) / 1000;
+    const progress = Math.min(1, elapsed / 0.5); // Fade in over 0.5s
 
-        if (innerGlowRef.current) {
-            const fillScale = snappyProgress * 0.95;
-            innerGlowRef.current.scale.set(fillScale, fillScale, 1);
-            const fillOpacity = Math.sin(progress * Math.PI) * 0.7;
-            innerMatRef.current.opacity = fillOpacity;
-        }
+    // Pulsing glow
+    const pulse = Math.sin(elapsed * 8) * 0.3 + 0.7;
+    materialRef.current.opacity = progress * pulse * 0.6;
+    materialRef.current.emissiveIntensity = pulse * 2;
+
+    // Animate particles flowing in reverse direction (from antipodal to original)
+    if (particlesRef.current) {
+      const positions = particlesRef.current.geometry.attributes.position;
+      for (let i = 0; i < particlePositions.length; i++) {
+        const t = ((elapsed * 2 + i / particlePositions.length) % 1);
+        const point = curve.getPoint(1 - t); // Reverse direction
+        positions.setXYZ(i, point.x, point.y, point.z);
+      }
+      positions.needsUpdate = true;
+    }
+  });
+
+  const geometry = useMemo(() => {
+    const points = curve.getPoints(50);
+    return new THREE.BufferGeometry().setFromPoints(points);
+  }, [curve]);
+
+  const particleGeometry = useMemo(() => {
+    const geo = new THREE.BufferGeometry();
+    const positions = new Float32Array(particlePositions.length * 3);
+    particlePositions.forEach((p, i) => {
+      positions[i * 3] = p.x;
+      positions[i * 3 + 1] = p.y;
+      positions[i * 3 + 2] = p.z;
     });
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    return geo;
+  }, [particlePositions]);
 
-    return (
-        <group position={[0, 0, 0.025]}>
-            <mesh ref={outerRingRef} geometry={_sharedOuterRingGeometry} material={outerMatRef.current} scale={[0, 0, 0]} />
-            <mesh ref={ringRef} geometry={_sharedMainRingGeometry} material={ringMatRef.current} scale={[0, 0, 0]} />
-            <mesh ref={innerGlowRef} position={[0, 0, -0.005]} geometry={_sharedInnerCircleGeometry} material={innerMatRef.current} scale={[0, 0, 0]} />
-        </group>
-    );
-};
+  // Color based on axis (matching AntipodalVisualization)
+  const color = useMemo(() => {
+    switch (echo.axis) {
+      case 'col': return '#22c55e'; // green for X
+      case 'row': return '#3b82f6'; // blue for Y
+      case 'depth': return '#ef4444'; // red for Z
+      default: return '#ffffff';
+    }
+  }, [echo.axis]);
 
-export default AntipodalGlowFill;
+  return (
+    <group>
+      {/* Tether line */}
+      <line ref={lineRef} geometry={geometry}>
+        <lineBasicMaterial
+          ref={materialRef}
+          color={color}
+          transparent
+          opacity={0.6}
+          linewidth={3}
+          depthWrite={false}
+        />
+      </line>
+
+      {/* Flow particles */}
+      <points ref={particlesRef} geometry={particleGeometry}>
+        <pointsMaterial
+          color={color}
+          size={0.1}
+          transparent
+          opacity={0.8}
+          sizeAttenuation
+          depthWrite={false}
+        />
+      </points>
+
+      {/* Emissive tube for glow effect */}
+      <mesh>
+        <tubeGeometry args={[curve, 50, 0.02, 8, false]} />
+        <meshBasicMaterial
+          color={color}
+          transparent
+          opacity={0.4}
+          emissive={color}
+          emissiveIntensity={1.5}
+          depthWrite={false}
+        />
+      </mesh>
+    </group>
+  );
+}
+
+/**
+ * PulseRing - A pulsing ring that appears at the antipodal rotation point
+ */
+function PulseRing({ echo, size }) {
+  const ringRef = useRef();
+  const materialRef = useRef();
+
+  const position = useMemo(() => {
+    return getFaceCenterPosition(echo.axis, echo.sliceIndex, size);
+  }, [echo.axis, echo.sliceIndex, size]);
+
+  useFrame(() => {
+    if (!ringRef.current || !materialRef.current) return;
+
+    const elapsed = (Date.now() - echo.startTime) / 1000;
+    const scale = 1 + elapsed * 2;
+    ringRef.current.scale.setScalar(scale);
+    materialRef.current.opacity = Math.max(0, 0.8 - elapsed * 2);
+  });
+
+  const color = useMemo(() => {
+    switch (echo.axis) {
+      case 'col': return '#22c55e';
+      case 'row': return '#3b82f6';
+      case 'depth': return '#ef4444';
+      default: return '#ffffff';
+    }
+  }, [echo.axis]);
+
+  return (
+    <mesh ref={ringRef} position={position} rotation={[Math.PI / 2, 0, 0]}>
+      <ringGeometry args={[0.3, 0.35, 32]} />
+      <meshBasicMaterial
+        ref={materialRef}
+        color={color}
+        transparent
+        opacity={0.8}
+        side={THREE.DoubleSide}
+        depthWrite={false}
+      />
+    </mesh>
+  );
+}
+
+/**
+ * AntipodalModeEffects - Main component
+ * Renders all active echo effects
+ */
+export default function AntipodalModeEffects() {
+  const antipodalMode = useGameStore((state) => state.antipodalMode);
+  const pendingEchoRotations = useGameStore((state) => state.pendingEchoRotations);
+  const antipodalVizIntensity = useGameStore((state) => state.antipodalVizIntensity);
+  const size = useGameStore((state) => state.size);
+
+  if (!antipodalMode || antipodalVizIntensity === 'low') {
+    return null;
+  }
+
+  return (
+    <group>
+      {pendingEchoRotations.map((echo) => (
+        <React.Fragment key={echo.id}>
+          <EchoTether echo={echo} size={size} />
+          {antipodalVizIntensity === 'high' && <PulseRing echo={echo} size={size} />}
+        </React.Fragment>
+      ))}
+    </group>
+  );
+}
