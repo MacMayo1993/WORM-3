@@ -114,6 +114,8 @@ function TilePreviewCanvas({ styleKey, colorHex = '#4a7fa5', size = 48 }) {
 
 // ── Shared inline styles ──────────────────────────────────────────────────────
 
+const isMobile = typeof window !== 'undefined' && (window.innerWidth <= 768 || 'ontouchstart' in window);
+
 const S = {
   overlay: {
     position: 'fixed',
@@ -294,8 +296,6 @@ function Checkmark() {
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
-const isMobile = typeof window !== 'undefined' && (window.innerWidth <= 768 || 'ontouchstart' in window);
-
 const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
   const [step, setStep] = useState(0);
   const [cubeSize, setCubeSize] = useState(initialSettings?.size || 3);
