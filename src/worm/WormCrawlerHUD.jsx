@@ -90,6 +90,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, onEnterPortal }) 
                 }}>
                     <button
                         onPointerDown={onEnterPortal}
+                        onTouchStart={e => { e.preventDefault(); onEnterPortal(); }}
                         style={{
                             background: 'linear-gradient(135deg, rgba(180,0,255,0.8), rgba(255,0,200,0.6))',
                             border: '2px solid #ff00ff',
@@ -99,6 +100,8 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, onEnterPortal }) 
                             textShadow: '0 0 12px #ff00ff',
                             boxShadow: '0 0 30px rgba(255,0,255,0.5)',
                             animation: 'portal-pulse 1s ease-in-out infinite',
+                            touchAction: 'manipulation',
+                            WebkitTapHighlightColor: 'transparent',
                         }}
                     >
                         🌀 ENTER PORTAL
@@ -141,8 +144,8 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, onEnterPortal }) 
 
             <style>{`
         @keyframes portal-pulse {
-          0%, 100% { transform: scale(1); box-shadow: 0 0 30px rgba(255,0,255,0.5); }
-          50% { transform: scale(1.04); box-shadow: 0 0 50px rgba(255,0,255,0.8); }
+          0%, 100% { box-shadow: 0 0 30px rgba(255,0,255,0.5); opacity: 1; }
+          50% { box-shadow: 0 0 55px rgba(255,0,255,0.9); opacity: 0.88; }
         }
       `}</style>
         </div>
