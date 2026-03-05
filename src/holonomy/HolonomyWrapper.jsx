@@ -6,7 +6,7 @@ import React from 'react';
 import { Html } from '@react-three/drei';
 import { useHolonomyMode } from './useHolonomyMode.js';
 import HolonomyTracer from './HolonomyTracer.jsx';
-import HolonomyHUD from './HolonomyHUD.jsx';
+import HolonomyHUD from './HolonomyHud.jsx';
 
 export default function HolonomyWrapper() {
     const game = useHolonomyMode();
