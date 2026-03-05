@@ -8,10 +8,10 @@ import { useGameStore } from '../hooks/useGameStore.js';
 export default function WormCrawlerHUD({ phase, onFlippedTile, onEnterPortal, cubeSize = 3, onHome, onSettings }) {
     const wormSpeed = useGameStore(s => s.wormSpeed ?? 1.0);
     const wormHealedCount = useGameStore(s => s.wormHealedCount ?? 0);
-    const wormTilesVisited = useGameStore(s => s.wormTilesVisited ?? 0);
+    const wormBodyTiles = useGameStore(s => s.wormBodyTiles ?? 1);
     const setWormSpeed = useGameStore(s => s.setWormSpeed);
     const totalTiles = 6 * cubeSize * cubeSize;
-    const coveragePct = Math.min(100, Math.round((wormTilesVisited / totalTiles) * 100));
+    const coveragePct = Math.min(100, Math.round((wormBodyTiles / totalTiles) * 100));
 
     const [showPortalPulse, setShowPortalPulse] = useState(false);
 
@@ -92,7 +92,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, onEnterPortal, cu
                             }} />
                         </div>
                         <span style={{ color: '#e9d5ff', fontSize: 12, fontWeight: 800, letterSpacing: 0.5, whiteSpace: 'nowrap', textShadow: '0 0 6px rgba(192,132,252,0.8)' }}>
-                            {wormTilesVisited}/{totalTiles}
+                            {wormBodyTiles}/{totalTiles}
                         </span>
                     </div>
                 </div>
