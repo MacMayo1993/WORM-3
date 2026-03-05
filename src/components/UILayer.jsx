@@ -34,6 +34,7 @@ import AntipodalHUD from './overlays/AntipodalHUD.jsx';
 import AntipodalModeHUD from './overlays/AntipodalModeHUD.jsx';
 import EchoRotationIndicator from './overlays/EchoRotationIndicator.jsx';
 import DisparityHUD from './overlays/DisparityHUD.jsx';
+import HealerWormHUD from './overlays/HealerWormHUD.jsx';
 
 // Lazy-loaded — deferred to reduce initial parse time
 const VictoryScreen = React.lazy(() => import('./screens/VictoryScreen.jsx'));
@@ -41,6 +42,7 @@ const LevelSelectScreen = React.lazy(() => import('./screens/LevelSelectScreen.j
 const Level10Cutscene = React.lazy(() => import('./screens/Level10Cutscene.jsx'));
 const LevelTutorial = React.lazy(() => import('./screens/LevelTutorial.jsx'));
 const FreeplaySetupWizard = React.lazy(() => import('./screens/FreeplaySetupWizard.jsx'));
+const WormModeSetupWizard = React.lazy(() => import('./screens/WormModeSetupWizard.jsx'));
 const DisparitySetupWizard = React.lazy(() => import('./screens/DisparitySetupWizard.jsx'));
 const DisparityWinnerScreen = React.lazy(() => import('./screens/DisparityWinnerScreen.jsx'));
 const CubeNet = React.lazy(() => import('./CubeNet.jsx'));
@@ -88,7 +90,7 @@ export default function UILayer({
 }) {
   const {
     sheetOpen, setSheetOpen, sheetMode, setSheetMode,
-    showFreeplayWizard,
+    showFreeplayWizard, showWormModeWizard,
     showDisparityWizard, setShowDisparityWizard,
     disparityWaitingFirstFlip, disparityCountdown,
   } = ui;
@@ -100,8 +102,9 @@ export default function UILayer({
     onTutorialClose, onLevelTutorialClose, onNextLevel,
     onPreset, onInstantChaos, onSaveState, onLoadState,
     onMenuPlay, onMenuLevels, onMenuFreeplay, onMenuCoop, onMenuTeach,
-    onMenuSettings, onMenuBiome, onMenuDisparity,
+    onMenuSettings, onMenuBiome, onMenuDisparity, onMenuWormHealer, onMenuHolonomy,
     onWizardComplete, onWizardCancel, onDisparitySetupComplete,
+    onWormSetupComplete, onWormWizardCancel,
     onToggleHandsMode, onFaceRotate, onTileRotation, onTileFaceRotation,
     onVictoryContinue, onVictoryNewGame,
   } = handlers;
@@ -119,7 +122,7 @@ export default function UILayer({
     showMainMenu, showTutorial, showLevelSelect, showSettings, showHelp,
     showFirstFlipTutorial, showCutscene, showLevelTutorial, showNetPanel,
     showLeaderboard, showMobileTouchHint, showDevConsole, solveModeActive,
-    showDisparityWinner,
+    showDisparityWinner, wormHealerMode, holonomyMode,
   } = useGameStore(useShallow(s => ({
     showMainMenu: s.showMainMenu,
     showTutorial: s.showTutorial,
@@ -135,6 +138,8 @@ export default function UILayer({
     showDevConsole: s.showDevConsole,
     solveModeActive: s.solveModeActive,
     showDisparityWinner: s.showDisparityWinner,
+    wormHealerMode: s.wormHealerMode,
+    holonomyMode: s.holonomyMode,
   })));
 
   // Visual state — change on user preference changes
@@ -226,10 +231,13 @@ export default function UILayer({
         )}
 
         {/* Floating HUD — auto-fade parity/chaos notifications */}
-        <FloatingHUD metrics={metrics} chaosLevel={chaosLevel} chaosMode={chaosMode} />
+        {!wormHealerMode && <FloatingHUD metrics={metrics} chaosLevel={chaosLevel} chaosMode={chaosMode} />}
 
         {/* Disparity HUD — RIP death log + winner announcement */}
-        {(chaosMode || disparityWinner) && <DisparityHUD />}
+        {(!wormHealerMode && (chaosMode || disparityWinner)) && <DisparityHUD />}
+
+        {/* Healer Worm HUD Overlay */}
+        <HealerWormHUD />
 
         {/* Disparity countdown — 3-2-1-GO overlay before chaos starts */}
         {disparityCountdown !== null && (
@@ -351,6 +359,8 @@ export default function UILayer({
           onSettings={onMenuSettings}
           onBiome={onMenuBiome}
           onDisparity={onMenuDisparity}
+          onWormHealer={onMenuWormHealer}
+          onHolonomy={onMenuHolonomy}
         />
       )}
 
@@ -373,6 +383,12 @@ export default function UILayer({
       {showFreeplayWizard && (
         <Suspense fallback={null}>
           <FreeplaySetupWizard onComplete={onWizardComplete} onCancel={onWizardCancel} initialSettings={settings} />
+        </Suspense>
+      )}
+
+      {showWormModeWizard && (
+        <Suspense fallback={null}>
+          <WormModeSetupWizard onComplete={onWormSetupComplete} onCancel={onWormWizardCancel} initialSettings={settings} />
         </Suspense>
       )}
 
