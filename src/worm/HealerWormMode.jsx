@@ -46,8 +46,44 @@ const INITIAL_POS = (size) => {
     return { x: c, y: c, z: size - 1, dirKey: 'PZ' };
 };
 
+// ─── Powerup helpers ─────────────────────────────────────────────────────────
+const POWERUP_COUNT = 5;
+const GROWTH_TILES = 3;         // body tiles gained per pickup
+const STEPS_PER_TILE = 50;      // sub-steps recorded per tile (0.02 resolution)
+
+function getAllSurfaceTiles(size) {
+    const tiles = [];
+    const faces = [
+        ['PX', 'x', size - 1], ['NX', 'x', 0],
+        ['PY', 'y', size - 1], ['NY', 'y', 0],
+        ['PZ', 'z', size - 1], ['NZ', 'z', 0],
+    ];
+    for (const [dirKey, axis, val] of faces) {
+        for (let a = 0; a < size; a++) {
+            for (let b = 0; b < size; b++) {
+                const p = { x: 0, y: 0, z: 0 };
+                if (axis === 'x') { p.x = val; p.y = a; p.z = b; }
+                else if (axis === 'y') { p.x = a; p.y = val; p.z = b; }
+                else { p.x = a; p.y = b; p.z = val; }
+                tiles.push({ ...p, dirKey });
+            }
+        }
+    }
+    return tiles;
+}
+
+function randomFreeTile(size, exclude) {
+    const all = getAllSurfaceTiles(size);
+    const excludeKeys = new Set(exclude.map(e => `${e.x},${e.y},${e.z},${e.dirKey}`));
+    const free = all.filter(t => !excludeKeys.has(`${t.x},${t.y},${t.z},${t.dirKey}`));
+    const pool = free.length > 0 ? free : all;
+    return pool[Math.floor(Math.random() * pool.length)];
+}
+
 // ─── Worm Crawler Hook ────────────────────────────────────────────────────────
-const MAX_TAIL = 120;
+// Tail segments needed to visually cover all tiles: totalTiles / (0.14 unit spacing / ~1 unit per tile)
+// For 5×5 (150 tiles): ~1100 segments. Round up generously.
+const MAX_TAIL = 1200;
 
 function useWormCrawler(size, cubies) {
     const wormSpeed = useGameStore(s => s.wormSpeed ?? 0.4);
@@ -79,10 +115,10 @@ function useWormCrawler(size, cubies) {
     const JUMP_HEIGHT = 0.55;
     const JUMP_SPEED = 3.5;
 
-    // Growing tail
+    // Growing tail + powerups
     const tailLength = useRef(4);
     const visitedFlipped = useRef(new Set());
-    const visitedTiles = useRef(new Set());
+    const powerupsRef = useRef([]);  // local fast-access copy of wormPowerups
     const stepHistory = useRef([]);  // one world-pos per tile step, used by WormBody
 
     // Compute world centroid of current grid tile
@@ -173,7 +209,7 @@ function useWormCrawler(size, cubies) {
                 stepHistory.current.unshift({ pos: ptLifted, normal: ptNorm });
                 lastRecordedT.current += 0.02; // A guaranteed resolution of 50 mathematical sub-steps per tile traverse
             }
-            if (stepHistory.current.length > 1500) {
+            if (stepHistory.current.length > MAX_TAIL * STEPS_PER_TILE) {
                 stepHistory.current.length = 1500;
             }
             // -----------------------------------------------------------
@@ -209,13 +245,21 @@ function useWormCrawler(size, cubies) {
                 // Immediately update curWorldPos so the interpolation target is correct
                 curWorldPos.current = getWorldPos(pos.current);
 
-                // Flipped tile detection + coverage tracking
+                // Powerup collision
                 const { x, y, z, dirKey } = pos.current;
-                const tileKey = `${x},${y},${z},${dirKey}`;
-                if (!visitedTiles.current.has(tileKey)) {
-                    visitedTiles.current.add(tileKey);
-                    useGameStore.getState().setWormTilesVisited(visitedTiles.current.size);
+                const puIdx = powerupsRef.current.findIndex(p => p.x === x && p.y === y && p.z === z && p.dirKey === dirKey);
+                if (puIdx !== -1) {
+                    tailLength.current = Math.min(tailLength.current + GROWTH_TILES * STEPS_PER_TILE, MAX_TAIL);
+                    const newBodyTiles = useGameStore.getState().wormBodyTiles + GROWTH_TILES;
+                    useGameStore.getState().setWormBodyTiles(newBodyTiles);
+                    const newPowerup = { ...randomFreeTile(size, [...powerupsRef.current, pos.current]), type: 'apple' };
+                    const next = [...powerupsRef.current];
+                    next[puIdx] = newPowerup;
+                    powerupsRef.current = next;
+                    useGameStore.getState().setWormPowerups(next);
                 }
+
+                // Flipped tile detection
                 const sticker = cubies?.[x]?.[y]?.[z]?.stickers?.[dirKey];
                 const isFlipped = !!(sticker && sticker.curr !== sticker.orig);
                 onFlippedTile.current = isFlipped;
@@ -306,6 +350,18 @@ function useWormCrawler(size, cubies) {
     }, [cubies, size]);
 
     const queueTurn = useCallback((dir) => { pendingTurn.current = dir; }, []);
+
+    // Spawn initial powerups once on mount
+    useEffect(() => {
+        const initial = [];
+        const startPos = INITIAL_POS(size);
+        for (let i = 0; i < POWERUP_COUNT; i++) {
+            initial.push({ ...randomFreeTile(size, [...initial, startPos]), type: 'apple' });
+        }
+        powerupsRef.current = initial;
+        useGameStore.getState().setWormPowerups(initial);
+        useGameStore.getState().setWormBodyTiles(1);
+    }, [size]);
 
     return {
         pos, moveDir, phase, tunnelProgress, activeTunnel, onFlippedTile,
@@ -654,6 +710,43 @@ function WormFace({ worm, size }) {
     );
 }
 
+// ─── Powerup Orbs ─────────────────────────────────────────────────────────────
+function PowerupOrbs({ size }) {
+    const groupRef = useRef();
+
+    useFrame(() => {
+        const powerups = useGameStore.getState().wormPowerups;
+        if (!groupRef.current) return;
+        const meshes = groupRef.current.children;
+        const t = Date.now() * 0.003;
+
+        for (let i = 0; i < meshes.length; i++) {
+            const mesh = meshes[i];
+            const p = powerups[i];
+            if (!p || !mesh) { if (mesh) mesh.visible = false; continue; }
+            const wp = getStickerWorldPos(p.x, p.y, p.z, p.dirKey, size, 0);
+            const n = FACE_NORMALS[p.dirKey] ?? new THREE.Vector3(0, 0, 1);
+            const phase = t + i * 1.5;
+            const lift = 0.18 + Math.sin(phase) * 0.05;
+            mesh.position.set(wp[0] + n.x * lift, wp[1] + n.y * lift, wp[2] + n.z * lift);
+            mesh.scale.setScalar(0.09 + Math.sin(phase) * 0.018);
+            mesh.rotation.y = t * 0.6 + i;
+            mesh.visible = true;
+        }
+    });
+
+    return (
+        <group ref={groupRef}>
+            {Array.from({ length: POWERUP_COUNT }).map((_, i) => (
+                <mesh key={i}>
+                    <icosahedronGeometry args={[1, 0]} />
+                    <meshStandardMaterial color="#22ff88" emissive="#22ff88" emissiveIntensity={1.2} />
+                </mesh>
+            ))}
+        </group>
+    );
+}
+
 // ─── Main exported wrapper ────────────────────────────────────────────────────
 export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animState, _onRotate, _onHeal }) {
     const worm = useWormCrawler(size, cubies);
@@ -679,6 +772,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             <WormBody worm={worm} size={size} />
             <WormFace worm={worm} size={size} />
             <PortalGlow worm={worm} size={size} />
+            <PowerupOrbs size={size} />
         </>
     );
 }
