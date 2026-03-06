@@ -48,9 +48,9 @@ const INITIAL_POS = (size) => {
 
 // ─── Powerup helpers ─────────────────────────────────────────────────────────
 const POWERUP_COUNT = 5;
-const GROWTH_TILES = 1;         // body-tile counter increment per pickup (HUD)
-const GROWTH_SEGS = 12;         // visual tail segments added per apple pickup
+const ORB_SEGMENT_GROWTH = 2;   // every orb adds exactly 2 visual balls
 const STEPS_PER_TILE = 50;      // sub-steps recorded per tile (0.02 resolution)
+const BASE_TAIL_LENGTH = 4;
 
 function getAllSurfaceTiles(size) {
     const tiles = [];
@@ -117,7 +117,7 @@ function useWormCrawler(size, cubies) {
     const JUMP_SPEED = 3.5;
 
     // Growing tail + powerups
-    const tailLength = useRef(4);
+    const tailLength = useRef(BASE_TAIL_LENGTH);
     const visitedFlipped = useRef(new Set());
     const powerupsRef = useRef([]);  // local fast-access copy of wormPowerups
     const stepHistory = useRef([]);  // one world-pos per tile step, used by WormBody
@@ -131,6 +131,12 @@ function useWormCrawler(size, cubies) {
     const jumpLift = () => isJumping.current
         ? Math.sin(jumpT.current * Math.PI) * JUMP_HEIGHT
         : 0;
+
+    const applyOrbPickupGrowth = () => {
+        tailLength.current = Math.min(tailLength.current + ORB_SEGMENT_GROWTH, MAX_TAIL);
+        const orbCountOnWorm = Math.max(0, Math.floor((tailLength.current - BASE_TAIL_LENGTH) / ORB_SEGMENT_GROWTH));
+        useGameStore.getState().setWormBodyTiles(orbCountOnWorm);
+    };
 
     // ── Per-frame simulation ──────────────────────────────────────────────────
     const tick = useCallback((delta) => {
@@ -250,9 +256,7 @@ function useWormCrawler(size, cubies) {
                 const { x, y, z, dirKey } = pos.current;
                 const puIdx = powerupsRef.current.findIndex(p => p.x === x && p.y === y && p.z === z && p.dirKey === dirKey);
                 if (puIdx !== -1) {
-                    tailLength.current = Math.min(tailLength.current + GROWTH_SEGS, MAX_TAIL);
-                    const newBodyTiles = useGameStore.getState().wormBodyTiles + GROWTH_TILES;
-                    useGameStore.getState().setWormBodyTiles(newBodyTiles);
+                    applyOrbPickupGrowth();
                     const newPowerup = { ...randomFreeTile(size, [...powerupsRef.current, pos.current]), type: 'apple' };
                     const next = [...powerupsRef.current];
                     next[puIdx] = newPowerup;
@@ -270,8 +274,7 @@ function useWormCrawler(size, cubies) {
                     const key = `${x},${y},${z},${dirKey}`;
                     if (!visitedFlipped.current.has(key)) {
                         visitedFlipped.current.add(key);
-                        // Tail grows 3x faster since steps are much denser now (0.15 vs 1.0)
-                        tailLength.current = Math.min(tailLength.current + 8, MAX_TAIL);
+                        applyOrbPickupGrowth();
 
                         // "Eat" the parity orb
                         useGameStore.setState((state) => {
@@ -361,7 +364,7 @@ function useWormCrawler(size, cubies) {
         }
         powerupsRef.current = initial;
         useGameStore.getState().setWormPowerups(initial);
-        useGameStore.getState().setWormBodyTiles(1);
+        useGameStore.getState().setWormBodyTiles(0);
     }, [size]);
 
     return {
@@ -781,4 +784,3 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         </>
     );
 }
-
