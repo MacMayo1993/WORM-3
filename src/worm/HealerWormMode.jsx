@@ -12,13 +12,18 @@ import { getNextSurfacePosition, getActiveTunnels, getTunnelWorldPos, turnWorm }
 import { buildManifoldGridMap, flipStickerPair } from '../game/manifoldLogic.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const CAM_HEIGHT_BASE = 3.2;  // base height above worm (much further back)
-const CAM_BACK_BASE = 2.8;  // base behind distance
+const CAM_HEIGHT_BASE = 4.6;  // base height above worm
+const CAM_BACK_BASE = 4.2;  // base behind distance
 const LOOK_AHEAD = 1.8;  // look-at ahead of worm
 const CAM_LERP = 6;    // camera smoothing (× delta)
 const WORM_LIFT = 0.08; // worm sits right on tile surface
 const ZOOM_BURST = 0.8;  // brief camera pull-back on pickup (decays fast)
 const MAX_EXTRA_ZOOM = 2.0; // hard cap so camera never flies away
+
+const GLASS_MIN_OPACITY = 0.12;
+const GLASS_MAX_OPACITY = 0.28;
+const GLASS_MIN_TRANSMISSION = 0.72;
+const GLASS_MAX_TRANSMISSION = 0.95;
 
 // Face outward normals
 const FACE_NORMALS = {
@@ -399,15 +404,26 @@ function useWormCrawler(size, cubies) {
 
 // ─── Chase Camera (dynamic zoom based on tail length) ───────────────────────
 function WormChaseCamera({ worm, size }) {
-    const { camera } = useThree();
+    const { camera, size: viewportSize } = useThree();
     const camPosRef = useRef(new THREE.Vector3(0, 6, 10));
     const lookAtRef = useRef(new THREE.Vector3(0, 0, 0));
     const zoomExtraRef = useRef(0);   // burst zoom accumulated
-    const prevTailLen = useRef(4);   // detect new parity pickups
+    const prevTailLen = useRef(BASE_TAIL_LENGTH);   // detect new parity pickups
 
     useFrame((_, delta) => {
         const phase = worm.phase.current;
         const tailLen = worm.tailLength.current;
+        const viewportAspect = viewportSize.width / Math.max(1, viewportSize.height);
+
+        // Use a continuous portrait factor so camera framing doesn't jump at aspect=1.
+        const portraitFactor = THREE.MathUtils.clamp((1 - viewportAspect) / 0.45, 0, 1);
+        const targetFov = THREE.MathUtils.lerp(50, 62, portraitFactor);
+        const fovAlpha = Math.min(1, delta * 6);
+        const nextFov = THREE.MathUtils.lerp(camera.fov, targetFov, fovAlpha);
+        if (Math.abs(nextFov - camera.fov) > 0.01) {
+            camera.fov = nextFov;
+            camera.updateProjectionMatrix();
+        }
 
         // Detect new pickup → brief burst zoom that decays quickly
         if (tailLen > prevTailLen.current) {
@@ -421,11 +437,12 @@ function WormChaseCamera({ worm, size }) {
 
         // Permanent zoom grows gently with snake length so you always see the whole cube + worm.
         // Cap is size-relative: a full-coverage snake should just fit in frame.
-        const MAX_PERM_ZOOM = size * 2.2;
-        const permZoom = Math.min(tailLen * 0.018, MAX_PERM_ZOOM);
+        const MAX_PERM_ZOOM = size * 2.6;
+        const permZoom = Math.min(tailLen * 0.028, MAX_PERM_ZOOM);
+        const aspectZoomBoost = THREE.MathUtils.lerp(0, 2.2, portraitFactor);
         const extraZoom = permZoom + Math.min(zoomExtraRef.current, MAX_EXTRA_ZOOM);
-        const camHeight = CAM_HEIGHT_BASE + extraZoom;
-        const camBack = CAM_BACK_BASE + extraZoom * 0.55;
+        const camHeight = CAM_HEIGHT_BASE + extraZoom + aspectZoomBoost;
+        const camBack = CAM_BACK_BASE + extraZoom * 0.8 + aspectZoomBoost * 0.9;
 
         if (phase === 'crawling' || phase === 'entering' || phase === 'exiting') {
             // Smooth interpolated worm world position
@@ -781,6 +798,50 @@ function PowerupOrbs({ size }) {
     );
 }
 
+
+function WormInteriorGlass({ worm, size }) {
+    const glassRef = useRef();
+
+    useFrame(({ clock }) => {
+        if (!glassRef.current) return;
+
+        const phase = worm.phase.current;
+        const isTunnelPhase = phase === 'entering' || phase === 'tunnel' || phase === 'exiting';
+        const tunnelBoost = isTunnelPhase ? 1 : 0;
+        const pulse = (Math.sin(clock.elapsedTime * 4.2) + 1) * 0.5;
+        const transmission = THREE.MathUtils.lerp(GLASS_MIN_TRANSMISSION, GLASS_MAX_TRANSMISSION, tunnelBoost * 0.7 + pulse * 0.3);
+        const opacity = THREE.MathUtils.lerp(GLASS_MIN_OPACITY, GLASS_MAX_OPACITY, tunnelBoost * 0.85 + pulse * 0.15);
+
+        glassRef.current.transmission = transmission;
+        glassRef.current.opacity = opacity;
+        glassRef.current.emissiveIntensity = tunnelBoost * 0.35 + pulse * 0.08;
+    });
+
+    // Keep a thin margin from outer stickers so we read it as an interior shell.
+    const innerSize = Math.max(0.8, size - 1.1);
+
+    return (
+        <mesh>
+            <boxGeometry args={[innerSize, innerSize, innerSize]} />
+            <meshPhysicalMaterial
+                ref={glassRef}
+                color="#b8f6ff"
+                emissive="#4ccfe6"
+                emissiveIntensity={0.06}
+                roughness={0.06}
+                metalness={0.02}
+                transmission={GLASS_MIN_TRANSMISSION}
+                thickness={1.2}
+                ior={1.23}
+                transparent
+                opacity={GLASS_MIN_OPACITY}
+                depthWrite={false}
+                side={THREE.DoubleSide}
+            />
+        </mesh>
+    );
+}
+
 // ─── Main exported wrapper ────────────────────────────────────────────────────
 export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animState, _onRotate, _onHeal }) {
     const worm = useWormCrawler(size, cubies);
@@ -803,6 +864,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         <>
             <WormChaseCamera worm={worm} size={size} />
             <WormSwipeControls onTurn={worm.queueTurn} />
+            <WormInteriorGlass worm={worm} size={size} />
             <WormBody worm={worm} size={size} />
             <WormFace worm={worm} size={size} />
             <PortalGlow worm={worm} size={size} />
