@@ -1054,11 +1054,6 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
               side={THREE.DoubleSide}
             />
           </mesh>
-
-          {/* Defensive mount so AntipodalGlowFill stays a defined symbol in all builds/HMR states.
-              Kept inactive so seam-leak visual direction remains unchanged. */}
-          <AntipodalGlowFill active={false} color={antipodalColor} />
-
           {/* WORM creatures - disabled in Disparity Mode (too many instances at 4×4/5×5) */}
           {!chaosLevel && Array.from({ length: Math.min(meta?.flips ?? 0, 4) }, (_, i) => {
             const count = Math.min(meta?.flips ?? 0, 4);
