@@ -26,7 +26,6 @@ import WoodVolume from './styles/WoodVolume.jsx';
 import { BIOME_GROUND_TEXTURES } from './BiomeGroundTextures.js';
 import { resolveColors } from '../utils/colorSchemes.js';
 import FlipParticles from './FlipParticles.jsx';
-import AntipodalGlowFill from './AntipodalGlowFill.jsx';
 import ParityBreakthrough from './ParityBreakthrough.jsx';
 import StickerWorm from './StickerWorm.jsx';
 import DisparityHealthBar from './DisparityHealthBar.jsx';
@@ -37,7 +36,6 @@ const _sharedStickerGeo = new THREE.PlaneGeometry(0.85, 0.85);
 const sharedRing38_41 = new THREE.RingGeometry(0.38, 0.41, 16);
 const sharedRing35_38 = new THREE.RingGeometry(0.35, 0.38, 16);
 const sharedRing36_40 = new THREE.RingGeometry(0.36, 0.40, 16);
-const sharedCircle44 = new THREE.CircleGeometry(0.44, 16);
 // Scratch vectors for biome edge-on fade.
 const _normal = new THREE.Vector3();
 const _worldQuat = new THREE.Quaternion();
@@ -143,6 +141,32 @@ const hazardCrackFragmentShader = `
 `;
 
 
+const seamLeakFragmentShader = `
+  uniform vec3 uColor;
+  uniform float uTime;
+  uniform float uIntensity;
+  varying vec2 vUv;
+
+  void main() {
+    vec2 uv = vUv;
+    float edge = max(abs(uv.x - 0.5), abs(uv.y - 0.5));
+
+    // Brightness concentrated near the tile perimeter (where dark seams live).
+    float edgeBand = smoothstep(0.38, 0.5, edge);
+    // Suppress center so light does not appear to emit through the middle of the tile.
+    float centerBlock = 1.0 - smoothstep(0.18, 0.28, length(uv - 0.5));
+    float seamMask = edgeBand * (1.0 - centerBlock);
+
+    float waveX = sin((uv.x * 18.0 + uTime * 4.0));
+    float waveY = cos((uv.y * 22.0 - uTime * 3.2));
+    float pulse = 0.55 + (waveX * waveY) * 0.25 + sin(uTime * 7.5) * 0.2;
+
+    float alpha = clamp(seamMask * pulse * uIntensity, 0.0, 1.0);
+    gl_FragColor = vec4(uColor * 1.7, alpha);
+  }
+`;
+
+
 const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay, mode, faceRow, faceCol, faceSize, hollow, currentDir: _currentDir }) {
   // Batch all store reads into a single subscription to minimize Zustand overhead.
   // With 54 stickers on a 3×3 cube, separate selectors = many subscriptions;
@@ -173,12 +197,18 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const spiderPlaneRef = useRef();
   const spiderMatRef = useRef();
   const crackMatRef = useRef();
+  const seamLeakMatRef = useRef();
   const [spiderUniforms] = React.useState(() => ({
     uColor: { value: new THREE.Color() },
     uTime: { value: 0 },
     uBurst: { value: 1.0 }, // Always fully active for ghost tiles
   }));
   const [crackUniforms] = React.useState(() => ({
+    uColor: { value: new THREE.Color('#ffffff') },
+    uTime: { value: 0 },
+    uIntensity: { value: 0 },
+  }));
+  const [seamLeakUniforms] = React.useState(() => ({
     uColor: { value: new THREE.Color('#ffffff') },
     uTime: { value: 0 },
     uIntensity: { value: 0 },
@@ -198,7 +228,6 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // no slot was allocated — those stickers must fall back to individual draw calls.
   const [instancedSlotValid, setInstancedSlotValid] = useState(false);
   const ringRef = useRef();
-  const glowRef = useRef();
   const spinT = useRef(0);
   const shakeT = useRef(0);
   const pulseT = useRef(0);
@@ -536,9 +565,16 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       }
     }
 
-    if (glowRef.current) {
-      const glowIntensity = 0.3 + Math.sin(pulseT.current * 1.5) * 0.2;
-      glowRef.current.material.opacity = glowIntensity;
+    if (crackMatRef.current) {
+      crackMatRef.current.uniforms.uTime.value = state.clock.elapsedTime;
+      crackMatRef.current.uniforms.uIntensity.value = wormhole && !isDead ? 0.85 : 0;
+      crackMatRef.current.uniforms.uColor.value.set(antipodalColor);
+    }
+
+    if (seamLeakMatRef.current) {
+      seamLeakMatRef.current.uniforms.uTime.value = state.clock.elapsedTime;
+      seamLeakMatRef.current.uniforms.uIntensity.value = wormhole && !isDead ? 0.9 : 0;
+      seamLeakMatRef.current.uniforms.uColor.value.set(antipodalColor);
     }
 
     if (crackMatRef.current) {
@@ -998,14 +1034,30 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
             <primitive object={sharedRing36_40} attach="geometry" />
             <meshBasicMaterial color="#dda15e" transparent opacity={0.85} blending={THREE.AdditiveBlending} depthWrite={false} />
           </mesh>
-          <mesh ref={glowRef} position={[0, 0, 0.015]}>
-            <primitive object={sharedCircle44} attach="geometry" />
-            <meshBasicMaterial
-              color="#bc6c25"
+          <mesh position={[0, 0, 0.018]} renderOrder={2}>
+            <primitive object={_sharedStickerGeo} attach="geometry" />
+            <shaderMaterial
+              ref={crackMatRef}
+              vertexShader={hazardCrackVertexShader}
+              fragmentShader={hazardCrackFragmentShader}
+              uniforms={crackUniforms}
               transparent
-              opacity={0.25}
-              blending={THREE.AdditiveBlending}
               depthWrite={false}
+              blending={THREE.AdditiveBlending}
+            />
+          </mesh>
+
+          <mesh position={[0, 0, -0.009]} scale={[1.08, 1.08, 1]} renderOrder={1}>
+            <primitive object={_sharedStickerGeo} attach="geometry" />
+            <shaderMaterial
+              ref={seamLeakMatRef}
+              vertexShader={hazardCrackVertexShader}
+              fragmentShader={seamLeakFragmentShader}
+              uniforms={seamLeakUniforms}
+              transparent
+              depthWrite={false}
+              blending={THREE.AdditiveBlending}
+              side={THREE.DoubleSide}
             />
           </mesh>
 
