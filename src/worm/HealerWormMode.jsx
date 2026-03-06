@@ -210,7 +210,7 @@ function useWormCrawler(size, cubies) {
                 lastRecordedT.current += 0.02; // A guaranteed resolution of 50 mathematical sub-steps per tile traverse
             }
             if (stepHistory.current.length > MAX_TAIL * STEPS_PER_TILE) {
-                stepHistory.current.length = 1500;
+                stepHistory.current.length = MAX_TAIL * STEPS_PER_TILE;
             }
             // -----------------------------------------------------------
 
