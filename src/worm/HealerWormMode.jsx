@@ -131,7 +131,6 @@ function useWormCrawler(size, cubies) {
 
     // Growing tail + powerups
     const tailLength = useRef(BASE_TAIL_LENGTH);
-    const visitedFlipped = useRef(new Set());
     const powerupsRef = useRef([]);  // local fast-access copy of wormPowerups
     const stepHistory = useRef([]);  // one world-pos per tile step, used by WormBody
     const wormholeTimer = useRef(WORMHOLE_FLIP_INTERVAL);
@@ -307,27 +306,7 @@ function useWormCrawler(size, cubies) {
                 const isFlipped = !!(sticker && sticker.curr !== sticker.orig);
                 onFlippedTile.current = isFlipped;
 
-                // Parity pickup — grow tail AND unflipp the tile (consume it)
-                if (isFlipped) {
-                    const key = `${x},${y},${z},${dirKey}`;
-                    if (!visitedFlipped.current.has(key)) {
-                        visitedFlipped.current.add(key);
-                        applyOrbPickupGrowth();
-
-                        // "Eat" the parity orb
-                        useGameStore.setState((state) => {
-                            const mm = buildManifoldGridMap(state.cubies, size);
-                            return {
-                                cubies: flipStickerPair(state.cubies, size, x, y, z, dirKey, mm)
-                            };
-                        });
-
-                        // Reset flipped state immediately so portal disappears
-                        onFlippedTile.current = false;
-                        lastFlippedRef.current = false;
-                        useGameStore.getState().setWormOnFlippedTile(false);
-                    }
-                }
+                // Flipped tiles remain active wormholes until the player deliberately jumps to enter.
 
                 if (isFlipped !== lastFlippedRef.current) {
                     lastFlippedRef.current = isFlipped;
@@ -371,7 +350,7 @@ function useWormCrawler(size, cubies) {
 
     // ── Enter portal ─────────────────────────────────────────────────────────
     const enterPortal = useCallback(() => {
-        if (phase.current !== 'crawling' || !onFlippedTile.current) return;
+        if (phase.current !== 'crawling' || !onFlippedTile.current) return false;
         const tunnels = getActiveTunnels(cubies, size);
         const { x, y, z, dirKey } = pos.current;
         const tunnel = tunnels.find(t =>
@@ -381,7 +360,7 @@ function useWormCrawler(size, cubies) {
             t.exit.x === x && t.exit.y === y &&
             t.exit.z === z && t.exit.dirKey === dirKey
         );
-        if (!tunnel) return;
+        if (!tunnel) return false;
         if (tunnel.exit.x === x && tunnel.exit.y === y && tunnel.exit.z === z) {
             activeTunnel.current = { ...tunnel, entry: tunnel.exit, exit: tunnel.entry };
         } else {
@@ -389,6 +368,8 @@ function useWormCrawler(size, cubies) {
         }
         tunnelProgress.current = 0;
         phase.current = 'entering';
+        useGameStore.getState().setWormPhase('entering');
+        return true;
     }, [cubies, size]);
 
     const queueTurn = useCallback((dir) => { pendingTurn.current = dir; }, []);
@@ -537,7 +518,11 @@ function WormSwipeControls({ onTurn }) {
             if (e.key === 'ArrowLeft') { e.preventDefault(); onTurn('left'); }
             if (e.key === 'ArrowRight') { e.preventDefault(); onTurn('right'); }
             if (e.key === 'ArrowDown') { e.preventDefault(); onTurn('down'); }
-            if (e.key === ' ') { e.preventDefault(); onTurn('jump'); }
+            if (e.key === ' ') {
+                e.preventDefault();
+                const entered = useGameStore.getState()._wormEnterPortal?.() ?? false;
+                if (!entered) onTurn('jump');
+            }
         };
         window.addEventListener('touchstart', onTouchStart, { passive: true });
         window.addEventListener('touchend', onTouchEnd, { passive: true });

@@ -16,7 +16,7 @@ export default function HealerWormHUD({ onHome, onSettings }) {
 
     const handleEnterPortal = () => {
         // Callback registered by HealerWormMode3DWrapper via store
-        useGameStore.getState()._wormEnterPortal?.();
+        return useGameStore.getState()._wormEnterPortal?.() ?? false;
     };
 
     return (

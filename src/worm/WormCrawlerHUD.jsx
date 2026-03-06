@@ -2,7 +2,7 @@
 // Mobile-friendly HUD for WORM Chase-Cam Mode.
 // Speed slider, portal button, healed count, phase indicator.
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useGameStore } from '../hooks/useGameStore.js';
 
 export default function WormCrawlerHUD({ phase, onFlippedTile, onEnterPortal, cubeSize: _cubeSize = 3, onHome, onSettings }) {
@@ -12,12 +12,10 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, onEnterPortal, cu
     const wormholeCountdown = useGameStore(s => s.wormholeCountdown ?? 0);
     const setWormSpeed = useGameStore(s => s.setWormSpeed);
 
-    const [showPortalPulse, setShowPortalPulse] = useState(false);
-
-    // Pulse portal button when on a flipped tile
-    useEffect(() => {
-        setShowPortalPulse(onFlippedTile && phase === 'crawling');
-    }, [onFlippedTile, phase]);
+    const handleJumpAction = () => {
+        const entered = onEnterPortal?.() ?? (useGameStore.getState()._wormEnterPortal?.() ?? false);
+        if (!entered) useGameStore.getState()._wormTurn?.('jump');
+    };
 
     const phaseLabel = {
         crawling: '🐍 CRAWLING',
@@ -121,33 +119,48 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, onEnterPortal, cu
                 />
             </div>
 
-            {/* ENTER PORTAL button — center bottom, only shows on flipped tile */}
-            {showPortalPulse && (
+            {/* Jump to enter wormholes when standing on a flipped tile */}
+            {onFlippedTile && phase === 'crawling' && (
                 <div style={{
-                    position: 'absolute', bottom: 150, left: '50%',
+                    position: 'absolute', bottom: 198, left: '50%',
                     transform: 'translateX(-50%)',
-                    pointerEvents: 'auto',
+                    pointerEvents: 'none',
+                    color: '#ff7af6', fontSize: 11, fontWeight: 800, letterSpacing: 1.2,
+                    textShadow: '0 0 10px rgba(255,122,246,0.8)',
                 }}>
-                    <button
-                        onPointerDown={onEnterPortal}
-                        onTouchStart={e => { e.preventDefault(); onEnterPortal(); }}
-                        style={{
-                            background: 'linear-gradient(135deg, rgba(180,0,255,0.8), rgba(255,0,200,0.6))',
-                            border: '2px solid #ff00ff',
-                            borderRadius: 16, padding: '14px 32px',
-                            color: '#fff', fontSize: 16, fontWeight: 900,
-                            letterSpacing: 3, cursor: 'pointer',
-                            textShadow: '0 0 12px #ff00ff',
-                            boxShadow: '0 0 30px rgba(255,0,255,0.5)',
-                            animation: 'portal-pulse 1s ease-in-out infinite',
-                            touchAction: 'manipulation',
-                            WebkitTapHighlightColor: 'transparent',
-                        }}
-                    >
-                        🌀 ENTER PORTAL
-                    </button>
+                    PRESS JUMP TO ENTER WORMHOLE
                 </div>
             )}
+
+            {/* Jump button — center bottom (mobile) */}
+            <div style={{
+                position: 'absolute', bottom: 132, left: '50%',
+                transform: 'translateX(-50%)',
+                pointerEvents: 'auto',
+            }}>
+                <button
+                    onPointerDown={handleJumpAction}
+                    onTouchStart={e => { e.preventDefault(); handleJumpAction(); }}
+                    style={{
+                        background: onFlippedTile && phase === 'crawling'
+                            ? 'linear-gradient(135deg, rgba(180,0,255,0.82), rgba(255,0,200,0.65))'
+                            : 'linear-gradient(135deg, rgba(0,245,255,0.3), rgba(34,255,136,0.35))',
+                        border: onFlippedTile && phase === 'crawling' ? '2px solid #ff00ff' : '1.5px solid rgba(0,245,255,0.55)',
+                        borderRadius: 14, padding: '11px 24px',
+                        color: '#fff', fontSize: 14, fontWeight: 900,
+                        letterSpacing: 1.4, cursor: 'pointer',
+                        textShadow: '0 0 8px rgba(255,255,255,0.7)',
+                        boxShadow: onFlippedTile && phase === 'crawling'
+                            ? '0 0 24px rgba(255,0,255,0.45)'
+                            : '0 0 18px rgba(0,245,255,0.25)',
+                        animation: onFlippedTile && phase === 'crawling' ? 'portal-pulse 1s ease-in-out infinite' : 'none',
+                        touchAction: 'manipulation',
+                        WebkitTapHighlightColor: 'transparent',
+                    }}
+                >
+                    ⤴ JUMP
+                </button>
+            </div>
 
             {/* D-pad arrows — bottom right (mobile) */}
             <div style={{
