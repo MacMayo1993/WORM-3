@@ -17,8 +17,8 @@ const CAM_BACK_BASE = 2.8;  // base behind distance
 const LOOK_AHEAD = 1.8;  // look-at ahead of worm
 const CAM_LERP = 6;    // camera smoothing (× delta)
 const WORM_LIFT = 0.08; // worm sits right on tile surface
-const ZOOM_PER_SEG = 0.22; // extra height per tail segment
-const ZOOM_BURST = 2.2;  // instant burst zoom on parity pickup
+const ZOOM_BURST = 0.8;  // brief camera pull-back on pickup (decays fast)
+const MAX_EXTRA_ZOOM = 2.0; // hard cap so camera never flies away
 
 // Face outward normals
 const FACE_NORMALS = {
@@ -48,7 +48,8 @@ const INITIAL_POS = (size) => {
 
 // ─── Powerup helpers ─────────────────────────────────────────────────────────
 const POWERUP_COUNT = 5;
-const GROWTH_TILES = 3;         // body tiles gained per pickup
+const GROWTH_TILES = 1;         // body-tile counter increment per pickup (HUD)
+const GROWTH_SEGS = 12;         // visual tail segments added per apple pickup
 const STEPS_PER_TILE = 50;      // sub-steps recorded per tile (0.02 resolution)
 
 function getAllSurfaceTiles(size) {
@@ -249,7 +250,7 @@ function useWormCrawler(size, cubies) {
                 const { x, y, z, dirKey } = pos.current;
                 const puIdx = powerupsRef.current.findIndex(p => p.x === x && p.y === y && p.z === z && p.dirKey === dirKey);
                 if (puIdx !== -1) {
-                    tailLength.current = Math.min(tailLength.current + GROWTH_TILES * STEPS_PER_TILE, MAX_TAIL);
+                    tailLength.current = Math.min(tailLength.current + GROWTH_SEGS, MAX_TAIL);
                     const newBodyTiles = useGameStore.getState().wormBodyTiles + GROWTH_TILES;
                     useGameStore.getState().setWormBodyTiles(newBodyTiles);
                     const newPowerup = { ...randomFreeTile(size, [...powerupsRef.current, pos.current]), type: 'apple' };
@@ -383,19 +384,19 @@ function WormChaseCamera({ worm, size }) {
         const phase = worm.phase.current;
         const tailLen = worm.tailLength.current;
 
-        // Detect new parity pickup → burst
+        // Detect new pickup → brief burst zoom that decays quickly
         if (tailLen > prevTailLen.current) {
             prevTailLen.current = tailLen;
-            zoomExtraRef.current = ZOOM_BURST;
+            zoomExtraRef.current = Math.min(zoomExtraRef.current + ZOOM_BURST, MAX_EXTRA_ZOOM);
         }
         // Decay burst zoom over time
         if (zoomExtraRef.current > 0) {
-            zoomExtraRef.current = Math.max(0, zoomExtraRef.current - delta * 1.8);
+            zoomExtraRef.current = Math.max(0, zoomExtraRef.current - delta * 3.0);
         }
 
-        const extraZoom = (tailLen - 4) * ZOOM_PER_SEG + zoomExtraRef.current;
+        const extraZoom = Math.min(zoomExtraRef.current, MAX_EXTRA_ZOOM);
         const camHeight = CAM_HEIGHT_BASE + extraZoom;
-        const camBack = CAM_BACK_BASE + extraZoom * 0.7;
+        const camBack = CAM_BACK_BASE + extraZoom * 0.5;
 
         if (phase === 'crawling' || phase === 'entering' || phase === 'exiting') {
             // Smooth interpolated worm world position
