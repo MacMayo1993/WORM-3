@@ -40,7 +40,7 @@ const buttonBase = {
     boxShadow: palette.shadow,
 };
 
-export default function WormCrawlerHUD({ phase, onFlippedTile, onEnterPortal, cubeSize: _cubeSize = 3, onHome, onSettings, wormAlive = true, showDeathMenu = false, onTryAgain }) {
+export default function WormCrawlerHUD({ phase, onFlippedTile, onEnterPortal, cubeSize: _cubeSize = 3, onHome, onSettings, wormAlive = true, showDeathMenu = false, onRetry, onNewGame }) {
     const wormSpeed = useGameStore(s => s.wormSpeed ?? 1.0);
     const wormHealedCount = useGameStore(s => s.wormHealedCount ?? 0);
     const wormBodyTiles = useGameStore(s => s.wormBodyTiles ?? 0);
@@ -247,25 +247,43 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, onEnterPortal, cu
                     }}>
                         <div style={{ color: palette.subText, fontSize: 12, fontWeight: 700, letterSpacing: 1.0 }}>WORM COLLISION</div>
                         <div style={{ color: '#f8fafc', fontSize: 24, fontWeight: 800, marginTop: 4 }}>You hit your tail.</div>
-                        <div style={{ color: palette.subText, fontSize: 13, marginTop: 8 }}>Try again from the WORM setup wizard.</div>
-                        <button
-                            onPointerDown={onTryAgain}
-                            style={{
-                                marginTop: 16,
-                                minWidth: 190,
-                                borderRadius: 12,
-                                padding: '10px 16px',
-                                fontSize: 14,
-                                fontWeight: 800,
-                                letterSpacing: 0.7,
-                                color: '#f8fafc',
-                                background: 'linear-gradient(135deg, #2563eb, #7c3aed)',
-                                border: `1px solid ${palette.strongBorder}`,
-                                cursor: 'pointer',
-                            }}
-                        >
-                            Try Again
-                        </button>
+                        <div style={{ color: palette.subText, fontSize: 13, marginTop: 8 }}>Retry this run or start a new game mode.</div>
+                        <div style={{ marginTop: 16, display: 'flex', gap: 10, justifyContent: 'center' }}>
+                            <button
+                                onPointerDown={onRetry}
+                                style={{
+                                    minWidth: 120,
+                                    borderRadius: 12,
+                                    padding: '10px 16px',
+                                    fontSize: 14,
+                                    fontWeight: 800,
+                                    letterSpacing: 0.7,
+                                    color: '#f8fafc',
+                                    background: 'linear-gradient(135deg, #2563eb, #7c3aed)',
+                                    border: `1px solid ${palette.strongBorder}`,
+                                    cursor: 'pointer',
+                                }}
+                            >
+                                Retry
+                            </button>
+                            <button
+                                onPointerDown={onNewGame}
+                                style={{
+                                    minWidth: 120,
+                                    borderRadius: 12,
+                                    padding: '10px 16px',
+                                    fontSize: 14,
+                                    fontWeight: 800,
+                                    letterSpacing: 0.7,
+                                    color: '#f8fafc',
+                                    background: 'linear-gradient(135deg, #334155, #1e293b)',
+                                    border: `1px solid ${palette.border}`,
+                                    cursor: 'pointer',
+                                }}
+                            >
+                                New Game
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

@@ -104,7 +104,7 @@ export default function UILayer({
     onMenuPlay, onMenuLevels, onMenuFreeplay, onMenuCoop, onMenuTeach,
     onMenuSettings, onMenuBiome, onMenuDisparity, onMenuWormHealer, onMenuHolonomy,
     onWizardComplete, onWizardCancel, onDisparitySetupComplete,
-    onWormSetupComplete, onWormWizardCancel, onWormTryAgain,
+    onWormSetupComplete, onWormWizardCancel, onWormRetry, onWormNewGame,
     onToggleHandsMode, onFaceRotate, onTileRotation, onTileFaceRotation,
     onVictoryContinue, onVictoryNewGame,
   } = handlers;
@@ -236,7 +236,7 @@ export default function UILayer({
         {(!wormHealerMode && (chaosMode || disparityWinner)) && <DisparityHUD />}
 
         {/* Healer Worm HUD Overlay */}
-        <HealerWormHUD onHome={onBackToMainMenu} onSettings={() => setShowSettings(true)} onTryAgain={onWormTryAgain} />
+        <HealerWormHUD onHome={onBackToMainMenu} onSettings={() => setShowSettings(true)} onRetry={onWormRetry} onNewGame={onWormNewGame} />
 
         {/* Disparity countdown — 3-2-1-GO overlay before chaos starts */}
         {disparityCountdown !== null && (

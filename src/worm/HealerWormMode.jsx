@@ -55,6 +55,7 @@ const INITIAL_POS = (size) => {
 const POWERUP_COUNT = 5;
 const ORB_SEGMENT_GROWTH = 2;   // every orb adds exactly 2 visual balls
 const STEPS_PER_TILE = 50;      // sub-steps recorded per tile (0.02 resolution)
+const BODY_BALL_SPACING = 0.14; // matches WormBody clone spacing along the trail
 const BASE_TAIL_LENGTH = 4;
 const WORMHOLE_FLIP_INTERVAL = 10; // seconds between guaranteed antipodal wormhole spawns
 
@@ -301,8 +302,12 @@ function useWormCrawler(size, cubies) {
                     const crossedFace = next.dirKey !== oldDirKey;
                     const nextPos = { x: next.x, y: next.y, z: next.z, dirKey: next.dirKey };
                     const nextKey = tileKey(nextPos);
-                    const bodyWindow = Math.max(2, Math.round(tailLength.current));
-                    const selfHit = tileTrail.current.slice(0, bodyWindow).includes(nextKey);
+                    // tailLength is measured in visual balls, not tiles.
+                    // Convert to approximate occupied tile count so collision checks align with what players see.
+                    const occupiedTiles = Math.max(1, Math.ceil((tailLength.current * BODY_BALL_SPACING) / 1.0));
+                    const bodyTilesBehindHead = Math.max(0, occupiedTiles - 1);
+                    const bodyTrail = tileTrail.current.slice(1, 1 + bodyTilesBehindHead);
+                    const selfHit = bodyTrail.includes(nextKey);
                     if (selfHit) {
                         killWorm();
                         return;

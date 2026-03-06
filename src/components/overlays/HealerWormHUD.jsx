@@ -6,7 +6,7 @@ import React from 'react';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import WormCrawlerHUD from '../../worm/WormCrawlerHUD.jsx';
 
-export default function HealerWormHUD({ onHome, onSettings, onTryAgain }) {
+export default function HealerWormHUD({ onHome, onSettings, onRetry, onNewGame }) {
     const wormHealerMode = useGameStore(s => s.wormHealerMode);
     const wormPhase = useGameStore(s => s.wormPhase);
     const wormOnFlippedTile = useGameStore(s => s.wormOnFlippedTile);
@@ -31,7 +31,8 @@ export default function HealerWormHUD({ onHome, onSettings, onTryAgain }) {
             onSettings={onSettings}
             wormAlive={wormAlive}
             showDeathMenu={showWormDeathMenu}
-            onTryAgain={onTryAgain}
+            onRetry={onRetry}
+            onNewGame={onNewGame}
         />
     );
 }
