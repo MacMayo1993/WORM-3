@@ -446,6 +446,7 @@ function useWormCrawler(size, cubies) {
         tailLength.current = BASE_TAIL_LENGTH;
         stepHistory.current = [];
         lastRecordedT.current = 0;
+        healedRef.current = 0;
 
         powerupsRef.current = initial;
         alive.current = true;
@@ -453,6 +454,7 @@ function useWormCrawler(size, cubies) {
         useGameStore.setState({
             wormPowerups: initial,
             wormBodyTiles: 0,
+            wormHealedCount: 0,
             wormholeCountdown: WORMHOLE_FLIP_INTERVAL,
             wormAlive: true,
             showWormDeathMenu: false,
