@@ -577,12 +577,6 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       seamLeakMatRef.current.uniforms.uColor.value.set(antipodalColor);
     }
 
-    if (crackMatRef.current) {
-      crackMatRef.current.uniforms.uTime.value = state.clock.elapsedTime;
-      crackMatRef.current.uniforms.uIntensity.value = wormhole && !isDead ? 0.95 : 0;
-      crackMatRef.current.uniforms.uColor.value.set(antipodalColor);
-    }
-
     // Persistent tremor for flipped tiles — the parity violation makes the tile unstable
     // Dead tiles (flips >= FLIP_CAP) are inert — no tremor
     if (wormhole && !isDead && groupRef.current && spinT.current <= 0 && shakeT.current <= 0) {
@@ -1061,20 +1055,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
             />
           </mesh>
 
-          <mesh position={[0, 0, 0.018]} renderOrder={2}>
-            <primitive object={_sharedStickerGeo} attach="geometry" />
-            <shaderMaterial
-              ref={crackMatRef}
-              vertexShader={hazardCrackVertexShader}
-              fragmentShader={hazardCrackFragmentShader}
-              uniforms={crackUniforms}
-              transparent
-              depthWrite={false}
-              blending={THREE.AdditiveBlending}
-            />
-          </mesh>
-
-          <AntipodalGlowFill active={isWormhole} color={antipodalColor} />
+          {/* Defensive mount so AntipodalGlowFill stays a defined symbol in all builds/HMR states.
+              Kept inactive so seam-leak visual direction remains unchanged. */}
+          <AntipodalGlowFill active={false} color={antipodalColor} />
 
           {/* WORM creatures - disabled in Disparity Mode (too many instances at 4×4/5×5) */}
           {!chaosLevel && Array.from({ length: Math.min(meta?.flips ?? 0, 4) }, (_, i) => {
