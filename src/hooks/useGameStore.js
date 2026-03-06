@@ -243,6 +243,7 @@ export const useGameStore = create(
     }),
     setWormHealerMode: (v) => set({ wormHealerMode: v }),
     setHolonomyMode: (v) => set({ holonomyMode: v }),
+    wormRunId: 0,
     wormSpeed: 1.0,
     setWormSpeed: (v) => set({ wormSpeed: v }),
     wormHealedCount: 0,
@@ -257,10 +258,14 @@ export const useGameStore = create(
     setWormPowerups: (v) => set({ wormPowerups: v }),
     wormholeCountdown: 0,
     setWormholeCountdown: (v) => set({ wormholeCountdown: v }),
-    clearDisparityGame: () => set({ disparityDeaths: [], disparityDeathByGridId: {}, disparityWinner: null, showDisparityWinner: false, disparityEliminatedFaces: [], cascades: [], wormHealerMode: false, holonomyMode: false, wormHealedCount: 0, wormPhase: 'crawling', wormOnFlippedTile: false, wormBodyTiles: 0, wormPowerups: [], wormholeCountdown: 0 }),
+    wormAlive: true,
+    setWormAlive: (v) => set({ wormAlive: v }),
+    showWormDeathMenu: false,
+    setShowWormDeathMenu: (v) => set({ showWormDeathMenu: v }),
+    clearDisparityGame: () => set({ disparityDeaths: [], disparityDeathByGridId: {}, disparityWinner: null, showDisparityWinner: false, disparityEliminatedFaces: [], cascades: [], wormHealerMode: false, holonomyMode: false, wormHealedCount: 0, wormPhase: 'crawling', wormOnFlippedTile: false, wormBodyTiles: 0, wormPowerups: [], wormholeCountdown: 0, wormAlive: true, showWormDeathMenu: false }),
     // Atomic init for Worm Mode — clears disparity state AND enables worm in one set()
     // so wormHealerMode:true can never be clobbered by the reset.
-    initWormMode: (flipCap = 9999, chaosLevel = 1) => set({ disparityDeaths: [], disparityDeathByGridId: {}, disparityWinner: null, showDisparityWinner: false, disparityEliminatedFaces: [], cascades: [], holonomyMode: false, wormHealedCount: 0, wormPhase: 'crawling', wormOnFlippedTile: false, wormBodyTiles: 0, wormPowerups: [], wormholeCountdown: 0, wormHealerMode: true, disparityFlipCap: flipCap, chaosLevel }),
+    initWormMode: (flipCap = 9999, chaosLevel = 1) => set((state) => ({ disparityDeaths: [], disparityDeathByGridId: {}, disparityWinner: null, showDisparityWinner: false, disparityEliminatedFaces: [], cascades: [], holonomyMode: false, wormHealedCount: 0, wormPhase: 'crawling', wormOnFlippedTile: false, wormBodyTiles: 0, wormPowerups: [], wormholeCountdown: 0, wormAlive: true, showWormDeathMenu: false, wormHealerMode: true, disparityFlipCap: flipCap, chaosLevel, wormRunId: (state.wormRunId ?? 0) + 1 })),
 
     // ========================================================================
     // ANIMATION STATE
