@@ -98,6 +98,51 @@ const spiderFragmentShader = `
 `;
 
 
+const hazardCrackVertexShader = `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const hazardCrackFragmentShader = `
+  uniform vec3 uColor;
+  uniform float uTime;
+  uniform float uIntensity;
+  varying vec2 vUv;
+
+  float hash21(vec2 p) {
+    p = fract(p * vec2(123.34, 456.21));
+    p += dot(p, p + 45.32);
+    return fract(p.x * p.y);
+  }
+
+  void main() {
+    vec2 uv = vUv - 0.5;
+    float dist = length(uv);
+    if (dist > 0.5) discard;
+
+    float radialMask = smoothstep(0.5, 0.18, dist);
+    float angle = atan(uv.y, uv.x);
+    float angleN = (angle + 3.14159265) / 6.2831853;
+
+    float crackA = abs(fract(angleN * 7.0 + sin(dist * 20.0 + uTime * 2.1) * 0.06) - 0.5);
+    float crackB = abs(fract(angleN * 11.0 + cos(dist * 26.0 - uTime * 2.7) * 0.08) - 0.5);
+    float crackLines = (1.0 - smoothstep(0.0, 0.05, crackA)) + (1.0 - smoothstep(0.0, 0.04, crackB));
+
+    float ringCrack = 1.0 - smoothstep(0.0, 0.035, abs(dist - (0.25 + sin(angle * 3.0 + uTime * 3.0) * 0.02)));
+    float shards = smoothstep(0.78, 1.0, hash21(floor((uv + 0.5) * 18.0) + uTime * 0.02));
+
+    float crackMask = clamp(crackLines * 0.45 + ringCrack * 0.6 + shards * 0.25, 0.0, 1.0);
+    float pulse = 0.65 + sin(uTime * 8.0 + angle * 5.0) * 0.35;
+    float alpha = crackMask * radialMask * pulse * uIntensity;
+
+    gl_FragColor = vec4(uColor * 1.9, alpha);
+  }
+`;
+
+
 const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay, mode, faceRow, faceCol, faceSize, hollow, currentDir: _currentDir }) {
   // Batch all store reads into a single subscription to minimize Zustand overhead.
   // With 54 stickers on a 3×3 cube, separate selectors = many subscriptions;
@@ -127,10 +172,16 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
   const spiderPlaneRef = useRef();
   const spiderMatRef = useRef();
+  const crackMatRef = useRef();
   const [spiderUniforms] = React.useState(() => ({
     uColor: { value: new THREE.Color() },
     uTime: { value: 0 },
     uBurst: { value: 1.0 }, // Always fully active for ghost tiles
+  }));
+  const [crackUniforms] = React.useState(() => ({
+    uColor: { value: new THREE.Color('#ffffff') },
+    uTime: { value: 0 },
+    uIntensity: { value: 0 },
   }));
 
   // ── InstancedMesh batch integration ─────────────────────────────────────────
@@ -490,6 +541,12 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       glowRef.current.material.opacity = glowIntensity;
     }
 
+    if (crackMatRef.current) {
+      crackMatRef.current.uniforms.uTime.value = state.clock.elapsedTime;
+      crackMatRef.current.uniforms.uIntensity.value = wormhole && !isDead ? 0.95 : 0;
+      crackMatRef.current.uniforms.uColor.value.set(antipodalColor);
+    }
+
     // Persistent tremor for flipped tiles — the parity violation makes the tile unstable
     // Dead tiles (flips >= FLIP_CAP) are inert — no tremor
     if (wormhole && !isDead && groupRef.current && spinT.current <= 0 && shakeT.current <= 0) {
@@ -500,7 +557,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       // Multi-frequency vibration for organic feel
       const jX = Math.sin(t * 19 + pos[0] * 7) * tremIntensity
         + Math.sin(t * 33 + pos[1] * 11) * tremIntensity * 0.5;
-      const jY = Math.cos(t * 17 + pos[2] * 8) * tremIntensity * 0.3;
+      const hop = Math.max(0, Math.sin(t * (6 + flips * 0.8) + pos[0] * 2.3 + pos[2] * 1.8)) * (0.008 + flips * 0.002);
+      const jY = Math.cos(t * 17 + pos[2] * 8) * tremIntensity * 0.3 + hop;
       const jZ = Math.cos(t * 24 + pos[1] * 9) * tremIntensity * 0.8
         + Math.cos(t * 41 + pos[0] * 13) * tremIntensity * 0.4;
 
@@ -950,6 +1008,21 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
               depthWrite={false}
             />
           </mesh>
+
+          <mesh position={[0, 0, 0.018]} renderOrder={2}>
+            <primitive object={_sharedStickerGeo} attach="geometry" />
+            <shaderMaterial
+              ref={crackMatRef}
+              vertexShader={hazardCrackVertexShader}
+              fragmentShader={hazardCrackFragmentShader}
+              uniforms={crackUniforms}
+              transparent
+              depthWrite={false}
+              blending={THREE.AdditiveBlending}
+            />
+          </mesh>
+
+          <AntipodalGlowFill active={isWormhole} color={antipodalColor} />
 
           {/* WORM creatures - disabled in Disparity Mode (too many instances at 4×4/5×5) */}
           {!chaosLevel && Array.from({ length: Math.min(meta?.flips ?? 0, 4) }, (_, i) => {
