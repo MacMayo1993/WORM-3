@@ -251,14 +251,14 @@ export const useGameStore = create(
     setWormPhase: (v) => set({ wormPhase: v }),
     wormOnFlippedTile: false,
     setWormOnFlippedTile: (v) => set({ wormOnFlippedTile: v }),
-    wormBodyTiles: 1,
+    wormBodyTiles: 0,
     setWormBodyTiles: (v) => set({ wormBodyTiles: v }),
     wormPowerups: [],
     setWormPowerups: (v) => set({ wormPowerups: v }),
-    clearDisparityGame: () => set({ disparityDeaths: [], disparityDeathByGridId: {}, disparityWinner: null, showDisparityWinner: false, disparityEliminatedFaces: [], cascades: [], wormHealerMode: false, holonomyMode: false, wormHealedCount: 0, wormPhase: 'crawling', wormOnFlippedTile: false, wormBodyTiles: 1, wormPowerups: [] }),
+    clearDisparityGame: () => set({ disparityDeaths: [], disparityDeathByGridId: {}, disparityWinner: null, showDisparityWinner: false, disparityEliminatedFaces: [], cascades: [], wormHealerMode: false, holonomyMode: false, wormHealedCount: 0, wormPhase: 'crawling', wormOnFlippedTile: false, wormBodyTiles: 0, wormPowerups: [] }),
     // Atomic init for Worm Mode — clears disparity state AND enables worm in one set()
     // so wormHealerMode:true can never be clobbered by the reset.
-    initWormMode: (flipCap = 9999, chaosLevel = 1) => set({ disparityDeaths: [], disparityDeathByGridId: {}, disparityWinner: null, showDisparityWinner: false, disparityEliminatedFaces: [], cascades: [], holonomyMode: false, wormHealedCount: 0, wormPhase: 'crawling', wormOnFlippedTile: false, wormBodyTiles: 1, wormPowerups: [], wormHealerMode: true, disparityFlipCap: flipCap, chaosLevel }),
+    initWormMode: (flipCap = 9999, chaosLevel = 1) => set({ disparityDeaths: [], disparityDeathByGridId: {}, disparityWinner: null, showDisparityWinner: false, disparityEliminatedFaces: [], cascades: [], holonomyMode: false, wormHealedCount: 0, wormPhase: 'crawling', wormOnFlippedTile: false, wormBodyTiles: 0, wormPowerups: [], wormHealerMode: true, disparityFlipCap: flipCap, chaosLevel }),
 
     // ========================================================================
     // ANIMATION STATE
