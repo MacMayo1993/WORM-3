@@ -1,7 +1,7 @@
 // src/worm/HealerWormMode.jsx
 // WORM Chase-Cam Mode — complete rewrite.
 // Chase camera follows the worm crawling on the cube exterior.
-// Disparity Level 1 runs in background. Tap a flipped tile to ride the antipodal tunnel.
+// Disparity Level 1 runs in background. Flipped tiles are instant wormholes; jump to clear them.
 
 import React, { useRef, useCallback, useEffect } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
@@ -107,6 +107,7 @@ const MAX_TAIL = 1200;
 
 function useWormCrawler(size, cubies) {
     const wormSpeed = useGameStore(s => s.wormSpeed ?? 0.4);
+    const wormRunId = useGameStore(s => s.wormRunId ?? 0);
     const healedRef = useRef(0);
 
     const pos = useRef(INITIAL_POS(size));
@@ -345,11 +346,35 @@ function useWormCrawler(size, cubies) {
                 const isFlipped = !!(sticker && sticker.curr !== sticker.orig);
                 onFlippedTile.current = isFlipped;
 
-                // Flipped tiles remain active wormholes until the player deliberately jumps to enter.
+                // Flipped tiles are instant wormholes unless the player is currently jumping over them.
 
                 if (isFlipped !== lastFlippedRef.current) {
                     lastFlippedRef.current = isFlipped;
                     useGameStore.getState().setWormOnFlippedTile(isFlipped);
+                }
+
+                if (isFlipped && !isJumping.current) {
+                    const tunnels = getActiveTunnels(cubies, size);
+                    const tunnel = tunnels.find(t =>
+                        t.entry.x === x && t.entry.y === y &&
+                        t.entry.z === z && t.entry.dirKey === dirKey
+                    ) || tunnels.find(t =>
+                        t.exit.x === x && t.exit.y === y &&
+                        t.exit.z === z && t.exit.dirKey === dirKey
+                    );
+
+                    if (tunnel) {
+                        if (tunnel.exit.x === x && tunnel.exit.y === y && tunnel.exit.z === z) {
+                            activeTunnel.current = { ...tunnel, entry: tunnel.exit, exit: tunnel.entry };
+                        } else {
+                            activeTunnel.current = tunnel;
+                        }
+                        tunnelProgress.current = 0;
+                        phase.current = 'entering';
+                        onFlippedTile.current = false;
+                        lastFlippedRef.current = false;
+                        useGameStore.setState({ wormPhase: 'entering', wormOnFlippedTile: false });
+                    }
                 }
             }
         } else if (phase.current === 'entering') {
@@ -387,29 +412,7 @@ function useWormCrawler(size, cubies) {
         }
     }, [size, cubies, wormSpeed]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // ── Enter portal ─────────────────────────────────────────────────────────
-    const enterPortal = useCallback(() => {
-        if (phase.current !== 'crawling' || !onFlippedTile.current) return false;
-        const tunnels = getActiveTunnels(cubies, size);
-        const { x, y, z, dirKey } = pos.current;
-        const tunnel = tunnels.find(t =>
-            t.entry.x === x && t.entry.y === y &&
-            t.entry.z === z && t.entry.dirKey === dirKey
-        ) || tunnels.find(t =>
-            t.exit.x === x && t.exit.y === y &&
-            t.exit.z === z && t.exit.dirKey === dirKey
-        );
-        if (!tunnel) return false;
-        if (tunnel.exit.x === x && tunnel.exit.y === y && tunnel.exit.z === z) {
-            activeTunnel.current = { ...tunnel, entry: tunnel.exit, exit: tunnel.entry };
-        } else {
-            activeTunnel.current = tunnel;
-        }
-        tunnelProgress.current = 0;
-        phase.current = 'entering';
-        useGameStore.getState().setWormPhase('entering');
-        return true;
-    }, [cubies, size]);
+
 
     const queueTurn = useCallback((dir) => { pendingTurn.current = dir; }, []);
 
@@ -420,6 +423,30 @@ function useWormCrawler(size, cubies) {
         for (let i = 0; i < POWERUP_COUNT; i++) {
             initial.push({ ...randomFreeTile(size, [...initial, startPos]), type: 'apple' });
         }
+
+        // Full local-state reset for new runs (retry/new setup), not only on size changes.
+        pos.current = startPos;
+        moveDir.current = INITIAL_DIR;
+        phase.current = 'crawling';
+        tunnelProgress.current = 0;
+        activeTunnel.current = null;
+        stepAcc.current = 0;
+        pendingTurn.current = null;
+        onFlippedTile.current = false;
+        lastFlippedRef.current = false;
+        prevDirKey.current = null;
+        crossingCorner.current = false;
+        interpT.current = 1;
+        prevWorldPos.current = null;
+        curWorldPos.current = getWorldPos(startPos);
+        headInterpPos.current.copy(curWorldPos.current);
+        currentNormal.current.copy(FACE_NORMALS[startPos.dirKey] ?? new THREE.Vector3(0, 0, 1));
+        isJumping.current = false;
+        jumpT.current = 0;
+        tailLength.current = BASE_TAIL_LENGTH;
+        stepHistory.current = [];
+        lastRecordedT.current = 0;
+
         powerupsRef.current = initial;
         alive.current = true;
         tileTrail.current = [tileKey(startPos)];
@@ -430,16 +457,17 @@ function useWormCrawler(size, cubies) {
             wormAlive: true,
             showWormDeathMenu: false,
             wormPhase: 'crawling',
+            wormOnFlippedTile: false,
         });
         wormholeTimer.current = WORMHOLE_FLIP_INTERVAL;
         lastCountdownDeci.current = Math.round(WORMHOLE_FLIP_INTERVAL * 10);
-    }, [size]);
+    }, [size, wormRunId]);
 
     return {
         pos, moveDir, phase, tunnelProgress, activeTunnel, onFlippedTile,
         interpT, prevWorldPos, curWorldPos, jumpT, isJumping, jumpLift,
         headInterpPos, currentNormal,
-        tailLength, stepHistory, tick, enterPortal, queueTurn
+        tailLength, stepHistory, tick, queueTurn
     };
 }
 
@@ -578,8 +606,7 @@ function WormSwipeControls({ onTurn }) {
             if (e.key === 'ArrowDown') { e.preventDefault(); onTurn('down'); }
             if (e.key === ' ') {
                 e.preventDefault();
-                const entered = useGameStore.getState()._wormEnterPortal?.() ?? false;
-                if (!entered) onTurn('jump');
+                onTurn('jump');
             }
         };
         window.addEventListener('touchstart', onTouchStart, { passive: true });
@@ -888,14 +915,11 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     const worm = useWormCrawler(size, cubies);
 
     useEffect(() => {
-        useGameStore.setState({
-            _wormEnterPortal: worm.enterPortal,
-            _wormTurn: worm.queueTurn,
-        });
+        useGameStore.setState({ _wormTurn: worm.queueTurn });
         return () => {
-            useGameStore.setState({ _wormEnterPortal: null, _wormTurn: null });
+            useGameStore.setState({ _wormTurn: null });
         };
-    }, [worm.enterPortal, worm.queueTurn]);
+    }, [worm.queueTurn]);
 
     useFrame((_, delta) => {
         worm.tick(delta);

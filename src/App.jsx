@@ -539,8 +539,8 @@ export default function WORM3() {
 
   const handleWormNewGame = useCallback(() => {
     useGameStore.getState().clearDisparityGame();
-    useGameStore.getState().setShowMainMenu(true);
-    setShowWormModeWizard(false);
+    useGameStore.getState().setShowMainMenu(false);
+    setShowWormModeWizard(true);
   }, []);
 
   const handleMenuHolonomy = useCallback(() => {

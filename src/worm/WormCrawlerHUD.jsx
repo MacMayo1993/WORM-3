@@ -40,7 +40,7 @@ const buttonBase = {
     boxShadow: palette.shadow,
 };
 
-export default function WormCrawlerHUD({ phase, onFlippedTile, onEnterPortal, cubeSize: _cubeSize = 3, onHome, onSettings, wormAlive = true, showDeathMenu = false, onRetry, onNewGame }) {
+export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSize = 3, onHome, onSettings, wormAlive = true, showDeathMenu = false, onRetry, onNewGame }) {
     const wormSpeed = useGameStore(s => s.wormSpeed ?? 1.0);
     const wormHealedCount = useGameStore(s => s.wormHealedCount ?? 0);
     const wormBodyTiles = useGameStore(s => s.wormBodyTiles ?? 0);
@@ -49,8 +49,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, onEnterPortal, cu
 
     const handleJumpAction = () => {
         if (!wormAlive) return;
-        const entered = onEnterPortal?.() ?? (useGameStore.getState()._wormEnterPortal?.() ?? false);
-        if (!entered) useGameStore.getState()._wormTurn?.('jump');
+        useGameStore.getState()._wormTurn?.('jump');
     };
 
     const phaseMeta = PHASE_META[phase] || { label: phase || 'CRAWLING', accent: '#93c5fd' };
@@ -151,7 +150,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, onEnterPortal, cu
                     borderRadius: 999,
                     padding: '6px 12px',
                 }}>
-                    Jump to enter wormhole
+                    Jump over wormhole
                 </div>
             )}
 
