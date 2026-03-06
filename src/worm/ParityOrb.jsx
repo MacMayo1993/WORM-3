@@ -17,89 +17,169 @@ const ORB_COLORS = [
 ];
 
 function SingleOrb({ position, colorIndex = 0, collected = false, isTarget = false }) {
-  const meshRef = useRef();
+  const orbGroupRef = useRef();
+  const coreRef = useRef();
+  const shellRef = useRef();
   const glowRef = useRef();
   const targetGlowRef = useRef();
+  const orbitSystemRef = useRef();
+  const ringARef = useRef();
+  const ringBRef = useRef();
+  const ringCRef = useRef();
+  const electronRefs = useRef([]);
   const timeOffset = useMemo(() => Math.random() * Math.PI * 2, []);
 
   const color = ORB_COLORS[colorIndex % ORB_COLORS.length];
 
   useFrame((state) => {
-    if (!meshRef.current) return;
+    const core = coreRef.current;
+    const orbGroup = orbGroupRef.current;
+    if (!core || !orbGroup) return;
 
     const t = state.clock.elapsedTime + timeOffset;
 
-    // Floating bob animation - more intense if target
-    const bobIntensity = isTarget ? 0.12 : 0.05;
-    meshRef.current.position.y = position[1] + Math.sin(t * 2) * bobIntensity;
+    // Whole-orb floating motion
+    const bobIntensity = isTarget ? 0.13 : 0.06;
+    orbGroup.position.y = position[1] + Math.sin(t * 2.1) * bobIntensity;
 
-    // Rotation - faster if target
-    const rotSpeed = isTarget ? 1.5 : 0.5;
-    meshRef.current.rotation.y = t * rotSpeed;
-    meshRef.current.rotation.x = Math.sin(t * 0.3) * 0.2;
+    // Core quantum-spin wobble
+    core.rotation.y = t * (isTarget ? 1.7 : 1.0);
+    core.rotation.x = Math.sin(t * 1.4) * 0.2;
 
-    // Pulse scale - larger pulse if target
-    const pulseIntensity = isTarget ? 0.3 : 0.15;
-    const pulse = 1 + Math.sin(t * 4) * pulseIntensity;
-    meshRef.current.scale.setScalar(pulse);
+    // Pulse for energy breathing
+    const pulse = 1 + Math.sin(t * (isTarget ? 5.2 : 3.8)) * (isTarget ? 0.18 : 0.1);
+    core.scale.setScalar(pulse);
 
-    // Glow intensity pulse
-    if (glowRef.current) {
-      const baseOpacity = isTarget ? 0.5 : 0.3;
-      glowRef.current.material.opacity = baseOpacity + Math.sin(t * 4) * 0.15;
+    // Outer shell subtle counter-spin
+    if (shellRef.current) {
+      shellRef.current.rotation.y = -t * 0.65;
+      shellRef.current.rotation.x = t * 0.35;
+      const shellPulse = 1 + Math.sin(t * 2.8) * 0.06;
+      shellRef.current.scale.setScalar(shellPulse);
     }
 
-    // Target highlight glow
+    // Electron orbit system rotates as a whole
+    if (orbitSystemRef.current) {
+      orbitSystemRef.current.rotation.y = t * (isTarget ? 2.6 : 1.8);
+      orbitSystemRef.current.rotation.x = Math.sin(t * 0.8) * 0.65;
+      orbitSystemRef.current.rotation.z = Math.cos(t * 0.55) * 0.5;
+    }
+
+    // Three intersecting orbit rings
+    if (ringARef.current) ringARef.current.rotation.z = t * 1.5;
+    if (ringBRef.current) ringBRef.current.rotation.x = t * 1.2;
+    if (ringCRef.current) ringCRef.current.rotation.y = t * 1.35;
+
+    // Electron points running on different paths
+    electronRefs.current.forEach((el, i) => {
+      if (!el) return;
+      const radius = isTarget ? 0.43 : 0.36;
+      const speed = (isTarget ? 2.4 : 1.8) + i * 0.35;
+      const phase = t * speed + i * (Math.PI * 2 / 3);
+      if (i === 0) {
+        el.position.set(Math.cos(phase) * radius, Math.sin(phase) * radius, 0);
+      } else if (i === 1) {
+        el.position.set(Math.cos(phase) * radius, 0, Math.sin(phase) * radius);
+      } else {
+        el.position.set(0, Math.cos(phase) * radius, Math.sin(phase) * radius);
+      }
+      const ePulse = 1 + Math.sin(t * 8 + i * 2) * 0.18;
+      el.scale.setScalar((isTarget ? 1.15 : 1) * ePulse);
+    });
+
+    // Global glow pulse
+    if (glowRef.current) {
+      const baseOpacity = isTarget ? 0.48 : 0.28;
+      glowRef.current.material.opacity = baseOpacity + Math.sin(t * 4.5) * 0.14;
+      glowRef.current.scale.setScalar(1 + Math.sin(t * 2.7) * 0.08);
+    }
+
     if (targetGlowRef.current && isTarget) {
-      targetGlowRef.current.scale.setScalar(1 + Math.sin(t * 6) * 0.2);
-      targetGlowRef.current.material.opacity = 0.2 + Math.sin(t * 6) * 0.1;
+      targetGlowRef.current.rotation.z = t * 0.9;
+      targetGlowRef.current.scale.setScalar(1 + Math.sin(t * 6.5) * 0.2);
+      targetGlowRef.current.material.opacity = 0.22 + Math.sin(t * 6.2) * 0.08;
     }
   });
 
   if (collected) return null;
 
+  const coreRadius = isTarget ? 0.2 : 0.16;
+  const orbitRadius = isTarget ? 0.42 : 0.35;
+
   return (
-    <group position={[position[0], position[1], position[2]]}>
-      {/* Core orb */}
-      <mesh ref={meshRef}>
-        <icosahedronGeometry args={[isTarget ? 0.22 : 0.18, 1]} />
+    <group ref={orbGroupRef} position={[position[0], position[1], position[2]]}>
+      {/* Core nucleus */}
+      <mesh ref={coreRef}>
+        <icosahedronGeometry args={[coreRadius, 2]} />
         <meshStandardMaterial
           color={color}
           emissive={color}
-          emissiveIntensity={isTarget ? 1.8 : 1.2}
-          metalness={0.3}
-          roughness={0.2}
+          emissiveIntensity={isTarget ? 2.0 : 1.35}
+          metalness={0.22}
+          roughness={0.15}
         />
       </mesh>
 
-      {/* Outer glow */}
-      <mesh ref={glowRef}>
-        <sphereGeometry args={[isTarget ? 0.45 : 0.35, 16, 16]} />
+      {/* Energy shell */}
+      <mesh ref={shellRef}>
+        <sphereGeometry args={[isTarget ? 0.26 : 0.21, 20, 20]} />
         <meshBasicMaterial
           color={color}
           transparent
-          opacity={isTarget ? 0.5 : 0.3}
-          side={THREE.BackSide}
+          opacity={isTarget ? 0.22 : 0.14}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
         />
       </mesh>
 
-      {/* Target highlight ring */}
+      {/* Electron orbital rings + electrons */}
+      <group ref={orbitSystemRef}>
+        <mesh ref={ringARef} rotation={[0.3, 0.4, 0]}>
+          <torusGeometry args={[orbitRadius, isTarget ? 0.01 : 0.008, 8, 48]} />
+          <meshBasicMaterial color={color} transparent opacity={0.38} depthWrite={false} />
+        </mesh>
+        <mesh ref={ringBRef} rotation={[-0.6, 0, 0.5]}>
+          <torusGeometry args={[orbitRadius * 0.95, isTarget ? 0.01 : 0.008, 8, 48]} />
+          <meshBasicMaterial color="#ffffff" transparent opacity={0.3} depthWrite={false} />
+        </mesh>
+        <mesh ref={ringCRef} rotation={[0, 0.85, -0.35]}>
+          <torusGeometry args={[orbitRadius * 1.05, isTarget ? 0.008 : 0.006, 8, 48]} />
+          <meshBasicMaterial color={color} transparent opacity={0.26} depthWrite={false} />
+        </mesh>
+
+        {Array.from({ length: 3 }, (_, i) => (
+          <mesh key={i} ref={(el) => { electronRefs.current[i] = el; }}>
+            <sphereGeometry args={[isTarget ? 0.045 : 0.035, 10, 10]} />
+            <meshBasicMaterial color="#c6f6ff" transparent opacity={0.92} blending={THREE.AdditiveBlending} depthWrite={false} />
+          </mesh>
+        ))}
+      </group>
+
+      {/* Outer aura */}
+      <mesh ref={glowRef}>
+        <sphereGeometry args={[isTarget ? 0.52 : 0.42, 18, 18]} />
+        <meshBasicMaterial
+          color={color}
+          transparent
+          opacity={isTarget ? 0.48 : 0.28}
+          side={THREE.BackSide}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+        />
+      </mesh>
+
+      {/* Target lock ring */}
       {isTarget && (
         <mesh ref={targetGlowRef}>
-          <torusGeometry args={[0.4, 0.05, 8, 32]} />
-          <meshBasicMaterial
-            color="#ffffff"
-            transparent
-            opacity={0.3}
-          />
+          <torusGeometry args={[0.5, 0.03, 10, 48]} />
+          <meshBasicMaterial color="#ffffff" transparent opacity={0.3} blending={THREE.AdditiveBlending} depthWrite={false} />
         </mesh>
       )}
 
-      {/* Inner sparkle - brighter for target */}
       <pointLight
         color={color}
-        intensity={isTarget ? 1.0 : 0.5}
-        distance={isTarget ? 3 : 2}
+        intensity={isTarget ? 1.1 : 0.65}
+        distance={isTarget ? 3.3 : 2.3}
         decay={2}
       />
     </group>

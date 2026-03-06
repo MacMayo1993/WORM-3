@@ -17,12 +17,37 @@ export function useWormGameContext() {
 // Provider component - place this high in the component tree
 // mode: 'surface' (classic) or 'tunnel' (inside the cube through wormholes)
 export function WormModeProvider({ children, cubies, size, animState, onRotate, onGameStateChange, mode = 'surface' }) {
-  // Use appropriate hook based on mode
-  const surfaceGame = useWormGame(cubies, size, animState, onRotate);
-  const tunnelGame = useTunnelWormGame(cubies, size, animState, onRotate);
-  const game = mode === 'tunnel' ? tunnelGame : surfaceGame;
+  if (mode === 'tunnel') {
+    return (
+      <TunnelWormModeProvider
+        cubies={cubies}
+        size={size}
+        animState={animState}
+        onRotate={onRotate}
+        onGameStateChange={onGameStateChange}
+      >
+        {children}
+      </TunnelWormModeProvider>
+    );
+  }
 
-  // Report game state changes to parent (for UI outside Canvas)
+  return (
+    <SurfaceWormModeProvider
+      cubies={cubies}
+      size={size}
+      animState={animState}
+      onRotate={onRotate}
+      onGameStateChange={onGameStateChange}
+      mode={mode}
+    >
+      {children}
+    </SurfaceWormModeProvider>
+  );
+}
+
+function SurfaceWormModeProvider({ children, cubies, size, animState, onRotate, onGameStateChange, mode }) {
+  const game = useWormGame(cubies, size, animState, onRotate);
+
   React.useEffect(() => {
     if (onGameStateChange) {
       onGameStateChange({
@@ -37,7 +62,7 @@ export function WormModeProvider({ children, cubies, size, animState, onRotate, 
         orbsTotal: game.orbsTotal,
         wormCameraEnabled: game.wormCameraEnabled,
         targetTunnelId: game.targetTunnelId || null,
-        mode: mode,
+        mode,
         setGameState: game.setGameState,
         setWormCameraEnabled: game.setWormCameraEnabled,
         restart: game.restart
@@ -60,6 +85,55 @@ export function WormModeProvider({ children, cubies, size, animState, onRotate, 
     game.setWormCameraEnabled,
     game.restart,
     mode
+  ]);
+
+  return (
+    <WormGameContext.Provider value={game}>
+      {children}
+    </WormGameContext.Provider>
+  );
+}
+
+function TunnelWormModeProvider({ children, cubies, size, animState, onRotate, onGameStateChange }) {
+  const game = useTunnelWormGame(cubies, size, animState, onRotate);
+
+  // Report game state changes to parent (for UI outside Canvas)
+  React.useEffect(() => {
+    if (onGameStateChange) {
+      onGameStateChange({
+        gameState: game.gameState,
+        worm: game.worm,
+        orbs: game.orbs,
+        score: game.score,
+        warps: game.warps || 0,
+        tunnelsTraversed: game.tunnelsTraversed || 0,
+        tunnels: game.tunnels || [],
+        speed: game.speed,
+        orbsTotal: game.orbsTotal,
+        wormCameraEnabled: game.wormCameraEnabled,
+        targetTunnelId: game.targetTunnelId || null,
+        mode: 'tunnel',
+        setGameState: game.setGameState,
+        setWormCameraEnabled: game.setWormCameraEnabled,
+        restart: game.restart
+      });
+    }
+  }, [
+    onGameStateChange,
+    game.gameState,
+    game.worm,
+    game.orbs,
+    game.score,
+    game.warps,
+    game.tunnelsTraversed,
+    game.tunnels,
+    game.speed,
+    game.orbsTotal,
+    game.wormCameraEnabled,
+    game.targetTunnelId,
+    game.setGameState,
+    game.setWormCameraEnabled,
+    game.restart,
   ]);
 
   return (
