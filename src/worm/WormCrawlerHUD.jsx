@@ -9,6 +9,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, onEnterPortal, cu
     const wormSpeed = useGameStore(s => s.wormSpeed ?? 1.0);
     const wormHealedCount = useGameStore(s => s.wormHealedCount ?? 0);
     const wormBodyTiles = useGameStore(s => s.wormBodyTiles ?? 0);
+    const wormholeCountdown = useGameStore(s => s.wormholeCountdown ?? 0);
     const setWormSpeed = useGameStore(s => s.setWormSpeed);
 
     const [showPortalPulse, setShowPortalPulse] = useState(false);
@@ -75,6 +76,9 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, onEnterPortal, cu
                         <span style={{ color: '#00ff88', fontSize: 18, textShadow: '0 0 8px #00ff88' }}>
                             {wormHealedCount}
                         </span>
+                    </div>
+                    <div style={{ color: '#ffd166', fontSize: 11, fontWeight: 700, letterSpacing: 0.4, textShadow: '0 0 8px rgba(255,209,102,0.6)' }}>
+                        NEXT WORMHOLE: {wormholeCountdown.toFixed(1)}s
                     </div>
                     {/* Orb tracker */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
