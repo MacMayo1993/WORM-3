@@ -48,9 +48,10 @@ const INITIAL_POS = (size) => {
 
 // ─── Powerup helpers ─────────────────────────────────────────────────────────
 const POWERUP_COUNT = 5;
-const GROWTH_TILES = 1;         // body-tile counter increment per pickup (HUD)
-const GROWTH_SEGS = 12;         // visual tail segments added per apple pickup
+const ORB_SEGMENT_GROWTH = 2;   // every orb adds exactly 2 visual balls
 const STEPS_PER_TILE = 50;      // sub-steps recorded per tile (0.02 resolution)
+const BASE_TAIL_LENGTH = 4;
+const WORMHOLE_FLIP_INTERVAL = 10; // seconds between guaranteed antipodal wormhole spawns
 
 function getAllSurfaceTiles(size) {
     const tiles = [];
@@ -79,6 +80,18 @@ function randomFreeTile(size, exclude) {
     const free = all.filter(t => !excludeKeys.has(`${t.x},${t.y},${t.z},${t.dirKey}`));
     const pool = free.length > 0 ? free : all;
     return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function randomUnflippedTile(cubies, size, exclude = []) {
+    const all = getAllSurfaceTiles(size);
+    const excludeKeys = new Set(exclude.map(e => `${e.x},${e.y},${e.z},${e.dirKey}`));
+    const pool = all.filter((t) => {
+        if (excludeKeys.has(`${t.x},${t.y},${t.z},${t.dirKey}`)) return false;
+        const st = cubies?.[t.x]?.[t.y]?.[t.z]?.stickers?.[t.dirKey];
+        return !!st && st.curr === st.orig;
+    });
+    const pickFrom = pool.length > 0 ? pool : all;
+    return pickFrom[Math.floor(Math.random() * pickFrom.length)];
 }
 
 // ─── Worm Crawler Hook ────────────────────────────────────────────────────────
@@ -117,10 +130,12 @@ function useWormCrawler(size, cubies) {
     const JUMP_SPEED = 3.5;
 
     // Growing tail + powerups
-    const tailLength = useRef(4);
+    const tailLength = useRef(BASE_TAIL_LENGTH);
     const visitedFlipped = useRef(new Set());
     const powerupsRef = useRef([]);  // local fast-access copy of wormPowerups
     const stepHistory = useRef([]);  // one world-pos per tile step, used by WormBody
+    const wormholeTimer = useRef(WORMHOLE_FLIP_INTERVAL);
+    const lastCountdownDeci = useRef(-1);
 
     // Compute world centroid of current grid tile
     const getWorldPos = (p) => new THREE.Vector3(
@@ -132,9 +147,38 @@ function useWormCrawler(size, cubies) {
         ? Math.sin(jumpT.current * Math.PI) * JUMP_HEIGHT
         : 0;
 
+    const applyOrbPickupGrowth = () => {
+        tailLength.current = Math.min(tailLength.current + ORB_SEGMENT_GROWTH, MAX_TAIL);
+        const orbCountOnWorm = Math.max(0, Math.floor((tailLength.current - BASE_TAIL_LENGTH) / ORB_SEGMENT_GROWTH));
+        useGameStore.getState().setWormBodyTiles(orbCountOnWorm);
+    };
+
+    const spawnWormholePair = () => {
+        const tile = randomUnflippedTile(cubies, size, [pos.current]);
+        if (!tile) return;
+        useGameStore.setState((state) => {
+            const mm = buildManifoldGridMap(state.cubies, size);
+            return {
+                cubies: flipStickerPair(state.cubies, size, tile.x, tile.y, tile.z, tile.dirKey, mm)
+            };
+        });
+    };
+
     // ── Per-frame simulation ──────────────────────────────────────────────────
     const tick = useCallback((delta) => {
         const STEP_SEC = 1.0 / wormSpeed;
+
+        wormholeTimer.current -= delta;
+        if (wormholeTimer.current <= 0) {
+            spawnWormholePair();
+            wormholeTimer.current = WORMHOLE_FLIP_INTERVAL;
+        }
+        const countdown = Math.max(0, Math.ceil(wormholeTimer.current * 10) / 10);
+        const countdownDeci = Math.round(countdown * 10);
+        if (countdownDeci !== lastCountdownDeci.current) {
+            lastCountdownDeci.current = countdownDeci;
+            useGameStore.getState().setWormholeCountdown(countdown);
+        }
 
         // Always advance jump
         if (isJumping.current) {
@@ -250,9 +294,7 @@ function useWormCrawler(size, cubies) {
                 const { x, y, z, dirKey } = pos.current;
                 const puIdx = powerupsRef.current.findIndex(p => p.x === x && p.y === y && p.z === z && p.dirKey === dirKey);
                 if (puIdx !== -1) {
-                    tailLength.current = Math.min(tailLength.current + GROWTH_SEGS, MAX_TAIL);
-                    const newBodyTiles = useGameStore.getState().wormBodyTiles + GROWTH_TILES;
-                    useGameStore.getState().setWormBodyTiles(newBodyTiles);
+                    applyOrbPickupGrowth();
                     const newPowerup = { ...randomFreeTile(size, [...powerupsRef.current, pos.current]), type: 'apple' };
                     const next = [...powerupsRef.current];
                     next[puIdx] = newPowerup;
@@ -270,8 +312,7 @@ function useWormCrawler(size, cubies) {
                     const key = `${x},${y},${z},${dirKey}`;
                     if (!visitedFlipped.current.has(key)) {
                         visitedFlipped.current.add(key);
-                        // Tail grows 3x faster since steps are much denser now (0.15 vs 1.0)
-                        tailLength.current = Math.min(tailLength.current + 8, MAX_TAIL);
+                        applyOrbPickupGrowth();
 
                         // "Eat" the parity orb
                         useGameStore.setState((state) => {
@@ -361,7 +402,10 @@ function useWormCrawler(size, cubies) {
         }
         powerupsRef.current = initial;
         useGameStore.getState().setWormPowerups(initial);
-        useGameStore.getState().setWormBodyTiles(1);
+        useGameStore.getState().setWormBodyTiles(0);
+        useGameStore.getState().setWormholeCountdown(WORMHOLE_FLIP_INTERVAL);
+        wormholeTimer.current = WORMHOLE_FLIP_INTERVAL;
+        lastCountdownDeci.current = Math.round(WORMHOLE_FLIP_INTERVAL * 10);
     }, [size]);
 
     return {
@@ -781,4 +825,3 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         </>
     );
 }
-

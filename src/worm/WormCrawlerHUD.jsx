@@ -5,13 +5,12 @@
 import React, { useState, useEffect } from 'react';
 import { useGameStore } from '../hooks/useGameStore.js';
 
-export default function WormCrawlerHUD({ phase, onFlippedTile, onEnterPortal, cubeSize = 3, onHome, onSettings }) {
+export default function WormCrawlerHUD({ phase, onFlippedTile, onEnterPortal, cubeSize: _cubeSize = 3, onHome, onSettings }) {
     const wormSpeed = useGameStore(s => s.wormSpeed ?? 1.0);
     const wormHealedCount = useGameStore(s => s.wormHealedCount ?? 0);
-    const wormBodyTiles = useGameStore(s => s.wormBodyTiles ?? 1);
+    const wormBodyTiles = useGameStore(s => s.wormBodyTiles ?? 0);
+    const wormholeCountdown = useGameStore(s => s.wormholeCountdown ?? 0);
     const setWormSpeed = useGameStore(s => s.setWormSpeed);
-    const totalTiles = 6 * cubeSize * cubeSize;
-    const coveragePct = Math.min(100, Math.round((wormBodyTiles / totalTiles) * 100));
 
     const [showPortalPulse, setShowPortalPulse] = useState(false);
 
@@ -78,21 +77,23 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, onEnterPortal, cu
                             {wormHealedCount}
                         </span>
                     </div>
-                    {/* Coverage tracker */}
+                    <div style={{ color: '#ffd166', fontSize: 11, fontWeight: 700, letterSpacing: 0.4, textShadow: '0 0 8px rgba(255,209,102,0.6)' }}>
+                        NEXT WORMHOLE: {wormholeCountdown.toFixed(1)}s
+                    </div>
+                    {/* Orb tracker */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{ width: 100, height: 8, borderRadius: 4, background: 'rgba(255,255,255,0.25)', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.15)' }}>
+                        <span style={{ color: '#aaa', fontSize: 10, letterSpacing: 1 }}>ORBS ON WORM</span>
+                        <div style={{ width: 100, height: 8, borderRadius: 4, background: 'rgba(255,255,255,0.2)', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.15)' }}>
                             <div style={{
                                 height: '100%', borderRadius: 4,
-                                width: `${coveragePct}%`,
-                                background: coveragePct === 100
-                                    ? 'linear-gradient(90deg, #00ff88, #00f5ff)'
-                                    : 'linear-gradient(90deg, #c084fc, #7c3aed)',
+                                width: `${Math.min(100, wormBodyTiles * 6)}%`,
+                                background: 'linear-gradient(90deg, #c084fc, #7c3aed)',
                                 transition: 'width 0.4s ease',
-                                boxShadow: coveragePct > 0 ? '0 0 6px rgba(192,132,252,0.7)' : 'none',
+                                boxShadow: wormBodyTiles > 0 ? '0 0 6px rgba(192,132,252,0.7)' : 'none',
                             }} />
                         </div>
                         <span style={{ color: '#e9d5ff', fontSize: 12, fontWeight: 800, letterSpacing: 0.5, whiteSpace: 'nowrap', textShadow: '0 0 6px rgba(192,132,252,0.8)' }}>
-                            {wormBodyTiles}/{totalTiles}
+                            {wormBodyTiles}
                         </span>
                     </div>
                 </div>
