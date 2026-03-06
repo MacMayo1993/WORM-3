@@ -12,8 +12,8 @@ import { getNextSurfacePosition, getActiveTunnels, getTunnelWorldPos, turnWorm }
 import { buildManifoldGridMap, flipStickerPair } from '../game/manifoldLogic.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const CAM_HEIGHT_BASE = 3.2;  // base height above worm (much further back)
-const CAM_BACK_BASE = 2.8;  // base behind distance
+const CAM_HEIGHT_BASE = 4.6;  // base height above worm
+const CAM_BACK_BASE = 4.2;  // base behind distance
 const LOOK_AHEAD = 1.8;  // look-at ahead of worm
 const CAM_LERP = 6;    // camera smoothing (× delta)
 const WORM_LIFT = 0.08; // worm sits right on tile surface
@@ -399,15 +399,26 @@ function useWormCrawler(size, cubies) {
 
 // ─── Chase Camera (dynamic zoom based on tail length) ───────────────────────
 function WormChaseCamera({ worm, size }) {
-    const { camera } = useThree();
+    const { camera, size: viewportSize } = useThree();
     const camPosRef = useRef(new THREE.Vector3(0, 6, 10));
     const lookAtRef = useRef(new THREE.Vector3(0, 0, 0));
     const zoomExtraRef = useRef(0);   // burst zoom accumulated
-    const prevTailLen = useRef(4);   // detect new parity pickups
+    const prevTailLen = useRef(BASE_TAIL_LENGTH);   // detect new parity pickups
 
     useFrame((_, delta) => {
         const phase = worm.phase.current;
         const tailLen = worm.tailLength.current;
+        const viewportAspect = viewportSize.width / Math.max(1, viewportSize.height);
+
+        // Use a continuous portrait factor so camera framing doesn't jump at aspect=1.
+        const portraitFactor = THREE.MathUtils.clamp((1 - viewportAspect) / 0.45, 0, 1);
+        const targetFov = THREE.MathUtils.lerp(50, 62, portraitFactor);
+        const fovAlpha = Math.min(1, delta * 6);
+        const nextFov = THREE.MathUtils.lerp(camera.fov, targetFov, fovAlpha);
+        if (Math.abs(nextFov - camera.fov) > 0.01) {
+            camera.fov = nextFov;
+            camera.updateProjectionMatrix();
+        }
 
         // Detect new pickup → brief burst zoom that decays quickly
         if (tailLen > prevTailLen.current) {
@@ -421,11 +432,12 @@ function WormChaseCamera({ worm, size }) {
 
         // Permanent zoom grows gently with snake length so you always see the whole cube + worm.
         // Cap is size-relative: a full-coverage snake should just fit in frame.
-        const MAX_PERM_ZOOM = size * 2.2;
-        const permZoom = Math.min(tailLen * 0.018, MAX_PERM_ZOOM);
+        const MAX_PERM_ZOOM = size * 2.6;
+        const permZoom = Math.min(tailLen * 0.028, MAX_PERM_ZOOM);
+        const aspectZoomBoost = THREE.MathUtils.lerp(0, 2.2, portraitFactor);
         const extraZoom = permZoom + Math.min(zoomExtraRef.current, MAX_EXTRA_ZOOM);
-        const camHeight = CAM_HEIGHT_BASE + extraZoom;
-        const camBack = CAM_BACK_BASE + extraZoom * 0.55;
+        const camHeight = CAM_HEIGHT_BASE + extraZoom + aspectZoomBoost;
+        const camBack = CAM_BACK_BASE + extraZoom * 0.8 + aspectZoomBoost * 0.9;
 
         if (phase === 'crawling' || phase === 'entering' || phase === 'exiting') {
             // Smooth interpolated worm world position
