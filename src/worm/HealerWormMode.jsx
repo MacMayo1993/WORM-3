@@ -394,9 +394,13 @@ function WormChaseCamera({ worm, size }) {
             zoomExtraRef.current = Math.max(0, zoomExtraRef.current - delta * 3.0);
         }
 
-        const extraZoom = Math.min(zoomExtraRef.current, MAX_EXTRA_ZOOM);
+        // Permanent zoom grows gently with snake length so you always see the whole cube + worm.
+        // Cap is size-relative: a full-coverage snake should just fit in frame.
+        const MAX_PERM_ZOOM = size * 2.2;
+        const permZoom = Math.min(tailLen * 0.018, MAX_PERM_ZOOM);
+        const extraZoom = permZoom + Math.min(zoomExtraRef.current, MAX_EXTRA_ZOOM);
         const camHeight = CAM_HEIGHT_BASE + extraZoom;
-        const camBack = CAM_BACK_BASE + extraZoom * 0.5;
+        const camBack = CAM_BACK_BASE + extraZoom * 0.55;
 
         if (phase === 'crawling' || phase === 'entering' || phase === 'exiting') {
             // Smooth interpolated worm world position
