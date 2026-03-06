@@ -40,7 +40,7 @@ const buttonBase = {
     boxShadow: palette.shadow,
 };
 
-export default function WormCrawlerHUD({ phase, onFlippedTile, onEnterPortal, cubeSize: _cubeSize = 3, onHome, onSettings }) {
+export default function WormCrawlerHUD({ phase, onFlippedTile, onEnterPortal, cubeSize: _cubeSize = 3, onHome, onSettings, wormAlive = true, showDeathMenu = false, onTryAgain }) {
     const wormSpeed = useGameStore(s => s.wormSpeed ?? 1.0);
     const wormHealedCount = useGameStore(s => s.wormHealedCount ?? 0);
     const wormBodyTiles = useGameStore(s => s.wormBodyTiles ?? 0);
@@ -48,12 +48,13 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, onEnterPortal, cu
     const setWormSpeed = useGameStore(s => s.setWormSpeed);
 
     const handleJumpAction = () => {
+        if (!wormAlive) return;
         const entered = onEnterPortal?.() ?? (useGameStore.getState()._wormEnterPortal?.() ?? false);
         if (!entered) useGameStore.getState()._wormTurn?.('jump');
     };
 
     const phaseMeta = PHASE_META[phase] || { label: phase || 'CRAWLING', accent: '#93c5fd' };
-    const isPortalReady = onFlippedTile && phase === 'crawling';
+    const isPortalReady = wormAlive && onFlippedTile && phase === 'crawling';
 
     return (
         <div style={{
@@ -133,7 +134,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, onEnterPortal, cu
                     max="3.0"
                     step="0.1"
                     value={wormSpeed}
-                    onChange={e => setWormSpeed(parseFloat(e.target.value))}
+                    onChange={e => wormAlive && setWormSpeed(parseFloat(e.target.value))}
                     style={{ width: '100%', accentColor: '#60a5fa', cursor: 'pointer' }}
                 />
             </div>
@@ -202,7 +203,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, onEnterPortal, cu
                     dir ? (
                         <button
                             key={dir}
-                            onPointerDown={() => useGameStore.getState()._wormTurn?.(dir)}
+                            onPointerDown={() => wormAlive && useGameStore.getState()._wormTurn?.(dir)}
                             style={{
                                 gridColumn: col + 1,
                                 gridRow: row + 1,
@@ -223,6 +224,52 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, onEnterPortal, cu
                     ) : <div key="center" style={{ gridColumn: col + 1, gridRow: row + 1 }} />
                 ))}
             </div>
+
+            {showDeathMenu && (
+                <div style={{
+                    position: 'absolute',
+                    inset: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: 'rgba(2, 6, 23, 0.55)',
+                    backdropFilter: 'blur(4px)',
+                    pointerEvents: 'auto',
+                }}>
+                    <div style={{
+                        width: 'min(92vw, 380px)',
+                        borderRadius: 16,
+                        border: `1px solid ${palette.border}`,
+                        background: 'rgba(15, 23, 42, 0.92)',
+                        boxShadow: palette.shadow,
+                        padding: 18,
+                        textAlign: 'center',
+                    }}>
+                        <div style={{ color: palette.subText, fontSize: 12, fontWeight: 700, letterSpacing: 1.0 }}>WORM COLLISION</div>
+                        <div style={{ color: '#f8fafc', fontSize: 24, fontWeight: 800, marginTop: 4 }}>You hit your tail.</div>
+                        <div style={{ color: palette.subText, fontSize: 13, marginTop: 8 }}>Try again from the WORM setup wizard.</div>
+                        <button
+                            onPointerDown={onTryAgain}
+                            style={{
+                                marginTop: 16,
+                                minWidth: 190,
+                                borderRadius: 12,
+                                padding: '10px 16px',
+                                fontSize: 14,
+                                fontWeight: 800,
+                                letterSpacing: 0.7,
+                                color: '#f8fafc',
+                                background: 'linear-gradient(135deg, #2563eb, #7c3aed)',
+                                border: `1px solid ${palette.strongBorder}`,
+                                cursor: 'pointer',
+                            }}
+                        >
+                            Try Again
+                        </button>
+                    </div>
+                </div>
+            )}
+
         </div>
     );
 }

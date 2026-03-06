@@ -140,6 +140,8 @@ function useWormCrawler(size, cubies) {
     const stepHistory = useRef([]);  // one world-pos per tile step, used by WormBody
     const wormholeTimer = useRef(WORMHOLE_FLIP_INTERVAL);
     const lastCountdownDeci = useRef(-1);
+    const alive = useRef(true);
+    const tileTrail = useRef([]);
 
     // Compute world centroid of current grid tile
     const getWorldPos = (p) => new THREE.Vector3(
@@ -150,6 +152,20 @@ function useWormCrawler(size, cubies) {
     const jumpLift = () => isJumping.current
         ? Math.sin(jumpT.current * Math.PI) * JUMP_HEIGHT
         : 0;
+
+    const tileKey = (p) => `${p.x},${p.y},${p.z},${p.dirKey}`;
+
+    const killWorm = () => {
+        if (!alive.current) return;
+        alive.current = false;
+        phase.current = 'dead';
+        useGameStore.setState({
+            wormPhase: 'dead',
+            wormOnFlippedTile: false,
+            wormAlive: false,
+            showWormDeathMenu: true,
+        });
+    };
 
     const applyOrbPickupGrowth = () => {
         tailLength.current = Math.min(tailLength.current + ORB_SEGMENT_GROWTH, MAX_TAIL);
@@ -171,6 +187,8 @@ function useWormCrawler(size, cubies) {
     // ── Per-frame simulation ──────────────────────────────────────────────────
     const tick = useCallback((delta) => {
         const STEP_SEC = 1.0 / wormSpeed;
+
+        if (!alive.current) return;
 
         wormholeTimer.current -= delta;
         if (wormholeTimer.current <= 0) {
@@ -281,7 +299,18 @@ function useWormCrawler(size, cubies) {
 
                 if (next) {
                     const crossedFace = next.dirKey !== oldDirKey;
-                    pos.current = { x: next.x, y: next.y, z: next.z, dirKey: next.dirKey };
+                    const nextPos = { x: next.x, y: next.y, z: next.z, dirKey: next.dirKey };
+                    const nextKey = tileKey(nextPos);
+                    const bodyWindow = Math.max(2, Math.round(tailLength.current));
+                    const selfHit = tileTrail.current.slice(0, bodyWindow).includes(nextKey);
+                    if (selfHit) {
+                        killWorm();
+                        return;
+                    }
+
+                    pos.current = nextPos;
+                    tileTrail.current.unshift(nextKey);
+                    if (tileTrail.current.length > MAX_TAIL) tileTrail.current.length = MAX_TAIL;
                     if (next.moveDir) moveDir.current = next.moveDir;
 
                     if (crossedFace) {
@@ -387,9 +416,16 @@ function useWormCrawler(size, cubies) {
             initial.push({ ...randomFreeTile(size, [...initial, startPos]), type: 'apple' });
         }
         powerupsRef.current = initial;
-        useGameStore.getState().setWormPowerups(initial);
-        useGameStore.getState().setWormBodyTiles(0);
-        useGameStore.getState().setWormholeCountdown(WORMHOLE_FLIP_INTERVAL);
+        alive.current = true;
+        tileTrail.current = [tileKey(startPos)];
+        useGameStore.setState({
+            wormPowerups: initial,
+            wormBodyTiles: 0,
+            wormholeCountdown: WORMHOLE_FLIP_INTERVAL,
+            wormAlive: true,
+            showWormDeathMenu: false,
+            wormPhase: 'crawling',
+        });
         wormholeTimer.current = WORMHOLE_FLIP_INTERVAL;
         lastCountdownDeci.current = Math.round(WORMHOLE_FLIP_INTERVAL * 10);
     }, [size]);

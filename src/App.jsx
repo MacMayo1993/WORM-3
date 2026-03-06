@@ -531,6 +531,12 @@ export default function WORM3() {
     useGameStore.getState().setShowMainMenu(true);
   }, []);
 
+  const handleWormTryAgain = useCallback(() => {
+    useGameStore.getState().clearDisparityGame();
+    useGameStore.getState().setShowMainMenu(false);
+    setShowWormModeWizard(true);
+  }, []);
+
   const handleMenuHolonomy = useCallback(() => {
     useGameStore.getState().setShowMainMenu(false);
     useGameStore.getState().clearLevel();
@@ -979,6 +985,7 @@ export default function WORM3() {
             onDisparitySetupComplete: handleDisparitySetupComplete,
             onWormSetupComplete: handleWormSetupComplete,
             onWormWizardCancel: handleWormWizardCancel,
+            onWormTryAgain: handleWormTryAgain,
             onToggleHandsMode: handleToggleHandsMode,
             onFaceRotate: handleFaceRotate,
             onTileRotation: handleTileRotation,
