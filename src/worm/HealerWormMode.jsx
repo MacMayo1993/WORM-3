@@ -17,7 +17,7 @@ const CAM_BACK_BASE = 2.8;  // base behind distance
 const LOOK_AHEAD = 1.8;  // look-at ahead of worm
 const CAM_LERP = 6;    // camera smoothing (× delta)
 const WORM_LIFT = 0.08; // worm sits right on tile surface
-const ZOOM_PER_SEG = 0.22; // extra height per tail segment
+const ZOOM_PER_TILE = 0.5; // extra camera height per body tile gained
 const ZOOM_BURST = 2.2;  // instant burst zoom on parity pickup
 
 // Face outward normals
@@ -209,8 +209,11 @@ function useWormCrawler(size, cubies) {
                 stepHistory.current.unshift({ pos: ptLifted, normal: ptNorm });
                 lastRecordedT.current += 0.02; // A guaranteed resolution of 50 mathematical sub-steps per tile traverse
             }
-            if (stepHistory.current.length > MAX_TAIL * STEPS_PER_TILE) {
-                stepHistory.current.length = 1500;
+            // Keep enough history to render the full tail (each segment is 0.14 units apart,
+            // each step covers 0.02 units → ~7 steps per unit of tail length)
+            const MAX_HISTORY = MAX_TAIL * 7;
+            if (stepHistory.current.length > MAX_HISTORY) {
+                stepHistory.current.length = MAX_HISTORY;
             }
             // -----------------------------------------------------------
 
@@ -379,6 +382,17 @@ function WormChaseCamera({ worm, size }) {
     const zoomExtraRef = useRef(0);   // burst zoom accumulated
     const prevTailLen = useRef(4);   // detect new parity pickups
 
+    // Reset camera to a sensible game position when worm mode exits
+    useEffect(() => {
+        return () => {
+            const z = size <= 2 ? 10 : size === 3 ? 14 : size === 4 ? 20 : 30;
+            camera.up.set(0, 1, 0);
+            camera.position.set(0, 0, z);
+            camera.lookAt(0, 0, 0);
+            camera.updateProjectionMatrix();
+        };
+    }, [camera, size]);
+
     useFrame((_, delta) => {
         const phase = worm.phase.current;
         const tailLen = worm.tailLength.current;
@@ -393,7 +407,8 @@ function WormChaseCamera({ worm, size }) {
             zoomExtraRef.current = Math.max(0, zoomExtraRef.current - delta * 1.8);
         }
 
-        const extraZoom = (tailLen - 4) * ZOOM_PER_SEG + zoomExtraRef.current;
+        const bodyTiles = useGameStore.getState().wormBodyTiles;
+        const extraZoom = Math.max(0, bodyTiles - 1) * ZOOM_PER_TILE + zoomExtraRef.current;
         const camHeight = CAM_HEIGHT_BASE + extraZoom;
         const camBack = CAM_BACK_BASE + extraZoom * 0.7;
 
