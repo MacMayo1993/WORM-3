@@ -20,6 +20,11 @@ const WORM_LIFT = 0.08; // worm sits right on tile surface
 const ZOOM_BURST = 0.8;  // brief camera pull-back on pickup (decays fast)
 const MAX_EXTRA_ZOOM = 2.0; // hard cap so camera never flies away
 
+const GLASS_MIN_OPACITY = 0.12;
+const GLASS_MAX_OPACITY = 0.28;
+const GLASS_MIN_TRANSMISSION = 0.72;
+const GLASS_MAX_TRANSMISSION = 0.95;
+
 // Face outward normals
 const FACE_NORMALS = {
     PX: new THREE.Vector3(1, 0, 0),
@@ -793,6 +798,50 @@ function PowerupOrbs({ size }) {
     );
 }
 
+
+function WormInteriorGlass({ worm, size }) {
+    const glassRef = useRef();
+
+    useFrame(({ clock }) => {
+        if (!glassRef.current) return;
+
+        const phase = worm.phase.current;
+        const isTunnelPhase = phase === 'entering' || phase === 'tunnel' || phase === 'exiting';
+        const tunnelBoost = isTunnelPhase ? 1 : 0;
+        const pulse = (Math.sin(clock.elapsedTime * 4.2) + 1) * 0.5;
+        const transmission = THREE.MathUtils.lerp(GLASS_MIN_TRANSMISSION, GLASS_MAX_TRANSMISSION, tunnelBoost * 0.7 + pulse * 0.3);
+        const opacity = THREE.MathUtils.lerp(GLASS_MIN_OPACITY, GLASS_MAX_OPACITY, tunnelBoost * 0.85 + pulse * 0.15);
+
+        glassRef.current.transmission = transmission;
+        glassRef.current.opacity = opacity;
+        glassRef.current.emissiveIntensity = tunnelBoost * 0.35 + pulse * 0.08;
+    });
+
+    // Keep a thin margin from outer stickers so we read it as an interior shell.
+    const innerSize = Math.max(0.8, size - 1.1);
+
+    return (
+        <mesh>
+            <boxGeometry args={[innerSize, innerSize, innerSize]} />
+            <meshPhysicalMaterial
+                ref={glassRef}
+                color="#b8f6ff"
+                emissive="#4ccfe6"
+                emissiveIntensity={0.06}
+                roughness={0.06}
+                metalness={0.02}
+                transmission={GLASS_MIN_TRANSMISSION}
+                thickness={1.2}
+                ior={1.23}
+                transparent
+                opacity={GLASS_MIN_OPACITY}
+                depthWrite={false}
+                side={THREE.DoubleSide}
+            />
+        </mesh>
+    );
+}
+
 // ─── Main exported wrapper ────────────────────────────────────────────────────
 export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animState, _onRotate, _onHeal }) {
     const worm = useWormCrawler(size, cubies);
@@ -815,6 +864,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         <>
             <WormChaseCamera worm={worm} size={size} />
             <WormSwipeControls onTurn={worm.queueTurn} />
+            <WormInteriorGlass worm={worm} size={size} />
             <WormBody worm={worm} size={size} />
             <WormFace worm={worm} size={size} />
             <PortalGlow worm={worm} size={size} />
