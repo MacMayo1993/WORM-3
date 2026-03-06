@@ -210,8 +210,10 @@ function useWormCrawler(size, cubies) {
                 stepHistory.current.unshift({ pos: ptLifted, normal: ptNorm });
                 lastRecordedT.current += 0.02; // A guaranteed resolution of 50 mathematical sub-steps per tile traverse
             }
-            if (stepHistory.current.length > MAX_TAIL * STEPS_PER_TILE) {
-                stepHistory.current.length = 1500;
+            // Keep enough history for the full worm body (MAX_TAIL segs × ~10 sub-steps each)
+            const MAX_HISTORY = MAX_TAIL * 10;
+            if (stepHistory.current.length > MAX_HISTORY) {
+                stepHistory.current.length = MAX_HISTORY;
             }
             // -----------------------------------------------------------
 
@@ -510,6 +512,7 @@ function WormSwipeControls({ onTurn }) {
 
 // ─── Worm Body (head = smooth lerp; body = per-step tile history) ─────────────
 const _wormDummy = new THREE.Object3D();
+const _wormColor = new THREE.Color();
 
 function WormBody({ worm }) {
     const meshRef = useRef();
@@ -593,7 +596,7 @@ function WormBody({ worm }) {
 
             _wormDummy.updateMatrix();
             mesh.setMatrixAt(i, _wormDummy.matrix);
-            mesh.setColorAt(i, new THREE.Color().setHSL(
+            mesh.setColorAt(i, _wormColor.setHSL(
                 0.38 - i * 0.005,
                 1,
                 0.4 + fade * 0.3
