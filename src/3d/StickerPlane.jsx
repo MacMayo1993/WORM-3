@@ -389,8 +389,10 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     // read once per frame instead of twice (was separate wormhole + hasFlips lines).
     const hasFlips = (meta?.flips ?? 0) > 0;
     const wormhole = hasFlips && meta?.curr !== meta?.orig;
+    const showGhostTile = !chaosLevel && hasFlips;
+    const showWormholeHazardFx = !chaosLevel && wormhole;
 
-    const needsGhostUpdate = hasFlips && spiderMatRef.current && (
+    const needsGhostUpdate = showGhostTile && spiderMatRef.current && (
       (wormhole && spiderMatRef.current.uniforms.uBurst.value !== 1.0) ||
       (!wormhole && spiderMatRef.current.uniforms.uBurst.value !== 0.4) ||
       (!spiderPlaneRef.current.visible)
@@ -399,7 +401,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     // Single-boolean gate: skip the entire body on idle frames.
     // Ensure we trigger animation if the tile is flipped (since ghost tile needs uTime updates).
     // If we need to transition the ghost tile (e.g. going from active to dormant), run at least one more frame.
-    const anyActive = spinT.current > 0 || shakeT.current > 0 || wormhole || needsGhostUpdate || (spiderPlaneRef.current?.visible && !hasFlips);
+    const anyActive = spinT.current > 0 || shakeT.current > 0 || showWormholeHazardFx || needsGhostUpdate || (spiderPlaneRef.current?.visible && !showGhostTile);
     if (!anyActive) {
       isActiveRef.current = false;
       return;
@@ -407,7 +409,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     isActiveRef.current = true;
 
     // Update Ghost Tile spiral animation if flipped
-    if (hasFlips && spiderPlaneRef.current && spiderMatRef.current) {
+    if (showGhostTile && spiderPlaneRef.current && spiderMatRef.current) {
       spiderPlaneRef.current.visible = true;
       spiderMatRef.current.uniforms.uColor.value.set(baseColorRef.current);
       if (wormhole) {
@@ -567,19 +569,19 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
     if (crackMatRef.current) {
       crackMatRef.current.uniforms.uTime.value = state.clock.elapsedTime;
-      crackMatRef.current.uniforms.uIntensity.value = wormhole && !isDead ? 0.85 : 0;
+      crackMatRef.current.uniforms.uIntensity.value = showWormholeHazardFx && !isDead ? 0.85 : 0;
       crackMatRef.current.uniforms.uColor.value.set(antipodalColor);
     }
 
     if (seamLeakMatRef.current) {
       seamLeakMatRef.current.uniforms.uTime.value = state.clock.elapsedTime;
-      seamLeakMatRef.current.uniforms.uIntensity.value = wormhole && !isDead ? 0.9 : 0;
+      seamLeakMatRef.current.uniforms.uIntensity.value = showWormholeHazardFx && !isDead ? 0.9 : 0;
       seamLeakMatRef.current.uniforms.uColor.value.set(antipodalColor);
     }
 
     // Persistent tremor for flipped tiles — the parity violation makes the tile unstable
     // Dead tiles (flips >= FLIP_CAP) are inert — no tremor
-    if (wormhole && !isDead && groupRef.current && spinT.current <= 0 && shakeT.current <= 0) {
+    if (showWormholeHazardFx && !isDead && groupRef.current && spinT.current <= 0 && shakeT.current <= 0) {
       const t = state.clock.elapsedTime;
       const flips = Math.min(meta?.flips ?? 1, 5);
       const tremIntensity = 0.004 + flips * 0.003;
@@ -1018,7 +1020,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         </>
       )}
 
-      {!isDead && !isSudokube && isWormhole && (
+      {!isDead && !isSudokube && !chaosLevel && isWormhole && (
         <>
           {/* Parity breakthrough — original color trying to push through.
               LOD: skip at flips === 1 (6–8 blended meshes saved for the very first wormhole frame). */}
