@@ -108,12 +108,19 @@ export function stepCrawler(state, input, dt, size) {
   }
 
   // --- Jump: purely parametric sine arc, no velocity-based physics ---
-  // jumpT: 0 = grounded, (0, 1) = airborne, resets to 0 on landing.
+  // jumpT: 0 = grounded, (0,1) = airborne, resets to 0 on landing.
+  // jumpReady: must release the jump key between jumps to prevent auto-chaining.
   let newJumpT = state.jumpT || 0;
   let newJumpHeight = jumpHeight;
+  let jumpReady = state.jumpReady !== false; // default true on first frame
 
-  if (input.jump && newJumpT === 0) {
+  // Only allow a new jump if the key was freshly pressed (not held from last jump)
+  if (input.jump && newJumpT === 0 && jumpReady) {
     newJumpT = 1e-9; // kick off the arc (tiny non-zero to enter the airborne branch)
+    jumpReady = false; // consume — must release key before next jump
+  }
+  if (!input.jump) {
+    jumpReady = true; // key released, ready for next press
   }
 
   const isAirborne = newJumpT > 0;
@@ -176,6 +183,7 @@ export function stepCrawler(state, input, dt, size) {
     velocity: vel,
     jumpHeight: newJumpHeight,
     jumpT: newJumpT,
+    jumpReady,
   };
 }
 
