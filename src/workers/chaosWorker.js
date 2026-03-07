@@ -180,19 +180,22 @@ const flipStickerPairLocal = (cubeState, x, y, z, dirKey, manifoldMap, outFlips)
   const sticker = cubeState[x]?.[y]?.[z]?.stickers?.[dirKey];
   if (!sticker) return;
 
-  const applyFlip = (loc) => {
+  const applyFlip = (loc, emitOp = false) => {
     if (!loc) return;
     const st = cubeState[loc.x][loc.y][loc.z].stickers[loc.dirKey];
     const currentFlips = st.flips || 0;
     if (currentFlips >= flipCap) return;
     st.curr = ANTIPODAL_COLOR[st.curr];
     st.flips = Math.min(flipCap, currentFlips + 1);
-    outFlips.push([loc.x, loc.y, loc.z, loc.dirKey]);
+    if (emitOp) outFlips.push([loc.x, loc.y, loc.z, loc.dirKey]);
   };
 
-  applyFlip({ x, y, z, dirKey });
+  // Emit exactly ONE operation per pair-step.
+  // Main-thread replay uses flipStickerPair(), which already flips both members.
+  // Emitting both locations would double-apply and visually cancel color flips.
+  applyFlip({ x, y, z, dirKey }, true);
   const anti = findAntipodalStickerByGrid(manifoldMap, sticker, size);
-  applyFlip(anti);
+  applyFlip(anti, false);
 };
 
 const resetChainState = () => {
