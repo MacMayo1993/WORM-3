@@ -38,6 +38,7 @@ const BG_OPTIONS = BACKGROUNDS.map(bg => ({
 
 const CLASSIC_STYLE_KEYS = ['solid', 'glossy', 'matte', 'metallic', 'carbonFiber', 'hexGrid', 'comic', 'cafeWall', 'hermanGrid', 'opticSpin', 'ouchi', 'scintillatingGrid', 'zoellner', 'kanizsa', 'fraserSpiral', 'muellerLyer', 'rotatingSnakes', 'poggendorff'];
 const LIVING_STYLE_KEYS = ['grass', 'ice', 'sand', 'water', 'wood', 'circuit', 'holographic', 'pulse', 'lava', 'galaxy', 'neural', 'moireRings', 'moireLines', 'infinityTunnel', 'vortex', 'shockwave'];
+const ANTIPODAL_STYLE_KEYS = ['polkaDots', 'zigzag', 'checkerboard', 'diagStripes'];
 
 // Color schemes shown in the wizard (biome is a mode, not a palette)
 const WIZARD_SCHEME_KEYS = Object.keys(SCHEME_LABELS).filter(k => k !== 'biome');
@@ -487,24 +488,24 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           <div style={{ flex: 1, height: '1px', background: 'rgba(0,0,0,0.08)' }} />
         </div>
 
-        {/* Palette grid — name above dots, 2 columns, matching in-game settings */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '7px', paddingBottom: '8px' }}>
+        {/* Palette grid — name above dots, 4 columns, matching in-game settings */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '7px', paddingBottom: '8px' }}>
           {WIZARD_SCHEME_KEYS.filter(k => k !== 'custom').map(key => {
             const selected = settings.colorScheme === key;
             const colors = Object.values(COLOR_SCHEMES[key] || {});
             return (
-              <button key={key} style={{ ...S.card(selected), flexDirection: 'column', gap: '6px', padding: '10px 12px' }}
+              <button key={key} style={{ ...S.card(selected), flexDirection: 'column', gap: '5px', padding: '8px 6px' }}
                 onClick={() => select('colorScheme', key)}>
-                <span style={{ fontSize: '12px', fontWeight: selected ? '600' : '400', color: selected ? '#0a0a0a' : 'rgba(0,0,0,0.6)', lineHeight: 1.2 }}>
+                <span style={{ fontSize: '10px', fontWeight: selected ? '600' : '400', color: selected ? '#0a0a0a' : 'rgba(0,0,0,0.6)', lineHeight: 1.2, textAlign: 'center' }}>
                   {SCHEME_LABELS[key]}
                 </span>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 13px)', gap: '3px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 10px)', gap: '2px' }}>
                   {colors.slice(0, 6).map((c, i) => (
-                    <div key={i} style={{ width: '13px', height: '13px', borderRadius: '50%', background: c, boxShadow: '0 1px 2px rgba(0,0,0,0.18)' }} />
+                    <div key={i} style={{ width: '10px', height: '10px', borderRadius: '50%', background: c, boxShadow: '0 1px 2px rgba(0,0,0,0.18)' }} />
                   ))}
                 </div>
                 {selected && (
-                  <div style={{ position: 'absolute', top: '8px', right: '8px' }}><Checkmark /></div>
+                  <div style={{ position: 'absolute', top: '5px', right: '5px' }}><Checkmark /></div>
                 )}
               </button>
             );
@@ -587,6 +588,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
 
         <StyleGrid keys={CLASSIC_STYLE_KEYS} label="Classic" />
         <StyleGrid keys={LIVING_STYLE_KEYS} label="Living" />
+        <StyleGrid keys={ANTIPODAL_STYLE_KEYS} label="Antipodal" />
 
         {/* Per-face overrides */}
         <div style={{ marginBottom: '8px' }}>
@@ -626,6 +628,9 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                     </optgroup>
                     <optgroup label="Living">
                       {LIVING_STYLE_KEYS.map(k => <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>)}
+                    </optgroup>
+                    <optgroup label="Antipodal">
+                      {ANTIPODAL_STYLE_KEYS.map(k => <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>)}
                     </optgroup>
                   </select>
                 </div>
