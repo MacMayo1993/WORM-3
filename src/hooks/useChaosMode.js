@@ -1,40 +1,11 @@
 /**
  * useChaosMode Hook
- *
- * Manages chaos cascade system and auto-rotate effects.
- *
- * Performance optimisations applied:
- *  #1 – Disparity counter kept in a ref, updated once per chaos tick instead
- *       of being re-computed on every RAF frame (was 60×/s O(N³) scan).
- *  #7 – Effective tick period scales with ACTIVE %: the engine breathes when
- *       the board is already saturated and doesn't freeze trying to flip dead
- *       tiles at full speed.
- *  #8 – Surface-cubie list pre-computed once per cube size.  All inner loops
- *       iterate only the ~78 % of cubies that actually carry stickers, and
- *       the redundant isOnEdge() guard is dropped because every sticker that
- *       exists on a surface cubie is by construction an edge sticker.
  */
 
 import { useEffect, useRef, useCallback, useMemo } from 'react';
 import { useGameStore } from './useGameStore.js';
-import { buildManifoldGridMap, flipStickerPair, getManifoldNeighbors, isOnSeam, isCrossFaceNeighbor, findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
-import { getStickerWorldPos, getManifoldGridId, faceRCFor } from '../game/coordinates.js';
-import { FLIP_CAP } from '../utils/constants.js';
+import { useChaosWorker } from './useChaosWorker.js';
 
-// ─── Module-level pure helpers ────────────────────────────────────────────────
-
-// A1: Maximum concurrent lightning bolts rendered at once.
-// Oldest cascades are dropped when the queue exceeds this limit, ensuring
-// useFrame count stays bounded and animations remain visible.
-const MAX_CASCADES = 6;
-
-/**
- * Build a flat list of [x, y, z] triples for every surface cubie in an S×S×S
- * cube.  Interior cubies carry no stickers and are permanently excluded.
- *
- * For S=5: 125 cubies total → 98 surface cubies (22 % saving per scan pass).
- * For S=3:  27 cubies total → 26 surface cubies.
- */
 const buildSurfaceCoords = (S) => {
   const coords = [];
   for (let x = 0; x < S; x++)
@@ -45,13 +16,6 @@ const buildSurfaceCoords = (S) => {
   return coords;
 };
 
-/**
- * Single-pass scan over surface cubies only.
- *
- * Returns { disparity, flipActive, edgeTotal } without calling isOnEdge()
- * because every sticker on a surface cubie is guaranteed to be an edge sticker
- * (makeCubies only adds stickers for outward-facing directions).
- */
 const computeChaosMetrics = (state, surfCoords) => {
   let disparity = 0;
   let flipActive = 0;
@@ -68,11 +32,6 @@ const computeChaosMetrics = (state, surfCoords) => {
   return { disparity, flipActive, edgeTotal };
 };
 
-// ─── Hook ─────────────────────────────────────────────────────────────────────
-
-/**
- * Hook for chaos mode management
- */
 export function useChaosMode() {
   const chaosLevel = useGameStore((state) => state.chaosLevel);
   const setChaosLevel = useGameStore((state) => state.setChaosLevel);
@@ -86,10 +45,10 @@ export function useChaosMode() {
   const animState = useGameStore((state) => state.animState);
   const cubies = useGameStore((state) => state.cubies);
   const setCubies = useGameStore((state) => state.setCubies);
+  const rotationEpoch = useGameStore((state) => state.rotationEpoch);
   const addDisparityDeathsBulk = useGameStore((state) => state.addDisparityDeathsBulk);
   const addDisparityEliminatedFacesBulk = useGameStore((state) => state.addDisparityEliminatedFacesBulk);
 
-  // Auto-rotate state
   const upcomingRotation = useGameStore((state) => state.upcomingRotation);
   const setUpcomingRotation = useGameStore((state) => state.setUpcomingRotation);
   const rotationCountdown = useGameStore((state) => state.rotationCountdown);
@@ -101,48 +60,49 @@ export function useChaosMode() {
 
   const cubiesRef = useRef(cubies);
   cubiesRef.current = cubies;
-  // Keep explosionT in a ref so the chaos RAF reads the current value without
-  // the effect needing to re-mount (and wipe disparity state) every time
-  // the explosion factor changes.
-  const explosionTRef = useRef(explosionT);
-  explosionTRef.current = explosionT;
   const pendingMoveRef = useRef(null);
 
-  // Cache the manifold map between ticks — it only changes on face rotations,
-  // not on sticker flips, so rebuilding every 100ms is wasteful.
-  const manifoldMapCacheRef = useRef(null);
-  const animStateRef = useRef(animState);
-  animStateRef.current = animState;
-
-  // ── Auto-rotate refs — kept up-to-date every render so the merged RAF loop
-  // can read current values without re-subscribing on every state change.
-  // Previously these were closed over inside a second RAF, causing the loop to
-  // restart (and reset lastTimestamp) on every upcomingRotation / animState change.
-  const autoRotateEnabledRef = useRef(autoRotateEnabled);
-  autoRotateEnabledRef.current = autoRotateEnabled;
   const sizeRef = useRef(size);
   sizeRef.current = size;
   const upcomingRotationRef = useRef(upcomingRotation);
   upcomingRotationRef.current = upcomingRotation;
-  // Countdown held in a ref so the RAF body mutates it without triggering React
-  // re-renders on every frame; setRotationCountdown is called only at key events.
-  const _rotationCountdownRef = useRef(0);
+  const animStateRef = useRef(animState);
+  animStateRef.current = animState;
 
-  // ── Opt #8: surface coords list, rebuilt only when cube size changes ────────
-  const surfaceCoords = useMemo(() => buildSurfaceCoords(size), [size]);
-  const surfaceCoordsRef = useRef(surfaceCoords);
-  surfaceCoordsRef.current = surfaceCoords;
+  const surfaceCoordsRef = useRef(buildSurfaceCoords(size));
+  const surfaceCoordsMemo = useMemo(() => buildSurfaceCoords(size), [size]);
+  useEffect(() => {
+    surfaceCoordsRef.current = surfaceCoordsMemo;
+  }, [surfaceCoordsMemo]);
 
-  // Keep disparityFlipCap in a ref so the RAF closure can read it without stale captures
-  const flipCapRef = useRef(disparityFlipCap);
-  flipCapRef.current = disparityFlipCap;
-
-  // ── Opt #1: disparity + flipPct stored in refs, updated once per tick ──────
-  // The auto-rotate RAF reads these refs instead of scanning the full cube.
   const disparityRef = useRef(0);
-  const flipPctRef = useRef(0); // 0-100
+  const flipPctRef = useRef(0);
 
-  // Generate a random rotation
+  useEffect(() => {
+    if (!chaosMode) return;
+    const { disparity, flipActive, edgeTotal } = computeChaosMetrics(cubiesRef.current, surfaceCoordsRef.current);
+    disparityRef.current = disparity;
+    flipPctRef.current = edgeTotal > 0 ? Math.round((flipActive / edgeTotal) * 100) : 0;
+  }, [chaosMode]);
+
+  useChaosWorker({
+    chaosMode,
+    chaosLevel,
+    size,
+    cubies,
+    cubiesRef,
+    disparityFlipCap,
+    explosionT,
+    animState,
+    rotationEpoch,
+    setCubies,
+    setCascades,
+    disparityRef,
+    flipPctRef,
+    addDisparityDeathsBulk,
+    addDisparityEliminatedFacesBulk,
+  });
+
   const generateRandomRotation = useCallback((cubeSize) => {
     const axes = ['col', 'row', 'depth'];
     const axis = axes[Math.floor(Math.random() * axes.length)];
@@ -151,410 +111,6 @@ export function useChaosMode() {
     return { axis, dir, sliceIndex };
   }, []);
 
-  // Chaos chain propagation effect
-  useEffect(() => {
-    if (!chaosMode) return;
-
-    // Clear stale manifold map cache so it rebuilds from the current cube geometry.
-    // Without this, a second disparity game reuses the cache from the previous game
-    // (which may reflect a rotated/scrambled cube), causing propagation to reference
-    // wrong tile positions on the freshly-reset cube.
-    manifoldMapCacheRef.current = null;
-
-    // ── Opt #1: seed metrics once at activation ───────────────────────────────
-    {
-      const sc = surfaceCoordsRef.current;
-      const { disparity, flipActive, edgeTotal } = computeChaosMetrics(cubiesRef.current, sc);
-      disparityRef.current = disparity;
-      flipPctRef.current = edgeTotal > 0 ? Math.round((flipActive / edgeTotal) * 100) : 0;
-    }
-
-    // Reset disparity death log each time chaos starts fresh
-    useGameStore.getState().clearDisparityGame();
-
-    let raf = 0, last = performance.now(), tickAcc = 0;
-    let wasAnimating = !!animStateRef.current;
-
-    // ── Death-tracking state for Disparity Mode ────────────────────────────
-    const deadTileSet = new Set(); // keys of already-dead stickers
-    let deathRank = 0;
-    let pairDeathCount = 0; // one increment per tick that produces deaths (pair grouping)
-    let winnerAnnounced = false;
-    let stopped = false; // set true on winner to halt rescheduling cleanly
-    // Track alive tile count per face (faceNum 1-6). Populated on first death scan.
-    const faceAliveMap = new Map([[1, 0], [2, 0], [3, 0], [4, 0], [5, 0], [6, 0]]);
-    const faceSeedDone = { done: false };
-
-    // ── Level config: 5 levels (index 0 = off) ───────────────────────────────
-    // L1: single slow chain — intro to the mechanic
-    // L2: single chain, faster propagation
-    // L3: two independent chains, stochastic activation timing
-    // L4: two chains, higher rates
-    // L5: three chains, same rates as L4
-    const numChainsByLevel = [0, 1, 1, 2, 2, 3];
-    const delayByLevel     = [0, 380, 220, 200, 130, 130];
-    const basePropByLevel  = [0, 0.45, 0.72, 0.65, 0.85, 0.85];
-    const decayByLevel     = [0, 0.72, 0.82, 0.78, 0.88, 0.88];
-    const cooldownByLevel  = [0, 1600, 900,  800,  450,  450];
-
-    // Scale chain count proportionally with surface sticker count relative to 3×3.
-    // 3×3=54 stickers → scale 1×; 4×4=96 → 2×; 5×5=150 → 3×.
-    // This keeps chaos density (flips/sec/sticker) consistent across cube sizes.
-    const surfaceStickers = size * size * 6;
-    const sizeScale = Math.max(1, Math.ceil(surfaceStickers / 54));
-    const numChains = (numChainsByLevel[chaosLevel] || 1) * sizeScale;
-    const tickPeriod     = delayByLevel[chaosLevel]    || 250;
-    const basePropagation = basePropByLevel[chaosLevel] || 0.65;
-    const strengthDecay  = decayByLevel[chaosLevel]    || 0.78;
-    const chainCooldown  = cooldownByLevel[chaosLevel] || 1000;
-
-    // ── Per-chain state objects — each chain is fully independent ─────────────
-    // cooldownDuration is randomised on each restart (stochastic desync for L3+).
-    const chains = Array.from({ length: numChains }, () => ({
-      tile: null,
-      strength: 1.0,
-      visited: new Set(),
-      inCooldown: false,
-      cooldownAcc: 0,
-      cooldownDuration: chainCooldown,
-    }));
-
-    // ── Opt #8: iterate surface coords only ───────────────────────────────────
-    const findChainStart = (state) => {
-      const surfCoords = surfaceCoordsRef.current;
-      const candidates = [];
-
-      for (const [x, y, z] of surfCoords) {
-        const c = state[x][y][z];
-        for (const [dirKey, st] of Object.entries(c.stickers)) {
-          if (st.flips > 0 && st.flips < flipCapRef.current) {
-            candidates.push({ x, y, z, dirKey, flips: st.flips });
-          }
-        }
-      }
-
-      if (!candidates.length) {
-        // No eligible flipped tiles — seed a random unflipped, non-dead sticker
-        // so chaos bootstraps itself on a clean board.
-        // Fix: explicitly exclude dead tiles so 5×5 boards with saturated stickers
-        // don't get stuck picking tiles that can never propagate.
-        const freshPool = [];
-        for (const [x, y, z] of surfCoords) {
-          const c = state[x][y][z];
-          for (const [dirKey, st] of Object.entries(c.stickers)) {
-            if ((st.flips || 0) < flipCapRef.current) {
-              freshPool.push({ x, y, z, dirKey, flips: 1 });
-            }
-          }
-        }
-        if (!freshPool.length) return null; // entire board is dead — nothing to do
-        return { tile: freshPool[Math.floor(Math.random() * freshPool.length)], strength: 1.0 };
-      }
-
-      const totalWeight = candidates.reduce((sum, c) => sum + c.flips, 0);
-      let roll = Math.random() * totalWeight;
-      for (const c of candidates) {
-        roll -= c.flips;
-        if (roll <= 0) return { tile: c, strength: 1.0 };
-      }
-      return { tile: candidates[candidates.length - 1], strength: 1.0 };
-    };
-
-    // Steps one chain forward by one tile and mutates the chain object in place.
-    // Returns { next, newlyDead } — next is the updated cubies state (same reference
-    // as input state if no flip happened), newlyDead is an array of sticker objects
-    // that crossed FLIP_CAP this step.
-    const stepSingleChain = (state, chain, deadTileSet) => {
-      const S = state.length;
-      if (!manifoldMapCacheRef.current) {
-        manifoldMapCacheRef.current = buildManifoldGridMap(state, S);
-      }
-      const currentManifoldMap = manifoldMapCacheRef.current;
-
-      if (!chain.tile) {
-        const start = findChainStart(state);
-        if (!start) {
-          // Board fully dead — go to cooldown and try again later
-          chain.inCooldown = true;
-          chain.cooldownAcc = 0;
-          chain.cooldownDuration = chainCooldown;
-          return { next: state, newlyDead: [] };
-        }
-        chain.tile = start.tile;
-        chain.strength = start.strength;
-        chain.visited = new Set();
-        chain.visited.add(`${start.tile.x},${start.tile.y},${start.tile.z},${start.tile.dirKey}`);
-      }
-
-      const next = flipStickerPair(
-        state, S,
-        chain.tile.x, chain.tile.y, chain.tile.z,
-        chain.tile.dirKey, currentManifoldMap
-      );
-
-      // ── Capture deaths at the exact moment of flip ──────────────────────────
-      const newlyDead = [];
-      const { x: fx, y: fy, z: fz, dirKey: fdk } = chain.tile;
-      const flipKey = `${fx},${fy},${fz},${fdk}`;
-      const flippedSt = next[fx]?.[fy]?.[fz]?.stickers?.[fdk];
-      const fc = flipCapRef.current;
-      if (flippedSt && (flippedSt.flips || 0) >= fc && !deadTileSet.has(flipKey)) {
-        // Never kill the last surviving pair — they are the winners
-        if (surfaceStickers - deadTileSet.size > 2) {
-          deadTileSet.add(flipKey);
-          newlyDead.push({ sticker: flippedSt, x: fx, y: fy, z: fz, dirKey: fdk });
-        }
-      }
-      if (flippedSt) {
-        const antiLoc = findAntipodalStickerByGrid(currentManifoldMap, flippedSt, S);
-        if (antiLoc) {
-          const antiKey = `${antiLoc.x},${antiLoc.y},${antiLoc.z},${antiLoc.dirKey}`;
-          const antiSt = next[antiLoc.x]?.[antiLoc.y]?.[antiLoc.z]?.stickers?.[antiLoc.dirKey];
-          if (antiSt && (antiSt.flips || 0) >= fc && !deadTileSet.has(antiKey)) {
-            // Never kill the last surviving pair — they are the winners
-            if (surfaceStickers - deadTileSet.size > 2) {
-              deadTileSet.add(antiKey);
-              newlyDead.push({ sticker: antiSt, x: antiLoc.x, y: antiLoc.y, z: antiLoc.z, dirKey: antiLoc.dirKey });
-            }
-          }
-        }
-      }
-
-      chain.strength *= strengthDecay;
-
-      if (chain.strength < 0.1) {
-        // Chain exhausted — reset immediately so chaos never stalls.
-        // Cooldown is reserved only for the board-fully-dead case (findChainStart returns null).
-        chain.tile = null;
-        chain.strength = 1.0;
-        chain.visited = new Set();
-        return { next, newlyDead };
-      }
-
-      const neighbors = getManifoldNeighbors(
-        chain.tile.x, chain.tile.y, chain.tile.z,
-        chain.tile.dirKey, S
-      );
-
-      const validNeighbors = [];
-      for (const neighbor of neighbors) {
-        const nKey = `${neighbor.x},${neighbor.y},${neighbor.z},${neighbor.dirKey}`;
-        if (chain.visited.has(nKey)) continue;
-
-        const nc = next[neighbor.x]?.[neighbor.y]?.[neighbor.z];
-        if (!nc) continue;
-        const nst = nc.stickers[neighbor.dirKey];
-        if (!nst) continue;
-        if ((nst.flips || 0) >= flipCapRef.current) continue;
-        const { x: nx, y: ny, z: nz, dirKey: nd } = neighbor;
-        const S1 = S - 1;
-        const onEdge = (nd === 'PX' && nx === S1) || (nd === 'NX' && nx === 0) ||
-                       (nd === 'PY' && ny === S1) || (nd === 'NY' && ny === 0) ||
-                       (nd === 'PZ' && nz === S1) || (nd === 'NZ' && nz === 0);
-        if (!onEdge) continue;
-
-        const crossFace = isCrossFaceNeighbor(chain.tile.dirKey, neighbor.dirKey);
-        const onSeam = isOnSeam(neighbor.x, neighbor.y, neighbor.z, neighbor.dirKey, S);
-        const seamWeight = crossFace ? 4 : onSeam ? 2 : 1;
-        validNeighbors.push({ ...neighbor, flips: nst.flips || 0, seamWeight, crossFace });
-      }
-
-      let nextTile = null;
-      if (validNeighbors.length > 0) {
-        const sorted = [];
-        const pool = [...validNeighbors];
-        while (pool.length > 0) {
-          let roll = Math.random() * pool.reduce((s, n) => s + n.seamWeight, 0);
-          let pick = pool.length - 1;
-          for (let i = 0; i < pool.length; i++) {
-            roll -= pool[i].seamWeight;
-            if (roll <= 0) { pick = i; break; }
-          }
-          sorted.push(pool.splice(pick, 1)[0]);
-        }
-
-        for (const neighbor of sorted) {
-          const flipBoost = neighbor.flips > 0 ? 1.15 : 1.0;
-          const propagateChance = chain.strength * basePropagation * flipBoost;
-
-          if (Math.random() < propagateChance) {
-            const fromPos = getStickerWorldPos(
-              chain.tile.x, chain.tile.y, chain.tile.z,
-              chain.tile.dirKey, S, explosionTRef.current
-            );
-            const toPos = getStickerWorldPos(
-              neighbor.x, neighbor.y, neighbor.z,
-              neighbor.dirKey, S, explosionTRef.current
-            );
-            const boltKey = `${fromPos.map(v => v.toFixed(1)).join(',')}→${toPos.map(v => v.toFixed(1)).join(',')}`;
-            setCascades((prev) => {
-              if (prev.some(c => c.key === boltKey)) return prev;
-              const n2 = [...prev, { id: Date.now() + Math.random(), key: boltKey, from: fromPos, to: toPos, crossFace: neighbor.crossFace }];
-              return n2.length > MAX_CASCADES ? n2.slice(-MAX_CASCADES) : n2;
-            });
-            nextTile = neighbor;
-            break;
-          }
-        }
-      }
-
-      if (nextTile) {
-        chain.visited.add(`${nextTile.x},${nextTile.y},${nextTile.z},${nextTile.dirKey}`);
-        chain.tile = nextTile;
-      } else {
-        // No valid neighbor found — reset immediately and pick a new start next tick.
-        chain.tile = null;
-        chain.strength = 1.0;
-        chain.visited = new Set();
-      }
-
-      return { next, newlyDead };
-    };
-
-    const loop = (now) => {
-      const dt = now - last;
-      last = now;
-
-      // When a face rotation completes, cube geometry changes — invalidate the cache.
-      const isAnimating = !!animStateRef.current;
-      if (wasAnimating && !isAnimating) {
-        manifoldMapCacheRef.current = null;
-      }
-      wasAnimating = isAnimating;
-
-      // Advance each chain's cooldown independently
-      for (const chain of chains) {
-        if (chain.inCooldown) {
-          chain.cooldownAcc += dt;
-          if (chain.cooldownAcc >= chain.cooldownDuration) {
-            chain.inCooldown = false;
-            chain.cooldownAcc = 0;
-          }
-        }
-      }
-
-      tickAcc += dt;
-
-      // Gentle adaptive period — slows by at most 1.5× at full saturation.
-      // Replaces the old satBrake which could reach 6× and stall 5×5 boards.
-      const pct = flipPctRef.current;
-      // Slow-motion final 5: when only a handful of tiles survive, dramatically
-      // decelerate so each death feels weighty and deliberate.
-      const totalSurface = sizeRef.current * sizeRef.current * 6;
-      const aliveNow = totalSurface - deadTileSet.size;
-      const slowMoPeriodMult = aliveNow <= 5
-        ? 1 / Math.max(0.25, aliveNow / 10)
-        : 1.0;
-      const effectivePeriod = tickPeriod * (1 + pct / 200) * slowMoPeriodMult;
-
-      if (tickAcc >= effectivePeriod) {
-        let state = cubiesRef.current;
-        let changed = false;
-        const allNewDeaths = [];
-
-        for (const chain of chains) {
-          if (chain.inCooldown) continue;
-          const { next: newState, newlyDead } = stepSingleChain(state, chain, deadTileSet);
-          if (newState !== state) {
-            state = newState;
-            changed = true;
-            for (const st of newlyDead) allNewDeaths.push(st);
-          }
-        }
-
-        if (changed) {
-          const sc = surfaceCoordsRef.current;
-          const { disparity, flipActive, edgeTotal } = computeChaosMetrics(state, sc);
-          disparityRef.current = disparity;
-          flipPctRef.current = edgeTotal > 0 ? Math.round((flipActive / edgeTotal) * 100) : 0;
-
-          const S = sizeRef.current;
-
-          // ── Disparity Mode: seed faceAliveMap on first tick with deaths ───
-          if (!faceSeedDone.done) {
-            faceSeedDone.done = true;
-            for (const [x, y, z] of surfaceCoordsRef.current) {
-              const c = state[x][y][z];
-              for (const st of Object.values(c.stickers)) {
-                const faceNum = st.orig;
-                if (faceNum) faceAliveMap.set(faceNum, (faceAliveMap.get(faceNum) ?? 0) + 1);
-              }
-            }
-          }
-
-          // ── Disparity Mode: record deaths captured inside stepSingleChain ──
-          if (allNewDeaths.length > 0) {
-            pairDeathCount++;
-            const DIR_TO_FACE = { PZ: 1, NX: 2, PY: 3, NZ: 4, PX: 5, NY: 6 };
-            const newDeaths = [];
-            const eliminatedFaces = [];
-            for (const { sticker: st, x: dx, y: dy, z: dz, dirKey: ddk } of allNewDeaths) {
-              deathRank++;
-              const gridId = getManifoldGridId(st, S);
-              // Compute where the tile physically was when it died (may differ from origin if cube was rotated)
-              const { r, c } = faceRCFor(ddk, dx, dy, dz, S);
-              const endFaceId = DIR_TO_FACE[ddk] ?? st.curr;
-              const endGridId = `M${endFaceId}-${String(r * S + c + 1).padStart(3, '0')}`;
-              newDeaths.push({ id: Date.now() + Math.random(), gridId, endGridId, rank: deathRank, pairRank: pairDeathCount, timestamp: Date.now() });
-              // Decrement face count and fire elimination event when face hits 0
-              const faceNum = st.orig;
-              if (faceNum) {
-                const prev = faceAliveMap.get(faceNum) ?? 1;
-                const next = Math.max(0, prev - 1);
-                faceAliveMap.set(faceNum, next);
-                if (next === 0) {
-                  eliminatedFaces.push(faceNum);
-                }
-              }
-            }
-            addDisparityDeathsBulk(newDeaths);
-            if (eliminatedFaces.length > 0) addDisparityEliminatedFacesBulk(eliminatedFaces);
-          }
-
-          // ── Winner detection: last 2 surviving (alive) tiles ──────────────────
-          // Each death reduces alive count by 1 (pairs die together so count drops
-          // by 2 per tick at most). Winner fires once exactly 2 tiles remain alive
-          // and at least one death has already happened.
-          const aliveAfterDeaths = surfaceStickers - deadTileSet.size;
-          if (!winnerAnnounced && aliveAfterDeaths <= 2 && aliveAfterDeaths > 0 && deathRank > 0) {
-            winnerAnnounced = true;
-            // Find the surviving stickers — those still below the flip cap
-            const winnerStickers = [];
-            for (const [wx, wy, wz] of sc) {
-              const wc = state[wx][wy][wz];
-              for (const st of Object.values(wc.stickers)) {
-                if ((st.flips || 0) < flipCapRef.current) {
-                  winnerStickers.push(st);
-                }
-              }
-            }
-            const winnerPair = winnerStickers.map(st => getManifoldGridId(st, S));
-            // Stop the RAF from rescheduling — prevents the chaos loop from racing
-            // with React's effect cleanup (calling setChaosLevel inside the RAF
-            // can cancel the wrong frame ID and leave the loop running forever).
-            // chaosLevel intentionally stays > 0 so isWinnerTile stays true and
-            // the gold glow renders on the winning tiles while the screen is up.
-            stopped = true;
-            useGameStore.getState().setDisparityWinner({ pair: winnerPair });
-            useGameStore.getState().setShowDisparityWinner(true);
-          }
-
-          setCubies(state);
-        }
-        tickAcc = 0;
-      }
-
-      if (!stopped) {
-        raf = requestAnimationFrame(loop);
-      }
-    };
-
-    raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chaosMode, chaosLevel, setCubies, setCascades, addDisparityDeathsBulk, addDisparityEliminatedFacesBulk]);
-
-  // Auto-rotate effect
   useEffect(() => {
     if (!autoRotateEnabled || !chaosMode) {
       setUpcomingRotation(null);
@@ -573,14 +129,13 @@ export function useChaosMode() {
       const dt = now - last;
       last = now;
 
-      if (animState) {
+      if (animStateRef.current) {
         raf = requestAnimationFrame(loop);
         return;
       }
 
-      // ── Opt #1: read pre-computed disparity from ref — zero cube scan ───────
       const disparity = disparityRef.current;
-      const maxDisparity = size * size * 6;
+      const maxDisparity = sizeRef.current * sizeRef.current * 6;
       const disparityRatio = Math.min(1, disparity / maxDisparity);
 
       const maxInterval = 10000;
@@ -589,51 +144,46 @@ export function useChaosMode() {
 
       setRotationCountdown((prev) => {
         const newCountdown = prev - dt;
-
         if (newCountdown <= 0) {
-          if (upcomingRotation) {
-            const { axis, dir, sliceIndex } = upcomingRotation;
+          const nextRotation = upcomingRotationRef.current;
+          if (nextRotation) {
+            const { axis, dir, sliceIndex } = nextRotation;
             setAnimState({ axis, dir, sliceIndex, t: 0 });
             const move = { axis, dir, sliceIndex };
             setPendingMove(move);
             pendingMoveRef.current = move;
           }
-          setUpcomingRotation(generateRandomRotation(size));
+          const generated = generateRandomRotation(sizeRef.current);
+          setUpcomingRotation(generated);
+          upcomingRotationRef.current = generated;
           return targetInterval;
         }
-
         return newCountdown;
       });
 
       raf = requestAnimationFrame(loop);
     };
 
-    // ── Opt #1: read pre-computed disparity ref for initial countdown ─────────
     const disparity = disparityRef.current;
     const maxDisparity = size * size * 6;
     const disparityRatio = Math.min(1, disparity / maxDisparity);
-    const initialInterval = 10000 - disparityRatio * 9250;
-    setRotationCountdown(initialInterval);
+    setRotationCountdown(10000 - disparityRatio * 9250);
 
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [autoRotateEnabled, chaosMode, size, animState, upcomingRotation, generateRandomRotation, setAnimState, setPendingMove, setUpcomingRotation, setRotationCountdown]);
+  }, [autoRotateEnabled, chaosMode, size, upcomingRotation, generateRandomRotation, setAnimState, setPendingMove, setUpcomingRotation, setRotationCountdown]);
 
-  // Cascade completion handler
   const onCascadeComplete = useCallback((id) => {
     setCascades((prev) => prev.filter((c) => c.id !== id));
   }, [setCascades]);
 
   return {
-    // State
     chaosLevel,
     chaosMode,
     autoRotateEnabled,
     cascades,
     upcomingRotation,
     rotationCountdown,
-
-    // Actions
     setChaosLevel,
     setAutoRotateEnabled,
     setCascades,
