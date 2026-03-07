@@ -5,8 +5,7 @@
 import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { getStickerWorldPos } from '../game/coordinates.js';
-import { calculateSmartControlPoint } from '../utils/smartRouting.js';
+import { getTunnelSideKey } from './wormLogic.js';
 
 // Tunnel colors
 const TUNNEL_COLOR = '#00ff88';
@@ -26,31 +25,32 @@ function getStableOffset(tunnelId) {
   return (Math.abs(hash) % 1000) / 1000 * Math.PI * 2;
 }
 
-function TunnelTube({ tunnel, size, explosionFactor = 0, isTarget = false, wormInTunnel = false }) {
+function TunnelTube({ tunnel, size, explosionFactor = 0, isTarget = false, wormInTunnel = false, inactiveSideKeys = new Set() }) {
   const tubeRef = useRef();
   const glowRef = useRef();
   const timeRef = useRef(getStableOffset(tunnel.id));
 
   // Calculate tunnel path
   const { curve, entryPos, exitPos } = useMemo(() => {
-    const entry = getStickerWorldPos(
-      tunnel.entry.x, tunnel.entry.y, tunnel.entry.z,
-      tunnel.entry.dirKey, size, explosionFactor
+    const k = (size - 1) / 2;
+    const scale = 1 + explosionFactor * 1.8;
+    const entryCenter = new THREE.Vector3(
+      (tunnel.entry.x - k) * scale,
+      (tunnel.entry.y - k) * scale,
+      (tunnel.entry.z - k) * scale
     );
-    const exit = getStickerWorldPos(
-      tunnel.exit.x, tunnel.exit.y, tunnel.exit.z,
-      tunnel.exit.dirKey, size, explosionFactor
-    );
-
-    const controlPoint = calculateSmartControlPoint(entry, exit, size, 0);
-
-    const curve = new THREE.QuadraticBezierCurve3(
-      new THREE.Vector3(...entry),
-      controlPoint,
-      new THREE.Vector3(...exit)
+    const exitCenter = new THREE.Vector3(
+      (tunnel.exit.x - k) * scale,
+      (tunnel.exit.y - k) * scale,
+      (tunnel.exit.z - k) * scale
     );
 
-    return { curve, entryPos: entry, exitPos: exit };
+    // Match gameplay path exactly: tile center -> void core center -> tile center.
+    const path = new THREE.CurvePath();
+    path.add(new THREE.LineCurve3(entryCenter, new THREE.Vector3(0, 0, 0)));
+    path.add(new THREE.LineCurve3(new THREE.Vector3(0, 0, 0), exitCenter));
+
+    return { curve: path, entryPos: [entryCenter.x, entryCenter.y, entryCenter.z], exitPos: [exitCenter.x, exitCenter.y, exitCenter.z] };
   }, [tunnel, size, explosionFactor]);
 
   // Create tube geometry
@@ -58,6 +58,11 @@ function TunnelTube({ tunnel, size, explosionFactor = 0, isTarget = false, wormI
     const radius = isTarget ? 0.12 : 0.08;
     return new THREE.TubeGeometry(curve, 32, radius, 8, false);
   }, [curve, isTarget]);
+
+  const color = isTarget ? TARGET_TUNNEL_COLOR : TUNNEL_COLOR;
+  const entryActive = !inactiveSideKeys.has(getTunnelSideKey(tunnel.entry));
+  const exitActive = !inactiveSideKeys.has(getTunnelSideKey(tunnel.exit));
+  const tunnelOpacityScale = entryActive || exitActive ? 1 : 0.25;
 
   // Animate tube
   useFrame((state, delta) => {
@@ -69,8 +74,8 @@ function TunnelTube({ tunnel, size, explosionFactor = 0, isTarget = false, wormI
       const pulseSpeed = isTarget ? 4 : 2;
 
       // Opacity pulse
-      const baseOpacity = wormInTunnel ? 0.9 : (isTarget ? 0.7 : 0.4);
-      tubeRef.current.material.opacity = baseOpacity + Math.sin(t * pulseSpeed) * 0.1;
+      const baseOpacity = (wormInTunnel ? 0.9 : (isTarget ? 0.7 : 0.4)) * tunnelOpacityScale;
+      tubeRef.current.material.opacity = baseOpacity + Math.sin(t * pulseSpeed) * 0.1 * tunnelOpacityScale;
 
       // Emissive pulse
       const baseEmissive = isTarget ? 0.8 : 0.4;
@@ -83,8 +88,6 @@ function TunnelTube({ tunnel, size, explosionFactor = 0, isTarget = false, wormI
     }
   });
 
-  const color = isTarget ? TARGET_TUNNEL_COLOR : TUNNEL_COLOR;
-
   return (
     <group>
       {/* Main tunnel tube */}
@@ -94,7 +97,7 @@ function TunnelTube({ tunnel, size, explosionFactor = 0, isTarget = false, wormI
           emissive={color}
           emissiveIntensity={isTarget ? 0.8 : 0.4}
           transparent
-          opacity={isTarget ? 0.7 : 0.4}
+          opacity={(isTarget ? 0.7 : 0.4) * tunnelOpacityScale}
           side={THREE.DoubleSide}
         />
       </mesh>
@@ -120,7 +123,7 @@ function TunnelTube({ tunnel, size, explosionFactor = 0, isTarget = false, wormI
             emissive={color}
             emissiveIntensity={0.6}
             transparent
-            opacity={0.8}
+            opacity={entryActive ? 0.8 : 0.18}
           />
         </mesh>
       </group>
@@ -134,7 +137,7 @@ function TunnelTube({ tunnel, size, explosionFactor = 0, isTarget = false, wormI
             emissive={color}
             emissiveIntensity={0.6}
             transparent
-            opacity={0.8}
+            opacity={exitActive ? 0.8 : 0.18}
           />
         </mesh>
       </group>
@@ -150,13 +153,15 @@ function TunnelTube({ tunnel, size, explosionFactor = 0, isTarget = false, wormI
  * @param {number} props.explosionFactor - Explosion animation factor
  * @param {string} props.targetTunnelId - ID of tunnel to highlight
  * @param {string} props.wormTunnelId - ID of tunnel the worm is currently in
+ * @param {Set<string>} props.inactiveSideKeys - side keys already consumed by tunnel entry
  */
 export default function WormTunnelNetwork({
   tunnels,
   size,
   explosionFactor = 0,
   targetTunnelId = null,
-  wormTunnelId = null
+  wormTunnelId = null,
+  inactiveSideKeys = new Set()
 }) {
   if (!tunnels || tunnels.length === 0) return null;
 
@@ -170,6 +175,7 @@ export default function WormTunnelNetwork({
           explosionFactor={explosionFactor}
           isTarget={tunnel.id === targetTunnelId}
           wormInTunnel={tunnel.id === wormTunnelId}
+          inactiveSideKeys={inactiveSideKeys}
         />
       ))}
     </group>
