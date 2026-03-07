@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { FLIP_CAP, getHalfLifeMultiplier } from '../utils/constants.js';
@@ -25,6 +25,7 @@ const _trueUp = new THREE.Vector3();
 const _c1 = new THREE.Color();
 const _c2 = new THREE.Color();
 const _cTemp = new THREE.Color();
+const _streakPos = new THREE.Vector3();
 const _lPt = new THREE.Vector3();
 const _dummy = new THREE.Object3D();
 
@@ -38,6 +39,8 @@ const FACE_OFFSET = 0.52;
 
 const DANGER_START = 9;
 const DANGER_RANGE = FLIP_CAP - 1 - DANGER_START;
+const STREAK_COUNT_LOW = 10;
+const STREAK_COUNT_HIGH = 18;
 
 const tubeVertexShader = `
   varying vec2 vUv;
@@ -128,12 +131,30 @@ const strandFragmentShader = `
   }
 `;
 
-const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2, active1, active2, cubieRefs, intensity, flips, color1, color2, isCenter, _explosionFactor = 0 }) => {
+const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2, active1, active2, cubieRefs, intensity, flips, color1, color2, isCenter, maxStrands = 50, _explosionFactor = 0 }) => {
   const coreTubeRef = useRef();
   const coreMatRef = useRef();
   const pulseT = useRef(Math.random() * Math.PI * 2);
   const strandsRef = useRef();
   const strandMatRef = useRef();
+  const streaksRef = useRef();
+  const streakMaterialRef = useRef();
+
+  const streakCount = maxStrands > 30 ? STREAK_COUNT_HIGH : STREAK_COUNT_LOW;
+  const streakSeed = useMemo(() => {
+    const seed = new Float32Array(streakCount * 4);
+    for (let i = 0; i < streakCount; i++) {
+      const i4 = i * 4;
+      seed[i4] = Math.random();
+      seed[i4 + 1] = (Math.random() - 0.5) * (isCenter ? 0.03 : 0.12);
+      seed[i4 + 2] = (Math.random() - 0.5) * (isCenter ? 0.03 : 0.12);
+      seed[i4 + 3] = 0.45 + Math.random() * 0.55;
+    }
+    return seed;
+  }, [streakCount, isCenter]);
+
+  const streakPositions = useMemo(() => new Float32Array(streakCount * 3), [streakCount]);
+  const streakColors = useMemo(() => new Float32Array(streakCount * 3), [streakCount]);
 
   const [tubeUniforms] = React.useState(() => ({
     uColor1: { value: new THREE.Color() },
@@ -272,6 +293,47 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
         strandMatRef.current.uniforms.uBurst.value = burstEnv;
         strandMatRef.current.uniforms.uOpacity.value = dead ? 0 : 0.6 + (burstEnv * 0.4);
       }
+    }
+
+    const streaks = streaksRef.current;
+    if (streaks && streakMaterialRef.current) {
+      const points = curveRef.current.points;
+      const maxSeg = LIGHTNING_PTS - 1;
+      const colorMix = _cTemp;
+      for (let i = 0; i < streakCount; i++) {
+        const i3 = i * 3;
+        const i4 = i * 4;
+        const flow = (streakSeed[i4] + t * (0.22 + intensity * 0.28)) % 1;
+        const centerDist = Math.abs(flow - 0.5);
+        const maskedFlow = centerDist < 0.1 ? (flow < 0.5 ? 0.39 : 0.61) : flow;
+
+        const fSeg = maskedFlow * maxSeg;
+        const seg = Math.floor(fSeg);
+        const segT = fSeg - seg;
+        _streakPos.copy(points[seg]).lerp(points[Math.min(seg + 1, maxSeg)], segT);
+
+        if (!isCenter) {
+          const wobble = Math.sin((t * 5) + i * 1.17) * 0.65 + 0.35;
+          _streakPos.addScaledVector(_right, streakSeed[i4 + 1] * wobble);
+          _streakPos.addScaledVector(_trueUp, streakSeed[i4 + 2] * wobble);
+        }
+
+        streakPositions[i3] = _streakPos.x;
+        streakPositions[i3 + 1] = _streakPos.y;
+        streakPositions[i3 + 2] = _streakPos.z;
+
+        colorMix.lerpColors(_c1, _c2, maskedFlow);
+        const lum = (1.0 + burstEnv * 0.6) * streakSeed[i4 + 3];
+        streakColors[i3] = colorMix.r * lum;
+        streakColors[i3 + 1] = colorMix.g * lum;
+        streakColors[i3 + 2] = colorMix.b * lum;
+      }
+
+      streaks.geometry.attributes.position.needsUpdate = true;
+      streaks.geometry.attributes.color.needsUpdate = true;
+      streakMaterialRef.current.opacity = dead ? 0.06 : (0.22 + intensity * 0.12 + burstEnv * 0.18);
+      streakMaterialRef.current.size = dead ? 0.008 : (0.014 + intensity * 0.006);
+      streaks.visible = true;
     }
 
 
@@ -447,6 +509,24 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
           blending={THREE.AdditiveBlending}
         />
       </mesh>
+
+      {/* Warp streak particles: gives all tunnels the same high-speed wormhole feel. */}
+      <points ref={streaksRef}>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" count={streakCount} array={streakPositions} itemSize={3} />
+          <bufferAttribute attach="attributes-color" count={streakCount} array={streakColors} itemSize={3} />
+        </bufferGeometry>
+        <pointsMaterial
+          ref={streakMaterialRef}
+          size={0.014}
+          transparent
+          opacity={0.3}
+          depthWrite={false}
+          vertexColors
+          blending={THREE.AdditiveBlending}
+          sizeAttenuation
+        />
+      </points>
 
 
 
