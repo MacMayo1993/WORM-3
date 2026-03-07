@@ -113,8 +113,8 @@ export function stepCrawler(state, input, dt, size) {
   }
 
   // --- Jump ---
-  const gravity = 18.0;
-  const jumpForce = 7.0;
+  const gravity = 25.0;
+  const jumpForce = 5.0;
   let newJumpHeight = jumpHeight;
   let newJumpVel = jumpVel;
 
