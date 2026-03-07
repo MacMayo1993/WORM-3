@@ -142,10 +142,15 @@ export function stepCrawler(state, input, dt, size) {
     }
   }
 
-  // --- Movement --- horizontal speed is unaffected by jump
-  const moveSpeed = vel;
+  // --- Movement --- clamp horizontal step to one tile while airborne
+  const TILE_SIZE = 1;
   const moveDir = newForward.clone().normalize();
-  const step = moveDir.multiplyScalar(moveSpeed * dt);
+  let stepLength = vel * dt;
+  if (isAirborne) {
+    stepLength = Math.min(stepLength, TILE_SIZE);
+    vel = 0; // freeze velocity during jump so landing speed is clean
+  }
+  const step = moveDir.multiplyScalar(stepLength);
   const normal = FACE_NORMALS[face];
 
   // Strip jump offset to get the surface-level position, then advance
