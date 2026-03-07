@@ -282,23 +282,25 @@ export default function UILayer({
         <TileLeaderboard cubies={cubies} size={size} chaosMode={chaosMode} visible={showLeaderboard} onClose={toggleLeaderboard} />
 
         {/* Bottom Navigation Bar */}
-        <BottomNavBar
-          onReset={onReset}
-          onShuffle={currentLevelData ? onShuffleForLevel : onShuffle}
-          solveModeActive={solveModeActive}
-          teachModeActive={teachMode.active}
-          onToggleSolve={() => { setSolveModeActive(!solveModeActive); if (!solveModeActive) setSolveFocusedStep(null); else setSolveHighlights([]); }}
-          onToggleTeach={() => { if (teachMode.active) teachMode.exitTeachMode(); else if (size === 3) teachMode.enterTeachMode(); }}
-          hasActiveView={exploded || showTunnels || showNetPanel || hollowMode || showLeaderboard}
-          onToggleViews={() => { setSheetMode('views'); setSheetOpen(!sheetOpen || sheetMode !== 'views'); }}
-          onToggleMore={() => { setSheetMode('more'); setSheetOpen(!sheetOpen || sheetMode !== 'more'); }}
-          moreOpen={sheetOpen && sheetMode === 'more'}
-          viewsOpen={sheetOpen && sheetMode === 'views'}
-        />
+        {!wormHealerMode && (
+          <BottomNavBar
+            onReset={onReset}
+            onShuffle={currentLevelData ? onShuffleForLevel : onShuffle}
+            solveModeActive={solveModeActive}
+            teachModeActive={teachMode.active}
+            onToggleSolve={() => { setSolveModeActive(!solveModeActive); if (!solveModeActive) setSolveFocusedStep(null); else setSolveHighlights([]); }}
+            onToggleTeach={() => { if (teachMode.active) teachMode.exitTeachMode(); else if (size === 3) teachMode.enterTeachMode(); }}
+            hasActiveView={exploded || showTunnels || showNetPanel || hollowMode || showLeaderboard}
+            onToggleViews={() => { setSheetMode('views'); setSheetOpen(!sheetOpen || sheetMode !== 'views'); }}
+            onToggleMore={() => { setSheetMode('more'); setSheetOpen(!sheetOpen || sheetMode !== 'more'); }}
+            moreOpen={sheetOpen && sheetMode === 'more'}
+            viewsOpen={sheetOpen && sheetMode === 'views'}
+          />
+        )}
       </div>
 
       {/* Secondary Modes Bottom Sheet */}
-      <SecondaryModesSheet
+      {!wormHealerMode && <SecondaryModesSheet
         open={sheetOpen}
         onClose={() => setSheetOpen(false)}
         mode={sheetMode}
@@ -338,10 +340,10 @@ export default function UILayer({
         currentLevelData={currentLevelData}
         onShowLevels={() => { setShowLevelSelect(true); setSheetOpen(false); }}
         onFreeplay={() => { useGameStore.getState().clearLevel(); setSheetOpen(false); }}
-      />
+      />}
 
       {/* Level Badge */}
-      {currentLevelData && !showMainMenu && !showLevelSelect && !victory && (
+      {currentLevelData && !wormHealerMode && !showMainMenu && !showLevelSelect && !victory && (
         <div className="level-badge">
           <span className="level-badge-number">{currentLevel}</span>
           <span className="level-badge-name">{currentLevelData.name}</span>
@@ -509,7 +511,7 @@ export default function UILayer({
         </Suspense>
       )}
 
-      {isMobile && !showTutorial && (
+      {isMobile && !wormHealerMode && !showTutorial && (
         <MobileControls
           onShowSettings={() => setShowSettings(true)} onShowHelp={() => setShowHelp(true)}
           flipMode={flipMode} onToggleFlip={() => setFlipMode(!flipMode)}
@@ -546,7 +548,7 @@ export default function UILayer({
         />
       )}
 
-      {handsMode && (
+      {handsMode && !wormHealerMode && (
         <HandsOverlay
           recentMoves={handsMoveHistory}
           lastMove={handsMoveHistory.length > 0 ? handsMoveHistory[handsMoveHistory.length - 1] : null}
@@ -554,7 +556,7 @@ export default function UILayer({
         />
       )}
 
-      {antipodalIntegrityMode && (
+      {antipodalIntegrityMode && !wormHealerMode && (
         <AntipodalHUD
           integrity={antipodalData.integrity}
           preserved={antipodalData.preserved}
@@ -565,8 +567,8 @@ export default function UILayer({
         />
       )}
 
-      <AntipodalModeHUD />
-      <EchoRotationIndicator />
+      {!wormHealerMode && <AntipodalModeHUD />}
+      {!wormHealerMode && <EchoRotationIndicator />}
 
       {showDevConsole && (
         <Suspense fallback={null}>
