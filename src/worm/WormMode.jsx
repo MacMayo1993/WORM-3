@@ -249,7 +249,8 @@ export function WormMode3D({
   gameState,
   mode = 'surface',
   targetTunnelId = null,
-  tunnels = []
+  tunnels = [],
+  inactiveTunnelSides = new Set()
 }) {
   const isTunnelMode = mode === 'tunnel';
   const wormTunnelId = isTunnelMode && worm[0] ? worm[0].tunnelId : null;
@@ -668,7 +669,7 @@ export function TunnelWormGameLoop({
     if (!head || !head.tunnel) return;
 
     // Advance worm through tunnel
-    let movementDir = head.direction ?? 1;
+    const movementDir = head.direction ?? 1;
     let newT = head.t + (moveAmount * movementDir);
     let newTunnelId = head.tunnelId;
     let newTunnel = head.tunnel;
