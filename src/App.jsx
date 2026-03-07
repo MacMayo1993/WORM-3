@@ -441,13 +441,14 @@ export default function WORM3() {
     setShowDisparityWizard(true);
   }, []);
 
-  const handleDisparitySetupComplete = useCallback(({ cubeSize, disparityLevel, flipCap, visualMode: vm, flipMode: fm, showTunnels: st }) => {
+  const handleDisparitySetupComplete = useCallback(({ cubeSize, disparityLevel, flipCap, visualMode: vm, flipMode: fm, showTunnels: st, colorScheme: cs }) => {
     setShowDisparityWizard(false);
     useGameStore.getState().clearLevel();
     useGameStore.getState().clearDisparityGame();
     if (flipCap != null) useGameStore.getState().setDisparityFlipCap(flipCap);
-    // Keep current background/colors; only disable biome mode so the scene renders
-    setSettings({ ...settings, biomeMode: { enabled: false, faceAssignment: null } });
+    const newSettings = { ...settings, biomeMode: { enabled: false, faceAssignment: null } };
+    if (cs) newSettings.colorScheme = cs;
+    setSettings(newSettings);
     if (vm) setVisualMode(vm);
     setFlipMode(fm);
     if (st !== undefined) setShowTunnels(st);
