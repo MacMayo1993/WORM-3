@@ -47,6 +47,8 @@ const TUNNEL_CONFIG = {
   minFlipsForStart: 3     // Minimum flipped stickers needed to start tunnel mode
 };
 
+const EMPTY_INACTIVE_TUNNEL_SIDES = new Set();
+
 // Custom hook for WORM mode game logic
 export function useWormGame(cubies, size, animState, onRotate) {
   // Game state
@@ -249,10 +251,12 @@ export function WormMode3D({
   gameState,
   mode = 'surface',
   targetTunnelId = null,
-  tunnels = []
+  tunnels = [],
+  inactiveTunnelSides
 }) {
   const isTunnelMode = mode === 'tunnel';
   const wormTunnelId = isTunnelMode && worm[0] ? worm[0].tunnelId : null;
+  const inactiveSideKeys = inactiveTunnelSides || EMPTY_INACTIVE_TUNNEL_SIDES;
 
   return (
     <>
@@ -264,6 +268,7 @@ export function WormMode3D({
           explosionFactor={explosionFactor}
           targetTunnelId={targetTunnelId}
           wormTunnelId={wormTunnelId}
+          inactiveSideKeys={inactiveSideKeys}
         />
       )}
 
@@ -403,6 +408,7 @@ export function useTunnelWormGame(cubies, size, animState, onRotate) {
   const [tunnelsTraversed, setTunnelsTraversed] = useState(0);
   const [pendingGrowth, setPendingGrowth] = useState(0);
   const [targetTunnelId, setTargetTunnelId] = useState(null);
+  const [inactiveTunnelSides, setInactiveTunnelSides] = useState(() => new Set());
 
   // Camera mode - first-person worm view
   const [wormCameraEnabled, setWormCameraEnabled] = useState(false);
@@ -487,6 +493,7 @@ export function useTunnelWormGame(cubies, size, animState, onRotate) {
     setScore(0);
     setTunnelsTraversed(0);
     setPendingGrowth(0);
+    setInactiveTunnelSides(new Set());
     setGameState('playing');
     lastMoveTime.current = 0;
     rotationQueue.current = [];
@@ -596,6 +603,7 @@ export function useTunnelWormGame(cubies, size, animState, onRotate) {
     orbsTotal: TUNNEL_CONFIG.initialOrbs,
     wormCameraEnabled,
     targetTunnelId,
+    inactiveTunnelSides,
     mode: 'tunnel',
 
     // Setters
@@ -607,6 +615,7 @@ export function useTunnelWormGame(cubies, size, animState, onRotate) {
     setPendingGrowth,
     setWormCameraEnabled,
     setTargetTunnelId,
+    setInactiveTunnelSides,
 
     // Refs
     lastMoveTime,
@@ -643,6 +652,8 @@ export function TunnelWormGameLoop({
     setTunnelsTraversed,
     setPendingGrowth,
     setTargetTunnelId,
+    inactiveTunnelSides,
+    setInactiveTunnelSides,
     CONFIG
   } = game;
 
@@ -660,24 +671,33 @@ export function TunnelWormGameLoop({
     if (!head || !head.tunnel) return;
 
     // Advance worm through tunnel
-    let newT = head.t + moveAmount;
+    const movementDir = head.direction ?? 1;
+    let newT = head.t + (moveAmount * movementDir);
     let newTunnelId = head.tunnelId;
     let newTunnel = head.tunnel;
-    let _traversedTunnel = false;
+    let newDirection = movementDir;
 
     // Check if we've reached the end of the tunnel
-    if (newT >= 1.0) {
+    if (newT >= 1.0 || newT <= 0.0) {
       // Exited tunnel - find next tunnel to enter
-      const exitPos = head.tunnel.exit;
-      const nextTunnelInfo = findNextTunnel(exitPos, tunnels, head.tunnelId, size);
+      const exitedFromEntry = newT <= 0.0;
+      const exitPos = exitedFromEntry ? head.tunnel.entry : head.tunnel.exit;
+      const nextTunnelInfo = findNextTunnel(exitPos, tunnels, head.tunnelId, size, inactiveTunnelSides);
 
       if (nextTunnelInfo) {
+        // Entering from this side consumes only that side; opposite side remains usable.
+        setInactiveTunnelSides(prev => {
+          const next = new Set(prev);
+          next.add(nextTunnelInfo.enteredSideKey);
+          return next;
+        });
+
         newTunnel = nextTunnelInfo.tunnel;
         newTunnelId = newTunnel.id;
         // Enter from appropriate end
         newT = nextTunnelInfo.enterFromEntry ? 0.0 : 1.0;
-        // If entering from exit, we'll travel backwards (decreasing t)
-        _traversedTunnel = true;
+        // If entering from exit, travel backwards (decreasing t).
+        newDirection = nextTunnelInfo.enterFromEntry ? 1 : -1;
         setTunnelsTraversed(t => t + 1);
         setScore(s => s + CONFIG.tunnelBonus);
         play('/sounds/warp.mp3');
@@ -690,7 +710,12 @@ export function TunnelWormGameLoop({
     }
 
     // Check for self-collision
-    const newHead = { tunnelId: newTunnelId, t: newT, tunnel: newTunnel };
+    const newHead = {
+      tunnelId: newTunnelId,
+      t: Math.max(0, Math.min(1, newT)),
+      tunnel: newTunnel,
+      direction: newDirection
+    };
     if (checkTunnelSelfCollision(newHead, worm)) {
       setGameState('gameover');
       play('/sounds/gameover.mp3');
@@ -736,7 +761,8 @@ export function TunnelWormGameLoop({
         newWorm.push({
           tunnelId: seg.tunnelId,
           t: seg.t,
-          tunnel: seg.tunnel
+          tunnel: seg.tunnel,
+          direction: seg.direction ?? 1
         });
       }
 
