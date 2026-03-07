@@ -1,4 +1,7 @@
 import React, { useState } from 'react';
+import { COLOR_SCHEMES, SCHEME_LABELS } from '../../utils/colorSchemes.js';
+
+const PALETTE_KEYS = Object.keys(SCHEME_LABELS).filter(k => k !== 'biome' && k !== 'custom');
 
 const LEVEL_LABELS = { 1: 'Low', 2: 'Medium', 3: 'High', 4: 'Extreme', 5: 'Maximum' };
 const LEVEL_ACCENT = { 1: '#34c759', 2: '#ffcc00', 3: '#ff9500', 4: '#ff3b30', 5: '#af52de' };
@@ -25,6 +28,7 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
   const [visualMode, setVisualMode] = useState('classic');
   const [flipMode, setFlipMode] = useState(true);
   const [showTunnels, setShowTunnels] = useState(true);
+  const [colorScheme, setColorScheme] = useState('standard');
 
   const accent = LEVEL_ACCENT[disparityLevel];
 
@@ -151,6 +155,33 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
           </div>
         </Section>
 
+        {/* Color Palette */}
+        <Section label="Color Palette">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', maxHeight: '220px', overflowY: 'auto' }}>
+            {PALETTE_KEYS.map(key => {
+              const selected = colorScheme === key;
+              const colors = Object.values(COLOR_SCHEMES[key] || {});
+              return (
+                <button key={key} onClick={() => setColorScheme(key)} style={{
+                  display: 'flex', flexDirection: 'column', gap: '4px',
+                  padding: '8px 10px', border: `1.5px solid ${selected ? accent : '#e5e5ea'}`,
+                  borderRadius: '10px', background: selected ? `${accent}18` : '#f9f9fb',
+                  cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+                }}>
+                  <span style={{ fontSize: '11px', fontWeight: selected ? '600' : '400', color: selected ? '#1c1c1e' : '#8e8e93' }}>
+                    {SCHEME_LABELS[key]}
+                  </span>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 12px)', gap: '2px' }}>
+                    {colors.slice(0, 6).map((c, i) => (
+                      <div key={i} style={{ width: '12px', height: '12px', borderRadius: '50%', background: c, boxShadow: '0 1px 2px rgba(0,0,0,0.18)' }} />
+                    ))}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </Section>
+
         {/* Toggles */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
           <ToggleRow label="Flip Mode" sub="Allow manual tile flips" value={flipMode} onChange={setFlipMode} />
@@ -171,7 +202,7 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
             Back
           </button>
           <button
-            onClick={() => onStart({ cubeSize, disparityLevel, flipCap, visualMode, flipMode, showTunnels })}
+            onClick={() => onStart({ cubeSize, disparityLevel, flipCap, visualMode, flipMode, showTunnels, colorScheme })}
             style={{
               flex: 2, padding: '14px', border: 'none', borderRadius: '12px',
               fontSize: '16px', fontWeight: '600', background: accent, color: '#fff',
