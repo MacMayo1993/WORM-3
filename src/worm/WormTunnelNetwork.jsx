@@ -7,6 +7,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { getStickerWorldPos } from '../game/coordinates.js';
 import { calculateSmartControlPoint } from '../utils/smartRouting.js';
+import { getTunnelSideKey } from './wormLogic.js';
 
 // Tunnel colors
 const TUNNEL_COLOR = '#00ff88';
@@ -26,7 +27,7 @@ function getStableOffset(tunnelId) {
   return (Math.abs(hash) % 1000) / 1000 * Math.PI * 2;
 }
 
-function TunnelTube({ tunnel, size, explosionFactor = 0, isTarget = false, wormInTunnel = false }) {
+function TunnelTube({ tunnel, size, explosionFactor = 0, isTarget = false, wormInTunnel = false, inactiveSideKeys = new Set() }) {
   const tubeRef = useRef();
   const glowRef = useRef();
   const timeRef = useRef(getStableOffset(tunnel.id));
@@ -59,6 +60,11 @@ function TunnelTube({ tunnel, size, explosionFactor = 0, isTarget = false, wormI
     return new THREE.TubeGeometry(curve, 32, radius, 8, false);
   }, [curve, isTarget]);
 
+  const color = isTarget ? TARGET_TUNNEL_COLOR : TUNNEL_COLOR;
+  const entryActive = !inactiveSideKeys.has(getTunnelSideKey(tunnel.entry));
+  const exitActive = !inactiveSideKeys.has(getTunnelSideKey(tunnel.exit));
+  const tunnelOpacityScale = entryActive || exitActive ? 1 : 0.25;
+
   // Animate tube
   useFrame((state, delta) => {
     timeRef.current += delta;
@@ -69,8 +75,8 @@ function TunnelTube({ tunnel, size, explosionFactor = 0, isTarget = false, wormI
       const pulseSpeed = isTarget ? 4 : 2;
 
       // Opacity pulse
-      const baseOpacity = wormInTunnel ? 0.9 : (isTarget ? 0.7 : 0.4);
-      tubeRef.current.material.opacity = baseOpacity + Math.sin(t * pulseSpeed) * 0.1;
+      const baseOpacity = (wormInTunnel ? 0.9 : (isTarget ? 0.7 : 0.4)) * tunnelOpacityScale;
+      tubeRef.current.material.opacity = baseOpacity + Math.sin(t * pulseSpeed) * 0.1 * tunnelOpacityScale;
 
       // Emissive pulse
       const baseEmissive = isTarget ? 0.8 : 0.4;
@@ -83,8 +89,6 @@ function TunnelTube({ tunnel, size, explosionFactor = 0, isTarget = false, wormI
     }
   });
 
-  const color = isTarget ? TARGET_TUNNEL_COLOR : TUNNEL_COLOR;
-
   return (
     <group>
       {/* Main tunnel tube */}
@@ -94,7 +98,7 @@ function TunnelTube({ tunnel, size, explosionFactor = 0, isTarget = false, wormI
           emissive={color}
           emissiveIntensity={isTarget ? 0.8 : 0.4}
           transparent
-          opacity={isTarget ? 0.7 : 0.4}
+          opacity={(isTarget ? 0.7 : 0.4) * tunnelOpacityScale}
           side={THREE.DoubleSide}
         />
       </mesh>
@@ -120,7 +124,7 @@ function TunnelTube({ tunnel, size, explosionFactor = 0, isTarget = false, wormI
             emissive={color}
             emissiveIntensity={0.6}
             transparent
-            opacity={0.8}
+            opacity={entryActive ? 0.8 : 0.18}
           />
         </mesh>
       </group>
@@ -134,7 +138,7 @@ function TunnelTube({ tunnel, size, explosionFactor = 0, isTarget = false, wormI
             emissive={color}
             emissiveIntensity={0.6}
             transparent
-            opacity={0.8}
+            opacity={exitActive ? 0.8 : 0.18}
           />
         </mesh>
       </group>
@@ -150,13 +154,15 @@ function TunnelTube({ tunnel, size, explosionFactor = 0, isTarget = false, wormI
  * @param {number} props.explosionFactor - Explosion animation factor
  * @param {string} props.targetTunnelId - ID of tunnel to highlight
  * @param {string} props.wormTunnelId - ID of tunnel the worm is currently in
+ * @param {Set<string>} props.inactiveSideKeys - side keys already consumed by tunnel entry
  */
 export default function WormTunnelNetwork({
   tunnels,
   size,
   explosionFactor = 0,
   targetTunnelId = null,
-  wormTunnelId = null
+  wormTunnelId = null,
+  inactiveSideKeys = new Set()
 }) {
   if (!tunnels || tunnels.length === 0) return null;
 
@@ -170,6 +176,7 @@ export default function WormTunnelNetwork({
           explosionFactor={explosionFactor}
           isTarget={tunnel.id === targetTunnelId}
           wormInTunnel={tunnel.id === wormTunnelId}
+          inactiveSideKeys={inactiveSideKeys}
         />
       ))}
     </group>
