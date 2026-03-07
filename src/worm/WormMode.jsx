@@ -47,6 +47,8 @@ const TUNNEL_CONFIG = {
   minFlipsForStart: 3     // Minimum flipped stickers needed to start tunnel mode
 };
 
+const EMPTY_INACTIVE_TUNNEL_SIDES = new Set();
+
 // Custom hook for WORM mode game logic
 export function useWormGame(cubies, size, animState, onRotate) {
   // Game state
@@ -250,11 +252,11 @@ export function WormMode3D({
   mode = 'surface',
   targetTunnelId = null,
   tunnels = [],
-  inactiveTunnelSides = new Set()
+  inactiveTunnelSides
 }) {
   const isTunnelMode = mode === 'tunnel';
   const wormTunnelId = isTunnelMode && worm[0] ? worm[0].tunnelId : null;
-  const inactiveTunnelSides = isTunnelMode ? game.inactiveTunnelSides : new Set();
+  const inactiveSideKeys = inactiveTunnelSides || EMPTY_INACTIVE_TUNNEL_SIDES;
 
   return (
     <>
@@ -266,7 +268,7 @@ export function WormMode3D({
           explosionFactor={explosionFactor}
           targetTunnelId={targetTunnelId}
           wormTunnelId={wormTunnelId}
-          inactiveSideKeys={inactiveTunnelSides}
+          inactiveSideKeys={inactiveSideKeys}
         />
       )}
 
