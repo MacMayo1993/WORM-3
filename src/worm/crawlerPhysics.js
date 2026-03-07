@@ -79,11 +79,17 @@ export function rotateTangent(forward, face, angle) {
   return forward.clone().applyAxisAngle(n, angle);
 }
 
+// Jump constants — fixed arc, fully speed-independent.
+// One jump always covers exactly 1 tile forward and peaks at JUMP_HEIGHT.
+const JUMP_DURATION = 0.45; // seconds for the full arc
+const JUMP_HEIGHT = 0.65;   // peak height above surface (world units)
+const JUMP_TILE_SPEED = 1.0 / JUMP_DURATION; // horizontal speed mid-air to cover exactly 1 tile
+
 /**
  * Core physics step: move the crawler on the cube surface.
  *
  * @param {Object} state - { position: Vector3, forward: Vector3, face: string,
- *                            velocity: number, jumpHeight: number, jumpVel: number }
+ *                            velocity: number, jumpHeight: number, jumpT: number }
  * @param {Object} input - { turnRate: number (-1 to 1), thrust: number (0 or 1),
  *                            brake: number, jump: boolean, sprint: boolean }
  * @param {number} dt - Delta time in seconds
@@ -91,67 +97,61 @@ export function rotateTangent(forward, face, angle) {
  * @returns {Object} Updated state
  */
 export function stepCrawler(state, input, dt, size) {
-  const { position, forward, face, jumpHeight, jumpVel } = state;
+  const { position, forward, face, jumpHeight } = state;
   let vel = state.velocity;
 
-  // --- Turning ---
+  // --- Turning (allowed while airborne so the player can steer the arc) ---
   const turnSpeed = 3.5; // radians per second
   let newForward = forward.clone();
   if (input.turnRate !== 0) {
     newForward = rotateTangent(forward, face, -input.turnRate * turnSpeed * dt);
   }
 
-  // --- Acceleration ---
-  const maxSpeed = input.sprint ? 5.0 : 3.0;
-  const accel = 12.0;
-  const friction = 8.0;
-
-  if (input.thrust > 0) {
-    vel = Math.min(maxSpeed, vel + accel * dt);
-  } else {
-    vel = Math.max(0, vel - friction * dt);
-  }
-
-  // --- Jump ---
-  // Jump covers exactly 1 tile regardless of speed.
-  // arcDuration = 2 * jumpForce / gravity; distance = vel * arcDuration = 1.0
-  // => jumpForce = gravity / (2 * vel)
-  // jumpDist is a safety cap for cases where vel changes mid-air.
-  const gravity = 25.0;
-  const jumpTileDistance = 1.0;
+  // --- Jump: purely parametric sine arc, no velocity-based physics ---
+  // jumpT: 0 = grounded, (0, 1) = airborne, resets to 0 on landing.
+  let newJumpT = state.jumpT || 0;
   let newJumpHeight = jumpHeight;
-  let newJumpVel = jumpVel;
-  let newJumpDist = state.jumpDist || 0;
 
-  if (input.jump && jumpHeight <= 0.01) {
-    const jumpForce = vel > 0.5 ? (gravity * jumpTileDistance) / (2 * vel) : 4.0;
-    newJumpVel = jumpForce;
-    newJumpHeight = 0.01;
-    newJumpDist = 0;
+  if (input.jump && newJumpT === 0) {
+    newJumpT = 1e-9; // kick off the arc (tiny non-zero to enter the airborne branch)
   }
 
-  if (newJumpHeight > 0) {
-    newJumpDist += vel * dt;
+  const isAirborne = newJumpT > 0;
+
+  if (isAirborne) {
+    newJumpT = Math.min(1.0, newJumpT + dt / JUMP_DURATION);
+    newJumpHeight = Math.sin(newJumpT * Math.PI) * JUMP_HEIGHT;
+    if (newJumpT >= 1.0) {
+      newJumpT = 0;
+      newJumpHeight = 0;
+    }
   }
 
-  newJumpVel -= gravity * dt;
-  newJumpHeight += newJumpVel * dt;
-
-  if (newJumpHeight <= 0 || newJumpDist >= jumpTileDistance) {
-    newJumpHeight = 0;
-    newJumpVel = 0;
-    newJumpDist = 0;
+  // --- Acceleration (grounded only — no mid-air thrust changes) ---
+  if (!isAirborne) {
+    const maxSpeed = input.sprint ? 5.0 : 3.0;
+    const accel = 12.0;
+    const friction = 8.0;
+    if (input.thrust > 0) {
+      vel = Math.min(maxSpeed, vel + accel * dt);
+    } else {
+      vel = Math.max(0, vel - friction * dt);
+    }
   }
 
   // --- Movement ---
+  // Airborne: always move at JUMP_TILE_SPEED so one jump = exactly one tile forward.
+  // Grounded: move at current velocity as normal.
+  const moveSpeed = isAirborne ? JUMP_TILE_SPEED : vel;
   const moveDir = newForward.clone().normalize();
-  const step = moveDir.multiplyScalar(vel * dt);
+  const step = moveDir.multiplyScalar(moveSpeed * dt);
   const normal = FACE_NORMALS[face];
-  // Lift position off surface by jumpHeight along normal
+
+  // Strip jump offset to get the surface-level position, then advance
   const surfacePos = position.clone().sub(normal.clone().multiplyScalar(jumpHeight));
   const newSurfacePos = surfacePos.add(step);
 
-  // Project back onto cube surface
+  // Project back onto cube surface, then re-add the new jump height
   const projected = projectOntoCube(newSurfacePos, size);
   const newFace = projected.face;
   const newPosition = projected.position.clone().add(
@@ -175,8 +175,7 @@ export function stepCrawler(state, input, dt, size) {
     face: newFace,
     velocity: vel,
     jumpHeight: newJumpHeight,
-    jumpVel: newJumpVel,
-    jumpDist: newJumpDist,
+    jumpT: newJumpT,
   };
 }
 
