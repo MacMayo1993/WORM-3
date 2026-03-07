@@ -1601,17 +1601,18 @@ button:focus-visible,
    Rectangular with a light border so near-black colors stay visible. */
 .scheme-grid .scheme-preview {
   display: flex;
-  gap: 2px;
+  gap: 4px;
   width: 100%;
+  align-items: center;
 }
 
 .scheme-grid .scheme-dot {
-  flex: 1;
-  width: auto;
+  flex: 0 0 auto;
+  width: 10px;
   height: 10px;
-  border-radius: 2px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.3);
+  border-radius: 50%;
+  border: 1px solid rgba(15, 23, 42, 0.22);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.5);
 }
 
 /* Image Upload */
@@ -3117,7 +3118,7 @@ select.btn-compact:disabled {
 }
 
 .settings-section-title {
-  color: var(--ui-ink-subtle);
+  color: #334155 !important;
   text-shadow: none;
   font-family: var(--ui-font);
 }
@@ -3143,11 +3144,17 @@ select.btn-compact:disabled {
 }
 
 .settings-tab {
+  color: rgba(51, 65, 85, 0.68);
+  border-bottom-color: transparent;
   font-family: var(--ui-font);
+}
+
+.settings-tab:hover {
+  color: #0f172a;
 }
 
 .settings-tab.active {
   background: rgba(15, 23, 42, 0.08);
   color: var(--ui-ink);
-  border-color: rgba(15, 23, 42, 0.18);
+  border-bottom-color: rgba(15, 23, 42, 0.28);
 }

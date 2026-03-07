@@ -352,7 +352,7 @@ const NavItem = ({ icon, label, color, onClick }) => {
 // ─── Main component ───────────────────────────────────────────────────────────
 const MainMenu = ({ onPlay, _onLevels, onFreeplay, _onCoop, onSettings, onBiome, onDisparity, onWormHealer, onHolonomy }) => {
   const CLEAN = {
-    pageBg: '#05050f',
+    pageBg: 'radial-gradient(circle at 50% 35%, #0e1324 0%, #070b16 52%, #05050f 100%)',
     panel: 'rgba(255,255,255,0.8)',
     panelStrong: 'rgba(255,255,255,0.9)',
     text: '#111827',
@@ -382,17 +382,19 @@ const MainMenu = ({ onPlay, _onLevels, onFreeplay, _onCoop, onSettings, onBiome,
       {/* ── Full-screen 3D canvas — same setup as WelcomeScreen ── */}
       <div style={{ position: 'absolute', inset: 0, zIndex: 1 }}>
         <Canvas camera={{ position: [0, 3, 12], fov: 40 }}>
-          <color attach="background" args={['#f3f5f8']} />
-          <ambientLight intensity={0.6} />
-          <pointLight position={[10, 10, 10]} intensity={1.8} />
-          <pointLight position={[-10, -10, -10]} intensity={1.2} />
+          <color attach="background" args={['#060916']} />
+          <ambientLight intensity={0.12} />
+          <pointLight position={[8, 8, 10]} intensity={0.32} color="#a8d8ff" />
+          <pointLight position={[-9, -8, 7]} intensity={0.18} color="#7aa3ff" />
+          {/* very dim back light (~5% feel) so cube silhouette is readable without washing out */}
+          <pointLight position={[0, 2, -14]} intensity={0.08} color="#8db3ff" />
           <RotatingBlackCube />
           <Suspense fallback={null}>
-            <Environment preset="city" />
+            <Environment preset="city" intensity={0.22} />
           </Suspense>
           <EffectComposer>
-            <Bloom intensity={0.6} luminanceThreshold={0.15} luminanceSmoothing={0.85} mipmapBlur />
-            <Vignette offset={0.35} darkness={0.75} />
+            <Bloom intensity={0.26} luminanceThreshold={0.24} luminanceSmoothing={0.9} mipmapBlur />
+            <Vignette offset={0.38} darkness={0.82} />
           </EffectComposer>
         </Canvas>
       </div>
