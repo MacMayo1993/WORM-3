@@ -7,6 +7,12 @@ const FACE_ELIMINATION_LIFETIME = 2500; // ms to show the face elimination banne
 
 const NOTIFICATION_LIFETIME = 8000; // ms before a death entry fades out
 const MAX_PAIR_GROUPS = 6;           // max simultaneous pair groups visible
+const CLEAN_CARD = {
+  bg: 'rgba(255,255,255,0.9)',
+  border: 'rgba(15,23,42,0.14)',
+  text: '#0f172a',
+  subtle: 'rgba(15,23,42,0.62)',
+};
 
 /**
  * DisparityHUD
@@ -110,17 +116,17 @@ const DisparityHUD = () => {
       {/* Face elimination banner */}
       {activeFaceElimination != null && (
         <div key={activeFaceElimination} style={{
-          background: `${FACE_COLORS[activeFaceElimination] ?? '#888'}22`,
-          border: `2px solid ${FACE_COLORS[activeFaceElimination] ?? '#888'}`,
-          borderRadius: '8px',
+          background: CLEAN_CARD.bg,
+          border: `1.5px solid ${CLEAN_CARD.border}`,
+          borderRadius: '12px',
           padding: '8px 14px',
-          fontFamily: "'Courier New', monospace",
+          fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif",
           textAlign: 'center',
-          backdropFilter: 'blur(8px)',
+          backdropFilter: 'blur(18px)',
           marginBottom: '4px',
           animation: 'disparity-face-elim 0.35s cubic-bezier(0.22,1,0.36,1) forwards',
         }}>
-          <div style={{ fontSize: '9px', color: 'rgba(200,200,220,0.7)', letterSpacing: '0.12em', marginBottom: '2px' }}>
+          <div style={{ fontSize: '9px', color: CLEAN_CARD.subtle, letterSpacing: '0.12em', marginBottom: '2px' }}>
             FACE ELIMINATED
           </div>
           <div style={{
@@ -138,44 +144,44 @@ const DisparityHUD = () => {
       {/* Alive count — always visible once chaos has started (at least 1 death) */}
       {!disparityWinner && disparityDeaths.length > 0 && (
         <div style={{
-          background: 'rgba(0,0,0,0.75)',
-          border: `1.5px solid ${aliveCount <= 5 ? 'rgba(239,68,68,0.8)' : 'rgba(255,255,255,0.2)'}`,
-          borderRadius: '8px',
+          background: CLEAN_CARD.bg,
+          border: `1.5px solid ${aliveCount <= 5 ? 'rgba(239,68,68,0.55)' : CLEAN_CARD.border}`,
+          borderRadius: '12px',
           padding: '8px 14px',
-          fontFamily: "'Courier New', monospace",
+          fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif",
           display: 'flex',
           alignItems: 'baseline',
           gap: '6px',
-          backdropFilter: 'blur(8px)',
+          backdropFilter: 'blur(18px)',
           marginBottom: '4px',
           animation: aliveCount <= 5 ? 'disparity-pulse-red 1.2s ease-in-out infinite' : 'none',
         }}>
           <span style={{
             fontSize: counterFlash ? '30px' : '26px',
             fontWeight: 900,
-            color: aliveCount <= 5 ? '#ef4444' : aliveCount <= 10 ? '#f97316' : '#ffffff',
+            color: aliveCount <= 5 ? '#ef4444' : aliveCount <= 10 ? '#f97316' : CLEAN_CARD.text,
             transition: 'font-size 0.15s, color 0.3s',
             textShadow: aliveCount <= 5 ? '0 0 12px rgba(239,68,68,0.8)' : 'none',
             lineHeight: 1,
           }}>
             {aliveCount}
           </span>
-          <span style={{ fontSize: '11px', color: 'rgba(180,180,200,0.8)', letterSpacing: '0.06em' }}>
+          <span style={{ fontSize: '11px', color: CLEAN_CARD.subtle, letterSpacing: '0.06em' }}>
             ALIVE
           </span>
-          <span style={{ fontSize: '10px', color: 'rgba(100,100,120,0.8)', marginLeft: 'auto' }}>
+          <span style={{ fontSize: '10px', color: CLEAN_CARD.subtle, marginLeft: 'auto' }}>
             / {totalTiles}
           </span>
         </div>
       )}
       {disparityWinner && (
         <div style={{
-          background: 'rgba(30, 20, 0, 0.90)',
-          border: '2px solid rgba(255, 215, 0, 0.75)',
-          borderRadius: '10px',
+          background: CLEAN_CARD.bg,
+          border: '1.5px solid rgba(255, 215, 0, 0.5)',
+          borderRadius: '12px',
           padding: '12px 18px',
           color: '#FFD700',
-          fontFamily: "'Courier New', monospace",
+          fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif",
           fontSize: '13px',
           fontWeight: 'bold',
           textAlign: 'center',
@@ -195,14 +201,14 @@ const DisparityHUD = () => {
         const isPair = deaths.length > 1;
         return (
           <div key={pr} style={{
-            background: 'rgba(40, 0, 0, 0.82)',
-            border: `1px solid rgba(180, 40, 40, ${isPair ? '0.7' : '0.45'})`,
-            borderRadius: '5px',
+            background: CLEAN_CARD.bg,
+            border: `1px solid rgba(180, 40, 40, ${isPair ? '0.45' : '0.3'})`,
+            borderRadius: '10px',
             padding: '4px 10px',
-            color: 'rgba(220, 110, 110, 0.95)',
-            fontFamily: "'Courier New', monospace",
+            color: '#b91c1c',
+            fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif",
             fontSize: '11px',
-            backdropFilter: 'blur(6px)',
+            backdropFilter: 'blur(18px)',
             whiteSpace: 'nowrap',
             letterSpacing: '0.04em',
           }}>
