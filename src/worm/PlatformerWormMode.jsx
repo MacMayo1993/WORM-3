@@ -333,6 +333,7 @@ export default function PlatformerWormMode({ cubies: initialCubies, size, faceCo
       velocity: 0,
       jumpHeight: 0,
       jumpVel: 0,
+      jumpDist: 0,
       alive: true,
     };
 

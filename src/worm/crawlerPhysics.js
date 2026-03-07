@@ -115,20 +115,28 @@ export function stepCrawler(state, input, dt, size) {
   // --- Jump ---
   const gravity = 25.0;
   const jumpForce = 5.0;
+  const jumpTileDistance = 1.0; // jump covers exactly 1 tile regardless of speed
   let newJumpHeight = jumpHeight;
   let newJumpVel = jumpVel;
+  let newJumpDist = state.jumpDist || 0;
 
   if (input.jump && jumpHeight <= 0.01) {
     newJumpVel = jumpForce;
     newJumpHeight = 0.01;
+    newJumpDist = 0;
+  }
+
+  if (newJumpHeight > 0) {
+    newJumpDist += vel * dt;
   }
 
   newJumpVel -= gravity * dt;
   newJumpHeight += newJumpVel * dt;
 
-  if (newJumpHeight <= 0) {
+  if (newJumpHeight <= 0 || newJumpDist >= jumpTileDistance) {
     newJumpHeight = 0;
     newJumpVel = 0;
+    newJumpDist = 0;
   }
 
   // --- Movement ---
@@ -164,6 +172,7 @@ export function stepCrawler(state, input, dt, size) {
     velocity: vel,
     jumpHeight: newJumpHeight,
     jumpVel: newJumpVel,
+    jumpDist: newJumpDist,
   };
 }
 
