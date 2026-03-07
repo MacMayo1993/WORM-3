@@ -109,18 +109,24 @@ export function stepCrawler(state, input, dt, size) {
 
   // --- Jump: purely parametric sine arc, no velocity-based physics ---
   // jumpT: 0 = grounded, (0,1) = airborne, resets to 0 on landing.
-  // jumpReady: must release the jump key between jumps to prevent auto-chaining.
+  // jumpReady: blocks re-triggering until the key is released AND we've landed.
+  // This works for both keyboard (held key) and mobile (touchStart/touchEnd):
+  //   - Keyboard: jump=true persists while held → blocked until key up + landed
+  //   - Mobile: jump=true only during touch → blocked by jumpT>0 while airborne;
+  //             jumpReady resets on touchEnd but the newJumpT===0 guard prevents
+  //             mid-air re-trigger; a fresh tap after landing works as expected.
   let newJumpT = state.jumpT || 0;
   let newJumpHeight = jumpHeight;
-  let jumpReady = state.jumpReady !== false; // default true on first frame
+  let jumpReady = state.jumpReady !== false; // defaults true on first frame
 
-  // Only allow a new jump if the key was freshly pressed (not held from last jump)
   if (input.jump && newJumpT === 0 && jumpReady) {
     newJumpT = 1e-9; // kick off the arc (tiny non-zero to enter the airborne branch)
     jumpReady = false; // consume — must release key before next jump
   }
-  if (!input.jump) {
-    jumpReady = true; // key released, ready for next press
+  // Reset ready state only when grounded AND key is released.
+  // Prevents keyboard hold-chaining while still letting mobile taps work correctly.
+  if (!input.jump && newJumpT === 0) {
+    jumpReady = true;
   }
 
   const isAirborne = newJumpT > 0;
