@@ -352,7 +352,7 @@ const NavItem = ({ icon, label, color, onClick }) => {
 // ─── Main component ───────────────────────────────────────────────────────────
 const MainMenu = ({ onPlay, _onLevels, onFreeplay, _onCoop, onSettings, onBiome, onDisparity, onWormHealer, onHolonomy }) => {
   const CLEAN = {
-    pageBg: 'radial-gradient(circle at 50% -20%, #ffffff 0%, #f8f9fb 45%, #edf1f6 100%)',
+    pageBg: '#05050f',
     panel: 'rgba(255,255,255,0.8)',
     panelStrong: 'rgba(255,255,255,0.9)',
     text: '#111827',
