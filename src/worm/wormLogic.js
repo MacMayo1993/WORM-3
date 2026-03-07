@@ -5,7 +5,6 @@
 import { getManifoldNeighbors, findAntipodalStickerByGrid, buildManifoldGridMap } from '../game/manifoldLogic.js';
 import { getStickerWorldPos } from '../game/coordinates.js';
 import * as THREE from 'three';
-import { calculateSmartControlPoint } from '../utils/smartRouting.js';
 
 // ============================================================================
 // TUNNEL MODE - Worm travels INSIDE the cube through antipodal wormhole tunnels
@@ -107,8 +106,8 @@ export const getTunnelWorldPos = (tunnel, t, size, explosionFactor = 0) => {
     tunnel.exit.dirKey, size, explosionFactor
   );
 
-  // Use smart control point for curved path through center
-  const controlPoint = calculateSmartControlPoint(entryPos, exitPos, size, 0);
+  // Force tunnel travel through cube core to avoid surface clipping.
+  const controlPoint = new THREE.Vector3(0, 0, 0);
 
   // Quadratic Bezier interpolation
   const vStart = new THREE.Vector3(...entryPos);

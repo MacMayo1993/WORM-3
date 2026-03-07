@@ -6,7 +6,6 @@ import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { getStickerWorldPos } from '../game/coordinates.js';
-import { calculateSmartControlPoint } from '../utils/smartRouting.js';
 import { getTunnelSideKey } from './wormLogic.js';
 
 // Tunnel colors
@@ -43,7 +42,8 @@ function TunnelTube({ tunnel, size, explosionFactor = 0, isTarget = false, wormI
       tunnel.exit.dirKey, size, explosionFactor
     );
 
-    const controlPoint = calculateSmartControlPoint(entry, exit, size, 0);
+    // Match gameplay path: tunnels route through the cube core.
+    const controlPoint = new THREE.Vector3(0, 0, 0);
 
     const curve = new THREE.QuadraticBezierCurve3(
       new THREE.Vector3(...entry),
