@@ -498,7 +498,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                 <span style={{ fontSize: '12px', fontWeight: selected ? '600' : '400', color: selected ? '#0a0a0a' : 'rgba(0,0,0,0.6)', lineHeight: 1.2 }}>
                   {SCHEME_LABELS[key]}
                 </span>
-                <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 13px)', gap: '3px' }}>
                   {colors.slice(0, 6).map((c, i) => (
                     <div key={i} style={{ width: '13px', height: '13px', borderRadius: '50%', background: c, boxShadow: '0 1px 2px rgba(0,0,0,0.18)' }} />
                   ))}
