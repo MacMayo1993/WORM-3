@@ -36,6 +36,14 @@
   --shadow-lg: 0 2px 6px 2px rgba(60, 64, 67, 0.15), 0 8px 24px 4px rgba(60, 64, 67, 0.15);
   --shadow-xl: 0 4px 16px 0 rgba(60, 64, 67, 0.15), 0 8px 32px 6px rgba(60, 64, 67, 0.15);
 
+  /* Unified clean UI theme (aligned with Freeplay wizard) */
+  --ui-font: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+  --ui-panel: rgba(255, 255, 255, 0.88);
+  --ui-panel-strong: rgba(255, 255, 255, 0.94);
+  --ui-ink: #0f172a;
+  --ui-ink-subtle: rgba(15, 23, 42, 0.6);
+  --ui-border: rgba(15, 23, 42, 0.12);
+
   /* Safe area insets for mobile browsers */
   --safe-area-inset-top: env(safe-area-inset-top, 0px);
   --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
@@ -98,6 +106,7 @@ body {
   padding: 0;
   box-sizing: border-box;
   z-index: 100;
+  font-family: var(--ui-font);
 }
 
 /* Base UI Element - Clean Material Design */
@@ -122,12 +131,12 @@ body {
   width: 100%;
   height: 56px;
   padding: 0 16px;
-  background: var(--surface-overlay);
-  backdrop-filter: blur(16px);
-  border-bottom: 1px solid var(--border-light);
+  background: var(--ui-panel);
+  backdrop-filter: blur(18px);
+  border-bottom: 1px solid var(--ui-border);
   box-sizing: border-box;
   box-shadow: var(--shadow-sm);
-  font-family: 'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--ui-font);
 }
 
 .top-bar-left {
@@ -279,13 +288,13 @@ button:focus-visible,
   height: 64px;
   padding: 4px 8px;
   padding-bottom: calc(4px + var(--safe-area-inset-bottom));
-  background: var(--surface-overlay);
-  backdrop-filter: blur(16px);
-  border-top: 1px solid var(--border-light);
+  background: var(--ui-panel);
+  backdrop-filter: blur(18px);
+  border-top: 1px solid var(--ui-border);
   border-radius: 20px 20px 0 0;
   box-sizing: border-box;
-  box-shadow: 0 -2px 8px rgba(60, 64, 67, 0.15);
-  font-family: 'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  box-shadow: 0 -8px 28px rgba(15, 23, 42, 0.15);
+  font-family: var(--ui-font);
 }
 
 .bottom-nav-item {
@@ -375,7 +384,7 @@ button:focus-visible,
 .sheet-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(15, 23, 42, 0.28);
   z-index: 500;
   animation: sheet-fade-in 0.2s ease;
 }
@@ -396,7 +405,7 @@ button:focus-visible,
   left: 0;
   right: 0;
   z-index: 501;
-  background: var(--surface-base);
+  background: var(--ui-panel-strong);
   border-radius: 20px 20px 0 0;
   padding: 8px 20px 24px;
   padding-bottom: calc(24px + var(--safe-area-inset-bottom));
@@ -404,8 +413,9 @@ button:focus-visible,
   overflow-y: auto;
   transform: translateY(100%);
   animation: sheet-slide-up 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-  box-shadow: 0 -8px 32px rgba(60, 64, 67, 0.15);
-  font-family: 'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  box-shadow: 0 -12px 40px rgba(15, 23, 42, 0.16);
+  border-top: 1px solid var(--ui-border);
+  font-family: var(--ui-font);
 }
 
 .sheet-open {
@@ -459,12 +469,12 @@ button:focus-visible,
   gap: 6px;
   padding: 12px 16px;
   border-radius: 12px;
-  border: 1px solid var(--border-light);
-  background: var(--bg-secondary);
+  border: 1px solid var(--ui-border);
+  background: rgba(255, 255, 255, 0.72);
   color: var(--text-primary);
   font-size: 13px;
   font-weight: 500;
-  font-family: 'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--ui-font);
   cursor: pointer;
   transition: all 0.15s ease;
   position: relative;
@@ -474,8 +484,8 @@ button:focus-visible,
 }
 
 .sheet-item:hover {
-  background: var(--bg-tertiary);
-  border-color: var(--border-medium);
+  background: #ffffff;
+  border-color: rgba(15, 23, 42, 0.22);
 }
 
 .sheet-item:active {
@@ -527,12 +537,12 @@ button:focus-visible,
   left: 50%;
   transform: translateX(-50%);
   padding: 10px 20px;
-  background: var(--surface-overlay);
-  backdrop-filter: blur(12px);
-  border: 1px solid var(--border-light);
+  background: var(--ui-panel-strong);
+  backdrop-filter: blur(18px);
+  border: 1px solid var(--ui-border);
   border-radius: 20px;
   box-shadow: var(--shadow-md);
-  font-family: 'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--ui-font);
   font-size: 13px;
   font-weight: 500;
   color: var(--text-primary);
@@ -1382,8 +1392,8 @@ button:focus-visible,
   right: 0;
   bottom: 0;
   height: 100dvh;
-  background: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(12px);
+  background: rgba(15, 23, 42, 0.35);
+  backdrop-filter: blur(20px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1393,16 +1403,16 @@ button:focus-visible,
 }
 
 .settings-panel {
-  background: rgba(22, 27, 44, 0.98);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
+  background: var(--ui-panel-strong);
+  border: 1px solid var(--ui-border);
+  border-radius: 20px;
   padding: 0;
   max-width: 480px;
   width: 90%;
   max-height: calc(100dvh - 60px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
   overflow-y: auto;
   backdrop-filter: blur(20px);
-  box-shadow: var(--shadow-xl);
+  box-shadow: 0 28px 64px rgba(15, 23, 42, 0.2);
 }
 
 .settings-header {
@@ -1410,24 +1420,24 @@ button:focus-visible,
   justify-content: space-between;
   align-items: center;
   padding: 20px 24px;
-  border-bottom: 1px solid var(--border-light);
-  background: rgba(30, 35, 50, 0.98);
-  border-radius: 16px 16px 0 0;
+  border-bottom: 1px solid var(--ui-border);
+  background: rgba(255, 255, 255, 0.75);
+  border-radius: 20px 20px 0 0;
 }
 
 .settings-title {
   margin: 0;
   font-size: 20px;
   font-weight: 500;
-  color: #ffffff;
-  font-family: 'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: var(--ui-ink);
+  font-family: var(--ui-font);
   letter-spacing: 0.01em;
 }
 
 .settings-close-btn {
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--ui-ink-subtle);
   width: 40px;
   height: 40px;
   border-radius: 50%;
@@ -1441,8 +1451,8 @@ button:focus-visible,
 }
 
 .settings-close-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #ffffff;
+  background: rgba(15, 23, 42, 0.08);
+  color: var(--ui-ink);
 }
 
 .settings-body {
@@ -3092,4 +3102,52 @@ select.btn-compact:disabled {
 .wizard-body .wizard-options:has(.wizard-bg-thumb) {
   padding-left: 40px;
   padding-right: 40px;
+}
+
+/* =====================================================================
+   Unified clean theme overrides (menus + settings + HUD)
+   Aligns UI chrome with Freeplay wizard visual language.
+   ===================================================================== */
+.settings-panel,
+.top-app-bar,
+.bottom-nav-bar,
+.sheet-container,
+.floating-hud {
+  font-family: var(--ui-font);
+}
+
+.settings-section-title {
+  color: var(--ui-ink-subtle);
+  text-shadow: none;
+  font-family: var(--ui-font);
+}
+
+.settings-radio,
+.scheme-grid .settings-radio {
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.settings-radio:hover,
+.scheme-grid .settings-radio:hover {
+  background: #ffffff;
+  border-color: rgba(15, 23, 42, 0.12);
+}
+
+.settings-radio-label,
+.settings-hint,
+.settings-label,
+.wizard-option.compact .wizard-option-label {
+  color: var(--ui-ink);
+  font-family: var(--ui-font);
+}
+
+.settings-tab {
+  font-family: var(--ui-font);
+}
+
+.settings-tab.active {
+  background: rgba(15, 23, 42, 0.08);
+  color: var(--ui-ink);
+  border-color: rgba(15, 23, 42, 0.18);
 }

@@ -351,6 +351,15 @@ const NavItem = ({ icon, label, color, onClick }) => {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 const MainMenu = ({ onPlay, _onLevels, onFreeplay, _onCoop, onSettings, onBiome, onDisparity, onWormHealer, onHolonomy }) => {
+  const CLEAN = {
+    pageBg: 'radial-gradient(circle at 50% -20%, #ffffff 0%, #f8f9fb 45%, #edf1f6 100%)',
+    panel: 'rgba(255,255,255,0.8)',
+    panelStrong: 'rgba(255,255,255,0.9)',
+    text: '#111827',
+    textSubtle: 'rgba(17,24,39,0.6)',
+    border: 'rgba(17,24,39,0.12)',
+    accent: '#0f172a',
+  };
   const [titleVisible, setTitleVisible] = useState(false);
   const [subtitleVisible, setSubtitleVisible] = useState(false);
   const [btnVisible, setBtnVisible] = useState(false);
@@ -365,7 +374,7 @@ const MainMenu = ({ onPlay, _onLevels, onFreeplay, _onCoop, onSettings, onBiome,
   }, []);
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: '#05050f', zIndex: 9999, overflow: 'hidden' }}>
+    <div style={{ position: 'fixed', inset: 0, background: CLEAN.pageBg, zIndex: 9999, overflow: 'hidden' }}>
 
       {/* ── Screen-edge color washes — synced to FacePulses via _pulse ── */}
       <ScreenGlow />
@@ -373,7 +382,7 @@ const MainMenu = ({ onPlay, _onLevels, onFreeplay, _onCoop, onSettings, onBiome,
       {/* ── Full-screen 3D canvas — same setup as WelcomeScreen ── */}
       <div style={{ position: 'absolute', inset: 0, zIndex: 1 }}>
         <Canvas camera={{ position: [0, 3, 12], fov: 40 }}>
-          <color attach="background" args={['#05050f']} />
+          <color attach="background" args={['#f3f5f8']} />
           <ambientLight intensity={0.6} />
           <pointLight position={[10, 10, 10]} intensity={1.8} />
           <pointLight position={[-10, -10, -10]} intensity={1.2} />
@@ -395,13 +404,13 @@ const MainMenu = ({ onPlay, _onLevels, onFreeplay, _onCoop, onSettings, onBiome,
         <button onClick={onSettings} style={{
           position: 'absolute', bottom: 'max(14px, env(safe-area-inset-bottom,14px))', right: '16px',
           zIndex: 20, width: '32px', height: '32px', padding: 0,
-          background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)',
-          borderRadius: '9px', cursor: 'pointer', color: 'rgba(255,255,255,0.28)',
+          background: CLEAN.panelStrong, border: `1px solid ${CLEAN.border}`,
+          borderRadius: '9px', cursor: 'pointer', color: CLEAN.textSubtle,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           transition: 'all 0.2s', backdropFilter: 'blur(10px)', pointerEvents: 'all',
         }}
-          onMouseEnter={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.65)'; e.currentTarget.style.background = 'rgba(255,255,255,0.09)'; }}
-          onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.28)'; e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
+          onMouseEnter={e => { e.currentTarget.style.color = CLEAN.text; e.currentTarget.style.background = '#ffffff'; }}
+          onMouseLeave={e => { e.currentTarget.style.color = CLEAN.textSubtle; e.currentTarget.style.background = CLEAN.panelStrong; }}
         ><GearIcon /></button>
 
         {/* Title */}
@@ -429,7 +438,7 @@ const MainMenu = ({ onPlay, _onLevels, onFreeplay, _onCoop, onSettings, onBiome,
             <div style={{ width: '30px', height: '1px', background: 'linear-gradient(to right, transparent, rgba(140,180,255,0.45))' }} />
             <p style={{
               margin: 0, fontSize: 'clamp(10px,1.7vw,13px)', letterSpacing: '0.26em',
-              textTransform: 'uppercase', fontWeight: 500, color: 'rgba(170,205,255,0.5)',
+              textTransform: 'uppercase', fontWeight: 500, color: CLEAN.textSubtle,
               fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif",
             }}>A Cube That Remembers</p>
             <div style={{ width: '30px', height: '1px', background: 'linear-gradient(to left, transparent, rgba(140,180,255,0.45))' }} />
@@ -452,9 +461,9 @@ const MainMenu = ({ onPlay, _onLevels, onFreeplay, _onCoop, onSettings, onBiome,
               fontSize: 'clamp(13px,2.4vw,15px)', fontWeight: 700, letterSpacing: '0.2em',
               textTransform: 'uppercase',
               fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif",
-              color: hoverEnter ? '#ffffff' : 'rgba(210,230,255,0.88)',
-              background: hoverEnter ? 'rgba(18,52,125,0.92)' : 'rgba(10,32,88,0.85)',
-              border: `1px solid ${hoverEnter ? 'rgba(80,140,255,0.55)' : 'rgba(55,105,220,0.32)'}`,
+              color: hoverEnter ? '#ffffff' : CLEAN.text,
+              background: hoverEnter ? CLEAN.accent : CLEAN.panel,
+              border: `1px solid ${hoverEnter ? CLEAN.accent : CLEAN.border}`,
               borderRadius: '100px', cursor: 'pointer',
               transition: 'all 0.22s cubic-bezier(0.4,0,0.2,1)',
               backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
@@ -479,32 +488,29 @@ const MainMenu = ({ onPlay, _onLevels, onFreeplay, _onCoop, onSettings, onBiome,
         }}>
           <div style={{
             display: 'flex', width: 'min(460px,88vw)',
-            background: 'rgba(5,12,35,0.48)',
+            background: CLEAN.panel,
             backdropFilter: 'blur(28px)', WebkitBackdropFilter: 'blur(28px)',
-            border: '1.5px solid rgba(100,155,255,0.52)',
+            border: `1.5px solid ${CLEAN.border}`,
             borderRadius: '100px',
             boxShadow: [
-              '0 0 0 1px rgba(80,130,255,0.10)',        // outer softening ring
-              '0 0 22px rgba(60,100,255,0.22)',          // diffuse blue glow
-              '0 0 60px rgba(40,70,200,0.10)',           // wide ambient
-              '0 8px 32px rgba(0,0,0,0.55)',             // drop shadow
-              'inset 0 1px 0 rgba(255,255,255,0.13)',    // top inner highlight
-              'inset 0 -1px 0 rgba(80,130,255,0.08)',   // bottom inner tint
+              '0 0 0 1px rgba(255,255,255,0.28)',
+              '0 10px 40px rgba(15,23,42,0.12)',
+              'inset 0 1px 0 rgba(255,255,255,0.65)',
             ].join(', '),
             overflow: 'hidden',
           }}>
             <NavItem icon={<DisparityIcon />} label="Disparity" color="#f59e0b" onClick={onDisparity} />
             {/* divider */}
-            <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(100,150,255,0.18)' }} />
+            <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(15,23,42,0.12)' }} />
             <NavItem icon={<WormIcon />} label="WORM" color="#a855f7" onClick={onWormHealer} />
             {/* divider */}
-            <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(100,150,255,0.18)' }} />
+            <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(15,23,42,0.12)' }} />
             <NavItem icon={<HolonomyIcon />} label="∮ Holonomy" color="#00f5ff" onClick={onHolonomy} />
             {/* divider */}
-            <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(100,150,255,0.18)' }} />
+            <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(15,23,42,0.12)' }} />
             <NavItem icon={<ExploreIcon />} label="Explore" color="#22c55e" onClick={onFreeplay} />
             {/* divider */}
-            <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(100,150,255,0.18)' }} />
+            <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(15,23,42,0.12)' }} />
             <NavItem icon={<WorldIcon />} label="World" color="#60a5fa" onClick={onBiome} />
           </div>
         </div>
