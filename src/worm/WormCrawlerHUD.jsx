@@ -40,7 +40,7 @@ const buttonBase = {
     boxShadow: palette.shadow,
 };
 
-export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSize = 3, onHome, onSettings, wormAlive = true, showDeathMenu = false, onRetry, onNewGame }) {
+export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSize = 3, onHome, onSettings, wormAlive = true, showDeathMenu = false, deathDetails = null, onRetry, onNewGame }) {
     const wormSpeed = useGameStore(s => s.wormSpeed ?? 1.0);
     const wormHealedCount = useGameStore(s => s.wormHealedCount ?? 0);
     const wormBodyTiles = useGameStore(s => s.wormBodyTiles ?? 0);
@@ -266,6 +266,25 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                         <div style={{ color: palette.subText, fontSize: 12, fontWeight: 700, letterSpacing: 1.0 }}>WORM COLLISION</div>
                         <div style={{ color: palette.text, fontSize: 24, fontWeight: 800, marginTop: 4 }}>You hit your tail.</div>
                         <div style={{ color: palette.subText, fontSize: 13, marginTop: 8 }}>Retry this run or start a new game mode.</div>
+                        {deathDetails?.reason === 'self-collision' && (
+                            <div style={{
+                                marginTop: 10,
+                                padding: '8px 10px',
+                                borderRadius: 10,
+                                border: `1px solid ${palette.border}`,
+                                background: 'rgba(255,255,255,0.78)',
+                                textAlign: 'left',
+                                fontSize: 11,
+                                color: palette.subText,
+                                fontFamily: "'SF Mono', ui-monospace, Menlo, monospace",
+                                lineHeight: 1.35,
+                            }}>
+                                <div>Reason: <b style={{ color: palette.text }}>Self-collision</b></div>
+                                <div>Head tile: <b style={{ color: palette.text }}>{deathDetails.headTile ?? 'n/a'}</b></div>
+                                <div>Body tile hit: <b style={{ color: palette.text }}>{deathDetails.collisionTile ?? 'n/a'}</b></div>
+                                <div>Impact progress: <b style={{ color: palette.text }}>{deathDetails.progress ?? 'n/a'}</b></div>
+                            </div>
+                        )}
                         <div style={{ marginTop: 16, display: 'flex', gap: 10, justifyContent: 'center' }}>
                             <button
                                 onPointerDown={onRetry}

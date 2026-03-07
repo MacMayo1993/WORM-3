@@ -12,6 +12,7 @@ export default function HealerWormHUD({ onHome, onSettings, onRetry, onNewGame }
     const size = useGameStore(s => s.size);
     const wormAlive = useGameStore(s => s.wormAlive ?? true);
     const showWormDeathMenu = useGameStore(s => s.showWormDeathMenu ?? false);
+    const wormDeathDetails = useGameStore(s => s.wormDeathDetails ?? null);
 
     if (!wormHealerMode) return null;
 
@@ -24,6 +25,7 @@ export default function HealerWormHUD({ onHome, onSettings, onRetry, onNewGame }
             onSettings={onSettings}
             wormAlive={wormAlive}
             showDeathMenu={showWormDeathMenu}
+            deathDetails={wormDeathDetails}
             onRetry={onRetry}
             onNewGame={onNewGame}
         />
