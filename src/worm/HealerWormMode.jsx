@@ -146,7 +146,7 @@ function useWormCrawler(size, cubies) {
     const jumpCount = useRef(0);
     const pendingTunnelTrigger = useRef(null);
     const JUMP_HEIGHT = 1.5;   // tall arc — astronaut bounding in low gravity
-    const JUMP_SPEED = 0.42;  // slow float (~2.4 s) so one jump clears a full tile at default worm speed
+    const JUMP_TILE_SPAN = 1;  // keep jump distance fixed to one traversed tile at any speed setting
 
     // Growing tail + powerups
     const tailLength = useRef(BASE_TAIL_LENGTH);
@@ -253,7 +253,8 @@ function useWormCrawler(size, cubies) {
 
         // Always advance jump
         if (isJumping.current) {
-            jumpT.current += delta * JUMP_SPEED;
+            // Tie jump progress to tile-traverse progress so speed slider never changes jump distance.
+            jumpT.current += (delta / STEP_SEC) / JUMP_TILE_SPAN;
             if (jumpT.current >= 1) {
                 jumpT.current = 0;
                 isJumping.current = false;
