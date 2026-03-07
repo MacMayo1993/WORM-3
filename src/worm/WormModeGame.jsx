@@ -163,6 +163,7 @@ export function WormModeCanvasElements({ size, explosionFactor, animState, cubie
         mode={isTunnelMode ? 'tunnel' : 'surface'}
         targetTunnelId={game.targetTunnelId}
         tunnels={game.tunnels || []}
+        inactiveTunnelSides={game.inactiveTunnelSides || new Set()}
       />
       <GameLoop
         cubies={cubies}

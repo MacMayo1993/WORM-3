@@ -5,7 +5,6 @@
 import { getManifoldNeighbors, findAntipodalStickerByGrid, buildManifoldGridMap } from '../game/manifoldLogic.js';
 import { getStickerWorldPos } from '../game/coordinates.js';
 import * as THREE from 'three';
-import { calculateSmartControlPoint } from '../utils/smartRouting.js';
 
 // ============================================================================
 // TUNNEL MODE - Worm travels INSIDE the cube through antipodal wormhole tunnels
@@ -98,30 +97,31 @@ export const getActiveTunnels = (cubies, size) => {
  * @returns {Array} [x, y, z] world coordinates
  */
 export const getTunnelWorldPos = (tunnel, t, size, explosionFactor = 0) => {
-  const entryPos = getStickerWorldPos(
-    tunnel.entry.x, tunnel.entry.y, tunnel.entry.z,
-    tunnel.entry.dirKey, size, explosionFactor
+  const k = (size - 1) / 2;
+  const scale = 1 + explosionFactor * 1.8;
+
+  // Use the geometric center of each face tile (not sticker offset).
+  const entryCenter = new THREE.Vector3(
+    (tunnel.entry.x - k) * scale,
+    (tunnel.entry.y - k) * scale,
+    (tunnel.entry.z - k) * scale
   );
-  const exitPos = getStickerWorldPos(
-    tunnel.exit.x, tunnel.exit.y, tunnel.exit.z,
-    tunnel.exit.dirKey, size, explosionFactor
+  const exitCenter = new THREE.Vector3(
+    (tunnel.exit.x - k) * scale,
+    (tunnel.exit.y - k) * scale,
+    (tunnel.exit.z - k) * scale
   );
+  const coreCenter = new THREE.Vector3(0, 0, 0);
 
-  // Use smart control point for curved path through center
-  const controlPoint = calculateSmartControlPoint(entryPos, exitPos, size, 0);
+  // Enforce exact path: entry tile center -> void core center -> exit tile center.
+  if (t <= 0.5) {
+    const localT = Math.max(0, t) * 2;
+    const result = entryCenter.clone().lerp(coreCenter, localT);
+    return [result.x, result.y, result.z];
+  }
 
-  // Quadratic Bezier interpolation
-  const vStart = new THREE.Vector3(...entryPos);
-  const vControl = controlPoint;
-  const vEnd = new THREE.Vector3(...exitPos);
-
-  // B(t) = (1-t)²P₀ + 2(1-t)tP₁ + t²P₂
-  const oneMinusT = 1 - t;
-  const result = new THREE.Vector3()
-    .addScaledVector(vStart, oneMinusT * oneMinusT)
-    .addScaledVector(vControl, 2 * oneMinusT * t)
-    .addScaledVector(vEnd, t * t);
-
+  const localT = (Math.min(1, t) - 0.5) * 2;
+  const result = coreCenter.clone().lerp(exitCenter, localT);
   return [result.x, result.y, result.z];
 };
 
@@ -149,12 +149,17 @@ export const createInitialTunnelWorm = (tunnels, initialLength = 3) => {
     segments.push({
       tunnelId: startTunnel.id,
       t,
-      tunnel: startTunnel
+      tunnel: startTunnel,
+      direction: 1
     });
   }
 
   return segments;
 };
+
+export const getTunnelSideKey = (endpoint) => (
+  `${endpoint.x},${endpoint.y},${endpoint.z},${endpoint.dirKey}`
+);
 
 /**
  * Find the closest tunnel entrance to a given exit position
@@ -164,7 +169,7 @@ export const createInitialTunnelWorm = (tunnels, initialLength = 3) => {
  * @param {number} size - Cube size
  * @returns {Object|null} Best next tunnel or null if none available
  */
-export const findNextTunnel = (exitPos, tunnels, excludeTunnelId, size) => {
+export const findNextTunnel = (exitPos, tunnels, excludeTunnelId, size, inactiveSideKeys = new Set()) => {
   // Get world position of exit
   const exitWorld = getStickerWorldPos(exitPos.x, exitPos.y, exitPos.z, exitPos.dirKey, size, 0);
   const exitVec = new THREE.Vector3(...exitWorld);
@@ -183,9 +188,16 @@ export const findNextTunnel = (exitPos, tunnels, excludeTunnelId, size) => {
     const entryVec = new THREE.Vector3(...entryWorld);
     const dist = exitVec.distanceTo(entryVec);
 
-    if (dist < bestDist) {
+    const entryKey = getTunnelSideKey(tunnel.entry);
+    if (inactiveSideKeys.has(entryKey)) {
+      // This side has already been consumed, so can't be entered again.
+    } else if (dist < bestDist) {
       bestDist = dist;
-      bestTunnel = { tunnel, enterFromEntry: true };
+      bestTunnel = {
+        tunnel,
+        enterFromEntry: true,
+        enteredSideKey: entryKey
+      };
     }
 
     // Also check distance to tunnel's exit (can enter from either end)
@@ -196,9 +208,16 @@ export const findNextTunnel = (exitPos, tunnels, excludeTunnelId, size) => {
     const exitVec2 = new THREE.Vector3(...exitWorld2);
     const dist2 = exitVec.distanceTo(exitVec2);
 
-    if (dist2 < bestDist) {
+    const exitKey = getTunnelSideKey(tunnel.exit);
+    if (inactiveSideKeys.has(exitKey)) {
+      // This side has already been consumed, so can't be entered again.
+    } else if (dist2 < bestDist) {
       bestDist = dist2;
-      bestTunnel = { tunnel, enterFromEntry: false };
+      bestTunnel = {
+        tunnel,
+        enterFromEntry: false,
+        enteredSideKey: exitKey
+      };
     }
   }
 
