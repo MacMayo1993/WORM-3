@@ -113,6 +113,7 @@ const MAX_TAIL = 1200;
 
 function useWormCrawler(size, cubies) {
     const wormSpeed = useGameStore(s => s.wormSpeed ?? 0.4);
+    const wormControlMode = useGameStore(s => s.wormControlMode ?? 'non-oriented');
     const wormRunId = useGameStore(s => s.wormRunId ?? 0);
     const healedRef = useRef(0);
 
@@ -261,11 +262,18 @@ function useWormCrawler(size, cubies) {
             // Apply pending turn — RELATIVE to current heading
             if (pendingTurn.current) {
                 const t = pendingTurn.current;
-                if (t === 'left' || t === 'right') {
-                    moveDir.current = turnWorm(moveDir.current, t);
+                if (t === 'jump') {
+                    startJump();
+                } else if (wormControlMode === 'oriented') {
+                    if (t === 'up' || t === 'down' || t === 'left' || t === 'right') {
+                        moveDir.current = t;
+                    }
+                } else {
+                    if (t === 'left' || t === 'right') {
+                        moveDir.current = turnWorm(moveDir.current, t);
+                    }
+                    if (t === 'down') moveDir.current = turnWorm(turnWorm(moveDir.current, 'left'), 'left');
                 }
-                if (t === 'down') moveDir.current = turnWorm(turnWorm(moveDir.current, 'left'), 'left');
-                if (t === 'jump') startJump();
                 pendingTurn.current = null;
             }
 
@@ -444,7 +452,7 @@ function useWormCrawler(size, cubies) {
                 useGameStore.getState().setWormHealedCount(healedRef.current);
             }
         }
-    }, [size, cubies, wormSpeed]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [size, cubies, wormSpeed, wormControlMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
 
 
@@ -694,8 +702,54 @@ function TunnelSurfFX({ worm, size }) {
 }
 
 // ─── Swipe Controls ───────────────────────────────────────────────────────────
-function WormSwipeControls({ onTurn }) {
+function WormSwipeControls({ onTurn, worm }) {
+    const { camera } = useThree();
+    const wormControlMode = useGameStore(s => s.wormControlMode ?? 'non-oriented');
     const touchStart = useRef(null);
+
+    const mapOrientedDirection = useCallback((inputDir) => {
+        const dirKey = worm.pos.current?.dirKey;
+        if (!dirKey) return inputDir;
+
+        const faceNormal = FACE_NORMALS[dirKey] ?? new THREE.Vector3(0, 0, 1);
+        const camForward = new THREE.Vector3();
+        camera.getWorldDirection(camForward);
+        const camUp = camera.up.clone().normalize();
+        const camRight = new THREE.Vector3().crossVectors(camForward, camUp).normalize();
+
+        let desired = null;
+        if (inputDir === 'up') desired = camUp;
+        if (inputDir === 'down') desired = camUp.clone().multiplyScalar(-1);
+        if (inputDir === 'left') desired = camRight.clone().multiplyScalar(-1);
+        if (inputDir === 'right') desired = camRight;
+        if (!desired) return inputDir;
+
+        desired = desired.clone().sub(faceNormal.clone().multiplyScalar(desired.dot(faceNormal)));
+        if (desired.lengthSq() < 1e-6) return inputDir;
+        desired.normalize();
+
+        const candidates = ['up', 'down', 'left', 'right'];
+        let bestDir = 'up';
+        let bestDot = -Infinity;
+        for (const dir of candidates) {
+            const vec = new THREE.Vector3(...(DIR_FORWARD[dirKey]?.[dir] ?? [0, 0, -1])).normalize();
+            const d = vec.dot(desired);
+            if (d > bestDot) {
+                bestDot = d;
+                bestDir = dir;
+            }
+        }
+
+        return bestDir;
+    }, [camera, worm]);
+
+    const emitDirection = useCallback((dir) => {
+        if (wormControlMode === 'oriented') {
+            onTurn(mapOrientedDirection(dir));
+            return;
+        }
+        onTurn(dir);
+    }, [wormControlMode, onTurn, mapOrientedDirection]);
 
     useEffect(() => {
         const onTouchStart = (e) => {
@@ -713,13 +767,19 @@ function WormSwipeControls({ onTurn }) {
             if (adx < 12 && ady < 12) return;
 
             if (adx > ady) {
-                onTurn(dx > 0 ? 'right' : 'left');
+                emitDirection(dx > 0 ? 'right' : 'left');
+            } else if (wormControlMode === 'oriented') {
+                emitDirection(dy > 0 ? 'down' : 'up');
+            } else if (dy > 0) {
+                // non-oriented mode supports 180° turn via downward swipe
+                emitDirection('down');
             }
         };
         const onKey = (e) => {
-            if (e.key === 'ArrowLeft') { e.preventDefault(); onTurn('left'); }
-            if (e.key === 'ArrowRight') { e.preventDefault(); onTurn('right'); }
-            if (e.key === 'ArrowDown') { e.preventDefault(); onTurn('down'); }
+            if (e.key === 'ArrowLeft') { e.preventDefault(); emitDirection('left'); }
+            if (e.key === 'ArrowRight') { e.preventDefault(); emitDirection('right'); }
+            if (e.key === 'ArrowDown') { e.preventDefault(); emitDirection('down'); }
+            if (e.key === 'ArrowUp' && wormControlMode === 'oriented') { e.preventDefault(); emitDirection('up'); }
             if (e.key === ' ') {
                 e.preventDefault();
                 onTurn('jump');
@@ -733,7 +793,7 @@ function WormSwipeControls({ onTurn }) {
             window.removeEventListener('touchend', onTouchEnd);
             window.removeEventListener('keydown', onKey, { capture: true });
         };
-    }, [onTurn]);
+    }, [onTurn, emitDirection, wormControlMode]);
 
     return null;
 }
@@ -1044,7 +1104,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     return (
         <>
             <WormChaseCamera worm={worm} size={size} />
-            <WormSwipeControls onTurn={worm.queueTurn} />
+            <WormSwipeControls onTurn={worm.queueTurn} worm={worm} />
             <WormInteriorGlass worm={worm} size={size} />
             <TunnelSurfFX worm={worm} size={size} />
             <WormBody worm={worm} size={size} />
