@@ -298,11 +298,19 @@ export const TILE_STYLES = {
   muellerLyer:        { label: 'Müller-Lyer',        cost: 'low', type: 'pattern' },
   rotatingSnakes:     { label: 'Rotating Snakes',    cost: 'low', type: 'pattern' },
   poggendorff:        { label: 'Poggendorff',        cost: 'low', type: 'pattern' },
-  // Antipodal-color patterns — use this face's color + its opposite face's color
+  // Antipodal-color patterns — use this face's color + its opposite face's color.
+  // All patterns use an asymmetric coverage split (~20-30% antipodal, ~70-80% base)
+  // so that flipping base↔antipodal produces a clearly different visual.
   polkaDots:          { label: 'Polka Dots',         cost: 'low', type: 'pattern' },
   zigzag:             { label: 'Zigzag',             cost: 'low', type: 'pattern' },
-  checkerboard:       { label: 'Checkerboard',       cost: 'low', type: 'pattern' },
+  checkerboard:       { label: 'Tile Grout',         cost: 'low', type: 'pattern' },
   diagStripes:        { label: 'Diag Stripes',       cost: 'low', type: 'pattern' },
+  cornerAccent:       { label: 'Corner Accent',      cost: 'low', type: 'pattern' },
+  innerDisc:          { label: 'Inner Disc',         cost: 'low', type: 'pattern' },
+  crossPlus:          { label: 'Cross',              cost: 'low', type: 'pattern' },
+  borderFrame:        { label: 'Border Frame',       cost: 'low', type: 'pattern' },
+  thinHatch:          { label: 'Crosshatch',         cost: 'low', type: 'pattern' },
+  dotRing:            { label: 'Dot Ring',           cost: 'low', type: 'pattern' },
   moireRings:    { label: 'Moiré Rings',     cost: 'med', type: 'animated' },
   moireLines:    { label: 'Moiré Lines',     cost: 'med', type: 'animated' },
   infinityTunnel: { label: 'Infinity Tunnel', cost: 'med', type: 'animated' },
