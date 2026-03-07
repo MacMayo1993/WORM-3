@@ -382,7 +382,7 @@ const MainMenu = ({ onPlay, _onLevels, onFreeplay, _onCoop, onSettings, onBiome,
       {/* ── Full-screen 3D canvas — same setup as WelcomeScreen ── */}
       <div style={{ position: 'absolute', inset: 0, zIndex: 1 }}>
         <Canvas camera={{ position: [0, 3, 12], fov: 40 }}>
-          <color attach="background" args={['#05050f']} />
+          <color attach="background" args={['#f3f5f8']} />
           <ambientLight intensity={0.6} />
           <pointLight position={[10, 10, 10]} intensity={1.8} />
           <pointLight position={[-10, -10, -10]} intensity={1.2} />
