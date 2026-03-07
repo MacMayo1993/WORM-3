@@ -316,40 +316,35 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     const prevVal = prevCurr.current;
 
     // Only trigger flip animation if the color actually changed to its antipodal.
-    // In chaos/disparity mode the entire visual-flip block is suppressed — the color
-    // update is handled imperatively in useLayoutEffect([materialColor]) — because
-    // running coin-spin animations and audio on every chaos flip (100+ Hz on 5×5)
-    // overwhelms the browser's audio context and GPU simultaneously.
+    // Keep manual-style vortex/squish visuals active in chaos/disparity too.
     if (curr !== prevVal && meta?.flips > 0 && ANTIPODAL_COLOR[prevVal] === curr) {
-      if (!chaosLevel) {
-        // Mark as animating to prevent React state from interrupting
-        isFlipping.current = true;
-        // Store the colors for the flip animation
-        // flipToColor is the ANTIPODAL color (what we're flipping TO)
-        flipFromColor.current = fc[prevVal];
-        flipToColor.current = fc[curr];
-        // Texture follows city identity — use biome ground textures in biome mode
-        if (biomeEnabled && meta?.orig) {
-          const newFlips = meta?.flips ?? 0;
-          // newFlips is already incremented. Odd = we just flipped TO antipodal; even = flipped back.
-          const fromFace = newFlips % 2 === 1
-            ? meta.orig
-            : (ANTIPODAL_COLOR[meta.orig] ?? meta.orig);
-          const toFace = newFlips % 2 === 1
-            ? (ANTIPODAL_COLOR[meta.orig] ?? meta.orig)
-            : meta.orig;
-          flipFromTexture.current = BIOME_GROUND_TEXTURES[FACE_CITIES[fromFace]] ?? null;
-          flipToTexture.current = BIOME_GROUND_TEXTURES[FACE_CITIES[toFace]] ?? null;
-        } else {
-          flipFromTexture.current = faceTextures?.[prevVal] || null;
-          flipToTexture.current = faceTextures?.[curr] || null;
-        }
-        spinT.current = 1;
-        prevRawP.current = 0;
-        flipParticlesRef.current?.trigger(fc[curr]);
-        play('/sounds/flip.mp3');
-        vibrate(16);
+      // Mark as animating to prevent React state from interrupting
+      isFlipping.current = true;
+      // Store the colors for the flip animation
+      // flipToColor is the ANTIPODAL color (what we're flipping TO)
+      flipFromColor.current = fc[prevVal];
+      flipToColor.current = fc[curr];
+      // Texture follows city identity — use biome ground textures in biome mode
+      if (biomeEnabled && meta?.orig) {
+        const newFlips = meta?.flips ?? 0;
+        // newFlips is already incremented. Odd = we just flipped TO antipodal; even = flipped back.
+        const fromFace = newFlips % 2 === 1
+          ? meta.orig
+          : (ANTIPODAL_COLOR[meta.orig] ?? meta.orig);
+        const toFace = newFlips % 2 === 1
+          ? (ANTIPODAL_COLOR[meta.orig] ?? meta.orig)
+          : meta.orig;
+        flipFromTexture.current = BIOME_GROUND_TEXTURES[FACE_CITIES[fromFace]] ?? null;
+        flipToTexture.current = BIOME_GROUND_TEXTURES[FACE_CITIES[toFace]] ?? null;
+      } else {
+        flipFromTexture.current = faceTextures?.[prevVal] || null;
+        flipToTexture.current = faceTextures?.[curr] || null;
       }
+      spinT.current = 1;
+      prevRawP.current = 0;
+      flipParticlesRef.current?.trigger(fc[curr]);
+      play('/sounds/flip.mp3');
+      vibrate(16);
     }
     prevCurr.current = curr;
   }, [meta?.curr, meta?.flips]);
@@ -1034,7 +1029,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         </>
       )}
 
-      {!isDead && !isSudokube && !chaosLevel && isWormhole && (
+      {!isDead && !isSudokube && isWormhole && (
         <>
           {/* Parity breakthrough — original color trying to push through.
               LOD: skip at flips === 1 (6–8 blended meshes saved for the very first wormhole frame). */}
@@ -1070,8 +1065,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
               side={THREE.DoubleSide}
             />
           </mesh>
-          {/* WORM creatures - disabled in Disparity Mode (too many instances at 4×4/5×5) */}
-          {!chaosLevel && Array.from({ length: Math.min(meta?.flips ?? 0, 4) }, (_, i) => {
+          {/* WORM creatures around active vortex */}
+          {Array.from({ length: Math.min(meta?.flips ?? 0, 4) }, (_, i) => {
             const count = Math.min(meta?.flips ?? 0, 4);
             const angle = (i / count) * Math.PI * 2;
             const radius = count <= 4 ? 0.25 : 0.28;
@@ -1090,9 +1085,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         </>
       )}
 
-      {/* Particle burst effect during flip — skipped in Disparity Mode where every tile
-          flips repeatedly; the burst volume causes severe GPU stuttering on 4×4 / 5×5. */}
-      {!chaosLevel && <FlipParticles ref={flipParticlesRef} />}
+      {/* Particle burst effect during flip (manual + chaos/disparity). */}
+      <FlipParticles ref={flipParticlesRef} />
 
       {overlay && (
         <Text position={[0, 0, 0.03]} fontSize={0.17} color="black" anchorX="center" anchorY="middle">
