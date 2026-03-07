@@ -260,6 +260,13 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // Live ref to current texture so useFrame closures can access it without stale captures.
   const currTextureRef = useRef(null);
 
+  // Ensure transient flip-burst artifacts never leak across mode/home transitions.
+  useEffect(() => {
+    return () => {
+      if (stickerGridIdRef.current) flipBurstMap.delete(stickerGridIdRef.current);
+    };
+  }, []);
+
   // Death rank from Disparity Mode — null if not in disparity game or tile not yet dead
   const deadRank = isDead ? (disparityDeathByGridId?.[stickerGridIdRef.current]?.rank ?? null) : null;
   // Winner tile — glows gold after the last pair is found

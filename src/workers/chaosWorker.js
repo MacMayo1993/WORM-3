@@ -297,10 +297,11 @@ const tick = () => {
     const checkDeath = (loc) => {
       if (!loc) return;
       const st = state[loc.x]?.[loc.y]?.[loc.z]?.stickers?.[loc.dirKey];
-      const key = `${loc.x},${loc.y},${loc.z},${loc.dirKey}`;
-      if (st && (st.flips || 0) >= flipCap && !deadTileSet.has(key) && surfaceStickers - deadTileSet.size > 2) {
-        deadTileSet.add(key);
-        chainDeaths.push({ st, ...loc });
+      if (!st) return;
+      const gridId = getManifoldGridId(st, size);
+      if ((st.flips || 0) >= flipCap && !deadTileSet.has(gridId) && surfaceStickers - deadTileSet.size > 2) {
+        deadTileSet.add(gridId);
+        chainDeaths.push({ st, gridId, ...loc });
       }
     };
 
@@ -315,9 +316,8 @@ const tick = () => {
       pairDeathCount += 1;
       producedDeaths = true;
       const DIR_TO_FACE = { PZ: 1, NX: 2, PY: 3, NZ: 4, PX: 5, NY: 6 };
-      for (const { st, x, y, z, dirKey: ddk } of chainDeaths) {
+      for (const { st, gridId, x, y, z, dirKey: ddk } of chainDeaths) {
         deathRank += 1;
-        const gridId = getManifoldGridId(st, size);
         const { r, c } = faceRCFor(ddk, x, y, z, size);
         const endFaceId = DIR_TO_FACE[ddk] ?? st.curr;
         const endGridId = `M${endFaceId}-${String(r * size + c + 1).padStart(3, '0')}`;
@@ -413,7 +413,7 @@ const tick = () => {
     eliminatedFaces: [...new Set(eliminatedFaces)],
     winner,
     metrics: { disparity, flipPct },
-    didWork: flips.length > 0 || cascades.length > 0 || producedDeaths,
+    didWork: flips.length > 0 || cascades.length > 0 || producedDeaths || !!winner,
   };
 };
 

@@ -55,7 +55,11 @@ export function useChaosWorker({
 
       if (deaths?.length > 0) {
         const now = Date.now();
-        addDisparityDeathsBulk(deaths.map((d, i) => ({ id: now + i + Math.random(), ...d })));
+        const seen = useGameStore.getState().disparityDeathByGridId || {};
+        const deduped = deaths.filter((d) => d?.gridId && !seen[d.gridId]);
+        if (deduped.length > 0) {
+          addDisparityDeathsBulk(deduped.map((d, i) => ({ id: now + i + Math.random(), ...d })));
+        }
       }
 
       if (eliminatedFaces?.length > 0) {
@@ -63,6 +67,8 @@ export function useChaosWorker({
       }
 
       if (winner?.length) {
+        // Flush any lingering bolt visuals when the winner pair is finalized.
+        setCascades([]);
         useGameStore.getState().setDisparityWinner({ pair: winner });
         useGameStore.getState().setShowDisparityWinner(true);
       }
@@ -100,6 +106,7 @@ export function useChaosWorker({
     }
 
     worker.postMessage({ type: 'STOP' });
+    setCascades([]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chaosMode]);
 

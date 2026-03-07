@@ -224,11 +224,15 @@ export const useGameStore = create(
     addDisparityDeathsBulk: (deaths) => set((state) => {
       if (!deaths?.length) return state;
       const byGrid = { ...state.disparityDeathByGridId };
+      const uniqueNew = [];
       for (const death of deaths) {
+        if (!death?.gridId || byGrid[death.gridId]) continue;
         byGrid[death.gridId] = death;
+        uniqueNew.push(death);
       }
+      if (!uniqueNew.length) return state;
       return {
-        disparityDeaths: [...state.disparityDeaths, ...deaths],
+        disparityDeaths: [...state.disparityDeaths, ...uniqueNew],
         disparityDeathByGridId: byGrid,
       };
     }),
