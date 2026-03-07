@@ -145,8 +145,8 @@ function useWormCrawler(size, cubies) {
     const isJumping = useRef(false);
     const jumpCount = useRef(0);
     const pendingTunnelTrigger = useRef(null);
-    const JUMP_HEIGHT = 0.55;
-    const JUMP_SPEED = 3.5;
+    const JUMP_HEIGHT = 1.5;   // tall arc — astronaut bounding in low gravity
+    const JUMP_SPEED = 0.42;  // slow float (~2.4 s) so one jump clears a full tile at default worm speed
 
     // Growing tail + powerups
     const tailLength = useRef(BASE_TAIL_LENGTH);
@@ -344,7 +344,7 @@ function useWormCrawler(size, cubies) {
             // If the game lags and skips 0.3 seconds, this perfectly reconstructs the 15 missing physics frames along the true 3D edge curve
             while (lastRecordedT.current <= interpT.current) {
                 const { hPos: ptPos, cNorm: ptNorm } = evaluatePosAndNormal(lastRecordedT.current);
-                const ptJump = isJumping.current ? Math.sin(jumpT.current * Math.PI) * 0.55 : 0;
+                const ptJump = isJumping.current ? Math.sin(jumpT.current * Math.PI) * JUMP_HEIGHT : 0;
                 const ptLifted = ptPos.clone().addScaledVector(ptNorm, WORM_LIFT + ptJump);
 
                 stepHistory.current.unshift({ pos: ptLifted, normal: ptNorm });
