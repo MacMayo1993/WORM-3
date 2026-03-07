@@ -122,8 +122,11 @@ export default function GameScene({
   const cubies = useGameStore((s) => s.cubies);
   const wormHealerMode = useGameStore((s) => s.wormHealerMode);
   const wormPhase = useGameStore((s) => s.wormPhase);
-  const showTunnels = useGameStore((s) => s.showTunnels);
   const holonomyMode = useGameStore((s) => s.holonomyMode);
+
+  const wormholePhaseActive = wormHealerMode && (
+    wormPhase === 'entering' || wormPhase === 'tunnel' || wormPhase === 'exiting'
+  );
 
   return (
     <>
@@ -186,8 +189,8 @@ export default function GameScene({
         {currentLevelData && !currentLevelData.background && <Environment preset="city" />}
 
         <WormholeWarpFX
-          enabled={showTunnels || wormHealerMode}
-          wormPhase={wormHealerMode ? wormPhase : 'crawling'}
+          enabled={wormholePhaseActive}
+          wormPhase={wormPhase}
         />
 
         <CubeAssembly
