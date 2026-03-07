@@ -3,6 +3,12 @@ import { COLOR_SCHEMES, SCHEME_LABELS } from '../../utils/colorSchemes.js';
 
 const PALETTE_KEYS = Object.keys(SCHEME_LABELS).filter(k => k !== 'biome' && k !== 'custom');
 
+// Perceived brightness of a hex color (0–255); higher = lighter
+const hexLum = hex => {
+  const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+  return 0.299 * r + 0.587 * g + 0.114 * b;
+};
+
 const LEVEL_LABELS = { 1: 'Low', 2: 'Medium', 3: 'High', 4: 'Extreme', 5: 'Maximum' };
 const LEVEL_ACCENT = { 1: '#34c759', 2: '#ffcc00', 3: '#ff9500', 4: '#ff3b30', 5: '#af52de' };
 
@@ -160,7 +166,7 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', maxHeight: '220px', overflowY: 'auto' }}>
             {PALETTE_KEYS.map(key => {
               const selected = colorScheme === key;
-              const colors = Object.values(COLOR_SCHEMES[key] || {});
+              const colors = Object.values(COLOR_SCHEMES[key] || {}).slice(0, 6).sort((a, b) => hexLum(b) - hexLum(a));
               return (
                 <button key={key} onClick={() => setColorScheme(key)} style={{
                   display: 'flex', flexDirection: 'column', gap: '4px',
@@ -171,9 +177,9 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
                   <span style={{ fontSize: '11px', fontWeight: selected ? '600' : '400', color: selected ? '#1c1c1e' : '#8e8e93' }}>
                     {SCHEME_LABELS[key]}
                   </span>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 12px)', gap: '2px' }}>
-                    {colors.slice(0, 6).map((c, i) => (
-                      <div key={i} style={{ width: '12px', height: '12px', borderRadius: '50%', background: c, boxShadow: '0 1px 2px rgba(0,0,0,0.18)' }} />
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '3px', width: '100%' }}>
+                    {colors.map((c, i) => (
+                      <div key={i} style={{ width: '100%', aspectRatio: '1', borderRadius: '50%', background: c, boxShadow: '0 1px 2px rgba(0,0,0,0.18)' }} />
                     ))}
                   </div>
                 </button>

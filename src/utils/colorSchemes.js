@@ -249,17 +249,6 @@ export const SCHEME_LABELS = {
   forest:       'Forest',
   candy:        'Candy',
   retro:        'Retro',
-  // Superheroes
-  spiderman:    'Spider-Man',
-  batman:       'Batman',
-  ironman:      'Iron Man',
-  wonderwoman:  'Wonder Woman',
-  joker:        'The Joker',
-  blackpanther: 'Black Panther',
-  cap:          'Captain America',
-  thor:         'Thor',
-  deadpool:     'Deadpool',
-  strange:      'Doctor Strange',
   // Themes
   aurora:       'Aurora Borealis',
   sumi:         'Ink & Washi',
@@ -271,6 +260,17 @@ export const SCHEME_LABELS = {
   desert:       'Desert Dusk',
   arctic:       'Arctic',
   ember:        'Ember & Ash',
+  // Superheroes (at bottom — dark palettes that would obscure previews if first)
+  spiderman:    'Spider-Man',
+  batman:       'Batman',
+  ironman:      'Iron Man',
+  wonderwoman:  'Wonder Woman',
+  joker:        'The Joker',
+  blackpanther: 'Black Panther',
+  cap:          'Captain America',
+  thor:         'Thor',
+  deadpool:     'Deadpool',
+  strange:      'Doctor Strange',
   // Biome
   biome:        'City Biome',
   // Custom always last
