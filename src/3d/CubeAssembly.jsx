@@ -753,7 +753,7 @@ const CubeAssembly = React.memo(({
         />
         {!isBiomeMode && cascades.map(c => (
           <ChaosWave
-            key={c.key}
+            key={c.id}
             from={c.from}
             to={c.to}
             crossFace={c.crossFace}
