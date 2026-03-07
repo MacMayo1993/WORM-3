@@ -8,6 +8,15 @@ import {
   K_STAR
 } from '../game/antipodalIntegrity.js';
 
+
+const makeDeterministicRng = (seed) => {
+  let state = seed >>> 0;
+  return () => {
+    state = (1664525 * state + 1013904223) >>> 0;
+    return state / 4294967296;
+  };
+};
+
 describe('K_STAR constant', () => {
   it('equals 1/(2 ln 2) ≈ 0.7213', () => {
     expect(K_STAR).toBeCloseTo(0.7213, 3);
@@ -82,15 +91,18 @@ describe('computeAntipodalIntegrity', () => {
 
   it('integrity approaches 0 after many scrambles', () => {
     let cubies = makeCubies(3);
-    // Apply many random rotations
+    const rng = makeDeterministicRng(7);
+
+    // Apply many pseudo-random rotations with a stable seed so CI is deterministic.
     for (let i = 0; i < 50; i++) {
-      const ax = ['row', 'col', 'depth'][Math.floor(Math.random() * 3)];
-      const slice = Math.floor(Math.random() * 3);
-      const dir = Math.random() > 0.5 ? 1 : -1;
+      const ax = ['row', 'col', 'depth'][Math.floor(rng() * 3)];
+      const slice = Math.floor(rng() * 3);
+      const dir = rng() > 0.5 ? 1 : -1;
       cubies = rotateSliceCubies(cubies, 3, ax, slice, dir);
     }
+
     const result = computeAntipodalIntegrity(cubies, 3);
-    // Heavily scrambled state should have low integrity
+    // Heavily scrambled state should have low integrity.
     expect(result.integrity).toBeLessThan(0.5);
   });
 
