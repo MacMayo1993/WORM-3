@@ -298,6 +298,11 @@ export const TILE_STYLES = {
   muellerLyer:        { label: 'Müller-Lyer',        cost: 'low', type: 'pattern' },
   rotatingSnakes:     { label: 'Rotating Snakes',    cost: 'low', type: 'pattern' },
   poggendorff:        { label: 'Poggendorff',        cost: 'low', type: 'pattern' },
+  // Antipodal-color patterns — use this face's color + its opposite face's color
+  polkaDots:          { label: 'Polka Dots',         cost: 'low', type: 'pattern' },
+  zigzag:             { label: 'Zigzag',             cost: 'low', type: 'pattern' },
+  checkerboard:       { label: 'Checkerboard',       cost: 'low', type: 'pattern' },
+  diagStripes:        { label: 'Diag Stripes',       cost: 'low', type: 'pattern' },
   moireRings:    { label: 'Moiré Rings',     cost: 'med', type: 'animated' },
   moireLines:    { label: 'Moiré Lines',     cost: 'med', type: 'animated' },
   infinityTunnel: { label: 'Infinity Tunnel', cost: 'med', type: 'animated' },

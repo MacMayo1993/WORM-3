@@ -493,7 +493,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           mat.color.set(tex ? '#ffffff' : flipToColor.current);
           mat.needsUpdate = true; // single GPU upload, not per-frame
         } else if (mat?.uniforms?.baseColor) {
-          const newMat = getTileStyleMaterial(tileStyle, flipToColor.current, false, null);
+          const newMat = getTileStyleMaterial(tileStyle, flipToColor.current, false, null, antipodalHexRef.current);
           meshRef.current.material = newMat;
         }
         // Ring opacity spike — event horizon signal. Clamp write, no stacking.
@@ -534,7 +534,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           mat.color.set(finalTex ? '#ffffff' : baseColorRef.current);
           mat.needsUpdate = true;
         } else if (mat?.uniforms?.baseColor) {
-          const newMat = getTileStyleMaterial(tileStyle, baseColorRef.current, false, null);
+          const newMat = getTileStyleMaterial(tileStyle, baseColorRef.current, false, null, antipodalHexRef.current);
           meshRef.current.material = newMat;
         }
       }
@@ -645,6 +645,12 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const baseColorRef = useRef(materialColor);
   baseColorRef.current = materialColor;
 
+  // Hex color of the antipodal face — used by antipodal-pattern tile styles.
+  // Kept in a ref so imperative flip/layout-effect callbacks can read the live value.
+  const antipodalHex = meta?.curr ? (fc[ANTIPODAL_COLOR[meta.curr]] ?? null) : null;
+  const antipodalHexRef = useRef(antipodalHex);
+  antipodalHexRef.current = antipodalHex;
+
   // In biome mode the ground texture IS the tile style — force solid so no
   // shader layer renders underneath the buildings.
   const _styleKey = biomeEnabled ? cityFace : meta?.orig;
@@ -713,12 +719,13 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     // Ensure we have a valid color string
     const colorHex = baseColor || '#888888';
     try {
-      return getTileStyleMaterial(tileStyle, colorHex, false, null);
+      return getTileStyleMaterial(tileStyle, colorHex, false, null, antipodalHex);
     } catch (e) {
       console.warn('Failed to create tile style material:', e);
       return null;
     }
-  }, [useShaderStyle, tileStyle, baseColor]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [useShaderStyle, tileStyle, baseColor, antipodalHex]);
 
   // Set up UVs to show the correct portion of the face texture
   // Skip for hollow frame geometry (different UV layout, textures not applicable)
@@ -768,7 +775,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       } else if (mat.uniforms?.baseColor && !glbFullFace) {
         // Only re-apply shader material on non-full-face tiles.
         // For full-face GLBs the shader is intentionally suppressed — don't revive it here.
-        const newMat = getTileStyleMaterial(tileStyleRef.current, materialColor, false, null);
+        const newMat = getTileStyleMaterial(tileStyleRef.current, materialColor, false, null, antipodalHexRef.current);
         meshRef.current.material = newMat;
       }
     }

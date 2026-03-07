@@ -344,7 +344,7 @@ const fragmentShaders = {
       float hot = pow(lava, 2.0);
 
       // Color gradient: dark crust to bright lava
-      vec3 crustColor = baseColor * 0.2;
+      vec3 crustColor = baseColor * 0.35;
       vec3 hotColor = baseColor * 1.5 + vec3(0.3, 0.1, 0.0);
       vec3 brightColor = vec3(1.0, 0.8, 0.3);
 
@@ -372,7 +372,7 @@ const fragmentShaders = {
 
       // Nebula background
       float nebula = fbm(uv * 4.0 + time * 0.05);
-      vec3 nebulaColor = baseColor * nebula * 0.5;
+      vec3 nebulaColor = mix(baseColor * 0.10, baseColor * 0.55, nebula);
 
       // Stars
       vec2 starUv = uv * 20.0;
@@ -772,8 +772,8 @@ const fragmentShaders = {
 
       float signal = web * (sin(uv.x * 4.2 + uv.y * 3.3 - time * 2.8) * 0.5 + 0.5);
 
-      // Dark neural background
-      vec3 bg    = mix(vec3(0.02, 0.04, 0.13), baseColor * 0.12, 0.45);
+      // Dark neural background (slightly lighter so patterns read on all colors)
+      vec3 bg    = mix(vec3(0.06, 0.10, 0.25), baseColor * 0.22, 0.55);
       vec3 color = bg;
       color += baseColor * glow * 0.85;
       color += baseColor * 0.45 * web;
@@ -1205,7 +1205,7 @@ const fragmentShaders = {
       float moire = sin(r1 * PI * 2.0) * sin(r2 * PI * 2.0);
       float bright = moire * 0.5 + 0.5;
 
-      vec3 color = mix(baseColor * 0.08, baseColor * 1.15, bright);
+      vec3 color = mix(baseColor * 0.28, baseColor * 1.15, bright);
       // Soft circular vignette
       color *= 1.0 - smoothstep(0.44, 0.52, length(c1));
       gl_FragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
@@ -1236,7 +1236,7 @@ const fragmentShaders = {
       float moire = lines1 * lines2;
       float bright = moire * 0.5 + 0.5;
 
-      vec3 color = mix(baseColor * 0.06, baseColor * 1.2, bright);
+      vec3 color = mix(baseColor * 0.25, baseColor * 1.2, bright);
       gl_FragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
     }
   `,
@@ -1268,7 +1268,7 @@ const fragmentShaders = {
       float fade  = smoothstep(0.5, 0.38, r);   // circular clip at tile edge
 
       vec3 colA  = baseColor * 1.1;
-      vec3 colB  = baseColor * 0.11;
+      vec3 colB  = baseColor * 0.28;
       vec3 color = mix(colA, colB, band) * fade;
 
       // Bright vanishing-point glow at the centre
@@ -1302,7 +1302,7 @@ const fragmentShaders = {
       bright *= 1.0 - r * 0.5;
 
       float fade  = 1.0 - smoothstep(0.37, 0.51, r);
-      vec3  color = mix(baseColor * 0.05, baseColor * 1.25, bright) * fade;
+      vec3  color = mix(baseColor * 0.22, baseColor * 1.25, bright) * fade;
 
       // Hot-white centre
       color = mix(color, baseColor * 1.6, smoothstep(0.06, 0.0, r));
@@ -1331,8 +1331,75 @@ const fragmentShaders = {
       float bright = clamp(w, 0.0, 1.0);
       float fade   = 1.0 - smoothstep(0.43, 0.51, r);
 
-      vec3 color = mix(baseColor * 0.05, baseColor * 1.3, bright) * fade;
+      vec3 color = mix(baseColor * 0.22, baseColor * 1.3, bright) * fade;
       gl_FragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
+    }
+  `,
+
+  // ── Antipodal-color patterns ────────────────────────────────────────────────
+  // These use both baseColor (this face) and antipodalColor (opposite face).
+  // When antipodalColor is not provided (e.g. style previews), getTileStyleMaterial
+  // derives a hue-shifted contrast color automatically.
+
+  // Polka Dots — circles of antipodalColor on a baseColor background
+  polkaDots: `
+    uniform vec3 baseColor;
+    uniform vec3 antipodalColor;
+    varying vec2 vUv;
+
+    void main() {
+      float grid = 4.0;
+      vec2 f = fract(vUv * grid) - 0.5;
+      float dist = length(f);
+      float circ = smoothstep(0.35, 0.29, dist);
+      vec3 color = mix(baseColor, antipodalColor, circ);
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `,
+
+  // Zigzag — chevron bands alternating between the two antipodal colors
+  zigzag: `
+    uniform vec3 baseColor;
+    uniform vec3 antipodalColor;
+    varying vec2 vUv;
+
+    void main() {
+      float nBands = 7.0;
+      // Triangle wave in x offsets the y stripe boundary → chevron/zigzag
+      float tx = abs(fract(vUv.x * nBands) * 2.0 - 1.0);
+      float zy = fract(vUv.y * nBands + tx * 0.5);
+      float band = step(0.5, zy);
+      vec3 color = mix(baseColor, antipodalColor, band);
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `,
+
+  // Checkerboard — alternating squares in the two antipodal colors
+  checkerboard: `
+    uniform vec3 baseColor;
+    uniform vec3 antipodalColor;
+    varying vec2 vUv;
+
+    void main() {
+      float grid = 5.0;
+      vec2 idx = floor(vUv * grid);
+      float checker = mod(idx.x + idx.y, 2.0);
+      vec3 color = mix(baseColor, antipodalColor, checker);
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `,
+
+  // Diagonal Stripes — 45-degree stripes alternating the two antipodal colors
+  diagStripes: `
+    uniform vec3 baseColor;
+    uniform vec3 antipodalColor;
+    varying vec2 vUv;
+
+    void main() {
+      float freq = 8.0;
+      float stripe = step(0.5, fract((vUv.x + vUv.y) * freq * 0.5));
+      vec3 color = mix(baseColor, antipodalColor, stripe);
+      gl_FragColor = vec4(color, 1.0);
     }
   `,
 };
@@ -1371,11 +1438,19 @@ function _matCachePut(key, mat) {
   }
 }
 
+// Styles that use a second antipodalColor uniform (opposite face's color)
+const ANTIPODAL_STYLES = new Set(['polkaDots', 'zigzag', 'checkerboard', 'diagStripes']);
+
 /**
- * Get or create a shader material for a tile style
- * Materials are cached and shared across tiles with the same style+color
+ * Get or create a shader material for a tile style.
+ * @param {string} style - tile style key
+ * @param {string} colorHex - hex color for this face
+ * @param {boolean} useTexture - unused (reserved)
+ * @param {object} texture - unused (reserved)
+ * @param {string|null} antipodalHex - hex color of the antipodal face (for antipodal patterns).
+ *   When null for an antipodal-style, a hue-shifted contrast color is derived automatically.
  */
-export function getTileStyleMaterial(style, colorHex, useTexture = false, texture = null) {
+export function getTileStyleMaterial(style, colorHex, useTexture = false, texture = null, antipodalHex = null) {
   // Texture path: currently unused (all callers pass useTexture=false, null).
   // If activated, cache by texture.uuid to avoid per-call allocations and leaks.
   if (useTexture && texture) {
@@ -1391,9 +1466,10 @@ export function getTileStyleMaterial(style, colorHex, useTexture = false, textur
   const safeStyle = style || 'solid';
   const safeColorHex = colorHex || '#888888';
 
-  // Cache by style+color: shader compilation is expensive (~200ms GPU block per
-  // unique pair).  Repeated calls with the same style+color return instantly.
-  const cacheKey = `${safeStyle}_${safeColorHex}`;
+  // Cache key includes antipodal hex for antipodal-style patterns so each face pair
+  // gets its own compiled material; other styles are unaffected.
+  const antipodalSuffix = ANTIPODAL_STYLES.has(safeStyle) && antipodalHex ? `_${antipodalHex}` : '';
+  const cacheKey = `${safeStyle}_${safeColorHex}${antipodalSuffix}`;
   const cached = _matCacheGet(cacheKey);
   if (cached) return cached;
 
@@ -1409,11 +1485,25 @@ export function getTileStyleMaterial(style, colorHex, useTexture = false, textur
 
   const isGlass = safeStyle === 'glass';
 
+  const uniforms = {
+    baseColor: { value: color },
+    time: sharedUniforms.time,
+  };
+
+  // Antipodal patterns need a second color uniform.  Use the provided antipodal
+  // hex when available; otherwise derive a hue-shifted contrast (e.g. previews).
+  if (ANTIPODAL_STYLES.has(safeStyle)) {
+    let antiColor;
+    if (antipodalHex) {
+      try { antiColor = new THREE.Color(antipodalHex); } catch (_e) { antiColor = color.clone().offsetHSL(0.5, 0, 0); }
+    } else {
+      antiColor = color.clone().offsetHSL(0.5, 0.1, 0);
+    }
+    uniforms.antipodalColor = { value: antiColor };
+  }
+
   const material = new THREE.ShaderMaterial({
-    uniforms: {
-      baseColor: { value: color },
-      time: sharedUniforms.time,
-    },
+    uniforms,
     vertexShader: baseVertexShader,
     fragmentShader: fragmentShader,
     side: isGlass ? THREE.DoubleSide : THREE.FrontSide,
