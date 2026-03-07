@@ -97,30 +97,31 @@ export const getActiveTunnels = (cubies, size) => {
  * @returns {Array} [x, y, z] world coordinates
  */
 export const getTunnelWorldPos = (tunnel, t, size, explosionFactor = 0) => {
-  const entryPos = getStickerWorldPos(
-    tunnel.entry.x, tunnel.entry.y, tunnel.entry.z,
-    tunnel.entry.dirKey, size, explosionFactor
+  const k = (size - 1) / 2;
+  const scale = 1 + explosionFactor * 1.8;
+
+  // Use the geometric center of each face tile (not sticker offset).
+  const entryCenter = new THREE.Vector3(
+    (tunnel.entry.x - k) * scale,
+    (tunnel.entry.y - k) * scale,
+    (tunnel.entry.z - k) * scale
   );
-  const exitPos = getStickerWorldPos(
-    tunnel.exit.x, tunnel.exit.y, tunnel.exit.z,
-    tunnel.exit.dirKey, size, explosionFactor
+  const exitCenter = new THREE.Vector3(
+    (tunnel.exit.x - k) * scale,
+    (tunnel.exit.y - k) * scale,
+    (tunnel.exit.z - k) * scale
   );
+  const coreCenter = new THREE.Vector3(0, 0, 0);
 
-  // Force tunnel travel through cube core to avoid surface clipping.
-  const controlPoint = new THREE.Vector3(0, 0, 0);
+  // Enforce exact path: entry tile center -> void core center -> exit tile center.
+  if (t <= 0.5) {
+    const localT = Math.max(0, t) * 2;
+    const result = entryCenter.clone().lerp(coreCenter, localT);
+    return [result.x, result.y, result.z];
+  }
 
-  // Quadratic Bezier interpolation
-  const vStart = new THREE.Vector3(...entryPos);
-  const vControl = controlPoint;
-  const vEnd = new THREE.Vector3(...exitPos);
-
-  // B(t) = (1-t)²P₀ + 2(1-t)tP₁ + t²P₂
-  const oneMinusT = 1 - t;
-  const result = new THREE.Vector3()
-    .addScaledVector(vStart, oneMinusT * oneMinusT)
-    .addScaledVector(vControl, 2 * oneMinusT * t)
-    .addScaledVector(vEnd, t * t);
-
+  const localT = (Math.min(1, t) - 0.5) * 2;
+  const result = coreCenter.clone().lerp(exitCenter, localT);
   return [result.x, result.y, result.z];
 };
 

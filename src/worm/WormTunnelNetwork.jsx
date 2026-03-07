@@ -5,7 +5,6 @@
 import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { getStickerWorldPos } from '../game/coordinates.js';
 import { getTunnelSideKey } from './wormLogic.js';
 
 // Tunnel colors
@@ -33,25 +32,25 @@ function TunnelTube({ tunnel, size, explosionFactor = 0, isTarget = false, wormI
 
   // Calculate tunnel path
   const { curve, entryPos, exitPos } = useMemo(() => {
-    const entry = getStickerWorldPos(
-      tunnel.entry.x, tunnel.entry.y, tunnel.entry.z,
-      tunnel.entry.dirKey, size, explosionFactor
+    const k = (size - 1) / 2;
+    const scale = 1 + explosionFactor * 1.8;
+    const entryCenter = new THREE.Vector3(
+      (tunnel.entry.x - k) * scale,
+      (tunnel.entry.y - k) * scale,
+      (tunnel.entry.z - k) * scale
     );
-    const exit = getStickerWorldPos(
-      tunnel.exit.x, tunnel.exit.y, tunnel.exit.z,
-      tunnel.exit.dirKey, size, explosionFactor
-    );
-
-    // Match gameplay path: tunnels route through the cube core.
-    const controlPoint = new THREE.Vector3(0, 0, 0);
-
-    const curve = new THREE.QuadraticBezierCurve3(
-      new THREE.Vector3(...entry),
-      controlPoint,
-      new THREE.Vector3(...exit)
+    const exitCenter = new THREE.Vector3(
+      (tunnel.exit.x - k) * scale,
+      (tunnel.exit.y - k) * scale,
+      (tunnel.exit.z - k) * scale
     );
 
-    return { curve, entryPos: entry, exitPos: exit };
+    // Match gameplay path exactly: tile center -> void core center -> tile center.
+    const path = new THREE.CurvePath();
+    path.add(new THREE.LineCurve3(entryCenter, new THREE.Vector3(0, 0, 0)));
+    path.add(new THREE.LineCurve3(new THREE.Vector3(0, 0, 0), exitCenter));
+
+    return { curve: path, entryPos: [entryCenter.x, entryCenter.y, entryCenter.z], exitPos: [exitCenter.x, exitCenter.y, exitCenter.z] };
   }, [tunnel, size, explosionFactor]);
 
   // Create tube geometry

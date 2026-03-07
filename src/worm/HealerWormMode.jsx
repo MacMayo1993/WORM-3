@@ -25,9 +25,10 @@ const GLASS_MAX_OPACITY = 0.28;
 const GLASS_MIN_TRANSMISSION = 0.72;
 const GLASS_MAX_TRANSMISSION = 0.95;
 const TUNNEL_SURF_FOV = 78;
-const TUNNEL_SURF_BACK = 1.6;
-const TUNNEL_SURF_UP = 0.52;
+const TUNNEL_SURF_BACK = 2.2;
+const TUNNEL_SURF_UP = 0.72;
 const TUNNEL_SURF_SWAY = 0.22;
+const TUNNEL_SPEED_SCALE = 0.8; // 20% slower tunnel traversal
 
 // Face outward normals
 const FACE_NORMALS = {
@@ -437,14 +438,14 @@ function useWormCrawler(size, cubies) {
                 }
             }
         } else if (phase.current === 'entering') {
-            tunnelProgress.current += delta * 2.5;
+            tunnelProgress.current += delta * (2.5 * TUNNEL_SPEED_SCALE);
             if (tunnelProgress.current >= 1) {
                 tunnelProgress.current = 0;
                 phase.current = 'tunnel';
                 useGameStore.getState().setWormPhase('tunnel');
             }
         } else if (phase.current === 'tunnel') {
-            tunnelProgress.current += delta * 0.65;
+            tunnelProgress.current += delta * (0.65 * TUNNEL_SPEED_SCALE);
             if (tunnelProgress.current >= 1) {
                 tunnelProgress.current = 0;
                 phase.current = 'exiting';
@@ -456,7 +457,7 @@ function useWormCrawler(size, cubies) {
                 }
             }
         } else if (phase.current === 'exiting') {
-            tunnelProgress.current += delta * 2.0;
+            tunnelProgress.current += delta * (2.0 * TUNNEL_SPEED_SCALE);
             if (tunnelProgress.current >= 1) {
                 tunnelProgress.current = 0;
                 activeTunnel.current = null;
@@ -579,7 +580,7 @@ function WormChaseCamera({ worm, size }) {
         const camHeight = CAM_HEIGHT_BASE + extraZoom + aspectZoomBoost;
         const camBack = CAM_BACK_BASE + extraZoom * 0.8 + aspectZoomBoost * 0.9;
 
-        if (phase === 'crawling' || phase === 'entering' || phase === 'exiting') {
+        if (phase === 'crawling' || !worm.activeTunnel.current) {
             // Smooth interpolated worm world position
             const wormWorld = worm.headInterpPos.current.clone();
             const { dirKey } = worm.pos.current;
@@ -618,11 +619,11 @@ function WormChaseCamera({ worm, size }) {
             camera.position.copy(camPosRef.current);
             camera.up.copy(cameraUp);
             camera.lookAt(lookAtRef.current);
-
-
-
-        } else if (phase === 'tunnel' && worm.activeTunnel.current) {
-            const t = worm.tunnelProgress.current;
+        } else if ((phase === 'entering' || phase === 'tunnel' || phase === 'exiting') && worm.activeTunnel.current) {
+            let t = worm.tunnelProgress.current;
+            // Blend entry/exit camera across the same antipodal core path.
+            if (phase === 'entering') t *= 0.35;
+            if (phase === 'exiting') t = 0.65 + (t * 0.35);
             const t1 = Math.min(t + 0.12, 1);
             const t2 = Math.min(t + 0.24, 1);
             const camPt = getTunnelWorldPos(worm.activeTunnel.current, t, size);
