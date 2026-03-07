@@ -79,11 +79,9 @@ export function rotateTangent(forward, face, angle) {
   return forward.clone().applyAxisAngle(n, angle);
 }
 
-// Jump constants — fixed arc, fully speed-independent.
-// One jump always covers exactly 1 tile forward and peaks at JUMP_HEIGHT.
-const JUMP_DURATION = 0.45; // seconds for the full arc
-const JUMP_HEIGHT = 0.65;   // peak height above surface (world units)
-const JUMP_TILE_SPEED = 1.0 / JUMP_DURATION; // horizontal speed mid-air to cover exactly 1 tile
+// Jump constants — simple vertical bounce, no effect on horizontal speed.
+const JUMP_DURATION = 0.32; // seconds for the full arc
+const JUMP_HEIGHT = 0.35;   // peak height above surface (world units)
 
 /**
  * Core physics step: move the crawler on the cube surface.
@@ -107,25 +105,17 @@ export function stepCrawler(state, input, dt, size) {
     newForward = rotateTangent(forward, face, -input.turnRate * turnSpeed * dt);
   }
 
-  // --- Jump: purely parametric sine arc, no velocity-based physics ---
-  // jumpT: 0 = grounded, (0,1) = airborne, resets to 0 on landing.
-  // jumpReady: blocks re-triggering until the key is released AND we've landed.
-  // This works for both keyboard (held key) and mobile (touchStart/touchEnd):
-  //   - Keyboard: jump=true persists while held → blocked until key up + landed
-  //   - Mobile: jump=true only during touch → blocked by jumpT>0 while airborne;
-  //             jumpReady resets on touchEnd but the newJumpT===0 guard prevents
-  //             mid-air re-trigger; a fresh tap after landing works as expected.
+  // --- Jump: simple vertical sine arc, no effect on horizontal movement ---
+  // jumpT: 0 = grounded, (0,1) = mid-arc. jumpReady prevents auto-repeat on hold.
   let newJumpT = state.jumpT || 0;
   let newJumpHeight = jumpHeight;
-  let jumpReady = state.jumpReady !== false; // defaults true on first frame
+  let jumpReady = state.jumpReady !== false;
 
   if (input.jump && newJumpT === 0 && jumpReady) {
-    newJumpT = 1e-9; // kick off the arc (tiny non-zero to enter the airborne branch)
-    jumpReady = false; // consume — must release key before next jump
+    newJumpT = 1e-9;
+    jumpReady = false;
   }
-  // Reset ready state only when grounded AND key is released.
-  // Prevents keyboard hold-chaining while still letting mobile taps work correctly.
-  if (!input.jump && newJumpT === 0) {
+  if (!input.jump) {
     jumpReady = true;
   }
 
@@ -152,10 +142,8 @@ export function stepCrawler(state, input, dt, size) {
     }
   }
 
-  // --- Movement ---
-  // Airborne: always move at JUMP_TILE_SPEED so one jump = exactly one tile forward.
-  // Grounded: move at current velocity as normal.
-  const moveSpeed = isAirborne ? JUMP_TILE_SPEED : vel;
+  // --- Movement --- horizontal speed is unaffected by jump
+  const moveSpeed = vel;
   const moveDir = newForward.clone().normalize();
   const step = moveDir.multiplyScalar(moveSpeed * dt);
   const normal = FACE_NORMALS[face];
