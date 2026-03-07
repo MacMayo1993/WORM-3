@@ -254,6 +254,7 @@ export function WormMode3D({
 }) {
   const isTunnelMode = mode === 'tunnel';
   const wormTunnelId = isTunnelMode && worm[0] ? worm[0].tunnelId : null;
+  const inactiveTunnelSides = isTunnelMode ? game.inactiveTunnelSides : new Set();
 
   return (
     <>
