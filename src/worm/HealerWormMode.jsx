@@ -64,6 +64,7 @@ const BASE_TAIL_LENGTH = 4;
 const WORMHOLE_FLIP_INTERVAL = 10; // seconds between guaranteed antipodal wormhole spawns
 const MAX_JUMPS = 2;
 const TUNNEL_TRIGGER_PROGRESS = 1 / 3;
+const SELF_COLLISION_TRIGGER_PROGRESS = 0.4;
 
 function getAllSurfaceTiles(size) {
     const tiles = [];
@@ -129,6 +130,7 @@ function useWormCrawler(size, cubies) {
     const prevDirKey = useRef(null);
     const lastRecordedT = useRef(0);
     const crossingCorner = useRef(false);
+    const pendingSelfCollision = useRef(null);
 
     // Smooth inter-tile interpolation
     const interpT = useRef(1);          // 0→1 between prev and current tile
@@ -282,6 +284,16 @@ function useWormCrawler(size, cubies) {
                 interpT.current = Math.min(1, interpT.current + delta / STEP_SEC);
             }
 
+            if (pendingSelfCollision.current) {
+                if (isJumping.current) {
+                    // Allow jumping over your own body tile before impact threshold.
+                    pendingSelfCollision.current = null;
+                } else if (interpT.current >= SELF_COLLISION_TRIGGER_PROGRESS) {
+                    killWorm();
+                    return;
+                }
+            }
+
             if (pendingTunnelTrigger.current) {
                 const { x, y, z, dirKey } = pendingTunnelTrigger.current;
                 if (interpT.current >= TUNNEL_TRIGGER_PROGRESS && !isJumping.current) {
@@ -369,8 +381,9 @@ function useWormCrawler(size, cubies) {
                     const bodyTrail = tileTrail.current.slice(1, 1 + bodyTilesBehindHead);
                     const selfHit = bodyTrail.includes(nextKey);
                     if (selfHit) {
-                        killWorm();
-                        return;
+                        // Defer self-hit until we've penetrated the tile by 40%.
+                        // This gives players a short reaction window to jump over their body.
+                        pendingSelfCollision.current = { key: nextKey };
                     }
 
                     pos.current = nextPos;
@@ -383,9 +396,13 @@ function useWormCrawler(size, cubies) {
                     }
 
                     pendingTunnelTrigger.current = null;
+                    if (!selfHit) {
+                        pendingSelfCollision.current = null;
+                    }
                 } else {
                     moveDir.current = turnWorm(turnWorm(moveDir.current, 'left'), 'left');
                     pendingTunnelTrigger.current = null;
+                    pendingSelfCollision.current = null;
                 }
 
                 // Immediately update curWorldPos so the interpolation target is correct
@@ -487,6 +504,7 @@ function useWormCrawler(size, cubies) {
         jumpT.current = 0;
         jumpCount.current = 0;
         pendingTunnelTrigger.current = null;
+        pendingSelfCollision.current = null;
         tailLength.current = BASE_TAIL_LENGTH;
         stepHistory.current = [];
         lastRecordedT.current = 0;
