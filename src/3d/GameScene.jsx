@@ -16,6 +16,7 @@ import { BACKGROUNDS, getBackgroundUrl } from '../utils/backgrounds.js';
 import LayerHighlight from '../teach/LayerHighlight.jsx';
 import AntipodalVisualization from './AntipodalVisualization.jsx';
 import AntipodalModeEffects from './AntipodalModeEffects.jsx';
+import WormholeWarpFX from './WormholeWarpFX.jsx';
 
 import { HealerWormMode3DWrapper } from '../worm/HealerWormMode.jsx';
 const HolonomyWrapper = React.lazy(() => import('../holonomy/HolonomyWrapper.jsx'));
@@ -120,6 +121,8 @@ export default function GameScene({
   const size = useGameStore((s) => s.size);
   const cubies = useGameStore((s) => s.cubies);
   const wormHealerMode = useGameStore((s) => s.wormHealerMode);
+  const wormPhase = useGameStore((s) => s.wormPhase);
+  const showTunnels = useGameStore((s) => s.showTunnels);
   const holonomyMode = useGameStore((s) => s.holonomyMode);
 
   return (
@@ -181,6 +184,11 @@ export default function GameScene({
         )}
         {/* Default lighting env for levels without a custom background */}
         {currentLevelData && !currentLevelData.background && <Environment preset="city" />}
+
+        <WormholeWarpFX
+          enabled={showTunnels || wormHealerMode}
+          wormPhase={wormHealerMode ? wormPhase : 'crawling'}
+        />
 
         <CubeAssembly
           size={size}
