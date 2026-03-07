@@ -156,6 +156,7 @@ function useWormCrawler(size, cubies) {
     const lastCountdownDeci = useRef(-1);
     const alive = useRef(true);
     const tileTrail = useRef([]);
+    const deathMenuTimer = useRef(null);
 
     // Compute world centroid of current grid tile
     const getWorldPos = (p) => new THREE.Vector3(
@@ -204,16 +205,29 @@ function useWormCrawler(size, cubies) {
 
     const tileKey = (p) => `${p.x},${p.y},${p.z},${p.dirKey}`;
 
-    const killWorm = () => {
+    const killWorm = (details = null) => {
         if (!alive.current) return;
         alive.current = false;
         phase.current = 'dead';
+
+        if (deathMenuTimer.current) {
+            clearTimeout(deathMenuTimer.current);
+            deathMenuTimer.current = null;
+        }
+
         useGameStore.setState({
             wormPhase: 'dead',
             wormOnFlippedTile: false,
             wormAlive: false,
-            showWormDeathMenu: true,
+            showWormDeathMenu: false,
+            wormDeathDetails: details,
         });
+
+        // Let death state land first, then reveal menu for clearer sequencing.
+        deathMenuTimer.current = setTimeout(() => {
+            useGameStore.setState({ showWormDeathMenu: true });
+            deathMenuTimer.current = null;
+        }, 520);
     };
 
     const applyOrbPickupGrowth = () => {
@@ -291,7 +305,12 @@ function useWormCrawler(size, cubies) {
                     // Allow jumping over your own body tile before impact threshold.
                     pendingSelfCollision.current = null;
                 } else if (interpT.current >= SELF_COLLISION_TRIGGER_PROGRESS) {
-                    killWorm();
+                    killWorm({
+                        reason: 'self-collision',
+                        progress: Number(interpT.current.toFixed(2)),
+                        headTile: tileKey(pos.current),
+                        collisionTile: pendingSelfCollision.current?.key ?? null,
+                    });
                     return;
                 }
             }
@@ -522,12 +541,20 @@ function useWormCrawler(size, cubies) {
             wormholeCountdown: WORMHOLE_FLIP_INTERVAL,
             wormAlive: true,
             showWormDeathMenu: false,
+            wormDeathDetails: null,
             wormPhase: 'crawling',
             wormOnFlippedTile: false,
         });
         wormholeTimer.current = WORMHOLE_FLIP_INTERVAL;
         lastCountdownDeci.current = Math.round(WORMHOLE_FLIP_INTERVAL * 10);
     }, [size, wormRunId]);
+
+    useEffect(() => () => {
+        if (deathMenuTimer.current) {
+            clearTimeout(deathMenuTimer.current);
+            deathMenuTimer.current = null;
+        }
+    }, []);
 
     return {
         pos, moveDir, phase, tunnelProgress, activeTunnel, onFlippedTile,

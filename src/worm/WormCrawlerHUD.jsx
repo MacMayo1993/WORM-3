@@ -13,12 +13,12 @@ const PHASE_META = {
 };
 
 const palette = {
-    text: '#e2e8f0',
-    subText: '#94a3b8',
-    panel: 'rgba(15, 23, 42, 0.78)',
-    border: 'rgba(148, 163, 184, 0.35)',
-    strongBorder: 'rgba(125, 211, 252, 0.55)',
-    shadow: '0 8px 20px rgba(2, 6, 23, 0.35)',
+    text: '#0f172a',
+    subText: 'rgba(15, 23, 42, 0.62)',
+    panel: 'rgba(255, 255, 255, 0.9)',
+    border: 'rgba(15, 23, 42, 0.14)',
+    strongBorder: 'rgba(59, 130, 246, 0.45)',
+    shadow: '0 10px 28px rgba(15, 23, 42, 0.18)',
     success: '#34d399',
     warning: '#fbbf24',
     fillA: '#60a5fa',
@@ -26,7 +26,7 @@ const palette = {
 };
 
 const buttonBase = {
-    background: 'rgba(15, 23, 42, 0.75)',
+    background: 'rgba(255, 255, 255, 0.86)',
     border: `1px solid ${palette.border}`,
     borderRadius: 10,
     width: 34,
@@ -40,7 +40,7 @@ const buttonBase = {
     boxShadow: palette.shadow,
 };
 
-export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSize = 3, onHome, onSettings, wormAlive = true, showDeathMenu = false, onRetry, onNewGame }) {
+export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSize = 3, onHome, onSettings, wormAlive = true, showDeathMenu = false, deathDetails = null, onRetry, onNewGame }) {
     const wormSpeed = useGameStore(s => s.wormSpeed ?? 1.0);
     const wormHealedCount = useGameStore(s => s.wormHealedCount ?? 0);
     const wormBodyTiles = useGameStore(s => s.wormBodyTiles ?? 0);
@@ -61,7 +61,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
         <div style={{
             position: 'fixed', inset: 0,
             pointerEvents: 'none', zIndex: 600,
-            fontFamily: "'Inter', 'Segoe UI', sans-serif",
+            fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif",
             color: palette.text,
         }}>
             {/* Top info bar */}
@@ -71,7 +71,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                 padding: '10px 12px',
                 border: `1px solid ${palette.border}`,
                 background: palette.panel,
-                backdropFilter: 'blur(10px)',
+                backdropFilter: 'blur(18px)',
                 boxShadow: palette.shadow,
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -93,8 +93,8 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                         style={{
                             borderRadius: 999,
                             border: `1px solid ${palette.border}`,
-                            background: 'rgba(30, 41, 59, 0.82)',
-                            color: '#cbd5e1',
+                            background: 'rgba(255,255,255,0.84)',
+                            color: palette.text,
                             fontSize: 11,
                             fontWeight: 800,
                             letterSpacing: 0.6,
@@ -123,7 +123,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                 borderRadius: 14,
                 border: `1px solid ${palette.border}`,
                 background: palette.panel,
-                backdropFilter: 'blur(10px)',
+                backdropFilter: 'blur(18px)',
                 boxShadow: palette.shadow,
                 padding: 12,
                 pointerEvents: 'auto',
@@ -132,7 +132,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                     <span style={{ color: palette.subText, fontSize: 10, letterSpacing: 0.8, fontWeight: 700 }}>ORBS ON WORM</span>
                     <span style={{ color: '#c4b5fd', fontSize: 12, fontWeight: 800 }}>{wormBodyTiles}</span>
                 </div>
-                <div style={{ height: 8, borderRadius: 999, background: 'rgba(148,163,184,0.25)', overflow: 'hidden' }}>
+                <div style={{ height: 8, borderRadius: 999, background: 'rgba(100,116,139,0.2)', overflow: 'hidden' }}>
                     <div
                         style={{
                             height: '100%',
@@ -164,7 +164,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                     pointerEvents: 'none',
                     fontSize: 11, letterSpacing: 1.0, fontWeight: 700,
                     color: '#c4b5fd',
-                    background: 'rgba(30, 41, 59, 0.78)',
+                    background: 'rgba(255, 255, 255, 0.86)',
                     border: `1px solid ${palette.border}`,
                     borderRadius: 999,
                     padding: '6px 12px',
@@ -188,7 +188,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                         color: '#f8fafc',
                         background: isPortalReady
                             ? 'linear-gradient(135deg, #6366f1, #8b5cf6)'
-                            : 'linear-gradient(135deg, #334155, #475569)',
+                            : 'linear-gradient(135deg, #64748b, #475569)',
                         border: isPortalReady
                             ? `1px solid ${palette.strongBorder}`
                             : `1px solid ${palette.border}`,
@@ -228,9 +228,9 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                                 width: 44,
                                 height: 44,
                                 borderRadius: 10,
-                                background: 'rgba(30, 41, 59, 0.78)',
+                                background: 'rgba(255, 255, 255, 0.86)',
                                 border: `1px solid ${palette.border}`,
-                                color: '#bfdbfe',
+                                color: '#1e40af',
                                 fontSize: 18,
                                 fontWeight: 700,
                                 cursor: 'pointer',
@@ -258,14 +258,33 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                         width: 'min(92vw, 380px)',
                         borderRadius: 16,
                         border: `1px solid ${palette.border}`,
-                        background: 'rgba(15, 23, 42, 0.92)',
+                        background: 'rgba(255, 255, 255, 0.94)',
                         boxShadow: palette.shadow,
                         padding: 18,
                         textAlign: 'center',
                     }}>
                         <div style={{ color: palette.subText, fontSize: 12, fontWeight: 700, letterSpacing: 1.0 }}>WORM COLLISION</div>
-                        <div style={{ color: '#f8fafc', fontSize: 24, fontWeight: 800, marginTop: 4 }}>You hit your tail.</div>
+                        <div style={{ color: palette.text, fontSize: 24, fontWeight: 800, marginTop: 4 }}>You hit your tail.</div>
                         <div style={{ color: palette.subText, fontSize: 13, marginTop: 8 }}>Retry this run or start a new game mode.</div>
+                        {deathDetails?.reason === 'self-collision' && (
+                            <div style={{
+                                marginTop: 10,
+                                padding: '8px 10px',
+                                borderRadius: 10,
+                                border: `1px solid ${palette.border}`,
+                                background: 'rgba(255,255,255,0.78)',
+                                textAlign: 'left',
+                                fontSize: 11,
+                                color: palette.subText,
+                                fontFamily: "'SF Mono', ui-monospace, Menlo, monospace",
+                                lineHeight: 1.35,
+                            }}>
+                                <div>Reason: <b style={{ color: palette.text }}>Self-collision</b></div>
+                                <div>Head tile: <b style={{ color: palette.text }}>{deathDetails.headTile ?? 'n/a'}</b></div>
+                                <div>Body tile hit: <b style={{ color: palette.text }}>{deathDetails.collisionTile ?? 'n/a'}</b></div>
+                                <div>Impact progress: <b style={{ color: palette.text }}>{deathDetails.progress ?? 'n/a'}</b></div>
+                            </div>
+                        )}
                         <div style={{ marginTop: 16, display: 'flex', gap: 10, justifyContent: 'center' }}>
                             <button
                                 onPointerDown={onRetry}
