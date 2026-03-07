@@ -45,7 +45,9 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
     const wormHealedCount = useGameStore(s => s.wormHealedCount ?? 0);
     const wormBodyTiles = useGameStore(s => s.wormBodyTiles ?? 0);
     const wormholeCountdown = useGameStore(s => s.wormholeCountdown ?? 0);
+    const wormControlMode = useGameStore(s => s.wormControlMode ?? 'non-oriented');
     const setWormSpeed = useGameStore(s => s.setWormSpeed);
+    const toggleWormControlMode = useGameStore(s => s.toggleWormControlMode);
 
     const handleJumpAction = () => {
         if (!wormAlive) return;
@@ -86,6 +88,23 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                    <button
+                        onPointerDown={() => toggleWormControlMode()}
+                        style={{
+                            borderRadius: 999,
+                            border: `1px solid ${palette.border}`,
+                            background: 'rgba(30, 41, 59, 0.82)',
+                            color: '#cbd5e1',
+                            fontSize: 11,
+                            fontWeight: 800,
+                            letterSpacing: 0.6,
+                            padding: '6px 10px',
+                            cursor: 'pointer',
+                        }}
+                        title="Toggle worm control mode"
+                    >
+                        {wormControlMode === 'oriented' ? 'ORIENTED' : 'NON-ORIENTED'}
+                    </button>
                     <div style={{ textAlign: 'right' }}>
                         <div style={{ fontSize: 10, color: palette.subText, letterSpacing: 0.8, fontWeight: 700 }}>HEALED</div>
                         <div style={{ color: palette.success, fontSize: 18, fontWeight: 800 }}>{wormHealedCount}</div>

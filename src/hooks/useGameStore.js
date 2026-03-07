@@ -246,6 +246,11 @@ export const useGameStore = create(
     wormRunId: 0,
     wormSpeed: 1.0,
     setWormSpeed: (v) => set({ wormSpeed: v }),
+    wormControlMode: 'non-oriented', // 'non-oriented' (relative turns) | 'oriented' (camera-relative)
+    setWormControlMode: (v) => set({ wormControlMode: v }),
+    toggleWormControlMode: () => set((state) => ({
+      wormControlMode: state.wormControlMode === 'non-oriented' ? 'oriented' : 'non-oriented'
+    })),
     wormHealedCount: 0,
     setWormHealedCount: (v) => set({ wormHealedCount: v }),
     wormPhase: 'crawling',

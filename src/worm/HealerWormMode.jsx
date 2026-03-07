@@ -24,6 +24,10 @@ const GLASS_MIN_OPACITY = 0.12;
 const GLASS_MAX_OPACITY = 0.28;
 const GLASS_MIN_TRANSMISSION = 0.72;
 const GLASS_MAX_TRANSMISSION = 0.95;
+const TUNNEL_SURF_FOV = 78;
+const TUNNEL_SURF_BACK = 1.6;
+const TUNNEL_SURF_UP = 0.52;
+const TUNNEL_SURF_SWAY = 0.22;
 
 // Face outward normals
 const FACE_NORMALS = {
@@ -58,6 +62,9 @@ const STEPS_PER_TILE = 50;      // sub-steps recorded per tile (0.02 resolution)
 const BODY_BALL_SPACING = 0.14; // matches WormBody clone spacing along the trail
 const BASE_TAIL_LENGTH = 4;
 const WORMHOLE_FLIP_INTERVAL = 10; // seconds between guaranteed antipodal wormhole spawns
+const MAX_JUMPS = 2;
+const TUNNEL_TRIGGER_PROGRESS = 1 / 3;
+const SELF_COLLISION_TRIGGER_PROGRESS = 0.4;
 
 function getAllSurfaceTiles(size) {
     const tiles = [];
@@ -107,6 +114,7 @@ const MAX_TAIL = 1200;
 
 function useWormCrawler(size, cubies) {
     const wormSpeed = useGameStore(s => s.wormSpeed ?? 0.4);
+    const wormControlMode = useGameStore(s => s.wormControlMode ?? 'non-oriented');
     const wormRunId = useGameStore(s => s.wormRunId ?? 0);
     const healedRef = useRef(0);
 
@@ -122,6 +130,7 @@ function useWormCrawler(size, cubies) {
     const prevDirKey = useRef(null);
     const lastRecordedT = useRef(0);
     const crossingCorner = useRef(false);
+    const pendingSelfCollision = useRef(null);
 
     // Smooth inter-tile interpolation
     const interpT = useRef(1);          // 0→1 between prev and current tile
@@ -133,6 +142,8 @@ function useWormCrawler(size, cubies) {
     // Jump state
     const jumpT = useRef(0);            // 0 = grounded, >0 = in air
     const isJumping = useRef(false);
+    const jumpCount = useRef(0);
+    const pendingTunnelTrigger = useRef(null);
     const JUMP_HEIGHT = 0.55;
     const JUMP_SPEED = 3.5;
 
@@ -154,6 +165,41 @@ function useWormCrawler(size, cubies) {
     const jumpLift = () => isJumping.current
         ? Math.sin(jumpT.current * Math.PI) * JUMP_HEIGHT
         : 0;
+
+    const startJump = useCallback(() => {
+        if (jumpCount.current >= MAX_JUMPS) return;
+        isJumping.current = true;
+        jumpT.current = 0.001;
+        jumpCount.current += 1;
+        // If the player jumps early on a flipped tile, don't auto-enter the tunnel.
+        pendingTunnelTrigger.current = null;
+    }, []);
+
+    const beginTunnelTransition = useCallback((x, y, z, dirKey) => {
+        const tunnels = getActiveTunnels(cubies, size);
+        const tunnel = tunnels.find(t =>
+            t.entry.x === x && t.entry.y === y &&
+            t.entry.z === z && t.entry.dirKey === dirKey
+        ) || tunnels.find(t =>
+            t.exit.x === x && t.exit.y === y &&
+            t.exit.z === z && t.exit.dirKey === dirKey
+        );
+
+        if (!tunnel) return;
+
+        if (tunnel.exit.x === x && tunnel.exit.y === y && tunnel.exit.z === z) {
+            activeTunnel.current = { ...tunnel, entry: tunnel.exit, exit: tunnel.entry };
+        } else {
+            activeTunnel.current = tunnel;
+        }
+
+        pendingTunnelTrigger.current = null;
+        tunnelProgress.current = 0;
+        phase.current = 'entering';
+        onFlippedTile.current = false;
+        lastFlippedRef.current = false;
+        useGameStore.setState({ wormPhase: 'entering', wormOnFlippedTile: false });
+    }, [cubies, size]);
 
     const tileKey = (p) => `${p.x},${p.y},${p.z},${p.dirKey}`;
 
@@ -210,6 +256,7 @@ function useWormCrawler(size, cubies) {
             if (jumpT.current >= 1) {
                 jumpT.current = 0;
                 isJumping.current = false;
+                jumpCount.current = 0;
             }
         }
 
@@ -217,17 +264,41 @@ function useWormCrawler(size, cubies) {
             // Apply pending turn — RELATIVE to current heading
             if (pendingTurn.current) {
                 const t = pendingTurn.current;
-                if (t === 'left' || t === 'right') {
-                    moveDir.current = turnWorm(moveDir.current, t);
+                if (t === 'jump') {
+                    startJump();
+                } else if (wormControlMode === 'oriented') {
+                    if (t === 'up' || t === 'down' || t === 'left' || t === 'right') {
+                        moveDir.current = t;
+                    }
+                } else {
+                    if (t === 'left' || t === 'right') {
+                        moveDir.current = turnWorm(moveDir.current, t);
+                    }
+                    if (t === 'down') moveDir.current = turnWorm(turnWorm(moveDir.current, 'left'), 'left');
                 }
-                if (t === 'down') moveDir.current = turnWorm(turnWorm(moveDir.current, 'left'), 'left');
-                if (t === 'jump') { isJumping.current = true; jumpT.current = 0.001; }
                 pendingTurn.current = null;
             }
 
             // Advance interpolation
             if (interpT.current < 1) {
                 interpT.current = Math.min(1, interpT.current + delta / STEP_SEC);
+            }
+
+            if (pendingSelfCollision.current) {
+                if (isJumping.current) {
+                    // Allow jumping over your own body tile before impact threshold.
+                    pendingSelfCollision.current = null;
+                } else if (interpT.current >= SELF_COLLISION_TRIGGER_PROGRESS) {
+                    killWorm();
+                    return;
+                }
+            }
+
+            if (pendingTunnelTrigger.current) {
+                const { x, y, z, dirKey } = pendingTunnelTrigger.current;
+                if (interpT.current >= TUNNEL_TRIGGER_PROGRESS && !isJumping.current) {
+                    beginTunnelTransition(x, y, z, dirKey);
+                }
             }
 
             // --- Continuous path recording for contiguous touching clones ---
@@ -310,8 +381,9 @@ function useWormCrawler(size, cubies) {
                     const bodyTrail = tileTrail.current.slice(1, 1 + bodyTilesBehindHead);
                     const selfHit = bodyTrail.includes(nextKey);
                     if (selfHit) {
-                        killWorm();
-                        return;
+                        // Defer self-hit until we've penetrated the tile by 40%.
+                        // This gives players a short reaction window to jump over their body.
+                        pendingSelfCollision.current = { key: nextKey };
                     }
 
                     pos.current = nextPos;
@@ -322,8 +394,15 @@ function useWormCrawler(size, cubies) {
                     if (crossedFace) {
                         crossingCorner.current = true;
                     }
+
+                    pendingTunnelTrigger.current = null;
+                    if (!selfHit) {
+                        pendingSelfCollision.current = null;
+                    }
                 } else {
                     moveDir.current = turnWorm(turnWorm(moveDir.current, 'left'), 'left');
+                    pendingTunnelTrigger.current = null;
+                    pendingSelfCollision.current = null;
                 }
 
                 // Immediately update curWorldPos so the interpolation target is correct
@@ -353,28 +432,8 @@ function useWormCrawler(size, cubies) {
                     useGameStore.getState().setWormOnFlippedTile(isFlipped);
                 }
 
-                if (isFlipped && !isJumping.current) {
-                    const tunnels = getActiveTunnels(cubies, size);
-                    const tunnel = tunnels.find(t =>
-                        t.entry.x === x && t.entry.y === y &&
-                        t.entry.z === z && t.entry.dirKey === dirKey
-                    ) || tunnels.find(t =>
-                        t.exit.x === x && t.exit.y === y &&
-                        t.exit.z === z && t.exit.dirKey === dirKey
-                    );
-
-                    if (tunnel) {
-                        if (tunnel.exit.x === x && tunnel.exit.y === y && tunnel.exit.z === z) {
-                            activeTunnel.current = { ...tunnel, entry: tunnel.exit, exit: tunnel.entry };
-                        } else {
-                            activeTunnel.current = tunnel;
-                        }
-                        tunnelProgress.current = 0;
-                        phase.current = 'entering';
-                        onFlippedTile.current = false;
-                        lastFlippedRef.current = false;
-                        useGameStore.setState({ wormPhase: 'entering', wormOnFlippedTile: false });
-                    }
+                if (isFlipped) {
+                    pendingTunnelTrigger.current = { x, y, z, dirKey };
                 }
             }
         } else if (phase.current === 'entering') {
@@ -410,7 +469,7 @@ function useWormCrawler(size, cubies) {
                 useGameStore.getState().setWormHealedCount(healedRef.current);
             }
         }
-    }, [size, cubies, wormSpeed]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [size, cubies, wormSpeed, wormControlMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
 
 
@@ -443,6 +502,9 @@ function useWormCrawler(size, cubies) {
         currentNormal.current.copy(FACE_NORMALS[startPos.dirKey] ?? new THREE.Vector3(0, 0, 1));
         isJumping.current = false;
         jumpT.current = 0;
+        jumpCount.current = 0;
+        pendingTunnelTrigger.current = null;
+        pendingSelfCollision.current = null;
         tailLength.current = BASE_TAIL_LENGTH;
         stepHistory.current = [];
         lastRecordedT.current = 0;
@@ -488,7 +550,9 @@ function WormChaseCamera({ worm, size }) {
 
         // Use a continuous portrait factor so camera framing doesn't jump at aspect=1.
         const portraitFactor = THREE.MathUtils.clamp((1 - viewportAspect) / 0.45, 0, 1);
-        const targetFov = THREE.MathUtils.lerp(50, 62, portraitFactor);
+        const baseFov = THREE.MathUtils.lerp(50, 62, portraitFactor);
+        const tunnelMix = phase === 'tunnel' ? 1 : (phase === 'entering' || phase === 'exiting' ? 0.35 : 0);
+        const targetFov = THREE.MathUtils.lerp(baseFov, TUNNEL_SURF_FOV, tunnelMix);
         const fovAlpha = Math.min(1, delta * 6);
         const nextFov = THREE.MathUtils.lerp(camera.fov, targetFov, fovAlpha);
         if (Math.abs(nextFov - camera.fov) > 0.01) {
@@ -559,17 +623,30 @@ function WormChaseCamera({ worm, size }) {
 
         } else if (phase === 'tunnel' && worm.activeTunnel.current) {
             const t = worm.tunnelProgress.current;
-            const t1 = Math.min(t + 0.05, 1);
+            const t1 = Math.min(t + 0.12, 1);
+            const t2 = Math.min(t + 0.24, 1);
             const camPt = getTunnelWorldPos(worm.activeTunnel.current, t, size);
             const lookPt = getTunnelWorldPos(worm.activeTunnel.current, t1, size);
+            const lookAheadPt = getTunnelWorldPos(worm.activeTunnel.current, t2, size);
 
             const exitNormal = FACE_NORMALS[worm.activeTunnel.current.exit.dirKey] ?? new THREE.Vector3(0, 1, 0);
             const entryNormal = FACE_NORMALS[worm.activeTunnel.current.entry.dirKey] ?? new THREE.Vector3(0, 1, 0);
             const upVec = entryNormal.clone().lerp(exitNormal, t).normalize();
 
+            const camVec = new THREE.Vector3(...camPt);
+            const lookVec = new THREE.Vector3(...lookPt);
+            const lookAheadVec = new THREE.Vector3(...lookAheadPt);
+            const tunnelTangent = lookVec.clone().sub(camVec).normalize();
+            const tunnelRight = new THREE.Vector3().crossVectors(tunnelTangent, upVec).normalize();
+            const sway = Math.sin(performance.now() * 0.0045) * TUNNEL_SURF_SWAY;
+            const surfCam = camVec.clone()
+                .addScaledVector(tunnelTangent, -TUNNEL_SURF_BACK)
+                .addScaledVector(upVec, TUNNEL_SURF_UP)
+                .addScaledVector(tunnelRight, sway);
+
             const alpha = Math.min(1, CAM_LERP * delta);
-            camPosRef.current.lerp(new THREE.Vector3(...camPt), alpha * 2);
-            lookAtRef.current.lerp(new THREE.Vector3(...lookPt), alpha * 2);
+            camPosRef.current.lerp(surfCam, alpha * 2);
+            lookAtRef.current.lerp(lookAheadVec, alpha * 2);
             camera.position.copy(camPosRef.current);
             camera.up.copy(upVec);
             camera.lookAt(lookAtRef.current);
@@ -579,9 +656,118 @@ function WormChaseCamera({ worm, size }) {
     return null;
 }
 
+function TunnelSurfFX({ worm, size }) {
+    const sparksRef = useRef([]);
+
+    useFrame(({ clock }) => {
+        const phase = worm.phase.current;
+        const tunnel = worm.activeTunnel.current;
+        if (!tunnel) return;
+
+        const active = phase === 'entering' || phase === 'tunnel' || phase === 'exiting';
+        const sparkMeshes = sparksRef.current;
+        if (!active) {
+            sparkMeshes.forEach((m) => {
+                if (!m) return;
+                m.visible = false;
+            });
+            return;
+        }
+
+        const baseT = worm.tunnelProgress.current;
+        const tt = clock.elapsedTime;
+
+        sparkMeshes.forEach((mesh, i) => {
+            if (!mesh) return;
+            const trailOffset = i * 0.06;
+            const travel = (baseT + trailOffset + tt * 0.8) % 1;
+            const p0 = getTunnelWorldPos(tunnel, travel, size);
+            const p1 = getTunnelWorldPos(tunnel, Math.min(travel + 0.03, 1), size);
+            const center = new THREE.Vector3(...p0);
+            const forward = new THREE.Vector3(...p1).sub(center).normalize();
+
+            const exitNormal = FACE_NORMALS[tunnel.exit.dirKey] ?? new THREE.Vector3(0, 1, 0);
+            const entryNormal = FACE_NORMALS[tunnel.entry.dirKey] ?? new THREE.Vector3(0, 1, 0);
+            const up = entryNormal.clone().lerp(exitNormal, travel).normalize();
+            const right = new THREE.Vector3().crossVectors(forward, up).normalize();
+
+            const angle = tt * 5 + i * 0.9;
+            const radius = 0.35 + Math.sin(tt * 2.4 + i) * 0.08;
+            mesh.position.copy(center)
+                .addScaledVector(right, Math.cos(angle) * radius)
+                .addScaledVector(up, Math.sin(angle) * radius * 0.6);
+            mesh.scale.setScalar(0.035 + Math.sin(tt * 8 + i * 1.3) * 0.01);
+            mesh.visible = true;
+            mesh.material.opacity = 0.35 + Math.sin(tt * 10 + i) * 0.25;
+        });
+    });
+
+    return (
+        <group>
+            {Array.from({ length: 14 }).map((_, i) => (
+                <mesh
+                    key={i}
+                    ref={(el) => {
+                        sparksRef.current[i] = el;
+                    }}
+                >
+                    <sphereGeometry args={[1, 8, 8]} />
+                    <meshBasicMaterial color="#80eaff" transparent opacity={0.4} />
+                </mesh>
+            ))}
+        </group>
+    );
+}
+
 // ─── Swipe Controls ───────────────────────────────────────────────────────────
-function WormSwipeControls({ onTurn }) {
+function WormSwipeControls({ onTurn, worm }) {
+    const { camera } = useThree();
+    const wormControlMode = useGameStore(s => s.wormControlMode ?? 'non-oriented');
     const touchStart = useRef(null);
+
+    const mapOrientedDirection = useCallback((inputDir) => {
+        const dirKey = worm.pos.current?.dirKey;
+        if (!dirKey) return inputDir;
+
+        const faceNormal = FACE_NORMALS[dirKey] ?? new THREE.Vector3(0, 0, 1);
+        const camForward = new THREE.Vector3();
+        camera.getWorldDirection(camForward);
+        const camUp = camera.up.clone().normalize();
+        const camRight = new THREE.Vector3().crossVectors(camForward, camUp).normalize();
+
+        let desired = null;
+        if (inputDir === 'up') desired = camUp;
+        if (inputDir === 'down') desired = camUp.clone().multiplyScalar(-1);
+        if (inputDir === 'left') desired = camRight.clone().multiplyScalar(-1);
+        if (inputDir === 'right') desired = camRight;
+        if (!desired) return inputDir;
+
+        desired = desired.clone().sub(faceNormal.clone().multiplyScalar(desired.dot(faceNormal)));
+        if (desired.lengthSq() < 1e-6) return inputDir;
+        desired.normalize();
+
+        const candidates = ['up', 'down', 'left', 'right'];
+        let bestDir = 'up';
+        let bestDot = -Infinity;
+        for (const dir of candidates) {
+            const vec = new THREE.Vector3(...(DIR_FORWARD[dirKey]?.[dir] ?? [0, 0, -1])).normalize();
+            const d = vec.dot(desired);
+            if (d > bestDot) {
+                bestDot = d;
+                bestDir = dir;
+            }
+        }
+
+        return bestDir;
+    }, [camera, worm]);
+
+    const emitDirection = useCallback((dir) => {
+        if (wormControlMode === 'oriented') {
+            onTurn(mapOrientedDirection(dir));
+            return;
+        }
+        onTurn(dir);
+    }, [wormControlMode, onTurn, mapOrientedDirection]);
 
     useEffect(() => {
         const onTouchStart = (e) => {
@@ -599,13 +785,19 @@ function WormSwipeControls({ onTurn }) {
             if (adx < 12 && ady < 12) return;
 
             if (adx > ady) {
-                onTurn(dx > 0 ? 'right' : 'left');
+                emitDirection(dx > 0 ? 'right' : 'left');
+            } else if (wormControlMode === 'oriented') {
+                emitDirection(dy > 0 ? 'down' : 'up');
+            } else if (dy > 0) {
+                // non-oriented mode supports 180° turn via downward swipe
+                emitDirection('down');
             }
         };
         const onKey = (e) => {
-            if (e.key === 'ArrowLeft') { e.preventDefault(); onTurn('left'); }
-            if (e.key === 'ArrowRight') { e.preventDefault(); onTurn('right'); }
-            if (e.key === 'ArrowDown') { e.preventDefault(); onTurn('down'); }
+            if (e.key === 'ArrowLeft') { e.preventDefault(); emitDirection('left'); }
+            if (e.key === 'ArrowRight') { e.preventDefault(); emitDirection('right'); }
+            if (e.key === 'ArrowDown') { e.preventDefault(); emitDirection('down'); }
+            if (e.key === 'ArrowUp' && wormControlMode === 'oriented') { e.preventDefault(); emitDirection('up'); }
             if (e.key === ' ') {
                 e.preventDefault();
                 onTurn('jump');
@@ -619,7 +811,7 @@ function WormSwipeControls({ onTurn }) {
             window.removeEventListener('touchend', onTouchEnd);
             window.removeEventListener('keydown', onKey, { capture: true });
         };
-    }, [onTurn]);
+    }, [onTurn, emitDirection, wormControlMode]);
 
     return null;
 }
@@ -930,8 +1122,9 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     return (
         <>
             <WormChaseCamera worm={worm} size={size} />
-            <WormSwipeControls onTurn={worm.queueTurn} />
+            <WormSwipeControls onTurn={worm.queueTurn} worm={worm} />
             <WormInteriorGlass worm={worm} size={size} />
+            <TunnelSurfFX worm={worm} size={size} />
             <WormBody worm={worm} size={size} />
             <WormFace worm={worm} size={size} />
             <PortalGlow worm={worm} size={size} />
