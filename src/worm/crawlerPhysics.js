@@ -113,14 +113,18 @@ export function stepCrawler(state, input, dt, size) {
   }
 
   // --- Jump ---
+  // Jump covers exactly 1 tile regardless of speed.
+  // arcDuration = 2 * jumpForce / gravity; distance = vel * arcDuration = 1.0
+  // => jumpForce = gravity / (2 * vel)
+  // jumpDist is a safety cap for cases where vel changes mid-air.
   const gravity = 25.0;
-  const jumpForce = 5.0;
-  const jumpTileDistance = 1.0; // jump covers exactly 1 tile regardless of speed
+  const jumpTileDistance = 1.0;
   let newJumpHeight = jumpHeight;
   let newJumpVel = jumpVel;
   let newJumpDist = state.jumpDist || 0;
 
   if (input.jump && jumpHeight <= 0.01) {
+    const jumpForce = vel > 0.5 ? (gravity * jumpTileDistance) / (2 * vel) : 4.0;
     newJumpVel = jumpForce;
     newJumpHeight = 0.01;
     newJumpDist = 0;
