@@ -42,6 +42,12 @@ const LIVING_STYLE_KEYS = ['grass', 'ice', 'sand', 'water', 'wood', 'circuit', '
 // Color schemes shown in the wizard (biome is a mode, not a palette)
 const WIZARD_SCHEME_KEYS = Object.keys(SCHEME_LABELS).filter(k => k !== 'biome');
 
+// Perceived brightness of a hex color (0–255); higher = lighter
+const hexLum = hex => {
+  const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+  return 0.299 * r + 0.587 * g + 0.114 * b;
+};
+
 const FACE_LABELS = { 1: 'Front', 2: 'Left', 3: 'Top', 4: 'Back', 5: 'Right', 6: 'Bottom' };
 
 function extractColorsFromImage(img, count = 6) {
@@ -488,16 +494,16 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '7px', paddingBottom: '8px' }}>
           {WIZARD_SCHEME_KEYS.filter(k => k !== 'custom').map(key => {
             const selected = settings.colorScheme === key;
-            const colors = Object.values(COLOR_SCHEMES[key] || {});
+            const colors = Object.values(COLOR_SCHEMES[key] || {}).slice(0, 6).sort((a, b) => hexLum(b) - hexLum(a));
             return (
               <button key={key} style={{ ...S.card(selected), flexDirection: 'column', gap: '6px', padding: '10px 12px' }}
                 onClick={() => select('colorScheme', key)}>
                 <span style={{ fontSize: '12px', fontWeight: selected ? '600' : '400', color: selected ? '#0a0a0a' : 'rgba(0,0,0,0.6)', lineHeight: 1.2 }}>
                   {SCHEME_LABELS[key]}
                 </span>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 13px)', gap: '3px' }}>
-                  {colors.slice(0, 6).map((c, i) => (
-                    <div key={i} style={{ width: '13px', height: '13px', borderRadius: '50%', background: c, boxShadow: '0 1px 2px rgba(0,0,0,0.18)' }} />
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '3px', width: '100%' }}>
+                  {colors.map((c, i) => (
+                    <div key={i} style={{ width: '100%', aspectRatio: '1', borderRadius: '50%', background: c, boxShadow: '0 1px 2px rgba(0,0,0,0.18)' }} />
                   ))}
                 </div>
                 {selected && (
