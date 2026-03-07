@@ -58,6 +58,8 @@ const STEPS_PER_TILE = 50;      // sub-steps recorded per tile (0.02 resolution)
 const BODY_BALL_SPACING = 0.14; // matches WormBody clone spacing along the trail
 const BASE_TAIL_LENGTH = 4;
 const WORMHOLE_FLIP_INTERVAL = 10; // seconds between guaranteed antipodal wormhole spawns
+const MAX_JUMPS = 2;
+const TUNNEL_TRIGGER_PROGRESS = 1 / 3;
 
 function getAllSurfaceTiles(size) {
     const tiles = [];
@@ -133,6 +135,8 @@ function useWormCrawler(size, cubies) {
     // Jump state
     const jumpT = useRef(0);            // 0 = grounded, >0 = in air
     const isJumping = useRef(false);
+    const jumpCount = useRef(0);
+    const pendingTunnelTrigger = useRef(null);
     const JUMP_HEIGHT = 0.55;
     const JUMP_SPEED = 3.5;
 
@@ -154,6 +158,41 @@ function useWormCrawler(size, cubies) {
     const jumpLift = () => isJumping.current
         ? Math.sin(jumpT.current * Math.PI) * JUMP_HEIGHT
         : 0;
+
+    const startJump = useCallback(() => {
+        if (jumpCount.current >= MAX_JUMPS) return;
+        isJumping.current = true;
+        jumpT.current = 0.001;
+        jumpCount.current += 1;
+        // If the player jumps early on a flipped tile, don't auto-enter the tunnel.
+        pendingTunnelTrigger.current = null;
+    }, []);
+
+    const beginTunnelTransition = useCallback((x, y, z, dirKey) => {
+        const tunnels = getActiveTunnels(cubies, size);
+        const tunnel = tunnels.find(t =>
+            t.entry.x === x && t.entry.y === y &&
+            t.entry.z === z && t.entry.dirKey === dirKey
+        ) || tunnels.find(t =>
+            t.exit.x === x && t.exit.y === y &&
+            t.exit.z === z && t.exit.dirKey === dirKey
+        );
+
+        if (!tunnel) return;
+
+        if (tunnel.exit.x === x && tunnel.exit.y === y && tunnel.exit.z === z) {
+            activeTunnel.current = { ...tunnel, entry: tunnel.exit, exit: tunnel.entry };
+        } else {
+            activeTunnel.current = tunnel;
+        }
+
+        pendingTunnelTrigger.current = null;
+        tunnelProgress.current = 0;
+        phase.current = 'entering';
+        onFlippedTile.current = false;
+        lastFlippedRef.current = false;
+        useGameStore.setState({ wormPhase: 'entering', wormOnFlippedTile: false });
+    }, [cubies, size]);
 
     const tileKey = (p) => `${p.x},${p.y},${p.z},${p.dirKey}`;
 
@@ -210,6 +249,7 @@ function useWormCrawler(size, cubies) {
             if (jumpT.current >= 1) {
                 jumpT.current = 0;
                 isJumping.current = false;
+                jumpCount.current = 0;
             }
         }
 
@@ -221,13 +261,20 @@ function useWormCrawler(size, cubies) {
                     moveDir.current = turnWorm(moveDir.current, t);
                 }
                 if (t === 'down') moveDir.current = turnWorm(turnWorm(moveDir.current, 'left'), 'left');
-                if (t === 'jump') { isJumping.current = true; jumpT.current = 0.001; }
+                if (t === 'jump') startJump();
                 pendingTurn.current = null;
             }
 
             // Advance interpolation
             if (interpT.current < 1) {
                 interpT.current = Math.min(1, interpT.current + delta / STEP_SEC);
+            }
+
+            if (pendingTunnelTrigger.current) {
+                const { x, y, z, dirKey } = pendingTunnelTrigger.current;
+                if (interpT.current >= TUNNEL_TRIGGER_PROGRESS && !isJumping.current) {
+                    beginTunnelTransition(x, y, z, dirKey);
+                }
             }
 
             // --- Continuous path recording for contiguous touching clones ---
@@ -322,8 +369,11 @@ function useWormCrawler(size, cubies) {
                     if (crossedFace) {
                         crossingCorner.current = true;
                     }
+
+                    pendingTunnelTrigger.current = null;
                 } else {
                     moveDir.current = turnWorm(turnWorm(moveDir.current, 'left'), 'left');
+                    pendingTunnelTrigger.current = null;
                 }
 
                 // Immediately update curWorldPos so the interpolation target is correct
@@ -353,28 +403,8 @@ function useWormCrawler(size, cubies) {
                     useGameStore.getState().setWormOnFlippedTile(isFlipped);
                 }
 
-                if (isFlipped && !isJumping.current) {
-                    const tunnels = getActiveTunnels(cubies, size);
-                    const tunnel = tunnels.find(t =>
-                        t.entry.x === x && t.entry.y === y &&
-                        t.entry.z === z && t.entry.dirKey === dirKey
-                    ) || tunnels.find(t =>
-                        t.exit.x === x && t.exit.y === y &&
-                        t.exit.z === z && t.exit.dirKey === dirKey
-                    );
-
-                    if (tunnel) {
-                        if (tunnel.exit.x === x && tunnel.exit.y === y && tunnel.exit.z === z) {
-                            activeTunnel.current = { ...tunnel, entry: tunnel.exit, exit: tunnel.entry };
-                        } else {
-                            activeTunnel.current = tunnel;
-                        }
-                        tunnelProgress.current = 0;
-                        phase.current = 'entering';
-                        onFlippedTile.current = false;
-                        lastFlippedRef.current = false;
-                        useGameStore.setState({ wormPhase: 'entering', wormOnFlippedTile: false });
-                    }
+                if (isFlipped) {
+                    pendingTunnelTrigger.current = { x, y, z, dirKey };
                 }
             }
         } else if (phase.current === 'entering') {
@@ -443,6 +473,8 @@ function useWormCrawler(size, cubies) {
         currentNormal.current.copy(FACE_NORMALS[startPos.dirKey] ?? new THREE.Vector3(0, 0, 1));
         isJumping.current = false;
         jumpT.current = 0;
+        jumpCount.current = 0;
+        pendingTunnelTrigger.current = null;
         tailLength.current = BASE_TAIL_LENGTH;
         stepHistory.current = [];
         lastRecordedT.current = 0;
