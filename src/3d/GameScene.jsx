@@ -17,7 +17,7 @@ import LayerHighlight from '../teach/LayerHighlight.jsx';
 import AntipodalVisualization from './AntipodalVisualization.jsx';
 import AntipodalModeEffects from './AntipodalModeEffects.jsx';
 
-const HealerWormMode3DWrapper = React.lazy(() => import('../worm/HealerWormMode.jsx').then(m => ({ default: m.HealerWormMode3DWrapper })));
+import { HealerWormMode3DWrapper } from '../worm/HealerWormMode.jsx';
 const HolonomyWrapper = React.lazy(() => import('../holonomy/HolonomyWrapper.jsx'));
 
 const PHOTO_PRESETS = new Set([
@@ -217,13 +217,11 @@ export default function GameScene({
         <AntipodalModeEffects />
 
         {wormHealerMode && (
-          <Suspense fallback={null}>
-            <ErrorBoundary3D>
-              <HealerWormMode3DWrapper
-                cubies={cubies} size={size} explosionFactor={explosionT} animState={animState} onRotate={onRotate} onHeal={onHeal}
-              />
-            </ErrorBoundary3D>
-          </Suspense>
+          <ErrorBoundary3D>
+            <HealerWormMode3DWrapper
+              cubies={cubies} size={size} explosionFactor={explosionT} animState={animState} onRotate={onRotate} onHeal={onHeal}
+            />
+          </ErrorBoundary3D>
         )}
 
         {holonomyMode && (
