@@ -1341,7 +1341,8 @@ const fragmentShaders = {
   // When antipodalColor is not provided (e.g. style previews), getTileStyleMaterial
   // derives a hue-shifted contrast color automatically.
 
-  // Polka Dots — circles of antipodalColor on a baseColor background
+  // Polka Dots — small circles (~20% coverage) of antipodalColor on a baseColor background.
+  // Asymmetric: base dominates; flipped version shows base dots on antipodal field — clearly different.
   polkaDots: `
     uniform vec3 baseColor;
     uniform vec3 antipodalColor;
@@ -1351,13 +1352,14 @@ const fragmentShaders = {
       float grid = 4.0;
       vec2 f = fract(vUv * grid) - 0.5;
       float dist = length(f);
-      float circ = smoothstep(0.35, 0.29, dist);
+      float circ = smoothstep(0.22, 0.17, dist);
       vec3 color = mix(baseColor, antipodalColor, circ);
       gl_FragColor = vec4(color, 1.0);
     }
   `,
 
-  // Zigzag — chevron bands alternating between the two antipodal colors
+  // Zigzag — narrow chevron stripes (~30% antipodalColor, 70% baseColor).
+  // Asymmetric: thin antipodal chevrons on a base field; flipped shows thin base chevrons on antipodal — clearly different.
   zigzag: `
     uniform vec3 baseColor;
     uniform vec3 antipodalColor;
@@ -1368,28 +1370,32 @@ const fragmentShaders = {
       // Triangle wave in x offsets the y stripe boundary → chevron/zigzag
       float tx = abs(fract(vUv.x * nBands) * 2.0 - 1.0);
       float zy = fract(vUv.y * nBands + tx * 0.5);
-      float band = step(0.5, zy);
+      float band = step(0.70, zy);
       vec3 color = mix(baseColor, antipodalColor, band);
       gl_FragColor = vec4(color, 1.0);
     }
   `,
 
-  // Checkerboard — alternating squares in the two antipodal colors
+  // Checkerboard — large base-color tiles with thin antipodalColor grout lines (~22% antipodal).
+  // Asymmetric: base dominates as wide tiles; flipped shows antipodal tiles with base grout — clearly different.
   checkerboard: `
     uniform vec3 baseColor;
     uniform vec3 antipodalColor;
     varying vec2 vUv;
 
     void main() {
-      float grid = 5.0;
-      vec2 idx = floor(vUv * grid);
-      float checker = mod(idx.x + idx.y, 2.0);
-      vec3 color = mix(baseColor, antipodalColor, checker);
+      float grid = 4.0;
+      vec2 f = fract(vUv * grid);
+      float grout = 0.12;
+      float isGrout = step(1.0 - grout, f.x) + step(1.0 - grout, f.y);
+      isGrout = clamp(isGrout, 0.0, 1.0);
+      vec3 color = mix(baseColor, antipodalColor, isGrout);
       gl_FragColor = vec4(color, 1.0);
     }
   `,
 
-  // Diagonal Stripes — 45-degree stripes alternating the two antipodal colors
+  // Diagonal Stripes — thin 45-degree antipodalColor stripes on base (~20% antipodal).
+  // Asymmetric: thin stripes on a base field; flipped shows thin base stripes on antipodal — clearly different.
   diagStripes: `
     uniform vec3 baseColor;
     uniform vec3 antipodalColor;
@@ -1397,8 +1403,113 @@ const fragmentShaders = {
 
     void main() {
       float freq = 8.0;
-      float stripe = step(0.5, fract((vUv.x + vUv.y) * freq * 0.5));
+      float stripe = step(0.80, fract((vUv.x + vUv.y) * freq * 0.5));
       vec3 color = mix(baseColor, antipodalColor, stripe);
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `,
+
+  // ── New asymmetric antipodal patterns ──────────────────────────────────────
+  // All use a clear majority/minority split so flipping base↔antipodal
+  // produces a visually distinct result — you can always tell which manifold is which.
+
+  // Corner Accent — antipodalColor triangle in bottom-left corner (~19% coverage).
+  // Base color fills the rest. Flipped: small base triangle on antipodal field.
+  cornerAccent: `
+    uniform vec3 baseColor;
+    uniform vec3 antipodalColor;
+    varying vec2 vUv;
+
+    void main() {
+      float inTri = 1.0 - step(0.62, vUv.x + vUv.y);
+      vec3 color = mix(baseColor, antipodalColor, inTri);
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `,
+
+  // Inner Disc — single large centered disc of antipodalColor (~25% coverage).
+  // Flipped: big antipodal field with a base-colored circle center — very different feel.
+  innerDisc: `
+    uniform vec3 baseColor;
+    uniform vec3 antipodalColor;
+    varying vec2 vUv;
+
+    void main() {
+      float r = length(vUv - 0.5);
+      float disc = smoothstep(0.30, 0.26, r);
+      vec3 color = mix(baseColor, antipodalColor, disc);
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `,
+
+  // Cross Plus — thin plus-sign of antipodalColor on base (~28% coverage).
+  // Flipped: base cross on antipodal field — clearly different visual weight.
+  crossPlus: `
+    uniform vec3 baseColor;
+    uniform vec3 antipodalColor;
+    varying vec2 vUv;
+
+    void main() {
+      float armW = 0.08;
+      vec2 p = abs(vUv - 0.5);
+      float onArm = step(p.x, armW) + step(p.y, armW);
+      onArm = clamp(onArm, 0.0, 1.0);
+      vec3 color = mix(baseColor, antipodalColor, onArm);
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `,
+
+  // Border Frame — antipodalColor frame around a base-color interior (~29% coverage).
+  // Flipped: antipodal interior with base frame — the center color completely swaps.
+  borderFrame: `
+    uniform vec3 baseColor;
+    uniform vec3 antipodalColor;
+    varying vec2 vUv;
+
+    void main() {
+      float border = 0.08;
+      vec2 p = abs(vUv - 0.5);
+      float isFrame = step(0.5 - border, max(p.x, p.y));
+      vec3 color = mix(baseColor, antipodalColor, isFrame);
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `,
+
+  // Thin Hatch — diagonal cross-hatch lines of antipodalColor on base (~27% coverage).
+  // Two sets of 45°/135° thin lines. Flipped: solid antipodal with base cross-hatch.
+  thinHatch: `
+    uniform vec3 baseColor;
+    uniform vec3 antipodalColor;
+    varying vec2 vUv;
+
+    void main() {
+      float freq = 5.0;
+      float lineW = 0.15;
+      float d1 = step(1.0 - lineW, fract((vUv.x + vUv.y) * freq * 0.5));
+      float d2 = step(1.0 - lineW, fract((vUv.x - vUv.y + 1.0) * freq * 0.5));
+      float hatch = clamp(d1 + d2, 0.0, 1.0);
+      vec3 color = mix(baseColor, antipodalColor, hatch);
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `,
+
+  // Dot Ring — six small antipodalColor dots arranged in a hexagonal ring (~20% coverage).
+  // Flipped: six base dots on antipodal field — the surrounding color completely swaps.
+  dotRing: `
+    uniform vec3 baseColor;
+    uniform vec3 antipodalColor;
+    varying vec2 vUv;
+
+    void main() {
+      vec2 c = vUv - 0.5;
+      float minDist = 1.0;
+      for (int i = 0; i < 6; i++) {
+        float a = float(i) * 1.0472;
+        vec2 dotCenter = vec2(cos(a), sin(a)) * 0.32;
+        minDist = min(minDist, length(c - dotCenter));
+      }
+      float dots = smoothstep(0.11, 0.08, minDist);
+      vec3 color = mix(baseColor, antipodalColor, dots);
       gl_FragColor = vec4(color, 1.0);
     }
   `,
@@ -1439,7 +1550,10 @@ function _matCachePut(key, mat) {
 }
 
 // Styles that use a second antipodalColor uniform (opposite face's color)
-const ANTIPODAL_STYLES = new Set(['polkaDots', 'zigzag', 'checkerboard', 'diagStripes']);
+const ANTIPODAL_STYLES = new Set([
+  'polkaDots', 'zigzag', 'checkerboard', 'diagStripes',
+  'cornerAccent', 'innerDisc', 'crossPlus', 'borderFrame', 'thinHatch', 'dotRing',
+]);
 
 /**
  * Get or create a shader material for a tile style.
