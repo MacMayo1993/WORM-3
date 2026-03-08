@@ -342,6 +342,20 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       }
       spinT.current = 1;
       prevRawP.current = 0;
+      // Imperatively reset the mesh to the FROM color here. This covers the case where
+      // the mesh was just mounted for the first time (tile going instanceable→non-instanceable)
+      // and the JSX-created material already has materialColor (the new post-flip color).
+      // useLayoutEffect skips the update when isFlipPending, but a brand-new mesh starts
+      // with the JSX color, so we must explicitly restore the old color before the first frame.
+      if (isInstancedRef.current && flipFromColor.current) {
+        instanceColorRef.current.setStyle(flipFromColor.current);
+      }
+      const mat = meshRef.current?.material;
+      if (mat?.color && flipFromColor.current) {
+        mat.color.set(flipFromColor.current);
+        mat.map = flipFromTexture.current || null;
+        mat.needsUpdate = true;
+      }
       flipParticlesRef.current?.trigger(fc[curr]);
       play('/sounds/flip.mp3');
       vibrate(16);
@@ -762,13 +776,22 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // positions for one frame (the "sticker color flash" on single-turn drag releases).
   useLayoutEffect(() => {
     tileStyleRef.current = tileStyle;
+    // Detect a pending flip transition: prevCurr.current still holds the OLD face id here
+    // because useEffect (which updates prevCurr) hasn't run yet. When a flip is pending we
+    // must NOT overwrite the mesh with the new post-flip color — the squish animation needs
+    // the mesh to start showing the OLD color so the "collapse → color-swap → expand" plays
+    // correctly. Without this guard useLayoutEffect would set new color before useEffect
+    // even gets a chance to set isFlipping=true, causing a one-frame new-color flash.
+    const isFlipPending = (meta?.curr ?? 0) !== prevCurr.current
+      && (meta?.flips ?? 0) > 0
+      && ANTIPODAL_COLOR[prevCurr.current] === (meta?.curr ?? 0);
     // Always keep the instanced-mesh color ref current, even when this sticker is
     // temporarily non-instanceable (the manager will zero its slot; the ref stays
     // ready for when it becomes instanceable again without a re-register).
-    if (!isFlipping.current && spinT.current <= 0) {
+    if (!isFlipping.current && spinT.current <= 0 && !isFlipPending) {
       instanceColorRef.current.setStyle(materialColor);
     }
-    if (meshRef.current && meshRef.current.material && !isFlipping.current && spinT.current <= 0) {
+    if (meshRef.current && meshRef.current.material && !isFlipping.current && spinT.current <= 0 && !isFlipPending) {
       const mat = meshRef.current.material;
       if (mat.color) {
         mat.color.set(materialColor);
