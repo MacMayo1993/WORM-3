@@ -760,7 +760,7 @@ const CubeAssembly = React.memo(({
             onComplete={() => onCascadeComplete(c.id)}
           />
         ))}
-        {!chaosLevel && flipWaveOrigins && flipWaveOrigins.length > 0 && (
+        {flipWaveOrigins && flipWaveOrigins.length > 0 && (
           <FlipPropagationWave
             origins={flipWaveOrigins}
             onComplete={onFlipWaveComplete}
