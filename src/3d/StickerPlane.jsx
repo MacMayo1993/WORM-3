@@ -185,23 +185,33 @@ const spinRevealFragmentShader = `
   void main() {
     vec2 uv = vUv - 0.5;
     float dist = length(uv);
-    if (dist > 0.5) discard;
-
     // Outside-in: inner hole shrinks from 0.5 (empty) to 0 (full disc) as progress 0→1
     float innerEdge = 0.5 * (1.0 - uProgress);
 
-    // Smooth reveal boundary
-    float show = smoothstep(innerEdge - 0.04, innerEdge + 0.02, dist);
-    if (show < 0.005) discard;
+    // Smooth disc boundary — only the circular area participates in the colour reveal.
+    float inDisc = 1.0 - smoothstep(0.46, 0.52, dist);
 
-    // Spinning arc glow at the reveal edge
+    // Revealed band: new face colour sweeps from the outer rim inward (disc only).
+    float show = smoothstep(innerEdge - 0.04, innerEdge + 0.02, dist) * inDisc;
+
+    // Glass tile backing: covers the full tile quad — the unrevealed disc centre AND the
+    // square corners — so the plain underlying mesh colour (often white) never shows through.
+    float holeAlpha = (1.0 - show) * 0.92;
+    // Subtle dark glass with a rim brightening toward the disc edge.
+    vec3 glassColor = vec3(0.04, 0.06, 0.13)
+      + smoothstep(0.22, 0.46, dist) * inDisc * 0.18;
+
+    // Spinning arc glow at the reveal edge (inside disc only).
     float angle = atan(uv.y, uv.x);
     float spin = 0.5 + 0.5 * sin(angle * 8.0 - uTime * 14.0);
     float edgeDist = abs(dist - innerEdge);
-    float edgeGlow = smoothstep(0.14, 0.0, edgeDist) * spin;
+    float edgeGlow = smoothstep(0.14, 0.0, edgeDist) * spin * inDisc;
 
     float brightness = 1.0 + edgeGlow * 0.7;
-    gl_FragColor = vec4(uColor * brightness, show);
+
+    float alpha = max(show, holeAlpha);
+    if (alpha < 0.005) discard;
+    gl_FragColor = vec4(mix(glassColor, uColor * brightness, show), alpha);
   }
 `;
 
