@@ -480,26 +480,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       groupRef.current.position.x = pos[0] + jX;
       groupRef.current.position.y = pos[1] + jY;
 
-      // Antipodal color bleed overlay — counter-scale so it stays full-width while the
-      // parent squishes. In world space: xScale * (1/xScale) = 1 throughout the flip.
-      if (flipOverlayRef.current) {
-        const mat = flipOverlayRef.current.material;
-        // Prevent division by zero; at xScale < 0.001 the tile is effectively invisible
-        // so the overlay is the only thing the player sees.
-        const safeX = Math.max(xScale, 0.001);
-        flipOverlayRef.current.scale.x = 1 / safeX;
-        if (rawP < 0.5) {
-          // Incoming color bleeds through as the tile collapses toward zero width.
-          const bleed = Math.pow(rawP * 2, 2.0);
-          if (flipToColor.current) mat.color.set(flipToColor.current);
-          mat.opacity = bleed * 0.85;
-        } else {
-          // Original color echoes as the new identity expands out.
-          const echo = 1 - Math.pow((rawP - 0.5) * 2, 0.5);
-          if (flipFromColor.current) mat.color.set(flipFromColor.current);
-          mat.opacity = echo * 0.4;
-        }
-      }
+      // Overlay kept hidden — the squish + midpoint color-swap is the full animation.
 
       // One-shot color swap at the sacred frame: fire exactly when xScale === 0.
       if (prevRawP.current < 0.5 && rawP >= 0.5) {
