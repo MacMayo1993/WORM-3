@@ -350,7 +350,7 @@ const NavItem = ({ icon, label, color, onClick }) => {
 };
 
 // ─── Main component ───────────────────────────────────────────────────────────
-const MainMenu = ({ onPlay, _onLevels, onFreeplay, _onCoop, onSettings, onBiome, onDisparity, onWormHealer, onHolonomy }) => {
+const MainMenu = ({ onPlay, _onLevels, onFreeplay, _onCoop, onSettings, onBiome, onDisparity, onWormHealer, onHolonomy, onMerge }) => {
   const CLEAN = {
     pageBg: 'radial-gradient(circle at 50% 35%, #0e1324 0%, #070b16 52%, #05050f 100%)',
     panel: 'rgba(255,255,255,0.8)',
@@ -514,6 +514,9 @@ const MainMenu = ({ onPlay, _onLevels, onFreeplay, _onCoop, onSettings, onBiome,
             {/* divider */}
             <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(15,23,42,0.12)' }} />
             <NavItem icon={<WorldIcon />} label="World" color="#60a5fa" onClick={onBiome} />
+            {/* divider */}
+            <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(15,23,42,0.12)' }} />
+            <NavItem icon={<MergeIcon />} label="Merge" color="#a78bfa" onClick={onMerge} />
           </div>
         </div>
       </div>
@@ -566,6 +569,19 @@ const HolonomyIcon = () => (
     <path d="M12 5 A7 7 0 0 1 19 12" stroke="#00f5ff" strokeWidth="2" strokeLinecap="round" />
     <polygon points="19,9 22,12 19,15" fill="#00f5ff" opacity="0.8" />
     <circle cx="12" cy="12" r="1.8" fill="#00f5ff" />
+  </svg>
+);
+const MergeIcon = () => (
+  <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+    {/* Three circles converging → merge/evolve metaphor */}
+    <circle cx="7" cy="17" r="3" stroke="#a78bfa" strokeWidth="1.5" fill="none" />
+    <circle cx="17" cy="17" r="3" stroke="#a78bfa" strokeWidth="1.5" fill="none" />
+    <circle cx="12" cy="8" r="3" stroke="#a78bfa" strokeWidth="1.5" fill="none" />
+    {/* Lines connecting to center */}
+    <line x1="9.5" y1="15.5" x2="12" y2="12" stroke="#a78bfa" strokeWidth="1.2" opacity="0.7" />
+    <line x1="14.5" y1="15.5" x2="12" y2="12" stroke="#a78bfa" strokeWidth="1.2" opacity="0.7" />
+    {/* Center star burst */}
+    <circle cx="12" cy="12" r="1.5" fill="#a78bfa" opacity="0.9" />
   </svg>
 );
 const GearIcon = () => (

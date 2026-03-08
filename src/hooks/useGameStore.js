@@ -451,6 +451,19 @@ export const useGameStore = create(
     }),
 
     // ========================================================================
+    // MERGE MODE
+    // ========================================================================
+    mergeMode: false,
+    mergeTheme: 'pokemon',
+    // Computed after each rotation: homeKey → tier (1|2|3)
+    // homeKey = `${origPos.x}-${origPos.y}-${origPos.z}-${origDir}`
+    mergeRegionTiers: {},
+
+    setMergeMode: (mergeMode) => set({ mergeMode }),
+    setMergeTheme: (mergeTheme) => set({ mergeTheme }),
+    setMergeRegionTiers: (mergeRegionTiers) => set({ mergeRegionTiers }),
+
+    // ========================================================================
     // HOLLOW VOID CUBE MODE
     // ========================================================================
     hollowMode: false,

@@ -275,6 +275,9 @@ export default function WORM3() {
   const [showFreeplayWizard, setShowFreeplayWizard] = useState(false);
   const [showWormModeWizard, setShowWormModeWizard] = useState(false);
 
+  // Merge Mode theme picker
+  const [showMergeThemePicker, setShowMergeThemePicker] = useState(false);
+
   // Disparity Mode wizard + first-flip gate
   const [showDisparityWizard, setShowDisparityWizard] = useState(false);
   const [disparityWaitingFirstFlip, setDisparityWaitingFirstFlip] = useState(false);
@@ -567,6 +570,26 @@ export default function WORM3() {
     useGameStore.getState().resetGame();
     useGameStore.getState().setHasShuffled(true);
   }, [settings, setSettings]);
+
+  const handleMenuMerge = useCallback(() => {
+    useGameStore.getState().setShowMainMenu(false);
+    setShowMergeThemePicker(true);
+  }, []);
+
+  const handleMergeStart = useCallback((themeId) => {
+    setShowMergeThemePicker(false);
+    useGameStore.getState().setMergeTheme(themeId);
+    useGameStore.getState().setMergeMode(true);
+    useGameStore.getState().clearLevel();
+    useGameStore.getState().resetGame();
+    useGameStore.getState().setHasShuffled(true);
+    shuffle();
+  }, [shuffle]);
+
+  const handleMergeCancel = useCallback(() => {
+    setShowMergeThemePicker(false);
+    useGameStore.getState().setShowMainMenu(true);
+  }, []);
 
   const closeTutorial = useCallback(() => {
     setShowTutorial(false);
@@ -987,6 +1010,10 @@ export default function WORM3() {
             onMenuDisparity: handleMenuDisparity,
             onMenuWormHealer: handleMenuWormHealer,
             onMenuHolonomy: handleMenuHolonomy,
+            onMenuMerge: handleMenuMerge,
+            showMergeThemePicker,
+            onMergeStart: handleMergeStart,
+            onMergeCancel: handleMergeCancel,
             onWizardComplete: handleWizardComplete,
             onWizardCancel: handleWizardCancel,
             onDisparitySetupComplete: handleDisparitySetupComplete,
