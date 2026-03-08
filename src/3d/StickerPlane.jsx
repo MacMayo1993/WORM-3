@@ -826,9 +826,36 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     if (!isFlipping.current && spinT.current <= 0 && !isFlipPending) {
       instanceColorRef.current.setStyle(materialColor);
     }
-    if (meshRef.current && meshRef.current.material && !isFlipping.current && spinT.current <= 0 && !isFlipPending) {
+    if (meshRef.current && meshRef.current.material && !isFlipping.current && spinT.current <= 0) {
       const mat = meshRef.current.material;
-      if (mat.color) {
+      if (isFlipPending) {
+        // A flip is about to start — immediately paint the mesh with the FROM face color so no
+        // frame of the post-flip materialColor (e.g. '#ffffff' for textured tiles, COLORS.white
+        // for Sudokube) is ever visible before the squish animation kicks in.  This closes two
+        // distinct gaps:
+        //   1. First-flip white flash: the tile just went instanceable → non-instanceable so a
+        //      brand-new <mesh> mounted with color={materialColor}='#ffffff' from JSX.  The old
+        //      guard would skip the update, leaving it white until useEffect corrects it after paint.
+        //   2. Constant-materialColor modes (Sudokube, glass): materialColor never changes on a
+        //      flip so useLayoutEffect wouldn't fire at all without meta?.curr in the deps array.
+        //      Applying FROM color here ensures the squish starts on the right color, not white.
+        if (mat.color) {
+          const fromVal = prevCurr.current;
+          const fromColor = fc[fromVal];
+          if (fromColor) {
+            const fromTex = biomeEnabled && meta?.orig
+              ? (BIOME_GROUND_TEXTURES[FACE_CITIES[
+                  (meta?.flips ?? 0) % 2 === 1 ? meta.orig : (ANTIPODAL_COLOR[meta.orig] ?? meta.orig)
+                ]] ?? null)
+              : (faceTextures?.[fromVal] || null);
+            mat.color.set(fromTex ? '#ffffff' : fromColor);
+            mat.map = fromTex;
+            mat.needsUpdate = true;
+          }
+        }
+        // Shader-style tiles (uniforms.baseColor) are handled by the flip useEffect which builds
+        // a fromMat with getTileStyleMaterial — no action needed here for those.
+      } else if (mat.color) {
         mat.color.set(materialColor);
         mat.map = currTexture;
         mat.needsUpdate = true;
@@ -839,7 +866,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         meshRef.current.material = newMat;
       }
     }
-  }, [materialColor, currTexture, tileStyle]);
+  }, [materialColor, currTexture, tileStyle, meta?.curr, meta?.flips]);
   const isWormhole = meta?.flips > 0 && meta?.curr !== meta?.orig;
   const hasFlipHistory = meta?.flips > 0;
 
