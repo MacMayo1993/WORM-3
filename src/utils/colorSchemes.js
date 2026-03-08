@@ -223,6 +223,210 @@ export const COLOR_SCHEMES = {
     6: '#FFD700',  // spark gold              ← charcoal ↔ spark
   },
 
+  // ── MEDIA & POPULAR CULTURE THEMES ──────────────────────────────────────────
+
+  // Studio Ghibli — soft naturalistic palette from Totoro / Spirited Away
+  ghibli: {
+    1: '#87C4E8',  // Totoro sky blue
+    4: '#E8987A',  // warm earth peach        ← sky ↔ earth
+    2: '#7DB87A',  // leaf green
+    5: '#E8A8B8',  // dusty rose              ← green ↔ rose
+    3: '#E8C870',  // golden wheat
+    6: '#B0A4D4',  // spirit world lavender   ← wheat ↔ lavender
+  },
+
+  // Wes Anderson — Grand Budapest Hotel symmetrical pastels
+  wesanderson: {
+    1: '#D4849A',  // dusty mauve rose
+    4: '#8AA07A',  // sage green              ← mauve ↔ sage
+    2: '#9A8EC8',  // muted lilac
+    5: '#C8A840',  // mustard yellow          ← lilac ↔ mustard
+    3: '#F0D0C0',  // pale blush cream
+    6: '#A04868',  // medium berry            ← blush ↔ berry
+  },
+
+  // Avatar: The Last Airbender — four-nation elemental palette
+  avatar: {
+    1: '#8C9E4A',  // Earth Kingdom green
+    4: '#C83020',  // Fire Nation red         ← earth ↔ fire
+    2: '#4888D0',  // Water Tribe blue
+    5: '#E8A820',  // Fire Nation gold        ← water ↔ gold
+    3: '#F08830',  // Air Nomad orange
+    6: '#7A5830',  // Earth Kingdom brown     ← orange ↔ brown
+  },
+
+  // Super Mario — classic Nintendo palette
+  mario: {
+    1: '#E82018',  // Mario red
+    4: '#38A018',  // Luigi green             ← red ↔ green
+    2: '#58A8E8',  // sky blue
+    5: '#E8C000',  // coin gold               ← sky ↔ gold
+    3: '#F8F0D0',  // cream mushroom
+    6: '#8040C8',  // star purple             ← cream ↔ purple
+  },
+
+  // Frozen — Elsa's ice kingdom: cool blues, soft purples, warm ivory
+  frozen: {
+    1: '#88D4F0',  // ice crystal blue
+    4: '#7858C0',  // amethyst purple         ← ice ↔ amethyst
+    2: '#C0B0D8',  // soft lilac
+    5: '#F4EDD0',  // warm ivory              ← lilac ↔ ivory
+    3: '#68A8C8',  // glacier teal-blue
+    6: '#4838A0',  // twilight violet         ← glacier ↔ violet
+  },
+
+  // Moana — Pacific Ocean: tropical turquoise, coral, golden sand
+  moana: {
+    1: '#30C0C0',  // turquoise ocean
+    4: '#E86858',  // warm coral              ← turquoise ↔ coral
+    2: '#F0C860',  // golden sand
+    5: '#2A7090',  // deep ocean teal         ← sand ↔ teal
+    3: '#E84080',  // hibiscus pink
+    6: '#307048',  // tropical forest         ← hibiscus ↔ forest
+  },
+
+  // Pokémon — type-based palette: fire, water, electric, grass, psychic, ghost
+  pokemon: {
+    1: '#E03020',  // Pokéball red
+    4: '#3888E0',  // water blue              ← red ↔ blue
+    2: '#F8D020',  // Pikachu yellow
+    5: '#48A838',  // grass green             ← yellow ↔ green
+    3: '#F870C0',  // psychic pink
+    6: '#6850C8',  // ghost purple            ← pink ↔ purple
+  },
+
+  // Zelda — Triforce gold, Hyrule green, fairy pink, Sheikah teal
+  zelda: {
+    1: '#E8C020',  // Triforce gold
+    4: '#308840',  // tunic green             ← gold ↔ green
+    2: '#58A8E8',  // Hyrule sky blue
+    5: '#C04828',  // Ganondorf red           ← sky ↔ earth fire
+    3: '#F878C0',  // Great Fairy pink
+    6: '#205870',  // Sheikah dark teal       ← fairy ↔ sheikah
+  },
+
+  // Cyberpunk — neon accents on chrome, lighter take for readability
+  cyberpunk: {
+    1: '#FF6080',  // neon magenta
+    4: '#00D8E8',  // electric cyan           ← magenta ↔ cyan
+    2: '#C8C8E0',  // chrome silver-blue
+    5: '#A838E8',  // neon violet             ← chrome ↔ violet
+    3: '#FFB030',  // amber warning
+    6: '#50E040',  // lime neon               ← amber ↔ lime
+  },
+
+  // Minecraft — biome blocks: grass, dirt, sky, stone, sand, lapis
+  minecraft: {
+    1: '#5EA332',  // grass green
+    4: '#8B5E3C',  // dirt brown              ← green ↔ brown
+    2: '#78B4D8',  // daytime sky
+    5: '#606870',  // stone grey              ← sky ↔ stone
+    3: '#D4C870',  // sand yellow
+    6: '#2448B0',  // lapis lazuli            ← sand ↔ lapis
+  },
+
+  // ── FINE ART THEMES ──────────────────────────────────────────────────────────
+
+  // Mondrian — Piet Mondrian primary block palette
+  mondrian: {
+    1: '#D42020',  // primary red
+    4: '#1858C8',  // primary blue            ← red ↔ blue
+    2: '#F8D000',  // cadmium yellow
+    5: '#404040',  // dark charcoal           ← yellow ↔ dark (strong contrast)
+    3: '#F0F0F0',  // off-white
+    6: '#808080',  // medium grey             ← white ↔ grey
+  },
+
+  // Matisse / Fauvism — flat vivid color fields
+  matisse: {
+    1: '#4890D8',  // cerulean blue
+    4: '#E83830',  // vermillion              ← cerulean ↔ vermillion
+    2: '#F8C840',  // warm yellow
+    5: '#70A868',  // sage green              ← yellow ↔ sage
+    3: '#E86890',  // coral-pink
+    6: '#A888C8',  // soft lavender           ← coral ↔ lavender
+  },
+
+  // Water Lilies — Monet's impressionist pond palette
+  waterlilies: {
+    1: '#A8A0D8',  // periwinkle lavender
+    4: '#E8A8B0',  // blush rose              ← lavender ↔ blush
+    2: '#88C8C8',  // soft aqua
+    5: '#F0C898',  // warm peach              ← aqua ↔ peach
+    3: '#98B890',  // sage green reflection
+    6: '#9868B0',  // mauve violet            ← sage ↔ mauve
+  },
+
+  // Starry Night — Van Gogh's night sky: blues, gold, amber
+  starrynight: {
+    1: '#3870C8',  // cobalt blue
+    4: '#F0C010',  // star gold               ← cobalt ↔ gold
+    2: '#F0E0A0',  // moonlight cream
+    5: '#286090',  // midnight indigo         ← cream ↔ midnight
+    3: '#50A898',  // cypress teal-green
+    6: '#D87020',  // village amber           ← cypress ↔ amber
+  },
+
+  // Klimt / The Kiss — rich gold, jade, amber, terracotta
+  klimt: {
+    1: '#D4A820',  // rich Klimt gold
+    4: '#207870',  // deep jade teal          ← gold ↔ jade
+    2: '#E07828',  // amber-orange
+    5: '#C05888',  // deep rose               ← amber ↔ rose
+    3: '#F0E4C0',  // warm parchment cream
+    6: '#A84838',  // terracotta red          ← cream ↔ terracotta
+  },
+
+  // Great Wave — Hokusai ukiyo-e: Prussian blue, ivory, vermillion, sepia
+  greatwave: {
+    1: '#1C5898',  // Prussian blue
+    4: '#F2ECD8',  // washi ivory             ← prussian ↔ ivory
+    2: '#7890A8',  // sea mist blue-grey
+    5: '#B02808',  // vermillion              ← mist ↔ vermillion
+    3: '#4898C0',  // ocean wave blue
+    6: '#C89040',  // aged sepia gold         ← ocean ↔ sepia
+  },
+
+  // Pop Art — Andy Warhol flat-colour silkscreen palette
+  popart: {
+    1: '#FF5898',  // hot pink
+    4: '#78D830',  // lime green              ← pink ↔ lime
+    2: '#00D0E8',  // electric cyan
+    5: '#FF8818',  // bright orange           ← cyan ↔ orange
+    3: '#E018C0',  // magenta
+    6: '#FFE008',  // acid yellow             ← magenta ↔ yellow
+  },
+
+  // Bauhaus — Bauhaus school: primaries + neutral greys
+  bauhaus: {
+    1: '#C82020',  // Bauhaus red
+    4: '#1858B0',  // cobalt blue             ← red ↔ blue
+    2: '#E8C000',  // cadmium yellow
+    5: '#F0F0F0',  // white                   ← yellow ↔ white
+    3: '#C0B8A8',  // warm light grey
+    6: '#484038',  // dark charcoal           ← warm grey ↔ charcoal
+  },
+
+  // Art Deco — gold, jade green, ivory, coral, purple, chartreuse
+  artdeco: {
+    1: '#D4A828',  // Art Deco gold
+    4: '#357860',  // jade emerald            ← gold ↔ jade
+    2: '#F0E0C0',  // ivory cream
+    5: '#C06050',  // coral-terracotta        ← ivory ↔ coral
+    3: '#7858A0',  // art deco purple
+    6: '#C8D070',  // chartreuse-sage         ← purple ↔ chartreuse
+  },
+
+  // Impressionist Sunrise — Monet's warm dawn reflections
+  impressionist: {
+    1: '#F09090',  // coral sunrise
+    4: '#90B4D8',  // powder blue sky         ← coral ↔ sky
+    2: '#F0B858',  // warm amber gold
+    5: '#B898C8',  // soft lavender           ← gold ↔ lavender
+    3: '#D890A8',  // dusty mauve
+    6: '#88A880',  // sage green reflection   ← mauve ↔ sage
+  },
+
   // ── BIOME SCHEME ─────────────────────────────────────────────────────────────
   // Default city biome palette — each face uses the pulse color of its assigned city.
   // Faces: 1=Frozen Citadel, 2=Deep Station, 3=Volcanic Foundry,
@@ -260,6 +464,28 @@ export const SCHEME_LABELS = {
   desert:       'Desert Dusk',
   arctic:       'Arctic',
   ember:        'Ember & Ash',
+  // Media & Pop Culture
+  ghibli:       'Studio Ghibli',
+  wesanderson:  'Wes Anderson',
+  avatar:       'Avatar: ATLA',
+  mario:        'Super Mario',
+  frozen:       'Frozen',
+  moana:        'Moana',
+  pokemon:      'Pokémon',
+  zelda:        'Zelda',
+  cyberpunk:    'Cyberpunk',
+  minecraft:    'Minecraft',
+  // Fine Art
+  mondrian:     'Mondrian',
+  matisse:      'Matisse',
+  waterlilies:  'Water Lilies',
+  starrynight:  'Starry Night',
+  klimt:        'Klimt / The Kiss',
+  greatwave:    'Great Wave',
+  popart:       'Pop Art',
+  bauhaus:      'Bauhaus',
+  artdeco:      'Art Deco',
+  impressionist:'Impressionist',
   // Superheroes (at bottom — dark palettes that would obscure previews if first)
   spiderman:    'Spider-Man',
   batman:       'Batman',
