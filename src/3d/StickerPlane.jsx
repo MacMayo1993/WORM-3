@@ -166,6 +166,45 @@ const seamLeakFragmentShader = `
   }
 `;
 
+// Spin-reveal overlay: new tile face sweeps in from the outer rim toward the center
+// with a spinning arc glow at the leading edge. Used to replace the midpoint white flash.
+const spinRevealVertexShader = `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const spinRevealFragmentShader = `
+  uniform vec3 uColor;
+  uniform float uProgress; // 0 = reveal just started (outer ring only), 1 = full disc
+  uniform float uTime;
+  varying vec2 vUv;
+
+  void main() {
+    vec2 uv = vUv - 0.5;
+    float dist = length(uv);
+    if (dist > 0.5) discard;
+
+    // Outside-in: inner hole shrinks from 0.5 (empty) to 0 (full disc) as progress 0→1
+    float innerEdge = 0.5 * (1.0 - uProgress);
+
+    // Smooth reveal boundary
+    float show = smoothstep(innerEdge - 0.04, innerEdge + 0.02, dist);
+    if (show < 0.005) discard;
+
+    // Spinning arc glow at the reveal edge
+    float angle = atan(uv.y, uv.x);
+    float spin = 0.5 + 0.5 * sin(angle * 8.0 - uTime * 14.0);
+    float edgeDist = abs(dist - innerEdge);
+    float edgeGlow = smoothstep(0.14, 0.0, edgeDist) * spin;
+
+    float brightness = 1.0 + edgeGlow * 0.7;
+    gl_FragColor = vec4(uColor * brightness, show);
+  }
+`;
+
 
 const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay, mode, faceRow, faceCol, faceSize, hollow, currentDir: _currentDir }) {
   // Batch all store reads into a single subscription to minimize Zustand overhead.
@@ -212,6 +251,14 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     uColor: { value: new THREE.Color('#ffffff') },
     uTime: { value: 0 },
     uIntensity: { value: 0 },
+  }));
+  // Spin reveal overlay — animates the new tile face in from the outer rim inward
+  const spinRevealRef = useRef();
+  const spinRevealMatRef = useRef();
+  const [spinRevealUniforms] = React.useState(() => ({
+    uColor: { value: new THREE.Color() },
+    uProgress: { value: 0.0 },
+    uTime: { value: 0.0 },
   }));
 
   // ── InstancedMesh batch integration ─────────────────────────────────────────
@@ -411,8 +458,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     // read once per frame instead of twice (was separate wormhole + hasFlips lines).
     const hasFlips = (meta?.flips ?? 0) > 0;
     const wormhole = hasFlips && meta?.curr !== meta?.orig;
-    const showGhostTile = !chaosLevel && hasFlips;
-    const showWormholeHazardFx = !chaosLevel && wormhole;
+    const showGhostTile = !isDead && hasFlips;
+    const showWormholeHazardFx = !isDead && wormhole;
 
     const needsGhostUpdate = showGhostTile && spiderMatRef.current && (
       (wormhole && spiderMatRef.current.uniforms.uBurst.value !== 1.0) ||
@@ -480,35 +527,36 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       groupRef.current.position.x = pos[0] + jX;
       groupRef.current.position.y = pos[1] + jY;
 
-      // Overlay kept hidden — the squish + midpoint color-swap is the full animation.
-
-      // One-shot color swap at the sacred frame: fire exactly when xScale === 0.
+      // Spin-reveal: at the midpoint (tile is at zero width) start the circular
+      // outside-in reveal of the new face instead of an instant color swap.
+      // This eliminates the white-square flash that appeared at the crossing frame.
       if (prevRawP.current < 0.5 && rawP >= 0.5) {
-        // InstancedMesh path: update the instance colour so the manager uploads
-        // it this frame (manager runs at priority 1, after this priority-0 useFrame).
-        if (isInstancedRef.current && flipToColor.current) {
-          instanceColorRef.current.setStyle(flipToColor.current);
+        // Kick off the spin reveal overlay with the new face color.
+        if (spinRevealRef.current && spinRevealMatRef.current && flipToColor.current) {
+          spinRevealMatRef.current.uniforms.uColor.value.set(flipToColor.current);
+          spinRevealMatRef.current.uniforms.uProgress.value = 0.0;
+          spinRevealRef.current.visible = true;
         }
-        const mat = meshRef.current?.material;
-        if (mat?.color) {
-          const tex = flipToTexture.current;
-          mat.map = tex || null;
-          mat.color.set(tex ? '#ffffff' : flipToColor.current);
-          mat.needsUpdate = true; // single GPU upload, not per-frame
-        } else if (mat?.uniforms?.baseColor) {
-          const newMat = getTileStyleMaterial(tileStyle, flipToColor.current, false, null, antipodalHexRef.current);
-          meshRef.current.material = newMat;
-        }
-        // Ring opacity spike — event horizon signal. Clamp write, no stacking.
+        // Ring opacity spike — event horizon signal.
         if (ringRef.current) {
           ringRef.current.material.opacity = 0.9;
           ringFlashRef.current = 1;
         }
       }
+
+      // Second half: drive the spin-reveal inward as the tile expands back.
+      if (rawP >= 0.5 && spinRevealRef.current && spinRevealMatRef.current) {
+        const revealProgress = Math.min(1.0, (rawP - 0.5) * 2.0);
+        spinRevealMatRef.current.uniforms.uProgress.value = revealProgress;
+        spinRevealMatRef.current.uniforms.uTime.value = state.clock.elapsedTime;
+      }
+
       prevRawP.current = rawP;
 
       if (spinT.current <= 0) {
         isFlipping.current = false;
+        // Hide spin-reveal and commit the final face color/texture to the mesh.
+        if (spinRevealRef.current) spinRevealRef.current.visible = false;
         groupRef.current.scale.set(1, 1, 1);
         groupRef.current.rotation.y = rot[1];
         groupRef.current.rotation.z = rot[2];
@@ -919,6 +967,19 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       <mesh ref={flipOverlayRef} position={[0, 0, 0.003]}>
         <primitive object={_sharedStickerGeo} attach="geometry" />
         <meshBasicMaterial transparent opacity={0} blending={THREE.AdditiveBlending} depthWrite={false} />
+      </mesh>
+
+      {/* Spin-reveal overlay — new face appears as a spinning circle from the outer rim inward */}
+      <mesh ref={spinRevealRef} position={[0, 0, 0.005]} visible={false} renderOrder={1}>
+        <primitive object={_sharedStickerGeo} attach="geometry" />
+        <shaderMaterial
+          ref={spinRevealMatRef}
+          vertexShader={spinRevealVertexShader}
+          fragmentShader={spinRevealFragmentShader}
+          uniforms={spinRevealUniforms}
+          transparent
+          depthWrite={false}
+        />
       </mesh>
 
       {/* City Biome buildings — kept mounted during rotation so they don't pop/glitch */}
