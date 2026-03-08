@@ -80,7 +80,7 @@ const CubeAssembly = React.memo(({
     isBiomeMode,
     rotationEpoch,
     settings,
-    chaosLevel,
+    _chaosLevel,
   } = useGameStore(
     useShallow(s => ({
       explosionFactor: s.explosionT,
@@ -93,7 +93,7 @@ const CubeAssembly = React.memo(({
       isBiomeMode: s.settings?.biomeMode?.enabled,
       rotationEpoch: s.rotationEpoch,
       settings: s.settings,
-      chaosLevel: s.chaosLevel,
+      _chaosLevel: s.chaosLevel,
     }))
   );
   const cubieRefs = useRef([]);

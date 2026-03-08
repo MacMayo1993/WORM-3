@@ -194,12 +194,10 @@ const spinRevealFragmentShader = `
     // Revealed band: new face colour sweeps from the outer rim inward (disc only).
     float show = smoothstep(innerEdge - 0.04, innerEdge + 0.02, dist) * inDisc;
 
-    // Glass tile backing: covers the full tile quad — the unrevealed disc centre AND the
-    // square corners — so the plain underlying mesh colour (often white) never shows through.
-    float holeAlpha = (1.0 - show) * 0.92;
-    // Subtle dark glass with a rim brightening toward the disc edge.
-    vec3 glassColor = vec3(0.04, 0.06, 0.13)
-      + smoothstep(0.22, 0.46, dist) * inDisc * 0.18;
+    // Glass cube tile backing — fully opaque so the underlying face never bleeds through.
+    // Mimics the glass visual mode: dark base with Fresnel-like rim brightening toward the disc edge.
+    float rimGlow = smoothstep(0.2, 0.45, dist) * inDisc;
+    vec3 glassColor = vec3(0.05, 0.08, 0.22) + rimGlow * 0.40;
 
     // Spinning arc glow at the reveal edge (inside disc only).
     float angle = atan(uv.y, uv.x);
@@ -209,9 +207,9 @@ const spinRevealFragmentShader = `
 
     float brightness = 1.0 + edgeGlow * 0.7;
 
-    float alpha = max(show, holeAlpha);
-    if (alpha < 0.005) discard;
-    gl_FragColor = vec4(mix(glassColor, uColor * brightness, show), alpha);
+    // Always fully opaque — overlay completely covers the underlying tile during the flip,
+    // replacing the raw face colour (which could be white) with a glass cube tile appearance.
+    gl_FragColor = vec4(mix(glassColor, uColor * brightness, show), 1.0);
   }
 `;
 
@@ -399,6 +397,14 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       }
       spinT.current = 1;
       prevRawP.current = 0;
+      // Activate spin-reveal immediately with FROM color at full disc coverage so the
+      // squish phase shows the FROM colour contracting into glass — not raw face colour.
+      // This eliminates the white tile flash on both halves of the flip.
+      if (spinRevealRef.current && spinRevealMatRef.current && flipFromColor.current) {
+        spinRevealMatRef.current.uniforms.uColor.value.set(flipFromColor.current);
+        spinRevealMatRef.current.uniforms.uProgress.value = 1.0;
+        spinRevealRef.current.visible = true;
+      }
       // Imperatively reset the mesh to the FROM color here. This covers the case where
       // the mesh was just mounted for the first time (tile going instanceable→non-instanceable)
       // and the JSX-created material already has materialColor (the new post-flip color).
@@ -541,11 +547,17 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       groupRef.current.position.x = pos[0] + jX;
       groupRef.current.position.y = pos[1] + jY;
 
-      // Spin-reveal: at the midpoint (tile is at zero width) start the circular
-      // outside-in reveal of the new face instead of an instant color swap.
-      // This eliminates the white-square flash that appeared at the crossing frame.
+      // First half: contract FROM colour disc into glass (progress 1.0 → 0.0 as tile squishes).
+      // The spin-reveal was activated at full disc coverage when the flip started; here we
+      // shrink it so the glass centre grows while the FROM colour ring collapses inward.
+      if (rawP < 0.5 && spinRevealRef.current && spinRevealMatRef.current) {
+        const contractProgress = Math.max(0.0, 1.0 - rawP / 0.5);
+        spinRevealMatRef.current.uniforms.uProgress.value = contractProgress;
+        spinRevealMatRef.current.uniforms.uTime.value = state.clock.elapsedTime;
+      }
+
+      // Midpoint: switch the spin-reveal colour from FROM to TO and begin the outside-in reveal.
       if (prevRawP.current < 0.5 && rawP >= 0.5) {
-        // Kick off the spin reveal overlay with the new face color.
         if (spinRevealRef.current && spinRevealMatRef.current && flipToColor.current) {
           spinRevealMatRef.current.uniforms.uColor.value.set(flipToColor.current);
           spinRevealMatRef.current.uniforms.uProgress.value = 0.0;
