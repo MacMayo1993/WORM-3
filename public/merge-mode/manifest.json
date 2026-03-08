@@ -1,0 +1,23 @@
+{
+  "themes": [
+    { "id": "pokemon", "label": "Pokémon", "color": "#FFCB05", "accent": "#3B4CCA", "emoji": "⚡" },
+    { "id": "dnd", "label": "D&D", "color": "#8B0000", "accent": "#C5A028", "emoji": "🐉" },
+    { "id": "digimon", "label": "Digimon", "color": "#FF6B35", "accent": "#1B4FBE", "emoji": "🌐" },
+    { "id": "marvel", "label": "Marvel", "color": "#ED1D24", "accent": "#F0C100", "emoji": "🦸" },
+    { "id": "harry-potter", "label": "Harry Potter", "color": "#740001", "accent": "#D3A625", "emoji": "⚡" },
+    { "id": "disney", "label": "Disney", "color": "#003087", "accent": "#FCD000", "emoji": "✨" }
+  ],
+  "colors": {
+    "color1": { "face": "PZ", "name": "Red", "hex": "#ef4444" },
+    "color2": { "face": "NX", "name": "Green", "hex": "#22c55e" },
+    "color3": { "face": "PY", "name": "White", "hex": "#ffffff" },
+    "color4": { "face": "NZ", "name": "Orange", "hex": "#f97316" },
+    "color5": { "face": "PX", "name": "Blue", "hex": "#3b82f6" },
+    "color6": { "face": "NY", "name": "Yellow", "hex": "#eab308" }
+  },
+  "tiers": {
+    "1": { "minTiles": 1, "maxTiles": 2, "description": "Base form — 1–2 connected tiles" },
+    "2": { "minTiles": 3, "maxTiles": null, "description": "Mid form — 3+ connected tiles (pulses)" },
+    "3": { "minTiles": "full face", "description": "Final form — full face covered (pops out)" }
+  }
+}
