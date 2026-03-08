@@ -399,8 +399,12 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       }
       const mat = meshRef.current?.material;
       if (mat?.color && flipFromColor.current) {
+        // Drop the texture during the flip so the mesh shows a clean face color rather than
+        // white (the neutral tint required for texture display). The texture is restored at
+        // animation end. This gives a glass-tile look: solid colour squishes in, solid
+        // antipodal colour reveals out, texture snaps back when the animation settles.
         mat.color.set(flipFromColor.current);
-        mat.map = flipFromTexture.current || null;
+        mat.map = null;
         mat.needsUpdate = true;
       } else if (mat?.uniforms?.baseColor && flipFromColor.current) {
         // Shader-style tile (circuit, grid, etc.): switch to the from-color material so the
@@ -843,14 +847,11 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           const fromVal = prevCurr.current;
           const fromColor = fc[fromVal];
           if (fromColor) {
-            const fromTex = biomeEnabled && meta?.orig
-              ? (BIOME_GROUND_TEXTURES[FACE_CITIES[
-                  (meta?.flips ?? 0) % 2 === 1 ? meta.orig : (ANTIPODAL_COLOR[meta.orig] ?? meta.orig)
-                ]] ?? null)
-              : (faceTextures?.[fromVal] || null);
-            mat.color.set(fromTex ? '#ffffff' : fromColor);
-            mat.map = fromTex;
-            mat.needsUpdate = true;
+            // Drop the texture so the mesh shows the raw face colour (not white).
+          // The texture is restored at the end of the animation (see flip-end block in useFrame).
+          mat.color.set(fromColor);
+          mat.map = null;
+          mat.needsUpdate = true;
           }
         }
         // Shader-style tiles (uniforms.baseColor) are handled by the flip useEffect which builds
