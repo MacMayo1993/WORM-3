@@ -355,6 +355,12 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         mat.color.set(flipFromColor.current);
         mat.map = flipFromTexture.current || null;
         mat.needsUpdate = true;
+      } else if (mat?.uniforms?.baseColor && flipFromColor.current) {
+        // Shader-style tile (circuit, grid, etc.): switch to the from-color material so the
+        // squish animation starts on the OLD color, not the post-flip color that React already
+        // attached via the styleMaterial useMemo. flipToColor is the antipodal hex of the from face.
+        const fromMat = getTileStyleMaterial(tileStyleRef.current, flipFromColor.current, false, null, flipToColor.current);
+        meshRef.current.material = fromMat;
       }
       flipParticlesRef.current?.trigger(fc[curr]);
       play('/sounds/flip.mp3');
