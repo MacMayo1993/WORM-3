@@ -320,7 +320,7 @@ const NavItem = ({ icon, label, color, onClick }) => {
       style={{
         flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
         justifyContent: 'center', gap: '8px', padding: '14px 12px 12px',
-        background: hovered ? `${color}12` : 'transparent',
+        background: hovered ? `${color}20` : 'transparent',
         border: 'none', cursor: 'pointer',
         transition: 'background 0.2s ease',
         position: 'relative',
@@ -330,18 +330,18 @@ const NavItem = ({ icon, label, color, onClick }) => {
       {hovered && (
         <div style={{
           position: 'absolute', inset: 0, borderRadius: 'inherit',
-          background: `radial-gradient(ellipse 80% 120% at 50% 0%, ${color}18 0%, transparent 70%)`,
+          background: `radial-gradient(ellipse 80% 120% at 50% 0%, ${color}25 0%, transparent 70%)`,
           pointerEvents: 'none',
         }} />
       )}
       <span style={{
         lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        filter: hovered ? `drop-shadow(0 0 6px ${color}90)` : 'none',
+        filter: hovered ? `drop-shadow(0 0 8px ${color}cc)` : `drop-shadow(0 0 4px ${color}55)`,
         transition: 'filter 0.2s ease',
       }}>{icon}</span>
       <span style={{
         fontSize: '10px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase',
-        color: hovered ? color : 'rgba(180,210,255,0.55)',
+        color: hovered ? color : 'rgba(200,220,255,0.75)',
         transition: 'color 0.2s ease',
         fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif",
       }}>{label}</span>
@@ -351,14 +351,19 @@ const NavItem = ({ icon, label, color, onClick }) => {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 const MainMenu = ({ onPlay, _onLevels, onFreeplay, _onCoop, onSettings, onBiome, onDisparity, onWormHealer, onHolonomy, onMerge }) => {
+  // Dark glass palette — Rubik's cube rainbow colors as accents
   const CLEAN = {
     pageBg: 'radial-gradient(circle at 50% 35%, #0e1324 0%, #070b16 52%, #05050f 100%)',
-    panel: 'rgba(255,255,255,0.8)',
-    panelStrong: 'rgba(255,255,255,0.9)',
-    text: '#111827',
-    textSubtle: 'rgba(17,24,39,0.6)',
-    border: 'rgba(17,24,39,0.12)',
-    accent: '#0f172a',
+    // Dark glass panels
+    panel: 'rgba(8,12,28,0.68)',
+    panelStrong: 'rgba(10,14,32,0.80)',
+    // Text on dark glass
+    text: 'rgba(230,240,255,0.95)',
+    textSubtle: 'rgba(180,210,255,0.65)',
+    // Glass borders with a hint of color
+    border: 'rgba(120,160,255,0.22)',
+    borderRainbow: 'linear-gradient(90deg,#ef444455,#f9731655,#eab30855,#22c55e55,#3b82f655,#a855f755)',
+    accent: 'rgba(30,60,160,0.75)',
   };
   const [titleVisible, setTitleVisible] = useState(false);
   const [subtitleVisible, setSubtitleVisible] = useState(false);
@@ -405,14 +410,16 @@ const MainMenu = ({ onPlay, _onLevels, onFreeplay, _onCoop, onSettings, onBiome,
         {/* Settings gear */}
         <button onClick={onSettings} style={{
           position: 'absolute', bottom: 'max(14px, env(safe-area-inset-bottom,14px))', right: '16px',
-          zIndex: 20, width: '32px', height: '32px', padding: 0,
+          zIndex: 20, width: '36px', height: '36px', padding: 0,
           background: CLEAN.panelStrong, border: `1px solid ${CLEAN.border}`,
-          borderRadius: '9px', cursor: 'pointer', color: CLEAN.textSubtle,
+          borderRadius: '10px', cursor: 'pointer', color: CLEAN.textSubtle,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          transition: 'all 0.2s', backdropFilter: 'blur(10px)', pointerEvents: 'all',
+          transition: 'all 0.2s', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+          pointerEvents: 'all',
+          boxShadow: '0 2px 12px rgba(0,0,0,0.45), inset 0 1px 0 rgba(120,160,255,0.18)',
         }}
-          onMouseEnter={e => { e.currentTarget.style.color = CLEAN.text; e.currentTarget.style.background = '#ffffff'; }}
-          onMouseLeave={e => { e.currentTarget.style.color = CLEAN.textSubtle; e.currentTarget.style.background = CLEAN.panelStrong; }}
+          onMouseEnter={e => { e.currentTarget.style.color = '#ffffff'; e.currentTarget.style.borderColor = 'rgba(120,160,255,0.5)'; e.currentTarget.style.boxShadow = '0 0 14px rgba(59,130,246,0.35), 0 2px 12px rgba(0,0,0,0.45), inset 0 1px 0 rgba(120,160,255,0.3)'; }}
+          onMouseLeave={e => { e.currentTarget.style.color = CLEAN.textSubtle; e.currentTarget.style.borderColor = CLEAN.border; e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,0.45), inset 0 1px 0 rgba(120,160,255,0.18)'; }}
         ><GearIcon /></button>
 
         {/* Title */}
@@ -440,8 +447,9 @@ const MainMenu = ({ onPlay, _onLevels, onFreeplay, _onCoop, onSettings, onBiome,
             <div style={{ width: '30px', height: '1px', background: 'linear-gradient(to right, transparent, rgba(140,180,255,0.45))' }} />
             <p style={{
               margin: 0, fontSize: 'clamp(10px,1.7vw,13px)', letterSpacing: '0.26em',
-              textTransform: 'uppercase', fontWeight: 500, color: CLEAN.textSubtle,
+              textTransform: 'uppercase', fontWeight: 600, color: 'rgba(200,220,255,0.80)',
               fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif",
+              textShadow: '0 0 20px rgba(100,160,255,0.5)',
             }}>A Cube That Remembers</p>
             <div style={{ width: '30px', height: '1px', background: 'linear-gradient(to left, transparent, rgba(140,180,255,0.45))' }} />
           </div>
@@ -453,30 +461,41 @@ const MainMenu = ({ onPlay, _onLevels, onFreeplay, _onCoop, onSettings, onBiome,
           width: 'min(400px,85vw)', opacity: btnVisible ? 1 : 0, transition: 'opacity 0.55s ease',
           pointerEvents: 'all',
         }}>
-          <button onClick={onPlay}
-            onMouseEnter={() => setHoverEnter(true)}
-            onMouseLeave={() => { setHoverEnter(false); setPressEnter(false); }}
-            onMouseDown={() => setPressEnter(true)} onMouseUp={() => setPressEnter(false)}
-            style={{
-              width: '100%', padding: '17px 32px',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
-              fontSize: 'clamp(13px,2.4vw,15px)', fontWeight: 700, letterSpacing: '0.2em',
-              textTransform: 'uppercase',
-              fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif",
-              color: hoverEnter ? '#ffffff' : CLEAN.text,
-              background: hoverEnter ? CLEAN.accent : CLEAN.panel,
-              border: `1px solid ${hoverEnter ? CLEAN.accent : CLEAN.border}`,
-              borderRadius: '100px', cursor: 'pointer',
-              transition: 'all 0.22s cubic-bezier(0.4,0,0.2,1)',
-              backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
-              transform: pressEnter ? 'scale(0.975)' : hoverEnter ? 'translateY(-2px)' : 'none',
-              boxShadow: hoverEnter
-                ? '0 8px 40px rgba(30,80,255,0.22),0 2px 8px rgba(0,0,0,0.3),inset 0 1px 0 rgba(255,255,255,0.1)'
-                : '0 2px 16px rgba(0,0,0,0.28),inset 0 1px 0 rgba(255,255,255,0.05)',
-            }}>
-            <PlayIcon hovered={hoverEnter} />
-            Enter the Cube
-          </button>
+          {/* Rainbow outline wrapper for the button */}
+          <div style={{
+            borderRadius: '100px', padding: '1.5px',
+            background: hoverEnter
+              ? 'linear-gradient(90deg,#ef4444,#f97316,#eab308,#22c55e,#3b82f6,#a855f7,#ef4444)'
+              : 'linear-gradient(90deg,#ef444455,#f9731655,#eab30855,#22c55e55,#3b82f655,#a855f755,#ef444455)',
+            boxShadow: hoverEnter
+              ? '0 0 28px rgba(99,120,255,0.45), 0 8px 32px rgba(0,0,0,0.5)'
+              : '0 0 12px rgba(60,80,200,0.20), 0 4px 16px rgba(0,0,0,0.4)',
+            transition: 'all 0.25s cubic-bezier(0.4,0,0.2,1)',
+            transform: pressEnter ? 'scale(0.975)' : hoverEnter ? 'translateY(-2px)' : 'none',
+          }}>
+            <button onClick={onPlay}
+              onMouseEnter={() => setHoverEnter(true)}
+              onMouseLeave={() => { setHoverEnter(false); setPressEnter(false); }}
+              onMouseDown={() => setPressEnter(true)} onMouseUp={() => setPressEnter(false)}
+              style={{
+                width: '100%', padding: '17px 32px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+                fontSize: 'clamp(13px,2.4vw,15px)', fontWeight: 700, letterSpacing: '0.2em',
+                textTransform: 'uppercase',
+                fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif",
+                color: hoverEnter ? '#ffffff' : 'rgba(210,230,255,0.92)',
+                background: hoverEnter
+                  ? 'rgba(18,28,68,0.88)'
+                  : 'rgba(8,12,28,0.72)',
+                border: 'none', borderRadius: '100px', cursor: 'pointer',
+                transition: 'all 0.22s cubic-bezier(0.4,0,0.2,1)',
+                backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+                boxShadow: 'inset 0 1px 0 rgba(120,160,255,0.18)',
+              }}>
+              <PlayIcon hovered={hoverEnter} />
+              Enter the Cube
+            </button>
+          </div>
         </div>
 
         {/* Bottom nav — unified glass pill */}
@@ -488,35 +507,38 @@ const MainMenu = ({ onPlay, _onLevels, onFreeplay, _onCoop, onSettings, onBiome,
           transform: btnVisible ? 'none' : 'translateY(16px)',
           transition: 'opacity 0.55s ease 0.1s, transform 0.55s cubic-bezier(0.22,1,0.36,1) 0.1s',
         }}>
+          {/* Rainbow outline wrapper for the pill */}
           <div style={{
-            display: 'flex', width: 'min(460px,88vw)',
-            background: CLEAN.panel,
-            backdropFilter: 'blur(28px)', WebkitBackdropFilter: 'blur(28px)',
-            border: `1.5px solid ${CLEAN.border}`,
-            borderRadius: '100px',
-            boxShadow: [
-              '0 0 0 1px rgba(255,255,255,0.28)',
-              '0 10px 40px rgba(15,23,42,0.12)',
-              'inset 0 1px 0 rgba(255,255,255,0.65)',
-            ].join(', '),
-            overflow: 'hidden',
+            borderRadius: '100px', padding: '1.5px',
+            background: 'linear-gradient(90deg,#ef444460,#f9731660,#eab30860,#22c55e60,#3b82f660,#a855f760,#ef444460)',
+            boxShadow: '0 0 20px rgba(60,80,200,0.25), 0 8px 32px rgba(0,0,0,0.5)',
+            width: 'min(460px,88vw)',
           }}>
-            <NavItem icon={<DisparityIcon />} label="Disparity" color="#f59e0b" onClick={onDisparity} />
-            {/* divider */}
-            <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(15,23,42,0.12)' }} />
-            <NavItem icon={<WormIcon />} label="WORM" color="#a855f7" onClick={onWormHealer} />
-            {/* divider */}
-            <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(15,23,42,0.12)' }} />
-            <NavItem icon={<HolonomyIcon />} label="∮ Holonomy" color="#00f5ff" onClick={onHolonomy} />
-            {/* divider */}
-            <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(15,23,42,0.12)' }} />
-            <NavItem icon={<ExploreIcon />} label="Explore" color="#22c55e" onClick={onFreeplay} />
-            {/* divider */}
-            <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(15,23,42,0.12)' }} />
-            <NavItem icon={<WorldIcon />} label="World" color="#60a5fa" onClick={onBiome} />
-            {/* divider */}
-            <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(15,23,42,0.12)' }} />
-            <NavItem icon={<MergeIcon />} label="Merge" color="#a78bfa" onClick={onMerge} />
+            <div style={{
+              display: 'flex',
+              background: 'rgba(6,10,24,0.80)',
+              backdropFilter: 'blur(28px)', WebkitBackdropFilter: 'blur(28px)',
+              borderRadius: '100px',
+              boxShadow: 'inset 0 1px 0 rgba(120,160,255,0.14)',
+              overflow: 'hidden',
+            }}>
+              <NavItem icon={<DisparityIcon />} label="Disparity" color="#f59e0b" onClick={onDisparity} />
+              {/* divider */}
+              <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(120,160,255,0.15)' }} />
+              <NavItem icon={<WormIcon />} label="WORM" color="#a855f7" onClick={onWormHealer} />
+              {/* divider */}
+              <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(120,160,255,0.15)' }} />
+              <NavItem icon={<HolonomyIcon />} label="∮ Holonomy" color="#00f5ff" onClick={onHolonomy} />
+              {/* divider */}
+              <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(120,160,255,0.15)' }} />
+              <NavItem icon={<ExploreIcon />} label="Explore" color="#22c55e" onClick={onFreeplay} />
+              {/* divider */}
+              <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(120,160,255,0.15)' }} />
+              <NavItem icon={<WorldIcon />} label="World" color="#60a5fa" onClick={onBiome} />
+              {/* divider */}
+              <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(120,160,255,0.15)' }} />
+              <NavItem icon={<MergeIcon />} label="Merge" color="#a78bfa" onClick={onMerge} />
+            </div>
           </div>
         </div>
       </div>
@@ -527,7 +549,7 @@ const MainMenu = ({ onPlay, _onLevels, onFreeplay, _onCoop, onSettings, onBiome,
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const PlayIcon = ({ hovered }) => (
   <svg width="13" height="13" viewBox="0 0 12 12" fill="none">
-    <polygon points="2,1 11,6 2,11" fill={hovered ? '#ffffff' : 'rgba(180,210,255,0.8)'} style={{ transition: 'fill 0.2s' }} />
+    <polygon points="2,1 11,6 2,11" fill={hovered ? '#ffffff' : 'rgba(200,220,255,0.9)'} style={{ transition: 'fill 0.2s' }} />
   </svg>
 );
 const DisparityIcon = () => (
