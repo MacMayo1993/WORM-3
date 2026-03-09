@@ -15,7 +15,7 @@ import { play } from '../utils/audio.js';
 import { ANTIPODAL_COLOR } from '../utils/constants.js';
 import { resolveColors } from '../utils/colorSchemes.js';
 import { isInRefractory, markFlipped, clearRefractory } from '../game/refractoryMap.js';
-import { computeMergeRegions } from '../game/mergeRegions.js';
+import { computeMergeRegions } from '../modes/merge/index.js';
 
 // Recompute merge region tiers from the current store state and persist them.
 // Called imperatively after every rotation/shuffle when merge mode is active.
