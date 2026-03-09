@@ -29,6 +29,7 @@ import FlipParticles from './FlipParticles.jsx';
 import ParityBreakthrough from './ParityBreakthrough.jsx';
 import StickerWorm from './StickerWorm.jsx';
 import DisparityHealthBar from './DisparityHealthBar.jsx';
+import MergeTileOverlay from './MergeTileOverlay.jsx';
 
 // Shared geometries used only by StickerPlane itself (not by extracted sub-components).
 const _sharedStickerGeo = new THREE.PlaneGeometry(0.85, 0.85);
@@ -218,7 +219,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // Batch all store reads into a single subscription to minimize Zustand overhead.
   // With 54 stickers on a 3×3 cube, separate selectors = many subscriptions;
   // one combined selector with shallow equality keeps it to 54 subscriptions.
-  const { biomeEnabled, chaosLevel, disparityFlipCap, disparityWinner, settings, faceTextures, disparityDeathByGridId } = useGameStore(
+  const { biomeEnabled, chaosLevel, disparityFlipCap, disparityWinner, settings, faceTextures, disparityDeathByGridId, mergeMode, mergeTheme } = useGameStore(
     useShallow((s) => ({
       biomeEnabled: s.settings?.biomeMode?.enabled ?? false,
       chaosLevel: s.chaosLevel,
@@ -227,6 +228,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       settings: s.settings,
       faceTextures: s.faceTextures,
       disparityDeathByGridId: s.disparityDeathByGridId,
+      mergeMode: s.mergeMode,
+      mergeTheme: s.mergeTheme,
     }))
   );
   const fc = resolveColors(settings, settings?.biomeMode?.faceAssignment) || FACE_COLORS;
@@ -312,6 +315,10 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // WormholeTunnel can read the burst progress without prop drilling.
   // origPos/origDir/orig never change so this is computed once.
   const stickerGridIdRef = useRef(meta ? getManifoldGridId(meta, faceSize) : null);
+  // Stable home key for Merge Mode tier lookup — same format as computeMergeRegions output.
+  const mergeHomeKey = meta?.origPos
+    ? `${meta.origPos.x}-${meta.origPos.y}-${meta.origPos.z}-${meta.origDir}`
+    : null;
   // Live ref to current texture so useFrame closures can access it without stale captures.
   const currTextureRef = useRef(null);
 
@@ -1218,6 +1225,10 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       {/* Per-tile health bar — visible in Disparity Mode only, for live tiles */}
       {chaosLevel > 0 && !isDead && (
         <DisparityHealthBar flips={meta?.flips ?? 0} flipCap={effectiveFlipCap} />
+      )}
+
+      {mergeMode && mergeHomeKey && (
+        <MergeTileOverlay homeKey={mergeHomeKey} themeId={mergeTheme} colorIndex={meta.curr} />
       )}
     </group>
   );
