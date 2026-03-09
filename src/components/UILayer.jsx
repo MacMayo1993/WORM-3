@@ -44,6 +44,7 @@ const LevelTutorial = React.lazy(() => import('./screens/LevelTutorial.jsx'));
 const FreeplaySetupWizard = React.lazy(() => import('./screens/FreeplaySetupWizard.jsx'));
 const WormModeSetupWizard = React.lazy(() => import('./screens/WormModeSetupWizard.jsx'));
 const DisparitySetupWizard = React.lazy(() => import('./screens/DisparitySetupWizard.jsx'));
+const MergeThemePicker = React.lazy(() => import('./screens/MergeThemePicker.jsx'));
 const DisparityWinnerScreen = React.lazy(() => import('./screens/DisparityWinnerScreen.jsx'));
 const CubeNet = React.lazy(() => import('./CubeNet.jsx'));
 const SolveMode = React.lazy(() => import('./SolveMode.jsx'));
@@ -102,7 +103,8 @@ export default function UILayer({
     onTutorialClose, onLevelTutorialClose, onNextLevel,
     onPreset, onInstantChaos, onSaveState, onLoadState,
     onMenuPlay, onMenuLevels, onMenuFreeplay, onMenuCoop, onMenuTeach,
-    onMenuSettings, onMenuBiome, onMenuDisparity, onMenuWormHealer, onMenuHolonomy,
+    onMenuSettings, onMenuBiome, onMenuDisparity, onMenuWormHealer, onMenuHolonomy, onMenuMerge,
+    showMergeThemePicker, onMergeStart, onMergeCancel,
     onWizardComplete, onWizardCancel, onDisparitySetupComplete,
     onWormSetupComplete, onWormWizardCancel, onWormRetry, onWormNewGame,
     onToggleHandsMode, onFaceRotate, onTileRotation, onTileFaceRotation,
@@ -362,6 +364,7 @@ export default function UILayer({
           onDisparity={onMenuDisparity}
           onWormHealer={onMenuWormHealer}
           onHolonomy={onMenuHolonomy}
+          onMerge={onMenuMerge}
         />
       )}
 
@@ -390,6 +393,12 @@ export default function UILayer({
       {showWormModeWizard && (
         <Suspense fallback={null}>
           <WormModeSetupWizard onComplete={onWormSetupComplete} onCancel={onWormWizardCancel} initialSettings={settings} />
+        </Suspense>
+      )}
+
+      {showMergeThemePicker && (
+        <Suspense fallback={null}>
+          <MergeThemePicker onStart={onMergeStart} onBack={onMergeCancel} />
         </Suspense>
       )}
 
