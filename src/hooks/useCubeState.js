@@ -15,6 +15,15 @@ import { play } from '../utils/audio.js';
 import { ANTIPODAL_COLOR } from '../utils/constants.js';
 import { resolveColors } from '../utils/colorSchemes.js';
 import { isInRefractory, markFlipped, clearRefractory } from '../game/refractoryMap.js';
+import { computeMergeRegions } from '../game/mergeRegions.js';
+
+// Recompute merge region tiers from the current store state and persist them.
+// Called imperatively after every rotation/shuffle when merge mode is active.
+function updateMergeTiers() {
+  const { mergeMode, cubies, size, setMergeRegionTiers } = useGameStore.getState();
+  if (!mergeMode) return;
+  setMergeRegionTiers(computeMergeRegions(cubies, size));
+}
 
 /**
  * Hook for cube state management
@@ -102,6 +111,7 @@ export function useCubeState() {
       moves: state.moves + 1,
       moveHistory: [...state.moveHistory, { type: 'rotation', axis, dir, sliceIndex, timestamp: Date.now() }].slice(-10),
     }));
+    updateMergeTiers();
   }, [size]);
 
   // Flip sticker pair
@@ -187,6 +197,7 @@ export function useCubeState() {
     clearHistory();
     clearRefractory();
     setHasShuffled(true);
+    updateMergeTiers();
   }, [size, setRotatedCubies, resetGame, clearHistory, setHasShuffled]);
 
   // Reset to solved state
