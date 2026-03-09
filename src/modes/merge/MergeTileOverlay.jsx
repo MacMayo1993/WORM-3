@@ -14,10 +14,10 @@
  * Missing assets are silently ignored (THREE.TextureLoader onError callback).
  */
 
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { useGameStore } from '../hooks/useGameStore.js';
+import { useGameStore } from '../../hooks/useGameStore.js';
 
 // Shared loader — reused across all overlay instances.
 const _loader = new THREE.TextureLoader();

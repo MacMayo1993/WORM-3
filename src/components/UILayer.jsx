@@ -44,7 +44,7 @@ const LevelTutorial = React.lazy(() => import('./screens/LevelTutorial.jsx'));
 const FreeplaySetupWizard = React.lazy(() => import('./screens/FreeplaySetupWizard.jsx'));
 const WormModeSetupWizard = React.lazy(() => import('./screens/WormModeSetupWizard.jsx'));
 const DisparitySetupWizard = React.lazy(() => import('./screens/DisparitySetupWizard.jsx'));
-const MergeThemePicker = React.lazy(() => import('./screens/MergeThemePicker.jsx'));
+const MergeThemePicker = React.lazy(() => import('../modes/merge/index.js').then((m) => ({ default: m.MergeThemePicker })));
 const DisparityWinnerScreen = React.lazy(() => import('./screens/DisparityWinnerScreen.jsx'));
 const CubeNet = React.lazy(() => import('./CubeNet.jsx'));
 const SolveMode = React.lazy(() => import('./SolveMode.jsx'));

@@ -29,7 +29,7 @@ import FlipParticles from './FlipParticles.jsx';
 import ParityBreakthrough from './ParityBreakthrough.jsx';
 import StickerWorm from './StickerWorm.jsx';
 import DisparityHealthBar from './DisparityHealthBar.jsx';
-import MergeTileOverlay from './MergeTileOverlay.jsx';
+import { MergeTileOverlay } from '../modes/merge/index.js';
 
 // Shared geometries used only by StickerPlane itself (not by extracted sub-components).
 const _sharedStickerGeo = new THREE.PlaneGeometry(0.85, 0.85);
