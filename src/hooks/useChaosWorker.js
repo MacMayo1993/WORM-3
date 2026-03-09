@@ -112,8 +112,13 @@ export function useChaosWorker({
 
   useEffect(() => {
     if (!workerRef.current || !chaosMode) return;
-    workerRef.current.postMessage({ type: 'SYNC_CUBIES', payload: { cubies } });
-  }, [chaosMode, cubies, rotationEpoch]);
+    // Use cubiesRef to read current state without triggering on every chaos flip.
+    // SYNC_CUBIES must only fire on actual cube rotations (rotationEpoch), not on
+    // every disparity flip — otherwise the worker state rolls back to the main
+    // thread's lagging snapshot and M2/corner stickers spaz from being re-flipped.
+    workerRef.current.postMessage({ type: 'SYNC_CUBIES', payload: { cubies: cubiesRef.current } });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chaosMode, rotationEpoch]);
 
   useEffect(() => {
     if (!workerRef.current) return;
