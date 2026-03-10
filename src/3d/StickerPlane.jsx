@@ -408,6 +408,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       }
       spinT.current = 1;
       prevRawP.current = 0;
+      wormIntroT.current = 3.0;
+      setShowWormIntro(true);
       // Activate spin-reveal immediately with FROM color at full disc coverage so the
       // squish phase shows the FROM colour contracting into glass — not raw face colour.
       // This eliminates the white tile flash on both halves of the flip.
@@ -604,8 +606,6 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         }
         if (stickerGridIdRef.current) flipBurstMap.delete(stickerGridIdRef.current);
         shakeT.current = 0.4;
-        wormIntroT.current = 2.0;
-        setShowWormIntro(true);
         flipFromColor.current = null;
         flipToColor.current = null;
         flipFromTexture.current = null;
