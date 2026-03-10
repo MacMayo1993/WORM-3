@@ -464,6 +464,30 @@ export const useGameStore = create(
     setMergeRegionTiers: (mergeRegionTiers) => set({ mergeRegionTiers }),
 
     // ========================================================================
+    // QUANTUM SUPERPOSITION MODE
+    // ========================================================================
+    // When enabled, some stickers flicker between two color states (their current
+    // color and its antipodal counterpart) and collapse to a definite color when
+    // the slice they live on is rotated — a wave-function-collapse mechanic.
+    quantumMode: false,
+    // Map of stickerKey → { x, y, z, dirKey, color1, color2, seed }
+    superposedStickers: {},
+
+    setQuantumMode: (v) => set({ quantumMode: v }),
+    toggleQuantumMode: () => set((state) => ({ quantumMode: !state.quantumMode })),
+    setSuperposedStickers: (v) => set(typeof v === 'function'
+      ? (state) => ({ superposedStickers: v(state.superposedStickers) })
+      : { superposedStickers: v }),
+    clearSuperposedStickers: () => set({ superposedStickers: {} }),
+
+    // ========================================================================
+    // SMOKE SCREEN MODE
+    // ========================================================================
+    // Controls the smoke-screen shuffle visual. 'off' → 'building' → 'peak' → 'clearing' → 'off'
+    smokePhase: 'off',
+    setSmokePhase: (smokePhase) => set({ smokePhase }),
+
+    // ========================================================================
     // HOLLOW VOID CUBE MODE
     // ========================================================================
     hollowMode: false,

@@ -28,6 +28,7 @@ export const BACKGROUNDS = [
     { id: 'snow', label: 'Snow Field', file: 'snow.exr', thumbnail: 'thumbnails/Snow Field.png' },
     { id: 'stadium', label: 'Stadium', file: 'stadium.exr', thumbnail: 'thumbnails/stadium.png' },
     { id: 'blackhole', label: 'Black Hole' },
+    { id: 'quantum_realm', label: 'Quantum Realm' },
     { id: 'umbrella', label: 'Umbrella', file: 'umbrella.exr', thumbnail: 'thumbnails/umbrella.png' },
 
     // Solid colors/simple themes removed

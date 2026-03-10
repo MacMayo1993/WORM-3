@@ -16,6 +16,7 @@ import { ANTIPODAL_COLOR } from '../utils/constants.js';
 import { resolveColors } from '../utils/colorSchemes.js';
 import { isInRefractory, markFlipped, clearRefractory } from '../game/refractoryMap.js';
 import { computeMergeRegions } from '../modes/merge/index.js';
+import { collapseSlice, applyCollapse, createSuperposition, clearSuperposition } from '../game/quantumState.js';
 
 // Recompute merge region tiers from the current store state and persist them.
 // Called imperatively after every rotation/shuffle when merge mode is active.
@@ -102,15 +103,31 @@ export function useCubeState() {
     }
   }, []);
 
-  // Apply rotation to cubies — single atomic setState (1 re-render instead of 3)
+  // Apply rotation to cubies — single atomic setState (1 re-render instead of 3).
+  // When Quantum Mode is active, also collapses any superposed stickers in the
+  // rotated slice (wave-function collapse: measurement forces a definite color).
   const rotateSlice = useCallback((axis, sliceIndex, dir) => {
     play('/sounds/rotate.mp3');
-    useGameStore.setState((state) => ({
-      cubies: rotateSliceCubies(state.cubies, size, axis, sliceIndex, dir),
-      rotationEpoch: state.rotationEpoch + 1,
-      moves: state.moves + 1,
-      moveHistory: [...state.moveHistory, { type: 'rotation', axis, dir, sliceIndex, timestamp: Date.now() }].slice(-10),
-    }));
+    useGameStore.setState((state) => {
+      const rotatedCubies = rotateSliceCubies(state.cubies, size, axis, sliceIndex, dir);
+
+      // Quantum collapse: stickers in the rotated slice pick a definite color
+      let finalCubies = rotatedCubies;
+      let newSuperposed = state.superposedStickers;
+      if (state.quantumMode && state.superposedStickers && Object.keys(state.superposedStickers).length > 0) {
+        const [collapsed, events] = collapseSlice(state.superposedStickers, size, axis, sliceIndex);
+        newSuperposed = collapsed;
+        finalCubies = applyCollapse(rotatedCubies, events);
+      }
+
+      return {
+        cubies: finalCubies,
+        rotationEpoch: state.rotationEpoch + 1,
+        moves: state.moves + 1,
+        moveHistory: [...state.moveHistory, { type: 'rotation', axis, dir, sliceIndex, timestamp: Date.now() }].slice(-10),
+        superposedStickers: newSuperposed,
+      };
+    });
     updateMergeTiers();
   }, [size]);
 
@@ -183,20 +200,30 @@ export function useCubeState() {
     }));
   }, []);
 
-  // Shuffle the cube
+  // Shuffle the cube with optional Smoke Screen and Quantum Superposition effects.
   const shuffle = useCallback(() => {
-    let state = makeCubies(size);
+    // Fire the smoke screen before scrambling — the smoke hides the individual moves
+    useGameStore.setState({ smokePhase: 'building' });
+
+    let scrambled = makeCubies(size);
     for (let i = 0; i < 25; i++) {
       const ax = ['row', 'col', 'depth'][Math.floor(Math.random() * 3)];
       const slice = Math.floor(Math.random() * size);
       const dir = Math.random() > 0.5 ? 1 : -1;
-      state = rotateSliceCubies(state, size, ax, slice, dir);
+      scrambled = rotateSliceCubies(scrambled, size, ax, slice, dir);
     }
-    setRotatedCubies(state);
+
+    // Quantum Mode: after scrambling, mark ~45% of stickers as superposed so
+    // the player doesn't immediately know which color each sticker "really" is.
+    const { quantumMode } = useGameStore.getState();
+    const newSuperposed = quantumMode ? createSuperposition(scrambled, size, 0.45) : clearSuperposition();
+
+    setRotatedCubies(scrambled);
     resetGame();
     clearHistory();
     clearRefractory();
     setHasShuffled(true);
+    useGameStore.setState({ superposedStickers: newSuperposed });
     updateMergeTiers();
   }, [size, setRotatedCubies, resetGame, clearHistory, setHasShuffled]);
 

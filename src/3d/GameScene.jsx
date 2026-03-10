@@ -17,6 +17,9 @@ import LayerHighlight from '../teach/LayerHighlight.jsx';
 import AntipodalVisualization from './AntipodalVisualization.jsx';
 import AntipodalModeEffects from './AntipodalModeEffects.jsx';
 import WormholeWarpFX from './WormholeWarpFX.jsx';
+import QuantumOverlay from './QuantumOverlay.jsx';
+import SmokescreenFX from './SmokescreenFX.jsx';
+import QuantumRealmBG from './QuantumRealmBG.jsx';
 
 import { HealerWormMode3DWrapper } from '../worm/HealerWormMode.jsx';
 const HolonomyWrapper = React.lazy(() => import('../holonomy/HolonomyWrapper.jsx'));
@@ -128,6 +131,9 @@ export default function GameScene({
     wormPhase === 'entering' || wormPhase === 'tunnel' || wormPhase === 'exiting'
   );
 
+  const smokePhase = useGameStore((s) => s.smokePhase);
+  const quantumMode = useGameStore((s) => s.quantumMode);
+
   return (
     <>
       {/* Lights — intensity varies by visualMode */}
@@ -161,8 +167,10 @@ export default function GameScene({
           getLevelBackground(currentLevelData.background, blackHolePulse)}
         {/* Free play: Black Hole */}
         {!currentLevelData && settings.backgroundTheme === 'blackhole' && <BlackHoleEnvironment flipTrigger={blackHolePulse} />}
+        {/* Free play: Quantum Realm — fully procedural, no external files needed */}
+        {!currentLevelData && settings.backgroundTheme === 'quantum_realm' && <QuantumRealmBG />}
         {/* Free play: interactive photo panoramas */}
-        {!currentLevelData && (
+        {!currentLevelData && settings.backgroundTheme !== 'quantum_realm' && (
           (() => {
             const bgConfig = BACKGROUNDS.find((b) => b.id === settings.backgroundTheme);
             if (bgConfig && bgConfig.file) {
@@ -226,6 +234,12 @@ export default function GameScene({
           />
         )}
         <AntipodalModeEffects />
+
+        {/* Quantum Superposition overlay — ghost stickers for unobserved states */}
+        {quantumMode && <QuantumOverlay />}
+
+        {/* Smoke Screen — covers the cube during shuffle */}
+        {smokePhase !== 'off' && <SmokescreenFX />}
 
         {wormHealerMode && (
           <ErrorBoundary3D>
