@@ -369,9 +369,16 @@ const tick = () => {
       const flipBoost = neighbor.flips > 0 ? 1.15 : 1.0;
       const propagateChance = chain.strength * basePropagation * flipBoost;
       if (Math.random() < propagateChance) {
-        const from = getStickerWorldPos(current.x, current.y, current.z, current.dirKey, size, explosionT);
-        const to = getStickerWorldPos(neighbor.x, neighbor.y, neighbor.z, neighbor.dirKey, size, explosionT);
-        cascades.push({ from, to, crossFace: neighbor.crossFace });
+        // Only emit a cascade bolt for hops between *different* cubies.
+        // Same-cubie cross-face hops (corner NX→NY→NZ) are topologically valid but
+        // produce an impact sphere right on the neighboring sticker, making it
+        // appear to randomly spaz/flash even though its flip count hasn't changed.
+        const sameCubie = neighbor.x === current.x && neighbor.y === current.y && neighbor.z === current.z;
+        if (!sameCubie) {
+          const from = getStickerWorldPos(current.x, current.y, current.z, current.dirKey, size, explosionT);
+          const to = getStickerWorldPos(neighbor.x, neighbor.y, neighbor.z, neighbor.dirKey, size, explosionT);
+          cascades.push({ from, to, crossFace: neighbor.crossFace });
+        }
         chain.tile = { x: neighbor.x, y: neighbor.y, z: neighbor.z, dirKey: neighbor.dirKey };
         chain.visited.add(`${neighbor.x},${neighbor.y},${neighbor.z},${neighbor.dirKey}`);
         break;
