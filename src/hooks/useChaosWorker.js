@@ -1,8 +1,50 @@
 import { useEffect, useRef } from 'react';
 import { useGameStore } from './useGameStore.js';
-import { buildManifoldGridMap, flipStickerPair } from '../game/manifoldLogic.js';
+import { buildManifoldGridMap, findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
+import { ANTIPODAL_COLOR, FLIP_CAP } from '../utils/constants.js';
 
 const MAX_CASCADES = 6;
+
+function applyChaosFlipsBatch(state, flips, size, manifoldMap) {
+  if (!flips?.length || !manifoldMap) return state;
+
+  const next = state.map((L) => L.map((R) => R.slice()));
+  const touchedCubies = new Map();
+
+  const getCubieForWrite = (x, y, z) => {
+    const key = `${x},${y},${z}`;
+    const cached = touchedCubies.get(key);
+    if (cached) return cached;
+    const cloned = { ...next[x][y][z], stickers: { ...next[x][y][z].stickers } };
+    next[x][y][z] = cloned;
+    touchedCubies.set(key, cloned);
+    return cloned;
+  };
+
+  const applyOne = (loc) => {
+    if (!loc) return;
+    const c = getCubieForWrite(loc.x, loc.y, loc.z);
+    const st = c.stickers[loc.dirKey];
+    if (!st) return;
+    const currentFlips = st.flips || 0;
+    if (currentFlips >= FLIP_CAP) return;
+    c.stickers[loc.dirKey] = {
+      ...st,
+      curr: ANTIPODAL_COLOR[st.curr],
+      flips: Math.min(FLIP_CAP, currentFlips + 1),
+    };
+  };
+
+  for (const [x, y, z, dirKey] of flips) {
+    const sticker = state[x]?.[y]?.[z]?.stickers?.[dirKey];
+    if (!sticker) continue;
+    const anti = findAntipodalStickerByGrid(manifoldMap, sticker, size);
+    applyOne({ x, y, z, dirKey });
+    applyOne(anti);
+  }
+
+  return next;
+}
 
 export function useChaosWorker({
   chaosMode,
@@ -22,6 +64,7 @@ export function useChaosWorker({
   addDisparityEliminatedFacesBulk,
 }) {
   const workerRef = useRef(null);
+  const manifoldMapRef = useRef(null);
 
   useEffect(() => {
     const worker = new Worker(new URL('../workers/chaosWorker.js', import.meta.url), { type: 'module' });
@@ -32,11 +75,7 @@ export function useChaosWorker({
       const { flips, cascades, deaths, eliminatedFaces, winner, metrics } = e.data.payload;
 
       if (flips?.length > 0) {
-        let next = cubiesRef.current;
-        const mmap = buildManifoldGridMap(next, size);
-        for (const [x, y, z, dirKey] of flips) {
-          next = flipStickerPair(next, size, x, y, z, dirKey, mmap);
-        }
+        const next = applyChaosFlipsBatch(cubiesRef.current, flips, size, manifoldMapRef.current);
         setCubies(next);
       }
 
@@ -90,6 +129,7 @@ export function useChaosWorker({
     if (!worker) return;
 
     if (chaosMode) {
+      manifoldMapRef.current = buildManifoldGridMap(cubies, size);
       useGameStore.getState().clearDisparityGame();
       worker.postMessage({
         type: 'START',
@@ -116,6 +156,7 @@ export function useChaosWorker({
     // SYNC_CUBIES must only fire on actual cube rotations (rotationEpoch), not on
     // every disparity flip — otherwise the worker state rolls back to the main
     // thread's lagging snapshot and M2/corner stickers spaz from being re-flipped.
+    manifoldMapRef.current = buildManifoldGridMap(cubiesRef.current, size);
     workerRef.current.postMessage({ type: 'SYNC_CUBIES', payload: { cubies: cubiesRef.current } });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chaosMode, rotationEpoch]);

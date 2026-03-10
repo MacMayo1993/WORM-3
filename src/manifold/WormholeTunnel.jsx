@@ -25,9 +25,18 @@ const _trueUp = new THREE.Vector3();
 const _c1 = new THREE.Color();
 const _c2 = new THREE.Color();
 const _cTemp = new THREE.Color();
+const _cTemp2 = new THREE.Color();
 const _streakPos = new THREE.Vector3();
 const _lPt = new THREE.Vector3();
+const _startPt = new THREE.Vector3();
 const _dummy = new THREE.Object3D();
+const _yAxis = new THREE.Vector3(0, 1, 0);
+
+const CORE_GEOMETRY_FPS = 18;
+const LIGHTNING_GEOMETRY_FPS = 24;
+const CORE_REBUILD_POS_EPS_SQ = 1e-4;
+const LIGHTNING_REBUILD_POS_EPS_SQ = 1e-4;
+const LIGHTNING_RADIUS_EPS = 1e-4;
 
 const FACE_NORM_LOCAL = {
   PX: [1, 0, 0], NX: [-1, 0, 0],
@@ -179,6 +188,13 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
   const lightningCurveRef = useRef(new THREE.CatmullRomCurve3(Array(LIGHTNING_PTS).fill(0).map(() => new THREE.Vector3())));
   const lightningJagsRef = useRef(new Float32Array(LIGHTNING_PTS * 2));
   const lightningFrameRef = useRef(-1);
+  const lastCoreGeometryBuildRef = useRef(-Infinity);
+  const lastLightningGeometryBuildRef = useRef(-Infinity);
+  const lastCoreStartRef = useRef(new THREE.Vector3());
+  const lastCoreEndRef = useRef(new THREE.Vector3());
+  const lastLightningStartRef = useRef(new THREE.Vector3());
+  const lastLightningEndRef = useRef(new THREE.Vector3());
+  const lastLightningRadiusRef = useRef(-1);
 
   useEffect(() => {
     const ct = coreTubeRef.current;
@@ -275,10 +291,18 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
       // Regenerate geometry explicitly instead of mutating array to ensure
       // normals/tangents of the fat tube recalculate correctly. TubeGeo is cheap
       // enough to do 24x per frame.
-      const oldGeo = coreTubeRef.current.geometry;
-      // 20 segments along tube, 5 radial segments
-      coreTubeRef.current.geometry = new THREE.TubeGeometry(curveRef.current, 20, 0.02, 5, false);
-      if (oldGeo) oldGeo.dispose();
+      const coreMoved =
+        lastCoreStartRef.current.distanceToSquared(_vStart) > CORE_REBUILD_POS_EPS_SQ ||
+        lastCoreEndRef.current.distanceToSquared(_vEnd) > CORE_REBUILD_POS_EPS_SQ;
+      if (coreMoved || (t - lastCoreGeometryBuildRef.current >= 1 / CORE_GEOMETRY_FPS)) {
+        const oldGeo = coreTubeRef.current.geometry;
+        // 20 segments along tube, 5 radial segments
+        coreTubeRef.current.geometry = new THREE.TubeGeometry(curveRef.current, 20, 0.02, 5, false);
+        if (oldGeo) oldGeo.dispose();
+        lastCoreGeometryBuildRef.current = t;
+        lastCoreStartRef.current.copy(_vStart);
+        lastCoreEndRef.current.copy(_vEnd);
+      }
 
       if (coreMatRef.current) {
         coreMatRef.current.uniforms.uColor1.value.copy(_c1);
@@ -398,9 +422,20 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
         }
 
         // Fat tube for the lightning bolt too! (Diameter halved per user request)
-        const oldGeo = lightningLine.geometry;
-        lightningLine.geometry = new THREE.TubeGeometry(lightningCurveRef.current, LIGHTNING_PTS * 2, 0.0075 + burstEnv * 0.0075, 4, false);
-        if (oldGeo) oldGeo.dispose();
+        const lightningRadius = 0.0075 + burstEnv * 0.0075;
+        const lightningMoved =
+          lastLightningStartRef.current.distanceToSquared(_vStart) > LIGHTNING_REBUILD_POS_EPS_SQ ||
+          lastLightningEndRef.current.distanceToSquared(_vEnd) > LIGHTNING_REBUILD_POS_EPS_SQ ||
+          Math.abs(lightningRadius - lastLightningRadiusRef.current) > LIGHTNING_RADIUS_EPS;
+        if (lightningMoved || (t - lastLightningGeometryBuildRef.current >= 1 / LIGHTNING_GEOMETRY_FPS)) {
+          const oldGeo = lightningLine.geometry;
+          lightningLine.geometry = new THREE.TubeGeometry(lightningCurveRef.current, LIGHTNING_PTS * 2, lightningRadius, 4, false);
+          if (oldGeo) oldGeo.dispose();
+          lastLightningGeometryBuildRef.current = t;
+          lastLightningStartRef.current.copy(_vStart);
+          lastLightningEndRef.current.copy(_vEnd);
+          lastLightningRadiusRef.current = lightningRadius;
+        }
 
         lightningLine.material.opacity = Math.min(0.97, burstEnv * 1.4);
 
@@ -417,8 +452,10 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
     const strands = strandsRef.current;
     if (strands) {
       const r_tip = 0.42; // Radius to the tips of the spiral arms
-      const color1Obj = _c1.clone();
-      const color2Obj = _c2.clone();
+      const color1Obj = _cTemp;
+      const color2Obj = _cTemp2;
+      color1Obj.copy(_c1);
+      color2Obj.copy(_c2);
 
       for (let side = 0; side < 2; side++) {
         const isM1 = side === 0;
@@ -454,7 +491,7 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
         for (let i = 0; i < 9; i++) {
           const idx = side * 9 + i;
 
-          const startPt = vStart.clone();
+          const startPt = _startPt.copy(vStart);
           if (i > 0) {
             // i=1..8 are the 8 arms. The spider fragment uses uTime * 5.0.
             // We rotate the 8 points around the face to match.
@@ -470,7 +507,7 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
 
           // Orientation
           _dir.subVectors(_lPt, startPt).normalize();
-          _wQuat1.setFromUnitVectors(new THREE.Vector3(0, 1, 0), _dir);
+          _wQuat1.setFromUnitVectors(_yAxis, _dir);
 
           _dummy.position.copy(_cp2);
           _dummy.quaternion.copy(_wQuat1);
