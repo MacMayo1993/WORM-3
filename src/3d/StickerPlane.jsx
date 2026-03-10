@@ -341,7 +341,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // Persistent wispy ring — replaces static color rings on all tiles
   const wispyRingMatRef = useRef();
   const [wispyRingUniforms] = React.useState(() => ({
-    uColor: { value: new THREE.Color(materialColor) },
+    uColor: { value: new THREE.Color() },
     uTime: _wispyT, // shared reference — updated once per frame externally
     uLens: { value: 0.0 },
   }));
