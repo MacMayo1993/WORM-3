@@ -50,7 +50,8 @@ export const VEC_TO_DIR = (x, y, z) => {
   if (x === 0 && y === 1 && z === 0) return 'PY';
   if (x === 0 && y === -1 && z === 0) return 'NY';
   if (x === 0 && y === 0 && z === 1) return 'PZ';
-  return 'NZ';
+  if (x === 0 && y === 0 && z === -1) return 'NZ';
+  throw new Error(`VEC_TO_DIR: invalid vector (${x}, ${y}, ${z})`);
 };
 
 // Antipodal face mapping (for Antipodal Mode)
