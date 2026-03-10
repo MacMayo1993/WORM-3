@@ -60,7 +60,7 @@ export function calculateEchoSync(totalMoves, reversalCount) {
  * @returns {string} - Unique ID
  */
 export function generateEchoId() {
-  return `echo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  return `echo-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
 }
 
 /**
