@@ -25,14 +25,11 @@ import {
 export function useAnimation() {
   const {
     size,
-    setRotatedCubies,
-    setMoves,
     animState,
     pendingMove,
     setAnimState,
     setPendingMove,
     clearAnimation,
-    addToHistory,
     antipodalMode,
     echoDelay,
     addPendingEchoRotation,
@@ -40,14 +37,11 @@ export function useAnimation() {
   } = useGameStore(
     useShallow(s => ({
       size: s.size,
-      setRotatedCubies: s.setRotatedCubies,
-      setMoves: s.setMoves,
       animState: s.animState,
       pendingMove: s.pendingMove,
       setAnimState: s.setAnimState,
       setPendingMove: s.setPendingMove,
       clearAnimation: s.clearAnimation,
-      addToHistory: s.addToHistory,
       antipodalMode: s.antipodalMode,
       echoDelay: s.echoDelay,
       addPendingEchoRotation: s.addPendingEchoRotation,
@@ -147,7 +141,7 @@ export function useAnimation() {
           cubies: rotateSliceCubies(state.cubies, size, axis, sliceIndex, dir),
           rotationEpoch: state.rotationEpoch + 1,
           moves: state.moves + 1,
-          moveHistory: [...state.moveHistory, { type: 'rotation', axis, dir, sliceIndex, timestamp: Date.now() }].slice(-10),
+          moveHistory: [...state.moveHistory, { type: 'rotation', axis, dir, sliceIndex, numTurns: 1, timestamp: Date.now() }].slice(-10),
           animState: null,
           pendingMove: null,
         }));
@@ -228,24 +222,29 @@ export function useAnimation() {
 
   // Handle move initiation (from UI interactions).
   // numTurns > 1 is used by live-drag commits so multiple quarter-turns are
-  // applied atomically without triggering N separate animState animations
-  // (Zustand batches synchronous sets, so only the last would survive).
+  // applied in one atomic setState — cubies, rotationEpoch, moves, and history
+  // all land in the same render, preventing any intermediate state from
+  // triggering win detection or a stale animation frame.
   const onMove = useCallback((axis, dir, sel, numTurns = 1) => {
     const sliceIndex = axis === 'col' ? sel.x : axis === 'row' ? sel.y : sel.z;
     if (numTurns <= 1) {
       startAnimation(axis, dir, sliceIndex);
     } else {
-      // Apply all quarter-turns directly to cubies without an animation pass.
-      setRotatedCubies((prev) => {
-        let c = prev;
-        for (let i = 0; i < numTurns; i++) c = rotateSliceCubies(c, size, axis, sliceIndex, dir);
-        return c;
-      });
-      setMoves((m) => m + numTurns);
+      // Apply all quarter-turns in a single atomic setState so no intermediate
+      // render can fire between cubies, moves, and history updates.
       play('/sounds/rotate.mp3');
-      addToHistory({ type: 'rotation', axis, dir, sliceIndex, timestamp: Date.now() });
+      useGameStore.setState((state) => {
+        let c = state.cubies;
+        for (let i = 0; i < numTurns; i++) c = rotateSliceCubies(c, state.size, axis, sliceIndex, dir);
+        return {
+          cubies: c,
+          rotationEpoch: state.rotationEpoch + 1,
+          moves: state.moves + numTurns,
+          moveHistory: [...state.moveHistory, { type: 'rotation', axis, dir, sliceIndex, numTurns, timestamp: Date.now() }].slice(-10),
+        };
+      });
     }
-  }, [startAnimation, setRotatedCubies, setMoves, addToHistory, size]);
+  }, [startAnimation, size]);
 
   return {
     // State
