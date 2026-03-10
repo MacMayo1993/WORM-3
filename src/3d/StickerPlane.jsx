@@ -1012,7 +1012,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // Check if colors are white - don't show white indicators on non-white tiles
   const currIsWhite = meta?.curr === 3;
   const origIsWhite = meta?.orig === 3;
-  const antipodalIsWhite = ANTIPODAL_COLOR[meta?.orig] === 3;
+  const _antipodalIsWhite = ANTIPODAL_COLOR[meta?.orig] === 3;
 
   // ── InstancedMesh eligibility ────────────────────────────────────────────────
   // A sticker is "instanceable" when it renders as a plain solid-colour quad with
