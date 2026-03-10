@@ -811,13 +811,24 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     ? (BIOME_GROUND_TEXTURES[stableCity] ?? null)
     : null;
 
+  const isTextureReady = (texture) => {
+    if (!texture) return false;
+    const img = texture.image ?? texture.source?.data ?? null;
+    if (!img) return false;
+    if (img.complete === false) return false;
+    const width = img.videoWidth ?? img.naturalWidth ?? img.width ?? 0;
+    const height = img.videoHeight ?? img.naturalHeight ?? img.height ?? 0;
+    return width > 0 && height > 0;
+  };
+
   // Texture and style follow the CURRENT displayed face (meta.curr).
   // Biome ground texture takes priority over face textures.
   const currTexture = isDead ? null
     : biomeGroundTexture
     ?? (biomeEnabled ? null : (faceTextures?.[meta?.curr] || null));
+  const currTextureReady = isTextureReady(currTexture);
   // Keep ref in sync so useFrame closures always read the live value.
-  currTextureRef.current = currTexture;
+  currTextureRef.current = currTextureReady ? currTexture : null;
   const baseColor = isDead ? '#555555'
     : isSudokube ? COLORS.white
       : biomeEnabled
@@ -825,7 +836,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         : (meta?.curr ? fc[meta.curr] : COLORS.black); // normal mode: show current face color
   // Full-face GLBs (colosseum, volcano) cover the sticker completely.
   // Use city-specific bgColor so edge gaps match the model's ground material, falling back to near-black.
-  const materialColor = currTexture ? '#ffffff'
+  const materialColor = currTextureReady ? '#ffffff'
     : (biomeEnabled && stableCity && isGLBFullFace(stableCity)) ? (CITY_CONFIG[stableCity]?.bgColor ?? '#0d0d0d')
       : baseColor;
 
