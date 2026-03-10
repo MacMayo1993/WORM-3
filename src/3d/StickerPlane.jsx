@@ -173,50 +173,60 @@ const spinRevealVertexShader = `
   }
 `;
 
+// Wormhole portal overlay: a hole opens from the tile's centre outward as uProgress drops
+// 1→0, revealing a dark swirling void with an accretion ring glowing in the face colour.
+// At the midpoint uColor switches to the antipodal colour and uProgress resets 0→1,
+// closing the portal as the new face colour fills back in.
 const spinRevealFragmentShader = `
   uniform vec3 uColor;
-  uniform float uProgress; // 0 = reveal just started (outer ring only), 1 = full disc
+  uniform float uProgress; // 1 = full face visible, 0 = portal fully open
   uniform float uTime;
-  uniform float uDissolve; // 0 = solid, 1 = fully dissolved — sweeps 0→1 first half, 1→0 second half
+  uniform float uDissolve; // kept for uniform API compat — unused in portal mode
   varying vec2 vUv;
 
   void main() {
     vec2 uv = vUv - 0.5;
-    float dist = length(uv);
-    // Outside-in: inner hole shrinks from 0.5 (empty) to 0 (full disc) as progress 0→1
-    float innerEdge = 0.5 * (1.0 - uProgress);
-
-    // Smooth disc boundary — only the circular area participates in the colour reveal.
-    float inDisc = 1.0 - smoothstep(0.46, 0.52, dist);
-
-    // Per-pixel dissolve mask — 14×14 coarse grid so blocks are visible.
-    // Each block has a unique random threshold; dissolve sweeps through them as uDissolve rises.
-    // Classic sin-hash: well-tested across all WebGL drivers, no scalar-broadcast issues.
-    float pixelNoise = fract(sin(dot(floor(vUv * 14.0), vec2(127.1, 311.7))) * 43758.5453);
-    // dissolveVis: 1 = colour showing, 0 = dissolved to glass backing.
-    float dissolveVis = 1.0 - smoothstep(pixelNoise - 0.06, pixelNoise + 0.06, uDissolve);
-
-    // Revealed band: new face colour sweeps from the outer rim inward (disc only).
-    float show = smoothstep(innerEdge - 0.04, innerEdge + 0.02, dist) * inDisc * dissolveVis;
-
-    // Glass cube tile backing — fully opaque so the underlying face never bleeds through.
-    // Mimics the glass visual mode: dark base with Fresnel-like rim brightening toward the disc edge.
-    float rimGlow = smoothstep(0.2, 0.45, dist) * inDisc;
-    vec3 glassColor = vec3(0.05, 0.08, 0.22) + rimGlow * 0.40;
-
-    // Spinning arc glow at the reveal edge (inside disc only).
+    float dist  = length(uv);
     float angle = atan(uv.y, uv.x);
-    float spin = 0.5 + 0.5 * sin(angle * 8.0 - uTime * 14.0);
-    float edgeDist = abs(dist - innerEdge);
-    float edgeGlow = smoothstep(0.14, 0.0, edgeDist) * spin * inDisc;
 
-    // Sparkle at the dissolve frontier — bright flash where pixels are mid-transition.
-    float dissolveEdge = smoothstep(0.10, 0.0, abs(uDissolve - pixelNoise)) * inDisc;
-    float brightness = 1.0 + edgeGlow * 0.7 + dissolveEdge * 1.2;
+    // Smooth disc clip
+    float inDisc = 1.0 - smoothstep(0.44, 0.50, dist);
+    if (inDisc < 0.001) discard;
 
-    // Always fully opaque — overlay completely covers the underlying tile during the flip,
-    // replacing the raw face colour (which could be white) with a glass cube tile appearance.
-    gl_FragColor = vec4(mix(glassColor, uColor * brightness, show), 1.0);
+    // Portal hole radius: 0 when closed (uProgress=1), max when fully open (uProgress=0).
+    // 0.50 guarantees the hole engulfs the entire disc at peak.
+    float holeRadius = (1.0 - uProgress) * 0.50;
+
+    // Signed blend: 1.0 deep inside the hole, 0.0 outside
+    float voidBlend = 1.0 - smoothstep(holeRadius - 0.025, holeRadius + 0.025, dist);
+
+    // ── Wormhole void ────────────────────────────────────────────────────────
+    // Dual-layer polar spiral that tightens toward the singularity.
+    float nd     = dist / max(holeRadius, 0.001);
+    float swirl  = angle * 2.5 - uTime * 3.4 + nd * 6.5;
+    float swirl2 = angle * 1.3 + uTime * 2.1 - nd * 4.0;
+    float vortex = (0.5 + 0.5 * sin(swirl)) * (0.6 + 0.4 * sin(swirl2));
+    vec3 voidColor = vec3(0.0, 0.012, 0.07) + vortex * 0.09 * vec3(0.15, 0.45, 1.0);
+
+    // Accretion ring: face colour glows at ~72% of the hole radius
+    float acc  = exp(-pow(dist - holeRadius * 0.72, 2.0) / (2.0 * 0.012 * 0.012));
+    voidColor += acc * uColor * 1.7;
+
+    // ── Event horizon ────────────────────────────────────────────────────────
+    float horizon = exp(-pow(dist - holeRadius, 2.0) / (2.0 * 0.008 * 0.008));
+    vec3 horizonCol = uColor * 2.2 + vec3(0.1, 0.25, 0.55);
+
+    // ── Face colour (outside the hole) ──────────────────────────────────────
+    // Subtle inward pull-glow toward the event horizon
+    float pull = exp(-max(0.0, dist - holeRadius) / 0.07) * (1.0 - voidBlend);
+    vec3 faceColor = uColor * (1.0 + pull * 0.5);
+
+    // ── Composite ────────────────────────────────────────────────────────────
+    vec3 col = mix(faceColor, voidColor, voidBlend);
+    col += horizonCol * horizon * inDisc;
+    col  = clamp(col, 0.0, 3.0);
+
+    gl_FragColor = vec4(col, inDisc);
   }
 `;
 
@@ -623,23 +633,10 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       spinT.current -= dt;
       const rawP = 1 - spinT.current;
 
-      // Ease the time variable, not the geometry — expressive control lives here.
-      const p = easeInOutCubic(rawP);
-
-      // Nonlinear squish: 1→0→1 — tile starts full, collapses to zero at midpoint
-      // where the color swaps, then expands back. Power curve (0.85) keeps the tile
-      // at near-full width for longer then accelerates the collapse, so the snap feels
-      // decisive rather than gradual.
-      const t = p < 0.5 ? 1 - p * 2 : (p - 0.5) * 2;
-      const xScale = Math.pow(t, 0.85);
-      const yPunch = 1 + Math.sin(p * Math.PI) * 0.12;
-
-      // Micro z-shear: directional crossing cue without Y-rotation.
-      const shear = Math.sin(p * Math.PI) * 0.04;
-
-      groupRef.current.scale.set(xScale, yPunch, 1);
+      // No geometry squish — the portal overlay handles the entire visual transition.
+      groupRef.current.scale.set(1, 1, 1);
       groupRef.current.rotation.y = rot[1]; // fixed — never animates
-      groupRef.current.rotation.z = rot[2] + shear;
+      groupRef.current.rotation.z = rot[2];
 
       // Broadcast flip progress so WormholeTunnel can arch-lift in sync.
       if (stickerGridIdRef.current) flipBurstMap.set(stickerGridIdRef.current, rawP);
