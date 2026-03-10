@@ -33,10 +33,6 @@ import { MergeTileOverlay } from '../modes/merge/index.js';
 
 // Shared geometries used only by StickerPlane itself (not by extracted sub-components).
 const _sharedStickerGeo = new THREE.PlaneGeometry(0.85, 0.85);
-// Shared ring/circle geometries for wormhole and flip-history indicators.
-const sharedRing38_41 = new THREE.RingGeometry(0.38, 0.41, 16);
-const sharedRing35_38 = new THREE.RingGeometry(0.35, 0.38, 16);
-const sharedRing36_40 = new THREE.RingGeometry(0.36, 0.40, 16);
 // Scratch vectors for biome edge-on fade.
 const _normal = new THREE.Vector3();
 const _worldQuat = new THREE.Quaternion();
@@ -215,6 +211,56 @@ const spinRevealFragmentShader = `
 `;
 
 
+// Shared time uniform — all wispy ring materials reference this single object so only
+// one value write per frame is needed regardless of how many tiles are on screen.
+const _wispyT = { value: 0.0 };
+
+// Persistent spinning-wispy-ring shader — replaces static color rings on every tile.
+// Reuses the same spinning-arc formula as spinRevealFragmentShader but at a fixed
+// ring radius so it animates continuously rather than during a flip.
+const wispyRingVertexShader = `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const wispyRingFragmentShader = `
+  uniform vec3 uColor;
+  uniform float uTime;
+  varying vec2 vUv;
+
+  void main() {
+    vec2 uv = vUv - 0.5;
+    float dist = length(uv);
+
+    // Clip to tile disc boundary
+    float inDisc = 1.0 - smoothstep(0.46, 0.52, dist);
+
+    // Ring annulus — occupies the outer band of the tile
+    float innerEdge = 0.28;
+    float inRing = smoothstep(innerEdge - 0.02, innerEdge + 0.02, dist) * inDisc;
+
+    // Dark glass backing (same palette as spinReveal)
+    float rimGlow = smoothstep(0.22, 0.44, dist) * inRing;
+    vec3 glassColor = vec3(0.05, 0.08, 0.22) * inRing + rimGlow * vec3(0.12, 0.18, 0.38);
+
+    // Spinning wispy arc at ring perimeter — same formula as spinReveal
+    float angle = atan(uv.y, uv.x);
+    float spin = 0.5 + 0.5 * sin(angle * 8.0 - uTime * 4.0);
+    float edgeDist = abs(dist - 0.40);
+    float edgeGlow = smoothstep(0.13, 0.0, edgeDist) * spin * inDisc;
+
+    float brightness = 1.0 + edgeGlow * 0.7;
+    vec3 col = mix(glassColor, uColor * brightness, edgeGlow);
+
+    float alpha = inRing * 0.18 + edgeGlow * 0.88;
+    gl_FragColor = vec4(col, alpha);
+  }
+`;
+
+
 const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay, mode, faceRow, faceCol, faceSize, hollow, currentDir: _currentDir }) {
   // Batch all store reads into a single subscription to minimize Zustand overhead.
   // With 54 stickers on a 3×3 cube, separate selectors = many subscriptions;
@@ -270,6 +316,12 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     uColor: { value: new THREE.Color() },
     uProgress: { value: 0.0 },
     uTime: { value: 0.0 },
+  }));
+  // Persistent wispy ring — replaces static color rings on all tiles
+  const wispyRingMatRef = useRef();
+  const [wispyRingUniforms] = React.useState(() => ({
+    uColor: { value: new THREE.Color(materialColor) },
+    uTime: _wispyT, // shared reference — updated once per frame externally
   }));
 
   // ── InstancedMesh batch integration ─────────────────────────────────────────
@@ -486,6 +538,10 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       }
       return; // skip other animations while dying
     }
+
+    // Keep the shared wispy ring time current — single cheap write before any early return
+    // so spinning rings stay animated even on otherwise-idle tiles.
+    _wispyT.value = state.clock.elapsedTime;
 
     // Compute flip state once — hasFlips guards wormhole so meta?.flips is only
     // read once per frame instead of twice (was separate wormhole + hasFlips lines).
@@ -908,6 +964,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         meshRef.current.material = newMat;
       }
     }
+    // Keep wispy ring color in sync with the tile's current color
+    if (wispyRingMatRef.current) wispyRingMatRef.current.uniforms.uColor.value.set(materialColor);
   }, [materialColor, currTexture, tileStyle, meta?.curr, meta?.flips]);
   const isWormhole = meta?.flips > 0 && meta?.curr !== meta?.orig;
   const hasFlipHistory = meta?.flips > 0;
@@ -1151,22 +1209,20 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         />
       )}
 
-      {/* Flipped tile border - skip white rings on non-white tiles */}
-      {!isDead && !isSudokube && hasFlipHistory && (
-        <>
-          {!(origIsWhite && !currIsWhite) && (
-            <mesh position={[0, 0, 0.006]}>
-              <primitive object={sharedRing38_41} attach="geometry" />
-              <meshBasicMaterial color={origColor} />
-            </mesh>
-          )}
-          {!(antipodalIsWhite && !currIsWhite) && (
-            <mesh position={[0, 0, 0.007]}>
-              <primitive object={sharedRing35_38} attach="geometry" />
-              <meshBasicMaterial color={antipodalColor} />
-            </mesh>
-          )}
-        </>
+      {/* Wispy spinning ring — replaces static color rings on every non-dead tile */}
+      {!isDead && !isSudokube && (
+        <mesh position={[0, 0, 0.007]} renderOrder={1}>
+          <primitive object={_sharedStickerGeo} attach="geometry" />
+          <shaderMaterial
+            ref={wispyRingMatRef}
+            vertexShader={wispyRingVertexShader}
+            fragmentShader={wispyRingFragmentShader}
+            uniforms={wispyRingUniforms}
+            transparent
+            depthWrite={false}
+            blending={THREE.AdditiveBlending}
+          />
+        </mesh>
       )}
 
       {!isDead && !isSudokube && (isWormhole || showWormIntro) && (
@@ -1175,10 +1231,6 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
               LOD: skip at flips === 1 (6–8 blended meshes saved for the very first wormhole frame). */}
           {isWormhole && (meta?.flips ?? 1) >= 2 && <ParityBreakthrough origColor={origColor} flipCount={meta?.flips ?? 1} />}
 
-          {isWormhole && <mesh ref={ringRef} position={[0, 0, 0.02]}>
-            <primitive object={sharedRing36_40} attach="geometry" />
-            <meshBasicMaterial color="#dda15e" transparent opacity={0.85} blending={THREE.AdditiveBlending} depthWrite={false} />
-          </mesh>}
           {isWormhole && <mesh position={[0, 0, 0.018]} renderOrder={2}>
             <primitive object={_sharedStickerGeo} attach="geometry" />
             <shaderMaterial
