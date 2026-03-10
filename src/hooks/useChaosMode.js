@@ -32,6 +32,8 @@ const computeChaosMetrics = (state, surfCoords) => {
   return { disparity, flipActive, edgeTotal };
 };
 
+const COUNTDOWN_PUBLISH_MS = 100;
+
 export function useChaosMode() {
   const chaosLevel = useGameStore((state) => state.chaosLevel);
   const setChaosLevel = useGameStore((state) => state.setChaosLevel);
@@ -68,6 +70,8 @@ export function useChaosMode() {
   upcomingRotationRef.current = upcomingRotation;
   const animStateRef = useRef(animState);
   animStateRef.current = animState;
+  const countdownRef = useRef(rotationCountdown);
+  countdownRef.current = rotationCountdown;
 
   const surfaceCoordsRef = useRef(buildSurfaceCoords(size));
   const surfaceCoordsMemo = useMemo(() => buildSurfaceCoords(size), [size]);
@@ -124,6 +128,7 @@ export function useChaosMode() {
 
     let raf = 0;
     let last = performance.now();
+    let publishAcc = 0;
 
     const loop = (now) => {
       const dt = now - last;
@@ -142,24 +147,30 @@ export function useChaosMode() {
       const minInterval = 750;
       const targetInterval = maxInterval - disparityRatio * (maxInterval - minInterval);
 
-      setRotationCountdown((prev) => {
-        const newCountdown = prev - dt;
-        if (newCountdown <= 0) {
-          const nextRotation = upcomingRotationRef.current;
-          if (nextRotation) {
-            const { axis, dir, sliceIndex } = nextRotation;
-            setAnimState({ axis, dir, sliceIndex, t: 0 });
-            const move = { axis, dir, sliceIndex };
-            setPendingMove(move);
-            pendingMoveRef.current = move;
-          }
-          const generated = generateRandomRotation(sizeRef.current);
-          setUpcomingRotation(generated);
-          upcomingRotationRef.current = generated;
-          return targetInterval;
+      const newCountdown = countdownRef.current - dt;
+      if (newCountdown <= 0) {
+        const nextRotation = upcomingRotationRef.current;
+        if (nextRotation) {
+          const { axis, dir, sliceIndex } = nextRotation;
+          setAnimState({ axis, dir, sliceIndex, t: 0 });
+          const move = { axis, dir, sliceIndex };
+          setPendingMove(move);
+          pendingMoveRef.current = move;
         }
-        return newCountdown;
-      });
+        const generated = generateRandomRotation(sizeRef.current);
+        setUpcomingRotation(generated);
+        upcomingRotationRef.current = generated;
+        countdownRef.current = targetInterval;
+        setRotationCountdown(targetInterval);
+        publishAcc = 0;
+      } else {
+        countdownRef.current = newCountdown;
+        publishAcc += dt;
+        if (publishAcc >= COUNTDOWN_PUBLISH_MS) {
+          setRotationCountdown(newCountdown);
+          publishAcc = 0;
+        }
+      }
 
       raf = requestAnimationFrame(loop);
     };
@@ -167,7 +178,9 @@ export function useChaosMode() {
     const disparity = disparityRef.current;
     const maxDisparity = size * size * 6;
     const disparityRatio = Math.min(1, disparity / maxDisparity);
-    setRotationCountdown(10000 - disparityRatio * 9250);
+    const initialCountdown = 10000 - disparityRatio * 9250;
+    countdownRef.current = initialCountdown;
+    setRotationCountdown(initialCountdown);
 
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
