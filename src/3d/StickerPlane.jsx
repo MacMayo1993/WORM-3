@@ -307,6 +307,10 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const deathAnimT = useRef(isDead ? 1 : -1);
   const wasDeadRef = useRef(isDead);
   const [deathAnimDone, setDeathAnimDone] = useState(isDead);
+  // Post-flip worm intro timer: counts down from 2 after each flip animation ends.
+  // Keeps worm(s) visible for 2 seconds even if isWormhole becomes false quickly.
+  const wormIntroT = useRef(0);
+  const [showWormIntro, setShowWormIntro] = useState(false);
   // Flash timer for ring opacity spike at midpoint crossing; decays to 0 in useFrame.
   const ringFlashRef = useRef(0);
   // Overlay ref for antipodal color bleed during flip transitions.
@@ -497,7 +501,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     // Single-boolean gate: skip the entire body on idle frames.
     // Ensure we trigger animation if the tile is flipped (since ghost tile needs uTime updates).
     // If we need to transition the ghost tile (e.g. going from active to dormant), run at least one more frame.
-    const anyActive = spinT.current > 0 || shakeT.current > 0 || showWormholeHazardFx || needsGhostUpdate || (spiderPlaneRef.current?.visible && !showGhostTile);
+    const anyActive = spinT.current > 0 || shakeT.current > 0 || showWormholeHazardFx || needsGhostUpdate || (spiderPlaneRef.current?.visible && !showGhostTile) || wormIntroT.current > 0;
     if (!anyActive) {
       isActiveRef.current = false;
       return;
@@ -600,6 +604,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         }
         if (stickerGridIdRef.current) flipBurstMap.delete(stickerGridIdRef.current);
         shakeT.current = 0.4;
+        wormIntroT.current = 2.0;
+        setShowWormIntro(true);
         flipFromColor.current = null;
         flipToColor.current = null;
         flipFromTexture.current = null;
@@ -638,6 +644,12 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       if (shakeT.current <= 0) {
         groupRef.current.position.set(pos[0], pos[1], pos[2]);
       }
+    }
+
+    // Post-flip worm intro countdown — keeps worm(s) visible for 2 s after each flip.
+    if (wormIntroT.current > 0) {
+      wormIntroT.current = Math.max(0, wormIntroT.current - delta);
+      if (wormIntroT.current <= 0) setShowWormIntro(false);
     }
 
     pulseT.current += delta * 2.1;
@@ -1157,17 +1169,17 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         </>
       )}
 
-      {!isDead && !isSudokube && isWormhole && (
+      {!isDead && !isSudokube && (isWormhole || showWormIntro) && (
         <>
           {/* Parity breakthrough — original color trying to push through.
               LOD: skip at flips === 1 (6–8 blended meshes saved for the very first wormhole frame). */}
-          {(meta?.flips ?? 1) >= 2 && <ParityBreakthrough origColor={origColor} flipCount={meta?.flips ?? 1} />}
+          {isWormhole && (meta?.flips ?? 1) >= 2 && <ParityBreakthrough origColor={origColor} flipCount={meta?.flips ?? 1} />}
 
-          <mesh ref={ringRef} position={[0, 0, 0.02]}>
+          {isWormhole && <mesh ref={ringRef} position={[0, 0, 0.02]}>
             <primitive object={sharedRing36_40} attach="geometry" />
             <meshBasicMaterial color="#dda15e" transparent opacity={0.85} blending={THREE.AdditiveBlending} depthWrite={false} />
-          </mesh>
-          <mesh position={[0, 0, 0.018]} renderOrder={2}>
+          </mesh>}
+          {isWormhole && <mesh position={[0, 0, 0.018]} renderOrder={2}>
             <primitive object={_sharedStickerGeo} attach="geometry" />
             <shaderMaterial
               ref={crackMatRef}
@@ -1178,9 +1190,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
               depthWrite={false}
               blending={THREE.AdditiveBlending}
             />
-          </mesh>
+          </mesh>}
 
-          <mesh position={[0, 0, -0.009]} scale={[1.08, 1.08, 1]} renderOrder={1}>
+          {isWormhole && <mesh position={[0, 0, -0.009]} scale={[1.08, 1.08, 1]} renderOrder={1}>
             <primitive object={_sharedStickerGeo} attach="geometry" />
             <shaderMaterial
               ref={seamLeakMatRef}
@@ -1192,10 +1204,10 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
               blending={THREE.AdditiveBlending}
               side={THREE.DoubleSide}
             />
-          </mesh>
-          {/* WORM creatures around active vortex */}
-          {Array.from({ length: Math.min(meta?.flips ?? 0, 4) }, (_, i) => {
-            const count = Math.min(meta?.flips ?? 0, 4);
+          </mesh>}
+          {/* WORM creatures around active vortex — also shown for 2 s after any flip */}
+          {Array.from({ length: Math.max(1, Math.min(meta?.flips ?? 0, 4)) }, (_, i) => {
+            const count = Math.max(1, Math.min(meta?.flips ?? 0, 4));
             const angle = (i / count) * Math.PI * 2;
             const radius = count <= 4 ? 0.25 : 0.28;
             const x = Math.cos(angle) * radius;
