@@ -827,8 +827,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     : biomeGroundTexture
     ?? (biomeEnabled ? null : (faceTextures?.[meta?.curr] || null));
   const currTextureReady = isTextureReady(currTexture);
+  const renderTexture = currTextureReady ? currTexture : null;
   // Keep ref in sync so useFrame closures always read the live value.
-  currTextureRef.current = currTextureReady ? currTexture : null;
+  currTextureRef.current = renderTexture;
   const baseColor = isDead ? '#555555'
     : isSudokube ? COLORS.white
       : biomeEnabled
@@ -1002,7 +1003,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         // a fromMat with getTileStyleMaterial — no action needed here for those.
       } else if (mat.color) {
         mat.color.set(materialColor);
-        mat.map = currTexture;
+        mat.map = renderTexture;
         mat.needsUpdate = true;
       } else if (mat.uniforms?.baseColor && !glbFullFace) {
         // Only re-apply shader material on non-full-face tiles.
@@ -1017,7 +1018,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       wispyRingMatRef.current.uniforms.uAntiColor.value.set(antipodalHexRef.current ?? materialColor);
       wispyRingMatRef.current.uniforms.uLens.value = (meta?.flips > 0 && meta?.curr !== meta?.orig) ? 1.0 : 0.0;
     }
-  }, [materialColor, currTexture, tileStyle, meta?.curr, meta?.flips]);
+  }, [materialColor, renderTexture, tileStyle, meta?.curr, meta?.flips]);
   const isWormhole = meta?.flips > 0 && meta?.curr !== meta?.orig;
   const hasFlipHistory = meta?.flips > 0;
 
@@ -1088,7 +1089,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           ) : (
             <meshStandardMaterial
               color={materialColor}
-              map={hollow ? null : currTexture}
+              map={hollow ? null : renderTexture}
               side={THREE.FrontSide}
               roughness={0.3}
               metalness={0.05}
