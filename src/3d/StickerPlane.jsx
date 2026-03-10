@@ -1,5 +1,4 @@
 import React, { useRef, useEffect, useLayoutEffect, useMemo, useState } from 'react';
-import { easeInOutCubic } from '../utils/easing.js';
 import { useFrame } from '@react-three/fiber';
 import { Text } from '@react-three/drei';
 import * as THREE from 'three';
