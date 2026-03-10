@@ -188,16 +188,16 @@ const spinRevealFragmentShader = `
     float dist  = length(uv);
     float angle = atan(uv.y, uv.x);
 
-    // Smooth disc clip
+    // Disc mask — 1.0 inside the circular tile area, 0.0 in the square corners.
+    // Corners render as plain face colour so the whole tile quad is covered (no white bleed).
     float inDisc = 1.0 - smoothstep(0.44, 0.50, dist);
-    if (inDisc < 0.001) discard;
 
     // Portal hole radius: 0 when closed (uProgress=1), max when fully open (uProgress=0).
     // 0.50 guarantees the hole engulfs the entire disc at peak.
     float holeRadius = (1.0 - uProgress) * 0.50;
 
-    // Signed blend: 1.0 deep inside the hole, 0.0 outside
-    float voidBlend = 1.0 - smoothstep(holeRadius - 0.025, holeRadius + 0.025, dist);
+    // Signed blend: 1.0 deep inside the hole, 0.0 outside — only active within the disc
+    float voidBlend = (1.0 - smoothstep(holeRadius - 0.025, holeRadius + 0.025, dist)) * inDisc;
 
     // ── Wormhole void ────────────────────────────────────────────────────────
     // Dual-layer polar spiral that tightens toward the singularity.
@@ -215,9 +215,9 @@ const spinRevealFragmentShader = `
     float horizon = exp(-pow(dist - holeRadius, 2.0) / (2.0 * 0.008 * 0.008));
     vec3 horizonCol = uColor * 2.2 + vec3(0.1, 0.25, 0.55);
 
-    // ── Face colour (outside the hole) ──────────────────────────────────────
-    // Subtle inward pull-glow toward the event horizon
-    float pull = exp(-max(0.0, dist - holeRadius) / 0.07) * (1.0 - voidBlend);
+    // ── Face colour (outside the hole, and in the square corners) ───────────
+    // Subtle inward pull-glow toward the event horizon (only inside disc)
+    float pull = exp(-max(0.0, dist - holeRadius) / 0.07) * (1.0 - voidBlend) * inDisc;
     vec3 faceColor = uColor * (1.0 + pull * 0.5);
 
     // ── Composite ────────────────────────────────────────────────────────────
@@ -225,7 +225,9 @@ const spinRevealFragmentShader = `
     col += horizonCol * horizon * inDisc;
     col  = clamp(col, 0.0, 3.0);
 
-    gl_FragColor = vec4(col, inDisc);
+    // Always fully opaque — covers the entire tile quad including square corners,
+    // so the underlying mesh material never shows through during the flip.
+    gl_FragColor = vec4(col, 1.0);
   }
 `;
 
