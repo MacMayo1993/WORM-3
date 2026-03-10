@@ -1136,8 +1136,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         <meshBasicMaterial transparent opacity={0} blending={THREE.AdditiveBlending} depthWrite={false} />
       </mesh>
 
-      {/* Spin-reveal overlay — new face appears as a spinning circle from the outer rim inward */}
-      <mesh ref={spinRevealRef} position={[0, 0, 0.005]} visible={false} renderOrder={1}>
+      {/* Wormhole portal overlay — covers the tile during the flip animation */}
+      <mesh ref={spinRevealRef} position={[0, 0, 0]} visible={false} renderOrder={10}>
         <primitive object={_sharedStickerGeo} attach="geometry" />
         <shaderMaterial
           ref={spinRevealMatRef}
@@ -1145,6 +1145,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           fragmentShader={spinRevealFragmentShader}
           uniforms={spinRevealUniforms}
           transparent
+          depthTest={false}
           depthWrite={false}
         />
       </mesh>
