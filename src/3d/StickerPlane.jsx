@@ -180,13 +180,6 @@ const spinRevealFragmentShader = `
   uniform float uDissolve; // 0 = solid, 1 = fully dissolved — sweeps 0→1 first half, 1→0 second half
   varying vec2 vUv;
 
-  // Coarse-grid hash — one value per N×N pixel block, drives the dissolve scatter order.
-  float hash2(vec2 p) {
-    p = fract(p * vec2(127.1, 311.7));
-    p += dot(p, p + 43.21);
-    return fract(p.x * p.y);
-  }
-
   void main() {
     vec2 uv = vUv - 0.5;
     float dist = length(uv);
@@ -198,7 +191,8 @@ const spinRevealFragmentShader = `
 
     // Per-pixel dissolve mask — 14×14 coarse grid so blocks are visible.
     // Each block has a unique random threshold; dissolve sweeps through them as uDissolve rises.
-    float pixelNoise = hash2(floor(vUv * 14.0));
+    // Classic sin-hash: well-tested across all WebGL drivers, no scalar-broadcast issues.
+    float pixelNoise = fract(sin(dot(floor(vUv * 14.0), vec2(127.1, 311.7))) * 43758.5453);
     // dissolveVis: 1 = colour showing, 0 = dissolved to glass backing.
     float dissolveVis = 1.0 - smoothstep(pixelNoise - 0.06, pixelNoise + 0.06, uDissolve);
 
@@ -998,8 +992,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     // Keep wispy ring color and lens flag in sync with tile state
     if (wispyRingMatRef.current) {
       wispyRingMatRef.current.uniforms.uColor.value.set(materialColor);
-      const lensOn = (meta?.flips ?? 0) > 0 && meta?.curr !== meta?.orig;
-      wispyRingMatRef.current.uniforms.uLens.value = lensOn ? 1.0 : 0.0;
+      wispyRingMatRef.current.uniforms.uLens.value = (meta?.flips > 0 && meta?.curr !== meta?.orig) ? 1.0 : 0.0;
     }
   }, [materialColor, currTexture, tileStyle, meta?.curr, meta?.flips]);
   const isWormhole = meta?.flips > 0 && meta?.curr !== meta?.orig;
