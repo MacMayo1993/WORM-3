@@ -405,8 +405,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const deathAnimT = useRef(isDead ? 1 : -1);
   const wasDeadRef = useRef(isDead);
   const [deathAnimDone, setDeathAnimDone] = useState(isDead);
-  // Post-flip worm intro timer: counts down from 2 after each flip animation ends.
-  // Keeps worm(s) visible for 2 seconds even if isWormhole becomes false quickly.
+  // Post-flip worm intro timer: counts down from 6 after each flip animation ends.
+  // Keeps worm(s) visible for 6 seconds even if isWormhole becomes false quickly.
   const wormIntroT = useRef(0);
   const [showWormIntro, setShowWormIntro] = useState(false);
   // Flash timer for ring opacity spike at midpoint crossing; decays to 0 in useFrame.
@@ -506,7 +506,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       }
       spinT.current = 1;
       prevRawP.current = 0;
-      wormIntroT.current = 3.0;
+      wormIntroT.current = 6.0;
       setShowWormIntro(true);
       // Activate spin-reveal immediately with FROM color at full disc coverage so the
       // squish phase shows the FROM colour contracting into glass — not raw face colour.
@@ -738,7 +738,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       }
     }
 
-    // Post-flip worm intro countdown — keeps worm(s) visible for 2 s after each flip.
+    // Post-flip worm intro countdown — keeps worm(s) visible for 6 s after each flip.
     if (wormIntroT.current > 0) {
       wormIntroT.current = Math.max(0, wormIntroT.current - delta);
       if (wormIntroT.current <= 0) setShowWormIntro(false);
@@ -1310,14 +1310,16 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
               side={THREE.DoubleSide}
             />
           </mesh>}
-          {/* WORM creatures around active vortex — also shown for 2 s after any flip */}
-          {Array.from({ length: Math.max(1, Math.min(meta?.flips ?? 0, 4)) }, (_, i) => {
-            const count = Math.max(1, Math.min(meta?.flips ?? 0, 4));
+          {/* WORM creatures around active vortex — also shown for 6 s after any flip. */}
+          {Array.from({ length: Math.max(showWormIntro ? 2 : 1, Math.min(meta?.flips ?? 0, 4)) }, (_, i) => {
+            const count = Math.max(showWormIntro ? 2 : 1, Math.min(meta?.flips ?? 0, 4));
             const angle = (i / count) * Math.PI * 2;
-            const radius = count <= 4 ? 0.25 : 0.28;
+            const radius = showWormIntro && !isWormhole ? 0.22 : (count <= 4 ? 0.25 : 0.28);
             const x = Math.cos(angle) * radius;
             const y = Math.sin(angle) * radius;
-            const scale = count <= 4 ? 0.7 + (i % 2) * 0.1 : 0.6;
+            const scale = (showWormIntro && !isWormhole)
+              ? (0.98 + (i % 2) * 0.08)
+              : (count <= 4 ? 0.7 + (i % 2) * 0.1 : 0.6);
             return (
               <StickerWorm
                 key={i}
