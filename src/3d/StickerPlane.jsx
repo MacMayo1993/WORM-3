@@ -811,13 +811,25 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     ? (BIOME_GROUND_TEXTURES[stableCity] ?? null)
     : null;
 
+  const isTextureReady = (texture) => {
+    if (!texture) return false;
+    const img = texture.image ?? texture.source?.data ?? null;
+    if (!img) return false;
+    if (img.complete === false) return false;
+    const width = img.videoWidth ?? img.naturalWidth ?? img.width ?? 0;
+    const height = img.videoHeight ?? img.naturalHeight ?? img.height ?? 0;
+    return width > 0 && height > 0;
+  };
+
   // Texture and style follow the CURRENT displayed face (meta.curr).
   // Biome ground texture takes priority over face textures.
   const currTexture = isDead ? null
     : biomeGroundTexture
     ?? (biomeEnabled ? null : (faceTextures?.[meta?.curr] || null));
+  const currTextureReady = isTextureReady(currTexture);
+  const renderTexture = currTextureReady ? currTexture : null;
   // Keep ref in sync so useFrame closures always read the live value.
-  currTextureRef.current = currTexture;
+  currTextureRef.current = renderTexture;
   const baseColor = isDead ? '#555555'
     : isSudokube ? COLORS.white
       : biomeEnabled
@@ -825,7 +837,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         : (meta?.curr ? fc[meta.curr] : COLORS.black); // normal mode: show current face color
   // Full-face GLBs (colosseum, volcano) cover the sticker completely.
   // Use city-specific bgColor so edge gaps match the model's ground material, falling back to near-black.
-  const materialColor = currTexture ? '#ffffff'
+  const materialColor = currTextureReady ? '#ffffff'
     : (biomeEnabled && stableCity && isGLBFullFace(stableCity)) ? (CITY_CONFIG[stableCity]?.bgColor ?? '#0d0d0d')
       : baseColor;
 
@@ -991,7 +1003,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         // a fromMat with getTileStyleMaterial — no action needed here for those.
       } else if (mat.color) {
         mat.color.set(materialColor);
-        mat.map = currTexture;
+        mat.map = renderTexture;
         mat.needsUpdate = true;
       } else if (mat.uniforms?.baseColor && !glbFullFace) {
         // Only re-apply shader material on non-full-face tiles.
@@ -1006,7 +1018,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       wispyRingMatRef.current.uniforms.uAntiColor.value.set(antipodalHexRef.current ?? materialColor);
       wispyRingMatRef.current.uniforms.uLens.value = (meta?.flips > 0 && meta?.curr !== meta?.orig) ? 1.0 : 0.0;
     }
-  }, [materialColor, currTexture, tileStyle, meta?.curr, meta?.flips]);
+  }, [materialColor, renderTexture, tileStyle, meta?.curr, meta?.flips]);
   const isWormhole = meta?.flips > 0 && meta?.curr !== meta?.orig;
   const hasFlipHistory = meta?.flips > 0;
 
@@ -1077,7 +1089,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           ) : (
             <meshStandardMaterial
               color={materialColor}
-              map={hollow ? null : currTexture}
+              map={hollow ? null : renderTexture}
               side={THREE.FrontSide}
               roughness={0.3}
               metalness={0.05}
