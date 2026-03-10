@@ -238,6 +238,7 @@ export default function WORM3() {
   // Animated shuffle: resets to solved, then plays 15 quick layer rotations visually.
   // Uses a 50ms delay after reset so React commits the solved layout before animation starts.
   const animatedShuffle = useCallback(() => {
+    useGameStore.getState().setCubies(makeCubies(size));
     useGameStore.getState().resetGame();
     const axes = ['row', 'col', 'depth'];
     const moves = Array.from({ length: 15 }, () => ({
