@@ -160,6 +160,8 @@ export function StickerInstanceProvider({ children }) {
     // Invalidate the cached color so the recycled slot uploads correctly on first use.
     const base = entry.slot * 3;
     lastColorsRef.current[base] = NaN;
+    lastColorsRef.current[base + 1] = NaN;
+    lastColorsRef.current[base + 2] = NaN;
   }, [instanceMesh]);
 
   // ── Per-frame update ────────────────────────────────────────────────────────
