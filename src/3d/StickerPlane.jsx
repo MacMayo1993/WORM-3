@@ -405,8 +405,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const deathAnimT = useRef(isDead ? 1 : -1);
   const wasDeadRef = useRef(isDead);
   const [deathAnimDone, setDeathAnimDone] = useState(isDead);
-  // Post-flip worm intro timer: counts down from 2 after each flip animation ends.
-  // Keeps worm(s) visible for 2 seconds even if isWormhole becomes false quickly.
+  // Post-flip worm intro timer: counts down from 6 after each flip animation ends.
+  // Keeps worm(s) visible for 6 seconds even if isWormhole becomes false quickly.
   const wormIntroT = useRef(0);
   const [showWormIntro, setShowWormIntro] = useState(false);
   // Flash timer for ring opacity spike at midpoint crossing; decays to 0 in useFrame.
@@ -506,7 +506,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       }
       spinT.current = 1;
       prevRawP.current = 0;
-      wormIntroT.current = 3.0;
+      wormIntroT.current = 6.0;
       setShowWormIntro(true);
       // Activate spin-reveal immediately with FROM color at full disc coverage so the
       // squish phase shows the FROM colour contracting into glass — not raw face colour.
@@ -738,7 +738,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       }
     }
 
-    // Post-flip worm intro countdown — keeps worm(s) visible for 2 s after each flip.
+    // Post-flip worm intro countdown — keeps worm(s) visible for 6 s after each flip.
     if (wormIntroT.current > 0) {
       wormIntroT.current = Math.max(0, wormIntroT.current - delta);
       if (wormIntroT.current <= 0) setShowWormIntro(false);
@@ -811,13 +811,25 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     ? (BIOME_GROUND_TEXTURES[stableCity] ?? null)
     : null;
 
+  const isTextureReady = (texture) => {
+    if (!texture) return false;
+    const img = texture.image ?? texture.source?.data ?? null;
+    if (!img) return false;
+    if (img.complete === false) return false;
+    const width = img.videoWidth ?? img.naturalWidth ?? img.width ?? 0;
+    const height = img.videoHeight ?? img.naturalHeight ?? img.height ?? 0;
+    return width > 0 && height > 0;
+  };
+
   // Texture and style follow the CURRENT displayed face (meta.curr).
   // Biome ground texture takes priority over face textures.
   const currTexture = isDead ? null
     : biomeGroundTexture
     ?? (biomeEnabled ? null : (faceTextures?.[meta?.curr] || null));
+  const currTextureReady = isTextureReady(currTexture);
+  const renderTexture = currTextureReady ? currTexture : null;
   // Keep ref in sync so useFrame closures always read the live value.
-  currTextureRef.current = currTexture;
+  currTextureRef.current = renderTexture;
   const baseColor = isDead ? '#555555'
     : isSudokube ? COLORS.white
       : biomeEnabled
@@ -825,7 +837,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         : (meta?.curr ? fc[meta.curr] : COLORS.black); // normal mode: show current face color
   // Full-face GLBs (colosseum, volcano) cover the sticker completely.
   // Use city-specific bgColor so edge gaps match the model's ground material, falling back to near-black.
-  const materialColor = currTexture ? '#ffffff'
+  const materialColor = currTextureReady ? '#ffffff'
     : (biomeEnabled && stableCity && isGLBFullFace(stableCity)) ? (CITY_CONFIG[stableCity]?.bgColor ?? '#0d0d0d')
       : baseColor;
 
@@ -991,7 +1003,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         // a fromMat with getTileStyleMaterial — no action needed here for those.
       } else if (mat.color) {
         mat.color.set(materialColor);
-        mat.map = currTexture;
+        mat.map = renderTexture;
         mat.needsUpdate = true;
       } else if (mat.uniforms?.baseColor && !glbFullFace) {
         // Only re-apply shader material on non-full-face tiles.
@@ -1006,7 +1018,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       wispyRingMatRef.current.uniforms.uAntiColor.value.set(antipodalHexRef.current ?? materialColor);
       wispyRingMatRef.current.uniforms.uLens.value = (meta?.flips > 0 && meta?.curr !== meta?.orig) ? 1.0 : 0.0;
     }
-  }, [materialColor, currTexture, tileStyle, meta?.curr, meta?.flips]);
+  }, [materialColor, renderTexture, tileStyle, meta?.curr, meta?.flips]);
   const isWormhole = meta?.flips > 0 && meta?.curr !== meta?.orig;
   const hasFlipHistory = meta?.flips > 0;
 
@@ -1077,7 +1089,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           ) : (
             <meshStandardMaterial
               color={materialColor}
-              map={hollow ? null : currTexture}
+              map={hollow ? null : renderTexture}
               side={THREE.FrontSide}
               roughness={0.3}
               metalness={0.05}
@@ -1298,14 +1310,16 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
               side={THREE.DoubleSide}
             />
           </mesh>}
-          {/* WORM creatures around active vortex — also shown for 2 s after any flip */}
-          {Array.from({ length: Math.max(1, Math.min(meta?.flips ?? 0, 4)) }, (_, i) => {
-            const count = Math.max(1, Math.min(meta?.flips ?? 0, 4));
+          {/* WORM creatures around active vortex — also shown for 6 s after any flip. */}
+          {Array.from({ length: Math.max(showWormIntro ? 2 : 1, Math.min(meta?.flips ?? 0, 4)) }, (_, i) => {
+            const count = Math.max(showWormIntro ? 2 : 1, Math.min(meta?.flips ?? 0, 4));
             const angle = (i / count) * Math.PI * 2;
-            const radius = count <= 4 ? 0.25 : 0.28;
+            const radius = showWormIntro && !isWormhole ? 0.22 : (count <= 4 ? 0.25 : 0.28);
             const x = Math.cos(angle) * radius;
             const y = Math.sin(angle) * radius;
-            const scale = count <= 4 ? 0.7 + (i % 2) * 0.1 : 0.6;
+            const scale = (showWormIntro && !isWormhole)
+              ? (0.98 + (i % 2) * 0.08)
+              : (count <= 4 ? 0.7 + (i % 2) * 0.1 : 0.6);
             return (
               <StickerWorm
                 key={i}

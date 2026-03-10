@@ -6,11 +6,12 @@ import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
-const _wormGeoHead = new THREE.SphereGeometry(0.022, 8, 8);
-const _wormGeoSeg1 = new THREE.SphereGeometry(0.018, 6, 6);
-const _wormGeoSeg2 = new THREE.SphereGeometry(0.017, 6, 6);
-const _wormGeoSeg3 = new THREE.SphereGeometry(0.015, 6, 6);
-const _wormGeoTail = new THREE.SphereGeometry(0.011, 6, 6);
+const _wormGeoHead = new THREE.SphereGeometry(0.028, 10, 10);
+const _wormGeoSeg1 = new THREE.SphereGeometry(0.024, 8, 8);
+const _wormGeoSeg2 = new THREE.SphereGeometry(0.022, 8, 8);
+const _wormGeoSeg3 = new THREE.SphereGeometry(0.020, 8, 8);
+const _wormGeoTail = new THREE.SphereGeometry(0.016, 8, 8);
+const _wormGlowGeo = new THREE.SphereGeometry(0.045, 10, 10);
 
 const StickerWorm = ({ position, rotation, scale = 1 }) => {
     const headRef = useRef();
@@ -21,8 +22,8 @@ const StickerWorm = ({ position, rotation, scale = 1 }) => {
 
     useFrame(({ clock }) => {
         const time = clock.elapsedTime;
-        const freq = 3.5;
-        const amp = 0.020 * scale;
+        const freq = 4.2;
+        const amp = 0.028 * scale;
         const refs = [headRef, seg1Ref, seg2Ref, seg3Ref, tailRef];
         refs.forEach((ref, i) => {
             if (!ref.current) return;
@@ -30,31 +31,46 @@ const StickerWorm = ({ position, rotation, scale = 1 }) => {
         });
     });
 
-    const sp = 0.025 * scale; // spacing between segments along body axis
+    const sp = 0.034 * scale; // spacing between segments along body axis
 
     return (
         // rotation = angle of this worm's orbit position; +PI/2 = tangent direction.
         <group position={position} rotation={[0, 0, rotation + Math.PI / 2]}>
-            <mesh ref={headRef} position={[sp * 2, 0, 0.016]}>
+            <mesh ref={headRef} position={[sp * 2, 0, 0.026]} renderOrder={4}>
                 <primitive object={_wormGeoHead} attach="geometry" />
-                <meshBasicMaterial color="#dda15e" />
+                <meshBasicMaterial color="#f2c38b" toneMapped={false} />
             </mesh>
-            <mesh ref={seg1Ref} position={[sp, 0, 0.015]}>
+            <mesh ref={seg1Ref} position={[sp, 0, 0.024]} renderOrder={4}>
                 <primitive object={_wormGeoSeg1} attach="geometry" />
-                <meshBasicMaterial color="#bc6c25" />
+                <meshBasicMaterial color="#dda15e" toneMapped={false} />
             </mesh>
-            <mesh ref={seg2Ref} position={[0, 0, 0.015]}>
+            <mesh ref={seg2Ref} position={[0, 0, 0.023]} renderOrder={4}>
                 <primitive object={_wormGeoSeg2} attach="geometry" />
-                <meshBasicMaterial color="#a05c20" />
+                <meshBasicMaterial color="#bc6c25" toneMapped={false} />
             </mesh>
-            <mesh ref={seg3Ref} position={[-sp, 0, 0.015]}>
+            <mesh ref={seg3Ref} position={[-sp, 0, 0.022]} renderOrder={4}>
                 <primitive object={_wormGeoSeg3} attach="geometry" />
-                <meshBasicMaterial color="#bc6c25" />
+                <meshBasicMaterial color="#a05c20" toneMapped={false} />
             </mesh>
-            <mesh ref={tailRef} position={[-sp * 2, 0, 0.015]}>
+            <mesh ref={tailRef} position={[-sp * 2, 0, 0.021]} renderOrder={4}>
                 <primitive object={_wormGeoTail} attach="geometry" />
-                <meshBasicMaterial color="#a05c20" />
+                <meshBasicMaterial color="#8f4e1b" toneMapped={false} />
             </mesh>
+
+            {/* Soft additive glow so ghost worms read clearly above busy tile art */}
+            {[sp * 2, sp, 0, -sp, -sp * 2].map((x, i) => (
+                <mesh key={i} position={[x, 0, 0.018]} renderOrder={3}>
+                    <primitive object={_wormGlowGeo} attach="geometry" />
+                    <meshBasicMaterial
+                        color="#ffe6c6"
+                        transparent
+                        opacity={i === 0 ? 0.24 : 0.14}
+                        blending={THREE.AdditiveBlending}
+                        depthWrite={false}
+                        toneMapped={false}
+                    />
+                </mesh>
+            ))}
         </group>
     );
 };
