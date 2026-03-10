@@ -34,6 +34,9 @@ const _yAxis = new THREE.Vector3(0, 1, 0);
 
 const CORE_GEOMETRY_FPS = 18;
 const LIGHTNING_GEOMETRY_FPS = 24;
+const CORE_REBUILD_POS_EPS_SQ = 1e-4;
+const LIGHTNING_REBUILD_POS_EPS_SQ = 1e-4;
+const LIGHTNING_RADIUS_EPS = 1e-4;
 
 const FACE_NORM_LOCAL = {
   PX: [1, 0, 0], NX: [-1, 0, 0],
@@ -185,8 +188,13 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
   const lightningCurveRef = useRef(new THREE.CatmullRomCurve3(Array(LIGHTNING_PTS).fill(0).map(() => new THREE.Vector3())));
   const lightningJagsRef = useRef(new Float32Array(LIGHTNING_PTS * 2));
   const lightningFrameRef = useRef(-1);
-  const lastCoreGeometryBuildRef = useRef(0);
-  const lastLightningGeometryBuildRef = useRef(0);
+  const lastCoreGeometryBuildRef = useRef(-Infinity);
+  const lastLightningGeometryBuildRef = useRef(-Infinity);
+  const lastCoreStartRef = useRef(new THREE.Vector3());
+  const lastCoreEndRef = useRef(new THREE.Vector3());
+  const lastLightningStartRef = useRef(new THREE.Vector3());
+  const lastLightningEndRef = useRef(new THREE.Vector3());
+  const lastLightningRadiusRef = useRef(-1);
 
   useEffect(() => {
     const ct = coreTubeRef.current;
@@ -283,12 +291,17 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
       // Regenerate geometry explicitly instead of mutating array to ensure
       // normals/tangents of the fat tube recalculate correctly. TubeGeo is cheap
       // enough to do 24x per frame.
-      if (t - lastCoreGeometryBuildRef.current >= 1 / CORE_GEOMETRY_FPS) {
+      const coreMoved =
+        lastCoreStartRef.current.distanceToSquared(_vStart) > CORE_REBUILD_POS_EPS_SQ ||
+        lastCoreEndRef.current.distanceToSquared(_vEnd) > CORE_REBUILD_POS_EPS_SQ;
+      if (coreMoved || (t - lastCoreGeometryBuildRef.current >= 1 / CORE_GEOMETRY_FPS)) {
         const oldGeo = coreTubeRef.current.geometry;
         // 20 segments along tube, 5 radial segments
         coreTubeRef.current.geometry = new THREE.TubeGeometry(curveRef.current, 20, 0.02, 5, false);
         if (oldGeo) oldGeo.dispose();
         lastCoreGeometryBuildRef.current = t;
+        lastCoreStartRef.current.copy(_vStart);
+        lastCoreEndRef.current.copy(_vEnd);
       }
 
       if (coreMatRef.current) {
@@ -409,11 +422,19 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
         }
 
         // Fat tube for the lightning bolt too! (Diameter halved per user request)
-        if (t - lastLightningGeometryBuildRef.current >= 1 / LIGHTNING_GEOMETRY_FPS) {
+        const lightningRadius = 0.0075 + burstEnv * 0.0075;
+        const lightningMoved =
+          lastLightningStartRef.current.distanceToSquared(_vStart) > LIGHTNING_REBUILD_POS_EPS_SQ ||
+          lastLightningEndRef.current.distanceToSquared(_vEnd) > LIGHTNING_REBUILD_POS_EPS_SQ ||
+          Math.abs(lightningRadius - lastLightningRadiusRef.current) > LIGHTNING_RADIUS_EPS;
+        if (lightningMoved || (t - lastLightningGeometryBuildRef.current >= 1 / LIGHTNING_GEOMETRY_FPS)) {
           const oldGeo = lightningLine.geometry;
-          lightningLine.geometry = new THREE.TubeGeometry(lightningCurveRef.current, LIGHTNING_PTS * 2, 0.0075 + burstEnv * 0.0075, 4, false);
+          lightningLine.geometry = new THREE.TubeGeometry(lightningCurveRef.current, LIGHTNING_PTS * 2, lightningRadius, 4, false);
           if (oldGeo) oldGeo.dispose();
           lastLightningGeometryBuildRef.current = t;
+          lastLightningStartRef.current.copy(_vStart);
+          lastLightningEndRef.current.copy(_vEnd);
+          lastLightningRadiusRef.current = lightningRadius;
         }
 
         lightningLine.material.opacity = Math.min(0.97, burstEnv * 1.4);
