@@ -9,6 +9,7 @@ import React, { Suspense } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Environment, Html } from '@react-three/drei';
 import { useGameStore } from '../hooks/useGameStore.js';
+import { useShallow } from 'zustand/react/shallow';
 import CubeAssembly from './CubeAssembly.jsx';
 import BlackHoleEnvironment from './BlackHoleEnvironment.jsx';
 import { getLevelBackground } from './LifeJourneyBackgrounds.jsx';
@@ -110,19 +111,35 @@ export default function GameScene({
   layerHighlight,
 }) {
   // ── State from store ──────────────────────────────────────────────────────
-  const visualMode = useGameStore((s) => s.visualMode);
-  const explosionT = useGameStore((s) => s.explosionT);
-  const currentLevelData = useGameStore((s) => s.currentLevelData);
-  const blackHolePulse = useGameStore((s) => s.blackHolePulse);
-  const settings = useGameStore((s) => s.settings);
-  const antipodalIntegrityMode = useGameStore((s) => s.antipodalIntegrityMode);
-  const solveModeActive = useGameStore((s) => s.solveModeActive);
-  const solveHighlights = useGameStore((s) => s.solveHighlights);
-  const size = useGameStore((s) => s.size);
-  const cubies = useGameStore((s) => s.cubies);
-  const wormHealerMode = useGameStore((s) => s.wormHealerMode);
-  const wormPhase = useGameStore((s) => s.wormPhase);
-  const holonomyMode = useGameStore((s) => s.holonomyMode);
+  const {
+    visualMode,
+    explosionT,
+    currentLevelData,
+    blackHolePulse,
+    settings,
+    antipodalIntegrityMode,
+    solveModeActive,
+    solveHighlights,
+    size,
+    cubies,
+    wormHealerMode,
+    wormPhase,
+    holonomyMode,
+  } = useGameStore(useShallow((s) => ({
+    visualMode: s.visualMode,
+    explosionT: s.explosionT,
+    currentLevelData: s.currentLevelData,
+    blackHolePulse: s.blackHolePulse,
+    settings: s.settings,
+    antipodalIntegrityMode: s.antipodalIntegrityMode,
+    solveModeActive: s.solveModeActive,
+    solveHighlights: s.solveHighlights,
+    size: s.size,
+    cubies: s.cubies,
+    wormHealerMode: s.wormHealerMode,
+    wormPhase: s.wormPhase,
+    holonomyMode: s.holonomyMode,
+  })));
 
   const wormholePhaseActive = wormHealerMode && (
     wormPhase === 'entering' || wormPhase === 'tunnel' || wormPhase === 'exiting'

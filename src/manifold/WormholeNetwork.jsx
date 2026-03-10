@@ -24,7 +24,10 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
       explosionFactor: s.explosionT,
     }))
   );
-  const fc = resolveColors(settings, settings?.biomeMode?.faceAssignment) || FACE_COLORS;
+  const fc = useMemo(
+    () => resolveColors(settings, settings?.biomeMode?.faceAssignment) || FACE_COLORS,
+    [settings]
+  );
 
   // B4: debounce cubies so tunnel geometry only rebuilds at most every 150ms
   // instead of on every sticker flip (~12×/s at L4 chaos).
