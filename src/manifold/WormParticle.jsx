@@ -59,7 +59,7 @@ const WormParticle = ({
   const trailRefs        = useRef([]);
   const trailGeoRef      = useRef();
 
-  const duration = 2.2;
+  const duration = 3.2;
 
   // ── Unique personality — stable across re-renders ─────────────────────────
   const p = useMemo(() => ({
