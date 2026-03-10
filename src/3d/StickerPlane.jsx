@@ -52,7 +52,6 @@ const _stickerFrameShape = (() => {
   hole.lineTo(inner, -inner);
   hole.closePath();
   shape.holes.push(hole);
-  shape.holes.push(hole);
   return shape;
 })();
 
@@ -300,7 +299,10 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       mergeTheme: s.mergeTheme,
     }))
   );
-  const fc = resolveColors(settings, settings?.biomeMode?.faceAssignment) || FACE_COLORS;
+  const fc = useMemo(
+    () => resolveColors(settings, settings?.biomeMode?.faceAssignment) || FACE_COLORS,
+    [settings]
+  );
   const manifoldStyles = settings?.manifoldStyles;
   // In Disparity Mode (chaosLevel > 0), use the configurable flip cap; otherwise the global constant
   const effectiveFlipCap = chaosLevel > 0 ? disparityFlipCap : FLIP_CAP;
@@ -927,6 +929,26 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     uvs.needsUpdate = true;
   }, [hollow, biomeGroundTexture, currTexture, faceRow, faceCol, faceSize]);
 
+  // ── InstancedMesh eligibility ────────────────────────────────────────────────
+  // A sticker is "instanceable" when it renders as a plain solid-colour quad with
+  // no shader, no special geometry, and no biome overlay.  The manager handles the
+  // draw call; StickerPlane skips its own <mesh> to avoid a redundant render.
+  // All per-sticker animations (flip squish, tremor, shake) still run normally —
+  // they modify groupRef / innerGroupRef, and the manager samples matrixWorld.
+  // Declared here (before the useLayoutEffect) so it is available in both the
+  // effect body and its deps array — the ref write still lands in the commit phase.
+  const isInstanceable = (
+    !!instanceCtx &&
+    instancedSlotValid &&
+    !hollow &&
+    !isGlass &&
+    !isSudokube &&
+    !biomeEnabled &&
+    !currTexture &&
+    tileStyle === 'solid' &&
+    !(meta?.flips > 0) // Cannot instance if it has a ghost tile spider web (active or dormant)
+  );
+
   // Sync material color/texture when meta.curr changes (e.g., during cube rotation).
   // Uses useLayoutEffect so the color updates BEFORE the browser paints,
   // preventing a 1-frame flash of the wrong color after rotation.
@@ -938,6 +960,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // yield before the commit, letting R3F's frame loop read new colors at still-rotated
   // positions for one frame (the "sticker color flash" on single-turn drag releases).
   useLayoutEffect(() => {
+    // Keep isInstancedRef current in the commit phase so StickerInstances' useFrame never
+    // reads a value written by a speculative render that React 18 later discarded.
+    isInstancedRef.current = isInstanceable;
     tileStyleRef.current = tileStyle;
     // Detect a pending flip transition: prevCurr.current still holds the OLD face id here
     // because useEffect (which updates prevCurr) hasn't run yet. When a flip is pending we
@@ -997,7 +1022,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       wispyRingMatRef.current.uniforms.uAntiColor.value.set(antipodalHexRef.current ?? materialColor);
       wispyRingMatRef.current.uniforms.uLens.value = (meta?.flips > 0 && meta?.curr !== meta?.orig) ? 1.0 : 0.0;
     }
-  }, [materialColor, renderTexture, tileStyle, meta?.curr, meta?.flips]);
+  }, [isInstanceable, materialColor, renderTexture, tileStyle, meta?.curr, meta?.flips]);
   const isWormhole = meta?.flips > 0 && meta?.curr !== meta?.orig;
   const hasFlipHistory = meta?.flips > 0;
 
@@ -1009,29 +1034,6 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const currIsWhite = meta?.curr === 3;
   const origIsWhite = meta?.orig === 3;
   const _antipodalIsWhite = ANTIPODAL_COLOR[meta?.orig] === 3;
-
-  // ── InstancedMesh eligibility ────────────────────────────────────────────────
-  // A sticker is "instanceable" when it renders as a plain solid-colour quad with
-  // no shader, no special geometry, and no biome overlay.  The manager handles the
-  // draw call; StickerPlane skips its own <mesh> to avoid a redundant render.
-  // All per-sticker animations (flip squish, tremor, shake) still run normally —
-  // they modify groupRef / innerGroupRef, and the manager samples matrixWorld.
-  const isInstanceable = (
-    !!instanceCtx &&
-    instancedSlotValid &&
-    !hollow &&
-    !isGlass &&
-    !isSudokube &&
-    !biomeEnabled &&
-    !currTexture &&
-    tileStyle === 'solid' &&
-    !(meta?.flips > 0) // Cannot instance if it has a ghost tile spider web (active or dormant)
-  );
-  // Update isInstancedRef every render so the manager's useFrame always reads a fresh value.
-  // instanceColorRef is updated in useLayoutEffect([materialColor]) below, not here, so that
-  // the color write is atomic with CubeAssembly's position-reset useLayoutEffect and cannot
-  // race with R3F's frame loop in React 18 concurrent mode.
-  isInstancedRef.current = isInstanceable;
 
   return (
     <group position={pos} rotation={rot} ref={groupRef}>
