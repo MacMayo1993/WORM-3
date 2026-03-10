@@ -1237,8 +1237,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         />
       )}
 
-      {/* Wispy spinning ring — replaces static color rings on every non-dead tile */}
-      {!isDead && !isSudokube && (
+      {/* Wispy spinning ring — only shown after the tile has been flipped at least once */}
+      {!isDead && !isSudokube && hasFlipHistory && (
         <mesh position={[0, 0, 0.007]} renderOrder={1}>
           <primitive object={_sharedStickerGeo} attach="geometry" />
           <shaderMaterial
