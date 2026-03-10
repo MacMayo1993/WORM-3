@@ -177,7 +177,15 @@ const spinRevealFragmentShader = `
   uniform vec3 uColor;
   uniform float uProgress; // 0 = reveal just started (outer ring only), 1 = full disc
   uniform float uTime;
+  uniform float uDissolve; // 0 = solid, 1 = fully dissolved — sweeps 0→1 first half, 1→0 second half
   varying vec2 vUv;
+
+  // Coarse-grid hash — one value per N×N pixel block, drives the dissolve scatter order.
+  float hash2(vec2 p) {
+    p = fract(p * vec2(127.1, 311.7));
+    p += dot(p, p + 43.21);
+    return fract(p.x * p.y);
+  }
 
   void main() {
     vec2 uv = vUv - 0.5;
@@ -188,8 +196,14 @@ const spinRevealFragmentShader = `
     // Smooth disc boundary — only the circular area participates in the colour reveal.
     float inDisc = 1.0 - smoothstep(0.46, 0.52, dist);
 
+    // Per-pixel dissolve mask — 14×14 coarse grid so blocks are visible.
+    // Each block has a unique random threshold; dissolve sweeps through them as uDissolve rises.
+    float pixelNoise = hash2(floor(vUv * 14.0));
+    // dissolveVis: 1 = colour showing, 0 = dissolved to glass backing.
+    float dissolveVis = 1.0 - smoothstep(pixelNoise - 0.06, pixelNoise + 0.06, uDissolve);
+
     // Revealed band: new face colour sweeps from the outer rim inward (disc only).
-    float show = smoothstep(innerEdge - 0.04, innerEdge + 0.02, dist) * inDisc;
+    float show = smoothstep(innerEdge - 0.04, innerEdge + 0.02, dist) * inDisc * dissolveVis;
 
     // Glass cube tile backing — fully opaque so the underlying face never bleeds through.
     // Mimics the glass visual mode: dark base with Fresnel-like rim brightening toward the disc edge.
@@ -202,7 +216,9 @@ const spinRevealFragmentShader = `
     float edgeDist = abs(dist - innerEdge);
     float edgeGlow = smoothstep(0.14, 0.0, edgeDist) * spin * inDisc;
 
-    float brightness = 1.0 + edgeGlow * 0.7;
+    // Sparkle at the dissolve frontier — bright flash where pixels are mid-transition.
+    float dissolveEdge = smoothstep(0.10, 0.0, abs(uDissolve - pixelNoise)) * inDisc;
+    float brightness = 1.0 + edgeGlow * 0.7 + dissolveEdge * 1.2;
 
     // Always fully opaque — overlay completely covers the underlying tile during the flip,
     // replacing the raw face colour (which could be white) with a glass cube tile appearance.
@@ -229,10 +245,20 @@ const wispyRingVertexShader = `
 const wispyRingFragmentShader = `
   uniform vec3 uColor;
   uniform float uTime;
+  uniform float uLens; // 0 = normal tile, 1 = wormhole — enables subtle gravitational barrel distortion
   varying vec2 vUv;
 
   void main() {
     vec2 uv = vUv - 0.5;
+
+    // Gravitational lens: very slight barrel distortion on wormhole tiles.
+    // Expands the centre (like a convex lens / Einstein ring effect) by pulling
+    // coordinates inward toward the singularity. kLens = 0.11 gives ~5% warp at the tile edge.
+    if (uLens > 0.5) {
+      float d2 = dot(uv, uv);
+      uv = uv * (1.0 - 0.11 * d2);
+    }
+
     float dist = length(uv);
 
     // Clip to tile disc boundary
@@ -316,12 +342,14 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     uColor: { value: new THREE.Color() },
     uProgress: { value: 0.0 },
     uTime: { value: 0.0 },
+    uDissolve: { value: 0.0 },
   }));
   // Persistent wispy ring — replaces static color rings on all tiles
   const wispyRingMatRef = useRef();
   const [wispyRingUniforms] = React.useState(() => ({
     uColor: { value: new THREE.Color(materialColor) },
     uTime: _wispyT, // shared reference — updated once per frame externally
+    uLens: { value: 0.0 },
   }));
 
   // ── InstancedMesh batch integration ─────────────────────────────────────────
@@ -623,6 +651,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         const contractProgress = Math.max(0.0, 1.0 - rawP / 0.5);
         spinRevealMatRef.current.uniforms.uProgress.value = contractProgress;
         spinRevealMatRef.current.uniforms.uTime.value = state.clock.elapsedTime;
+        spinRevealMatRef.current.uniforms.uDissolve.value = Math.min(1.0, rawP * 2.0);
       }
 
       // Midpoint: switch the spin-reveal colour from FROM to TO and begin the outside-in reveal.
@@ -630,6 +659,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         if (spinRevealRef.current && spinRevealMatRef.current && flipToColor.current) {
           spinRevealMatRef.current.uniforms.uColor.value.set(flipToColor.current);
           spinRevealMatRef.current.uniforms.uProgress.value = 0.0;
+          spinRevealMatRef.current.uniforms.uDissolve.value = 1.0;
           spinRevealRef.current.visible = true;
         }
         // Ring opacity spike — event horizon signal.
@@ -644,6 +674,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         const revealProgress = Math.min(1.0, (rawP - 0.5) * 2.0);
         spinRevealMatRef.current.uniforms.uProgress.value = revealProgress;
         spinRevealMatRef.current.uniforms.uTime.value = state.clock.elapsedTime;
+        spinRevealMatRef.current.uniforms.uDissolve.value = Math.max(0.0, (1.0 - rawP) * 2.0);
       }
 
       prevRawP.current = rawP;
@@ -964,8 +995,12 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         meshRef.current.material = newMat;
       }
     }
-    // Keep wispy ring color in sync with the tile's current color
-    if (wispyRingMatRef.current) wispyRingMatRef.current.uniforms.uColor.value.set(materialColor);
+    // Keep wispy ring color and lens flag in sync with tile state
+    if (wispyRingMatRef.current) {
+      wispyRingMatRef.current.uniforms.uColor.value.set(materialColor);
+      const lensOn = (meta?.flips ?? 0) > 0 && meta?.curr !== meta?.orig;
+      wispyRingMatRef.current.uniforms.uLens.value = lensOn ? 1.0 : 0.0;
+    }
   }, [materialColor, currTexture, tileStyle, meta?.curr, meta?.flips]);
   const isWormhole = meta?.flips > 0 && meta?.curr !== meta?.orig;
   const hasFlipHistory = meta?.flips > 0;
