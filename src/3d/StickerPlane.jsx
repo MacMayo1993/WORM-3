@@ -237,7 +237,8 @@ const wispyRingVertexShader = `
 `;
 
 const wispyRingFragmentShader = `
-  uniform vec3 uColor;
+  uniform vec3 uColor;      // face color (strand A)
+  uniform vec3 uAntiColor;  // antipodal face color (strand B)
   uniform float uTime;
   uniform float uLens; // 0 = normal tile, 1 = wormhole — enables subtle gravitational barrel distortion
   varying vec2 vUv;
@@ -246,37 +247,48 @@ const wispyRingFragmentShader = `
     vec2 uv = vUv - 0.5;
 
     // Gravitational lens: very slight barrel distortion on wormhole tiles.
-    // Expands the centre (like a convex lens / Einstein ring effect) by pulling
-    // coordinates inward toward the singularity. kLens = 0.11 gives ~5% warp at the tile edge.
     if (uLens > 0.5) {
       float d2 = dot(uv, uv);
       uv = uv * (1.0 - 0.11 * d2);
     }
 
     float dist = length(uv);
+    float angle = atan(uv.y, uv.x);
 
     // Clip to tile disc boundary
-    float inDisc = 1.0 - smoothstep(0.46, 0.52, dist);
+    float inDisc = 1.0 - smoothstep(0.44, 0.50, dist);
 
-    // Ring annulus — occupies the outer band of the tile
-    float innerEdge = 0.28;
-    float inRing = smoothstep(innerEdge - 0.02, innerEdge + 0.02, dist) * inDisc;
+    // Double-helix: two thin strands braiding around r0.
+    // Each strand weaves in/out of the base radius using a sinusoidal offset;
+    // strand B is exactly half a period (PI) behind strand A so they always
+    // sit on opposite sides of the ring — the classic double-helix relationship.
+    float r0        = 0.36;   // base ring radius
+    float weave     = 0.030;  // radial weave amplitude (thinner = smaller)
+    float turns     = 4.0;    // helix turns around the ring (integer → seamless loop)
+    float speed     = 1.6;    // rotation speed
+    float phase     = angle * turns - uTime * speed;
 
-    // Dark glass backing (same palette as spinReveal)
-    float rimGlow = smoothstep(0.22, 0.44, dist) * inRing;
-    vec3 glassColor = vec3(0.05, 0.08, 0.22) * inRing + rimGlow * vec3(0.12, 0.18, 0.38);
+    float rA = r0 + weave * sin(phase);
+    float rB = r0 + weave * sin(phase + 3.14159265);
 
-    // Spinning wispy arc at ring perimeter — same formula as spinReveal
-    float angle = atan(uv.y, uv.x);
-    float spin = 0.5 + 0.5 * sin(angle * 8.0 - uTime * 4.0);
-    float edgeDist = abs(dist - 0.40);
-    float edgeGlow = smoothstep(0.13, 0.0, edgeDist) * spin * inDisc;
+    // Gaussian radial falloff — controls strand thickness (smaller sigma = thinner)
+    float sigma = 0.013;
+    float gA = exp(-pow(dist - rA, 2.0) / (2.0 * sigma * sigma));
+    float gB = exp(-pow(dist - rB, 2.0) / (2.0 * sigma * sigma));
 
-    float brightness = 1.0 + edgeGlow * 0.7;
-    vec3 col = mix(glassColor, uColor * brightness, edgeGlow);
+    // Soft sparkle: brightness pulses at twice the helix frequency for a live feel
+    gA *= 0.75 + 0.25 * sin(phase * 2.0);
+    gB *= 0.75 + 0.25 * sin(phase * 2.0 + 3.14159265);
 
-    float alpha = inRing * 0.18 + edgeGlow * 0.88;
-    gl_FragColor = vec4(col, alpha);
+    gA *= inDisc;
+    gB *= inDisc;
+
+    // Blend the two strand colors; where they overlap use a weighted average
+    float total = gA + gB;
+    vec3 col = total > 0.001 ? (uColor * gA + uAntiColor * gB) / total : uColor;
+
+    float alpha = clamp(total, 0.0, 1.0) * 0.92;
+    gl_FragColor = vec4(col * 1.3, alpha);
   }
 `;
 
@@ -342,6 +354,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const wispyRingMatRef = useRef();
   const [wispyRingUniforms] = React.useState(() => ({
     uColor: { value: new THREE.Color() },
+    uAntiColor: { value: new THREE.Color() },
     uTime: _wispyT, // shared reference — updated once per frame externally
     uLens: { value: 0.0 },
   }));
@@ -989,9 +1002,10 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         meshRef.current.material = newMat;
       }
     }
-    // Keep wispy ring color and lens flag in sync with tile state
+    // Keep wispy ring colors and lens flag in sync with tile state
     if (wispyRingMatRef.current) {
       wispyRingMatRef.current.uniforms.uColor.value.set(materialColor);
+      wispyRingMatRef.current.uniforms.uAntiColor.value.set(antipodalHexRef.current ?? materialColor);
       wispyRingMatRef.current.uniforms.uLens.value = (meta?.flips > 0 && meta?.curr !== meta?.orig) ? 1.0 : 0.0;
     }
   }, [materialColor, currTexture, tileStyle, meta?.curr, meta?.flips]);
