@@ -3,6 +3,138 @@
 
 import React, { useState } from 'react';
 
+// ─── Module-level style constants (never reallocated) ─────────────────────────
+const TABS_CONTAINER_STYLE = {
+  display: 'flex',
+  gap: '4px',
+  padding: '8px 16px',
+  borderBottom: '1px solid rgba(0, 217, 255, 0.15)',
+  flexShrink: 0,
+};
+
+const TAB_ICON_STYLE = { fontSize: '14px' };
+
+const WHYCARD_OUTER_BUTTON_STYLE = {
+  width: '100%',
+  padding: '7px 10px',
+  background: 'none',
+  border: 'none',
+  fontFamily: "'Courier New', monospace",
+  fontSize: '11px',
+  fontWeight: 'bold',
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '6px',
+  textAlign: 'left',
+  touchAction: 'manipulation',
+};
+
+const WHYCARD_ICON_STYLE = {
+  width: '16px',
+  height: '16px',
+  borderRadius: '50%',
+  background: 'rgba(251,191,36,0.2)',
+  border: '1px solid rgba(251,191,36,0.4)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  fontSize: '10px',
+  flexShrink: 0,
+  color: '#fbbf24',
+};
+
+const WHYCARD_CHEVRON_STYLE_BASE = { marginLeft: 'auto', transition: 'transform 0.2s' };
+
+const WHYCARD_CONTENT_STYLE = { padding: '2px 10px 10px' };
+
+const TM_PANEL_STYLE = {
+  position: 'fixed',
+  top: 0,
+  left: 0,
+  width: '340px',
+  maxWidth: 'calc(100vw - 20px)',
+  height: '100%',
+  maxHeight: '100dvh',
+  background: 'rgba(10, 12, 20, 0.95)',
+  backdropFilter: 'blur(20px)',
+  borderRight: '1px solid rgba(0, 217, 255, 0.2)',
+  zIndex: 600,
+  display: 'flex',
+  flexDirection: 'column',
+  fontFamily: "'Courier New', monospace",
+  color: '#e0e0e0',
+  overflowY: 'auto',
+  WebkitOverflowScrolling: 'touch',
+};
+
+const TM_HEADER_STYLE = {
+  padding: '16px',
+  borderBottom: '1px solid rgba(0, 217, 255, 0.15)',
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  flexShrink: 0,
+};
+
+const TM_TITLE_STYLE = { fontSize: '16px', fontWeight: 'bold', color: '#00d9ff' };
+const TM_SUBTITLE_STYLE = { fontSize: '10px', color: 'rgba(255,255,255,0.5)', marginTop: '2px' };
+
+const TM_CLOSE_BTN_STYLE = {
+  background: 'rgba(255, 255, 255, 0.1)',
+  border: '1px solid rgba(255, 255, 255, 0.2)',
+  borderRadius: '50%',
+  width: '32px',
+  height: '32px',
+  color: '#fff',
+  fontSize: '16px',
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+};
+
+const TM_SECTION_STYLE = {
+  padding: '12px 16px',
+  borderBottom: '1px solid rgba(0, 217, 255, 0.1)',
+  flexShrink: 0,
+};
+
+const TM_SECTION_LABEL_STYLE = { fontSize: '11px', color: 'rgba(255,255,255,0.5)', marginBottom: '8px' };
+const TM_STAGES_BAR_ROW_STYLE = { display: 'flex', gap: '3px', marginBottom: '6px' };
+
+const TM_ALL_STAGES_SECTION_STYLE = {
+  padding: '12px 16px',
+  borderTop: '1px solid rgba(0, 217, 255, 0.1)',
+};
+
+const TM_SECTION_SUB_LABEL_STYLE = { fontSize: '10px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px' };
+
+const TM_STAGE_ITEM_STYLE = { marginBottom: '4px' };
+
+const TM_STAGE_EXPANDED_STYLE = {
+  padding: '8px 10px 8px 36px',
+  fontSize: '11px',
+  color: 'rgba(255,255,255,0.5)',
+  lineHeight: '1.4',
+};
+
+const TM_STAGE_GOAL_STYLE = { marginBottom: '6px' };
+
+const TM_ALGO_CARD_STYLE = {
+  padding: '4px 8px',
+  margin: '4px 0',
+  background: 'rgba(255, 255, 255, 0.03)',
+  borderRadius: '4px',
+  borderLeft: '2px solid rgba(0, 217, 255, 0.3)',
+};
+
+const TM_ALGO_CARD_NAME_STYLE = { fontWeight: 'bold', color: '#00d9ff', fontSize: '10px' };
+const TM_ALGO_CARD_NOTATION_STYLE = { fontFamily: 'monospace', fontSize: '12px', color: '#fbbf24', margin: '2px 0' };
+const TM_ALGO_CARD_WHEN_STYLE = { fontSize: '10px', color: 'rgba(255,255,255,0.4)' };
+
+const TM_ALGO_LIST_LABEL_STYLE = { fontSize: '10px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px' };
+
 // ---------------------------------------------------------------------------
 // Sub-mode tab bar
 // ---------------------------------------------------------------------------
@@ -14,13 +146,7 @@ const SubModeTabs = ({ subMode, onSwitch }) => {
   ];
 
   return (
-    <div style={{
-      display: 'flex',
-      gap: '4px',
-      padding: '8px 16px',
-      borderBottom: '1px solid rgba(0, 217, 255, 0.15)',
-      flexShrink: 0,
-    }}>
+    <div style={TABS_CONTAINER_STYLE}>
       {tabs.map((tab) => {
         const active = subMode === tab.id;
         return (
@@ -47,7 +173,7 @@ const SubModeTabs = ({ subMode, onSwitch }) => {
               touchAction: 'manipulation',
             }}
           >
-            <span style={{ fontSize: '14px' }}>{tab.icon}</span>
+            <span style={TAB_ICON_STYLE}>{tab.icon}</span>
             <span>{tab.label}</span>
           </button>
         );
@@ -73,46 +199,15 @@ const WhyCard = ({ algo, open, onToggle }) => {
     }}>
       <button
         onClick={onToggle}
-        style={{
-          width: '100%',
-          padding: '7px 10px',
-          background: 'none',
-          border: 'none',
-          color: open ? '#fbbf24' : 'rgba(255,255,255,0.4)',
-          fontFamily: "'Courier New', monospace",
-          fontSize: '11px',
-          fontWeight: 'bold',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          textAlign: 'left',
-          touchAction: 'manipulation',
-        }}
+        style={{ ...WHYCARD_OUTER_BUTTON_STYLE, color: open ? '#fbbf24' : 'rgba(255,255,255,0.4)' }}
       >
-        <span style={{
-          width: '16px',
-          height: '16px',
-          borderRadius: '50%',
-          background: 'rgba(251,191,36,0.2)',
-          border: '1px solid rgba(251,191,36,0.4)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: '10px',
-          flexShrink: 0,
-          color: '#fbbf24',
-        }}>?</span>
+        <span style={WHYCARD_ICON_STYLE}>?</span>
         WHY DOES THIS WORK?
-        <span style={{
-          marginLeft: 'auto',
-          transform: open ? 'rotate(180deg)' : 'none',
-          transition: 'transform 0.2s',
-        }}>▼</span>
+        <span style={{ ...WHYCARD_CHEVRON_STYLE_BASE, transform: open ? 'rotate(180deg)' : 'none' }}>▼</span>
       </button>
 
       {open && (
-        <div style={{ padding: '2px 10px 10px' }}>
+        <div style={WHYCARD_CONTENT_STYLE}>
           {algo.why && (
             <div style={{
               fontSize: '11px',
@@ -543,56 +638,16 @@ const TeachMode = ({
   const isSolved = analysis.stageId === 'solved';
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      width: '340px',
-      maxWidth: 'calc(100vw - 20px)',
-      height: '100%',
-      maxHeight: '100dvh',
-      background: 'rgba(10, 12, 20, 0.95)',
-      backdropFilter: 'blur(20px)',
-      borderRight: '1px solid rgba(0, 217, 255, 0.2)',
-      zIndex: 600,
-      display: 'flex',
-      flexDirection: 'column',
-      fontFamily: "'Courier New', monospace",
-      color: '#e0e0e0',
-      overflowY: 'auto',
-      WebkitOverflowScrolling: 'touch',
-    }}>
+    <div style={TM_PANEL_STYLE}>
       {/* Header */}
-      <div style={{
-        padding: '16px',
-        borderBottom: '1px solid rgba(0, 217, 255, 0.15)',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        flexShrink: 0,
-      }}>
+      <div style={TM_HEADER_STYLE}>
         <div>
-          <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#00d9ff' }}>TEACH MODE</div>
-          <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>
+          <div style={TM_TITLE_STYLE}>TEACH MODE</div>
+          <div style={TM_SUBTITLE_STYLE}>
             {methodName}
           </div>
         </div>
-        <button
-          onClick={onClose}
-          style={{
-            background: 'rgba(255, 255, 255, 0.1)',
-            border: '1px solid rgba(255, 255, 255, 0.2)',
-            borderRadius: '50%',
-            width: '32px',
-            height: '32px',
-            color: '#fff',
-            fontSize: '16px',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
+        <button onClick={onClose} style={TM_CLOSE_BTN_STYLE}>
           ×
         </button>
       </div>
@@ -601,15 +656,11 @@ const TeachMode = ({
       <SubModeTabs subMode={subMode} onSwitch={onSwitchSubMode} />
 
       {/* Progress Overview */}
-      <div style={{
-        padding: '12px 16px',
-        borderBottom: '1px solid rgba(0, 217, 255, 0.1)',
-        flexShrink: 0,
-      }}>
-        <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', marginBottom: '8px' }}>
+      <div style={TM_SECTION_STYLE}>
+        <div style={TM_SECTION_LABEL_STYLE}>
           SOLVE PROGRESS
         </div>
-        <div style={{ display: 'flex', gap: '3px', marginBottom: '6px' }}>
+        <div style={TM_STAGES_BAR_ROW_STYLE}>
           {stages.map((stage, i) => (
             <div
               key={stage.id}
@@ -697,7 +748,7 @@ const TeachMode = ({
         {/* ── Algorithm Cards for Current Stage ── */}
         {currentStage && !isSolved && subMode !== 'quiz' && (
           <div style={{ padding: '12px 16px' }}>
-            <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px' }}>
+            <div style={TM_ALGO_LIST_LABEL_STYLE}>
               ALGORITHMS FOR THIS STEP
             </div>
             {currentStage.algorithms.map((algo, algoIdx) => {
@@ -726,11 +777,8 @@ const TeachMode = ({
         )}
 
         {/* ── All Stages Reference ── */}
-        <div style={{
-          padding: '12px 16px',
-          borderTop: '1px solid rgba(0, 217, 255, 0.1)',
-        }}>
-          <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px' }}>
+        <div style={TM_ALL_STAGES_SECTION_STYLE}>
+          <div style={TM_SECTION_SUB_LABEL_STYLE}>
             ALL STAGES
           </div>
           {stages.map((stage, i) => {
@@ -739,7 +787,7 @@ const TeachMode = ({
             const isExpanded = expandedStage === i;
 
             return (
-              <div key={stage.id} style={{ marginBottom: '4px' }}>
+              <div key={stage.id} style={TM_STAGE_ITEM_STYLE}>
                 <div
                   onClick={() => setExpandedStage(isExpanded ? null : i)}
                   style={{
@@ -791,33 +839,17 @@ const TeachMode = ({
 
                 {/* Expanded stage details */}
                 {isExpanded && (
-                  <div style={{
-                    padding: '8px 10px 8px 36px',
-                    fontSize: '11px',
-                    color: 'rgba(255,255,255,0.5)',
-                    lineHeight: '1.4',
-                  }}>
-                    <div style={{ marginBottom: '6px' }}>{stage.goal}</div>
+                  <div style={TM_STAGE_EXPANDED_STYLE}>
+                    <div style={TM_STAGE_GOAL_STYLE}>{stage.goal}</div>
                     {stage.algorithms.map((algo, j) => (
-                      <div key={j} style={{
-                        padding: '4px 8px',
-                        margin: '4px 0',
-                        background: 'rgba(255, 255, 255, 0.03)',
-                        borderRadius: '4px',
-                        borderLeft: '2px solid rgba(0, 217, 255, 0.3)',
-                      }}>
-                        <div style={{ fontWeight: 'bold', color: '#00d9ff', fontSize: '10px' }}>
+                      <div key={j} style={TM_ALGO_CARD_STYLE}>
+                        <div style={TM_ALGO_CARD_NAME_STYLE}>
                           {algo.name}
                         </div>
-                        <div style={{
-                          fontFamily: 'monospace',
-                          fontSize: '12px',
-                          color: '#fbbf24',
-                          margin: '2px 0',
-                        }}>
+                        <div style={TM_ALGO_CARD_NOTATION_STYLE}>
                           {algo.notation}
                         </div>
-                        <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)' }}>
+                        <div style={TM_ALGO_CARD_WHEN_STYLE}>
                           {algo.when}
                         </div>
                       </div>

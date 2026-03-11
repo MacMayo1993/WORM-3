@@ -24,9 +24,12 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
       explosionFactor: s.explosionT,
     }))
   );
+  // Narrow deps: only the two settings fields that affect face-color resolution.
+  // Avoids re-running the lookup on every unrelated settings change (e.g. background theme).
   const fc = useMemo(
     () => resolveColors(settings, settings?.biomeMode?.faceAssignment) || FACE_COLORS,
-    [settings]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [settings?.colorScheme, settings?.biomeMode?.faceAssignment]
   );
 
   // B4: debounce cubies so tunnel geometry only rebuilds at most every 150ms
