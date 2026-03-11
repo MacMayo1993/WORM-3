@@ -39,6 +39,7 @@ export default function WormholeWarpFX({
     const v3 = new THREE.Vector3();
     const color = new THREE.Color();
     const arr = new Float32Array(verts.count * 3);
+    const phase = new Float32Array(verts.count);
 
     const noiseFreq = 0.1;
     const noiseAmp = 0.38;
@@ -61,11 +62,57 @@ export default function WormholeWarpFX({
       arr[i3] = color.r;
       arr[i3 + 1] = color.g;
       arr[i3 + 2] = color.b;
+
+      phase[i] = noise.noise(v3.x * 0.02, v3.y * 0.02, v3.z * 0.02) * 0.5 + 0.5;
     }
 
     geo.setAttribute('color', new THREE.BufferAttribute(arr, 3));
+    geo.setAttribute('aPhase', new THREE.BufferAttribute(phase, 1));
     return geo;
   }, [radius, tubeLength]);
+
+  const material = useMemo(() => new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uBoost: { value: 0 },
+      uBaseSize: { value: 5.5 },
+    },
+    vertexColors: true,
+    transparent: true,
+    depthWrite: false,
+    depthTest: true,
+    blending: THREE.AdditiveBlending,
+    vertexShader: `
+      attribute float aPhase;
+      uniform float uTime;
+      uniform float uBoost;
+      uniform float uBaseSize;
+      varying vec3 vColor;
+      varying float vPulse;
+
+      void main() {
+        vColor = color;
+        float pulse = 0.65 + 0.35 * sin(uTime * (1.5 + uBoost * 4.0) + aPhase * 10.0 + position.y * 0.8);
+        vPulse = pulse;
+        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+        gl_PointSize = uBaseSize * (0.7 + uBoost * 0.8) * pulse;
+        gl_PointSize *= (1.0 / max(0.1, -mvPosition.z));
+        gl_Position = projectionMatrix * mvPosition;
+      }
+    `,
+    fragmentShader: `
+      varying vec3 vColor;
+      varying float vPulse;
+
+      void main() {
+        vec2 uv = gl_PointCoord - vec2(0.5);
+        float d = length(uv);
+        float alpha = smoothstep(0.5, 0.0, d) * (0.15 + vPulse * 0.45);
+        if (alpha <= 0.001) discard;
+        gl_FragColor = vec4(vColor * (0.75 + vPulse * 0.7), alpha);
+      }
+    `,
+  }), []);
 
   useFrame((_state, delta) => {
     if (!enabled || !tubeARef.current || !tubeBRef.current || !matRef.current) return;
@@ -82,8 +129,9 @@ export default function WormholeWarpFX({
       }
     }
 
-    matRef.current.opacity = THREE.MathUtils.lerp(0.05, 0.28, boost);
-    matRef.current.size = THREE.MathUtils.lerp(0.01, 0.022, boost);
+    matRef.current.uniforms.uTime.value += delta;
+    matRef.current.uniforms.uBoost.value = boost;
+    matRef.current.uniforms.uBaseSize.value = THREE.MathUtils.lerp(4.2, 7.8, boost);
   });
 
   if (!enabled) return null;
@@ -91,29 +139,12 @@ export default function WormholeWarpFX({
   return (
     <group>
       <points ref={tubeARef} geometry={geometry} rotation-x={Math.PI * 0.5} position-z={0}>
-        <pointsMaterial
-          ref={matRef}
-          size={0.015}
-          vertexColors
-          transparent
-          opacity={0.1}
-          depthWrite={false}
-          depthTest
-          blending={THREE.AdditiveBlending}
-        />
+        <primitive object={material} ref={matRef} attach="material" />
       </points>
 
       {/* second copy creates seamless reset loop like original effect */}
       <points ref={tubeBRef} geometry={geometry} rotation-x={Math.PI * 0.5} position-z={-tubeLength}>
-        <pointsMaterial
-          size={0.015}
-          vertexColors
-          transparent
-          opacity={0.1}
-          depthWrite={false}
-          depthTest
-          blending={THREE.AdditiveBlending}
-        />
+        <primitive object={material} attach="material" />
       </points>
     </group>
   );

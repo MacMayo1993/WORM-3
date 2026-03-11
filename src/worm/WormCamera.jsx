@@ -6,7 +6,6 @@ import React, { useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { getSegmentWorldPos } from './wormLogic.js';
-import { DIR_TO_VEC } from '../utils/constants.js';
 
 // Map face direction to its normal vector (outward from cube)
 const FACE_NORMALS = {
@@ -74,6 +73,14 @@ export default function WormCamera({
   const targetLookAt = useRef(new THREE.Vector3(0, 0, 0));
   const targetUp = useRef(new THREE.Vector3(0, 1, 0));
 
+  // Reused temporaries to avoid per-frame allocations/GC churn
+  const headVec = useRef(new THREE.Vector3());
+  const faceNormal = useRef(new THREE.Vector3());
+  const forward = useRef(new THREE.Vector3());
+  const behindOffset = useRef(new THREE.Vector3());
+  const aboveOffset = useRef(new THREE.Vector3());
+  const lookAheadOffset = useRef(new THREE.Vector3());
+
   // Store original camera settings to restore when disabled
   const originalPos = useRef(null);
   const wasEnabled = useRef(false);
@@ -95,30 +102,30 @@ export default function WormCamera({
     if (!worm || worm.length < 1) return;
 
     const head = worm[0];
-    const headPos = getSegmentWorldPos(head, size, explosionFactor);
-    const headVec = new THREE.Vector3(headPos[0], headPos[1], headPos[2]);
+    const segmentWorldPos = getSegmentWorldPos(head, size, explosionFactor);
+    headVec.current.set(segmentWorldPos[0], segmentWorldPos[1], segmentWorldPos[2]);
 
     // Get face normal (camera "up" relative to the surface)
-    const faceNormal = FACE_NORMALS[head.dirKey]?.clone() || new THREE.Vector3(0, 0, 1);
+    faceNormal.current.copy(FACE_NORMALS[head.dirKey] || FACE_NORMALS.PZ);
 
     // Get forward direction based on movement direction on this face
     const faceMoveDirs = FACE_MOVE_VECTORS[head.dirKey];
-    const forward = faceMoveDirs?.[moveDir]?.clone() || new THREE.Vector3(0, 1, 0);
+    forward.current.copy(faceMoveDirs?.[moveDir] || FACE_MOVE_VECTORS.PZ.up);
 
     // Position camera behind and above the worm head
     // "Behind" = opposite of forward direction
     // "Above" = along face normal (away from cube surface)
-    const behindOffset = forward.clone().multiplyScalar(-1.8);
-    const aboveOffset = faceNormal.clone().multiplyScalar(1.2);
+    behindOffset.current.copy(forward.current).multiplyScalar(-1.8);
+    aboveOffset.current.copy(faceNormal.current).multiplyScalar(1.2);
 
-    targetPos.current.copy(headVec).add(behindOffset).add(aboveOffset);
+    targetPos.current.copy(headVec.current).add(behindOffset.current).add(aboveOffset.current);
 
     // Look ahead of the worm
-    const lookAheadOffset = forward.clone().multiplyScalar(2);
-    targetLookAt.current.copy(headVec).add(lookAheadOffset);
+    lookAheadOffset.current.copy(forward.current).multiplyScalar(2);
+    targetLookAt.current.copy(headVec.current).add(lookAheadOffset.current);
 
     // Up vector is the face normal
-    targetUp.current.copy(faceNormal);
+    targetUp.current.copy(faceNormal.current);
 
     // Smoothly interpolate camera position
     camera.position.lerp(targetPos.current, lerpSpeed);
