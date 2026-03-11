@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { COLOR_SCHEMES, SCHEME_LABELS, TILE_STYLES } from '../../utils/colorSchemes.js';
+import { CLASSIC_STYLE_KEYS, ANTIPODAL_STYLE_KEYS, LIVING_STYLE_KEYS } from '../../utils/tileStyleCatalog.js';
 import { BACKGROUNDS } from '../../utils/backgrounds.js';
 import {
   registerTilePreview,
@@ -15,11 +16,6 @@ const BG_OPTIONS = BACKGROUNDS.map(bg => ({
   value: bg.id,
   label: bg.label
 }));
-
-// Styles shown in the Classic (2D) section
-const CLASSIC_STYLE_KEYS = ['solid', 'glossy', 'matte', 'metallic', 'carbonFiber', 'hexGrid', 'comic', 'polkaDots', 'zigzag', 'checkerboard', 'diagStripes', 'cafeWall', 'hermanGrid', 'opticSpin', 'ouchi', 'scintillatingGrid', 'zoellner', 'kanizsa', 'fraserSpiral', 'muellerLyer', 'rotatingSnakes', 'poggendorff'];
-// Styles shown in the Living (3D / animated) section
-const LIVING_STYLE_KEYS = ['grass', 'ice', 'sand', 'water', 'wood', 'circuit', 'holographic', 'pulse', 'lava', 'galaxy', 'neural', 'moireRings', 'moireLines', 'infinityTunnel', 'vortex', 'shockwave'];
 
 // Extract N dominant colors from an ima ge using pixel sampling + k-means
 function extractColorsFromImage(img, count = 6) {
@@ -314,7 +310,7 @@ function TilesPanel({ settings, onSettingsChange }) {
 
   // Pick 6 unique styles (no repeats) from the full pool and assign one per face
   const randomizeStyles = () => {
-    const pool = [...CLASSIC_STYLE_KEYS, ...LIVING_STYLE_KEYS];
+    const pool = [...CLASSIC_STYLE_KEYS, ...ANTIPODAL_STYLE_KEYS, ...LIVING_STYLE_KEYS];
     // Fisher-Yates shuffle then take first 6
     for (let i = pool.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -328,6 +324,7 @@ function TilesPanel({ settings, onSettingsChange }) {
   return (
     <>
       <StyleGrid keys={CLASSIC_STYLE_KEYS} label="Classic" globalStyle={globalStyle} onApply={applyToAll} />
+      <StyleGrid keys={ANTIPODAL_STYLE_KEYS} label="Antipodal Op Art" globalStyle={globalStyle} onApply={applyToAll} />
       <StyleGrid keys={LIVING_STYLE_KEYS} label="Living" globalStyle={globalStyle} onApply={applyToAll} />
 
       {/* Randomize — assigns a unique style to each of the 6 faces */}
@@ -363,6 +360,11 @@ function TilesPanel({ settings, onSettingsChange }) {
                 >
                   <optgroup label="Classic">
                     {CLASSIC_STYLE_KEYS.map(k => (
+                      <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Antipodal Op Art">
+                    {ANTIPODAL_STYLE_KEYS.map(k => (
                       <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>
                     ))}
                   </optgroup>

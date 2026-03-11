@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { COLOR_SCHEMES, TILE_STYLES, SCHEME_LABELS } from '../../utils/colorSchemes.js';
+import { CLASSIC_STYLE_KEYS, ANTIPODAL_STYLE_KEYS, LIVING_STYLE_KEYS } from '../../utils/tileStyleCatalog.js';
 import { BACKGROUNDS, getBackgroundUrl } from '../../utils/backgrounds.js';
 import { registerTilePreview, updateTilePreview, unregisterTilePreview } from '../../3d/TilePreviewRenderer.js';
 
@@ -35,9 +36,6 @@ const BG_OPTIONS = BACKGROUNDS.map(bg => ({
   thumbnail: bg.thumbnail ? getBackgroundUrl(bg.thumbnail) : null,
   gradient: BG_PREVIEWS[bg.id] || 'linear-gradient(135deg, #333 0%, #000 100%)',
 }));
-
-const CLASSIC_STYLE_KEYS = ['solid', 'glossy', 'matte', 'metallic', 'carbonFiber', 'hexGrid', 'comic', 'cafeWall', 'hermanGrid', 'opticSpin', 'ouchi', 'scintillatingGrid', 'zoellner', 'kanizsa', 'fraserSpiral', 'muellerLyer', 'rotatingSnakes', 'poggendorff'];
-const LIVING_STYLE_KEYS = ['grass', 'ice', 'sand', 'water', 'wood', 'circuit', 'holographic', 'pulse', 'lava', 'galaxy', 'neural', 'moireRings', 'moireLines', 'infinityTunnel', 'vortex', 'shockwave'];
 
 // Color schemes shown in the wizard (biome is a mode, not a palette)
 const WIZARD_SCHEME_KEYS = Object.keys(SCHEME_LABELS).filter(k => k !== 'biome');
@@ -589,6 +587,7 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
         </div>
 
         <StyleGrid keys={CLASSIC_STYLE_KEYS} label="Classic" />
+        <StyleGrid keys={ANTIPODAL_STYLE_KEYS} label="Antipodal Op Art" />
         <StyleGrid keys={LIVING_STYLE_KEYS} label="Living" />
 
         {/* Per-face overrides */}
@@ -626,6 +625,9 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                   >
                     <optgroup label="Classic">
                       {CLASSIC_STYLE_KEYS.map(k => <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>)}
+                    </optgroup>
+                    <optgroup label="Antipodal Op Art">
+                      {ANTIPODAL_STYLE_KEYS.map(k => <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>)}
                     </optgroup>
                     <optgroup label="Living">
                       {LIVING_STYLE_KEYS.map(k => <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>)}

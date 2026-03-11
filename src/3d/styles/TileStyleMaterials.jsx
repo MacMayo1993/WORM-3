@@ -1513,6 +1513,135 @@ const fragmentShaders = {
       gl_FragColor = vec4(color, 1.0);
     }
   `,
+
+  // Op Art expansion pack — antipodal-color driven illusions for tile selection
+  opConcentric: `
+    uniform vec3 baseColor;
+    uniform vec3 antipodalColor;
+    varying vec2 vUv;
+    void main() {
+      float r = length(vUv - 0.5);
+      float ring = step(0.58, fract(r * 16.0));
+      vec3 color = mix(baseColor, antipodalColor, ring);
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `,
+  opRadialSpokes: `
+    uniform vec3 baseColor;
+    uniform vec3 antipodalColor;
+    varying vec2 vUv;
+    void main() {
+      vec2 p = vUv - 0.5;
+      float a = atan(p.y, p.x);
+      float spoke = step(0.66, fract((a + 3.14159) * 3.2));
+      vec3 color = mix(baseColor, antipodalColor, spoke);
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `,
+  opTiltMosaic: `
+    uniform vec3 baseColor;
+    uniform vec3 antipodalColor;
+    varying vec2 vUv;
+    void main() {
+      vec2 t = vUv * 7.0;
+      vec2 c = floor(t);
+      float tilt = mod(c.x + c.y, 2.0);
+      vec2 f = fract(t) - 0.5;
+      float mask = step(0.20, abs(f.x + (tilt > 0.5 ? f.y : -f.y)));
+      vec3 color = mix(baseColor, antipodalColor, mask);
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `,
+  opDiamondWave: `
+    uniform vec3 baseColor;
+    uniform vec3 antipodalColor;
+    varying vec2 vUv;
+    void main() {
+      vec2 p = abs(vUv - 0.5);
+      float d = p.x + p.y;
+      float band = step(0.70, fract(d * 10.0));
+      vec3 color = mix(baseColor, antipodalColor, band);
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `,
+  opBullseyeSteps: `
+    uniform vec3 baseColor;
+    uniform vec3 antipodalColor;
+    varying vec2 vUv;
+    void main() {
+      float r = length(vUv - 0.5);
+      float zone = floor(r * 8.0);
+      float mask = step(0.5, mod(zone, 2.0));
+      vec3 color = mix(baseColor, antipodalColor, mask);
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `,
+  opWarpGrid: `
+    uniform vec3 baseColor;
+    uniform vec3 antipodalColor;
+    varying vec2 vUv;
+    void main() {
+      vec2 p = vUv - 0.5;
+      vec2 warp = p * (1.0 + length(p) * 1.8);
+      float gx = step(0.86, fract((warp.x + 0.5) * 8.0));
+      float gy = step(0.86, fract((warp.y + 0.5) * 8.0));
+      float mask = clamp(gx + gy, 0.0, 1.0);
+      vec3 color = mix(baseColor, antipodalColor, mask);
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `,
+  opChevronBands: `
+    uniform vec3 baseColor;
+    uniform vec3 antipodalColor;
+    varying vec2 vUv;
+    void main() {
+      float tx = abs(fract(vUv.x * 9.0) * 2.0 - 1.0);
+      float vy = fract(vUv.y * 7.0 + tx * 0.9);
+      float band = step(0.74, vy);
+      vec3 color = mix(baseColor, antipodalColor, band);
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `,
+  opInterferencePlaid: `
+    uniform vec3 baseColor;
+    uniform vec3 antipodalColor;
+    varying vec2 vUv;
+    void main() {
+      float sx = step(0.82, fract(vUv.x * 13.0));
+      float sy = step(0.82, fract(vUv.y * 11.0));
+      float diag = step(0.88, fract((vUv.x + vUv.y) * 9.0));
+      float mask = clamp(sx + sy + diag, 0.0, 1.0);
+      vec3 color = mix(baseColor, antipodalColor, mask);
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `,
+  opRibbonTwist: `
+    uniform vec3 baseColor;
+    uniform vec3 antipodalColor;
+    varying vec2 vUv;
+    void main() {
+      float y = 0.5 + sin((vUv.x - 0.5) * 18.0) * 0.18;
+      float ribbon = smoothstep(0.15, 0.12, abs(vUv.y - y));
+      float cut = step(0.65, fract(vUv.x * 6.0));
+      float mask = ribbon * cut;
+      vec3 color = mix(baseColor, antipodalColor, mask);
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `,
+  opPinwheel: `
+    uniform vec3 baseColor;
+    uniform vec3 antipodalColor;
+    varying vec2 vUv;
+    void main() {
+      vec2 p = vUv - 0.5;
+      float a = atan(p.y, p.x);
+      float r = length(p);
+      float swirl = fract((a + r * 14.0 + 3.14159) * 2.2);
+      float blade = step(0.7, swirl);
+      vec3 color = mix(baseColor, antipodalColor, blade);
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `,
 };
 
 // ─── LRU material cache ───────────────────────────────────────────────────────
@@ -1553,6 +1682,8 @@ function _matCachePut(key, mat) {
 const ANTIPODAL_STYLES = new Set([
   'polkaDots', 'zigzag', 'checkerboard', 'diagStripes',
   'cornerAccent', 'innerDisc', 'crossPlus', 'borderFrame', 'thinHatch', 'dotRing',
+  'opConcentric', 'opRadialSpokes', 'opTiltMosaic', 'opDiamondWave', 'opBullseyeSteps',
+  'opWarpGrid', 'opChevronBands', 'opInterferencePlaid', 'opRibbonTwist', 'opPinwheel',
 ]);
 
 /**
