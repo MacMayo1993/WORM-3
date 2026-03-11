@@ -1,254 +1,290 @@
 # WORM-3
 
-**A topological cube game where opposite faces are identified (RP²).**
+**WORM-3** is a 3D topological puzzle/action game built around a cube with antipodal identification (RP²-inspired rules), not a standard orientable Rubik model.
 
-WORM-3 is an interactive 3D puzzle/sandbox built around a Real Projective Plane interpretation of a Rubik-like cube. Instead of treating opposite faces as independent, WORM-3 models antipodal identification and exposes it through flips, tunnel travel, parity systems, teaching overlays, chaos, and character-based traversal modes.
-
-**Live:** https://macmayo1993.github.io/WORM-3/
+Live demo: https://macmayo1993.github.io/WORM-3/
 
 ---
 
 ## Table of Contents
 
-- [What This Project Is](#what-this-project-is)
-- [Mode Reference (Complete)](#mode-reference-complete)
-  - [1) Core Puzzle Modes](#1-core-puzzle-modes)
-  - [2) System/Overlay Modes](#2-systemoverlay-modes)
-  - [3) WORM Family Modes](#3-worm-family-modes)
-  - [4) Disparity Mode](#4-disparity-mode)
-  - [5) Holonomy Mode](#5-holonomy-mode)
-  - [6) Explore / Freeplay](#6-explore--freeplay)
-  - [7) World / Biome Mode](#7-world--biome-mode)
-  - [8) Level Campaign](#8-level-campaign)
-- [Controls (By Mode)](#controls-by-mode)
-- [WORM Healer Control Modes](#worm-healer-control-modes)
-- [Visual Systems](#visual-systems)
-- [Mathematical Model](#mathematical-model)
-- [Architecture Overview](#architecture-overview)
-- [Development](#development)
-- [Testing](#testing)
+- [Project Overview](#project-overview)
+- [Gameplay Systems](#gameplay-systems)
+  - [Core Cube Rules](#core-cube-rules)
+  - [Puzzle Rule Sets](#puzzle-rule-sets)
+  - [Progression + Campaign](#progression--campaign)
+- [Modes and Variants](#modes-and-variants)
+  - [Primary Modes](#primary-modes)
+  - [Secondary/Overlay Modes](#secondaryoverlay-modes)
+  - [WORM Family Modes](#worm-family-modes)
+  - [Experimental / Specialty Modes](#experimental--specialty-modes)
+- [Controls](#controls)
+  - [Mouse / Touch](#mouse--touch)
+  - [Keyboard Shortcuts](#keyboard-shortcuts)
+  - [Hands Mode Keymap](#hands-mode-keymap)
+  - [WORM Healer Control Styles](#worm-healer-control-styles)
+- [Visual + World Systems](#visual--world-systems)
+- [Audio / Feedback / HUD](#audio--feedback--hud)
+- [Tech Architecture](#tech-architecture)
+- [Codebase Map](#codebase-map)
+- [Local Development](#local-development)
+- [Testing, Linting, CI](#testing-linting-ci)
+- [Known Notes](#known-notes)
 - [License](#license)
 
 ---
 
-## What This Project Is
+## Project Overview
 
 WORM-3 combines:
 
-- A cube-state engine (slice rotations, sticker flips, parity, win detection).
-- Multiple game modes that reinterpret the same cube/manifold in different ways.
-- React + React Three Fiber rendering stack with heavy shader/VFX use.
-- A Zustand global store coordinating gameplay, HUD, menus, and mode state.
+- A **cube-state engine** (slice rotations, flips, parity-aware state, win checks).
+- A **mode framework** that reuses the same manifold/cube state across puzzle, action, and traversal gameplay.
+- A **React + React Three Fiber** rendering stack with post-processing, biome environments, and topology overlays.
+- A **Zustand global store** coordinating game state, menus, overlays, settings, run/session telemetry, and mode toggles.
 
-The guiding idea is that face-opposites are not simply “other sides” of a cube, but identified through antipodal mapping. That makes orientation and traversal behavior very different from a standard orientable cube game.
-
----
-
-## Mode Reference (Complete)
-
-## 1) Core Puzzle Modes
-
-These are the fundamental rule sets for solving the cube-like puzzle state.
-
-### Classic
-
-- Goal: restore face color consistency under projective/antipodal constraints.
-- Primary actions: slice rotations + optional sticker flips (depending on setup/rules).
-- Good for: baseline puzzle flow and parity intuition.
-
-### Sudokube
-
-- Goal: satisfy Latin-square-like constraints per face (number/pattern consistency by row/column rules).
-- Adds combinatorial constraints beyond raw color restoration.
-
-### Ultimate
-
-- Goal: satisfy both color and Sudokube-style constraints simultaneously.
-- Hardest pure puzzle target among the core solve modes.
+Design intent: opposite faces/points are treated as identified through quotient-like antipodal mapping, so orientation, pathing, and parity behaviors differ from standard cube games.
 
 ---
 
-## 2) System/Overlay Modes
+## Gameplay Systems
 
-These can be active with puzzle modes and alter interaction or information density.
+### Core Cube Rules
 
-### Chaos Mode
+- Cube sizes supported in UI flows: **2×2, 3×3, 4×4, 5×5**.
+- Base interactions:
+  - Rotate slices.
+  - Rotate faces directly (including mobile-assisted face rotation UI).
+  - Flip stickers antipodally when flip interactions are enabled.
+- Session metrics track moves/time/flips/wormhole state and feed multiple HUD layers.
+- Undo history is capped and surfaced in desktop HUD.
 
-- Introduces dynamic instability (auto-rotation/cascade pressure depending on settings/level).
-- Changes pacing from deterministic solve to real-time adaptation.
+### Puzzle Rule Sets
 
-### Hands Mode
+WORM-3 includes three canonical rule sets used in freeplay/levels:
 
-- Speedcubing-style key interaction layer.
-- Tracks move cadence and speed-oriented input behavior.
+1. **Classic** — color restoration under projective constraints.
+2. **Sudokube** — Latin/sudoku-like sticker constraints.
+3. **Ultimate** — hybrid of color + Sudokube constraints.
 
-### Teach Mode (CFOP assistant flow)
+### Progression + Campaign
 
-- Step-guided instructional pipeline.
-- Highlights layers/targets, supports progression learning rather than free solving.
-
-### Cursor / Accessibility Controls
-
-- Keyboard-first sticker/cursor interaction paths.
-- Supports non-mouse workflows and structured tile targeting.
-
----
-
-## 3) WORM Family Modes
-
-WORM modes turn cube/manifold state into movement/traversal gameplay.
-
-### WORM (Surface)
-
-- Worm advances over cube surfaces tile-to-tile.
-- Direction and body trail create snake-like routing constraints.
-- Uses flips/parity zones as hazards/opportunities depending on variant.
-
-### WORM (Tunnel)
-
-- Worm travels through antipodal tunnels inside the cube volume.
-- Tunnel routing follows tunnel paths through the cube core.
-- Tracks tunnel-side activity/inactivity for traversal logic in newer implementations.
-- Orb collection and self-collision still govern run survival.
-
-### Healer WORM (Chase-cam action mode)
-
-- Real-time crawler variant with character-like movement and jump mechanics.
-- Includes wormhole/tunnel transitions, tunnel camera phases, and HUD-driven run state.
-- Features:
-  - jump systems (including multi-jump logic),
-  - delayed tunnel triggering windows,
-  - self-collision windows/grace logic,
-  - tunnel surf camera behavior + tunnel FX,
-  - optional oriented vs non-oriented input behavior.
-
-### Co-op Platformer WORM
-
-- Split-responsibility style mode where crawler and cube manipulation interplay.
-- Platformer HUD and movement controls coexist with cube interactions.
+- Story campaign pack: **“Life Journey”** (Daycare → Black Hole).
+- Progressive feature unlocking across levels (rotations, tunnels, flips, chaos/disparity, parity, explode view, net view).
+- Level metadata supports:
+  - cube size,
+  - chaos level,
+  - game mode + win condition,
+  - environment/background,
+  - feature flags,
+  - tutorial/cutscene text,
+  - difficulty/tags,
+  - optional move/time limits,
+  - unlock requirements.
+- Validation utilities exist for individual levels, packs, and full built-in sets.
 
 ---
 
-## 4) Disparity Mode
+## Modes and Variants
 
-- Competitive/elimination-styled manifold pressure mode.
-- Uses flip-cap/death style logic and last-survivor/winner tracking systems.
-- Includes setup wizard flow and countdown/start behavior.
-- Integrates with chaos pressure and elimination visuals.
+## Primary Modes
 
----
+- **Classic Puzzle** (default solve flow)
+- **Sudokube**
+- **Ultimate**
+- **Freeplay Setup Wizard** (customized sandbox entry)
+- **Level Select + Story Campaign** (guided progression)
 
-## 5) Holonomy Mode
+## Secondary/Overlay Modes
 
-- Focuses on path-dependent orientation/transport behavior.
-- Exposes geometric phase/parallel transport intuition through traversal and HUD overlays.
-- Serves as a mathematically focused exploratory mode rather than classic “solve fastest”.
+These layer on top of core play:
 
----
+- **Flip Mode** — enables antipodal sticker flips.
+- **Disparity / Chaos Mode**
+  - chaos levels,
+  - optional auto-rotate pressure,
+  - cascade tracking,
+  - elimination/death tracking overlays,
+  - winner cinematic flow.
+- **Hands Mode**
+  - speedcube-style keyboard mapping,
+  - move-history notation,
+  - turns-per-second telemetry,
+  - combo detection.
+- **Solve Mode**
+  - focused step/highlight assistance.
+- **Teach Mode**
+  - guided instructional flow (3×3-targeted learning).
+- **Antipodal Integrity Mode (I(T))** — topology/integrity exploration overlay.
+- **Antipodal Echo Mode**
+  - delayed mirrored/echo rotations,
+  - reversal/effect telemetry,
+  - echo synchronization controls + indicators.
+- **Leaderboard/Tile Stats View** — live tile/death/flip style leaderboard panel.
+- **View Modes**
+  - classic,
+  - grid,
+  - sudokube,
+  - wireframe,
+  - glass.
+- **Spatial View Toggles**
+  - explode,
+  - net panel,
+  - hollow cube,
+  - tunnel visibility.
 
-## 6) Explore / Freeplay
+## WORM Family Modes
 
-- Sandbox entry for custom cube size, visuals, and mode toggles.
-- Ideal for experimentation without strict campaign sequencing.
-- Commonly used to stress-test interactions between flip systems, tunnels, and view modes.
+WORM transforms cube state into movement gameplay:
 
----
+- **WORM Surface** — tile-based crawling with path/body constraints.
+- **WORM Tunnel** — wormhole/interior routing variant.
+- **WORM Healer** (real-time chase-cam action)
+  - jumping + multi-jump behavior,
+  - tunnel trigger windows and transitions,
+  - collision/death management,
+  - run lifecycle controls (retry/new game),
+  - orb + powerup driven flow.
+- **Co-op Platformer WORM**
+  - platforming + cube interaction blend,
+  - dedicated setup wizard and HUD components.
 
-## 7) World / Biome Mode
+## Experimental / Specialty Modes
 
-- Environment/scene theming layer.
-- Changes visual world style while keeping gameplay state model consistent.
-- Useful for immersion and readability testing under varied art directions.
-
----
-
-## 8) Level Campaign
-
-- Structured progression with tutorials/cutscenes and staged mechanic onboarding.
-- Teaches topology/mechanics incrementally.
-- Includes level-specific setup constraints and next-level transitions.
-
----
-
-## Controls (By Mode)
-
-## Global Cube Interaction
-
-- Drag / swipe: rotate slices.
-- Flip interaction: sticker flip mode and direct tile interactions (depending on active setup).
-- Menu/HUD controls: mode toggles, settings, overlays.
-
-## WORM Surface/Tunnel
-
-- Keyboard/game HUD controls for directional movement.
-- Jump and run-state interactions in Healer/platformer variants.
-- Mobile/touch controls include swipe-driven directional input and jump action.
-
-## Healer-specific
-
-- Arrow input + swipe mapping.
-- Jump action (space / HUD jump button / touch).
-- Control mode toggle in HUD (Oriented / Non-Oriented).
-
----
-
-## WORM Healer Control Modes
-
-WORM Healer includes two input interpretations:
-
-### Non-Oriented (legacy / manifold-relative)
-
-- Left/right are interpreted relative to worm heading.
-- Reinforces non-orientable navigation feel.
-- More mathematically “raw” but less intuitive for some players.
-
-### Oriented (camera/view-relative)
-
-- Up/left/down/right map relative to what the player sees on screen.
-- Better for onboarding and casual usability.
-- Especially useful in chase-cam + tunnel transitions.
+- **Holonomy Mode** — path-dependent orientation/transport exploration.
+- **Merge Mode**
+  - theme picker (Pokémon, D&D, Digimon, Marvel, Harry Potter, Disney),
+  - connected-region detection,
+  - tile evolution tiers (base/mid/final) with tier-based rendering overlays.
+- **Biome/World Styling**
+  - city/biome driven visual treatment,
+  - environment map switching,
+  - per-face thematic styling options.
 
 ---
 
-## Visual Systems
+## Controls
 
-WORM-3 includes multiple rendering overlays/systems layered on gameplay state:
+## Mouse / Touch
 
-- Antipodal tunnel network visualization.
-- Void core and manifold-centric interior rendering.
-- Flip propagation/chaos wave effects.
-- Disparity and parity HUD overlays.
-- Tunnel travel camera states and tunnel particle/spark effects.
-- Environment packs/biome worlds.
+- Drag/swipe on cube: rotate slices.
+- Shift + drag: twist face.
+- Tap/click sticker: antipodal flip (when enabled).
+- Mobile includes dedicated touch controls for WORM and face/tile rotation helpers.
+
+## Keyboard Shortcuts
+
+General shortcuts:
+
+- `Space` — shuffle
+- `R` — reset
+- `H` or `?` — help
+- `G` — toggle flip mode
+- `T` — toggle tunnels
+- `X` — toggle explode
+- `V` — cycle visual mode
+- `C` — toggle disparity/chaos mode
+- `P` — toggle hands mode
+- `Esc` — close menus / hide cursor / exit hands mode
+- `Z` — undo
+
+Keyboard cursor + cube interaction:
+
+- Arrow keys — move tile cursor
+- `W` / `S` — rotate selected row up/down
+- `A` / `D` — rotate selected column left/right
+- `Q` / `E` — rotate selected face CCW/CW
+- `F` — flip selected tile
+
+## Hands Mode Keymap
+
+- `I` / `K` → U / U'
+- `O` → U2
+- `J` / `L` → R / R'
+- `F` / `D` → L / L'
+- `H` / `G` → F / F'
+- `W` / `E` → B / B'
+- `S` / `;` → D / D'
+- `,` / `M` → M' / M
+- `.` → M2
+- `U` / `N` → E' / E
+
+## WORM Healer Control Styles
+
+- **Non-oriented (legacy manifold-relative):** turning relative to worm heading.
+- **Oriented (camera-relative):** turning relative to on-screen camera frame.
+
+Both can be toggled in mode-specific UI.
 
 ---
 
-## Mathematical Model
+## Visual + World Systems
 
-The project models the cube under antipodal identification inspired by:
-
-- **RP² viewpoint**: opposite points/faces identified under quotient intuition.
-- **Non-orientability effects**: control/heading intuition can diverge from viewer intuition.
-- **Parity and path dependence**: state updates can reflect topology-aware transitions.
-
-This is why WORM-3 can feel fundamentally different from a standard cube simulator.
-
----
-
-## Architecture Overview
-
-- **UI + scene orchestration:** `src/App.jsx`
-- **Global state:** `src/hooks/useGameStore.js` (Zustand)
-- **Cube/game logic:** `src/game/*`
-- **WORM systems:** `src/worm/*`
-- **Manifold/topology visual systems:** `src/manifold/*`
-- **Teaching/solver flow:** `src/teach/*`
-- **Overlays/menus/screens:** `src/components/*`
-- **Levels/content packs:** `src/levels/*`
+- Antipodal tunnel network rendering.
+- Manifold and wormhole effects (waves, tunnel FX, pulse overlays).
+- Intro scene + post-processing stack (bloom, vignette, chromatic aberration).
+- Optional PiP antipodal visualization.
+- Disparity/instability overlays and health/death-style indicators.
+- 3D background environments and biome clusters (GLB assets + HDR/EXR maps).
+- Large color/theme catalog (classic palettes, stylistic and pop-culture schemes).
+- Optional custom face imagery/texture assignment from settings pipeline.
 
 ---
 
-## Development
+## Audio / Feedback / HUD
+
+- Audio utility hooks for game feedback.
+- Floating HUD for parity/chaos state cues.
+- Top menu stats and runtime indicators.
+- Bottom navigation + grouped secondary mode sheet.
+- Specialized overlays:
+  - hands HUD,
+  - disparity HUD,
+  - antipodal HUDs,
+  - healer worm HUD,
+  - rotation previews,
+  - solve highlights,
+  - cursor highlights.
+
+---
+
+## Tech Architecture
+
+- **Frontend:** React 18 + Vite
+- **3D:** Three.js, @react-three/fiber, @react-three/drei
+- **Post FX:** @react-three/postprocessing
+- **State:** Zustand (single global store + modular hooks)
+- **Animation:** GSAP + frame-driven effects
+- **Testing:** Vitest + jsdom
+- **Linting:** ESLint 9
+
+High-level runtime layering:
+
+1. `App.jsx` orchestrates scene branches, mode switching, and handler wiring.
+2. Store/hooks compose stateful systems (cube, chaos, settings, levels, inputs).
+3. 3D scene components render manifold/cube/worm visuals.
+4. UI layer renders menus, wizards, HUD, overlays, and campaign flows.
+
+---
+
+## Codebase Map
+
+- `src/App.jsx` — main app orchestration.
+- `src/hooks/*` — store adapters and gameplay hooks (`useCubeState`, `useChaosMode`, `useHandsMode`, etc.).
+- `src/game/*` — core puzzle math/state transitions (rotation, flips, verification, parity, win detection).
+- `src/worm/*` — worm movement/gameplay variants, HUD, controls, camera.
+- `src/3d/*` — cube/manifold rendering stack and visual effects.
+- `src/components/*` — menus, overlays, setup wizards, screens, intro UI.
+- `src/teach/*` — teach mode + solving guidance utilities.
+- `src/levels/*` — level schema, validation, campaign packs, progression management.
+- `src/modes/*` — additional mode domains (biomes, merge mode).
+- `src/utils/*` — color schemes, backgrounds, graph/math helpers, constants, audio.
+- `src/workers/*` — worker-based chaos/compute utilities.
+- `public/models/biomes/*` + `public/environments/*` — 3D world/environment assets.
+
+---
+
+## Local Development
 
 ### Prerequisites
 
@@ -261,19 +297,19 @@ This is why WORM-3 can feel fundamentally different from a standard cube simulat
 npm install
 ```
 
-### Run Dev Server
+### Start Dev Server
 
 ```bash
 npm run dev
 ```
 
-### Build
+### Build for Production
 
 ```bash
 npm run build
 ```
 
-### Preview Build
+### Preview Production Build
 
 ```bash
 npm run preview
@@ -281,9 +317,9 @@ npm run preview
 
 ---
 
-## Testing
+## Testing, Linting, CI
 
-### Unit Tests
+### Run Tests
 
 ```bash
 npm test
@@ -307,8 +343,21 @@ npm run test:coverage
 npm run lint
 ```
 
+### Full CI Command
+
+```bash
+npm run ci
+```
+
+---
+
+## Known Notes
+
+- Merge mode includes code-level support for themed region tiers and overlays; final art asset completeness may vary by theme pack at runtime.
+- The project intentionally blends puzzle precision with experimental manifold mechanics (chaos/disparity, worm traversal, holonomy), so some modes are more “sandbox research” than fixed competitive rulesets.
+
 ---
 
 ## License
 
-MIT (see `LICENSE`).
+MIT. See `LICENSE`.
