@@ -94,6 +94,7 @@ export default function UILayer({
     showFreeplayWizard, showWormModeWizard,
     showDisparityWizard, setShowDisparityWizard,
     disparityWaitingFirstFlip, disparityCountdown,
+    showAntipodalPiP, onToggleAntipodalPiP,
   } = ui;
 
   const {
@@ -207,6 +208,8 @@ export default function UILayer({
           onShowSettings={() => setShowSettings(true)}
           onHome={onBackToMainMenu}
           currentLevelData={currentLevelData}
+          showAntipodalPiP={showAntipodalPiP}
+          onToggleAntipodalPiP={onToggleAntipodalPiP}
         />}
 
         {/* Undo Indicator — desktop only (mobile uses MobileControls) */}

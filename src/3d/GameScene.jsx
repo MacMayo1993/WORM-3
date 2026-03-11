@@ -18,6 +18,7 @@ import LayerHighlight from '../teach/LayerHighlight.jsx';
 import AntipodalVisualization from './AntipodalVisualization.jsx';
 import AntipodalModeEffects from './AntipodalModeEffects.jsx';
 import WormholeWarpFX from './WormholeWarpFX.jsx';
+import AntipodalPiP from './AntipodalPiP.jsx';
 
 import { HealerWormMode3DWrapper } from '../worm/HealerWormMode.jsx';
 const HolonomyWrapper = React.lazy(() => import('../holonomy/HolonomyWrapper.jsx'));
@@ -109,6 +110,8 @@ export default function GameScene({
   antipodalData,
   teachModeActive,
   layerHighlight,
+  // PiP toggle
+  showAntipodalPiP,
 }) {
   // ── State from store ──────────────────────────────────────────────────────
   const {
@@ -258,6 +261,9 @@ export default function GameScene({
           </Suspense>
         )}
       </Suspense>
+
+      {/* Antipodal PiP — always mounted (owns render loop when active) */}
+      <AntipodalPiP enabled={!!showAntipodalPiP} />
     </>
   );
 }
