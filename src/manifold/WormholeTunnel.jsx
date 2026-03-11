@@ -32,8 +32,10 @@ const _startPt = new THREE.Vector3();
 const _dummy = new THREE.Object3D();
 const _yAxis = new THREE.Vector3(0, 1, 0);
 
-const CORE_GEOMETRY_FPS = 18;
-const LIGHTNING_GEOMETRY_FPS = 24;
+// Geometry rebuild FPS kept low — TubeGeometry alloc+dispose is expensive.
+// Core rebuilt at 8 fps (was 18), lightning at 12 fps (was 24).
+const CORE_GEOMETRY_FPS = 8;
+const LIGHTNING_GEOMETRY_FPS = 12;
 const CORE_REBUILD_POS_EPS_SQ = 1e-4;
 const LIGHTNING_REBUILD_POS_EPS_SQ = 1e-4;
 const LIGHTNING_RADIUS_EPS = 1e-4;

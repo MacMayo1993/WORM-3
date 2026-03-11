@@ -9,10 +9,10 @@ import { resolveColors } from '../utils/colorSchemes.js';
 
 // B2: Cap the number of rendered tunnels.
 // At peak 5×5 chaos there can be ~75 active antipodal pairs; each renders
-// up to 50 animated strands × 30 pts = 1 125 GPU line vertices per tunnel.
-// Keeping only the most active MAX_TUNNELS connections bounds GPU work to a
-// fixed budget and keeps the visually interesting pairs on screen.
-const MAX_TUNNELS = 300;
+// up to 30 animated strands × 30 pts per tunnel.
+// 150 (was 300) keeps GPU work tighter; during Worm mode the extra clutter
+// of 300 tunnels hurts both performance and readability.
+const MAX_TUNNELS = 150;
 
 const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
   const { cubies, size, showTunnels, settings, explosionFactor } = useGameStore(
@@ -24,9 +24,12 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
       explosionFactor: s.explosionT,
     }))
   );
+  // Narrow deps: only the two settings fields that affect face-color resolution.
+  // Avoids re-running the lookup on every unrelated settings change (e.g. background theme).
   const fc = useMemo(
     () => resolveColors(settings, settings?.biomeMode?.faceAssignment) || FACE_COLORS,
-    [settings]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [settings?.colorScheme, settings?.biomeMode?.faceAssignment]
   );
 
   // B4: debounce cubies so tunnel geometry only rebuilds at most every 150ms
@@ -101,11 +104,12 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
   }, [debouncedCubies, size, showTunnels, manifoldMap, fc]);
 
   // B3: adaptive strand-count LOD based on how many tunnels are visible.
-  // With more tunnels each tunnel needs fewer strands to maintain a playable
-  // frame rate — the total GPU line-vertex budget stays roughly constant.
-  //  1–12 tunnels  → full density (50 strands max)
-  // 13–24 tunnels  → half density (25 strands max)
-  const maxStrands = tunnelData.length > 12 ? 25 : 50;
+  // With more tunnels each tunnel needs fewer strands to keep GPU work bounded.
+  //  1–6 tunnels   → moderate density (30 strands)
+  //  7–20 tunnels  → reduced density (15 strands)
+  // 21+ tunnels    → minimal density  (8 strands)
+  const n = tunnelData.length;
+  const maxStrands = n > 20 ? 8 : n > 6 ? 15 : 30;
 
   if (!showTunnels) return null;
 

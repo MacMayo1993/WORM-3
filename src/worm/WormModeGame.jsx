@@ -2,7 +2,7 @@
 // Complete WORM mode game - wraps all components with shared state
 // Supports both surface mode (classic) and tunnel mode (new inside-the-cube mode)
 
-import React, { createContext, useContext, useCallback } from 'react';
+import React, { createContext, useContext, useCallback, useRef } from 'react';
 import { useWormGame, useTunnelWormGame, WormMode3D, WormGameLoop, TunnelWormGameLoop } from './WormMode.jsx';
 import WormHUD from './WormHUD.jsx';
 import WormCamera from './WormCamera.jsx';
@@ -48,28 +48,31 @@ export function WormModeProvider({ children, cubies, size, animState, onRotate, 
 function SurfaceWormModeProvider({ children, cubies, size, animState, onRotate, onGameStateChange, mode }) {
   const game = useWormGame(cubies, size, animState, onRotate);
 
+  // Keep a ref so the effect never needs onGameStateChange in its dep array.
+  // This prevents the effect from re-firing when the parent re-renders without
+  // wrapping the callback in useCallback (which is the common case in App.jsx).
+  const onGameStateChangeRef = useRef(onGameStateChange);
+  onGameStateChangeRef.current = onGameStateChange;
+
   React.useEffect(() => {
-    if (onGameStateChange) {
-      onGameStateChange({
-        gameState: game.gameState,
-        worm: game.worm,
-        orbs: game.orbs,
-        score: game.score,
-        warps: game.warps || 0,
-        tunnelsTraversed: game.tunnelsTraversed || 0,
-        tunnels: game.tunnels || [],
-        speed: game.speed,
-        orbsTotal: game.orbsTotal,
-        wormCameraEnabled: game.wormCameraEnabled,
-        targetTunnelId: game.targetTunnelId || null,
-        mode,
-        setGameState: game.setGameState,
-        setWormCameraEnabled: game.setWormCameraEnabled,
-        restart: game.restart
-      });
-    }
+    onGameStateChangeRef.current?.({
+      gameState: game.gameState,
+      worm: game.worm,
+      orbs: game.orbs,
+      score: game.score,
+      warps: game.warps || 0,
+      tunnelsTraversed: game.tunnelsTraversed || 0,
+      tunnels: game.tunnels || [],
+      speed: game.speed,
+      orbsTotal: game.orbsTotal,
+      wormCameraEnabled: game.wormCameraEnabled,
+      targetTunnelId: game.targetTunnelId || null,
+      mode,
+      setGameState: game.setGameState,
+      setWormCameraEnabled: game.setWormCameraEnabled,
+      restart: game.restart
+    });
   }, [
-    onGameStateChange,
     game.gameState,
     game.worm,
     game.orbs,
@@ -97,29 +100,30 @@ function SurfaceWormModeProvider({ children, cubies, size, animState, onRotate, 
 function TunnelWormModeProvider({ children, cubies, size, animState, onRotate, onGameStateChange }) {
   const game = useTunnelWormGame(cubies, size, animState, onRotate);
 
+  // Keep a ref so the effect never needs onGameStateChange in its dep array.
+  const onGameStateChangeRef = useRef(onGameStateChange);
+  onGameStateChangeRef.current = onGameStateChange;
+
   // Report game state changes to parent (for UI outside Canvas)
   React.useEffect(() => {
-    if (onGameStateChange) {
-      onGameStateChange({
-        gameState: game.gameState,
-        worm: game.worm,
-        orbs: game.orbs,
-        score: game.score,
-        warps: game.warps || 0,
-        tunnelsTraversed: game.tunnelsTraversed || 0,
-        tunnels: game.tunnels || [],
-        speed: game.speed,
-        orbsTotal: game.orbsTotal,
-        wormCameraEnabled: game.wormCameraEnabled,
-        targetTunnelId: game.targetTunnelId || null,
-        mode: 'tunnel',
-        setGameState: game.setGameState,
-        setWormCameraEnabled: game.setWormCameraEnabled,
-        restart: game.restart
-      });
-    }
+    onGameStateChangeRef.current?.({
+      gameState: game.gameState,
+      worm: game.worm,
+      orbs: game.orbs,
+      score: game.score,
+      warps: game.warps || 0,
+      tunnelsTraversed: game.tunnelsTraversed || 0,
+      tunnels: game.tunnels || [],
+      speed: game.speed,
+      orbsTotal: game.orbsTotal,
+      wormCameraEnabled: game.wormCameraEnabled,
+      targetTunnelId: game.targetTunnelId || null,
+      mode: 'tunnel',
+      setGameState: game.setGameState,
+      setWormCameraEnabled: game.setWormCameraEnabled,
+      restart: game.restart
+    });
   }, [
-    onGameStateChange,
     game.gameState,
     game.worm,
     game.orbs,

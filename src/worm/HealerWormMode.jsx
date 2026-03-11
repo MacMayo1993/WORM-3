@@ -3,7 +3,7 @@
 // Chase camera follows the worm crawling on the cube exterior.
 // Disparity Level 1 runs in background. Flipped tiles are instant wormholes; jump to clear them.
 
-import React, { useRef, useCallback, useEffect } from 'react';
+import React, { useRef, useCallback, useEffect, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
@@ -1191,13 +1191,21 @@ const _ringUp = new THREE.Vector3();
 function WormholeRings({ cubies, size }) {
     const meshRef = useRef();
 
+    // Debounce cubies so the O(size³×6) scan only reruns every 200 ms instead
+    // of on every individual sticker flip (~12×/sec at chaos L4).
+    const [debouncedCubies, setDebouncedCubies] = useState(cubies);
+    useEffect(() => {
+        const timer = setTimeout(() => setDebouncedCubies(cubies), 200);
+        return () => clearTimeout(timer);
+    }, [cubies]);
+
     const flippedPositions = React.useMemo(() => {
         const result = [];
         const dirs = ['PX', 'NX', 'PY', 'NY', 'PZ', 'NZ'];
         for (let x = 0; x < size; x++) {
             for (let y = 0; y < size; y++) {
                 for (let z = 0; z < size; z++) {
-                    const cubie = cubies?.[x]?.[y]?.[z];
+                    const cubie = debouncedCubies?.[x]?.[y]?.[z];
                     if (!cubie) continue;
                     for (const dk of dirs) {
                         const st = cubie.stickers?.[dk];
@@ -1213,7 +1221,7 @@ function WormholeRings({ cubies, size }) {
             }
         }
         return result;
-    }, [cubies, size]);
+    }, [debouncedCubies, size]);
 
     useFrame(({ clock }) => {
         const mesh = meshRef.current;

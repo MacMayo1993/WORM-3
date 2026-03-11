@@ -187,10 +187,20 @@ const Cubie = React.forwardRef(function Cubie({
   // Primitive fingerprint of each face's current color — a plain string that
   // React can compare by value. Changes only when sticker colors actually change,
   // not on every object-reference re-creation during rotation.
-  // Skipped (empty string) when not in wireframe mode to avoid wasted work.
-  const stickerColorKey = visualMode === 'wireframe'
-    ? `${cubie.stickers.PZ?.curr},${cubie.stickers.NZ?.curr},${cubie.stickers.PX?.curr},${cubie.stickers.NX?.curr},${cubie.stickers.PY?.curr},${cubie.stickers.NY?.curr}`
-    : '';
+  // Memoized so the template-literal is not evaluated on every render; in non-wireframe
+  // mode the memo short-circuits immediately (no string allocation at all).
+  const stickerColorKey = useMemo(
+    () => visualMode === 'wireframe'
+      ? `${cubie.stickers.PZ?.curr},${cubie.stickers.NZ?.curr},${cubie.stickers.PX?.curr},${cubie.stickers.NX?.curr},${cubie.stickers.PY?.curr},${cubie.stickers.NY?.curr}`
+      : '',
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      visualMode,
+      cubie.stickers.PZ?.curr, cubie.stickers.NZ?.curr,
+      cubie.stickers.PX?.curr, cubie.stickers.NX?.curr,
+      cubie.stickers.PY?.curr, cubie.stickers.NY?.curr,
+    ]
+  );
 
   // Stable per-cubie pulse phase derived from original position.
   // Using Math.random() inside useMemo caused a new phase on every deps change

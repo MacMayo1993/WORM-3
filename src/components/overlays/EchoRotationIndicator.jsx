@@ -7,10 +7,42 @@
 
 import React, { useMemo } from 'react';
 import { useGameStore } from '../../hooks/useGameStore.js';
+import { useShallow } from 'zustand/react/shallow';
+
+// ─── Static style constants ───────────────────────────────────────────────────
+const BASE_INDICATOR_STYLE = {
+  position: 'fixed',
+  transform: 'translate(-50%, -50%)',
+  pointerEvents: 'none',
+  zIndex: 150,
+  display: 'flex',
+  alignItems: 'center',
+  gap: '8px',
+  padding: '8px 16px',
+  borderRadius: '20px',
+  backdropFilter: 'blur(8px)',
+  animation: 'pulse 1s infinite',
+};
+
+const DOT_BASE_STYLE = {
+  width: '8px',
+  height: '8px',
+  borderRadius: '50%',
+  animation: 'pulse 0.8s infinite',
+};
+
+const LABEL_BASE_STYLE = {
+  fontSize: '12px',
+  fontWeight: 600,
+  fontFamily: "'Courier New', monospace",
+  letterSpacing: '0.1em',
+  textTransform: 'uppercase',
+};
 
 export default function EchoRotationIndicator() {
-  const animState = useGameStore((state) => state.animState);
-  const size = useGameStore((state) => state.size);
+  const { animState, size } = useGameStore(
+    useShallow(state => ({ animState: state.animState, size: state.size }))
+  );
 
   // Calculate position based on axis and slice (must be called unconditionally)
   const sliceInfo = useMemo(() => {
@@ -53,48 +85,23 @@ export default function EchoRotationIndicator() {
   // Color based on axis (matching the tether colors)
   const color = sliceInfo.axis === 'col' ? '#22c55e' : sliceInfo.axis === 'row' ? '#3b82f6' : '#ef4444';
 
+  const indicatorStyle = {
+    ...BASE_INDICATOR_STYLE,
+    ...sliceInfo.position,
+    background: `${color}20`,
+    border: `2px solid ${color}`,
+  };
+
+  const dotStyle = { ...DOT_BASE_STYLE, background: color, boxShadow: `0 0 10px ${color}` };
+  const labelStyle = { ...LABEL_BASE_STYLE, color };
+
   return (
-    <div
-      style={{
-        position: 'fixed',
-        ...sliceInfo.position,
-        transform: 'translate(-50%, -50%)',
-        pointerEvents: 'none',
-        zIndex: 150,
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        padding: '8px 16px',
-        background: `${color}20`,
-        border: `2px solid ${color}`,
-        borderRadius: '20px',
-        backdropFilter: 'blur(8px)',
-        animation: 'pulse 1s infinite',
-      }}
-    >
+    <div style={indicatorStyle}>
       {/* Pulsing indicator */}
-      <div
-        style={{
-          width: '8px',
-          height: '8px',
-          borderRadius: '50%',
-          background: color,
-          boxShadow: `0 0 10px ${color}`,
-          animation: 'pulse 0.8s infinite',
-        }}
-      />
+      <div style={dotStyle} />
 
       {/* Label */}
-      <span
-        style={{
-          fontSize: '12px',
-          fontWeight: 600,
-          color: color,
-          fontFamily: "'Courier New', monospace",
-          letterSpacing: '0.1em',
-          textTransform: 'uppercase',
-        }}
-      >
+      <span style={labelStyle}>
         Echo: {sliceInfo.label}
       </span>
 

@@ -5,10 +5,9 @@
  * Reads most state directly from useGameStore to reduce prop drilling.
  */
 
-import React, { Suspense } from 'react';
+import React, { Suspense, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Environment, Html } from '@react-three/drei';
-import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import CubeAssembly from './CubeAssembly.jsx';
@@ -149,6 +148,13 @@ export default function GameScene({
     wormPhase === 'entering' || wormPhase === 'tunnel' || wormPhase === 'exiting'
   );
 
+  // Memoize the BACKGROUNDS array search — avoids re-iterating on every render.
+  // Only recomputes when the user actually changes their background theme.
+  const bgConfig = useMemo(
+    () => BACKGROUNDS.find((b) => b.id === settings.backgroundTheme),
+    [settings.backgroundTheme]
+  );
+
   return (
     <>
       {/* Lights — intensity varies by visualMode */}
@@ -183,28 +189,19 @@ export default function GameScene({
         {/* Free play: Black Hole */}
         {!currentLevelData && settings.backgroundTheme === 'blackhole' && <BlackHoleEnvironment flipTrigger={blackHolePulse} />}
         {/* Free play: interactive photo panoramas */}
-        {!currentLevelData && (
-          (() => {
-            const bgConfig = BACKGROUNDS.find((b) => b.id === settings.backgroundTheme);
-            if (bgConfig && bgConfig.file) {
-              return (
-                <ErrorBoundary3D>
-                  <InteractivePhotoBackground files={getBackgroundUrl(bgConfig.file)} />
-                </ErrorBoundary3D>
-              );
-            }
-            if (PHOTO_PRESETS.has(settings.backgroundTheme)) {
-              return (
-                <ErrorBoundary3D>
-                  <InteractivePhotoBackground preset={settings.backgroundTheme} />
-                </ErrorBoundary3D>
-              );
-            }
-            if (settings.backgroundTheme === 'blackhole' || !bgConfig) {
-              return <BlackHoleEnvironment flipTrigger={blackHolePulse} />;
-            }
-            return null;
-          })()
+        {!currentLevelData && bgConfig?.file && (
+          <ErrorBoundary3D>
+            <InteractivePhotoBackground files={getBackgroundUrl(bgConfig.file)} />
+          </ErrorBoundary3D>
+        )}
+        {!currentLevelData && !bgConfig?.file && PHOTO_PRESETS.has(settings.backgroundTheme) && (
+          <ErrorBoundary3D>
+            <InteractivePhotoBackground preset={settings.backgroundTheme} />
+          </ErrorBoundary3D>
+        )}
+        {!currentLevelData && !bgConfig?.file && !PHOTO_PRESETS.has(settings.backgroundTheme) &&
+          (settings.backgroundTheme === 'blackhole' || !bgConfig) && (
+          <BlackHoleEnvironment flipTrigger={blackHolePulse} />
         )}
         {/* Default lighting env for levels without a custom background */}
         {currentLevelData && !currentLevelData.background && <Environment preset="city" />}
@@ -265,13 +262,6 @@ export default function GameScene({
 
       {/* Antipodal PiP — only mounted when active so R3F auto-render stays live when off */}
       {showAntipodalPiP && <AntipodalPiP />}
-
-      {/* Bloom post-processing — active in worm mode to make emissive worm/orbs/portals glow */}
-      {wormHealerMode && (
-        <EffectComposer>
-          <Bloom luminanceThreshold={0.35} luminanceSmoothing={0.9} intensity={0.9} mipmapBlur />
-        </EffectComposer>
-      )}
     </>
   );
 }
