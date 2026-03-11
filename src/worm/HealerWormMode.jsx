@@ -896,6 +896,7 @@ const _headPathPoint = { pos: _bodyHeadPos, normal: _bodyNormal };
 function WormBody({ worm }) {
     const meshRef = useRef();
     const wormColor = useGameStore(s => s.wormColor ?? '#33ff66');
+    const prevTailLenRef = useRef(0);
 
     useFrame((state) => {
         // Copy head/normal into scratch vectors (avoids .clone() allocation)
@@ -920,13 +921,10 @@ function WormBody({ worm }) {
         let walkIndex = 0;
         let cumulativeDist = 0;
 
-        for (let i = 0; i < MAX_TAIL; i++) {
-            if (i >= tLen) {
-                _wormDummy.scale.setScalar(0);
-                _wormDummy.updateMatrix();
-                mesh.setMatrixAt(i, _wormDummy.matrix);
-                continue;
-            }
+        const visibleCount = Math.min(MAX_TAIL, tLen);
+        mesh.count = visibleCount;
+
+        for (let i = 0; i < visibleCount; i++) {
             const fade = 1 - i / tLen;
 
             if (i === 0) {
@@ -976,12 +974,19 @@ function WormBody({ worm }) {
 
             _wormDummy.updateMatrix();
             mesh.setMatrixAt(i, _wormDummy.matrix);
-            // Reuse pre-allocated color object — avoids 1 Color allocation per segment per frame
-            mesh.setColorAt(i, _bodyColor.setHSL(0.38 - i * 0.005, 1, 0.4 + fade * 0.3));
+        }
+
+        if (prevTailLenRef.current !== visibleCount) {
+            prevTailLenRef.current = visibleCount;
+            for (let i = 0; i < visibleCount; i++) {
+                const fade = 1 - i / tLen;
+                // Reuse pre-allocated color object — avoids 1 Color allocation per segment per frame
+                mesh.setColorAt(i, _bodyColor.setHSL(0.38 - i * 0.005, 1, 0.4 + fade * 0.3));
+            }
+            if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
         }
 
         mesh.instanceMatrix.needsUpdate = true;
-        if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     });
 
     return (
