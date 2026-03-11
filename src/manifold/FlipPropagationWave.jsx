@@ -27,17 +27,34 @@ const FlipPropagationWave = ({ origins, onComplete }) => {
   // makes the worm teleport to a new destination each frame.
   const wormEnds = useMemo(() => {
     if (!origins) return [];
+
+    // Flip events are usually emitted as antipodal pairs. When we have a pair,
+    // each worm should travel toward the opposite tile so it actually crosses
+    // through the cube instead of drifting away from the source face.
+    if (origins.length === 2) {
+      return origins.map((_, idx) => origins[(idx + 1) % 2].position);
+    }
+
+    // Fallback for non-paired origins: target the approximate antipodal point
+    // through the cube center with a tiny deterministic jitter so paths don't
+    // look perfectly mechanical.
     return origins.map((origin) => {
-      // Pick a destination that arcs nicely above the tile surface.
-      // The arc peaks ~1.5 units out from the face in a random radial direction.
-      const angle = Math.random() * Math.PI * 2;
-      const radius = 0.8 + Math.random() * 0.6;   // 0.8 – 1.4 units lateral spread
-      const rise   = 0.6 + Math.random() * 0.5;   // 0.6 – 1.1 units above surface
-      return [
-        origin.position[0] + Math.cos(angle) * radius,
-        origin.position[1] + Math.sin(angle) * radius,
-        origin.position[2] + rise,
-      ];
+      const originPos = new THREE.Vector3(...origin.position);
+      const inward = originPos.clone().multiplyScalar(-1);
+      const axis = originPos.clone().normalize();
+
+      const fallbackUp = Math.abs(axis.dot(new THREE.Vector3(0, 1, 0))) > 0.9
+        ? new THREE.Vector3(1, 0, 0)
+        : new THREE.Vector3(0, 1, 0);
+
+      const jitterRight = new THREE.Vector3().crossVectors(axis, fallbackUp).normalize();
+      const jitterUp = new THREE.Vector3().crossVectors(jitterRight, axis).normalize();
+      const jitter = 0.18;
+
+      return inward
+        .addScaledVector(jitterRight, (Math.random() - 0.5) * jitter)
+        .addScaledVector(jitterUp, (Math.random() - 0.5) * jitter)
+        .toArray();
     });
   }, [origins]);  // only recalculated when origins reference changes
 
