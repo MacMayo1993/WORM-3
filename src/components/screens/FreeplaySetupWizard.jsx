@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { COLOR_SCHEMES, TILE_STYLES, SCHEME_LABELS } from '../../utils/colorSchemes.js';
+import { CLASSIC_STYLE_KEYS, ANTIPODAL_STYLE_KEYS, LIVING_STYLE_KEYS } from '../../utils/tileStyleCatalog.js';
 import { BACKGROUNDS, getBackgroundUrl } from '../../utils/backgrounds.js';
 import { registerTilePreview, updateTilePreview, unregisterTilePreview } from '../../3d/TilePreviewRenderer.js';
 
@@ -35,9 +36,6 @@ const BG_OPTIONS = BACKGROUNDS.map(bg => ({
   thumbnail: bg.thumbnail ? getBackgroundUrl(bg.thumbnail) : null,
   gradient: BG_PREVIEWS[bg.id] || 'linear-gradient(135deg, #333 0%, #000 100%)',
 }));
-
-const CLASSIC_STYLE_KEYS = ['solid', 'glossy', 'matte', 'metallic', 'carbonFiber', 'hexGrid', 'comic', 'cafeWall', 'hermanGrid', 'opticSpin', 'ouchi', 'scintillatingGrid', 'zoellner', 'kanizsa', 'fraserSpiral', 'muellerLyer', 'rotatingSnakes', 'poggendorff'];
-const LIVING_STYLE_KEYS = ['grass', 'ice', 'sand', 'water', 'wood', 'circuit', 'holographic', 'pulse', 'lava', 'galaxy', 'neural', 'moireRings', 'moireLines', 'infinityTunnel', 'vortex', 'shockwave'];
 
 // Color schemes shown in the wizard (biome is a mode, not a palette)
 const WIZARD_SCHEME_KEYS = Object.keys(SCHEME_LABELS).filter(k => k !== 'biome');
@@ -328,7 +326,7 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     img.src = url;
   };
 
-  const STEPS = ['Size', 'Scene', 'Colors', 'Style'];
+  const STEPS = ['Scene', 'Colors', 'Style', 'Size'];
   const totalSteps = 4;
 
   const handleNext = () => {
@@ -345,6 +343,10 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
   };
 
   const select = (key, value) => setSettings(s => ({ ...s, [key]: value }));
+
+  const resolvedColors = settings.colorScheme === 'custom' && settings.customColors
+    ? { ...COLOR_SCHEMES.standard, ...settings.customColors }
+    : COLOR_SCHEMES[settings.colorScheme] || COLOR_SCHEMES.standard;
 
   // ── Step 0: Size ────────────────────────────────────────────────────────────
 
@@ -363,21 +365,37 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           return (
             <button key={n} style={{ ...S.card(selected), flexDirection: 'column', gap: '12px', padding: '18px 16px' }}
               onClick={() => setCubeSize(n)}>
-              {/* Dot-grid thumbnail representing one face of the cube */}
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: `repeat(${n}, 1fr)`,
-                gap: '3px',
-                width: '44px',
-              }}>
-                {Array.from({ length: n * n }).map((_, i) => (
-                  <div key={i} style={{
-                    aspectRatio: '1',
-                    borderRadius: '3px',
-                    background: selected ? '#0a0a0a' : 'rgba(0,0,0,0.15)',
-                    transition: 'background 0.18s ease',
-                  }} />
-                ))}
+              {/* Loaded tile style preview + cube face density thumbnail */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '44px',
+                  height: '44px',
+                  borderRadius: '8px',
+                  overflow: 'hidden',
+                  border: `1px solid ${selected ? 'rgba(0,0,0,0.38)' : 'rgba(0,0,0,0.16)'}`,
+                  background: 'rgba(0,0,0,0.04)',
+                }}>
+                  <TilePreviewCanvas
+                    styleKey={settings.tileStyle === 'random' ? 'solid' : (settings.tileStyle || 'solid')}
+                    colorHex={resolvedColors[1] || '#4a7fa5'}
+                    size={44}
+                  />
+                </div>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: `repeat(${n}, 1fr)`,
+                  gap: '3px',
+                  width: '44px',
+                }}>
+                  {Array.from({ length: n * n }).map((_, i) => (
+                    <div key={i} style={{
+                      aspectRatio: '1',
+                      borderRadius: '3px',
+                      background: selected ? '#0a0a0a' : 'rgba(0,0,0,0.15)',
+                      transition: 'background 0.18s ease',
+                    }} />
+                  ))}
+                </div>
               </div>
 
               <div style={{ flex: 1 }}>
@@ -589,6 +607,7 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
         </div>
 
         <StyleGrid keys={CLASSIC_STYLE_KEYS} label="Classic" />
+        <StyleGrid keys={ANTIPODAL_STYLE_KEYS} label="Antipodal Op Art" />
         <StyleGrid keys={LIVING_STYLE_KEYS} label="Living" />
 
         {/* Per-face overrides */}
@@ -627,6 +646,9 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                     <optgroup label="Classic">
                       {CLASSIC_STYLE_KEYS.map(k => <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>)}
                     </optgroup>
+                    <optgroup label="Antipodal Op Art">
+                      {ANTIPODAL_STYLE_KEYS.map(k => <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>)}
+                    </optgroup>
                     <optgroup label="Living">
                       {LIVING_STYLE_KEYS.map(k => <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>)}
                     </optgroup>
@@ -642,13 +664,13 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
 
   // ── Step titles ─────────────────────────────────────────────────────────────
 
-  const stepContent = [renderSize, renderBackgrounds, renderColors, renderStyles];
-  const stepTitles = ['Cube Size', 'Background', 'Color Palette', 'Tile Style'];
+  const stepContent = [renderBackgrounds, renderColors, renderStyles, renderSize];
+  const stepTitles = ['Background', 'Color Palette', 'Tile Style', 'Cube Size'];
   const stepSubtitles = [
-    'Pick your puzzle dimensions',
     'Choose your play environment',
-    'Set the colors for your cube faces',
+    'Set the colors for your cube faces (or upload an image)',
     'Choose how your tiles look and feel',
+    'Pick your puzzle dimensions with tile previews loaded',
   ];
 
   return (

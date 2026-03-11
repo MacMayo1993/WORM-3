@@ -60,7 +60,7 @@ const WormParticle = ({
   const trailGeoRef      = useRef();
 
   const duration = 3.2;
-  const lingerDuration = 1.4;
+  const lingerDuration = 3.4;
   const totalDuration = duration + lingerDuration;
 
   // ── Unique personality — stable across re-renders ─────────────────────────
@@ -74,7 +74,7 @@ const WormParticle = ({
     squishFreq   : 8 + Math.random() * 6,
     glowPulseFreq: 2 + Math.random() * 2,
     eyeWobble    : 0.02 + Math.random() * 0.03,
-    baseScale    : 1.05 + Math.random() * 0.35,
+    baseScale    : (1.05 + Math.random() * 0.35) * 0.9,
     speedVariance: 0.92 + Math.random() * 0.2,
     antennaPhase : Math.random() * Math.PI * 2,
     bandShift    : 0.07 + Math.random() * 0.06,  // hue shift between even/odd segments
@@ -117,23 +117,32 @@ const WormParticle = ({
 
     const dir = _v3.subVectors(vEnd, vStart);
     const len = dir.length();
-    _right.crossVectors(dir.clone().normalize(), _up).normalize();
+    const dirNorm = dir.clone().normalize();
+    _right.crossVectors(dirNorm, _up).normalize();
     if (_right.lengthSq() < 0.001) _right.set(1, 0, 0);
 
-    // Build a CatmullRomCurve3 with alternating lateral waypoints so the worm
-    // travels in a natural S-curve rather than a straight-line arc.
-    // The waypoints shift each frame to animate the body ripple.
+    // Keep the flip path inside the cube volume by pulling mid-waypoints inward
+    // toward world origin (cube center), then layer subtle side-to-side wiggle.
     const tw = clockTime * p.wiggleFreq + p.wigglePhase;
-    const amp = p.wiggleAmp * len * 0.38;
+    const lateralAmp = Math.min(0.26, p.wiggleAmp * len * 0.14);
+
+    const midpoint = vStart.clone().lerp(vEnd, 0.5);
+    const centerPull = midpoint.clone().multiplyScalar(-0.75);
+    const maxPull = Math.max(0.45, len * 0.28);
+    if (centerPull.length() > maxPull) centerPull.setLength(maxPull);
 
     const wp0 = vStart.clone();
-    const wp1 = vStart.clone().lerp(vEnd, 0.2)
-      .addScaledVector(_right, Math.sin(tw) * amp)
-      .addScaledVector(_up, Math.cos(tw * 0.8) * amp * 0.3);
-    const wp2 = vStart.clone().lerp(vEnd, 0.45)
-      .addScaledVector(_right, Math.sin(tw + Math.PI) * amp * 0.85);
-    const wp3 = vStart.clone().lerp(vEnd, 0.7)
-      .addScaledVector(_right, Math.sin(tw + Math.PI * 1.5) * amp * 0.65);
+    const wp1 = vStart.clone().lerp(vEnd, 0.22)
+      .addScaledVector(_right, Math.sin(tw) * lateralAmp)
+      .addScaledVector(_up, Math.cos(tw * 0.8) * lateralAmp * 0.25)
+      .addScaledVector(centerPull, 0.45);
+    const wp2 = midpoint.clone()
+      .add(centerPull)
+      .addScaledVector(_right, Math.sin(tw + Math.PI) * lateralAmp * 0.6);
+    const wp3 = vStart.clone().lerp(vEnd, 0.78)
+      .addScaledVector(_right, Math.sin(tw + Math.PI * 1.5) * lateralAmp)
+      .addScaledVector(_up, Math.cos(tw * 0.8 + Math.PI * 0.3) * lateralAmp * 0.25)
+      .addScaledVector(centerPull, 0.45);
     const wp4 = vEnd.clone();
 
     const curve = new THREE.CatmullRomCurve3([wp0, wp1, wp2, wp3, wp4]);
