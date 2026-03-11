@@ -150,25 +150,25 @@ function EchoTether({ echo, size }) {
   );
 }
 
+// How many smoke rings billow out per pulse. More = denser, puffier smoke.
+const SMOKE_RING_COUNT = 3;
+// Seconds between each successive ring launch — controls how spread-out the billow is.
+const SMOKE_RING_STAGGER = 0.12;
+// Each ring lives this long (seconds) before fully fading.
+const SMOKE_RING_DURATION = 0.55;
+
 /**
- * PulseRing - A pulsing ring that appears at the antipodal rotation point
+ * PulseRing - Smoky billowing rings that expand from the antipodal rotation point.
+ * Three wide, semi-transparent rings launch in quick succession with additive
+ * blending so overlapping layers build up into a soft, hazy smoke puff.
  */
 function PulseRing({ echo, size }) {
-  const ringRef = useRef();
-  const materialRef = useRef();
+  const ringsRef = useRef([]);
+  const matsRef = useRef([]);
 
   const position = useMemo(() => {
     return getFaceCenterPosition(echo.axis, echo.sliceIndex, size);
   }, [echo.axis, echo.sliceIndex, size]);
-
-  useFrame(() => {
-    if (!ringRef.current || !materialRef.current) return;
-
-    const elapsed = (Date.now() - echo.startTime) / 1000;
-    const scale = 1 + elapsed * 2;
-    ringRef.current.scale.setScalar(scale);
-    materialRef.current.opacity = Math.max(0, 0.8 - elapsed * 2);
-  });
 
   const color = useMemo(() => {
     switch (echo.axis) {
@@ -179,18 +179,43 @@ function PulseRing({ echo, size }) {
     }
   }, [echo.axis]);
 
+  useFrame(() => {
+    for (let i = 0; i < SMOKE_RING_COUNT; i++) {
+      const ring = ringsRef.current[i];
+      const mat = matsRef.current[i];
+      if (!ring || !mat) continue;
+
+      // Each ring starts `i * STAGGER` seconds after the echo fires.
+      const elapsed = (Date.now() - echo.startTime) / 1000 - i * SMOKE_RING_STAGGER;
+      if (elapsed < 0) { ring.visible = false; continue; }
+
+      ring.visible = true;
+      // Slower expansion than the original crisp ring — smoke drifts rather than snaps.
+      ring.scale.setScalar(1 + elapsed * 1.3);
+      // Fade out over the ring's lifetime; innermost ring slightly more opaque.
+      const peakOpacity = 0.38 - i * 0.06;
+      mat.opacity = Math.max(0, peakOpacity - (elapsed / SMOKE_RING_DURATION) * peakOpacity);
+    }
+  });
+
   return (
-    <mesh ref={ringRef} position={position} rotation={[Math.PI / 2, 0, 0]}>
-      <ringGeometry args={[0.3, 0.35, 32]} />
-      <meshBasicMaterial
-        ref={materialRef}
-        color={color}
-        transparent
-        opacity={0.8}
-        side={THREE.DoubleSide}
-        depthWrite={false}
-      />
-    </mesh>
+    <group position={position} rotation={[Math.PI / 2, 0, 0]}>
+      {Array.from({ length: SMOKE_RING_COUNT }, (_, i) => (
+        <mesh key={i} ref={el => { ringsRef.current[i] = el; }} visible={false}>
+          {/* Wide ring (inner 0.10, outer 0.48) gives a diffuse smoke band rather than a sharp line */}
+          <ringGeometry args={[0.10, 0.48, 48]} />
+          <meshBasicMaterial
+            ref={el => { matsRef.current[i] = el; }}
+            color={color}
+            transparent
+            opacity={0}
+            side={THREE.DoubleSide}
+            depthWrite={false}
+            blending={THREE.AdditiveBlending}
+          />
+        </mesh>
+      ))}
+    </group>
   );
 }
 
