@@ -116,10 +116,10 @@ const Cubie = React.forwardRef(function Cubie({
       wormPhase: s.wormPhase,
     }))
   );
-  // During wormhole animation, override visual mode to glass so antipodal tunnels
-  // are visible through the transparent cube body and stickers.
+  // During wormhole animation, hide the cube body so antipodal tunnels are visible
+  // inside. Using visible={false} instead of transparency avoids the per-frame
+  // transparent-object sort and eliminates WebGL material churn on every tunnel enter/exit.
   const isWormGlassPhase = wormPhase === 'entering' || wormPhase === 'tunnel' || wormPhase === 'exiting';
-  const effectiveMode = isWormGlassPhase ? 'glass' : visualMode;
   // faceColors needed locally for wireframe edge coloring
   const faceColors = useMemo(() => resolveColors(settings, settings?.biomeMode?.faceAssignment), [settings]);
   const isEdge = (p, v) => Math.abs(p - v) < 0.01;
@@ -162,13 +162,13 @@ const Cubie = React.forwardRef(function Cubie({
 
   const overlay = (dirKey) => {
     const m = meta(dirKey); if (!m) return '';
-    if (effectiveMode === 'grid') {
+    if (visualMode === 'grid') {
       const { r, c } = faceRCFor(m.origDir, m.origPos.x, m.origPos.y, m.origPos.z, size);
       const idx = r * size + c + 1;
       const idStr = String(idx).padStart(3, '0');
       return `M${m.curr}-${idStr}`;
     }
-    if (effectiveMode === 'sudokube') {
+    if (visualMode === 'sudokube') {
       const v = faceValue(dirKey, cubie.x, cubie.y, cubie.z, size);
       return String(v);
     }
@@ -193,7 +193,7 @@ const Cubie = React.forwardRef(function Cubie({
   // React can compare by value. Changes only when sticker colors actually change,
   // not on every object-reference re-creation during rotation.
   // Skipped (empty string) when not in wireframe mode to avoid wasted work.
-  const stickerColorKey = effectiveMode === 'wireframe'
+  const stickerColorKey = visualMode === 'wireframe'
     ? `${cubie.stickers.PZ?.curr},${cubie.stickers.NZ?.curr},${cubie.stickers.PX?.curr},${cubie.stickers.NX?.curr},${cubie.stickers.PY?.curr},${cubie.stickers.NY?.curr}`
     : '';
 
@@ -212,7 +212,7 @@ const Cubie = React.forwardRef(function Cubie({
 
   // Generate wireframe edges for wireframe mode ONLY
   const wireframeEdges = useMemo(() => {
-    if (effectiveMode !== 'wireframe') return [];
+    if (visualMode !== 'wireframe') return [];
 
     const halfSize = 0.49;
     const eps = 0.01;
@@ -297,7 +297,7 @@ const Cubie = React.forwardRef(function Cubie({
     }
 
     return edgeList;
-  }, [effectiveMode, isOnEdge, size, faceColors, stickerColorKey]);
+  }, [visualMode, isOnEdge, size, faceColors, stickerColorKey]);
 
   // Mirror mode: derive this piece's intrinsic box dimensions from its *original*
   // home position (origPos), not its current grid slot.  rotateSliceCubies writes
@@ -335,27 +335,27 @@ const Cubie = React.forwardRef(function Cubie({
 
           {/* 12 edge beams forming a hollow cube frame */}
           {HOLLOW_EDGES.map((edge, idx) => (
-            <mesh key={idx} position={edge.pos} castShadow receiveShadow>
+            <mesh key={idx} position={edge.pos} visible={!isWormGlassPhase} castShadow receiveShadow>
               <boxGeometry args={BEAM_DIMS[edge.geo]} />
-              <primitive object={getHollowBeamMaterial(effectiveMode)} attach="material" />
+              <primitive object={getHollowBeamMaterial(visualMode)} attach="material" />
             </mesh>
           ))}
         </>
       ) : (
-        <RoundedBox args={[0.98, 0.98, 0.98]} radius={0.08} smoothness={4} onPointerDown={handleDown} castShadow receiveShadow>
+        <RoundedBox args={[0.98, 0.98, 0.98]} radius={0.08} smoothness={4} visible={!isWormGlassPhase} onPointerDown={handleDown} castShadow receiveShadow>
           <meshStandardMaterial
-            color={effectiveMode === 'wireframe' ? "#000000" : effectiveMode === 'glass' ? "#111111" : "#0a0a0a"}
-            roughness={effectiveMode === 'wireframe' ? 0.9 : effectiveMode === 'glass' ? 0.05 : 0.25}
-            metalness={effectiveMode === 'wireframe' ? 0 : effectiveMode === 'glass' ? 0.3 : 0.15}
-            envMapIntensity={effectiveMode === 'glass' ? 0.8 : 0.4}
-            transparent={effectiveMode === 'glass'}
-            opacity={effectiveMode === 'glass' ? 0.12 : 1.0}
+            color={visualMode === 'wireframe' ? "#000000" : visualMode === 'glass' ? "#111111" : "#0a0a0a"}
+            roughness={visualMode === 'wireframe' ? 0.9 : visualMode === 'glass' ? 0.05 : 0.25}
+            metalness={visualMode === 'wireframe' ? 0 : visualMode === 'glass' ? 0.3 : 0.15}
+            envMapIntensity={visualMode === 'glass' ? 0.8 : 0.4}
+            transparent={visualMode === 'glass'}
+            opacity={visualMode === 'glass' ? 0.12 : 1.0}
           />
         </RoundedBox>
       )}
 
       {/* LED Wireframe edges ONLY in wireframe mode (skip in hollow/mirror mode) */}
-      {effectiveMode === 'wireframe' && !hollowMode && !mirrorMode && wireframeEdges.map((edge, idx) => (
+      {visualMode === 'wireframe' && !hollowMode && !mirrorMode && wireframeEdges.map((edge, idx) => (
         <WireframeEdge
           key={idx}
           start={edge.start}
@@ -367,14 +367,14 @@ const Cubie = React.forwardRef(function Cubie({
       ))}
 
       {/* Stickers — frame-shaped when hollow, solid plane otherwise; none in mirror mode */}
-      {effectiveMode !== 'wireframe' && !mirrorMode && (
+      {visualMode !== 'wireframe' && !mirrorMode && (
         <>
-          {isEdge(position[2], (size - 1) / 2) && meta('PZ') && <StickerPlane key={stickerKey('PZ')} currentDir="PZ" meta={meta('PZ')} pos={STICKER_POS.PZ} rot={STICKER_ROT.PZ} mode={effectiveMode} overlay={overlay('PZ')} faceSize={size} {...gridPos('PZ')} hollow={hollowMode} />}
-          {isEdge(position[2], -(size - 1) / 2) && meta('NZ') && <StickerPlane key={stickerKey('NZ')} currentDir="NZ" meta={meta('NZ')} pos={STICKER_POS.NZ} rot={STICKER_ROT.NZ} mode={effectiveMode} overlay={overlay('NZ')} faceSize={size} {...gridPos('NZ')} hollow={hollowMode} />}
-          {isEdge(position[0], (size - 1) / 2) && meta('PX') && <StickerPlane key={stickerKey('PX')} currentDir="PX" meta={meta('PX')} pos={STICKER_POS.PX} rot={STICKER_ROT.PX} mode={effectiveMode} overlay={overlay('PX')} faceSize={size} {...gridPos('PX')} hollow={hollowMode} />}
-          {isEdge(position[0], -(size - 1) / 2) && meta('NX') && <StickerPlane key={stickerKey('NX')} currentDir="NX" meta={meta('NX')} pos={STICKER_POS.NX} rot={STICKER_ROT.NX} mode={effectiveMode} overlay={overlay('NX')} faceSize={size} {...gridPos('NX')} hollow={hollowMode} />}
-          {isEdge(position[1], (size - 1) / 2) && meta('PY') && <StickerPlane key={stickerKey('PY')} currentDir="PY" meta={meta('PY')} pos={STICKER_POS.PY} rot={STICKER_ROT.PY} mode={effectiveMode} overlay={overlay('PY')} faceSize={size} {...gridPos('PY')} hollow={hollowMode} />}
-          {isEdge(position[1], -(size - 1) / 2) && meta('NY') && <StickerPlane key={stickerKey('NY')} currentDir="NY" meta={meta('NY')} pos={STICKER_POS.NY} rot={STICKER_ROT.NY} mode={effectiveMode} overlay={overlay('NY')} faceSize={size} {...gridPos('NY')} hollow={hollowMode} />}
+          {isEdge(position[2], (size - 1) / 2) && meta('PZ') && <StickerPlane key={stickerKey('PZ')} currentDir="PZ" meta={meta('PZ')} pos={STICKER_POS.PZ} rot={STICKER_ROT.PZ} mode={visualMode} overlay={overlay('PZ')} faceSize={size} {...gridPos('PZ')} hollow={hollowMode} />}
+          {isEdge(position[2], -(size - 1) / 2) && meta('NZ') && <StickerPlane key={stickerKey('NZ')} currentDir="NZ" meta={meta('NZ')} pos={STICKER_POS.NZ} rot={STICKER_ROT.NZ} mode={visualMode} overlay={overlay('NZ')} faceSize={size} {...gridPos('NZ')} hollow={hollowMode} />}
+          {isEdge(position[0], (size - 1) / 2) && meta('PX') && <StickerPlane key={stickerKey('PX')} currentDir="PX" meta={meta('PX')} pos={STICKER_POS.PX} rot={STICKER_ROT.PX} mode={visualMode} overlay={overlay('PX')} faceSize={size} {...gridPos('PX')} hollow={hollowMode} />}
+          {isEdge(position[0], -(size - 1) / 2) && meta('NX') && <StickerPlane key={stickerKey('NX')} currentDir="NX" meta={meta('NX')} pos={STICKER_POS.NX} rot={STICKER_ROT.NX} mode={visualMode} overlay={overlay('NX')} faceSize={size} {...gridPos('NX')} hollow={hollowMode} />}
+          {isEdge(position[1], (size - 1) / 2) && meta('PY') && <StickerPlane key={stickerKey('PY')} currentDir="PY" meta={meta('PY')} pos={STICKER_POS.PY} rot={STICKER_ROT.PY} mode={visualMode} overlay={overlay('PY')} faceSize={size} {...gridPos('PY')} hollow={hollowMode} />}
+          {isEdge(position[1], -(size - 1) / 2) && meta('NY') && <StickerPlane key={stickerKey('NY')} currentDir="NY" meta={meta('NY')} pos={STICKER_POS.NY} rot={STICKER_ROT.NY} mode={visualMode} overlay={overlay('NY')} faceSize={size} {...gridPos('NY')} hollow={hollowMode} />}
         </>
       )}
     </group>
