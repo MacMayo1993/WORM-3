@@ -161,6 +161,10 @@ function useWormCrawler(size, cubies) {
     const alive = useRef(true);
     const tileTrail = useRef([]);
     const deathMenuTimer = useRef(null);
+    // Cached tunnel list — rebuilt whenever cubies change to avoid redundant getActiveTunnels calls
+    const tunnelCacheRef = useRef(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    React.useEffect(() => { tunnelCacheRef.current = getActiveTunnels(cubies, size); }, [cubies, size]);
 
     // Compute world centroid of current grid tile
     const getWorldPos = (p) => new THREE.Vector3(
@@ -182,7 +186,8 @@ function useWormCrawler(size, cubies) {
     }, []);
 
     const beginTunnelTransition = useCallback((x, y, z, dirKey) => {
-        const tunnels = getActiveTunnels(cubies, size);
+        // Use cached tunnels (built when cubies change) instead of rebuilding every entry
+        const tunnels = tunnelCacheRef.current ?? getActiveTunnels(cubies, size);
         const tunnel = tunnels.find(t =>
             t.entry.x === x && t.entry.y === y &&
             t.entry.z === z && t.entry.dirKey === dirKey
@@ -572,6 +577,21 @@ function useWormCrawler(size, cubies) {
     };
 }
 
+// Pre-allocated scratch vectors for WormChaseCamera — avoids per-frame allocations
+const _camForward = new THREE.Vector3();
+const _camUp = new THREE.Vector3();
+const _camWormWorld = new THREE.Vector3();
+const _camNormal = new THREE.Vector3();
+const _camTargetCam = new THREE.Vector3();
+const _camTargetLook = new THREE.Vector3();
+const _camUpVec = new THREE.Vector3();
+const _camVec = new THREE.Vector3();
+const _camLookVec = new THREE.Vector3();
+const _camLookAheadVec = new THREE.Vector3();
+const _camTunnelTangent = new THREE.Vector3();
+const _camTunnelRight = new THREE.Vector3();
+const _camSurfCam = new THREE.Vector3();
+
 // ─── Chase Camera (dynamic zoom based on tail length) ───────────────────────
 function WormChaseCamera({ worm, size }) {
     const { camera, size: viewportSize } = useThree();
@@ -617,47 +637,41 @@ function WormChaseCamera({ worm, size }) {
         const camBack = CAM_BACK_BASE + extraZoom * 0.8 + aspectZoomBoost * 0.9;
 
         if (phase === 'crawling' || !worm.activeTunnel.current) {
-            // Smooth interpolated worm world position
-            const wormWorld = worm.headInterpPos.current.clone();
+            // Smooth interpolated worm world position (copy into scratch — no .clone())
+            _camWormWorld.copy(worm.headInterpPos.current);
             const { dirKey } = worm.pos.current;
-            const normal = worm.currentNormal.current.clone();
+            _camNormal.copy(worm.currentNormal.current);
             const fwdArr = DIR_FORWARD[dirKey]?.[worm.moveDir.current] ?? [0, 0, -1];
-            const forward = new THREE.Vector3(...fwdArr);
+            _camForward.set(fwdArr[0], fwdArr[1], fwdArr[2]);
 
             // Camera position: above worm (along face normal) + behind (backward along forward).
-            // This is correct for all faces and never cuts through the cube.
-            const targetCam = wormWorld.clone()
-                .addScaledVector(normal, camHeight)
-                .addScaledVector(forward, -camBack);
-            const targetLook = wormWorld.clone().addScaledVector(forward, LOOK_AHEAD);
+            _camTargetCam.copy(_camWormWorld)
+                .addScaledVector(_camNormal, camHeight)
+                .addScaledVector(_camForward, -camBack);
+            _camTargetLook.copy(_camWormWorld).addScaledVector(_camForward, LOOK_AHEAD);
 
             let liftMult = 1;
             if (phase === 'entering') liftMult = 1 - worm.tunnelProgress.current;
             if (phase === 'exiting') liftMult = worm.tunnelProgress.current;
-            targetCam.addScaledVector(normal, (liftMult - 1) * camHeight * 0.4);
+            _camTargetCam.addScaledVector(_camNormal, (liftMult - 1) * camHeight * 0.4);
 
             // Camera UP: world-Y for side faces (no roll).
-            // For PY/NY the normal is vertical so we use the face-local 'up' direction
-            // which is perpendicular to both the normal and the movement vector.
-            const absNormalY = Math.abs(normal.y);
-            let cameraUp;
+            const absNormalY = Math.abs(_camNormal.y);
             if (absNormalY > 0.8) {
-                // Top or bottom face — use face-local 'up' as camera up (avoids gimbal lock)
                 const upArr = DIR_FORWARD[dirKey]?.['up'] ?? [0, 0, -1];
-                cameraUp = new THREE.Vector3(...upArr);
+                _camUp.set(upArr[0], upArr[1], upArr[2]);
             } else {
-                cameraUp = new THREE.Vector3(0, 1, 0);
+                _camUp.set(0, 1, 0);
             }
 
             const alpha = Math.min(1, CAM_LERP * delta);
-            camPosRef.current.lerp(targetCam, alpha);
-            lookAtRef.current.lerp(targetLook, alpha);
+            camPosRef.current.lerp(_camTargetCam, alpha);
+            lookAtRef.current.lerp(_camTargetLook, alpha);
             camera.position.copy(camPosRef.current);
-            camera.up.copy(cameraUp);
+            camera.up.copy(_camUp);
             camera.lookAt(lookAtRef.current);
         } else if ((phase === 'entering' || phase === 'tunnel' || phase === 'exiting') && worm.activeTunnel.current) {
             let t = worm.tunnelProgress.current;
-            // Blend entry/exit camera across the same antipodal core path.
             if (phase === 'entering') t *= 0.35;
             if (phase === 'exiting') t = 0.65 + (t * 0.35);
             const t1 = Math.min(t + 0.12, 1);
@@ -666,32 +680,38 @@ function WormChaseCamera({ worm, size }) {
             const lookPt = getTunnelWorldPos(worm.activeTunnel.current, t1, size);
             const lookAheadPt = getTunnelWorldPos(worm.activeTunnel.current, t2, size);
 
-            const exitNormal = FACE_NORMALS[worm.activeTunnel.current.exit.dirKey] ?? new THREE.Vector3(0, 1, 0);
-            const entryNormal = FACE_NORMALS[worm.activeTunnel.current.entry.dirKey] ?? new THREE.Vector3(0, 1, 0);
-            const upVec = entryNormal.clone().lerp(exitNormal, t).normalize();
+            const exitNormal = FACE_NORMALS[worm.activeTunnel.current.exit.dirKey] ?? FACE_NORMALS.PY;
+            const entryNormal = FACE_NORMALS[worm.activeTunnel.current.entry.dirKey] ?? FACE_NORMALS.PY;
+            _camUpVec.lerpVectors(entryNormal, exitNormal, t).normalize();
 
-            const camVec = new THREE.Vector3(...camPt);
-            const lookVec = new THREE.Vector3(...lookPt);
-            const lookAheadVec = new THREE.Vector3(...lookAheadPt);
-            const tunnelTangent = lookVec.clone().sub(camVec).normalize();
-            const tunnelRight = new THREE.Vector3().crossVectors(tunnelTangent, upVec).normalize();
+            _camVec.set(camPt[0], camPt[1], camPt[2]);
+            _camLookVec.set(lookPt[0], lookPt[1], lookPt[2]);
+            _camLookAheadVec.set(lookAheadPt[0], lookAheadPt[1], lookAheadPt[2]);
+            _camTunnelTangent.subVectors(_camLookVec, _camVec).normalize();
+            _camTunnelRight.crossVectors(_camTunnelTangent, _camUpVec).normalize();
             const sway = Math.sin(performance.now() * 0.0045) * TUNNEL_SURF_SWAY;
-            const surfCam = camVec.clone()
-                .addScaledVector(tunnelTangent, -TUNNEL_SURF_BACK)
-                .addScaledVector(upVec, TUNNEL_SURF_UP)
-                .addScaledVector(tunnelRight, sway);
+            _camSurfCam.copy(_camVec)
+                .addScaledVector(_camTunnelTangent, -TUNNEL_SURF_BACK)
+                .addScaledVector(_camUpVec, TUNNEL_SURF_UP)
+                .addScaledVector(_camTunnelRight, sway);
 
             const alpha = Math.min(1, CAM_LERP * delta);
-            camPosRef.current.lerp(surfCam, alpha * 2);
-            lookAtRef.current.lerp(lookAheadVec, alpha * 2);
+            camPosRef.current.lerp(_camSurfCam, alpha * 2);
+            lookAtRef.current.lerp(_camLookAheadVec, alpha * 2);
             camera.position.copy(camPosRef.current);
-            camera.up.copy(upVec);
+            camera.up.copy(_camUpVec);
             camera.lookAt(lookAtRef.current);
         }
     });
 
     return null;
 }
+
+// Pre-allocated scratch vectors for TunnelSurfFX sparks
+const _sparkCenter = new THREE.Vector3();
+const _sparkForward = new THREE.Vector3();
+const _sparkUp = new THREE.Vector3();
+const _sparkRight = new THREE.Vector3();
 
 function TunnelSurfFX({ worm, size }) {
     const sparksRef = useRef([]);
@@ -704,39 +724,39 @@ function TunnelSurfFX({ worm, size }) {
         const active = phase === 'entering' || phase === 'tunnel' || phase === 'exiting';
         const sparkMeshes = sparksRef.current;
         if (!active) {
-            sparkMeshes.forEach((m) => {
-                if (!m) return;
-                m.visible = false;
-            });
+            for (let i = 0; i < sparkMeshes.length; i++) {
+                if (sparkMeshes[i]) sparkMeshes[i].visible = false;
+            }
             return;
         }
 
         const baseT = worm.tunnelProgress.current;
         const tt = clock.elapsedTime;
+        const exitNormal = FACE_NORMALS[tunnel.exit.dirKey] ?? FACE_NORMALS.PY;
+        const entryNormal = FACE_NORMALS[tunnel.entry.dirKey] ?? FACE_NORMALS.PY;
 
-        sparkMeshes.forEach((mesh, i) => {
-            if (!mesh) return;
+        for (let i = 0; i < sparkMeshes.length; i++) {
+            const mesh = sparkMeshes[i];
+            if (!mesh) continue;
             const trailOffset = i * 0.06;
             const travel = (baseT + trailOffset + tt * 0.8) % 1;
             const p0 = getTunnelWorldPos(tunnel, travel, size);
             const p1 = getTunnelWorldPos(tunnel, Math.min(travel + 0.03, 1), size);
-            const center = new THREE.Vector3(...p0);
-            const forward = new THREE.Vector3(...p1).sub(center).normalize();
-
-            const exitNormal = FACE_NORMALS[tunnel.exit.dirKey] ?? new THREE.Vector3(0, 1, 0);
-            const entryNormal = FACE_NORMALS[tunnel.entry.dirKey] ?? new THREE.Vector3(0, 1, 0);
-            const up = entryNormal.clone().lerp(exitNormal, travel).normalize();
-            const right = new THREE.Vector3().crossVectors(forward, up).normalize();
+            // Reuse scratch vectors instead of allocating new ones each iteration
+            _sparkCenter.set(p0[0], p0[1], p0[2]);
+            _sparkForward.set(p1[0], p1[1], p1[2]).sub(_sparkCenter).normalize();
+            _sparkUp.lerpVectors(entryNormal, exitNormal, travel).normalize();
+            _sparkRight.crossVectors(_sparkForward, _sparkUp).normalize();
 
             const angle = tt * 5 + i * 0.9;
             const radius = 0.35 + Math.sin(tt * 2.4 + i) * 0.08;
-            mesh.position.copy(center)
-                .addScaledVector(right, Math.cos(angle) * radius)
-                .addScaledVector(up, Math.sin(angle) * radius * 0.6);
+            mesh.position.copy(_sparkCenter)
+                .addScaledVector(_sparkRight, Math.cos(angle) * radius)
+                .addScaledVector(_sparkUp, Math.sin(angle) * radius * 0.6);
             mesh.scale.setScalar(0.035 + Math.sin(tt * 8 + i * 1.3) * 0.01);
             mesh.visible = true;
             mesh.material.opacity = 0.35 + Math.sin(tt * 10 + i) * 0.25;
-        });
+        }
     });
 
     return (
@@ -856,18 +876,29 @@ function WormSwipeControls({ onTurn, worm }) {
 
 // ─── Worm Body (head = smooth lerp; body = per-step tile history) ─────────────
 const _wormDummy = new THREE.Object3D();
+// Pre-allocated scratch objects — avoids per-frame GC pressure from WormBody loop
+const _bodyColor = new THREE.Color();
+const _bodyHeadPos = new THREE.Vector3();
+const _bodyNormal = new THREE.Vector3();
+const _bodyClonePos = new THREE.Vector3();
+const _bodyCloneNormal = new THREE.Vector3();
+const _bodySegForward = new THREE.Vector3();
+const _bodySideVec = new THREE.Vector3();
+// Stable path-points buffer: reused every frame to avoid spread-array allocation
+const _pathPointsBuffer = [];
+const _headPathPoint = { pos: _bodyHeadPos, normal: _bodyNormal };
 
 function WormBody({ worm }) {
     const meshRef = useRef();
     const wormColor = useGameStore(s => s.wormColor ?? '#33ff66');
 
     useFrame((state) => {
-        // Pull mathematically exact physics track for the head including the edge rolling arc
-        const headPos = worm.headInterpPos.current.clone();
-        const normal = worm.currentNormal.current.clone();
+        // Copy head/normal into scratch vectors (avoids .clone() allocation)
+        _bodyHeadPos.copy(worm.headInterpPos.current);
+        _bodyNormal.copy(worm.currentNormal.current);
 
         const currentJumpVal = worm.isJumping.current ? Math.sin(worm.jumpT.current * Math.PI) * 0.55 : 0;
-        headPos.addScaledVector(normal, WORM_LIFT + currentJumpVal);
+        _bodyHeadPos.addScaledVector(_bodyNormal, WORM_LIFT + currentJumpVal);
 
         const mesh = meshRef.current;
         if (!mesh) return;
@@ -876,8 +907,11 @@ function WormBody({ worm }) {
         const steps = worm.stepHistory.current;
         const time = state.clock.getElapsedTime();
 
-        // Treat the head and all history points as a single continuous curve
-        const pathPoints = [{ pos: headPos, normal: normal }, ...steps];
+        // Rebuild path-points buffer in-place (no array allocation or spread)
+        _pathPointsBuffer.length = steps.length + 1;
+        _pathPointsBuffer[0] = _headPathPoint;
+        for (let j = 0; j < steps.length; j++) _pathPointsBuffer[j + 1] = steps[j];
+
         let walkIndex = 0;
         let cumulativeDist = 0;
 
@@ -892,35 +926,32 @@ function WormBody({ worm }) {
 
             if (i === 0) {
                 // Head
-                _wormDummy.position.copy(headPos);
+                _wormDummy.position.copy(_bodyHeadPos);
                 _wormDummy.scale.setScalar(0.07);
             } else {
                 // Clones — parameterically walk backwards along the curve to exact target distance
                 const targetDist = i * 0.14; // Diameter of scale 0.07 sphere
-                let clonePos = headPos.clone();
-                let cloneNormal = normal;
                 let foundPosition = false;
 
-                while (walkIndex < pathPoints.length - 1) {
-                    const ptA = pathPoints[walkIndex];
-                    const ptB = pathPoints[walkIndex + 1];
+                while (walkIndex < _pathPointsBuffer.length - 1) {
+                    const ptA = _pathPointsBuffer[walkIndex];
+                    const ptB = _pathPointsBuffer[walkIndex + 1];
                     const distToNext = ptA.pos.distanceTo(ptB.pos);
 
                     if (cumulativeDist + distToNext >= targetDist) {
                         // Found the bracket on the curve! Interpolate exact point.
                         const t = distToNext > 0 ? (targetDist - cumulativeDist) / distToNext : 0;
-                        clonePos = ptA.pos.clone().lerp(ptB.pos, t);
-                        cloneNormal = ptA.normal.clone().lerp(ptB.normal, t).normalize();
+                        // Use scratch vectors instead of .clone() to avoid GC pressure
+                        _bodyClonePos.lerpVectors(ptA.pos, ptB.pos, t);
+                        _bodyCloneNormal.lerpVectors(ptA.normal, ptB.normal, t).normalize();
 
                         // Calculate forward/side vector for the wiggle at this exact localized point
-                        const segForward = ptA.pos.clone().sub(ptB.pos).normalize();
-                        const sideVec = new THREE.Vector3().crossVectors(cloneNormal, segForward).normalize();
+                        _bodySegForward.subVectors(ptA.pos, ptB.pos).normalize();
+                        _bodySideVec.crossVectors(_bodyCloneNormal, _bodySegForward).normalize();
 
                         const wiggleAmp = 0.08 * Math.sin(fade * Math.PI);
                         const wigglePhase = i * 0.8 - time * 6.0;
-                        const wiggleOffset = Math.sin(wigglePhase) * wiggleAmp;
-
-                        clonePos.addScaledVector(sideVec, wiggleOffset);
+                        _bodyClonePos.addScaledVector(_bodySideVec, Math.sin(wigglePhase) * wiggleAmp);
                         foundPosition = true;
                         break;
                     }
@@ -929,22 +960,19 @@ function WormBody({ worm }) {
                 }
 
                 // If the track runs out (just spawned and moving), freeze at the last known point.
-                if (!foundPosition && pathPoints.length > 0) {
-                    clonePos = pathPoints[pathPoints.length - 1].pos.clone();
+                if (!foundPosition && _pathPointsBuffer.length > 0) {
+                    _bodyClonePos.copy(_pathPointsBuffer[_pathPointsBuffer.length - 1].pos);
                 }
 
-                _wormDummy.position.copy(clonePos);
+                _wormDummy.position.copy(_bodyClonePos);
                 // It's a true clone, so KEEP THE SCALE EXACTLY LIKE THE HEAD
                 _wormDummy.scale.setScalar(0.07);
             }
 
             _wormDummy.updateMatrix();
             mesh.setMatrixAt(i, _wormDummy.matrix);
-            mesh.setColorAt(i, new THREE.Color().setHSL(
-                0.38 - i * 0.005,
-                1,
-                0.4 + fade * 0.3
-            ));
+            // Reuse pre-allocated color object — avoids 1 Color allocation per segment per frame
+            mesh.setColorAt(i, _bodyColor.setHSL(0.38 - i * 0.005, 1, 0.4 + fade * 0.3));
         }
 
         mesh.instanceMatrix.needsUpdate = true;
@@ -959,18 +987,21 @@ function WormBody({ worm }) {
     );
 }
 
+// Pre-allocated scratch vector for PortalGlow
+const _glowPos = new THREE.Vector3();
+
 // ─── Portal indicator (glows when on a flipped tile) ─────────────────────────
 function PortalGlow({ worm, size }) {
     const meshRef = useRef();
-    useFrame((_, _delta) => {
+    useFrame(({ clock }) => {
         if (!meshRef.current) return;
         const { x, y, z, dirKey } = worm.pos.current;
         const wp = getStickerWorldPos(x, y, z, dirKey, size, 0);
-        const n = FACE_NORMALS[dirKey] ?? new THREE.Vector3(0, 0, 1);
-        const p = new THREE.Vector3(...wp).addScaledVector(n, 0.2);
-        meshRef.current.position.copy(p);
+        const n = FACE_NORMALS[dirKey] ?? FACE_NORMALS.PZ;
+        _glowPos.set(wp[0], wp[1], wp[2]).addScaledVector(n, 0.2);
+        meshRef.current.position.copy(_glowPos);
         meshRef.current.material.opacity = worm.onFlippedTile.current
-            ? 0.3 + Math.sin(Date.now() * 0.006) * 0.2
+            ? 0.3 + Math.sin(clock.elapsedTime * 6) * 0.2
             : 0;
     });
 
@@ -984,6 +1015,8 @@ function PortalGlow({ worm, size }) {
 
 // ─── Worm Face (eyes + smile) ─────────────────────────────────────────────────
 const _faceRight = new THREE.Vector3();
+const _faceForward = new THREE.Vector3();
+const _faceHeadPos = new THREE.Vector3();
 
 function WormFace({ worm, size }) {
     const leftEyeRef = useRef();
@@ -993,53 +1026,54 @@ function WormFace({ worm, size }) {
 
     useFrame(() => {
         const { dirKey } = worm.pos.current;
-        const normal = FACE_NORMALS[dirKey] ?? new THREE.Vector3(0, 0, 1);
+        const normal = FACE_NORMALS[dirKey] ?? FACE_NORMALS.PZ;
         const fwdArr = DIR_FORWARD[dirKey]?.[worm.moveDir.current] ?? [0, 1, 0];
-        const forward = new THREE.Vector3(...fwdArr);
+        _faceForward.set(fwdArr[0], fwdArr[1], fwdArr[2]);
 
         // Rightward axis in the face plane
-        _faceRight.crossVectors(forward, normal).normalize();
+        _faceRight.crossVectors(_faceForward, normal).normalize();
 
-        // Interpolated head world pos
+        // Interpolated head world pos (copy into scratch — no .clone())
         const prev = worm.prevWorldPos.current;
-        const cur = worm.curWorldPos.current ?? new THREE.Vector3(
-            ...getStickerWorldPos(worm.pos.current.x, worm.pos.current.y,
-                worm.pos.current.z, dirKey, size, 0)
-        );
-        let headPos;
-        if (prev && worm.interpT.current < 1) {
-            headPos = prev.clone().lerp(cur, worm.interpT.current);
+        const cur = worm.curWorldPos.current;
+        if (!cur) {
+            const wp = getStickerWorldPos(worm.pos.current.x, worm.pos.current.y,
+                worm.pos.current.z, dirKey, size, 0);
+            _faceHeadPos.set(wp[0], wp[1], wp[2]);
+        } else if (prev && worm.interpT.current < 1) {
+            _faceHeadPos.lerpVectors(prev, cur, worm.interpT.current);
         } else {
-            headPos = cur.clone();
+            _faceHeadPos.copy(cur);
         }
         const jumpLiftVal = worm.isJumping.current
             ? Math.sin(worm.jumpT.current * Math.PI) * 0.55 : 0;
-        headPos.addScaledVector(normal, WORM_LIFT + jumpLiftVal + 0.09);
+        _faceHeadPos.addScaledVector(normal, WORM_LIFT + jumpLiftVal + 0.09);
 
         const S = 0.022;
         if (leftEyeRef.current) {
-            leftEyeRef.current.position.copy(headPos)
+            leftEyeRef.current.position.copy(_faceHeadPos)
                 .addScaledVector(_faceRight, 0.028)
-                .addScaledVector(forward, 0.025);
+                .addScaledVector(_faceForward, 0.025);
             leftEyeRef.current.scale.setScalar(S);
         }
         if (rightEyeRef.current) {
-            rightEyeRef.current.position.copy(headPos)
+            rightEyeRef.current.position.copy(_faceHeadPos)
                 .addScaledVector(_faceRight, -0.028)
-                .addScaledVector(forward, 0.025);
+                .addScaledVector(_faceForward, 0.025);
             rightEyeRef.current.scale.setScalar(S);
         }
         const smileOffsets = [-0.022, 0, 0.022];
-        smileRefs.forEach((ref, i) => {
-            if (!ref.current) return;
+        for (let i = 0; i < smileRefs.length; i++) {
+            const ref = smileRefs[i];
+            if (!ref.current) continue;
             const xo = smileOffsets[i];
             const yo = i === 1 ? -0.028 : -0.022;
-            ref.current.position.copy(headPos)
+            ref.current.position.copy(_faceHeadPos)
                 .addScaledVector(_faceRight, xo)
                 .addScaledVector(normal, yo * 0.3)
-                .addScaledVector(forward, 0.025);
+                .addScaledVector(_faceForward, 0.025);
             ref.current.scale.setScalar(S * 0.55);
-        });
+        }
     });
 
     return (
@@ -1144,6 +1178,79 @@ function WormInteriorGlass({ worm, size }) {
     );
 }
 
+// ─── Wormhole portal rings — spinning neon rings at every flipped tile ────────
+// Gives players a clear visual cue for all wormhole locations on the cube surface.
+const _ringDummy = new THREE.Object3D();
+const _ringUp = new THREE.Vector3();
+
+function WormholeRings({ cubies, size }) {
+    const meshRef = useRef();
+
+    const flippedPositions = React.useMemo(() => {
+        const result = [];
+        const dirs = ['PX', 'NX', 'PY', 'NY', 'PZ', 'NZ'];
+        for (let x = 0; x < size; x++) {
+            for (let y = 0; y < size; y++) {
+                for (let z = 0; z < size; z++) {
+                    const cubie = cubies?.[x]?.[y]?.[z];
+                    if (!cubie) continue;
+                    for (const dk of dirs) {
+                        const st = cubie.stickers?.[dk];
+                        if (!st || st.curr === st.orig) continue;
+                        const isVisible = (
+                            (dk === 'PX' && x === size - 1) || (dk === 'NX' && x === 0) ||
+                            (dk === 'PY' && y === size - 1) || (dk === 'NY' && y === 0) ||
+                            (dk === 'PZ' && z === size - 1) || (dk === 'NZ' && z === 0)
+                        );
+                        if (isVisible) result.push({ x, y, z, dirKey: dk });
+                    }
+                }
+            }
+        }
+        return result;
+    }, [cubies, size]);
+
+    useFrame(({ clock }) => {
+        const mesh = meshRef.current;
+        if (!mesh) return;
+        const t = clock.elapsedTime;
+        const count = flippedPositions.length;
+
+        for (let i = 0; i < mesh.count; i++) {
+            if (i >= count) {
+                _ringDummy.scale.setScalar(0);
+                _ringDummy.updateMatrix();
+                mesh.setMatrixAt(i, _ringDummy.matrix);
+                continue;
+            }
+            const { x, y, z, dirKey } = flippedPositions[i];
+            const wp = getStickerWorldPos(x, y, z, dirKey, size, 0);
+            const n = FACE_NORMALS[dirKey] ?? FACE_NORMALS.PZ;
+            _ringDummy.position.set(wp[0], wp[1], wp[2]).addScaledVector(n, 0.08);
+            // Orient ring to face outward from the cube surface
+            _ringUp.set(0, 1, 0);
+            if (Math.abs(n.y) > 0.9) _ringUp.set(1, 0, 0);
+            _ringDummy.quaternion.setFromUnitVectors(_ringUp, n);
+            // Spin the ring + pulse scale
+            _ringDummy.rotateOnAxis(n, t * 1.8 + i * 0.7);
+            const pulse = 1 + Math.sin(t * 3.5 + i) * 0.12;
+            _ringDummy.scale.setScalar(pulse);
+            _ringDummy.updateMatrix();
+            mesh.setMatrixAt(i, _ringDummy.matrix);
+        }
+
+        mesh.instanceMatrix.needsUpdate = true;
+    });
+
+    const MAX_RINGS = 6 * size * size; // max flipped tiles possible
+    return (
+        <instancedMesh ref={meshRef} args={[undefined, undefined, MAX_RINGS]} frustumCulled={false}>
+            <torusGeometry args={[0.42, 0.025, 8, 32]} />
+            <meshBasicMaterial color="#ff44ff" transparent opacity={0.75} blending={THREE.AdditiveBlending} depthWrite={false} />
+        </instancedMesh>
+    );
+}
+
 // ─── Main exported wrapper ────────────────────────────────────────────────────
 export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animState, _onRotate, _onHeal }) {
     const worm = useWormCrawler(size, cubies);
@@ -1168,6 +1275,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             <WormBody worm={worm} size={size} />
             <WormFace worm={worm} size={size} />
             <PortalGlow worm={worm} size={size} />
+            <WormholeRings cubies={cubies} size={size} />
             <PowerupOrbs size={size} />
         </>
     );

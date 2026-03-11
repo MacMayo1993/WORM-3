@@ -72,13 +72,18 @@ export const getActiveTunnels = (cubies, size) => {
           // Count flips for intensity
           const flips = (sticker.flips || 0) + (antipodal.sticker?.flips || 0);
 
+          // Pre-compute world positions so findNextTunnel avoids per-call getStickerWorldPos
+          const entryWorld = getStickerWorldPos(x, y, z, dirKey, size, 0);
+          const exitWorld = getStickerWorldPos(antipodal.x, antipodal.y, antipodal.z, antipodal.dirKey, size, 0);
           tunnels.push({
             id: `tunnel-${x}-${y}-${z}-${dirKey}`,
             entry: { x, y, z, dirKey },
             exit: { x: antipodal.x, y: antipodal.y, z: antipodal.z, dirKey: antipodal.dirKey },
             flips: Math.max(1, flips),
             entryColor: sticker.curr,
-            exitColor: antipodal.sticker?.curr || sticker.curr
+            exitColor: antipodal.sticker?.curr || sticker.curr,
+            entryWorldVec: new THREE.Vector3(entryWorld[0], entryWorld[1], entryWorld[2]),
+            exitWorldVec: new THREE.Vector3(exitWorld[0], exitWorld[1], exitWorld[2])
           });
         }
       }
@@ -169,10 +174,13 @@ export const getTunnelSideKey = (endpoint) => (
  * @param {number} size - Cube size
  * @returns {Object|null} Best next tunnel or null if none available
  */
+// Reusable scratch vector for findNextTunnel — avoids per-call allocation
+const _findExitVec = new THREE.Vector3();
+
 export const findNextTunnel = (exitPos, tunnels, excludeTunnelId, size, inactiveSideKeys = new Set()) => {
-  // Get world position of exit
+  // Compute exit world position once (reuse scratch vector)
   const exitWorld = getStickerWorldPos(exitPos.x, exitPos.y, exitPos.z, exitPos.dirKey, size, 0);
-  const exitVec = new THREE.Vector3(...exitWorld);
+  _findExitVec.set(exitWorld[0], exitWorld[1], exitWorld[2]);
 
   let bestTunnel = null;
   let bestDist = Infinity;
@@ -180,53 +188,33 @@ export const findNextTunnel = (exitPos, tunnels, excludeTunnelId, size, inactive
   for (const tunnel of tunnels) {
     if (tunnel.id === excludeTunnelId) continue;
 
-    // Check distance to this tunnel's entry
-    const entryWorld = getStickerWorldPos(
-      tunnel.entry.x, tunnel.entry.y, tunnel.entry.z,
-      tunnel.entry.dirKey, size, 0
+    // Use pre-computed world vectors if available, otherwise compute on-the-fly
+    const entryVec = tunnel.entryWorldVec ?? new THREE.Vector3(
+      ...getStickerWorldPos(tunnel.entry.x, tunnel.entry.y, tunnel.entry.z, tunnel.entry.dirKey, size, 0)
     );
-    const entryVec = new THREE.Vector3(...entryWorld);
-    const dist = exitVec.distanceTo(entryVec);
+    const dist = _findExitVec.distanceTo(entryVec);
 
     const entryKey = getTunnelSideKey(tunnel.entry);
-    if (inactiveSideKeys.has(entryKey)) {
-      // This side has already been consumed, so can't be entered again.
-    } else if (dist < bestDist) {
+    if (!inactiveSideKeys.has(entryKey) && dist < bestDist) {
       bestDist = dist;
-      bestTunnel = {
-        tunnel,
-        enterFromEntry: true,
-        enteredSideKey: entryKey
-      };
+      bestTunnel = { tunnel, enterFromEntry: true, enteredSideKey: entryKey };
     }
 
-    // Also check distance to tunnel's exit (can enter from either end)
-    const exitWorld2 = getStickerWorldPos(
-      tunnel.exit.x, tunnel.exit.y, tunnel.exit.z,
-      tunnel.exit.dirKey, size, 0
+    // Also check tunnel's exit end (can enter from either side)
+    const exitVec2 = tunnel.exitWorldVec ?? new THREE.Vector3(
+      ...getStickerWorldPos(tunnel.exit.x, tunnel.exit.y, tunnel.exit.z, tunnel.exit.dirKey, size, 0)
     );
-    const exitVec2 = new THREE.Vector3(...exitWorld2);
-    const dist2 = exitVec.distanceTo(exitVec2);
+    const dist2 = _findExitVec.distanceTo(exitVec2);
 
     const exitKey = getTunnelSideKey(tunnel.exit);
-    if (inactiveSideKeys.has(exitKey)) {
-      // This side has already been consumed, so can't be entered again.
-    } else if (dist2 < bestDist) {
+    if (!inactiveSideKeys.has(exitKey) && dist2 < bestDist) {
       bestDist = dist2;
-      bestTunnel = {
-        tunnel,
-        enterFromEntry: false,
-        enteredSideKey: exitKey
-      };
+      bestTunnel = { tunnel, enterFromEntry: false, enteredSideKey: exitKey };
     }
   }
 
   // Only return if within reasonable distance (adjacent or nearby)
-  if (bestTunnel && bestDist < 3.0) {
-    return bestTunnel;
-  }
-
-  return null;
+  return bestTunnel && bestDist < 3.0 ? bestTunnel : null;
 };
 
 /**
