@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useGameStore } from '../../hooks/useGameStore.js';
+import { useShallow } from 'zustand/react/shallow';
 import { FACE_COLORS } from '../../utils/constants.js';
 
 const FACE_NAMES = { 1: 'RED', 2: 'GREEN', 3: 'WHITE', 4: 'ORANGE', 5: 'BLUE', 6: 'YELLOW' };
@@ -14,6 +15,73 @@ const CLEAN_CARD = {
   subtle: 'rgba(15,23,42,0.62)',
 };
 
+// ─── Static style constants ───────────────────────────────────────────────────
+const CONTAINER_STYLE = {
+  position: 'fixed',
+  right: '16px',
+  bottom: '80px',
+  display: 'flex',
+  flexDirection: 'column-reverse',
+  gap: '5px',
+  zIndex: 200,
+  pointerEvents: 'none',
+  maxWidth: '260px',
+};
+
+const FACE_ELIM_BANNER_STYLE = {
+  background: CLEAN_CARD.bg,
+  border: `1.5px solid ${CLEAN_CARD.border}`,
+  borderRadius: '12px',
+  padding: '8px 14px',
+  fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif",
+  textAlign: 'center',
+  backdropFilter: 'blur(18px)',
+  marginBottom: '4px',
+  animation: 'disparity-face-elim 0.35s cubic-bezier(0.22,1,0.36,1) forwards',
+};
+
+const FACE_ELIM_LABEL_STYLE = {
+  fontSize: '9px',
+  color: CLEAN_CARD.subtle,
+  letterSpacing: '0.12em',
+  marginBottom: '2px',
+};
+
+const ALIVE_COUNT_BASE_STYLE = {
+  borderRadius: '12px',
+  padding: '8px 14px',
+  fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif",
+  display: 'flex',
+  alignItems: 'baseline',
+  gap: '6px',
+  backdropFilter: 'blur(18px)',
+  marginBottom: '4px',
+};
+
+const ALIVE_LABEL_STYLE = { fontSize: '11px', color: CLEAN_CARD.subtle, letterSpacing: '0.06em' };
+const ALIVE_TOTAL_STYLE = { fontSize: '10px', color: CLEAN_CARD.subtle, marginLeft: 'auto' };
+
+const WINNER_STYLE = {
+  background: CLEAN_CARD.bg,
+  border: '1.5px solid rgba(255, 215, 0, 0.5)',
+  borderRadius: '12px',
+  padding: '12px 18px',
+  color: '#FFD700',
+  fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif",
+  fontSize: '13px',
+  fontWeight: 'bold',
+  textAlign: 'center',
+  backdropFilter: 'blur(10px)',
+  textShadow: '0 0 12px rgba(255, 215, 0, 0.7)',
+  lineHeight: 1.5,
+  marginBottom: '4px',
+};
+
+const WINNER_TROPHY_STYLE = { fontSize: '18px', marginBottom: '4px' };
+const WINNER_PAIR_STYLE = { fontSize: '15px', letterSpacing: '0.06em', marginTop: '4px' };
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
 /**
  * DisparityHUD
  *
@@ -26,10 +94,14 @@ const CLEAN_CARD = {
  * Rendered whenever Disparity Mode (chaos) is active.
  */
 const DisparityHUD = () => {
-  const disparityDeaths = useGameStore((s) => s.disparityDeaths);
-  const disparityWinner = useGameStore((s) => s.disparityWinner);
-  const disparityEliminatedFaces = useGameStore((s) => s.disparityEliminatedFaces);
-  const size = useGameStore((s) => s.size);
+  const { disparityDeaths, disparityWinner, disparityEliminatedFaces, size } = useGameStore(
+    useShallow(s => ({
+      disparityDeaths: s.disparityDeaths,
+      disparityWinner: s.disparityWinner,
+      disparityEliminatedFaces: s.disparityEliminatedFaces,
+      size: s.size,
+    }))
+  );
 
   const totalTiles = size * size * 6;
   const aliveCount = Math.max(0, totalTiles - disparityDeaths.length);
@@ -75,33 +147,40 @@ const DisparityHUD = () => {
   }, [disparityDeaths]);
 
   // Group deaths by pairRank, only include visible groups
-  const groups = {};
-  disparityDeaths.forEach((d) => {
-    const pr = d.pairRank ?? d.rank;
-    if (!visiblePairRanks.has(pr)) return;
-    if (!groups[pr]) groups[pr] = [];
-    groups[pr].push(d);
-  });
+  const sortedGroups = useMemo(() => {
+    const groups = {};
+    disparityDeaths.forEach((d) => {
+      const pr = d.pairRank ?? d.rank;
+      if (!visiblePairRanks.has(pr)) return;
+      if (!groups[pr]) groups[pr] = [];
+      groups[pr].push(d);
+    });
+    return Object.entries(groups)
+      .sort(([a], [b]) => Number(b) - Number(a))
+      .slice(0, MAX_PAIR_GROUPS);
+  }, [disparityDeaths, visiblePairRanks]);
 
-  // Sort groups descending (most recent first) and cap display
-  const sortedGroups = Object.entries(groups)
-    .sort(([a], [b]) => Number(b) - Number(a))
-    .slice(0, MAX_PAIR_GROUPS);
+  // Dynamic alive count styles memoized on their changing deps
+  const aliveCountStyle = useMemo(() => ({
+    ...ALIVE_COUNT_BASE_STYLE,
+    background: CLEAN_CARD.bg,
+    border: `1.5px solid ${aliveCount <= 5 ? 'rgba(239,68,68,0.55)' : CLEAN_CARD.border}`,
+    animation: aliveCount <= 5 ? 'disparity-pulse-red 1.2s ease-in-out infinite' : 'none',
+  }), [aliveCount]);
+
+  const aliveNumStyle = useMemo(() => ({
+    fontSize: counterFlash ? '30px' : '26px',
+    fontWeight: 900,
+    color: aliveCount <= 5 ? '#ef4444' : aliveCount <= 10 ? '#f97316' : CLEAN_CARD.text,
+    transition: 'font-size 0.15s, color 0.3s',
+    textShadow: aliveCount <= 5 ? '0 0 12px rgba(239,68,68,0.8)' : 'none',
+    lineHeight: 1,
+  }), [counterFlash, aliveCount]);
 
   if (!sortedGroups.length && !disparityWinner && aliveCount === totalTiles) return null;
 
   return (
-    <div style={{
-      position: 'fixed',
-      right: '16px',
-      bottom: '80px',
-      display: 'flex',
-      flexDirection: 'column-reverse',
-      gap: '5px',
-      zIndex: 200,
-      pointerEvents: 'none',
-      maxWidth: '260px',
-    }}>
+    <div style={CONTAINER_STYLE}>
       <style>{`
         @keyframes disparity-pulse-red {
           0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
@@ -115,124 +194,102 @@ const DisparityHUD = () => {
       `}</style>
       {/* Face elimination banner */}
       {activeFaceElimination != null && (
-        <div key={activeFaceElimination} style={{
-          background: CLEAN_CARD.bg,
-          border: `1.5px solid ${CLEAN_CARD.border}`,
-          borderRadius: '12px',
-          padding: '8px 14px',
-          fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif",
-          textAlign: 'center',
-          backdropFilter: 'blur(18px)',
-          marginBottom: '4px',
-          animation: 'disparity-face-elim 0.35s cubic-bezier(0.22,1,0.36,1) forwards',
-        }}>
-          <div style={{ fontSize: '9px', color: CLEAN_CARD.subtle, letterSpacing: '0.12em', marginBottom: '2px' }}>
+        <div key={activeFaceElimination} style={FACE_ELIM_BANNER_STYLE}>
+          <div style={FACE_ELIM_LABEL_STYLE}>
             FACE ELIMINATED
           </div>
-          <div style={{
-            fontSize: '14px',
-            fontWeight: 900,
-            color: FACE_COLORS[activeFaceElimination] ?? '#fff',
-            letterSpacing: '0.08em',
-            textShadow: `0 0 10px ${FACE_COLORS[activeFaceElimination] ?? '#fff'}`,
-          }}>
-            {FACE_NAMES[activeFaceElimination] ?? `FACE ${activeFaceElimination}`}
-          </div>
+          <FaceEliminationName faceNum={activeFaceElimination} />
         </div>
       )}
 
       {/* Alive count — always visible once chaos has started (at least 1 death) */}
       {!disparityWinner && disparityDeaths.length > 0 && (
-        <div style={{
-          background: CLEAN_CARD.bg,
-          border: `1.5px solid ${aliveCount <= 5 ? 'rgba(239,68,68,0.55)' : CLEAN_CARD.border}`,
-          borderRadius: '12px',
-          padding: '8px 14px',
-          fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif",
-          display: 'flex',
-          alignItems: 'baseline',
-          gap: '6px',
-          backdropFilter: 'blur(18px)',
-          marginBottom: '4px',
-          animation: aliveCount <= 5 ? 'disparity-pulse-red 1.2s ease-in-out infinite' : 'none',
-        }}>
-          <span style={{
-            fontSize: counterFlash ? '30px' : '26px',
-            fontWeight: 900,
-            color: aliveCount <= 5 ? '#ef4444' : aliveCount <= 10 ? '#f97316' : CLEAN_CARD.text,
-            transition: 'font-size 0.15s, color 0.3s',
-            textShadow: aliveCount <= 5 ? '0 0 12px rgba(239,68,68,0.8)' : 'none',
-            lineHeight: 1,
-          }}>
+        <div style={aliveCountStyle}>
+          <span style={aliveNumStyle}>
             {aliveCount}
           </span>
-          <span style={{ fontSize: '11px', color: CLEAN_CARD.subtle, letterSpacing: '0.06em' }}>
+          <span style={ALIVE_LABEL_STYLE}>
             ALIVE
           </span>
-          <span style={{ fontSize: '10px', color: CLEAN_CARD.subtle, marginLeft: 'auto' }}>
+          <span style={ALIVE_TOTAL_STYLE}>
             / {totalTiles}
           </span>
         </div>
       )}
       {disparityWinner && (
-        <div style={{
-          background: CLEAN_CARD.bg,
-          border: '1.5px solid rgba(255, 215, 0, 0.5)',
-          borderRadius: '12px',
-          padding: '12px 18px',
-          color: '#FFD700',
-          fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif",
-          fontSize: '13px',
-          fontWeight: 'bold',
-          textAlign: 'center',
-          backdropFilter: 'blur(10px)',
-          textShadow: '0 0 12px rgba(255, 215, 0, 0.7)',
-          lineHeight: 1.5,
-          marginBottom: '4px',
-        }}>
-          <div style={{ fontSize: '18px', marginBottom: '4px' }}>🏆</div>
+        <div style={WINNER_STYLE}>
+          <div style={WINNER_TROPHY_STYLE}>🏆</div>
           <div>Winning antipodal pair</div>
-          <div style={{ fontSize: '15px', letterSpacing: '0.06em', marginTop: '4px' }}>
+          <div style={WINNER_PAIR_STYLE}>
             {(disparityWinner.pair ?? [disparityWinner.gridId]).join(' ↔ ')}
           </div>
         </div>
       )}
-      {sortedGroups.map(([pr, deaths]) => {
-        const isPair = deaths.length > 1;
-        return (
-          <div key={pr} style={{
-            background: CLEAN_CARD.bg,
-            border: `1px solid rgba(180, 40, 40, ${isPair ? '0.45' : '0.3'})`,
-            borderRadius: '10px',
-            padding: '4px 10px',
-            color: '#b91c1c',
-            fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif",
-            fontSize: '11px',
-            backdropFilter: 'blur(18px)',
-            whiteSpace: 'nowrap',
-            letterSpacing: '0.04em',
-          }}>
-            {isPair ? (
-              // Antipodal pair died together
-              <>
-                <span style={{ marginRight: '4px' }}>✝✝</span>
-                {deaths.map((d, i) => (
-                  <span key={d.id}>
-                    {i > 0 && <span style={{ color: 'rgba(200,80,80,0.6)', margin: '0 4px' }}>+</span>}
-                    <span>{d.gridId} </span>
-                    <span style={{ fontWeight: 'bold' }}>#{d.rank}</span>
-                  </span>
-                ))}
-              </>
-            ) : (
-              // Solo death
-              <>✝ {deaths[0].gridId} — <span style={{ fontWeight: 'bold' }}>#{deaths[0].rank}</span></>
-            )}
-          </div>
-        );
-      })}
+      {sortedGroups.map(([pr, deaths]) => (
+        <DeathEntry key={pr} pairRank={pr} deaths={deaths} />
+      ))}
     </div>
   );
 };
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+const FACE_NAME_BASE_STYLE = {
+  fontSize: '14px',
+  fontWeight: 900,
+  letterSpacing: '0.08em',
+};
+
+const FaceEliminationName = React.memo(({ faceNum }) => {
+  const color = FACE_COLORS[faceNum] ?? '#fff';
+  const style = useMemo(() => ({
+    ...FACE_NAME_BASE_STYLE,
+    color,
+    textShadow: `0 0 10px ${color}`,
+  }), [color]);
+  return <div style={style}>{FACE_NAMES[faceNum] ?? `FACE ${faceNum}`}</div>;
+});
+
+const DEATH_ENTRY_BASE_STYLE = {
+  background: CLEAN_CARD.bg,
+  borderRadius: '10px',
+  padding: '4px 10px',
+  color: '#b91c1c',
+  fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif",
+  fontSize: '11px',
+  backdropFilter: 'blur(18px)',
+  whiteSpace: 'nowrap',
+  letterSpacing: '0.04em',
+};
+
+const DEATH_PAIR_SEPARATOR_STYLE = { color: 'rgba(200,80,80,0.6)', margin: '0 4px' };
+const DEATH_RANK_STYLE = { fontWeight: 'bold' };
+
+const DeathEntry = React.memo(({ deaths }) => {
+  const isPair = deaths.length > 1;
+  const style = useMemo(() => ({
+    ...DEATH_ENTRY_BASE_STYLE,
+    border: `1px solid rgba(180, 40, 40, ${isPair ? '0.45' : '0.3'})`,
+  }), [isPair]);
+
+  return (
+    <div style={style}>
+      {isPair ? (
+        <>
+          <span style={{ marginRight: '4px' }}>✝✝</span>
+          {deaths.map((d, i) => (
+            <span key={d.id}>
+              {i > 0 && <span style={DEATH_PAIR_SEPARATOR_STYLE}>+</span>}
+              <span>{d.gridId} </span>
+              <span style={DEATH_RANK_STYLE}>#{d.rank}</span>
+            </span>
+          ))}
+        </>
+      ) : (
+        <>✝ {deaths[0].gridId} — <span style={DEATH_RANK_STYLE}>#{deaths[0].rank}</span></>
+      )}
+    </div>
+  );
+});
 
 export default DisparityHUD;

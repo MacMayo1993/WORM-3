@@ -1,14 +1,14 @@
 // src/components/overlays/SolveHighlight.jsx
 // Visual highlighting for solve mode pieces
 
-import React, { useRef } from 'react';
+import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 
 // Individual highlight for one piece
-const PieceHighlight = ({ x, y, z, dir, solved, type }) => {
+const PieceHighlight = React.memo(({ x, y, z, dir, solved, type }) => {
   const { size, explosionFactor } = useGameStore(
     useShallow(s => ({ size: s.size, explosionFactor: s.explosionT }))
   );
@@ -17,20 +17,18 @@ const PieceHighlight = ({ x, y, z, dir, solved, type }) => {
   const phaseRef = useRef(Math.random() * Math.PI * 2);
 
   // Convert grid position to world position
-  const getWorldPos = () => {
+  const position = useMemo(() => {
     const k = (size - 1) / 2;
     const baseX = x - k;
     const baseY = y - k;
     const baseZ = z - k;
 
-    // Apply explosion factor
     const exploded = [
       baseX * (1 + explosionFactor * 1.8),
       baseY * (1 + explosionFactor * 1.8),
       baseZ * (1 + explosionFactor * 1.8)
     ];
 
-    // Offset slightly outward from face
     const offset = 0.54;
     switch (dir) {
       case 'PZ': return [exploded[0], exploded[1], exploded[2] + offset];
@@ -41,10 +39,10 @@ const PieceHighlight = ({ x, y, z, dir, solved, type }) => {
       case 'NY': return [exploded[0], exploded[1] - offset, exploded[2]];
       default: return exploded;
     }
-  };
+  }, [x, y, z, dir, size, explosionFactor]);
 
   // Get rotation for the highlight to face outward
-  const getRotation = () => {
+  const rotation = useMemo(() => {
     switch (dir) {
       case 'PZ': return [0, 0, 0];
       case 'NZ': return [0, Math.PI, 0];
@@ -54,10 +52,10 @@ const PieceHighlight = ({ x, y, z, dir, solved, type }) => {
       case 'NY': return [Math.PI / 2, 0, 0];
       default: return [0, 0, 0];
     }
-  };
+  }, [dir]);
 
   // Colors based on state
-  const getColors = () => {
+  const colors = useMemo(() => {
     if (solved) {
       return { ring: '#00ff88', glow: '#00cc66' }; // Green for solved
     }
@@ -76,7 +74,7 @@ const PieceHighlight = ({ x, y, z, dir, solved, type }) => {
       default:
         return { ring: '#fbbf24', glow: '#f59e0b' };
     }
-  };
+  }, [solved, type]);
 
   // Animate glow
   useFrame((state) => {
@@ -91,10 +89,6 @@ const PieceHighlight = ({ x, y, z, dir, solved, type }) => {
       glowRef.current.scale.setScalar(pulse);
     }
   });
-
-  const position = getWorldPos();
-  const rotation = getRotation();
-  const colors = getColors();
 
   return (
     <group position={position} rotation={rotation}>
@@ -135,7 +129,7 @@ const PieceHighlight = ({ x, y, z, dir, solved, type }) => {
       )}
     </group>
   );
-};
+});
 
 // Main component that renders all highlights
 const SolveHighlight = ({ highlights }) => {
