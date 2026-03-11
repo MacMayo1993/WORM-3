@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../../hooks/useGameStore.js';
@@ -15,9 +15,10 @@ const CursorHighlight = () => {
   const meshRef = useRef();
   const glowRef = useRef();
 
-  // Convert cursor to world position
-  const getWorldPos = () => {
-    const { face, row, col } = cursor;
+  const { face, row, col } = cursor;
+
+  // Convert cursor to world position — only recomputes when cursor/size/explosionFactor change
+  const position = useMemo(() => {
     const k = (size - 1) / 2;
     const maxIdx = size - 1;
 
@@ -32,14 +33,12 @@ const CursorHighlight = () => {
       default: x = 0; y = 0; z = k;
     }
 
-    // Apply explosion factor
     const exploded = [
       x * (1 + explosionFactor * 1.8),
       y * (1 + explosionFactor * 1.8),
       z * (1 + explosionFactor * 1.8)
     ];
 
-    // Offset slightly outward from face
     const offset = 0.53;
     switch (face) {
       case 'PZ': return [exploded[0], exploded[1], exploded[2] + offset];
@@ -50,11 +49,10 @@ const CursorHighlight = () => {
       case 'NY': return [exploded[0], exploded[1] - offset, exploded[2]];
       default: return exploded;
     }
-  };
+  }, [face, row, col, size, explosionFactor]);
 
-  // Get rotation for the highlight to face outward
-  const getRotation = () => {
-    const { face } = cursor;
+  // Get rotation for the highlight to face outward — only recomputes when face changes
+  const rotation = useMemo(() => {
     switch (face) {
       case 'PZ': return [0, 0, 0];
       case 'NZ': return [0, Math.PI, 0];
@@ -64,7 +62,7 @@ const CursorHighlight = () => {
       case 'NY': return [Math.PI / 2, 0, 0];
       default: return [0, 0, 0];
     }
-  };
+  }, [face]);
 
   // Animate glow
   useFrame((state) => {
@@ -77,9 +75,6 @@ const CursorHighlight = () => {
       glowRef.current.scale.setScalar(pulse);
     }
   });
-
-  const position = getWorldPos();
-  const rotation = getRotation();
 
   return (
     <group position={position} rotation={rotation}>

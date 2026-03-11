@@ -7,6 +7,7 @@ import React, { useRef, useCallback, useEffect } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
+import { useShallow } from 'zustand/react/shallow';
 import { getStickerWorldPos } from '../game/coordinates.js';
 import { getNextSurfacePosition, getActiveTunnels, getTunnelWorldPos, turnWorm } from './wormLogic.js';
 import { buildManifoldGridMap, flipStickerPair } from '../game/manifoldLogic.js';
@@ -115,11 +116,15 @@ function randomUnflippedTile(cubies, size, exclude = []) {
 const MAX_TAIL = 1200;
 
 function useWormCrawler(size, cubies) {
-    const wormSpeed = useGameStore(s => s.wormSpeed ?? 1.0);
-    const wormControlMode = useGameStore(s => s.wormControlMode ?? 'non-oriented');
-    const wormRunId = useGameStore(s => s.wormRunId ?? 0);
-    const wormOrbCount = useGameStore(s => s.wormOrbCount ?? DEFAULT_POWERUP_COUNT);
-    const wormholeInterval = useGameStore(s => s.wormholeInterval ?? DEFAULT_WORMHOLE_FLIP_INTERVAL);
+    const { wormSpeed, wormControlMode, wormRunId, wormOrbCount, wormholeInterval } = useGameStore(
+        useShallow(s => ({
+            wormSpeed: s.wormSpeed ?? 1.0,
+            wormControlMode: s.wormControlMode ?? 'non-oriented',
+            wormRunId: s.wormRunId ?? 0,
+            wormOrbCount: s.wormOrbCount ?? DEFAULT_POWERUP_COUNT,
+            wormholeInterval: s.wormholeInterval ?? DEFAULT_WORMHOLE_FLIP_INTERVAL,
+        }))
+    );
     const healedRef = useRef(0);
 
     const pos = useRef(INITIAL_POS(size));
