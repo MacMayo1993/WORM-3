@@ -68,6 +68,7 @@ const MAX_JUMPS = 2;
 const MAX_POWERUP_RENDER = 24;
 const TUNNEL_TRIGGER_PROGRESS = 1 / 3;
 const SELF_COLLISION_TRIGGER_PROGRESS = 0.4;
+const WORMHOLE_MAX_TRAVERSALS = 3;
 
 function getAllSurfaceTiles(size) {
     const tiles = [];
@@ -166,6 +167,8 @@ function useWormCrawler(size, cubies) {
     const alive = useRef(true);
     const tileTrail = useRef([]);
     const deathMenuTimer = useRef(null);
+    const tunnelUseCountsRef = useRef(new Map());
+    const voidTunnelKeysRef = useRef(new Set());
     // Cached tunnel list — rebuilt whenever cubies change to avoid redundant getActiveTunnels calls
     const tunnelCacheRef = useRef(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -190,8 +193,15 @@ function useWormCrawler(size, cubies) {
         pendingTunnelTrigger.current = null;
     }, []);
 
-    const beginTunnelTransition = useCallback((x, y, z, dirKey) => {
-        // Use cached tunnels (built when cubies change) instead of rebuilding every entry
+    const tileKey = useCallback((p) => `${p.x},${p.y},${p.z},${p.dirKey}`, []);
+
+    const canonicalTunnelKey = useCallback((tunnel) => {
+        const a = tileKey(tunnel.entry);
+        const b = tileKey(tunnel.exit);
+        return a < b ? `${a}|${b}` : `${b}|${a}`;
+    }, [tileKey]);
+
+    const resolveTunnelAtTile = useCallback((x, y, z, dirKey) => {
         const tunnels = tunnelCacheRef.current ?? getActiveTunnels(cubies, size);
         const tunnel = tunnels.find(t =>
             t.entry.x === x && t.entry.y === y &&
@@ -201,27 +211,19 @@ function useWormCrawler(size, cubies) {
             t.exit.z === z && t.exit.dirKey === dirKey
         );
 
-        if (!tunnel) return;
+        if (!tunnel) return null;
 
-        if (tunnel.exit.x === x && tunnel.exit.y === y && tunnel.exit.z === z) {
-            activeTunnel.current = { ...tunnel, entry: tunnel.exit, exit: tunnel.entry };
-        } else {
-            activeTunnel.current = tunnel;
-        }
+        const orientedTunnel = (tunnel.exit.x === x && tunnel.exit.y === y && tunnel.exit.z === z)
+            ? { ...tunnel, entry: tunnel.exit, exit: tunnel.entry }
+            : tunnel;
 
-        pendingTunnelTrigger.current = null;
-        tunnelProgress.current = 0;
-        phase.current = 'entering';
-        onFlippedTile.current = false;
-        lastFlippedRef.current = false;
-        const prevVisualMode = useGameStore.getState().visualMode;
-        prevVisualModeRef.current = prevVisualMode;
-        useGameStore.setState({ wormPhase: 'entering', wormOnFlippedTile: false, visualMode: 'glass' });
-    }, [cubies, size]);
+        return {
+            tunnel: orientedTunnel,
+            tunnelKey: canonicalTunnelKey(tunnel),
+        };
+    }, [canonicalTunnelKey, cubies, size]);
 
-    const tileKey = (p) => `${p.x},${p.y},${p.z},${p.dirKey}`;
-
-    const killWorm = (details = null) => {
+    const killWorm = useCallback((details = null) => {
         if (!alive.current) return;
         alive.current = false;
         phase.current = 'dead';
@@ -244,7 +246,40 @@ function useWormCrawler(size, cubies) {
             useGameStore.setState({ showWormDeathMenu: true });
             deathMenuTimer.current = null;
         }, 520);
-    };
+    }, []);
+
+    const beginTunnelTransition = useCallback((x, y, z, dirKey) => {
+        const resolved = resolveTunnelAtTile(x, y, z, dirKey);
+        if (!resolved) return;
+
+        const { tunnel, tunnelKey } = resolved;
+
+        if (voidTunnelKeysRef.current.has(tunnelKey)) {
+            killWorm({
+                reason: 'void-zone',
+                tunnelKey,
+                headTile: tileKey({ x, y, z, dirKey }),
+            });
+            return;
+        }
+
+        const traversals = tunnelUseCountsRef.current.get(tunnelKey) ?? 0;
+        const nextTraversals = traversals + 1;
+        tunnelUseCountsRef.current.set(tunnelKey, nextTraversals);
+        if (nextTraversals >= WORMHOLE_MAX_TRAVERSALS) {
+            voidTunnelKeysRef.current.add(tunnelKey);
+        }
+
+        activeTunnel.current = tunnel;
+        pendingTunnelTrigger.current = null;
+        tunnelProgress.current = 0;
+        phase.current = 'entering';
+        onFlippedTile.current = false;
+        lastFlippedRef.current = false;
+        const prevVisualMode = useGameStore.getState().visualMode;
+        prevVisualModeRef.current = prevVisualMode;
+        useGameStore.setState({ wormPhase: 'entering', wormOnFlippedTile: false, visualMode: 'glass' });
+    }, [killWorm, resolveTunnelAtTile, tileKey]);
 
     const applyOrbPickupGrowth = () => {
         tailLength.current = Math.min(tailLength.current + ORB_SEGMENT_GROWTH, MAX_TAIL);
@@ -459,13 +494,15 @@ function useWormCrawler(size, cubies) {
                 // Flipped tile detection
                 const sticker = cubies?.[x]?.[y]?.[z]?.stickers?.[dirKey];
                 const isFlipped = !!(sticker && sticker.curr !== sticker.orig);
-                onFlippedTile.current = isFlipped;
+                const resolved = isFlipped ? resolveTunnelAtTile(x, y, z, dirKey) : null;
+                const isVoidZone = !!(resolved && voidTunnelKeysRef.current.has(resolved.tunnelKey));
+                onFlippedTile.current = isFlipped && !isVoidZone;
 
                 // Flipped tiles are instant wormholes unless the player is currently jumping over them.
 
-                if (isFlipped !== lastFlippedRef.current) {
-                    lastFlippedRef.current = isFlipped;
-                    useGameStore.getState().setWormOnFlippedTile(isFlipped);
+                if (onFlippedTile.current !== lastFlippedRef.current) {
+                    lastFlippedRef.current = onFlippedTile.current;
+                    useGameStore.getState().setWormOnFlippedTile(onFlippedTile.current);
                 }
 
                 if (isFlipped) {
@@ -504,7 +541,7 @@ function useWormCrawler(size, cubies) {
                 useGameStore.getState().setWormHealedCount(healedRef.current);
             }
         }
-    }, [size, cubies, wormSpeed, wormControlMode, wormholeInterval]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [size, cubies, wormSpeed, wormControlMode, wormholeInterval, beginTunnelTransition, resolveTunnelAtTile]); // eslint-disable-line react-hooks/exhaustive-deps
 
 
 
@@ -548,6 +585,8 @@ function useWormCrawler(size, cubies) {
         stepHistory.current = [];
         lastRecordedT.current = 0;
         healedRef.current = 0;
+        tunnelUseCountsRef.current = new Map();
+        voidTunnelKeysRef.current = new Set();
 
         powerupsRef.current = initial;
         alive.current = true;
@@ -896,6 +935,7 @@ const _headPathPoint = { pos: _bodyHeadPos, normal: _bodyNormal };
 function WormBody({ worm }) {
     const meshRef = useRef();
     const wormColor = useGameStore(s => s.wormColor ?? '#33ff66');
+    const prevTailLenRef = useRef(0);
 
     useFrame((state) => {
         // Copy head/normal into scratch vectors (avoids .clone() allocation)
@@ -920,13 +960,10 @@ function WormBody({ worm }) {
         let walkIndex = 0;
         let cumulativeDist = 0;
 
-        for (let i = 0; i < MAX_TAIL; i++) {
-            if (i >= tLen) {
-                _wormDummy.scale.setScalar(0);
-                _wormDummy.updateMatrix();
-                mesh.setMatrixAt(i, _wormDummy.matrix);
-                continue;
-            }
+        const visibleCount = Math.min(MAX_TAIL, tLen);
+        mesh.count = visibleCount;
+
+        for (let i = 0; i < visibleCount; i++) {
             const fade = 1 - i / tLen;
 
             if (i === 0) {
@@ -976,12 +1013,19 @@ function WormBody({ worm }) {
 
             _wormDummy.updateMatrix();
             mesh.setMatrixAt(i, _wormDummy.matrix);
-            // Reuse pre-allocated color object — avoids 1 Color allocation per segment per frame
-            mesh.setColorAt(i, _bodyColor.setHSL(0.38 - i * 0.005, 1, 0.4 + fade * 0.3));
+        }
+
+        if (prevTailLenRef.current !== visibleCount) {
+            prevTailLenRef.current = visibleCount;
+            for (let i = 0; i < visibleCount; i++) {
+                const fade = 1 - i / tLen;
+                // Reuse pre-allocated color object — avoids 1 Color allocation per segment per frame
+                mesh.setColorAt(i, _bodyColor.setHSL(0.38 - i * 0.005, 1, 0.4 + fade * 0.3));
+            }
+            if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
         }
 
         mesh.instanceMatrix.needsUpdate = true;
-        if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     });
 
     return (
