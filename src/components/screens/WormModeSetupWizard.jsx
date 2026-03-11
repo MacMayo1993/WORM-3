@@ -310,6 +310,10 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     backgroundTheme: initialSettings?.backgroundTheme || 'blackhole',
     // Per-face tile styles; null means "use global tileStyle"
     perFaceStyles: null,
+    wormSpeed: 1.0,
+    wormOrbCount: 5,
+    wormholeInterval: 10,
+    wormColor: '#33ff66',
   });
   const [customPreview, setCustomPreview] = useState(null);
   const fileInputRef = useRef(null);
@@ -329,8 +333,8 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     img.src = url;
   };
 
-  const STEPS = ['Scene', 'Colors', 'Style', 'Size'];
-  const totalSteps = 4;
+  const STEPS = ['Scene', 'Colors', 'Style', 'Gameplay', 'Size'];
+  const totalSteps = 5;
 
   const handleNext = () => {
     if (step < totalSteps - 1) {
@@ -665,14 +669,49 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     );
   };
 
+
+  const renderGameplay = () => (
+    <div style={{ display: 'grid', gap: '14px' }}>
+      <label style={{ display: 'grid', gap: '6px' }}>
+        <div style={{ fontSize: '12px', fontWeight: 700, color: 'rgba(0,0,0,0.66)' }}>Worm speed ({settings.wormSpeed.toFixed(1)}×)</div>
+        <input type="range" min="0.4" max="2.2" step="0.1" value={settings.wormSpeed}
+          onChange={e => select('wormSpeed', parseFloat(e.target.value))}
+          style={{ width: '100%', accentColor: '#60a5fa' }} />
+      </label>
+
+      <label style={{ display: 'grid', gap: '6px' }}>
+        <div style={{ fontSize: '12px', fontWeight: 700, color: 'rgba(0,0,0,0.66)' }}>Orb count ({settings.wormOrbCount})</div>
+        <input type="range" min="2" max="16" step="1" value={settings.wormOrbCount}
+          onChange={e => select('wormOrbCount', parseInt(e.target.value, 10))}
+          style={{ width: '100%', accentColor: '#a78bfa' }} />
+      </label>
+
+      <label style={{ display: 'grid', gap: '6px' }}>
+        <div style={{ fontSize: '12px', fontWeight: 700, color: 'rgba(0,0,0,0.66)' }}>Wormhole spawn interval ({settings.wormholeInterval.toFixed(1)}s)</div>
+        <input type="range" min="3" max="20" step="0.5" value={settings.wormholeInterval}
+          onChange={e => select('wormholeInterval', parseFloat(e.target.value))}
+          style={{ width: '100%', accentColor: '#f59e0b' }} />
+      </label>
+
+      <label style={{ display: 'grid', gap: '6px' }}>
+        <div style={{ fontSize: '12px', fontWeight: 700, color: 'rgba(0,0,0,0.66)' }}>Worm color</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <input type="color" value={settings.wormColor} onChange={e => select('wormColor', e.target.value)} style={{ width: 44, height: 34, border: 0, background: 'transparent', padding: 0, cursor: 'pointer' }} />
+          <code style={{ fontSize: '12px', color: 'rgba(0,0,0,0.5)' }}>{settings.wormColor}</code>
+        </div>
+      </label>
+    </div>
+  );
+
   // ── Step titles ─────────────────────────────────────────────────────────────
 
-  const stepContent = [renderBackgrounds, renderColors, renderStyles, renderSize];
-  const stepTitles = ['Background', 'Color Palette', 'Tile Style', 'Cube Size'];
+  const stepContent = [renderBackgrounds, renderColors, renderStyles, renderGameplay, renderSize];
+  const stepTitles = ['Background', 'Color Palette', 'Tile Style', 'Gameplay', 'Cube Size'];
   const stepSubtitles = [
     'Choose your play environment',
     'Set the colors for your cube faces (or upload an image)',
     'Choose how your tiles look and feel',
+    'Tune how fast and chaotic your worm run feels',
     'Pick your puzzle dimensions with tile previews loaded',
   ];
 
