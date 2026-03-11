@@ -8,7 +8,6 @@
 import React, { Suspense, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Environment, Html } from '@react-three/drei';
-import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import CubeAssembly from './CubeAssembly.jsx';
@@ -263,13 +262,6 @@ export default function GameScene({
 
       {/* Antipodal PiP — only mounted when active so R3F auto-render stays live when off */}
       {showAntipodalPiP && <AntipodalPiP />}
-
-      {/* Bloom post-processing — active in worm mode to make emissive worm/orbs/portals glow */}
-      {wormHealerMode && (
-        <EffectComposer>
-          <Bloom luminanceThreshold={0.35} luminanceSmoothing={0.9} intensity={0.9} mipmapBlur />
-        </EffectComposer>
-      )}
     </>
   );
 }
