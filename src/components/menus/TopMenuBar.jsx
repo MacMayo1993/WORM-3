@@ -43,7 +43,9 @@ const TopMenuBar = ({
   cascadeCount = 0,
   onShowSettings,
   onHome,
-  currentLevelData
+  currentLevelData,
+  showAntipodalPiP,
+  onToggleAntipodalPiP,
 }) => {
   const modeLabel = visualMode === 'classic' ? 'Classic' :
                    visualMode === 'grid' ? 'Grid' :
@@ -196,8 +198,26 @@ const TopMenuBar = ({
         </span>
       </div>
 
-      {/* Right: Home + Settings gear */}
+      {/* Right: PiP toggle + Home + Settings gear */}
       <div className="top-bar-right">
+        {onToggleAntipodalPiP && (
+          <button
+            className="top-bar-icon-btn"
+            onClick={onToggleAntipodalPiP}
+            title={showAntipodalPiP ? 'Hide antipodal view' : 'Show antipodal view (back of cube)'}
+            style={{
+              marginRight: '4px',
+              color: showAntipodalPiP ? '#00d9ff' : undefined,
+              opacity: showAntipodalPiP ? 1 : 0.7,
+            }}
+          >
+            {/* Two overlapping squares icon representing PiP */}
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="3" width="14" height="11" rx="1" />
+              <rect x="10" y="12" width="12" height="9" rx="1" fill={showAntipodalPiP ? 'rgba(0,217,255,0.25)' : 'none'} />
+            </svg>
+          </button>
+        )}
         {onHome && (
           <button className="top-bar-icon-btn" onClick={onHome} title="Main Menu" style={{ marginRight: '4px' }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">

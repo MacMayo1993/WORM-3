@@ -268,6 +268,9 @@ export default function WORM3() {
   // Co-op Crawler mode
   const [coopMode, setCoopMode] = useState(false);
 
+  // Antipodal PiP — second camera from opposite side of the cube
+  const [showAntipodalPiP, setShowAntipodalPiP] = useState(false);
+
   // Bottom sheet state for new nav bar
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetMode, setSheetMode] = useState('more'); // 'more' or 'views'
@@ -937,10 +940,44 @@ export default function WORM3() {
               layerHighlight={teachMode.layerHighlight}
               onHeal={healSticker}
               onRotate={startAnimation}
+              showAntipodalPiP={showAntipodalPiP}
             />
           )}
         </Canvas>
       </div>
+
+      {/* Antipodal PiP frame overlay — border + label drawn over the canvas scissor region */}
+      {!showWelcome && showAntipodalPiP && (
+        <div
+          style={{
+            position: 'fixed',
+            top: '56px',
+            left: '8px',
+            width: '240px',
+            height: '180px',
+            border: '2px solid rgba(0, 217, 255, 0.7)',
+            borderRadius: '6px',
+            pointerEvents: 'none',
+            zIndex: 50,
+            boxShadow: '0 0 12px rgba(0, 217, 255, 0.35), inset 0 0 8px rgba(0, 0, 0, 0.4)',
+          }}
+        >
+          <span style={{
+            position: 'absolute',
+            top: '4px',
+            left: '6px',
+            fontSize: '9px',
+            fontFamily: "'Courier New', monospace",
+            fontWeight: 700,
+            letterSpacing: '0.1em',
+            color: 'rgba(0, 217, 255, 0.85)',
+            textTransform: 'uppercase',
+            pointerEvents: 'none',
+          }}>
+            ↕ Antipodal
+          </span>
+        </div>
+      )}
 
       {/* Welcome DOM overlay — transparent background, Canvas shows through */}
       {showWelcome && (
@@ -979,6 +1016,7 @@ export default function WORM3() {
             showFreeplayWizard, showWormModeWizard,
             showDisparityWizard, setShowDisparityWizard,
             disparityWaitingFirstFlip, disparityCountdown,
+            showAntipodalPiP, onToggleAntipodalPiP: () => setShowAntipodalPiP(v => !v),
           }}
           handlers={{
             onReset: handleReset,
