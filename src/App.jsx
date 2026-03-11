@@ -951,7 +951,7 @@ export default function WORM3() {
         <div
           style={{
             position: 'fixed',
-            top: '56px',
+            top: `${(isMobile ? (window.matchMedia('(max-height: 500px) and (orientation: landscape)').matches ? 36 : 44) : 56) + 8}px`,
             left: '8px',
             width: '240px',
             height: '180px',
