@@ -85,94 +85,93 @@ export default function WormTrail({ segments, size, explosionFactor = 0, alive =
   const bodyCount = Math.max(0, positions.length - 1); // segments index 1..n
   const tubeCount = bodyCount; // one tube between every pair of adjacent segments
 
-  // ── Update body-sphere InstancedMesh ──────────────────────────────────────
+  // ── Update both body-sphere and tube InstancedMeshes in a single effect ───
+  // Merged from two separate effects to halve the React reconciliation overhead.
   useEffect(() => {
-    const mesh = bodyMeshRef.current;
-    if (!mesh) return;
+    const bodyMesh = bodyMeshRef.current;
+    const tubeMesh = tubeMeshRef.current;
+    const transparent = !alive;
+    const opacity = alive ? 1 : 0.5;
 
-    // Sync material opacity/transparency with alive prop
-    mesh.material.transparent = !alive;
-    mesh.material.opacity = alive ? 1 : 0.5;
-    mesh.material.needsUpdate = true;
+    // ── Body spheres ──
+    if (bodyMesh) {
+      bodyMesh.material.transparent = transparent;
+      bodyMesh.material.opacity = opacity;
+      bodyMesh.material.needsUpdate = true;
 
-    for (let i = 1; i < positions.length; i++) {
-      const idx = i - 1;
-      const pos = positions[i];
-      const isTail = i === positions.length - 1;
-      const t = positions.length > 1 ? i / (positions.length - 1) : 0;
-      const radius = isTail ? 0.2 : 0.28 - t * 0.08; // same formula as original
+      for (let i = 1; i < positions.length; i++) {
+        const idx = i - 1;
+        const pos = positions[i];
+        const isTail = i === positions.length - 1;
+        const t = positions.length > 1 ? i / (positions.length - 1) : 0;
+        const radius = isTail ? 0.2 : 0.28 - t * 0.08;
 
-      _dummy.position.set(pos[0], pos[1], pos[2]);
-      _dummy.scale.setScalar(radius);
-      _dummy.rotation.set(0, 0, 0);
-      _dummy.updateMatrix();
-      mesh.setMatrixAt(idx, _dummy.matrix);
-      mesh.setColorAt(idx, segmentColors[i]);
-    }
+        _dummy.position.set(pos[0], pos[1], pos[2]);
+        _dummy.scale.setScalar(radius);
+        _dummy.rotation.set(0, 0, 0);
+        _dummy.updateMatrix();
+        bodyMesh.setMatrixAt(idx, _dummy.matrix);
+        bodyMesh.setColorAt(idx, segmentColors[i]);
+      }
 
-    // Hide unused slots
-    for (let i = bodyCount; i < mesh.count; i++) {
-      _dummy.position.set(0, 0, 0);
-      _dummy.scale.setScalar(0);
-      _dummy.updateMatrix();
-      mesh.setMatrixAt(i, _dummy.matrix);
-    }
-
-    mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-  }, [positions, segmentColors, bodyCount, alive]);
-
-  // ── Update tube InstancedMesh ─────────────────────────────────────────────
-  useEffect(() => {
-    const mesh = tubeMeshRef.current;
-    if (!mesh) return;
-
-    mesh.material.transparent = !alive;
-    mesh.material.opacity = alive ? 1 : 0.5;
-    mesh.material.needsUpdate = true;
-
-    let tubeIdx = 0;
-    for (let i = 1; i < positions.length; i++) {
-      const pos = positions[i];
-      const prev = positions[i - 1];
-      const dx = pos[0] - prev[0];
-      const dy = pos[1] - prev[1];
-      const dz = pos[2] - prev[2];
-      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-
-      if (dist < 0.1 || dist > 2) {
-        // Collapse this instance so it's invisible
+      for (let i = bodyCount; i < bodyMesh.count; i++) {
         _dummy.position.set(0, 0, 0);
         _dummy.scale.setScalar(0);
         _dummy.updateMatrix();
-        mesh.setMatrixAt(tubeIdx, _dummy.matrix);
-        tubeIdx++;
-        continue;
+        bodyMesh.setMatrixAt(i, _dummy.matrix);
       }
 
-      _dummy.position.set((pos[0] + prev[0]) / 2, (pos[1] + prev[1]) / 2, (pos[2] + prev[2]) / 2);
-      _dummy.quaternion.setFromUnitVectors(
-        new THREE.Vector3(0, 1, 0),
-        new THREE.Vector3(dx, dy, dz).normalize()
-      );
-      _dummy.scale.set(1, dist * 0.8, 1); // Y scale = tube length
-      _dummy.updateMatrix();
-      mesh.setMatrixAt(tubeIdx, _dummy.matrix);
-      mesh.setColorAt(tubeIdx, segmentColors[i]);
-      tubeIdx++;
+      bodyMesh.instanceMatrix.needsUpdate = true;
+      if (bodyMesh.instanceColor) bodyMesh.instanceColor.needsUpdate = true;
     }
 
-    // Hide unused slots
-    for (let i = tubeIdx; i < mesh.count; i++) {
-      _dummy.position.set(0, 0, 0);
-      _dummy.scale.setScalar(0);
-      _dummy.updateMatrix();
-      mesh.setMatrixAt(i, _dummy.matrix);
-    }
+    // ── Connecting tubes ──
+    if (tubeMesh) {
+      tubeMesh.material.transparent = transparent;
+      tubeMesh.material.opacity = opacity;
+      tubeMesh.material.needsUpdate = true;
 
-    mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-  }, [positions, segmentColors, tubeCount, alive]);
+      let tubeIdx = 0;
+      for (let i = 1; i < positions.length; i++) {
+        const pos = positions[i];
+        const prev = positions[i - 1];
+        const dx = pos[0] - prev[0];
+        const dy = pos[1] - prev[1];
+        const dz = pos[2] - prev[2];
+        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+        if (dist < 0.1 || dist > 2) {
+          _dummy.position.set(0, 0, 0);
+          _dummy.scale.setScalar(0);
+          _dummy.updateMatrix();
+          tubeMesh.setMatrixAt(tubeIdx, _dummy.matrix);
+          tubeIdx++;
+          continue;
+        }
+
+        _dummy.position.set((pos[0] + prev[0]) / 2, (pos[1] + prev[1]) / 2, (pos[2] + prev[2]) / 2);
+        _dummy.quaternion.setFromUnitVectors(
+          new THREE.Vector3(0, 1, 0),
+          new THREE.Vector3(dx, dy, dz).normalize()
+        );
+        _dummy.scale.set(1, dist * 0.8, 1);
+        _dummy.updateMatrix();
+        tubeMesh.setMatrixAt(tubeIdx, _dummy.matrix);
+        tubeMesh.setColorAt(tubeIdx, segmentColors[i]);
+        tubeIdx++;
+      }
+
+      for (let i = tubeIdx; i < tubeMesh.count; i++) {
+        _dummy.position.set(0, 0, 0);
+        _dummy.scale.setScalar(0);
+        _dummy.updateMatrix();
+        tubeMesh.setMatrixAt(i, _dummy.matrix);
+      }
+
+      tubeMesh.instanceMatrix.needsUpdate = true;
+      if (tubeMesh.instanceColor) tubeMesh.instanceColor.needsUpdate = true;
+    }
+  }, [positions, segmentColors, bodyCount, alive]);
 
   // ── Per-frame: animate head pulse + glow ─────────────────────────────────
   useFrame((_state, delta) => {

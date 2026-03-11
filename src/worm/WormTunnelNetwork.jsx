@@ -2,7 +2,7 @@
 // Visualizes the tunnel network that the worm travels through
 // Shows glowing tube paths with highlighting for target tunnels
 
-import React, { useRef, useMemo } from 'react';
+import React, { useRef, useMemo, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { getTunnelSideKey } from './wormLogic.js';
@@ -53,11 +53,20 @@ function TunnelTube({ tunnel, size, explosionFactor = 0, isTarget = false, wormI
     return { curve: path, entryPos: [entryCenter.x, entryCenter.y, entryCenter.z], exitPos: [exitCenter.x, exitCenter.y, exitCenter.z] };
   }, [tunnel, size, explosionFactor]);
 
-  // Create tube geometry
-  const tubeGeometry = useMemo(() => {
-    const radius = isTarget ? 0.12 : 0.08;
-    return new THREE.TubeGeometry(curve, 32, radius, 8, false);
-  }, [curve, isTarget]);
+  // Pre-compute all three geometries based only on curve path (not isTarget).
+  // This avoids reallocating GPU geometry just because the target tunnel changes.
+  const geometries = useMemo(() => ({
+    normal: new THREE.TubeGeometry(curve, 32, 0.08, 8, false),
+    target: new THREE.TubeGeometry(curve, 32, 0.12, 8, false),
+    glow: new THREE.TubeGeometry(curve, 32, 0.2, 8, false)
+  }), [curve]);
+
+  // Dispose geometries when the curve changes (prevents GPU memory leaks)
+  useEffect(() => () => {
+    geometries.normal.dispose();
+    geometries.target.dispose();
+    geometries.glow.dispose();
+  }, [geometries]);
 
   const color = isTarget ? TARGET_TUNNEL_COLOR : TUNNEL_COLOR;
   const entryActive = !inactiveSideKeys.has(getTunnelSideKey(tunnel.entry));
@@ -90,8 +99,8 @@ function TunnelTube({ tunnel, size, explosionFactor = 0, isTarget = false, wormI
 
   return (
     <group>
-      {/* Main tunnel tube */}
-      <mesh ref={tubeRef} geometry={tubeGeometry}>
+      {/* Main tunnel tube — swap between pre-computed geometries; no reallocation */}
+      <mesh ref={tubeRef} geometry={isTarget ? geometries.target : geometries.normal}>
         <meshStandardMaterial
           color={color}
           emissive={color}
@@ -102,9 +111,9 @@ function TunnelTube({ tunnel, size, explosionFactor = 0, isTarget = false, wormI
         />
       </mesh>
 
-      {/* Outer glow for target tunnels */}
+      {/* Outer glow for target tunnels — use pre-computed glow geometry */}
       {isTarget && (
-        <mesh ref={glowRef} geometry={new THREE.TubeGeometry(curve, 32, 0.2, 8, false)}>
+        <mesh ref={glowRef} geometry={geometries.glow}>
           <meshBasicMaterial
             color={TARGET_TUNNEL_COLOR}
             transparent
