@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Text } from '@react-three/drei';
+import { Text, Billboard } from '@react-three/drei';
 import * as THREE from 'three';
 import { COLORS, FACE_COLORS, ANTIPODAL_COLOR, FLIP_CAP } from '../utils/constants.js';
 import { play, vibrate } from '../utils/audio.js';
@@ -281,6 +281,22 @@ const wispyRingFragmentShader = `
   }
 `;
 
+
+// Ghost worms that lazily orbit a dead tile's tombstone.
+// The orbit group sits at mid-tombstone height so the worms circle the stone body.
+function TombstoneGhost() {
+  const orbitRef = useRef();
+  useFrame(({ clock }) => {
+    if (orbitRef.current) orbitRef.current.rotation.z = clock.elapsedTime * 0.45;
+  });
+  const r = 0.30;
+  return (
+    <group ref={orbitRef} position={[0, 0, 0.22]}>
+      <StickerWorm position={[r, 0, 0]} rotation={0} scale={1.3} />
+      <StickerWorm position={[-r, 0, 0]} rotation={Math.PI} scale={1.3} />
+    </group>
+  );
+}
 
 const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay, mode, faceRow, faceCol, faceSize, hollow, currentDir: _currentDir }) {
   // Batch all store reads into a single subscription to minimize Zustand overhead.
@@ -1187,50 +1203,52 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         </mesh>
       )}
 
-      {/* Dead tile headstone — only in Disparity Mode, after tile actually dies and animation completes */}
+      {/* Dead tile tombstone — stands perpendicular to the tile face (tall dimension = local Z = outward) */}
       {chaosLevel > 0 && isDead && deathAnimDone && (
-        <group position={[0, 0, 0.02]}>
-          {/* Headstone body — rounded rectangle */}
-          <mesh position={[0, 0.06, 0]}>
-            <planeGeometry args={[0.28, 0.34]} />
-            <meshStandardMaterial color="#777777" roughness={0.8} metalness={0.1} />
+        <group position={[0, 0, 0.01]}>
+          {/* Base slab — sits on the tile surface, wide in X, thick in Y, thin in Z */}
+          <mesh position={[0, 0, 0.025]}>
+            <boxGeometry args={[0.38, 0.14, 0.05]} />
+            <meshStandardMaterial color={origColor} roughness={0.9} metalness={0.05} />
           </mesh>
-          {/* Headstone arch top */}
-          <mesh position={[0, 0.24, 0.001]}>
-            <circleGeometry args={[0.14, 16, 0, Math.PI]} />
-            <meshStandardMaterial color="#777777" roughness={0.8} metalness={0.1} />
+          {/* Stone body — wide in X (0.28), thick in Y (0.12), tall in Z (0.34) */}
+          {/* Z range: 0.05 → 0.39  (rises outward from tile face) */}
+          <mesh position={[0, 0, 0.22]}>
+            <boxGeometry args={[0.28, 0.12, 0.34]} />
+            <meshStandardMaterial color={origColor} roughness={0.75} metalness={0.1} />
           </mesh>
-          {/* Cross etching */}
-          <mesh position={[0, 0.1, 0.003]}>
-            <planeGeometry args={[0.03, 0.16]} />
-            <meshBasicMaterial color="#444444" />
+          {/* Arch cap — half-cylinder, default axis=Y (the thin dim), semicircle in XZ plane.
+              thetaStart=-PI/2, thetaLength=PI  →  arc goes from -X through +Z to +X
+              (the +Z peak is the top of the arch, outward from tile)  */}
+          <mesh position={[0, 0, 0.39]}>
+            <cylinderGeometry args={[0.14, 0.14, 0.12, 20, 1, false, -Math.PI / 2, Math.PI]} />
+            <meshStandardMaterial color={origColor} roughness={0.75} metalness={0.1} />
           </mesh>
-          <mesh position={[0, 0.14, 0.003]}>
-            <planeGeometry args={[0.1, 0.03]} />
-            <meshBasicMaterial color="#444444" />
+          {/* Cross engraving — on the +Y face of the body (XZ plane, just outside Y=0.06) */}
+          <mesh position={[0, 0.063, 0.18]}>
+            <boxGeometry args={[0.028, 0.003, 0.13]} />
+            <meshStandardMaterial color="#111111" roughness={0.9} />
           </mesh>
-          {/* Ground base */}
-          <mesh position={[0, -0.12, -0.001]}>
-            <planeGeometry args={[0.36, 0.06]} />
-            <meshStandardMaterial color="#555555" roughness={0.9} />
+          <mesh position={[0, 0.063, 0.26]}>
+            <boxGeometry args={[0.09, 0.003, 0.028]} />
+            <meshStandardMaterial color="#111111" roughness={0.9} />
           </mesh>
-          {/* Disparity Mode: tile identity and death rank in original color */}
+          {/* Text — Billboard keeps labels facing the camera as the cube is orbited */}
           {deadRank != null && (
-            <>
-              {/* "RIP" in the arch area */}
-              <Text position={[0, 0.22, 0.006]} fontSize={0.075} color={origColor} anchorX="center" anchorY="middle" fontWeight={700} renderOrder={1} depthTest={false}>
+            <Billboard position={[0, 0, 0.27]}>
+              <Text position={[0, 0.12, 0]} fontSize={0.075} color={antipodalColor} anchorX="center" anchorY="middle" fontWeight={700} renderOrder={2} depthTest={false}>
                 RIP
               </Text>
-              {/* Original grid ID below the cross */}
-              <Text position={[0, 0.03, 0.006]} fontSize={0.038} color={origColor} anchorX="center" anchorY="middle" renderOrder={1} depthTest={false}>
+              <Text position={[0, 0, 0]} fontSize={0.038} color={antipodalColor} anchorX="center" anchorY="middle" renderOrder={2} depthTest={false}>
                 {stickerGridIdRef.current}
               </Text>
-              {/* Death rank at the base */}
-              <Text position={[0, -0.09, 0.006]} fontSize={0.062} color={origColor} anchorX="center" anchorY="middle" fontWeight={700} renderOrder={1} depthTest={false}>
+              <Text position={[0, -0.13, 0]} fontSize={0.062} color={antipodalColor} anchorX="center" anchorY="middle" fontWeight={700} renderOrder={2} depthTest={false}>
                 #{deadRank}
               </Text>
-            </>
+            </Billboard>
           )}
+          {/* Ghost worms orbit mid-tombstone height */}
+          <TombstoneGhost />
         </group>
       )}
 
