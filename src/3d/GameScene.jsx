@@ -262,8 +262,8 @@ export default function GameScene({
         )}
       </Suspense>
 
-      {/* Antipodal PiP — always mounted (owns render loop when active) */}
-      <AntipodalPiP enabled={!!showAntipodalPiP} />
+      {/* Antipodal PiP — only mounted when active so R3F auto-render stays live when off */}
+      {showAntipodalPiP && <AntipodalPiP />}
     </>
   );
 }

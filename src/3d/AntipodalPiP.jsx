@@ -3,15 +3,17 @@
  * AntipodalPiP — Picture-in-Picture second camera view.
  *
  * Renders the scene from the antipodal position of the main camera
- * (i.e. camera.position negated through the origin) into a scissored
- * viewport region in the top-left corner of the canvas.
+ * (negated through the origin) into a scissored viewport in the top-left.
  *
- * Because this component uses useFrame with priority 1, R3F's auto-render
- * is disabled and this component takes over the full render loop — calling
- * gl.render() for both the main view and the PiP overlay every frame.
+ * Mount/unmount strategy: this component is only rendered when the PiP is
+ * enabled. Keeping it always mounted (with priority 1) would suppress R3F's
+ * auto-render even when the PiP is off, breaking touch-event raycasting on
+ * mobile. By conditionally mounting, R3F resumes its own render loop when
+ * the PiP is hidden.
  *
- * Coordinate note: Three.js scissor/viewport use bottom-left origin,
- * the inverse of CSS (top-left origin). The math below compensates.
+ * Coordinate note: Three.js setViewport/setScissor accept CSS pixels and
+ * multiply by pixelRatio internally. DO NOT pre-multiply by dpr — pass
+ * logical CSS values only.
  */
 
 import { useRef, useEffect } from 'react';
@@ -22,13 +24,19 @@ import { PerspectiveCamera } from 'three';
 const PIP_W = 240;
 const PIP_H = 180;
 const PIP_MARGIN_LEFT = 8;
-const PIP_MARGIN_TOP = 56; // 48px top-bar + 8px gap
+const PIP_GAP = 8; // gap below the top bar
 
-export default function AntipodalPiP({ enabled }) {
+// Top-bar height varies by viewport size — must match App.css breakpoints
+function getTopBarHeight() {
+  if (typeof window === 'undefined') return 56;
+  if (window.matchMedia('(max-height: 500px) and (orientation: landscape)').matches) return 36;
+  if (window.matchMedia('(max-width: 768px)').matches) return 44;
+  return 56;
+}
+
+export default function AntipodalPiP() {
   const { camera } = useThree();
   const pipCamRef = useRef(null);
-  const enabledRef = useRef(enabled);
-  enabledRef.current = enabled;
 
   // Create the antipodal PerspectiveCamera once, matching main camera FOV
   useEffect(() => {
@@ -41,57 +49,46 @@ export default function AntipodalPiP({ enabled }) {
     pipCamRef.current = cam;
   }, [camera.fov, camera.near, camera.far]);
 
-  // Priority 1 — disables R3F auto-render; we drive both passes manually
+  // Priority 1 — disables R3F auto-render; this component drives both passes.
+  // Only mounted when PiP is enabled, so R3F resumes auto-render when hidden.
   useFrame(({ gl, scene, camera: mainCam }) => {
     const pipCam = pipCamRef.current;
+    if (!pipCam) return;
+
+    // Canvas size in CSS pixels (Three.js setViewport/setScissor expect CSS px)
     const dpr = gl.getPixelRatio();
-    const cW = gl.domElement.width;
-    const cH = gl.domElement.height;
+    const cssW = gl.domElement.width / dpr;
+    const cssH = gl.domElement.height / dpr;
 
-    if (!enabledRef.current || !pipCam) {
-      // PiP off — just do the normal main render
-      gl.autoClear = true;
-      gl.setViewport(0, 0, cW, cH);
-      gl.setScissorTest(false);
-      gl.render(scene, mainCam);
-      return;
-    }
-
-    // ── 1. Main render — full viewport ──────────────────────────────────────
+    // ── 1. Main render — full canvas ─────────────────────────────────────────
     gl.autoClear = true;
     gl.setScissorTest(false);
-    gl.setViewport(0, 0, cW, cH);
+    gl.setViewport(0, 0, cssW, cssH);
     gl.render(scene, mainCam);
 
-    // ── 2. PiP render — antipodal camera into scissored region ─────────────
-    // Position antipodal camera: negate main camera position through origin
-    pipCam.position.set(
-      -mainCam.position.x,
-      -mainCam.position.y,
-      -mainCam.position.z
-    );
+    // ── 2. PiP render — antipodal camera into scissored region ───────────────
+    pipCam.position.set(-mainCam.position.x, -mainCam.position.y, -mainCam.position.z);
     pipCam.lookAt(0, 0, 0);
     pipCam.fov = mainCam.fov;
     pipCam.updateProjectionMatrix();
 
-    // Convert CSS pixel region to physical pixels (WebGL bottom-left origin)
-    const pipW = Math.floor(PIP_W * dpr);
-    const pipH = Math.floor(PIP_H * dpr);
-    const x = Math.floor(PIP_MARGIN_LEFT * dpr);
-    // In WebGL: y=0 is bottom, so top-left CSS maps to (x, cH - cssTop - cssH)
-    const y = Math.floor(cH - PIP_MARGIN_TOP * dpr - pipH);
+    // Y is from canvas bottom (GL convention). Top-bar height varies by breakpoint.
+    const topBarH = getTopBarHeight();
+    const pipTop = topBarH + PIP_GAP; // CSS px from canvas top
+    const x = PIP_MARGIN_LEFT;
+    const y = cssH - pipTop - PIP_H; // CSS px from canvas bottom
 
     gl.autoClear = false;
     gl.setScissorTest(true);
-    gl.setScissor(x, y, pipW, pipH);
-    gl.setViewport(x, y, pipW, pipH);
+    gl.setScissor(x, y, PIP_W, PIP_H);
+    gl.setViewport(x, y, PIP_W, PIP_H);
     gl.clearDepth();
     gl.render(scene, pipCam);
 
-    // ── Restore state ───────────────────────────────────────────────────────
+    // ── Restore ───────────────────────────────────────────────────────────────
     gl.setScissorTest(false);
     gl.autoClear = true;
-    gl.setViewport(0, 0, cW, cH);
+    gl.setViewport(0, 0, cssW, cssH);
   }, 1);
 
   return null;
