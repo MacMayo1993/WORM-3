@@ -106,20 +106,15 @@ const faceValue = (dirKey, x, y, z, size) => {
 const Cubie = React.forwardRef(function Cubie({
   position, cubie, size, onPointerDown,
 }, ref) {
-  const { hollowMode, mirrorMode, visualMode, explosionFactor, settings, wormPhase } = useGameStore(
+  const { hollowMode, mirrorMode, visualMode, explosionFactor, settings } = useGameStore(
     useShallow(s => ({
       hollowMode: s.hollowMode,
       mirrorMode: s.mirrorMode,
       visualMode: s.visualMode,
       explosionFactor: s.explosionT,
       settings: s.settings,
-      wormPhase: s.wormPhase,
     }))
   );
-  // During wormhole animation, hide the cube body so antipodal tunnels are visible
-  // inside. Using visible={false} instead of transparency avoids the per-frame
-  // transparent-object sort and eliminates WebGL material churn on every tunnel enter/exit.
-  const isWormGlassPhase = wormPhase === 'entering' || wormPhase === 'tunnel' || wormPhase === 'exiting';
   // faceColors needed locally for wireframe edge coloring
   const faceColors = useMemo(() => resolveColors(settings, settings?.biomeMode?.faceAssignment), [settings]);
   const isEdge = (p, v) => Math.abs(p - v) < 0.01;
@@ -335,14 +330,14 @@ const Cubie = React.forwardRef(function Cubie({
 
           {/* 12 edge beams forming a hollow cube frame */}
           {HOLLOW_EDGES.map((edge, idx) => (
-            <mesh key={idx} position={edge.pos} visible={!isWormGlassPhase} castShadow receiveShadow>
+            <mesh key={idx} position={edge.pos} castShadow receiveShadow>
               <boxGeometry args={BEAM_DIMS[edge.geo]} />
               <primitive object={getHollowBeamMaterial(visualMode)} attach="material" />
             </mesh>
           ))}
         </>
       ) : (
-        <RoundedBox args={[0.98, 0.98, 0.98]} radius={0.08} smoothness={4} visible={!isWormGlassPhase} onPointerDown={handleDown} castShadow receiveShadow>
+        <RoundedBox args={[0.98, 0.98, 0.98]} radius={0.08} smoothness={4} onPointerDown={handleDown} castShadow receiveShadow>
           <meshStandardMaterial
             color={visualMode === 'wireframe' ? "#000000" : visualMode === 'glass' ? "#111111" : "#0a0a0a"}
             roughness={visualMode === 'wireframe' ? 0.9 : visualMode === 'glass' ? 0.05 : 0.25}

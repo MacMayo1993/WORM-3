@@ -124,6 +124,7 @@ function useWormCrawler(size, cubies) {
     const phase = useRef('crawling');
     const tunnelProgress = useRef(0);
     const activeTunnel = useRef(null);
+    const prevVisualModeRef = useRef('classic');
     const stepAcc = useRef(0);
     const pendingTurn = useRef(null);
     const onFlippedTile = useRef(false);
@@ -200,7 +201,9 @@ function useWormCrawler(size, cubies) {
         phase.current = 'entering';
         onFlippedTile.current = false;
         lastFlippedRef.current = false;
-        useGameStore.setState({ wormPhase: 'entering', wormOnFlippedTile: false });
+        const prevVisualMode = useGameStore.getState().visualMode;
+        prevVisualModeRef.current = prevVisualMode;
+        useGameStore.setState({ wormPhase: 'entering', wormOnFlippedTile: false, visualMode: 'glass' });
     }, [cubies, size]);
 
     const tileKey = (p) => `${p.x},${p.y},${p.z},${p.dirKey}`;
@@ -482,10 +485,9 @@ function useWormCrawler(size, cubies) {
                 tunnelProgress.current = 0;
                 activeTunnel.current = null;
                 phase.current = 'crawling';
-                useGameStore.getState().setWormPhase('crawling');
+                useGameStore.setState({ wormPhase: 'crawling', wormOnFlippedTile: false, visualMode: prevVisualModeRef.current ?? 'classic' });
                 onFlippedTile.current = false;
                 lastFlippedRef.current = false;
-                useGameStore.getState().setWormOnFlippedTile(false);
                 healedRef.current += 1;
                 useGameStore.getState().setWormHealedCount(healedRef.current);
             }
