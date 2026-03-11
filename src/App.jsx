@@ -523,6 +523,10 @@ export default function WORM3() {
     // Atomic init — clears disparity fields AND sets wormHealerMode:true in a single
     // Zustand set() so nothing can clobber it between calls.
     useGameStore.getState().clearLevel();
+    useGameStore.getState().setWormSpeed(wizardSettings.wormSpeed ?? 1.0);
+    useGameStore.getState().setWormOrbCount(wizardSettings.wormOrbCount ?? 5);
+    useGameStore.getState().setWormholeInterval(wizardSettings.wormholeInterval ?? 10);
+    useGameStore.getState().setWormColor(wizardSettings.wormColor ?? '#33ff66');
     useGameStore.getState().initWormMode();
 
     // Resize / reset cube AFTER worm mode is established

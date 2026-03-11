@@ -57,13 +57,14 @@ const INITIAL_POS = (size) => {
 };
 
 // ─── Powerup helpers ─────────────────────────────────────────────────────────
-const POWERUP_COUNT = 5;
+const DEFAULT_POWERUP_COUNT = 5;
 const ORB_SEGMENT_GROWTH = 2;   // every orb adds exactly 2 visual balls
 const STEPS_PER_TILE = 50;      // sub-steps recorded per tile (0.02 resolution)
 const BODY_BALL_SPACING = 0.14; // matches WormBody clone spacing along the trail
 const BASE_TAIL_LENGTH = 4;
-const WORMHOLE_FLIP_INTERVAL = 10; // seconds between guaranteed antipodal wormhole spawns
+const DEFAULT_WORMHOLE_FLIP_INTERVAL = 10; // seconds between guaranteed antipodal wormhole spawns
 const MAX_JUMPS = 2;
+const MAX_POWERUP_RENDER = 24;
 const TUNNEL_TRIGGER_PROGRESS = 1 / 3;
 const SELF_COLLISION_TRIGGER_PROGRESS = 0.4;
 
@@ -114,9 +115,11 @@ function randomUnflippedTile(cubies, size, exclude = []) {
 const MAX_TAIL = 1200;
 
 function useWormCrawler(size, cubies) {
-    const wormSpeed = useGameStore(s => s.wormSpeed ?? 0.4);
+    const wormSpeed = useGameStore(s => s.wormSpeed ?? 1.0);
     const wormControlMode = useGameStore(s => s.wormControlMode ?? 'non-oriented');
     const wormRunId = useGameStore(s => s.wormRunId ?? 0);
+    const wormOrbCount = useGameStore(s => s.wormOrbCount ?? DEFAULT_POWERUP_COUNT);
+    const wormholeInterval = useGameStore(s => s.wormholeInterval ?? DEFAULT_WORMHOLE_FLIP_INTERVAL);
     const healedRef = useRef(0);
 
     const pos = useRef(INITIAL_POS(size));
@@ -126,7 +129,7 @@ function useWormCrawler(size, cubies) {
     const activeTunnel = useRef(null);
     const prevVisualModeRef = useRef('classic');
     const stepAcc = useRef(0);
-    const pendingTurn = useRef(null);
+    const pendingTurns = useRef([]);
     const onFlippedTile = useRef(false);
     const lastFlippedRef = useRef(false);
     const prevDirKey = useRef(null);
@@ -153,7 +156,7 @@ function useWormCrawler(size, cubies) {
     const tailLength = useRef(BASE_TAIL_LENGTH);
     const powerupsRef = useRef([]);  // local fast-access copy of wormPowerups
     const stepHistory = useRef([]);  // one world-pos per tile step, used by WormBody
-    const wormholeTimer = useRef(WORMHOLE_FLIP_INTERVAL);
+    const wormholeTimer = useRef(DEFAULT_WORMHOLE_FLIP_INTERVAL);
     const lastCountdownDeci = useRef(-1);
     const alive = useRef(true);
     const tileTrail = useRef([]);
@@ -259,7 +262,7 @@ function useWormCrawler(size, cubies) {
         wormholeTimer.current -= delta;
         if (wormholeTimer.current <= 0) {
             spawnWormholePair();
-            wormholeTimer.current = WORMHOLE_FLIP_INTERVAL;
+            wormholeTimer.current = wormholeInterval;
         }
         const countdown = Math.max(0, Math.ceil(wormholeTimer.current * 10) / 10);
         const countdownDeci = Math.round(countdown * 10);
@@ -281,8 +284,8 @@ function useWormCrawler(size, cubies) {
 
         if (phase.current === 'crawling') {
             // Apply pending turn — RELATIVE to current heading
-            if (pendingTurn.current) {
-                const t = pendingTurn.current;
+            if (pendingTurns.current.length > 0) {
+                const t = pendingTurns.current.shift();
                 if (t === 'jump') {
                     startJump();
                 } else if (wormControlMode === 'oriented') {
@@ -295,7 +298,6 @@ function useWormCrawler(size, cubies) {
                     }
                     if (t === 'down') moveDir.current = turnWorm(turnWorm(moveDir.current, 'left'), 'left');
                 }
-                pendingTurn.current = null;
             }
 
             // Advance interpolation
@@ -492,17 +494,21 @@ function useWormCrawler(size, cubies) {
                 useGameStore.getState().setWormHealedCount(healedRef.current);
             }
         }
-    }, [size, cubies, wormSpeed, wormControlMode]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [size, cubies, wormSpeed, wormControlMode, wormholeInterval]); // eslint-disable-line react-hooks/exhaustive-deps
 
 
 
-    const queueTurn = useCallback((dir) => { pendingTurn.current = dir; }, []);
+    const queueTurn = useCallback((dir) => {
+        const q = pendingTurns.current;
+        if (q.length >= 3) q.shift();
+        if (q[q.length - 1] !== dir) q.push(dir);
+    }, []);
 
     // Spawn initial powerups once on mount
     useEffect(() => {
         const initial = [];
         const startPos = INITIAL_POS(size);
-        for (let i = 0; i < POWERUP_COUNT; i++) {
+        for (let i = 0; i < wormOrbCount; i++) {
             initial.push({ ...randomFreeTile(size, [...initial, startPos]), type: 'apple' });
         }
 
@@ -513,7 +519,7 @@ function useWormCrawler(size, cubies) {
         tunnelProgress.current = 0;
         activeTunnel.current = null;
         stepAcc.current = 0;
-        pendingTurn.current = null;
+        pendingTurns.current = [];
         onFlippedTile.current = false;
         lastFlippedRef.current = false;
         prevDirKey.current = null;
@@ -540,16 +546,16 @@ function useWormCrawler(size, cubies) {
             wormPowerups: initial,
             wormBodyTiles: 0,
             wormHealedCount: 0,
-            wormholeCountdown: WORMHOLE_FLIP_INTERVAL,
+            wormholeCountdown: wormholeInterval,
             wormAlive: true,
             showWormDeathMenu: false,
             wormDeathDetails: null,
             wormPhase: 'crawling',
             wormOnFlippedTile: false,
         });
-        wormholeTimer.current = WORMHOLE_FLIP_INTERVAL;
-        lastCountdownDeci.current = Math.round(WORMHOLE_FLIP_INTERVAL * 10);
-    }, [size, wormRunId]);
+        wormholeTimer.current = wormholeInterval;
+        lastCountdownDeci.current = Math.round(wormholeInterval * 10);
+    }, [size, wormRunId, wormOrbCount, wormholeInterval]);
 
     useEffect(() => () => {
         if (deathMenuTimer.current) {
@@ -825,6 +831,7 @@ function WormSwipeControls({ onTurn, worm }) {
             }
         };
         const onKey = (e) => {
+            if (e.repeat && e.key !== ' ') return;
             if (e.key === 'ArrowLeft') { e.preventDefault(); emitDirection('left'); }
             if (e.key === 'ArrowRight') { e.preventDefault(); emitDirection('right'); }
             if (e.key === 'ArrowDown') { e.preventDefault(); emitDirection('down'); }
@@ -852,6 +859,7 @@ const _wormDummy = new THREE.Object3D();
 
 function WormBody({ worm }) {
     const meshRef = useRef();
+    const wormColor = useGameStore(s => s.wormColor ?? '#33ff66');
 
     useFrame((state) => {
         // Pull mathematically exact physics track for the head including the edge rolling arc
@@ -946,7 +954,7 @@ function WormBody({ worm }) {
     return (
         <instancedMesh ref={meshRef} args={[undefined, undefined, MAX_TAIL]} frustumCulled={false}>
             <sphereGeometry args={[1, 12, 12]} />
-            <meshStandardMaterial emissive="#33ff66" emissiveIntensity={0.8} />
+            <meshStandardMaterial color={wormColor} emissive={wormColor} emissiveIntensity={0.8} />
         </instancedMesh>
     );
 }
@@ -1057,6 +1065,7 @@ function WormFace({ worm, size }) {
 // ─── Powerup Orbs ─────────────────────────────────────────────────────────────
 function PowerupOrbs({ size }) {
     const groupRef = useRef();
+    const wormColor = useGameStore(s => s.wormColor ?? '#22ff88');
 
     useFrame(() => {
         const powerups = useGameStore.getState().wormPowerups;
@@ -1081,10 +1090,10 @@ function PowerupOrbs({ size }) {
 
     return (
         <group ref={groupRef}>
-            {Array.from({ length: POWERUP_COUNT }).map((_, i) => (
+            {Array.from({ length: MAX_POWERUP_RENDER }).map((_, i) => (
                 <mesh key={i}>
                     <icosahedronGeometry args={[1, 0]} />
-                    <meshStandardMaterial color="#22ff88" emissive="#22ff88" emissiveIntensity={1.2} />
+                    <meshStandardMaterial color={wormColor} emissive={wormColor} emissiveIntensity={1.2} />
                 </mesh>
             ))}
         </group>

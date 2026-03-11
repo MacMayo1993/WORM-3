@@ -250,6 +250,12 @@ export const useGameStore = create(
     wormRunId: 0,
     wormSpeed: 1.0,
     setWormSpeed: (v) => set({ wormSpeed: v }),
+    wormOrbCount: 5,
+    setWormOrbCount: (v) => set({ wormOrbCount: Math.max(1, Math.min(24, Math.round(v))) }),
+    wormholeInterval: 10,
+    setWormholeInterval: (v) => set({ wormholeInterval: Math.max(2, Math.min(30, Number(v))) }),
+    wormColor: '#33ff66',
+    setWormColor: (v) => set({ wormColor: v || '#33ff66' }),
     wormControlMode: 'non-oriented', // 'non-oriented' (relative turns) | 'oriented' (camera-relative)
     setWormControlMode: (v) => set({ wormControlMode: v }),
     toggleWormControlMode: () => set((state) => ({
