@@ -1249,7 +1249,8 @@ const _tapeYellow = new THREE.Color('#ffe000');
 const _tapeBlack = new THREE.Color('#111111');
 const BUBBLES_PER_VOID = 5;          // rising gas bubbles per dead portal
 const SPARKS_PER_CRITICAL = 7;
-const TAPE_SEGMENTS_PER_TILE = 8;
+const POLES_PER_TILE = 4;
+const TAPES_PER_TILE = 4;
 const FRAME_SEGMENTS_PER_VOID = 4;
 
 function WormholeRings({ cubies, size, voidTunnelKeysRef, tunnelUseCountsRef }) {
@@ -1258,13 +1259,34 @@ function WormholeRings({ cubies, size, voidTunnelKeysRef, tunnelUseCountsRef }) 
     const voidInnerRef = useRef();  // void inner ring (near-black, counter-rotating)
     const bubblesRef = useRef();    // void swamp gas rising from dead portals
     const sparkRef = useRef();      // warning electricity when tunnel is one trip from void
-    const cautionRef = useRef();    // caution tape fence around dangerous portals
+    const poleRef = useRef();       // caution poles
+    const tapeRef = useRef();       // caution tape strips
     const voidFrameRef = useRef();  // bright square frame on fully voided tiles
+
+    const cautionTexture = React.useMemo(() => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 64;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffe000';
+        ctx.fillRect(0, 0, 512, 64);
+        ctx.fillStyle = '#111111';
+        ctx.font = 'bold 44px "Arial Black", Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('CAUTION', 256, 36);
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.wrapS = THREE.RepeatWrapping;
+        tex.wrapT = THREE.RepeatWrapping;
+        tex.repeat.set(3, 1);
+        tex.colorSpace = THREE.SRGBColorSpace;
+        return tex;
+    }, []);
 
     // Stable random seeds per (position × bubble) slot — no per-frame allocation
     const MAX_RINGS = 6 * size * size;
     const bubbleSeeds = React.useMemo(() => {
-        const s = new Float32Array(MAX_RINGS * Math.max(BUBBLES_PER_VOID, SPARKS_PER_CRITICAL, TAPE_SEGMENTS_PER_TILE) * 3);
+        const s = new Float32Array(MAX_RINGS * Math.max(BUBBLES_PER_VOID, SPARKS_PER_CRITICAL, Math.max(POLES_PER_TILE, TAPES_PER_TILE)) * 3);
         for (let i = 0; i < s.length / 3; i++) {
             s[i * 3]     = (Math.random() - 0.5) * 0.18; // lateral x jitter
             s[i * 3 + 1] = (Math.random() - 0.5) * 0.18; // lateral y jitter
@@ -1323,9 +1345,10 @@ function WormholeRings({ cubies, size, voidTunnelKeysRef, tunnelUseCountsRef }) 
         const voidInner = voidInnerRef.current;
         const bubbles = bubblesRef.current;
         const sparks = sparkRef.current;
-        const caution = cautionRef.current;
+        const poles = poleRef.current;
+        const tapes = tapeRef.current;
         const voidFrames = voidFrameRef.current;
-        if (!liveMesh || !voidOuter || !voidInner || !bubbles || !sparks || !caution || !voidFrames) return;
+        if (!liveMesh || !voidOuter || !voidInner || !bubbles || !sparks || !poles || !tapes || !voidFrames) return;
 
         const t = clock.elapsedTime;
         const voidKeys = voidTunnelKeysRef?.current ?? new Set();
@@ -1335,7 +1358,8 @@ function WormholeRings({ cubies, size, voidTunnelKeysRef, tunnelUseCountsRef }) 
         let voidIdx = 0;
         let bubbleIdx = 0;
         let sparkIdx = 0;
-        let cautionIdx = 0;
+        let poleIdx = 0;
+        let tapeIdx = 0;
         let frameIdx = 0;
 
         for (let i = 0; i < allPositions.length; i++) {
@@ -1438,25 +1462,101 @@ function WormholeRings({ cubies, size, voidTunnelKeysRef, tunnelUseCountsRef }) 
                 if (_tapeRight.lengthSq() < 1e-4) _tapeRight.set(1, 0, 0);
                 _tapeRight.normalize();
                 _tapeForward.crossVectors(n, _tapeRight).normalize();
-                for (let ti = 0; ti < TAPE_SEGMENTS_PER_TILE && cautionIdx < caution.count; ti++) {
-                    const si = (i * TAPE_SEGMENTS_PER_TILE + ti) * 3;
-                    const a = (ti / TAPE_SEGMENTS_PER_TILE) * Math.PI * 2 + t * 0.35;
-                    const perimeter = 0.50;
-                    const sag = Math.sin(t * 2.2 + ti * 1.7 + bubbleSeeds[si + 2] * Math.PI * 2) * 0.02;
-                    const px = Math.cos(a) * perimeter;
-                    const py = Math.sin(a) * perimeter;
+                
+                const half = 0.45;
+                const corners = [
+                    [half, half],
+                    [half, -half],
+                    [-half, -half],
+                    [-half, half]
+                ];
+                
+                for (let c = 0; c < 4 && poleIdx < poles.count; c++) {
+                    const cx = corners[c][0];
+                    const cy = corners[c][1];
                     _cautionDummy.position.set(
-                        wp[0] + _tapeRight.x * px + _tapeForward.x * py + n.x * (0.14 + sag),
-                        wp[1] + _tapeRight.y * px + _tapeForward.y * py + n.y * (0.14 + sag),
-                        wp[2] + _tapeRight.z * px + _tapeForward.z * py + n.z * (0.14 + sag)
+                        wp[0] + _tapeRight.x * cx + _tapeForward.x * cy + n.x * 0.2,
+                        wp[1] + _tapeRight.y * cx + _tapeForward.y * cy + n.y * 0.2,
+                        wp[2] + _tapeRight.z * cx + _tapeForward.z * cy + n.z * 0.2
                     );
                     _cautionDummy.quaternion.setFromUnitVectors(_voidArcAxisY, n);
-                    _cautionDummy.rotateOnAxis(n, a + Math.PI * 0.5);
-                    _cautionDummy.scale.set(0.045, 0.42, 0.012);
+                    _cautionDummy.scale.set(1, 1, 1);
                     _cautionDummy.updateMatrix();
-                    caution.setMatrixAt(cautionIdx, _cautionDummy.matrix);
-                    caution.setColorAt(cautionIdx, (ti % 2 === 0) ? _tapeYellow : _tapeBlack);
-                    cautionIdx++;
+                    poles.setMatrixAt(poleIdx++, _cautionDummy.matrix);
+                }
+                
+                const poleHeight = 0.4;
+                const tapeWidth = 0.07;
+                // Place tapes near the top of the poles, slightly below the tip
+                const tapeLift = 0.2 + (poleHeight / 2) - (tapeWidth / 2) - 0.02;
+                
+                const loopT = t * 0.8 + i * 2.3;
+
+                for (let e = 0; e < 4 && tapeIdx < tapes.count; e++) {
+                    const si = (i * TAPES_PER_TILE + e) * 3;
+                    const c1 = corners[e];
+                    const c2 = corners[(e + 1) % 4];
+                    const mx = (c1[0] + c2[0]) / 2;
+                    const my = (c1[1] + c2[1]) / 2;
+                    
+                    const edgeVecX = c2[0] - c1[0];
+                    const edgeVecY = c2[1] - c1[1];
+                    const eD_x = _tapeRight.x * edgeVecX + _tapeForward.x * edgeVecY;
+                    const eD_y = _tapeRight.y * edgeVecX + _tapeForward.y * edgeVecY;
+                    const eD_z = _tapeRight.z * edgeVecX + _tapeForward.z * edgeVecY;
+                    const edgeDir = new THREE.Vector3(eD_x, eD_y, eD_z).normalize();
+                    
+                    // Background: A Three.js PlaneGeometry is created on the XY plane and faces +Z.
+                    // To hang like a fence around the perimeter:
+                    // Width (X-axis) should run along the edge: edgeDir
+                    // Height (Y-axis) should point UP relative to the cube surface: tapeUp
+                    // Normal (Z-axis) should point OUTWARD from the tile center: tapeNormal
+                    
+                    // The outward vector for this edge
+                    const outwardVecX = mx;
+                    const outwardVecY = my;
+                    const out_x = _tapeRight.x * outwardVecX + _tapeForward.x * outwardVecY;
+                    const out_y = _tapeRight.y * outwardVecX + _tapeForward.y * outwardVecY;
+                    const out_z = _tapeRight.z * outwardVecX + _tapeForward.z * outwardVecY;
+                    const outwardDir = new THREE.Vector3(out_x, out_y, out_z).normalize();
+                    
+                    // The UP vector is the surface normal 'n'
+                    // We want the tape to stand up like a fence, so its Y axis is 'n'
+                    const tapeUpVec = n.clone();
+                    
+                    // The OUTWARD normal of the tape is 'outwardDir'
+                    // We add flutter to it so the tape blows in the wind
+                    const flutter = Math.sin(loopT * 15 + e * 2.1) * 0.08;
+                    const tapeNormal = outwardDir.clone().addScaledVector(n, flutter).normalize();
+                    
+                    // Re-derive the exact edge direction that is perpendicular to both UP and NORMAL
+                    // to ensure an orthogonal basis
+                    const tapeRight = new THREE.Vector3().crossVectors(tapeUpVec, tapeNormal).normalize();
+                    
+                    // If tapeRight points opposite to edgeDir, flip it to keep texture orientation consistent
+                    if (tapeRight.dot(edgeDir) < 0) {
+                        tapeRight.negate();
+                        tapeNormal.negate(); // Flip normal too to keep right-handed coordinate system
+                    }
+                    
+                    // X = tapeRight (along edge), Y = tapeUpVec (height), Z = tapeNormal (outward)
+                    const m = new THREE.Matrix4().makeBasis(tapeRight, tapeUpVec, tapeNormal);
+                    
+                    // Tape spans from pole to pole. Distance between them is 0.9
+                    const tapeLength = 0.9;
+                    
+                    // Add slight downward sag in the middle of the tape
+                    const sag = Math.sin(loopT * 2 + e + bubbleSeeds[si + 2] * Math.PI * 2) * 0.015 - 0.015;
+                    _cautionDummy.position.set(
+                        wp[0] + _tapeRight.x * mx + _tapeForward.x * my + n.x * (tapeLift + sag),
+                        wp[1] + _tapeRight.y * mx + _tapeForward.y * my + n.y * (tapeLift + sag),
+                        wp[2] + _tapeRight.z * mx + _tapeForward.z * my + n.z * (tapeLift + sag)
+                    );
+                    _cautionDummy.quaternion.setFromRotationMatrix(m);
+                    // Scale X ensures it reaches exactly pole to pole
+                    _cautionDummy.scale.set(tapeLength, tapeWidth, 1);
+                    _cautionDummy.updateMatrix();
+                    tapes.setMatrixAt(tapeIdx++, _cautionDummy.matrix);
                 }
             }
 
@@ -1511,7 +1611,8 @@ function WormholeRings({ cubies, size, voidTunnelKeysRef, tunnelUseCountsRef }) 
         for (let i = sparkIdx; i < sparks.count; i++) sparks.setMatrixAt(i, _sparkDummy.matrix);
         _cautionDummy.scale.setScalar(0);
         _cautionDummy.updateMatrix();
-        for (let i = cautionIdx; i < caution.count; i++) caution.setMatrixAt(i, _cautionDummy.matrix);
+        for (let i = poleIdx; i < poles.count; i++) poles.setMatrixAt(i, _cautionDummy.matrix);
+        for (let i = tapeIdx; i < tapes.count; i++) tapes.setMatrixAt(i, _cautionDummy.matrix);
         _voidFrameDummy.scale.setScalar(0);
         _voidFrameDummy.updateMatrix();
         for (let i = frameIdx; i < voidFrames.count; i++) voidFrames.setMatrixAt(i, _voidFrameDummy.matrix);
@@ -1522,14 +1623,15 @@ function WormholeRings({ cubies, size, voidTunnelKeysRef, tunnelUseCountsRef }) 
         voidInner.instanceMatrix.needsUpdate = true;
         bubbles.instanceMatrix.needsUpdate = true;
         sparks.instanceMatrix.needsUpdate = true;
-        caution.instanceMatrix.needsUpdate = true;
-        if (caution.instanceColor) caution.instanceColor.needsUpdate = true;
+        poles.instanceMatrix.needsUpdate = true;
+        tapes.instanceMatrix.needsUpdate = true;
         voidFrames.instanceMatrix.needsUpdate = true;
     });
 
     const MAX_BUBBLES = MAX_RINGS * BUBBLES_PER_VOID;
     const MAX_SPARKS = MAX_RINGS * SPARKS_PER_CRITICAL;
-    const MAX_TAPE = MAX_RINGS * TAPE_SEGMENTS_PER_TILE;
+    const MAX_POLES = MAX_RINGS * POLES_PER_TILE;
+    const MAX_TAPES = MAX_RINGS * TAPES_PER_TILE;
     const MAX_VOID_FRAME_SEGMENTS = MAX_RINGS * FRAME_SEGMENTS_PER_VOID;
     return (
         <>
@@ -1563,10 +1665,16 @@ function WormholeRings({ cubies, size, voidTunnelKeysRef, tunnelUseCountsRef }) 
                 <meshBasicMaterial color={CRITICAL_ARC_COLOR} transparent opacity={0.88} blending={THREE.AdditiveBlending} depthWrite={false} />
             </instancedMesh>
 
-            {/* Caution fence — yellow/black tape draped around dangerous tiles */}
-            <instancedMesh ref={cautionRef} args={[undefined, undefined, MAX_TAPE]} frustumCulled={false}>
-                <boxGeometry args={[1, 1, 1]} />
-                <meshBasicMaterial color="#ffe000" vertexColors transparent opacity={0.98} depthWrite={false} />
+            {/* Caution poles */}
+            <instancedMesh ref={poleRef} args={[undefined, undefined, MAX_POLES]} frustumCulled={false}>
+                <cylinderGeometry args={[0.015, 0.015, 0.4, 8]} />
+                <meshBasicMaterial color="#111111" transparent opacity={0.98} depthWrite={false} />
+            </instancedMesh>
+
+            {/* Caution tape strips */}
+            <instancedMesh ref={tapeRef} args={[undefined, undefined, MAX_TAPES]} frustumCulled={false}>
+                <planeGeometry args={[1, 1]} />
+                <meshBasicMaterial map={cautionTexture} color="#ffffff" side={THREE.DoubleSide} transparent opacity={0.98} depthWrite={false} />
             </instancedMesh>
 
             {/* Void tile frame booster — brighter than neighbor tile frames */}
