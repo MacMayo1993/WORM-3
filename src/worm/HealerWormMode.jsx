@@ -1294,6 +1294,10 @@ const _canonicalTunnelKeyStr = (tunnel) => {
 const _ringDummy = new THREE.Object3D();
 const _ringUp = new THREE.Vector3();
 const _bubbleDummy = new THREE.Object3D();
+const _sparkDummy = new THREE.Object3D();
+const _voidArcAxisY = new THREE.Vector3(0, 1, 0);
+const _voidArcRight = new THREE.Vector3();
+const _voidArcForward = new THREE.Vector3();
 const _liveBaseColor = new THREE.Color('#ff44ff');
 const _liveColor = new THREE.Color();
 
@@ -1301,18 +1305,22 @@ const _liveColor = new THREE.Color();
 const VOID_OUTER_COLOR = '#b8b1ff';   // inverted-feel rim over dark tiles
 const VOID_INNER_COLOR = '#121a3b';   // cool inverted core
 const VOID_BUBBLE_COLOR = '#39ff14';  // neon green ooze
+const CRITICAL_ARC_COLOR = '#7dff2a';  // electrical warning before full void
+const _criticalArcColor = new THREE.Color(CRITICAL_ARC_COLOR);
 const BUBBLES_PER_VOID = 5;          // rising gas bubbles per dead portal
+const SPARKS_PER_CRITICAL = 7;
 
 function WormholeRings({ cubies, size, voidTunnelKeysRef, tunnelUseCountsRef }) {
     const liveRef = useRef();       // live wormhole rings (neon pink)
     const voidOuterRef = useRef();  // void outer ring (sickly green, slow reverse)
     const voidInnerRef = useRef();  // void inner ring (near-black, counter-rotating)
     const bubblesRef = useRef();    // void swamp gas rising from dead portals
+    const sparkRef = useRef();      // warning electricity when tunnel is one trip from void
 
     // Stable random seeds per (position × bubble) slot — no per-frame allocation
     const MAX_RINGS = 6 * size * size;
     const bubbleSeeds = React.useMemo(() => {
-        const s = new Float32Array(MAX_RINGS * BUBBLES_PER_VOID * 3);
+        const s = new Float32Array(MAX_RINGS * Math.max(BUBBLES_PER_VOID, SPARKS_PER_CRITICAL) * 3);
         for (let i = 0; i < s.length / 3; i++) {
             s[i * 3]     = (Math.random() - 0.5) * 0.18; // lateral x jitter
             s[i * 3 + 1] = (Math.random() - 0.5) * 0.18; // lateral y jitter
@@ -1370,7 +1378,8 @@ function WormholeRings({ cubies, size, voidTunnelKeysRef, tunnelUseCountsRef }) 
         const voidOuter = voidOuterRef.current;
         const voidInner = voidInnerRef.current;
         const bubbles = bubblesRef.current;
-        if (!liveMesh || !voidOuter || !voidInner || !bubbles) return;
+        const sparks = sparkRef.current;
+        if (!liveMesh || !voidOuter || !voidInner || !bubbles || !sparks) return;
 
         const t = clock.elapsedTime;
         const voidKeys = voidTunnelKeysRef?.current ?? new Set();
@@ -1379,6 +1388,7 @@ function WormholeRings({ cubies, size, voidTunnelKeysRef, tunnelUseCountsRef }) 
         let liveIdx = 0;
         let voidIdx = 0;
         let bubbleIdx = 0;
+        let sparkIdx = 0;
 
         for (let i = 0; i < allPositions.length; i++) {
             const { x, y, z, dirKey, tunnelKey } = allPositions[i];
@@ -1429,12 +1439,13 @@ function WormholeRings({ cubies, size, voidTunnelKeysRef, tunnelUseCountsRef }) 
 
                 voidIdx++;
             } else {
-                // ── Live wormhole ring — gains intensity each use (0/1/2) ───
+                // ── Live wormhole ring — gets severe warning at 3rd traversal ─
                 const traversals = tunnelKey ? (useCounts.get(tunnelKey) ?? 0) : 0;
-                const intensityTier = Math.min(Math.max(traversals, 0), Math.max(0, WORMHOLE_MAX_TRAVERSALS - 1));
-                const speedMul = 1 + (intensityTier * 0.25);
-                const glowMul = 1 + (intensityTier * 0.25);
-                const wobble = Math.sin(t * (9.0 * speedMul) + i * 1.4) * (0.03 * intensityTier);
+                const intensityTier = Math.min(Math.max(traversals, 0), WORMHOLE_MAX_TRAVERSALS);
+                const isCritical = traversals >= WORMHOLE_MAX_TRAVERSALS;
+                const speedMul = 1 + (intensityTier * 0.35) + (isCritical ? 0.55 : 0);
+                const glowMul = 1 + (intensityTier * 0.35) + (isCritical ? 0.75 : 0);
+                const wobble = Math.sin(t * (9.0 * speedMul) + i * 1.4) * (0.03 + 0.03 * intensityTier);
                 _ringDummy.position.set(wp[0], wp[1], wp[2]).addScaledVector(n, 0.08 + wobble);
                 _ringDummy.quaternion.setFromUnitVectors(_ringUp, n);
                 _ringDummy.rotateOnAxis(n, t * (2.1 * speedMul) + i * 0.9);
@@ -1442,9 +1453,36 @@ function WormholeRings({ cubies, size, voidTunnelKeysRef, tunnelUseCountsRef }) 
                 _ringDummy.scale.setScalar(pulse);
                 _ringDummy.updateMatrix();
                 liveMesh.setMatrixAt(liveIdx, _ringDummy.matrix);
-                _liveColor.copy(_liveBaseColor).multiplyScalar(glowMul);
+                _liveColor.copy(_liveBaseColor).lerp(_criticalArcColor, isCritical ? 0.45 : 0).multiplyScalar(glowMul);
                 liveMesh.setColorAt(liveIdx, _liveColor);
                 liveIdx++;
+
+                if (isCritical) {
+                    _voidArcRight.crossVectors(n, _voidArcAxisY);
+                    if (_voidArcRight.lengthSq() < 1e-4) _voidArcRight.set(1, 0, 0);
+                    _voidArcRight.normalize();
+                    _voidArcForward.crossVectors(n, _voidArcRight).normalize();
+                    for (let sp = 0; sp < SPARKS_PER_CRITICAL && sparkIdx < sparks.count; sp++) {
+                        const si = (i * SPARKS_PER_CRITICAL + sp) * 3;
+                        const phase = (t * (2.5 + sp * 0.15) + bubbleSeeds[si + 2]) % 1;
+                        const radial = 0.08 + Math.sin(phase * Math.PI * 2 + sp) * 0.035;
+                        const lift = 0.18 + phase * 0.95;
+                        const thickness = 0.010 + Math.sin(phase * Math.PI) * 0.010;
+                        const height = 0.10 + Math.sin(phase * Math.PI) * 0.28;
+
+                        _sparkDummy.position.set(
+                            wp[0] + n.x * lift + _voidArcRight.x * radial + _voidArcForward.x * bubbleSeeds[si] * 0.12,
+                            wp[1] + n.y * lift + _voidArcRight.y * radial + _voidArcForward.y * bubbleSeeds[si + 1] * 0.12,
+                            wp[2] + n.z * lift + _voidArcRight.z * radial + _voidArcForward.z * bubbleSeeds[si] * 0.12
+                        );
+                        _sparkDummy.quaternion.setFromUnitVectors(_voidArcAxisY, n);
+                        _sparkDummy.rotateOnAxis(n, phase * Math.PI * 8 + sp * 0.9);
+                        _sparkDummy.scale.set(thickness, height, thickness);
+                        _sparkDummy.updateMatrix();
+                        sparks.setMatrixAt(sparkIdx, _sparkDummy.matrix);
+                        sparkIdx++;
+                    }
+                }
             }
         }
 
@@ -1460,15 +1498,20 @@ function WormholeRings({ cubies, size, voidTunnelKeysRef, tunnelUseCountsRef }) 
         _bubbleDummy.scale.setScalar(0);
         _bubbleDummy.updateMatrix();
         for (let i = bubbleIdx; i < bubbles.count; i++) bubbles.setMatrixAt(i, _bubbleDummy.matrix);
+        _sparkDummy.scale.setScalar(0);
+        _sparkDummy.updateMatrix();
+        for (let i = sparkIdx; i < sparks.count; i++) sparks.setMatrixAt(i, _sparkDummy.matrix);
 
         liveMesh.instanceMatrix.needsUpdate = true;
         if (liveMesh.instanceColor) liveMesh.instanceColor.needsUpdate = true;
         voidOuter.instanceMatrix.needsUpdate = true;
         voidInner.instanceMatrix.needsUpdate = true;
         bubbles.instanceMatrix.needsUpdate = true;
+        sparks.instanceMatrix.needsUpdate = true;
     });
 
     const MAX_BUBBLES = MAX_RINGS * BUBBLES_PER_VOID;
+    const MAX_SPARKS = MAX_RINGS * SPARKS_PER_CRITICAL;
     return (
         <>
             {/* Live wormhole rings — bright neon pink, fast spin */}
@@ -1493,6 +1536,12 @@ function WormholeRings({ cubies, size, voidTunnelKeysRef, tunnelUseCountsRef }) 
             <instancedMesh ref={bubblesRef} args={[undefined, undefined, MAX_BUBBLES]} frustumCulled={false}>
                 <sphereGeometry args={[1, 5, 5]} />
                 <meshBasicMaterial color={VOID_BUBBLE_COLOR} transparent opacity={0.78} blending={THREE.AdditiveBlending} depthWrite={false} />
+            </instancedMesh>
+
+            {/* Critical escape arcs — electricity venting from near-void portals */}
+            <instancedMesh ref={sparkRef} args={[undefined, undefined, MAX_SPARKS]} frustumCulled={false}>
+                <cylinderGeometry args={[1, 1, 1, 5]} />
+                <meshBasicMaterial color={CRITICAL_ARC_COLOR} transparent opacity={0.88} blending={THREE.AdditiveBlending} depthWrite={false} />
             </instancedMesh>
         </>
     );
