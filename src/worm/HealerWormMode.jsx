@@ -268,8 +268,13 @@ function useWormCrawler(size, cubies) {
         const nextTraversals = traversals + 1;
         tunnelUseCountsRef.current.set(tunnelKey, nextTraversals);
         if (nextTraversals >= WORMHOLE_MAX_TRAVERSALS) {
-            voidTunnelKeysRef.current.add(tunnelKey);
-            pendingVoidKillRef.current = tunnelKey;
+            // Arm the tunnel to become void only after the worm fully exits this traversal.
+            // This prevents "inside tunnel" deaths on the final pass.
+            pendingVoidKillRef.current = {
+                tunnelKey,
+                exitTileKey: tileKey(tunnel.exit),
+                armed: false,
+            };
         }
 
         activeTunnel.current = tunnel;
@@ -350,6 +355,20 @@ function useWormCrawler(size, cubies) {
             // Advance interpolation
             if (interpT.current < 1) {
                 interpT.current = Math.min(1, interpT.current + delta / STEP_SEC);
+            }
+
+            if (pendingVoidKillRef.current?.armed) {
+                const { tunnelKey, exitTileKey } = pendingVoidKillRef.current;
+                const headTileKey = tileKey(pos.current);
+                const hasClearedExitTile = headTileKey !== exitTileKey;
+                const fullyOnNextTile = interpT.current >= 1;
+
+                if (hasClearedExitTile && fullyOnNextTile) {
+                    pendingVoidKillRef.current = null;
+                    voidTunnelKeysRef.current.add(tunnelKey);
+                    killWorm({ reason: 'void-tunnel-exhausted', tunnelKey, exitTileKey, headTile: headTileKey });
+                    return;
+                }
             }
 
             if (pendingSelfCollision.current) {
@@ -533,20 +552,19 @@ function useWormCrawler(size, cubies) {
         } else if (phase.current === 'exiting') {
             tunnelProgress.current += delta * (2.0 * TUNNEL_SPEED_SCALE);
             if (tunnelProgress.current >= 1) {
-                const voidKillKey = pendingVoidKillRef.current;
-                pendingVoidKillRef.current = null;
+                const voidKillState = pendingVoidKillRef.current;
                 tunnelProgress.current = 0;
                 activeTunnel.current = null;
-                if (voidKillKey) {
-                    killWorm({ reason: 'void-tunnel-exhausted', tunnelKey: voidKillKey });
-                } else {
-                    phase.current = 'crawling';
-                    useGameStore.setState({ wormPhase: 'crawling', wormOnFlippedTile: false, visualMode: prevVisualModeRef.current ?? 'classic' });
-                    onFlippedTile.current = false;
-                    lastFlippedRef.current = false;
-                    healedRef.current += 1;
-                    useGameStore.getState().setWormHealedCount(healedRef.current);
+                if (voidKillState) {
+                    pendingVoidKillRef.current = { ...voidKillState, armed: true };
                 }
+
+                phase.current = 'crawling';
+                useGameStore.setState({ wormPhase: 'crawling', wormOnFlippedTile: false, visualMode: prevVisualModeRef.current ?? 'classic' });
+                onFlippedTile.current = false;
+                lastFlippedRef.current = false;
+                healedRef.current += 1;
+                useGameStore.getState().setWormHealedCount(healedRef.current);
             }
         }
     }, [size, cubies, wormSpeed, wormControlMode, wormholeInterval, beginTunnelTransition, resolveTunnelAtTile, killWorm]); // eslint-disable-line react-hooks/exhaustive-deps
