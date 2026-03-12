@@ -1298,9 +1298,12 @@ const _ringDummy = new THREE.Object3D();
 const _ringUp = new THREE.Vector3();
 const _bubbleDummy = new THREE.Object3D();
 const _sparkDummy = new THREE.Object3D();
+const _cautionDummy = new THREE.Object3D();
 const _voidArcAxisY = new THREE.Vector3(0, 1, 0);
 const _voidArcRight = new THREE.Vector3();
 const _voidArcForward = new THREE.Vector3();
+const _tapeRight = new THREE.Vector3();
+const _tapeForward = new THREE.Vector3();
 const _liveBaseColor = new THREE.Color('#ff44ff');
 const _liveColor = new THREE.Color();
 
@@ -1310,8 +1313,11 @@ const VOID_INNER_COLOR = '#121a3b';   // cool inverted core
 const VOID_BUBBLE_COLOR = '#39ff14';  // neon green ooze
 const CRITICAL_ARC_COLOR = '#7dff2a';  // electrical warning before full void
 const _criticalArcColor = new THREE.Color(CRITICAL_ARC_COLOR);
+const _tapeYellow = new THREE.Color('#ffe000');
+const _tapeBlack = new THREE.Color('#111111');
 const BUBBLES_PER_VOID = 5;          // rising gas bubbles per dead portal
 const SPARKS_PER_CRITICAL = 7;
+const TAPE_SEGMENTS_PER_TILE = 8;
 
 function WormholeRings({ cubies, size, voidTunnelKeysRef, tunnelUseCountsRef }) {
     const liveRef = useRef();       // live wormhole rings (neon pink)
@@ -1319,11 +1325,12 @@ function WormholeRings({ cubies, size, voidTunnelKeysRef, tunnelUseCountsRef }) 
     const voidInnerRef = useRef();  // void inner ring (near-black, counter-rotating)
     const bubblesRef = useRef();    // void swamp gas rising from dead portals
     const sparkRef = useRef();      // warning electricity when tunnel is one trip from void
+    const cautionRef = useRef();    // caution tape fence around dangerous portals
 
     // Stable random seeds per (position × bubble) slot — no per-frame allocation
     const MAX_RINGS = 6 * size * size;
     const bubbleSeeds = React.useMemo(() => {
-        const s = new Float32Array(MAX_RINGS * Math.max(BUBBLES_PER_VOID, SPARKS_PER_CRITICAL) * 3);
+        const s = new Float32Array(MAX_RINGS * Math.max(BUBBLES_PER_VOID, SPARKS_PER_CRITICAL, TAPE_SEGMENTS_PER_TILE) * 3);
         for (let i = 0; i < s.length / 3; i++) {
             s[i * 3]     = (Math.random() - 0.5) * 0.18; // lateral x jitter
             s[i * 3 + 1] = (Math.random() - 0.5) * 0.18; // lateral y jitter
@@ -1382,7 +1389,8 @@ function WormholeRings({ cubies, size, voidTunnelKeysRef, tunnelUseCountsRef }) 
         const voidInner = voidInnerRef.current;
         const bubbles = bubblesRef.current;
         const sparks = sparkRef.current;
-        if (!liveMesh || !voidOuter || !voidInner || !bubbles || !sparks) return;
+        const caution = cautionRef.current;
+        if (!liveMesh || !voidOuter || !voidInner || !bubbles || !sparks || !caution) return;
 
         const t = clock.elapsedTime;
         const voidKeys = voidTunnelKeysRef?.current ?? new Set();
@@ -1392,10 +1400,13 @@ function WormholeRings({ cubies, size, voidTunnelKeysRef, tunnelUseCountsRef }) 
         let voidIdx = 0;
         let bubbleIdx = 0;
         let sparkIdx = 0;
+        let cautionIdx = 0;
 
         for (let i = 0; i < allPositions.length; i++) {
             const { x, y, z, dirKey, tunnelKey } = allPositions[i];
             const isVoid = !!(tunnelKey && voidKeys.has(tunnelKey));
+            const traversals = tunnelKey ? (useCounts.get(tunnelKey) ?? 0) : 0;
+            const isCritical = !isVoid && traversals >= WORMHOLE_MAX_TRAVERSALS;
 
             const wp = getStickerWorldPos(x, y, z, dirKey, size, 0);
             const n = FACE_NORMALS[dirKey] ?? FACE_NORMALS.PZ;
@@ -1443,9 +1454,7 @@ function WormholeRings({ cubies, size, voidTunnelKeysRef, tunnelUseCountsRef }) 
                 voidIdx++;
             } else {
                 // ── Live wormhole ring — gets severe warning at 3rd traversal ─
-                const traversals = tunnelKey ? (useCounts.get(tunnelKey) ?? 0) : 0;
                 const intensityTier = Math.min(Math.max(traversals, 0), WORMHOLE_MAX_TRAVERSALS);
-                const isCritical = traversals >= WORMHOLE_MAX_TRAVERSALS;
                 const speedMul = 1 + (intensityTier * 0.35) + (isCritical ? 0.55 : 0);
                 const glowMul = 1 + (intensityTier * 0.35) + (isCritical ? 0.75 : 0);
                 const wobble = Math.sin(t * (9.0 * speedMul) + i * 1.4) * (0.03 + 0.03 * intensityTier);
@@ -1487,6 +1496,33 @@ function WormholeRings({ cubies, size, voidTunnelKeysRef, tunnelUseCountsRef }) 
                     }
                 }
             }
+
+            if (isVoid || isCritical) {
+                _tapeRight.crossVectors(n, _voidArcAxisY);
+                if (_tapeRight.lengthSq() < 1e-4) _tapeRight.set(1, 0, 0);
+                _tapeRight.normalize();
+                _tapeForward.crossVectors(n, _tapeRight).normalize();
+                for (let ti = 0; ti < TAPE_SEGMENTS_PER_TILE && cautionIdx < caution.count; ti++) {
+                    const si = (i * TAPE_SEGMENTS_PER_TILE + ti) * 3;
+                    const a = (ti / TAPE_SEGMENTS_PER_TILE) * Math.PI * 2 + t * 0.35;
+                    const perimeter = 0.50;
+                    const sag = Math.sin(t * 2.2 + ti * 1.7 + bubbleSeeds[si + 2] * Math.PI * 2) * 0.02;
+                    const px = Math.cos(a) * perimeter;
+                    const py = Math.sin(a) * perimeter;
+                    _cautionDummy.position.set(
+                        wp[0] + _tapeRight.x * px + _tapeForward.x * py + n.x * (0.14 + sag),
+                        wp[1] + _tapeRight.y * px + _tapeForward.y * py + n.y * (0.14 + sag),
+                        wp[2] + _tapeRight.z * px + _tapeForward.z * py + n.z * (0.14 + sag)
+                    );
+                    _cautionDummy.quaternion.setFromUnitVectors(_voidArcAxisY, n);
+                    _cautionDummy.rotateOnAxis(n, a + Math.PI * 0.5);
+                    _cautionDummy.scale.set(0.028, 0.34, 0.005);
+                    _cautionDummy.updateMatrix();
+                    caution.setMatrixAt(cautionIdx, _cautionDummy.matrix);
+                    caution.setColorAt(cautionIdx, (ti % 2 === 0) ? _tapeYellow : _tapeBlack);
+                    cautionIdx++;
+                }
+            }
         }
 
         // Zero out unused slots so nothing stale renders
@@ -1504,6 +1540,9 @@ function WormholeRings({ cubies, size, voidTunnelKeysRef, tunnelUseCountsRef }) 
         _sparkDummy.scale.setScalar(0);
         _sparkDummy.updateMatrix();
         for (let i = sparkIdx; i < sparks.count; i++) sparks.setMatrixAt(i, _sparkDummy.matrix);
+        _cautionDummy.scale.setScalar(0);
+        _cautionDummy.updateMatrix();
+        for (let i = cautionIdx; i < caution.count; i++) caution.setMatrixAt(i, _cautionDummy.matrix);
 
         liveMesh.instanceMatrix.needsUpdate = true;
         if (liveMesh.instanceColor) liveMesh.instanceColor.needsUpdate = true;
@@ -1511,10 +1550,13 @@ function WormholeRings({ cubies, size, voidTunnelKeysRef, tunnelUseCountsRef }) 
         voidInner.instanceMatrix.needsUpdate = true;
         bubbles.instanceMatrix.needsUpdate = true;
         sparks.instanceMatrix.needsUpdate = true;
+        caution.instanceMatrix.needsUpdate = true;
+        if (caution.instanceColor) caution.instanceColor.needsUpdate = true;
     });
 
     const MAX_BUBBLES = MAX_RINGS * BUBBLES_PER_VOID;
     const MAX_SPARKS = MAX_RINGS * SPARKS_PER_CRITICAL;
+    const MAX_TAPE = MAX_RINGS * TAPE_SEGMENTS_PER_TILE;
     return (
         <>
             {/* Live wormhole rings — bright neon pink, fast spin */}
@@ -1545,6 +1587,12 @@ function WormholeRings({ cubies, size, voidTunnelKeysRef, tunnelUseCountsRef }) 
             <instancedMesh ref={sparkRef} args={[undefined, undefined, MAX_SPARKS]} frustumCulled={false}>
                 <cylinderGeometry args={[1, 1, 1, 5]} />
                 <meshBasicMaterial color={CRITICAL_ARC_COLOR} transparent opacity={0.88} blending={THREE.AdditiveBlending} depthWrite={false} />
+            </instancedMesh>
+
+            {/* Caution fence — yellow/black tape draped around dangerous tiles */}
+            <instancedMesh ref={cautionRef} args={[undefined, undefined, MAX_TAPE]} frustumCulled={false}>
+                <boxGeometry args={[1, 1, 1]} />
+                <meshBasicMaterial color="#ffe000" vertexColors transparent opacity={0.92} depthWrite={false} />
             </instancedMesh>
         </>
     );
