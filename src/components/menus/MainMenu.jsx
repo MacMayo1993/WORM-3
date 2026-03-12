@@ -3,12 +3,6 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import IntroCubie from '../intro/IntroCubie.jsx';
 
-const isMobile = typeof window !== 'undefined' && (
-  window.innerWidth <= 768 ||
-  'ontouchstart' in window ||
-  navigator.maxTouchPoints > 0
-);
-
 // All stickers black — same as the opening frames of the intro
 const ZERO_REVEAL = { PZ: 0, NZ: 0, PX: 0, NX: 0, PY: 0, NY: 0 };
 
