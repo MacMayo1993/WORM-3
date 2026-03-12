@@ -13,10 +13,21 @@ const EYE_WHITE = '#ffffff';
 const PUPIL = '#111111';
 const ANTENNA_COLOR = '#88ffbb';
 const GLOW_COLOR = '#00ff88';
+const SEGMENT_OFFSETS = [0, -0.32, -0.6, -0.85];
+const HISTORY_SIZE = 100;
+const HISTORY_STEP = 10;
+
+const _worldPos = new THREE.Vector3();
+const _rootPos = new THREE.Vector3();
+const _segPos = new THREE.Vector3();
+const _invQuat = new THREE.Quaternion();
 
 export default function CrawlerCharacter({ position, forward, face, jumpHeight, velocity, alive = true }) {
   const groupRef = useRef();
+  const bodyRootRef = useRef();
   const timeRef = useRef(0);
+  const positionHistory = useRef([]);
+  const bodySegmentRefs = useRef([]);
 
   // Compute orientation: look along forward, up along face normal
   const quaternion = useMemo(() => {
@@ -34,6 +45,31 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
   // Animate
   useFrame((_, delta) => {
     timeRef.current += delta;
+
+    if (!groupRef.current) return;
+
+    groupRef.current.getWorldPosition(_worldPos);
+    positionHistory.current.unshift(_worldPos.clone());
+    if (positionHistory.current.length > HISTORY_SIZE) positionHistory.current.pop();
+
+    if (!bodyRootRef.current) return;
+
+    groupRef.current.getWorldPosition(_rootPos);
+    _invQuat.copy(quaternion).invert();
+
+    const moveFactor = Math.min(1, velocity || 0);
+    for (let i = 1; i < SEGMENT_OFFSETS.length; i++) {
+      const segGroup = bodySegmentRefs.current[i];
+      if (!segGroup) continue;
+
+      const historyIndex = Math.min(positionHistory.current.length - 1, i * HISTORY_STEP);
+      const sampled = positionHistory.current[historyIndex];
+      if (!sampled) continue;
+
+      _segPos.copy(sampled).sub(_rootPos).applyQuaternion(_invQuat);
+      _segPos.y += Math.sin(timeRef.current * 6 + i * 0.8) * 0.02 * moveFactor;
+      segGroup.position.copy(_segPos);
+    }
   });
 
   if (!position) return null;
@@ -45,22 +81,31 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
 
   return (
     <group ref={groupRef} position={position.toArray ? position.toArray() : position}>
-      <group quaternion={quaternion}>
+      <group ref={bodyRootRef} quaternion={quaternion}>
         {/* Body segments */}
-        {[0, -0.32, -0.6, -0.85].map((zOff, i) => {
+        {SEGMENT_OFFSETS.map((zOff, i) => {
           const isHead = i === 0;
           const segScale = isHead ? 0.28 : 0.24 - i * 0.02;
           const segBob = Math.sin(t * 6 + i * 0.8) * 0.02 * Math.min(1, velocity || 0);
           const segColor = isHead ? BODY_COLOR : BELLY_COLOR;
 
           return (
-            <group key={i} position={[0, segBob + bobble, zOff]}>
+            <group ref={el => (bodySegmentRefs.current[i] = el)} key={i} position={[0, segBob + bobble, zOff]}>
               <mesh scale={[segScale * breathe, segScale * breathe, segScale]}>
                 <sphereGeometry args={[1, 12, 12]} />
-                <meshStandardMaterial
+                <meshPhysicalMaterial
                   color={segColor}
                   emissive={segColor}
-                  emissiveIntensity={isHead ? 0.5 : 0.2}
+                  emissiveIntensity={isHead ? 0.4 : 0.12}
+                  clearcoat={1}
+                  clearcoatRoughness={0.1}
+                  thickness={0.5}
+                  roughness={0.2}
+                  metalness={0}
+                  transmission={0.2}
+                  ior={1.45}
+                  iridescence={0.16}
+                  iridescenceIOR={1.3}
                   transparent={!alive}
                   opacity={opacity}
                 />
