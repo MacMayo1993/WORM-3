@@ -617,7 +617,8 @@ function useWormCrawler(size, cubies) {
         pos, moveDir, phase, tunnelProgress, activeTunnel, onFlippedTile,
         interpT, prevWorldPos, curWorldPos, jumpT, isJumping, jumpLift,
         headInterpPos, currentNormal,
-        tailLength, stepHistory, tick, queueTurn
+        tailLength, stepHistory, tick, queueTurn,
+        voidTunnelKeysRef
     };
 }
 
@@ -1227,13 +1228,44 @@ function WormInteriorGlass({ worm, size }) {
     );
 }
 
+// ─── Module-level helpers for canonical tunnel key (mirrors useWormCrawler logic) ─
+// Used by WormholeRings to check void-tunnel membership without prop-drilling.
+const _tileKeyStr = (p) => `${p.x},${p.y},${p.z},${p.dirKey}`;
+const _canonicalTunnelKeyStr = (tunnel) => {
+    const a = _tileKeyStr(tunnel.entry);
+    const b = _tileKeyStr(tunnel.exit);
+    return a < b ? `${a}|${b}` : `${b}|${a}`;
+};
+
 // ─── Wormhole portal rings — spinning neon rings at every flipped tile ────────
 // Gives players a clear visual cue for all wormhole locations on the cube surface.
 const _ringDummy = new THREE.Object3D();
 const _ringUp = new THREE.Vector3();
+const _bubbleDummy = new THREE.Object3D();
 
-function WormholeRings({ cubies, size }) {
-    const meshRef = useRef();
+// Void swamp palette — sickly, stagnant, antipodality-gone-wrong
+const VOID_OUTER_COLOR = '#1a4d1a';   // dark swamp green outer ring
+const VOID_INNER_COLOR = '#0d260d';   // near-black green inner ring
+const VOID_BUBBLE_COLOR = '#0d2b10';  // dark swamp gas bubble
+const BUBBLES_PER_VOID = 5;          // rising gas bubbles per dead portal
+
+function WormholeRings({ cubies, size, voidTunnelKeysRef }) {
+    const liveRef = useRef();       // live wormhole rings (neon pink)
+    const voidOuterRef = useRef();  // void outer ring (sickly green, slow reverse)
+    const voidInnerRef = useRef();  // void inner ring (near-black, counter-rotating)
+    const bubblesRef = useRef();    // void swamp gas rising from dead portals
+
+    // Stable random seeds per (position × bubble) slot — no per-frame allocation
+    const MAX_RINGS = 6 * size * size;
+    const bubbleSeeds = React.useMemo(() => {
+        const s = new Float32Array(MAX_RINGS * BUBBLES_PER_VOID * 3);
+        for (let i = 0; i < s.length / 3; i++) {
+            s[i * 3]     = (Math.random() - 0.5) * 0.18; // lateral x jitter
+            s[i * 3 + 1] = (Math.random() - 0.5) * 0.18; // lateral y jitter
+            s[i * 3 + 2] = Math.random();                 // phase start offset
+        }
+        return s;
+    }, [MAX_RINGS]);
 
     // Debounce cubies so the O(size³×6) scan only reruns every 200 ms instead
     // of on every individual sticker flip (~12×/sec at chaos L4).
@@ -1243,7 +1275,18 @@ function WormholeRings({ cubies, size }) {
         return () => clearTimeout(timer);
     }, [cubies]);
 
-    const flippedPositions = React.useMemo(() => {
+    // All flipped surface positions, augmented with canonical tunnel key so
+    // WormholeRings can tell live vs void without re-running manifold logic per frame.
+    const allPositions = React.useMemo(() => {
+        const tunnels = getActiveTunnels(debouncedCubies, size);
+        // Build tile-key → canonical-tunnel-key lookup (covers both entry and exit)
+        const tunnelKeyMap = new Map();
+        for (const t of tunnels) {
+            const ck = _canonicalTunnelKeyStr(t);
+            tunnelKeyMap.set(_tileKeyStr(t.entry), ck);
+            tunnelKeyMap.set(_tileKeyStr(t.exit), ck);
+        }
+
         const result = [];
         const dirs = ['PX', 'NX', 'PY', 'NY', 'PZ', 'NZ'];
         for (let x = 0; x < size; x++) {
@@ -1259,7 +1302,8 @@ function WormholeRings({ cubies, size }) {
                             (dk === 'PY' && y === size - 1) || (dk === 'NY' && y === 0) ||
                             (dk === 'PZ' && z === size - 1) || (dk === 'NZ' && z === 0)
                         );
-                        if (isVisible) result.push({ x, y, z, dirKey: dk });
+                        if (!isVisible) continue;
+                        result.push({ x, y, z, dirKey: dk, tunnelKey: tunnelKeyMap.get(`${x},${y},${z},${dk}`) ?? null });
                     }
                 }
             }
@@ -1268,43 +1312,124 @@ function WormholeRings({ cubies, size }) {
     }, [debouncedCubies, size]);
 
     useFrame(({ clock }) => {
-        const mesh = meshRef.current;
-        if (!mesh) return;
-        const t = clock.elapsedTime;
-        const count = flippedPositions.length;
+        const liveMesh = liveRef.current;
+        const voidOuter = voidOuterRef.current;
+        const voidInner = voidInnerRef.current;
+        const bubbles = bubblesRef.current;
+        if (!liveMesh || !voidOuter || !voidInner || !bubbles) return;
 
-        for (let i = 0; i < mesh.count; i++) {
-            if (i >= count) {
-                _ringDummy.scale.setScalar(0);
-                _ringDummy.updateMatrix();
-                mesh.setMatrixAt(i, _ringDummy.matrix);
-                continue;
-            }
-            const { x, y, z, dirKey } = flippedPositions[i];
+        const t = clock.elapsedTime;
+        const voidKeys = voidTunnelKeysRef?.current ?? new Set();
+
+        let liveIdx = 0;
+        let voidIdx = 0;
+        let bubbleIdx = 0;
+
+        for (let i = 0; i < allPositions.length; i++) {
+            const { x, y, z, dirKey, tunnelKey } = allPositions[i];
+            const isVoid = !!(tunnelKey && voidKeys.has(tunnelKey));
+
             const wp = getStickerWorldPos(x, y, z, dirKey, size, 0);
             const n = FACE_NORMALS[dirKey] ?? FACE_NORMALS.PZ;
+
             _ringDummy.position.set(wp[0], wp[1], wp[2]).addScaledVector(n, 0.08);
-            // Orient ring to face outward from the cube surface
             _ringUp.set(0, 1, 0);
             if (Math.abs(n.y) > 0.9) _ringUp.set(1, 0, 0);
             _ringDummy.quaternion.setFromUnitVectors(_ringUp, n);
-            // Spin the ring + pulse scale
-            _ringDummy.rotateOnAxis(n, t * 1.8 + i * 0.7);
-            const pulse = 1 + Math.sin(t * 3.5 + i) * 0.12;
-            _ringDummy.scale.setScalar(pulse);
-            _ringDummy.updateMatrix();
-            mesh.setMatrixAt(i, _ringDummy.matrix);
+
+            if (isVoid) {
+                // ── Void swamp portal ───────────────────────────────────────
+                // Outer ring: slow reverse rotation, sluggish dying pulse
+                _ringDummy.rotateOnAxis(n, -t * 0.35 + voidIdx * 1.1);
+                const outerPulse = 0.9 + Math.sin(t * 0.85 + voidIdx * 2.3) * 0.1;
+                _ringDummy.scale.setScalar(outerPulse);
+                _ringDummy.updateMatrix();
+                voidOuter.setMatrixAt(voidIdx, _ringDummy.matrix);
+
+                // Inner ring: slightly different counter-rotation phase, smaller
+                _ringDummy.position.set(wp[0], wp[1], wp[2]).addScaledVector(n, 0.08);
+                _ringDummy.quaternion.setFromUnitVectors(_ringUp, n);
+                _ringDummy.rotateOnAxis(n, t * 0.2 - voidIdx * 0.9); // counter-phase
+                const innerPulse = 0.7 + Math.sin(t * 1.1 + voidIdx * 1.7) * 0.08;
+                _ringDummy.scale.setScalar(innerPulse);
+                _ringDummy.updateMatrix();
+                voidInner.setMatrixAt(voidIdx, _ringDummy.matrix);
+
+                // Void swamp bubbles — rising gas from the dead portal
+                for (let b = 0; b < BUBBLES_PER_VOID && bubbleIdx < bubbles.count; b++) {
+                    const si = (i * BUBBLES_PER_VOID + b) * 3;
+                    const phase = (t * 0.28 + bubbleSeeds[si + 2]) % 1;
+                    const lift = phase * 0.55;
+                    const envelope = Math.sin(phase * Math.PI); // 0→1→0 over lifetime
+                    _bubbleDummy.position.set(
+                        wp[0] + n.x * lift + bubbleSeeds[si] * envelope,
+                        wp[1] + n.y * lift + bubbleSeeds[si + 1] * envelope,
+                        wp[2] + n.z * lift
+                    );
+                    _bubbleDummy.scale.setScalar(Math.max(0, envelope * 0.024));
+                    _bubbleDummy.updateMatrix();
+                    bubbles.setMatrixAt(bubbleIdx, _bubbleDummy.matrix);
+                    bubbleIdx++;
+                }
+
+                voidIdx++;
+            } else {
+                // ── Live wormhole ring — neon pink fast spin (unchanged) ────
+                _ringDummy.rotateOnAxis(n, t * 1.8 + i * 0.7);
+                const pulse = 1 + Math.sin(t * 3.5 + i) * 0.12;
+                _ringDummy.scale.setScalar(pulse);
+                _ringDummy.updateMatrix();
+                liveMesh.setMatrixAt(liveIdx, _ringDummy.matrix);
+                liveIdx++;
+            }
         }
 
-        mesh.instanceMatrix.needsUpdate = true;
+        // Zero out unused slots so nothing stale renders
+        _ringDummy.position.set(0, 0, 0);
+        _ringDummy.scale.setScalar(0);
+        _ringDummy.updateMatrix();
+        for (let i = liveIdx; i < liveMesh.count; i++) liveMesh.setMatrixAt(i, _ringDummy.matrix);
+        for (let i = voidIdx; i < voidOuter.count; i++) {
+            voidOuter.setMatrixAt(i, _ringDummy.matrix);
+            voidInner.setMatrixAt(i, _ringDummy.matrix);
+        }
+        _bubbleDummy.scale.setScalar(0);
+        _bubbleDummy.updateMatrix();
+        for (let i = bubbleIdx; i < bubbles.count; i++) bubbles.setMatrixAt(i, _bubbleDummy.matrix);
+
+        liveMesh.instanceMatrix.needsUpdate = true;
+        voidOuter.instanceMatrix.needsUpdate = true;
+        voidInner.instanceMatrix.needsUpdate = true;
+        bubbles.instanceMatrix.needsUpdate = true;
     });
 
-    const MAX_RINGS = 6 * size * size; // max flipped tiles possible
+    const MAX_BUBBLES = MAX_RINGS * BUBBLES_PER_VOID;
     return (
-        <instancedMesh ref={meshRef} args={[undefined, undefined, MAX_RINGS]} frustumCulled={false}>
-            <torusGeometry args={[0.42, 0.025, 8, 32]} />
-            <meshBasicMaterial color="#ff44ff" transparent opacity={0.75} blending={THREE.AdditiveBlending} depthWrite={false} />
-        </instancedMesh>
+        <>
+            {/* Live wormhole rings — bright neon pink, fast spin */}
+            <instancedMesh ref={liveRef} args={[undefined, undefined, MAX_RINGS]} frustumCulled={false}>
+                <torusGeometry args={[0.42, 0.025, 8, 32]} />
+                <meshBasicMaterial color="#ff44ff" transparent opacity={0.75} blending={THREE.AdditiveBlending} depthWrite={false} />
+            </instancedMesh>
+
+            {/* Dead void outer ring — sickly swamp green, slow reverse rotation */}
+            <instancedMesh ref={voidOuterRef} args={[undefined, undefined, MAX_RINGS]} frustumCulled={false}>
+                <torusGeometry args={[0.44, 0.030, 8, 32]} />
+                <meshBasicMaterial color={VOID_OUTER_COLOR} transparent opacity={0.7} blending={THREE.AdditiveBlending} depthWrite={false} />
+            </instancedMesh>
+
+            {/* Dead void inner ring — near-black green, barely alive counter-rotation */}
+            <instancedMesh ref={voidInnerRef} args={[undefined, undefined, MAX_RINGS]} frustumCulled={false}>
+                <torusGeometry args={[0.28, 0.018, 6, 24]} />
+                <meshBasicMaterial color={VOID_INNER_COLOR} transparent opacity={0.55} blending={THREE.AdditiveBlending} depthWrite={false} />
+            </instancedMesh>
+
+            {/* Void swamp gas bubbles — dark orbs seeping out of dead portals */}
+            <instancedMesh ref={bubblesRef} args={[undefined, undefined, MAX_BUBBLES]} frustumCulled={false}>
+                <sphereGeometry args={[1, 5, 5]} />
+                <meshBasicMaterial color={VOID_BUBBLE_COLOR} transparent opacity={0.6} blending={THREE.AdditiveBlending} depthWrite={false} />
+            </instancedMesh>
+        </>
     );
 }
 
@@ -1332,7 +1457,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             <WormBody worm={worm} size={size} />
             <WormFace worm={worm} size={size} />
             <PortalGlow worm={worm} size={size} />
-            <WormholeRings cubies={cubies} size={size} />
+            <WormholeRings cubies={cubies} size={size} voidTunnelKeysRef={worm.voidTunnelKeysRef} />
             <PowerupOrbs size={size} />
         </>
     );
