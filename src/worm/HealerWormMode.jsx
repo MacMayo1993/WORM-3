@@ -68,6 +68,7 @@ const MAX_JUMPS = 2;
 const MAX_POWERUP_RENDER = 24;
 const TUNNEL_TRIGGER_PROGRESS = 1 / 3;
 const SELF_COLLISION_TRIGGER_PROGRESS = 0.4;
+const SELF_COLLISION_GRACE_STEPS_AFTER_TUNNEL = 2;
 const WORMHOLE_MAX_TRAVERSALS = 3;
 
 function getAllSurfaceTiles(size) {
@@ -142,6 +143,7 @@ function useWormCrawler(size, cubies) {
     const lastRecordedT = useRef(0);
     const crossingCorner = useRef(false);
     const pendingSelfCollision = useRef(null);
+    const selfCollisionGraceStepsRef = useRef(0);
 
     // Smooth inter-tile interpolation
     const interpT = useRef(1);          // 0→1 between prev and current tile
@@ -268,12 +270,19 @@ function useWormCrawler(size, cubies) {
         const nextTraversals = traversals + 1;
         tunnelUseCountsRef.current.set(tunnelKey, nextTraversals);
         if (nextTraversals >= WORMHOLE_MAX_TRAVERSALS) {
-            voidTunnelKeysRef.current.add(tunnelKey);
-            pendingVoidKillRef.current = tunnelKey;
+            // Arm the tunnel to become void only after the worm fully exits this traversal.
+            // This prevents "inside tunnel" deaths on the final pass.
+            pendingVoidKillRef.current = {
+                tunnelKey,
+                exitTileKey: tileKey(tunnel.exit),
+                armed: false,
+            };
         }
 
         activeTunnel.current = tunnel;
         pendingTunnelTrigger.current = null;
+        pendingSelfCollision.current = null;
+        selfCollisionGraceStepsRef.current = SELF_COLLISION_GRACE_STEPS_AFTER_TUNNEL;
         tunnelProgress.current = 0;
         phase.current = 'entering';
         onFlippedTile.current = false;
@@ -352,8 +361,32 @@ function useWormCrawler(size, cubies) {
                 interpT.current = Math.min(1, interpT.current + delta / STEP_SEC);
             }
 
+            if (pendingVoidKillRef.current?.armed) {
+                const { tunnelKey, exitTileKey } = pendingVoidKillRef.current;
+                const headTileKey = tileKey(pos.current);
+                const hasClearedExitTile = headTileKey !== exitTileKey;
+                const fullyOnNextTile = interpT.current >= 1;
+
+                if (hasClearedExitTile && fullyOnNextTile) {
+                    pendingVoidKillRef.current = null;
+                    voidTunnelKeysRef.current.add(tunnelKey);
+                    killWorm({ reason: 'void-tunnel-exhausted', tunnelKey, exitTileKey, headTile: headTileKey });
+                    return;
+                }
+            }
+
+            if (pendingTunnelTrigger.current) {
+                const { x, y, z, dirKey } = pendingTunnelTrigger.current;
+                if (interpT.current >= TUNNEL_TRIGGER_PROGRESS && !isJumping.current) {
+                    beginTunnelTransition(x, y, z, dirKey);
+                    return;
+                }
+            }
+
             if (pendingSelfCollision.current) {
-                if (isJumping.current) {
+                if (selfCollisionGraceStepsRef.current > 0) {
+                    pendingSelfCollision.current = null;
+                } else if (isJumping.current) {
                     // Allow jumping over your own body tile before impact threshold.
                     pendingSelfCollision.current = null;
                 } else if (interpT.current >= SELF_COLLISION_TRIGGER_PROGRESS) {
@@ -364,13 +397,6 @@ function useWormCrawler(size, cubies) {
                         collisionTile: pendingSelfCollision.current?.key ?? null,
                     });
                     return;
-                }
-            }
-
-            if (pendingTunnelTrigger.current) {
-                const { x, y, z, dirKey } = pendingTunnelTrigger.current;
-                if (interpT.current >= TUNNEL_TRIGGER_PROGRESS && !isJumping.current) {
-                    beginTunnelTransition(x, y, z, dirKey);
                 }
             }
 
@@ -452,7 +478,7 @@ function useWormCrawler(size, cubies) {
                     const occupiedTiles = Math.max(1, Math.ceil((tailLength.current * BODY_BALL_SPACING) / 1.0));
                     const bodyTilesBehindHead = Math.max(0, occupiedTiles - 1);
                     const bodyTrail = tileTrail.current.slice(1, 1 + bodyTilesBehindHead);
-                    const selfHit = bodyTrail.includes(nextKey);
+                    const selfHit = selfCollisionGraceStepsRef.current <= 0 && bodyTrail.includes(nextKey);
                     if (selfHit) {
                         // Defer self-hit until we've penetrated the tile by 40%.
                         // This gives players a short reaction window to jump over their body.
@@ -471,6 +497,9 @@ function useWormCrawler(size, cubies) {
                     pendingTunnelTrigger.current = null;
                     if (!selfHit) {
                         pendingSelfCollision.current = null;
+                    }
+                    if (selfCollisionGraceStepsRef.current > 0) {
+                        selfCollisionGraceStepsRef.current -= 1;
                     }
                 } else {
                     moveDir.current = turnWorm(turnWorm(moveDir.current, 'left'), 'left');
@@ -533,20 +562,19 @@ function useWormCrawler(size, cubies) {
         } else if (phase.current === 'exiting') {
             tunnelProgress.current += delta * (2.0 * TUNNEL_SPEED_SCALE);
             if (tunnelProgress.current >= 1) {
-                const voidKillKey = pendingVoidKillRef.current;
-                pendingVoidKillRef.current = null;
+                const voidKillState = pendingVoidKillRef.current;
                 tunnelProgress.current = 0;
                 activeTunnel.current = null;
-                if (voidKillKey) {
-                    killWorm({ reason: 'void-tunnel-exhausted', tunnelKey: voidKillKey });
-                } else {
-                    phase.current = 'crawling';
-                    useGameStore.setState({ wormPhase: 'crawling', wormOnFlippedTile: false, visualMode: prevVisualModeRef.current ?? 'classic' });
-                    onFlippedTile.current = false;
-                    lastFlippedRef.current = false;
-                    healedRef.current += 1;
-                    useGameStore.getState().setWormHealedCount(healedRef.current);
+                if (voidKillState) {
+                    pendingVoidKillRef.current = { ...voidKillState, armed: true };
                 }
+
+                phase.current = 'crawling';
+                useGameStore.setState({ wormPhase: 'crawling', wormOnFlippedTile: false, visualMode: prevVisualModeRef.current ?? 'classic' });
+                onFlippedTile.current = false;
+                lastFlippedRef.current = false;
+                healedRef.current += 1;
+                useGameStore.getState().setWormHealedCount(healedRef.current);
             }
         }
     }, [size, cubies, wormSpeed, wormControlMode, wormholeInterval, beginTunnelTransition, resolveTunnelAtTile, killWorm]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -589,6 +617,7 @@ function useWormCrawler(size, cubies) {
         jumpCount.current = 0;
         pendingTunnelTrigger.current = null;
         pendingSelfCollision.current = null;
+        selfCollisionGraceStepsRef.current = 0;
         tailLength.current = BASE_TAIL_LENGTH;
         stepHistory.current = [];
         lastRecordedT.current = 0;
@@ -627,7 +656,7 @@ function useWormCrawler(size, cubies) {
         interpT, prevWorldPos, curWorldPos, jumpT, isJumping, jumpLift,
         headInterpPos, currentNormal,
         tailLength, stepHistory, tick, queueTurn,
-        voidTunnelKeysRef
+        voidTunnelKeysRef, tunnelUseCountsRef
     };
 }
 
@@ -1251,14 +1280,16 @@ const _canonicalTunnelKeyStr = (tunnel) => {
 const _ringDummy = new THREE.Object3D();
 const _ringUp = new THREE.Vector3();
 const _bubbleDummy = new THREE.Object3D();
+const _liveBaseColor = new THREE.Color('#ff44ff');
+const _liveColor = new THREE.Color();
 
 // Void swamp palette — sickly, stagnant, antipodality-gone-wrong
-const VOID_OUTER_COLOR = '#1a4d1a';   // dark swamp green outer ring
-const VOID_INNER_COLOR = '#0d260d';   // near-black green inner ring
-const VOID_BUBBLE_COLOR = '#0d2b10';  // dark swamp gas bubble
+const VOID_OUTER_COLOR = '#b8b1ff';   // inverted-feel rim over dark tiles
+const VOID_INNER_COLOR = '#121a3b';   // cool inverted core
+const VOID_BUBBLE_COLOR = '#39ff14';  // neon green ooze
 const BUBBLES_PER_VOID = 5;          // rising gas bubbles per dead portal
 
-function WormholeRings({ cubies, size, voidTunnelKeysRef }) {
+function WormholeRings({ cubies, size, voidTunnelKeysRef, tunnelUseCountsRef }) {
     const liveRef = useRef();       // live wormhole rings (neon pink)
     const voidOuterRef = useRef();  // void outer ring (sickly green, slow reverse)
     const voidInnerRef = useRef();  // void inner ring (near-black, counter-rotating)
@@ -1329,6 +1360,7 @@ function WormholeRings({ cubies, size, voidTunnelKeysRef }) {
 
         const t = clock.elapsedTime;
         const voidKeys = voidTunnelKeysRef?.current ?? new Set();
+        const useCounts = tunnelUseCountsRef?.current ?? new Map();
 
         let liveIdx = 0;
         let voidIdx = 0;
@@ -1367,15 +1399,15 @@ function WormholeRings({ cubies, size, voidTunnelKeysRef }) {
                 // Void swamp bubbles — rising gas from the dead portal
                 for (let b = 0; b < BUBBLES_PER_VOID && bubbleIdx < bubbles.count; b++) {
                     const si = (i * BUBBLES_PER_VOID + b) * 3;
-                    const phase = (t * 0.28 + bubbleSeeds[si + 2]) % 1;
-                    const lift = phase * 0.55;
+                    const phase = (t * 0.55 + bubbleSeeds[si + 2]) % 1;
+                    const lift = phase * 0.72;
                     const envelope = Math.sin(phase * Math.PI); // 0→1→0 over lifetime
                     _bubbleDummy.position.set(
                         wp[0] + n.x * lift + bubbleSeeds[si] * envelope,
                         wp[1] + n.y * lift + bubbleSeeds[si + 1] * envelope,
                         wp[2] + n.z * lift
                     );
-                    _bubbleDummy.scale.setScalar(Math.max(0, envelope * 0.024));
+                    _bubbleDummy.scale.setScalar(Math.max(0, envelope * 0.038));
                     _bubbleDummy.updateMatrix();
                     bubbles.setMatrixAt(bubbleIdx, _bubbleDummy.matrix);
                     bubbleIdx++;
@@ -1383,12 +1415,21 @@ function WormholeRings({ cubies, size, voidTunnelKeysRef }) {
 
                 voidIdx++;
             } else {
-                // ── Live wormhole ring — neon pink fast spin (unchanged) ────
-                _ringDummy.rotateOnAxis(n, t * 1.8 + i * 0.7);
-                const pulse = 1 + Math.sin(t * 3.5 + i) * 0.12;
+                // ── Live wormhole ring — gains intensity each use (0/1/2) ───
+                const traversals = tunnelKey ? (useCounts.get(tunnelKey) ?? 0) : 0;
+                const intensityTier = Math.min(Math.max(traversals, 0), Math.max(0, WORMHOLE_MAX_TRAVERSALS - 1));
+                const speedMul = 1 + (intensityTier * 0.25);
+                const glowMul = 1 + (intensityTier * 0.25);
+                const wobble = Math.sin(t * (9.0 * speedMul) + i * 1.4) * (0.03 * intensityTier);
+                _ringDummy.position.set(wp[0], wp[1], wp[2]).addScaledVector(n, 0.08 + wobble);
+                _ringDummy.quaternion.setFromUnitVectors(_ringUp, n);
+                _ringDummy.rotateOnAxis(n, t * (2.1 * speedMul) + i * 0.9);
+                const pulse = glowMul + Math.sin(t * (4.8 * speedMul) + i * 1.7) * (0.16 * glowMul);
                 _ringDummy.scale.setScalar(pulse);
                 _ringDummy.updateMatrix();
                 liveMesh.setMatrixAt(liveIdx, _ringDummy.matrix);
+                _liveColor.copy(_liveBaseColor).multiplyScalar(glowMul);
+                liveMesh.setColorAt(liveIdx, _liveColor);
                 liveIdx++;
             }
         }
@@ -1407,6 +1448,7 @@ function WormholeRings({ cubies, size, voidTunnelKeysRef }) {
         for (let i = bubbleIdx; i < bubbles.count; i++) bubbles.setMatrixAt(i, _bubbleDummy.matrix);
 
         liveMesh.instanceMatrix.needsUpdate = true;
+        if (liveMesh.instanceColor) liveMesh.instanceColor.needsUpdate = true;
         voidOuter.instanceMatrix.needsUpdate = true;
         voidInner.instanceMatrix.needsUpdate = true;
         bubbles.instanceMatrix.needsUpdate = true;
@@ -1418,25 +1460,25 @@ function WormholeRings({ cubies, size, voidTunnelKeysRef }) {
             {/* Live wormhole rings — bright neon pink, fast spin */}
             <instancedMesh ref={liveRef} args={[undefined, undefined, MAX_RINGS]} frustumCulled={false}>
                 <torusGeometry args={[0.42, 0.025, 8, 32]} />
-                <meshBasicMaterial color="#ff44ff" transparent opacity={0.75} blending={THREE.AdditiveBlending} depthWrite={false} />
+                <meshBasicMaterial color="#ff44ff" vertexColors transparent opacity={0.75} blending={THREE.AdditiveBlending} depthWrite={false} />
             </instancedMesh>
 
             {/* Dead void outer ring — sickly swamp green, slow reverse rotation */}
             <instancedMesh ref={voidOuterRef} args={[undefined, undefined, MAX_RINGS]} frustumCulled={false}>
                 <torusGeometry args={[0.44, 0.030, 8, 32]} />
-                <meshBasicMaterial color={VOID_OUTER_COLOR} transparent opacity={0.7} blending={THREE.AdditiveBlending} depthWrite={false} />
+                <meshBasicMaterial color={VOID_OUTER_COLOR} transparent opacity={0.82} blending={THREE.AdditiveBlending} depthWrite={false} />
             </instancedMesh>
 
             {/* Dead void inner ring — near-black green, barely alive counter-rotation */}
             <instancedMesh ref={voidInnerRef} args={[undefined, undefined, MAX_RINGS]} frustumCulled={false}>
                 <torusGeometry args={[0.28, 0.018, 6, 24]} />
-                <meshBasicMaterial color={VOID_INNER_COLOR} transparent opacity={0.55} blending={THREE.AdditiveBlending} depthWrite={false} />
+                <meshBasicMaterial color={VOID_INNER_COLOR} transparent opacity={0.7} blending={THREE.AdditiveBlending} depthWrite={false} />
             </instancedMesh>
 
             {/* Void swamp gas bubbles — dark orbs seeping out of dead portals */}
             <instancedMesh ref={bubblesRef} args={[undefined, undefined, MAX_BUBBLES]} frustumCulled={false}>
                 <sphereGeometry args={[1, 5, 5]} />
-                <meshBasicMaterial color={VOID_BUBBLE_COLOR} transparent opacity={0.6} blending={THREE.AdditiveBlending} depthWrite={false} />
+                <meshBasicMaterial color={VOID_BUBBLE_COLOR} transparent opacity={0.78} blending={THREE.AdditiveBlending} depthWrite={false} />
             </instancedMesh>
         </>
     );
@@ -1543,7 +1585,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             <WormBody worm={worm} size={size} />
             <WormFace worm={worm} size={size} />
             <PortalGlow worm={worm} size={size} />
-            <WormholeRings cubies={cubies} size={size} voidTunnelKeysRef={worm.voidTunnelKeysRef} />
+            <WormholeRings cubies={cubies} size={size} voidTunnelKeysRef={worm.voidTunnelKeysRef} tunnelUseCountsRef={worm.tunnelUseCountsRef} />
             <PowerupOrbs size={size} />
         </>
     );
