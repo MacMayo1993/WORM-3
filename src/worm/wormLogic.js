@@ -331,12 +331,12 @@ export const updateTunnelWormAfterRotation = (segments, newTunnels, oldTunnels) 
       return { ...seg, tunnel: newTunnel };
     }
 
-    // Tunnel disappeared - find nearest new tunnel
+    // Tunnel disappeared - find nearest new tunnel, clamp t away from edges to avoid instant exit
     if (newTunnels.length > 0) {
       const randomTunnel = newTunnels[Math.floor(Math.random() * newTunnels.length)];
       return {
         tunnelId: randomTunnel.id,
-        t: seg.t,
+        t: Math.max(0.15, Math.min(0.85, seg.t)),
         tunnel: randomTunnel
       };
     }
