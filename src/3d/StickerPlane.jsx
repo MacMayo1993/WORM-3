@@ -187,8 +187,8 @@ const spinRevealFragmentShader = `
     float dist = length(uv);
     float angle = atan(uv.y, uv.x);
 
-    // Keep rendering within the round sticker footprint while still covering the
-    // full quad corners with color (prevents any background bleed).
+    // Circular mask: 1 inside the sticker disc, fades to 0 at the corners.
+    // Used as alpha so the overlay is transparent outside the tile radius.
     float inDisc = 1.0 - smoothstep(0.44, 0.50, dist);
 
     // Transition energy envelope: strongest near midpoint of each half.
@@ -204,8 +204,9 @@ const spinRevealFragmentShader = `
     vec3 coolGlow = vec3(0.20, 0.50, 1.00) * (wisp * 0.20);
     vec3 col = clamp(faceColor + coolGlow, 0.0, 3.0);
 
-    // Always opaque so the sticker never disappears during flip.
-    gl_FragColor = vec4(col, 1.0);
+    // Use inDisc as alpha so corners are transparent, preserving the black gaps between
+    // tiles and preventing this overlay from covering neighbouring stickers.
+    gl_FragColor = vec4(col, inDisc);
   }
 `;
 
@@ -1145,8 +1146,11 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         <meshBasicMaterial transparent opacity={0} blending={THREE.AdditiveBlending} depthWrite={false} />
       </mesh>
 
-      {/* Wormhole portal overlay — covers the tile during the flip animation */}
-      <mesh ref={spinRevealRef} position={[0, 0, 0]} visible={false} renderOrder={10}>
+      {/* Wormhole portal overlay — covers the tile during the flip animation.
+          Positioned slightly in front of the main mesh so depth-testing works correctly
+          without z-fighting.  depthTest must stay ON so that back-face flips don't bleed
+          over front-face tiles (the main cause of white-tile / outline artifacts). */}
+      <mesh ref={spinRevealRef} position={[0, 0, 0.002]} visible={false}>
         <primitive object={_sharedStickerGeo} attach="geometry" />
         <shaderMaterial
           ref={spinRevealMatRef}
@@ -1154,7 +1158,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           fragmentShader={spinRevealFragmentShader}
           uniforms={spinRevealUniforms}
           transparent
-          depthTest={false}
+          depthTest={true}
           depthWrite={false}
         />
       </mesh>
