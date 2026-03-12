@@ -457,6 +457,10 @@ export function useTunnelWormGame(cubies, size, animState, onRotate) {
     // Update worm positions for new tunnel configuration
     setWorm(prev => updateTunnelWormAfterRotation(prev, newTunnels, oldTunnels));
 
+    // Clear inactive side tracking — old tunnel IDs are invalid after a rotation,
+    // so stale entries would block the worm from entering any tunnel
+    setInactiveTunnelSides(new Set());
+
     // Update orb positions
     setOrbs(prev => prev.map(orb => {
       const newTunnel = newTunnels.find(t => t.id === orb.tunnelId);
@@ -474,7 +478,7 @@ export function useTunnelWormGame(cubies, size, animState, onRotate) {
       }
       return orb;
     }));
-  }, [cubies, size, tunnels]);
+  }, [cubies, size, tunnels, setInactiveTunnelSides]);
 
   // Restart handler
   const restart = useCallback(() => {
