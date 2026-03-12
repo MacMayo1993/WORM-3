@@ -148,6 +148,10 @@ export default function GameScene({
     wormPhase === 'entering' || wormPhase === 'tunnel' || wormPhase === 'exiting'
   );
 
+  // In Healer WORM mode, always show antipodal PiP except during wormhole travel,
+  // where the dedicated tunnel camera takes over.
+  const shouldShowAntipodalPiP = (showAntipodalPiP || wormHealerMode) && !wormholePhaseActive;
+
   // Memoize the BACKGROUNDS array search — avoids re-iterating on every render.
   // Only recomputes when the user actually changes their background theme.
   const bgConfig = useMemo(
@@ -261,7 +265,7 @@ export default function GameScene({
       </Suspense>
 
       {/* Antipodal PiP — only mounted when active so R3F auto-render stays live when off */}
-      {showAntipodalPiP && <AntipodalPiP />}
+      {shouldShowAntipodalPiP && <AntipodalPiP />}
     </>
   );
 }
