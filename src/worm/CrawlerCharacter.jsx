@@ -13,10 +13,33 @@ const EYE_WHITE = '#ffffff';
 const PUPIL = '#111111';
 const ANTENNA_COLOR = '#88ffbb';
 const GLOW_COLOR = '#00ff88';
+const SEGMENT_OFFSETS = [0, -0.32, -0.6, -0.85];
+const HISTORY_SIZE = 100;
+const HISTORY_STEP = 10;
+const TRAIL_LIFETIME = 2.0;
+const TRAIL_SPAWN_INTERVAL = 0.08;
+const TRAIL_MAX_POINTS = 28;
+
+const _worldPos = new THREE.Vector3();
+const _rootPos = new THREE.Vector3();
+const _segPos = new THREE.Vector3();
+const _invQuat = new THREE.Quaternion();
+const _tailWorldPos = new THREE.Vector3();
+const _trailLocalPos = new THREE.Vector3();
 
 export default function CrawlerCharacter({ position, forward, face, jumpHeight, velocity, alive = true }) {
   const groupRef = useRef();
+  const bodyRootRef = useRef();
   const timeRef = useRef(0);
+  const positionHistory = useRef([]);
+  const bodySegmentRefs = useRef([]);
+  const trailRefs = useRef([]);
+  const trailSpawnT = useRef(0);
+  const trailData = useRef(Array.from({ length: TRAIL_MAX_POINTS }, () => ({
+    active: false,
+    age: 0,
+    pos: new THREE.Vector3(),
+  })));
 
   // Compute orientation: look along forward, up along face normal
   const quaternion = useMemo(() => {
@@ -34,6 +57,70 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
   // Animate
   useFrame((_, delta) => {
     timeRef.current += delta;
+
+    if (!groupRef.current) return;
+
+    groupRef.current.getWorldPosition(_worldPos);
+    positionHistory.current.unshift(_worldPos.clone());
+    if (positionHistory.current.length > HISTORY_SIZE) positionHistory.current.pop();
+
+    if (!bodyRootRef.current) return;
+
+    groupRef.current.getWorldPosition(_rootPos);
+    _invQuat.copy(quaternion).invert();
+
+    const moveFactor = Math.min(1, velocity || 0);
+    for (let i = 1; i < SEGMENT_OFFSETS.length; i++) {
+      const segGroup = bodySegmentRefs.current[i];
+      if (!segGroup) continue;
+
+      const historyIndex = Math.min(positionHistory.current.length - 1, i * HISTORY_STEP);
+      const sampled = positionHistory.current[historyIndex];
+      if (!sampled) continue;
+
+      _segPos.copy(sampled).sub(_rootPos).applyQuaternion(_invQuat);
+      _segPos.y += Math.sin(timeRef.current * 6 + i * 0.8) * 0.02 * moveFactor;
+      segGroup.position.copy(_segPos);
+    }
+
+    const tailRef = bodySegmentRefs.current[SEGMENT_OFFSETS.length - 1];
+    if (tailRef) {
+      trailSpawnT.current += delta;
+      tailRef.getWorldPosition(_tailWorldPos);
+
+      if (alive && moveFactor > 0.05 && trailSpawnT.current >= TRAIL_SPAWN_INTERVAL) {
+        trailSpawnT.current = 0;
+        const slot = trailData.current.find(tp => !tp.active) || trailData.current[0];
+        slot.active = true;
+        slot.age = 0;
+        slot.pos.copy(_tailWorldPos);
+      }
+    }
+
+    for (let i = 0; i < TRAIL_MAX_POINTS; i++) {
+      const tp = trailData.current[i];
+      const mesh = trailRefs.current[i];
+      if (!mesh) continue;
+
+      if (!tp.active) {
+        mesh.visible = false;
+        continue;
+      }
+
+      tp.age += delta;
+      if (tp.age >= TRAIL_LIFETIME) {
+        tp.active = false;
+        mesh.visible = false;
+        continue;
+      }
+
+      const life = 1 - tp.age / TRAIL_LIFETIME;
+      mesh.visible = true;
+      _trailLocalPos.copy(tp.pos).sub(_rootPos);
+      mesh.position.copy(_trailLocalPos);
+      mesh.scale.setScalar(0.35 + life * 0.55);
+      mesh.material.opacity = life * 0.25;
+    }
   });
 
   if (!position) return null;
@@ -45,22 +132,31 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
 
   return (
     <group ref={groupRef} position={position.toArray ? position.toArray() : position}>
-      <group quaternion={quaternion}>
+      <group ref={bodyRootRef} quaternion={quaternion}>
         {/* Body segments */}
-        {[0, -0.32, -0.6, -0.85].map((zOff, i) => {
+        {SEGMENT_OFFSETS.map((zOff, i) => {
           const isHead = i === 0;
           const segScale = isHead ? 0.28 : 0.24 - i * 0.02;
           const segBob = Math.sin(t * 6 + i * 0.8) * 0.02 * Math.min(1, velocity || 0);
           const segColor = isHead ? BODY_COLOR : BELLY_COLOR;
 
           return (
-            <group key={i} position={[0, segBob + bobble, zOff]}>
+            <group ref={el => (bodySegmentRefs.current[i] = el)} key={i} position={[0, segBob + bobble, zOff]}>
               <mesh scale={[segScale * breathe, segScale * breathe, segScale]}>
                 <sphereGeometry args={[1, 12, 12]} />
-                <meshStandardMaterial
+                <meshPhysicalMaterial
                   color={segColor}
                   emissive={segColor}
-                  emissiveIntensity={isHead ? 0.5 : 0.2}
+                  emissiveIntensity={isHead ? 0.4 : 0.12}
+                  clearcoat={1}
+                  clearcoatRoughness={0.1}
+                  thickness={0.5}
+                  roughness={0.2}
+                  metalness={0}
+                  transmission={0.2}
+                  ior={1.45}
+                  iridescence={0.16}
+                  iridescenceIOR={1.3}
                   transparent={!alive}
                   opacity={opacity}
                 />
@@ -151,6 +247,26 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
 
       {/* Point light on crawler */}
       <pointLight color={GLOW_COLOR} intensity={0.6} distance={3} decay={2} />
+
+      {/* Slimy trail — each blob fades out completely after 2 seconds */}
+      {Array.from({ length: TRAIL_MAX_POINTS }, (_, i) => (
+        <mesh
+          key={`trail-${i}`}
+          ref={el => (trailRefs.current[i] = el)}
+          visible={false}
+          renderOrder={5}
+        >
+          <sphereGeometry args={[0.08, 8, 8]} />
+          <meshBasicMaterial
+            color={GLOW_COLOR}
+            transparent
+            opacity={0}
+            blending={THREE.AdditiveBlending}
+            depthWrite={false}
+            toneMapped={false}
+          />
+        </mesh>
+      ))}
     </group>
   );
 }
