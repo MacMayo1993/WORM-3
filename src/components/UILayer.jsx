@@ -287,7 +287,7 @@ export default function UILayer({
         <TileLeaderboard cubies={cubies} size={size} chaosMode={chaosMode} visible={showLeaderboard} onClose={toggleLeaderboard} />
 
         {/* Bottom Navigation Bar */}
-        {!wormHealerMode && (
+        {!wormHealerMode && !showMainMenu && (
           <BottomNavBar
             onReset={onReset}
             onShuffle={currentLevelData ? onShuffleForLevel : onShuffle}
@@ -305,7 +305,7 @@ export default function UILayer({
       </div>
 
       {/* Secondary Modes Bottom Sheet */}
-      {!wormHealerMode && <SecondaryModesSheet
+      {!wormHealerMode && !showMainMenu && <SecondaryModesSheet
         open={sheetOpen}
         onClose={() => setSheetOpen(false)}
         mode={sheetMode}
