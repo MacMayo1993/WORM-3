@@ -7,7 +7,7 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback, useMemo, Suspense } from 'react';
-import { Canvas, useThree } from '@react-three/fiber';
+import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { Environment } from '@react-three/drei';
 import { EffectComposer, Bloom, Vignette, ChromaticAberration } from '@react-three/postprocessing';
 import { BlendFunction } from 'postprocessing';
@@ -42,6 +42,7 @@ import {
 import GameScene from './3d/GameScene.jsx';
 import IntroScene from './components/intro/IntroScene.jsx';
 import { RotatingBlackCube } from './components/menus/MainMenu.jsx';
+import { setSharedRenderer, tickPreviews } from './3d/TilePreviewRenderer.js';
 
 // UI components
 import WelcomeScreen from './components/screens/WelcomeScreen.jsx';
@@ -174,6 +175,18 @@ function MenuScene() {
       )}
     </>
   );
+}
+
+/**
+ * TilePreviewHost — lives inside the Canvas so it can inject the main R3F
+ * renderer into TilePreviewRenderer, eliminating the need for a second WebGL
+ * context (which causes context loss on mobile).
+ */
+function TilePreviewHost() {
+  const { gl } = useThree();
+  useEffect(() => { setSharedRenderer(gl); }, [gl]);
+  useFrame((_, delta) => { tickPreviews(delta); });
+  return null;
 }
 
 export default function WORM3() {
@@ -954,6 +967,7 @@ export default function WORM3() {
           gl={{ powerPreference: 'high-performance', antialias: true }}
         >
           <CameraManager showWelcome={showWelcome} showMainMenu={showMainMenu} cameraZ={cameraZ} />
+          <TilePreviewHost />
           {showWelcome ? (
             <IntroBranch
               time={introTime}
