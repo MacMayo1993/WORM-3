@@ -41,6 +41,7 @@ import {
 // 3D components
 import GameScene from './3d/GameScene.jsx';
 import IntroScene from './components/intro/IntroScene.jsx';
+import { RotatingBlackCube } from './components/menus/MainMenu.jsx';
 
 // UI components
 import WelcomeScreen from './components/screens/WelcomeScreen.jsx';
@@ -130,19 +131,49 @@ function IntroBranch({ time, onComplete, reducedMotion = false, performanceMode 
 }
 
 /**
- * CameraManager — teleports the camera when transitioning intro → game.
+ * CameraManager — teleports the camera when transitioning intro → menu → game.
  * Must live inside the Canvas to access useThree().
  */
-function CameraManager({ showWelcome, cameraZ }) {
+function CameraManager({ showWelcome, showMainMenu, cameraZ }) {
   const { camera } = useThree();
   useEffect(() => {
-    if (!showWelcome) {
+    if (showMainMenu) {
+      camera.position.set(0, 3, 12);
+      camera.lookAt(0, 0, 0);
+      camera.updateProjectionMatrix();
+    } else if (!showWelcome) {
       camera.position.set(0, 0, cameraZ);
       camera.lookAt(0, 0, 0);
       camera.updateProjectionMatrix();
     }
-  }, [showWelcome, camera, cameraZ]);
+  }, [showWelcome, showMainMenu, camera, cameraZ]);
   return null;
+}
+
+/**
+ * MenuScene — the rotating black cube shown in the main menu.
+ * Rendered inside the shared Canvas so there is never a second WebGL context.
+ */
+function MenuScene() {
+  return (
+    <>
+      <color attach="background" args={['#060916']} />
+      <ambientLight intensity={0.12} />
+      <pointLight position={[8, 8, 10]} intensity={0.32} color="#a8d8ff" />
+      <pointLight position={[-9, -8, 7]} intensity={0.18} color="#7aa3ff" />
+      <pointLight position={[0, 2, -14]} intensity={0.08} color="#8db3ff" />
+      <RotatingBlackCube />
+      <Suspense fallback={null}>
+        <Environment preset="city" intensity={0.22} />
+      </Suspense>
+      {!isMobile && (
+        <EffectComposer>
+          <Bloom intensity={0.26} luminanceThreshold={0.24} luminanceSmoothing={0.9} mipmapBlur />
+          <Vignette offset={0.38} darkness={0.82} />
+        </EffectComposer>
+      )}
+    </>
+  );
 }
 
 export default function WORM3() {
@@ -152,6 +183,7 @@ export default function WORM3() {
   // UI navigation state — batched into one subscription (was 10 separate selectors)
   const {
     showWelcome, setShowWelcome,
+    showMainMenu,
     showTutorial, setShowTutorial,
     setShowSettings, setShowLevelSelect,
     showMobileTouchHint, markMobileHintShown,
@@ -159,6 +191,7 @@ export default function WORM3() {
   } = useGameStore(useShallow(s => ({
     showWelcome: s.showWelcome,
     setShowWelcome: s.setShowWelcome,
+    showMainMenu: s.showMainMenu,
     showTutorial: s.showTutorial,
     setShowTutorial: s.setShowTutorial,
     setShowSettings: s.setShowSettings,
@@ -912,14 +945,15 @@ export default function WORM3() {
     <div className={`full-screen${settings.backgroundTheme === 'dark' ? ' bg-dark' : settings.backgroundTheme === 'midnight' ? ' bg-midnight' : ''}`}>
       {showTutorial && !showWelcome && <Tutorial onClose={closeTutorial} onMainMenu={() => { closeTutorial(); handleBackToMainMenu(); }} />}
 
-      {/* Single persistent Canvas — never unmounts, eliminates context loss on intro→game */}
+      {/* Single persistent Canvas — never unmounts, eliminates context loss on intro→game.
+          Also renders the main-menu cube scene so there is never a second WebGL context. */}
       <div className="canvas-container" onContextMenu={(e) => e.preventDefault()}>
         <Canvas
-          camera={{ position: showWelcome ? [0, 3, 12] : [0, 0, cameraZ], fov: 40 }}
+          camera={{ position: (showWelcome || showMainMenu) ? [0, 3, 12] : [0, 0, cameraZ], fov: 40 }}
           dpr={[1, 1.5]}
           gl={{ powerPreference: 'high-performance', antialias: true }}
         >
-          <CameraManager showWelcome={showWelcome} cameraZ={cameraZ} />
+          <CameraManager showWelcome={showWelcome} showMainMenu={showMainMenu} cameraZ={cameraZ} />
           {showWelcome ? (
             <IntroBranch
               time={introTime}
@@ -927,6 +961,8 @@ export default function WORM3() {
               reducedMotion={prefersReducedMotion}
               performanceMode={introPerformanceMode}
             />
+          ) : showMainMenu ? (
+            <MenuScene />
           ) : (
             <GameScene
               onMove={onMove}
