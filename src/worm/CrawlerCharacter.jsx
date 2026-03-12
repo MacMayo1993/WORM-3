@@ -16,11 +16,16 @@ const GLOW_COLOR = '#00ff88';
 const SEGMENT_OFFSETS = [0, -0.32, -0.6, -0.85];
 const HISTORY_SIZE = 100;
 const HISTORY_STEP = 10;
+const TRAIL_LIFETIME = 2.0;
+const TRAIL_SPAWN_INTERVAL = 0.08;
+const TRAIL_MAX_POINTS = 28;
 
 const _worldPos = new THREE.Vector3();
 const _rootPos = new THREE.Vector3();
 const _segPos = new THREE.Vector3();
 const _invQuat = new THREE.Quaternion();
+const _tailWorldPos = new THREE.Vector3();
+const _trailLocalPos = new THREE.Vector3();
 
 export default function CrawlerCharacter({ position, forward, face, jumpHeight, velocity, alive = true }) {
   const groupRef = useRef();
@@ -28,6 +33,13 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
   const timeRef = useRef(0);
   const positionHistory = useRef([]);
   const bodySegmentRefs = useRef([]);
+  const trailRefs = useRef([]);
+  const trailSpawnT = useRef(0);
+  const trailData = useRef(Array.from({ length: TRAIL_MAX_POINTS }, () => ({
+    active: false,
+    age: 0,
+    pos: new THREE.Vector3(),
+  })));
 
   // Compute orientation: look along forward, up along face normal
   const quaternion = useMemo(() => {
@@ -69,6 +81,45 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
       _segPos.copy(sampled).sub(_rootPos).applyQuaternion(_invQuat);
       _segPos.y += Math.sin(timeRef.current * 6 + i * 0.8) * 0.02 * moveFactor;
       segGroup.position.copy(_segPos);
+    }
+
+    const tailRef = bodySegmentRefs.current[SEGMENT_OFFSETS.length - 1];
+    if (tailRef) {
+      trailSpawnT.current += delta;
+      tailRef.getWorldPosition(_tailWorldPos);
+
+      if (alive && moveFactor > 0.05 && trailSpawnT.current >= TRAIL_SPAWN_INTERVAL) {
+        trailSpawnT.current = 0;
+        const slot = trailData.current.find(tp => !tp.active) || trailData.current[0];
+        slot.active = true;
+        slot.age = 0;
+        slot.pos.copy(_tailWorldPos);
+      }
+    }
+
+    for (let i = 0; i < TRAIL_MAX_POINTS; i++) {
+      const tp = trailData.current[i];
+      const mesh = trailRefs.current[i];
+      if (!mesh) continue;
+
+      if (!tp.active) {
+        mesh.visible = false;
+        continue;
+      }
+
+      tp.age += delta;
+      if (tp.age >= TRAIL_LIFETIME) {
+        tp.active = false;
+        mesh.visible = false;
+        continue;
+      }
+
+      const life = 1 - tp.age / TRAIL_LIFETIME;
+      mesh.visible = true;
+      _trailLocalPos.copy(tp.pos).sub(_rootPos);
+      mesh.position.copy(_trailLocalPos);
+      mesh.scale.setScalar(0.35 + life * 0.55);
+      mesh.material.opacity = life * 0.25;
     }
   });
 
@@ -196,6 +247,26 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
 
       {/* Point light on crawler */}
       <pointLight color={GLOW_COLOR} intensity={0.6} distance={3} decay={2} />
+
+      {/* Slimy trail — each blob fades out completely after 2 seconds */}
+      {Array.from({ length: TRAIL_MAX_POINTS }, (_, i) => (
+        <mesh
+          key={`trail-${i}`}
+          ref={el => (trailRefs.current[i] = el)}
+          visible={false}
+          renderOrder={5}
+        >
+          <sphereGeometry args={[0.08, 8, 8]} />
+          <meshBasicMaterial
+            color={GLOW_COLOR}
+            transparent
+            opacity={0}
+            blending={THREE.AdditiveBlending}
+            depthWrite={false}
+            toneMapped={false}
+          />
+        </mesh>
+      ))}
     </group>
   );
 }
