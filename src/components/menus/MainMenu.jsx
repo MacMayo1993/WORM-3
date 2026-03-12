@@ -5,6 +5,12 @@ import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import IntroCubie from '../intro/IntroCubie.jsx';
 
+const isMobile = typeof window !== 'undefined' && (
+  window.innerWidth <= 768 ||
+  'ontouchstart' in window ||
+  navigator.maxTouchPoints > 0
+);
+
 // All stickers black — same as the opening frames of the intro
 const ZERO_REVEAL = { PZ: 0, NZ: 0, PX: 0, NX: 0, PY: 0, NY: 0 };
 
@@ -381,28 +387,32 @@ const MainMenu = ({ onPlay, _onLevels, onFreeplay, _onCoop, onSettings, onBiome,
   return (
     <div style={{ position: 'fixed', inset: 0, background: CLEAN.pageBg, zIndex: 9999, overflow: 'hidden' }}>
 
-      {/* ── Screen-edge color washes — synced to FacePulses via _pulse ── */}
-      <ScreenGlow />
+      {/* ── Screen-edge color washes — synced to FacePulses via _pulse (desktop only) ── */}
+      {!isMobile && <ScreenGlow />}
 
-      {/* ── Full-screen 3D canvas — same setup as WelcomeScreen ── */}
-      <div style={{ position: 'absolute', inset: 0, zIndex: 1 }}>
-        <Canvas camera={{ position: [0, 3, 12], fov: 40 }}>
-          <color attach="background" args={['#060916']} />
-          <ambientLight intensity={0.12} />
-          <pointLight position={[8, 8, 10]} intensity={0.32} color="#a8d8ff" />
-          <pointLight position={[-9, -8, 7]} intensity={0.18} color="#7aa3ff" />
-          {/* very dim back light (~5% feel) so cube silhouette is readable without washing out */}
-          <pointLight position={[0, 2, -14]} intensity={0.08} color="#8db3ff" />
-          <RotatingBlackCube />
-          <Suspense fallback={null}>
-            <Environment preset="city" intensity={0.22} />
-          </Suspense>
-          <EffectComposer>
-            <Bloom intensity={0.26} luminanceThreshold={0.24} luminanceSmoothing={0.9} mipmapBlur />
-            <Vignette offset={0.38} darkness={0.82} />
-          </EffectComposer>
-        </Canvas>
-      </div>
+      {/* ── Full-screen 3D canvas — skipped on mobile to avoid dual-WebGL-context crash ── */}
+      {isMobile ? (
+        <div style={{ position: 'absolute', inset: 0, zIndex: 1, background: 'radial-gradient(ellipse 80% 60% at 50% 40%, #0d1a3a 0%, #060916 60%, #05050f 100%)' }} />
+      ) : (
+        <div style={{ position: 'absolute', inset: 0, zIndex: 1 }}>
+          <Canvas camera={{ position: [0, 3, 12], fov: 40 }} dpr={[1, 1.5]}>
+            <color attach="background" args={['#060916']} />
+            <ambientLight intensity={0.12} />
+            <pointLight position={[8, 8, 10]} intensity={0.32} color="#a8d8ff" />
+            <pointLight position={[-9, -8, 7]} intensity={0.18} color="#7aa3ff" />
+            {/* very dim back light (~5% feel) so cube silhouette is readable without washing out */}
+            <pointLight position={[0, 2, -14]} intensity={0.08} color="#8db3ff" />
+            <RotatingBlackCube />
+            <Suspense fallback={null}>
+              <Environment preset="city" intensity={0.22} />
+            </Suspense>
+            <EffectComposer>
+              <Bloom intensity={0.26} luminanceThreshold={0.24} luminanceSmoothing={0.9} mipmapBlur />
+              <Vignette offset={0.38} darkness={0.82} />
+            </EffectComposer>
+          </Canvas>
+        </div>
+      )}
 
       {/* ── UI overlay ── */}
       <div style={{ position: 'relative', zIndex: 2, height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', pointerEvents: 'none' }}>
