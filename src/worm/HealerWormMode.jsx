@@ -274,9 +274,9 @@ function useWormCrawler(size, cubies) {
         const traversals = tunnelUseCountsRef.current.get(tunnelKey) ?? 0;
         const nextTraversals = traversals + 1;
         tunnelUseCountsRef.current.set(tunnelKey, nextTraversals);
-        if (nextTraversals >= WORMHOLE_MAX_TRAVERSALS) {
+        if (nextTraversals > WORMHOLE_MAX_TRAVERSALS) {
             // Arm the tunnel to become void only after the worm fully exits this traversal.
-            // This prevents "inside tunnel" deaths on the final pass.
+            // This prevents "inside tunnel" deaths and only voids on the 4th traversal.
             pendingVoidKillRef.current = {
                 tunnelKey,
                 exitTileKey: tileKey(tunnel.exit),
