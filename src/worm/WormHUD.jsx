@@ -3,18 +3,26 @@
 
 import React from 'react';
 
+function formatTime(secs) {
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
 export default function WormHUD({
   score,
   length,
   orbsRemaining,
   orbsTotal,
+  orbsCollected = 0,
   warps,
   warpsLabel = 'WARPS', // 'WARPS' for surface mode, 'TUNNELS' for tunnel mode
   gameState, // 'playing', 'paused', 'gameover', 'victory'
   speed,
   wormCameraEnabled = false,
   mode = 'surface', // 'surface' or 'tunnel'
-  onPause: _onPause,
+  timeAlive = 0,
+  onPause,
   onResume,
   onRestart,
   onQuit
@@ -29,34 +37,50 @@ export default function WormHUD({
     <div className="worm-hud" style={styles.container}>
       {/* Stats Bar */}
       <div style={styles.statsBar}>
-        <div style={styles.statGroup}>
-          <span style={styles.statLabel}>SCORE</span>
-          <span style={styles.statValue}>{score.toLocaleString()}</span>
-        </div>
-        <div style={styles.statGroup}>
-          <span style={styles.statLabel}>LENGTH</span>
-          <span style={styles.statValue}>{length}</span>
-        </div>
-        <div style={styles.statGroup}>
-          <span style={styles.statLabel}>ORBS</span>
-          <span style={styles.statValue}>
-            {orbsRemaining} / {orbsTotal}
-          </span>
-        </div>
-        <div style={styles.statGroup}>
-          <span style={styles.statLabel}>{warpsLabel}</span>
-          <span style={styles.statValue}>{warps}</span>
-        </div>
-        <div style={styles.statGroup}>
-          <span style={styles.statLabel}>SPEED</span>
-          <span style={styles.statValue}>{speed.toFixed(1)}x</span>
-        </div>
-        {wormCameraEnabled && (
-          <div style={{...styles.statGroup, ...styles.cameraIndicator}}>
-            <span style={styles.statLabel}>CAM</span>
-            <span style={{...styles.statValue, color: '#ff6b6b'}}>WORM</span>
+        <div style={styles.statsLeft}>
+          <div style={styles.statGroup}>
+            <span style={styles.statLabel}>SCORE</span>
+            <span style={styles.statValue}>{score.toLocaleString()}</span>
           </div>
-        )}
+          <div style={styles.statGroup}>
+            <span style={styles.statLabel}>LENGTH</span>
+            <span style={styles.statValue}>{length}</span>
+          </div>
+          <div style={styles.statGroup}>
+            <span style={styles.statLabel}>TIME</span>
+            <span style={styles.statValue}>{formatTime(timeAlive)}</span>
+          </div>
+          <div style={styles.statGroup}>
+            <span style={styles.statLabel}>ORBS</span>
+            <span style={styles.statValue}>{orbsCollected} / {orbsTotal}</span>
+          </div>
+          <div style={styles.statGroup}>
+            <span style={styles.statLabel}>{warpsLabel}</span>
+            <span style={styles.statValue}>{warps}</span>
+          </div>
+          <div style={styles.statGroup}>
+            <span style={styles.statLabel}>SPEED</span>
+            <span style={styles.statValue}>{speed.toFixed(1)}x</span>
+          </div>
+          {wormCameraEnabled && (
+            <div style={{...styles.statGroup, ...styles.cameraIndicator}}>
+              <span style={styles.statLabel}>CAM</span>
+              <span style={{...styles.statValue, color: '#ff6b6b'}}>WORM</span>
+            </div>
+          )}
+        </div>
+
+        {/* Pause button - always visible during active gameplay */}
+        <button
+          style={{
+            ...styles.pauseButton,
+            ...(isPaused ? styles.pauseButtonActive : {})
+          }}
+          onClick={isPaused ? onResume : onPause}
+          title={isPaused ? 'Resume (Space)' : 'Pause (Space)'}
+        >
+          {isPaused ? '▶' : '⏸'}
+        </button>
       </div>
 
       {/* Control hint */}
@@ -73,6 +97,20 @@ export default function WormHUD({
         <div style={styles.overlay}>
           <div style={styles.overlayContent}>
             <h2 style={styles.overlayTitle}>PAUSED</h2>
+            <div style={styles.pauseStats}>
+              <div style={styles.pauseStatRow}>
+                <span style={styles.pauseStatLabel}>Time Alive</span>
+                <span style={styles.pauseStatValue}>{formatTime(timeAlive)}</span>
+              </div>
+              <div style={styles.pauseStatRow}>
+                <span style={styles.pauseStatLabel}>Orbs Collected</span>
+                <span style={styles.pauseStatValue}>{orbsCollected} / {orbsTotal}</span>
+              </div>
+              <div style={styles.pauseStatRow}>
+                <span style={styles.pauseStatLabel}>{warpsLabel === 'TUNNELS' ? 'Tunnels Traveled' : 'Wormholes Traveled'}</span>
+                <span style={styles.pauseStatValue}>{warps}</span>
+              </div>
+            </div>
             <div style={styles.buttonGroup}>
               <button style={styles.button} onClick={onResume}>
                 RESUME
@@ -98,9 +136,10 @@ export default function WormHUD({
             </p>
             <div style={styles.finalStats}>
               <div>Final Score: <strong>{score.toLocaleString()}</strong></div>
+              <div>Time Alive: <strong>{formatTime(timeAlive)}</strong></div>
               <div>Length: <strong>{length}</strong></div>
-              <div>Orbs Collected: <strong>{orbsTotal - orbsRemaining}</strong></div>
-              <div>{isTunnelMode ? 'Tunnels Traversed' : 'Wormhole Warps'}: <strong>{warps}</strong></div>
+              <div>Orbs Collected: <strong>{orbsCollected} / {orbsTotal}</strong></div>
+              <div>{isTunnelMode ? 'Tunnels Traveled' : 'Wormholes Traveled'}: <strong>{warps}</strong></div>
             </div>
             <div style={styles.buttonGroup}>
               <button style={styles.button} onClick={onRestart}>
@@ -124,8 +163,10 @@ export default function WormHUD({
             </p>
             <div style={styles.finalStats}>
               <div>Final Score: <strong>{score.toLocaleString()}</strong></div>
+              <div>Time Alive: <strong>{formatTime(timeAlive)}</strong></div>
               <div>Final Length: <strong>{length}</strong></div>
-              <div>{isTunnelMode ? 'Tunnels Traversed' : 'Wormhole Warps'}: <strong>{warps}</strong></div>
+              <div>Orbs Collected: <strong>{orbsCollected} / {orbsTotal}</strong></div>
+              <div>{isTunnelMode ? 'Tunnels Traveled' : 'Wormholes Traveled'}: <strong>{warps}</strong></div>
             </div>
             <div style={styles.buttonGroup}>
               <button style={styles.button} onClick={onRestart}>
@@ -158,11 +199,16 @@ const styles = {
   },
   statsBar: {
     display: 'flex',
-    justifyContent: 'center',
-    gap: isMobile ? '12px' : '24px',
-    padding: isMobile ? '8px 10px' : '12px 20px',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: isMobile ? '8px 10px' : '12px 16px',
     background: 'linear-gradient(180deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.4) 100%)',
-    borderBottom: '2px solid #00ff88',
+    borderBottom: '2px solid #00ff88'
+  },
+  statsLeft: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: isMobile ? '10px' : '20px',
     flexWrap: 'wrap'
   },
   statGroup: {
@@ -187,6 +233,27 @@ const styles = {
     padding: '4px 8px',
     borderRadius: '4px',
     border: '1px solid #ff6b6b'
+  },
+  pauseButton: {
+    pointerEvents: 'auto',
+    background: 'rgba(0, 255, 136, 0.1)',
+    border: '2px solid #00ff88',
+    borderRadius: '6px',
+    color: '#00ff88',
+    fontSize: isMobile ? '16px' : '20px',
+    width: isMobile ? '36px' : '44px',
+    height: isMobile ? '36px' : '44px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    transition: 'background 0.15s ease',
+    flexShrink: 0,
+    touchAction: 'manipulation'
+  },
+  pauseButtonActive: {
+    background: 'rgba(0, 255, 136, 0.25)',
+    boxShadow: '0 0 12px rgba(0, 255, 136, 0.4)'
   },
   hint: {
     position: 'absolute',
@@ -230,6 +297,27 @@ const styles = {
     fontSize: '16px',
     color: '#aaa',
     margin: '0 0 20px 0'
+  },
+  pauseStats: {
+    marginBottom: '24px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px'
+  },
+  pauseStatRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: '32px',
+    fontSize: '14px'
+  },
+  pauseStatLabel: {
+    color: '#888',
+    textAlign: 'left'
+  },
+  pauseStatValue: {
+    color: '#00ff88',
+    fontWeight: 'bold',
+    textAlign: 'right'
   },
   finalStats: {
     fontSize: '14px',

@@ -66,6 +66,10 @@ export function useWormGame(cubies, size, animState, onRotate) {
   // Timing
   const lastMoveTime = useRef(0);
   const rotationQueue = useRef([]);
+  const timeAliveAcc = useRef(0); // Accumulated seconds (ref avoids per-frame renders)
+
+  // Time alive display state (updated at whole-second intervals)
+  const [timeAlive, setTimeAlive] = useState(0);
 
   // Ref for current worm state (avoids stale closures in event handlers)
   const wormRef = useRef(worm);
@@ -94,8 +98,10 @@ export function useWormGame(cubies, size, animState, onRotate) {
     setScore(0);
     setWarps(0);
     setPendingGrowth(0);
+    setTimeAlive(0);
     setGameState('playing');
     lastMoveTime.current = 0;
+    timeAliveAcc.current = 0;
     rotationQueue.current = [];
   }, [cubies, size]);
 
@@ -218,6 +224,7 @@ export function useWormGame(cubies, size, animState, onRotate) {
     pendingGrowth,
     orbsTotal: CONFIG.initialOrbs,
     wormCameraEnabled,
+    timeAlive,
 
     // Setters for game loop
     setGameState,
@@ -228,9 +235,11 @@ export function useWormGame(cubies, size, animState, onRotate) {
     setWarps,
     setPendingGrowth,
     setWormCameraEnabled,
+    setTimeAlive,
 
     // Refs
     lastMoveTime,
+    timeAliveAcc,
 
     // Actions
     restart,
@@ -305,6 +314,7 @@ export function WormGameLoop({
     speed,
     pendingGrowth,
     lastMoveTime,
+    timeAliveAcc,
     setGameState,
     setWorm,
     setMoveDir,
@@ -312,12 +322,19 @@ export function WormGameLoop({
     setScore,
     setWarps,
     setPendingGrowth,
+    setTimeAlive,
     CONFIG
   } = game;
 
   useFrame((state, delta) => {
     if (gameState !== 'playing') return;
     if (animState) return;
+
+    // Track time alive (update display state at whole-second boundaries)
+    const prevSecs = Math.floor(timeAliveAcc.current);
+    timeAliveAcc.current += delta;
+    const newSecs = Math.floor(timeAliveAcc.current);
+    if (newSecs !== prevSecs) setTimeAlive(newSecs);
 
     lastMoveTime.current += delta;
 
@@ -416,6 +433,10 @@ export function useTunnelWormGame(cubies, size, animState, onRotate) {
   // Timing
   const lastMoveTime = useRef(0);
   const rotationQueue = useRef([]);
+  const timeAliveAcc = useRef(0); // Accumulated seconds (ref avoids per-frame renders)
+
+  // Time alive display state (updated at whole-second intervals)
+  const [timeAlive, setTimeAlive] = useState(0);
 
   // Ref for current worm state
   const wormRef = useRef(worm);
@@ -498,8 +519,10 @@ export function useTunnelWormGame(cubies, size, animState, onRotate) {
     setTunnelsTraversed(0);
     setPendingGrowth(0);
     setInactiveTunnelSides(new Set());
+    setTimeAlive(0);
     setGameState('playing');
     lastMoveTime.current = 0;
+    timeAliveAcc.current = 0;
     rotationQueue.current = [];
   }, [cubies, size]);
 
@@ -609,6 +632,7 @@ export function useTunnelWormGame(cubies, size, animState, onRotate) {
     targetTunnelId,
     inactiveTunnelSides,
     mode: 'tunnel',
+    timeAlive,
 
     // Setters
     setGameState,
@@ -620,9 +644,11 @@ export function useTunnelWormGame(cubies, size, animState, onRotate) {
     setWormCameraEnabled,
     setTargetTunnelId,
     setInactiveTunnelSides,
+    setTimeAlive,
 
     // Refs
     lastMoveTime,
+    timeAliveAcc,
 
     // Actions
     restart,
@@ -649,6 +675,7 @@ export function TunnelWormGameLoop({
     speed,
     pendingGrowth,
     lastMoveTime,
+    timeAliveAcc,
     setGameState,
     setWorm,
     setOrbs,
@@ -656,6 +683,7 @@ export function TunnelWormGameLoop({
     setTunnelsTraversed,
     setPendingGrowth,
     setTargetTunnelId,
+    setTimeAlive,
     inactiveTunnelSides,
     setInactiveTunnelSides,
     CONFIG
@@ -665,6 +693,12 @@ export function TunnelWormGameLoop({
     if (gameState !== 'playing') return;
     if (animState) return;
     if (worm.length === 0 || tunnels.length === 0) return;
+
+    // Track time alive (update display state at whole-second boundaries)
+    const prevSecs = Math.floor(timeAliveAcc.current);
+    timeAliveAcc.current += delta;
+    const newSecs = Math.floor(timeAliveAcc.current);
+    if (newSecs !== prevSecs) setTimeAlive(newSecs);
 
     lastMoveTime.current += delta;
 

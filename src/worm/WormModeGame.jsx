@@ -67,6 +67,7 @@ function SurfaceWormModeProvider({ children, cubies, size, animState, onRotate, 
       orbsTotal: game.orbsTotal,
       wormCameraEnabled: game.wormCameraEnabled,
       targetTunnelId: game.targetTunnelId || null,
+      timeAlive: game.timeAlive || 0,
       mode,
       setGameState: game.setGameState,
       setWormCameraEnabled: game.setWormCameraEnabled,
@@ -84,6 +85,7 @@ function SurfaceWormModeProvider({ children, cubies, size, animState, onRotate, 
     game.orbsTotal,
     game.wormCameraEnabled,
     game.targetTunnelId,
+    game.timeAlive,
     game.setGameState,
     game.setWormCameraEnabled,
     game.restart,
@@ -118,6 +120,7 @@ function TunnelWormModeProvider({ children, cubies, size, animState, onRotate, o
       orbsTotal: game.orbsTotal,
       wormCameraEnabled: game.wormCameraEnabled,
       targetTunnelId: game.targetTunnelId || null,
+      timeAlive: game.timeAlive || 0,
       mode: 'tunnel',
       setGameState: game.setGameState,
       setWormCameraEnabled: game.setWormCameraEnabled,
@@ -135,6 +138,7 @@ function TunnelWormModeProvider({ children, cubies, size, animState, onRotate, o
     game.orbsTotal,
     game.wormCameraEnabled,
     game.targetTunnelId,
+    game.timeAlive,
     game.setGameState,
     game.setWormCameraEnabled,
     game.restart,
@@ -235,10 +239,12 @@ export function WormModeHUD({ onQuit, gameData }) {
     orbsTotal,
     wormCameraEnabled,
     mode,
+    timeAlive,
     restart
   } = game;
 
   const isTunnelMode = mode === 'tunnel';
+  const orbsCollected = orbsTotal - orbs.length;
 
   return (
     <WormHUD
@@ -246,12 +252,14 @@ export function WormModeHUD({ onQuit, gameData }) {
       length={worm.length}
       orbsRemaining={orbs.length}
       orbsTotal={orbsTotal}
+      orbsCollected={orbsCollected}
       warps={isTunnelMode ? tunnelsTraversed : warps}
       warpsLabel={isTunnelMode ? 'TUNNELS' : 'WARPS'}
       gameState={gameState}
       speed={speed}
       wormCameraEnabled={wormCameraEnabled}
       mode={mode}
+      timeAlive={timeAlive || 0}
       onPause={handlePause}
       onResume={handleResume}
       onRestart={restart}
