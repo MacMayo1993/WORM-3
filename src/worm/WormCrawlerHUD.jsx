@@ -268,6 +268,10 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
     const phaseMeta = PHASE_META[phase] || { label: phase || 'CRAWLING', accent: '#93c5fd' };
     const isPortalReady = wormAlive && onFlippedTile && phase === 'crawling';
 
+    const isVoidedDeath = deathDetails?.reason === 'voided' || deathDetails?.reason === 'void-zone' || deathDetails?.reason === 'void-tunnel-exhausted';
+    const deathTitle = isVoidedDeath ? 'VOID BREACH' : 'WORM COLLISION';
+    const deathHeading = isVoidedDeath ? 'You have been VOIDED!' : 'You hit your tail.';
+
     const phaseNameStyle = useMemo(
         () => ({ fontSize: 13, fontWeight: 700, color: phaseMeta.accent }),
         [phaseMeta.accent]
@@ -377,9 +381,16 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
             {showDeathMenu && (
                 <div style={DEATH_OVERLAY_STYLE}>
                     <div style={DEATH_CARD_STYLE}>
-                        <div style={DEATH_TITLE_STYLE}>WORM COLLISION</div>
-                        <div style={DEATH_HEADING_STYLE}>You hit your tail.</div>
+                        <div style={DEATH_TITLE_STYLE}>{deathTitle}</div>
+                        <div style={DEATH_HEADING_STYLE}>{deathHeading}</div>
                         <div style={DEATH_SUBTITLE_STYLE}>Retry this run or start a new game mode.</div>
+                        {isVoidedDeath && (
+                            <div style={DEATH_DETAILS_STYLE}>
+                                <div>Reason: <b style={DEATH_DETAIL_VALUE_STYLE}>Void breach</b></div>
+                                <div>Head tile: <b style={DEATH_DETAIL_VALUE_STYLE}>{deathDetails?.headTile ?? 'n/a'}</b></div>
+                                <div>Tunnel key: <b style={DEATH_DETAIL_VALUE_STYLE}>{deathDetails?.tunnelKey ?? 'n/a'}</b></div>
+                            </div>
+                        )}
                         {deathDetails?.reason === 'self-collision' && (
                             <div style={DEATH_DETAILS_STYLE}>
                                 <div>Reason: <b style={DEATH_DETAIL_VALUE_STYLE}>Self-collision</b></div>

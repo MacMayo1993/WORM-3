@@ -264,7 +264,7 @@ function useWormCrawler(size, cubies) {
 
         if (voidTunnelKeysRef.current.has(tunnelKey)) {
             killWorm({
-                reason: 'void-zone',
+                reason: 'voided',
                 tunnelKey,
                 headTile: tileKey({ x, y, z, dirKey }),
             });
@@ -275,13 +275,16 @@ function useWormCrawler(size, cubies) {
         const nextTraversals = traversals + 1;
         tunnelUseCountsRef.current.set(tunnelKey, nextTraversals);
         if (nextTraversals > WORMHOLE_MAX_TRAVERSALS) {
-            // Arm the tunnel to become void only after the worm fully exits this traversal.
-            // This prevents "inside tunnel" deaths and only voids on the 4th traversal.
-            pendingVoidKillRef.current = {
+            // 4th touch: this tunnel is now fully void and kills immediately on contact.
+            voidTunnelKeysRef.current.add(tunnelKey);
+            pendingVoidKillRef.current = null;
+            killWorm({
+                reason: 'voided',
                 tunnelKey,
-                exitTileKey: tileKey(tunnel.exit),
-                armed: false,
-            };
+                headTile: tileKey({ x, y, z, dirKey }),
+                traversals: nextTraversals,
+            });
+            return;
         }
 
         activeTunnel.current = tunnel;
@@ -381,7 +384,7 @@ function useWormCrawler(size, cubies) {
                 if (headOnSurface && hasClearedExitTile && fullyOnNextTile) {
                     pendingVoidKillRef.current = null;
                     voidTunnelKeysRef.current.add(tunnelKey);
-                    killWorm({ reason: 'void-tunnel-exhausted', tunnelKey, exitTileKey, headTile: headTileKey });
+                    killWorm({ reason: 'voided', tunnelKey, exitTileKey, headTile: headTileKey });
                     return;
                 }
             }
