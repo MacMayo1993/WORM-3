@@ -169,6 +169,7 @@ function useWormCrawler(size, cubies) {
     const deathMenuTimer = useRef(null);
     const tunnelUseCountsRef = useRef(new Map());
     const voidTunnelKeysRef = useRef(new Set());
+    const pendingVoidKillRef = useRef(null);
     // Cached tunnel list — rebuilt whenever cubies change to avoid redundant getActiveTunnels calls
     const tunnelCacheRef = useRef(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -268,6 +269,7 @@ function useWormCrawler(size, cubies) {
         tunnelUseCountsRef.current.set(tunnelKey, nextTraversals);
         if (nextTraversals >= WORMHOLE_MAX_TRAVERSALS) {
             voidTunnelKeysRef.current.add(tunnelKey);
+            pendingVoidKillRef.current = tunnelKey;
         }
 
         activeTunnel.current = tunnel;
@@ -531,17 +533,23 @@ function useWormCrawler(size, cubies) {
         } else if (phase.current === 'exiting') {
             tunnelProgress.current += delta * (2.0 * TUNNEL_SPEED_SCALE);
             if (tunnelProgress.current >= 1) {
+                const voidKillKey = pendingVoidKillRef.current;
+                pendingVoidKillRef.current = null;
                 tunnelProgress.current = 0;
                 activeTunnel.current = null;
-                phase.current = 'crawling';
-                useGameStore.setState({ wormPhase: 'crawling', wormOnFlippedTile: false, visualMode: prevVisualModeRef.current ?? 'classic' });
-                onFlippedTile.current = false;
-                lastFlippedRef.current = false;
-                healedRef.current += 1;
-                useGameStore.getState().setWormHealedCount(healedRef.current);
+                if (voidKillKey) {
+                    killWorm({ reason: 'void-tunnel-exhausted', tunnelKey: voidKillKey });
+                } else {
+                    phase.current = 'crawling';
+                    useGameStore.setState({ wormPhase: 'crawling', wormOnFlippedTile: false, visualMode: prevVisualModeRef.current ?? 'classic' });
+                    onFlippedTile.current = false;
+                    lastFlippedRef.current = false;
+                    healedRef.current += 1;
+                    useGameStore.getState().setWormHealedCount(healedRef.current);
+                }
             }
         }
-    }, [size, cubies, wormSpeed, wormControlMode, wormholeInterval, beginTunnelTransition, resolveTunnelAtTile]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [size, cubies, wormSpeed, wormControlMode, wormholeInterval, beginTunnelTransition, resolveTunnelAtTile, killWorm]); // eslint-disable-line react-hooks/exhaustive-deps
 
 
 
@@ -587,6 +595,7 @@ function useWormCrawler(size, cubies) {
         healedRef.current = 0;
         tunnelUseCountsRef.current = new Map();
         voidTunnelKeysRef.current = new Set();
+        pendingVoidKillRef.current = null;
 
         powerupsRef.current = initial;
         alive.current = true;
@@ -1433,6 +1442,82 @@ function WormholeRings({ cubies, size, voidTunnelKeysRef }) {
     );
 }
 
+// ─── Tunnel Portal Rings — 3 gyroscope rings during antipodal traversal ──────
+// Stacked torus rings rotating around X, Y, Z axes respectively; shown every
+// time the worm travels through an antipodal tunnel.
+const _portalRingPos = new THREE.Vector3();
+
+function TunnelPortalRings({ worm, size }) {
+    const ringXRef = useRef();
+    const ringYRef = useRef();
+    const ringZRef = useRef();
+
+    useFrame(({ clock }) => {
+        const phase = worm.phase.current;
+        const tunnel = worm.activeTunnel.current;
+        const active = (phase === 'entering' || phase === 'tunnel' || phase === 'exiting') && tunnel;
+
+        const rings = [ringXRef.current, ringYRef.current, ringZRef.current];
+        if (!active) {
+            for (const r of rings) if (r) r.visible = false;
+            return;
+        }
+
+        // Map phase progress → tunnel t (same mapping as WormChaseCamera)
+        const prog = worm.tunnelProgress.current;
+        let tunnelT;
+        if (phase === 'entering') tunnelT = prog * 0.35;
+        else if (phase === 'exiting') tunnelT = 0.65 + prog * 0.35;
+        else tunnelT = 0.35 + prog * 0.30;
+
+        const wp = getTunnelWorldPos(tunnel, Math.min(tunnelT, 1), size);
+        _portalRingPos.set(wp[0], wp[1], wp[2]);
+
+        const t = clock.elapsedTime;
+        // Quick fade-in at the start of entering phase; fade-out at end of exiting
+        const fadeIn = phase === 'entering' ? Math.min(1, prog * 5) : (phase === 'exiting' ? Math.max(0, 1 - prog * 3) : 1);
+
+        if (ringXRef.current) {
+            ringXRef.current.position.copy(_portalRingPos);
+            ringXRef.current.rotation.set(t * 2.2, t * 0.3, 0);
+            ringXRef.current.material.opacity = 0.75 * fadeIn;
+            ringXRef.current.visible = true;
+        }
+        if (ringYRef.current) {
+            ringYRef.current.position.copy(_portalRingPos);
+            ringYRef.current.rotation.set(t * 0.4, t * 1.8, 0);
+            ringYRef.current.material.opacity = 0.65 * fadeIn;
+            ringYRef.current.visible = true;
+        }
+        if (ringZRef.current) {
+            ringZRef.current.position.copy(_portalRingPos);
+            ringZRef.current.rotation.set(0, t * 0.5, t * 2.5);
+            ringZRef.current.material.opacity = 0.55 * fadeIn;
+            ringZRef.current.visible = true;
+        }
+    });
+
+    return (
+        <>
+            {/* X-axis ring */}
+            <mesh ref={ringXRef} visible={false}>
+                <torusGeometry args={[0.40, 0.026, 8, 32]} />
+                <meshBasicMaterial color="#cc44ff" transparent opacity={0} blending={THREE.AdditiveBlending} depthWrite={false} />
+            </mesh>
+            {/* Y-axis ring */}
+            <mesh ref={ringYRef} visible={false}>
+                <torusGeometry args={[0.36, 0.022, 8, 32]} />
+                <meshBasicMaterial color="#aa22ff" transparent opacity={0} blending={THREE.AdditiveBlending} depthWrite={false} />
+            </mesh>
+            {/* Z-axis ring */}
+            <mesh ref={ringZRef} visible={false}>
+                <torusGeometry args={[0.32, 0.020, 8, 32]} />
+                <meshBasicMaterial color="#ff44ff" transparent opacity={0} blending={THREE.AdditiveBlending} depthWrite={false} />
+            </mesh>
+        </>
+    );
+}
+
 // ─── Main exported wrapper ────────────────────────────────────────────────────
 export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animState, _onRotate, _onHeal }) {
     const worm = useWormCrawler(size, cubies);
@@ -1454,6 +1539,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             <WormSwipeControls onTurn={worm.queueTurn} worm={worm} />
             <WormInteriorGlass worm={worm} size={size} />
             <TunnelSurfFX worm={worm} size={size} />
+            <TunnelPortalRings worm={worm} size={size} />
             <WormBody worm={worm} size={size} />
             <WormFace worm={worm} size={size} />
             <PortalGlow worm={worm} size={size} />
