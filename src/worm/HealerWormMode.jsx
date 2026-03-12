@@ -11,117 +11,48 @@ import { useShallow } from 'zustand/react/shallow';
 import { getStickerWorldPos } from '../game/coordinates.js';
 import { getNextSurfacePosition, getActiveTunnels, getTunnelWorldPos, turnWorm } from './wormLogic.js';
 import { buildManifoldGridMap, flipStickerPair } from '../game/manifoldLogic.js';
-
-// ─── Constants ────────────────────────────────────────────────────────────────
-const CAM_HEIGHT_BASE = 4.6;  // base height above worm
-const CAM_BACK_BASE = 4.2;  // base behind distance
-const LOOK_AHEAD = 1.8;  // look-at ahead of worm
-const CAM_LERP = 6;    // camera smoothing (× delta)
-const WORM_LIFT = 0.08; // worm sits right on tile surface
-const ZOOM_BURST = 0.8;  // brief camera pull-back on pickup (decays fast)
-const MAX_EXTRA_ZOOM = 2.0; // hard cap so camera never flies away
-
-const GLASS_MIN_OPACITY = 0.12;
-const GLASS_MAX_OPACITY = 0.28;
-const GLASS_MIN_TRANSMISSION = 0.72;
-const GLASS_MAX_TRANSMISSION = 0.95;
-const TUNNEL_SURF_FOV = 78;
-const TUNNEL_SURF_BACK = 2.2;
-const TUNNEL_SURF_UP = 0.72;
-const TUNNEL_SURF_SWAY = 0.22;
-const TUNNEL_SPEED_SCALE = 0.8; // 20% slower tunnel traversal
-
-// Face outward normals
-const FACE_NORMALS = {
-    PX: new THREE.Vector3(1, 0, 0),
-    NX: new THREE.Vector3(-1, 0, 0),
-    PY: new THREE.Vector3(0, 1, 0),
-    NY: new THREE.Vector3(0, -1, 0),
-    PZ: new THREE.Vector3(0, 0, 1),
-    NZ: new THREE.Vector3(0, 0, -1),
-};
-
-// Move direction → world forward vector (on each face)
-const DIR_FORWARD = {
-    PZ: { up: [0, 1, 0], down: [0, -1, 0], left: [-1, 0, 0], right: [1, 0, 0] },
-    NZ: { up: [0, 1, 0], down: [0, -1, 0], left: [1, 0, 0], right: [-1, 0, 0] },
-    PX: { up: [0, 1, 0], down: [0, -1, 0], left: [0, 0, 1], right: [0, 0, -1] },
-    NX: { up: [0, 1, 0], down: [0, -1, 0], left: [0, 0, -1], right: [0, 0, 1] },
-    PY: { up: [0, 0, -1], down: [0, 0, 1], left: [-1, 0, 0], right: [1, 0, 0] },
-    NY: { up: [0, 0, 1], down: [0, 0, -1], left: [-1, 0, 0], right: [1, 0, 0] },
-};
-
-const INITIAL_DIR = 'up';
-const INITIAL_POS = (size) => {
-    const c = Math.floor(size / 2);
-    return { x: c, y: c, z: size - 1, dirKey: 'PZ' };
-};
-
-// ─── Powerup helpers ─────────────────────────────────────────────────────────
-const DEFAULT_POWERUP_COUNT = 5;
-const ORB_SEGMENT_GROWTH = 2;   // every orb adds exactly 2 visual balls
-const STEPS_PER_TILE = 50;      // sub-steps recorded per tile (0.02 resolution)
-const BODY_BALL_SPACING = 0.14; // matches WormBody clone spacing along the trail
-const BASE_TAIL_LENGTH = 4;
-const DEFAULT_WORMHOLE_FLIP_INTERVAL = 10; // seconds between guaranteed antipodal wormhole spawns
-const MAX_JUMPS = 2;
-const MAX_POWERUP_RENDER = 24;
-const TUNNEL_TRIGGER_PROGRESS = 1 / 3;
-const SELF_COLLISION_TRIGGER_PROGRESS = 0.4;
-const SELF_COLLISION_GRACE_STEPS_AFTER_TUNNEL = 2;
-const WORMHOLE_MAX_TRAVERSALS = 3;
-
-function getAllSurfaceTiles(size) {
-    const tiles = [];
-    const faces = [
-        ['PX', 'x', size - 1], ['NX', 'x', 0],
-        ['PY', 'y', size - 1], ['NY', 'y', 0],
-        ['PZ', 'z', size - 1], ['NZ', 'z', 0],
-    ];
-    for (const [dirKey, axis, val] of faces) {
-        for (let a = 0; a < size; a++) {
-            for (let b = 0; b < size; b++) {
-                const p = { x: 0, y: 0, z: 0 };
-                if (axis === 'x') { p.x = val; p.y = a; p.z = b; }
-                else if (axis === 'y') { p.x = a; p.y = val; p.z = b; }
-                else { p.x = a; p.y = b; p.z = val; }
-                tiles.push({ ...p, dirKey });
-            }
-        }
-    }
-    return tiles;
-}
-
-function isSurfaceTilePos(p, size) {
-    if (!p) return false;
-    return p.x === 0 || p.x === size - 1 || p.y === 0 || p.y === size - 1 || p.z === 0 || p.z === size - 1;
-}
-
-function randomFreeTile(size, exclude) {
-    const all = getAllSurfaceTiles(size);
-    const excludeKeys = new Set(exclude.map(e => `${e.x},${e.y},${e.z},${e.dirKey}`));
-    const free = all.filter(t => !excludeKeys.has(`${t.x},${t.y},${t.z},${t.dirKey}`));
-    const pool = free.length > 0 ? free : all;
-    return pool[Math.floor(Math.random() * pool.length)];
-}
-
-function randomUnflippedTile(cubies, size, exclude = []) {
-    const all = getAllSurfaceTiles(size);
-    const excludeKeys = new Set(exclude.map(e => `${e.x},${e.y},${e.z},${e.dirKey}`));
-    const pool = all.filter((t) => {
-        if (excludeKeys.has(`${t.x},${t.y},${t.z},${t.dirKey}`)) return false;
-        const st = cubies?.[t.x]?.[t.y]?.[t.z]?.stickers?.[t.dirKey];
-        return !!st && st.curr === st.orig;
-    });
-    const pickFrom = pool.length > 0 ? pool : all;
-    return pickFrom[Math.floor(Math.random() * pickFrom.length)];
-}
+import {
+    CAM_HEIGHT_BASE,
+    CAM_BACK_BASE,
+    LOOK_AHEAD,
+    CAM_LERP,
+    WORM_LIFT,
+    ZOOM_BURST,
+    MAX_EXTRA_ZOOM,
+    GLASS_MIN_OPACITY,
+    GLASS_MAX_OPACITY,
+    GLASS_MIN_TRANSMISSION,
+    GLASS_MAX_TRANSMISSION,
+    TUNNEL_SURF_FOV,
+    TUNNEL_SURF_BACK,
+    TUNNEL_SURF_UP,
+    TUNNEL_SURF_SWAY,
+    TUNNEL_SPEED_SCALE,
+    FACE_NORMALS,
+    DIR_FORWARD,
+    INITIAL_DIR,
+    INITIAL_POS,
+    DEFAULT_POWERUP_COUNT,
+    ORB_SEGMENT_GROWTH,
+    STEPS_PER_TILE,
+    BODY_BALL_SPACING,
+    BASE_TAIL_LENGTH,
+    DEFAULT_WORMHOLE_FLIP_INTERVAL,
+    MAX_JUMPS,
+    MAX_POWERUP_RENDER,
+    TUNNEL_TRIGGER_PROGRESS,
+    SELF_COLLISION_TRIGGER_PROGRESS,
+    SELF_COLLISION_GRACE_STEPS_AFTER_TUNNEL,
+    WORMHOLE_MAX_TRAVERSALS,
+    MAX_TAIL,
+} from './healerWorm/constants.js';
+import {
+    isSurfaceTilePos,
+    randomFreeTile,
+    randomUnflippedTile,
+} from './healerWorm/surfaceTiles.js';
 
 // ─── Worm Crawler Hook ────────────────────────────────────────────────────────
-// Tail segments needed to visually cover all tiles: totalTiles / (0.14 unit spacing / ~1 unit per tile)
-// For 5×5 (150 tiles): ~1100 segments. Round up generously.
-const MAX_TAIL = 1200;
-
 function useWormCrawler(size, cubies) {
     const { wormSpeed, wormControlMode, wormRunId, wormOrbCount, wormholeInterval } = useGameStore(
         useShallow(s => ({
