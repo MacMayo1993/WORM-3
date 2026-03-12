@@ -18,6 +18,14 @@ export function isAnimatedPreviewStyle(styleKey) {
   return ANIMATED_STYLE_SET.has(styleKey);
 }
 
+// ── Mobile detection — skip WebGL renderer to avoid dual-context crash ───────
+
+const _isMobile = typeof window !== 'undefined' && (
+  window.innerWidth <= 768 ||
+  'ontouchstart' in window ||
+  navigator.maxTouchPoints > 0
+);
+
 // ── Shared renderer state ────────────────────────────────────────────────────
 
 let renderer = null;
@@ -27,6 +35,7 @@ let mesh = null;
 
 function ensureRenderer() {
   if (renderer) return;
+  if (_isMobile) return;
 
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true });
   renderer.setSize(PREVIEW_SIZE, PREVIEW_SIZE);
@@ -46,6 +55,16 @@ function ensureRenderer() {
 
 /** Render a style+color combo to the shared renderer then blit to targetCanvas. */
 function renderToCanvas(styleKey, colorHex, simTime, targetCanvas) {
+  // On mobile skip WebGL rendering — fill with a solid color swatch instead
+  if (_isMobile) {
+    const ctx = targetCanvas.getContext('2d');
+    if (ctx) {
+      ctx.fillStyle = colorHex;
+      ctx.fillRect(0, 0, targetCanvas.width, targetCanvas.height);
+    }
+    return;
+  }
+
   ensureRenderer();
 
   const mat = getTileStyleMaterial(styleKey, colorHex);
