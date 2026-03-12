@@ -1149,8 +1149,12 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       {/* Wormhole portal overlay — covers the tile during the flip animation.
           Positioned slightly in front of the main mesh so depth-testing works correctly
           without z-fighting.  depthTest must stay ON so that back-face flips don't bleed
-          over front-face tiles (the main cause of white-tile / outline artifacts). */}
-      <mesh ref={spinRevealRef} position={[0, 0, 0.002]} visible={false}>
+          over front-face tiles (the main cause of white-tile / outline artifacts).
+          renderOrder must be HIGH (above wispy ring=1, wormhole crack/winner=2) so the
+          flip animation paints cleanly over those per-tile additive overlays — otherwise
+          in disparity mode where every flipped tile carries a wispy ring, the additive ring
+          bleeds on top of the spin-reveal and the flip looks washed out / glitchy. */}
+      <mesh ref={spinRevealRef} position={[0, 0, 0.002]} visible={false} renderOrder={10}>
         <primitive object={_sharedStickerGeo} attach="geometry" />
         <shaderMaterial
           ref={spinRevealMatRef}
