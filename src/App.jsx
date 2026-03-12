@@ -317,6 +317,15 @@ export default function WORM3() {
   // Antipodal PiP — second camera from opposite side of the cube
   const [showAntipodalPiP, setShowAntipodalPiP] = useState(false);
 
+  const { wormHealerMode, wormPhase } = useGameStore(useShallow((s) => ({
+    wormHealerMode: s.wormHealerMode,
+    wormPhase: s.wormPhase,
+  })));
+  const wormholePhaseActive = wormHealerMode && (
+    wormPhase === 'entering' || wormPhase === 'tunnel' || wormPhase === 'exiting'
+  );
+  const showAntipodalFrame = !showWelcome && ((showAntipodalPiP || wormHealerMode) && !wormholePhaseActive);
+
   // Bottom sheet state for new nav bar
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetMode, setSheetMode] = useState('more'); // 'more' or 'views'
@@ -1001,7 +1010,7 @@ export default function WORM3() {
       </div>
 
       {/* Antipodal PiP frame overlay — border + label drawn over the canvas scissor region */}
-      {!showWelcome && showAntipodalPiP && (
+      {showAntipodalFrame && (
         <div
           style={{
             position: 'fixed',
