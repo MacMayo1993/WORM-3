@@ -2,7 +2,7 @@
 // Mobile-friendly HUD for WORM Chase-Cam Mode.
 // Uses the same clean, pedagogical visual language as other overlays.
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -89,8 +89,79 @@ const WORMHOLE_COL_STYLE = { textAlign: 'right' };
 const WORMHOLE_LABEL_STYLE = { fontSize: 10, color: palette.subText, letterSpacing: 0.8, fontWeight: 700 };
 const WORMHOLE_VALUE_STYLE = { color: palette.warning, fontSize: 13, fontWeight: 700 };
 
+const PAUSE_BTN_STYLE = {
+    background: 'rgba(255, 255, 255, 0.86)',
+    border: `1px solid ${palette.border}`,
+    borderRadius: 10,
+    width: 34,
+    height: 34,
+    color: palette.text,
+    fontSize: 16,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    boxShadow: palette.shadow,
+    touchAction: 'manipulation',
+    WebkitTapHighlightColor: 'transparent',
+};
+
+const PAUSE_OVERLAY_STYLE = {
+    position: 'absolute',
+    inset: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'rgba(2, 6, 23, 0.55)',
+    backdropFilter: 'blur(4px)',
+    pointerEvents: 'auto',
+    zIndex: 10,
+};
+
+const PAUSE_CARD_STYLE = {
+    width: 'min(92vw, 340px)',
+    borderRadius: 16,
+    border: `1px solid ${palette.border}`,
+    background: 'rgba(255, 255, 255, 0.94)',
+    boxShadow: palette.shadow,
+    padding: 20,
+    textAlign: 'center',
+};
+
+const PAUSE_TITLE_STYLE = { color: palette.subText, fontSize: 11, fontWeight: 700, letterSpacing: 1.0 };
+const PAUSE_HEADING_STYLE = { color: palette.text, fontSize: 26, fontWeight: 800, marginTop: 4, marginBottom: 14 };
+
+const PAUSE_STATS_STYLE = {
+    padding: '10px 12px',
+    borderRadius: 10,
+    border: `1px solid ${palette.border}`,
+    background: 'rgba(255,255,255,0.78)',
+    textAlign: 'left',
+    fontSize: 12,
+    color: palette.subText,
+    lineHeight: 1.8,
+    marginBottom: 16,
+};
+
+const PAUSE_STAT_VALUE_STYLE = { color: palette.text, fontWeight: 700 };
+
+const RESUME_BTN_STYLE = {
+    minWidth: 120,
+    borderRadius: 12,
+    padding: '10px 16px',
+    fontSize: 14,
+    fontWeight: 800,
+    letterSpacing: 0.7,
+    color: '#f8fafc',
+    background: 'linear-gradient(135deg, #2563eb, #7c3aed)',
+    border: `1px solid ${palette.strongBorder}`,
+    cursor: 'pointer',
+    touchAction: 'manipulation',
+    WebkitTapHighlightColor: 'transparent',
+};
+
 const PROGRESS_PANEL_STYLE = {
-    position: 'absolute', left: 12, bottom: 122,
+    position: 'absolute', left: 12, bottom: 150,
     width: 210,
     borderRadius: 14,
     border: `1px solid ${palette.border}`,
@@ -109,7 +180,7 @@ const SPEED_LABEL_STYLE = { marginTop: 12, marginBottom: 6, color: palette.subTe
 const SPEED_INPUT_STYLE = { width: '100%', accentColor: '#60a5fa', cursor: 'pointer' };
 
 const PORTAL_HINT_STYLE = {
-    position: 'absolute', bottom: 186, left: '50%', transform: 'translateX(-50%)',
+    position: 'absolute', bottom: 230, left: '50%', transform: 'translateX(-50%)',
     pointerEvents: 'none',
     fontSize: 11, letterSpacing: 1.0, fontWeight: 700,
     color: '#c4b5fd',
@@ -119,13 +190,13 @@ const PORTAL_HINT_STYLE = {
     padding: '6px 12px',
 };
 
-const JUMP_WRAP_STYLE = { position: 'absolute', bottom: 122, left: '50%', transform: 'translateX(-50%)', pointerEvents: 'auto' };
+const JUMP_WRAP_STYLE = { position: 'absolute', bottom: 150, left: '50%', transform: 'translateX(-50%)', pointerEvents: 'auto' };
 
 const JUMP_BTN_BASE = {
-    minWidth: 120,
-    borderRadius: 12,
-    padding: '10px 18px',
-    fontSize: 14,
+    minWidth: 150,
+    borderRadius: 16,
+    padding: '16px 28px',
+    fontSize: 18,
     fontWeight: 800,
     letterSpacing: 0.7,
     color: '#f8fafc',
@@ -148,11 +219,11 @@ const JUMP_BTN_IDLE = {
 };
 
 const DPAD_STYLE = {
-    position: 'absolute', bottom: 92, right: 12,
+    position: 'absolute', bottom: 24, right: 12,
     display: 'grid',
-    gridTemplateColumns: '44px 44px 44px',
-    gridTemplateRows: '44px 44px 44px',
-    gap: 4,
+    gridTemplateColumns: '54px 54px 54px',
+    gridTemplateRows: '54px 54px 54px',
+    gap: 6,
     pointerEvents: 'auto',
 };
 
@@ -165,16 +236,18 @@ const DPAD_DIRS = [
 ];
 
 const DPAD_BTN_STYLE = {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
+    width: 54,
+    height: 54,
+    borderRadius: 12,
     background: 'rgba(255, 255, 255, 0.86)',
     border: `1px solid ${palette.border}`,
     color: '#1e40af',
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: 700,
     cursor: 'pointer',
     boxShadow: palette.shadow,
+    touchAction: 'manipulation',
+    WebkitTapHighlightColor: 'transparent',
 };
 
 const DEATH_OVERLAY_STYLE = {
@@ -248,17 +321,43 @@ const NEW_GAME_BTN_STYLE = {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSize = 3, onHome, onSettings, wormAlive = true, showDeathMenu = false, deathDetails = null, onRetry, onNewGame }) {
-    const { wormSpeed, wormHealedCount, wormBodyTiles, wormholeCountdown, wormControlMode, setWormSpeed, toggleWormControlMode } = useGameStore(
+    const { wormSpeed, wormHealedCount, wormBodyTiles, wormholeCountdown, wormControlMode, wormPaused, wormTimeAlive, wormTunnelCount, setWormSpeed, toggleWormControlMode, setWormPaused } = useGameStore(
         useShallow(s => ({
             wormSpeed: s.wormSpeed ?? 1.0,
             wormHealedCount: s.wormHealedCount ?? 0,
             wormBodyTiles: s.wormBodyTiles ?? 0,
             wormholeCountdown: s.wormholeCountdown ?? 0,
             wormControlMode: s.wormControlMode ?? 'non-oriented',
+            wormPaused: s.wormPaused ?? false,
+            wormTimeAlive: s.wormTimeAlive ?? 0,
+            wormTunnelCount: s.wormTunnelCount ?? 0,
             setWormSpeed: s.setWormSpeed,
             toggleWormControlMode: s.toggleWormControlMode,
+            setWormPaused: s.setWormPaused,
         }))
     );
+
+    const togglePause = () => {
+        if (!wormAlive) return;
+        setWormPaused(!wormPaused);
+    };
+
+    useEffect(() => {
+        const onKey = (e) => {
+            if (e.code === 'Escape' || e.code === 'Space') {
+                e.preventDefault();
+                if (wormAlive) setWormPaused(!useGameStore.getState().wormPaused);
+            }
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [wormAlive, setWormPaused]);
+
+    const formatTime = (secs) => {
+        const m = Math.floor(secs / 60);
+        const s = secs % 60;
+        return `${m}:${String(s).padStart(2, '0')}`;
+    };
 
     const handleJumpAction = () => {
         if (!wormAlive) return;
@@ -318,6 +417,11 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                         <div style={WORMHOLE_LABEL_STYLE}>NEXT WORMHOLE</div>
                         <div style={WORMHOLE_VALUE_STYLE}>{wormholeCountdown.toFixed(1)}s</div>
                     </div>
+                    {wormAlive && (
+                        <button onPointerDown={togglePause} style={PAUSE_BTN_STYLE} aria-label={wormPaused ? 'Resume' : 'Pause'}>
+                            {wormPaused ? '▶' : '⏸'}
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -377,6 +481,24 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                     ) : <div key="center" style={{ gridColumn: col + 1, gridRow: row + 1 }} />
                 ))}
             </div>
+
+            {wormPaused && wormAlive && (
+                <div style={PAUSE_OVERLAY_STYLE}>
+                    <div style={PAUSE_CARD_STYLE}>
+                        <div style={PAUSE_TITLE_STYLE}>WORM MODE</div>
+                        <div style={PAUSE_HEADING_STYLE}>PAUSED</div>
+                        <div style={PAUSE_STATS_STYLE}>
+                            <div>Time alive: <b style={PAUSE_STAT_VALUE_STYLE}>{formatTime(wormTimeAlive)}</b></div>
+                            <div>Tiles healed: <b style={PAUSE_STAT_VALUE_STYLE}>{wormHealedCount}</b></div>
+                            <div>Wormholes used: <b style={PAUSE_STAT_VALUE_STYLE}>{wormTunnelCount}</b></div>
+                            <div>Orbs on worm: <b style={PAUSE_STAT_VALUE_STYLE}>{wormBodyTiles}</b></div>
+                        </div>
+                        <button onPointerDown={togglePause} style={RESUME_BTN_STYLE}>
+                            ▶ RESUME
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {showDeathMenu && (
                 <div style={DEATH_OVERLAY_STYLE}>

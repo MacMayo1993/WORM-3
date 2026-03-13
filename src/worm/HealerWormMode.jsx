@@ -54,15 +54,20 @@ import {
 
 // ─── Worm Crawler Hook ────────────────────────────────────────────────────────
 function useWormCrawler(size, cubies) {
-    const { wormSpeed, wormControlMode, wormRunId, wormOrbCount, wormholeInterval } = useGameStore(
+    const { wormSpeed, wormControlMode, wormRunId, wormOrbCount, wormholeInterval, wormPaused } = useGameStore(
         useShallow(s => ({
             wormSpeed: s.wormSpeed ?? 1.0,
             wormControlMode: s.wormControlMode ?? 'non-oriented',
             wormRunId: s.wormRunId ?? 0,
             wormOrbCount: s.wormOrbCount ?? DEFAULT_POWERUP_COUNT,
             wormholeInterval: s.wormholeInterval ?? DEFAULT_WORMHOLE_FLIP_INTERVAL,
+            wormPaused: s.wormPaused ?? false,
         }))
     );
+    const wormPausedRef = useRef(false);
+    wormPausedRef.current = wormPaused;
+    const timeAliveRef = useRef(0);
+    const timeAliveSyncRef = useRef(0);
     const healedRef = useRef(0);
 
     const pos = useRef(INITIAL_POS(size));
@@ -228,7 +233,8 @@ function useWormCrawler(size, cubies) {
         lastFlippedRef.current = false;
         const prevVisualMode = useGameStore.getState().visualMode;
         prevVisualModeRef.current = prevVisualMode;
-        useGameStore.setState({ wormPhase: 'entering', wormOnFlippedTile: false, visualMode: 'glass' });
+        const nextTunnelCount = (useGameStore.getState().wormTunnelCount ?? 0) + 1;
+        useGameStore.setState({ wormPhase: 'entering', wormOnFlippedTile: false, visualMode: 'glass', wormTunnelCount: nextTunnelCount });
     }, [killWorm, resolveTunnelAtTile, tileKey]);
 
     const applyOrbPickupGrowth = () => {
@@ -253,6 +259,15 @@ function useWormCrawler(size, cubies) {
         const STEP_SEC = 1.0 / wormSpeed;
 
         if (!alive.current) return;
+        if (wormPausedRef.current) return;
+
+        // Track time alive and sync to store every ~0.1s to avoid excessive re-renders
+        timeAliveRef.current += delta;
+        timeAliveSyncRef.current += delta;
+        if (timeAliveSyncRef.current >= 0.1) {
+            timeAliveSyncRef.current = 0;
+            useGameStore.getState().setWormTimeAlive(Math.floor(timeAliveRef.current));
+        }
 
         wormholeTimer.current -= delta;
         if (wormholeTimer.current <= 0) {
@@ -577,6 +592,8 @@ function useWormCrawler(size, cubies) {
         powerupsRef.current = initial;
         alive.current = true;
         tileTrail.current = [tileKey(startPos)];
+        timeAliveRef.current = 0;
+        timeAliveSyncRef.current = 0;
         useGameStore.setState({
             wormPowerups: initial,
             wormBodyTiles: 0,
@@ -587,6 +604,9 @@ function useWormCrawler(size, cubies) {
             wormDeathDetails: null,
             wormPhase: 'crawling',
             wormOnFlippedTile: false,
+            wormPaused: false,
+            wormTimeAlive: 0,
+            wormTunnelCount: 0,
         });
         wormholeTimer.current = wormholeInterval;
         lastCountdownDeci.current = Math.round(wormholeInterval * 10);
