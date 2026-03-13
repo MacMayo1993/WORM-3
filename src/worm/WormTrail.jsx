@@ -29,10 +29,6 @@ const _unitCylinder = new THREE.CylinderGeometry(0.15, 0.18, 1, 8);
 const _dummy = new THREE.Object3D();
 // Maximum instanced segments (enough for any realistic worm length).
 const MAX_WORM_INSTANCES = 100;
-// Pre-computed midpoint emissive colors (avoid per-render allocation).
-const _MID_GREEN = new THREE.Color(HEAD_COLOR).lerp(new THREE.Color(TAIL_COLOR), 0.5);
-const _MID_GREEN_TUNNEL = new THREE.Color(HEAD_COLOR_TUNNEL).lerp(new THREE.Color(TAIL_COLOR_TUNNEL), 0.5);
-
 // Face-normal direction for each dirKey — used to lift worm segments off tile surface
 const FACE_NORMALS = {
   PX: [1, 0, 0], NX: [-1, 0, 0],
@@ -77,10 +73,11 @@ export default function WormTrail({ segments, size, explosionFactor = 0, alive =
     ];
   }), [segments, size, explosionFactor, isTunnelMode]);
 
-  const segmentColors = useMemo(() => positions.map((_, i) => {
-    const t = positions.length > 1 ? i / (positions.length - 1) : 0;
+  const segmentColors = useMemo(() => segments.map((seg, i) => {
+    if (seg.color) return new THREE.Color(seg.color);
+    const t = segments.length > 1 ? i / (segments.length - 1) : 0;
     return headColorObj.clone().lerp(tailColorObj, t);
-  }), [positions, headColorObj, tailColorObj]);
+  }), [segments, headColorObj, tailColorObj]);
 
   const bodyCount = Math.max(0, positions.length - 1); // segments index 1..n
   const tubeCount = bodyCount; // one tube between every pair of adjacent segments
@@ -249,8 +246,8 @@ export default function WormTrail({ segments, size, explosionFactor = 0, alive =
           {/* color="#ffffff" so instanceColor passes through unmodified */}
           <meshStandardMaterial
             color="#ffffff"
-            emissive={isTunnelMode ? _MID_GREEN_TUNNEL : _MID_GREEN}
-            emissiveIntensity={0.4}
+            emissive="#000000"
+            emissiveIntensity={0}
           />
         </instancedMesh>
       )}
@@ -260,8 +257,8 @@ export default function WormTrail({ segments, size, explosionFactor = 0, alive =
         <instancedMesh ref={tubeMeshRef} args={[_unitCylinder, null, MAX_WORM_INSTANCES]} frustumCulled={false}>
           <meshStandardMaterial
             color="#ffffff"
-            emissive={isTunnelMode ? _MID_GREEN_TUNNEL : _MID_GREEN}
-            emissiveIntensity={0.3}
+            emissive="#000000"
+            emissiveIntensity={0}
           />
         </instancedMesh>
       )}
