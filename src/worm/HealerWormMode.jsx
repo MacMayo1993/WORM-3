@@ -142,19 +142,25 @@ function useWormCrawler(size, cubies) {
     const tunnelCacheRef = useRef(null);
     // O(1) tunnel endpoint lookup to avoid repeated per-step linear scans.
     const tunnelLookupRef = useRef(new Map());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     React.useEffect(() => {
         const tunnels = getActiveTunnels(cubies, size);
         tunnelCacheRef.current = tunnels;
 
+        const encodeTile = (p) => `${p.x},${p.y},${p.z},${p.dirKey}`;
+        const canonical = (tunnel) => {
+            const a = encodeTile(tunnel.entry);
+            const b = encodeTile(tunnel.exit);
+            return a < b ? `${a}|${b}` : `${b}|${a}`;
+        };
+
         const lookup = new Map();
         for (const tunnel of tunnels) {
-            const tunnelKey = canonicalTunnelKey(tunnel);
-            lookup.set(tileKey(tunnel.entry), { tunnel, tunnelKey, reversed: false });
-            lookup.set(tileKey(tunnel.exit), { tunnel, tunnelKey, reversed: true });
+            const tunnelKey = canonical(tunnel);
+            lookup.set(encodeTile(tunnel.entry), { tunnel, tunnelKey, reversed: false });
+            lookup.set(encodeTile(tunnel.exit), { tunnel, tunnelKey, reversed: true });
         }
         tunnelLookupRef.current = lookup;
-    }, [canonicalTunnelKey, cubies, size, tileKey]);
+    }, [cubies, size]);
 
     // Compute world centroid of current grid tile
     const getWorldPos = (p) => new THREE.Vector3(
@@ -176,12 +182,6 @@ function useWormCrawler(size, cubies) {
     }, []);
 
     const tileKey = useCallback((p) => `${p.x},${p.y},${p.z},${p.dirKey}`, []);
-
-    const canonicalTunnelKey = useCallback((tunnel) => {
-        const a = tileKey(tunnel.entry);
-        const b = tileKey(tunnel.exit);
-        return a < b ? `${a}|${b}` : `${b}|${a}`;
-    }, [tileKey]);
 
     const resolveTunnelAtTile = useCallback((x, y, z, dirKey) => {
         const hit = tunnelLookupRef.current.get(tileKey({ x, y, z, dirKey }));
