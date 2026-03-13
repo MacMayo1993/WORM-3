@@ -161,7 +161,7 @@ const RESUME_BTN_STYLE = {
 };
 
 const PROGRESS_PANEL_STYLE = {
-    position: 'absolute', left: 12, bottom: 122,
+    position: 'absolute', left: 12, bottom: 150,
     width: 210,
     borderRadius: 14,
     border: `1px solid ${palette.border}`,
@@ -180,7 +180,7 @@ const SPEED_LABEL_STYLE = { marginTop: 12, marginBottom: 6, color: palette.subTe
 const SPEED_INPUT_STYLE = { width: '100%', accentColor: '#60a5fa', cursor: 'pointer' };
 
 const PORTAL_HINT_STYLE = {
-    position: 'absolute', bottom: 186, left: '50%', transform: 'translateX(-50%)',
+    position: 'absolute', bottom: 230, left: '50%', transform: 'translateX(-50%)',
     pointerEvents: 'none',
     fontSize: 11, letterSpacing: 1.0, fontWeight: 700,
     color: '#c4b5fd',
@@ -190,13 +190,13 @@ const PORTAL_HINT_STYLE = {
     padding: '6px 12px',
 };
 
-const JUMP_WRAP_STYLE = { position: 'absolute', bottom: 122, left: '50%', transform: 'translateX(-50%)', pointerEvents: 'auto' };
+const JUMP_WRAP_STYLE = { position: 'absolute', bottom: 150, left: '50%', transform: 'translateX(-50%)', pointerEvents: 'auto' };
 
 const JUMP_BTN_BASE = {
-    minWidth: 120,
-    borderRadius: 12,
-    padding: '10px 18px',
-    fontSize: 14,
+    minWidth: 150,
+    borderRadius: 16,
+    padding: '16px 28px',
+    fontSize: 18,
     fontWeight: 800,
     letterSpacing: 0.7,
     color: '#f8fafc',
@@ -219,11 +219,11 @@ const JUMP_BTN_IDLE = {
 };
 
 const DPAD_STYLE = {
-    position: 'absolute', bottom: 92, right: 12,
+    position: 'absolute', bottom: 24, right: 12,
     display: 'grid',
-    gridTemplateColumns: '44px 44px 44px',
-    gridTemplateRows: '44px 44px 44px',
-    gap: 4,
+    gridTemplateColumns: '54px 54px 54px',
+    gridTemplateRows: '54px 54px 54px',
+    gap: 6,
     pointerEvents: 'auto',
 };
 
@@ -236,16 +236,18 @@ const DPAD_DIRS = [
 ];
 
 const DPAD_BTN_STYLE = {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
+    width: 54,
+    height: 54,
+    borderRadius: 12,
     background: 'rgba(255, 255, 255, 0.86)',
     border: `1px solid ${palette.border}`,
     color: '#1e40af',
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: 700,
     cursor: 'pointer',
     boxShadow: palette.shadow,
+    touchAction: 'manipulation',
+    WebkitTapHighlightColor: 'transparent',
 };
 
 const DEATH_OVERLAY_STYLE = {
