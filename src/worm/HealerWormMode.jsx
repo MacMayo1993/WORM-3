@@ -12,7 +12,8 @@ import { getStickerWorldPos } from '../game/coordinates.js';
 import { getNextSurfacePosition, getActiveTunnels, getTunnelWorldPos, turnWorm } from './wormLogic.js';
 import { buildManifoldGridMap, flipStickerPair } from '../game/manifoldLogic.js';
 import { rotateVec90 } from '../game/cubeRotation.js';
-import { DIR_TO_VEC, VEC_TO_DIR, FACE_COLORS } from '../utils/constants.js';
+import { DIR_TO_VEC, VEC_TO_DIR } from '../utils/constants.js';
+import { resolveColors } from '../utils/colorSchemes.js';
 import {
     CAM_HEIGHT_BASE,
     CAM_BACK_BASE,
@@ -1206,16 +1207,32 @@ function WormFace({ worm, size }) {
 // ─── Powerup Orbs ─────────────────────────────────────────────────────────────
 // Each orb inherits the color of the sticker tile it sits on and follows
 // that tile through cube rotations.
+const _orbDefaultNormal = new THREE.Vector3(0, 0, 1);
 function PowerupOrbs({ size }) {
     const groupRef = useRef();
-    // Per-orb material refs so we can update color without remounting
-    const matRefs = useRef(Array.from({ length: MAX_POWERUP_RENDER }, () => React.createRef()));
+    // Direct material refs — populated via callback refs, no React.createRef() overhead
+    const matsRef = useRef([]);
+    // Cached sticker face IDs (int 1-6) per slot — avoids getStyle() string comparison each frame
+    const lastStickerIdsRef = useRef(new Int8Array(MAX_POWERUP_RENDER).fill(-1));
+    // Resolved color scheme, kept in sync with settings via a store subscription
+    const resolvedColorsRef = useRef({});
+    useEffect(() => {
+        // Initialize immediately with current settings
+        resolvedColorsRef.current = resolveColors(useGameStore.getState().settings);
+        // Keep in sync when settings change (e.g. user switches color scheme)
+        return useGameStore.subscribe(
+            s => s.settings,
+            settings => { resolvedColorsRef.current = resolveColors(settings); }
+        );
+    }, []);
 
     useFrame(() => {
         const { wormPowerups: powerups, cubies } = useGameStore.getState();
         if (!groupRef.current) return;
         const meshes = groupRef.current.children;
         const t = Date.now() * 0.003;
+        const colors = resolvedColorsRef.current;
+        const lastIds = lastStickerIdsRef.current;
 
         for (let i = 0; i < meshes.length; i++) {
             const mesh = meshes[i];
@@ -1224,7 +1241,7 @@ function PowerupOrbs({ size }) {
 
             // Position: tile world pos + face-normal lift
             const wp = getStickerWorldPos(p.x, p.y, p.z, p.dirKey, size, 0);
-            const n = FACE_NORMALS[p.dirKey] ?? new THREE.Vector3(0, 0, 1);
+            const n = FACE_NORMALS[p.dirKey] ?? _orbDefaultNormal;
             const phase = t + i * 1.5;
             const lift = 0.18 + Math.sin(phase) * 0.05;
             mesh.position.set(wp[0] + n.x * lift, wp[1] + n.y * lift, wp[2] + n.z * lift);
@@ -1232,14 +1249,16 @@ function PowerupOrbs({ size }) {
             mesh.rotation.y = t * 0.6 + i;
             mesh.visible = true;
 
-            // Color: inherit from the sticker this orb is mapped to
-            const mat = matRefs.current[i]?.current;
+            // Color: inherit from the sticker this orb is mapped to, using the active color scheme
+            const mat = matsRef.current[i];
             if (mat && cubies) {
                 const sticker = cubies[p.x]?.[p.y]?.[p.z]?.stickers?.[p.dirKey];
-                const stickerColor = sticker ? (FACE_COLORS[sticker.curr] ?? '#22ff88') : '#22ff88';
-                if (mat.color.getStyle() !== stickerColor) {
-                    mat.color.set(stickerColor);
-                    mat.emissive.set(stickerColor);
+                const faceId = sticker ? sticker.curr : 0;
+                if (faceId !== lastIds[i]) {
+                    lastIds[i] = faceId;
+                    const c = (faceId && colors[faceId]) ?? '#22ff88';
+                    mat.color.set(c);
+                    mat.emissive.set(c);
                 }
             }
         }
@@ -1247,10 +1266,13 @@ function PowerupOrbs({ size }) {
 
     return (
         <group ref={groupRef}>
-            {Array.from({ length: MAX_POWERUP_RENDER }).map((_, i) => (
+            {Array.from({ length: MAX_POWERUP_RENDER }, (_, i) => (
                 <mesh key={i}>
                     <icosahedronGeometry args={[1, 0]} />
-                    <meshStandardMaterial ref={matRefs.current[i]} color="#22ff88" emissive="#22ff88" emissiveIntensity={1.2} />
+                    <meshStandardMaterial
+                        ref={mat => { if (mat) matsRef.current[i] = mat; }}
+                        color="#22ff88" emissive="#22ff88" emissiveIntensity={1.2}
+                    />
                 </mesh>
             ))}
         </group>
@@ -1334,6 +1356,16 @@ const CRITICAL_ARC_COLOR = '#7dff2a';  // electrical warning before full void
 const _criticalArcColor = new THREE.Color(CRITICAL_ARC_COLOR);
 const _tapeYellow = new THREE.Color('#ffe000');
 const _tapeBlack = new THREE.Color('#111111');
+// Scratch objects for the per-tape instanced-mesh loop — avoids per-frame allocations
+const _tapeEdgeDir = new THREE.Vector3();
+const _tapeOutwardDir = new THREE.Vector3();
+const _tapeUp = new THREE.Vector3();
+const _tapeNormal = new THREE.Vector3();
+const _tapeCrossRight = new THREE.Vector3();
+const _tapeMat4 = new THREE.Matrix4();
+// Static empty collections used as safe fallbacks (never mutated)
+const _EMPTY_SET = new Set();
+const _EMPTY_MAP = new Map();
 const BUBBLES_PER_VOID = 5;          // rising gas bubbles per dead portal
 const SPARKS_PER_CRITICAL = 7;
 const POLES_PER_TILE = 4;
@@ -1438,8 +1470,8 @@ function WormholeRings({ cubies, size, voidTunnelKeysRef, tunnelUseCountsRef }) 
         if (!liveMesh || !voidOuter || !voidInner || !bubbles || !sparks || !poles || !tapes || !voidFrames) return;
 
         const t = clock.elapsedTime;
-        const voidKeys = voidTunnelKeysRef?.current ?? new Set();
-        const useCounts = tunnelUseCountsRef?.current ?? new Map();
+        const voidKeys = voidTunnelKeysRef?.current ?? _EMPTY_SET;
+        const useCounts = tunnelUseCountsRef?.current ?? _EMPTY_MAP;
 
         let liveIdx = 0;
         let voidIdx = 0;
@@ -1591,43 +1623,43 @@ function WormholeRings({ cubies, size, voidTunnelKeysRef, tunnelUseCountsRef }) 
                     const eD_x = _tapeRight.x * edgeVecX + _tapeForward.x * edgeVecY;
                     const eD_y = _tapeRight.y * edgeVecX + _tapeForward.y * edgeVecY;
                     const eD_z = _tapeRight.z * edgeVecX + _tapeForward.z * edgeVecY;
-                    const edgeDir = new THREE.Vector3(eD_x, eD_y, eD_z).normalize();
-                    
+                    _tapeEdgeDir.set(eD_x, eD_y, eD_z).normalize();
+
                     // Background: A Three.js PlaneGeometry is created on the XY plane and faces +Z.
                     // To hang like a fence around the perimeter:
                     // Width (X-axis) should run along the edge: edgeDir
                     // Height (Y-axis) should point UP relative to the cube surface: tapeUp
                     // Normal (Z-axis) should point OUTWARD from the tile center: tapeNormal
-                    
+
                     // The outward vector for this edge
                     const outwardVecX = mx;
                     const outwardVecY = my;
                     const out_x = _tapeRight.x * outwardVecX + _tapeForward.x * outwardVecY;
                     const out_y = _tapeRight.y * outwardVecX + _tapeForward.y * outwardVecY;
                     const out_z = _tapeRight.z * outwardVecX + _tapeForward.z * outwardVecY;
-                    const outwardDir = new THREE.Vector3(out_x, out_y, out_z).normalize();
-                    
+                    _tapeOutwardDir.set(out_x, out_y, out_z).normalize();
+
                     // The UP vector is the surface normal 'n'
                     // We want the tape to stand up like a fence, so its Y axis is 'n'
-                    const tapeUpVec = n.clone();
-                    
+                    _tapeUp.copy(n);
+
                     // The OUTWARD normal of the tape is 'outwardDir'
                     // We add flutter to it so the tape blows in the wind
                     const flutter = Math.sin(loopT * 15 + e * 2.1) * 0.08;
-                    const tapeNormal = outwardDir.clone().addScaledVector(n, flutter).normalize();
-                    
+                    _tapeNormal.copy(_tapeOutwardDir).addScaledVector(n, flutter).normalize();
+
                     // Re-derive the exact edge direction that is perpendicular to both UP and NORMAL
                     // to ensure an orthogonal basis
-                    const tapeRight = new THREE.Vector3().crossVectors(tapeUpVec, tapeNormal).normalize();
-                    
-                    // If tapeRight points opposite to edgeDir, flip it to keep texture orientation consistent
-                    if (tapeRight.dot(edgeDir) < 0) {
-                        tapeRight.negate();
-                        tapeNormal.negate(); // Flip normal too to keep right-handed coordinate system
+                    _tapeCrossRight.crossVectors(_tapeUp, _tapeNormal).normalize();
+
+                    // If _tapeCrossRight points opposite to edgeDir, flip it to keep texture orientation consistent
+                    if (_tapeCrossRight.dot(_tapeEdgeDir) < 0) {
+                        _tapeCrossRight.negate();
+                        _tapeNormal.negate(); // Flip normal too to keep right-handed coordinate system
                     }
-                    
-                    // X = tapeRight (along edge), Y = tapeUpVec (height), Z = tapeNormal (outward)
-                    const m = new THREE.Matrix4().makeBasis(tapeRight, tapeUpVec, tapeNormal);
+
+                    // X = _tapeCrossRight (along edge), Y = _tapeUp (height), Z = _tapeNormal (outward)
+                    _tapeMat4.makeBasis(_tapeCrossRight, _tapeUp, _tapeNormal);
                     
                     // Tape spans from pole to pole. Distance between them is 0.9
                     const tapeLength = 0.9;
@@ -1639,7 +1671,7 @@ function WormholeRings({ cubies, size, voidTunnelKeysRef, tunnelUseCountsRef }) 
                         wp[1] + _tapeRight.y * mx + _tapeForward.y * my + n.y * (tapeLift + sag),
                         wp[2] + _tapeRight.z * mx + _tapeForward.z * my + n.z * (tapeLift + sag)
                     );
-                    _cautionDummy.quaternion.setFromRotationMatrix(m);
+                    _cautionDummy.quaternion.setFromRotationMatrix(_tapeMat4);
                     // Scale X ensures it reaches exactly pole to pole
                     _cautionDummy.scale.set(tapeLength, tapeWidth, 1);
                     _cautionDummy.updateMatrix();
