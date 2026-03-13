@@ -68,7 +68,8 @@ export function useWormGame(cubies, size, animState, onRotate) {
   const [orbs, setOrbs] = useState([]);
   const [score, setScore] = useState(0);
   const [warps, setWarps] = useState(0);
-  const [pendingGrowthColors, setPendingGrowthColors] = useState([]);
+  const [pendingGrowth, setPendingGrowth] = useState(0);
+  const pendingGrowthColorsRef = useRef([]);
 
   // Camera mode - first-person worm view
   const [wormCameraEnabled, setWormCameraEnabled] = useState(false);
@@ -107,7 +108,8 @@ export function useWormGame(cubies, size, animState, onRotate) {
     setOrbs(spawnOrbs(cubies, size, CONFIG.initialOrbs, newWorm, []));
     setScore(0);
     setWarps(0);
-    setPendingGrowthColors([]);
+    setPendingGrowth(0);
+    pendingGrowthColorsRef.current = [];
     setTimeAlive(0);
     setGameState('playing');
     lastMoveTime.current = 0;
@@ -231,7 +233,8 @@ export function useWormGame(cubies, size, animState, onRotate) {
     score,
     warps,
     speed,
-    pendingGrowthColors,
+    pendingGrowth,
+    pendingGrowthColorsRef,
     orbsTotal: CONFIG.initialOrbs,
     wormCameraEnabled,
     timeAlive,
@@ -243,7 +246,7 @@ export function useWormGame(cubies, size, animState, onRotate) {
     setOrbs,
     setScore,
     setWarps,
-    setPendingGrowthColors,
+    setPendingGrowth,
     setWormCameraEnabled,
     setTimeAlive,
 
@@ -322,7 +325,8 @@ export function WormGameLoop({
     moveDir,
     orbs,
     speed,
-    pendingGrowthColors,
+    pendingGrowth,
+    pendingGrowthColorsRef,
     lastMoveTime,
     timeAliveAcc,
     setGameState,
@@ -331,7 +335,7 @@ export function WormGameLoop({
     setOrbs,
     setScore,
     setWarps,
-    setPendingGrowthColors,
+    setPendingGrowth,
     setTimeAlive,
     CONFIG
   } = game;
@@ -396,7 +400,8 @@ export function WormGameLoop({
     if (orbIndex !== -1) {
       const orbColor = FACE_DIR_COLORS[orbs[orbIndex].dirKey] ?? null;
       setOrbs(prev => prev.filter((_, i) => i !== orbIndex));
-      setPendingGrowthColors(prev => [...prev, ...Array(CONFIG.growthPerOrb).fill(orbColor)]);
+      for (let g = 0; g < CONFIG.growthPerOrb; g++) pendingGrowthColorsRef.current.push(orbColor);
+      setPendingGrowth(g => g + CONFIG.growthPerOrb);
       setScore(s => s + 50 + (worm.length * 10));
       play('/sounds/eat.mp3');
 
@@ -407,16 +412,13 @@ export function WormGameLoop({
     }
 
     setWorm(prev => {
-      const growthColor = pendingGrowthColors[0] ?? null;
-      const newHead = growthColor ? { ...finalPos, moveDir, color: growthColor } : { ...finalPos, moveDir };
-      const newWorm = [newHead, ...prev];
-
-      if (pendingGrowthColors.length > 0) {
-        setPendingGrowthColors(c => c.slice(1));
-        return newWorm;
-      } else {
-        return newWorm.slice(0, -1);
+      if (pendingGrowth > 0) {
+        const growthColor = pendingGrowthColorsRef.current.shift() ?? null;
+        const newHead = growthColor ? { ...finalPos, moveDir, color: growthColor } : { ...finalPos, moveDir };
+        setPendingGrowth(g => g - 1);
+        return [newHead, ...prev];
       }
+      return [{ ...finalPos, moveDir }, ...prev].slice(0, -1);
     });
   });
 
@@ -436,7 +438,8 @@ export function useTunnelWormGame(cubies, size, animState, onRotate) {
   const [tunnels, setTunnels] = useState([]);
   const [score, setScore] = useState(0);
   const [tunnelsTraversed, setTunnelsTraversed] = useState(0);
-  const [pendingGrowthColors, setPendingGrowthColors] = useState([]);
+  const [pendingGrowth, setPendingGrowth] = useState(0);
+  const pendingGrowthColorsRef = useRef([]);
   const [targetTunnelId, setTargetTunnelId] = useState(null);
   const [inactiveTunnelSides, setInactiveTunnelSides] = useState(() => new Set());
 
@@ -530,7 +533,8 @@ export function useTunnelWormGame(cubies, size, animState, onRotate) {
 
     setScore(0);
     setTunnelsTraversed(0);
-    setPendingGrowthColors([]);
+    setPendingGrowth(0);
+    pendingGrowthColorsRef.current = [];
     setInactiveTunnelSides(new Set());
     setTimeAlive(0);
     setGameState('playing');
@@ -639,7 +643,8 @@ export function useTunnelWormGame(cubies, size, animState, onRotate) {
     score,
     tunnelsTraversed,
     speed,
-    pendingGrowthColors,
+    pendingGrowth,
+    pendingGrowthColorsRef,
     orbsTotal: TUNNEL_CONFIG.initialOrbs,
     wormCameraEnabled,
     targetTunnelId,
@@ -653,7 +658,7 @@ export function useTunnelWormGame(cubies, size, animState, onRotate) {
     setOrbs,
     setScore,
     setTunnelsTraversed,
-    setPendingGrowthColors,
+    setPendingGrowth,
     setWormCameraEnabled,
     setTargetTunnelId,
     setInactiveTunnelSides,
@@ -686,7 +691,8 @@ export function TunnelWormGameLoop({
     orbs,
     tunnels,
     speed,
-    pendingGrowthColors,
+    pendingGrowth,
+    pendingGrowthColorsRef,
     lastMoveTime,
     timeAliveAcc,
     setGameState,
@@ -694,7 +700,7 @@ export function TunnelWormGameLoop({
     setOrbs,
     setScore,
     setTunnelsTraversed,
-    setPendingGrowthColors,
+    setPendingGrowth,
     setTargetTunnelId,
     setTimeAlive,
     inactiveTunnelSides,
@@ -782,7 +788,8 @@ export function TunnelWormGameLoop({
 
     if (orbIndex !== -1) {
       setOrbs(prev => prev.filter((_, i) => i !== orbIndex));
-      setPendingGrowthColors(prev => [...prev, ...Array(CONFIG.growthPerOrb).fill(null)]);
+      for (let g = 0; g < CONFIG.growthPerOrb; g++) pendingGrowthColorsRef.current.push(null);
+      setPendingGrowth(g => g + CONFIG.growthPerOrb);
       setScore(s => s + 50 + (worm.length * 10));
       play('/sounds/eat.mp3');
 
@@ -800,9 +807,10 @@ export function TunnelWormGameLoop({
 
     // Update worm positions
     setWorm(prev => {
-      const growthColor = pendingGrowthColors[0] ?? null;
-      const coloredHead = growthColor ? { ...newHead, color: growthColor } : newHead;
-      const newWorm = [coloredHead];
+      const growing = pendingGrowth > 0;
+      const growthColor = growing ? (pendingGrowthColorsRef.current.shift() ?? null) : null;
+      const head = growthColor ? { ...newHead, color: growthColor } : newHead;
+      const newWorm = [head];
 
       // Move body segments along their tunnels
       for (let i = 0; i < prev.length; i++) {
@@ -821,14 +829,11 @@ export function TunnelWormGameLoop({
       }
 
       // Handle growth or tail removal
-      if (pendingGrowthColors.length > 0) {
-        setPendingGrowthColors(c => c.slice(1));
-        // Keep all segments (growth)
+      if (growing) {
+        setPendingGrowth(g => g - 1);
         return newWorm;
-      } else {
-        // Remove tail segment
-        return newWorm.slice(0, -1);
       }
+      return newWorm.slice(0, -1);
     });
   });
 
