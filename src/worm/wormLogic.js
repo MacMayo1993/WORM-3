@@ -777,3 +777,30 @@ export const getSegmentWorldPos = (seg, size, explosionFactor = 0) => {
 export const calculateScore = (length, orbsEaten, warpsUsed) => {
   return (length * 100) + (orbsEaten * 50) + (warpsUsed * 25);
 };
+
+/**
+ * Check if any worm segment is currently inside a tunnel
+ * Used to gate cube rotations — no rotation allowed while any segment is in-tunnel
+ * @param {Array} worm - Array of worm segments
+ * @returns {boolean}
+ */
+export const isAnySegmentInTunnel = (worm) => worm.some(seg => seg.tunnel != null);
+
+/**
+ * Get all worm segments that fall within a rotating cube slice
+ * Tunnel segments are ignored (they have no x/y/z grid coords)
+ * @param {Array} worm - Array of worm segments
+ * @param {string} axis - 'col' | 'row' | 'depth'
+ * @param {number} sliceIndex - Which slice (0 to size-1)
+ * @returns {Array} [{segmentIndex, segment}] sorted head-first (lowest index first)
+ */
+export const getSegmentsInSlice = (worm, axis, sliceIndex) => {
+  const hits = [];
+  for (let i = 0; i < worm.length; i++) {
+    const seg = worm[i];
+    if (seg.tunnel != null) continue;
+    const coord = axis === 'col' ? seg.x : axis === 'row' ? seg.y : seg.z;
+    if (coord === sliceIndex) hits.push({ segmentIndex: i, segment: seg });
+  }
+  return hits;
+};
