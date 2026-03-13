@@ -262,8 +262,12 @@ function useWormCrawler(size, cubies) {
         useGameStore.setState({ wormPhase: 'entering', wormOnFlippedTile: false, visualMode: 'glass', wormTunnelCount: nextTunnelCount });
     }, [killWorm, resolveTunnelAtTile, tileKey]);
 
-    const applyOrbPickupGrowth = () => {
+    // Colors of each collected orb, in pickup order — used by WormBody to color segments
+    const orbPickupColorsRef = useRef([]);
+
+    const applyOrbPickupGrowth = (color) => {
         tailLength.current = Math.min(tailLength.current + ORB_SEGMENT_GROWTH, MAX_TAIL);
+        orbPickupColorsRef.current = [...orbPickupColorsRef.current, color];
         const orbCountOnWorm = Math.max(0, Math.floor((tailLength.current - BASE_TAIL_LENGTH) / ORB_SEGMENT_GROWTH));
         useGameStore.getState().setWormBodyTiles(orbCountOnWorm);
     };
@@ -502,7 +506,11 @@ function useWormCrawler(size, cubies) {
                 const { x, y, z, dirKey } = pos.current;
                 const puIdx = powerupsRef.current.findIndex(p => p.x === x && p.y === y && p.z === z && p.dirKey === dirKey);
                 if (puIdx !== -1) {
-                    applyOrbPickupGrowth();
+                    const pickedUp = powerupsRef.current[puIdx];
+                    const pickedSticker = cubies?.[pickedUp.x]?.[pickedUp.y]?.[pickedUp.z]?.stickers?.[pickedUp.dirKey];
+                    const pickedFaceId = pickedSticker ? pickedSticker.curr : 0;
+                    const pickedColor = resolveColors(useGameStore.getState().settings)[pickedFaceId] ?? '#22ff88';
+                    applyOrbPickupGrowth(pickedColor);
                     const newPowerup = { ...randomFreeTile(size, [...powerupsRef.current, pos.current]), type: 'apple' };
                     const next = [...powerupsRef.current];
                     next[puIdx] = newPowerup;
@@ -607,6 +615,7 @@ function useWormCrawler(size, cubies) {
         pendingSelfCollision.current = null;
         selfCollisionGraceStepsRef.current = 0;
         tailLength.current = BASE_TAIL_LENGTH;
+        orbPickupColorsRef.current = [];
         stepHistory.current = [];
         lastRecordedT.current = 0;
         healedRef.current = 0;
@@ -675,7 +684,7 @@ function useWormCrawler(size, cubies) {
         pos, moveDir, phase, tunnelProgress, activeTunnel, onFlippedTile,
         interpT, prevWorldPos, curWorldPos, jumpT, isJumping, jumpLift,
         headInterpPos, currentNormal,
-        tailLength, stepHistory, tick, queueTurn,
+        tailLength, stepHistory, orbPickupColorsRef, tick, queueTurn,
         voidTunnelKeysRef, tunnelUseCountsRef
     };
 }
@@ -995,6 +1004,7 @@ function WormBody({ worm }) {
     const meshRef = useRef();
     const wormColor = useGameStore(s => s.wormColor ?? '#33ff66');
     const prevTailLenRef = useRef(0);
+    const prevOrbCountRef = useRef(0);
 
     useFrame((state) => {
         // Copy head/normal into scratch vectors (avoids .clone() allocation)
@@ -1074,12 +1084,22 @@ function WormBody({ worm }) {
             mesh.setMatrixAt(i, _wormDummy.matrix);
         }
 
-        if (prevTailLenRef.current !== visibleCount) {
+        const orbColors = worm.orbPickupColorsRef.current;
+        if (prevTailLenRef.current !== visibleCount || prevOrbCountRef.current !== orbColors.length) {
             prevTailLenRef.current = visibleCount;
+            prevOrbCountRef.current = orbColors.length;
             for (let i = 0; i < visibleCount; i++) {
-                const fade = 1 - i / tLen;
-                // Reuse pre-allocated color object — avoids 1 Color allocation per segment per frame
-                mesh.setColorAt(i, _bodyColor.setHSL(0.38 - i * 0.005, 1, 0.4 + fade * 0.3));
+                // Segments past the initial tail length are colored by orb pickup order.
+                // orbPickupIndex: 0 = first orb collected, and its ORB_SEGMENT_GROWTH
+                // segments are the oldest (highest i) orb segments on the worm.
+                const orbPickupIndex = Math.floor((i - BASE_TAIL_LENGTH) / ORB_SEGMENT_GROWTH);
+                if (orbPickupIndex >= 0 && orbPickupIndex < orbColors.length) {
+                    _bodyColor.set(orbColors[orbPickupIndex]);
+                } else {
+                    const fade = 1 - i / tLen;
+                    _bodyColor.setHSL(0.38 - i * 0.005, 1, 0.4 + fade * 0.3);
+                }
+                mesh.setColorAt(i, _bodyColor);
             }
             if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
         }
@@ -1903,7 +1923,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             <WormInteriorGlass worm={worm} size={size} />
             <TunnelSurfFX worm={worm} size={size} />
             <TunnelPortalRings worm={worm} size={size} />
-            <WormBody worm={worm} size={size} />
+            <WormBody worm={worm} />
             <WormFace worm={worm} size={size} />
             <PortalGlow worm={worm} size={size} />
             <WormholeRings cubies={cubies} size={size} voidTunnelKeysRef={worm.voidTunnelKeysRef} tunnelUseCountsRef={worm.tunnelUseCountsRef} />
