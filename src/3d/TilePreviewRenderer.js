@@ -141,6 +141,9 @@ let lastTimestamp = null;
 // Map<id, { canvas, styleKey, colorHex, animated, dirty }>
 const registry = new Map();
 
+/** Returns true when there are previews that need rendering. */
+export function hasActivePreviews() { return registry.size > 0; }
+
 /** Driven by TilePreviewHost's useFrame when using the shared renderer. */
 export function tickPreviews(delta) {
   if (registry.size === 0) return;

@@ -42,7 +42,7 @@ import {
 import GameScene from './3d/GameScene.jsx';
 import IntroScene from './components/intro/IntroScene.jsx';
 import { RotatingBlackCube } from './components/menus/MainMenu.jsx';
-import { setSharedRenderer, tickPreviews } from './3d/TilePreviewRenderer.js';
+import { setSharedRenderer, tickPreviews, hasActivePreviews } from './3d/TilePreviewRenderer.js';
 
 // UI components
 import WelcomeScreen from './components/screens/WelcomeScreen.jsx';
@@ -185,7 +185,7 @@ function MenuScene() {
 function TilePreviewHost() {
   const { gl } = useThree();
   useEffect(() => { setSharedRenderer(gl); }, [gl]);
-  useFrame((_, delta) => { tickPreviews(delta); });
+  useFrame((_, delta) => { if (hasActivePreviews()) tickPreviews(delta); });
   return null;
 }
 

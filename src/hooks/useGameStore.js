@@ -105,6 +105,8 @@ export const useGameStore = create(
       cascades: [],
       blackHolePulse: 0,
       flipWaveOrigins: [],
+      exploded: false,
+      explosionT: 0,
     }),
 
     // ========================================================================

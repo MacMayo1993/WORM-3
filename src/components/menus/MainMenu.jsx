@@ -53,16 +53,23 @@ const ScreenGlow = () => {
   const divRefs = useRef({});
   useEffect(() => {
     let raf;
+    let prevIdx = -1;
+    let prevRawP = -1;
     const tick = () => {
       const { idx, rawP } = _pulse;
-      const activeFaces = PULSE_PAIRS[idx]?.faces ?? [];
-      const bell = rawP < 0.30 ? rawP / 0.30 : (1 - rawP) / 0.70;
-      const alpha = Math.max(0, bell) * 0.28;
-      FACE_KEYS.forEach(face => {
-        const el = divRefs.current[face];
-        if (!el) return;
-        el.style.opacity = activeFaces.includes(face) ? String(alpha) : '0';
-      });
+      // Skip DOM writes when the pulse state hasn't changed (e.g. during the gap period)
+      if (idx !== prevIdx || rawP !== prevRawP) {
+        prevIdx = idx;
+        prevRawP = rawP;
+        const activeFaces = PULSE_PAIRS[idx]?.faces ?? [];
+        const bell = rawP < 0.30 ? rawP / 0.30 : (1 - rawP) / 0.70;
+        const alpha = Math.max(0, bell) * 0.28;
+        FACE_KEYS.forEach(face => {
+          const el = divRefs.current[face];
+          if (!el) return;
+          el.style.opacity = activeFaces.includes(face) ? String(alpha) : '0';
+        });
+      }
       raf = requestAnimationFrame(tick);
     };
     tick();
@@ -153,11 +160,15 @@ const FacePulses = () => {
       ps.t0 += PAIR_INTERVAL;
     }
 
-    const activeFaces = PULSE_PAIRS[ps.idx].faces;
     const rawP = Math.min((t - ps.t0) / PULSE_DUR, 1.0);
 
     _pulse.idx = ps.idx;
     _pulse.rawP = rawP;
+
+    // During the gap between pulses every face is invisible — skip geometry/light work
+    if (rawP >= 1.0) return;
+
+    const activeFaces = PULSE_PAIRS[ps.idx].faces;
 
     FACE_KEYS.forEach(face => {
       const lines = lineRefs.current[face];
