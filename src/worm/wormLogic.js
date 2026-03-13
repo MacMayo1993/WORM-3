@@ -752,7 +752,7 @@ export const updateWormAfterRotation = (segments, axis, sliceIndex, dir, size) =
 
     const newDirKey = rotateDir(seg.dirKey, axis, dir);
 
-    return { x: nx, y: ny, z: nz, dirKey: newDirKey, moveDir: seg.moveDir };
+    return { ...seg, x: nx, y: ny, z: nz, dirKey: newDirKey };
   });
 };
 
