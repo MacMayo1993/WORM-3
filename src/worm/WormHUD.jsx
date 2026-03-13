@@ -12,7 +12,7 @@ function formatTime(secs) {
 export default function WormHUD({
   score,
   length,
-  orbsRemaining,
+  orbsRemaining: _orbsRemaining,
   orbsTotal,
   orbsCollected = 0,
   warps,
