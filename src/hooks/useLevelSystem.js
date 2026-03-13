@@ -7,6 +7,8 @@
 import { useCallback } from 'react';
 import { useGameStore } from './useGameStore.js';
 import { getLevel, getNextLevel } from '../levels/index.js';
+import { makeCubies } from '../game/cubeState.js';
+import { clearRefractory } from '../game/refractoryMap.js';
 
 /**
  * Hook for level system management
@@ -92,10 +94,14 @@ export function useLevelSystem() {
   const handleBackToMainMenu = useCallback(() => {
     setShowLevelSelect(false);
     setShowMainMenu(true);
-    // Stop any running chaos and wipe disparity state so the cube is clean
-    // when the user starts a new mode from the main menu.
+    // Fully reset cube and all game state so the next session starts clean.
+    const { size: currentSize } = useGameStore.getState();
+    useGameStore.getState().setRotatedCubies(makeCubies(currentSize));
+    useGameStore.getState().resetGame();
+    useGameStore.getState().clearHistory();
     useGameStore.getState().setChaosLevel(0);
     useGameStore.getState().clearDisparityGame();
+    clearRefractory();
   }, [setShowLevelSelect, setShowMainMenu]);
 
   // Handle next level
