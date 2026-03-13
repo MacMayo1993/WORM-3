@@ -140,8 +140,21 @@ function useWormCrawler(size, cubies) {
     const pendingVoidKillRef = useRef(null);
     // Cached tunnel list — rebuilt whenever cubies change to avoid redundant getActiveTunnels calls
     const tunnelCacheRef = useRef(null);
+    // O(1) tunnel endpoint lookup to avoid repeated per-step linear scans.
+    const tunnelLookupRef = useRef(new Map());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    React.useEffect(() => { tunnelCacheRef.current = getActiveTunnels(cubies, size); }, [cubies, size]);
+    React.useEffect(() => {
+        const tunnels = getActiveTunnels(cubies, size);
+        tunnelCacheRef.current = tunnels;
+
+        const lookup = new Map();
+        for (const tunnel of tunnels) {
+            const tunnelKey = canonicalTunnelKey(tunnel);
+            lookup.set(tileKey(tunnel.entry), { tunnel, tunnelKey, reversed: false });
+            lookup.set(tileKey(tunnel.exit), { tunnel, tunnelKey, reversed: true });
+        }
+        tunnelLookupRef.current = lookup;
+    }, [canonicalTunnelKey, cubies, size, tileKey]);
 
     // Compute world centroid of current grid tile
     const getWorldPos = (p) => new THREE.Vector3(
@@ -171,26 +184,21 @@ function useWormCrawler(size, cubies) {
     }, [tileKey]);
 
     const resolveTunnelAtTile = useCallback((x, y, z, dirKey) => {
-        const tunnels = tunnelCacheRef.current ?? getActiveTunnels(cubies, size);
-        const tunnel = tunnels.find(t =>
-            t.entry.x === x && t.entry.y === y &&
-            t.entry.z === z && t.entry.dirKey === dirKey
-        ) || tunnels.find(t =>
-            t.exit.x === x && t.exit.y === y &&
-            t.exit.z === z && t.exit.dirKey === dirKey
-        );
+        const hit = tunnelLookupRef.current.get(tileKey({ x, y, z, dirKey }));
+        if (!hit) return null;
 
-        if (!tunnel) return null;
-
-        const orientedTunnel = (tunnel.exit.x === x && tunnel.exit.y === y && tunnel.exit.z === z)
-            ? { ...tunnel, entry: tunnel.exit, exit: tunnel.entry }
-            : tunnel;
+        if (hit.reversed) {
+            return {
+                tunnel: { ...hit.tunnel, entry: hit.tunnel.exit, exit: hit.tunnel.entry },
+                tunnelKey: hit.tunnelKey,
+            };
+        }
 
         return {
-            tunnel: orientedTunnel,
-            tunnelKey: canonicalTunnelKey(tunnel),
+            tunnel: hit.tunnel,
+            tunnelKey: hit.tunnelKey,
         };
-    }, [canonicalTunnelKey, cubies, size]);
+    }, [tileKey]);
 
     const killWorm = useCallback((details = null) => {
         if (!alive.current) return;
