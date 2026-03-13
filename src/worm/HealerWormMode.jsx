@@ -11,6 +11,8 @@ import { useShallow } from 'zustand/react/shallow';
 import { getStickerWorldPos } from '../game/coordinates.js';
 import { getNextSurfacePosition, getActiveTunnels, getTunnelWorldPos, turnWorm } from './wormLogic.js';
 import { buildManifoldGridMap, flipStickerPair } from '../game/manifoldLogic.js';
+import { rotateVec90 } from '../game/cubeRotation.js';
+import { DIR_TO_VEC, VEC_TO_DIR, FACE_COLORS } from '../utils/constants.js';
 import {
     CAM_HEIGHT_BASE,
     CAM_BACK_BASE,
@@ -51,6 +53,28 @@ import {
     randomFreeTile,
     randomUnflippedTile,
 } from './healerWorm/surfaceTiles.js';
+
+// ─── Tile position rotation helper ───────────────────────────────────────────
+// Transforms a {x, y, z, dirKey} surface tile through a cube slice rotation.
+// Mirrors the math in rotateSliceCubies + rotateStickers.
+function rotateTilePosition(tile, axis, sliceIndex, dir, size) {
+    const { x, y, z, dirKey } = tile;
+    const inSlice = (axis === 'col' && x === sliceIndex) ||
+        (axis === 'row' && y === sliceIndex) ||
+        (axis === 'depth' && z === sliceIndex);
+    if (!inSlice) return tile;
+
+    const k = (size - 1) / 2;
+    const cx = x - k, cy = y - k, cz = z - k;
+    const [nx, ny, nz] = rotateVec90(cx, cy, cz, axis, dir);
+    const newX = Math.round(nx + k), newY = Math.round(ny + k), newZ = Math.round(nz + k);
+
+    const [vx, vy, vz] = DIR_TO_VEC[dirKey];
+    const [rvx, rvy, rvz] = rotateVec90(vx, vy, vz, axis, dir);
+    const newDirKey = VEC_TO_DIR(rvx, rvy, rvz);
+
+    return { ...tile, x: newX, y: newY, z: newZ, dirKey: newDirKey };
+}
 
 // ─── Worm Crawler Hook ────────────────────────────────────────────────────────
 function useWormCrawler(size, cubies) {
@@ -619,6 +643,33 @@ function useWormCrawler(size, cubies) {
         }
     }, []);
 
+    // Track the last pending rotation so we can apply it to powerup positions when
+    // the animation commits (rotationEpoch increments).
+    const lastPendingMoveRef = useRef(null);
+    useEffect(() => {
+        const unsub = useGameStore.subscribe(
+            s => s.animState,
+            animState => { if (animState) lastPendingMoveRef.current = animState; }
+        );
+        return unsub;
+    }, []);
+
+    // When a cube rotation commits, transform every powerup so it follows its tile.
+    useEffect(() => {
+        const unsub = useGameStore.subscribe(
+            s => s.rotationEpoch,
+            () => {
+                const rot = lastPendingMoveRef.current;
+                if (!rot || !powerupsRef.current.length) return;
+                const { axis, dir, sliceIndex } = rot;
+                const rotated = powerupsRef.current.map(p => rotateTilePosition(p, axis, sliceIndex, dir, size));
+                powerupsRef.current = rotated;
+                useGameStore.getState().setWormPowerups(rotated);
+            }
+        );
+        return unsub;
+    }, [size]);
+
     return {
         pos, moveDir, phase, tunnelProgress, activeTunnel, onFlippedTile,
         interpT, prevWorldPos, curWorldPos, jumpT, isJumping, jumpLift,
@@ -1153,12 +1204,15 @@ function WormFace({ worm, size }) {
 }
 
 // ─── Powerup Orbs ─────────────────────────────────────────────────────────────
+// Each orb inherits the color of the sticker tile it sits on and follows
+// that tile through cube rotations.
 function PowerupOrbs({ size }) {
     const groupRef = useRef();
-    const wormColor = useGameStore(s => s.wormColor ?? '#22ff88');
+    // Per-orb material refs so we can update color without remounting
+    const matRefs = useRef(Array.from({ length: MAX_POWERUP_RENDER }, () => React.createRef()));
 
     useFrame(() => {
-        const powerups = useGameStore.getState().wormPowerups;
+        const { wormPowerups: powerups, cubies } = useGameStore.getState();
         if (!groupRef.current) return;
         const meshes = groupRef.current.children;
         const t = Date.now() * 0.003;
@@ -1167,6 +1221,8 @@ function PowerupOrbs({ size }) {
             const mesh = meshes[i];
             const p = powerups[i];
             if (!p || !mesh) { if (mesh) mesh.visible = false; continue; }
+
+            // Position: tile world pos + face-normal lift
             const wp = getStickerWorldPos(p.x, p.y, p.z, p.dirKey, size, 0);
             const n = FACE_NORMALS[p.dirKey] ?? new THREE.Vector3(0, 0, 1);
             const phase = t + i * 1.5;
@@ -1175,6 +1231,17 @@ function PowerupOrbs({ size }) {
             mesh.scale.setScalar(0.09 + Math.sin(phase) * 0.018);
             mesh.rotation.y = t * 0.6 + i;
             mesh.visible = true;
+
+            // Color: inherit from the sticker this orb is mapped to
+            const mat = matRefs.current[i]?.current;
+            if (mat && cubies) {
+                const sticker = cubies[p.x]?.[p.y]?.[p.z]?.stickers?.[p.dirKey];
+                const stickerColor = sticker ? (FACE_COLORS[sticker.curr] ?? '#22ff88') : '#22ff88';
+                if (mat.color.getStyle() !== stickerColor) {
+                    mat.color.set(stickerColor);
+                    mat.emissive.set(stickerColor);
+                }
+            }
         }
     });
 
@@ -1183,7 +1250,7 @@ function PowerupOrbs({ size }) {
             {Array.from({ length: MAX_POWERUP_RENDER }).map((_, i) => (
                 <mesh key={i}>
                     <icosahedronGeometry args={[1, 0]} />
-                    <meshStandardMaterial color={wormColor} emissive={wormColor} emissiveIntensity={1.2} />
+                    <meshStandardMaterial ref={matRefs.current[i]} color="#22ff88" emissive="#22ff88" emissiveIntensity={1.2} />
                 </mesh>
             ))}
         </group>
