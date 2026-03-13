@@ -54,7 +54,6 @@ import { useAntipodalIntegrity } from './hooks/useAntipodalIntegrity.js';
 const PlatformerWormMode = React.lazy(() => import('./worm/PlatformerWormMode.jsx'));
 const HealerWormMode = React.lazy(() => import('./worm/HealerWormMode.jsx'));
 const WormTouchControls = React.lazy(() => import('./worm/WormTouchControls.jsx'));
-const SnakeWormMode = React.lazy(() => import('./worm/SnakeWormMode.jsx'));
 const HollowVoidCube = React.lazy(() => import('./3d/HollowVoidCube.jsx'));
 
 // Mobile detection
@@ -315,9 +314,6 @@ export default function WORM3() {
   // Co-op Crawler mode
   const [coopMode, setCoopMode] = useState(false);
 
-  // Snake Worm mode (standalone surface/tunnel snake game)
-  const [showSnakeWorm, setShowSnakeWorm] = useState(false);
-
   // Antipodal PiP — second camera from opposite side of the cube
   const [showAntipodalPiP, setShowAntipodalPiP] = useState(false);
 
@@ -550,11 +546,6 @@ export default function WORM3() {
     console.log('[WORM] handleMenuWormHealer called — opening wizard');
     useGameStore.getState().setShowMainMenu(false);
     setShowWormModeWizard(true);
-  }, []);
-
-  const handleMenuSnakeWorm = useCallback(() => {
-    useGameStore.getState().setShowMainMenu(false);
-    setShowSnakeWorm(true);
   }, []);
 
   const handleWormSetupComplete = useCallback((wizardSettings) => {
@@ -972,19 +963,6 @@ export default function WORM3() {
     );
   }
 
-  if (showSnakeWorm) {
-    return (
-      <Suspense fallback={<div style={{ background: '#0a0a14', width: '100vw', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#00ff88', fontFamily: "'Courier New', monospace" }}>Loading Snake Worm...</div>}>
-        <SnakeWormMode
-          onQuit={() => {
-            setShowSnakeWorm(false);
-            useGameStore.getState().setShowMainMenu(true);
-          }}
-        />
-      </Suspense>
-    );
-  }
-
   return (
     <div className={`full-screen${settings.backgroundTheme === 'dark' ? ' bg-dark' : settings.backgroundTheme === 'midnight' ? ' bg-midnight' : ''}`}>
       {showTutorial && !showWelcome && <Tutorial onClose={closeTutorial} onMainMenu={() => { closeTutorial(); handleBackToMainMenu(); }} />}
@@ -1133,7 +1111,6 @@ export default function WORM3() {
             onMenuBiome: handleMenuBiome,
             onMenuDisparity: handleMenuDisparity,
             onMenuWormHealer: handleMenuWormHealer,
-            onMenuSnakeWorm: handleMenuSnakeWorm,
             onMenuHolonomy: handleMenuHolonomy,
             onMenuMerge: handleMenuMerge,
             showMergeThemePicker,
