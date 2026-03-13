@@ -237,7 +237,7 @@ export default function ParityOrbs({ orbs, size, explosionFactor = 0, mode = 'su
 
       return {
         position,
-        colorIndex: i,
+        colorIndex: orb.colorIndex !== undefined ? orb.colorIndex : i,
         key,
         isTarget: isTunnelMode && orb.tunnelId === targetTunnelId
       };

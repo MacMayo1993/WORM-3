@@ -277,7 +277,8 @@ export const spawnTunnelOrbs = (tunnels, count, wormSegments = []) => {
         orbs.push({
           tunnelId: tunnel.id,
           t,
-          tunnel
+          tunnel,
+          colorIndex: orbs.length
         });
         usedTunnels.add(`${tunnel.id}-${t}`);
         break;
@@ -292,7 +293,8 @@ export const spawnTunnelOrbs = (tunnels, count, wormSegments = []) => {
     orbs.push({
       tunnelId: tunnel.id,
       t,
-      tunnel
+      tunnel,
+      colorIndex: orbs.length
     });
   }
 
@@ -675,7 +677,7 @@ export const spawnOrbs = (cubies, size, count, wormSegments = [], existingOrbs =
   const shuffled = validPositions.sort(() => Math.random() - 0.5);
   const selected = shuffled.slice(0, Math.min(count, shuffled.length));
 
-  return selected;
+  return selected.map((pos, i) => ({ ...pos, colorIndex: i }));
 };
 
 /**

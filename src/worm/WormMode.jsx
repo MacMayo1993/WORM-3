@@ -26,15 +26,14 @@ import {
 } from './wormLogic.js';
 import { play } from '../utils/audio.js';
 
-// Maps face direction key → face hex color (matches constants.js FACE_COLORS)
-const FACE_DIR_COLORS = {
-  PZ: '#ef4444', // Red   (face 1)
-  NX: '#22c55e', // Green (face 2)
-  PY: '#ffffff', // White (face 3)
-  NZ: '#f97316', // Orange (face 4)
-  PX: '#3b82f6', // Blue  (face 5)
-  NY: '#eab308', // Yellow (face 6)
-};
+// Orb colors — must match ORB_COLORS in ParityOrb.jsx so worm body shows the same color as the eaten orb
+const ORB_COLORS = [
+  '#ffd700', // Gold
+  '#ff6b6b', // Coral
+  '#4ecdc4', // Teal
+  '#a855f7', // Purple
+  '#f97316'  // Orange
+];
 
 // Game configuration for surface mode
 const CONFIG = {
@@ -398,7 +397,8 @@ export function WormGameLoop({
     const orbIndex = orbs.findIndex(o => positionKey(o) === orbKey);
 
     if (orbIndex !== -1) {
-      const orbColor = FACE_DIR_COLORS[orbs[orbIndex].dirKey] ?? null;
+      const orb = orbs[orbIndex];
+      const orbColor = ORB_COLORS[(orb.colorIndex ?? orbIndex) % ORB_COLORS.length];
       setOrbs(prev => prev.filter((_, i) => i !== orbIndex));
       for (let g = 0; g < CONFIG.growthPerOrb; g++) pendingGrowthColorsRef.current.push(orbColor);
       setPendingGrowth(g => g + CONFIG.growthPerOrb);
@@ -787,8 +787,10 @@ export function TunnelWormGameLoop({
     );
 
     if (orbIndex !== -1) {
+      const tunnelOrb = orbs[orbIndex];
+      const tunnelOrbColor = ORB_COLORS[(tunnelOrb.colorIndex ?? orbIndex) % ORB_COLORS.length];
       setOrbs(prev => prev.filter((_, i) => i !== orbIndex));
-      for (let g = 0; g < CONFIG.growthPerOrb; g++) pendingGrowthColorsRef.current.push(null);
+      for (let g = 0; g < CONFIG.growthPerOrb; g++) pendingGrowthColorsRef.current.push(tunnelOrbColor);
       setPendingGrowth(g => g + CONFIG.growthPerOrb);
       setScore(s => s + 50 + (worm.length * 10));
       play('/sounds/eat.mp3');
