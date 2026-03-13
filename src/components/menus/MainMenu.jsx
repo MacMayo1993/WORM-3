@@ -349,7 +349,7 @@ const NavItem = ({ icon, label, color, onClick }) => {
 };
 
 // ─── Main component ───────────────────────────────────────────────────────────
-const MainMenu = ({ onPlay, _onLevels, onFreeplay, _onCoop, onSettings, onBiome, onDisparity, onWormHealer, onHolonomy, onMerge }) => {
+const MainMenu = ({ onPlay, _onLevels, onFreeplay, _onCoop, onSettings, onBiome, onDisparity, onWormHealer, onSnakeWorm, onHolonomy, onMerge }) => {
   // Dark glass palette — Rubik's cube rainbow colors as accents
   const CLEAN = {
     pageBg: 'radial-gradient(circle at 50% 35%, #0e1324 0%, #070b16 52%, #05050f 100%)',
@@ -508,6 +508,9 @@ const MainMenu = ({ onPlay, _onLevels, onFreeplay, _onCoop, onSettings, onBiome,
               <NavItem icon={<WormIcon />} label="WORM" color="#a855f7" onClick={onWormHealer} />
               {/* divider */}
               <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(120,160,255,0.15)' }} />
+              <NavItem icon={<SnakeIcon />} label="SNAKE" color="#00ff88" onClick={onSnakeWorm} />
+              {/* divider */}
+              <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(120,160,255,0.15)' }} />
               <NavItem icon={<HolonomyIcon />} label="∮ Holonomy" color="#00f5ff" onClick={onHolonomy} />
               {/* divider */}
               <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(120,160,255,0.15)' }} />
@@ -547,6 +550,14 @@ const WormIcon = () => (
   <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
     <path d="M4 12 Q8 4 12 12 T20 12" stroke="#a855f7" strokeWidth="2" strokeLinecap="round" fill="none" />
     <circle cx="20" cy="12" r="2.5" fill="#a855f7" />
+  </svg>
+);
+const SnakeIcon = () => (
+  <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+    <path d="M4 18 L4 10 Q4 7 7 7 L17 7 Q20 7 20 10 L20 14 Q20 17 17 17 L7 17 Q5 17 5 15" stroke="#00ff88" strokeWidth="2" strokeLinecap="round" fill="none" />
+    <circle cx="5" cy="13" r="2" fill="#00ff88" />
+    <circle cx="4.5" cy="12.5" r="0.7" fill="#0a0a14" />
+    <circle cx="5.5" cy="12.5" r="0.7" fill="#0a0a14" />
   </svg>
 );
 const ExploreIcon = () => (

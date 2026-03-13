@@ -104,7 +104,7 @@ export default function UILayer({
     onTutorialClose, onLevelTutorialClose, onNextLevel,
     onPreset, onInstantChaos, onSaveState, onLoadState,
     onMenuPlay, onMenuLevels, onMenuFreeplay, onMenuCoop, onMenuTeach,
-    onMenuSettings, onMenuBiome, onMenuDisparity, onMenuWormHealer, onMenuHolonomy, onMenuMerge,
+    onMenuSettings, onMenuBiome, onMenuDisparity, onMenuWormHealer, onMenuSnakeWorm, onMenuHolonomy, onMenuMerge,
     showMergeThemePicker, onMergeStart, onMergeCancel,
     onWizardComplete, onWizardCancel, onDisparitySetupComplete,
     onWormSetupComplete, onWormWizardCancel, onWormRetry, onWormNewGame,
@@ -366,6 +366,7 @@ export default function UILayer({
           onBiome={onMenuBiome}
           onDisparity={onMenuDisparity}
           onWormHealer={onMenuWormHealer}
+          onSnakeWorm={onMenuSnakeWorm}
           onHolonomy={onMenuHolonomy}
           onMerge={onMenuMerge}
         />
