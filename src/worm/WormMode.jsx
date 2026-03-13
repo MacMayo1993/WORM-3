@@ -6,7 +6,6 @@ import { useFrame } from '@react-three/fiber';
 import WormTrail from './WormTrail.jsx';
 import ParityOrbs from './ParityOrb.jsx';
 import WormTunnelNetwork from './WormTunnelNetwork.jsx';
-import WormAmputationEffects from './WormAmputationEffect.jsx';
 import {
   createInitialWorm,
   getNextSurfacePosition,
@@ -17,9 +16,6 @@ import {
   positionKey,
   spawnOrbs,
   updateWormAfterRotation,
-  getSegmentWorldPos,
-  isAnySegmentInTunnel,
-  getSegmentsInSlice,
   // Tunnel mode imports
   getActiveTunnels,
   createInitialTunnelWorm,
@@ -28,7 +24,6 @@ import {
   spawnTunnelOrbs,
   updateTunnelWormAfterRotation
 } from './wormLogic.js';
-import * as THREE from 'three';
 import { play } from '../utils/audio.js';
 
 // Game configuration for surface mode
@@ -40,10 +35,6 @@ const CONFIG = {
   growthPerOrb: 1,        // Segments gained per orb
   warpBonus: 25           // Score bonus per warp
 };
-
-// Auto-rotate configuration
-const AUTO_ROTATE_INTERVAL = 5.0;  // Seconds between rotations
-const DANGER_WARN_LEAD    = 2.5;   // Seconds of warning before rotation fires
 
 // Game configuration for tunnel mode
 const TUNNEL_CONFIG = {
@@ -72,14 +63,6 @@ export function useWormGame(cubies, size, animState, onRotate) {
   // Camera mode - first-person worm view
   const [wormCameraEnabled, setWormCameraEnabled] = useState(false);
 
-  // Auto-rotate danger slice: null when safe, {axis, sliceIndex, dir} during warning phase
-  const [dangerSlice, setDangerSlice] = useState(null);
-  // Countdown in whole seconds shown in HUD (null when no pending rotation warning)
-  const [autoRotateCountdown, setAutoRotateCountdown] = useState(null);
-  // Pending amputation particle effects
-  const [amputationEffects, setAmputationEffects] = useState([]);
-  const amputationIdRef = useRef(0);
-
   // Timing
   const lastMoveTime = useRef(0);
   const rotationQueue = useRef([]);
@@ -91,10 +74,6 @@ export function useWormGame(cubies, size, animState, onRotate) {
   // Ref for current worm state (avoids stale closures in event handlers)
   const wormRef = useRef(worm);
   wormRef.current = worm;
-
-  // Ref for onRotate (lets the game loop call it without a stale closure)
-  const onRotateRef = useRef(onRotate);
-  onRotateRef.current = onRotate;
 
   // Calculate current speed
   const speed = useMemo(() => {
@@ -120,9 +99,6 @@ export function useWormGame(cubies, size, animState, onRotate) {
     setWarps(0);
     setPendingGrowth(0);
     setTimeAlive(0);
-    setDangerSlice(null);
-    setAutoRotateCountdown(null);
-    setAmputationEffects([]);
     setGameState('playing');
     lastMoveTime.current = 0;
     timeAliveAcc.current = 0;
@@ -212,18 +188,17 @@ export function useWormGame(cubies, size, animState, onRotate) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [gameState, restart]); // worm accessed via wormRef to avoid stale closure
 
-  // Process rotation queue — blocked while animating or any segment is in a tunnel
+  // Process rotation queue
   useEffect(() => {
     if (animState) return;
     if (rotationQueue.current.length === 0) return;
     if (gameState !== 'playing') return;
-    if (isAnySegmentInTunnel(worm)) return;
 
     const rotation = rotationQueue.current.shift();
     if (rotation && onRotate) {
       onRotate(rotation.axis, rotation.dir, rotation.sliceIndex);
     }
-  }, [animState, gameState, onRotate, worm]);
+  }, [animState, gameState, onRotate]);
 
   // Update worm after cube rotation
   const updateAfterRotation = useCallback((axis, sliceIndex, dir) => {
@@ -250,9 +225,6 @@ export function useWormGame(cubies, size, animState, onRotate) {
     orbsTotal: CONFIG.initialOrbs,
     wormCameraEnabled,
     timeAlive,
-    dangerSlice,
-    autoRotateCountdown,
-    amputationEffects,
 
     // Setters for game loop
     setGameState,
@@ -264,15 +236,10 @@ export function useWormGame(cubies, size, animState, onRotate) {
     setPendingGrowth,
     setWormCameraEnabled,
     setTimeAlive,
-    setDangerSlice,
-    setAutoRotateCountdown,
-    setAmputationEffects,
-    amputationIdRef,
 
     // Refs
     lastMoveTime,
     timeAliveAcc,
-    onRotateRef,
 
     // Actions
     restart,
@@ -281,54 +248,6 @@ export function useWormGame(cubies, size, animState, onRotate) {
     // Config
     CONFIG
   };
-}
-
-// Face-normal for a slice plane perpendicular to each axis
-const _SLICE_PLANE_NORMAL = {
-  col:   new THREE.Vector3(1, 0, 0),
-  row:   new THREE.Vector3(0, 1, 0),
-  depth: new THREE.Vector3(0, 0, 1),
-};
-
-// Semi-transparent warning plane shown across the at-risk slice
-function SliceWarning({ dangerSlice, size, explosionFactor = 0 }) {
-  const timeRef = useRef(0);
-  const meshRef = useRef();
-
-  // Animate the opacity to pulse
-  useFrame((_state, delta) => {
-    timeRef.current += delta;
-    if (meshRef.current) {
-      meshRef.current.material.opacity = 0.18 + Math.sin(timeRef.current * 6) * 0.12;
-    }
-  });
-
-  if (!dangerSlice) return null;
-
-  const { axis, sliceIndex } = dangerSlice;
-  const center = (size - 1) / 2;
-  const scale = 1 + explosionFactor * 1.8;
-  const coord = (sliceIndex - center) * scale;
-  const planeSize = size * scale * 1.3;
-
-  let position, rotation;
-  if (axis === 'col') {
-    position = [coord, 0, 0];
-    rotation = [0, Math.PI / 2, 0];
-  } else if (axis === 'row') {
-    position = [0, coord, 0];
-    rotation = [Math.PI / 2, 0, 0];
-  } else {
-    position = [0, 0, coord];
-    rotation = [0, 0, 0];
-  }
-
-  return (
-    <mesh ref={meshRef} position={position} rotation={rotation}>
-      <planeGeometry args={[planeSize, planeSize]} />
-      <meshBasicMaterial color="#ff3333" transparent opacity={0.22} side={THREE.DoubleSide} depthWrite={false} />
-    </mesh>
-  );
 }
 
 // 3D component for rendering worm and orbs inside Canvas
@@ -342,10 +261,7 @@ export function WormMode3D({
   mode = 'surface',
   targetTunnelId = null,
   tunnels = [],
-  inactiveTunnelSides,
-  dangerSlice = null,
-  amputationEffects = [],
-  onAmputationEffectDone
+  inactiveTunnelSides
 }) {
   const isTunnelMode = mode === 'tunnel';
   const wormTunnelId = isTunnelMode && worm[0] ? worm[0].tunnelId : null;
@@ -364,14 +280,6 @@ export function WormMode3D({
           inactiveSideKeys={inactiveSideKeys}
         />
       )}
-
-      {/* Auto-rotate danger slice highlight */}
-      {dangerSlice && (
-        <SliceWarning dangerSlice={dangerSlice} size={size} explosionFactor={explosionFactor} />
-      )}
-
-      {/* Tail amputation disintegration particles */}
-      <WormAmputationEffects effects={amputationEffects} onEffectDone={onAmputationEffectDone} />
 
       <WormTrail
         segments={worm}
@@ -415,20 +323,8 @@ export function WormGameLoop({
     setWarps,
     setPendingGrowth,
     setTimeAlive,
-    setDangerSlice,
-    setAutoRotateCountdown,
-    setAmputationEffects,
-    amputationIdRef,
-    onRotateRef,
     CONFIG
   } = game;
-
-  // Auto-rotate timer: counts down from AUTO_ROTATE_INTERVAL each frame
-  const autoRotateTimerRef = useRef(AUTO_ROTATE_INTERVAL);
-  // The chosen rotation stored as soon as warning phase begins
-  const pendingAutoRotationRef = useRef(null);
-  // Previous whole-second countdown value (avoids unnecessary setState calls)
-  const prevCountdownSecRef = useRef(null);
 
   useFrame((state, delta) => {
     if (gameState !== 'playing') return;
@@ -441,93 +337,6 @@ export function WormGameLoop({
     if (newSecs !== prevSecs) setTimeAlive(newSecs);
 
     lastMoveTime.current += delta;
-
-    // ── Auto-rotate countdown ──────────────────────────────────────────────
-    const inTunnel = isAnySegmentInTunnel(worm);
-    if (!inTunnel) {
-      autoRotateTimerRef.current -= delta;
-
-      // Enter warning phase: pick the rotation that will fire
-      if (autoRotateTimerRef.current <= DANGER_WARN_LEAD && !pendingAutoRotationRef.current) {
-        const axes = ['col', 'row', 'depth'];
-        const axis = axes[Math.floor(Math.random() * axes.length)];
-        const sliceIndex = Math.floor(Math.random() * size);
-        const dir = Math.random() < 0.5 ? 1 : -1;
-        pendingAutoRotationRef.current = { axis, sliceIndex, dir };
-        setDangerSlice({ axis, sliceIndex, dir });
-      }
-
-      // Update displayed countdown (whole seconds only)
-      if (pendingAutoRotationRef.current) {
-        const secsLeft = Math.ceil(Math.max(0, autoRotateTimerRef.current));
-        if (secsLeft !== prevCountdownSecRef.current) {
-          prevCountdownSecRef.current = secsLeft;
-          setAutoRotateCountdown(secsLeft);
-        }
-      }
-
-      // Fire the rotation
-      if (autoRotateTimerRef.current <= 0 && pendingAutoRotationRef.current) {
-        const rot = pendingAutoRotationRef.current;
-
-        // Check for worm intersection before dispatching
-        const hits = getSegmentsInSlice(worm, rot.axis, rot.sliceIndex);
-        if (hits.length > 0) {
-          const firstHit = hits[0]; // Lowest index = closest to head
-          if (firstHit.segmentIndex === 0) {
-            // Head hit — instant death
-            setDangerSlice(null);
-            setAutoRotateCountdown(null);
-            pendingAutoRotationRef.current = null;
-            prevCountdownSecRef.current = null;
-            autoRotateTimerRef.current = AUTO_ROTATE_INTERVAL;
-            setGameState('gameover');
-            play('/sounds/gameover.mp3');
-            return;
-          } else {
-            // Body hit — amputate at first hit, disintegrate the rest
-            const cutIndex = firstHit.segmentIndex;
-            const cutSegments = worm.slice(cutIndex); // segments to disintegrate
-            const FACE_NORMALS_MAP = {
-              PX: [1, 0, 0], NX: [-1, 0, 0],
-              PY: [0, 1, 0], NY: [0, -1, 0],
-              PZ: [0, 0, 1], NZ: [0, 0, -1],
-            };
-            const LIFT = 0.45;
-            const effectPositions = cutSegments.map(seg => {
-              const base = getSegmentWorldPos(seg, size, 0);
-              const n = FACE_NORMALS_MAP[seg.dirKey] || [0, 0, 1];
-              return [base[0] + n[0] * LIFT, base[1] + n[1] * LIFT, base[2] + n[2] * LIFT];
-            });
-            const effectId = amputationIdRef.current++;
-            setAmputationEffects(prev => [...prev, { id: effectId, positions: effectPositions }]);
-            setWorm(prev => prev.slice(0, cutIndex));
-          }
-        }
-
-        // Fire the actual cube rotation
-        onRotateRef.current?.(rot.axis, rot.dir, rot.sliceIndex);
-
-        // Reset
-        setDangerSlice(null);
-        setAutoRotateCountdown(null);
-        pendingAutoRotationRef.current = null;
-        prevCountdownSecRef.current = null;
-        autoRotateTimerRef.current = AUTO_ROTATE_INTERVAL;
-      }
-    } else {
-      // Worm is in tunnel — suspend the countdown display but keep the timer frozen
-      // (don't decrement, so we resume from the same point when worm exits)
-      if (autoRotateTimerRef.current <= DANGER_WARN_LEAD && pendingAutoRotationRef.current) {
-        // Keep warning visible but clear countdown number while in tunnel
-        const secsLeft = Math.ceil(Math.max(0, autoRotateTimerRef.current));
-        if (secsLeft !== prevCountdownSecRef.current) {
-          prevCountdownSecRef.current = secsLeft;
-          setAutoRotateCountdown(secsLeft);
-        }
-      }
-    }
-    // ── End auto-rotate ────────────────────────────────────────────────────
 
     const moveInterval = 1 / speed;
     if (lastMoveTime.current < moveInterval) return;
@@ -790,19 +599,17 @@ export function useTunnelWormGame(cubies, size, animState, onRotate) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [gameState, restart, size]);
 
-  // Process rotation queue — blocked while any segment is in a tunnel (always true in tunnel mode,
-  // but the guard ensures consistency if the worm straddles tunnel entry/exit)
+  // Process rotation queue
   useEffect(() => {
     if (animState) return;
     if (rotationQueue.current.length === 0) return;
     if (gameState !== 'playing') return;
-    if (isAnySegmentInTunnel(worm)) return;
 
     const rotation = rotationQueue.current.shift();
     if (rotation && onRotate) {
       onRotate(rotation.axis, rotation.dir, rotation.sliceIndex);
     }
-  }, [animState, gameState, onRotate, worm]);
+  }, [animState, gameState, onRotate]);
 
   // Update after rotation
   const updateAfterRotation = useCallback((_axis, _sliceIndex, _dir) => {

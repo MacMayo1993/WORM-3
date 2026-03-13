@@ -22,8 +22,6 @@ export default function WormHUD({
   wormCameraEnabled = false,
   mode = 'surface', // 'surface' or 'tunnel'
   timeAlive = 0,
-  dangerSlice = null,  // {axis, sliceIndex, dir} or null
-  autoRotateCountdown = null, // whole-second number or null
   onPause,
   onResume,
   onRestart,
@@ -84,15 +82,6 @@ export default function WormHUD({
           {isPaused ? '▶' : '⏸'}
         </button>
       </div>
-
-      {/* Auto-rotate danger countdown */}
-      {dangerSlice && isPlaying && (
-        <div style={styles.dangerBanner}>
-          <span style={styles.dangerLabel}>⚠ ROTATION IN</span>
-          <span style={styles.dangerCountdown}>{autoRotateCountdown ?? 0}s</span>
-          <span style={styles.dangerAxis}>{dangerSlice.axis.toUpperCase()} SLICE {dangerSlice.sliceIndex}</span>
-        </div>
-      )}
 
       {/* Control hint */}
       {isPlaying && (
@@ -265,35 +254,6 @@ const styles = {
   pauseButtonActive: {
     background: 'rgba(0, 255, 136, 0.25)',
     boxShadow: '0 0 12px rgba(0, 255, 136, 0.4)'
-  },
-  dangerBanner: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: isMobile ? '8px' : '14px',
-    padding: isMobile ? '5px 12px' : '7px 16px',
-    background: 'rgba(255, 40, 40, 0.2)',
-    borderBottom: '2px solid #ff3333',
-    boxShadow: '0 0 16px rgba(255, 50, 50, 0.4)'
-  },
-  dangerLabel: {
-    fontSize: isMobile ? '10px' : '12px',
-    color: '#ff8888',
-    letterSpacing: '0.1em',
-    fontWeight: 'bold'
-  },
-  dangerCountdown: {
-    fontSize: isMobile ? '20px' : '28px',
-    color: '#ff3333',
-    fontWeight: 'bold',
-    textShadow: '0 0 12px #ff3333',
-    minWidth: '40px',
-    textAlign: 'center'
-  },
-  dangerAxis: {
-    fontSize: isMobile ? '9px' : '11px',
-    color: '#ff8888',
-    letterSpacing: '0.08em'
   },
   hint: {
     position: 'absolute',

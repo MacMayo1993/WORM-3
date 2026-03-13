@@ -172,11 +172,6 @@ export function WormModeCanvasElements({ size, explosionFactor, animState, cubie
         targetTunnelId={game.targetTunnelId}
         tunnels={game.tunnels || []}
         inactiveTunnelSides={game.inactiveTunnelSides || new Set()}
-        dangerSlice={game.dangerSlice || null}
-        amputationEffects={game.amputationEffects || []}
-        onAmputationEffectDone={(id) => {
-          game.setAmputationEffects?.(prev => prev.filter(e => e.id !== id));
-        }}
       />
       <GameLoop
         cubies={cubies}
@@ -245,8 +240,6 @@ export function WormModeHUD({ onQuit, gameData }) {
     wormCameraEnabled,
     mode,
     timeAlive,
-    dangerSlice,
-    autoRotateCountdown,
     restart
   } = game;
 
@@ -267,8 +260,6 @@ export function WormModeHUD({ onQuit, gameData }) {
       wormCameraEnabled={wormCameraEnabled}
       mode={mode}
       timeAlive={timeAlive || 0}
-      dangerSlice={dangerSlice || null}
-      autoRotateCountdown={autoRotateCountdown}
       onPause={handlePause}
       onResume={handleResume}
       onRestart={restart}
