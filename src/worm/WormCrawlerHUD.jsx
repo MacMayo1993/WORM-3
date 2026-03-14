@@ -81,22 +81,38 @@ const CONTROL_MODE_BTN_STYLE = {
     cursor: 'pointer',
 };
 
-const TOP_SPEED_WRAP_STYLE = {
-    minWidth: 114,
+const SPEED_BAR_STYLE = {
+    position: 'absolute',
+    top: 76,
+    left: 12,
+    right: 12,
+    borderRadius: 12,
+    padding: '8px 12px',
+    border: `1px solid ${palette.border}`,
+    background: palette.panel,
+    backdropFilter: 'blur(18px)',
+    boxShadow: palette.shadow,
     display: 'flex',
-    flexDirection: 'column',
-    gap: 4,
+    alignItems: 'center',
+    gap: 10,
+    pointerEvents: 'auto',
 };
 
-const TOP_SPEED_LABEL_STYLE = {
+const SPEED_BAR_LABEL_STYLE = {
+    minWidth: 82,
     color: palette.subText,
-    fontSize: 9,
+    fontSize: 10,
     letterSpacing: 0.8,
     fontWeight: 700,
-    textAlign: 'right',
 };
 
-const TOP_SPEED_INPUT_STYLE = {
+const SPEED_BAR_INPUT_WRAP_STYLE = {
+    flex: 1,
+    display: 'flex',
+    alignItems: 'center',
+};
+
+const SPEED_BAR_INPUT_STYLE = {
     width: '100%',
     accentColor: '#60a5fa',
     cursor: 'pointer',
@@ -182,7 +198,7 @@ const RESUME_BTN_STYLE = {
 };
 
 const PROGRESS_PANEL_STYLE = {
-    position: 'absolute', left: 12, bottom: 150,
+    position: 'absolute', top: 124, left: 12,
     width: 210,
     borderRadius: 14,
     border: `1px solid ${palette.border}`,
@@ -209,7 +225,12 @@ const PORTAL_HINT_STYLE = {
     padding: '6px 12px',
 };
 
-const JUMP_WRAP_STYLE = { position: 'absolute', bottom: 'calc(62px + env(safe-area-inset-bottom, 0px))', left: '50%', transform: 'translateX(-50%)', pointerEvents: 'auto' };
+const JUMP_WRAP_STYLE = {
+    position: 'absolute',
+    bottom: 'calc(18px + env(safe-area-inset-bottom, 0px))',
+    left: 12,
+    pointerEvents: 'auto'
+};
 
 const JUMP_BTN_BASE = {
     minWidth: 198,
@@ -434,7 +455,23 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                 </div>
             </div>
 
-            {/* Progress + speed */}
+            {/* Speed row (directly under top status/settings bar) */}
+            <div style={SPEED_BAR_STYLE}>
+                <div style={SPEED_BAR_LABEL_STYLE}>SPEED {wormSpeed.toFixed(1)}×</div>
+                <div style={SPEED_BAR_INPUT_WRAP_STYLE}>
+                    <input
+                        type="range"
+                        min="0.3"
+                        max="3.0"
+                        step="0.1"
+                        value={wormSpeed}
+                        onChange={e => wormAlive && setWormSpeed(parseFloat(e.target.value))}
+                        style={SPEED_BAR_INPUT_STYLE}
+                    />
+                </div>
+            </div>
+
+            {/* Progress */}
             <div style={PROGRESS_PANEL_STYLE}>
                 <div style={PROGRESS_ROW_STYLE}>
                     <span style={PROGRESS_LABEL_STYLE}>ORBS ON WORM</span>
