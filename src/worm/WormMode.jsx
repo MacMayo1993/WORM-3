@@ -26,15 +26,6 @@ import {
 } from './wormLogic.js';
 import { play } from '../utils/audio.js';
 
-// Orb colors — must match ORB_COLORS in ParityOrb.jsx so worm body shows the same color as the eaten orb
-const ORB_COLORS = [
-  '#ffd700', // Gold
-  '#ff6b6b', // Coral
-  '#4ecdc4', // Teal
-  '#a855f7', // Purple
-  '#f97316'  // Orange
-];
-
 // Game configuration for surface mode
 const CONFIG = {
   initialOrbs: 15,        // Starting number of orbs
@@ -397,8 +388,7 @@ export function WormGameLoop({
     const orbIndex = orbs.findIndex(o => positionKey(o) === orbKey);
 
     if (orbIndex !== -1) {
-      const orb = orbs[orbIndex];
-      const orbColor = ORB_COLORS[(orb.colorIndex ?? orbIndex) % ORB_COLORS.length];
+      const orbColor = orbs[orbIndex].color ?? null;
       setOrbs(prev => prev.filter((_, i) => i !== orbIndex));
       for (let g = 0; g < CONFIG.growthPerOrb; g++) pendingGrowthColorsRef.current.push(orbColor);
       setPendingGrowth(g => g + CONFIG.growthPerOrb);
@@ -787,8 +777,7 @@ export function TunnelWormGameLoop({
     );
 
     if (orbIndex !== -1) {
-      const tunnelOrb = orbs[orbIndex];
-      const tunnelOrbColor = ORB_COLORS[(tunnelOrb.colorIndex ?? orbIndex) % ORB_COLORS.length];
+      const tunnelOrbColor = orbs[orbIndex].color ?? null;
       setOrbs(prev => prev.filter((_, i) => i !== orbIndex));
       for (let g = 0; g < CONFIG.growthPerOrb; g++) pendingGrowthColorsRef.current.push(tunnelOrbColor);
       setPendingGrowth(g => g + CONFIG.growthPerOrb);
