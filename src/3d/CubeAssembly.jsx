@@ -12,6 +12,7 @@ import WormholeNetwork from '../manifold/WormholeNetwork.jsx';
 import ChaosWave from '../manifold/ChaosWave.jsx';
 import FlipPropagationWave from '../manifold/FlipPropagationWave.jsx';
 import { vibrate } from '../utils/audio.js';
+import { pressState } from '../worm/wormLogic.js';
 import { updateSharedTime, updateSharedTremor, warmUpDefaultStyles } from './styles/TileStyleMaterials.jsx';
 import { StickerInstanceProvider } from './StickerInstances.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
@@ -40,6 +41,15 @@ const _dragPosPool = Array.from({ length: _MAX_SLICE }, () => new THREE.Vector3(
 const _dragRotPool = Array.from({ length: _MAX_SLICE }, () => new THREE.Quaternion());
 const _dragBasePositions = new Map();
 const _dragBaseRotations = new Map();
+
+// Face-normal inward direction for each dirKey — used to offset pressed cubies
+const PRESS_NORMALS = {
+  PX: [-1, 0, 0], NX: [1, 0, 0],
+  PY: [0, -1, 0], NY: [0, 1, 0],
+  PZ: [0, 0, -1], NZ: [0, 0, 1],
+};
+// Max inward displacement (units) when a tile is fully pressed by the worm
+const MAX_PRESS_OFFSET = 0.06;
 
 // Mobile detection
 const isTouchDevice = typeof window !== 'undefined' && (
@@ -97,6 +107,7 @@ const CubeAssembly = React.memo(({
     }))
   );
   const cubieRefs = useRef([]);
+  const prevPressedIdxRef = useRef(new Set()); // tracks indices pressed last frame for cleanup
   const controlsRef = useRef();
   const controlsEnabledRef = useRef(true); // Track controls state with ref for immediate updates
   const cubeGroupRef = useRef(null);
@@ -685,6 +696,64 @@ const CubeAssembly = React.memo(({
       });
     }
   }, -1);
+
+  // Priority 1: runs after all animation systems (-2, -1, 0).
+  // Applies worm weight press offsets to cubie positions. Resets cubies that
+  // were pressed last frame but are no longer pressed back to their clean positions.
+  useFrame(() => {
+    const hasPressNow = pressState.tiles.size > 0;
+    const hadPressBefore = prevPressedIdxRef.current.size > 0;
+    if (!hasPressNow && !hadPressBefore) return;
+
+    const explosionMultiplier = size >= 4 ? 1.53 : 1.8;
+    const expansionFactor = 1 + explosionFactorRef.current * explosionMultiplier;
+    const k = (size - 1) / 2;
+    const newPressedIdx = new Set();
+
+    // Reset cubies that were pressed last frame (spring back to clean position)
+    prevPressedIdxRef.current.forEach(idx => {
+      if (sliceIndicesRef.current?.has(idx)) return; // skip if in active rotation slice
+      if (liveDragRef.current?.sliceIndices?.has(idx)) return; // skip if in live drag
+      const g = cubieRefs.current[idx];
+      if (!g) return;
+      g.position.set(
+        positionCache[idx][0] * expansionFactor,
+        positionCache[idx][1] * expansionFactor,
+        positionCache[idx][2] * expansionFactor
+      );
+    });
+
+    // Apply current press offsets
+    pressState.tiles.forEach((depth, key) => {
+      const parts = key.split(',');
+      const px = parseInt(parts[0]);
+      const py = parseInt(parts[1]);
+      const pz = parseInt(parts[2]);
+      const dirKey = parts[3];
+      if (px < 0 || px >= size || py < 0 || py >= size || pz < 0 || pz >= size) return;
+
+      const idx = px * size * size + py * size + pz;
+      if (sliceIndicesRef.current?.has(idx)) return;
+      if (liveDragRef.current?.sliceIndices?.has(idx)) return;
+
+      const g = cubieRefs.current[idx];
+      if (!g) return;
+
+      const n = PRESS_NORMALS[dirKey];
+      if (!n) return;
+
+      const offset = MAX_PRESS_OFFSET * depth;
+      // Set absolute position = clean base + inward press offset (no drift)
+      g.position.set(
+        (px - k) * expansionFactor + n[0] * offset,
+        (py - k) * expansionFactor + n[1] * offset,
+        (pz - k) * expansionFactor + n[2] * offset
+      );
+      newPressedIdx.add(idx);
+    });
+
+    prevPressedIdxRef.current = newPressedIdx;
+  }, 1);
 
   // Stable ref callbacks so that passing ref={fn} doesn't defeat React.memo on Cubie.
   // We create one callback per index, memoized by size.

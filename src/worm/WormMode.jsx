@@ -22,8 +22,14 @@ import {
   findNextTunnel,
   checkTunnelSelfCollision,
   spawnTunnelOrbs,
-  updateTunnelWormAfterRotation
+  updateTunnelWormAfterRotation,
+  // Weight & healing
+  pressState,
+  getPressedTileKeys,
+  checkHealingCandidates,
 } from './wormLogic.js';
+import { healSticker } from '../game/cubeState.js';
+import { useGameStore } from '../hooks/useGameStore.js';
 import { play } from '../utils/audio.js';
 
 // Game configuration for surface mode
@@ -33,7 +39,8 @@ const CONFIG = {
   speedIncrement: 0.05,   // Speed increase per segment
   maxSpeed: 3.0,          // Maximum speed
   growthPerOrb: 1,        // Segments gained per orb
-  warpBonus: 25           // Score bonus per warp
+  warpBonus: 25,          // Score bonus per warp
+  healBonus: 75,          // Score bonus per healed wormhole tile
 };
 
 // Game configuration for tunnel mode
@@ -330,9 +337,50 @@ export function WormGameLoop({
     CONFIG
   } = game;
 
+  const setCubies = useGameStore(s => s.setCubies);
+  const recentlyHealedRef = useRef(new Set());
+
+  // Clear press state on unmount so tiles don't stay depressed after leaving worm mode
+  useEffect(() => {
+    return () => { pressState.tiles.clear(); };
+  }, []);
+
   useFrame((state, delta) => {
     if (gameState !== 'playing') return;
     if (animState) return;
+
+    // ── Press state: set depth=1 for current worm tiles, decay released tiles ──
+    const currentPressedKeys = getPressedTileKeys(worm);
+    pressState.tiles.forEach((_depth, key) => {
+      if (currentPressedKeys.has(key)) return;
+      const next = pressState.tiles.get(key) * 0.78;
+      if (next < 0.01) pressState.tiles.delete(key);
+      else pressState.tiles.set(key, next);
+    });
+    for (const key of currentPressedKeys) {
+      pressState.tiles.set(key, 1.0);
+    }
+
+    // ── Healing check: fires every frame, guarded by recentlyHealedRef ──
+    const candidates = checkHealingCandidates(cubies, size, worm);
+    if (candidates.length > 0) {
+      let updatedCubies = cubies;
+      let healed = false;
+      for (const c of candidates) {
+        const key = positionKey(c);
+        if (!recentlyHealedRef.current.has(key)) {
+          updatedCubies = healSticker(updatedCubies, size, c.x, c.y, c.z, c.dirKey);
+          recentlyHealedRef.current.add(key);
+          setScore(s => s + CONFIG.healBonus);
+          healed = true;
+          setTimeout(() => recentlyHealedRef.current.delete(key), 500);
+        }
+      }
+      if (healed) {
+        setCubies(updatedCubies);
+        play('/sounds/eat.mp3');
+      }
+    }
 
     // Track time alive (update display state at whole-second boundaries)
     const prevSecs = Math.floor(timeAliveAcc.current);

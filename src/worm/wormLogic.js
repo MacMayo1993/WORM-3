@@ -781,3 +781,135 @@ export const getSegmentWorldPos = (seg, size, explosionFactor = 0) => {
 export const calculateScore = (length, orbsEaten, warpsUsed) => {
   return (length * 100) + (orbsEaten * 50) + (warpsUsed * 25);
 };
+
+// ============================================================================
+// WORM WEIGHT - Tile press state & healing logic (surface mode)
+// ============================================================================
+
+/**
+ * Shared press state for worm weight visualization.
+ * Written each frame by WormGameLoop, read by CubeAssembly to animate tile depression.
+ * Module-level singleton — only one worm game runs at a time.
+ * Map key: "x,y,z,dirKey" → current press depth (0.0–1.0).
+ */
+export const pressState = {
+  tiles: new Map(),
+};
+
+/**
+ * Get all 8 surrounding surface tile neighbors (Moore neighborhood).
+ * Cardinal neighbors via getNextSurfacePosition; diagonals via two sequential steps.
+ * @param {Object} pos - Position {x, y, z, dirKey}
+ * @param {number} size - Cube size
+ * @returns {Array} Up to 8 neighboring positions {x, y, z, dirKey}
+ */
+export const getSurroundingNeighbors = (pos, size) => {
+  const cardinalDirs = ['up', 'down', 'left', 'right'];
+  const cardinalResults = {};
+  const seen = new Set();
+  const neighbors = [];
+
+  // Step 1: 4 cardinal neighbors
+  for (const dir of cardinalDirs) {
+    const next = getNextSurfacePosition(pos, dir, size);
+    if (next) {
+      const key = positionKey(next);
+      if (!seen.has(key)) {
+        seen.add(key);
+        neighbors.push(next);
+      }
+      cardinalResults[dir] = next;
+    }
+  }
+
+  // Step 2: 4 diagonal neighbors via two sequential cardinal steps
+  const diagPairs = [
+    ['up', 'left'], ['up', 'right'],
+    ['down', 'left'], ['down', 'right'],
+  ];
+  for (const [d1, d2] of diagPairs) {
+    const step1 = cardinalResults[d1];
+    if (!step1) continue;
+    const step2 = getNextSurfacePosition(step1, d2, size);
+    if (step2) {
+      const key = positionKey(step2);
+      if (!seen.has(key)) {
+        seen.add(key);
+        neighbors.push(step2);
+      }
+    }
+  }
+
+  return neighbors;
+};
+
+/**
+ * Build a Set of tile keys currently occupied by worm body segments (surface mode).
+ * @param {Array} wormSegments - Worm segment array [{x, y, z, dirKey}, ...]
+ * @returns {Set<string>} Set of "x,y,z,dirKey" keys
+ */
+export const getPressedTileKeys = (wormSegments) => {
+  const keys = new Set();
+  for (const seg of wormSegments) {
+    if (seg.x !== undefined) keys.add(positionKey(seg));
+  }
+  return keys;
+};
+
+/**
+ * Find all flipped surface tiles where every non-flipped surrounding neighbor
+ * is currently occupied by a worm segment (healing condition met).
+ * @param {Array} cubies - Cube state
+ * @param {number} size - Cube size
+ * @param {Array} wormSegments - Current worm segments
+ * @returns {Array} Array of {x, y, z, dirKey} positions ready to be healed
+ */
+export const checkHealingCandidates = (cubies, size, wormSegments) => {
+  const pressedKeys = getPressedTileKeys(wormSegments);
+  const candidates = [];
+
+  for (let x = 0; x < size; x++) {
+    for (let y = 0; y < size; y++) {
+      for (let z = 0; z < size; z++) {
+        const cubie = cubies[x]?.[y]?.[z];
+        if (!cubie) continue;
+
+        for (const dirKey of Object.keys(cubie.stickers || {})) {
+          const sticker = cubie.stickers[dirKey];
+          if (!sticker) continue;
+
+          // Only visible surface tiles
+          const isVisible =
+            (dirKey === 'PX' && x === size - 1) ||
+            (dirKey === 'NX' && x === 0) ||
+            (dirKey === 'PY' && y === size - 1) ||
+            (dirKey === 'NY' && y === 0) ||
+            (dirKey === 'PZ' && z === size - 1) ||
+            (dirKey === 'NZ' && z === 0);
+          if (!isVisible) continue;
+
+          // Must be a flipped (unstable) wormhole tile
+          if (sticker.curr === sticker.orig) continue;
+
+          // Get all 8 surrounding neighbors
+          const neighbors = getSurroundingNeighbors({ x, y, z, dirKey }, size);
+
+          // Only require non-flipped neighbors to be pressed
+          const nonFlippedNeighbors = neighbors.filter(n => {
+            const ns = cubies[n.x]?.[n.y]?.[n.z]?.stickers?.[n.dirKey];
+            return ns && ns.curr === ns.orig;
+          });
+
+          // Skip isolated wormhole clusters (surrounded entirely by other wormholes)
+          if (nonFlippedNeighbors.length === 0) continue;
+
+          // Healing fires when ALL non-flipped surrounding tiles are covered
+          const allPressed = nonFlippedNeighbors.every(n => pressedKeys.has(positionKey(n)));
+          if (allPressed) candidates.push({ x, y, z, dirKey });
+        }
+      }
+    }
+  }
+
+  return candidates;
+};
