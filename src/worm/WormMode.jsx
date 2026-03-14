@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
+import * as THREE from 'three';
 import WormTrail from './WormTrail.jsx';
 import ParityOrbs from './ParityOrb.jsx';
 import WormTunnelNetwork from './WormTunnelNetwork.jsx';
@@ -27,10 +28,12 @@ import {
   pressState,
   getPressedTileKeys,
   checkHealingCandidates,
+  getSegmentWorldPos,
 } from './wormLogic.js';
 import { healSticker } from '../game/cubeState.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { play } from '../utils/audio.js';
+import { FACE_COLORS, ANTIPODAL_COLOR } from '../utils/constants.js';
 
 // Game configuration for surface mode
 const CONFIG = {
@@ -260,6 +263,101 @@ export function useWormGame(cubies, size, animState, onRotate) {
   };
 }
 
+// Face rotation to align plane with each cube face normal (pointing outward)
+const HIGHLIGHT_ROT = {
+  PZ: [0, 0, 0],
+  NZ: [0, Math.PI, 0],
+  PX: [0, Math.PI / 2, 0],
+  NX: [0, -Math.PI / 2, 0],
+  PY: [-Math.PI / 2, 0, 0],
+  NY: [Math.PI / 2, 0, 0],
+};
+
+// Face outward normals for lifting the highlight plane above the sticker surface
+const HIGHLIGHT_NORMALS = {
+  PX: [1, 0, 0], NX: [-1, 0, 0],
+  PY: [0, 1, 0], NY: [0, -1, 0],
+  PZ: [0, 0, 1], NZ: [0, 0, -1],
+};
+
+// Sticker surface sits at 0.51 from cubie center; lift slightly above
+const HIGHLIGHT_LIFT = 0.53;
+
+const _highlightGeo = new THREE.PlaneGeometry(0.95, 0.95);
+
+// One pre-built material per face color (keyed by hex string) — no per-frame allocation
+const _highlightMats = {};
+for (const hex of Object.values(FACE_COLORS)) {
+  _highlightMats[hex] = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(hex),
+    transparent: true,
+    opacity: 0.35,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+  });
+}
+// Fallback material for unknown colors
+const _highlightMatFallback = new THREE.MeshBasicMaterial({
+  color: new THREE.Color('#00ff88'),
+  transparent: true,
+  opacity: 0.35,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending,
+  side: THREE.DoubleSide,
+});
+
+/**
+ * Renders glowing tile highlights at each surface-mode worm segment position.
+ * Each tile glows in the antipodal color of its sticker.
+ */
+function WormTileHighlight({ segments, size, explosionFactor }) {
+  const cubies = useGameStore(s => s.cubies);
+  const timeRef = useRef(0);
+
+  const tileData = useMemo(() => {
+    return segments
+      .filter(seg => seg.dirKey) // surface segments only
+      .map(seg => {
+        const base = getSegmentWorldPos(seg, size, explosionFactor);
+        const n = HIGHLIGHT_NORMALS[seg.dirKey] || [0, 0, 1];
+        const pos = [base[0] + n[0] * HIGHLIGHT_LIFT, base[1] + n[1] * HIGHLIGHT_LIFT, base[2] + n[2] * HIGHLIGHT_LIFT];
+        const rot = HIGHLIGHT_ROT[seg.dirKey] || [0, 0, 0];
+        // Look up the sticker's antipodal face color
+        const faceId = cubies?.[seg.x]?.[seg.y]?.[seg.z]?.stickers?.[seg.dirKey]?.curr;
+        const antipodalId = ANTIPODAL_COLOR[faceId];
+        const hex = FACE_COLORS[antipodalId] || null;
+        const mat = (hex && _highlightMats[hex]) || _highlightMatFallback;
+        return { pos, rot, mat };
+      });
+  }, [segments, size, explosionFactor, cubies]);
+
+  useFrame((_state, delta) => {
+    timeRef.current += delta;
+    const opacity = 0.25 + Math.sin(timeRef.current * 6) * 0.15;
+    // Update all materials each frame (7 objects max — cheap)
+    for (const mat of Object.values(_highlightMats)) mat.opacity = opacity;
+    _highlightMatFallback.opacity = opacity;
+  });
+
+  if (tileData.length === 0) return null;
+
+  return (
+    <group>
+      {tileData.map(({ pos, rot, mat }, i) => (
+        <mesh
+          key={i}
+          position={pos}
+          rotation={rot}
+          geometry={_highlightGeo}
+          material={mat}
+          frustumCulled={false}
+        />
+      ))}
+    </group>
+  );
+}
+
 // 3D component for rendering worm and orbs inside Canvas
 // Supports both surface and tunnel modes
 export function WormMode3D({
@@ -288,6 +386,15 @@ export function WormMode3D({
           targetTunnelId={targetTunnelId}
           wormTunnelId={wormTunnelId}
           inactiveSideKeys={inactiveSideKeys}
+        />
+      )}
+
+      {/* Tile highlight overlay - shows which tiles the worm is pressing */}
+      {!isTunnelMode && (
+        <WormTileHighlight
+          segments={worm}
+          size={size}
+          explosionFactor={explosionFactor}
         />
       )}
 
