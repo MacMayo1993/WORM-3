@@ -418,7 +418,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                         <div style={WORMHOLE_VALUE_STYLE}>{wormholeCountdown.toFixed(1)}s</div>
                     </div>
                     {wormAlive && (
-                        <button onPointerDown={togglePause} style={PAUSE_BTN_STYLE} aria-label={wormPaused ? 'Resume' : 'Pause'}>
+                        <button onPointerDown={togglePause} tabIndex={-1} style={PAUSE_BTN_STYLE} aria-label={wormPaused ? 'Resume' : 'Pause'}>
                             {wormPaused ? '▶' : '⏸'}
                         </button>
                     )}
@@ -493,7 +493,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                             <div>Wormholes used: <b style={PAUSE_STAT_VALUE_STYLE}>{wormTunnelCount}</b></div>
                             <div>Orbs on worm: <b style={PAUSE_STAT_VALUE_STYLE}>{wormBodyTiles}</b></div>
                         </div>
-                        <button onPointerDown={togglePause} style={RESUME_BTN_STYLE}>
+                        <button onPointerDown={togglePause} tabIndex={-1} style={RESUME_BTN_STYLE}>
                             ▶ RESUME
                         </button>
                     </div>
