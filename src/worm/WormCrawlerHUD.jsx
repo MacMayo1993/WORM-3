@@ -432,6 +432,18 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                     >
                         {wormControlMode === 'oriented' ? 'ORIENTED' : 'NON-ORIENTED'}
                     </button>
+                    <div style={TOP_SPEED_WRAP_STYLE}>
+                        <div style={TOP_SPEED_LABEL_STYLE}>SPEED {wormSpeed.toFixed(1)}×</div>
+                        <input
+                            type="range"
+                            min="0.3"
+                            max="3.0"
+                            step="0.1"
+                            value={wormSpeed}
+                            onChange={e => wormAlive && setWormSpeed(parseFloat(e.target.value))}
+                            style={TOP_SPEED_INPUT_STYLE}
+                        />
+                    </div>
                     <div style={HEALED_COL_STYLE}>
                         <div style={HEALED_LABEL_STYLE}>HEALED</div>
                         <div style={HEALED_VALUE_STYLE}>{wormHealedCount}</div>
