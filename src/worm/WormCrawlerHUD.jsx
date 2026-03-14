@@ -83,7 +83,7 @@ const CONTROL_MODE_BTN_STYLE = {
 
 const SPEED_BAR_STYLE = {
     position: 'absolute',
-    top: 76,
+    top: 134,
     left: 12,
     right: 12,
     borderRadius: 12,
@@ -198,7 +198,7 @@ const RESUME_BTN_STYLE = {
 };
 
 const PROGRESS_PANEL_STYLE = {
-    position: 'absolute', top: 124, left: 12,
+    position: 'absolute', top: 76, left: 12,
     width: 210,
     borderRadius: 14,
     border: `1px solid ${palette.border}`,
@@ -227,8 +227,8 @@ const PORTAL_HINT_STYLE = {
 
 const JUMP_WRAP_STYLE = {
     position: 'absolute',
-    bottom: 'calc(18px + env(safe-area-inset-bottom, 0px))',
-    left: 12,
+    bottom: 'calc(4px + env(safe-area-inset-bottom, 0px))',
+    left: 4,
     pointerEvents: 'auto'
 };
 
@@ -259,7 +259,7 @@ const JUMP_BTN_IDLE = {
 };
 
 const DPAD_STYLE = {
-    position: 'absolute', bottom: 'calc(10px + env(safe-area-inset-bottom, 0px))', right: 8,
+    position: 'absolute', bottom: 'calc(4px + env(safe-area-inset-bottom, 0px))', right: 4,
     display: 'grid',
     gridTemplateColumns: '68px 68px 68px',
     gridTemplateRows: '68px 68px 68px',
@@ -432,8 +432,12 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                     >
                         {wormControlMode === 'oriented' ? 'ORIENTED' : 'NON-ORIENTED'}
                     </button>
-                    <div style={TOP_SPEED_WRAP_STYLE}>
-                        <div style={TOP_SPEED_LABEL_STYLE}>SPEED {wormSpeed.toFixed(1)}×</div>
+                    <div style={HEALED_COL_STYLE}>
+                        <div style={HEALED_LABEL_STYLE}>ORBS</div>
+                        <div style={{ ...HEALED_VALUE_STYLE, color: '#c4b5fd' }}>{wormBodyTiles}</div>
+                    </div>
+                    <div style={SPEED_BAR_INPUT_WRAP_STYLE}>
+                        <div style={SPEED_BAR_LABEL_STYLE}>SPEED {wormSpeed.toFixed(1)}×</div>
                         <input
                             type="range"
                             min="0.3"
@@ -441,7 +445,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                             step="0.1"
                             value={wormSpeed}
                             onChange={e => wormAlive && setWormSpeed(parseFloat(e.target.value))}
-                            style={TOP_SPEED_INPUT_STYLE}
+                            style={SPEED_BAR_INPUT_STYLE}
                         />
                     </div>
                     <div style={HEALED_COL_STYLE}>
@@ -455,32 +459,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                 </div>
             </div>
 
-            {/* Speed row (directly under top status/settings bar) */}
-            <div style={SPEED_BAR_STYLE}>
-                <div style={SPEED_BAR_LABEL_STYLE}>SPEED {wormSpeed.toFixed(1)}×</div>
-                <div style={SPEED_BAR_INPUT_WRAP_STYLE}>
-                    <input
-                        type="range"
-                        min="0.3"
-                        max="3.0"
-                        step="0.1"
-                        value={wormSpeed}
-                        onChange={e => wormAlive && setWormSpeed(parseFloat(e.target.value))}
-                        style={SPEED_BAR_INPUT_STYLE}
-                    />
-                </div>
-            </div>
 
-            {/* Progress */}
-            <div style={PROGRESS_PANEL_STYLE}>
-                <div style={PROGRESS_ROW_STYLE}>
-                    <span style={PROGRESS_LABEL_STYLE}>ORBS ON WORM</span>
-                    <span style={PROGRESS_VALUE_STYLE}>{wormBodyTiles}</span>
-                </div>
-                <div style={PROGRESS_TRACK_STYLE}>
-                    <div style={progressFillStyle} />
-                </div>
-            </div>
 
             {/* Portal instruction */}
             {isPortalReady && (
