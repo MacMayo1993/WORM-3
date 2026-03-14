@@ -195,7 +195,7 @@ export default function UILayer({
   return (
     <>
       <div className="ui-layer">
-        {!wormHealerMode && <TopMenuBar
+        {!wormHealerMode && !showMainMenu && <TopMenuBar
           metrics={metrics}
           size={size}
           visualMode={visualMode}
