@@ -697,7 +697,9 @@ const CubeAssembly = React.memo(({
     }
   }, -1);
 
-  // Priority 1: runs after all animation systems (-2, -1, 0).
+  // Priority 0 (default): runs after animation systems (-2, -1), before positive-priority
+  // frames. MUST NOT use a positive priority — positive priorities disable R3F auto-render,
+  // which breaks tunnel camera animation in HealerWormMode when AntipodalPiP is unmounted.
   // Applies worm weight press offsets to cubie positions. Resets cubies that
   // were pressed last frame but are no longer pressed back to their clean positions.
   useFrame(() => {
@@ -753,7 +755,7 @@ const CubeAssembly = React.memo(({
     });
 
     prevPressedIdxRef.current = newPressedIdx;
-  }, 1);
+  });
 
   // Stable ref callbacks so that passing ref={fn} doesn't defeat React.memo on Cubie.
   // We create one callback per index, memoized by size.
