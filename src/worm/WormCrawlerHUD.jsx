@@ -2,7 +2,7 @@
 // Mobile-friendly HUD for WORM Chase-Cam Mode.
 // Uses the same clean, pedagogical visual language as other overlays.
 
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -321,37 +321,20 @@ const NEW_GAME_BTN_STYLE = {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSize = 3, onHome, onSettings, wormAlive = true, showDeathMenu = false, deathDetails = null, onRetry, onNewGame }) {
-    const { wormSpeed, wormHealedCount, wormBodyTiles, wormholeCountdown, wormControlMode, wormPaused, wormTimeAlive, wormTunnelCount, setWormSpeed, toggleWormControlMode, setWormPaused } = useGameStore(
+    const { wormSpeed, wormHealedCount, wormBodyTiles, wormholeCountdown, wormControlMode, wormTimeAlive, wormTunnelCount, setWormSpeed, toggleWormControlMode } = useGameStore(
         useShallow(s => ({
             wormSpeed: s.wormSpeed ?? 1.0,
             wormHealedCount: s.wormHealedCount ?? 0,
             wormBodyTiles: s.wormBodyTiles ?? 0,
             wormholeCountdown: s.wormholeCountdown ?? 0,
             wormControlMode: s.wormControlMode ?? 'non-oriented',
-            wormPaused: s.wormPaused ?? false,
             wormTimeAlive: s.wormTimeAlive ?? 0,
             wormTunnelCount: s.wormTunnelCount ?? 0,
             setWormSpeed: s.setWormSpeed,
             toggleWormControlMode: s.toggleWormControlMode,
-            setWormPaused: s.setWormPaused,
         }))
     );
 
-    const togglePause = () => {
-        if (!wormAlive) return;
-        setWormPaused(!wormPaused);
-    };
-
-    useEffect(() => {
-        const onKey = (e) => {
-            if (e.code === 'Escape') {
-                e.preventDefault();
-                if (wormAlive) setWormPaused(!useGameStore.getState().wormPaused);
-            }
-        };
-        window.addEventListener('keydown', onKey);
-        return () => window.removeEventListener('keydown', onKey);
-    }, [wormAlive, setWormPaused]);
 
     const formatTime = (secs) => {
         const m = Math.floor(secs / 60);
@@ -417,11 +400,6 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                         <div style={WORMHOLE_LABEL_STYLE}>NEXT WORMHOLE</div>
                         <div style={WORMHOLE_VALUE_STYLE}>{wormholeCountdown.toFixed(1)}s</div>
                     </div>
-                    {wormAlive && (
-                        <button onPointerDown={togglePause} tabIndex={-1} style={PAUSE_BTN_STYLE} aria-label={wormPaused ? 'Resume' : 'Pause'}>
-                            {wormPaused ? '▶' : '⏸'}
-                        </button>
-                    )}
                 </div>
             </div>
 
@@ -482,23 +460,6 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                 ))}
             </div>
 
-            {wormPaused && wormAlive && (
-                <div style={PAUSE_OVERLAY_STYLE}>
-                    <div style={PAUSE_CARD_STYLE}>
-                        <div style={PAUSE_TITLE_STYLE}>WORM MODE</div>
-                        <div style={PAUSE_HEADING_STYLE}>PAUSED</div>
-                        <div style={PAUSE_STATS_STYLE}>
-                            <div>Time alive: <b style={PAUSE_STAT_VALUE_STYLE}>{formatTime(wormTimeAlive)}</b></div>
-                            <div>Tiles healed: <b style={PAUSE_STAT_VALUE_STYLE}>{wormHealedCount}</b></div>
-                            <div>Wormholes used: <b style={PAUSE_STAT_VALUE_STYLE}>{wormTunnelCount}</b></div>
-                            <div>Orbs on worm: <b style={PAUSE_STAT_VALUE_STYLE}>{wormBodyTiles}</b></div>
-                        </div>
-                        <button onPointerDown={togglePause} tabIndex={-1} style={RESUME_BTN_STYLE}>
-                            ▶ RESUME
-                        </button>
-                    </div>
-                </div>
-            )}
 
             {showDeathMenu && (
                 <div style={DEATH_OVERLAY_STYLE}>
