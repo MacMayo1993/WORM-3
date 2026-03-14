@@ -5,6 +5,7 @@
 import React, { useMemo } from 'react';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
+import { resolveColors } from '../utils/colorSchemes.js';
 
 const PHASE_META = {
     crawling: { label: 'CRAWLING', accent: '#38bdf8' },
@@ -361,7 +362,7 @@ const NEW_GAME_BTN_STYLE = {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSize = 3, onHome, onSettings, wormAlive = true, showDeathMenu = false, deathDetails = null, onRetry, onNewGame }) {
-    const { wormSpeed, wormHealedCount, wormBodyTiles, wormholeCountdown, wormControlMode, wormTimeAlive, wormTunnelCount, setWormSpeed, toggleWormControlMode } = useGameStore(
+    const { wormSpeed, wormHealedCount, wormBodyTiles, wormholeCountdown, wormControlMode, wormTimeAlive, wormTunnelCount, settings, setWormSpeed, toggleWormControlMode } = useGameStore(
         useShallow(s => ({
             wormSpeed: s.wormSpeed ?? 1.0,
             wormHealedCount: s.wormHealedCount ?? 0,
@@ -370,10 +371,34 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
             wormControlMode: s.wormControlMode ?? 'non-oriented',
             wormTimeAlive: s.wormTimeAlive ?? 0,
             wormTunnelCount: s.wormTunnelCount ?? 0,
+            settings: s.settings,
             setWormSpeed: s.setWormSpeed,
             toggleWormControlMode: s.toggleWormControlMode,
         }))
     );
+
+    const manifoldColors = useMemo(() => {
+        const colors = resolveColors(settings) || {};
+        return [1, 2, 3, 4, 5, 6].map(faceId => colors[faceId]).filter(Boolean);
+    }, [settings]);
+
+    const jumpGlowGradient = useMemo(() => {
+        if (!manifoldColors.length) {
+            return 'linear-gradient(125deg, #6366f1, #8b5cf6)';
+        }
+        const doubled = [...manifoldColors, manifoldColors[0]].join(', ');
+        return `linear-gradient(125deg, ${doubled})`;
+    }, [manifoldColors]);
+
+    const jumpGlowShadow = useMemo(() => {
+        if (!manifoldColors.length) {
+            return '0 0 24px rgba(99, 102, 241, 0.55), 0 10px 30px rgba(15, 23, 42, 0.2)';
+        }
+        const perColorGlow = manifoldColors
+            .map((color, i) => `${(i - 2) * 8}px 0 20px ${color}66`)
+            .join(', ');
+        return `${perColorGlow}, 0 10px 30px rgba(15, 23, 42, 0.24)`;
+    }, [manifoldColors]);
 
 
     const formatTime = (secs) => {
@@ -399,7 +424,12 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
         [phaseMeta.accent]
     );
 
-    const jumpBtnStyle = isPortalReady ? JUMP_BTN_READY : JUMP_BTN_IDLE;
+    const jumpBtnStyle = {
+        ...(isPortalReady ? JUMP_BTN_READY : JUMP_BTN_IDLE),
+        background: jumpGlowGradient,
+        border: `1px solid ${isPortalReady ? palette.strongBorder : palette.border}`,
+        boxShadow: jumpGlowShadow,
+    };
 
     return (
         <div style={ROOT_STYLE}>
