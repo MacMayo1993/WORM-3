@@ -7,18 +7,9 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { getSegmentWorldPos, getTunnelWorldPos } from './wormLogic.js';
 
-// Orb colors - radiant energy
-const ORB_COLORS = [
-  '#ffd700', // Gold
-  '#ff6b6b', // Coral
-  '#4ecdc4', // Teal
-  '#a855f7', // Purple
-  '#f97316'  // Orange
-];
-
 // SingleOrb renders geometry and registers its refs with the parent animator.
 // It has NO useFrame — all animation is driven by the single OrbAnimator in ParityOrbs.
-function SingleOrb({ position, colorIndex = 0, collected = false, isTarget = false, orbKey, registerAnim, unregisterAnim }) {
+function SingleOrb({ position, color = '#ffd700', collected = false, isTarget = false, orbKey, registerAnim, unregisterAnim }) {
   const orbGroupRef = useRef();
   const coreRef = useRef();
   const shellRef = useRef();
@@ -59,7 +50,6 @@ function SingleOrb({ position, colorIndex = 0, collected = false, isTarget = fal
 
   if (collected) return null;
 
-  const color = ORB_COLORS[colorIndex % ORB_COLORS.length];
   const coreRadius = isTarget ? 0.2 : 0.16;
   const orbitRadius = isTarget ? 0.42 : 0.35;
 
@@ -237,7 +227,7 @@ export default function ParityOrbs({ orbs, size, explosionFactor = 0, mode = 'su
 
       return {
         position,
-        colorIndex: orb.colorIndex !== undefined ? orb.colorIndex : i,
+        color: orb.color || '#ffd700',
         key,
         isTarget: isTunnelMode && orb.tunnelId === targetTunnelId
       };
@@ -251,7 +241,7 @@ export default function ParityOrbs({ orbs, size, explosionFactor = 0, mode = 'su
           key={data.key}
           orbKey={data.key}
           position={data.position}
-          colorIndex={data.colorIndex}
+          color={data.color}
           isTarget={data.isTarget}
           registerAnim={registerAnim}
           unregisterAnim={unregisterAnim}

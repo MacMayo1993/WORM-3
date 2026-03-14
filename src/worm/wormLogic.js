@@ -4,6 +4,7 @@
 
 import { getManifoldNeighbors, findAntipodalStickerByGrid, buildManifoldGridMap } from '../game/manifoldLogic.js';
 import { getStickerWorldPos } from '../game/coordinates.js';
+import { FACE_COLORS } from '../utils/constants.js';
 import * as THREE from 'three';
 
 // ============================================================================
@@ -278,7 +279,7 @@ export const spawnTunnelOrbs = (tunnels, count, wormSegments = []) => {
           tunnelId: tunnel.id,
           t,
           tunnel,
-          colorIndex: orbs.length
+          color: FACE_COLORS[tunnel.entryColor] || '#ffd700'
         });
         usedTunnels.add(`${tunnel.id}-${t}`);
         break;
@@ -294,7 +295,7 @@ export const spawnTunnelOrbs = (tunnels, count, wormSegments = []) => {
       tunnelId: tunnel.id,
       t,
       tunnel,
-      colorIndex: orbs.length
+      color: FACE_COLORS[tunnel.entryColor] || '#ffd700'
     });
   }
 
@@ -665,7 +666,8 @@ export const spawnOrbs = (cubies, size, count, wormSegments = [], existingOrbs =
           if (isVisible) {
             const pos = { x, y, z, dirKey };
             if (!occupied.has(positionKey(pos))) {
-              validPositions.push(pos);
+              const faceId = cubie.stickers[dirKey].curr;
+              validPositions.push({ ...pos, color: FACE_COLORS[faceId] });
             }
           }
         }
@@ -677,7 +679,7 @@ export const spawnOrbs = (cubies, size, count, wormSegments = [], existingOrbs =
   const shuffled = validPositions.sort(() => Math.random() - 0.5);
   const selected = shuffled.slice(0, Math.min(count, shuffled.length));
 
-  return selected.map((pos, i) => ({ ...pos, colorIndex: i }));
+  return selected;
 };
 
 /**
