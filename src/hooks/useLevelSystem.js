@@ -48,6 +48,10 @@ export function useLevelSystem() {
     setCurrentLevelData(levelData);
     setShowLevelSelect(false);
 
+    // Prevent win-detection firing on the freshly-solved cube that setSize creates
+    // while the tutorial/cutscene is shown. The real shuffle happens on close.
+    useGameStore.getState().setHasShuffled(false);
+
     // Apply level settings
     if (levelData) {
       setSize(levelData.cubeSize);
