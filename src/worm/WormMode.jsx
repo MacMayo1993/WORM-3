@@ -33,7 +33,7 @@ import {
 import { healSticker } from '../game/cubeState.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { play } from '../utils/audio.js';
-import { FACE_COLORS } from '../utils/constants.js';
+import { FACE_COLORS, ANTIPODAL_COLOR } from '../utils/constants.js';
 
 // Game configuration for surface mode
 const CONFIG = {
@@ -323,9 +323,10 @@ function WormTileHighlight({ segments, size, explosionFactor }) {
         const n = HIGHLIGHT_NORMALS[seg.dirKey] || [0, 0, 1];
         const pos = [base[0] + n[0] * HIGHLIGHT_LIFT, base[1] + n[1] * HIGHLIGHT_LIFT, base[2] + n[2] * HIGHLIGHT_LIFT];
         const rot = HIGHLIGHT_ROT[seg.dirKey] || [0, 0, 0];
-        // Look up the sticker's current face color
+        // Look up the sticker's antipodal face color
         const faceId = cubies?.[seg.x]?.[seg.y]?.[seg.z]?.stickers?.[seg.dirKey]?.curr;
-        const hex = FACE_COLORS[faceId] || null;
+        const antipodalId = ANTIPODAL_COLOR[faceId];
+        const hex = FACE_COLORS[antipodalId] || null;
         const mat = (hex && _highlightMats[hex]) || _highlightMatFallback;
         return { pos, rot, mat };
       });
