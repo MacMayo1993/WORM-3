@@ -212,7 +212,7 @@ export default function WormTrail({ segments, size, explosionFactor = 0, alive =
           <mesh ref={headGlowRef}>
             <sphereGeometry args={[isTunnelMode ? 0.63 : 0.525, 16, 16]} />
             <meshBasicMaterial
-              color={isTunnelMode ? HEAD_COLOR_TUNNEL : HEAD_COLOR}
+              color={headColor}
               transparent
               opacity={0.2}
               side={THREE.BackSide}
@@ -248,6 +248,7 @@ export default function WormTrail({ segments, size, explosionFactor = 0, alive =
             color="#ffffff"
             emissive="#000000"
             emissiveIntensity={0}
+            vertexColors
           />
         </instancedMesh>
       )}
@@ -259,6 +260,7 @@ export default function WormTrail({ segments, size, explosionFactor = 0, alive =
             color="#ffffff"
             emissive="#000000"
             emissiveIntensity={0}
+            vertexColors
           />
         </instancedMesh>
       )}
