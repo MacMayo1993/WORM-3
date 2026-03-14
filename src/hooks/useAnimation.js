@@ -57,6 +57,9 @@ export function useAnimation() {
   const shuffleQueueRef = useRef([]);
   const shuffleDoneRef = useRef(null);
   const isShufflingRef = useRef(false);
+  // Monotonically-increasing ID: bump it to invalidate any in-flight shuffle
+  // setTimeout callbacks from a previous (cancelled) shuffle session.
+  const shuffleIdRef = useRef(0);
 
   // Start a new animation (atomic: animState and pendingMove set in one render)
   const startAnimation = useCallback((axis, dir, sliceIndex, isEcho = false, isUndo = false) => {
@@ -73,12 +76,23 @@ export function useAnimation() {
   // onDone is called after all moves complete.
   const startAnimatedShuffle = useCallback((moves, onDone) => {
     if (!moves || !moves.length) { onDone?.(); return; }
+    // Bump the shuffle ID to cancel any pending setTimeout from a prior shuffle.
+    const sid = ++shuffleIdRef.current;
     shuffleQueueRef.current = moves.slice(1);
     shuffleDoneRef.current = onDone || null;
     isShufflingRef.current = true;
-    const first = { ...moves[0], isShuffle: true };
+    const first = { ...moves[0], isShuffle: true, shuffleId: sid };
     pendingMoveRef.current = first;
     useGameStore.setState({ animState: first, pendingMove: first });
+  }, []);
+
+  // Cancel any in-flight animated shuffle. Safe to call at any time.
+  const cancelShuffle = useCallback(() => {
+    shuffleIdRef.current += 1; // Invalidate pending setTimeout callbacks
+    isShufflingRef.current = false;
+    shuffleQueueRef.current = [];
+    shuffleDoneRef.current = null;
+    useGameStore.getState().clearAnimation();
   }, []);
 
   // Handle animation completion
@@ -105,6 +119,12 @@ export function useAnimation() {
       }
 
       if (isShuffle) {
+        // Discard moves belonging to a cancelled shuffle session.
+        const sid = pm.shuffleId;
+        if (sid !== undefined && sid !== shuffleIdRef.current) {
+          pendingMoveRef.current = null;
+          return;
+        }
         // Shuffle move: commit silently — no moves counter, no undo history, no echo.
         play('/sounds/rotate.mp3', 0.6);
         useGameStore.setState((state) => ({
@@ -116,8 +136,10 @@ export function useAnimation() {
         pendingMoveRef.current = null;
 
         if (shuffleQueueRef.current.length > 0) {
-          const next = { ...shuffleQueueRef.current.shift(), isShuffle: true };
+          const next = { ...shuffleQueueRef.current.shift(), isShuffle: true, shuffleId: sid };
           setTimeout(() => {
+            // Re-check: the shuffle may have been cancelled during the 50ms delay.
+            if (shuffleIdRef.current !== sid) return;
             pendingMoveRef.current = next;
             useGameStore.setState({ animState: next, pendingMove: next });
           }, 50);
@@ -257,6 +279,7 @@ export function useAnimation() {
     // Actions
     startAnimation,
     startAnimatedShuffle,
+    cancelShuffle,
     handleAnimComplete,
     onMove,
     setAnimState,

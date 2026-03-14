@@ -20,6 +20,7 @@ import { completeLevel } from './utils/levels.js';
 import { makeCubies } from './game/cubeState.js';
 import { rotateSliceCubies } from './game/cubeRotation.js';
 import { buildManifoldGridMap, flipStickerPair } from './game/manifoldLogic.js';
+import { clearRefractory } from './game/refractoryMap.js';
 
 // Hooks
 import { useShallow } from 'zustand/react/shallow';
@@ -254,7 +255,7 @@ export default function WORM3() {
   const { moves, gameTime, victory, achievedWins: _achievedWins, setVictory } = useGameSession();
 
   const {
-    animState, startAnimation, handleAnimComplete, onMove, startAnimatedShuffle
+    animState, startAnimation, handleAnimComplete, onMove, startAnimatedShuffle, cancelShuffle
   } = useAnimation();
 
   const {
@@ -284,7 +285,7 @@ export default function WORM3() {
   // Animated shuffle: resets to solved, then plays 15 quick layer rotations visually.
   // Uses a 50ms delay after reset so React commits the solved layout before animation starts.
   const animatedShuffle = useCallback(() => {
-    useGameStore.getState().setCubies(makeCubies(size));
+    useGameStore.getState().setRotatedCubies(makeCubies(size));
     useGameStore.getState().resetGame();
     const axes = ['row', 'col', 'depth'];
     const moves = Array.from({ length: 15 }, () => ({
@@ -765,6 +766,8 @@ export default function WORM3() {
 
   // Level-specific shuffle
   const shuffleForLevel = useCallback(() => {
+    // Cancel any animated shuffle still playing from a previous game session.
+    cancelShuffle();
     const levelSize = currentLevelData?.cubeSize || size;
     let state = makeCubies(levelSize);
     const shuffleCount = currentLevelData ? Math.min(25, 10 + currentLevel * 2) : 25;
@@ -775,9 +778,13 @@ export default function WORM3() {
       state = rotateSliceCubies(state, levelSize, ax, slice, dir);
     }
     setRotatedCubies(state);
+    // Save the level's chaos setting before resetGame() wipes it.
+    const savedChaosLevel = currentLevelData?.chaosLevel ?? 0;
     useGameStore.getState().resetGame();
+    clearRefractory();
+    if (savedChaosLevel > 0) useGameStore.getState().setChaosLevel(savedChaosLevel);
     useGameStore.getState().setHasShuffled(true);
-  }, [currentLevelData, currentLevel, size, setRotatedCubies]);
+  }, [cancelShuffle, currentLevelData, currentLevel, size, setRotatedCubies]);
 
   // Tutorial close handler
   const handleTutorialClose = useCallback(() => {
@@ -922,7 +929,11 @@ export default function WORM3() {
     reset();
     setDisparityCountdown(null);
     setDisparityWaitingFirstFlip(false);
-  }, [reset]);
+    // reset() calls resetGame() which clears chaosLevel. Re-apply the level's
+    // configured chaos so the mode stays active after a keyboard/button reset.
+    const savedChaosLevel = currentLevelData?.chaosLevel ?? 0;
+    if (savedChaosLevel > 0) useGameStore.getState().setChaosLevel(savedChaosLevel);
+  }, [reset, currentLevelData]);
 
   const { performCursorRotation } = useKeyboardControls({
     onMove,
