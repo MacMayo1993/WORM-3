@@ -37,6 +37,8 @@ const FACE_NORMALS = {
 };
 // How far (units) worm segments float above the tile surface to avoid clipping
 const WORM_LIFT = 0.45;
+// How much lift is removed when worm weight fully depresses a tile (matches MAX_PRESS_OFFSET)
+const WORM_PRESS_REDUCTION = 0.06;
 
 /**
  * @param {Object} props
@@ -64,12 +66,14 @@ export default function WormTrail({ segments, size, explosionFactor = 0, alive =
       return getTunnelWorldPos(seg.tunnel, seg.t, size, explosionFactor);
     }
     const base = getSegmentWorldPos(seg, size, explosionFactor);
-    // Push outward along the face normal so the worm sits visibly ON the cube
+    // Push outward along the face normal so the worm sits visibly ON the cube.
+    // Reduce lift by WORM_PRESS_REDUCTION so the worm sinks with the depressed tile.
     const normal = FACE_NORMALS[seg.dirKey] || [0, 0, 1];
+    const lift = WORM_LIFT - WORM_PRESS_REDUCTION;
     return [
-      base[0] + normal[0] * WORM_LIFT,
-      base[1] + normal[1] * WORM_LIFT,
-      base[2] + normal[2] * WORM_LIFT,
+      base[0] + normal[0] * lift,
+      base[1] + normal[1] * lift,
+      base[2] + normal[2] * lift,
     ];
   }), [segments, size, explosionFactor, isTunnelMode]);
 
