@@ -7,7 +7,6 @@
 import { useCallback } from 'react';
 import { useGameStore } from './useGameStore.js';
 import { getLevel, getNextLevel } from '../levels/index.js';
-import { makeCubies } from '../game/cubeState.js';
 import { clearRefractory } from '../game/refractoryMap.js';
 
 /**
@@ -92,16 +91,11 @@ export function useLevelSystem() {
 
   // Handle back to main menu
   const handleBackToMainMenu = useCallback(() => {
+    // fullReset wipes all transient game state and resets cube to default 3x3.
+    useGameStore.getState().fullReset();
+    clearRefractory();
     setShowLevelSelect(false);
     setShowMainMenu(true);
-    // Fully reset cube and all game state so the next session starts clean.
-    const { size: currentSize } = useGameStore.getState();
-    useGameStore.getState().setRotatedCubies(makeCubies(currentSize));
-    useGameStore.getState().resetGame();
-    useGameStore.getState().clearHistory();
-    useGameStore.getState().setChaosLevel(0);
-    useGameStore.getState().clearDisparityGame();
-    clearRefractory();
   }, [setShowLevelSelect, setShowMainMenu]);
 
   // Handle next level

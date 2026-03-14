@@ -109,6 +109,93 @@ export const useGameStore = create(
       explosionT: 0,
     }),
 
+    // Full reset to a clean slate — used when returning to the main menu.
+    // Resets all transient game state to initial defaults.
+    // Does NOT touch persisted state (settings, completedLevels, introSeen flags).
+    fullReset: () => set((state) => ({
+      // Cube
+      size: 3,
+      cubies: makeCubies(3),
+      rotationEpoch: state.rotationEpoch + 1,
+      // Session
+      moves: 0,
+      gameTime: 0,
+      gameStartTime: Date.now(),
+      hasShuffled: false,
+      victory: null,
+      achievedWins: { rubiks: false, sudokube: false, ultimate: false, worm: false },
+      moveHistory: [],
+      // Visual modes
+      visualMode: 'classic',
+      flipMode: false,
+      showTunnels: true,
+      exploded: false,
+      explosionT: 0,
+      showNetPanel: false,
+      // Chaos
+      chaosLevel: 0,
+      autoRotateEnabled: false,
+      cascades: [],
+      upcomingRotation: null,
+      rotationCountdown: 0,
+      blackHolePulse: 0,
+      flipWaveOrigins: [],
+      // Disparity / Worm
+      disparityDeaths: [],
+      disparityDeathByGridId: {},
+      disparityWinner: null,
+      showDisparityWinner: false,
+      disparityEliminatedFaces: [],
+      wormHealerMode: false,
+      holonomyMode: false,
+      wormHealedCount: 0,
+      wormPhase: 'crawling',
+      wormOnFlippedTile: false,
+      wormBodyTiles: 0,
+      wormPowerups: [],
+      wormholeCountdown: 0,
+      wormAlive: true,
+      showWormDeathMenu: false,
+      wormDeathDetails: null,
+      wormPaused: false,
+      wormTimeAlive: 0,
+      wormTunnelCount: 0,
+      // Animation
+      animState: null,
+      pendingMove: null,
+      // Cursor
+      cursor: { face: 'PZ', row: 1, col: 1 },
+      showCursor: false,
+      // Level
+      currentLevel: null,
+      currentLevelData: null,
+      showCutscene: false,
+      showLevelTutorial: false,
+      // Special modes
+      handsMode: false,
+      handsMoveHistory: [],
+      handsMoveQueue: [],
+      handsTps: 0,
+      solveModeActive: false,
+      solveFocusedStep: null,
+      solveHighlights: [],
+      teachModeActive: false,
+      antipodalIntegrityMode: false,
+      antipodalMode: false,
+      reversalCount: 0,
+      pendingEchoRotations: [],
+      mergeMode: false,
+      mergeRegionTiers: {},
+      hollowMode: false,
+      mirrorMode: false,
+      parityCurrent: 0,
+      parityTarget: 0,
+      chaosCurrent: 0,
+      chaosTarget: 0,
+      faceRotationTarget: null,
+      selectedTileForRotation: null,
+    })),
+
     // ========================================================================
     // UNDO SYSTEM (NEW)
     // ========================================================================
