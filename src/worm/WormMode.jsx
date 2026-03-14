@@ -426,7 +426,7 @@ export function WormGameLoop({
       }
     }
 
-    if (checkSelfCollision(finalPos, worm)) {
+    if (checkSelfCollision(finalPos, worm, pendingGrowth > 0)) {
       setGameState('gameover');
       play('/sounds/gameover.mp3');
       return;
@@ -805,6 +805,10 @@ export function TunnelWormGameLoop({
       }
     }
 
+    // Determine growth state BEFORE collision check so we can exclude the tail
+    // correctly — when growing, the tail stays; when not growing, it vacates.
+    const growing = pendingGrowth > 0;
+
     // Check for self-collision
     const newHead = {
       tunnelId: newTunnelId,
@@ -812,7 +816,7 @@ export function TunnelWormGameLoop({
       tunnel: newTunnel,
       direction: newDirection
     };
-    if (checkTunnelSelfCollision(newHead, worm)) {
+    if (checkTunnelSelfCollision(newHead, worm, growing)) {
       setGameState('gameover');
       play('/sounds/gameover.mp3');
       return;
@@ -846,7 +850,6 @@ export function TunnelWormGameLoop({
     }
 
     // Update worm positions
-    const growing = pendingGrowth > 0;
     const growthColor = growing ? (pendingGrowthColorsRef.current.shift() ?? null) : null;
     if (growing) setPendingGrowth(g => g - 1);
 
