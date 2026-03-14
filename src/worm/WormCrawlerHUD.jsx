@@ -5,6 +5,8 @@
 import React, { useMemo } from 'react';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
+import { resolveColors } from '../utils/colorSchemes.js';
+import { ANTIPODAL_COLOR } from '../utils/constants.js';
 
 const PHASE_META = {
     crawling: { label: 'CRAWLING', accent: '#38bdf8' },
@@ -24,6 +26,27 @@ const palette = {
     warning: '#fbbf24',
     fillA: '#60a5fa',
     fillB: '#a78bfa',
+};
+
+
+const toRgb = (color) => {
+    if (!color || typeof color !== 'string') return null;
+    const hex = color.trim();
+    const fullHex = /^#([0-9a-f]{3})$/i.test(hex)
+        ? `#${hex.slice(1).split('').map(ch => ch + ch).join('')}`
+        : hex;
+    const match = /^#([0-9a-f]{6})$/i.exec(fullHex);
+    if (!match) return null;
+    const value = parseInt(match[1], 16);
+    return { r: (value >> 16) & 255, g: (value >> 8) & 255, b: value & 255 };
+};
+
+const colorDistance = (a, b) => {
+    if (!a || !b) return Number.POSITIVE_INFINITY;
+    const dr = a.r - b.r;
+    const dg = a.g - b.g;
+    const db = a.b - b.b;
+    return dr * dr + dg * dg + db * db;
 };
 
 // ─── Module-level style constants ─────────────────────────────────────────────
@@ -361,7 +384,7 @@ const NEW_GAME_BTN_STYLE = {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSize = 3, onHome, onSettings, wormAlive = true, showDeathMenu = false, deathDetails = null, onRetry, onNewGame }) {
-    const { wormSpeed, wormHealedCount, wormBodyTiles, wormholeCountdown, wormControlMode, wormTimeAlive, wormTunnelCount, setWormSpeed, toggleWormControlMode } = useGameStore(
+    const { wormSpeed, wormHealedCount, wormBodyTiles, wormholeCountdown, wormControlMode, wormTimeAlive, wormTunnelCount, wormColor, settings, setWormSpeed, toggleWormControlMode } = useGameStore(
         useShallow(s => ({
             wormSpeed: s.wormSpeed ?? 1.0,
             wormHealedCount: s.wormHealedCount ?? 0,
@@ -370,10 +393,38 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
             wormControlMode: s.wormControlMode ?? 'non-oriented',
             wormTimeAlive: s.wormTimeAlive ?? 0,
             wormTunnelCount: s.wormTunnelCount ?? 0,
+            wormColor: s.wormColor ?? '#33ff66',
+            settings: s.settings,
             setWormSpeed: s.setWormSpeed,
             toggleWormControlMode: s.toggleWormControlMode,
         }))
     );
+
+    const resolvedFaceColors = useMemo(() => {
+        const safeSettings = settings && typeof settings === 'object'
+            ? settings
+            : { colorScheme: 'standard', customColors: {} };
+        return resolveColors(safeSettings, settings?.biomeMode?.faceAssignment) || {};
+    }, [settings]);
+
+    const jumpEdgeColor = useMemo(() => {
+        const wormRgb = toRgb(wormColor);
+        let nearestFaceId = 2;
+        let nearestDistance = Number.POSITIVE_INFINITY;
+
+        [1, 2, 3, 4, 5, 6].forEach(faceId => {
+            const faceRgb = toRgb(resolvedFaceColors[faceId]);
+            const dist = colorDistance(wormRgb, faceRgb);
+            if (dist < nearestDistance) {
+                nearestDistance = dist;
+                nearestFaceId = faceId;
+            }
+        });
+
+        const antipodalFace = ANTIPODAL_COLOR[nearestFaceId] ?? 5;
+        const antipodalColor = resolvedFaceColors[antipodalFace];
+        return toRgb(antipodalColor) ? antipodalColor : '#8b5cf6';
+    }, [resolvedFaceColors, wormColor]);
 
 
     const formatTime = (secs) => {
@@ -399,7 +450,11 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
         [phaseMeta.accent]
     );
 
-    const jumpBtnStyle = isPortalReady ? JUMP_BTN_READY : JUMP_BTN_IDLE;
+    const jumpBtnStyle = {
+        ...(isPortalReady ? JUMP_BTN_READY : JUMP_BTN_IDLE),
+        border: `1px solid ${jumpEdgeColor}`,
+        boxShadow: `${palette.shadow}, 0 0 14px ${jumpEdgeColor}, 0 0 28px ${jumpEdgeColor}`,
+    };
 
     return (
         <div style={ROOT_STYLE}>
