@@ -33,6 +33,7 @@ import {
 import { healSticker } from '../game/cubeState.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { play } from '../utils/audio.js';
+import { FACE_COLORS } from '../utils/constants.js';
 
 // Game configuration for surface mode
 const CONFIG = {
@@ -283,7 +284,21 @@ const HIGHLIGHT_NORMALS = {
 const HIGHLIGHT_LIFT = 0.53;
 
 const _highlightGeo = new THREE.PlaneGeometry(0.95, 0.95);
-const _highlightMat = new THREE.MeshBasicMaterial({
+
+// One pre-built material per face color (keyed by hex string) — no per-frame allocation
+const _highlightMats = {};
+for (const hex of Object.values(FACE_COLORS)) {
+  _highlightMats[hex] = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(hex),
+    transparent: true,
+    opacity: 0.35,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+  });
+}
+// Fallback material for unknown colors
+const _highlightMatFallback = new THREE.MeshBasicMaterial({
   color: new THREE.Color('#00ff88'),
   transparent: true,
   opacity: 0.35,
@@ -294,41 +309,47 @@ const _highlightMat = new THREE.MeshBasicMaterial({
 
 /**
  * Renders glowing tile highlights at each surface-mode worm segment position.
- * Used to visually confirm which tiles are being "pressed" by the worm.
+ * Each tile glows in the antipodal color of its sticker.
  */
 function WormTileHighlight({ segments, size, explosionFactor }) {
+  const cubies = useGameStore(s => s.cubies);
   const timeRef = useRef(0);
 
-  const positions = useMemo(() => {
+  const tileData = useMemo(() => {
     return segments
       .filter(seg => seg.dirKey) // surface segments only
       .map(seg => {
         const base = getSegmentWorldPos(seg, size, explosionFactor);
         const n = HIGHLIGHT_NORMALS[seg.dirKey] || [0, 0, 1];
-        return {
-          pos: [base[0] + n[0] * HIGHLIGHT_LIFT, base[1] + n[1] * HIGHLIGHT_LIFT, base[2] + n[2] * HIGHLIGHT_LIFT],
-          rot: HIGHLIGHT_ROT[seg.dirKey] || [0, 0, 0],
-        };
+        const pos = [base[0] + n[0] * HIGHLIGHT_LIFT, base[1] + n[1] * HIGHLIGHT_LIFT, base[2] + n[2] * HIGHLIGHT_LIFT];
+        const rot = HIGHLIGHT_ROT[seg.dirKey] || [0, 0, 0];
+        // Look up the sticker's current face color
+        const faceId = cubies?.[seg.x]?.[seg.y]?.[seg.z]?.stickers?.[seg.dirKey]?.curr;
+        const hex = FACE_COLORS[faceId] || null;
+        const mat = (hex && _highlightMats[hex]) || _highlightMatFallback;
+        return { pos, rot, mat };
       });
-  }, [segments, size, explosionFactor]);
+  }, [segments, size, explosionFactor, cubies]);
 
   useFrame((_state, delta) => {
     timeRef.current += delta;
-    // All highlights share the same material instance — update once
-    _highlightMat.opacity = 0.25 + Math.sin(timeRef.current * 6) * 0.15;
+    const opacity = 0.25 + Math.sin(timeRef.current * 6) * 0.15;
+    // Update all materials each frame (7 objects max — cheap)
+    for (const mat of Object.values(_highlightMats)) mat.opacity = opacity;
+    _highlightMatFallback.opacity = opacity;
   });
 
-  if (positions.length === 0) return null;
+  if (tileData.length === 0) return null;
 
   return (
     <group>
-      {positions.map(({ pos, rot }, i) => (
+      {tileData.map(({ pos, rot, mat }, i) => (
         <mesh
           key={i}
           position={pos}
           rotation={rot}
           geometry={_highlightGeo}
-          material={_highlightMat}
+          material={mat}
           frustumCulled={false}
         />
       ))}
