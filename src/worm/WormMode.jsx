@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
+import * as THREE from 'three';
 import WormTrail from './WormTrail.jsx';
 import ParityOrbs from './ParityOrb.jsx';
 import WormTunnelNetwork from './WormTunnelNetwork.jsx';
@@ -27,6 +28,7 @@ import {
   pressState,
   getPressedTileKeys,
   checkHealingCandidates,
+  getSegmentWorldPos,
 } from './wormLogic.js';
 import { healSticker } from '../game/cubeState.js';
 import { useGameStore } from '../hooks/useGameStore.js';
@@ -260,6 +262,80 @@ export function useWormGame(cubies, size, animState, onRotate) {
   };
 }
 
+// Face rotation to align plane with each cube face normal (pointing outward)
+const HIGHLIGHT_ROT = {
+  PZ: [0, 0, 0],
+  NZ: [0, Math.PI, 0],
+  PX: [0, Math.PI / 2, 0],
+  NX: [0, -Math.PI / 2, 0],
+  PY: [-Math.PI / 2, 0, 0],
+  NY: [Math.PI / 2, 0, 0],
+};
+
+// Face outward normals for lifting the highlight plane above the sticker surface
+const HIGHLIGHT_NORMALS = {
+  PX: [1, 0, 0], NX: [-1, 0, 0],
+  PY: [0, 1, 0], NY: [0, -1, 0],
+  PZ: [0, 0, 1], NZ: [0, 0, -1],
+};
+
+// Sticker surface sits at 0.51 from cubie center; lift slightly above
+const HIGHLIGHT_LIFT = 0.53;
+
+const _highlightGeo = new THREE.PlaneGeometry(0.95, 0.95);
+const _highlightMat = new THREE.MeshBasicMaterial({
+  color: new THREE.Color('#00ff88'),
+  transparent: true,
+  opacity: 0.35,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending,
+  side: THREE.DoubleSide,
+});
+
+/**
+ * Renders glowing tile highlights at each surface-mode worm segment position.
+ * Used to visually confirm which tiles are being "pressed" by the worm.
+ */
+function WormTileHighlight({ segments, size, explosionFactor }) {
+  const timeRef = useRef(0);
+
+  const positions = useMemo(() => {
+    return segments
+      .filter(seg => seg.dirKey) // surface segments only
+      .map(seg => {
+        const base = getSegmentWorldPos(seg, size, explosionFactor);
+        const n = HIGHLIGHT_NORMALS[seg.dirKey] || [0, 0, 1];
+        return {
+          pos: [base[0] + n[0] * HIGHLIGHT_LIFT, base[1] + n[1] * HIGHLIGHT_LIFT, base[2] + n[2] * HIGHLIGHT_LIFT],
+          rot: HIGHLIGHT_ROT[seg.dirKey] || [0, 0, 0],
+        };
+      });
+  }, [segments, size, explosionFactor]);
+
+  useFrame((_state, delta) => {
+    timeRef.current += delta;
+    // All highlights share the same material instance — update once
+    _highlightMat.opacity = 0.25 + Math.sin(timeRef.current * 6) * 0.15;
+  });
+
+  if (positions.length === 0) return null;
+
+  return (
+    <group>
+      {positions.map(({ pos, rot }, i) => (
+        <mesh
+          key={i}
+          position={pos}
+          rotation={rot}
+          geometry={_highlightGeo}
+          material={_highlightMat}
+          frustumCulled={false}
+        />
+      ))}
+    </group>
+  );
+}
+
 // 3D component for rendering worm and orbs inside Canvas
 // Supports both surface and tunnel modes
 export function WormMode3D({
@@ -288,6 +364,15 @@ export function WormMode3D({
           targetTunnelId={targetTunnelId}
           wormTunnelId={wormTunnelId}
           inactiveSideKeys={inactiveSideKeys}
+        />
+      )}
+
+      {/* Tile highlight overlay - shows which tiles the worm is pressing */}
+      {!isTunnelMode && (
+        <WormTileHighlight
+          segments={worm}
+          size={size}
+          explosionFactor={explosionFactor}
         />
       )}
 
