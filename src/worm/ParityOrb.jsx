@@ -213,7 +213,7 @@ export default function ParityOrbs({ orbs, size, explosionFactor = 0, mode = 'su
 
   // Calculate world positions for all orbs
   const orbData = useMemo(() => {
-    return orbs.map((orb, i) => {
+    return orbs.map((orb) => {
       let position;
       let key;
 

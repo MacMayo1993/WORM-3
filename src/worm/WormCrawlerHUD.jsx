@@ -65,7 +65,7 @@ const TOP_BAR_STYLE = {
 };
 
 const TOP_BAR_LEFT_STYLE = { display: 'flex', alignItems: 'center', gap: 8 };
-const TOP_BAR_RIGHT_STYLE = { display: 'flex', alignItems: 'center', gap: 16 };
+const TOP_BAR_RIGHT_STYLE = { display: 'flex', alignItems: 'center', gap: 12 };
 
 const STATUS_LABEL_STYLE = { fontSize: 10, color: palette.subText, letterSpacing: 0.9, fontWeight: 700 };
 
@@ -78,6 +78,27 @@ const CONTROL_MODE_BTN_STYLE = {
     fontWeight: 800,
     letterSpacing: 0.6,
     padding: '6px 10px',
+    cursor: 'pointer',
+};
+
+const TOP_SPEED_WRAP_STYLE = {
+    minWidth: 114,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 4,
+};
+
+const TOP_SPEED_LABEL_STYLE = {
+    color: palette.subText,
+    fontSize: 9,
+    letterSpacing: 0.8,
+    fontWeight: 700,
+    textAlign: 'right',
+};
+
+const TOP_SPEED_INPUT_STYLE = {
+    width: '100%',
+    accentColor: '#60a5fa',
     cursor: 'pointer',
 };
 
@@ -176,11 +197,9 @@ const PROGRESS_ROW_STYLE = { display: 'flex', justifyContent: 'space-between', m
 const PROGRESS_LABEL_STYLE = { color: palette.subText, fontSize: 10, letterSpacing: 0.8, fontWeight: 700 };
 const PROGRESS_VALUE_STYLE = { color: '#c4b5fd', fontSize: 12, fontWeight: 800 };
 const PROGRESS_TRACK_STYLE = { height: 8, borderRadius: 999, background: 'rgba(100,116,139,0.2)', overflow: 'hidden' };
-const SPEED_LABEL_STYLE = { marginTop: 12, marginBottom: 6, color: palette.subText, fontSize: 10, letterSpacing: 0.8, fontWeight: 700 };
-const SPEED_INPUT_STYLE = { width: '100%', accentColor: '#60a5fa', cursor: 'pointer' };
 
 const PORTAL_HINT_STYLE = {
-    position: 'absolute', bottom: 230, left: '50%', transform: 'translateX(-50%)',
+    position: 'absolute', bottom: 238, left: '50%', transform: 'translateX(-50%)',
     pointerEvents: 'none',
     fontSize: 11, letterSpacing: 1.0, fontWeight: 700,
     color: '#c4b5fd',
@@ -190,13 +209,13 @@ const PORTAL_HINT_STYLE = {
     padding: '6px 12px',
 };
 
-const JUMP_WRAP_STYLE = { position: 'absolute', bottom: 150, left: '50%', transform: 'translateX(-50%)', pointerEvents: 'auto' };
+const JUMP_WRAP_STYLE = { position: 'absolute', bottom: 'calc(62px + env(safe-area-inset-bottom, 0px))', left: '50%', transform: 'translateX(-50%)', pointerEvents: 'auto' };
 
 const JUMP_BTN_BASE = {
-    minWidth: 150,
-    borderRadius: 16,
-    padding: '16px 28px',
-    fontSize: 18,
+    minWidth: 198,
+    borderRadius: 18,
+    padding: '22px 38px',
+    fontSize: 22,
     fontWeight: 800,
     letterSpacing: 0.7,
     color: '#f8fafc',
@@ -219,11 +238,11 @@ const JUMP_BTN_IDLE = {
 };
 
 const DPAD_STYLE = {
-    position: 'absolute', bottom: 24, right: 12,
+    position: 'absolute', bottom: 'calc(10px + env(safe-area-inset-bottom, 0px))', right: 8,
     display: 'grid',
-    gridTemplateColumns: '54px 54px 54px',
-    gridTemplateRows: '54px 54px 54px',
-    gap: 6,
+    gridTemplateColumns: '68px 68px 68px',
+    gridTemplateRows: '68px 68px 68px',
+    gap: 8,
     pointerEvents: 'auto',
 };
 
@@ -236,13 +255,13 @@ const DPAD_DIRS = [
 ];
 
 const DPAD_BTN_STYLE = {
-    width: 54,
-    height: 54,
-    borderRadius: 12,
+    width: 68,
+    height: 68,
+    borderRadius: 14,
     background: 'rgba(255, 255, 255, 0.86)',
     border: `1px solid ${palette.border}`,
     color: '#1e40af',
-    fontSize: 22,
+    fontSize: 28,
     fontWeight: 700,
     cursor: 'pointer',
     boxShadow: palette.shadow,
@@ -392,6 +411,18 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                     >
                         {wormControlMode === 'oriented' ? 'ORIENTED' : 'NON-ORIENTED'}
                     </button>
+                    <div style={TOP_SPEED_WRAP_STYLE}>
+                        <div style={TOP_SPEED_LABEL_STYLE}>SPEED {wormSpeed.toFixed(1)}×</div>
+                        <input
+                            type="range"
+                            min="0.3"
+                            max="3.0"
+                            step="0.1"
+                            value={wormSpeed}
+                            onChange={e => wormAlive && setWormSpeed(parseFloat(e.target.value))}
+                            style={TOP_SPEED_INPUT_STYLE}
+                        />
+                    </div>
                     <div style={HEALED_COL_STYLE}>
                         <div style={HEALED_LABEL_STYLE}>HEALED</div>
                         <div style={HEALED_VALUE_STYLE}>{wormHealedCount}</div>
@@ -412,19 +443,6 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                 <div style={PROGRESS_TRACK_STYLE}>
                     <div style={progressFillStyle} />
                 </div>
-
-                <div style={SPEED_LABEL_STYLE}>
-                    SPEED {wormSpeed.toFixed(1)}×
-                </div>
-                <input
-                    type="range"
-                    min="0.3"
-                    max="3.0"
-                    step="0.1"
-                    value={wormSpeed}
-                    onChange={e => wormAlive && setWormSpeed(parseFloat(e.target.value))}
-                    style={SPEED_INPUT_STYLE}
-                />
             </div>
 
             {/* Portal instruction */}
