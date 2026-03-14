@@ -978,6 +978,7 @@ function WormSwipeControls({ onTurn, worm }) {
             if (e.key === 'ArrowUp' && wormControlMode === 'oriented') { e.preventDefault(); emitDirection('up'); }
             if (e.key === ' ') {
                 e.preventDefault();
+                e.stopImmediatePropagation();
                 onTurn('jump');
             }
         };
