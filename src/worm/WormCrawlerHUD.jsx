@@ -400,7 +400,12 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
         }))
     );
 
-    const resolvedFaceColors = useMemo(() => resolveColors(settings) || {}, [settings]);
+    const resolvedFaceColors = useMemo(() => {
+        const safeSettings = settings && typeof settings === 'object'
+            ? settings
+            : { colorScheme: 'standard', customColors: {} };
+        return resolveColors(safeSettings, safeSettings?.biomeMode?.faceAssignment) || {};
+    }, [settings]);
 
     const jumpEdgeColor = useMemo(() => {
         const wormRgb = toRgb(wormColor);
@@ -417,7 +422,8 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
         });
 
         const antipodalFace = ANTIPODAL_COLOR[nearestFaceId] ?? 5;
-        return resolvedFaceColors[antipodalFace] || '#8b5cf6';
+        const antipodalColor = resolvedFaceColors[antipodalFace];
+        return toRgb(antipodalColor) ? antipodalColor : '#8b5cf6';
     }, [resolvedFaceColors, wormColor]);
 
 
@@ -447,7 +453,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
     const jumpBtnStyle = {
         ...(isPortalReady ? JUMP_BTN_READY : JUMP_BTN_IDLE),
         border: `1px solid ${jumpEdgeColor}`,
-        boxShadow: `${palette.shadow}, 0 0 14px ${jumpEdgeColor}AA, 0 0 28px ${jumpEdgeColor}55`,
+        boxShadow: `${palette.shadow}, 0 0 14px ${jumpEdgeColor}, 0 0 28px ${jumpEdgeColor}`,
     };
 
     return (
