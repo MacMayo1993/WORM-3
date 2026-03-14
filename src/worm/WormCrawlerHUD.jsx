@@ -399,16 +399,6 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
         [phaseMeta.accent]
     );
 
-    const progressFillStyle = useMemo(
-        () => ({
-            height: '100%',
-            width: `${Math.min(100, wormBodyTiles * 6)}%`,
-            background: `linear-gradient(90deg, ${palette.fillA}, ${palette.fillB})`,
-            transition: 'width 0.35s ease',
-        }),
-        [wormBodyTiles]
-    );
-
     const jumpBtnStyle = isPortalReady ? JUMP_BTN_READY : JUMP_BTN_IDLE;
 
     return (
