@@ -344,7 +344,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
 
     useEffect(() => {
         const onKey = (e) => {
-            if (e.code === 'Escape' || e.code === 'Space') {
+            if (e.code === 'Escape') {
                 e.preventDefault();
                 if (wormAlive) setWormPaused(!useGameStore.getState().wormPaused);
             }
@@ -505,7 +505,12 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                     <div style={DEATH_CARD_STYLE}>
                         <div style={DEATH_TITLE_STYLE}>{deathTitle}</div>
                         <div style={DEATH_HEADING_STYLE}>{deathHeading}</div>
-                        <div style={DEATH_SUBTITLE_STYLE}>Retry this run or start a new game mode.</div>
+                        <div style={PAUSE_STATS_STYLE}>
+                            <div>Time alive: <b style={PAUSE_STAT_VALUE_STYLE}>{formatTime(wormTimeAlive)}</b></div>
+                            <div>Tiles healed: <b style={PAUSE_STAT_VALUE_STYLE}>{wormHealedCount}</b></div>
+                            <div>Wormholes used: <b style={PAUSE_STAT_VALUE_STYLE}>{wormTunnelCount}</b></div>
+                            <div>Orbs on worm: <b style={PAUSE_STAT_VALUE_STYLE}>{wormBodyTiles}</b></div>
+                        </div>
                         {isVoidedDeath && (
                             <div style={DEATH_DETAILS_STYLE}>
                                 <div>Reason: <b style={DEATH_DETAIL_VALUE_STYLE}>Void breach</b></div>

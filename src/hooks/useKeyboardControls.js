@@ -32,6 +32,8 @@ export function useKeyboardControls({ onMove, onFlip }) {
     cycleVisualMode,
     toggleChaos,
     setShowCursor,
+    wormHealerMode,
+    wormPaused,
   } = useGameStore(useShallow((state) => ({
     animState: state.animState,
     flipMode: state.flipMode,
@@ -48,6 +50,8 @@ export function useKeyboardControls({ onMove, onFlip }) {
     cycleVisualMode: state.cycleVisualMode,
     toggleChaos: state.toggleChaos,
     setShowCursor: state.setShowCursor,
+    wormHealerMode: state.wormHealerMode,
+    wormPaused: state.wormPaused ?? false,
   })));
 
   const { cursor, moveCursor, getRotationParams, cursorToCubePos } = useCursor();
@@ -91,6 +95,8 @@ export function useKeyboardControls({ onMove, onFlip }) {
     toggleChaos,
     setShowCursor,
     setShowLevelTutorial,
+    wormHealerMode,
+    wormPaused,
   });
 
   useEffect(() => {
@@ -113,6 +119,8 @@ export function useKeyboardControls({ onMove, onFlip }) {
       toggleChaos,
       setShowCursor,
       setShowLevelTutorial,
+      wormHealerMode,
+      wormPaused,
     };
   }, [
     animState,
@@ -133,6 +141,8 @@ export function useKeyboardControls({ onMove, onFlip }) {
     toggleChaos,
     setShowCursor,
     setShowLevelTutorial,
+    wormHealerMode,
+    wormPaused,
   ]);
 
   // Keyboard event handler (attached once, reads latest state via ref)
@@ -156,7 +166,12 @@ export function useKeyboardControls({ onMove, onFlip }) {
         toggleChaos: latestToggleChaos,
         setShowCursor: latestSetShowCursor,
         setShowLevelTutorial: latestSetShowLevelTutorial,
+        wormHealerMode: latestWormHealerMode,
+        wormPaused: latestWormPaused,
       } = latestRef.current;
+
+      // Block all cube interaction while worm mode is paused
+      if (latestWormHealerMode && latestWormPaused) return;
 
       // Don't trigger if typing in editable controls
       const target = e.target;

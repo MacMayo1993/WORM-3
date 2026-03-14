@@ -127,6 +127,7 @@ export default function GameScene({
     cubies,
     wormHealerMode,
     wormPhase,
+    wormPaused,
     holonomyMode,
   } = useGameStore(useShallow((s) => ({
     visualMode: s.visualMode,
@@ -141,6 +142,7 @@ export default function GameScene({
     cubies: s.cubies,
     wormHealerMode: s.wormHealerMode,
     wormPhase: s.wormPhase,
+    wormPaused: s.wormPaused ?? false,
     holonomyMode: s.holonomyMode,
   })));
 
@@ -218,7 +220,7 @@ export default function GameScene({
         <CubeAssembly
           size={size}
           cubies={cubies}
-          onMove={onMove}
+          onMove={wormHealerMode && wormPaused ? null : onMove}
           onTapFlip={onTapFlip}
           animState={animState}
           onAnimComplete={onAnimComplete}
