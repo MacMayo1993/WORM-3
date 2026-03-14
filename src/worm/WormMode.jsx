@@ -401,15 +401,16 @@ export function WormGameLoop({
       }
     }
 
-    setWorm(prev => {
-      if (pendingGrowth > 0) {
-        const growthColor = pendingGrowthColorsRef.current.shift() ?? null;
+    if (pendingGrowth > 0) {
+      const growthColor = pendingGrowthColorsRef.current.shift() ?? null;
+      setPendingGrowth(g => g - 1);
+      setWorm(prev => {
         const newHead = growthColor ? { ...finalPos, moveDir, color: growthColor } : { ...finalPos, moveDir };
-        setPendingGrowth(g => g - 1);
         return [newHead, ...prev];
-      }
-      return [{ ...finalPos, moveDir }, ...prev].slice(0, -1);
-    });
+      });
+    } else {
+      setWorm(prev => [{ ...finalPos, moveDir }, ...prev].slice(0, -1));
+    }
   });
 
   return null;
@@ -797,9 +798,11 @@ export function TunnelWormGameLoop({
     }
 
     // Update worm positions
+    const growing = pendingGrowth > 0;
+    const growthColor = growing ? (pendingGrowthColorsRef.current.shift() ?? null) : null;
+    if (growing) setPendingGrowth(g => g - 1);
+
     setWorm(prev => {
-      const growing = pendingGrowth > 0;
-      const growthColor = growing ? (pendingGrowthColorsRef.current.shift() ?? null) : null;
       const head = growthColor ? { ...newHead, color: growthColor } : newHead;
       const newWorm = [head];
 
@@ -819,12 +822,7 @@ export function TunnelWormGameLoop({
         });
       }
 
-      // Handle growth or tail removal
-      if (growing) {
-        setPendingGrowth(g => g - 1);
-        return newWorm;
-      }
-      return newWorm.slice(0, -1);
+      return growing ? newWorm : newWorm.slice(0, -1);
     });
   });
 
