@@ -219,15 +219,29 @@ export const findNextTunnel = (exitPos, tunnels, excludeTunnelId, size, inactive
 };
 
 /**
- * Check if worm collides with itself in tunnel mode
+ * Check if worm collides with itself in tunnel mode.
+ *
+ * IMPORTANT: call this BEFORE setWorm so segments still reflects the current state.
+ * Pass isGrowing=true when pendingGrowth > 0 (tail will NOT be removed this frame).
+ *
+ * Threshold is intentionally conservative (0.05 t-units) to avoid false positives
+ * when re-entering a tunnel whose body segments are still near the entry portal.
+ * At base speed 0.4 t/sec, 0.05 t-units ≈ 0.125 s of travel — well within visual
+ * overlap range (~0.35 t-units for a 2-world-unit tunnel) when it actually fires.
+ *
  * @param {Object} newHead - New head segment {tunnelId, t}
- * @param {Array} segments - Body segments (excluding head)
- * @returns {boolean} True if collision
+ * @param {Array} segments - Current worm segments (index 0 = current head)
+ * @param {boolean} isGrowing - True when growing this frame (tail stays)
+ * @returns {boolean} True if real collision
  */
-export const checkTunnelSelfCollision = (newHead, segments) => {
-  const collisionThreshold = 0.1; // How close segments can be before collision
+export const checkTunnelSelfCollision = (newHead, segments, isGrowing = false) => {
+  // Need at least 3 segments before a meaningful self-collision is possible.
+  if (segments.length < 3) return false;
 
-  for (let i = 1; i < segments.length; i++) {
+  const collisionThreshold = 0.05;
+  const limit = isGrowing ? segments.length : segments.length - 1;
+
+  for (let i = 1; i < limit; i++) {
     const seg = segments[i];
     if (seg.tunnelId === newHead.tunnelId) {
       if (Math.abs(seg.t - newHead.t) < collisionThreshold) {
@@ -574,14 +588,27 @@ export const getAntipodalPosition = (pos, cubies, size, manifoldMap = null) => {
 };
 
 /**
- * Check if the worm collides with itself
+ * Check if the worm collides with itself (surface mode).
+ *
+ * IMPORTANT: call this BEFORE setWorm so segments still reflects the current state.
+ * Pass isGrowing=true when the tail will NOT be removed this frame (pendingGrowth > 0),
+ * so we don't falsely collide with the tail that is about to vacate its tile.
+ *
  * @param {Object} newHead - New head position {x, y, z, dirKey}
- * @param {Array} segments - Worm body segments (excluding head)
- * @returns {boolean} True if collision detected
+ * @param {Array} segments - Current worm segments (index 0 = current head)
+ * @param {boolean} isGrowing - True when the worm is growing this frame (tail stays)
+ * @returns {boolean} True if real collision detected
  */
-export const checkSelfCollision = (newHead, segments) => {
-  // Check against all body segments (skip index 0 which is the old head position)
-  for (let i = 1; i < segments.length; i++) {
+export const checkSelfCollision = (newHead, segments, isGrowing = false) => {
+  // Need at least 3 segments (head + body + tail) before a real self-collision is possible.
+  // With only 2 segments the "body" IS the tail and would be excluded anyway.
+  if (segments.length < 3) return false;
+
+  // When not growing, the tail (last segment) is removed by setWorm this same frame.
+  // Exclude it from the check so landing on the vacating tail isn't a false death.
+  const limit = isGrowing ? segments.length : segments.length - 1;
+
+  for (let i = 1; i < limit; i++) {
     const seg = segments[i];
     if (
       seg.x === newHead.x &&
