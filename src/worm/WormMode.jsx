@@ -38,8 +38,8 @@ import { resolveColors } from '../utils/colorSchemes.js';
 
 // Game configuration for surface mode
 const CONFIG = {
-  initialOrbs: 15,        // Starting number of orbs
-  baseSpeed: 0.8,         // Base tiles per second
+  initialOrbs: 22,        // Starting number of orbs
+  baseSpeed: 1.2,         // Base tiles per second
   speedIncrement: 0.05,   // Speed increase per segment
   maxSpeed: 3.0,          // Maximum speed
   growthPerOrb: 1,        // Segments gained per orb
@@ -49,8 +49,8 @@ const CONFIG = {
 
 // Game configuration for tunnel mode
 const TUNNEL_CONFIG = {
-  initialOrbs: 10,        // Starting number of orbs in tunnels
-  baseSpeed: 0.4,         // Base tunnel progress per second (t units)
+  initialOrbs: 15,        // Starting number of orbs in tunnels
+  baseSpeed: 0.6,         // Base tunnel progress per second (t units)
   speedIncrement: 0.02,   // Speed increase per segment
   maxSpeed: 1.2,          // Maximum speed
   growthPerOrb: 1,        // Segments gained per orb
