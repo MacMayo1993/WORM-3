@@ -386,6 +386,11 @@ function useWormCrawler(size, cubies) {
                 } else if (isJumping.current) {
                     // Allow jumping over your own body tile before impact threshold.
                     pendingSelfCollision.current = null;
+                } else if (pendingTunnelTrigger.current) {
+                    // Prioritize wormhole entry over self-collision on the same tile.
+                    // This fixes the bug where entering a wormhole whose entrance is occupied by your tail
+                    // (which is almost always true for the first few tiles of a jump) kills you.
+                    pendingSelfCollision.current = null;
                 } else if (interpT.current >= SELF_COLLISION_TRIGGER_PROGRESS) {
                     killWorm({
                         reason: 'self-collision',
@@ -546,6 +551,14 @@ function useWormCrawler(size, cubies) {
             }
         } else if (phase.current === 'entering') {
             tunnelProgress.current += delta * (2.5 * TUNNEL_SPEED_SCALE);
+            if (activeTunnel.current) {
+                // Head travels first third of the tunnel (entry face → cube interior)
+                const tunnelT = tunnelProgress.current * 0.33;
+                const wp = getTunnelWorldPos(activeTunnel.current, tunnelT, size);
+                headInterpPos.current.set(wp[0], wp[1], wp[2]);
+                const entryN = FACE_NORMALS[activeTunnel.current.entry.dirKey];
+                if (entryN) currentNormal.current.copy(entryN);
+            }
             if (tunnelProgress.current >= 1) {
                 tunnelProgress.current = 0;
                 phase.current = 'tunnel';
@@ -553,6 +566,17 @@ function useWormCrawler(size, cubies) {
             }
         } else if (phase.current === 'tunnel') {
             tunnelProgress.current += delta * (0.65 * TUNNEL_SPEED_SCALE);
+            if (activeTunnel.current) {
+                // Head travels middle third of the tunnel (through cube core)
+                const tunnelT = 0.33 + tunnelProgress.current * 0.34;
+                const wp = getTunnelWorldPos(activeTunnel.current, tunnelT, size);
+                headInterpPos.current.set(wp[0], wp[1], wp[2]);
+                // Switch normal to exit face at the midpoint
+                const n = tunnelProgress.current > 0.5
+                    ? FACE_NORMALS[activeTunnel.current.exit.dirKey]
+                    : FACE_NORMALS[activeTunnel.current.entry.dirKey];
+                if (n) currentNormal.current.copy(n);
+            }
             if (tunnelProgress.current >= 1) {
                 tunnelProgress.current = 0;
                 phase.current = 'exiting';
@@ -565,6 +589,14 @@ function useWormCrawler(size, cubies) {
             }
         } else if (phase.current === 'exiting') {
             tunnelProgress.current += delta * (2.0 * TUNNEL_SPEED_SCALE);
+            if (activeTunnel.current) {
+                // Head travels final third of the tunnel (cube interior → exit face)
+                const tunnelT = 0.67 + tunnelProgress.current * 0.33;
+                const wp = getTunnelWorldPos(activeTunnel.current, tunnelT, size);
+                headInterpPos.current.set(wp[0], wp[1], wp[2]);
+                const exitN = FACE_NORMALS[activeTunnel.current.exit.dirKey];
+                if (exitN) currentNormal.current.copy(exitN);
+            }
             if (tunnelProgress.current >= 1) {
                 const voidKillState = pendingVoidKillRef.current;
                 tunnelProgress.current = 0;
@@ -770,11 +802,6 @@ function WormChaseCamera({ worm, size }) {
                 .addScaledVector(_camForward, -camBack);
             _camTargetLook.copy(_camWormWorld).addScaledVector(_camForward, LOOK_AHEAD);
 
-            let liftMult = 1;
-            if (phase === 'entering') liftMult = 1 - worm.tunnelProgress.current;
-            if (phase === 'exiting') liftMult = worm.tunnelProgress.current;
-            _camTargetCam.addScaledVector(_camNormal, (liftMult - 1) * camHeight * 0.4);
-
             // Camera UP: world-Y for side faces (no roll).
             const absNormalY = Math.abs(_camNormal.y);
             if (absNormalY > 0.8) {
@@ -815,9 +842,10 @@ function WormChaseCamera({ worm, size }) {
                 .addScaledVector(_camUpVec, TUNNEL_SURF_UP)
                 .addScaledVector(_camTunnelRight, sway);
 
-            const alpha = Math.min(1, CAM_LERP * delta);
-            camPosRef.current.lerp(_camSurfCam, alpha * 2);
-            lookAtRef.current.lerp(_camLookAheadVec, alpha * 2);
+            // Snappier lerping during transitions to avoid lag/stalling feel
+            const alpha = Math.min(1, CAM_LERP * delta * 2.5);
+            camPosRef.current.lerp(_camSurfCam, alpha);
+            lookAtRef.current.lerp(_camLookAheadVec, alpha);
             camera.position.copy(camPosRef.current);
             camera.up.copy(_camUpVec);
             camera.lookAt(lookAtRef.current);
@@ -826,6 +854,7 @@ function WormChaseCamera({ worm, size }) {
 
     return null;
 }
+
 
 // Pre-allocated scratch vectors for TunnelSurfFX sparks
 const _sparkCenter = new THREE.Vector3();
