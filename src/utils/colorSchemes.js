@@ -6,501 +6,123 @@ import { CITY_CONFIG, FACE_CITIES } from '../modes/CityBiomeMode.js';
 
 export const COLOR_SCHEMES = {
 
-  // ── ORIGINAL SCHEMES ────────────────────────────────────────────────────────
+  // Pair logic: 1↔4  2↔5  3↔6 — each pair should be high contrast in hue or lightness
 
-  standard:  { 1: '#ef4444', 2: '#22c55e', 3: '#ffffff', 4: '#f97316', 5: '#3b82f6', 6: '#eab308' },
-  neon:      { 1: '#ff0066', 2: '#00ff99', 3: '#00ffff', 4: '#ff3300', 5: '#0099ff', 6: '#ffff00' },
-  pastel:    { 1: '#f9a8b8', 2: '#a8f0c8', 3: '#f0f0f0', 4: '#ffc89a', 5: '#a8c8f0', 6: '#f0e8a0' },
-  mono:      { 1: '#E8E8E8', 2: '#BBBBBB', 3: '#FFFFFF', 4: '#888888', 5: '#484848', 6: '#111111' },
-  ocean:     { 1: '#0ea5e9', 2: '#14b8a6', 3: '#e0f2fe', 4: '#0284c7', 5: '#C2770A', 6: '#164e63' },
-  // face 5 was #06b6d4 cyan — too similar to teal (face 2) and sky (face 1); amber-sunset replaces it
-  forest:    { 1: '#a3b18a', 2: '#588157', 3: '#dad7cd', 4: '#6a994e', 5: '#386641', 6: '#bc6c25' },
-  candy:     { 1: '#ff006e', 2: '#8338ec', 3: '#ffffff', 4: '#fb5607', 5: '#3a86ff', 6: '#ffbe0b' },
-  retro:     { 1: '#d62828', 2: '#f77f00', 3: '#fcbf49', 4: '#bc4749', 5: '#003049', 6: '#eae2b7' },
+  standard:   { 1: '#ef4444', 2: '#22c55e', 3: '#ffffff', 4: '#f97316', 5: '#3b82f6', 6: '#eab308' },
 
-  // ── SUPERHERO SCHEMES ────────────────────────────────────────────────────────
-  // Each pair (1↔4, 2↔5, 3↔6) is the hero's signature color contrast
+  // Neon — red↔green / cyan↔magenta / white↔yellow
+  neon:       { 1: '#FF1111', 2: '#00E5FF', 3: '#F0F0FF', 4: '#00FF55', 5: '#FF00CC', 6: '#FFE600' },
 
-  // Spider-Man — red suit vs blue suit / black web vs white emblem / gold thread vs dark crimson
-  spiderman: {
-    1: '#D01010',  // deep red suit
-    4: '#1565C0',  // royal blue              ← red ↔ blue
-    2: '#111111',  // web black
-    5: '#F5F5F5',  // white spider emblem     ← black ↔ white
-    3: '#C8A800',  // gold web thread
-    6: '#8B0000',  // dark crimson            ← gold ↔ crimson
-  },
+  // Pastel — blush↔mint / periwinkle↔peach / white↔lilac
+  pastel:     { 1: '#F9B3B3', 2: '#B3C6FF', 3: '#FAFAF5', 4: '#A8EDD0', 5: '#FFDDB3', 6: '#E8B3F9' },
 
-  // Batman — cape black vs bat-signal gold / steel blue vs parchment / brass vs purple void
-  batman: {
-    1: '#1C1C1E',  // cape black
-    4: '#F5C518',  // bat-signal gold         ← black ↔ gold
-    2: '#4E6B7A',  // blue-grey steel (was #3A3A3C dark slate — too close to cape black)
-    5: '#E8E0C8',  // parchment bone          ← steel ↔ parchment
-    3: '#7A6800',  // aged brass
-    6: '#3D2A6E',  // dark purple void        ← brass ↔ void (lightened from #1E1435 to differ from face 1)
-  },
+  // Sunset — crimson↔deep violet / coral↔soft lavender / pale gold sky↔warm amber
+  sunset:     { 1: '#C82848', 2: '#FF7040', 3: '#FFF0B8', 4: '#5C1A88', 5: '#C0A8E0', 6: '#F0B840' },
 
-  // Iron Man — armor red vs gold plating / HUD blue vs arc reactor white / titanium vs steel
-  ironman: {
-    1: '#C0392B',  // armor red
-    4: '#F5A623',  // gold plating            ← red ↔ gold
-    2: '#1A5276',  // HUD blue
-    5: '#D6EAF8',  // arc reactor glow        ← blue ↔ ice
-    3: '#7F8C8D',  // titanium
-    6: '#2C3E50',  // dark steel              ← titanium ↔ steel
-  },
+  // Deep Sea — dark abyss↔hot coral / bioluminescent cyan↔phosphor green / seafoam↔gold
+  deepsea:    { 1: '#081828', 2: '#00C8E0', 3: '#D8F8F0', 4: '#FF4878', 5: '#00FF88', 6: '#E8D048' },
 
-  // Wonder Woman — Amazonian crimson vs tiara gold / Olympian blue vs parchment / royal purple vs forest
-  wonderwoman: {
-    1: '#C0001A',  // Amazonian crimson
-    4: '#D4A500',  // golden tiara            ← crimson ↔ gold
-    2: '#1A3A6B',  // Olympian blue
-    5: '#E8D5A3',  // parchment cream         ← blue ↔ cream
-    3: '#5C2E8A',  // royal amazon purple
-    6: '#2C4A1E',  // amazon forest           ← purple ↔ forest
-  },
+  // Lava — deep lava↔volcanic night / molten orange↔ash grey / pale ash↔sulfur yellow
+  lava:       { 1: '#AA1200', 2: '#FF6800', 3: '#E8D8B0', 4: '#182858', 5: '#909090', 6: '#FFD800' },
 
-  // The Joker — purple suit vs poison green / acid yellow vs blood red / clown white vs shadow black
-  joker: {
-    1: '#6A0DAD',  // purple suit
-    4: '#39A845',  // poison green            ← purple ↔ green
-    2: '#F5E642',  // acid yellow
-    5: '#8B0000',  // blood red               ← yellow ↔ blood
-    3: '#FFFFFF',  // clown white
-    6: '#1A1A1A',  // shadow black            ← white ↔ black
-  },
+  // Arctic — glacier white↔polar midnight / ice blue↔aurora coral / frost↔deep teal
+  arctic:     { 1: '#F0F8FF', 2: '#80C8F0', 3: '#C0D0D8', 4: '#0A2040', 5: '#FF7060', 6: '#0A6870' },
 
-  // Black Panther — wakandan night vs vibranium purple / silver vs wakandan bronze / deep violet vs pale lilac
-  blackpanther: {
-    1: '#0D0D2B',  // wakandan night
-    4: '#7B2FBE',  // vibranium purple        ← night ↔ energy
-    2: '#B8B8CC',  // vibranium silver
-    5: '#8B6A3A',  // wakandan bronze (was #2D2D2D matte black — too close to wakandan night face 1)
-    3: '#4A0080',  // deep violet
-    6: '#C8A8E8',  // pale lilac glow         ← violet ↔ pale
-  },
+  // Forest — autumn red↔bright leaf / deep forest↔mist blue / birch cream↔bark gold
+  forest:     { 1: '#C03020', 2: '#1A5830', 3: '#EEE8D8', 4: '#5AAA38', 5: '#8898D0', 6: '#C49040' },
 
-  // Captain America — Old Glory red vs Union blue / star white vs dark crimson / shield steel vs brass
-  cap: {
-    1: '#BF0A30',  // Old Glory red
-    4: '#002868',  // Union blue              ← red ↔ blue
-    2: '#F5F5F5',  // star white
-    5: '#8B0000',  // dark crimson            ← white ↔ crimson
-    3: '#4682B4',  // shield steel blue
-    6: '#D4AF37',  // brass rivets            ← steel ↔ brass
-  },
+  // Candy — cherry↔lime / blueberry↔lemon / white↔grape
+  candy:      { 1: '#FF2244', 2: '#4488FF', 3: '#FFFFFF', 4: '#22DD44', 5: '#FFCC00', 6: '#CC44FF' },
 
-  // Thor — storm grey vs lightning gold / bifrost cyan vs earth leather / silver chainmail vs midnight cape
-  thor: {
-    1: '#4A5568',  // storm grey
-    4: '#FFD700',  // Mjolnir gold            ← storm ↔ lightning
-    2: '#00BFFF',  // bifrost cyan
-    5: '#8B4513',  // leather brown           ← cyan ↔ earth
-    3: '#C0C0C0',  // silver chainmail
-    6: '#1A237E',  // midnight cape           ← silver ↔ midnight
-  },
+  // Cyberpunk — hot pink↔electric cyan / neon violet↔neon lime / chrome↔amber
+  cyberpunk:  { 1: '#FF0066', 2: '#9900FF', 3: '#C8D4E8', 4: '#00FFDD', 5: '#88FF00', 6: '#FFB800' },
 
-  // Deadpool — merc red vs suit black / white sclera vs gunmetal / shadow purple vs steel-blue katana
-  deadpool: {
-    1: '#CC0000',  // merc red
-    4: '#111111',  // suit black              ← red ↔ black
-    2: '#F0F0F0',  // eye white
-    5: '#6B6B6B',  // gunmetal (lightened from #555555 to widen gap from suit black)
-    3: '#2B1F30',  // dark shadow purple
-    6: '#7A9AAA',  // steel-blue katana (was #C8C8C8 — too close to eye white face 2)
-  },
+  // Cosmic — nebula crimson↔quasar orange / deep space↔star gold / starfield↔nebula purple
+  cosmic:     { 1: '#CC1050', 2: '#0818C0', 3: '#F8F8FF', 4: '#FF7800', 5: '#E8D030', 6: '#8010D0' },
 
-  // Doctor Strange — cloak maroon vs sling ring gold / astral indigo vs mirror aqua / dark dimension vs rune parchment
-  strange: {
-    1: '#722F37',  // cloak of levitation
-    4: '#C9A84C',  // sling ring gold         ← maroon ↔ gold
-    2: '#4B0082',  // astral indigo
-    5: '#7FFFD4',  // mirror dimension aqua   ← indigo ↔ aqua
-    3: '#2C003E',  // dark dimension
-    6: '#E8D5B7',  // rune parchment          ← dark ↔ light
-  },
+  // Sakura — cherry crimson↔spring green / sky blue↔warm gold / petal white↔wisteria
+  sakura:     { 1: '#D82848', 2: '#4878C8', 3: '#FFF0F4', 4: '#70B848', 5: '#F0D880', 6: '#A860D0' },
 
-  // ── THEMATIC SCHEMES ────────────────────────────────────────────────────────
+  // Autumn — maple red↔forest green / burnt orange↔autumn sky / harvest cream↔golden yellow
+  autumn:     { 1: '#C82010', 2: '#D06020', 3: '#F0E4C0', 4: '#2A6020', 5: '#6098C8', 6: '#E8B820' },
 
-  // Aurora Borealis — deep polar night vs electric green / magenta ribbons vs teal / tundra green vs lavender
-  aurora: {
-    1: '#0A0A2E',  // polar night
-    4: '#00FF87',  // electric green aurora   ← night ↔ aurora
-    2: '#FF006E',  // magenta ribbon
-    5: '#00CED1',  // teal wave               ← magenta ↔ teal
-    3: '#1A4A2A',  // tundra forest green (was #0D1B4B deep navy — too close to polar night face 1)
-    6: '#C77DFF',  // lavender glow           ← tundra ↔ lavender
-  },
+  // Tropical — hibiscus↔ocean blue / sunset orange↔palm green / sandy white↔sunshine
+  tropical:   { 1: '#E02028', 2: '#FF6820', 3: '#FFF0D0', 4: '#1878C0', 5: '#28A040', 6: '#F8D020' },
 
-  // Japanese Inkwash — sumi black vs washi cream / vermillion seal vs pine green / indigo vs gold leaf
-  sumi: {
-    1: '#1A1A1A',  // sumi ink black
-    4: '#F5F0E8',  // washi paper cream       ← ink ↔ paper
-    2: '#C0392B',  // vermillion hanko seal
-    5: '#2D5A27',  // pine needle green       ← vermillion ↔ pine
-    3: '#1B3A6B',  // deep indigo
-    6: '#D4A843',  // gold leaf               ← indigo ↔ gold
-  },
+  // Desert — canyon rust↔turquoise sky / sage↔dusk purple / bleached bone↔sand gold
+  desert:     { 1: '#C04020', 2: '#60A068', 3: '#F4E8D0', 4: '#4888A8', 5: '#7048A0', 6: '#D8B060' },
 
-  // Deep Sea — abyssal black vs bioluminescent cyan / cobalt blue vs phosphor green / deep purple vs coral
-  abyss: {
-    1: '#080C14',  // abyssal black
-    4: '#00FFEE',  // bioluminescent cyan     ← abyss ↔ glow
-    2: '#1C3D6E',  // cobalt blue
-    5: '#39FF14',  // phosphor green          ← cobalt ↔ phosphor
-    3: '#3A1060',  // deep abyssal purple (was #0D3F4A dark teal — too close to cobalt face 2)
-    6: '#FF6B6B',  // deep sea coral          ← deep purple ↔ coral
-  },
+  // Aurora — magenta↔electric green / deep violet↔electric cyan / polar sky↔aurora gold
+  aurora:     { 1: '#D010A0', 2: '#5020C8', 3: '#E8F4FF', 4: '#00EE80', 5: '#30E8F0', 6: '#FFD020' },
 
-  // Volcano — obsidian black vs molten lava / ash grey vs crimson core / basalt brown vs sulfur yellow
-  volcano: {
-    1: '#1A0A00',  // obsidian black
-    4: '#FF4500',  // molten lava orange      ← obsidian ↔ lava
-    2: '#696969',  // volcanic ash grey
-    5: '#CC2200',  // deep crimson lava (was #FF8C00 — too close to lava orange face 4)
-    3: '#7B4210',  // dark basalt brown (was #484040 dark slate — too close to obsidian face 1)
-    6: '#FFD700',  // sulfur yellow           ← basalt ↔ sulfur
-  },
+  // Halloween — crimson↔forest green / pumpkin↔witch purple / bone white↔candle gold
+  halloween:  { 1: '#C02010', 2: '#F07020', 3: '#F0EED0', 4: '#286820', 5: '#7020A0', 6: '#F0C030' },
 
-  // Sakura — deep cherry bark vs petal pink / mossy stone vs sage blossom / charcoal vs warm cream
-  sakura: {
-    1: '#5C1A1A',  // dark cherry bark
-    4: '#FFB7C5',  // petal pink              ← bark ↔ petal
-    2: '#4A5240',  // mossy stone
-    5: '#C8DCC0',  // pale sage blossom       ← stone ↔ sage
-    3: '#2C2C2C',  // charcoal branch
-    6: '#F5E8CC',  // warm parchment cream    ← charcoal ↔ cream
-  },
+  // Retro 70s — burnt sienna↔avocado / dusty mauve↔harvest gold / cream↔steel teal
+  retro:      { 1: '#C84020', 2: '#805888', 3: '#F0E4C0', 4: '#789020', 5: '#D4B050', 6: '#385060' },
 
-  // Cosmic — black hole vs quasar white / nebula purple vs star yellow / deep indigo vs comet blue
-  cosmic: {
-    1: '#050508',  // black hole
-    4: '#FFF8E7',  // quasar white            ← void ↔ light
-    2: '#6B35A8',  // nebula purple
-    5: '#FFD60A',  // star yellow             ← nebula ↔ star
-    3: '#1C2266',  // deep indigo dark matter
-    6: '#4FACFE',  // comet blue              ← indigo ↔ comet
-  },
+  // Midnight — deep royal blue↔star gold / violet↔pale silver / bright blue↔dark midnight
+  midnight:   { 1: '#2020A8', 2: '#9030C0', 3: '#4888D8', 4: '#E8D040', 5: '#C0C8E8', 6: '#201848' },
 
-  // Candy Shop — bubblegum pink vs mint green / hot coral vs sky blue / lemon vs grape
-  candyshop: {
-    1: '#FF69B4',  // bubblegum pink
-    4: '#98FF98',  // mint green              ← pink ↔ mint
-    2: '#FF6B6B',  // hot coral
-    5: '#87CEEB',  // sky blue                ← coral ↔ sky
-    3: '#FFF44F',  // lemon yellow
-    6: '#DA70D6',  // orchid grape            ← lemon ↔ grape
-  },
+  // Gemstone — ruby↔emerald / sapphire↔amethyst / diamond↔topaz
+  gemstone:   { 1: '#CC1830', 2: '#1840A8', 3: '#F0F4FF', 4: '#1A8040', 5: '#8028B0', 6: '#E0A020' },
 
-  // Desert Dusk — dune sand vs canyon rust / sun bleached vs terracotta / mesquite vs turquoise sky
-  desert: {
-    1: '#C2956A',  // dune sand
-    4: '#8B3A1A',  // canyon rust             ← sand ↔ rust
-    2: '#E8D5B0',  // sun bleached bone
-    5: '#C1440E',  // deep terracotta         ← bone ↔ terra
-    3: '#3D1F0A',  // dark mesquite wood (was #D4A96A mesa tan — too close to dune sand face 1)
-    6: '#4FA3A5',  // turquoise sky           ← mesquite ↔ turquoise
-  },
+  // Sunrise — dawn rose↔deep sky / coral orange↔soft lavender / pale sky↔warm gold
+  sunrise:    { 1: '#E84878', 2: '#FF7048', 3: '#E8F4FF', 4: '#2870C8', 5: '#B898D0', 6: '#F0C030' },
 
-  // Arctic — glacier white vs deep ice blue / ocean blue vs polar teal / frost grey vs arctic night
-  arctic: {
-    1: '#F0F8FF',  // glacier white
-    4: '#1C4E7A',  // deep ice blue           ← glacier ↔ deep
-    2: '#7BBCD6',  // ocean ice blue
-    5: '#006B77',  // polar teal              ← ocean blue ↔ teal
-    3: '#C8D4DC',  // frost grey
-    6: '#0A1628',  // arctic night            ← frost ↔ night
-  },
+  // Watercolor — soft rose↔sage green / sky wash↔warm buff / washed white↔muted teal
+  watercolor: { 1: '#E09898', 2: '#88B8E0', 3: '#F8F4EE', 4: '#90B878', 5: '#E8C898', 6: '#6898A8' },
 
-  // Ember & Ash — cold ash vs hot ember / cool steel vs firebrick / charcoal vs spark gold
-  ember: {
-    1: '#C8C8C0',  // cold ash
-    4: '#FF4500',  // hot ember               ← ash ↔ ember
-    2: '#4A7B8C',  // cooling steel blue (was #787878 smoke grey — too close to ash/charcoal)
-    5: '#B22222',  // firebrick red (was #FF8C00 fire orange — too close to hot ember face 4)
-    3: '#2C2C2C',  // charcoal
-    6: '#FFD700',  // spark gold              ← charcoal ↔ spark
-  },
+  // Mondrian — primary red↔primary blue / cadmium yellow↔medium grey / off-white↔charcoal
+  mondrian:   { 1: '#D01818', 2: '#F0C800', 3: '#F4F4F4', 4: '#1848C8', 5: '#A8A8A8', 6: '#303030' },
 
-  // ── MEDIA & POPULAR CULTURE THEMES ──────────────────────────────────────────
+  // Art Deco — gold↔jade / ivory↔rich purple / silver↔dark midnight
+  artdeco:    { 1: '#D4A020', 2: '#F0E0C0', 3: '#C8C8C8', 4: '#1A7060', 5: '#7038A0', 6: '#303050' },
 
-  // Studio Ghibli — soft naturalistic palette from Totoro / Spirited Away
-  ghibli: {
-    1: '#87C4E8',  // Totoro sky blue
-    4: '#E8987A',  // warm earth peach        ← sky ↔ earth
-    2: '#7DB87A',  // leaf green
-    5: '#E8A8B8',  // dusty rose              ← green ↔ rose
-    3: '#E8C870',  // golden wheat
-    6: '#B0A4D4',  // spirit world lavender   ← wheat ↔ lavender
-  },
-
-  // Wes Anderson — Grand Budapest Hotel symmetrical pastels
-  wesanderson: {
-    1: '#D4849A',  // dusty mauve rose
-    4: '#8AA07A',  // sage green              ← mauve ↔ sage
-    2: '#9A8EC8',  // muted lilac
-    5: '#C8A840',  // mustard yellow          ← lilac ↔ mustard
-    3: '#F0D0C0',  // pale blush cream
-    6: '#A04868',  // medium berry            ← blush ↔ berry
-  },
-
-  // Avatar: The Last Airbender — four-nation elemental palette
-  avatar: {
-    1: '#8C9E4A',  // Earth Kingdom green
-    4: '#C83020',  // Fire Nation red         ← earth ↔ fire
-    2: '#4888D0',  // Water Tribe blue
-    5: '#E8A820',  // Fire Nation gold        ← water ↔ gold
-    3: '#F08830',  // Air Nomad orange
-    6: '#7A5830',  // Earth Kingdom brown     ← orange ↔ brown
-  },
-
-  // Super Mario — classic Nintendo palette
-  mario: {
-    1: '#E82018',  // Mario red
-    4: '#38A018',  // Luigi green             ← red ↔ green
-    2: '#58A8E8',  // sky blue
-    5: '#E8C000',  // coin gold               ← sky ↔ gold
-    3: '#F8F0D0',  // cream mushroom
-    6: '#8040C8',  // star purple             ← cream ↔ purple
-  },
-
-  // Frozen — Elsa's ice kingdom: cool blues, soft purples, warm ivory
-  frozen: {
-    1: '#88D4F0',  // ice crystal blue
-    4: '#7858C0',  // amethyst purple         ← ice ↔ amethyst
-    2: '#C0B0D8',  // soft lilac
-    5: '#F4EDD0',  // warm ivory              ← lilac ↔ ivory
-    3: '#68A8C8',  // glacier teal-blue
-    6: '#4838A0',  // twilight violet         ← glacier ↔ violet
-  },
-
-  // Moana — Pacific Ocean: tropical turquoise, coral, golden sand
-  moana: {
-    1: '#30C0C0',  // turquoise ocean
-    4: '#E86858',  // warm coral              ← turquoise ↔ coral
-    2: '#F0C860',  // golden sand
-    5: '#2A7090',  // deep ocean teal         ← sand ↔ teal
-    3: '#E84080',  // hibiscus pink
-    6: '#307048',  // tropical forest         ← hibiscus ↔ forest
-  },
-
-  // Pokémon — type-based palette: fire, water, electric, grass, psychic, ghost
-  pokemon: {
-    1: '#E03020',  // Pokéball red
-    4: '#3888E0',  // water blue              ← red ↔ blue
-    2: '#F8D020',  // Pikachu yellow
-    5: '#48A838',  // grass green             ← yellow ↔ green
-    3: '#F870C0',  // psychic pink
-    6: '#6850C8',  // ghost purple            ← pink ↔ purple
-  },
-
-  // Zelda — Triforce gold, Hyrule green, fairy pink, Sheikah teal
-  zelda: {
-    1: '#E8C020',  // Triforce gold
-    4: '#308840',  // tunic green             ← gold ↔ green
-    2: '#58A8E8',  // Hyrule sky blue
-    5: '#C04828',  // Ganondorf red           ← sky ↔ earth fire
-    3: '#F878C0',  // Great Fairy pink
-    6: '#205870',  // Sheikah dark teal       ← fairy ↔ sheikah
-  },
-
-  // Cyberpunk — neon accents on chrome, lighter take for readability
-  cyberpunk: {
-    1: '#FF6080',  // neon magenta
-    4: '#00D8E8',  // electric cyan           ← magenta ↔ cyan
-    2: '#C8C8E0',  // chrome silver-blue
-    5: '#A838E8',  // neon violet             ← chrome ↔ violet
-    3: '#FFB030',  // amber warning
-    6: '#50E040',  // lime neon               ← amber ↔ lime
-  },
-
-  // Minecraft — biome blocks: grass, dirt, sky, stone, sand, lapis
-  minecraft: {
-    1: '#5EA332',  // grass green
-    4: '#8B5E3C',  // dirt brown              ← green ↔ brown
-    2: '#78B4D8',  // daytime sky
-    5: '#606870',  // stone grey              ← sky ↔ stone
-    3: '#D4C870',  // sand yellow
-    6: '#2448B0',  // lapis lazuli            ← sand ↔ lapis
-  },
-
-  // ── FINE ART THEMES ──────────────────────────────────────────────────────────
-
-  // Mondrian — Piet Mondrian primary block palette
-  mondrian: {
-    1: '#D42020',  // primary red
-    4: '#1858C8',  // primary blue            ← red ↔ blue
-    2: '#F8D000',  // cadmium yellow
-    5: '#404040',  // dark charcoal           ← yellow ↔ dark (strong contrast)
-    3: '#F0F0F0',  // off-white
-    6: '#808080',  // medium grey             ← white ↔ grey
-  },
-
-  // Matisse / Fauvism — flat vivid color fields
-  matisse: {
-    1: '#4890D8',  // cerulean blue
-    4: '#E83830',  // vermillion              ← cerulean ↔ vermillion
-    2: '#F8C840',  // warm yellow
-    5: '#70A868',  // sage green              ← yellow ↔ sage
-    3: '#E86890',  // coral-pink
-    6: '#A888C8',  // soft lavender           ← coral ↔ lavender
-  },
-
-  // Water Lilies — Monet's impressionist pond palette
-  waterlilies: {
-    1: '#A8A0D8',  // periwinkle lavender
-    4: '#E8A8B0',  // blush rose              ← lavender ↔ blush
-    2: '#88C8C8',  // soft aqua
-    5: '#F0C898',  // warm peach              ← aqua ↔ peach
-    3: '#98B890',  // sage green reflection
-    6: '#9868B0',  // mauve violet            ← sage ↔ mauve
-  },
-
-  // Starry Night — Van Gogh's night sky: blues, gold, amber
-  starrynight: {
-    1: '#3870C8',  // cobalt blue
-    4: '#F0C010',  // star gold               ← cobalt ↔ gold
-    2: '#F0E0A0',  // moonlight cream
-    5: '#286090',  // midnight indigo         ← cream ↔ midnight
-    3: '#50A898',  // cypress teal-green
-    6: '#D87020',  // village amber           ← cypress ↔ amber
-  },
-
-  // Klimt / The Kiss — rich gold, jade, amber, terracotta
-  klimt: {
-    1: '#D4A820',  // rich Klimt gold
-    4: '#207870',  // deep jade teal          ← gold ↔ jade
-    2: '#E07828',  // amber-orange
-    5: '#C05888',  // deep rose               ← amber ↔ rose
-    3: '#F0E4C0',  // warm parchment cream
-    6: '#A84838',  // terracotta red          ← cream ↔ terracotta
-  },
-
-  // Great Wave — Hokusai ukiyo-e: Prussian blue, ivory, vermillion, sepia
-  greatwave: {
-    1: '#1C5898',  // Prussian blue
-    4: '#F2ECD8',  // washi ivory             ← prussian ↔ ivory
-    2: '#7890A8',  // sea mist blue-grey
-    5: '#B02808',  // vermillion              ← mist ↔ vermillion
-    3: '#4898C0',  // ocean wave blue
-    6: '#C89040',  // aged sepia gold         ← ocean ↔ sepia
-  },
-
-  // Pop Art — Andy Warhol flat-colour silkscreen palette
-  popart: {
-    1: '#FF5898',  // hot pink
-    4: '#78D830',  // lime green              ← pink ↔ lime
-    2: '#00D0E8',  // electric cyan
-    5: '#FF8818',  // bright orange           ← cyan ↔ orange
-    3: '#E018C0',  // magenta
-    6: '#FFE008',  // acid yellow             ← magenta ↔ yellow
-  },
-
-  // Bauhaus — Bauhaus school: primaries + neutral greys
-  bauhaus: {
-    1: '#C82020',  // Bauhaus red
-    4: '#1858B0',  // cobalt blue             ← red ↔ blue
-    2: '#E8C000',  // cadmium yellow
-    5: '#F0F0F0',  // white                   ← yellow ↔ white
-    3: '#C0B8A8',  // warm light grey
-    6: '#484038',  // dark charcoal           ← warm grey ↔ charcoal
-  },
-
-  // Art Deco — gold, jade green, ivory, coral, purple, chartreuse
-  artdeco: {
-    1: '#D4A828',  // Art Deco gold
-    4: '#357860',  // jade emerald            ← gold ↔ jade
-    2: '#F0E0C0',  // ivory cream
-    5: '#C06050',  // coral-terracotta        ← ivory ↔ coral
-    3: '#7858A0',  // art deco purple
-    6: '#C8D070',  // chartreuse-sage         ← purple ↔ chartreuse
-  },
-
-  // Impressionist Sunrise — Monet's warm dawn reflections
-  impressionist: {
-    1: '#F09090',  // coral sunrise
-    4: '#90B4D8',  // powder blue sky         ← coral ↔ sky
-    2: '#F0B858',  // warm amber gold
-    5: '#B898C8',  // soft lavender           ← gold ↔ lavender
-    3: '#D890A8',  // dusty mauve
-    6: '#88A880',  // sage green reflection   ← mauve ↔ sage
-  },
+  // Ghibli — warm rose↔forest green / sky blue↔golden wheat / soft white↔spirit lavender
+  ghibli:     { 1: '#E88888', 2: '#58A0D0', 3: '#F4F0E8', 4: '#68AA58', 5: '#E8C870', 6: '#A898D4' },
 
   // ── BIOME SCHEME ─────────────────────────────────────────────────────────────
-  // Default city biome palette — each face uses the pulse color of its assigned city.
-  // Faces: 1=Frozen Citadel, 2=Deep Station, 3=Volcanic Foundry,
-  //        4=Solar Arcology, 5=Bio-Dome, 6=Neural Hub
   biome: {
-    1: CITY_CONFIG[FACE_CITIES[1]].pulseColor,  // frozenCitadel   → #B8E4FF
-    2: CITY_CONFIG[FACE_CITIES[2]].pulseColor,  // deepStation     → #00CED1
-    3: CITY_CONFIG[FACE_CITIES[3]].pulseColor,  // volcanicFoundry → #FF4500
-    4: CITY_CONFIG[FACE_CITIES[4]].pulseColor,  // solarArcology   → #FFD700
-    5: CITY_CONFIG[FACE_CITIES[5]].pulseColor,  // bioDome         → #39FF14
-    6: CITY_CONFIG[FACE_CITIES[6]].pulseColor,  // neuralHub       → #8B00FF
+    1: CITY_CONFIG[FACE_CITIES[1]].pulseColor,
+    2: CITY_CONFIG[FACE_CITIES[2]].pulseColor,
+    3: CITY_CONFIG[FACE_CITIES[3]].pulseColor,
+    4: CITY_CONFIG[FACE_CITIES[4]].pulseColor,
+    5: CITY_CONFIG[FACE_CITIES[5]].pulseColor,
+    6: CITY_CONFIG[FACE_CITIES[6]].pulseColor,
   },
 };
 
 // ── LABELS ───────────────────────────────────────────────────────────────────
 
 export const SCHEME_LABELS = {
-  // Originals
-  standard:     'Standard',
-  neon:         'Neon',
-  pastel:       'Pastel',
-  mono:         'Monochrome',
-  ocean:        'Ocean',
-  forest:       'Forest',
-  candy:        'Candy',
-  retro:        'Retro',
-  // Themes
-  aurora:       'Aurora Borealis',
-  sumi:         'Ink & Washi',
-  abyss:        'Deep Sea',
-  volcano:      'Volcano',
-  sakura:       'Sakura',
-  cosmic:       'Cosmic',
-  candyshop:    'Candy Shop',
-  desert:       'Desert Dusk',
-  arctic:       'Arctic',
-  ember:        'Ember & Ash',
-  // Media & Pop Culture
-  ghibli:       'Studio Ghibli',
-  wesanderson:  'Wes Anderson',
-  avatar:       'Avatar: ATLA',
-  mario:        'Super Mario',
-  frozen:       'Frozen',
-  moana:        'Moana',
-  pokemon:      'Pokémon',
-  zelda:        'Zelda',
-  cyberpunk:    'Cyberpunk',
-  minecraft:    'Minecraft',
-  // Fine Art
-  mondrian:     'Mondrian',
-  matisse:      'Matisse',
-  waterlilies:  'Water Lilies',
-  starrynight:  'Starry Night',
-  klimt:        'Klimt / The Kiss',
-  greatwave:    'Great Wave',
-  popart:       'Pop Art',
-  bauhaus:      'Bauhaus',
-  artdeco:      'Art Deco',
-  impressionist:'Impressionist',
-  // Superheroes (at bottom — dark palettes that would obscure previews if first)
-  spiderman:    'Spider-Man',
-  batman:       'Batman',
-  ironman:      'Iron Man',
-  wonderwoman:  'Wonder Woman',
-  joker:        'The Joker',
-  blackpanther: 'Black Panther',
-  cap:          'Captain America',
-  thor:         'Thor',
-  deadpool:     'Deadpool',
-  strange:      'Doctor Strange',
-  // Biome
-  biome:        'City Biome',
-  // Custom always last
-  custom:       'Custom Upload',
+  standard:   'Standard',
+  neon:       'Neon',
+  pastel:     'Pastel',
+  sunset:     'Sunset',
+  deepsea:    'Deep Sea',
+  lava:       'Lava',
+  arctic:     'Arctic',
+  forest:     'Forest',
+  candy:      'Candy',
+  cyberpunk:  'Cyberpunk',
+  cosmic:     'Cosmic',
+  sakura:     'Sakura',
+  autumn:     'Autumn',
+  tropical:   'Tropical',
+  desert:     'Desert',
+  aurora:     'Aurora',
+  halloween:  'Halloween',
+  retro:      'Retro',
+  midnight:   'Midnight',
+  gemstone:   'Gemstone',
+  sunrise:    'Sunrise',
+  watercolor: 'Watercolor',
+  mondrian:   'Mondrian',
+  artdeco:    'Art Deco',
+  ghibli:     'Ghibli',
+  biome:      'City Biome',
+  custom:     'Custom Upload',
 };
 
 // ── TILE STYLES ───────────────────────────────────────────────────────────────
@@ -524,9 +146,6 @@ export const TILE_STYLES = {
   muellerLyer:        { label: 'Müller-Lyer',        cost: 'low', type: 'pattern' },
   rotatingSnakes:     { label: 'Rotating Snakes',    cost: 'low', type: 'pattern' },
   poggendorff:        { label: 'Poggendorff',        cost: 'low', type: 'pattern' },
-  // Antipodal-color patterns — use this face's color + its opposite face's color.
-  // All patterns use an asymmetric coverage split (~20-30% antipodal, ~70-80% base)
-  // so that flipping base↔antipodal produces a clearly different visual.
   polkaDots:          { label: 'Polka Dots',         cost: 'low', type: 'pattern' },
   zigzag:             { label: 'Zigzag',             cost: 'low', type: 'pattern' },
   checkerboard:       { label: 'Tile Grout',         cost: 'low', type: 'pattern' },
@@ -583,12 +202,10 @@ export const DEFAULT_SETTINGS = {
   },
   biomeMode: {
     enabled: false,
-    faceAssignment: null, // null = use FACE_CITIES default from CityBiomeMode.js
+    faceAssignment: null,
   },
 };
 
-// Returns a face→hex color map for biome mode, using each city's pulse color.
-// Pass a custom userFaceAssignment (faceId→cityKey) to override the default FACE_CITIES mapping.
 export function resolveBiomeColors(userFaceAssignment = null) {
   const assignment = userFaceAssignment ?? FACE_CITIES;
   const colors = {};
