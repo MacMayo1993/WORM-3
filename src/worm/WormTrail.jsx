@@ -27,6 +27,11 @@ const _unitSphere = new THREE.SphereGeometry(1, 16, 16);
 const _unitCylinder = new THREE.CylinderGeometry(0.15, 0.18, 1, 8);
 // Single Object3D used as scratch for matrix math — never added to a scene.
 const _dummy = new THREE.Object3D();
+// Scratch vectors for tube orientation math — avoids per-iteration allocation.
+const _UP = new THREE.Vector3(0, 1, 0);
+const _tubeDir = new THREE.Vector3();
+// Pre-allocated color pool — reused across renders to avoid GC pressure.
+const _colorPool = Array.from({ length: 200 }, () => new THREE.Color());
 // Maximum instanced segments (enough for any realistic worm length).
 const MAX_WORM_INSTANCES = 100;
 // Face-normal direction for each dirKey — used to lift worm segments off tile surface
@@ -78,9 +83,11 @@ export default function WormTrail({ segments, size, explosionFactor = 0, alive =
   }), [segments, size, explosionFactor, isTunnelMode]);
 
   const segmentColors = useMemo(() => segments.map((seg, i) => {
-    if (seg.color) return new THREE.Color(seg.color);
+    // Reuse a pooled Color object — avoids allocation on every worm-move render.
+    const c = _colorPool[i] ?? new THREE.Color();
+    if (seg.color) return c.set(seg.color);
     const t = segments.length > 1 ? i / (segments.length - 1) : 0;
-    return headColorObj.clone().lerp(tailColorObj, t);
+    return c.copy(headColorObj).lerp(tailColorObj, t);
   }), [segments, headColorObj, tailColorObj]);
 
   const bodyCount = Math.max(0, positions.length - 1); // segments index 1..n
@@ -151,10 +158,8 @@ export default function WormTrail({ segments, size, explosionFactor = 0, alive =
         }
 
         _dummy.position.set((pos[0] + prev[0]) / 2, (pos[1] + prev[1]) / 2, (pos[2] + prev[2]) / 2);
-        _dummy.quaternion.setFromUnitVectors(
-          new THREE.Vector3(0, 1, 0),
-          new THREE.Vector3(dx, dy, dz).normalize()
-        );
+        _tubeDir.set(dx, dy, dz).normalize();
+        _dummy.quaternion.setFromUnitVectors(_UP, _tubeDir);
         _dummy.scale.set(1, dist * 0.8, 1);
         _dummy.updateMatrix();
         tubeMesh.setMatrixAt(tubeIdx, _dummy.matrix);
@@ -199,9 +204,8 @@ export default function WormTrail({ segments, size, explosionFactor = 0, alive =
     <group>
       {/* ── Head: kept as individual meshes (unique glow + eyes) ── */}
       <group position={headPos}>
-        {/* Head body sphere — scale driven by useFrame */}
-        <mesh ref={headMeshRef}>
-          <sphereGeometry args={[1, 16, 16]} />
+        {/* Head body sphere — scale driven by useFrame; shares module-level geometry */}
+        <mesh ref={headMeshRef} geometry={_unitSphere}>
           <meshStandardMaterial
             color={headColor}
             emissive={headColor}

@@ -2,7 +2,7 @@
 // Visualizes the tunnel network that the worm travels through
 // Shows glowing tube paths with highlighting for target tunnels
 
-import React, { useRef, useMemo, useEffect } from 'react';
+import React, { useRef, useMemo, useEffect, useCallback } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { getTunnelSideKey } from './wormLogic.js';
@@ -10,10 +10,10 @@ import { getTunnelSideKey } from './wormLogic.js';
 // Tunnel colors
 const TUNNEL_COLOR = '#00ff88';
 const TARGET_TUNNEL_COLOR = '#ffd700';
-const TUNNEL_GLOW = '#00ffaa';
 
 /**
- * Single tunnel tube visualization
+ * Single tunnel tube visualization.
+ * Has NO useFrame — all animation is driven by the single TunnelAnimator in WormTunnelNetwork.
  */
 // Generate stable random offset based on tunnel id
 function getStableOffset(tunnelId) {
@@ -25,13 +25,40 @@ function getStableOffset(tunnelId) {
   return (Math.abs(hash) % 1000) / 1000 * Math.PI * 2;
 }
 
-function TunnelTube({ tunnel, size, explosionFactor = 0, isTarget = false, wormInTunnel = false, inactiveSideKeys = new Set() }) {
+function TunnelTube({ tunnel, size, explosionFactor = 0, isTarget = false, wormInTunnel = false, inactiveSideKeys = new Set(), tunnelKey, registerAnim, unregisterAnim }) {
   const tubeRef = useRef();
   const glowRef = useRef();
-  const timeRef = useRef(getStableOffset(tunnel.id));
+
+  // Keep mutable refs so the animator always reads current values without causing re-renders
+  const isTargetRef = useRef(isTarget);
+  isTargetRef.current = isTarget;
+  const wormInTunnelRef = useRef(wormInTunnel);
+  wormInTunnelRef.current = wormInTunnel;
+  const inactiveSideKeysRef = useRef(inactiveSideKeys);
+  inactiveSideKeysRef.current = inactiveSideKeys;
+
+  const { entryKey, exitKey } = useMemo(() => ({
+    entryKey: getTunnelSideKey(tunnel.entry),
+    exitKey: getTunnelSideKey(tunnel.exit),
+  }), [tunnel]);
+
+  // Register refs with parent animator on mount, unregister on unmount
+  useEffect(() => {
+    registerAnim(tunnelKey, {
+      get tube() { return tubeRef.current; },
+      get glow() { return glowRef.current; },
+      get isTarget() { return isTargetRef.current; },
+      get wormInTunnel() { return wormInTunnelRef.current; },
+      get inactiveSideKeys() { return inactiveSideKeysRef.current; },
+      entryKey,
+      exitKey,
+      timeOffset: getStableOffset(tunnel.id),
+    });
+    return () => unregisterAnim(tunnelKey);
+  }, [tunnelKey, entryKey, exitKey, tunnel.id, registerAnim, unregisterAnim]);
 
   // Calculate tunnel path
-  const { curve, entryPos, exitPos } = useMemo(() => {
+  const { entryPos, exitPos } = useMemo(() => {
     const k = (size - 1) / 2;
     const scale = 1 + explosionFactor * 1.8;
     const entryCenter = new THREE.Vector3(
@@ -44,24 +71,34 @@ function TunnelTube({ tunnel, size, explosionFactor = 0, isTarget = false, wormI
       (tunnel.exit.y - k) * scale,
       (tunnel.exit.z - k) * scale
     );
+    return { entryPos: entryCenter.toArray(), exitPos: exitCenter.toArray() };
+  }, [tunnel, size, explosionFactor]);
 
-    // Match gameplay path exactly: tile center -> void core center -> tile center.
+  // Pre-compute geometries — straight-line paths need very few segments (4 is visually identical to 32).
+  // Three variants pre-built so isTarget switching never reallocates GPU geometry.
+  const geometries = useMemo(() => {
+    const k = (size - 1) / 2;
+    const scale = 1 + explosionFactor * 1.8;
+    const entryCenter = new THREE.Vector3(
+      (tunnel.entry.x - k) * scale,
+      (tunnel.entry.y - k) * scale,
+      (tunnel.entry.z - k) * scale
+    );
+    const exitCenter = new THREE.Vector3(
+      (tunnel.exit.x - k) * scale,
+      (tunnel.exit.y - k) * scale,
+      (tunnel.exit.z - k) * scale
+    );
     const path = new THREE.CurvePath();
     path.add(new THREE.LineCurve3(entryCenter, new THREE.Vector3(0, 0, 0)));
     path.add(new THREE.LineCurve3(new THREE.Vector3(0, 0, 0), exitCenter));
-
-    return { curve: path, entryPos: [entryCenter.x, entryCenter.y, entryCenter.z], exitPos: [exitCenter.x, exitCenter.y, exitCenter.z] };
+    return {
+      normal: new THREE.TubeGeometry(path, 4, 0.08, 8, false),
+      target: new THREE.TubeGeometry(path, 4, 0.12, 8, false),
+      glow:   new THREE.TubeGeometry(path, 4, 0.2,  8, false),
+    };
   }, [tunnel, size, explosionFactor]);
 
-  // Pre-compute all three geometries based only on curve path (not isTarget).
-  // This avoids reallocating GPU geometry just because the target tunnel changes.
-  const geometries = useMemo(() => ({
-    normal: new THREE.TubeGeometry(curve, 32, 0.08, 8, false),
-    target: new THREE.TubeGeometry(curve, 32, 0.12, 8, false),
-    glow: new THREE.TubeGeometry(curve, 32, 0.2, 8, false)
-  }), [curve]);
-
-  // Dispose geometries when the curve changes (prevents GPU memory leaks)
   useEffect(() => () => {
     geometries.normal.dispose();
     geometries.target.dispose();
@@ -72,30 +109,6 @@ function TunnelTube({ tunnel, size, explosionFactor = 0, isTarget = false, wormI
   const entryActive = !inactiveSideKeys.has(getTunnelSideKey(tunnel.entry));
   const exitActive = !inactiveSideKeys.has(getTunnelSideKey(tunnel.exit));
   const tunnelOpacityScale = entryActive || exitActive ? 1 : 0.25;
-
-  // Animate tube
-  useFrame((state, delta) => {
-    timeRef.current += delta;
-    const t = timeRef.current;
-
-    if (tubeRef.current) {
-      // Pulse effect - stronger for target tunnels
-      const pulseSpeed = isTarget ? 4 : 2;
-
-      // Opacity pulse
-      const baseOpacity = (wormInTunnel ? 0.9 : (isTarget ? 0.7 : 0.4)) * tunnelOpacityScale;
-      tubeRef.current.material.opacity = baseOpacity + Math.sin(t * pulseSpeed) * 0.1 * tunnelOpacityScale;
-
-      // Emissive pulse
-      const baseEmissive = isTarget ? 0.8 : 0.4;
-      tubeRef.current.material.emissiveIntensity = baseEmissive + Math.sin(t * pulseSpeed) * 0.2;
-    }
-
-    if (glowRef.current && isTarget) {
-      // Glow ring animation
-      glowRef.current.material.opacity = 0.2 + Math.sin(t * 6) * 0.1;
-    }
-  });
 
   return (
     <group>
@@ -172,6 +185,39 @@ export default function WormTunnelNetwork({
   wormTunnelId = null,
   inactiveSideKeys = new Set()
 }) {
+  // Single animation registry — all tunnel refs stored here, driven by one useFrame.
+  const animMapRef = useRef(new Map());
+
+  const registerAnim = useCallback((key, refs) => { animMapRef.current.set(key, refs); }, []);
+  const unregisterAnim = useCallback((key) => { animMapRef.current.delete(key); }, []);
+
+  // One useFrame drives ALL tunnel animations — replaces N individual callbacks.
+  useFrame((state, delta) => {
+    for (const refs of animMapRef.current.values()) {
+      const { tube, glow, isTarget, wormInTunnel, inactiveSideKeys: inactiveKeys, entryKey, exitKey, timeOffset } = refs;
+      if (!tube) continue;
+
+      const t = state.clock.elapsedTime + timeOffset;
+      const pulseSpeed = isTarget ? 4 : 2;
+      const entryActive = !inactiveKeys.has(entryKey);
+      const exitActive = !inactiveKeys.has(exitKey);
+      const opacityScale = entryActive || exitActive ? 1 : 0.25;
+
+      const baseOpacity = (wormInTunnel ? 0.9 : (isTarget ? 0.7 : 0.4)) * opacityScale;
+      tube.material.opacity = baseOpacity + Math.sin(t * pulseSpeed) * 0.1 * opacityScale;
+
+      const baseEmissive = isTarget ? 0.8 : 0.4;
+      tube.material.emissiveIntensity = baseEmissive + Math.sin(t * pulseSpeed) * 0.2;
+
+      if (glow && isTarget) {
+        glow.material.opacity = 0.2 + Math.sin(t * 6) * 0.1;
+      }
+
+      // Suppress unused-var warning — delta consumed intentionally to advance time via state.clock
+      void delta;
+    }
+  });
+
   if (!tunnels || tunnels.length === 0) return null;
 
   return (
@@ -179,12 +225,15 @@ export default function WormTunnelNetwork({
       {tunnels.map(tunnel => (
         <TunnelTube
           key={tunnel.id}
+          tunnelKey={tunnel.id}
           tunnel={tunnel}
           size={size}
           explosionFactor={explosionFactor}
           isTarget={tunnel.id === targetTunnelId}
           wormInTunnel={tunnel.id === wormTunnelId}
           inactiveSideKeys={inactiveSideKeys}
+          registerAnim={registerAnim}
+          unregisterAnim={unregisterAnim}
         />
       ))}
     </group>
