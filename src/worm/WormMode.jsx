@@ -1010,26 +1010,13 @@ export function TunnelWormGameLoop({
     }
 
     setWorm(prev => {
+      // Standard snake algorithm: new head prepended, each existing segment
+      // takes the position of the one in front of it (old head → seg[0], etc.).
+      // This makes the body flow through tunnels behind the head instead of
+      // staying frozen, which prevents false self-collision when the head
+      // re-enters a tunnel the body hasn't vacated yet.
       const head = growthColor ? { ...newHead, color: growthColor } : newHead;
-      const newWorm = [head];
-
-      // Move body segments along their tunnels
-      for (let i = 0; i < prev.length; i++) {
-        const seg = prev[i];
-        if (i === 0) continue; // Skip old head
-
-        // Body follows head with delay
-        const _followT = i < prev.length - 1 ? prev[i].t : prev[i].t;
-        newWorm.push({
-          tunnelId: seg.tunnelId,
-          t: seg.t,
-          tunnel: seg.tunnel,
-          direction: seg.direction ?? 1,
-          color: seg.color
-        });
-      }
-
-      return effectiveGrowing ? newWorm : newWorm.slice(0, -1);
+      return effectiveGrowing ? [head, ...prev] : [head, ...prev].slice(0, -1);
     });
   });
 
