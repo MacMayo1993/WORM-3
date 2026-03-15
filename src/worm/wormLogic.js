@@ -259,7 +259,7 @@ export const checkTunnelSelfCollision = (newHead, segments, isGrowing = false) =
  * @param {Array} wormSegments - Current worm positions to avoid
  * @returns {Array} Array of orb positions {tunnelId, t, tunnel}
  */
-export const spawnTunnelOrbs = (tunnels, count, wormSegments = []) => {
+export const spawnTunnelOrbs = (tunnels, count, wormSegments = [], faceColors = FACE_COLORS) => {
   if (tunnels.length === 0) return [];
 
   const orbs = [];
@@ -293,7 +293,7 @@ export const spawnTunnelOrbs = (tunnels, count, wormSegments = []) => {
           tunnelId: tunnel.id,
           t,
           tunnel,
-          color: FACE_COLORS[tunnel.entryColor] || '#ffd700'
+          color: faceColors[tunnel.entryColor] || '#ffd700'
         });
         usedTunnels.add(`${tunnel.id}-${t}`);
         break;
@@ -309,7 +309,7 @@ export const spawnTunnelOrbs = (tunnels, count, wormSegments = []) => {
       tunnelId: tunnel.id,
       t,
       tunnel,
-      color: FACE_COLORS[tunnel.entryColor] || '#ffd700'
+      color: faceColors[tunnel.entryColor] || '#ffd700'
     });
   }
 
@@ -657,7 +657,7 @@ export const createInitialWorm = (size) => {
  * @param {Array} existingOrbs - Existing orb positions to avoid
  * @returns {Array} Array of orb positions {x, y, z, dirKey}
  */
-export const spawnOrbs = (cubies, size, count, wormSegments = [], existingOrbs = []) => {
+export const spawnOrbs = (cubies, size, count, wormSegments = [], existingOrbs = [], faceColors = FACE_COLORS) => {
   const occupied = new Set();
 
   // Mark worm positions as occupied
@@ -694,7 +694,7 @@ export const spawnOrbs = (cubies, size, count, wormSegments = [], existingOrbs =
             const pos = { x, y, z, dirKey };
             if (!occupied.has(positionKey(pos))) {
               const faceId = cubie.stickers[dirKey].curr;
-              validPositions.push({ ...pos, color: FACE_COLORS[faceId] });
+              validPositions.push({ ...pos, color: faceColors[faceId] });
             }
           }
         }
