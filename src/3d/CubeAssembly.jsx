@@ -87,6 +87,7 @@ const CubeAssembly = React.memo(({
     flipMode,
     flipWaveOrigins,
     handsMode,
+    wormTunnelActive,
     isBiomeMode,
     rotationEpoch,
     settings,
@@ -100,6 +101,7 @@ const CubeAssembly = React.memo(({
       flipMode: s.flipMode,
       flipWaveOrigins: s.flipWaveOrigins,
       handsMode: s.handsMode,
+      wormTunnelActive: s.wormHealerMode && s.wormPhase !== 'crawling' && s.wormPhase !== 'dead',
       isBiomeMode: s.settings?.biomeMode?.enabled,
       rotationEpoch: s.rotationEpoch,
       settings: s.settings,
@@ -496,6 +498,7 @@ const CubeAssembly = React.memo(({
   const wasExploding = useRef(false);
   const prevEfRef2 = useRef(0);
 
+
   useFrame(() => {
     const ef = explosionFactorRef.current;
     const isExploding = ef > 0;
@@ -697,9 +700,8 @@ const CubeAssembly = React.memo(({
     }
   }, -1);
 
-  // Priority 0 (default): runs after animation systems (-2, -1), before positive-priority
-  // frames. MUST NOT use a positive priority — positive priorities disable R3F auto-render,
-  // which breaks tunnel camera animation in HealerWormMode when AntipodalPiP is unmounted.
+  // Priority 0 (default): runs after animation systems (-2, -1).
+  // Must NOT use positive priority — positive priority disables R3F's auto-render loop.
   // Applies worm weight press offsets to cubie positions. Resets cubies that
   // were pressed last frame but are no longer pressed back to their clean positions.
   useFrame(() => {
@@ -871,7 +873,7 @@ const CubeAssembly = React.memo(({
           noRotate={handsMode ? true : false}
           minDistance={5}
           maxDistance={MAX_DISTANCE_BY_SIZE[size] || 28}
-          enabled={(!handsMode || explosionFactor > 0) && !animState && !dragStart && controlsEnabledRef.current}
+          enabled={(!handsMode || explosionFactor > 0) && !animState && !dragStart && controlsEnabledRef.current && !wormTunnelActive}
           staticMoving={false}
           dynamicDampingFactor={isTouchDevice ? 0.15 : 0.08}
           rotateSpeed={isTouchDevice ? 0.8 : 1.2}
