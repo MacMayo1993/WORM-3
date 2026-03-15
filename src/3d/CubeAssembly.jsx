@@ -232,6 +232,24 @@ const CubeAssembly = React.memo(({
     if (onClearTileSelectionRef.current) onClearTileSelectionRef.current();
 
     const n = normalFromEvent(event);
+
+    // Reject hits that don't land on the outer face for the computed direction.
+    // When the worm camera is inside the cube (tunnel traversal), R3F's ray can
+    // intersect the back face of an outer cubie mesh, producing an inward-pointing
+    // normal and therefore the wrong dirKey. Checking that the cubie's grid position
+    // actually sits on the surface for that direction is a robust guard against this.
+    const s = sizeRef.current;
+    const dirKey = dirFromNormal(n);
+    const isOuterFace = (
+      (dirKey === 'PX' && pos.x === s - 1) ||
+      (dirKey === 'NX' && pos.x === 0) ||
+      (dirKey === 'PY' && pos.y === s - 1) ||
+      (dirKey === 'NY' && pos.y === 0) ||
+      (dirKey === 'PZ' && pos.z === s - 1) ||
+      (dirKey === 'NZ' && pos.z === 0)
+    );
+    if (!isOuterFace) return;
+
     const dragData = {
       pos, worldPos, event,
       screenX,
