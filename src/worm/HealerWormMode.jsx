@@ -1041,8 +1041,9 @@ const _headPathPoint = { pos: _bodyHeadPos, normal: _bodyNormal };
 function WormBody({ worm }) {
     const meshRef = useRef();
     const wormColor = useGameStore(s => s.wormColor ?? '#33ff66');
-    const prevTailLenRef = useRef(0);
-    const prevOrbCountRef = useRef(0);
+    // Ref so useFrame always reads the latest wormColor without closure staleness
+    const wormColorRef = useRef(wormColor);
+    wormColorRef.current = wormColor;
 
     useFrame((state) => {
         // Copy head/normal into scratch vectors (avoids .clone() allocation)
@@ -1069,6 +1070,9 @@ function WormBody({ worm }) {
 
         const visibleCount = Math.min(MAX_TAIL, tLen);
         mesh.count = visibleCount;
+
+        const orbColors = worm.orbPickupColorsRef.current;
+        const baseColor = wormColorRef.current;
 
         for (let i = 0; i < visibleCount; i++) {
             const fade = 1 - i / tLen;
@@ -1120,35 +1124,27 @@ function WormBody({ worm }) {
 
             _wormDummy.updateMatrix();
             mesh.setMatrixAt(i, _wormDummy.matrix);
-        }
 
-        const orbColors = worm.orbPickupColorsRef.current;
-        if (prevTailLenRef.current !== visibleCount || prevOrbCountRef.current !== orbColors.length) {
-            prevTailLenRef.current = visibleCount;
-            prevOrbCountRef.current = orbColors.length;
-            for (let i = 0; i < visibleCount; i++) {
-                // Segments past the initial tail length are colored by orb pickup order.
-                // orbPickupIndex: 0 = first orb collected, and its ORB_SEGMENT_GROWTH
-                // segments are the oldest (highest i) orb segments on the worm.
-                const orbPickupIndex = Math.floor((i - BASE_TAIL_LENGTH) / ORB_SEGMENT_GROWTH);
-                if (orbPickupIndex >= 0 && orbPickupIndex < orbColors.length) {
-                    _bodyColor.set(orbColors[orbPickupIndex]);
-                } else {
-                    const fade = 1 - i / tLen;
-                    _bodyColor.setHSL(0.38 - i * 0.005, 1, 0.4 + fade * 0.3);
-                }
-                mesh.setColorAt(i, _bodyColor);
+            // Color: base segments use wormColor; tail-growth segments use the orb's face color.
+            // BASE_TAIL_LENGTH segments (initial body) = wormColor.
+            // Each ORB_SEGMENT_GROWTH group beyond that = the orb color picked up at that point.
+            const orbPickupIndex = Math.floor((i - BASE_TAIL_LENGTH) / ORB_SEGMENT_GROWTH);
+            if (orbPickupIndex >= 0 && orbPickupIndex < orbColors.length) {
+                _bodyColor.set(orbColors[orbPickupIndex]);
+            } else {
+                _bodyColor.set(baseColor);
             }
-            if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+            mesh.setColorAt(i, _bodyColor);
         }
 
         mesh.instanceMatrix.needsUpdate = true;
+        if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     });
 
     return (
         <instancedMesh ref={meshRef} args={[undefined, undefined, MAX_TAIL]} frustumCulled={false}>
             <sphereGeometry args={[1, 12, 12]} />
-            <meshStandardMaterial color={wormColor} emissive={wormColor} emissiveIntensity={0.8} />
+            <meshStandardMaterial color="#ffffff" emissive={wormColor} emissiveIntensity={0.35} />
         </instancedMesh>
     );
 }
