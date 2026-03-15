@@ -1318,14 +1318,15 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
             />
           </mesh>}
           {/* WORM creatures around active vortex — also shown for 6 s after any flip. */}
-          {Array.from({ length: Math.max(showWormIntro ? 2 : 1, Math.min(meta?.flips ?? 0, 4)) }, (_, i) => {
-            const count = Math.max(showWormIntro ? 2 : 1, Math.min(meta?.flips ?? 0, 4));
+          {/* During the non-wormhole intro a single worm emerges from the tile centre. */}
+          {Array.from({ length: (showWormIntro && !isWormhole) ? 1 : Math.max(1, Math.min(meta?.flips ?? 0, 4)) }, (_, i) => {
+            const count = (showWormIntro && !isWormhole) ? 1 : Math.max(1, Math.min(meta?.flips ?? 0, 4));
             const angle = (i / count) * Math.PI * 2;
-            const radius = showWormIntro && !isWormhole ? 0.22 : (count <= 4 ? 0.25 : 0.28);
+            const radius = showWormIntro && !isWormhole ? 0 : (count <= 4 ? 0.25 : 0.28);
             const x = Math.cos(angle) * radius;
             const y = Math.sin(angle) * radius;
             const scale = (showWormIntro && !isWormhole)
-              ? (0.98 + (i % 2) * 0.08)
+              ? 1.0
               : (count <= 4 ? 0.7 + (i % 2) * 0.1 : 0.6);
             return (
               <StickerWorm
