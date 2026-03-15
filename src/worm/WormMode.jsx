@@ -34,6 +34,7 @@ import { healSticker } from '../game/cubeState.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { play } from '../utils/audio.js';
 import { FACE_COLORS, ANTIPODAL_COLOR } from '../utils/constants.js';
+import { resolveColors } from '../utils/colorSchemes.js';
 
 // Game configuration for surface mode
 const CONFIG = {
@@ -61,6 +62,9 @@ const EMPTY_INACTIVE_TUNNEL_SIDES = new Set();
 
 // Custom hook for WORM mode game logic
 export function useWormGame(cubies, size, animState, onRotate) {
+  const settings = useGameStore(s => s.settings);
+  const faceColors = useMemo(() => resolveColors(settings), [settings]);
+
   // Game state
   const [gameState, setGameState] = useState('playing');
   const [worm, setWorm] = useState(() => createInitialWorm(size));
@@ -70,6 +74,7 @@ export function useWormGame(cubies, size, animState, onRotate) {
   const [warps, setWarps] = useState(0);
   const [pendingGrowth, setPendingGrowth] = useState(0);
   const pendingGrowthColorsRef = useRef([]);
+  const lastOrbColorRef = useRef(null); // persists last-eaten orb color; applied to all new segments
 
   // Camera mode - first-person worm view
   const [wormCameraEnabled, setWormCameraEnabled] = useState(false);
@@ -95,7 +100,7 @@ export function useWormGame(cubies, size, animState, onRotate) {
   // Initialize orbs on mount only (intentionally empty deps)
   // Orbs should only spawn once when the game starts, not on every cubies/size change
   useEffect(() => {
-    const initialOrbs = spawnOrbs(cubies, size, CONFIG.initialOrbs, worm, []);
+    const initialOrbs = spawnOrbs(cubies, size, CONFIG.initialOrbs, worm, [], faceColors);
     setOrbs(initialOrbs);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -105,17 +110,18 @@ export function useWormGame(cubies, size, animState, onRotate) {
     const newWorm = createInitialWorm(size);
     setWorm(newWorm);
     setMoveDir('up');
-    setOrbs(spawnOrbs(cubies, size, CONFIG.initialOrbs, newWorm, []));
+    setOrbs(spawnOrbs(cubies, size, CONFIG.initialOrbs, newWorm, [], faceColors));
     setScore(0);
     setWarps(0);
     setPendingGrowth(0);
     pendingGrowthColorsRef.current = [];
+    lastOrbColorRef.current = null;
     setTimeAlive(0);
     setGameState('playing');
     lastMoveTime.current = 0;
     timeAliveAcc.current = 0;
     rotationQueue.current = [];
-  }, [cubies, size]);
+  }, [cubies, size, faceColors]);
 
   // Keyboard controls
   useEffect(() => {
@@ -253,6 +259,7 @@ export function useWormGame(cubies, size, animState, onRotate) {
     // Refs
     lastMoveTime,
     timeAliveAcc,
+    lastOrbColorRef,
 
     // Actions
     restart,
@@ -313,6 +320,8 @@ const _highlightMatFallback = new THREE.MeshBasicMaterial({
  */
 function WormTileHighlight({ segments, size, explosionFactor }) {
   const cubies = useGameStore(s => s.cubies);
+  const settings = useGameStore(s => s.settings);
+  const faceColors = useMemo(() => resolveColors(settings), [settings]);
   const timeRef = useRef(0);
 
   const tileData = useMemo(() => {
@@ -323,14 +332,14 @@ function WormTileHighlight({ segments, size, explosionFactor }) {
         const n = HIGHLIGHT_NORMALS[seg.dirKey] || [0, 0, 1];
         const pos = [base[0] + n[0] * HIGHLIGHT_LIFT, base[1] + n[1] * HIGHLIGHT_LIFT, base[2] + n[2] * HIGHLIGHT_LIFT];
         const rot = HIGHLIGHT_ROT[seg.dirKey] || [0, 0, 0];
-        // Look up the sticker's antipodal face color
+        // Look up the sticker's antipodal face color using the current color scheme
         const faceId = cubies?.[seg.x]?.[seg.y]?.[seg.z]?.stickers?.[seg.dirKey]?.curr;
         const antipodalId = ANTIPODAL_COLOR[faceId];
-        const hex = FACE_COLORS[antipodalId] || null;
+        const hex = faceColors[antipodalId] || null;
         const mat = (hex && _highlightMats[hex]) || _highlightMatFallback;
         return { pos, rot, mat };
       });
-  }, [segments, size, explosionFactor, cubies]);
+  }, [segments, size, explosionFactor, cubies, faceColors]);
 
   useFrame((_state, delta) => {
     timeRef.current += delta;
@@ -431,6 +440,7 @@ export function WormGameLoop({
     speed,
     pendingGrowth,
     pendingGrowthColorsRef,
+    lastOrbColorRef,
     lastMoveTime,
     timeAliveAcc,
     setGameState,
@@ -542,11 +552,15 @@ export function WormGameLoop({
     const orbKey = positionKey(finalPos);
     const orbIndex = orbs.findIndex(o => positionKey(o) === orbKey);
 
+    // ateOrbColor is set this frame so we can apply color immediately (avoids stale pendingGrowth)
+    let ateOrbColor = null;
     if (orbIndex !== -1) {
-      const orbColor = orbs[orbIndex].color ?? null;
+      ateOrbColor = orbs[orbIndex].color ?? null;
+      lastOrbColorRef.current = ateOrbColor; // remember for all subsequent segments
       setOrbs(prev => prev.filter((_, i) => i !== orbIndex));
-      for (let g = 0; g < CONFIG.growthPerOrb; g++) pendingGrowthColorsRef.current.push(orbColor);
-      setPendingGrowth(g => g + CONFIG.growthPerOrb);
+      // Push extra growth colors for growthPerOrb > 1 (first is handled this frame)
+      for (let g = 1; g < CONFIG.growthPerOrb; g++) pendingGrowthColorsRef.current.push(ateOrbColor);
+      setPendingGrowth(g => g + CONFIG.growthPerOrb - 1);
       setScore(s => s + 50 + (worm.length * 10));
       play('/sounds/eat.mp3');
 
@@ -556,15 +570,23 @@ export function WormGameLoop({
       }
     }
 
-    if (pendingGrowth > 0) {
-      const growthColor = pendingGrowthColorsRef.current.shift() ?? null;
+    // segColor applies to every new segment — worm inherits color of last eaten orb
+    const segColor = lastOrbColorRef.current;
+
+    if (ateOrbColor !== null) {
+      // Orb eaten this frame — grow immediately with orb color (bypasses stale pendingGrowth)
+      setWorm(prev => [{ ...finalPos, moveDir, color: ateOrbColor }, ...prev]);
+    } else if (pendingGrowth > 0) {
+      const growthColor = pendingGrowthColorsRef.current.shift() ?? segColor;
       setPendingGrowth(g => g - 1);
       setWorm(prev => {
         const newHead = growthColor ? { ...finalPos, moveDir, color: growthColor } : { ...finalPos, moveDir };
         return [newHead, ...prev];
       });
     } else {
-      setWorm(prev => [{ ...finalPos, moveDir }, ...prev].slice(0, -1));
+      // Regular movement — apply lastOrbColor so worm trail stays colored after eating
+      const newHead = segColor ? { ...finalPos, moveDir, color: segColor } : { ...finalPos, moveDir };
+      setWorm(prev => [newHead, ...prev].slice(0, -1));
     }
   });
 
@@ -577,6 +599,9 @@ export function WormGameLoop({
 
 // Custom hook for TUNNEL mode game logic
 export function useTunnelWormGame(cubies, size, animState, onRotate) {
+  const settings = useGameStore(s => s.settings);
+  const faceColors = useMemo(() => resolveColors(settings), [settings]);
+
   // Game state
   const [gameState, setGameState] = useState('playing');
   const [worm, setWorm] = useState([]);
@@ -586,6 +611,7 @@ export function useTunnelWormGame(cubies, size, animState, onRotate) {
   const [tunnelsTraversed, setTunnelsTraversed] = useState(0);
   const [pendingGrowth, setPendingGrowth] = useState(0);
   const pendingGrowthColorsRef = useRef([]);
+  const lastOrbColorRef = useRef(null); // persists last-eaten orb color; applied to all new segments
   const [targetTunnelId, setTargetTunnelId] = useState(null);
   const [inactiveTunnelSides, setInactiveTunnelSides] = useState(() => new Set());
 
@@ -619,7 +645,7 @@ export function useTunnelWormGame(cubies, size, animState, onRotate) {
       const initialWorm = createInitialTunnelWorm(activeTunnels, 3);
       setWorm(initialWorm);
 
-      const initialOrbs = spawnTunnelOrbs(activeTunnels, TUNNEL_CONFIG.initialOrbs, initialWorm);
+      const initialOrbs = spawnTunnelOrbs(activeTunnels, TUNNEL_CONFIG.initialOrbs, initialWorm, faceColors);
       setOrbs(initialOrbs);
 
       // Set initial target
@@ -671,7 +697,7 @@ export function useTunnelWormGame(cubies, size, animState, onRotate) {
     if (activeTunnels.length >= 1) {
       const newWorm = createInitialTunnelWorm(activeTunnels, 3);
       setWorm(newWorm);
-      setOrbs(spawnTunnelOrbs(activeTunnels, TUNNEL_CONFIG.initialOrbs, newWorm));
+      setOrbs(spawnTunnelOrbs(activeTunnels, TUNNEL_CONFIG.initialOrbs, newWorm, faceColors));
     } else {
       setWorm([]);
       setOrbs([]);
@@ -681,13 +707,14 @@ export function useTunnelWormGame(cubies, size, animState, onRotate) {
     setTunnelsTraversed(0);
     setPendingGrowth(0);
     pendingGrowthColorsRef.current = [];
+    lastOrbColorRef.current = null;
     setInactiveTunnelSides(new Set());
     setTimeAlive(0);
     setGameState('playing');
     lastMoveTime.current = 0;
     timeAliveAcc.current = 0;
     rotationQueue.current = [];
-  }, [cubies, size]);
+  }, [cubies, size, faceColors]);
 
   // Keyboard controls
   useEffect(() => {
@@ -813,6 +840,7 @@ export function useTunnelWormGame(cubies, size, animState, onRotate) {
     // Refs
     lastMoveTime,
     timeAliveAcc,
+    lastOrbColorRef,
 
     // Actions
     restart,
@@ -839,6 +867,7 @@ export function TunnelWormGameLoop({
     speed,
     pendingGrowth,
     pendingGrowthColorsRef,
+    lastOrbColorRef,
     lastMoveTime,
     timeAliveAcc,
     setGameState,
@@ -936,11 +965,14 @@ export function TunnelWormGameLoop({
       Math.abs(orb.t - newT) < collisionThreshold
     );
 
+    // ateOrbColor set this frame so color applies immediately (avoids stale pendingGrowth)
+    let ateOrbColor = null;
     if (orbIndex !== -1) {
-      const tunnelOrbColor = orbs[orbIndex].color ?? null;
+      ateOrbColor = orbs[orbIndex].color ?? null;
+      lastOrbColorRef.current = ateOrbColor;
       setOrbs(prev => prev.filter((_, i) => i !== orbIndex));
-      for (let g = 0; g < CONFIG.growthPerOrb; g++) pendingGrowthColorsRef.current.push(tunnelOrbColor);
-      setPendingGrowth(g => g + CONFIG.growthPerOrb);
+      for (let g = 1; g < TUNNEL_CONFIG.growthPerOrb; g++) pendingGrowthColorsRef.current.push(ateOrbColor);
+      setPendingGrowth(g => g + TUNNEL_CONFIG.growthPerOrb - 1);
       setScore(s => s + 50 + (worm.length * 10));
       play('/sounds/eat.mp3');
 
@@ -956,9 +988,19 @@ export function TunnelWormGameLoop({
       }
     }
 
+    // segColor keeps the worm colored after an orb pickup
+    const segColor = lastOrbColorRef.current;
+
     // Update worm positions
-    const growthColor = growing ? (pendingGrowthColorsRef.current.shift() ?? null) : null;
-    if (growing) setPendingGrowth(g => g - 1);
+    let growthColor;
+    let effectiveGrowing = growing;
+    if (ateOrbColor !== null) {
+      growthColor = ateOrbColor; // use orb color immediately
+      effectiveGrowing = true;   // grow this frame without waiting for pendingGrowth state
+    } else {
+      growthColor = growing ? (pendingGrowthColorsRef.current.shift() ?? segColor) : segColor;
+      if (growing) setPendingGrowth(g => g - 1);
+    }
 
     setWorm(prev => {
       const head = growthColor ? { ...newHead, color: growthColor } : newHead;
@@ -980,7 +1022,7 @@ export function TunnelWormGameLoop({
         });
       }
 
-      return growing ? newWorm : newWorm.slice(0, -1);
+      return effectiveGrowing ? newWorm : newWorm.slice(0, -1);
     });
   });
 
