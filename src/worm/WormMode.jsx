@@ -456,6 +456,8 @@ export function WormGameLoop({
 
   const setCubies = useGameStore(s => s.setCubies);
   const recentlyHealedRef = useRef(new Set());
+  // Healing scan is O(size³×6) — only run it after the worm actually steps onto a new tile.
+  const needsHealCheckRef = useRef(false);
 
   // Clear press state on unmount so tiles don't stay depressed after leaving worm mode
   useEffect(() => {
@@ -478,24 +480,27 @@ export function WormGameLoop({
       pressState.tiles.set(key, 1.0);
     }
 
-    // ── Healing check: fires every frame, guarded by recentlyHealedRef ──
-    const candidates = checkHealingCandidates(cubies, size, worm);
-    if (candidates.length > 0) {
-      let updatedCubies = cubies;
-      let healed = false;
-      for (const c of candidates) {
-        const key = positionKey(c);
-        if (!recentlyHealedRef.current.has(key)) {
-          updatedCubies = healSticker(updatedCubies, size, c.x, c.y, c.z, c.dirKey);
-          recentlyHealedRef.current.add(key);
-          setScore(s => s + CONFIG.healBonus);
-          healed = true;
-          setTimeout(() => recentlyHealedRef.current.delete(key), 500);
+    // ── Healing check: only runs after a worm step (not every frame) ──
+    if (needsHealCheckRef.current) {
+      needsHealCheckRef.current = false;
+      const candidates = checkHealingCandidates(cubies, size, worm);
+      if (candidates.length > 0) {
+        let updatedCubies = cubies;
+        let healed = false;
+        for (const c of candidates) {
+          const key = positionKey(c);
+          if (!recentlyHealedRef.current.has(key)) {
+            updatedCubies = healSticker(updatedCubies, size, c.x, c.y, c.z, c.dirKey);
+            recentlyHealedRef.current.add(key);
+            setScore(s => s + CONFIG.healBonus);
+            healed = true;
+            setTimeout(() => recentlyHealedRef.current.delete(key), 500);
+          }
         }
-      }
-      if (healed) {
-        setCubies(updatedCubies);
-        play('/sounds/eat.mp3');
+        if (healed) {
+          setCubies(updatedCubies);
+          play('/sounds/eat.mp3');
+        }
       }
     }
 
@@ -511,6 +516,8 @@ export function WormGameLoop({
     if (lastMoveTime.current < moveInterval) return;
 
     lastMoveTime.current = 0;
+    // Worm just stepped — schedule the heal scan for this frame's tail.
+    needsHealCheckRef.current = true;
 
     const head = worm[0];
     if (!head) return;
