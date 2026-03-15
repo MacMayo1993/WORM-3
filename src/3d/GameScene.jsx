@@ -149,6 +149,7 @@ export default function GameScene({
   const wormholePhaseActive = wormHealerMode && (
     wormPhase === 'entering' || wormPhase === 'tunnel' || wormPhase === 'exiting'
   );
+  // console.log("GameScene wormholePhaseActive", { wormHealerMode, wormPhase, wormholePhaseActive });
 
   // In Healer WORM mode, always show antipodal PiP except during wormhole travel,
   // where the dedicated tunnel camera takes over.
