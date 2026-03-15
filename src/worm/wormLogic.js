@@ -240,13 +240,22 @@ export const checkTunnelSelfCollision = (newHead, segments, isGrowing = false) =
 
   const collisionThreshold = 0.05;
   const limit = isGrowing ? segments.length : segments.length - 1;
+  // With the snake-following algorithm, body segments always trail directly
+  // behind the head in the same tunnel (lower t for direction=1, higher t for
+  // direction=-1). A genuine self-intersection only occurs when the head is
+  // about to run into a segment that is AHEAD of it — i.e. the worm is catching
+  // its own tail from behind. Trailing segments must be ignored, or the false-
+  // positive fires within 2 frames of entering any new tunnel.
+  const headDir = newHead.direction ?? 1;
 
   for (let i = 1; i < limit; i++) {
     const seg = segments[i];
-    if (seg.tunnelId === newHead.tunnelId) {
-      if (Math.abs(seg.t - newHead.t) < collisionThreshold) {
-        return true;
-      }
+    if (seg.tunnelId !== newHead.tunnelId) continue;
+
+    const tDiff = seg.t - newHead.t; // positive → seg is ahead when dir=1
+    const segIsAhead = headDir > 0 ? tDiff > 0 : tDiff < 0;
+    if (segIsAhead && Math.abs(tDiff) < collisionThreshold) {
+      return true;
     }
   }
   return false;
