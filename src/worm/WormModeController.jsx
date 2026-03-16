@@ -2,7 +2,9 @@
 // Controller component that manages WORM mode state and renders all pieces
 
 import React, { useCallback } from 'react';
-import { useWormGame, WormMode3D, WormGameLoop } from './WormMode.jsx';
+import { useWormGame } from './surface/useSurfaceWormGame.js';
+import { WormGameLoop } from './surface/SurfaceWormGameLoop.jsx';
+import { WormMode3D } from './render/WormMode3D.jsx';
 import WormHUD from './WormHUD.jsx';
 
 // This component should be rendered inside the Canvas

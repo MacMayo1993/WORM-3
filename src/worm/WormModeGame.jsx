@@ -3,7 +3,11 @@
 // Supports both surface mode (classic) and tunnel mode (new inside-the-cube mode)
 
 import React, { createContext, useContext, useCallback, useRef } from 'react';
-import { useWormGame, useTunnelWormGame, WormMode3D, WormGameLoop, TunnelWormGameLoop } from './WormMode.jsx';
+import { useWormGame } from './surface/useSurfaceWormGame.js';
+import { WormGameLoop } from './surface/SurfaceWormGameLoop.jsx';
+import { useTunnelWormGame } from './tunnel/useTunnelWormGame.js';
+import { TunnelWormGameLoop } from './tunnel/TunnelWormGameLoop.jsx';
+import { WormMode3D } from './render/WormMode3D.jsx';
 import WormHUD from './WormHUD.jsx';
 import OrbInventoryHUD from './OrbInventoryHUD.jsx';
 import WormCamera from './WormCamera.jsx';
