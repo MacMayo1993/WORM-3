@@ -11,6 +11,10 @@ import { getTunnelSideKey } from './wormLogic.js';
 const TUNNEL_COLOR = '#00ff88';
 const TARGET_TUNNEL_COLOR = '#ffd700';
 
+// ── Shared portal torus geometry (M2) ───────────────────────────────────────
+// Both entry and exit portal rings share this geometry instance.
+const _portalTorusGeo = new THREE.TorusGeometry(0.25, 0.04, 8, 32);
+
 /**
  * Single tunnel tube visualization.
  * Has NO useFrame — all animation is driven by the single TunnelAnimator in WormTunnelNetwork.
@@ -138,8 +142,7 @@ function TunnelTube({ tunnel, size, explosionFactor = 0, isTarget = false, wormI
 
       {/* Entry portal ring */}
       <group position={entryPos}>
-        <mesh rotation={[Math.PI / 2, 0, 0]}>
-          <torusGeometry args={[0.25, 0.04, 8, 32]} />
+        <mesh geometry={_portalTorusGeo} rotation={[Math.PI / 2, 0, 0]}>
           <meshStandardMaterial
             color={color}
             emissive={color}
@@ -152,8 +155,7 @@ function TunnelTube({ tunnel, size, explosionFactor = 0, isTarget = false, wormI
 
       {/* Exit portal ring */}
       <group position={exitPos}>
-        <mesh rotation={[Math.PI / 2, 0, 0]}>
-          <torusGeometry args={[0.25, 0.04, 8, 32]} />
+        <mesh geometry={_portalTorusGeo} rotation={[Math.PI / 2, 0, 0]}>
           <meshStandardMaterial
             color={color}
             emissive={color}
