@@ -3,14 +3,16 @@
 // Chase camera follows the worm crawling on the cube exterior.
 // Disparity Level 1 runs in background. Flipped tiles are instant wormholes; jump to clear them.
 
-import React, { useRef, useCallback, useEffect, useState } from 'react';
+import React, { useRef, useCallback, useEffect, useState, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
+import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { getStickerWorldPos } from '../game/coordinates.js';
-import { getNextSurfacePosition, getActiveTunnels, getTunnelWorldPos, turnWorm } from './wormLogic.js';
+import { getNextSurfacePosition, getActiveTunnels, getTunnelWorldPos, turnWorm, getStableKey, findStickerByStableKey } from './wormLogic.js';
 import { buildManifoldGridMap, flipStickerPair } from '../game/manifoldLogic.js';
+import { healSticker } from '../game/cubeState.js';
 import { rotateVec90 } from '../game/cubeRotation.js';
 import { DIR_TO_VEC, VEC_TO_DIR } from '../utils/constants.js';
 import { resolveColors } from '../utils/colorSchemes.js';
@@ -48,6 +50,7 @@ import {
     SELF_COLLISION_GRACE_STEPS_AFTER_TUNNEL,
     WORMHOLE_MAX_TRAVERSALS,
     MAX_TAIL,
+    HEAL_COST,
 } from './healerWorm/constants.js';
 import {
     isSurfaceTilePos,
@@ -138,6 +141,7 @@ function useWormCrawler(size, cubies) {
     const tunnelUseCountsRef = useRef(new Map());
     const voidTunnelKeysRef = useRef(new Set());
     const pendingVoidKillRef = useRef(null);
+    const currentTunnelStableKeyRef = useRef(null); // stable key of the tunnel being traversed
     // Cached tunnel list — rebuilt whenever cubies change to avoid redundant getActiveTunnels calls
     const tunnelCacheRef = useRef(null);
     // O(1) tunnel endpoint lookup to avoid repeated per-step linear scans.
@@ -255,6 +259,38 @@ function useWormCrawler(size, cubies) {
             });
             return;
         }
+
+        // ── DEPOSIT ORBS ──────────────────────────────────────────────────────
+        const liveCubies = useGameStore.getState().cubies;
+        const entrySticker = liveCubies?.[x]?.[y]?.[z]?.stickers?.[dirKey];
+        const entryFaceId = entrySticker?.curr ?? 0;
+        const stableKey = getStableKey(x, y, z, dirKey, liveCubies);
+        currentTunnelStableKeyRef.current = stableKey;
+
+        if (stableKey && entryFaceId) {
+            const depositState = useGameStore.getState();
+            const healingProgress = depositState.wormHealingProgress ?? {};
+            const progress = healingProgress[stableKey] ?? { deposited: 0, faceId: entryFaceId };
+            const orbsOnWorm = Math.floor((tailLength.current - BASE_TAIL_LENGTH) / ORB_SEGMENT_GROWTH);
+            const available = depositState.wormOrbInventory?.[entryFaceId] ?? 0;
+            const n = Math.min(available, HEAL_COST - progress.deposited, orbsOnWorm);
+
+            if (n > 0) {
+                tailLength.current = Math.max(BASE_TAIL_LENGTH, tailLength.current - n * ORB_SEGMENT_GROWTH);
+                orbPickupColorsRef.current = orbPickupColorsRef.current.slice(0, -n);
+                const orbsLeft = Math.max(0, Math.floor((tailLength.current - BASE_TAIL_LENGTH) / ORB_SEGMENT_GROWTH));
+                useGameStore.getState().setWormBodyTiles(orbsLeft);
+                useGameStore.getState().setWormOrbInventory({
+                    ...(depositState.wormOrbInventory ?? {}),
+                    [entryFaceId]: (depositState.wormOrbInventory?.[entryFaceId] ?? 0) - n,
+                });
+                useGameStore.getState().setWormHealingProgress({
+                    ...healingProgress,
+                    [stableKey]: { deposited: progress.deposited + n, faceId: entryFaceId },
+                });
+            }
+        }
+        // ── END DEPOSIT ───────────────────────────────────────────────────────
 
         activeTunnel.current = tunnel;
         pendingTunnelTrigger.current = null;
@@ -605,8 +641,11 @@ function useWormCrawler(size, cubies) {
             }
             if (tunnelProgress.current >= 1) {
                 const voidKillState = pendingVoidKillRef.current;
+                const exitedTunnel = activeTunnel.current; // capture before null
+                const exitStableKey = currentTunnelStableKeyRef.current;
                 tunnelProgress.current = 0;
                 activeTunnel.current = null;
+                currentTunnelStableKeyRef.current = null;
                 if (voidKillState) {
                     pendingVoidKillRef.current = { ...voidKillState, armed: true };
                 }
@@ -615,8 +654,22 @@ function useWormCrawler(size, cubies) {
                 useGameStore.setState({ wormPhase: 'crawling', wormOnFlippedTile: false, visualMode: prevVisualModeRef.current ?? 'classic' });
                 onFlippedTile.current = false;
                 lastFlippedRef.current = false;
-                healedRef.current += 1;
-                useGameStore.getState().setWormHealedCount(healedRef.current);
+
+                // Only heal when the required orbs have been fully deposited
+                const exitStore = useGameStore.getState();
+                const exitProgress = exitStableKey ? (exitStore.wormHealingProgress?.[exitStableKey]) : null;
+                if (exitProgress?.deposited >= HEAL_COST && exitedTunnel) {
+                    const { entry, exit: exitTile } = exitedTunnel;
+                    let healed = healSticker(exitStore.cubies, size, entry.x, entry.y, entry.z, entry.dirKey);
+                    healed = healSticker(healed, size, exitTile.x, exitTile.y, exitTile.z, exitTile.dirKey);
+                    exitStore.setCubies(healed);
+                    const newProgress = { ...(exitStore.wormHealingProgress ?? {}) };
+                    delete newProgress[exitStableKey];
+                    exitStore.setWormHealingProgress(newProgress);
+                    healedRef.current += 1;
+                    exitStore.setWormHealedCount(healedRef.current);
+                }
+                // else: partial/no deposit — tunnel stays flipped, progress persists
             }
         }
     }, [size, cubies, wormSpeed, wormControlMode, wormholeInterval, beginTunnelTransition, resolveTunnelAtTile, killWorm]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -678,6 +731,7 @@ function useWormCrawler(size, cubies) {
             wormPowerups: initial,
             wormBodyTiles: 0,
             wormOrbInventory: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
+            wormHealingProgress: {},
             wormHealedCount: 0,
             wormholeCountdown: wormholeInterval,
             wormAlive: true,
@@ -1433,6 +1487,55 @@ const POLES_PER_TILE = 4;
 const TAPES_PER_TILE = 4;
 const FRAME_SEGMENTS_PER_VOID = 4;
 
+const _isMobile = typeof window !== 'undefined' && (window.innerWidth <= 768 || 'ontouchstart' in window);
+
+function TunnelHealProgress({ size }) {
+    const healingProgress = useGameStore((s) => s.wormHealingProgress ?? {});
+    const cubies = useGameStore((s) => s.debouncedCubies ?? s.cubies);
+    const faceColors = useGameStore((s) => {
+        const settings = s.settings ?? { colorScheme: 'standard' };
+        return resolveColors(settings, settings?.biomeMode?.faceAssignment) || {};
+    });
+
+    const entries = useMemo(() => {
+        return Object.entries(healingProgress)
+            .filter(([, p]) => p.deposited > 0 && p.deposited < HEAL_COST)
+            .map(([key, p]) => {
+                const pos = findStickerByStableKey(cubies, size, key);
+                if (!pos) return null;
+                const wp = getStickerWorldPos(pos.x, pos.y, pos.z, pos.dirKey, size, 0.55);
+                if (!wp) return null;
+                return { key, wp, remaining: HEAL_COST - p.deposited, faceId: p.faceId };
+            })
+            .filter(Boolean);
+    }, [healingProgress, cubies, size]);
+
+    if (entries.length === 0) return null;
+
+    return (
+        <>
+            {entries.map(({ key, wp, remaining, faceId }) => {
+                const color = faceColors[faceId] ?? '#ffffff';
+                return (
+                    <Html key={key} position={[wp.x, wp.y, wp.z]} center>
+                        <div style={{
+                            color,
+                            fontSize: _isMobile ? '18px' : '14px',
+                            fontWeight: 'bold',
+                            fontFamily: "'Courier New', monospace",
+                            textShadow: `0 0 6px ${color}, 0 0 12px ${color}88`,
+                            pointerEvents: 'none',
+                            userSelect: 'none',
+                        }}>
+                            {remaining}
+                        </div>
+                    </Html>
+                );
+            })}
+        </>
+    );
+}
+
 function WormholeRings({ cubies, size, voidTunnelKeysRef, tunnelUseCountsRef }) {
     const liveRef = useRef();       // live wormhole rings (neon pink)
     const voidOuterRef = useRef();  // void outer ring (sickly green, slow reverse)
@@ -1968,6 +2071,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             <WormFace worm={worm} size={size} />
             <PortalGlow worm={worm} size={size} />
             <WormholeRings cubies={cubies} size={size} voidTunnelKeysRef={worm.voidTunnelKeysRef} tunnelUseCountsRef={worm.tunnelUseCountsRef} />
+            <TunnelHealProgress size={size} />
             <PowerupOrbs size={size} />
         </>
     );

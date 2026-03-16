@@ -4,6 +4,7 @@
 import React from 'react';
 
 const isMobile = typeof window !== 'undefined' && (window.innerWidth <= 768 || 'ontouchstart' in window);
+const isSmall = typeof window !== 'undefined' && window.innerWidth < 380;
 
 const FACE_ORDER = [1, 2, 3, 4, 5, 6];
 
@@ -31,7 +32,7 @@ export default function OrbInventoryHUD({ orbInventory, faceColors }) {
                   ...styles.orb,
                   background: color,
                   boxShadow: `0 0 8px ${color}, 0 0 16px ${color}44`,
-                  border: isLight ? '1px solid #888' : 'none',
+                  border: isLight ? '1px solid rgba(255,255,255,0.4)' : 'none',
                 }}
               />
               <span style={{ ...styles.count, color }}>{count}</span>
@@ -46,18 +47,19 @@ export default function OrbInventoryHUD({ orbInventory, faceColors }) {
 const styles = {
   container: {
     position: 'absolute',
-    bottom: isMobile ? '70px' : '20px',
-    left: '50%',
-    transform: 'translateX(-50%)',
+    ...(isMobile
+      ? { top: '76px', right: '12px' }
+      : { bottom: '20px', left: '50%', transform: 'translateX(-50%)' }
+    ),
     display: 'flex',
     flexDirection: 'column',
-    alignItems: 'center',
+    alignItems: isMobile ? 'flex-end' : 'center',
     gap: '4px',
     pointerEvents: 'none',
     zIndex: 101,
   },
   label: {
-    fontSize: isMobile ? '8px' : '10px',
+    fontSize: isSmall ? '7px' : (isMobile ? '8px' : '10px'),
     color: '#666',
     letterSpacing: '0.12em',
     fontFamily: "'Courier New', monospace",
@@ -65,7 +67,7 @@ const styles = {
   row: {
     display: 'flex',
     alignItems: 'center',
-    gap: isMobile ? '8px' : '12px',
+    gap: isSmall ? '6px' : (isMobile ? '8px' : '12px'),
     padding: '6px 14px',
     background: 'rgba(0, 0, 0, 0.6)',
     borderRadius: '20px',
@@ -78,13 +80,13 @@ const styles = {
     gap: '5px',
   },
   orb: {
-    width: isMobile ? '10px' : '12px',
-    height: isMobile ? '10px' : '12px',
+    width: isSmall ? '8px' : (isMobile ? '10px' : '12px'),
+    height: isSmall ? '8px' : (isMobile ? '10px' : '12px'),
     borderRadius: '50%',
     flexShrink: 0,
   },
   count: {
-    fontSize: isMobile ? '13px' : '16px',
+    fontSize: isSmall ? '12px' : (isMobile ? '13px' : '16px'),
     fontWeight: 'bold',
     fontFamily: "'Courier New', monospace",
     textShadow: '0 0 8px currentColor',

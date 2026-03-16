@@ -21,6 +21,41 @@ import * as THREE from 'three';
  */
 
 /**
+ * Returns a rotation-stable key for a surface sticker using origPos + origDir.
+ * The key survives cube rotations because origPos/origDir never change.
+ * Returns null if the sticker cannot be found.
+ */
+export function getStableKey(x, y, z, dirKey, cubies) {
+  const sticker = cubies?.[x]?.[y]?.[z]?.stickers?.[dirKey];
+  if (!sticker) return null;
+  const { origPos, origDir } = sticker;
+  return `${origDir}-${origPos.x}-${origPos.y}-${origPos.z}`;
+}
+
+/**
+ * Scans cubies to find the current grid position of a sticker by its stable key.
+ * Returns { x, y, z, dirKey } or null.
+ */
+export function findStickerByStableKey(cubies, size, stableKey) {
+  for (let x = 0; x < size; x++) {
+    for (let y = 0; y < size; y++) {
+      for (let z = 0; z < size; z++) {
+        const cubie = cubies?.[x]?.[y]?.[z];
+        if (!cubie) continue;
+        for (const dKey of Object.keys(cubie.stickers)) {
+          const st = cubie.stickers[dKey];
+          if (!st?.origPos) continue;
+          if (`${st.origDir}-${st.origPos.x}-${st.origPos.y}-${st.origPos.z}` === stableKey) {
+            return { x, y, z, dirKey: dKey };
+          }
+        }
+      }
+    }
+  }
+  return null;
+}
+
+/**
  * Get all active tunnels (connections between flipped stickers and their antipodals)
  * @param {Array} cubies - Cube state
  * @param {number} size - Cube size
