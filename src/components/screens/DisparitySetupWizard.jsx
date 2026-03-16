@@ -54,6 +54,8 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
         padding: '32px 28px',
         maxWidth: '400px',
         width: '92vw',
+        maxHeight: '90vh',
+        overflowY: 'auto',
         boxShadow: '0 8px 40px rgba(0,0,0,0.12)',
         display: 'flex', flexDirection: 'column', gap: '24px',
       }}>
