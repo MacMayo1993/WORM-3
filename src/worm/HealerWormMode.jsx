@@ -524,9 +524,11 @@ function useWormCrawler(size, cubies) {
                 const puIdx = powerupsRef.current.findIndex(p => p.x === x && p.y === y && p.z === z && p.dirKey === dirKey);
                 if (puIdx !== -1) {
                     const pickedUp = powerupsRef.current[puIdx];
-                    const pickedSticker = cubies?.[pickedUp.x]?.[pickedUp.y]?.[pickedUp.z]?.stickers?.[pickedUp.dirKey];
+                    const liveCubies = useGameStore.getState().cubies;
+                    const pickedSticker = liveCubies?.[pickedUp.x]?.[pickedUp.y]?.[pickedUp.z]?.stickers?.[pickedUp.dirKey];
                     const pickedFaceId = pickedSticker ? pickedSticker.curr : 0;
-                    const pickedColor = resolveColors(useGameStore.getState().settings)[pickedFaceId] ?? '#22ff88';
+                    const liveColors = resolveColors(useGameStore.getState().settings);
+                    const pickedColor = (pickedFaceId && liveColors[pickedFaceId]) ?? '#22ff88';
                     applyOrbPickupGrowth(pickedColor, pickedFaceId);
                     const newPowerup = { ...randomFreeTile(size, [...powerupsRef.current, pos.current]), type: 'apple' };
                     const next = [...powerupsRef.current];
