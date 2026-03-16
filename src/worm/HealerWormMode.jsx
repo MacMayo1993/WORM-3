@@ -271,13 +271,13 @@ function useWormCrawler(size, cubies) {
             const depositState = useGameStore.getState();
             const healingProgress = depositState.wormHealingProgress ?? {};
             const progress = healingProgress[stableKey] ?? { deposited: 0, faceId: entryFaceId };
-            const orbsOnWorm = Math.floor((tailLength.current - BASE_TAIL_LENGTH) / ORB_SEGMENT_GROWTH);
+            const segmentsOnWorm = tailLength.current - BASE_TAIL_LENGTH;
             const available = depositState.wormOrbInventory?.[entryFaceId] ?? 0;
-            const n = Math.min(available, HEAL_COST - progress.deposited, orbsOnWorm);
+            const n = Math.min(available, HEAL_COST - progress.deposited, segmentsOnWorm);
 
             if (n > 0) {
-                tailLength.current = Math.max(BASE_TAIL_LENGTH, tailLength.current - n * ORB_SEGMENT_GROWTH);
-                orbPickupColorsRef.current = orbPickupColorsRef.current.slice(0, -n);
+                tailLength.current = Math.max(BASE_TAIL_LENGTH, tailLength.current - n);
+                orbPickupColorsRef.current = orbPickupColorsRef.current.slice(0, -(n / ORB_SEGMENT_GROWTH));
                 const orbsLeft = Math.max(0, Math.floor((tailLength.current - BASE_TAIL_LENGTH) / ORB_SEGMENT_GROWTH));
                 useGameStore.getState().setWormBodyTiles(orbsLeft);
                 useGameStore.getState().setWormOrbInventory({
@@ -316,7 +316,7 @@ function useWormCrawler(size, cubies) {
         useGameStore.getState().setWormBodyTiles(orbCountOnWorm);
         if (faceId) {
             const prev = useGameStore.getState().wormOrbInventory ?? { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
-            useGameStore.getState().setWormOrbInventory({ ...prev, [faceId]: (prev[faceId] ?? 0) + 1 });
+            useGameStore.getState().setWormOrbInventory({ ...prev, [faceId]: (prev[faceId] ?? 0) + ORB_SEGMENT_GROWTH });
         }
     };
 
