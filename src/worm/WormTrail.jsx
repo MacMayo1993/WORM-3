@@ -32,8 +32,9 @@ const _UP = new THREE.Vector3(0, 1, 0);
 const _tubeDir = new THREE.Vector3();
 // Pre-allocated color pool — reused across renders to avoid GC pressure.
 const _colorPool = Array.from({ length: 200 }, () => new THREE.Color());
-// Maximum instanced segments (enough for any realistic worm length).
-const MAX_WORM_INSTANCES = 100;
+// Maximum instanced segments. Set well above any realistic worm length to prevent
+// InstancedMesh overflow (overflow is silent — instances beyond the cap are skipped).
+const MAX_WORM_INSTANCES = 200;
 // Face-normal direction for each dirKey — used to lift worm segments off tile surface
 const FACE_NORMALS = {
   PX: [1, 0, 0], NX: [-1, 0, 0],

@@ -3,13 +3,12 @@
 // All per-tick state transitions flow through here — one action per tick,
 // deterministic and replay-friendly.
 
-import { createInitialWorm } from '../wormLogic.js';
 import { CONFIG } from './useSurfaceWormGame.js';
 
 // Action type constants
 export const SA = {
   // Lifecycle
-  INIT_ORBS: 'INIT_ORBS',
+  INIT: 'INIT',       // First-mount init: sets worm + orbs together (single dispatch, like tunnel mode)
   RESTART: 'RESTART',
   // UI controls
   PAUSE: 'PAUSE',
@@ -29,13 +28,14 @@ export const SA = {
 };
 
 /**
- * Returns a fresh initial surface game state.
- * `orbs` starts empty — populated via INIT_ORBS after first render.
+ * Returns a blank surface game state.
+ * `worm` and `orbs` start empty — populated via SA.INIT after first render
+ * (matching the tunnel mode single-dispatch init pattern).
  */
-export function makeSurfaceState(size) {
+export function makeSurfaceState() {
   return {
     gameState: 'playing',
-    worm: createInitialWorm(size),
+    worm: [],
     moveDir: 'up',
     orbs: [],
     score: 0,
@@ -56,8 +56,8 @@ export function makeSurfaceState(size) {
  */
 export function surfaceReducer(state, action) {
   switch (action.type) {
-    case SA.INIT_ORBS:
-      return { ...state, orbs: action.orbs };
+    case SA.INIT:
+      return { ...makeSurfaceState(), worm: action.worm, orbs: action.orbs };
 
     case SA.RESTART:
       // Caller provides the complete pre-computed fresh state
