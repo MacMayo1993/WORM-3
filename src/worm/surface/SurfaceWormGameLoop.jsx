@@ -33,6 +33,8 @@ export function SurfaceWormGameLoop({ cubies, size, animState, game }) {
 
   const emitGameEvent = useGameEvents();
   const recentlyHealedRef = useRef(new Set());
+  // Timer IDs for the heal-cooldown timeouts — stored so they can be cancelled on unmount
+  const healTimerIdsRef = useRef([]);
   // Healing scan runs only after a step and only checks the head neighborhood (medium #1).
   const needsHealCheckRef = useRef(false);
 
@@ -42,9 +44,16 @@ export function SurfaceWormGameLoop({ cubies, size, animState, game }) {
   const lastOrbsRef = useRef(null);
   const orbMapRef = useRef(new Map());
 
-  // Clear press state on unmount so tiles don't stay depressed after leaving worm mode
+  // On unmount: clear press state and cancel any pending heal-cooldown timers.
+  // Without this, timers that fire after unmount try to mutate a stale ref, and
+  // if the component remounts quickly, stale cooldowns suppress healing in the new game.
   useEffect(() => {
-    return () => { pressState.tiles.clear(); };
+    return () => {
+      pressState.tiles.clear();
+      for (const id of healTimerIdsRef.current) clearTimeout(id);
+      healTimerIdsRef.current = [];
+      recentlyHealedRef.current.clear();
+    };
   }, []);
 
   useFrame((_state, delta) => {
@@ -79,7 +88,9 @@ export function SurfaceWormGameLoop({ cubies, size, animState, game }) {
             recentlyHealedRef.current.add(key);
             healScore += CONFIG.healBonus;
             healed = true;
-            setTimeout(() => recentlyHealedRef.current.delete(key), 500);
+            healTimerIdsRef.current.push(
+              setTimeout(() => recentlyHealedRef.current.delete(key), 500)
+            );
           }
         }
         if (healed) {

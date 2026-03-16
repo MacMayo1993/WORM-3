@@ -72,10 +72,16 @@ export function findStickerByStableKey(cubies, size, stableKey) {
  * @param {number} size - Cube size
  * @returns {Array} Array of tunnel objects {id, entry, exit, flips}
  */
-export const getActiveTunnels = (cubies, size) => {
+/**
+ * @param {Array} cubies - Cube state
+ * @param {number} size - Cube size
+ * @param {Map|null} [cachedManifoldMap] - Optional pre-built manifold map. When the caller
+ *   already holds one (e.g. HealerWormMode), passing it avoids an O(size³×6) rebuild.
+ */
+export const getActiveTunnels = (cubies, size, cachedManifoldMap = null) => {
   const tunnels = [];
   const seen = new Set();
-  const manifoldMap = buildManifoldGridMap(cubies, size);
+  const manifoldMap = cachedManifoldMap ?? buildManifoldGridMap(cubies, size);
 
   for (let x = 0; x < size; x++) {
     for (let y = 0; y < size; y++) {
@@ -122,16 +128,18 @@ export const getActiveTunnels = (cubies, size) => {
           // Pre-compute world positions so findNextTunnel avoids per-call getStickerWorldPos
           const entryWorld = getStickerWorldPos(x, y, z, dirKey, size, 0);
           const exitWorld = getStickerWorldPos(antipodal.x, antipodal.y, antipodal.z, antipodal.dirKey, size, 0);
-          tunnels.push(Object.freeze({
+          // No Object.freeze — frozen objects prevent V8 property-access optimisation
+          // and tunnel objects are already treated as immutable by all consumers.
+          tunnels.push({
             id: `tunnel-${x}-${y}-${z}-${dirKey}`,
-            entry: Object.freeze({ x, y, z, dirKey }),
-            exit: Object.freeze({ x: antipodal.x, y: antipodal.y, z: antipodal.z, dirKey: antipodal.dirKey }),
+            entry: { x, y, z, dirKey },
+            exit: { x: antipodal.x, y: antipodal.y, z: antipodal.z, dirKey: antipodal.dirKey },
             flips: Math.max(1, flips),
             entryColor: sticker.curr,
             exitColor: antipodal.sticker?.curr || sticker.curr,
-            entryWorldVec: Object.freeze(new THREE.Vector3(entryWorld[0], entryWorld[1], entryWorld[2])),
-            exitWorldVec: Object.freeze(new THREE.Vector3(exitWorld[0], exitWorld[1], exitWorld[2]))
-          }));
+            entryWorldVec: new THREE.Vector3(entryWorld[0], entryWorld[1], entryWorld[2]),
+            exitWorldVec: new THREE.Vector3(exitWorld[0], exitWorld[1], exitWorld[2]),
+          });
         }
       }
     }

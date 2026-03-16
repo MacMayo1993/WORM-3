@@ -147,7 +147,9 @@ function useWormCrawler(size, cubies) {
     // O(1) tunnel endpoint lookup to avoid repeated per-step linear scans.
     const tunnelLookupRef = useRef(new Map());
     React.useEffect(() => {
-        const tunnels = getActiveTunnels(cubies, size);
+        // Build manifold map once and share it with getActiveTunnels to avoid a second rebuild
+        const manifoldMap = buildManifoldGridMap(cubies, size);
+        const tunnels = getActiveTunnels(cubies, size, manifoldMap);
         tunnelCacheRef.current = tunnels;
 
         const encodeTile = (p) => `${p.x},${p.y},${p.z},${p.dirKey}`;
@@ -1589,7 +1591,8 @@ function WormholeRings({ cubies, size, voidTunnelKeysRef, tunnelUseCountsRef }) 
     // All flipped surface positions, augmented with canonical tunnel key so
     // WormholeRings can tell live vs void without re-running manifold logic per frame.
     const allPositions = React.useMemo(() => {
-        const tunnels = getActiveTunnels(debouncedCubies, size);
+        const manifoldMap = buildManifoldGridMap(debouncedCubies, size);
+        const tunnels = getActiveTunnels(debouncedCubies, size, manifoldMap);
         // Build tile-key → canonical-tunnel-key lookup (covers both entry and exit)
         const tunnelKeyMap = new Map();
         for (const t of tunnels) {
