@@ -2,24 +2,21 @@
 // Displays the worm's current color orb inventory — used for tunnel healing
 
 import React from 'react';
-import { FACE_COLORS } from '../utils/constants.js';
+import { useGameStore } from '../hooks/useGameStore.js';
+import { useShallow } from 'zustand/react/shallow';
+import { resolveColors } from '../utils/colorSchemes.js';
 
 const isMobile = typeof window !== 'undefined' && (window.innerWidth <= 768 || 'ontouchstart' in window);
 
-// Ordered display: Red, Green, White, Orange, Blue, Yellow
+// Ordered display: face IDs 1–6
 const FACE_ORDER = [1, 2, 3, 4, 5, 6];
 
-const FACE_NAMES = {
-  1: 'RED',
-  2: 'GRN',
-  3: 'WHT',
-  4: 'ORG',
-  5: 'BLU',
-  6: 'YLW',
-};
-
 export default function OrbInventoryHUD({ orbInventory }) {
-  if (!orbInventory) return null;
+  const settings = useGameStore(useShallow(s => s.settings));
+  if (!orbInventory || !settings) return null;
+
+  // Resolve the active color palette so orb dots match the tiles the player sees
+  const faceColors = resolveColors(settings);
 
   // Only show faces that have at least 1 orb
   const activeEntries = FACE_ORDER.filter(faceId => (orbInventory[faceId] ?? 0) > 0);
@@ -32,8 +29,13 @@ export default function OrbInventoryHUD({ orbInventory }) {
       <div style={styles.row}>
         {activeEntries.map(faceId => {
           const count = orbInventory[faceId];
-          const color = FACE_COLORS[faceId];
-          const isWhite = faceId === 3;
+          const color = faceColors[faceId] ?? '#888888';
+          // Compute perceived lightness to decide if we need a border for contrast
+          const r = parseInt(color.slice(1, 3), 16);
+          const g = parseInt(color.slice(3, 5), 16);
+          const b = parseInt(color.slice(5, 7), 16);
+          const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+          const isLight = luminance > 0.85;
           return (
             <div key={faceId} style={styles.entry}>
               <div
@@ -41,7 +43,7 @@ export default function OrbInventoryHUD({ orbInventory }) {
                   ...styles.orb,
                   background: color,
                   boxShadow: `0 0 8px ${color}, 0 0 16px ${color}44`,
-                  border: isWhite ? '1px solid #888' : 'none',
+                  border: isLight ? '1px solid #888' : 'none',
                 }}
               />
               <span style={{ ...styles.count, color }}>
