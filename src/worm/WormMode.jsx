@@ -73,6 +73,7 @@ export function useWormGame(cubies, size, animState, onRotate) {
   const [score, setScore] = useState(0);
   const [warps, setWarps] = useState(0);
   const [pendingGrowth, setPendingGrowth] = useState(0);
+  const [orbInventory, setOrbInventory] = useState({ 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 });
   const pendingGrowthColorsRef = useRef([]);
   const lastOrbColorRef = useRef(null); // persists last-eaten orb color; applied to all new segments
 
@@ -114,6 +115,7 @@ export function useWormGame(cubies, size, animState, onRotate) {
     setScore(0);
     setWarps(0);
     setPendingGrowth(0);
+    setOrbInventory({ 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 });
     pendingGrowthColorsRef.current = [];
     lastOrbColorRef.current = null;
     setTimeAlive(0);
@@ -241,6 +243,7 @@ export function useWormGame(cubies, size, animState, onRotate) {
     speed,
     pendingGrowth,
     pendingGrowthColorsRef,
+    orbInventory,
     orbsTotal: CONFIG.initialOrbs,
     wormCameraEnabled,
     timeAlive,
@@ -253,6 +256,7 @@ export function useWormGame(cubies, size, animState, onRotate) {
     setScore,
     setWarps,
     setPendingGrowth,
+    setOrbInventory,
     setWormCameraEnabled,
     setTimeAlive,
 
@@ -450,6 +454,7 @@ export function WormGameLoop({
     setScore,
     setWarps,
     setPendingGrowth,
+    setOrbInventory,
     setTimeAlive,
     CONFIG
   } = game;
@@ -562,9 +567,14 @@ export function WormGameLoop({
     // ateOrbColor is set this frame so we can apply color immediately (avoids stale pendingGrowth)
     let ateOrbColor = null;
     if (orbIndex !== -1) {
-      ateOrbColor = orbs[orbIndex].color ?? null;
+      const eatenOrb = orbs[orbIndex];
+      ateOrbColor = eatenOrb.color ?? null;
       lastOrbColorRef.current = ateOrbColor; // remember for all subsequent segments
       setOrbs(prev => prev.filter((_, i) => i !== orbIndex));
+      // Track orb in color inventory
+      if (eatenOrb.faceId) {
+        setOrbInventory(prev => ({ ...prev, [eatenOrb.faceId]: (prev[eatenOrb.faceId] ?? 0) + 1 }));
+      }
       // Push extra growth colors for growthPerOrb > 1 (first is handled this frame)
       for (let g = 1; g < CONFIG.growthPerOrb; g++) pendingGrowthColorsRef.current.push(ateOrbColor);
       setPendingGrowth(g => g + CONFIG.growthPerOrb - 1);
@@ -617,6 +627,7 @@ export function useTunnelWormGame(cubies, size, animState, onRotate) {
   const [score, setScore] = useState(0);
   const [tunnelsTraversed, setTunnelsTraversed] = useState(0);
   const [pendingGrowth, setPendingGrowth] = useState(0);
+  const [orbInventory, setOrbInventory] = useState({ 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 });
   const pendingGrowthColorsRef = useRef([]);
   const lastOrbColorRef = useRef(null); // persists last-eaten orb color; applied to all new segments
   const [targetTunnelId, setTargetTunnelId] = useState(null);
@@ -713,6 +724,7 @@ export function useTunnelWormGame(cubies, size, animState, onRotate) {
     setScore(0);
     setTunnelsTraversed(0);
     setPendingGrowth(0);
+    setOrbInventory({ 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 });
     pendingGrowthColorsRef.current = [];
     lastOrbColorRef.current = null;
     setInactiveTunnelSides(new Set());
@@ -825,6 +837,7 @@ export function useTunnelWormGame(cubies, size, animState, onRotate) {
     speed,
     pendingGrowth,
     pendingGrowthColorsRef,
+    orbInventory,
     orbsTotal: TUNNEL_CONFIG.initialOrbs,
     wormCameraEnabled,
     targetTunnelId,
@@ -839,6 +852,7 @@ export function useTunnelWormGame(cubies, size, animState, onRotate) {
     setScore,
     setTunnelsTraversed,
     setPendingGrowth,
+    setOrbInventory,
     setWormCameraEnabled,
     setTargetTunnelId,
     setInactiveTunnelSides,
@@ -883,6 +897,7 @@ export function TunnelWormGameLoop({
     setScore,
     setTunnelsTraversed,
     setPendingGrowth,
+    setOrbInventory,
     setTargetTunnelId,
     setTimeAlive,
     inactiveTunnelSides,
@@ -975,9 +990,14 @@ export function TunnelWormGameLoop({
     // ateOrbColor set this frame so color applies immediately (avoids stale pendingGrowth)
     let ateOrbColor = null;
     if (orbIndex !== -1) {
-      ateOrbColor = orbs[orbIndex].color ?? null;
+      const eatenOrb = orbs[orbIndex];
+      ateOrbColor = eatenOrb.color ?? null;
       lastOrbColorRef.current = ateOrbColor;
       setOrbs(prev => prev.filter((_, i) => i !== orbIndex));
+      // Track orb in color inventory
+      if (eatenOrb.faceId) {
+        setOrbInventory(prev => ({ ...prev, [eatenOrb.faceId]: (prev[eatenOrb.faceId] ?? 0) + 1 }));
+      }
       for (let g = 1; g < TUNNEL_CONFIG.growthPerOrb; g++) pendingGrowthColorsRef.current.push(ateOrbColor);
       setPendingGrowth(g => g + TUNNEL_CONFIG.growthPerOrb - 1);
       setScore(s => s + 50 + (worm.length * 10));

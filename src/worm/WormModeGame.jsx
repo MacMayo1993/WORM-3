@@ -5,6 +5,7 @@
 import React, { createContext, useContext, useCallback, useRef } from 'react';
 import { useWormGame, useTunnelWormGame, WormMode3D, WormGameLoop, TunnelWormGameLoop } from './WormMode.jsx';
 import WormHUD from './WormHUD.jsx';
+import OrbInventoryHUD from './OrbInventoryHUD.jsx';
 import WormCamera from './WormCamera.jsx';
 
 // Context for sharing game state between Canvas and UI
@@ -65,6 +66,7 @@ function SurfaceWormModeProvider({ children, cubies, size, animState, onRotate, 
       tunnels: game.tunnels || [],
       speed: game.speed,
       orbsTotal: game.orbsTotal,
+      orbInventory: game.orbInventory || { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
       wormCameraEnabled: game.wormCameraEnabled,
       targetTunnelId: game.targetTunnelId || null,
       timeAlive: game.timeAlive || 0,
@@ -83,6 +85,7 @@ function SurfaceWormModeProvider({ children, cubies, size, animState, onRotate, 
     game.tunnels,
     game.speed,
     game.orbsTotal,
+    game.orbInventory,
     game.wormCameraEnabled,
     game.targetTunnelId,
     game.timeAlive,
@@ -118,6 +121,7 @@ function TunnelWormModeProvider({ children, cubies, size, animState, onRotate, o
       tunnels: game.tunnels || [],
       speed: game.speed,
       orbsTotal: game.orbsTotal,
+      orbInventory: game.orbInventory || { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
       wormCameraEnabled: game.wormCameraEnabled,
       targetTunnelId: game.targetTunnelId || null,
       timeAlive: game.timeAlive || 0,
@@ -136,6 +140,7 @@ function TunnelWormModeProvider({ children, cubies, size, animState, onRotate, o
     game.tunnels,
     game.speed,
     game.orbsTotal,
+    game.orbInventory,
     game.wormCameraEnabled,
     game.targetTunnelId,
     game.timeAlive,
@@ -237,6 +242,7 @@ export function WormModeHUD({ onQuit, gameData }) {
     tunnelsTraversed,
     speed,
     orbsTotal,
+    orbInventory,
     wormCameraEnabled,
     mode,
     timeAlive,
@@ -245,26 +251,32 @@ export function WormModeHUD({ onQuit, gameData }) {
 
   const isTunnelMode = mode === 'tunnel';
   const orbsCollected = orbsTotal - orbs.length;
+  const isPlaying = gameState === 'playing' || gameState === 'paused';
 
   return (
-    <WormHUD
-      score={score}
-      length={worm.length}
-      orbsRemaining={orbs.length}
-      orbsTotal={orbsTotal}
-      orbsCollected={orbsCollected}
-      warps={isTunnelMode ? tunnelsTraversed : warps}
-      warpsLabel={isTunnelMode ? 'TUNNELS' : 'WARPS'}
-      gameState={gameState}
-      speed={speed}
-      wormCameraEnabled={wormCameraEnabled}
-      mode={mode}
-      timeAlive={timeAlive || 0}
-      onPause={handlePause}
-      onResume={handleResume}
-      onRestart={restart}
-      onQuit={onQuit}
-    />
+    <>
+      <WormHUD
+        score={score}
+        length={worm.length}
+        orbsRemaining={orbs.length}
+        orbsTotal={orbsTotal}
+        orbsCollected={orbsCollected}
+        warps={isTunnelMode ? tunnelsTraversed : warps}
+        warpsLabel={isTunnelMode ? 'TUNNELS' : 'WARPS'}
+        gameState={gameState}
+        speed={speed}
+        wormCameraEnabled={wormCameraEnabled}
+        mode={mode}
+        timeAlive={timeAlive || 0}
+        onPause={handlePause}
+        onResume={handleResume}
+        onRestart={restart}
+        onQuit={onQuit}
+      />
+      {isPlaying && (
+        <OrbInventoryHUD orbInventory={orbInventory} />
+      )}
+    </>
   );
 }
 
