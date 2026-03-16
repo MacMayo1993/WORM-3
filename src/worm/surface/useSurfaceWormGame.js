@@ -11,6 +11,7 @@ import {
   turnWorm,
   spawnOrbs,
   updateWormAfterRotation,
+  pressState,
 } from '../wormLogic.js';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { resolveColors } from '../../utils/colorSchemes.js';
@@ -31,7 +32,7 @@ export function useWormGame(cubies, size, animState, onRotate) {
   const faceColors = useMemo(() => resolveColors(settings), [settings]);
 
   // ── Single reducer for all game state ──────────────────────────────────────
-  const [state, dispatch] = useReducer(surfaceReducer, null, () => makeSurfaceState(size));
+  const [state, dispatch] = useReducer(surfaceReducer, null, makeSurfaceState);
 
   // stateRef — always reflects the latest state so the game loop reads fresh values
   const stateRef = useRef(state);
@@ -50,10 +51,11 @@ export function useWormGame(cubies, size, animState, onRotate) {
     return Math.min(s, CONFIG.maxSpeed);
   }, [state.worm.length]);
 
-  // Initialize orbs on mount only
+  // Initialize worm + orbs together on mount (single dispatch — matches tunnel mode pattern)
   useEffect(() => {
-    const initialOrbs = spawnOrbs(cubies, size, CONFIG.initialOrbs, stateRef.current.worm, [], faceColors);
-    dispatch({ type: SA.INIT_ORBS, orbs: initialOrbs });
+    const worm = createInitialWorm(size);
+    const orbs = spawnOrbs(cubies, size, CONFIG.initialOrbs, worm, [], faceColors);
+    dispatch({ type: SA.INIT, worm, orbs });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -63,13 +65,14 @@ export function useWormGame(cubies, size, animState, onRotate) {
     const newOrbs = spawnOrbs(cubies, size, CONFIG.initialOrbs, newWorm, [], faceColors);
     dispatch({
       type: SA.RESTART,
-      state: { ...makeSurfaceState(size), worm: newWorm, orbs: newOrbs },
+      state: { ...makeSurfaceState(), worm: newWorm, orbs: newOrbs },
     });
     pendingGrowthColorsRef.current = [];
     lastOrbColorRef.current = null;
     lastMoveTime.current = 0;
     timeAliveAcc.current = 0;
     rotationQueue.current = [];
+    pressState.tiles.clear(); // ensure no stale pressed-tile state carries over
   }, [cubies, size, faceColors]);
 
   // Keyboard controls
@@ -96,6 +99,8 @@ export function useWormGame(cubies, size, animState, onRotate) {
 
       if (gameState !== 'playing') return;
 
+      // Cap at 2 queued rotations. Beyond that, inputs are dropped intentionally —
+      // buffering too many causes the cube to keep spinning long after the player stops.
       const queueRotation = (axis, dir, sliceIndex) => {
         if (rotationQueue.current.length < 2) {
           rotationQueue.current.push({ axis, dir, sliceIndex });

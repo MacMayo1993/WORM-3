@@ -17,13 +17,17 @@ import { resolveColors } from '../../utils/colorSchemes.js';
 import { tunnelReducer, makeTunnelState, TA } from './tunnelReducer.js';
 
 export const TUNNEL_CONFIG = {
-  initialOrbs: 15,       // Starting number of orbs in tunnels
-  baseSpeed: 0.6,        // Base tunnel progress per second (t units)
-  speedIncrement: 0.02,  // Speed increase per segment
-  maxSpeed: 1.2,         // Maximum speed
-  growthPerOrb: 1,       // Segments gained per orb
-  tunnelBonus: 50,       // Bonus for completing a tunnel
-  minFlipsForStart: 3    // Minimum flipped stickers needed to start tunnel mode
+  initialOrbs: 15,            // Starting number of orbs in tunnels
+  baseSpeed: 0.6,             // Base tunnel progress per second (t units)
+  speedIncrement: 0.02,       // Speed increase per segment
+  maxSpeed: 1.2,              // Maximum speed
+  growthPerOrb: 1,            // Segments gained per orb
+  tunnelBonus: 50,            // Score bonus for completing a tunnel transition
+  minFlipsForStart: 3,        // Minimum flipped stickers needed to start tunnel mode
+  // Orb pickup: how close (in t-units) the head must be to an orb to eat it.
+  // Intentionally wider than self-collision threshold (0.05) because orbs are
+  // stationary and the head approaches them gradually — a loose radius feels responsive.
+  orbCollisionThreshold: 0.15,
 };
 
 export function useTunnelWormGame(cubies, size, animState, onRotate) {
@@ -136,6 +140,8 @@ export function useTunnelWormGame(cubies, size, animState, onRotate) {
 
       if (gameState !== 'playing') return;
 
+      // Cap at 2 queued rotations. Beyond that, inputs are dropped intentionally —
+      // buffering too many causes the cube to keep spinning long after the player stops.
       const queueRotation = (axis, dir, sliceIndex) => {
         if (rotationQueue.current.length < 2) {
           rotationQueue.current.push({ axis, dir, sliceIndex });

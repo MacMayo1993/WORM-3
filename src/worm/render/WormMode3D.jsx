@@ -69,6 +69,8 @@ function WormTileHighlight({ segments, size, explosionFactor }) {
   const settings = useGameStore(s => s.settings);
   const faceColors = useMemo(() => resolveColors(settings), [settings]);
   const timeRef = useRef(0);
+  // Track whether there are tiles to animate; avoids material writes every frame when idle
+  const hasTilesRef = useRef(false);
 
   const tileData = useMemo(() => {
     return segments
@@ -87,7 +89,10 @@ function WormTileHighlight({ segments, size, explosionFactor }) {
       });
   }, [segments, size, explosionFactor, cubies, faceColors]);
 
+  hasTilesRef.current = tileData.length > 0;
+
   useFrame((_state, delta) => {
+    if (!hasTilesRef.current) return; // nothing to animate — skip material writes
     timeRef.current += delta;
     const opacity = 0.25 + Math.sin(timeRef.current * 6) * 0.15;
     // Update all materials each frame using precomputed list — no per-frame allocation

@@ -11,6 +11,17 @@ import * as THREE from 'three';
 // TUNNEL MODE - Worm travels INSIDE the cube through antipodal wormhole tunnels
 // ============================================================================
 
+// ── Tunnel mode named constants ──────────────────────────────────────────────
+// Spacing (in t-units) between initial worm segments when spawning inside a tunnel
+const INITIAL_SEGMENT_SPACING = 0.15;
+// Maximum world-space distance between a tunnel end and an adjacent tunnel end
+// for the two to be considered "connected" by findNextTunnel.
+const TUNNEL_ADJACENCY_DISTANCE = 3.0;
+// Self-collision detection threshold (in t-units). Intentionally narrow (3× smaller
+// than orbCollisionThreshold) to avoid false positives when re-entering a tunnel
+// whose own body segments are still near the entry portal.
+const TUNNEL_SELF_COLLISION_THRESHOLD = 0.05;
+
 /**
  * Tunnel segment position - represents a position inside a tunnel
  * @typedef {Object} TunnelPosition
@@ -182,7 +193,7 @@ export const createInitialTunnelWorm = (tunnels, initialLength = 3) => {
   const startTunnel = tunnels[Math.floor(Math.random() * tunnels.length)];
 
   const segments = [];
-  const spacing = 0.15; // Space between segments along tunnel
+  const spacing = INITIAL_SEGMENT_SPACING;
 
   for (let i = 0; i < initialLength; i++) {
     // Head at t=0.5, body segments behind
@@ -250,7 +261,7 @@ export const findNextTunnel = (exitPos, tunnels, excludeTunnelId, size, inactive
   }
 
   // Only return if within reasonable distance (adjacent or nearby)
-  return bestTunnel && bestDist < 3.0 ? bestTunnel : null;
+  return bestTunnel && bestDist < TUNNEL_ADJACENCY_DISTANCE ? bestTunnel : null;
 };
 
 /**
@@ -273,7 +284,7 @@ export const checkTunnelSelfCollision = (newHead, segments, isGrowing = false) =
   // Need at least 3 segments before a meaningful self-collision is possible.
   if (segments.length < 3) return false;
 
-  const collisionThreshold = 0.05;
+  const collisionThreshold = TUNNEL_SELF_COLLISION_THRESHOLD;
   const limit = isGrowing ? segments.length : segments.length - 1;
   // With the snake-following algorithm, body segments always trail directly
   // behind the head in the same tunnel (lower t for direction=1, higher t for
@@ -930,65 +941,7 @@ export const getPressedTileKeys = (wormSegments) => {
 };
 
 /**
- * Find all flipped surface tiles where every non-flipped surrounding neighbor
- * is currently occupied by a worm segment (healing condition met).
- * @param {Array} cubies - Cube state
- * @param {number} size - Cube size
- * @param {Array} wormSegments - Current worm segments
- * @returns {Array} Array of {x, y, z, dirKey} positions ready to be healed
- */
-export const checkHealingCandidates = (cubies, size, wormSegments) => {
-  const pressedKeys = getPressedTileKeys(wormSegments);
-  const candidates = [];
-
-  for (let x = 0; x < size; x++) {
-    for (let y = 0; y < size; y++) {
-      for (let z = 0; z < size; z++) {
-        const cubie = cubies[x]?.[y]?.[z];
-        if (!cubie) continue;
-
-        for (const dirKey of Object.keys(cubie.stickers || {})) {
-          const sticker = cubie.stickers[dirKey];
-          if (!sticker) continue;
-
-          // Only visible surface tiles
-          const isVisible =
-            (dirKey === 'PX' && x === size - 1) ||
-            (dirKey === 'NX' && x === 0) ||
-            (dirKey === 'PY' && y === size - 1) ||
-            (dirKey === 'NY' && y === 0) ||
-            (dirKey === 'PZ' && z === size - 1) ||
-            (dirKey === 'NZ' && z === 0);
-          if (!isVisible) continue;
-
-          // Must be a flipped (unstable) wormhole tile
-          if (sticker.curr === sticker.orig) continue;
-
-          // Get all 8 surrounding neighbors
-          const neighbors = getSurroundingNeighbors({ x, y, z, dirKey }, size);
-
-          // Only require non-flipped neighbors to be pressed
-          const nonFlippedNeighbors = neighbors.filter(n => {
-            const ns = cubies[n.x]?.[n.y]?.[n.z]?.stickers?.[n.dirKey];
-            return ns && ns.curr === ns.orig;
-          });
-
-          // Skip isolated wormhole clusters (surrounded entirely by other wormholes)
-          if (nonFlippedNeighbors.length === 0) continue;
-
-          // Healing fires when ALL non-flipped surrounding tiles are covered
-          const allPressed = nonFlippedNeighbors.every(n => pressedKeys.has(positionKey(n)));
-          if (allPressed) candidates.push({ x, y, z, dirKey });
-        }
-      }
-    }
-  }
-
-  return candidates;
-};
-
-/**
- * Narrowed healing scan (M1): checks only tiles in the 8-neighbor neighborhood
+ * Narrowed healing scan: checks only tiles in the 8-neighbor neighborhood
  * of the worm head instead of the full O(size³×6) surface scan.
  * @param {Array} cubies - Cube state
  * @param {number} size - Cube size

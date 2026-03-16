@@ -128,9 +128,8 @@ export function TunnelWormGameLoop({
     }
 
     // ── Orb collision — scan only the current tunnel's bucket instead of all orbs ──
-    const collisionThreshold = 0.15;
     const orbBucket = orbMapRef.current.get(newTunnelId);
-    const eatenOrb = orbBucket && orbBucket.find(orb => Math.abs(orb.t - newT) < collisionThreshold);
+    const eatenOrb = orbBucket && orbBucket.find(orb => Math.abs(orb.t - newT) < TUNNEL_CONFIG.orbCollisionThreshold);
     const ateOrb = eatenOrb !== undefined && eatenOrb !== null;
     let ateOrbColor = null;
 
@@ -173,6 +172,7 @@ export function TunnelWormGameLoop({
     if (ateOrb) {
       const newOrbs = s.orbs.filter(o => o !== eatenOrb);
       payload.orbs = newOrbs;
+      // newScore already includes tunnelBonus if a tunnel exit also occurred this tick
       payload.score = newScore + 50 + (s.worm.length * 10);
       payload.orbInventory = eatenOrb.faceId
         ? { ...s.orbInventory, [eatenOrb.faceId]: (s.orbInventory[eatenOrb.faceId] ?? 0) + 1 }
