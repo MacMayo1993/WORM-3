@@ -20,6 +20,7 @@ import { useGameStore } from '../../hooks/useGameStore.js';
 import { play } from '../../utils/audio.js';
 import { CONFIG } from './useSurfaceWormGame.js';
 import { SA } from './surfaceReducer.js';
+import { advanceStepClock } from '../shared/movementClock.js';
 
 export function SurfaceWormGameLoop({ cubies, size, animState, game }) {
   const {
@@ -90,15 +91,15 @@ export function SurfaceWormGameLoop({ cubies, size, animState, game }) {
     const newSecs = Math.floor(timeAliveAcc.current);
     const secondTicked = newSecs !== prevSecs;
 
-    // ── Movement interval check ──
-    lastMoveTime.current += delta;
+    // ── Movement interval check (shared fixed-step clock) ──
+    // stepHz = speed tiles/sec → one tile step per 1/speed seconds.
+    // advanceStepClock preserves remainder so timing drift does not accumulate.
     const speed = Math.min(CONFIG.baseSpeed + s.worm.length * CONFIG.speedIncrement, CONFIG.maxSpeed);
-    if (lastMoveTime.current < 1 / speed) {
+    const steps = advanceStepClock(lastMoveTime, delta, speed);
+    if (steps < 1) {
       if (secondTicked) dispatch({ type: SA.TICK_TIME, payload: { timeAlive: newSecs } });
       return;
     }
-
-    lastMoveTime.current = 0;
     needsHealCheckRef.current = true;
 
     const head = s.worm[0];
