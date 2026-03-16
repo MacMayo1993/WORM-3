@@ -1,12 +1,14 @@
 // src/worm/tunnel/TunnelWormGameLoop.jsx
-// Game loop component for WORM tunnel mode — must be inside Canvas for useFrame
+// Game loop component for WORM tunnel mode — must be inside Canvas for useFrame.
+// Dispatches a single reducer action per movement step instead of multiple setters,
+// eliminating stale-closure risk and producing a deterministic tick trace.
 
 import { useFrame } from '@react-three/fiber';
 import { findNextTunnel, checkTunnelSelfCollision } from '../wormLogic.js';
 import { play } from '../../utils/audio.js';
 import { TUNNEL_CONFIG } from './useTunnelWormGame.js';
+import { TA } from './tunnelReducer.js';
 
-// Game loop component for tunnel mode — must be inside Canvas for useFrame
 export function TunnelWormGameLoop({
   cubies: _cubies,
   size,
@@ -14,162 +16,162 @@ export function TunnelWormGameLoop({
   game // from useTunnelWormGame
 }) {
   const {
-    gameState,
-    worm,
-    orbs,
-    tunnels,
-    speed,
-    pendingGrowth,
-    pendingGrowthColorsRef,
-    lastOrbColorRef,
+    stateRef,
+    dispatch,
     lastMoveTime,
     timeAliveAcc,
-    setGameState,
-    setWorm,
-    setOrbs,
-    setScore,
-    setTunnelsTraversed,
-    setPendingGrowth,
-    setOrbInventory,
-    setTargetTunnelId,
-    setTimeAlive,
-    inactiveTunnelSides,
-    setInactiveTunnelSides,
+    lastOrbColorRef,
+    pendingGrowthColorsRef,
   } = game;
 
   useFrame((_state, delta) => {
-    if (gameState !== 'playing') return;
+    const s = stateRef.current; // always-fresh state — no stale closure
+    if (s.gameState !== 'playing') return;
     if (animState) return;
-    if (worm.length === 0 || tunnels.length === 0) return;
+    if (s.worm.length === 0 || s.tunnels.length === 0) return;
 
-    // Track time alive (update display state at whole-second boundaries)
+    // ── Time alive (update display state at whole-second boundaries) ──
     const prevSecs = Math.floor(timeAliveAcc.current);
     timeAliveAcc.current += delta;
     const newSecs = Math.floor(timeAliveAcc.current);
-    if (newSecs !== prevSecs) setTimeAlive(newSecs);
+    const secondTicked = newSecs !== prevSecs;
 
     lastMoveTime.current += delta;
 
-    // Continuous movement through tunnel
+    // ── Continuous movement through tunnel ──
+    const speed = Math.min(
+      TUNNEL_CONFIG.baseSpeed + s.worm.length * TUNNEL_CONFIG.speedIncrement,
+      TUNNEL_CONFIG.maxSpeed
+    );
     const moveAmount = speed * delta;
 
-    const head = worm[0];
-    if (!head || !head.tunnel) return;
+    const head = s.worm[0];
+    if (!head || !head.tunnel) {
+      if (secondTicked) dispatch({ type: TA.TICK_TIME, payload: { timeAlive: newSecs } });
+      return;
+    }
 
-    // Advance worm through tunnel
     const movementDir = head.direction ?? 1;
     let newT = head.t + (moveAmount * movementDir);
     let newTunnelId = head.tunnelId;
     let newTunnel = head.tunnel;
     let newDirection = movementDir;
+    let tunnelExitOccurred = false;
+    let newInactiveTunnelSides = s.inactiveTunnelSides;
+    let newTunnelsTraversed = s.tunnelsTraversed;
+    let newScore = s.score;
 
-    // Check if we've reached the end of the tunnel
+    // ── Tunnel boundary check ──
     if (newT >= 1.0 || newT <= 0.0) {
-      // Exited tunnel - find next tunnel to enter
       const exitedFromEntry = newT <= 0.0;
       const exitPos = exitedFromEntry ? head.tunnel.entry : head.tunnel.exit;
-      const nextTunnelInfo = findNextTunnel(exitPos, tunnels, head.tunnelId, size, inactiveTunnelSides);
+      const nextTunnelInfo = findNextTunnel(exitPos, s.tunnels, head.tunnelId, size, s.inactiveTunnelSides);
 
       if (nextTunnelInfo) {
-        // Entering from this side consumes only that side; opposite side remains usable.
-        setInactiveTunnelSides(prev => {
-          const next = new Set(prev);
-          next.add(nextTunnelInfo.enteredSideKey);
-          return next;
-        });
-
+        const next = new Set(s.inactiveTunnelSides);
+        next.add(nextTunnelInfo.enteredSideKey);
+        newInactiveTunnelSides = next;
         newTunnel = nextTunnelInfo.tunnel;
         newTunnelId = newTunnel.id;
-        // Enter from appropriate end
         newT = nextTunnelInfo.enterFromEntry ? 0.0 : 1.0;
-        // If entering from exit, travel backwards (decreasing t).
         newDirection = nextTunnelInfo.enterFromEntry ? 1 : -1;
-        setTunnelsTraversed(t => t + 1);
-        setScore(s => s + TUNNEL_CONFIG.tunnelBonus);
-        play('/sounds/warp.mp3');
+        newTunnelsTraversed = s.tunnelsTraversed + 1;
+        newScore += TUNNEL_CONFIG.tunnelBonus;
+        tunnelExitOccurred = true;
       } else {
-        // No connected tunnel - game over or bounce back
-        setGameState('gameover');
+        dispatch({ type: TA.GAMEOVER });
         play('/sounds/gameover.mp3');
         return;
       }
     }
 
-    // Determine growth state BEFORE collision check so we can exclude the tail
-    // correctly — when growing, the tail stays; when not growing, it vacates.
-    const growing = pendingGrowth > 0;
-
-    // Check for self-collision
+    // ── Self-collision check ──
+    const growing = s.pendingGrowth > 0;
     const newHead = {
       tunnelId: newTunnelId,
       t: Math.max(0, Math.min(1, newT)),
       tunnel: newTunnel,
-      direction: newDirection
+      direction: newDirection,
     };
-    if (checkTunnelSelfCollision(newHead, worm, growing)) {
-      setGameState('gameover');
+
+    if (checkTunnelSelfCollision(newHead, s.worm, growing)) {
+      dispatch({ type: TA.GAMEOVER });
       play('/sounds/gameover.mp3');
       return;
     }
 
-    // Check for orb collision
+    // ── Orb collision ──
     const collisionThreshold = 0.15;
-    const orbIndex = orbs.findIndex(orb =>
+    const orbIndex = s.orbs.findIndex(orb =>
       orb.tunnelId === newTunnelId &&
       Math.abs(orb.t - newT) < collisionThreshold
     );
-
-    // ateOrbColor set this frame so color applies immediately (avoids stale pendingGrowth)
+    const ateOrb = orbIndex !== -1;
     let ateOrbColor = null;
-    if (orbIndex !== -1) {
-      const eatenOrb = orbs[orbIndex];
+
+    if (ateOrb) {
+      const eatenOrb = s.orbs[orbIndex];
       ateOrbColor = eatenOrb.color ?? null;
       lastOrbColorRef.current = ateOrbColor;
-      setOrbs(prev => prev.filter((_, i) => i !== orbIndex));
-      // Track orb in color inventory
-      if (eatenOrb.faceId) {
-        setOrbInventory(prev => ({ ...prev, [eatenOrb.faceId]: (prev[eatenOrb.faceId] ?? 0) + 1 }));
-      }
       for (let g = 1; g < TUNNEL_CONFIG.growthPerOrb; g++) pendingGrowthColorsRef.current.push(ateOrbColor);
-      setPendingGrowth(g => g + TUNNEL_CONFIG.growthPerOrb - 1);
-      setScore(s => s + 50 + (worm.length * 10));
-      play('/sounds/eat.mp3');
-
-      // Update target tunnel
-      const remainingOrbs = orbs.filter((_, i) => i !== orbIndex);
-      if (remainingOrbs.length > 0) {
-        setTargetTunnelId(remainingOrbs[0].tunnelId);
-      }
-
-      if (orbs.length === 1) {
-        setGameState('victory');
-        play('/sounds/victory.mp3');
-      }
     }
 
-    // segColor keeps the worm colored after an orb pickup
-    const segColor = lastOrbColorRef.current;
-
-    // Update worm positions
+    // ── Build new worm ──
+    const segColor = ateOrbColor ?? lastOrbColorRef.current;
+    let newPendingGrowth = s.pendingGrowth;
     let growthColor;
     let effectiveGrowing = growing;
-    if (ateOrbColor !== null) {
-      growthColor = ateOrbColor; // use orb color immediately
-      effectiveGrowing = true;   // grow this frame without waiting for pendingGrowth state
+
+    if (ateOrb) {
+      growthColor = ateOrbColor;
+      effectiveGrowing = true;
+      newPendingGrowth = s.pendingGrowth + TUNNEL_CONFIG.growthPerOrb - 1;
     } else {
       growthColor = growing ? (pendingGrowthColorsRef.current.shift() ?? segColor) : segColor;
-      if (growing) setPendingGrowth(g => g - 1);
+      if (growing) newPendingGrowth = s.pendingGrowth - 1;
     }
 
-    setWorm(prev => {
-      // Standard snake algorithm: new head prepended, each existing segment
-      // takes the position of the one in front of it (old head → seg[0], etc.).
-      // This makes the body flow through tunnels behind the head instead of
-      // staying frozen, which prevents false self-collision when the head
-      // re-enters a tunnel the body hasn't vacated yet.
-      const head = growthColor ? { ...newHead, color: growthColor } : newHead;
-      return effectiveGrowing ? [head, ...prev] : [head, ...prev].slice(0, -1);
-    });
+    const coloredHead = growthColor ? { ...newHead, color: growthColor } : newHead;
+    const newWorm = effectiveGrowing
+      ? [coloredHead, ...s.worm]
+      : [coloredHead, ...s.worm].slice(0, -1);
+
+    // ── Build single payload for this tick ──
+    const payload = {
+      worm: newWorm,
+      pendingGrowth: newPendingGrowth,
+      score: newScore,
+      tunnelsTraversed: newTunnelsTraversed,
+      inactiveTunnelSides: newInactiveTunnelSides,
+    };
+    if (secondTicked) payload.timeAlive = newSecs;
+
+    if (ateOrb) {
+      const newOrbs = s.orbs.filter((_, i) => i !== orbIndex);
+      const eatenOrb = s.orbs[orbIndex];
+      payload.orbs = newOrbs;
+      payload.score = newScore + 50 + (s.worm.length * 10);
+      payload.orbInventory = eatenOrb.faceId
+        ? { ...s.orbInventory, [eatenOrb.faceId]: (s.orbInventory[eatenOrb.faceId] ?? 0) + 1 }
+        : s.orbInventory;
+      payload.targetTunnelId = newOrbs.length > 0 ? newOrbs[0].tunnelId : s.targetTunnelId;
+
+      if (newOrbs.length === 0) {
+        dispatch({ type: TA.VICTORY });
+        play('/sounds/eat.mp3');
+        play('/sounds/victory.mp3');
+        return;
+      }
+
+      dispatch({ type: TA.STEP_EAT, payload });
+      play('/sounds/eat.mp3');
+      if (tunnelExitOccurred) play('/sounds/warp.mp3');
+    } else if (tunnelExitOccurred) {
+      dispatch({ type: TA.STEP_TUNNEL_EXIT, payload });
+      play('/sounds/warp.mp3');
+    } else {
+      dispatch({ type: TA.STEP, payload });
+    }
   });
 
   return null;
