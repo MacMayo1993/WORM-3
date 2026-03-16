@@ -7,6 +7,7 @@ import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { resolveColors } from '../utils/colorSchemes.js';
 import { ANTIPODAL_COLOR } from '../utils/constants.js';
+import OrbInventoryHUD from './OrbInventoryHUD.jsx';
 
 const PHASE_META = {
     crawling: { label: 'CRAWLING', accent: '#38bdf8' },
@@ -384,7 +385,7 @@ const NEW_GAME_BTN_STYLE = {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSize = 3, onHome, onSettings, wormAlive = true, showDeathMenu = false, deathDetails = null, onRetry, onNewGame }) {
-    const { wormSpeed, wormHealedCount, wormBodyTiles, wormholeCountdown, wormControlMode, wormTimeAlive, wormTunnelCount, wormColor, settings, setWormSpeed, toggleWormControlMode } = useGameStore(
+    const { wormSpeed, wormHealedCount, wormBodyTiles, wormholeCountdown, wormControlMode, wormTimeAlive, wormTunnelCount, wormColor, wormOrbInventory, settings, setWormSpeed, toggleWormControlMode } = useGameStore(
         useShallow(s => ({
             wormSpeed: s.wormSpeed ?? 1.0,
             wormHealedCount: s.wormHealedCount ?? 0,
@@ -394,6 +395,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
             wormTimeAlive: s.wormTimeAlive ?? 0,
             wormTunnelCount: s.wormTunnelCount ?? 0,
             wormColor: s.wormColor ?? '#33ff66',
+            wormOrbInventory: s.wormOrbInventory ?? { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
             settings: s.settings,
             setWormSpeed: s.setWormSpeed,
             toggleWormControlMode: s.toggleWormControlMode,
@@ -539,6 +541,8 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                 ))}
             </div>
 
+
+            {wormAlive && <OrbInventoryHUD orbInventory={wormOrbInventory} />}
 
             {showDeathMenu && (
                 <div style={DEATH_OVERLAY_STYLE}>

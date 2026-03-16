@@ -273,11 +273,15 @@ function useWormCrawler(size, cubies) {
     // Colors of each collected orb, in pickup order — used by WormBody to color segments
     const orbPickupColorsRef = useRef([]);
 
-    const applyOrbPickupGrowth = (color) => {
+    const applyOrbPickupGrowth = (color, faceId) => {
         tailLength.current = Math.min(tailLength.current + ORB_SEGMENT_GROWTH, MAX_TAIL);
         orbPickupColorsRef.current = [...orbPickupColorsRef.current, color];
         const orbCountOnWorm = Math.max(0, Math.floor((tailLength.current - BASE_TAIL_LENGTH) / ORB_SEGMENT_GROWTH));
         useGameStore.getState().setWormBodyTiles(orbCountOnWorm);
+        if (faceId) {
+            const prev = useGameStore.getState().wormOrbInventory ?? { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
+            useGameStore.getState().setWormOrbInventory({ ...prev, [faceId]: (prev[faceId] ?? 0) + 1 });
+        }
     };
 
     const spawnWormholePair = () => {
@@ -523,7 +527,7 @@ function useWormCrawler(size, cubies) {
                     const pickedSticker = cubies?.[pickedUp.x]?.[pickedUp.y]?.[pickedUp.z]?.stickers?.[pickedUp.dirKey];
                     const pickedFaceId = pickedSticker ? pickedSticker.curr : 0;
                     const pickedColor = resolveColors(useGameStore.getState().settings)[pickedFaceId] ?? '#22ff88';
-                    applyOrbPickupGrowth(pickedColor);
+                    applyOrbPickupGrowth(pickedColor, pickedFaceId);
                     const newPowerup = { ...randomFreeTile(size, [...powerupsRef.current, pos.current]), type: 'apple' };
                     const next = [...powerupsRef.current];
                     next[puIdx] = newPowerup;
@@ -671,6 +675,7 @@ function useWormCrawler(size, cubies) {
         useGameStore.setState({
             wormPowerups: initial,
             wormBodyTiles: 0,
+            wormOrbInventory: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
             wormHealedCount: 0,
             wormholeCountdown: wormholeInterval,
             wormAlive: true,
