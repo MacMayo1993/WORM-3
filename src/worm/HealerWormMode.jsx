@@ -3,13 +3,14 @@
 // Chase camera follows the worm crawling on the cube exterior.
 // Disparity Level 1 runs in background. Flipped tiles are instant wormholes; jump to clear them.
 
-import React, { useRef, useCallback, useEffect, useState } from 'react';
+import React, { useRef, useCallback, useEffect, useState, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
+import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { getStickerWorldPos } from '../game/coordinates.js';
-import { getNextSurfacePosition, getActiveTunnels, getTunnelWorldPos, turnWorm, getStableKey } from './wormLogic.js';
+import { getNextSurfacePosition, getActiveTunnels, getTunnelWorldPos, turnWorm, getStableKey, findStickerByStableKey } from './wormLogic.js';
 import { buildManifoldGridMap, flipStickerPair } from '../game/manifoldLogic.js';
 import { healSticker } from '../game/cubeState.js';
 import { rotateVec90 } from '../game/cubeRotation.js';
@@ -1486,6 +1487,55 @@ const POLES_PER_TILE = 4;
 const TAPES_PER_TILE = 4;
 const FRAME_SEGMENTS_PER_VOID = 4;
 
+const _isMobile = typeof window !== 'undefined' && (window.innerWidth <= 768 || 'ontouchstart' in window);
+
+function TunnelHealProgress({ size }) {
+    const healingProgress = useGameStore((s) => s.wormHealingProgress ?? {});
+    const cubies = useGameStore((s) => s.debouncedCubies ?? s.cubies);
+    const faceColors = useGameStore((s) => {
+        const settings = s.settings ?? { colorScheme: 'standard' };
+        return resolveColors(settings, settings?.biomeMode?.faceAssignment) || {};
+    });
+
+    const entries = useMemo(() => {
+        return Object.entries(healingProgress)
+            .filter(([, p]) => p.deposited > 0 && p.deposited < HEAL_COST)
+            .map(([key, p]) => {
+                const pos = findStickerByStableKey(cubies, size, key);
+                if (!pos) return null;
+                const wp = getStickerWorldPos(pos.x, pos.y, pos.z, pos.dirKey, size, 0.55);
+                if (!wp) return null;
+                return { key, wp, remaining: HEAL_COST - p.deposited, faceId: p.faceId };
+            })
+            .filter(Boolean);
+    }, [healingProgress, cubies, size]);
+
+    if (entries.length === 0) return null;
+
+    return (
+        <>
+            {entries.map(({ key, wp, remaining, faceId }) => {
+                const color = faceColors[faceId] ?? '#ffffff';
+                return (
+                    <Html key={key} position={[wp.x, wp.y, wp.z]} center>
+                        <div style={{
+                            color,
+                            fontSize: _isMobile ? '18px' : '14px',
+                            fontWeight: 'bold',
+                            fontFamily: "'Courier New', monospace",
+                            textShadow: `0 0 6px ${color}, 0 0 12px ${color}88`,
+                            pointerEvents: 'none',
+                            userSelect: 'none',
+                        }}>
+                            {remaining}
+                        </div>
+                    </Html>
+                );
+            })}
+        </>
+    );
+}
+
 function WormholeRings({ cubies, size, voidTunnelKeysRef, tunnelUseCountsRef }) {
     const liveRef = useRef();       // live wormhole rings (neon pink)
     const voidOuterRef = useRef();  // void outer ring (sickly green, slow reverse)
@@ -2021,6 +2071,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             <WormFace worm={worm} size={size} />
             <PortalGlow worm={worm} size={size} />
             <WormholeRings cubies={cubies} size={size} voidTunnelKeysRef={worm.voidTunnelKeysRef} tunnelUseCountsRef={worm.tunnelUseCountsRef} />
+            <TunnelHealProgress size={size} />
             <PowerupOrbs size={size} />
         </>
     );
