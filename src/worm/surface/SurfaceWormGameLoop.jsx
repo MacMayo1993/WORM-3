@@ -9,7 +9,6 @@ import {
   getAntipodalPosition,
   checkSelfCollision,
   positionKey,
-  spawnOrbs,
   pressState,
   getPressedTileKeys,
   checkHealingCandidates,
