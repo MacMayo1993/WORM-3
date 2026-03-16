@@ -8,6 +8,7 @@ import { findNextTunnel, checkTunnelSelfCollision } from '../wormLogic.js';
 import { play } from '../../utils/audio.js';
 import { TUNNEL_CONFIG } from './useTunnelWormGame.js';
 import { TA } from './tunnelReducer.js';
+import { advanceStepClock, SIMULATION_HZ, FIXED_DT } from '../shared/movementClock.js';
 
 export function TunnelWormGameLoop({
   cubies: _cubies,
@@ -36,14 +37,20 @@ export function TunnelWormGameLoop({
     const newSecs = Math.floor(timeAliveAcc.current);
     const secondTicked = newSecs !== prevSecs;
 
-    lastMoveTime.current += delta;
-
-    // ── Continuous movement through tunnel ──
+    // ── Fixed-step movement clock (shared with surface mode) ──
+    // Steps at SIMULATION_HZ so tunnel advance is frame-rate independent.
+    // Each step advances speed * FIXED_DT in t-space (same concept as surface's
+    // "one tile per step", just with a continuous position instead of a discrete tile).
     const speed = Math.min(
       TUNNEL_CONFIG.baseSpeed + s.worm.length * TUNNEL_CONFIG.speedIncrement,
       TUNNEL_CONFIG.maxSpeed
     );
-    const moveAmount = speed * delta;
+    const steps = advanceStepClock(lastMoveTime, delta, SIMULATION_HZ);
+    if (steps < 1) {
+      if (secondTicked) dispatch({ type: TA.TICK_TIME, payload: { timeAlive: newSecs } });
+      return;
+    }
+    const moveAmount = speed * steps * FIXED_DT;
 
     const head = s.worm[0];
     if (!head || !head.tunnel) {
