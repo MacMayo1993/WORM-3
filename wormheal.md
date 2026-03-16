@@ -23,17 +23,17 @@ When the worm enters a tunnel, it automatically deposits matching-color orbs fro
 ## Progress Tracker
 
 ### Step 1 — Orb Inventory State & HUD
-- [ ] 1.1 Add `faceId` field to surface-mode orb objects in `spawnOrbs()` (`wormLogic.js`)
-- [ ] 1.2 Add `faceId` field to tunnel-mode orb objects in `spawnTunnelOrbs()` (`wormLogic.js`)
-- [ ] 1.3 Add `orbInventory` state (`{ 1:0, 2:0, 3:0, 4:0, 5:0, 6:0 }`) to `useWormGame` (`WormMode.jsx`)
-- [ ] 1.4 Add `orbInventory` state to `useTunnelWormGame` (`WormMode.jsx`)
-- [ ] 1.5 Reset `orbInventory` in both `restart` handlers
-- [ ] 1.6 Wire `setOrbInventory` into `WormGameLoop`: increment `orbInventory[faceId]` when orb is eaten
-- [ ] 1.7 Wire `setOrbInventory` into `TunnelWormGameLoop`: increment `orbInventory[faceId]` when orb is eaten
-- [ ] 1.8 Expose `orbInventory` and `setOrbInventory` from both hooks' return objects
-- [ ] 1.9 Pass `orbInventory` through context in `WormModeGame.jsx` (add to `onGameStateChange` payload)
-- [ ] 1.10 Create `src/worm/OrbInventoryHUD.jsx` — color-coded orb count display
-- [ ] 1.11 Render `OrbInventoryHUD` inside `WormModeHUD` in `WormModeGame.jsx`
+- [x] 1.1 Add `faceId` field to surface-mode orb objects in `spawnOrbs()` (`wormLogic.js`)
+- [x] 1.2 Add `faceId` field to tunnel-mode orb objects in `spawnTunnelOrbs()` (`wormLogic.js`)
+- [x] 1.3 Add `orbInventory` state (`{ 1:0, 2:0, 3:0, 4:0, 5:0, 6:0 }`) to `useWormGame` (`WormMode.jsx`)
+- [x] 1.4 Add `orbInventory` state to `useTunnelWormGame` (`WormMode.jsx`)
+- [x] 1.5 Reset `orbInventory` in both `restart` handlers
+- [x] 1.6 Wire `setOrbInventory` into `WormGameLoop`: increment `orbInventory[faceId]` when orb is eaten
+- [x] 1.7 Wire `setOrbInventory` into `TunnelWormGameLoop`: increment `orbInventory[faceId]` when orb is eaten
+- [x] 1.8 Expose `orbInventory` and `setOrbInventory` from both hooks' return objects
+- [x] 1.9 Pass `orbInventory` through context in `WormModeGame.jsx` (add to `onGameStateChange` payload)
+- [x] 1.10 Create `src/worm/OrbInventoryHUD.jsx` — color-coded orb count display
+- [x] 1.11 Render `OrbInventoryHUD` inside `WormModeHUD` in `WormModeGame.jsx`
 
 **Test:** Eat orbs in both surface and tunnel mode, confirm counts appear and increment correctly.
 
