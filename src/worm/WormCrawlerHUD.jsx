@@ -542,7 +542,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
             </div>
 
 
-            {wormAlive && <OrbInventoryHUD orbInventory={wormOrbInventory} />}
+            {wormAlive && <OrbInventoryHUD orbInventory={wormOrbInventory} faceColors={resolvedFaceColors} />}
 
             {showDeathMenu && (
                 <div style={DEATH_OVERLAY_STYLE}>

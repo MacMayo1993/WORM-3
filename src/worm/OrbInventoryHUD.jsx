@@ -2,25 +2,15 @@
 // Displays the worm's current color orb inventory — used for tunnel healing
 
 import React from 'react';
-import { useGameStore } from '../hooks/useGameStore.js';
-import { useShallow } from 'zustand/react/shallow';
-import { resolveColors } from '../utils/colorSchemes.js';
 
 const isMobile = typeof window !== 'undefined' && (window.innerWidth <= 768 || 'ontouchstart' in window);
 
-// Ordered display: face IDs 1–6
 const FACE_ORDER = [1, 2, 3, 4, 5, 6];
 
-export default function OrbInventoryHUD({ orbInventory }) {
-  const settings = useGameStore(useShallow(s => s.settings));
-  if (!orbInventory || !settings) return null;
+export default function OrbInventoryHUD({ orbInventory, faceColors }) {
+  if (!orbInventory || !faceColors) return null;
 
-  // Resolve the active color palette so orb dots match the tiles the player sees
-  const faceColors = resolveColors(settings);
-
-  // Only show faces that have at least 1 orb
   const activeEntries = FACE_ORDER.filter(faceId => (orbInventory[faceId] ?? 0) > 0);
-
   if (activeEntries.length === 0) return null;
 
   return (
@@ -30,12 +20,10 @@ export default function OrbInventoryHUD({ orbInventory }) {
         {activeEntries.map(faceId => {
           const count = orbInventory[faceId];
           const color = faceColors[faceId] ?? '#888888';
-          // Compute perceived lightness to decide if we need a border for contrast
           const r = parseInt(color.slice(1, 3), 16);
           const g = parseInt(color.slice(3, 5), 16);
           const b = parseInt(color.slice(5, 7), 16);
-          const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-          const isLight = luminance > 0.85;
+          const isLight = (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.85;
           return (
             <div key={faceId} style={styles.entry}>
               <div
@@ -46,9 +34,7 @@ export default function OrbInventoryHUD({ orbInventory }) {
                   border: isLight ? '1px solid #888' : 'none',
                 }}
               />
-              <span style={{ ...styles.count, color }}>
-                {count}
-              </span>
+              <span style={{ ...styles.count, color }}>{count}</span>
             </div>
           );
         })}
