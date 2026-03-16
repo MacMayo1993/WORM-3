@@ -37,6 +37,12 @@ export function SurfaceWormGameLoop({ cubies, size, animState, game }) {
   // Healing scan is O(size³×6) — only run it after the worm steps onto a new tile.
   const needsHealCheckRef = useRef(false);
 
+  // ── Orb spatial map: positionKey → orb (O(1) lookup) ──────────────────────
+  // Rebuilt lazily only when the orbs array reference changes (i.e. after an eat
+  // or restart), not every frame. During normal play the map is reused as-is.
+  const lastOrbsRef = useRef(null);
+  const orbMapRef = useRef(new Map());
+
   // Clear press state on unmount so tiles don't stay depressed after leaving worm mode
   useEffect(() => {
     return () => { pressState.tiles.clear(); };
@@ -136,14 +142,20 @@ export function SurfaceWormGameLoop({ cubies, size, animState, game }) {
       return;
     }
 
-    // ── Orb collision ──
-    const orbKey = positionKey(finalPos);
-    const orbIndex = s.orbs.findIndex(o => positionKey(o) === orbKey);
-    const ateOrb = orbIndex !== -1;
+    // ── Orb spatial map: rebuild if orbs array was replaced (eat / restart) ──
+    if (s.orbs !== lastOrbsRef.current) {
+      lastOrbsRef.current = s.orbs;
+      const m = new Map();
+      for (const orb of s.orbs) m.set(positionKey(orb), orb);
+      orbMapRef.current = m;
+    }
+
+    // ── Orb collision — O(1) map lookup instead of O(n) findIndex ──
+    const eatenOrb = orbMapRef.current.get(positionKey(finalPos));
+    const ateOrb = eatenOrb !== undefined;
     let ateOrbColor = null;
 
     if (ateOrb) {
-      const eatenOrb = s.orbs[orbIndex];
       ateOrbColor = eatenOrb.color ?? null;
       lastOrbColorRef.current = ateOrbColor;
       // Queue extra growth colors for growthPerOrb > 1
@@ -177,8 +189,7 @@ export function SurfaceWormGameLoop({ cubies, size, animState, game }) {
     if (secondTicked) payload.timeAlive = newSecs;
 
     if (ateOrb) {
-      const newOrbs = s.orbs.filter((_, i) => i !== orbIndex);
-      const eatenOrb = s.orbs[orbIndex];
+      const newOrbs = s.orbs.filter(o => o !== eatenOrb);
       payload.orbs = newOrbs;
       payload.score = s.score + 50 + (s.worm.length * 10) + (warpOccurred ? CONFIG.warpBonus : 0);
       payload.orbInventory = eatenOrb.faceId

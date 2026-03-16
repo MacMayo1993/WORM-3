@@ -3,6 +3,7 @@
 // Dispatches a single reducer action per movement step instead of multiple setters,
 // eliminating stale-closure risk and producing a deterministic tick trace.
 
+import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { findNextTunnel, checkTunnelSelfCollision } from '../wormLogic.js';
 import { play } from '../../utils/audio.js';
@@ -24,6 +25,11 @@ export function TunnelWormGameLoop({
     lastOrbColorRef,
     pendingGrowthColorsRef,
   } = game;
+
+  // ── Orb spatial map: tunnelId → orb[] bucket (narrows scan to current tunnel) ──
+  // Rebuilt lazily only when the orbs array reference changes (eat / restart).
+  const lastOrbsRef = useRef(null);
+  const orbMapRef = useRef(new Map());
 
   useFrame((_state, delta) => {
     const s = stateRef.current; // always-fresh state — no stale closure
@@ -107,17 +113,26 @@ export function TunnelWormGameLoop({
       return;
     }
 
-    // ── Orb collision ──
+    // ── Orb spatial map: rebuild if orbs array was replaced (eat / restart) ──
+    if (s.orbs !== lastOrbsRef.current) {
+      lastOrbsRef.current = s.orbs;
+      const m = new Map();
+      for (const orb of s.orbs) {
+        let bucket = m.get(orb.tunnelId);
+        if (!bucket) { bucket = []; m.set(orb.tunnelId, bucket); }
+        bucket.push(orb);
+      }
+      orbMapRef.current = m;
+    }
+
+    // ── Orb collision — scan only the current tunnel's bucket instead of all orbs ──
     const collisionThreshold = 0.15;
-    const orbIndex = s.orbs.findIndex(orb =>
-      orb.tunnelId === newTunnelId &&
-      Math.abs(orb.t - newT) < collisionThreshold
-    );
-    const ateOrb = orbIndex !== -1;
+    const orbBucket = orbMapRef.current.get(newTunnelId);
+    const eatenOrb = orbBucket && orbBucket.find(orb => Math.abs(orb.t - newT) < collisionThreshold);
+    const ateOrb = eatenOrb !== undefined && eatenOrb !== null;
     let ateOrbColor = null;
 
     if (ateOrb) {
-      const eatenOrb = s.orbs[orbIndex];
       ateOrbColor = eatenOrb.color ?? null;
       lastOrbColorRef.current = ateOrbColor;
       for (let g = 1; g < TUNNEL_CONFIG.growthPerOrb; g++) pendingGrowthColorsRef.current.push(ateOrbColor);
@@ -154,8 +169,7 @@ export function TunnelWormGameLoop({
     if (secondTicked) payload.timeAlive = newSecs;
 
     if (ateOrb) {
-      const newOrbs = s.orbs.filter((_, i) => i !== orbIndex);
-      const eatenOrb = s.orbs[orbIndex];
+      const newOrbs = s.orbs.filter(o => o !== eatenOrb);
       payload.orbs = newOrbs;
       payload.score = newScore + 50 + (s.worm.length * 10);
       payload.orbInventory = eatenOrb.faceId
