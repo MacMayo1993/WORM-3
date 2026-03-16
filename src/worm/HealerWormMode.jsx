@@ -1517,7 +1517,7 @@ function TunnelHealProgress({ size }) {
             {entries.map(({ key, wp, remaining, faceId }) => {
                 const color = faceColors[faceId] ?? '#ffffff';
                 return (
-                    <Html key={key} position={[wp.x, wp.y, wp.z]} center>
+                    <Html key={key} position={[wp[0], wp[1], wp[2]]} center>
                         <div style={{
                             color,
                             fontSize: _isMobile ? '18px' : '14px',
