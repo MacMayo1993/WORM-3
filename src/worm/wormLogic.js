@@ -302,6 +302,7 @@ export const spawnTunnelOrbs = (tunnels, count, wormSegments = [], faceColors = 
           tunnelId: tunnel.id,
           t,
           tunnel,
+          faceId: tunnel.entryColor,
           color: faceColors[tunnel.entryColor] || '#ffd700'
         });
         usedTunnels.add(`${tunnel.id}-${t}`);
@@ -318,6 +319,7 @@ export const spawnTunnelOrbs = (tunnels, count, wormSegments = [], faceColors = 
       tunnelId: tunnel.id,
       t,
       tunnel,
+      faceId: tunnel.entryColor,
       color: faceColors[tunnel.entryColor] || '#ffd700'
     });
   }
@@ -703,7 +705,7 @@ export const spawnOrbs = (cubies, size, count, wormSegments = [], existingOrbs =
             const pos = { x, y, z, dirKey };
             if (!occupied.has(positionKey(pos))) {
               const faceId = cubie.stickers[dirKey].curr;
-              validPositions.push({ ...pos, color: faceColors[faceId] });
+              validPositions.push({ ...pos, faceId, color: faceColors[faceId] });
             }
           }
         }
