@@ -44,7 +44,6 @@ import {
     BASE_TAIL_LENGTH,
     DEFAULT_WORMHOLE_FLIP_INTERVAL,
     MAX_JUMPS,
-    MAX_POWERUP_RENDER,
     TUNNEL_TRIGGER_PROGRESS,
     SELF_COLLISION_TRIGGER_PROGRESS,
     SELF_COLLISION_GRACE_STEPS_AFTER_TUNNEL,
@@ -57,6 +56,7 @@ import {
     randomFreeTile,
     randomUnflippedTile,
 } from './healerWorm/surfaceTiles.js';
+import ParityOrbs from './ParityOrb.jsx';
 
 // ─── Tile position rotation helper ───────────────────────────────────────────
 // Transforms a {x, y, z, dirKey} surface tile through a cube slice rotation.
@@ -1323,77 +1323,26 @@ function WormFace({ worm, size }) {
 
 // ─── Powerup Orbs ─────────────────────────────────────────────────────────────
 // Each orb inherits the color of the sticker tile it sits on and follows
-// that tile through cube rotations.
-const _orbDefaultNormal = new THREE.Vector3(0, 0, 1);
+// that tile through cube rotations. Rendered using the shared ParityOrbs component.
 function PowerupOrbs({ size }) {
-    const groupRef = useRef();
-    // Direct material refs — populated via callback refs, no React.createRef() overhead
-    const matsRef = useRef([]);
-    // Cached sticker face IDs (int 1-6) per slot — avoids getStyle() string comparison each frame
-    const lastStickerIdsRef = useRef(new Int8Array(MAX_POWERUP_RENDER).fill(-1));
-    // Resolved color scheme, kept in sync with settings via a store subscription
-    const resolvedColorsRef = useRef({});
-    useEffect(() => {
-        // Initialize immediately with current settings
-        resolvedColorsRef.current = resolveColors(useGameStore.getState().settings);
-        // Keep in sync when settings change (e.g. user switches color scheme)
-        return useGameStore.subscribe(
-            s => s.settings,
-            settings => { resolvedColorsRef.current = resolveColors(settings); }
-        );
-    }, []);
+    const { wormPowerups, cubies, settings } = useGameStore(useShallow(s => ({
+        wormPowerups: s.wormPowerups,
+        cubies: s.cubies,
+        settings: s.settings,
+    })));
+    const faceColors = useMemo(() => resolveColors(settings), [settings]);
 
-    useFrame(() => {
-        const { wormPowerups: powerups, cubies } = useGameStore.getState();
-        if (!groupRef.current) return;
-        const meshes = groupRef.current.children;
-        const t = Date.now() * 0.003;
-        const colors = resolvedColorsRef.current;
-        const lastIds = lastStickerIdsRef.current;
+    const orbs = useMemo(() => {
+        if (!wormPowerups || !cubies) return [];
+        return wormPowerups.map(p => {
+            const sticker = cubies[p.x]?.[p.y]?.[p.z]?.stickers?.[p.dirKey];
+            const faceId = sticker?.curr ?? 0;
+            const color = (faceId && faceColors[faceId]) ?? '#22ff88';
+            return { ...p, color };
+        });
+    }, [wormPowerups, cubies, faceColors]);
 
-        for (let i = 0; i < meshes.length; i++) {
-            const mesh = meshes[i];
-            const p = powerups[i];
-            if (!p || !mesh) { if (mesh) mesh.visible = false; continue; }
-
-            // Position: tile world pos + face-normal lift
-            const wp = getStickerWorldPos(p.x, p.y, p.z, p.dirKey, size, 0);
-            const n = FACE_NORMALS[p.dirKey] ?? _orbDefaultNormal;
-            const phase = t + i * 1.5;
-            const lift = 0.18 + Math.sin(phase) * 0.05;
-            mesh.position.set(wp[0] + n.x * lift, wp[1] + n.y * lift, wp[2] + n.z * lift);
-            mesh.scale.setScalar(0.09 + Math.sin(phase) * 0.018);
-            mesh.rotation.y = t * 0.6 + i;
-            mesh.visible = true;
-
-            // Color: inherit from the sticker this orb is mapped to, using the active color scheme
-            const mat = matsRef.current[i];
-            if (mat && cubies) {
-                const sticker = cubies[p.x]?.[p.y]?.[p.z]?.stickers?.[p.dirKey];
-                const faceId = sticker ? sticker.curr : 0;
-                if (faceId !== lastIds[i]) {
-                    lastIds[i] = faceId;
-                    const c = (faceId && colors[faceId]) ?? '#22ff88';
-                    mat.color.set(c);
-                    mat.emissive.set(c);
-                }
-            }
-        }
-    });
-
-    return (
-        <group ref={groupRef}>
-            {Array.from({ length: MAX_POWERUP_RENDER }, (_, i) => (
-                <mesh key={i}>
-                    <icosahedronGeometry args={[1, 0]} />
-                    <meshStandardMaterial
-                        ref={mat => { if (mat) matsRef.current[i] = mat; }}
-                        color="#22ff88" emissive="#22ff88" emissiveIntensity={1.2}
-                    />
-                </mesh>
-            ))}
-        </group>
-    );
+    return <ParityOrbs orbs={orbs} size={size} />;
 }
 
 
