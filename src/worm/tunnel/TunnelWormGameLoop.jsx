@@ -6,10 +6,10 @@
 import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { findNextTunnel, checkTunnelSelfCollision } from '../wormLogic.js';
-import { play } from '../../utils/audio.js';
 import { TUNNEL_CONFIG } from './useTunnelWormGame.js';
 import { TA } from './tunnelReducer.js';
 import { advanceStepClock, SIMULATION_HZ, FIXED_DT } from '../shared/movementClock.js';
+import { useGameEvents, GE } from '../shared/useGameEvents.js';
 
 export function TunnelWormGameLoop({
   cubies: _cubies,
@@ -25,6 +25,8 @@ export function TunnelWormGameLoop({
     lastOrbColorRef,
     pendingGrowthColorsRef,
   } = game;
+
+  const emitGameEvent = useGameEvents();
 
   // ── Orb spatial map: tunnelId → orb[] bucket (narrows scan to current tunnel) ──
   // Rebuilt lazily only when the orbs array reference changes (eat / restart).
@@ -93,7 +95,7 @@ export function TunnelWormGameLoop({
         tunnelExitOccurred = true;
       } else {
         dispatch({ type: TA.GAMEOVER });
-        play('/sounds/gameover.mp3');
+        emitGameEvent({ type: GE.GAMEOVER });
         return;
       }
     }
@@ -109,7 +111,7 @@ export function TunnelWormGameLoop({
 
     if (checkTunnelSelfCollision(newHead, s.worm, growing)) {
       dispatch({ type: TA.GAMEOVER });
-      play('/sounds/gameover.mp3');
+      emitGameEvent({ type: GE.GAMEOVER });
       return;
     }
 
@@ -179,17 +181,15 @@ export function TunnelWormGameLoop({
 
       if (newOrbs.length === 0) {
         dispatch({ type: TA.VICTORY });
-        play('/sounds/eat.mp3');
-        play('/sounds/victory.mp3');
+        emitGameEvent({ type: GE.VICTORY });
         return;
       }
 
       dispatch({ type: TA.STEP_EAT, payload });
-      play('/sounds/eat.mp3');
-      if (tunnelExitOccurred) play('/sounds/warp.mp3');
+      emitGameEvent({ type: GE.EAT_ORB, warpOccurred: tunnelExitOccurred });
     } else if (tunnelExitOccurred) {
       dispatch({ type: TA.STEP_TUNNEL_EXIT, payload });
-      play('/sounds/warp.mp3');
+      emitGameEvent({ type: GE.WARP });
     } else {
       dispatch({ type: TA.STEP, payload });
     }

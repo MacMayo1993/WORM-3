@@ -111,16 +111,16 @@ export const getActiveTunnels = (cubies, size) => {
           // Pre-compute world positions so findNextTunnel avoids per-call getStickerWorldPos
           const entryWorld = getStickerWorldPos(x, y, z, dirKey, size, 0);
           const exitWorld = getStickerWorldPos(antipodal.x, antipodal.y, antipodal.z, antipodal.dirKey, size, 0);
-          tunnels.push({
+          tunnels.push(Object.freeze({
             id: `tunnel-${x}-${y}-${z}-${dirKey}`,
-            entry: { x, y, z, dirKey },
-            exit: { x: antipodal.x, y: antipodal.y, z: antipodal.z, dirKey: antipodal.dirKey },
+            entry: Object.freeze({ x, y, z, dirKey }),
+            exit: Object.freeze({ x: antipodal.x, y: antipodal.y, z: antipodal.z, dirKey: antipodal.dirKey }),
             flips: Math.max(1, flips),
             entryColor: sticker.curr,
             exitColor: antipodal.sticker?.curr || sticker.curr,
-            entryWorldVec: new THREE.Vector3(entryWorld[0], entryWorld[1], entryWorld[2]),
-            exitWorldVec: new THREE.Vector3(exitWorld[0], exitWorld[1], exitWorld[2])
-          });
+            entryWorldVec: Object.freeze(new THREE.Vector3(entryWorld[0], entryWorld[1], entryWorld[2])),
+            exitWorldVec: Object.freeze(new THREE.Vector3(exitWorld[0], exitWorld[1], exitWorld[2]))
+          }));
         }
       }
     }
@@ -981,6 +981,44 @@ export const checkHealingCandidates = (cubies, size, wormSegments) => {
           if (allPressed) candidates.push({ x, y, z, dirKey });
         }
       }
+    }
+  }
+
+  return candidates;
+};
+
+/**
+ * Narrowed healing scan (M1): checks only tiles in the 8-neighbor neighborhood
+ * of the worm head instead of the full O(size³×6) surface scan.
+ * @param {Array} cubies - Cube state
+ * @param {number} size - Cube size
+ * @param {Array} wormSegments - Current worm segments (head is index 0)
+ * @returns {Array} Array of {x, y, z, dirKey} positions ready to be healed
+ */
+export const checkHealingCandidatesNearHead = (cubies, size, wormSegments) => {
+  if (!wormSegments || wormSegments.length === 0) return [];
+  const head = wormSegments[0];
+  if (head.x === undefined) return [];
+
+  const pressedKeys = getPressedTileKeys(wormSegments);
+  const candidates = [];
+  const neighbors = getSurroundingNeighbors(head, size);
+
+  for (const tile of neighbors) {
+    const cubie = cubies[tile.x]?.[tile.y]?.[tile.z];
+    if (!cubie) continue;
+    const sticker = cubie.stickers?.[tile.dirKey];
+    if (!sticker) continue;
+    if (sticker.curr === sticker.orig) continue; // not flipped
+
+    const tileNeighbors = getSurroundingNeighbors(tile, size);
+    const nonFlippedNeighbors = tileNeighbors.filter(n => {
+      const ns = cubies[n.x]?.[n.y]?.[n.z]?.stickers?.[n.dirKey];
+      return ns && ns.curr === ns.orig;
+    });
+    if (nonFlippedNeighbors.length === 0) continue;
+    if (nonFlippedNeighbors.every(n => pressedKeys.has(positionKey(n)))) {
+      candidates.push(tile);
     }
   }
 

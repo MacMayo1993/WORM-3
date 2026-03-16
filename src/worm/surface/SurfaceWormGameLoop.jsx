@@ -13,14 +13,13 @@ import {
   positionKey,
   pressState,
   getPressedTileKeys,
-  checkHealingCandidates,
+  checkHealingCandidatesNearHead,
 } from '../wormLogic.js';
 import { healSticker } from '../../game/cubeState.js';
-import { useGameStore } from '../../hooks/useGameStore.js';
-import { play } from '../../utils/audio.js';
 import { CONFIG } from './useSurfaceWormGame.js';
 import { SA } from './surfaceReducer.js';
 import { advanceStepClock } from '../shared/movementClock.js';
+import { useGameEvents, GE } from '../shared/useGameEvents.js';
 
 export function SurfaceWormGameLoop({ cubies, size, animState, game }) {
   const {
@@ -32,9 +31,9 @@ export function SurfaceWormGameLoop({ cubies, size, animState, game }) {
     pendingGrowthColorsRef,
   } = game;
 
-  const setCubies = useGameStore(s => s.setCubies);
+  const emitGameEvent = useGameEvents();
   const recentlyHealedRef = useRef(new Set());
-  // Healing scan is O(size³×6) — only run it after the worm steps onto a new tile.
+  // Healing scan runs only after a step and only checks the head neighborhood (medium #1).
   const needsHealCheckRef = useRef(false);
 
   // ── Orb spatial map: positionKey → orb (O(1) lookup) ──────────────────────
@@ -65,10 +64,10 @@ export function SurfaceWormGameLoop({ cubies, size, animState, game }) {
       pressState.tiles.set(key, 1.0);
     }
 
-    // ── Healing check: only runs the frame after a step ──
+    // ── Healing check: only runs the frame after a step; scans head neighborhood only ──
     if (needsHealCheckRef.current) {
       needsHealCheckRef.current = false;
-      const candidates = checkHealingCandidates(cubies, size, s.worm);
+      const candidates = checkHealingCandidatesNearHead(cubies, size, s.worm);
       if (candidates.length > 0) {
         let updatedCubies = cubies;
         let healScore = 0;
@@ -84,9 +83,8 @@ export function SurfaceWormGameLoop({ cubies, size, animState, game }) {
           }
         }
         if (healed) {
-          setCubies(updatedCubies);
-          play('/sounds/eat.mp3');
           dispatch({ type: SA.HEAL, payload: { score: s.score + healScore } });
+          emitGameEvent({ type: GE.HEAL, cubies: updatedCubies });
         }
       }
     }
@@ -120,7 +118,7 @@ export function SurfaceWormGameLoop({ cubies, size, animState, game }) {
 
     if (!nextPos) {
       dispatch({ type: SA.GAMEOVER });
-      play('/sounds/gameover.mp3');
+      emitGameEvent({ type: GE.GAMEOVER });
       return;
     }
 
@@ -138,7 +136,7 @@ export function SurfaceWormGameLoop({ cubies, size, animState, game }) {
 
     if (checkSelfCollision(finalPos, s.worm, s.pendingGrowth > 0)) {
       dispatch({ type: SA.GAMEOVER });
-      play('/sounds/gameover.mp3');
+      emitGameEvent({ type: GE.GAMEOVER });
       return;
     }
 
@@ -150,7 +148,7 @@ export function SurfaceWormGameLoop({ cubies, size, animState, game }) {
       orbMapRef.current = m;
     }
 
-    // ── Orb collision — O(1) map lookup instead of O(n) findIndex ──
+    // ── Orb collision — O(1) map lookup ──
     const eatenOrb = orbMapRef.current.get(positionKey(finalPos));
     const ateOrb = eatenOrb !== undefined;
     let ateOrbColor = null;
@@ -158,7 +156,6 @@ export function SurfaceWormGameLoop({ cubies, size, animState, game }) {
     if (ateOrb) {
       ateOrbColor = eatenOrb.color ?? null;
       lastOrbColorRef.current = ateOrbColor;
-      // Queue extra growth colors for growthPerOrb > 1
       for (let g = 1; g < CONFIG.growthPerOrb; g++) pendingGrowthColorsRef.current.push(ateOrbColor);
     }
 
@@ -168,7 +165,6 @@ export function SurfaceWormGameLoop({ cubies, size, animState, game }) {
     let newPendingGrowth = s.pendingGrowth;
 
     if (ateOrb) {
-      // Grow immediately with orb color
       newWorm = [{ ...finalPos, moveDir: newMoveDir, color: ateOrbColor }, ...s.worm];
       newPendingGrowth = s.pendingGrowth + CONFIG.growthPerOrb - 1;
     } else if (s.pendingGrowth > 0) {
@@ -197,22 +193,19 @@ export function SurfaceWormGameLoop({ cubies, size, animState, game }) {
         : s.orbInventory;
       if (warpOccurred) payload.warps = s.warps + 1;
 
-      // Check victory before dispatching
       if (newOrbs.length === 0) {
         dispatch({ type: SA.VICTORY });
-        play('/sounds/eat.mp3');
-        play('/sounds/victory.mp3');
+        emitGameEvent({ type: GE.VICTORY });
         return;
       }
 
       dispatch({ type: SA.STEP_EAT, payload });
-      play('/sounds/eat.mp3');
-      if (warpOccurred) play('/sounds/warp.mp3');
+      emitGameEvent({ type: GE.EAT_ORB, warpOccurred });
     } else if (warpOccurred) {
       payload.score = s.score + CONFIG.warpBonus;
       payload.warps = s.warps + 1;
       dispatch({ type: SA.STEP_WARP, payload });
-      play('/sounds/warp.mp3');
+      emitGameEvent({ type: GE.WARP });
     } else {
       dispatch({ type: SA.STEP, payload });
     }

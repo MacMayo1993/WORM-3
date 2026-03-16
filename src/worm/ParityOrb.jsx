@@ -7,6 +7,31 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { getSegmentWorldPos, getTunnelWorldPos } from './wormLogic.js';
 
+// ── Shared module-level geometries (M2) ─────────────────────────────────────
+// Pre-built once at module load, shared across all SingleOrb instances.
+// Using the geometry={} prop (not JSX children) prevents R3F auto-disposal.
+const _orbGeos = {
+  normal: {
+    core:      new THREE.IcosahedronGeometry(0.16, 2),
+    shell:     new THREE.SphereGeometry(0.21, 20, 20),
+    ringA:     new THREE.TorusGeometry(0.35, 0.008, 8, 32),
+    ringB:     new THREE.TorusGeometry(0.35 * 0.95, 0.008, 8, 32),
+    ringC:     new THREE.TorusGeometry(0.35 * 1.05, 0.006, 8, 32),
+    electron:  new THREE.SphereGeometry(0.035, 10, 10),
+    glow:      new THREE.SphereGeometry(0.42, 18, 18),
+  },
+  target: {
+    core:      new THREE.IcosahedronGeometry(0.2, 2),
+    shell:     new THREE.SphereGeometry(0.26, 20, 20),
+    ringA:     new THREE.TorusGeometry(0.42, 0.01, 8, 32),
+    ringB:     new THREE.TorusGeometry(0.42 * 0.95, 0.01, 8, 32),
+    ringC:     new THREE.TorusGeometry(0.42 * 1.05, 0.008, 8, 32),
+    electron:  new THREE.SphereGeometry(0.045, 10, 10),
+    glow:      new THREE.SphereGeometry(0.52, 18, 18),
+    lockRing:  new THREE.TorusGeometry(0.5, 0.03, 10, 48),
+  },
+};
+
 // SingleOrb renders geometry and registers its refs with the parent animator.
 // It has NO useFrame — all animation is driven by the single OrbAnimator in ParityOrbs.
 function SingleOrb({ position, color = '#ffd700', collected = false, isTarget = false, orbKey, registerAnim, unregisterAnim }) {
@@ -50,14 +75,12 @@ function SingleOrb({ position, color = '#ffd700', collected = false, isTarget = 
 
   if (collected) return null;
 
-  const coreRadius = isTarget ? 0.2 : 0.16;
-  const orbitRadius = isTarget ? 0.42 : 0.35;
+  const g = isTarget ? _orbGeos.target : _orbGeos.normal;
 
   return (
     <group ref={orbGroupRef} position={[position[0], position[1], position[2]]}>
       {/* Core nucleus */}
-      <mesh ref={coreRef}>
-        <icosahedronGeometry args={[coreRadius, 2]} />
+      <mesh ref={coreRef} geometry={g.core}>
         <meshStandardMaterial
           color={color}
           emissive={color}
@@ -68,8 +91,7 @@ function SingleOrb({ position, color = '#ffd700', collected = false, isTarget = 
       </mesh>
 
       {/* Energy shell */}
-      <mesh ref={shellRef}>
-        <sphereGeometry args={[isTarget ? 0.26 : 0.21, 20, 20]} />
+      <mesh ref={shellRef} geometry={g.shell}>
         <meshBasicMaterial
           color={color}
           transparent
@@ -81,30 +103,25 @@ function SingleOrb({ position, color = '#ffd700', collected = false, isTarget = 
 
       {/* Electron orbital rings + electrons */}
       <group ref={orbitSystemRef}>
-        <mesh ref={ringARef} rotation={[0.3, 0.4, 0]}>
-          <torusGeometry args={[orbitRadius, isTarget ? 0.01 : 0.008, 8, 32]} />
+        <mesh ref={ringARef} geometry={g.ringA} rotation={[0.3, 0.4, 0]}>
           <meshBasicMaterial color={color} transparent opacity={0.38} depthWrite={false} />
         </mesh>
-        <mesh ref={ringBRef} rotation={[-0.6, 0, 0.5]}>
-          <torusGeometry args={[orbitRadius * 0.95, isTarget ? 0.01 : 0.008, 8, 32]} />
+        <mesh ref={ringBRef} geometry={g.ringB} rotation={[-0.6, 0, 0.5]}>
           <meshBasicMaterial color="#ffffff" transparent opacity={0.3} depthWrite={false} />
         </mesh>
-        <mesh ref={ringCRef} rotation={[0, 0.85, -0.35]}>
-          <torusGeometry args={[orbitRadius * 1.05, isTarget ? 0.008 : 0.006, 8, 32]} />
+        <mesh ref={ringCRef} geometry={g.ringC} rotation={[0, 0.85, -0.35]}>
           <meshBasicMaterial color={color} transparent opacity={0.26} depthWrite={false} />
         </mesh>
 
         {Array.from({ length: 3 }, (_, i) => (
-          <mesh key={i} ref={(el) => { electronRefs.current[i] = el; }}>
-            <sphereGeometry args={[isTarget ? 0.045 : 0.035, 10, 10]} />
+          <mesh key={i} geometry={g.electron} ref={(el) => { electronRefs.current[i] = el; }}>
             <meshBasicMaterial color="#c6f6ff" transparent opacity={0.92} blending={THREE.AdditiveBlending} depthWrite={false} />
           </mesh>
         ))}
       </group>
 
       {/* Outer aura */}
-      <mesh ref={glowRef}>
-        <sphereGeometry args={[isTarget ? 0.52 : 0.42, 18, 18]} />
+      <mesh ref={glowRef} geometry={g.glow}>
         <meshBasicMaterial
           color={color}
           transparent
@@ -117,8 +134,7 @@ function SingleOrb({ position, color = '#ffd700', collected = false, isTarget = 
 
       {/* Target lock ring */}
       {isTarget && (
-        <mesh ref={targetGlowRef}>
-          <torusGeometry args={[0.5, 0.03, 10, 48]} />
+        <mesh ref={targetGlowRef} geometry={g.lockRing}>
           <meshBasicMaterial color="#ffffff" transparent opacity={0.3} blending={THREE.AdditiveBlending} depthWrite={false} />
         </mesh>
       )}
