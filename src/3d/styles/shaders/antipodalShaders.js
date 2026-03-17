@@ -36,7 +36,7 @@ export const antipodalShaders = {
     }
   `,
 
-  // Checkerboard — large base-color tiles with thin antipodalColor grout lines (~22% antipodal).
+  // Checkerboard — 4×4 grid of alternating baseColor / antipodalColor tiles.
   checkerboard: `
     uniform vec3 baseColor;
     uniform vec3 antipodalColor;
@@ -44,11 +44,8 @@ export const antipodalShaders = {
 
     void main() {
       float grid = 4.0;
-      vec2 f = fract(vUv * grid);
-      float grout = 0.12;
-      float isGrout = step(1.0 - grout, f.x) + step(1.0 - grout, f.y);
-      isGrout = clamp(isGrout, 0.0, 1.0);
-      vec3 color = mix(baseColor, antipodalColor, isGrout);
+      float check = mod(floor(vUv.x * grid) + floor(vUv.y * grid), 2.0);
+      vec3 color = mix(baseColor, antipodalColor, check);
       gl_FragColor = vec4(color, 1.0);
     }
   `,
@@ -67,7 +64,7 @@ export const antipodalShaders = {
     }
   `,
 
-  // Corner Accent — antipodalColor triangle in bottom-left corner (~19% coverage).
+  // Corner Accent — antipodalColor triangle in the low-U/low-V corner (~19% coverage).
   cornerAccent: `
     uniform vec3 baseColor;
     uniform vec3 antipodalColor;
