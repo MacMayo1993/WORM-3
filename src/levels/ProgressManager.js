@@ -529,9 +529,8 @@ class ProgressManager {
   }
 }
 
-// Export singleton instance (with test mode for development)
 export const progressManager = new ProgressManager({
-  testMode: true,  // TODO: Set to false for production
+  testMode: false,
 });
 
 // Also export the class for testing or custom instances

@@ -4,6 +4,8 @@ import {
   checkFaceLatinSquare,
   checkWormVictory,
   detectWinConditions,
+  extractFaceGrid,
+  checkSudokubeSolved,
 } from '../game/winDetection.js';
 import { makeCubies } from '../game/cubeState.js';
 import { rotateSliceCubies } from '../game/cubeRotation.js';
@@ -117,6 +119,36 @@ describe('checkWormVictory', () => {
       }
     }
     expect(checkWormVictory(cubies, 3)).toBe(true);
+  });
+});
+
+describe('extractFaceGrid', () => {
+  it('uses sticker identity (origDir/origPos) not current grid position', () => {
+    // A freshly made cube is solved — each sticker's origDir matches the face it sits on,
+    // and origPos matches current position, so values should form a valid Latin square.
+    const cubies = makeCubies(3);
+    const grid = extractFaceGrid(cubies, 3, 'PZ');
+    expect(checkFaceLatinSquare(grid, 3)).toBe(true);
+  });
+
+  it('returns an invalid Latin square after scrambling (proves values track sticker identity)', () => {
+    // If extractFaceGrid mistakenly used positional faceValue(faceDir, x, y, z),
+    // it would always produce a valid Latin square regardless of cube state.
+    // After scrambling, sticker identities are mixed up — the grid must fail.
+    let cubies = makeCubies(3);
+    cubies = rotateSliceCubies(cubies, 3, 'col', 0, 1);
+    cubies = rotateSliceCubies(cubies, 3, 'row', 1, 1);
+    const grid = extractFaceGrid(cubies, 3, 'PZ');
+    expect(checkFaceLatinSquare(grid, 3)).toBe(false);
+  });
+
+  it('is consistent with checkSudokubeSolved on a solved cube', () => {
+    const cubies = makeCubies(3);
+    for (const dir of ['PZ', 'NZ', 'PX', 'NX', 'PY', 'NY']) {
+      const grid = extractFaceGrid(cubies, 3, dir);
+      expect(checkFaceLatinSquare(grid, 3)).toBe(true);
+    }
+    expect(checkSudokubeSolved(cubies, 3)).toBe(true);
   });
 });
 

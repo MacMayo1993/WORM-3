@@ -46,7 +46,12 @@ export const checkFaceLatinSquare = (faceGrid, size) => {
   return true;
 };
 
-// Extract face grid for Sudokube checking
+// Extract face grid for Sudokube checking.
+// Each cell value is the sticker's ORIGINAL identity (origDir + origPos), NOT a
+// function of its current grid position.  Using faceValue(faceDir, x, y, z) for
+// the current position would always produce a valid Latin square by construction
+// (faceValue is ((r+c) % size) + 1 which is inherently a Latin square pattern),
+// making the check trivially pass regardless of cube state.
 export const extractFaceGrid = (cubies, size, faceDir) => {
   const grid = Array.from({ length: size }, () => Array(size).fill(0));
 
@@ -55,7 +60,7 @@ export const extractFaceGrid = (cubies, size, faceDir) => {
     const st = cubies[x][y][z].stickers[faceDir];
     if (st) {
       const { r, c: col } = faceRCFor(faceDir, x, y, z, size);
-      grid[r][col] = faceValue(faceDir, x, y, z, size);
+      grid[r][col] = faceValue(st.origDir, st.origPos.x, st.origPos.y, st.origPos.z, size);
     }
   };
 
