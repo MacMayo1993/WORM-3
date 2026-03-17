@@ -73,6 +73,12 @@ export const AXIS_TO_ANTIPODAL_FACES = {
   depth: ['PZ', 'NZ']   // Z-axis: Front ↔ Back
 };
 
+// Face direction → solved face ID (1-6)
+export const DIR_TO_COLOR = { PZ: 1, NX: 2, PY: 3, NZ: 4, PX: 5, NY: 6 };
+
+// Face ID (1-6) → face direction
+export const COLOR_TO_DIR = { 1: 'PZ', 2: 'NX', 3: 'PY', 4: 'NZ', 5: 'PX', 6: 'NY' };
+
 // Flip cap — tiles "die" at this many flips
 export const FLIP_CAP = 25;
 

@@ -5,6 +5,7 @@
 import { getManifoldNeighbors, findAntipodalStickerByGrid, buildManifoldGridMap } from '../game/manifoldLogic.js';
 import { getStickerWorldPos } from '../game/coordinates.js';
 import { FACE_COLORS } from '../utils/constants.js';
+import { getStickerSafe } from '../game/cubeState.js';
 import * as THREE from 'three';
 
 // ============================================================================
@@ -621,7 +622,7 @@ export const turnWorm = (currentDir, turn) => {
  * @returns {boolean} True if the sticker at this position is flipped
  */
 export const isPositionFlipped = (pos, cubies) => {
-  const sticker = cubies[pos.x]?.[pos.y]?.[pos.z]?.stickers?.[pos.dirKey];
+  const sticker = getStickerSafe(cubies, pos.x, pos.y, pos.z, pos.dirKey);
   if (!sticker) return false;
   return sticker.curr !== sticker.orig;
 };
@@ -635,7 +636,7 @@ export const isPositionFlipped = (pos, cubies) => {
  * @returns {Object|null} Antipodal position or null
  */
 export const getAntipodalPosition = (pos, cubies, size, manifoldMap = null) => {
-  const sticker = cubies[pos.x]?.[pos.y]?.[pos.z]?.stickers?.[pos.dirKey];
+  const sticker = getStickerSafe(cubies, pos.x, pos.y, pos.z, pos.dirKey);
   if (!sticker) return null;
 
   // Use provided manifoldMap or build one (expensive fallback)
@@ -974,7 +975,7 @@ export const checkHealingCandidatesNearHead = (cubies, size, wormSegments) => {
 
     const tileNeighbors = getSurroundingNeighbors(tile, size);
     const nonFlippedNeighbors = tileNeighbors.filter(n => {
-      const ns = cubies[n.x]?.[n.y]?.[n.z]?.stickers?.[n.dirKey];
+      const ns = getStickerSafe(cubies, n.x, n.y, n.z, n.dirKey);
       return ns && ns.curr === ns.orig;
     });
     if (nonFlippedNeighbors.length === 0) continue;

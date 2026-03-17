@@ -1,17 +1,16 @@
 // src/game/solveDetection.js
 // Detection logic for CFOP solve stages and algorithm hints
 
+import { DIR_TO_COLOR } from '../utils/constants.js';
+import { getStickerSafe } from './cubeState.js';
+
 // Color mapping: 1=Red(PZ), 2=Green(NX), 3=White(PY), 4=Orange(NZ), 5=Blue(PX), 6=Yellow(NY)
 // Direction mapping: PZ=front(red), NX=left(green), PY=top(white), NZ=back(orange), PX=right(blue), NY=bottom(yellow)
 
-const DIR_TO_COLOR = { PZ: 1, NX: 2, PY: 3, NZ: 4, PX: 5, NY: 6 };
-const COLOR_TO_DIR = { 1: 'PZ', 2: 'NX', 3: 'PY', 4: 'NZ', 5: 'PX', 6: 'NY' };
 const COLOR_NAMES = { 1: 'Red', 2: 'Green', 3: 'White', 4: 'Orange', 5: 'Blue', 6: 'Yellow' };
 
-// Get sticker at a specific position and direction
-const getSticker = (cubies, x, y, z, dir) => {
-  return cubies[x]?.[y]?.[z]?.stickers?.[dir];
-};
+// Alias for local readability
+const getSticker = getStickerSafe;
 
 // ============================================
 // WHITE CROSS DETECTION (Step 1)
