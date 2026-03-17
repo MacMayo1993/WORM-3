@@ -674,14 +674,14 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     <div style={{ display: 'grid', gap: '14px' }}>
       <label style={{ display: 'grid', gap: '6px' }}>
         <div style={{ fontSize: '12px', fontWeight: 700, color: 'rgba(0,0,0,0.66)' }}>Worm speed ({settings.wormSpeed.toFixed(1)}×)</div>
-        <input type="range" min="0.4" max="2.2" step="0.1" value={settings.wormSpeed}
+        <input type="range" min="0.4" max="5.0" step="0.1" value={settings.wormSpeed}
           onChange={e => select('wormSpeed', parseFloat(e.target.value))}
           style={{ width: '100%', accentColor: '#60a5fa' }} />
       </label>
 
       <label style={{ display: 'grid', gap: '6px' }}>
         <div style={{ fontSize: '12px', fontWeight: 700, color: 'rgba(0,0,0,0.66)' }}>Orb count ({settings.wormOrbCount})</div>
-        <input type="range" min="2" max="16" step="1" value={settings.wormOrbCount}
+        <input type="range" min="2" max="25" step="1" value={settings.wormOrbCount}
           onChange={e => select('wormOrbCount', parseInt(e.target.value, 10))}
           style={{ width: '100%', accentColor: '#a78bfa' }} />
       </label>
