@@ -674,8 +674,8 @@ function useWormCrawler(size, cubies) {
                 if (exitProgress?.deposited >= HEAL_COST && exitedTunnel) {
                     const { entry, exit: exitTile } = exitedTunnel;
                     // Write healBurstMap for both tiles BEFORE healing (sticker orig fields intact)
-                    const entrySticker = getStickerSafe(exitStore.cubies, size, entry.x, entry.y, entry.z, entry.dirKey);
-                    const exitStickerData = getStickerSafe(exitStore.cubies, size, exitTile.x, exitTile.y, exitTile.z, exitTile.dirKey);
+                    const entrySticker = getStickerSafe(exitStore.cubies, entry.x, entry.y, entry.z, entry.dirKey);
+                    const exitStickerData = getStickerSafe(exitStore.cubies, exitTile.x, exitTile.y, exitTile.z, exitTile.dirKey);
                     if (entrySticker) healBurstMap.set(getManifoldGridId(entrySticker, size), 1);
                     if (exitStickerData) healBurstMap.set(getManifoldGridId(exitStickerData, size), 1);
                     healFiredRef.current = true;
