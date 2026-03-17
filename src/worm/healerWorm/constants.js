@@ -55,7 +55,7 @@ export const MAX_JUMPS = 2;
 export const MAX_POWERUP_RENDER = 24;
 export const TUNNEL_TRIGGER_PROGRESS = 1 / 3;
 export const SELF_COLLISION_TRIGGER_PROGRESS = 0.4;
-export const SELF_COLLISION_GRACE_STEPS_AFTER_TUNNEL = 2;
+export const SELF_COLLISION_GRACE_STEPS_AFTER_TUNNEL = 4;
 export const WORMHOLE_MAX_TRAVERSALS = 3;
 
 // Tail segments needed to visually cover all tiles: totalTiles / (0.14 unit spacing / ~1 unit per tile)

@@ -309,7 +309,10 @@ function useWormCrawler(size, cubies) {
         activeTunnel.current = tunnel;
         pendingTunnelTrigger.current = null;
         pendingSelfCollision.current = null;
-        selfCollisionGraceStepsRef.current = SELF_COLLISION_GRACE_STEPS_AFTER_TUNNEL;
+        // Remove the exit portal tile from the trail so the head landing on it after
+        // exiting the tunnel doesn't immediately trigger a false self-collision.
+        const exitTileKey = tileKey(tunnel.exit);
+        tileTrail.current = tileTrail.current.filter(k => k !== exitTileKey);
         tunnelProgress.current = 0;
         phase.current = 'entering';
         onFlippedTile.current = false;
@@ -665,6 +668,7 @@ function useWormCrawler(size, cubies) {
                 }
 
                 phase.current = 'crawling';
+                selfCollisionGraceStepsRef.current = SELF_COLLISION_GRACE_STEPS_AFTER_TUNNEL;
                 useGameStore.setState({ wormPhase: 'crawling', wormOnFlippedTile: false, visualMode: prevVisualModeRef.current ?? 'classic' });
                 onFlippedTile.current = false;
                 lastFlippedRef.current = false;
