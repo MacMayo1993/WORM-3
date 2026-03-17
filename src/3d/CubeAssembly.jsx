@@ -18,6 +18,7 @@ import { StickerInstanceProvider } from './StickerInstances.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { resolveColors } from '../utils/colorSchemes.js';
+import { liveRotation } from '../worm/liveRotation.js';
 
 // Reusable axis vectors and quaternion (allocated once, never recreated)
 const _axisCol = new THREE.Vector3(1, 0, 0);
@@ -674,11 +675,15 @@ const CubeAssembly = React.memo(({
           g.quaternion.premultiply(_rotQuat);
         }
       });
+      liveRotation.active = true;
+      liveRotation.axis = ld.axis;
+      liveRotation.sliceIndex = ld.sliceIndex;
+      liveRotation.angle = angle;
       return; // Skip animState processing during live drag
     }
 
     // Handle GSAP snap animation (completing rotation after release)
-    if (!animState) return;
+    if (!animState) { liveRotation.active = false; return; }
 
     const { axis, dir, sliceIndex } = animState;
     const worldAxis = axis === 'col' ? _axisCol : axis === 'row' ? _axisRow : _axisDepth;
@@ -701,6 +706,10 @@ const CubeAssembly = React.memo(({
 
     // Calculate incremental rotation from GSAP progress
     const currentProgress = animProgressRef.current.value;
+    liveRotation.active = true;
+    liveRotation.axis = axis;
+    liveRotation.sliceIndex = sliceIndex;
+    liveRotation.angle = currentProgress * (Math.PI / 2) * dir;
     const deltaProgress = currentProgress - prevProgressRef.current;
     prevProgressRef.current = currentProgress;
 
