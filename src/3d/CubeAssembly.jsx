@@ -69,9 +69,6 @@ const MAX_DISTANCE_BY_SIZE = { 2: 28, 3: 28, 4: 38, 5: 52 };
 // Pixels of drag to complete a 90° rotation
 const PIXELS_PER_90DEG = 100;
 
-// Long-press disabled - was too sensitive on mobile
-// const LONG_PRESS_DURATION = 500;
-
 const CubeAssembly = React.memo(({
   size, cubies, onMove, onTapFlip, animState, onAnimComplete,
   onCascadeComplete, manifoldMap,

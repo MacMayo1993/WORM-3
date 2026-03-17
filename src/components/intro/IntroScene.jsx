@@ -7,25 +7,19 @@ import ArrivalBurst from '../../manifold/ArrivalBurst.jsx';
 import { FACE_COLORS } from '../../utils/constants.js';
 import { play, vibrate } from '../../utils/audio.js';
 import { updateSharedTime } from '../../3d/styles/TileStyleMaterials.jsx';
+import {
+  BLUE_REVEAL_START, BLUE_REVEAL_END,
+  HINT_TILT_START, HINT_TILT_END,
+  GREEN_SHOW_START, GREEN_SHOW_END,
+  FULL_FLIP_START, FULL_FLIP_END,
+  TUNNEL_FORM_START,
+  EXPLOSION_START, EXPLOSION_END,
+  WORM_START,
+  IMPLODE_START, IMPLODE_END,
+} from './introTiming.js';
 
 // ─── Tile style assignment ─────────────────────────────────────────────────────
 const STYLE_SEQUENCE = ['lava', 'circuit', 'holographic', 'galaxy', 'neural', 'pulse'];
-
-// ─── Timing constants ─────────────────────────────────────────────────────────
-const BLUE_REVEAL_START   = 1.5;
-const BLUE_REVEAL_END     = 3.2;
-const HINT_TILT_START     = 3.2;
-const HINT_TILT_END       = 4.8;
-const GREEN_SHOW_START    = 4.8;
-const GREEN_SHOW_END      = 6.5;
-const FULL_FLIP_START     = 6.5;
-const FULL_FLIP_END       = 8.2;
-const TUNNEL_FORM_START   = 8.5;
-const EXPLOSION_START     = 8.7;
-const EXPLOSION_END       = 10.5;
-const WORM_START          = 11.0;
-const IMPLODE_START       = 12.5;
-const IMPLODE_END         = 14.5;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const ease = t => t < 0.5 ? 4 * t ** 3 : 1 - Math.pow(-2 * t + 2, 3) / 2;
