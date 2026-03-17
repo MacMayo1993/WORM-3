@@ -12,7 +12,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { getStickerWorldPos } from '../game/coordinates.js';
 import { getNextSurfacePosition, getActiveTunnels, getTunnelWorldPos, turnWorm, getStableKey, findStickerByStableKey } from './wormLogic.js';
 import { buildManifoldGridMap, flipStickerPair } from '../game/manifoldLogic.js';
-import { healSticker } from '../game/cubeState.js';
+import { healSticker, getStickerSafe } from '../game/cubeState.js';
 import { rotateVec90 } from '../game/cubeRotation.js';
 import { DIR_TO_VEC, VEC_TO_DIR, ANTIPODAL_COLOR } from '../utils/constants.js';
 import { resolveColors } from '../utils/colorSchemes.js';
@@ -1335,7 +1335,7 @@ function PowerupOrbs({ size }) {
     const orbs = useMemo(() => {
         if (!wormPowerups || !cubies) return [];
         return wormPowerups.map(p => {
-            const sticker = cubies[p.x]?.[p.y]?.[p.z]?.stickers?.[p.dirKey];
+            const sticker = getStickerSafe(cubies, p.x, p.y, p.z, p.dirKey);
             const faceId = sticker?.curr ?? 0;
             const color = (faceId && faceColors[faceId]) ?? '#22ff88';
             const antipodalFaceId = ANTIPODAL_COLOR[faceId];

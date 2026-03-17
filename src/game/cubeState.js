@@ -46,3 +46,6 @@ const cloneCubie = (cubie) => ({
 // Deep clone 3D cube array (properly clones cubie objects)
 export const clone3D = (arr) =>
   arr.map(L => L.map(R => R.map(cubie => cloneCubie(cubie))));
+
+// Safe sticker accessor — returns the sticker object or undefined
+export const getStickerSafe = (cubies, x, y, z, dir) => cubies[x]?.[y]?.[z]?.stickers?.[dir];

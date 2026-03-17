@@ -13,13 +13,12 @@
 // After "flip" orientation (white on bottom for stages 3-7):
 //   U=Yellow(6), D=White(3), F=Red(1), B=Orange(4), R=Blue(5), L=Green(2)
 
-// Face direction → solved color mapping
-const DIR_TO_COLOR = { PZ: 1, NX: 2, PY: 3, NZ: 4, PX: 5, NY: 6 };
-const COLOR_TO_DIR = { 1: 'PZ', 2: 'NX', 3: 'PY', 4: 'NZ', 5: 'PX', 6: 'NY' };
+import { DIR_TO_COLOR, COLOR_TO_DIR } from '../utils/constants.js';
+import { getStickerSafe } from '../game/cubeState.js';
 
 // Helper: get sticker color at a specific position and face direction
 function getSticker(cubies, x, y, z, dir) {
-  const st = cubies[x]?.[y]?.[z]?.stickers[dir];
+  const st = getStickerSafe(cubies, x, y, z, dir);
   return st ? st.curr : null;
 }
 

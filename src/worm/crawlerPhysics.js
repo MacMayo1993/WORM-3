@@ -4,6 +4,7 @@
 // handled automatically via projection.
 
 import * as THREE from 'three';
+import { getStickerSafe } from '../game/cubeState.js';
 
 // Face normals (outward)
 const FACE_NORMALS = {
@@ -307,7 +308,7 @@ export function checkOrbCollision(crawlerPos, orbPos, threshold = 0.6) {
  */
 export function isOnParityZone(state, cubies, size) {
   const grid = worldToGrid(getGroundPosition(state, size), state.face, size);
-  const sticker = cubies[grid.x]?.[grid.y]?.[grid.z]?.stickers?.[grid.dirKey];
+  const sticker = getStickerSafe(cubies, grid.x, grid.y, grid.z, grid.dirKey);
   if (!sticker) return false;
   return sticker.curr !== sticker.orig;
 }
