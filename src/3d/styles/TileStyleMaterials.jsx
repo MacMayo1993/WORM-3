@@ -36,6 +36,11 @@ export const sharedTremorState = {
 // Entries are deleted when the flip completes (spinT hits 0).
 export const flipBurstMap = new Map();
 
+// ─── Heal burst map ───────────────────────────────────────────────────────────
+// Written by HealerWormMode when a tunnel heals (key = sticker gridId, value = 1).
+// StickerPlane consumes + deletes the entry to trigger the heal seal animation.
+export const healBurstMap = new Map();
+
 /**
  * Recompute tremor state from the current elapsed clock time.
  * Must be called once per frame from CubeAssembly's useFrame, before any
