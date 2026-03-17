@@ -52,6 +52,7 @@ import UILayer from './components/UILayer.jsx';
 import { useTeachMode } from './teach/useTeachMode.js';
 import { useAntipodalIntegrity } from './hooks/useAntipodalIntegrity.js';
 import { isMobile } from './utils/device.js';
+import { EXPLOSION_START, EXPLOSION_END, IMPLODE_START, IMPLODE_END } from './components/intro/introTiming.js';
 // Lazy-loaded: not needed on initial render, deferred to reduce parse time
 const PlatformerWormMode = React.lazy(() => import('./worm/PlatformerWormMode.jsx'));
 const HealerWormMode = React.lazy(() => import('./worm/HealerWormMode.jsx'));
@@ -59,11 +60,6 @@ const WormTouchControls = React.lazy(() => import('./worm/WormTouchControls.jsx'
 const HollowVoidCube = React.lazy(() => import('./3d/HollowVoidCube.jsx'));
 
 
-// ─── Intro timing constants (mirror IntroScene) ──────────────────────────────
-const EXPLOSION_START = 8.7;
-const EXPLOSION_END = 10.5;
-const IMPLODE_START = 12.5;
-const IMPLODE_END = 14.5;
 const _clamp = (t, a = 0, b = 1) => Math.max(a, Math.min(b, t));
 const _ease = t => t < 0.5 ? 4 * t ** 3 : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const _prog = (t, s, e) => _clamp((t - s) / (e - s));
@@ -539,7 +535,6 @@ export default function WORM3() {
   }, [size, changeSize, shuffle, teachMode]);
 
   const handleMenuWormHealer = useCallback(() => {
-    console.log('[WORM] handleMenuWormHealer called — opening wizard');
     useGameStore.getState().setShowMainMenu(false);
     setShowWormModeWizard(true);
   }, []);

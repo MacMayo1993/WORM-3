@@ -1,15 +1,10 @@
 import React, { useMemo } from 'react';
-
-// Matches the new IntroScene timing constants
-const BLUE_REVEAL_START   = 1.5;
-const HINT_TILT_START     = 3.2;
-const GREEN_SHOW_START    = 4.8;
-const FULL_FLIP_START     = 6.5;
-const FULL_FLIP_END       = 8.2;
-const EXPLOSION_START     = 8.7;
-const EXPLOSION_END       = 10.5;
-const IMPLODE_START       = 12.5;
-const IMPLODE_END         = 14.5;
+import {
+  BLUE_REVEAL_START, HINT_TILT_START,
+  GREEN_SHOW_START, FULL_FLIP_START, FULL_FLIP_END,
+  EXPLOSION_START, EXPLOSION_END,
+  IMPLODE_START, IMPLODE_END,
+} from './introTiming.js';
 
 const ease = t => t < 0.5 ? 4 * t ** 3 : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const clamp01 = t => Math.max(0, Math.min(1, t));
