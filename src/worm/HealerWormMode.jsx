@@ -265,7 +265,7 @@ function useWormCrawler(size, cubies) {
         // ── DEPOSIT ORBS ──────────────────────────────────────────────────────
         const liveCubies = useGameStore.getState().cubies;
         const entrySticker = liveCubies?.[x]?.[y]?.[z]?.stickers?.[dirKey];
-        const entryFaceId = entrySticker?.curr ?? 0;
+        const entryFaceId = entrySticker ? (ANTIPODAL_COLOR[entrySticker.curr] ?? 0) : 0;
         const stableKey = getStableKey(x, y, z, dirKey, liveCubies);
         currentTunnelStableKeyRef.current = stableKey;
 
