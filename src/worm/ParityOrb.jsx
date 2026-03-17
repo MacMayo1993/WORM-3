@@ -7,6 +7,13 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { getSegmentWorldPos, getTunnelWorldPos } from './wormLogic.js';
 
+// Face-normal directions for bob animation — indexed by dirKey
+const BOB_NORMALS = {
+  PX: [1, 0, 0], NX: [-1, 0, 0],
+  PY: [0, 1, 0], NY: [0, -1, 0],
+  PZ: [0, 0, 1], NZ: [0, 0, -1],
+};
+
 // ── Shared module-level geometries (M2) ─────────────────────────────────────
 // Pre-built once at module load, shared across all SingleOrb instances.
 // Using the geometry={} prop (not JSX children) prevents R3F auto-disposal.
@@ -34,7 +41,7 @@ const _orbGeos = {
 
 // SingleOrb renders geometry and registers its refs with the parent animator.
 // It has NO useFrame — all animation is driven by the single OrbAnimator in ParityOrbs.
-function SingleOrb({ position, color = '#ffd700', collected = false, isTarget = false, orbKey, registerAnim, unregisterAnim }) {
+function SingleOrb({ position, color = '#ffd700', antipodalColor = '#ffd700', collected = false, isTarget = false, dirKey = 'PY', orbKey, registerAnim, unregisterAnim }) {
   const orbGroupRef = useRef();
   const coreRef = useRef();
   const shellRef = useRef();
@@ -52,6 +59,8 @@ function SingleOrb({ position, color = '#ffd700', collected = false, isTarget = 
   isTargetRef.current = isTarget;
   const positionRef = useRef(position);
   positionRef.current = position;
+  const dirKeyRef = useRef(dirKey);
+  dirKeyRef.current = dirKey;
 
   // Register animation refs with parent on mount, unregister on unmount
   useEffect(() => {
@@ -68,6 +77,7 @@ function SingleOrb({ position, color = '#ffd700', collected = false, isTarget = 
       get electrons() { return electronRefs.current; },
       get isTarget() { return isTargetRef.current; },
       get position() { return positionRef.current; },
+      get dirKey() { return dirKeyRef.current; },
       timeOffset
     });
     return () => unregisterAnim(orbKey);
@@ -107,7 +117,7 @@ function SingleOrb({ position, color = '#ffd700', collected = false, isTarget = 
           <meshBasicMaterial color={color} transparent opacity={0.38} depthWrite={false} />
         </mesh>
         <mesh ref={ringBRef} geometry={g.ringB} rotation={[-0.6, 0, 0.5]}>
-          <meshBasicMaterial color="#ffffff" transparent opacity={0.3} depthWrite={false} />
+          <meshBasicMaterial color={antipodalColor} transparent opacity={0.3} depthWrite={false} />
         </mesh>
         <mesh ref={ringCRef} geometry={g.ringC} rotation={[0, 0.85, -0.35]}>
           <meshBasicMaterial color={color} transparent opacity={0.26} depthWrite={false} />
@@ -120,10 +130,10 @@ function SingleOrb({ position, color = '#ffd700', collected = false, isTarget = 
         ))}
       </group>
 
-      {/* Outer aura */}
+      {/* Outer aura — antipodal color flags the manifold pair */}
       <mesh ref={glowRef} geometry={g.glow}>
         <meshBasicMaterial
-          color={color}
+          color={antipodalColor}
           transparent
           opacity={isTarget ? 0.48 : 0.28}
           side={THREE.BackSide}
@@ -168,12 +178,14 @@ export default function ParityOrbs({ orbs, size, explosionFactor = 0, mode = 'su
   useFrame((state) => {
     const t = state.clock.elapsedTime;
     for (const refs of animMapRef.current.values()) {
-      const { group, core, shell, glow, targetGlow, orbitSystem, ringA, ringB, ringC, electrons, isTarget, position, timeOffset } = refs;
+      const { group, core, shell, glow, targetGlow, orbitSystem, ringA, ringB, ringC, electrons, isTarget, position, dirKey, timeOffset } = refs;
       if (!group || !core) continue;
       const time = t + timeOffset;
 
-      // Whole-orb floating bob
-      group.position.y = position[1] + Math.sin(time * 2.1) * (isTarget ? 0.13 : 0.06);
+      // Whole-orb floating bob along face normal
+      const _bob = Math.sin(time * 2.1) * (isTarget ? 0.13 : 0.06);
+      const _bn = BOB_NORMALS[dirKey] || BOB_NORMALS.PY;
+      group.position.set(position[0] + _bn[0] * _bob, position[1] + _bn[1] * _bob, position[2] + _bn[2] * _bob);
 
       // Core quantum-spin wobble
       core.rotation.y = time * (isTarget ? 1.7 : 1.0);
@@ -244,6 +256,8 @@ export default function ParityOrbs({ orbs, size, explosionFactor = 0, mode = 'su
       return {
         position,
         color: orb.color || '#ffd700',
+        antipodalColor: orb.antipodalColor || orb.color || '#ffd700',
+        dirKey: orb.dirKey || 'PY',
         key,
         isTarget: isTunnelMode && orb.tunnelId === targetTunnelId
       };
@@ -258,6 +272,8 @@ export default function ParityOrbs({ orbs, size, explosionFactor = 0, mode = 'su
           orbKey={data.key}
           position={data.position}
           color={data.color}
+          antipodalColor={data.antipodalColor}
+          dirKey={data.dirKey}
           isTarget={data.isTarget}
           registerAnim={registerAnim}
           unregisterAnim={unregisterAnim}

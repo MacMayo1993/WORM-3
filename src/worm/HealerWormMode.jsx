@@ -14,7 +14,7 @@ import { getNextSurfacePosition, getActiveTunnels, getTunnelWorldPos, turnWorm, 
 import { buildManifoldGridMap, flipStickerPair } from '../game/manifoldLogic.js';
 import { healSticker } from '../game/cubeState.js';
 import { rotateVec90 } from '../game/cubeRotation.js';
-import { DIR_TO_VEC, VEC_TO_DIR } from '../utils/constants.js';
+import { DIR_TO_VEC, VEC_TO_DIR, ANTIPODAL_COLOR } from '../utils/constants.js';
 import { resolveColors } from '../utils/colorSchemes.js';
 import {
     CAM_HEIGHT_BASE,
@@ -1338,7 +1338,9 @@ function PowerupOrbs({ size }) {
             const sticker = cubies[p.x]?.[p.y]?.[p.z]?.stickers?.[p.dirKey];
             const faceId = sticker?.curr ?? 0;
             const color = (faceId && faceColors[faceId]) ?? '#22ff88';
-            return { ...p, color };
+            const antipodalFaceId = ANTIPODAL_COLOR[faceId];
+            const antipodalColor = (antipodalFaceId && faceColors[antipodalFaceId]) ?? color;
+            return { ...p, color, antipodalColor };
         });
     }, [wormPowerups, cubies, faceColors]);
 
