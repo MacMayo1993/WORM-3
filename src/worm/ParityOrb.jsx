@@ -52,7 +52,10 @@ function SingleOrb({ position, color = '#ffd700', antipodalColor = '#ffd700', co
   const ringBRef = useRef();
   const ringCRef = useRef();
   const electronRefs = useRef([]);
+  const outlineRef = useRef();
   const timeOffset = useMemo(() => Math.random() * Math.PI * 2, []);
+  // White orbs get a black outline so they're visible; everything else gets white
+  const outlineColor = color.toLowerCase() === '#ffffff' ? '#000000' : '#ffffff';
 
   // Keep mutable refs so the animator always reads current values without causing re-renders
   const isTargetRef = useRef(isTarget);
@@ -75,6 +78,7 @@ function SingleOrb({ position, color = '#ffd700', antipodalColor = '#ffd700', co
       get ringB() { return ringBRef.current; },
       get ringC() { return ringCRef.current; },
       get electrons() { return electronRefs.current; },
+      get outline() { return outlineRef.current; },
       get isTarget() { return isTargetRef.current; },
       get position() { return positionRef.current; },
       get dirKey() { return dirKeyRef.current; },
@@ -89,6 +93,11 @@ function SingleOrb({ position, color = '#ffd700', antipodalColor = '#ffd700', co
 
   return (
     <group ref={orbGroupRef} position={[position[0], position[1], position[2]]}>
+      {/* Core outline — back-face scale trick; black for white orbs, white for everything else */}
+      <mesh ref={outlineRef} geometry={g.core}>
+        <meshBasicMaterial color={outlineColor} side={THREE.BackSide} />
+      </mesh>
+
       {/* Core nucleus */}
       <mesh ref={coreRef} geometry={g.core}>
         <meshStandardMaterial
@@ -178,7 +187,7 @@ export default function ParityOrbs({ orbs, size, explosionFactor = 0, mode = 'su
   useFrame((state) => {
     const t = state.clock.elapsedTime;
     for (const refs of animMapRef.current.values()) {
-      const { group, core, shell, glow, targetGlow, orbitSystem, ringA, ringB, ringC, electrons, isTarget, position, dirKey, timeOffset } = refs;
+      const { group, core, shell, glow, targetGlow, orbitSystem, ringA, ringB, ringC, electrons, outline, isTarget, position, dirKey, timeOffset } = refs;
       if (!group || !core) continue;
       const time = t + timeOffset;
 
@@ -191,6 +200,13 @@ export default function ParityOrbs({ orbs, size, explosionFactor = 0, mode = 'su
       core.rotation.y = time * (isTarget ? 1.7 : 1.0);
       core.rotation.x = Math.sin(time * 1.4) * 0.2;
       core.scale.setScalar(1 + Math.sin(time * (isTarget ? 5.2 : 3.8)) * (isTarget ? 0.18 : 0.1));
+
+      // Outline tracks core scale, slightly larger for the rim
+      if (outline) {
+        outline.rotation.y = core.rotation.y;
+        outline.rotation.x = core.rotation.x;
+        outline.scale.setScalar(core.scale.x * 1.2);
+      }
 
       // Shell counter-spin
       if (shell) {
