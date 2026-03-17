@@ -1456,7 +1456,7 @@ function TunnelHealProgress({ size }) {
             .map(([key, p]) => {
                 const pos = findStickerByStableKey(cubies, size, key);
                 if (!pos) return null;
-                const wp = getStickerWorldPos(pos.x, pos.y, pos.z, pos.dirKey, size, 0.55);
+                const wp = getStickerWorldPos(pos.x, pos.y, pos.z, pos.dirKey, size, 0);
                 if (!wp) return null;
                 return { key, wp, remaining: HEAL_COST - p.deposited, faceId: p.faceId };
             })
@@ -1472,11 +1472,20 @@ function TunnelHealProgress({ size }) {
                 return (
                     <Html key={key} position={[wp[0], wp[1], wp[2]]} center>
                         <div style={{
-                            color,
-                            fontSize: _isMobile ? '18px' : '14px',
-                            fontWeight: 'bold',
-                            fontFamily: "'Courier New', monospace",
-                            textShadow: `0 0 6px ${color}, 0 0 12px ${color}88`,
+                            background: color,
+                            color: '#ffffff',
+                            width: _isMobile ? '32px' : '26px',
+                            height: _isMobile ? '32px' : '26px',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: _isMobile ? '15px' : '13px',
+                            fontWeight: 900,
+                            fontFamily: "'Arial Rounded MT Bold', 'Nunito', Arial, sans-serif",
+                            border: '2.5px solid #ffffff',
+                            boxShadow: `0 0 10px ${color}, 0 2px 6px rgba(0,0,0,0.5)`,
+                            lineHeight: 1,
                             pointerEvents: 'none',
                             userSelect: 'none',
                         }}>
