@@ -11,7 +11,7 @@ import { FACE_CITIES, CITY_CONFIG } from '../modes/CityBiomeMode.js';
 import CityBuildings from './CityBuildings.jsx';
 import { BiomeGLBCluster, isGLBActive, isGLBFullFace } from './BiomeGLBCluster.jsx';
 import { SeamPulseOverlay } from './SeamPulseOverlay.jsx';
-import { getTileStyleMaterial, getGlassMaterial, sharedTremorState, flipBurstMap } from './styles/TileStyleMaterials.jsx';
+import { getTileStyleMaterial, getGlassMaterial, sharedTremorState, flipBurstMap, healBurstMap } from './styles/TileStyleMaterials.jsx';
 import { useStickerInstances } from './StickerInstances.jsx';
 import { getManifoldGridId } from '../game/coordinates.js';
 import GrassBlades from './styles/GrassBlades.jsx';
@@ -25,6 +25,7 @@ import WoodVolume from './styles/WoodVolume.jsx';
 import { BIOME_GROUND_TEXTURES } from './BiomeGroundTextures.js';
 import { resolveColors } from '../utils/colorSchemes.js';
 import FlipParticles from './FlipParticles.jsx';
+import HealParticles from './HealParticles.jsx';
 import ParityBreakthrough from './ParityBreakthrough.jsx';
 import StickerWorm from './StickerWorm.jsx';
 import DisparityHealthBar from './DisparityHealthBar.jsx';
@@ -158,6 +159,64 @@ const seamLeakFragmentShader = `
 
     float alpha = clamp(seamMask * pulse * uIntensity, 0.0, 1.0);
     gl_FragColor = vec4(uColor * 1.7, alpha);
+  }
+`;
+
+// ─── Heal seal shader ─────────────────────────────────────────────────────────
+// Plays when the worm heals a wormhole tile.
+// Phase 1 (uHealProgress 0→0.5): golden ring converges rim→center (wound closing).
+// Phase 2 (uHealProgress 0.5→1): healed color blooms outward from center (life restored).
+const healSealVertexShader = `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const healSealFragmentShader = `
+  uniform vec3  uColor;        // original (healed) face color
+  uniform float uHealProgress; // 0→1
+  uniform float uTime;
+  varying vec2 vUv;
+
+  void main() {
+    vec2 uv = vUv - 0.5;
+    float dist = length(uv);
+    float inDisc = 1.0 - smoothstep(0.44, 0.50, dist);
+
+    vec4 col = vec4(0.0);
+
+    if (uHealProgress < 0.5) {
+      // Phase 1: golden convergence ring rushes from rim to center
+      float t = uHealProgress * 2.0;
+      // Quadratic contraction — fast start, slows to a stop at the center
+      float ringR = 0.44 * (1.0 - t * t);
+      float ringWidth = 0.036 + 0.018 * (1.0 - t);
+      float ring = 1.0 - smoothstep(0.0, ringWidth, abs(dist - ringR));
+      // Color sweeps gold → pure white as the ring closes
+      vec3 goldColor = vec3(1.0, 0.87, 0.20);
+      vec3 ringCol = mix(goldColor, vec3(1.0, 1.0, 1.0), t * 0.70);
+      float ringAlpha = ring * inDisc * (0.80 + 0.20 * t);
+      // Soft trailing wake just behind the ring (slightly wider, dimmer)
+      float wake = 1.0 - smoothstep(0.0, 0.04, abs(dist - (ringR + 0.07)));
+      float wakeAlpha = wake * inDisc * 0.25 * (1.0 - t);
+      col = vec4(ringCol * 1.8, max(ringAlpha, wakeAlpha));
+    } else {
+      // Phase 2: healed color blooms outward from center, fading as it expands
+      float t = (uHealProgress - 0.5) * 2.0;
+      float bloomR = t * 0.50;
+      float bloom = 1.0 - smoothstep(bloomR - 0.05, bloomR + 0.01, dist);
+      // White-hot center glow that fades with t
+      float centerGlow = (1.0 - smoothstep(0.0, 0.15 + t * 0.08, dist)) * (1.0 - t);
+      float whiteFade = (1.0 - t) * (1.0 - t);
+      vec3 bloomCol = mix(uColor, vec3(1.0, 1.0, 1.0), whiteFade * 0.70 + centerGlow * 0.45);
+      float bloomAlpha = (bloom + centerGlow * 0.80) * inDisc * (0.60 + 0.40 * (1.0 - t));
+      col = vec4(bloomCol * (1.0 + whiteFade * 0.80), bloomAlpha);
+    }
+
+    if (col.a < 0.001) discard;
+    gl_FragColor = col;
   }
 `;
 
@@ -409,6 +468,15 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const [showWormIntro, setShowWormIntro] = useState(false);
   // Flash timer for ring opacity spike at midpoint crossing; decays to 0 in useFrame.
   const ringFlashRef = useRef(0);
+  // Heal seal animation: -1 = idle, 0→1 = playing
+  const healTRef = useRef(-1);
+  const healParticlesRef = useRef();
+  const healSealRef = useRef();
+  const [healSealUniforms] = React.useState(() => ({
+    uColor: { value: new THREE.Color() },
+    uHealProgress: { value: 0.0 },
+    uTime: { value: 0.0 },
+  }));
   // Overlay ref for antipodal color bleed during flip transitions.
   const flipOverlayRef = useRef();
   // Stable gridId for this sticker — written to flipBurstMap during flips so
@@ -603,7 +671,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     // Single-boolean gate: skip the entire body on idle frames.
     // Ensure we trigger animation if the tile is flipped (since ghost tile needs uTime updates).
     // If we need to transition the ghost tile (e.g. going from active to dormant), run at least one more frame.
-    const anyActive = spinT.current > 0 || shakeT.current > 0 || showWormholeHazardFx || needsGhostUpdate || (spiderPlaneRef.current?.visible && !showGhostTile) || wormIntroT.current > 0;
+    const anyActive = spinT.current > 0 || shakeT.current > 0 || showWormholeHazardFx || needsGhostUpdate || (spiderPlaneRef.current?.visible && !showGhostTile) || wormIntroT.current > 0 || healTRef.current >= 0;
     if (!anyActive) {
       isActiveRef.current = false;
       return;
@@ -733,6 +801,27 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
       if (shakeT.current <= 0) {
         groupRef.current.position.set(pos[0], pos[1], pos[2]);
+      }
+    }
+
+    // Heal seal — triggered by healBurstMap written by HealerWormMode on tunnel heal.
+    // Check before the anyActive gate so idle tiles still pick up their heal trigger.
+    if (healTRef.current < 0 && stickerGridIdRef.current && healBurstMap.get(stickerGridIdRef.current)) {
+      healBurstMap.delete(stickerGridIdRef.current);
+      healTRef.current = 0;
+      const origHealColor = meta?.orig ? fc[meta.orig] : '#ffffff';
+      healSealUniforms.uColor.value.set(origHealColor);
+      healSealUniforms.uHealProgress.value = 0;
+      if (healSealRef.current) healSealRef.current.visible = true;
+      healParticlesRef.current?.trigger(origHealColor);
+    }
+    if (healTRef.current >= 0) {
+      healTRef.current = Math.min(1, healTRef.current + delta / 0.65);
+      healSealUniforms.uHealProgress.value = healTRef.current;
+      healSealUniforms.uTime.value = state.clock.elapsedTime;
+      if (healTRef.current >= 1) {
+        if (healSealRef.current) healSealRef.current.visible = false;
+        healTRef.current = -1;
       }
     }
 
@@ -1342,6 +1431,23 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
       {/* Particle burst effect during flip (manual + chaos/disparity). */}
       <FlipParticles ref={flipParticlesRef} />
+
+      {/* Heal seal overlay — golden convergence ring + color bloom on wormhole heal. */}
+      <mesh ref={healSealRef} position={[0, 0, 0.004]} visible={false} renderOrder={11}>
+        <primitive object={_sharedStickerGeo} attach="geometry" />
+        <shaderMaterial
+          vertexShader={healSealVertexShader}
+          fragmentShader={healSealFragmentShader}
+          uniforms={healSealUniforms}
+          transparent
+          depthTest={true}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+        />
+      </mesh>
+
+      {/* Double-density golden particle burst on heal. */}
+      <HealParticles ref={healParticlesRef} />
 
       {overlay && (
         <Text position={[0, 0, 0.03]} fontSize={0.17} color="black" anchorX="center" anchorY="middle">

@@ -129,6 +129,7 @@ export default function GameScene({
     wormPhase,
     wormPaused,
     holonomyMode,
+    wormHealedCount,
   } = useGameStore(useShallow((s) => ({
     visualMode: s.visualMode,
     explosionT: s.explosionT,
@@ -144,6 +145,7 @@ export default function GameScene({
     wormPhase: s.wormPhase,
     wormPaused: s.wormPaused ?? false,
     holonomyMode: s.holonomyMode,
+    wormHealedCount: s.wormHealedCount ?? 0,
   })));
 
   const wormholePhaseActive = wormHealerMode && (
@@ -214,6 +216,7 @@ export default function GameScene({
         <WormholeWarpFX
           enabled={wormholePhaseActive}
           wormPhase={wormPhase}
+          healMoment={wormHealedCount}
         />
 
         <CubeAssembly

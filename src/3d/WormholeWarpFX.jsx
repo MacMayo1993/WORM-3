@@ -17,9 +17,11 @@ const PHASE_BOOST = {
  * The vertex shader writes directly to clip space — no camera alignment needed,
  * always fills the screen, zero depth-test / frustum-cull issues.
  */
-export default function WormholeWarpFX({ wormPhase = 'crawling', enabled = true }) {
+export default function WormholeWarpFX({ wormPhase = 'crawling', enabled = true, healMoment = 0 }) {
   const meshRef = useRef(null);
   const prevEnabledRef = useRef(false);
+  const prevHealMomentRef = useRef(0);
+  const healFlashRef = useRef(0); // 1→0, drives reverse pressure flash
   const { size } = useThree();
 
   const geometry = useMemo(() => new THREE.PlaneGeometry(2, 2), []);
@@ -90,11 +92,25 @@ export default function WormholeWarpFX({ wormPhase = 'crawling', enabled = true 
 
     const boost = enabled ? (PHASE_BOOST[wormPhase] ?? 0) : 0;
 
+    // Heal moment: spike to full opacity then fast-fade — "pressure release" as the
+    // portal seals. Only fires if the warp was active (enabled) so it doesn't ghost.
+    if (healMoment !== prevHealMomentRef.current) {
+      prevHealMomentRef.current = healMoment;
+      healFlashRef.current = 1.0;
+    }
+    if (healFlashRef.current > 0) {
+      healFlashRef.current = Math.max(0, healFlashRef.current - delta * 8.0);
+      material.uniforms.uOpacity.value = Math.max(
+        material.uniforms.uOpacity.value,
+        healFlashRef.current
+      );
+    }
+
     if (enabled && !prevEnabledRef.current) {
       // Snap to full opacity the instant the wormhole activates — no fade-in delay.
       material.uniforms.uOpacity.value = 1.0;
-    } else if (!enabled) {
-      // Slow fade-out so the exit feels natural.
+    } else if (!enabled && healFlashRef.current <= 0) {
+      // Slow fade-out so the exit feels natural (skip while heal flash is decaying).
       material.uniforms.uOpacity.value = THREE.MathUtils.lerp(
         material.uniforms.uOpacity.value,
         0.0,

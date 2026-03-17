@@ -9,7 +9,7 @@ import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
-import { getStickerWorldPos } from '../game/coordinates.js';
+import { getStickerWorldPos, getManifoldGridId } from '../game/coordinates.js';
 import { getNextSurfacePosition, getActiveTunnels, getTunnelWorldPos, turnWorm, getStableKey, findStickerByStableKey } from './wormLogic.js';
 import { buildManifoldGridMap, flipStickerPair } from '../game/manifoldLogic.js';
 import { healSticker, getStickerSafe } from '../game/cubeState.js';
@@ -58,6 +58,7 @@ import {
 } from './healerWorm/surfaceTiles.js';
 import ParityOrbs from './ParityOrb.jsx';
 import { isMobile as _isMobile } from '../utils/device.js';
+import { healBurstMap } from '../3d/styles/TileStyleMaterials.jsx';
 
 // ─── Tile position rotation helper ───────────────────────────────────────────
 // Transforms a {x, y, z, dirKey} surface tile through a cube slice rotation.
@@ -98,6 +99,11 @@ function useWormCrawler(size, cubies) {
     const timeAliveRef = useRef(0);
     const timeAliveSyncRef = useRef(0);
     const healedRef = useRef(0);
+    // willHealRef: true when the active tunnel has enough deposited orbs to heal on exit.
+    // Consumed by TunnelPortalRings to show the pop-and-seal animation instead of a fade.
+    const willHealRef = useRef(false);
+    // healFiredRef: set true for one frame when a heal fires; consumed by TunnelPortalRings.
+    const healFiredRef = useRef(false);
 
     const pos = useRef(INITIAL_POS(size));
     const moveDir = useRef(INITIAL_DIR);
@@ -294,6 +300,10 @@ function useWormCrawler(size, cubies) {
             }
         }
         // ── END DEPOSIT ───────────────────────────────────────────────────────
+
+        // Determine whether this tunnel traversal will heal on exit (for portal ring pop fx).
+        const postDepositProgress = useGameStore.getState().wormHealingProgress?.[stableKey];
+        willHealRef.current = (postDepositProgress?.deposited ?? 0) >= HEAL_COST;
 
         activeTunnel.current = tunnel;
         pendingTunnelTrigger.current = null;
@@ -663,6 +673,12 @@ function useWormCrawler(size, cubies) {
                 const exitProgress = exitStableKey ? (exitStore.wormHealingProgress?.[exitStableKey]) : null;
                 if (exitProgress?.deposited >= HEAL_COST && exitedTunnel) {
                     const { entry, exit: exitTile } = exitedTunnel;
+                    // Write healBurstMap for both tiles BEFORE healing (sticker orig fields intact)
+                    const entrySticker = getStickerSafe(exitStore.cubies, size, entry.x, entry.y, entry.z, entry.dirKey);
+                    const exitStickerData = getStickerSafe(exitStore.cubies, size, exitTile.x, exitTile.y, exitTile.z, exitTile.dirKey);
+                    if (entrySticker) healBurstMap.set(getManifoldGridId(entrySticker, size), 1);
+                    if (exitStickerData) healBurstMap.set(getManifoldGridId(exitStickerData, size), 1);
+                    healFiredRef.current = true;
                     let healed = healSticker(exitStore.cubies, size, entry.x, entry.y, entry.z, entry.dirKey);
                     healed = healSticker(healed, size, exitTile.x, exitTile.y, exitTile.z, exitTile.dirKey);
                     exitStore.setCubies(healed);
@@ -789,7 +805,8 @@ function useWormCrawler(size, cubies) {
         interpT, prevWorldPos, curWorldPos, jumpT, isJumping, jumpLift,
         headInterpPos, currentNormal,
         tailLength, stepHistory, orbPickupColorsRef, tick, queueTurn,
-        voidTunnelKeysRef, tunnelUseCountsRef
+        voidTunnelKeysRef, tunnelUseCountsRef,
+        willHealRef, healFiredRef
     };
 }
 
@@ -1940,13 +1957,57 @@ function TunnelPortalRings({ worm, size }) {
     const ringXRef = useRef();
     const ringYRef = useRef();
     const ringZRef = useRef();
+    // popT: -1 = idle, 0→1 = contracting-and-popping
+    const popTRef = useRef(-1);
+    // Saved world position for the pop (rings may have been repositioned)
+    const popPosRef = useRef(new THREE.Vector3());
 
-    useFrame(({ clock }) => {
+    useFrame(({ clock }, delta) => {
         const phase = worm.phase.current;
         const tunnel = worm.activeTunnel.current;
         const active = (phase === 'entering' || phase === 'tunnel' || phase === 'exiting') && tunnel;
 
         const rings = [ringXRef.current, ringYRef.current, ringZRef.current];
+
+        // Consume healFiredRef → start pop
+        if (worm.healFiredRef.current) {
+            worm.healFiredRef.current = false;
+            popTRef.current = 0;
+            popPosRef.current.copy(_portalRingPos);
+        }
+
+        // Pop animation: rings spin fast, contract, then vanish
+        if (popTRef.current >= 0) {
+            popTRef.current = Math.min(1, popTRef.current + delta / 0.30);
+            const pt = popTRef.current;
+            const scale = Math.max(0, 1 - pt * pt); // quadratic collapse
+            const t = clock.elapsedTime;
+            const spinBoost = 6.0; // 6× faster spin during pop
+            for (const r of rings) {
+                if (!r) continue;
+                r.visible = pt < 1;
+                r.position.copy(popPosRef.current);
+                r.scale.setScalar(scale);
+            }
+            if (ringXRef.current) {
+                ringXRef.current.rotation.set(t * 2.2 * spinBoost, t * 0.3 * spinBoost, 0);
+                ringXRef.current.material.opacity = 0.75 * (1 - pt);
+            }
+            if (ringYRef.current) {
+                ringYRef.current.rotation.set(t * 0.4 * spinBoost, t * 1.8 * spinBoost, 0);
+                ringYRef.current.material.opacity = 0.65 * (1 - pt);
+            }
+            if (ringZRef.current) {
+                ringZRef.current.rotation.set(0, t * 0.5 * spinBoost, t * 2.5 * spinBoost);
+                ringZRef.current.material.opacity = 0.55 * (1 - pt);
+            }
+            if (popTRef.current >= 1) {
+                for (const r of rings) if (r) { r.visible = false; r.scale.setScalar(1); }
+                popTRef.current = -1;
+            }
+            return;
+        }
+
         if (!active) {
             for (const r of rings) if (r) r.visible = false;
             return;
@@ -1963,8 +2024,15 @@ function TunnelPortalRings({ worm, size }) {
         _portalRingPos.set(wp[0], wp[1], wp[2]);
 
         const t = clock.elapsedTime;
-        // Quick fade-in at the start of entering phase; fade-out at end of exiting
-        const fadeIn = phase === 'entering' ? Math.min(1, prog * 5) : (phase === 'exiting' ? Math.max(0, 1 - prog * 3) : 1);
+        // Healing exits: keep rings visible until the pop fires; normal exits fade out.
+        let fadeIn;
+        if (phase === 'entering') {
+            fadeIn = Math.min(1, prog * 5);
+        } else if (phase === 'exiting') {
+            fadeIn = worm.willHealRef.current ? 1.0 : Math.max(0, 1 - prog * 3);
+        } else {
+            fadeIn = 1;
+        }
 
         if (ringXRef.current) {
             ringXRef.current.position.copy(_portalRingPos);
