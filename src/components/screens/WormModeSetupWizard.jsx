@@ -3,6 +3,7 @@ import { COLOR_SCHEMES, TILE_STYLES, SCHEME_LABELS } from '../../utils/colorSche
 import { CLASSIC_STYLE_KEYS, ANTIPODAL_STYLE_KEYS, LIVING_STYLE_KEYS } from '../../utils/tileStyleCatalog.js';
 import { BACKGROUNDS, getBackgroundUrl } from '../../utils/backgrounds.js';
 import { registerTilePreview, updateTilePreview, unregisterTilePreview } from '../../3d/TilePreviewRenderer.js';
+import { isMobile } from '../../utils/device.js';
 
 const BG_PREVIEWS = {
   blackhole: 'radial-gradient(circle, #1a0033 0%, #000000 100%)',
@@ -118,7 +119,7 @@ function TilePreviewCanvas({ styleKey, colorHex = '#4a7fa5', size = 48 }) {
 
 // ── Shared inline styles ──────────────────────────────────────────────────────
 
-const isMobile = typeof window !== 'undefined' && (window.innerWidth <= 768 || 'ontouchstart' in window);
+// isMobile imported from utils/device.js
 
 const S = {
   overlay: {

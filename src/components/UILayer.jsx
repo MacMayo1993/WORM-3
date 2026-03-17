@@ -35,6 +35,7 @@ import AntipodalModeHUD from './overlays/AntipodalModeHUD.jsx';
 import EchoRotationIndicator from './overlays/EchoRotationIndicator.jsx';
 import DisparityHUD from './overlays/DisparityHUD.jsx';
 import HealerWormHUD from './overlays/HealerWormHUD.jsx';
+import { isMobile } from '../utils/device.js';
 
 // Lazy-loaded — deferred to reduce initial parse time
 const VictoryScreen = React.lazy(() => import('./screens/VictoryScreen.jsx'));
@@ -51,11 +52,6 @@ const SolveMode = React.lazy(() => import('./SolveMode.jsx'));
 const DevConsole = React.lazy(() => import('./menus/DevConsole.jsx'));
 const TeachMode = React.lazy(() => import('../teach/TeachMode.jsx'));
 
-const isMobile = typeof window !== 'undefined' && (
-  window.innerWidth <= 768 ||
-  'ontouchstart' in window ||
-  navigator.maxTouchPoints > 0
-);
 
 export default function UILayer({
   // Hook-derived data (not raw store state)

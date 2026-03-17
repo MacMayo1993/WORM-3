@@ -183,7 +183,7 @@ export function getTileStyleMaterial(style, colorHex, useTexture = false, textur
     side: isGlass ? THREE.DoubleSide : THREE.FrontSide,
     transparent: isGlass,
     depthWrite: !isGlass,
-    blending: isGlass ? THREE.NormalBlending : THREE.NormalBlending,
+    blending: THREE.NormalBlending,
   });
 
   _matCachePut(cacheKey, material);

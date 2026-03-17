@@ -2,8 +2,7 @@
 // Displays the worm's current color orb inventory — used for tunnel healing
 
 import React from 'react';
-
-const isMobile = typeof window !== 'undefined' && (window.innerWidth <= 768 || 'ontouchstart' in window);
+import { isMobile } from '../utils/device.js';
 const isSmall = typeof window !== 'undefined' && window.innerWidth < 380;
 
 const FACE_ORDER = [1, 2, 3, 4, 5, 6];

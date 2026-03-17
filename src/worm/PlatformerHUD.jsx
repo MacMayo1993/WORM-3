@@ -3,9 +3,7 @@
 // Left half: Manifolder stats and controls.  Right half: Crawler stats.
 
 import React from 'react';
-
-const isMobile = typeof window !== 'undefined' &&
-  (window.innerWidth <= 768 || 'ontouchstart' in window);
+import { isMobile } from '../utils/device.js';
 
 export default function PlatformerHUD({
   // Game state

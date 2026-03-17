@@ -39,7 +39,7 @@ export const checkFaceLatinSquare = (faceGrid, size) => {
     const seen = new Set();
     for (let r = 0; r < size; r++) {
       const val = faceGrid[r][c];
-      if (seen.has(val)) return false;
+      if (val < 1 || val > size || seen.has(val)) return false;
       seen.add(val);
     }
   }
@@ -119,34 +119,32 @@ export const checkSudokubeSolved = (cubies, size) => {
   return true;
 };
 
-// Check if WORM³ victory - cube is solved AND every sticker has traveled through wormhole
-export const checkWormVictory = (cubies, size) => {
-  // First check if cube is solved normally
-  if (!checkRubiksSolved(cubies, size)) return false;
-
-  // Then check if EVERY sticker has traveled through a wormhole at least once
+// Returns true if every exterior sticker has been flipped through a wormhole at least once.
+// Does NOT check whether the cube is solved — use checkWormVictory for the full condition.
+const allStickersFlipped = (cubies, size) => {
   for (let x = 0; x < size; x++) {
     for (let y = 0; y < size; y++) {
       for (let z = 0; z < size; z++) {
-        // Interior cubies have no stickers — skip them
         if (x > 0 && x < size - 1 && y > 0 && y < size - 1 && z > 0 && z < size - 1) continue;
         for (const st of Object.values(cubies[x][y][z].stickers)) {
-          // If any sticker has never been flipped, WORM³ victory not achieved
           if ((st.flips ?? 0) === 0) return false;
         }
       }
     }
   }
-
   return true;
 };
+
+// Check if WORM³ victory - cube is solved AND every sticker has traveled through wormhole
+export const checkWormVictory = (cubies, size) => checkRubiksSolved(cubies, size) && allStickersFlipped(cubies, size);
 
 // Main win detection function - returns { rubiks, sudokube, ultimate, worm }
 export const detectWinConditions = (cubies, size) => {
   const rubiks = checkRubiksSolved(cubies, size);
   const sudokube = checkSudokubeSolved(cubies, size);
   const ultimate = rubiks && sudokube;
-  const worm = checkWormVictory(cubies, size);
+  // Reuse the already-computed rubiks result — avoids running the O(size²) scan twice.
+  const worm = rubiks && allStickersFlipped(cubies, size);
 
   return { rubiks, sudokube, ultimate, worm };
 };

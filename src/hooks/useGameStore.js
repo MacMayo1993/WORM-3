@@ -9,6 +9,7 @@ import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { makeCubies } from '../game/cubeState.js';
 import { DEFAULT_SETTINGS } from '../utils/colorSchemes.js';
+import { isMobile } from '../utils/device.js';
 
 // Load persisted state from localStorage
 const loadPersistedState = () => {
@@ -37,12 +38,6 @@ const loadPersistedState = () => {
   }
 };
 
-// Mobile detection
-const isMobile = typeof window !== 'undefined' && (
-  window.innerWidth <= 768 ||
-  'ontouchstart' in window ||
-  navigator.maxTouchPoints > 0
-);
 
 const persistedState = loadPersistedState();
 const MAX_UNDO_HISTORY = 10;
