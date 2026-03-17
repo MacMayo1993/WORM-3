@@ -61,4 +61,4 @@ export const WORMHOLE_MAX_TRAVERSALS = 3;
 // Tail segments needed to visually cover all tiles: totalTiles / (0.14 unit spacing / ~1 unit per tile)
 // For 5×5 (150 tiles): ~1100 segments. Round up generously.
 export const MAX_TAIL = 1200;
-export const HEAL_COST = 8; // worm segments required to fully heal one tunnel (= 4 orb pickups)
+export const HEAL_COST = 4; // worm segments required to fully heal one tunnel (= 2 orb pickups)
