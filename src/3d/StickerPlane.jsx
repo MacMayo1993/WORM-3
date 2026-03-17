@@ -668,6 +668,19 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       (!spiderPlaneRef.current.visible)
     );
 
+    // Heal seal trigger — MUST be before the anyActive gate.
+    // After a tile heals, flips=0 so anyActive would be false and the gate would
+    // return early before we could pick up the one-shot healBurstMap entry.
+    if (healTRef.current < 0 && stickerGridIdRef.current && healBurstMap.get(stickerGridIdRef.current)) {
+      healBurstMap.delete(stickerGridIdRef.current);
+      healTRef.current = 0;
+      const origHealColor = meta?.orig ? fc[meta.orig] : '#ffffff';
+      healSealUniforms.uColor.value.set(origHealColor);
+      healSealUniforms.uHealProgress.value = 0;
+      if (healSealRef.current) healSealRef.current.visible = true;
+      healParticlesRef.current?.trigger(origHealColor);
+    }
+
     // Single-boolean gate: skip the entire body on idle frames.
     // Ensure we trigger animation if the tile is flipped (since ghost tile needs uTime updates).
     // If we need to transition the ghost tile (e.g. going from active to dormant), run at least one more frame.
@@ -804,17 +817,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       }
     }
 
-    // Heal seal — triggered by healBurstMap written by HealerWormMode on tunnel heal.
-    // Check before the anyActive gate so idle tiles still pick up their heal trigger.
-    if (healTRef.current < 0 && stickerGridIdRef.current && healBurstMap.get(stickerGridIdRef.current)) {
-      healBurstMap.delete(stickerGridIdRef.current);
-      healTRef.current = 0;
-      const origHealColor = meta?.orig ? fc[meta.orig] : '#ffffff';
-      healSealUniforms.uColor.value.set(origHealColor);
-      healSealUniforms.uHealProgress.value = 0;
-      if (healSealRef.current) healSealRef.current.visible = true;
-      healParticlesRef.current?.trigger(origHealColor);
-    }
+    // Heal seal progress — drive the animation each frame while active.
     if (healTRef.current >= 0) {
       healTRef.current = Math.min(1, healTRef.current + delta / 0.65);
       healSealUniforms.uHealProgress.value = healTRef.current;
