@@ -6,6 +6,7 @@ import React, { useRef, useMemo, useEffect, useCallback } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { getSegmentWorldPos, getTunnelWorldPos } from './wormLogic.js';
+import { liveRotation } from './liveRotation.js';
 
 // Face-normal directions for bob animation — indexed by dirKey
 const BOB_NORMALS = {
@@ -13,6 +14,18 @@ const BOB_NORMALS = {
   PY: [0, 1, 0], NY: [0, -1, 0],
   PZ: [0, 0, 1], NZ: [0, 0, -1],
 };
+
+// World axis vectors matching CubeAssembly — same instances as pre-allocated there,
+// but we need our own for applyAxisAngle calls (Three.js doesn't mutate these).
+const _worldAxes = {
+  col:   new THREE.Vector3(1, 0, 0),
+  row:   new THREE.Vector3(0, 1, 0),
+  depth: new THREE.Vector3(0, 0, 1),
+};
+
+// Scratch vectors used per-frame in the animator (never allocated during render).
+const _scratchPos = new THREE.Vector3();
+const _scratchBob = new THREE.Vector3();
 
 // ── Shared module-level geometries (M2) ─────────────────────────────────────
 // Pre-built once at module load, shared across all SingleOrb instances.
@@ -41,7 +54,7 @@ const _orbGeos = {
 
 // SingleOrb renders geometry and registers its refs with the parent animator.
 // It has NO useFrame — all animation is driven by the single OrbAnimator in ParityOrbs.
-function SingleOrb({ position, color = '#ffd700', antipodalColor = '#ffd700', collected = false, isTarget = false, dirKey = 'PY', orbKey, registerAnim, unregisterAnim }) {
+function SingleOrb({ position, color = '#ffd700', antipodalColor = '#ffd700', collected = false, isTarget = false, dirKey = 'PY', orbKey, registerAnim, unregisterAnim, gridX = -1, gridY = -1, gridZ = -1 }) {
   const orbGroupRef = useRef();
   const coreRef = useRef();
   const shellRef = useRef();
@@ -64,6 +77,12 @@ function SingleOrb({ position, color = '#ffd700', antipodalColor = '#ffd700', co
   positionRef.current = position;
   const dirKeyRef = useRef(dirKey);
   dirKeyRef.current = dirKey;
+  const gridXRef = useRef(gridX);
+  gridXRef.current = gridX;
+  const gridYRef = useRef(gridY);
+  gridYRef.current = gridY;
+  const gridZRef = useRef(gridZ);
+  gridZRef.current = gridZ;
 
   // Register animation refs with parent on mount, unregister on unmount
   useEffect(() => {
@@ -82,6 +101,9 @@ function SingleOrb({ position, color = '#ffd700', antipodalColor = '#ffd700', co
       get isTarget() { return isTargetRef.current; },
       get position() { return positionRef.current; },
       get dirKey() { return dirKeyRef.current; },
+      get gridX() { return gridXRef.current; },
+      get gridY() { return gridYRef.current; },
+      get gridZ() { return gridZRef.current; },
       timeOffset
     });
     return () => unregisterAnim(orbKey);
@@ -187,14 +209,32 @@ export default function ParityOrbs({ orbs, size, explosionFactor = 0, mode = 'su
   useFrame((state) => {
     const t = state.clock.elapsedTime;
     for (const refs of animMapRef.current.values()) {
-      const { group, core, shell, glow, targetGlow, orbitSystem, ringA, ringB, ringC, electrons, outline, isTarget, position, dirKey, timeOffset } = refs;
+      const { group, core, shell, glow, targetGlow, orbitSystem, ringA, ringB, ringC, electrons, outline, isTarget, position, dirKey, gridX, gridY, gridZ, timeOffset } = refs;
       if (!group || !core) continue;
       const time = t + timeOffset;
 
-      // Whole-orb floating bob along face normal
+      // Whole-orb position — apply live slice rotation when this orb is on the moving slice
+      const bn = BOB_NORMALS[dirKey] || BOB_NORMALS.PY;
+      let px = position[0], py = position[1], pz = position[2];
+      let bnx = bn[0], bny = bn[1], bnz = bn[2];
+
+      if (liveRotation.active && gridX >= 0) {
+        const lr = liveRotation;
+        const inSlice =
+          (lr.axis === 'col'   && gridX === lr.sliceIndex) ||
+          (lr.axis === 'row'   && gridY === lr.sliceIndex) ||
+          (lr.axis === 'depth' && gridZ === lr.sliceIndex);
+        if (inSlice) {
+          const worldAxis = _worldAxes[lr.axis];
+          _scratchPos.set(px, py, pz).applyAxisAngle(worldAxis, lr.angle);
+          px = _scratchPos.x; py = _scratchPos.y; pz = _scratchPos.z;
+          _scratchBob.set(bnx, bny, bnz).applyAxisAngle(worldAxis, lr.angle);
+          bnx = _scratchBob.x; bny = _scratchBob.y; bnz = _scratchBob.z;
+        }
+      }
+
       const _bob = Math.sin(time * 2.1) * (isTarget ? 0.13 : 0.06);
-      const _bn = BOB_NORMALS[dirKey] || BOB_NORMALS.PY;
-      group.position.set(position[0] + _bn[0] * _bob, position[1] + _bn[1] * _bob, position[2] + _bn[2] * _bob);
+      group.position.set(px + bnx * _bob, py + bny * _bob, pz + bnz * _bob);
 
       // Core quantum-spin wobble
       core.rotation.y = time * (isTarget ? 1.7 : 1.0);
@@ -275,7 +315,10 @@ export default function ParityOrbs({ orbs, size, explosionFactor = 0, mode = 'su
         antipodalColor: orb.antipodalColor || orb.color || '#ffd700',
         dirKey: orb.dirKey || 'PY',
         key,
-        isTarget: isTunnelMode && orb.tunnelId === targetTunnelId
+        isTarget: isTunnelMode && orb.tunnelId === targetTunnelId,
+        gridX: orb.x ?? -1,
+        gridY: orb.y ?? -1,
+        gridZ: orb.z ?? -1,
       };
     });
   }, [orbs, size, explosionFactor, isTunnelMode, targetTunnelId]);
@@ -291,6 +334,9 @@ export default function ParityOrbs({ orbs, size, explosionFactor = 0, mode = 'su
           antipodalColor={data.antipodalColor}
           dirKey={data.dirKey}
           isTarget={data.isTarget}
+          gridX={data.gridX}
+          gridY={data.gridY}
+          gridZ={data.gridZ}
           registerAnim={registerAnim}
           unregisterAnim={unregisterAnim}
         />
