@@ -149,6 +149,7 @@ function useWormCrawler(size, cubies) {
     const voidTunnelKeysRef = useRef(new Set());
     const pendingVoidKillRef = useRef(null);
     const currentTunnelStableKeyRef = useRef(null); // stable key of the tunnel being traversed
+    const pendingHealBurstRef = useRef(null); // set when a heal fires; consumed by HeartBurstSystem
     // Cached tunnel list — rebuilt whenever cubies change to avoid redundant getActiveTunnels calls
     const tunnelCacheRef = useRef(null);
     // O(1) tunnel endpoint lookup to avoid repeated per-step linear scans.
@@ -687,6 +688,7 @@ function useWormCrawler(size, cubies) {
                     exitStore.setWormHealingProgress(newProgress);
                     healedRef.current += 1;
                     exitStore.setWormHealedCount(healedRef.current);
+                    pendingHealBurstRef.current = { exitTile: exitedTunnel.exit, entryTile: exitedTunnel.entry };
                 }
                 // else: partial/no deposit — tunnel stays flipped, progress persists
             }
@@ -806,7 +808,7 @@ function useWormCrawler(size, cubies) {
         headInterpPos, currentNormal,
         tailLength, stepHistory, orbPickupColorsRef, tick, queueTurn,
         voidTunnelKeysRef, tunnelUseCountsRef,
-        willHealRef, healFiredRef
+        willHealRef, healFiredRef, pendingHealBurstRef
     };
 }
 
@@ -1458,6 +1460,109 @@ const POLES_PER_TILE = 4;
 const TAPES_PER_TILE = 4;
 const FRAME_SEGMENTS_PER_VOID = 4;
 
+// ─── Heart Burst Effect — green hearts fly out of healed tiles ────────────────
+// Emits a burst of 💚 hearts when the worm exits a healed tunnel.
+// Each heart gets its own CSS @keyframes rule injected once so the browser handles
+// the smooth per-heart arc entirely on the compositor thread.
+
+const HEART_COUNT = 10;
+const HEART_LIFETIME_MS = 1800;
+
+function HeartBurst({ id, wp, onDone }) {
+    // Generate stable per-heart motion data once (spread outward, biased upward)
+    const hearts = useMemo(() => {
+        return Array.from({ length: HEART_COUNT }, (_, i) => {
+            // Spread hearts in a full circle with an upward bias
+            const baseAngle = (i / HEART_COUNT) * Math.PI * 2;
+            const jitter = (Math.random() - 0.5) * 0.7;
+            const angle = baseAngle + jitter;
+            const dist = 50 + Math.random() * 40;
+            const dx = Math.cos(angle) * dist;
+            // Always travel upward on screen (negative y = up in CSS)
+            const dy = -Math.abs(Math.sin(angle) * dist) - 25 - Math.random() * 30;
+            const delay = i * 55 + Math.random() * 40;
+            const scale = 0.85 + Math.random() * 0.5;
+            const heartId = `wh-${id}-${i}`;
+            const styleEl = document.createElement('style');
+            styleEl.setAttribute('data-worm-heart', heartId);
+            styleEl.textContent = `@keyframes ${heartId}{` +
+                `0%{transform:translate(-50%,-50%) scale(0) rotate(-20deg);opacity:0;}` +
+                `18%{transform:translate(-50%,-50%) scale(${(scale * 1.6).toFixed(2)}) rotate(10deg);opacity:1;}` +
+                `100%{transform:translate(calc(-50% + ${dx.toFixed(1)}px),calc(-50% + ${dy.toFixed(1)}px)) ` +
+                `scale(${(scale * 0.25).toFixed(2)}) rotate(${Math.round((Math.random() - 0.5) * 40)}deg);opacity:0;}}`;
+            document.head.appendChild(styleEl);
+            return { heartId, delay };
+        });
+    }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            hearts.forEach(h => {
+                const el = document.querySelector(`[data-worm-heart="${h.heartId}"]`);
+                if (el) el.remove();
+            });
+            onDone();
+        }, HEART_LIFETIME_MS + 300);
+        return () => clearTimeout(timer);
+    }, [hearts, onDone]);
+
+    const fontSize = _isMobile ? '22px' : '18px';
+    return (
+        <Html position={wp} center>
+            <div style={{ position: 'relative', width: 0, height: 0, pointerEvents: 'none' }}>
+                {hearts.map(h => (
+                    <div
+                        key={h.heartId}
+                        style={{
+                            position: 'absolute',
+                            left: 0,
+                            top: 0,
+                            fontSize,
+                            animation: `${h.heartId} ${HEART_LIFETIME_MS}ms ease-out ${h.delay}ms both`,
+                            willChange: 'transform, opacity',
+                            textShadow: '0 0 6px #22ff66, 0 0 12px #00cc44',
+                            lineHeight: 1,
+                            userSelect: 'none',
+                            filter: 'drop-shadow(0 0 4px #00ff55)',
+                        }}
+                    >
+                        💚
+                    </div>
+                ))}
+            </div>
+        </Html>
+    );
+}
+
+// Watches for heal events from the worm hook and manages active HeartBurst instances.
+function HeartBurstSystem({ worm, size }) {
+    const [bursts, setBursts] = useState([]);
+
+    useFrame(() => {
+        if (!worm.pendingHealBurstRef.current) return;
+        const { exitTile } = worm.pendingHealBurstRef.current;
+        worm.pendingHealBurstRef.current = null;
+        const wp = getStickerWorldPos(exitTile.x, exitTile.y, exitTile.z, exitTile.dirKey, size, 0);
+        if (!wp) return;
+        const id = Date.now();
+        setBursts(prev => [...prev, { id, wp: [wp[0], wp[1], wp[2]] }]);
+    });
+
+    if (bursts.length === 0) return null;
+    return (
+        <>
+            {bursts.map(burst => (
+                <HeartBurst
+                    key={burst.id}
+                    id={burst.id}
+                    wp={burst.wp}
+                    onDone={() => setBursts(prev => prev.filter(b => b.id !== burst.id))}
+                />
+            ))}
+        </>
+    );
+}
+
 function TunnelHealProgress({ size }) {
     const healingProgress = useGameStore((s) => s.wormHealingProgress ?? {});
     const cubies = useGameStore((s) => s.debouncedCubies ?? s.cubies);
@@ -2102,6 +2207,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             <PortalGlow worm={worm} size={size} />
             <WormholeRings cubies={cubies} size={size} voidTunnelKeysRef={worm.voidTunnelKeysRef} tunnelUseCountsRef={worm.tunnelUseCountsRef} />
             <TunnelHealProgress size={size} />
+            <HeartBurstSystem worm={worm} size={size} />
             <PowerupOrbs size={size} />
         </>
     );
