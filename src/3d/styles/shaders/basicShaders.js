@@ -5,7 +5,6 @@ export const basicShaders = {
   // Solid - simple flat color
   solid: `
     uniform vec3 baseColor;
-    varying vec2 vUv;
 
     void main() {
       gl_FragColor = vec4(baseColor, 1.0);
@@ -15,7 +14,6 @@ export const basicShaders = {
   // Glossy - specular highlights
   glossy: `
     uniform vec3 baseColor;
-    varying vec2 vUv;
     varying vec3 vNormal;
     varying vec3 vViewPosition;
 
@@ -36,7 +34,6 @@ export const basicShaders = {
   // Matte - soft diffuse
   matte: `
     uniform vec3 baseColor;
-    varying vec2 vUv;
     varying vec3 vNormal;
 
     void main() {

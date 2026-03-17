@@ -60,6 +60,19 @@ const fragmentShaders = {
   ...antipodalShaders,
 };
 
+// Dev-time guard: silent key collisions from spread merges are very hard to debug.
+// This throws immediately at module load so the problem is impossible to miss.
+if (import.meta.env.DEV) {
+  const _shaderModules = [basicShaders, techShaders, natureShaders, opArtShaders, antipodalShaders];
+  const _seen = new Map();
+  for (const mod of _shaderModules) {
+    for (const key of Object.keys(mod)) {
+      if (_seen.has(key)) throw new Error(`[TileStyleMaterials] Duplicate shader key "${key}" — already defined in ${_seen.get(key)}`);
+      _seen.set(key, mod);
+    }
+  }
+}
+
 // ─── LRU material cache ───────────────────────────────────────────────────────
 // Key: "${style}_${colorHex}".  200 slots covers 20 styles × 6 face colors ×
 // several active color schemes with room to spare.  On eviction the GPU program

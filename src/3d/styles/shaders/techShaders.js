@@ -118,8 +118,6 @@ export const techShaders = {
 
       // Soma nodes: one per Voronoi cell, pulsing at individual rates
       float glow = 0.0;
-      float minD = 10.0;
-      vec2 closestCell = cell;
       for (int x = -1; x <= 1; x++) {
         for (int y = -1; y <= 1; y++) {
           vec2 n   = vec2(float(x), float(y));
@@ -129,7 +127,6 @@ export const techShaders = {
           float ph = hash(cell + n) * 6.28;
           float pulse = sin(time * hz + ph) * 0.5 + 0.5;
           glow += smoothstep(0.14, 0.0, d) * (0.55 + pulse * 0.9);
-          if (d < minD) { minD = d; closestCell = cell + n; }
         }
       }
 
