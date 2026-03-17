@@ -125,24 +125,34 @@ const ANTIPODAL_STYLES = new Set([
  *   When null for an antipodal-style, a hue-shifted contrast color is derived automatically.
  */
 export function getTileStyleMaterial(style, colorHex, useTexture = false, texture = null, antipodalHex = null) {
-  // Texture path: currently unused (all callers pass useTexture=false, null).
-  // If activated, cache by texture.uuid to avoid per-call allocations and leaks.
+  // Texture path — cached by texture.uuid so repeated calls don't allocate a new
+  // GPU program each time.  MeshStandardMaterial is evicted and disposed by the
+  // same LRU logic as the shader materials below.
   if (useTexture && texture) {
-    return new THREE.MeshStandardMaterial({
+    const texKey = `texture_${texture.uuid}`;
+    const cachedTex = _matCacheGet(texKey);
+    if (cachedTex) return cachedTex;
+    const texMat = new THREE.MeshStandardMaterial({
       map: texture,
       color: '#ffffff',
       metalness: 0.1,
       roughness: 0.8,
     });
+    _matCachePut(texKey, texMat);
+    return texMat;
   }
 
   // Validate inputs
   const safeStyle = style || 'solid';
   const safeColorHex = colorHex || '#888888';
 
-  // Cache key includes antipodal hex for antipodal-style patterns so each face pair
-  // gets its own compiled material; other styles are unaffected.
-  const antipodalSuffix = ANTIPODAL_STYLES.has(safeStyle) && antipodalHex ? `_${antipodalHex}` : '';
+  // For antipodal styles the cache key must encode which antiColor is baked into
+  // the material.  Use the explicit hex when provided, or '_derived' for the
+  // deterministic hue-shifted fallback — so a null-antipodal preview and an
+  // explicit-antipodal in-play material never accidentally alias the same key.
+  const antipodalSuffix = ANTIPODAL_STYLES.has(safeStyle)
+    ? (antipodalHex ? `_${antipodalHex}` : '_derived')
+    : '';
   const cacheKey = `${safeStyle}_${safeColorHex}${antipodalSuffix}`;
   const cached = _matCacheGet(cacheKey);
   if (cached) return cached;

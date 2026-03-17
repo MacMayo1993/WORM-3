@@ -2,8 +2,11 @@
 // Cube state initialization and utilities
 
 // Create initial cube state with all stickers in solved position
-export const makeCubies = (size) =>
-  Array.from({ length: size }, (_, x) =>
+export const makeCubies = (size) => {
+  if (!Number.isInteger(size) || size < 2 || size > 5) {
+    throw new RangeError(`makeCubies: size must be an integer 2–5, got ${size}`);
+  }
+  return Array.from({ length: size }, (_, x) =>
     Array.from({ length: size }, (_, y) =>
       Array.from({ length: size }, (_, z) => {
         const stickers = {};
@@ -17,6 +20,7 @@ export const makeCubies = (size) =>
       })
     )
   );
+};
 
 // Heal a sticker (reset flips and restore original color)
 export const healSticker = (cubies, size, x, y, z, dirKey) => {

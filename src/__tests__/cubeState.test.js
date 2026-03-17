@@ -55,15 +55,30 @@ describe('makeCubies', () => {
     expect(sticker.origDir).toBe('NZ');
   });
 
-  it('should work for different cube sizes', () => {
-    const sizes = [3, 4, 5];
-
-    sizes.forEach(size => {
+  it('should work for all valid cube sizes (2–5)', () => {
+    for (const size of [2, 3, 4, 5]) {
       const cubies = makeCubies(size);
       expect(cubies.length).toBe(size);
       expect(cubies[0].length).toBe(size);
       expect(cubies[0][0].length).toBe(size);
-    });
+    }
+  });
+
+  it('throws RangeError for size below 2', () => {
+    expect(() => makeCubies(1)).toThrow(RangeError);
+    expect(() => makeCubies(0)).toThrow(RangeError);
+    expect(() => makeCubies(-1)).toThrow(RangeError);
+  });
+
+  it('throws RangeError for size above 5', () => {
+    expect(() => makeCubies(6)).toThrow(RangeError);
+    expect(() => makeCubies(100)).toThrow(RangeError);
+  });
+
+  it('throws RangeError for non-integer size', () => {
+    expect(() => makeCubies(2.5)).toThrow(RangeError);
+    expect(() => makeCubies(NaN)).toThrow(RangeError);
+    expect(() => makeCubies('3')).toThrow(RangeError);
   });
 });
 
