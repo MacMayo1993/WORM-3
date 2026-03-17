@@ -57,6 +57,7 @@ import {
     randomUnflippedTile,
 } from './healerWorm/surfaceTiles.js';
 import ParityOrbs from './ParityOrb.jsx';
+import { isMobile as _isMobile } from '../utils/device.js';
 
 // ─── Tile position rotation helper ───────────────────────────────────────────
 // Transforms a {x, y, z, dirKey} surface tile through a cube slice rotation.
@@ -1439,8 +1440,6 @@ const SPARKS_PER_CRITICAL = 7;
 const POLES_PER_TILE = 4;
 const TAPES_PER_TILE = 4;
 const FRAME_SEGMENTS_PER_VOID = 4;
-
-const _isMobile = typeof window !== 'undefined' && (window.innerWidth <= 768 || 'ontouchstart' in window);
 
 function TunnelHealProgress({ size }) {
     const healingProgress = useGameStore((s) => s.wormHealingProgress ?? {});

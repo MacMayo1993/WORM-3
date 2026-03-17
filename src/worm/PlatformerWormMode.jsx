@@ -24,8 +24,7 @@ import {
 } from './crawlerPhysics.js';
 import { rotateSliceCubies } from '../game/cubeRotation.js';
 import { play } from '../utils/audio.js';
-
-const isMobileDevice = typeof window !== 'undefined' && (window.innerWidth <= 768 || 'ontouchstart' in window);
+import { isMobile as isMobileDevice } from '../utils/device.js';
 
 // ============================================================================
 // MOBILE TOUCH CONTROLS

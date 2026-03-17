@@ -51,18 +51,13 @@ import Tutorial from './components/screens/Tutorial.jsx';
 import UILayer from './components/UILayer.jsx';
 import { useTeachMode } from './teach/useTeachMode.js';
 import { useAntipodalIntegrity } from './hooks/useAntipodalIntegrity.js';
+import { isMobile } from './utils/device.js';
 // Lazy-loaded: not needed on initial render, deferred to reduce parse time
 const PlatformerWormMode = React.lazy(() => import('./worm/PlatformerWormMode.jsx'));
 const HealerWormMode = React.lazy(() => import('./worm/HealerWormMode.jsx'));
 const WormTouchControls = React.lazy(() => import('./worm/WormTouchControls.jsx'));
 const HollowVoidCube = React.lazy(() => import('./3d/HollowVoidCube.jsx'));
 
-// Mobile detection
-const isMobile = typeof window !== 'undefined' && (
-  window.innerWidth <= 768 ||
-  'ontouchstart' in window ||
-  navigator.maxTouchPoints > 0
-);
 
 // ─── Intro timing constants (mirror IntroScene) ──────────────────────────────
 const EXPLOSION_START = 8.7;
