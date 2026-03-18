@@ -238,7 +238,23 @@ export default function ParityOrbs({ orbs, size, explosionFactor = 0, mode = 'su
       }
 
       const _bob = Math.sin(time * 2.1) * (isTarget ? 0.13 : 0.06);
-      group.position.set(px + bnx * _bob, py + bny * _bob, pz + bnz * _bob);
+      let fpx = px + bnx * _bob;
+      let fpy = py + bny * _bob;
+      let fpz = pz + bnz * _bob;
+      // Prevent arc from passing through cube interior during live rotation.
+      // applyAxisAngle moves orbs along a circular path that can dip inside the cube
+      // bounding box at intermediate angles (e.g. a bottom-face orb rotating 90° passes
+      // through the cube at ~45°). Clamp to nearest face surface when inside.
+      if (liveRotation.active && gridX >= 0) {
+        const ib = (size - 1) / 2 + 0.52;
+        if (Math.abs(fpx) < ib && Math.abs(fpy) < ib && Math.abs(fpz) < ib) {
+          const maxCoord = Math.max(Math.abs(fpx), Math.abs(fpy), Math.abs(fpz));
+          if (maxCoord === Math.abs(fpx)) fpx = Math.sign(fpx || 1) * ib;
+          else if (maxCoord === Math.abs(fpy)) fpy = Math.sign(fpy || 1) * ib;
+          else fpz = Math.sign(fpz || 1) * ib;
+        }
+      }
+      group.position.set(fpx, fpy, fpz);
 
       // Core quantum-spin wobble
       core.rotation.y = time * (isTarget ? 1.7 : 1.0);
