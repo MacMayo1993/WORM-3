@@ -306,6 +306,12 @@ export default function ParityOrbs({ orbs, size, explosionFactor = 0, mode = 'su
         key = `${orb.tunnelId}-${orb.t}`;
       } else {
         position = getSegmentWorldPos(orb, size, explosionFactor);
+        // Elevated orbs (on flipped tiles) hover above the surface so the worm must jump to collect them
+        if (orb.elevated) {
+          const bn = BOB_NORMALS[orb.dirKey] || BOB_NORMALS.PY;
+          const ELEVATED_HOVER = 0.65;
+          position = [position[0] + bn[0] * ELEVATED_HOVER, position[1] + bn[1] * ELEVATED_HOVER, position[2] + bn[2] * ELEVATED_HOVER];
+        }
         key = `${orb.x}-${orb.y}-${orb.z}-${orb.dirKey}`;
       }
 

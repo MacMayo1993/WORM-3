@@ -588,15 +588,21 @@ function useWormCrawler(size, cubies) {
                     const pickedUp = powerupsRef.current[puIdx];
                     const liveCubies = useGameStore.getState().cubies;
                     const pickedSticker = liveCubies?.[pickedUp.x]?.[pickedUp.y]?.[pickedUp.z]?.stickers?.[pickedUp.dirKey];
-                    const pickedFaceId = pickedSticker ? pickedSticker.curr : 0;
-                    const liveColors = resolveColors(useGameStore.getState().settings);
-                    const pickedColor = (pickedFaceId && liveColors[pickedFaceId]) ?? '#22ff88';
-                    applyOrbPickupGrowth(pickedColor, pickedFaceId);
-                    const newPowerup = { ...randomFreeTile(size, [...powerupsRef.current, pos.current]), type: 'apple' };
-                    const next = [...powerupsRef.current];
-                    next[puIdx] = newPowerup;
-                    powerupsRef.current = next;
-                    useGameStore.getState().setWormPowerups(next);
+                    // Orbs on flipped tiles hover above the surface — worm must jump to reach them
+                    const tileIsFlipped = !!(pickedSticker && pickedSticker.curr !== pickedSticker.orig);
+                    if (tileIsFlipped && !isJumping.current) {
+                        // Worm crawled onto the tile but didn't jump — orb is out of reach
+                    } else {
+                        const pickedFaceId = pickedSticker ? pickedSticker.curr : 0;
+                        const liveColors = resolveColors(useGameStore.getState().settings);
+                        const pickedColor = (pickedFaceId && liveColors[pickedFaceId]) ?? '#22ff88';
+                        applyOrbPickupGrowth(pickedColor, pickedFaceId);
+                        const newPowerup = { ...randomFreeTile(size, [...powerupsRef.current, pos.current]), type: 'apple' };
+                        const next = [...powerupsRef.current];
+                        next[puIdx] = newPowerup;
+                        powerupsRef.current = next;
+                        useGameStore.getState().setWormPowerups(next);
+                    }
                 }
 
                 // Flipped tile detection
@@ -1373,7 +1379,9 @@ function PowerupOrbs({ size }) {
             const color = (faceId && faceColors[faceId]) ?? '#22ff88';
             const antipodalFaceId = ANTIPODAL_COLOR[faceId];
             const antipodalColor = (antipodalFaceId && faceColors[antipodalFaceId]) ?? color;
-            return { ...p, color, antipodalColor };
+            // Orbs on flipped tiles hover above the surface — worm must jump to collect
+            const elevated = !!(sticker && sticker.curr !== sticker.orig);
+            return { ...p, color, antipodalColor, elevated };
         });
     }, [wormPowerups, cubies, faceColors]);
 
