@@ -150,15 +150,13 @@ function useWormCrawler(size, cubies) {
     const pendingVoidKillRef = useRef(null);
     const currentTunnelStableKeyRef = useRef(null); // stable key of the tunnel being traversed
     const pendingHealBurstRef = useRef(null); // set when a heal fires; consumed by HeartBurstSystem
-    // Cached tunnel list — rebuilt whenever cubies change to avoid redundant getActiveTunnels calls
-    const tunnelCacheRef = useRef(null);
-    // O(1) tunnel endpoint lookup to avoid repeated per-step linear scans.
+    // O(1) tunnel endpoint lookup — rebuilt whenever cubies change via the effect below.
+    // Both the manifold map and tunnel list are built in one pass to avoid a second O(size³×6) scan.
     const tunnelLookupRef = useRef(new Map());
     React.useEffect(() => {
         // Build manifold map once and share it with getActiveTunnels to avoid a second rebuild
         const manifoldMap = buildManifoldGridMap(cubies, size);
         const tunnels = getActiveTunnels(cubies, size, manifoldMap);
-        tunnelCacheRef.current = tunnels;
 
         const encodeTile = (p) => `${p.x},${p.y},${p.z},${p.dirKey}`;
         const canonical = (tunnel) => {
@@ -621,6 +619,16 @@ function useWormCrawler(size, cubies) {
 
                 if (isFlipped) {
                     pendingTunnelTrigger.current = { x, y, z, dirKey };
+                    // Swept-entry guard: if the step accumulator remainder indicates the worm has already
+                    // spent ≥ TUNNEL_TRIGGER_PROGRESS of this tile's step time on the flipped tile
+                    // (possible after a lag spike where delta > STEP_SEC), fire the tunnel transition
+                    // immediately. Without this, the deferred trigger can be cleared by a second step
+                    // firing in the following frame before interpT reaches the threshold.
+                    if (!isJumping.current && stepAcc.current / STEP_SEC >= TUNNEL_TRIGGER_PROGRESS) {
+                        pendingTunnelTrigger.current = null;
+                        beginTunnelTransition(x, y, z, dirKey);
+                        return;
+                    }
                 }
             }
         } else if (phase.current === 'entering') {

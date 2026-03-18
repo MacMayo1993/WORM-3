@@ -300,6 +300,11 @@ export default function PlatformerWormMode({ cubies: initialCubies, size, faceCo
   const [selectedSlice, setSelectedSlice] = useState(0);
   const [selectedAxis, setSelectedAxis] = useState('col');
   const [rotationAnim, setRotationAnim] = useState(null);
+  // Synchronous guard: prevents a second rotation from starting in the narrow window
+  // between setRotationAnim() and the component re-render that would update the
+  // performRotation closure. React state updates are async, so without this ref the
+  // stale closure (rotationAnim === null) could pass the early-return check twice.
+  const rotationAnimActiveRef = useRef(false);
 
   // --- Crawler state (ref for per-frame mutation) ---
   const crawlerRef = useRef(null);
@@ -397,12 +402,14 @@ export default function PlatformerWormMode({ cubies: initialCubies, size, faceCo
 
   // --- Manifolder rotation ---
   const performRotation = useCallback((axis, dir) => {
-    if (rotationAnim) return; // Already animating
+    // Use a ref for the primary guard so it's synchronous — the rotationAnim state update
+    // is async and the stale closure would pass this check a second time before re-render.
+    if (rotationAnimActiveRef.current) return;
     if (gameState !== 'playing') return;
 
     const slice = selectedSlice;
 
-    // Animate rotation
+    rotationAnimActiveRef.current = true;
     setRotationAnim({ axis, sliceIndex: slice, dir, progress: 0 });
 
     // Animate progress 0→1 over 300ms
@@ -418,6 +425,7 @@ export default function PlatformerWormMode({ cubies: initialCubies, size, faceCo
         requestAnimationFrame(animate);
       } else {
         // Complete rotation
+        rotationAnimActiveRef.current = false;
         setRotationAnim(null);
         setCubies(prev => rotateSliceCubies(prev, size, axis, slice, dir));
         setRotationCount(prev => prev + 1);
@@ -450,7 +458,7 @@ export default function PlatformerWormMode({ cubies: initialCubies, size, faceCo
       }
     };
     requestAnimationFrame(animate);
-  }, [rotationAnim, gameState, selectedSlice, size]);
+  }, [gameState, selectedSlice, size]);
 
   // --- Keyboard input ---
   useEffect(() => {
