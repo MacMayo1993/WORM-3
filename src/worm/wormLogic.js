@@ -15,8 +15,10 @@ import * as THREE from 'three';
 // ── Tunnel mode named constants ──────────────────────────────────────────────
 // Spacing (in t-units) between initial worm segments when spawning inside a tunnel
 const INITIAL_SEGMENT_SPACING = 0.15;
-// Maximum world-space distance between a tunnel end and an adjacent tunnel end
-// for the two to be considered "connected" by findNextTunnel.
+// Base world-space distance threshold used by findNextTunnel for size-3 cubes.
+// Scaled proportionally inside the function for larger cubes: on a 5×5 cube,
+// corner stickers on adjacent faces sit ~4+ units apart, which would exceed a
+// hardcoded 3.0 and cause findNextTunnel to silently return null.
 const TUNNEL_ADJACENCY_DISTANCE = 3.0;
 // Self-collision detection threshold (in t-units). Intentionally narrow (3× smaller
 // than orbCollisionThreshold) to avoid false positives when re-entering a tunnel
@@ -269,8 +271,11 @@ export const findNextTunnel = (exitPos, tunnels, excludeTunnelId, size, inactive
     }
   }
 
-  // Only return if within reasonable distance (adjacent or nearby)
-  return bestTunnel && bestDist < TUNNEL_ADJACENCY_DISTANCE ? bestTunnel : null;
+  // Scale adjacency threshold proportionally with cube size.
+  // A 3×3 cube needs ~3.0 units; a 5×5 cube needs ~5.0+ units because its surface
+  // stickers span a larger world-space range (grid positions reach ±2 instead of ±1).
+  const adjacencyThreshold = TUNNEL_ADJACENCY_DISTANCE * (size / 3);
+  return bestTunnel && bestDist < adjacencyThreshold ? bestTunnel : null;
 };
 
 /**
