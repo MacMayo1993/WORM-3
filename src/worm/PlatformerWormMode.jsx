@@ -306,6 +306,24 @@ export default function PlatformerWormMode({ cubies: initialCubies, size, faceCo
   // stale closure (rotationAnim === null) could pass the early-return check twice.
   const rotationAnimActiveRef = useRef(false);
 
+  // --- Portrait / landscape layout ---
+  // Recalculated on resize so both canvases stay usable after orientation changes.
+  const [isPortrait, setIsPortrait] = useState(
+    () => typeof window !== 'undefined' && window.innerHeight > window.innerWidth
+  );
+  useEffect(() => {
+    const onResize = () => setIsPortrait(window.innerHeight > window.innerWidth);
+    // orientationchange fires before the browser has settled on new dimensions —
+    // delay 100 ms so the subsequent resize event carries the correct values.
+    const onOrientationChange = () => setTimeout(onResize, 100);
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', onOrientationChange);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('orientationchange', onOrientationChange);
+    };
+  }, []);
+
   // --- Crawler state (ref for per-frame mutation) ---
   const crawlerRef = useRef(null);
   const [crawlerDisplay, setCrawlerDisplay] = useState(null); // for React re-renders
@@ -551,15 +569,18 @@ export default function PlatformerWormMode({ cubies: initialCubies, size, faceCo
   }, []);
 
   // --- Camera Z for left canvas ---
-  const cameraZ = { 2: 10, 3: 14, 4: 20, 5: 26 }[size] || 14;
+  // In portrait mode the panel is half the screen height rather than half the width,
+  // so pull the camera back ~40 % to keep the cube fully in frame.
+  const baseCameraZ = { 2: 10, 3: 14, 4: 20, 5: 26 }[size] || 14;
+  const cameraZ = isPortrait ? Math.round(baseCameraZ * 1.4) : baseCameraZ;
 
   // Compute crawler world position for the manifolder view marker
   const crawlerWorldPos = crawlerDisplay?.position || null;
 
   return (
-    <div style={styles.root}>
-      {/* Left canvas: Manifolder overview */}
-      <div style={styles.leftPanel}>
+    <div style={{ ...styles.root, flexDirection: isPortrait ? 'column' : 'row' }}>
+      {/* Left/top canvas: Manifolder overview */}
+      <div style={isPortrait ? styles.topPanel : styles.leftPanel}>
         <Canvas camera={{ position: [0, 2, cameraZ], fov: 40 }}>
           <Suspense fallback={null}>
             <ManifoldScene
@@ -577,8 +598,8 @@ export default function PlatformerWormMode({ cubies: initialCubies, size, faceCo
         </div>
       </div>
 
-      {/* Right canvas: Crawler view */}
-      <div style={styles.rightPanel}>
+      {/* Right/bottom canvas: Crawler view */}
+      <div style={isPortrait ? styles.bottomPanel : styles.rightPanel}>
         <Canvas camera={{ position: [0, 0, 10], fov: 55 }}>
           <Suspense fallback={null}>
             <CrawlerScene
@@ -652,6 +673,7 @@ const styles = {
     position: 'fixed', inset: 0, zIndex: 9998,
     display: 'flex', background: '#000',
   },
+  // Landscape layout (default)
   leftPanel: {
     flex: 1, position: 'relative',
     borderRight: '1px solid rgba(96, 165, 250, 0.2)',
@@ -659,6 +681,15 @@ const styles = {
   rightPanel: {
     flex: 1, position: 'relative',
     borderLeft: '1px solid rgba(0, 255, 136, 0.2)',
+  },
+  // Portrait layout — panels stacked vertically
+  topPanel: {
+    flex: 1, position: 'relative',
+    borderBottom: '1px solid rgba(96, 165, 250, 0.2)',
+  },
+  bottomPanel: {
+    flex: 1, position: 'relative',
+    borderTop: '1px solid rgba(0, 255, 136, 0.2)',
   },
   panelLabel: {
     position: 'absolute', bottom: '8px', left: '50%', transform: 'translateX(-50%)',
