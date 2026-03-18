@@ -120,6 +120,9 @@ function useWormCrawler(size, cubies) {
     const crossingCorner = useRef(false);
     const pendingSelfCollision = useRef(null);
     const selfCollisionGraceStepsRef = useRef(0);
+    // Tracks the phase on the previous tick so enter()/exit() hooks fire exactly once
+    // per transition rather than every frame.
+    const prevPhaseRef = useRef('crawling');
 
     // Smooth inter-tile interpolation
     const interpT = useRef(1);          // 0→1 between prev and current tile
@@ -384,342 +387,391 @@ function useWormCrawler(size, cubies) {
             }
         }
 
-        if (phase.current === 'crawling') {
-            const headOnSurface = isSurfaceTilePos(pos.current, size);
-            if (!headOnSurface) {
-                pendingSelfCollision.current = null;
-                pendingTunnelTrigger.current = null;
-            }
-
-            // Apply pending turn — RELATIVE to current heading
-            if (pendingTurns.current.length > 0) {
-                const t = pendingTurns.current.shift();
-                if (t === 'jump') {
-                    startJump();
-                } else if (wormControlMode === 'oriented') {
-                    if (t === 'up' || t === 'down' || t === 'left' || t === 'right') {
-                        moveDir.current = t;
-                    }
-                } else {
-                    if (t === 'left' || t === 'right') {
-                        moveDir.current = turnWorm(moveDir.current, t);
-                    }
-                    if (t === 'down') moveDir.current = turnWorm(turnWorm(moveDir.current, 'left'), 'left');
-                }
-            }
-
-            // Advance interpolation
-            if (interpT.current < 1) {
-                interpT.current = Math.min(1, interpT.current + delta / STEP_SEC);
-            }
-
-            if (pendingVoidKillRef.current?.armed) {
-                const { tunnelKey, exitTileKey } = pendingVoidKillRef.current;
-                const headTileKey = tileKey(pos.current);
-                const hasClearedExitTile = headTileKey !== exitTileKey;
-                const fullyOnNextTile = interpT.current >= 1;
-
-                if (headOnSurface && hasClearedExitTile && fullyOnNextTile) {
-                    pendingVoidKillRef.current = null;
-                    voidTunnelKeysRef.current.add(tunnelKey);
-                    killWorm({ reason: 'voided', tunnelKey, exitTileKey, headTile: headTileKey });
-                    return;
-                }
-            }
-
-            if (headOnSurface && pendingTunnelTrigger.current) {
-                const { x, y, z, dirKey } = pendingTunnelTrigger.current;
-                if (interpT.current >= TUNNEL_TRIGGER_PROGRESS && !isJumping.current) {
-                    beginTunnelTransition(x, y, z, dirKey);
-                    return;
-                }
-            }
-
-            if (headOnSurface && pendingSelfCollision.current) {
-                if (selfCollisionGraceStepsRef.current > 0) {
-                    pendingSelfCollision.current = null;
-                } else if (isJumping.current) {
-                    // Allow jumping over your own body tile before impact threshold.
-                    pendingSelfCollision.current = null;
-                } else if (pendingTunnelTrigger.current) {
-                    // Prioritize wormhole entry over self-collision on the same tile.
-                    // This fixes the bug where entering a wormhole whose entrance is occupied by your tail
-                    // (which is almost always true for the first few tiles of a jump) kills you.
-                    pendingSelfCollision.current = null;
-                } else if (interpT.current >= SELF_COLLISION_TRIGGER_PROGRESS) {
-                    killWorm({
-                        reason: 'self-collision',
-                        progress: Number(interpT.current.toFixed(2)),
-                        headTile: tileKey(pos.current),
-                        collisionTile: pendingSelfCollision.current?.key ?? null,
-                    });
-                    return;
-                }
-            }
-
-            // --- Continuous path recording for contiguous touching clones ---
-            const pWorld = prevWorldPos.current;
-            const cWorld = curWorldPos.current ?? getWorldPos(pos.current);
-
-            // Function to perfectly mathematically evaluate the worm's ground position and normal at ANY timeframe
-            const evaluatePosAndNormal = (tValue) => {
-                let hPos = cWorld.clone();
-                let cNorm = FACE_NORMALS[pos.current.dirKey] ?? new THREE.Vector3(0, 0, 1);
-
-                if (pWorld && tValue < 1) {
-                    if (crossingCorner.current) {
-                        const oldDirKey = prevDirKey.current;
-                        const newDirKey = pos.current.dirKey;
-                        const oldNormal = FACE_NORMALS[oldDirKey];
-                        const newNormal = FACE_NORMALS[newDirKey];
-                        const cornerVertex = pWorld.clone().addScaledVector(newNormal, 0.52);
-
-                        if (tValue < 0.45) {
-                            hPos = pWorld.clone().lerp(cornerVertex, tValue / 0.45);
-                            cNorm = oldNormal.clone();
-                        } else if (tValue > 0.55) {
-                            hPos = cornerVertex.clone().lerp(cWorld, (tValue - 0.55) / 0.45);
-                            cNorm = newNormal.clone();
-                        } else {
-                            hPos = cornerVertex.clone();
-                            cNorm = new THREE.Vector3().lerpVectors(oldNormal, newNormal, (tValue - 0.45) / 0.10).normalize();
-                        }
-                    } else {
-                        hPos = pWorld.clone().lerp(cWorld, tValue);
-                    }
-                }
-                return { hPos, cNorm };
-            };
-
-            const currentEval = evaluatePosAndNormal(interpT.current);
-            headInterpPos.current.copy(currentEval.hPos);
-            currentNormal.current.copy(currentEval.cNorm);
-
-            // Back-fill step history so it is completely framerate independent
-            // If the game lags and skips 0.3 seconds, this perfectly reconstructs the 15 missing physics frames along the true 3D edge curve
-            while (lastRecordedT.current <= interpT.current) {
-                const { hPos: ptPos, cNorm: ptNorm } = evaluatePosAndNormal(lastRecordedT.current);
-
-                // Chain-fountain: each history entry records the jump height that was active at THAT spatial position.
-                // Since jumpT and interpT advance at identical rates (both scale by delta/STEP_SEC), the jumpT at
-                // any recorded position r is: jumpT_now - (interpT_now - r). Clamping to [0,1] naturally zeroes
-                // out positions before the jump started or after it ended. Body segments then inherit the arc as
-                // they travel through this stored lift — exactly like beads lifting off one-by-one in a chain fountain.
-                const jumpTAtR = isJumping.current
-                    ? Math.max(0, Math.min(1, jumpT.current - (interpT.current - lastRecordedT.current)))
-                    : 0;
-                const ptJump = jumpTAtR > 0 ? Math.sin(jumpTAtR * Math.PI) * JUMP_HEIGHT : 0;
-                const ptLifted = ptPos.clone().addScaledVector(ptNorm, WORM_LIFT + ptJump);
-
-                stepHistory.current.unshift({ pos: ptLifted, normal: ptNorm });
-                lastRecordedT.current += 0.02; // A guaranteed resolution of 50 mathematical sub-steps per tile traverse
-            }
-            if (stepHistory.current.length > MAX_TAIL * STEPS_PER_TILE) {
-                stepHistory.current.length = MAX_TAIL * STEPS_PER_TILE;
-            }
-            // -----------------------------------------------------------
-
-            stepAcc.current += delta;
-            // When navigating a corner, traversing double the distance means we should theoretically 
-            // give it more time so the speed looks constant, but the Bezier arc covers it nicely.
-            if (stepAcc.current >= STEP_SEC) {
-                stepAcc.current -= STEP_SEC;
-                interpT.current = 0;
-                lastRecordedT.current = 0;
-                prevWorldPos.current = getWorldPos(pos.current);
-                prevDirKey.current = pos.current.dirKey;
-
-                const oldDirKey = pos.current.dirKey;
-                const next = getNextSurfacePosition(pos.current, moveDir.current, size);
-
-                // We clear the corner navigation flag unless we're about to cross one right now
-                crossingCorner.current = false;
-
-                if (next) {
-                    const crossedFace = next.dirKey !== oldDirKey;
-                    const nextPos = { x: next.x, y: next.y, z: next.z, dirKey: next.dirKey };
-                    const nextKey = tileKey(nextPos);
-                    // tailLength is measured in visual balls, not tiles.
-                    // Convert to approximate occupied tile count so collision checks align with what players see.
-                    const occupiedTiles = Math.max(1, Math.ceil((tailLength.current * BODY_BALL_SPACING) / 1.0));
-                    const bodyTilesBehindHead = Math.max(0, occupiedTiles - 1);
-                    const bodyTrail = tileTrail.current.slice(1, 1 + bodyTilesBehindHead);
-                    const nextOnSurface = isSurfaceTilePos(nextPos, size);
-                    const selfHit = nextOnSurface && selfCollisionGraceStepsRef.current <= 0 && bodyTrail.includes(nextKey);
-                    if (selfHit) {
-                        // Defer self-hit until we've penetrated the tile by 40%.
-                        // This gives players a short reaction window to jump over their body.
-                        pendingSelfCollision.current = { key: nextKey };
-                    }
-
-                    pos.current = nextPos;
-                    if (nextOnSurface) {
-                        tileTrail.current.unshift(nextKey);
-                        if (tileTrail.current.length > MAX_TAIL) tileTrail.current.length = MAX_TAIL;
-                    }
-                    if (next.moveDir) moveDir.current = next.moveDir;
-
-                    if (crossedFace) {
-                        crossingCorner.current = true;
-                    }
-
-                    pendingTunnelTrigger.current = null;
-                    if (!selfHit) {
+        // ── Phase handlers ───────────────────────────────────────────────────────
+        // Each phase owns its update logic plus optional enter()/exit() hooks that
+        // fire exactly once per phase transition (detected via prevPhaseRef).
+        // Defined inline so they always close over the current cubies, wormSpeed, etc.
+        // update() returns true to signal an early exit (replaces bare `return`s).
+        const PHASE_HANDLERS = {
+            crawling: {
+                // enter() fires once when transitioning back from 'exiting'.
+                enter() {
+                    selfCollisionGraceStepsRef.current = SELF_COLLISION_GRACE_STEPS_AFTER_TUNNEL;
+                    useGameStore.setState({ wormPhase: 'crawling', wormOnFlippedTile: false, visualMode: prevVisualModeRef.current ?? 'classic' });
+                    onFlippedTile.current = false;
+                    lastFlippedRef.current = false;
+                },
+                update(delta, STEP_SEC) {
+                    const headOnSurface = isSurfaceTilePos(pos.current, size);
+                    if (!headOnSurface) {
                         pendingSelfCollision.current = null;
-                    }
-                    if (selfCollisionGraceStepsRef.current > 0) {
-                        selfCollisionGraceStepsRef.current -= 1;
-                    }
-                } else {
-                    moveDir.current = turnWorm(turnWorm(moveDir.current, 'left'), 'left');
-                    pendingTunnelTrigger.current = null;
-                    pendingSelfCollision.current = null;
-                }
-
-                // Immediately update curWorldPos so the interpolation target is correct
-                curWorldPos.current = getWorldPos(pos.current);
-
-                // Powerup collision
-                const { x, y, z, dirKey } = pos.current;
-                const puIdx = powerupsRef.current.findIndex(p => p.x === x && p.y === y && p.z === z && p.dirKey === dirKey);
-                if (puIdx !== -1) {
-                    const pickedUp = powerupsRef.current[puIdx];
-                    const liveCubies = useGameStore.getState().cubies;
-                    const pickedSticker = liveCubies?.[pickedUp.x]?.[pickedUp.y]?.[pickedUp.z]?.stickers?.[pickedUp.dirKey];
-                    // Orbs on flipped tiles hover above the surface — worm must jump to reach them
-                    const tileIsFlipped = !!(pickedSticker && pickedSticker.curr !== pickedSticker.orig);
-                    if (tileIsFlipped && !isJumping.current) {
-                        // Worm crawled onto the tile but didn't jump — orb is out of reach
-                    } else {
-                        const pickedFaceId = pickedSticker ? pickedSticker.curr : 0;
-                        const liveColors = resolveColors(useGameStore.getState().settings);
-                        const pickedColor = (pickedFaceId && liveColors[pickedFaceId]) ?? '#22ff88';
-                        applyOrbPickupGrowth(pickedColor, pickedFaceId);
-                        const newPowerup = { ...randomFreeTile(size, [...powerupsRef.current, pos.current]), type: 'apple' };
-                        const next = [...powerupsRef.current];
-                        next[puIdx] = newPowerup;
-                        powerupsRef.current = next;
-                        useGameStore.getState().setWormPowerups(next);
-                    }
-                }
-
-                // Flipped tile detection
-                const sticker = cubies?.[x]?.[y]?.[z]?.stickers?.[dirKey];
-                const isFlipped = !!(sticker && sticker.curr !== sticker.orig);
-                const resolved = isFlipped ? resolveTunnelAtTile(x, y, z, dirKey) : null;
-                const isVoidZone = !!(resolved && voidTunnelKeysRef.current.has(resolved.tunnelKey));
-                onFlippedTile.current = isFlipped && !isVoidZone;
-
-                // Flipped tiles are instant wormholes unless the player is currently jumping over them.
-
-                if (onFlippedTile.current !== lastFlippedRef.current) {
-                    lastFlippedRef.current = onFlippedTile.current;
-                    useGameStore.getState().setWormOnFlippedTile(onFlippedTile.current);
-                }
-
-                if (isFlipped) {
-                    pendingTunnelTrigger.current = { x, y, z, dirKey };
-                    // Swept-entry guard: if the step accumulator remainder indicates the worm has already
-                    // spent ≥ TUNNEL_TRIGGER_PROGRESS of this tile's step time on the flipped tile
-                    // (possible after a lag spike where delta > STEP_SEC), fire the tunnel transition
-                    // immediately. Without this, the deferred trigger can be cleared by a second step
-                    // firing in the following frame before interpT reaches the threshold.
-                    if (!isJumping.current && stepAcc.current / STEP_SEC >= TUNNEL_TRIGGER_PROGRESS) {
                         pendingTunnelTrigger.current = null;
-                        beginTunnelTransition(x, y, z, dirKey);
-                        return;
                     }
-                }
-            }
-        } else if (phase.current === 'entering') {
-            tunnelProgress.current += delta * (2.5 * TUNNEL_SPEED_SCALE);
-            if (activeTunnel.current) {
-                // Head travels first third of the tunnel (entry face → cube interior)
-                const tunnelT = tunnelProgress.current * 0.33;
-                const wp = getTunnelWorldPos(activeTunnel.current, tunnelT, size);
-                headInterpPos.current.set(wp[0], wp[1], wp[2]);
-                const entryN = FACE_NORMALS[activeTunnel.current.entry.dirKey];
-                if (entryN) currentNormal.current.copy(entryN);
-            }
-            if (tunnelProgress.current >= 1) {
-                tunnelProgress.current = 0;
-                phase.current = 'tunnel';
-                useGameStore.getState().setWormPhase('tunnel');
-            }
-        } else if (phase.current === 'tunnel') {
-            tunnelProgress.current += delta * (0.65 * TUNNEL_SPEED_SCALE);
-            if (activeTunnel.current) {
-                // Head travels middle third of the tunnel (through cube core)
-                const tunnelT = 0.33 + tunnelProgress.current * 0.34;
-                const wp = getTunnelWorldPos(activeTunnel.current, tunnelT, size);
-                headInterpPos.current.set(wp[0], wp[1], wp[2]);
-                // Switch normal to exit face at the midpoint
-                const n = tunnelProgress.current > 0.5
-                    ? FACE_NORMALS[activeTunnel.current.exit.dirKey]
-                    : FACE_NORMALS[activeTunnel.current.entry.dirKey];
-                if (n) currentNormal.current.copy(n);
-            }
-            if (tunnelProgress.current >= 1) {
-                tunnelProgress.current = 0;
-                phase.current = 'exiting';
-                useGameStore.getState().setWormPhase('exiting');
-                if (activeTunnel.current) {
-                    const ex = activeTunnel.current.exit;
-                    pos.current = { x: ex.x, y: ex.y, z: ex.z, dirKey: ex.dirKey };
-                    curWorldPos.current = getWorldPos(pos.current);
-                }
-            }
-        } else if (phase.current === 'exiting') {
-            tunnelProgress.current += delta * (2.0 * TUNNEL_SPEED_SCALE);
-            if (activeTunnel.current) {
-                // Head travels final third of the tunnel (cube interior → exit face)
-                const tunnelT = 0.67 + tunnelProgress.current * 0.33;
-                const wp = getTunnelWorldPos(activeTunnel.current, tunnelT, size);
-                headInterpPos.current.set(wp[0], wp[1], wp[2]);
-                const exitN = FACE_NORMALS[activeTunnel.current.exit.dirKey];
-                if (exitN) currentNormal.current.copy(exitN);
-            }
-            if (tunnelProgress.current >= 1) {
-                const voidKillState = pendingVoidKillRef.current;
-                const exitedTunnel = activeTunnel.current; // capture before null
-                const exitStableKey = currentTunnelStableKeyRef.current;
-                tunnelProgress.current = 0;
-                activeTunnel.current = null;
-                currentTunnelStableKeyRef.current = null;
-                if (voidKillState) {
-                    pendingVoidKillRef.current = { ...voidKillState, armed: true };
-                }
 
-                phase.current = 'crawling';
-                selfCollisionGraceStepsRef.current = SELF_COLLISION_GRACE_STEPS_AFTER_TUNNEL;
-                useGameStore.setState({ wormPhase: 'crawling', wormOnFlippedTile: false, visualMode: prevVisualModeRef.current ?? 'classic' });
-                onFlippedTile.current = false;
-                lastFlippedRef.current = false;
+                    // Apply pending turn — RELATIVE to current heading
+                    if (pendingTurns.current.length > 0) {
+                        const t = pendingTurns.current.shift();
+                        if (t === 'jump') {
+                            startJump();
+                        } else if (wormControlMode === 'oriented') {
+                            if (t === 'up' || t === 'down' || t === 'left' || t === 'right') {
+                                moveDir.current = t;
+                            }
+                        } else {
+                            if (t === 'left' || t === 'right') {
+                                moveDir.current = turnWorm(moveDir.current, t);
+                            }
+                            if (t === 'down') moveDir.current = turnWorm(turnWorm(moveDir.current, 'left'), 'left');
+                        }
+                    }
 
-                // Only heal when the required orbs have been fully deposited
-                const exitStore = useGameStore.getState();
-                const exitProgress = exitStableKey ? (exitStore.wormHealingProgress?.[exitStableKey]) : null;
-                if (exitProgress?.deposited >= HEAL_COST && exitedTunnel) {
-                    const { entry, exit: exitTile } = exitedTunnel;
-                    // Write healBurstMap for both tiles BEFORE healing (sticker orig fields intact)
-                    const entrySticker = getStickerSafe(exitStore.cubies, entry.x, entry.y, entry.z, entry.dirKey);
-                    const exitStickerData = getStickerSafe(exitStore.cubies, exitTile.x, exitTile.y, exitTile.z, exitTile.dirKey);
-                    if (entrySticker) healBurstMap.set(getManifoldGridId(entrySticker, size), 1);
-                    if (exitStickerData) healBurstMap.set(getManifoldGridId(exitStickerData, size), 1);
-                    healFiredRef.current = true;
-                    let healed = healSticker(exitStore.cubies, size, entry.x, entry.y, entry.z, entry.dirKey);
-                    healed = healSticker(healed, size, exitTile.x, exitTile.y, exitTile.z, exitTile.dirKey);
-                    exitStore.setCubies(healed);
-                    const newProgress = { ...(exitStore.wormHealingProgress ?? {}) };
-                    delete newProgress[exitStableKey];
-                    exitStore.setWormHealingProgress(newProgress);
-                    healedRef.current += 1;
-                    exitStore.setWormHealedCount(healedRef.current);
-                    pendingHealBurstRef.current = { exitTile: exitedTunnel.exit, entryTile: exitedTunnel.entry };
-                }
-                // else: partial/no deposit — tunnel stays flipped, progress persists
-            }
+                    // Advance interpolation
+                    if (interpT.current < 1) {
+                        interpT.current = Math.min(1, interpT.current + delta / STEP_SEC);
+                    }
+
+                    if (pendingVoidKillRef.current?.armed) {
+                        const { tunnelKey, exitTileKey } = pendingVoidKillRef.current;
+                        const headTileKey = tileKey(pos.current);
+                        const hasClearedExitTile = headTileKey !== exitTileKey;
+                        const fullyOnNextTile = interpT.current >= 1;
+
+                        if (headOnSurface && hasClearedExitTile && fullyOnNextTile) {
+                            pendingVoidKillRef.current = null;
+                            voidTunnelKeysRef.current.add(tunnelKey);
+                            killWorm({ reason: 'voided', tunnelKey, exitTileKey, headTile: headTileKey });
+                            return true;
+                        }
+                    }
+
+                    if (headOnSurface && pendingTunnelTrigger.current) {
+                        const { x, y, z, dirKey } = pendingTunnelTrigger.current;
+                        if (interpT.current >= TUNNEL_TRIGGER_PROGRESS && !isJumping.current) {
+                            beginTunnelTransition(x, y, z, dirKey);
+                            return true;
+                        }
+                    }
+
+                    if (headOnSurface && pendingSelfCollision.current) {
+                        if (selfCollisionGraceStepsRef.current > 0) {
+                            pendingSelfCollision.current = null;
+                        } else if (isJumping.current) {
+                            // Allow jumping over your own body tile before impact threshold.
+                            pendingSelfCollision.current = null;
+                        } else if (pendingTunnelTrigger.current) {
+                            // Prioritize wormhole entry over self-collision on the same tile.
+                            // This fixes the bug where entering a wormhole whose entrance is occupied by your tail
+                            // (which is almost always true for the first few tiles of a jump) kills you.
+                            pendingSelfCollision.current = null;
+                        } else if (interpT.current >= SELF_COLLISION_TRIGGER_PROGRESS) {
+                            killWorm({
+                                reason: 'self-collision',
+                                progress: Number(interpT.current.toFixed(2)),
+                                headTile: tileKey(pos.current),
+                                collisionTile: pendingSelfCollision.current?.key ?? null,
+                            });
+                            return true;
+                        }
+                    }
+
+                    // --- Continuous path recording for contiguous touching clones ---
+                    const pWorld = prevWorldPos.current;
+                    const cWorld = curWorldPos.current ?? getWorldPos(pos.current);
+
+                    // Function to perfectly mathematically evaluate the worm's ground position and normal at ANY timeframe
+                    const evaluatePosAndNormal = (tValue) => {
+                        let hPos = cWorld.clone();
+                        let cNorm = FACE_NORMALS[pos.current.dirKey] ?? new THREE.Vector3(0, 0, 1);
+
+                        if (pWorld && tValue < 1) {
+                            if (crossingCorner.current) {
+                                const oldDirKey = prevDirKey.current;
+                                const newDirKey = pos.current.dirKey;
+                                const oldNormal = FACE_NORMALS[oldDirKey];
+                                const newNormal = FACE_NORMALS[newDirKey];
+                                const cornerVertex = pWorld.clone().addScaledVector(newNormal, 0.52);
+
+                                if (tValue < 0.45) {
+                                    hPos = pWorld.clone().lerp(cornerVertex, tValue / 0.45);
+                                    cNorm = oldNormal.clone();
+                                } else if (tValue > 0.55) {
+                                    hPos = cornerVertex.clone().lerp(cWorld, (tValue - 0.55) / 0.45);
+                                    cNorm = newNormal.clone();
+                                } else {
+                                    hPos = cornerVertex.clone();
+                                    cNorm = new THREE.Vector3().lerpVectors(oldNormal, newNormal, (tValue - 0.45) / 0.10).normalize();
+                                }
+                            } else {
+                                hPos = pWorld.clone().lerp(cWorld, tValue);
+                            }
+                        }
+                        return { hPos, cNorm };
+                    };
+
+                    const currentEval = evaluatePosAndNormal(interpT.current);
+                    headInterpPos.current.copy(currentEval.hPos);
+                    currentNormal.current.copy(currentEval.cNorm);
+
+                    // Back-fill step history so it is completely framerate independent
+                    // If the game lags and skips 0.3 seconds, this perfectly reconstructs the 15 missing physics frames along the true 3D edge curve
+                    while (lastRecordedT.current <= interpT.current) {
+                        const { hPos: ptPos, cNorm: ptNorm } = evaluatePosAndNormal(lastRecordedT.current);
+
+                        // Chain-fountain: each history entry records the jump height that was active at THAT spatial position.
+                        // Since jumpT and interpT advance at identical rates (both scale by delta/STEP_SEC), the jumpT at
+                        // any recorded position r is: jumpT_now - (interpT_now - r). Clamping to [0,1] naturally zeroes
+                        // out positions before the jump started or after it ended. Body segments then inherit the arc as
+                        // they travel through this stored lift — exactly like beads lifting off one-by-one in a chain fountain.
+                        const jumpTAtR = isJumping.current
+                            ? Math.max(0, Math.min(1, jumpT.current - (interpT.current - lastRecordedT.current)))
+                            : 0;
+                        const ptJump = jumpTAtR > 0 ? Math.sin(jumpTAtR * Math.PI) * JUMP_HEIGHT : 0;
+                        const ptLifted = ptPos.clone().addScaledVector(ptNorm, WORM_LIFT + ptJump);
+
+                        stepHistory.current.unshift({ pos: ptLifted, normal: ptNorm });
+                        lastRecordedT.current += 0.02; // A guaranteed resolution of 50 mathematical sub-steps per tile traverse
+                    }
+                    if (stepHistory.current.length > MAX_TAIL * STEPS_PER_TILE) {
+                        stepHistory.current.length = MAX_TAIL * STEPS_PER_TILE;
+                    }
+                    // -----------------------------------------------------------
+
+                    stepAcc.current += delta;
+                    // When navigating a corner, traversing double the distance means we should theoretically
+                    // give it more time so the speed looks constant, but the Bezier arc covers it nicely.
+                    if (stepAcc.current >= STEP_SEC) {
+                        stepAcc.current -= STEP_SEC;
+                        interpT.current = 0;
+                        lastRecordedT.current = 0;
+                        prevWorldPos.current = getWorldPos(pos.current);
+                        prevDirKey.current = pos.current.dirKey;
+
+                        const oldDirKey = pos.current.dirKey;
+                        const next = getNextSurfacePosition(pos.current, moveDir.current, size);
+
+                        // We clear the corner navigation flag unless we're about to cross one right now
+                        crossingCorner.current = false;
+
+                        if (next) {
+                            const crossedFace = next.dirKey !== oldDirKey;
+                            const nextPos = { x: next.x, y: next.y, z: next.z, dirKey: next.dirKey };
+                            const nextKey = tileKey(nextPos);
+                            // tailLength is measured in visual balls, not tiles.
+                            // Convert to approximate occupied tile count so collision checks align with what players see.
+                            const occupiedTiles = Math.max(1, Math.ceil((tailLength.current * BODY_BALL_SPACING) / 1.0));
+                            const bodyTilesBehindHead = Math.max(0, occupiedTiles - 1);
+                            const bodyTrail = tileTrail.current.slice(1, 1 + bodyTilesBehindHead);
+                            const nextOnSurface = isSurfaceTilePos(nextPos, size);
+                            const selfHit = nextOnSurface && selfCollisionGraceStepsRef.current <= 0 && bodyTrail.includes(nextKey);
+                            if (selfHit) {
+                                // Defer self-hit until we've penetrated the tile by 40%.
+                                // This gives players a short reaction window to jump over their body.
+                                pendingSelfCollision.current = { key: nextKey };
+                            }
+
+                            pos.current = nextPos;
+                            if (nextOnSurface) {
+                                tileTrail.current.unshift(nextKey);
+                                if (tileTrail.current.length > MAX_TAIL) tileTrail.current.length = MAX_TAIL;
+                            }
+                            if (next.moveDir) moveDir.current = next.moveDir;
+
+                            if (crossedFace) {
+                                crossingCorner.current = true;
+                            }
+
+                            pendingTunnelTrigger.current = null;
+                            if (!selfHit) {
+                                pendingSelfCollision.current = null;
+                            }
+                            if (selfCollisionGraceStepsRef.current > 0) {
+                                selfCollisionGraceStepsRef.current -= 1;
+                            }
+                        } else {
+                            moveDir.current = turnWorm(turnWorm(moveDir.current, 'left'), 'left');
+                            pendingTunnelTrigger.current = null;
+                            pendingSelfCollision.current = null;
+                        }
+
+                        // Immediately update curWorldPos so the interpolation target is correct
+                        curWorldPos.current = getWorldPos(pos.current);
+
+                        // Powerup collision
+                        const { x, y, z, dirKey } = pos.current;
+                        const puIdx = powerupsRef.current.findIndex(p => p.x === x && p.y === y && p.z === z && p.dirKey === dirKey);
+                        if (puIdx !== -1) {
+                            const pickedUp = powerupsRef.current[puIdx];
+                            const liveCubies = useGameStore.getState().cubies;
+                            const pickedSticker = liveCubies?.[pickedUp.x]?.[pickedUp.y]?.[pickedUp.z]?.stickers?.[pickedUp.dirKey];
+                            // Orbs on flipped tiles hover above the surface — worm must jump to reach them
+                            const tileIsFlipped = !!(pickedSticker && pickedSticker.curr !== pickedSticker.orig);
+                            if (tileIsFlipped && !isJumping.current) {
+                                // Worm crawled onto the tile but didn't jump — orb is out of reach
+                            } else {
+                                const pickedFaceId = pickedSticker ? pickedSticker.curr : 0;
+                                const liveColors = resolveColors(useGameStore.getState().settings);
+                                const pickedColor = (pickedFaceId && liveColors[pickedFaceId]) ?? '#22ff88';
+                                applyOrbPickupGrowth(pickedColor, pickedFaceId);
+                                const newPowerup = { ...randomFreeTile(size, [...powerupsRef.current, pos.current]), type: 'apple' };
+                                const next = [...powerupsRef.current];
+                                next[puIdx] = newPowerup;
+                                powerupsRef.current = next;
+                                useGameStore.getState().setWormPowerups(next);
+                            }
+                        }
+
+                        // Flipped tile detection
+                        const sticker = cubies?.[x]?.[y]?.[z]?.stickers?.[dirKey];
+                        const isFlipped = !!(sticker && sticker.curr !== sticker.orig);
+                        const resolved = isFlipped ? resolveTunnelAtTile(x, y, z, dirKey) : null;
+                        const isVoidZone = !!(resolved && voidTunnelKeysRef.current.has(resolved.tunnelKey));
+                        onFlippedTile.current = isFlipped && !isVoidZone;
+
+                        // Flipped tiles are instant wormholes unless the player is currently jumping over them.
+
+                        if (onFlippedTile.current !== lastFlippedRef.current) {
+                            lastFlippedRef.current = onFlippedTile.current;
+                            useGameStore.getState().setWormOnFlippedTile(onFlippedTile.current);
+                        }
+
+                        if (isFlipped) {
+                            pendingTunnelTrigger.current = { x, y, z, dirKey };
+                            // Swept-entry guard: if the step accumulator remainder indicates the worm has already
+                            // spent ≥ TUNNEL_TRIGGER_PROGRESS of this tile's step time on the flipped tile
+                            // (possible after a lag spike where delta > STEP_SEC), fire the tunnel transition
+                            // immediately. Without this, the deferred trigger can be cleared by a second step
+                            // firing in the following frame before interpT reaches the threshold.
+                            if (!isJumping.current && stepAcc.current / STEP_SEC >= TUNNEL_TRIGGER_PROGRESS) {
+                                pendingTunnelTrigger.current = null;
+                                beginTunnelTransition(x, y, z, dirKey);
+                                return true;
+                            }
+                        }
+                    }
+                    return false;
+                },
+            },
+
+            entering: {
+                // enter() is intentionally absent: beginTunnelTransition sets wormPhase/'glass'
+                // immediately on the same tick the transition is triggered — no one-frame delay.
+                update(delta) {
+                    tunnelProgress.current += delta * (2.5 * TUNNEL_SPEED_SCALE);
+                    if (activeTunnel.current) {
+                        // Head travels first third of the tunnel (entry face → cube interior)
+                        const tunnelT = tunnelProgress.current * 0.33;
+                        const wp = getTunnelWorldPos(activeTunnel.current, tunnelT, size);
+                        headInterpPos.current.set(wp[0], wp[1], wp[2]);
+                        const entryN = FACE_NORMALS[activeTunnel.current.entry.dirKey];
+                        if (entryN) currentNormal.current.copy(entryN);
+                    }
+                    if (tunnelProgress.current >= 1) {
+                        tunnelProgress.current = 0;
+                        phase.current = 'tunnel';
+                        // tunnel.enter() fires next tick → setWormPhase('tunnel')
+                    }
+                    return false;
+                },
+            },
+
+            tunnel: {
+                enter() {
+                    useGameStore.getState().setWormPhase('tunnel');
+                },
+                update(delta) {
+                    tunnelProgress.current += delta * (0.65 * TUNNEL_SPEED_SCALE);
+                    if (activeTunnel.current) {
+                        // Head travels middle third of the tunnel (through cube core)
+                        const tunnelT = 0.33 + tunnelProgress.current * 0.34;
+                        const wp = getTunnelWorldPos(activeTunnel.current, tunnelT, size);
+                        headInterpPos.current.set(wp[0], wp[1], wp[2]);
+                        // Switch normal to exit face at the midpoint
+                        const n = tunnelProgress.current > 0.5
+                            ? FACE_NORMALS[activeTunnel.current.exit.dirKey]
+                            : FACE_NORMALS[activeTunnel.current.entry.dirKey];
+                        if (n) currentNormal.current.copy(n);
+                    }
+                    if (tunnelProgress.current >= 1) {
+                        tunnelProgress.current = 0;
+                        phase.current = 'exiting';
+                        // exiting.enter() fires next tick → setWormPhase + pos snap to exit tile
+                    }
+                    return false;
+                },
+            },
+
+            exiting: {
+                enter() {
+                    useGameStore.getState().setWormPhase('exiting');
+                    // Snap the logical grid position to the exit tile so crawling
+                    // resumes from the correct sticker when this phase completes.
+                    if (activeTunnel.current) {
+                        const ex = activeTunnel.current.exit;
+                        pos.current = { x: ex.x, y: ex.y, z: ex.z, dirKey: ex.dirKey };
+                        curWorldPos.current = getWorldPos(pos.current);
+                    }
+                },
+                update(delta) {
+                    tunnelProgress.current += delta * (2.0 * TUNNEL_SPEED_SCALE);
+                    if (activeTunnel.current) {
+                        // Head travels final third of the tunnel (cube interior → exit face)
+                        const tunnelT = 0.67 + tunnelProgress.current * 0.33;
+                        const wp = getTunnelWorldPos(activeTunnel.current, tunnelT, size);
+                        headInterpPos.current.set(wp[0], wp[1], wp[2]);
+                        const exitN = FACE_NORMALS[activeTunnel.current.exit.dirKey];
+                        if (exitN) currentNormal.current.copy(exitN);
+                    }
+                    if (tunnelProgress.current >= 1) {
+                        const voidKillState = pendingVoidKillRef.current;
+                        const exitedTunnel = activeTunnel.current; // capture before null
+                        const exitStableKey = currentTunnelStableKeyRef.current;
+                        tunnelProgress.current = 0;
+                        activeTunnel.current = null;
+                        currentTunnelStableKeyRef.current = null;
+                        if (voidKillState) {
+                            pendingVoidKillRef.current = { ...voidKillState, armed: true };
+                        }
+
+                        phase.current = 'crawling';
+                        // crawling.enter() fires next tick → grace steps + Zustand crawling reset
+
+                        // Heal immediately at exit completion (not deferred) when enough orbs deposited.
+                        const exitStore = useGameStore.getState();
+                        const exitProgress = exitStableKey ? (exitStore.wormHealingProgress?.[exitStableKey]) : null;
+                        if (exitProgress?.deposited >= HEAL_COST && exitedTunnel) {
+                            const { entry, exit: exitTile } = exitedTunnel;
+                            // Write healBurstMap for both tiles BEFORE healing (sticker orig fields intact)
+                            const entrySticker = getStickerSafe(exitStore.cubies, entry.x, entry.y, entry.z, entry.dirKey);
+                            const exitStickerData = getStickerSafe(exitStore.cubies, exitTile.x, exitTile.y, exitTile.z, exitTile.dirKey);
+                            if (entrySticker) healBurstMap.set(getManifoldGridId(entrySticker, size), 1);
+                            if (exitStickerData) healBurstMap.set(getManifoldGridId(exitStickerData, size), 1);
+                            healFiredRef.current = true;
+                            let healed = healSticker(exitStore.cubies, size, entry.x, entry.y, entry.z, entry.dirKey);
+                            healed = healSticker(healed, size, exitTile.x, exitTile.y, exitTile.z, exitTile.dirKey);
+                            exitStore.setCubies(healed);
+                            const newProgress = { ...(exitStore.wormHealingProgress ?? {}) };
+                            delete newProgress[exitStableKey];
+                            exitStore.setWormHealingProgress(newProgress);
+                            healedRef.current += 1;
+                            exitStore.setWormHealedCount(healedRef.current);
+                            pendingHealBurstRef.current = { exitTile: exitedTunnel.exit, entryTile: exitedTunnel.entry };
+                        }
+                        // else: partial/no deposit — tunnel stays flipped, progress persists
+                    }
+                    return false;
+                },
+            },
+        };
+
+        // ── Dispatch: detect phase transitions, then run the active handler ──────
+        const currentPhase = phase.current;
+        if (prevPhaseRef.current !== currentPhase) {
+            PHASE_HANDLERS[prevPhaseRef.current]?.exit?.();
+            PHASE_HANDLERS[currentPhase]?.enter?.();
+            prevPhaseRef.current = currentPhase;
         }
+        if (PHASE_HANDLERS[currentPhase].update(delta, STEP_SEC)) return;
+
     }, [size, cubies, wormSpeed, wormControlMode, wormholeInterval, beginTunnelTransition, resolveTunnelAtTile, killWorm]); // eslint-disable-line react-hooks/exhaustive-deps
 
 
@@ -769,6 +821,7 @@ function useWormCrawler(size, cubies) {
         tunnelUseCountsRef.current = new Map();
         voidTunnelKeysRef.current = new Set();
         pendingVoidKillRef.current = null;
+        prevPhaseRef.current = 'crawling';
 
         powerupsRef.current = initial;
         alive.current = true;

@@ -1,4 +1,10 @@
+// Module-level cache: cube sizes only range 2–5, so this is at most 4 entries.
+// Both callers (randomFreeTile, randomUnflippedTile) immediately call .filter() on
+// the result, which creates a new array — the cached reference is never mutated.
+const _tileCache = new Map();
+
 export function getAllSurfaceTiles(size) {
+    if (_tileCache.has(size)) return _tileCache.get(size);
     const tiles = [];
     const faces = [
         ['PX', 'x', size - 1], ['NX', 'x', 0],
@@ -28,6 +34,7 @@ export function getAllSurfaceTiles(size) {
         }
     }
 
+    _tileCache.set(size, tiles);
     return tiles;
 }
 
