@@ -26,6 +26,7 @@ const _worldAxes = {
 // Scratch vectors used per-frame in the animator (never allocated during render).
 const _scratchPos = new THREE.Vector3();
 const _scratchBob = new THREE.Vector3();
+const _rainbowColor = new THREE.Color();
 
 // ── Shared module-level geometries (M2) ─────────────────────────────────────
 // Pre-built once at module load, shared across all SingleOrb instances.
@@ -54,7 +55,7 @@ const _orbGeos = {
 
 // SingleOrb renders geometry and registers its refs with the parent animator.
 // It has NO useFrame — all animation is driven by the single OrbAnimator in ParityOrbs.
-function SingleOrb({ position, color = '#ffd700', antipodalColor = '#ffd700', collected = false, isTarget = false, dirKey = 'PY', orbKey, registerAnim, unregisterAnim, gridX = -1, gridY = -1, gridZ = -1 }) {
+function SingleOrb({ position, color = '#ffd700', antipodalColor = '#ffd700', collected = false, isTarget = false, elevated = false, dirKey = 'PY', orbKey, registerAnim, unregisterAnim, gridX = -1, gridY = -1, gridZ = -1 }) {
   const orbGroupRef = useRef();
   const coreRef = useRef();
   const shellRef = useRef();
@@ -73,6 +74,8 @@ function SingleOrb({ position, color = '#ffd700', antipodalColor = '#ffd700', co
   // Keep mutable refs so the animator always reads current values without causing re-renders
   const isTargetRef = useRef(isTarget);
   isTargetRef.current = isTarget;
+  const elevatedRef = useRef(elevated);
+  elevatedRef.current = elevated;
   const positionRef = useRef(position);
   positionRef.current = position;
   const dirKeyRef = useRef(dirKey);
@@ -99,6 +102,7 @@ function SingleOrb({ position, color = '#ffd700', antipodalColor = '#ffd700', co
       get electrons() { return electronRefs.current; },
       get outline() { return outlineRef.current; },
       get isTarget() { return isTargetRef.current; },
+      get elevated() { return elevatedRef.current; },
       get position() { return positionRef.current; },
       get dirKey() { return dirKeyRef.current; },
       get gridX() { return gridXRef.current; },
@@ -286,6 +290,35 @@ export default function ParityOrbs({ orbs, size, explosionFactor = 0, mode = 'su
         glow.scale.setScalar(1 + Math.sin(time * 2.7) * 0.08);
       }
 
+      // Rainbow pulse for elevated orbs (on flipped tiles)
+      const { elevated } = refs;
+      if (elevated) {
+        const hue = (time * 0.3) % 1; // full cycle every ~3.3 s
+        _rainbowColor.setHSL(hue, 1.0, 0.62);
+        if (core && core.material) {
+          core.material.color.copy(_rainbowColor);
+          core.material.emissive.copy(_rainbowColor);
+        }
+        if (shell && shell.material) shell.material.color.copy(_rainbowColor);
+        _rainbowColor.setHSL((hue + 0.33) % 1, 1.0, 0.62);
+        if (ringA && ringA.material) ringA.material.color.copy(_rainbowColor);
+        _rainbowColor.setHSL((hue + 0.67) % 1, 1.0, 0.62);
+        if (ringB && ringB.material) ringB.material.color.copy(_rainbowColor);
+        _rainbowColor.setHSL(hue, 1.0, 0.62);
+        if (ringC && ringC.material) ringC.material.color.copy(_rainbowColor);
+        for (let i = 0; i < electrons.length; i++) {
+          const el = electrons[i];
+          if (el && el.material) {
+            _rainbowColor.setHSL((hue + i * 0.33) % 1, 1.0, 0.75);
+            el.material.color.copy(_rainbowColor);
+          }
+        }
+        if (glow && glow.material) {
+          _rainbowColor.setHSL((hue + 0.5) % 1, 1.0, 0.65);
+          glow.material.color.copy(_rainbowColor);
+        }
+      }
+
       // Target lock ring
       if (targetGlow && isTarget) {
         targetGlow.rotation.z = time * 0.9;
@@ -306,10 +339,10 @@ export default function ParityOrbs({ orbs, size, explosionFactor = 0, mode = 'su
         key = `${orb.tunnelId}-${orb.t}`;
       } else {
         position = getSegmentWorldPos(orb, size, explosionFactor);
-        // Elevated orbs (on flipped tiles) hover above the surface so the worm must jump to collect them
+        // Elevated orbs (on flipped tiles) hover well above the surface so the worm must jump to collect them
         if (orb.elevated) {
           const bn = BOB_NORMALS[orb.dirKey] || BOB_NORMALS.PY;
-          const ELEVATED_HOVER = 0.65;
+          const ELEVATED_HOVER = 1.2;
           position = [position[0] + bn[0] * ELEVATED_HOVER, position[1] + bn[1] * ELEVATED_HOVER, position[2] + bn[2] * ELEVATED_HOVER];
         }
         key = `${orb.x}-${orb.y}-${orb.z}-${orb.dirKey}`;
@@ -322,6 +355,7 @@ export default function ParityOrbs({ orbs, size, explosionFactor = 0, mode = 'su
         dirKey: orb.dirKey || 'PY',
         key,
         isTarget: isTunnelMode && orb.tunnelId === targetTunnelId,
+        elevated: orb.elevated || false,
         gridX: orb.x ?? -1,
         gridY: orb.y ?? -1,
         gridZ: orb.z ?? -1,
@@ -340,6 +374,7 @@ export default function ParityOrbs({ orbs, size, explosionFactor = 0, mode = 'su
           antipodalColor={data.antipodalColor}
           dirKey={data.dirKey}
           isTarget={data.isTarget}
+          elevated={data.elevated}
           gridX={data.gridX}
           gridY={data.gridY}
           gridZ={data.gridZ}
