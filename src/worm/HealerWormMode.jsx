@@ -501,7 +501,17 @@ function useWormCrawler(size, cubies) {
             // If the game lags and skips 0.3 seconds, this perfectly reconstructs the 15 missing physics frames along the true 3D edge curve
             while (lastRecordedT.current <= interpT.current) {
                 const { hPos: ptPos, cNorm: ptNorm } = evaluatePosAndNormal(lastRecordedT.current);
-                const ptLifted = ptPos.clone().addScaledVector(ptNorm, WORM_LIFT);
+
+                // Chain-fountain: each history entry records the jump height that was active at THAT spatial position.
+                // Since jumpT and interpT advance at identical rates (both scale by delta/STEP_SEC), the jumpT at
+                // any recorded position r is: jumpT_now - (interpT_now - r). Clamping to [0,1] naturally zeroes
+                // out positions before the jump started or after it ended. Body segments then inherit the arc as
+                // they travel through this stored lift — exactly like beads lifting off one-by-one in a chain fountain.
+                const jumpTAtR = isJumping.current
+                    ? Math.max(0, Math.min(1, jumpT.current - (interpT.current - lastRecordedT.current)))
+                    : 0;
+                const ptJump = jumpTAtR > 0 ? Math.sin(jumpTAtR * Math.PI) * JUMP_HEIGHT : 0;
+                const ptLifted = ptPos.clone().addScaledVector(ptNorm, WORM_LIFT + ptJump);
 
                 stepHistory.current.unshift({ pos: ptLifted, normal: ptNorm });
                 lastRecordedT.current += 0.02; // A guaranteed resolution of 50 mathematical sub-steps per tile traverse
