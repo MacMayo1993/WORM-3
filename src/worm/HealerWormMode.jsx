@@ -501,8 +501,7 @@ function useWormCrawler(size, cubies) {
             // If the game lags and skips 0.3 seconds, this perfectly reconstructs the 15 missing physics frames along the true 3D edge curve
             while (lastRecordedT.current <= interpT.current) {
                 const { hPos: ptPos, cNorm: ptNorm } = evaluatePosAndNormal(lastRecordedT.current);
-                const ptJump = isJumping.current ? Math.sin(jumpT.current * Math.PI) * JUMP_HEIGHT : 0;
-                const ptLifted = ptPos.clone().addScaledVector(ptNorm, WORM_LIFT + ptJump);
+                const ptLifted = ptPos.clone().addScaledVector(ptNorm, WORM_LIFT);
 
                 stepHistory.current.unshift({ pos: ptLifted, normal: ptNorm });
                 lastRecordedT.current += 0.02; // A guaranteed resolution of 50 mathematical sub-steps per tile traverse
