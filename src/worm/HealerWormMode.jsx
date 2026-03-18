@@ -258,6 +258,15 @@ function useWormCrawler(size, cubies) {
         const traversals = tunnelUseCountsRef.current.get(tunnelKey) ?? 0;
         const nextTraversals = traversals + 1;
         tunnelUseCountsRef.current.set(tunnelKey, nextTraversals);
+        if (nextTraversals === WORMHOLE_MAX_TRAVERSALS) {
+            // Final free traversal — worm completes this tunnel, then dies when it steps
+            // off the exit tile. Arms the deferred kill checked in the crawling phase.
+            pendingVoidKillRef.current = {
+                tunnelKey,
+                exitTileKey: tileKey(tunnel.exit),
+                armed: false,
+            };
+        }
         if (nextTraversals > WORMHOLE_MAX_TRAVERSALS) {
             // 4th touch: this tunnel is now fully void and kills immediately on contact.
             voidTunnelKeysRef.current.add(tunnelKey);
@@ -872,11 +881,41 @@ function useWormCrawler(size, cubies) {
             s => s.rotationEpoch,
             () => {
                 const rot = lastPendingMoveRef.current;
-                if (!rot || !powerupsRef.current.length) return;
+                if (!rot) return;
                 const { axis, dir, sliceIndex } = rot;
-                const rotated = powerupsRef.current.map(p => rotateTilePosition(p, axis, sliceIndex, dir, size));
-                powerupsRef.current = rotated;
-                useGameStore.getState().setWormPowerups(rotated);
+
+                // Rotate powerups
+                if (powerupsRef.current.length) {
+                    const rotated = powerupsRef.current.map(p => rotateTilePosition(p, axis, sliceIndex, dir, size));
+                    powerupsRef.current = rotated;
+                    useGameStore.getState().setWormPowerups(rotated);
+                }
+
+                // Rotate the worm's logical grid position so it stays on its tile
+                const newPos = rotateTilePosition(pos.current, axis, sliceIndex, dir, size);
+                pos.current = newPos;
+                curWorldPos.current = new THREE.Vector3(
+                    ...getStickerWorldPos(newPos.x, newPos.y, newPos.z, newPos.dirKey, size, 0)
+                );
+
+                // Rotate the self-collision tile trail
+                tileTrail.current = tileTrail.current.map(key => {
+                    const [tx, ty, tz, tdirKey] = key.split(',');
+                    const r = rotateTilePosition(
+                        { x: Number(tx), y: Number(ty), z: Number(tz), dirKey: tdirKey },
+                        axis, sliceIndex, dir, size
+                    );
+                    return `${r.x},${r.y},${r.z},${r.dirKey}`;
+                });
+
+                // If mid-tunnel, rotate active tunnel endpoints so exit snap lands on the correct tile
+                if (activeTunnel.current) {
+                    activeTunnel.current = {
+                        ...activeTunnel.current,
+                        entry: rotateTilePosition(activeTunnel.current.entry, axis, sliceIndex, dir, size),
+                        exit: rotateTilePosition(activeTunnel.current.exit, axis, sliceIndex, dir, size),
+                    };
+                }
             }
         );
         return unsub;
