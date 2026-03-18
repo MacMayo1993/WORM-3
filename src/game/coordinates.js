@@ -4,32 +4,7 @@ import * as THREE from 'three';
 
 // Get grid (r,c) position for a sticker based on its original position
 // Ensures M*-001 is always top-left when viewing face head-on
-export const getGridRC = (origPos, origDir, size) => {
-  const { x, y, z } = origPos;
-
-  if (origDir === 'PZ') {
-    // Red face (front) - viewed from front
-    return { r: size - 1 - y, c: x };
-  }
-  if (origDir === 'NZ') {
-    // Orange face (back) - viewed from back (flipped horizontally)
-    return { r: size - 1 - y, c: size - 1 - x };
-  }
-  if (origDir === 'PX') {
-    // Blue face (right) - viewed from right
-    return { r: size - 1 - y, c: size - 1 - z };
-  }
-  if (origDir === 'NX') {
-    // Green face (left) - viewed from left (flipped horizontally)
-    return { r: size - 1 - y, c: z };
-  }
-  if (origDir === 'PY') {
-    // White face (top) - viewed from top, looking down from +Y
-    return { r: z, c: x };
-  }
-  // NY - Yellow face (bottom) - viewed from bottom, looking up from -Y
-  return { r: size - 1 - z, c: x };
-};
+export const getGridRC = (origPos, origDir, size) => faceRCFor(origDir, origPos.x, origPos.y, origPos.z, size);
 
 // Get manifold-grid ID like "M1-001"
 export const getManifoldGridId = (sticker, size) => {
