@@ -43,15 +43,16 @@ export const DIR_TO_VEC = {
   NZ: [0, 0, -1]    // Back (-Z)
 };
 
-// Convert vector to direction key
+// Convert vector to direction key — O(1) Map lookup instead of 6-branch if-chain
+const _VEC_TO_DIR_MAP = new Map([
+  ['1,0,0', 'PX'], ['-1,0,0', 'NX'],
+  ['0,1,0', 'PY'], ['0,-1,0', 'NY'],
+  ['0,0,1', 'PZ'], ['0,0,-1', 'NZ'],
+]);
 export const VEC_TO_DIR = (x, y, z) => {
-  if (x === 1 && y === 0 && z === 0) return 'PX';
-  if (x === -1 && y === 0 && z === 0) return 'NX';
-  if (x === 0 && y === 1 && z === 0) return 'PY';
-  if (x === 0 && y === -1 && z === 0) return 'NY';
-  if (x === 0 && y === 0 && z === 1) return 'PZ';
-  if (x === 0 && y === 0 && z === -1) return 'NZ';
-  throw new Error(`VEC_TO_DIR: invalid vector (${x}, ${y}, ${z})`);
+  const dir = _VEC_TO_DIR_MAP.get(`${x},${y},${z}`);
+  if (!dir) throw new Error(`VEC_TO_DIR: invalid vector (${x}, ${y}, ${z})`);
+  return dir;
 };
 
 // Antipodal face mapping (for Antipodal Mode)

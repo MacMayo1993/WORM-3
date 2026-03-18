@@ -1458,8 +1458,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         </Text>
       )}
 
-      {/* Per-tile health bar — visible in Disparity Mode only, for live tiles */}
-      {chaosLevel > 0 && !isDead && (
+      {/* Per-tile health bar — Disparity Mode always; standard mode once a tile has flips (approaching FLIP_CAP death) */}
+      {!isDead && (meta?.flips ?? 0) > 0 && (
         <DisparityHealthBar flips={meta?.flips ?? 0} flipCap={effectiveFlipCap} />
       )}
 

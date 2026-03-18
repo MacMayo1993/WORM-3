@@ -85,36 +85,8 @@ export const extractFaceGrid = (cubies, size, faceDir) => {
 // Check if Sudokube is solved (all faces are valid Latin squares based on current positions)
 export const checkSudokubeSolved = (cubies, size) => {
   const FACE_DIRS = ['PZ', 'NZ', 'PX', 'NX', 'PY', 'NY'];
-
   for (const faceDir of FACE_DIRS) {
-    // Build the actual value grid based on sticker positions
-    const grid = Array.from({ length: size }, () => Array(size).fill(0));
-
-    // Only iterate the single plane of cubies that carries stickers for this face
-    const fill = (x, y, z) => {
-      const st = cubies[x][y][z].stickers[faceDir];
-      if (st) {
-        const { r, c: col } = faceRCFor(faceDir, x, y, z, size);
-        grid[r][col] = faceValue(st.origDir, st.origPos.x, st.origPos.y, st.origPos.z, size);
-      }
-    };
-
-    if (faceDir === 'PX') {
-      for (let y = 0; y < size; y++) for (let z = 0; z < size; z++) fill(size - 1, y, z);
-    } else if (faceDir === 'NX') {
-      for (let y = 0; y < size; y++) for (let z = 0; z < size; z++) fill(0, y, z);
-    } else if (faceDir === 'PY') {
-      for (let x = 0; x < size; x++) for (let z = 0; z < size; z++) fill(x, size - 1, z);
-    } else if (faceDir === 'NY') {
-      for (let x = 0; x < size; x++) for (let z = 0; z < size; z++) fill(x, 0, z);
-    } else if (faceDir === 'PZ') {
-      for (let x = 0; x < size; x++) for (let y = 0; y < size; y++) fill(x, y, size - 1);
-    } else {
-      // NZ
-      for (let x = 0; x < size; x++) for (let y = 0; y < size; y++) fill(x, y, 0);
-    }
-
-    if (!checkFaceLatinSquare(grid, size)) return false;
+    if (!checkFaceLatinSquare(extractFaceGrid(cubies, size, faceDir), size)) return false;
   }
   return true;
 };

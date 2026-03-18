@@ -32,6 +32,15 @@ export class Worm3CubeVerifier {
     this.size = size;
     this.cubies = cubies ?? makeCubies(size);
     this.moveHistory = [];
+    this._manifoldMap = null; // lazily built, invalidated by rotations
+  }
+
+  // Returns the cached manifold map, building it on first access or after rotation.
+  _getManifoldMap() {
+    if (!this._manifoldMap) {
+      this._manifoldMap = buildManifoldGridMap(this.cubies, this.size);
+    }
+    return this._manifoldMap;
   }
 
   rotateSlice(axis, sliceIndex, turns = 1) {
@@ -45,11 +54,12 @@ export class Worm3CubeVerifier {
       this.cubies = rotateSliceCubies(this.cubies, this.size, axis, sliceIndex, dir);
     }
 
+    this._manifoldMap = null; // rotation changes cubie geometry — invalidate cache
     this.moveHistory.push({ type: 'rotate', axis, sliceIndex, dir, turns: count });
   }
 
   flipPair(x, y, z, dirKey) {
-    const manifoldMap = buildManifoldGridMap(this.cubies, this.size);
+    const manifoldMap = this._getManifoldMap();
     const sticker = this.cubies?.[x]?.[y]?.[z]?.stickers?.[dirKey];
     if (!sticker) return false;
 
