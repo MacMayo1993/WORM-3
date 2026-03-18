@@ -131,10 +131,16 @@ export const getActiveTunnels = (cubies, size, cachedManifoldMap = null) => {
           // Pre-compute world positions so findNextTunnel avoids per-call getStickerWorldPos
           const entryWorld = getStickerWorldPos(x, y, z, dirKey, size, 0);
           const exitWorld = getStickerWorldPos(antipodal.x, antipodal.y, antipodal.z, antipodal.dirKey, size, 0);
+          // Canonical (order-independent) tunnel ID: sort both endpoint keys so the same
+          // antipodal pair always yields the same ID regardless of which end the scan
+          // discovers first.  After a cube rotation the scan may encounter the pair in
+          // the opposite order, so a positional ID like `tunnel-${x}-${y}-${z}-${dirKey}`
+          // would change, breaking any tunnel-ID-based lookups.
           // No Object.freeze — frozen objects prevent V8 property-access optimisation
           // and tunnel objects are already treated as immutable by all consumers.
+          const id = entryKey < exitKey ? `${entryKey}|${exitKey}` : `${exitKey}|${entryKey}`;
           tunnels.push({
-            id: `tunnel-${x}-${y}-${z}-${dirKey}`,
+            id,
             entry: { x, y, z, dirKey },
             exit: { x: antipodal.x, y: antipodal.y, z: antipodal.z, dirKey: antipodal.dirKey },
             flips: Math.max(1, flips),
@@ -164,28 +170,29 @@ export const getTunnelWorldPos = (tunnel, t, size, explosionFactor = 0) => {
   const scale = 1 + explosionFactor * 1.8;
 
   // Use the geometric center of each face tile (not sticker offset).
-  const entryCenter = new THREE.Vector3(
+  // Write into pre-allocated scratch vectors to avoid per-call heap allocation.
+  _tunnelEntry.set(
     (tunnel.entry.x - k) * scale,
     (tunnel.entry.y - k) * scale,
     (tunnel.entry.z - k) * scale
   );
-  const exitCenter = new THREE.Vector3(
+  _tunnelExit.set(
     (tunnel.exit.x - k) * scale,
     (tunnel.exit.y - k) * scale,
     (tunnel.exit.z - k) * scale
   );
-  const coreCenter = new THREE.Vector3(0, 0, 0);
+  // _tunnelCore is always (0,0,0) — no need to re-set.
 
   // Enforce exact path: entry tile center -> void core center -> exit tile center.
   if (t <= 0.5) {
     const localT = Math.max(0, t) * 2;
-    const result = entryCenter.clone().lerp(coreCenter, localT);
-    return [result.x, result.y, result.z];
+    _tunnelResult.lerpVectors(_tunnelEntry, _tunnelCore, localT);
+    return [_tunnelResult.x, _tunnelResult.y, _tunnelResult.z];
   }
 
   const localT = (Math.min(1, t) - 0.5) * 2;
-  const result = coreCenter.clone().lerp(exitCenter, localT);
-  return [result.x, result.y, result.z];
+  _tunnelResult.lerpVectors(_tunnelCore, _tunnelExit, localT);
+  return [_tunnelResult.x, _tunnelResult.y, _tunnelResult.z];
 };
 
 /**
@@ -232,6 +239,14 @@ export const getTunnelSideKey = (endpoint) => (
  * @param {number} size - Cube size
  * @returns {Object|null} Best next tunnel or null if none available
  */
+// Module-level scratch vectors shared by getTunnelWorldPos and findNextTunnel.
+// getTunnelWorldPos is called for every rendered worm segment every frame, so
+// allocating new Vector3s on each call creates significant GC pressure.
+// These are safe to reuse because all callers run synchronously on the main thread.
+const _tunnelEntry = new THREE.Vector3();
+const _tunnelExit = new THREE.Vector3();
+const _tunnelCore = new THREE.Vector3(0, 0, 0);
+const _tunnelResult = new THREE.Vector3();
 // Reusable scratch vector for findNextTunnel — avoids per-call allocation
 const _findExitVec = new THREE.Vector3();
 
@@ -343,8 +358,15 @@ export const spawnTunnelOrbs = (tunnels, count, wormSegments = [], faceColors = 
     wormTunnelTs.get(seg.tunnelId).push(seg.t);
   }
 
-  // Shuffle tunnels for random placement
-  const shuffledTunnels = [...tunnels].sort(() => Math.random() - 0.5);
+  // Uniform Fisher-Yates shuffle — `sort(() => Math.random() - 0.5)` is statistically
+  // biased because the comparator is not a consistent total order.
+  const shuffledTunnels = [...tunnels];
+  for (let i = shuffledTunnels.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = shuffledTunnels[i];
+    shuffledTunnels[i] = shuffledTunnels[j];
+    shuffledTunnels[j] = tmp;
+  }
 
   for (const tunnel of shuffledTunnels) {
     if (orbs.length >= count) break;
@@ -371,10 +393,17 @@ export const spawnTunnelOrbs = (tunnels, count, wormSegments = [], faceColors = 
     }
   }
 
-  // If we need more orbs, allow multiple per tunnel
-  while (orbs.length < count && shuffledTunnels.length > 0) {
+  // If we need more orbs, allow multiple per tunnel.
+  // Vary t by orb index so concurrent orbs in the same tunnel don't overlap.
+  let fallbackAttempts = 0;
+  const maxFallbackAttempts = count * 10; // safety cap against infinite loops
+  while (orbs.length < count && shuffledTunnels.length > 0 && fallbackAttempts < maxFallbackAttempts) {
+    fallbackAttempts++;
     const tunnel = shuffledTunnels[orbs.length % shuffledTunnels.length];
-    const t = 0.3 + Math.random() * 0.4; // Random position in middle section
+    const t = 0.25 + ((orbs.length * 0.15) % 0.5); // Spread evenly across 0.25–0.75
+    const dedupKey = `${tunnel.id}-${t.toFixed(2)}`;
+    if (usedTunnels.has(dedupKey)) continue;
+    usedTunnels.add(dedupKey);
     orbs.push({
       tunnelId: tunnel.id,
       t,
@@ -395,42 +424,48 @@ export const spawnTunnelOrbs = (tunnels, count, wormSegments = [], faceColors = 
  * @param {Array} oldTunnels - Old tunnel configuration before rotation
  * @returns {Array} Updated worm segments
  */
-export const updateTunnelWormAfterRotation = (segments, newTunnels, oldTunnels) => {
-  // Create lookup for old tunnels
-  const oldTunnelMap = new Map();
-  for (const t of oldTunnels) {
-    oldTunnelMap.set(t.id, t);
-  }
+export const updateTunnelWormAfterRotation = (segments, newTunnels, oldTunnels, size = 3) => {
+  // O(m) Map keyed by tunnel ID for O(1) per-segment lookup (was O(n×m) with .find()).
+  const newTunnelById = new Map(newTunnels.map(t => [t.id, t]));
 
-  // Create lookup for new tunnels by entry/exit positions
-  const newTunnelByEntry = new Map();
-  const newTunnelByExit = new Map();
-  for (const t of newTunnels) {
-    const entryKey = `${t.entry.x},${t.entry.y},${t.entry.z},${t.entry.dirKey}`;
-    const exitKey = `${t.exit.x},${t.exit.y},${t.exit.z},${t.exit.dirKey}`;
-    newTunnelByEntry.set(entryKey, t);
-    newTunnelByExit.set(exitKey, t);
-  }
+  // Old tunnel map needed to compute world positions for the spatial fallback.
+  const oldTunnelById = new Map(oldTunnels.map(t => [t.id, t]));
 
   return segments.map(seg => {
-    // Try to find the same tunnel in new configuration
-    const newTunnel = newTunnels.find(t => t.id === seg.tunnelId);
+    // Happy path: tunnel still exists with the same canonical ID.
+    const newTunnel = newTunnelById.get(seg.tunnelId);
     if (newTunnel) {
       return { ...seg, tunnel: newTunnel };
     }
 
-    // Tunnel disappeared - find nearest new tunnel, clamp t away from edges to avoid instant exit
-    if (newTunnels.length > 0) {
-      const randomTunnel = newTunnels[Math.floor(Math.random() * newTunnels.length)];
-      return {
-        tunnelId: randomTunnel.id,
-        t: Math.max(0.15, Math.min(0.85, seg.t)),
-        tunnel: randomTunnel
-      };
+    if (newTunnels.length === 0) return seg;
+
+    // Tunnel disappeared — pick the spatially nearest new tunnel portal so the
+    // worm body stays visually cohesive.  Random selection (the previous approach)
+    // scattered individual segments across unrelated tunnels, breaking the snake.
+    const oldTunnel = oldTunnelById.get(seg.tunnelId);
+    let nearestTunnel = newTunnels[0];
+    if (oldTunnel) {
+      const [wx, wy, wz] = getTunnelWorldPos(oldTunnel, seg.t, size);
+      let bestDist = Infinity;
+      for (const nt of newTunnels) {
+        // Check both portals of each new tunnel.
+        const [ex, ey, ez] = getTunnelWorldPos(nt, 0, size);
+        const [xx, xy, xz] = getTunnelWorldPos(nt, 1, size);
+        const d1 = (wx - ex) ** 2 + (wy - ey) ** 2 + (wz - ez) ** 2;
+        const d2 = (wx - xx) ** 2 + (wy - xy) ** 2 + (wz - xz) ** 2;
+        const d = Math.min(d1, d2);
+        if (d < bestDist) { bestDist = d; nearestTunnel = nt; }
+      }
     }
 
-    // No tunnels available
-    return seg;
+    return {
+      ...seg,
+      tunnelId: nearestTunnel.id,
+      // Clamp t away from edges to avoid an instant portal exit on the first frame.
+      t: Math.max(0.15, Math.min(0.85, seg.t)),
+      tunnel: nearestTunnel,
+    };
   });
 };
 
@@ -711,12 +746,25 @@ export const createInitialWorm = (size) => {
   const center = Math.floor(size / 2);
   const z = size - 1; // Front face
 
-  // Start with 3 segments: head and 2 body
-  return [
-    { x: center, y: center, z, dirKey: 'PZ' },       // Head
-    { x: center, y: center - 1, z, dirKey: 'PZ' },   // Body 1
-    { x: center, y: center - 2 >= 0 ? center - 2 : center - 1, z, dirKey: 'PZ' }  // Body 2
-  ];
+  // Head always at face center.
+  const segments = [{ x: center, y: center, z, dirKey: 'PZ' }];
+
+  // Body 1: one tile below head (guaranteed valid since center >= 1 for size >= 2).
+  const y1 = center - 1;
+  if (y1 >= 0) segments.push({ x: center, y: y1, z, dirKey: 'PZ' });
+
+  // Body 2: two tiles below head, or one column to the left if that would duplicate
+  // Body 1 (happens on 2×2 where center-2 = -1 → fallback to center-1 = Body 1).
+  const y2 = center - 2;
+  if (y2 >= 0) {
+    segments.push({ x: center, y: y2, z, dirKey: 'PZ' });
+  } else if (center - 1 >= 0 && center - 1 < size) {
+    // Place on adjacent column instead so no two segments share the same tile.
+    const x2 = center - 1 >= 0 ? center - 1 : center + 1;
+    segments.push({ x: x2, y: y1 >= 0 ? y1 : 0, z, dirKey: 'PZ' });
+  }
+
+  return segments;
 };
 
 /**

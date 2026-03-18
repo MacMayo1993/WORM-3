@@ -50,6 +50,8 @@ import {
     WORMHOLE_MAX_TRAVERSALS,
     MAX_TAIL,
     HEAL_COST,
+    SURFACE_JUMP_HEIGHT,
+    SURFACE_JUMP_TILE_SPAN,
 } from './healerWorm/constants.js';
 import {
     isSurfaceTilePos,
@@ -136,8 +138,8 @@ function useWormCrawler(size, cubies) {
     const isJumping = useRef(false);
     const jumpCount = useRef(0);
     const pendingTunnelTrigger = useRef(null);
-    const JUMP_HEIGHT = 1.5;   // tall arc — astronaut bounding in low gravity
-    const JUMP_TILE_SPAN = 1;  // keep jump distance fixed to one traversed tile at any speed setting
+    const JUMP_HEIGHT = SURFACE_JUMP_HEIGHT;
+    const JUMP_TILE_SPAN = SURFACE_JUMP_TILE_SPAN;
 
     // Growing tail + powerups
     const tailLength = useRef(BASE_TAIL_LENGTH);
@@ -560,9 +562,16 @@ function useWormCrawler(size, cubies) {
                             // Convert to approximate occupied tile count so collision checks align with what players see.
                             const occupiedTiles = Math.max(1, Math.ceil((tailLength.current * BODY_BALL_SPACING) / 1.0));
                             const bodyTilesBehindHead = Math.max(0, occupiedTiles - 1);
-                            const bodyTrail = tileTrail.current.slice(1, 1 + bodyTilesBehindHead);
+                            // Direct indexed scan over tileTrail avoids allocating an intermediate
+                            // slice just for Array.includes().  bodyTilesBehindHead ≤ ~167 at MAX_TAIL.
+                            const trailArr = tileTrail.current;
+                            const trailLimit = Math.min(1 + bodyTilesBehindHead, trailArr.length);
+                            let bodyHit = false;
+                            for (let ti = 1; ti < trailLimit; ti++) {
+                                if (trailArr[ti] === nextKey) { bodyHit = true; break; }
+                            }
                             const nextOnSurface = isSurfaceTilePos(nextPos, size);
-                            const selfHit = nextOnSurface && selfCollisionGraceStepsRef.current <= 0 && bodyTrail.includes(nextKey);
+                            const selfHit = nextOnSurface && selfCollisionGraceStepsRef.current <= 0 && bodyHit;
                             if (selfHit) {
                                 // Defer self-hit until we've penetrated the tile by 40%.
                                 // This gives players a short reaction window to jump over their body.
