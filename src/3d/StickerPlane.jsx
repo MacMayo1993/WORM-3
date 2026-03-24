@@ -258,14 +258,17 @@ const spinRevealFragmentShader = `
     float swirl = 0.5 + 0.5 * sin(angle * 10.0 - uTime * 7.0 + dist * 20.0);
     float wisp = edgeBand * swirl * energy * inDisc;
 
-    // Keep face fully present; brighten edges and add a slight cool highlight.
-    vec3 faceColor = uColor * (1.0 + wisp * 0.55);
-    vec3 coolGlow = vec3(0.20, 0.50, 1.00) * (wisp * 0.20);
-    vec3 col = clamp(faceColor + coolGlow, 0.0, 3.0);
+    // Keep face visible but avoid full opaque replacement. In large disparity cascades,
+    // many simultaneous flip overlays can briefly look like a white "paint layer" if
+    // they fully occlude the base tile. So we keep this as a blended glaze.
+    vec3 faceColor = uColor * (1.0 + wisp * 0.35);
+    vec3 coolGlow = vec3(0.15, 0.40, 0.90) * (wisp * 0.12);
+    vec3 col = clamp(faceColor + coolGlow, 0.0, 1.35);
 
-    // Use inDisc as alpha so corners are transparent, preserving the black gaps between
-    // tiles and preventing this overlay from covering neighbouring stickers.
-    gl_FragColor = vec4(col, inDisc);
+    // Alpha envelope: slightly stronger at midpoint energy, never fully opaque.
+    // This preserves tile identity under heavy multi-tile flips (6x6 / 7x7 disparity).
+    float alpha = inDisc * (0.34 + energy * 0.38);
+    gl_FragColor = vec4(col, alpha);
   }
 `;
 
