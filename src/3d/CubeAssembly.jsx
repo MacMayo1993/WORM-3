@@ -64,7 +64,7 @@ const DRAG_THRESHOLD = isTouchDevice ? 8 : 5;
 
 // Max camera distance per cube size — defined once at module scope to avoid
 // creating a new object literal on every CubeAssembly render.
-const MAX_DISTANCE_BY_SIZE = { 2: 28, 3: 28, 4: 38, 5: 52 };
+const MAX_DISTANCE_BY_SIZE = { 2: 28, 3: 28, 4: 38, 5: 52, 6: 68, 7: 85 };
 
 // Pixels of drag to complete a 90° rotation
 const PIXELS_PER_90DEG = 100;
@@ -261,9 +261,8 @@ const CubeAssembly = React.memo(({
     setDragStart(dragData);
     longPressTriggeredRef.current = false;
 
-    // Immediately disable controls using ref AND direct property
-    controlsEnabledRef.current = false;
-    if (controlsRef.current) controlsRef.current.enabled = false;
+    // Don't disable controls here — wait until we confirm it's a slice drag (dist ≥ threshold).
+    // Disabling on every pointer-down prevented camera orbit on short taps in disparity mode.
   }, []);
 
 
@@ -332,6 +331,9 @@ const CubeAssembly = React.memo(({
             startDx: dx, startDy: dy, dir: m.dir, mappingDir
           };
           sliceIndicesRef.current = sliceIndices;
+          // Now we know it's a slice drag — disable camera orbit so the two don't fight.
+          controlsEnabledRef.current = false;
+          if (controlsRef.current) controlsRef.current.enabled = false;
         }
       }
 
