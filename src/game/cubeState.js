@@ -3,8 +3,8 @@
 
 // Create initial cube state with all stickers in solved position
 export const makeCubies = (size) => {
-  if (!Number.isInteger(size) || size < 2 || size > 5) {
-    throw new RangeError(`makeCubies: size must be an integer 2–5, got ${size}`);
+  if (!Number.isInteger(size) || size < 2 || size > 7) {
+    throw new RangeError(`makeCubies: size must be an integer 2–7, got ${size}`);
   }
   return Array.from({ length: size }, (_, x) =>
     Array.from({ length: size }, (_, y) =>
