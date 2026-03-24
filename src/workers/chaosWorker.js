@@ -9,11 +9,15 @@ const ANTIPODAL_COLOR = {
 
 const MAX_LEVEL = 5;
 
-const numChainsByLevel = [0, 1, 1, 2, 2, 3];
-const delayByLevel = [0, 380, 220, 200, 130, 130];
-const basePropByLevel = [0, 0.45, 0.72, 0.65, 0.85, 0.85];
-const decayByLevel = [0, 0.72, 0.82, 0.78, 0.88, 0.88];
-const cooldownByLevel = [0, 1600, 900, 800, 450, 450];
+// Level profile (1..5):
+// L1-L2: sparse, exploratory spread
+// L3-L4: sustained chain movement
+// L5: high propagation, but fewer starts and longer cadence to avoid frame spikes
+const numChainsByLevel = [0, 1, 1, 2, 2, 2];
+const delayByLevel = [0, 420, 280, 220, 170, 190];
+const basePropByLevel = [0, 0.40, 0.55, 0.68, 0.78, 0.92];
+const decayByLevel = [0, 0.68, 0.74, 0.80, 0.86, 0.93];
+const cooldownByLevel = [0, 1700, 1100, 850, 650, 520];
 const chainCapByLevel = [0, 4, 5, 8, 10, 12];
 
 const computeSizeScale = (stickers) => {
@@ -461,7 +465,8 @@ const schedule = () => {
   const tickPeriod = delayByLevel[level] || 250;
   // Use cached metrics (updated each tick) to avoid iterating all stickers every 16 ms.
   const activeRatio = cachedMetrics.edgeTotal > 0 ? (cachedMetrics.flipActive / cachedMetrics.edgeTotal) : 0;
-  const effectivePeriod = Math.round(tickPeriod * (0.9 + activeRatio * 1.1));
+  const chainPressure = Math.min(1, chains.length / 12);
+  const effectivePeriod = Math.round(tickPeriod * (0.9 + activeRatio * 1.1) * (1 + chainPressure * 0.6));
 
   if (tickAcc >= effectivePeriod) {
     const payload = tick();

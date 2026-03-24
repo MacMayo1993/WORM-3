@@ -145,13 +145,14 @@ const FirstFlipTutorial = ({ onClose, onMainMenu }) => {
                 Flipped tiles at the cube's edges can spontaneously cascade to their neighbors!
               </p>
               <p style={{ margin: '0 0 16px 0' }}>
-                <strong>Levels 1-4</strong> control how aggressively chaos spreads:
+                <strong>Levels 1-5</strong> control how aggressively chaos spreads:
               </p>
               <ul style={{ margin: '0 0 16px 0', paddingLeft: '24px' }}>
                 <li>L1: Gentle — occasional cascades</li>
                 <li>L2: Moderate — regular spreading</li>
                 <li>L3: Aggressive — rapid propagation</li>
-                <li>L4: Maximum entropy — constant chaos</li>
+                <li>L4: Maximum entropy — sustained chaos</li>
+                <li>L5: Deep-manifold surges — stronger hops with pacing control</li>
               </ul>
               <p style={{ margin: 0 }}>
                 Watch the <strong>Instability Tracker</strong> — when it goes critical, expect fireworks!
