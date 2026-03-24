@@ -9,11 +9,23 @@ const ANTIPODAL_COLOR = {
 
 const MAX_LEVEL = 5;
 
-const numChainsByLevel = [0, 1, 1, 2, 2, 3];
-const delayByLevel = [0, 380, 220, 200, 130, 130];
-const basePropByLevel = [0, 0.45, 0.72, 0.65, 0.85, 0.85];
-const decayByLevel = [0, 0.72, 0.82, 0.78, 0.88, 0.88];
-const cooldownByLevel = [0, 1600, 900, 800, 450, 450];
+// Level profile (1..5):
+// L1-L2: sparse, exploratory spread
+// L3-L4: sustained chain movement
+// L5: high propagation, but fewer starts and longer cadence to avoid frame spikes
+const numChainsByLevel = [0, 1, 1, 2, 2, 2];
+const delayByLevel = [0, 420, 280, 220, 170, 190];
+const basePropByLevel = [0, 0.40, 0.55, 0.68, 0.78, 0.92];
+const decayByLevel = [0, 0.68, 0.74, 0.80, 0.86, 0.93];
+const cooldownByLevel = [0, 1700, 1100, 850, 650, 520];
+const chainCapByLevel = [0, 4, 5, 8, 10, 12];
+
+const computeSizeScale = (stickers) => {
+  // Keep growth sub-linear on large cubes to avoid worker/main-thread burst
+  // overload (7x7 has 294 surface stickers vs 54 on 3x3).
+  // 3x3:1, 5x5:2, 6x6:3, 7x7:3
+  return Math.max(1, Math.ceil(stickers / 96));
+};
 
 let state = null;
 let running = false;
@@ -226,8 +238,9 @@ const resetChainState = () => {
   }
 
   const level = Math.max(1, Math.min(MAX_LEVEL, chaosLevel));
-  const sizeScale = Math.max(1, Math.ceil(surfaceStickers / 54));
-  const numChains = (numChainsByLevel[level] || 1) * sizeScale;
+  const sizeScale = computeSizeScale(surfaceStickers);
+  const rawChains = (numChainsByLevel[level] || 1) * sizeScale;
+  const numChains = Math.min(rawChains, chainCapByLevel[level] || rawChains);
   const chainCooldown = cooldownByLevel[level] || 1000;
   chains = Array.from({ length: numChains }, () => ({
     tile: null,
@@ -452,7 +465,8 @@ const schedule = () => {
   const tickPeriod = delayByLevel[level] || 250;
   // Use cached metrics (updated each tick) to avoid iterating all stickers every 16 ms.
   const activeRatio = cachedMetrics.edgeTotal > 0 ? (cachedMetrics.flipActive / cachedMetrics.edgeTotal) : 0;
-  const effectivePeriod = Math.round(tickPeriod * (0.9 + activeRatio * 1.1));
+  const chainPressure = Math.min(1, chains.length / 12);
+  const effectivePeriod = Math.round(tickPeriod * (0.9 + activeRatio * 1.1) * (1 + chainPressure * 0.6));
 
   if (tickAcc >= effectivePeriod) {
     const payload = tick();

@@ -165,7 +165,7 @@ export const useGameStore = create(
     // ========================================================================
     // CHAOS MODE STATE
     // ========================================================================
-    chaosLevel: 0, // 0 = off, 1-4 = chaos levels
+    chaosLevel: 0, // 0 = off, 1-5 = chaos levels
     autoRotateEnabled: false,
     cascades: [],
     upcomingRotation: null,

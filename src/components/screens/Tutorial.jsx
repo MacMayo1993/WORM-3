@@ -176,10 +176,11 @@ const Tutorial = ({ onClose, onMainMenu }) => {
         <>
           <p><b>DISPARITY Mode</b> makes unstable flipped stickers spread to their neighbors!</p>
           <ul style={{ margin: '6px 0', paddingLeft: '20px', fontSize: '13px', lineHeight: '1.7' }}>
-            <li><b>Level 1:</b> 1-second bursts, 3% spread per flip tally</li>
-            <li><b>Level 2:</b> 2-second bursts, 6% spread per flip tally</li>
-            <li><b>Level 3:</b> 3-second bursts, 9% spread per flip tally</li>
-            <li><b>Level 4:</b> 4-second bursts, 12% spread—extreme chaos!</li>
+            <li><b>Level 1:</b> Gentle, sparse propagation</li>
+            <li><b>Level 2:</b> Stable low-chaos spreading</li>
+            <li><b>Level 3:</b> Aggressive chain movement</li>
+            <li><b>Level 4:</b> Heavy sustained pressure</li>
+            <li><b>Level 5:</b> Deep-manifold surges (strong hops, throttled cadence)</li>
           </ul>
           <p><b>AUTO Mode:</b> Enable within chaos for automatic rotations based on cube instability!</p>
           <ul style={{ margin: '4px 0', paddingLeft: '20px', fontSize: '12px' }}>
