@@ -356,6 +356,8 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       { n: 3, name: '3×3×3', tag: 'Classic', desc: 'The original challenge' },
       { n: 4, name: '4×4×4', tag: 'Master',  desc: 'Expert territory' },
       { n: 5, name: '5×5×5', tag: 'Ultra',   desc: '150 stickers of chaos' },
+      { n: 6, name: '6×6×6', tag: 'Mega',    desc: '216 stickers of madness' },
+      { n: 7, name: '7×7×7', tag: 'Titan',   desc: '294 stickers of insanity' },
     ];
 
     return (

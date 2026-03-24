@@ -73,7 +73,7 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
         {/* Cube Size */}
         <Section label="Cube Size">
           <div style={{ display: 'flex', background: '#f2f2f7', borderRadius: '10px', padding: '3px', gap: '2px' }}>
-            {[2, 3, 4, 5].map(n => (
+            {[2, 3, 4, 5, 6, 7].map(n => (
               <button
                 key={n}
                 onClick={() => setCubeSize(n)}

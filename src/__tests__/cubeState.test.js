@@ -70,8 +70,8 @@ describe('makeCubies', () => {
     expect(() => makeCubies(-1)).toThrow(RangeError);
   });
 
-  it('throws RangeError for size above 5', () => {
-    expect(() => makeCubies(6)).toThrow(RangeError);
+  it('throws RangeError for size above 7', () => {
+    expect(() => makeCubies(8)).toThrow(RangeError);
     expect(() => makeCubies(100)).toThrow(RangeError);
   });
 
