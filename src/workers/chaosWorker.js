@@ -14,6 +14,14 @@ const delayByLevel = [0, 380, 220, 200, 130, 130];
 const basePropByLevel = [0, 0.45, 0.72, 0.65, 0.85, 0.85];
 const decayByLevel = [0, 0.72, 0.82, 0.78, 0.88, 0.88];
 const cooldownByLevel = [0, 1600, 900, 800, 450, 450];
+const chainCapByLevel = [0, 4, 5, 8, 10, 12];
+
+const computeSizeScale = (stickers) => {
+  // Keep growth sub-linear on large cubes to avoid worker/main-thread burst
+  // overload (7x7 has 294 surface stickers vs 54 on 3x3).
+  // 3x3:1, 5x5:2, 6x6:3, 7x7:3
+  return Math.max(1, Math.ceil(stickers / 96));
+};
 
 let state = null;
 let running = false;
@@ -226,8 +234,9 @@ const resetChainState = () => {
   }
 
   const level = Math.max(1, Math.min(MAX_LEVEL, chaosLevel));
-  const sizeScale = Math.max(1, Math.ceil(surfaceStickers / 54));
-  const numChains = (numChainsByLevel[level] || 1) * sizeScale;
+  const sizeScale = computeSizeScale(surfaceStickers);
+  const rawChains = (numChainsByLevel[level] || 1) * sizeScale;
+  const numChains = Math.min(rawChains, chainCapByLevel[level] || rawChains);
   const chainCooldown = cooldownByLevel[level] || 1000;
   chains = Array.from({ length: numChains }, () => ({
     tile: null,
