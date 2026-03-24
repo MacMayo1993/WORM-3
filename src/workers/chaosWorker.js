@@ -29,7 +29,15 @@ let surfaceStickers = 54;
 let tickAcc = 0;
 let last = 0;
 
+// Cached result of the last computeChaosMetrics call.
+// Reused by schedule() every 16 ms so we avoid iterating all surface stickers
+// on each scheduling loop iteration (previously ~9 k sticker reads/sec on 5×5).
+let cachedMetrics = { disparity: 0, flipActive: 0, edgeTotal: 1 };
+
 let chains = [];
+// Living sticker index: all surface stickers with flips < flipCap.
+// Maintained incrementally so findChainStart() scans only alive tiles.
+let livingStickers = [];
 let deadTileSet = new Set();
 let deathRank = 0;
 let pairDeathCount = 0;
@@ -206,6 +214,17 @@ const resetChainState = () => {
   faceAliveMap = new Map([[1, 0], [2, 0], [3, 0], [4, 0], [5, 0], [6, 0]]);
   faceSeedDone = false;
 
+  // Rebuild the living-sticker index from all surface stickers.
+  // state must be set before resetChainState() is called (guaranteed by START handler).
+  livingStickers = [];
+  if (state) {
+    for (const [x, y, z] of surfaceCoords) {
+      for (const dirKey of Object.keys(state[x][y][z].stickers)) {
+        livingStickers.push({ x, y, z, dirKey });
+      }
+    }
+  }
+
   const level = Math.max(1, Math.min(MAX_LEVEL, chaosLevel));
   const sizeScale = Math.max(1, Math.ceil(surfaceStickers / 54));
   const numChains = (numChainsByLevel[level] || 1) * sizeScale;
@@ -221,24 +240,19 @@ const resetChainState = () => {
 };
 
 const findChainStart = () => {
+  // Use the living-sticker index instead of scanning all surfaceCoords.
+  // livingStickers is maintained incrementally; dead tiles are removed on death.
   const candidates = [];
-  for (const [x, y, z] of surfaceCoords) {
-    const c = state[x][y][z];
-    for (const [dirKey, st] of Object.entries(c.stickers)) {
-      if (st.flips > 0 && st.flips < flipCap) candidates.push({ x, y, z, dirKey, flips: st.flips });
-    }
+  for (const { x, y, z, dirKey } of livingStickers) {
+    const st = state[x][y][z].stickers[dirKey];
+    if (st.flips > 0) candidates.push({ x, y, z, dirKey, flips: st.flips });
   }
 
   if (!candidates.length) {
-    const freshPool = [];
-    for (const [x, y, z] of surfaceCoords) {
-      const c = state[x][y][z];
-      for (const [dirKey, st] of Object.entries(c.stickers)) {
-        if ((st.flips || 0) < flipCap) freshPool.push({ x, y, z, dirKey, flips: 1 });
-      }
-    }
-    if (!freshPool.length) return null;
-    return { tile: freshPool[Math.floor(Math.random() * freshPool.length)], strength: 1 };
+    // No flipped tiles yet — pick any living tile as a fresh start.
+    if (!livingStickers.length) return null;
+    const pick = livingStickers[Math.floor(Math.random() * livingStickers.length)];
+    return { tile: { ...pick, flips: 1 }, strength: 1 };
   }
 
   const totalWeight = candidates.reduce((sum, c) => sum + c.flips, 0);
@@ -302,6 +316,9 @@ const tick = () => {
       if ((st.flips || 0) >= flipCap && !deadTileSet.has(gridId) && surfaceStickers - deadTileSet.size > 2) {
         deadTileSet.add(gridId);
         chainDeaths.push({ st, gridId, ...loc });
+        // Remove from living-sticker index so findChainStart() never picks a dead tile.
+        const li = livingStickers.findIndex((t) => t.x === loc.x && t.y === loc.y && t.z === loc.z && t.dirKey === loc.dirKey);
+        if (li >= 0) livingStickers.splice(li, 1);
       }
     };
 
@@ -410,8 +427,8 @@ const tick = () => {
     running = false;
   }
 
-  const { disparity, flipActive, edgeTotal } = computeChaosMetrics(state, surfaceCoords);
-  const flipPct = edgeTotal > 0 ? Math.round((flipActive / edgeTotal) * 100) : 0;
+  cachedMetrics = computeChaosMetrics(state, surfaceCoords);
+  const flipPct = cachedMetrics.edgeTotal > 0 ? Math.round((cachedMetrics.flipActive / cachedMetrics.edgeTotal) * 100) : 0;
 
   return {
     flips,
@@ -419,7 +436,7 @@ const tick = () => {
     deaths,
     eliminatedFaces: [...new Set(eliminatedFaces)],
     winner,
-    metrics: { disparity, flipPct },
+    metrics: { disparity: cachedMetrics.disparity, flipPct },
     didWork: flips.length > 0 || cascades.length > 0 || producedDeaths || !!winner,
   };
 };
@@ -433,8 +450,8 @@ const schedule = () => {
 
   const level = Math.max(1, Math.min(MAX_LEVEL, chaosLevel));
   const tickPeriod = delayByLevel[level] || 250;
-  const metrics = state ? computeChaosMetrics(state, surfaceCoords) : { flipActive: 0, edgeTotal: 1 };
-  const activeRatio = metrics.edgeTotal > 0 ? (metrics.flipActive / metrics.edgeTotal) : 0;
+  // Use cached metrics (updated each tick) to avoid iterating all stickers every 16 ms.
+  const activeRatio = cachedMetrics.edgeTotal > 0 ? (cachedMetrics.flipActive / cachedMetrics.edgeTotal) : 0;
   const effectivePeriod = Math.round(tickPeriod * (0.9 + activeRatio * 1.1));
 
   if (tickAcc >= effectivePeriod) {
