@@ -274,6 +274,11 @@ const spinRevealFragmentShader = `
 // one value write per frame is needed regardless of how many tiles are on screen.
 const _wispyT = { value: 0.0 };
 
+// Module-level frame counter for tremor sub-sampling.
+// Tremor is a slow organic vibration (~10–40 Hz signal content); computing it at
+// 30 Hz instead of 60 Hz is imperceptible and halves the trig cost per wormhole tile.
+let _tremorFrame = 0;
+
 // Persistent spinning-wispy-ring shader — replaces static color rings on every tile.
 // Reuses the same spinning-arc formula as spinRevealFragmentShader but at a fixed
 // ring radius so it animates continuously rather than during a flip.
@@ -857,9 +862,11 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       seamLeakMatRef.current.uniforms.uColor.value.set(antipodalColor);
     }
 
-    // Persistent tremor for flipped tiles — the parity violation makes the tile unstable
-    // Dead tiles (flips >= FLIP_CAP) are inert — no tremor
-    if (showWormholeHazardFx && !isDead && groupRef.current && spinT.current <= 0 && shakeT.current <= 0) {
+    // Persistent tremor for flipped tiles — the parity violation makes the tile unstable.
+    // Sub-sampled to every other frame (30 Hz effective) — the vibration frequencies are
+    // 6–41 Hz which are indistinguishable at 30 Hz vs 60 Hz updates.
+    _tremorFrame++;
+    if (showWormholeHazardFx && !isDead && groupRef.current && spinT.current <= 0 && shakeT.current <= 0 && (_tremorFrame & 1) === 0) {
       const t = state.clock.elapsedTime;
       const flips = Math.min(meta?.flips ?? 1, 5);
       const tremIntensity = 0.004 + flips * 0.003;

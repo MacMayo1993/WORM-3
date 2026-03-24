@@ -1,20 +1,29 @@
 import { useEffect, useRef } from 'react';
 import { useGameStore } from './useGameStore.js';
 import { buildManifoldGridMap, findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
-import { ANTIPODAL_COLOR, FLIP_CAP } from '../utils/constants.js';
+import { ANTIPODAL_COLOR } from '../utils/constants.js';
 
 const MAX_CASCADES = 6;
 
-function applyChaosFlipsBatch(state, flips, size, manifoldMap) {
+function applyChaosFlipsBatch(state, flips, size, manifoldMap, flipCap) {
   if (!flips?.length || !manifoldMap) return state;
 
-  const next = state.map((L) => L.map((R) => R.slice()));
+  // Lazy copy-on-write: only clone the x-layer and y-row arrays that contain a
+  // touched cubie. Avoids the O(size²) upfront clone of the entire 3-D array.
+  let next = state;
   const touchedCubies = new Map();
+
+  const cloneLayerIfNeeded = (x) => {
+    if (next === state) next = state.slice();
+    if (next[x] === state[x]) next[x] = state[x].slice();
+  };
 
   const getCubieForWrite = (x, y, z) => {
     const key = `${x},${y},${z}`;
     const cached = touchedCubies.get(key);
     if (cached) return cached;
+    cloneLayerIfNeeded(x);
+    if (next[x][y] === state[x][y]) next[x][y] = state[x][y].slice();
     const cloned = { ...next[x][y][z], stickers: { ...next[x][y][z].stickers } };
     next[x][y][z] = cloned;
     touchedCubies.set(key, cloned);
@@ -27,11 +36,11 @@ function applyChaosFlipsBatch(state, flips, size, manifoldMap) {
     const st = c.stickers[loc.dirKey];
     if (!st) return;
     const currentFlips = st.flips || 0;
-    if (currentFlips >= FLIP_CAP) return;
+    if (currentFlips >= flipCap) return;
     c.stickers[loc.dirKey] = {
       ...st,
       curr: ANTIPODAL_COLOR[st.curr],
-      flips: Math.min(FLIP_CAP, currentFlips + 1),
+      flips: Math.min(flipCap, currentFlips + 1),
     };
   };
 
@@ -75,7 +84,7 @@ export function useChaosWorker({
       const { flips, cascades, deaths, eliminatedFaces, winner, metrics } = e.data.payload;
 
       if (flips?.length > 0) {
-        const next = applyChaosFlipsBatch(cubiesRef.current, flips, size, manifoldMapRef.current);
+        const next = applyChaosFlipsBatch(cubiesRef.current, flips, size, manifoldMapRef.current, disparityFlipCap);
         setCubies(next);
       }
 
