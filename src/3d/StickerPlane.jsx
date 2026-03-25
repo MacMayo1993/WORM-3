@@ -33,6 +33,42 @@ import { MergeTileOverlay } from '../modes/merge/index.js';
 
 // Shared geometries used only by StickerPlane itself (not by extracted sub-components).
 const _sharedStickerGeo = new THREE.PlaneGeometry(0.85, 0.85);
+// Circular alpha map — clips the base sticker mesh to a disc matching the overlay shader
+// radius (smoothstep 0.44→0.50 in UV space).  Using alphaTest instead of transparent
+// avoids depth-sorting issues and is unaffected by the biome-mode code that explicitly
+// sets mat.transparent = false.  This eliminates white corners on textured tiles (which
+// use materialColor='#ffffff' as the neutral tint required for correct texture display).
+const _discAlphaMap = (() => {
+  const size = 128;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const cx = size / 2, cy = size / 2;
+  // innerR = UV 0.44 from centre → fully opaque (matches shader inDisc = 1 zone)
+  // outerR = UV 0.50 from centre → fully transparent (matches shader inDisc = 0 zone)
+  const innerR = 0.44 * size * 0.5;
+  const outerR = 0.50 * size * 0.5;
+  // Fill whole canvas black (transparent outside disc)
+  ctx.fillStyle = 'black';
+  ctx.fillRect(0, 0, size, size);
+  // Solid white inner disc
+  ctx.fillStyle = 'white';
+  ctx.beginPath();
+  ctx.arc(cx, cy, innerR, 0, Math.PI * 2);
+  ctx.fill();
+  // Soft antialiased edge matching smoothstep(0.44, 0.50, dist)
+  const grad = ctx.createRadialGradient(cx, cy, innerR, cx, cy, outerR);
+  grad.addColorStop(0, 'white');
+  grad.addColorStop(1, 'black');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
+  ctx.fill();
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.needsUpdate = true;
+  return tex;
+})();
 // Scratch vectors for biome edge-on fade.
 const _normal = new THREE.Vector3();
 const _worldQuat = new THREE.Quaternion();
@@ -1190,6 +1226,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
             <meshStandardMaterial
               color={materialColor}
               map={hollow ? null : renderTexture}
+              alphaMap={hollow ? null : _discAlphaMap}
+              alphaTest={0.45}
               side={THREE.FrontSide}
               roughness={0.3}
               metalness={0.05}
