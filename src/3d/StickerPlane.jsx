@@ -47,8 +47,9 @@ const _discAlphaMap = (() => {
   const cx = size / 2, cy = size / 2;
   // innerR = UV 0.44 from centre → fully opaque (matches shader inDisc = 1 zone)
   // outerR = UV 0.50 from centre → fully transparent (matches shader inDisc = 0 zone)
-  const innerR = 0.44 * size * 0.5;
-  const outerR = 0.50 * size * 0.5;
+  // dist = length(vUv - 0.5), vUv ∈ [0,1]²  →  UV dist maps directly to canvas pixels as d*size.
+  const innerR = 0.44 * size;   // UV 0.44 from centre → fully opaque  (56.32 px for size=128)
+  const outerR = 0.50 * size;   // UV 0.50 from centre → fully transparent (64 px for size=128)
   // Fill whole canvas black (transparent outside disc)
   ctx.fillStyle = 'black';
   ctx.fillRect(0, 0, size, size);
