@@ -17,7 +17,7 @@ const numChainsByLevel = [0, 1, 1, 2, 2, 2];
 const delayByLevel = [0, 420, 280, 220, 170, 190];
 const basePropByLevel = [0, 0.40, 0.55, 0.68, 0.78, 0.92];
 const decayByLevel = [0, 0.68, 0.74, 0.80, 0.86, 0.93];
-const cooldownByLevel = [0, 1700, 1100, 850, 650, 520];
+const cooldownByLevel = [0, 1700, 1100, 850, 650, 520]; // ms — compared against cooldownAcc (real ms)
 const chainCapByLevel = [0, 4, 5, 8, 10, 12];
 
 const computeSizeScale = (stickers) => {
@@ -42,20 +42,18 @@ let tickAcc = 0;
 let last = 0;
 
 // Cached result of the last computeChaosMetrics call.
-// Reused by schedule() every 16 ms so we avoid iterating all surface stickers
-// on each scheduling loop iteration (previously ~9 k sticker reads/sec on 5×5).
+// Only refreshed when didWork is true, so the O(n) scan is skipped on idle ticks.
 let cachedMetrics = { disparity: 0, flipActive: 0, edgeTotal: 1 };
 
 let chains = [];
-// Living sticker index: all surface stickers with flips < flipCap.
-// Maintained incrementally so findChainStart() scans only alive tiles.
-let livingStickers = [];
+// Living sticker index: Map<"x,y,z,dirKey", {x,y,z,dirKey}>.
+// Maintained incrementally; dead-tile removal is O(1) vs O(n) array splice.
+let livingStickers = new Map();
 let deadTileSet = new Set();
 let deathRank = 0;
 let pairDeathCount = 0;
 let winnerAnnounced = false;
 let faceAliveMap = new Map([[1, 0], [2, 0], [3, 0], [4, 0], [5, 0], [6, 0]]);
-let faceSeedDone = false;
 
 const buildSurfaceCoords = (S) => {
   const coords = [];
@@ -224,15 +222,22 @@ const resetChainState = () => {
   pairDeathCount = 0;
   winnerAnnounced = false;
   faceAliveMap = new Map([[1, 0], [2, 0], [3, 0], [4, 0], [5, 0], [6, 0]]);
-  faceSeedDone = false;
 
   // Rebuild the living-sticker index from all surface stickers.
   // state must be set before resetChainState() is called (guaranteed by START handler).
-  livingStickers = [];
+  livingStickers = new Map();
   if (state) {
     for (const [x, y, z] of surfaceCoords) {
       for (const dirKey of Object.keys(state[x][y][z].stickers)) {
-        livingStickers.push({ x, y, z, dirKey });
+        livingStickers.set(`${x},${y},${z},${dirKey}`, { x, y, z, dirKey });
+      }
+    }
+    // Seed face alive counts HERE, before any tick runs, so that death tracking
+    // on tick 1 never sees a zero-count face and fires false elimination events.
+    for (const [x, y, z] of surfaceCoords) {
+      const c = state[x][y][z];
+      for (const st of Object.values(c.stickers)) {
+        if (st.orig) faceAliveMap.set(st.orig, (faceAliveMap.get(st.orig) ?? 0) + 1);
       }
     }
   }
@@ -255,16 +260,18 @@ const resetChainState = () => {
 const findChainStart = () => {
   // Use the living-sticker index instead of scanning all surfaceCoords.
   // livingStickers is maintained incrementally; dead tiles are removed on death.
+  if (!livingStickers.size) return null;
+
   const candidates = [];
-  for (const { x, y, z, dirKey } of livingStickers) {
+  for (const { x, y, z, dirKey } of livingStickers.values()) {
     const st = state[x][y][z].stickers[dirKey];
     if (st.flips > 0) candidates.push({ x, y, z, dirKey, flips: st.flips });
   }
 
   if (!candidates.length) {
     // No flipped tiles yet — pick any living tile as a fresh start.
-    if (!livingStickers.length) return null;
-    const pick = livingStickers[Math.floor(Math.random() * livingStickers.length)];
+    const values = [...livingStickers.values()];
+    const pick = values[Math.floor(Math.random() * values.length)];
     return { tile: { ...pick, flips: 1 }, strength: 1 };
   }
 
@@ -277,7 +284,8 @@ const findChainStart = () => {
   return { tile: candidates[candidates.length - 1], strength: 1 };
 };
 
-const tick = () => {
+// dtMs: real milliseconds elapsed since the previous tick (used for cooldown accumulation).
+const tick = (dtMs) => {
   if (!state || animating) return null;
   if (!manifoldMapCache) manifoldMapCache = buildManifoldGridMap(state, size);
 
@@ -294,7 +302,8 @@ const tick = () => {
 
   for (const chain of chains) {
     if (chain.inCooldown) {
-      chain.cooldownAcc += 1;
+      // Accumulate real ms so cooldownDuration values (ms) work as intended.
+      chain.cooldownAcc += dtMs;
       if (chain.cooldownAcc >= chain.cooldownDuration) {
         chain.inCooldown = false;
         chain.tile = null;
@@ -329,9 +338,8 @@ const tick = () => {
       if ((st.flips || 0) >= flipCap && !deadTileSet.has(gridId) && surfaceStickers - deadTileSet.size > 2) {
         deadTileSet.add(gridId);
         chainDeaths.push({ st, gridId, ...loc });
-        // Remove from living-sticker index so findChainStart() never picks a dead tile.
-        const li = livingStickers.findIndex((t) => t.x === loc.x && t.y === loc.y && t.z === loc.z && t.dirKey === loc.dirKey);
-        if (li >= 0) livingStickers.splice(li, 1);
+        // O(1) removal — Map key matches the format used when inserting in resetChainState.
+        livingStickers.delete(`${loc.x},${loc.y},${loc.z},${loc.dirKey}`);
       }
     };
 
@@ -416,31 +424,22 @@ const tick = () => {
     }
   }
 
-  if (!faceSeedDone) {
-    for (const [x, y, z] of surfaceCoords) {
-      const c = state[x][y][z];
-      for (const st of Object.values(c.stickers)) {
-        if (st.orig) faceAliveMap.set(st.orig, (faceAliveMap.get(st.orig) ?? 0) + 1);
-      }
-    }
-    faceSeedDone = true;
-  }
-
   let winner = null;
   const aliveAfterDeaths = surfaceStickers - deadTileSet.size;
   if (!winnerAnnounced && aliveAfterDeaths <= 2 && aliveAfterDeaths > 0 && deathRank > 0) {
     winnerAnnounced = true;
-    winner = [];
-    for (const [x, y, z] of surfaceCoords) {
-      const c = state[x][y][z];
-      for (const st of Object.values(c.stickers)) {
-        if ((st.flips || 0) < flipCap) winner.push(getManifoldGridId(st, size));
-      }
-    }
+    // Read winner IDs directly from the living-sticker index — no surface scan needed.
+    winner = [...livingStickers.values()].map(({ x, y, z, dirKey }) =>
+      getManifoldGridId(state[x][y][z].stickers[dirKey], size)
+    );
     running = false;
   }
 
-  cachedMetrics = computeChaosMetrics(state, surfaceCoords);
+  // Only recompute the O(n) metrics scan when something actually changed this tick.
+  const didWork = flips.length > 0 || cascades.length > 0 || producedDeaths || !!winner;
+  if (didWork) {
+    cachedMetrics = computeChaosMetrics(state, surfaceCoords);
+  }
   const flipPct = cachedMetrics.edgeTotal > 0 ? Math.round((cachedMetrics.flipActive / cachedMetrics.edgeTotal) * 100) : 0;
 
   return {
@@ -450,7 +449,7 @@ const tick = () => {
     eliminatedFaces: [...new Set(eliminatedFaces)],
     winner,
     metrics: { disparity: cachedMetrics.disparity, flipPct },
-    didWork: flips.length > 0 || cascades.length > 0 || producedDeaths || !!winner,
+    didWork,
   };
 };
 
@@ -469,7 +468,8 @@ const schedule = () => {
   const effectivePeriod = Math.round(tickPeriod * (0.9 + activeRatio * 1.1) * (1 + chainPressure * 0.6));
 
   if (tickAcc >= effectivePeriod) {
-    const payload = tick();
+    // Pass accumulated real ms to tick() so chain cooldowns run in wall-clock time.
+    const payload = tick(tickAcc);
     if (payload && payload.didWork) {
       self.postMessage({ type: 'TICK', payload });
     }
