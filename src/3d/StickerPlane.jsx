@@ -643,8 +643,6 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         // antipodal colour reveals out, texture snaps back when the animation settles.
         mat.color.set(flipFromColor.current);
         mat.map = null;
-        mat.alphaMap = null;
-        mat.alphaTest = 0;
         mat.needsUpdate = true;
       } else if (mat?.uniforms?.baseColor && flipFromColor.current) {
         // Shader-style tile (circuit, grid, etc.): switch to the from-color material so the
@@ -840,8 +838,6 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           const finalTex = currTextureRef.current;
           mat.map = finalTex;
           mat.color.set(finalTex ? '#ffffff' : baseColorRef.current);
-          mat.alphaMap = finalTex ? _discAlphaMap : null;
-          mat.alphaTest = finalTex ? 0.45 : 0;
           mat.needsUpdate = true;
         } else if (mat?.uniforms?.baseColor) {
           const newMat = getTileStyleMaterial(tileStyle, baseColorRef.current, false, null, antipodalHexRef.current);
@@ -1212,6 +1208,22 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       </mesh>
 
       <group ref={innerGroupRef}>
+        {/* Antipodal colour background — full-square quad 1 mm behind the disc-clipped
+            main sticker so corners show the antipodal face colour instead of the black
+            cube body or the white '#ffffff' texture-tint bleed.
+            Skipped for hollow-frame and glass/shader-style tiles (own visuals). */}
+        {!isInstanceable && !hollow && !useGlassStyle && !useShaderStyle && (
+          <mesh position={[0, 0, -0.001]}>
+            <primitive object={_sharedStickerGeo} attach="geometry" />
+            <meshStandardMaterial
+              color={isDead ? '#333333' : (antipodalHex || baseColor)}
+              side={THREE.FrontSide}
+              roughness={0.3}
+              metalness={0.05}
+            />
+          </mesh>
+        )}
+
         {/* Main sticker quad — omitted when the InstancedMesh handles rendering */}
         {!isInstanceable && <mesh ref={meshRef} key={hollow ? 'frame' : 'plane'}>
           {hollow ? (
@@ -1231,8 +1243,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
             <meshStandardMaterial
               color={materialColor}
               map={hollow ? null : renderTexture}
-              alphaMap={!hollow && currTextureReady ? _discAlphaMap : null}
-              alphaTest={!hollow && currTextureReady ? 0.45 : 0}
+              alphaMap={hollow ? null : _discAlphaMap}
+              alphaTest={hollow ? 0 : 0.45}
               side={THREE.FrontSide}
               roughness={0.3}
               metalness={0.05}
