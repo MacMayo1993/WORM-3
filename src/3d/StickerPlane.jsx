@@ -1216,7 +1216,15 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           <mesh position={[0, 0, -0.001]}>
             <primitive object={_sharedStickerGeo} attach="geometry" />
             <meshStandardMaterial
-              color={isDead ? '#333333' : (antipodalHex || baseColor)}
+              color={isDead ? '#333333' : (
+                // Avoid pure #ffffff as background: for Yellow tiles the strict antipodal IS the
+                // White face (#ffffff), which is indistinguishable from the old white-corner
+                // artefact.  Fall back to baseColor (the tile's own face colour) so Yellow tiles
+                // get a yellow background; if baseColor is also white (edge case), use light-gray.
+                antipodalHex && antipodalHex !== COLORS.white
+                  ? antipodalHex
+                  : baseColor !== COLORS.white ? baseColor : '#e8e8e8'
+              )}
               side={THREE.FrontSide}
               roughness={0.3}
               metalness={0.05}
