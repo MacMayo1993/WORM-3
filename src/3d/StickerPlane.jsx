@@ -643,6 +643,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         // antipodal colour reveals out, texture snaps back when the animation settles.
         mat.color.set(flipFromColor.current);
         mat.map = null;
+        mat.alphaMap = null;
+        mat.alphaTest = 0;
         mat.needsUpdate = true;
       } else if (mat?.uniforms?.baseColor && flipFromColor.current) {
         // Shader-style tile (circuit, grid, etc.): switch to the from-color material so the
@@ -838,6 +840,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           const finalTex = currTextureRef.current;
           mat.map = finalTex;
           mat.color.set(finalTex ? '#ffffff' : baseColorRef.current);
+          mat.alphaMap = finalTex ? _discAlphaMap : null;
+          mat.alphaTest = finalTex ? 0.45 : 0;
           mat.needsUpdate = true;
         } else if (mat?.uniforms?.baseColor) {
           const newMat = getTileStyleMaterial(tileStyle, baseColorRef.current, false, null, antipodalHexRef.current);
@@ -1227,8 +1231,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
             <meshStandardMaterial
               color={materialColor}
               map={hollow ? null : renderTexture}
-              alphaMap={hollow ? null : _discAlphaMap}
-              alphaTest={0.45}
+              alphaMap={!hollow && currTextureReady ? _discAlphaMap : null}
+              alphaTest={!hollow && currTextureReady ? 0.45 : 0}
               side={THREE.FrontSide}
               roughness={0.3}
               metalness={0.05}
