@@ -41,7 +41,6 @@ export default function DisparityWinnerScreen({ onDismiss }) {
 
   const [phase, setPhase] = useState('intro'); // intro | reveal | celebrate | done
   const [glitch, setGlitch] = useState(false);
-  const [particleT, setParticleT] = useState(0); // 0-1 animation progress
   const rafRef = useRef(null);
 
   // Support both old { gridId } shape and new { pair: [id1, id2] } shape
@@ -72,10 +71,8 @@ export default function DisparityWinnerScreen({ onDismiss }) {
         setPhase('reveal');
       } else if (elapsed < 2400) {
         setPhase('celebrate');
-        setParticleT(Math.min(1, (elapsed - 1200) / 1200));
       } else {
         setPhase('done');
-        setParticleT(1);
         return; // stop ticking
       }
       rafRef.current = requestAnimationFrame(tick);
@@ -85,22 +82,65 @@ export default function DisparityWinnerScreen({ onDismiss }) {
     return () => cancelAnimationFrame(rafRef.current);
   }, []);
 
-  // Glitch flicker during reveal
+  // Glitch flicker during reveal.
+  // Uses a `cancelled` flag so orphaned timer callbacks from the previous
+  // render cycle cannot set glitch=true after the reveal phase ends.
   useEffect(() => {
     if (phase !== 'reveal') return;
+    let cancelled = false;
     let timer;
+
     const flicker = () => {
+      if (cancelled) return;
       setGlitch(true);
       timer = setTimeout(() => {
+        if (cancelled) return;
         setGlitch(false);
         timer = setTimeout(flicker, 80 + Math.random() * 200);
       }, 30 + Math.random() * 60);
     };
+
     flicker();
-    return () => clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      setGlitch(false);
+    };
   }, [phase]);
 
   const particles = useMemo(() => makeParticles(60, winnerColor), [winnerColor]);
+
+  // Particle DOM refs — updated directly via RAF to avoid 3,600 React re-renders/sec.
+  const particleElemsRef = useRef([]);
+  const particleRafRef = useRef(null);
+
+  // Drive particle positions with direct DOM mutation; triggers once on 'celebrate'.
+  useEffect(() => {
+    if (phase !== 'celebrate') return;
+    const startTime = performance.now();
+    const gravity = 60;
+
+    const animate = (now) => {
+      const t = Math.min(1, (now - startTime) / 1200);
+      particleElemsRef.current.forEach((el, i) => {
+        if (!el) return;
+        const p = particles[i];
+        const px = p.x + (p.vx * t) / 100;
+        const py = p.y + (p.vy * t) / 100 + (gravity * t * t) / 2;
+        const rot = p.rotation + p.rotationSpeed * t;
+        el.style.left = `${px}%`;
+        el.style.top = `${py}%`;
+        el.style.transform = `rotate(${rot}deg)`;
+        el.style.opacity = Math.max(0, 1 - t * 0.8);
+      });
+      if (t < 1) {
+        particleRafRef.current = requestAnimationFrame(animate);
+      }
+    };
+
+    particleRafRef.current = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(particleRafRef.current);
+  }, [phase, particles]);
 
   const handleDismiss = () => {
     clearDisparityGame();
@@ -108,29 +148,6 @@ export default function DisparityWinnerScreen({ onDismiss }) {
   };
 
   const isClickable = phase === 'done';
-
-  // Particle positions at current animation time
-  const particleStyle = (p) => {
-    const t = particleT;
-    const gravity = 60;
-    const px = p.x + (p.vx * t) / 100; // percent units
-    const py = p.y + (p.vy * t) / 100 + (gravity * t * t) / 2;
-    const rot = p.rotation + p.rotationSpeed * t;
-    const opacity = Math.max(0, 1 - t * 0.8);
-    return {
-      position: 'absolute',
-      left: `${px}%`,
-      top: `${py}%`,
-      width: p.size,
-      height: p.size,
-      background: p.color,
-      borderRadius: p.isCircle ? '50%' : '2px',
-      transform: `rotate(${rot}deg)`,
-      opacity,
-      pointerEvents: 'none',
-      transition: 'none',
-    };
-  };
 
   return (
     <div
@@ -210,9 +227,23 @@ export default function DisparityWinnerScreen({ onDismiss }) {
         />
       ))}
 
-      {/* Confetti particles */}
-      {(phase === 'celebrate' || phase === 'done') && particles.map((p) => (
-        <div key={p.id} style={particleStyle(p)} />
+      {/* Confetti particles — rendered once, animated via direct DOM updates in RAF */}
+      {(phase === 'celebrate' || phase === 'done') && particles.map((p, i) => (
+        <div
+          key={p.id}
+          ref={(el) => { particleElemsRef.current[i] = el; }}
+          style={{
+            position: 'absolute',
+            left: `${p.x}%`,
+            top: `${p.y}%`,
+            width: p.size,
+            height: p.size,
+            background: p.color,
+            borderRadius: p.isCircle ? '50%' : '2px',
+            opacity: 0,
+            pointerEvents: 'none',
+          }}
+        />
       ))}
 
       {/* Spinning winner tile cards */}
