@@ -70,6 +70,39 @@ const _discAlphaMap = (() => {
   tex.needsUpdate = true;
   return tex;
 })();
+// Inverted disc alpha map — white in corners, black inside the disc.
+// Used by the antipodal-colour corner overlay (rendered IN FRONT of the main disc at z=+0.001)
+// so that it only fills the corner area that the alphaTest disc cutout exposes.  Placing it
+// in front avoids any depth/occlusion conflict with the cube body geometry behind the sticker.
+const _cornerAlphaMap = (() => {
+  const size = 128;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const cx = size / 2, cy = size / 2;
+  const innerR = 0.44 * size;
+  const outerR = 0.50 * size;
+  // Fill whole canvas white (visible in corners)
+  ctx.fillStyle = 'white';
+  ctx.fillRect(0, 0, size, size);
+  // Black solid disc (invisible over the centre)
+  ctx.fillStyle = 'black';
+  ctx.beginPath();
+  ctx.arc(cx, cy, innerR, 0, Math.PI * 2);
+  ctx.fill();
+  // Soft transition at the disc edge (inverted gradient)
+  const grad = ctx.createRadialGradient(cx, cy, innerR, cx, cy, outerR);
+  grad.addColorStop(0, 'black');
+  grad.addColorStop(1, 'white');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
+  ctx.fill();
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.needsUpdate = true;
+  return tex;
+})();
 // Scratch vectors for biome edge-on fade.
 const _normal = new THREE.Vector3();
 const _worldQuat = new THREE.Quaternion();
@@ -1208,23 +1241,26 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       </mesh>
 
       <group ref={innerGroupRef}>
-        {/* Antipodal colour background — full-square quad 1 mm behind the disc-clipped
-            main sticker so corners show the antipodal face colour instead of the black
-            cube body or the white '#ffffff' texture-tint bleed.
+        {/* Antipodal-colour corner overlay — rendered IN FRONT of the main disc (z=+0.001)
+            with an inverted alpha map that is opaque only in the corner area (outside the
+            disc boundary).  Being in front means it is never occluded by cube body geometry,
+            and it only paints the corners that the disc alphaTest exposes.
             Skipped for hollow-frame and glass/shader-style tiles (own visuals). */}
         {!isInstanceable && !hollow && !useGlassStyle && !useShaderStyle && (
-          <mesh position={[0, 0, -0.001]}>
+          <mesh position={[0, 0, 0.001]}>
             <primitive object={_sharedStickerGeo} attach="geometry" />
             <meshStandardMaterial
               color={isDead ? '#333333' : (
-                // Avoid pure #ffffff as background: for Yellow tiles the strict antipodal IS the
+                // Avoid pure #ffffff as corner fill: for Yellow tiles the strict antipodal IS the
                 // White face (#ffffff), which is indistinguishable from the old white-corner
                 // artefact.  Fall back to baseColor (the tile's own face colour) so Yellow tiles
-                // get a yellow background; if baseColor is also white (edge case), use light-gray.
+                // get a yellow corner; if baseColor is also white (edge case), use light-gray.
                 antipodalHex && antipodalHex !== COLORS.white
                   ? antipodalHex
                   : baseColor !== COLORS.white ? baseColor : '#e8e8e8'
               )}
+              alphaMap={_cornerAlphaMap}
+              alphaTest={0.45}
               side={THREE.FrontSide}
               roughness={0.3}
               metalness={0.05}
