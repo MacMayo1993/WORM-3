@@ -587,13 +587,19 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   }, [isDead]);
 
   const prevCurr = useRef(meta?.curr ?? 0);
+  const prevFlips = useRef(meta?.flips ?? 0);
   useEffect(() => {
     const curr = meta?.curr ?? 0;
+    const flips = meta?.flips ?? 0;
     const prevVal = prevCurr.current;
+    const prevFlipCount = prevFlips.current;
+    const didFlip = flips > prevFlipCount;
 
-    // Only trigger flip animation if the color actually changed to its antipodal.
-    // Keep manual-style vortex/squish visuals active in chaos/disparity too.
-    if (curr !== prevVal && meta?.flips > 0 && ANTIPODAL_COLOR[prevVal] === curr) {
+    // Standardize all flip sources (manual + chaos/disparity) to use the same visual pipeline.
+    // In disparity bursts a tile can be flipped multiple times between React commits, so curr can
+    // end up unchanged while flips still increased; we still run the manual-style squish/reveal.
+    const didAntipodalColorSwap = curr !== prevVal && ANTIPODAL_COLOR[prevVal] === curr;
+    if (didFlip && (didAntipodalColorSwap || curr === prevVal)) {
       // Mark as animating to prevent React state from interrupting
       isFlipping.current = true;
       // Store the colors for the flip animation
@@ -602,7 +608,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       flipToColor.current = fc[curr];
       // Texture follows city identity — use biome ground textures in biome mode
       if (biomeEnabled && meta?.orig) {
-        const newFlips = meta?.flips ?? 0;
+        const newFlips = flips;
         // newFlips is already incremented. Odd = we just flipped TO antipodal; even = flipped back.
         const fromFace = newFlips % 2 === 1
           ? meta.orig
@@ -640,6 +646,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       vibrate(16);
     }
     prevCurr.current = curr;
+    prevFlips.current = flips;
   }, [meta?.curr, meta?.flips]);
 
   // Biome mode: restore anything left in transparent or hidden state from previous code —
