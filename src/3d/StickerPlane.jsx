@@ -302,9 +302,9 @@ const spinRevealFragmentShader = `
     vec3 coolGlow = vec3(0.15, 0.40, 0.90) * (wisp * 0.12);
     vec3 col = clamp(faceColor + coolGlow, 0.0, 1.35);
 
-    // Alpha envelope: slightly stronger at midpoint energy, never fully opaque.
-    // This preserves tile identity under heavy multi-tile flips (6x6 / 7x7 disparity).
-    float alpha = inDisc * (0.34 + energy * 0.38);
+    // Alpha envelope: nearly fully opaque throughout so no background color bleeds through.
+    // Peaks at 1.0 at midpoint energy; base of 0.92 at calm state prevents disc edge artifacts.
+    float alpha = inDisc * (0.92 + energy * 0.08);
     gl_FragColor = vec4(col, alpha);
   }
 `;
@@ -790,6 +790,14 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           spinRevealMatRef.current.uniforms.uProgress.value = 0.0;
           spinRevealMatRef.current.uniforms.uDissolve.value = 1.0;
           spinRevealRef.current.visible = true;
+        }
+        // Switch main disc to TO color so the second half has the right background.
+        // This prevents any residual FROM color (e.g. white) bleeding through the
+        // spinReveal overlay near the disc edge where inDisc < 1.
+        const midMat = meshRef.current?.material;
+        if (midMat?.color && flipToColor.current) {
+          midMat.color.set(flipToColor.current);
+          midMat.needsUpdate = true;
         }
         // Ring opacity spike — event horizon signal.
         if (ringRef.current) {
