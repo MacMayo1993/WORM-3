@@ -2,7 +2,7 @@
 // Dual-screen co-op mode: Manifolder (P1) rotates the cube, Crawler (P2) navigates the surface.
 // Uses two <Canvas> elements in a horizontal split layout sharing React state.
 
-import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Environment, TrackballControls } from '@react-three/drei';
 import * as THREE from 'three';
@@ -25,6 +25,14 @@ import {
 import { rotateSliceCubies } from '../game/cubeRotation.js';
 import { play } from '../utils/audio.js';
 import { isMobile as isMobileDevice } from '../utils/device.js';
+
+// Module-level scratch objects — never reallocated per frame
+const _camNormal = new THREE.Vector3();
+const _camBehind = new THREE.Vector3();
+const _camAhead = new THREE.Vector3();
+const _CAM_AXIS_COL = new THREE.Vector3(1, 0, 0);
+const _CAM_AXIS_ROW = new THREE.Vector3(0, 1, 0);
+const _CAM_AXIS_DEPTH = new THREE.Vector3(0, 0, 1);
 
 // ============================================================================
 // MOBILE TOUCH CONTROLS
@@ -215,19 +223,23 @@ function ChaseCam({ crawlerState, size: _size }) {
     if (!crawlerState) return;
 
     const { position, forward, face } = crawlerState;
-    const normal = FACE_NORMALS[face]?.clone() || new THREE.Vector3(0, 1, 0);
+    const faceNormal = FACE_NORMALS[face];
+    if (faceNormal) {
+      _camNormal.copy(faceNormal);
+    } else {
+      _camNormal.set(0, 1, 0);
+    }
 
-    // Behind and above
-    const behind = forward.clone().normalize().multiplyScalar(-2.5);
-    const above = normal.clone().multiplyScalar(1.8);
-    targetPos.current.copy(position).add(behind).add(above);
+    // Behind and above — reuse scratch vectors, no clone()
+    _camBehind.copy(forward).normalize().multiplyScalar(-2.5);
+    targetPos.current.copy(position).add(_camBehind).addScaledVector(_camNormal, 1.8);
 
     // Look ahead
-    const ahead = forward.clone().normalize().multiplyScalar(2.0);
-    targetLookAt.current.copy(position).add(ahead);
+    _camAhead.copy(forward).normalize().multiplyScalar(2.0);
+    targetLookAt.current.copy(position).add(_camAhead);
 
     camera.position.lerp(targetPos.current, lerpSpeed);
-    camera.up.copy(normal);
+    camera.up.copy(_camNormal);
     camera.lookAt(targetLookAt.current);
   });
 
@@ -257,6 +269,7 @@ function CrawlerGameLoop({ crawlerRef, inputRef, gameStateRef, size, cubies, orb
       if (!orbs[i].collected && checkOrbCollision(groundPos, orbs[i].position, 0.7)) {
         orbs[i] = { ...orbs[i], collected: true };
         orbsRef.current = [...orbs];
+        orbsVersionRef.current++;
         onOrbCollect();
       }
     }
@@ -331,6 +344,9 @@ export default function PlatformerWormMode({ cubies: initialCubies, size, faceCo
   // --- Orbs ---
   const orbsRef = useRef([]);
   const [orbsDisplay, setOrbsDisplay] = useState([]);
+  // Version counter incremented whenever orbsRef.current is replaced (orb collected / init)
+  const orbsVersionRef = useRef(0);
+  const orbsDisplayVersionRef = useRef(0);
 
   // --- Input refs (updated on keydown/keyup, read in game loop) ---
   const inputRef = useRef({
@@ -361,6 +377,7 @@ export default function PlatformerWormMode({ cubies: initialCubies, size, faceCo
 
     const orbs = spawnCrawlerOrbs(CONFIG.orbCount, size, startPos);
     orbsRef.current = orbs;
+    orbsVersionRef.current++;
     setOrbsDisplay(orbs);
     setOrbsCollected(0);
     setHealth(CONFIG.maxHealth);
@@ -382,7 +399,11 @@ export default function PlatformerWormMode({ cubies: initialCubies, size, faceCo
       if (crawlerRef.current) {
         setCrawlerDisplay({ ...crawlerRef.current });
       }
-      setOrbsDisplay([...orbsRef.current]);
+      // Only spread the orbs array when it has actually changed (version counter check)
+      if (orbsVersionRef.current !== orbsDisplayVersionRef.current) {
+        orbsDisplayVersionRef.current = orbsVersionRef.current;
+        setOrbsDisplay([...orbsRef.current]);
+      }
       if (gameStateRef.current === 'playing') {
         timerRef.current += 1 / 30;
         setTimer(timerRef.current);
@@ -453,13 +474,9 @@ export default function PlatformerWormMode({ cubies: initialCubies, size, faceCo
           crawlerRef.current = rotateCrawlerWithSlice(crawlerRef.current, axis, slice, dir, size);
         }
 
-        // Update orb positions
-        const rotQuat = new THREE.Quaternion().setFromAxisAngle(
-          axis === 'col' ? new THREE.Vector3(1, 0, 0) :
-          axis === 'row' ? new THREE.Vector3(0, 1, 0) :
-          new THREE.Vector3(0, 0, 1),
-          dir * Math.PI / 2
-        );
+        // Update orb positions — use module-level axis vectors to avoid allocations
+        const rotAxis = axis === 'col' ? _CAM_AXIS_COL : axis === 'row' ? _CAM_AXIS_ROW : _CAM_AXIS_DEPTH;
+        const rotQuat = new THREE.Quaternion().setFromAxisAngle(rotAxis, dir * Math.PI / 2);
 
         orbsRef.current = orbsRef.current.map(orb => {
           if (orb.collected) return orb;
@@ -473,6 +490,7 @@ export default function PlatformerWormMode({ cubies: initialCubies, size, faceCo
           const projected = projectOntoCube(newPos, size);
           return { ...orb, position: projected.position, face: projected.face };
         });
+        orbsVersionRef.current++;
       }
     };
     requestAnimationFrame(animate);
