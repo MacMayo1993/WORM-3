@@ -619,37 +619,20 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       prevRawP.current = 0;
       wormIntroT.current = 6.0;
       setShowWormIntro(true);
-      // Activate spin-reveal immediately with FROM color at full disc coverage so the
-      // squish phase shows the FROM colour contracting into glass — not raw face colour.
-      // This eliminates the white tile flash on both halves of the flip.
+      // Activate spin-reveal immediately with FROM color at full disc coverage.
       if (spinRevealRef.current && spinRevealMatRef.current && flipFromColor.current) {
         spinRevealMatRef.current.uniforms.uColor.value.set(flipFromColor.current);
         spinRevealMatRef.current.uniforms.uProgress.value = 1.0;
         spinRevealRef.current.visible = true;
       }
-      // Imperatively reset the mesh to the FROM color here. This covers the case where
-      // the mesh was just mounted for the first time (tile going instanceable→non-instanceable)
-      // and the JSX-created material already has materialColor (the new post-flip color).
-      // useLayoutEffect skips the update when isFlipPending, but a brand-new mesh starts
-      // with the JSX color, so we must explicitly restore the old color before the first frame.
+      // Hide the main disc entirely — spinReveal owns all visuals during the flip.
+      // Keeping the disc visible (even with mat.map=null) produced a white square behind the
+      // spinReveal circle because dropping the map also loses the disc alphaMap clip.
+      if (meshRef.current) meshRef.current.visible = false;
+      // Keep instanceColorRef updated so the manager doesn't show stale color if the tile
+      // transitions back to instanced rendering after the animation ends.
       if (isInstancedRef.current && flipFromColor.current) {
         instanceColorRef.current.setStyle(flipFromColor.current);
-      }
-      const mat = meshRef.current?.material;
-      if (mat?.color && flipFromColor.current) {
-        // Drop the texture during the flip so the mesh shows a clean face color rather than
-        // white (the neutral tint required for texture display). The texture is restored at
-        // animation end. This gives a glass-tile look: solid colour squishes in, solid
-        // antipodal colour reveals out, texture snaps back when the animation settles.
-        mat.color.set(flipFromColor.current);
-        mat.map = null;
-        mat.needsUpdate = true;
-      } else if (mat?.uniforms?.baseColor && flipFromColor.current) {
-        // Shader-style tile (circuit, grid, etc.): switch to the from-color material so the
-        // squish animation starts on the OLD color, not the post-flip color that React already
-        // attached via the styleMaterial useMemo. flipToColor is the antipodal hex of the from face.
-        const fromMat = getTileStyleMaterial(tileStyleRef.current, flipFromColor.current, false, null, flipToColor.current);
-        meshRef.current.material = fromMat;
       }
       flipParticlesRef.current?.trigger(fc[curr]);
       play('/sounds/flip.mp3');
@@ -791,14 +774,6 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           spinRevealMatRef.current.uniforms.uDissolve.value = 1.0;
           spinRevealRef.current.visible = true;
         }
-        // Switch main disc to TO color so the second half has the right background.
-        // This prevents any residual FROM color (e.g. white) bleeding through the
-        // spinReveal overlay near the disc edge where inDisc < 1.
-        const midMat = meshRef.current?.material;
-        if (midMat?.color && flipToColor.current) {
-          midMat.color.set(flipToColor.current);
-          midMat.needsUpdate = true;
-        }
         // Ring opacity spike — event horizon signal.
         if (ringRef.current) {
           ringRef.current.material.opacity = 0.9;
@@ -835,8 +810,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         flipFromTexture.current = null;
         flipToTexture.current = null;
         prevRawP.current = 0;
-        // Force set the final color/texture correctly.
-        // Use currTextureRef (includes biome ground texture) instead of faceTextures.
+        // Restore the main disc with the final TO color/texture, then make it visible.
         // InstancedMesh path: restore the final base colour.
         if (isInstancedRef.current && baseColorRef.current) {
           instanceColorRef.current.setStyle(baseColorRef.current);
@@ -851,6 +825,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           const newMat = getTileStyleMaterial(tileStyle, baseColorRef.current, false, null, antipodalHexRef.current);
           meshRef.current.material = newMat;
         }
+        // Reveal the mesh now that it has the correct final color — was hidden during flip.
+        if (meshRef.current) meshRef.current.visible = true;
       }
     }
 
@@ -1146,29 +1122,20 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     if (meshRef.current && meshRef.current.material && !isFlipping.current && spinT.current <= 0) {
       const mat = meshRef.current.material;
       if (isFlipPending) {
-        // A flip is about to start — immediately paint the mesh with the FROM face color so no
-        // frame of the post-flip materialColor (e.g. '#ffffff' for textured tiles, COLORS.white
-        // for Sudokube) is ever visible before the squish animation kicks in.  This closes two
-        // distinct gaps:
-        //   1. First-flip white flash: the tile just went instanceable → non-instanceable so a
-        //      brand-new <mesh> mounted with color={materialColor}='#ffffff' from JSX.  The old
-        //      guard would skip the update, leaving it white until useEffect corrects it after paint.
-        //   2. Constant-materialColor modes (Sudokube, glass): materialColor never changes on a
-        //      flip so useLayoutEffect wouldn't fire at all without meta?.curr in the deps array.
-        //      Applying FROM color here ensures the squish starts on the right color, not white.
-        if (mat.color) {
-          const fromVal = prevCurr.current;
-          const fromColor = fc[fromVal];
+        // Hide the main disc immediately — spinReveal will cover the tile.
+        // This closes the commit→paint gap before useEffect can fire, preventing any
+        // white flash from the mesh (textured tiles use '#ffffff' as materialColor).
+        meshRef.current.visible = false;
+        // Pre-activate spinReveal with the FROM color so there is no transparent frame
+        // between commit (where we hide the mesh) and the first paint.
+        if (spinRevealRef.current && spinRevealMatRef.current) {
+          const fromColor = fc[prevCurr.current];
           if (fromColor) {
-            // Drop the texture so the mesh shows the raw face colour (not white).
-          // The texture is restored at the end of the animation (see flip-end block in useFrame).
-          mat.color.set(fromColor);
-          mat.map = null;
-          mat.needsUpdate = true;
+            spinRevealMatRef.current.uniforms.uColor.value.set(fromColor);
+            spinRevealMatRef.current.uniforms.uProgress.value = 1.0;
+            spinRevealRef.current.visible = true;
           }
         }
-        // Shader-style tiles (uniforms.baseColor) are handled by the flip useEffect which builds
-        // a fromMat with getTileStyleMaterial — no action needed here for those.
       } else if (mat.color) {
         mat.color.set(materialColor);
         mat.map = renderTexture;
