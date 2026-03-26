@@ -36,8 +36,8 @@ const _projected = new THREE.Vector3();
 const _rotAxis = new THREE.Vector3();
 
 // Pre-allocated pool for live drag base positions/rotations.
-// Max slice size = size² = 5² = 25 cubies for a 5×5 cube.
-const _MAX_SLICE = 25;
+// Max supported cube size is 7, so a rotated slice can contain up to 7² = 49 cubies.
+const _MAX_SLICE = 49;
 const _dragPosPool = Array.from({ length: _MAX_SLICE }, () => new THREE.Vector3());
 const _dragRotPool = Array.from({ length: _MAX_SLICE }, () => new THREE.Quaternion());
 const _dragBasePositions = new Map();

@@ -676,8 +676,13 @@ export default function WORM3() {
     const newCursor = cubePosToCursor(pos, dirKey);
     useGameStore.getState().setCursor(newCursor);
     setShowCursor(true);
+
+    // Mobile explore flow: keep direct swipe-to-rotate behavior without
+    // opening the directional rotation selector popup on tap.
+    if (isMobile) return;
+
     setSelectedTileForRotation({ pos, dirKey, cursor: newCursor });
-  }, [disparityWaitingFirstFlip, flipSticker, setChaosLevel, cubePosToCursor, setShowCursor, setSelectedTileForRotation]);
+  }, [disparityWaitingFirstFlip, flipSticker, cubePosToCursor, setShowCursor, setSelectedTileForRotation]);
 
   // Face rotation handlers
   const handleFaceRotationMode = useCallback((target) => {
