@@ -1209,11 +1209,11 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
       <group ref={innerGroupRef}>
         {/* Background quad — full-square mesh 1 mm behind the disc-clipped main sticker
-            so the cube body / white '#ffffff' texture-tint does not bleed through the
-            transparent disc corners.  Uses the sticker's own baseColor so no "antipodal
-            circle outline" appears in classic solid mode.
+            so the white '#ffffff' texture-tint does not bleed through the transparent disc
+            corners on textured tiles.  Only rendered when a texture is active; plain
+            solid-colour tiles skip it since the main sticker is now a full square.
             Skipped for hollow-frame and glass/shader-style tiles (own visuals). */}
-        {!isInstanceable && !hollow && !useGlassStyle && !useShaderStyle && (
+        {!isInstanceable && !hollow && !useGlassStyle && !useShaderStyle && !!renderTexture && (
           <mesh position={[0, 0, -0.001]}>
             <primitive object={_sharedStickerGeo} attach="geometry" />
             <meshStandardMaterial
@@ -1244,8 +1244,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
             <meshStandardMaterial
               color={materialColor}
               map={hollow ? null : renderTexture}
-              alphaMap={hollow ? null : _discAlphaMap}
-              alphaTest={hollow ? 0 : 0.45}
+              alphaMap={hollow || !renderTexture ? null : _discAlphaMap}
+              alphaTest={hollow || !renderTexture ? 0 : 0.45}
               side={THREE.FrontSide}
               roughness={0.3}
               metalness={0.05}
