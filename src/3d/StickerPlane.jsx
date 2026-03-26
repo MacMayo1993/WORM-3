@@ -1208,15 +1208,16 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       </mesh>
 
       <group ref={innerGroupRef}>
-        {/* Antipodal colour background — full-square quad 1 mm behind the disc-clipped
-            main sticker so corners show the antipodal face colour instead of the black
-            cube body or the white '#ffffff' texture-tint bleed.
+        {/* Background quad — full-square mesh 1 mm behind the disc-clipped main sticker
+            so the cube body / white '#ffffff' texture-tint does not bleed through the
+            transparent disc corners.  Uses the sticker's own baseColor so no "antipodal
+            circle outline" appears in classic solid mode.
             Skipped for hollow-frame and glass/shader-style tiles (own visuals). */}
         {!isInstanceable && !hollow && !useGlassStyle && !useShaderStyle && (
           <mesh position={[0, 0, -0.001]}>
             <primitive object={_sharedStickerGeo} attach="geometry" />
             <meshStandardMaterial
-              color={isDead ? '#333333' : (antipodalHex || baseColor)}
+              color={isDead ? '#333333' : baseColor}
               side={THREE.FrontSide}
               roughness={0.3}
               metalness={0.05}
