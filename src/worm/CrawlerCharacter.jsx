@@ -27,14 +27,38 @@ const _invQuat = new THREE.Quaternion();
 const _tailWorldPos = new THREE.Vector3();
 const _trailLocalPos = new THREE.Vector3();
 
+// Circular buffer helpers — avoids per-frame unshift/clone allocations
+function makeCircularBuffer(capacity) {
+  return {
+    buf: Array.from({ length: capacity }, () => new THREE.Vector3()),
+    head: 0,  // points to the slot where the NEXT write will go
+    count: 0,
+    capacity,
+  };
+}
+// Write a new entry (overwrites oldest when full)
+function cbWrite(cb, v) {
+  cb.buf[cb.head].copy(v);
+  cb.head = (cb.head + 1) % cb.capacity;
+  if (cb.count < cb.capacity) cb.count++;
+}
+// Read the entry that is `offset` steps behind the most-recent write (0 = newest)
+function cbRead(cb, offset) {
+  if (offset >= cb.count) return null;
+  const idx = (cb.head - 1 - offset + cb.capacity) % cb.capacity;
+  return cb.buf[idx];
+}
+
 export default function CrawlerCharacter({ position, forward, face, jumpHeight, velocity, alive = true }) {
   const groupRef = useRef();
   const bodyRootRef = useRef();
   const timeRef = useRef(0);
-  const positionHistory = useRef([]);
+  const positionHistory = useRef(makeCircularBuffer(HISTORY_SIZE));
   const bodySegmentRefs = useRef([]);
   const trailRefs = useRef([]);
   const trailSpawnT = useRef(0);
+  // nextTrailSlot: round-robin index so finding a free slot is O(1)
+  const nextTrailSlot = useRef(0);
   const trailData = useRef(Array.from({ length: TRAIL_MAX_POINTS }, () => ({
     active: false,
     age: 0,
@@ -61,8 +85,7 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
     if (!groupRef.current) return;
 
     groupRef.current.getWorldPosition(_worldPos);
-    positionHistory.current.unshift(_worldPos.clone());
-    if (positionHistory.current.length > HISTORY_SIZE) positionHistory.current.pop();
+    cbWrite(positionHistory.current, _worldPos);
 
     if (!bodyRootRef.current) return;
 
@@ -74,8 +97,7 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
       const segGroup = bodySegmentRefs.current[i];
       if (!segGroup) continue;
 
-      const historyIndex = Math.min(positionHistory.current.length - 1, i * HISTORY_STEP);
-      const sampled = positionHistory.current[historyIndex];
+      const sampled = cbRead(positionHistory.current, i * HISTORY_STEP);
       if (!sampled) continue;
 
       _segPos.copy(sampled).sub(_rootPos).applyQuaternion(_invQuat);
@@ -90,7 +112,15 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
 
       if (alive && moveFactor > 0.05 && trailSpawnT.current >= TRAIL_SPAWN_INTERVAL) {
         trailSpawnT.current = 0;
-        const slot = trailData.current.find(tp => !tp.active) || trailData.current[0];
+        // Round-robin: scan at most TRAIL_MAX_POINTS slots starting from nextTrailSlot
+        const data = trailData.current;
+        let slotIdx = nextTrailSlot.current;
+        for (let s = 0; s < TRAIL_MAX_POINTS; s++) {
+          if (!data[slotIdx].active) break;
+          slotIdx = (slotIdx + 1) % TRAIL_MAX_POINTS;
+        }
+        nextTrailSlot.current = (slotIdx + 1) % TRAIL_MAX_POINTS;
+        const slot = data[slotIdx];
         slot.active = true;
         slot.age = 0;
         slot.pos.copy(_tailWorldPos);

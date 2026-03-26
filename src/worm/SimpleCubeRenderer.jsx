@@ -2,8 +2,13 @@
 // Lightweight cube renderer for the platformer split-screen views.
 // Renders cubies as colored boxes with sticker planes — no interaction, no animation.
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
 import * as THREE from 'three';
+
+// Module-level axis vectors — reused across all frames, never reallocated
+const _AXIS_COL = new THREE.Vector3(1, 0, 0);
+const _AXIS_ROW = new THREE.Vector3(0, 1, 0);
+const _AXIS_DEPTH = new THREE.Vector3(0, 0, 1);
 
 const STICKER_OFFSET = 0.505;
 
@@ -103,24 +108,27 @@ export default function SimpleCubeRenderer({ cubies, size, faceColors, rotationA
     return list;
   }, [cubies, size]);
 
-  // Optional rotation animation: { axis, sliceIndex, dir, progress }
-  // progress goes 0→1, rotates the slice smoothly
-  const getSliceRotation = (x, y, z) => {
+  // Memoize the rotation quaternion — recompute only when the animation parameters change.
+  // Stored in a ref so the same Quaternion object is mutated in place rather than
+  // allocating a new one on every render.
+  const animQuatRef = useRef(new THREE.Quaternion());
+  const sliceQuaternion = useMemo(() => {
     if (!rotationAnim) return null;
-    const { axis, sliceIndex, dir, progress } = rotationAnim;
-    let inSlice = false;
-    if (axis === 'col' && x === sliceIndex) inSlice = true;
-    if (axis === 'row' && y === sliceIndex) inSlice = true;
-    if (axis === 'depth' && z === sliceIndex) inSlice = true;
-    if (!inSlice) return null;
-
+    const { axis, dir, progress } = rotationAnim;
     const angle = dir * progress * (Math.PI / 2);
-    const rotAxis = axis === 'col'
-      ? new THREE.Vector3(1, 0, 0)
-      : axis === 'row'
-        ? new THREE.Vector3(0, 1, 0)
-        : new THREE.Vector3(0, 0, 1);
-    return new THREE.Quaternion().setFromAxisAngle(rotAxis, angle);
+    const rotAxis = axis === 'col' ? _AXIS_COL : axis === 'row' ? _AXIS_ROW : _AXIS_DEPTH;
+    animQuatRef.current.setFromAxisAngle(rotAxis, angle);
+    return animQuatRef.current;
+  }, [rotationAnim]);
+
+  // Returns the shared quaternion for cubies in the rotating slice, null otherwise
+  const getSliceRotation = (x, y, z) => {
+    if (!sliceQuaternion || !rotationAnim) return null;
+    const { axis, sliceIndex } = rotationAnim;
+    const inSlice = (axis === 'col' && x === sliceIndex) ||
+                    (axis === 'row' && y === sliceIndex) ||
+                    (axis === 'depth' && z === sliceIndex);
+    return inSlice ? sliceQuaternion : null;
   };
 
   return (
