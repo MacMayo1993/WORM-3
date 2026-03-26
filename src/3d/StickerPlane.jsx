@@ -302,9 +302,10 @@ const spinRevealFragmentShader = `
     vec3 coolGlow = vec3(0.15, 0.40, 0.90) * (wisp * 0.12);
     vec3 col = clamp(faceColor + coolGlow, 0.0, 1.35);
 
-    // Alpha envelope: nearly fully opaque throughout so no background color bleeds through.
-    // Peaks at 1.0 at midpoint energy; base of 0.92 at calm state prevents disc edge artifacts.
-    float alpha = inDisc * (0.92 + energy * 0.08);
+    // Fully opaque within the disc — the main mesh is hidden during the flip so the
+    // spinReveal is the sole visible layer.  Any alpha < 1 lets background content show
+    // through (worm portal, hollow tiles, glass backplate), which reads as white.
+    float alpha = inDisc;
     gl_FragColor = vec4(col, alpha);
   }
 `;
