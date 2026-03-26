@@ -1749,7 +1749,7 @@ function TunnelHealProgress({ size }) {
     );
 }
 
-function WormholeRings({ cubies, size, voidTunnelKeysRef, tunnelUseCountsRef }) {
+function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUseCountsRef }) {
     const liveRef = useRef();       // live wormhole rings (neon pink)
     const voidOuterRef = useRef();  // void outer ring (sickly green, slow reverse)
     const voidInnerRef = useRef();  // void inner ring (near-black, counter-rotating)
@@ -1836,7 +1836,27 @@ function WormholeRings({ cubies, size, voidTunnelKeysRef, tunnelUseCountsRef }) 
         return result;
     }, [debouncedCubies, size]);
 
-    useFrame(({ clock }) => {
+    // Performance throttle:
+    // - During active tunnel travel, update at full frame rate for smooth motion.
+    // - During normal crawling, animate rings at a lower cadence to cut per-frame CPU load.
+    const frameBudgetRef = useRef(0);
+    const lastPhaseRef = useRef('crawling');
+
+    useFrame(({ clock }, delta) => {
+        const phase = worm?.phase?.current ?? 'crawling';
+        const inTunnelPhase = phase === 'entering' || phase === 'tunnel' || phase === 'exiting';
+        const targetStep = inTunnelPhase ? (1 / 60) : (1 / 20);
+
+        if (lastPhaseRef.current !== phase) {
+            // Prevent carrying large accumulated delta across phase changes.
+            frameBudgetRef.current = 0;
+            lastPhaseRef.current = phase;
+        }
+
+        frameBudgetRef.current += delta;
+        if (frameBudgetRef.current < targetStep) return;
+        frameBudgetRef.current = 0;
+
         const liveMesh = liveRef.current;
         const voidOuter = voidOuterRef.current;
         const voidInner = voidInnerRef.current;
@@ -2335,7 +2355,13 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             <WormBody worm={worm} />
             <WormFace worm={worm} size={size} />
             <PortalGlow worm={worm} size={size} />
-            <WormholeRings cubies={cubies} size={size} voidTunnelKeysRef={worm.voidTunnelKeysRef} tunnelUseCountsRef={worm.tunnelUseCountsRef} />
+            <WormholeRings
+                cubies={cubies}
+                size={size}
+                worm={worm}
+                voidTunnelKeysRef={worm.voidTunnelKeysRef}
+                tunnelUseCountsRef={worm.tunnelUseCountsRef}
+            />
             <TunnelHealProgress size={size} />
             <HeartBurstSystem worm={worm} size={size} />
             <PowerupOrbs size={size} />
