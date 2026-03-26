@@ -527,7 +527,16 @@ export default function UILayer({
           showTunnels={showTunnels} onToggleTunnels={() => setShowTunnels(!showTunnels)}
           onShuffle={onShuffle} onReset={onReset}
           showNetPanel={showNetPanel} onToggleNet={() => setShowNetPanel(!showNetPanel)}
-          onRotateCW={() => performCursorRotation('cw')} onRotateCCW={() => performCursorRotation('ccw')}
+          onRotateCW={() => {
+            if (faceRotationTarget) onFaceRotate('cw');
+            else if (selectedTileForRotation && !flipMode) onTileFaceRotation('cw');
+            else performCursorRotation('cw');
+          }}
+          onRotateCCW={() => {
+            if (faceRotationTarget) onFaceRotate('ccw');
+            else if (selectedTileForRotation && !flipMode) onTileFaceRotation('ccw');
+            else performCursorRotation('ccw');
+          }}
           onUndo={undo} canUndo={canUndo} undoCount={moveHistory.length}
           teachModeActive={teachMode.active}
           onToggleTeachMode={() => { if (teachMode.active) teachMode.exitTeachMode(); else teachMode.enterTeachMode(); }}
@@ -539,7 +548,7 @@ export default function UILayer({
         <div className="mobile-touch-hint">Swipe to rotate • Tap tile for options</div>
       )}
 
-      {faceRotationTarget && (
+      {faceRotationTarget && !isMobile && (
         <FaceRotationButtons
           onRotateCW={() => onFaceRotate('cw')}
           onRotateCCW={() => onFaceRotate('ccw')}
@@ -547,7 +556,7 @@ export default function UILayer({
         />
       )}
 
-      {selectedTileForRotation && !flipMode && (
+      {selectedTileForRotation && !flipMode && !isMobile && (
         <TileRotationSelector
           onRotate={onTileRotation}
           onRotateFaceCW={() => onTileFaceRotation('cw')}
