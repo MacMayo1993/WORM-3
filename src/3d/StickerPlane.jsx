@@ -268,9 +268,8 @@ const spinRevealVertexShader = `
 `;
 
 // Flip overlay shader: keeps the tile fully visible during the whole flip while
-// adding a high-energy edge swirl. We intentionally avoid the old center-hole
-// portal transition so the flip effects stay readable and don't get swallowed by
-// a black disc.
+// adding a restrained chromatic edge swirl. Intentionally avoids any white-phase
+// bridge so heavy disparity bursts cannot accumulate into a white wash.
 const spinRevealFragmentShader = `
   uniform vec3 uColor;
   uniform float uProgress; // 1 = calm, 0 = peak transition energy
@@ -290,17 +289,16 @@ const spinRevealFragmentShader = `
     // Transition energy envelope: strongest near midpoint of each half.
     float energy = 1.0 - uProgress;
 
-    // Rotating edge wisps (purely additive to face color; no center cutout).
+    // Rotating edge wisps (chromatic-only; no neutral/white bridge).
     float edgeBand = smoothstep(0.20, 0.40, dist) * (1.0 - smoothstep(0.40, 0.50, dist));
     float swirl = 0.5 + 0.5 * sin(angle * 10.0 - uTime * 7.0 + dist * 20.0);
     float wisp = edgeBand * swirl * energy * inDisc;
 
-    // Keep face visible but avoid full opaque replacement. In large disparity cascades,
-    // many simultaneous flip overlays can briefly look like a white "paint layer" if
-    // they fully occlude the base tile. So we keep this as a blended glaze.
-    vec3 faceColor = uColor * (1.0 + wisp * 0.35);
-    vec3 coolGlow = vec3(0.15, 0.40, 0.90) * (wisp * 0.12);
-    vec3 col = clamp(faceColor + coolGlow, 0.0, 1.35);
+    // White-free transition: stay on-face-color through the entire handoff.
+    // Slight brighten/darken modulation preserves motion readability without
+    // introducing additive white accumulation under load.
+    float shade = 1.0 + (wisp - 0.5 * energy) * 0.18;
+    vec3 col = clamp(uColor * shade, 0.0, 1.0);
 
     // Fully opaque within the disc — the main mesh is hidden during the flip so the
     // spinReveal is the sole visible layer.  Any alpha < 1 lets background content show
@@ -1303,6 +1301,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           fragmentShader={spinRevealFragmentShader}
           uniforms={spinRevealUniforms}
           transparent
+          blending={THREE.NormalBlending}
           depthTest={true}
           depthWrite={false}
         />

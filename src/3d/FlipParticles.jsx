@@ -7,7 +7,6 @@ import * as THREE from 'three';
 
 const _sharedParticleGeometry = new THREE.PlaneGeometry(1, 1);
 const _particleDummy = new THREE.Object3D();
-const _bloomWhite = new THREE.Color(1, 1, 1);
 const _baseBurstColor = new THREE.Color();
 
 const PARTICLE_COUNT = 20;
@@ -34,13 +33,13 @@ const FRAGMENT_SHADER = `
     float dist = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - corner;
     float chipAlpha = 1.0 - smoothstep(-0.05, 0.12, dist);
 
-    // Inner highlight radiates from center
+    // Inner highlight radiates from center (chromatic only).
     float highlight = 1.0 - smoothstep(0.0, 0.55, length(p));
-    vec3 litColor = uColor + highlight * 0.55;
+    vec3 litColor = uColor * (1.0 + highlight * 0.22);
 
     // Crisp sticker-edge border
     float border = 1.0 - smoothstep(0.82, 0.98, max(abs(p.x), abs(p.y)));
-    litColor += border * 0.3;
+    litColor += uColor * (border * 0.16);
 
     gl_FragColor = vec4(clamp(litColor, 0.0, 1.0), chipAlpha * uOpacity);
   }
@@ -129,12 +128,7 @@ const FlipParticles = React.forwardRef((_props, ref) => {
       : Math.pow(1 - (p - fadeStart) / (1 - fadeStart), 1.8);
     uniformsRef.current.uOpacity.value = opacity;
 
-    const bloomPeak = Math.sin(p * Math.PI);
-    uniformsRef.current.uColor.value.lerpColors(
-      _baseBurstColor,
-      _bloomWhite,
-      bloomPeak * 0.45
-    );
+    uniformsRef.current.uColor.value.copy(_baseBurstColor);
 
     for (let i = 0; i < PARTICLE_COUNT; i++) {
       const vel = velocitiesRef.current[i];
@@ -176,7 +170,7 @@ const FlipParticles = React.forwardRef((_props, ref) => {
         transparent
         side={THREE.DoubleSide}
         depthWrite={false}
-        blending={THREE.AdditiveBlending}
+        blending={THREE.NormalBlending}
       />
     </instancedMesh>
   );
