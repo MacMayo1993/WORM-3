@@ -2,7 +2,7 @@
 // Dual-screen co-op mode: Manifolder (P1) rotates the cube, Crawler (P2) navigates the surface.
 // Uses two <Canvas> elements in a horizontal split layout sharing React state.
 
-import React, { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'react';
+import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Environment, TrackballControls } from '@react-three/drei';
 import * as THREE from 'three';
@@ -249,7 +249,7 @@ function ChaseCam({ crawlerState, size: _size }) {
 // ============================================================================
 // GAME LOOP — runs in the Crawler canvas to drive physics each frame
 // ============================================================================
-function CrawlerGameLoop({ crawlerRef, inputRef, gameStateRef, size, cubies, orbsRef, healthRef: _healthRef, onOrbCollect, onDamage, lastParityDamage }) {
+function CrawlerGameLoop({ crawlerRef, inputRef, gameStateRef, size, cubies, orbsRef, orbsVersionRef, healthRef: _healthRef, onOrbCollect, onDamage, lastParityDamage }) {
   useFrame((_, delta) => {
     if (gameStateRef.current !== 'playing') return;
 
@@ -636,6 +636,7 @@ export default function PlatformerWormMode({ cubies: initialCubies, size, faceCo
               size={size}
               cubies={cubies}
               orbsRef={orbsRef}
+              orbsVersionRef={orbsVersionRef}
               healthRef={healthRef}
               onOrbCollect={handleOrbCollect}
               onDamage={handleDamage}
