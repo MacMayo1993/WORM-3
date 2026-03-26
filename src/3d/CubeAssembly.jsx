@@ -261,8 +261,13 @@ const CubeAssembly = React.memo(({
     setDragStart(dragData);
     longPressTriggeredRef.current = false;
 
-    // Don't disable controls here — wait until we confirm it's a slice drag (dist ≥ threshold).
-    // Disabling on every pointer-down prevented camera orbit on short taps in disparity mode.
+    // Disable camera controls immediately so TrackballControls never processes this touch.
+    // If controls stay enabled through pointerdown, THREE.TrackballControls adds the pointer
+    // to its internal _pointers array. When we later disable mid-drag, its onPointerUp never
+    // runs to clean up, leaving a stale entry. On the next touch THREE sees 2 pointers and
+    // enters zoom mode instead of orbit mode — breaking every subsequent rotation gesture.
+    controlsEnabledRef.current = false;
+    if (controlsRef.current) controlsRef.current.enabled = false;
   }, []);
 
 
@@ -331,7 +336,7 @@ const CubeAssembly = React.memo(({
             startDx: dx, startDy: dy, dir: m.dir, mappingDir
           };
           sliceIndicesRef.current = sliceIndices;
-          // Now we know it's a slice drag — disable camera orbit so the two don't fight.
+          // Belt-and-suspenders: also disable here in case the ref was stale at pointerdown.
           controlsEnabledRef.current = false;
           if (controlsRef.current) controlsRef.current.enabled = false;
         }
