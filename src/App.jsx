@@ -495,23 +495,45 @@ export default function WORM3() {
     setShowDisparityWizard(true);
   }, []);
 
-  const handleDisparitySetupComplete = useCallback(({ cubeSize, disparityLevel, flipCap, visualMode: vm, flipMode: fm, showTunnels: st, colorScheme: cs }) => {
+  const handleDisparitySetupComplete = useCallback((wizardSettings) => {
     setShowDisparityWizard(false);
     useGameStore.getState().clearLevel();
     useGameStore.getState().clearDisparityGame();
-    if (flipCap != null) useGameStore.getState().setDisparityFlipCap(flipCap);
-    const newSettings = { ...settings, biomeMode: { enabled: false, faceAssignment: null } };
-    if (cs) newSettings.colorScheme = cs;
+    if (wizardSettings.flipCap != null) useGameStore.getState().setDisparityFlipCap(wizardSettings.flipCap);
+
+    const manifoldStyles = {};
+    [1, 2, 3, 4, 5, 6].forEach((id) => {
+      const perFace = wizardSettings.perFaceStyles?.[id];
+      if (perFace && perFace !== 'random') {
+        manifoldStyles[id] = perFace;
+      } else if (wizardSettings.tileStyle === 'random' || perFace === 'random') {
+        manifoldStyles[id] = null;
+      } else {
+        manifoldStyles[id] = wizardSettings.tileStyle || 'solid';
+      }
+    });
+
+    const newSettings = {
+      ...settings,
+      colorScheme: wizardSettings.colorScheme || settings.colorScheme,
+      backgroundTheme: wizardSettings.backgroundTheme || settings.backgroundTheme,
+      manifoldStyles,
+      biomeMode: { enabled: false, faceAssignment: null },
+    };
+    if (wizardSettings.customColors) newSettings.customColors = wizardSettings.customColors;
     setSettings(newSettings);
-    if (vm) setVisualMode(vm);
-    setFlipMode(fm);
-    if (st !== undefined) setShowTunnels(st);
+
+    if (wizardSettings.visualMode) setVisualMode(wizardSettings.visualMode);
+    setFlipMode(wizardSettings.flipMode ?? true);
+    if (wizardSettings.showTunnels !== undefined) setShowTunnels(wizardSettings.showTunnels);
+
     // Chaos stays OFF until the player makes the first flip
-    pendingDisparityLevelRef.current = disparityLevel;
+    pendingDisparityLevelRef.current = wizardSettings.disparityLevel;
     setChaosLevel(0);
-    // Start with a solved cube.  changeSize resets internally; same-size just needs reset().
-    if (cubeSize !== size) {
-      changeSize(cubeSize);
+
+    const targetSize = wizardSettings.cubeSize || size;
+    if (targetSize !== size) {
+      changeSize(targetSize);
     } else {
       reset();
     }
