@@ -2,7 +2,7 @@ import { readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ASSETS_DIR = 'dist/assets';
-const JS_MAX_BYTES = 700 * 1024; // 700 KB per JS asset
+const JS_MAX_BYTES = 680 * 1024; // 680 KB per JS asset (keeps Three.js bounded)
 const CSS_MAX_BYTES = 80 * 1024; // 80 KB per CSS asset
 
 const files = readdirSync(ASSETS_DIR);

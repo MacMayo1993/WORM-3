@@ -193,7 +193,6 @@ const Cubie = React.forwardRef(function Cubie({
     () => visualMode === 'wireframe'
       ? `${cubie.stickers.PZ?.curr},${cubie.stickers.NZ?.curr},${cubie.stickers.PX?.curr},${cubie.stickers.NX?.curr},${cubie.stickers.PY?.curr},${cubie.stickers.NY?.curr}`
       : '',
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       visualMode,
       cubie.stickers.PZ?.curr, cubie.stickers.NZ?.curr,
@@ -212,7 +211,6 @@ const Cubie = React.forwardRef(function Cubie({
     const oz = s?.origPos?.z ?? cubie.z;
     return ((ox * 7 + oy * 13 + oz * 17) & 31) * (Math.PI * 2 / 32);
   // origPos never changes after cube creation — this runs exactly once per cubie mount.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Generate wireframe edges for wireframe mode ONLY

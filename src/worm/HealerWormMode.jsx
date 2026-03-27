@@ -790,7 +790,7 @@ function useWormCrawler(size, cubies) {
         }
         if (PHASE_HANDLERS[currentPhase].update(delta, STEP_SEC)) return;
 
-    }, [size, cubies, wormSpeed, wormControlMode, wormholeInterval, beginTunnelTransition, resolveTunnelAtTile, killWorm]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [size, cubies, wormSpeed, wormControlMode, wormholeInterval, beginTunnelTransition, resolveTunnelAtTile, killWorm]);
 
 
 
@@ -1623,7 +1623,7 @@ function HeartBurst({ id, wp, onDone }) {
             document.head.appendChild(styleEl);
             return { heartId, delay };
         });
-    }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [id]);
 
     useEffect(() => {
         const timer = setTimeout(() => {

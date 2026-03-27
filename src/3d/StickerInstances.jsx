@@ -77,7 +77,7 @@ export function StickerInstanceProvider({ children }) {
     for (let i = 0; i < MAX_INSTANCES; i++) mesh.setMatrixAt(i, _zeroMatrix);
     mesh.instanceMatrix.needsUpdate = true;
     return mesh;
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // Add to scene root.  Remove on unmount.
   // NOTE: geometry and material are NOT disposed here.  In React 18 Strict Mode

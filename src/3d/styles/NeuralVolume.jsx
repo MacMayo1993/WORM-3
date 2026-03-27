@@ -199,7 +199,6 @@ export default function NeuralVolume({ faceColor }) {
   // args never change — R3F destroys and recreates the underlying Three.js object
   // when args change, which would discard the instance matrices set below.
   // Color updates are pushed imperatively via the useEffect that follows.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const somaMat = useMemo(() => new THREE.ShaderMaterial({
     uniforms: { neuColor: { value: neuCol.clone() }, time: sharedUniforms.time },
     vertexShader: somaVertexShader, fragmentShader: somaFragmentShader,

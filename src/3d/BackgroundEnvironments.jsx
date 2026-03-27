@@ -9,7 +9,6 @@ export function StarfieldEnvironment({ flipTrigger = 0 }) {
   const materialRef = useRef();
   const [pulseIntensity, setPulseIntensity] = useState(0);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (flipTrigger > 0) setPulseIntensity(1.0);
   }, [flipTrigger]);
@@ -137,7 +136,6 @@ export function AuroraEnvironment({ flipTrigger = 0 }) {
   const materialRef = useRef();
   const [pulseIntensity, setPulseIntensity] = useState(0);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (flipTrigger > 0) setPulseIntensity(1.0);
   }, [flipTrigger]);
@@ -300,7 +298,6 @@ export function DeepOceanEnvironment({ flipTrigger = 0 }) {
   const materialRef = useRef();
   const [pulseIntensity, setPulseIntensity] = useState(0);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (flipTrigger > 0) setPulseIntensity(1.0);
   }, [flipTrigger]);
@@ -460,7 +457,6 @@ export function CrystalCaveEnvironment({ flipTrigger = 0 }) {
   const materialRef = useRef();
   const [pulseIntensity, setPulseIntensity] = useState(0);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (flipTrigger > 0) setPulseIntensity(1.0);
   }, [flipTrigger]);
@@ -617,7 +613,6 @@ export function BambooForestEnvironment({ flipTrigger = 0 }) {
   const materialRef = useRef();
   const [pulseIntensity, setPulseIntensity] = useState(0);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (flipTrigger > 0) setPulseIntensity(1.0);
   }, [flipTrigger]);
@@ -788,7 +783,6 @@ export function VolcanicEnvironment({ flipTrigger = 0 }) {
   const materialRef = useRef();
   const [pulseIntensity, setPulseIntensity] = useState(0);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (flipTrigger > 0) setPulseIntensity(1.0);
   }, [flipTrigger]);
@@ -978,7 +972,6 @@ export function NebulaSkyEnvironment({ flipTrigger = 0 }) {
   const materialRef = useRef();
   const [pulseIntensity, setPulseIntensity] = useState(0);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (flipTrigger > 0) setPulseIntensity(1.0);
   }, [flipTrigger]);

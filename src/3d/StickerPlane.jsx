@@ -1051,7 +1051,6 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       console.warn('Failed to create tile style material:', e);
       return null;
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [useShaderStyle, tileStyle, baseColor, antipodalHex]);
 
   // Set up UVs to show the correct portion of the face texture
