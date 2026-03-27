@@ -180,7 +180,7 @@ function computeRotationPermutation(size, axis, sliceIndex, dir) {
         if (!inSlice) continue;
 
         // Rotate the cubie's centre position.
-        let cx = x - k, cy = y - k, cz = z - k;
+        const cx = x - k, cy = y - k, cz = z - k;
         let ncx, ncy, ncz;
         if (axis === 'col') {
           ncx = cx;

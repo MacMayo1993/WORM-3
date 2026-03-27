@@ -11,17 +11,37 @@ import { makeCubies } from '../game/cubeState.js';
 import { DEFAULT_SETTINGS } from '../utils/colorSchemes.js';
 import { isMobile } from '../utils/device.js';
 
+const SETTINGS_STORAGE_KEY = 'worm3_settings';
+const SETTINGS_VERSION_KEY = 'worm3_settings_version';
+const CURRENT_SETTINGS_VERSION = 1;
+
+const migrateSettings = (rawSettings, version) => {
+  if (!rawSettings || typeof rawSettings !== 'object') return { ...DEFAULT_SETTINGS };
+
+  // Future migrations should be added as explicit version steps.
+  // v0 -> v1 currently just normalizes into DEFAULT_SETTINGS shape.
+  if (version <= 1) {
+    return { ...DEFAULT_SETTINGS, ...rawSettings };
+  }
+
+  // Unknown future version in storage; safest fallback is merged defaults.
+  return { ...DEFAULT_SETTINGS, ...rawSettings };
+};
+
 // Load persisted state from localStorage
 const loadPersistedState = () => {
   try {
-    const settings = localStorage.getItem('worm3_settings');
+    const settings = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    const settingsVersionRaw = localStorage.getItem(SETTINGS_VERSION_KEY);
+    const settingsVersion = Number.parseInt(settingsVersionRaw ?? '0', 10) || 0;
     const introSeen = localStorage.getItem('worm3_intro_seen') === '1';
     const tutorialDone = localStorage.getItem('worm3_tutorial_done') === '1';
     const firstFlipDone = localStorage.getItem('worm3_first_flip_done') === '1';
     const mobileHintShown = localStorage.getItem('worm3_mobile_hint_shown') === '1';
+    const parsedSettings = settings ? JSON.parse(settings) : null;
 
     return {
-      settings: settings ? { ...DEFAULT_SETTINGS, ...JSON.parse(settings) } : { ...DEFAULT_SETTINGS },
+      settings: migrateSettings(parsedSettings, settingsVersion),
       introSeen,
       tutorialDone,
       hasFlippedOnce: firstFlipDone,
@@ -569,7 +589,8 @@ useGameStore.subscribe(
   (state) => state.settings,
   (settings) => {
     try {
-      localStorage.setItem('worm3_settings', JSON.stringify(settings));
+      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+      localStorage.setItem(SETTINGS_VERSION_KEY, String(CURRENT_SETTINGS_VERSION));
     } catch { }
   }
 );
