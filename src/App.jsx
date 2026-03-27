@@ -55,7 +55,6 @@ import { isMobile } from './utils/device.js';
 import { EXPLOSION_START, EXPLOSION_END, IMPLODE_START, IMPLODE_END } from './components/intro/introTiming.js';
 // Lazy-loaded: not needed on initial render, deferred to reduce parse time
 const PlatformerWormMode = React.lazy(() => import('./worm/PlatformerWormMode.jsx'));
-const HealerWormMode = React.lazy(() => import('./worm/HealerWormMode.jsx'));
 const WormTouchControls = React.lazy(() => import('./worm/WormTouchControls.jsx'));
 const HollowVoidCube = React.lazy(() => import('./3d/HollowVoidCube.jsx'));
 
