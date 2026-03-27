@@ -10,11 +10,6 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (id.includes('/src/3d/')) return 'app-3d';
-          if (id.includes('/src/components/')) return 'app-components';
-          if (id.includes('/src/worm/')) return 'app-worm';
-          if (id.includes('/src/manifold/')) return 'app-manifold';
-
           if (!id.includes('node_modules')) return;
           if (id.includes('/node_modules/react/')) return 'vendor-react3d';
           if (id.includes('/node_modules/react-dom/')) return 'vendor-react3d';
