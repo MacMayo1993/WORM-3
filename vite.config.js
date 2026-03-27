@@ -16,11 +16,11 @@ export default defineConfig({
           if (id.includes('/src/manifold/')) return 'app-manifold';
 
           if (!id.includes('node_modules')) return;
-          if (id.includes('/node_modules/react/')) return 'vendor-react';
-          if (id.includes('/node_modules/react-dom/')) return 'vendor-react';
-          if (id.includes('/node_modules/@react-three/fiber/')) return 'vendor-r3f-fiber';
-          if (id.includes('/node_modules/@react-three/drei/')) return 'vendor-r3f-drei';
-          if (id.includes('/node_modules/@react-three/postprocessing/')) return 'vendor-r3f-post';
+          if (id.includes('/node_modules/react/')) return 'vendor-react3d';
+          if (id.includes('/node_modules/react-dom/')) return 'vendor-react3d';
+          if (id.includes('/node_modules/@react-three/fiber/')) return 'vendor-react3d';
+          if (id.includes('/node_modules/@react-three/drei/')) return 'vendor-react3d';
+          if (id.includes('/node_modules/@react-three/postprocessing/')) return 'vendor-react3d';
           if (id.includes('/node_modules/postprocessing/')) return 'vendor-postprocessing';
           if (id.includes('/node_modules/three/examples/')) {
             const examplesPath = id.split('/node_modules/three/examples/')[1] || '';
