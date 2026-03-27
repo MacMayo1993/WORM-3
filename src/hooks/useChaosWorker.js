@@ -74,6 +74,11 @@ export function useChaosWorker({
 }) {
   const workerRef = useRef(null);
   const manifoldMapRef = useRef(null);
+  const disparityFlipCapRef = useRef(disparityFlipCap);
+
+  useEffect(() => {
+    disparityFlipCapRef.current = disparityFlipCap;
+  }, [disparityFlipCap]);
 
   useEffect(() => {
     const worker = new Worker(new URL('../workers/chaosWorker.js', import.meta.url), { type: 'module' });
@@ -84,7 +89,7 @@ export function useChaosWorker({
       const { flips, cascades, deaths, eliminatedFaces, winner, metrics } = e.data.payload;
 
       if (flips?.length > 0) {
-        const next = applyChaosFlipsBatch(cubiesRef.current, flips, size, manifoldMapRef.current, disparityFlipCap);
+        const next = applyChaosFlipsBatch(cubiesRef.current, flips, size, manifoldMapRef.current, disparityFlipCapRef.current);
         setCubies(next);
       }
 

@@ -17,7 +17,7 @@ export default defineConfig({
 
           if (!id.includes('node_modules')) return;
           if (id.includes('/node_modules/react/')) return 'vendor-react';
-          if (id.includes('/node_modules/react-dom/')) return 'vendor-react-dom';
+          if (id.includes('/node_modules/react-dom/')) return 'vendor-react';
           if (id.includes('/node_modules/@react-three/fiber/')) return 'vendor-r3f-fiber';
           if (id.includes('/node_modules/@react-three/drei/')) return 'vendor-r3f-drei';
           if (id.includes('/node_modules/@react-three/postprocessing/')) return 'vendor-r3f-post';
