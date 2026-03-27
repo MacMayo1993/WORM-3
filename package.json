@@ -13,7 +13,8 @@
     "test:coverage": "vitest run --coverage",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
-    "ci": "npm run lint && npm run test && npm run build"
+    "bundle:check": "node scripts/check-bundle-size.mjs",
+    "ci": "npm run lint && npm run test && npm run build && npm run bundle:check"
   },
   "dependencies": {
     "@react-three/drei": "^9.93.0",

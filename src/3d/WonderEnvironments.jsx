@@ -36,7 +36,6 @@ function useWonderShader(fragmentShader, flipTrigger) {
   const materialRef = useRef();
   const [pulseIntensity, setPulseIntensity] = useState(0);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (flipTrigger > 0) setPulseIntensity(1.0); }, [flipTrigger]);
 
   const shaderMaterial = useMemo(() => new THREE.ShaderMaterial({
