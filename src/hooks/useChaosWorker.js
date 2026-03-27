@@ -136,7 +136,7 @@ export function useChaosWorker({
       worker.terminate();
       workerRef.current = null;
     };
-  }, [addDisparityDeathsBulk, addDisparityEliminatedFacesBulk, cubiesRef, disparityRef, flipPctRef, setCascades, setCubies, size]);
+  }, [addDisparityDeathsBulk, addDisparityEliminatedFacesBulk, cubiesRef, disparityFlipCap, disparityRef, flipPctRef, setCascades, setCubies, size]);
 
   useEffect(() => {
     const worker = workerRef.current;
