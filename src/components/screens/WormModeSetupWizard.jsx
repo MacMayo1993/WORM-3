@@ -731,14 +731,14 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
         }}>
           {/* CSS worm illustration */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '5px', position: 'relative' }}>
-            {/* Hat emoji above head */}
+            {/* Hat indicator above head */}
             {wormHatId !== 'none' && (
               <div style={{
-                position: 'absolute', top: '-22px', left: '-2px',
-                fontSize: '18px', lineHeight: 1,
-                filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.3))',
+                position: 'absolute', top: '-16px', left: '-2px',
+                fontSize: '10px', fontWeight: 700, letterSpacing: '0.1em',
+                color: '#7c3aed', textTransform: 'uppercase',
               }}>
-                {WORM_HATS.find(h => h.id === wormHatId)?.emoji}
+                {WORM_HATS.find(h => h.id === wormHatId)?.label}
               </div>
             )}
             {/* Head */}
@@ -824,17 +824,16 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                   onClick={() => setWormHat(hat.id)}
                   style={{
                     ...chipBase,
-                    padding: '10px 14px',
+                    padding: '10px 16px',
                     background: selected ? 'rgba(168,85,247,0.12)' : 'rgba(0,0,0,0.04)',
                     border: selected ? '2px solid #a855f7' : '2px solid transparent',
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
-                    minWidth: '56px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    minWidth: '64px',
                     boxShadow: selected ? '0 0 10px rgba(168,85,247,0.3)' : 'none',
                   }}
                 >
-                  <span style={{ fontSize: '22px', lineHeight: 1 }}>{hat.emoji}</span>
                   <span style={{
-                    fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em',
+                    fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
                     color: selected ? '#7c3aed' : 'rgba(0,0,0,0.5)',
                   }}>{hat.label}</span>
                 </button>
