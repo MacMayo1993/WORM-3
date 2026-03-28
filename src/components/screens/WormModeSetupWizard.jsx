@@ -1,4 +1,6 @@
 import React, { useState, useRef } from 'react';
+import { useGameStore } from '../../hooks/useGameStore.js';
+import { WORM_SKINS, WORM_HATS } from '../../worm/wormCosmeticsData.js';
 import { COLOR_SCHEMES, TILE_STYLES, SCHEME_LABELS } from '../../utils/colorSchemes.js';
 import { CLASSIC_STYLE_KEYS, ANTIPODAL_STYLE_KEYS, LIVING_STYLE_KEYS } from '../../utils/tileStyleCatalog.js';
 import { BACKGROUNDS, getBackgroundUrl } from '../../utils/backgrounds.js';
@@ -334,8 +336,8 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     img.src = url;
   };
 
-  const STEPS = ['Scene', 'Colors', 'Style', 'Gameplay', 'Size'];
-  const totalSteps = 5;
+  const STEPS = ['Character', 'Scene', 'Colors', 'Style', 'Gameplay', 'Size'];
+  const totalSteps = 6;
 
   const handleNext = () => {
     if (step < totalSteps - 1) {
@@ -706,11 +708,150 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     </div>
   );
 
+  // ── Step 0: Character ───────────────────────────────────────────────────────
+
+  const wormSkinId = useGameStore(s => s.wormSkin ?? 'slime');
+  const wormHatId = useGameStore(s => s.wormHat ?? 'none');
+  const setWormSkin = useGameStore(s => s.setWormSkin);
+  const setWormHat = useGameStore(s => s.setWormHat);
+  const activeSkin = WORM_SKINS.find(s => s.id === wormSkinId) ?? WORM_SKINS[0];
+
+  const renderCharacter = () => {
+    const chipBase = {
+      border: 'none', cursor: 'pointer', borderRadius: '10px',
+      transition: 'all 0.18s ease', fontFamily: 'inherit',
+    };
+    return (
+      <div style={{ display: 'grid', gap: '20px' }}>
+
+        {/* Worm preview */}
+        <div style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px',
+          padding: '16px 0 8px',
+        }}>
+          {/* CSS worm illustration */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', position: 'relative' }}>
+            {/* Hat emoji above head */}
+            {wormHatId !== 'none' && (
+              <div style={{
+                position: 'absolute', top: '-22px', left: '-2px',
+                fontSize: '18px', lineHeight: 1,
+                filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.3))',
+              }}>
+                {WORM_HATS.find(h => h.id === wormHatId)?.emoji}
+              </div>
+            )}
+            {/* Head */}
+            <div style={{
+              width: '38px', height: '38px', borderRadius: '50%',
+              background: activeSkin.body,
+              boxShadow: `0 0 14px ${activeSkin.glow}88`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '14px', position: 'relative',
+            }}>
+              {/* Eyes */}
+              <div style={{ display: 'flex', gap: '6px', marginTop: '-2px' }}>
+                <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#111' }} />
+                </div>
+                <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#111' }} />
+                </div>
+              </div>
+            </div>
+            {/* Body segments */}
+            {[32, 27, 22].map((sz, i) => (
+              <div key={i} style={{
+                width: `${sz}px`, height: `${sz}px`, borderRadius: '50%',
+                background: activeSkin.belly,
+                boxShadow: `0 0 8px ${activeSkin.glow}55`,
+                opacity: 1 - i * 0.08,
+              }} />
+            ))}
+          </div>
+          <div style={{ fontSize: '12px', fontWeight: 600, color: activeSkin.body, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+            {activeSkin.label} {wormHatId !== 'none' ? `· ${WORM_HATS.find(h => h.id === wormHatId)?.label}` : ''}
+          </div>
+        </div>
+
+        {/* Skin picker */}
+        <div>
+          <div style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(0,0,0,0.5)', letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: '10px' }}>
+            Skin
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+            {WORM_SKINS.map(skin => {
+              const selected = skin.id === wormSkinId;
+              return (
+                <button
+                  key={skin.id}
+                  onClick={() => setWormSkin(skin.id)}
+                  style={{
+                    ...chipBase,
+                    padding: '10px 6px 8px',
+                    background: selected ? `${skin.body}22` : 'rgba(0,0,0,0.04)',
+                    border: selected ? `2px solid ${skin.body}` : '2px solid transparent',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
+                    boxShadow: selected ? `0 0 10px ${skin.glow}55` : 'none',
+                  }}
+                >
+                  <div style={{
+                    width: '26px', height: '26px', borderRadius: '50%',
+                    background: skin.body,
+                    boxShadow: `0 0 8px ${skin.glow}88`,
+                  }} />
+                  <span style={{
+                    fontSize: '10px', fontWeight: 700, color: selected ? skin.body : 'rgba(0,0,0,0.5)',
+                    letterSpacing: '0.08em',
+                  }}>{skin.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Hat picker */}
+        <div>
+          <div style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(0,0,0,0.5)', letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: '10px' }}>
+            Hat
+          </div>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {WORM_HATS.map(hat => {
+              const selected = hat.id === wormHatId;
+              return (
+                <button
+                  key={hat.id}
+                  onClick={() => setWormHat(hat.id)}
+                  style={{
+                    ...chipBase,
+                    padding: '10px 14px',
+                    background: selected ? 'rgba(168,85,247,0.12)' : 'rgba(0,0,0,0.04)',
+                    border: selected ? '2px solid #a855f7' : '2px solid transparent',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
+                    minWidth: '56px',
+                    boxShadow: selected ? '0 0 10px rgba(168,85,247,0.3)' : 'none',
+                  }}
+                >
+                  <span style={{ fontSize: '22px', lineHeight: 1 }}>{hat.emoji}</span>
+                  <span style={{
+                    fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em',
+                    color: selected ? '#7c3aed' : 'rgba(0,0,0,0.5)',
+                  }}>{hat.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // ── Step titles ─────────────────────────────────────────────────────────────
 
-  const stepContent = [renderBackgrounds, renderColors, renderStyles, renderGameplay, renderSize];
-  const stepTitles = ['Background', 'Color Palette', 'Tile Style', 'Gameplay', 'Cube Size'];
+  const stepContent = [renderCharacter, renderBackgrounds, renderColors, renderStyles, renderGameplay, renderSize];
+  const stepTitles = ['Character', 'Background', 'Color Palette', 'Tile Style', 'Gameplay', 'Cube Size'];
   const stepSubtitles = [
+    'Choose your worm\'s skin and hat',
     'Choose your play environment',
     'Set the colors for your cube faces (or upload an image)',
     'Choose how your tiles look and feel',

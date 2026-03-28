@@ -6,13 +6,12 @@ import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { FACE_NORMALS } from './crawlerPhysics.js';
+import { useGameStore } from '../hooks/useGameStore.js';
+import WormHat3D from './wormCosmetics.jsx';
+import { getSkin } from './wormCosmeticsData.js';
 
-const BODY_COLOR = '#00ff88';
-const BELLY_COLOR = '#00cc66';
 const EYE_WHITE = '#ffffff';
 const PUPIL = '#111111';
-const ANTENNA_COLOR = '#88ffbb';
-const GLOW_COLOR = '#00ff88';
 const SEGMENT_OFFSETS = [0, -0.32, -0.6, -0.85];
 const HISTORY_SIZE = 100;
 const HISTORY_STEP = 10;
@@ -50,6 +49,14 @@ function cbRead(cb, offset) {
 }
 
 export default function CrawlerCharacter({ position, forward, face, jumpHeight, velocity, alive = true }) {
+  const wormSkinId = useGameStore(s => s.wormSkin);
+  const wormHatId = useGameStore(s => s.wormHat);
+  const skin = getSkin(wormSkinId);
+  const BODY_COLOR = skin.body;
+  const BELLY_COLOR = skin.belly;
+  const ANTENNA_COLOR = skin.antenna;
+  const GLOW_COLOR = skin.glow;
+
   const groupRef = useRef();
   const bodyRootRef = useRef();
   const timeRef = useRef(0);
@@ -210,6 +217,11 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
             </group>
           );
         })}
+
+        {/* Hat — sits on top of the head, Y is outward from the face */}
+        <group position={[0, 0.28, 0]}>
+          <WormHat3D type={wormHatId} scale={0.28} />
+        </group>
 
         {/* Eyes */}
         <mesh position={[0.1, 0.12, 0.2]}>

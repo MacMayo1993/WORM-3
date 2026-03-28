@@ -61,6 +61,8 @@ import {
 import ParityOrbs from './ParityOrb.jsx';
 import { isMobile as _isMobile } from '../utils/device.js';
 import { healBurstMap } from '../3d/styles/TileStyleMaterials.jsx';
+import WormHat3D from './wormCosmetics.jsx';
+import { getSkin, _hatAlignQuat, _hatYUp } from './wormCosmeticsData.js';
 
 // ─── Tile position rotation helper ───────────────────────────────────────────
 // Transforms a {x, y, z, dirKey} surface tile through a cube slice rotation.
@@ -1251,7 +1253,8 @@ const _headPathPoint = { pos: _bodyHeadPos, normal: _bodyNormal };
 
 function WormBody({ worm }) {
     const meshRef = useRef();
-    const wormColor = useGameStore(s => s.wormColor ?? '#33ff66');
+    const wormSkinId = useGameStore(s => s.wormSkin ?? 'slime');
+    const wormColor = getSkin(wormSkinId).body;
     // Ref so useFrame always reads the latest wormColor without closure staleness
     const wormColorRef = useRef(wormColor);
     wormColorRef.current = wormColor;
@@ -1355,7 +1358,7 @@ function WormBody({ worm }) {
     return (
         <instancedMesh ref={meshRef} args={[undefined, undefined, MAX_TAIL]} frustumCulled={false}>
             <sphereGeometry args={[1, 12, 12]} />
-            <meshStandardMaterial color="#ffffff" emissive={wormColor} emissiveIntensity={0.35} />
+            <meshStandardMaterial color={wormColor} emissive={wormColor} emissiveIntensity={0.35} />
         </instancedMesh>
     );
 }
@@ -1396,6 +1399,8 @@ function WormFace({ worm, size }) {
     const rightEyeRef = useRef();
     const smile0 = useRef(), smile1 = useRef(), smile2 = useRef();
     const smileRefs = [smile0, smile1, smile2];
+    const hatGroupRef = useRef();
+    const wormHatId = useGameStore(s => s.wormHat ?? 'none');
 
     useFrame(() => {
         const { dirKey } = worm.pos.current;
@@ -1447,6 +1452,14 @@ function WormFace({ worm, size }) {
                 .addScaledVector(_faceForward, 0.025);
             ref.current.scale.setScalar(S * 0.55);
         }
+
+        // Hat: position above head, orient Y to face normal
+        if (hatGroupRef.current) {
+            hatGroupRef.current.position.copy(_faceHeadPos)
+                .addScaledVector(normal, 0.04);
+            _hatAlignQuat.setFromUnitVectors(_hatYUp, normal);
+            hatGroupRef.current.quaternion.copy(_hatAlignQuat);
+        }
     });
 
     return (
@@ -1465,6 +1478,11 @@ function WormFace({ worm, size }) {
                     <meshBasicMaterial color="#111" />
                 </mesh>
             ))}
+            {wormHatId !== 'none' && (
+                <group ref={hatGroupRef}>
+                    <WormHat3D type={wormHatId} scale={0.07} />
+                </group>
+            )}
         </>
     );
 }

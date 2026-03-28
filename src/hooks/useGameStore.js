@@ -39,6 +39,8 @@ const loadPersistedState = () => {
     const firstFlipDone = localStorage.getItem('worm3_first_flip_done') === '1';
     const mobileHintShown = localStorage.getItem('worm3_mobile_hint_shown') === '1';
     const parsedSettings = settings ? JSON.parse(settings) : null;
+    const wormSkin = localStorage.getItem('worm3_skin') || 'slime';
+    const wormHat = localStorage.getItem('worm3_hat') || 'none';
 
     return {
       settings: migrateSettings(parsedSettings, settingsVersion),
@@ -46,6 +48,8 @@ const loadPersistedState = () => {
       tutorialDone,
       hasFlippedOnce: firstFlipDone,
       mobileHintShown,
+      wormSkin,
+      wormHat,
     };
   } catch {
     return {
@@ -54,6 +58,8 @@ const loadPersistedState = () => {
       tutorialDone: false,
       hasFlippedOnce: false,
       mobileHintShown: false,
+      wormSkin: 'slime',
+      wormHat: 'none',
     };
   }
 };
@@ -273,6 +279,16 @@ export const useGameStore = create(
     setWormholeInterval: (v) => set({ wormholeInterval: Math.max(2, Math.min(30, Number(v))) }),
     wormColor: '#33ff66',
     setWormColor: (v) => set({ wormColor: v || '#33ff66' }),
+    wormSkin: persistedState.wormSkin,
+    setWormSkin: (id) => {
+      try { localStorage.setItem('worm3_skin', id); } catch { }
+      set({ wormSkin: id });
+    },
+    wormHat: persistedState.wormHat,
+    setWormHat: (id) => {
+      try { localStorage.setItem('worm3_hat', id); } catch { }
+      set({ wormHat: id });
+    },
     wormControlMode: 'non-oriented', // 'non-oriented' (relative turns) | 'oriented' (camera-relative)
     setWormControlMode: (v) => set({ wormControlMode: v }),
     toggleWormControlMode: () => set((state) => ({
