@@ -15,11 +15,11 @@ export const WORM_SKINS = [
 ];
 
 export const WORM_HATS = [
-  { id: 'none',   label: 'None',    emoji: '—' },
-  { id: 'tophat', label: 'Top Hat', emoji: '🎩' },
-  { id: 'party',  label: 'Party',   emoji: '🎉' },
-  { id: 'crown',  label: 'Crown',   emoji: '👑' },
-  { id: 'halo',   label: 'Halo',    emoji: '😇' },
+  { id: 'none',   label: 'None' },
+  { id: 'tophat', label: 'Top Hat' },
+  { id: 'party',  label: 'Party' },
+  { id: 'crown',  label: 'Crown' },
+  { id: 'halo',   label: 'Halo' },
 ];
 
 export function getSkin(id) {
