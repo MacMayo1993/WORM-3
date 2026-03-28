@@ -68,8 +68,8 @@ function SingleOrb({ position, color = '#ffd700', antipodalColor = '#ffd700', co
   const electronRefs = useRef([]);
   const outlineRef = useRef();
   const timeOffset = useMemo(() => Math.random() * Math.PI * 2, []);
-  // White orbs get a black outline so they're visible; everything else gets white
-  const outlineColor = color.toLowerCase() === '#ffffff' ? '#000000' : '#ffffff';
+  // All orbs get a black outline for definition; white orbs especially need it
+  const outlineColor = '#000000';
 
   // Keep mutable refs so the animator always reads current values without causing re-renders
   const isTargetRef = useRef(isTarget);
