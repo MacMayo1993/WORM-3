@@ -319,7 +319,179 @@ export const RotatingBlackCube = () => {
   );
 };
 
-// ─── Bottom nav item (inside shared pill) ─────────────────────────────────────
+// ─── Coming Soon data ─────────────────────────────────────────────────────────
+const COMING_SOON = [
+  {
+    id: 'story',
+    label: 'Story Mode',
+    color: '#ef4444',
+    icon: '📖',
+    preview: 'linear-gradient(135deg,#ef444422 0%,#f9731622 100%)',
+    description: 'Ten levels. A cube that remembers every move. A narrative written in rotations. The beginning of everything.',
+  },
+  {
+    id: 'holonomy',
+    label: '∮ Holonomy',
+    color: '#00f5ff',
+    icon: '∮',
+    preview: 'linear-gradient(135deg,#00f5ff18 0%,#0080ff18 100%)',
+    description: 'Move a loop around the cube and watch it come back changed. A mode built on the mathematics of curvature.',
+  },
+  {
+    id: 'biome',
+    label: 'Biome',
+    color: '#60a5fa',
+    icon: '⬡',
+    preview: 'linear-gradient(135deg,#60a5fa18 0%,#22c55e18 100%)',
+    description: 'A living world grows on the surface of RP². Each face a different ecosystem. Navigate a topology that breathes.',
+  },
+  {
+    id: 'merge',
+    label: 'Merge',
+    color: '#a78bfa',
+    icon: '✦',
+    preview: 'linear-gradient(135deg,#a78bfa18 0%,#ec489918 100%)',
+    description: 'Two cubes. One truth. Combine solved states across the manifold boundary into something that has never existed.',
+  },
+];
+
+// ─── Coming Soon card ─────────────────────────────────────────────────────────
+const ComingSoonCard = ({ item }) => {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <button
+      onClick={() => setExpanded(v => !v)}
+      style={{
+        flexShrink: 0,
+        width: '140px',
+        background: item.preview,
+        border: `1px solid ${item.color}30`,
+        borderRadius: '14px',
+        padding: '14px 12px 12px',
+        cursor: 'pointer',
+        textAlign: 'left',
+        transition: 'all 0.25s ease',
+        boxShadow: expanded ? `0 0 18px ${item.color}30, 0 4px 16px rgba(0,0,0,0.5)` : '0 2px 10px rgba(0,0,0,0.35)',
+        transform: expanded ? 'translateY(-2px)' : 'none',
+        position: 'relative',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Silhouette icon */}
+      <div style={{
+        fontSize: '28px', lineHeight: 1, marginBottom: '8px',
+        filter: 'grayscale(1) opacity(0.45)',
+        display: 'flex', alignItems: 'center',
+      }}>
+        {item.icon}
+      </div>
+      {/* Mode name */}
+      <div style={{
+        fontSize: '11px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase',
+        color: `${item.color}99`,
+        fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif",
+        marginBottom: expanded ? '8px' : 0,
+        transition: 'margin 0.2s ease',
+      }}>{item.label}</div>
+      {/* Coming soon badge */}
+      {!expanded && (
+        <div style={{
+          fontSize: '9px', fontWeight: 600, letterSpacing: '0.18em', textTransform: 'uppercase',
+          color: `${item.color}55`,
+          fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif",
+          marginTop: '4px',
+        }}>Coming Soon</div>
+      )}
+      {/* Description (expanded) */}
+      {expanded && (
+        <div style={{
+          fontSize: '11px', lineHeight: 1.5,
+          color: 'rgba(200,220,255,0.75)',
+          fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif",
+          animation: 'fadeIn 0.2s ease',
+        }}>{item.description}</div>
+      )}
+      {/* Subtle color wash on expanded */}
+      {expanded && (
+        <div style={{
+          position: 'absolute', inset: 0, borderRadius: 'inherit', pointerEvents: 'none',
+          background: `radial-gradient(ellipse 100% 80% at 50% 0%, ${item.color}14 0%, transparent 70%)`,
+        }} />
+      )}
+    </button>
+  );
+};
+
+// ─── Coming Soon drawer ───────────────────────────────────────────────────────
+const ComingSoonDrawer = ({ visible }) => {
+  const [open, setOpen] = useState(false);
+  const [pulse, setPulse] = useState(false);
+
+  useEffect(() => {
+    if (!visible) return;
+    const t = setTimeout(() => setPulse(true), 1200);
+    return () => clearTimeout(t);
+  }, [visible]);
+
+  return (
+    <div style={{
+      position: 'absolute', bottom: '84px', left: 0, right: 0,
+      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      opacity: visible ? 1 : 0,
+      transform: visible ? 'none' : 'translateY(10px)',
+      transition: 'opacity 0.55s ease 0.3s, transform 0.55s cubic-bezier(0.22,1,0.36,1) 0.3s',
+      pointerEvents: visible ? 'all' : 'none',
+    }}>
+      {/* Drawer toggle label */}
+      <button
+        onClick={() => setOpen(v => !v)}
+        style={{
+          background: 'transparent', border: 'none', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px',
+          borderRadius: '20px',
+          transition: 'background 0.2s ease',
+        }}
+        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(120,160,255,0.08)'; }}
+        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+      >
+        <span style={{
+          fontSize: '10px', fontWeight: 700, letterSpacing: '0.22em', textTransform: 'uppercase',
+          fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif",
+          color: pulse ? 'rgba(180,210,255,0.70)' : 'rgba(140,170,255,0.45)',
+          transition: 'color 0.6s ease',
+        }}>What&apos;s Coming</span>
+        <span style={{
+          fontSize: '9px',
+          color: 'rgba(140,170,255,0.50)',
+          display: 'inline-block',
+          transform: open ? 'rotate(180deg)' : 'none',
+          transition: 'transform 0.3s ease',
+        }}>▼</span>
+      </button>
+
+      {/* Cards panel */}
+      <div style={{
+        maxHeight: open ? '220px' : '0px',
+        overflow: 'hidden',
+        transition: 'max-height 0.4s cubic-bezier(0.22,1,0.36,1)',
+        width: '100%',
+      }}>
+        <div style={{
+          display: 'flex', gap: '10px', overflowX: 'auto', padding: '12px 20px 4px',
+          scrollbarWidth: 'none', msOverflowStyle: 'none',
+          justifyContent: 'center',
+          flexWrap: 'nowrap',
+        }}>
+          {COMING_SOON.map(item => (
+            <ComingSoonCard key={item.id} item={item} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Nav items ────────────────────────────────────────────────────────────────
 const NavItem = ({ icon, label, color, onClick }) => {
   const [hovered, setHovered] = useState(false);
   return (
@@ -336,7 +508,6 @@ const NavItem = ({ icon, label, color, onClick }) => {
         position: 'relative',
       }}
     >
-      {/* Hover tint overlay */}
       {hovered && (
         <div style={{
           position: 'absolute', inset: 0, borderRadius: 'inherit',
@@ -359,27 +530,103 @@ const NavItem = ({ icon, label, color, onClick }) => {
   );
 };
 
+// ─── Locked store nav item ────────────────────────────────────────────────────
+const StoreNavItem = () => {
+  const [showTeaser, setShowTeaser] = useState(false);
+  const color = '#6366f1';
+  return (
+    <div style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <button
+        onClick={() => setShowTeaser(v => !v)}
+        style={{
+          width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center',
+          justifyContent: 'center', gap: '8px', padding: '14px 12px 12px',
+          background: 'transparent', border: 'none', cursor: 'pointer',
+          position: 'relative', opacity: 0.55,
+          transition: 'opacity 0.2s ease',
+        }}
+        onMouseEnter={e => { e.currentTarget.style.opacity = '0.75'; }}
+        onMouseLeave={e => { e.currentTarget.style.opacity = '0.55'; }}
+      >
+        <span style={{
+          lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          filter: `drop-shadow(0 0 4px ${color}44)`,
+          position: 'relative',
+        }}>
+          <StoreIcon />
+          {/* Lock badge */}
+          <span style={{
+            position: 'absolute', top: '-4px', right: '-6px',
+            fontSize: '9px', lineHeight: 1,
+          }}>🔒</span>
+        </span>
+        <span style={{
+          fontSize: '10px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase',
+          color: 'rgba(150,170,220,0.55)',
+          fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif",
+        }}>Store</span>
+      </button>
+
+      {/* Teaser popup */}
+      {showTeaser && (
+        <>
+          {/* Backdrop dismiss */}
+          <div
+            style={{ position: 'fixed', inset: 0, zIndex: 10 }}
+            onClick={() => setShowTeaser(false)}
+          />
+          <div style={{
+            position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)',
+            marginBottom: '10px', width: '220px',
+            background: 'rgba(8,12,32,0.96)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
+            border: `1px solid ${color}40`,
+            borderRadius: '14px', padding: '14px',
+            boxShadow: `0 0 24px ${color}30, 0 8px 32px rgba(0,0,0,0.6)`,
+            zIndex: 20,
+            animation: 'fadeIn 0.18s ease',
+          }}>
+            <div style={{
+              fontSize: '11px', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase',
+              color: color, marginBottom: '8px',
+              fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif",
+            }}>Parity Store</div>
+            <div style={{
+              fontSize: '12px', lineHeight: 1.55, color: 'rgba(180,210,255,0.80)',
+              fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif",
+            }}>
+              Spend your Parity Points on worm skins, cube themes, and more. Earn points by collecting orbs in WORM mode and playing Disparity.
+            </div>
+            {/* Arrow */}
+            <div style={{
+              position: 'absolute', bottom: '-6px', left: '50%',
+              width: '12px', height: '12px',
+              background: 'rgba(8,12,32,0.96)', border: `1px solid ${color}40`,
+              borderTop: 'none', borderLeft: 'none',
+              transform: 'translateX(-50%) rotate(45deg)',
+            }} />
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
 // ─── Main component ───────────────────────────────────────────────────────────
-const MainMenu = ({ onPlay, _onLevels, onFreeplay, _onCoop, onSettings, onBiome, onDisparity, onWormHealer, onHolonomy, onMerge }) => {
-  // Dark glass palette — Rubik's cube rainbow colors as accents
+// onPlay / onHolonomy / onBiome / onMerge are kept as props for UILayer compatibility
+// but are no longer wired to buttons — those modes live in the Coming Soon drawer.
+const MainMenu = ({ onPlay: _onPlay, _onLevels, onFreeplay, _onCoop, onSettings, onBiome: _onBiome, onDisparity, onWormHealer, onHolonomy: _onHolonomy, onMerge: _onMerge }) => {
   const CLEAN = {
-    pageBg: 'radial-gradient(circle at 50% 35%, #0e1324 0%, #070b16 52%, #05050f 100%)',
-    // Dark glass panels
     panel: 'rgba(8,12,28,0.68)',
     panelStrong: 'rgba(10,14,32,0.80)',
-    // Text on dark glass
     text: 'rgba(230,240,255,0.95)',
     textSubtle: 'rgba(180,210,255,0.65)',
-    // Glass borders with a hint of color
     border: 'rgba(120,160,255,0.22)',
-    borderRainbow: 'linear-gradient(90deg,#ef444455,#f9731655,#eab30855,#22c55e55,#3b82f655,#a855f755)',
-    accent: 'rgba(30,60,160,0.75)',
   };
   const [titleVisible, setTitleVisible] = useState(false);
   const [subtitleVisible, setSubtitleVisible] = useState(false);
   const [btnVisible, setBtnVisible] = useState(false);
-  const [hoverEnter, setHoverEnter] = useState(false);
-  const [pressEnter, setPressEnter] = useState(false);
+  const [hoverWorm, setHoverWorm] = useState(false);
+  const [pressWorm, setPressWorm] = useState(false);
 
   useEffect(() => {
     const t1 = setTimeout(() => setTitleVisible(true), 200);
@@ -389,13 +636,11 @@ const MainMenu = ({ onPlay, _onLevels, onFreeplay, _onCoop, onSettings, onBiome,
   }, []);
 
   return (
-    // Background is transparent — the rotating cube is rendered in App.jsx's shared Canvas
     <div style={{ position: 'fixed', inset: 0, background: 'transparent', zIndex: 9999, overflow: 'hidden' }}>
+      <style>{`@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }`}</style>
 
-      {/* ── Screen-edge color washes — synced to FacePulses via _pulse ── */}
       <ScreenGlow />
 
-      {/* ── UI overlay ── */}
       <div style={{ position: 'relative', zIndex: 2, height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', pointerEvents: 'none' }}>
 
         {/* Settings gear */}
@@ -446,50 +691,50 @@ const MainMenu = ({ onPlay, _onLevels, onFreeplay, _onCoop, onSettings, onBiome,
           </div>
         </div>
 
-        {/* Enter the Cube button */}
+        {/* ── Play WORM hero button ── */}
         <div style={{
-          position: 'absolute', bottom: '118px', left: '50%', transform: 'translateX(-50%)',
+          position: 'absolute', bottom: '130px', left: '50%', transform: 'translateX(-50%)',
           width: 'min(400px,85vw)', opacity: btnVisible ? 1 : 0, transition: 'opacity 0.55s ease',
           pointerEvents: 'all',
         }}>
-          {/* Rainbow outline wrapper for the button */}
           <div style={{
             borderRadius: '100px', padding: '1.5px',
-            background: hoverEnter
-              ? 'linear-gradient(90deg,#ef4444,#f97316,#eab308,#22c55e,#3b82f6,#a855f7,#ef4444)'
-              : 'linear-gradient(90deg,#ef444455,#f9731655,#eab30855,#22c55e55,#3b82f655,#a855f755,#ef444455)',
-            boxShadow: hoverEnter
-              ? '0 0 28px rgba(99,120,255,0.45), 0 8px 32px rgba(0,0,0,0.5)'
-              : '0 0 12px rgba(60,80,200,0.20), 0 4px 16px rgba(0,0,0,0.4)',
+            background: hoverWorm
+              ? 'linear-gradient(90deg,#a855f7,#ec4899,#f97316,#a855f7)'
+              : 'linear-gradient(90deg,#a855f760,#ec489960,#f9731660,#a855f760)',
+            boxShadow: hoverWorm
+              ? '0 0 32px rgba(168,85,247,0.55), 0 0 60px rgba(168,85,247,0.20), 0 8px 32px rgba(0,0,0,0.5)'
+              : '0 0 14px rgba(168,85,247,0.22), 0 4px 16px rgba(0,0,0,0.4)',
             transition: 'all 0.25s cubic-bezier(0.4,0,0.2,1)',
-            transform: pressEnter ? 'scale(0.975)' : hoverEnter ? 'translateY(-2px)' : 'none',
+            transform: pressWorm ? 'scale(0.975)' : hoverWorm ? 'translateY(-2px)' : 'none',
           }}>
-            <button onClick={onPlay}
-              onMouseEnter={() => setHoverEnter(true)}
-              onMouseLeave={() => { setHoverEnter(false); setPressEnter(false); }}
-              onMouseDown={() => setPressEnter(true)} onMouseUp={() => setPressEnter(false)}
+            <button onClick={onWormHealer}
+              onMouseEnter={() => setHoverWorm(true)}
+              onMouseLeave={() => { setHoverWorm(false); setPressWorm(false); }}
+              onMouseDown={() => setPressWorm(true)} onMouseUp={() => setPressWorm(false)}
               style={{
                 width: '100%', padding: '17px 32px',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
                 fontSize: 'clamp(13px,2.4vw,15px)', fontWeight: 700, letterSpacing: '0.2em',
                 textTransform: 'uppercase',
                 fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif",
-                color: hoverEnter ? '#ffffff' : 'rgba(210,230,255,0.92)',
-                background: hoverEnter
-                  ? 'rgba(18,28,68,0.88)'
-                  : 'rgba(8,12,28,0.72)',
+                color: hoverWorm ? '#ffffff' : 'rgba(220,200,255,0.92)',
+                background: hoverWorm ? 'rgba(28,12,48,0.90)' : 'rgba(14,8,28,0.75)',
                 border: 'none', borderRadius: '100px', cursor: 'pointer',
                 transition: 'all 0.22s cubic-bezier(0.4,0,0.2,1)',
                 backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-                boxShadow: 'inset 0 1px 0 rgba(120,160,255,0.18)',
+                boxShadow: 'inset 0 1px 0 rgba(168,85,247,0.25)',
               }}>
-              <PlayIcon hovered={hoverEnter} />
-              Enter the Cube
+              <WormIcon color={hoverWorm ? '#ffffff' : '#d8b4fe'} />
+              Play WORM
             </button>
           </div>
         </div>
 
-        {/* Bottom nav — unified glass pill */}
+        {/* ── Coming Soon drawer ── */}
+        <ComingSoonDrawer visible={btnVisible} />
+
+        {/* ── Bottom nav pill: Disparity | Explore | Store ── */}
         <div style={{
           position: 'absolute', bottom: 0, left: 0, right: 0,
           paddingBottom: 'max(20px, env(safe-area-inset-bottom,20px))',
@@ -498,12 +743,11 @@ const MainMenu = ({ onPlay, _onLevels, onFreeplay, _onCoop, onSettings, onBiome,
           transform: btnVisible ? 'none' : 'translateY(16px)',
           transition: 'opacity 0.55s ease 0.1s, transform 0.55s cubic-bezier(0.22,1,0.36,1) 0.1s',
         }}>
-          {/* Rainbow outline wrapper for the pill */}
           <div style={{
             borderRadius: '100px', padding: '1.5px',
             background: 'linear-gradient(90deg,#ef444460,#f9731660,#eab30860,#22c55e60,#3b82f660,#a855f760,#ef444460)',
             boxShadow: '0 0 20px rgba(60,80,200,0.25), 0 8px 32px rgba(0,0,0,0.5)',
-            width: 'min(460px,88vw)',
+            width: 'min(360px,85vw)',
           }}>
             <div style={{
               display: 'flex',
@@ -511,24 +755,13 @@ const MainMenu = ({ onPlay, _onLevels, onFreeplay, _onCoop, onSettings, onBiome,
               backdropFilter: 'blur(28px)', WebkitBackdropFilter: 'blur(28px)',
               borderRadius: '100px',
               boxShadow: 'inset 0 1px 0 rgba(120,160,255,0.14)',
-              overflow: 'hidden',
+              overflow: 'visible',
             }}>
               <NavItem icon={<DisparityIcon />} label="Disparity" color="#f59e0b" onClick={onDisparity} />
-              {/* divider */}
-              <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(120,160,255,0.15)' }} />
-              <NavItem icon={<WormIcon />} label="WORM" color="#a855f7" onClick={onWormHealer} />
-              {/* divider */}
-              <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(120,160,255,0.15)' }} />
-              <NavItem icon={<HolonomyIcon />} label="∮ Holonomy" color="#00f5ff" onClick={onHolonomy} />
-              {/* divider */}
               <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(120,160,255,0.15)' }} />
               <NavItem icon={<ExploreIcon />} label="Explore" color="#22c55e" onClick={onFreeplay} />
-              {/* divider */}
               <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(120,160,255,0.15)' }} />
-              <NavItem icon={<WorldIcon />} label="World" color="#60a5fa" onClick={onBiome} />
-              {/* divider */}
-              <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(120,160,255,0.15)' }} />
-              <NavItem icon={<MergeIcon />} label="Merge" color="#a78bfa" onClick={onMerge} />
+              <StoreNavItem />
             </div>
           </div>
         </div>
@@ -554,10 +787,19 @@ const DisparityIcon = () => (
     <line x1="19" y1="5" x2="5" y2="19" stroke="#f59e0b" strokeWidth="1.2" opacity="0.4" />
   </svg>
 );
-const WormIcon = () => (
+const WormIcon = ({ color = '#a855f7' }) => (
   <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
-    <path d="M4 12 Q8 4 12 12 T20 12" stroke="#a855f7" strokeWidth="2" strokeLinecap="round" fill="none" />
-    <circle cx="20" cy="12" r="2.5" fill="#a855f7" />
+    <path d="M4 12 Q8 4 12 12 T20 12" stroke={color} strokeWidth="2" strokeLinecap="round" fill="none" />
+    <circle cx="20" cy="12" r="2.5" fill={color} />
+  </svg>
+);
+const StoreIcon = () => (
+  <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+    <rect x="3" y="10" width="18" height="11" rx="2" stroke="#6366f1" strokeWidth="1.5" fill="none" />
+    <path d="M3 10 L5 4 H19 L21 10" stroke="#6366f1" strokeWidth="1.5" strokeLinejoin="round" fill="none" />
+    <line x1="12" y1="10" x2="12" y2="21" stroke="#6366f1" strokeWidth="1.2" opacity="0.5" />
+    <circle cx="9" cy="15" r="1.2" fill="#6366f1" opacity="0.7" />
+    <circle cx="15" cy="15" r="1.2" fill="#6366f1" opacity="0.7" />
   </svg>
 );
 const ExploreIcon = () => (
