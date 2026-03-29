@@ -721,42 +721,90 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       border: 'none', cursor: 'pointer', borderRadius: '10px',
       transition: 'all 0.18s ease', fontFamily: 'inherit',
     };
+
+    // CSS hat renderers — drawn above the 38px head circle
+    const HatPreview = ({ hatId }) => {
+      if (hatId === 'tophat') return (
+        <div style={{ position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)', marginBottom: '1px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          {/* Crown */}
+          <div style={{ width: '22px', height: '20px', background: '#111', borderRadius: '3px 3px 0 0' }} />
+          {/* Band */}
+          <div style={{ width: '22px', height: '4px', background: '#ef4444' }} />
+          {/* Brim */}
+          <div style={{ width: '36px', height: '5px', background: '#111', borderRadius: '2px' }} />
+        </div>
+      );
+      if (hatId === 'party') return (
+        <div style={{ position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)', marginBottom: '1px' }}>
+          <svg width="34" height="32" viewBox="0 0 34 32" fill="none">
+            <polygon points="17,1 32,31 2,31" fill="#f97316" />
+            <line x1="8" y1="22" x2="26" y2="22" stroke="#ef4444" strokeWidth="2" />
+            <line x1="12" y1="13" x2="22" y2="13" stroke="#eab308" strokeWidth="2" />
+            <circle cx="17" cy="2" r="2.5" fill="white" />
+          </svg>
+        </div>
+      );
+      if (hatId === 'crown') return (
+        <div style={{ position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)', marginBottom: '1px' }}>
+          <svg width="40" height="24" viewBox="0 0 40 24" fill="none">
+            <polygon points="2,22 8,8 14,18 20,2 26,18 32,8 38,22" fill="#f59e0b" stroke="#fbbf24" strokeWidth="1" strokeLinejoin="round" />
+            <rect x="2" y="18" width="36" height="5" rx="2" fill="#f59e0b" />
+            <circle cx="20" cy="4" r="2" fill="#fde68a" />
+            <circle cx="8" cy="10" r="1.5" fill="#fde68a" />
+            <circle cx="32" cy="10" r="1.5" fill="#fde68a" />
+          </svg>
+        </div>
+      );
+      if (hatId === 'halo') return (
+        <div style={{ position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)', marginBottom: '4px' }}>
+          <svg width="40" height="14" viewBox="0 0 40 14" fill="none">
+            <ellipse cx="20" cy="7" rx="17" ry="5" stroke="#fde68a" strokeWidth="3" fill="none" filter="url(#haloGlow)" />
+            <defs>
+              <filter id="haloGlow">
+                <feGaussianBlur stdDeviation="1.5" result="blur" />
+                <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+              </filter>
+            </defs>
+          </svg>
+        </div>
+      );
+      return null;
+    };
+
     return (
       <div style={{ display: 'grid', gap: '20px' }}>
 
         {/* Worm preview */}
         <div style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px',
-          padding: '16px 0 8px',
+          padding: '28px 0 8px',
         }}>
           {/* CSS worm illustration */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', position: 'relative' }}>
-            {/* Hat indicator above head */}
-            {wormHatId !== 'none' && (
-              <div style={{
-                position: 'absolute', top: '-16px', left: '-2px',
-                fontSize: '10px', fontWeight: 700, letterSpacing: '0.1em',
-                color: '#7c3aed', textTransform: 'uppercase',
-              }}>
-                {WORM_HATS.find(h => h.id === wormHatId)?.label}
-              </div>
-            )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
             {/* Head */}
             <div style={{
               width: '38px', height: '38px', borderRadius: '50%',
               background: activeSkin.body,
               boxShadow: `0 0 14px ${activeSkin.glow}88`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '14px', position: 'relative',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              gap: '3px', position: 'relative',
             }}>
+              {/* Hat above head */}
+              <HatPreview hatId={wormHatId} />
               {/* Eyes */}
-              <div style={{ display: 'flex', gap: '6px', marginTop: '-2px' }}>
+              <div style={{ display: 'flex', gap: '6px' }}>
                 <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#111' }} />
                 </div>
                 <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#111' }} />
                 </div>
+              </div>
+              {/* Mouth — 3-dot smile matching the 3D character */}
+              <div style={{ display: 'flex', gap: '3px', alignItems: 'flex-end' }}>
+                <div style={{ width: '3px', height: '3px', borderRadius: '50%', background: '#111', opacity: 0.7 }} />
+                <div style={{ width: '3px', height: '3px', borderRadius: '50%', background: '#111', opacity: 0.7, marginBottom: '-2px' }} />
+                <div style={{ width: '3px', height: '3px', borderRadius: '50%', background: '#111', opacity: 0.7 }} />
               </div>
             </div>
             {/* Body segments */}
@@ -770,7 +818,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
             ))}
           </div>
           <div style={{ fontSize: '12px', fontWeight: 600, color: activeSkin.body, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-            {activeSkin.label} {wormHatId !== 'none' ? `· ${WORM_HATS.find(h => h.id === wormHatId)?.label}` : ''}
+            {activeSkin.label}{wormHatId !== 'none' ? ` · ${WORM_HATS.find(h => h.id === wormHatId)?.label}` : ''}
           </div>
         </div>
 
