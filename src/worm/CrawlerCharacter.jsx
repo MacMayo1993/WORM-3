@@ -241,6 +241,20 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
           <meshBasicMaterial color={PUPIL} />
         </mesh>
 
+        {/* Mouth — 3-dot smile matching HealerWormMode */}
+        <mesh position={[-0.07, 0.01, 0.27]}>
+          <sphereGeometry args={[0.025, 6, 6]} />
+          <meshBasicMaterial color={PUPIL} />
+        </mesh>
+        <mesh position={[0, -0.025, 0.27]}>
+          <sphereGeometry args={[0.025, 6, 6]} />
+          <meshBasicMaterial color={PUPIL} />
+        </mesh>
+        <mesh position={[0.07, 0.01, 0.27]}>
+          <sphereGeometry args={[0.025, 6, 6]} />
+          <meshBasicMaterial color={PUPIL} />
+        </mesh>
+
         {/* Antennae */}
         <group position={[0.06, 0.22, 0.15]}
           rotation={[Math.sin(t * 4) * 0.15, 0, 0.3]}>
