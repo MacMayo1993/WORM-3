@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import {
   BET_TYPES, FACE_INFO, ANTIPODAL_PAIRS, calcPayout, streakMultiplier,

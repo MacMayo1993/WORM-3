@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import IntroCubie from '../intro/IntroCubie.jsx';
-import { useGameStore } from '../../hooks/useGameStore.js';
 import ParityWallet from '../overlays/ParityWallet.jsx';
 
 // All stickers black — same as the opening frames of the intro
