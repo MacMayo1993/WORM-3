@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { FLIP_CAP } from '../../utils/constants.js';
+import ParityWallet from '../overlays/ParityWallet.jsx';
 
 // Must match MAX_CASCADES in useChaosMode.js — keeps the bolt display accurate
 const MAX_CASCADES = 6;
@@ -198,7 +199,7 @@ const TopMenuBar = ({
         </span>
       </div>
 
-      {/* Right: PiP toggle + Home + Settings gear */}
+      {/* Right: PP wallet + PiP toggle + Home + Settings gear */}
       <div className="top-bar-right">
         {onToggleAntipodalPiP && (
           <button
@@ -226,6 +227,7 @@ const TopMenuBar = ({
             </svg>
           </button>
         )}
+        <ParityWallet dark={false} />
         <button className="top-bar-icon-btn" onClick={onShowSettings} title="Settings">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="3" />
