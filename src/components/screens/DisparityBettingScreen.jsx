@@ -8,11 +8,15 @@ import { BET_MIN, BET_MAX } from '../../utils/economyConstants.js';
 const FONT = "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif";
 const WAGER_PRESETS = [10, 25, 50, 100, 250, 500];
 
+// ── Shared touch-friendly button base styles ──────────────────────────────────
+const TOUCH_BTN = { touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' };
+
 // ── Bet type card ─────────────────────────────────────────────────────────────
 const BetTypeCard = ({ betType, selected, onSelect }) => (
   <button
-    onClick={onSelect}
+    onPointerDown={onSelect}
     style={{
+      ...TOUCH_BTN,
       flex: '1 1 130px', minWidth: '120px', maxWidth: '180px',
       padding: '12px 10px 10px',
       background: selected ? 'rgba(168,85,247,0.18)' : 'rgba(255,255,255,0.04)',
@@ -52,7 +56,8 @@ const FacePicker = ({ value, onChange }) => (
       const faceId = parseInt(id, 10);
       const selected = value === faceId;
       return (
-        <button key={id} onClick={() => onChange(faceId)} style={{
+        <button key={id} onPointerDown={() => onChange(faceId)} style={{
+          ...TOUCH_BTN,
           display: 'flex', alignItems: 'center', gap: '5px',
           padding: '6px 11px', borderRadius: '100px', cursor: 'pointer',
           border: selected ? `1.5px solid ${info.hex}` : '1px solid rgba(120,160,255,0.2)',
@@ -78,7 +83,8 @@ const PairPicker = ({ value, onChange }) => (
       const f1 = FACE_INFO[pair.faces[0]];
       const f2 = FACE_INFO[pair.faces[1]];
       return (
-        <button key={pair.id} onClick={() => onChange(pair.id)} style={{
+        <button key={pair.id} onPointerDown={() => onChange(pair.id)} style={{
+          ...TOUCH_BTN,
           display: 'flex', alignItems: 'center', gap: '5px',
           padding: '8px 13px', borderRadius: '100px', cursor: 'pointer',
           border: selected ? `1.5px solid ${pair.color}` : '1px solid rgba(120,160,255,0.2)',
@@ -106,7 +112,8 @@ const SpeedPicker = ({ value, onChange }) => (
     ].map(opt => {
       const selected = value === opt.id;
       return (
-        <button key={opt.id} onClick={() => onChange(opt.id)} style={{
+        <button key={opt.id} onPointerDown={() => onChange(opt.id)} style={{
+          ...TOUCH_BTN,
           flex: 1, padding: '10px 14px', borderRadius: '12px', cursor: 'pointer',
           border: selected ? `1.5px solid ${opt.color}` : '1px solid rgba(120,160,255,0.2)',
           background: selected ? `${opt.color}18` : 'rgba(255,255,255,0.04)',
@@ -267,7 +274,8 @@ const DisparityBettingScreen = ({ onBetPlaced, onSkip }) => {
                   const disabled = preset > maxWager;
                   const active = wager === preset;
                   return (
-                    <button key={preset} onClick={() => !disabled && setWager(preset)} style={{
+                    <button key={preset} onPointerDown={() => !disabled && setWager(preset)} style={{
+                      ...TOUCH_BTN,
                       padding: '5px 12px', borderRadius: '100px',
                       cursor: disabled ? 'not-allowed' : 'pointer',
                       border: active ? '1.5px solid rgba(168,85,247,0.7)' : '1px solid rgba(120,160,255,0.2)',
@@ -280,7 +288,8 @@ const DisparityBettingScreen = ({ onBetPlaced, onSkip }) => {
                   );
                 })}
                 {maxWager > 0 && !WAGER_PRESETS.includes(maxWager) && (
-                  <button onClick={() => setWager(maxWager)} style={{
+                  <button onPointerDown={() => setWager(maxWager)} style={{
+                    ...TOUCH_BTN,
                     padding: '5px 12px', borderRadius: '100px', cursor: 'pointer',
                     border: wager === maxWager ? '1.5px solid rgba(168,85,247,0.7)' : '1px solid rgba(120,160,255,0.2)',
                     background: wager === maxWager ? 'rgba(168,85,247,0.2)' : 'rgba(255,255,255,0.04)',
@@ -327,7 +336,8 @@ const DisparityBettingScreen = ({ onBetPlaced, onSkip }) => {
           )}
 
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            <button onClick={handlePlace} disabled={!canPlace} style={{
+            <button onPointerDown={handlePlace} disabled={!canPlace} style={{
+              ...TOUCH_BTN,
               flex: 1, padding: '14px 20px', borderRadius: '100px',
               cursor: canPlace ? 'pointer' : 'not-allowed',
               background: canPlace ? 'linear-gradient(90deg,#a855f7,#7c3aed)' : 'rgba(80,60,120,0.25)',
@@ -340,7 +350,8 @@ const DisparityBettingScreen = ({ onBetPlaced, onSkip }) => {
               {canPlace ? `Bet ${wager} PP & Start` : 'Place Bet & Start'}
             </button>
 
-            <button onClick={onSkip} style={{
+            <button onPointerDown={onSkip} style={{
+              ...TOUCH_BTN,
               padding: '14px 18px', borderRadius: '100px', cursor: 'pointer',
               background: 'transparent', border: '1px solid rgba(120,160,255,0.2)',
               fontFamily: FONT, fontSize: '12px', fontWeight: 600,
