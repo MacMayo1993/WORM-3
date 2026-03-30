@@ -8,6 +8,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { resolveColors } from '../utils/colorSchemes.js';
 import { ANTIPODAL_COLOR } from '../utils/constants.js';
 import OrbInventoryHUD from './OrbInventoryHUD.jsx';
+import ParityWallet from '../components/overlays/ParityWallet.jsx';
 
 const PHASE_META = {
     crawling: { label: 'CRAWLING', accent: '#38bdf8' },
@@ -472,6 +473,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                 </div>
 
                 <div style={TOP_BAR_RIGHT_STYLE}>
+                    <ParityWallet dark={false} />
                     <button
                         onPointerDown={() => toggleWormControlMode()}
                         style={CONTROL_MODE_BTN_STYLE}
