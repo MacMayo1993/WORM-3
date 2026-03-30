@@ -14,6 +14,7 @@ import { isMobile } from '../utils/device.js';
 const SETTINGS_STORAGE_KEY = 'worm3_settings';
 const SETTINGS_VERSION_KEY = 'worm3_settings_version';
 const CURRENT_SETTINGS_VERSION = 1;
+const PARITY_POINTS_KEY = 'worm3_parity_points';
 
 const migrateSettings = (rawSettings, version) => {
   if (!rawSettings || typeof rawSettings !== 'object') return { ...DEFAULT_SETTINGS };
@@ -41,6 +42,7 @@ const loadPersistedState = () => {
     const parsedSettings = settings ? JSON.parse(settings) : null;
     const wormSkin = localStorage.getItem('worm3_skin') || 'slime';
     const wormHat = localStorage.getItem('worm3_hat') || 'none';
+    const parityPoints = parseInt(localStorage.getItem(PARITY_POINTS_KEY) ?? '0', 10) || 0;
 
     return {
       settings: migrateSettings(parsedSettings, settingsVersion),
@@ -50,6 +52,7 @@ const loadPersistedState = () => {
       mobileHintShown,
       wormSkin,
       wormHat,
+      parityPoints,
     };
   } catch {
     return {
@@ -60,6 +63,7 @@ const loadPersistedState = () => {
       mobileHintShown: false,
       wormSkin: 'slime',
       wormHat: 'none',
+      parityPoints: 0,
     };
   }
 };
@@ -289,6 +293,24 @@ export const useGameStore = create(
       try { localStorage.setItem('worm3_hat', id); } catch { }
       set({ wormHat: id });
     },
+
+    // ── Economy ──────────────────────────────────────────────────────────────
+    parityPoints: persistedState.parityPoints,
+    earnCoins: (amount) => set((state) => {
+      const next = Math.max(0, (state.parityPoints || 0) + Math.round(amount));
+      try { localStorage.setItem(PARITY_POINTS_KEY, String(next)); } catch { }
+      return { parityPoints: next };
+    }),
+    spendCoins: (amount) => {
+      const state = get();
+      const current = state.parityPoints || 0;
+      if (current < amount) return false;
+      const next = current - Math.round(amount);
+      try { localStorage.setItem(PARITY_POINTS_KEY, String(next)); } catch { }
+      set({ parityPoints: next });
+      return true;
+    },
+
     wormControlMode: 'non-oriented', // 'non-oriented' (relative turns) | 'oriented' (camera-relative)
     setWormControlMode: (v) => set({ wormControlMode: v }),
     toggleWormControlMode: () => set((state) => ({

@@ -63,6 +63,7 @@ import { isMobile as _isMobile } from '../utils/device.js';
 import { healBurstMap } from '../3d/styles/TileStyleMaterials.jsx';
 import WormHat3D from './wormCosmetics.jsx';
 import { getSkin, _hatAlignQuat, _hatYUp } from './wormCosmeticsData.js';
+import { EARN_ORB_COLLECT, EARN_WORM_SURVIVAL_TICK, EARN_WORM_HEALED_FACE, SURVIVAL_TICK_INTERVAL } from '../utils/economyConstants.js';
 
 // ─── Tile position rotation helper ───────────────────────────────────────────
 // Transforms a {x, y, z, dirKey} surface tile through a cube slice rotation.
@@ -102,6 +103,7 @@ function useWormCrawler(size, cubies) {
     wormPausedRef.current = wormPaused;
     const timeAliveRef = useRef(0);
     const timeAliveSyncRef = useRef(0);
+    const survivalTickRef = useRef(0);
     const healedRef = useRef(0);
     // willHealRef: true when the active tunnel has enough deposited orbs to heal on exit.
     // Consumed by TunnelPortalRings to show the pop-and-seal animation instead of a fade.
@@ -345,6 +347,7 @@ function useWormCrawler(size, cubies) {
         orbPickupColorsRef.current = [...orbPickupColorsRef.current, color];
         const orbCountOnWorm = Math.max(0, Math.floor((tailLength.current - BASE_TAIL_LENGTH) / ORB_SEGMENT_GROWTH));
         useGameStore.getState().setWormBodyTiles(orbCountOnWorm);
+        useGameStore.getState().earnCoins(EARN_ORB_COLLECT);
         if (faceId) {
             const prev = useGameStore.getState().wormOrbInventory ?? { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
             useGameStore.getState().setWormOrbInventory({ ...prev, [faceId]: (prev[faceId] ?? 0) + ORB_SEGMENT_GROWTH });
@@ -375,6 +378,13 @@ function useWormCrawler(size, cubies) {
         if (timeAliveSyncRef.current >= 0.1) {
             timeAliveSyncRef.current = 0;
             useGameStore.getState().setWormTimeAlive(Math.floor(timeAliveRef.current));
+        }
+
+        // Earn parity points for surviving (1 PP per SURVIVAL_TICK_INTERVAL seconds)
+        survivalTickRef.current += delta;
+        if (survivalTickRef.current >= SURVIVAL_TICK_INTERVAL) {
+            survivalTickRef.current -= SURVIVAL_TICK_INTERVAL;
+            useGameStore.getState().earnCoins(EARN_WORM_SURVIVAL_TICK);
         }
 
         wormholeTimer.current -= delta;
@@ -774,6 +784,7 @@ function useWormCrawler(size, cubies) {
                             exitStore.setWormHealingProgress(newProgress);
                             healedRef.current += 1;
                             exitStore.setWormHealedCount(healedRef.current);
+                            useGameStore.getState().earnCoins(EARN_WORM_HEALED_FACE);
                             pendingHealBurstRef.current = { exitTile: exitedTunnel.exit, entryTile: exitedTunnel.entry };
                         }
                         // else: partial/no deposit — tunnel stays flipped, progress persists
@@ -848,6 +859,7 @@ function useWormCrawler(size, cubies) {
         tileTrail.current = [tileKey(startPos)];
         timeAliveRef.current = 0;
         timeAliveSyncRef.current = 0;
+        survivalTickRef.current = 0;
         useGameStore.setState({
             wormPowerups: initial,
             wormBodyTiles: 0,

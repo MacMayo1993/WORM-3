@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import IntroCubie from '../intro/IntroCubie.jsx';
+import { useGameStore } from '../../hooks/useGameStore.js';
 
 // All stickers black — same as the opening frames of the intro
 const ZERO_REVEAL = { PZ: 0, NZ: 0, PX: 0, NX: 0, PY: 0, NY: 0 };
@@ -533,6 +534,7 @@ const NavItem = ({ icon, label, color, onClick }) => {
 // ─── Locked store nav item ────────────────────────────────────────────────────
 const StoreNavItem = () => {
   const [showTeaser, setShowTeaser] = useState(false);
+  const parityPoints = useGameStore(s => s.parityPoints);
   const color = '#6366f1';
   return (
     <div style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -565,6 +567,14 @@ const StoreNavItem = () => {
           color: 'rgba(150,170,220,0.55)',
           fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif",
         }}>Store</span>
+        {parityPoints > 0 && (
+          <span style={{
+            fontSize: '9px', fontWeight: 700,
+            color: `${color}99`,
+            fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif",
+            letterSpacing: '0.04em',
+          }}>{parityPoints} PP</span>
+        )}
       </button>
 
       {/* Teaser popup */}
