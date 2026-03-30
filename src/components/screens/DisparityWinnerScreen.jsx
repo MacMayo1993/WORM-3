@@ -6,6 +6,8 @@ import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { FACE_COLORS } from '../../utils/constants.js';
 
+const FONT = "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif";
+
 // Extract face number from a gridId like "M3-007" → 3
 const faceNumFromGridId = (gridId) => {
   if (!gridId) return 1;
@@ -38,6 +40,7 @@ export default function DisparityWinnerScreen({ onDismiss }) {
   const disparityWinner = useGameStore((s) => s.disparityWinner);
   const disparityDeaths = useGameStore((s) => s.disparityDeaths);
   const clearDisparityGame = useGameStore((s) => s.clearDisparityGame);
+  const lastBetResult = useGameStore((s) => s.lastBetResult);
 
   const [phase, setPhase] = useState('intro'); // intro | reveal | celebrate | done
   const [glitch, setGlitch] = useState(false);
@@ -343,6 +346,42 @@ export default function DisparityWinnerScreen({ onDismiss }) {
           }}
         >
           Last antipodal pair alive — outlasted {observations} fallen tile{observations !== 1 ? 's' : ''}.
+        </div>
+      )}
+
+      {/* Bet result banner */}
+      {phase === 'done' && lastBetResult && (
+        <div
+          style={{
+            width: 'min(420px, 90vw)',
+            marginBottom: '1rem',
+            padding: '14px 18px',
+            borderRadius: '14px',
+            background: lastBetResult.won ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.10)',
+            border: `1.5px solid ${lastBetResult.won ? 'rgba(34,197,94,0.4)' : 'rgba(239,68,68,0.35)'}`,
+            boxShadow: lastBetResult.won ? '0 0 24px rgba(34,197,94,0.15)' : 'none',
+            animation: 'dws-tagline-in 0.4s ease-out 0.05s both',
+            display: 'flex', alignItems: 'center', gap: '14px',
+          }}
+        >
+          <div style={{ fontSize: '1.6rem', lineHeight: 1, flexShrink: 0 }}>
+            {lastBetResult.won ? '🎉' : '💸'}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{
+              fontSize: '11px', fontWeight: 800, letterSpacing: '0.16em', textTransform: 'uppercase',
+              color: lastBetResult.won ? '#4ade80' : '#f87171',
+              fontFamily: FONT, marginBottom: '3px',
+            }}>
+              {lastBetResult.won ? `Won +${lastBetResult.payout} PP` : `Lost ${lastBetResult.wager} PP`}
+            </div>
+            <div style={{
+              fontSize: '12px', color: 'rgba(180,210,255,0.65)',
+              fontFamily: FONT, lineHeight: 1.4,
+            }}>
+              {lastBetResult.description}
+            </div>
+          </div>
         </div>
       )}
 

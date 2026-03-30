@@ -311,6 +311,19 @@ export const useGameStore = create(
       return true;
     },
 
+    // ── Disparity betting ─────────────────────────────────────────────────────
+    // activeBet: { type, pick, wager, odds, potentialWin, placedAt, streak }
+    activeBet: null,
+    setActiveBet: (bet) => set({ activeBet: bet }),
+    clearActiveBet: () => set({ activeBet: null }),
+    // lastBetResult: { won, payout, description, wager }
+    lastBetResult: null,
+    setLastBetResult: (result) => set({ lastBetResult: result }),
+    clearLastBetResult: () => set({ lastBetResult: null }),
+    // betStreak: consecutive wins (persisted in memory only, resets on page reload)
+    betStreak: 0,
+    setBetStreak: (v) => set({ betStreak: v }),
+
     wormControlMode: 'non-oriented', // 'non-oriented' (relative turns) | 'oriented' (camera-relative)
     setWormControlMode: (v) => set({ wormControlMode: v }),
     toggleWormControlMode: () => set((state) => ({

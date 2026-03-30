@@ -17,6 +17,7 @@ import './App.css';
 // Utils
 import { resolveBiomeManifoldStyles } from './modes/CityBiomeMode.js';
 import { completeLevel } from './utils/levels.js';
+import { resolveBet, calcPayout } from './utils/disparityBetting.js';
 import { makeCubies } from './game/cubeState.js';
 import { rotateSliceCubies } from './game/cubeRotation.js';
 import { buildManifoldGridMap, flipStickerPair } from './game/manifoldLogic.js';
@@ -328,10 +329,12 @@ export default function WORM3() {
   // Merge Mode theme picker
   const [showMergeThemePicker, setShowMergeThemePicker] = useState(false);
 
-  // Disparity Mode wizard + first-flip gate
+  // Disparity Mode wizard + betting screen + first-flip gate
   const [showDisparityWizard, setShowDisparityWizard] = useState(false);
+  const [showDisparityBetting, setShowDisparityBetting] = useState(false);
   const [disparityWaitingFirstFlip, setDisparityWaitingFirstFlip] = useState(false);
   const pendingDisparityLevelRef = useRef(3);
+  const pendingWizardSettingsRef = useRef(null);
   // Countdown: null = not running, 3/2/1 = ticking, 'GO!' = flash before start
   const [disparityCountdown, setDisparityCountdown] = useState(null);
 
@@ -382,6 +385,43 @@ export default function WORM3() {
     const timer = setTimeout(() => markMobileHintShown(), 4500);
     return () => clearTimeout(timer);
   }, [showMobileTouchHint, markMobileHintShown]);
+
+  // Resolve active bet when the winner screen appears
+  useEffect(() => {
+    return useGameStore.subscribe(
+      (s) => s.showDisparityWinner,
+      (show) => {
+        if (!show) return;
+        const s = useGameStore.getState();
+        const activeBet = s.activeBet;
+        if (!activeBet) return;
+        const result = resolveBet(activeBet, {
+          disparityDeaths: s.disparityDeaths,
+          disparityWinner: s.disparityWinner,
+          disparityEliminatedFaces: s.disparityEliminatedFaces,
+        });
+        if (!result) return;
+        const streak = s.betStreak || 0;
+        if (result.won) {
+          const payout = calcPayout(activeBet.wager, activeBet.odds, streak);
+          useGameStore.getState().earnCoins(payout);
+          useGameStore.getState().setBetStreak(streak + 1);
+          useGameStore.getState().setLastBetResult({
+            won: true, payout, loss: 0,
+            description: result.description, wager: activeBet.wager,
+          });
+        } else {
+          // Wager was already deducted at bet time — just record the result.
+          useGameStore.getState().setBetStreak(0);
+          useGameStore.getState().setLastBetResult({
+            won: false, payout: 0, loss: activeBet.wager,
+            description: result.description, wager: activeBet.wager,
+          });
+        }
+        useGameStore.getState().clearActiveBet();
+      }
+    );
+  }, []);
 
   // 3-2-1-GO countdown before chaos begins
   useEffect(() => {
@@ -494,8 +534,9 @@ export default function WORM3() {
     setShowDisparityWizard(true);
   }, []);
 
-  const handleDisparitySetupComplete = useCallback((wizardSettings) => {
-    setShowDisparityWizard(false);
+  // Applies wizard settings and begins the waiting-for-first-flip phase.
+  // Called after the betting screen (or immediately if skipped/no PP).
+  const startDisparityGame = useCallback((wizardSettings) => {
     useGameStore.getState().clearLevel();
     useGameStore.getState().clearDisparityGame();
     if (wizardSettings.flipCap != null) useGameStore.getState().setDisparityFlipCap(wizardSettings.flipCap);
@@ -526,7 +567,6 @@ export default function WORM3() {
     setFlipMode(wizardSettings.flipMode ?? true);
     if (wizardSettings.showTunnels !== undefined) setShowTunnels(wizardSettings.showTunnels);
 
-    // Chaos stays OFF until the player makes the first flip
     pendingDisparityLevelRef.current = wizardSettings.disparityLevel;
     setChaosLevel(0);
 
@@ -538,6 +578,26 @@ export default function WORM3() {
     }
     setDisparityWaitingFirstFlip(true);
   }, [size, settings, setSettings, changeSize, setVisualMode, setFlipMode, setShowTunnels, setChaosLevel, reset]);
+
+  const handleDisparitySetupComplete = useCallback((wizardSettings) => {
+    setShowDisparityWizard(false);
+    pendingWizardSettingsRef.current = wizardSettings;
+    // Show betting screen so the player can wager before chaos starts.
+    setShowDisparityBetting(true);
+  }, []);
+
+  const handleBetPlaced = useCallback((bet) => {
+    // Wager already deducted in DisparityBettingScreen before calling this.
+    useGameStore.getState().setActiveBet(bet);
+    setShowDisparityBetting(false);
+    startDisparityGame(pendingWizardSettingsRef.current);
+  }, [startDisparityGame]);
+
+  const handleBetSkipped = useCallback(() => {
+    useGameStore.getState().clearActiveBet();
+    setShowDisparityBetting(false);
+    startDisparityGame(pendingWizardSettingsRef.current);
+  }, [startDisparityGame]);
 
   const handleMenuCoop = useCallback(() => {
     useGameStore.getState().setShowMainMenu(false);
@@ -1105,6 +1165,7 @@ export default function WORM3() {
             sheetOpen, setSheetOpen, sheetMode, setSheetMode,
             showFreeplayWizard, showWormModeWizard,
             showDisparityWizard, setShowDisparityWizard,
+            showDisparityBetting,
             disparityWaitingFirstFlip, disparityCountdown,
             showAntipodalPiP, onToggleAntipodalPiP: () => setShowAntipodalPiP(v => !v),
           }}
@@ -1146,6 +1207,8 @@ export default function WORM3() {
             onWizardComplete: handleWizardComplete,
             onWizardCancel: handleWizardCancel,
             onDisparitySetupComplete: handleDisparitySetupComplete,
+            onBetPlaced: handleBetPlaced,
+            onBetSkipped: handleBetSkipped,
             onWormSetupComplete: handleWormSetupComplete,
             onWormWizardCancel: handleWormWizardCancel,
             onWormRetry: handleWormRetry,

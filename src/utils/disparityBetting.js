@@ -1,0 +1,143 @@
+// src/utils/disparityBetting.js
+// Disparity Parity Roulette — bet types, resolution logic, and payout math.
+
+// ── Face identity ─────────────────────────────────────────────────────────────
+// Face IDs match CLAUDE.md: 1=PZ(Red) 2=NX(Green) 3=PY(White) 4=NZ(Orange) 5=PX(Blue) 6=NY(Yellow)
+export const FACE_INFO = {
+  1: { name: 'Red',    hex: '#ef4444', antipodalFace: 4 },
+  2: { name: 'Green',  hex: '#22c55e', antipodalFace: 5 },
+  3: { name: 'White',  hex: '#e5e5e5', antipodalFace: 6 },
+  4: { name: 'Orange', hex: '#f97316', antipodalFace: 1 },
+  5: { name: 'Blue',   hex: '#3b82f6', antipodalFace: 2 },
+  6: { name: 'Yellow', hex: '#eab308', antipodalFace: 3 },
+};
+
+export const ANTIPODAL_PAIRS = [
+  { id: 'RO', faces: [1, 4], label: 'Red – Orange', color: '#f97316' },
+  { id: 'GB', faces: [2, 5], label: 'Green – Blue', color: '#22c55e' },
+  { id: 'WY', faces: [3, 6], label: 'White – Yellow', color: '#eab308' },
+];
+
+// ── Bet type definitions ──────────────────────────────────────────────────────
+export const BET_TYPES = {
+  SURVIVOR: {
+    id: 'SURVIVOR',
+    label: 'Last Color',
+    tagline: 'One face survives to the end',
+    desc: 'Pick the face color that will have a tile in the final winning pair. 1-in-6 shot.',
+    odds: 4,
+    icon: 'S',
+  },
+  PAIR: {
+    id: 'PAIR',
+    label: 'Exact Pair',
+    tagline: 'Name the winning antipodal pair',
+    desc: 'Call the exact antipodal pairing that outlasts all others. Red-Orange, Green-Blue, or White-Yellow.',
+    odds: 8,
+    icon: 'P',
+  },
+  FIRST_OUT: {
+    id: 'FIRST_OUT',
+    label: 'First Fall',
+    tagline: 'Who collapses first?',
+    desc: 'Pick which face color loses all its tiles before anyone else. First blood.',
+    odds: 4,
+    icon: 'F',
+  },
+  SPEED: {
+    id: 'SPEED',
+    label: 'Speed Round',
+    tagline: 'Fast or slow collapse?',
+    desc: 'Will this round end in under 60 seconds from the first death? Bet on the pace.',
+    odds: 1.8,
+    icon: 'Z',
+  },
+};
+
+// ── Streak multiplier ─────────────────────────────────────────────────────────
+// Consecutive wins boost payout. Capped at +50%.
+export function streakMultiplier(streak) {
+  return Math.min(1 + (streak || 0) * 0.1, 1.5);
+}
+
+// ── Grid ID helpers ───────────────────────────────────────────────────────────
+// "M3-042" → 3
+export function getFaceFromGridId(gridId) {
+  return parseInt(String(gridId).replace('M', '').split('-')[0], 10);
+}
+
+export function getWinnerFaces(pair) {
+  return (pair || []).map(getFaceFromGridId);
+}
+
+// ── Bet resolution ────────────────────────────────────────────────────────────
+// Returns { won: bool, description: string }
+export function resolveBet(bet, { disparityDeaths, disparityWinner, disparityEliminatedFaces }) {
+  if (!bet || !disparityWinner?.pair?.length) return null;
+
+  const { type, pick } = bet;
+
+  if (type === 'SURVIVOR') {
+    const winnerFaces = getWinnerFaces(disparityWinner.pair);
+    const won = winnerFaces.includes(pick);
+    const faceName = FACE_INFO[pick]?.name ?? pick;
+    const actual = winnerFaces.map(f => FACE_INFO[f]?.name ?? f).join(' & ');
+    return {
+      won,
+      description: won
+        ? `${faceName} was in the final pair!`
+        : `The final pair was ${actual}, not ${faceName}.`,
+    };
+  }
+
+  if (type === 'PAIR') {
+    const winnerFaces = new Set(getWinnerFaces(disparityWinner.pair));
+    const pairDef = ANTIPODAL_PAIRS.find(p => p.id === pick);
+    const won = pairDef ? pairDef.faces.every(f => winnerFaces.has(f)) : false;
+    const actualFaces = getWinnerFaces(disparityWinner.pair);
+    const actualPair = ANTIPODAL_PAIRS.find(p => p.faces.every(f => actualFaces.includes(f)));
+    return {
+      won,
+      description: won
+        ? `${pairDef?.label} survived — perfect call!`
+        : `The winner was ${actualPair?.label ?? 'unknown pair'}.`,
+    };
+  }
+
+  if (type === 'FIRST_OUT') {
+    const firstElim = disparityEliminatedFaces?.[0];
+    const won = firstElim === pick;
+    const faceName = FACE_INFO[pick]?.name ?? pick;
+    const actualName = FACE_INFO[firstElim]?.name ?? firstElim;
+    return {
+      won,
+      description: won
+        ? `${faceName} fell first — you called it!`
+        : `${actualName} was eliminated first, not ${faceName}.`,
+    };
+  }
+
+  if (type === 'SPEED') {
+    // Duration from first death event to last
+    const sorted = [...(disparityDeaths || [])].sort((a, b) => a.timestamp - b.timestamp);
+    const elapsed = sorted.length >= 2
+      ? (sorted[sorted.length - 1].timestamp - sorted[0].timestamp) / 1000
+      : 0;
+    const threshold = 60; // seconds
+    const wasFast = elapsed < threshold;
+    const won = pick === 'FAST' ? wasFast : !wasFast;
+    return {
+      won,
+      description: won
+        ? `Round lasted ${Math.round(elapsed)}s — ${pick === 'FAST' ? 'fast as predicted' : 'nice and slow'}.`
+        : `Round lasted ${Math.round(elapsed)}s — ${pick === 'FAST' ? 'too slow' : 'ended too fast'}.`,
+    };
+  }
+
+  return null;
+}
+
+// ── Payout calculator ─────────────────────────────────────────────────────────
+export function calcPayout(wager, odds, streak) {
+  return Math.round(wager * odds * streakMultiplier(streak));
+}

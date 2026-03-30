@@ -47,6 +47,7 @@ const WormModeSetupWizard = React.lazy(() => import('./screens/WormModeSetupWiza
 const DisparitySetupWizard = React.lazy(() => import('./screens/DisparitySetupWizard.jsx'));
 const MergeThemePicker = React.lazy(() => import('../modes/merge/index.js').then((m) => ({ default: m.MergeThemePicker })));
 const DisparityWinnerScreen = React.lazy(() => import('./screens/DisparityWinnerScreen.jsx'));
+const DisparityBettingScreen = React.lazy(() => import('./screens/DisparityBettingScreen.jsx'));
 const CubeNet = React.lazy(() => import('./CubeNet.jsx'));
 const SolveMode = React.lazy(() => import('./SolveMode.jsx'));
 const DevConsole = React.lazy(() => import('./menus/DevConsole.jsx'));
@@ -89,6 +90,7 @@ export default function UILayer({
     sheetOpen, setSheetOpen, sheetMode, setSheetMode,
     showFreeplayWizard, showWormModeWizard,
     showDisparityWizard, setShowDisparityWizard,
+    showDisparityBetting,
     disparityWaitingFirstFlip, disparityCountdown,
     showAntipodalPiP, onToggleAntipodalPiP,
   } = ui;
@@ -103,6 +105,7 @@ export default function UILayer({
     onMenuSettings, onMenuBiome, onMenuDisparity, onMenuWormHealer, onMenuHolonomy, onMenuMerge,
     showMergeThemePicker, onMergeStart, onMergeCancel,
     onWizardComplete, onWizardCancel, onDisparitySetupComplete,
+    onBetPlaced, onBetSkipped,
     onWormSetupComplete, onWormWizardCancel, onWormRetry, onWormNewGame,
     onToggleHandsMode, onFaceRotate, onTileRotation, onTileFaceRotation,
     onVictoryContinue, onVictoryNewGame,
@@ -266,12 +269,20 @@ export default function UILayer({
           </div>
         )}
 
+        {/* Disparity Betting Screen — intercepts before chaos starts */}
+        {showDisparityBetting && (
+          <Suspense fallback={null}>
+            <DisparityBettingScreen onBetPlaced={onBetPlaced} onSkip={onBetSkipped} />
+          </Suspense>
+        )}
+
         {/* Disparity Winner — cinematic celebration screen */}
         {showDisparityWinner && (
           <Suspense fallback={null}>
             <DisparityWinnerScreen
               onDismiss={() => {
                 useGameStore.getState().clearDisparityGame();
+                useGameStore.getState().clearLastBetResult();
                 useGameStore.getState().setChaosLevel(0);
                 setShowDisparityWizard(true);
               }}
