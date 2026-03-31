@@ -10,11 +10,13 @@ import { subscribeWithSelector } from 'zustand/middleware';
 import { makeCubies } from '../game/cubeState.js';
 import { DEFAULT_SETTINGS } from '../utils/colorSchemes.js';
 import { isMobile } from '../utils/device.js';
+import { DEFAULT_OWNED } from '../utils/storeCatalog.js';
 
 const SETTINGS_STORAGE_KEY = 'worm3_settings';
 const SETTINGS_VERSION_KEY = 'worm3_settings_version';
 const CURRENT_SETTINGS_VERSION = 1;
 const PARITY_POINTS_KEY = 'worm3_parity_points';
+const OWNED_ITEMS_KEY = 'worm3_owned_items';
 
 const migrateSettings = (rawSettings, version) => {
   if (!rawSettings || typeof rawSettings !== 'object') return { ...DEFAULT_SETTINGS };
@@ -43,6 +45,8 @@ const loadPersistedState = () => {
     const wormSkin = localStorage.getItem('worm3_skin') || 'slime';
     const wormHat = localStorage.getItem('worm3_hat') || 'none';
     const parityPoints = parseInt(localStorage.getItem(PARITY_POINTS_KEY) ?? '0', 10) || 0;
+    const rawOwned = localStorage.getItem(OWNED_ITEMS_KEY);
+    const ownedItems = rawOwned ? JSON.parse(rawOwned) : [...DEFAULT_OWNED];
 
     return {
       settings: migrateSettings(parsedSettings, settingsVersion),
@@ -53,6 +57,7 @@ const loadPersistedState = () => {
       wormSkin,
       wormHat,
       parityPoints,
+      ownedItems,
     };
   } catch {
     return {
@@ -64,6 +69,7 @@ const loadPersistedState = () => {
       wormSkin: 'slime',
       wormHat: 'none',
       parityPoints: 0,
+      ownedItems: [...DEFAULT_OWNED],
     };
   }
 };
@@ -308,6 +314,23 @@ export const useGameStore = create(
       const next = current - Math.round(amount);
       try { localStorage.setItem(PARITY_POINTS_KEY, String(next)); } catch { }
       set({ parityPoints: next });
+      return true;
+    },
+
+    // ── Store ownership ───────────────────────────────────────────────────────
+    ownedItems: persistedState.ownedItems,
+    buyItem: (itemId, price) => {
+      const state = get();
+      if (state.ownedItems.includes(itemId)) return true; // already owned
+      const current = state.parityPoints || 0;
+      if (current < price) return false;
+      const next = current - Math.round(price);
+      const nextOwned = [...state.ownedItems, itemId];
+      try {
+        localStorage.setItem(PARITY_POINTS_KEY, String(next));
+        localStorage.setItem(OWNED_ITEMS_KEY, JSON.stringify(nextOwned));
+      } catch { }
+      set({ parityPoints: next, ownedItems: nextOwned });
       return true;
     },
 

@@ -48,6 +48,7 @@ const DisparitySetupWizard = React.lazy(() => import('./screens/DisparitySetupWi
 const MergeThemePicker = React.lazy(() => import('../modes/merge/index.js').then((m) => ({ default: m.MergeThemePicker })));
 const DisparityWinnerScreen = React.lazy(() => import('./screens/DisparityWinnerScreen.jsx'));
 const DisparityBettingScreen = React.lazy(() => import('./screens/DisparityBettingScreen.jsx'));
+const ParityStoreScreen = React.lazy(() => import('./screens/ParityStoreScreen.jsx'));
 const CubeNet = React.lazy(() => import('./CubeNet.jsx'));
 const SolveMode = React.lazy(() => import('./SolveMode.jsx'));
 const DevConsole = React.lazy(() => import('./menus/DevConsole.jsx'));
@@ -93,6 +94,7 @@ export default function UILayer({
     showDisparityBetting,
     disparityWaitingFirstFlip, disparityCountdown,
     showAntipodalPiP, onToggleAntipodalPiP,
+    showStore, setShowStore,
   } = ui;
 
   const {
@@ -102,7 +104,7 @@ export default function UILayer({
     onTutorialClose, onLevelTutorialClose, onNextLevel,
     onPreset, onInstantChaos, onSaveState, onLoadState,
     onMenuPlay, onMenuLevels, onMenuFreeplay, onMenuCoop, onMenuTeach,
-    onMenuSettings, onMenuBiome, onMenuDisparity, onMenuWormHealer, onMenuHolonomy, onMenuMerge,
+    onMenuSettings, onMenuBiome, onMenuDisparity, onMenuWormHealer, onMenuHolonomy, onMenuMerge, onMenuStore,
     showMergeThemePicker, onMergeStart, onMergeCancel,
     onWizardComplete, onWizardCancel, onDisparitySetupComplete,
     onBetPlaced, onBetSkipped,
@@ -375,7 +377,14 @@ export default function UILayer({
           onWormHealer={onMenuWormHealer}
           onHolonomy={onMenuHolonomy}
           onMerge={onMenuMerge}
+          onStore={onMenuStore}
         />
+      )}
+
+      {showStore && (
+        <Suspense fallback={null}>
+          <ParityStoreScreen onClose={() => setShowStore(false)} />
+        </Suspense>
       )}
 
       {showLevelSelect && (

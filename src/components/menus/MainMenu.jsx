@@ -531,84 +531,36 @@ const NavItem = ({ icon, label, color, onClick }) => {
   );
 };
 
-// ─── Locked store nav item ────────────────────────────────────────────────────
-const StoreNavItem = () => {
-  const [showTeaser, setShowTeaser] = useState(false);
+// ─── Store nav item ───────────────────────────────────────────────────────────
+const StoreNavItem = ({ onStore }) => {
   const color = '#6366f1';
   return (
     <div style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       <button
-        onClick={() => setShowTeaser(v => !v)}
+        onClick={onStore}
         style={{
           width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center',
           justifyContent: 'center', gap: '8px', padding: '14px 12px 12px',
           background: 'transparent', border: 'none', cursor: 'pointer',
-          position: 'relative', opacity: 0.55,
+          position: 'relative', opacity: 0.85,
           transition: 'opacity 0.2s ease',
         }}
-        onMouseEnter={e => { e.currentTarget.style.opacity = '0.75'; }}
-        onMouseLeave={e => { e.currentTarget.style.opacity = '0.55'; }}
+        onMouseEnter={e => { e.currentTarget.style.opacity = '1'; }}
+        onMouseLeave={e => { e.currentTarget.style.opacity = '0.85'; }}
       >
         <span style={{
           lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          filter: `drop-shadow(0 0 4px ${color}44)`,
-          position: 'relative',
+          filter: `drop-shadow(0 0 6px ${color}66)`,
         }}>
           <StoreIcon />
-          {/* Lock badge */}
-          <span style={{
-            position: 'absolute', top: '-4px', right: '-6px',
-            fontSize: '9px', lineHeight: 1,
-          }}>🔒</span>
         </span>
         <span style={{
           fontSize: '10px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase',
-          color: 'rgba(150,170,220,0.55)',
+          color: '#818cf8',
           fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif",
         }}>Store</span>
         <ParityWallet dark={true} />
       </button>
-
-      {/* Teaser popup */}
-      {showTeaser && (
-        <>
-          {/* Backdrop dismiss */}
-          <div
-            style={{ position: 'fixed', inset: 0, zIndex: 10 }}
-            onClick={() => setShowTeaser(false)}
-          />
-          <div style={{
-            position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)',
-            marginBottom: '10px', width: '220px',
-            background: 'rgba(8,12,32,0.96)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
-            border: `1px solid ${color}40`,
-            borderRadius: '14px', padding: '14px',
-            boxShadow: `0 0 24px ${color}30, 0 8px 32px rgba(0,0,0,0.6)`,
-            zIndex: 20,
-            animation: 'fadeIn 0.18s ease',
-          }}>
-            <div style={{
-              fontSize: '11px', fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase',
-              color: color, marginBottom: '8px',
-              fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif",
-            }}>Parity Store</div>
-            <div style={{
-              fontSize: '12px', lineHeight: 1.55, color: 'rgba(180,210,255,0.80)',
-              fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif",
-            }}>
-              Spend your Parity Points on worm skins, cube themes, and more. Earn points by collecting orbs in WORM mode and playing Disparity.
-            </div>
-            {/* Arrow */}
-            <div style={{
-              position: 'absolute', bottom: '-6px', left: '50%',
-              width: '12px', height: '12px',
-              background: 'rgba(8,12,32,0.96)', border: `1px solid ${color}40`,
-              borderTop: 'none', borderLeft: 'none',
-              transform: 'translateX(-50%) rotate(45deg)',
-            }} />
-          </div>
-        </>
-      )}
     </div>
   );
 };
@@ -616,7 +568,7 @@ const StoreNavItem = () => {
 // ─── Main component ───────────────────────────────────────────────────────────
 // onPlay / onHolonomy / onBiome / onMerge are kept as props for UILayer compatibility
 // but are no longer wired to buttons — those modes live in the Coming Soon drawer.
-const MainMenu = ({ onPlay: _onPlay, _onLevels, onFreeplay, _onCoop, onSettings, onBiome: _onBiome, onDisparity, onWormHealer, onHolonomy: _onHolonomy, onMerge: _onMerge }) => {
+const MainMenu = ({ onPlay: _onPlay, _onLevels, onFreeplay, _onCoop, onSettings, onBiome: _onBiome, onDisparity, onWormHealer, onHolonomy: _onHolonomy, onMerge: _onMerge, onStore }) => {
   const CLEAN = {
     panel: 'rgba(8,12,28,0.68)',
     panelStrong: 'rgba(10,14,32,0.80)',
@@ -763,7 +715,7 @@ const MainMenu = ({ onPlay: _onPlay, _onLevels, onFreeplay, _onCoop, onSettings,
               <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(120,160,255,0.15)' }} />
               <NavItem icon={<ExploreIcon />} label="Explore" color="#22c55e" onClick={onFreeplay} />
               <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(120,160,255,0.15)' }} />
-              <StoreNavItem />
+              <StoreNavItem onStore={onStore} />
             </div>
           </div>
         </div>
