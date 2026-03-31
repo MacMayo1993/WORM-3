@@ -199,6 +199,7 @@ const DisparityBettingScreen = ({ onBetPlaced, onSkip }) => {
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 9998,
+      pointerEvents: 'auto',
       background: 'rgba(4,6,18,0.92)',
       backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
