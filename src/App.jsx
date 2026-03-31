@@ -329,6 +329,9 @@ export default function WORM3() {
   // Merge Mode theme picker
   const [showMergeThemePicker, setShowMergeThemePicker] = useState(false);
 
+  // Parity Store
+  const [showStore, setShowStore] = useState(false);
+
   // Disparity Mode wizard + betting screen + first-flip gate
   const [showDisparityWizard, setShowDisparityWizard] = useState(false);
   const [showDisparityBetting, setShowDisparityBetting] = useState(false);
@@ -1168,6 +1171,7 @@ export default function WORM3() {
             showDisparityBetting,
             disparityWaitingFirstFlip, disparityCountdown,
             showAntipodalPiP, onToggleAntipodalPiP: () => setShowAntipodalPiP(v => !v),
+            showStore, setShowStore,
           }}
           handlers={{
             onReset: handleReset,
@@ -1201,6 +1205,7 @@ export default function WORM3() {
             onMenuWormHealer: handleMenuWormHealer,
             onMenuHolonomy: handleMenuHolonomy,
             onMenuMerge: handleMenuMerge,
+            onMenuStore: () => setShowStore(true),
             showMergeThemePicker,
             onMergeStart: handleMergeStart,
             onMergeCancel: handleMergeCancel,
