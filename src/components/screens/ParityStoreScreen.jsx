@@ -7,7 +7,6 @@ import {
   registerTilePreview,
   updateTilePreview,
   unregisterTilePreview,
-  tickPreviews,
 } from '../../3d/TilePreviewRenderer.js';
 
 const FONT = "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif";
@@ -394,18 +393,6 @@ const ParityStoreScreen = ({ onClose }) => {
     settings: s.settings,
     setSettings: s.setSettings,
   })));
-
-  // The R3F canvas pauses its loop when the store is open (frameloop='never').
-  // Drive tile preview rendering ourselves so all TilePreviewCanvas instances paint.
-  useEffect(() => {
-    let rafId;
-    const tick = () => {
-      tickPreviews(1 / 60);
-      rafId = requestAnimationFrame(tick);
-    };
-    rafId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafId);
-  }, []);
 
   const [toast, setToast] = useState(null);
   const [previewItem, setPreviewItem] = useState(null);

@@ -1073,7 +1073,7 @@ export default function WORM3() {
           camera={{ position: (showWelcome || showMainMenu) ? [0, 3, 12] : [0, 0, cameraZ], fov: 40 }}
           dpr={[1, 1.5]}
           gl={{ powerPreference: 'high-performance', antialias: true }}
-          frameloop={showStore ? 'never' : 'always'}
+          frameloop="always"
         >
           <CameraManager showWelcome={showWelcome} showMainMenu={showMainMenu} cameraZ={cameraZ} />
           <TilePreviewHost />
