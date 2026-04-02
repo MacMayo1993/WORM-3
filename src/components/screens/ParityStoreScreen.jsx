@@ -116,6 +116,125 @@ const LockBadge = ({ top = 5, right = 5 }) => (
   <span style={{ position: 'absolute', top, right, fontSize: '9px', lineHeight: 1 }}>🔒</span>
 );
 
+// ── Purchase preview / confirmation modal ─────────────────────────────────────
+const PreviewModal = ({ item, owned, pp, onClose, onBuy, onEquip }) => {
+  const accentColor = item.type === 'skin' ? (item.glow || '#00ff88')
+    : item.type === 'hat' ? '#6366f1'
+    : item.type === 'scheme' ? '#f59e0b'
+    : '#22c55e';
+  const canAfford = pp >= item.price;
+
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 100000,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'rgba(0,0,0,0.72)',
+        backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          background: 'rgba(6,10,26,0.98)',
+          border: `1px solid ${accentColor}28`,
+          borderRadius: '22px',
+          padding: '28px 22px 22px',
+          width: 'min(300px, calc(100vw - 40px))',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px',
+          boxShadow: `0 24px 64px rgba(0,0,0,0.6), 0 0 0 1px ${accentColor}12`,
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Large preview */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '130px' }}>
+          {item.type === 'skin' && <SkinSwatch skin={item} size={120} locked={false} />}
+          {item.type === 'hat' && (
+            <div style={{
+              width: 120, height: 120,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: `${accentColor}15`, borderRadius: '50%',
+            }}>
+              <HatIcon hatId={item.hatId} color={accentColor} size={80} />
+            </div>
+          )}
+          {item.type === 'scheme' && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '7px', width: '150px' }}>
+              {Object.values(COLOR_SCHEMES[item.schemeKey] || COLOR_SCHEMES.standard).slice(0, 6).map((c, i) => (
+                <div key={i} style={{
+                  aspectRatio: '1', borderRadius: '10px', background: c,
+                  boxShadow: `0 3px 10px ${c}50`,
+                }} />
+              ))}
+            </div>
+          )}
+          {item.type === 'tile' && <TilePreviewCanvas styleKey={item.tileKey} size={130} />}
+        </div>
+
+        {/* Name + type */}
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '18px', fontWeight: 800, color: '#e0e7ff', fontFamily: FONT, letterSpacing: '-0.02em' }}>
+            {item.label}
+          </div>
+          <div style={{ fontSize: '11px', color: 'rgba(140,170,220,0.45)', fontFamily: FONT, marginTop: '3px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+            {item.type === 'skin' ? 'Worm Skin' : item.type === 'hat' ? 'Hat' : item.type === 'scheme' ? 'Color Palette' : 'Tile Style'}
+          </div>
+        </div>
+
+        {/* Action area */}
+        {owned ? (
+          <button
+            style={{
+              ...TOUCH_BTN, width: '100%', padding: '12px', borderRadius: '12px',
+              background: `${accentColor}18`, border: `1.5px solid ${accentColor}55`,
+              color: accentColor, fontSize: '14px', fontWeight: 700,
+              cursor: 'pointer', fontFamily: FONT,
+            }}
+            onClick={onEquip}
+          >Equip</button>
+        ) : (
+          <>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px' }}>
+              <span style={{ fontSize: '22px', fontWeight: 800, color: canAfford ? accentColor : 'rgba(120,140,180,0.45)', fontFamily: FONT }}>{item.price}</span>
+              <span style={{ fontSize: '13px', fontWeight: 700, color: canAfford ? accentColor : 'rgba(120,140,180,0.4)', fontFamily: FONT }}>PP</span>
+              <span style={{ fontSize: '10px', color: 'rgba(120,140,180,0.4)', fontFamily: FONT, marginLeft: '4px' }}>you have {pp}</span>
+            </div>
+            {canAfford ? (
+              <button
+                style={{
+                  ...TOUCH_BTN, width: '100%', padding: '13px', borderRadius: '12px',
+                  background: `${accentColor}18`, border: `1.5px solid ${accentColor}55`,
+                  color: accentColor, fontSize: '14px', fontWeight: 700,
+                  cursor: 'pointer', fontFamily: FONT,
+                }}
+                onClick={onBuy}
+              >Confirm Purchase — {item.price} PP</button>
+            ) : (
+              <div style={{
+                width: '100%', padding: '12px', borderRadius: '12px', textAlign: 'center',
+                background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.2)',
+                color: '#f97316', fontSize: '12px', fontWeight: 600, fontFamily: FONT,
+              }}>
+                Need {item.price - pp} more PP to unlock
+              </div>
+            )}
+          </>
+        )}
+
+        <button
+          style={{
+            ...TOUCH_BTN, width: '100%', padding: '10px', borderRadius: '12px',
+            background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)',
+            color: 'rgba(140,170,220,0.55)', fontSize: '13px', fontWeight: 600,
+            cursor: 'pointer', fontFamily: FONT,
+          }}
+          onClick={onClose}
+        >Cancel</button>
+      </div>
+    </div>
+  );
+};
+
 // ── Price chip ────────────────────────────────────────────────────────────────
 const PriceChip = ({ price, canAfford, accentColor }) => (
   <div style={{
@@ -130,7 +249,7 @@ const PriceChip = ({ price, canAfford, accentColor }) => (
 );
 
 // ── Generic item card ─────────────────────────────────────────────────────────
-const ItemCard = ({ item, owned, equipped, pp, onBuy, onEquip }) => {
+const ItemCard = ({ item, owned, equipped, pp, onPreview, onEquip }) => {
   const accentColor = item.type === 'skin' ? (item.glow || '#00ff88')
     : item.type === 'hat' ? '#6366f1'
     : item.type === 'scheme' ? '#f59e0b'
@@ -140,7 +259,7 @@ const ItemCard = ({ item, owned, equipped, pp, onBuy, onEquip }) => {
 
   const handleClick = () => {
     if (owned) onEquip();
-    else if (canAfford) onBuy();
+    else onPreview();
   };
 
   return (
@@ -152,7 +271,7 @@ const ItemCard = ({ item, owned, equipped, pp, onBuy, onEquip }) => {
         background: equipped ? `${accentColor}12` : owned ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.02)',
         border: equipped ? `1.5px solid ${accentColor}55` : owned ? '1px solid rgba(120,160,255,0.18)' : '1px solid rgba(120,160,255,0.07)',
         borderRadius: '12px',
-        cursor: owned ? 'pointer' : canAfford ? 'pointer' : 'default',
+        cursor: 'pointer',
         position: 'relative',
         opacity: locked && !canAfford ? 0.45 : 1,
         transition: 'all 0.15s ease',
@@ -256,6 +375,7 @@ const ParityStoreScreen = ({ onClose }) => {
   })));
 
   const [toast, setToast] = useState(null);
+  const [previewItem, setPreviewItem] = useState(null);
 
   const showToast = (msg, color = '#00ff88') => {
     setToast({ msg, color });
@@ -317,7 +437,7 @@ const ParityStoreScreen = ({ onClose }) => {
             owned={owned}
             equipped={isEquipped(item)}
             pp={parityPoints}
-            onBuy={() => handleBuy(item)}
+            onPreview={() => setPreviewItem(item)}
             onEquip={() => { equip(item); showToast(`${item.label} applied`); }}
           />
         );
@@ -428,6 +548,25 @@ const ParityStoreScreen = ({ onClose }) => {
         }}>
           {toast.msg}
         </div>
+      )}
+
+      {/* Preview / purchase confirmation modal */}
+      {previewItem && (
+        <PreviewModal
+          item={previewItem}
+          owned={ownedItems.includes(previewItem.id)}
+          pp={parityPoints}
+          onClose={() => setPreviewItem(null)}
+          onBuy={() => {
+            handleBuy(previewItem);
+            setPreviewItem(null);
+          }}
+          onEquip={() => {
+            equip(previewItem);
+            showToast(`${previewItem.label} applied`);
+            setPreviewItem(null);
+          }}
+        />
       )}
     </div>
   );

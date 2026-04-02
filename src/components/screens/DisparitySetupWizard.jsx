@@ -4,6 +4,7 @@ import { CLASSIC_STYLE_KEYS, ANTIPODAL_STYLE_KEYS, LIVING_STYLE_KEYS } from '../
 import { BACKGROUNDS, getBackgroundUrl } from '../../utils/backgrounds.js';
 import { registerTilePreview, updateTilePreview, unregisterTilePreview } from '../../3d/TilePreviewRenderer.js';
 import { isMobile } from '../../utils/device.js';
+import { useGameStore } from '../../hooks/useGameStore.js';
 
 const BG_PREVIEWS = {
   blackhole: 'radial-gradient(circle, #1a0033 0%, #000000 100%)',
@@ -238,6 +239,10 @@ function Checkmark() {
 }
 
 const DisparitySetupWizard = ({ onStart, onCancel }) => {
+  const ownedItems = useGameStore(s => s.ownedItems);
+  const schemeOwned = (key) => key === 'custom' || ownedItems.includes(`scheme_${key}`);
+  const tileOwned = (key) => ownedItems.includes(`tile_${key}`);
+
   const [step, setStep] = useState(0);
   const [cubeSize, setCubeSize] = useState(3);
   const [settings, setSettings] = useState({
@@ -350,12 +355,18 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '7px', paddingBottom: '8px' }}>
           {WIZARD_SCHEME_KEYS.filter(k => k !== 'custom').map(key => {
             const selected = settings.colorScheme === key;
+            const owned = schemeOwned(key);
             const colors = Object.values(COLOR_SCHEMES[key] || {}).slice(0, 6).sort((a, b) => hexLum(b) - hexLum(a));
             return (
-              <button key={key} style={{ ...S.card(selected), flexDirection: 'column', gap: '6px', padding: '10px 12px' }} onClick={() => select('colorScheme', key)}>
-                <span style={{ fontSize: '12px', fontWeight: selected ? '600' : '400', color: selected ? '#0a0a0a' : 'rgba(0,0,0,0.6)', lineHeight: 1.2 }}>{SCHEME_LABELS[key]}</span>
+              <button key={key} style={{
+                ...S.card(selected), flexDirection: 'column', gap: '6px', padding: '10px 12px',
+                ...(owned ? {} : { opacity: 0.42, cursor: 'not-allowed', pointerEvents: 'none' }),
+              }} onClick={() => owned && select('colorScheme', key)}>
+                <span style={{ fontSize: '12px', fontWeight: selected ? '600' : '400', color: selected ? '#0a0a0a' : 'rgba(0,0,0,0.6)', lineHeight: 1.2 }}>
+                  {SCHEME_LABELS[key]}{!owned ? ' 🔒' : ''}
+                </span>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '3px', width: '100%' }}>
-                  {colors.map((c, i) => <div key={i} style={{ width: '100%', aspectRatio: '1', borderRadius: '50%', background: c, boxShadow: '0 1px 2px rgba(0,0,0,0.18)' }} />)}
+                  {colors.map((c, i) => <div key={i} style={{ width: '100%', aspectRatio: '1', borderRadius: '50%', background: owned ? c : '#bbb', boxShadow: '0 1px 2px rgba(0,0,0,0.18)' }} />)}
                 </div>
                 {selected && <div style={{ position: 'absolute', top: '8px', right: '8px' }}><Checkmark /></div>}
               </button>
@@ -387,10 +398,23 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '7px' }}>
           {keys.map(key => {
             const sel = globalStyle === key;
+            const owned = tileOwned(key);
             return (
-              <button key={key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', padding: '10px 6px 8px', borderRadius: '12px', border: sel ? '2px solid #0a0a0a' : '2px solid transparent', background: sel ? 'rgba(0,0,0,0.05)' : 'rgba(0,0,0,0.025)', cursor: 'pointer', outline: 'none', WebkitTapHighlightColor: 'transparent', transition: 'all 0.15s ease', fontFamily: 'inherit' }} onClick={() => applyGlobal(key)}>
-                <TilePreviewCanvas styleKey={key} colorHex={Object.values(resolvedColors)[0] || '#4a7fa5'} size={48} />
-                <span style={{ fontSize: '10px', fontWeight: sel ? '600' : '400', color: sel ? '#0a0a0a' : 'rgba(0,0,0,0.5)', textAlign: 'center', lineHeight: 1.2 }}>{TILE_STYLES[key]?.label || key}</span>
+              <button key={key} style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
+                padding: '10px 6px 8px', borderRadius: '12px',
+                border: sel ? '2px solid #0a0a0a' : '2px solid transparent',
+                background: sel ? 'rgba(0,0,0,0.05)' : 'rgba(0,0,0,0.025)',
+                cursor: owned ? 'pointer' : 'not-allowed', outline: 'none',
+                WebkitTapHighlightColor: 'transparent', transition: 'all 0.15s ease',
+                fontFamily: 'inherit', opacity: owned ? 1 : 0.42,
+              }} onClick={() => owned && applyGlobal(key)}>
+                <div style={{ opacity: owned ? 1 : 0.5 }}>
+                  <TilePreviewCanvas styleKey={key} colorHex={Object.values(resolvedColors)[0] || '#4a7fa5'} size={48} />
+                </div>
+                <span style={{ fontSize: '10px', fontWeight: sel ? '600' : '400', color: sel ? '#0a0a0a' : 'rgba(0,0,0,0.5)', textAlign: 'center', lineHeight: 1.2 }}>
+                  {TILE_STYLES[key]?.label || key}{!owned ? ' 🔒' : ''}
+                </span>
               </button>
             );
           })}
@@ -420,7 +444,9 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
             {[1, 2, 3, 4, 5, 6].map(faceId => {
               const globalFallback = settings.tileStyle === 'random' ? 'solid' : (settings.tileStyle || 'solid');
-              const faceStyle = perFace?.[faceId] || globalFallback;
+              const rawStyle = perFace?.[faceId] || globalFallback;
+              // If the saved style is no longer owned, fall back to solid
+              const faceStyle = tileOwned(rawStyle) ? rawStyle : 'solid';
               const faceColor = resolvedColors[faceId] || '#4a7fa5';
               return (
                 <div key={faceId} style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '10px', borderRadius: '12px', background: 'rgba(0,0,0,0.025)', border: `2px solid ${faceColor}44` }}>
@@ -430,9 +456,9 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
                   </div>
                   <TilePreviewCanvas styleKey={faceStyle === 'random' ? 'solid' : faceStyle} colorHex={faceColor} size={36} />
                   <select value={faceStyle} onChange={e => applyPerFace(faceId, e.target.value)} style={{ fontSize: '10px', padding: '4px 6px', borderRadius: '6px', border: '1px solid rgba(0,0,0,0.15)', background: '#fff', color: '#0a0a0a', fontFamily: 'inherit', cursor: 'pointer', appearance: 'none', WebkitAppearance: 'none' }}>
-                    <optgroup label="Classic">{CLASSIC_STYLE_KEYS.map(k => <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>)}</optgroup>
-                    <optgroup label="Antipodal Op Art">{ANTIPODAL_STYLE_KEYS.map(k => <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>)}</optgroup>
-                    <optgroup label="Living">{LIVING_STYLE_KEYS.map(k => <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>)}</optgroup>
+                    <optgroup label="Classic">{CLASSIC_STYLE_KEYS.filter(tileOwned).map(k => <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>)}</optgroup>
+                    <optgroup label="Antipodal Op Art">{ANTIPODAL_STYLE_KEYS.filter(tileOwned).map(k => <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>)}</optgroup>
+                    <optgroup label="Living">{LIVING_STYLE_KEYS.filter(tileOwned).map(k => <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>)}</optgroup>
                   </select>
                 </div>
               );
