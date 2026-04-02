@@ -154,6 +154,7 @@ const IntroScene = ({ time, onComplete }) => {
       cubeGroupRef.current.rotation.set(cubeRotRef.current.x, cubeRotRef.current.y, 0);
 
       // "Cube awakening": soft scale-up + rise settle in the opening beat.
+      // During explosion hold: subtle breathing pulse.
       if (t < AWAKEN_END) {
         const p = smoothstep(progress(t, 0, AWAKEN_END));
         const targetScale = 0.9 + p * 0.1 + (1 - p) * Math.sin(t * 10) * 0.01;
@@ -163,6 +164,10 @@ const IntroScene = ({ time, onComplete }) => {
         cubeGroupRef.current.scale.y += (targetScale - cubeGroupRef.current.scale.y) * awakenLerp;
         cubeGroupRef.current.scale.z += (targetScale - cubeGroupRef.current.scale.z) * awakenLerp;
         cubeGroupRef.current.position.y += (targetY - cubeGroupRef.current.position.y) * awakenLerp;
+      } else if (t >= EXPLOSION_END && t < IMPLODE_START) {
+        cubeGroupRef.current.scale.setScalar(1 + Math.sin(t * 2.8) * 0.025);
+        const settleLerp = 1 - Math.exp(-Math.max(0, delta) * 10);
+        cubeGroupRef.current.position.y += (0 - cubeGroupRef.current.position.y) * settleLerp;
       } else {
         const settleLerp = 1 - Math.exp(-Math.max(0, delta) * 10);
         cubeGroupRef.current.scale.x += (1 - cubeGroupRef.current.scale.x) * settleLerp;
@@ -170,11 +175,6 @@ const IntroScene = ({ time, onComplete }) => {
         cubeGroupRef.current.scale.z += (1 - cubeGroupRef.current.scale.z) * settleLerp;
         cubeGroupRef.current.position.y += (0 - cubeGroupRef.current.position.y) * settleLerp;
       }
-
-      const rotLerp = 1 - Math.exp(-Math.max(0, delta) * 10);
-      cubeRotRef.current.y += (targetRotY - cubeRotRef.current.y) * rotLerp;
-      cubeRotRef.current.x += (targetRotX - cubeRotRef.current.x) * rotLerp;
-      cubeGroupRef.current.rotation.set(cubeRotRef.current.x, cubeRotRef.current.y, 0);
     }
 
     // Camera choreography
@@ -199,7 +199,9 @@ const IntroScene = ({ time, onComplete }) => {
     } else if (t < IMPLODE_START) {
       radius = 22;
       camY   = 7;
-      angle  = 0.3 + (t - 1.0) * 0.08;
+      // Faster orbit during explosion showcase; keep continuity from previous phase
+      const angleAtHoldStart = 0.3 + (EXPLOSION_START + 1.5 - 1.0) * 0.04;
+      angle  = angleAtHoldStart + (t - (EXPLOSION_START + 1.5)) * 0.16;
     } else {
       const p = ease((t - IMPLODE_START) / (IMPLODE_END - IMPLODE_START));
       radius = 22 - p * 10;
@@ -360,6 +362,8 @@ const IntroScene = ({ time, onComplete }) => {
             topoPos[2] * (1 + ef * 1.8),
           ];
 
+          const blastColor = ef > 0.05 ? '#3b82f6' : undefined;
+
           return (
             <group
               key={it.key}
@@ -376,6 +380,7 @@ const IntroScene = ({ time, onComplete }) => {
                 cubieFlips={cubieFlips}
                 antipodalSwaps={antipodalSwaps}
                 faceReveal={faceReveal}
+                overrideColor={blastColor}
               />
             </group>
           );

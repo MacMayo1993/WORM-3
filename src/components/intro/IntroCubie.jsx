@@ -38,6 +38,7 @@ const IntroCubie = React.forwardRef(({
   cubieFlips = {},
   antipodalSwaps = {},
   faceReveal = FULL_REVEAL,   // default = fully revealed, never black
+  overrideColor,              // when set, all faces render this color (e.g. blue during explosion)
 }, ref) => {
   const limit = (size - 1) / 2;
   // In IntroScene, cubies are wrapped in a parent <group position={...}> and this
@@ -59,6 +60,7 @@ const IntroCubie = React.forwardRef(({
   const antipodalMap = { PZ: 'NZ', NZ: 'PZ', PX: 'NX', NX: 'PX', PY: 'NY', NY: 'PY' };
 
   const getDisplayColor = (face) => {
+    if (overrideColor) return overrideColor;
     if (antipodalSwaps[face]) {
       return FACE_COLORS[colorMap[antipodalMap[face]]];
     }
