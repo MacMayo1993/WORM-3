@@ -63,8 +63,34 @@ const IntroScene = ({ time, onComplete }) => {
   const [showBurst,    setShowBurst]    = useState({});
   const [burstTimes,   setBurstTimes]   = useState({});
 
-  // ── Face reveal intensities — all faces fully visible from the start ────────
-  const getFaceReveal = (_faceKey) => 1.0;
+  // ── Face reveal intensities ──────────────────────────────────────────────────
+  // Requested behavior:
+  // 1) Start as an all-black cube.
+  // 2) Introduce color during explosion.
+  // 3) Return to all-black when the cube reassembles.
+  const getFaceReveal = (faceKey) => {
+    // Keep the full cube black until explosion begins.
+    if (time < EXPLOSION_START) return 0;
+
+    // During explosion, reveal antipodal axis pairs in sequence so each step is legible.
+    // z-axis pair first (blue/green), then x-axis (red/orange), then y-axis (white/yellow).
+    if (time < EXPLOSION_END) {
+      const axisSlots = {
+        PZ: [0.00, 0.33], NZ: [0.00, 0.33],
+        PX: [0.20, 0.66], NX: [0.20, 0.66],
+        PY: [0.40, 1.00], NY: [0.40, 1.00],
+      };
+      const [startN, endN] = axisSlots[faceKey] || [0, 1];
+      const blastN = progress(time, EXPLOSION_START, EXPLOSION_END);
+      return smoothstep(progress(blastN, startN, endN));
+    }
+
+    // Hold fully colored while exploded.
+    if (time < IMPLODE_START) return 1;
+
+    // Fade all faces back to black as we implode.
+    return 1 - smoothstep(progress(time, IMPLODE_START, IMPLODE_END));
+  };
 
   // ── Center tile flip (no hint tilt, just the full 180° flip) ───────────────
   const getCenterTileFlip = () => {
