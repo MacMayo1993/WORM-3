@@ -8,18 +8,12 @@ import { FACE_COLORS } from '../../utils/constants.js';
 import { play, vibrate } from '../../utils/audio.js';
 import { updateSharedTime } from '../../3d/styles/TileStyleMaterials.jsx';
 import {
-  BLUE_REVEAL_START, BLUE_REVEAL_END,
-  HINT_TILT_START, HINT_TILT_END,
-  GREEN_SHOW_START, GREEN_SHOW_END,
   FULL_FLIP_START, FULL_FLIP_END,
   TUNNEL_FORM_START,
   EXPLOSION_START, EXPLOSION_END,
   WORM_START,
   IMPLODE_START, IMPLODE_END,
 } from './introTiming.js';
-
-// ─── Tile style assignment ─────────────────────────────────────────────────────
-const STYLE_SEQUENCE = ['lava', 'circuit', 'holographic', 'galaxy', 'neural', 'pulse'];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const ease = t => t < 0.5 ? 4 * t ** 3 : 1 - Math.pow(-2 * t + 2, 3) / 2;
@@ -69,37 +63,18 @@ const IntroScene = ({ time, onComplete }) => {
   const [showBurst,    setShowBurst]    = useState({});
   const [burstTimes,   setBurstTimes]   = useState({});
 
-  // ── Face reveal intensities ─────────────────────────────────────────────────
-  const getFaceReveal = (faceKey) => {
-    if (time >= EXPLOSION_START) return 1.0;
-    if (faceKey === 'PX') return ease(progress(time, BLUE_REVEAL_START, BLUE_REVEAL_END));
-    if (faceKey === 'NX') return ease(progress(time, GREEN_SHOW_START, GREEN_SHOW_END));
-    return 0;
-  };
+  // ── Face reveal intensities — all faces fully visible from the start ────────
+  const getFaceReveal = (_faceKey) => 1.0;
 
-  // ── Center tile Rummikub flip ───────────────────────────────────────────────
+  // ── Center tile flip (no hint tilt, just the full 180° flip) ───────────────
   const getCenterTileFlip = () => {
-    const hintP = progress(time, HINT_TILT_START, HINT_TILT_END);
-    if (hintP > 0 && hintP < 1) {
-      return Math.sin(hintP * Math.PI) * (Math.PI / 6);
-    }
     const flipP = progress(time, FULL_FLIP_START, FULL_FLIP_END);
-    if (flipP > 0) {
-      return ease(clamp01(flipP)) * Math.PI;
-    }
+    if (flipP > 0) return ease(clamp01(flipP)) * Math.PI;
     return 0;
   };
 
-  // ── Dynamic faceStyles ──────────────────────────────────────────────────────
-  const faceStyles = useMemo(() => {
-    // During and after explosion: clean solid Rubik's colors, no shader overlays
-    if (time >= EXPLOSION_START) return {};
-    return {
-      PX: 'holographic',
-      NX: 'circuit',
-      PZ: 'lava', NZ: 'galaxy', PY: 'neural', NY: 'pulse',
-    };
-  }, [time]);
+  // ── No shader styles — clean solid Rubik's colors throughout ───────────────
+  const faceStyles = {};
 
   // ── Explosion factor ────────────────────────────────────────────────────────
   let explosionFactor = 0;

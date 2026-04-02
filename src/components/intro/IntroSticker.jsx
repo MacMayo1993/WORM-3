@@ -27,15 +27,12 @@ function getCachedMat(styleKey, colorHex) {
  * inner mesh = flip rotation around local X (which is the tile's width axis).
  *
  * flipRotation — radians, 0 = flat, PI = fully flipped (shows back)
- * glowIntensity — 0-1, extra emissive punch for the "reveal" moment
  */
-const IntroSticker = ({ pos, rot, color, styleKey, isBack = false, flipRotation = 0, glowIntensity = 0 }) => {
+const IntroSticker = ({ pos, rot, color, styleKey, flipRotation = 0 }) => {
   const shaderMat = useMemo(() => {
-    if (!styleKey || isBack) return null;
+    if (!styleKey) return null;
     return getCachedMat(styleKey, color);
-  }, [styleKey, color, isBack]);
-
-  const emissiveBoost = isBack ? 0.2 : (1.5 + glowIntensity * 3.0);
+  }, [styleKey, color]);
 
   return (
     // Outer group positions the sticker on the face and orients it to face outward
@@ -51,30 +48,25 @@ const IntroSticker = ({ pos, rot, color, styleKey, isBack = false, flipRotation 
           ) : (
             <meshStandardMaterial
               color={color}
-              roughness={isBack ? 0.5 : 0.05}
-              metalness={isBack ? 0.0 : 0.6}
-              side={THREE.DoubleSide}
+              roughness={0.35}
+              metalness={0.0}
+              side={THREE.FrontSide}
               emissive={color}
-              emissiveIntensity={emissiveBoost}
-              transparent={isBack}
-              opacity={isBack ? 0.7 : 1}
-              toneMapped={false}
+              emissiveIntensity={0.25}
             />
           )}
         </mesh>
-        {/* Subtle border frame for non-back tiles */}
-        {!isBack && (
-          <mesh renderOrder={0} position={[0, 0, -0.001]}>
-            <planeGeometry args={[0.96, 0.96]} />
-            <meshStandardMaterial
-              color="#111111"
-              roughness={0.9}
-              metalness={0.0}
-              transparent
-              opacity={0.6}
-            />
-          </mesh>
-        )}
+        {/* Subtle border frame */}
+        <mesh renderOrder={0} position={[0, 0, -0.001]}>
+          <planeGeometry args={[0.96, 0.96]} />
+          <meshStandardMaterial
+            color="#111111"
+            roughness={0.9}
+            metalness={0.0}
+            transparent
+            opacity={0.6}
+          />
+        </mesh>
       </group>
     </group>
   );
