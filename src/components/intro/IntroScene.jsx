@@ -25,6 +25,8 @@ const STYLE_SEQUENCE = ['lava', 'circuit', 'holographic', 'galaxy', 'neural', 'p
 const ease = t => t < 0.5 ? 4 * t ** 3 : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const clamp01 = t => Math.max(0, Math.min(1, t));
 const progress = (t, start, end) => clamp01((t - start) / (end - start));
+const smoothstep = t => t * t * (3 - 2 * t);
+const AWAKEN_END = 1.2;
 
 const getStickerWorldPos = (x, y, z, dirKey, size, ef = 0) => {
   const k = (size - 1) / 2;
@@ -48,6 +50,8 @@ const IntroScene = ({ time, onComplete }) => {
   const { camera }   = useThree();
   const size = 3;
   const completedRef = useRef(false);
+  const cameraStateRef = useRef({ x: 0, y: 0, z: 9 });
+  const cubeRotRef = useRef({ x: 0, y: 0 });
 
   // ── KEY FIX: keep a ref to time so useFrame always sees the latest value ──
   // useFrame callbacks capture variables at registration time (stale closure).
@@ -123,22 +127,48 @@ const IntroScene = ({ time, onComplete }) => {
   }
 
   // ── useFrame: reads timeRef.current (always fresh) ─────────────────────────
-  useFrame(({ clock }) => {
+  useFrame(({ clock }, delta) => {
     updateSharedTime(clock.getElapsedTime());
 
     const t = timeRef.current; // ← always the current prop value, never stale
 
     if (cubeGroupRef.current) {
+      let targetRotY = 0;
+      let targetRotX = 0;
       if (t < FULL_FLIP_START) {
         const baseRot = t * 0.28;
-        cubeGroupRef.current.rotation.y = baseRot;
-        cubeGroupRef.current.rotation.x = Math.sin(t * 0.15) * 0.12;
+        targetRotY = baseRot;
+        targetRotX = Math.sin(t * 0.15) * 0.12;
       } else if (t < EXPLOSION_START) {
-        cubeGroupRef.current.rotation.y =
-          FULL_FLIP_START * 0.28 + Math.sin((t - FULL_FLIP_START) * 0.5) * 0.05;
-        cubeGroupRef.current.rotation.x = Math.sin(t * 0.15) * 0.08;
+        // Gently settle instead of abruptly switching to the pre-explosion pose.
+        const settle = smoothstep(progress(t, FULL_FLIP_START, EXPLOSION_START));
+        const preY = FULL_FLIP_START * 0.28 + Math.sin((t - FULL_FLIP_START) * 0.5) * 0.05;
+        const preX = Math.sin(t * 0.15) * 0.08;
+        targetRotY = preY * (1 - settle);
+        targetRotX = preX * (1 - settle);
+      }
+
+      const rotLerp = 1 - Math.exp(-Math.max(0, delta) * 10);
+      cubeRotRef.current.y += (targetRotY - cubeRotRef.current.y) * rotLerp;
+      cubeRotRef.current.x += (targetRotX - cubeRotRef.current.x) * rotLerp;
+      cubeGroupRef.current.rotation.set(cubeRotRef.current.x, cubeRotRef.current.y, 0);
+
+      // "Cube awakening": soft scale-up + rise settle in the opening beat.
+      if (t < AWAKEN_END) {
+        const p = smoothstep(progress(t, 0, AWAKEN_END));
+        const targetScale = 0.9 + p * 0.1 + (1 - p) * Math.sin(t * 10) * 0.01;
+        const targetY = (1 - p) * -0.35;
+        const awakenLerp = 1 - Math.exp(-Math.max(0, delta) * 8);
+        cubeGroupRef.current.scale.x += (targetScale - cubeGroupRef.current.scale.x) * awakenLerp;
+        cubeGroupRef.current.scale.y += (targetScale - cubeGroupRef.current.scale.y) * awakenLerp;
+        cubeGroupRef.current.scale.z += (targetScale - cubeGroupRef.current.scale.z) * awakenLerp;
+        cubeGroupRef.current.position.y += (targetY - cubeGroupRef.current.position.y) * awakenLerp;
       } else {
-        cubeGroupRef.current.rotation.set(0, 0, 0);
+        const settleLerp = 1 - Math.exp(-Math.max(0, delta) * 10);
+        cubeGroupRef.current.scale.x += (1 - cubeGroupRef.current.scale.x) * settleLerp;
+        cubeGroupRef.current.scale.y += (1 - cubeGroupRef.current.scale.y) * settleLerp;
+        cubeGroupRef.current.scale.z += (1 - cubeGroupRef.current.scale.z) * settleLerp;
+        cubeGroupRef.current.position.y += (0 - cubeGroupRef.current.position.y) * settleLerp;
       }
     }
 
@@ -172,9 +202,18 @@ const IntroScene = ({ time, onComplete }) => {
       angle  = 0.3 + (t - 1.0) * 0.08;
     }
 
-    camera.position.x = Math.sin(angle) * radius;
-    camera.position.z = Math.cos(angle) * radius;
-    camera.position.y = camY;
+    const targetX = Math.sin(angle) * radius;
+    const targetZ = Math.cos(angle) * radius;
+    const targetY = camY;
+    const camLerp = 1 - Math.exp(-Math.max(0, delta) * 6);
+
+    cameraStateRef.current.x += (targetX - cameraStateRef.current.x) * camLerp;
+    cameraStateRef.current.y += (targetY - cameraStateRef.current.y) * camLerp;
+    cameraStateRef.current.z += (targetZ - cameraStateRef.current.z) * camLerp;
+
+    camera.position.x = cameraStateRef.current.x;
+    camera.position.z = cameraStateRef.current.z;
+    camera.position.y = cameraStateRef.current.y;
     camera.lookAt(0, 0, 0);
   });
 
@@ -325,6 +364,7 @@ const IntroScene = ({ time, onComplete }) => {
               <IntroCubie
                 ref={el => (cubieRefs.current[idx] = el)}
                 position={[0, 0, 0]}
+                gridPos={[gx, gy, gz]}
                 size={size}
                 explosionFactor={ef}
                 faceStyles={faceStyles}
