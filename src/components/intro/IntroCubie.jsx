@@ -38,7 +38,6 @@ const IntroCubie = React.forwardRef(({
   cubieFlips = {},
   antipodalSwaps = {},
   faceReveal = FULL_REVEAL,   // default = fully revealed, never black
-  overrideColor,              // when set, all faces render this color (e.g. blue during explosion)
 }, ref) => {
   const limit = (size - 1) / 2;
   // In IntroScene, cubies are wrapped in a parent <group position={...}> and this
@@ -46,8 +45,6 @@ const IntroCubie = React.forwardRef(({
   const x = gridPos ? gridPos[0] : Math.round(position[0] / (1 + explosionFactor * 1.8) + limit);
   const y = gridPos ? gridPos[1] : Math.round(position[1] / (1 + explosionFactor * 1.8) + limit);
   const z = gridPos ? gridPos[2] : Math.round(position[2] / (1 + explosionFactor * 1.8) + limit);
-
-  const showAllFaces = explosionFactor > 0.1;
 
   const isOuterPZ = z === size - 1;
   const isOuterNZ = z === 0;
@@ -60,7 +57,6 @@ const IntroCubie = React.forwardRef(({
   const antipodalMap = { PZ: 'NZ', NZ: 'PZ', PX: 'NX', NX: 'PX', PY: 'NY', NY: 'PY' };
 
   const getDisplayColor = (face) => {
-    if (overrideColor) return overrideColor;
     if (antipodalSwaps[face]) {
       return FACE_COLORS[colorMap[antipodalMap[face]]];
     }
@@ -105,17 +101,16 @@ const IntroCubie = React.forwardRef(({
       </RoundedBox>
 
       {FACE_DEFS.map(({ key, outer, pos, rot }) => {
-        if (!showAllFaces && !outer) return null;
+        if (!outer) return null;
         return (
           <IntroSticker
             key={key}
             pos={pos}
             rot={rot}
             color={getDisplayColor(key)}
-            styleKey={outer ? getDisplayStyle(key) : undefined}
-            isBack={!outer && showAllFaces}
+            styleKey={getDisplayStyle(key)}
             flipRotation={cubieFlips[key] || 0}
-            glowIntensity={outer ? getGlow(key) : 0}
+            glowIntensity={getGlow(key)}
           />
         );
       })}
