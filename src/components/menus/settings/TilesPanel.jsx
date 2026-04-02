@@ -1,6 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { COLOR_SCHEMES, TILE_STYLES } from '../../../utils/colorSchemes.js';
 import { CLASSIC_STYLE_KEYS, ANTIPODAL_STYLE_KEYS, LIVING_STYLE_KEYS } from '../../../utils/tileStyleCatalog.js';
+import { useGameStore } from '../../../hooks/useGameStore.js';
 import {
   registerTilePreview,
   updateTilePreview,
@@ -42,7 +43,7 @@ function TilePreviewCanvas({ styleKey, colorHex = '#4a7fa5', size = 48, classNam
   );
 }
 
-function StyleGrid({ keys, label, globalStyle, onApply }) {
+function StyleGrid({ keys, label, globalStyle, onApply, tileOwned }) {
   return (
     <section className="settings-section">
       <h3 className="settings-section-title">{label}</h3>
@@ -50,15 +51,17 @@ function StyleGrid({ keys, label, globalStyle, onApply }) {
         {keys.map(key => {
           const style = TILE_STYLES[key];
           if (!style) return null;
+          const owned = tileOwned(key);
           return (
             <button
               key={key}
-              className={`style-card${globalStyle === key ? ' selected' : ''}`}
-              onClick={() => onApply(key)}
-              title={`Apply ${style.label} to all faces`}
+              className={`style-card${globalStyle === key ? ' selected' : ''}${!owned ? ' locked' : ''}`}
+              onClick={() => owned && onApply(key)}
+              style={!owned ? { opacity: 0.4, cursor: 'not-allowed', position: 'relative' } : { position: 'relative' }}
+              title={!owned ? `Locked — buy in Parity Store` : `Apply ${style.label} to all faces`}
             >
               <TilePreviewCanvas styleKey={key} size={56} className="style-card-preview" />
-              <span className="style-card-label">{style.label}</span>
+              <span className="style-card-label">{style.label}{!owned ? ' 🔒' : ''}</span>
             </button>
           );
         })}
@@ -68,6 +71,9 @@ function StyleGrid({ keys, label, globalStyle, onApply }) {
 }
 
 export function TilesPanel({ settings, onSettingsChange }) {
+  const ownedItems = useGameStore(s => s.ownedItems);
+  const tileOwned = (key) => ownedItems.includes(`tile_${key}`);
+
   const resolvedColors = settings.colorScheme === 'custom' && settings.customColors
     ? { ...COLOR_SCHEMES.standard, ...settings.customColors }
     : COLOR_SCHEMES[settings.colorScheme] || COLOR_SCHEMES.standard;
@@ -92,9 +98,10 @@ export function TilesPanel({ settings, onSettingsChange }) {
     });
   };
 
-  // Pick 6 unique styles (no repeats) from the full pool and assign one per face
+  // Pick 6 unique styles (no repeats) from the owned pool and assign one per face
   const randomizeStyles = () => {
-    const pool = [...CLASSIC_STYLE_KEYS, ...ANTIPODAL_STYLE_KEYS, ...LIVING_STYLE_KEYS];
+    const pool = [...CLASSIC_STYLE_KEYS, ...ANTIPODAL_STYLE_KEYS, ...LIVING_STYLE_KEYS]
+      .filter(k => tileOwned(k));
     // Fisher-Yates shuffle then take first 6
     for (let i = pool.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -107,9 +114,9 @@ export function TilesPanel({ settings, onSettingsChange }) {
 
   return (
     <>
-      <StyleGrid keys={CLASSIC_STYLE_KEYS} label="Classic" globalStyle={globalStyle} onApply={applyToAll} />
-      <StyleGrid keys={ANTIPODAL_STYLE_KEYS} label="Antipodal Op Art" globalStyle={globalStyle} onApply={applyToAll} />
-      <StyleGrid keys={LIVING_STYLE_KEYS} label="Living" globalStyle={globalStyle} onApply={applyToAll} />
+      <StyleGrid keys={CLASSIC_STYLE_KEYS} label="Classic" globalStyle={globalStyle} onApply={applyToAll} tileOwned={tileOwned} />
+      <StyleGrid keys={ANTIPODAL_STYLE_KEYS} label="Antipodal Op Art" globalStyle={globalStyle} onApply={applyToAll} tileOwned={tileOwned} />
+      <StyleGrid keys={LIVING_STYLE_KEYS} label="Living" globalStyle={globalStyle} onApply={applyToAll} tileOwned={tileOwned} />
 
       {/* Randomize — assigns a unique style to each of the 6 faces */}
       <section className="settings-section">
@@ -143,17 +150,17 @@ export function TilesPanel({ settings, onSettingsChange }) {
                   onChange={e => applyToFace(faceId, e.target.value)}
                 >
                   <optgroup label="Classic">
-                    {CLASSIC_STYLE_KEYS.map(k => (
+                    {CLASSIC_STYLE_KEYS.filter(tileOwned).map(k => (
                       <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>
                     ))}
                   </optgroup>
                   <optgroup label="Antipodal Op Art">
-                    {ANTIPODAL_STYLE_KEYS.map(k => (
+                    {ANTIPODAL_STYLE_KEYS.filter(tileOwned).map(k => (
                       <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>
                     ))}
                   </optgroup>
                   <optgroup label="Living">
-                    {LIVING_STYLE_KEYS.map(k => (
+                    {LIVING_STYLE_KEYS.filter(tileOwned).map(k => (
                       <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>
                     ))}
                   </optgroup>

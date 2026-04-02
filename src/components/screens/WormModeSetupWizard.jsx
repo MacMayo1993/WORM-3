@@ -523,17 +523,26 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
         {/* Palette grid — name above dots, 4 columns, matching in-game settings */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '7px', paddingBottom: '8px' }}>
           {WIZARD_SCHEME_KEYS.filter(k => k !== 'custom').map(key => {
+            const owned = ownedItems.includes(`scheme_${key}`);
             const selected = settings.colorScheme === key;
             const colors = Object.values(COLOR_SCHEMES[key] || {}).slice(0, 6).sort((a, b) => hexLum(b) - hexLum(a));
             return (
-              <button key={key} style={{ ...S.card(selected), flexDirection: 'column', gap: '5px', padding: '8px 6px' }}
-                onClick={() => select('colorScheme', key)}>
+              <button key={key}
+                style={{
+                  ...S.card(selected),
+                  flexDirection: 'column', gap: '5px', padding: '8px 6px',
+                  opacity: owned ? 1 : 0.38,
+                  cursor: owned ? 'pointer' : 'not-allowed',
+                  position: 'relative',
+                }}
+                onClick={() => owned && select('colorScheme', key)}>
+                {!owned && <span style={{ position: 'absolute', top: 3, right: 4, fontSize: '8px' }}>🔒</span>}
                 <span style={{ fontSize: '10px', fontWeight: selected ? '600' : '400', color: selected ? '#0a0a0a' : 'rgba(0,0,0,0.6)', lineHeight: 1.2, textAlign: 'center' }}>
                   {SCHEME_LABELS[key]}
                 </span>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '3px', width: '100%' }}>
                   {colors.map((c, i) => (
-                    <div key={i} style={{ width: '100%', aspectRatio: '1', borderRadius: '50%', background: c, boxShadow: '0 1px 2px rgba(0,0,0,0.18)' }} />
+                    <div key={i} style={{ width: '100%', aspectRatio: '1', borderRadius: '50%', background: owned ? c : '#aaa', boxShadow: '0 1px 2px rgba(0,0,0,0.18)' }} />
                   ))}
                 </div>
                 {selected && (
@@ -580,6 +589,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '7px' }}>
           {keys.map(key => {
+            const owned = ownedItems.includes(`tile_${key}`);
             const sel = globalStyle === key;
             return (
               <button key={key} style={{
@@ -587,9 +597,13 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                 padding: '10px 6px 8px', borderRadius: '12px',
                 border: sel ? '2px solid #0a0a0a' : '2px solid transparent',
                 background: sel ? 'rgba(0,0,0,0.05)' : 'rgba(0,0,0,0.025)',
-                cursor: 'pointer', outline: 'none', WebkitTapHighlightColor: 'transparent',
+                cursor: owned ? 'pointer' : 'not-allowed',
+                opacity: owned ? 1 : 0.38,
+                outline: 'none', WebkitTapHighlightColor: 'transparent',
                 transition: 'all 0.15s ease', fontFamily: 'inherit',
-              }} onClick={() => applyGlobal(key)}>
+                position: 'relative',
+              }} onClick={() => owned && applyGlobal(key)}>
+                {!owned && <span style={{ position: 'absolute', top: 3, right: 4, fontSize: '8px' }}>🔒</span>}
                 <TilePreviewCanvas styleKey={key} colorHex={Object.values(resolvedColors)[0] || '#4a7fa5'} size={48} />
                 <span style={{ fontSize: '10px', fontWeight: sel ? '600' : '400', color: sel ? '#0a0a0a' : 'rgba(0,0,0,0.5)', textAlign: 'center', lineHeight: 1.2 }}>
                   {TILE_STYLES[key]?.label || key}
@@ -656,13 +670,13 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                     }}
                   >
                     <optgroup label="Classic">
-                      {CLASSIC_STYLE_KEYS.map(k => <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>)}
+                      {CLASSIC_STYLE_KEYS.filter(k => ownedItems.includes(`tile_${k}`)).map(k => <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>)}
                     </optgroup>
                     <optgroup label="Antipodal Op Art">
-                      {ANTIPODAL_STYLE_KEYS.map(k => <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>)}
+                      {ANTIPODAL_STYLE_KEYS.filter(k => ownedItems.includes(`tile_${k}`)).map(k => <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>)}
                     </optgroup>
                     <optgroup label="Living">
-                      {LIVING_STYLE_KEYS.map(k => <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>)}
+                      {LIVING_STYLE_KEYS.filter(k => ownedItems.includes(`tile_${k}`)).map(k => <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>)}
                     </optgroup>
                   </select>
                 </div>
