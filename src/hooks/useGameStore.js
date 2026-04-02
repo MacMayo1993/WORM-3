@@ -48,14 +48,18 @@ const loadPersistedState = () => {
     const rawOwned = localStorage.getItem(OWNED_ITEMS_KEY);
     const ownedItems = rawOwned ? JSON.parse(rawOwned) : [...DEFAULT_OWNED];
 
+    // Guard: reset skin/hat to defaults if the saved value isn't owned
+    const safeSkin = ownedItems.includes(`skin_${wormSkin}`) ? wormSkin : 'slime';
+    const safeHat = ownedItems.includes(`hat_${wormHat}`) ? wormHat : 'none';
+
     return {
       settings: migrateSettings(parsedSettings, settingsVersion),
       introSeen,
       tutorialDone,
       hasFlippedOnce: firstFlipDone,
       mobileHintShown,
-      wormSkin,
-      wormHat,
+      wormSkin: safeSkin,
+      wormHat: safeHat,
       parityPoints,
       ownedItems,
     };

@@ -714,6 +714,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
   const wormHatId = useGameStore(s => s.wormHat ?? 'none');
   const setWormSkin = useGameStore(s => s.setWormSkin);
   const setWormHat = useGameStore(s => s.setWormHat);
+  const ownedItems = useGameStore(s => s.ownedItems);
   const activeSkin = WORM_SKINS.find(s => s.id === wormSkinId) ?? WORM_SKINS[0];
 
   const renderCharacter = () => {
@@ -829,11 +830,12 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
             {WORM_SKINS.map(skin => {
+              const owned = ownedItems.includes(`skin_${skin.id}`);
               const selected = skin.id === wormSkinId;
               return (
                 <button
                   key={skin.id}
-                  onClick={() => setWormSkin(skin.id)}
+                  onClick={() => owned && setWormSkin(skin.id)}
                   style={{
                     ...chipBase,
                     padding: '10px 6px 8px',
@@ -841,17 +843,26 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                     border: selected ? `2px solid ${skin.body}` : '2px solid transparent',
                     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
                     boxShadow: selected ? `0 0 10px ${skin.glow}55` : 'none',
+                    opacity: owned ? 1 : 0.4,
+                    cursor: owned ? 'pointer' : 'not-allowed',
+                    position: 'relative',
                   }}
                 >
                   <div style={{
                     width: '26px', height: '26px', borderRadius: '50%',
-                    background: skin.body,
-                    boxShadow: `0 0 8px ${skin.glow}88`,
+                    background: owned ? skin.body : '#888',
+                    boxShadow: owned ? `0 0 8px ${skin.glow}88` : 'none',
                   }} />
                   <span style={{
                     fontSize: '10px', fontWeight: 700, color: selected ? skin.body : 'rgba(0,0,0,0.5)',
                     letterSpacing: '0.08em',
                   }}>{skin.label}</span>
+                  {!owned && (
+                    <span style={{
+                      position: 'absolute', top: '4px', right: '4px',
+                      fontSize: '9px', lineHeight: 1,
+                    }}>🔒</span>
+                  )}
                 </button>
               );
             })}
@@ -865,11 +876,12 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           </div>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             {WORM_HATS.map(hat => {
+              const owned = ownedItems.includes(`hat_${hat.id}`);
               const selected = hat.id === wormHatId;
               return (
                 <button
                   key={hat.id}
-                  onClick={() => setWormHat(hat.id)}
+                  onClick={() => owned && setWormHat(hat.id)}
                   style={{
                     ...chipBase,
                     padding: '10px 16px',
@@ -878,12 +890,15 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     minWidth: '64px',
                     boxShadow: selected ? '0 0 10px rgba(168,85,247,0.3)' : 'none',
+                    opacity: owned ? 1 : 0.4,
+                    cursor: owned ? 'pointer' : 'not-allowed',
+                    position: 'relative',
                   }}
                 >
                   <span style={{
                     fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em',
                     color: selected ? '#7c3aed' : 'rgba(0,0,0,0.5)',
-                  }}>{hat.label}</span>
+                  }}>{hat.label}{!owned ? ' 🔒' : ''}</span>
                 </button>
               );
             })}
