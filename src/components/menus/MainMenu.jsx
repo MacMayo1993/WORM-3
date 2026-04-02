@@ -461,13 +461,6 @@ const ComingSoonDrawer = ({ visible }) => {
           color: pulse ? 'rgba(180,210,255,0.70)' : 'rgba(140,170,255,0.45)',
           transition: 'color 0.6s ease',
         }}>What&apos;s Coming</span>
-        <span style={{
-          fontSize: '9px',
-          color: 'rgba(140,170,255,0.50)',
-          display: 'inline-block',
-          transform: open ? 'rotate(180deg)' : 'none',
-          transition: 'transform 0.3s ease',
-        }}>▼</span>
       </button>
 
       {/* Cards panel */}
@@ -568,7 +561,7 @@ const StoreNavItem = ({ onStore }) => {
 // ─── Main component ───────────────────────────────────────────────────────────
 // onPlay / onHolonomy / onBiome / onMerge are kept as props for UILayer compatibility
 // but are no longer wired to buttons — those modes live in the Coming Soon drawer.
-const MainMenu = ({ onPlay: _onPlay, _onLevels, onFreeplay, _onCoop, onSettings, onBiome: _onBiome, onDisparity, onWormHealer, onHolonomy: _onHolonomy, onMerge: _onMerge, onStore }) => {
+const MainMenu = ({ onPlay: _onPlay, _onLevels, onFreeplay, _onCoop, onSettings: _onSettings, onBiome: _onBiome, onDisparity, onWormHealer, onHolonomy: _onHolonomy, onMerge: _onMerge, onStore }) => {
   const CLEAN = {
     panel: 'rgba(8,12,28,0.68)',
     panelStrong: 'rgba(10,14,32,0.80)',
@@ -596,21 +589,6 @@ const MainMenu = ({ onPlay: _onPlay, _onLevels, onFreeplay, _onCoop, onSettings,
       <ScreenGlow />
 
       <div style={{ position: 'relative', zIndex: 2, height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', pointerEvents: 'none' }}>
-
-        {/* Settings gear */}
-        <button onClick={onSettings} style={{
-          position: 'absolute', bottom: 'max(14px, env(safe-area-inset-bottom,14px))', right: '16px',
-          zIndex: 20, width: '36px', height: '36px', padding: 0,
-          background: CLEAN.panelStrong, border: `1px solid ${CLEAN.border}`,
-          borderRadius: '10px', cursor: 'pointer', color: CLEAN.textSubtle,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          transition: 'all 0.2s', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-          pointerEvents: 'all',
-          boxShadow: '0 2px 12px rgba(0,0,0,0.45), inset 0 1px 0 rgba(120,160,255,0.18)',
-        }}
-          onMouseEnter={e => { e.currentTarget.style.color = '#ffffff'; e.currentTarget.style.borderColor = 'rgba(120,160,255,0.5)'; e.currentTarget.style.boxShadow = '0 0 14px rgba(59,130,246,0.35), 0 2px 12px rgba(0,0,0,0.45), inset 0 1px 0 rgba(120,160,255,0.3)'; }}
-          onMouseLeave={e => { e.currentTarget.style.color = CLEAN.textSubtle; e.currentTarget.style.borderColor = CLEAN.border; e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,0.45), inset 0 1px 0 rgba(120,160,255,0.18)'; }}
-        ><GearIcon /></button>
 
         {/* Title */}
         <div style={{
