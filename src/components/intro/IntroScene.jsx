@@ -170,6 +170,11 @@ const IntroScene = ({ time, onComplete }) => {
         cubeGroupRef.current.scale.z += (1 - cubeGroupRef.current.scale.z) * settleLerp;
         cubeGroupRef.current.position.y += (0 - cubeGroupRef.current.position.y) * settleLerp;
       }
+
+      const rotLerp = 1 - Math.exp(-Math.max(0, delta) * 10);
+      cubeRotRef.current.y += (targetRotY - cubeRotRef.current.y) * rotLerp;
+      cubeRotRef.current.x += (targetRotX - cubeRotRef.current.x) * rotLerp;
+      cubeGroupRef.current.rotation.set(cubeRotRef.current.x, cubeRotRef.current.y, 0);
     }
 
     // Camera choreography
