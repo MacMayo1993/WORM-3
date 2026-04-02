@@ -74,10 +74,6 @@ const IntroCubie = React.forwardRef(({
     return faceStyles[face];
   };
 
-  const getGlow = (face) => {
-    return faceReveal[face] ?? 1;
-  };
-
   // Face definitions: [dirKey, outerFlag, pos, rot]
   const FACE_DEFS = [
     { key: 'PZ', outer: isOuterPZ, pos: [0, 0,  0.53], rot: [0, 0, 0] },
@@ -110,7 +106,6 @@ const IntroCubie = React.forwardRef(({
             color={getDisplayColor(key)}
             styleKey={getDisplayStyle(key)}
             flipRotation={cubieFlips[key] || 0}
-            glowIntensity={getGlow(key)}
           />
         );
       })}
