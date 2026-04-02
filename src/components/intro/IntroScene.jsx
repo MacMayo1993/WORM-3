@@ -92,22 +92,12 @@ const IntroScene = ({ time, onComplete }) => {
 
   // ── Dynamic faceStyles ──────────────────────────────────────────────────────
   const faceStyles = useMemo(() => {
-    if (time < EXPLOSION_START) {
-      return {
-        PX: 'holographic',
-        NX: 'circuit',
-        PZ: 'lava', NZ: 'galaxy', PY: 'neural', NY: 'pulse',
-      };
-    }
-    const cycleSpeed = 0.3;
-    const cycleIndex = Math.floor(time * cycleSpeed) % STYLE_SEQUENCE.length;
+    // During and after explosion: clean solid Rubik's colors, no shader overlays
+    if (time >= EXPLOSION_START) return {};
     return {
-      PZ: STYLE_SEQUENCE[(cycleIndex + 0) % STYLE_SEQUENCE.length],
-      NX: STYLE_SEQUENCE[(cycleIndex + 1) % STYLE_SEQUENCE.length],
-      PY: STYLE_SEQUENCE[(cycleIndex + 2) % STYLE_SEQUENCE.length],
-      NZ: STYLE_SEQUENCE[(cycleIndex + 3) % STYLE_SEQUENCE.length],
-      PX: STYLE_SEQUENCE[(cycleIndex + 4) % STYLE_SEQUENCE.length],
-      NY: STYLE_SEQUENCE[(cycleIndex + 5) % STYLE_SEQUENCE.length],
+      PX: 'holographic',
+      NX: 'circuit',
+      PZ: 'lava', NZ: 'galaxy', PY: 'neural', NY: 'pulse',
     };
   }, [time]);
 
@@ -362,8 +352,6 @@ const IntroScene = ({ time, onComplete }) => {
             topoPos[2] * (1 + ef * 1.8),
           ];
 
-          const blastColor = ef > 0.05 ? '#3b82f6' : undefined;
-
           return (
             <group
               key={it.key}
@@ -380,7 +368,6 @@ const IntroScene = ({ time, onComplete }) => {
                 cubieFlips={cubieFlips}
                 antipodalSwaps={antipodalSwaps}
                 faceReveal={faceReveal}
-                overrideColor={blastColor}
               />
             </group>
           );
