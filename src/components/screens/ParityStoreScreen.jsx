@@ -43,16 +43,38 @@ function TilePreviewCanvas({ styleKey, size = 40 }) {
   return <canvas ref={canvasRef} width={size} height={size} style={{ borderRadius: 6, display: 'block' }} />;
 }
 
-// ── Skin preview ──────────────────────────────────────────────────────────────
-const SkinSwatch = ({ skin, size = 48, locked }) => (
+// ── Full-body worm preview ─────────────────────────────────────────────────────
+// Diagonal layout: tail (bottom-left) → head (top-right), three body segments.
+const WormBody = ({ skin, size = 46 }) => (
   <svg width={size} height={size} viewBox="0 0 48 48">
-    <circle cx="24" cy="24" r="20" fill={locked ? '#444' : skin.glow} opacity="0.18" />
-    <circle cx="24" cy="24" r="16" fill={locked ? '#666' : skin.body} />
-    <ellipse cx="24" cy="27" rx="8" ry="6" fill={locked ? '#555' : skin.belly} opacity="0.7" />
-    <circle cx="20" cy="20" r="2.5" fill="white" opacity={locked ? 0.4 : 1} />
-    <circle cx="28" cy="20" r="2.5" fill="white" opacity={locked ? 0.4 : 1} />
-    <circle cx="21" cy="20" r="1.2" fill="#1a1a2e" />
-    <circle cx="29" cy="20" r="1.2" fill="#1a1a2e" />
+    {/* Soft glow behind head */}
+    <circle cx="35" cy="14" r="16" fill={skin.glow} opacity="0.22" />
+    {/* Smooth body spine connecting all segments */}
+    <path d="M 9 41 Q 18 32 27 24 Q 31 19 35 14"
+      stroke={skin.body} strokeWidth="10" strokeLinecap="round" fill="none" opacity="0.55" />
+    {/* Tail */}
+    <circle cx="9" cy="41" r="5" fill={skin.belly} opacity="0.8" />
+    {/* Body segment 1 */}
+    <circle cx="18" cy="33" r="7.5" fill={skin.body} />
+    <ellipse cx="18" cy="35.5" rx="4" ry="2.8" fill={skin.belly} opacity="0.55" />
+    {/* Body segment 2 */}
+    <circle cx="27" cy="24" r="9.5" fill={skin.body} />
+    <ellipse cx="27" cy="26.5" rx="5.5" ry="3.8" fill={skin.belly} opacity="0.55" />
+    {/* Head */}
+    <circle cx="35" cy="14" r="12" fill={skin.body} />
+    <ellipse cx="35" cy="17.5" rx="7.5" ry="5" fill={skin.belly} opacity="0.6" />
+    {/* Eyes — white sclera */}
+    <circle cx="30.5" cy="10" r="3.1" fill="white" opacity="0.95" />
+    <circle cx="39" cy="9" r="3.1" fill="white" opacity="0.95" />
+    {/* Pupils — offset slightly toward travel direction */}
+    <circle cx="31.5" cy="10.5" r="1.7" fill="#0d0d1a" />
+    <circle cx="40" cy="9.5" r="1.7" fill="#0d0d1a" />
+    {/* Eye gleams */}
+    <circle cx="30.8" cy="9.2" r="0.85" fill="white" />
+    <circle cx="39.3" cy="8.2" r="0.85" fill="white" />
+    {/* Smile */}
+    <path d="M 29.5 17 Q 35 22.5 40.5 17"
+      stroke="#0d0d1a" strokeWidth="1.5" fill="none" strokeLinecap="round" opacity="0.38" />
   </svg>
 );
 
@@ -96,15 +118,15 @@ const HatIcon = ({ hatId, color = '#e2e8f0', size = 32 }) => {
 };
 
 // ── Scheme preview dots ───────────────────────────────────────────────────────
-const SchemeDots = ({ schemeKey, locked }) => {
+const SchemeDots = ({ schemeKey }) => {
   const colors = Object.values(COLOR_SCHEMES[schemeKey] || COLOR_SCHEMES.standard);
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '3px', width: '100%' }}>
       {colors.slice(0, 6).map((c, i) => (
         <div key={i} style={{
           aspectRatio: '1', borderRadius: '50%',
-          background: locked ? '#555' : c,
-          boxShadow: locked ? 'none' : `0 1px 3px rgba(0,0,0,0.3)`,
+          background: c,
+          boxShadow: `0 1px 3px rgba(0,0,0,0.3)`,
         }} />
       ))}
     </div>
@@ -148,7 +170,7 @@ const PreviewModal = ({ item, owned, pp, onClose, onBuy, onEquip }) => {
       >
         {/* Large preview */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '130px' }}>
-          {item.type === 'skin' && <SkinSwatch skin={item} size={120} locked={false} />}
+          {item.type === 'skin' && <WormBody skin={item} size={120} />}
           {item.type === 'hat' && (
             <div style={{
               width: 120, height: 120,
@@ -273,7 +295,7 @@ const ItemCard = ({ item, owned, equipped, pp, onPreview, onEquip }) => {
         borderRadius: '12px',
         cursor: 'pointer',
         position: 'relative',
-        opacity: locked && !canAfford ? 0.45 : 1,
+        opacity: locked && !canAfford ? 0.65 : 1,
         transition: 'all 0.15s ease',
       }}
     >
@@ -289,26 +311,24 @@ const ItemCard = ({ item, owned, equipped, pp, onPreview, onEquip }) => {
       )}
       {locked && <LockBadge />}
 
-      {/* Preview */}
-      <div style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-        {item.type === 'skin' && <SkinSwatch skin={item} size={46} locked={locked} />}
+      {/* Preview — always shows real appearance; opacity dims when locked */}
+      <div style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', opacity: locked ? 0.62 : 1 }}>
+        {item.type === 'skin' && <WormBody skin={item} size={46} />}
         {item.type === 'hat' && (
           <div style={{
             width: 46, height: 46, display: 'flex', alignItems: 'center', justifyContent: 'center',
             background: equipped ? `${accentColor}18` : 'rgba(255,255,255,0.04)', borderRadius: '50%',
           }}>
-            <HatIcon hatId={item.hatId} color={equipped ? '#a5b4fc' : locked ? 'rgba(100,120,160,0.35)' : '#94a3b8'} size={30} />
+            <HatIcon hatId={item.hatId} color={equipped ? '#a5b4fc' : '#94a3b8'} size={30} />
           </div>
         )}
         {item.type === 'scheme' && (
           <div style={{ width: '100%', padding: '0 2px' }}>
-            <SchemeDots schemeKey={item.schemeKey} locked={locked} />
+            <SchemeDots schemeKey={item.schemeKey} />
           </div>
         )}
         {item.type === 'tile' && (
-          <div style={{ opacity: locked ? 0.35 : 1 }}>
-            <TilePreviewCanvas styleKey={item.tileKey} size={44} />
-          </div>
+          <TilePreviewCanvas styleKey={item.tileKey} size={44} />
         )}
       </div>
 
