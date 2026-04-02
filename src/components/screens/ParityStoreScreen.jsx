@@ -7,6 +7,7 @@ import {
   registerTilePreview,
   updateTilePreview,
   unregisterTilePreview,
+  tickPreviews,
 } from '../../3d/TilePreviewRenderer.js';
 
 const FONT = "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif";
@@ -33,12 +34,12 @@ function TilePreviewCanvas({ styleKey, size = 40 }) {
     if (!canvas) return;
     canvas.width = size;
     canvas.height = size;
-    idRef.current = registerTilePreview(canvas, styleKey, '#4a7fa5');
+    idRef.current = registerTilePreview(canvas, styleKey, '#e53935');
     return () => { if (idRef.current !== null) unregisterTilePreview(idRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
-    if (idRef.current !== null) updateTilePreview(idRef.current, styleKey, '#4a7fa5');
+    if (idRef.current !== null) updateTilePreview(idRef.current, styleKey, '#e53935');
   }, [styleKey]);
   return <canvas ref={canvasRef} width={size} height={size} style={{ borderRadius: 6, display: 'block' }} />;
 }
@@ -393,6 +394,18 @@ const ParityStoreScreen = ({ onClose }) => {
     settings: s.settings,
     setSettings: s.setSettings,
   })));
+
+  // The R3F canvas pauses its loop when the store is open (frameloop='never').
+  // Drive tile preview rendering ourselves so all TilePreviewCanvas instances paint.
+  useEffect(() => {
+    let rafId;
+    const tick = () => {
+      tickPreviews(1 / 60);
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, []);
 
   const [toast, setToast] = useState(null);
   const [previewItem, setPreviewItem] = useState(null);
