@@ -48,7 +48,6 @@ const DisparitySetupWizard = React.lazy(() => import('./screens/DisparitySetupWi
 const MergeThemePicker = React.lazy(() => import('../modes/merge/index.js').then((m) => ({ default: m.MergeThemePicker })));
 const DisparityWinnerScreen = React.lazy(() => import('./screens/DisparityWinnerScreen.jsx'));
 const DisparityBettingScreen = React.lazy(() => import('./screens/DisparityBettingScreen.jsx'));
-const ParityStoreScreen = React.lazy(() => import('./screens/ParityStoreScreen.jsx'));
 const CubeNet = React.lazy(() => import('./CubeNet.jsx'));
 const SolveMode = React.lazy(() => import('./SolveMode.jsx'));
 const DevConsole = React.lazy(() => import('./menus/DevConsole.jsx'));
@@ -94,7 +93,6 @@ export default function UILayer({
     showDisparityBetting,
     disparityWaitingFirstFlip, disparityCountdown,
     showAntipodalPiP, onToggleAntipodalPiP,
-    showStore, setShowStore,
   } = ui;
 
   const {
@@ -312,13 +310,6 @@ export default function UILayer({
           />
         )}
       </div>
-
-      {/* Parity Store — outside ui-layer so pointer-events and z-index are unaffected */}
-      {showStore && (
-        <Suspense fallback={null}>
-          <ParityStoreScreen onClose={() => setShowStore(false)} />
-        </Suspense>
-      )}
 
       {/* Secondary Modes Bottom Sheet */}
       {!wormHealerMode && !showMainMenu && <SecondaryModesSheet

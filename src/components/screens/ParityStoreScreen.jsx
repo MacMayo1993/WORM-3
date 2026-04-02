@@ -327,7 +327,7 @@ const ParityStoreScreen = ({ onClose }) => {
 
   return (
     <div style={{
-      position: 'fixed', inset: 0, zIndex: 800,
+      position: 'fixed', inset: 0, zIndex: 99999,
       display: 'flex', flexDirection: 'column',
       background: 'rgba(4,8,20,0.97)',
       backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',

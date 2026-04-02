@@ -50,6 +50,7 @@ import { setSharedRenderer, tickPreviews, hasActivePreviews } from './3d/TilePre
 import WelcomeScreen from './components/screens/WelcomeScreen.jsx';
 import Tutorial from './components/screens/Tutorial.jsx';
 import UILayer from './components/UILayer.jsx';
+const ParityStoreScreen = React.lazy(() => import('./components/screens/ParityStoreScreen.jsx'));
 import { useTeachMode } from './teach/useTeachMode.js';
 import { useAntipodalIntegrity } from './hooks/useAntipodalIntegrity.js';
 import { isMobile } from './utils/device.js';
@@ -329,8 +330,16 @@ export default function WORM3() {
   // Merge Mode theme picker
   const [showMergeThemePicker, setShowMergeThemePicker] = useState(false);
 
-  // Parity Store
+  // Parity Store — hides main menu and freezes canvas while open
   const [showStore, setShowStore] = useState(false);
+  const handleOpenStore = useCallback(() => {
+    useGameStore.getState().setShowMainMenu(false);
+    setShowStore(true);
+  }, []);
+  const handleCloseStore = useCallback(() => {
+    setShowStore(false);
+    useGameStore.getState().setShowMainMenu(true);
+  }, []);
 
   // Disparity Mode wizard + betting screen + first-flip gate
   const [showDisparityWizard, setShowDisparityWizard] = useState(false);
@@ -1064,6 +1073,7 @@ export default function WORM3() {
           camera={{ position: (showWelcome || showMainMenu) ? [0, 3, 12] : [0, 0, cameraZ], fov: 40 }}
           dpr={[1, 1.5]}
           gl={{ powerPreference: 'high-performance', antialias: true }}
+          frameloop={showStore ? 'never' : 'always'}
         >
           <CameraManager showWelcome={showWelcome} showMainMenu={showMainMenu} cameraZ={cameraZ} />
           <TilePreviewHost />
@@ -1171,7 +1181,6 @@ export default function WORM3() {
             showDisparityBetting,
             disparityWaitingFirstFlip, disparityCountdown,
             showAntipodalPiP, onToggleAntipodalPiP: () => setShowAntipodalPiP(v => !v),
-            showStore, setShowStore,
           }}
           handlers={{
             onReset: handleReset,
@@ -1205,7 +1214,7 @@ export default function WORM3() {
             onMenuWormHealer: handleMenuWormHealer,
             onMenuHolonomy: handleMenuHolonomy,
             onMenuMerge: handleMenuMerge,
-            onMenuStore: () => setShowStore(true),
+            onMenuStore: handleOpenStore,
             showMergeThemePicker,
             onMergeStart: handleMergeStart,
             onMergeCancel: handleMergeCancel,
@@ -1226,6 +1235,13 @@ export default function WORM3() {
             onVictoryNewGame: handleVictoryNewGame,
           }}
         />
+      )}
+
+      {/* Parity Store — mounted at app root so it's above every overlay */}
+      {showStore && (
+        <Suspense fallback={null}>
+          <ParityStoreScreen onClose={handleCloseStore} />
+        </Suspense>
       )}
     </div>
   );
