@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { COLOR_SCHEMES, SCHEME_LABELS } from '../../../utils/colorSchemes.js';
+import { useGameStore } from '../../../hooks/useGameStore.js';
 
 const FACE_LABELS = { 1: 'Front', 2: 'Left', 3: 'Top', 4: 'Back', 5: 'Right', 6: 'Bottom' };
 
@@ -70,6 +71,9 @@ export function ColorsPanel({ settings, onSettingsChange, faceImages, onFaceImag
   const fileInputRef = useRef(null);
   const faceFileRefs = useRef({});
   const [preview, setPreview] = useState(null);
+  const ownedItems = useGameStore(s => s.ownedItems);
+
+  const schemeOwned = (key) => key === 'custom' || ownedItems.includes(`scheme_${key}`);
 
   const update = (key, val) => onSettingsChange({ ...settings, [key]: val });
 
@@ -113,23 +117,34 @@ export function ColorsPanel({ settings, onSettingsChange, faceImages, onFaceImag
       <section className="settings-section">
         <h3 className="settings-section-title">Color Scheme</h3>
         <div className="settings-radio-group scheme-grid">
-          {Object.keys(SCHEME_LABELS).map(key => (
-            <label key={key} className={`settings-radio${settings.colorScheme === key ? ' active' : ''}`}>
-              <input type="radio" name="colorScheme" value={key}
-                checked={settings.colorScheme === key}
-                onChange={() => update('colorScheme', key)} />
-              <span className="scheme-info">
-                <span className="settings-radio-label">{SCHEME_LABELS[key]}</span>
-                {key !== 'custom' && (
-                  <span className="scheme-preview">
-                    {Object.values(COLOR_SCHEMES[key]).map((c, i) => (
-                      <span key={i} className="scheme-dot" style={{ background: c }} />
-                    ))}
+          {Object.keys(SCHEME_LABELS).map(key => {
+            const owned = schemeOwned(key);
+            const active = settings.colorScheme === key;
+            return (
+              <label key={key}
+                className={`settings-radio${active ? ' active' : ''}${!owned ? ' locked' : ''}`}
+                style={!owned ? { opacity: 0.42, cursor: 'not-allowed', pointerEvents: 'none' } : {}}
+                title={!owned ? `Locked — buy in Parity Store` : undefined}
+              >
+                <input type="radio" name="colorScheme" value={key}
+                  checked={active}
+                  disabled={!owned}
+                  onChange={() => owned && update('colorScheme', key)} />
+                <span className="scheme-info">
+                  <span className="settings-radio-label">
+                    {SCHEME_LABELS[key]}{!owned ? ' 🔒' : ''}
                   </span>
-                )}
-              </span>
-            </label>
-          ))}
+                  {key !== 'custom' && COLOR_SCHEMES[key] && (
+                    <span className="scheme-preview">
+                      {Object.values(COLOR_SCHEMES[key]).map((c, i) => (
+                        <span key={i} className="scheme-dot" style={{ background: owned ? c : '#555' }} />
+                      ))}
+                    </span>
+                  )}
+                </span>
+              </label>
+            );
+          })}
         </div>
       </section>
 

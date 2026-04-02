@@ -1,26 +1,56 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
-import { getSkins, getHats } from '../../utils/storeCatalog.js';
+import { getSkins, getHats, getSchemes, getTiles } from '../../utils/storeCatalog.js';
+import { COLOR_SCHEMES } from '../../utils/colorSchemes.js';
+import {
+  registerTilePreview,
+  updateTilePreview,
+  unregisterTilePreview,
+} from '../../3d/TilePreviewRenderer.js';
 
 const FONT = "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif";
 const TOUCH_BTN = { touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' };
 
-const SKINS = getSkins();
-const HATS = getHats();
+const SKINS   = getSkins();
+const HATS    = getHats();
+const SCHEMES = getSchemes();
+const TILES   = getTiles();
 
-// ── Skin preview circle ───────────────────────────────────────────────────────
-const SkinSwatch = ({ skin, size = 48 }) => (
+const TABS = [
+  { id: 'skins',   label: 'Skins' },
+  { id: 'hats',    label: 'Hats' },
+  { id: 'schemes', label: 'Palettes' },
+  { id: 'tiles',   label: 'Tiles' },
+];
+
+// ── Tile preview canvas (WebGL, works outside R3F canvas) ─────────────────────
+function TilePreviewCanvas({ styleKey, size = 40 }) {
+  const canvasRef = useRef(null);
+  const idRef = useRef(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.width = size;
+    canvas.height = size;
+    idRef.current = registerTilePreview(canvas, styleKey, '#4a7fa5');
+    return () => { if (idRef.current !== null) unregisterTilePreview(idRef.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (idRef.current !== null) updateTilePreview(idRef.current, styleKey, '#4a7fa5');
+  }, [styleKey]);
+  return <canvas ref={canvasRef} width={size} height={size} style={{ borderRadius: 6, display: 'block' }} />;
+}
+
+// ── Skin preview ──────────────────────────────────────────────────────────────
+const SkinSwatch = ({ skin, size = 48, locked }) => (
   <svg width={size} height={size} viewBox="0 0 48 48">
-    {/* Glow */}
-    <circle cx="24" cy="24" r="20" fill={skin.glow} opacity="0.18" />
-    {/* Body */}
-    <circle cx="24" cy="24" r="16" fill={skin.body} />
-    {/* Belly highlight */}
-    <ellipse cx="24" cy="27" rx="8" ry="6" fill={skin.belly} opacity="0.7" />
-    {/* Eyes */}
-    <circle cx="20" cy="20" r="2.5" fill="white" />
-    <circle cx="28" cy="20" r="2.5" fill="white" />
+    <circle cx="24" cy="24" r="20" fill={locked ? '#444' : skin.glow} opacity="0.18" />
+    <circle cx="24" cy="24" r="16" fill={locked ? '#666' : skin.body} />
+    <ellipse cx="24" cy="27" rx="8" ry="6" fill={locked ? '#555' : skin.belly} opacity="0.7" />
+    <circle cx="20" cy="20" r="2.5" fill="white" opacity={locked ? 0.4 : 1} />
+    <circle cx="28" cy="20" r="2.5" fill="white" opacity={locked ? 0.4 : 1} />
     <circle cx="21" cy="20" r="1.2" fill="#1a1a2e" />
     <circle cx="29" cy="20" r="1.2" fill="#1a1a2e" />
   </svg>
@@ -28,151 +58,182 @@ const SkinSwatch = ({ skin, size = 48 }) => (
 
 // ── Hat icon ──────────────────────────────────────────────────────────────────
 const HatIcon = ({ hatId, color = '#e2e8f0', size = 32 }) => {
-  if (hatId === 'none') {
-    return (
-      <svg width={size} height={size} viewBox="0 0 32 32">
-        <circle cx="16" cy="16" r="12" stroke={color} strokeWidth="1.5" fill="none" strokeDasharray="4 3" opacity="0.5" />
-        <line x1="10" y1="10" x2="22" y2="22" stroke={color} strokeWidth="1.5" opacity="0.4" />
-      </svg>
-    );
-  }
-  if (hatId === 'tophat') {
-    return (
-      <svg width={size} height={size} viewBox="0 0 32 32">
-        <rect x="8" y="8" width="16" height="14" rx="1" fill={color} />
-        <rect x="4" y="21" width="24" height="4" rx="2" fill={color} />
-        <rect x="10" y="10" width="12" height="10" rx="1" fill="rgba(0,0,0,0.3)" />
-      </svg>
-    );
-  }
-  if (hatId === 'party') {
-    return (
-      <svg width={size} height={size} viewBox="0 0 32 32">
-        <polygon points="16,4 6,26 26,26" fill={color} />
-        <line x1="16" y1="4" x2="16" y2="26" stroke="rgba(0,0,0,0.2)" strokeWidth="1" />
-        <circle cx="9" cy="20" r="1.5" fill="#f59e0b" />
-        <circle cx="20" cy="15" r="1.5" fill="#ec4899" />
-        <circle cx="14" cy="22" r="1.5" fill="#06b6d4" />
-      </svg>
-    );
-  }
-  if (hatId === 'crown') {
-    return (
-      <svg width={size} height={size} viewBox="0 0 32 32">
-        <polygon points="4,22 4,12 10,18 16,8 22,18 28,12 28,22" fill={color} />
-        <rect x="4" y="22" width="24" height="4" rx="1" fill={color} />
-        <circle cx="16" cy="9" r="2" fill="#f59e0b" />
-        <circle cx="6" cy="13" r="1.5" fill="#f59e0b" />
-        <circle cx="26" cy="13" r="1.5" fill="#f59e0b" />
-      </svg>
-    );
-  }
-  if (hatId === 'halo') {
-    return (
-      <svg width={size} height={size} viewBox="0 0 32 32">
-        <ellipse cx="16" cy="13" rx="12" ry="4" fill="none" stroke={color} strokeWidth="2.5" />
-        <ellipse cx="16" cy="13" rx="12" ry="4" fill={color} opacity="0.15" />
-        <ellipse cx="16" cy="13" rx="12" ry="4" fill="none" stroke={color} strokeWidth="1" opacity="0.4" />
-      </svg>
-    );
-  }
+  if (hatId === 'none') return (
+    <svg width={size} height={size} viewBox="0 0 32 32">
+      <circle cx="16" cy="16" r="12" stroke={color} strokeWidth="1.5" fill="none" strokeDasharray="4 3" opacity="0.5" />
+      <line x1="10" y1="10" x2="22" y2="22" stroke={color} strokeWidth="1.5" opacity="0.4" />
+    </svg>
+  );
+  if (hatId === 'tophat') return (
+    <svg width={size} height={size} viewBox="0 0 32 32">
+      <rect x="8" y="8" width="16" height="14" rx="1" fill={color} />
+      <rect x="4" y="21" width="24" height="4" rx="2" fill={color} />
+      <rect x="10" y="10" width="12" height="10" rx="1" fill="rgba(0,0,0,0.3)" />
+    </svg>
+  );
+  if (hatId === 'party') return (
+    <svg width={size} height={size} viewBox="0 0 32 32">
+      <polygon points="16,4 6,26 26,26" fill={color} />
+      <circle cx="9" cy="20" r="1.5" fill="#f59e0b" />
+      <circle cx="20" cy="15" r="1.5" fill="#ec4899" />
+      <circle cx="14" cy="22" r="1.5" fill="#06b6d4" />
+    </svg>
+  );
+  if (hatId === 'crown') return (
+    <svg width={size} height={size} viewBox="0 0 32 32">
+      <polygon points="4,22 4,12 10,18 16,8 22,18 28,12 28,22" fill={color} />
+      <rect x="4" y="22" width="24" height="4" rx="1" fill={color} />
+      <circle cx="16" cy="9" r="2" fill="#f59e0b" />
+    </svg>
+  );
+  if (hatId === 'halo') return (
+    <svg width={size} height={size} viewBox="0 0 32 32">
+      <ellipse cx="16" cy="13" rx="12" ry="4" fill="none" stroke={color} strokeWidth="2.5" />
+      <ellipse cx="16" cy="13" rx="12" ry="4" fill={color} opacity="0.15" />
+    </svg>
+  );
   return null;
 };
 
-// ── Item card ─────────────────────────────────────────────────────────────────
-const ItemCard = ({ item, owned, equipped, pp, onBuy, onEquip }) => {
-  const canAfford = pp >= item.price;
-  const accentColor = item.type === 'skin' ? (item.glow || '#00ff88') : '#6366f1';
+// ── Scheme preview dots ───────────────────────────────────────────────────────
+const SchemeDots = ({ schemeKey, locked }) => {
+  const colors = Object.values(COLOR_SCHEMES[schemeKey] || COLOR_SCHEMES.standard);
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '3px', width: '100%' }}>
+      {colors.slice(0, 6).map((c, i) => (
+        <div key={i} style={{
+          aspectRatio: '1', borderRadius: '50%',
+          background: locked ? '#555' : c,
+          boxShadow: locked ? 'none' : `0 1px 3px rgba(0,0,0,0.3)`,
+        }} />
+      ))}
+    </div>
+  );
+};
 
-  const statusColor = equipped
-    ? '#00ff88'
-    : owned
-    ? 'rgba(180,210,255,0.7)'
-    : canAfford
-    ? accentColor
-    : 'rgba(120,140,180,0.5)';
+// ── Lock overlay ──────────────────────────────────────────────────────────────
+const LockBadge = ({ top = 5, right = 5 }) => (
+  <span style={{ position: 'absolute', top, right, fontSize: '9px', lineHeight: 1 }}>🔒</span>
+);
+
+// ── Price chip ────────────────────────────────────────────────────────────────
+const PriceChip = ({ price, canAfford, accentColor }) => (
+  <div style={{
+    display: 'flex', alignItems: 'baseline', gap: '3px',
+    padding: '3px 8px', borderRadius: '7px',
+    background: canAfford ? `${accentColor}20` : 'rgba(255,255,255,0.04)',
+    border: `1px solid ${canAfford ? accentColor + '50' : 'rgba(255,255,255,0.08)'}`,
+  }}>
+    <span style={{ fontSize: '9px', fontWeight: 700, color: canAfford ? accentColor : 'rgba(120,140,180,0.5)', fontFamily: FONT }}>PP</span>
+    <span style={{ fontSize: '12px', fontWeight: 800, color: canAfford ? accentColor : 'rgba(120,140,180,0.5)', fontFamily: FONT }}>{price}</span>
+  </div>
+);
+
+// ── Generic item card ─────────────────────────────────────────────────────────
+const ItemCard = ({ item, owned, equipped, pp, onBuy, onEquip }) => {
+  const accentColor = item.type === 'skin' ? (item.glow || '#00ff88')
+    : item.type === 'hat' ? '#6366f1'
+    : item.type === 'scheme' ? '#f59e0b'
+    : '#22c55e';
+  const locked = !owned;
+  const canAfford = pp >= item.price;
+
+  const handleClick = () => {
+    if (owned) onEquip();
+    else if (canAfford) onBuy();
+  };
 
   return (
-    <div style={{
-      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
-      padding: '14px 10px 12px',
-      background: equipped
-        ? `rgba(0,255,136,0.08)`
-        : owned
-        ? 'rgba(255,255,255,0.04)'
-        : 'rgba(255,255,255,0.025)',
-      border: equipped
-        ? '1.5px solid rgba(0,255,136,0.45)'
-        : owned
-        ? '1px solid rgba(120,160,255,0.2)'
-        : '1px solid rgba(120,160,255,0.1)',
-      borderRadius: '14px',
-      transition: 'all 0.18s ease',
-      position: 'relative',
-      cursor: owned ? 'pointer' : canAfford ? 'pointer' : 'default',
-    }}
-    onClick={owned ? onEquip : canAfford ? onBuy : undefined}
+    <div
+      onClick={handleClick}
+      style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '7px',
+        padding: item.type === 'tile' ? '10px 7px 9px' : '12px 8px 10px',
+        background: equipped ? `${accentColor}12` : owned ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.02)',
+        border: equipped ? `1.5px solid ${accentColor}55` : owned ? '1px solid rgba(120,160,255,0.18)' : '1px solid rgba(120,160,255,0.07)',
+        borderRadius: '12px',
+        cursor: owned ? 'pointer' : canAfford ? 'pointer' : 'default',
+        position: 'relative',
+        opacity: locked && !canAfford ? 0.45 : 1,
+        transition: 'all 0.15s ease',
+      }}
     >
       {/* Equipped badge */}
       {equipped && (
         <span style={{
-          position: 'absolute', top: '6px', right: '6px',
-          fontSize: '8px', fontWeight: 800, letterSpacing: '0.1em',
-          color: '#00ff88', background: 'rgba(0,255,136,0.15)',
-          border: '1px solid rgba(0,255,136,0.4)',
-          borderRadius: '4px', padding: '1px 5px',
-          fontFamily: FONT,
+          position: 'absolute', top: 5, right: 5,
+          fontSize: '7px', fontWeight: 800, letterSpacing: '0.08em',
+          color: accentColor, background: `${accentColor}20`,
+          border: `1px solid ${accentColor}50`,
+          borderRadius: '4px', padding: '1px 4px', fontFamily: FONT,
         }}>ON</span>
       )}
+      {locked && <LockBadge />}
 
       {/* Preview */}
-      <div style={{ lineHeight: 1 }}>
-        {item.type === 'skin' ? (
-          <SkinSwatch skin={item} size={52} />
-        ) : (
+      <div style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        {item.type === 'skin' && <SkinSwatch skin={item} size={46} locked={locked} />}
+        {item.type === 'hat' && (
           <div style={{
-            width: 52, height: 52, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: equipped ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.04)',
-            borderRadius: '50%',
+            width: 46, height: 46, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: equipped ? `${accentColor}18` : 'rgba(255,255,255,0.04)', borderRadius: '50%',
           }}>
-            <HatIcon hatId={item.hatId} color={equipped ? '#a5b4fc' : owned ? '#94a3b8' : 'rgba(120,140,180,0.4)'} size={34} />
+            <HatIcon hatId={item.hatId} color={equipped ? '#a5b4fc' : locked ? 'rgba(100,120,160,0.35)' : '#94a3b8'} size={30} />
+          </div>
+        )}
+        {item.type === 'scheme' && (
+          <div style={{ width: '100%', padding: '0 2px' }}>
+            <SchemeDots schemeKey={item.schemeKey} locked={locked} />
+          </div>
+        )}
+        {item.type === 'tile' && (
+          <div style={{ opacity: locked ? 0.35 : 1 }}>
+            <TilePreviewCanvas styleKey={item.tileKey} size={44} />
           </div>
         )}
       </div>
 
       {/* Label */}
       <span style={{
-        fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em',
-        color: equipped ? '#e0fff0' : owned ? 'rgba(200,220,255,0.9)' : 'rgba(150,170,220,0.65)',
-        fontFamily: FONT, textAlign: 'center',
+        fontSize: item.type === 'tile' ? '9px' : '10px',
+        fontWeight: 700,
+        letterSpacing: '0.04em',
+        color: equipped ? '#e0fff0' : owned ? 'rgba(200,220,255,0.85)' : 'rgba(140,170,220,0.5)',
+        fontFamily: FONT, textAlign: 'center', lineHeight: 1.2,
       }}>{item.label}</span>
 
-      {/* Price / action */}
+      {/* Price / status */}
       {owned ? (
         <span style={{
-          fontSize: '10px', fontWeight: 600,
-          color: equipped ? '#00ff88' : 'rgba(140,170,220,0.55)',
+          fontSize: '9px', fontWeight: 600,
+          color: equipped ? accentColor : 'rgba(120,150,200,0.45)',
           fontFamily: FONT,
-        }}>{equipped ? 'Equipped' : 'Tap to equip'}</span>
+        }}>{equipped ? 'Active' : 'Tap'}</span>
       ) : (
-        <button
-          onPointerDown={e => { e.stopPropagation(); onBuy(); }}
-          disabled={!canAfford}
-          style={{
-            ...TOUCH_BTN,
-            display: 'flex', alignItems: 'center', gap: '4px',
-            padding: '4px 10px', borderRadius: '8px', border: 'none', cursor: canAfford ? 'pointer' : 'not-allowed',
-            background: canAfford ? `${accentColor}22` : 'rgba(255,255,255,0.04)',
-            color: statusColor, fontFamily: FONT, fontSize: '11px', fontWeight: 700,
-          }}
-        >
-          <span style={{ fontSize: '10px', opacity: 0.75 }}>PP</span>
-          {item.price}
-        </button>
+        <PriceChip price={item.price} canAfford={canAfford} accentColor={accentColor} />
       )}
     </div>
   );
 };
+
+// ── Tile category section ─────────────────────────────────────────────────────
+// Tile section header + grid, defined outside component to avoid re-create-on-render
+const TileSection = ({ label, items, renderItems }) => items.length === 0 ? null : (
+  <div style={{ marginBottom: '20px' }}>
+    <div style={{
+      fontSize: '10px', fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase',
+      color: 'rgba(140,170,220,0.45)',
+      fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif",
+      marginBottom: '8px',
+    }}>{label}</div>
+    {renderItems(items)}
+  </div>
+);
+
+// Tile classification: Classic = static/pattern/procedural ≤100PP, Op Art = pattern 75-125PP dedupe, Living = animated/3d
+const classicOnlyTiles = TILES.filter(t => ['static', 'pattern', 'procedural'].includes(t.tileType) && t.price <= 100);
+const opArtOnlyTiles   = TILES.filter(t => t.tileType === 'pattern' && t.price >= 75 && t.price <= 125 && !classicOnlyTiles.includes(t));
+const livingOnlyTiles  = TILES.filter(t => t.tileType === 'animated' || t.tileType === '3d');
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 const ParityStoreScreen = ({ onClose }) => {
@@ -189,6 +250,11 @@ const ParityStoreScreen = ({ onClose }) => {
       setWormHat: s.setWormHat,
     })));
 
+  const { settings, setSettings } = useGameStore(useShallow(s => ({
+    settings: s.settings,
+    setSettings: s.setSettings,
+  })));
+
   const [toast, setToast] = useState(null);
 
   const showToast = (msg, color = '#00ff88') => {
@@ -198,9 +264,7 @@ const ParityStoreScreen = ({ onClose }) => {
 
   const handleBuy = (item) => {
     if (ownedItems.includes(item.id)) {
-      // equip directly
-      if (item.type === 'skin') setWormSkin(item.skinId);
-      else setWormHat(item.hatId);
+      equip(item);
       return;
     }
     const ok = buyItem(item.id, item.price);
@@ -208,19 +272,58 @@ const ParityStoreScreen = ({ onClose }) => {
       showToast(`Need ${item.price - parityPoints} more PP`, '#f97316');
       return;
     }
-    // auto-equip on purchase
-    if (item.type === 'skin') setWormSkin(item.skinId);
-    else setWormHat(item.hatId);
+    equip(item);
     showToast(`${item.label} unlocked!`);
   };
 
-  const handleEquip = (item) => {
-    if (item.type === 'skin') setWormSkin(item.skinId);
-    else setWormHat(item.hatId);
-    showToast(`${item.label} equipped`);
+  const equip = (item) => {
+    if (item.type === 'skin') {
+      setWormSkin(item.skinId);
+    } else if (item.type === 'hat') {
+      setWormHat(item.hatId);
+    } else if (item.type === 'scheme') {
+      setSettings({ ...settings, colorScheme: item.schemeKey });
+    } else if (item.type === 'tile') {
+      const newStyles = {};
+      [1, 2, 3, 4, 5, 6].forEach(id => { newStyles[id] = item.tileKey; });
+      setSettings({ ...settings, manifoldStyles: newStyles });
+    }
+    showToast(`${item.label} applied`);
   };
 
-  const items = tab === 'skins' ? SKINS : HATS;
+  const isEquipped = (item) => {
+    if (item.type === 'skin') return wormSkin === item.skinId;
+    if (item.type === 'hat') return wormHat === item.hatId;
+    if (item.type === 'scheme') return settings?.colorScheme === item.schemeKey;
+    if (item.type === 'tile') {
+      const styles = settings?.manifoldStyles || {};
+      return [1, 2, 3, 4, 5, 6].every(id => (styles[id] || 'solid') === item.tileKey);
+    }
+    return false;
+  };
+
+  const renderItems = (items) => (
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: `repeat(auto-fill, minmax(${tab === 'tiles' ? '90px' : '100px'}, 1fr))`,
+      gap: '8px',
+    }}>
+      {items.map(item => {
+        const owned = ownedItems.includes(item.id);
+        return (
+          <ItemCard
+            key={item.id}
+            item={item}
+            owned={owned}
+            equipped={isEquipped(item)}
+            pp={parityPoints}
+            onBuy={() => handleBuy(item)}
+            onEquip={() => { equip(item); showToast(`${item.label} applied`); }}
+          />
+        );
+      })}
+    </div>
+  );
 
   return (
     <div style={{
@@ -238,37 +341,30 @@ const ParityStoreScreen = ({ onClose }) => {
         flexShrink: 0,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          {/* Store icon */}
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
             <rect x="3" y="10" width="18" height="11" rx="2" stroke="#6366f1" strokeWidth="1.5" fill="none" />
             <path d="M7 10V7a5 5 0 0 1 10 0v3" stroke="#6366f1" strokeWidth="1.5" strokeLinecap="round" fill="none" />
           </svg>
           <span style={{
-            fontSize: '16px', fontWeight: 700, letterSpacing: '0.12em',
+            fontSize: '15px', fontWeight: 700, letterSpacing: '0.1em',
             textTransform: 'uppercase', color: '#a5b4fc', fontFamily: FONT,
           }}>Parity Store</span>
         </div>
-
-        {/* PP balance */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{
             display: 'flex', alignItems: 'baseline', gap: '4px',
-            background: 'rgba(99,102,241,0.12)',
-            border: '1px solid rgba(99,102,241,0.3)',
+            background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.3)',
             borderRadius: '10px', padding: '4px 12px',
           }}>
             <span style={{ fontSize: '10px', fontWeight: 700, color: '#818cf8', fontFamily: FONT }}>PP</span>
             <span style={{ fontSize: '18px', fontWeight: 800, color: '#e0e7ff', fontFamily: FONT }}>{parityPoints}</span>
           </div>
-          <button
-            onPointerDown={onClose}
-            style={{
-              ...TOUCH_BTN,
-              width: 36, height: 36, borderRadius: '50%',
-              background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-              color: 'rgba(200,220,255,0.7)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
-          >
+          <button onPointerDown={onClose} style={{
+            ...TOUCH_BTN, width: 36, height: 36, borderRadius: '50%',
+            background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+            color: 'rgba(200,220,255,0.7)', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
             </svg>
@@ -277,66 +373,45 @@ const ParityStoreScreen = ({ onClose }) => {
       </div>
 
       {/* Tabs */}
-      <div style={{
-        display: 'flex', gap: '4px', padding: '12px 20px 0',
-        flexShrink: 0,
-      }}>
-        {['skins', 'hats'].map(t => (
+      <div style={{ display: 'flex', gap: '3px', padding: '10px 16px 0', flexShrink: 0, overflowX: 'auto' }}>
+        {TABS.map(t => (
           <button
-            key={t}
-            onPointerDown={() => setTab(t)}
+            key={t.id}
+            onPointerDown={() => setTab(t.id)}
             style={{
               ...TOUCH_BTN,
-              padding: '8px 20px', borderRadius: '10px', cursor: 'pointer',
-              background: tab === t ? 'rgba(99,102,241,0.25)' : 'rgba(255,255,255,0.04)',
-              color: tab === t ? '#a5b4fc' : 'rgba(150,170,220,0.55)',
-              fontSize: '12px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase',
-              fontFamily: FONT,
-              border: tab === t ? '1px solid rgba(99,102,241,0.4)' : '1px solid transparent',
+              padding: '7px 16px', borderRadius: '9px', cursor: 'pointer',
+              background: tab === t.id ? 'rgba(99,102,241,0.25)' : 'rgba(255,255,255,0.04)',
+              color: tab === t.id ? '#a5b4fc' : 'rgba(150,170,220,0.5)',
+              fontSize: '11px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase',
+              fontFamily: FONT, whiteSpace: 'nowrap',
+              border: tab === t.id ? '1px solid rgba(99,102,241,0.4)' : '1px solid transparent',
               transition: 'all 0.15s ease',
             }}
-          >
-            {t === 'skins' ? 'Skins' : 'Hats'}
-          </button>
+          >{t.label}</button>
         ))}
       </div>
 
-      {/* Grid */}
-      <div style={{
-        flex: 1, overflowY: 'auto', padding: '16px 20px 20px',
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))',
-        gap: '10px',
-        alignContent: 'start',
-      }}>
-        {items.map(item => {
-          const owned = ownedItems.includes(item.id);
-          const equipped = item.type === 'skin' ? wormSkin === item.skinId : wormHat === item.hatId;
-          return (
-            <ItemCard
-              key={item.id}
-              item={item}
-              owned={owned}
-              equipped={equipped}
-              pp={parityPoints}
-              onBuy={() => handleBuy(item)}
-              onEquip={() => handleEquip(item)}
-            />
-          );
-        })}
+      {/* Content */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '14px 16px 16px' }}>
+        {tab === 'skins'   && renderItems(SKINS)}
+        {tab === 'hats'    && renderItems(HATS)}
+        {tab === 'schemes' && renderItems(SCHEMES)}
+        {tab === 'tiles' && (
+          <>
+            <TileSection label="Classic" items={classicOnlyTiles} renderItems={renderItems} />
+            <TileSection label="Op Art"  items={opArtOnlyTiles}   renderItems={renderItems} />
+            <TileSection label="Living"  items={livingOnlyTiles}  renderItems={renderItems} />
+          </>
+        )}
       </div>
 
       {/* Earn hint */}
       <div style={{
-        padding: '10px 20px 16px',
-        textAlign: 'center',
-        borderTop: '1px solid rgba(99,102,241,0.12)',
-        flexShrink: 0,
+        padding: '8px 20px 14px', textAlign: 'center',
+        borderTop: '1px solid rgba(99,102,241,0.1)', flexShrink: 0,
       }}>
-        <span style={{
-          fontSize: '11px', color: 'rgba(140,170,220,0.5)',
-          fontFamily: FONT, lineHeight: 1.5,
-        }}>
+        <span style={{ fontSize: '10px', color: 'rgba(120,150,200,0.45)', fontFamily: FONT }}>
           Earn PP by collecting orbs in Worm mode and playing Disparity
         </span>
       </div>
@@ -345,13 +420,11 @@ const ParityStoreScreen = ({ onClose }) => {
       {toast && (
         <div style={{
           position: 'fixed', bottom: '80px', left: '50%', transform: 'translateX(-50%)',
-          background: 'rgba(8,12,32,0.95)',
-          border: `1px solid ${toast.color}60`,
-          borderRadius: '12px', padding: '10px 20px',
-          color: toast.color, fontSize: '13px', fontWeight: 600, fontFamily: FONT,
-          boxShadow: `0 4px 20px rgba(0,0,0,0.5)`,
-          pointerEvents: 'none', zIndex: 900,
-          animation: 'fadeIn 0.2s ease',
+          background: 'rgba(8,12,32,0.96)', border: `1px solid ${toast.color}50`,
+          borderRadius: '12px', padding: '9px 18px',
+          color: toast.color, fontSize: '12px', fontWeight: 600, fontFamily: FONT,
+          boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+          pointerEvents: 'none', zIndex: 900, animation: 'fadeIn 0.2s ease',
         }}>
           {toast.msg}
         </div>

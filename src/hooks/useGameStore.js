@@ -48,14 +48,33 @@ const loadPersistedState = () => {
     const rawOwned = localStorage.getItem(OWNED_ITEMS_KEY);
     const ownedItems = rawOwned ? JSON.parse(rawOwned) : [...DEFAULT_OWNED];
 
+    // Guard: reset cosmetics/settings to defaults if the saved value isn't owned
+    const safeSkin = ownedItems.includes(`skin_${wormSkin}`) ? wormSkin : 'slime';
+    const safeHat  = ownedItems.includes(`hat_${wormHat}`) ? wormHat : 'none';
+
+    // Guard: reset color scheme if not owned
+    const migratedSettings = migrateSettings(parsedSettings, settingsVersion);
+    const cs = migratedSettings.colorScheme || 'standard';
+    if (cs !== 'custom' && !ownedItems.includes(`scheme_${cs}`)) {
+      migratedSettings.colorScheme = 'standard';
+    }
+    // Guard: reset each face's tile style if not owned
+    if (migratedSettings.manifoldStyles) {
+      const safeStyles = {};
+      for (const [faceId, styleKey] of Object.entries(migratedSettings.manifoldStyles)) {
+        safeStyles[faceId] = ownedItems.includes(`tile_${styleKey}`) ? styleKey : 'solid';
+      }
+      migratedSettings.manifoldStyles = safeStyles;
+    }
+
     return {
-      settings: migrateSettings(parsedSettings, settingsVersion),
+      settings: migratedSettings,
       introSeen,
       tutorialDone,
       hasFlippedOnce: firstFlipDone,
       mobileHintShown,
-      wormSkin,
-      wormHat,
+      wormSkin: safeSkin,
+      wormHat: safeHat,
       parityPoints,
       ownedItems,
     };
