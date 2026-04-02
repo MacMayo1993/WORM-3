@@ -313,6 +313,13 @@ export default function UILayer({
         )}
       </div>
 
+      {/* Parity Store — outside ui-layer so pointer-events and z-index are unaffected */}
+      {showStore && (
+        <Suspense fallback={null}>
+          <ParityStoreScreen onClose={() => setShowStore(false)} />
+        </Suspense>
+      )}
+
       {/* Secondary Modes Bottom Sheet */}
       {!wormHealerMode && !showMainMenu && <SecondaryModesSheet
         open={sheetOpen}
@@ -379,12 +386,6 @@ export default function UILayer({
           onMerge={onMenuMerge}
           onStore={onMenuStore}
         />
-      )}
-
-      {showStore && (
-        <Suspense fallback={null}>
-          <ParityStoreScreen onClose={() => setShowStore(false)} />
-        </Suspense>
       )}
 
       {showLevelSelect && (
