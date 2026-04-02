@@ -31,6 +31,7 @@ const FULL_REVEAL = { PZ: 1, NZ: 1, PX: 1, NX: 1, PY: 1, NY: 1 };
 
 const IntroCubie = React.forwardRef(({
   position,
+  gridPos = null,
   size,
   explosionFactor = 0,
   faceStyles = {},
@@ -39,9 +40,11 @@ const IntroCubie = React.forwardRef(({
   faceReveal = FULL_REVEAL,   // default = fully revealed, never black
 }, ref) => {
   const limit = (size - 1) / 2;
-  const x = Math.round(position[0] / (1 + explosionFactor * 1.8) + limit);
-  const y = Math.round(position[1] / (1 + explosionFactor * 1.8) + limit);
-  const z = Math.round(position[2] / (1 + explosionFactor * 1.8) + limit);
+  // In IntroScene, cubies are wrapped in a parent <group position={...}> and this
+  // component receives local position [0,0,0]. Use explicit gridPos when supplied.
+  const x = gridPos ? gridPos[0] : Math.round(position[0] / (1 + explosionFactor * 1.8) + limit);
+  const y = gridPos ? gridPos[1] : Math.round(position[1] / (1 + explosionFactor * 1.8) + limit);
+  const z = gridPos ? gridPos[2] : Math.round(position[2] / (1 + explosionFactor * 1.8) + limit);
 
   const showAllFaces = explosionFactor > 0.1;
 

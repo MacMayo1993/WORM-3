@@ -26,6 +26,7 @@ const ease = t => t < 0.5 ? 4 * t ** 3 : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const clamp01 = t => Math.max(0, Math.min(1, t));
 const progress = (t, start, end) => clamp01((t - start) / (end - start));
 const smoothstep = t => t * t * (3 - 2 * t);
+const AWAKEN_END = 1.2;
 
 const getStickerWorldPos = (x, y, z, dirKey, size, ef = 0) => {
   const k = (size - 1) / 2;
@@ -145,6 +146,29 @@ const IntroScene = ({ time, onComplete }) => {
         const preX = Math.sin(t * 0.15) * 0.08;
         targetRotY = preY * (1 - settle);
         targetRotX = preX * (1 - settle);
+      }
+
+      const rotLerp = 1 - Math.exp(-Math.max(0, delta) * 10);
+      cubeRotRef.current.y += (targetRotY - cubeRotRef.current.y) * rotLerp;
+      cubeRotRef.current.x += (targetRotX - cubeRotRef.current.x) * rotLerp;
+      cubeGroupRef.current.rotation.set(cubeRotRef.current.x, cubeRotRef.current.y, 0);
+
+      // "Cube awakening": soft scale-up + rise settle in the opening beat.
+      if (t < AWAKEN_END) {
+        const p = smoothstep(progress(t, 0, AWAKEN_END));
+        const targetScale = 0.9 + p * 0.1 + (1 - p) * Math.sin(t * 10) * 0.01;
+        const targetY = (1 - p) * -0.35;
+        const awakenLerp = 1 - Math.exp(-Math.max(0, delta) * 8);
+        cubeGroupRef.current.scale.x += (targetScale - cubeGroupRef.current.scale.x) * awakenLerp;
+        cubeGroupRef.current.scale.y += (targetScale - cubeGroupRef.current.scale.y) * awakenLerp;
+        cubeGroupRef.current.scale.z += (targetScale - cubeGroupRef.current.scale.z) * awakenLerp;
+        cubeGroupRef.current.position.y += (targetY - cubeGroupRef.current.position.y) * awakenLerp;
+      } else {
+        const settleLerp = 1 - Math.exp(-Math.max(0, delta) * 10);
+        cubeGroupRef.current.scale.x += (1 - cubeGroupRef.current.scale.x) * settleLerp;
+        cubeGroupRef.current.scale.y += (1 - cubeGroupRef.current.scale.y) * settleLerp;
+        cubeGroupRef.current.scale.z += (1 - cubeGroupRef.current.scale.z) * settleLerp;
+        cubeGroupRef.current.position.y += (0 - cubeGroupRef.current.position.y) * settleLerp;
       }
 
       const rotLerp = 1 - Math.exp(-Math.max(0, delta) * 10);
@@ -345,6 +369,7 @@ const IntroScene = ({ time, onComplete }) => {
               <IntroCubie
                 ref={el => (cubieRefs.current[idx] = el)}
                 position={[0, 0, 0]}
+                gridPos={[gx, gy, gz]}
                 size={size}
                 explosionFactor={ef}
                 faceStyles={faceStyles}
