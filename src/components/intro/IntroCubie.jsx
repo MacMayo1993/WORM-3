@@ -46,12 +46,13 @@ const IntroCubie = React.forwardRef(({
   const y = gridPos ? gridPos[1] : Math.round(position[1] / (1 + explosionFactor * 1.8) + limit);
   const z = gridPos ? gridPos[2] : Math.round(position[2] / (1 + explosionFactor * 1.8) + limit);
 
-  const isOuterPZ = z === size - 1;
-  const isOuterNZ = z === 0;
-  const isOuterPX = x === size - 1;
-  const isOuterNX = x === 0;
-  const isOuterPY = y === size - 1;
-  const isOuterNY = y === 0;
+  const exploded = explosionFactor > 0;
+  const isOuterPZ = exploded || z === size - 1;
+  const isOuterNZ = exploded || z === 0;
+  const isOuterPX = exploded || x === size - 1;
+  const isOuterNX = exploded || x === 0;
+  const isOuterPY = exploded || y === size - 1;
+  const isOuterNY = exploded || y === 0;
 
   const colorMap = { PZ: 1, NZ: 4, PX: 5, NX: 2, PY: 3, NY: 6 };
   const antipodalMap = { PZ: 'NZ', NZ: 'PZ', PX: 'NX', NX: 'PX', PY: 'NY', NY: 'PY' };
