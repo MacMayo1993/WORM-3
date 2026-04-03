@@ -28,7 +28,7 @@ function getCachedMat(styleKey, colorHex) {
  *
  * flipRotation — radians, 0 = flat, PI = fully flipped (shows back)
  */
-const IntroSticker = ({ pos, rot, color, styleKey, flipRotation = 0 }) => {
+const IntroSticker = ({ pos, rot, color, styleKey, flipRotation = 0, emissiveBoost = 0 }) => {
   const shaderMat = useMemo(() => {
     if (!styleKey) return null;
     return getCachedMat(styleKey, color);
@@ -52,7 +52,7 @@ const IntroSticker = ({ pos, rot, color, styleKey, flipRotation = 0 }) => {
               metalness={0.0}
               side={THREE.FrontSide}
               emissive={color}
-              emissiveIntensity={0.25}
+              emissiveIntensity={0.25 + emissiveBoost * 0.75}
             />
           )}
         </mesh>
