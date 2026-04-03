@@ -328,7 +328,6 @@ const IntroScene = ({ time, onComplete }) => {
 
           if (isCenterPX && centerFlipAngle > 0) {
             cubieFlips['PX'] = centerFlipAngle;
-            antipodalSwaps['PX'] = centerFlipAngle > Math.PI * 0.5;
           }
 
           let topoPos = [...pos];
