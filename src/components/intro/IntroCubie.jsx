@@ -38,6 +38,7 @@ const IntroCubie = React.forwardRef(({
   cubieFlips = {},
   antipodalSwaps = {},
   faceReveal = FULL_REVEAL,   // default = fully revealed, never black
+  pulseFaces = {},
 }, ref) => {
   const limit = (size - 1) / 2;
   // In IntroScene, cubies are wrapped in a parent <group position={...}> and this
@@ -107,6 +108,7 @@ const IntroCubie = React.forwardRef(({
             color={getDisplayColor(key)}
             styleKey={getDisplayStyle(key)}
             flipRotation={cubieFlips[key] || 0}
+            emissiveBoost={pulseFaces[key] || 0}
           />
         );
       })}

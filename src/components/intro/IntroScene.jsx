@@ -1,5 +1,6 @@
 import React, { useRef, useState, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
+import { Line } from '@react-three/drei';
 import IntroCubie from './IntroCubie.jsx';
 import IntroTunnel from '../../manifold/IntroTunnel.jsx';
 import WormParticle from '../../manifold/WormParticle.jsx';
@@ -9,6 +10,7 @@ import { play, vibrate } from '../../utils/audio.js';
 import { updateSharedTime } from '../../3d/styles/TileStyleMaterials.jsx';
 import {
   FULL_FLIP_START, FULL_FLIP_END,
+  GREEN_SHOW_START,
   TUNNEL_FORM_START,
   EXPLOSION_START, EXPLOSION_END,
   WORM_START,
@@ -35,6 +37,70 @@ const getStickerWorldPos = (x, y, z, dirKey, size, ef = 0) => {
   if (dirKey === 'PY') return [ex,      ey + o,  ez    ];
   if (dirKey === 'NY') return [ex,      ey - o,  ez    ];
   return [ex, ey, ez];
+};
+
+// ─── Grid lines on assembled cube faces ──────────────────────────────────────
+// Renders the 3×3 seam lines on each face in that face's manifold color.
+// Fades out as the explosion begins; pulses brighter when the matching
+// antipodal-pair text is on screen.
+const GridLines = ({ time }) => {
+  const S = 1.5, G = 0.5, E = 0.006; // half-extent, seam offset, depth epsilon
+
+  // Static line endpoints — one pair per seam line, per face
+  const faces = useMemo(() => [
+    { colorId: 1, pulse: 'z',
+      seams: [[[-S,-G,S+E],[S,-G,S+E]], [[-S,G,S+E],[S,G,S+E]],
+               [[-G,-S,S+E],[-G,S,S+E]], [[G,-S,S+E],[G,S,S+E]]] },
+    { colorId: 4, pulse: 'z',
+      seams: [[[-S,-G,-S-E],[S,-G,-S-E]], [[-S,G,-S-E],[S,G,-S-E]],
+               [[-G,-S,-S-E],[-G,S,-S-E]], [[G,-S,-S-E],[G,S,-S-E]]] },
+    { colorId: 5, pulse: 'x',
+      seams: [[[S+E,-G,-S],[S+E,-G,S]], [[S+E,G,-S],[S+E,G,S]],
+               [[S+E,-S,-G],[S+E,S,-G]], [[S+E,-S,G],[S+E,S,G]]] },
+    { colorId: 2, pulse: 'x',
+      seams: [[[-S-E,-G,-S],[-S-E,-G,S]], [[-S-E,G,-S],[-S-E,G,S]],
+               [[-S-E,-S,-G],[-S-E,S,-G]], [[-S-E,-S,G],[-S-E,S,G]]] },
+    { colorId: 3, pulse: 'y',
+      seams: [[[-S,S+E,-G],[S,S+E,-G]], [[-S,S+E,G],[S,S+E,G]],
+               [[-G,S+E,-S],[-G,S+E,S]], [[G,S+E,-S],[G,S+E,S]]] },
+    { colorId: 6, pulse: 'y',
+      seams: [[[-S,-S-E,-G],[S,-S-E,-G]], [[-S,-S-E,G],[S,-S-E,G]],
+               [[-G,-S-E,-S],[-G,-S-E,S]], [[G,-S-E,-S],[G,-S-E,S]]] },
+  ], []);
+
+  // Base opacity fades to zero as the explosion starts
+  const baseOpacity = (() => {
+    if (time >= EXPLOSION_START) return 0;
+    if (time >= TUNNEL_FORM_START) return (1 - progress(time, TUNNEL_FORM_START, EXPLOSION_START)) * 0.15;
+    return 0.15;
+  })();
+
+  if (baseOpacity <= 0) return null;
+
+  // "Blue ↔ Green" pre-explosion text (GREEN_SHOW_START+0.4 → FULL_FLIP_START)
+  // pulses the x-axis (PX=Blue, NX=Green) grid lines
+  const xPulse = (time >= GREEN_SHOW_START + 0.4 && time < FULL_FLIP_START)
+    ? Math.sin(progress(time, GREEN_SHOW_START + 0.4, FULL_FLIP_START) * Math.PI) * 0.55
+    : 0;
+
+  const pulseFor = { x: xPulse, y: 0, z: 0 };
+
+  return (
+    <>
+      {faces.map(({ colorId, pulse, seams }, fi) =>
+        seams.map((pts, si) => (
+          <Line
+            key={`gl-${fi}-${si}`}
+            points={pts}
+            color={FACE_COLORS[colorId]}
+            transparent
+            opacity={Math.min(1, baseOpacity + pulseFor[pulse])}
+            lineWidth={1}
+          />
+        ))
+      )}
+    </>
+  );
 };
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -88,8 +154,16 @@ const IntroScene = ({ time, onComplete }) => {
     // Hold fully colored while exploded.
     if (time < IMPLODE_START) return 1;
 
-    // Fade all faces back to black as we implode.
-    return 1 - smoothstep(progress(time, IMPLODE_START, IMPLODE_END));
+    // Reverse-order drain: Y axis first (0–60%), X (20–80%), Z last (40–100%)
+    // Mirrors the reveal sequence in reverse for a satisfying pedagogical callback.
+    const drainSlots = {
+      PY: [0.0, 0.6], NY: [0.0, 0.6],
+      PX: [0.2, 0.8], NX: [0.2, 0.8],
+      PZ: [0.4, 1.0], NZ: [0.4, 1.0],
+    };
+    const [dStart, dEnd] = drainSlots[faceKey] || [0, 1];
+    const implodeN = progress(time, IMPLODE_START, IMPLODE_END);
+    return 1 - smoothstep(progress(implodeN, dStart, dEnd));
   };
 
   // ── Center tile flip (no hint tilt, just the full 180° flip) ───────────────
@@ -304,10 +378,28 @@ const IntroScene = ({ time, onComplete }) => {
   const CENTER_Y = 1;
   const CENTER_Z = 1;
 
+  // ── Axis-pair face pulses during explosion hold callouts ─────────────────
+  // Bell-curve pulse (0→1→0) over each 1-second axis-callout window.
+  const pulseFaces = useMemo(() => {
+    const bell = (start, end) => {
+      if (time < start || time > end) return 0;
+      return Math.sin(progress(time, start, end) * Math.PI);
+    };
+    return {
+      PZ: bell(EXPLOSION_END,       EXPLOSION_END + 1.0),
+      NZ: bell(EXPLOSION_END,       EXPLOSION_END + 1.0),
+      PX: bell(EXPLOSION_END + 1.0, EXPLOSION_END + 2.0),
+      NX: bell(EXPLOSION_END + 1.0, EXPLOSION_END + 2.0),
+      PY: bell(EXPLOSION_END + 2.0, EXPLOSION_END + 3.0),
+      NY: bell(EXPLOSION_END + 2.0, EXPLOSION_END + 3.0),
+    };
+  }, [time]);
+
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <group>
       <group ref={cubeGroupRef}>
+        <GridLines time={time} />
         {items.map((it, idx) => {
           const { pos, gx, gy, gz } = it;
           const k = (size - 1) / 2;
@@ -368,6 +460,7 @@ const IntroScene = ({ time, onComplete }) => {
                 cubieFlips={cubieFlips}
                 antipodalSwaps={antipodalSwaps}
                 faceReveal={faceReveal}
+                pulseFaces={pulseFaces}
               />
             </group>
           );

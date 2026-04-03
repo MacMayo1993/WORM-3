@@ -13,6 +13,24 @@ const fadeout = (t, end,   dur = 0.35) => ease(clamp01((end - t)   / dur));
 const fadeWindow = (t, start, end, rampDur = 0.35) =>
   Math.min(fadein(t, start, rampDur), fadeout(t, end, rampDur));
 
+// Each color word is rendered in its antipodal partner's color
+const ANTIPODAL_TEXT_COLORS = {
+  Blue:   '#22c55e', // blue word → green
+  Green:  '#3b82f6', // green word → blue
+  Red:    '#f97316', // red word → orange
+  Orange: '#ef4444', // orange word → red
+  White:  '#eab308', // white word → yellow
+  Yellow: '#ffffff', // yellow word → white
+};
+
+const antipodalNode = (wordA, wordB) => (
+  <>
+    <span style={{ color: ANTIPODAL_TEXT_COLORS[wordA] }}>{wordA}</span>
+    {' ↔ '}
+    <span style={{ color: ANTIPODAL_TEXT_COLORS[wordB] }}>{wordB}</span>
+  </>
+);
+
 const TextOverlay = ({ time }) => {
   const messages = useMemo(() => {
     const msgs = [];
@@ -49,10 +67,10 @@ const TextOverlay = ({ time }) => {
     // Green face appears
     if (time >= GREEN_SHOW_START + 0.4 && time < FULL_FLIP_START) {
       msgs.push({
-        text: 'Blue ↔ Green',
+        node: antipodalNode('Blue', 'Green'),
         opacity: fadeWindow(time, GREEN_SHOW_START + 0.4, FULL_FLIP_START),
         size: 'xl',
-        color: '#4ade80', // green-400
+        color: '#22c55e',
         mono: true,
       });
     }
@@ -81,13 +99,13 @@ const TextOverlay = ({ time }) => {
 
     // Highlight axis groups
     if (time >= EXPLOSION_END && time < EXPLOSION_END + 1.0) {
-      msgs.push({ text: 'Red ↔ Orange', opacity: fadeWindow(time, EXPLOSION_END, EXPLOSION_END + 1.0), size: 'lg', color: '#f97316', mono: true });
+      msgs.push({ node: antipodalNode('Red', 'Orange'), opacity: fadeWindow(time, EXPLOSION_END, EXPLOSION_END + 1.0), size: 'lg', color: '#f97316', mono: true });
     }
     if (time >= EXPLOSION_END + 1.0 && time < EXPLOSION_END + 2.0) {
-      msgs.push({ text: 'Blue ↔ Green', opacity: fadeWindow(time, EXPLOSION_END + 1.0, EXPLOSION_END + 2.0), size: 'lg', color: '#4ade80', mono: true });
+      msgs.push({ node: antipodalNode('Blue', 'Green'), opacity: fadeWindow(time, EXPLOSION_END + 1.0, EXPLOSION_END + 2.0), size: 'lg', color: '#22c55e', mono: true });
     }
     if (time >= EXPLOSION_END + 2.0 && time < EXPLOSION_END + 3.0) {
-      msgs.push({ text: 'White ↔ Yellow', opacity: fadeWindow(time, EXPLOSION_END + 2.0, EXPLOSION_END + 3.0), size: 'lg', color: '#fde68a', mono: true });
+      msgs.push({ node: antipodalNode('White', 'Yellow'), opacity: fadeWindow(time, EXPLOSION_END + 2.0, EXPLOSION_END + 3.0), size: 'lg', color: '#eab308', mono: true });
     }
 
     // Implode / reassemble
@@ -151,7 +169,7 @@ const TextOverlay = ({ time }) => {
               padding: '0 24px',
             }}
           >
-            {msg.text}
+            {msg.node || msg.text}
           </div>
         ))}
       </div>
