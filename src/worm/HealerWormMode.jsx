@@ -651,7 +651,7 @@ function useWormCrawler(size, cubies) {
                         if (puIdx !== -1) {
                             const pickedUp = powerupsRef.current[puIdx];
                             const liveCubies = useGameStore.getState().cubies;
-                            const pickedSticker = liveCubies?.[pickedUp.x]?.[pickedUp.y]?.[pickedUp.z]?.stickers?.[pickedUp.dirKey];
+                            const pickedSticker = getStickerSafe(liveCubies, pickedUp.x, pickedUp.y, pickedUp.z, pickedUp.dirKey);
                             // Orbs on flipped tiles hover above the surface — worm must jump to reach them
                             const tileIsFlipped = !!(pickedSticker && pickedSticker.curr !== pickedSticker.orig);
                             if (tileIsFlipped && !isJumping.current) {

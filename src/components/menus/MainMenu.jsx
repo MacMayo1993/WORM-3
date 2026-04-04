@@ -183,8 +183,17 @@ const FacePulses = () => {
     _pulse.idx = ps.idx;
     _pulse.rawP = rawP;
 
-    // During the gap between pulses every face is invisible — skip geometry/light work
-    if (rawP >= 1.0) return;
+    // During the gap between pulses hide everything and skip geometry/light work.
+    // Must explicitly hide lines and balls here — the forEach below only runs when rawP < 1.
+    if (rawP >= 1.0) {
+      FACE_KEYS.forEach(face => {
+        lineRefs.current[face]?.forEach(l => { if (l) l.visible = false; });
+        ballRefs.current[face]?.forEach(b => { if (b) b.visible = false; });
+        const lt = lightRefs.current[face];
+        if (lt) lt.intensity = 0;
+      });
+      return;
+    }
 
     const activeFaces = PULSE_PAIRS[ps.idx].faces;
 
@@ -197,6 +206,7 @@ const FacePulses = () => {
 
       if (!isActive || rawP <= 0 || rawP >= 1) {
         lines.forEach(l => { if (l) l.visible = false; });
+        ballRefs.current[face]?.forEach(b => { if (b) b.visible = false; });
         if (light) light.intensity = 0;
         return;
       }
