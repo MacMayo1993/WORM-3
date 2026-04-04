@@ -87,7 +87,7 @@ const fragmentShader = /* glsl */ `
 
     // Combine: major lines override minor
     float lineStr = max(minor * 0.55, major);
-    if (lineStr < 0.02) discard;
+    // NOTE: no discard here — non-line pixels render as the paper background
 
     // ── Color ──────────────────────────────────────────────────────────────
     // Classic graph paper: blue lines on white paper.
