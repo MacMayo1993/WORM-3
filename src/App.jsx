@@ -44,6 +44,7 @@ import {
 import GameScene from './3d/GameScene.jsx';
 import IntroScene from './components/intro/IntroScene.jsx';
 import { RotatingBlackCube } from './components/menus/MainMenu.jsx';
+import { RP2GridBackground } from './components/RP2GridBackground.jsx';
 import { setSharedRenderer, tickPreviews, hasActivePreviews } from './3d/TilePreviewRenderer.js';
 
 // UI components
@@ -97,6 +98,7 @@ function IntroBranch({ time, onComplete, reducedMotion = false, performanceMode 
       <ambientLight intensity={0.6} />
       <pointLight position={[10, 10, 10]} intensity={1.8} />
       <pointLight position={[-10, -10, -10]} intensity={1.2} />
+      <RP2GridBackground opacity={0.55} />
       <IntroScene time={time} onComplete={onComplete} />
       <Suspense fallback={null}>
         <Environment preset="city" />
@@ -156,6 +158,7 @@ function MenuScene() {
       <pointLight position={[8, 8, 10]} intensity={0.32} color="#a8d8ff" />
       <pointLight position={[-9, -8, 7]} intensity={0.18} color="#7aa3ff" />
       <pointLight position={[0, 2, -14]} intensity={0.08} color="#8db3ff" />
+      <RP2GridBackground opacity={1.0} />
       <RotatingBlackCube />
       <Suspense fallback={null}>
         <Environment preset="city" intensity={0.22} />
