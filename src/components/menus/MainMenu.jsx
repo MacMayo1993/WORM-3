@@ -719,7 +719,7 @@ const StoreNavItem = ({ onStore }) => {
 // ─── Main component ───────────────────────────────────────────────────────────
 // onPlay / onHolonomy / onBiome / onMerge are kept as props for UILayer compatibility
 // but are no longer wired to buttons — those modes live in the Coming Soon screen.
-const MainMenu = ({ onPlay: _onPlay, _onLevels, onFreeplay, _onCoop, onSettings: _onSettings, onBiome: _onBiome, onDisparity, onWormHealer, onHolonomy: _onHolonomy, onMerge: _onMerge, onStore, onComingSoon }) => {
+const MainMenu = ({ onPlay: _onPlay, _onLevels, onFreeplay, _onCoop, onSettings: _onSettings, onBiome: _onBiome, onDisparity, onWormHealer, onHolonomy: _onHolonomy, onMerge: _onMerge, onStore, onComingSoon, onMobiusCubelet }) => {
   const CLEAN = {
     panel: 'rgba(8,12,28,0.68)',
     panelStrong: 'rgba(10,14,32,0.80)',
@@ -833,6 +833,28 @@ const MainMenu = ({ onPlay: _onPlay, _onLevels, onFreeplay, _onCoop, onSettings:
 
           {/* What's Coming pill */}
           <ComingSoonButton onPress={onComingSoon} />
+
+          {/* Möbius Cubelet visualizer link */}
+          {onMobiusCubelet && (
+            <button
+              onClick={onMobiusCubelet}
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: '4px 10px',
+                cursor: 'pointer',
+                fontSize: '11px',
+                color: 'rgba(160,190,255,0.45)',
+                fontFamily: "-apple-system, 'SF Pro Text', system-ui, sans-serif",
+                letterSpacing: '0.06em',
+                transition: 'color 0.2s ease',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.color = 'rgba(200,220,255,0.75)'; }}
+              onMouseLeave={e => { e.currentTarget.style.color = 'rgba(160,190,255,0.45)'; }}
+            >
+              ∞ Möbius Cubelet
+            </button>
+          )}
 
           {/* Bottom nav pill: Disparity | Explore | Store */}
           <div style={{

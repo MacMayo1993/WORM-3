@@ -39,6 +39,7 @@ import { isMobile } from '../utils/device.js';
 
 // Lazy-loaded — deferred to reduce initial parse time
 const ComingSoonScreen = React.lazy(() => import('./screens/ComingSoonScreen.jsx'));
+const MobiusCubeletScreen = React.lazy(() => import('./screens/MobiusCubeletScreen.jsx'));
 const VictoryScreen = React.lazy(() => import('./screens/VictoryScreen.jsx'));
 const LevelSelectScreen = React.lazy(() => import('./screens/LevelSelectScreen.jsx'));
 const Level10Cutscene = React.lazy(() => import('./screens/Level10Cutscene.jsx'));
@@ -95,6 +96,7 @@ export default function UILayer({
     disparityWaitingFirstFlip, disparityCountdown,
     showAntipodalPiP, onToggleAntipodalPiP,
     showComingSoon, onCloseComingSoon,
+    showMobiusCubelet, onCloseMobiusCubelet,
   } = ui;
 
   const {
@@ -104,7 +106,7 @@ export default function UILayer({
     onTutorialClose, onLevelTutorialClose, onNextLevel,
     onPreset, onInstantChaos, onSaveState, onLoadState,
     onMenuPlay, onMenuLevels, onMenuFreeplay, onMenuCoop, onMenuTeach,
-    onMenuSettings, onMenuBiome, onMenuDisparity, onMenuWormHealer, onMenuHolonomy, onMenuMerge, onMenuStore, onMenuComingSoon,
+    onMenuSettings, onMenuBiome, onMenuDisparity, onMenuWormHealer, onMenuHolonomy, onMenuMerge, onMenuStore, onMenuComingSoon, onMenuMobiusCubelet,
     showMergeThemePicker, onMergeStart, onMergeCancel,
     onWizardComplete, onWizardCancel, onDisparitySetupComplete,
     onBetPlaced, onBetSkipped,
@@ -379,12 +381,19 @@ export default function UILayer({
           onMerge={onMenuMerge}
           onStore={onMenuStore}
           onComingSoon={onMenuComingSoon}
+          onMobiusCubelet={onMenuMobiusCubelet}
         />
       )}
 
       {showComingSoon && (
         <Suspense fallback={null}>
           <ComingSoonScreen onBack={onCloseComingSoon} />
+        </Suspense>
+      )}
+
+      {showMobiusCubelet && (
+        <Suspense fallback={null}>
+          <MobiusCubeletScreen onBack={onCloseMobiusCubelet} />
         </Suspense>
       )}
 
