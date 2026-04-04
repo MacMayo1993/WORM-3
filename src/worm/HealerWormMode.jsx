@@ -58,7 +58,7 @@ import {
     randomFreeTile,
     randomUnflippedTile,
 } from './healerWorm/surfaceTiles.js';
-import ParityOrbs from './ParityOrb.jsx';
+import ParityOrbs, { OrbCollectEffect } from './ParityOrb.jsx';
 import { isMobile as _isMobile } from '../utils/device.js';
 import { healBurstMap } from '../3d/styles/TileStyleMaterials.jsx';
 import WormHat3D from './wormCosmetics.jsx';
@@ -177,7 +177,8 @@ function useWormCrawler(size, cubies) {
     const voidTunnelKeysRef = useRef(new Set());
     const pendingVoidKillRef = useRef(null);
     const currentTunnelStableKeyRef = useRef(null); // stable key of the tunnel being traversed
-    const pendingHealBurstRef = useRef(null); // set when a heal fires; consumed by HeartBurstSystem
+    const pendingHealBurstRef = useRef(null);  // set when a heal fires; consumed by HeartBurstSystem
+    const pendingOrbFlashRef = useRef(null);   // set when glow worm picks up orb; consumed by OrbFlashSystem
     // O(1) tunnel endpoint lookup — rebuilt whenever cubies change via the effect below.
     // Both the manifold map and tunnel list are built in one pass to avoid a second O(size³×6) scan.
     const tunnelLookupRef = useRef(new Map());
@@ -661,6 +662,7 @@ function useWormCrawler(size, cubies) {
                                 const liveColors = resolveColors(useGameStore.getState().settings);
                                 const pickedColor = ensureOrbContrast((pickedFaceId && liveColors[pickedFaceId]) ?? '#22ff88');
                                 applyOrbPickupGrowth(pickedColor, pickedFaceId);
+                                pendingOrbFlashRef.current = { color: pickedColor, pos: curWorldPos.current.toArray() };
                                 const newPowerup = { ...randomFreeTile(size, [...powerupsRef.current, pos.current]), type: 'apple' };
                                 const next = [...powerupsRef.current];
                                 next[puIdx] = newPowerup;
@@ -969,7 +971,7 @@ function useWormCrawler(size, cubies) {
         headInterpPos, currentNormal,
         tailLength, stepHistory, orbPickupColorsRef, tick, queueTurn,
         voidTunnelKeysRef, tunnelUseCountsRef,
-        willHealRef, healFiredRef, pendingHealBurstRef
+        willHealRef, healFiredRef, pendingHealBurstRef, pendingOrbFlashRef
     };
 }
 
@@ -1730,6 +1732,36 @@ function PowerupOrbs({ size }) {
     return <ParityOrbs orbs={orbs} size={size} />;
 }
 
+// Watches for orb pickups by the glow worm and renders a color bloom at the collect point.
+// Follows the same pendingRef + useFrame polling pattern as HeartBurstSystem.
+function OrbFlashSystem({ worm }) {
+    const wormCharacterId = useGameStore(s => s.wormCharacter ?? 'classic');
+    const [flashes, setFlashes] = useState([]);
+
+    useFrame(() => {
+        if (!worm.pendingOrbFlashRef.current) return;
+        const { color, pos } = worm.pendingOrbFlashRef.current;
+        worm.pendingOrbFlashRef.current = null;
+        // Only the glow worm gets the color bloom
+        if (wormCharacterId !== 'glow') return;
+        const id = Date.now() + Math.random();
+        setFlashes(prev => [...prev, { id, pos, color }]);
+    });
+
+    if (flashes.length === 0) return null;
+    return (
+        <>
+            {flashes.map(f => (
+                <OrbCollectEffect
+                    key={f.id}
+                    position={f.pos}
+                    color={f.color}
+                    onDone={() => setFlashes(prev => prev.filter(x => x.id !== f.id))}
+                />
+            ))}
+        </>
+    );
+}
 
 function WormInteriorGlass({ worm, size }) {
     const glassRef = useRef();
@@ -2598,6 +2630,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             />
             <TunnelHealProgress size={size} />
             <HeartBurstSystem worm={worm} size={size} />
+            <OrbFlashSystem worm={worm} />
             <PowerupOrbs size={size} />
         </>
     );
