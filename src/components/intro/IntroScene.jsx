@@ -501,14 +501,34 @@ const IntroScene = ({ time, onComplete }) => {
       ))}
 
       {/* Worms traversing antipodal tunnels */}
-      {time >= WORM_START && wormPaths.map(path => (
-        !wormComplete[path.id] && (
-          <WormParticle
-            key={path.id}
-            start={path.start}
-            end={path.end}
-            color1={path.color1}
-            color2={path.color2}
-            startTime={WORM_START}
+      {time >= WORM_START && wormPaths.filter(path => !wormComplete[path.id]).map(path => (
+        <WormParticle
+          key={path.id}
+          start={path.start}
+          end={path.end}
+          color1={path.color1}
+          color2={path.color2}
+          startTime={WORM_START}
+          currentTime={time}
+          onComplete={() => handleWormComplete(path.id)}
+        />
+      ))}
+
+      {/* Arrival bursts when worms exit */}
+      {wormPaths.map(path => {
+        const bt = burstTimes[path.id];
+        return (showBurst[path.id] && bt && time < bt + 0.5) ? (
+          <ArrivalBurst
+            key={`burst-${path.id}`}
+            position={path.end}
+            color={path.color2}
+            startTime={bt}
             currentTime={time}
-          
+          />
+        ) : null;
+      })}
+    </group>
+  );
+};
+
+export default IntroScene;
