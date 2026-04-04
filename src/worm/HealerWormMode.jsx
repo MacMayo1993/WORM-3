@@ -63,6 +63,7 @@ import { isMobile as _isMobile } from '../utils/device.js';
 import { healBurstMap } from '../3d/styles/TileStyleMaterials.jsx';
 import WormHat3D from './wormCosmetics.jsx';
 import { getSkin, _hatAlignQuat, _hatYUp } from './wormCosmeticsData.js';
+import { getWormCharacter } from './wormCharacterData.js';
 import { EARN_ORB_COLLECT, EARN_WORM_SURVIVAL_TICK, EARN_WORM_HEALED_FACE, SURVIVAL_TICK_INTERVAL } from '../utils/economyConstants.js';
 
 // ─── Tile position rotation helper ───────────────────────────────────────────
@@ -1266,6 +1267,11 @@ const _headPathPoint = { pos: _bodyHeadPos, normal: _bodyNormal };
 function WormBody({ worm }) {
     const meshRef = useRef();
     const wormSkinId = useGameStore(s => s.wormSkin ?? 'slime');
+    const wormCharacterId = useGameStore(s => s.wormCharacter ?? 'classic');
+    const wormCharacter = getWormCharacter(wormCharacterId);
+    const isInch = wormCharacter.id === 'inch';
+    const isGlow = wormCharacter.id === 'glow';
+    const isBook = wormCharacter.id === 'book';
     const wormColor = getSkin(wormSkinId).body;
     // Ref so useFrame always reads the latest wormColor without closure staleness
     const wormColorRef = useRef(wormColor);
@@ -1344,8 +1350,16 @@ function WormBody({ worm }) {
                 }
 
                 _wormDummy.position.copy(_bodyClonePos);
-                // It's a true clone, so KEEP THE SCALE EXACTLY LIKE THE HEAD
-                _wormDummy.scale.setScalar(0.07);
+                if (isInch) {
+                    const accordion = 1 + Math.sin(time * 8 + i) * 0.2;
+                    _wormDummy.scale.set(0.078 * accordion, 0.062, 0.095);
+                } else if (isBook) {
+                    _wormDummy.scale.set(0.082, 0.055, 0.095);
+                } else if (isGlow) {
+                    _wormDummy.scale.setScalar(0.073);
+                } else {
+                    _wormDummy.scale.setScalar(0.07);
+                }
             }
 
             _wormDummy.updateMatrix();
@@ -1370,7 +1384,13 @@ function WormBody({ worm }) {
     return (
         <instancedMesh ref={meshRef} args={[undefined, undefined, MAX_TAIL]} frustumCulled={false}>
             <sphereGeometry args={[1, 12, 12]} />
-            <meshStandardMaterial color={wormColor} emissive={wormColor} emissiveIntensity={0.35} />
+            <meshStandardMaterial
+                color={wormColor}
+                emissive={wormColor}
+                emissiveIntensity={isGlow ? 0.9 : 0.35}
+                roughness={isBook ? 0.52 : 0.28}
+                metalness={isBook ? 0.15 : 0}
+            />
         </instancedMesh>
     );
 }

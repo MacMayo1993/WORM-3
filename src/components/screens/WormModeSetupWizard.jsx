@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { WORM_SKINS, WORM_HATS } from '../../worm/wormCosmeticsData.js';
+import { WORM_CHARACTERS } from '../../worm/wormCharacterData.js';
 import { COLOR_SCHEMES, TILE_STYLES, SCHEME_LABELS } from '../../utils/colorSchemes.js';
 import { CLASSIC_STYLE_KEYS, ANTIPODAL_STYLE_KEYS, LIVING_STYLE_KEYS } from '../../utils/tileStyleCatalog.js';
 import { BACKGROUNDS, getBackgroundUrl } from '../../utils/backgrounds.js';
@@ -726,10 +727,13 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
 
   const wormSkinId = useGameStore(s => s.wormSkin ?? 'slime');
   const wormHatId = useGameStore(s => s.wormHat ?? 'none');
+  const wormCharacterId = useGameStore(s => s.wormCharacter ?? 'classic');
   const setWormSkin = useGameStore(s => s.setWormSkin);
   const setWormHat = useGameStore(s => s.setWormHat);
+  const setWormCharacter = useGameStore(s => s.setWormCharacter);
   const ownedItems = useGameStore(s => s.ownedItems);
   const activeSkin = WORM_SKINS.find(s => s.id === wormSkinId) ?? WORM_SKINS[0];
+  const activeCharacter = WORM_CHARACTERS.find(c => c.id === wormCharacterId) ?? WORM_CHARACTERS[0];
 
   const renderCharacter = () => {
     const chipBase = {
@@ -794,13 +798,45 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px',
           padding: '28px 0 8px',
         }}>
+          {/* Character archetype picker */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px', width: '100%', maxWidth: '440px' }}>
+            {WORM_CHARACTERS.map(character => {
+              const selected = character.id === wormCharacterId;
+              return (
+                <button
+                  key={character.id}
+                  onClick={() => setWormCharacter(character.id)}
+                  style={{
+                    ...chipBase,
+                    padding: '10px 12px',
+                    textAlign: 'left',
+                    background: selected ? 'rgba(59,130,246,0.14)' : 'rgba(0,0,0,0.04)',
+                    border: selected ? '2px solid #3b82f6' : '2px solid transparent',
+                    boxShadow: selected ? '0 0 10px rgba(59,130,246,0.25)' : 'none',
+                  }}
+                >
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: selected ? '#1d4ed8' : 'rgba(0,0,0,0.66)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                    {character.label}
+                  </div>
+                  <div style={{ fontSize: '10px', color: 'rgba(0,0,0,0.46)', marginTop: '2px' }}>
+                    {character.subtitle}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
           {/* CSS worm illustration */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
             {/* Head */}
             <div style={{
-              width: '38px', height: '38px', borderRadius: '50%',
+              width: wormCharacterId === 'inch' ? '34px' : '38px',
+              height: wormCharacterId === 'inch' ? '34px' : '38px',
+              borderRadius: wormCharacterId === 'book' ? '12px' : '50%',
               background: activeSkin.body,
-              boxShadow: `0 0 14px ${activeSkin.glow}88`,
+              boxShadow: wormCharacterId === 'glow'
+                ? `0 0 22px ${activeSkin.glow}cc`
+                : `0 0 14px ${activeSkin.glow}88`,
               display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
               gap: '3px', position: 'relative',
             }}>
@@ -821,19 +857,33 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                 <div style={{ width: '3px', height: '3px', borderRadius: '50%', background: '#111', opacity: 0.7, marginBottom: '-2px' }} />
                 <div style={{ width: '3px', height: '3px', borderRadius: '50%', background: '#111', opacity: 0.7 }} />
               </div>
+              {wormCharacterId === 'book' && (
+                <div style={{
+                  position: 'absolute',
+                  top: '10px',
+                  width: '24px',
+                  height: '9px',
+                  border: '1.5px solid rgba(17,17,17,0.9)',
+                  borderRadius: '999px',
+                  boxSizing: 'border-box',
+                }} />
+              )}
             </div>
             {/* Body segments */}
-            {[32, 27, 22].map((sz, i) => (
+            {(wormCharacterId === 'inch' ? [29, 18] : [32, 27, 22]).map((sz, i) => (
               <div key={i} style={{
-                width: `${sz}px`, height: `${sz}px`, borderRadius: '50%',
+                width: `${sz}px`, height: `${sz}px`,
+                borderRadius: wormCharacterId === 'book' ? '10px' : '50%',
                 background: activeSkin.belly,
-                boxShadow: `0 0 8px ${activeSkin.glow}55`,
+                boxShadow: wormCharacterId === 'glow'
+                  ? `0 0 12px ${activeSkin.glow}bb`
+                  : `0 0 8px ${activeSkin.glow}55`,
                 opacity: 1 - i * 0.08,
               }} />
             ))}
           </div>
           <div style={{ fontSize: '12px', fontWeight: 600, color: activeSkin.body, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-            {activeSkin.label}{wormHatId !== 'none' ? ` · ${WORM_HATS.find(h => h.id === wormHatId)?.label}` : ''}
+            {activeCharacter.label} · {activeSkin.label}{wormHatId !== 'none' ? ` · ${WORM_HATS.find(h => h.id === wormHatId)?.label}` : ''}
           </div>
         </div>
 
@@ -927,7 +977,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
   const stepContent = [renderCharacter, renderBackgrounds, renderColors, renderStyles, renderGameplay, renderSize];
   const stepTitles = ['Character', 'Background', 'Color Palette', 'Tile Style', 'Gameplay', 'Cube Size'];
   const stepSubtitles = [
-    'Choose your worm\'s skin and hat',
+    'Choose your worm character, skin, and hat',
     'Choose your play environment',
     'Set the colors for your cube faces (or upload an image)',
     'Choose how your tiles look and feel',
