@@ -18,15 +18,21 @@ const ALL_STYLES = [
 
 const FACE_DIRS = ['PZ', 'NZ', 'PX', 'NX', 'PY', 'NY'];
 
-// ─── Antipodal face pulse rings ────────────────────────────────────────────────
-// Cycle: B-G → R-O → W-Y → repeat
-const PULSE_PAIRS = [
-  { faces: ['PX', 'NX'] },  // Blue – Green
-  { faces: ['PZ', 'NZ'] },  // Red  – Orange
-  { faces: ['PY', 'NY'] },  // White – Yellow
-];
-const PAIR_INTERVAL = 1.3;   // seconds per step (pulse + gap)
-const PULSE_DUR = 0.95;  // animation window within each step
+// ─── Per-face independent pulse timing ────────────────────────────────────────
+// Each of the 6 faces gets its own phase offset so all 6 colors are always
+// visible — staggered evenly across one full cycle (PULSE_CYCLE seconds).
+const PULSE_CYCLE = 3.6;   // full repeat period per face (seconds)
+const PULSE_DUR   = 0.90;  // active window within each cycle
+
+// Phase offsets: antipodal pairs fire together (0° apart), pairs 60° apart each.
+const FACE_PHASE = {
+  PZ:  0.0,                   // Red
+  NZ:  0.0,                   // Orange  (antipodal to Red, same phase)
+  PX:  PULSE_CYCLE / 3,       // Blue
+  NX:  PULSE_CYCLE / 3,       // Green   (antipodal to Blue, same phase)
+  PY:  (PULSE_CYCLE / 3) * 2, // White
+  NY:  (PULSE_CYCLE / 3) * 2, // Yellow  (antipodal to White, same phase)
+};
 
 const FACE_COLOR = {
   PX: '#3b82f6', NX: '#22c55e',
@@ -46,8 +52,8 @@ const FACE_CFG = {
 const FACE_KEYS = Object.keys(FACE_CFG);
 
 // ─── Shared pulse state — written by FacePulses (WebGL), read by ScreenGlow (DOM) ──
-// Same pattern as sharedTremorState in the game; no React re-renders on the hot path.
-const _pulse = { idx: 0, rawP: 0 };
+// Per-face rawP values (0→1) so all 6 colors are always independently visible.
+const _pulsePerFace = { PX: 0, NX: 0, PY: 0, NY: 0, PZ: 0, NZ: 0 };
 
 // Screen-edge gradient per face: each face maps to the screen region it faces.
 // PZ/NZ (front/back) use left/right edges since they have no top-bottom screen axis.
@@ -60,28 +66,23 @@ const FACE_SCREEN_GRADIENT = {
   NZ: c => `radial-gradient(ellipse 55% 120% at 88%  50%, ${c} 0%, transparent 68%)`,
 };
 
-// DOM overlay — reads _pulse via rAF and updates div opacity directly (no React state)
+// DOM overlay — reads _pulsePerFace via rAF and updates div opacity directly (no React state)
 const ScreenGlow = () => {
   const divRefs = useRef({});
   useEffect(() => {
     let raf;
-    let prevIdx = -1;
-    let prevRawP = -1;
+    // Track previous per-face values to skip no-op DOM writes
+    const prev = { PX: -1, NX: -1, PY: -1, NY: -1, PZ: -1, NZ: -1 };
     const tick = () => {
-      const { idx, rawP } = _pulse;
-      // Skip DOM writes when the pulse state hasn't changed (e.g. during the gap period)
-      if (idx !== prevIdx || rawP !== prevRawP) {
-        prevIdx = idx;
-        prevRawP = rawP;
-        const activeFaces = PULSE_PAIRS[idx]?.faces ?? [];
+      FACE_KEYS.forEach(face => {
+        const rawP = _pulsePerFace[face];
+        if (rawP === prev[face]) return;
+        prev[face] = rawP;
+        const el = divRefs.current[face];
+        if (!el) return;
         const bell = rawP < 0.30 ? rawP / 0.30 : (1 - rawP) / 0.70;
-        const alpha = Math.max(0, bell) * 0.28;
-        FACE_KEYS.forEach(face => {
-          const el = divRefs.current[face];
-          if (!el) return;
-          el.style.opacity = activeFaces.includes(face) ? String(alpha) : '0';
-        });
-      }
+        el.style.opacity = String(Math.max(0, bell) * 0.22);
+      });
       raf = requestAnimationFrame(tick);
     };
     tick();
@@ -176,46 +177,25 @@ const FacePulses = () => {
   const lineRefs = useRef({});   // face → [line, ...]  (arrays)
   const ballRefs = useRef({});   // face → [instancedMesh, ...]
   const lightRefs = useRef({});
-  const pairState = useRef({ idx: 0, t0: -1 });
   const tempObj = useMemo(() => new THREE.Object3D(), []);
 
   useFrame((state) => {
     const t = state.clock.elapsedTime;
-    const ps = pairState.current;
-    if (ps.t0 < 0) ps.t0 = t;
-
-    if (t - ps.t0 >= PAIR_INTERVAL) {
-      ps.idx = (ps.idx + 1) % PULSE_PAIRS.length;
-      ps.t0 += PAIR_INTERVAL;
-    }
-
-    const rawP = Math.min((t - ps.t0) / PULSE_DUR, 1.0);
-
-    _pulse.idx = ps.idx;
-    _pulse.rawP = rawP;
-
-    // During the gap between pulses hide everything and skip geometry/light work.
-    // Must explicitly hide lines and balls here — the forEach below only runs when rawP < 1.
-    if (rawP >= 1.0) {
-      FACE_KEYS.forEach(face => {
-        lineRefs.current[face]?.forEach(l => { if (l) l.visible = false; });
-        ballRefs.current[face]?.forEach(b => { if (b) b.visible = false; });
-        const lt = lightRefs.current[face];
-        if (lt) lt.intensity = 0;
-      });
-      return;
-    }
-
-    const activeFaces = PULSE_PAIRS[ps.idx].faces;
 
     FACE_KEYS.forEach(face => {
+      // Each face runs on its own clock offset by FACE_PHASE[face]
+      const tFace = (t + FACE_PHASE[face]) % PULSE_CYCLE;
+      const rawP = tFace < PULSE_DUR ? tFace / PULSE_DUR : 1.0;
+
+      // Write per-face rawP for ScreenGlow to read
+      _pulsePerFace[face] = rawP;
+
       const lines = lineRefs.current[face];
       const light = lightRefs.current[face];
-      const isActive = activeFaces.includes(face);
 
       if (!lines?.length) return;
 
-      if (!isActive || rawP <= 0 || rawP >= 1) {
+      if (rawP >= 1.0) {
         lines.forEach(l => { if (l) l.visible = false; });
         ballRefs.current[face]?.forEach(b => { if (b) b.visible = false; });
         if (light) light.intensity = 0;
