@@ -55,7 +55,7 @@ const ParityStoreScreen = React.lazy(() => import('./components/screens/ParitySt
 import { useTeachMode } from './teach/useTeachMode.js';
 import { useAntipodalIntegrity } from './hooks/useAntipodalIntegrity.js';
 import { isMobile } from './utils/device.js';
-import { EXPLOSION_START, EXPLOSION_END, IMPLODE_START, IMPLODE_END } from './components/intro/introTiming.js';
+import { GREEN_SHOW_START, FULL_FLIP_START, EXPLOSION_START, EXPLOSION_END, IMPLODE_START, IMPLODE_END } from './components/intro/introTiming.js';
 // Lazy-loaded: not needed on initial render, deferred to reduce parse time
 const PlatformerWormMode = React.lazy(() => import('./worm/PlatformerWormMode.jsx'));
 const WormTouchControls = React.lazy(() => import('./worm/WormTouchControls.jsx'));
@@ -74,8 +74,19 @@ const _chromaticVec = new Vector2(0, 0);
  */
 function IntroBranch({ time, onComplete, reducedMotion = false, performanceMode = false }) {
   const bloomIntensity = useMemo(() => {
-    if (time < EXPLOSION_START) return reducedMotion ? 0.25 : 0.6;
-    if (time < EXPLOSION_END) return (reducedMotion ? 0.25 : 0.6) + _ease(_prog(time, EXPLOSION_START, EXPLOSION_END)) * (reducedMotion ? 0.9 : 2.4);
+    const base = reducedMotion ? 0.25 : 0.6;
+
+    // All-manifold grid-line flash: +33 % bloom bell-curve from GREEN_SHOW+0.4
+    // through FULL_FLIP_START (the window when all face-pair seams light up).
+    const GRID_FLASH_START = GREEN_SHOW_START + 0.4; // ≈ 5.2 s
+    const GRID_FLASH_END   = FULL_FLIP_START;         // 6.5 s
+    const gridFlash =
+      time >= GRID_FLASH_START && time < GRID_FLASH_END
+        ? Math.sin(_prog(time, GRID_FLASH_START, GRID_FLASH_END) * Math.PI) * (base * 0.33)
+        : 0;
+
+    if (time < EXPLOSION_START) return base + gridFlash;
+    if (time < EXPLOSION_END) return base + _ease(_prog(time, EXPLOSION_START, EXPLOSION_END)) * (reducedMotion ? 0.9 : 2.4);
     if (time < IMPLODE_START) return reducedMotion ? 1.1 : 3.0;
     if (time < IMPLODE_END) return (reducedMotion ? 1.1 : 3.0) - _ease(_prog(time, IMPLODE_START, IMPLODE_END)) * (reducedMotion ? 0.7 : 2.2);
     return reducedMotion ? 0.3 : 0.8;

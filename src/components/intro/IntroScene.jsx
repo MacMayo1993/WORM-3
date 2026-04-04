@@ -77,17 +77,13 @@ const GridLines = ({ time }) => {
 
   if (baseOpacity <= 0) return null;
 
-  // Grid line pulses — highlight the relevant face pair during each callout window.
-  // Pre-explosion: x-axis (PX=Blue, NX=Green) during "Blue ↔ Green" text.
-  const xPulse = (time >= GREEN_SHOW_START + 0.4 && time < FULL_FLIP_START)
+  // Grid line pulses — all three antipodal face-pairs flash at full brightness
+  // during the callout window (GREEN_SHOW+0.4 → FULL_FLIP_START) so every
+  // manifold lights up before the explosion, not just the Blue/Green pair.
+  const allPulse = (time >= GREEN_SHOW_START + 0.4 && time < FULL_FLIP_START)
     ? Math.sin(progress(time, GREEN_SHOW_START + 0.4, FULL_FLIP_START) * Math.PI) * 0.70
     : 0;
-  // Smaller ambient pulses for z and y axes whenever blue/green are pulsing
-  // (gives the other seams a faint sympathetic glow so the cube feels alive).
-  const zPulse = xPulse * 0.4;
-  const yPulse = xPulse * 0.3;
-
-  const pulseFor = { x: xPulse, y: yPulse, z: zPulse };
+  const pulseFor = { x: allPulse, y: allPulse, z: allPulse };
 
   return (
     <>
