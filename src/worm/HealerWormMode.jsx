@@ -66,6 +66,24 @@ import { getSkin, _hatAlignQuat, _hatYUp } from './wormCosmeticsData.js';
 import { getWormCharacter } from './wormCharacterData.js';
 import { EARN_ORB_COLLECT, EARN_WORM_SURVIVAL_TICK, EARN_WORM_HEALED_FACE, SURVIVAL_TICK_INTERVAL } from '../utils/economyConstants.js';
 
+// ─── Orb contrast helper ─────────────────────────────────────────────────────
+// Ensures orb colors are always visible regardless of color scheme.
+// Near-white face colors (e.g. face 3 in pastel/ghibli) wash out to invisible
+// against the bright orb emissive — clamp perceived luminance to ≤ 0.72.
+function ensureOrbContrast(hex) {
+    if (!hex || hex.length < 7) return hex;
+    const r = parseInt(hex.slice(1, 3), 16) / 255;
+    const g = parseInt(hex.slice(3, 5), 16) / 255;
+    const b = parseInt(hex.slice(5, 7), 16) / 255;
+    const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+    if (lum <= 0.72) return hex;
+    const factor = 0.55 / Math.max(lum, 0.01);
+    const nr = Math.min(255, Math.round(r * factor * 255));
+    const ng = Math.min(255, Math.round(g * factor * 255));
+    const nb = Math.min(255, Math.round(b * factor * 255));
+    return `#${nr.toString(16).padStart(2, '0')}${ng.toString(16).padStart(2, '0')}${nb.toString(16).padStart(2, '0')}`;
+}
+
 // ─── Tile position rotation helper ───────────────────────────────────────────
 // Transforms a {x, y, z, dirKey} surface tile through a cube slice rotation.
 // Mirrors the math in rotateSliceCubies + rotateStickers.
@@ -641,7 +659,7 @@ function useWormCrawler(size, cubies) {
                             } else {
                                 const pickedFaceId = pickedSticker ? pickedSticker.curr : 0;
                                 const liveColors = resolveColors(useGameStore.getState().settings);
-                                const pickedColor = (pickedFaceId && liveColors[pickedFaceId]) ?? '#22ff88';
+                                const pickedColor = ensureOrbContrast((pickedFaceId && liveColors[pickedFaceId]) ?? '#22ff88');
                                 applyOrbPickupGrowth(pickedColor, pickedFaceId);
                                 const newPowerup = { ...randomFreeTile(size, [...powerupsRef.current, pos.current]), type: 'apple' };
                                 const next = [...powerupsRef.current];
@@ -1535,9 +1553,9 @@ function PowerupOrbs({ size }) {
         return wormPowerups.map(p => {
             const sticker = getStickerSafe(cubies, p.x, p.y, p.z, p.dirKey);
             const faceId = sticker?.curr ?? 0;
-            const color = (faceId && faceColors[faceId]) ?? '#22ff88';
+            const color = ensureOrbContrast((faceId && faceColors[faceId]) ?? '#22ff88');
             const antipodalFaceId = ANTIPODAL_COLOR[faceId];
-            const antipodalColor = (antipodalFaceId && faceColors[antipodalFaceId]) ?? color;
+            const antipodalColor = ensureOrbContrast((antipodalFaceId && faceColors[antipodalFaceId]) ?? color);
             // Orbs on flipped tiles hover above the surface — worm must jump to collect
             const elevated = !!(sticker && sticker.curr !== sticker.orig);
             return { ...p, color, antipodalColor, elevated };
