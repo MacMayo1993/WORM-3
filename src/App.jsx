@@ -341,6 +341,9 @@ export default function WORM3() {
     useGameStore.getState().setShowMainMenu(true);
   }, []);
 
+  // Coming Soon screen
+  const [showComingSoon, setShowComingSoon] = useState(false);
+
   // Disparity Mode wizard + betting screen + first-flip gate
   const [showDisparityWizard, setShowDisparityWizard] = useState(false);
   const [showDisparityBetting, setShowDisparityBetting] = useState(false);
@@ -692,6 +695,11 @@ export default function WORM3() {
     useGameStore.getState().clearDisparityGame();
     useGameStore.getState().setShowMainMenu(false);
     setShowWormModeWizard(true);
+  }, []);
+
+  const handleMenuComingSoon = useCallback(() => {
+    useGameStore.getState().setShowMainMenu(false);
+    setShowComingSoon(true);
   }, []);
 
   const handleMenuHolonomy = useCallback(() => {
@@ -1181,6 +1189,7 @@ export default function WORM3() {
             showDisparityBetting,
             disparityWaitingFirstFlip, disparityCountdown,
             showAntipodalPiP, onToggleAntipodalPiP: () => setShowAntipodalPiP(v => !v),
+            showComingSoon, onCloseComingSoon: () => { setShowComingSoon(false); useGameStore.getState().setShowMainMenu(true); },
           }}
           handlers={{
             onReset: handleReset,
@@ -1215,6 +1224,7 @@ export default function WORM3() {
             onMenuHolonomy: handleMenuHolonomy,
             onMenuMerge: handleMenuMerge,
             onMenuStore: handleOpenStore,
+            onMenuComingSoon: handleMenuComingSoon,
             showMergeThemePicker,
             onMergeStart: handleMergeStart,
             onMergeCancel: handleMergeCancel,
