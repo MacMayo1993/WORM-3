@@ -11,10 +11,10 @@ import { FACE_COLORS } from '../../utils/constants.js';
  *
  *   PZ (front,  z=max): pos=[0,0,+0.53]  rot=[0,0,0]          — already faces +Z ✓
  *   NZ (back,   z=min): pos=[0,0,-0.53]  rot=[0,PI,0]          — flip around Y to face -Z
- *   PX (right,  x=max): pos=[+0.53,0,0]  rot=[0,-PI/2,0]       — rotate -90° Y to face +X
- *   NX (left,   x=min): pos=[-0.53,0,0]  rot=[0,+PI/2,0]       — rotate +90° Y to face -X
- *   PY (top,    y=max): pos=[0,+0.53,0]  rot=[+PI/2,0,0]       — rotate +90° X to face +Y
- *   NY (bottom, y=min): pos=[0,-0.53,0]  rot=[-PI/2,0,0]       — rotate -90° X to face -Y
+ *   PX (right,  x=max): pos=[+0.53,0,0]  rot=[0,+PI/2,0]       — rotate +90° Y to face +X
+ *   NX (left,   x=min): pos=[-0.53,0,0]  rot=[0,-PI/2,0]       — rotate -90° Y to face -X
+ *   PY (top,    y=max): pos=[0,+0.53,0]  rot=[-PI/2,0,0]       — rotate -90° X to face +Y
+ *   NY (bottom, y=min): pos=[0,-0.53,0]  rot=[+PI/2,0,0]       — rotate +90° X to face -Y
  *
  * faceReveal — object { PZ, NZ, PX, NX, PY, NY } each 0→1, controls glow/visibility.
  *
@@ -80,10 +80,10 @@ const IntroCubie = React.forwardRef(({
   const FACE_DEFS = [
     { key: 'PZ', outer: isOuterPZ, pos: [0, 0,  0.53], rot: [0, 0, 0] },
     { key: 'NZ', outer: isOuterNZ, pos: [0, 0, -0.53], rot: [0, Math.PI, 0] },
-    { key: 'PX', outer: isOuterPX, pos: [ 0.53, 0, 0], rot: [0, -Math.PI / 2, 0] },
-    { key: 'NX', outer: isOuterNX, pos: [-0.53, 0, 0], rot: [0,  Math.PI / 2, 0] },
-    { key: 'PY', outer: isOuterPY, pos: [0,  0.53, 0], rot: [ Math.PI / 2, 0, 0] },
-    { key: 'NY', outer: isOuterNY, pos: [0, -0.53, 0], rot: [-Math.PI / 2, 0, 0] },
+    { key: 'PX', outer: isOuterPX, pos: [ 0.53, 0, 0], rot: [0,  Math.PI / 2, 0] },
+    { key: 'NX', outer: isOuterNX, pos: [-0.53, 0, 0], rot: [0, -Math.PI / 2, 0] },
+    { key: 'PY', outer: isOuterPY, pos: [0,  0.53, 0], rot: [-Math.PI / 2, 0, 0] },
+    { key: 'NY', outer: isOuterNY, pos: [0, -0.53, 0], rot: [ Math.PI / 2, 0, 0] },
   ];
 
   return (
