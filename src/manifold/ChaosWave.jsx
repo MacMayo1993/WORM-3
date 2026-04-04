@@ -19,6 +19,8 @@ const headGeo = new THREE.SphereGeometry(0.11, 8, 8);
 const ghostGeo = new THREE.SphereGeometry(0.065, 6, 6);
 const impactGeo = new THREE.SphereGeometry(0.26, 8, 8);
 const seamGlowGeo = new THREE.SphereGeometry(0.2, 8, 8);
+// Large plane covering an entire cube face — reused across all cross-face bolts
+const faceBloomGeo = new THREE.PlaneGeometry(7, 7);
 
 // Reusable vectors — avoids per-frame GC pressure
 const _a = new THREE.Vector3();
@@ -86,10 +88,11 @@ const ChaosWave = ({ from, to, crossFace = false, onComplete }) => {
 
   const headRef = useRef();
   const ghostRefs = useRef([]);
-  const coreRef = useRef();   // white bolt (line)
-  const glowRef = useRef();   // blue/cyan halo (line, lags behind core)
-  const impactRef = useRef(); // destination flash
-  const seamRef = useRef();   // seam glow (cross-face only)
+  const coreRef = useRef();      // white bolt (line)
+  const glowRef = useRef();      // blue/cyan halo (line, lags behind core)
+  const impactRef = useRef();    // destination flash
+  const seamRef = useRef();      // seam glow (cross-face only)
+  const faceBloomRef = useRef(); // whole-face bloom overlay (cross-face only)
 
   // ── Stable jagged path — one generation per cascade ──────────────────────
   const path = useMemo(() => makePath(from, to), [from, to]);
@@ -119,6 +122,27 @@ const ChaosWave = ({ from, to, crossFace = false, onComplete }) => {
   // Cross-face bolts travel through the manifold gap → slight speed reduction
   // so the seam glow has time to read
   const speed = crossFace ? 1.8 : 2.5;
+
+  // Infer source face position + orientation from the `from` sticker position.
+  // The sticker's 0.52 offset along its face normal makes that axis dominant.
+  const faceBloomProps = useMemo(() => {
+    if (!crossFace) return null;
+    const [fx, fy, fz] = from;
+    const ax = Math.abs(fx), ay = Math.abs(fy), az = Math.abs(fz);
+    if (ax >= ay && ax >= az) {
+      return fx > 0
+        ? { pos: [fx, 0, 0], rot: [0, Math.PI / 2, 0] }
+        : { pos: [fx, 0, 0], rot: [0, -Math.PI / 2, 0] };
+    }
+    if (ay >= ax && ay >= az) {
+      return fy > 0
+        ? { pos: [0, fy, 0], rot: [-Math.PI / 2, 0, 0] }
+        : { pos: [0, fy, 0], rot: [Math.PI / 2, 0, 0] };
+    }
+    return fz > 0
+      ? { pos: [0, 0, fz], rot: [0, 0, 0] }
+      : { pos: [0, 0, fz], rot: [0, Math.PI, 0] };
+  }, [crossFace, from]);
 
   useFrame((_, delta) => {
     if (completedRef.current) return;
@@ -171,6 +195,15 @@ const ChaosWave = ({ from, to, crossFace = false, onComplete }) => {
       const intensity = Math.exp(-(d * d) / 0.025);
       seamRef.current.material.opacity = intensity * 0.75;
       seamRef.current.scale.setScalar(0.6 + intensity * 1.8);
+    }
+
+    // ── Face bloom: broad 30% additive wash over the whole source manifold face ─
+    // Broader Gaussian than the seam glow, so the face lights up softly around
+    // the seam crossing and fades before/after the bolt completes.
+    if (crossFace && faceBloomRef.current) {
+      const d = p - 0.5;
+      const bloomIntensity = Math.exp(-(d * d) / 0.12);
+      faceBloomRef.current.material.opacity = bloomIntensity * 0.3;
     }
 
     // ── Impact flash: sin-bell centered just before arrival ───────────────────
@@ -251,6 +284,25 @@ const ChaosWave = ({ from, to, crossFace = false, onComplete }) => {
             opacity={0}
             blending={THREE.AdditiveBlending}
             depthWrite={false}
+          />
+        </mesh>
+      )}
+
+      {/* Face bloom — 30% additive wash lighting the whole source manifold face */}
+      {crossFace && faceBloomProps && (
+        <mesh
+          ref={faceBloomRef}
+          geometry={faceBloomGeo}
+          position={faceBloomProps.pos}
+          rotation={faceBloomProps.rot}
+        >
+          <meshBasicMaterial
+            color="#00ccff"
+            transparent
+            opacity={0}
+            blending={THREE.AdditiveBlending}
+            depthWrite={false}
+            side={THREE.FrontSide}
           />
         </mesh>
       )}

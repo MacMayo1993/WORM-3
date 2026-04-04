@@ -25,6 +25,12 @@ const _segPos = new THREE.Vector3();
 const _invQuat = new THREE.Quaternion();
 const _tailWorldPos = new THREE.Vector3();
 const _trailLocalPos = new THREE.Vector3();
+// Bookworm per-segment orientation (reusable to avoid GC)
+const _bookDirWorld = new THREE.Vector3();
+const _bookDirLocal = new THREE.Vector3();
+const _bookMat = new THREE.Matrix4();
+const _localOrigin = new THREE.Vector3(0, 0, 0);
+const _localUp = new THREE.Vector3(0, 1, 0);
 
 // Circular buffer helpers — avoids per-frame unshift/clone allocations
 function makeCircularBuffer(capacity) {
@@ -118,11 +124,32 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
 
       _segPos.copy(sampled).sub(_rootPos).applyQuaternion(_invQuat);
       _segPos.y += Math.sin(timeRef.current * 6 + i * 0.8) * 0.02 * moveFactor;
+
       if (isInch) {
-        const accordion = Math.sin(timeRef.current * 8.5) * 0.07;
-        _segPos.z += i === 1 ? accordion : -accordion * 0.7;
+        // Two-phase gait: rear bunches up fast (gather), then slowly extends forward.
+        // Period ~0.83s — 40% gather, 60% extend for the "inch then lunge" feel.
+        const gaitRaw = (timeRef.current * 1.2) % 1.0;
+        const gL = gaitRaw < 0.4 ? gaitRaw / 0.4 : 1.0 - (gaitRaw - 0.4) / 0.6;
+        const gait = gL * gL * (3 - 2 * gL); // smoothstep — no sine, distinct phases
+        _segPos.z += gait * (i === 1 ? 0.13 : 0.21); // rear bunches toward head
+        _segPos.y += gait * (i === 1 ? 0.03 : 0.07); // arch upward while gathered
       }
+
       segGroup.position.copy(_segPos);
+
+      if (isBook) {
+        // Orient each box segment toward the segment ahead of it (toward head),
+        // so body boxes rotate properly through turns instead of snapping with the head.
+        const sampledAhead = cbRead(positionHistory.current, (i - 1) * historyStep);
+        if (sampledAhead) {
+          _bookDirWorld.subVectors(sampledAhead, sampled).normalize();
+          if (_bookDirWorld.lengthSq() > 0.001) {
+            _bookDirLocal.copy(_bookDirWorld).applyQuaternion(_invQuat);
+            _bookMat.lookAt(_localOrigin, _bookDirLocal, _localUp);
+            segGroup.quaternion.setFromRotationMatrix(_bookMat);
+          }
+        }
+      }
     }
 
     const tailRef = bodySegmentRefs.current[segmentOffsets.length - 1];
@@ -177,7 +204,7 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
       for (let ri = 0; ri < glowRingRefs.current.length; ri++) {
         const ring = glowRingRefs.current[ri];
         if (ring && ring.material) {
-          ring.material.opacity = 0.28 + Math.sin(timeRef.current * 3.8 + ri * 1.4) * 0.18;
+          ring.material.opacity = 0.55 + Math.sin(timeRef.current * 3.8 + ri * 1.4) * 0.25;
         }
       }
       const tail = glowTailRef.current;
@@ -221,7 +248,7 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
                   thickness={0.5}
                   roughness={isBook ? 0.52 : 0.2}
                   metalness={0}
-                  transmission={isGlow ? 0.45 : 0.2}
+                  transmission={isGlow ? 0.28 : 0.2}
                   ior={1.45}
                   iridescence={0.16}
                   iridescenceIOR={1.3}
@@ -244,6 +271,14 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
                     <meshStandardMaterial color={BELLY_COLOR} />
                   </mesh>
                 </>
+              )}
+
+              {/* Glow ring anchored to this segment so it tracks through turns */}
+              {isGlow && !isHead && (
+                <mesh ref={el => { glowRingRefs.current[i - 1] = el; }} position={[0, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
+                  <torusGeometry args={[0.17, 0.024, 8, 24]} />
+                  <meshBasicMaterial color={GLOW_COLOR} transparent opacity={0.55} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+                </mesh>
               )}
             </group>
           );
@@ -318,14 +353,6 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
             </mesh>
           </>
         )}
-
-        {/* Glow worm bioluminescent rings — one ring per body segment */}
-        {isGlow && segmentOffsets.slice(1).map((zOff, ri) => (
-          <mesh key={`gr-${ri}`} ref={el => { glowRingRefs.current[ri] = el; }} position={[0, 0, zOff]} rotation={[Math.PI / 2, 0, 0]}>
-            <torusGeometry args={[0.17, 0.024, 8, 24]} />
-            <meshBasicMaterial color={GLOW_COLOR} transparent opacity={0.3} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
-          </mesh>
-        ))}
 
         {/* Glow worm firefly butt — bright tail light */}
         {isGlow && (
