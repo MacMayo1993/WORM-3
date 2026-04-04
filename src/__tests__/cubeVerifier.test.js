@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { makeCubies } from '../game/cubeState.js';
-import { Worm3CubeVerifier, verifyCubeStateShape } from '../game/cubeVerifier.js';
+import { Worm3CubeVerifier, verifyCubeStateShape } from '../coming-soon/game/cubeVerifier.js';
 import { importCubeState } from '../game/cubeUtils.js';
 
 describe('verifyCubeStateShape', () => {

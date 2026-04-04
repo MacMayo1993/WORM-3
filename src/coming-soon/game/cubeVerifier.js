@@ -1,8 +1,8 @@
-import { makeCubies } from './cubeState.js';
-import { exportCubeState, importCubeState } from './cubeUtils.js';
-import { rotateSliceCubies } from './cubeRotation.js';
-import { buildManifoldGridMap, findAntipodalStickerByGrid, flipStickerPair } from './manifoldLogic.js';
-import { computeAntipodalIntegrity, K_STAR, getRegime } from './antipodalIntegrity.js';
+import { makeCubies } from '../../game/cubeState.js';
+import { exportCubeState, importCubeState } from '../../game/cubeUtils.js';
+import { rotateSliceCubies } from '../../game/cubeRotation.js';
+import { buildManifoldGridMap, findAntipodalStickerByGrid, flipStickerPair } from '../../game/manifoldLogic.js';
+import { computeAntipodalIntegrity, K_STAR, getRegime } from '../../game/antipodalIntegrity.js';
 
 const AXES = ['col', 'row', 'depth'];
 

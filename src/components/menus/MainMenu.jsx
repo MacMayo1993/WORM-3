@@ -485,6 +485,52 @@ const ComingSoonDrawer = ({ visible }) => {
   );
 };
 
+// ─── Coming Soon button ───────────────────────────────────────────────────────
+const ComingSoonButton = ({ onPress }) => {
+  const [hovered, setHovered] = useState(false);
+  const [pulse, setPulse] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => setPulse(true), 1200);
+    const interval = setInterval(() => setPulse(v => !v), 3000);
+    return () => { clearTimeout(t); clearInterval(interval); };
+  }, []);
+
+  return (
+    <button
+      onClick={onPress}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: 'flex', alignItems: 'center', gap: '8px',
+        padding: '9px 20px',
+        background: hovered ? 'rgba(120,160,255,0.12)' : 'transparent',
+        border: `1px solid ${hovered ? 'rgba(120,160,255,0.35)' : 'rgba(120,160,255,0.18)'}`,
+        borderRadius: '24px',
+        cursor: 'pointer',
+        transition: 'all 0.22s ease',
+      }}
+    >
+      <span style={{
+        width: '6px', height: '6px', borderRadius: '50%',
+        background: pulse ? 'rgba(168,85,247,0.9)' : 'rgba(168,85,247,0.4)',
+        boxShadow: pulse ? '0 0 8px rgba(168,85,247,0.7)' : 'none',
+        transition: 'all 0.6s ease',
+        flexShrink: 0,
+      }} />
+      <span style={{
+        fontSize: '11px', fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase',
+        color: hovered ? 'rgba(180,210,255,0.85)' : 'rgba(140,170,255,0.55)',
+        fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif",
+        transition: 'color 0.2s ease',
+      }}>What&apos;s Coming</span>
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ opacity: hovered ? 0.7 : 0.35, transition: 'opacity 0.2s ease' }}>
+        <path d="M4.5 2.5L8 6L4.5 9.5" stroke="rgba(180,210,255,0.9)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </button>
+  );
+};
+
 // ─── Nav items ────────────────────────────────────────────────────────────────
 const NavItem = ({ icon, label, color, onClick }) => {
   const [hovered, setHovered] = useState(false);
@@ -560,8 +606,8 @@ const StoreNavItem = ({ onStore }) => {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 // onPlay / onHolonomy / onBiome / onMerge are kept as props for UILayer compatibility
-// but are no longer wired to buttons — those modes live in the Coming Soon drawer.
-const MainMenu = ({ onPlay: _onPlay, _onLevels, onFreeplay, _onCoop, onSettings: _onSettings, onBiome: _onBiome, onDisparity, onWormHealer, onHolonomy: _onHolonomy, onMerge: _onMerge, onStore }) => {
+// but are no longer wired to buttons — those modes live in the Coming Soon screen.
+const MainMenu = ({ onPlay: _onPlay, _onLevels, onFreeplay, _onCoop, onSettings: _onSettings, onBiome: _onBiome, onDisparity, onWormHealer, onHolonomy: _onHolonomy, onMerge: _onMerge, onStore, onComingSoon }) => {
   const CLEAN = {
     panel: 'rgba(8,12,28,0.68)',
     panelStrong: 'rgba(10,14,32,0.80)',
@@ -663,8 +709,17 @@ const MainMenu = ({ onPlay: _onPlay, _onLevels, onFreeplay, _onCoop, onSettings:
           </div>
         </div>
 
-        {/* ── Coming Soon drawer ── */}
-        <ComingSoonDrawer visible={btnVisible} />
+        {/* ── Coming Soon button ── */}
+        <div style={{
+          position: 'absolute', bottom: '84px', left: 0, right: 0,
+          display: 'flex', justifyContent: 'center',
+          opacity: btnVisible ? 1 : 0,
+          transform: btnVisible ? 'none' : 'translateY(10px)',
+          transition: 'opacity 0.55s ease 0.2s, transform 0.55s cubic-bezier(0.22,1,0.36,1) 0.2s',
+          pointerEvents: btnVisible ? 'all' : 'none',
+        }}>
+          <ComingSoonButton onPress={onComingSoon} />
+        </div>
 
         {/* ── Bottom nav pill: Disparity | Explore | Store ── */}
         <div style={{
