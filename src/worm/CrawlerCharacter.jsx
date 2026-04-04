@@ -2,7 +2,7 @@
 // 3D worm character for the platformer mode.
 // Rendered as a segmented caterpillar-like creature with eyes and antennae.
 
-import React, { useRef, useMemo } from 'react';
+import React, { useRef, useMemo, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { FACE_NORMALS } from './crawlerPhysics.js';
@@ -242,13 +242,13 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
                 <meshPhysicalMaterial
                   color={segColor}
                   emissive={segColor}
-                  emissiveIntensity={isGlow ? (isHead ? 0.95 : 0.55) : (isHead ? 0.4 : 0.12)}
+                  emissiveIntensity={isGlow ? (isHead ? 1.2 : 0.75) : (isHead ? 0.4 : 0.12)}
                   clearcoat={1}
                   clearcoatRoughness={0.1}
                   thickness={0.5}
                   roughness={isBook ? 0.52 : 0.2}
                   metalness={0}
-                  transmission={isGlow ? 0.28 : 0.2}
+                  transmission={isGlow ? 0 : 0.2}
                   ior={1.45}
                   iridescence={0.16}
                   iridescenceIOR={1.3}
@@ -468,40 +468,86 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
 
 /**
  * Simple orb mesh for platformer mode.
+ * isGlowChar: when true (glow worm), shows an expanding color bloom on collect
+ *             instead of immediately vanishing.
  */
-export function CrawlerOrb({ position, color = '#ffd700', collected }) {
+export function CrawlerOrb({ position, color = '#ffd700', collected, isGlowChar = false }) {
   const meshRef = useRef();
+  const bloomRef = useRef();
   const timeRef = useRef(Math.random() * 100);
+  const collectTimeRef = useRef(null);
+  const [bloomDone, setBloomDone] = useState(false);
 
   useFrame((_, delta) => {
     timeRef.current += delta;
+
+    // Mark the moment of collection
+    if (collected && collectTimeRef.current === null) {
+      collectTimeRef.current = 0;
+    }
+    if (collectTimeRef.current !== null) {
+      collectTimeRef.current += delta;
+    }
+
+    // Normal idle animation
     if (meshRef.current && !collected) {
       const t = timeRef.current;
       meshRef.current.rotation.y = t * 1.5;
       meshRef.current.position.y = position.y + Math.sin(t * 3) * 0.08;
       meshRef.current.scale.setScalar(1 + Math.sin(t * 4) * 0.1);
     }
+
+    // Glow worm bloom: expands from orb-size to ~3.5 units and fades over 0.45 s
+    if (isGlowChar && bloomRef.current && collectTimeRef.current !== null && !bloomDone) {
+      const ct = collectTimeRef.current;
+      const bloomT = Math.min(1, ct / 0.45);
+      bloomRef.current.scale.setScalar(0.3 + bloomT * 3.2);
+      bloomRef.current.material.opacity = Math.max(0, 0.65 * (1 - bloomT));
+      if (ct >= 0.5) setBloomDone(true);
+    }
   });
 
-  if (collected) return null;
+  // Non-glow: vanish immediately. Glow worm: stay alive until bloom finishes.
+  if (collected && (!isGlowChar || bloomDone)) return null;
+
+  const pos = position.toArray ? position.toArray() : position;
 
   return (
-    <group position={position.toArray ? position.toArray() : position}>
-      <mesh ref={meshRef}>
-        <icosahedronGeometry args={[0.15, 1]} />
-        <meshStandardMaterial
-          color={color}
-          emissive={color}
-          emissiveIntensity={1.2}
-          metalness={0.4}
-          roughness={0.2}
-        />
-      </mesh>
-      <mesh>
-        <sphereGeometry args={[0.3, 12, 12]} />
-        <meshBasicMaterial color={color} transparent opacity={0.2} side={THREE.BackSide} />
-      </mesh>
-      <pointLight color={color} intensity={0.4} distance={2} decay={2} />
+    <group position={pos}>
+      {!collected && (
+        <>
+          <mesh ref={meshRef}>
+            <icosahedronGeometry args={[0.15, 1]} />
+            <meshStandardMaterial
+              color={color}
+              emissive={color}
+              emissiveIntensity={1.2}
+              metalness={0.4}
+              roughness={0.2}
+            />
+          </mesh>
+          <mesh>
+            <sphereGeometry args={[0.3, 12, 12]} />
+            <meshBasicMaterial color={color} transparent opacity={0.2} side={THREE.BackSide} />
+          </mesh>
+          <pointLight color={color} intensity={0.4} distance={2} decay={2} />
+        </>
+      )}
+      {/* Glow worm: expanding color bloom on pickup */}
+      {isGlowChar && !bloomDone && (
+        <mesh ref={bloomRef} scale={[0.3, 0.3, 0.3]}>
+          <sphereGeometry args={[1, 12, 12]} />
+          <meshBasicMaterial
+            color={color}
+            transparent
+            opacity={0}
+            blending={THREE.AdditiveBlending}
+            depthWrite={false}
+            side={THREE.BackSide}
+            toneMapped={false}
+          />
+        </mesh>
+      )}
     </group>
   );
 }

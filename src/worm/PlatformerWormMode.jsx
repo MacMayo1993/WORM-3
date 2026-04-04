@@ -9,6 +9,7 @@ import * as THREE from 'three';
 
 import SimpleCubeRenderer from './SimpleCubeRenderer.jsx';
 import CrawlerCharacter, { CrawlerOrb } from './CrawlerCharacter.jsx';
+import { useGameStore } from '../hooks/useGameStore.js';
 import PlatformerHUD from './PlatformerHUD.jsx';
 import {
   stepCrawler,
@@ -159,7 +160,7 @@ function ManifoldScene({ cubies, size, faceColors, crawlerWorldPos, orbs, rotati
 
       {/* Orbs */}
       {orbs.map((orb) => (
-        <CrawlerOrb key={orb.id} position={orb.position} collected={orb.collected} color="#ffd700" />
+        <CrawlerOrb key={orb.id} position={orb.position} collected={orb.collected} color="#ffd700" isGlowChar={isGlowChar} />
       ))}
 
       <TrackballControls
@@ -179,7 +180,7 @@ function ManifoldScene({ cubies, size, faceColors, crawlerWorldPos, orbs, rotati
 // ============================================================================
 // CRAWLER VIEW (Right canvas) — Chase camera following the worm
 // ============================================================================
-function CrawlerScene({ cubies, size, faceColors, crawlerState, orbs, rotationAnim }) {
+function CrawlerScene({ cubies, size, faceColors, crawlerState, orbs, rotationAnim, isGlowChar }) {
   return (
     <>
       <ambientLight intensity={0.5} />
@@ -201,7 +202,7 @@ function CrawlerScene({ cubies, size, faceColors, crawlerState, orbs, rotationAn
 
       {/* Orbs */}
       {orbs.map((orb) => (
-        <CrawlerOrb key={orb.id} position={orb.position} collected={orb.collected} color="#ffd700" />
+        <CrawlerOrb key={orb.id} position={orb.position} collected={orb.collected} color="#ffd700" isGlowChar={isGlowChar} />
       ))}
 
       {/* Chase camera */}
@@ -293,6 +294,7 @@ function CrawlerGameLoop({ crawlerRef, inputRef, gameStateRef, size, cubies, orb
 export default function PlatformerWormMode({ cubies: initialCubies, size, faceColors, onQuit }) {
   // --- Cube state (local copy for co-op mode) ---
   const [cubies, setCubies] = useState(initialCubies);
+  const isGlowChar = useGameStore(s => (s.wormCharacter ?? 'classic') === 'glow');
 
   // --- Game state ---
   const [gameState, setGameState] = useState('waiting'); // waiting, playing, paused, gameover, victory
@@ -627,6 +629,7 @@ export default function PlatformerWormMode({ cubies: initialCubies, size, faceCo
               crawlerState={crawlerDisplay}
               orbs={orbsDisplay}
               rotationAnim={rotationAnim}
+              isGlowChar={isGlowChar}
             />
             {/* Game loop runs here (needs useFrame) */}
             <CrawlerGameLoop

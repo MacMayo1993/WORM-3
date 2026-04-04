@@ -409,9 +409,11 @@ const _collectDummy = new THREE.Object3D();
 const COLLECT_PARTICLE_COUNT = 12;
 
 // Explosion effect when orb is collected
-export function OrbCollectEffect({ position, color = '#ffd700' }) {
+export function OrbCollectEffect({ position, color = '#ffd700', onDone }) {
   const meshRef = useRef();
+  const bloomRef = useRef();
   const timeRef = useRef(0);
+  const calledDoneRef = useRef(false);
 
   // Random velocities are stable for the lifetime of this effect.
   const velocities = useMemo(
@@ -425,33 +427,66 @@ export function OrbCollectEffect({ position, color = '#ffd700' }) {
   );
 
   useFrame((_state, delta) => {
-    const mesh = meshRef.current;
-    if (!mesh || timeRef.current >= 0.5) return;
-
     timeRef.current += delta;
     const t = timeRef.current;
-    const alpha = Math.max(0, 1 - t * 2);
 
-    for (let i = 0; i < COLLECT_PARTICLE_COUNT; i++) {
-      const v = velocities[i];
-      _collectDummy.position.set(v.x * t * 3, v.y * t * 3, v.z * t * 3);
-      _collectDummy.scale.setScalar(alpha);
-      _collectDummy.updateMatrix();
-      mesh.setMatrixAt(i, _collectDummy.matrix);
+    // Particle burst: spreads outward and fades over 0.5 s
+    const mesh = meshRef.current;
+    if (mesh && t < 0.5) {
+      const alpha = Math.max(0, 1 - t * 2);
+      for (let i = 0; i < COLLECT_PARTICLE_COUNT; i++) {
+        const v = velocities[i];
+        _collectDummy.position.set(v.x * t * 3, v.y * t * 3, v.z * t * 3);
+        _collectDummy.scale.setScalar(alpha);
+        _collectDummy.updateMatrix();
+        mesh.setMatrixAt(i, _collectDummy.matrix);
+      }
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.material.opacity = alpha;
     }
-    mesh.instanceMatrix.needsUpdate = true;
-    mesh.material.opacity = alpha;
+
+    // Expanding color bloom: grows from orb-size to ~3.5 units and fades over 0.45 s
+    if (bloomRef.current) {
+      const bloomT = Math.min(1, t / 0.45);
+      bloomRef.current.scale.setScalar(0.3 + bloomT * 3.2);
+      bloomRef.current.material.opacity = Math.max(0, 0.65 * (1 - bloomT));
+    }
+
+    // Notify parent when fully complete
+    if (t >= 0.5 && !calledDoneRef.current) {
+      calledDoneRef.current = true;
+      onDone?.();
+    }
   });
 
-  if (timeRef.current > 0.5) return null;
-
   return (
-    <instancedMesh
-      ref={meshRef}
-      args={[_collectSphere, null, COLLECT_PARTICLE_COUNT]}
-      position={position}
-    >
-      <meshBasicMaterial color={color} transparent opacity={1} />
-    </instancedMesh>
+    <group position={position}>
+      <instancedMesh
+        ref={meshRef}
+        args={[_collectSphere, null, COLLECT_PARTICLE_COUNT]}
+      >
+        <meshBasicMaterial
+          color={color}
+          transparent
+          opacity={1}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+          toneMapped={false}
+        />
+      </instancedMesh>
+      {/* Expanding color bloom sphere — the main bloom in the orb's inherent color */}
+      <mesh ref={bloomRef} scale={[0.3, 0.3, 0.3]}>
+        <sphereGeometry args={[1, 14, 14]} />
+        <meshBasicMaterial
+          color={color}
+          transparent
+          opacity={0.65}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+          side={THREE.BackSide}
+          toneMapped={false}
+        />
+      </mesh>
+    </group>
   );
 }
