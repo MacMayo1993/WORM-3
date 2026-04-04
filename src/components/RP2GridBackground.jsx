@@ -105,11 +105,12 @@ const fragmentShader = /* glsl */ `
     vec3 paperCol = mix(vec3(0.96, 0.97, 1.00), vec3(0.94, 0.91, 0.82), vEdge * 0.7);
 
     // ── Alpha ──────────────────────────────────────────────────────────────
-    // Lines: full opacity, slightly boosted on major lines.
-    // Paper background: very subtle so the cube scene shows through.
-    float majorBoost = major * 0.18;
-    float lineAlpha  = (lineStr * (0.56 - vEdge * 0.18) + majorBoost) * uAlpha;
-    float paperAlpha = (0.055 - vEdge * 0.03) * uAlpha;
+    // Lines: solid and crisp, slightly boosted on major lines.
+    // Paper background: visible white fill — enough to read as graph paper
+    // even without bloom (mobile / reduced-motion path).
+    float majorBoost = major * 0.22;
+    float lineAlpha  = (lineStr * (0.72 - vEdge * 0.18) + majorBoost) * uAlpha;
+    float paperAlpha = (0.22 - vEdge * 0.10) * uAlpha;
 
     // Blend paper under lines
     vec3  col   = mix(paperCol, lineCol, lineStr);

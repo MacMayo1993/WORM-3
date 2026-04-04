@@ -109,7 +109,7 @@ function IntroBranch({ time, onComplete, reducedMotion = false, performanceMode 
       <ambientLight intensity={0.6} />
       <pointLight position={[10, 10, 10]} intensity={1.8} />
       <pointLight position={[-10, -10, -10]} intensity={1.2} />
-      <RP2GridBackground opacity={0.55} />
+      <RP2GridBackground opacity={0.85} />
       <IntroScene time={time} onComplete={onComplete} />
       <Suspense fallback={null}>
         <Environment preset="city" />
