@@ -401,7 +401,7 @@ export const RotatingBlackCube = () => {
     groupRef.current.rotation.x = Math.sin(t * 0.15) * 0.12;
   });
   return (
-    <group ref={groupRef}>
+    <group ref={groupRef} position={[0, 0.15, 0]}>
       <BlackCube />
       <FacePulses />
     </group>
