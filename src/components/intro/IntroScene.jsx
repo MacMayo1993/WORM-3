@@ -445,11 +445,22 @@ const IntroScene = ({ time, onComplete }) => {
             topoPos[2] * (1 + ef * 1.8),
           ];
 
+          // During explosion, fan cubies outward so multiple sticker faces are visible
+          // instead of reading as a flat wall of front-face reds.
+          const radialLen = Math.hypot(topoPos[0], topoPos[1], topoPos[2]) || 1;
+          const rxBase = topoPos[1] / radialLen;
+          const ryBase = -topoPos[0] / radialLen;
+          const tiltN = Math.min(1, explosionFactor / 1.5);
+          const tiltMag = Math.sin(tiltN * Math.PI * 0.5) * 0.62;
+          const tiltX = rxBase * tiltMag;
+          const tiltY = ryBase * tiltMag;
+          const wobble = Math.sin((time + gx * 0.33 + gy * 0.27 + gz * 0.19) * 2.4) * 0.05 * tiltN;
+
           return (
             <group
               key={it.key}
               position={explodedPos}
-              rotation={[topoRot, topoRot, topoRot]}
+              rotation={[topoRot + tiltX + wobble, topoRot + tiltY - wobble, topoRot]}
             >
               <IntroCubie
                 ref={el => (cubieRefs.current[idx] = el)}

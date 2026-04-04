@@ -98,6 +98,7 @@ const ScreenGlow = () => {
 // Strands originate from the 4 tile gap lines (# positions at ±0.5) and curve outward.
 const RAY_STRANDS = 14;   // per face — distributed across the 4 tile gap lines
 const RAY_PTS = 24;   // curve sample points per strand (more segments = worm-like motion)
+const WORM_BALLS = 7; // bead count per strand body
 
 // Pre-computed per-face strand paths — originate from the # grid lines at ±0.5 and
 // curve outward along the face normal (+Z), like light leaking through the tile seams.
@@ -162,8 +163,10 @@ FACE_KEYS.forEach(face => { _faceColorObj[face] = new THREE.Color(FACE_COLOR[fac
 
 const FacePulses = () => {
   const lineRefs = useRef({});   // face → [line, ...]  (arrays)
+  const ballRefs = useRef({});   // face → [instancedMesh, ...]
   const lightRefs = useRef({});
   const pairState = useRef({ idx: 0, t0: -1 });
+  const tempObj = useMemo(() => new THREE.Object3D(), []);
 
   useFrame((state) => {
     const t = state.clock.elapsedTime;
@@ -214,6 +217,8 @@ const FacePulses = () => {
         const spark = 0.8 + Math.sin(t * 5.5 + cfg.sparkOffset) * 0.2;
         line.material.opacity = overall * spark;
         line.visible = overall > 0.01;
+        const balls = ballRefs.current[face]?.[i];
+        if (balls) balls.visible = overall > 0.01;
 
         // Growth: clip strand at current growth progress; collapsed points → tip of visible segment.
         // Add a moving sinusoidal offset + segmented luminance for a worm-body look.
@@ -254,6 +259,29 @@ const FacePulses = () => {
           colors[j * 3 + 2] = col.b * glow;
         }
         line.geometry.attributes.color.needsUpdate = true;
+
+        // Worm body beads: instanced spheres distributed from head backward.
+        if (balls) {
+          for (let b = 0; b < WORM_BALLS; b++) {
+            const behind = b / Math.max(1, WORM_BALLS - 1);
+            const u = Math.max(0, growth - behind * 0.22);
+            const pt = u * (RAY_PTS - 1);
+            const lo = Math.floor(pt);
+            const hi = Math.min(lo + 1, RAY_PTS - 1);
+            const f = pt - lo;
+            const x = pos[lo * 3] + (pos[hi * 3] - pos[lo * 3]) * f;
+            const y = pos[lo * 3 + 1] + (pos[hi * 3 + 1] - pos[lo * 3 + 1]) * f;
+            const z = pos[lo * 3 + 2] + (pos[hi * 3 + 2] - pos[lo * 3 + 2]) * f;
+
+            const headT = 1 - behind;
+            const scale = (0.018 + headT * 0.03) * (0.65 + overall * 0.7);
+            tempObj.position.set(x, y, z);
+            tempObj.scale.setScalar(scale);
+            tempObj.updateMatrix();
+            balls.setMatrixAt(b, tempObj.matrix);
+          }
+          balls.instanceMatrix.needsUpdate = true;
+        }
       });
 
       if (light) {
@@ -294,6 +322,29 @@ const FacePulses = () => {
                   </bufferGeometry>
                   <lineBasicMaterial vertexColors transparent opacity={0} depthWrite={false} />
                 </line>
+              ))}
+              {configs.map((cfg, i) => (
+                <instancedMesh
+                  key={`balls-${cfg.id}`}
+                  ref={el => {
+                    if (!ballRefs.current[face]) ballRefs.current[face] = [];
+                    ballRefs.current[face][i] = el;
+                  }}
+                  args={[null, null, WORM_BALLS]}
+                  visible={false}
+                >
+                  <sphereGeometry args={[1, 9, 9]} />
+                  <meshStandardMaterial
+                    color={col}
+                    emissive={col}
+                    emissiveIntensity={1.0}
+                    transparent
+                    opacity={0.88}
+                    roughness={0.2}
+                    metalness={0.0}
+                    depthWrite={false}
+                  />
+                </instancedMesh>
               ))}
             </group>
           </group>
