@@ -9,10 +9,10 @@ import { FACE_NORMALS } from './crawlerPhysics.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import WormHat3D from './wormCosmetics.jsx';
 import { getSkin } from './wormCosmeticsData.js';
+import { getWormCharacter } from './wormCharacterData.js';
 
 const EYE_WHITE = '#ffffff';
 const PUPIL = '#111111';
-const SEGMENT_OFFSETS = [0, -0.32, -0.6, -0.85];
 const HISTORY_SIZE = 100;
 const HISTORY_STEP = 10;
 const TRAIL_LIFETIME = 2.0;
@@ -51,11 +51,18 @@ function cbRead(cb, offset) {
 export default function CrawlerCharacter({ position, forward, face, jumpHeight, velocity, alive = true }) {
   const wormSkinId = useGameStore(s => s.wormSkin);
   const wormHatId = useGameStore(s => s.wormHat);
+  const wormCharacterId = useGameStore(s => s.wormCharacter ?? 'classic');
   const skin = getSkin(wormSkinId);
+  const wormCharacter = getWormCharacter(wormCharacterId);
   const BODY_COLOR = skin.body;
   const BELLY_COLOR = skin.belly;
   const ANTENNA_COLOR = skin.antenna;
   const GLOW_COLOR = skin.glow;
+  const isInch = wormCharacter.id === 'inch';
+  const isGlow = wormCharacter.id === 'glow';
+  const isBook = wormCharacter.id === 'book';
+  const segmentOffsets = isInch ? [0, -0.22, -0.52] : [0, -0.32, -0.6, -0.85];
+  const historyStep = isInch ? 13 : HISTORY_STEP;
 
   const groupRef = useRef();
   const bodyRootRef = useRef();
@@ -100,19 +107,23 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
     _invQuat.copy(quaternion).invert();
 
     const moveFactor = Math.min(1, velocity || 0);
-    for (let i = 1; i < SEGMENT_OFFSETS.length; i++) {
+    for (let i = 1; i < segmentOffsets.length; i++) {
       const segGroup = bodySegmentRefs.current[i];
       if (!segGroup) continue;
 
-      const sampled = cbRead(positionHistory.current, i * HISTORY_STEP);
+      const sampled = cbRead(positionHistory.current, i * historyStep);
       if (!sampled) continue;
 
       _segPos.copy(sampled).sub(_rootPos).applyQuaternion(_invQuat);
       _segPos.y += Math.sin(timeRef.current * 6 + i * 0.8) * 0.02 * moveFactor;
+      if (isInch) {
+        const accordion = Math.sin(timeRef.current * 8.5) * 0.07;
+        _segPos.z += i === 1 ? accordion : -accordion * 0.7;
+      }
       segGroup.position.copy(_segPos);
     }
 
-    const tailRef = bodySegmentRefs.current[SEGMENT_OFFSETS.length - 1];
+    const tailRef = bodySegmentRefs.current[segmentOffsets.length - 1];
     if (tailRef) {
       trailSpawnT.current += delta;
       tailRef.getWorldPosition(_tailWorldPos);
@@ -155,8 +166,8 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
       mesh.visible = true;
       _trailLocalPos.copy(tp.pos).sub(_rootPos);
       mesh.position.copy(_trailLocalPos);
-      mesh.scale.setScalar(0.35 + life * 0.55);
-      mesh.material.opacity = life * 0.25;
+      mesh.scale.setScalar((isGlow ? 0.55 : 0.35) + life * (isGlow ? 0.75 : 0.55));
+      mesh.material.opacity = life * (isGlow ? 0.38 : 0.25);
     }
   });
 
@@ -171,26 +182,29 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
     <group ref={groupRef} position={position.toArray ? position.toArray() : position}>
       <group ref={bodyRootRef} quaternion={quaternion}>
         {/* Body segments */}
-        {SEGMENT_OFFSETS.map((zOff, i) => {
+        {segmentOffsets.map((zOff, i) => {
           const isHead = i === 0;
-          const segScale = isHead ? 0.28 : 0.24 - i * 0.02;
+          const segScale = isInch
+            ? (isHead ? 0.24 : (i === 1 ? 0.17 : 0.15))
+            : (isHead ? 0.28 : 0.24 - i * 0.02);
           const segBob = Math.sin(t * 6 + i * 0.8) * 0.02 * Math.min(1, velocity || 0);
           const segColor = isHead ? BODY_COLOR : BELLY_COLOR;
+          const stretch = isInch && !isHead ? 1 + Math.sin(t * 8 + i) * 0.24 : 1;
 
           return (
             <group ref={el => (bodySegmentRefs.current[i] = el)} key={i} position={[0, segBob + bobble, zOff]}>
-              <mesh scale={[segScale * breathe, segScale * breathe, segScale]}>
-                <sphereGeometry args={[1, 12, 12]} />
+              <mesh scale={[segScale * breathe * stretch, segScale * breathe * (isBook ? 0.78 : 1), segScale * (isBook ? 1.15 : 1)]}>
+                {isBook && !isHead ? <boxGeometry args={[1, 0.8, 1.2]} /> : <sphereGeometry args={[1, 12, 12]} />}
                 <meshPhysicalMaterial
                   color={segColor}
                   emissive={segColor}
-                  emissiveIntensity={isHead ? 0.4 : 0.12}
+                  emissiveIntensity={isGlow ? (isHead ? 0.95 : 0.55) : (isHead ? 0.4 : 0.12)}
                   clearcoat={1}
                   clearcoatRoughness={0.1}
                   thickness={0.5}
-                  roughness={0.2}
+                  roughness={isBook ? 0.52 : 0.2}
                   metalness={0}
-                  transmission={0.2}
+                  transmission={isGlow ? 0.45 : 0.2}
                   ior={1.45}
                   iridescence={0.16}
                   iridescenceIOR={1.3}
@@ -200,7 +214,7 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
               </mesh>
 
               {/* Tiny legs on body segments */}
-              {!isHead && (
+              {!isHead && !isGlow && (
                 <>
                   <mesh position={[segScale * 0.8, -segScale * 0.5, 0]}
                     rotation={[0, 0, Math.sin(t * 8 + i) * 0.4]}>
@@ -219,9 +233,23 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
         })}
 
         {/* Hat — sits on top of the head, Y is outward from the face */}
-        <group position={[0, 0.28, 0]}>
+        <group position={[0, isInch ? 0.24 : 0.28, 0]}>
           <WormHat3D type={wormHatId} scale={0.28} />
         </group>
+
+        {/* Book accessory */}
+        {isBook && (
+          <group position={[0, 0.08, -0.26]} rotation={[0.25, 0.2, 0]}>
+            <mesh>
+              <boxGeometry args={[0.22, 0.05, 0.32]} />
+              <meshStandardMaterial color="#4b2e20" />
+            </mesh>
+            <mesh position={[0, 0.001, 0]}>
+              <boxGeometry args={[0.18, 0.052, 0.28]} />
+              <meshStandardMaterial color="#f8f5dd" />
+            </mesh>
+          </group>
+        )}
 
         {/* Eyes */}
         <mesh position={[0.1, 0.12, 0.2]}>
@@ -282,11 +310,11 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
         {/* Glow halo */}
         {alive && (
           <mesh>
-            <sphereGeometry args={[0.45, 16, 16]} />
+            <sphereGeometry args={[isGlow ? 0.62 : 0.45, 16, 16]} />
             <meshBasicMaterial
               color={GLOW_COLOR}
               transparent
-              opacity={0.12 + Math.sin(t * 4) * 0.05}
+              opacity={(isGlow ? 0.2 : 0.12) + Math.sin(t * 4) * (isGlow ? 0.08 : 0.05)}
               side={THREE.BackSide}
             />
           </mesh>
@@ -302,7 +330,7 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
       )}
 
       {/* Point light on crawler */}
-      <pointLight color={GLOW_COLOR} intensity={0.6} distance={3} decay={2} />
+      <pointLight color={GLOW_COLOR} intensity={isGlow ? 1.1 : 0.6} distance={isGlow ? 4.2 : 3} decay={2} />
 
       {/* Slimy trail — each blob fades out completely after 2 seconds */}
       {Array.from({ length: TRAIL_MAX_POINTS }, (_, i) => (

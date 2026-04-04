@@ -17,6 +17,7 @@ const SETTINGS_VERSION_KEY = 'worm3_settings_version';
 const CURRENT_SETTINGS_VERSION = 1;
 const PARITY_POINTS_KEY = 'worm3_parity_points';
 const OWNED_ITEMS_KEY = 'worm3_owned_items';
+const WORM_CHARACTER_KEY = 'worm3_character';
 
 const migrateSettings = (rawSettings, version) => {
   if (!rawSettings || typeof rawSettings !== 'object') return { ...DEFAULT_SETTINGS };
@@ -44,6 +45,7 @@ const loadPersistedState = () => {
     const parsedSettings = settings ? JSON.parse(settings) : null;
     const wormSkin = localStorage.getItem('worm3_skin') || 'slime';
     const wormHat = localStorage.getItem('worm3_hat') || 'none';
+    const wormCharacter = localStorage.getItem(WORM_CHARACTER_KEY) || 'classic';
     const parityPoints = parseInt(localStorage.getItem(PARITY_POINTS_KEY) ?? '0', 10) || 0;
     const rawOwned = localStorage.getItem(OWNED_ITEMS_KEY);
     const ownedItems = rawOwned ? JSON.parse(rawOwned) : [...DEFAULT_OWNED];
@@ -75,6 +77,7 @@ const loadPersistedState = () => {
       mobileHintShown,
       wormSkin: safeSkin,
       wormHat: safeHat,
+      wormCharacter,
       parityPoints,
       ownedItems,
     };
@@ -87,6 +90,7 @@ const loadPersistedState = () => {
       mobileHintShown: false,
       wormSkin: 'slime',
       wormHat: 'none',
+      wormCharacter: 'classic',
       parityPoints: 0,
       ownedItems: [...DEFAULT_OWNED],
     };
@@ -317,6 +321,11 @@ export const useGameStore = create(
     setWormHat: (id) => {
       try { localStorage.setItem('worm3_hat', id); } catch { }
       set({ wormHat: id });
+    },
+    wormCharacter: persistedState.wormCharacter ?? 'classic',
+    setWormCharacter: (id) => {
+      try { localStorage.setItem(WORM_CHARACTER_KEY, id); } catch { }
+      set({ wormCharacter: id });
     },
 
     // ── Economy ──────────────────────────────────────────────────────────────
