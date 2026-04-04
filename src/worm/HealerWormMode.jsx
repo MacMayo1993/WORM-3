@@ -1430,13 +1430,16 @@ function WormBody({ worm }) {
 
     return (
         <>
-            {/* Sphere body — Classic, Inch Worm, Glow Worm */}
+            {/* Sphere body — Classic, Inch Worm, Glow Worm
+                IMPORTANT: material color must be white so per-instance colors (setColorAt)
+                pass through unmodified. Three.js multiplies instanceColor × material.color,
+                so any non-white material color taints every orb pickup color. */}
             <instancedMesh ref={meshRef} args={[undefined, undefined, MAX_TAIL]} visible={!isBook} frustumCulled={false}>
                 <sphereGeometry args={[1, 12, 12]} />
                 <meshStandardMaterial
-                    color={wormColor}
-                    emissive={wormColor}
-                    emissiveIntensity={isGlow ? 1.4 : 0.35}
+                    color="white"
+                    emissive="white"
+                    emissiveIntensity={isGlow ? 0.55 : 0.22}
                     roughness={0.28}
                     metalness={0}
                     transparent={isGlow}
@@ -1448,9 +1451,9 @@ function WormBody({ worm }) {
             <instancedMesh ref={boxMeshRef} args={[undefined, undefined, MAX_TAIL]} visible={isBook} frustumCulled={false}>
                 <boxGeometry args={[1, 0.68, 1.12]} />
                 <meshStandardMaterial
-                    color={wormColor}
-                    emissive={wormColor}
-                    emissiveIntensity={0.28}
+                    color="white"
+                    emissive="white"
+                    emissiveIntensity={0.18}
                     roughness={0.58}
                     metalness={0.2}
                 />
