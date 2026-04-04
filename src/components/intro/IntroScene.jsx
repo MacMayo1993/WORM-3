@@ -139,38 +139,24 @@ const IntroScene = ({ time, onComplete }) => {
   // ── Face reveal intensities ──────────────────────────────────────────────────
   // Requested behavior:
   // 1) Start as an all-black cube.
-  // 2) Introduce color during explosion.
+  // 2) Once the explosion starts, all six face colors become visible together.
   // 3) Return to all-black when the cube reassembles.
-  const getFaceReveal = (faceKey) => {
+  const getFaceReveal = () => {
     // Keep the full cube black until explosion begins.
     if (time < EXPLOSION_START) return 0;
 
-    // During explosion, reveal antipodal axis pairs in sequence so each step is legible.
-    // z-axis pair first (blue/green), then x-axis (red/orange), then y-axis (white/yellow).
+    // Reveal every face together during the blast so all 27 cubies read as fully colored.
     if (time < EXPLOSION_END) {
-      const axisSlots = {
-        PZ: [0.00, 0.33], NZ: [0.00, 0.33],
-        PX: [0.20, 0.66], NX: [0.20, 0.66],
-        PY: [0.40, 1.00], NY: [0.40, 1.00],
-      };
-      const [startN, endN] = axisSlots[faceKey] || [0, 1];
       const blastN = progress(time, EXPLOSION_START, EXPLOSION_END);
-      return smoothstep(progress(blastN, startN, endN));
+      return smoothstep(blastN);
     }
 
     // Hold fully colored while exploded.
     if (time < IMPLODE_START) return 1;
 
-    // Reverse-order drain: Y axis first (0–60%), X (20–80%), Z last (40–100%)
-    // Mirrors the reveal sequence in reverse for a satisfying pedagogical callback.
-    const drainSlots = {
-      PY: [0.0, 0.6], NY: [0.0, 0.6],
-      PX: [0.2, 0.8], NX: [0.2, 0.8],
-      PZ: [0.4, 1.0], NZ: [0.4, 1.0],
-    };
-    const [dStart, dEnd] = drainSlots[faceKey] || [0, 1];
+    // Drain uniformly on implode so the color collapse feels coherent.
     const implodeN = progress(time, IMPLODE_START, IMPLODE_END);
-    return 1 - smoothstep(progress(implodeN, dStart, dEnd));
+    return 1 - smoothstep(implodeN);
   };
 
   // ── Center tile flip: forward 0→π, brief hold, then reverse π→0 ─────────────
@@ -420,12 +406,12 @@ const IntroScene = ({ time, onComplete }) => {
           const k = (size - 1) / 2;
 
           const faceReveal = {
-            PZ: getFaceReveal('PZ'),
-            NZ: getFaceReveal('NZ'),
-            PX: getFaceReveal('PX'),
-            NX: getFaceReveal('NX'),
-            PY: getFaceReveal('PY'),
-            NY: getFaceReveal('NY'),
+            PZ: getFaceReveal(),
+            NZ: getFaceReveal(),
+            PX: getFaceReveal(),
+            NX: getFaceReveal(),
+            PY: getFaceReveal(),
+            NY: getFaceReveal(),
           };
 
           const cubieFlips = {};
@@ -459,11 +445,22 @@ const IntroScene = ({ time, onComplete }) => {
             topoPos[2] * (1 + ef * 1.8),
           ];
 
+          // During explosion, fan cubies outward so multiple sticker faces are visible
+          // instead of reading as a flat wall of front-face reds.
+          const radialLen = Math.hypot(topoPos[0], topoPos[1], topoPos[2]) || 1;
+          const rxBase = topoPos[1] / radialLen;
+          const ryBase = -topoPos[0] / radialLen;
+          const tiltN = Math.min(1, explosionFactor / 1.5);
+          const tiltMag = Math.sin(tiltN * Math.PI * 0.5) * 0.62;
+          const tiltX = rxBase * tiltMag;
+          const tiltY = ryBase * tiltMag;
+          const wobble = Math.sin((time + gx * 0.33 + gy * 0.27 + gz * 0.19) * 2.4) * 0.05 * tiltN;
+
           return (
             <group
               key={it.key}
               position={explodedPos}
-              rotation={[topoRot, topoRot, topoRot]}
+              rotation={[topoRot + tiltX + wobble, topoRot + tiltY - wobble, topoRot]}
             >
               <IntroCubie
                 ref={el => (cubieRefs.current[idx] = el)}
