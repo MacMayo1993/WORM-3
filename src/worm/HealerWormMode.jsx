@@ -1347,10 +1347,14 @@ function WormBody({ worm }) {
                 _wormDummy.position.copy(_bodyHeadPos);
                 _wormDummy.scale.setScalar(0.07);
             } else {
-                // Inch worm: sinusoidal spacing creates a traveling compression wave (looper gait)
-                const targetDist = _isInch
-                    ? i * 0.14 + Math.sin(i * 1.1 - time * 2.8) * 0.075
-                    : i * 0.14;
+                // Inch worm: asymmetric 2-phase traveling wave — rear bunches up fast (arch),
+                // releases slowly (extend), so segments gather then lunge rather than sine-oscillate.
+                const targetDist = _isInch ? (() => {
+                    const ph = ((time * 1.5 - i * 0.6) % 1.0 + 1.0) % 1.0;
+                    const wL = ph < 0.35 ? ph / 0.35 : 1.0 - (ph - 0.35) / 0.65;
+                    const wave = wL * wL * (3 - 2 * wL); // smoothstep, no sinusoid
+                    return i * 0.14 - wave * 0.055;       // max bunching: 0.055 per segment
+                })() : i * 0.14;
 
                 // Clones — parametrically walk backwards along the curve to exact target distance
                 let foundPosition = false;
@@ -1388,9 +1392,11 @@ function WormBody({ worm }) {
 
                 _wormDummy.position.copy(_bodyClonePos);
                 if (_isInch) {
-                    // Scale oscillates dramatically — compressed segments look tiny, stretched look elongated
-                    const wave = Math.sin(time * 2.8 + i * 1.1);
-                    const sc = 0.052 + (wave * 0.5 + 0.5) * 0.04; // 0.052 → 0.092
+                    // Scale mirrors the same 2-phase wave: compressed (gathered) = smaller
+                    const ph = ((time * 1.5 - i * 0.6) % 1.0 + 1.0) % 1.0;
+                    const wL = ph < 0.35 ? ph / 0.35 : 1.0 - (ph - 0.35) / 0.65;
+                    const wave = wL * wL * (3 - 2 * wL);
+                    const sc = 0.065 - wave * 0.02; // 0.065 (extended) → 0.045 (gathered)
                     _wormDummy.scale.setScalar(sc);
                 } else if (_isBook) {
                     _wormDummy.scale.set(0.088, 0.055, 0.1);
