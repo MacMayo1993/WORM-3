@@ -172,7 +172,6 @@ function buildArrowGeometry(planeW, planeH) {
 
 // ─── Main component ───────────────────────────────────────────────────────
 export function RP2GridBackground({ opacity = 1.0 }) {
-  const matRef   = useRef();
   const arrowRef = useRef();
 
   // Geometry — created once

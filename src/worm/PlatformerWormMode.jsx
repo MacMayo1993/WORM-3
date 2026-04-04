@@ -141,7 +141,7 @@ const CONFIG = {
 // ============================================================================
 // MANIFOLDER VIEW (Left canvas) — Overview camera showing the full cube
 // ============================================================================
-function ManifoldScene({ cubies, size, faceColors, crawlerWorldPos, orbs, rotationAnim }) {
+function ManifoldScene({ cubies, size, faceColors, crawlerWorldPos, orbs, rotationAnim, isGlowChar }) {
   return (
     <>
       <ambientLight intensity={0.6} />
@@ -610,6 +610,7 @@ export default function PlatformerWormMode({ cubies: initialCubies, size, faceCo
               crawlerWorldPos={crawlerWorldPos}
               orbs={orbsDisplay}
               rotationAnim={rotationAnim}
+              isGlowChar={isGlowChar}
             />
           </Suspense>
         </Canvas>
