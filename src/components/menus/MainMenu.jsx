@@ -96,8 +96,8 @@ const ScreenGlow = () => {
 // ─── Ray strand system — shoots outward from tile gaps like antipodal tunnel effects ──
 // In face-group local space: +Z is outward (face normal), XY is the face plane.
 // Strands originate from the 4 tile gap lines (# positions at ±0.5) and curve outward.
-const RAY_STRANDS = 10;   // per face — distributed across the 4 tile gap lines
-const RAY_PTS = 16;   // curve sample points per strand
+const RAY_STRANDS = 14;   // per face — distributed across the 4 tile gap lines
+const RAY_PTS = 24;   // curve sample points per strand (more segments = worm-like motion)
 
 // Pre-computed per-face strand paths — originate from the # grid lines at ±0.5 and
 // curve outward along the face normal (+Z), like light leaking through the tile seams.
@@ -136,7 +136,21 @@ const _faceRayConfigs = (() => {
       const basePts = new Float32Array(RAY_PTS * 3);
       pts.forEach((p, j) => { basePts[j * 3] = p.x; basePts[j * 3 + 1] = p.y; basePts[j * 3 + 2] = p.z; });
 
-      return { id: i, basePts, sparkOffset: rng() * Math.PI * 2 };
+      // Per-strand wobble profile used to sculpt a moving worm body along the sine rays.
+      const wiggleDirAngle = rng() * Math.PI * 2;
+      const wiggleDirX = Math.cos(wiggleDirAngle);
+      const wiggleDirY = Math.sin(wiggleDirAngle);
+
+      return {
+        id: i,
+        basePts,
+        sparkOffset: rng() * Math.PI * 2,
+        wiggleAmp: 0.035 + rng() * 0.045,
+        wiggleFreq: 1.7 + rng() * 1.9,
+        wiggleSpeed: 3.4 + rng() * 2.8,
+        wiggleDirX,
+        wiggleDirY,
+      };
     });
   });
   return result;
@@ -201,7 +215,8 @@ const FacePulses = () => {
         line.material.opacity = overall * spark;
         line.visible = overall > 0.01;
 
-        // Growth: clip strand at current growth progress; collapsed points → tip of visible segment
+        // Growth: clip strand at current growth progress; collapsed points → tip of visible segment.
+        // Add a moving sinusoidal offset + segmented luminance for a worm-body look.
         const pos = line.geometry.attributes.position.array;
         const base = cfg.basePts;
         const visibleEnd = growth * (RAY_PTS - 1);  // last visible point index (float)
@@ -211,17 +226,29 @@ const FacePulses = () => {
           const lo = Math.floor(clampedJ);
           const hi = Math.min(lo + 1, RAY_PTS - 1);
           const f = clampedJ - lo;
-          pos[j * 3] = base[lo * 3] + (base[hi * 3] - base[lo * 3]) * f;
-          pos[j * 3 + 1] = base[lo * 3 + 1] + (base[hi * 3 + 1] - base[lo * 3 + 1]) * f;
-          pos[j * 3 + 2] = base[lo * 3 + 2] + (base[hi * 3 + 2] - base[lo * 3 + 2]) * f;
+          const baseX = base[lo * 3] + (base[hi * 3] - base[lo * 3]) * f;
+          const baseY = base[lo * 3 + 1] + (base[hi * 3 + 1] - base[lo * 3 + 1]) * f;
+          const baseZ = base[lo * 3 + 2] + (base[hi * 3 + 2] - base[lo * 3 + 2]) * f;
+
+          const u = clampedJ / (RAY_PTS - 1);
+          const bodyEnvelope = Math.sin(Math.PI * Math.min(1, Math.max(0, u))) * 0.95;
+          const crawlWave = Math.sin(u * cfg.wiggleFreq * Math.PI * 2 - t * cfg.wiggleSpeed + cfg.sparkOffset);
+          const wormOffset = bodyEnvelope * crawlWave * cfg.wiggleAmp;
+
+          pos[j * 3] = baseX + cfg.wiggleDirX * wormOffset;
+          pos[j * 3 + 1] = baseY + cfg.wiggleDirY * wormOffset;
+          pos[j * 3 + 2] = baseZ;
         }
         line.geometry.attributes.position.needsUpdate = true;
 
-        // Vertex colors: bright face color at root → black at tip (Bloom makes it glow)
         const colors = line.geometry.attributes.color.array;
+        const headU = growth;
         for (let j = 0; j < RAY_PTS; j++) {
           const u = j / (RAY_PTS - 1);
-          const glow = Math.pow(Math.max(0, 1 - u), 0.55);   // slower fade = longer bright core
+          const tail = Math.pow(Math.max(0, 1 - u), 0.4);
+          const segmentBand = 0.72 + 0.28 * Math.sin(u * 26 - t * 12 + cfg.sparkOffset);
+          const headGlow = Math.exp(-Math.pow((u - headU) / 0.12, 2)) * 0.65;
+          const glow = tail * segmentBand + headGlow;
           colors[j * 3] = col.r * glow;
           colors[j * 3 + 1] = col.g * glow;
           colors[j * 3 + 2] = col.b * glow;
