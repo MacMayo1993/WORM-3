@@ -77,27 +77,34 @@ const GridLines = ({ time }) => {
 
   if (baseOpacity <= 0) return null;
 
-  // "Blue ↔ Green" pre-explosion text (GREEN_SHOW_START+0.4 → FULL_FLIP_START)
-  // pulses the x-axis (PX=Blue, NX=Green) grid lines
+  // Grid line pulses — highlight the relevant face pair during each callout window.
+  // Pre-explosion: x-axis (PX=Blue, NX=Green) during "Blue ↔ Green" text.
   const xPulse = (time >= GREEN_SHOW_START + 0.4 && time < FULL_FLIP_START)
-    ? Math.sin(progress(time, GREEN_SHOW_START + 0.4, FULL_FLIP_START) * Math.PI) * 0.55
+    ? Math.sin(progress(time, GREEN_SHOW_START + 0.4, FULL_FLIP_START) * Math.PI) * 0.70
     : 0;
+  // Smaller ambient pulses for z and y axes whenever blue/green are pulsing
+  // (gives the other seams a faint sympathetic glow so the cube feels alive).
+  const zPulse = xPulse * 0.4;
+  const yPulse = xPulse * 0.3;
 
-  const pulseFor = { x: xPulse, y: 0, z: 0 };
+  const pulseFor = { x: xPulse, y: yPulse, z: zPulse };
 
   return (
     <>
       {faces.map(({ colorId, pulse, seams }, fi) =>
-        seams.map((pts, si) => (
-          <Line
-            key={`gl-${fi}-${si}`}
-            points={pts}
-            color={FACE_COLORS[colorId]}
-            transparent
-            opacity={Math.min(1, baseOpacity + pulseFor[pulse])}
-            lineWidth={1}
-          />
-        ))
+        seams.map((pts, si) => {
+          const p = pulseFor[pulse];
+          return (
+            <Line
+              key={`gl-${fi}-${si}`}
+              points={pts}
+              color={FACE_COLORS[colorId]}
+              transparent
+              opacity={Math.min(1, baseOpacity + p)}
+              lineWidth={1 + p * 1.5}
+            />
+          );
+        })
       )}
     </>
   );
@@ -166,10 +173,18 @@ const IntroScene = ({ time, onComplete }) => {
     return 1 - smoothstep(progress(implodeN, dStart, dEnd));
   };
 
-  // ── Center tile flip (no hint tilt, just the full 180° flip) ───────────────
+  // ── Center tile flip: forward 0→π, brief hold, then reverse π→0 ─────────────
+  // Reversing before EXPLOSION_START ensures the PX center sticker is face-forward
+  // (not back-face culled) when the exploded blue face is revealed.
   const getCenterTileFlip = () => {
-    const flipP = progress(time, FULL_FLIP_START, FULL_FLIP_END);
-    if (flipP > 0) return ease(clamp01(flipP)) * Math.PI;
+    const HOLD_END = FULL_FLIP_END + 0.3; // pause at π for 0.3 s before snapping back
+    if (time >= FULL_FLIP_START && time < FULL_FLIP_END) {
+      return ease(clamp01(progress(time, FULL_FLIP_START, FULL_FLIP_END))) * Math.PI;
+    }
+    if (time >= FULL_FLIP_END && time < HOLD_END) return Math.PI;
+    if (time >= HOLD_END && time < EXPLOSION_START) {
+      return (1 - ease(progress(time, HOLD_END, EXPLOSION_START))) * Math.PI;
+    }
     return 0;
   };
 
