@@ -358,6 +358,9 @@ export default function WORM3() {
   // Coming Soon screen
   const [showComingSoon, setShowComingSoon] = useState(false);
 
+  // Möbius Cubelet visualization
+  const [showMobiusCubelet, setShowMobiusCubelet] = useState(false);
+
   // Disparity Mode wizard + betting screen + first-flip gate
   const [showDisparityWizard, setShowDisparityWizard] = useState(false);
   const [showDisparityBetting, setShowDisparityBetting] = useState(false);
@@ -714,6 +717,11 @@ export default function WORM3() {
   const handleMenuComingSoon = useCallback(() => {
     useGameStore.getState().setShowMainMenu(false);
     setShowComingSoon(true);
+  }, []);
+
+  const handleMenuMobiusCubelet = useCallback(() => {
+    useGameStore.getState().setShowMainMenu(false);
+    setShowMobiusCubelet(true);
   }, []);
 
   const handleMenuHolonomy = useCallback(() => {
@@ -1204,6 +1212,7 @@ export default function WORM3() {
             disparityWaitingFirstFlip, disparityCountdown,
             showAntipodalPiP, onToggleAntipodalPiP: () => setShowAntipodalPiP(v => !v),
             showComingSoon, onCloseComingSoon: () => { setShowComingSoon(false); useGameStore.getState().setShowMainMenu(true); },
+            showMobiusCubelet, onCloseMobiusCubelet: () => { setShowMobiusCubelet(false); useGameStore.getState().setShowMainMenu(true); },
           }}
           handlers={{
             onReset: handleReset,
@@ -1239,6 +1248,7 @@ export default function WORM3() {
             onMenuMerge: handleMenuMerge,
             onMenuStore: handleOpenStore,
             onMenuComingSoon: handleMenuComingSoon,
+            onMenuMobiusCubelet: handleMenuMobiusCubelet,
             showMergeThemePicker,
             onMergeStart: handleMergeStart,
             onMergeCancel: handleMergeCancel,
