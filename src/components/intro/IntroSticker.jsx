@@ -52,7 +52,7 @@ const IntroSticker = ({ pos, rot, color, styleKey, flipRotation = 0, emissiveBoo
               metalness={0.0}
               side={THREE.FrontSide}
               emissive={color}
-              emissiveIntensity={0.25 + emissiveBoost * 0.75}
+              emissiveIntensity={0.25 + emissiveBoost * 1.25}
             />
           )}
         </mesh>
