@@ -69,6 +69,8 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
   const timeRef = useRef(0);
   const positionHistory = useRef(makeCircularBuffer(HISTORY_SIZE));
   const bodySegmentRefs = useRef([]);
+  const glowRingRefs = useRef([]);
+  const glowTailRef = useRef();
   const trailRefs = useRef([]);
   const trailSpawnT = useRef(0);
   // nextTrailSlot: round-robin index so finding a free slot is O(1)
@@ -169,6 +171,21 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
       mesh.scale.setScalar((isGlow ? 0.55 : 0.35) + life * (isGlow ? 0.75 : 0.55));
       mesh.material.opacity = life * (isGlow ? 0.38 : 0.25);
     }
+
+    // Animate glow worm bioluminescent rings + firefly tail
+    if (isGlow) {
+      for (let ri = 0; ri < glowRingRefs.current.length; ri++) {
+        const ring = glowRingRefs.current[ri];
+        if (ring && ring.material) {
+          ring.material.opacity = 0.28 + Math.sin(timeRef.current * 3.8 + ri * 1.4) * 0.18;
+        }
+      }
+      const tail = glowTailRef.current;
+      if (tail) {
+        if (tail.material) tail.material.opacity = 0.52 + Math.sin(timeRef.current * 5.2) * 0.24;
+        tail.scale.setScalar(0.85 + Math.sin(timeRef.current * 3.8) * 0.2);
+      }
+    }
   });
 
   if (!position) return null;
@@ -213,8 +230,8 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
                 />
               </mesh>
 
-              {/* Tiny legs on body segments */}
-              {!isHead && !isGlow && (
+              {/* Tiny legs on body segments — inch worm only has prolegs at the very back */}
+              {!isHead && !isGlow && !(isInch && i < segmentOffsets.length - 1) && (
                 <>
                   <mesh position={[segScale * 0.8, -segScale * 0.5, 0]}
                     rotation={[0, 0, Math.sin(t * 8 + i) * 0.4]}>
@@ -283,29 +300,96 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
           <meshBasicMaterial color={PUPIL} />
         </mesh>
 
-        {/* Antennae */}
-        <group position={[0.06, 0.22, 0.15]}
-          rotation={[Math.sin(t * 4) * 0.15, 0, 0.3]}>
-          <mesh>
-            <capsuleGeometry args={[0.015, 0.2, 4, 4]} />
-            <meshStandardMaterial color={ANTENNA_COLOR} emissive={ANTENNA_COLOR} emissiveIntensity={0.3} />
+        {/* Book worm glasses — wire-frame spectacles over the eyes */}
+        {isBook && (
+          <>
+            <mesh position={[0.1, 0.12, 0.23]}>
+              <torusGeometry args={[0.063, 0.013, 8, 18]} />
+              <meshStandardMaterial color="#1a1a1a" metalness={0.88} roughness={0.12} />
+            </mesh>
+            <mesh position={[-0.1, 0.12, 0.23]}>
+              <torusGeometry args={[0.063, 0.013, 8, 18]} />
+              <meshStandardMaterial color="#1a1a1a" metalness={0.88} roughness={0.12} />
+            </mesh>
+            {/* Bridge between lenses */}
+            <mesh position={[0, 0.12, 0.24]} rotation={[0, Math.PI / 2, 0]}>
+              <capsuleGeometry args={[0.007, 0.074, 4, 4]} />
+              <meshStandardMaterial color="#1a1a1a" metalness={0.88} roughness={0.12} />
+            </mesh>
+          </>
+        )}
+
+        {/* Glow worm bioluminescent rings — one ring per body segment */}
+        {isGlow && segmentOffsets.slice(1).map((zOff, ri) => (
+          <mesh key={`gr-${ri}`} ref={el => { glowRingRefs.current[ri] = el; }} position={[0, 0, zOff]} rotation={[Math.PI / 2, 0, 0]}>
+            <torusGeometry args={[0.17, 0.024, 8, 24]} />
+            <meshBasicMaterial color={GLOW_COLOR} transparent opacity={0.3} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
           </mesh>
-          <mesh position={[0, 0.12, 0]}>
-            <sphereGeometry args={[0.035, 6, 6]} />
-            <meshStandardMaterial color={GLOW_COLOR} emissive={GLOW_COLOR} emissiveIntensity={1} />
+        ))}
+
+        {/* Glow worm firefly butt — bright tail light */}
+        {isGlow && (
+          <mesh ref={glowTailRef} position={[0, 0, segmentOffsets[segmentOffsets.length - 1] - 0.13]}>
+            <sphereGeometry args={[0.12, 8, 8]} />
+            <meshBasicMaterial color="#ccffaa" transparent opacity={0.65} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
           </mesh>
-        </group>
-        <group position={[-0.06, 0.22, 0.15]}
-          rotation={[Math.sin(t * 4 + 1) * 0.15, 0, -0.3]}>
-          <mesh>
-            <capsuleGeometry args={[0.015, 0.2, 4, 4]} />
-            <meshStandardMaterial color={ANTENNA_COLOR} emissive={ANTENNA_COLOR} emissiveIntensity={0.3} />
-          </mesh>
-          <mesh position={[0, 0.12, 0]}>
-            <sphereGeometry args={[0.035, 6, 6]} />
-            <meshStandardMaterial color={GLOW_COLOR} emissive={GLOW_COLOR} emissiveIntensity={1} />
-          </mesh>
-        </group>
+        )}
+
+        {/* Antennae — character-specific */}
+
+        {/* Classic/Book: standard antennae */}
+        {!isInch && !isGlow && (
+          <>
+            <group position={[0.06, 0.22, 0.15]} rotation={[Math.sin(t * 4) * 0.15, 0, 0.3]}>
+              <mesh>
+                <capsuleGeometry args={[0.015, 0.2, 4, 4]} />
+                <meshStandardMaterial color={ANTENNA_COLOR} emissive={ANTENNA_COLOR} emissiveIntensity={0.3} />
+              </mesh>
+              <mesh position={[0, 0.12, 0]}>
+                <sphereGeometry args={[0.035, 6, 6]} />
+                <meshStandardMaterial color={GLOW_COLOR} emissive={GLOW_COLOR} emissiveIntensity={1} />
+              </mesh>
+            </group>
+            <group position={[-0.06, 0.22, 0.15]} rotation={[Math.sin(t * 4 + 1) * 0.15, 0, -0.3]}>
+              <mesh>
+                <capsuleGeometry args={[0.015, 0.2, 4, 4]} />
+                <meshStandardMaterial color={ANTENNA_COLOR} emissive={ANTENNA_COLOR} emissiveIntensity={0.3} />
+              </mesh>
+              <mesh position={[0, 0.12, 0]}>
+                <sphereGeometry args={[0.035, 6, 6]} />
+                <meshStandardMaterial color={GLOW_COLOR} emissive={GLOW_COLOR} emissiveIntensity={1} />
+              </mesh>
+            </group>
+          </>
+        )}
+
+        {/* Glow worm: long bioluminescent tendrils with big pulsing orbs */}
+        {isGlow && (
+          <>
+            <group position={[0.07, 0.26, 0.1]} rotation={[Math.sin(t * 3.0) * 0.25, 0, 0.4]}>
+              <mesh>
+                <capsuleGeometry args={[0.018, 0.3, 4, 4]} />
+                <meshStandardMaterial color={GLOW_COLOR} emissive={GLOW_COLOR} emissiveIntensity={1.0} transparent opacity={0.9} />
+              </mesh>
+              <mesh position={[0, 0.18, 0]}>
+                <sphereGeometry args={[0.058, 8, 8]} />
+                <meshStandardMaterial color={GLOW_COLOR} emissive={GLOW_COLOR} emissiveIntensity={2.2} />
+              </mesh>
+            </group>
+            <group position={[-0.07, 0.26, 0.1]} rotation={[Math.sin(t * 3.0 + 1.2) * 0.25, 0, -0.4]}>
+              <mesh>
+                <capsuleGeometry args={[0.018, 0.3, 4, 4]} />
+                <meshStandardMaterial color={GLOW_COLOR} emissive={GLOW_COLOR} emissiveIntensity={1.0} transparent opacity={0.9} />
+              </mesh>
+              <mesh position={[0, 0.18, 0]}>
+                <sphereGeometry args={[0.058, 8, 8]} />
+                <meshStandardMaterial color={GLOW_COLOR} emissive={GLOW_COLOR} emissiveIntensity={2.2} />
+              </mesh>
+            </group>
+          </>
+        )}
+
+        {/* Inch worm: no antennae (real loopers have none) */}
 
         {/* Glow halo */}
         {alive && (

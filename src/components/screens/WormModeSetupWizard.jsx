@@ -713,13 +713,6 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           style={{ width: '100%', accentColor: '#f59e0b' }} />
       </label>
 
-      <label style={{ display: 'grid', gap: '6px' }}>
-        <div style={{ fontSize: '12px', fontWeight: 700, color: 'rgba(0,0,0,0.66)' }}>Worm color</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <input type="color" value={settings.wormColor} onChange={e => select('wormColor', e.target.value)} style={{ width: 44, height: 34, border: 0, background: 'transparent', padding: 0, cursor: 'pointer' }} />
-          <code style={{ fontSize: '12px', color: 'rgba(0,0,0,0.5)' }}>{settings.wormColor}</code>
-        </div>
-      </label>
     </div>
   );
 
@@ -815,6 +808,21 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                     boxShadow: selected ? '0 0 10px rgba(59,130,246,0.25)' : 'none',
                   }}
                 >
+                  {/* Character silhouette icon */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '3px', marginBottom: '5px' }}>
+                    {character.id === 'classic' && [14, 11, 9].map((sz, j) => (
+                      <div key={j} style={{ width: sz, height: sz, borderRadius: '50%', background: selected ? '#3b82f6' : 'rgba(0,0,0,0.2)' }} />
+                    ))}
+                    {character.id === 'inch' && [14, 10].map((sz, j) => (
+                      <div key={j} style={{ width: sz, height: Math.round(sz * 0.6), borderRadius: '50%', background: selected ? '#3b82f6' : 'rgba(0,0,0,0.2)', transform: `translateY(${j === 0 ? -2 : 2}px)` }} />
+                    ))}
+                    {character.id === 'glow' && [14, 11, 9].map((sz, j) => (
+                      <div key={j} style={{ width: sz, height: sz, borderRadius: '50%', background: selected ? '#3b82f6' : 'rgba(0,0,0,0.2)', boxShadow: selected ? `0 0 6px #3b82f6` : 'none', outline: selected ? '1.5px solid #93c5fd66' : 'none' }} />
+                    ))}
+                    {character.id === 'book' && [14, 11, 9].map((sz, j) => (
+                      <div key={j} style={{ width: sz, height: sz, borderRadius: '3px', background: selected ? '#3b82f6' : 'rgba(0,0,0,0.2)' }} />
+                    ))}
+                  </div>
                   <div style={{ fontSize: '11px', fontWeight: 700, color: selected ? '#1d4ed8' : 'rgba(0,0,0,0.66)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
                     {character.label}
                   </div>
@@ -857,27 +865,30 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                 <div style={{ width: '3px', height: '3px', borderRadius: '50%', background: '#111', opacity: 0.7, marginBottom: '-2px' }} />
                 <div style={{ width: '3px', height: '3px', borderRadius: '50%', background: '#111', opacity: 0.7 }} />
               </div>
+              {/* Book worm: two-lens wire-frame glasses */}
               {wormCharacterId === 'book' && (
-                <div style={{
-                  position: 'absolute',
-                  top: '10px',
-                  width: '24px',
-                  height: '9px',
-                  border: '1.5px solid rgba(17,17,17,0.9)',
-                  borderRadius: '999px',
-                  boxSizing: 'border-box',
-                }} />
+                <div style={{ position: 'absolute', top: '9px', display: 'flex', gap: '4px' }}>
+                  <div style={{ width: '11px', height: '9px', border: '1.5px solid rgba(17,17,17,0.85)', borderRadius: '50%', boxSizing: 'border-box' }} />
+                  <div style={{ width: '11px', height: '9px', border: '1.5px solid rgba(17,17,17,0.85)', borderRadius: '50%', boxSizing: 'border-box' }} />
+                </div>
               )}
             </div>
             {/* Body segments */}
-            {(wormCharacterId === 'inch' ? [29, 18] : [32, 27, 22]).map((sz, i) => (
+            {(wormCharacterId === 'inch'
+              ? [{w: 26, h: 15}, {w: 20, h: 12}]
+              : [{w: 32, h: 32}, {w: 27, h: 27}, {w: 22, h: 22}]
+            ).map(({w, h}, i) => (
               <div key={i} style={{
-                width: `${sz}px`, height: `${sz}px`,
-                borderRadius: wormCharacterId === 'book' ? '10px' : '50%',
+                position: 'relative',
+                width: `${w}px`,
+                height: `${h}px`,
+                borderRadius: wormCharacterId === 'book' ? '8px' : '50%',
                 background: activeSkin.belly,
                 boxShadow: wormCharacterId === 'glow'
-                  ? `0 0 12px ${activeSkin.glow}bb`
+                  ? `0 0 16px ${activeSkin.glow}cc, 0 0 6px ${activeSkin.glow}88`
                   : `0 0 8px ${activeSkin.glow}55`,
+                outline: wormCharacterId === 'glow' ? `1.5px solid ${activeSkin.glow}66` : 'none',
+                transform: wormCharacterId === 'inch' ? `translateY(${i === 0 ? -3 : 3}px)` : 'none',
                 opacity: 1 - i * 0.08,
               }} />
             ))}
