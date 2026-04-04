@@ -90,20 +90,30 @@ const fragmentShader = /* glsl */ `
     if (lineStr < 0.02) discard;
 
     // ── Color ──────────────────────────────────────────────────────────────
-    // Centre: cool ruled-paper blue-white
-    // Crumpled edge: shifts toward warm purple (topology fighting back)
-    vec3 centreCol = vec3(0.42, 0.65, 1.00);
-    vec3 edgeCol   = vec3(0.72, 0.38, 1.00);
-    vec3 col = mix(centreCol, edgeCol, vEdge);
+    // Classic graph paper: blue lines on white paper.
+    // Flat centre: crisp "Ampad" ruled-paper blue.
+    // Crumpled edges: lines warm toward indigo as the paper folds under
+    // the strain of RP2 identification; the paper background yellows slightly
+    // like stress-creased graph stock.
+    vec3 lineCol  = mix(vec3(0.22, 0.50, 0.88), vec3(0.35, 0.18, 0.72), vEdge);
 
-    // Subtle glow where the surface is steeply displaced
-    float crumpleGlow = clamp(abs(vDispZ) * 0.14, 0.0, 0.35);
-    col += crumpleGlow * vec3(0.35, 0.08, 0.55);
+    // Subtle extra brightness where the displacement is steepest
+    float crumpleGlow = clamp(abs(vDispZ) * 0.12, 0.0, 0.28);
+    lineCol += crumpleGlow * vec3(0.10, 0.05, 0.30);
+
+    // Paper background — white with a faint warm tint at the crumpled edges
+    vec3 paperCol = mix(vec3(0.96, 0.97, 1.00), vec3(0.94, 0.91, 0.82), vEdge * 0.7);
 
     // ── Alpha ──────────────────────────────────────────────────────────────
-    // Major lines slightly brighter; both fade at the extreme crumpled edges
+    // Lines: full opacity, slightly boosted on major lines.
+    // Paper background: very subtle so the cube scene shows through.
     float majorBoost = major * 0.18;
-    float alpha = (lineStr * (0.52 - vEdge * 0.20) + majorBoost) * uAlpha;
+    float lineAlpha  = (lineStr * (0.56 - vEdge * 0.18) + majorBoost) * uAlpha;
+    float paperAlpha = (0.055 - vEdge * 0.03) * uAlpha;
+
+    // Blend paper under lines
+    vec3  col   = mix(paperCol, lineCol, lineStr);
+    float alpha = mix(paperAlpha, lineAlpha, lineStr);
 
     gl_FragColor = vec4(col, alpha);
   }
@@ -201,7 +211,7 @@ export function RP2GridBackground({ opacity = 1.0 }) {
         transparent: true,
         side:       THREE.DoubleSide,
         depthWrite: false,
-        blending:   THREE.AdditiveBlending,
+        blending:   THREE.NormalBlending,
       }),
     [] // eslint-disable-line react-hooks/exhaustive-deps
   );
@@ -212,9 +222,9 @@ export function RP2GridBackground({ opacity = 1.0 }) {
       new THREE.LineBasicMaterial({
         vertexColors: true,
         transparent:  true,
-        opacity:      0.55 * opacity,
+        opacity:      0.60 * opacity,
         depthWrite:   false,
-        blending:     THREE.AdditiveBlending,
+        blending:     THREE.NormalBlending,
       }),
     [] // eslint-disable-line react-hooks/exhaustive-deps
   );
