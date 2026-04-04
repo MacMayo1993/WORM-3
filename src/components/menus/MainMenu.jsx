@@ -3,9 +3,20 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import IntroCubie from '../intro/IntroCubie.jsx';
 import ParityWallet from '../overlays/ParityWallet.jsx';
+import { updateSharedTime } from '../../3d/styles/TileStyleMaterials.jsx';
 
-// All stickers black — same as the opening frames of the intro
-const ZERO_REVEAL = { PZ: 0, NZ: 0, PX: 0, NX: 0, PY: 0, NY: 0 };
+// All available manifold element styles — one will be picked at random per face
+const ALL_STYLES = [
+  'circuit', 'holographic', 'pulse', 'neural',
+  'lava', 'galaxy', 'ice', 'water', 'wood', 'grass', 'sand',
+  'vortex', 'shockwave', 'moireRings', 'moireLines', 'infinityTunnel',
+  'polkaDots', 'zigzag', 'checkerboard', 'diagStripes', 'hexGrid',
+  'opConcentric', 'opRadialSpokes', 'opDiamondWave', 'opPinwheel',
+  'opChevronBands', 'opBullseyeSteps', 'opTiltMosaic', 'opWarpGrid',
+  'carbonFiber', 'metallic', 'glossy',
+];
+
+const FACE_DIRS = ['PZ', 'NZ', 'PX', 'NX', 'PY', 'NY'];
 
 // ─── Antipodal face pulse rings ────────────────────────────────────────────────
 // Cycle: B-G → R-O → W-Y → repeat
@@ -364,7 +375,7 @@ const FacePulses = () => {
   );
 };
 
-const BlackCube = () => {
+const SolvedCube = () => {
   const items = useMemo(() => {
     const result = [];
     for (let x = 0; x < 3; x++)
@@ -373,6 +384,17 @@ const BlackCube = () => {
           result.push({ key: `${x}-${y}-${z}`, pos: [x - 1, y - 1, z - 1] });
     return result;
   }, []);
+
+  // One random manifold style per face direction, chosen once on mount.
+  // All 9 cubies on the same face share the same style → solved cube appearance.
+  const faceStyles = useMemo(() => {
+    const styles = {};
+    // Shuffle ALL_STYLES so each face gets a unique style
+    const pool = [...ALL_STYLES].sort(() => Math.random() - 0.5);
+    FACE_DIRS.forEach((dir, i) => { styles[dir] = pool[i % pool.length]; });
+    return styles;
+  }, []);
+
   return (
     <>
       {items.map(it => (
@@ -381,7 +403,7 @@ const BlackCube = () => {
           position={it.pos}
           size={3}
           explosionFactor={0}
-          faceReveal={ZERO_REVEAL}
+          faceStyles={faceStyles}
           cubieFlips={{}}
           antipodalSwaps={{}}
         />
@@ -399,10 +421,12 @@ export const RotatingBlackCube = () => {
     const t = state.clock.elapsedTime;
     groupRef.current.rotation.y = t * 0.28;
     groupRef.current.rotation.x = Math.sin(t * 0.15) * 0.12;
+    // Drive animated tile style shaders (lava, galaxy, circuit, etc.)
+    updateSharedTime(t);
   });
   return (
     <group ref={groupRef} position={[0, 0.15, 0]}>
-      <BlackCube />
+      <SolvedCube />
       <FacePulses />
     </group>
   );
