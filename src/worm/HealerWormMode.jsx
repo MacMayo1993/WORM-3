@@ -1283,17 +1283,28 @@ const _pathPointsBuffer = [];
 const _headPathPoint = { pos: _bodyHeadPos, normal: _bodyNormal };
 
 function WormBody({ worm }) {
-    const meshRef = useRef();
+    const meshRef = useRef();       // sphere body (classic / inch / glow)
+    const boxMeshRef = useRef();    // box body (book worm only)
     const wormSkinId = useGameStore(s => s.wormSkin ?? 'slime');
     const wormCharacterId = useGameStore(s => s.wormCharacter ?? 'classic');
     const wormCharacter = getWormCharacter(wormCharacterId);
     const isInch = wormCharacter.id === 'inch';
     const isGlow = wormCharacter.id === 'glow';
     const isBook = wormCharacter.id === 'book';
-    const wormColor = getSkin(wormSkinId).body;
-    // Ref so useFrame always reads the latest wormColor without closure staleness
+    const skin = getSkin(wormSkinId);
+    const wormColor = skin.body;
+    const bellyColor = skin.belly;
+    // Refs so useFrame always reads latest values without closure staleness
     const wormColorRef = useRef(wormColor);
     wormColorRef.current = wormColor;
+    const bellyColorRef = useRef(bellyColor);
+    bellyColorRef.current = bellyColor;
+    const isInchRef = useRef(isInch);
+    isInchRef.current = isInch;
+    const isGlowRef = useRef(isGlow);
+    isGlowRef.current = isGlow;
+    const isBookRef = useRef(isBook);
+    isBookRef.current = isBook;
 
     useFrame((state) => {
         // Copy head/normal into scratch vectors (avoids .clone() allocation)
@@ -1303,7 +1314,10 @@ function WormBody({ worm }) {
         const currentJumpVal = worm.isJumping.current ? Math.sin(worm.jumpT.current * Math.PI) * 0.55 : 0;
         _bodyHeadPos.addScaledVector(_bodyNormal, WORM_LIFT + currentJumpVal);
 
-        const mesh = meshRef.current;
+        const _isInch = isInchRef.current;
+        const _isGlow = isGlowRef.current;
+        const _isBook = isBookRef.current;
+        const mesh = _isBook ? boxMeshRef.current : meshRef.current;
         if (!mesh) return;
 
         const tLen = worm.tailLength.current;
@@ -1323,6 +1337,7 @@ function WormBody({ worm }) {
 
         const orbColors = worm.orbPickupColorsRef.current;
         const baseColor = wormColorRef.current;
+        const bellyCol = bellyColorRef.current;
 
         for (let i = 0; i < visibleCount; i++) {
             const fade = 1 - i / tLen;
@@ -1332,8 +1347,12 @@ function WormBody({ worm }) {
                 _wormDummy.position.copy(_bodyHeadPos);
                 _wormDummy.scale.setScalar(0.07);
             } else {
-                // Clones — parameterically walk backwards along the curve to exact target distance
-                const targetDist = i * 0.14; // Diameter of scale 0.07 sphere
+                // Inch worm: sinusoidal spacing creates a traveling compression wave (looper gait)
+                const targetDist = _isInch
+                    ? i * 0.14 + Math.sin(i * 1.1 - time * 2.8) * 0.075
+                    : i * 0.14;
+
+                // Clones — parametrically walk backwards along the curve to exact target distance
                 let foundPosition = false;
 
                 while (walkIndex < _pathPointsBuffer.length - 1) {
@@ -1352,7 +1371,7 @@ function WormBody({ worm }) {
                         _bodySegForward.subVectors(ptA.pos, ptB.pos).normalize();
                         _bodySideVec.crossVectors(_bodyCloneNormal, _bodySegForward).normalize();
 
-                        const wiggleAmp = 0.08 * Math.sin(fade * Math.PI);
+                        const wiggleAmp = _isInch ? 0.0 : 0.08 * Math.sin(fade * Math.PI);
                         const wigglePhase = i * 0.8 - time * 6.0;
                         _bodyClonePos.addScaledVector(_bodySideVec, Math.sin(wigglePhase) * wiggleAmp);
                         foundPosition = true;
@@ -1368,13 +1387,17 @@ function WormBody({ worm }) {
                 }
 
                 _wormDummy.position.copy(_bodyClonePos);
-                if (isInch) {
-                    const accordion = 1 + Math.sin(time * 8 + i) * 0.2;
-                    _wormDummy.scale.set(0.078 * accordion, 0.062, 0.095);
-                } else if (isBook) {
-                    _wormDummy.scale.set(0.082, 0.055, 0.095);
-                } else if (isGlow) {
-                    _wormDummy.scale.setScalar(0.073);
+                if (_isInch) {
+                    // Scale oscillates dramatically — compressed segments look tiny, stretched look elongated
+                    const wave = Math.sin(time * 2.8 + i * 1.1);
+                    const sc = 0.052 + (wave * 0.5 + 0.5) * 0.04; // 0.052 → 0.092
+                    _wormDummy.scale.setScalar(sc);
+                } else if (_isBook) {
+                    _wormDummy.scale.set(0.088, 0.055, 0.1);
+                } else if (_isGlow) {
+                    // Slightly varied glow segment sizes
+                    const glowSc = 0.068 + Math.sin(time * 3.5 + i * 1.6) * 0.01;
+                    _wormDummy.scale.setScalar(glowSc);
                 } else {
                     _wormDummy.scale.setScalar(0.07);
                 }
@@ -1383,12 +1406,18 @@ function WormBody({ worm }) {
             _wormDummy.updateMatrix();
             mesh.setMatrixAt(i, _wormDummy.matrix);
 
-            // Color: base segments use wormColor; tail-growth segments use the orb's face color.
-            // BASE_TAIL_LENGTH segments (initial body) = wormColor.
-            // Each ORB_SEGMENT_GROWTH group beyond that = the orb color picked up at that point.
+            // Color per segment
             const orbPickupIndex = Math.floor((i - BASE_TAIL_LENGTH) / ORB_SEGMENT_GROWTH);
-            if (orbPickupIndex >= 0 && orbPickupIndex < orbColors.length) {
+            const hasOrbColor = orbPickupIndex >= 0 && orbPickupIndex < orbColors.length;
+            if (hasOrbColor) {
                 _bodyColor.set(orbColors[orbPickupIndex]);
+            } else if (_isInch) {
+                // Alternating body/belly bands for visible ring pattern
+                _bodyColor.set(i % 2 === 0 ? baseColor : bellyCol);
+            } else if (_isGlow) {
+                // Pulsing bioluminescent brightness bands along body
+                const bandPhase = Math.sin(i * 2.2 - time * 5.0);
+                _bodyColor.set(baseColor).multiplyScalar(0.65 + bandPhase * 0.35);
             } else {
                 _bodyColor.set(baseColor);
             }
@@ -1400,16 +1429,103 @@ function WormBody({ worm }) {
     });
 
     return (
-        <instancedMesh ref={meshRef} args={[undefined, undefined, MAX_TAIL]} frustumCulled={false}>
-            <sphereGeometry args={[1, 12, 12]} />
-            <meshStandardMaterial
-                color={wormColor}
-                emissive={wormColor}
-                emissiveIntensity={isGlow ? 0.9 : 0.35}
-                roughness={isBook ? 0.52 : 0.28}
-                metalness={isBook ? 0.15 : 0}
-            />
-        </instancedMesh>
+        <>
+            {/* Sphere body — Classic, Inch Worm, Glow Worm */}
+            <instancedMesh ref={meshRef} args={[undefined, undefined, MAX_TAIL]} visible={!isBook} frustumCulled={false}>
+                <sphereGeometry args={[1, 12, 12]} />
+                <meshStandardMaterial
+                    color={wormColor}
+                    emissive={wormColor}
+                    emissiveIntensity={isGlow ? 1.4 : 0.35}
+                    roughness={0.28}
+                    metalness={0}
+                    transparent={isGlow}
+                    opacity={isGlow ? 0.78 : 1}
+                />
+            </instancedMesh>
+
+            {/* Box body — Book Worm only: unmistakably boxy rectangular segments */}
+            <instancedMesh ref={boxMeshRef} args={[undefined, undefined, MAX_TAIL]} visible={isBook} frustumCulled={false}>
+                <boxGeometry args={[1, 0.68, 1.12]} />
+                <meshStandardMaterial
+                    color={wormColor}
+                    emissive={wormColor}
+                    emissiveIntensity={0.28}
+                    roughness={0.58}
+                    metalness={0.2}
+                />
+            </instancedMesh>
+        </>
+    );
+}
+
+// ─── Glow Worm Aura ───────────────────────────────────────────────────────────
+// Bioluminescent rings + strong pulsing light only active for the Glow Worm.
+// Rings are instanced tori placed along the step history so they always trail the body.
+const GLOW_RING_COUNT = 8;
+const _glowRingDummy = new THREE.Object3D();
+const _glowRingUp = new THREE.Vector3(0, 1, 0);
+const _glowRingQuat = new THREE.Quaternion();
+
+function GlowWormAura({ worm }) {
+    const wormCharacterId = useGameStore(s => s.wormCharacter ?? 'classic');
+    const wormSkinId = useGameStore(s => s.wormSkin ?? 'slime');
+    const isGlow = wormCharacterId === 'glow';
+    const glowColor = getSkin(wormSkinId).glow;
+    const lightRef = useRef();
+    const ringRef = useRef();
+
+    useFrame(({ clock }) => {
+        if (!isGlow) return;
+        const t = clock.elapsedTime;
+
+        // Pulsing point light follows the head
+        if (lightRef.current) {
+            lightRef.current.position.copy(worm.headInterpPos.current)
+                .addScaledVector(worm.currentNormal.current, WORM_LIFT + 0.1);
+            lightRef.current.intensity = 3.2 + Math.sin(t * 4.0) * 1.0;
+        }
+
+        // Bioluminescent rings distributed along body path
+        const rings = ringRef.current;
+        if (!rings) return;
+        const steps = worm.stepHistory.current;
+        const count = Math.min(GLOW_RING_COUNT, Math.max(1, steps.length));
+        rings.count = count;
+        for (let i = 0; i < count; i++) {
+            const stepIdx = Math.floor((i / (count - 1 || 1)) * (steps.length - 1 || 0));
+            const step = steps[stepIdx] ?? steps[0];
+            if (!step) continue;
+            _glowRingDummy.position.copy(step.pos)
+                .addScaledVector(step.normal, WORM_LIFT + 0.04);
+            // Orient ring so it lies flat on the cube face
+            _glowRingQuat.setFromUnitVectors(_glowRingUp, step.normal);
+            _glowRingDummy.quaternion.copy(_glowRingQuat);
+            const pulse = 0.72 + Math.sin(t * 5.5 + i * 0.9) * 0.28;
+            _glowRingDummy.scale.setScalar(pulse);
+            _glowRingDummy.updateMatrix();
+            rings.setMatrixAt(i, _glowRingDummy.matrix);
+        }
+        rings.instanceMatrix.needsUpdate = true;
+    });
+
+    if (!isGlow) return null;
+
+    return (
+        <>
+            <pointLight ref={lightRef} color={glowColor} intensity={3.0} distance={5.5} decay={2} />
+            <instancedMesh ref={ringRef} args={[undefined, undefined, GLOW_RING_COUNT]} frustumCulled={false}>
+                <torusGeometry args={[0.18, 0.025, 8, 28]} />
+                <meshBasicMaterial
+                    color={glowColor}
+                    transparent
+                    opacity={0.45}
+                    blending={THREE.AdditiveBlending}
+                    depthWrite={false}
+                    toneMapped={false}
+                />
+            </instancedMesh>
+        </>
     );
 }
 
@@ -1443,6 +1559,9 @@ function PortalGlow({ worm, size }) {
 const _faceRight = new THREE.Vector3();
 const _faceForward = new THREE.Vector3();
 const _faceHeadPos = new THREE.Vector3();
+// Glasses orientation — torus axis (Y) aligned to face-forward so ring appears circular
+const _glassAxisY = new THREE.Vector3(0, 1, 0);
+const _glassQuat = new THREE.Quaternion();
 
 function WormFace({ worm, size }) {
     const leftEyeRef = useRef();
@@ -1450,7 +1569,11 @@ function WormFace({ worm, size }) {
     const smile0 = useRef(), smile1 = useRef(), smile2 = useRef();
     const smileRefs = [smile0, smile1, smile2];
     const hatGroupRef = useRef();
+    const glassLeftRef = useRef();
+    const glassRightRef = useRef();
     const wormHatId = useGameStore(s => s.wormHat ?? 'none');
+    const wormCharacterId = useGameStore(s => s.wormCharacter ?? 'classic');
+    const isBook = wormCharacterId === 'book';
 
     useFrame(() => {
         const { dirKey } = worm.pos.current;
@@ -1510,6 +1633,26 @@ function WormFace({ worm, size }) {
             _hatAlignQuat.setFromUnitVectors(_hatYUp, normal);
             hatGroupRef.current.quaternion.copy(_hatAlignQuat);
         }
+
+        // Book worm glasses — torus rings in front of each eye, axis aligned to forward
+        if (isBook) {
+            _glassQuat.setFromUnitVectors(_glassAxisY, _faceForward);
+            const GS = 0.054;
+            if (glassLeftRef.current) {
+                glassLeftRef.current.position.copy(_faceHeadPos)
+                    .addScaledVector(_faceRight, 0.028)
+                    .addScaledVector(_faceForward, 0.029);
+                glassLeftRef.current.quaternion.copy(_glassQuat);
+                glassLeftRef.current.scale.setScalar(GS);
+            }
+            if (glassRightRef.current) {
+                glassRightRef.current.position.copy(_faceHeadPos)
+                    .addScaledVector(_faceRight, -0.028)
+                    .addScaledVector(_faceForward, 0.029);
+                glassRightRef.current.quaternion.copy(_glassQuat);
+                glassRightRef.current.scale.setScalar(GS);
+            }
+        }
     });
 
     return (
@@ -1532,6 +1675,19 @@ function WormFace({ worm, size }) {
                 <group ref={hatGroupRef}>
                     <WormHat3D type={wormHatId} scale={0.07} />
                 </group>
+            )}
+            {/* Book worm glasses — two torus rings, only rendered for book character */}
+            {isBook && (
+                <>
+                    <mesh ref={glassLeftRef}>
+                        <torusGeometry args={[1, 0.13, 8, 18]} />
+                        <meshStandardMaterial color="#1a1a1a" metalness={0.9} roughness={0.1} />
+                    </mesh>
+                    <mesh ref={glassRightRef}>
+                        <torusGeometry args={[1, 0.13, 8, 18]} />
+                        <meshStandardMaterial color="#1a1a1a" metalness={0.9} roughness={0.1} />
+                    </mesh>
+                </>
             )}
         </>
     );
@@ -2421,6 +2577,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             <TunnelSurfFX worm={worm} size={size} />
             <TunnelPortalRings worm={worm} size={size} />
             <WormBody worm={worm} />
+            <GlowWormAura worm={worm} />
             <WormFace worm={worm} size={size} />
             <PortalGlow worm={worm} size={size} />
             <WormholeRings
