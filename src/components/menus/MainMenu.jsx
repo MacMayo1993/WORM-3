@@ -669,13 +669,23 @@ const MainMenu = ({ onPlay: _onPlay, _onLevels, onFreeplay, _onCoop, onSettings:
           </div>
         </div>
 
-        {/* ── Play WORM hero button ── */}
+        {/* ── Bottom CTA stack: Play WORM → What's Coming → Nav pill ── */}
+        {/* Single flex column so everything scales together on any screen size */}
         <div style={{
-          position: 'absolute', bottom: '130px', left: '50%', transform: 'translateX(-50%)',
-          width: 'min(400px,85vw)', opacity: btnVisible ? 1 : 0, transition: 'opacity 0.55s ease',
+          position: 'absolute', bottom: 0, left: 0, right: 0,
+          paddingBottom: 'max(16px, env(safe-area-inset-bottom, 16px))',
+          paddingLeft: '16px', paddingRight: '16px',
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          gap: '10px',
           pointerEvents: 'all',
+          opacity: btnVisible ? 1 : 0,
+          transform: btnVisible ? 'none' : 'translateY(16px)',
+          transition: 'opacity 0.55s ease 0.1s, transform 0.55s cubic-bezier(0.22,1,0.36,1) 0.1s',
         }}>
+
+          {/* Play WORM hero button */}
           <div style={{
+            width: 'min(400px, 100%)',
             borderRadius: '100px', padding: '1.5px',
             background: hoverWorm
               ? 'linear-gradient(90deg,#a855f7,#ec4899,#f97316,#a855f7)'
@@ -690,8 +700,9 @@ const MainMenu = ({ onPlay: _onPlay, _onLevels, onFreeplay, _onCoop, onSettings:
               onMouseEnter={() => setHoverWorm(true)}
               onMouseLeave={() => { setHoverWorm(false); setPressWorm(false); }}
               onMouseDown={() => setPressWorm(true)} onMouseUp={() => setPressWorm(false)}
+              onTouchStart={() => setPressWorm(true)} onTouchEnd={() => setPressWorm(false)}
               style={{
-                width: '100%', padding: '17px 32px',
+                width: '100%', padding: '16px 32px',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
                 fontSize: 'clamp(13px,2.4vw,15px)', fontWeight: 700, letterSpacing: '0.2em',
                 textTransform: 'uppercase',
@@ -707,34 +718,16 @@ const MainMenu = ({ onPlay: _onPlay, _onLevels, onFreeplay, _onCoop, onSettings:
               Play WORM
             </button>
           </div>
-        </div>
 
-        {/* ── Coming Soon button ── */}
-        <div style={{
-          position: 'absolute', bottom: '84px', left: 0, right: 0,
-          display: 'flex', justifyContent: 'center',
-          opacity: btnVisible ? 1 : 0,
-          transform: btnVisible ? 'none' : 'translateY(10px)',
-          transition: 'opacity 0.55s ease 0.2s, transform 0.55s cubic-bezier(0.22,1,0.36,1) 0.2s',
-          pointerEvents: btnVisible ? 'all' : 'none',
-        }}>
+          {/* What's Coming pill */}
           <ComingSoonButton onPress={onComingSoon} />
-        </div>
 
-        {/* ── Bottom nav pill: Disparity | Explore | Store ── */}
-        <div style={{
-          position: 'absolute', bottom: 0, left: 0, right: 0,
-          paddingBottom: 'max(20px, env(safe-area-inset-bottom,20px))',
-          display: 'flex', justifyContent: 'center', pointerEvents: 'all',
-          opacity: btnVisible ? 1 : 0,
-          transform: btnVisible ? 'none' : 'translateY(16px)',
-          transition: 'opacity 0.55s ease 0.1s, transform 0.55s cubic-bezier(0.22,1,0.36,1) 0.1s',
-        }}>
+          {/* Bottom nav pill: Disparity | Explore | Store */}
           <div style={{
             borderRadius: '100px', padding: '1.5px',
             background: 'linear-gradient(90deg,#ef444460,#f9731660,#eab30860,#22c55e60,#3b82f660,#a855f760,#ef444460)',
             boxShadow: '0 0 20px rgba(60,80,200,0.25), 0 8px 32px rgba(0,0,0,0.5)',
-            width: 'min(360px,85vw)',
+            width: 'min(360px, 100%)',
           }}>
             <div style={{
               display: 'flex',

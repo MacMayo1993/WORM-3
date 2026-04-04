@@ -77,8 +77,8 @@ const ModeCard = ({ item, isSelected, onClick }) => {
         width: '100%',
         background: active ? item.gradient.replace(/18/g, '28').replace(/22/g, '35') : item.gradient,
         border: `1px solid ${isSelected ? item.color + '60' : item.color + '25'}`,
-        borderRadius: '18px',
-        padding: '20px',
+        borderRadius: '16px',
+        padding: 'clamp(14px, 4vw, 20px)',
         cursor: 'pointer',
         textAlign: 'left',
         transition: 'all 0.25s cubic-bezier(0.22,1,0.36,1)',
@@ -155,9 +155,9 @@ const ModeCard = ({ item, isSelected, onClick }) => {
           {/* Description — shown when selected */}
           <div
             style={{
-              maxHeight: isSelected ? '120px' : '0px',
+              maxHeight: isSelected ? '240px' : '0px',
               overflow: 'hidden',
-              transition: 'max-height 0.35s cubic-bezier(0.22,1,0.36,1)',
+              transition: 'max-height 0.4s cubic-bezier(0.22,1,0.36,1)',
             }}
           >
             <p
@@ -232,16 +232,21 @@ export default function ComingSoonScreen({ onBack }) {
         transform: visible ? 'none' : 'translateY(16px)',
         transition: 'opacity 0.32s ease, transform 0.32s cubic-bezier(0.22,1,0.36,1)',
         overflowY: 'auto',
+        WebkitOverflowScrolling: 'touch',
       }}
     >
       <div
         style={{
           width: '100%',
           maxWidth: '480px',
-          padding: 'max(44px, env(safe-area-inset-top,44px)) 20px 40px',
+          paddingTop: 'max(44px, env(safe-area-inset-top, 44px))',
+          paddingBottom: 'max(32px, env(safe-area-inset-bottom, 32px))',
+          paddingLeft: '20px',
+          paddingRight: '20px',
           display: 'flex',
           flexDirection: 'column',
           gap: '0',
+          boxSizing: 'border-box',
         }}
       >
         {/* Back button */}
