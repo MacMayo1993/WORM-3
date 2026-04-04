@@ -242,13 +242,13 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
                 <meshPhysicalMaterial
                   color={segColor}
                   emissive={segColor}
-                  emissiveIntensity={isGlow ? (isHead ? 0.95 : 0.55) : (isHead ? 0.4 : 0.12)}
+                  emissiveIntensity={isGlow ? (isHead ? 1.2 : 0.75) : (isHead ? 0.4 : 0.12)}
                   clearcoat={1}
                   clearcoatRoughness={0.1}
                   thickness={0.5}
                   roughness={isBook ? 0.52 : 0.2}
                   metalness={0}
-                  transmission={isGlow ? 0.28 : 0.2}
+                  transmission={isGlow ? 0 : 0.2}
                   ior={1.45}
                   iridescence={0.16}
                   iridescenceIOR={1.3}
