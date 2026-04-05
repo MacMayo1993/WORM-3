@@ -12,6 +12,9 @@ const _wPos1 = new THREE.Vector3();
 const _wPos2 = new THREE.Vector3();
 const _wQuat1 = new THREE.Quaternion();
 const _wQuat2 = new THREE.Quaternion();
+const _zAxis = new THREE.Vector3(0, 0, 1);
+const _glowQ1 = new THREE.Quaternion();
+const _glowQ2 = new THREE.Quaternion();
 const _faceNorm1 = new THREE.Vector3();
 const _faceNorm2 = new THREE.Vector3();
 const _vStart = new THREE.Vector3();
@@ -143,6 +146,35 @@ const strandFragmentShader = `
   }
 `;
 
+// Entrance glow disc shaders — radial portal bloom at each tunnel mouth
+const glowDiscVertexShader = `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const glowDiscFragmentShader = `
+  uniform vec3 uColor;
+  uniform float uTime;
+  uniform float uOpacity;
+  varying vec2 vUv;
+  void main() {
+    vec2 center = vUv - 0.5;
+    float dist = length(center) * 2.0;
+    // Soft gaussian halo + bright inner core + subtle ring
+    float halo = exp(-dist * 2.5);
+    float core = smoothstep(0.32, 0.0, dist);
+    float ring = smoothstep(0.58, 0.40, dist) * smoothstep(0.14, 0.28, dist) * 0.55;
+    // Gentle breathing pulse
+    float pulse = 0.82 + 0.18 * sin(uTime * 2.8);
+    float alpha = clamp((halo * 0.65 + core * 1.1 + ring * 0.5) * uOpacity * pulse, 0.0, 1.0);
+    vec3 col = uColor * (1.3 + core * 3.5 + ring * 2.0);
+    gl_FragColor = vec4(col, alpha);
+  }
+`;
+
 const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2, active1, active2, cubieRefs, intensity, flips, color1, color2, isCenter, maxStrands = 50, _explosionFactor = 0 }) => {
   const coreTubeRef = useRef();
   const coreMatRef = useRef();
@@ -182,6 +214,20 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
     uTime: { value: 0 },
     uBurst: { value: 0 },
     uOpacity: { value: 1 }
+  }));
+
+  // Entrance glow discs — one per tunnel endpoint, shining outward from cube faces
+  const glowDisc1Ref = useRef();
+  const glowDisc2Ref = useRef();
+  const [glowUniforms1] = React.useState(() => ({
+    uColor: { value: new THREE.Color() },
+    uTime: { value: 0 },
+    uOpacity: { value: 0 },
+  }));
+  const [glowUniforms2] = React.useState(() => ({
+    uColor: { value: new THREE.Color() },
+    uTime: { value: 0 },
+    uOpacity: { value: 0 },
   }));
 
   const curveRef = useRef(new THREE.CatmullRomCurve3(Array(LIGHTNING_PTS).fill(0).map(() => new THREE.Vector3())));
@@ -450,6 +496,30 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
       }
     }
 
+    // UPDATE ENTRANCE GLOW DISCS — radial portal bloom shining outward from each cube face
+    const disc1 = glowDisc1Ref.current;
+    if (disc1) {
+      disc1.position.copy(_wPos1).addScaledVector(_faceNorm1, 0.05);
+      _glowQ1.setFromUnitVectors(_zAxis, _faceNorm1);
+      disc1.quaternion.copy(_glowQ1);
+      disc1.scale.setScalar((0.48 + intensity * 0.28 + burstEnv * 0.32) * pulse);
+      disc1.visible = !dead && active1;
+      glowUniforms1.uColor.value.copy(_c1);
+      glowUniforms1.uTime.value = t;
+      glowUniforms1.uOpacity.value = dead ? 0 : 0.5 + burstEnv * 0.5;
+    }
+    const disc2 = glowDisc2Ref.current;
+    if (disc2) {
+      disc2.position.copy(_wPos2).addScaledVector(_faceNorm2, 0.05);
+      _glowQ2.setFromUnitVectors(_zAxis, _faceNorm2);
+      disc2.quaternion.copy(_glowQ2);
+      disc2.scale.setScalar((0.48 + intensity * 0.28 + burstEnv * 0.32) * pulse);
+      disc2.visible = !dead && active2;
+      glowUniforms2.uColor.value.copy(_c2);
+      glowUniforms2.uTime.value = t;
+      glowUniforms2.uOpacity.value = dead ? 0 : 0.5 + burstEnv * 0.5;
+    }
+
     // UPDATE STRANDS (Feeding into the main tunnel from the 8 spiral arms + center)
     const strands = strandsRef.current;
     if (strands) {
@@ -590,6 +660,32 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
           opacity={0}
           depthWrite={false}
           blending={THREE.AdditiveBlending}
+        />
+      </mesh>
+
+      {/* Entrance glow discs — radial portal bloom shining outward from each tunnel mouth */}
+      <mesh ref={glowDisc1Ref} renderOrder={5} visible={false}>
+        <circleGeometry args={[0.5, 24]} />
+        <shaderMaterial
+          vertexShader={glowDiscVertexShader}
+          fragmentShader={glowDiscFragmentShader}
+          uniforms={glowUniforms1}
+          transparent
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+      <mesh ref={glowDisc2Ref} renderOrder={5} visible={false}>
+        <circleGeometry args={[0.5, 24]} />
+        <shaderMaterial
+          vertexShader={glowDiscVertexShader}
+          fragmentShader={glowDiscFragmentShader}
+          uniforms={glowUniforms2}
+          transparent
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+          side={THREE.DoubleSide}
         />
       </mesh>
     </group>

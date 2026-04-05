@@ -8,6 +8,7 @@
 import React, { Suspense, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Environment, Html } from '@react-three/drei';
+import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import CubeAssembly from './CubeAssembly.jsx';
@@ -19,6 +20,7 @@ import AntipodalVisualization from './AntipodalVisualization.jsx';
 import AntipodalModeEffects from './AntipodalModeEffects.jsx';
 import WormholeWarpFX from './WormholeWarpFX.jsx';
 import AntipodalPiP from './AntipodalPiP.jsx';
+import { isMobile } from '../utils/device.js';
 
 import { HealerWormMode3DWrapper } from '../worm/HealerWormMode.jsx';
 const HolonomyWrapper = React.lazy(() => import('../holonomy/HolonomyWrapper.jsx'));
@@ -265,6 +267,19 @@ export default function GameScene({
           <Suspense fallback={null}>
             <HolonomyWrapper size={size} />
           </Suspense>
+        )}
+
+        {/* Worm mode bloom — makes tunnel entrance glow discs bleed light outward.
+            Only on desktop; mobile skips post-processing for performance. */}
+        {wormHealerMode && !isMobile && (
+          <EffectComposer>
+            <Bloom
+              intensity={0.45}
+              luminanceThreshold={0.08}
+              luminanceSmoothing={0.85}
+              mipmapBlur
+            />
+          </EffectComposer>
         )}
       </Suspense>
 
