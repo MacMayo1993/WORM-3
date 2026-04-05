@@ -20,7 +20,6 @@ import AntipodalVisualization from './AntipodalVisualization.jsx';
 import AntipodalModeEffects from './AntipodalModeEffects.jsx';
 import WormholeWarpFX from './WormholeWarpFX.jsx';
 import AntipodalPiP from './AntipodalPiP.jsx';
-import { isMobile } from '../utils/device.js';
 
 import { HealerWormMode3DWrapper } from '../worm/HealerWormMode.jsx';
 const HolonomyWrapper = React.lazy(() => import('../holonomy/HolonomyWrapper.jsx'));
@@ -269,9 +268,8 @@ export default function GameScene({
           </Suspense>
         )}
 
-        {/* Worm mode bloom — makes tunnel entrance glow discs bleed light outward.
-            Only on desktop; mobile skips post-processing for performance. */}
-        {wormHealerMode && !isMobile && (
+        {/* Worm mode bloom — makes tunnel entrance glow discs bleed light outward. */}
+        {wormHealerMode && (
           <EffectComposer>
             <Bloom
               intensity={0.45}
