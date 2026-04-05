@@ -90,6 +90,8 @@ const CubeAssembly = React.memo(({
     rotationEpoch,
     settings,
     _chaosLevel,
+    cameraOrbitRequest,
+    cameraOrbitDir,
   } = useGameStore(
     useShallow(s => ({
       explosionFactor: s.explosionT,
@@ -104,6 +106,8 @@ const CubeAssembly = React.memo(({
       rotationEpoch: s.rotationEpoch,
       settings: s.settings,
       _chaosLevel: s.chaosLevel,
+      cameraOrbitRequest: s.cameraOrbitRequest,
+      cameraOrbitDir: s.cameraOrbitDir,
     }))
   );
   const cubieRefs = useRef([]);
@@ -496,6 +500,20 @@ const CubeAssembly = React.memo(({
       }
     }
   }, [handsMode, camera]);
+
+  // Programmatic camera orbit for mobile view-rotation buttons.
+  // Rotates the camera position 45° around the world Y axis so the user can
+  // inspect all sides of the cube without needing empty canvas space to drag.
+  const prevCameraOrbitRequestRef = useRef(cameraOrbitRequest);
+  useEffect(() => {
+    if (cameraOrbitRequest === prevCameraOrbitRequestRef.current) return;
+    prevCameraOrbitRequestRef.current = cameraOrbitRequest;
+    if (!cameraOrbitDir || handsMode) return;
+    const angle = cameraOrbitDir === 'cw' ? -Math.PI / 4 : Math.PI / 4;
+    camera.position.applyAxisAngle(new THREE.Vector3(0, 1, 0), angle);
+    camera.lookAt(0, 0, 0);
+    if (controlsRef.current) controlsRef.current.update();
+  }, [cameraOrbitRequest, cameraOrbitDir, handsMode, camera]);
 
   // Store refs for values accessed in useFrame to avoid stale closures
   const onAnimCompleteRef = useRef(onAnimComplete);

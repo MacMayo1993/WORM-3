@@ -193,6 +193,7 @@ export default function UILayer({
     setSolveHighlights: s.setSolveHighlights,
     setAntipodalIntegrityMode: s.setAntipodalIntegrityMode,
     toggleHollowMode: s.toggleHollowMode,
+    triggerCameraOrbit: s.triggerCameraOrbit,
   })));
 
   return (
@@ -571,6 +572,8 @@ export default function UILayer({
           teachModeActive={teachMode.active}
           onToggleTeachMode={() => { if (teachMode.active) teachMode.exitTeachMode(); else teachMode.enterTeachMode(); }}
           cubeSize={size}
+          onOrbitCW={() => triggerCameraOrbit('cw')}
+          onOrbitCCW={() => triggerCameraOrbit('ccw')}
         />
       )}
 
