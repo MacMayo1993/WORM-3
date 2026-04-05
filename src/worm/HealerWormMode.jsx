@@ -440,6 +440,13 @@ function useWormCrawler(size, cubies) {
                 // enter() fires once when transitioning back from 'exiting'.
                 enter() {
                     selfCollisionGraceStepsRef.current = SELF_COLLISION_GRACE_STEPS_AFTER_TUNNEL;
+                    // Clear the pre-tunnel tile trail. The body traveled through the tunnel so those
+                    // old surface positions no longer reliably reflect where body segments are.
+                    // Resetting to just the exit tile lets the collision window rebuild naturally,
+                    // preventing false-positive self-collision deaths in the post-tunnel window.
+                    // The grace period covers the initial steps where the trail is too short to
+                    // reliably catch real collisions.
+                    tileTrail.current = [tileKey(pos.current)];
                     useGameStore.setState({ wormPhase: 'crawling', wormOnFlippedTile: false, visualMode: prevVisualModeRef.current ?? 'classic' });
                     onFlippedTile.current = false;
                     lastFlippedRef.current = false;
