@@ -275,8 +275,8 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
 
               {/* Glow ring anchored to this segment so it tracks through turns */}
               {isGlow && !isHead && (
-                <mesh ref={el => { glowRingRefs.current[i - 1] = el; }} position={[0, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
-                  <torusGeometry args={[0.17, 0.024, 8, 24]} />
+                <mesh ref={el => { glowRingRefs.current[i - 1] = el; }} position={[0, 0, 0]} rotation={[0, 0, 0]} scale={[segScale, segScale, segScale]}>
+                  <torusGeometry args={[1.3, 0.12, 8, 24]} />
                   <meshBasicMaterial color={GLOW_COLOR} transparent opacity={0.55} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
                 </mesh>
               )}
