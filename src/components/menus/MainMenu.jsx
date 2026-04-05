@@ -589,37 +589,49 @@ const ComingSoonButton = ({ onPress }) => {
   }, []);
 
   return (
-    <button
-      onClick={onPress}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        display: 'flex', alignItems: 'center', gap: '8px',
-        padding: '9px 20px',
-        background: hovered ? 'rgba(120,160,255,0.12)' : 'transparent',
-        border: `1px solid ${hovered ? 'rgba(120,160,255,0.35)' : 'rgba(120,160,255,0.18)'}`,
-        borderRadius: '24px',
-        cursor: 'pointer',
-        transition: 'all 0.22s ease',
-      }}
-    >
-      <span style={{
-        width: '6px', height: '6px', borderRadius: '50%',
-        background: pulse ? 'rgba(168,85,247,0.9)' : 'rgba(168,85,247,0.4)',
-        boxShadow: pulse ? '0 0 8px rgba(168,85,247,0.7)' : 'none',
-        transition: 'all 0.6s ease',
-        flexShrink: 0,
-      }} />
-      <span style={{
-        fontSize: '11px', fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase',
-        color: hovered ? 'rgba(180,210,255,0.85)' : 'rgba(140,170,255,0.55)',
-        fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif",
-        transition: 'color 0.2s ease',
-      }}>What&apos;s Coming</span>
-      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ opacity: hovered ? 0.7 : 0.35, transition: 'opacity 0.2s ease' }}>
-        <path d="M4.5 2.5L8 6L4.5 9.5" stroke="rgba(180,210,255,0.9)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    </button>
+    <div style={{
+      borderRadius: '100px', padding: '1.5px',
+      background: hovered
+        ? 'linear-gradient(90deg,#a855f780,#3b82f680,#22c55e80,#a855f780)'
+        : 'linear-gradient(90deg,#a855f740,#3b82f640,#22c55e40,#a855f740)',
+      boxShadow: hovered
+        ? '0 0 18px rgba(168,85,247,0.30), 0 4px 16px rgba(0,0,0,0.45)'
+        : '0 0 8px rgba(168,85,247,0.12), 0 2px 10px rgba(0,0,0,0.35)',
+      transition: 'all 0.22s ease',
+    }}>
+      <button
+        onClick={onPress}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: '8px',
+          padding: '9px 20px',
+          background: hovered ? 'rgba(14,10,32,0.92)' : 'rgba(6,10,24,0.82)',
+          backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+          border: 'none',
+          borderRadius: '100px',
+          cursor: 'pointer',
+          transition: 'background 0.22s ease',
+        }}
+      >
+        <span style={{
+          width: '6px', height: '6px', borderRadius: '50%',
+          background: pulse ? 'rgba(168,85,247,0.9)' : 'rgba(168,85,247,0.5)',
+          boxShadow: pulse ? '0 0 8px rgba(168,85,247,0.8)' : 'none',
+          transition: 'all 0.6s ease',
+          flexShrink: 0,
+        }} />
+        <span style={{
+          fontSize: '11px', fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase',
+          color: hovered ? 'rgba(200,225,255,0.95)' : 'rgba(170,200,255,0.82)',
+          fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif",
+          transition: 'color 0.2s ease',
+        }}>What&apos;s Coming</span>
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ opacity: hovered ? 0.8 : 0.55, transition: 'opacity 0.2s ease' }}>
+          <path d="M4.5 2.5L8 6L4.5 9.5" stroke="rgba(180,210,255,0.9)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+    </div>
   );
 };
 
@@ -735,29 +747,41 @@ const MainMenu = ({ onPlay: _onPlay, _onLevels, onFreeplay, _onCoop, onSettings:
           opacity: titleVisible ? 1 : 0,
           transform: titleVisible ? 'translateY(0)' : 'translateY(-18px)',
           transition: 'all 0.75s cubic-bezier(0.22,1,0.36,1)',
+          paddingLeft: '16px', paddingRight: '16px',
         }}>
-          <h1 style={{
-            margin: 0, fontSize: 'clamp(54px,13vw,96px)', fontWeight: 900,
-            letterSpacing: '0.1em', lineHeight: 1, fontFamily: "'Courier New', monospace",
-            background: 'linear-gradient(100deg,#ef4444 0%,#f97316 18%,#eab308 36%,#22c55e 54%,#3b82f6 72%,#a855f7 90%,#ef4444 100%)',
-            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
-          }}>
-            WORM<sup style={{ fontSize: '0.42em', verticalAlign: 'super', WebkitTextFillColor: 'transparent' }}>3</sup>
-          </h1>
+          {/* Frosted glass card so the title and subtitle are readable over any background */}
           <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginTop: '14px',
-            opacity: subtitleVisible ? 1 : 0,
-            transform: subtitleVisible ? 'none' : 'translateY(6px)',
-            transition: 'all 0.55s ease 0.1s',
+            display: 'inline-block',
+            background: 'rgba(6,10,24,0.72)',
+            backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
+            borderRadius: '24px',
+            padding: '18px 28px 16px',
+            border: '1px solid rgba(120,160,255,0.14)',
+            boxShadow: '0 4px 32px rgba(0,0,0,0.45), inset 0 1px 0 rgba(120,160,255,0.10)',
           }}>
-            <div style={{ width: '30px', height: '1px', background: 'linear-gradient(to right, transparent, rgba(140,180,255,0.45))' }} />
-            <p style={{
-              margin: 0, fontSize: 'clamp(10px,1.7vw,13px)', letterSpacing: '0.26em',
-              textTransform: 'uppercase', fontWeight: 600, color: 'rgba(200,220,255,0.80)',
-              fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif",
-              textShadow: '0 0 20px rgba(100,160,255,0.5)',
-            }}>A Cube That Remembers</p>
-            <div style={{ width: '30px', height: '1px', background: 'linear-gradient(to left, transparent, rgba(140,180,255,0.45))' }} />
+            <h1 style={{
+              margin: 0, fontSize: 'clamp(54px,13vw,96px)', fontWeight: 900,
+              letterSpacing: '0.1em', lineHeight: 1, fontFamily: "'Courier New', monospace",
+              background: 'linear-gradient(100deg,#ef4444 0%,#f97316 18%,#eab308 36%,#22c55e 54%,#3b82f6 72%,#a855f7 90%,#ef4444 100%)',
+              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+            }}>
+              WORM<sup style={{ fontSize: '0.42em', verticalAlign: 'super', WebkitTextFillColor: 'transparent' }}>3</sup>
+            </h1>
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginTop: '14px',
+              opacity: subtitleVisible ? 1 : 0,
+              transform: subtitleVisible ? 'none' : 'translateY(6px)',
+              transition: 'all 0.55s ease 0.1s',
+            }}>
+              <div style={{ width: '30px', height: '1px', background: 'linear-gradient(to right, transparent, rgba(140,180,255,0.55))' }} />
+              <p style={{
+                margin: 0, fontSize: 'clamp(10px,1.7vw,13px)', letterSpacing: '0.26em',
+                textTransform: 'uppercase', fontWeight: 600, color: 'rgba(200,220,255,0.92)',
+                fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif",
+                textShadow: '0 0 20px rgba(100,160,255,0.6)',
+              }}>A Cube That Remembers</p>
+              <div style={{ width: '30px', height: '1px', background: 'linear-gradient(to left, transparent, rgba(140,180,255,0.55))' }} />
+            </div>
           </div>
         </div>
 
@@ -816,24 +840,38 @@ const MainMenu = ({ onPlay: _onPlay, _onLevels, onFreeplay, _onCoop, onSettings:
 
           {/* Möbius Cubelet visualizer link */}
           {onMobiusCubelet && (
-            <button
-              onClick={onMobiusCubelet}
-              style={{
-                background: 'none',
-                border: 'none',
-                padding: '4px 10px',
-                cursor: 'pointer',
-                fontSize: '11px',
-                color: 'rgba(160,190,255,0.45)',
-                fontFamily: "-apple-system, 'SF Pro Text', system-ui, sans-serif",
-                letterSpacing: '0.06em',
-                transition: 'color 0.2s ease',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.color = 'rgba(200,220,255,0.75)'; }}
-              onMouseLeave={e => { e.currentTarget.style.color = 'rgba(160,190,255,0.45)'; }}
-            >
-              ∞ Möbius Cubelet
-            </button>
+            <div style={{
+              borderRadius: '100px', padding: '1.5px',
+              background: 'linear-gradient(90deg,rgba(99,102,241,0.45),rgba(139,92,246,0.45),rgba(99,102,241,0.45))',
+              boxShadow: '0 2px 10px rgba(0,0,0,0.35)',
+            }}>
+              <button
+                onClick={onMobiusCubelet}
+                style={{
+                  background: 'rgba(6,10,24,0.82)',
+                  backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+                  border: 'none',
+                  borderRadius: '100px',
+                  padding: '7px 18px',
+                  cursor: 'pointer',
+                  fontSize: '11px',
+                  color: 'rgba(180,200,255,0.85)',
+                  fontFamily: "-apple-system, 'SF Pro Text', system-ui, sans-serif",
+                  letterSpacing: '0.08em',
+                  transition: 'color 0.2s ease, background 0.2s ease',
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.color = 'rgba(220,235,255,0.96)';
+                  e.currentTarget.style.background = 'rgba(14,10,32,0.92)';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.color = 'rgba(180,200,255,0.85)';
+                  e.currentTarget.style.background = 'rgba(6,10,24,0.82)';
+                }}
+              >
+                ∞ Möbius Cubelet
+              </button>
+            </div>
           )}
 
           {/* Bottom nav pill: Disparity | Explore | Store */}
