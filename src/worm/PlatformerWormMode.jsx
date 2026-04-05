@@ -275,11 +275,15 @@ function CrawlerGameLoop({ crawlerRef, inputRef, gameStateRef, size, cubies, orb
       }
     }
 
+    // Tick down parity damage cooldown using capped game-time delta so pausing
+    // the game (or backgrounding the tab) cannot reset the cooldown for free.
+    if (lastParityDamage.current > 0) {
+      lastParityDamage.current = Math.max(0, lastParityDamage.current - dt);
+    }
     // Check parity zone damage
     if (isOnParityZone(newState, cubies, size)) {
-      const now = performance.now() / 1000;
-      if (now - lastParityDamage.current > CONFIG.parityDamageCooldown) {
-        lastParityDamage.current = now;
+      if (lastParityDamage.current <= 0) {
+        lastParityDamage.current = CONFIG.parityDamageCooldown;
         onDamage();
       }
     }

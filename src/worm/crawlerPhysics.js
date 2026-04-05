@@ -305,8 +305,10 @@ export function checkOrbCollision(crawlerPos, orbPos, threshold = 0.6) {
 
 /**
  * Check if crawler is on a flipped (parity) sticker.
+ * Returns false while the crawler is airborne so players can jump over parity tiles.
  */
 export function isOnParityZone(state, cubies, size) {
+  if (state.jumpT > 0) return false; // airborne — no parity damage while jumping
   const grid = worldToGrid(getGroundPosition(state, size), state.face, size);
   const sticker = getStickerSafe(cubies, grid.x, grid.y, grid.z, grid.dirKey);
   if (!sticker) return false;
