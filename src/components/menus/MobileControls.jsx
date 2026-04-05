@@ -24,7 +24,9 @@ const MobileControls = ({
   undoCount,
   teachModeActive,
   onToggleTeachMode,
-  cubeSize
+  cubeSize,
+  onOrbitCW,
+  onOrbitCCW,
 }) => {
   const [expanded, setExpanded] = useState(false);
 
@@ -146,6 +148,46 @@ const MobileControls = ({
             >
               ?
             </button>
+
+            {/* Orbit view left (CCW around Y axis) */}
+            {onOrbitCCW && (
+              <button
+                onClick={onOrbitCCW}
+                style={{
+                  ...smallButtonStyle,
+                  background: 'rgba(251, 191, 36, 0.15)',
+                  borderColor: 'rgba(251, 191, 36, 0.5)',
+                }}
+                aria-label="Rotate view left"
+                title="Rotate view left"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 12a9 9 0 1 0 9-9"/>
+                  <polyline points="3 3 3 12 12 12"/>
+                  <circle cx="12" cy="12" r="2" fill="#fbbf24" stroke="none"/>
+                </svg>
+              </button>
+            )}
+
+            {/* Orbit view right (CW around Y axis) */}
+            {onOrbitCW && (
+              <button
+                onClick={onOrbitCW}
+                style={{
+                  ...smallButtonStyle,
+                  background: 'rgba(251, 191, 36, 0.15)',
+                  borderColor: 'rgba(251, 191, 36, 0.5)',
+                }}
+                aria-label="Rotate view right"
+                title="Rotate view right"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 12a9 9 0 1 1-9-9"/>
+                  <polyline points="21 3 21 12 12 12"/>
+                  <circle cx="12" cy="12" r="2" fill="#fbbf24" stroke="none"/>
+                </svg>
+              </button>
+            )}
 
             {/* CW rotation */}
             {onRotateCW && (

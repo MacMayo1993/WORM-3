@@ -231,7 +231,10 @@ export const useGameStore = create(
     rotationCountdown: 0,
     blackHolePulse: 0,
     flipWaveOrigins: [],
+    cameraOrbitRequest: 0,  // epoch — increments each time the user requests a camera orbit
+    cameraOrbitDir: null,   // 'cw' | 'ccw'
 
+    triggerCameraOrbit: (dir) => set(state => ({ cameraOrbitDir: dir, cameraOrbitRequest: state.cameraOrbitRequest + 1 })),
     setChaosLevel: (chaosLevel) => set(typeof chaosLevel === 'function'
       ? (state) => ({ chaosLevel: chaosLevel(state.chaosLevel) })
       : { chaosLevel }),
