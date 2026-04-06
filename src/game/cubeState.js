@@ -50,7 +50,10 @@ const cloneCubie = (cubie) => ({
   )
 });
 
-// Deep clone 3D cube array (properly clones cubie objects)
+// Deep clone 3D cube array (properly clones cubie objects).
+// WARNING: O(size³) full clone — only use for tests, resets, or initial state setup.
+// For rotation/flip operations use the targeted shallow-clone pattern in
+// cubeRotation.js and manifoldLogic.js to avoid unnecessary re-renders.
 export const clone3D = (arr) =>
   arr.map(L => L.map(R => R.map(cubie => cloneCubie(cubie))));
 

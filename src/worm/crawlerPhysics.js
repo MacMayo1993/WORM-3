@@ -247,9 +247,14 @@ export function rotateCrawlerWithSlice(state, axis, sliceIndex, dir, size) {
   const angle = dir * (Math.PI / 2);
   const quat = new THREE.Quaternion().setFromAxisAngle(rotAxis, angle);
 
-  const newPos = state.position.clone().applyQuaternion(quat);
+  // Strip jump offset before rotating so the quaternion is applied to the
+  // surface-level position only (mirrors the pattern in stepCrawler).
+  // Without this, a mid-air crawler can be projected onto the wrong face.
+  const normal = FACE_NORMALS[state.face];
+  const surfacePos = state.position.clone().sub(normal.clone().multiplyScalar(state.jumpHeight));
+  const newSurfacePos = surfacePos.applyQuaternion(quat);
   const newFwd = state.forward.clone().applyQuaternion(quat);
-  const projected = projectOntoCube(newPos, size);
+  const projected = projectOntoCube(newSurfacePos, size);
 
   return {
     ...state,
@@ -271,25 +276,25 @@ export function spawnCrawlerOrbs(count, size, crawlerPos) {
   const faces = ['PX', 'NX', 'PY', 'NY', 'PZ', 'NZ'];
 
   for (let i = 0; i < count; i++) {
-    const face = faces[Math.floor(Math.random() * faces.length)];
-    const u = (Math.random() * (size - 1)) - k;
-    const v = (Math.random() * (size - 1)) - k;
-
-    let pos;
-    switch (face) {
-      case 'PX': pos = new THREE.Vector3(s, u, v); break;
-      case 'NX': pos = new THREE.Vector3(-s, u, v); break;
-      case 'PY': pos = new THREE.Vector3(u, s, v); break;
-      case 'NY': pos = new THREE.Vector3(u, -s, v); break;
-      case 'PZ': pos = new THREE.Vector3(u, v, s); break;
-      case 'NZ': pos = new THREE.Vector3(u, v, -s); break;
-    }
-
-    // Don't spawn too close to crawler
-    if (crawlerPos && pos.distanceTo(crawlerPos) < 1.5) {
-      i--;
-      continue;
-    }
+    let pos, face;
+    // Retry up to 20 times to avoid spawning too close to the crawler.
+    // Guard prevents an infinite loop on small cubes or when crawlerPos
+    // occupies most of the available surface area.
+    let attempts = 0;
+    do {
+      face = faces[Math.floor(Math.random() * faces.length)];
+      const u = (Math.random() * (size - 1)) - k;
+      const v = (Math.random() * (size - 1)) - k;
+      switch (face) {
+        case 'PX': pos = new THREE.Vector3(s, u, v); break;
+        case 'NX': pos = new THREE.Vector3(-s, u, v); break;
+        case 'PY': pos = new THREE.Vector3(u, s, v); break;
+        case 'NY': pos = new THREE.Vector3(u, -s, v); break;
+        case 'PZ': pos = new THREE.Vector3(u, v, s); break;
+        case 'NZ': pos = new THREE.Vector3(u, v, -s); break;
+      }
+      attempts++;
+    } while (crawlerPos && pos.distanceTo(crawlerPos) < 1.5 && attempts < 20);
 
     orbs.push({ position: pos, face, collected: false, id: i });
   }
@@ -306,6 +311,11 @@ export function checkOrbCollision(crawlerPos, orbPos, threshold = 0.6) {
 /**
  * Check if crawler is on a flipped (parity) sticker.
  * Returns false while the crawler is airborne so players can jump over parity tiles.
+ *
+ * Uses `curr !== orig` (visual state) rather than `flips > 0` (flip count).
+ * A sticker flipped an even number of times returns to its original color and is
+ * intentionally NOT treated as a parity zone — even flips = visually self-healed.
+ * Cube rotations (scrambling) do not change `curr`, so only antipodal flips trigger this.
  */
 export function isOnParityZone(state, cubies, size) {
   if (state.jumpT > 0) return false; // airborne — no parity damage while jumping
