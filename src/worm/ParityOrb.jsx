@@ -55,7 +55,7 @@ const _orbGeos = {
 
 // SingleOrb renders geometry and registers its refs with the parent animator.
 // It has NO useFrame — all animation is driven by the single OrbAnimator in ParityOrbs.
-function SingleOrb({ position, color = '#ffd700', antipodalColor = '#ffd700', collected = false, isTarget = false, elevated = false, dirKey = 'PY', orbKey, registerAnim, unregisterAnim, gridX = -1, gridY = -1, gridZ = -1 }) {
+function SingleOrb({ position, color = '#ffd700', antipodalColor = '#ffd700', collected = false, isTarget = false, elevated = false, dirKey = 'PY', orbKey, registerAnim, unregisterAnim, gridX = -1, gridY = -1, gridZ = -1, isGlowWorm = false }) {
   const orbGroupRef = useRef();
   const coreRef = useRef();
   const shellRef = useRef();
@@ -86,6 +86,8 @@ function SingleOrb({ position, color = '#ffd700', antipodalColor = '#ffd700', co
   gridYRef.current = gridY;
   const gridZRef = useRef(gridZ);
   gridZRef.current = gridZ;
+  const isGlowWormRef = useRef(isGlowWorm);
+  isGlowWormRef.current = isGlowWorm;
 
   // Register animation refs with parent on mount, unregister on unmount
   useEffect(() => {
@@ -108,6 +110,7 @@ function SingleOrb({ position, color = '#ffd700', antipodalColor = '#ffd700', co
       get gridX() { return gridXRef.current; },
       get gridY() { return gridYRef.current; },
       get gridZ() { return gridZRef.current; },
+      get isGlowWorm() { return isGlowWormRef.current; },
       timeOffset
     });
     return () => unregisterAnim(orbKey);
@@ -200,7 +203,7 @@ function SingleOrb({ position, color = '#ffd700', antipodalColor = '#ffd700', co
  * @param {string} props.mode - 'surface' or 'tunnel'
  * @param {string} props.targetTunnelId - ID of tunnel to highlight (for tunnel mode)
  */
-export default function ParityOrbs({ orbs, size, explosionFactor = 0, mode = 'surface', targetTunnelId = null }) {
+export default function ParityOrbs({ orbs, size, explosionFactor = 0, mode = 'surface', targetTunnelId = null, isGlowWorm = false }) {
   const isTunnelMode = mode === 'tunnel';
 
   // Single animation registry — all orb refs stored here, driven by one useFrame
@@ -306,8 +309,17 @@ export default function ParityOrbs({ orbs, size, explosionFactor = 0, mode = 'su
         glow.scale.setScalar(1 + Math.sin(time * 2.7) * 0.08);
       }
 
+      // Glow worm mode: pulse emissive intensity at the same frequency as the worm's point light
+      const { isGlowWorm, elevated } = refs;
+      if (isGlowWorm && core && core.material && !elevated) {
+        const baseIntensity = isTarget ? 2.0 : 1.35;
+        core.material.emissiveIntensity = baseIntensity + Math.sin(t * 4.0) * 0.9;
+        if (glow) {
+          glow.material.opacity = (isTarget ? 0.62 : 0.48) + Math.sin(t * 4.0) * 0.22;
+        }
+      }
+
       // Rainbow pulse for elevated orbs (on flipped tiles)
-      const { elevated } = refs;
       if (elevated) {
         const hue = (time * 0.3) % 1; // full cycle every ~3.3 s
         _rainbowColor.setHSL(hue, 1.0, 0.62);
@@ -394,6 +406,7 @@ export default function ParityOrbs({ orbs, size, explosionFactor = 0, mode = 'su
           gridX={data.gridX}
           gridY={data.gridY}
           gridZ={data.gridZ}
+          isGlowWorm={isGlowWorm}
           registerAnim={registerAnim}
           unregisterAnim={unregisterAnim}
         />
