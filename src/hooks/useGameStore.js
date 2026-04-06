@@ -48,12 +48,10 @@ const loadPersistedState = () => {
     const wormCharacter = localStorage.getItem(WORM_CHARACTER_KEY) || 'classic';
     const parityPoints = parseInt(localStorage.getItem(PARITY_POINTS_KEY) ?? '0', 10) || 0;
     const rawOwned = localStorage.getItem(OWNED_ITEMS_KEY);
-    // Dev mode: always treat every item as owned so new styles/palettes are testable immediately.
-    const ownedItems = import.meta.env.DEV
-      ? [...DEFAULT_OWNED]
-      : Array.from(new Set([...(rawOwned ? JSON.parse(rawOwned) : []), ...DEFAULT_OWNED]));
-    // Dev mode wallet floor so the store is fully testable even when localStorage starts at 0 PP.
-    const safeParityPoints = import.meta.env.DEV ? Math.max(parityPoints, 10000) : parityPoints;
+    // All items always owned during development/preview.
+    const ownedItems = [...DEFAULT_OWNED];
+    // Wallet floor so the store UI is fully explorable.
+    const safeParityPoints = Math.max(parityPoints, 10000);
 
     // Guard: reset cosmetics/settings to defaults if the saved value isn't owned
     const safeSkin = ownedItems.includes(`skin_${wormSkin}`) ? wormSkin : 'slime';

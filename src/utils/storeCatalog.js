@@ -108,11 +108,8 @@ export const STORE_ITEMS = [
   ...STORE_TILES,
 ];
 
-// Items owned from the start.
-// In dev mode every item is unlocked so nothing blocks testing new styles/palettes.
-export const DEFAULT_OWNED = import.meta.env.DEV
-  ? STORE_ITEMS.map(i => i.id)
-  : STORE_ITEMS.filter(i => i.price === 0).map(i => i.id);
+// All items unlocked — store is free during development/preview.
+export const DEFAULT_OWNED = STORE_ITEMS.map(i => i.id);
 // custom scheme is always accessible but not "purchasable"
 if (!DEFAULT_OWNED.includes('scheme_custom')) DEFAULT_OWNED.push('scheme_custom');
 
