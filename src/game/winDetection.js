@@ -130,6 +130,12 @@ export const countFlippedStickers = (cubies, size) => {
 export const checkWormVictory = (cubies, size) => checkRubiksSolved(cubies, size) && allStickersFlipped(cubies, size);
 
 // Main win detection function - returns { rubiks, sudokube, ultimate, worm }
+//
+// Priority note: `ultimate` (rubiks + sudokube) takes precedence over `worm`
+// (rubiks + allFlipped). If a player simultaneously satisfies ALL four conditions,
+// only `ultimate` and `worm` will both be true — the caller (useGameSession) sets
+// `victory` to whichever it checks first. This is intentional: `ultimate` is the
+// harder achievement and should be surfaced over `worm` if both are met at once.
 export const detectWinConditions = (cubies, size) => {
   const rubiks = checkRubiksSolved(cubies, size);
   const sudokube = checkSudokubeSolved(cubies, size);

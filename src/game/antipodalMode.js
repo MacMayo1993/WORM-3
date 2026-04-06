@@ -58,11 +58,13 @@ export function calculateEchoSync(totalMoves, reversalCount) {
 }
 
 /**
- * Generate a unique ID for an echo rotation
+ * Generate a unique ID for an echo rotation.
+ * Uses crypto.randomUUID() which is available in all modern browsers and
+ * Node.js 14.17+, providing a standards-compliant V4 UUID.
  * @returns {string} - Unique ID
  */
 export function generateEchoId() {
-  return `echo-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+  return `echo-${crypto.randomUUID()}`;
 }
 
 /**

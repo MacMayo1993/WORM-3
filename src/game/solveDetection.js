@@ -219,7 +219,9 @@ export const checkOLL = (cubies, size) => {
 // PLL DETECTION (Step 4 - Permute Last Layer)
 // ============================================
 
-export const checkPLL = (cubies, size) => {
+// _precomputedOll is an optional optimisation: if the caller (checkSolveProgress)
+// already has the OLL result, pass it here to avoid computing checkOLL twice.
+export const checkPLL = (cubies, size, _precomputedOll = null) => {
   const max = size - 1;
 
   // Check if each side of bottom layer is uniform
@@ -255,8 +257,10 @@ export const checkPLL = (cubies, size) => {
     if (sideComplete) solvedSides++;
   }
 
-  // Also need OLL to be complete for PLL to matter
-  const ollStatus = checkOLL(cubies, size);
+  // Also need OLL to be complete for PLL to matter.
+  // Re-use the pre-computed result if available (avoids a double OLL scan when
+  // called from checkSolveProgress which already ran checkOLL).
+  const ollStatus = _precomputedOll ?? checkOLL(cubies, size);
 
   return {
     complete: solvedSides === 4 && ollStatus.complete,
@@ -431,7 +435,7 @@ export const checkSolveProgress = (cubies, size) => {
   const whiteCross = checkWhiteCross(cubies, size);
   const f2l = checkF2L(cubies, size);
   const oll = checkOLL(cubies, size);
-  const pll = checkPLL(cubies, size);
+  const pll = checkPLL(cubies, size, oll); // pass pre-computed oll to avoid running checkOLL twice
 
   // Determine current step
   let currentStep = 'whiteCross';

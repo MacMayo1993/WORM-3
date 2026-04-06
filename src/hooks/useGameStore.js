@@ -22,13 +22,13 @@ const WORM_CHARACTER_KEY = 'worm3_character';
 const migrateSettings = (rawSettings, version) => {
   if (!rawSettings || typeof rawSettings !== 'object') return { ...DEFAULT_SETTINGS };
 
-  // Future migrations should be added as explicit version steps.
-  // v0 -> v1 currently just normalizes into DEFAULT_SETTINGS shape.
-  if (version <= 1) {
+  // v0 → v1: normalise into DEFAULT_SETTINGS shape (first schema version).
+  // Add new `if (version < N)` blocks above this line for future migrations.
+  if (version < CURRENT_SETTINGS_VERSION) {
     return { ...DEFAULT_SETTINGS, ...rawSettings };
   }
 
-  // Unknown future version in storage; safest fallback is merged defaults.
+  // Current version — merge in case new keys were added to DEFAULT_SETTINGS.
   return { ...DEFAULT_SETTINGS, ...rawSettings };
 };
 
@@ -47,10 +47,11 @@ const loadPersistedState = () => {
     const wormHat = localStorage.getItem('worm3_hat') || 'none';
     const wormCharacter = localStorage.getItem(WORM_CHARACTER_KEY) || 'classic';
     const parityPoints = parseInt(localStorage.getItem(PARITY_POINTS_KEY) ?? '0', 10) || 0;
-    // All items always owned during development/preview.
-    const ownedItems = [...DEFAULT_OWNED];
-    // Wallet floor so the store UI is fully explorable.
-    const safeParityPoints = Math.max(parityPoints, 10000);
+    // TODO(pre-release): Remove the two lines below before shipping to production.
+    // They grant all items for free and floor the wallet at 10 000 points so the
+    // store UI is fully explorable during development/preview.
+    const ownedItems = [...DEFAULT_OWNED]; // TODO(pre-release): restore from localStorage: JSON.parse(localStorage.getItem(OWNED_ITEMS_KEY) ?? '[]')
+    const safeParityPoints = Math.max(parityPoints, 10000); // TODO(pre-release): remove Math.max floor
 
     // Guard: reset cosmetics/settings to defaults if the saved value isn't owned
     const safeSkin = ownedItems.includes(`skin_${wormSkin}`) ? wormSkin : 'slime';
