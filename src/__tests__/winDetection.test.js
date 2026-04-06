@@ -136,8 +136,7 @@ describe('extractFaceGrid', () => {
     // it would always produce a valid Latin square regardless of cube state.
     // After scrambling, sticker identities are mixed up — the grid must fail.
     let cubies = makeCubies(3);
-    cubies = rotateSliceCubies(cubies, 3, 'col', 0, 1);
-    cubies = rotateSliceCubies(cubies, 3, 'row', 1, 1);
+    cubies = rotateSliceCubies(cubies, 3, 'row', 0, 1);
     const grid = extractFaceGrid(cubies, 3, 'PZ');
     expect(checkFaceLatinSquare(grid, 3)).toBe(false);
   });

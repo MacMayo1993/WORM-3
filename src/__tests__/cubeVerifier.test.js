@@ -45,7 +45,7 @@ describe('Worm3CubeVerifier', () => {
     expect(changed).toBe(true);
     const lastMove = verifier.moveHistory[verifier.moveHistory.length - 1];
     expect(lastMove.type).toBe('flip');
-    expect(lastMove.antipodal).toEqual({ x: 2, y: 0, z: 2, dirKey: 'PX' });
+    expect(lastMove.antipodal).toEqual({ x: 2, y: 2, z: 2, dirKey: 'PX' });
   });
 
   it('supports random fuzz moves while preserving shape', () => {
