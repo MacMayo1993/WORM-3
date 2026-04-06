@@ -25,8 +25,8 @@ export const COLOR_SCHEMES = {
   // Lava — deep lava↔volcanic night / molten orange↔ash grey / pale ash↔sulfur yellow
   lava:       { 1: '#AA1200', 2: '#FF6800', 3: '#E8D8B0', 4: '#182858', 5: '#909090', 6: '#FFD800' },
 
-  // Arctic — glacier white↔polar midnight / ice blue↔aurora coral / frost↔deep teal
-  arctic:     { 1: '#F0F8FF', 2: '#80C8F0', 3: '#C0D0D8', 4: '#0A2040', 5: '#FF7060', 6: '#0A6870' },
+  // Arctic — ice white↔polar midnight / glacier blue↔aurora coral / aurora mint↔deep teal
+  arctic:     { 1: '#F0F8FF', 2: '#80C8F0', 3: '#90E8C0', 4: '#0A2040', 5: '#FF7060', 6: '#0A6870' },
 
   // Forest — autumn red↔bright leaf / deep forest↔mist blue / birch cream↔bark gold
   forest:     { 1: '#C03020', 2: '#1A5830', 3: '#EEE8D8', 4: '#5AAA38', 5: '#8898D0', 6: '#C49040' },
@@ -70,20 +70,20 @@ export const COLOR_SCHEMES = {
   // Sunrise — dawn rose↔deep sky / coral orange↔soft lavender / pale sky↔warm gold
   sunrise:    { 1: '#E84878', 2: '#FF7048', 3: '#E8F4FF', 4: '#2870C8', 5: '#B898D0', 6: '#F0C030' },
 
-  // Watercolor — soft rose↔sage green / sky wash↔warm buff / washed white↔muted teal
-  watercolor: { 1: '#E09898', 2: '#88B8E0', 3: '#F8F4EE', 4: '#90B878', 5: '#E8C898', 6: '#6898A8' },
+  // Watercolor — soft rose↔sage green / sky wash↔warm buff / washed white↔muted plum
+  watercolor: { 1: '#E09898', 2: '#88B8E0', 3: '#F8F4EE', 4: '#90B878', 5: '#E8C898', 6: '#8A6898' },
 
   // Mondrian — primary red↔primary blue / cadmium yellow↔medium grey / off-white↔charcoal
   mondrian:   { 1: '#D01818', 2: '#F0C800', 3: '#F4F4F4', 4: '#1848C8', 5: '#A8A8A8', 6: '#303030' },
 
-  // Art Deco — gold↔jade / ivory↔rich purple / silver↔dark midnight
-  artdeco:    { 1: '#D4A020', 2: '#F0E0C0', 3: '#C8C8C8', 4: '#1A7060', 5: '#7038A0', 6: '#303050' },
+  // Art Deco — gold↔jade / ivory↔rich purple / platinum pearl↔dark midnight
+  artdeco:    { 1: '#D4A020', 2: '#F0E0C0', 3: '#B8C8D8', 4: '#1A7060', 5: '#7038A0', 6: '#303050' },
 
   // Ghibli — warm rose↔forest green / sky blue↔golden wheat / soft white↔spirit lavender
   ghibli:     { 1: '#E88888', 2: '#58A0D0', 3: '#F4F0E8', 4: '#68AA58', 5: '#E8C870', 6: '#A898D4' },
 
-  // Noire — film noir: blood red↔silver / near-black↔mid-grey / ivory↔charcoal
-  noire:        { 1: '#8B0000', 2: '#1A1A1A', 3: '#F5F5F0', 4: '#D0D0C8', 5: '#B0B0B0', 6: '#363636' },
+  // Noire — film noir: blood red↔antique gold / near-black↔steel blue / warm cream↔deep plum
+  noire:        { 1: '#8B0000', 2: '#121212', 3: '#F0EDE4', 4: '#C4943A', 5: '#4A7A9B', 6: '#5C2A6A' },
 
   // Vaporwave — 80s retro-future: hot pink↔neon cyan / electric purple↔yellow / soft pink↔deep purple
   vaporwave:    { 1: '#FF2D78', 2: '#9D00FF', 3: '#FFB3D9', 4: '#00FFCC', 5: '#FFE556', 6: '#3A0CA3' },
@@ -94,8 +94,8 @@ export const COLOR_SCHEMES = {
   // Bioluminescence — deep-sea glow: phosphor cyan↔coral / deep navy↔neon green / electric teal↔deep violet
   bioluminescence: { 1: '#00FFC8', 2: '#0A0A2A', 3: '#4DEEEA', 4: '#FF2D6B', 5: '#39FF14', 6: '#7B2FBE' },
 
-  // Nordic — Scandinavian winter: fjord blue↔birch amber / pine green↔frost / snow↔slate blue
-  nordic:       { 1: '#3B5998', 2: '#2D6A4F', 3: '#F0EFE8', 4: '#E8C98A', 5: '#C9D4DC', 6: '#5E7891' },
+  // Nordic — Scandinavian winter: fjord blue↔birch amber / pine green↔nordic blue / snow↔bark brown
+  nordic:       { 1: '#3B5998', 2: '#2D6A4F', 3: '#F0EFE8', 4: '#E8C98A', 5: '#7898B8', 6: '#6B5040' },
 
   // Saffron — Indian spice market: saffron orange↔deep indigo / deep red↔turmeric gold / golden yellow↔burgundy
   saffron:      { 1: '#FF6B35', 2: '#C8102E', 3: '#FF9F1C', 4: '#1A3C6E', 5: '#F5C518', 6: '#7B0D1E' },
@@ -103,14 +103,44 @@ export const COLOR_SCHEMES = {
   // Patina — aged metal oxidation: verdigris↔copper / bronze↔oxide blue / tarnished gold↔oxidized green
   patina:       { 1: '#2A9D8F', 2: '#8B5E3C', 3: '#E8D5A3', 4: '#C97B3A', 5: '#5B7FA6', 6: '#3D5A3E' },
 
-  // Eclipse — solar corona at totality: deep space↔corona gold / eclipse red↔midnight blue / solar white↔plasma violet
-  eclipse:      { 1: '#1A1A2E', 2: '#E94560', 3: '#F8F9FA', 4: '#FFB627', 5: '#0F3460', 6: '#C77DFF' },
+  // Eclipse — solar corona at totality: deep space↔corona gold / eclipse red↔royal blue / solar white↔plasma violet
+  eclipse:      { 1: '#1A1A2E', 2: '#E94560', 3: '#F8F9FA', 4: '#FFB627', 5: '#1060AA', 6: '#C77DFF' },
 
-  // Inkwell — calligraphy & ink wash: ink black↔rice paper / ink blue↔vermillion / warm sepia↔dark ink
-  inkwell:      { 1: '#0D0D0D', 2: '#1B3A6B', 3: '#C2855F', 4: '#E8E0D5', 5: '#D64045', 6: '#2C1810' },
+  // Inkwell — calligraphy & ink wash: ink black↔rice paper / ink blue↔vermillion / sienna↔malachite
+  inkwell:      { 1: '#0D0D0D', 2: '#1B3A6B', 3: '#C2855F', 4: '#E8E0D5', 5: '#D64045', 6: '#3A5A3A' },
 
   // Reef — shallow tropical coral reef: coral pink↔ocean blue / turquoise↔sandy beach / sea-foam↔sea coral
   reef:         { 1: '#FF6B81', 2: '#00B4D8', 3: '#90E0EF', 4: '#0077B6', 5: '#F7C59F', 6: '#E76F51' },
+
+  // Manuscript — illuminated books: carmine↔viridian / ultramarine↔gold leaf / parchment↔royal purple
+  manuscript:   { 1: '#9B1B30', 2: '#1B4A8A', 3: '#F8F0DC', 4: '#2D7A3A', 5: '#D4A520', 6: '#6B1F78' },
+
+  // Carnival — bright fairground: cherry red↔royal blue / carnival gold↔deep purple / white↔carnival green
+  carnival:     { 1: '#E8192C', 2: '#F5A820', 3: '#F8F8F8', 4: '#1050CC', 5: '#8A00AB', 6: '#0AAF4A' },
+
+  // Wabi-Sabi — Japanese aesthetics: clay red↔indigo / moss↔sand / rice paper↔wisteria
+  wabisabi:     { 1: '#8B3A2A', 2: '#4A6840', 3: '#F0E8D8', 4: '#2A4A5A', 5: '#C8A878', 6: '#5A3A6A' },
+
+  // Tidepool — coastal: starfish red↔sandy orange / ocean blue↔anemone teal / sea foam↔urchin purple
+  tidepool:     { 1: '#C8183C', 2: '#0070B8', 3: '#F0F8E8', 4: '#E88020', 5: '#1A8878', 6: '#6838A8' },
+
+  // Hammam — Turkish mosaic: ruby↔emerald / turquoise↔copper / ivory↔deep purple
+  hammam:       { 1: '#B01830', 2: '#1A6898', 3: '#F4E8C0', 4: '#28784A', 5: '#C8701C', 6: '#5A2878' },
+
+  // Savanna — African plains: red earth↔waterhole blue / savanna green↔golden grass / bleached bone↔dusk purple
+  savanna:      { 1: '#C43C1C', 2: '#507830', 3: '#F8F0D8', 4: '#1A4060', 5: '#E8A830', 6: '#5A2060' },
+
+  // Studio — artist's palette: cadmium red↔sap green / ultramarine↔yellow ochre / titanium white↔dioxazine purple
+  studio:       { 1: '#C01830', 2: '#1A5490', 3: '#F2EDD8', 4: '#4A8828', 5: '#F0A020', 6: '#6A2888' },
+
+  // Deepspace — cosmic: nebula crimson↔solar flare / deep space↔exoplanet teal / starlight↔nebula purple
+  deepspace:    { 1: '#CC1040', 2: '#0D1B3A', 3: '#F8F8FF', 4: '#FF8C14', 5: '#00C8A0', 6: '#8C30C8' },
+
+  // Stormfront — dramatic weather: storm red↔amber alert / navy↔storm green / pale cloud↔storm violet
+  stormfront:   { 1: '#8C1A24', 2: '#2A4070', 3: '#E8F0F4', 4: '#D06820', 5: '#5AAA38', 6: '#5C2A8C' },
+
+  // Ember — glowing fire: deep ember↔cold midnight / molten orange↔smoke teal / pale ash↔ember purple
+  ember:        { 1: '#B81C1C', 2: '#E87720', 3: '#FCF0D8', 4: '#0E2B4A', 5: '#2A8A7A', 6: '#6B2D8B' },
 
   // ── BIOME SCHEME ─────────────────────────────────────────────────────────────
   biome: {
@@ -151,6 +181,16 @@ export const SCHEME_LABELS = {
   mondrian:   'Mondrian',
   artdeco:    'Art Deco',
   ghibli:     'Ghibli',
+  manuscript: 'Manuscript',
+  carnival:   'Carnival',
+  wabisabi:   'Wabi-Sabi',
+  tidepool:   'Tidepool',
+  hammam:     'Hammam',
+  savanna:    'Savanna',
+  studio:     'Studio',
+  deepspace:  'Deep Space',
+  stormfront: 'Stormfront',
+  ember:      'Ember',
   biome:      'City Biome',
   noire:      'Noire',
   vaporwave:  'Vaporwave',
