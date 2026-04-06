@@ -230,6 +230,8 @@ const ANIMATED_STYLES = new Set([
   'holographic', 'pulse', 'lava', 'galaxy', 'circuit', 'grass', 'ice', 'sand', 'water', 'neural',
   'moireRings', 'moireLines', 'infinityTunnel', 'vortex', 'shockwave',
   'oilSlick', 'constellation', 'waveform', 'dnaHelix', 'neonSign',
+  'prismBloom', 'magnetFlux', 'liquidChrome', 'auroraWeave', 'plasmaCells',
+  'quantumScanlines', 'emberstorm', 'fractalPulse', 'bioLattice', 'stellarLensing',
 ]);
 
 /**

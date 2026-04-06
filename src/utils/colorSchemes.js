@@ -234,6 +234,16 @@ export const TILE_STYLES = {
   waveform:     { label: 'Waveform',      cost: 'med', type: 'animated' },
   dnaHelix:     { label: 'DNA Helix',     cost: 'med', type: 'animated' },
   neonSign:     { label: 'Neon Sign',     cost: 'med', type: 'animated' },
+  prismBloom:   { label: 'Prism Bloom',   cost: 'med', type: 'animated' },
+  magnetFlux:   { label: 'Magnet Flux',   cost: 'med', type: 'animated' },
+  liquidChrome: { label: 'Liquid Chrome', cost: 'med', type: 'animated' },
+  auroraWeave:  { label: 'Aurora Weave',  cost: 'med', type: 'animated' },
+  plasmaCells:  { label: 'Plasma Cells',  cost: 'med', type: 'animated' },
+  quantumScanlines: { label: 'Quantum Scanlines', cost: 'med', type: 'animated' },
+  emberstorm:   { label: 'Emberstorm',    cost: 'med', type: 'animated' },
+  fractalPulse: { label: 'Fractal Pulse', cost: 'med', type: 'animated' },
+  bioLattice:   { label: 'Bio-Lattice',   cost: 'med', type: 'animated' },
+  stellarLensing: { label: 'Stellar Lensing', cost: 'med', type: 'animated' },
 };
 
 export const DEFAULT_SETTINGS = {

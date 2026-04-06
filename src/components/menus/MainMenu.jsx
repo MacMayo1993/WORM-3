@@ -14,6 +14,8 @@ const ALL_STYLES = [
   'opConcentric', 'opRadialSpokes', 'opDiamondWave', 'opPinwheel',
   'opChevronBands', 'opBullseyeSteps', 'opTiltMosaic', 'opWarpGrid',
   'carbonFiber', 'metallic', 'glossy',
+  'prismBloom', 'magnetFlux', 'liquidChrome', 'auroraWeave', 'plasmaCells',
+  'quantumScanlines', 'emberstorm', 'fractalPulse', 'bioLattice', 'stellarLensing',
 ];
 
 const FACE_DIRS = ['PZ', 'NZ', 'PX', 'NX', 'PY', 'NY'];

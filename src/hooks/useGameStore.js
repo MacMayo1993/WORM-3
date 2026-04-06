@@ -51,7 +51,9 @@ const loadPersistedState = () => {
     // Dev mode: always treat every item as owned so new styles/palettes are testable immediately.
     const ownedItems = import.meta.env.DEV
       ? [...DEFAULT_OWNED]
-      : (rawOwned ? JSON.parse(rawOwned) : [...DEFAULT_OWNED]);
+      : Array.from(new Set([...(rawOwned ? JSON.parse(rawOwned) : []), ...DEFAULT_OWNED]));
+    // Dev mode wallet floor so the store is fully testable even when localStorage starts at 0 PP.
+    const safeParityPoints = import.meta.env.DEV ? Math.max(parityPoints, 10000) : parityPoints;
 
     // Guard: reset cosmetics/settings to defaults if the saved value isn't owned
     const safeSkin = ownedItems.includes(`skin_${wormSkin}`) ? wormSkin : 'slime';
@@ -81,7 +83,7 @@ const loadPersistedState = () => {
       wormSkin: safeSkin,
       wormHat: safeHat,
       wormCharacter,
-      parityPoints,
+      parityPoints: safeParityPoints,
       ownedItems,
     };
   } catch {
