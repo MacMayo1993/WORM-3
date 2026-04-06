@@ -22,17 +22,20 @@ export const makeCubies = (size) => {
   );
 };
 
-// Heal a sticker (reset flips and restore original color)
-export const healSticker = (cubies, size, x, y, z, dirKey) => {
-  const next = clone3D(cubies);
+// Heal a sticker (reset flips and restore original color).
+// Uses a targeted shallow clone — only the affected cubie is recreated,
+// matching the same pattern used by flipStickerPair for consistency.
+export const healSticker = (cubies, _size, x, y, z, dirKey) => {
+  const next = cubies.map(L => L.map(R => R.slice()));
   const c = next[x]?.[y]?.[z];
   if (!c) return next;
   const st = c.stickers[dirKey];
   if (!st) return next;
 
-  st.flips = 0;
-  st.curr = st.orig;
-
+  next[x][y][z] = {
+    ...c,
+    stickers: { ...c.stickers, [dirKey]: { ...st, flips: 0, curr: st.orig } },
+  };
   return next;
 };
 
