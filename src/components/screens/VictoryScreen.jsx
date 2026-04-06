@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { VICTORY } from '../../utils/constants.js';
 
 const VictoryScreen = ({
   winType,
@@ -83,7 +84,7 @@ const VictoryScreen = ({
       boxSizing: 'border-box'
     }}>
       {/* Confetti particles for ultimate win */}
-      {winType === 'ultimate' && showConfetti && (
+      {winType === VICTORY.ULTIMATE && showConfetti && (
         <div style={{
           position: 'absolute',
           top: 0, left: 0, right: 0, bottom: 0,
@@ -107,7 +108,7 @@ const VictoryScreen = ({
       )}
 
       {/* WORM particles for worm victory */}
-      {winType === 'worm' && showConfetti && (
+      {winType === VICTORY.WORM && showConfetti && (
         <div style={{
           position: 'absolute',
           top: 0, left: 0, right: 0, bottom: 0,
@@ -162,13 +163,13 @@ const VictoryScreen = ({
 
         {/* Title */}
         <h1 style={{
-          fontSize: winType === 'ultimate' || winType === 'worm' ? '42px' : '36px',
+          fontSize: winType === VICTORY.ULTIMATE || winType === VICTORY.WORM ? '42px' : '36px',
           fontWeight: 700,
           margin: '0 0 8px 0',
           color: config.color,
           fontFamily: 'Georgia, serif',
           letterSpacing: '1px',
-          textShadow: winType === 'ultimate' || winType === 'worm' ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
+          textShadow: winType === VICTORY.ULTIMATE || winType === VICTORY.WORM ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
         }}>
           {config.title}
         </h1>
@@ -379,7 +380,7 @@ const VictoryScreen = ({
         )}
 
         {/* Achievement hint for non-ultimate wins */}
-        {winType !== 'ultimate' && winType !== 'worm' && (
+        {winType !== VICTORY.ULTIMATE && winType !== VICTORY.WORM && (
           <div style={{
             marginTop: '24px',
             padding: '12px 16px',
@@ -393,7 +394,7 @@ const VictoryScreen = ({
               color: '#92400e',
               fontStyle: 'italic'
             }}>
-              {winType === 'rubiks'
+              {winType === VICTORY.RUBIKS
                 ? '🎯 Challenge: Can you also solve the Sudokube (Latin squares) for the Ultimate Victory?'
                 : '🎯 Challenge: Can you also solve the colors for the Ultimate Victory?'}
             </p>
@@ -401,7 +402,7 @@ const VictoryScreen = ({
         )}
 
         {/* Secret achievement message for worm victory */}
-        {winType === 'worm' && (
+        {winType === VICTORY.WORM && (
           <div style={{
             marginTop: '24px',
             padding: '16px 20px',

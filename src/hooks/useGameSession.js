@@ -7,6 +7,7 @@
 import { useEffect, useCallback, useRef } from 'react';
 import { useGameStore } from './useGameStore.js';
 import { detectWinConditions } from '../game/winDetection.js';
+import { VICTORY } from '../utils/constants.js';
 
 /**
  * Hook for game session management
@@ -54,16 +55,16 @@ export function useGameSession() {
 
     // Prioritize worm victory (rarest), then ultimate, then individual wins
     if (wins.worm && !achievedWins.worm) {
-      setVictory('worm');
+      setVictory(VICTORY.WORM);
       setAchievedWins((prev) => ({ ...prev, worm: true }));
     } else if (wins.ultimate && !achievedWins.ultimate) {
-      setVictory('ultimate');
+      setVictory(VICTORY.ULTIMATE);
       setAchievedWins((prev) => ({ ...prev, ultimate: true, rubiks: true, sudokube: true }));
     } else if (wins.rubiks && !achievedWins.rubiks) {
-      setVictory('rubiks');
+      setVictory(VICTORY.RUBIKS);
       setAchievedWins((prev) => ({ ...prev, rubiks: true }));
     } else if (wins.sudokube && !achievedWins.sudokube) {
-      setVictory('sudokube');
+      setVictory(VICTORY.SUDOKUBE);
       setAchievedWins((prev) => ({ ...prev, sudokube: true }));
     }
   }, [cubies, size, hasShuffled, victory, achievedWins, chaosLevel, setVictory, setAchievedWins]);
