@@ -48,7 +48,10 @@ const loadPersistedState = () => {
     const wormCharacter = localStorage.getItem(WORM_CHARACTER_KEY) || 'classic';
     const parityPoints = parseInt(localStorage.getItem(PARITY_POINTS_KEY) ?? '0', 10) || 0;
     const rawOwned = localStorage.getItem(OWNED_ITEMS_KEY);
-    const ownedItems = rawOwned ? JSON.parse(rawOwned) : [...DEFAULT_OWNED];
+    // Dev mode: always treat every item as owned so new styles/palettes are testable immediately.
+    const ownedItems = import.meta.env.DEV
+      ? [...DEFAULT_OWNED]
+      : (rawOwned ? JSON.parse(rawOwned) : [...DEFAULT_OWNED]);
 
     // Guard: reset cosmetics/settings to defaults if the saved value isn't owned
     const safeSkin = ownedItems.includes(`skin_${wormSkin}`) ? wormSkin : 'slime';

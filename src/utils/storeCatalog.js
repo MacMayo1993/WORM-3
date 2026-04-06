@@ -37,6 +37,10 @@ const SCHEME_PRICES = {
   sunrise:    150, mondrian:   150, artdeco:    150,
   deepsea:    200, cyberpunk:  200, midnight:   200,
   biome:      300,
+  // New palettes
+  noire:      150, vaporwave:  150, terracotta: 100,
+  bioluminescence: 200, nordic: 100, saffron:  125,
+  patina:     150, eclipse:    175, inkwell:   125, reef: 100,
 };
 
 export const STORE_SCHEMES = Object.keys(SCHEME_LABELS)
@@ -77,6 +81,10 @@ const TILE_PRICES = {
   shockwave: 175, solar: 175,
   // Living — complex 3D / shader
   circuit: 200, holographic: 200, pulse: 200, lava: 200, galaxy: 200, neural: 200,
+  // New classic patterns
+  stainedGlass: 100, fingerprint: 75, topographic: 75, mandelbrot: 125, penrose: 125,
+  // New animated / antipodal
+  oilSlick: 175, constellation: 175, waveform: 150, dnaHelix: 175, neonSign: 175,
 };
 
 export const STORE_TILES = Object.keys(TILE_STYLES).map(k => ({
@@ -97,8 +105,11 @@ export const STORE_ITEMS = [
   ...STORE_TILES,
 ];
 
-// Items owned from the start (price === 0)
-export const DEFAULT_OWNED = STORE_ITEMS.filter(i => i.price === 0).map(i => i.id);
+// Items owned from the start.
+// In dev mode every item is unlocked so nothing blocks testing new styles/palettes.
+export const DEFAULT_OWNED = import.meta.env.DEV
+  ? STORE_ITEMS.map(i => i.id)
+  : STORE_ITEMS.filter(i => i.price === 0).map(i => i.id);
 // custom scheme is always accessible but not "purchasable"
 if (!DEFAULT_OWNED.includes('scheme_custom')) DEFAULT_OWNED.push('scheme_custom');
 
