@@ -52,6 +52,9 @@ import {
     HEAL_COST,
     SURFACE_JUMP_HEIGHT,
     SURFACE_JUMP_TILE_SPAN,
+    AUTO_ROTATE_INTERVAL_MIN,
+    AUTO_ROTATE_INTERVAL_MAX,
+    AUTO_ROTATE_WARNING,
 } from './healerWorm/constants.js';
 import {
     isSurfaceTilePos,
@@ -104,6 +107,81 @@ function rotateTilePosition(tile, axis, sliceIndex, dir, size) {
     const newDirKey = VEC_TO_DIR(rvx, rvy, rvz);
 
     return { ...tile, x: newX, y: newY, z: newZ, dirKey: newDirKey };
+}
+
+// ─── Auto-rotation helpers ────────────────────────────────────────────────────
+
+function getNextAutoInterval() {
+    return AUTO_ROTATE_INTERVAL_MIN + Math.random() * (AUTO_ROTATE_INTERVAL_MAX - AUTO_ROTATE_INTERVAL_MIN);
+}
+
+// All surface sticker positions in the rotating slice — used for beam placement and hit detection.
+function getSliceSurfaceStickers(size, axis, sliceIndex) {
+    const stickers = [];
+    for (let a = 0; a < size; a++) {
+        for (let b = 0; b < size; b++) {
+            let x, y, z;
+            if (axis === 'col') { x = sliceIndex; y = a; z = b; }
+            else if (axis === 'row') { x = a; y = sliceIndex; z = b; }
+            else { x = a; y = b; z = sliceIndex; }
+            if (x === 0) stickers.push({ x, y, z, dirKey: 'NX' });
+            if (x === size - 1) stickers.push({ x, y, z, dirKey: 'PX' });
+            if (y === 0) stickers.push({ x, y, z, dirKey: 'NY' });
+            if (y === size - 1) stickers.push({ x, y, z, dirKey: 'PY' });
+            if (z === 0) stickers.push({ x, y, z, dirKey: 'NZ' });
+            if (z === size - 1) stickers.push({ x, y, z, dirKey: 'PZ' });
+        }
+    }
+    return stickers;
+}
+
+// Returns null | { type:'death' } | { type:'cut', cutTrailIdx }
+// Rules:
+//   - Entire worm on slice → travels with rotation, null (no harm)
+//   - Head on slice but body spans boundary → death (head gets clipped)
+//   - Head off slice, body segment on slice → cut at first hit segment
+function checkWormHitBySlice(worm, axis, sliceIndex) {
+    const head = worm.pos.current;
+    const axisCoord = axis === 'col' ? 'x' : axis === 'row' ? 'y' : 'z';
+    const partsIdx = axis === 'col' ? 0 : axis === 'row' ? 1 : 2;
+    const headOnSlice = head[axisCoord] === sliceIndex;
+    const trail = worm.tileTrail.current;
+
+    // Only scan the ACTIVE body — the portion the player can see.
+    // tileTrail can hold up to MAX_TAIL=1200 historical entries but the visible snake
+    // body is ceil(tailLength × BODY_BALL_SPACING) tiles, matching the self-collision check.
+    const activeTiles = Math.max(1, Math.ceil(worm.tailLength.current * BODY_BALL_SPACING));
+    const bodyEnd = Math.min(activeTiles, trail.length); // exclusive upper bound for body scan
+
+    if (!headOnSlice) {
+        // Head is off the slice — cut if any active body tile is on it
+        for (let i = 1; i < bodyEnd; i++) {
+            if (Number(trail[i].split(',')[partsIdx]) === sliceIndex) {
+                return { type: 'cut', cutTrailIdx: i };
+            }
+        }
+        return null;
+    }
+
+    // Head is on the slice — death only if any active body tile is OFF the slice
+    // (if the entire active body is on the slice the worm travels with the rotation)
+    for (let i = 1; i < bodyEnd; i++) {
+        if (Number(trail[i].split(',')[partsIdx]) !== sliceIndex) {
+            return { type: 'death' };
+        }
+    }
+    return null; // whole active body on slice — travels safely
+}
+
+// Remove all worm segments at and beyond cutTrailIdx.
+function cutWormTail(worm, cutTrailIdx) {
+    worm.tileTrail.current.length = cutTrailIdx;
+    const histLen = cutTrailIdx * STEPS_PER_TILE;
+    if (worm.stepHistory.current.length > histLen) worm.stepHistory.current.length = histLen;
+    worm.tailLength.current = Math.max(BASE_TAIL_LENGTH, cutTrailIdx);
+    const orbsLeft = Math.max(0, Math.floor((worm.tailLength.current - BASE_TAIL_LENGTH) / ORB_SEGMENT_GROWTH));
+    if (worm.orbPickupColorsRef.current.length > orbsLeft) worm.orbPickupColorsRef.current.length = orbsLeft;
+    useGameStore.getState().setWormBodyTiles(orbsLeft);
 }
 
 // ─── Worm Crawler Hook ────────────────────────────────────────────────────────
@@ -978,7 +1056,8 @@ function useWormCrawler(size, cubies) {
         headInterpPos, currentNormal,
         tailLength, stepHistory, orbPickupColorsRef, tick, queueTurn,
         voidTunnelKeysRef, tunnelUseCountsRef,
-        willHealRef, healFiredRef, pendingHealBurstRef, pendingOrbFlashRef
+        willHealRef, healFiredRef, pendingHealBurstRef, pendingOrbFlashRef,
+    tileTrail, killWorm,
     };
 }
 
@@ -2559,9 +2638,309 @@ function TunnelPortalRings({ worm, size }) {
     );
 }
 
+// ─── Slice Warning Lights ─────────────────────────────────────────────────────
+// Visual warning for the about-to-rotate slice:
+//   1. Spinning rainbow torus ring — encircles the cube at the slice plane, sized to the
+//      cube's actual world-space dimensions so it is always visible on any cube size.
+//      Vertex-colored with all 6 face colors. Spins in the rotation direction.
+//   2. PointLights per face — antipodal-colored scene lighting.
+//
+// World-space coordinate formula: tile at grid index i on axis with size n
+//   maps to world coord  i - (n-1)/2
+// So the cube half-extent is (size-1)/2, and the ring radius must clear
+// the face diagonal: (size-1)/2 * sqrt(2) plus margin.
+const MAX_SLICE_LIGHTS = 6;
+const TUBULAR_SEGS = 96;
+const RADIAL_SEGS  = 16;
+
+const _ringSpinQ = new THREE.Quaternion();
+const _xAxis     = new THREE.Vector3(1, 0, 0);
+const _yAxis     = new THREE.Vector3(0, 1, 0);
+const _zAxis     = new THREE.Vector3(0, 0, 1);
+
+function SliceWarningLights({ pendingRotRef, warningProgressRef, size, cubies }) {
+    const lightGroupRef = useRef();
+    const ringRef       = useRef();
+    const customGeoRef  = useRef(null); // tracks geometries we created so we can dispose them
+    const dataRef       = useRef(null);
+    const lastKeyRef    = useRef(null);
+    const spinAngleRef  = useRef(0);
+
+    useFrame(({ clock }, delta) => {
+        const lgroup = lightGroupRef.current;
+        const ring   = ringRef.current;
+        if (!lgroup || !ring) return;
+
+        const pending = pendingRotRef.current;
+        const t  = clock.elapsedTime;
+        const wp = warningProgressRef.current;
+
+        if (!pending) {
+            for (const l of lgroup.children) l.intensity = 0;
+            ring.visible = false;
+            lastKeyRef.current = null;
+            dataRef.current    = null;
+            return;
+        }
+
+        ring.visible = true;
+
+        // Recompute when the slice identity changes
+        const key = `${pending.axis}-${pending.sliceIndex}`;
+        if (key !== lastKeyRef.current) {
+            lastKeyRef.current = key;
+            const { axis, sliceIndex } = pending;
+            const stickers   = getSliceSurfaceStickers(size, axis, sliceIndex);
+            const faceColors = resolveColors(useGameStore.getState().settings);
+
+            // Per-face center + color for point lights
+            const byFace = {};
+            for (const { x, y, z, dirKey } of stickers) {
+                const [wx, wy, wz] = getStickerWorldPos(x, y, z, dirKey, size, 0);
+                if (!byFace[dirKey]) {
+                    const sticker = cubies?.[x]?.[y]?.[z]?.stickers?.[dirKey];
+                    const faceId  = sticker?.curr ?? 0;
+                    const antiId  = ANTIPODAL_COLOR[faceId] ?? faceId;
+                    const hex     = (antiId && faceColors[antiId]) ?? '#ffcc44';
+                    byFace[dirKey] = { wx: 0, wy: 0, wz: 0, n: 0, color: new THREE.Color(hex) };
+                }
+                byFace[dirKey].wx += wx;
+                byFace[dirKey].wy += wy;
+                byFace[dirKey].wz += wz;
+                byFace[dirKey].n++;
+            }
+            const faceData = Object.entries(byFace).map(([dirKey, d]) => {
+                const nm = FACE_NORMALS[dirKey] ?? FACE_NORMALS.PZ;
+                return { cx: d.wx / d.n, cy: d.wy / d.n, cz: d.wz / d.n, nx: nm.x, ny: nm.y, nz: nm.z, color: d.color };
+            });
+
+            // ── Ring position ─────────────────────────────────────────────────
+            // Tile grid index i maps to world coord  i - (size-1)/2
+            const sliceW = sliceIndex - (size - 1) / 2;
+            if (axis === 'col')        ring.position.set(sliceW, 0, 0);
+            else if (axis === 'row')   ring.position.set(0, sliceW, 0);
+            else                       ring.position.set(0, 0, sliceW);
+
+            // ── Ring geometry — sized to cube, rainbow vertex colors ───────────
+            // Outer corner of any cube face is (size-1)/2 * sqrt(2) from center;
+            // add 15% margin so the ring clearly floats outside.
+            const halfExt    = (size - 1) / 2;
+            const ringRadius = halfExt * Math.SQRT2 * 1.15;
+            const ringTube   = Math.max(0.06, halfExt * 0.055);
+
+            if (customGeoRef.current) { customGeoRef.current.dispose(); customGeoRef.current = null; }
+            const geo = new THREE.TorusGeometry(ringRadius, ringTube, RADIAL_SEGS, TUBULAR_SEGS);
+
+            // Vertex colors: cycle through all 6 face colors equally around the ring
+            const colors6  = [1, 2, 3, 4, 5, 6].map(id => new THREE.Color(faceColors[id] ?? '#ffffff'));
+            const vertCount = (RADIAL_SEGS + 1) * (TUBULAR_SEGS + 1);
+            const colorArr  = new Float32Array(vertCount * 3);
+            let ci = 0;
+            for (let i = 0; i <= TUBULAR_SEGS; i++) {
+                const c = colors6[Math.floor((i / TUBULAR_SEGS) * 6) % 6];
+                for (let j = 0; j <= RADIAL_SEGS; j++) {
+                    colorArr[ci++] = c.r;
+                    colorArr[ci++] = c.g;
+                    colorArr[ci++] = c.b;
+                }
+            }
+            geo.setAttribute('color', new THREE.BufferAttribute(colorArr, 3));
+            customGeoRef.current = geo;
+            ring.geometry = geo;
+
+            // ── Ring orientation ──────────────────────────────────────────────
+            // Default TorusGeometry: XY plane, hole (symmetry axis) along Z.
+            //   col  → rotate 90° around Y   → hole along +X
+            //   row  → rotate -90° around X  → hole along +Y
+            //   depth→ identity               → hole already along Z
+            const baseQ = new THREE.Quaternion();
+            if (axis === 'col')      baseQ.setFromAxisAngle(_yAxis,  Math.PI / 2);
+            else if (axis === 'row') baseQ.setFromAxisAngle(_xAxis, -Math.PI / 2);
+
+            const rotAxis = axis === 'col'   ? _xAxis.clone()
+                          : axis === 'row'   ? _yAxis.clone()
+                          :                    _zAxis.clone();
+
+            dataRef.current = { faceData, baseQ, rotAxis };
+        }
+
+        const { faceData, baseQ, rotAxis } = dataRef.current;
+
+        // ── 1. Point lights ───────────────────────────────────────────────────
+        const strobe   = 0.4 + Math.abs(Math.sin(t * (4 + wp * 14))) * 0.6;
+        const lightInt = (3 + wp * 10) * strobe;
+        for (let i = 0; i < MAX_SLICE_LIGHTS; i++) {
+            const l = lgroup.children[i];
+            if (!l) continue;
+            if (i >= faceData.length) { l.intensity = 0; continue; }
+            const { cx, cy, cz, nx, ny, nz, color } = faceData[i];
+            l.position.set(cx + nx * 0.15, cy + ny * 0.15, cz + nz * 0.15);
+            l.color.copy(color);
+            l.intensity = lightInt;
+        }
+
+        // ── 2. Ring spin + pulse ──────────────────────────────────────────────
+        spinAngleRef.current += delta * (1.2 + wp * 2.5) * pending.dir;
+        _ringSpinQ.setFromAxisAngle(rotAxis, spinAngleRef.current);
+        ring.quaternion.multiplyQuaternions(_ringSpinQ, baseQ);
+
+        const pulse = 0.7 + 0.3 * Math.sin(t * 7);
+        ring.material.opacity = (0.55 + wp * 0.4) * pulse;
+        ring.scale.setScalar(1 + Math.sin(t * 4) * 0.02);
+    });
+
+    return (
+        <>
+            <group ref={lightGroupRef}>
+                {Array.from({ length: MAX_SLICE_LIGHTS }, (_, i) => (
+                    <pointLight key={i} intensity={0} distance={30} decay={2} castShadow={false} />
+                ))}
+            </group>
+            {/* Rainbow spinning ring — geometry set imperatively in useFrame to scale with cube size */}
+            <mesh ref={ringRef} visible={false}>
+                <torusGeometry args={[1, 0.04, RADIAL_SEGS, TUBULAR_SEGS]} />
+                <meshBasicMaterial vertexColors transparent opacity={0.9}
+                    blending={THREE.AdditiveBlending} depthWrite={false} />
+            </mesh>
+        </>
+    );
+}
+
+// ─── Thunk Comic Effect ───────────────────────────────────────────────────────
+// Comic-book THUNK text + coloured orb burst at the worm cut point.
+const MAX_THUNK_ORBS = 10;
+const _thunkDummy = new THREE.Object3D();
+
+function ThunkEffect({ thunkRef }) {
+    const groupRef = useRef();
+    const divRef = useRef();
+    const orbMeshRef = useRef();
+    const animTRef = useRef(0);
+    const activeRef = useRef(false);
+    const orbStateRef = useRef({ positions: [], velocities: [], colors: [] });
+
+    useFrame((_, delta) => {
+        const pending = thunkRef.current;
+        if (pending?.active) {
+            pending.active = false;
+            activeRef.current = true;
+            animTRef.current = 0;
+            const [px, py, pz] = pending.pos;
+            if (groupRef.current) {
+                groupRef.current.position.set(px, py, pz);
+                groupRef.current.visible = true;
+            }
+            const st = orbStateRef.current;
+            const colors = pending.colors?.length ? pending.colors : ['#ffdd44', '#ff8800', '#ff4444'];
+            st.positions = [];
+            st.velocities = [];
+            st.colors = colors;
+            for (let i = 0; i < MAX_THUNK_ORBS; i++) {
+                st.positions.push([px, py, pz]);
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.random() * Math.PI;
+                const spd = 1.8 + Math.random() * 2.2;
+                st.velocities.push([
+                    Math.sin(phi) * Math.cos(theta) * spd,
+                    Math.sin(phi) * Math.sin(theta) * spd,
+                    Math.cos(phi) * spd,
+                ]);
+            }
+        }
+
+        if (!activeRef.current) {
+            const mesh = orbMeshRef.current;
+            if (mesh) {
+                _thunkDummy.scale.setScalar(0);
+                _thunkDummy.updateMatrix();
+                for (let i = 0; i < MAX_THUNK_ORBS; i++) mesh.setMatrixAt(i, _thunkDummy.matrix);
+                mesh.instanceMatrix.needsUpdate = true;
+            }
+            return;
+        }
+
+        animTRef.current += delta;
+        const t = Math.min(animTRef.current / 1.4, 1);
+
+        // Animate HTML text scale + fade
+        if (divRef.current) {
+            const scale = t < 0.15 ? (t / 0.15) * 1.5 : t < 0.4 ? 1.5 - ((t - 0.15) / 0.25) * 0.5 : 1.0;
+            const opacity = t > 0.55 ? 1 - (t - 0.55) / 0.45 : 1;
+            divRef.current.style.transform = `scale(${scale})`;
+            divRef.current.style.opacity = String(opacity);
+            divRef.current.style.display = 'block';
+        }
+
+        // Animate orb burst
+        const mesh = orbMeshRef.current;
+        if (mesh) {
+            const st = orbStateRef.current;
+            const et = animTRef.current;
+            const _col = new THREE.Color();
+            for (let i = 0; i < MAX_THUNK_ORBS; i++) {
+                const [vx, vy, vz] = st.velocities[i] || [0, 0, 0];
+                const fade = Math.max(0, 1 - et / 0.75);
+                _thunkDummy.position.set(
+                    st.positions[i][0] + vx * et,
+                    st.positions[i][1] + vy * et,
+                    st.positions[i][2] + vz * et,
+                );
+                _thunkDummy.scale.setScalar(fade * 0.11);
+                _thunkDummy.updateMatrix();
+                mesh.setMatrixAt(i, _thunkDummy.matrix);
+                _col.set(st.colors[i % st.colors.length] || '#ffdd44');
+                mesh.setColorAt(i, _col);
+            }
+            mesh.instanceMatrix.needsUpdate = true;
+            if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+        }
+
+        if (animTRef.current >= 1.4) {
+            activeRef.current = false;
+            if (groupRef.current) groupRef.current.visible = false;
+            if (divRef.current) divRef.current.style.display = 'none';
+        }
+    });
+
+    return (
+        <>
+            <group ref={groupRef} visible={false}>
+                <Html center distanceFactor={10}>
+                    <div ref={divRef} style={{
+                        fontFamily: "'Impact', 'Arial Black', sans-serif",
+                        fontSize: '54px',
+                        fontWeight: 900,
+                        color: '#ffdd00',
+                        textShadow: '-3px -3px 0 #cc2200, 3px -3px 0 #cc2200, -3px 3px 0 #cc2200, 3px 3px 0 #cc2200',
+                        pointerEvents: 'none',
+                        userSelect: 'none',
+                        whiteSpace: 'nowrap',
+                        letterSpacing: '-2px',
+                        transformOrigin: 'center',
+                        display: 'none',
+                    }}>
+                        WORM&apos;D
+                    </div>
+                </Html>
+            </group>
+            <instancedMesh ref={orbMeshRef} args={[undefined, undefined, MAX_THUNK_ORBS]} frustumCulled={false}>
+                <sphereGeometry args={[1, 6, 6]} />
+                <meshBasicMaterial vertexColors transparent blending={THREE.AdditiveBlending} depthWrite={false} />
+            </instancedMesh>
+        </>
+    );
+}
+
 // ─── Main exported wrapper ────────────────────────────────────────────────────
-export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animState, _onRotate, _onHeal }) {
+export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animState, onRotate, _onHeal }) {
     const worm = useWormCrawler(size, cubies);
+
+    // ── Auto-rotation hazard state ─────────────────────────────────────────────
+    const autoTimerRef = useRef(0);
+    const nextIntervalRef = useRef(getNextAutoInterval());
+    const pendingRotRef = useRef(null);       // { axis, dir, sliceIndex } during warning phase
+    const warningProgressRef = useRef(0);     // 0→1 through warning window
+    const thunkRef = useRef({ active: false, pos: [0, 0, 0], colors: [] });
 
     useEffect(() => {
         useGameStore.setState({ _wormTurn: worm.queueTurn });
@@ -2570,8 +2949,87 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         };
     }, [worm.queueTurn]);
 
+    // Reset auto-rotation timer whenever a new worm run starts
+    useEffect(() => {
+        const unsub = useGameStore.subscribe(
+            s => s.wormRunId,
+            () => {
+                autoTimerRef.current = 0;
+                nextIntervalRef.current = getNextAutoInterval();
+                pendingRotRef.current = null;
+                warningProgressRef.current = 0;
+            }
+        );
+        return unsub;
+    }, []);
+
     useFrame((_, delta) => {
         worm.tick(delta);
+
+        // ── Auto-rotation tick ─────────────────────────────────────────────────
+        const store = useGameStore.getState();
+        if (!store.wormAlive || store.wormPaused) return;
+
+        autoTimerRef.current += delta;
+        const interval = nextIntervalRef.current;
+        const warningStart = interval - AUTO_ROTATE_WARNING;
+
+        // Arm warning phase — pick rotation parameters once
+        if (autoTimerRef.current >= warningStart && !pendingRotRef.current) {
+            const axes = ['col', 'row', 'depth'];
+            pendingRotRef.current = {
+                axis: axes[Math.floor(Math.random() * 3)],
+                dir: Math.random() < 0.5 ? 1 : -1,
+                sliceIndex: Math.floor(Math.random() * size),
+            };
+        }
+
+        // Update warning progress (0→1)
+        if (pendingRotRef.current) {
+            const elapsed = autoTimerRef.current - warningStart;
+            warningProgressRef.current = Math.min(1, Math.max(0, elapsed / AUTO_ROTATE_WARNING));
+        }
+
+        // Fire rotation when timer expires
+        if (autoTimerRef.current >= interval && pendingRotRef.current) {
+            // Delay during tunnel transit — retry in 1.5 s
+            if (worm.phase.current !== 'crawling') {
+                autoTimerRef.current = interval - 1.5;
+                return;
+            }
+
+            const { axis, dir, sliceIndex } = pendingRotRef.current;
+
+            // Hit detection: check head then body
+            const hit = checkWormHitBySlice(worm, axis, sliceIndex);
+            if (hit) {
+                const histEntry = hit.type === 'cut'
+                    ? worm.stepHistory.current[hit.cutTrailIdx * STEPS_PER_TILE]
+                    : null;
+                const hitPos = histEntry
+                    ? histEntry.pos.toArray()
+                    : worm.headInterpPos.current.toArray();
+                const cutColors = worm.orbPickupColorsRef.current.slice(0, 5);
+                thunkRef.current = {
+                    active: true,
+                    pos: hitPos,
+                    colors: cutColors.length ? cutColors : ['#ffdd44', '#ff8800'],
+                };
+                if (hit.type === 'death') {
+                    worm.killWorm({ reason: 'slice-rotation', axis, sliceIndex });
+                } else {
+                    cutWormTail(worm, hit.cutTrailIdx);
+                }
+            }
+
+            if (onRotate) onRotate(axis, dir, sliceIndex);
+
+            // Reset for next cycle
+            pendingRotRef.current = null;
+            warningProgressRef.current = 0;
+            autoTimerRef.current = 0;
+            nextIntervalRef.current = getNextAutoInterval();
+        }
     });
 
     return (
@@ -2596,6 +3054,8 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             <HeartBurstSystem worm={worm} size={size} />
             <OrbFlashSystem worm={worm} />
             <PowerupOrbs size={size} />
+            <SliceWarningLights pendingRotRef={pendingRotRef} warningProgressRef={warningProgressRef} size={size} cubies={cubies} />
+            <ThunkEffect thunkRef={thunkRef} />
         </>
     );
 }
