@@ -268,13 +268,13 @@ export default function GameScene({
           </Suspense>
         )}
 
-        {/* Worm mode bloom — makes tunnel entrance glow discs bleed light outward. */}
+        {/* Worm mode bloom — only affects the worm's bright emissive surfaces. */}
         {wormHealerMode && (
           <EffectComposer>
             <Bloom
               intensity={0.45}
-              luminanceThreshold={0.08}
-              luminanceSmoothing={0.85}
+              luminanceThreshold={0.6}
+              luminanceSmoothing={0.4}
               mipmapBlur
             />
           </EffectComposer>

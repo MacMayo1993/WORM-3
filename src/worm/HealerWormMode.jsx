@@ -1478,20 +1478,13 @@ function WormBody({ worm }) {
 }
 
 // ─── Glow Worm Aura ───────────────────────────────────────────────────────────
-// Bioluminescent rings + strong pulsing light only active for the Glow Worm.
-// Rings are instanced tori placed along the step history so they always trail the body.
-const GLOW_RING_COUNT = 8;
-const _glowRingDummy = new THREE.Object3D();
-const _glowRingUp = new THREE.Vector3(0, 1, 0);
-const _glowRingQuat = new THREE.Quaternion();
-
+// Pulsing point light that follows the Glow Worm's head.
 function GlowWormAura({ worm }) {
     const wormCharacterId = useGameStore(s => s.wormCharacter ?? 'classic');
     const wormSkinId = useGameStore(s => s.wormSkin ?? 'slime');
     const isGlow = wormCharacterId === 'glow';
     const glowColor = getSkin(wormSkinId).glow;
     const lightRef = useRef();
-    const ringRef = useRef();
 
     useFrame(({ clock }) => {
         if (!isGlow) return;
@@ -1503,48 +1496,11 @@ function GlowWormAura({ worm }) {
                 .addScaledVector(worm.currentNormal.current, WORM_LIFT + 0.1);
             lightRef.current.intensity = 3.2 + Math.sin(t * 4.0) * 1.0;
         }
-
-        // Bioluminescent rings distributed along body path
-        const rings = ringRef.current;
-        if (!rings) return;
-        const steps = worm.stepHistory.current;
-        const count = Math.min(GLOW_RING_COUNT, Math.max(1, steps.length));
-        rings.count = count;
-        for (let i = 0; i < count; i++) {
-            const stepIdx = Math.floor((i / (count - 1 || 1)) * (steps.length - 1 || 0));
-            const step = steps[stepIdx] ?? steps[0];
-            if (!step) continue;
-            _glowRingDummy.position.copy(step.pos)
-                .addScaledVector(step.normal, WORM_LIFT + 0.04);
-            // Orient ring so it lies flat on the cube face
-            _glowRingQuat.setFromUnitVectors(_glowRingUp, step.normal);
-            _glowRingDummy.quaternion.copy(_glowRingQuat);
-            const pulse = 0.72 + Math.sin(t * 5.5 + i * 0.9) * 0.28;
-            _glowRingDummy.scale.setScalar(pulse);
-            _glowRingDummy.updateMatrix();
-            rings.setMatrixAt(i, _glowRingDummy.matrix);
-        }
-        rings.instanceMatrix.needsUpdate = true;
     });
 
     if (!isGlow) return null;
 
-    return (
-        <>
-            <pointLight ref={lightRef} color={glowColor} intensity={3.0} distance={5.5} decay={2} />
-            <instancedMesh ref={ringRef} args={[undefined, undefined, GLOW_RING_COUNT]} frustumCulled={false}>
-                <torusGeometry args={[0.18, 0.025, 8, 28]} />
-                <meshBasicMaterial
-                    color={glowColor}
-                    transparent
-                    opacity={0.45}
-                    blending={THREE.AdditiveBlending}
-                    depthWrite={false}
-                    toneMapped={false}
-                />
-            </instancedMesh>
-        </>
-    );
+    return <pointLight ref={lightRef} color={glowColor} intensity={3.0} distance={5.5} decay={2} />;
 }
 
 // Pre-allocated scratch vector for PortalGlow
