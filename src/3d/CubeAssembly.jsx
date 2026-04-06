@@ -18,7 +18,7 @@ import { StickerInstanceProvider } from './StickerInstances.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { resolveColors } from '../utils/colorSchemes.js';
-import { liveRotation } from '../worm/liveRotation.js';
+import { liveRotation, resetLiveRotation } from '../worm/liveRotation.js';
 
 // Reusable axis vectors and quaternion (allocated once, never recreated)
 const _axisCol = new THREE.Vector3(1, 0, 0);
@@ -435,6 +435,7 @@ const CubeAssembly = React.memo(({
 
               liveDragRef.current = null;
               sliceIndicesRef.current = null;
+              resetLiveRotation();
               // trigger onMove (which now always sets animState for 1 turn).
               onMoveRef.current(savedAxis, gameDir, savedPos, numTurns);
             }
@@ -450,6 +451,7 @@ const CubeAssembly = React.memo(({
               gsapAnimRef.current = null;
               liveDragRef.current = null;
               sliceIndicesRef.current = null;
+              resetLiveRotation();
             }
           });
         }
@@ -619,6 +621,7 @@ const CubeAssembly = React.memo(({
       onComplete: () => {
         gsapAnimRef.current = null;
         sliceIndicesRef.current = null;
+        resetLiveRotation();
         vibrate(isFast ? 8 : 14);
         onAnimCompleteRef.current();
       }

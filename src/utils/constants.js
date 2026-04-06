@@ -88,6 +88,34 @@ export const FLIP_CAP = 25;
 // needs to position geometry on the cube surface.
 export const SURFACE_OFFSET = 0.52;
 
+// Victory condition type constants (use instead of magic strings)
+export const VICTORY = {
+  RUBIKS:   'rubiks',
+  SUDOKUBE: 'sudokube',
+  ULTIMATE: 'ultimate',
+  WORM:     'worm',
+};
+
+// Rotation axis constants (use instead of magic strings)
+export const AXIS = {
+  COL:   'col',
+  ROW:   'row',
+  DEPTH: 'depth',
+};
+
+// Game mode identifiers — returned by getActiveMode() selector
+export const MODES = {
+  FREEPLAY:    'freeplay',    // Default, no special mode active
+  WORM_HEALER: 'worm-healer', // Co-op platformer / worm healer
+  TEACH:       'teach',       // Teaching / algorithm mode
+  HOLONOMY:    'holonomy',    // Holonomy loop mode
+  MERGE:       'merge',       // Merge Blocks mode
+  HOLLOW:      'hollow',      // Hollow Void Cube
+  MIRROR:      'mirror',      // Mirror Blocks mode
+  CHAOS:       'chaos',       // Chaos / Disparity mode (chaosLevel > 0)
+  FLIP:        'flip',        // Flip Mode
+};
+
 // Half-life acceleration: each halving of remaining distance doubles the rate.
 // 0-12 = 1x, 13-18 = 2x, 19-21 = 4x, 22-23 = 8x, 24 = 16x
 export const getHalfLifeMultiplier = (flips) => {

@@ -11,6 +11,7 @@ import { makeCubies } from '../game/cubeState.js';
 import { DEFAULT_SETTINGS } from '../utils/colorSchemes.js';
 import { isMobile } from '../utils/device.js';
 import { DEFAULT_OWNED } from '../utils/storeCatalog.js';
+import { MODES } from '../utils/constants.js';
 
 const SETTINGS_STORAGE_KEY = 'worm3_settings';
 const SETTINGS_VERSION_KEY = 'worm3_settings_version';
@@ -691,6 +692,26 @@ export const useGameStore = create(
     },
   }))
 );
+
+/**
+ * Derived selector: returns the single active game mode identifier.
+ * Priority order matches the original design: worm-healer overrides teach,
+ * teach overrides holonomy, etc.  Use with `useGameStore(getActiveMode)`.
+ *
+ * @param {object} state - Zustand store state
+ * @returns {string} One of the MODES values
+ */
+export const getActiveMode = (state) => {
+  if (state.wormHealerMode)         return MODES.WORM_HEALER;
+  if (state.teachModeActive)        return MODES.TEACH;
+  if (state.holonomyMode)           return MODES.HOLONOMY;
+  if (state.mergeMode)              return MODES.MERGE;
+  if (state.hollowMode)             return MODES.HOLLOW;
+  if (state.mirrorMode)             return MODES.MIRROR;
+  if (state.chaosLevel > 0)         return MODES.CHAOS;
+  if (state.flipMode)               return MODES.FLIP;
+  return MODES.FREEPLAY;
+};
 
 // Subscribe to settings changes and persist to localStorage
 useGameStore.subscribe(

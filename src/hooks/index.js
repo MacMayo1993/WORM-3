@@ -20,8 +20,8 @@
  *   - useUndo: Undo functionality
  */
 
-// Zustand store
-export { useGameStore } from './useGameStore.js';
+// Zustand store + derived selectors
+export { useGameStore, getActiveMode } from './useGameStore.js';
 
 // Domain hooks
 export { useCubeState } from './useCubeState.js';

@@ -20,3 +20,16 @@ export const liveRotation = {
   sliceIndex: 0,    // which slice index on that axis (0..size-1)
   angle: 0,         // total signed rotation angle in radians
 };
+
+/**
+ * Reset liveRotation to its idle state.
+ * Call this when a rotation animation completes or a component unmounts,
+ * so that stale rotation data isn't read by worm-mode consumers on the
+ * next frame before a new rotation starts.
+ */
+export const resetLiveRotation = () => {
+  liveRotation.active = false;
+  liveRotation.axis = null;
+  liveRotation.sliceIndex = 0;
+  liveRotation.angle = 0;
+};
