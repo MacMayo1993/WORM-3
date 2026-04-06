@@ -41,6 +41,10 @@ const SCHEME_PRICES = {
   noire:      150, vaporwave:  150, terracotta: 100,
   bioluminescence: 200, nordic: 100, saffron:  125,
   patina:     150, eclipse:    175, inkwell:   125, reef: 100,
+  // New distinct palettes
+  manuscript: 150, carnival:   125, wabisabi:  125,
+  tidepool:   125, hammam:     150, savanna:   125,
+  studio:     100, deepspace:  150, stormfront: 125, ember: 125,
 };
 
 export const STORE_SCHEMES = Object.keys(SCHEME_LABELS)
