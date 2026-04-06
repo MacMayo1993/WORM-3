@@ -1,6 +1,10 @@
 // src/game/refractoryMap.js
 // Per-tile cooldown tracking — prevents rapid re-flipping of the same sticker.
 // Shared across hooks (useCubeState, useParityDecay) via module-level Map.
+//
+// NOTE for tests: this module holds global state across test runs.
+// Call clearRefractory() in beforeEach / afterEach when testing code that
+// calls flipSticker, otherwise refractory state bleeds between test cases.
 
 const _map = new Map();
 const REFRACTORY_MS = 3000; // 3-second cooldown per tile

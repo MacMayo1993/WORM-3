@@ -68,24 +68,27 @@ export function getVisibleDirections(x, y, z, size) {
 }
 
 /**
- * Iterate over all edge stickers in the cube
+ * Iterate over all edge stickers in the cube.
+ * Visits only the face-boundary slices directly (O(6·size²)) instead of
+ * checking every (x,y,z,dir) combination (O(6·size³)) and filtering.
  *
  * @param {number} size - Cube size
  * @param {function} callback - Called with (x, y, z, dirKey) for each edge sticker
  */
 export function forEachEdgeSticker(size, callback) {
-  const dirs = ['PX', 'NX', 'PY', 'NY', 'PZ', 'NZ'];
-  for (let x = 0; x < size; x++) {
-    for (let y = 0; y < size; y++) {
-      for (let z = 0; z < size; z++) {
-        for (const dirKey of dirs) {
-          if (isOnEdge(x, y, z, dirKey, size)) {
-            callback(x, y, z, dirKey);
-          }
-        }
-      }
-    }
-  }
+  const max = size - 1;
+  // PX face (x = max)
+  for (let y = 0; y < size; y++) for (let z = 0; z < size; z++) callback(max, y, z, 'PX');
+  // NX face (x = 0)
+  for (let y = 0; y < size; y++) for (let z = 0; z < size; z++) callback(0, y, z, 'NX');
+  // PY face (y = max)
+  for (let x = 0; x < size; x++) for (let z = 0; z < size; z++) callback(x, max, z, 'PY');
+  // NY face (y = 0)
+  for (let x = 0; x < size; x++) for (let z = 0; z < size; z++) callback(x, 0, z, 'NY');
+  // PZ face (z = max)
+  for (let x = 0; x < size; x++) for (let y = 0; y < size; y++) callback(x, y, max, 'PZ');
+  // NZ face (z = 0)
+  for (let x = 0; x < size; x++) for (let y = 0; y < size; y++) callback(x, y, 0, 'NZ');
 }
 
 /**

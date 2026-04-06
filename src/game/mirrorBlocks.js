@@ -9,17 +9,27 @@
 // Asymmetric layer widths per cube size.
 // Values must sum to exactly `size`. The intentional asymmetry makes each
 // piece uniquely shaped so the puzzle is solvable by shape alone.
+// All supported sizes (2–7) must have an entry — the fallback produces
+// uniform widths which makes all pieces identical and the puzzle unsolvable.
 const LAYER_WIDTHS = {
   2: [0.75, 1.25],
   3: [0.6, 1.0, 1.4],
   4: [0.55, 0.85, 1.15, 1.45],
   5: [0.5, 0.75, 1.0, 1.25, 1.5],
+  6: [0.45, 0.65, 0.85, 1.05, 1.35, 1.65],
+  7: [0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6],
 };
 
 const GAP = 0.02; // small cosmetic gap between pieces
 
 export function getMirrorLayerWidths(size) {
-  return LAYER_WIDTHS[size] || Array.from({ length: size }, () => 1.0);
+  if (!LAYER_WIDTHS[size]) {
+    // Fallback: uniform widths — pieces are indistinguishable, puzzle is unsolvable.
+    // Add an entry to LAYER_WIDTHS above if you need mirror mode for this size.
+    console.warn(`mirrorBlocks: no asymmetric widths defined for size ${size}, falling back to uniform.`);
+    return Array.from({ length: size }, () => 1.0);
+  }
+  return LAYER_WIDTHS[size];
 }
 
 // Centers for each layer along one axis, with the whole cube spanning -size/2 to +size/2.

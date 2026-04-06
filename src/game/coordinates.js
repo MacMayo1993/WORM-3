@@ -1,6 +1,7 @@
 // src/game/coordinates.js
 // Grid and position calculation utilities
 import * as THREE from 'three';
+import { SURFACE_OFFSET } from '../utils/constants.js';
 
 // Get grid (r,c) position for a sticker based on its original position
 // Ensures M*-001 is always top-left when viewing face head-on
@@ -53,14 +54,13 @@ export const getStickerWorldPos = (x, y, z, dirKey, size, explosionFactor = 0) =
     base[2] * (1 + explosionFactor * 1.8)
   ];
 
-  const offset = 0.52;
   switch (dirKey) {
-    case 'PX': return [exploded[0] + offset, exploded[1], exploded[2]];
-    case 'NX': return [exploded[0] - offset, exploded[1], exploded[2]];
-    case 'PY': return [exploded[0], exploded[1] + offset, exploded[2]];
-    case 'NY': return [exploded[0], exploded[1] - offset, exploded[2]];
-    case 'PZ': return [exploded[0], exploded[1], exploded[2] + offset];
-    case 'NZ': return [exploded[0], exploded[1], exploded[2] - offset];
+    case 'PX': return [exploded[0] + SURFACE_OFFSET, exploded[1], exploded[2]];
+    case 'NX': return [exploded[0] - SURFACE_OFFSET, exploded[1], exploded[2]];
+    case 'PY': return [exploded[0], exploded[1] + SURFACE_OFFSET, exploded[2]];
+    case 'NY': return [exploded[0], exploded[1] - SURFACE_OFFSET, exploded[2]];
+    case 'PZ': return [exploded[0], exploded[1], exploded[2] + SURFACE_OFFSET];
+    case 'NZ': return [exploded[0], exploded[1], exploded[2] - SURFACE_OFFSET];
     default: return exploded;
   }
 };
@@ -78,14 +78,13 @@ export const getStickerWorldPosFromMesh = (meshRef, dirKey) => {
   meshRef.getWorldPosition(_worldPos);
   meshRef.getWorldQuaternion(_worldQuat);
 
-  const offset = 0.52;
   switch (dirKey) {
-    case 'PX': _localOffset.set(offset, 0, 0); break;
-    case 'NX': _localOffset.set(-offset, 0, 0); break;
-    case 'PY': _localOffset.set(0, offset, 0); break;
-    case 'NY': _localOffset.set(0, -offset, 0); break;
-    case 'PZ': _localOffset.set(0, 0, offset); break;
-    case 'NZ': _localOffset.set(0, 0, -offset); break;
+    case 'PX': _localOffset.set(SURFACE_OFFSET, 0, 0); break;
+    case 'NX': _localOffset.set(-SURFACE_OFFSET, 0, 0); break;
+    case 'PY': _localOffset.set(0, SURFACE_OFFSET, 0); break;
+    case 'NY': _localOffset.set(0, -SURFACE_OFFSET, 0); break;
+    case 'PZ': _localOffset.set(0, 0, SURFACE_OFFSET); break;
+    case 'NZ': _localOffset.set(0, 0, -SURFACE_OFFSET); break;
     default: _localOffset.set(0, 0, 0); break;
   }
 
