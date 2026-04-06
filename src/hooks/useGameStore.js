@@ -47,7 +47,6 @@ const loadPersistedState = () => {
     const wormHat = localStorage.getItem('worm3_hat') || 'none';
     const wormCharacter = localStorage.getItem(WORM_CHARACTER_KEY) || 'classic';
     const parityPoints = parseInt(localStorage.getItem(PARITY_POINTS_KEY) ?? '0', 10) || 0;
-    const rawOwned = localStorage.getItem(OWNED_ITEMS_KEY);
     // All items always owned during development/preview.
     const ownedItems = [...DEFAULT_OWNED];
     // Wallet floor so the store UI is fully explorable.
