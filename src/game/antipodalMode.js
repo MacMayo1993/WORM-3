@@ -30,29 +30,31 @@ export function getReverseDirection(dir) {
 }
 
 /**
- * Check if a rotation should trigger an antipodal echo
- * @param {string} _axis - 'row', 'col', or 'depth'
- * @param {number} _sliceIndex - Slice index
- * @param {number} _size - Cube size
- * @returns {boolean} - True if should trigger echo
+ * Check if a rotation should trigger an antipodal echo.
+ * Currently always returns true — every slice triggers an echo in antipodal mode
+ * (including the middle layer, which rotates in reverse against itself).
+ * Parameters are reserved for future selective-echo behaviour.
+ * @param {string} _axis - 'row', 'col', or 'depth' (reserved)
+ * @param {number} _sliceIndex - Slice index (reserved)
+ * @param {number} _size - Cube size (reserved)
+ * @returns {boolean} - Always true
  */
 export function shouldTriggerEcho(_axis, _sliceIndex, _size) {
-  // Always trigger echo for all slices in antipodal mode
-  // Middle layer (for odd sizes) will rotate itself in reverse
   return true;
 }
 
 /**
- * Calculate echo synchronization percentage
+ * Calculate echo synchronization percentage.
+ * Because shouldTriggerEcho always returns true, every move triggers an echo,
+ * so this will always return 100% in practice. Kept for potential future use
+ * if selective echo modes are introduced.
  * @param {number} totalMoves - Total moves made
  * @param {number} reversalCount - Number of antipodal reversals
- * @returns {number} - Sync percentage (0-100)
+ * @returns {number} - Sync percentage (0-100), currently always 100
  */
 export function calculateEchoSync(totalMoves, reversalCount) {
   if (totalMoves === 0) return 100;
-  // Perfect sync means reversalCount equals totalMoves (every move triggered an echo)
-  const sync = Math.min(100, (reversalCount / totalMoves) * 100);
-  return Math.round(sync);
+  return Math.min(100, Math.round((reversalCount / totalMoves) * 100));
 }
 
 /**

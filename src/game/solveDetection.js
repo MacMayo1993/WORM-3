@@ -110,7 +110,9 @@ export const checkWhiteCross = (cubies, size) => {
 // F2L DETECTION (Step 2 - First Two Layers)
 // ============================================
 
-// F2L corner positions (white corners that go in bottom layer of white face)
+// F2L corner positions (white corners that go in bottom layer of white face).
+// NOTE: F2L detection is only valid for 3×3 cubes. Corner/edge positions are
+// hardcoded and will return incorrect results for other cube sizes.
 const getF2LCorners = (size) => {
   const max = size - 1;
 
@@ -222,10 +224,10 @@ export const checkPLL = (cubies, size) => {
 
   // Check if each side of bottom layer is uniform
   const sides = [
-    { face: 'PZ', y: 0, check: (_x, z) => z === 0 }, // Front row
-    { face: 'NZ', y: 0, check: (_x, z) => z === max }, // Back row
-    { face: 'PX', y: 0, check: (x, _z) => x === max }, // Right row
-    { face: 'NX', y: 0, check: (x, _z) => x === 0 }, // Left row
+    { face: 'PZ' }, // Front row
+    { face: 'NZ' }, // Back row
+    { face: 'PX' }, // Right row
+    { face: 'NX' }, // Left row
   ];
 
   let solvedSides = 0;
@@ -234,16 +236,7 @@ export const checkPLL = (cubies, size) => {
     const expectedColor = DIR_TO_COLOR[side.face];
     let sideComplete = true;
 
-    for (let x = 0; x < size && sideComplete; x++) {
-      for (let z = 0; z < size && sideComplete; z++) {
-        if (side.check(x, z)) {
-          // This position is on the edge of the bottom layer facing this side
-          // We need to check the sticker on the side face
-        }
-      }
-    }
-
-    // Simplified: check if bottom row of each face is correct color
+    // Check if bottom row of each face is correct color
     for (let i = 0; i < size; i++) {
       let x, z;
       switch (side.face) {

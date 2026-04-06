@@ -93,7 +93,8 @@ export const checkSudokubeSolved = (cubies, size) => {
 
 // Returns true if every exterior sticker has been flipped through a wormhole at least once.
 // Does NOT check whether the cube is solved — use checkWormVictory for the full condition.
-const allStickersFlipped = (cubies, size) => {
+// Exported so callers can drive WORM³ progress UI (e.g. "47/54 stickers flipped").
+export const allStickersFlipped = (cubies, size) => {
   for (let x = 0; x < size; x++) {
     for (let y = 0; y < size; y++) {
       for (let z = 0; z < size; z++) {
@@ -105,6 +106,24 @@ const allStickersFlipped = (cubies, size) => {
     }
   }
   return true;
+};
+
+// Count how many exterior stickers have been flipped at least once (flips > 0).
+// Returns { flipped, total } for use in WORM³ progress UI.
+export const countFlippedStickers = (cubies, size) => {
+  let flipped = 0, total = 0;
+  for (let x = 0; x < size; x++) {
+    for (let y = 0; y < size; y++) {
+      for (let z = 0; z < size; z++) {
+        if (x > 0 && x < size - 1 && y > 0 && y < size - 1 && z > 0 && z < size - 1) continue;
+        for (const st of Object.values(cubies[x][y][z].stickers)) {
+          total++;
+          if ((st.flips ?? 0) > 0) flipped++;
+        }
+      }
+    }
+  }
+  return { flipped, total };
 };
 
 // Check if WORM³ victory - cube is solved AND every sticker has traveled through wormhole
