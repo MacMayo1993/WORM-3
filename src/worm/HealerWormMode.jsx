@@ -1671,10 +1671,11 @@ function WormFace({ worm, size }) {
 // Each orb inherits the color of the sticker tile it sits on and follows
 // that tile through cube rotations. Rendered using the shared ParityOrbs component.
 function PowerupOrbs({ size }) {
-    const { wormPowerups, cubies, settings } = useGameStore(useShallow(s => ({
+    const { wormPowerups, cubies, settings, wormCharacter } = useGameStore(useShallow(s => ({
         wormPowerups: s.wormPowerups,
         cubies: s.cubies,
         settings: s.settings,
+        wormCharacter: s.wormCharacter ?? 'classic',
     })));
     const faceColors = useMemo(() => resolveColors(settings), [settings]);
 
@@ -1692,7 +1693,7 @@ function PowerupOrbs({ size }) {
         });
     }, [wormPowerups, cubies, faceColors]);
 
-    return <ParityOrbs orbs={orbs} size={size} />;
+    return <ParityOrbs orbs={orbs} size={size} isGlowWorm={wormCharacter === 'glow'} />;
 }
 
 // Watches for orb pickups by the glow worm and renders a color bloom at the collect point.
