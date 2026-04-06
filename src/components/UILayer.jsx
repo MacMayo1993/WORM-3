@@ -173,7 +173,7 @@ export default function UILayer({
     setShowNetPanel, toggleLeaderboard, setFlipMode, setVisualMode,
     setExploded, setShowTunnels, setFaceRotationTarget, setSelectedTileForRotation,
     setShowDevConsole, setSolveModeActive, setSolveFocusedStep, setSolveHighlights,
-    setAntipodalIntegrityMode, toggleHollowMode,
+    setAntipodalIntegrityMode, toggleHollowMode, triggerCameraOrbit,
   } = useGameStore(useShallow(s => ({
     setShowLevelSelect: s.setShowLevelSelect,
     setShowSettings: s.setShowSettings,
