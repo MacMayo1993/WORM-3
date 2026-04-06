@@ -21,19 +21,19 @@ export const faceRCFor = (dirKey, x, y, z, size) => {
     return { r: size - 1 - y, c: x };
   }
   if (dirKey === 'NZ') {
-    return { r: size - 1 - y, c: size - 1 - x };
+    return { r: y, c: size - 1 - x };
   }
   if (dirKey === 'PX') {
     return { r: size - 1 - y, c: size - 1 - z };
   }
   if (dirKey === 'NX') {
-    return { r: size - 1 - y, c: z };
+    return { r: y, c: z };
   }
   if (dirKey === 'PY') {
     return { r: z, c: x };
   }
   // NY
-  return { r: size - 1 - z, c: x };
+  return { r: size - 1 - z, c: size - 1 - x };
 };
 
 // Get face value for Latin square (Sudokube mode)
