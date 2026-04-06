@@ -82,6 +82,36 @@ export const COLOR_SCHEMES = {
   // Ghibli — warm rose↔forest green / sky blue↔golden wheat / soft white↔spirit lavender
   ghibli:     { 1: '#E88888', 2: '#58A0D0', 3: '#F4F0E8', 4: '#68AA58', 5: '#E8C870', 6: '#A898D4' },
 
+  // Noire — film noir: blood red↔silver / near-black↔mid-grey / ivory↔charcoal
+  noire:        { 1: '#8B0000', 2: '#1A1A1A', 3: '#F5F5F0', 4: '#D0D0C8', 5: '#B0B0B0', 6: '#363636' },
+
+  // Vaporwave — 80s retro-future: hot pink↔neon cyan / electric purple↔yellow / soft pink↔deep purple
+  vaporwave:    { 1: '#FF2D78', 2: '#9D00FF', 3: '#FFB3D9', 4: '#00FFCC', 5: '#FFE556', 6: '#3A0CA3' },
+
+  // Terracotta — earth & pottery: burnt sienna↔sage / clay orange↔muted blue / sandy cream↔dark clay
+  terracotta:   { 1: '#C4622D', 2: '#E8956D', 3: '#F2DFC8', 4: '#5C8A6B', 5: '#3D6B8A', 6: '#7B4B3A' },
+
+  // Bioluminescence — deep-sea glow: phosphor cyan↔coral / deep navy↔neon green / electric teal↔deep violet
+  bioluminescence: { 1: '#00FFC8', 2: '#0A0A2A', 3: '#4DEEEA', 4: '#FF2D6B', 5: '#39FF14', 6: '#7B2FBE' },
+
+  // Nordic — Scandinavian winter: fjord blue↔birch amber / pine green↔frost / snow↔slate blue
+  nordic:       { 1: '#3B5998', 2: '#2D6A4F', 3: '#F0EFE8', 4: '#E8C98A', 5: '#C9D4DC', 6: '#5E7891' },
+
+  // Saffron — Indian spice market: saffron orange↔deep indigo / deep red↔turmeric gold / golden yellow↔burgundy
+  saffron:      { 1: '#FF6B35', 2: '#C8102E', 3: '#FF9F1C', 4: '#1A3C6E', 5: '#F5C518', 6: '#7B0D1E' },
+
+  // Patina — aged metal oxidation: verdigris↔copper / bronze↔oxide blue / tarnished gold↔oxidized green
+  patina:       { 1: '#2A9D8F', 2: '#8B5E3C', 3: '#E8D5A3', 4: '#C97B3A', 5: '#5B7FA6', 6: '#3D5A3E' },
+
+  // Eclipse — solar corona at totality: deep space↔corona gold / eclipse red↔midnight blue / solar white↔plasma violet
+  eclipse:      { 1: '#1A1A2E', 2: '#E94560', 3: '#F8F9FA', 4: '#FFB627', 5: '#0F3460', 6: '#C77DFF' },
+
+  // Inkwell — calligraphy & ink wash: ink black↔rice paper / ink blue↔vermillion / warm sepia↔dark ink
+  inkwell:      { 1: '#0D0D0D', 2: '#1B3A6B', 3: '#C2855F', 4: '#E8E0D5', 5: '#D64045', 6: '#2C1810' },
+
+  // Reef — shallow tropical coral reef: coral pink↔ocean blue / turquoise↔sandy beach / sea-foam↔sea coral
+  reef:         { 1: '#FF6B81', 2: '#00B4D8', 3: '#90E0EF', 4: '#0077B6', 5: '#F7C59F', 6: '#E76F51' },
+
   // ── BIOME SCHEME ─────────────────────────────────────────────────────────────
   biome: {
     1: CITY_CONFIG[FACE_CITIES[1]].pulseColor,
@@ -122,6 +152,16 @@ export const SCHEME_LABELS = {
   artdeco:    'Art Deco',
   ghibli:     'Ghibli',
   biome:      'City Biome',
+  noire:      'Noire',
+  vaporwave:  'Vaporwave',
+  terracotta: 'Terracotta',
+  bioluminescence: 'Bioluminescence',
+  nordic:     'Nordic',
+  saffron:    'Saffron',
+  patina:     'Patina',
+  eclipse:    'Eclipse',
+  inkwell:    'Inkwell',
+  reef:       'Reef',
   custom:     'Custom Upload',
 };
 
@@ -183,6 +223,17 @@ export const TILE_STYLES = {
   wood:        { label: 'Wood',         cost: 'med', type: '3d' },
   neural:      { label: 'Neural',       cost: 'med', type: '3d' },
   solar:       { label: 'Solar',        cost: 'med', type: 'animated' },
+  // New styles
+  stainedGlass: { label: 'Stained Glass', cost: 'low', type: 'pattern' },
+  fingerprint:  { label: 'Fingerprint',   cost: 'low', type: 'pattern' },
+  topographic:  { label: 'Topographic',   cost: 'low', type: 'pattern' },
+  mandelbrot:   { label: 'Mandelbrot',    cost: 'low', type: 'procedural' },
+  penrose:      { label: 'Penrose',       cost: 'low', type: 'pattern' },
+  oilSlick:     { label: 'Oil Slick',     cost: 'med', type: 'animated' },
+  constellation: { label: 'Constellation', cost: 'med', type: 'animated' },
+  waveform:     { label: 'Waveform',      cost: 'med', type: 'animated' },
+  dnaHelix:     { label: 'DNA Helix',     cost: 'med', type: 'animated' },
+  neonSign:     { label: 'Neon Sign',     cost: 'med', type: 'animated' },
 };
 
 export const DEFAULT_SETTINGS = {

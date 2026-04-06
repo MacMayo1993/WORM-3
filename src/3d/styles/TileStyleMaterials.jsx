@@ -8,6 +8,7 @@ import { techShaders } from './shaders/techShaders.js';
 import { natureShaders } from './shaders/natureShaders.js';
 import { opArtShaders } from './shaders/opArtShaders.js';
 import { antipodalShaders } from './shaders/antipodalShaders.js';
+import { newStyleShaders } from './shaders/newStyleShaders.js';
 
 // Shared time uniform updated by useFrame in parent
 export const sharedUniforms = {
@@ -63,12 +64,13 @@ const fragmentShaders = {
   ...natureShaders,
   ...opArtShaders,
   ...antipodalShaders,
+  ...newStyleShaders,
 };
 
 // Dev-time guard: silent key collisions from spread merges are very hard to debug.
 // This throws immediately at module load so the problem is impossible to miss.
 if (import.meta.env.DEV) {
-  const _shaderModules = [basicShaders, techShaders, natureShaders, opArtShaders, antipodalShaders];
+  const _shaderModules = [basicShaders, techShaders, natureShaders, opArtShaders, antipodalShaders, newStyleShaders];
   const _seen = new Map();
   for (const mod of _shaderModules) {
     for (const key of Object.keys(mod)) {
@@ -118,6 +120,7 @@ const ANTIPODAL_STYLES = new Set([
   'cornerAccent', 'innerDisc', 'crossPlus', 'borderFrame', 'thinHatch', 'dotRing',
   'opConcentric', 'opRadialSpokes', 'opTiltMosaic', 'opDiamondWave', 'opBullseyeSteps',
   'opWarpGrid', 'opChevronBands', 'opInterferencePlaid', 'opRibbonTwist', 'opPinwheel',
+  'waveform', 'dnaHelix',
 ]);
 
 /**
@@ -223,7 +226,11 @@ export function clearMaterialCache() {
 
 // Module-level Set: O(1) lookup instead of allocating an array + O(N) includes
 // every time isAnimatedStyle is called (which happens per sticker per render).
-const ANIMATED_STYLES = new Set(['holographic', 'pulse', 'lava', 'galaxy', 'circuit', 'grass', 'ice', 'sand', 'water', 'neural', 'moireRings', 'moireLines', 'infinityTunnel', 'vortex', 'shockwave']);
+const ANIMATED_STYLES = new Set([
+  'holographic', 'pulse', 'lava', 'galaxy', 'circuit', 'grass', 'ice', 'sand', 'water', 'neural',
+  'moireRings', 'moireLines', 'infinityTunnel', 'vortex', 'shockwave',
+  'oilSlick', 'constellation', 'waveform', 'dnaHelix', 'neonSign',
+]);
 
 /**
  * Check if a style needs time updates (animated)

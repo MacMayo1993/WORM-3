@@ -2,6 +2,7 @@ export const CLASSIC_STYLE_KEYS = [
   'solid', 'glossy', 'matte', 'metallic', 'carbonFiber', 'hexGrid', 'comic',
   'cafeWall', 'hermanGrid', 'opticSpin', 'ouchi', 'scintillatingGrid',
   'zoellner', 'kanizsa', 'fraserSpiral', 'muellerLyer', 'rotatingSnakes', 'poggendorff',
+  'stainedGlass', 'fingerprint', 'topographic', 'mandelbrot', 'penrose',
 ];
 
 export const ANTIPODAL_STYLE_KEYS = [
@@ -9,12 +10,14 @@ export const ANTIPODAL_STYLE_KEYS = [
   'cornerAccent', 'innerDisc', 'crossPlus', 'borderFrame', 'thinHatch', 'dotRing',
   'opConcentric', 'opRadialSpokes', 'opTiltMosaic', 'opDiamondWave', 'opBullseyeSteps',
   'opWarpGrid', 'opChevronBands', 'opInterferencePlaid', 'opRibbonTwist', 'opPinwheel',
+  'waveform', 'dnaHelix',
 ];
 
 export const LIVING_STYLE_KEYS = [
   'grass', 'ice', 'sand', 'water', 'wood', 'circuit', 'holographic', 'pulse',
   'lava', 'galaxy', 'neural', 'moireRings', 'moireLines', 'infinityTunnel',
-  'vortex', 'shockwave',
+  'vortex', 'shockwave', 'solar',
+  'oilSlick', 'constellation', 'neonSign',
 ];
 
 export const TILE_STYLE_SECTIONS = [
