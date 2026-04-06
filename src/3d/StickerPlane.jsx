@@ -471,6 +471,19 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     uLens: { value: 0.0 },
   }));
 
+  // Dispose shader materials on unmount to prevent GPU program / texture leaks.
+  // The THREE.Color values inside uniform objects are plain JS objects (no GPU resource),
+  // so only the ShaderMaterial instances themselves need disposal.
+  useEffect(() => {
+    return () => {
+      spiderMatRef.current?.dispose();
+      crackMatRef.current?.dispose();
+      seamLeakMatRef.current?.dispose();
+      spinRevealMatRef.current?.dispose();
+      wispyRingMatRef.current?.dispose();
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── InstancedMesh batch integration ─────────────────────────────────────────
   const instanceCtx = useStickerInstances();
   // THREE.Color kept in sync with the current material colour; manager reads it

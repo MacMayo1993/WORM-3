@@ -11,6 +11,7 @@ import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
+import { useShallow } from 'zustand/react/shallow';
 
 /**
  * Get face center position for a given axis and slice
@@ -224,10 +225,14 @@ function PulseRing({ echo, size }) {
  * Renders all active echo effects
  */
 export default function AntipodalModeEffects() {
-  const antipodalMode = useGameStore((state) => state.antipodalMode);
-  const pendingEchoRotations = useGameStore((state) => state.pendingEchoRotations);
-  const antipodalVizIntensity = useGameStore((state) => state.antipodalVizIntensity);
-  const size = useGameStore((state) => state.size);
+  const { antipodalMode, pendingEchoRotations, antipodalVizIntensity, size } = useGameStore(
+    useShallow((s) => ({
+      antipodalMode: s.antipodalMode,
+      pendingEchoRotations: s.pendingEchoRotations,
+      antipodalVizIntensity: s.antipodalVizIntensity,
+      size: s.size,
+    }))
+  );
 
   if (!antipodalMode || antipodalVizIntensity === 'low') {
     return null;

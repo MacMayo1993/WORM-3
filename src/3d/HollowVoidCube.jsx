@@ -8,11 +8,12 @@
  * - Camera controls included
  */
 
-import React, { useRef, useMemo } from 'react';
+import React, { useRef, useMemo, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { TrackballControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
+import { useShallow } from 'zustand/react/shallow';
 import { FACE_COLORS } from '../utils/constants.js';
 
 /**
@@ -82,8 +83,9 @@ function HollowCubelet({ position, size = 0.65 }) {
  */
 function VoidSpaceGlow() {
   const meshRef = useRef();
-  const parityCurrent = useGameStore((state) => state.parityCurrent);
-  const chaosCurrent = useGameStore((state) => state.chaosCurrent);
+  const { parityCurrent, chaosCurrent } = useGameStore(
+    useShallow((s) => ({ parityCurrent: s.parityCurrent, chaosCurrent: s.chaosCurrent }))
+  );
 
   const shaderMaterial = useMemo(() => {
     return new THREE.ShaderMaterial({
@@ -130,6 +132,12 @@ function VoidSpaceGlow() {
       depthWrite: false,
     });
   }, []);
+
+  useEffect(() => {
+    return () => {
+      shaderMaterial.dispose();
+    };
+  }, [shaderMaterial]);
 
   useFrame((state) => {
     if (meshRef.current) {
