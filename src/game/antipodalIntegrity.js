@@ -2,9 +2,12 @@
 // Antipodal integrity metric I(T) from the paper:
 // "Discrete Quotient Structures and Regime Transitions in Combinatorial Puzzles"
 //
-// For each of the 27 antipodal position-pairs on the cube surface,
-// check whether the colors currently at those two positions are antipodal.
-// I(T) = (# preserved pairs) / 27
+// For each antipodal sticker-pair on the cube surface, check whether the
+// colors at those two positions are antipodal under ANTIPODAL_COLOR.
+// I(T) = (# preserved pairs) / (total pairs)
+//
+// Pair count is size-dependent: a 3×3 has 27 pairs, a 5×5 has 75, etc.
+// (total exterior stickers / 2 = 6·size²/2 = 3·size²)
 
 import { ANTIPODAL_COLOR } from '../utils/constants.js';
 

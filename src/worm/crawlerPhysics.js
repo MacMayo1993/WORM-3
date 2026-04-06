@@ -5,6 +5,7 @@
 
 import * as THREE from 'three';
 import { getStickerSafe } from '../game/cubeState.js';
+import { SURFACE_OFFSET } from '../utils/constants.js';
 
 // Face normals (outward)
 const FACE_NORMALS = {
@@ -16,7 +17,7 @@ const FACE_NORMALS = {
   NZ: new THREE.Vector3(0, 0, -1),
 };
 
-const SURFACE_OFFSET = 0.52;
+// SURFACE_OFFSET is imported from utils/constants.js — same value used by coordinates.js.
 
 /**
  * Project a 3D point onto the cube surface.

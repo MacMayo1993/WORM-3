@@ -83,6 +83,11 @@ export const COLOR_TO_DIR = { 1: 'PZ', 2: 'NX', 3: 'PY', 4: 'NZ', 5: 'PX', 6: 'N
 // Flip cap — tiles "die" at this many flips
 export const FLIP_CAP = 25;
 
+// Distance from the cubie center to the outer face of a sticker (world units).
+// Used consistently across coordinates.js, crawlerPhysics.js, and any code that
+// needs to position geometry on the cube surface.
+export const SURFACE_OFFSET = 0.52;
+
 // Half-life acceleration: each halving of remaining distance doubles the rate.
 // 0-12 = 1x, 13-18 = 2x, 19-21 = 4x, 22-23 = 8x, 24 = 16x
 export const getHalfLifeMultiplier = (flips) => {
