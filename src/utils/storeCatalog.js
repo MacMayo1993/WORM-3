@@ -85,6 +85,9 @@ const TILE_PRICES = {
   stainedGlass: 100, fingerprint: 75, topographic: 75, mandelbrot: 125, penrose: 125,
   // New animated / antipodal
   oilSlick: 175, constellation: 175, waveform: 150, dnaHelix: 175, neonSign: 175,
+  // Animated style pack (dev request)
+  prismBloom: 175, magnetFlux: 175, liquidChrome: 200, auroraWeave: 175, plasmaCells: 175,
+  quantumScanlines: 150, emberstorm: 175, fractalPulse: 175, bioLattice: 175, stellarLensing: 200,
 };
 
 export const STORE_TILES = Object.keys(TILE_STYLES).map(k => ({

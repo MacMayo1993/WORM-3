@@ -1,5 +1,7 @@
 // New tile style shaders: stainedGlass, fingerprint, topographic, mandelbrot, penrose,
-//                         oilSlick, constellation, waveform, dnaHelix, neonSign
+//                         oilSlick, constellation, waveform, dnaHelix, neonSign,
+//                         prismBloom, magnetFlux, liquidChrome, auroraWeave, plasmaCells,
+//                         quantumScanlines, emberstorm, fractalPulse, bioLattice, stellarLensing
 
 export const newStyleShaders = {
   // Stained Glass - cathedral leaded glass with radial + concentric segments
@@ -256,6 +258,219 @@ export const newStyleShaders = {
       vec3 gc  = baseColor * 0.75;
       vec3 bg  = baseColor * 0.04;
       vec3 col = bg + gc * glow * pulse + nc * neon;
+      gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+    }
+  `,
+
+  prismBloom: `
+    uniform vec3 baseColor;
+    uniform float time;
+    varying vec2 vUv;
+
+    vec3 hsv2rgb(vec3 c) {
+      vec3 p = abs(fract(c.xxx + vec3(0.0, 2.0/3.0, 1.0/3.0)) * 6.0 - 3.0);
+      vec3 rgb = clamp(p - 1.0, 0.0, 1.0);
+      return c.z * mix(vec3(1.0), rgb, c.y);
+    }
+
+    void main() {
+      vec2 uv = vUv - 0.5;
+      float r = length(uv);
+      float a = atan(uv.y, uv.x);
+      float petals = sin(a * 8.0 + time * 0.8) * 0.5 + 0.5;
+      float bloom = smoothstep(0.52, 0.04, r) * petals;
+      float hue = fract(a / 6.28318 + time * 0.035 + r * 0.25);
+      vec3 prism = hsv2rgb(vec3(hue, 0.75, 1.0));
+      vec3 col = mix(baseColor * 0.28, prism * 0.95 + baseColor * 0.2, bloom);
+      gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+    }
+  `,
+
+  magnetFlux: `
+    uniform vec3 baseColor;
+    uniform float time;
+    varying vec2 vUv;
+
+    void main() {
+      vec2 uv = (vUv - 0.5) * 2.0;
+      vec2 p1 = vec2(sin(time * 0.7) * 0.45, cos(time * 0.8) * 0.45);
+      vec2 p2 = -p1;
+      float d1 = length(uv - p1);
+      float d2 = length(uv - p2);
+      float flux = sin((d1 - d2) * 20.0 - time * 2.0) * 0.5 + 0.5;
+      float lines = smoothstep(0.62, 0.9, flux);
+      vec3 col = baseColor * (0.16 + lines * 1.2);
+      gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+    }
+  `,
+
+  liquidChrome: `
+    uniform vec3 baseColor;
+    uniform float time;
+    varying vec2 vUv;
+
+    void main() {
+      vec2 uv = vUv;
+      float n = sin((uv.x + time * 0.15) * 16.0) * 0.35
+              + sin((uv.y - time * 0.11) * 14.0) * 0.35
+              + sin((uv.x + uv.y + time * 0.09) * 22.0) * 0.25;
+      float metal = smoothstep(-0.1, 0.8, n);
+      vec3 chrome = mix(vec3(0.05), vec3(0.95), metal);
+      vec3 tint = mix(baseColor * 0.22, baseColor * 0.6, 0.35 + 0.35 * sin(time * 0.9));
+      vec3 col = chrome * 0.78 + tint;
+      gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+    }
+  `,
+
+  auroraWeave: `
+    uniform vec3 baseColor;
+    uniform float time;
+    varying vec2 vUv;
+
+    void main() {
+      vec2 uv = vUv;
+      float r1 = sin((uv.x * 5.0 + uv.y * 1.8) + time * 0.8);
+      float r2 = sin((uv.x * -4.3 + uv.y * 2.2) - time * 0.65);
+      float weave = smoothstep(-0.3, 0.7, r1 * 0.55 + r2 * 0.45);
+      vec3 a = vec3(0.2, 0.9, 0.7);
+      vec3 b = vec3(0.6, 0.35, 1.0);
+      vec3 ribbon = mix(a, b, 0.5 + 0.5 * sin(time * 0.35 + uv.y * 3.5));
+      vec3 col = baseColor * 0.15 + ribbon * weave * 0.85;
+      gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+    }
+  `,
+
+  plasmaCells: `
+    uniform vec3 baseColor;
+    uniform float time;
+    varying vec2 vUv;
+
+    float cell(vec2 p) {
+      vec2 i = floor(p);
+      vec2 f = fract(p) - 0.5;
+      float h = fract(sin(dot(i, vec2(127.1, 311.7))) * 43758.5453);
+      vec2 o = vec2(cos(h * 6.28318), sin(h * 6.28318)) * 0.25;
+      return length(f - o);
+    }
+
+    void main() {
+      vec2 uv = vUv * 5.0 + vec2(time * 0.18, -time * 0.14);
+      float d = 1.0;
+      for (int y = -1; y <= 1; y++) {
+        for (int x = -1; x <= 1; x++) {
+          d = min(d, cell(uv + vec2(float(x), float(y))));
+        }
+      }
+      float edge = smoothstep(0.32, 0.18, d);
+      vec3 glow = mix(baseColor * 0.12, baseColor * 1.35, edge);
+      gl_FragColor = vec4(clamp(glow, 0.0, 1.0), 1.0);
+    }
+  `,
+
+  quantumScanlines: `
+    uniform vec3 baseColor;
+    uniform float time;
+    varying vec2 vUv;
+
+    void main() {
+      float scan = sin((vUv.y + time * 0.85) * 180.0) * 0.5 + 0.5;
+      float tear = step(0.86, fract(vUv.x * 8.0 + time * 0.6)) * step(0.45, fract(vUv.y * 12.0 + time * 0.25));
+      float glow = smoothstep(0.55, 1.0, scan) + tear * 0.7;
+      vec3 col = baseColor * 0.13 + vec3(0.2, 0.95, 1.0) * glow * 0.8 + baseColor * glow * 0.45;
+      gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+    }
+  `,
+
+  emberstorm: `
+    uniform vec3 baseColor;
+    uniform float time;
+    varying vec2 vUv;
+
+    float hash(vec2 p) { return fract(sin(dot(p, vec2(41.0, 289.0))) * 45758.5453); }
+
+    void main() {
+      vec2 uv = vUv * 6.0;
+      vec2 id = floor(uv);
+      vec2 fr = fract(uv) - 0.5;
+      float h = hash(id);
+      vec2 drift = vec2(sin(time * (0.6 + h)), cos(time * (0.5 + h))) * 0.18;
+      float spark = smoothstep(0.19, 0.02, length(fr - drift)) * step(0.74, h);
+      float smoke = sin((vUv.x * 4.0 + vUv.y * 7.0) + time * 0.25) * 0.5 + 0.5;
+      vec3 ember = vec3(1.0, 0.45, 0.1);
+      vec3 col = baseColor * 0.08 + baseColor * smoke * 0.35 + ember * spark * 1.2;
+      gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+    }
+  `,
+
+  fractalPulse: `
+    uniform vec3 baseColor;
+    uniform float time;
+    varying vec2 vUv;
+
+    void main() {
+      vec2 z = (vUv - 0.5) * 2.2;
+      vec2 c = vec2(-0.62 + sin(time * 0.2) * 0.08, 0.34 + cos(time * 0.17) * 0.06);
+      float it = 0.0;
+      for (int i = 0; i < 38; i++) {
+        z = vec2(z.x * z.x - z.y * z.y, 2.0 * z.x * z.y) + c;
+        if (dot(z, z) > 4.0) break;
+        it += 1.0;
+      }
+      float t = it / 38.0;
+      float pulse = 0.5 + 0.5 * sin(time * 1.25 + t * 9.0);
+      vec3 col = mix(baseColor * 0.08, baseColor * (0.75 + pulse), t);
+      gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+    }
+  `,
+
+  bioLattice: `
+    uniform vec3 baseColor;
+    uniform float time;
+    varying vec2 vUv;
+
+    void main() {
+      vec2 uv = (vUv - 0.5) * 2.0;
+      float veins = 0.0;
+      for (int i = 0; i < 4; i++) {
+        float fi = float(i);
+        float a = fi * 1.5708 + time * 0.12;
+        vec2 dir = vec2(cos(a), sin(a));
+        veins += smoothstep(0.11, 0.01, abs(dot(uv, dir) + sin(dot(uv.yx, dir) * 7.5 + time * (0.5 + fi * 0.2)) * 0.08));
+      }
+      veins = clamp(veins / 2.8, 0.0, 1.0);
+      vec3 col = mix(baseColor * 0.11, vec3(0.25, 1.0, 0.65) * 0.8 + baseColor * 0.35, veins);
+      gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+    }
+  `,
+
+  stellarLensing: `
+    uniform vec3 baseColor;
+    uniform float time;
+    varying vec2 vUv;
+
+    float star(vec2 p) {
+      vec2 i = floor(p);
+      vec2 f = fract(p) - 0.5;
+      float h = fract(sin(dot(i, vec2(127.1, 311.7))) * 43758.5453);
+      return smoothstep(0.17, 0.01, length(f)) * step(0.86, h);
+    }
+
+    void main() {
+      vec2 uv = (vUv - 0.5) * 2.0;
+      vec2 lens = vec2(sin(time * 0.31) * 0.22, cos(time * 0.27) * 0.22);
+      vec2 d = uv - lens;
+      float r = max(0.08, dot(d, d));
+      vec2 warped = uv + d * (0.08 / r);
+
+      float stars = 0.0;
+      vec2 p = warped * 6.0 + vec2(time * 0.06, -time * 0.04);
+      for (int y = -1; y <= 1; y++) {
+        for (int x = -1; x <= 1; x++) {
+          stars += star(p + vec2(float(x), float(y)));
+        }
+      }
+      float ring = smoothstep(0.34, 0.30, abs(length(d) - 0.28));
+      vec3 col = baseColor * 0.06 + vec3(0.9, 0.95, 1.0) * stars + baseColor * ring * 0.9;
       gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
     }
   `,
