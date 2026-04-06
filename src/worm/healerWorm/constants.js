@@ -66,3 +66,8 @@ export const HEAL_COST = 4; // worm segments required to fully heal one tunnel (
 // Surface-worm jump physics (distinct from crawlerPhysics.js JUMP_HEIGHT which is 0.35).
 export const SURFACE_JUMP_HEIGHT = 1.5;   // tall arc — astronaut bounding in low gravity
 export const SURFACE_JUMP_TILE_SPAN = 1;  // jump distance is fixed to one traversed tile regardless of speed
+
+// ─── Auto-rotation hazard ─────────────────────────────────────────────────────
+export const AUTO_ROTATE_INTERVAL_MIN = 9;   // seconds between auto-rotations
+export const AUTO_ROTATE_INTERVAL_MAX = 15;
+export const AUTO_ROTATE_WARNING = 2.5;      // seconds of beam warning before rotation fires
