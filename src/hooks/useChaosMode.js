@@ -73,11 +73,14 @@ export function useChaosMode() {
   const countdownRef = useRef(rotationCountdown);
   countdownRef.current = rotationCountdown;
 
-  const surfaceCoordsRef = useRef(buildSurfaceCoords(size));
+  // Compute surface coords once per size change. Keep a ref so callbacks
+  // always read the latest value without re-subscribing. Initialising the ref
+  // from the memo (and keeping it in sync during render) avoids the double
+  // buildSurfaceCoords call that happened when the ref was initialised
+  // independently and then synced via a useEffect.
   const surfaceCoordsMemo = useMemo(() => buildSurfaceCoords(size), [size]);
-  useEffect(() => {
-    surfaceCoordsRef.current = surfaceCoordsMemo;
-  }, [surfaceCoordsMemo]);
+  const surfaceCoordsRef = useRef(surfaceCoordsMemo);
+  surfaceCoordsRef.current = surfaceCoordsMemo;
 
   const disparityRef = useRef(0);
   const flipPctRef = useRef(0);
