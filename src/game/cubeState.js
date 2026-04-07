@@ -59,3 +59,14 @@ export const clone3D = (arr) =>
 
 // Safe sticker accessor — returns the sticker object or undefined
 export const getStickerSafe = (cubies, x, y, z, dir) => cubies[x]?.[y]?.[z]?.stickers?.[dir];
+
+// Check if a sticker position is on the cube surface for a given size.
+export const isSurfaceSticker = (x, y, z, dirKey, size) => {
+  if (dirKey === 'PX') return x === size - 1;
+  if (dirKey === 'NX') return x === 0;
+  if (dirKey === 'PY') return y === size - 1;
+  if (dirKey === 'NY') return y === 0;
+  if (dirKey === 'PZ') return z === size - 1;
+  if (dirKey === 'NZ') return z === 0;
+  return false;
+};
