@@ -3056,6 +3056,92 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             <PowerupOrbs size={size} />
             <SliceWarningLights pendingRotRef={pendingRotRef} warningProgressRef={warningProgressRef} size={size} cubies={cubies} />
             <ThunkEffect thunkRef={thunkRef} />
+            <CollisionGlow size={size} />
+        </>
+    );
+}
+
+// ─── Collision Glow ───────────────────────────────────────────────────────────
+// Renders pulsing glowing spheres at the self-collision head + body tile so the
+// player can examine exactly where they died after minimising the death card.
+// Reads from the Zustand store imperatively (no React state → no re-render cost).
+function CollisionGlow({ size }) {
+    const colMeshRef  = useRef();
+    const headMeshRef = useRef();
+    const cachedRef   = useRef(null);
+    const lastDetailsRef = useRef(null);
+
+    useFrame(({ clock }) => {
+        const col  = colMeshRef.current;
+        const head = headMeshRef.current;
+        if (!col || !head) return;
+
+        const st      = useGameStore.getState();
+        const details = st.wormDeathDetails;
+        const active  = !!(details?.reason === 'self-collision' && !st.wormAlive);
+
+        if (!active) {
+            col.visible  = false;
+            head.visible = false;
+            if (cachedRef.current !== null) cachedRef.current = null;
+            return;
+        }
+
+        // Cache world positions once per death event
+        if (cachedRef.current === null || lastDetailsRef.current !== details) {
+            lastDetailsRef.current = details;
+            cachedRef.current = {};
+            const LIFT = 0.08; // raise slightly off tile surface
+
+            if (details.collisionTile) {
+                const [tx, ty, tz, dk] = details.collisionTile.split(',');
+                const [wx, wy, wz] = getStickerWorldPos(Number(tx), Number(ty), Number(tz), dk, size, 0);
+                const n = FACE_NORMALS[dk] ?? FACE_NORMALS.PZ;
+                cachedRef.current.colPos  = new THREE.Vector3(wx + n.x * LIFT, wy + n.y * LIFT, wz + n.z * LIFT);
+            }
+            if (details.headTile) {
+                const [tx, ty, tz, dk] = details.headTile.split(',');
+                const [wx, wy, wz] = getStickerWorldPos(Number(tx), Number(ty), Number(tz), dk, size, 0);
+                const n = FACE_NORMALS[dk] ?? FACE_NORMALS.PZ;
+                cachedRef.current.headPos = new THREE.Vector3(wx + n.x * LIFT, wy + n.y * LIFT, wz + n.z * LIFT);
+            }
+        }
+
+        const t     = clock.elapsedTime;
+        const pulse = 0.55 + 0.45 * Math.sin(t * 4.5);
+        const R     = 0.28; // glow sphere radius (world units, ~1 tile)
+
+        if (cachedRef.current.colPos) {
+            col.visible = true;
+            col.position.copy(cachedRef.current.colPos);
+            col.scale.setScalar(R * (0.75 + 0.5 * pulse));
+            col.material.opacity = 0.5 + 0.45 * pulse;
+        } else {
+            col.visible = false;
+        }
+
+        if (cachedRef.current.headPos) {
+            head.visible = true;
+            head.position.copy(cachedRef.current.headPos);
+            head.scale.setScalar(R * (0.75 + 0.5 * (1 - pulse))); // opposite phase
+            head.material.opacity = 0.4 + 0.35 * (1 - pulse);
+        } else {
+            head.visible = false;
+        }
+    });
+
+    return (
+        <>
+            {/* Body tile that was hit — red */}
+            <mesh ref={colMeshRef} visible={false} frustumCulled={false}>
+                <sphereGeometry args={[1, 16, 16]} />
+                <meshBasicMaterial color="#ff1a1a" transparent opacity={0.8} blending={THREE.AdditiveBlending} depthWrite={false} />
+            </mesh>
+            {/* Head tile at moment of collision — orange */}
+            <mesh ref={headMeshRef} visible={false} frustumCulled={false}>
+                <sphereGeometry args={[1, 16, 16]} />
+                <meshBasicMaterial color="#ff8800" transparent opacity={0.6} blending={THREE.AdditiveBlending} depthWrite={false} />
+            </mesh>
         </>
     );
 }
