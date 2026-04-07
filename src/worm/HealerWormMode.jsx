@@ -2851,6 +2851,7 @@ function ThunkEffect({ thunkRef }) {
     const orbMeshRef = useRef();
     const animTRef = useRef(0);
     const activeRef = useRef(false);
+    const durationRef = useRef(1.4); // seconds — 1.4 for WORM!, 4.2 for WORM'D
     const orbStateRef = useRef({ positions: [], velocities: [], colors: [] });
 
     useFrame((_, delta) => {
@@ -2860,7 +2861,10 @@ function ThunkEffect({ thunkRef }) {
             activeRef.current = true;
             animTRef.current = 0;
             // Support custom text (e.g. countdown "WORM!" vs collision "WORM'D")
-            if (divRef.current) divRef.current.textContent = pending.text ?? "WORM'D";
+            const text = pending.text ?? "WORM'D";
+            if (divRef.current) divRef.current.textContent = text;
+            // WORM'D lingers 3× longer so players have time to read it
+            durationRef.current = text === "WORM'D" ? 4.2 : 1.4;
             const [px, py, pz] = pending.pos;
             if (groupRef.current) {
                 groupRef.current.position.set(px, py, pz);
@@ -2896,7 +2900,7 @@ function ThunkEffect({ thunkRef }) {
         }
 
         animTRef.current += delta;
-        const t = Math.min(animTRef.current / 1.4, 1);
+        const t = Math.min(animTRef.current / durationRef.current, 1);
 
         // Animate HTML text scale + fade
         if (divRef.current) {
@@ -2930,7 +2934,7 @@ function ThunkEffect({ thunkRef }) {
             if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
         }
 
-        if (animTRef.current >= 1.4) {
+        if (animTRef.current >= durationRef.current) {
             activeRef.current = false;
             if (groupRef.current) groupRef.current.visible = false;
             if (divRef.current) divRef.current.style.display = 'none';
