@@ -5,7 +5,7 @@
 import { getManifoldNeighbors, findAntipodalStickerByGrid, buildManifoldGridMap } from '../game/manifoldLogic.js';
 import { getStickerWorldPos } from '../game/coordinates.js';
 import { FACE_COLORS } from '../utils/constants.js';
-import { getStickerSafe } from '../game/cubeState.js';
+import { getStickerSafe, isSurfaceSticker } from '../game/cubeState.js';
 import * as THREE from 'three';
 
 // ============================================================================
@@ -41,7 +41,7 @@ const TUNNEL_SELF_COLLISION_THRESHOLD = 0.05;
  */
 export function getStableKey(x, y, z, dirKey, cubies) {
   const sticker = cubies?.[x]?.[y]?.[z]?.stickers?.[dirKey];
-  if (!sticker) return null;
+  if (!sticker || !sticker.origPos) return null;
   const { origPos, origDir } = sticker;
   return `${origDir}-${origPos.x}-${origPos.y}-${origPos.z}`;
 }
@@ -50,20 +50,16 @@ export function getStableKey(x, y, z, dirKey, cubies) {
  * Scans cubies to find the current grid position of a sticker by its stable key.
  * Returns { x, y, z, dirKey } or null.
  */
-export function findStickerByStableKey(cubies, size, stableKey) {
-  for (let x = 0; x < size; x++) {
-    for (let y = 0; y < size; y++) {
-      for (let z = 0; z < size; z++) {
-        const cubie = cubies?.[x]?.[y]?.[z];
-        if (!cubie) continue;
-        for (const dKey of Object.keys(cubie.stickers)) {
-          const st = cubie.stickers[dKey];
-          if (!st?.origPos) continue;
-          if (`${st.origDir}-${st.origPos.x}-${st.origPos.y}-${st.origPos.z}` === stableKey) {
-            return { x, y, z, dirKey: dKey };
-          }
-        }
-      }
+export function findStickerByStableKey(cubies, size, stableKey, manifoldMap = null) {
+  // Use the provided manifoldMap or build one (O(size³) scan, but only once per series of calls)
+  const map = manifoldMap || buildManifoldGridMap(cubies, size);
+  
+  // Scans the map values (all facelets) for a matching stable key.
+  // This is O(size² * 6) which is much faster than the previous O(size³ * 6) nested search.
+  for (const entry of map.values()) {
+    const st = entry.sticker;
+    if (st && `${st.origDir}-${st.origPos.x}-${st.origPos.y}-${st.origPos.z}` === stableKey) {
+      return { x: entry.x, y: entry.y, z: entry.z, dirKey: entry.dirKey };
     }
   }
   return null;
@@ -97,16 +93,7 @@ export const getActiveTunnels = (cubies, size, cachedManifoldMap = null) => {
           if (!sticker) continue;
 
           // Check if sticker is on surface and flipped
-          const isVisible = (
-            (dirKey === 'PX' && x === size - 1) ||
-            (dirKey === 'NX' && x === 0) ||
-            (dirKey === 'PY' && y === size - 1) ||
-            (dirKey === 'NY' && y === 0) ||
-            (dirKey === 'PZ' && z === size - 1) ||
-            (dirKey === 'NZ' && z === 0)
-          );
-
-          if (!isVisible) continue;
+          if (!isSurfaceSticker(x, y, z, dirKey, size)) continue;
 
           const isFlipped = sticker.curr !== sticker.orig;
           if (!isFlipped) continue;
@@ -247,8 +234,10 @@ const _tunnelEntry = new THREE.Vector3();
 const _tunnelExit = new THREE.Vector3();
 const _tunnelCore = new THREE.Vector3(0, 0, 0);
 const _tunnelResult = new THREE.Vector3();
-// Reusable scratch vector for findNextTunnel — avoids per-call allocation
+// Reusable scratch vectors for findNextTunnel — avoids per-call allocation
 const _findExitVec = new THREE.Vector3();
+const _scratchVec1 = new THREE.Vector3();
+const _scratchVec2 = new THREE.Vector3();
 
 export const findNextTunnel = (exitPos, tunnels, excludeTunnelId, size, inactiveSideKeys = new Set()) => {
   // Compute exit world position once (reuse scratch vector)
@@ -261,10 +250,13 @@ export const findNextTunnel = (exitPos, tunnels, excludeTunnelId, size, inactive
   for (const tunnel of tunnels) {
     if (tunnel.id === excludeTunnelId) continue;
 
-    // Use pre-computed world vectors if available, otherwise compute on-the-fly
-    const entryVec = tunnel.entryWorldVec ?? new THREE.Vector3(
-      ...getStickerWorldPos(tunnel.entry.x, tunnel.entry.y, tunnel.entry.z, tunnel.entry.dirKey, size, 0)
-    );
+    // Use pre-computed world vectors if available, otherwise compute into scratch
+    let entryVec = tunnel.entryWorldVec;
+    if (!entryVec) {
+      const v = getStickerWorldPos(tunnel.entry.x, tunnel.entry.y, tunnel.entry.z, tunnel.entry.dirKey, size, 0);
+      _scratchVec1.set(v[0], v[1], v[2]);
+      entryVec = _scratchVec1;
+    }
     const dist = _findExitVec.distanceTo(entryVec);
 
     const entryKey = getTunnelSideKey(tunnel.entry);
@@ -274,9 +266,12 @@ export const findNextTunnel = (exitPos, tunnels, excludeTunnelId, size, inactive
     }
 
     // Also check tunnel's exit end (can enter from either side)
-    const exitVec2 = tunnel.exitWorldVec ?? new THREE.Vector3(
-      ...getStickerWorldPos(tunnel.exit.x, tunnel.exit.y, tunnel.exit.z, tunnel.exit.dirKey, size, 0)
-    );
+    let exitVec2 = tunnel.exitWorldVec;
+    if (!exitVec2) {
+      const v = getStickerWorldPos(tunnel.exit.x, tunnel.exit.y, tunnel.exit.z, tunnel.exit.dirKey, size, 0);
+      _scratchVec2.set(v[0], v[1], v[2]);
+      exitVec2 = _scratchVec2;
+    }
     const dist2 = _findExitVec.distanceTo(exitVec2);
 
     const exitKey = getTunnelSideKey(tunnel.exit);
@@ -800,16 +795,7 @@ export const spawnOrbs = (cubies, size, count, wormSegments = [], existingOrbs =
 
         for (const dirKey of Object.keys(cubie.stickers)) {
           // Check if this sticker is on the surface
-          const isVisible = (
-            (dirKey === 'PX' && x === size - 1) ||
-            (dirKey === 'NX' && x === 0) ||
-            (dirKey === 'PY' && y === size - 1) ||
-            (dirKey === 'NY' && y === 0) ||
-            (dirKey === 'PZ' && z === size - 1) ||
-            (dirKey === 'NZ' && z === 0)
-          );
-
-          if (isVisible) {
+          if (isSurfaceSticker(x, y, z, dirKey, size)) {
             const pos = { x, y, z, dirKey };
             if (!occupied.has(positionKey(pos))) {
               const faceId = cubie.stickers[dirKey].curr;
@@ -822,10 +808,14 @@ export const spawnOrbs = (cubies, size, count, wormSegments = [], existingOrbs =
   }
 
   // Randomly select positions for orbs
-  const shuffled = validPositions.sort(() => Math.random() - 0.5);
-  const selected = shuffled.slice(0, Math.min(count, shuffled.length));
-
-  return selected;
+  const selected = [];
+  const shuffled = [...validPositions];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  
+  return shuffled.slice(0, Math.min(count, shuffled.length));
 };
 
 /**
@@ -879,31 +869,34 @@ export const updateWormAfterRotation = (segments, axis, sliceIndex, dir, size) =
     }
 
     // Rotate the direction key
-    const rotateDir = (d, ax, direction) => {
-      const rotations = {
-        col: {
-          PY: direction > 0 ? 'NZ' : 'PZ', NZ: direction > 0 ? 'NY' : 'PY',
-          NY: direction > 0 ? 'PZ' : 'NZ', PZ: direction > 0 ? 'PY' : 'NY',
-          PX: 'PX', NX: 'NX'
-        },
-        row: {
-          PX: direction > 0 ? 'PZ' : 'NZ', PZ: direction > 0 ? 'NX' : 'PX',
-          NX: direction > 0 ? 'NZ' : 'PZ', NZ: direction > 0 ? 'PX' : 'NX',
-          PY: 'PY', NY: 'NY'
-        },
-        depth: {
-          PX: direction > 0 ? 'NY' : 'PY', PY: direction > 0 ? 'PX' : 'NX',
-          NX: direction > 0 ? 'PY' : 'NY', NY: direction > 0 ? 'NX' : 'PX',
-          PZ: 'PZ', NZ: 'NZ'
-        }
-      };
-      return rotations[ax]?.[d] || d;
-    };
-
-    const newDirKey = rotateDir(seg.dirKey, axis, dir);
+    const newDirKey = rotateWormDir(seg.dirKey, axis, dir);
 
     return { ...seg, x: nx, y: ny, z: nz, dirKey: newDirKey };
   });
+};
+
+const WORM_ROTATIONS = {
+  col: {
+    PY: { p: 'NZ', n: 'PZ' }, NZ: { p: 'NY', n: 'PY' },
+    NY: { p: 'PZ', n: 'NZ' }, PZ: { p: 'PY', n: 'NY' },
+    PX: { p: 'PX', n: 'PX' }, NX: { p: 'NX', n: 'NX' }
+  },
+  row: {
+    PX: { p: 'PZ', n: 'NZ' }, PZ: { p: 'NX', n: 'PX' },
+    NX: { p: 'NZ', n: 'PZ' }, NZ: { p: 'PX', n: 'NX' },
+    PY: { p: 'PY', n: 'PY' }, NY: { p: 'NY', n: 'NY' }
+  },
+  depth: {
+    PX: { p: 'NY', n: 'PY' }, PY: { p: 'PX', n: 'NX' },
+    NX: { p: 'PY', n: 'NY' }, NY: { p: 'NX', n: 'PX' },
+    PZ: { p: 'PZ', n: 'PZ' }, NZ: { p: 'NZ', n: 'NZ' }
+  }
+};
+
+const rotateWormDir = (d, ax, direction) => {
+  const entry = WORM_ROTATIONS[ax]?.[d];
+  if (!entry) return d;
+  return direction > 0 ? entry.p : entry.n;
 };
 
 /**
