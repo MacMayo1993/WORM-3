@@ -1545,11 +1545,12 @@ function WormBody({ worm }) {
                 <meshStandardMaterial
                     color="white"
                     emissive="white"
-                    emissiveIntensity={isGlow ? 0.55 : 0.22}
+                    emissiveIntensity={isGlow ? 2.2 : 0.22}
                     roughness={0.28}
                     metalness={0}
                     transparent={isGlow}
-                    opacity={isGlow ? 0.78 : 1}
+                    opacity={isGlow ? 0.88 : 1}
+                    toneMapped={!isGlow}
                 />
             </instancedMesh>
 
@@ -1581,17 +1582,18 @@ function GlowWormAura({ worm }) {
         if (!isGlow) return;
         const t = clock.elapsedTime;
 
-        // Pulsing point light follows the head
+        // Soft pulsing light — kept weak so it illuminates the worm face only,
+        // never bright enough to push nearby cube tiles above the bloom threshold.
         if (lightRef.current) {
             lightRef.current.position.copy(worm.headInterpPos.current)
                 .addScaledVector(worm.currentNormal.current, WORM_LIFT + 0.1);
-            lightRef.current.intensity = 3.2 + Math.sin(t * 4.0) * 1.0;
+            lightRef.current.intensity = 0.7 + Math.sin(t * 4.0) * 0.2;
         }
     });
 
     if (!isGlow) return null;
 
-    return <pointLight ref={lightRef} color={glowColor} intensity={3.0} distance={5.5} decay={2} />;
+    return <pointLight ref={lightRef} color={glowColor} intensity={0.7} distance={3.0} decay={2} />;
 }
 
 // Pre-allocated scratch vector for PortalGlow
@@ -3076,8 +3078,10 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                 if (remaining.length === 0) {
                     gameModePhaseRef.current = 'solved';
                     const bodyOrbs = useGameStore.getState().wormBodyTiles ?? 0;
-                    if (bodyOrbs > 0) useGameStore.getState().earnCoins(bodyOrbs * EARN_ORB_COLLECT);
-                    useGameStore.setState({ wormGamePhase: 'solved' });
+                    // 2× multiplier: reward for clearing all tunnels before the clock ran out
+                    if (bodyOrbs > 0) useGameStore.getState().earnCoins(bodyOrbs * EARN_ORB_COLLECT * 2);
+                    // Freeze the worm — game is over
+                    useGameStore.setState({ wormGamePhase: 'solved', wormPaused: true });
                 }
             }
             return;
