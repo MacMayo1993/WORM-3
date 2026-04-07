@@ -19,15 +19,30 @@ export const liveRotation = {
   axis: null,       // 'col' | 'row' | 'depth'
   sliceIndex: 0,    // which slice index on that axis (0..size-1)
   angle: 0,         // total signed rotation angle in radians
+
+  // After a rotation animation completes, the final rotation is held here for
+  // a couple of extra frames while React re-renders with updated powerup grid
+  // coordinates. Without this, orbs on the rotating slice snap back to their
+  // pre-rotation world positions for one frame before the new positions arrive.
+  completedFrames: 0,     // frames remaining to apply the completed rotation
+  completedAxis: null,
+  completedSliceIndex: 0,
+  completedAngle: 0,
 };
 
 /**
  * Reset liveRotation to its idle state.
- * Call this when a rotation animation completes or a component unmounts,
- * so that stale rotation data isn't read by worm-mode consumers on the
- * next frame before a new rotation starts.
+ * Saves the just-completed rotation into the `completed*` fields so that
+ * ParityOrbs can hold the final position for a couple of frames while React
+ * state catches up with the new rotated powerup coordinates.
  */
 export const resetLiveRotation = () => {
+  // Preserve the final rotation for the holdover mechanism
+  liveRotation.completedAxis = liveRotation.axis;
+  liveRotation.completedSliceIndex = liveRotation.sliceIndex;
+  liveRotation.completedAngle = liveRotation.angle;
+  liveRotation.completedFrames = 2;
+  // Clear active state
   liveRotation.active = false;
   liveRotation.axis = null;
   liveRotation.sliceIndex = 0;

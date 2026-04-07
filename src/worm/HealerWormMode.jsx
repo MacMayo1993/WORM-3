@@ -176,7 +176,9 @@ function cutWormTail(worm, cutTrailIdx) {
     worm.tileTrail.current.length = cutTrailIdx;
     const histLen = cutTrailIdx * STEPS_PER_TILE;
     if (worm.stepHistory.current.length > histLen) worm.stepHistory.current.length = histLen;
-    worm.tailLength.current = Math.max(BASE_TAIL_LENGTH, cutTrailIdx);
+    // cutTrailIdx is in tile units; tailLength is in visual-ball units.
+    // BODY_BALL_SPACING = 0.14 converts: tailLength = tiles / BODY_BALL_SPACING
+    worm.tailLength.current = Math.max(BASE_TAIL_LENGTH, Math.round(cutTrailIdx / BODY_BALL_SPACING));
     const orbsLeft = Math.max(0, Math.floor((worm.tailLength.current - BASE_TAIL_LENGTH) / ORB_SEGMENT_GROWTH));
     if (worm.orbPickupColorsRef.current.length > orbsLeft) worm.orbPickupColorsRef.current.length = orbsLeft;
     useGameStore.getState().setWormBodyTiles(orbsLeft);
