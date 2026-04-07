@@ -215,27 +215,41 @@ export default function ParityOrbs({ orbs, size, explosionFactor = 0, mode = 'su
   // Single useFrame drives ALL orb animations — replaces N individual useFrame callbacks
   useFrame((state) => {
     const t = state.clock.elapsedTime;
+
+    // Decrement the post-completion holdover counter once per frame (before the orb loop).
+    // This bridges the one-frame gap between liveRotation going inactive and React
+    // re-rendering ParityOrbs with the new rotated powerup coordinates.
+    if (liveRotation.completedFrames > 0) {
+      liveRotation.completedFrames--;
+    }
+
     for (const refs of animMapRef.current.values()) {
       const { group, core, shell, glow, targetGlow, orbitSystem, ringA, ringB, ringC, electrons, outline, isTarget, position, dirKey, gridX, gridY, gridZ, timeOffset } = refs;
       if (!group || !core) continue;
       const time = t + timeOffset;
 
-      // Whole-orb position — apply live slice rotation when this orb is on the moving slice
+      // Whole-orb position — apply live slice rotation when this orb is on the moving slice.
+      // When the animation just completed (completedFrames > 0) hold the final angle for a
+      // couple of extra frames so React state has time to update positionRef before we stop.
       const bn = BOB_NORMALS[dirKey] || BOB_NORMALS.PY;
       let px = position[0], py = position[1], pz = position[2];
       let bnx = bn[0], bny = bn[1], bnz = bn[2];
 
-      if (liveRotation.active && gridX >= 0) {
-        const lr = liveRotation;
+      const lrActive = liveRotation.active;
+      const lrHolding = !lrActive && liveRotation.completedFrames > 0;
+      if ((lrActive || lrHolding) && gridX >= 0) {
+        const axis = lrActive ? liveRotation.axis : liveRotation.completedAxis;
+        const sliceIdx = lrActive ? liveRotation.sliceIndex : liveRotation.completedSliceIndex;
+        const angle = lrActive ? liveRotation.angle : liveRotation.completedAngle;
         const inSlice =
-          (lr.axis === 'col'   && gridX === lr.sliceIndex) ||
-          (lr.axis === 'row'   && gridY === lr.sliceIndex) ||
-          (lr.axis === 'depth' && gridZ === lr.sliceIndex);
+          (axis === 'col'   && gridX === sliceIdx) ||
+          (axis === 'row'   && gridY === sliceIdx) ||
+          (axis === 'depth' && gridZ === sliceIdx);
         if (inSlice) {
-          const worldAxis = _worldAxes[lr.axis];
-          _scratchPos.set(px, py, pz).applyAxisAngle(worldAxis, lr.angle);
+          const worldAxis = _worldAxes[axis];
+          _scratchPos.set(px, py, pz).applyAxisAngle(worldAxis, angle);
           px = _scratchPos.x; py = _scratchPos.y; pz = _scratchPos.z;
-          _scratchBob.set(bnx, bny, bnz).applyAxisAngle(worldAxis, lr.angle);
+          _scratchBob.set(bnx, bny, bnz).applyAxisAngle(worldAxis, angle);
           bnx = _scratchBob.x; bny = _scratchBob.y; bnz = _scratchBob.z;
         }
       }
@@ -248,7 +262,7 @@ export default function ParityOrbs({ orbs, size, explosionFactor = 0, mode = 'su
       // applyAxisAngle moves orbs along a circular path that can dip inside the cube
       // bounding box at intermediate angles (e.g. a bottom-face orb rotating 90° passes
       // through the cube at ~45°). Clamp to nearest face surface when inside.
-      if (liveRotation.active && gridX >= 0) {
+      if ((liveRotation.active || liveRotation.completedFrames > 0) && gridX >= 0) {
         const ib = (size - 1) / 2 + 0.52;
         if (Math.abs(fpx) < ib && Math.abs(fpy) < ib && Math.abs(fpz) < ib) {
           const maxCoord = Math.max(Math.abs(fpx), Math.abs(fpy), Math.abs(fpz));
