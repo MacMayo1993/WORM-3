@@ -113,12 +113,6 @@ function rotateTilePosition(tile, axis, sliceIndex, dir, size) {
     return { ...tile, x: newX, y: newY, z: newZ, dirKey: newDirKey };
 }
 
-// ─── Auto-rotation helpers ────────────────────────────────────────────────────
-
-function getNextAutoInterval() {
-    return AUTO_ROTATE_INTERVAL_MIN + Math.random() * (AUTO_ROTATE_INTERVAL_MAX - AUTO_ROTATE_INTERVAL_MIN);
-}
-
 // All surface sticker positions in the rotating slice — used for beam placement and hit detection.
 function getSliceSurfaceStickers(size, axis, sliceIndex) {
     const stickers = [];
