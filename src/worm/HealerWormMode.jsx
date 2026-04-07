@@ -3067,14 +3067,9 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                 else if (step === 1) useGameStore.setState({ wormCountdownStep: 2 });
                 else if (step === 2) useGameStore.setState({ wormCountdownStep: 1 });
                 else if (step === 3) {
+                    // 'go' beat — HUD displays WORM! in the purple-glow countdown style.
+                    // No separate ThunkEffect pop here; the HUD text IS the cool WORM display.
                     useGameStore.setState({ wormCountdownStep: 'go' });
-                    // Fire the WORM! pop effect at the worm's head position
-                    thunkRef.current = {
-                        active: true,
-                        text: 'WORM!',
-                        pos: worm.headInterpPos.current.toArray(),
-                        colors: ['#33ff66', '#00ffcc', '#ffdd00'],
-                    };
                 } else if (step >= 4) {
                     // Countdown done — release the worm
                     gameModePhaseRef.current = 'active';

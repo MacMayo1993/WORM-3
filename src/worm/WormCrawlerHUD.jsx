@@ -937,12 +937,11 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                 </div>
             )}
 
-            {/* Scramble-solve countdown overlay — shows 3/2/1 only.
-                The 'go' beat is handled by ThunkEffect in 3D space. */}
-            {wormGamePhase === 'countdown' && wormCountdownStep !== null && wormCountdownStep !== 'go' && (
+            {/* Scramble-solve countdown overlay — 3, 2, 1, WORM! */}
+            {wormGamePhase === 'countdown' && wormCountdownStep !== null && (
                 <div style={COUNTDOWN_OVERLAY_STYLE}>
                     <div style={COUNTDOWN_NUMBER_STYLE}>
-                        {wormCountdownStep}
+                        {wormCountdownStep === 'go' ? 'WORM!' : wormCountdownStep}
                     </div>
                 </div>
             )}

@@ -216,13 +216,6 @@ export default function ParityOrbs({ orbs, size, explosionFactor = 0, mode = 'su
   useFrame((state) => {
     const t = state.clock.elapsedTime;
 
-    // Decrement the post-completion holdover counter once per frame (before the orb loop).
-    // This bridges the one-frame gap between liveRotation going inactive and React
-    // re-rendering ParityOrbs with the new rotated powerup coordinates.
-    if (liveRotation.completedFrames > 0) {
-      liveRotation.completedFrames--;
-    }
-
     for (const refs of animMapRef.current.values()) {
       const { group, core, shell, glow, targetGlow, orbitSystem, ringA, ringB, ringC, electrons, outline, isTarget, position, dirKey, gridX, gridY, gridZ, timeOffset } = refs;
       if (!group || !core) continue;
@@ -236,6 +229,8 @@ export default function ParityOrbs({ orbs, size, explosionFactor = 0, mode = 'su
       let bnx = bn[0], bny = bn[1], bnz = bn[2];
 
       const lrActive = liveRotation.active;
+      // completedFrames is only decremented AFTER the per-orb loop (below), and only
+      // when !active, so it stays valid for the full frame it's needed.
       const lrHolding = !lrActive && liveRotation.completedFrames > 0;
       if ((lrActive || lrHolding) && gridX >= 0) {
         const axis = lrActive ? liveRotation.axis : liveRotation.completedAxis;
@@ -262,7 +257,7 @@ export default function ParityOrbs({ orbs, size, explosionFactor = 0, mode = 'su
       // applyAxisAngle moves orbs along a circular path that can dip inside the cube
       // bounding box at intermediate angles (e.g. a bottom-face orb rotating 90° passes
       // through the cube at ~45°). Clamp to nearest face surface when inside.
-      if ((liveRotation.active || liveRotation.completedFrames > 0) && gridX >= 0) {
+      if ((lrActive || lrHolding) && gridX >= 0) {
         const ib = (size - 1) / 2 + 0.52;
         if (Math.abs(fpx) < ib && Math.abs(fpy) < ib && Math.abs(fpz) < ib) {
           const maxCoord = Math.max(Math.abs(fpx), Math.abs(fpy), Math.abs(fpz));
@@ -367,6 +362,14 @@ export default function ParityOrbs({ orbs, size, explosionFactor = 0, mode = 'su
         targetGlow.scale.setScalar(1 + Math.sin(time * 6.5) * 0.2);
         targetGlow.material.opacity = 0.22 + Math.sin(time * 6.2) * 0.08;
       }
+    }
+
+    // Decrement the holdover counter AFTER all orbs are processed and only when
+    // liveRotation is inactive. Doing this before the loop (or unconditionally)
+    // would consume the holdover on the same frame the animation goes active=false,
+    // leaving no bridge frames for React state to catch up.
+    if (!liveRotation.active && liveRotation.completedFrames > 0) {
+      liveRotation.completedFrames--;
     }
   });
 
