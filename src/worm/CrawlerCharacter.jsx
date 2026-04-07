@@ -87,18 +87,16 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
     pos: new THREE.Vector3(),
   })));
 
-  // Compute orientation: look along forward, up along face normal
+  // Compute orientation: look along forward, up along face normal.
+  // Depend on forward.x/y/z (primitives) instead of the Vector3 reference so the
+  // memo only recalculates when the direction actually changes, not every 30ms interval.
   const quaternion = useMemo(() => {
     if (!forward || !face) return new THREE.Quaternion();
     const fwd = forward.clone().normalize();
     const up = FACE_NORMALS[face]?.clone() || new THREE.Vector3(0, 1, 0);
-    const mat = new THREE.Matrix4().lookAt(
-      new THREE.Vector3(0, 0, 0),
-      fwd,
-      up
-    );
+    const mat = new THREE.Matrix4().lookAt(new THREE.Vector3(0, 0, 0), fwd, up);
     return new THREE.Quaternion().setFromRotationMatrix(mat);
-  }, [forward, face]);
+  }, [forward?.x, forward?.y, forward?.z, face]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Animate
   useFrame((_, delta) => {
