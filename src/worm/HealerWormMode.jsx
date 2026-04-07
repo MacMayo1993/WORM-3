@@ -55,6 +55,10 @@ import {
     AUTO_ROTATE_INTERVAL_MIN,
     AUTO_ROTATE_INTERVAL_MAX,
     AUTO_ROTATE_WARNING,
+    SCRAMBLE_STEPS,
+    SCRAMBLE_MOVE_INTERVAL,
+    ACTIVE_ROTATE_INTERVAL,
+    COUNTDOWN_STEP_DURATION,
 } from './healerWorm/constants.js';
 import {
     isSurfaceTilePos,
@@ -445,7 +449,10 @@ function useWormCrawler(size, cubies) {
         orbPickupColorsRef.current = [...orbPickupColorsRef.current, color];
         const orbCountOnWorm = Math.max(0, Math.floor((tailLength.current - BASE_TAIL_LENGTH) / ORB_SEGMENT_GROWTH));
         useGameStore.getState().setWormBodyTiles(orbCountOnWorm);
-        useGameStore.getState().earnCoins(EARN_ORB_COLLECT);
+        // PP are NOT awarded on pickup — only banked when the player wins (cube solved).
+        // Track session total separately for the in-game counter.
+        const prevSession = useGameStore.getState().wormSessionOrbs ?? 0;
+        useGameStore.getState().setWormSessionOrbs(prevSession + 1);
         if (faceId) {
             const prev = useGameStore.getState().wormOrbInventory ?? { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
             useGameStore.getState().setWormOrbInventory({ ...prev, [faceId]: (prev[faceId] ?? 0) + ORB_SEGMENT_GROWTH });
@@ -485,12 +492,15 @@ function useWormCrawler(size, cubies) {
             useGameStore.getState().earnCoins(EARN_WORM_SURVIVAL_TICK);
         }
 
+        // In finalHealing / solved phases no new wormholes spawn — player heals the remaining ones.
+        const gamePhaseNow = useGameStore.getState().wormGamePhase;
+        const noMoreSpawns = gamePhaseNow === 'finalHealing' || gamePhaseNow === 'solved';
         wormholeTimer.current -= delta;
         if (wormholeTimer.current <= 0) {
-            spawnWormholePair();
+            if (!noMoreSpawns) spawnWormholePair();
             wormholeTimer.current = wormholeInterval;
         }
-        const countdown = Math.max(0, Math.ceil(wormholeTimer.current * 10) / 10);
+        const countdown = noMoreSpawns ? 0 : Math.max(0, Math.ceil(wormholeTimer.current * 10) / 10);
         const countdownDeci = Math.round(countdown * 10);
         if (countdownDeci !== lastCountdownDeci.current) {
             lastCountdownDeci.current = countdownDeci;
@@ -978,7 +988,9 @@ function useWormCrawler(size, cubies) {
             wormDeathDetails: null,
             wormPhase: 'crawling',
             wormOnFlippedTile: false,
-            wormPaused: false,
+            // NOTE: do NOT reset wormPaused here. initWormMode sets it to true so
+            // the scramble animation plays before gameplay begins; HealerWormMode3DWrapper
+            // releases it to false after the countdown finishes.
             wormTimeAlive: 0,
             wormTunnelCount: 0,
         });
@@ -2825,6 +2837,8 @@ function ThunkEffect({ thunkRef }) {
             pending.active = false;
             activeRef.current = true;
             animTRef.current = 0;
+            // Support custom text (e.g. countdown "WORM!" vs collision "WORM'D")
+            if (divRef.current) divRef.current.textContent = pending.text ?? "WORM'D";
             const [px, py, pz] = pending.pos;
             if (groupRef.current) {
                 groupRef.current.position.set(px, py, pz);
@@ -2921,6 +2935,7 @@ function ThunkEffect({ thunkRef }) {
                     }}>
                         WORM&apos;D
                     </div>
+                    {/* text is overwritten imperatively via divRef.current.textContent */}
                 </Html>
             </group>
             <instancedMesh ref={orbMeshRef} args={[undefined, undefined, MAX_THUNK_ORBS]} frustumCulled={false}>
@@ -2935,53 +2950,159 @@ function ThunkEffect({ thunkRef }) {
 export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animState, onRotate, _onHeal }) {
     const worm = useWormCrawler(size, cubies);
 
+    // ── Game phase + scramble state ────────────────────────────────────────────
+    const gameModePhaseRef  = useRef('scrambling'); // 'scrambling'|'countdown'|'active'|'solved'
+    const scrambleSeqRef    = useRef([]);   // [{axis,dir,sliceIndex}] × SCRAMBLE_STEPS
+    const inverseQueueRef   = useRef([]);   // remaining inverse moves (consumed each rotation)
+    const scrambleTimerRef  = useRef(0);    // seconds elapsed in scramble phase
+    const scrambleFiredRef  = useRef(0);    // how many scramble moves have been fired
+    const countdownTimerRef = useRef(0);    // seconds elapsed in countdown phase
+    const countdownStepRef  = useRef(-1);   // last store-synced step (avoids redundant setState)
+    const finalHealCheckTimer = useRef(0);  // throttle: scan for active tunnels every 0.5s
+
     // ── Auto-rotation hazard state ─────────────────────────────────────────────
-    const autoTimerRef = useRef(0);
-    const nextIntervalRef = useRef(getNextAutoInterval());
-    const pendingRotRef = useRef(null);       // { axis, dir, sliceIndex } during warning phase
+    const autoTimerRef      = useRef(0);
+    const pendingRotRef     = useRef(null);   // {axis,dir,sliceIndex} during warning window
     const warningProgressRef = useRef(0);     // 0→1 through warning window
     const thunkRef = useRef({ active: false, pos: [0, 0, 0], colors: [] });
 
     useEffect(() => {
         useGameStore.setState({ _wormTurn: worm.queueTurn });
-        return () => {
-            useGameStore.setState({ _wormTurn: null });
-        };
+        return () => { useGameStore.setState({ _wormTurn: null }); };
     }, [worm.queueTurn]);
 
-    // Reset auto-rotation timer whenever a new worm run starts
+    // Build a fresh scramble whenever a new run starts (or on first mount).
     useEffect(() => {
-        const unsub = useGameStore.subscribe(
-            s => s.wormRunId,
-            () => {
-                autoTimerRef.current = 0;
-                nextIntervalRef.current = getNextAutoInterval();
-                pendingRotRef.current = null;
-                warningProgressRef.current = 0;
-            }
-        );
+        const generateScramble = () => {
+            const axes = ['col', 'row', 'depth'];
+            const seq = Array.from({ length: SCRAMBLE_STEPS }, () => ({
+                axis: axes[Math.floor(Math.random() * 3)],
+                dir: Math.random() < 0.5 ? 1 : -1,
+                sliceIndex: Math.floor(Math.random() * size),
+            }));
+            scrambleSeqRef.current  = seq;
+            // Inverse = reversed sequence with each dir flipped
+            inverseQueueRef.current = [...seq].reverse().map(m => ({ ...m, dir: -m.dir }));
+
+            // Reset all phase timers
+            gameModePhaseRef.current  = 'scrambling';
+            scrambleTimerRef.current  = 0;
+            scrambleFiredRef.current  = 0;
+            countdownTimerRef.current = 0;
+            countdownStepRef.current  = -1;
+            autoTimerRef.current      = 0;
+            pendingRotRef.current     = null;
+            warningProgressRef.current = 0;
+            // Ensure worm is frozen until countdown completes
+            useGameStore.setState({ wormGamePhase: 'scrambling', wormCountdownStep: null, wormPaused: true });
+        };
+
+        // Run immediately so the first game (where initWormMode fires before this
+        // component mounts) gets a valid scramble — not just on future runId changes.
+        generateScramble();
+
+        const unsub = useGameStore.subscribe(s => s.wormRunId, generateScramble);
         return unsub;
-    }, []);
+    }, [size]);
 
     useFrame((_, delta) => {
         worm.tick(delta);
 
-        // ── Auto-rotation tick ─────────────────────────────────────────────────
         const store = useGameStore.getState();
+
+        // ── Phase: scrambling ──────────────────────────────────────────────────
+        if (gameModePhaseRef.current === 'scrambling') {
+            scrambleTimerRef.current += delta;
+            // Fire each scramble move at evenly-spaced intervals
+            const shouldFire = Math.floor(scrambleTimerRef.current / SCRAMBLE_MOVE_INTERVAL);
+            while (scrambleFiredRef.current < shouldFire && scrambleFiredRef.current < SCRAMBLE_STEPS) {
+                const move = scrambleSeqRef.current[scrambleFiredRef.current];
+                if (move && onRotate) onRotate(move.axis, move.dir, move.sliceIndex);
+                scrambleFiredRef.current++;
+            }
+            // Wait one full extra interval after the last move for the animation to finish
+            if (scrambleFiredRef.current >= SCRAMBLE_STEPS &&
+                scrambleTimerRef.current >= (SCRAMBLE_STEPS + 1) * SCRAMBLE_MOVE_INTERVAL) {
+                gameModePhaseRef.current  = 'countdown';
+                countdownTimerRef.current = 0;
+                countdownStepRef.current  = -1;
+                useGameStore.setState({ wormGamePhase: 'countdown', wormCountdownStep: 3 });
+                countdownStepRef.current = 0; // step 0 = "3" shown
+            }
+            return;
+        }
+
+        // ── Phase: countdown ──────────────────────────────────────────────────
+        if (gameModePhaseRef.current === 'countdown') {
+            countdownTimerRef.current += delta;
+            const step = Math.floor(countdownTimerRef.current / COUNTDOWN_STEP_DURATION);
+            if (step !== countdownStepRef.current) {
+                countdownStepRef.current = step;
+                if      (step === 0) useGameStore.setState({ wormCountdownStep: 3 });
+                else if (step === 1) useGameStore.setState({ wormCountdownStep: 2 });
+                else if (step === 2) useGameStore.setState({ wormCountdownStep: 1 });
+                else if (step === 3) {
+                    useGameStore.setState({ wormCountdownStep: 'go' });
+                    // Fire the WORM! pop effect at the worm's head position
+                    thunkRef.current = {
+                        active: true,
+                        text: 'WORM!',
+                        pos: worm.headInterpPos.current.toArray(),
+                        colors: ['#33ff66', '#00ffcc', '#ffdd00'],
+                    };
+                } else if (step >= 4) {
+                    // Countdown done — release the worm
+                    gameModePhaseRef.current = 'active';
+                    autoTimerRef.current = 0;
+                    pendingRotRef.current = null;
+                    warningProgressRef.current = 0;
+                    useGameStore.setState({ wormGamePhase: 'active', wormCountdownStep: null, wormPaused: false });
+                }
+            }
+            return;
+        }
+
+        // ── Phase: solved ──────────────────────────────────────────────────────
+        if (gameModePhaseRef.current === 'solved') return;
+
+        // ── Phase: finalHealing — all rotations done, heal remaining tunnels ───
+        if (gameModePhaseRef.current === 'finalHealing') {
+            if (!store.wormAlive) return;
+            // Throttle the expensive tunnel scan to once every 0.5 s
+            finalHealCheckTimer.current += delta;
+            if (finalHealCheckTimer.current >= 0.5) {
+                finalHealCheckTimer.current = 0;
+                const remaining = getActiveTunnels(useGameStore.getState().cubies, size);
+                if (remaining.length === 0) {
+                    gameModePhaseRef.current = 'solved';
+                    const bodyOrbs = useGameStore.getState().wormBodyTiles ?? 0;
+                    if (bodyOrbs > 0) useGameStore.getState().earnCoins(bodyOrbs * EARN_ORB_COLLECT);
+                    useGameStore.setState({ wormGamePhase: 'solved' });
+                }
+            }
+            return;
+        }
+
+        // ── Phase: active — inverse-rotation hazard ────────────────────────────
         if (!store.wormAlive || store.wormPaused) return;
 
         autoTimerRef.current += delta;
-        const interval = nextIntervalRef.current;
-        const warningStart = interval - AUTO_ROTATE_WARNING;
+        const warningStart = ACTIVE_ROTATE_INTERVAL - AUTO_ROTATE_WARNING;
 
-        // Arm warning phase — pick rotation parameters once
+        // Arm warning with the NEXT inverse move (peek, don't dequeue yet)
         if (autoTimerRef.current >= warningStart && !pendingRotRef.current) {
-            const axes = ['col', 'row', 'depth'];
-            pendingRotRef.current = {
-                axis: axes[Math.floor(Math.random() * 3)],
-                dir: Math.random() < 0.5 ? 1 : -1,
-                sliceIndex: Math.floor(Math.random() * size),
-            };
+            if (inverseQueueRef.current.length === 0) {
+                // All inverse moves exhausted — enter final healing phase.
+                // Wormhole spawning is now blocked (checked in worm.tick).
+                // Game ends only when the player heals all remaining tunnels.
+                gameModePhaseRef.current = 'finalHealing';
+                finalHealCheckTimer.current = 0.5; // check immediately next frame batch
+                pendingRotRef.current = null;
+                warningProgressRef.current = 0;
+                useGameStore.setState({ wormGamePhase: 'finalHealing' });
+                return;
+            }
+            pendingRotRef.current = inverseQueueRef.current[0]; // peek
         }
 
         // Update warning progress (0→1)
@@ -2990,17 +3111,18 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             warningProgressRef.current = Math.min(1, Math.max(0, elapsed / AUTO_ROTATE_WARNING));
         }
 
-        // Fire rotation when timer expires
-        if (autoTimerRef.current >= interval && pendingRotRef.current) {
-            // Delay during tunnel transit — retry in 1.5 s
+        // Fire rotation at the fixed 10-second mark
+        if (autoTimerRef.current >= ACTIVE_ROTATE_INTERVAL && pendingRotRef.current) {
+            // Delay if mid-tunnel
             if (worm.phase.current !== 'crawling') {
-                autoTimerRef.current = interval - 1.5;
+                autoTimerRef.current = ACTIVE_ROTATE_INTERVAL - 1.5;
                 return;
             }
 
             const { axis, dir, sliceIndex } = pendingRotRef.current;
+            inverseQueueRef.current.shift(); // now dequeue
 
-            // Hit detection: check head then body
+            // Hit detection
             const hit = checkWormHitBySlice(worm, axis, sliceIndex);
             if (hit) {
                 const histEntry = hit.type === 'cut'
@@ -3024,11 +3146,10 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
 
             if (onRotate) onRotate(axis, dir, sliceIndex);
 
-            // Reset for next cycle
+            // Reset for next cycle (fixed interval — no randomisation)
             pendingRotRef.current = null;
             warningProgressRef.current = 0;
             autoTimerRef.current = 0;
-            nextIntervalRef.current = getNextAutoInterval();
         }
     });
 
