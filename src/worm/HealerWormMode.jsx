@@ -182,6 +182,10 @@ function cutWormTail(worm, cutTrailIdx) {
     useGameStore.getState().setWormBodyTiles(orbsLeft);
 }
 
+// ─── Scratch vectors for evaluatePosAndNormal (avoids per-sub-step allocations) ──
+const _evalHPos = new THREE.Vector3();
+const _evalCornerVtx = new THREE.Vector3();
+
 // ─── Worm Crawler Hook ────────────────────────────────────────────────────────
 function useWormCrawler(size, cubies) {
     const { wormSpeed, wormControlMode, wormRunId, wormOrbCount, wormholeInterval, wormPaused } = useGameStore(
@@ -610,44 +614,45 @@ function useWormCrawler(size, cubies) {
                     const pWorld = prevWorldPos.current;
                     const cWorld = curWorldPos.current ?? getWorldPos(pos.current);
 
-                    // Function to perfectly mathematically evaluate the worm's ground position and normal at ANY timeframe
-                    const evaluatePosAndNormal = (tValue) => {
-                        let hPos = cWorld.clone();
+                    // Writes the interpolated ground position into outPos (module-level scratch or a direct ref).
+                    // Returns cNorm — a direct reference to a FACE_NORMALS constant in the straight-crawl case
+                    // (no allocation), or a newly allocated Vector3 only for the rare corner-lerp midpoint.
+                    const evaluatePosAndNormal = (tValue, outPos) => {
+                        outPos.copy(cWorld);
                         let cNorm = FACE_NORMALS[pos.current.dirKey] ?? new THREE.Vector3(0, 0, 1);
 
                         if (pWorld && tValue < 1) {
                             if (crossingCorner.current) {
-                                const oldDirKey = prevDirKey.current;
-                                const newDirKey = pos.current.dirKey;
-                                const oldNormal = FACE_NORMALS[oldDirKey];
-                                const newNormal = FACE_NORMALS[newDirKey];
-                                const cornerVertex = pWorld.clone().addScaledVector(newNormal, 0.52);
+                                const oldNormal = FACE_NORMALS[prevDirKey.current];
+                                const newNormal = FACE_NORMALS[pos.current.dirKey];
+                                _evalCornerVtx.copy(pWorld).addScaledVector(newNormal, 0.52);
 
                                 if (tValue < 0.45) {
-                                    hPos = pWorld.clone().lerp(cornerVertex, tValue / 0.45);
-                                    cNorm = oldNormal.clone();
+                                    outPos.copy(pWorld).lerp(_evalCornerVtx, tValue / 0.45);
+                                    cNorm = oldNormal;
                                 } else if (tValue > 0.55) {
-                                    hPos = cornerVertex.clone().lerp(cWorld, (tValue - 0.55) / 0.45);
-                                    cNorm = newNormal.clone();
+                                    outPos.copy(_evalCornerVtx).lerp(cWorld, (tValue - 0.55) / 0.45);
+                                    cNorm = newNormal;
                                 } else {
-                                    hPos = cornerVertex.clone();
+                                    outPos.copy(_evalCornerVtx);
                                     cNorm = new THREE.Vector3().lerpVectors(oldNormal, newNormal, (tValue - 0.45) / 0.10).normalize();
                                 }
                             } else {
-                                hPos = pWorld.clone().lerp(cWorld, tValue);
+                                outPos.copy(pWorld).lerp(cWorld, tValue);
                             }
                         }
-                        return { hPos, cNorm };
+                        return cNorm;
                     };
 
-                    const currentEval = evaluatePosAndNormal(interpT.current);
-                    headInterpPos.current.copy(currentEval.hPos);
-                    currentNormal.current.copy(currentEval.cNorm);
+                    // Write head position directly into the live refs — zero allocations.
+                    const headNorm = evaluatePosAndNormal(interpT.current, headInterpPos.current);
+                    currentNormal.current.copy(headNorm);
 
                     // Back-fill step history so it is completely framerate independent
                     // If the game lags and skips 0.3 seconds, this perfectly reconstructs the 15 missing physics frames along the true 3D edge curve
                     while (lastRecordedT.current <= interpT.current) {
-                        const { hPos: ptPos, cNorm: ptNorm } = evaluatePosAndNormal(lastRecordedT.current);
+                        // _evalHPos is a module-level scratch; ptNorm is a FACE_NORMALS ref (no alloc) except at corner midpoint.
+                        const ptNorm = evaluatePosAndNormal(lastRecordedT.current, _evalHPos);
 
                         // Chain-fountain: each history entry records the jump height that was active at THAT spatial position.
                         // Since jumpT and interpT advance at identical rates (both scale by delta/STEP_SEC), the jumpT at
@@ -658,7 +663,7 @@ function useWormCrawler(size, cubies) {
                             ? Math.max(0, Math.min(1, jumpT.current - (interpT.current - lastRecordedT.current)))
                             : 0;
                         const ptJump = jumpTAtR > 0 ? Math.sin(jumpTAtR * Math.PI) * JUMP_HEIGHT : 0;
-                        const ptLifted = ptPos.clone().addScaledVector(ptNorm, WORM_LIFT + ptJump);
+                        const ptLifted = new THREE.Vector3().copy(_evalHPos).addScaledVector(ptNorm, WORM_LIFT + ptJump);
 
                         stepHistory.current.unshift({ pos: ptLifted, normal: ptNorm });
                         lastRecordedT.current += 0.02; // A guaranteed resolution of 50 mathematical sub-steps per tile traverse
@@ -1200,6 +1205,13 @@ const _sparkForward = new THREE.Vector3();
 const _sparkUp = new THREE.Vector3();
 const _sparkRight = new THREE.Vector3();
 
+// Pre-allocated scratch vectors for mapOrientedDirection (called on every input event)
+const _mapCamForward = new THREE.Vector3();
+const _mapCamUp = new THREE.Vector3();
+const _mapCamRight = new THREE.Vector3();
+const _mapDesired = new THREE.Vector3();
+const _mapCandVec = new THREE.Vector3();
+
 function TunnelSurfFX({ worm, size }) {
     const sparksRef = useRef([]);
 
@@ -1274,28 +1286,28 @@ function WormSwipeControls({ onTurn, worm }) {
         if (!dirKey) return inputDir;
 
         const faceNormal = FACE_NORMALS[dirKey] ?? new THREE.Vector3(0, 0, 1);
-        const camForward = new THREE.Vector3();
-        camera.getWorldDirection(camForward);
-        const camUp = camera.up.clone().normalize();
-        const camRight = new THREE.Vector3().crossVectors(camForward, camUp).normalize();
+        camera.getWorldDirection(_mapCamForward);
+        _mapCamUp.copy(camera.up).normalize();
+        _mapCamRight.crossVectors(_mapCamForward, _mapCamUp).normalize();
 
-        let desired = null;
-        if (inputDir === 'up') desired = camUp;
-        if (inputDir === 'down') desired = camUp.clone().multiplyScalar(-1);
-        if (inputDir === 'left') desired = camRight.clone().multiplyScalar(-1);
-        if (inputDir === 'right') desired = camRight;
-        if (!desired) return inputDir;
+        if (inputDir === 'up') _mapDesired.copy(_mapCamUp);
+        else if (inputDir === 'down') _mapDesired.copy(_mapCamUp).multiplyScalar(-1);
+        else if (inputDir === 'left') _mapDesired.copy(_mapCamRight).multiplyScalar(-1);
+        else if (inputDir === 'right') _mapDesired.copy(_mapCamRight);
+        else return inputDir;
 
-        desired = desired.clone().sub(faceNormal.clone().multiplyScalar(desired.dot(faceNormal)));
-        if (desired.lengthSq() < 1e-6) return inputDir;
-        desired.normalize();
+        // Project onto face plane (remove normal component)
+        _mapDesired.addScaledVector(faceNormal, -_mapDesired.dot(faceNormal));
+        if (_mapDesired.lengthSq() < 1e-6) return inputDir;
+        _mapDesired.normalize();
 
         const candidates = ['up', 'down', 'left', 'right'];
         let bestDir = 'up';
         let bestDot = -Infinity;
         for (const dir of candidates) {
-            const vec = new THREE.Vector3(...(DIR_FORWARD[dirKey]?.[dir] ?? [0, 0, -1])).normalize();
-            const d = vec.dot(desired);
+            const arr = DIR_FORWARD[dirKey]?.[dir] ?? [0, 0, -1];
+            _mapCandVec.set(arr[0], arr[1], arr[2]).normalize();
+            const d = _mapCandVec.dot(_mapDesired);
             if (d > bestDot) {
                 bestDot = d;
                 bestDir = dir;
@@ -1528,38 +1540,37 @@ function WormBody({ worm }) {
         if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     });
 
-    return (
-        <>
-            {/* Sphere body — Classic, Inch Worm, Glow Worm
-                IMPORTANT: material color must be white so per-instance colors (setColorAt)
-                pass through unmodified. Three.js multiplies instanceColor × material.color,
-                so any non-white material color taints every orb pickup color. */}
-            <instancedMesh ref={meshRef} args={[undefined, undefined, MAX_TAIL]} visible={!isBook} frustumCulled={false}>
-                <sphereGeometry args={[1, 12, 12]} />
-                <meshStandardMaterial
-                    color="white"
-                    emissive="white"
-                    emissiveIntensity={isGlow ? 2.2 : 0.22}
-                    roughness={0.28}
-                    metalness={0}
-                    transparent={isGlow}
-                    opacity={isGlow ? 0.88 : 1}
-                    toneMapped={!isGlow}
-                />
-            </instancedMesh>
-
-            {/* Box body — Book Worm only: unmistakably boxy rectangular segments */}
-            <instancedMesh ref={boxMeshRef} args={[undefined, undefined, MAX_TAIL]} visible={isBook} frustumCulled={false}>
-                <boxGeometry args={[1, 0.68, 1.12]} />
-                <meshStandardMaterial
-                    color="white"
-                    emissive="white"
-                    emissiveIntensity={0.18}
-                    roughness={0.58}
-                    metalness={0.2}
-                />
-            </instancedMesh>
-        </>
+    return isBook ? (
+        /* Box body — Book Worm only. Conditionally mounted so the sphere instancedMesh
+           (MAX_TAIL=1200 instances) is not allocated in GPU memory when unused. */
+        <instancedMesh ref={boxMeshRef} args={[undefined, undefined, MAX_TAIL]} frustumCulled={false}>
+            <boxGeometry args={[1, 0.68, 1.12]} />
+            <meshStandardMaterial
+                color="white"
+                emissive="white"
+                emissiveIntensity={0.18}
+                roughness={0.58}
+                metalness={0.2}
+            />
+        </instancedMesh>
+    ) : (
+        /* Sphere body — Classic, Inch Worm, Glow Worm.
+           IMPORTANT: material color must be white so per-instance colors (setColorAt)
+           pass through unmodified. Three.js multiplies instanceColor × material.color,
+           so any non-white material color taints every orb pickup color. */
+        <instancedMesh ref={meshRef} args={[undefined, undefined, MAX_TAIL]} frustumCulled={false}>
+            <sphereGeometry args={[1, 12, 12]} />
+            <meshStandardMaterial
+                color="white"
+                emissive="white"
+                emissiveIntensity={isGlow ? 2.2 : 0.22}
+                roughness={0.28}
+                metalness={0}
+                transparent={isGlow}
+                opacity={isGlow ? 0.88 : 1}
+                toneMapped={!isGlow}
+            />
+        </instancedMesh>
     );
 }
 
@@ -1916,41 +1927,49 @@ const HEART_LIFETIME_MS = 1800;
 
 function HeartBurst({ id, wp, onDone }) {
     // Generate stable per-heart motion data once (spread outward, biased upward)
-    const hearts = useMemo(() => {
-        return Array.from({ length: HEART_COUNT }, (_, i) => {
-            // Spread hearts in a full circle with an upward bias
+    // Generate stable random motion data once per burst. Using useRef so the data is
+    // computed exactly once on mount — useMemo with Math.random() is unsafe because
+    // React may evict the cache and recompute, which would re-inject duplicate <style> tags.
+    const heartsRef = useRef(null);
+    if (heartsRef.current === null) {
+        heartsRef.current = Array.from({ length: HEART_COUNT }, (_, i) => {
             const baseAngle = (i / HEART_COUNT) * Math.PI * 2;
-            const jitter = (Math.random() - 0.5) * 0.7;
-            const angle = baseAngle + jitter;
+            const angle = baseAngle + (Math.random() - 0.5) * 0.7;
             const dist = 50 + Math.random() * 40;
             const dx = Math.cos(angle) * dist;
-            // Always travel upward on screen (negative y = up in CSS)
             const dy = -Math.abs(Math.sin(angle) * dist) - 25 - Math.random() * 30;
             const delay = i * 55 + Math.random() * 40;
             const scale = 0.85 + Math.random() * 0.5;
             const heartId = `wh-${id}-${i}`;
-            const styleEl = document.createElement('style');
-            styleEl.setAttribute('data-worm-heart', heartId);
-            styleEl.textContent = `@keyframes ${heartId}{` +
+            const cssText = `@keyframes ${heartId}{` +
                 `0%{transform:translate(-50%,-50%) scale(0) rotate(-20deg);opacity:0;}` +
                 `18%{transform:translate(-50%,-50%) scale(${(scale * 1.6).toFixed(2)}) rotate(10deg);opacity:1;}` +
                 `100%{transform:translate(calc(-50% + ${dx.toFixed(1)}px),calc(-50% + ${dy.toFixed(1)}px)) ` +
                 `scale(${(scale * 0.25).toFixed(2)}) rotate(${Math.round((Math.random() - 0.5) * 40)}deg);opacity:0;}}`;
-            document.head.appendChild(styleEl);
-            return { heartId, delay };
+            return { heartId, delay, cssText };
         });
-    }, [id]);
+    }
+    const hearts = heartsRef.current;
 
+    // DOM mutations in useEffect so they are guarded by mount and always cleaned up.
+    // useMemo must not mutate the DOM — React may rerun it without a corresponding cleanup.
     useEffect(() => {
+        const styleEls = hearts.map(({ heartId, cssText }) => {
+            const el = document.createElement('style');
+            el.setAttribute('data-worm-heart', heartId);
+            el.textContent = cssText;
+            document.head.appendChild(el);
+            return el;
+        });
         const timer = setTimeout(() => {
-            hearts.forEach(h => {
-                const el = document.querySelector(`[data-worm-heart="${h.heartId}"]`);
-                if (el) el.remove();
-            });
+            styleEls.forEach(el => el.remove());
             onDone();
         }, HEART_LIFETIME_MS + 300);
-        return () => clearTimeout(timer);
-    }, [hearts, onDone]);
+        return () => {
+            clearTimeout(timer);
+            styleEls.forEach(el => el.remove());
+        };
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const fontSize = _isMobile ? '22px' : '18px';
     return (
@@ -2018,10 +2037,14 @@ function TunnelHealProgress({ size }) {
     });
 
     const entries = useMemo(() => {
-        return Object.entries(healingProgress)
-            .filter(([, p]) => p.deposited > 0 && p.deposited < HEAL_COST)
+        const partial = Object.entries(healingProgress).filter(([, p]) => p.deposited > 0 && p.deposited < HEAL_COST);
+        if (partial.length === 0) return [];
+        // Build the manifold map once and share it across all findStickerByStableKey calls.
+        // Without this, each call rebuilt an O(size³×6) map — 3 tunnels = 3× the work.
+        const mm = buildManifoldGridMap(cubies, size);
+        return partial
             .map(([key, p]) => {
-                const pos = findStickerByStableKey(cubies, size, key);
+                const pos = findStickerByStableKey(cubies, size, key, mm);
                 if (!pos) return null;
                 const wp = getStickerWorldPos(pos.x, pos.y, pos.z, pos.dirKey, size, 0);
                 if (!wp) return null;
@@ -2818,6 +2841,7 @@ function SliceWarningLights({ pendingRotRef, warningProgressRef, size, cubies })
 // Comic-book THUNK text + coloured orb burst at the worm cut point.
 const MAX_THUNK_ORBS = 10;
 const _thunkDummy = new THREE.Object3D();
+const _thunkCol = new THREE.Color();
 
 function ThunkEffect({ thunkRef }) {
     const groupRef = useRef();
@@ -2886,7 +2910,6 @@ function ThunkEffect({ thunkRef }) {
         if (mesh) {
             const st = orbStateRef.current;
             const et = animTRef.current;
-            const _col = new THREE.Color();
             for (let i = 0; i < MAX_THUNK_ORBS; i++) {
                 const [vx, vy, vz] = st.velocities[i] || [0, 0, 0];
                 const fade = Math.max(0, 1 - et / 0.75);
@@ -2898,8 +2921,8 @@ function ThunkEffect({ thunkRef }) {
                 _thunkDummy.scale.setScalar(fade * 0.11);
                 _thunkDummy.updateMatrix();
                 mesh.setMatrixAt(i, _thunkDummy.matrix);
-                _col.set(st.colors[i % st.colors.length] || '#ffdd44');
-                mesh.setColorAt(i, _col);
+                _thunkCol.set(st.colors[i % st.colors.length] || '#ffdd44');
+                mesh.setColorAt(i, _thunkCol);
             }
             mesh.instanceMatrix.needsUpdate = true;
             if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
