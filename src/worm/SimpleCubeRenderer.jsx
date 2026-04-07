@@ -5,6 +5,11 @@
 import React, { useMemo, useRef } from 'react';
 import * as THREE from 'three';
 
+// Shared geometries — allocated once at module level so every Sticker and SimpleCubie
+// reuses the same Three.js object instead of creating a new one per render.
+const _stickerGeo = new THREE.PlaneGeometry(0.88, 0.88);
+const _cubieBodyGeo = new THREE.BoxGeometry(0.96, 0.96, 0.96);
+
 // Module-level axis vectors — reused across all frames, never reallocated
 const _AXIS_COL = new THREE.Vector3(1, 0, 0);
 const _AXIS_ROW = new THREE.Vector3(0, 1, 0);
@@ -31,10 +36,10 @@ const STICKER_CONFIG = {
   NZ: { pos: [0, 0, -STICKER_OFFSET], rot: [0, Math.PI, 0] },
 };
 
-function Sticker({ position, rotation, color, isFlipped }) {
+const Sticker = React.memo(function Sticker({ position, rotation, color, isFlipped }) {
   return (
     <mesh position={position} rotation={rotation}>
-      <planeGeometry args={[0.88, 0.88]} />
+      <primitive object={_stickerGeo} attach="geometry" />
       <meshStandardMaterial
         color={color}
         emissive={isFlipped ? '#a855f7' : color}
@@ -44,9 +49,9 @@ function Sticker({ position, rotation, color, isFlipped }) {
       />
     </mesh>
   );
-}
+});
 
-function SimpleCubie({ x, y, z, size, cubies, faceColors }) {
+const SimpleCubie = React.memo(function SimpleCubie({ x, y, z, size, cubies, faceColors }) {
   const k = (size - 1) / 2;
   const cubie = cubies[x]?.[y]?.[z];
   if (!cubie) return null;
@@ -58,7 +63,7 @@ function SimpleCubie({ x, y, z, size, cubies, faceColors }) {
     <group position={position}>
       {/* Dark cubie body */}
       <mesh>
-        <boxGeometry args={[0.96, 0.96, 0.96]} />
+        <primitive object={_cubieBodyGeo} attach="geometry" />
         <meshStandardMaterial color="#1a1a2e" roughness={0.8} />
       </mesh>
 
@@ -90,7 +95,7 @@ function SimpleCubie({ x, y, z, size, cubies, faceColors }) {
       })}
     </group>
   );
-}
+});
 
 export default function SimpleCubeRenderer({ cubies, size, faceColors, rotationAnim }) {
   // Build list of cubie positions
