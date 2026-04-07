@@ -19,6 +19,7 @@ import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { resolveColors } from '../utils/colorSchemes.js';
 import { liveRotation, resetLiveRotation } from '../worm/liveRotation.js';
+import { liveCubies } from '../worm/liveCubies.js';
 
 // Reusable axis vectors and quaternion (allocated once, never recreated)
 const _axisCol = new THREE.Vector3(1, 0, 0);
@@ -111,6 +112,9 @@ const CubeAssembly = React.memo(({
     }))
   );
   const cubieRefs = useRef([]);
+  // Expose cubie refs + size to ParityOrbs so orbs can read live cubie transforms each frame.
+  liveCubies.refs = cubieRefs.current;
+  liveCubies.size = size;
   const prevPressedIdxRef = useRef(new Set()); // tracks indices pressed last frame for cleanup
   const controlsRef = useRef();
   const controlsEnabledRef = useRef(true); // Track controls state with ref for immediate updates

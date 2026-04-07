@@ -6,21 +6,14 @@ import React, { useRef, useMemo, useEffect, useCallback } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { getSegmentWorldPos, getTunnelWorldPos } from './wormLogic.js';
-import { liveRotation } from './liveRotation.js';
+import { liveCubies } from './liveCubies.js';
+import { SURFACE_OFFSET } from '../utils/constants.js';
 
 // Face-normal directions for bob animation — indexed by dirKey
 const BOB_NORMALS = {
   PX: [1, 0, 0], NX: [-1, 0, 0],
   PY: [0, 1, 0], NY: [0, -1, 0],
   PZ: [0, 0, 1], NZ: [0, 0, -1],
-};
-
-// World axis vectors matching CubeAssembly — same instances as pre-allocated there,
-// but we need our own for applyAxisAngle calls (Three.js doesn't mutate these).
-const _worldAxes = {
-  col:   new THREE.Vector3(1, 0, 0),
-  row:   new THREE.Vector3(0, 1, 0),
-  depth: new THREE.Vector3(0, 0, 1),
 };
 
 // Scratch vectors used per-frame in the animator (never allocated during render).
@@ -221,52 +214,36 @@ export default function ParityOrbs({ orbs, size, explosionFactor = 0, mode = 'su
       if (!group || !core) continue;
       const time = t + timeOffset;
 
-      // Whole-orb position — apply live slice rotation when this orb is on the moving slice.
-      // When the animation just completed (completedFrames > 0) hold the final angle for a
-      // couple of extra frames so React state has time to update positionRef before we stop.
+      // Whole-orb position — read live cubie transform so the orb is "glued" to its tile.
+      // CubeAssembly runs at useFrame priority -1 (before our priority 0), so cubieRefs
+      // already hold the final world position/quaternion for this frame by the time we run.
       const bn = BOB_NORMALS[dirKey] || BOB_NORMALS.PY;
-      let px = position[0], py = position[1], pz = position[2];
-      let bnx = bn[0], bny = bn[1], bnz = bn[2];
+      const { elevated } = refs;
+      const lSize = liveCubies.size;
+      const cubie = (gridX >= 0 && liveCubies.refs && lSize > 0)
+        ? liveCubies.refs[gridX * lSize * lSize + gridY * lSize + gridZ]
+        : null;
 
-      const lrActive = liveRotation.active;
-      // completedFrames is only decremented AFTER the per-orb loop (below), and only
-      // when !active, so it stays valid for the full frame it's needed.
-      const lrHolding = !lrActive && liveRotation.completedFrames > 0;
-      if ((lrActive || lrHolding) && gridX >= 0) {
-        const axis = lrActive ? liveRotation.axis : liveRotation.completedAxis;
-        const sliceIdx = lrActive ? liveRotation.sliceIndex : liveRotation.completedSliceIndex;
-        const angle = lrActive ? liveRotation.angle : liveRotation.completedAngle;
-        const inSlice =
-          (axis === 'col'   && gridX === sliceIdx) ||
-          (axis === 'row'   && gridY === sliceIdx) ||
-          (axis === 'depth' && gridZ === sliceIdx);
-        if (inSlice) {
-          const worldAxis = _worldAxes[axis];
-          _scratchPos.set(px, py, pz).applyAxisAngle(worldAxis, angle);
-          px = _scratchPos.x; py = _scratchPos.y; pz = _scratchPos.z;
-          _scratchBob.set(bnx, bny, bnz).applyAxisAngle(worldAxis, angle);
-          bnx = _scratchBob.x; bny = _scratchBob.y; bnz = _scratchBob.z;
-        }
+      if (cubie) {
+        // Rotate the face normal by the cubie's live quaternion to get the world-space normal.
+        _scratchBob.set(bn[0], bn[1], bn[2]).applyQuaternion(cubie.quaternion);
+        // Sticker world position = cubie center + rotated normal * SURFACE_OFFSET
+        _scratchPos.copy(cubie.position).addScaledVector(_scratchBob, SURFACE_OFFSET);
+        // Elevated orbs hover above the surface
+        if (elevated) _scratchPos.addScaledVector(_scratchBob, 1.2);
+        // Bob along face normal
+        const bobAmt = Math.sin(time * 2.1) * (isTarget ? 0.13 : 0.06);
+        _scratchPos.addScaledVector(_scratchBob, bobAmt);
+        group.position.copy(_scratchPos);
+      } else {
+        // Fallback: use pre-computed static position (tunnel mode, or cubie ref not ready)
+        const _bob = Math.sin(time * 2.1) * (isTarget ? 0.13 : 0.06);
+        group.position.set(
+          position[0] + bn[0] * _bob,
+          position[1] + bn[1] * _bob,
+          position[2] + bn[2] * _bob
+        );
       }
-
-      const _bob = Math.sin(time * 2.1) * (isTarget ? 0.13 : 0.06);
-      let fpx = px + bnx * _bob;
-      let fpy = py + bny * _bob;
-      let fpz = pz + bnz * _bob;
-      // Prevent arc from passing through cube interior during live rotation.
-      // applyAxisAngle moves orbs along a circular path that can dip inside the cube
-      // bounding box at intermediate angles (e.g. a bottom-face orb rotating 90° passes
-      // through the cube at ~45°). Clamp to nearest face surface when inside.
-      if ((lrActive || lrHolding) && gridX >= 0) {
-        const ib = (size - 1) / 2 + 0.52;
-        if (Math.abs(fpx) < ib && Math.abs(fpy) < ib && Math.abs(fpz) < ib) {
-          const maxCoord = Math.max(Math.abs(fpx), Math.abs(fpy), Math.abs(fpz));
-          if (maxCoord === Math.abs(fpx)) fpx = Math.sign(fpx || 1) * ib;
-          else if (maxCoord === Math.abs(fpy)) fpy = Math.sign(fpy || 1) * ib;
-          else fpz = Math.sign(fpz || 1) * ib;
-        }
-      }
-      group.position.set(fpx, fpy, fpz);
 
       // Core quantum-spin wobble
       core.rotation.y = time * (isTarget ? 1.7 : 1.0);
@@ -319,7 +296,7 @@ export default function ParityOrbs({ orbs, size, explosionFactor = 0, mode = 'su
       }
 
       // Glow worm mode: pulse emissive intensity at the same frequency as the worm's point light
-      const { isGlowWorm, elevated } = refs;
+      const { isGlowWorm } = refs;
       if (isGlowWorm && core && core.material && !elevated) {
         const baseIntensity = isTarget ? 2.0 : 1.35;
         core.material.emissiveIntensity = baseIntensity + Math.sin(t * 4.0) * 0.9;
@@ -364,13 +341,6 @@ export default function ParityOrbs({ orbs, size, explosionFactor = 0, mode = 'su
       }
     }
 
-    // Decrement the holdover counter AFTER all orbs are processed and only when
-    // liveRotation is inactive. Doing this before the loop (or unconditionally)
-    // would consume the holdover on the same frame the animation goes active=false,
-    // leaving no bridge frames for React state to catch up.
-    if (!liveRotation.active && liveRotation.completedFrames > 0) {
-      liveRotation.completedFrames--;
-    }
   });
 
   // Calculate world positions for all orbs
