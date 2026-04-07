@@ -467,83 +467,277 @@ const COUNTDOWN_NUMBER_STYLE = {
     userSelect: 'none',
 };
 
-const WIN_OVERLAY_STYLE = {
-    position: 'absolute',
+// ─── Winner screen styles ──────────────────────────────────────────────────────
+
+const WINNER_SCREEN_STYLE = {
+    position: 'fixed',
     inset: 0,
+    zIndex: 200,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'radial-gradient(ellipse at 50% 30%, #1a0a3d 0%, #08051a 60%, #000 100%)',
+    pointerEvents: 'auto',
+    overflow: 'hidden',
+    fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif",
+};
+
+const WINNER_STARS_STYLE = {
+    position: 'absolute', inset: 0, pointerEvents: 'none',
+    background: `
+        radial-gradient(circle, rgba(255,255,255,0.9) 1px, transparent 1px) 12% 18%/200px 200px,
+        radial-gradient(circle, rgba(255,255,255,0.6) 1px, transparent 1px) 37% 44%/150px 150px,
+        radial-gradient(circle, rgba(255,255,255,0.7) 1px, transparent 1px) 68% 22%/180px 180px,
+        radial-gradient(circle, rgba(255,255,255,0.5) 1px, transparent 1px) 84% 67%/120px 120px,
+        radial-gradient(circle, rgba(255,255,255,0.8) 1px, transparent 1px) 22% 78%/160px 160px
+    `,
+};
+
+const WINNER_TITLE_STYLE = {
+    fontFamily: "'Impact', 'Arial Black', sans-serif",
+    fontSize: 'clamp(52px, 11vw, 96px)',
+    fontWeight: 900,
+    letterSpacing: '-2px',
+    color: '#ffdd00',
+    textShadow: '-4px -4px 0 #cc2200, 4px -4px 0 #cc2200, -4px 4px 0 #cc2200, 4px 4px 0 #cc2200, 0 0 40px rgba(255,221,0,0.5)',
+    userSelect: 'none',
+    marginBottom: 4,
+    lineHeight: 1,
+    textAlign: 'center',
+};
+
+const WINNER_SUB_STYLE = {
+    color: 'rgba(255,255,255,0.55)',
+    fontSize: 13,
+    fontWeight: 600,
+    letterSpacing: 2,
+    marginBottom: 28,
+    textAlign: 'center',
+};
+
+const PODIUM_WRAP_STYLE = {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    marginBottom: 22,
+    position: 'relative',
+};
+
+const PODIUM_WORM_ROW_STYLE = {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 6,
+    flexWrap: 'nowrap',
+    maxWidth: 'min(90vw, 520px)',
+    overflow: 'hidden',
+};
+
+const PODIUM_BASE_STYLE = {
+    width: 'min(90vw, 320px)',
+    height: 44,
+    borderRadius: '0 0 12px 12px',
+    background: 'linear-gradient(180deg, #ffd700 0%, #b8860b 60%, #8B6914 100%)',
+    boxShadow: '0 8px 32px rgba(255,215,0,0.35), inset 0 1px 0 rgba(255,255,255,0.4)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: 'rgba(2, 6, 23, 0.62)',
-    backdropFilter: 'blur(6px)',
-    pointerEvents: 'auto',
-    zIndex: 30,
 };
 
-const WIN_CARD_STYLE = {
-    width: 'min(92vw, 380px)',
-    borderRadius: 20,
-    border: `2px solid rgba(99,102,241,0.5)`,
-    background: 'rgba(255, 255, 255, 0.96)',
-    boxShadow: '0 20px 60px rgba(99,102,241,0.25), 0 10px 28px rgba(15,23,42,0.2)',
-    padding: '22px 20px',
-    textAlign: 'center',
-};
-
-const WIN_BADGE_STYLE = {
-    display: 'inline-block',
-    background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: 800,
-    letterSpacing: 1.4,
-    borderRadius: 999,
-    padding: '4px 12px',
-    marginBottom: 8,
-};
-
-const WIN_HEADING_STYLE = {
-    color: palette.text,
-    fontSize: 30,
+const PODIUM_LABEL_STYLE = {
+    fontFamily: "'Impact', 'Arial Black', sans-serif",
+    fontSize: 18,
     fontWeight: 900,
-    letterSpacing: -0.5,
-    marginBottom: 4,
+    color: '#3d2000',
+    letterSpacing: 2,
+    textShadow: '0 1px 0 rgba(255,255,255,0.3)',
 };
 
-const WIN_SUB_STYLE = {
-    color: palette.subText,
-    fontSize: 13,
-    marginBottom: 14,
+const WINNER_STATS_STYLE = {
+    display: 'flex',
+    gap: 12,
+    marginBottom: 18,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
 };
 
-const WIN_REWARD_STYLE = {
+const WINNER_STAT_BOX_STYLE = {
     borderRadius: 12,
-    border: `1px solid rgba(99,102,241,0.3)`,
-    background: 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(139,92,246,0.08))',
-    padding: '12px 16px',
-    marginBottom: 14,
+    border: '1px solid rgba(255,255,255,0.12)',
+    background: 'rgba(255,255,255,0.07)',
+    backdropFilter: 'blur(8px)',
+    padding: '10px 16px',
     textAlign: 'center',
+    minWidth: 90,
 };
 
-const WIN_REWARD_LABEL_STYLE = {
-    fontSize: 10,
+const WINNER_STAT_LABEL_STYLE = {
+    fontSize: 9,
     fontWeight: 700,
-    letterSpacing: 1.0,
-    color: palette.subText,
+    letterSpacing: 1.2,
+    color: 'rgba(255,255,255,0.45)',
     marginBottom: 2,
 };
 
-const WIN_REWARD_VALUE_STYLE = {
-    fontSize: 36,
-    fontWeight: 900,
-    color: '#6366f1',
+const WINNER_STAT_VALUE_STYLE = {
+    fontSize: 20,
+    fontWeight: 800,
+    color: '#fff',
     lineHeight: 1.1,
 };
 
-const WIN_REWARD_NOTE_STYLE = {
-    fontSize: 11,
-    color: palette.subText,
-    marginTop: 2,
+const WINNER_PP_STYLE = {
+    fontFamily: "'Impact', 'Arial Black', sans-serif",
+    fontSize: 'clamp(28px, 6vw, 44px)',
+    color: '#c4b5fd',
+    letterSpacing: '-1px',
+    textShadow: '-2px -2px 0 #5b21b6, 2px -2px 0 #5b21b6, -2px 2px 0 #5b21b6, 2px 2px 0 #5b21b6',
+    marginBottom: 6,
+    textAlign: 'center',
 };
+
+const WINNER_PP_NOTE_STYLE = {
+    fontSize: 11,
+    color: 'rgba(196,181,253,0.65)',
+    marginBottom: 22,
+    textAlign: 'center',
+};
+
+const WINNER_BTN_ROW_STYLE = {
+    display: 'flex',
+    gap: 12,
+    justifyContent: 'center',
+};
+
+const WINNER_PLAY_AGAIN_STYLE = {
+    minWidth: 140,
+    borderRadius: 14,
+    padding: '12px 20px',
+    fontSize: 15,
+    fontWeight: 800,
+    letterSpacing: 0.6,
+    color: '#fff',
+    background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+    border: '2px solid rgba(139,92,246,0.6)',
+    cursor: 'pointer',
+    touchAction: 'manipulation',
+    WebkitTapHighlightColor: 'transparent',
+    boxShadow: '0 4px 20px rgba(99,102,241,0.4)',
+};
+
+const WINNER_NEW_GAME_STYLE = {
+    minWidth: 120,
+    borderRadius: 14,
+    padding: '12px 20px',
+    fontSize: 15,
+    fontWeight: 800,
+    letterSpacing: 0.6,
+    color: 'rgba(255,255,255,0.8)',
+    background: 'rgba(255,255,255,0.08)',
+    border: '1px solid rgba(255,255,255,0.18)',
+    cursor: 'pointer',
+    touchAction: 'manipulation',
+    WebkitTapHighlightColor: 'transparent',
+};
+
+// ─── WinnerScreen ─────────────────────────────────────────────────────────────
+
+const MAX_WORM_DISPLAY = 28; // max segments to draw in the worm graphic
+
+function WinnerScreen({ wormBodyTiles, wormSessionOrbs, parityPoints, wormTimeAlive, wormHealedCount, wormColor, formatTime, onRetry, onNewGame }) {
+    const ppEarned = wormBodyTiles * 10; // EARN_ORB_COLLECT(5) × 2 multiplier
+    const displayCount = Math.min(wormBodyTiles, MAX_WORM_DISPLAY);
+    const overflow = wormBodyTiles > MAX_WORM_DISPLAY ? wormBodyTiles - MAX_WORM_DISPLAY : 0;
+
+    // Build worm segment colors: head is slightly lighter, tail fades
+    const segments = useMemo(() => {
+        if (displayCount === 0) return [];
+        return Array.from({ length: displayCount }, (_, i) => {
+            const t = i / Math.max(1, displayCount - 1);
+            const alpha = 0.35 + 0.65 * (1 - t * 0.5);
+            return { size: i === 0 ? 28 : 20 - t * 6, alpha };
+        });
+    }, [displayCount]);
+
+    return (
+        <div style={WINNER_SCREEN_STYLE}>
+            {/* starfield */}
+            <div style={WINNER_STARS_STYLE} />
+
+            {/* Title */}
+            <div style={WINNER_TITLE_STYLE}>WINNER WORM!</div>
+            <div style={WINNER_SUB_STYLE}>CUBE SOLVED · ALL TUNNELS HEALED</div>
+
+            {/* Worm on podium */}
+            <div style={PODIUM_WRAP_STYLE}>
+                <div style={PODIUM_WORM_ROW_STYLE}>
+                    {segments.map((seg, i) => (
+                        <div
+                            key={i}
+                            style={{
+                                width: seg.size,
+                                height: seg.size,
+                                borderRadius: '50%',
+                                background: wormColor,
+                                opacity: seg.alpha,
+                                flexShrink: 0,
+                                boxShadow: i === 0 ? `0 0 12px 4px ${wormColor}` : 'none',
+                                border: i === 0 ? '2px solid rgba(255,255,255,0.5)' : 'none',
+                            }}
+                        />
+                    ))}
+                    {overflow > 0 && (
+                        <div style={{ fontSize: 13, fontWeight: 800, color: 'rgba(255,255,255,0.6)', flexShrink: 0, marginLeft: 4 }}>
+                            +{overflow}
+                        </div>
+                    )}
+                    {wormBodyTiles === 0 && (
+                        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>no orbs</div>
+                    )}
+                </div>
+                <div style={PODIUM_BASE_STYLE}>
+                    <span style={PODIUM_LABEL_STYLE}>🏆 FINAL LENGTH: {wormBodyTiles}</span>
+                </div>
+            </div>
+
+            {/* PP earned */}
+            <div style={WINNER_PP_STYLE}>+{ppEarned} PARITY POINTS</div>
+            <div style={WINNER_PP_NOTE_STYLE}>{wormBodyTiles} orbs × 5 PP × 2× WIN BONUS</div>
+
+            {/* Stats row */}
+            <div style={WINNER_STATS_STYLE}>
+                <div style={WINNER_STAT_BOX_STYLE}>
+                    <div style={WINNER_STAT_LABEL_STYLE}>TIME</div>
+                    <div style={WINNER_STAT_VALUE_STYLE}>{formatTime(wormTimeAlive)}</div>
+                </div>
+                <div style={WINNER_STAT_BOX_STYLE}>
+                    <div style={WINNER_STAT_LABEL_STYLE}>COLLECTED</div>
+                    <div style={WINNER_STAT_VALUE_STYLE}>{wormSessionOrbs}</div>
+                </div>
+                <div style={WINNER_STAT_BOX_STYLE}>
+                    <div style={WINNER_STAT_LABEL_STYLE}>HEALED</div>
+                    <div style={WINNER_STAT_VALUE_STYLE}>{wormHealedCount}</div>
+                </div>
+                <div style={WINNER_STAT_BOX_STYLE}>
+                    <div style={WINNER_STAT_LABEL_STYLE}>TOTAL PPs</div>
+                    <div style={{ ...WINNER_STAT_VALUE_STYLE, color: '#c4b5fd' }}>{parityPoints}</div>
+                </div>
+            </div>
+
+            {/* Buttons */}
+            <div style={WINNER_BTN_ROW_STYLE}>
+                <button onPointerDown={onRetry} style={WINNER_PLAY_AGAIN_STYLE}>
+                    Play Again
+                </button>
+                <button onPointerDown={onNewGame} style={WINNER_NEW_GAME_STYLE}>
+                    New Game
+                </button>
+            </div>
+        </div>
+    );
+}
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -752,35 +946,19 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                 </div>
             )}
 
-            {/* Scramble-solve win screen */}
+            {/* ── Full-screen winner takeover ── */}
             {wormGamePhase === 'solved' && (
-                <div style={WIN_OVERLAY_STYLE}>
-                    <div style={WIN_CARD_STYLE}>
-                        <div style={WIN_BADGE_STYLE}>CUBE SOLVED</div>
-                        <div style={WIN_HEADING_STYLE}>You win!</div>
-                        <div style={WIN_SUB_STYLE}>All rotations reversed. All tunnels healed.</div>
-                        <div style={WIN_REWARD_STYLE}>
-                            <div style={WIN_REWARD_LABEL_STYLE}>PARITY POINTS BANKED</div>
-                            <div style={WIN_REWARD_VALUE_STYLE}>+{wormBodyTiles}</div>
-                            <div style={WIN_REWARD_NOTE_STYLE}>{wormBodyTiles} orb{wormBodyTiles !== 1 ? 's' : ''} on worm × 1 PP each</div>
-                        </div>
-                        <div style={PAUSE_STATS_STYLE}>
-                            <div>Orbs collected this run: <b style={PAUSE_STAT_VALUE_STYLE}>{wormSessionOrbs}</b></div>
-                            <div>Orbs on worm (banked): <b style={{ color: '#6366f1', fontWeight: 700 }}>{wormBodyTiles}</b></div>
-                            <div>Total banked PPs: <b style={{ color: '#c4b5fd', fontWeight: 700 }}>{parityPoints}</b></div>
-                            <div>Time alive: <b style={PAUSE_STAT_VALUE_STYLE}>{formatTime(wormTimeAlive)}</b></div>
-                            <div>Tiles healed: <b style={PAUSE_STAT_VALUE_STYLE}>{wormHealedCount}</b></div>
-                        </div>
-                        <div style={DEATH_BTN_ROW_STYLE}>
-                            <button onPointerDown={onRetry} style={RESUME_BTN_STYLE}>
-                                Play Again
-                            </button>
-                            <button onPointerDown={onNewGame} style={NEW_GAME_BTN_STYLE}>
-                                New Game
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                <WinnerScreen
+                    wormBodyTiles={wormBodyTiles}
+                    wormSessionOrbs={wormSessionOrbs}
+                    parityPoints={parityPoints}
+                    wormTimeAlive={wormTimeAlive}
+                    wormHealedCount={wormHealedCount}
+                    wormColor={wormColor}
+                    formatTime={formatTime}
+                    onRetry={onRetry}
+                    onNewGame={onNewGame}
+                />
             )}
 
             {showDeathMenu && !isMinimized && (
