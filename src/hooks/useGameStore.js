@@ -415,10 +415,18 @@ export const useGameStore = create(
     setWormOrbInventory: (v) => set({ wormOrbInventory: v }),
     wormHealingProgress: {},
     setWormHealingProgress: (v) => set({ wormHealingProgress: v }),
-    clearDisparityGame: () => set({ disparityDeaths: [], disparityDeathByGridId: {}, disparityWinner: null, showDisparityWinner: false, disparityEliminatedFaces: [], cascades: [], wormHealerMode: false, holonomyMode: false, wormHealedCount: 0, wormPhase: 'crawling', wormOnFlippedTile: false, wormBodyTiles: 0, wormPowerups: [], wormholeCountdown: 0, wormAlive: true, showWormDeathMenu: false, wormDeathDetails: null, wormPaused: false, wormTimeAlive: 0, wormTunnelCount: 0, wormOrbInventory: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }, wormHealingProgress: {} }),
+    // ── Scramble-solve game phase ────────────────────────────────────────────
+    wormGamePhase: 'scrambling',   // 'scrambling' | 'countdown' | 'active' | 'finalHealing' | 'solved'
+    setWormGamePhase: (v) => set({ wormGamePhase: v }),
+    wormCountdownStep: null,       // null | 3 | 2 | 1 | 'go'
+    setWormCountdownStep: (v) => set({ wormCountdownStep: v }),
+    wormSessionOrbs: 0,            // orbs picked up this run (shown in HUD; NOT auto-banked)
+    setWormSessionOrbs: (v) => set({ wormSessionOrbs: v }),
+    clearDisparityGame: () => set({ disparityDeaths: [], disparityDeathByGridId: {}, disparityWinner: null, showDisparityWinner: false, disparityEliminatedFaces: [], cascades: [], wormHealerMode: false, holonomyMode: false, wormHealedCount: 0, wormPhase: 'crawling', wormOnFlippedTile: false, wormBodyTiles: 0, wormPowerups: [], wormholeCountdown: 0, wormAlive: true, showWormDeathMenu: false, wormDeathDetails: null, wormPaused: false, wormTimeAlive: 0, wormTunnelCount: 0, wormOrbInventory: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }, wormHealingProgress: {}, wormGamePhase: 'scrambling', wormCountdownStep: null, wormSessionOrbs: 0 }),
     // Atomic init for Worm Mode — clears disparity state AND enables worm in one set()
     // so wormHealerMode:true can never be clobbered by the reset.
-    initWormMode: (flipCap = 9999, chaosLevel = 1) => set((state) => ({ disparityDeaths: [], disparityDeathByGridId: {}, disparityWinner: null, showDisparityWinner: false, disparityEliminatedFaces: [], cascades: [], holonomyMode: false, wormHealedCount: 0, wormPhase: 'crawling', wormOnFlippedTile: false, wormBodyTiles: 0, wormPowerups: [], wormholeCountdown: 0, wormAlive: true, showWormDeathMenu: false, wormDeathDetails: null, wormHealerMode: true, disparityFlipCap: flipCap, chaosLevel, wormRunId: (state.wormRunId ?? 0) + 1, wormPaused: false, wormTimeAlive: 0, wormTunnelCount: 0, wormOrbInventory: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }, wormHealingProgress: {} })),
+    // wormPaused:true — the scramble animation runs first; gameplay starts after countdown.
+    initWormMode: (flipCap = 9999, chaosLevel = 1) => set((state) => ({ disparityDeaths: [], disparityDeathByGridId: {}, disparityWinner: null, showDisparityWinner: false, disparityEliminatedFaces: [], cascades: [], holonomyMode: false, wormHealedCount: 0, wormPhase: 'crawling', wormOnFlippedTile: false, wormBodyTiles: 0, wormPowerups: [], wormholeCountdown: 0, wormAlive: true, showWormDeathMenu: false, wormDeathDetails: null, wormHealerMode: true, disparityFlipCap: flipCap, chaosLevel, wormRunId: (state.wormRunId ?? 0) + 1, wormPaused: true, wormTimeAlive: 0, wormTunnelCount: 0, wormOrbInventory: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }, wormHealingProgress: {}, wormGamePhase: 'scrambling', wormCountdownStep: null, wormSessionOrbs: 0 })),
 
     // ========================================================================
     // ANIMATION STATE
