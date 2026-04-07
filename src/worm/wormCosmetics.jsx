@@ -7,7 +7,8 @@ import React from 'react';
 // ─── WormHat3D ────────────────────────────────────────────────────────────────
 // Renders a hat in the parent's local space where +Y is the "outward" direction.
 // `scale` = head sphere radius in world units.
-export default function WormHat3D({ type, scale = 0.28 }) {
+// React.memo: type and scale rarely change, so skip re-renders when parent re-renders at 30fps.
+const WormHat3D = React.memo(function WormHat3D({ type, scale = 0.28 }) {
   if (!type || type === 'none') return null;
 
   const s = scale;
@@ -90,4 +91,6 @@ export default function WormHat3D({ type, scale = 0.28 }) {
   }
 
   return null;
-}
+});
+
+export default WormHat3D;
