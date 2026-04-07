@@ -808,7 +808,6 @@ export const spawnOrbs = (cubies, size, count, wormSegments = [], existingOrbs =
   }
 
   // Randomly select positions for orbs
-  const selected = [];
   const shuffled = [...validPositions];
   for (let i = shuffled.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
