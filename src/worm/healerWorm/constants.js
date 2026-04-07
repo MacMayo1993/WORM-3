@@ -68,6 +68,12 @@ export const SURFACE_JUMP_HEIGHT = 1.5;   // tall arc — astronaut bounding in 
 export const SURFACE_JUMP_TILE_SPAN = 1;  // jump distance is fixed to one traversed tile regardless of speed
 
 // ─── Auto-rotation hazard ─────────────────────────────────────────────────────
-export const AUTO_ROTATE_INTERVAL_MIN = 9;   // seconds between auto-rotations
+export const AUTO_ROTATE_INTERVAL_MIN = 9;   // kept for non-scramble modes
 export const AUTO_ROTATE_INTERVAL_MAX = 15;
 export const AUTO_ROTATE_WARNING = 2.5;      // seconds of beam warning before rotation fires
+
+// ─── Scramble-solve game mode ─────────────────────────────────────────────────
+export const SCRAMBLE_STEPS = 15;            // moves in the opening scramble
+export const SCRAMBLE_MOVE_INTERVAL = 0.55;  // seconds between each scramble move during opening
+export const ACTIVE_ROTATE_INTERVAL = 10;    // fixed interval during gameplay (15 moves × 10s = 150s)
+export const COUNTDOWN_STEP_DURATION = 0.85; // seconds per beat of the 3-2-1-WORM countdown
