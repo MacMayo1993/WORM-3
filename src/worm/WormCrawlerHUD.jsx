@@ -2,7 +2,7 @@
 // Mobile-friendly HUD for WORM Chase-Cam Mode.
 // Uses the same clean, pedagogical visual language as other overlays.
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { resolveColors } from '../utils/colorSchemes.js';
@@ -383,9 +383,78 @@ const NEW_GAME_BTN_STYLE = {
     cursor: 'pointer',
 };
 
+const EXAMINE_BTN_STYLE = {
+    minWidth: 100,
+    borderRadius: 12,
+    padding: '10px 14px',
+    fontSize: 13,
+    fontWeight: 800,
+    letterSpacing: 0.5,
+    color: '#fff',
+    background: 'linear-gradient(135deg, #dc2626, #991b1b)',
+    border: '1px solid rgba(220,38,38,0.5)',
+    cursor: 'pointer',
+    touchAction: 'manipulation',
+    WebkitTapHighlightColor: 'transparent',
+};
+
+// Minimised examine mode — no full-screen backdrop so the cube is rotatable
+const EXAMINE_MINIMIZED_OUTER_STYLE = {
+    position: 'absolute',
+    inset: 0,
+    pointerEvents: 'none', // lets Canvas events through
+    display: 'flex',
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    paddingTop: 70,
+    zIndex: 10,
+};
+
+const EXAMINE_BAR_STYLE = {
+    pointerEvents: 'auto',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    background: 'rgba(255,255,255,0.92)',
+    border: '1px solid rgba(220,38,38,0.35)',
+    borderRadius: 999,
+    padding: '8px 16px',
+    boxShadow: '0 4px 18px rgba(0,0,0,0.18)',
+};
+
+const EXAMINE_DOT_STYLE = {
+    width: 10, height: 10, borderRadius: '50%',
+    background: '#ef4444',
+    boxShadow: '0 0 6px 2px rgba(239,68,68,0.6)',
+    flexShrink: 0,
+};
+
+const EXAMINE_LABEL_STYLE = {
+    fontSize: 12, fontWeight: 800, letterSpacing: 0.7,
+    color: '#991b1b',
+};
+
+const EXAMINE_RESTORE_BTN_STYLE = {
+    fontSize: 11, fontWeight: 700,
+    color: '#1e293b',
+    background: 'rgba(255,255,255,0.85)',
+    border: `1px solid ${palette.border}`,
+    borderRadius: 8,
+    padding: '4px 10px',
+    cursor: 'pointer',
+    touchAction: 'manipulation',
+    WebkitTapHighlightColor: 'transparent',
+};
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSize = 3, onHome, onSettings, wormAlive = true, showDeathMenu = false, deathDetails = null, onRetry, onNewGame }) {
+    const [isMinimized, setIsMinimized] = useState(false);
+
+    // Reset minimize whenever a fresh death menu appears
+    useEffect(() => {
+        if (showDeathMenu) setIsMinimized(false);
+    }, [showDeathMenu]);
     const { wormSpeed, wormHealedCount, wormBodyTiles, wormholeCountdown, wormControlMode, wormTimeAlive, wormTunnelCount, wormColor, wormOrbInventory, settings, setWormSpeed, toggleWormControlMode } = useGameStore(
         useShallow(s => ({
             wormSpeed: s.wormSpeed ?? 1.0,
@@ -546,7 +615,21 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
 
             {wormAlive && <OrbInventoryHUD orbInventory={wormOrbInventory} faceColors={resolvedFaceColors} />}
 
-            {showDeathMenu && (
+            {showDeathMenu && isMinimized && (
+                // Minimised: no backdrop — canvas is fully interactive for cube inspection.
+                // A small floating bar lets the player restore the card.
+                <div style={EXAMINE_MINIMIZED_OUTER_STYLE}>
+                    <div style={EXAMINE_BAR_STYLE}>
+                        <div style={EXAMINE_DOT_STYLE} />
+                        <span style={EXAMINE_LABEL_STYLE}>EXAMINE MODE</span>
+                        <button onPointerDown={() => setIsMinimized(false)} style={EXAMINE_RESTORE_BTN_STYLE}>
+                            View Card
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {showDeathMenu && !isMinimized && (
                 <div style={DEATH_OVERLAY_STYLE}>
                     <div style={DEATH_CARD_STYLE}>
                         <div style={DEATH_TITLE_STYLE}>{deathTitle}</div>
@@ -573,6 +656,11 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                             </div>
                         )}
                         <div style={DEATH_BTN_ROW_STYLE}>
+                            {deathDetails?.reason === 'self-collision' && (
+                                <button onPointerDown={() => setIsMinimized(true)} style={EXAMINE_BTN_STYLE}>
+                                    Examine
+                                </button>
+                            )}
                             <button onPointerDown={onRetry} style={RETRY_BTN_STYLE}>
                                 Retry
                             </button>
