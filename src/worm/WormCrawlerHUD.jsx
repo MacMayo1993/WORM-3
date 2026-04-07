@@ -446,6 +446,105 @@ const EXAMINE_RESTORE_BTN_STYLE = {
     WebkitTapHighlightColor: 'transparent',
 };
 
+const COUNTDOWN_OVERLAY_STYLE = {
+    position: 'absolute',
+    inset: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    pointerEvents: 'none',
+    zIndex: 20,
+};
+
+const COUNTDOWN_NUMBER_STYLE = {
+    fontSize: 'clamp(96px, 22vw, 180px)',
+    fontWeight: 900,
+    letterSpacing: -4,
+    color: '#fff',
+    textShadow: '0 0 40px rgba(99,102,241,0.9), 0 0 80px rgba(139,92,246,0.7), 0 4px 20px rgba(0,0,0,0.6)',
+    WebkitTextStroke: '3px rgba(99,102,241,0.8)',
+    lineHeight: 1,
+    userSelect: 'none',
+};
+
+const WIN_OVERLAY_STYLE = {
+    position: 'absolute',
+    inset: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'rgba(2, 6, 23, 0.62)',
+    backdropFilter: 'blur(6px)',
+    pointerEvents: 'auto',
+    zIndex: 30,
+};
+
+const WIN_CARD_STYLE = {
+    width: 'min(92vw, 380px)',
+    borderRadius: 20,
+    border: `2px solid rgba(99,102,241,0.5)`,
+    background: 'rgba(255, 255, 255, 0.96)',
+    boxShadow: '0 20px 60px rgba(99,102,241,0.25), 0 10px 28px rgba(15,23,42,0.2)',
+    padding: '22px 20px',
+    textAlign: 'center',
+};
+
+const WIN_BADGE_STYLE = {
+    display: 'inline-block',
+    background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 800,
+    letterSpacing: 1.4,
+    borderRadius: 999,
+    padding: '4px 12px',
+    marginBottom: 8,
+};
+
+const WIN_HEADING_STYLE = {
+    color: palette.text,
+    fontSize: 30,
+    fontWeight: 900,
+    letterSpacing: -0.5,
+    marginBottom: 4,
+};
+
+const WIN_SUB_STYLE = {
+    color: palette.subText,
+    fontSize: 13,
+    marginBottom: 14,
+};
+
+const WIN_REWARD_STYLE = {
+    borderRadius: 12,
+    border: `1px solid rgba(99,102,241,0.3)`,
+    background: 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(139,92,246,0.08))',
+    padding: '12px 16px',
+    marginBottom: 14,
+    textAlign: 'center',
+};
+
+const WIN_REWARD_LABEL_STYLE = {
+    fontSize: 10,
+    fontWeight: 700,
+    letterSpacing: 1.0,
+    color: palette.subText,
+    marginBottom: 2,
+};
+
+const WIN_REWARD_VALUE_STYLE = {
+    fontSize: 36,
+    fontWeight: 900,
+    color: '#6366f1',
+    lineHeight: 1.1,
+};
+
+const WIN_REWARD_NOTE_STYLE = {
+    fontSize: 11,
+    color: palette.subText,
+    marginTop: 2,
+};
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSize = 3, onHome, onSettings, wormAlive = true, showDeathMenu = false, deathDetails = null, onRetry, onNewGame }) {
@@ -455,7 +554,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
     useEffect(() => {
         if (showDeathMenu) setIsMinimized(false);
     }, [showDeathMenu]);
-    const { wormSpeed, wormHealedCount, wormBodyTiles, wormholeCountdown, wormControlMode, wormTimeAlive, wormTunnelCount, wormColor, wormOrbInventory, settings, setWormSpeed, toggleWormControlMode } = useGameStore(
+    const { wormSpeed, wormHealedCount, wormBodyTiles, wormholeCountdown, wormControlMode, wormTimeAlive, wormTunnelCount, wormColor, wormOrbInventory, settings, setWormSpeed, toggleWormControlMode, wormGamePhase, wormCountdownStep, wormSessionOrbs, parityPoints } = useGameStore(
         useShallow(s => ({
             wormSpeed: s.wormSpeed ?? 1.0,
             wormHealedCount: s.wormHealedCount ?? 0,
@@ -469,6 +568,10 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
             settings: s.settings,
             setWormSpeed: s.setWormSpeed,
             toggleWormControlMode: s.toggleWormControlMode,
+            wormGamePhase: s.wormGamePhase ?? 'active',
+            wormCountdownStep: s.wormCountdownStep ?? null,
+            wormSessionOrbs: s.wormSessionOrbs ?? 0,
+            parityPoints: s.parityPoints ?? 0,
         }))
     );
 
@@ -551,8 +654,12 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                         {wormControlMode === 'oriented' ? 'ORIENTED' : 'NON-ORIENTED'}
                     </button>
                     <div style={HEALED_COL_STYLE}>
-                        <div style={HEALED_LABEL_STYLE}>ORBS</div>
+                        <div style={HEALED_LABEL_STYLE}>ON WORM</div>
                         <div style={{ ...HEALED_VALUE_STYLE, color: '#c4b5fd' }}>{wormBodyTiles}</div>
+                    </div>
+                    <div style={HEALED_COL_STYLE}>
+                        <div style={HEALED_LABEL_STYLE}>COLLECTED</div>
+                        <div style={{ ...HEALED_VALUE_STYLE, color: '#fbbf24' }}>{wormSessionOrbs}</div>
                     </div>
                     <div style={SPEED_BAR_INPUT_WRAP_STYLE}>
                         <div style={SPEED_BAR_LABEL_STYLE}>SPEED {wormSpeed.toFixed(1)}×</div>
@@ -570,10 +677,17 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                         <div style={HEALED_LABEL_STYLE}>HEALED</div>
                         <div style={HEALED_VALUE_STYLE}>{wormHealedCount}</div>
                     </div>
-                    <div style={WORMHOLE_COL_STYLE}>
-                        <div style={WORMHOLE_LABEL_STYLE}>NEXT WORMHOLE</div>
-                        <div style={WORMHOLE_VALUE_STYLE}>{wormholeCountdown.toFixed(1)}s</div>
-                    </div>
+                    {wormGamePhase === 'finalHealing' ? (
+                        <div style={{ ...WORMHOLE_COL_STYLE, textAlign: 'center' }}>
+                            <div style={{ ...WORMHOLE_LABEL_STYLE, color: '#f97316' }}>FINAL PHASE</div>
+                            <div style={{ ...WORMHOLE_VALUE_STYLE, color: '#f97316', fontSize: 11 }}>HEAL ALL TUNNELS</div>
+                        </div>
+                    ) : (
+                        <div style={WORMHOLE_COL_STYLE}>
+                            <div style={WORMHOLE_LABEL_STYLE}>NEXT WORMHOLE</div>
+                            <div style={WORMHOLE_VALUE_STYLE}>{wormholeCountdown.toFixed(1)}s</div>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -625,6 +739,46 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                         <button onPointerDown={() => setIsMinimized(false)} style={EXAMINE_RESTORE_BTN_STYLE}>
                             View Card
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Scramble-solve countdown overlay */}
+            {wormGamePhase === 'countdown' && wormCountdownStep !== null && (
+                <div style={COUNTDOWN_OVERLAY_STYLE}>
+                    <div style={COUNTDOWN_NUMBER_STYLE}>
+                        {wormCountdownStep === 'go' ? 'WORM!' : wormCountdownStep}
+                    </div>
+                </div>
+            )}
+
+            {/* Scramble-solve win screen */}
+            {wormGamePhase === 'solved' && (
+                <div style={WIN_OVERLAY_STYLE}>
+                    <div style={WIN_CARD_STYLE}>
+                        <div style={WIN_BADGE_STYLE}>CUBE SOLVED</div>
+                        <div style={WIN_HEADING_STYLE}>You win!</div>
+                        <div style={WIN_SUB_STYLE}>All rotations reversed. All tunnels healed.</div>
+                        <div style={WIN_REWARD_STYLE}>
+                            <div style={WIN_REWARD_LABEL_STYLE}>PARITY POINTS BANKED</div>
+                            <div style={WIN_REWARD_VALUE_STYLE}>+{wormBodyTiles}</div>
+                            <div style={WIN_REWARD_NOTE_STYLE}>{wormBodyTiles} orb{wormBodyTiles !== 1 ? 's' : ''} on worm × 1 PP each</div>
+                        </div>
+                        <div style={PAUSE_STATS_STYLE}>
+                            <div>Orbs collected this run: <b style={PAUSE_STAT_VALUE_STYLE}>{wormSessionOrbs}</b></div>
+                            <div>Orbs on worm (banked): <b style={{ color: '#6366f1', fontWeight: 700 }}>{wormBodyTiles}</b></div>
+                            <div>Total banked PPs: <b style={{ color: '#c4b5fd', fontWeight: 700 }}>{parityPoints}</b></div>
+                            <div>Time alive: <b style={PAUSE_STAT_VALUE_STYLE}>{formatTime(wormTimeAlive)}</b></div>
+                            <div>Tiles healed: <b style={PAUSE_STAT_VALUE_STYLE}>{wormHealedCount}</b></div>
+                        </div>
+                        <div style={DEATH_BTN_ROW_STYLE}>
+                            <button onPointerDown={onRetry} style={RESUME_BTN_STYLE}>
+                                Play Again
+                            </button>
+                            <button onPointerDown={onNewGame} style={NEW_GAME_BTN_STYLE}>
+                                New Game
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
