@@ -21,7 +21,9 @@ import AntipodalModeEffects from './AntipodalModeEffects.jsx';
 import WormholeWarpFX from './WormholeWarpFX.jsx';
 import AntipodalPiP from './AntipodalPiP.jsx';
 
-import { HealerWormMode3DWrapper } from '../worm/HealerWormMode.jsx';
+const HealerWormMode3DWrapper = React.lazy(() =>
+  import('../worm/HealerWormMode.jsx').then((mod) => ({ default: mod.HealerWormMode3DWrapper }))
+);
 const HolonomyWrapper = React.lazy(() => import('../holonomy/HolonomyWrapper.jsx'));
 
 const PHOTO_PRESETS = new Set([
@@ -256,9 +258,11 @@ export default function GameScene({
 
         {wormHealerMode && (
           <ErrorBoundary3D>
-            <HealerWormMode3DWrapper
-              cubies={cubies} size={size} explosionFactor={explosionT} animState={animState} onRotate={onRotate} onHeal={onHeal}
-            />
+            <Suspense fallback={null}>
+              <HealerWormMode3DWrapper
+                cubies={cubies} size={size} explosionFactor={explosionT} animState={animState} onRotate={onRotate} onHeal={onHeal}
+              />
+            </Suspense>
           </ErrorBoundary3D>
         )}
 

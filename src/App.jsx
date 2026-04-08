@@ -41,17 +41,19 @@ import {
 } from './hooks/index.js';
 
 // 3D components
-import GameScene from './3d/GameScene.jsx';
 import IntroScene from './components/intro/IntroScene.jsx';
-import { RotatingBlackCube } from './components/menus/MainMenu.jsx';
 import { RP2GridBackground } from './components/RP2GridBackground.jsx';
 import { setSharedRenderer, tickPreviews, hasActivePreviews } from './3d/TilePreviewRenderer.js';
 
 // UI components
 import WelcomeScreen from './components/screens/WelcomeScreen.jsx';
 import Tutorial from './components/screens/Tutorial.jsx';
-import UILayer from './components/UILayer.jsx';
 const ParityStoreScreen = React.lazy(() => import('./components/screens/ParityStoreScreen.jsx'));
+const GameScene = React.lazy(() => import('./3d/GameScene.jsx'));
+const UILayer = React.lazy(() => import('./components/UILayer.jsx'));
+const RotatingBlackCube = React.lazy(() =>
+  import('./components/menus/MainMenu.jsx').then((mod) => ({ default: mod.RotatingBlackCube }))
+);
 import { useTeachMode } from './teach/useTeachMode.js';
 import { useAntipodalIntegrity } from './hooks/useAntipodalIntegrity.js';
 import { isMobile } from './utils/device.js';
@@ -170,7 +172,9 @@ function MenuScene() {
       <pointLight position={[-9, -8, 7]} intensity={0.18} color="#7aa3ff" />
       <pointLight position={[0, 2, -14]} intensity={0.08} color="#8db3ff" />
       <RP2GridBackground opacity={1.0} />
-      <RotatingBlackCube />
+      <Suspense fallback={null}>
+        <RotatingBlackCube />
+      </Suspense>
       <Suspense fallback={null}>
         <Environment preset="city" intensity={0.22} />
       </Suspense>
@@ -1117,24 +1121,26 @@ export default function WORM3() {
           ) : showMainMenu ? (
             <MenuScene />
           ) : (
-            <GameScene
-              onMove={onMove}
-              onTapFlip={onTapFlip}
-              onAnimComplete={handleAnimComplete}
-              onCascadeComplete={onCascadeComplete}
-              onSelectTile={handleSelectTile}
-              onClearTileSelection={() => setSelectedTileForRotation(null)}
-              onFlipWaveComplete={onFlipWaveComplete}
-              onFaceRotationMode={handleFaceRotationMode}
-              animState={animState}
-              manifoldMap={manifoldMap}
-              antipodalData={antipodalData}
-              teachModeActive={teachMode.active}
-              layerHighlight={teachMode.layerHighlight}
-              onHeal={healSticker}
-              onRotate={startAnimation}
-              showAntipodalPiP={showAntipodalPiP}
-            />
+            <Suspense fallback={null}>
+              <GameScene
+                onMove={onMove}
+                onTapFlip={onTapFlip}
+                onAnimComplete={handleAnimComplete}
+                onCascadeComplete={onCascadeComplete}
+                onSelectTile={handleSelectTile}
+                onClearTileSelection={() => setSelectedTileForRotation(null)}
+                onFlipWaveComplete={onFlipWaveComplete}
+                onFaceRotationMode={handleFaceRotationMode}
+                animState={animState}
+                manifoldMap={manifoldMap}
+                antipodalData={antipodalData}
+                teachModeActive={teachMode.active}
+                layerHighlight={teachMode.layerHighlight}
+                onHeal={healSticker}
+                onRotate={startAnimation}
+                showAntipodalPiP={showAntipodalPiP}
+              />
+            </Suspense>
           )}
         </Canvas>
       </div>
@@ -1178,97 +1184,99 @@ export default function WORM3() {
       )}
 
       {!showWelcome && (
-        <UILayer
-          metrics={metrics}
-          resolvedColors={resolvedColors}
-          faceTextures={faceTextures}
-          faceImages={faceImages}
-          settings={settings}
-          chaosMode={chaosMode}
-          chaosLevel={chaosLevel}
-          cascades={cascades}
-          autoRotateEnabled={autoRotateEnabled}
-          upcomingRotation={upcomingRotation}
-          rotationCountdown={rotationCountdown}
-          moveHistory={moveHistory}
-          undo={undo}
-          canUndo={canUndo}
-          handsMode={handsMode}
-          handsMoveHistory={handsMoveHistory}
-          handsTps={handsTps}
-          victory={victory}
-          moves={moves}
-          gameTime={gameTime}
-          currentLevel={currentLevel}
-          currentLevelData={currentLevelData}
-          antipodalData={antipodalData}
-          teachMode={teachMode}
-          performCursorRotation={performCursorRotation}
-          ui={{
-            sheetOpen, setSheetOpen, sheetMode, setSheetMode,
-            showFreeplayWizard, showWormModeWizard,
-            showDisparityWizard, setShowDisparityWizard,
-            showDisparityBetting,
-            disparityWaitingFirstFlip, disparityCountdown,
-            showAntipodalPiP, onToggleAntipodalPiP: () => setShowAntipodalPiP(v => !v),
-            showComingSoon, onCloseComingSoon: () => { setShowComingSoon(false); useGameStore.getState().setShowMainMenu(true); },
-            showMobiusCubelet, onCloseMobiusCubelet: () => { setShowMobiusCubelet(false); useGameStore.getState().setShowMainMenu(true); },
-          }}
-          handlers={{
-            onReset: handleReset,
-            onShuffle: animatedShuffle,
-            onShuffleForLevel: shuffleForLevel,
-            onChangeSize: changeSize,
-            onSetChaosLevel: setChaosLevel,
-            onSetAutoRotate: setAutoRotateEnabled,
-            onSetSettings: setSettings,
-            onFaceImage: handleFaceImage,
-            onSetVictory: setVictory,
-            onTapFlip,
-            onBackToMainMenu: handleBackToMainMenu,
-            onLevelSelect: handleLevelSelect,
-            onCutsceneComplete: handleCutsceneComplete,
-            onTutorialClose: handleTutorialClose,
-            onLevelTutorialClose: levelTutorialClose,
-            onNextLevel: handleNextLevel,
-            onPreset: handlePreset,
-            onInstantChaos: handleInstantChaos,
-            onSaveState: handleSaveState,
-            onLoadState: handleLoadState,
-            onMenuPlay: handleMenuPlay,
-            onMenuLevels: handleMenuLevels,
-            onMenuFreeplay: handleMenuFreeplay,
-            onMenuCoop: handleMenuCoop,
-            onMenuTeach: handleMenuTeach,
-            onMenuSettings: handleMenuSettings,
-            onMenuBiome: handleMenuBiome,
-            onMenuDisparity: handleMenuDisparity,
-            onMenuWormHealer: handleMenuWormHealer,
-            onMenuHolonomy: handleMenuHolonomy,
-            onMenuMerge: handleMenuMerge,
-            onMenuStore: handleOpenStore,
-            onMenuComingSoon: handleMenuComingSoon,
-            onMenuMobiusCubelet: handleMenuMobiusCubelet,
-            showMergeThemePicker,
-            onMergeStart: handleMergeStart,
-            onMergeCancel: handleMergeCancel,
-            onWizardComplete: handleWizardComplete,
-            onWizardCancel: handleWizardCancel,
-            onDisparitySetupComplete: handleDisparitySetupComplete,
-            onBetPlaced: handleBetPlaced,
-            onBetSkipped: handleBetSkipped,
-            onWormSetupComplete: handleWormSetupComplete,
-            onWormWizardCancel: handleWormWizardCancel,
-            onWormRetry: handleWormRetry,
-            onWormNewGame: handleWormNewGame,
-            onToggleHandsMode: handleToggleHandsMode,
-            onFaceRotate: handleFaceRotate,
-            onTileRotation: handleTileRotation,
-            onTileFaceRotation: handleTileFaceRotation,
-            onVictoryContinue: handleVictoryContinue,
-            onVictoryNewGame: handleVictoryNewGame,
-          }}
-        />
+        <Suspense fallback={null}>
+          <UILayer
+            metrics={metrics}
+            resolvedColors={resolvedColors}
+            faceTextures={faceTextures}
+            faceImages={faceImages}
+            settings={settings}
+            chaosMode={chaosMode}
+            chaosLevel={chaosLevel}
+            cascades={cascades}
+            autoRotateEnabled={autoRotateEnabled}
+            upcomingRotation={upcomingRotation}
+            rotationCountdown={rotationCountdown}
+            moveHistory={moveHistory}
+            undo={undo}
+            canUndo={canUndo}
+            handsMode={handsMode}
+            handsMoveHistory={handsMoveHistory}
+            handsTps={handsTps}
+            victory={victory}
+            moves={moves}
+            gameTime={gameTime}
+            currentLevel={currentLevel}
+            currentLevelData={currentLevelData}
+            antipodalData={antipodalData}
+            teachMode={teachMode}
+            performCursorRotation={performCursorRotation}
+            ui={{
+              sheetOpen, setSheetOpen, sheetMode, setSheetMode,
+              showFreeplayWizard, showWormModeWizard,
+              showDisparityWizard, setShowDisparityWizard,
+              showDisparityBetting,
+              disparityWaitingFirstFlip, disparityCountdown,
+              showAntipodalPiP, onToggleAntipodalPiP: () => setShowAntipodalPiP(v => !v),
+              showComingSoon, onCloseComingSoon: () => { setShowComingSoon(false); useGameStore.getState().setShowMainMenu(true); },
+              showMobiusCubelet, onCloseMobiusCubelet: () => { setShowMobiusCubelet(false); useGameStore.getState().setShowMainMenu(true); },
+            }}
+            handlers={{
+              onReset: handleReset,
+              onShuffle: animatedShuffle,
+              onShuffleForLevel: shuffleForLevel,
+              onChangeSize: changeSize,
+              onSetChaosLevel: setChaosLevel,
+              onSetAutoRotate: setAutoRotateEnabled,
+              onSetSettings: setSettings,
+              onFaceImage: handleFaceImage,
+              onSetVictory: setVictory,
+              onTapFlip,
+              onBackToMainMenu: handleBackToMainMenu,
+              onLevelSelect: handleLevelSelect,
+              onCutsceneComplete: handleCutsceneComplete,
+              onTutorialClose: handleTutorialClose,
+              onLevelTutorialClose: levelTutorialClose,
+              onNextLevel: handleNextLevel,
+              onPreset: handlePreset,
+              onInstantChaos: handleInstantChaos,
+              onSaveState: handleSaveState,
+              onLoadState: handleLoadState,
+              onMenuPlay: handleMenuPlay,
+              onMenuLevels: handleMenuLevels,
+              onMenuFreeplay: handleMenuFreeplay,
+              onMenuCoop: handleMenuCoop,
+              onMenuTeach: handleMenuTeach,
+              onMenuSettings: handleMenuSettings,
+              onMenuBiome: handleMenuBiome,
+              onMenuDisparity: handleMenuDisparity,
+              onMenuWormHealer: handleMenuWormHealer,
+              onMenuHolonomy: handleMenuHolonomy,
+              onMenuMerge: handleMenuMerge,
+              onMenuStore: handleOpenStore,
+              onMenuComingSoon: handleMenuComingSoon,
+              onMenuMobiusCubelet: handleMenuMobiusCubelet,
+              showMergeThemePicker,
+              onMergeStart: handleMergeStart,
+              onMergeCancel: handleMergeCancel,
+              onWizardComplete: handleWizardComplete,
+              onWizardCancel: handleWizardCancel,
+              onDisparitySetupComplete: handleDisparitySetupComplete,
+              onBetPlaced: handleBetPlaced,
+              onBetSkipped: handleBetSkipped,
+              onWormSetupComplete: handleWormSetupComplete,
+              onWormWizardCancel: handleWormWizardCancel,
+              onWormRetry: handleWormRetry,
+              onWormNewGame: handleWormNewGame,
+              onToggleHandsMode: handleToggleHandsMode,
+              onFaceRotate: handleFaceRotate,
+              onTileRotation: handleTileRotation,
+              onTileFaceRotation: handleTileFaceRotation,
+              onVictoryContinue: handleVictoryContinue,
+              onVictoryNewGame: handleVictoryNewGame,
+            }}
+          />
+        </Suspense>
       )}
 
       {/* Parity Store — mounted at app root so it's above every overlay */}
