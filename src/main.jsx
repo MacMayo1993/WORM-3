@@ -8,7 +8,5 @@ import './App.css' // Import App.css instead of index.css
 window.addEventListener('vite:preloadError', () => window.location.reload());
 
 ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
+  <App />,
 )
