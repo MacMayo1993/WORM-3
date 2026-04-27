@@ -133,6 +133,7 @@ export default function GameScene({
     wormPaused,
     holonomyMode,
     wormHealedCount,
+    wormCharacter,
   } = useGameStore(useShallow((s) => ({
     visualMode: s.visualMode,
     explosionT: s.explosionT,
@@ -149,7 +150,10 @@ export default function GameScene({
     wormPaused: s.wormPaused ?? false,
     holonomyMode: s.holonomyMode,
     wormHealedCount: s.wormHealedCount ?? 0,
+    wormCharacter: s.wormCharacter ?? 'classic',
   })));
+
+  const isGlowWorm = wormHealerMode && wormCharacter === 'glow';
 
   const wormholePhaseActive = wormHealerMode && (
     wormPhase === 'entering' || wormPhase === 'tunnel' || wormPhase === 'exiting'
@@ -272,13 +276,16 @@ export default function GameScene({
           </Suspense>
         )}
 
-        {/* Worm mode bloom — only affects the worm's bright emissive surfaces. */}
+        {/* Worm mode bloom — only affects the worm's bright emissive surfaces.
+            Glow worm uses a higher threshold (0.82) so only the worm's HDR emissive
+            blooms, not background tiles. Non-glow characters use a lower threshold
+            (0.6) for orb glow. */}
         {wormHealerMode && (
           <EffectComposer>
             <Bloom
-              intensity={0.45}
-              luminanceThreshold={0.6}
-              luminanceSmoothing={0.4}
+              intensity={isGlowWorm ? 0.35 : 0.45}
+              luminanceThreshold={isGlowWorm ? 0.82 : 0.6}
+              luminanceSmoothing={isGlowWorm ? 0.75 : 0.4}
               mipmapBlur
             />
           </EffectComposer>

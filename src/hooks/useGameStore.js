@@ -48,11 +48,8 @@ const loadPersistedState = () => {
     const wormHat = localStorage.getItem('worm3_hat') || 'none';
     const wormCharacter = localStorage.getItem(WORM_CHARACTER_KEY) || 'classic';
     const parityPoints = parseInt(localStorage.getItem(PARITY_POINTS_KEY) ?? '0', 10) || 0;
-    // TODO(pre-release): Remove the two lines below before shipping to production.
-    // They grant all items for free and floor the wallet at 10 000 points so the
-    // store UI is fully explorable during development/preview.
-    const ownedItems = [...DEFAULT_OWNED]; // TODO(pre-release): restore from localStorage: JSON.parse(localStorage.getItem(OWNED_ITEMS_KEY) ?? '[]')
-    const safeParityPoints = Math.max(parityPoints, 10000); // TODO(pre-release): remove Math.max floor
+    const ownedItems = [...DEFAULT_OWNED]; // DEV: all items unlocked for store testing
+    const safeParityPoints = Math.max(parityPoints, 10000); // DEV: floor wallet at 10 000 for store testing
 
     // Guard: reset cosmetics/settings to defaults if the saved value isn't owned
     const safeSkin = ownedItems.includes(`skin_${wormSkin}`) ? wormSkin : 'slime';
@@ -426,7 +423,9 @@ export const useGameStore = create(
     // Atomic init for Worm Mode — clears disparity state AND enables worm in one set()
     // so wormHealerMode:true can never be clobbered by the reset.
     // wormPaused:true — the scramble animation runs first; gameplay starts after countdown.
-    initWormMode: (flipCap = 9999, chaosLevel = 1) => set((state) => ({ disparityDeaths: [], disparityDeathByGridId: {}, disparityWinner: null, showDisparityWinner: false, disparityEliminatedFaces: [], cascades: [], holonomyMode: false, wormHealedCount: 0, wormPhase: 'crawling', wormOnFlippedTile: false, wormBodyTiles: 0, wormPowerups: [], wormholeCountdown: 0, wormAlive: true, showWormDeathMenu: false, wormDeathDetails: null, wormHealerMode: true, disparityFlipCap: flipCap, chaosLevel, wormRunId: (state.wormRunId ?? 0) + 1, wormPaused: true, wormTimeAlive: 0, wormTunnelCount: 0, wormOrbInventory: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }, wormHealingProgress: {}, wormGamePhase: 'scrambling', wormCountdownStep: null, wormSessionOrbs: 0 })),
+    // speed/orbCount/interval/color: when provided, overwrite the stored wizard settings atomically
+    // so callers never need separate setWormSpeed/setWormOrbCount/… calls before this one.
+    initWormMode: (flipCap = 9999, chaosLevel = 1, speed = null, orbCount = null, interval = null, color = null) => set((state) => ({ disparityDeaths: [], disparityDeathByGridId: {}, disparityWinner: null, showDisparityWinner: false, disparityEliminatedFaces: [], cascades: [], holonomyMode: false, wormHealedCount: 0, wormPhase: 'crawling', wormOnFlippedTile: false, wormBodyTiles: 0, wormPowerups: [], wormholeCountdown: 0, wormAlive: true, showWormDeathMenu: false, wormDeathDetails: null, wormHealerMode: true, disparityFlipCap: flipCap, chaosLevel, wormRunId: (state.wormRunId ?? 0) + 1, wormPaused: true, wormTimeAlive: 0, wormTunnelCount: 0, wormOrbInventory: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }, wormHealingProgress: {}, wormGamePhase: 'scrambling', wormCountdownStep: null, wormSessionOrbs: 0, wormSpeed: speed !== null ? Math.max(0.5, Math.min(3.0, speed)) : state.wormSpeed, wormOrbCount: orbCount !== null ? Math.max(1, Math.min(24, Math.round(orbCount))) : state.wormOrbCount, wormholeInterval: interval !== null ? Math.max(2, Math.min(30, Number(interval))) : state.wormholeInterval, wormColor: color !== null ? (color || '#33ff66') : state.wormColor })),
 
     // ========================================================================
     // ANIMATION STATE

@@ -683,14 +683,15 @@ export default function WORM3() {
     if (wizardSettings.customColors) newSettings.customColors = wizardSettings.customColors;
     setSettings(newSettings);
 
-    // Atomic init — clears disparity fields AND sets wormHealerMode:true in a single
-    // Zustand set() so nothing can clobber it between calls.
+    // Single atomic set: clears disparity fields, enables worm, and applies wizard settings.
     useGameStore.getState().clearLevel();
-    useGameStore.getState().setWormSpeed(wizardSettings.wormSpeed ?? 1.0);
-    useGameStore.getState().setWormOrbCount(wizardSettings.wormOrbCount ?? 5);
-    useGameStore.getState().setWormholeInterval(wizardSettings.wormholeInterval ?? 10);
-    useGameStore.getState().setWormColor(wizardSettings.wormColor ?? '#33ff66');
-    useGameStore.getState().initWormMode();
+    useGameStore.getState().initWormMode(
+      undefined, undefined,
+      wizardSettings.wormSpeed ?? 1.0,
+      wizardSettings.wormOrbCount ?? 5,
+      wizardSettings.wormholeInterval ?? 10,
+      wizardSettings.wormColor ?? '#33ff66'
+    );
 
     // Resize / reset cube AFTER worm mode is established
     const targetSize = wizardSettings.cubeSize || 3;
