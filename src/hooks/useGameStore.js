@@ -48,9 +48,8 @@ const loadPersistedState = () => {
     const wormHat = localStorage.getItem('worm3_hat') || 'none';
     const wormCharacter = localStorage.getItem(WORM_CHARACTER_KEY) || 'classic';
     const parityPoints = parseInt(localStorage.getItem(PARITY_POINTS_KEY) ?? '0', 10) || 0;
-    const ownedItemsRaw = localStorage.getItem(OWNED_ITEMS_KEY);
-    const ownedItems = ownedItemsRaw ? JSON.parse(ownedItemsRaw) : [...DEFAULT_OWNED];
-    const safeParityPoints = parityPoints;
+    const ownedItems = [...DEFAULT_OWNED]; // DEV: all items unlocked for store testing
+    const safeParityPoints = Math.max(parityPoints, 10000); // DEV: floor wallet at 10 000 for store testing
 
     // Guard: reset cosmetics/settings to defaults if the saved value isn't owned
     const safeSkin = ownedItems.includes(`skin_${wormSkin}`) ? wormSkin : 'slime';
