@@ -358,6 +358,8 @@ export default function PlatformerWormMode({ cubies: initialCubies, size, faceCo
   const inputRef = useRef({
     turnRate: 0, thrust: 0, brake: 0, jump: false, sprint: false,
   });
+  // Persisted across effect re-runs so held keys survive gameState transitions (e.g. pause → resume)
+  const keyStateRef = useRef(new Set());
 
   const lastParityDamage = useRef(0);
 
@@ -504,15 +506,14 @@ export default function PlatformerWormMode({ cubies: initialCubies, size, faceCo
 
   // --- Keyboard input ---
   useEffect(() => {
-    const keyState = new Set();
-
     const updateInput = () => {
+      const ks = keyStateRef.current;
       inputRef.current = {
-        turnRate: (keyState.has('arrowleft') ? -1 : 0) + (keyState.has('arrowright') ? 1 : 0),
-        thrust: keyState.has('arrowup') ? 1 : 0,
-        brake: keyState.has('arrowdown') ? 1 : 0,
-        jump: keyState.has(' '),
-        sprint: keyState.has('shift'),
+        turnRate: (ks.has('arrowleft') ? -1 : 0) + (ks.has('arrowright') ? 1 : 0),
+        thrust: ks.has('arrowup') ? 1 : 0,
+        brake: ks.has('arrowdown') ? 1 : 0,
+        jump: ks.has(' '),
+        sprint: ks.has('shift'),
       };
     };
 
@@ -530,7 +531,7 @@ export default function PlatformerWormMode({ cubies: initialCubies, size, faceCo
       // --- Crawler controls (Arrow keys + Space + Shift) ---
       if (e.key.startsWith('Arrow') || key === ' ' || key === 'shift') {
         e.preventDefault();
-        keyState.add(key === ' ' ? ' ' : e.key.startsWith('Arrow') ? e.key.toLowerCase() : key);
+        keyStateRef.current.add(key === ' ' ? ' ' : e.key.startsWith('Arrow') ? e.key.toLowerCase() : key);
         updateInput();
         return;
       }
@@ -569,9 +570,14 @@ export default function PlatformerWormMode({ cubies: initialCubies, size, faceCo
 
     const onKeyUp = (e) => {
       const key = e.key.toLowerCase();
-      keyState.delete(key === ' ' ? ' ' : e.key.startsWith('Arrow') ? e.key.toLowerCase() : key);
+      keyStateRef.current.delete(key === ' ' ? ' ' : e.key.startsWith('Arrow') ? e.key.toLowerCase() : key);
       updateInput();
     };
+
+    // Clear held keys whenever the effect re-runs (e.g. gameState changes) so no
+    // key appears stuck after a pause/resume transition.
+    keyStateRef.current.clear();
+    updateInput();
 
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
