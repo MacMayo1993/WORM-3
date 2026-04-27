@@ -909,17 +909,6 @@ export const getSegmentWorldPos = (seg, size, explosionFactor = 0) => {
   return getStickerWorldPos(seg.x, seg.y, seg.z, seg.dirKey, size, explosionFactor);
 };
 
-/**
- * Calculate score based on worm length and stats
- * @param {number} length - Worm length
- * @param {number} orbsEaten - Total orbs eaten
- * @param {number} warpsUsed - Total wormhole warps
- * @returns {number} Score
- */
-export const calculateScore = (length, orbsEaten, warpsUsed) => {
-  return (length * 100) + (orbsEaten * 50) + (warpsUsed * 25);
-};
-
 // ============================================================================
 // WORM WEIGHT - Tile press state & healing logic (surface mode)
 // ============================================================================

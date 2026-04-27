@@ -9,6 +9,7 @@ import { resolveColors } from '../utils/colorSchemes.js';
 import { ANTIPODAL_COLOR } from '../utils/constants.js';
 import OrbInventoryHUD from './OrbInventoryHUD.jsx';
 import ParityWallet from '../components/overlays/ParityWallet.jsx';
+import { callWormTurn } from './wormTurnBridge.js';
 
 const PHASE_META = {
     crawling: { label: 'CRAWLING', accent: '#38bdf8' },
@@ -804,7 +805,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
 
     const handleJumpAction = () => {
         if (!wormAlive) return;
-        useGameStore.getState()._wormTurn?.('jump');
+        callWormTurn('jump');
     };
 
     const phaseMeta = PHASE_META[phase] || { label: phase || 'CRAWLING', accent: '#93c5fd' };
@@ -911,7 +912,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                     dir ? (
                         <button
                             key={dir}
-                            onPointerDown={() => wormAlive && useGameStore.getState()._wormTurn?.(dir)}
+                            onPointerDown={() => wormAlive && callWormTurn(dir)}
                             style={{ ...DPAD_BTN_STYLE, gridColumn: col + 1, gridRow: row + 1 }}
                         >
                             {label}

@@ -102,6 +102,36 @@ const loadPersistedState = () => {
 const persistedState = loadPersistedState();
 const MAX_UNDO_HISTORY = 10;
 
+// All runtime worm fields that must be reset on both session start (initWormMode)
+// and session end (clearDisparityGame). Extracted here so both callers share the same
+// key list and a forgotten field can't silently differ between the two resets.
+const makeWormRuntimeDefaults = () => ({
+  disparityDeaths: [],
+  disparityDeathByGridId: {},
+  disparityWinner: null,
+  showDisparityWinner: false,
+  disparityEliminatedFaces: [],
+  cascades: [],
+  holonomyMode: false,
+  wormHealedCount: 0,
+  wormPhase: 'crawling',
+  wormOnFlippedTile: false,
+  wormBodyTiles: 0,
+  wormPowerups: [],
+  wormholeCountdown: 0,
+  wormAlive: true,
+  showWormDeathMenu: false,
+  wormDeathDetails: null,
+  wormPaused: false,
+  wormTimeAlive: 0,
+  wormTunnelCount: 0,
+  wormOrbInventory: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
+  wormHealingProgress: {},
+  wormGamePhase: 'scrambling',
+  wormCountdownStep: null,
+  wormSessionOrbs: 0,
+});
+
 export const useGameStore = create(
   subscribeWithSelector((set, get) => ({
     // ========================================================================
@@ -419,13 +449,24 @@ export const useGameStore = create(
     setWormCountdownStep: (v) => set({ wormCountdownStep: v }),
     wormSessionOrbs: 0,            // orbs picked up this run (shown in HUD; NOT auto-banked)
     setWormSessionOrbs: (v) => set({ wormSessionOrbs: v }),
-    clearDisparityGame: () => set({ disparityDeaths: [], disparityDeathByGridId: {}, disparityWinner: null, showDisparityWinner: false, disparityEliminatedFaces: [], cascades: [], wormHealerMode: false, holonomyMode: false, wormHealedCount: 0, wormPhase: 'crawling', wormOnFlippedTile: false, wormBodyTiles: 0, wormPowerups: [], wormholeCountdown: 0, wormAlive: true, showWormDeathMenu: false, wormDeathDetails: null, wormPaused: false, wormTimeAlive: 0, wormTunnelCount: 0, wormOrbInventory: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }, wormHealingProgress: {}, wormGamePhase: 'scrambling', wormCountdownStep: null, wormSessionOrbs: 0 }),
+    clearDisparityGame: () => set({ ...makeWormRuntimeDefaults(), wormHealerMode: false }),
     // Atomic init for Worm Mode — clears disparity state AND enables worm in one set()
     // so wormHealerMode:true can never be clobbered by the reset.
     // wormPaused:true — the scramble animation runs first; gameplay starts after countdown.
     // speed/orbCount/interval/color: when provided, overwrite the stored wizard settings atomically
     // so callers never need separate setWormSpeed/setWormOrbCount/… calls before this one.
-    initWormMode: (flipCap = 9999, chaosLevel = 1, speed = null, orbCount = null, interval = null, color = null) => set((state) => ({ disparityDeaths: [], disparityDeathByGridId: {}, disparityWinner: null, showDisparityWinner: false, disparityEliminatedFaces: [], cascades: [], holonomyMode: false, wormHealedCount: 0, wormPhase: 'crawling', wormOnFlippedTile: false, wormBodyTiles: 0, wormPowerups: [], wormholeCountdown: 0, wormAlive: true, showWormDeathMenu: false, wormDeathDetails: null, wormHealerMode: true, disparityFlipCap: flipCap, chaosLevel, wormRunId: (state.wormRunId ?? 0) + 1, wormPaused: true, wormTimeAlive: 0, wormTunnelCount: 0, wormOrbInventory: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }, wormHealingProgress: {}, wormGamePhase: 'scrambling', wormCountdownStep: null, wormSessionOrbs: 0, wormSpeed: speed !== null ? Math.max(0.5, Math.min(3.0, speed)) : state.wormSpeed, wormOrbCount: orbCount !== null ? Math.max(1, Math.min(24, Math.round(orbCount))) : state.wormOrbCount, wormholeInterval: interval !== null ? Math.max(2, Math.min(30, Number(interval))) : state.wormholeInterval, wormColor: color !== null ? (color || '#33ff66') : state.wormColor })),
+    initWormMode: (flipCap = 9999, chaosLevel = 1, speed = null, orbCount = null, interval = null, color = null) => set((state) => ({
+      ...makeWormRuntimeDefaults(),
+      wormHealerMode: true,
+      disparityFlipCap: flipCap,
+      chaosLevel,
+      wormRunId: (state.wormRunId ?? 0) + 1,
+      wormPaused: true, // overrides makeWormRuntimeDefaults wormPaused:false — scramble plays first
+      wormSpeed: speed !== null ? Math.max(0.5, Math.min(3.0, speed)) : state.wormSpeed,
+      wormOrbCount: orbCount !== null ? Math.max(1, Math.min(24, Math.round(orbCount))) : state.wormOrbCount,
+      wormholeInterval: interval !== null ? Math.max(2, Math.min(30, Number(interval))) : state.wormholeInterval,
+      wormColor: color !== null ? (color || '#33ff66') : state.wormColor,
+    })),
 
     // ========================================================================
     // ANIMATION STATE

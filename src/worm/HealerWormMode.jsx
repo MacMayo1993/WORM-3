@@ -11,6 +11,7 @@ import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { getStickerWorldPos, getManifoldGridId } from '../game/coordinates.js';
 import { getNextSurfacePosition, getActiveTunnels, getTunnelWorldPos, turnWorm, getStableKey, findStickerByStableKey } from './wormLogic.js';
+import { setWormTurnCallback } from './wormTurnBridge.js';
 import { buildManifoldGridMap, flipStickerPair } from '../game/manifoldLogic.js';
 import { healSticker, getStickerSafe } from '../game/cubeState.js';
 import { rotateVec90 } from '../game/cubeRotation.js';
@@ -272,6 +273,18 @@ function useWormCrawler(size, cubies) {
     );
     const wormPausedRef = useRef(false);
     wormPausedRef.current = wormPaused;
+
+    // Mutable refs for values captured by tick/PHASE_HANDLERS that change between renders.
+    // Reading via ref avoids adding them to tick's useCallback deps, preventing tick from
+    // being recreated (and the callback reference replaced) on every cube rotation or setting change.
+    const cubiesRef = useRef(cubies);
+    cubiesRef.current = cubies;
+    const wormControlModeRef = useRef(wormControlMode);
+    wormControlModeRef.current = wormControlMode;
+    const wormholeIntervalRef = useRef(wormholeInterval);
+    wormholeIntervalRef.current = wormholeInterval;
+    const wormSpeedRef = useRef(wormSpeed);
+    wormSpeedRef.current = wormSpeed;
     const timeAliveRef = useRef(0);
     const timeAliveSyncRef = useRef(0);
     const survivalTickRef = useRef(0);
@@ -530,7 +543,7 @@ function useWormCrawler(size, cubies) {
     };
 
     const spawnWormholePair = () => {
-        const tile = randomUnflippedTile(cubies, size, [pos.current]);
+        const tile = randomUnflippedTile(cubiesRef.current, size, [pos.current]);
         if (!tile) return;
         useGameStore.setState((state) => {
             const mm = buildManifoldGridMap(state.cubies, size);
@@ -542,7 +555,7 @@ function useWormCrawler(size, cubies) {
 
     // ── Per-frame simulation ──────────────────────────────────────────────────
     const tick = useCallback((delta) => {
-        const STEP_SEC = 1.0 / wormSpeed;
+        const STEP_SEC = 1.0 / wormSpeedRef.current;
 
         if (!alive.current) return;
         if (wormPausedRef.current) return;
@@ -568,7 +581,7 @@ function useWormCrawler(size, cubies) {
         wormholeTimer.current -= delta;
         if (wormholeTimer.current <= 0) {
             if (!noMoreSpawns) spawnWormholePair();
-            wormholeTimer.current = wormholeInterval;
+            wormholeTimer.current = wormholeIntervalRef.current;
         }
         const countdown = noMoreSpawns ? 0 : Math.max(0, Math.ceil(wormholeTimer.current * 10) / 10);
         const countdownDeci = Math.round(countdown * 10);
@@ -621,7 +634,7 @@ function useWormCrawler(size, cubies) {
                         const t = pendingTurns.current.shift();
                         if (t === 'jump') {
                             startJump();
-                        } else if (wormControlMode === 'oriented') {
+                        } else if (wormControlModeRef.current === 'oriented') {
                             if (t === 'up' || t === 'down' || t === 'left' || t === 'right') {
                                 moveDir.current = t;
                             }
@@ -833,7 +846,7 @@ function useWormCrawler(size, cubies) {
                         }
 
                         // Flipped tile detection
-                        const sticker = cubies?.[x]?.[y]?.[z]?.stickers?.[dirKey];
+                        const sticker = cubiesRef.current?.[x]?.[y]?.[z]?.stickers?.[dirKey];
                         const isFlipped = !!(sticker && sticker.curr !== sticker.orig);
                         const resolved = isFlipped ? resolveTunnelAtTile(x, y, z, dirKey) : null;
                         const isVoidZone = !!(resolved && voidTunnelKeysRef.current.has(resolved.tunnelKey));
@@ -985,7 +998,7 @@ function useWormCrawler(size, cubies) {
         }
         if (PHASE_HANDLERS[currentPhase].update(delta, STEP_SEC)) return;
 
-    }, [size, cubies, wormSpeed, wormControlMode, wormholeInterval, beginTunnelTransition, resolveTunnelAtTile, killWorm]);
+    }, [size, beginTunnelTransition, resolveTunnelAtTile, killWorm]);
 
 
 
@@ -3057,8 +3070,8 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     const thunkRef = useRef({ active: false, pos: [0, 0, 0], colors: [] });
 
     useEffect(() => {
-        useGameStore.setState({ _wormTurn: worm.queueTurn });
-        return () => { useGameStore.setState({ _wormTurn: null }); };
+        setWormTurnCallback(worm.queueTurn);
+        return () => { setWormTurnCallback(null); };
     }, [worm.queueTurn]);
 
     // Build a fresh scramble whenever a new run starts (or on first mount).
