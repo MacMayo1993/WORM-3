@@ -19,9 +19,19 @@ const FACE_NORMALS = {
 
 // SURFACE_OFFSET is imported from utils/constants.js — same value used by coordinates.js.
 
+// Module-level scratch vectors — eliminates per-frame allocations in the 60fps physics loop.
+const _pjScratch = new THREE.Vector3();   // projectOntoCube intermediate
+const _pfNScaled = new THREE.Vector3();   // projectOntoFace normal component
+const _scFwd = new THREE.Vector3();       // stepCrawler forward direction
+const _scSurf = new THREE.Vector3();      // stepCrawler surface position
+const _scJumpNorm = new THREE.Vector3();  // stepCrawler jump-height offset
+const _gpScratch = new THREE.Vector3();   // getGroundPosition
+
 /**
  * Project a 3D point onto the cube surface.
  * Returns the projected position and the face it lands on.
+ * NOTE: `position` in the returned object is the module-level _pjScratch vector.
+ * Callers that need to store the result across another projectOntoCube call must clone it.
  */
 export function projectOntoCube(point, size) {
   const k = (size - 1) / 2;
@@ -31,7 +41,7 @@ export function projectOntoCube(point, size) {
   const az = Math.abs(point.z);
 
   let face;
-  const p = point.clone();
+  const p = _pjScratch.copy(point);
 
   if (ax >= ay && ax >= az) {
     face = p.x > 0 ? 'PX' : 'NX';
@@ -55,10 +65,12 @@ export function projectOntoCube(point, size) {
 
 /**
  * Project a vector onto the tangent plane of a face (remove normal component).
+ * Returns a NEW Vector3 (the caller stores it in state between frames).
  */
 export function projectOntoFace(vec, face) {
   const n = FACE_NORMALS[face];
-  return vec.clone().sub(n.clone().multiplyScalar(vec.dot(n)));
+  _pfNScaled.copy(n).multiplyScalar(vec.dot(n));
+  return new THREE.Vector3().copy(vec).sub(_pfNScaled);
 }
 
 /**
@@ -75,10 +87,11 @@ export function getDefaultForward(face) {
 
 /**
  * Rotate a tangent vector around the face normal by an angle (radians).
+ * If `out` is provided the result is written into it (no allocation); otherwise a new Vector3 is returned.
  */
-export function rotateTangent(forward, face, angle) {
+export function rotateTangent(forward, face, angle, out = new THREE.Vector3()) {
   const n = FACE_NORMALS[face];
-  return forward.clone().applyAxisAngle(n, angle);
+  return out.copy(forward).applyAxisAngle(n, angle);
 }
 
 // Jump constants — simple vertical bounce, no effect on horizontal speed.
@@ -102,10 +115,11 @@ export function stepCrawler(state, input, dt, size) {
 
   // --- Turning (allowed while airborne so the player can steer the arc) ---
   const turnSpeed = 3.5; // radians per second
-  let newForward = forward.clone();
+  _scFwd.copy(forward);
   if (input.turnRate !== 0) {
-    newForward = rotateTangent(forward, face, -input.turnRate * turnSpeed * dt);
+    rotateTangent(forward, face, -input.turnRate * turnSpeed * dt, _scFwd);
   }
+  const newForward = _scFwd;
 
   // --- Jump: simple vertical sine arc, no effect on horizontal movement ---
   // jumpT: 0 = grounded, (0,1) = mid-arc. jumpReady prevents auto-repeat on hold.
@@ -146,25 +160,27 @@ export function stepCrawler(state, input, dt, size) {
 
   // --- Movement --- clamp horizontal step to one tile while airborne
   const TILE_SIZE = 1;
-  const moveDir = newForward.clone().normalize();
   let stepLength = vel * dt;
   if (isAirborne) {
     stepLength = Math.min(stepLength, TILE_SIZE);
     vel = 0; // freeze velocity during jump so landing speed is clean
   }
-  const step = moveDir.multiplyScalar(stepLength);
   const normal = FACE_NORMALS[face];
 
-  // Strip jump offset to get the surface-level position, then advance
-  const surfacePos = position.clone().sub(normal.clone().multiplyScalar(jumpHeight));
-  const newSurfacePos = surfacePos.add(step);
+  // Strip jump offset, advance, project back — all using scratch vectors.
+  // Normalize newForward in-place (we no longer need the un-normalized length).
+  newForward.normalize();
+  // _scSurf = position - normal*jumpHeight + forward*stepLength
+  _scSurf.copy(position)
+    .addScaledVector(normal, -jumpHeight)
+    .addScaledVector(newForward, stepLength);
 
-  // Project back onto cube surface, then re-add the new jump height
-  const projected = projectOntoCube(newSurfacePos, size);
+  // Project back onto cube surface, then re-add the new jump height.
+  // projectOntoCube returns a reference to its internal scratch (_pjScratch).
+  // We clone it immediately so newPosition persists in crawlerRef between frames.
+  const projected = projectOntoCube(_scSurf, size);
   const newFace = projected.face;
-  const newPosition = projected.position.clone().add(
-    FACE_NORMALS[newFace].clone().multiplyScalar(newJumpHeight)
-  );
+  const newPosition = projected.position.clone().addScaledVector(FACE_NORMALS[newFace], newJumpHeight);
 
   // Re-project forward onto new face if face changed
   let finalForward = newForward;
@@ -190,10 +206,11 @@ export function stepCrawler(state, input, dt, size) {
 
 /**
  * Get the ground-level world position (no jump offset) for a crawler state.
+ * Returns a reference to a module-level scratch vector — clone if you need to store it.
  */
 export function getGroundPosition(state, _size) {
   const normal = FACE_NORMALS[state.face];
-  return state.position.clone().sub(normal.clone().multiplyScalar(state.jumpHeight));
+  return _gpScratch.copy(state.position).addScaledVector(normal, -state.jumpHeight);
 }
 
 /**

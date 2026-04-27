@@ -149,12 +149,12 @@ function checkWormHitBySlice(worm, axis, sliceIndex) {
     // tileTrail can hold up to MAX_TAIL=1200 historical entries but the visible snake
     // body is ceil(tailLength × BODY_BALL_SPACING) tiles, matching the self-collision check.
     const activeTiles = Math.max(1, Math.ceil(worm.tailLength.current * BODY_BALL_SPACING));
-    const bodyEnd = Math.min(activeTiles, trail.length); // exclusive upper bound for body scan
+    const bodyEnd = Math.min(activeTiles, trail.count); // exclusive upper bound for body scan
 
     if (!headOnSlice) {
         // Head is off the slice — cut if any active body tile is on it
         for (let i = 1; i < bodyEnd; i++) {
-            if (Number(trail[i].split(',')[partsIdx]) === sliceIndex) {
+            if (Number(ttAt(trail, i).split(',')[partsIdx]) === sliceIndex) {
                 return { type: 'cut', cutTrailIdx: i };
             }
         }
@@ -164,7 +164,7 @@ function checkWormHitBySlice(worm, axis, sliceIndex) {
     // Head is on the slice — death only if any active body tile is OFF the slice
     // (if the entire active body is on the slice the worm travels with the rotation)
     for (let i = 1; i < bodyEnd; i++) {
-        if (Number(trail[i].split(',')[partsIdx]) !== sliceIndex) {
+        if (Number(ttAt(trail, i).split(',')[partsIdx]) !== sliceIndex) {
             return { type: 'death' };
         }
     }
@@ -173,9 +173,9 @@ function checkWormHitBySlice(worm, axis, sliceIndex) {
 
 // Remove all worm segments at and beyond cutTrailIdx.
 function cutWormTail(worm, cutTrailIdx) {
-    worm.tileTrail.current.length = cutTrailIdx;
+    ttTrimTo(worm.tileTrail.current, cutTrailIdx);
     const histLen = cutTrailIdx * STEPS_PER_TILE;
-    if (worm.stepHistory.current.length > histLen) worm.stepHistory.current.length = histLen;
+    shTrimTo(worm.stepHistory.current, histLen);
     // cutTrailIdx is in tile units; tailLength is in visual-ball units.
     // BODY_BALL_SPACING = 0.14 converts: tailLength = tiles / BODY_BALL_SPACING
     worm.tailLength.current = Math.max(BASE_TAIL_LENGTH, Math.round(cutTrailIdx / BODY_BALL_SPACING));
@@ -187,6 +187,76 @@ function cutWormTail(worm, cutTrailIdx) {
 // ─── Scratch vectors for evaluatePosAndNormal (avoids per-sub-step allocations) ──
 const _evalHPos = new THREE.Vector3();
 const _evalCornerVtx = new THREE.Vector3();
+// Extra scratch for computing the lifted position before writing into stepHistory
+const _evalLiftedPos = new THREE.Vector3();
+
+// ─── Step History Circular Buffer ────────────────────────────────────────────
+// Pre-allocated ring of {pos, normal} objects — eliminates per-step Vector3
+// allocations and O(N) unshift that grows to 60 000 elements at MAX_TAIL.
+function makeStepHistory(capacity) {
+    return {
+        buf: Array.from({ length: capacity }, () => ({ pos: new THREE.Vector3(), normal: new THREE.Vector3() })),
+        head: 0,   // next write slot; newest entry is at (head-1+capacity)%capacity
+        count: 0,
+        capacity,
+    };
+}
+function shPush(sh, pos, normal) {
+    const slot = sh.buf[sh.head];
+    slot.pos.copy(pos);
+    slot.normal.copy(normal);
+    sh.head = (sh.head + 1) % sh.capacity;
+    if (sh.count < sh.capacity) sh.count++;
+}
+// i=0 → newest, i=count-1 → oldest
+function shAt(sh, i) {
+    return sh.buf[(sh.head - 1 - i + sh.capacity) % sh.capacity];
+}
+function shTrimTo(sh, maxCount) {
+    if (maxCount < sh.count) sh.count = maxCount;
+}
+function shReset(sh) { sh.head = 0; sh.count = 0; }
+
+// ─── Tile Trail Circular Buffer ───────────────────────────────────────────────
+// O(1) push replaces the O(N) unshift on a 1 200-entry string array.
+function makeTileTrail(capacity) {
+    return {
+        buf: new Array(capacity).fill(''),
+        head: 0,   // head is the slot of index-0 (newest entry)
+        count: 0,
+        capacity,
+    };
+}
+// Push new key as newest (index 0). Ring automatically evicts oldest when full.
+function ttPush(tt, key) {
+    tt.head = (tt.head - 1 + tt.capacity) % tt.capacity;
+    tt.buf[tt.head] = key;
+    if (tt.count < tt.capacity) tt.count++;
+}
+// i=0 → newest (current tile), i=count-1 → oldest
+function ttAt(tt, i) { return tt.buf[(tt.head + i) % tt.capacity]; }
+function ttTrimTo(tt, maxCount) { if (maxCount < tt.count) tt.count = maxCount; }
+function ttReset(tt, initialKey) { tt.head = 0; tt.buf[0] = initialKey; tt.count = 1; }
+// Transform every key in place (used when cube rotates to re-encode tile coords).
+function ttMapInPlace(tt, fn) {
+    for (let i = 0; i < tt.count; i++) {
+        const idx = (tt.head + i) % tt.capacity;
+        tt.buf[idx] = fn(tt.buf[idx]);
+    }
+}
+// Keep only entries matching predicate, compacting the ring (rare: tunnel entry).
+function ttFilterInPlace(tt, fn) {
+    let keep = 0;
+    for (let i = 0; i < tt.count; i++) {
+        const src = (tt.head + i) % tt.capacity;
+        if (fn(tt.buf[src])) {
+            const dst = (tt.head + keep) % tt.capacity;
+            if (dst !== src) tt.buf[dst] = tt.buf[src];
+            keep++;
+        }
+    }
+    tt.count = keep;
+}
 
 // ─── Worm Crawler Hook ────────────────────────────────────────────────────────
 function useWormCrawler(size, cubies) {
@@ -249,11 +319,11 @@ function useWormCrawler(size, cubies) {
     // Growing tail + powerups
     const tailLength = useRef(BASE_TAIL_LENGTH);
     const powerupsRef = useRef([]);  // local fast-access copy of wormPowerups
-    const stepHistory = useRef([]);  // one world-pos per tile step, used by WormBody
+    const stepHistory = useRef(makeStepHistory(MAX_TAIL * STEPS_PER_TILE)); // pre-allocated ring, used by WormBody
     const wormholeTimer = useRef(DEFAULT_WORMHOLE_FLIP_INTERVAL);
     const lastCountdownDeci = useRef(-1);
     const alive = useRef(true);
-    const tileTrail = useRef([]);
+    const tileTrail = useRef(makeTileTrail(MAX_TAIL));
     const deathMenuTimer = useRef(null);
     const tunnelUseCountsRef = useRef(new Map());
     const voidTunnelKeysRef = useRef(new Set());
@@ -430,7 +500,7 @@ function useWormCrawler(size, cubies) {
         // Remove the exit portal tile from the trail so the head landing on it after
         // exiting the tunnel doesn't immediately trigger a false self-collision.
         const exitTileKey = tileKey(tunnel.exit);
-        tileTrail.current = tileTrail.current.filter(k => k !== exitTileKey);
+        ttFilterInPlace(tileTrail.current, k => k !== exitTileKey);
         tunnelProgress.current = 0;
         phase.current = 'entering';
         onFlippedTile.current = false;
@@ -534,7 +604,7 @@ function useWormCrawler(size, cubies) {
                     // preventing false-positive self-collision deaths in the post-tunnel window.
                     // The grace period covers the initial steps where the trail is too short to
                     // reliably catch real collisions.
-                    tileTrail.current = [tileKey(pos.current)];
+                    ttReset(tileTrail.current, tileKey(pos.current));
                     useGameStore.setState({ wormPhase: 'crawling', wormOnFlippedTile: false, visualMode: prevVisualModeRef.current ?? 'classic' });
                     onFlippedTile.current = false;
                     lastFlippedRef.current = false;
@@ -665,13 +735,10 @@ function useWormCrawler(size, cubies) {
                             ? Math.max(0, Math.min(1, jumpT.current - (interpT.current - lastRecordedT.current)))
                             : 0;
                         const ptJump = jumpTAtR > 0 ? Math.sin(jumpTAtR * Math.PI) * JUMP_HEIGHT : 0;
-                        const ptLifted = new THREE.Vector3().copy(_evalHPos).addScaledVector(ptNorm, WORM_LIFT + ptJump);
-
-                        stepHistory.current.unshift({ pos: ptLifted, normal: ptNorm });
+                        // Compute lifted pos into module-level scratch, then copy into pre-allocated ring slot.
+                        _evalLiftedPos.copy(_evalHPos).addScaledVector(ptNorm, WORM_LIFT + ptJump);
+                        shPush(stepHistory.current, _evalLiftedPos, ptNorm);
                         lastRecordedT.current += 0.02; // A guaranteed resolution of 50 mathematical sub-steps per tile traverse
-                    }
-                    if (stepHistory.current.length > MAX_TAIL * STEPS_PER_TILE) {
-                        stepHistory.current.length = MAX_TAIL * STEPS_PER_TILE;
                     }
                     // -----------------------------------------------------------
 
@@ -701,11 +768,10 @@ function useWormCrawler(size, cubies) {
                             const bodyTilesBehindHead = Math.max(0, occupiedTiles - 1);
                             // Direct indexed scan over tileTrail avoids allocating an intermediate
                             // slice just for Array.includes().  bodyTilesBehindHead ≤ ~167 at MAX_TAIL.
-                            const trailArr = tileTrail.current;
-                            const trailLimit = Math.min(1 + bodyTilesBehindHead, trailArr.length);
+                            const trailLimit = Math.min(1 + bodyTilesBehindHead, tileTrail.current.count);
                             let bodyHit = false;
                             for (let ti = 1; ti < trailLimit; ti++) {
-                                if (trailArr[ti] === nextKey) { bodyHit = true; break; }
+                                if (ttAt(tileTrail.current, ti) === nextKey) { bodyHit = true; break; }
                             }
                             const nextOnSurface = isSurfaceTilePos(nextPos, size);
                             const selfHit = nextOnSurface && selfCollisionGraceStepsRef.current <= 0 && bodyHit;
@@ -717,8 +783,7 @@ function useWormCrawler(size, cubies) {
 
                             pos.current = nextPos;
                             if (nextOnSurface) {
-                                tileTrail.current.unshift(nextKey);
-                                if (tileTrail.current.length > MAX_TAIL) tileTrail.current.length = MAX_TAIL;
+                                ttPush(tileTrail.current, nextKey);
                             }
                             if (next.moveDir) moveDir.current = next.moveDir;
 
@@ -963,7 +1028,7 @@ function useWormCrawler(size, cubies) {
         selfCollisionGraceStepsRef.current = 0;
         tailLength.current = BASE_TAIL_LENGTH;
         orbPickupColorsRef.current = [];
-        stepHistory.current = [];
+        shReset(stepHistory.current);
         lastRecordedT.current = 0;
         healedRef.current = 0;
         tunnelUseCountsRef.current = new Map();
@@ -973,7 +1038,7 @@ function useWormCrawler(size, cubies) {
 
         powerupsRef.current = initial;
         alive.current = true;
-        tileTrail.current = [tileKey(startPos)];
+        ttReset(tileTrail.current, tileKey(startPos));
         timeAliveRef.current = 0;
         timeAliveSyncRef.current = 0;
         survivalTickRef.current = 0;
@@ -1041,7 +1106,7 @@ function useWormCrawler(size, cubies) {
                 );
 
                 // Rotate the self-collision tile trail
-                tileTrail.current = tileTrail.current.map(key => {
+                ttMapInPlace(tileTrail.current, key => {
                     const [tx, ty, tz, tdirKey] = key.split(',');
                     const r = rotateTilePosition(
                         { x: Number(tx), y: Number(ty), z: Number(tz), dirKey: tdirKey },
@@ -1433,9 +1498,9 @@ function WormBody({ worm }) {
         const time = state.clock.getElapsedTime();
 
         // Rebuild path-points buffer in-place (no array allocation or spread)
-        _pathPointsBuffer.length = steps.length + 1;
+        _pathPointsBuffer.length = steps.count + 1;
         _pathPointsBuffer[0] = _headPathPoint;
-        for (let j = 0; j < steps.length; j++) _pathPointsBuffer[j + 1] = steps[j];
+        for (let j = 0; j < steps.count; j++) _pathPointsBuffer[j + 1] = shAt(steps, j);
 
         let walkIndex = 0;
         let cumulativeDist = 0;
@@ -1565,11 +1630,11 @@ function WormBody({ worm }) {
             <meshStandardMaterial
                 color="white"
                 emissive="white"
-                emissiveIntensity={isGlow ? 2.2 : 0.22}
+                emissiveIntensity={isGlow ? 1.2 : 0.22}
                 roughness={0.28}
                 metalness={0}
                 transparent={isGlow}
-                opacity={isGlow ? 0.88 : 1}
+                opacity={isGlow ? 0.92 : 1}
                 toneMapped={!isGlow}
             />
         </instancedMesh>
@@ -1589,12 +1654,12 @@ function GlowWormAura({ worm }) {
         if (!isGlow) return;
         const t = clock.elapsedTime;
 
-        // Soft pulsing light — kept weak so it illuminates the worm face only,
-        // never bright enough to push nearby cube tiles above the bloom threshold.
+        // Soft pulsing light — illuminates the worm face only.
+        // Kept below the 0.82 bloom threshold so nearby cube tiles don't bloom.
         if (lightRef.current) {
             lightRef.current.position.copy(worm.headInterpPos.current)
                 .addScaledVector(worm.currentNormal.current, WORM_LIFT + 0.1);
-            lightRef.current.intensity = 0.7 + Math.sin(t * 4.0) * 0.2;
+            lightRef.current.intensity = 0.4 + Math.sin(t * 4.0) * 0.12;
         }
     });
 
@@ -3148,7 +3213,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             const hit = checkWormHitBySlice(worm, axis, sliceIndex);
             if (hit) {
                 const histEntry = hit.type === 'cut'
-                    ? worm.stepHistory.current[hit.cutTrailIdx * STEPS_PER_TILE]
+                    ? shAt(worm.stepHistory.current, hit.cutTrailIdx * STEPS_PER_TILE)
                     : null;
                 const hitPos = histEntry
                     ? histEntry.pos.toArray()
