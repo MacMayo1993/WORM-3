@@ -24,14 +24,13 @@ const _pjScratch = new THREE.Vector3();   // projectOntoCube intermediate
 const _pfNScaled = new THREE.Vector3();   // projectOntoFace normal component
 const _scFwd = new THREE.Vector3();       // stepCrawler forward direction
 const _scSurf = new THREE.Vector3();      // stepCrawler surface position
-const _scJumpNorm = new THREE.Vector3();  // stepCrawler jump-height offset
 const _gpScratch = new THREE.Vector3();   // getGroundPosition
 
 /**
  * Project a 3D point onto the cube surface.
- * Returns the projected position and the face it lands on.
- * NOTE: `position` in the returned object is the module-level _pjScratch vector.
- * Callers that need to store the result across another projectOntoCube call must clone it.
+ * Returns a fresh {position: Vector3, face} on every call — safe to store.
+ * Uses _pjScratch internally to avoid intermediate allocations; the returned
+ * position is a new Vector3 cloned from it.
  */
 export function projectOntoCube(point, size) {
   const k = (size - 1) / 2;
@@ -60,7 +59,7 @@ export function projectOntoCube(point, size) {
     p.z = Math.sign(p.z) * s;
   }
 
-  return { position: p, face };
+  return { position: new THREE.Vector3().copy(p), face };
 }
 
 /**
@@ -176,11 +175,10 @@ export function stepCrawler(state, input, dt, size) {
     .addScaledVector(newForward, stepLength);
 
   // Project back onto cube surface, then re-add the new jump height.
-  // projectOntoCube returns a reference to its internal scratch (_pjScratch).
-  // We clone it immediately so newPosition persists in crawlerRef between frames.
+  // projectOntoCube returns a fresh Vector3 — mutate it in-place (no extra clone needed).
   const projected = projectOntoCube(_scSurf, size);
   const newFace = projected.face;
-  const newPosition = projected.position.clone().addScaledVector(FACE_NORMALS[newFace], newJumpHeight);
+  const newPosition = projected.position.addScaledVector(FACE_NORMALS[newFace], newJumpHeight);
 
   // Re-project forward onto new face if face changed
   let finalForward = newForward;
@@ -276,9 +274,8 @@ export function rotateCrawlerWithSlice(state, axis, sliceIndex, dir, size) {
 
   return {
     ...state,
-    position: projected.position.clone().add(
-      FACE_NORMALS[projected.face].clone().multiplyScalar(state.jumpHeight)
-    ),
+    // projected.position is already a fresh Vector3 — mutate in-place.
+    position: projected.position.addScaledVector(FACE_NORMALS[projected.face], state.jumpHeight),
     forward: projectOntoFace(newFwd, projected.face).normalize(),
     face: projected.face,
   };
