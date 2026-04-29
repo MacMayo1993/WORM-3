@@ -197,31 +197,29 @@ export default function GameScene({
       )}
 
       <Suspense fallback={null}>
-        {/* Worm mode always uses the black hole environment regardless of level or user theme */}
-        {wormHealerMode && <BlackHoleEnvironment flipTrigger={blackHolePulse} />}
         {/* Level-specific backgrounds */}
-        {!wormHealerMode && currentLevelData?.background === 'blackhole' && <BlackHoleEnvironment flipTrigger={blackHolePulse} />}
-        {!wormHealerMode && currentLevelData?.background && currentLevelData.background !== 'blackhole' &&
+        {currentLevelData?.background === 'blackhole' && <BlackHoleEnvironment flipTrigger={blackHolePulse} />}
+        {currentLevelData?.background && currentLevelData.background !== 'blackhole' &&
           getLevelBackground(currentLevelData.background, blackHolePulse)}
         {/* Free play: Black Hole */}
-        {!wormHealerMode && !currentLevelData && settings.backgroundTheme === 'blackhole' && <BlackHoleEnvironment flipTrigger={blackHolePulse} />}
+        {!currentLevelData && settings.backgroundTheme === 'blackhole' && <BlackHoleEnvironment flipTrigger={blackHolePulse} />}
         {/* Free play: interactive photo panoramas */}
-        {!wormHealerMode && !currentLevelData && bgConfig?.file && (
+        {!currentLevelData && bgConfig?.file && (
           <ErrorBoundary3D>
             <InteractivePhotoBackground files={getBackgroundUrl(bgConfig.file)} />
           </ErrorBoundary3D>
         )}
-        {!wormHealerMode && !currentLevelData && !bgConfig?.file && PHOTO_PRESETS.has(settings.backgroundTheme) && (
+        {!currentLevelData && !bgConfig?.file && PHOTO_PRESETS.has(settings.backgroundTheme) && (
           <ErrorBoundary3D>
             <InteractivePhotoBackground preset={settings.backgroundTheme} />
           </ErrorBoundary3D>
         )}
-        {!wormHealerMode && !currentLevelData && !bgConfig?.file && !PHOTO_PRESETS.has(settings.backgroundTheme) &&
+        {!currentLevelData && !bgConfig?.file && !PHOTO_PRESETS.has(settings.backgroundTheme) &&
           (settings.backgroundTheme === 'blackhole' || !bgConfig) && (
           <BlackHoleEnvironment flipTrigger={blackHolePulse} />
         )}
         {/* Default lighting env for levels without a custom background */}
-        {!wormHealerMode && currentLevelData && !currentLevelData.background && <Environment preset="city" />}
+        {currentLevelData && !currentLevelData.background && <Environment preset="city" />}
 
         <WormholeWarpFX
           enabled={wormholePhaseActive}
