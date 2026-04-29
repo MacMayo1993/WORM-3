@@ -43,6 +43,7 @@ import {
 // 3D components
 import IntroScene from './components/intro/IntroScene.jsx';
 import { RP2GridBackground } from './components/RP2GridBackground.jsx';
+import BlackHoleEnvironment from './3d/BlackHoleEnvironment.jsx';
 import { setSharedRenderer, tickPreviews, hasActivePreviews } from './3d/TilePreviewRenderer.js';
 
 // UI components
@@ -165,21 +166,19 @@ function CameraManager({ showWelcome, showMainMenu, cameraZ }) {
 function MenuScene() {
   return (
     <>
-      <color attach="background" args={['#060916']} />
-      <ambientLight intensity={0.12} />
-      <pointLight position={[8, 8, 10]} intensity={0.32} color="#a8d8ff" />
-      <pointLight position={[-9, -8, 7]} intensity={0.18} color="#7aa3ff" />
-      <pointLight position={[0, 2, -14]} intensity={0.08} color="#8db3ff" />
-      <RP2GridBackground opacity={1.0} />
+      <color attach="background" args={['#000005']} />
+      <ambientLight intensity={0.18} />
+      <pointLight position={[8, 8, 10]} intensity={0.45} color="#a8d8ff" />
+      <pointLight position={[-9, -8, 7]} intensity={0.22} color="#7aa3ff" />
+      <Suspense fallback={null}>
+        <BlackHoleEnvironment />
+      </Suspense>
       <Suspense fallback={null}>
         <RotatingBlackCube />
       </Suspense>
-      <Suspense fallback={null}>
-        <Environment preset="city" intensity={0.22} />
-      </Suspense>
       {!isMobile && (
         <EffectComposer>
-          <Bloom intensity={0.26} luminanceThreshold={0.24} luminanceSmoothing={0.9} mipmapBlur />
+          <Bloom intensity={0.35} luminanceThreshold={0.18} luminanceSmoothing={0.85} mipmapBlur />
           <Vignette offset={0.38} darkness={0.82} />
         </EffectComposer>
       )}
