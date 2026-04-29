@@ -107,6 +107,7 @@ export default function GameScene({
   onFaceRotationMode,
   onHeal,
   onRotate,
+  onAnimatedShuffle,
   // computed / hook-derived data
   animState,
   manifoldMap,
@@ -264,7 +265,7 @@ export default function GameScene({
           <ErrorBoundary3D>
             <Suspense fallback={null}>
               <HealerWormMode3DWrapper
-                cubies={cubies} size={size} explosionFactor={explosionT} animState={animState} onRotate={onRotate} onHeal={onHeal}
+                cubies={cubies} size={size} explosionFactor={explosionT} animState={animState} onRotate={onRotate} onHeal={onHeal} onAnimatedShuffle={onAnimatedShuffle}
               />
             </Suspense>
           </ErrorBoundary3D>

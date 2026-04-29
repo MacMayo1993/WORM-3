@@ -1138,6 +1138,7 @@ export default function WORM3() {
                 layerHighlight={teachMode.layerHighlight}
                 onHeal={healSticker}
                 onRotate={startAnimation}
+                onAnimatedShuffle={startAnimatedShuffle}
                 showAntipodalPiP={showAntipodalPiP}
               />
             </Suspense>
