@@ -76,6 +76,8 @@ import { liveRotation } from './liveRotation.js';
 
 // Pre-allocated axis vector for applying liveRotation to the worm during scramble
 const _liveAxis = new THREE.Vector3();
+// Duration of the worm's entrance wiggle after the shuffle finishes
+const SPAWN_DURATION = 0.75;
 
 // ─── Orb contrast helper ─────────────────────────────────────────────────────
 // Ensures orb colors are always visible regardless of color scheme.
@@ -1184,9 +1186,24 @@ function WormChaseCamera({ worm, size }) {
     const prevTailLen = useRef(BASE_TAIL_LENGTH);   // detect new parity pickups
 
     useFrame((_, delta) => {
+        const gamePhase = useGameStore.getState().wormGamePhase ?? 'active';
         const phase = worm.phase.current;
         const tailLen = worm.tailLength.current;
         const viewportAspect = viewportSize.width / Math.max(1, viewportSize.height);
+
+        // During the scramble, park the camera at a fixed overview angle so the full
+        // cube is visible while it shuffles — the worm is hidden so there's nothing to follow.
+        if (gamePhase === 'scrambling') {
+            const dist = 5.5 + size * 1.4;
+            _camTargetCam.set(0.6, 1.1, 1).normalize().multiplyScalar(dist);
+            _camTargetLook.set(0, 0, 0);
+            camPosRef.current.lerp(_camTargetCam, Math.min(1, delta * 2.5));
+            lookAtRef.current.lerp(_camTargetLook, Math.min(1, delta * 2.5));
+            camera.position.copy(camPosRef.current);
+            camera.up.set(0, 1, 0);
+            camera.lookAt(lookAtRef.current);
+            return;
+        }
 
         // Use a continuous portrait factor so camera framing doesn't jump at aspect=1.
         const portraitFactor = THREE.MathUtils.clamp((1 - viewportAspect) / 0.45, 0, 1);
@@ -3062,12 +3079,17 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     const worm = useWormCrawler(size, cubies);
 
     // ── Game phase + scramble state ────────────────────────────────────────────
-    const gameModePhaseRef  = useRef('scrambling'); // 'scrambling'|'countdown'|'active'|'solved'
+    // gameModePhaseRef: 'scrambling'|'spawning'|'countdown'|'active'|'finalHealing'|'solved'
+    const gameModePhaseRef  = useRef('scrambling');
     const scrambleSeqRef    = useRef([]);   // [{axis,dir,sliceIndex}] × SCRAMBLE_STEPS
     const inverseQueueRef   = useRef([]);   // remaining inverse moves (consumed each rotation)
+    const spawnTimerRef     = useRef(0);    // seconds elapsed in spawning entrance animation
     const countdownTimerRef = useRef(0);    // seconds elapsed in countdown phase
     const countdownStepRef  = useRef(-1);   // last store-synced step (avoids redundant setState)
     const finalHealCheckTimer = useRef(0);  // throttle: scan for active tunnels every 0.5s
+
+    // Reactive phase for conditional JSX rendering — only changes on phase transitions
+    const wormGamePhase = useGameStore(s => s.wormGamePhase ?? 'scrambling');
 
     // ── Auto-rotation hazard state ─────────────────────────────────────────────
     const autoTimerRef      = useRef(0);
@@ -3095,6 +3117,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
 
             // Reset all phase state
             gameModePhaseRef.current  = 'scrambling';
+            spawnTimerRef.current     = 0;
             countdownTimerRef.current = 0;
             countdownStepRef.current  = -1;
             autoTimerRef.current      = 0;
@@ -3106,12 +3129,11 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             // Play all 15 moves through the shared animated-shuffle pipeline:
             // fast 0.12s power2.out animations (no back-easing overshoot → no black layers),
             // properly sequenced, not counted as player moves.
+            // When done, go to 'spawning' so the worm can emerge before the countdown.
             onAnimatedShuffle(seq, () => {
-                gameModePhaseRef.current  = 'countdown';
-                countdownTimerRef.current = 0;
-                countdownStepRef.current  = -1;
-                useGameStore.setState({ wormGamePhase: 'countdown', wormCountdownStep: 3 });
-                countdownStepRef.current  = 0;
+                gameModePhaseRef.current = 'spawning';
+                spawnTimerRef.current    = 0;
+                useGameStore.setState({ wormGamePhase: 'spawning', wormCountdownStep: null });
             });
         };
 
@@ -3151,6 +3173,26 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                     );
                     worm.headInterpPos.current.applyAxisAngle(_liveAxis, angle);
                 }
+            }
+            return;
+        }
+
+        // ── Phase: spawning — worm wiggles out of the face center ─────────────
+        if (gameModePhaseRef.current === 'spawning') {
+            spawnTimerRef.current += delta;
+            const t = Math.min(spawnTimerRef.current / SPAWN_DURATION, 1);
+            // Damped spring: shoots out of the face then settles
+            const bounce = Math.sin(t * Math.PI * 2.4) * Math.exp(-t * 4.0) * 0.4;
+            const { x, y, z, dirKey } = worm.pos.current;
+            const norm = FACE_NORMALS[dirKey] ?? FACE_NORMALS.PZ;
+            const wp = getStickerWorldPos(x, y, z, dirKey, size, 0);
+            worm.headInterpPos.current.set(wp[0], wp[1], wp[2]).addScaledVector(norm, WORM_LIFT + bounce);
+            if (t >= 1) {
+                gameModePhaseRef.current  = 'countdown';
+                countdownTimerRef.current = 0;
+                countdownStepRef.current  = -1;
+                useGameStore.setState({ wormGamePhase: 'countdown', wormCountdownStep: 3 });
+                countdownStepRef.current  = 0;
             }
             return;
         }
@@ -3273,6 +3315,8 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         }
     });
 
+    const wormVisible = wormGamePhase !== 'scrambling';
+
     return (
         <>
             <WormChaseCamera worm={worm} size={size} />
@@ -3280,10 +3324,10 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             <WormInteriorGlass worm={worm} size={size} />
             <TunnelSurfFX worm={worm} size={size} />
             <TunnelPortalRings worm={worm} size={size} />
-            <WormBody worm={worm} />
-            <GlowWormAura worm={worm} />
-            <WormFace worm={worm} size={size} />
-            <PortalGlow worm={worm} size={size} />
+            {wormVisible && <WormBody worm={worm} />}
+            {wormVisible && <GlowWormAura worm={worm} />}
+            {wormVisible && <WormFace worm={worm} size={size} />}
+            {wormVisible && <PortalGlow worm={worm} size={size} />}
             <WormholeRings
                 cubies={cubies}
                 size={size}
