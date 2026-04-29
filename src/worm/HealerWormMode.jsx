@@ -57,7 +57,6 @@ import {
     AUTO_ROTATE_INTERVAL_MAX,
     AUTO_ROTATE_WARNING,
     SCRAMBLE_STEPS,
-    SCRAMBLE_MOVE_INTERVAL,
     ACTIVE_ROTATE_INTERVAL,
     COUNTDOWN_STEP_DURATION,
 } from './healerWorm/constants.js';
@@ -73,6 +72,10 @@ import WormHat3D from './wormCosmetics.jsx';
 import { getSkin, _hatAlignQuat, _hatYUp } from './wormCosmeticsData.js';
 import { getWormCharacter } from './wormCharacterData.js';
 import { EARN_ORB_COLLECT, EARN_WORM_SURVIVAL_TICK, EARN_WORM_HEALED_FACE, SURVIVAL_TICK_INTERVAL } from '../utils/economyConstants.js';
+import { liveRotation } from './liveRotation.js';
+
+// Pre-allocated axis vector for applying liveRotation to the worm during scramble
+const _liveAxis = new THREE.Vector3();
 
 // ─── Orb contrast helper ─────────────────────────────────────────────────────
 // Ensures orb colors are always visible regardless of color scheme.
@@ -1117,6 +1120,11 @@ function useWormCrawler(size, cubies) {
                 curWorldPos.current = new THREE.Vector3(
                     ...getStickerWorldPos(newPos.x, newPos.y, newPos.z, newPos.dirKey, size, 0)
                 );
+                // When paused (e.g. during opening scramble), snap the render position too so
+                // the worm lands correctly on its tile after the rotation animation finishes.
+                if (wormPausedRef.current) {
+                    headInterpPos.current.copy(curWorldPos.current);
+                }
 
                 // Rotate the self-collision tile trail
                 ttMapInPlace(tileTrail.current, key => {
@@ -3050,15 +3058,13 @@ function ThunkEffect({ thunkRef }) {
 }
 
 // ─── Main exported wrapper ────────────────────────────────────────────────────
-export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animState, onRotate, _onHeal }) {
+export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animState, onRotate, _onHeal, onAnimatedShuffle }) {
     const worm = useWormCrawler(size, cubies);
 
     // ── Game phase + scramble state ────────────────────────────────────────────
     const gameModePhaseRef  = useRef('scrambling'); // 'scrambling'|'countdown'|'active'|'solved'
     const scrambleSeqRef    = useRef([]);   // [{axis,dir,sliceIndex}] × SCRAMBLE_STEPS
     const inverseQueueRef   = useRef([]);   // remaining inverse moves (consumed each rotation)
-    const scrambleTimerRef  = useRef(0);    // seconds elapsed in scramble phase
-    const scrambleFiredRef  = useRef(0);    // how many scramble moves have been fired
     const countdownTimerRef = useRef(0);    // seconds elapsed in countdown phase
     const countdownStepRef  = useRef(-1);   // last store-synced step (avoids redundant setState)
     const finalHealCheckTimer = useRef(0);  // throttle: scan for active tunnels every 0.5s
@@ -3087,17 +3093,26 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             // Inverse = reversed sequence with each dir flipped
             inverseQueueRef.current = [...seq].reverse().map(m => ({ ...m, dir: -m.dir }));
 
-            // Reset all phase timers
+            // Reset all phase state
             gameModePhaseRef.current  = 'scrambling';
-            scrambleTimerRef.current  = 0;
-            scrambleFiredRef.current  = 0;
             countdownTimerRef.current = 0;
             countdownStepRef.current  = -1;
             autoTimerRef.current      = 0;
             pendingRotRef.current     = null;
             warningProgressRef.current = 0;
-            // Ensure worm is frozen until countdown completes
+            // Freeze the worm until the countdown completes
             useGameStore.setState({ wormGamePhase: 'scrambling', wormCountdownStep: null, wormPaused: true });
+
+            // Play all 15 moves through the shared animated-shuffle pipeline:
+            // fast 0.12s power2.out animations (no back-easing overshoot → no black layers),
+            // properly sequenced, not counted as player moves.
+            onAnimatedShuffle(seq, () => {
+                gameModePhaseRef.current  = 'countdown';
+                countdownTimerRef.current = 0;
+                countdownStepRef.current  = -1;
+                useGameStore.setState({ wormGamePhase: 'countdown', wormCountdownStep: 3 });
+                countdownStepRef.current  = 0;
+            });
         };
 
         // Run immediately so the first game (where initWormMode fires before this
@@ -3106,7 +3121,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
 
         const unsub = useGameStore.subscribe(s => s.wormRunId, generateScramble);
         return unsub;
-    }, [size]);
+    }, [size, onAnimatedShuffle]);
 
     useFrame((_, delta) => {
         worm.tick(delta);
@@ -3114,23 +3129,28 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         const store = useGameStore.getState();
 
         // ── Phase: scrambling ──────────────────────────────────────────────────
+        // Moves are sequenced by startAnimatedShuffle (called from generateScramble).
+        // Here we only track the worm's visual position so it rides along with each
+        // rotating slice instead of staying frozen in world space.
         if (gameModePhaseRef.current === 'scrambling') {
-            scrambleTimerRef.current += delta;
-            // Fire each scramble move at evenly-spaced intervals
-            const shouldFire = Math.floor(scrambleTimerRef.current / SCRAMBLE_MOVE_INTERVAL);
-            while (scrambleFiredRef.current < shouldFire && scrambleFiredRef.current < SCRAMBLE_STEPS) {
-                const move = scrambleSeqRef.current[scrambleFiredRef.current];
-                if (move && onRotate) onRotate(move.axis, move.dir, move.sliceIndex);
-                scrambleFiredRef.current++;
-            }
-            // Wait one full extra interval after the last move for the animation to finish
-            if (scrambleFiredRef.current >= SCRAMBLE_STEPS &&
-                scrambleTimerRef.current >= (SCRAMBLE_STEPS + 1) * SCRAMBLE_MOVE_INTERVAL) {
-                gameModePhaseRef.current  = 'countdown';
-                countdownTimerRef.current = 0;
-                countdownStepRef.current  = -1;
-                useGameStore.setState({ wormGamePhase: 'countdown', wormCountdownStep: 3 });
-                countdownStepRef.current = 0; // step 0 = "3" shown
+            if (liveRotation.active) {
+                const { axis, sliceIndex, angle } = liveRotation;
+                const { x, y, z, dirKey } = worm.pos.current;
+                const wormInSlice = (
+                    (axis === 'col'   && x === sliceIndex) ||
+                    (axis === 'row'   && y === sliceIndex) ||
+                    (axis === 'depth' && z === sliceIndex)
+                );
+                if (wormInSlice) {
+                    const wp = getStickerWorldPos(x, y, z, dirKey, size, 0);
+                    worm.headInterpPos.current.set(wp[0], wp[1], wp[2]);
+                    _liveAxis.set(
+                        axis === 'col' ? 1 : 0,
+                        axis === 'row' ? 1 : 0,
+                        axis === 'depth' ? 1 : 0
+                    );
+                    worm.headInterpPos.current.applyAxisAngle(_liveAxis, angle);
+                }
             }
             return;
         }
