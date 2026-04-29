@@ -443,7 +443,7 @@ export const useGameStore = create(
     wormHealingProgress: {},
     setWormHealingProgress: (v) => set({ wormHealingProgress: v }),
     // ── Scramble-solve game phase ────────────────────────────────────────────
-    wormGamePhase: 'scrambling',   // 'scrambling' | 'countdown' | 'active' | 'finalHealing' | 'solved'
+    wormGamePhase: 'scrambling',   // 'scrambling' | 'spawning' | 'countdown' | 'active' | 'finalHealing' | 'solved'
     setWormGamePhase: (v) => set({ wormGamePhase: v }),
     wormCountdownStep: null,       // null | 3 | 2 | 1 | 'go'
     setWormCountdownStep: (v) => set({ wormCountdownStep: v }),
