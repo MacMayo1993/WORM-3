@@ -42,7 +42,6 @@ import {
 
 // 3D components
 import IntroScene from './components/intro/IntroScene.jsx';
-import { RP2GridBackground } from './components/RP2GridBackground.jsx';
 import BlackHoleEnvironment from './3d/BlackHoleEnvironment.jsx';
 import { setSharedRenderer, tickPreviews, hasActivePreviews } from './3d/TilePreviewRenderer.js';
 
@@ -111,7 +110,9 @@ function IntroBranch({ time, onComplete, reducedMotion = false, performanceMode 
       <ambientLight intensity={0.6} />
       <pointLight position={[10, 10, 10]} intensity={1.8} />
       <pointLight position={[-10, -10, -10]} intensity={1.2} />
-      <RP2GridBackground opacity={0.85} />
+      <Suspense fallback={null}>
+        <BlackHoleEnvironment />
+      </Suspense>
       <IntroScene time={time} onComplete={onComplete} />
       <Suspense fallback={null}>
         <Environment preset="city" />
