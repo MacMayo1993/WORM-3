@@ -111,7 +111,8 @@ function IntroBranch({ time, onComplete, reducedMotion = false, performanceMode 
       <ambientLight intensity={0.6} />
       <pointLight position={[10, 10, 10]} intensity={1.8} />
       <pointLight position={[-10, -10, -10]} intensity={1.2} />
-      <RP2GridBackground opacity={0.85} />
+      <BlackHoleEnvironment zoom={1.75} orbitStrength={0.04} />
+      <RP2GridBackground opacity={0.55} />
       <IntroScene time={time} onComplete={onComplete} />
       <Suspense fallback={null}>
         <Environment preset="city" />
@@ -171,7 +172,7 @@ function MenuScene() {
       <pointLight position={[8, 8, 10]} intensity={0.45} color="#a8d8ff" />
       <pointLight position={[-9, -8, 7]} intensity={0.22} color="#7aa3ff" />
       <Suspense fallback={null}>
-        <BlackHoleEnvironment />
+        <BlackHoleEnvironment zoom={1.75} orbitStrength={0.04} />
       </Suspense>
       <Suspense fallback={null}>
         <RotatingBlackCube />
