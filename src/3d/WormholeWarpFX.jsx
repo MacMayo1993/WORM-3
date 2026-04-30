@@ -38,7 +38,7 @@ export default function WormholeWarpFX({ wormPhase = 'crawling', enabled = true,
         transparent: true,
         depthWrite: false,
         depthTest: false,
-        blending: THREE.AdditiveBlending,
+        blending: THREE.NormalBlending,
         vertexShader: `
           varying vec2 vUv;
           void main() {
@@ -76,8 +76,8 @@ export default function WormholeWarpFX({ wormPhase = 'crawling', enabled = true,
             // EDGE-ONLY vignette — transparent in the centre so the camera
             // animation is always visible, glowing only at the screen perimeter.
             float edgeMask = smoothstep(0.55, 1.3, r);  // 0 at centre, 1 near edges
-            float alpha = edgeMask * (rings * 0.6 + 0.25) * uOpacity;
-            alpha = clamp(alpha, 0.0, 0.9);
+            float alpha = edgeMask * (rings * 0.35 + 0.14) * uOpacity;
+            alpha = clamp(alpha, 0.0, 0.45);
 
             if (alpha < 0.001) discard;
             gl_FragColor = vec4(col, alpha);
@@ -99,7 +99,7 @@ export default function WormholeWarpFX({ wormPhase = 'crawling', enabled = true,
       healFlashRef.current = 1.0;
     }
     if (healFlashRef.current > 0) {
-      healFlashRef.current = Math.max(0, healFlashRef.current - delta * 8.0);
+      healFlashRef.current = Math.max(0, healFlashRef.current - delta * 11.0);
       material.uniforms.uOpacity.value = Math.max(
         material.uniforms.uOpacity.value,
         healFlashRef.current
@@ -108,7 +108,7 @@ export default function WormholeWarpFX({ wormPhase = 'crawling', enabled = true,
 
     if (enabled && !prevEnabledRef.current) {
       // Snap to full opacity the instant the wormhole activates — no fade-in delay.
-      material.uniforms.uOpacity.value = 1.0;
+      material.uniforms.uOpacity.value = 0.52;
     } else if (!enabled && healFlashRef.current <= 0) {
       // Slow fade-out so the exit feels natural (skip while heal flash is decaying).
       material.uniforms.uOpacity.value = THREE.MathUtils.lerp(
