@@ -6,7 +6,7 @@ import * as THREE from 'three';
  * BlackHoleEnvironment - A dynamic 3D black hole background
  * Provides an immersive, panoramic black hole effect as part of the 3D scene
  */
-export default function BlackHoleEnvironment({ flipTrigger = 0 }) {
+export default function BlackHoleEnvironment({ flipTrigger = 0, zoom = 1.65, orbitStrength = 0.03 }) {
   const sphereRef = useRef();
   const materialRef = useRef();
   const [pulseIntensity, setPulseIntensity] = useState(0);
@@ -22,6 +22,8 @@ export default function BlackHoleEnvironment({ flipTrigger = 0 }) {
       uniforms: {
         time: { value: 0 },
         pulseIntensity: { value: 0 },
+        zoom: { value: zoom },
+        centerOffset: { value: new THREE.Vector2(0, 0) },
       },
       vertexShader: `
         varying vec3 vPosition;
@@ -36,6 +38,8 @@ export default function BlackHoleEnvironment({ flipTrigger = 0 }) {
       fragmentShader: `
         uniform float time;
         uniform float pulseIntensity;
+        uniform float zoom;
+        uniform vec2 centerOffset;
         varying vec3 vPosition;
         varying vec2 vUv;
 
@@ -76,11 +80,12 @@ export default function BlackHoleEnvironment({ flipTrigger = 0 }) {
           float phi = acos(dir.y);
 
           // Center of black hole
-          vec2 center = vec2(0.5, 0.5);
+          vec2 center = vec2(0.5, 0.5) + centerOffset;
           vec2 coord = vec2(theta / (2.0 * 3.14159) + 0.5, phi / 3.14159);
 
-          // Distance from center (event horizon)
-          float dist = length(coord - center);
+          // Distance from center (event horizon).
+          // zoom > 1 shrinks the event horizon so more of the black hole shape is visible.
+          float dist = length(coord - center) * zoom;
 
           // === ENHANCED STARS ===
           float stars = 0.0;
@@ -231,12 +236,20 @@ export default function BlackHoleEnvironment({ flipTrigger = 0 }) {
         }
       `,
     });
-  }, []);
+  }, [zoom]);
 
   useFrame((state, delta) => {
     if (materialRef.current) {
       materialRef.current.uniforms.time.value = state.clock.elapsedTime;
       materialRef.current.uniforms.pulseIntensity.value = pulseIntensity;
+      materialRef.current.uniforms.zoom.value = zoom;
+
+      const t = state.clock.elapsedTime * 0.08;
+      const orbitRadius = orbitStrength * (0.7 + 0.3 * Math.sin(state.clock.elapsedTime * 0.11));
+      materialRef.current.uniforms.centerOffset.value.set(
+        Math.cos(t) * orbitRadius,
+        Math.sin(t * 1.17) * orbitRadius * 0.7
+      );
     }
 
     // Decay pulse intensity smoothly
