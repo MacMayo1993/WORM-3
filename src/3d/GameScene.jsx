@@ -284,9 +284,9 @@ export default function GameScene({
         {wormHealerMode && (
           <EffectComposer>
             <Bloom
-              intensity={isGlowWorm ? 0.35 : 0.45}
-              luminanceThreshold={isGlowWorm ? 0.82 : 0.6}
-              luminanceSmoothing={isGlowWorm ? 0.75 : 0.4}
+              intensity={isGlowWorm ? 0.24 : 0.4}
+              luminanceThreshold={isGlowWorm ? 0.9 : 0.62}
+              luminanceSmoothing={isGlowWorm ? 0.82 : 0.45}
               mipmapBlur
             />
           </EffectComposer>

@@ -1632,9 +1632,18 @@ function WormBody({ worm }) {
                 // Alternating body/belly bands for visible ring pattern
                 _bodyColor.set(i % 2 === 0 ? baseColor : bellyCol);
             } else if (_isGlow) {
-                // Pulsing bioluminescent brightness bands along body
-                const bandPhase = Math.sin(i * 2.2 - time * 5.0);
-                _bodyColor.set(baseColor).multiplyScalar(0.65 + bandPhase * 0.35);
+                // Glow worm keeps piece-wise orb colors along its body.
+                // When there are fewer orb colors than rendered segments,
+                // continue the palette in repeating ORB_SEGMENT_GROWTH bands.
+                if (orbColors.length > 0) {
+                    const bandIndex = Math.max(0, Math.floor(i / ORB_SEGMENT_GROWTH));
+                    const cyc = orbColors[bandIndex % orbColors.length];
+                    const bandPhase = Math.sin(i * 1.8 - time * 4.8);
+                    _bodyColor.set(cyc).multiplyScalar(0.82 + bandPhase * 0.18);
+                } else {
+                    const bandPhase = Math.sin(i * 2.2 - time * 5.0);
+                    _bodyColor.set(baseColor).multiplyScalar(0.65 + bandPhase * 0.35);
+                }
             } else {
                 _bodyColor.set(baseColor);
             }
