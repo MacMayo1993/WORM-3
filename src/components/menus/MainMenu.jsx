@@ -691,6 +691,13 @@ const MainMenu = ({
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, []);
 
+  const handleWormSelect = () => {
+    _onWormHealer?.();
+  };
+  const handleCubeSelect = () => {
+    _onLevels?.();
+  };
+
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'transparent', zIndex: 9999, overflow: 'hidden', pointerEvents: 'none' }}>
       <ScreenGlow />
@@ -738,6 +745,75 @@ const MainMenu = ({
             <div style={{ width: '30px', height: '1px', background: 'linear-gradient(to left, transparent, rgba(140,180,255,0.55))' }} />
           </div>
         </div>
+      </div>
+
+      {/* Primary mode buttons (UI fallback + explicit choices) */}
+      <div style={{
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: 'max(116px, calc(env(safe-area-inset-bottom, 0px) + 96px))',
+        display: 'flex',
+        justifyContent: 'center',
+        gap: '12px',
+        padding: '0 16px',
+        opacity: bottomVisible ? 1 : 0,
+        transform: bottomVisible ? 'none' : 'translateY(16px)',
+        transition: 'opacity 0.55s ease 0.1s, transform 0.55s cubic-bezier(0.22,1,0.36,1) 0.1s',
+        pointerEvents: 'all',
+      }}>
+        <button
+          onClick={handleWormSelect}
+          style={{
+            minWidth: '132px',
+            borderRadius: '14px',
+            border: '1px solid rgba(34,197,94,0.55)',
+            background: 'linear-gradient(180deg, rgba(34,197,94,0.26), rgba(6,10,24,0.82))',
+            color: '#dcffe9',
+            padding: '12px 14px',
+            fontWeight: 800,
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase',
+            fontSize: '13px',
+            fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif",
+            boxShadow: '0 0 18px rgba(34,197,94,0.24)',
+            cursor: 'pointer',
+          }}
+        >
+          WORM
+        </button>
+        <button
+          onClick={handleCubeSelect}
+          style={{
+            minWidth: '132px',
+            borderRadius: '14px',
+            border: '1px solid rgba(59,130,246,0.55)',
+            background: 'linear-gradient(180deg, rgba(59,130,246,0.26), rgba(6,10,24,0.82))',
+            color: '#dff0ff',
+            padding: '10px 14px 8px',
+            fontWeight: 800,
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase',
+            fontSize: '13px',
+            fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif",
+            boxShadow: '0 0 18px rgba(59,130,246,0.24)',
+            cursor: 'pointer',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '4px',
+          }}
+        >
+          <span>CUBE</span>
+          <span style={{
+            fontSize: '9px',
+            fontWeight: 700,
+            letterSpacing: '0.14em',
+            color: 'rgba(180,220,255,0.9)',
+          }}>
+            START HERE
+          </span>
+        </button>
       </div>
 
       {/* Bottom: hint + nav pill */}
