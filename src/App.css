@@ -1076,6 +1076,7 @@ button:focus-visible,
   .top-app-bar {
     padding: 0 10px;
     height: 44px;
+    border-bottom: 1px solid rgba(103, 127, 184, 0.55);
   }
 
   .top-bar-title {
@@ -1093,6 +1094,9 @@ button:focus-visible,
     max-width: 100%;
     border-radius: 0;
     height: 60px;
+    background: rgba(9, 14, 34, 0.9);
+    border-top: 1px solid rgba(116, 154, 238, 0.65);
+    box-shadow: 0 -10px 22px rgba(1, 4, 12, 0.45);
   }
 
   .bottom-nav-central-ring {
@@ -1216,16 +1220,32 @@ button:focus-visible,
 
 /* Extra small screens (phones in portrait) */
 @media (max-width: 480px) {
-  .top-bar-center {
-    gap: 6px;
-  }
+  .top-bar-center { display: none; }
 
   .top-bar-title {
     font-size: 11px;
+    max-width: 128px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .top-bar-progress {
     font-size: 10px;
+  }
+
+  .top-bar-right {
+    gap: 4px;
+  }
+
+  .top-bar-right > div[title="Parity Points balance"] {
+    display: none !important;
+  }
+
+  .top-bar-icon-btn {
+    width: 34px;
+    height: 34px;
+    color: #111827;
   }
 
   .chaos-pill,
