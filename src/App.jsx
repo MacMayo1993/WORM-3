@@ -162,7 +162,7 @@ function CameraManager({ showWelcome, showMainMenu, cameraZ }) {
  * MenuScene — the rotating black cube shown in the main menu.
  * Rendered inside the shared Canvas so there is never a second WebGL context.
  */
-function MenuScene() {
+function MenuScene({ onCubeClick, onWormClick }) {
   return (
     <>
       <color attach="background" args={['#000005']} />
@@ -173,7 +173,7 @@ function MenuScene() {
         <BlackHoleEnvironment zoom={1.2} orbitStrength={0.1} />
       </Suspense>
       <Suspense fallback={null}>
-        <RotatingBlackCube />
+        <RotatingBlackCube onCubeClick={onCubeClick} onWormClick={onWormClick} />
       </Suspense>
       {!isMobile && (
         <EffectComposer>
@@ -1117,7 +1117,7 @@ export default function WORM3() {
               performanceMode={introPerformanceMode}
             />
           ) : showMainMenu ? (
-            <MenuScene />
+            <MenuScene onCubeClick={handleMenuLevels} onWormClick={handleMenuWormHealer} />
           ) : (
             <Suspense fallback={null}>
               <GameScene

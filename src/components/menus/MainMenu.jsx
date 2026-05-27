@@ -394,246 +394,209 @@ const SolvedCube = () => {
   );
 };
 
-// Exactly mirrors the intro rotation: y = t*0.28, x = sin(t*0.15)*0.12
-// Exported so App.jsx can render it inside the single shared Canvas
-export const RotatingBlackCube = () => {
+// ─── MenuWorm — worm mascot that sits on top of the cube ─────────────────────
+const _SEG_Y = [1.12, 0.84, 0.56, 0.28, 0.0];
+const _SEG_R = [0.22, 0.185, 0.158, 0.132, 0.105];
+const _SEG_COL = ['#3be08a', '#2bcc78', '#22b866', '#1aa255', '#148842'];
+
+const MenuWorm = ({ onWormClick }) => {
   const groupRef = useRef();
-  useFrame((state) => {
+  const headRef = useRef();
+  const seg1Ref = useRef();
+  const seg2Ref = useRef();
+  const seg3Ref = useRef();
+  const tailRef = useRef();
+  const segRefs = [headRef, seg1Ref, seg2Ref, seg3Ref, tailRef];
+
+  const wiggling = useRef(false);
+  const wiggleStart = useRef(0);
+  const targetScale = useRef(1.0);
+  const currentScale = useRef(1.0);
+  const callbackRef = useRef(onWormClick);
+  callbackRef.current = onWormClick;
+
+  useFrame(({ clock }, delta) => {
     if (!groupRef.current) return;
-    const t = state.clock.elapsedTime;
-    groupRef.current.rotation.y = t * 0.28;
-    groupRef.current.rotation.x = Math.sin(t * 0.15) * 0.12;
-    // Drive animated tile style shaders (lava, galaxy, circuit, etc.)
-    updateSharedTime(t);
+    const t = clock.elapsedTime;
+
+    if (wiggling.current && Date.now() - wiggleStart.current > 720) {
+      wiggling.current = false;
+      targetScale.current = 1.0;
+      callbackRef.current?.();
+    }
+
+    const isWiggle = wiggling.current;
+    const freq = isWiggle ? 12 : 2.8;
+    const amp = isWiggle ? 0.26 : 0.07;
+
+    segRefs.forEach((ref, i) => {
+      if (!ref.current) return;
+      ref.current.position.x = Math.sin(t * freq - i * 0.88) * amp;
+      ref.current.position.y = _SEG_Y[i];
+    });
+
+    groupRef.current.position.y = 1.72 + (isWiggle
+      ? Math.abs(Math.sin(t * 14)) * 0.22
+      : Math.sin(t * 1.5) * 0.045);
+
+    currentScale.current += (targetScale.current - currentScale.current) * Math.min(1, delta * 16);
+    groupRef.current.scale.setScalar(currentScale.current);
   });
+
+  const handleClick = (e) => {
+    e.stopPropagation();
+    if (wiggling.current) return;
+    wiggling.current = true;
+    wiggleStart.current = Date.now();
+    targetScale.current = 1.18;
+  };
+  const handlePointerDown = (e) => { e.stopPropagation(); targetScale.current = 0.83; };
+  const handlePointerUp = (e) => { e.stopPropagation(); if (!wiggling.current) targetScale.current = 1.0; };
+
   return (
-    <group ref={groupRef} position={[0, 0.15, 0]}>
-      <SolvedCube />
-      <FacePulses />
+    <group
+      ref={groupRef}
+      position={[0, 1.72, 0]}
+      onClick={handleClick}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      onPointerLeave={handlePointerUp}
+    >
+      {/* Head with eyes + antennae */}
+      <group ref={headRef}>
+        <mesh>
+          <sphereGeometry args={[_SEG_R[0], 14, 14]} />
+          <meshStandardMaterial color={_SEG_COL[0]} roughness={0.3} metalness={0.1} emissive={_SEG_COL[0]} emissiveIntensity={0.15} />
+        </mesh>
+        <mesh position={[-0.085, 0.13, 0.19]}>
+          <sphereGeometry args={[0.058, 8, 8]} />
+          <meshStandardMaterial color="#ffffff" roughness={0.2} />
+        </mesh>
+        <mesh position={[0.085, 0.13, 0.19]}>
+          <sphereGeometry args={[0.058, 8, 8]} />
+          <meshStandardMaterial color="#ffffff" roughness={0.2} />
+        </mesh>
+        <mesh position={[-0.085, 0.135, 0.235]}>
+          <sphereGeometry args={[0.03, 6, 6]} />
+          <meshStandardMaterial color="#0a0a14" roughness={0.5} />
+        </mesh>
+        <mesh position={[0.085, 0.135, 0.235]}>
+          <sphereGeometry args={[0.03, 6, 6]} />
+          <meshStandardMaterial color="#0a0a14" roughness={0.5} />
+        </mesh>
+        <mesh position={[-0.11, 0.28, 0.1]} rotation={[0, 0, 0.3]}>
+          <cylinderGeometry args={[0.012, 0.008, 0.25, 6]} />
+          <meshStandardMaterial color={_SEG_COL[0]} roughness={0.5} />
+        </mesh>
+        <mesh position={[0.11, 0.28, 0.1]} rotation={[0, 0, -0.3]}>
+          <cylinderGeometry args={[0.012, 0.008, 0.25, 6]} />
+          <meshStandardMaterial color={_SEG_COL[0]} roughness={0.5} />
+        </mesh>
+        <mesh position={[-0.145, 0.38, 0.1]}>
+          <sphereGeometry args={[0.025, 6, 6]} />
+          <meshStandardMaterial color="#b0ffda" emissive="#40ff99" emissiveIntensity={0.6} />
+        </mesh>
+        <mesh position={[0.145, 0.38, 0.1]}>
+          <sphereGeometry args={[0.025, 6, 6]} />
+          <meshStandardMaterial color="#b0ffda" emissive="#40ff99" emissiveIntensity={0.6} />
+        </mesh>
+      </group>
+      {/* Body segments */}
+      <group ref={seg1Ref}>
+        <mesh>
+          <sphereGeometry args={[_SEG_R[1], 12, 12]} />
+          <meshStandardMaterial color={_SEG_COL[1]} roughness={0.35} metalness={0.08} emissive={_SEG_COL[1]} emissiveIntensity={0.10} />
+        </mesh>
+      </group>
+      <group ref={seg2Ref}>
+        <mesh>
+          <sphereGeometry args={[_SEG_R[2], 12, 12]} />
+          <meshStandardMaterial color={_SEG_COL[2]} roughness={0.38} metalness={0.08} emissive={_SEG_COL[2]} emissiveIntensity={0.10} />
+        </mesh>
+      </group>
+      <group ref={seg3Ref}>
+        <mesh>
+          <sphereGeometry args={[_SEG_R[3], 10, 10]} />
+          <meshStandardMaterial color={_SEG_COL[3]} roughness={0.4} metalness={0.06} emissive={_SEG_COL[3]} emissiveIntensity={0.09} />
+        </mesh>
+      </group>
+      <group ref={tailRef}>
+        <mesh>
+          <sphereGeometry args={[_SEG_R[4], 10, 10]} />
+          <meshStandardMaterial color={_SEG_COL[4]} roughness={0.45} metalness={0.05} emissive={_SEG_COL[4]} emissiveIntensity={0.08} />
+        </mesh>
+      </group>
+      {/* Soft glow halo */}
+      <mesh position={[0, 0.56, 0]}>
+        <sphereGeometry args={[0.55, 10, 10]} />
+        <meshBasicMaterial color="#00ff88" transparent opacity={0.055} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+      </mesh>
     </group>
   );
 };
 
-// ─── Coming Soon data ─────────────────────────────────────────────────────────
-const COMING_SOON = [
-  {
-    id: 'story',
-    label: 'Story Mode',
-    color: '#ef4444',
-    icon: '📖',
-    preview: 'linear-gradient(135deg,#ef444422 0%,#f9731622 100%)',
-    description: 'Ten levels. A cube that remembers every move. A narrative written in rotations. The beginning of everything.',
-  },
-  {
-    id: 'holonomy',
-    label: '∮ Holonomy',
-    color: '#00f5ff',
-    icon: '∮',
-    preview: 'linear-gradient(135deg,#00f5ff18 0%,#0080ff18 100%)',
-    description: 'Move a loop around the cube and watch it come back changed. A mode built on the mathematics of curvature.',
-  },
-  {
-    id: 'biome',
-    label: 'Biome',
-    color: '#60a5fa',
-    icon: '⬡',
-    preview: 'linear-gradient(135deg,#60a5fa18 0%,#22c55e18 100%)',
-    description: 'A living world grows on the surface of RP². Each face a different ecosystem. Navigate a topology that breathes.',
-  },
-  {
-    id: 'merge',
-    label: 'Merge',
-    color: '#a78bfa',
-    icon: '✦',
-    preview: 'linear-gradient(135deg,#a78bfa18 0%,#ec489918 100%)',
-    description: 'Two cubes. One truth. Combine solved states across the manifold boundary into something that has never existed.',
-  },
-];
+// ─── Rotating cube + worm mascot — exported for App.jsx's shared Canvas ───────
+export const RotatingBlackCube = ({ onCubeClick, onWormClick }) => {
+  const cubeRef = useRef();
+  const shaking = useRef(false);
+  const shakeStart = useRef(0);
+  const cubeTargetScale = useRef(1.0);
+  const cubeCurrentScale = useRef(1.0);
+  const onCubeClickRef = useRef(onCubeClick);
+  onCubeClickRef.current = onCubeClick;
 
-// ─── Coming Soon card ─────────────────────────────────────────────────────────
-const ComingSoonCard = ({ item }) => {
-  const [expanded, setExpanded] = useState(false);
-  return (
-    <button
-      onClick={() => setExpanded(v => !v)}
-      style={{
-        flexShrink: 0,
-        width: '140px',
-        background: item.preview,
-        border: `1px solid ${item.color}30`,
-        borderRadius: '14px',
-        padding: '14px 12px 12px',
-        cursor: 'pointer',
-        textAlign: 'left',
-        transition: 'all 0.25s ease',
-        boxShadow: expanded ? `0 0 18px ${item.color}30, 0 4px 16px rgba(0,0,0,0.5)` : '0 2px 10px rgba(0,0,0,0.35)',
-        transform: expanded ? 'translateY(-2px)' : 'none',
-        position: 'relative',
-        overflow: 'hidden',
-      }}
-    >
-      {/* Silhouette icon */}
-      <div style={{
-        fontSize: '28px', lineHeight: 1, marginBottom: '8px',
-        filter: 'grayscale(1) opacity(0.45)',
-        display: 'flex', alignItems: 'center',
-      }}>
-        {item.icon}
-      </div>
-      {/* Mode name */}
-      <div style={{
-        fontSize: '11px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase',
-        color: `${item.color}99`,
-        fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif",
-        marginBottom: expanded ? '8px' : 0,
-        transition: 'margin 0.2s ease',
-      }}>{item.label}</div>
-      {/* Coming soon badge */}
-      {!expanded && (
-        <div style={{
-          fontSize: '9px', fontWeight: 600, letterSpacing: '0.18em', textTransform: 'uppercase',
-          color: `${item.color}55`,
-          fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif",
-          marginTop: '4px',
-        }}>Coming Soon</div>
-      )}
-      {/* Description (expanded) */}
-      {expanded && (
-        <div style={{
-          fontSize: '11px', lineHeight: 1.5,
-          color: 'rgba(200,220,255,0.75)',
-          fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif",
-          animation: 'fadeIn 0.2s ease',
-        }}>{item.description}</div>
-      )}
-      {/* Subtle color wash on expanded */}
-      {expanded && (
-        <div style={{
-          position: 'absolute', inset: 0, borderRadius: 'inherit', pointerEvents: 'none',
-          background: `radial-gradient(ellipse 100% 80% at 50% 0%, ${item.color}14 0%, transparent 70%)`,
-        }} />
-      )}
-    </button>
-  );
-};
+  useFrame((state, delta) => {
+    if (!cubeRef.current) return;
+    const t = state.clock.elapsedTime;
+    updateSharedTime(t);
 
-// ─── Coming Soon drawer ───────────────────────────────────────────────────────
-const ComingSoonDrawer = ({ visible }) => {
-  const [open, setOpen] = useState(false);
-  const [pulse, setPulse] = useState(false);
+    cubeCurrentScale.current += (cubeTargetScale.current - cubeCurrentScale.current) * Math.min(1, delta * 18);
+    cubeRef.current.scale.setScalar(cubeCurrentScale.current);
 
-  useEffect(() => {
-    if (!visible) return;
-    const t = setTimeout(() => setPulse(true), 1200);
-    return () => clearTimeout(t);
-  }, [visible]);
+    if (shaking.current) {
+      const elapsed = Date.now() - shakeStart.current;
+      if (elapsed > 540) {
+        shaking.current = false;
+        cubeTargetScale.current = 1.0;
+        cubeRef.current.position.set(0, 0.15, 0);
+        onCubeClickRef.current?.();
+      } else {
+        const intensity = 0.10 * (1 - elapsed / 540);
+        cubeRef.current.position.x = Math.sin(t * 42) * intensity;
+        cubeRef.current.position.y = 0.15 + Math.sin(t * 37 + 1) * intensity * 0.5;
+        cubeRef.current.position.z = Math.sin(t * 31 + 2) * intensity * 0.3;
+      }
+    } else {
+      cubeRef.current.rotation.y = t * 0.28;
+      cubeRef.current.rotation.x = Math.sin(t * 0.15) * 0.12;
+      cubeRef.current.position.set(0, 0.15, 0);
+    }
+  });
+
+  const handleCubeClick = (e) => {
+    e.stopPropagation();
+    if (shaking.current) return;
+    shaking.current = true;
+    shakeStart.current = Date.now();
+  };
+  const handleCubeDown = () => { cubeTargetScale.current = 0.94; };
+  const handleCubeUp = () => { if (!shaking.current) cubeTargetScale.current = 1.0; };
 
   return (
-    <div style={{
-      position: 'absolute', bottom: '84px', left: 0, right: 0,
-      display: 'flex', flexDirection: 'column', alignItems: 'center',
-      opacity: visible ? 1 : 0,
-      transform: visible ? 'none' : 'translateY(10px)',
-      transition: 'opacity 0.55s ease 0.3s, transform 0.55s cubic-bezier(0.22,1,0.36,1) 0.3s',
-      pointerEvents: visible ? 'all' : 'none',
-    }}>
-      {/* Drawer toggle label */}
-      <button
-        onClick={() => setOpen(v => !v)}
-        style={{
-          background: 'transparent', border: 'none', cursor: 'pointer',
-          display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px',
-          borderRadius: '20px',
-          transition: 'background 0.2s ease',
-        }}
-        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(120,160,255,0.08)'; }}
-        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+    <>
+      <group
+        ref={cubeRef}
+        position={[0, 0.15, 0]}
+        onClick={handleCubeClick}
+        onPointerDown={handleCubeDown}
+        onPointerUp={handleCubeUp}
+        onPointerLeave={handleCubeUp}
       >
-        <span style={{
-          fontSize: '10px', fontWeight: 700, letterSpacing: '0.22em', textTransform: 'uppercase',
-          fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif",
-          color: pulse ? 'rgba(180,210,255,0.70)' : 'rgba(140,170,255,0.45)',
-          transition: 'color 0.6s ease',
-        }}>What&apos;s Coming</span>
-      </button>
-
-      {/* Cards panel */}
-      <div style={{
-        maxHeight: open ? '220px' : '0px',
-        overflow: 'hidden',
-        transition: 'max-height 0.4s cubic-bezier(0.22,1,0.36,1)',
-        width: '100%',
-      }}>
-        <div style={{
-          display: 'flex', gap: '10px', overflowX: 'auto', padding: '12px 20px 4px',
-          scrollbarWidth: 'none', msOverflowStyle: 'none',
-          justifyContent: 'center',
-          flexWrap: 'nowrap',
-        }}>
-          {COMING_SOON.map(item => (
-            <ComingSoonCard key={item.id} item={item} />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// ─── Coming Soon button ───────────────────────────────────────────────────────
-const ComingSoonButton = ({ onPress }) => {
-  const [hovered, setHovered] = useState(false);
-  const [pulse, setPulse] = useState(false);
-
-  useEffect(() => {
-    const t = setTimeout(() => setPulse(true), 1200);
-    const interval = setInterval(() => setPulse(v => !v), 3000);
-    return () => { clearTimeout(t); clearInterval(interval); };
-  }, []);
-
-  return (
-    <div style={{
-      borderRadius: '100px', padding: '1.5px',
-      background: hovered
-        ? 'linear-gradient(90deg,#a855f780,#3b82f680,#22c55e80,#a855f780)'
-        : 'linear-gradient(90deg,#a855f740,#3b82f640,#22c55e40,#a855f740)',
-      boxShadow: hovered
-        ? '0 0 18px rgba(168,85,247,0.30), 0 4px 16px rgba(0,0,0,0.45)'
-        : '0 0 8px rgba(168,85,247,0.12), 0 2px 10px rgba(0,0,0,0.35)',
-      transition: 'all 0.22s ease',
-    }}>
-      <button
-        onClick={onPress}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-        style={{
-          display: 'flex', alignItems: 'center', gap: '8px',
-          padding: '9px 20px',
-          background: hovered ? 'rgba(14,10,32,0.92)' : 'rgba(6,10,24,0.82)',
-          backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-          border: 'none',
-          borderRadius: '100px',
-          cursor: 'pointer',
-          transition: 'background 0.22s ease',
-        }}
-      >
-        <span style={{
-          width: '6px', height: '6px', borderRadius: '50%',
-          background: pulse ? 'rgba(168,85,247,0.9)' : 'rgba(168,85,247,0.5)',
-          boxShadow: pulse ? '0 0 8px rgba(168,85,247,0.8)' : 'none',
-          transition: 'all 0.6s ease',
-          flexShrink: 0,
-        }} />
-        <span style={{
-          fontSize: '11px', fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase',
-          color: hovered ? 'rgba(200,225,255,0.95)' : 'rgba(170,200,255,0.82)',
-          fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif",
-          transition: 'color 0.2s ease',
-        }}>What&apos;s Coming</span>
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ opacity: hovered ? 0.8 : 0.55, transition: 'opacity 0.2s ease' }}>
-          <path d="M4.5 2.5L8 6L4.5 9.5" stroke="rgba(180,210,255,0.9)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
-    </div>
+        <SolvedCube />
+        <FacePulses />
+      </group>
+      <MenuWorm onWormClick={onWormClick} />
+    </>
   );
 };
 
@@ -711,192 +674,107 @@ const StoreNavItem = ({ onStore }) => {
 };
 
 // ─── Main component ───────────────────────────────────────────────────────────
-// onPlay / onHolonomy / onBiome / onMerge are kept as props for UILayer compatibility
-// but are no longer wired to buttons — those modes live in the Coming Soon screen.
-const MainMenu = ({ onPlay: _onPlay, _onLevels, onFreeplay, _onCoop, onSettings: _onSettings, onBiome: _onBiome, onDisparity, onWormHealer, onHolonomy: _onHolonomy, onMerge: _onMerge, onStore, onComingSoon, onMobiusCubelet }) => {
-  const CLEAN = {
-    panel: 'rgba(8,12,28,0.68)',
-    panelStrong: 'rgba(10,14,32,0.80)',
-    text: 'rgba(230,240,255,0.95)',
-    textSubtle: 'rgba(180,210,255,0.65)',
-    border: 'rgba(120,160,255,0.22)',
-  };
+const MainMenu = ({
+  onPlay: _onPlay, onLevels: _onLevels, onFreeplay, onCoop: _onCoop, onTeach: _onTeach,
+  onSettings: _onSettings, onBiome: _onBiome, onDisparity: _onDisparity,
+  onWormHealer: _onWormHealer, onHolonomy: _onHolonomy, onMerge: _onMerge,
+  onStore, onComingSoon: _onComingSoon, onMobiusCubelet: _onMobiusCubelet,
+}) => {
   const [titleVisible, setTitleVisible] = useState(false);
   const [subtitleVisible, setSubtitleVisible] = useState(false);
-  const [btnVisible, setBtnVisible] = useState(false);
-  const [hoverWorm, setHoverWorm] = useState(false);
-  const [pressWorm, setPressWorm] = useState(false);
+  const [bottomVisible, setBottomVisible] = useState(false);
 
   useEffect(() => {
     const t1 = setTimeout(() => setTitleVisible(true), 200);
     const t2 = setTimeout(() => setSubtitleVisible(true), 500);
-    const t3 = setTimeout(() => setBtnVisible(true), 800);
+    const t3 = setTimeout(() => setBottomVisible(true), 900);
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, []);
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'transparent', zIndex: 9999, overflow: 'hidden' }}>
-      <style>{`@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }`}</style>
-
+    <div style={{ position: 'fixed', inset: 0, background: 'transparent', zIndex: 9999, overflow: 'hidden', pointerEvents: 'none' }}>
       <ScreenGlow />
 
-      <div style={{ position: 'relative', zIndex: 2, height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', pointerEvents: 'none' }}>
-
-        {/* Title */}
+      {/* Title */}
+      <div style={{
+        position: 'absolute', top: 0, left: 0, right: 0,
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        paddingTop: 'max(44px, env(safe-area-inset-top,44px))',
+        paddingLeft: '16px', paddingRight: '16px',
+        opacity: titleVisible ? 1 : 0,
+        transform: titleVisible ? 'translateY(0)' : 'translateY(-18px)',
+        transition: 'all 0.75s cubic-bezier(0.22,1,0.36,1)',
+      }}>
         <div style={{
-          textAlign: 'center',
-          paddingTop: 'max(44px, env(safe-area-inset-top,44px))',
-          opacity: titleVisible ? 1 : 0,
-          transform: titleVisible ? 'translateY(0)' : 'translateY(-18px)',
-          transition: 'all 0.75s cubic-bezier(0.22,1,0.36,1)',
-          paddingLeft: '16px', paddingRight: '16px',
+          display: 'inline-block',
+          background: 'rgba(6,10,24,0.72)',
+          backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
+          borderRadius: '24px',
+          padding: '18px 28px 16px',
+          border: '1px solid rgba(120,160,255,0.14)',
+          boxShadow: '0 4px 32px rgba(0,0,0,0.45), inset 0 1px 0 rgba(120,160,255,0.10)',
         }}>
-          {/* Frosted glass card so the title and subtitle are readable over any background */}
-          <div style={{
-            display: 'inline-block',
-            background: 'rgba(6,10,24,0.72)',
-            backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
-            borderRadius: '24px',
-            padding: '18px 28px 16px',
-            border: '1px solid rgba(120,160,255,0.14)',
-            boxShadow: '0 4px 32px rgba(0,0,0,0.45), inset 0 1px 0 rgba(120,160,255,0.10)',
+          <h1 style={{
+            margin: 0, fontSize: 'clamp(54px,13vw,96px)', fontWeight: 900,
+            letterSpacing: '0.1em', lineHeight: 1, fontFamily: "'Courier New', monospace",
+            background: 'linear-gradient(100deg,#ef4444 0%,#f97316 18%,#eab308 36%,#22c55e 54%,#3b82f6 72%,#a855f7 90%,#ef4444 100%)',
+            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
           }}>
-            <h1 style={{
-              margin: 0, fontSize: 'clamp(54px,13vw,96px)', fontWeight: 900,
-              letterSpacing: '0.1em', lineHeight: 1, fontFamily: "'Courier New', monospace",
-              background: 'linear-gradient(100deg,#ef4444 0%,#f97316 18%,#eab308 36%,#22c55e 54%,#3b82f6 72%,#a855f7 90%,#ef4444 100%)',
-              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
-            }}>
-              WORM<sup style={{ fontSize: '0.42em', verticalAlign: 'super', WebkitTextFillColor: 'transparent' }}>3</sup>
-            </h1>
-            <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginTop: '14px',
-              opacity: subtitleVisible ? 1 : 0,
-              transform: subtitleVisible ? 'none' : 'translateY(6px)',
-              transition: 'all 0.55s ease 0.1s',
-            }}>
-              <div style={{ width: '30px', height: '1px', background: 'linear-gradient(to right, transparent, rgba(140,180,255,0.55))' }} />
-              <p style={{
-                margin: 0, fontSize: 'clamp(10px,1.7vw,13px)', letterSpacing: '0.26em',
-                textTransform: 'uppercase', fontWeight: 600, color: 'rgba(200,220,255,0.92)',
-                fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif",
-                textShadow: '0 0 20px rgba(100,160,255,0.6)',
-              }}>A Cube That Remembers</p>
-              <div style={{ width: '30px', height: '1px', background: 'linear-gradient(to left, transparent, rgba(140,180,255,0.55))' }} />
-            </div>
+            WORM<sup style={{ fontSize: '0.42em', verticalAlign: 'super', WebkitTextFillColor: 'transparent' }}>3</sup>
+          </h1>
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginTop: '14px',
+            opacity: subtitleVisible ? 1 : 0,
+            transform: subtitleVisible ? 'none' : 'translateY(6px)',
+            transition: 'all 0.55s ease 0.1s',
+          }}>
+            <div style={{ width: '30px', height: '1px', background: 'linear-gradient(to right, transparent, rgba(140,180,255,0.55))' }} />
+            <p style={{
+              margin: 0, fontSize: 'clamp(10px,1.7vw,13px)', letterSpacing: '0.26em',
+              textTransform: 'uppercase', fontWeight: 600, color: 'rgba(200,220,255,0.92)',
+              fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif",
+              textShadow: '0 0 20px rgba(100,160,255,0.6)',
+            }}>A Cube That Remembers</p>
+            <div style={{ width: '30px', height: '1px', background: 'linear-gradient(to left, transparent, rgba(140,180,255,0.55))' }} />
           </div>
         </div>
+      </div>
 
-        {/* ── Bottom CTA stack: Play WORM → What's Coming → Nav pill ── */}
-        {/* Single flex column so everything scales together on any screen size */}
+      {/* Bottom: hint + nav pill */}
+      <div style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0,
+        paddingBottom: 'max(16px, env(safe-area-inset-bottom, 16px))',
+        paddingLeft: '16px', paddingRight: '16px',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px',
+        opacity: bottomVisible ? 1 : 0,
+        transform: bottomVisible ? 'none' : 'translateY(16px)',
+        transition: 'opacity 0.55s ease 0.1s, transform 0.55s cubic-bezier(0.22,1,0.36,1) 0.1s',
+      }}>
+        <p style={{
+          margin: 0, fontSize: '11px', fontWeight: 500, letterSpacing: '0.22em',
+          textTransform: 'uppercase', color: 'rgba(160,200,255,0.5)',
+          fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif",
+          pointerEvents: 'none',
+        }}>tap the worm · tap the cube</p>
+
         <div style={{
-          position: 'absolute', bottom: 0, left: 0, right: 0,
-          paddingBottom: 'max(16px, env(safe-area-inset-bottom, 16px))',
-          paddingLeft: '16px', paddingRight: '16px',
-          display: 'flex', flexDirection: 'column', alignItems: 'center',
-          gap: '10px',
+          borderRadius: '100px', padding: '1.5px',
+          background: 'linear-gradient(90deg,#22c55e60,#3b82f660,#6366f160)',
+          boxShadow: '0 0 20px rgba(60,80,200,0.25), 0 8px 32px rgba(0,0,0,0.5)',
+          width: 'min(260px, 100%)',
           pointerEvents: 'all',
-          opacity: btnVisible ? 1 : 0,
-          transform: btnVisible ? 'none' : 'translateY(16px)',
-          transition: 'opacity 0.55s ease 0.1s, transform 0.55s cubic-bezier(0.22,1,0.36,1) 0.1s',
         }}>
-
-          {/* Play WORM hero button */}
           <div style={{
-            width: 'min(400px, 100%)',
-            borderRadius: '100px', padding: '1.5px',
-            background: hoverWorm
-              ? 'linear-gradient(90deg,#a855f7,#ec4899,#f97316,#a855f7)'
-              : 'linear-gradient(90deg,#a855f760,#ec489960,#f9731660,#a855f760)',
-            boxShadow: hoverWorm
-              ? '0 0 32px rgba(168,85,247,0.55), 0 0 60px rgba(168,85,247,0.20), 0 8px 32px rgba(0,0,0,0.5)'
-              : '0 0 14px rgba(168,85,247,0.22), 0 4px 16px rgba(0,0,0,0.4)',
-            transition: 'all 0.25s cubic-bezier(0.4,0,0.2,1)',
-            transform: pressWorm ? 'scale(0.975)' : hoverWorm ? 'translateY(-2px)' : 'none',
+            display: 'flex',
+            background: 'rgba(6,10,24,0.80)',
+            backdropFilter: 'blur(28px)', WebkitBackdropFilter: 'blur(28px)',
+            borderRadius: '100px',
+            boxShadow: 'inset 0 1px 0 rgba(120,160,255,0.14)',
+            overflow: 'visible',
           }}>
-            <button onClick={onWormHealer}
-              onMouseEnter={() => setHoverWorm(true)}
-              onMouseLeave={() => { setHoverWorm(false); setPressWorm(false); }}
-              onMouseDown={() => setPressWorm(true)} onMouseUp={() => setPressWorm(false)}
-              onTouchStart={() => setPressWorm(true)} onTouchEnd={() => setPressWorm(false)}
-              style={{
-                width: '100%', padding: '16px 32px',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
-                fontSize: 'clamp(13px,2.4vw,15px)', fontWeight: 700, letterSpacing: '0.2em',
-                textTransform: 'uppercase',
-                fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif",
-                color: hoverWorm ? '#ffffff' : 'rgba(220,200,255,0.92)',
-                background: hoverWorm ? 'rgba(28,12,48,0.90)' : 'rgba(14,8,28,0.75)',
-                border: 'none', borderRadius: '100px', cursor: 'pointer',
-                transition: 'all 0.22s cubic-bezier(0.4,0,0.2,1)',
-                backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-                boxShadow: 'inset 0 1px 0 rgba(168,85,247,0.25)',
-              }}>
-              <WormIcon color={hoverWorm ? '#ffffff' : '#d8b4fe'} />
-              Play WORM
-            </button>
-          </div>
-
-          {/* What's Coming pill */}
-          <ComingSoonButton onPress={onComingSoon} />
-
-          {/* Möbius Cubelet visualizer link */}
-          {onMobiusCubelet && (
-            <div style={{
-              borderRadius: '100px', padding: '1.5px',
-              background: 'linear-gradient(90deg,rgba(99,102,241,0.45),rgba(139,92,246,0.45),rgba(99,102,241,0.45))',
-              boxShadow: '0 2px 10px rgba(0,0,0,0.35)',
-            }}>
-              <button
-                onClick={onMobiusCubelet}
-                style={{
-                  background: 'rgba(6,10,24,0.82)',
-                  backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-                  border: 'none',
-                  borderRadius: '100px',
-                  padding: '7px 18px',
-                  cursor: 'pointer',
-                  fontSize: '11px',
-                  color: 'rgba(180,200,255,0.85)',
-                  fontFamily: "-apple-system, 'SF Pro Text', system-ui, sans-serif",
-                  letterSpacing: '0.08em',
-                  transition: 'color 0.2s ease, background 0.2s ease',
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.color = 'rgba(220,235,255,0.96)';
-                  e.currentTarget.style.background = 'rgba(14,10,32,0.92)';
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.color = 'rgba(180,200,255,0.85)';
-                  e.currentTarget.style.background = 'rgba(6,10,24,0.82)';
-                }}
-              >
-                ∞ Möbius Cubelet
-              </button>
-            </div>
-          )}
-
-          {/* Bottom nav pill: Disparity | Explore | Store */}
-          <div style={{
-            borderRadius: '100px', padding: '1.5px',
-            background: 'linear-gradient(90deg,#ef444460,#f9731660,#eab30860,#22c55e60,#3b82f660,#a855f760,#ef444460)',
-            boxShadow: '0 0 20px rgba(60,80,200,0.25), 0 8px 32px rgba(0,0,0,0.5)',
-            width: 'min(360px, 100%)',
-          }}>
-            <div style={{
-              display: 'flex',
-              background: 'rgba(6,10,24,0.80)',
-              backdropFilter: 'blur(28px)', WebkitBackdropFilter: 'blur(28px)',
-              borderRadius: '100px',
-              boxShadow: 'inset 0 1px 0 rgba(120,160,255,0.14)',
-              overflow: 'visible',
-            }}>
-              <NavItem icon={<DisparityIcon />} label="Disparity" color="#f59e0b" onClick={onDisparity} />
-              <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(120,160,255,0.15)' }} />
-              <NavItem icon={<ExploreIcon />} label="Explore" color="#22c55e" onClick={onFreeplay} />
-              <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(120,160,255,0.15)' }} />
-              <StoreNavItem onStore={onStore} />
-            </div>
+            <NavItem icon={<ExploreIcon />} label="Explore" color="#22c55e" onClick={onFreeplay} />
+            <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(120,160,255,0.15)' }} />
+            <StoreNavItem onStore={onStore} />
           </div>
         </div>
       </div>
@@ -905,28 +783,6 @@ const MainMenu = ({ onPlay: _onPlay, _onLevels, onFreeplay, _onCoop, onSettings:
 };
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
-const PlayIcon = ({ hovered }) => (
-  <svg width="13" height="13" viewBox="0 0 12 12" fill="none">
-    <polygon points="2,1 11,6 2,11" fill={hovered ? '#ffffff' : 'rgba(200,220,255,0.9)'} style={{ transition: 'fill 0.2s' }} />
-  </svg>
-);
-const DisparityIcon = () => (
-  <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
-    <circle cx="5" cy="5" r="1.8" fill="#f59e0b" />
-    <circle cx="19" cy="5" r="1.8" fill="#f59e0b" opacity="0.5" />
-    <circle cx="12" cy="12" r="1.8" fill="#f59e0b" />
-    <circle cx="5" cy="19" r="1.8" fill="#f59e0b" opacity="0.5" />
-    <circle cx="19" cy="19" r="1.8" fill="#f59e0b" />
-    <line x1="5" y1="5" x2="19" y2="19" stroke="#f59e0b" strokeWidth="1.2" opacity="0.4" />
-    <line x1="19" y1="5" x2="5" y2="19" stroke="#f59e0b" strokeWidth="1.2" opacity="0.4" />
-  </svg>
-);
-const WormIcon = ({ color = '#a855f7' }) => (
-  <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
-    <path d="M4 12 Q8 4 12 12 T20 12" stroke={color} strokeWidth="2" strokeLinecap="round" fill="none" />
-    <circle cx="20" cy="12" r="2.5" fill={color} />
-  </svg>
-);
 const StoreIcon = () => (
   <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
     <rect x="3" y="10" width="18" height="11" rx="2" stroke="#6366f1" strokeWidth="1.5" fill="none" />
@@ -941,42 +797,6 @@ const ExploreIcon = () => (
     <polygon points="12,2 20,10 12,22 4,10" fill="none" stroke="#22c55e" strokeWidth="1.5" strokeLinejoin="round" />
     <polygon points="12,2 20,10 12,14 4,10" fill="#22c55e" opacity="0.25" />
     <line x1="4" y1="10" x2="20" y2="10" stroke="#22c55e" strokeWidth="1.2" opacity="0.65" />
-  </svg>
-);
-const WorldIcon = () => (
-  <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
-    <path d="M3 18 Q3 10 12 10 Q21 10 21 18" stroke="#60a5fa" strokeWidth="1.6" fill="none" strokeLinecap="round" />
-    <line x1="3" y1="18" x2="21" y2="18" stroke="#60a5fa" strokeWidth="1.6" strokeLinecap="round" />
-    <line x1="6" y1="18" x2="6" y2="14" stroke="#60a5fa" strokeWidth="1.4" strokeLinecap="round" />
-    <line x1="12" y1="18" x2="12" y2="10.5" stroke="#60a5fa" strokeWidth="1.4" strokeLinecap="round" />
-    <line x1="18" y1="18" x2="18" y2="14" stroke="#60a5fa" strokeWidth="1.4" strokeLinecap="round" />
-  </svg>
-);
-const HolonomyIcon = () => (
-  <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
-    <circle cx="12" cy="12" r="7" stroke="#00f5ff" strokeWidth="1.5" fill="none" />
-    <path d="M12 5 A7 7 0 0 1 19 12" stroke="#00f5ff" strokeWidth="2" strokeLinecap="round" />
-    <polygon points="19,9 22,12 19,15" fill="#00f5ff" opacity="0.8" />
-    <circle cx="12" cy="12" r="1.8" fill="#00f5ff" />
-  </svg>
-);
-const MergeIcon = () => (
-  <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
-    {/* Three circles converging → merge/evolve metaphor */}
-    <circle cx="7" cy="17" r="3" stroke="#a78bfa" strokeWidth="1.5" fill="none" />
-    <circle cx="17" cy="17" r="3" stroke="#a78bfa" strokeWidth="1.5" fill="none" />
-    <circle cx="12" cy="8" r="3" stroke="#a78bfa" strokeWidth="1.5" fill="none" />
-    {/* Lines connecting to center */}
-    <line x1="9.5" y1="15.5" x2="12" y2="12" stroke="#a78bfa" strokeWidth="1.2" opacity="0.7" />
-    <line x1="14.5" y1="15.5" x2="12" y2="12" stroke="#a78bfa" strokeWidth="1.2" opacity="0.7" />
-    {/* Center star burst */}
-    <circle cx="12" cy="12" r="1.5" fill="#a78bfa" opacity="0.9" />
-  </svg>
-);
-const GearIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="3" />
-    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
   </svg>
 );
 
