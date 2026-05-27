@@ -673,6 +673,117 @@ const StoreNavItem = ({ onStore }) => {
   );
 };
 
+const MENU_FONT = "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif";
+const menuStyles = {
+  titleWrap: {
+    position: 'absolute', top: 0, left: 0, right: 0,
+    display: 'flex', flexDirection: 'column', alignItems: 'center',
+    paddingTop: 'max(44px, env(safe-area-inset-top,44px))',
+    paddingLeft: '16px', paddingRight: '16px',
+    transition: 'all 0.75s cubic-bezier(0.22,1,0.36,1)',
+  },
+  titleCard: {
+    display: 'inline-block',
+    background: 'rgba(6,10,24,0.72)',
+    backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
+    borderRadius: '24px',
+    padding: '18px 28px 16px',
+    border: '1px solid rgba(120,160,255,0.14)',
+    boxShadow: '0 4px 32px rgba(0,0,0,0.45), inset 0 1px 0 rgba(120,160,255,0.10)',
+  },
+  primaryActionsWrap: {
+    position: 'absolute', left: 0, right: 0,
+    bottom: 'max(116px, calc(env(safe-area-inset-bottom, 0px) + 96px))',
+    display: 'flex', justifyContent: 'center', gap: '12px', padding: '0 16px',
+    transition: 'opacity 0.55s ease 0.1s, transform 0.55s cubic-bezier(0.22,1,0.36,1) 0.1s',
+    pointerEvents: 'all',
+  },
+  utilityWrap: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    paddingBottom: 'max(16px, env(safe-area-inset-bottom, 16px))',
+    paddingLeft: '16px', paddingRight: '16px',
+    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px',
+    transition: 'opacity 0.55s ease 0.1s, transform 0.55s cubic-bezier(0.22,1,0.36,1) 0.1s',
+  },
+};
+
+const MenuTitleCard = ({ visible }) => (
+  <div style={{
+    ...menuStyles.titleWrap,
+    opacity: visible ? 1 : 0,
+    transform: visible ? 'translateY(0)' : 'translateY(-18px)',
+  }}>
+    <div style={menuStyles.titleCard}>
+      <h1 style={{
+        margin: 0, fontSize: 'clamp(54px,13vw,96px)', fontWeight: 900,
+        letterSpacing: '0.1em', lineHeight: 1, fontFamily: "'Courier New', monospace",
+        background: 'linear-gradient(100deg,#ef4444 0%,#f97316 18%,#eab308 36%,#22c55e 54%,#3b82f6 72%,#a855f7 90%,#ef4444 100%)',
+        WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+        textAlign: 'center',
+      }}>
+        WORM<sup style={{ fontSize: '0.42em', verticalAlign: 'super', WebkitTextFillColor: 'transparent' }}>3</sup>
+      </h1>
+    </div>
+  </div>
+);
+
+const MenuPrimaryActions = ({ visible, onWormSelect, onCubeSelect }) => (
+  <div style={{
+    ...menuStyles.primaryActionsWrap,
+    opacity: visible ? 1 : 0,
+    transform: visible ? 'none' : 'translateY(16px)',
+  }}>
+    <button onClick={onWormSelect} style={{
+      minWidth: '132px', borderRadius: '14px', border: '1px solid rgba(34,197,94,0.55)',
+      background: 'linear-gradient(180deg, rgba(34,197,94,0.26), rgba(6,10,24,0.82))',
+      color: '#dcffe9', padding: '12px 14px', fontWeight: 800, letterSpacing: '0.12em',
+      textTransform: 'uppercase', fontSize: '13px', fontFamily: MENU_FONT,
+      boxShadow: '0 0 18px rgba(34,197,94,0.24)', cursor: 'pointer',
+    }}>WORM</button>
+    <button onClick={onCubeSelect} style={{
+      minWidth: '132px', borderRadius: '14px', border: '1px solid rgba(59,130,246,0.55)',
+      background: 'linear-gradient(180deg, rgba(59,130,246,0.26), rgba(6,10,24,0.82))',
+      color: '#dff0ff', padding: '10px 14px 8px', fontWeight: 800, letterSpacing: '0.12em',
+      textTransform: 'uppercase', fontSize: '13px', fontFamily: MENU_FONT,
+      boxShadow: '0 0 18px rgba(59,130,246,0.24)', cursor: 'pointer',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
+    }}>
+      <span>CUBE</span>
+      <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.14em', color: 'rgba(180,220,255,0.9)' }}>START HERE</span>
+    </button>
+  </div>
+);
+
+const MenuUtilityNav = ({ visible, onFreeplay, onStore }) => (
+  <div style={{
+    ...menuStyles.utilityWrap,
+    opacity: visible ? 1 : 0,
+    transform: visible ? 'none' : 'translateY(16px)',
+  }}>
+    <p style={{
+      margin: 0, fontSize: '11px', fontWeight: 500, letterSpacing: '0.22em',
+      textTransform: 'uppercase', color: 'rgba(160,200,255,0.5)',
+      fontFamily: MENU_FONT, pointerEvents: 'none',
+    }}>tap the worm · tap the cube</p>
+    <div style={{
+      borderRadius: '100px', padding: '1.5px',
+      background: 'linear-gradient(90deg,#22c55e60,#3b82f660,#6366f160)',
+      boxShadow: '0 0 20px rgba(60,80,200,0.25), 0 8px 32px rgba(0,0,0,0.5)',
+      width: 'min(260px, 100%)', pointerEvents: 'all',
+    }}>
+      <div style={{
+        display: 'flex', background: 'rgba(6,10,24,0.80)',
+        backdropFilter: 'blur(28px)', WebkitBackdropFilter: 'blur(28px)',
+        borderRadius: '100px', boxShadow: 'inset 0 1px 0 rgba(120,160,255,0.14)', overflow: 'visible',
+      }}>
+        <NavItem icon={<ExploreIcon />} label="Explore" color="#22c55e" onClick={onFreeplay} />
+        <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(120,160,255,0.15)' }} />
+        <StoreNavItem onStore={onStore} />
+      </div>
+    </div>
+  </div>
+);
+
 // ─── Main component ───────────────────────────────────────────────────────────
 const MainMenu = ({
   onPlay: _onPlay, onLevels: _onLevels, onFreeplay, onCoop: _onCoop, onTeach: _onTeach,
@@ -699,145 +810,9 @@ const MainMenu = ({
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'transparent', zIndex: 9999, overflow: 'hidden', pointerEvents: 'none' }}>
       <ScreenGlow />
-
-      {/* Title */}
-      <div style={{
-        position: 'absolute', top: 0, left: 0, right: 0,
-        display: 'flex', flexDirection: 'column', alignItems: 'center',
-        paddingTop: 'max(44px, env(safe-area-inset-top,44px))',
-        paddingLeft: '16px', paddingRight: '16px',
-        opacity: titleVisible ? 1 : 0,
-        transform: titleVisible ? 'translateY(0)' : 'translateY(-18px)',
-        transition: 'all 0.75s cubic-bezier(0.22,1,0.36,1)',
-      }}>
-        <div style={{
-          display: 'inline-block',
-          background: 'rgba(6,10,24,0.72)',
-          backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
-          borderRadius: '24px',
-          padding: '18px 28px 16px',
-          border: '1px solid rgba(120,160,255,0.14)',
-          boxShadow: '0 4px 32px rgba(0,0,0,0.45), inset 0 1px 0 rgba(120,160,255,0.10)',
-        }}>
-          <h1 style={{
-            margin: 0, fontSize: 'clamp(54px,13vw,96px)', fontWeight: 900,
-            letterSpacing: '0.1em', lineHeight: 1, fontFamily: "'Courier New', monospace",
-            background: 'linear-gradient(100deg,#ef4444 0%,#f97316 18%,#eab308 36%,#22c55e 54%,#3b82f6 72%,#a855f7 90%,#ef4444 100%)',
-            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
-            textAlign: 'center',
-          }}>
-            WORM<sup style={{ fontSize: '0.42em', verticalAlign: 'super', WebkitTextFillColor: 'transparent' }}>3</sup>
-          </h1>
-        </div>
-      </div>
-
-      {/* Primary mode buttons (UI fallback + explicit choices) */}
-      <div style={{
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        bottom: 'max(116px, calc(env(safe-area-inset-bottom, 0px) + 96px))',
-        display: 'flex',
-        justifyContent: 'center',
-        gap: '12px',
-        padding: '0 16px',
-        opacity: bottomVisible ? 1 : 0,
-        transform: bottomVisible ? 'none' : 'translateY(16px)',
-        transition: 'opacity 0.55s ease 0.1s, transform 0.55s cubic-bezier(0.22,1,0.36,1) 0.1s',
-        pointerEvents: 'all',
-      }}>
-        <button
-          onClick={handleWormSelect}
-          style={{
-            minWidth: '132px',
-            borderRadius: '14px',
-            border: '1px solid rgba(34,197,94,0.55)',
-            background: 'linear-gradient(180deg, rgba(34,197,94,0.26), rgba(6,10,24,0.82))',
-            color: '#dcffe9',
-            padding: '12px 14px',
-            fontWeight: 800,
-            letterSpacing: '0.12em',
-            textTransform: 'uppercase',
-            fontSize: '13px',
-            fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif",
-            boxShadow: '0 0 18px rgba(34,197,94,0.24)',
-            cursor: 'pointer',
-          }}
-        >
-          WORM
-        </button>
-        <button
-          onClick={handleCubeSelect}
-          style={{
-            minWidth: '132px',
-            borderRadius: '14px',
-            border: '1px solid rgba(59,130,246,0.55)',
-            background: 'linear-gradient(180deg, rgba(59,130,246,0.26), rgba(6,10,24,0.82))',
-            color: '#dff0ff',
-            padding: '10px 14px 8px',
-            fontWeight: 800,
-            letterSpacing: '0.12em',
-            textTransform: 'uppercase',
-            fontSize: '13px',
-            fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif",
-            boxShadow: '0 0 18px rgba(59,130,246,0.24)',
-            cursor: 'pointer',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '4px',
-          }}
-        >
-          <span>CUBE</span>
-          <span style={{
-            fontSize: '9px',
-            fontWeight: 700,
-            letterSpacing: '0.14em',
-            color: 'rgba(180,220,255,0.9)',
-          }}>
-            START HERE
-          </span>
-        </button>
-      </div>
-
-      {/* Bottom: hint + nav pill */}
-      <div style={{
-        position: 'absolute', bottom: 0, left: 0, right: 0,
-        paddingBottom: 'max(16px, env(safe-area-inset-bottom, 16px))',
-        paddingLeft: '16px', paddingRight: '16px',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px',
-        opacity: bottomVisible ? 1 : 0,
-        transform: bottomVisible ? 'none' : 'translateY(16px)',
-        transition: 'opacity 0.55s ease 0.1s, transform 0.55s cubic-bezier(0.22,1,0.36,1) 0.1s',
-      }}>
-        <p style={{
-          margin: 0, fontSize: '11px', fontWeight: 500, letterSpacing: '0.22em',
-          textTransform: 'uppercase', color: 'rgba(160,200,255,0.5)',
-          fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif",
-          pointerEvents: 'none',
-        }}>tap the worm · tap the cube</p>
-
-        <div style={{
-          borderRadius: '100px', padding: '1.5px',
-          background: 'linear-gradient(90deg,#22c55e60,#3b82f660,#6366f160)',
-          boxShadow: '0 0 20px rgba(60,80,200,0.25), 0 8px 32px rgba(0,0,0,0.5)',
-          width: 'min(260px, 100%)',
-          pointerEvents: 'all',
-        }}>
-          <div style={{
-            display: 'flex',
-            background: 'rgba(6,10,24,0.80)',
-            backdropFilter: 'blur(28px)', WebkitBackdropFilter: 'blur(28px)',
-            borderRadius: '100px',
-            boxShadow: 'inset 0 1px 0 rgba(120,160,255,0.14)',
-            overflow: 'visible',
-          }}>
-            <NavItem icon={<ExploreIcon />} label="Explore" color="#22c55e" onClick={onFreeplay} />
-            <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(120,160,255,0.15)' }} />
-            <StoreNavItem onStore={onStore} />
-          </div>
-        </div>
-      </div>
+      <MenuTitleCard visible={titleVisible} />
+      <MenuPrimaryActions visible={bottomVisible} onWormSelect={handleWormSelect} onCubeSelect={handleCubeSelect} />
+      <MenuUtilityNav visible={bottomVisible} onFreeplay={onFreeplay} onStore={onStore} />
     </div>
   );
 };
