@@ -206,7 +206,7 @@ export default function WORM3() {
     showWelcome, setShowWelcome,
     showMainMenu,
     showTutorial, setShowTutorial,
-    setShowSettings, setShowLevelSelect,
+    setShowSettings,
     showMobileTouchHint, markMobileHintShown,
     markIntroSeen, markTutorialDone,
   } = useGameStore(useShallow(s => ({
@@ -216,7 +216,6 @@ export default function WORM3() {
     showTutorial: s.showTutorial,
     setShowTutorial: s.setShowTutorial,
     setShowSettings: s.setShowSettings,
-    setShowLevelSelect: s.setShowLevelSelect,
     showMobileTouchHint: s.showMobileTouchHint,
     markMobileHintShown: s.markMobileHintShown,
     markIntroSeen: s.markIntroSeen,
@@ -338,7 +337,8 @@ export default function WORM3() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetMode, setSheetMode] = useState('more'); // 'more' or 'views'
 
-  // Freeplay setup wizard
+  // Cube mode selection + setup wizards
+  const [showCubeModeSelect, setShowCubeModeSelect] = useState(false);
   const [showFreeplayWizard, setShowFreeplayWizard] = useState(false);
   const [showWormModeWizard, setShowWormModeWizard] = useState(false);
 
@@ -490,13 +490,14 @@ export default function WORM3() {
     handleLevelSelect(1); // Start at level 1
   }, [handleLevelSelect]);
 
-  const handleMenuLevels = useCallback(() => {
+  const handleMenuCube = useCallback(() => {
     useGameStore.getState().setShowMainMenu(false);
-    setShowLevelSelect(true);
-  }, [setShowLevelSelect]);
+    setShowCubeModeSelect(true);
+  }, []);
 
   const handleMenuFreeplay = useCallback(() => {
     useGameStore.getState().setShowMainMenu(false);
+    setShowCubeModeSelect(false);
     setShowFreeplayWizard(true);
   }, []);
 
@@ -564,7 +565,13 @@ export default function WORM3() {
 
   const handleMenuDisparity = useCallback(() => {
     useGameStore.getState().setShowMainMenu(false);
+    setShowCubeModeSelect(false);
     setShowDisparityWizard(true);
+  }, []);
+
+  const handleCubeModeBack = useCallback(() => {
+    setShowCubeModeSelect(false);
+    useGameStore.getState().setShowMainMenu(true);
   }, []);
 
   // Applies wizard settings and begins the waiting-for-first-flip phase.
@@ -1117,7 +1124,7 @@ export default function WORM3() {
               performanceMode={introPerformanceMode}
             />
           ) : showMainMenu ? (
-            <MenuScene onCubeClick={handleMenuLevels} onWormClick={handleMenuWormHealer} />
+            <MenuScene onCubeClick={handleMenuCube} onWormClick={handleMenuWormHealer} />
           ) : (
             <Suspense fallback={null}>
               <GameScene
@@ -1212,7 +1219,7 @@ export default function WORM3() {
             performCursorRotation={performCursorRotation}
             ui={{
               sheetOpen, setSheetOpen, sheetMode, setSheetMode,
-              showFreeplayWizard, showWormModeWizard,
+              showFreeplayWizard, showWormModeWizard, showCubeModeSelect,
               showDisparityWizard, setShowDisparityWizard,
               showDisparityBetting,
               disparityWaitingFirstFlip, disparityCountdown,
@@ -1242,7 +1249,7 @@ export default function WORM3() {
               onSaveState: handleSaveState,
               onLoadState: handleLoadState,
               onMenuPlay: handleMenuPlay,
-              onMenuLevels: handleMenuLevels,
+              onMenuLevels: handleMenuCube,
               onMenuFreeplay: handleMenuFreeplay,
               onMenuCoop: handleMenuCoop,
               onMenuTeach: handleMenuTeach,
@@ -1260,6 +1267,9 @@ export default function WORM3() {
               onMergeCancel: handleMergeCancel,
               onWizardComplete: handleWizardComplete,
               onWizardCancel: handleWizardCancel,
+              onCubeModeRubiks: handleMenuFreeplay,
+              onCubeModeDisparity: handleMenuDisparity,
+              onCubeModeBack: handleCubeModeBack,
               onDisparitySetupComplete: handleDisparitySetupComplete,
               onBetPlaced: handleBetPlaced,
               onBetSkipped: handleBetSkipped,
