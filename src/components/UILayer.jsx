@@ -45,6 +45,7 @@ const LevelSelectScreen = React.lazy(() => import('./screens/LevelSelectScreen.j
 const Level10Cutscene = React.lazy(() => import('./screens/Level10Cutscene.jsx'));
 const LevelTutorial = React.lazy(() => import('./screens/LevelTutorial.jsx'));
 const FreeplaySetupWizard = React.lazy(() => import('./screens/FreeplaySetupWizard.jsx'));
+const CubeModeSelectScreen = React.lazy(() => import('./screens/CubeModeSelectScreen.jsx'));
 const WormModeSetupWizard = React.lazy(() => import('./screens/WormModeSetupWizard.jsx'));
 const DisparitySetupWizard = React.lazy(() => import('./screens/DisparitySetupWizard.jsx'));
 const MergeThemePicker = React.lazy(() => import('../modes/merge/index.js').then((m) => ({ default: m.MergeThemePicker })));
@@ -90,7 +91,7 @@ export default function UILayer({
 }) {
   const {
     sheetOpen, setSheetOpen, sheetMode, setSheetMode,
-    showFreeplayWizard, showWormModeWizard,
+    showFreeplayWizard, showWormModeWizard, showCubeModeSelect,
     showDisparityWizard, setShowDisparityWizard,
     showDisparityBetting,
     disparityWaitingFirstFlip, disparityCountdown,
@@ -108,7 +109,7 @@ export default function UILayer({
     onMenuPlay, onMenuLevels, onMenuFreeplay, onMenuCoop, onMenuTeach,
     onMenuSettings, onMenuBiome, onMenuDisparity, onMenuWormHealer, onMenuHolonomy, onMenuMerge, onMenuStore, onMenuComingSoon, onMenuMobiusCubelet,
     showMergeThemePicker, onMergeStart, onMergeCancel,
-    onWizardComplete, onWizardCancel, onDisparitySetupComplete,
+    onWizardComplete, onWizardCancel, onCubeModeRubiks, onCubeModeDisparity, onCubeModeBack, onDisparitySetupComplete,
     onBetPlaced, onBetSkipped,
     onWormSetupComplete, onWormWizardCancel, onWormRetry, onWormNewGame,
     onToggleHandsMode, onFaceRotate, onTileRotation, onTileFaceRotation,
@@ -412,6 +413,16 @@ export default function UILayer({
           faceImages={faceImages}
           onFaceImage={onFaceImage}
         />
+      )}
+
+      {showCubeModeSelect && (
+        <Suspense fallback={null}>
+          <CubeModeSelectScreen
+            onRubiks={onCubeModeRubiks}
+            onDisparity={onCubeModeDisparity}
+            onBack={onCubeModeBack}
+          />
+        </Suspense>
       )}
 
       {showFreeplayWizard && (
