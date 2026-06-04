@@ -80,6 +80,7 @@ const HelpMenu = ({ onClose }) => (
       zIndex: 1000,
       padding: 'env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px)',
       boxSizing: 'border-box',
+      animation: 'modalBackdropIn 0.22s ease',
     }}
   >
     <div
@@ -97,6 +98,7 @@ const HelpMenu = ({ onClose }) => (
         backdropFilter: 'blur(24px)',
         boxSizing: 'border-box',
         fontFamily: 'var(--ui-font)',
+        animation: 'modalSheetIn 0.30s cubic-bezier(0.22, 1, 0.36, 1)',
       }}
     >
       {/* Header */}

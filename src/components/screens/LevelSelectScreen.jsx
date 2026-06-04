@@ -59,6 +59,7 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
       padding: 'env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px)',
       boxSizing: 'border-box',
       fontFamily: 'var(--ui-font, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif)',
+      animation: 'modalBackdropIn 0.22s ease',
     }}>
       <div style={{
         textAlign: 'center',
@@ -73,6 +74,7 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
         border: '1px solid rgba(255, 255, 255, 0.06)',
         backdropFilter: 'blur(24px)',
         boxSizing: 'border-box',
+        animation: 'modalSheetIn 0.30s cubic-bezier(0.22, 1, 0.36, 1)',
       }}>
         {/* Header */}
         <h1 style={{
