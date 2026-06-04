@@ -11,9 +11,9 @@ const LevelBadge = ({ size, chaos }) => (
     <span style={{
       fontSize: '8px',
       padding: '1px 4px',
-      background: 'rgba(59, 130, 246, 0.12)',
+      background: 'rgba(30, 136, 229, 0.20)',
       borderRadius: '3px',
-      color: 'rgba(15, 23, 42, 0.65)',
+      color: 'rgba(200, 220, 255, 0.75)',
       fontWeight: 600,
     }}>
       {size}x{size}
@@ -22,9 +22,9 @@ const LevelBadge = ({ size, chaos }) => (
       <span style={{
         fontSize: '8px',
         padding: '1px 4px',
-        background: `rgba(239, 68, 68, ${0.10 + chaos * 0.06})`,
+        background: `rgba(239, 68, 68, ${0.15 + chaos * 0.08})`,
         borderRadius: '3px',
-        color: 'rgba(15, 23, 42, 0.65)',
+        color: 'rgba(200, 220, 255, 0.75)',
         fontWeight: 600,
       }}>
         C{chaos}
@@ -49,9 +49,9 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
       position: 'fixed',
       top: 0, left: 0, right: 0, bottom: 0,
       height: '100dvh',
-      background: 'rgba(15, 23, 42, 0.28)',
-      backdropFilter: 'blur(20px)',
-      WebkitBackdropFilter: 'blur(20px)',
+      background: 'rgba(8, 10, 22, 0.72)',
+      backdropFilter: 'blur(24px)',
+      WebkitBackdropFilter: 'blur(24px)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -67,11 +67,11 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
         padding: '32px',
         maxHeight: 'calc(100dvh - 40px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))',
         overflowY: 'auto',
-        background: 'rgba(255, 255, 255, 0.96)',
+        background: 'rgba(14, 17, 38, 0.94)',
         borderRadius: '20px',
-        boxShadow: '0 28px 64px rgba(15, 23, 42, 0.16), 0 4px 12px rgba(15, 23, 42, 0.08)',
-        border: '1px solid rgba(15, 23, 42, 0.08)',
-        backdropFilter: 'blur(20px)',
+        boxShadow: '0 32px 80px rgba(0,0,0,0.60), 0 0 0 1px rgba(255,255,255,0.06)',
+        border: '1px solid rgba(255, 255, 255, 0.06)',
+        backdropFilter: 'blur(24px)',
         boxSizing: 'border-box',
       }}>
         {/* Header */}
@@ -88,7 +88,7 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
 
         <p style={{
           fontSize: '14px',
-          color: 'rgba(15, 23, 42, 0.50)',
+          color: 'rgba(200, 220, 255, 0.65)',
           marginBottom: '24px',
         }}>
           Master topology one concept at a time
@@ -120,21 +120,21 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
                   background: isBlackHole
                     ? 'radial-gradient(circle at center, #1a0a2e 0%, #0d0015 50%, #000 100%)'
                     : isCompleted
-                      ? 'rgba(34, 197, 94, 0.10)'
+                      ? 'rgba(34, 197, 94, 0.14)'
                       : !isUnlocked
-                        ? 'rgba(15, 23, 42, 0.04)'
+                        ? 'rgba(255, 255, 255, 0.03)'
                         : isHovered
-                          ? 'rgba(59, 130, 246, 0.10)'
-                          : 'rgba(15, 23, 42, 0.06)',
+                          ? 'rgba(30, 136, 229, 0.18)'
+                          : 'rgba(255, 255, 255, 0.06)',
                   border: isBlackHole
                     ? '2px solid #8b5cf6'
                     : isCompleted
                       ? '2px solid rgba(34, 197, 94, 0.45)'
                       : !isUnlocked
-                        ? '1px solid rgba(15, 23, 42, 0.06)'
+                        ? '1px solid rgba(255, 255, 255, 0.06)'
                         : isHovered
-                          ? '2px solid rgba(59, 130, 246, 0.55)'
-                          : '1px solid rgba(15, 23, 42, 0.10)',
+                          ? '2px solid rgba(30, 136, 229, 0.55)'
+                          : '1px solid rgba(255, 255, 255, 0.10)',
                   borderRadius: '12px',
                   cursor: canPlay ? 'pointer' : 'not-allowed',
                   display: 'flex',
@@ -148,9 +148,9 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
                     : isCompleted
                       ? '0 0 12px rgba(34, 197, 94, 0.18)'
                       : isHovered && canPlay
-                        ? '0 4px 16px rgba(59, 130, 246, 0.22)'
+                        ? '0 4px 16px rgba(30, 136, 229, 0.22)'
                         : 'none',
-                  opacity: !isUnlocked ? 0.45 : 1,
+                  opacity: !isUnlocked ? 0.40 : 1,
                   overflow: 'hidden'
                 }}
               >
@@ -206,10 +206,10 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
                   color: isBlackHole
                     ? '#c084fc'
                     : isCompleted
-                      ? '#16a34a'
+                      ? '#4ade80'
                       : !isUnlocked
-                        ? 'rgba(15, 23, 42, 0.22)'
-                        : '#0f172a',
+                        ? 'rgba(255, 255, 255, 0.20)'
+                        : '#e8edf8',
                   fontFamily: '"Courier New", monospace',
                   textShadow: isBlackHole ? '0 0 10px #8b5cf6' : 'none'
                 }}>
@@ -229,9 +229,9 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
         {hoveredLevelData && (
           <div style={{
             background: hoveredLevelData.id === 10
-              ? 'rgba(139, 92, 246, 0.07)'
-              : 'rgba(59, 130, 246, 0.06)',
-            border: `1px solid ${hoveredLevelData.id === 10 ? 'rgba(139, 92, 246, 0.20)' : 'rgba(59, 130, 246, 0.18)'}`,
+              ? 'rgba(139, 92, 246, 0.10)'
+              : 'rgba(255, 255, 255, 0.04)',
+            border: `1px solid ${hoveredLevelData.id === 10 ? 'rgba(139, 92, 246, 0.25)' : 'rgba(255, 255, 255, 0.08)'}`,
             borderRadius: '12px',
             padding: '16px 20px',
             marginBottom: '20px',
@@ -248,7 +248,7 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
               <span style={{
                 fontSize: '17px',
                 fontWeight: 700,
-                color: hoveredLevelData.id === 10 ? '#7c3aed' : '#1e88e5',
+                color: hoveredLevelData.id === 10 ? '#a78bfa' : '#60a5fa',
               }}>
                 {hoveredLevelData.id === 10 ? '∞' : hoveredLevelData.id}: {hoveredLevelData.name}
               </span>
@@ -256,9 +256,9 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
                 <span style={{
                   fontSize: '10px',
                   padding: '2px 8px',
-                  background: 'rgba(34, 197, 94, 0.12)',
+                  background: 'rgba(34, 197, 94, 0.20)',
                   borderRadius: '4px',
-                  color: '#15803d',
+                  color: '#4ade80',
                   fontWeight: 700,
                   letterSpacing: '0.04em',
                 }}>
@@ -269,9 +269,9 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
                 <span style={{
                   fontSize: '10px',
                   padding: '2px 8px',
-                  background: 'rgba(15, 23, 42, 0.07)',
+                  background: 'rgba(255, 255, 255, 0.08)',
                   borderRadius: '4px',
-                  color: 'rgba(15, 23, 42, 0.50)',
+                  color: 'rgba(200, 220, 255, 0.55)',
                   fontWeight: 600,
                 }}>
                   LOCKED — Complete Level {hoveredLevelData.id - 1}
@@ -282,7 +282,7 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
             <p style={{
               margin: '0 0 10px 0',
               fontSize: '14px',
-              color: 'rgba(15, 23, 42, 0.65)',
+              color: 'rgba(200, 220, 255, 0.65)',
               lineHeight: 1.5
             }}>
               {hoveredLevelData.description}
@@ -301,7 +301,7 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
                   }}>
                     <span style={{
                       fontSize: '10px',
-                      color: 'rgba(15, 23, 42, 0.45)',
+                      color: 'rgba(200, 220, 255, 0.55)',
                       marginRight: '4px',
                       fontWeight: 600,
                     }}>
@@ -311,10 +311,10 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
                       <span key={i} style={{
                         fontSize: '10px',
                         padding: '2px 6px',
-                        background: 'rgba(34, 197, 94, 0.10)',
-                        border: '1px solid rgba(34, 197, 94, 0.28)',
+                        background: 'rgba(34, 197, 94, 0.14)',
+                        border: '1px solid rgba(34, 197, 94, 0.30)',
                         borderRadius: '4px',
-                        color: '#15803d',
+                        color: '#4ade80',
                         fontWeight: 600,
                       }}>
                         {feat}
@@ -330,9 +330,9 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
             <div style={{
               marginTop: '10px',
               fontSize: '11px',
-              color: 'rgba(15, 23, 42, 0.50)',
+              color: 'rgba(200, 220, 255, 0.55)',
             }}>
-              <span style={{ color: 'rgba(15, 23, 42, 0.35)', fontWeight: 600 }}>Goal: </span>
+              <span style={{ color: 'rgba(180, 210, 255, 0.40)', fontWeight: 600 }}>Goal: </span>
               {hoveredLevelData.winCondition === 'classic' && 'Solve the cube (match all face colors)'}
               {hoveredLevelData.winCondition === 'sudokube' && 'Solve Sudokube (no repeated numbers per face)'}
               {hoveredLevelData.winCondition === 'ultimate' && 'Solve Ultimate (colors + numbers)'}
@@ -343,8 +343,8 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
         {/* Placeholder info when nothing hovered */}
         {!hoveredLevel && (
           <div style={{
-            background: 'rgba(15, 23, 42, 0.04)',
-            border: '1px solid rgba(15, 23, 42, 0.08)',
+            background: 'rgba(255, 255, 255, 0.04)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
             borderRadius: '12px',
             padding: '16px 20px',
             marginBottom: '20px',
@@ -357,7 +357,7 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
             <p style={{
               margin: 0,
               fontSize: '14px',
-              color: 'rgba(15, 23, 42, 0.45)',
+              color: 'rgba(180, 210, 255, 0.45)',
             }}>
               Hover over a level to see details. Complete levels to unlock the next!
             </p>
@@ -368,14 +368,14 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
         <div style={{
           marginBottom: '20px',
           fontSize: '12px',
-          color: 'rgba(15, 23, 42, 0.50)',
+          color: 'rgba(200, 220, 255, 0.55)',
           fontWeight: 500,
         }}>
           Progress: {completedLevels.length} / {LEVELS.length} levels completed
           <div style={{
             marginTop: '8px',
             height: '4px',
-            background: 'rgba(15, 23, 42, 0.08)',
+            background: 'rgba(255, 255, 255, 0.10)',
             borderRadius: '2px',
             overflow: 'hidden'
           }}>
@@ -398,9 +398,9 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
           <button
             onClick={onBack}
             style={{
-              background: 'rgba(15, 23, 42, 0.05)',
-              border: '1px solid rgba(15, 23, 42, 0.12)',
-              color: 'rgba(15, 23, 42, 0.70)',
+              background: 'rgba(255, 255, 255, 0.06)',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              color: 'rgba(200, 220, 255, 0.75)',
               fontSize: '15px',
               fontWeight: 600,
               padding: '10px 28px',
@@ -409,12 +409,12 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
               transition: 'all 0.2s',
             }}
             onMouseEnter={e => {
-              e.target.style.background = 'rgba(15, 23, 42, 0.09)';
-              e.target.style.borderColor = 'rgba(15, 23, 42, 0.20)';
+              e.target.style.background = 'rgba(255, 255, 255, 0.10)';
+              e.target.style.borderColor = 'rgba(255, 255, 255, 0.20)';
             }}
             onMouseLeave={e => {
-              e.target.style.background = 'rgba(15, 23, 42, 0.05)';
-              e.target.style.borderColor = 'rgba(15, 23, 42, 0.12)';
+              e.target.style.background = 'rgba(255, 255, 255, 0.06)';
+              e.target.style.borderColor = 'rgba(255, 255, 255, 0.12)';
             }}
           >
             Back

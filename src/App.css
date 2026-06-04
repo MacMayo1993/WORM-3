@@ -36,13 +36,13 @@
   --shadow-lg: 0 2px 6px 2px rgba(60, 64, 67, 0.15), 0 8px 24px 4px rgba(60, 64, 67, 0.15);
   --shadow-xl: 0 4px 16px 0 rgba(60, 64, 67, 0.15), 0 8px 32px 6px rgba(60, 64, 67, 0.15);
 
-  /* Unified clean UI theme (aligned with Freeplay wizard) */
+  /* Unified dark glass UI theme (Tetris Effect × Genshin Impact) */
   --ui-font: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
-  --ui-panel: rgba(255, 255, 255, 0.88);
-  --ui-panel-strong: rgba(255, 255, 255, 0.94);
-  --ui-ink: #0f172a;
-  --ui-ink-subtle: rgba(15, 23, 42, 0.6);
-  --ui-border: rgba(15, 23, 42, 0.12);
+  --ui-panel: rgba(14, 17, 38, 0.88);
+  --ui-panel-strong: rgba(14, 17, 38, 0.94);
+  --ui-ink: #e8edf8;
+  --ui-ink-subtle: rgba(200, 220, 255, 0.60);
+  --ui-border: rgba(255, 255, 255, 0.08);
 
   /* Safe area insets for mobile browsers */
   --safe-area-inset-top: env(safe-area-inset-top, 0px);
@@ -214,7 +214,7 @@ body {
 .top-bar-title {
   font-size: 15px;
   font-weight: 500;
-  color: var(--text-primary);
+  color: var(--ui-ink);
   letter-spacing: 0.01em;
   white-space: nowrap;
 }
@@ -222,7 +222,7 @@ body {
 .top-bar-progress {
   font-size: 13px;
   font-weight: 500;
-  color: var(--text-secondary);
+  color: var(--ui-ink-subtle);
   letter-spacing: 0.02em;
 }
 
@@ -245,12 +245,12 @@ body {
   cursor: pointer;
   transition: background 0.2s ease, color 0.2s ease;
   padding: 0;
-  color: #202124;
+  color: rgba(200, 220, 255, 0.80);
 }
 
 .top-bar-icon-btn:hover {
-  background: rgba(0, 0, 0, 0.08);
-  color: #000000;
+  background: rgba(255, 255, 255, 0.08);
+  color: #e8edf8;
 }
 
 .top-bar-icon-btn:focus-visible {
@@ -288,12 +288,12 @@ button:focus-visible,
   height: 64px;
   padding: 4px 8px;
   padding-bottom: calc(4px + var(--safe-area-inset-bottom));
-  background: rgba(255, 255, 255, 0.88);
+  background: rgba(14, 17, 38, 0.94);
   backdrop-filter: blur(20px);
-  border-top: 1px solid rgba(15, 23, 42, 0.08);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 20px 20px 0 0;
   box-sizing: border-box;
-  box-shadow: 0 -4px 24px rgba(15, 23, 42, 0.10);
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.50);
   font-family: var(--ui-font);
 }
 
@@ -348,7 +348,7 @@ button:focus-visible,
 .bottom-nav-label {
   font-size: 11px;
   font-weight: 500;
-  color: rgba(15, 23, 42, 0.50);
+  color: rgba(200, 220, 255, 0.50);
   letter-spacing: 0.02em;
   line-height: 1;
   transition: color 0.2s ease;
@@ -368,7 +368,7 @@ button:focus-visible,
   height: 56px;
   border-radius: 50%;
   border: 2px solid var(--rubiks-blue);
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(14, 17, 38, 0.94);
   transition: all 0.2s ease;
   box-shadow: var(--shadow-md);
 }
@@ -384,7 +384,7 @@ button:focus-visible,
 .sheet-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.30);
+  background: rgba(8, 10, 22, 0.60);
   z-index: 500;
   animation: sheet-fade-in 0.2s ease;
 }
@@ -405,7 +405,8 @@ button:focus-visible,
   left: 0;
   right: 0;
   z-index: 501;
-  background: rgba(255, 255, 255, 0.96);
+  background: rgba(14, 17, 38, 0.96);
+  backdrop-filter: blur(24px);
   border-radius: 20px 20px 0 0;
   padding: 8px 20px 24px;
   padding-bottom: calc(24px + var(--safe-area-inset-bottom));
@@ -413,8 +414,8 @@ button:focus-visible,
   overflow-y: auto;
   transform: translateY(100%);
   animation: sheet-slide-up 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-  box-shadow: 0 -12px 40px rgba(15, 23, 42, 0.12);
-  border-top: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.60);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
   font-family: var(--ui-font);
 }
 
@@ -451,7 +452,7 @@ button:focus-visible,
 .sheet-group-title {
   font-size: 11px;
   font-weight: 600;
-  color: rgba(15, 23, 42, 0.45);
+  color: rgba(180, 210, 255, 0.40);
   text-transform: uppercase;
   letter-spacing: 0.1em;
   margin-bottom: 10px;
@@ -469,9 +470,9 @@ button:focus-visible,
   gap: 6px;
   padding: 12px 16px;
   border-radius: 12px;
-  border: 1px solid rgba(15, 23, 42, 0.10);
-  background: rgba(255, 255, 255, 0.65);
-  color: rgba(15, 23, 42, 0.80);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(200, 220, 255, 0.85);
   font-size: 13px;
   font-weight: 500;
   font-family: var(--ui-font);
@@ -484,8 +485,8 @@ button:focus-visible,
 }
 
 .sheet-item:hover {
-  background: rgba(15, 23, 42, 0.05);
-  border-color: rgba(15, 23, 42, 0.18);
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.16);
 }
 
 .sheet-item:active {
@@ -493,9 +494,9 @@ button:focus-visible,
 }
 
 .sheet-item-active {
-  background: rgba(30, 136, 229, 0.10);
-  border-color: var(--rubiks-blue);
-  color: var(--rubiks-blue);
+  background: rgba(30, 136, 229, 0.18);
+  border-color: rgba(30, 136, 229, 0.55);
+  color: #60a5fa;
   font-weight: 600;
 }
 
@@ -1095,9 +1096,9 @@ button:focus-visible,
     max-width: 100%;
     border-radius: 0;
     height: 60px;
-    background: rgba(255, 255, 255, 0.92);
-    border-top: 1px solid rgba(15, 23, 42, 0.08);
-    box-shadow: 0 -4px 20px rgba(15, 23, 42, 0.10);
+    background: rgba(14, 17, 38, 0.96);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.50);
   }
 
   .bottom-nav-central-ring {
@@ -1149,8 +1150,8 @@ button:focus-visible,
     padding: 16px 18px;
     position: sticky;
     top: 0;
-    background: rgba(255, 255, 255, 0.96);
-    backdrop-filter: blur(20px);
+    background: rgba(14, 17, 38, 0.96);
+    backdrop-filter: blur(24px);
     z-index: 1;
   }
 
@@ -1414,8 +1415,8 @@ button:focus-visible,
   right: 0;
   bottom: 0;
   height: 100dvh;
-  background: rgba(15, 23, 42, 0.35);
-  backdrop-filter: blur(20px);
+  background: rgba(8, 10, 22, 0.72);
+  backdrop-filter: blur(24px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1425,16 +1426,16 @@ button:focus-visible,
 }
 
 .settings-panel {
-  background: var(--ui-panel-strong);
-  border: 1px solid var(--ui-border);
+  background: rgba(14, 17, 38, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 20px;
   padding: 0;
   max-width: 480px;
   width: 90%;
   max-height: calc(100dvh - 60px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
   overflow-y: auto;
-  backdrop-filter: blur(20px);
-  box-shadow: 0 28px 64px rgba(15, 23, 42, 0.2);
+  backdrop-filter: blur(24px);
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.60), 0 0 0 1px rgba(255, 255, 255, 0.06);
 }
 
 .settings-header {
@@ -1442,8 +1443,8 @@ button:focus-visible,
   justify-content: space-between;
   align-items: center;
   padding: 20px 24px;
-  border-bottom: 1px solid var(--ui-border);
-  background: rgba(255, 255, 255, 0.75);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(14, 17, 38, 0.94);
   border-radius: 20px 20px 0 0;
 }
 
@@ -1451,7 +1452,7 @@ button:focus-visible,
   margin: 0;
   font-size: 20px;
   font-weight: 500;
-  color: var(--ui-ink);
+  color: #e8edf8;
   font-family: var(--ui-font);
   letter-spacing: 0.01em;
 }
@@ -1459,7 +1460,7 @@ button:focus-visible,
 .settings-close-btn {
   background: transparent;
   border: none;
-  color: var(--ui-ink-subtle);
+  color: rgba(200, 220, 255, 0.55);
   width: 40px;
   height: 40px;
   border-radius: 50%;
@@ -1473,8 +1474,8 @@ button:focus-visible,
 }
 
 .settings-close-btn:hover {
-  background: rgba(15, 23, 42, 0.08);
-  color: var(--ui-ink);
+  background: rgba(255, 255, 255, 0.08);
+  color: #e8edf8;
 }
 
 .settings-body {
@@ -3128,8 +3129,8 @@ select.btn-compact:disabled {
 }
 
 /* =====================================================================
-   Unified clean theme overrides (menus + settings + HUD)
-   Aligns UI chrome with Freeplay wizard visual language.
+   Dark Glass System — unified settings + nav + HUD overrides
+   Dark smoked navy glass (Tetris Effect × Genshin Impact style).
    ===================================================================== */
 .settings-panel,
 .top-app-bar,
@@ -3140,21 +3141,21 @@ select.btn-compact:disabled {
 }
 
 .settings-section-title {
-  color: #334155 !important;
+  color: rgba(180, 210, 255, 0.40) !important;
   text-shadow: none;
   font-family: var(--ui-font);
 }
 
 .settings-radio,
 .scheme-grid .settings-radio {
-  border: 1px solid transparent;
-  background: rgba(255, 255, 255, 0.58);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .settings-radio:hover,
 .scheme-grid .settings-radio:hover {
-  background: #ffffff;
-  border-color: rgba(15, 23, 42, 0.12);
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.14);
 }
 
 .settings-radio-label,
@@ -3166,133 +3167,129 @@ select.btn-compact:disabled {
 }
 
 .settings-tab {
-  color: rgba(51, 65, 85, 0.68);
+  color: rgba(200, 220, 255, 0.50);
   border-bottom-color: transparent;
   font-family: var(--ui-font);
 }
 
 .settings-tab:hover {
-  color: #0f172a;
+  color: rgba(200, 220, 255, 0.85);
 }
 
 .settings-tab.active {
-  background: rgba(15, 23, 42, 0.08);
-  color: var(--ui-ink);
-  border-bottom-color: rgba(15, 23, 42, 0.28);
+  background: rgba(255, 255, 255, 0.06);
+  color: #e8edf8;
+  border-bottom-color: #3b82f6;
 }
 
-/* =====================================================================
-   Light Glass System — settings panel content overrides
-   Ensures all settings panel internals read as dark ink on light glass.
-   ===================================================================== */
-
 .settings-tabs {
-  border-bottom-color: rgba(15, 23, 42, 0.08) !important;
+  border-bottom-color: rgba(255, 255, 255, 0.08) !important;
 }
 
 .toggle-label {
-  color: rgba(15, 23, 42, 0.82) !important;
+  color: rgba(200, 220, 255, 0.85) !important;
   font-family: var(--ui-font) !important;
 }
 
 .settings-toggle-row:hover {
-  background: rgba(15, 23, 42, 0.04) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
 }
 
 /* Style cards — Tiles panel */
 .style-card {
-  background: rgba(255, 255, 255, 0.60) !important;
-  border: 1px solid rgba(15, 23, 42, 0.10) !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
 }
 
 .style-card:hover {
-  background: rgba(255, 255, 255, 0.92) !important;
-  border-color: rgba(15, 23, 42, 0.18) !important;
+  background: rgba(255, 255, 255, 0.10) !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
 }
 
 .style-card.selected {
-  background: rgba(30, 136, 229, 0.10) !important;
-  border-color: rgba(30, 136, 229, 0.48) !important;
+  background: rgba(30, 136, 229, 0.18) !important;
+  border-color: rgba(30, 136, 229, 0.55) !important;
 }
 
 .style-card-label {
-  color: rgba(15, 23, 42, 0.72) !important;
+  color: rgba(200, 220, 255, 0.72) !important;
 }
 
 .style-card.selected .style-card-label {
-  color: #1e88e5 !important;
+  color: #60a5fa !important;
 }
 
 /* Per-face and tile selects */
 .per-face-select,
 .tile-style-select {
-  background: rgba(255, 255, 255, 0.95) !important;
-  border: 1px solid rgba(15, 23, 42, 0.12) !important;
-  color: rgba(15, 23, 42, 0.85) !important;
+  background: rgba(20, 24, 48, 0.95) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  color: rgba(200, 220, 255, 0.85) !important;
 }
 
 .per-face-select option,
 .tile-style-select option,
 .per-face-select optgroup,
 .tile-style-select optgroup {
-  background: #ffffff;
-  color: #0f172a;
+  background: #1a1e3a;
+  color: #e8edf8;
 }
 
 .per-face-preview-wrap {
-  border-color: rgba(15, 23, 42, 0.12) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
 }
 
 /* Color picker labels */
 .color-picker-label {
-  color: rgba(15, 23, 42, 0.55) !important;
+  color: rgba(200, 220, 255, 0.55) !important;
 }
 
 /* Image upload */
 .image-upload-btn {
-  border: 1px dashed rgba(15, 23, 42, 0.20) !important;
-  background: rgba(255, 255, 255, 0.55) !important;
-  color: rgba(15, 23, 42, 0.60) !important;
+  border: 1px dashed rgba(255, 255, 255, 0.20) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  color: rgba(200, 220, 255, 0.60) !important;
 }
 
 .image-upload-btn:hover {
-  background: rgba(30, 136, 229, 0.08) !important;
-  border-color: rgba(30, 136, 229, 0.35) !important;
-  color: rgba(15, 23, 42, 0.85) !important;
+  background: rgba(30, 136, 229, 0.12) !important;
+  border-color: rgba(30, 136, 229, 0.40) !important;
+  color: rgba(200, 220, 255, 0.90) !important;
 }
 
 /* Face texture upload */
 .face-texture-upload {
-  background: rgba(255, 255, 255, 0.55) !important;
-  border: 1px dashed rgba(15, 23, 42, 0.18) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px dashed rgba(255, 255, 255, 0.18) !important;
 }
 
 .face-texture-plus {
-  color: rgba(15, 23, 42, 0.35) !important;
+  color: rgba(200, 220, 255, 0.35) !important;
 }
 
 /* Color input border */
 .color-input {
-  border: 1px solid rgba(15, 23, 42, 0.15) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
 }
 
-/* Settings radio group in light mode */
+/* Settings radio active state */
 .settings-radio.active {
-  background: rgba(30, 136, 229, 0.08) !important;
+  background: rgba(30, 136, 229, 0.14) !important;
+  border-color: rgba(30, 136, 229, 0.45) !important;
 }
 
-/* Scheme dots ring in light mode */
+/* Scheme dots ring */
 .scheme-dot {
-  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.12) !important;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15) !important;
 }
 
-/* Sheet item locked state on light background */
+/* Sheet item locked state */
 .sheet-item-locked:hover {
-  background: rgba(15, 23, 42, 0.03);
-  border-color: rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.06);
 }
 
-/* Sheet handle visible on white */
+/* Sheet handle */
 .sheet-handle {
-  background: rgba(15, 23, 42, 0.18) !important;
+  background: rgba(255, 255, 255, 0.20) !important;
 }

@@ -760,11 +760,6 @@ const MenuUtilityNav = ({ visible, onFreeplay, onStore }) => (
     opacity: visible ? 1 : 0,
     transform: visible ? 'none' : 'translateY(16px)',
   }}>
-    <p style={{
-      margin: 0, fontSize: '11px', fontWeight: 500, letterSpacing: '0.22em',
-      textTransform: 'uppercase', color: 'rgba(160,200,255,0.5)',
-      fontFamily: MENU_FONT, pointerEvents: 'none',
-    }}>tap the worm · tap the cube</p>
     <div style={{
       borderRadius: '100px', padding: '1.5px',
       background: 'linear-gradient(90deg,#22c55e60,#3b82f660,#6366f160)',

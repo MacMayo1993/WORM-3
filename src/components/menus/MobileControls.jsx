@@ -34,17 +34,17 @@ const MobileControls = ({
     width: '48px',
     height: '48px',
     borderRadius: '50%',
-    border: '1px solid rgba(15, 23, 42, 0.12)',
-    background: 'rgba(255, 255, 255, 0.88)',
-    backdropFilter: 'blur(12px)',
-    WebkitBackdropFilter: 'blur(12px)',
-    color: 'rgba(15, 23, 42, 0.75)',
+    border: '1px solid rgba(255, 255, 255, 0.10)',
+    background: 'rgba(14, 17, 38, 0.88)',
+    backdropFilter: 'blur(16px)',
+    WebkitBackdropFilter: 'blur(16px)',
+    color: 'rgba(200, 220, 255, 0.80)',
     fontSize: '18px',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    boxShadow: '0 2px 12px rgba(15, 23, 42, 0.12)',
+    boxShadow: '0 2px 12px rgba(0, 0, 0, 0.40)',
     transition: 'all 0.15s ease',
     WebkitTapHighlightColor: 'transparent',
     touchAction: 'manipulation'
@@ -52,8 +52,8 @@ const MobileControls = ({
 
   const _activeButtonStyle = {
     ...buttonStyle,
-    background: 'rgba(59, 130, 246, 0.8)',
-    borderColor: 'rgba(96, 165, 250, 0.5)'
+    background: 'rgba(59, 130, 246, 0.35)',
+    borderColor: 'rgba(96, 165, 250, 0.55)'
   };
 
   const smallButtonStyle = {
@@ -65,8 +65,8 @@ const MobileControls = ({
 
   const activeSmallButtonStyle = {
     ...smallButtonStyle,
-    background: 'rgba(59, 130, 246, 0.8)',
-    borderColor: 'rgba(96, 165, 250, 0.5)'
+    background: 'rgba(59, 130, 246, 0.35)',
+    borderColor: 'rgba(96, 165, 250, 0.55)'
   };
 
   return (
@@ -323,9 +323,9 @@ const MobileControls = ({
             width: '54px',
             height: '54px',
             fontSize: '22px',
-            background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.9), rgba(37, 99, 235, 0.9))',
-            borderColor: 'rgba(96, 165, 250, 0.5)',
-            boxShadow: '0 4px 20px rgba(59, 130, 246, 0.4)'
+            background: 'linear-gradient(135deg, rgba(30, 136, 229, 0.80), rgba(37, 99, 235, 0.80))',
+            borderColor: 'rgba(96, 165, 250, 0.40)',
+            boxShadow: '0 4px 20px rgba(30, 136, 229, 0.35)'
           }}
           aria-label="Settings"
         >
