@@ -1,169 +1,230 @@
 import React from 'react';
 
-const HelpMenu = ({ onClose }) => {
-  return (
-    <div style={{
+const Section = ({ title, children }) => (
+  <section style={{ marginBottom: '24px' }}>
+    <h3 style={{
+      margin: '0 0 10px',
+      fontSize: '11px',
+      fontWeight: 700,
+      color: 'rgba(15, 23, 42, 0.45)',
+      textTransform: 'uppercase',
+      letterSpacing: '0.10em',
+    }}>{title}</h3>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+      {children}
+    </div>
+  </section>
+);
+
+const Row = ({ label, desc }) => (
+  <div style={{
+    display: 'flex',
+    alignItems: 'baseline',
+    gap: '10px',
+    padding: '6px 10px',
+    borderRadius: '8px',
+    background: 'rgba(255, 255, 255, 0.60)',
+    border: '1px solid rgba(15, 23, 42, 0.07)',
+    fontSize: '13px',
+    lineHeight: 1.5,
+  }}>
+    <span style={{ fontWeight: 600, color: '#0f172a', whiteSpace: 'nowrap', flexShrink: 0 }}>{label}</span>
+    <span style={{ color: 'rgba(15, 23, 42, 0.60)' }}>{desc}</span>
+  </div>
+);
+
+const KeyRow = ({ keys, desc }) => (
+  <div style={{
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    padding: '6px 10px',
+    borderRadius: '8px',
+    background: 'rgba(255, 255, 255, 0.60)',
+    border: '1px solid rgba(15, 23, 42, 0.07)',
+  }}>
+    <span style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+      {keys.split('/').map((k, i) => (
+        <kbd key={i} style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '2px 7px',
+          background: 'rgba(15, 23, 42, 0.06)',
+          border: '1px solid rgba(15, 23, 42, 0.14)',
+          borderRadius: '5px',
+          fontSize: '11px',
+          fontWeight: 600,
+          fontFamily: 'var(--ui-font)',
+          color: '#0f172a',
+          minWidth: '22px',
+        }}>{k.trim()}</kbd>
+      ))}
+    </span>
+    <span style={{ fontSize: '13px', color: 'rgba(15, 23, 42, 0.65)', lineHeight: 1.4 }}>{desc}</span>
+  </div>
+);
+
+const HelpMenu = ({ onClose }) => (
+  <div
+    onClick={onClose}
+    style={{
       position: 'fixed',
       top: 0, left: 0, right: 0, bottom: 0,
       height: '100dvh',
-      background: 'rgba(245,241,232,0.92)',
+      background: 'rgba(15, 23, 42, 0.28)',
+      backdropFilter: 'blur(20px)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       zIndex: 1000,
-      backdropFilter: 'blur(4px)',
       padding: 'env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px)',
-      boxSizing: 'border-box'
-    }} onClick={onClose}>
-      <div style={{
-        background: '#fdfbf7',
-        border: '2px solid #d4c5a9',
-        borderRadius: '8px',
-        padding: '32px',
-        maxWidth: '600px',
-        width: '90%',
-        maxHeight: 'calc(100dvh - 60px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))',
+      boxSizing: 'border-box',
+    }}
+  >
+    <div
+      onClick={e => e.stopPropagation()}
+      style={{
+        background: 'rgba(255, 255, 255, 0.96)',
+        border: '1px solid rgba(15, 23, 42, 0.08)',
+        borderRadius: '20px',
+        padding: '0',
+        maxWidth: '560px',
+        width: '92%',
+        maxHeight: 'calc(100dvh - 48px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))',
         overflowY: 'auto',
-        boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-        boxSizing: 'border-box'
-      }} onClick={e => e.stopPropagation()}>
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '24px'
-        }}>
-          <h2 style={{
-            margin: 0,
-            fontSize: '28px',
-            fontWeight: 600,
-            color: '#6b4423',
-            fontFamily: 'Georgia, serif'
-          }}>How to Play</h2>
-          <button onClick={onClose} style={{
-            background: '#e8dcc8',
-            border: '1px solid #d4c5a9',
-            color: '#6b4423',
-            fontSize: '24px',
+        boxShadow: '0 28px 64px rgba(15, 23, 42, 0.16), 0 4px 12px rgba(15, 23, 42, 0.08)',
+        backdropFilter: 'blur(20px)',
+        boxSizing: 'border-box',
+        fontFamily: 'var(--ui-font)',
+      }}
+    >
+      {/* Header */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '20px 24px',
+        borderBottom: '1px solid rgba(15, 23, 42, 0.08)',
+        position: 'sticky',
+        top: 0,
+        background: 'rgba(255, 255, 255, 0.96)',
+        backdropFilter: 'blur(20px)',
+        borderRadius: '20px 20px 0 0',
+        zIndex: 1,
+      }}>
+        <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 600, color: '#0f172a', letterSpacing: '0.01em' }}>
+          How to Play
+        </h2>
+        <button
+          onClick={onClose}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: 'rgba(15, 23, 42, 0.45)',
             width: '36px',
             height: '36px',
             borderRadius: '50%',
             cursor: 'pointer',
+            fontSize: '20px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            transition: 'all 0.2s'
-          }}>×</button>
-        </div>
+            transition: 'background 0.15s ease, color 0.15s ease',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(15,23,42,0.07)'; e.currentTarget.style.color = '#0f172a'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(15,23,42,0.45)'; }}
+        >
+          &times;
+        </button>
+      </div>
 
-        <div style={{ color: '#5a4a3a', lineHeight: 1.7, fontFamily: 'Georgia, serif' }}>
-          <section style={{ marginBottom: '24px' }}>
-            <h3 style={{ color: '#8b6f47', marginBottom: '12px', fontSize: '18px', fontWeight: 600 }}>🎮 Moving the Cube</h3>
-            <div style={{ paddingLeft: '16px', fontSize: '14px' }}>
-              <p style={{ margin: '8px 0' }}><strong>Drag normally:</strong> Rotates a slice (like a Rubik's Cube)</p>
-              <p style={{ margin: '8px 0' }}><strong>Hold Shift + Drag:</strong> Twists the face itself</p>
-              <p style={{ margin: '8px 0' }}><strong>Click a sticker:</strong> Flips it to its "opposite" color</p>
-            </div>
-          </section>
+      {/* Content */}
+      <div style={{ padding: '20px 24px 24px' }}>
 
-          <section style={{ marginBottom: '24px' }}>
-            <h3 style={{ color: '#a67c52', marginBottom: '12px', fontSize: '18px', fontWeight: 600 }}>🌀 Special Features</h3>
-            <div style={{ paddingLeft: '16px', fontSize: '14px' }}>
-              <p style={{ margin: '8px 0' }}><strong>Tunnels:</strong> The colorful tunnels show connections between opposite points</p>
-              <p style={{ margin: '8px 0' }}><strong>Flip Mode:</strong> Turn color flipping on or off</p>
-              <p style={{ margin: '8px 0' }}><strong>Disparity Mode:</strong> Watch instability spread across the cube!</p>
-            </div>
-          </section>
+        <Section title="Moving the Cube">
+          <Row label="Drag" desc="Rotates a slice — just like a real Rubik's Cube" />
+          <Row label="Shift + Drag" desc="Twists the entire face" />
+          <Row label="Click a sticker" desc="Flips it to its antipodal (opposite) color" />
+        </Section>
 
-          <section style={{ marginBottom: '24px' }}>
-            <h3 style={{ color: '#c19a6b', marginBottom: '12px', fontSize: '18px', fontWeight: 600 }}>👁️ Different Views</h3>
-            <div style={{ paddingLeft: '16px', fontSize: '14px' }}>
-              <p style={{ margin: '8px 0' }}><strong>Classic:</strong> The standard colorful cube</p>
-              <p style={{ margin: '8px 0' }}><strong>Grid:</strong> Shows position labels (M1-001, etc.)</p>
-              <p style={{ margin: '8px 0' }}><strong>Sudokube:</strong> Numbers instead of colors</p>
-              <p style={{ margin: '8px 0' }}><strong>Wireframe:</strong> See-through edges with lights</p>
-              <p style={{ margin: '8px 0' }}><strong>Explode:</strong> Spreads the cube apart to see all sides</p>
-              <p style={{ margin: '8px 0' }}><strong>Tunnels:</strong> Hide or show the antipodal connections</p>
-            </div>
-          </section>
+        <Section title="Special Features">
+          <Row label="Tunnels" desc="Colorful tunnels show connections between antipodal points" />
+          <Row label="Flip Mode" desc="Toggle color flipping on or off" />
+          <Row label="Disparity Mode" desc="Watch instability cascade across the cube!" />
+        </Section>
 
-          <section style={{ marginBottom: '24px' }}>
-            <h3 style={{ color: '#8b6f47', marginBottom: '12px', fontSize: '18px', fontWeight: 600 }}>📊 What the Numbers Mean</h3>
-            <div style={{ paddingLeft: '16px', fontSize: '14px' }}>
-              <p style={{ margin: '8px 0' }}><strong>M:</strong> How many moves you've made</p>
-              <p style={{ margin: '8px 0' }}><strong>F:</strong> How many times you've flipped colors</p>
-              <p style={{ margin: '8px 0' }}><strong>W:</strong> How many flipped pairs are currently active</p>
-              <p style={{ margin: '8px 0' }}><strong>Instability Bar:</strong> Shows how chaotic things are getting!</p>
-            </div>
-          </section>
+        <Section title="Views">
+          <Row label="Classic" desc="Standard colorful cube" />
+          <Row label="Grid" desc="Position labels (M1-001, etc.)" />
+          <Row label="Sudoku" desc="Numbers instead of colors" />
+          <Row label="Wireframe" desc="See-through edges with lights" />
+          <Row label="Explode" desc="Spreads cube apart to see all sides" />
+        </Section>
 
-          <section style={{ marginBottom: '24px' }}>
-            <h3 style={{ color: '#a67c52', marginBottom: '12px', fontSize: '18px', fontWeight: 600 }}>🎯 Speedcube Controls</h3>
-            <div style={{ paddingLeft: '16px', fontSize: '14px' }}>
-              <p style={{ margin: '8px 0' }}><strong>Arrow Keys</strong> — Move cursor to select a tile</p>
-              <p style={{ margin: '8px 0' }}><strong>W / S</strong> — Rotate selected row up / down</p>
-              <p style={{ margin: '8px 0' }}><strong>A / D</strong> — Rotate selected column left / right</p>
-              <p style={{ margin: '8px 0' }}><strong>Q / E</strong> — Rotate face counter-clockwise / clockwise</p>
-              <p style={{ margin: '8px 0' }}><strong>F</strong> — Flip the selected tile (antipodal)</p>
-              <p style={{ margin: '8px 0', color: '#9b8b7a', fontStyle: 'italic' }}>Cursor appears when you use keyboard controls</p>
-            </div>
-          </section>
+        <Section title="HUD Numbers">
+          <Row label="M" desc="Moves made" />
+          <Row label="F" desc="Color flips" />
+          <Row label="W" desc="Active flipped pairs" />
+          <Row label="Pressure bar" desc="Shows chaos intensity" />
+        </Section>
 
-          <section style={{ marginBottom: '24px' }}>
-            <h3 style={{ color: '#c17035', marginBottom: '12px', fontSize: '18px', fontWeight: 600 }}>🤲 Hands Mode (P)</h3>
-            <div style={{ paddingLeft: '16px', fontSize: '14px' }}>
-              <p style={{ margin: '8px 0', color: '#9b8b7a', fontStyle: 'italic' }}>Speedcuber controls — fixed camera, fast moves, standard notation</p>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px' }}>
-                <p style={{ margin: '4px 0' }}><strong>I / K</strong> — U / U'</p>
-                <p style={{ margin: '4px 0' }}><strong>O</strong> — U2</p>
-                <p style={{ margin: '4px 0' }}><strong>J / L</strong> — R / R'</p>
-                <p style={{ margin: '4px 0' }}><strong>F / D</strong> — L / L'</p>
-                <p style={{ margin: '4px 0' }}><strong>H / G</strong> — F / F'</p>
-                <p style={{ margin: '4px 0' }}><strong>W / E</strong> — B / B'</p>
-                <p style={{ margin: '4px 0' }}><strong>S / ;</strong> — D / D'</p>
-                <p style={{ margin: '4px 0' }}><strong>, / M</strong> — M' / M</p>
-                <p style={{ margin: '4px 0' }}><strong>.</strong> — M2</p>
-                <p style={{ margin: '4px 0' }}><strong>U / N</strong> — E' / E</p>
-              </div>
-              <p style={{ margin: '8px 0', color: '#a67c52', fontSize: '12px' }}>Combo detection: Sexy Move, Sledgehammer, Sune, T-Perm and more</p>
-            </div>
-          </section>
+        <Section title="Keyboard Controls">
+          <KeyRow keys="Arrow keys" desc="Move cursor to select a tile" />
+          <KeyRow keys="W / S" desc="Rotate selected row up / down" />
+          <KeyRow keys="A / D" desc="Rotate selected column left / right" />
+          <KeyRow keys="Q / E" desc="Rotate face counter-clockwise / clockwise" />
+          <KeyRow keys="F" desc="Flip the selected tile (antipodal)" />
+        </Section>
 
-          <section>
-            <h3 style={{ color: '#a67c52', marginBottom: '12px', fontSize: '18px', fontWeight: 600 }}>⌨️ Other Shortcuts</h3>
-            <div style={{ paddingLeft: '16px', fontSize: '14px' }}>
-              <p style={{ margin: '8px 0' }}><strong>H</strong> or <strong>?</strong> — Open/close this help menu</p>
-              <p style={{ margin: '8px 0' }}><strong>Space</strong> — Shuffle the cube randomly</p>
-              <p style={{ margin: '8px 0' }}><strong>R</strong> — Reset everything</p>
-              <p style={{ margin: '8px 0' }}><strong>G</strong> — Toggle flip mode for mouse</p>
-              <p style={{ margin: '8px 0' }}><strong>T</strong> — Show/hide tunnels</p>
-              <p style={{ margin: '8px 0' }}><strong>X</strong> — Toggle explosion view</p>
-              <p style={{ margin: '8px 0' }}><strong>V</strong> — Change view mode</p>
-              <p style={{ margin: '8px 0' }}><strong>C</strong> — Turn Disparity Mode on/off</p>
-              <p style={{ margin: '8px 0' }}><strong>P</strong> — Toggle Hands Mode</p>
-              <p style={{ margin: '8px 0' }}><strong>Esc</strong> — Close menus / hide cursor / exit Hands Mode</p>
-            </div>
-          </section>
-        </div>
+        <Section title="Hands Mode (P) — Speedcuber">
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '6px',
+          }}>
+            <KeyRow keys="I / K" desc="U / U'" />
+            <KeyRow keys="O" desc="U2" />
+            <KeyRow keys="J / L" desc="R / R'" />
+            <KeyRow keys="F / D" desc="L / L'" />
+            <KeyRow keys="H / G" desc="F / F'" />
+            <KeyRow keys="W / E" desc="B / B'" />
+            <KeyRow keys="S / ;" desc="D / D'" />
+            <KeyRow keys=", / M" desc="M' / M" />
+          </div>
+        </Section>
 
+        <Section title="Quick Shortcuts">
+          <KeyRow keys="H / ?" desc="Open / close this help menu" />
+          <KeyRow keys="Space" desc="Shuffle the cube" />
+          <KeyRow keys="R" desc="Reset everything" />
+          <KeyRow keys="G" desc="Toggle flip mode" />
+          <KeyRow keys="T" desc="Show / hide tunnels" />
+          <KeyRow keys="X" desc="Toggle explosion view" />
+          <KeyRow keys="V" desc="Cycle view mode" />
+          <KeyRow keys="C" desc="Toggle Disparity Mode" />
+          <KeyRow keys="P" desc="Toggle Hands Mode" />
+          <KeyRow keys="Esc" desc="Close menus / exit Hands Mode" />
+        </Section>
+
+        {/* Footnote */}
         <div style={{
-          marginTop: '24px',
-          padding: '16px',
-          background: '#f9f5ed',
-          borderRadius: '6px',
-          fontSize: '14px',
-          color: '#6b4423',
-          fontStyle: 'italic',
-          border: '2px solid #e8dcc8',
-          fontFamily: 'Georgia, serif'
+          marginTop: '8px',
+          padding: '14px 16px',
+          background: 'rgba(30, 136, 229, 0.07)',
+          borderRadius: '12px',
+          fontSize: '13px',
+          color: 'rgba(15, 23, 42, 0.65)',
+          lineHeight: 1.6,
+          border: '1px solid rgba(30, 136, 229, 0.18)',
         }}>
-          💡 <strong>What you're learning:</strong> This puzzle demonstrates a special kind of mathematical space
-          where opposite points are treated as the same location. When you flip a color, you're creating a connection
-          through this space – that's what the tunnels represent!
+          <strong style={{ color: '#1e88e5' }}>What you're learning:</strong> This puzzle demonstrates a special mathematical space —
+          the real projective plane — where opposite points are the same location.
+          When you flip a color you're creating a connection through this space. That's what the tunnels represent.
         </div>
       </div>
     </div>
-  );
-};
+  </div>
+);
 
 export default HelpMenu;

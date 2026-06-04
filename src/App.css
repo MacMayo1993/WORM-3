@@ -288,12 +288,12 @@ button:focus-visible,
   height: 64px;
   padding: 4px 8px;
   padding-bottom: calc(4px + var(--safe-area-inset-bottom));
-  background: rgba(5, 12, 35, 0.62);
-  backdrop-filter: blur(18px);
-  border-top: 1px solid rgba(100, 155, 255, 0.35);
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
   border-radius: 20px 20px 0 0;
   box-sizing: border-box;
-  box-shadow: 0 -8px 28px rgba(3, 8, 24, 0.4);
+  box-shadow: 0 -4px 24px rgba(15, 23, 42, 0.10);
   font-family: var(--ui-font);
 }
 
@@ -348,7 +348,7 @@ button:focus-visible,
 .bottom-nav-label {
   font-size: 11px;
   font-weight: 500;
-  color: rgba(190, 214, 255, 0.72);
+  color: rgba(15, 23, 42, 0.50);
   letter-spacing: 0.02em;
   line-height: 1;
   transition: color 0.2s ease;
@@ -368,7 +368,7 @@ button:focus-visible,
   height: 56px;
   border-radius: 50%;
   border: 2px solid var(--rubiks-blue);
-  background: rgba(12, 24, 60, 0.9);
+  background: rgba(255, 255, 255, 0.95);
   transition: all 0.2s ease;
   box-shadow: var(--shadow-md);
 }
@@ -384,7 +384,7 @@ button:focus-visible,
 .sheet-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(2, 6, 23, 0.55);
+  background: rgba(15, 23, 42, 0.30);
   z-index: 500;
   animation: sheet-fade-in 0.2s ease;
 }
@@ -405,7 +405,7 @@ button:focus-visible,
   left: 0;
   right: 0;
   z-index: 501;
-  background: rgba(10, 20, 48, 0.95);
+  background: rgba(255, 255, 255, 0.96);
   border-radius: 20px 20px 0 0;
   padding: 8px 20px 24px;
   padding-bottom: calc(24px + var(--safe-area-inset-bottom));
@@ -413,8 +413,8 @@ button:focus-visible,
   overflow-y: auto;
   transform: translateY(100%);
   animation: sheet-slide-up 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-  box-shadow: 0 -12px 40px rgba(15, 23, 42, 0.16);
-  border-top: 1px solid rgba(110, 160, 255, 0.35);
+  box-shadow: 0 -12px 40px rgba(15, 23, 42, 0.12);
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
   font-family: var(--ui-font);
 }
 
@@ -451,7 +451,7 @@ button:focus-visible,
 .sheet-group-title {
   font-size: 11px;
   font-weight: 600;
-  color: rgba(190, 214, 255, 0.7);
+  color: rgba(15, 23, 42, 0.45);
   text-transform: uppercase;
   letter-spacing: 0.1em;
   margin-bottom: 10px;
@@ -469,9 +469,9 @@ button:focus-visible,
   gap: 6px;
   padding: 12px 16px;
   border-radius: 12px;
-  border: 1px solid rgba(110, 160, 255, 0.28);
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(226, 232, 240, 0.95);
+  border: 1px solid rgba(15, 23, 42, 0.10);
+  background: rgba(255, 255, 255, 0.65);
+  color: rgba(15, 23, 42, 0.80);
   font-size: 13px;
   font-weight: 500;
   font-family: var(--ui-font);
@@ -484,8 +484,8 @@ button:focus-visible,
 }
 
 .sheet-item:hover {
-  background: rgba(59, 130, 246, 0.18);
-  border-color: rgba(110, 160, 255, 0.56);
+  background: rgba(15, 23, 42, 0.05);
+  border-color: rgba(15, 23, 42, 0.18);
 }
 
 .sheet-item:active {
@@ -493,9 +493,10 @@ button:focus-visible,
 }
 
 .sheet-item-active {
-  background: rgba(30, 136, 229, 0.12);
+  background: rgba(30, 136, 229, 0.10);
   border-color: var(--rubiks-blue);
   color: var(--rubiks-blue);
+  font-weight: 600;
 }
 
 .sheet-item-locked {
@@ -1094,9 +1095,9 @@ button:focus-visible,
     max-width: 100%;
     border-radius: 0;
     height: 60px;
-    background: rgba(9, 14, 34, 0.9);
-    border-top: 1px solid rgba(116, 154, 238, 0.65);
-    box-shadow: 0 -10px 22px rgba(1, 4, 12, 0.45);
+    background: rgba(255, 255, 255, 0.92);
+    border-top: 1px solid rgba(15, 23, 42, 0.08);
+    box-shadow: 0 -4px 20px rgba(15, 23, 42, 0.10);
   }
 
   .bottom-nav-central-ring {
@@ -1148,7 +1149,8 @@ button:focus-visible,
     padding: 16px 18px;
     position: sticky;
     top: 0;
-    background: rgba(30, 35, 50, 0.98);
+    background: rgba(255, 255, 255, 0.96);
+    backdrop-filter: blur(20px);
     z-index: 1;
   }
 
@@ -3177,4 +3179,120 @@ select.btn-compact:disabled {
   background: rgba(15, 23, 42, 0.08);
   color: var(--ui-ink);
   border-bottom-color: rgba(15, 23, 42, 0.28);
+}
+
+/* =====================================================================
+   Light Glass System — settings panel content overrides
+   Ensures all settings panel internals read as dark ink on light glass.
+   ===================================================================== */
+
+.settings-tabs {
+  border-bottom-color: rgba(15, 23, 42, 0.08) !important;
+}
+
+.toggle-label {
+  color: rgba(15, 23, 42, 0.82) !important;
+  font-family: var(--ui-font) !important;
+}
+
+.settings-toggle-row:hover {
+  background: rgba(15, 23, 42, 0.04) !important;
+}
+
+/* Style cards — Tiles panel */
+.style-card {
+  background: rgba(255, 255, 255, 0.60) !important;
+  border: 1px solid rgba(15, 23, 42, 0.10) !important;
+}
+
+.style-card:hover {
+  background: rgba(255, 255, 255, 0.92) !important;
+  border-color: rgba(15, 23, 42, 0.18) !important;
+}
+
+.style-card.selected {
+  background: rgba(30, 136, 229, 0.10) !important;
+  border-color: rgba(30, 136, 229, 0.48) !important;
+}
+
+.style-card-label {
+  color: rgba(15, 23, 42, 0.72) !important;
+}
+
+.style-card.selected .style-card-label {
+  color: #1e88e5 !important;
+}
+
+/* Per-face and tile selects */
+.per-face-select,
+.tile-style-select {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border: 1px solid rgba(15, 23, 42, 0.12) !important;
+  color: rgba(15, 23, 42, 0.85) !important;
+}
+
+.per-face-select option,
+.tile-style-select option,
+.per-face-select optgroup,
+.tile-style-select optgroup {
+  background: #ffffff;
+  color: #0f172a;
+}
+
+.per-face-preview-wrap {
+  border-color: rgba(15, 23, 42, 0.12) !important;
+}
+
+/* Color picker labels */
+.color-picker-label {
+  color: rgba(15, 23, 42, 0.55) !important;
+}
+
+/* Image upload */
+.image-upload-btn {
+  border: 1px dashed rgba(15, 23, 42, 0.20) !important;
+  background: rgba(255, 255, 255, 0.55) !important;
+  color: rgba(15, 23, 42, 0.60) !important;
+}
+
+.image-upload-btn:hover {
+  background: rgba(30, 136, 229, 0.08) !important;
+  border-color: rgba(30, 136, 229, 0.35) !important;
+  color: rgba(15, 23, 42, 0.85) !important;
+}
+
+/* Face texture upload */
+.face-texture-upload {
+  background: rgba(255, 255, 255, 0.55) !important;
+  border: 1px dashed rgba(15, 23, 42, 0.18) !important;
+}
+
+.face-texture-plus {
+  color: rgba(15, 23, 42, 0.35) !important;
+}
+
+/* Color input border */
+.color-input {
+  border: 1px solid rgba(15, 23, 42, 0.15) !important;
+}
+
+/* Settings radio group in light mode */
+.settings-radio.active {
+  background: rgba(30, 136, 229, 0.08) !important;
+}
+
+/* Scheme dots ring in light mode */
+.scheme-dot {
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.12) !important;
+}
+
+/* Sheet item locked state on light background */
+.sheet-item-locked:hover {
+  background: rgba(15, 23, 42, 0.03);
+  border-color: rgba(15, 23, 42, 0.08);
+}
+
+/* Sheet handle visible on white */
+.sheet-handle {
+  background: rgba(15, 23, 42, 0.18) !important;
 }
