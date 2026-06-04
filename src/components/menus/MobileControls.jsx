@@ -34,16 +34,17 @@ const MobileControls = ({
     width: '48px',
     height: '48px',
     borderRadius: '50%',
-    border: '1px solid rgba(255, 255, 255, 0.15)',
-    background: 'rgba(30, 35, 50, 0.9)',
+    border: '1px solid rgba(15, 23, 42, 0.12)',
+    background: 'rgba(255, 255, 255, 0.88)',
     backdropFilter: 'blur(12px)',
-    color: 'rgba(255, 255, 255, 0.9)',
+    WebkitBackdropFilter: 'blur(12px)',
+    color: 'rgba(15, 23, 42, 0.75)',
     fontSize: '18px',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.4)',
+    boxShadow: '0 2px 12px rgba(15, 23, 42, 0.12)',
     transition: 'all 0.15s ease',
     WebkitTapHighlightColor: 'transparent',
     touchAction: 'manipulation'
@@ -86,9 +87,9 @@ const MobileControls = ({
               width: '54px',
               height: '54px',
               fontSize: '22px',
-              background: 'rgba(0, 217, 255, 0.2)',
-              borderColor: 'rgba(0, 217, 255, 0.5)',
-              boxShadow: '0 4px 20px rgba(0, 217, 255, 0.3)',
+              background: 'rgba(0, 200, 230, 0.12)',
+              borderColor: 'rgba(0, 200, 230, 0.45)',
+              boxShadow: '0 4px 20px rgba(0, 200, 230, 0.20)',
               position: 'relative'
             }}
             aria-label={`Undo last move (${undoCount} available)`}
@@ -342,7 +343,6 @@ const MobileControls = ({
             width: '40px',
             height: '40px',
             fontSize: '18px',
-            background: 'rgba(50, 55, 70, 0.9)'
           }}
           aria-label={expanded ? "Close menu" : "Open menu"}
         >

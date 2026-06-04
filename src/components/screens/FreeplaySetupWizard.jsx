@@ -126,7 +126,7 @@ const S = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: 'rgba(0,0,0,0.55)',
+    background: 'rgba(15,23,42,0.28)',
     backdropFilter: 'blur(20px)',
     WebkitBackdropFilter: 'blur(20px)',
     zIndex: 1000,
@@ -141,7 +141,7 @@ const S = {
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
-    boxShadow: '0 32px 80px rgba(0,0,0,0.28), 0 0 0 1px rgba(0,0,0,0.06)',
+    boxShadow: '0 28px 64px rgba(15,23,42,0.16), 0 0 0 1px rgba(15,23,42,0.08)',
   },
 
   header: {
