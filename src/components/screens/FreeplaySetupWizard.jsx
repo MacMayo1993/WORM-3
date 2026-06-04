@@ -126,22 +126,23 @@ const S = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: 'rgba(15,23,42,0.28)',
-    backdropFilter: 'blur(20px)',
-    WebkitBackdropFilter: 'blur(20px)',
+    background: 'rgba(8,10,22,0.72)',
+    backdropFilter: 'blur(24px)',
+    WebkitBackdropFilter: 'blur(24px)',
     zIndex: 1000,
     fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif',
   },
 
   sheet: {
-    background: 'rgba(255,255,255,0.96)',
+    background: 'rgba(14,17,38,0.94)',
     borderRadius: '24px',
     width: 'min(640px, 96vw)',
     maxHeight: '88vh',
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
-    boxShadow: '0 28px 64px rgba(15,23,42,0.16), 0 0 0 1px rgba(15,23,42,0.08)',
+    boxShadow: '0 32px 80px rgba(0,0,0,0.60), 0 0 0 1px rgba(255,255,255,0.06)',
+    border: '1px solid rgba(255,255,255,0.06)',
   },
 
   header: {
@@ -158,7 +159,7 @@ const S = {
   dot: (active, current) => ({
     height: '3px',
     borderRadius: '2px',
-    background: current ? '#0f172a' : active ? 'rgba(15,23,42,0.40)' : 'rgba(15,23,42,0.12)',
+    background: current ? '#1e88e5' : active ? 'rgba(30,136,229,0.50)' : 'rgba(255,255,255,0.15)',
     flex: current ? '2' : '1',
     transition: 'all 0.35s cubic-bezier(0.4,0,0.2,1)',
   }),
@@ -167,14 +168,14 @@ const S = {
     fontSize: '24px',
     fontWeight: '700',
     letterSpacing: '-0.5px',
-    color: '#0f172a',
+    color: '#e8edf8',
     margin: '0 0 4px',
     lineHeight: 1.15,
   },
 
   subtitle: {
     fontSize: '13px',
-    color: 'rgba(15,23,42,0.50)',
+    color: 'rgba(200,220,255,0.65)',
     margin: '0 0 20px',
     fontWeight: '400',
   },
@@ -184,7 +185,7 @@ const S = {
     overflowY: 'auto',
     flex: 1,
     scrollbarWidth: 'thin',
-    scrollbarColor: 'rgba(15,23,42,0.15) transparent',
+    scrollbarColor: 'rgba(255,255,255,0.15) transparent',
   },
 
   // Generic card with optional selected state
@@ -192,8 +193,9 @@ const S = {
     display: 'flex',
     padding: '14px 16px',
     borderRadius: '14px',
-    border: selected ? '2px solid rgba(30,136,229,0.55)' : '2px solid rgba(15,23,42,0.08)',
-    background: selected ? 'rgba(30,136,229,0.08)' : 'rgba(255,255,255,0.65)',
+    border: selected ? '2px solid rgba(30,136,229,0.55)' : '2px solid rgba(255,255,255,0.08)',
+    background: selected ? 'rgba(30,136,229,0.18)' : 'rgba(255,255,255,0.05)',
+    boxShadow: selected ? '0 0 14px rgba(30,136,229,0.22)' : 'none',
     cursor: 'pointer',
     transition: 'all 0.18s ease',
     outline: 'none',
@@ -254,7 +256,7 @@ const S = {
     justifyContent: 'space-between',
     alignItems: 'center',
     flexShrink: 0,
-    borderTop: '1px solid rgba(15,23,42,0.08)',
+    borderTop: '1px solid rgba(255,255,255,0.08)',
   },
 
   btnSecondary: {
@@ -262,7 +264,7 @@ const S = {
     border: 'none',
     fontSize: '15px',
     fontWeight: '500',
-    color: 'rgba(15,23,42,0.50)',
+    color: 'rgba(200,220,255,0.55)',
     cursor: 'pointer',
     padding: '10px 16px',
     borderRadius: '10px',
@@ -271,7 +273,7 @@ const S = {
   },
 
   btnPrimary: {
-    background: 'linear-gradient(135deg, #1e88e5 0%, #42a5f5 100%)',
+    background: 'linear-gradient(135deg, #1e88e5, #42a5f5)',
     border: 'none',
     fontSize: '15px',
     fontWeight: '600',
@@ -281,7 +283,7 @@ const S = {
     borderRadius: '12px',
     transition: 'opacity 0.15s ease, transform 0.12s ease',
     fontFamily: 'inherit',
-    boxShadow: '0 4px 16px rgba(30,136,229,0.28)',
+    boxShadow: '0 4px 20px rgba(30,136,229,0.40)',
   },
 };
 
@@ -380,8 +382,8 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                   height: '44px',
                   borderRadius: '8px',
                   overflow: 'hidden',
-                  border: `1px solid ${selected ? 'rgba(0,0,0,0.38)' : 'rgba(0,0,0,0.16)'}`,
-                  background: 'rgba(0,0,0,0.04)',
+                  border: `1px solid ${selected ? 'rgba(255,255,255,0.40)' : 'rgba(255,255,255,0.15)'}`,
+                  background: 'rgba(255,255,255,0.06)',
                 }}>
                   <TilePreviewCanvas
                     styleKey={settings.tileStyle === 'random' ? 'solid' : (settings.tileStyle || 'solid')}
@@ -399,7 +401,7 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                     <div key={i} style={{
                       aspectRatio: '1',
                       borderRadius: '3px',
-                      background: selected ? '#0a0a0a' : 'rgba(0,0,0,0.15)',
+                      background: selected ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.20)',
                       transition: 'background 0.18s ease',
                     }} />
                   ))}
@@ -408,13 +410,13 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
 
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '3px' }}>
-                  <span style={{ fontSize: '16px', fontWeight: '700', color: '#0f172a', letterSpacing: '-0.4px' }}>{name}</span>
+                  <span style={{ fontSize: '16px', fontWeight: '700', color: '#e8edf8', letterSpacing: '-0.4px' }}>{name}</span>
                   <span style={{
                     fontSize: '10px', fontWeight: '600', letterSpacing: '0.04em',
-                    textTransform: 'uppercase', color: selected ? '#0f172a' : 'rgba(15,23,42,0.45)',
+                    textTransform: 'uppercase', color: selected ? '#e8edf8' : 'rgba(180,210,255,0.40)',
                   }}>{tag}</span>
                 </div>
-                <div style={{ fontSize: '12px', color: 'rgba(15,23,42,0.52)' }}>{desc}</div>
+                <div style={{ fontSize: '12px', color: 'rgba(180,210,255,0.45)' }}>{desc}</div>
               </div>
 
               {selected && (
@@ -483,15 +485,15 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
             ) : (
               <div style={{
                 width: '56px', height: '36px', borderRadius: '8px',
-                background: 'rgba(0,0,0,0.07)', display: 'flex', alignItems: 'center',
+                background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center',
                 justifyContent: 'center', fontSize: '20px', flexShrink: 0,
               }}>📷</div>
             )}
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '14px', fontWeight: settings.colorScheme === 'custom' ? '600' : '500', color: '#0f172a' }}>
+              <div style={{ fontSize: '14px', fontWeight: settings.colorScheme === 'custom' ? '600' : '500', color: '#e8edf8' }}>
                 Extract from Image
               </div>
-              <div style={{ fontSize: '12px', color: 'rgba(15,23,42,0.45)', marginTop: '2px' }}>
+              <div style={{ fontSize: '12px', color: 'rgba(200,220,255,0.65)', marginTop: '2px' }}>
                 {customPreview ? 'Tap to change image' : 'Upload a photo to auto-generate a palette'}
               </div>
             </div>
@@ -511,9 +513,9 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
 
         {/* Divider */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
-          <div style={{ flex: 1, height: '1px', background: 'rgba(0,0,0,0.08)' }} />
-          <span style={{ fontSize: '11px', fontWeight: '600', letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(0,0,0,0.28)' }}>Presets</span>
-          <div style={{ flex: 1, height: '1px', background: 'rgba(0,0,0,0.08)' }} />
+          <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.10)' }} />
+          <span style={{ fontSize: '11px', fontWeight: '600', letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(180,210,255,0.40)' }}>Presets</span>
+          <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.10)' }} />
         </div>
 
         {/* Palette grid — name above dots, 2 columns, matching in-game settings */}
@@ -529,7 +531,7 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                 ...(owned ? {} : { opacity: 0.42, cursor: 'not-allowed', pointerEvents: 'none' }),
               }}
                 onClick={() => owned && select('colorScheme', key)}>
-                <span style={{ fontSize: '12px', fontWeight: selected ? '600' : '400', color: selected ? '#0a0a0a' : 'rgba(0,0,0,0.6)', lineHeight: 1.2 }}>
+                <span style={{ fontSize: '12px', fontWeight: selected ? '600' : '400', color: selected ? '#e8edf8' : 'rgba(200,220,255,0.65)', lineHeight: 1.2 }}>
                   {SCHEME_LABELS[key]}{!owned ? ' 🔒' : ''}
                 </span>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '3px', width: '100%' }}>
@@ -576,7 +578,7 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
 
     const StyleGrid = ({ keys, label }) => (
       <div style={{ marginBottom: '20px' }}>
-        <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(15,23,42,0.38)', marginBottom: '8px' }}>
+        <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(180,210,255,0.40)', marginBottom: '8px' }}>
           {label}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '7px' }}>
@@ -587,8 +589,8 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
               <button key={key} style={{
                 display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
                 padding: '10px 6px 8px', borderRadius: '12px',
-                border: sel ? '2px solid #0a0a0a' : '2px solid transparent',
-                background: sel ? 'rgba(0,0,0,0.05)' : 'rgba(0,0,0,0.025)',
+                border: sel ? '2px solid rgba(255,255,255,0.40)' : '2px solid rgba(255,255,255,0.09)',
+                background: 'rgba(255,255,255,0.06)',
                 cursor: owned ? 'pointer' : 'not-allowed', outline: 'none',
                 WebkitTapHighlightColor: 'transparent', transition: 'all 0.15s ease',
                 fontFamily: 'inherit', opacity: owned ? 1 : 0.42,
@@ -596,7 +598,7 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                 <div style={{ opacity: owned ? 1 : 0.5 }}>
                   <TilePreviewCanvas styleKey={key} colorHex={Object.values(resolvedColors)[0] || '#4a7fa5'} size={48} />
                 </div>
-                <span style={{ fontSize: '10px', fontWeight: sel ? '600' : '400', color: sel ? '#0a0a0a' : 'rgba(0,0,0,0.5)', textAlign: 'center', lineHeight: 1.2 }}>
+                <span style={{ fontSize: '10px', fontWeight: sel ? '600' : '400', color: sel ? '#e8edf8' : 'rgba(200,220,255,0.55)', textAlign: 'center', lineHeight: 1.2 }}>
                   {TILE_STYLES[key]?.label || key}{!owned ? ' 🔒' : ''}
                 </span>
               </button>
@@ -614,10 +616,10 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
             style={{ ...S.card(settings.tileStyle === 'random' && !perFace), flexDirection: 'row', alignItems: 'center', gap: '14px' }}
             onClick={() => applyGlobal('random')}
           >
-            <div style={{ width: '48px', height: '48px', borderRadius: '10px', background: 'rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', flexShrink: 0 }}>🎲</div>
+            <div style={{ width: '48px', height: '48px', borderRadius: '10px', background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', flexShrink: 0 }}>🎲</div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '14px', fontWeight: '600', color: '#0f172a' }}>Random Mix</div>
-              <div style={{ fontSize: '12px', color: 'rgba(15,23,42,0.45)', marginTop: '2px' }}>Different style on every face</div>
+              <div style={{ fontSize: '14px', fontWeight: '600', color: '#e8edf8' }}>Random Mix</div>
+              <div style={{ fontSize: '12px', color: 'rgba(200,220,255,0.65)', marginTop: '2px' }}>Different style on every face</div>
             </div>
             {settings.tileStyle === 'random' && !perFace && <Checkmark />}
           </button>
@@ -629,7 +631,7 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
 
         {/* Per-face overrides */}
         <div style={{ marginBottom: '8px' }}>
-          <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(15,23,42,0.38)', marginBottom: '10px' }}>
+          <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(180,210,255,0.40)', marginBottom: '10px' }}>
             Per Face
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
@@ -644,12 +646,12 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
               return (
                 <div key={faceId} style={{
                   display: 'flex', flexDirection: 'column', gap: '6px',
-                  padding: '10px', borderRadius: '12px', background: 'rgba(0,0,0,0.025)',
+                  padding: '10px', borderRadius: '12px', background: 'rgba(255,255,255,0.06)',
                   border: `2px solid ${faceColor}44`,
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
                     <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: faceColor, flexShrink: 0 }} />
-                    <span style={{ fontSize: '11px', fontWeight: '600', color: 'rgba(15,23,42,0.65)' }}>{FACE_LABELS[faceId]}</span>
+                    <span style={{ fontSize: '11px', fontWeight: '600', color: 'rgba(200,220,255,0.65)' }}>{FACE_LABELS[faceId]}</span>
                   </div>
                   <TilePreviewCanvas styleKey={faceStyle === 'random' ? 'solid' : faceStyle} colorHex={faceColor} size={36} />
                   <select
@@ -657,8 +659,8 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                     onChange={e => applyPerFace(faceId, e.target.value)}
                     style={{
                       fontSize: '10px', padding: '4px 6px', borderRadius: '6px',
-                      border: '1px solid rgba(0,0,0,0.15)', background: '#fff',
-                      color: '#0f172a', fontFamily: 'inherit', cursor: 'pointer',
+                      border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)',
+                      color: '#e8edf8', fontFamily: 'inherit', cursor: 'pointer',
                       appearance: 'none', WebkitAppearance: 'none',
                     }}
                   >
@@ -720,8 +722,8 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           <button
             style={S.btnSecondary}
             onClick={handleBack}
-            onMouseEnter={e => { e.currentTarget.style.color = 'rgba(0,0,0,0.8)'; }}
-            onMouseLeave={e => { e.currentTarget.style.color = 'rgba(0,0,0,0.45)'; }}
+            onMouseEnter={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.85)'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = 'rgba(200,220,255,0.55)'; }}
           >
             {step === 0 ? 'Cancel' : 'Back'}
           </button>
