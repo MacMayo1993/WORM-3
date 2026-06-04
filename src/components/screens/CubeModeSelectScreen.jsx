@@ -12,6 +12,7 @@ const panelStyle = {
   backdropFilter: 'blur(24px)',
   WebkitBackdropFilter: 'blur(24px)',
   fontFamily: 'var(--ui-font, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif)',
+  animation: 'modalBackdropIn 0.22s ease',
 };
 
 const cardStyle = {
@@ -23,6 +24,7 @@ const cardStyle = {
   boxShadow: '0 32px 80px rgba(0,0,0,0.60), 0 0 0 1px rgba(255,255,255,0.06)',
   backdropFilter: 'blur(24px)',
   color: '#e8edf8',
+  animation: 'modalSheetIn 0.30s cubic-bezier(0.22, 1, 0.36, 1)',
 };
 
 const optionGridStyle = {

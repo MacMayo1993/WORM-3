@@ -148,6 +148,7 @@ const S = {
     fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif',
     padding: isMobile ? '12px' : '0',
     boxSizing: 'border-box',
+    animation: 'modalBackdropIn 0.22s ease',
   },
   sheet: {
     background: 'rgba(14,17,38,0.94)',
@@ -159,6 +160,7 @@ const S = {
     overflow: 'hidden',
     boxShadow: '0 32px 80px rgba(0,0,0,0.60), 0 0 0 1px rgba(255,255,255,0.06)',
     border: '1px solid rgba(255,255,255,0.06)',
+    animation: 'modalSheetIn 0.30s cubic-bezier(0.22, 1, 0.36, 1)',
   },
   header: { padding: isMobile ? '20px 20px 0' : '32px 36px 0', flexShrink: 0 },
   stepIndicator: { display: 'flex', gap: '6px', marginBottom: '24px' },
