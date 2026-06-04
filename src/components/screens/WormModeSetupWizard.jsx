@@ -165,7 +165,7 @@ const S = {
   dot: (active, current) => ({
     height: '3px',
     borderRadius: '2px',
-    background: current ? '#000' : active ? 'rgba(0,0,0,0.35)' : 'rgba(0,0,0,0.12)',
+    background: current ? '#0f172a' : active ? 'rgba(15,23,42,0.40)' : 'rgba(15,23,42,0.12)',
     flex: current ? '2' : '1',
     transition: 'all 0.35s cubic-bezier(0.4,0,0.2,1)',
   }),
@@ -174,14 +174,14 @@ const S = {
     fontSize: '24px',
     fontWeight: '700',
     letterSpacing: '-0.5px',
-    color: '#0a0a0a',
+    color: '#0f172a',
     margin: '0 0 4px',
     lineHeight: 1.15,
   },
 
   subtitle: {
     fontSize: '13px',
-    color: 'rgba(0,0,0,0.42)',
+    color: 'rgba(15,23,42,0.50)',
     margin: '0 0 20px',
     fontWeight: '400',
   },
@@ -191,7 +191,7 @@ const S = {
     overflowY: 'auto',
     flex: 1,
     scrollbarWidth: 'thin',
-    scrollbarColor: 'rgba(0,0,0,0.15) transparent',
+    scrollbarColor: 'rgba(15,23,42,0.15) transparent',
   },
 
   // Generic card with optional selected state
@@ -199,8 +199,8 @@ const S = {
     display: 'flex',
     padding: '14px 16px',
     borderRadius: '14px',
-    border: selected ? '2px solid #0a0a0a' : '2px solid transparent',
-    background: selected ? 'rgba(0,0,0,0.05)' : 'rgba(0,0,0,0.025)',
+    border: selected ? '2px solid rgba(168,85,247,0.50)' : '2px solid rgba(15,23,42,0.08)',
+    background: selected ? 'rgba(168,85,247,0.07)' : 'rgba(255,255,255,0.65)',
     cursor: 'pointer',
     transition: 'all 0.18s ease',
     outline: 'none',
@@ -215,7 +215,7 @@ const S = {
     width: '18px',
     height: '18px',
     borderRadius: '50%',
-    background: '#0a0a0a',
+    background: '#a855f7',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -233,7 +233,7 @@ const S = {
   bgCard: (selected) => ({
     borderRadius: '12px',
     overflow: 'hidden',
-    border: selected ? '2.5px solid #0a0a0a' : '2.5px solid transparent',
+    border: selected ? '2.5px solid #a855f7' : '2.5px solid transparent',
     cursor: 'pointer',
     transition: 'all 0.18s ease',
     outline: 'none',
@@ -261,7 +261,7 @@ const S = {
     justifyContent: 'space-between',
     alignItems: 'center',
     flexShrink: 0,
-    borderTop: '1px solid rgba(0,0,0,0.07)',
+    borderTop: '1px solid rgba(15,23,42,0.08)',
   },
 
   btnSecondary: {
@@ -269,7 +269,7 @@ const S = {
     border: 'none',
     fontSize: '15px',
     fontWeight: '500',
-    color: 'rgba(0,0,0,0.45)',
+    color: 'rgba(15,23,42,0.50)',
     cursor: 'pointer',
     padding: '10px 16px',
     borderRadius: '10px',
@@ -278,7 +278,7 @@ const S = {
   },
 
   btnPrimary: {
-    background: '#0a0a0a',
+    background: 'linear-gradient(135deg, #a855f7 0%, #c084fc 100%)',
     border: 'none',
     fontSize: '15px',
     fontWeight: '600',
@@ -288,6 +288,7 @@ const S = {
     borderRadius: '12px',
     transition: 'opacity 0.15s ease, transform 0.12s ease',
     fontFamily: 'inherit',
+    boxShadow: '0 4px 16px rgba(168,85,247,0.28)',
   },
 };
 
@@ -419,7 +420,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                     textTransform: 'uppercase', color: selected ? '#0a0a0a' : 'rgba(0,0,0,0.38)',
                   }}>{tag}</span>
                 </div>
-                <div style={{ fontSize: '12px', color: 'rgba(0,0,0,0.45)' }}>{desc}</div>
+                <div style={{ fontSize: '12px', color: 'rgba(15,23,42,0.52)' }}>{desc}</div>
               </div>
 
               {selected && (
@@ -496,7 +497,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
               <div style={{ fontSize: '14px', fontWeight: settings.colorScheme === 'custom' ? '600' : '500', color: '#0a0a0a' }}>
                 Extract from Image
               </div>
-              <div style={{ fontSize: '12px', color: 'rgba(0,0,0,0.4)', marginTop: '2px' }}>
+              <div style={{ fontSize: '12px', color: 'rgba(15,23,42,0.45)', marginTop: '2px' }}>
                 {customPreview ? 'Tap to change image' : 'Upload a photo to auto-generate a palette'}
               </div>
             </div>
@@ -585,7 +586,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
 
     const StyleGrid = ({ keys, label }) => (
       <div style={{ marginBottom: '20px' }}>
-        <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(0,0,0,0.32)', marginBottom: '8px' }}>
+        <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(15,23,42,0.38)', marginBottom: '8px' }}>
           {label}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '7px' }}>
@@ -627,7 +628,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
             <div style={{ width: '48px', height: '48px', borderRadius: '10px', background: 'rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', flexShrink: 0 }}>🎲</div>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: '14px', fontWeight: '600', color: '#0a0a0a' }}>Random Mix</div>
-              <div style={{ fontSize: '12px', color: 'rgba(0,0,0,0.4)', marginTop: '2px' }}>Different style on every face</div>
+              <div style={{ fontSize: '12px', color: 'rgba(15,23,42,0.45)', marginTop: '2px' }}>Different style on every face</div>
             </div>
             {settings.tileStyle === 'random' && !perFace && <Checkmark />}
           </button>
@@ -639,7 +640,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
 
         {/* Per-face overrides */}
         <div style={{ marginBottom: '8px' }}>
-          <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(0,0,0,0.32)', marginBottom: '10px' }}>
+          <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(15,23,42,0.38)', marginBottom: '10px' }}>
             Per Face
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
@@ -657,7 +658,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
                     <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: faceColor, flexShrink: 0 }} />
-                    <span style={{ fontSize: '11px', fontWeight: '600', color: 'rgba(0,0,0,0.6)' }}>{FACE_LABELS[faceId]}</span>
+                    <span style={{ fontSize: '11px', fontWeight: '600', color: 'rgba(15,23,42,0.65)' }}>{FACE_LABELS[faceId]}</span>
                   </div>
                   <TilePreviewCanvas styleKey={faceStyle === 'random' ? 'solid' : faceStyle} colorHex={faceColor} size={36} />
                   <select
@@ -1021,7 +1022,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
 
         {/* ── Skin picker — compact horizontal scroll ── */}
         <div>
-          <div style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(0,0,0,0.5)', letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: '8px' }}>Skin</div>
+          <div style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(15,23,42,0.55)', letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: '8px' }}>Skin</div>
           <div style={{ display: 'flex', gap: '7px', overflowX: 'auto', paddingBottom: '4px' }}>
             {WORM_SKINS.map(skin => {
               const owned = ownedItems.includes(`skin_${skin.id}`);
@@ -1050,7 +1051,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
 
         {/* ── Hat picker ── */}
         <div>
-          <div style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(0,0,0,0.5)', letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: '8px' }}>Hat</div>
+          <div style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(15,23,42,0.55)', letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: '8px' }}>Hat</div>
           <div style={{ display: 'flex', gap: '7px', flexWrap: 'wrap' }}>
             {WORM_HATS.map(hat => {
               const owned = ownedItems.includes(`hat_${hat.id}`);
