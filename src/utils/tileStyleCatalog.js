@@ -18,6 +18,8 @@ export const LIVING_STYLE_KEYS = [
   'lava', 'galaxy', 'neural', 'moireRings', 'moireLines', 'infinityTunnel',
   'vortex', 'shockwave', 'solar',
   'oilSlick', 'constellation', 'neonSign',
+  'prismBloom', 'magnetFlux', 'liquidChrome', 'auroraWeave', 'plasmaCells',
+  'quantumScanlines', 'emberstorm', 'fractalPulse', 'bioLattice', 'stellarLensing',
 ];
 
 export const TILE_STYLE_SECTIONS = [
