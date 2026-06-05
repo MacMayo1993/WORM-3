@@ -366,7 +366,7 @@ const ShuffleCubie = React.memo(({ cubie }) => {
     <group position={[cx, cy, cz]}>
       <mesh>
         <boxGeometry args={[0.93, 0.93, 0.93]} />
-        <meshStandardMaterial color="#0a0a14" roughness={0.55} metalness={0.3} />
+        <meshStandardMaterial color="#1c1c30" roughness={0.55} metalness={0.4} emissive="#0d0d1e" emissiveIntensity={0.6} />
       </mesh>
       {STICKER_CFG.map(({ dir, pos, rot }) => {
         const sticker = cubie.stickers?.[dir];
@@ -375,7 +375,7 @@ const ShuffleCubie = React.memo(({ cubie }) => {
           <group key={dir} position={pos} rotation={rot}>
             <mesh>
               <planeGeometry args={[0.80, 0.80]} />
-              <meshStandardMaterial color={FACE_ID_COLOR[sticker.curr] ?? '#888'} roughness={0.20} metalness={0.08} />
+              <meshStandardMaterial color={FACE_ID_COLOR[sticker.curr] ?? '#888'} roughness={0.20} metalness={0.08} side={THREE.DoubleSide} />
             </mesh>
           </group>
         );
