@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useDeferredValue } from 'react';
 import WormholeTunnel from './WormholeTunnel.jsx';
 import { FACE_COLORS, FLIP_CAP } from '../utils/constants.js';
 import { getManifoldGridId } from '../game/coordinates.js';
@@ -13,6 +13,10 @@ import { resolveColors } from '../utils/colorSchemes.js';
 // 150 (was 300) keeps GPU work tighter; during Worm mode the extra clutter
 // of 300 tunnels hurts both performance and readability.
 const MAX_TUNNELS = 150;
+
+// Static direction list — avoids Object.entries() allocating a new array of
+// arrays on every iteration of the O(N³) loop (GC pressure in chaos mode).
+const DIRS = ['PX', 'NX', 'PY', 'NY', 'PZ', 'NZ'];
 
 const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
   const { cubies, size, showTunnels, settings, explosionFactor } = useGameStore(
@@ -32,19 +36,15 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
     [settings?.colorScheme, settings?.biomeMode?.faceAssignment]
   );
 
-  // B4: debounce cubies so tunnel geometry only rebuilds at most every 150ms
-  // instead of on every sticker flip (~12×/s at L4 chaos).
-  const [debouncedCubies, setDebouncedCubies] = useState(cubies);
-  useEffect(() => {
-    if (!showTunnels) return;
-    const timer = setTimeout(() => setDebouncedCubies(cubies), 150);
-    return () => clearTimeout(timer);
-  }, [cubies, showTunnels]);
+  // B4: useDeferredValue lets React keep the UI responsive while allowing
+  // this heavy tunnel geometry calculation to lag safely behind the main thread,
+  // without ever starving under continuous rapid state updates (chaos mode).
+  const deferredCubies = useDeferredValue(cubies);
 
   const tunnelData = useMemo(() => {
     if (!showTunnels) return [];
     // Guard against size/cubies mismatch during size transitions
-    if (debouncedCubies.length !== size) return [];
+    if (deferredCubies.length !== size) return [];
 
     const connections = [];
     const processed = new Set();
@@ -52,21 +52,26 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
     for (let x = 0; x < size; x++) {
       for (let y = 0; y < size; y++) {
         for (let z = 0; z < size; z++) {
-          const cubie = debouncedCubies[x][y][z];
+          const cubie = deferredCubies[x][y][z];
 
-          Object.entries(cubie.stickers).forEach(([dirKey, sticker]) => {
-            if (sticker.flips === 0) return;
-            // Dead tiles — sever the tunnel, connection is gone
-            if (sticker.flips >= FLIP_CAP) return;
+          for (let i = 0; i < DIRS.length; i++) {
+            const dirKey = DIRS[i];
+            const sticker = cubie.stickers[dirKey];
+            if (!sticker || sticker.flips === 0 || sticker.flips >= FLIP_CAP) continue;
 
             const gridId = getManifoldGridId(sticker, size);
-            if (processed.has(gridId)) return;
+            if (processed.has(gridId)) continue;
             processed.add(gridId);
 
             const antipodalLoc = findAntipodalStickerByGrid(manifoldMap, sticker, size);
-            if (!antipodalLoc) return;
+            if (!antipodalLoc || !antipodalLoc.sticker) continue;
             // Also sever if the antipodal side is dead
-            if ((antipodalLoc.sticker?.flips || 0) >= FLIP_CAP) return;
+            if (antipodalLoc.sticker.flips >= FLIP_CAP) continue;
+
+            const antipodalGridId = getManifoldGridId(antipodalLoc.sticker, size);
+            // Prevent the reverse-direction tunnel when the loop reaches the antipodal sticker.
+            // Without this, each pair is rendered twice (once per endpoint), doubling draw calls.
+            processed.add(antipodalGridId);
 
             const idx1 = ((x * size) + y) * size + z;
             const idx2 = ((antipodalLoc.x * size) + antipodalLoc.y) * size + antipodalLoc.z;
@@ -80,7 +85,7 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
 
             connections.push({
               id: gridId,
-              gridId2: antipodalLoc.sticker ? getManifoldGridId(antipodalLoc.sticker, size) : null,
+              gridId2: antipodalGridId,
               meshIdx1: idx1,
               meshIdx2: idx2,
               dirKey1: dirKey,
@@ -93,7 +98,7 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
               color1: fc[sticker.curr],
               color2: fc[antipodalLoc.sticker.curr]
             });
-          });
+          }
         }
       }
     }
@@ -101,7 +106,7 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
     // Most-active pairs stay visible; low-activity tail is dropped silently.
     connections.sort((a, b) => b.flips - a.flips);
     return connections.slice(0, MAX_TUNNELS);
-  }, [debouncedCubies, size, showTunnels, manifoldMap, fc]);
+  }, [deferredCubies, size, showTunnels, manifoldMap, fc]);
 
   // B3: adaptive strand-count LOD based on how many tunnels are visible.
   // With more tunnels each tunnel needs fewer strands to keep GPU work bounded.
