@@ -2,7 +2,6 @@ import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
-// ─── Global scratchpad — zero allocations in the game loop ───────────────────
 const _v1 = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
 const _v3 = new THREE.Vector3();
@@ -10,251 +9,119 @@ const _tangent = new THREE.Vector3();
 const _up = new THREE.Vector3(0, 1, 0);
 const _right = new THREE.Vector3();
 
-// ─── Shared geometries (one per shape, never recreated) ──────────────────────
-// Smaller head — avoid the "bulbous tip" look by keeping it close to segment size
-const headGeo        = new THREE.SphereGeometry(0.15, 12, 12);
-// Segments same width as head; tapering handled via scale in the frame loop
-const segGeo         = new THREE.SphereGeometry(0.13, 10, 8);
-const eyeGeo         = new THREE.SphereGeometry(0.055, 8, 8);
-const pupilGeo       = new THREE.SphereGeometry(0.032, 6, 6);
-// Antennae — two stalks + glowing tips clearly identify this as a worm head
-const antennaStemGeo = new THREE.CapsuleGeometry(0.007, 0.09, 4, 8);
-const antennaTipGeo  = new THREE.SphereGeometry(0.022, 6, 6);
-const glowGeo        = new THREE.SphereGeometry(0.24, 8, 8);
-const trailDotGeo    = new THREE.SphereGeometry(0.04, 6, 6);
+const SEG_COLORS  = ['#3be08a', '#2fd47e', '#24be72', '#1aa862', '#129650'];
+const TIP_COLOR   = '#b0ffda';
+const TIP_EMISSIVE = '#40ff99';
 
-const SEGMENT_COUNT = 8;
-const TRAIL_DOTS    = 12;
-const TRAIL_SPACING = 0.07;
+const wHeadGeo  = new THREE.SphereGeometry(0.18, 12, 12);
+const wSegGeos  = [
+  new THREE.SphereGeometry(0.16, 12, 10),
+  new THREE.SphereGeometry(0.14, 10, 8),
+  new THREE.SphereGeometry(0.13, 10, 8),
+  new THREE.SphereGeometry(0.12, 8, 8),
+  new THREE.SphereGeometry(0.10, 8, 8),
+];
+const wEyeGeo   = new THREE.SphereGeometry(0.055, 8, 8);
+const wPupilGeo = new THREE.SphereGeometry(0.030, 6, 6);
+const wStemGeo  = new THREE.CylinderGeometry(0.012, 0.009, 0.22, 6);
+const wTipGeo   = new THREE.SphereGeometry(0.022, 6, 6);
 
-// ─── WormParticle ─────────────────────────────────────────────────────────────
-/**
- * A bioluminescent worm that:
- *  1. Travels along a sinuous S-curve (CatmullRomCurve3) from `start` to `end`
- *  2. Has a round head with googly eyes + two wiggling antennae (no tongue)
- *  3. Body segments taper toward the tail with alternating color bands
- *  4. Leaves a glowing additive-blend particle trail
- *  5. Head glow halo pulses on beat
- */
-const WormParticle = ({
-  start,
-  end,
-  color1,
-  color2,
-  startTime,
-  currentTime,
-  onComplete,
-}) => {
-  const headRef          = useRef();
-  const headGlowRef      = useRef();
-  const segRefs          = useRef([]);
-  const eyeLeftRef       = useRef();
-  const eyeRightRef      = useRef();
-  const pupilLRef        = useRef();
-  const pupilRRef        = useRef();
-  const antenna1StemRef  = useRef();
-  const antenna1TipRef   = useRef();
-  const antenna2StemRef  = useRef();
-  const antenna2TipRef   = useRef();
-  const trailRefs        = useRef([]);
-  const trailGeoRef      = useRef();
+const SEGMENT_COUNT = 5;
 
-  const duration = 3.2;
+const WormParticle = ({ start, end, color1: _c1, color2: _c2, startTime, currentTime, onComplete }) => {
+  const headGroupRef = useRef();
+  const eyeLRef      = useRef();
+  const eyeRRef      = useRef();
+  const ant1StemRef  = useRef();
+  const ant2StemRef  = useRef();
+  const ant1TipRef   = useRef();
+  const ant2TipRef   = useRef();
+  const segRefs      = useRef([]);
+
+  const duration       = 3.2;
   const lingerDuration = 3.4;
-  const totalDuration = duration + lingerDuration;
+  const totalDuration  = duration + lingerDuration;
 
-  // ── Unique personality — stable across re-renders ─────────────────────────
   const p = useMemo(() => ({
-    wiggleFreq   : 1.8 + Math.random() * 1.2,   // S-curve oscillation speed
-    wiggleAmp    : 0.38 + Math.random() * 0.22,  // how wide the S-curves swing
+    wiggleFreq   : 1.8 + Math.random() * 1.2,
+    wiggleAmp    : 0.38 + Math.random() * 0.22,
     wigglePhase  : Math.random() * Math.PI * 2,
-    blinkInterval: 1.4 + Math.random() * 2.0,
+    blinkInterval: 1.6 + Math.random() * 2.0,
     blinkDur     : 0.12,
-    squishAmp    : 0.12 + Math.random() * 0.10,
-    squishFreq   : 8 + Math.random() * 6,
-    glowPulseFreq: 2 + Math.random() * 2,
-    eyeWobble    : 0.02 + Math.random() * 0.03,
-    baseScale    : (1.05 + Math.random() * 0.35) * 0.9,
-    speedVariance: 0.92 + Math.random() * 0.2,
+    squishAmp    : 0.10 + Math.random() * 0.08,
+    squishFreq   : 7 + Math.random() * 5,
     antennaPhase : Math.random() * Math.PI * 2,
-    bandShift    : 0.07 + Math.random() * 0.06,  // hue shift between even/odd segments
   }), []);
 
   const blinkTimerRef = useRef(0);
   const isBlinkingRef = useRef(false);
 
-  const trailPoints = useMemo(() => new Float32Array(40 * 3), []);
-
-  // ── Frame loop ────────────────────────────────────────────────────────────
   useFrame(({ clock }) => {
     const clockTime = clock.getElapsedTime();
     const animTime  = currentTime !== undefined ? currentTime : clockTime;
     if (animTime < startTime) return;
 
     const elapsed = animTime - startTime;
-    if (elapsed >= totalDuration) {
-      onComplete?.();
-      return;
-    }
+    if (elapsed >= totalDuration) { onComplete?.(); return; }
 
-    // ── 1. Progress & S-curve path ───────────────────────────────────────────
-    const travelElapsed = Math.min(elapsed, duration);
-    const t = (travelElapsed / duration) * p.speedVariance;
-    const tClamped = Math.min(t, 1);
-    // Quintic ease-in-out
-    const progress = tClamped < 0.5
-      ? 16 * tClamped ** 5
-      : 1 - (-2 * tClamped + 2) ** 5 / 2;
+    const tRaw     = Math.min(elapsed / duration, 1);
+    const progress = tRaw < 0.5
+      ? 16 * tRaw ** 5
+      : 1 - (-2 * tRaw + 2) ** 5 / 2;
 
-    const fadeIn = Math.min(1, elapsed / 0.35);
+    const fadeIn  = Math.min(1, elapsed / 0.35);
     const fadeOut = elapsed <= duration
-      ? 1
-      : Math.max(0, 1 - (elapsed - duration) / lingerDuration);
-    const lifeAlpha = fadeIn * fadeOut;
+      ? 1 : Math.max(0, 1 - (elapsed - duration) / lingerDuration);
+    const alpha = fadeIn * fadeOut;
 
+    // S-curve path — identical to the original so the route through the cube is unchanged
     const vStart = _v1.set(...start);
     const vEnd   = _v2.set(...end);
-
-    const dir = _v3.subVectors(vEnd, vStart);
-    const len = dir.length();
+    const dir    = _v3.subVectors(vEnd, vStart);
+    const len    = dir.length();
     const dirNorm = dir.clone().normalize();
     _right.crossVectors(dirNorm, _up).normalize();
     if (_right.lengthSq() < 0.001) _right.set(1, 0, 0);
 
-    // Keep the flip path inside the cube volume by pulling mid-waypoints inward
-    // toward world origin (cube center), then layer subtle side-to-side wiggle.
     const tw = clockTime * p.wiggleFreq + p.wigglePhase;
     const lateralAmp = Math.min(0.26, p.wiggleAmp * len * 0.14);
-
-    const midpoint = vStart.clone().lerp(vEnd, 0.5);
+    const midpoint   = vStart.clone().lerp(vEnd, 0.5);
     const centerPull = midpoint.clone().multiplyScalar(-0.75);
-    const maxPull = Math.max(0.45, len * 0.28);
+    const maxPull    = Math.max(0.45, len * 0.28);
     if (centerPull.length() > maxPull) centerPull.setLength(maxPull);
 
-    const wp0 = vStart.clone();
-    const wp1 = vStart.clone().lerp(vEnd, 0.22)
-      .addScaledVector(_right, Math.sin(tw) * lateralAmp)
-      .addScaledVector(_up, Math.cos(tw * 0.8) * lateralAmp * 0.25)
-      .addScaledVector(centerPull, 0.45);
-    const wp2 = midpoint.clone()
-      .add(centerPull)
-      .addScaledVector(_right, Math.sin(tw + Math.PI) * lateralAmp * 0.6);
-    const wp3 = vStart.clone().lerp(vEnd, 0.78)
-      .addScaledVector(_right, Math.sin(tw + Math.PI * 1.5) * lateralAmp)
-      .addScaledVector(_up, Math.cos(tw * 0.8 + Math.PI * 0.3) * lateralAmp * 0.25)
-      .addScaledVector(centerPull, 0.45);
-    const wp4 = vEnd.clone();
+    const curve = new THREE.CatmullRomCurve3([
+      vStart.clone(),
+      vStart.clone().lerp(vEnd, 0.22)
+        .addScaledVector(_right, Math.sin(tw) * lateralAmp)
+        .addScaledVector(_up, Math.cos(tw * 0.8) * lateralAmp * 0.25)
+        .addScaledVector(centerPull, 0.45),
+      midpoint.clone()
+        .add(centerPull)
+        .addScaledVector(_right, Math.sin(tw + Math.PI) * lateralAmp * 0.6),
+      vStart.clone().lerp(vEnd, 0.78)
+        .addScaledVector(_right, Math.sin(tw + Math.PI * 1.5) * lateralAmp)
+        .addScaledVector(_up, Math.cos(tw * 0.8 + Math.PI * 0.3) * lateralAmp * 0.25)
+        .addScaledVector(centerPull, 0.45),
+      vEnd.clone(),
+    ]);
 
-    const curve = new THREE.CatmullRomCurve3([wp0, wp1, wp2, wp3, wp4]);
+    // Head group — position + orient once, children inherit
+    const headPos = curve.getPoint(progress);
+    const headFwd = curve.getPoint(Math.min(progress + 0.02, 1));
+    _tangent.subVectors(headFwd, headPos).normalize();
 
-    // ── 2. Color interpolation ────────────────────────────────────────────────
-    const c1 = new THREE.Color(color1);
-    const c2 = new THREE.Color(color2);
-    const currentColor = c1.clone().lerp(c2, progress);
-    currentColor.offsetHSL(Math.sin(clockTime * 4) * 0.04, 0, 0);
-
-    const glowColor = currentColor.clone();
-    glowColor.r = Math.min(1, glowColor.r * 1.4 + 0.15);
-    glowColor.g = Math.min(1, glowColor.g * 1.4 + 0.15);
-    glowColor.b = Math.min(1, glowColor.b * 1.4 + 0.15);
-
-    // ── 3. Head position & orientation ───────────────────────────────────────
-    const headPos      = curve.getPoint(progress);
-    const lookAheadPos = curve.getPoint(Math.min(progress + 0.02, 1));
-    _tangent.subVectors(lookAheadPos, headPos).normalize();
-
-    if (headRef.current) {
-      headRef.current.position.copy(headPos);
-      headRef.current.material.color.copy(currentColor);
-      headRef.current.material.opacity = 1.0 * lifeAlpha;
-      const s = p.baseScale * (1 + Math.sin(clockTime * p.squishFreq) * p.squishAmp * 0.25);
-      headRef.current.scale.setScalar(s);
+    if (headGroupRef.current) {
+      headGroupRef.current.visible = alpha > 0.02;
+      headGroupRef.current.position.copy(headPos);
       if (_tangent.lengthSq() > 0.001) {
-        headRef.current.setRotationFromQuaternion(
-          new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), _tangent)
-        );
+        headGroupRef.current.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), _tangent);
       }
+      const squish = Math.sin(clockTime * p.squishFreq) * p.squishAmp;
+      headGroupRef.current.scale.set(1 + squish * 0.3, 1 - squish * 0.15, 1 + squish * 0.3);
     }
 
-    // ── 4. Head glow halo — reduced opacity so features are visible ───────────
-    if (headGlowRef.current) {
-      headGlowRef.current.position.copy(headPos);
-      const glowPulse = 0.5 + Math.sin(clockTime * p.glowPulseFreq) * 0.35;
-      headGlowRef.current.material.opacity = glowPulse * 0.34 * p.baseScale * lifeAlpha;
-      headGlowRef.current.material.color.copy(glowColor);
-      headGlowRef.current.scale.setScalar(p.baseScale * (1.35 + glowPulse * 0.2));
-    }
-
-    // ── 5. Body segments — peristaltic wave, clear taper, alternating bands ──
-    for (let i = 0; i < SEGMENT_COUNT; i++) {
-      const seg = segRefs.current[i];
-      if (!seg) continue;
-
-      // More spread-out lag so individual segments are clearly visible
-      const lag     = (i + 1) / (SEGMENT_COUNT + 1) * 0.40;
-      const segProg = Math.max(0, progress - lag);
-      const segPos  = curve.getPoint(segProg);
-      const wave    = Math.sin(clockTime * p.squishFreq - i * 0.9) * p.squishAmp;
-      // Taper: head-adjacent is full size, tail is half size
-      const taper   = 1 - (i / (SEGMENT_COUNT - 1)) * 0.52;
-      const scaleXZ = p.baseScale * taper * (1 + wave);
-      const scaleY  = p.baseScale * taper * (1 - wave * 0.5);
-
-      seg.position.copy(segPos);
-      seg.scale.set(scaleXZ, scaleY, scaleXZ);
-
-      // Alternating color bands (earthy, caterpillar-like)
-      const segColor = c1.clone().lerp(c2, segProg);
-      const bandOffset = i % 2 === 0 ? p.bandShift : -p.bandShift * 0.5;
-      segColor.offsetHSL(bandOffset, 0.08 * (i % 2), -0.04 * (i % 2));
-      seg.material.color.copy(segColor);
-      seg.material.opacity = (0.95 - (i / SEGMENT_COUNT) * 0.22) * lifeAlpha;
-    }
-
-    // ── 6. Glowing particle trail ─────────────────────────────────────────────
-    for (let i = 0; i < TRAIL_DOTS; i++) {
-      const dot = trailRefs.current[i];
-      if (!dot) continue;
-      const trailProg = Math.max(0, progress - (i + 1) * TRAIL_SPACING);
-      if (trailProg <= 0) {
-        dot.visible = false;
-        continue;
-      }
-      dot.visible = true;
-      const dotPos = curve.getPoint(trailProg);
-      dot.position.copy(dotPos);
-      const fade   = Math.max(0, 1 - (i + 1) / TRAIL_DOTS) * (1 - progress * 0.5);
-      const tColor = c1.clone().lerp(c2, trailProg);
-      dot.material.color.copy(tColor);
-      dot.material.opacity = fade * 0.8 * lifeAlpha;
-      dot.scale.setScalar(Math.max(0.1, (1 - i / TRAIL_DOTS) * 0.8 * p.baseScale));
-    }
-
-    // ── 7. Glow tube trail (line) ──────────────────────────────────────────────
-    if (trailGeoRef.current) {
-      for (let j = 0; j < 40; j++) {
-        const tp = Math.max(0, progress - j * 0.012);
-        const pt = curve.getPoint(tp);
-        trailPoints[j * 3]     = pt.x;
-        trailPoints[j * 3 + 1] = pt.y;
-        trailPoints[j * 3 + 2] = pt.z;
-      }
-      trailGeoRef.current.attributes.position.needsUpdate = true;
-    }
-
-    // ── 8. Head orientation helpers ────────────────────────────────────────────
-    const headQuat = new THREE.Quaternion().setFromUnitVectors(
-      new THREE.Vector3(0, 0, 1),
-      _tangent.lengthSq() > 0.001 ? _tangent : new THREE.Vector3(0, 0, 1)
-    );
-    const faceRight = new THREE.Vector3(1, 0, 0).applyQuaternion(headQuat);
-    const faceUp    = new THREE.Vector3(0, 1, 0).applyQuaternion(headQuat);
-
-    const eyeForwardOffset = _tangent.clone().multiplyScalar(0.13 * p.baseScale);
-    const eyeUpOffset      = faceUp.clone().multiplyScalar(0.07 * p.baseScale);
-    const eyeLateralOffset = faceRight.clone().multiplyScalar(0.09 * p.baseScale);
-
-    // ── 9. Blinking ────────────────────────────────────────────────────────────
+    // Blinking
     const timeSinceBlink = clockTime - blinkTimerRef.current;
     if (!isBlinkingRef.current && timeSinceBlink > p.blinkInterval) {
       isBlinkingRef.current = true;
@@ -264,276 +131,105 @@ const WormParticle = ({
       isBlinkingRef.current = false;
     }
     const eyeScaleY = isBlinkingRef.current ? 0.08 : 1;
-    const eyeWobble = Math.sin(clockTime * 8) * p.eyeWobble;
+    if (eyeLRef.current) eyeLRef.current.scale.set(1, eyeScaleY, 1);
+    if (eyeRRef.current) eyeRRef.current.scale.set(1, eyeScaleY, 1);
 
-    [eyeLeftRef, eyeRightRef].forEach((ref, side) => {
-      if (!ref.current) return;
-      const lateralSign = side === 0 ? 1 : -1;
-      ref.current.position.copy(headPos)
-        .add(eyeForwardOffset)
-        .add(eyeUpOffset)
-        .addScaledVector(eyeLateralOffset, lateralSign * 2);
-      ref.current.scale.set(p.baseScale, p.baseScale * eyeScaleY, p.baseScale);
-      ref.current.material.opacity = 0.98 * lifeAlpha;
-    });
-
-    [pupilLRef, pupilRRef].forEach((ref, side) => {
-      if (!ref.current) return;
-      const lateralSign = side === 0 ? 1 : -1;
-      ref.current.position.copy(headPos)
-        .add(eyeForwardOffset)
-        .addScaledVector(_tangent, 0.04 * p.baseScale)
-        .add(eyeUpOffset)
-        .addScaledVector(eyeLateralOffset, lateralSign * 2)
-        .add(new THREE.Vector3(Math.sin(clockTime * 2.3) * p.eyeWobble, Math.cos(clockTime * 1.7) * p.eyeWobble + eyeWobble, 0));
-      ref.current.scale.setScalar(p.baseScale * (isBlinkingRef.current ? 0.05 : 0.85));
-      ref.current.material.opacity = 0.95 * lifeAlpha;
-    });
-
-    // ── 10. Antennae — two wiggling stalks on top of head ─────────────────────
-    // These are the key feature that makes this clearly a worm, not anything else.
-    const antennaWiggle = Math.sin(clockTime * 6 + p.antennaPhase) * 0.05;
-    const antennaBaseUp = faceUp.clone().multiplyScalar(0.15 * p.baseScale);
-    const antennaFwd    = _tangent.clone().multiplyScalar(0.08 * p.baseScale);
-    const stemHeight    = 0.12 * p.baseScale;
-
-    // Left antenna
-    if (antenna1StemRef.current) {
-      const stemBase = headPos.clone().add(antennaBaseUp).add(antennaFwd)
-        .addScaledVector(faceRight, 0.06 * p.baseScale);
-      antenna1StemRef.current.position.copy(stemBase);
-      const stemDir = faceUp.clone()
-        .addScaledVector(faceRight, antennaWiggle)
-        .addScaledVector(_tangent, 0.1)
-        .normalize();
-      antenna1StemRef.current.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), stemDir);
-      antenna1StemRef.current.material.color.copy(currentColor);
-      antenna1StemRef.current.material.opacity = 0.95 * lifeAlpha;
-      antenna1StemRef.current.scale.setScalar(p.baseScale);
+    // Antenna wiggle — local rotation, tips follow
+    const antWiggle = Math.sin(clockTime * 6 + p.antennaPhase) * 0.12;
+    const r1 = 0.3 + antWiggle;
+    const r2 = 0.3 + antWiggle;
+    if (ant1StemRef.current) ant1StemRef.current.rotation.z = r1;
+    if (ant2StemRef.current) ant2StemRef.current.rotation.z = -r2;
+    if (ant1TipRef.current) {
+      ant1TipRef.current.position.set(-0.07 + Math.sin(r1) * 0.11, 0.15 + Math.cos(r1) * 0.11, 0.05);
     }
-    if (antenna1TipRef.current) {
-      antenna1TipRef.current.position.copy(headPos.clone()
-        .add(antennaBaseUp)
-        .addScaledVector(faceUp, stemHeight)
-        .add(antennaFwd)
-        .addScaledVector(faceRight, (0.06 + antennaWiggle * 0.8) * p.baseScale));
-      antenna1TipRef.current.material.color.copy(glowColor);
-      antenna1TipRef.current.material.opacity = 1.0 * lifeAlpha;
-      antenna1TipRef.current.scale.setScalar(p.baseScale);
+    if (ant2TipRef.current) {
+      ant2TipRef.current.position.set(0.07 - Math.sin(r2) * 0.11, 0.15 + Math.cos(r2) * 0.11, 0.05);
     }
 
-    // Right antenna
-    if (antenna2StemRef.current) {
-      const stemBase = headPos.clone().add(antennaBaseUp).add(antennaFwd)
-        .addScaledVector(faceRight, -0.06 * p.baseScale);
-      antenna2StemRef.current.position.copy(stemBase);
-      const stemDir = faceUp.clone()
-        .addScaledVector(faceRight, -antennaWiggle)
-        .addScaledVector(_tangent, 0.1)
-        .normalize();
-      antenna2StemRef.current.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), stemDir);
-      antenna2StemRef.current.material.color.copy(currentColor);
-      antenna2StemRef.current.material.opacity = 0.95 * lifeAlpha;
-      antenna2StemRef.current.scale.setScalar(p.baseScale);
-    }
-    if (antenna2TipRef.current) {
-      antenna2TipRef.current.position.copy(headPos.clone()
-        .add(antennaBaseUp)
-        .addScaledVector(faceUp, stemHeight)
-        .add(antennaFwd)
-        .addScaledVector(faceRight, -(0.06 + antennaWiggle * 0.8) * p.baseScale));
-      antenna2TipRef.current.material.color.copy(glowColor);
-      antenna2TipRef.current.material.opacity = 1.0 * lifeAlpha;
-      antenna2TipRef.current.scale.setScalar(p.baseScale);
+    // Body segments — smooth peristaltic wave, opacity fade
+    for (let i = 0; i < SEGMENT_COUNT; i++) {
+      const seg = segRefs.current[i];
+      if (!seg) continue;
+      const lag     = (i + 1) / (SEGMENT_COUNT + 1) * 0.35;
+      const segProg = Math.max(0, progress - lag);
+      const segPos  = curve.getPoint(segProg);
+      const wave    = Math.sin(clockTime * p.squishFreq - i * 0.9) * p.squishAmp;
+      const taper   = 1 - (i / (SEGMENT_COUNT - 1)) * 0.45;
+      seg.position.copy(segPos);
+      seg.scale.set(taper * (1 + wave), taper * (1 - wave * 0.5), taper * (1 + wave));
+      seg.material.opacity = (0.95 - (i / SEGMENT_COUNT) * 0.15) * alpha;
     }
   });
 
   return (
     <group>
-      {/* ── Glow tube trail ─────────────────────────────────────────────── */}
-      <line renderOrder={6}>
-        <bufferGeometry ref={trailGeoRef}>
-          <bufferAttribute
-            attach="attributes-position"
-            count={40}
-            array={trailPoints}
-            itemSize={3}
-          />
-        </bufferGeometry>
-        <lineBasicMaterial
-          color={color2}
-          transparent
-          opacity={0.46}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-          depthTest={false}
-          toneMapped={false}
-        />
-      </line>
-
-      {/* ── Particle trail dots ──────────────────────────────────────────── */}
-      {Array.from({ length: TRAIL_DOTS }, (_, i) => (
-        <mesh
-          key={`trail-${i}`}
-          renderOrder={6}
-          ref={el => (trailRefs.current[i] = el)}
-          geometry={trailDotGeo}
-          visible={false}
-        >
-          <meshBasicMaterial
-            color={color1}
-            transparent
-            opacity={0}
-            blending={THREE.AdditiveBlending}
-            depthWrite={false}
-            depthTest={false}
-            toneMapped={false}
+      {/* ── Head group — all face features as children inherit the head transform ─ */}
+      <group ref={headGroupRef}>
+        <mesh geometry={wHeadGeo} renderOrder={7}>
+          <meshStandardMaterial
+            color={SEG_COLORS[0]} roughness={0.3} metalness={0}
+            emissive={SEG_COLORS[0]} emissiveIntensity={0.35}
+            depthWrite={false} depthTest={false} toneMapped={false}
           />
         </mesh>
-      ))}
+        <mesh ref={eyeLRef} position={[-0.09, 0.06, 0.15]} geometry={wEyeGeo} renderOrder={8}>
+          <meshStandardMaterial color="#ffffff" roughness={0.1}
+            depthWrite={false} depthTest={false} toneMapped={false} />
+        </mesh>
+        <mesh ref={eyeRRef} position={[0.09, 0.06, 0.15]} geometry={wEyeGeo} renderOrder={8}>
+          <meshStandardMaterial color="#ffffff" roughness={0.1}
+            depthWrite={false} depthTest={false} toneMapped={false} />
+        </mesh>
+        <mesh position={[-0.09, 0.065, 0.185]} geometry={wPupilGeo} renderOrder={9}>
+          <meshStandardMaterial color="#0a0a14" roughness={0.5}
+            depthWrite={false} depthTest={false} toneMapped={false} />
+        </mesh>
+        <mesh position={[0.09, 0.065, 0.185]} geometry={wPupilGeo} renderOrder={9}>
+          <meshStandardMaterial color="#0a0a14" roughness={0.5}
+            depthWrite={false} depthTest={false} toneMapped={false} />
+        </mesh>
+        <mesh position={[0, -0.04, 0.14]} rotation={[0.25, 0, Math.PI]} renderOrder={8}>
+          <torusGeometry args={[0.055, 0.015, 6, 12, Math.PI]} />
+          <meshStandardMaterial color="#0d2410" roughness={0.6}
+            depthWrite={false} depthTest={false} toneMapped={false} />
+        </mesh>
+        <mesh ref={ant1StemRef} position={[-0.07, 0.15, 0.05]} rotation={[0, 0, 0.3]} geometry={wStemGeo} renderOrder={7}>
+          <meshStandardMaterial color={SEG_COLORS[0]} roughness={0.5}
+            emissive={SEG_COLORS[0]} emissiveIntensity={0.2}
+            depthWrite={false} depthTest={false} toneMapped={false} />
+        </mesh>
+        <mesh ref={ant2StemRef} position={[0.07, 0.15, 0.05]} rotation={[0, 0, -0.3]} geometry={wStemGeo} renderOrder={7}>
+          <meshStandardMaterial color={SEG_COLORS[0]} roughness={0.5}
+            emissive={SEG_COLORS[0]} emissiveIntensity={0.2}
+            depthWrite={false} depthTest={false} toneMapped={false} />
+        </mesh>
+        <mesh ref={ant1TipRef} position={[-0.07, 0.26, 0.05]} geometry={wTipGeo} renderOrder={8}>
+          <meshStandardMaterial color={TIP_COLOR} emissive={TIP_EMISSIVE} emissiveIntensity={0.8}
+            depthWrite={false} depthTest={false} toneMapped={false} />
+        </mesh>
+        <mesh ref={ant2TipRef} position={[0.07, 0.26, 0.05]} geometry={wTipGeo} renderOrder={8}>
+          <meshStandardMaterial color={TIP_COLOR} emissive={TIP_EMISSIVE} emissiveIntensity={0.8}
+            depthWrite={false} depthTest={false} toneMapped={false} />
+        </mesh>
+      </group>
 
-      {/* ── Body segments ────────────────────────────────────────────────── */}
+      {/* ── Body segments ─────────────────────────────────────────────────── */}
       {Array.from({ length: SEGMENT_COUNT }, (_, i) => (
         <mesh
           key={`seg-${i}`}
           renderOrder={6}
           ref={el => (segRefs.current[i] = el)}
-          geometry={segGeo}
+          geometry={wSegGeos[i]}
         >
-          <meshBasicMaterial
-            color={color1}
-            transparent
-            opacity={0.85}
-            blending={THREE.AdditiveBlending}
-            depthWrite={false}
-            depthTest={false}
-            toneMapped={false}
+          <meshStandardMaterial
+            color={SEG_COLORS[i]} roughness={0.3} metalness={0}
+            emissive={SEG_COLORS[i]} emissiveIntensity={0.2 - i * 0.025}
+            transparent opacity={0}
+            depthWrite={false} depthTest={false} toneMapped={false}
           />
         </mesh>
       ))}
-
-      {/* ── Head glow halo ────────────────────────────────────────────────── */}
-      <mesh ref={headGlowRef} geometry={glowGeo} renderOrder={6}>
-        <meshBasicMaterial
-          color={color1}
-          transparent
-          opacity={0}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-          depthTest={false}
-          toneMapped={false}
-        />
-      </mesh>
-
-      {/* ── Head ──────────────────────────────────────────────────────────── */}
-      <mesh ref={headRef} geometry={headGeo} renderOrder={7}>
-        <meshBasicMaterial
-          color={color1}
-          transparent
-          opacity={1}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-          depthTest={false}
-          toneMapped={false}
-        />
-      </mesh>
-
-      {/* ── Eyes — white sclera (renderOrder ensures they draw over head) ─── */}
-      <mesh ref={eyeLeftRef} geometry={eyeGeo} renderOrder={8}>
-        <meshBasicMaterial
-          color="#ffffff"
-          transparent
-          opacity={0}
-          blending={THREE.NormalBlending}
-          depthWrite={false}
-          depthTest={false}
-          toneMapped={false}
-        />
-      </mesh>
-      <mesh ref={eyeRightRef} geometry={eyeGeo} renderOrder={8}>
-        <meshBasicMaterial
-          color="#ffffff"
-          transparent
-          opacity={0}
-          blending={THREE.NormalBlending}
-          depthWrite={false}
-          depthTest={false}
-          toneMapped={false}
-        />
-      </mesh>
-
-      {/* ── Pupils ────────────────────────────────────────────────────────── */}
-      <mesh ref={pupilLRef} geometry={pupilGeo} renderOrder={9}>
-        <meshBasicMaterial
-          color="#111111"
-          transparent
-          opacity={0}
-          blending={THREE.NormalBlending}
-          depthWrite={false}
-          depthTest={false}
-          toneMapped={false}
-        />
-      </mesh>
-      <mesh ref={pupilRRef} geometry={pupilGeo} renderOrder={9}>
-        <meshBasicMaterial
-          color="#111111"
-          transparent
-          opacity={0}
-          blending={THREE.NormalBlending}
-          depthWrite={false}
-          depthTest={false}
-          toneMapped={false}
-        />
-      </mesh>
-
-      {/* ── Antennae — left ───────────────────────────────────────────────── */}
-      {/* These are the primary visual cue that this is a worm/insect head   */}
-      <mesh ref={antenna1StemRef} geometry={antennaStemGeo} renderOrder={7}>
-        <meshBasicMaterial
-          color={color1}
-          transparent
-          opacity={0}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-          depthTest={false}
-          toneMapped={false}
-        />
-      </mesh>
-      <mesh ref={antenna1TipRef} geometry={antennaTipGeo} renderOrder={8}>
-        <meshBasicMaterial
-          color={color1}
-          transparent
-          opacity={0}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-          depthTest={false}
-          toneMapped={false}
-        />
-      </mesh>
-
-      {/* ── Antennae — right ──────────────────────────────────────────────── */}
-      <mesh ref={antenna2StemRef} geometry={antennaStemGeo} renderOrder={7}>
-        <meshBasicMaterial
-          color={color1}
-          transparent
-          opacity={0}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-          depthTest={false}
-          toneMapped={false}
-        />
-      </mesh>
-      <mesh ref={antenna2TipRef} geometry={antennaTipGeo} renderOrder={8}>
-        <meshBasicMaterial
-          color={color1}
-          transparent
-          opacity={0}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-          depthTest={false}
-          toneMapped={false}
-        />
-      </mesh>
     </group>
   );
 };

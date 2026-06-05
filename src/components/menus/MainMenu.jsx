@@ -778,7 +778,7 @@ const MenuWorm = ({ onWormClick }) => {
 };
 
 // ─── Rotating cube + worm mascot — exported for App.jsx's shared Canvas ───────
-export const RotatingBlackCube = ({ onCubeClick, onWormClick }) => {
+export const RotatingBlackCube = ({ onCubeClick }) => {
   const cubeRef = useRef();
   const shaking = useRef(false);
   const shakeStart = useRef(0);
@@ -839,7 +839,6 @@ export const RotatingBlackCube = ({ onCubeClick, onWormClick }) => {
         <ShufflingCube />
         <FacePulses />
       </group>
-      <MenuWorm onWormClick={onWormClick} />
     </>
   );
 };
