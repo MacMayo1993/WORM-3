@@ -166,9 +166,9 @@ function MenuScene({ onCubeClick, onWormClick }) {
   return (
     <>
       <color attach="background" args={['#000005']} />
-      <ambientLight intensity={0.18} />
-      <pointLight position={[8, 8, 10]} intensity={0.45} color="#a8d8ff" />
-      <pointLight position={[-9, -8, 7]} intensity={0.22} color="#7aa3ff" />
+      <ambientLight intensity={0.207} />
+      <pointLight position={[8, 8, 10]} intensity={0.517} color="#a8d8ff" />
+      <pointLight position={[-9, -8, 7]} intensity={0.253} color="#7aa3ff" />
       <Suspense fallback={null}>
         <BlackHoleEnvironment zoom={1.2} orbitStrength={0.1} />
       </Suspense>
