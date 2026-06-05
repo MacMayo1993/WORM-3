@@ -268,7 +268,7 @@ export default function WORM3() {
 
   const {
     chaosLevel, chaosMode, autoRotateEnabled, cascades,
-    upcomingRotation, rotationCountdown, setChaosLevel,
+    upcomingRotation, setChaosLevel,
     setAutoRotateEnabled, onCascadeComplete
   } = useChaosMode();
 
@@ -1207,7 +1207,6 @@ export default function WORM3() {
             cascades={cascades}
             autoRotateEnabled={autoRotateEnabled}
             upcomingRotation={upcomingRotation}
-            rotationCountdown={rotationCountdown}
             moveHistory={moveHistory}
             undo={undo}
             canUndo={canUndo}

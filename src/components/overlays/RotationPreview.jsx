@@ -1,11 +1,50 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
+import { chaosCountdownState } from '../../hooks/useChaosMode.js';
 
-const RotationPreview = ({ upcomingRotation, countdown, maxCountdown, size }) => {
+// maxCountdown is the reference scale for the progress bar (fixed at the
+// longest possible interval so the bar always reads "time left before
+// rotation" even when disparity-driven intervals are much shorter).
+const MAX_COUNTDOWN = 10000;
+
+const RotationPreview = ({ upcomingRotation, size }) => {
+  const fillRef = useRef(null);
+  const textRef = useRef(null);
+  const arrowRef = useRef(null);
+
+  // Poll the shared mutable countdown object every animation frame and push
+  // updates straight to the DOM, bypassing React's render cycle entirely.
+  useEffect(() => {
+    let raf;
+    const update = () => {
+      const countdown = chaosCountdownState.countdown;
+      const progress = Math.max(0, Math.min(1, countdown / MAX_COUNTDOWN));
+      const sec = Math.max(0, countdown / 1000).toFixed(1);
+      const r = Math.floor(255 * (1 - progress));
+      const g = Math.floor(200 * progress);
+      const color = `rgb(${r}, ${g}, 50)`;
+
+      if (fillRef.current) {
+        fillRef.current.style.width = `${progress * 100}%`;
+        fillRef.current.style.background = color;
+      }
+      if (textRef.current) {
+        textRef.current.textContent = `${sec}s`;
+        textRef.current.style.color = color;
+      }
+      if (arrowRef.current) {
+        arrowRef.current.style.color = color;
+      }
+
+      raf = requestAnimationFrame(update);
+    };
+    raf = requestAnimationFrame(update);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
   if (!upcomingRotation) return null;
 
   const { axis, dir, sliceIndex } = upcomingRotation;
 
-  // Get axis display name and direction arrow
   const getAxisLabel = () => {
     switch (axis) {
       case 'col': return 'X';
@@ -15,18 +54,11 @@ const RotationPreview = ({ upcomingRotation, countdown, maxCountdown, size }) =>
     }
   };
 
-  const getDirectionArrow = () => {
-    return dir === 1 ? '↻' : '↺';
-  };
-
-  // Generate a 2D grid preview showing which slice will rotate
   const renderGridPreview = () => {
     const cells = [];
     for (let row = 0; row < size; row++) {
       for (let col = 0; col < size; col++) {
         let isHighlighted = false;
-
-        // Highlight the slice that will rotate
         if (axis === 'col' && col === sliceIndex) isHighlighted = true;
         if (axis === 'row' && row === (size - 1 - sliceIndex)) isHighlighted = true;
         if (axis === 'depth' && (row === sliceIndex || col === sliceIndex)) isHighlighted = true;
@@ -35,10 +67,7 @@ const RotationPreview = ({ upcomingRotation, countdown, maxCountdown, size }) =>
           <div
             key={`${row}-${col}`}
             className={`preview-cell ${isHighlighted ? 'highlighted' : ''}`}
-            style={{
-              gridRow: row + 1,
-              gridColumn: col + 1
-            }}
+            style={{ gridRow: row + 1, gridColumn: col + 1 }}
           />
         );
       }
@@ -46,19 +75,11 @@ const RotationPreview = ({ upcomingRotation, countdown, maxCountdown, size }) =>
     return cells;
   };
 
-  const countdownProgress = Math.max(0, Math.min(1, countdown / maxCountdown));
-  const countdownSec = Math.max(0, countdown / 1000).toFixed(1);
-
-  // Color transitions from green (safe) to red (imminent)
-  const r = Math.floor(255 * (1 - countdownProgress));
-  const g = Math.floor(200 * countdownProgress);
-  const progressColor = `rgb(${r}, ${g}, 50)`;
-
   return (
     <div className="rotation-preview">
       <div className="preview-header">
         <span className="preview-title">NEXT</span>
-        <span className="preview-arrow" style={{ color: progressColor }}>{getDirectionArrow()}</span>
+        <span ref={arrowRef} className="preview-arrow">{dir === 1 ? '↻' : '↺'}</span>
       </div>
 
       <div className="preview-grid" style={{ gridTemplateColumns: `repeat(${size}, 1fr)` }}>
@@ -70,18 +91,10 @@ const RotationPreview = ({ upcomingRotation, countdown, maxCountdown, size }) =>
       </div>
 
       <div className="preview-countdown-bar">
-        <div
-          className="preview-countdown-fill"
-          style={{
-            width: `${countdownProgress * 100}%`,
-            background: progressColor
-          }}
-        />
+        <div ref={fillRef} className="preview-countdown-fill" />
       </div>
 
-      <div className="preview-countdown-text" style={{ color: progressColor }}>
-        {countdownSec}s
-      </div>
+      <div ref={textRef} className="preview-countdown-text" />
     </div>
   );
 };
