@@ -3135,6 +3135,19 @@ select.btn-compact:disabled {
    Two-keyframe system: backdrop fades in, sheet slides up with slight overshoot.
    Apply via inline animation property or .modal-backdrop-enter / .modal-sheet-enter.
    ======================================== */
+@keyframes orbDrift1 {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(6%, 9%) scale(1.09); }
+}
+@keyframes orbDrift2 {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(-8%, 5%) scale(0.93); }
+}
+@keyframes orbDrift3 {
+  from { transform: translate(0, 0) scale(1); }
+  to   { transform: translate(5%, -8%) scale(1.07); }
+}
+
 @keyframes modalBackdropIn {
   from { opacity: 0; }
   to   { opacity: 1; }

@@ -733,21 +733,49 @@ const MenuPrimaryActions = ({ visible, onWormSelect, onCubeSelect }) => (
     opacity: visible ? 1 : 0,
     transform: visible ? 'none' : 'translateY(16px)',
   }}>
-    <button onClick={onWormSelect} style={{
-      minWidth: '132px', borderRadius: '14px', border: '1px solid rgba(34,197,94,0.55)',
-      background: 'linear-gradient(180deg, rgba(34,197,94,0.26), rgba(6,10,24,0.82))',
-      color: '#dcffe9', padding: '12px 14px', fontWeight: 800, letterSpacing: '0.12em',
-      textTransform: 'uppercase', fontSize: '13px', fontFamily: MENU_FONT,
-      boxShadow: '0 0 18px rgba(34,197,94,0.24)', cursor: 'pointer',
-    }}>WORM</button>
-    <button onClick={onCubeSelect} style={{
-      minWidth: '132px', borderRadius: '14px', border: '1px solid rgba(59,130,246,0.55)',
-      background: 'linear-gradient(180deg, rgba(59,130,246,0.26), rgba(6,10,24,0.82))',
-      color: '#dff0ff', padding: '10px 14px 8px', fontWeight: 800, letterSpacing: '0.12em',
-      textTransform: 'uppercase', fontSize: '13px', fontFamily: MENU_FONT,
-      boxShadow: '0 0 18px rgba(59,130,246,0.24)', cursor: 'pointer',
-      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
-    }}>
+    <button
+      onClick={onWormSelect}
+      style={{
+        minWidth: '132px', borderRadius: '14px', border: '1px solid rgba(34,197,94,0.55)',
+        background: 'linear-gradient(180deg, rgba(34,197,94,0.26), rgba(6,10,24,0.82))',
+        color: '#dcffe9', padding: '12px 14px', fontWeight: 800, letterSpacing: '0.12em',
+        textTransform: 'uppercase', fontSize: '13px', fontFamily: MENU_FONT,
+        boxShadow: '0 0 18px rgba(34,197,94,0.24)', cursor: 'pointer',
+        transition: 'transform 220ms cubic-bezier(0.34,1.56,0.64,1), box-shadow 200ms ease, border-color 200ms ease',
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.transform = 'scale(1.07)';
+        e.currentTarget.style.boxShadow = '0 0 36px rgba(34,197,94,0.55), 0 0 72px rgba(34,197,94,0.18)';
+        e.currentTarget.style.borderColor = 'rgba(34,197,94,0.90)';
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.transform = 'scale(1)';
+        e.currentTarget.style.boxShadow = '0 0 18px rgba(34,197,94,0.24)';
+        e.currentTarget.style.borderColor = 'rgba(34,197,94,0.55)';
+      }}
+    >WORM</button>
+    <button
+      onClick={onCubeSelect}
+      style={{
+        minWidth: '132px', borderRadius: '14px', border: '1px solid rgba(59,130,246,0.55)',
+        background: 'linear-gradient(180deg, rgba(59,130,246,0.26), rgba(6,10,24,0.82))',
+        color: '#dff0ff', padding: '10px 14px 8px', fontWeight: 800, letterSpacing: '0.12em',
+        textTransform: 'uppercase', fontSize: '13px', fontFamily: MENU_FONT,
+        boxShadow: '0 0 18px rgba(59,130,246,0.24)', cursor: 'pointer',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
+        transition: 'transform 220ms cubic-bezier(0.34,1.56,0.64,1), box-shadow 200ms ease, border-color 200ms ease',
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.transform = 'scale(1.07)';
+        e.currentTarget.style.boxShadow = '0 0 36px rgba(59,130,246,0.55), 0 0 72px rgba(59,130,246,0.18)';
+        e.currentTarget.style.borderColor = 'rgba(59,130,246,0.90)';
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.transform = 'scale(1)';
+        e.currentTarget.style.boxShadow = '0 0 18px rgba(59,130,246,0.24)';
+        e.currentTarget.style.borderColor = 'rgba(59,130,246,0.55)';
+      }}
+    >
       <span>CUBE</span>
       <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.14em', color: 'rgba(180,220,255,0.9)' }}>START HERE</span>
     </button>
@@ -779,6 +807,32 @@ const MenuUtilityNav = ({ visible, onFreeplay, onStore }) => (
   </div>
 );
 
+// ─── Ambient background orbs ─────────────────────────────────────────────────
+const ORB_DEFS = [
+  { color: '#3b82f6', top: '-18%',  left: '-12%',  size: '58vmax', anim: 'orbDrift1 30s ease-in-out infinite alternate',          opacity: 0.30 },
+  { color: '#a855f7', bottom: '-22%',right: '-16%', size: '62vmax', anim: 'orbDrift2 36s ease-in-out infinite alternate',          opacity: 0.24 },
+  { color: '#f97316', top: '15%',   right: '-18%',  size: '46vmax', anim: 'orbDrift3 24s ease-in-out infinite alternate',          opacity: 0.18 },
+  { color: '#22c55e', bottom: '8%', left: '-14%',   size: '42vmax', anim: 'orbDrift1 28s ease-in-out infinite alternate-reverse',  opacity: 0.15 },
+  { color: '#eab308', top: '44%',   left: '28%',    size: '36vmax', anim: 'orbDrift2 40s ease-in-out infinite alternate',          opacity: 0.11 },
+];
+
+const MenuBackgroundOrbs = () => (
+  <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', zIndex: 0, pointerEvents: 'none' }}>
+    {ORB_DEFS.map((orb, i) => (
+      <div key={i} style={{
+        position: 'absolute',
+        width: orb.size, height: orb.size,
+        top: orb.top, left: orb.left, bottom: orb.bottom, right: orb.right,
+        borderRadius: '50%',
+        background: `radial-gradient(circle, ${orb.color} 0%, transparent 70%)`,
+        filter: 'blur(72px)',
+        opacity: orb.opacity,
+        animation: orb.anim,
+      }} />
+    ))}
+  </div>
+);
+
 // ─── Main component ───────────────────────────────────────────────────────────
 const MainMenu = ({
   onPlay: _onPlay, onLevels: _onLevels, onFreeplay, onCoop: _onCoop, onTeach: _onTeach,
@@ -804,6 +858,7 @@ const MainMenu = ({
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'transparent', zIndex: 9999, overflow: 'hidden', pointerEvents: 'none' }}>
+      <MenuBackgroundOrbs />
       <ScreenGlow />
       <MenuTitleCard visible={titleVisible} />
       <MenuPrimaryActions visible={bottomVisible} onWormSelect={handleWormSelect} onCubeSelect={handleCubeSelect} />
