@@ -495,14 +495,16 @@ function useWormCrawler(size, cubies) {
                 tailLength.current = Math.max(BASE_TAIL_LENGTH, tailLength.current - n);
                 orbPickupColorsRef.current = orbPickupColorsRef.current.slice(0, -(n / ORB_SEGMENT_GROWTH));
                 const orbsLeft = Math.max(0, Math.floor((tailLength.current - BASE_TAIL_LENGTH) / ORB_SEGMENT_GROWTH));
-                useGameStore.getState().setWormBodyTiles(orbsLeft);
-                useGameStore.getState().setWormOrbInventory({
-                    ...(depositState.wormOrbInventory ?? {}),
-                    [entryFaceId]: (depositState.wormOrbInventory?.[entryFaceId] ?? 0) - n,
-                });
-                useGameStore.getState().setWormHealingProgress({
-                    ...healingProgress,
-                    [stableKey]: { deposited: progress.deposited + n, faceId: entryFaceId },
+                useGameStore.setState({
+                    wormBodyTiles: orbsLeft,
+                    wormOrbInventory: {
+                        ...(depositState.wormOrbInventory ?? {}),
+                        [entryFaceId]: (depositState.wormOrbInventory?.[entryFaceId] ?? 0) - n,
+                    },
+                    wormHealingProgress: {
+                        ...healingProgress,
+                        [stableKey]: { deposited: progress.deposited + n, faceId: entryFaceId },
+                    },
                 });
             }
         }
@@ -536,15 +538,18 @@ function useWormCrawler(size, cubies) {
         tailLength.current = Math.min(tailLength.current + ORB_SEGMENT_GROWTH, MAX_TAIL);
         orbPickupColorsRef.current = [...orbPickupColorsRef.current, color];
         const orbCountOnWorm = Math.max(0, Math.floor((tailLength.current - BASE_TAIL_LENGTH) / ORB_SEGMENT_GROWTH));
-        useGameStore.getState().setWormBodyTiles(orbCountOnWorm);
         // PP are NOT awarded on pickup — only banked when the player wins (cube solved).
         // Track session total separately for the in-game counter.
-        const prevSession = useGameStore.getState().wormSessionOrbs ?? 0;
-        useGameStore.getState().setWormSessionOrbs(prevSession + 1);
-        if (faceId) {
-            const prev = useGameStore.getState().wormOrbInventory ?? { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
-            useGameStore.getState().setWormOrbInventory({ ...prev, [faceId]: (prev[faceId] ?? 0) + ORB_SEGMENT_GROWTH });
-        }
+        useGameStore.setState((state) => ({
+            wormBodyTiles: orbCountOnWorm,
+            wormSessionOrbs: (state.wormSessionOrbs ?? 0) + 1,
+            ...(faceId ? {
+                wormOrbInventory: {
+                    ...(state.wormOrbInventory ?? { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }),
+                    [faceId]: (state.wormOrbInventory?.[faceId] ?? 0) + ORB_SEGMENT_GROWTH,
+                },
+            } : {}),
+        }));
     };
 
     const spawnWormholePair = () => {
@@ -2145,10 +2150,11 @@ function HeartBurstSystem({ worm, size }) {
 function TunnelHealProgress({ size }) {
     const healingProgress = useGameStore((s) => s.wormHealingProgress ?? {});
     const cubies = useGameStore((s) => s.debouncedCubies ?? s.cubies);
-    const faceColors = useGameStore((s) => {
-        const settings = s.settings ?? { colorScheme: 'standard' };
-        return resolveColors(settings, settings?.biomeMode?.faceAssignment) || {};
-    });
+    const settings = useGameStore((s) => s.settings);
+    const faceColors = useMemo(
+        () => resolveColors(settings, settings?.biomeMode?.faceAssignment) || {},
+        [settings]
+    );
 
     const entries = useMemo(() => {
         const partial = Object.entries(healingProgress).filter(([, p]) => p.deposited > 0 && p.deposited < HEAL_COST);
