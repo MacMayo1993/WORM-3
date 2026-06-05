@@ -205,6 +205,7 @@ export default function WORM3() {
   const {
     showWelcome, setShowWelcome,
     showMainMenu,
+    showSettings,
     showTutorial, setShowTutorial,
     setShowSettings,
     showMobileTouchHint, markMobileHintShown,
@@ -213,6 +214,7 @@ export default function WORM3() {
     showWelcome: s.showWelcome,
     setShowWelcome: s.setShowWelcome,
     showMainMenu: s.showMainMenu,
+    showSettings: s.showSettings,
     showTutorial: s.showTutorial,
     setShowTutorial: s.setShowTutorial,
     setShowSettings: s.setShowSettings,
@@ -1124,7 +1126,10 @@ export default function WORM3() {
               performanceMode={introPerformanceMode}
             />
           ) : showMainMenu ? (
-            <MenuScene onCubeClick={handleMenuCube} onWormClick={handleMenuWormHealer} />
+            // Stop the cube/worm animation when a full-screen overlay covers the menu
+            showSettings ? <color attach="background" args={['#000005']} /> : (
+              <MenuScene onCubeClick={handleMenuCube} onWormClick={handleMenuWormHealer} />
+            )
           ) : (
             <Suspense fallback={null}>
               <GameScene

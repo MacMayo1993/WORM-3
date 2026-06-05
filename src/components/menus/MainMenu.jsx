@@ -715,8 +715,8 @@ export const RotatingBlackCube = ({ onCubeClick, onWormClick }) => {
   const cubeRef = useRef();
   const shaking = useRef(false);
   const shakeStart = useRef(0);
-  const cubeTargetScale = useRef(0.76);
-  const cubeCurrentScale = useRef(0.76);
+  const cubeTargetScale = useRef(1.0);
+  const cubeCurrentScale = useRef(1.0);
   const onCubeClickRef = useRef(onCubeClick);
   onCubeClickRef.current = onCubeClick;
 
@@ -756,8 +756,8 @@ export const RotatingBlackCube = ({ onCubeClick, onWormClick }) => {
     shaking.current = true;
     shakeStart.current = Date.now();
   };
-  const handleCubeDown = () => { cubeTargetScale.current = 0.7; };
-  const handleCubeUp = () => { if (!shaking.current) cubeTargetScale.current = 0.76; };
+  const handleCubeDown = () => { cubeTargetScale.current = 0.90; };
+  const handleCubeUp = () => { if (!shaking.current) cubeTargetScale.current = 1.0; };
 
   return (
     <>
