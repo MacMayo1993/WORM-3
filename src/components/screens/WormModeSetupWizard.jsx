@@ -342,7 +342,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     img.src = url;
   };
 
-  const STEPS = ['Character', 'Scene', 'Colors', 'Style', 'Gameplay', 'Size'];
+  const STEPS = ['Character', 'Scene', 'Style', 'Colors', 'Gameplay', 'Size'];
   const totalSteps = 6;
 
   const handleNext = () => {
@@ -472,6 +472,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     const resolvedCustom = settings.colorScheme === 'custom' && settings.customColors
       ? settings.customColors
       : null;
+    const previewStyle = settings.tileStyle === 'random' ? 'solid' : (settings.tileStyle || 'solid');
 
     return (
       <>
@@ -546,9 +547,12 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                 <span style={{ fontSize: '10px', fontWeight: selected ? '600' : '400', color: selected ? '#e8edf8' : 'rgba(200,220,255,0.65)', lineHeight: 1.2, textAlign: 'center' }}>
                   {SCHEME_LABELS[key]}
                 </span>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '3px', width: '100%' }}>
-                  {colors.map((c, i) => (
-                    <div key={i} style={{ width: '100%', aspectRatio: '1', borderRadius: '50%', background: owned ? c : '#aaa', boxShadow: '0 1px 2px rgba(0,0,0,0.18)' }} />
+                <div style={{ width: '100%', borderRadius: '5px', overflow: 'hidden' }}>
+                  <TilePreviewCanvas styleKey={previewStyle} colorHex={colors[0] || '#4a7fa5'} size={56} />
+                </div>
+                <div style={{ display: 'flex', gap: '3px', justifyContent: 'center' }}>
+                  {colors.slice(1, 4).map((c, i) => (
+                    <div key={i} style={{ width: '10px', height: '10px', borderRadius: '50%', background: owned ? c : '#aaa', boxShadow: '0 1px 2px rgba(0,0,0,0.18)' }} />
                   ))}
                 </div>
                 {selected && (
@@ -1086,15 +1090,15 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
 
   // ── Step titles ─────────────────────────────────────────────────────────────
 
-  const stepContent = [renderCharacter, renderBackgrounds, renderColors, renderStyles, renderGameplay, renderSize];
-  const stepTitles = ['Pick Worm Type', 'Background', 'Color Palette', 'Tile Style', 'Gameplay', 'Cube Size'];
+  const stepContent = [renderCharacter, renderBackgrounds, renderStyles, renderColors, renderGameplay, renderSize];
+  const stepTitles = ['Pick Worm Type', 'Background', 'Tile Style', 'Color Palette', 'Gameplay', 'Cube Size'];
   const stepSubtitles = [
     'Select your character, then customize skin & hat',
     'Choose your play environment',
-    'Set the colors for your cube faces (or upload an image)',
     'Choose how your tiles look and feel',
+    'Pick a palette — see it applied to your chosen tile style',
     'Tune how fast and chaotic your worm run feels',
-    'Pick your puzzle dimensions with tile previews loaded',
+    'Pick your puzzle dimensions',
   ];
 
   return (
