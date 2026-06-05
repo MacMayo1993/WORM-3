@@ -403,18 +403,15 @@ function TombstoneGhost() {
 }
 
 const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay, mode, faceRow, faceCol, faceSize, hollow, currentDir: _currentDir }) {
-  // Batch all store reads into a single subscription to minimize Zustand overhead.
-  // With 54 stickers on a 3×3 cube, separate selectors = many subscriptions;
-  // one combined selector with shallow equality keeps it to 54 subscriptions.
-  const { biomeEnabled, chaosLevel, disparityFlipCap, disparityWinner, settings, faceTextures, disparityDeathByGridId, mergeMode, mergeTheme } = useGameStore(
+  // Static game config — set once at game start, rarely changes during active play.
+  // Kept in one shallow selector so tile-style/palette changes still reach all stickers.
+  const { biomeEnabled, chaosLevel, disparityFlipCap, settings, faceTextures, mergeMode, mergeTheme } = useGameStore(
     useShallow((s) => ({
       biomeEnabled: s.settings?.biomeMode?.enabled ?? false,
       chaosLevel: s.chaosLevel,
       disparityFlipCap: s.disparityFlipCap,
-      disparityWinner: s.disparityWinner,
       settings: s.settings,
       faceTextures: s.faceTextures,
-      disparityDeathByGridId: s.disparityDeathByGridId,
       mergeMode: s.mergeMode,
       mergeTheme: s.mergeTheme,
     }))
@@ -541,6 +538,12 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // WormholeTunnel can read the burst progress without prop drilling.
   // origPos/origDir/orig never change so this is computed once.
   const stickerGridIdRef = useRef(meta ? getManifoldGridId(meta, faceSize) : null);
+  // Per-sticker dynamic selectors — subscribe only to this sticker's own derived values.
+  // When disparityDeathByGridId grows (a tile dies) Zustand re-runs all selectors, but
+  // only the sticker whose primitive return value actually changed triggers a re-render.
+  // 54 stickers dying → 54×54 re-renders becomes 1 re-render per death event.
+  const deadRankRaw = useGameStore((s) => s.disparityDeathByGridId?.[stickerGridIdRef.current]?.rank ?? null);
+  const isWinnerTile = useGameStore((s) => s.chaosLevel > 0 && !!(s.disparityWinner?.pair?.includes(stickerGridIdRef.current)));
   // Stable home key for Merge Mode tier lookup — same format as computeMergeRegions output.
   const mergeHomeKey = meta?.origPos
     ? `${meta.origPos.x}-${meta.origPos.y}-${meta.origPos.z}-${meta.origDir}`
@@ -556,9 +559,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   }, []);
 
   // Death rank from Disparity Mode — null if not in disparity game or tile not yet dead
-  const deadRank = isDead ? (disparityDeathByGridId?.[stickerGridIdRef.current]?.rank ?? null) : null;
-  // Winner tile — glows gold after the last pair is found
-  const isWinnerTile = chaosLevel > 0 && !!(disparityWinner?.pair?.includes(stickerGridIdRef.current));
+  const deadRank = isDead ? deadRankRaw : null;
 
   // Imperative ref to FlipParticles — avoids re-rendering StickerPlane on every flip.
   const flipParticlesRef = useRef();
