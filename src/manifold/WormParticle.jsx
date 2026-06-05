@@ -2,27 +2,24 @@ import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
-const _faceN   = new THREE.Vector3();
-const _perp    = new THREE.Vector3();
-const _arcDir  = new THREE.Vector3();
-const _wigDir  = new THREE.Vector3();
-const _tangent = new THREE.Vector3();
-const _lookDir = new THREE.Vector3();
+const _faceN    = new THREE.Vector3();
+const _perp     = new THREE.Vector3();
+const _arcDir   = new THREE.Vector3();
+const _wigDir   = new THREE.Vector3();
+const _tangent  = new THREE.Vector3();
+const _lookDir  = new THREE.Vector3();
 const _camLocal = new THREE.Vector3();
 const _lookQuat = new THREE.Quaternion();
 const _wigQuat  = new THREE.Quaternion();
 const _wigAxis  = new THREE.Vector3(0, 1, 0);
 const _fwdAxis  = new THREE.Vector3(0, 0, 1);
+const _flyOff   = new THREE.Vector3();
 
-const SEG_COLORS   = ['#3be08a', '#2fd47e', '#24be72', '#1aa862', '#129650'];
-const TIP_COLOR    = '#b0ffda';
-const TIP_EMISSIVE = '#40ff99';
-
-// Head only slightly larger; first two segments nearly the same size
+// Head only slightly larger; first two segs nearly same size as head
 const wHeadGeo  = new THREE.SphereGeometry(0.22, 14, 12);
 const wSegGeos  = [
-  new THREE.SphereGeometry(0.21, 12, 10), // close to head
-  new THREE.SphereGeometry(0.21, 10, 8),  // close to head
+  new THREE.SphereGeometry(0.21, 12, 10),
+  new THREE.SphereGeometry(0.21, 10, 8),
   new THREE.SphereGeometry(0.19, 10, 8),
   new THREE.SphereGeometry(0.18, 8, 8),
   new THREE.SphereGeometry(0.16, 8, 8),
@@ -37,10 +34,11 @@ const SEGMENT_COUNT = 5;
 
 /**
  * WormParticle — cartoon apple-worm emerge from flip hole.
- * Tail is anchored at `start` (face center, inside cube / hidden by depth test).
- * Head arcs outward, then during linger turns to face the camera and wiggles.
+ * Uses `color1` (the flipped face's color) for the whole body.
+ * After emerging and looking at the camera, flies off screen instead
+ * of fading — onComplete fires only once the worm is far out of view.
  */
-const WormParticle = ({ start, end: _end, color1: _c1, color2: _c2, startTime, currentTime, onComplete }) => {
+const WormParticle = ({ start, end: _end, color1, color2: _c2, startTime, currentTime, onComplete }) => {
   const headGroupRef = useRef();
   const eyeLRef      = useRef();
   const eyeRRef      = useRef();
@@ -50,9 +48,10 @@ const WormParticle = ({ start, end: _end, color1: _c1, color2: _c2, startTime, c
   const ant2TipRef   = useRef();
   const segRefs      = useRef([]);
 
-  const duration       = 2.0;
-  const lingerDuration = 4.2; // +1.2 s of camera-facing linger
-  const totalDuration  = duration + lingerDuration;
+  const duration      = 2.0;  // emerge from hole
+  const lingerDur     = 4.2;  // linger + look at camera
+  const flyDur        = 2.2;  // fly off screen (no fade)
+  const totalDuration = duration + lingerDur + flyDur;
 
   const p = useMemo(() => ({
     arcPhase    : Math.random() * Math.PI * 2,
@@ -75,17 +74,17 @@ const WormParticle = ({ start, end: _end, color1: _c1, color2: _c2, startTime, c
     if (elapsed >= totalDuration) { onComplete?.(); return; }
 
     const tRaw     = Math.min(elapsed / duration, 1);
-    const progress = 1 - Math.pow(1 - tRaw, 3);
+    const progress = 1 - Math.pow(1 - tRaw, 3); // ease-out cubic — head races out first
 
-    const fadeIn  = Math.min(1, elapsed / 0.25);
-    const fadeOut = elapsed <= duration
-      ? 1 : Math.max(0, 1 - (elapsed - duration) / lingerDuration);
-    const alpha = fadeIn * fadeOut;
-    const inLinger = elapsed > duration;
+    // No fade-out: alpha only ramps up during emerge, stays full until off-screen
+    const alpha = Math.min(1, elapsed / 0.25);
+
+    const inLinger  = elapsed > duration && elapsed <= duration + lingerDur;
+    const inFlyOff  = elapsed > duration + lingerDur;
+    const flyT      = inFlyOff ? elapsed - duration - lingerDur : 0;
 
     // Face normal away from cube center
     _faceN.set(...start).normalize();
-
     const basePerp = Math.abs(_faceN.y) < 0.8
       ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
     _perp.crossVectors(_faceN, basePerp).normalize();
@@ -96,51 +95,53 @@ const WormParticle = ({ start, end: _end, color1: _c1, color2: _c2, startTime, c
     _arcDir.copy(_perp).multiplyScalar(cosP).addScaledVector(arcFwdVec, sinP);
     _wigDir.copy(_perp).multiplyScalar(-sinP).addScaledVector(arcFwdVec, cosP);
 
-    // Linger wiggle amplitude increases during linger phase
     const wLive = Math.sin(clockTime * 2.5) * (inLinger ? 0.09 : 0.05);
 
     const origin = new THREE.Vector3(...start);
     const wp0 = origin.clone().addScaledVector(_faceN, -0.20);
     const wp1 = origin.clone().addScaledVector(_faceN,  0.14);
     const wp2 = origin.clone()
-      .addScaledVector(_faceN,  0.42)
-      .addScaledVector(_arcDir, 0.22)
-      .addScaledVector(_wigDir, wLive);
+      .addScaledVector(_faceN,  0.42).addScaledVector(_arcDir, 0.22).addScaledVector(_wigDir, wLive);
     const wp3 = origin.clone()
-      .addScaledVector(_faceN,  0.54)
-      .addScaledVector(_arcDir, 0.42)
-      .addScaledVector(_wigDir, wLive * 1.5);
+      .addScaledVector(_faceN,  0.54).addScaledVector(_arcDir, 0.42).addScaledVector(_wigDir, wLive * 1.5);
     const wp4 = origin.clone()
-      .addScaledVector(_faceN,  0.38)
-      .addScaledVector(_arcDir, 0.56)
-      .addScaledVector(_wigDir, wLive * 2.0);
+      .addScaledVector(_faceN,  0.38).addScaledVector(_arcDir, 0.56).addScaledVector(_wigDir, wLive * 2.0);
 
     const curve = new THREE.CatmullRomCurve3([wp0, wp1, wp2, wp3, wp4]);
-    const headPos = curve.getPoint(progress);
 
+    // Fly-off: accelerate in arcDir + slightly outward from face
+    _flyOff.copy(_arcDir)
+      .addScaledVector(_faceN, 0.4)
+      .normalize()
+      .multiplyScalar(flyT * flyT * 2.2);
+
+    const headPos = curve.getPoint(progress).add(_flyOff);
+
+    // ── Head ───────────────────────────────────────────────────────────────
     if (headGroupRef.current) {
       headGroupRef.current.visible = alpha > 0.02;
       headGroupRef.current.position.copy(headPos);
 
-      if (inLinger && headGroupRef.current.parent) {
-        // Convert camera world position to parent-local space, then look at it
+      if (inFlyOff) {
+        // Face the fly direction
+        _lookQuat.setFromUnitVectors(_fwdAxis,
+          _arcDir.clone().addScaledVector(_faceN, 0.4).normalize());
+        headGroupRef.current.quaternion.slerp(_lookQuat, 0.12);
+      } else if (inLinger && headGroupRef.current.parent) {
+        // Convert camera world pos to parent-local, look at it
         _camLocal.copy(state.camera.position);
         headGroupRef.current.parent.worldToLocal(_camLocal);
         _lookDir.subVectors(_camLocal, headPos).normalize();
-
         if (_lookDir.lengthSq() > 0.001) {
           _lookQuat.setFromUnitVectors(_fwdAxis, _lookDir);
-          // Add a gentle Y-axis head-bob wiggle on top of the look-at
-          const wiggleAmt = Math.sin(clockTime * 3.8) * 0.18;
-          _wigQuat.setFromAxisAngle(_wigAxis, wiggleAmt);
+          _wigQuat.setFromAxisAngle(_wigAxis, Math.sin(clockTime * 3.8) * 0.18);
           _lookQuat.multiply(_wigQuat);
-          // Smooth slerp so transition from arc-follow to camera-look is gradual
           headGroupRef.current.quaternion.slerp(_lookQuat, 0.05);
         }
       } else {
-        // During emerge: head follows arc tangent
+        // Emerge: follow arc tangent
         const headFwd = curve.getPoint(Math.min(progress + 0.03, 1));
-        _tangent.subVectors(headFwd, headPos).normalize();
+        _tangent.subVectors(headFwd, headPos.clone().sub(_flyOff)).normalize();
         if (_tangent.lengthSq() > 0.001) {
           headGroupRef.current.quaternion.setFromUnitVectors(_fwdAxis, _tangent);
         }
@@ -150,7 +151,7 @@ const WormParticle = ({ start, end: _end, color1: _c1, color2: _c2, startTime, c
       headGroupRef.current.scale.set(1 + squish * 0.3, 1 - squish * 0.15, 1 + squish * 0.3);
     }
 
-    // Blinking
+    // ── Blinking ───────────────────────────────────────────────────────────
     const timeSinceBlink = clockTime - blinkTimerRef.current;
     if (!isBlinkingRef.current && timeSinceBlink > p.blinkInterval) {
       isBlinkingRef.current = true;
@@ -163,45 +164,44 @@ const WormParticle = ({ start, end: _end, color1: _c1, color2: _c2, startTime, c
     if (eyeLRef.current) eyeLRef.current.scale.set(1, eyeScaleY, 1);
     if (eyeRRef.current) eyeRRef.current.scale.set(1, eyeScaleY, 1);
 
-    // Antenna wiggle (more energetic during linger)
-    const antSpeed = inLinger ? 7.5 : 6;
-    const r = 0.3 + Math.sin(clockTime * antSpeed + p.antennaPhase) * (inLinger ? 0.18 : 0.12);
+    // ── Antennae ───────────────────────────────────────────────────────────
+    const antSpeed = (inLinger || inFlyOff) ? 7.5 : 6;
+    const antAmp   = (inLinger || inFlyOff) ? 0.18 : 0.12;
+    const r = 0.3 + Math.sin(clockTime * antSpeed + p.antennaPhase) * antAmp;
     if (ant1StemRef.current) ant1StemRef.current.rotation.z = r;
     if (ant2StemRef.current) ant2StemRef.current.rotation.z = -r;
     if (ant1TipRef.current) {
-      ant1TipRef.current.position.set(
-        -0.09 + Math.sin(r) * STEM_HALF, 0.22 + Math.cos(r) * STEM_HALF, 0.08
-      );
+      ant1TipRef.current.position.set(-0.09 + Math.sin(r) * STEM_HALF, 0.22 + Math.cos(r) * STEM_HALF, 0.08);
     }
     if (ant2TipRef.current) {
-      ant2TipRef.current.position.set(
-        0.09 - Math.sin(r) * STEM_HALF, 0.22 + Math.cos(r) * STEM_HALF, 0.08
-      );
+      ant2TipRef.current.position.set(0.09 - Math.sin(r) * STEM_HALF, 0.22 + Math.cos(r) * STEM_HALF, 0.08);
     }
 
-    // Body segments
+    // ── Body segments — unfurl from hole, fly off as unit ─────────────────
     for (let i = 0; i < SEGMENT_COUNT; i++) {
       const seg = segRefs.current[i];
       if (!seg) continue;
-      const lag  = (i + 1) / (SEGMENT_COUNT + 1);
-      const segT = Math.max(0, progress * (1 - lag));
-      const segPos = curve.getPoint(segT);
+      const lag    = (i + 1) / (SEGMENT_COUNT + 1);
+      const segT   = Math.max(0, progress * (1 - lag));
+      const segPos = curve.getPoint(segT).add(_flyOff.clone());
       const wave   = Math.sin(clockTime * p.squishFreq - i * 0.8) * p.squishAmp;
       const taper  = 1 - (i / (SEGMENT_COUNT - 1)) * 0.18;
       seg.position.copy(segPos);
       seg.scale.set(taper * (1 + wave), taper * (1 - wave * 0.5), taper * (1 + wave));
-      seg.material.opacity = (0.95 - (i / SEGMENT_COUNT) * 0.12) * alpha;
+      seg.material.opacity = 0.95 - (i / SEGMENT_COUNT) * 0.12; // full opacity, no fade
     }
   });
 
+  const faceColor = color1 || '#3be08a';
+
   return (
     <group>
-      {/* ── Head group — children inherit position+orientation ────────────── */}
+      {/* ── Head group ────────────────────────────────────────────────────── */}
       <group ref={headGroupRef}>
         <mesh geometry={wHeadGeo} renderOrder={7}>
           <meshStandardMaterial
-            color={SEG_COLORS[0]} roughness={0.3} metalness={0}
-            emissive={SEG_COLORS[0]} emissiveIntensity={0.7}
+            color={faceColor} roughness={0.3} metalness={0}
+            emissive={faceColor} emissiveIntensity={0.7}
             depthWrite={false}
           />
         </mesh>
@@ -222,24 +222,25 @@ const WormParticle = ({ start, end: _end, color1: _c1, color2: _c2, startTime, c
           <meshStandardMaterial color="#0d2410" roughness={0.6} depthWrite={false} />
         </mesh>
         <mesh ref={ant1StemRef} position={[-0.09, 0.22, 0.08]} rotation={[0, 0, 0.3]} geometry={wStemGeo} renderOrder={7}>
-          <meshStandardMaterial color={SEG_COLORS[0]} roughness={0.5}
-            emissive={SEG_COLORS[0]} emissiveIntensity={0.4} depthWrite={false} />
+          <meshStandardMaterial color={faceColor} roughness={0.5}
+            emissive={faceColor} emissiveIntensity={0.4} depthWrite={false} />
         </mesh>
         <mesh ref={ant2StemRef} position={[0.09, 0.22, 0.08]} rotation={[0, 0, -0.3]} geometry={wStemGeo} renderOrder={7}>
-          <meshStandardMaterial color={SEG_COLORS[0]} roughness={0.5}
-            emissive={SEG_COLORS[0]} emissiveIntensity={0.4} depthWrite={false} />
+          <meshStandardMaterial color={faceColor} roughness={0.5}
+            emissive={faceColor} emissiveIntensity={0.4} depthWrite={false} />
         </mesh>
+        {/* Tips: white with face-color emissive glow for bright contrast */}
         <mesh ref={ant1TipRef} position={[-0.06, 0.32, 0.08]} geometry={wTipGeo} renderOrder={8}>
-          <meshStandardMaterial color={TIP_COLOR} emissive={TIP_EMISSIVE} emissiveIntensity={1.2}
+          <meshStandardMaterial color="#ffffff" emissive={faceColor} emissiveIntensity={2.0}
             depthWrite={false} />
         </mesh>
         <mesh ref={ant2TipRef} position={[0.06, 0.32, 0.08]} geometry={wTipGeo} renderOrder={8}>
-          <meshStandardMaterial color={TIP_COLOR} emissive={TIP_EMISSIVE} emissiveIntensity={1.2}
+          <meshStandardMaterial color="#ffffff" emissive={faceColor} emissiveIntensity={2.0}
             depthWrite={false} />
         </mesh>
       </group>
 
-      {/* ── Body segments ─────────────────────────────────────────────────── */}
+      {/* ── Body segments — face color, no fade-out ───────────────────────── */}
       {Array.from({ length: SEGMENT_COUNT }, (_, i) => (
         <mesh
           key={`seg-${i}`}
@@ -248,8 +249,8 @@ const WormParticle = ({ start, end: _end, color1: _c1, color2: _c2, startTime, c
           geometry={wSegGeos[i]}
         >
           <meshStandardMaterial
-            color={SEG_COLORS[i]} roughness={0.3} metalness={0}
-            emissive={SEG_COLORS[i]} emissiveIntensity={0.5 - i * 0.06}
+            color={faceColor} roughness={0.3} metalness={0}
+            emissive={faceColor} emissiveIntensity={0.45 - i * 0.06}
             transparent opacity={0}
             depthWrite={false}
           />
