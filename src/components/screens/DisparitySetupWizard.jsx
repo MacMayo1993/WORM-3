@@ -337,7 +337,7 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
             {customPreview ? (
               <img src={customPreview} alt="Uploaded" style={{ width: '56px', height: '36px', objectFit: 'cover', borderRadius: '8px', flexShrink: 0 }} />
             ) : (
-              <div style={{ width: '56px', height: '36px', borderRadius: '8px', background: 'rgba(0,0,0,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>📷</div>
+              <div style={{ width: '56px', height: '36px', borderRadius: '8px', background: 'rgba(0,0,0,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 600, letterSpacing: '0.06em', color: 'rgba(200,220,255,0.35)', flexShrink: 0 }}>IMG</div>
             )}
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: '14px', fontWeight: settings.colorScheme === 'custom' ? '600' : '500', color: '#e8edf8' }}>Extract from Image</div>
@@ -437,7 +437,6 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
       <>
         <div style={{ marginBottom: '18px' }}>
           <button style={{ ...S.card(settings.tileStyle === 'random' && !perFace), flexDirection: 'row', alignItems: 'center', gap: '14px' }} onClick={() => applyGlobal('random')}>
-            <div style={{ width: '48px', height: '48px', borderRadius: '10px', background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', flexShrink: 0 }}>🎲</div>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: '14px', fontWeight: '600', color: '#e8edf8' }}>Random Mix</div>
               <div style={{ fontSize: '12px', color: 'rgba(200,220,255,0.65)', marginTop: '2px' }}>Different style on every face</div>
@@ -577,7 +576,7 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
       <div style={S.sheet}>
         <div style={S.header}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(249,115,22,0.14)', border: '1.5px solid rgba(249,115,22,0.40)', borderRadius: '20px', padding: '4px 12px', marginBottom: '16px', fontSize: '11px', fontWeight: '700', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#fb923c' }}>
-            ⚡ DISPARITY MODE
+            DISPARITY MODE
           </div>
           <div style={S.stepIndicator}>{STEPS.map((_, i) => <div key={i} style={S.dot(i <= step, i === step)} />)}</div>
           <h2 style={S.title}>{stepTitles[step]}</h2>

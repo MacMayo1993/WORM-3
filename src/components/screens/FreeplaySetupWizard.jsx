@@ -489,8 +489,9 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
               <div style={{
                 width: '56px', height: '36px', borderRadius: '8px',
                 background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center',
-                justifyContent: 'center', fontSize: '20px', flexShrink: 0,
-              }}>📷</div>
+                justifyContent: 'center', fontSize: '10px', fontWeight: 600, letterSpacing: '0.06em',
+                color: 'rgba(200,220,255,0.35)', flexShrink: 0,
+              }}>IMG</div>
             )}
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: '14px', fontWeight: settings.colorScheme === 'custom' ? '600' : '500', color: '#e8edf8' }}>
@@ -624,7 +625,6 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
             style={{ ...S.card(settings.tileStyle === 'random' && !perFace), flexDirection: 'row', alignItems: 'center', gap: '14px' }}
             onClick={() => applyGlobal('random')}
           >
-            <div style={{ width: '48px', height: '48px', borderRadius: '10px', background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', flexShrink: 0 }}>🎲</div>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: '14px', fontWeight: '600', color: '#e8edf8' }}>Random Mix</div>
               <div style={{ fontSize: '12px', color: 'rgba(200,220,255,0.65)', marginTop: '2px' }}>Different style on every face</div>

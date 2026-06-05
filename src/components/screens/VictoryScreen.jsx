@@ -32,7 +32,6 @@ const VictoryScreen = ({
       color: '#43a047',
       gradientFrom: '#43a047',
       gradientTo: '#2e7d32',
-      icon: '🎲',
       bgGradient: 'linear-gradient(135deg, #f1f8e9, #c5e1a5)'
     },
     sudokube: {
@@ -42,7 +41,6 @@ const VictoryScreen = ({
       color: '#1e88e5',
       gradientFrom: '#1e88e5',
       gradientTo: '#1565c0',
-      icon: '🔢',
       bgGradient: 'linear-gradient(135deg, #e3f2fd, #90caf9)'
     },
     ultimate: {
@@ -52,17 +50,15 @@ const VictoryScreen = ({
       color: '#fdd835',
       gradientFrom: '#fdd835',
       gradientTo: '#f9a825',
-      icon: '👑',
       bgGradient: 'linear-gradient(135deg, #fffde7, #fff59d)'
     },
     worm: {
       title: 'WORM³ COMPLETE!',
-      subtitle: '🪱 Secret Achievement Unlocked 🪱',
+      subtitle: 'Secret Achievement Unlocked',
       description: 'You\'ve solved the ENTIRE CUBE through the WORMHOLES! Every single sticker traveled through antipodal space. You are a true master of manifold topology!',
       color: '#fb8c00',
       gradientFrom: '#fb8c00',
       gradientTo: '#f57c00',
-      icon: '🪱',
       bgGradient: 'linear-gradient(135deg, #fff3e0, #ffcc80)'
     }
   };
@@ -124,7 +120,7 @@ const VictoryScreen = ({
               animation: `worm-wiggle ${2 + Math.random() * 3}s linear infinite`,
               animationDelay: `${Math.random() * 2}s`
             }}>
-              🪱
+              ◎
             </div>
           ))}
         </div>
@@ -151,15 +147,6 @@ const VictoryScreen = ({
           height: '6px',
           background: `linear-gradient(90deg, ${config.gradientFrom}, ${config.gradientTo})`
         }} />
-
-        {/* Icon */}
-        <div style={{
-          fontSize: '64px',
-          marginBottom: '16px',
-          filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.1))'
-        }}>
-          {config.icon}
-        </div>
 
         {/* Title */}
         <h1 style={{
@@ -395,8 +382,8 @@ const VictoryScreen = ({
               fontStyle: 'italic'
             }}>
               {winType === VICTORY.RUBIKS
-                ? '🎯 Challenge: Can you also solve the Sudokube (Latin squares) for the Ultimate Victory?'
-                : '🎯 Challenge: Can you also solve the colors for the Ultimate Victory?'}
+                ? 'Challenge: Can you also solve the Sudokube (Latin squares) for the Ultimate Victory?'
+                : 'Challenge: Can you also solve the colors for the Ultimate Victory?'}
             </p>
           </div>
         )}
@@ -417,7 +404,7 @@ const VictoryScreen = ({
               fontWeight: 600,
               textAlign: 'center'
             }}>
-              🌟 You've discovered the SECRET WORM VICTORY! 🌟<br/>
+              You've discovered the SECRET WORM VICTORY!<br/>
               <span style={{ fontSize: '12px', fontWeight: 'normal', fontStyle: 'italic' }}>
                 The rarest achievement - solving through pure manifold chaos!
               </span>

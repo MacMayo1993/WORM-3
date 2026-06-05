@@ -43,7 +43,7 @@ export default function DevConsole({
     <div className="dev-console-overlay" onClick={onClose}>
       <div className="dev-console" onClick={e => e.stopPropagation()}>
         <div className="dev-console-header">
-          <h2>🛠️ Developer Console</h2>
+          <h2>Developer Console</h2>
           <button className="close-btn" onClick={onClose}>✕</button>
         </div>
 
@@ -94,7 +94,7 @@ export default function DevConsole({
             <h3>State Management</h3>
             <div className="state-controls">
               <button className="state-btn" onClick={onSaveState}>
-                💾 Save Current State
+                Save Current State
               </button>
               <button
                 className="state-btn"
@@ -102,7 +102,7 @@ export default function DevConsole({
                 disabled={!hasSavedState}
                 title={hasSavedState ? 'Load saved state' : 'No saved state'}
               >
-                📂 Load Saved State
+                Load Saved State
               </button>
             </div>
           </section>

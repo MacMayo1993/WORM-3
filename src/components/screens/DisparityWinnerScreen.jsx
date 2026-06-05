@@ -325,12 +325,15 @@ export default function DisparityWinnerScreen({ onDismiss }) {
       {(phase === 'celebrate' || phase === 'done') && (
         <div
           style={{
-            fontSize: '3rem',
+            fontSize: '1rem',
+            fontWeight: 800,
+            letterSpacing: '0.2em',
+            textTransform: 'uppercase',
             animation: 'dws-crown-drop 0.5s cubic-bezier(0.22,1,0.36,1) forwards',
             marginBottom: '0.5rem',
           }}
         >
-          👑
+          WINNER
         </div>
       )}
 
@@ -364,8 +367,8 @@ export default function DisparityWinnerScreen({ onDismiss }) {
             display: 'flex', alignItems: 'center', gap: '14px',
           }}
         >
-          <div style={{ fontSize: '1.6rem', lineHeight: 1, flexShrink: 0 }}>
-            {lastBetResult.won ? '🎉' : '💸'}
+          <div style={{ fontSize: '1rem', fontWeight: 800, lineHeight: 1, flexShrink: 0, color: lastBetResult.won ? '#4ade80' : '#f87171' }}>
+            {lastBetResult.won ? '+' : '−'}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{
@@ -412,7 +415,7 @@ export default function DisparityWinnerScreen({ onDismiss }) {
               marginBottom: '0.25rem',
             }}
           >
-            <span style={{ color: '#888', fontSize: '0.75rem', minWidth: 28 }}>🏆</span>
+            <span style={{ color: '#888', fontSize: '0.75rem', minWidth: 28 }}>1st</span>
             <span
               style={{
                 width: 12,

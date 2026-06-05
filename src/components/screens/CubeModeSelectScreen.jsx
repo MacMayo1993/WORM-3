@@ -85,7 +85,6 @@ const CubeModeSelectScreen = ({ onRubiks, onDisparity, onBack }) => (
             event.currentTarget.style.boxShadow = '0 2px 12px rgba(30,136,229,0.10)';
           }}
         >
-          <span style={{ display: 'block', fontSize: '34px', marginBottom: '14px' }}>🧩</span>
           <span style={{ display: 'block', fontSize: '22px', fontWeight: 900, letterSpacing: '-0.03em', color: '#60a5fa' }}>Rubik's Mode</span>
           <span style={{ display: 'block', marginTop: '10px', color: 'rgba(200, 220, 255, 0.65)', lineHeight: 1.45 }}>
             Classic cube play with the freeplay setup wizard before shuffling into the board.
@@ -109,7 +108,6 @@ const CubeModeSelectScreen = ({ onRubiks, onDisparity, onBack }) => (
             event.currentTarget.style.boxShadow = '0 2px 12px rgba(249,115,22,0.10)';
           }}
         >
-          <span style={{ display: 'block', fontSize: '34px', marginBottom: '14px' }}>⚡</span>
           <span style={{ display: 'block', fontSize: '22px', fontWeight: 900, letterSpacing: '-0.03em', color: '#fb923c' }}>Disparity Mode</span>
           <span style={{ display: 'block', marginTop: '10px', color: 'rgba(200, 220, 255, 0.65)', lineHeight: 1.45 }}>
             Antipodal flip survival, betting, and chaos tuning through the disparity wizard.

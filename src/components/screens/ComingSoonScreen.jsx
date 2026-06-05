@@ -6,7 +6,7 @@ const MODES = [
     id: 'story',
     label: 'Story Mode',
     color: '#ef4444',
-    icon: '📖',
+    icon: '§',
     gradient: 'linear-gradient(135deg,#ef444422 0%,#f9731622 100%)',
     description:
       'Ten levels. A cube that remembers every move. A narrative written in rotations — where solving the puzzle unlocks the next chapter of a world built on real projective plane topology.',
