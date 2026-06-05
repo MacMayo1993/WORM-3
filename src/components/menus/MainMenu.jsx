@@ -445,17 +445,15 @@ const ShufflingCube = () => {
 };
 
 // ─── MenuWorm — worm mascot that sits on top of the cube ─────────────────────
-const _SEG_Y   = [1.12, 0.84, 0.56, 0.28, 0.0];
-const _SEG_R   = [0.22, 0.185, 0.158, 0.132, 0.105];
-const _SEG_COL = ['#3be08a', '#2bcc78', '#22b866', '#1aa255', '#148842'];
+const _SEG_Y        = [1.12, 0.84, 0.56, 0.28, 0.0];
+const _SEG_R        = [0.22, 0.185, 0.158, 0.132, 0.105];
+const _SEG_COL      = ['#3be08a', '#2bcc78', '#22b866', '#1aa255', '#148842'];
+const _PATH_MIN_DIST = 0.004;
+const _SEG_SPACING   = 0.145;
+const _MAX_PATH_LEN  = 4 * 0.145 + 0.15;
+const _BLINK_DUR     = 0.13;                         // seconds for a full blink cycle
+const _BODY_ROT_SPD  = [0.28, -0.35, 0.22, -0.18];  // per-segment tumble speed (rad/s)
 
-// Distance-based path constants (world units)
-const _PATH_MIN_DIST = 0.004;           // only record a point when head moves this far
-const _SEG_SPACING   = 0.145;           // arc-length between adjacent segment centers
-const _MAX_PATH_LEN  = 4 * 0.145 + 0.15; // keep only enough history for all 4 body segments
-
-// Interpolate the head's recorded XZ path at `behindDist` world-units behind the current tip.
-// path: [{x, z, arc}] — arc grows monotonically from oldest→newest entry.
 function _samplePath(path, behindDist) {
   if (path.length === 0) return { x: 0, z: 0 };
   const headArc   = path[path.length - 1].arc;
@@ -473,37 +471,55 @@ function _samplePath(path, behindDist) {
 
 const MenuWorm = ({ onWormClick }) => {
   const groupRef    = useRef();
-  const headRef     = useRef();      // position + rotation of the whole head
-  const headBodyRef = useRef();      // scale-only inner group — sphere only, eyes/antennae excluded
+  const headRef     = useRef();
+  const headBodyRef = useRef();   // inner group: squash/stretch + slow tumble (icosahedron only)
   const seg1Ref     = useRef();
   const seg2Ref     = useRef();
   const seg3Ref     = useRef();
   const tailRef     = useRef();
 
-  const wiggling    = useRef(false);
-  const wiggleStart = useRef(0);
+  // Eye expressiveness
+  const eyeLRef   = useRef();
+  const eyeRRef   = useRef();
+  const pupilLRef = useRef();
+  const pupilRRef = useRef();
+  const blinkT             = useRef(-1);   // -1 = idle, 0→1 = mid-blink
+  const nextBlink          = useRef(-1);   // -1 = not yet initialized
+  const pupilTargetScale   = useRef(1.0);
+  const pupilCurrentScale  = useRef(1.0);
+
+  // Pulsing bioluminescent cores — one per segment (head + 4 body)
+  const core0Ref = useRef();
+  const core1Ref = useRef();
+  const core2Ref = useRef();
+  const core3Ref = useRef();
+  const core4Ref = useRef();
+
+  const wiggling     = useRef(false);
+  const wiggleStart  = useRef(0);
   const targetScale  = useRef(0.70);
   const currentScale = useRef(0.70);
   const callbackRef  = useRef(onWormClick);
   callbackRef.current = onWormClick;
 
-  // Path-based trailing: each entry { x, z, arc } — frame-rate independent
-  const pathBuf  = useRef([{ x: 0, z: 0, arc: 0 }]);
-  const prevHead = useRef({ x: 0, z: 0 });
-  // Low-pass smoothed pointer for jitter-free cursor look-at blend
+  const pathBuf   = useRef([{ x: 0, z: 0, arc: 0 }]);
+  const prevHead  = useRef({ x: 0, z: 0 });
   const smoothPtr = useRef({ x: 0, y: 0 });
 
   useFrame(({ clock, pointer }, delta) => {
     if (!groupRef.current) return;
     const t = clock.elapsedTime;
 
+    // Initialize blink timer on first frame
+    if (nextBlink.current < 0) nextBlink.current = t + 3.5;
+
     if (wiggling.current && Date.now() - wiggleStart.current > 720) {
       wiggling.current = false;
       targetScale.current = 0.70;
+      pupilTargetScale.current = 1.0;
       callbackRef.current?.();
     }
 
-    // Smooth the raw pointer so small hand tremors don't jitter the head
     smoothPtr.current.x += (pointer.x - smoothPtr.current.x) * Math.min(1, delta * 5);
     smoothPtr.current.y += (pointer.y - smoothPtr.current.y) * Math.min(1, delta * 5);
 
@@ -512,20 +528,17 @@ const MenuWorm = ({ onWormClick }) => {
     const ampX = isWiggle ? 0.27 : 0.16;
     const ampZ = isWiggle ? 0.13 : 0.07;
 
-    // Head traces a Lissajous figure-8 in XZ
     const hx = Math.sin(t * freq) * ampX;
     const hz = Math.sin(t * freq * 0.55 + 1.0) * ampZ;
 
-    // ── Distance-based path recording (frame-rate independent) ───────────────
+    // ── Distance-based path recording ──────────────────────────────────────
     const prev = prevHead.current;
     const dx = hx - prev.x, dz = hz - prev.z;
     const stepDist = Math.sqrt(dx * dx + dz * dz);
     const path = pathBuf.current;
-
     if (stepDist >= _PATH_MIN_DIST) {
       path.push({ x: hx, z: hz, arc: path[path.length - 1].arc + stepDist });
       prevHead.current = { x: hx, z: hz };
-      // Trim entries older than the max needed arc length
       const headArc = path[path.length - 1].arc;
       const minKeep = headArc - _MAX_PATH_LEN;
       let trim = 0;
@@ -533,43 +546,72 @@ const MenuWorm = ({ onWormClick }) => {
       if (trim > 0) path.splice(0, trim);
     }
 
-    // ── Head: position + tilt + cursor blend + squash/stretch ────────────────
-    // Analytic derivatives for smooth, jitter-free velocity
+    // ── Head position + tilt + cursor blend ────────────────────────────────
     const vx    = Math.cos(t * freq) * freq * ampX;
     const vz    = Math.cos(t * freq * 0.55 + 1.0) * freq * 0.55 * ampZ;
     const speed = Math.sqrt(vx * vx + vz * vz);
 
     if (headRef.current) {
       headRef.current.position.set(hx, _SEG_Y[0], hz);
-      // 80 % path-tilt, 20 % cursor look-at so the worm glances at the pointer
       headRef.current.rotation.z = -Math.atan2(vx, 2.0) * 0.55 - smoothPtr.current.x * 0.20;
       headRef.current.rotation.x =  Math.atan2(vz, 2.0) * 0.40 + smoothPtr.current.y * 0.14;
     }
-    // Squash/stretch the head body sphere without affecting eyes or antennae
+    // Squash/stretch + slow tumble on icosahedron body only (eyes/antennae excluded)
     if (headBodyRef.current) {
       const stretch = 1 + Math.min(speed * 0.45, 0.35);
       const squash  = 1 / Math.sqrt(stretch);
       headBodyRef.current.scale.set(squash, stretch, squash);
+      headBodyRef.current.rotation.y = t * 0.18;
+      headBodyRef.current.rotation.z = t * 0.11;
     }
 
-    // ── Body segments: arc-length interpolation + squash/stretch ─────────────
+    // ── Body segments: path position + squash/stretch + self-tumble ─────────
     const bodyRefs = [seg1Ref, seg2Ref, seg3Ref, tailRef];
     bodyRefs.forEach((ref, i) => {
       if (!ref.current) return;
-      const pos = _samplePath(path, (i + 1) * _SEG_SPACING);
+      const pos      = _samplePath(path, (i + 1) * _SEG_SPACING);
+      const segSpeed = speed * Math.max(0.35, 1 - i * 0.18);
+      const stretch  = 1 + Math.min(segSpeed * 0.28, 0.28);
+      const squash   = 1 / Math.sqrt(stretch);
       ref.current.position.set(pos.x, _SEG_Y[i + 1], pos.z);
-      // Speed decays slightly down the body (tail lags in energy)
-      const segSpeed  = speed * Math.max(0.35, 1 - i * 0.18);
-      const stretch   = 1 + Math.min(segSpeed * 0.28, 0.28);
-      const squash    = 1 / Math.sqrt(stretch);
       ref.current.scale.set(squash, stretch, squash);
+      ref.current.rotation.y = t * _BODY_ROT_SPD[i];
+      ref.current.rotation.x = t * _BODY_ROT_SPD[i] * 0.45;
     });
 
-    // Vertical bob of the whole group
+    // ── Pulsing bioluminescent cores ────────────────────────────────────────
+    const allCores = [core0Ref, core1Ref, core2Ref, core3Ref, core4Ref];
+    allCores.forEach((ref, i) => {
+      if (!ref.current?.material) return;
+      const pulse = 0.5 + 0.5 * Math.sin(t * 3.5 + i * 0.7);
+      ref.current.material.color.setHSL(0.38, 1.0, 0.35 + pulse * 0.45);
+    });
+
+    // ── Blinking ────────────────────────────────────────────────────────────
+    if (blinkT.current >= 0) {
+      blinkT.current = Math.min(1, blinkT.current + delta / _BLINK_DUR);
+      const openness = 1 - Math.sin(blinkT.current * Math.PI);
+      if (eyeLRef.current) eyeLRef.current.scale.y = Math.max(0.05, openness);
+      if (eyeRRef.current) eyeRRef.current.scale.y = Math.max(0.05, openness);
+      if (blinkT.current >= 1) {
+        blinkT.current = -1;
+        if (eyeLRef.current) eyeLRef.current.scale.y = 1;
+        if (eyeRRef.current) eyeRRef.current.scale.y = 1;
+        nextBlink.current = t + 2.5 + Math.random() * 3.5;
+      }
+    } else if (t >= nextBlink.current) {
+      blinkT.current = 0;
+    }
+
+    // ── Pupil dilation ──────────────────────────────────────────────────────
+    pupilCurrentScale.current += (pupilTargetScale.current - pupilCurrentScale.current) * Math.min(1, delta * 10);
+    if (pupilLRef.current) pupilLRef.current.scale.setScalar(pupilCurrentScale.current);
+    if (pupilRRef.current) pupilRRef.current.scale.setScalar(pupilCurrentScale.current);
+
+    // ── Group bob + master scale ────────────────────────────────────────────
     groupRef.current.position.y = 1.35 + (isWiggle
       ? Math.abs(Math.sin(t * 14)) * 0.22
       : Math.sin(t * 1.5) * 0.045);
-
     currentScale.current += (targetScale.current - currentScale.current) * Math.min(1, delta * 16);
     groupRef.current.scale.setScalar(currentScale.current);
   });
@@ -580,6 +622,7 @@ const MenuWorm = ({ onWormClick }) => {
     wiggling.current = true;
     wiggleStart.current = Date.now();
     targetScale.current = 0.826;
+    pupilTargetScale.current = 1.8;   // dilate on excitation
   };
   const handlePointerDown = (e) => { e.stopPropagation(); targetScale.current = 0.581; };
   const handlePointerUp   = (e) => { e.stopPropagation(); if (!wiggling.current) targetScale.current = 0.70; };
@@ -593,33 +636,38 @@ const MenuWorm = ({ onWormClick }) => {
       onPointerUp={handlePointerUp}
       onPointerLeave={handlePointerUp}
     >
-      {/* Head — outer group: position + rotation; inner group: squash/stretch sphere only */}
+      {/* ── Head ─────────────────────────────────────────────────────────── */}
       <group ref={headRef}>
+        {/* Inner group: squash/stretch + slow tumble — icosahedron body only */}
         <group ref={headBodyRef}>
           <mesh>
-            <sphereGeometry args={[_SEG_R[0], 16, 16]} />
+            <icosahedronGeometry args={[_SEG_R[0], 0]} />
             <meshPhysicalMaterial
-              color={_SEG_COL[0]} roughness={0.22} metalness={0.0}
-              emissive={_SEG_COL[0]} emissiveIntensity={0.14}
-              transmission={0.10} thickness={0.45} ior={1.42}
-              clearcoat={0.35} clearcoatRoughness={0.18}
+              color={_SEG_COL[0]} roughness={0.08} metalness={0.0}
+              emissive={_SEG_COL[0]} emissiveIntensity={0.12}
+              transmission={0.38} thickness={0.45} ior={1.50}
+              clearcoat={0.90} clearcoatRoughness={0.08}
             />
           </mesh>
+          <mesh ref={core0Ref}>
+            <icosahedronGeometry args={[_SEG_R[0] * 0.42, 0]} />
+            <meshBasicMaterial color="#40ff99" toneMapped={false} />
+          </mesh>
         </group>
-        {/* Eyes */}
-        <mesh position={[-0.085, 0.13, 0.19]}>
+        {/* Eyes — outside headBodyRef so they never squash/stretch or tumble */}
+        <mesh ref={eyeLRef} position={[-0.085, 0.13, 0.19]}>
           <sphereGeometry args={[0.058, 8, 8]} />
           <meshStandardMaterial color="#ffffff" roughness={0.2} />
         </mesh>
-        <mesh position={[0.085, 0.13, 0.19]}>
+        <mesh ref={eyeRRef} position={[0.085, 0.13, 0.19]}>
           <sphereGeometry args={[0.058, 8, 8]} />
           <meshStandardMaterial color="#ffffff" roughness={0.2} />
         </mesh>
-        <mesh position={[-0.085, 0.135, 0.235]}>
+        <mesh ref={pupilLRef} position={[-0.085, 0.135, 0.235]}>
           <sphereGeometry args={[0.03, 6, 6]} />
           <meshStandardMaterial color="#0a0a14" roughness={0.5} />
         </mesh>
-        <mesh position={[0.085, 0.135, 0.235]}>
+        <mesh ref={pupilRRef} position={[0.085, 0.135, 0.235]}>
           <sphereGeometry args={[0.03, 6, 6]} />
           <meshStandardMaterial color="#0a0a14" roughness={0.5} />
         </mesh>
@@ -642,49 +690,65 @@ const MenuWorm = ({ onWormClick }) => {
         </mesh>
       </group>
 
-      {/* Body segments — group scale drives squash/stretch each frame */}
+      {/* ── Body segments — faceted icosahedra + pulsing inner cores ─────── */}
       <group ref={seg1Ref}>
         <mesh>
-          <sphereGeometry args={[_SEG_R[1], 12, 12]} />
+          <icosahedronGeometry args={[_SEG_R[1], 0]} />
           <meshPhysicalMaterial
-            color={_SEG_COL[1]} roughness={0.26} metalness={0.0}
+            color={_SEG_COL[1]} roughness={0.10} metalness={0.0}
             emissive={_SEG_COL[1]} emissiveIntensity={0.10}
-            transmission={0.09} thickness={0.40} ior={1.40}
-            clearcoat={0.25} clearcoatRoughness={0.22}
+            transmission={0.34} thickness={0.40} ior={1.48}
+            clearcoat={0.80} clearcoatRoughness={0.10}
           />
+        </mesh>
+        <mesh ref={core1Ref}>
+          <icosahedronGeometry args={[_SEG_R[1] * 0.42, 0]} />
+          <meshBasicMaterial color="#40ff99" toneMapped={false} />
         </mesh>
       </group>
       <group ref={seg2Ref}>
         <mesh>
-          <sphereGeometry args={[_SEG_R[2], 12, 12]} />
+          <icosahedronGeometry args={[_SEG_R[2], 0]} />
           <meshPhysicalMaterial
-            color={_SEG_COL[2]} roughness={0.28} metalness={0.0}
+            color={_SEG_COL[2]} roughness={0.12} metalness={0.0}
             emissive={_SEG_COL[2]} emissiveIntensity={0.09}
-            transmission={0.08} thickness={0.36} ior={1.38}
-            clearcoat={0.20} clearcoatRoughness={0.24}
+            transmission={0.30} thickness={0.36} ior={1.46}
+            clearcoat={0.70} clearcoatRoughness={0.12}
           />
+        </mesh>
+        <mesh ref={core2Ref}>
+          <icosahedronGeometry args={[_SEG_R[2] * 0.42, 0]} />
+          <meshBasicMaterial color="#40ff99" toneMapped={false} />
         </mesh>
       </group>
       <group ref={seg3Ref}>
         <mesh>
-          <sphereGeometry args={[_SEG_R[3], 10, 10]} />
+          <icosahedronGeometry args={[_SEG_R[3], 0]} />
           <meshPhysicalMaterial
-            color={_SEG_COL[3]} roughness={0.30} metalness={0.0}
+            color={_SEG_COL[3]} roughness={0.15} metalness={0.0}
             emissive={_SEG_COL[3]} emissiveIntensity={0.08}
-            transmission={0.07} thickness={0.32} ior={1.36}
-            clearcoat={0.15} clearcoatRoughness={0.26}
+            transmission={0.26} thickness={0.32} ior={1.44}
+            clearcoat={0.60} clearcoatRoughness={0.15}
           />
+        </mesh>
+        <mesh ref={core3Ref}>
+          <icosahedronGeometry args={[_SEG_R[3] * 0.42, 0]} />
+          <meshBasicMaterial color="#40ff99" toneMapped={false} />
         </mesh>
       </group>
       <group ref={tailRef}>
         <mesh>
-          <sphereGeometry args={[_SEG_R[4], 10, 10]} />
+          <icosahedronGeometry args={[_SEG_R[4], 0]} />
           <meshPhysicalMaterial
-            color={_SEG_COL[4]} roughness={0.33} metalness={0.0}
+            color={_SEG_COL[4]} roughness={0.18} metalness={0.0}
             emissive={_SEG_COL[4]} emissiveIntensity={0.07}
-            transmission={0.06} thickness={0.28} ior={1.35}
-            clearcoat={0.10} clearcoatRoughness={0.28}
+            transmission={0.22} thickness={0.28} ior={1.42}
+            clearcoat={0.50} clearcoatRoughness={0.18}
           />
+        </mesh>
+        <mesh ref={core4Ref}>
+          <icosahedronGeometry args={[_SEG_R[4] * 0.42, 0]} />
+          <meshBasicMaterial color="#40ff99" toneMapped={false} />
         </mesh>
       </group>
 
