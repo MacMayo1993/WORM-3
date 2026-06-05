@@ -25,6 +25,10 @@ const _pfNScaled = new THREE.Vector3();   // projectOntoFace normal component
 const _scFwd = new THREE.Vector3();       // stepCrawler forward direction
 const _scSurf = new THREE.Vector3();      // stepCrawler surface position
 const _gpScratch = new THREE.Vector3();   // getGroundPosition
+const _rotAxisScratch = new THREE.Vector3();
+const _rotQuatScratch = new THREE.Quaternion();
+const _surfacePosScratch = new THREE.Vector3();
+const _rotatedForwardScratch = new THREE.Vector3();
 
 /**
  * Project a 3D point onto the cube surface.
@@ -216,17 +220,15 @@ export function getGroundPosition(state, _size) {
  */
 export function worldToGrid(worldPos, face, size) {
   const k = (size - 1) / 2;
-  // Remove surface offset to get base position
-  const p = worldPos.clone();
-  switch (face) {
-    case 'PX': case 'NX': p.x = 0; break;
-    case 'PY': case 'NY': p.y = 0; break;
-    case 'PZ': case 'NZ': p.z = 0; break;
-  }
+  // Avoid cloning on this hot path.  The coordinate fixed by `face` is replaced
+  // by the boundary value below, so only the two tangent coordinates need to be read.
+  const px = face === 'PX' || face === 'NX' ? 0 : worldPos.x;
+  const py = face === 'PY' || face === 'NY' ? 0 : worldPos.y;
+  const pz = face === 'PZ' || face === 'NZ' ? 0 : worldPos.z;
 
-  const x = Math.round(clamp(p.x + k, 0, size - 1));
-  const y = Math.round(clamp(p.y + k, 0, size - 1));
-  const z = Math.round(clamp(p.z + k, 0, size - 1));
+  const x = Math.round(clamp(px + k, 0, size - 1));
+  const y = Math.round(clamp(py + k, 0, size - 1));
+  const z = Math.round(clamp(pz + k, 0, size - 1));
 
   // Fix the coordinate that should be at face boundary
   switch (face) {
@@ -254,29 +256,25 @@ export function rotateCrawlerWithSlice(state, axis, sliceIndex, dir, size) {
 
   if (!inSlice) return state;
 
-  // Build rotation quaternion
-  const rotAxis = axis === 'col'
-    ? new THREE.Vector3(1, 0, 0)
-    : axis === 'row'
-      ? new THREE.Vector3(0, 1, 0)
-      : new THREE.Vector3(0, 0, 1);
+  // Build rotation quaternion using reusable scratch objects.  Rotations happen
+  // less often than physics steps, but avoiding these bursts helps the split-screen mode.
+  _rotAxisScratch.set(axis === 'col' ? 1 : 0, axis === 'row' ? 1 : 0, axis === 'depth' ? 1 : 0);
   const angle = dir * (Math.PI / 2);
-  const quat = new THREE.Quaternion().setFromAxisAngle(rotAxis, angle);
+  _rotQuatScratch.setFromAxisAngle(_rotAxisScratch, angle);
 
   // Strip jump offset before rotating so the quaternion is applied to the
   // surface-level position only (mirrors the pattern in stepCrawler).
   // Without this, a mid-air crawler can be projected onto the wrong face.
   const normal = FACE_NORMALS[state.face];
-  const surfacePos = state.position.clone().sub(normal.clone().multiplyScalar(state.jumpHeight));
-  const newSurfacePos = surfacePos.applyQuaternion(quat);
-  const newFwd = state.forward.clone().applyQuaternion(quat);
-  const projected = projectOntoCube(newSurfacePos, size);
+  _surfacePosScratch.copy(state.position).addScaledVector(normal, -state.jumpHeight).applyQuaternion(_rotQuatScratch);
+  _rotatedForwardScratch.copy(state.forward).applyQuaternion(_rotQuatScratch);
+  const projected = projectOntoCube(_surfacePosScratch, size);
 
   return {
     ...state,
     // projected.position is already a fresh Vector3 — mutate in-place.
     position: projected.position.addScaledVector(FACE_NORMALS[projected.face], state.jumpHeight),
-    forward: projectOntoFace(newFwd, projected.face).normalize(),
+    forward: projectOntoFace(_rotatedForwardScratch, projected.face).normalize(),
     face: projected.face,
   };
 }
@@ -309,7 +307,7 @@ export function spawnCrawlerOrbs(count, size, crawlerPos) {
         case 'NZ': pos = new THREE.Vector3(u, v, -s); break;
       }
       attempts++;
-    } while (crawlerPos && pos.distanceTo(crawlerPos) < 1.5 && attempts < 20);
+    } while (crawlerPos && pos.distanceToSquared(crawlerPos) < 2.25 && attempts < 20);
 
     orbs.push({ position: pos, face, collected: false, id: i });
   }
@@ -320,7 +318,7 @@ export function spawnCrawlerOrbs(count, size, crawlerPos) {
  * Check if crawler collides with an orb (distance-based).
  */
 export function checkOrbCollision(crawlerPos, orbPos, threshold = 0.6) {
-  return crawlerPos.distanceTo(orbPos) < threshold;
+  return crawlerPos.distanceToSquared(orbPos) < threshold * threshold;
 }
 
 /**

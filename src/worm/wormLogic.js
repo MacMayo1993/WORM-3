@@ -145,14 +145,16 @@ export const getActiveTunnels = (cubies, size, cachedManifoldMap = null) => {
 };
 
 /**
- * Get world position along a tunnel at parameter t (0-1)
+ * Write the world position along a tunnel at parameter t (0-1) into `out`.
+ * Use this in render/physics loops to avoid allocating a throwaway [x, y, z] array.
+ * @param {THREE.Vector3} out - Destination vector
  * @param {Object} tunnel - Tunnel object with entry/exit positions
  * @param {number} t - Parameter along tunnel (0 = entry, 1 = exit)
  * @param {number} size - Cube size
  * @param {number} explosionFactor - Explosion animation factor
- * @returns {Array} [x, y, z] world coordinates
+ * @returns {THREE.Vector3} The `out` vector
  */
-export const getTunnelWorldPos = (tunnel, t, size, explosionFactor = 0) => {
+export const getTunnelWorldPosInto = (out, tunnel, t, size, explosionFactor = 0) => {
   const k = (size - 1) / 2;
   const scale = 1 + explosionFactor * 1.8;
 
@@ -173,12 +175,20 @@ export const getTunnelWorldPos = (tunnel, t, size, explosionFactor = 0) => {
   // Enforce exact path: entry tile center -> void core center -> exit tile center.
   if (t <= 0.5) {
     const localT = Math.max(0, t) * 2;
-    _tunnelResult.lerpVectors(_tunnelEntry, _tunnelCore, localT);
-    return [_tunnelResult.x, _tunnelResult.y, _tunnelResult.z];
+    return out.lerpVectors(_tunnelEntry, _tunnelCore, localT);
   }
 
   const localT = (Math.min(1, t) - 0.5) * 2;
-  _tunnelResult.lerpVectors(_tunnelCore, _tunnelExit, localT);
+  return out.lerpVectors(_tunnelCore, _tunnelExit, localT);
+};
+
+/**
+ * Get world position along a tunnel at parameter t (0-1).
+ * Prefer getTunnelWorldPosInto in hot paths that can reuse a Vector3.
+ * @returns {Array} [x, y, z] world coordinates
+ */
+export const getTunnelWorldPos = (tunnel, t, size, explosionFactor = 0) => {
+  getTunnelWorldPosInto(_tunnelResult, tunnel, t, size, explosionFactor);
   return [_tunnelResult.x, _tunnelResult.y, _tunnelResult.z];
 };
 
@@ -238,6 +248,9 @@ const _tunnelResult = new THREE.Vector3();
 const _findExitVec = new THREE.Vector3();
 const _scratchVec1 = new THREE.Vector3();
 const _scratchVec2 = new THREE.Vector3();
+const _updateOldPos = new THREE.Vector3();
+const _updatePortalA = new THREE.Vector3();
+const _updatePortalB = new THREE.Vector3();
 
 export const findNextTunnel = (exitPos, tunnels, excludeTunnelId, size, inactiveSideKeys = new Set()) => {
   // Compute exit world position once (reuse scratch vector)
@@ -441,14 +454,14 @@ export const updateTunnelWormAfterRotation = (segments, newTunnels, oldTunnels, 
     const oldTunnel = oldTunnelById.get(seg.tunnelId);
     let nearestTunnel = newTunnels[0];
     if (oldTunnel) {
-      const [wx, wy, wz] = getTunnelWorldPos(oldTunnel, seg.t, size);
+      getTunnelWorldPosInto(_updateOldPos, oldTunnel, seg.t, size);
       let bestDist = Infinity;
       for (const nt of newTunnels) {
-        // Check both portals of each new tunnel.
-        const [ex, ey, ez] = getTunnelWorldPos(nt, 0, size);
-        const [xx, xy, xz] = getTunnelWorldPos(nt, 1, size);
-        const d1 = (wx - ex) ** 2 + (wy - ey) ** 2 + (wz - ez) ** 2;
-        const d2 = (wx - xx) ** 2 + (wy - xy) ** 2 + (wz - xz) ** 2;
+        // Check both portals of each new tunnel without allocating temporary arrays.
+        getTunnelWorldPosInto(_updatePortalA, nt, 0, size);
+        getTunnelWorldPosInto(_updatePortalB, nt, 1, size);
+        const d1 = _updateOldPos.distanceToSquared(_updatePortalA);
+        const d2 = _updateOldPos.distanceToSquared(_updatePortalB);
         const d = Math.min(d1, d2);
         if (d < bestDist) { bestDist = d; nearestTunnel = nt; }
       }

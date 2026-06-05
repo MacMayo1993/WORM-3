@@ -10,7 +10,7 @@ import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { getStickerWorldPos, getManifoldGridId } from '../game/coordinates.js';
-import { getNextSurfacePosition, getActiveTunnels, getTunnelWorldPos, turnWorm, getStableKey, findStickerByStableKey } from './wormLogic.js';
+import { getNextSurfacePosition, getActiveTunnels, getTunnelWorldPosInto, turnWorm, getStableKey, findStickerByStableKey } from './wormLogic.js';
 import { setWormTurnCallback } from './wormTurnBridge.js';
 import { buildManifoldGridMap, flipStickerPair } from '../game/manifoldLogic.js';
 import { healSticker, getStickerSafe } from '../game/cubeState.js';
@@ -76,6 +76,7 @@ import { liveRotation } from './liveRotation.js';
 
 // Pre-allocated axis vector for applying liveRotation to the worm during scramble
 const _liveAxis = new THREE.Vector3();
+const _tunnelDirScratch = new THREE.Vector3();
 // Duration of the worm's entrance wiggle after the shuffle finishes
 const SPAWN_DURATION = 0.75;
 
@@ -890,8 +891,7 @@ function useWormCrawler(size, cubies) {
                     if (activeTunnel.current) {
                         // Head travels first third of the tunnel (entry face → cube interior)
                         const tunnelT = tunnelProgress.current * 0.33;
-                        const wp = getTunnelWorldPos(activeTunnel.current, tunnelT, size);
-                        headInterpPos.current.set(wp[0], wp[1], wp[2]);
+                        getTunnelWorldPosInto(headInterpPos.current, activeTunnel.current, tunnelT, size);
                         const entryN = FACE_NORMALS[activeTunnel.current.entry.dirKey];
                         if (entryN) currentNormal.current.copy(entryN);
                     }
@@ -913,8 +913,7 @@ function useWormCrawler(size, cubies) {
                     if (activeTunnel.current) {
                         // Head travels middle third of the tunnel (through cube core)
                         const tunnelT = 0.33 + tunnelProgress.current * 0.34;
-                        const wp = getTunnelWorldPos(activeTunnel.current, tunnelT, size);
-                        headInterpPos.current.set(wp[0], wp[1], wp[2]);
+                        getTunnelWorldPosInto(headInterpPos.current, activeTunnel.current, tunnelT, size);
                         // Switch normal to exit face at the midpoint
                         const n = tunnelProgress.current > 0.5
                             ? FACE_NORMALS[activeTunnel.current.exit.dirKey]
@@ -946,8 +945,7 @@ function useWormCrawler(size, cubies) {
                     if (activeTunnel.current) {
                         // Head travels final third of the tunnel (cube interior → exit face)
                         const tunnelT = 0.67 + tunnelProgress.current * 0.33;
-                        const wp = getTunnelWorldPos(activeTunnel.current, tunnelT, size);
-                        headInterpPos.current.set(wp[0], wp[1], wp[2]);
+                        getTunnelWorldPosInto(headInterpPos.current, activeTunnel.current, tunnelT, size);
                         const exitN = FACE_NORMALS[activeTunnel.current.exit.dirKey];
                         if (exitN) currentNormal.current.copy(exitN);
                     }
@@ -1271,17 +1269,13 @@ function WormChaseCamera({ worm, size }) {
             if (phase === 'exiting') t = 0.65 + (t * 0.35);
             const t1 = Math.min(t + 0.12, 1);
             const t2 = Math.min(t + 0.24, 1);
-            const camPt = getTunnelWorldPos(worm.activeTunnel.current, t, size);
-            const lookPt = getTunnelWorldPos(worm.activeTunnel.current, t1, size);
-            const lookAheadPt = getTunnelWorldPos(worm.activeTunnel.current, t2, size);
+            getTunnelWorldPosInto(_camVec, worm.activeTunnel.current, t, size);
+            getTunnelWorldPosInto(_camLookVec, worm.activeTunnel.current, t1, size);
+            getTunnelWorldPosInto(_camLookAheadVec, worm.activeTunnel.current, t2, size);
 
             const exitNormal = FACE_NORMALS[worm.activeTunnel.current.exit.dirKey] ?? FACE_NORMALS.PY;
             const entryNormal = FACE_NORMALS[worm.activeTunnel.current.entry.dirKey] ?? FACE_NORMALS.PY;
             _camUpVec.lerpVectors(entryNormal, exitNormal, t).normalize();
-
-            _camVec.set(camPt[0], camPt[1], camPt[2]);
-            _camLookVec.set(lookPt[0], lookPt[1], lookPt[2]);
-            _camLookAheadVec.set(lookAheadPt[0], lookAheadPt[1], lookAheadPt[2]);
             _camTunnelTangent.subVectors(_camLookVec, _camVec).normalize();
             _camTunnelRight.crossVectors(_camTunnelTangent, _camUpVec).normalize();
             const sway = Math.sin(performance.now() * 0.0045) * TUNNEL_SURF_SWAY;
@@ -1344,11 +1338,10 @@ function TunnelSurfFX({ worm, size }) {
             if (!mesh) continue;
             const trailOffset = i * 0.06;
             const travel = (baseT + trailOffset + tt * 0.8) % 1;
-            const p0 = getTunnelWorldPos(tunnel, travel, size);
-            const p1 = getTunnelWorldPos(tunnel, Math.min(travel + 0.03, 1), size);
-            // Reuse scratch vectors instead of allocating new ones each iteration
-            _sparkCenter.set(p0[0], p0[1], p0[2]);
-            _sparkForward.set(p1[0], p1[1], p1[2]).sub(_sparkCenter).normalize();
+            getTunnelWorldPosInto(_sparkCenter, tunnel, travel, size);
+            getTunnelWorldPosInto(_tunnelDirScratch, tunnel, Math.min(travel + 0.03, 1), size);
+            // Reuse scratch vectors instead of allocating new arrays/vectors each iteration
+            _sparkForward.copy(_tunnelDirScratch).sub(_sparkCenter).normalize();
             _sparkUp.lerpVectors(entryNormal, exitNormal, travel).normalize();
             _sparkRight.crossVectors(_sparkForward, _sparkUp).normalize();
 
@@ -2728,8 +2721,7 @@ function TunnelPortalRings({ worm, size }) {
         else if (phase === 'exiting') tunnelT = 0.65 + prog * 0.35;
         else tunnelT = 0.35 + prog * 0.30;
 
-        const wp = getTunnelWorldPos(tunnel, Math.min(tunnelT, 1), size);
-        _portalRingPos.set(wp[0], wp[1], wp[2]);
+        getTunnelWorldPosInto(_portalRingPos, tunnel, Math.min(tunnelT, 1), size);
 
         const t = clock.elapsedTime;
         // Healing exits: keep rings visible until the pop fires; normal exits fade out.

@@ -5,7 +5,7 @@
 import React, { useRef, useMemo, useEffect, useCallback } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { getSegmentWorldPos, getTunnelWorldPos } from './wormLogic.js';
+import { getSegmentWorldPos, getTunnelWorldPosInto } from './wormLogic.js';
 import { liveCubies } from './liveCubies.js';
 import { SURFACE_OFFSET } from '../utils/constants.js';
 
@@ -20,6 +20,7 @@ const BOB_NORMALS = {
 const _scratchPos = new THREE.Vector3();
 const _scratchBob = new THREE.Vector3();
 const _rainbowColor = new THREE.Color();
+const _tunnelOrbScratch = new THREE.Vector3();
 
 // ── Shared module-level geometries (M2) ─────────────────────────────────────
 // Pre-built once at module load, shared across all SingleOrb instances.
@@ -350,7 +351,8 @@ export default function ParityOrbs({ orbs, size, explosionFactor = 0, mode = 'su
       let key;
 
       if (isTunnelMode && orb.tunnel) {
-        position = getTunnelWorldPos(orb.tunnel, orb.t, size, explosionFactor);
+        getTunnelWorldPosInto(_tunnelOrbScratch, orb.tunnel, orb.t, size, explosionFactor);
+        position = [_tunnelOrbScratch.x, _tunnelOrbScratch.y, _tunnelOrbScratch.z];
         key = `${orb.tunnelId}-${orb.t}`;
       } else {
         position = getSegmentWorldPos(orb, size, explosionFactor);
