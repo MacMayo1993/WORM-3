@@ -515,9 +515,9 @@ const MenuWorm = ({ onWormClick }) => {
     smoothPtr.current.y += (pointer.y - smoothPtr.current.y) * Math.min(1, delta * 5);
 
     const isWiggle = wiggling.current;
-    const freq = isWiggle ? 8.5 : 1.6;
-    const ampX = isWiggle ? 0.27 : 0.16;
-    const ampZ = isWiggle ? 0.13 : 0.07;
+    const freq = isWiggle ? 8.5 : 1.8;
+    const ampX = isWiggle ? 0.27 : 0.26;
+    const ampZ = isWiggle ? 0.13 : 0.11;
 
     const hx = Math.sin(t * freq) * ampX;
     const hz = Math.sin(t * freq * 0.55 + 1.0) * ampZ;
@@ -590,7 +590,7 @@ const MenuWorm = ({ onWormClick }) => {
     // ── Group bob + master scale ────────────────────────────────────────────
     groupRef.current.position.y = 1.45 + (isWiggle
       ? Math.abs(Math.sin(t * 14)) * 0.20
-      : Math.sin(t * 1.5) * 0.06);
+      : Math.sin(t * 1.4) * 0.10);
     currentScale.current += (targetScale.current - currentScale.current) * Math.min(1, delta * 16);
     groupRef.current.scale.setScalar(currentScale.current);
   });
@@ -617,6 +617,11 @@ const MenuWorm = ({ onWormClick }) => {
     >
       {/* ── Head ─────────────────────────────────────────────────────────── */}
       <group ref={headRef}>
+        {/* Oversized transparent hit-zone — always above cube reach, catches taps reliably */}
+        <mesh>
+          <sphereGeometry args={[0.52, 8, 8]} />
+          <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+        </mesh>
         {/* Sphere only gets squash/stretch — eyes and antennae stay round */}
         <mesh ref={headMeshRef}>
           <sphereGeometry args={[_SEG_R[0], 16, 12]} />
@@ -715,8 +720,8 @@ export const RotatingBlackCube = ({ onCubeClick, onWormClick }) => {
   const cubeRef = useRef();
   const shaking = useRef(false);
   const shakeStart = useRef(0);
-  const cubeTargetScale = useRef(1.0);
-  const cubeCurrentScale = useRef(1.0);
+  const cubeTargetScale = useRef(0.90);
+  const cubeCurrentScale = useRef(0.90);
   const onCubeClickRef = useRef(onCubeClick);
   onCubeClickRef.current = onCubeClick;
 
@@ -732,7 +737,7 @@ export const RotatingBlackCube = ({ onCubeClick, onWormClick }) => {
       const elapsed = Date.now() - shakeStart.current;
       if (elapsed > 540) {
         shaking.current = false;
-        cubeTargetScale.current = 1.0;
+        cubeTargetScale.current = 0.90;
         cubeRef.current.position.set(0, -0.2, 0);
         onCubeClickRef.current?.();
       } else {
@@ -756,8 +761,8 @@ export const RotatingBlackCube = ({ onCubeClick, onWormClick }) => {
     shaking.current = true;
     shakeStart.current = Date.now();
   };
-  const handleCubeDown = () => { cubeTargetScale.current = 0.90; };
-  const handleCubeUp = () => { if (!shaking.current) cubeTargetScale.current = 1.0; };
+  const handleCubeDown = () => { cubeTargetScale.current = 0.81; };
+  const handleCubeUp = () => { if (!shaking.current) cubeTargetScale.current = 0.90; };
 
   return (
     <>
