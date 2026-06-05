@@ -315,9 +315,9 @@ export const newStyleShaders = {
               + sin((uv.y - time * 0.11) * 14.0) * 0.35
               + sin((uv.x + uv.y + time * 0.09) * 22.0) * 0.25;
       float metal = smoothstep(-0.1, 0.8, n);
-      vec3 chrome = mix(vec3(0.05), vec3(0.95), metal);
-      vec3 tint = mix(baseColor * 0.22, baseColor * 0.6, 0.35 + 0.35 * sin(time * 0.9));
-      vec3 col = chrome * 0.78 + tint;
+      vec3 chrome = mix(baseColor * 0.12, baseColor * 0.85 + vec3(0.15), metal);
+      float shimmer = sin(time * 0.9) * 0.5 + 0.5;
+      vec3 col = chrome + baseColor * 0.12 * shimmer;
       gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
     }
   `,
@@ -332,8 +332,8 @@ export const newStyleShaders = {
       float r1 = sin((uv.x * 5.0 + uv.y * 1.8) + time * 0.8);
       float r2 = sin((uv.x * -4.3 + uv.y * 2.2) - time * 0.65);
       float weave = smoothstep(-0.3, 0.7, r1 * 0.55 + r2 * 0.45);
-      vec3 a = vec3(0.2, 0.9, 0.7);
-      vec3 b = vec3(0.6, 0.35, 1.0);
+      vec3 a = baseColor * 1.35 + vec3(0.1, 0.15, 0.1);
+      vec3 b = baseColor * 0.7 + vec3(0.15, 0.1, 0.3);
       vec3 ribbon = mix(a, b, 0.5 + 0.5 * sin(time * 0.35 + uv.y * 3.5));
       vec3 col = baseColor * 0.15 + ribbon * weave * 0.85;
       gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
@@ -376,7 +376,8 @@ export const newStyleShaders = {
       float scan = sin((vUv.y + time * 0.85) * 180.0) * 0.5 + 0.5;
       float tear = step(0.86, fract(vUv.x * 8.0 + time * 0.6)) * step(0.45, fract(vUv.y * 12.0 + time * 0.25));
       float glow = smoothstep(0.55, 1.0, scan) + tear * 0.7;
-      vec3 col = baseColor * 0.13 + vec3(0.2, 0.95, 1.0) * glow * 0.8 + baseColor * glow * 0.45;
+      vec3 scanCol = baseColor * 1.85 + vec3(0.22);
+      vec3 col = baseColor * 0.13 + scanCol * glow * 0.8;
       gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
     }
   `,
@@ -396,7 +397,7 @@ export const newStyleShaders = {
       vec2 drift = vec2(sin(time * (0.6 + h)), cos(time * (0.5 + h))) * 0.18;
       float spark = smoothstep(0.19, 0.02, length(fr - drift)) * step(0.74, h);
       float smoke = sin((vUv.x * 4.0 + vUv.y * 7.0) + time * 0.25) * 0.5 + 0.5;
-      vec3 ember = vec3(1.0, 0.45, 0.1);
+      vec3 ember = mix(baseColor * 1.8, vec3(1.0, 0.82, 0.35), 0.28);
       vec3 col = baseColor * 0.08 + baseColor * smoke * 0.35 + ember * spark * 1.2;
       gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
     }
@@ -438,7 +439,8 @@ export const newStyleShaders = {
         veins += smoothstep(0.11, 0.01, abs(dot(uv, dir) + sin(dot(uv.yx, dir) * 7.5 + time * (0.5 + fi * 0.2)) * 0.08));
       }
       veins = clamp(veins / 2.8, 0.0, 1.0);
-      vec3 col = mix(baseColor * 0.11, vec3(0.25, 1.0, 0.65) * 0.8 + baseColor * 0.35, veins);
+      vec3 veinCol = baseColor * 1.45 + vec3(0.1, 0.15, 0.08);
+      vec3 col = mix(baseColor * 0.11, veinCol * 0.85, veins);
       gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
     }
   `,
@@ -470,7 +472,8 @@ export const newStyleShaders = {
         }
       }
       float ring = smoothstep(0.34, 0.30, abs(length(d) - 0.28));
-      vec3 col = baseColor * 0.06 + vec3(0.9, 0.95, 1.0) * stars + baseColor * ring * 0.9;
+      vec3 starColor = mix(vec3(1.0), baseColor * 1.5, 0.5);
+      vec3 col = baseColor * 0.06 + starColor * stars + baseColor * ring * 0.9;
       gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
     }
   `,
