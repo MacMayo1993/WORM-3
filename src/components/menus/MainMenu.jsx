@@ -444,15 +444,14 @@ const ShufflingCube = () => {
   );
 };
 
-// ─── MenuWorm — worm mascot that sits on top of the cube ─────────────────────
-const _SEG_Y        = [1.12, 0.84, 0.56, 0.28, 0.0];
-const _SEG_R        = [0.22, 0.185, 0.158, 0.132, 0.105];
-const _SEG_COL      = ['#3be08a', '#2bcc78', '#22b866', '#1aa255', '#148842'];
+// ─── MenuWorm — round-blob worm mascot emerging from the cube's top face ──────
+const _SEG_Y         = [0.80, 0.44, 0.10, -0.25, -0.55]; // head up, lower segs inside cube
+const _SEG_R         = [0.24, 0.22, 0.21, 0.20, 0.18];   // uniform blobs, gentle taper
+const _SEG_COL       = ['#3be08a', '#2fd47e', '#24be72', '#1aa862', '#129650'];
 const _PATH_MIN_DIST = 0.004;
-const _SEG_SPACING   = 0.145;
-const _MAX_PATH_LEN  = 4 * 0.145 + 0.15;
-const _BLINK_DUR     = 0.13;                         // seconds for a full blink cycle
-const _BODY_ROT_SPD  = [0.28, -0.35, 0.22, -0.18];  // per-segment tumble speed (rad/s)
+const _SEG_SPACING   = 0.22;
+const _MAX_PATH_LEN  = 4 * 0.22 + 0.15;
+const _BLINK_DUR     = 0.13;
 
 function _samplePath(path, behindDist) {
   if (path.length === 0) return { x: 0, z: 0 };
@@ -470,30 +469,22 @@ function _samplePath(path, behindDist) {
 }
 
 const MenuWorm = ({ onWormClick }) => {
-  const groupRef    = useRef();
-  const headRef     = useRef();
-  const headBodyRef = useRef();   // inner group: squash/stretch + slow tumble (icosahedron only)
-  const seg1Ref     = useRef();
-  const seg2Ref     = useRef();
-  const seg3Ref     = useRef();
-  const tailRef     = useRef();
+  const groupRef   = useRef();
+  const headRef    = useRef();   // outer group: position + rotation
+  const headMeshRef = useRef();  // sphere only: squash/stretch (eyes excluded)
+  const seg1Ref    = useRef();
+  const seg2Ref    = useRef();
+  const seg3Ref    = useRef();
+  const tailRef    = useRef();
 
-  // Eye expressiveness
   const eyeLRef   = useRef();
   const eyeRRef   = useRef();
   const pupilLRef = useRef();
   const pupilRRef = useRef();
-  const blinkT             = useRef(-1);   // -1 = idle, 0→1 = mid-blink
-  const nextBlink          = useRef(-1);   // -1 = not yet initialized
-  const pupilTargetScale   = useRef(1.0);
-  const pupilCurrentScale  = useRef(1.0);
-
-  // Pulsing bioluminescent cores — one per segment (head + 4 body)
-  const core0Ref = useRef();
-  const core1Ref = useRef();
-  const core2Ref = useRef();
-  const core3Ref = useRef();
-  const core4Ref = useRef();
+  const blinkT            = useRef(-1);
+  const nextBlink         = useRef(-1);
+  const pupilTargetScale  = useRef(1.0);
+  const pupilCurrentScale = useRef(1.0);
 
   const wiggling     = useRef(false);
   const wiggleStart  = useRef(0);
@@ -556,35 +547,23 @@ const MenuWorm = ({ onWormClick }) => {
       headRef.current.rotation.z = -Math.atan2(vx, 2.0) * 0.55 - smoothPtr.current.x * 0.20;
       headRef.current.rotation.x =  Math.atan2(vz, 2.0) * 0.40 + smoothPtr.current.y * 0.14;
     }
-    // Squash/stretch + slow tumble on icosahedron body only (eyes/antennae excluded)
-    if (headBodyRef.current) {
-      const stretch = 1 + Math.min(speed * 0.45, 0.35);
+    // Squash/stretch on sphere only — eyes/antennae stay round
+    if (headMeshRef.current) {
+      const stretch = 1 + Math.min(speed * 0.40, 0.30);
       const squash  = 1 / Math.sqrt(stretch);
-      headBodyRef.current.scale.set(squash, stretch, squash);
-      headBodyRef.current.rotation.y = t * 0.18;
-      headBodyRef.current.rotation.z = t * 0.11;
+      headMeshRef.current.scale.set(squash, stretch, squash);
     }
 
-    // ── Body segments: path position + squash/stretch + self-tumble ─────────
+    // ── Body segments: path position + squash/stretch ────────────────────────
     const bodyRefs = [seg1Ref, seg2Ref, seg3Ref, tailRef];
     bodyRefs.forEach((ref, i) => {
       if (!ref.current) return;
-      const pos      = _samplePath(path, (i + 1) * _SEG_SPACING);
+      const pos     = _samplePath(path, (i + 1) * _SEG_SPACING);
       const segSpeed = speed * Math.max(0.35, 1 - i * 0.18);
-      const stretch  = 1 + Math.min(segSpeed * 0.28, 0.28);
+      const stretch  = 1 + Math.min(segSpeed * 0.25, 0.25);
       const squash   = 1 / Math.sqrt(stretch);
       ref.current.position.set(pos.x, _SEG_Y[i + 1], pos.z);
       ref.current.scale.set(squash, stretch, squash);
-      ref.current.rotation.y = t * _BODY_ROT_SPD[i];
-      ref.current.rotation.x = t * _BODY_ROT_SPD[i] * 0.45;
-    });
-
-    // ── Pulsing bioluminescent cores ────────────────────────────────────────
-    const allCores = [core0Ref, core1Ref, core2Ref, core3Ref, core4Ref];
-    allCores.forEach((ref, i) => {
-      if (!ref.current?.material) return;
-      const pulse = 0.5 + 0.5 * Math.sin(t * 3.5 + i * 0.7);
-      ref.current.material.color.setHSL(0.38, 1.0, 0.35 + pulse * 0.45);
     });
 
     // ── Blinking ────────────────────────────────────────────────────────────
@@ -609,9 +588,9 @@ const MenuWorm = ({ onWormClick }) => {
     if (pupilRRef.current) pupilRRef.current.scale.setScalar(pupilCurrentScale.current);
 
     // ── Group bob + master scale ────────────────────────────────────────────
-    groupRef.current.position.y = 1.35 + (isWiggle
-      ? Math.abs(Math.sin(t * 14)) * 0.22
-      : Math.sin(t * 1.5) * 0.045);
+    groupRef.current.position.y = 1.10 + (isWiggle
+      ? Math.abs(Math.sin(t * 14)) * 0.20
+      : Math.sin(t * 1.5) * 0.04);
     currentScale.current += (targetScale.current - currentScale.current) * Math.min(1, delta * 16);
     groupRef.current.scale.setScalar(currentScale.current);
   });
@@ -630,7 +609,7 @@ const MenuWorm = ({ onWormClick }) => {
   return (
     <group
       ref={groupRef}
-      position={[0, 1.72, 0]}
+      position={[0, 1.10, 0]}
       onClick={handleClick}
       onPointerDown={handlePointerDown}
       onPointerUp={handlePointerUp}
@@ -638,124 +617,94 @@ const MenuWorm = ({ onWormClick }) => {
     >
       {/* ── Head ─────────────────────────────────────────────────────────── */}
       <group ref={headRef}>
-        {/* Inner group: squash/stretch + slow tumble — icosahedron body only */}
-        <group ref={headBodyRef}>
-          <mesh>
-            <icosahedronGeometry args={[_SEG_R[0], 0]} />
-            <meshPhysicalMaterial
-              color={_SEG_COL[0]} roughness={0.08} metalness={0.0}
-              emissive={_SEG_COL[0]} emissiveIntensity={0.12}
-              transmission={0.38} thickness={0.45} ior={1.50}
-              clearcoat={0.90} clearcoatRoughness={0.08}
-            />
-          </mesh>
-          <mesh ref={core0Ref}>
-            <icosahedronGeometry args={[_SEG_R[0] * 0.42, 0]} />
-            <meshBasicMaterial color="#40ff99" toneMapped={false} />
-          </mesh>
-        </group>
-        {/* Eyes — outside headBodyRef so they never squash/stretch or tumble */}
-        <mesh ref={eyeLRef} position={[-0.085, 0.13, 0.19]}>
-          <sphereGeometry args={[0.058, 8, 8]} />
-          <meshStandardMaterial color="#ffffff" roughness={0.2} />
-        </mesh>
-        <mesh ref={eyeRRef} position={[0.085, 0.13, 0.19]}>
-          <sphereGeometry args={[0.058, 8, 8]} />
-          <meshStandardMaterial color="#ffffff" roughness={0.2} />
-        </mesh>
-        <mesh ref={pupilLRef} position={[-0.085, 0.135, 0.235]}>
-          <sphereGeometry args={[0.03, 6, 6]} />
-          <meshStandardMaterial color="#0a0a14" roughness={0.5} />
-        </mesh>
-        <mesh ref={pupilRRef} position={[0.085, 0.135, 0.235]}>
-          <sphereGeometry args={[0.03, 6, 6]} />
-          <meshStandardMaterial color="#0a0a14" roughness={0.5} />
-        </mesh>
-        {/* Antennae */}
-        <mesh position={[-0.11, 0.28, 0.1]} rotation={[0, 0, 0.3]}>
-          <cylinderGeometry args={[0.012, 0.008, 0.25, 6]} />
-          <meshStandardMaterial color={_SEG_COL[0]} roughness={0.5} />
-        </mesh>
-        <mesh position={[0.11, 0.28, 0.1]} rotation={[0, 0, -0.3]}>
-          <cylinderGeometry args={[0.012, 0.008, 0.25, 6]} />
-          <meshStandardMaterial color={_SEG_COL[0]} roughness={0.5} />
-        </mesh>
-        <mesh position={[-0.145, 0.38, 0.1]}>
-          <sphereGeometry args={[0.025, 6, 6]} />
-          <meshStandardMaterial color="#b0ffda" emissive="#40ff99" emissiveIntensity={0.6} />
-        </mesh>
-        <mesh position={[0.145, 0.38, 0.1]}>
-          <sphereGeometry args={[0.025, 6, 6]} />
-          <meshStandardMaterial color="#b0ffda" emissive="#40ff99" emissiveIntensity={0.6} />
-        </mesh>
-      </group>
-
-      {/* ── Body segments — faceted icosahedra + pulsing inner cores ─────── */}
-      <group ref={seg1Ref}>
-        <mesh>
-          <icosahedronGeometry args={[_SEG_R[1], 0]} />
+        {/* Sphere only gets squash/stretch — eyes and antennae stay round */}
+        <mesh ref={headMeshRef}>
+          <sphereGeometry args={[_SEG_R[0], 16, 12]} />
           <meshPhysicalMaterial
-            color={_SEG_COL[1]} roughness={0.10} metalness={0.0}
-            emissive={_SEG_COL[1]} emissiveIntensity={0.10}
-            transmission={0.34} thickness={0.40} ior={1.48}
-            clearcoat={0.80} clearcoatRoughness={0.10}
-          />
-        </mesh>
-        <mesh ref={core1Ref}>
-          <icosahedronGeometry args={[_SEG_R[1] * 0.42, 0]} />
-          <meshBasicMaterial color="#40ff99" toneMapped={false} />
-        </mesh>
-      </group>
-      <group ref={seg2Ref}>
-        <mesh>
-          <icosahedronGeometry args={[_SEG_R[2], 0]} />
-          <meshPhysicalMaterial
-            color={_SEG_COL[2]} roughness={0.12} metalness={0.0}
-            emissive={_SEG_COL[2]} emissiveIntensity={0.09}
-            transmission={0.30} thickness={0.36} ior={1.46}
+            color={_SEG_COL[0]} roughness={0.28} metalness={0.0}
+            emissive={_SEG_COL[0]} emissiveIntensity={0.20}
             clearcoat={0.70} clearcoatRoughness={0.12}
           />
         </mesh>
-        <mesh ref={core2Ref}>
-          <icosahedronGeometry args={[_SEG_R[2] * 0.42, 0]} />
-          <meshBasicMaterial color="#40ff99" toneMapped={false} />
+        {/* Eyes */}
+        <mesh ref={eyeLRef} position={[-0.10, 0.14, 0.22]}>
+          <sphereGeometry args={[0.068, 10, 10]} />
+          <meshStandardMaterial color="#ffffff" roughness={0.1} />
         </mesh>
-      </group>
-      <group ref={seg3Ref}>
-        <mesh>
-          <icosahedronGeometry args={[_SEG_R[3], 0]} />
-          <meshPhysicalMaterial
-            color={_SEG_COL[3]} roughness={0.15} metalness={0.0}
-            emissive={_SEG_COL[3]} emissiveIntensity={0.08}
-            transmission={0.26} thickness={0.32} ior={1.44}
-            clearcoat={0.60} clearcoatRoughness={0.15}
-          />
+        <mesh ref={eyeRRef} position={[0.10, 0.14, 0.22]}>
+          <sphereGeometry args={[0.068, 10, 10]} />
+          <meshStandardMaterial color="#ffffff" roughness={0.1} />
         </mesh>
-        <mesh ref={core3Ref}>
-          <icosahedronGeometry args={[_SEG_R[3] * 0.42, 0]} />
-          <meshBasicMaterial color="#40ff99" toneMapped={false} />
+        <mesh ref={pupilLRef} position={[-0.10, 0.145, 0.268]}>
+          <sphereGeometry args={[0.036, 8, 8]} />
+          <meshStandardMaterial color="#0a0a14" roughness={0.5} />
         </mesh>
-      </group>
-      <group ref={tailRef}>
-        <mesh>
-          <icosahedronGeometry args={[_SEG_R[4], 0]} />
-          <meshPhysicalMaterial
-            color={_SEG_COL[4]} roughness={0.18} metalness={0.0}
-            emissive={_SEG_COL[4]} emissiveIntensity={0.07}
-            transmission={0.22} thickness={0.28} ior={1.42}
-            clearcoat={0.50} clearcoatRoughness={0.18}
-          />
+        <mesh ref={pupilRRef} position={[0.10, 0.145, 0.268]}>
+          <sphereGeometry args={[0.036, 8, 8]} />
+          <meshStandardMaterial color="#0a0a14" roughness={0.5} />
         </mesh>
-        <mesh ref={core4Ref}>
-          <icosahedronGeometry args={[_SEG_R[4] * 0.42, 0]} />
-          <meshBasicMaterial color="#40ff99" toneMapped={false} />
+        {/* Smile */}
+        <mesh position={[0, 0.04, 0.235]} rotation={[0.25, 0, 0]}>
+          <torusGeometry args={[0.065, 0.018, 6, 14, Math.PI]} />
+          <meshStandardMaterial color="#0d2410" roughness={0.6} />
+        </mesh>
+        {/* Antennae */}
+        <mesh position={[-0.13, 0.30, 0.10]} rotation={[0, 0, 0.32]}>
+          <cylinderGeometry args={[0.013, 0.009, 0.28, 6]} />
+          <meshStandardMaterial color={_SEG_COL[0]} roughness={0.5} />
+        </mesh>
+        <mesh position={[0.13, 0.30, 0.10]} rotation={[0, 0, -0.32]}>
+          <cylinderGeometry args={[0.013, 0.009, 0.28, 6]} />
+          <meshStandardMaterial color={_SEG_COL[0]} roughness={0.5} />
+        </mesh>
+        <mesh position={[-0.165, 0.41, 0.10]}>
+          <sphereGeometry args={[0.026, 6, 6]} />
+          <meshStandardMaterial color="#b0ffda" emissive="#40ff99" emissiveIntensity={0.7} />
+        </mesh>
+        <mesh position={[0.165, 0.41, 0.10]}>
+          <sphereGeometry args={[0.026, 6, 6]} />
+          <meshStandardMaterial color="#b0ffda" emissive="#40ff99" emissiveIntensity={0.7} />
         </mesh>
       </group>
 
+      {/* ── Body segments — smooth round blobs ───────────────────────────── */}
+      <mesh ref={seg1Ref}>
+        <sphereGeometry args={[_SEG_R[1], 16, 12]} />
+        <meshPhysicalMaterial
+          color={_SEG_COL[1]} roughness={0.30} metalness={0.0}
+          emissive={_SEG_COL[1]} emissiveIntensity={0.16}
+          clearcoat={0.60} clearcoatRoughness={0.15}
+        />
+      </mesh>
+      <mesh ref={seg2Ref}>
+        <sphereGeometry args={[_SEG_R[2], 16, 12]} />
+        <meshPhysicalMaterial
+          color={_SEG_COL[2]} roughness={0.32} metalness={0.0}
+          emissive={_SEG_COL[2]} emissiveIntensity={0.14}
+          clearcoat={0.55} clearcoatRoughness={0.18}
+        />
+      </mesh>
+      <mesh ref={seg3Ref}>
+        <sphereGeometry args={[_SEG_R[3], 14, 10]} />
+        <meshPhysicalMaterial
+          color={_SEG_COL[3]} roughness={0.34} metalness={0.0}
+          emissive={_SEG_COL[3]} emissiveIntensity={0.12}
+          clearcoat={0.50} clearcoatRoughness={0.20}
+        />
+      </mesh>
+      <mesh ref={tailRef}>
+        <sphereGeometry args={[_SEG_R[4], 12, 8]} />
+        <meshPhysicalMaterial
+          color={_SEG_COL[4]} roughness={0.36} metalness={0.0}
+          emissive={_SEG_COL[4]} emissiveIntensity={0.10}
+          clearcoat={0.45} clearcoatRoughness={0.22}
+        />
+      </mesh>
+
       {/* Soft glow halo */}
-      <mesh position={[0, 0.56, 0]}>
-        <sphereGeometry args={[0.55, 10, 10]} />
-        <meshBasicMaterial color="#00ff88" transparent opacity={0.055} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+      <mesh position={[0, 0.44, 0]}>
+        <sphereGeometry args={[0.52, 10, 10]} />
+        <meshBasicMaterial color="#00ff88" transparent opacity={0.05} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
       </mesh>
     </group>
   );
