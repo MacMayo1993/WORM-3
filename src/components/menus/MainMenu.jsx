@@ -1,24 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import IntroCubie from '../intro/IntroCubie.jsx';
 import ParityWallet from '../overlays/ParityWallet.jsx';
+import { makeCubies } from '../../game/cubeState.js';
+import { rotateSliceCubies } from '../../game/cubeRotation.js';
 import { updateSharedTime } from '../../3d/styles/TileStyleMaterials.jsx';
-
-// All available manifold element styles — one will be picked at random per face
-const ALL_STYLES = [
-  'circuit', 'holographic', 'pulse', 'neural',
-  'lava', 'galaxy', 'ice', 'water', 'wood', 'grass', 'sand',
-  'vortex', 'shockwave', 'moireRings', 'moireLines', 'infinityTunnel',
-  'polkaDots', 'zigzag', 'checkerboard', 'diagStripes', 'hexGrid',
-  'opConcentric', 'opRadialSpokes', 'opDiamondWave', 'opPinwheel',
-  'opChevronBands', 'opBullseyeSteps', 'opTiltMosaic', 'opWarpGrid',
-  'carbonFiber', 'metallic', 'glossy',
-  'prismBloom', 'magnetFlux', 'liquidChrome', 'auroraWeave', 'plasmaCells',
-  'quantumScanlines', 'emberstorm', 'fractalPulse', 'bioLattice', 'stellarLensing',
-];
-
-const FACE_DIRS = ['PZ', 'NZ', 'PX', 'NX', 'PY', 'NY'];
 
 // ─── Per-face independent pulse timing ────────────────────────────────────────
 // Each of the 6 faces gets its own phase offset so all 6 colors are always
@@ -357,39 +343,98 @@ const FacePulses = () => {
   );
 };
 
-const SolvedCube = () => {
-  const items = useMemo(() => {
-    const result = [];
-    for (let x = 0; x < 3; x++)
-      for (let y = 0; y < 3; y++)
-        for (let z = 0; z < 3; z++)
-          result.push({ key: `${x}-${y}-${z}`, pos: [x - 1, y - 1, z - 1] });
-    return result;
-  }, []);
+// ─── Shuffling cube — live Rubik's slice animation ────────────────────────────
+const FACE_ID_COLOR = {
+  1: '#ef4444', 2: '#22c55e', 3: '#f0f0f0', 4: '#f97316', 5: '#3b82f6', 6: '#eab308',
+};
+const STICKER_CFG = [
+  { dir: 'PX', pos: [0.501, 0, 0],   rot: [0,  Math.PI / 2, 0] },
+  { dir: 'NX', pos: [-0.501, 0, 0],  rot: [0, -Math.PI / 2, 0] },
+  { dir: 'PY', pos: [0,  0.501, 0],  rot: [-Math.PI / 2, 0, 0] },
+  { dir: 'NY', pos: [0, -0.501, 0],  rot: [ Math.PI / 2, 0, 0] },
+  { dir: 'PZ', pos: [0, 0,  0.501],  rot: [0, 0, 0] },
+  { dir: 'NZ', pos: [0, 0, -0.501],  rot: [0, Math.PI, 0] },
+];
+const ALL_MOVES = ['x', 'y', 'z'].flatMap(ax => [0, 1, 2].flatMap(sl => [1, -1].map(d => ({ ax, sl, d }))));
+const ANIM_DUR = 0.50;
+const PAUSE_DUR = 0.80;
+const easeIO = t => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
 
-  // One random manifold style per face direction, chosen once on mount.
-  // All 9 cubies on the same face share the same style → solved cube appearance.
-  const faceStyles = useMemo(() => {
-    const styles = {};
-    // Shuffle ALL_STYLES so each face gets a unique style
-    const pool = [...ALL_STYLES].sort(() => Math.random() - 0.5);
-    FACE_DIRS.forEach((dir, i) => { styles[dir] = pool[i % pool.length]; });
-    return styles;
-  }, []);
+const ShuffleCubie = React.memo(({ cubie }) => {
+  const cx = cubie.x - 1, cy = cubie.y - 1, cz = cubie.z - 1;
+  return (
+    <group position={[cx, cy, cz]}>
+      <mesh>
+        <boxGeometry args={[0.93, 0.93, 0.93]} />
+        <meshStandardMaterial color="#0a0a14" roughness={0.55} metalness={0.3} />
+      </mesh>
+      {STICKER_CFG.map(({ dir, pos, rot }) => {
+        const sticker = cubie.stickers?.[dir];
+        if (!sticker) return null;
+        return (
+          <group key={dir} position={pos} rotation={rot}>
+            <mesh>
+              <planeGeometry args={[0.80, 0.80]} />
+              <meshStandardMaterial color={FACE_ID_COLOR[sticker.curr] ?? '#888'} roughness={0.20} metalness={0.08} />
+            </mesh>
+          </group>
+        );
+      })}
+    </group>
+  );
+});
+ShuffleCubie.displayName = 'ShuffleCubie';
+
+const ShufflingCube = () => {
+  const [cubeState, setCubeState] = useState(() => {
+    let cubies = makeCubies(3);
+    for (let i = 0; i < 18; i++) {
+      const m = ALL_MOVES[Math.floor(Math.random() * ALL_MOVES.length)];
+      cubies = rotateSliceCubies(cubies, 3, m.ax, m.sl, m.d);
+    }
+    return { cubies, rotating: null };
+  });
+
+  const cubeStateRef = useRef(cubeState);
+  cubeStateRef.current = cubeState;
+  const sliceGroupRef = useRef();
+  const nextMoveAt = useRef(0);
+
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime;
+    const { rotating, cubies } = cubeStateRef.current;
+
+    if (rotating) {
+      const progress = Math.min((t - rotating.startT) / ANIM_DUR, 1);
+      const angle = easeIO(progress) * (Math.PI / 2) * rotating.d;
+      if (sliceGroupRef.current) {
+        sliceGroupRef.current.rotation.set(
+          rotating.ax === 'x' ? angle : 0,
+          rotating.ax === 'y' ? angle : 0,
+          rotating.ax === 'z' ? angle : 0,
+        );
+      }
+      if (progress >= 1) {
+        const newCubies = rotateSliceCubies(cubies, 3, rotating.ax, rotating.sl, rotating.d);
+        nextMoveAt.current = t + PAUSE_DUR;
+        setCubeState({ cubies: newCubies, rotating: null });
+      }
+    } else if (t >= nextMoveAt.current) {
+      const m = ALL_MOVES[Math.floor(Math.random() * ALL_MOVES.length)];
+      setCubeState(prev => ({ ...prev, rotating: { ...m, startT: t } }));
+    }
+  });
+
+  const { cubies, rotating } = cubeState;
+  const staticCubies = rotating ? cubies.filter(c => c[rotating.ax] !== rotating.sl) : cubies;
+  const sliceCubies = rotating ? cubies.filter(c => c[rotating.ax] === rotating.sl) : [];
 
   return (
     <>
-      {items.map(it => (
-        <IntroCubie
-          key={it.key}
-          position={it.pos}
-          size={3}
-          explosionFactor={0}
-          faceStyles={faceStyles}
-          cubieFlips={{}}
-          antipodalSwaps={{}}
-        />
-      ))}
+      {staticCubies.map(c => <ShuffleCubie key={`${c.x}-${c.y}-${c.z}`} cubie={c} />)}
+      <group ref={sliceGroupRef}>
+        {sliceCubies.map(c => <ShuffleCubie key={`${c.x}-${c.y}-${c.z}`} cubie={c} />)}
+      </group>
     </>
   );
 };
@@ -567,8 +612,10 @@ export const RotatingBlackCube = ({ onCubeClick, onWormClick }) => {
         cubeRef.current.position.z = Math.sin(t * 31 + 2) * intensity * 0.3;
       }
     } else {
-      cubeRef.current.rotation.y = t * 0.28;
-      cubeRef.current.rotation.x = Math.sin(t * 0.15) * 0.12;
+      // Compound rotation shows all 6 faces over time
+      cubeRef.current.rotation.y = t * 0.20 + Math.sin(t * 0.09) * 0.55;
+      cubeRef.current.rotation.x = Math.sin(t * 0.13) * 0.48;
+      cubeRef.current.rotation.z = Math.sin(t * 0.07) * 0.18;
       cubeRef.current.position.set(0, -0.2, 0);
     }
   });
@@ -592,7 +639,7 @@ export const RotatingBlackCube = ({ onCubeClick, onWormClick }) => {
         onPointerUp={handleCubeUp}
         onPointerLeave={handleCubeUp}
       >
-        <SolvedCube />
+        <ShufflingCube />
         <FacePulses />
       </group>
       <MenuWorm onWormClick={onWormClick} />
@@ -691,19 +738,13 @@ const menuStyles = {
     border: '1px solid rgba(120,160,255,0.14)',
     boxShadow: '0 4px 32px rgba(0,0,0,0.45), inset 0 1px 0 rgba(120,160,255,0.10)',
   },
-  primaryActionsWrap: {
-    position: 'absolute', left: 0, right: 0,
-    bottom: 'max(116px, calc(env(safe-area-inset-bottom, 0px) + 96px))',
-    display: 'flex', justifyContent: 'center', gap: '12px', padding: '0 16px',
-    transition: 'opacity 0.55s ease 0.1s, transform 0.55s cubic-bezier(0.22,1,0.36,1) 0.1s',
-    pointerEvents: 'all',
-  },
-  utilityWrap: {
+  bottomStack: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     paddingBottom: 'max(16px, env(safe-area-inset-bottom, 16px))',
-    paddingLeft: '16px', paddingRight: '16px',
+    padding: '0 16px max(16px, env(safe-area-inset-bottom, 16px))',
     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px',
     transition: 'opacity 0.55s ease 0.1s, transform 0.55s cubic-bezier(0.22,1,0.36,1) 0.1s',
+    pointerEvents: 'all',
   },
 };
 
@@ -727,72 +768,119 @@ const MenuTitleCard = ({ visible }) => (
   </div>
 );
 
-const MenuPrimaryActions = ({ visible, onWormSelect, onCubeSelect }) => (
-  <div style={{
-    ...menuStyles.primaryActionsWrap,
-    opacity: visible ? 1 : 0,
-    transform: visible ? 'none' : 'translateY(16px)',
-  }}>
-    <button
-      onClick={onWormSelect}
-      style={{
-        minWidth: '132px', borderRadius: '14px', border: '1px solid rgba(34,197,94,0.55)',
-        background: 'linear-gradient(180deg, rgba(34,197,94,0.26), rgba(6,10,24,0.82))',
-        color: '#dcffe9', padding: '12px 14px', fontWeight: 800, letterSpacing: '0.12em',
-        textTransform: 'uppercase', fontSize: '13px', fontFamily: MENU_FONT,
-        boxShadow: '0 0 18px rgba(34,197,94,0.24)', cursor: 'pointer',
-        transition: 'transform 220ms cubic-bezier(0.34,1.56,0.64,1), box-shadow 200ms ease, border-color 200ms ease',
-      }}
-      onMouseEnter={e => {
-        e.currentTarget.style.transform = 'scale(1.07)';
-        e.currentTarget.style.boxShadow = '0 0 36px rgba(34,197,94,0.55), 0 0 72px rgba(34,197,94,0.18)';
-        e.currentTarget.style.borderColor = 'rgba(34,197,94,0.90)';
-      }}
-      onMouseLeave={e => {
-        e.currentTarget.style.transform = 'scale(1)';
-        e.currentTarget.style.boxShadow = '0 0 18px rgba(34,197,94,0.24)';
-        e.currentTarget.style.borderColor = 'rgba(34,197,94,0.55)';
-      }}
-    >WORM</button>
-    <button
-      onClick={onCubeSelect}
-      style={{
-        minWidth: '132px', borderRadius: '14px', border: '1px solid rgba(59,130,246,0.55)',
-        background: 'linear-gradient(180deg, rgba(59,130,246,0.26), rgba(6,10,24,0.82))',
-        color: '#dff0ff', padding: '10px 14px 8px', fontWeight: 800, letterSpacing: '0.12em',
-        textTransform: 'uppercase', fontSize: '13px', fontFamily: MENU_FONT,
-        boxShadow: '0 0 18px rgba(59,130,246,0.24)', cursor: 'pointer',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
-        transition: 'transform 220ms cubic-bezier(0.34,1.56,0.64,1), box-shadow 200ms ease, border-color 200ms ease',
-      }}
-      onMouseEnter={e => {
-        e.currentTarget.style.transform = 'scale(1.07)';
-        e.currentTarget.style.boxShadow = '0 0 36px rgba(59,130,246,0.55), 0 0 72px rgba(59,130,246,0.18)';
-        e.currentTarget.style.borderColor = 'rgba(59,130,246,0.90)';
-      }}
-      onMouseLeave={e => {
-        e.currentTarget.style.transform = 'scale(1)';
-        e.currentTarget.style.boxShadow = '0 0 18px rgba(59,130,246,0.24)';
-        e.currentTarget.style.borderColor = 'rgba(59,130,246,0.55)';
-      }}
-    >
-      <span>CUBE</span>
-      <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.14em', color: 'rgba(180,220,255,0.9)' }}>START HERE</span>
-    </button>
-  </div>
-);
+const COMING_MODES = [
+  { icon: '📖', label: 'Story',    color: '#ef4444' },
+  { icon: '∮',  label: 'Holonomy', color: '#00f5ff' },
+  { icon: '⬡',  label: 'Biome',   color: '#60a5fa' },
+  { icon: '✦',  label: 'Merge',   color: '#a78bfa' },
+];
 
-const MenuUtilityNav = ({ visible, onFreeplay, onStore }) => (
+const MenuBottomSection = ({ visible, onWormSelect, onCubeSelect, onFreeplay, onStore, onComingSoon }) => (
   <div style={{
-    ...menuStyles.utilityWrap,
+    ...menuStyles.bottomStack,
     opacity: visible ? 1 : 0,
     transform: visible ? 'none' : 'translateY(16px)',
   }}>
+
+    {/* Primary mode buttons */}
+    <div style={{ display: 'flex', gap: '12px', width: '100%', justifyContent: 'center' }}>
+      <button
+        onClick={onWormSelect}
+        style={{
+          minWidth: '132px', borderRadius: '14px', border: '1px solid rgba(34,197,94,0.55)',
+          background: 'linear-gradient(180deg, rgba(34,197,94,0.26), rgba(6,10,24,0.82))',
+          color: '#dcffe9', padding: '12px 14px', fontWeight: 800, letterSpacing: '0.12em',
+          textTransform: 'uppercase', fontSize: '13px', fontFamily: MENU_FONT,
+          boxShadow: '0 0 18px rgba(34,197,94,0.24)', cursor: 'pointer',
+          transition: 'transform 220ms cubic-bezier(0.34,1.56,0.64,1), box-shadow 200ms ease, border-color 200ms ease',
+        }}
+        onMouseEnter={e => {
+          e.currentTarget.style.transform = 'scale(1.07)';
+          e.currentTarget.style.boxShadow = '0 0 36px rgba(34,197,94,0.55), 0 0 72px rgba(34,197,94,0.18)';
+          e.currentTarget.style.borderColor = 'rgba(34,197,94,0.90)';
+        }}
+        onMouseLeave={e => {
+          e.currentTarget.style.transform = 'scale(1)';
+          e.currentTarget.style.boxShadow = '0 0 18px rgba(34,197,94,0.24)';
+          e.currentTarget.style.borderColor = 'rgba(34,197,94,0.55)';
+        }}
+      >WORM</button>
+
+      <button
+        onClick={onCubeSelect}
+        style={{
+          minWidth: '132px', borderRadius: '14px', border: '1px solid rgba(59,130,246,0.55)',
+          background: 'linear-gradient(180deg, rgba(59,130,246,0.26), rgba(6,10,24,0.82))',
+          color: '#dff0ff', padding: '10px 14px 8px', fontWeight: 800, letterSpacing: '0.12em',
+          textTransform: 'uppercase', fontSize: '13px', fontFamily: MENU_FONT,
+          boxShadow: '0 0 18px rgba(59,130,246,0.24)', cursor: 'pointer',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
+          transition: 'transform 220ms cubic-bezier(0.34,1.56,0.64,1), box-shadow 200ms ease, border-color 200ms ease',
+        }}
+        onMouseEnter={e => {
+          e.currentTarget.style.transform = 'scale(1.07)';
+          e.currentTarget.style.boxShadow = '0 0 36px rgba(59,130,246,0.55), 0 0 72px rgba(59,130,246,0.18)';
+          e.currentTarget.style.borderColor = 'rgba(59,130,246,0.90)';
+        }}
+        onMouseLeave={e => {
+          e.currentTarget.style.transform = 'scale(1)';
+          e.currentTarget.style.boxShadow = '0 0 18px rgba(59,130,246,0.24)';
+          e.currentTarget.style.borderColor = 'rgba(59,130,246,0.55)';
+        }}
+      >
+        <span>CUBE</span>
+        <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.14em', color: 'rgba(180,220,255,0.9)' }}>START HERE</span>
+      </button>
+    </div>
+
+    {/* Coming Soon mode teasers */}
+    <div style={{ width: '100%', maxWidth: '296px' }}>
+      <p style={{
+        margin: '0 0 6px', textAlign: 'center',
+        fontSize: '9px', fontWeight: 700, letterSpacing: '0.20em', textTransform: 'uppercase',
+        color: 'rgba(160,185,255,0.35)', fontFamily: MENU_FONT,
+      }}>Coming Soon</p>
+      <div style={{ display: 'flex', gap: '6px' }}>
+        {COMING_MODES.map(mode => (
+          <button
+            key={mode.label}
+            onClick={onComingSoon}
+            style={{
+              flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
+              padding: '8px 4px 7px',
+              borderRadius: '12px',
+              border: `1px solid ${mode.color}28`,
+              background: `${mode.color}10`,
+              cursor: 'pointer',
+              transition: 'background 180ms ease, border-color 180ms ease, transform 180ms ease',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.background = `${mode.color}22`;
+              e.currentTarget.style.borderColor = `${mode.color}55`;
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = `${mode.color}10`;
+              e.currentTarget.style.borderColor = `${mode.color}28`;
+              e.currentTarget.style.transform = 'none';
+            }}
+          >
+            <span style={{ fontSize: '16px', lineHeight: 1 }}>{mode.icon}</span>
+            <span style={{
+              fontSize: '8px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase',
+              color: `${mode.color}aa`, fontFamily: MENU_FONT,
+            }}>{mode.label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+
+    {/* Utility nav pill */}
     <div style={{
       borderRadius: '100px', padding: '1.5px',
       background: 'linear-gradient(90deg,#22c55e60,#3b82f660,#6366f160)',
       boxShadow: '0 0 20px rgba(60,80,200,0.25), 0 8px 32px rgba(0,0,0,0.5)',
-      width: 'min(260px, 100%)', pointerEvents: 'all',
+      width: 'min(260px, 100%)',
     }}>
       <div style={{
         display: 'flex', background: 'rgba(6,10,24,0.80)',
@@ -804,6 +892,7 @@ const MenuUtilityNav = ({ visible, onFreeplay, onStore }) => (
         <StoreNavItem onStore={onStore} />
       </div>
     </div>
+
   </div>
 );
 
@@ -838,7 +927,7 @@ const MainMenu = ({
   onPlay: _onPlay, onLevels: _onLevels, onFreeplay, onCoop: _onCoop, onTeach: _onTeach,
   onSettings: _onSettings, onBiome: _onBiome, onDisparity: _onDisparity,
   onWormHealer: _onWormHealer, onHolonomy: _onHolonomy, onMerge: _onMerge,
-  onStore, onComingSoon: _onComingSoon, onMobiusCubelet: _onMobiusCubelet,
+  onStore, onComingSoon, onMobiusCubelet: _onMobiusCubelet,
 }) => {
   const [titleVisible, setTitleVisible] = useState(false);
   const [bottomVisible, setBottomVisible] = useState(false);
@@ -861,8 +950,14 @@ const MainMenu = ({
       <MenuBackgroundOrbs />
       <ScreenGlow />
       <MenuTitleCard visible={titleVisible} />
-      <MenuPrimaryActions visible={bottomVisible} onWormSelect={handleWormSelect} onCubeSelect={handleCubeSelect} />
-      <MenuUtilityNav visible={bottomVisible} onFreeplay={onFreeplay} onStore={onStore} />
+      <MenuBottomSection
+        visible={bottomVisible}
+        onWormSelect={handleWormSelect}
+        onCubeSelect={handleCubeSelect}
+        onFreeplay={onFreeplay}
+        onStore={onStore}
+        onComingSoon={onComingSoon}
+      />
     </div>
   );
 };
