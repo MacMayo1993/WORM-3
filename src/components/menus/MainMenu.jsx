@@ -355,7 +355,9 @@ const STICKER_CFG = [
   { dir: 'PZ', pos: [0, 0,  0.501],  rot: [0, 0, 0] },
   { dir: 'NZ', pos: [0, 0, -0.501],  rot: [0, Math.PI, 0] },
 ];
-const ALL_MOVES = ['x', 'y', 'z'].flatMap(ax => [0, 1, 2].flatMap(sl => [1, -1].map(d => ({ ax, sl, d }))));
+const ALL_MOVES = ['col', 'row', 'depth'].flatMap(ax => [0, 1, 2].flatMap(sl => [1, -1].map(d => ({ ax, sl, d }))));
+// Maps axis name → cubie coordinate property (for flat-array slice filtering)
+const AX_PROP = { col: 'x', row: 'y', depth: 'z' };
 const ANIM_DUR = 0.50;
 const PAUSE_DUR = 0.80;
 const easeIO = t => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
@@ -409,9 +411,9 @@ const ShufflingCube = () => {
       const angle = easeIO(progress) * (Math.PI / 2) * rotating.d;
       if (sliceGroupRef.current) {
         sliceGroupRef.current.rotation.set(
-          rotating.ax === 'x' ? angle : 0,
-          rotating.ax === 'y' ? angle : 0,
-          rotating.ax === 'z' ? angle : 0,
+          rotating.ax === 'col'   ? angle : 0,
+          rotating.ax === 'row'   ? angle : 0,
+          rotating.ax === 'depth' ? angle : 0,
         );
       }
       if (progress >= 1) {
@@ -426,8 +428,11 @@ const ShufflingCube = () => {
   });
 
   const { cubies, rotating } = cubeState;
-  const staticCubies = rotating ? cubies.filter(c => c[rotating.ax] !== rotating.sl) : cubies;
-  const sliceCubies = rotating ? cubies.filter(c => c[rotating.ax] === rotating.sl) : [];
+  // makeCubies returns a 3D array [x][y][z]; flatten to a list of 27 cubie objects.
+  const flatCubies = cubies.flat(2);
+  const axProp = rotating ? AX_PROP[rotating.ax] : null;
+  const staticCubies = rotating ? flatCubies.filter(c => c[axProp] !== rotating.sl) : flatCubies;
+  const sliceCubies = rotating ? flatCubies.filter(c => c[axProp] === rotating.sl) : [];
 
   return (
     <>
