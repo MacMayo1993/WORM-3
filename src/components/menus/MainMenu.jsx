@@ -448,6 +448,7 @@ const ShufflingCube = () => {
 const _SEG_Y = [1.12, 0.84, 0.56, 0.28, 0.0];
 const _SEG_R = [0.22, 0.185, 0.158, 0.132, 0.105];
 const _SEG_COL = ['#3be08a', '#2bcc78', '#22b866', '#1aa255', '#148842'];
+const _TRAIL_SIZE = 90; // circular buffer — 90 frames ≈ 1.5 s at 60 fps
 
 const MenuWorm = ({ onWormClick }) => {
   const groupRef = useRef();
@@ -456,7 +457,6 @@ const MenuWorm = ({ onWormClick }) => {
   const seg2Ref = useRef();
   const seg3Ref = useRef();
   const tailRef = useRef();
-  const segRefs = [headRef, seg1Ref, seg2Ref, seg3Ref, tailRef];
 
   const wiggling = useRef(false);
   const wiggleStart = useRef(0);
@@ -464,6 +464,13 @@ const MenuWorm = ({ onWormClick }) => {
   const currentScale = useRef(1.0);
   const callbackRef = useRef(onWormClick);
   callbackRef.current = onWormClick;
+
+  // GC-free circular position history — head position is pushed every frame
+  // and each body segment reads it back at a fixed frame-lag (follow-the-leader).
+  const trailX = useRef(new Float32Array(_TRAIL_SIZE));
+  const trailZ = useRef(new Float32Array(_TRAIL_SIZE));
+  const trailPtr = useRef(0);
+  const trailLen = useRef(0);
 
   useFrame(({ clock }, delta) => {
     if (!groupRef.current) return;
@@ -476,15 +483,43 @@ const MenuWorm = ({ onWormClick }) => {
     }
 
     const isWiggle = wiggling.current;
-    const freq = isWiggle ? 12 : 2.8;
-    const amp = isWiggle ? 0.26 : 0.07;
+    const freq = isWiggle ? 8.5 : 1.6;
+    const ampX = isWiggle ? 0.27 : 0.16;
+    const ampZ = isWiggle ? 0.13 : 0.07;
 
-    segRefs.forEach((ref, i) => {
+    // Head traces a Lissajous figure-8 in XZ — far more natural than pure side-sway.
+    // X: one full cycle per period; Z: half-period with 90° offset → figure-8 shape.
+    const hx = Math.sin(t * freq) * ampX;
+    const hz = Math.sin(t * freq * 0.55 + 1.0) * ampZ;
+
+    // Push head position into the circular history buffer every frame.
+    trailPtr.current = (trailPtr.current + 1) % _TRAIL_SIZE;
+    trailX.current[trailPtr.current] = hx;
+    trailZ.current[trailPtr.current] = hz;
+    if (trailLen.current < _TRAIL_SIZE) trailLen.current++;
+
+    // Head: position + tilt toward velocity direction so it "faces" where it's going.
+    if (headRef.current) {
+      headRef.current.position.set(hx, _SEG_Y[0], hz);
+      const vx = Math.cos(t * freq) * freq * ampX;
+      const vz = Math.cos(t * freq * 0.55 + 1.0) * freq * 0.55 * ampZ;
+      headRef.current.rotation.z = -Math.atan2(vx, 2.0) * 0.55;
+      headRef.current.rotation.x =  Math.atan2(vz, 2.0) * 0.40;
+    }
+
+    // Body segments: each reads its position from the head-history at a fixed lag.
+    // LAG_STEP ≈ 100 ms at 60 fps — gives a smooth wave along the body spine.
+    const LAG_STEP = 6;
+    const bodyRefs = [seg1Ref, seg2Ref, seg3Ref, tailRef];
+    bodyRefs.forEach((ref, i) => {
       if (!ref.current) return;
-      ref.current.position.x = Math.sin(t * freq - i * 0.88) * amp;
-      ref.current.position.y = _SEG_Y[i];
+      const lag = (i + 1) * LAG_STEP;
+      if (trailLen.current <= lag) return;
+      const idx = ((trailPtr.current - lag) % _TRAIL_SIZE + _TRAIL_SIZE) % _TRAIL_SIZE;
+      ref.current.position.set(trailX.current[idx], _SEG_Y[i + 1], trailZ.current[idx]);
     });
 
+    // Subtle vertical bob of the whole worm group.
     groupRef.current.position.y = 1.35 + (isWiggle
       ? Math.abs(Math.sin(t * 14)) * 0.22
       : Math.sin(t * 1.5) * 0.045);
