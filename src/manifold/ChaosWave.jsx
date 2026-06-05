@@ -22,9 +22,19 @@ const seamGlowGeo = new THREE.SphereGeometry(0.2, 8, 8);
 // Large plane covering an entire cube face — reused across all cross-face bolts
 const faceBloomGeo = new THREE.PlaneGeometry(7, 7);
 
-// Reusable vectors — avoids per-frame GC pressure
+// Reusable scratch vectors — avoids per-bolt and per-frame GC pressure
 const _a = new THREE.Vector3();
 const _b = new THREE.Vector3();
+const _c = new THREE.Vector3(); // makePath: along
+const _d = new THREE.Vector3(); // makePath: perp ref axis
+const _e = new THREE.Vector3(); // makePath: p1
+const _f = new THREE.Vector3(); // makePath: p2
+
+// Deterministic pseudo-random for reproducible bolt shape variation per seed
+const seededRand = (s) => {
+  const x = Math.sin(s) * 10000;
+  return x - Math.floor(x);
+};
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const JITTER_SEGS = 10; // points in the jagged path (including endpoints)
@@ -38,10 +48,10 @@ const GHOST_GAP = 0.09; // fraction of path length between ghost positions
  * Jitter tapers to zero at both endpoints so the bolt always starts and ends
  * exactly on the tile surface positions.
  */
-const makePath = (from, to, segs = JITTER_SEGS, jitter = 0.22) => {
-  const f = new THREE.Vector3(...from);
-  const t = new THREE.Vector3(...to);
-  const along = new THREE.Vector3().subVectors(t, f);
+const makePath = (from, to, segs = JITTER_SEGS, jitter = 0.22, seed = 0) => {
+  const f = _a.set(from[0], from[1], from[2]);
+  const t = _b.set(to[0], to[1], to[2]);
+  const along = _c.subVectors(t, f);
   const len = along.length();
 
   if (len < 0.01) return [f.clone(), t.clone()]; // degenerate guard
@@ -49,9 +59,9 @@ const makePath = (from, to, segs = JITTER_SEGS, jitter = 0.22) => {
   along.normalize();
 
   // Two stable perpendicular axes for 3-D jitter
-  const ref = Math.abs(along.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
-  const p1 = new THREE.Vector3().crossVectors(along, ref).normalize();
-  const p2 = new THREE.Vector3().crossVectors(along, p1).normalize();
+  const ref = Math.abs(along.y) < 0.9 ? _d.set(0, 1, 0) : _d.set(1, 0, 0);
+  const p1 = _e.crossVectors(along, ref).normalize();
+  const p2 = _f.crossVectors(along, p1).normalize();
 
   const pts = [f.clone()];
   for (let i = 1; i < segs; i++) {
@@ -60,8 +70,8 @@ const makePath = (from, to, segs = JITTER_SEGS, jitter = 0.22) => {
     // sin-taper: max jitter at midpoint, zero at both ends
     const taper = Math.sin(frac * Math.PI);
     const j = jitter * taper * len;
-    pt.addScaledVector(p1, (Math.random() - 0.5) * 2 * j);
-    pt.addScaledVector(p2, (Math.random() - 0.5) * 2 * j);
+    pt.addScaledVector(p1, (seededRand(seed + i * 2) - 0.5) * 2 * j);
+    pt.addScaledVector(p2, (seededRand(seed + i * 2 + 1) - 0.5) * 2 * j);
     pts.push(pt);
   }
   pts.push(t.clone());
@@ -82,9 +92,11 @@ const pathAt = (pts, t, out) => {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-const ChaosWave = ({ from, to, crossFace = false, onComplete }) => {
+const ChaosWave = ({ from, to, crossFace = false, onComplete, speedMult = 1, colorOverride = null }) => {
   const progressRef = useRef(0);
   const completedRef = useRef(false);
+  // Stable per-instance seed so every bolt has a unique shape
+  const seed = useMemo(() => Math.floor(Math.random() * 10000), []);
 
   const headRef = useRef();
   const ghostRefs = useRef([]);
@@ -95,7 +107,7 @@ const ChaosWave = ({ from, to, crossFace = false, onComplete }) => {
   const faceBloomRef = useRef(); // whole-face bloom overlay (cross-face only)
 
   // ── Stable jagged path — one generation per cascade ──────────────────────
-  const path = useMemo(() => makePath(from, to), [from, to]);
+  const path = useMemo(() => makePath(from, to, JITTER_SEGS, 0.22, seed), [from, to, seed]);
 
   // ── Per-instance line geometries (unique path, so cannot be shared) ───────
   const coreGeo = useMemo(() => {
@@ -116,12 +128,12 @@ const ChaosWave = ({ from, to, crossFace = false, onComplete }) => {
   // ── Color palette ─────────────────────────────────────────────────────────
   // Same-face:   white core, electric-blue glow
   // Cross-face:  white core, cyan glow (the manifold "jump" feels colder)
-  const glowColor = crossFace ? '#00ccff' : '#3377ff';
-  const ghostColor = crossFace ? '#80eeff' : '#6699ff';
+  const glowColor = colorOverride ?? (crossFace ? '#00ccff' : '#3377ff');
+  const ghostColor = colorOverride ?? (crossFace ? '#80eeff' : '#6699ff');
 
   // Cross-face bolts travel through the manifold gap → slight speed reduction
   // so the seam glow has time to read
-  const speed = crossFace ? 1.8 : 2.5;
+  const speed = (crossFace ? 1.8 : 2.5) * speedMult;
 
   // Infer source face position + orientation from the `from` sticker position.
   // The sticker's 0.52 offset along its face normal makes that axis dominant.
