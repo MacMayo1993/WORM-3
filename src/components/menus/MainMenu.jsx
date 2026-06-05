@@ -899,7 +899,7 @@ const MenuTitleCard = ({ visible }) => (
 );
 
 const COMING_MODES = [
-  { icon: '📖', label: 'Story',    color: '#ef4444' },
+  { icon: '§',  label: 'Story',    color: '#ef4444' },
   { icon: '∮',  label: 'Holonomy', color: '#00f5ff' },
   { icon: '⬡',  label: 'Biome',   color: '#60a5fa' },
   { icon: '✦',  label: 'Merge',   color: '#a78bfa' },

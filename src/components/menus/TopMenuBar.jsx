@@ -305,7 +305,7 @@ const TopMenuBar = ({
                 style={{ color: fc[1], fontStyle: 'italic', fontSize: '10px' }}
                 title="Chaos engine seeding — first ignition is automatic"
               >
-                ⚡ igniting…
+                igniting…
               </span>
             )}
           </div>

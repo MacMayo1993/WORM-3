@@ -218,7 +218,7 @@ const DisparityHUD = () => {
       )}
       {disparityWinner && (
         <div style={WINNER_STYLE}>
-          <div style={WINNER_TROPHY_STYLE}>🏆</div>
+          <div style={WINNER_TROPHY_STYLE}>Win</div>
           <div>Winning antipodal pair</div>
           <div style={WINNER_PAIR_STYLE}>
             {(disparityWinner.pair ?? [disparityWinner.gridId]).join(' ↔ ')}

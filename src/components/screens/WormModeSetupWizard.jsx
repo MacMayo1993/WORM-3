@@ -495,8 +495,9 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
               <div style={{
                 width: '56px', height: '36px', borderRadius: '8px',
                 background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center',
-                justifyContent: 'center', fontSize: '20px', flexShrink: 0,
-              }}>📷</div>
+                justifyContent: 'center', fontSize: '10px', fontWeight: 600, letterSpacing: '0.06em',
+                color: 'rgba(200,220,255,0.35)', flexShrink: 0,
+              }}>IMG</div>
             )}
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: '14px', fontWeight: settings.colorScheme === 'custom' ? '600' : '500', color: '#e8edf8' }}>
@@ -633,7 +634,6 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
             style={{ ...S.card(settings.tileStyle === 'random' && !perFace), flexDirection: 'row', alignItems: 'center', gap: '14px' }}
             onClick={() => applyGlobal('random')}
           >
-            <div style={{ width: '48px', height: '48px', borderRadius: '10px', background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', flexShrink: 0 }}>🎲</div>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: '14px', fontWeight: '600', color: '#e8edf8' }}>Random Mix</div>
               <div style={{ fontSize: '12px', color: 'rgba(200,220,255,0.65)', marginTop: '2px' }}>Different style on every face</div>
@@ -832,10 +832,10 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     };
 
     const STAT_ROWS = [
-      { icon: '⚡', label: 'Speed',   key: 'speed',   color: '#f59e0b' },
-      { icon: '💚', label: 'Healing', key: 'healing', color: '#22c55e' },
-      { icon: '🌀', label: 'Agility', key: 'agility', color: '#60a5fa' },
-      { icon: '✨', label: 'Glow',    key: 'glow',    color: '#c084fc' },
+      { label: 'Speed',   key: 'speed',   color: '#f59e0b' },
+      { label: 'Healing', key: 'healing', color: '#22c55e' },
+      { label: 'Agility', key: 'agility', color: '#60a5fa' },
+      { label: 'Glow',    key: 'glow',    color: '#c084fc' },
     ];
 
     return (
@@ -998,11 +998,10 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
 
             {/* Stat bars */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {STAT_ROWS.map(({ icon, label, key, color }) => {
+              {STAT_ROWS.map(({ label, key, color }) => {
                 const val = activeCharacter.stats[key];
                 return (
                   <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <span style={{ fontSize: '13px', width: '18px', flexShrink: 0 }}>{icon}</span>
                     <span style={{ fontSize: '10px', fontWeight: '700', color: '#5c2d0a', width: '46px', textTransform: 'uppercase', letterSpacing: '0.04em', flexShrink: 0 }}>{label}</span>
                     <div style={{ flex: 1, height: '7px', borderRadius: '4px', background: 'rgba(0,0,0,0.12)', overflow: 'hidden' }}>
                       <div style={{
@@ -1116,7 +1115,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
             fontSize: '11px', fontWeight: '700', letterSpacing: '0.12em',
             textTransform: 'uppercase', color: '#c084fc',
           }}>
-            🐍 WORM MODE
+            WORM MODE
           </div>
           <div style={S.stepIndicator}>
             {STEPS.map((_, i) => (
