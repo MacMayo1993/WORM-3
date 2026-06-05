@@ -336,7 +336,7 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     img.src = url;
   };
 
-  const STEPS = ['Scene', 'Colors', 'Style', 'Size'];
+  const STEPS = ['Scene', 'Style', 'Colors', 'Size'];
   const totalSteps = 4;
 
   const handleNext = () => {
@@ -466,6 +466,7 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     const resolvedCustom = settings.colorScheme === 'custom' && settings.customColors
       ? settings.customColors
       : null;
+    const previewStyle = settings.tileStyle === 'random' ? 'solid' : (settings.tileStyle || 'solid');
 
     return (
       <>
@@ -536,10 +537,15 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                 <span style={{ fontSize: '12px', fontWeight: selected ? '600' : '400', color: selected ? '#e8edf8' : 'rgba(200,220,255,0.65)', lineHeight: 1.2 }}>
                   {SCHEME_LABELS[key]}{!owned ? ' 🔒' : ''}
                 </span>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '3px', width: '100%' }}>
-                  {colors.map((c, i) => (
-                    <div key={i} style={{ width: '100%', aspectRatio: '1', borderRadius: '50%', background: owned ? c : '#bbb', boxShadow: '0 1px 2px rgba(0,0,0,0.18)' }} />
-                  ))}
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '5px', overflow: 'hidden', flexShrink: 0 }}>
+                    <TilePreviewCanvas styleKey={previewStyle} colorHex={colors[0] || '#4a7fa5'} size={32} />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '3px', flex: 1 }}>
+                    {colors.slice(1).map((c, i) => (
+                      <div key={i} style={{ width: '100%', aspectRatio: '1', borderRadius: '50%', background: owned ? c : '#bbb', boxShadow: '0 1px 2px rgba(0,0,0,0.18)' }} />
+                    ))}
+                  </div>
                 </div>
                 {selected && (
                   <div style={{ position: 'absolute', top: '8px', right: '8px' }}><Checkmark /></div>
@@ -687,13 +693,13 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
 
   // ── Step titles ─────────────────────────────────────────────────────────────
 
-  const stepContent = [renderBackgrounds, renderColors, renderStyles, renderSize];
-  const stepTitles = ['Background', 'Color Palette', 'Tile Style', 'Cube Size'];
+  const stepContent = [renderBackgrounds, renderStyles, renderColors, renderSize];
+  const stepTitles = ['Background', 'Tile Style', 'Color Palette', 'Cube Size'];
   const stepSubtitles = [
     'Choose your play environment',
-    'Set the colors for your cube faces (or upload an image)',
     'Choose how your tiles look and feel',
-    'Pick your puzzle dimensions with tile previews loaded',
+    'Pick a palette — see it applied to your chosen tile style',
+    'Pick your puzzle dimensions',
   ];
 
   return (
