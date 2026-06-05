@@ -5,6 +5,8 @@ import ParityWallet from '../overlays/ParityWallet.jsx';
 import { makeCubies } from '../../game/cubeState.js';
 import { rotateSliceCubies } from '../../game/cubeRotation.js';
 import { updateSharedTime } from '../../3d/styles/TileStyleMaterials.jsx';
+import FlipPropagationWave from '../../manifold/FlipPropagationWave.jsx';
+import { ANTIPODAL_COLOR } from '../../utils/constants.js';
 
 // ─── Per-face independent pulse timing ────────────────────────────────────────
 // Each of the 6 faces gets its own phase offset so all 6 colors are always
@@ -362,6 +364,26 @@ const ANIM_DUR = 0.50;
 const PAUSE_DUR = 0.80;
 const easeIO = t => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
 
+// Antipodal center-sticker pairs used for the sporadic menu flips.
+// Positions are in ShufflingCube local space (cubies centred at –1/0/+1,
+// sticker planes sit 0.501 beyond that, so surface ≈ ±1.501).
+const MENU_FLIP_PAIRS = [
+  [
+    { dir: 'PZ', cubie: [1, 1, 2], pos: [0, 0,  1.501], rot: [0, 0, 0] },
+    { dir: 'NZ', cubie: [1, 1, 0], pos: [0, 0, -1.501], rot: [0, Math.PI, 0] },
+  ],
+  [
+    { dir: 'PX', cubie: [2, 1, 1], pos: [ 1.501, 0, 0], rot: [0,  Math.PI / 2, 0] },
+    { dir: 'NX', cubie: [0, 1, 1], pos: [-1.501, 0, 0], rot: [0, -Math.PI / 2, 0] },
+  ],
+  [
+    { dir: 'PY', cubie: [1, 2, 1], pos: [0,  1.501, 0], rot: [-Math.PI / 2, 0, 0] },
+    { dir: 'NY', cubie: [1, 0, 1], pos: [0, -1.501, 0], rot: [ Math.PI / 2, 0, 0] },
+  ],
+];
+const MENU_FLIP_INTERVAL = 2.0;
+const MENU_FLIP_JITTER   = 0.6;
+
 const ShuffleCubie = React.memo(({ cubie }) => {
   const cx = cubie.x - 1, cy = cubie.y - 1, cz = cubie.z - 1;
   return (
@@ -397,15 +419,19 @@ const ShufflingCube = () => {
     return { cubies, rotating: null };
   });
 
+  const [flipWaves, setFlipWaves] = useState(null);
   const cubeStateRef = useRef(cubeState);
   cubeStateRef.current = cubeState;
   const sliceGroupRef = useRef();
-  const nextMoveAt = useRef(0);
+  const nextMoveAt  = useRef(0);
+  const nextFlipAt  = useRef(3.0); // first flip after 3 s so the cube settles first
+  const flipIdRef   = useRef(0);
 
   useFrame(({ clock }) => {
     const t = clock.elapsedTime;
     const { rotating, cubies } = cubeStateRef.current;
 
+    // Slice rotation animation
     if (rotating) {
       const progress = Math.min((t - rotating.startT) / ANIM_DUR, 1);
       const angle = easeIO(progress) * (Math.PI / 2) * rotating.d;
@@ -425,6 +451,41 @@ const ShufflingCube = () => {
       const m = ALL_MOVES[Math.floor(Math.random() * ALL_MOVES.length)];
       setCubeState(prev => ({ ...prev, rotating: { ...m, startT: t } }));
     }
+
+    // Sporadic antipodal flip on center stickers — only when no slice is animating
+    if (!rotating && t >= nextFlipAt.current) {
+      nextFlipAt.current = t + MENU_FLIP_INTERVAL + (Math.random() * 2 - 1) * MENU_FLIP_JITTER;
+
+      const pair = MENU_FLIP_PAIRS[Math.floor(Math.random() * MENU_FLIP_PAIRS.length)];
+      const [sA, sB] = pair;
+      const [ax, ay, az] = sA.cubie;
+      const [bx, by, bz] = sB.cubie;
+      const stA = cubies[ax][ay][az].stickers[sA.dir];
+      const stB = cubies[bx][by][bz].stickers[sB.dir];
+
+      // Trigger the ring wave on both sides of the cube (in local cube space)
+      const wid = ++flipIdRef.current;
+      setFlipWaves([
+        { position: sA.pos, rotation: sA.rot, color: FACE_ID_COLOR[stA.curr], id: `${wid}a` },
+        { position: sB.pos, rotation: sB.rot, color: FACE_ID_COLOR[stB.curr], id: `${wid}b` },
+      ]);
+
+      // Swap the sticker colors (deep-clone only the two affected cubies)
+      const newCubies = cubies.map((plane, xi) =>
+        plane.map((row, yi) =>
+          row.map((cubie, zi) => {
+            if (xi === ax && yi === ay && zi === az) {
+              return { ...cubie, stickers: { ...cubie.stickers, [sA.dir]: { ...stA, curr: ANTIPODAL_COLOR[stA.curr] } } };
+            }
+            if (xi === bx && yi === by && zi === bz) {
+              return { ...cubie, stickers: { ...cubie.stickers, [sB.dir]: { ...stB, curr: ANTIPODAL_COLOR[stB.curr] } } };
+            }
+            return cubie;
+          })
+        )
+      );
+      setCubeState({ rotating: null, cubies: newCubies });
+    }
   });
 
   const { cubies, rotating } = cubeState;
@@ -440,6 +501,12 @@ const ShufflingCube = () => {
       <group ref={sliceGroupRef}>
         {sliceCubies.map(c => <ShuffleCubie key={`${c.x}-${c.y}-${c.z}`} cubie={c} />)}
       </group>
+      {flipWaves && (
+        <FlipPropagationWave
+          origins={flipWaves}
+          onComplete={() => setFlipWaves(null)}
+        />
+      )}
     </>
   );
 };
