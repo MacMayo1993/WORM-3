@@ -9,24 +9,28 @@ const _tangent = new THREE.Vector3();
 const _up = new THREE.Vector3(0, 1, 0);
 const _right = new THREE.Vector3();
 
-const SEG_COLORS  = ['#3be08a', '#2fd47e', '#24be72', '#1aa862', '#129650'];
-const TIP_COLOR   = '#b0ffda';
+const SEG_COLORS   = ['#3be08a', '#2fd47e', '#24be72', '#1aa862', '#129650'];
+const TIP_COLOR    = '#b0ffda';
 const TIP_EMISSIVE = '#40ff99';
 
-const wHeadGeo  = new THREE.SphereGeometry(0.18, 12, 12);
+// Proportional to MenuWorm mascot with head r=0.35
+const wHeadGeo  = new THREE.SphereGeometry(0.35, 14, 12);
 const wSegGeos  = [
-  new THREE.SphereGeometry(0.16, 12, 10),
-  new THREE.SphereGeometry(0.14, 10, 8),
-  new THREE.SphereGeometry(0.13, 10, 8),
-  new THREE.SphereGeometry(0.12, 8, 8),
-  new THREE.SphereGeometry(0.10, 8, 8),
+  new THREE.SphereGeometry(0.30, 12, 10),
+  new THREE.SphereGeometry(0.27, 10, 8),
+  new THREE.SphereGeometry(0.25, 10, 8),
+  new THREE.SphereGeometry(0.22, 8, 8),
+  new THREE.SphereGeometry(0.21, 8, 8),
 ];
-const wEyeGeo   = new THREE.SphereGeometry(0.055, 8, 8);
-const wPupilGeo = new THREE.SphereGeometry(0.030, 6, 6);
-const wStemGeo  = new THREE.CylinderGeometry(0.012, 0.009, 0.22, 6);
-const wTipGeo   = new THREE.SphereGeometry(0.022, 6, 6);
+const wEyeGeo   = new THREE.SphereGeometry(0.080, 8, 8);
+const wPupilGeo = new THREE.SphereGeometry(0.042, 6, 6);
+const wStemGeo  = new THREE.CylinderGeometry(0.015, 0.011, 0.32, 6);
+const wTipGeo   = new THREE.SphereGeometry(0.030, 6, 6);
 
+const STEM_HALF = 0.16; // half of stem height (0.32 / 2)
 const SEGMENT_COUNT = 5;
+// How far outside the cube face the worm starts/ends so it's clearly visible
+const FACE_EXTEND = 0.30;
 
 const WormParticle = ({ start, end, color1: _c1, color2: _c2, startTime, currentTime, onComplete }) => {
   const headGroupRef = useRef();
@@ -74,9 +78,14 @@ const WormParticle = ({ start, end, color1: _c1, color2: _c2, startTime, current
       ? 1 : Math.max(0, 1 - (elapsed - duration) / lingerDuration);
     const alpha = fadeIn * fadeOut;
 
-    // S-curve path — identical to the original so the route through the cube is unchanged
+    // Extend start/end outward from cube surface so the worm visibly emerges
     const vStart = _v1.set(...start);
     const vEnd   = _v2.set(...end);
+    _v3.copy(vStart).normalize().multiplyScalar(FACE_EXTEND);
+    vStart.add(_v3);
+    _v3.copy(vEnd).normalize().multiplyScalar(FACE_EXTEND);
+    vEnd.add(_v3);
+
     const dir    = _v3.subVectors(vEnd, vStart);
     const len    = dir.length();
     const dirNorm = dir.clone().normalize();
@@ -134,20 +143,26 @@ const WormParticle = ({ start, end, color1: _c1, color2: _c2, startTime, current
     if (eyeLRef.current) eyeLRef.current.scale.set(1, eyeScaleY, 1);
     if (eyeRRef.current) eyeRRef.current.scale.set(1, eyeScaleY, 1);
 
-    // Antenna wiggle — local rotation, tips follow
-    const antWiggle = Math.sin(clockTime * 6 + p.antennaPhase) * 0.12;
-    const r1 = 0.3 + antWiggle;
-    const r2 = 0.3 + antWiggle;
-    if (ant1StemRef.current) ant1StemRef.current.rotation.z = r1;
-    if (ant2StemRef.current) ant2StemRef.current.rotation.z = -r2;
+    // Antenna wiggle — update stem rotation and recompute tip positions
+    const r = 0.3 + Math.sin(clockTime * 6 + p.antennaPhase) * 0.12;
+    if (ant1StemRef.current) ant1StemRef.current.rotation.z = r;
+    if (ant2StemRef.current) ant2StemRef.current.rotation.z = -r;
     if (ant1TipRef.current) {
-      ant1TipRef.current.position.set(-0.07 + Math.sin(r1) * 0.11, 0.15 + Math.cos(r1) * 0.11, 0.05);
+      ant1TipRef.current.position.set(
+        -0.15 + Math.sin(r) * STEM_HALF,
+        0.35 + Math.cos(r) * STEM_HALF,
+        0.12
+      );
     }
     if (ant2TipRef.current) {
-      ant2TipRef.current.position.set(0.07 - Math.sin(r2) * 0.11, 0.15 + Math.cos(r2) * 0.11, 0.05);
+      ant2TipRef.current.position.set(
+        0.15 - Math.sin(r) * STEM_HALF,
+        0.35 + Math.cos(r) * STEM_HALF,
+        0.12
+      );
     }
 
-    // Body segments — smooth peristaltic wave, opacity fade
+    // Body segments — peristaltic wave with opacity fade
     for (let i = 0; i < SEGMENT_COUNT; i++) {
       const seg = segRefs.current[i];
       if (!seg) continue;
@@ -164,57 +179,50 @@ const WormParticle = ({ start, end, color1: _c1, color2: _c2, startTime, current
 
   return (
     <group>
-      {/* ── Head group — all face features as children inherit the head transform ─ */}
+      {/* ── Head group — children inherit position+orientation from frame loop ─ */}
       <group ref={headGroupRef}>
         <mesh geometry={wHeadGeo} renderOrder={7}>
           <meshStandardMaterial
             color={SEG_COLORS[0]} roughness={0.3} metalness={0}
-            emissive={SEG_COLORS[0]} emissiveIntensity={0.35}
-            depthWrite={false} depthTest={false} toneMapped={false}
+            emissive={SEG_COLORS[0]} emissiveIntensity={0.7}
+            depthWrite={false}
           />
         </mesh>
-        <mesh ref={eyeLRef} position={[-0.09, 0.06, 0.15]} geometry={wEyeGeo} renderOrder={8}>
-          <meshStandardMaterial color="#ffffff" roughness={0.1}
-            depthWrite={false} depthTest={false} toneMapped={false} />
+        <mesh ref={eyeLRef} position={[-0.12, 0.16, 0.26]} geometry={wEyeGeo} renderOrder={8}>
+          <meshStandardMaterial color="#ffffff" roughness={0.1} depthWrite={false} />
         </mesh>
-        <mesh ref={eyeRRef} position={[0.09, 0.06, 0.15]} geometry={wEyeGeo} renderOrder={8}>
-          <meshStandardMaterial color="#ffffff" roughness={0.1}
-            depthWrite={false} depthTest={false} toneMapped={false} />
+        <mesh ref={eyeRRef} position={[0.12, 0.16, 0.26]} geometry={wEyeGeo} renderOrder={8}>
+          <meshStandardMaterial color="#ffffff" roughness={0.1} depthWrite={false} />
         </mesh>
-        <mesh position={[-0.09, 0.065, 0.185]} geometry={wPupilGeo} renderOrder={9}>
-          <meshStandardMaterial color="#0a0a14" roughness={0.5}
-            depthWrite={false} depthTest={false} toneMapped={false} />
+        <mesh position={[-0.12, 0.17, 0.31]} geometry={wPupilGeo} renderOrder={9}>
+          <meshStandardMaterial color="#0a0a14" roughness={0.5} depthWrite={false} />
         </mesh>
-        <mesh position={[0.09, 0.065, 0.185]} geometry={wPupilGeo} renderOrder={9}>
-          <meshStandardMaterial color="#0a0a14" roughness={0.5}
-            depthWrite={false} depthTest={false} toneMapped={false} />
+        <mesh position={[0.12, 0.17, 0.31]} geometry={wPupilGeo} renderOrder={9}>
+          <meshStandardMaterial color="#0a0a14" roughness={0.5} depthWrite={false} />
         </mesh>
-        <mesh position={[0, -0.04, 0.14]} rotation={[0.25, 0, Math.PI]} renderOrder={8}>
-          <torusGeometry args={[0.055, 0.015, 6, 12, Math.PI]} />
-          <meshStandardMaterial color="#0d2410" roughness={0.6}
-            depthWrite={false} depthTest={false} toneMapped={false} />
+        <mesh position={[0, -0.05, 0.27]} rotation={[0.25, 0, Math.PI]} renderOrder={8}>
+          <torusGeometry args={[0.075, 0.021, 6, 12, Math.PI]} />
+          <meshStandardMaterial color="#0d2410" roughness={0.6} depthWrite={false} />
         </mesh>
-        <mesh ref={ant1StemRef} position={[-0.07, 0.15, 0.05]} rotation={[0, 0, 0.3]} geometry={wStemGeo} renderOrder={7}>
+        <mesh ref={ant1StemRef} position={[-0.15, 0.35, 0.12]} rotation={[0, 0, 0.3]} geometry={wStemGeo} renderOrder={7}>
           <meshStandardMaterial color={SEG_COLORS[0]} roughness={0.5}
-            emissive={SEG_COLORS[0]} emissiveIntensity={0.2}
-            depthWrite={false} depthTest={false} toneMapped={false} />
+            emissive={SEG_COLORS[0]} emissiveIntensity={0.4} depthWrite={false} />
         </mesh>
-        <mesh ref={ant2StemRef} position={[0.07, 0.15, 0.05]} rotation={[0, 0, -0.3]} geometry={wStemGeo} renderOrder={7}>
+        <mesh ref={ant2StemRef} position={[0.15, 0.35, 0.12]} rotation={[0, 0, -0.3]} geometry={wStemGeo} renderOrder={7}>
           <meshStandardMaterial color={SEG_COLORS[0]} roughness={0.5}
-            emissive={SEG_COLORS[0]} emissiveIntensity={0.2}
-            depthWrite={false} depthTest={false} toneMapped={false} />
+            emissive={SEG_COLORS[0]} emissiveIntensity={0.4} depthWrite={false} />
         </mesh>
-        <mesh ref={ant1TipRef} position={[-0.07, 0.26, 0.05]} geometry={wTipGeo} renderOrder={8}>
-          <meshStandardMaterial color={TIP_COLOR} emissive={TIP_EMISSIVE} emissiveIntensity={0.8}
-            depthWrite={false} depthTest={false} toneMapped={false} />
+        <mesh ref={ant1TipRef} position={[-0.10, 0.50, 0.12]} geometry={wTipGeo} renderOrder={8}>
+          <meshStandardMaterial color={TIP_COLOR} emissive={TIP_EMISSIVE} emissiveIntensity={1.2}
+            depthWrite={false} />
         </mesh>
-        <mesh ref={ant2TipRef} position={[0.07, 0.26, 0.05]} geometry={wTipGeo} renderOrder={8}>
-          <meshStandardMaterial color={TIP_COLOR} emissive={TIP_EMISSIVE} emissiveIntensity={0.8}
-            depthWrite={false} depthTest={false} toneMapped={false} />
+        <mesh ref={ant2TipRef} position={[0.10, 0.50, 0.12]} geometry={wTipGeo} renderOrder={8}>
+          <meshStandardMaterial color={TIP_COLOR} emissive={TIP_EMISSIVE} emissiveIntensity={1.2}
+            depthWrite={false} />
         </mesh>
       </group>
 
-      {/* ── Body segments ─────────────────────────────────────────────────── */}
+      {/* ── Body segments — depthTest:true (default) so cube occludes them ─── */}
       {Array.from({ length: SEGMENT_COUNT }, (_, i) => (
         <mesh
           key={`seg-${i}`}
@@ -224,9 +232,9 @@ const WormParticle = ({ start, end, color1: _c1, color2: _c2, startTime, current
         >
           <meshStandardMaterial
             color={SEG_COLORS[i]} roughness={0.3} metalness={0}
-            emissive={SEG_COLORS[i]} emissiveIntensity={0.2 - i * 0.025}
+            emissive={SEG_COLORS[i]} emissiveIntensity={0.5 - i * 0.07}
             transparent opacity={0}
-            depthWrite={false} depthTest={false} toneMapped={false}
+            depthWrite={false}
           />
         </mesh>
       ))}
