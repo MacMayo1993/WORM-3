@@ -460,8 +460,8 @@ const MenuWorm = ({ onWormClick }) => {
 
   const wiggling = useRef(false);
   const wiggleStart = useRef(0);
-  const targetScale = useRef(1.0);
-  const currentScale = useRef(1.0);
+  const targetScale = useRef(0.70);
+  const currentScale = useRef(0.70);
   const callbackRef = useRef(onWormClick);
   callbackRef.current = onWormClick;
 
@@ -478,7 +478,7 @@ const MenuWorm = ({ onWormClick }) => {
 
     if (wiggling.current && Date.now() - wiggleStart.current > 720) {
       wiggling.current = false;
-      targetScale.current = 1.0;
+      targetScale.current = 0.70;
       callbackRef.current?.();
     }
 
@@ -533,10 +533,10 @@ const MenuWorm = ({ onWormClick }) => {
     if (wiggling.current) return;
     wiggling.current = true;
     wiggleStart.current = Date.now();
-    targetScale.current = 1.18;
+    targetScale.current = 0.826;
   };
-  const handlePointerDown = (e) => { e.stopPropagation(); targetScale.current = 0.83; };
-  const handlePointerUp = (e) => { e.stopPropagation(); if (!wiggling.current) targetScale.current = 1.0; };
+  const handlePointerDown = (e) => { e.stopPropagation(); targetScale.current = 0.581; };
+  const handlePointerUp = (e) => { e.stopPropagation(); if (!wiggling.current) targetScale.current = 0.70; };
 
   return (
     <group
