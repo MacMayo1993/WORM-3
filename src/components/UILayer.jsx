@@ -69,7 +69,6 @@ export default function UILayer({
   cascades,
   autoRotateEnabled,
   upcomingRotation,
-  rotationCountdown,
   moveHistory,
   undo,
   canUndo,
@@ -236,7 +235,7 @@ export default function UILayer({
 
         {/* Auto-rotate Preview */}
         {autoRotateEnabled && chaosMode && (
-          <RotationPreview upcomingRotation={upcomingRotation} countdown={rotationCountdown} maxCountdown={10000} size={size} />
+          <RotationPreview upcomingRotation={upcomingRotation} size={size} />
         )}
 
         {/* Floating HUD — auto-fade parity/chaos notifications */}

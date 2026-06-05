@@ -292,7 +292,6 @@ function useWormCrawler(size, cubies) {
     const wormSpeedRef = useRef(wormSpeed);
     wormSpeedRef.current = wormSpeed;
     const timeAliveRef = useRef(0);
-    const timeAliveSyncRef = useRef(0);
     const survivalTickRef = useRef(0);
     const healedRef = useRef(0);
     // willHealRef: true when the active tunnel has enough deposited orbs to heal on exit.
@@ -428,6 +427,7 @@ function useWormCrawler(size, cubies) {
             wormAlive: false,
             showWormDeathMenu: false,
             wormDeathDetails: details,
+            wormTimeAlive: Math.floor(timeAliveRef.current),
         });
 
         // Let death state land first, then reveal menu for clearer sequencing.
@@ -571,13 +571,9 @@ function useWormCrawler(size, cubies) {
         if (!alive.current) return;
         if (wormPausedRef.current) return;
 
-        // Track time alive and sync to store every ~0.1s to avoid excessive re-renders
+        // Track time alive in a ref only; published to the store on death or win
+        // to avoid 10Hz Zustand updates that would re-render the entire HUD tree.
         timeAliveRef.current += delta;
-        timeAliveSyncRef.current += delta;
-        if (timeAliveSyncRef.current >= 0.1) {
-            timeAliveSyncRef.current = 0;
-            useGameStore.getState().setWormTimeAlive(Math.floor(timeAliveRef.current));
-        }
 
         // Earn parity points for surviving (1 PP per SURVIVAL_TICK_INTERVAL seconds)
         survivalTickRef.current += delta;
@@ -1061,7 +1057,6 @@ function useWormCrawler(size, cubies) {
         alive.current = true;
         ttReset(tileTrail.current, tileKey(startPos));
         timeAliveRef.current = 0;
-        timeAliveSyncRef.current = 0;
         survivalTickRef.current = 0;
         useGameStore.setState({
             wormPowerups: initial,
@@ -3245,8 +3240,8 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                     const bodyOrbs = useGameStore.getState().wormBodyTiles ?? 0;
                     // 2× multiplier: reward for clearing all tunnels before the clock ran out
                     if (bodyOrbs > 0) useGameStore.getState().earnCoins(bodyOrbs * EARN_ORB_COLLECT * 2);
-                    // Freeze the worm — game is over
-                    useGameStore.setState({ wormGamePhase: 'solved', wormPaused: true });
+                    // Freeze the worm — game is over; publish final time for WinnerScreen
+                    useGameStore.setState({ wormGamePhase: 'solved', wormPaused: true, wormTimeAlive: Math.floor(timeAliveRef.current) });
                 }
             }
             return;

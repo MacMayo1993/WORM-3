@@ -32,7 +32,10 @@ const computeChaosMetrics = (state, surfCoords) => {
   return { disparity, flipActive, edgeTotal };
 };
 
-const COUNTDOWN_PUBLISH_MS = 100;
+// Mutable object shared with RotationPreview for zero-overhead countdown display.
+// RotationPreview polls this in its own RAF loop and mutates the DOM directly,
+// bypassing React's render cycle entirely.
+export const chaosCountdownState = { countdown: 0 };
 
 export function useChaosMode() {
   const chaosLevel = useGameStore((state) => state.chaosLevel);
@@ -53,7 +56,6 @@ export function useChaosMode() {
 
   const upcomingRotation = useGameStore((state) => state.upcomingRotation);
   const setUpcomingRotation = useGameStore((state) => state.setUpcomingRotation);
-  const rotationCountdown = useGameStore((state) => state.rotationCountdown);
   const setRotationCountdown = useGameStore((state) => state.setRotationCountdown);
   const setAnimState = useGameStore((state) => state.setAnimState);
   const setPendingMove = useGameStore((state) => state.setPendingMove);
@@ -70,8 +72,7 @@ export function useChaosMode() {
   upcomingRotationRef.current = upcomingRotation;
   const animStateRef = useRef(animState);
   animStateRef.current = animState;
-  const countdownRef = useRef(rotationCountdown);
-  countdownRef.current = rotationCountdown;
+  const countdownRef = useRef(0);
 
   // Compute surface coords once per size change. Keep a ref so callbacks
   // always read the latest value without re-subscribing. Initialising the ref
@@ -122,6 +123,7 @@ export function useChaosMode() {
     if (!autoRotateEnabled || !chaosMode) {
       setUpcomingRotation(null);
       setRotationCountdown(0);
+      chaosCountdownState.countdown = 0;
       return;
     }
 
@@ -131,7 +133,6 @@ export function useChaosMode() {
 
     let raf = 0;
     let last = performance.now();
-    let publishAcc = 0;
 
     const loop = (now) => {
       const dt = now - last;
@@ -164,15 +165,15 @@ export function useChaosMode() {
         setUpcomingRotation(generated);
         upcomingRotationRef.current = generated;
         countdownRef.current = targetInterval;
+        chaosCountdownState.countdown = targetInterval;
+        // Notify Zustand once per rotation cycle (not per frame) so listeners
+        // that genuinely need the reset value (e.g. DisparityHUD) can react.
         setRotationCountdown(targetInterval);
-        publishAcc = 0;
       } else {
         countdownRef.current = newCountdown;
-        publishAcc += dt;
-        if (publishAcc >= COUNTDOWN_PUBLISH_MS) {
-          setRotationCountdown(newCountdown);
-          publishAcc = 0;
-        }
+        // Write directly to the shared mutable object — RotationPreview reads
+        // this via its own RAF loop without touching React's render pipeline.
+        chaosCountdownState.countdown = newCountdown;
       }
 
       raf = requestAnimationFrame(loop);
@@ -183,6 +184,7 @@ export function useChaosMode() {
     const disparityRatio = Math.min(1, disparity / maxDisparity);
     const initialCountdown = 10000 - disparityRatio * 9250;
     countdownRef.current = initialCountdown;
+    chaosCountdownState.countdown = initialCountdown;
     setRotationCountdown(initialCountdown);
 
     raf = requestAnimationFrame(loop);
@@ -199,7 +201,6 @@ export function useChaosMode() {
     autoRotateEnabled,
     cascades,
     upcomingRotation,
-    rotationCountdown,
     setChaosLevel,
     setAutoRotateEnabled,
     setCascades,
