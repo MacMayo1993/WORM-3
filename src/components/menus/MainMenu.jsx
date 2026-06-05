@@ -445,34 +445,55 @@ const ShufflingCube = () => {
 };
 
 // ─── MenuWorm — worm mascot that sits on top of the cube ─────────────────────
-const _SEG_Y = [1.12, 0.84, 0.56, 0.28, 0.0];
-const _SEG_R = [0.22, 0.185, 0.158, 0.132, 0.105];
+const _SEG_Y   = [1.12, 0.84, 0.56, 0.28, 0.0];
+const _SEG_R   = [0.22, 0.185, 0.158, 0.132, 0.105];
 const _SEG_COL = ['#3be08a', '#2bcc78', '#22b866', '#1aa255', '#148842'];
-const _TRAIL_SIZE = 90; // circular buffer — 90 frames ≈ 1.5 s at 60 fps
+
+// Distance-based path constants (world units)
+const _PATH_MIN_DIST = 0.004;           // only record a point when head moves this far
+const _SEG_SPACING   = 0.145;           // arc-length between adjacent segment centers
+const _MAX_PATH_LEN  = 4 * 0.145 + 0.15; // keep only enough history for all 4 body segments
+
+// Interpolate the head's recorded XZ path at `behindDist` world-units behind the current tip.
+// path: [{x, z, arc}] — arc grows monotonically from oldest→newest entry.
+function _samplePath(path, behindDist) {
+  if (path.length === 0) return { x: 0, z: 0 };
+  const headArc   = path[path.length - 1].arc;
+  const targetArc = headArc - behindDist;
+  if (targetArc <= path[0].arc) return { x: path[0].x, z: path[0].z };
+  let lo = 0, hi = path.length - 1;
+  while (lo < hi - 1) {
+    const mid = (lo + hi) >> 1;
+    if (path[mid].arc <= targetArc) lo = mid; else hi = mid;
+  }
+  const p0 = path[lo], p1 = path[hi];
+  const frac = p1.arc === p0.arc ? 0 : (targetArc - p0.arc) / (p1.arc - p0.arc);
+  return { x: p0.x + (p1.x - p0.x) * frac, z: p0.z + (p1.z - p0.z) * frac };
+}
 
 const MenuWorm = ({ onWormClick }) => {
-  const groupRef = useRef();
-  const headRef = useRef();
-  const seg1Ref = useRef();
-  const seg2Ref = useRef();
-  const seg3Ref = useRef();
-  const tailRef = useRef();
+  const groupRef    = useRef();
+  const headRef     = useRef();      // position + rotation of the whole head
+  const headBodyRef = useRef();      // scale-only inner group — sphere only, eyes/antennae excluded
+  const seg1Ref     = useRef();
+  const seg2Ref     = useRef();
+  const seg3Ref     = useRef();
+  const tailRef     = useRef();
 
-  const wiggling = useRef(false);
+  const wiggling    = useRef(false);
   const wiggleStart = useRef(0);
-  const targetScale = useRef(0.70);
+  const targetScale  = useRef(0.70);
   const currentScale = useRef(0.70);
-  const callbackRef = useRef(onWormClick);
+  const callbackRef  = useRef(onWormClick);
   callbackRef.current = onWormClick;
 
-  // GC-free circular position history — head position is pushed every frame
-  // and each body segment reads it back at a fixed frame-lag (follow-the-leader).
-  const trailX = useRef(new Float32Array(_TRAIL_SIZE));
-  const trailZ = useRef(new Float32Array(_TRAIL_SIZE));
-  const trailPtr = useRef(0);
-  const trailLen = useRef(0);
+  // Path-based trailing: each entry { x, z, arc } — frame-rate independent
+  const pathBuf  = useRef([{ x: 0, z: 0, arc: 0 }]);
+  const prevHead = useRef({ x: 0, z: 0 });
+  // Low-pass smoothed pointer for jitter-free cursor look-at blend
+  const smoothPtr = useRef({ x: 0, y: 0 });
 
-  useFrame(({ clock }, delta) => {
+  useFrame(({ clock, pointer }, delta) => {
     if (!groupRef.current) return;
     const t = clock.elapsedTime;
 
@@ -482,44 +503,69 @@ const MenuWorm = ({ onWormClick }) => {
       callbackRef.current?.();
     }
 
+    // Smooth the raw pointer so small hand tremors don't jitter the head
+    smoothPtr.current.x += (pointer.x - smoothPtr.current.x) * Math.min(1, delta * 5);
+    smoothPtr.current.y += (pointer.y - smoothPtr.current.y) * Math.min(1, delta * 5);
+
     const isWiggle = wiggling.current;
     const freq = isWiggle ? 8.5 : 1.6;
     const ampX = isWiggle ? 0.27 : 0.16;
     const ampZ = isWiggle ? 0.13 : 0.07;
 
-    // Head traces a Lissajous figure-8 in XZ — far more natural than pure side-sway.
-    // X: one full cycle per period; Z: half-period with 90° offset → figure-8 shape.
+    // Head traces a Lissajous figure-8 in XZ
     const hx = Math.sin(t * freq) * ampX;
     const hz = Math.sin(t * freq * 0.55 + 1.0) * ampZ;
 
-    // Push head position into the circular history buffer every frame.
-    trailPtr.current = (trailPtr.current + 1) % _TRAIL_SIZE;
-    trailX.current[trailPtr.current] = hx;
-    trailZ.current[trailPtr.current] = hz;
-    if (trailLen.current < _TRAIL_SIZE) trailLen.current++;
+    // ── Distance-based path recording (frame-rate independent) ───────────────
+    const prev = prevHead.current;
+    const dx = hx - prev.x, dz = hz - prev.z;
+    const stepDist = Math.sqrt(dx * dx + dz * dz);
+    const path = pathBuf.current;
 
-    // Head: position + tilt toward velocity direction so it "faces" where it's going.
-    if (headRef.current) {
-      headRef.current.position.set(hx, _SEG_Y[0], hz);
-      const vx = Math.cos(t * freq) * freq * ampX;
-      const vz = Math.cos(t * freq * 0.55 + 1.0) * freq * 0.55 * ampZ;
-      headRef.current.rotation.z = -Math.atan2(vx, 2.0) * 0.55;
-      headRef.current.rotation.x =  Math.atan2(vz, 2.0) * 0.40;
+    if (stepDist >= _PATH_MIN_DIST) {
+      path.push({ x: hx, z: hz, arc: path[path.length - 1].arc + stepDist });
+      prevHead.current = { x: hx, z: hz };
+      // Trim entries older than the max needed arc length
+      const headArc = path[path.length - 1].arc;
+      const minKeep = headArc - _MAX_PATH_LEN;
+      let trim = 0;
+      while (trim < path.length - 1 && path[trim + 1].arc < minKeep) trim++;
+      if (trim > 0) path.splice(0, trim);
     }
 
-    // Body segments: each reads its position from the head-history at a fixed lag.
-    // LAG_STEP ≈ 100 ms at 60 fps — gives a smooth wave along the body spine.
-    const LAG_STEP = 6;
+    // ── Head: position + tilt + cursor blend + squash/stretch ────────────────
+    // Analytic derivatives for smooth, jitter-free velocity
+    const vx    = Math.cos(t * freq) * freq * ampX;
+    const vz    = Math.cos(t * freq * 0.55 + 1.0) * freq * 0.55 * ampZ;
+    const speed = Math.sqrt(vx * vx + vz * vz);
+
+    if (headRef.current) {
+      headRef.current.position.set(hx, _SEG_Y[0], hz);
+      // 80 % path-tilt, 20 % cursor look-at so the worm glances at the pointer
+      headRef.current.rotation.z = -Math.atan2(vx, 2.0) * 0.55 - smoothPtr.current.x * 0.20;
+      headRef.current.rotation.x =  Math.atan2(vz, 2.0) * 0.40 + smoothPtr.current.y * 0.14;
+    }
+    // Squash/stretch the head body sphere without affecting eyes or antennae
+    if (headBodyRef.current) {
+      const stretch = 1 + Math.min(speed * 0.45, 0.35);
+      const squash  = 1 / Math.sqrt(stretch);
+      headBodyRef.current.scale.set(squash, stretch, squash);
+    }
+
+    // ── Body segments: arc-length interpolation + squash/stretch ─────────────
     const bodyRefs = [seg1Ref, seg2Ref, seg3Ref, tailRef];
     bodyRefs.forEach((ref, i) => {
       if (!ref.current) return;
-      const lag = (i + 1) * LAG_STEP;
-      if (trailLen.current <= lag) return;
-      const idx = ((trailPtr.current - lag) % _TRAIL_SIZE + _TRAIL_SIZE) % _TRAIL_SIZE;
-      ref.current.position.set(trailX.current[idx], _SEG_Y[i + 1], trailZ.current[idx]);
+      const pos = _samplePath(path, (i + 1) * _SEG_SPACING);
+      ref.current.position.set(pos.x, _SEG_Y[i + 1], pos.z);
+      // Speed decays slightly down the body (tail lags in energy)
+      const segSpeed  = speed * Math.max(0.35, 1 - i * 0.18);
+      const stretch   = 1 + Math.min(segSpeed * 0.28, 0.28);
+      const squash    = 1 / Math.sqrt(stretch);
+      ref.current.scale.set(squash, stretch, squash);
     });
 
-    // Subtle vertical bob of the whole worm group.
+    // Vertical bob of the whole group
     groupRef.current.position.y = 1.35 + (isWiggle
       ? Math.abs(Math.sin(t * 14)) * 0.22
       : Math.sin(t * 1.5) * 0.045);
@@ -536,7 +582,7 @@ const MenuWorm = ({ onWormClick }) => {
     targetScale.current = 0.826;
   };
   const handlePointerDown = (e) => { e.stopPropagation(); targetScale.current = 0.581; };
-  const handlePointerUp = (e) => { e.stopPropagation(); if (!wiggling.current) targetScale.current = 0.70; };
+  const handlePointerUp   = (e) => { e.stopPropagation(); if (!wiggling.current) targetScale.current = 0.70; };
 
   return (
     <group
@@ -547,12 +593,20 @@ const MenuWorm = ({ onWormClick }) => {
       onPointerUp={handlePointerUp}
       onPointerLeave={handlePointerUp}
     >
-      {/* Head with eyes + antennae */}
+      {/* Head — outer group: position + rotation; inner group: squash/stretch sphere only */}
       <group ref={headRef}>
-        <mesh>
-          <sphereGeometry args={[_SEG_R[0], 14, 14]} />
-          <meshStandardMaterial color={_SEG_COL[0]} roughness={0.3} metalness={0.1} emissive={_SEG_COL[0]} emissiveIntensity={0.15} />
-        </mesh>
+        <group ref={headBodyRef}>
+          <mesh>
+            <sphereGeometry args={[_SEG_R[0], 16, 16]} />
+            <meshPhysicalMaterial
+              color={_SEG_COL[0]} roughness={0.22} metalness={0.0}
+              emissive={_SEG_COL[0]} emissiveIntensity={0.14}
+              transmission={0.10} thickness={0.45} ior={1.42}
+              clearcoat={0.35} clearcoatRoughness={0.18}
+            />
+          </mesh>
+        </group>
+        {/* Eyes */}
         <mesh position={[-0.085, 0.13, 0.19]}>
           <sphereGeometry args={[0.058, 8, 8]} />
           <meshStandardMaterial color="#ffffff" roughness={0.2} />
@@ -569,6 +623,7 @@ const MenuWorm = ({ onWormClick }) => {
           <sphereGeometry args={[0.03, 6, 6]} />
           <meshStandardMaterial color="#0a0a14" roughness={0.5} />
         </mesh>
+        {/* Antennae */}
         <mesh position={[-0.11, 0.28, 0.1]} rotation={[0, 0, 0.3]}>
           <cylinderGeometry args={[0.012, 0.008, 0.25, 6]} />
           <meshStandardMaterial color={_SEG_COL[0]} roughness={0.5} />
@@ -586,31 +641,53 @@ const MenuWorm = ({ onWormClick }) => {
           <meshStandardMaterial color="#b0ffda" emissive="#40ff99" emissiveIntensity={0.6} />
         </mesh>
       </group>
-      {/* Body segments */}
+
+      {/* Body segments — group scale drives squash/stretch each frame */}
       <group ref={seg1Ref}>
         <mesh>
           <sphereGeometry args={[_SEG_R[1], 12, 12]} />
-          <meshStandardMaterial color={_SEG_COL[1]} roughness={0.35} metalness={0.08} emissive={_SEG_COL[1]} emissiveIntensity={0.10} />
+          <meshPhysicalMaterial
+            color={_SEG_COL[1]} roughness={0.26} metalness={0.0}
+            emissive={_SEG_COL[1]} emissiveIntensity={0.10}
+            transmission={0.09} thickness={0.40} ior={1.40}
+            clearcoat={0.25} clearcoatRoughness={0.22}
+          />
         </mesh>
       </group>
       <group ref={seg2Ref}>
         <mesh>
           <sphereGeometry args={[_SEG_R[2], 12, 12]} />
-          <meshStandardMaterial color={_SEG_COL[2]} roughness={0.38} metalness={0.08} emissive={_SEG_COL[2]} emissiveIntensity={0.10} />
+          <meshPhysicalMaterial
+            color={_SEG_COL[2]} roughness={0.28} metalness={0.0}
+            emissive={_SEG_COL[2]} emissiveIntensity={0.09}
+            transmission={0.08} thickness={0.36} ior={1.38}
+            clearcoat={0.20} clearcoatRoughness={0.24}
+          />
         </mesh>
       </group>
       <group ref={seg3Ref}>
         <mesh>
           <sphereGeometry args={[_SEG_R[3], 10, 10]} />
-          <meshStandardMaterial color={_SEG_COL[3]} roughness={0.4} metalness={0.06} emissive={_SEG_COL[3]} emissiveIntensity={0.09} />
+          <meshPhysicalMaterial
+            color={_SEG_COL[3]} roughness={0.30} metalness={0.0}
+            emissive={_SEG_COL[3]} emissiveIntensity={0.08}
+            transmission={0.07} thickness={0.32} ior={1.36}
+            clearcoat={0.15} clearcoatRoughness={0.26}
+          />
         </mesh>
       </group>
       <group ref={tailRef}>
         <mesh>
           <sphereGeometry args={[_SEG_R[4], 10, 10]} />
-          <meshStandardMaterial color={_SEG_COL[4]} roughness={0.45} metalness={0.05} emissive={_SEG_COL[4]} emissiveIntensity={0.08} />
+          <meshPhysicalMaterial
+            color={_SEG_COL[4]} roughness={0.33} metalness={0.0}
+            emissive={_SEG_COL[4]} emissiveIntensity={0.07}
+            transmission={0.06} thickness={0.28} ior={1.35}
+            clearcoat={0.10} clearcoatRoughness={0.28}
+          />
         </mesh>
       </group>
+
       {/* Soft glow halo */}
       <mesh position={[0, 0.56, 0]}>
         <sphereGeometry args={[0.55, 10, 10]} />
