@@ -445,7 +445,7 @@ const ShufflingCube = () => {
 };
 
 // ─── MenuWorm — round-blob worm mascot emerging from the cube's top face ──────
-const _SEG_Y         = [0.80, 0.44, 0.10, -0.25, -0.55]; // head up, lower segs inside cube
+const _SEG_Y         = [0.80, 0.55, 0.33, 0.15, 0.00]; // all segs above cube surface
 const _SEG_R         = [0.24, 0.22, 0.21, 0.20, 0.18];   // uniform blobs, gentle taper
 const _SEG_COL       = ['#3be08a', '#2fd47e', '#24be72', '#1aa862', '#129650'];
 const _PATH_MIN_DIST = 0.004;
@@ -588,9 +588,9 @@ const MenuWorm = ({ onWormClick }) => {
     if (pupilRRef.current) pupilRRef.current.scale.setScalar(pupilCurrentScale.current);
 
     // ── Group bob + master scale ────────────────────────────────────────────
-    groupRef.current.position.y = 1.10 + (isWiggle
+    groupRef.current.position.y = 1.45 + (isWiggle
       ? Math.abs(Math.sin(t * 14)) * 0.20
-      : Math.sin(t * 1.5) * 0.04);
+      : Math.sin(t * 1.5) * 0.06);
     currentScale.current += (targetScale.current - currentScale.current) * Math.min(1, delta * 16);
     groupRef.current.scale.setScalar(currentScale.current);
   });
@@ -609,7 +609,7 @@ const MenuWorm = ({ onWormClick }) => {
   return (
     <group
       ref={groupRef}
-      position={[0, 1.10, 0]}
+      position={[0, 1.45, 0]}
       onClick={handleClick}
       onPointerDown={handlePointerDown}
       onPointerUp={handlePointerUp}
@@ -644,7 +644,7 @@ const MenuWorm = ({ onWormClick }) => {
           <meshStandardMaterial color="#0a0a14" roughness={0.5} />
         </mesh>
         {/* Smile */}
-        <mesh position={[0, 0.04, 0.235]} rotation={[0.25, 0, 0]}>
+        <mesh position={[0, -0.04, 0.235]} rotation={[0.25, 0, Math.PI]}>
           <torusGeometry args={[0.065, 0.018, 6, 14, Math.PI]} />
           <meshStandardMaterial color="#0d2410" roughness={0.6} />
         </mesh>
