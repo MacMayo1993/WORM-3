@@ -1156,7 +1156,8 @@ function useWormCrawler(size, cubies) {
         tailLength, stepHistory, orbPickupColorsRef, tick, queueTurn,
         voidTunnelKeysRef, tunnelUseCountsRef,
         willHealRef, healFiredRef, pendingHealBurstRef, pendingOrbFlashRef,
-    tileTrail, killWorm,
+        tileTrail, killWorm,
+        timeAliveRef,
     };
 }
 
@@ -3241,7 +3242,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                     // 2× multiplier: reward for clearing all tunnels before the clock ran out
                     if (bodyOrbs > 0) useGameStore.getState().earnCoins(bodyOrbs * EARN_ORB_COLLECT * 2);
                     // Freeze the worm — game is over; publish final time for WinnerScreen
-                    useGameStore.setState({ wormGamePhase: 'solved', wormPaused: true, wormTimeAlive: Math.floor(timeAliveRef.current) });
+                    useGameStore.setState({ wormGamePhase: 'solved', wormPaused: true, wormTimeAlive: Math.floor(worm.timeAliveRef.current) });
                 }
             }
             return;
