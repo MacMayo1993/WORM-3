@@ -20,6 +20,7 @@ const FlipPropagationWave = ({ origins, onComplete }) => {
   const [currentTime, setCurrentTime] = useState(0);
   const ringsRef = useRef([]);
   const startTimeRef = useRef(null);
+  const wormCompleteCount = useRef(0);
   const { clock } = useThree();
 
   // ── Stable worm destinations — computed ONCE per origins change, not per render ──
@@ -60,6 +61,7 @@ const FlipPropagationWave = ({ origins, onComplete }) => {
 
   useEffect(() => {
     setProgress(0);
+    wormCompleteCount.current = 0;
     startTimeRef.current = clock.getElapsedTime();
     setCurrentTime(clock.getElapsedTime());
   }, [origins, clock]);
@@ -95,9 +97,7 @@ const FlipPropagationWave = ({ origins, onComplete }) => {
       }
     });
 
-    if (newProgress >= 1) {
-      onComplete?.();
-    }
+    // Rings are done — worms own the component lifetime now
   });
 
   if (!origins || origins.length === 0) return null;
@@ -145,12 +145,15 @@ const FlipPropagationWave = ({ origins, onComplete }) => {
         <WormParticle
           key={`worm-${idx}`}
           start={origin.position}
-          end={wormEnds[idx] || origin.position}   // stable, pre-computed destination
+          end={wormEnds[idx] || origin.position}
           color1={origin.color}
           color2={origin.color}
           startTime={startTimeRef.current || 0}
-          currentTime={currentTime}                 // ← the missing prop that froze all worms
-          onComplete={null}
+          currentTime={currentTime}
+          onComplete={() => {
+            wormCompleteCount.current += 1;
+            if (wormCompleteCount.current >= origins.length) onComplete?.();
+          }}
         />
       ))}
     </group>
