@@ -66,13 +66,17 @@ const WormParticle = ({ start, end: _end, color1, color2: _c2, startTime, onComp
 
   const blinkTimerRef = useRef(0);
   const isBlinkingRef = useRef(false);
+  const hasCompletedRef = useRef(false);
 
   useFrame((state) => {
     const clockTime = state.clock.getElapsedTime();
     if (clockTime < startTime) return;
 
     const elapsed = clockTime - startTime;
-    if (elapsed >= totalDuration) { onComplete?.(); return; }
+    if (elapsed >= totalDuration) {
+      if (!hasCompletedRef.current) { hasCompletedRef.current = true; onComplete?.(); }
+      return;
+    }
 
     const tRaw     = Math.min(elapsed / duration, 1);
     const progress = 1 - Math.pow(1 - tRaw, 3); // ease-out cubic — head races out first

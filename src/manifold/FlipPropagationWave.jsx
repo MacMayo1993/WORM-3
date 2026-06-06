@@ -60,14 +60,12 @@ const TileFlash = ({ startTime, color }) => {
 
 /**
  * FlipPropagationWave - Visual wave that propagates from flip origins across the cube.
- * WormParticles use state.clock directly — no currentTime prop needed.
+ * startTime is passed in from the parent so it's correct on the very first frame.
  */
-const FlipPropagationWave = ({ origins, onComplete }) => {
+const FlipPropagationWave = ({ origins, startTime, onComplete }) => {
   const [progress, setProgress] = useState(0);
   const ringsRef = useRef([]);
-  const startTimeRef = useRef(null);
-  const wormCompleteCount = useRef(0);
-  const { clock } = useThree();
+  const onCompleteCalledRef = useRef(false);
 
   // ── Stable worm destinations — computed ONCE per origins change ──
   const wormEnds = useMemo(() => {
@@ -91,12 +89,6 @@ const FlipPropagationWave = ({ origins, onComplete }) => {
   }, [origins]);
 
   useEffect(() => {
-    setProgress(0);
-    wormCompleteCount.current = 0;
-    startTimeRef.current = clock.getElapsedTime();
-  }, [origins, clock]);
-
-  useEffect(() => {
     return () => { ringsRef.current = []; };
   }, []);
 
@@ -114,6 +106,12 @@ const FlipPropagationWave = ({ origins, onComplete }) => {
   });
 
   if (!origins || origins.length === 0) return null;
+
+  const wormCompleted = () => {
+    if (onCompleteCalledRef.current) return;
+    onCompleteCalledRef.current = true;
+    onComplete?.();
+  };
 
   return (
     <group>
@@ -134,7 +132,7 @@ const FlipPropagationWave = ({ origins, onComplete }) => {
             />
           </mesh>
           {/* Tile face flash — bright disc that pops open like a wormhole gate */}
-          <TileFlash startTime={startTimeRef.current || 0} color={origin.color} />
+          <TileFlash startTime={startTime} color={origin.color} />
           {/* Shard burst particles — same effect as disparity mode */}
           <AutoFlipParticles color={origin.color} />
         </group>
@@ -148,11 +146,8 @@ const FlipPropagationWave = ({ origins, onComplete }) => {
           end={wormEnds[idx] || origin.position}
           color1={origin.color}
           color2={origin.color}
-          startTime={startTimeRef.current || 0}
-          onComplete={() => {
-            wormCompleteCount.current += 1;
-            if (wormCompleteCount.current >= origins.length) onComplete?.();
-          }}
+          startTime={startTime}
+          onComplete={idx === 0 ? wormCompleted : undefined}
         />
       ))}
     </group>

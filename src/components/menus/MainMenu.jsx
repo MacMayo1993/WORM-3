@@ -466,9 +466,9 @@ const ShufflingCube = () => {
       setCubeState(prev => ({ ...prev, rotating: { ...m, startT: t } }));
     }
 
-    // Sporadic antipodal flip — only when no slice is animating and no worm wave is active.
-    // Pausing while waves are active keeps the tile stationary so worms stay anchored.
-    if (!rotating && flipWavesRef.current.length === 0 && t >= nextFlipAt.current) {
+    // Sporadic antipodal flip — fires on a timer regardless of active waves so worms
+    // keep spawning continuously. Multiple waves are allowed concurrently.
+    if (!rotating && t >= nextFlipAt.current) {
       nextFlipAt.current = t + MENU_FLIP_INTERVAL + (Math.random() * 2 - 1) * MENU_FLIP_JITTER;
 
       const pair = MENU_FLIP_PAIRS[Math.floor(Math.random() * MENU_FLIP_PAIRS.length)];
@@ -478,13 +478,13 @@ const ShufflingCube = () => {
       const stA = cubies[ax][ay][az].stickers[sA.dir];
       const stB = cubies[bx][by][bz].stickers[sB.dir];
 
-      // Spawn worm wave — exactly one wave at a time (gated above on length === 0).
-      // safeAx is stored so the rotation timer can use it while the wave is active.
+      // Append new wave so concurrent waves are allowed (multiple worm pairs on screen).
       const safeAx = FLIP_PAIR_SAFE_AX[sA.dir];
       const wid = ++flipIdRef.current;
-      setFlipWaves([{
+      setFlipWaves(prev => [...prev, {
         id: wid,
         safeAx,
+        startTime: t,
         origins: [
           { position: sA.pos, rotation: sA.rot, color: FACE_ID_COLOR[stA.curr], id: `${wid}a` },
           { position: sB.pos, rotation: sB.rot, color: FACE_ID_COLOR[stB.curr], id: `${wid}b` },
@@ -527,6 +527,7 @@ const ShufflingCube = () => {
         <FlipPropagationWave
           key={wave.id}
           origins={wave.origins}
+          startTime={wave.startTime}
           onComplete={() => setFlipWaves(prev => prev.filter(w => w.id !== wave.id))}
         />
       ))}
