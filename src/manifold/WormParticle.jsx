@@ -9,9 +9,7 @@ const _wigDir   = new THREE.Vector3();
 const _tangent  = new THREE.Vector3();
 const _lookQuat = new THREE.Quaternion();
 const _fwdAxis  = new THREE.Vector3(0, 0, 1);
-const _flyOff   = new THREE.Vector3();
 
-// Head only slightly larger; first two segs nearly same size as head
 const wHeadGeo  = new THREE.SphereGeometry(0.22, 14, 12);
 const wSegGeos  = [
   new THREE.SphereGeometry(0.21, 12, 10),
@@ -29,26 +27,23 @@ const STEM_HALF     = 0.10;
 const SEGMENT_COUNT = 5;
 
 /**
- * WormParticle — cartoon apple-worm emerges from a flip tile.
- * Outer group is anchored at `start` (face tile center) so the worm
- * rotates with the cube. Uses color1 (the flipped face color) for the body.
- * Emerges along the arc, then flies off in the same direction — no linger stop.
+ * WormParticle — emerges from a flip tile along an arc, then retreats
+ * back into the hole in reverse. No fly-off; the hole swallows it whole.
  */
 const WormParticle = ({ start, end: _end, color1, color2: _c2, startTime, onComplete }) => {
-  const headGroupRef  = useRef();
-  const eyeLRef       = useRef();
-  const eyeRRef       = useRef();
-  const ant1StemRef   = useRef();
-  const ant2StemRef   = useRef();
-  const ant1TipRef    = useRef();
-  const ant2TipRef    = useRef();
-  const segRefs       = useRef([]);  // groups — position + scale
-  const segMeshRefs   = useRef([]);  // meshes — material opacity
+  const headGroupRef = useRef();
+  const eyeLRef      = useRef();
+  const eyeRRef      = useRef();
+  const ant1StemRef  = useRef();
+  const ant2StemRef  = useRef();
+  const ant1TipRef   = useRef();
+  const ant2TipRef   = useRef();
+  const segRefs      = useRef([]);   // groups — position + scale
+  const segMeshRefs  = useRef([]);   // meshes — material opacity
 
-  const duration      = 2.0;
-  const lingerDur     = 0;    // no stop — fly off immediately after emergence
-  const flyDur        = 1.5;
-  const totalDuration = duration + lingerDur + flyDur;
+  const duration      = 2.0;   // emerge from hole
+  const retreatDur    = 2.0;   // slide back in — mirrors the emergence
+  const totalDuration = duration + retreatDur;
 
   const p = useMemo(() => ({
     arcPhase    : Math.random() * Math.PI * 2,
@@ -59,9 +54,9 @@ const WormParticle = ({ start, end: _end, color1, color2: _c2, startTime, onComp
     antennaPhase: Math.random() * Math.PI * 2,
   }), []);
 
-  const blinkTimerRef    = useRef(0);
-  const isBlinkingRef    = useRef(false);
-  const hasCompletedRef  = useRef(false);
+  const blinkTimerRef   = useRef(0);
+  const isBlinkingRef   = useRef(false);
+  const hasCompletedRef = useRef(false);
 
   useFrame((state) => {
     const clockTime = state.clock.getElapsedTime();
@@ -73,11 +68,18 @@ const WormParticle = ({ start, end: _end, color1, color2: _c2, startTime, onComp
       return;
     }
 
-    const tRaw     = Math.min(elapsed / duration, 1);
+    const tRaw    = Math.min(elapsed / duration, 1);
     const progress = 1 - Math.pow(1 - tRaw, 3); // ease-out cubic
-    const alpha    = Math.min(1, elapsed / 0.25);
-    const inFlyOff = elapsed > duration;
-    const flyT     = inFlyOff ? elapsed - duration : 0;
+    const alpha   = Math.min(1, elapsed / 0.25);
+
+    // After emergence, retreat: displayProgress goes 1→0 (back into hole)
+    const inRetreat      = elapsed > duration;
+    const retreatT       = inRetreat ? elapsed - duration : 0;
+    const retreatProg    = Math.min(1, retreatT / retreatDur);
+    const easeRetract    = retreatProg < 0.5
+      ? 2 * retreatProg * retreatProg                // ease-in start
+      : 1 - Math.pow(-2 * retreatProg + 2, 2) / 2;  // ease-out finish
+    const displayProgress = inRetreat ? 1 - easeRetract : progress;
 
     // Face normal from tile center position
     _faceN.set(...start).normalize();
@@ -91,41 +93,35 @@ const WormParticle = ({ start, end: _end, color1, color2: _c2, startTime, onComp
     _arcDir.copy(_perp).multiplyScalar(cosP).addScaledVector(arcFwdVec, sinP);
     _wigDir.copy(_perp).multiplyScalar(-sinP).addScaledVector(arcFwdVec, cosP);
 
-    const wLive = Math.sin(clockTime * 2.5) * 0.05;
+    const wLive = Math.sin(clockTime * 2.5) * 0.04;
 
+    // Arc: emerges perpendicular to face then curves along arcDir.
+    // wp3→wp4 keeps faceN component rising so the head doesn't droop back down.
     const wp0 = new THREE.Vector3().addScaledVector(_faceN, -0.20);
-    const wp1 = new THREE.Vector3().addScaledVector(_faceN,  0.14);
+    const wp1 = new THREE.Vector3().addScaledVector(_faceN,  0.18);
     const wp2 = new THREE.Vector3()
-      .addScaledVector(_faceN,  0.42).addScaledVector(_arcDir, 0.22).addScaledVector(_wigDir, wLive);
+      .addScaledVector(_faceN, 0.48).addScaledVector(_arcDir, 0.18).addScaledVector(_wigDir, wLive);
     const wp3 = new THREE.Vector3()
-      .addScaledVector(_faceN,  0.54).addScaledVector(_arcDir, 0.42).addScaledVector(_wigDir, wLive * 1.5);
+      .addScaledVector(_faceN, 0.58).addScaledVector(_arcDir, 0.36).addScaledVector(_wigDir, wLive * 1.2);
     const wp4 = new THREE.Vector3()
-      .addScaledVector(_faceN,  0.38).addScaledVector(_arcDir, 0.56).addScaledVector(_wigDir, wLive * 2.0);
+      .addScaledVector(_faceN, 0.62).addScaledVector(_arcDir, 0.52).addScaledVector(_wigDir, wLive * 1.6);
 
     const curve = new THREE.CatmullRomCurve3([wp0, wp1, wp2, wp3, wp4]);
 
-    // Fly-off: continue along the same lateral arc direction — no face-normal component
-    // so the worm shoots sideways (along arcDir) rather than vertically (along faceN).
-    _flyOff.copy(_arcDir).multiplyScalar(flyT * flyT * 6.5);
-
-    const headPos = curve.getPoint(progress).add(_flyOff);
+    const headPos = curve.getPoint(displayProgress);
 
     // ── Head ───────────────────────────────────────────────────────────────
     if (headGroupRef.current) {
       headGroupRef.current.visible = alpha > 0.02;
       headGroupRef.current.position.copy(headPos);
 
-      if (inFlyOff) {
-        // Face the fly direction — same as the arc lateral direction
-        _lookQuat.setFromUnitVectors(_fwdAxis, _arcDir);
-        headGroupRef.current.quaternion.slerp(_lookQuat, 0.2);
-      } else {
-        // Emerge: follow arc tangent
-        const headFwd = curve.getPoint(Math.min(progress + 0.03, 1));
-        _tangent.subVectors(headFwd, headPos.clone().sub(_flyOff)).normalize();
-        if (_tangent.lengthSq() > 0.001) {
-          headGroupRef.current.quaternion.setFromUnitVectors(_fwdAxis, _tangent);
-        }
+      // Always face forward along arc tangent so the head stays upright
+      // even during retreat (worm backs into hole, head looking out).
+      const lookAhead = curve.getPoint(Math.min(displayProgress + 0.06, 1));
+      _tangent.subVectors(lookAhead, headPos).normalize();
+      if (_tangent.lengthSq() > 0.001) {
+        _lookQuat.setFromUnitVectors(_fwdAxis, _tangent);
+        headGroupRef.current.quaternion.slerp(_lookQuat, inRetreat ? 0.25 : 0.5);
       }
 
       const squish = Math.sin(clockTime * p.squishFreq) * p.squishAmp;
@@ -146,8 +142,7 @@ const WormParticle = ({ start, end: _end, color1, color2: _c2, startTime, onComp
     if (eyeRRef.current) eyeRRef.current.scale.set(1, eyeScaleY, 1);
 
     // ── Antennae ───────────────────────────────────────────────────────────
-    const antAmp = inFlyOff ? 0.18 : 0.12;
-    const r = 0.3 + Math.sin(clockTime * 6 + p.antennaPhase) * antAmp;
+    const r = 0.3 + Math.sin(clockTime * 6 + p.antennaPhase) * 0.12;
     if (ant1StemRef.current) ant1StemRef.current.rotation.z = r;
     if (ant2StemRef.current) ant2StemRef.current.rotation.z = -r;
     if (ant1TipRef.current) {
@@ -157,13 +152,14 @@ const WormParticle = ({ start, end: _end, color1, color2: _c2, startTime, onComp
       ant2TipRef.current.position.set(0.09 - Math.sin(r) * STEM_HALF, 0.22 + Math.cos(r) * STEM_HALF, 0.08);
     }
 
-    // ── Body segments — unfurl from hole, fly off as unit ─────────────────
+    // ── Body segments ─────────────────────────────────────────────────────
     for (let i = 0; i < SEGMENT_COUNT; i++) {
       const seg = segRefs.current[i];
       if (!seg) continue;
-      const lag    = (i + 1) / (SEGMENT_COUNT + 1);
-      const segT   = Math.max(0, progress * (1 - lag));
-      const segPos = curve.getPoint(segT).add(_flyOff.clone());
+      const lag  = (i + 1) / (SEGMENT_COUNT + 1);
+      // Segments always trail behind the head along the arc
+      const segT = Math.max(0, Math.min(1, displayProgress * (1 - lag)));
+      const segPos = curve.getPoint(segT);
       const wave   = Math.sin(clockTime * p.squishFreq - i * 0.8) * p.squishAmp;
       const taper  = 1 - (i / (SEGMENT_COUNT - 1)) * 0.18;
       seg.position.copy(segPos);
@@ -176,11 +172,10 @@ const WormParticle = ({ start, end: _end, color1, color2: _c2, startTime, onComp
   const faceColor = color1 || '#3be08a';
 
   return (
-    // Outer group anchored at the face tile center — rotates with the cube
     <group position={start}>
       {/* ── Head group ──────────────────────────────────────────────────── */}
       <group ref={headGroupRef}>
-        {/* Cartoon outline — back-face scaled-up shell */}
+        {/* Cartoon outline */}
         <mesh geometry={wHeadGeo} renderOrder={5} scale={[1.16, 1.16, 1.16]}>
           <meshBasicMaterial color="#111111" side={THREE.BackSide} depthWrite={false} />
         </mesh>
@@ -225,21 +220,13 @@ const WormParticle = ({ start, end: _end, color1, color2: _c2, startTime, onComp
         </mesh>
       </group>
 
-      {/* ── Body segments — cartoon outline + colored sphere ─────────────── */}
+      {/* ── Body segments ─────────────────────────────────────────────────── */}
       {Array.from({ length: SEGMENT_COUNT }, (_, i) => (
-        <group
-          key={`seg-${i}`}
-          ref={el => (segRefs.current[i] = el)}
-        >
-          {/* Cartoon outline */}
+        <group key={`seg-${i}`} ref={el => (segRefs.current[i] = el)}>
           <mesh geometry={wSegGeos[i]} renderOrder={5} scale={[1.16, 1.16, 1.16]}>
             <meshBasicMaterial color="#111111" side={THREE.BackSide} depthWrite={false} />
           </mesh>
-          <mesh
-            ref={el => (segMeshRefs.current[i] = el)}
-            renderOrder={6}
-            geometry={wSegGeos[i]}
-          >
+          <mesh ref={el => (segMeshRefs.current[i] = el)} renderOrder={6} geometry={wSegGeos[i]}>
             <meshStandardMaterial
               color={faceColor} roughness={0.3} metalness={0}
               emissive={faceColor} emissiveIntensity={0.45 - i * 0.06}
