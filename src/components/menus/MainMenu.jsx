@@ -86,7 +86,7 @@ const ScreenGlow = () => {
           ref={el => { divRefs.current[face] = el; }}
           style={{
             position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 2,
-            opacity: 0,
+            opacity: 0, willChange: 'opacity',
             background: FACE_SCREEN_GRADIENT[face](FACE_COLOR[face]),
           }}
         />
