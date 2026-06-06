@@ -358,8 +358,13 @@ const STICKER_CFG = [
   { dir: 'NZ', pos: [0, 0, -0.501],  rot: [0, Math.PI, 0] },
 ];
 const ALL_MOVES    = ['col', 'row', 'depth'].flatMap(ax => [0, 1, 2].flatMap(sl => [1, -1].map(d => ({ ax, sl, d }))));
-// Middle-slice only moves: sl=1 never moves any face-center cubie, so worms stay anchored
-const MIDDLE_MOVES = ['col', 'row', 'depth'].flatMap(ax => [1, -1].map(d => ({ ax, sl: 1, d })));
+// Per-flip-pair safe axis: middle slice of the PERPENDICULAR axis does not contain any
+// face center of the flipped pair. e.g. PZ center is at z=2, so depth sl=1 (z=1) is safe.
+const FLIP_PAIR_SAFE_AX = {
+  PZ: 'depth', NZ: 'depth',
+  PX: 'col',   NX: 'col',
+  PY: 'row',   NY: 'row',
+};
 // Maps axis name → cubie coordinate property (for flat-array slice filtering)
 const AX_PROP = { col: 'x', row: 'y', depth: 'z' };
 const ANIM_DUR = 0.50;
@@ -422,6 +427,8 @@ const ShufflingCube = () => {
   });
 
   const [flipWaves, setFlipWaves] = useState([]);
+  const flipWavesRef = useRef([]);
+  flipWavesRef.current = flipWaves;
   const cubeStateRef = useRef(cubeState);
   cubeStateRef.current = cubeState;
   const sliceGroupRef = useRef();
@@ -449,9 +456,9 @@ const ShufflingCube = () => {
       }
     }
 
-    // Sporadic antipodal flip — only when no slice is animating.
-    // Each flip also triggers one middle-slice rotation (sl=1 never moves face centers).
-    if (!rotating && t >= nextFlipAt.current) {
+    // Sporadic antipodal flip — only when no slice is animating and no worm wave is active.
+    // Pausing while waves are active keeps the tile stationary so worms stay anchored.
+    if (!rotating && flipWavesRef.current.length === 0 && t >= nextFlipAt.current) {
       nextFlipAt.current = t + MENU_FLIP_INTERVAL + (Math.random() * 2 - 1) * MENU_FLIP_JITTER;
 
       const pair = MENU_FLIP_PAIRS[Math.floor(Math.random() * MENU_FLIP_PAIRS.length)];
@@ -461,9 +468,9 @@ const ShufflingCube = () => {
       const stA = cubies[ax][ay][az].stickers[sA.dir];
       const stB = cubies[bx][by][bz].stickers[sB.dir];
 
-      // Spawn worm wave — keep at most 3 concurrent waves
+      // Spawn worm wave — exactly one wave at a time (gated above on length === 0)
       const wid = ++flipIdRef.current;
-      setFlipWaves(prev => [...prev.slice(-2), {
+      setFlipWaves([{
         id: wid,
         origins: [
           { position: sA.pos, rotation: sA.rot, color: FACE_ID_COLOR[stA.curr], id: `${wid}a` },
@@ -471,8 +478,10 @@ const ShufflingCube = () => {
         ],
       }]);
 
-      // Swap sticker colors + kick off a middle-slice rotation in the same frame
-      const m = MIDDLE_MOVES[Math.floor(Math.random() * MIDDLE_MOVES.length)];
+      // Rotate the slice that does NOT contain either flipped face center.
+      // e.g. PZ center is at z=2, so depth sl=1 (z=1 layer) is safe.
+      const safeAx = FLIP_PAIR_SAFE_AX[sA.dir];
+      const m = { ax: safeAx, sl: 1, d: Math.random() < 0.5 ? 1 : -1 };
       const newCubies = cubies.map((plane, xi) =>
         plane.map((row, yi) =>
           row.map((cubie, zi) => {
