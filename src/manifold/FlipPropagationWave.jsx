@@ -62,7 +62,7 @@ const TileFlash = ({ startTime, color }) => {
  * FlipPropagationWave - Visual wave that propagates from flip origins across the cube.
  * startTime is passed in from the parent so it's correct on the very first frame.
  */
-const WORM_TOTAL_DURATION = 2.0 + 0 + 1.5; // duration + lingerDur + flyDur, must match WormParticle
+const WORM_TOTAL_DURATION = 2.0 + 2.0; // duration + retreatDur, must match WormParticle
 
 const FlipPropagationWave = ({ origins, startTime, onComplete }) => {
   const [progress, setProgress] = useState(0);
@@ -133,24 +133,22 @@ const FlipPropagationWave = ({ origins, startTime, onComplete }) => {
     <group>
       {origins.map((origin, idx) => (
         <group key={idx} position={origin.position} rotation={origin.rotation || [0, 0, 0]}>
-          {/* Expanding ring */}
-          <mesh ref={el => ringsRef.current[idx] = el} geometry={sharedWaveRingGeometry}>
+          {/* Expanding ring — start opacity:0 scale:0.01 so the first frame is invisible */}
+          <mesh ref={el => ringsRef.current[idx] = el} geometry={sharedWaveRingGeometry} scale={[0.01, 0.01, 0.01]}>
             <meshBasicMaterial
-              color={origin.color} transparent opacity={0.8}
+              color={origin.color} transparent opacity={0}
               side={THREE.DoubleSide} blending={THREE.AdditiveBlending} depthWrite={false}
             />
           </mesh>
           {/* Inner glow ring */}
-          <mesh geometry={sharedInnerRingGeometry}>
+          <mesh geometry={sharedInnerRingGeometry} scale={[0.01, 0.01, 0.01]}>
             <meshBasicMaterial
-              color={origin.color} transparent opacity={0.4 * (1 - progress)}
+              color={origin.color} transparent opacity={0}
               side={THREE.DoubleSide} blending={THREE.AdditiveBlending} depthWrite={false}
             />
           </mesh>
           {/* Tile face flash — bright disc that pops open like a wormhole gate */}
           <TileFlash startTime={startTime} color={origin.color} />
-          {/* Shard burst particles — same effect as disparity mode */}
-          <AutoFlipParticles color={origin.color} />
         </group>
       ))}
 
