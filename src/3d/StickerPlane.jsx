@@ -33,6 +33,8 @@ import { MergeTileOverlay } from '../modes/merge/index.js';
 
 // Shared geometries used only by StickerPlane itself (not by extracted sub-components).
 const _sharedStickerGeo = new THREE.PlaneGeometry(0.85, 0.85);
+// Slightly larger plane for the worm-mode rim glow — extends the halo beyond the tile edge.
+const _wormRimGlowGeo = new THREE.PlaneGeometry(1.05, 1.05);
 // Circular alpha map — clips the base sticker mesh to a disc matching the overlay shader
 // radius (smoothstep 0.44→0.50 in UV space).  Using alphaTest instead of transparent
 // avoids depth-sorting issues and is unaffected by the biome-mode code that explicitly
@@ -196,6 +198,37 @@ const seamLeakFragmentShader = `
 
     float alpha = clamp(seamMask * pulse * uIntensity, 0.0, 1.0);
     gl_FragColor = vec4(uColor * 1.7, alpha);
+  }
+`;
+
+// ─── Worm-mode rim glow shader ────────────────────────────────────────────────
+// Heartbeat ring on the outer rim of flipped tiles — only active in worm healer
+// mode. Annular band from ~UV 0.30 to 0.50 on the 1.05×1.05 rim plane, so the
+// glow overlaps the tile edge and extends ~0.1 world-units beyond it.
+const wormRimGlowFragmentShader = `
+  uniform vec3  uColor;
+  uniform float uTime;
+  uniform float uIntensity;
+  varying vec2  vUv;
+
+  void main() {
+    vec2  p    = vUv - 0.5;
+    float dist = length(p);
+    if (dist > 0.5) discard;
+
+    // Annular band covering the outer rim of the tile and slightly beyond its edge.
+    float rim = smoothstep(0.30, 0.39, dist) * (1.0 - smoothstep(0.44, 0.50, dist));
+
+    // Heartbeat: sharp 12 % attack, slow exponential decay over the remaining 88 %.
+    float t    = fract(uTime * 1.8);
+    float beat = t < 0.12 ? t / 0.12 : pow(1.0 - (t - 0.12) / 0.88, 2.5);
+
+    // Rotating shimmer so the ring sparkles from every camera angle.
+    float angle   = atan(p.y, p.x);
+    float shimmer = 0.60 + 0.40 * sin(angle * 6.0 + uTime * 5.0);
+
+    float alpha = rim * (0.55 + beat * 0.75) * shimmer * uIntensity;
+    gl_FragColor = vec4(uColor * (1.5 + beat * 2.0), alpha);
   }
 `;
 
@@ -405,7 +438,7 @@ function TombstoneGhost() {
 const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay, mode, faceRow, faceCol, faceSize, hollow, currentDir: _currentDir }) {
   // Static game config — set once at game start, rarely changes during active play.
   // Kept in one shallow selector so tile-style/palette changes still reach all stickers.
-  const { biomeEnabled, chaosLevel, disparityFlipCap, settings, faceTextures, mergeMode, mergeTheme } = useGameStore(
+  const { biomeEnabled, chaosLevel, disparityFlipCap, settings, faceTextures, mergeMode, mergeTheme, wormHealerMode } = useGameStore(
     useShallow((s) => ({
       biomeEnabled: s.settings?.biomeMode?.enabled ?? false,
       chaosLevel: s.chaosLevel,
@@ -414,6 +447,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       faceTextures: s.faceTextures,
       mergeMode: s.mergeMode,
       mergeTheme: s.mergeTheme,
+      wormHealerMode: s.wormHealerMode ?? false,
     }))
   );
   const fc = useMemo(
@@ -467,6 +501,14 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     uTime: _wispyT, // shared reference — updated once per frame externally
     uLens: { value: 0.0 },
   }));
+  // Worm-mode rim glow — heartbeat ring on flipped tiles in worm healer mode
+  const wormRimGroupRef = useRef();
+  const wormRimMatRef = useRef();
+  const [wormRimUniforms] = React.useState(() => ({
+    uColor: { value: new THREE.Color() },
+    uTime: { value: 0 },
+    uIntensity: { value: 0 },
+  }));
 
   // Dispose shader materials on unmount to prevent GPU program / texture leaks.
   // These are imperative Three.js material refs (not React DOM refs), assigned
@@ -479,6 +521,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       seamLeakMatRef.current?.dispose(); // eslint-disable-line react-hooks/exhaustive-deps
       spinRevealMatRef.current?.dispose(); // eslint-disable-line react-hooks/exhaustive-deps
       wispyRingMatRef.current?.dispose(); // eslint-disable-line react-hooks/exhaustive-deps
+      wormRimMatRef.current?.dispose(); // eslint-disable-line react-hooks/exhaustive-deps
     };
   }, []);
 
@@ -905,6 +948,25 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       seamLeakMatRef.current.uniforms.uTime.value = state.clock.elapsedTime;
       seamLeakMatRef.current.uniforms.uIntensity.value = showWormholeHazardFx && !isDead ? 0.9 : 0;
       seamLeakMatRef.current.uniforms.uColor.value.set(antipodalColor);
+    }
+
+    // Worm-mode rim glow: heartbeat pulse + Z-bounce ("other side pressing through").
+    if (wormRimMatRef.current) {
+      const wormRimActive = wormHealerMode && showWormholeHazardFx;
+      wormRimMatRef.current.uniforms.uTime.value = state.clock.elapsedTime;
+      wormRimMatRef.current.uniforms.uIntensity.value = wormRimActive
+        ? 0.6 + Math.min(meta?.flips ?? 1, 5) * 0.08
+        : 0;
+      wormRimMatRef.current.uniforms.uColor.value.set(antipodalColor);
+    }
+    if (wormRimGroupRef.current) {
+      if (wormHealerMode && showWormholeHazardFx) {
+        const bt = (state.clock.elapsedTime * 1.8) % 1.0;
+        const bounce = bt < 0.12 ? (bt / 0.12) * 0.055 : Math.pow(1.0 - (bt - 0.12) / 0.88, 2.5) * 0.055;
+        wormRimGroupRef.current.position.z = bounce;
+      } else {
+        wormRimGroupRef.current.position.z = 0;
+      }
     }
 
     // Persistent tremor for flipped tiles — the parity violation makes the tile unstable.
@@ -1471,6 +1533,27 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
               side={THREE.DoubleSide}
             />
           </mesh>}
+
+          {/* Worm-mode rim glow — heartbeat ring that makes healing targets easy to spot.
+              The group's Z position is animated in useFrame (heartbeat bounce) so the whole
+              effect "pops" forward rhythmically, as if the antipodal face is pressing through. */}
+          {isWormhole && wormHealerMode && (
+            <group ref={wormRimGroupRef}>
+              <mesh position={[0, 0, 0.022]} renderOrder={3}>
+                <primitive object={_wormRimGlowGeo} attach="geometry" />
+                <shaderMaterial
+                  ref={wormRimMatRef}
+                  vertexShader={hazardCrackVertexShader}
+                  fragmentShader={wormRimGlowFragmentShader}
+                  uniforms={wormRimUniforms}
+                  transparent
+                  depthWrite={false}
+                  blending={THREE.AdditiveBlending}
+                />
+              </mesh>
+            </group>
+          )}
+
           {/* WORM creatures around active vortex — also shown for 6 s after any flip. */}
           {/* During the non-wormhole intro a single worm emerges from the tile centre. */}
           {Array.from({ length: (showWormIntro && !isWormhole) ? 1 : Math.max(1, Math.min(meta?.flips ?? 0, 4)) }, (_, i) => {
