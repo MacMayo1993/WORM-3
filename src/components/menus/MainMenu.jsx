@@ -357,7 +357,9 @@ const STICKER_CFG = [
   { dir: 'PZ', pos: [0, 0,  0.501],  rot: [0, 0, 0] },
   { dir: 'NZ', pos: [0, 0, -0.501],  rot: [0, Math.PI, 0] },
 ];
-const ALL_MOVES = ['col', 'row', 'depth'].flatMap(ax => [0, 1, 2].flatMap(sl => [1, -1].map(d => ({ ax, sl, d }))));
+const ALL_MOVES    = ['col', 'row', 'depth'].flatMap(ax => [0, 1, 2].flatMap(sl => [1, -1].map(d => ({ ax, sl, d }))));
+// Middle-slice only moves: sl=1 never moves any face-center cubie, so worms stay anchored
+const MIDDLE_MOVES = ['col', 'row', 'depth'].flatMap(ax => [1, -1].map(d => ({ ax, sl: 1, d })));
 // Maps axis name → cubie coordinate property (for flat-array slice filtering)
 const AX_PROP = { col: 'x', row: 'y', depth: 'z' };
 const ANIM_DUR = 0.50;
@@ -423,7 +425,6 @@ const ShufflingCube = () => {
   const cubeStateRef = useRef(cubeState);
   cubeStateRef.current = cubeState;
   const sliceGroupRef = useRef();
-  const nextMoveAt  = useRef(0);
   const nextFlipAt  = useRef(3.0); // first flip after 3 s so the cube settles first
   const flipIdRef   = useRef(0);
 
@@ -444,15 +445,12 @@ const ShufflingCube = () => {
       }
       if (progress >= 1) {
         const newCubies = rotateSliceCubies(cubies, 3, rotating.ax, rotating.sl, rotating.d);
-        nextMoveAt.current = t + PAUSE_DUR;
         setCubeState({ cubies: newCubies, rotating: null });
       }
-    } else if (t >= nextMoveAt.current) {
-      const m = ALL_MOVES[Math.floor(Math.random() * ALL_MOVES.length)];
-      setCubeState(prev => ({ ...prev, rotating: { ...m, startT: t } }));
     }
 
-    // Sporadic antipodal flip on center stickers — only when no slice is animating
+    // Sporadic antipodal flip — only when no slice is animating.
+    // Each flip also triggers one middle-slice rotation (sl=1 never moves face centers).
     if (!rotating && t >= nextFlipAt.current) {
       nextFlipAt.current = t + MENU_FLIP_INTERVAL + (Math.random() * 2 - 1) * MENU_FLIP_JITTER;
 
@@ -463,8 +461,7 @@ const ShufflingCube = () => {
       const stA = cubies[ax][ay][az].stickers[sA.dir];
       const stB = cubies[bx][by][bz].stickers[sB.dir];
 
-      // Trigger the ring wave on both sides of the cube (in local cube space).
-      // Keep at most 3 concurrent waves so worms don't pile up.
+      // Spawn worm wave — keep at most 3 concurrent waves
       const wid = ++flipIdRef.current;
       setFlipWaves(prev => [...prev.slice(-2), {
         id: wid,
@@ -474,7 +471,8 @@ const ShufflingCube = () => {
         ],
       }]);
 
-      // Swap the sticker colors (deep-clone only the two affected cubies)
+      // Swap sticker colors + kick off a middle-slice rotation in the same frame
+      const m = MIDDLE_MOVES[Math.floor(Math.random() * MIDDLE_MOVES.length)];
       const newCubies = cubies.map((plane, xi) =>
         plane.map((row, yi) =>
           row.map((cubie, zi) => {
@@ -488,7 +486,7 @@ const ShufflingCube = () => {
           })
         )
       );
-      setCubeState({ rotating: null, cubies: newCubies });
+      setCubeState({ rotating: { ...m, startT: t }, cubies: newCubies });
     }
   });
 
@@ -829,7 +827,7 @@ export const RotatingBlackCube = ({ onCubeClick }) => {
     shakeStart.current = Date.now();
   };
   const handleCubeDown = () => { cubeTargetScale.current = 0.90; };
-  const handleCubeUp = () => { if (!shaking.current) cubeTargetScale.current = 1.0; };
+  const handleCubeUp = () => { if (!shaking.current) cubeTargetScale.current = 0.95; };
 
   return (
     <>
