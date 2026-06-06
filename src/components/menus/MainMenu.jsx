@@ -5,7 +5,7 @@ import ParityWallet from '../overlays/ParityWallet.jsx';
 import { makeCubies } from '../../game/cubeState.js';
 import { rotateSliceCubies } from '../../game/cubeRotation.js';
 import { updateSharedTime } from '../../3d/styles/TileStyleMaterials.jsx';
-import FlipPropagationWave from '../../manifold/FlipPropagationWave.jsx';
+import MenuFlipWave from './MenuFlipWave.jsx';
 import { ANTIPODAL_COLOR } from '../../utils/constants.js';
 
 // ─── Per-face independent pulse timing ────────────────────────────────────────
@@ -524,7 +524,7 @@ const ShufflingCube = () => {
         {sliceCubies.map(c => <ShuffleCubie key={`${c.x}-${c.y}-${c.z}`} cubie={c} />)}
       </group>
       {flipWaves.map(wave => (
-        <FlipPropagationWave
+        <MenuFlipWave
           key={wave.id}
           origins={wave.origins}
           startTime={wave.startTime}
