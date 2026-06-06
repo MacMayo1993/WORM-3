@@ -432,6 +432,7 @@ const ShufflingCube = () => {
   const cubeStateRef = useRef(cubeState);
   cubeStateRef.current = cubeState;
   const sliceGroupRef = useRef();
+  const nextMoveAt  = useRef(0);   // independent rotation timer
   const nextFlipAt  = useRef(3.0); // first flip after 3 s so the cube settles first
   const flipIdRef   = useRef(0);
 
@@ -452,8 +453,17 @@ const ShufflingCube = () => {
       }
       if (progress >= 1) {
         const newCubies = rotateSliceCubies(cubies, 3, rotating.ax, rotating.sl, rotating.d);
+        nextMoveAt.current = t + PAUSE_DUR;
         setCubeState({ cubies: newCubies, rotating: null });
       }
+    } else if (t >= nextMoveAt.current) {
+      // Continuous rotation — safe axis only while a worm wave is active so the
+      // spawned face center tile doesn't move under the worm during its animation.
+      const wave = flipWavesRef.current[0];
+      const m = wave
+        ? { ax: wave.safeAx, sl: 1, d: Math.random() < 0.5 ? 1 : -1 }
+        : ALL_MOVES[Math.floor(Math.random() * ALL_MOVES.length)];
+      setCubeState(prev => ({ ...prev, rotating: { ...m, startT: t } }));
     }
 
     // Sporadic antipodal flip — only when no slice is animating and no worm wave is active.
@@ -468,19 +478,20 @@ const ShufflingCube = () => {
       const stA = cubies[ax][ay][az].stickers[sA.dir];
       const stB = cubies[bx][by][bz].stickers[sB.dir];
 
-      // Spawn worm wave — exactly one wave at a time (gated above on length === 0)
+      // Spawn worm wave — exactly one wave at a time (gated above on length === 0).
+      // safeAx is stored so the rotation timer can use it while the wave is active.
+      const safeAx = FLIP_PAIR_SAFE_AX[sA.dir];
       const wid = ++flipIdRef.current;
       setFlipWaves([{
         id: wid,
+        safeAx,
         origins: [
           { position: sA.pos, rotation: sA.rot, color: FACE_ID_COLOR[stA.curr], id: `${wid}a` },
           { position: sB.pos, rotation: sB.rot, color: FACE_ID_COLOR[stB.curr], id: `${wid}b` },
         ],
       }]);
 
-      // Rotate the slice that does NOT contain either flipped face center.
-      // e.g. PZ center is at z=2, so depth sl=1 (z=1 layer) is safe.
-      const safeAx = FLIP_PAIR_SAFE_AX[sA.dir];
+      // Rotate the safe slice (computed above) coincident with the flip
       const m = { ax: safeAx, sl: 1, d: Math.random() < 0.5 ? 1 : -1 };
       const newCubies = cubies.map((plane, xi) =>
         plane.map((row, yi) =>
