@@ -2,19 +2,20 @@ import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
-const _faceN    = new THREE.Vector3();
-const _perp     = new THREE.Vector3();
-const _arcDir   = new THREE.Vector3();
-const _wigDir   = new THREE.Vector3();
-const _tangent  = new THREE.Vector3();
-const _lookDir  = new THREE.Vector3();
-const _camLocal = new THREE.Vector3();
-const _lookQuat = new THREE.Quaternion();
-const _wigQuat  = new THREE.Quaternion();
-const _wigAxis  = new THREE.Vector3(0, 1, 0);
-const _fwdAxis  = new THREE.Vector3(0, 0, 1);
-const _flyOff      = new THREE.Vector3();
-const _exploreTarget = new THREE.Vector3(0, -3, 0.7); // world-space Explore button
+const _faceN         = new THREE.Vector3();
+const _perp          = new THREE.Vector3();
+const _arcDir        = new THREE.Vector3();
+const _wigDir        = new THREE.Vector3();
+const _tangent       = new THREE.Vector3();
+const _lookDir       = new THREE.Vector3();
+const _camLocal      = new THREE.Vector3();
+const _lookQuat      = new THREE.Quaternion();
+const _wigQuat       = new THREE.Quaternion();
+const _wigAxis       = new THREE.Vector3(0, 1, 0);
+const _fwdAxis       = new THREE.Vector3(0, 0, 1);
+const _flyOff        = new THREE.Vector3();
+// World-space position of the Explore button — worms look here during linger
+const _exploreTarget = new THREE.Vector3(0, -3, 0.7);
 
 // Head only slightly larger; first two segs nearly same size as head
 const wHeadGeo  = new THREE.SphereGeometry(0.22, 14, 12);
@@ -34,10 +35,10 @@ const STEM_HALF     = 0.10;
 const SEGMENT_COUNT = 5;
 
 /**
- * WormParticle — cartoon apple-worm emerge from flip hole.
- * Uses `color1` (the flipped face's color) for the whole body.
- * After emerging and looking at the camera, flies off screen instead
- * of fading — onComplete fires only once the worm is far out of view.
+ * WormParticle — cartoon apple-worm emerges from a flip tile.
+ * Outer group is anchored at `start` (face tile center) so the worm
+ * rotates with the cube. Uses color1 (the flipped face color) for the body.
+ * After emerging and looking toward the Explore button, flies off screen.
  */
 const WormParticle = ({ start, end: _end, color1, color2: _c2, startTime, currentTime, onComplete }) => {
   const headGroupRef = useRef();
@@ -50,7 +51,7 @@ const WormParticle = ({ start, end: _end, color1, color2: _c2, startTime, curren
   const segRefs      = useRef([]);
 
   const duration      = 2.0;  // emerge from hole
-  const lingerDur     = 4.2;  // linger + look at camera
+  const lingerDur     = 4.2;  // linger + look toward Explore button
   const flyDur        = 2.2;  // fly off screen (no fade)
   const totalDuration = duration + lingerDur + flyDur;
 
@@ -77,14 +78,15 @@ const WormParticle = ({ start, end: _end, color1, color2: _c2, startTime, curren
     const tRaw     = Math.min(elapsed / duration, 1);
     const progress = 1 - Math.pow(1 - tRaw, 3); // ease-out cubic — head races out first
 
-    // No fade-out: alpha only ramps up during emerge, stays full until off-screen
+    // Alpha only ramps up during emerge, stays full until worm exits view
     const alpha = Math.min(1, elapsed / 0.25);
 
-    const inLinger  = elapsed > duration && elapsed <= duration + lingerDur;
-    const inFlyOff  = elapsed > duration + lingerDur;
-    const flyT      = inFlyOff ? elapsed - duration - lingerDur : 0;
+    const inLinger = elapsed > duration && elapsed <= duration + lingerDur;
+    const inFlyOff = elapsed > duration + lingerDur;
+    const flyT     = inFlyOff ? elapsed - duration - lingerDur : 0;
 
-    // Face normal away from cube center
+    // Face normal: `start` is the tile center in cube-local space.
+    // Normalizing it gives the outward face direction.
     _faceN.set(...start).normalize();
     const basePerp = Math.abs(_faceN.y) < 0.8
       ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
@@ -98,14 +100,15 @@ const WormParticle = ({ start, end: _end, color1, color2: _c2, startTime, curren
 
     const wLive = Math.sin(clockTime * 2.5) * (inLinger ? 0.09 : 0.05);
 
-    const origin = new THREE.Vector3(...start);
-    const wp0 = origin.clone().addScaledVector(_faceN, -0.20);
-    const wp1 = origin.clone().addScaledVector(_faceN,  0.14);
-    const wp2 = origin.clone()
+    // All arc points are relative to (0,0,0) — the tile face center.
+    // The outer group is positioned at `start` so (0,0,0) IS the tile.
+    const wp0 = new THREE.Vector3().addScaledVector(_faceN, -0.20);
+    const wp1 = new THREE.Vector3().addScaledVector(_faceN,  0.14);
+    const wp2 = new THREE.Vector3()
       .addScaledVector(_faceN,  0.42).addScaledVector(_arcDir, 0.22).addScaledVector(_wigDir, wLive);
-    const wp3 = origin.clone()
+    const wp3 = new THREE.Vector3()
       .addScaledVector(_faceN,  0.54).addScaledVector(_arcDir, 0.42).addScaledVector(_wigDir, wLive * 1.5);
-    const wp4 = origin.clone()
+    const wp4 = new THREE.Vector3()
       .addScaledVector(_faceN,  0.38).addScaledVector(_arcDir, 0.56).addScaledVector(_wigDir, wLive * 2.0);
 
     const curve = new THREE.CatmullRomCurve3([wp0, wp1, wp2, wp3, wp4]);
@@ -124,12 +127,11 @@ const WormParticle = ({ start, end: _end, color1, color2: _c2, startTime, curren
       headGroupRef.current.position.copy(headPos);
 
       if (inFlyOff) {
-        // Face the fly direction
         _lookQuat.setFromUnitVectors(_fwdAxis,
           _arcDir.clone().addScaledVector(_faceN, 0.4).normalize());
         headGroupRef.current.quaternion.slerp(_lookQuat, 0.12);
       } else if (inLinger && headGroupRef.current.parent) {
-        // Look toward Explore button (player's focus point)
+        // Look toward the Explore button (player's focus area)
         _camLocal.copy(_exploreTarget);
         headGroupRef.current.parent.worldToLocal(_camLocal);
         _lookDir.subVectors(_camLocal, headPos).normalize();
@@ -189,15 +191,16 @@ const WormParticle = ({ start, end: _end, color1, color2: _c2, startTime, curren
       const taper  = 1 - (i / (SEGMENT_COUNT - 1)) * 0.18;
       seg.position.copy(segPos);
       seg.scale.set(taper * (1 + wave), taper * (1 - wave * 0.5), taper * (1 + wave));
-      seg.material.opacity = 0.95 - (i / SEGMENT_COUNT) * 0.12; // full opacity, no fade
+      seg.material.opacity = 0.95 - (i / SEGMENT_COUNT) * 0.12;
     }
   });
 
   const faceColor = color1 || '#3be08a';
 
   return (
-    <group>
-      {/* ── Head group ────────────────────────────────────────────────────── */}
+    // Outer group anchored at the face tile center — rotates with the cube
+    <group position={start}>
+      {/* ── Head group ──────────────────────────────────────────────────── */}
       <group ref={headGroupRef}>
         <mesh geometry={wHeadGeo} renderOrder={7}>
           <meshStandardMaterial
@@ -230,7 +233,7 @@ const WormParticle = ({ start, end: _end, color1, color2: _c2, startTime, curren
           <meshStandardMaterial color={faceColor} roughness={0.5}
             emissive={faceColor} emissiveIntensity={0.4} depthWrite={false} />
         </mesh>
-        {/* Tips: white with face-color emissive glow for bright contrast */}
+        {/* Tips: white with face-color emissive glow */}
         <mesh ref={ant1TipRef} position={[-0.06, 0.32, 0.08]} geometry={wTipGeo} renderOrder={8}>
           <meshStandardMaterial color="#ffffff" emissive={faceColor} emissiveIntensity={2.0}
             depthWrite={false} />
@@ -241,7 +244,7 @@ const WormParticle = ({ start, end: _end, color1, color2: _c2, startTime, curren
         </mesh>
       </group>
 
-      {/* ── Body segments — face color, no fade-out ───────────────────────── */}
+      {/* ── Body segments — face color, no fade-out ─────────────────────── */}
       {Array.from({ length: SEGMENT_COUNT }, (_, i) => (
         <mesh
           key={`seg-${i}`}
