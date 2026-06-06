@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
-import { useFrame, useThree } from '@react-three/fiber';
+import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { FACE_COLORS, ANTIPODAL_COLOR, FLIP_CAP, getHalfLifeMultiplier } from '../utils/constants.js';
 import WormParticle from './WormParticle.jsx';
@@ -62,10 +62,26 @@ const TileFlash = ({ startTime, color }) => {
  * FlipPropagationWave - Visual wave that propagates from flip origins across the cube.
  * startTime is passed in from the parent so it's correct on the very first frame.
  */
+const WORM_TOTAL_DURATION = 2.0 + 0 + 1.5; // duration + lingerDur + flyDur, must match WormParticle
+
 const FlipPropagationWave = ({ origins, startTime, onComplete }) => {
   const [progress, setProgress] = useState(0);
   const ringsRef = useRef([]);
   const onCompleteCalledRef = useRef(false);
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
+
+  // Fallback timeout — guarantees the wave removes itself after worm lifetime
+  // even if the worm's onComplete callback is never invoked.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!onCompleteCalledRef.current) {
+        onCompleteCalledRef.current = true;
+        onCompleteRef.current?.();
+      }
+    }, (WORM_TOTAL_DURATION + 0.3) * 1000);
+    return () => clearTimeout(timer);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Stable worm destinations — computed ONCE per origins change ──
   const wormEnds = useMemo(() => {
