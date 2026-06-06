@@ -419,7 +419,7 @@ const ShufflingCube = () => {
     return { cubies, rotating: null };
   });
 
-  const [flipWaves, setFlipWaves] = useState(null);
+  const [flipWaves, setFlipWaves] = useState([]);
   const cubeStateRef = useRef(cubeState);
   cubeStateRef.current = cubeState;
   const sliceGroupRef = useRef();
@@ -463,12 +463,16 @@ const ShufflingCube = () => {
       const stA = cubies[ax][ay][az].stickers[sA.dir];
       const stB = cubies[bx][by][bz].stickers[sB.dir];
 
-      // Trigger the ring wave on both sides of the cube (in local cube space)
+      // Trigger the ring wave on both sides of the cube (in local cube space).
+      // Keep at most 3 concurrent waves so worms don't pile up.
       const wid = ++flipIdRef.current;
-      setFlipWaves([
-        { position: sA.pos, rotation: sA.rot, color: FACE_ID_COLOR[stA.curr], id: `${wid}a` },
-        { position: sB.pos, rotation: sB.rot, color: FACE_ID_COLOR[stB.curr], id: `${wid}b` },
-      ]);
+      setFlipWaves(prev => [...prev.slice(-2), {
+        id: wid,
+        origins: [
+          { position: sA.pos, rotation: sA.rot, color: FACE_ID_COLOR[stA.curr], id: `${wid}a` },
+          { position: sB.pos, rotation: sB.rot, color: FACE_ID_COLOR[stB.curr], id: `${wid}b` },
+        ],
+      }]);
 
       // Swap the sticker colors (deep-clone only the two affected cubies)
       const newCubies = cubies.map((plane, xi) =>
@@ -501,12 +505,13 @@ const ShufflingCube = () => {
       <group ref={sliceGroupRef}>
         {sliceCubies.map(c => <ShuffleCubie key={`${c.x}-${c.y}-${c.z}`} cubie={c} />)}
       </group>
-      {flipWaves && (
+      {flipWaves.map(wave => (
         <FlipPropagationWave
-          origins={flipWaves}
-          onComplete={() => setFlipWaves(null)}
+          key={wave.id}
+          origins={wave.origins}
+          onComplete={() => setFlipWaves(prev => prev.filter(w => w.id !== wave.id))}
         />
-      )}
+      ))}
     </>
   );
 };
