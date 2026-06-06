@@ -140,7 +140,6 @@ const FlipPropagationWave = ({ origins, onComplete }) => {
         </group>
       ))}
 
-      {/* Worms rendered OUTSIDE the positioned groups so start/end coords are world-space */}
       {origins.map((origin, idx) => (
         <WormParticle
           key={`worm-${idx}`}
