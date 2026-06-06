@@ -13,7 +13,8 @@ const _lookQuat = new THREE.Quaternion();
 const _wigQuat  = new THREE.Quaternion();
 const _wigAxis  = new THREE.Vector3(0, 1, 0);
 const _fwdAxis  = new THREE.Vector3(0, 0, 1);
-const _flyOff   = new THREE.Vector3();
+const _flyOff      = new THREE.Vector3();
+const _exploreTarget = new THREE.Vector3(0, -3, 0.7); // world-space Explore button
 
 // Head only slightly larger; first two segs nearly same size as head
 const wHeadGeo  = new THREE.SphereGeometry(0.22, 14, 12);
@@ -128,8 +129,8 @@ const WormParticle = ({ start, end: _end, color1, color2: _c2, startTime, curren
           _arcDir.clone().addScaledVector(_faceN, 0.4).normalize());
         headGroupRef.current.quaternion.slerp(_lookQuat, 0.12);
       } else if (inLinger && headGroupRef.current.parent) {
-        // Convert camera world pos to parent-local, look at it
-        _camLocal.copy(state.camera.position);
+        // Look toward Explore button (player's focus point)
+        _camLocal.copy(_exploreTarget);
         headGroupRef.current.parent.worldToLocal(_camLocal);
         _lookDir.subVectors(_camLocal, headPos).normalize();
         if (_lookDir.lengthSq() > 0.001) {
