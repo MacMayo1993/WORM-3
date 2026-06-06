@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useMemo } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import MenuWormParticle from './MenuWormParticle.jsx';
@@ -59,27 +59,6 @@ const MenuFlipWave = ({ origins, startTime, onComplete }) => {
     }, (WORM_TOTAL_DURATION + 0.3) * 1000);
     return () => clearTimeout(timer);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Stable worm endpoints — computed once per origins change
-  const wormEnds = useMemo(() => {
-    if (!origins) return [];
-    if (origins.length === 2) {
-      return origins.map((_, idx) => origins[(idx + 1) % 2].position);
-    }
-    return origins.map((origin) => {
-      const originPos = new THREE.Vector3(...origin.position);
-      const inward = originPos.clone().multiplyScalar(-1);
-      const axis = originPos.clone().normalize();
-      const fallbackUp = Math.abs(axis.dot(new THREE.Vector3(0, 1, 0))) > 0.9
-        ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
-      const jitterRight = new THREE.Vector3().crossVectors(axis, fallbackUp).normalize();
-      const jitterUp = new THREE.Vector3().crossVectors(jitterRight, axis).normalize();
-      return inward
-        .addScaledVector(jitterRight, (Math.random() - 0.5) * 0.18)
-        .addScaledVector(jitterUp, (Math.random() - 0.5) * 0.18)
-        .toArray();
-    });
-  }, [origins]);
 
   useEffect(() => {
     return () => { ringsRef.current = []; };
