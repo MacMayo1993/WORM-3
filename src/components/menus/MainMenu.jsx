@@ -381,7 +381,7 @@ const MENU_FLIP_PAIRS = [
     { dir: 'NY', cubie: [1, 0, 1], pos: [0, -1.501, 0], rot: [ Math.PI / 2, 0, 0] },
   ],
 ];
-const MENU_FLIP_INTERVAL = 2.0;
+const MENU_FLIP_INTERVAL = 3.0;
 const MENU_FLIP_JITTER   = 0.6;
 
 const ShuffleCubie = React.memo(({ cubie }) => {
