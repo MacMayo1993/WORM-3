@@ -40,7 +40,7 @@ const SEGMENT_COUNT = 5;
  * rotates with the cube. Uses color1 (the flipped face color) for the body.
  * After emerging and looking toward the Explore button, flies off screen.
  */
-const WormParticle = ({ start, end: _end, color1, color2: _c2, startTime, currentTime, onComplete }) => {
+const WormParticle = ({ start, end: _end, color1, color2: _c2, startTime, onComplete }) => {
   const headGroupRef = useRef();
   const eyeLRef      = useRef();
   const eyeRRef      = useRef();
@@ -51,8 +51,8 @@ const WormParticle = ({ start, end: _end, color1, color2: _c2, startTime, curren
   const segRefs      = useRef([]);
 
   const duration      = 2.0;  // emerge from hole
-  const lingerDur     = 4.2;  // linger + look toward Explore button
-  const flyDur        = 2.2;  // fly off screen (no fade)
+  const lingerDur     = 1.5;  // quick look toward Explore button
+  const flyDur        = 1.5;  // shoot off screen like a wormhole burst
   const totalDuration = duration + lingerDur + flyDur;
 
   const p = useMemo(() => ({
@@ -69,10 +69,9 @@ const WormParticle = ({ start, end: _end, color1, color2: _c2, startTime, curren
 
   useFrame((state) => {
     const clockTime = state.clock.getElapsedTime();
-    const animTime  = currentTime !== undefined ? currentTime : clockTime;
-    if (animTime < startTime) return;
+    if (clockTime < startTime) return;
 
-    const elapsed = animTime - startTime;
+    const elapsed = clockTime - startTime;
     if (elapsed >= totalDuration) { onComplete?.(); return; }
 
     const tRaw     = Math.min(elapsed / duration, 1);
@@ -113,11 +112,11 @@ const WormParticle = ({ start, end: _end, color1, color2: _c2, startTime, curren
 
     const curve = new THREE.CatmullRomCurve3([wp0, wp1, wp2, wp3, wp4]);
 
-    // Fly-off: accelerate in arcDir + slightly outward from face
+    // Fly-off: shoot out like a wormhole burst — quadratic acceleration + exponential boost
     _flyOff.copy(_arcDir)
       .addScaledVector(_faceN, 0.4)
       .normalize()
-      .multiplyScalar(flyT * flyT * 2.2);
+      .multiplyScalar(flyT * flyT * 6.5);
 
     const headPos = curve.getPoint(progress).add(_flyOff);
 
