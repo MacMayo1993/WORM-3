@@ -29,6 +29,7 @@ const _c1 = new THREE.Color();
 const _c2 = new THREE.Color();
 const _cTemp = new THREE.Color();
 const _cTemp2 = new THREE.Color();
+const _white = new THREE.Color(1, 1, 1);
 const _streakPos = new THREE.Vector3();
 const _lPt = new THREE.Vector3();
 const _startPt = new THREE.Vector3();
@@ -146,34 +147,6 @@ const strandFragmentShader = `
   }
 `;
 
-// Entrance glow disc shaders — radial portal bloom at each tunnel mouth
-const glowDiscVertexShader = `
-  varying vec2 vUv;
-  void main() {
-    vUv = uv;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  }
-`;
-
-const glowDiscFragmentShader = `
-  uniform vec3 uColor;
-  uniform float uTime;
-  uniform float uOpacity;
-  varying vec2 vUv;
-  void main() {
-    vec2 center = vUv - 0.5;
-    float dist = length(center) * 2.0;
-    // Soft gaussian halo + bright inner core + subtle ring
-    float halo = exp(-dist * 2.5);
-    float core = smoothstep(0.32, 0.0, dist);
-    float ring = smoothstep(0.58, 0.40, dist) * smoothstep(0.14, 0.28, dist) * 0.55;
-    // Gentle breathing pulse
-    float pulse = 0.82 + 0.18 * sin(uTime * 2.8);
-    float alpha = clamp((halo * 0.65 + core * 1.1 + ring * 0.5) * uOpacity * pulse, 0.0, 1.0);
-    vec3 col = uColor * (1.3 + core * 3.5 + ring * 2.0);
-    gl_FragColor = vec4(col, alpha);
-  }
-`;
 
 const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2, active1, active2, cubieRefs, intensity, flips, color1, color2, isCenter, maxStrands = 50, _explosionFactor = 0 }) => {
   const coreTubeRef = useRef();
@@ -216,19 +189,11 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
     uOpacity: { value: 1 }
   }));
 
-  // Entrance glow discs — one per tunnel endpoint, shining outward from cube faces
+  // Entrance portal rings — one per tunnel endpoint, shining outward from cube faces
   const glowDisc1Ref = useRef();
   const glowDisc2Ref = useRef();
-  const [glowUniforms1] = React.useState(() => ({
-    uColor: { value: new THREE.Color() },
-    uTime: { value: 0 },
-    uOpacity: { value: 0 },
-  }));
-  const [glowUniforms2] = React.useState(() => ({
-    uColor: { value: new THREE.Color() },
-    uTime: { value: 0 },
-    uOpacity: { value: 0 },
-  }));
+  const glowMat1Ref = useRef();
+  const glowMat2Ref = useRef();
 
   const curveRef = useRef(new THREE.CatmullRomCurve3(Array(LIGHTNING_PTS).fill(0).map(() => new THREE.Vector3())));
 
@@ -292,7 +257,8 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
     }
 
     const burstRaw = Math.max(flipBurstMap.get(gridId1) ?? 0, flipBurstMap.get(gridId2) ?? 0);
-    const burstEnv = Math.sin(burstRaw * Math.PI);
+    // Violent snap: overshoots and vibrates — feels like a rupture, not a breath
+    const burstEnv = Math.sin(burstRaw * Math.PI) * (1.0 + Math.sin(burstRaw * Math.PI * 5) * 0.2);
 
     // Route directly through the VoidCore (0,0,0)
     // Antipodal pairs will form perfectly straight X-crossing beams through the center.
@@ -309,6 +275,11 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
     }
     _right.normalize();
     _trueUp.crossVectors(_right, _dir).normalize();
+
+    // Burst bows the tunnel violently outward — applied after right/trueUp are ready
+    if (burstEnv > 0.01) {
+      _cp1.addScaledVector(_right, burstEnv * 0.4).addScaledVector(_trueUp, burstEnv * 0.2);
+    }
 
     // UPDATE VOLUMETRIC CORE
     if (coreTubeRef.current) {
@@ -345,7 +316,7 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
       if (coreMoved || (t - lastCoreGeometryBuildRef.current >= 1 / CORE_GEOMETRY_FPS)) {
         const oldGeo = coreTubeRef.current.geometry;
         // 20 segments along tube, 5 radial segments
-        coreTubeRef.current.geometry = new THREE.TubeGeometry(curveRef.current, 20, 0.02, 5, false);
+        coreTubeRef.current.geometry = new THREE.TubeGeometry(curveRef.current, 20, 0.02 * (1 + _explosionFactor * 2), 5, false);
         if (oldGeo) oldGeo.dispose();
         lastCoreGeometryBuildRef.current = t;
         lastCoreStartRef.current.copy(_vStart);
@@ -357,7 +328,7 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
         coreMatRef.current.uniforms.uColor2.value.copy(_c2);
         coreMatRef.current.uniforms.uTime.value = t;
         coreMatRef.current.uniforms.uPulse.value = pulse;
-        coreMatRef.current.uniforms.uBurst.value = burstEnv;
+        coreMatRef.current.uniforms.uBurst.value = Math.min(1, burstEnv + _explosionFactor * 0.5);
         coreMatRef.current.uniforms.uDanger.value = dangerT;
         coreMatRef.current.uniforms.uDead.value = dead ? 1 : 0;
       }
@@ -488,7 +459,7 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
         lightningLine.material.opacity = Math.min(0.97, burstEnv * 1.4);
 
         // Color it purely using the antipodal colors
-        lightningLine.material.color.lerpColors(_c1, _c2, 0.5);
+        lightningLine.material.color.lerpColors(_c1, _c2, 0.5).lerp(_white, _explosionFactor * 0.7);
 
         lightningLine.visible = true;
       } else {
@@ -496,28 +467,31 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
       }
     }
 
-    // UPDATE ENTRANCE GLOW DISCS — radial portal bloom shining outward from each cube face
+    // UPDATE ENTRANCE PORTAL RINGS — torus shockwave expanding outward from each tunnel mouth
     const disc1 = glowDisc1Ref.current;
     if (disc1) {
       disc1.position.copy(_wPos1).addScaledVector(_faceNorm1, 0.05);
       _glowQ1.setFromUnitVectors(_zAxis, _faceNorm1);
       disc1.quaternion.copy(_glowQ1);
-      disc1.scale.setScalar((0.48 + intensity * 0.28 + burstEnv * 0.32) * pulse);
+      // Torus expands outward on burst, fades as it disperses
+      disc1.scale.setScalar((0.5 + intensity * 0.25) * pulse + burstEnv * 1.5);
       disc1.visible = !dead && active1;
-      glowUniforms1.uColor.value.copy(_c1);
-      glowUniforms1.uTime.value = t;
-      glowUniforms1.uOpacity.value = dead ? 0 : 0.5 + burstEnv * 0.5;
+      if (glowMat1Ref.current) {
+        glowMat1Ref.current.color.copy(_c1);
+        glowMat1Ref.current.opacity = dead ? 0 : Math.max(0, (0.5 + burstEnv * 0.5) * (1 - burstEnv * 0.5));
+      }
     }
     const disc2 = glowDisc2Ref.current;
     if (disc2) {
       disc2.position.copy(_wPos2).addScaledVector(_faceNorm2, 0.05);
       _glowQ2.setFromUnitVectors(_zAxis, _faceNorm2);
       disc2.quaternion.copy(_glowQ2);
-      disc2.scale.setScalar((0.48 + intensity * 0.28 + burstEnv * 0.32) * pulse);
+      disc2.scale.setScalar((0.5 + intensity * 0.25) * pulse + burstEnv * 1.5);
       disc2.visible = !dead && active2;
-      glowUniforms2.uColor.value.copy(_c2);
-      glowUniforms2.uTime.value = t;
-      glowUniforms2.uOpacity.value = dead ? 0 : 0.5 + burstEnv * 0.5;
+      if (glowMat2Ref.current) {
+        glowMat2Ref.current.color.copy(_c2);
+        glowMat2Ref.current.opacity = dead ? 0 : Math.max(0, (0.5 + burstEnv * 0.5) * (1 - burstEnv * 0.5));
+      }
     }
 
     // UPDATE STRANDS (Feeding into the main tunnel from the 8 spiral arms + center)
@@ -663,26 +637,24 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
         />
       </mesh>
 
-      {/* Entrance glow discs — radial portal bloom shining outward from each tunnel mouth */}
+      {/* Entrance portal rings — torus shockwaves expanding outward from each tunnel mouth */}
       <mesh ref={glowDisc1Ref} renderOrder={5} visible={false}>
-        <circleGeometry args={[0.5, 24]} />
-        <shaderMaterial
-          vertexShader={glowDiscVertexShader}
-          fragmentShader={glowDiscFragmentShader}
-          uniforms={glowUniforms1}
+        <torusGeometry args={[0.3, 0.05, 8, 24]} />
+        <meshBasicMaterial
+          ref={glowMat1Ref}
           transparent
+          opacity={0}
           depthWrite={false}
           blending={THREE.AdditiveBlending}
           side={THREE.DoubleSide}
         />
       </mesh>
       <mesh ref={glowDisc2Ref} renderOrder={5} visible={false}>
-        <circleGeometry args={[0.5, 24]} />
-        <shaderMaterial
-          vertexShader={glowDiscVertexShader}
-          fragmentShader={glowDiscFragmentShader}
-          uniforms={glowUniforms2}
+        <torusGeometry args={[0.3, 0.05, 8, 24]} />
+        <meshBasicMaterial
+          ref={glowMat2Ref}
           transparent
+          opacity={0}
           depthWrite={false}
           blending={THREE.AdditiveBlending}
           side={THREE.DoubleSide}
