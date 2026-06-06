@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import MenuWormParticle from './MenuWormParticle.jsx';
@@ -37,13 +37,11 @@ const TileFlash = ({ startTime, color }) => {
 };
 
 /**
- * MenuFlipWave — menu-only version of the flip wave effect.
- * Renders expanding rings + TileFlash + MenuWormParticle.
- * startTime is passed from the parent (computed at spawn time, not via useEffect).
- * Does NOT affect the shared FlipPropagationWave used by the game.
+ * MenuFlipWave — menu-only flip wave: expanding rings + TileFlash + MenuWormParticle.
+ * Progress is tracked via useRef (never useState) so useFrame never triggers React re-renders.
  */
 const MenuFlipWave = ({ origins, startTime, onComplete }) => {
-  const [progress, setProgress] = useState(0);
+  const progressRef = useRef(0);
   const ringsRef = useRef([]);
   const onCompleteCalledRef = useRef(false);
   const onCompleteRef = useRef(onComplete);
@@ -65,14 +63,13 @@ const MenuFlipWave = ({ origins, startTime, onComplete }) => {
   }, []);
 
   useFrame((_state, delta) => {
-    if (progress >= 1) return;
-    const newProgress = Math.min(1, progress + delta * 1.2);
-    setProgress(newProgress);
-    const easeOut = 1 - Math.pow(1 - newProgress, 3);
+    if (progressRef.current >= 1) return;
+    progressRef.current = Math.min(1, progressRef.current + delta * 1.2);
+    const easeOut = 1 - Math.pow(1 - progressRef.current, 3);
     ringsRef.current.forEach((ring) => {
       if (!ring) return;
       const scale = easeOut * 4 + 0.5;
-      ring.scale.set(scale, scale, scale);
+      ring.scale.setScalar(scale);
       if (ring.material) ring.material.opacity = (1 - easeOut) * 0.8;
     });
   });
