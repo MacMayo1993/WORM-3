@@ -19,13 +19,12 @@ const MAX_TUNNELS = 150;
 const DIRS = ['PX', 'NX', 'PY', 'NY', 'PZ', 'NZ'];
 
 const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
-  const { cubies, size, showTunnels, settings, explosionFactor } = useGameStore(
+  const { cubies, size, showTunnels, settings } = useGameStore(
     useShallow(s => ({
       cubies: s.cubies,
       size: s.size,
       showTunnels: s.showTunnels,
       settings: s.settings,
-      explosionFactor: s.explosionT,
     }))
   );
   // Narrow deps: only the two settings fields that affect face-color resolution.
