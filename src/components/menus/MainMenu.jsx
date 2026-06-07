@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { makeCubies } from '../../game/cubeState.js';
@@ -648,12 +648,16 @@ const CAROUSEL_MODES = [
 ];
 
 // ─── Cube-tile card sub-components ───────────────────────────────────────────
-const TileCardActive = ({ mode }) => (
-  <div style={{
-    background: '#0c0c1a', padding: '7px', borderRadius: '20px', flexShrink: 0,
-    width: 'min(200px, 54vw)',
-    boxShadow: `0 0 64px ${mode.tileColor}30, 0 24px 56px rgba(0,0,0,0.75)`,
-  }}>
+const TileCardActive = ({ mode, spinDir }) => (
+  <div
+    className={spinDir === 0 ? undefined : `mode-cube-spin-${spinDir > 0 ? 'right' : 'left'}`}
+    style={{
+      background: '#0c0c1a', padding: '7px', borderRadius: '20px', flexShrink: 0,
+      width: 'min(200px, 54vw)',
+      boxShadow: `0 0 64px ${mode.tileColor}30, 0 24px 56px rgba(0,0,0,0.75)`,
+      transformStyle: 'preserve-3d', transformOrigin: '50% 50%', willChange: 'transform',
+    }}
+  >
     <div style={{
       background: mode.tileColor, borderRadius: '14px',
       padding: '28px 16px 22px', minHeight: '170px',
@@ -669,7 +673,7 @@ const TileCardActive = ({ mode }) => (
 );
 
 const TileCardSide = ({ mode, onClick, dir }) => (
-  <button onClick={onClick} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', flexShrink: 0, transform: `rotateY(${dir > 0 ? 32 : -32}deg) scale(0.80)`, opacity: 0.30, transition: 'opacity 280ms ease, transform 280ms ease' }}>
+  <button type="button" onClick={onClick} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', flexShrink: 0, transform: `rotateY(${dir > 0 ? 32 : -32}deg) scale(0.80)`, opacity: 0.30, transition: 'opacity 280ms ease, transform 280ms ease' }}>
     <div style={{ background: '#0c0c1a', padding: '5px', borderRadius: '14px', width: '70px' }}>
       <div style={{ background: mode.tileColor, borderRadius: '10px', height: '108px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px', position: 'relative', overflow: 'hidden', boxShadow: 'inset 0 -4px 10px rgba(0,0,0,0.42), inset 3px 3px 8px rgba(255,255,255,0.18)' }}>
         <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'linear-gradient(135deg, rgba(255,255,255,0.20) 0%, transparent 50%, rgba(0,0,0,0.12) 100%)' }} />
@@ -683,27 +687,48 @@ const TileCardSide = ({ mode, onClick, dir }) => (
 const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay, onRandom, onComingSoon, onHowToPlay }) => {
   const [activeIndex, setActiveIndex] = useState(0);
   const [imgError, setImgError] = useState(false);
+  const [spinDir, setSpinDir] = useState(0);
   const touchStartX = useRef(null);
+  const spinTimer = useRef(null);
   const N = CAROUSEL_MODES.length;
 
   useEffect(() => {
     _carouselActive = true;
-    return () => { _carouselActive = false; };
+    return () => {
+      _carouselActive = false;
+      if (spinTimer.current) clearTimeout(spinTimer.current);
+    };
   }, []);
 
   useEffect(() => { setImgError(false); }, [activeIndex]);
 
+  const navigate = useCallback((dir) => {
+    if (spinTimer.current) clearTimeout(spinTimer.current);
+    setSpinDir(dir);
+    setActiveIndex(i => (i + dir + N) % N);
+    spinTimer.current = setTimeout(() => setSpinDir(0), 420);
+  }, [N]);
+
+  const selectIndex = (targetIndex) => {
+    if (targetIndex === activeIndex) return;
+    const forwardSteps = (targetIndex - activeIndex + N) % N;
+    const backwardSteps = (activeIndex - targetIndex + N) % N;
+    const dir = forwardSteps <= backwardSteps ? 1 : -1;
+    if (spinTimer.current) clearTimeout(spinTimer.current);
+    setSpinDir(dir);
+    setActiveIndex(targetIndex);
+    spinTimer.current = setTimeout(() => setSpinDir(0), 420);
+  };
+
   useEffect(() => {
     const handleKey = (e) => {
-      if (e.key === 'ArrowLeft')  setActiveIndex(i => (i - 1 + N) % N);
-      if (e.key === 'ArrowRight') setActiveIndex(i => (i + 1) % N);
+      if (e.key === 'ArrowLeft') navigate(-1);
+      if (e.key === 'ArrowRight') navigate(1);
       if (e.key === 'Escape') onBack();
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [onBack, N]);
-
-  const navigate = (dir) => setActiveIndex(i => (i + dir + N) % N);
+  }, [navigate, onBack]);
 
   const handlePlay = () => {
     const id = CAROUSEL_MODES[activeIndex].id;
@@ -724,6 +749,8 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
 
   const arrowBtn = (onClick, label) => (
     <button
+      type="button"
+      aria-label={label === '›' ? 'Rotate mode cube right' : 'Rotate mode cube left'}
       onClick={onClick}
       style={{
         background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
@@ -744,6 +771,7 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
         background: 'rgba(4,6,18,0.97)',
         backdropFilter: 'blur(32px)', WebkitBackdropFilter: 'blur(32px)',
         display: 'flex', flexDirection: 'column', overflowY: 'auto',
+        pointerEvents: 'auto', touchAction: 'pan-y',
       }}
       onTouchStart={e => { touchStartX.current = e.touches[0].clientX; }}
       onTouchEnd={e => {
@@ -754,6 +782,20 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
       }}
     >
       <MenuBackgroundOrbs />
+      <style>{`
+        @keyframes modeCubeSpinRight {
+          0% { transform: rotateY(-78deg) scale(0.88); filter: brightness(0.70); }
+          62% { transform: rotateY(8deg) scale(1.015); filter: brightness(1.08); }
+          100% { transform: rotateY(0deg) scale(1); filter: brightness(1); }
+        }
+        @keyframes modeCubeSpinLeft {
+          0% { transform: rotateY(78deg) scale(0.88); filter: brightness(0.70); }
+          62% { transform: rotateY(-8deg) scale(1.015); filter: brightness(1.08); }
+          100% { transform: rotateY(0deg) scale(1); filter: brightness(1); }
+        }
+        .mode-cube-spin-right { animation: modeCubeSpinRight 420ms cubic-bezier(0.18, 0.92, 0.22, 1) both; }
+        .mode-cube-spin-left { animation: modeCubeSpinLeft 420ms cubic-bezier(0.18, 0.92, 0.22, 1) both; }
+      `}</style>
 
       {/* ── Top section: tile card carousel ── */}
       <div style={{
@@ -769,7 +811,7 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', maxWidth: '580px', justifyContent: 'center', perspective: '900px' }}>
           {arrowBtn(() => navigate(-1), '‹')}
           <TileCardSide mode={prev} onClick={() => navigate(-1)} dir={1} />
-          <TileCardActive mode={active} />
+          <TileCardActive key={`${active.id}-${spinDir}`} mode={active} spinDir={spinDir} />
           <TileCardSide mode={next} onClick={() => navigate(1)} dir={-1} />
           {arrowBtn(() => navigate(1), '›')}
         </div>
@@ -778,7 +820,9 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
           {CAROUSEL_MODES.map((_, i) => (
             <button
               key={i}
-              onClick={() => setActiveIndex(i)}
+              type="button"
+              aria-label={`Show ${CAROUSEL_MODES[i].label} mode`}
+              onClick={() => selectIndex(i)}
               style={{
                 width: i === activeIndex ? '20px' : '6px', height: '6px',
                 borderRadius: '100px', border: 'none', cursor: 'pointer', padding: 0,
@@ -799,18 +843,27 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
       }}>
         {/* Screenshot + controls panel */}
         <div style={{
-          width: 'min(360px, 94vw)', borderRadius: '20px', overflow: 'hidden',
-          border: `1px solid ${active.tileColor}28`,
-          background: 'rgba(8,10,24,0.65)',
-          backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
-          boxShadow: `0 0 40px ${active.tileColor}14, 0 12px 40px rgba(0,0,0,0.50)`,
-          transition: 'border-color 350ms ease, box-shadow 350ms ease',
+          width: 'min(360px, 94vw)', borderRadius: '24px', padding: '2px',
+          background: RAINBOW_GRADIENT,
+          boxShadow: `0 0 44px ${active.tileColor}22, 0 18px 52px rgba(0,0,0,0.54)`,
+          transition: 'box-shadow 350ms ease',
         }}>
+          <div style={{
+            borderRadius: '22px', padding: '14px', overflow: 'hidden',
+            background: `linear-gradient(150deg, ${active.tileColor}24 0%, rgba(8,10,24,0.92) 38%, rgba(8,10,24,0.78) 100%)`,
+            backdropFilter: 'blur(18px) saturate(1.35)', WebkitBackdropFilter: 'blur(18px) saturate(1.35)',
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.16), inset 0 -30px 80px rgba(0,0,0,0.18)',
+          }}>
           {/* Screenshot */}
           <div style={{
-            width: '100%', aspectRatio: '16/9', overflow: 'hidden',
-            background: `linear-gradient(135deg, ${active.tileColor}20, rgba(6,10,24,0.6))`,
+            padding: '1.5px', borderRadius: '18px', background: RAINBOW_GRADIENT,
+            boxShadow: '0 10px 28px rgba(0,0,0,0.32)',
+          }}>
+          <div style={{
+            width: '100%', aspectRatio: '16/9', overflow: 'hidden', borderRadius: '16.5px',
+            background: `radial-gradient(circle at 24% 18%, rgba(255,255,255,0.14), transparent 34%), linear-gradient(135deg, ${active.tileColor}24, rgba(6,10,24,0.82))`,
             position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.18)',
           }}>
             {!imgError && (
               <img
@@ -826,21 +879,30 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
               </span>
             )}
           </div>
+          </div>
 
           {/* Controls list */}
-          <div style={{ padding: '16px 20px 20px' }}>
-            <p style={{ margin: '0 0 10px', fontSize: '9px', fontWeight: 800, letterSpacing: '0.24em', textTransform: 'uppercase', color: 'rgba(160,185,255,0.42)', fontFamily: MENU_FONT }}>How to play</p>
+          <div style={{ marginTop: '12px', padding: '1.5px', borderRadius: '18px', background: RAINBOW_GRADIENT }}>
+          <div style={{
+            padding: '16px 18px 18px', borderRadius: '16.5px',
+            background: 'linear-gradient(180deg, rgba(12,16,36,0.92), rgba(7,9,22,0.94))',
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.12)',
+          }}>
+            <p style={{ margin: '0 0 10px', fontSize: '9px', fontWeight: 800, letterSpacing: '0.24em', textTransform: 'uppercase', color: 'rgba(190,210,255,0.56)', fontFamily: MENU_FONT }}>How to play</p>
             {active.controls.map((ctrl, i) => (
               <div key={i} style={{ display: 'flex', gap: '8px', margin: '5px 0', alignItems: 'flex-start' }}>
                 <span style={{ color: active.tileColor, fontSize: '14px', flexShrink: 0, lineHeight: 1.4 }}>·</span>
-                <span style={{ fontSize: '13px', lineHeight: 1.5, color: 'rgba(210,225,255,0.70)', fontFamily: MENU_FONT }}>{ctrl}</span>
+                <span style={{ fontSize: '13px', lineHeight: 1.5, color: 'rgba(226,235,255,0.76)', fontFamily: MENU_FONT }}>{ctrl}</span>
               </div>
             ))}
+          </div>
+          </div>
           </div>
         </div>
 
         {/* PLAY button */}
         <button
+          type="button"
           onClick={handlePlay}
           style={{
             width: 'min(360px, 94vw)', padding: '15px', borderRadius: '100px',
@@ -856,6 +918,7 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
 
         {/* Back button */}
         <button
+          type="button"
           onClick={onBack}
           style={{
             background: 'transparent', border: '1px solid rgba(255,255,255,0.12)',
