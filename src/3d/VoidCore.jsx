@@ -20,6 +20,65 @@ const innerGeo = new THREE.SphereGeometry(0.28, 32, 32);
 const outerGeo = new THREE.IcosahedronGeometry(0.38, 1);
 const sparkGeo = new THREE.SphereGeometry(0.015, 6, 6);
 
+// Mini cube geometry — shared across all mounts
+const MINI_BODY = 0.48;
+const MINI_S = 0.25;    // sticker offset from centre (just past body face at 0.24)
+const MINI_ST = 0.40;   // sticker plane size (~0.83 of face, matching game cubie ratio)
+const minicubeBodyGeo = new THREE.BoxGeometry(MINI_BODY, MINI_BODY, MINI_BODY);
+const minicubeStickerGeo = new THREE.PlaneGeometry(MINI_ST, MINI_ST);
+
+// Face definitions — id matches FACE_COLORS in constants.js (1=PZ Red … 6=NY Yellow)
+const MINI_FACES = [
+  { id: 1, pos: [0, 0,        MINI_S],  rot: [0, 0, 0] },
+  { id: 4, pos: [0, 0,       -MINI_S],  rot: [0, Math.PI, 0] },
+  { id: 2, pos: [-MINI_S, 0,  0],       rot: [0, -Math.PI / 2, 0] },
+  { id: 5, pos: [MINI_S,  0,  0],       rot: [0,  Math.PI / 2, 0] },
+  { id: 3, pos: [0,  MINI_S,  0],       rot: [-Math.PI / 2, 0, 0] },
+  { id: 6, pos: [0, -MINI_S,  0],       rot: [ Math.PI / 2, 0, 0] },
+];
+
+/**
+ * A tiny 1×1 cube at the void centre whose six sticker faces show the live
+ * antipodal face-colour assignments (Red↔Orange, Green↔Blue, White↔Yellow).
+ * Rotates slowly so all faces are visible over time.
+ */
+function AntipodalMinicube({ settings }) {
+  const groupRef = useRef();
+
+  // Recompute only when colour scheme or biome face assignment changes.
+  const fc = useMemo(
+    () => resolveColors(settings, settings?.biomeMode?.faceAssignment) || {},
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [settings?.colorScheme, settings?.biomeMode?.faceAssignment]
+  );
+
+  useFrame((_, dt) => {
+    if (groupRef.current) {
+      groupRef.current.rotation.y += dt * 0.28;
+      groupRef.current.rotation.x += dt * 0.09;
+    }
+  });
+
+  return (
+    <group ref={groupRef}>
+      <mesh geometry={minicubeBodyGeo}>
+        <meshStandardMaterial color="#111111" roughness={0.3} metalness={0.4} />
+      </mesh>
+      {MINI_FACES.map(({ id, pos, rot }) => (
+        <mesh key={id} geometry={minicubeStickerGeo} position={pos} rotation={rot}>
+          <meshStandardMaterial
+            color={fc[id] || '#888888'}
+            emissive={fc[id] || '#888888'}
+            emissiveIntensity={0.25}
+            roughness={0.2}
+            metalness={0.05}
+          />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
 const SPARK_COUNT = 40;
 
 const coreVertexShader = `
@@ -212,6 +271,8 @@ function VoidCore() {
 
   return (
     <group>
+      <AntipodalMinicube settings={settings} />
+
       <mesh ref={innerCoreRef} geometry={innerGeo}>
         <shaderMaterial
           ref={innerMatRef}
