@@ -608,19 +608,81 @@ export const RotatingBlackCube = ({ onCubeClick }) => {
 // ─── Mode carousel constants ──────────────────────────────────────────────────
 const RAINBOW_GRADIENT = 'linear-gradient(100deg,#ef4444 0%,#f97316 18%,#eab308 36%,#22c55e 54%,#3b82f6 72%,#a855f7 90%,#ef4444 100%)';
 
+// tileColor matches the game's 6 face colors; textColor ensures contrast on the tile
 const CAROUSEL_MODES = [
-  { id: 'cube',        label: 'CUBE',        color: '#3b82f6', desc: "Classic Rubik's cube solving with full setup wizard." },
-  { id: 'worm',        label: 'WORM',        color: '#22c55e', desc: 'Co-op worm healer mode on a living antipodal cube.' },
-  { id: 'chaos',       label: 'CHAOS',       color: '#f97316', desc: 'Antipodal flip survival with betting and chaos tuning.' },
-  { id: 'freeplay',    label: 'FREE PLAY',   color: '#a855f7', desc: 'Unlimited customization — your cube, your rules.' },
-  { id: 'random',      label: 'RANDOM',      color: '#eab308', desc: 'Randomized style cycling every 15 seconds.' },
-  { id: 'coming-soon', label: 'COMING SOON', color: '#60a5fa', desc: 'Story, Holonomy, Biome, Merge — arriving soon.' },
-  { id: 'how-to-play', label: 'HOW TO PLAY', color: '#ef4444', desc: 'Learn the rules and mechanics of WORM³.' },
+  {
+    id: 'cube', label: 'CUBE', tileColor: '#3b82f6', textColor: '#fff',
+    desc: "Classic Rubik's cube solving with full setup wizard.",
+    controls: ['Drag face edges to rotate slices', 'Tap a tile to toggle Flip mode', 'Undo moves with the undo button', 'Hit Shuffle to scramble and start'],
+  },
+  {
+    id: 'worm', label: 'WORM', tileColor: '#22c55e', textColor: '#fff',
+    desc: 'Co-op worm healer mode on a living antipodal cube.',
+    controls: ['Worm follows your cursor or touch', 'Healed tiles restore the cube face', 'Collect orbs scattered across faces', 'Avoid flipped chaos tiles'],
+  },
+  {
+    id: 'chaos', label: 'CHAOS', tileColor: '#f97316', textColor: '#fff',
+    desc: 'Antipodal flip survival with betting and chaos tuning.',
+    controls: ['Tiles flip automatically over time', 'Bet Parity Points before the round', 'Set chaos level 1–5 in the wizard', 'Survive until the last tile falls'],
+  },
+  {
+    id: 'freeplay', label: 'FREE PLAY', tileColor: '#eab308', textColor: 'rgba(0,0,0,0.80)',
+    desc: 'Unlimited customization — your cube, your rules.',
+    controls: ['Pick cube size 2×2 through 5×5', 'Choose color scheme and tile style', 'Solve at your own pace', 'No time limit or win condition'],
+  },
+  {
+    id: 'random', label: 'RANDOM', tileColor: '#ef4444', textColor: '#fff',
+    desc: 'Randomized style cycling every 15 seconds.',
+    controls: ['Color scheme changes every 15 s', 'Cube and tiles transform live', 'Keep solving through the shifts', 'Style variety makes every run fresh'],
+  },
+  {
+    id: 'coming-soon', label: 'COMING SOON', tileColor: '#e8e8e0', textColor: 'rgba(0,0,0,0.70)',
+    desc: 'Story, Holonomy, Biome, Merge — arriving soon.',
+    controls: ['Story: 10-level campaign with cutscenes', 'Holonomy: loop visualization mode', 'Biome: city face-specific environments', 'Merge: block-merging puzzle variant'],
+  },
+  {
+    id: 'how-to-play', label: 'HOW TO PLAY', tileColor: '#a855f7', textColor: '#fff',
+    desc: 'Learn the rules and mechanics of WORM³.',
+    controls: ['Step-by-step algorithm teaching', 'Learn F, R, U and slice moves', 'Practice one layer at a time', 'Hints and solution previews'],
+  },
 ];
+
+// ─── Cube-tile card sub-components ───────────────────────────────────────────
+const TileCardActive = ({ mode }) => (
+  <div style={{
+    background: '#0c0c1a', padding: '7px', borderRadius: '20px', flexShrink: 0,
+    width: 'min(200px, 54vw)',
+    boxShadow: `0 0 64px ${mode.tileColor}30, 0 24px 56px rgba(0,0,0,0.75)`,
+  }}>
+    <div style={{
+      background: mode.tileColor, borderRadius: '14px',
+      padding: '28px 16px 22px', minHeight: '170px',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px',
+      position: 'relative', overflow: 'hidden',
+      boxShadow: ['inset 0 -6px 16px rgba(0,0,0,0.45)', 'inset 4px 4px 14px rgba(255,255,255,0.22)', 'inset -3px -3px 10px rgba(0,0,0,0.28)'].join(', '),
+    }}>
+      <div style={{ position: 'absolute', inset: 0, borderRadius: '14px', pointerEvents: 'none', background: 'linear-gradient(135deg, rgba(255,255,255,0.26) 0%, transparent 48%, rgba(0,0,0,0.14) 100%)' }} />
+      <div style={{ position: 'relative', zIndex: 1, textAlign: 'center', fontSize: 'clamp(26px,7vw,42px)', fontWeight: 900, lineHeight: 1, letterSpacing: '0.05em', fontFamily: MENU_FONT, color: mode.textColor, textShadow: '0 2px 6px rgba(0,0,0,0.40)' }}>{mode.label}</div>
+      <p style={{ position: 'relative', zIndex: 1, margin: 0, maxWidth: '160px', textAlign: 'center', fontSize: '11px', lineHeight: 1.45, fontFamily: MENU_FONT, color: mode.textColor === '#fff' ? 'rgba(255,255,255,0.70)' : 'rgba(0,0,0,0.56)' }}>{mode.desc}</p>
+    </div>
+  </div>
+);
+
+const TileCardSide = ({ mode, onClick, dir }) => (
+  <button onClick={onClick} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', flexShrink: 0, transform: `rotateY(${dir > 0 ? 32 : -32}deg) scale(0.80)`, opacity: 0.30, transition: 'opacity 280ms ease, transform 280ms ease' }}>
+    <div style={{ background: '#0c0c1a', padding: '5px', borderRadius: '14px', width: '70px' }}>
+      <div style={{ background: mode.tileColor, borderRadius: '10px', height: '108px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px', position: 'relative', overflow: 'hidden', boxShadow: 'inset 0 -4px 10px rgba(0,0,0,0.42), inset 3px 3px 8px rgba(255,255,255,0.18)' }}>
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'linear-gradient(135deg, rgba(255,255,255,0.20) 0%, transparent 50%, rgba(0,0,0,0.12) 100%)' }} />
+        <span style={{ position: 'relative', zIndex: 1, fontSize: '11px', fontWeight: 900, fontFamily: MENU_FONT, textAlign: 'center', lineHeight: 1.2, color: mode.textColor, textShadow: '0 1px 3px rgba(0,0,0,0.35)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{mode.label}</span>
+      </div>
+    </div>
+  </button>
+);
 
 // ─── Mode carousel overlay ────────────────────────────────────────────────────
 const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay, onRandom, onComingSoon, onHowToPlay }) => {
   const [activeIndex, setActiveIndex] = useState(0);
+  const [imgError, setImgError] = useState(false);
   const touchStartX = useRef(null);
   const N = CAROUSEL_MODES.length;
 
@@ -628,6 +690,8 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
     _carouselActive = true;
     return () => { _carouselActive = false; };
   }, []);
+
+  useEffect(() => { setImgError(false); }, [activeIndex]);
 
   useEffect(() => {
     const handleKey = (e) => {
@@ -663,11 +727,10 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
       onClick={onClick}
       style={{
         background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
-        borderRadius: '50%', width: '44px', height: '44px', cursor: 'pointer', flexShrink: 0,
-        color: 'rgba(200,220,255,0.70)', fontSize: '24px', lineHeight: 1, fontWeight: 400,
+        borderRadius: '50%', width: '40px', height: '40px', cursor: 'pointer', flexShrink: 0,
+        color: 'rgba(200,220,255,0.70)', fontSize: '22px', lineHeight: 1, fontWeight: 400,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        transition: 'background 160ms ease, border-color 160ms ease',
-        fontFamily: MENU_FONT,
+        transition: 'background 160ms ease, border-color 160ms ease', fontFamily: MENU_FONT,
       }}
       onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.12)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.26)'; }}
       onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; }}
@@ -677,10 +740,10 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
   return (
     <div
       style={{
-        position: 'fixed', inset: 0, zIndex: 10000, display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center', padding: '0 8px', pointerEvents: 'all',
+        position: 'fixed', inset: 0, zIndex: 10000,
         background: 'rgba(4,6,18,0.97)',
         backdropFilter: 'blur(32px)', WebkitBackdropFilter: 'blur(32px)',
+        display: 'flex', flexDirection: 'column', overflowY: 'auto',
       }}
       onTouchStart={e => { touchStartX.current = e.touches[0].clientX; }}
       onTouchEnd={e => {
@@ -692,113 +755,118 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
     >
       <MenuBackgroundOrbs />
 
-      {/* Content sits above the orbs */}
-      <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', padding: '0 8px' }}>
-      <p style={{
-        margin: '0 0 28px', fontSize: '10px', fontWeight: 800, letterSpacing: '0.30em',
-        textTransform: 'uppercase', color: 'rgba(160,185,255,0.40)', fontFamily: MENU_FONT,
-      }}>Choose your mode</p>
+      {/* ── Top section: tile card carousel ── */}
+      <div style={{
+        position: 'relative', zIndex: 1, flexShrink: 0,
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        padding: 'max(28px,env(safe-area-inset-top,28px)) 8px 16px',
+      }}>
+        <p style={{
+          margin: '0 0 20px', fontSize: '10px', fontWeight: 800, letterSpacing: '0.30em',
+          textTransform: 'uppercase', color: 'rgba(160,185,255,0.38)', fontFamily: MENU_FONT,
+        }}>Choose your mode</p>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', maxWidth: '620px', justifyContent: 'center', perspective: '1000px' }}>
-        {arrowBtn(() => navigate(-1), '‹')}
-
-        {/* Previous card */}
-        <button
-          onClick={() => navigate(-1)}
-          style={{
-            flexShrink: 0, width: '100px', minHeight: '200px', borderRadius: '18px',
-            border: `1px solid ${prev.color}1a`, background: `${prev.color}07`,
-            cursor: 'pointer', padding: '16px 10px', display: 'flex', flexDirection: 'column',
-            alignItems: 'center', justifyContent: 'center',
-            transform: 'rotateY(30deg) scale(0.76)', opacity: 0.25, pointerEvents: 'auto',
-            transition: 'all 300ms cubic-bezier(0.22,1,0.36,1)',
-          }}
-        >
-          <span style={{ fontSize: '15px', fontWeight: 900, color: prev.color, letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: MENU_FONT, textAlign: 'center' }}>{prev.label}</span>
-        </button>
-
-        {/* Active card */}
-        <div style={{
-          flexShrink: 0, width: 'min(260px, 68vw)', minHeight: '290px', borderRadius: '22px',
-          border: `1.5px solid ${active.color}50`,
-          background: `linear-gradient(160deg, ${active.color}16 0%, rgba(6,10,24,0.86) 100%)`,
-          boxShadow: `0 0 56px ${active.color}24, 0 20px 56px rgba(0,0,0,0.52)`,
-          padding: '28px 20px 22px', display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center', gap: '10px',
-          transition: 'border-color 350ms ease, box-shadow 350ms ease',
-        }}>
-          <div style={{
-            fontSize: 'clamp(34px,8vw,56px)', fontWeight: 900, letterSpacing: '0.06em',
-            lineHeight: 1, textAlign: 'center', fontFamily: MENU_FONT,
-            color: active.color, textShadow: `0 0 28px ${active.color}55`,
-            transition: 'color 350ms ease, text-shadow 350ms ease',
-          }}>{active.label}</div>
-          <p style={{
-            margin: 0, fontSize: '12px', lineHeight: 1.55, textAlign: 'center',
-            color: 'rgba(200,220,255,0.55)', fontFamily: MENU_FONT, maxWidth: '200px',
-          }}>{active.desc}</p>
-          <button
-            onClick={handlePlay}
-            style={{
-              marginTop: '6px', padding: '11px 28px', borderRadius: '100px',
-              border: `1px solid ${active.color}70`, background: `${active.color}1e`,
-              color: active.color, fontWeight: 800, letterSpacing: '0.18em',
-              fontSize: '12px', textTransform: 'uppercase', cursor: 'pointer',
-              fontFamily: MENU_FONT, transition: 'background 160ms ease, box-shadow 160ms ease',
-              boxShadow: `0 0 18px ${active.color}1e`,
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = `${active.color}36`; e.currentTarget.style.boxShadow = `0 0 28px ${active.color}40`; }}
-            onMouseLeave={e => { e.currentTarget.style.background = `${active.color}1e`; e.currentTarget.style.boxShadow = `0 0 18px ${active.color}1e`; }}
-          >PLAY</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', maxWidth: '580px', justifyContent: 'center', perspective: '900px' }}>
+          {arrowBtn(() => navigate(-1), '‹')}
+          <TileCardSide mode={prev} onClick={() => navigate(-1)} dir={1} />
+          <TileCardActive mode={active} />
+          <TileCardSide mode={next} onClick={() => navigate(1)} dir={-1} />
+          {arrowBtn(() => navigate(1), '›')}
         </div>
 
-        {/* Next card */}
+        <div style={{ display: 'flex', gap: '7px', marginTop: '18px', alignItems: 'center' }}>
+          {CAROUSEL_MODES.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setActiveIndex(i)}
+              style={{
+                width: i === activeIndex ? '20px' : '6px', height: '6px',
+                borderRadius: '100px', border: 'none', cursor: 'pointer', padding: 0,
+                background: i === activeIndex ? active.tileColor : 'rgba(255,255,255,0.18)',
+                transition: 'width 300ms cubic-bezier(0.34,1.56,0.64,1), background 300ms ease',
+                boxShadow: i === activeIndex ? `0 0 8px ${active.tileColor}88` : 'none',
+              }}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* ── Bottom section: info panel — scrolls under the carousel ── */}
+      <div style={{
+        position: 'relative', zIndex: 1, flex: 1,
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        padding: '8px 16px max(24px,env(safe-area-inset-bottom,24px))', gap: '12px',
+      }}>
+        {/* Screenshot + controls panel */}
+        <div style={{
+          width: 'min(360px, 94vw)', borderRadius: '20px', overflow: 'hidden',
+          border: `1px solid ${active.tileColor}28`,
+          background: 'rgba(8,10,24,0.65)',
+          backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+          boxShadow: `0 0 40px ${active.tileColor}14, 0 12px 40px rgba(0,0,0,0.50)`,
+          transition: 'border-color 350ms ease, box-shadow 350ms ease',
+        }}>
+          {/* Screenshot */}
+          <div style={{
+            width: '100%', aspectRatio: '16/9', overflow: 'hidden',
+            background: `linear-gradient(135deg, ${active.tileColor}20, rgba(6,10,24,0.6))`,
+            position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            {!imgError && (
+              <img
+                src={`${import.meta.env.BASE_URL}images/modes/${active.id}.jpg`}
+                alt={`${active.label} gameplay`}
+                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                onError={() => setImgError(true)}
+              />
+            )}
+            {imgError && (
+              <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.22em', textTransform: 'uppercase', color: `${active.tileColor}60`, fontFamily: MENU_FONT }}>
+                screenshot coming soon
+              </span>
+            )}
+          </div>
+
+          {/* Controls list */}
+          <div style={{ padding: '16px 20px 20px' }}>
+            <p style={{ margin: '0 0 10px', fontSize: '9px', fontWeight: 800, letterSpacing: '0.24em', textTransform: 'uppercase', color: 'rgba(160,185,255,0.42)', fontFamily: MENU_FONT }}>How to play</p>
+            {active.controls.map((ctrl, i) => (
+              <div key={i} style={{ display: 'flex', gap: '8px', margin: '5px 0', alignItems: 'flex-start' }}>
+                <span style={{ color: active.tileColor, fontSize: '14px', flexShrink: 0, lineHeight: 1.4 }}>·</span>
+                <span style={{ fontSize: '13px', lineHeight: 1.5, color: 'rgba(210,225,255,0.70)', fontFamily: MENU_FONT }}>{ctrl}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* PLAY button */}
         <button
-          onClick={() => navigate(1)}
+          onClick={handlePlay}
           style={{
-            flexShrink: 0, width: '100px', minHeight: '200px', borderRadius: '18px',
-            border: `1px solid ${next.color}1a`, background: `${next.color}07`,
-            cursor: 'pointer', padding: '16px 10px', display: 'flex', flexDirection: 'column',
-            alignItems: 'center', justifyContent: 'center',
-            transform: 'rotateY(-30deg) scale(0.76)', opacity: 0.25, pointerEvents: 'auto',
-            transition: 'all 300ms cubic-bezier(0.22,1,0.36,1)',
+            width: 'min(360px, 94vw)', padding: '15px', borderRadius: '100px',
+            border: `1.5px solid ${active.tileColor}70`, background: `${active.tileColor}22`,
+            color: active.tileColor, fontWeight: 800, fontSize: '14px', letterSpacing: '0.20em',
+            textTransform: 'uppercase', cursor: 'pointer', fontFamily: MENU_FONT,
+            boxShadow: `0 0 28px ${active.tileColor}20`,
+            transition: 'background 160ms ease, box-shadow 160ms ease, border-color 160ms ease',
           }}
-        >
-          <span style={{ fontSize: '15px', fontWeight: 900, color: next.color, letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: MENU_FONT, textAlign: 'center' }}>{next.label}</span>
-        </button>
+          onMouseEnter={e => { e.currentTarget.style.background = `${active.tileColor}38`; e.currentTarget.style.boxShadow = `0 0 40px ${active.tileColor}40`; }}
+          onMouseLeave={e => { e.currentTarget.style.background = `${active.tileColor}22`; e.currentTarget.style.boxShadow = `0 0 28px ${active.tileColor}20`; }}
+        >PLAY →</button>
 
-        {arrowBtn(() => navigate(1), '›')}
+        {/* Back button */}
+        <button
+          onClick={onBack}
+          style={{
+            background: 'transparent', border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: '100px', padding: '8px 24px', color: 'rgba(180,200,255,0.48)',
+            fontSize: '12px', fontWeight: 600, letterSpacing: '0.10em', cursor: 'pointer',
+            fontFamily: MENU_FONT, transition: 'border-color 160ms ease, color 160ms ease',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.26)'; e.currentTarget.style.color = 'rgba(200,220,255,0.78)'; }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.color = 'rgba(180,200,255,0.48)'; }}
+        >← Back</button>
       </div>
-
-      {/* Dot indicators */}
-      <div style={{ display: 'flex', gap: '8px', marginTop: '22px', alignItems: 'center' }}>
-        {CAROUSEL_MODES.map((_, i) => (
-          <button
-            key={i}
-            onClick={() => setActiveIndex(i)}
-            style={{
-              width: i === activeIndex ? '20px' : '6px', height: '6px',
-              borderRadius: '100px', border: 'none', cursor: 'pointer', padding: 0,
-              background: i === activeIndex ? active.color : 'rgba(255,255,255,0.18)',
-              transition: 'width 300ms cubic-bezier(0.34,1.56,0.64,1), background 300ms ease',
-              boxShadow: i === activeIndex ? `0 0 8px ${active.color}88` : 'none',
-            }}
-          />
-        ))}
-      </div>
-
-      <button
-        onClick={onBack}
-        style={{
-          marginTop: '24px', background: 'transparent', border: '1px solid rgba(255,255,255,0.12)',
-          borderRadius: '100px', padding: '8px 20px', color: 'rgba(180,200,255,0.50)',
-          fontSize: '12px', fontWeight: 600, letterSpacing: '0.10em', cursor: 'pointer',
-          fontFamily: MENU_FONT, transition: 'border-color 160ms ease, color 160ms ease',
-        }}
-        onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.26)'; e.currentTarget.style.color = 'rgba(200,220,255,0.78)'; }}
-        onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.color = 'rgba(180,200,255,0.50)'; }}
-      >← Back</button>
-      </div>{/* end content wrapper */}
     </div>
   );
 };
