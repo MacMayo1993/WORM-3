@@ -35,6 +35,7 @@ import AntipodalModeHUD from './overlays/AntipodalModeHUD.jsx';
 import EchoRotationIndicator from './overlays/EchoRotationIndicator.jsx';
 import DisparityHUD from './overlays/DisparityHUD.jsx';
 import HealerWormHUD from './overlays/HealerWormHUD.jsx';
+import MobiusHUD from '../worm/MobiusHUD.jsx';
 import { isMobile } from '../utils/device.js';
 
 // Lazy-loaded — deferred to reduce initial parse time
@@ -248,6 +249,8 @@ export default function UILayer({
 
         {/* Healer Worm HUD Overlay */}
         <HealerWormHUD onHome={onBackToMainMenu} onSettings={() => setShowSettings(true)} onRetry={onWormRetry} onNewGame={onWormNewGame} />
+        {/* Möbius Band HUD — shows topology of active wormhole during tunnel traversal */}
+        <MobiusHUD />
 
         {/* Disparity countdown — 3-2-1-GO overlay before chaos starts */}
         {disparityCountdown !== null && (

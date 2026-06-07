@@ -15,7 +15,7 @@ import { setWormTurnCallback } from './wormTurnBridge.js';
 import { buildManifoldGridMap, flipStickerPair } from '../game/manifoldLogic.js';
 import { healSticker, getStickerSafe } from '../game/cubeState.js';
 import { rotateVec90 } from '../game/cubeRotation.js';
-import { DIR_TO_VEC, VEC_TO_DIR, ANTIPODAL_COLOR } from '../utils/constants.js';
+import { DIR_TO_VEC, VEC_TO_DIR, ANTIPODAL_COLOR, FACE_COLORS } from '../utils/constants.js';
 import { resolveColors } from '../utils/colorSchemes.js';
 import {
     CAM_HEIGHT_BASE,
@@ -306,6 +306,7 @@ function useWormCrawler(size, cubies) {
     const tunnelProgress = useRef(0);
     const activeTunnel = useRef(null);
     const prevVisualModeRef = useRef('classic');
+    const prevShowTunnelsRef = useRef(false);
     const stepAcc = useRef(0);
     const pendingTurns = useRef([]);
     const onFlippedTile = useRef(false);
@@ -526,10 +527,22 @@ function useWormCrawler(size, cubies) {
         phase.current = 'entering';
         onFlippedTile.current = false;
         lastFlippedRef.current = false;
-        const prevVisualMode = useGameStore.getState().visualMode;
-        prevVisualModeRef.current = prevVisualMode;
-        const nextTunnelCount = (useGameStore.getState().wormTunnelCount ?? 0) + 1;
-        useGameStore.setState({ wormPhase: 'entering', wormOnFlippedTile: false, visualMode: 'glass', wormTunnelCount: nextTunnelCount });
+        const prevState = useGameStore.getState();
+        prevVisualModeRef.current = prevState.visualMode;
+        prevShowTunnelsRef.current = prevState.showTunnels ?? false;
+        const nextTunnelCount = (prevState.wormTunnelCount ?? 0) + 1;
+        const fc = resolveColors(prevState.settings, prevState.settings?.biomeMode?.faceAssignment) || FACE_COLORS;
+        useGameStore.setState({
+            wormPhase: 'entering',
+            wormOnFlippedTile: false,
+            visualMode: 'glass',
+            wormTunnelCount: nextTunnelCount,
+            showTunnels: true,
+            wormActiveTunnelColors: {
+                entryColor: fc[tunnel.entryColor] ?? FACE_COLORS[tunnel.entryColor] ?? '#00aaff',
+                exitColor: fc[tunnel.exitColor] ?? FACE_COLORS[tunnel.exitColor] ?? '#ff8800',
+            },
+        });
     }, [killWorm, resolveTunnelAtTile, tileKey]);
 
     // Colors of each collected orb, in pickup order — used by WormBody to color segments
@@ -625,7 +638,13 @@ function useWormCrawler(size, cubies) {
                     // The grace period covers the initial steps where the trail is too short to
                     // reliably catch real collisions.
                     ttReset(tileTrail.current, tileKey(pos.current));
-                    useGameStore.setState({ wormPhase: 'crawling', wormOnFlippedTile: false, visualMode: prevVisualModeRef.current ?? 'classic' });
+                    useGameStore.setState({
+                        wormPhase: 'crawling',
+                        wormOnFlippedTile: false,
+                        visualMode: prevVisualModeRef.current ?? 'classic',
+                        showTunnels: prevShowTunnelsRef.current,
+                        wormActiveTunnelColors: null,
+                    });
                     onFlippedTile.current = false;
                     lastFlippedRef.current = false;
                 },
@@ -1268,27 +1287,24 @@ function WormChaseCamera({ worm, size }) {
             let t = worm.tunnelProgress.current;
             if (phase === 'entering') t *= 0.35;
             if (phase === 'exiting') t = 0.65 + (t * 0.35);
-            const t1 = Math.min(t + 0.12, 1);
-            const t2 = Math.min(t + 0.24, 1);
+            // FPS mode: camera rides at the head, tight lookahead so the ribbon walls
+            // fill the frame and the Möbius half-twist is felt as the cube flips around.
+            const tLook = Math.min(t + 0.06, 1);
             getTunnelWorldPosInto(_camVec, worm.activeTunnel.current, t, size);
-            getTunnelWorldPosInto(_camLookVec, worm.activeTunnel.current, t1, size);
-            getTunnelWorldPosInto(_camLookAheadVec, worm.activeTunnel.current, t2, size);
+            getTunnelWorldPosInto(_camLookVec, worm.activeTunnel.current, tLook, size);
 
             const exitNormal = FACE_NORMALS[worm.activeTunnel.current.exit.dirKey] ?? FACE_NORMALS.PY;
             const entryNormal = FACE_NORMALS[worm.activeTunnel.current.entry.dirKey] ?? FACE_NORMALS.PY;
             _camUpVec.lerpVectors(entryNormal, exitNormal, t).normalize();
             _camTunnelTangent.subVectors(_camLookVec, _camVec).normalize();
             _camTunnelRight.crossVectors(_camTunnelTangent, _camUpVec).normalize();
-            const sway = Math.sin(performance.now() * 0.0045) * TUNNEL_SURF_SWAY;
-            _camSurfCam.copy(_camVec)
-                .addScaledVector(_camTunnelTangent, -TUNNEL_SURF_BACK)
-                .addScaledVector(_camUpVec, TUNNEL_SURF_UP)
-                .addScaledVector(_camTunnelRight, sway);
+            // Subtle sway — camera at head position, ribbon walls visible on both sides
+            const sway = Math.sin(performance.now() * 0.0045) * 0.12;
+            _camSurfCam.copy(_camVec).addScaledVector(_camTunnelRight, sway);
 
-            // Snappier lerping during transitions to avoid lag/stalling feel
-            const alpha = Math.min(1, CAM_LERP * delta * 2.5);
+            const alpha = Math.min(1, CAM_LERP * delta * 3.0);
             camPosRef.current.lerp(_camSurfCam, alpha);
-            lookAtRef.current.lerp(_camLookAheadVec, alpha);
+            lookAtRef.current.lerp(_camLookVec, alpha);
             camera.position.copy(camPosRef.current);
             camera.up.copy(_camUpVec);
             camera.lookAt(lookAtRef.current);
