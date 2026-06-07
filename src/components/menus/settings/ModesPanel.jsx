@@ -15,8 +15,28 @@ export function ModesPanel() {
   const mirrorMode = useGameStore((state) => state.mirrorMode);
   const setMirrorMode = useGameStore((state) => state.setMirrorMode);
 
+  const randomMode = useGameStore((state) => state.randomMode);
+  const setRandomMode = useGameStore((state) => state.setRandomMode);
+
   return (
     <>
+      {/* Random Style Mode */}
+      <section className="settings-section">
+        <h3 className="settings-section-title">Random Style Mode</h3>
+        <p style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.6)', marginBottom: '16px', lineHeight: '1.5' }}>
+          Every 15 seconds, the color scheme, tile style, and background randomize automatically while you play.
+        </p>
+        <div className="settings-toggles">
+          <label className="settings-toggle-row">
+            <span className="toggle-label">Enable Random Mode</span>
+            <div className={`toggle-switch${randomMode ? ' on' : ''}`}
+              onClick={() => setRandomMode(!randomMode)}>
+              <div className="toggle-knob" />
+            </div>
+          </label>
+        </div>
+      </section>
+
       {/* Hollow Void Cube Mode */}
       <section className="settings-section">
         <h3 className="settings-section-title">Hollow Void Cube Mode</h3>

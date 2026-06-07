@@ -38,6 +38,7 @@ import {
   useUndo,
   useParityDecay,
   useKeyboardControls,
+  useRandomMode,
 } from './hooks/index.js';
 
 // 3D components
@@ -314,6 +315,9 @@ export default function WORM3() {
   // Parity instability — flipped tiles spontaneously re-flip and propagate
   useParityDecay();
 
+  // Random style cycling — randomizes colors, tiles, and background every 15s
+  useRandomMode();
+
   // Antipodal integrity — real-time I(T) metric from the paper
   const antipodalData = useAntipodalIntegrity();
 
@@ -498,6 +502,13 @@ export default function WORM3() {
   }, []);
 
   const handleMenuFreeplay = useCallback(() => {
+    useGameStore.getState().setShowMainMenu(false);
+    setShowCubeModeSelect(false);
+    setShowFreeplayWizard(true);
+  }, []);
+
+  const handleMenuRandomMode = useCallback(() => {
+    useGameStore.getState().setRandomMode(true);
     useGameStore.getState().setShowMainMenu(false);
     setShowCubeModeSelect(false);
     setShowFreeplayWizard(true);
@@ -1255,6 +1266,7 @@ export default function WORM3() {
               onMenuPlay: handleMenuPlay,
               onMenuLevels: handleMenuCube,
               onMenuFreeplay: handleMenuFreeplay,
+              onMenuRandomMode: handleMenuRandomMode,
               onMenuCoop: handleMenuCoop,
               onMenuTeach: handleMenuTeach,
               onMenuSettings: handleMenuSettings,

@@ -999,7 +999,7 @@ const COMING_MODES = [
   { icon: '✦',  label: 'Merge',   color: '#a78bfa' },
 ];
 
-const MenuBottomSection = ({ visible, onWormSelect, onCubeSelect, onFreeplay, onStore, onComingSoon }) => (
+const MenuBottomSection = ({ visible, onWormSelect, onCubeSelect, onFreeplay, onRandom, onStore, onComingSoon }) => (
   <div style={{
     ...menuStyles.bottomStack,
     opacity: visible ? 1 : 0,
@@ -1113,6 +1113,8 @@ const MenuBottomSection = ({ visible, onWormSelect, onCubeSelect, onFreeplay, on
       }}>
         <NavItem icon={<ExploreIcon />} label="Explore" color="#22c55e" onClick={onFreeplay} />
         <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(120,160,255,0.15)' }} />
+        <NavItem icon={<RandomIcon />} label="Random" color="#f97316" onClick={onRandom} />
+        <div style={{ width: '1px', alignSelf: 'stretch', margin: '10px 0', background: 'rgba(120,160,255,0.15)' }} />
         <StoreNavItem onStore={onStore} />
       </div>
     </div>
@@ -1148,7 +1150,7 @@ const MenuBackgroundOrbs = () => (
 
 // ─── Main component ───────────────────────────────────────────────────────────
 const MainMenu = ({
-  onPlay: _onPlay, onLevels: _onLevels, onFreeplay, onCoop: _onCoop, onTeach: _onTeach,
+  onPlay: _onPlay, onLevels: _onLevels, onFreeplay, onRandom, onCoop: _onCoop, onTeach: _onTeach,
   onSettings: _onSettings, onBiome: _onBiome, onDisparity: _onDisparity,
   onWormHealer: _onWormHealer, onHolonomy: _onHolonomy, onMerge: _onMerge,
   onStore, onComingSoon, onMobiusCubelet: _onMobiusCubelet,
@@ -1212,6 +1214,7 @@ const MainMenu = ({
         onWormSelect={handleWormSelect}
         onCubeSelect={handleCubeSelect}
         onFreeplay={onFreeplay}
+        onRandom={onRandom}
         onStore={onStore}
         onComingSoon={onComingSoon}
       />
@@ -1234,6 +1237,15 @@ const ExploreIcon = () => (
     <polygon points="12,2 20,10 12,22 4,10" fill="none" stroke="#22c55e" strokeWidth="1.5" strokeLinejoin="round" />
     <polygon points="12,2 20,10 12,14 4,10" fill="#22c55e" opacity="0.25" />
     <line x1="4" y1="10" x2="20" y2="10" stroke="#22c55e" strokeWidth="1.2" opacity="0.65" />
+  </svg>
+);
+const RandomIcon = () => (
+  <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+    <path d="M16 3h5v5" stroke="#f97316" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M4 20L21 3" stroke="#f97316" strokeWidth="1.5" strokeLinecap="round" />
+    <path d="M21 16v5h-5" stroke="#f97316" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M15 15l6 6" stroke="#f97316" strokeWidth="1.5" strokeLinecap="round" />
+    <path d="M4 4l5 5" stroke="#f97316" strokeWidth="1.5" strokeLinecap="round" opacity="0.55" />
   </svg>
 );
 

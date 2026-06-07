@@ -105,7 +105,7 @@ export default function UILayer({
     onTapFlip, onBackToMainMenu, onLevelSelect, onCutsceneComplete,
     onTutorialClose, onLevelTutorialClose, onNextLevel,
     onPreset, onInstantChaos, onSaveState, onLoadState,
-    onMenuPlay, onMenuLevels, onMenuFreeplay, onMenuCoop, onMenuTeach,
+    onMenuPlay, onMenuLevels, onMenuFreeplay, onMenuRandomMode, onMenuCoop, onMenuTeach,
     onMenuSettings, onMenuBiome, onMenuDisparity, onMenuWormHealer, onMenuHolonomy, onMenuMerge, onMenuStore, onMenuComingSoon, onMenuMobiusCubelet,
     showMergeThemePicker, onMergeStart, onMergeCancel,
     onWizardComplete, onWizardCancel, onCubeModeRubiks, onCubeModeDisparity, onCubeModeBack, onDisparitySetupComplete,
@@ -372,6 +372,7 @@ export default function UILayer({
           onPlay={onMenuPlay}
           onLevels={onMenuLevels}
           onFreeplay={onMenuFreeplay}
+          onRandom={onMenuRandomMode}
           onCoop={onMenuCoop}
           onTeach={onMenuTeach}
           onSettings={onMenuSettings}

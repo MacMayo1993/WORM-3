@@ -663,6 +663,9 @@ export const useGameStore = create(
     chaosCurrent: 0,       // 0-1, smoothly lerped
     chaosTarget: 0,        // 0-1 based on chaosLevel
 
+    randomMode: false,
+    setRandomMode: (randomMode) => set({ randomMode }),
+
     setHollowMode: (hollowMode) => set({ hollowMode }),
     toggleHollowMode: () => set((state) => ({ hollowMode: !state.hollowMode })),
 
