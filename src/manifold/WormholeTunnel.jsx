@@ -346,11 +346,16 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
         coreMatRef.current.uniforms.uDead.value = dead ? 1 : 0;
       }
 
-      // Keep atmosphere tube color in sync with the entry-side tunnel color
+      // Atmosphere tube: dark tinted walls that actually occlude the background.
+      // Normal blending means 82% of the dark tunnel color shows, blocking background.
+      // The additive core tube + streaks then glow on top for the wormhole energy feel.
       if (atmosphereMatRef.current) {
-        _cTemp.copy(_c1).lerp(_white, 0.15);
-        atmosphereMatRef.current.color.copy(_cTemp);
-        atmosphereMatRef.current.opacity = dead ? 0 : 0.07 + burstEnv * 0.08;
+        // Very dark base tinted with entry-side tunnel color (12%) — nearly black but hued
+        const ar = _c1.r * 0.12 + 0.01;
+        const ag = _c1.g * 0.12 + 0.01;
+        const ab = _c1.b * 0.12 + 0.07;
+        atmosphereMatRef.current.color.setRGB(ar, ag, ab);
+        atmosphereMatRef.current.opacity = dead ? 0 : 0.84 + burstEnv * 0.10;
       }
       if (strandMatRef.current) {
         strandMatRef.current.uniforms.uTime.value = t;
@@ -611,18 +616,18 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
         />
       </instancedMesh>
 
-      {/* Atmosphere tube — wide BackSide cylinder, only visible from inside.
-          Creates tunnel-wall immersion when camera flies through on the centerline. */}
-      <mesh ref={atmosphereTubeRef}>
+      {/* Atmosphere tube — wide BackSide occluder, visible only from inside the tunnel.
+          Uses normal blending so the dark walls block the background (additive can't).
+          The core tube + streaks glow on top via additive blending for energy feel. */}
+      <mesh ref={atmosphereTubeRef} renderOrder={1}>
         <tubeGeometry args={[new THREE.LineCurve3(new THREE.Vector3(), new THREE.Vector3(0, 0, 0.1)), 2, 0.28, 12, false]} />
         <meshBasicMaterial
           ref={atmosphereMatRef}
-          color="#ffffff"
+          color="#01010f"
           transparent
-          opacity={0.07}
+          opacity={0.84}
           side={THREE.BackSide}
           depthWrite={false}
-          blending={THREE.AdditiveBlending}
         />
       </mesh>
 
@@ -648,9 +653,9 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
         </bufferGeometry>
         <pointsMaterial
           ref={streakMaterialRef}
-          size={0.014}
+          size={0.026}
           transparent
-          opacity={0.3}
+          opacity={0.55}
           depthWrite={false}
           depthTest
           vertexColors
