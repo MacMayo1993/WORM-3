@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { FACE_COLORS, ANTIPODAL_COLOR, FLIP_CAP, getHalfLifeMultiplier } from '../utils/constants.js';
@@ -6,42 +6,61 @@ import { FACE_COLORS, ANTIPODAL_COLOR, FLIP_CAP, getHalfLifeMultiplier } from '.
 // Shared geometries for wave effects - created once, reused
 const sharedWaveRingGeometry = new THREE.RingGeometry(0.8, 1.0, 32);
 const sharedInnerRingGeometry = new THREE.RingGeometry(0.3, 0.6, 32);
+
+// Three trailing rings per origin: lead ring + 2 followers at increasing delay.
+const RING_DELAYS    = [0, 0.14, 0.28];   // seconds behind the lead
+const RING_OPACITIES = [0.50, 0.32, 0.18]; // lead is darkest/most opaque
+const RING_DURATION  = 0.85;               // seconds per ring
 // Shared geometries for heat map
 const sharedHeatOuterCircle = new THREE.CircleGeometry(0.55, 32);
 const sharedHeatInnerCircle = new THREE.CircleGeometry(0.3, 32);
 
 /**
  * FlipPropagationWave - Visual ring wave that propagates from flip origins.
- * Rings only — no worm. Calls onComplete when the ring animation finishes (~0.83s).
+ * Renders 3 staggered rings per origin (lead + 2 trailing followers).
+ * Rings use NormalBlending for a darker, more grounded look.
+ * Calls onComplete when all rings have finished.
  */
 const FlipPropagationWave = ({ origins, onComplete }) => {
-  const [progress, setProgress] = useState(0);
-  const ringsRef = useRef([]);
+  const elapsedRef   = useRef(0);
+  const doneRef      = useRef(false);
+  // Flat array: origins.length × RING_DELAYS.length refs
+  const ringsRef     = useRef([]);
 
   useEffect(() => {
-    setProgress(0);
+    elapsedRef.current = 0;
+    doneRef.current    = false;
+    ringsRef.current   = [];
   }, [origins]);
 
-  useEffect(() => {
-    return () => { ringsRef.current = []; };
-  }, []);
+  const totalDuration = RING_DURATION + RING_DELAYS[RING_DELAYS.length - 1];
 
   useFrame((_state, delta) => {
-    if (progress >= 1) return;
+    if (doneRef.current) return;
 
-    const newProgress = Math.min(1, progress + delta * 1.2);
-    setProgress(newProgress);
+    elapsedRef.current += delta;
+    const elapsed = elapsedRef.current;
 
-    const easeOut = 1 - Math.pow(1 - newProgress, 3);
+    for (let i = 0; i < ringsRef.current.length; i++) {
+      const ring = ringsRef.current[i];
+      if (!ring) continue;
+      const delay   = RING_DELAYS[i % RING_DELAYS.length];
+      const ringT   = elapsed - delay;
+      if (ringT <= 0) {
+        ring.scale.setScalar(0.01);
+        if (ring.material) ring.material.opacity = 0;
+        continue;
+      }
+      const rawT   = Math.min(1, ringT / RING_DURATION);
+      const easeOut = 1 - Math.pow(1 - rawT, 3);
+      ring.scale.setScalar(easeOut * 4 + 0.5);
+      if (ring.material) {
+        ring.material.opacity = (1 - easeOut) * RING_OPACITIES[i % RING_DELAYS.length];
+      }
+    }
 
-    ringsRef.current.forEach((ring) => {
-      if (!ring) return;
-      const scale = easeOut * 4 + 0.5;
-      ring.scale.set(scale, scale, scale);
-      if (ring.material) ring.material.opacity = (1 - easeOut) * 0.8;
-    });
-
-    if (newProgress >= 1) {
+    if (elapsed >= totalDuration) {
+      doneRef.current = true;
       onComplete?.();
     }
   });
@@ -50,35 +69,28 @@ const FlipPropagationWave = ({ origins, onComplete }) => {
 
   return (
     <group>
-      {origins.map((origin, idx) => (
-        <group key={idx} position={origin.position}>
-          <mesh
-            ref={el => ringsRef.current[idx] = el}
-            rotation={origin.rotation || [0, 0, 0]}
-            geometry={sharedWaveRingGeometry}
-          >
-            <meshBasicMaterial
-              color={origin.color}
-              transparent
-              opacity={0.8}
-              side={THREE.DoubleSide}
-              blending={THREE.AdditiveBlending}
-              depthWrite={false}
-            />
-          </mesh>
-
-          <mesh rotation={origin.rotation || [0, 0, 0]} geometry={sharedInnerRingGeometry}>
-            <meshBasicMaterial
-              color={origin.color}
-              transparent
-              opacity={0.4 * (1 - progress)}
-              side={THREE.DoubleSide}
-              blending={THREE.AdditiveBlending}
-              depthWrite={false}
-            />
-          </mesh>
-        </group>
-      ))}
+      {origins.map((origin, oIdx) =>
+        RING_DELAYS.map((_, rIdx) => {
+          const flatIdx = oIdx * RING_DELAYS.length + rIdx;
+          return (
+            <mesh
+              key={`${oIdx}-${rIdx}`}
+              ref={el => { ringsRef.current[flatIdx] = el; }}
+              position={origin.position}
+              rotation={origin.rotation || [0, 0, 0]}
+              geometry={sharedWaveRingGeometry}
+            >
+              <meshBasicMaterial
+                color={origin.color}
+                transparent
+                opacity={0}
+                side={THREE.DoubleSide}
+                depthWrite={false}
+              />
+            </mesh>
+          );
+        })
+      )}
     </group>
   );
 };
