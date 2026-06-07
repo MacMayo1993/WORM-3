@@ -5,7 +5,6 @@ import { FACE_COLORS, ANTIPODAL_COLOR, FLIP_CAP, getHalfLifeMultiplier } from '.
 
 // Shared geometries for wave effects - created once, reused
 const sharedWaveRingGeometry = new THREE.RingGeometry(0.8, 1.0, 32);
-const sharedInnerRingGeometry = new THREE.RingGeometry(0.3, 0.6, 32);
 
 // Three trailing rings per origin: lead ring + 2 followers at increasing delay.
 const RING_DELAYS    = [0, 0.14, 0.28];   // seconds behind the lead
