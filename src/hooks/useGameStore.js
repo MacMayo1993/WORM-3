@@ -130,6 +130,7 @@ const makeWormRuntimeDefaults = () => ({
   wormGamePhase: 'scrambling',
   wormCountdownStep: null,
   wormSessionOrbs: 0,
+  wormActiveTunnelColors: null,
 });
 
 export const useGameStore = create(
@@ -442,6 +443,7 @@ export const useGameStore = create(
     setWormOrbInventory: (v) => set({ wormOrbInventory: v }),
     wormHealingProgress: {},
     setWormHealingProgress: (v) => set({ wormHealingProgress: v }),
+    wormActiveTunnelColors: null,
     // ── Scramble-solve game phase ────────────────────────────────────────────
     wormGamePhase: 'scrambling',   // 'scrambling' | 'spawning' | 'countdown' | 'active' | 'finalHealing' | 'solved'
     setWormGamePhase: (v) => set({ wormGamePhase: v }),
