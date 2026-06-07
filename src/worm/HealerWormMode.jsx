@@ -1327,6 +1327,17 @@ function WormChaseCamera({ worm, size }) {
             const tLook = Math.min(t + 0.06, 1.0);
             getTunnelWorldPosInto(_camSurfCam, tunnel, t, size);
             getTunnelWorldPosInto(_camLookVec, tunnel, tLook, size);
+
+            // Extend the camera path outside the cube so the tunnel portal is visible
+            // before entry and after exit — approach from ~2 units outside the face.
+            if (phase === 'entering') {
+                // Pull back along entry normal: 2 units outside at tp=0, 0 at tp=1
+                _camSurfCam.addScaledVector(entN, (1.0 - tp) * 2.0);
+            } else if (phase === 'exiting') {
+                // Push out along exit normal: 0 at tp=0, 2 units outside at tp=1
+                _camSurfCam.addScaledVector(extN, tp * 2.0);
+                _camLookVec.addScaledVector(extN, Math.min(tp + 0.1, 1.0) * 2.0);
+            }
             _camTunnelTangent.subVectors(_camLookVec, _camSurfCam);
             if (_camTunnelTangent.lengthSq() < 0.0001) _camTunnelTangent.copy(_ribAxis);
             _camTunnelTangent.normalize();
@@ -3149,6 +3160,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
 
     // Reactive phase for conditional JSX rendering — only changes on phase transitions
     const wormGamePhase = useGameStore(s => s.wormGamePhase ?? 'scrambling');
+    const wormPhaseReactive = useGameStore(s => s.wormPhase ?? 'crawling');
 
     // ── Auto-rotation hazard state ─────────────────────────────────────────────
     const autoTimerRef      = useRef(0);
@@ -3374,7 +3386,8 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         }
     });
 
-    const wormVisible = wormGamePhase !== 'scrambling';
+    const wormInTunnel = wormPhaseReactive === 'entering' || wormPhaseReactive === 'tunnel' || wormPhaseReactive === 'exiting';
+    const wormVisible = wormGamePhase !== 'scrambling' && !wormInTunnel;
 
     return (
         <>
