@@ -8,9 +8,17 @@ import { COLOR_SCHEMES } from '../../utils/colorSchemes.js';
 import { CLASSIC_STYLE_KEYS, ANTIPODAL_STYLE_KEYS, LIVING_STYLE_KEYS } from '../../utils/tileStyleCatalog.js';
 import { BACKGROUNDS } from '../../utils/backgrounds.js';
 import { rotateSliceCubies } from '../../game/cubeRotation.js';
-import { updateSharedTime } from '../../3d/styles/TileStyleMaterials.jsx';
+import { updateSharedTime, getTileStyleMaterial } from '../../3d/styles/TileStyleMaterials.jsx';
 import MenuFlipWave from './MenuFlipWave.jsx';
 import { ANTIPODAL_COLOR } from '../../utils/constants.js';
+import { COLOR_SCHEMES, TILE_STYLES } from '../../utils/colorSchemes.js';
+
+// ─── Random scheme + tile style, picked once per page load ────────────────────
+const _SCHEME_KEYS = Object.keys(COLOR_SCHEMES).filter(k => k !== 'biome' && k !== 'custom');
+const _TILE_KEYS = Object.keys(TILE_STYLES);
+const _menuSchemeKey = _SCHEME_KEYS[Math.floor(Math.random() * _SCHEME_KEYS.length)];
+const _menuTileStyle = _TILE_KEYS[Math.floor(Math.random() * _TILE_KEYS.length)];
+const MENU_FACE_COLORS = COLOR_SCHEMES[_menuSchemeKey]; // { 1: hex, 2: hex, ... }
 
 // ─── Per-face independent pulse timing ────────────────────────────────────────
 // Each of the 6 faces gets its own phase offset so all 6 colors are always
@@ -350,9 +358,6 @@ const FacePulses = () => {
 };
 
 // ─── Shuffling cube — live Rubik's slice animation ────────────────────────────
-const FACE_ID_COLOR = {
-  1: '#ef4444', 2: '#22c55e', 3: '#f0f0f0', 4: '#f97316', 5: '#3b82f6', 6: '#eab308',
-};
 const STICKER_CFG = [
   { dir: 'PX', pos: [0.501, 0, 0],   rot: [0,  Math.PI / 2, 0] },
   { dir: 'NX', pos: [-0.501, 0, 0],  rot: [0, -Math.PI / 2, 0] },
@@ -406,11 +411,12 @@ const ShuffleCubie = React.memo(({ cubie }) => {
       {STICKER_CFG.map(({ dir, pos, rot }) => {
         const sticker = cubie.stickers?.[dir];
         if (!sticker) return null;
+        const colorHex = MENU_FACE_COLORS[sticker.curr] ?? '#888888';
         return (
           <group key={dir} position={pos} rotation={rot}>
             <mesh>
               <planeGeometry args={[0.80, 0.80]} />
-              <meshStandardMaterial color={FACE_ID_COLOR[sticker.curr] ?? '#888'} roughness={0.20} metalness={0.08} side={THREE.DoubleSide} />
+              <primitive attach="material" object={getTileStyleMaterial(_menuTileStyle, colorHex)} />
             </mesh>
           </group>
         );
@@ -490,8 +496,8 @@ const ShufflingCube = () => {
         safeAx,
         startTime: t,
         origins: [
-          { position: sA.pos, rotation: sA.rot, color: FACE_ID_COLOR[stA.curr], id: `${wid}a` },
-          { position: sB.pos, rotation: sB.rot, color: FACE_ID_COLOR[stB.curr], id: `${wid}b` },
+          { position: sA.pos, rotation: sA.rot, color: MENU_FACE_COLORS[stA.curr], id: `${wid}a` },
+          { position: sB.pos, rotation: sB.rot, color: MENU_FACE_COLORS[stB.curr], id: `${wid}b` },
         ],
       }]);
 
