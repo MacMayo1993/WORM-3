@@ -16,7 +16,7 @@ export const TUNNEL_SURF_FOV = 78;
 export const TUNNEL_SURF_BACK = 2.2;
 export const TUNNEL_SURF_UP = 0.72;
 export const TUNNEL_SURF_SWAY = 0.22;
-export const TUNNEL_SPEED_SCALE = 0.8; // 20% slower tunnel traversal
+export const TUNNEL_SPEED_SCALE = 0.42; // slow tunnel for a more dramatic fly-through
 
 // Face outward normals.
 export const FACE_NORMALS = {

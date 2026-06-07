@@ -150,6 +150,8 @@ const strandFragmentShader = `
 
 const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2, active1, active2, cubieRefs, intensity, flips, color1, color2, isCenter, maxStrands = 50, _explosionFactor = 0 }) => {
   const coreTubeRef = useRef();
+  const atmosphereTubeRef = useRef();
+  const atmosphereMatRef = useRef();
   const coreMatRef = useRef();
   const pulseT = useRef(Math.random() * Math.PI * 2);
   const strandsRef = useRef();
@@ -212,9 +214,11 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
   useEffect(() => {
     const ct = coreTubeRef.current;
     const lt = lightningRef.current;
+    const at = atmosphereTubeRef.current;
     return () => {
       if (ct?.geometry) ct.geometry.dispose();
       if (lt?.geometry) lt.geometry.dispose();
+      if (at?.geometry) at.geometry.dispose();
     };
   }, []);
 
@@ -318,6 +322,15 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
         // 20 segments along tube, 5 radial segments
         coreTubeRef.current.geometry = new THREE.TubeGeometry(curveRef.current, 20, 0.02 * (1 + _explosionFactor * 2), 5, false);
         if (oldGeo) oldGeo.dispose();
+
+        // Atmosphere tube — wide BackSide tube visible only from inside the tunnel.
+        // Radius 0.28 creates tunnel-wall feel when camera flies through on centerline.
+        if (atmosphereTubeRef.current) {
+          const oldAtmo = atmosphereTubeRef.current.geometry;
+          atmosphereTubeRef.current.geometry = new THREE.TubeGeometry(curveRef.current, 20, 0.28 * (1 + _explosionFactor * 2), 12, false);
+          if (oldAtmo) oldAtmo.dispose();
+        }
+
         lastCoreGeometryBuildRef.current = t;
         lastCoreStartRef.current.copy(_vStart);
         lastCoreEndRef.current.copy(_vEnd);
@@ -331,6 +344,13 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
         coreMatRef.current.uniforms.uBurst.value = Math.min(1, burstEnv + _explosionFactor * 0.5);
         coreMatRef.current.uniforms.uDanger.value = dangerT;
         coreMatRef.current.uniforms.uDead.value = dead ? 1 : 0;
+      }
+
+      // Keep atmosphere tube color in sync with the entry-side tunnel color
+      if (atmosphereMatRef.current) {
+        _cTemp.copy(_c1).lerp(_white, 0.15);
+        atmosphereMatRef.current.color.copy(_cTemp);
+        atmosphereMatRef.current.opacity = dead ? 0 : 0.07 + burstEnv * 0.08;
       }
       if (strandMatRef.current) {
         strandMatRef.current.uniforms.uTime.value = t;
@@ -590,6 +610,21 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
           blending={THREE.AdditiveBlending}
         />
       </instancedMesh>
+
+      {/* Atmosphere tube — wide BackSide cylinder, only visible from inside.
+          Creates tunnel-wall immersion when camera flies through on the centerline. */}
+      <mesh ref={atmosphereTubeRef}>
+        <tubeGeometry args={[new THREE.LineCurve3(new THREE.Vector3(), new THREE.Vector3(0, 0, 0.1)), 2, 0.28, 12, false]} />
+        <meshBasicMaterial
+          ref={atmosphereMatRef}
+          color="#ffffff"
+          transparent
+          opacity={0.07}
+          side={THREE.BackSide}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+        />
+      </mesh>
 
       {/* Thick volumetric brain stem (core axis) */}
       <mesh ref={coreTubeRef}>
