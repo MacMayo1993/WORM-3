@@ -541,8 +541,8 @@ export const RotatingBlackCube = ({ onCubeClick }) => {
   const cubeRef = useRef();
   const shaking = useRef(false);
   const shakeStart = useRef(0);
-  const cubeTargetScale = useRef(0.95);
-  const cubeCurrentScale = useRef(0.95);
+  const cubeTargetScale = useRef(0.808);
+  const cubeCurrentScale = useRef(0.808);
   const onCubeClickRef = useRef(onCubeClick);
   onCubeClickRef.current = onCubeClick;
 
@@ -558,13 +558,13 @@ export const RotatingBlackCube = ({ onCubeClick }) => {
       const elapsed = Date.now() - shakeStart.current;
       if (elapsed > 540) {
         shaking.current = false;
-        cubeTargetScale.current = 0.95;
-        cubeRef.current.position.set(0, -0.09, 0);
+        cubeTargetScale.current = 0.808;
+        cubeRef.current.position.set(0, 0.45, 0);
         onCubeClickRef.current?.();
       } else {
         const intensity = 0.10 * (1 - elapsed / 540);
         cubeRef.current.position.x = Math.sin(t * 42) * intensity;
-        cubeRef.current.position.y = -0.09 + Math.sin(t * 37 + 1) * intensity * 0.5;
+        cubeRef.current.position.y = 0.45 + Math.sin(t * 37 + 1) * intensity * 0.5;
         cubeRef.current.position.z = Math.sin(t * 31 + 2) * intensity * 0.3;
       }
     } else {
@@ -572,7 +572,7 @@ export const RotatingBlackCube = ({ onCubeClick }) => {
       cubeRef.current.rotation.y = t * 0.20 + Math.sin(t * 0.09) * 0.55;
       cubeRef.current.rotation.x = Math.sin(t * 0.13) * 0.48;
       cubeRef.current.rotation.z = Math.sin(t * 0.07) * 0.18;
-      cubeRef.current.position.set(0, -0.09, 0);
+      cubeRef.current.position.set(0, 0.45, 0);
     }
   });
 
@@ -582,14 +582,14 @@ export const RotatingBlackCube = ({ onCubeClick }) => {
     shaking.current = true;
     shakeStart.current = Date.now();
   };
-  const handleCubeDown = () => { cubeTargetScale.current = 0.90; };
-  const handleCubeUp = () => { if (!shaking.current) cubeTargetScale.current = 0.95; };
+  const handleCubeDown = () => { cubeTargetScale.current = 0.765; };
+  const handleCubeUp = () => { if (!shaking.current) cubeTargetScale.current = 0.808; };
 
   return (
     <>
       <group
         ref={cubeRef}
-        position={[0, -0.09, 0]}
+        position={[0, 0.45, 0]}
         onClick={handleCubeClick}
         onPointerDown={handleCubeDown}
         onPointerUp={handleCubeUp}
