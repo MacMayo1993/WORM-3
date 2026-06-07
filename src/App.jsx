@@ -315,8 +315,21 @@ export default function WORM3() {
   // Parity instability — flipped tiles spontaneously re-flip and propagate
   useParityDecay();
 
-  // Random style cycling — randomizes colors, tiles, and background every 15s
+  // Random style cycling — randomizes colors and tiles every 15s
   useRandomMode();
+
+  // Screen shake on each style cycle
+  const randomStyleTick = useGameStore(s => s.randomStyleTick);
+  const [randomShaking, setRandomShaking] = useState(false);
+  const prevRandomTickRef = useRef(0);
+  useEffect(() => {
+    if (randomStyleTick > 0 && randomStyleTick !== prevRandomTickRef.current) {
+      prevRandomTickRef.current = randomStyleTick;
+      setRandomShaking(true);
+      const id = setTimeout(() => setRandomShaking(false), 420);
+      return () => clearTimeout(id);
+    }
+  }, [randomStyleTick]);
 
   // Antipodal integrity — real-time I(T) metric from the paper
   const antipodalData = useAntipodalIntegrity();
@@ -346,6 +359,7 @@ export default function WORM3() {
   // Cube mode selection + setup wizards
   const [showCubeModeSelect, setShowCubeModeSelect] = useState(false);
   const [showFreeplayWizard, setShowFreeplayWizard] = useState(false);
+  const [showRandomWizard, setShowRandomWizard] = useState(false);
   const [showWormModeWizard, setShowWormModeWizard] = useState(false);
 
   // Merge Mode theme picker
@@ -508,10 +522,39 @@ export default function WORM3() {
   }, []);
 
   const handleMenuRandomMode = useCallback(() => {
-    useGameStore.getState().setRandomMode(true);
     useGameStore.getState().setShowMainMenu(false);
     setShowCubeModeSelect(false);
-    setShowFreeplayWizard(true);
+    setShowRandomWizard(true);
+  }, []);
+
+  const handleRandomWizardComplete = useCallback(({ backgroundTheme, cubeSize }) => {
+    setShowRandomWizard(false);
+    useGameStore.getState().setRandomMode(true);
+
+    const newSettings = { ...settings, backgroundTheme };
+    setSettings(newSettings);
+    useGameStore.getState().clearLevel();
+
+    const targetSize = cubeSize || size;
+    if (targetSize !== size) {
+      changeSize(targetSize);
+      let state = makeCubies(targetSize);
+      for (let i = 0; i < 25; i++) {
+        const ax = ['row', 'col', 'depth'][Math.floor(Math.random() * 3)];
+        const slice = Math.floor(Math.random() * targetSize);
+        const dir = Math.random() > 0.5 ? 1 : -1;
+        state = rotateSliceCubies(state, targetSize, ax, slice, dir);
+      }
+      setRotatedCubies(state);
+      useGameStore.getState().setHasShuffled(true);
+    } else {
+      animatedShuffle();
+    }
+  }, [settings, setSettings, size, changeSize, setRotatedCubies, animatedShuffle]);
+
+  const handleRandomWizardCancel = useCallback(() => {
+    setShowRandomWizard(false);
+    useGameStore.getState().setShowMainMenu(true);
   }, []);
 
   const handleWizardComplete = useCallback((wizardSettings) => {
@@ -1115,7 +1158,7 @@ export default function WORM3() {
   }
 
   return (
-    <div className={`full-screen${settings.backgroundTheme === 'dark' ? ' bg-dark' : settings.backgroundTheme === 'midnight' ? ' bg-midnight' : ''}`}>
+    <div className={`full-screen${settings.backgroundTheme === 'dark' ? ' bg-dark' : settings.backgroundTheme === 'midnight' ? ' bg-midnight' : ''}${randomShaking ? ' random-shake' : ''}`}>
       {showTutorial && !showWelcome && <Tutorial onClose={closeTutorial} onMainMenu={() => { closeTutorial(); handleBackToMainMenu(); }} />}
 
       {/* Single persistent Canvas — never unmounts, eliminates context loss on intro→game.
@@ -1234,7 +1277,7 @@ export default function WORM3() {
             performCursorRotation={performCursorRotation}
             ui={{
               sheetOpen, setSheetOpen, sheetMode, setSheetMode,
-              showFreeplayWizard, showWormModeWizard, showCubeModeSelect,
+              showFreeplayWizard, showRandomWizard, showWormModeWizard, showCubeModeSelect,
               showDisparityWizard, setShowDisparityWizard,
               showDisparityBetting,
               disparityWaitingFirstFlip, disparityCountdown,
@@ -1283,6 +1326,8 @@ export default function WORM3() {
               onMergeCancel: handleMergeCancel,
               onWizardComplete: handleWizardComplete,
               onWizardCancel: handleWizardCancel,
+              onRandomWizardComplete: handleRandomWizardComplete,
+              onRandomWizardCancel: handleRandomWizardCancel,
               onCubeModeRubiks: handleMenuFreeplay,
               onCubeModeDisparity: handleMenuDisparity,
               onCubeModeBack: handleCubeModeBack,

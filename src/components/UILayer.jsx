@@ -45,6 +45,7 @@ const LevelSelectScreen = React.lazy(() => import('./screens/LevelSelectScreen.j
 const Level10Cutscene = React.lazy(() => import('./screens/Level10Cutscene.jsx'));
 const LevelTutorial = React.lazy(() => import('./screens/LevelTutorial.jsx'));
 const FreeplaySetupWizard = React.lazy(() => import('./screens/FreeplaySetupWizard.jsx'));
+const RandomModeSetupWizard = React.lazy(() => import('./screens/RandomModeSetupWizard.jsx'));
 const CubeModeSelectScreen = React.lazy(() => import('./screens/CubeModeSelectScreen.jsx'));
 const WormModeSetupWizard = React.lazy(() => import('./screens/WormModeSetupWizard.jsx'));
 const DisparitySetupWizard = React.lazy(() => import('./screens/DisparitySetupWizard.jsx'));
@@ -90,7 +91,7 @@ export default function UILayer({
 }) {
   const {
     sheetOpen, setSheetOpen, sheetMode, setSheetMode,
-    showFreeplayWizard, showWormModeWizard, showCubeModeSelect,
+    showFreeplayWizard, showRandomWizard, showWormModeWizard, showCubeModeSelect,
     showDisparityWizard, setShowDisparityWizard,
     showDisparityBetting,
     disparityWaitingFirstFlip, disparityCountdown,
@@ -108,7 +109,8 @@ export default function UILayer({
     onMenuPlay, onMenuLevels, onMenuFreeplay, onMenuRandomMode, onMenuCoop, onMenuTeach,
     onMenuSettings, onMenuBiome, onMenuDisparity, onMenuWormHealer, onMenuHolonomy, onMenuMerge, onMenuStore, onMenuComingSoon, onMenuMobiusCubelet,
     showMergeThemePicker, onMergeStart, onMergeCancel,
-    onWizardComplete, onWizardCancel, onCubeModeRubiks, onCubeModeDisparity, onCubeModeBack, onDisparitySetupComplete,
+    onWizardComplete, onWizardCancel, onRandomWizardComplete, onRandomWizardCancel,
+    onCubeModeRubiks, onCubeModeDisparity, onCubeModeBack, onDisparitySetupComplete,
     onBetPlaced, onBetSkipped,
     onWormSetupComplete, onWormWizardCancel, onWormRetry, onWormNewGame,
     onToggleHandsMode, onFaceRotate, onTileRotation, onTileFaceRotation,
@@ -431,6 +433,12 @@ export default function UILayer({
         </Suspense>
       )}
 
+      {showRandomWizard && (
+        <Suspense fallback={null}>
+          <RandomModeSetupWizard onComplete={onRandomWizardComplete} onCancel={onRandomWizardCancel} initialSettings={settings} />
+        </Suspense>
+      )}
+
       {showWormModeWizard && (
         <Suspense fallback={null}>
           <WormModeSetupWizard onComplete={onWormSetupComplete} onCancel={onWormWizardCancel} initialSettings={settings} />
@@ -642,6 +650,23 @@ export default function UILayer({
           />
         </Suspense>
       )}
+
+      <RandomStyleFlash />
     </>
+  );
+}
+
+function RandomStyleFlash() {
+  const tick = useGameStore(s => s.randomStyleTick);
+  if (tick === 0) return null;
+  return (
+    <div
+      key={tick}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 9990, pointerEvents: 'none',
+        background: 'radial-gradient(ellipse at center, rgba(255,255,255,0.18) 0%, rgba(180,120,255,0.10) 45%, transparent 72%)',
+        animation: 'randomFlash 0.5s ease-out forwards',
+      }}
+    />
   );
 }
