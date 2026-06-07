@@ -81,6 +81,10 @@ const ScreenGlow = () => {
 };
 
 
+// ─── Carousel-active flag — set by MainMenu, read by all useFrame hooks ────────
+// Plain module-level variable: no React state needed, just a synchronous gate.
+let _carouselActive = false;
+
 // ─── Shuffling cube — live Rubik's slice animation ────────────────────────────
 const STICKER_CFG = [
   { dir: 'PX', pos: [0.501, 0, 0],   rot: [0,  Math.PI / 2, 0] },
@@ -171,6 +175,7 @@ const ShufflingCube = () => {
   const flipIdRef   = useRef(0);
 
   useFrame(({ clock }) => {
+    if (_carouselActive) return;
     const t = clock.elapsedTime;
     const { rotating, cubies } = cubeStateRef.current;
 
@@ -323,7 +328,7 @@ const MenuWorm = ({ onWormClick }) => {
   const smoothPtr = useRef({ x: 0, y: 0 });
 
   useFrame(({ clock, pointer }, delta) => {
-    if (!groupRef.current) return;
+    if (_carouselActive || !groupRef.current) return;
     const t = clock.elapsedTime;
 
     // Initialize blink timer on first frame
@@ -546,7 +551,7 @@ export const RotatingBlackCube = ({ onCubeClick }) => {
   onCubeClickRef.current = onCubeClick;
 
   useFrame((state, delta) => {
-    if (!cubeRef.current) return;
+    if (_carouselActive || !cubeRef.current) return;
     const t = state.clock.elapsedTime;
     updateSharedTime(t);
 
@@ -620,6 +625,11 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
   const N = CAROUSEL_MODES.length;
 
   useEffect(() => {
+    _carouselActive = true;
+    return () => { _carouselActive = false; };
+  }, []);
+
+  useEffect(() => {
     const handleKey = (e) => {
       if (e.key === 'ArrowLeft')  setActiveIndex(i => (i - 1 + N) % N);
       if (e.key === 'ArrowRight') setActiveIndex(i => (i + 1) % N);
@@ -667,8 +677,10 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
   return (
     <div
       style={{
-        position: 'absolute', inset: 0, zIndex: 10, display: 'flex', flexDirection: 'column',
+        position: 'fixed', inset: 0, zIndex: 10000, display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center', padding: '0 8px', pointerEvents: 'all',
+        background: 'rgba(4,6,18,0.97)',
+        backdropFilter: 'blur(32px)', WebkitBackdropFilter: 'blur(32px)',
       }}
       onTouchStart={e => { touchStartX.current = e.touches[0].clientX; }}
       onTouchEnd={e => {
@@ -678,6 +690,10 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
         if (Math.abs(delta) > 50) navigate(delta < 0 ? 1 : -1);
       }}
     >
+      <MenuBackgroundOrbs />
+
+      {/* Content sits above the orbs */}
+      <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', padding: '0 8px' }}>
       <p style={{
         margin: '0 0 28px', fontSize: '10px', fontWeight: 800, letterSpacing: '0.30em',
         textTransform: 'uppercase', color: 'rgba(160,185,255,0.40)', fontFamily: MENU_FONT,
@@ -782,6 +798,7 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
         onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.26)'; e.currentTarget.style.color = 'rgba(200,220,255,0.78)'; }}
         onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.color = 'rgba(180,200,255,0.50)'; }}
       >← Back</button>
+      </div>{/* end content wrapper */}
     </div>
   );
 };
