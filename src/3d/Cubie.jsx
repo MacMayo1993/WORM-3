@@ -332,22 +332,52 @@ const Cubie = React.forwardRef(function Cubie({
     const entry = cubiePops[popKey];
     if (!entry) {
       popGroupRef.current.position.set(0, 0, 0);
+      popGroupRef.current.scale.set(1, 1, 1);
       return;
     }
     const rawT = (performance.now() - entry.startMs) / entry.durationMs;
     if (rawT >= 1) {
       popGroupRef.current.position.set(0, 0, 0);
+      popGroupRef.current.scale.set(1, 1, 1);
       return;
     }
-    // Bell-curve pop: sin(t*π) peaks at t=0.5, magnitude 0.6 world units radially outward.
-    const popFactor = Math.sin(rawT * Math.PI) * 0.6;
+
+    // Asymmetric envelope: fast rush out (0→0.25), hover near peak (0.25→0.65), slow drift back (0.65→1).
+    let envelope;
+    if (rawT < 0.25) {
+      const t = rawT / 0.25;
+      envelope = 1 - (1 - t) * (1 - t); // easeOutQuad → 0 to 1
+    } else if (rawT < 0.65) {
+      const hoverT = (rawT - 0.25) / 0.40;
+      envelope = 1.0 - 0.06 * Math.sin(hoverT * Math.PI * 2); // gentle hover bob
+    } else {
+      const t = (rawT - 0.65) / 0.35;
+      envelope = 1 - t * t; // easeInQuad → 1 to 0
+    }
+
     const [px, py, pz] = explodedPos;
     const len = Math.sqrt(px * px + py * py + pz * pz) || 1;
+    const rx = px / len, ry = py / len, rz = pz / len;
+
+    // Radial push — 1.2 world units at peak
+    const radial = envelope * 1.2;
+
+    // Lateral shake perpendicular to radial direction (world-up × radial)
+    const shakeAmp = envelope * 0.10;
+    const shakeX = Math.sin(rawT * Math.PI * 22) * shakeAmp;
+    const shakeZ = Math.cos(rawT * Math.PI * 17) * shakeAmp;
+    // Perp vectors: (-rz, 0, rx) and (0, 1, 0) cross products
+    const perpX = -rz, perpZ = rx; // horizontal perp to radial
+
     popGroupRef.current.position.set(
-      (px / len) * popFactor,
-      (py / len) * popFactor,
-      (pz / len) * popFactor
+      rx * radial + perpX * shakeX,
+      ry * radial + shakeX * 0.5,
+      rz * radial + perpZ * shakeX + shakeZ * 0.5
     );
+
+    // Pulsating scale: rapid breathing while airborne
+    const pulse = 1.0 + envelope * 0.14 * Math.sin(rawT * Math.PI * 10);
+    popGroupRef.current.scale.set(pulse, pulse, pulse);
   });
 
   return (
