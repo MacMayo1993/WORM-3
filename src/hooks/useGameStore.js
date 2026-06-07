@@ -665,6 +665,8 @@ export const useGameStore = create(
 
     randomMode: false,
     setRandomMode: (randomMode) => set({ randomMode }),
+    randomStyleTick: 0,
+    bumpRandomTick: () => set(s => ({ randomStyleTick: s.randomStyleTick + 1 })),
 
     setHollowMode: (hollowMode) => set({ hollowMode }),
     toggleHollowMode: () => set((state) => ({ hollowMode: !state.hollowMode })),

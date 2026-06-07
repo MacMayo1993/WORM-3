@@ -1,31 +1,30 @@
 import { useEffect, useRef } from 'react';
 import { useGameStore } from './useGameStore.js';
 import { COLOR_SCHEMES, TILE_STYLES } from '../utils/colorSchemes.js';
-import { BACKGROUNDS } from '../utils/backgrounds.js';
 import { clearMaterialCache } from '../3d/styles/TileStyleMaterials.jsx';
 
 const CYCLE_MS = 15000;
 
 const SCHEME_KEYS = Object.keys(COLOR_SCHEMES).filter(k => k !== 'biome' && k !== 'custom');
 const TILE_KEYS = Object.keys(TILE_STYLES);
-const BG_IDS = BACKGROUNDS.map(b => b.id);
 
 function pick(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-function applyRandomStyle(setSettings) {
+function applyRandomStyle(setSettings, bumpTick) {
   const scheme = pick(SCHEME_KEYS);
   const tile = pick(TILE_KEYS);
-  const bg = pick(BG_IDS);
   const manifoldStyles = { 1: tile, 2: tile, 3: tile, 4: tile, 5: tile, 6: tile };
   clearMaterialCache();
-  setSettings(prev => ({ ...prev, colorScheme: scheme, manifoldStyles, backgroundTheme: bg }));
+  setSettings(prev => ({ ...prev, colorScheme: scheme, manifoldStyles }));
+  bumpTick();
 }
 
 export function useRandomMode() {
   const randomMode = useGameStore(s => s.randomMode);
   const setSettings = useGameStore(s => s.setSettings);
+  const bumpRandomTick = useGameStore(s => s.bumpRandomTick);
   const showMainMenu = useGameStore(s => s.showMainMenu);
   const showSettings = useGameStore(s => s.showSettings);
   const showWelcome = useGameStore(s => s.showWelcome);
@@ -39,12 +38,12 @@ export function useRandomMode() {
   useEffect(() => {
     if (!randomMode || !inGame) return;
 
-    applyRandomStyle(setSettings);
+    applyRandomStyle(setSettings, bumpRandomTick);
 
     const id = setInterval(() => {
-      if (activeRef.current) applyRandomStyle(setSettings);
+      if (activeRef.current) applyRandomStyle(setSettings, bumpRandomTick);
     }, CYCLE_MS);
 
     return () => clearInterval(id);
-  }, [randomMode, inGame, setSettings]);
+  }, [randomMode, inGame, setSettings, bumpRandomTick]);
 }
