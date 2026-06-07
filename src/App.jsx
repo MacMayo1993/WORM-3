@@ -507,6 +507,13 @@ export default function WORM3() {
     setShowFreeplayWizard(true);
   }, []);
 
+  const handleMenuRandomMode = useCallback(() => {
+    useGameStore.getState().setRandomMode(true);
+    useGameStore.getState().setShowMainMenu(false);
+    setShowCubeModeSelect(false);
+    setShowFreeplayWizard(true);
+  }, []);
+
   const handleWizardComplete = useCallback((wizardSettings) => {
     setShowFreeplayWizard(false);
     const allStyles = ['solid', 'glossy', 'matte', 'metallic', 'carbonFiber', 'hexGrid', 'comic', 'cafeWall', 'hermanGrid', 'opticSpin', 'ouchi', 'scintillatingGrid', 'zoellner', 'kanizsa', 'grass', 'ice', 'sand', 'water', 'wood', 'circuit', 'holographic', 'pulse', 'lava', 'galaxy', 'neural'];
@@ -1259,6 +1266,7 @@ export default function WORM3() {
               onMenuPlay: handleMenuPlay,
               onMenuLevels: handleMenuCube,
               onMenuFreeplay: handleMenuFreeplay,
+              onMenuRandomMode: handleMenuRandomMode,
               onMenuCoop: handleMenuCoop,
               onMenuTeach: handleMenuTeach,
               onMenuSettings: handleMenuSettings,
