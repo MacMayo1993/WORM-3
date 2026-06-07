@@ -9,32 +9,34 @@ const FACE_NORM_LOCAL = {
   PZ: [0, 0, 1], NZ: [0, 0, -1],
 };
 
-const FACE_OFFSET = 0.52;
-const RIBBON_WIDTH = 0.85;
-const RIBBON_SEGS = 32; // must be even — half goes to mini-cube face, half from it
+const FACE_OFFSET   = 0.52;
+const RIBBON_WIDTH  = 0.85;
+const RIBBON_SEGS   = 32;   // must be even
 const REBUILD_EPS_SQ = 1e-4;
-
-// Radius from cube centre to the AntipodalMinicube sticker face — must match MINI_S in VoidCore.jsx.
-const MINI_FACE_R = 0.25;
+const MINI_FACE_R   = 0.25; // must match MINI_S in VoidCore.jsx
+const TAPER_MIN     = 0.15; // narrowest fraction of full width at the mini-cube
+const BUMPER_HEIGHT = 0.22; // guard-rail height at full width (world units)
 
 // Module-level cached objects — no per-frame allocation.
-const _wPos1 = new THREE.Vector3();
-const _wPos2 = new THREE.Vector3();
-const _wQuat1 = new THREE.Quaternion();
-const _wQuat2 = new THREE.Quaternion();
-const _faceNorm1 = new THREE.Vector3();
-const _faceNorm2 = new THREE.Vector3();
-const _vStart = new THREE.Vector3();
-const _vEnd = new THREE.Vector3();
-const _midA = new THREE.Vector3();
-const _midB = new THREE.Vector3();
-const _axis = new THREE.Vector3();
-const _perpBase = new THREE.Vector3();
-const _perpCurrent = new THREE.Vector3();
-const _up = new THREE.Vector3(0, 1, 0);
-const _side = new THREE.Vector3(0, 0, 1);
+const _wPos1         = new THREE.Vector3();
+const _wPos2         = new THREE.Vector3();
+const _wQuat1        = new THREE.Quaternion();
+const _wQuat2        = new THREE.Quaternion();
+const _faceNorm1     = new THREE.Vector3();
+const _faceNorm2     = new THREE.Vector3();
+const _vStart        = new THREE.Vector3();
+const _vEnd          = new THREE.Vector3();
+const _midA          = new THREE.Vector3();
+const _midB          = new THREE.Vector3();
+const _axis          = new THREE.Vector3();
+const _perpBase      = new THREE.Vector3();
+const _perpCurrent   = new THREE.Vector3();
+const _segTangent    = new THREE.Vector3();
+const _surfaceNormal = new THREE.Vector3();
+const _up            = new THREE.Vector3(0, 1, 0);
+const _side          = new THREE.Vector3(0, 0, 1);
 
-// Vertex shader: pass UV to fragment.
+// Vertex shader: pass UV through to fragment.
 const vertexShader = `
   varying vec2 vUv;
   void main() {
@@ -43,144 +45,297 @@ const vertexShader = `
   }
 `;
 
-// Fragment shader: color each arm of the band to match the spiral color on its tile.
-// vUv.y runs 0→1 along the ribbon (tile-1 end → tile-2 end), so the first arm shows
-// colorA (tile 1's face color) and the second arm shows colorB (tile 2's face color),
-// with a smooth blend at the centre where the band passes through the mini-cube.
+// Racing-stripes fragment shader.
+// Both halves of the ribbon scroll toward the center mini-cube (halfPos mirrors
+// vUv.y so t=0 at tile ends, t=1 at the crossing).  Three coloured lanes
+// separated by white dividers race inward like Mario Kart Rainbow Road lanes.
 const fragmentShader = `
-  uniform vec3 uColorA;
-  uniform vec3 uColorB;
+  uniform vec3  uColorA;
+  uniform vec3  uColorB;
   uniform float uOpacity;
-  varying vec2 vUv;
+  uniform float uTime;
+  varying vec2  vUv;
 
   void main() {
-    float blend = smoothstep(0.38, 0.62, vUv.y);
-    vec3 col = mix(uColorA, uColorB, blend);
+    // Mirror so stripes flow toward the centre from both tile ends.
+    float halfPos = vUv.y < 0.5 ? vUv.y * 2.0 : (1.0 - vUv.y) * 2.0;
+    float scroll  = fract(halfPos * 5.0 - uTime * 2.5);
+    float pos     = scroll * 5.0; // 0 → 5 within one repeat
+
+    vec3  col  = vec3(0.0);
+    float mask = 0.0;
+
+    // Velocity spark: white-hot flash at the leading edge of each repeat
+    float spark = (1.0 - smoothstep(0.0, 0.06, pos)) * 0.9;
+
+    if (pos < 1.1) {
+      // Lane A — colorA
+      mask = 1.0 - smoothstep(0.85, 1.1, pos);
+      col  = mix(uColorA * 1.5, vec3(1.2), spark);
+    } else if (pos < 1.5) {
+      // White lane divider
+      float d = (pos - 1.1) / 0.4;
+      mask = (1.0 - abs(d * 2.0 - 1.0)) * 0.75;
+      col  = vec3(1.0);
+    } else if (pos < 3.1) {
+      // Lane mid — blend of both antipodal colors
+      mask = 1.0 - smoothstep(2.85, 3.1, pos);
+      col  = mix(uColorA, uColorB, 0.5) * 1.6;
+    } else if (pos < 3.5) {
+      // White lane divider
+      float d = (pos - 3.1) / 0.4;
+      mask = (1.0 - abs(d * 2.0 - 1.0)) * 0.75;
+      col  = vec3(1.0);
+    } else if (pos < 4.6) {
+      // Lane B — colorB
+      mask = 1.0 - smoothstep(4.35, 4.6, pos);
+      col  = uColorB * 1.5;
+    }
+    // else: fully transparent gap — cube geometry shows through (space feel)
+
     float edgeFade = smoothstep(0.0, 0.14, vUv.x) * smoothstep(1.0, 0.86, vUv.x);
-    gl_FragColor = vec4(col, uOpacity * mix(0.5, 1.0, edgeFade));
+    gl_FragColor = vec4(col, uOpacity * edgeFade * mask);
+  }
+`;
+
+// Bumper vertex shader: passes height fraction for the top-edge fade.
+const bumperVertexShader = `
+  attribute float aHeightFrac;
+  varying  float vHeightFrac;
+  void main() {
+    vHeightFrac = aHeightFrac;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+// Bumper fragment shader: solid neon colour, fading at the top edge.
+// The Möbius half-twist continuously rotates the surface normal, so the
+// bumper that starts pointing "up" at tile 1 ends pointing "down" at tile 2
+// — the non-orientability of RP2 made physically visible.
+const bumperFragmentShader = `
+  uniform vec3  uColor;
+  uniform float uOpacity;
+  varying float vHeightFrac;
+
+  void main() {
+    float topFade = 1.0 - smoothstep(0.6, 1.0, vHeightFrac);
+    gl_FragColor  = vec4(uColor * 1.8, uOpacity * topFade);
   }
 `;
 
 /**
- * Fill position + UV buffers for a Möbius ribbon that routes through the
- * AntipodalMinicube at the cube's centre.
- *
- * Path (piecewise, two visible segments):
- *   Segment 1  t∈[0, 0.5]: startPos → midAPos (mini-cube face A surface)
- *   Segment 2  t∈[0.5, 1]: midBPos (mini-cube face B surface) → endPos
- *
- * The mini-cube body occludes everything between midA and midB, so the ribbon
- * appears to enter the mini-cube on one face and exit the antipodal face.
- * The Möbius half-twist is distributed continuously over all t, so the
- * edge-on transition (t=0.5, the natural "pinch" of the twist) lands exactly
- * at the hidden interior — the two visible arcs each show a clean 90° arc of
- * solid ribbon with no apparent split.
+ * Fill position + UV buffers for the Möbius ribbon.
+ * Path: startPos → midAPos (first arm) | gap (mini-cube interior) | midBPos → endPos (second arm).
+ * Width tapers from full at tile ends to TAPER_MIN fraction at the mini-cube crossing.
+ * Cross-section direction (_perpCurrent) rotates π via applyAxisAngle — the Möbius half-twist.
  */
-// Minimum width multiplier at the centre (t=0.5): the band tapers to this fraction
-// of its full width as it funnels into the AntipodalMinicube at the cube's heart.
-const TAPER_MIN = 0.15;
-
 function fillRibbon(posArray, uvArray, startPos, midAPos, midBPos, endPos, axis, perpStart, segs, width) {
-  const halfW = width / 2;
-  const halfSegs = segs / 2; // segs is always even (32)
+  const halfW    = width / 2;
+  const halfSegs = segs / 2;
 
   for (let i = 0; i <= segs; i++) {
-    const t = i / segs; // twist parameter: 0 → 1
-
-    // Taper: full width at each tile end (t=0, t=1), narrowest at the mini-cube (t=0.5).
-    // Math.abs(2t-1) is 1 at the ends and 0 at the centre.
+    const t     = i / segs;
     const taper = TAPER_MIN + (1.0 - TAPER_MIN) * Math.abs(2.0 * t - 1.0);
-    const w = halfW * taper;
+    const w     = halfW * taper;
 
-    // Piecewise centre-line position
     let cx, cy, cz;
     if (i <= halfSegs) {
-      // First arc: sticker A → mini-cube face A
       const s = i / halfSegs;
       cx = startPos.x + (midAPos.x - startPos.x) * s;
       cy = startPos.y + (midAPos.y - startPos.y) * s;
       cz = startPos.z + (midAPos.z - startPos.z) * s;
     } else {
-      // Second arc: mini-cube face B → sticker B
       const s = (i - halfSegs) / halfSegs;
       cx = midBPos.x + (endPos.x - midBPos.x) * s;
       cy = midBPos.y + (endPos.y - midBPos.y) * s;
       cz = midBPos.z + (endPos.z - midBPos.z) * s;
     }
 
-    // Möbius half-twist: cross-section direction rotates π over the full t range
     _perpCurrent.copy(perpStart).applyAxisAngle(axis, t * Math.PI);
 
     for (let side = 0; side < 2; side++) {
       const sign = side === 0 ? -w : w;
-      const vi = (i * 2 + side) * 3;
+      const vi   = (i * 2 + side) * 3;
       posArray[vi]     = cx + _perpCurrent.x * sign;
       posArray[vi + 1] = cy + _perpCurrent.y * sign;
       posArray[vi + 2] = cz + _perpCurrent.z * sign;
-
       const ui = (i * 2 + side) * 2;
-      uvArray[ui]     = side; // 0 or 1 across the width
-      uvArray[ui + 1] = t;    // 0 → 1 along the length
+      uvArray[ui]     = side;
+      uvArray[ui + 1] = t;
     }
   }
 }
 
-function createRibbonGeo(segs) {
-  const vertCount = (segs + 1) * 2;
-  const posArray = new Float32Array(vertCount * 3);
-  const uvArray  = new Float32Array(vertCount * 2);
+/**
+ * Fill left and right bumper geometry buffers.
+ *
+ * Each bumper is a thin wall that rises from a ribbon edge in the direction of the
+ * ribbon's surface normal (= segTangent × perpCurrent).  Because perpCurrent rotates
+ * π over the full ribbon length (the Möbius half-twist), the surface normal also
+ * rotates π — the bumper that is upright at tile 1 ends inverted at tile 2,
+ * demonstrating RP2 non-orientability.
+ */
+function fillBumpers(
+  leftPosArr, rightPosArr, leftHFArr, rightHFArr,
+  startPos, midAPos, midBPos, endPos,
+  axis, perpStart, segs, width
+) {
+  const halfW    = width / 2;
+  const halfSegs = segs / 2;
 
-  // Quad triangles connecting adjacent cross-sections.
-  // Skip i === segs/2: that quad would bridge midA → midB (inside the mini-cube body).
-  const indices = [];
+  // Segment tangents for each arm (constant within each half)
+  const tAx = midAPos.x - startPos.x;
+  const tAy = midAPos.y - startPos.y;
+  const tAz = midAPos.z - startPos.z;
+  const tALen = Math.sqrt(tAx * tAx + tAy * tAy + tAz * tAz) || 1;
+
+  const tBx = endPos.x - midBPos.x;
+  const tBy = endPos.y - midBPos.y;
+  const tBz = endPos.z - midBPos.z;
+  const tBLen = Math.sqrt(tBx * tBx + tBy * tBy + tBz * tBz) || 1;
+
+  for (let i = 0; i <= segs; i++) {
+    const t     = i / segs;
+    const taper = TAPER_MIN + (1.0 - TAPER_MIN) * Math.abs(2.0 * t - 1.0);
+    const w     = halfW * taper;
+    const bh    = BUMPER_HEIGHT * taper;
+
+    // Centre position (same piecewise formula as fillRibbon)
+    let cx, cy, cz;
+    if (i <= halfSegs) {
+      const s = i / halfSegs;
+      cx = startPos.x + (midAPos.x - startPos.x) * s;
+      cy = startPos.y + (midAPos.y - startPos.y) * s;
+      cz = startPos.z + (midAPos.z - startPos.z) * s;
+    } else {
+      const s = (i - halfSegs) / halfSegs;
+      cx = midBPos.x + (endPos.x - midBPos.x) * s;
+      cy = midBPos.y + (endPos.y - midBPos.y) * s;
+      cz = midBPos.z + (endPos.z - midBPos.z) * s;
+    }
+
+    // Width (cross-section) direction with Möbius half-twist
+    _perpCurrent.copy(perpStart).applyAxisAngle(axis, t * Math.PI);
+
+    // Segment tangent for this arm
+    if (i <= halfSegs) {
+      _segTangent.set(tAx / tALen, tAy / tALen, tAz / tALen);
+    } else {
+      _segTangent.set(tBx / tBLen, tBy / tBLen, tBz / tBLen);
+    }
+
+    // Surface normal: tangent × perpCurrent — rotates 180° over the ribbon length
+    _surfaceNormal.crossVectors(_segTangent, _perpCurrent);
+    if (_surfaceNormal.lengthSq() < 0.001) {
+      _surfaceNormal.crossVectors(_up, _perpCurrent);
+    }
+    _surfaceNormal.normalize();
+
+    // Ribbon edge positions
+    const lx = cx - _perpCurrent.x * w;
+    const ly = cy - _perpCurrent.y * w;
+    const lz = cz - _perpCurrent.z * w;
+
+    const rx = cx + _perpCurrent.x * w;
+    const ry = cy + _perpCurrent.y * w;
+    const rz = cz + _perpCurrent.z * w;
+
+    // Bumper top positions (edge + surface-normal * height)
+    const ltx = lx + _surfaceNormal.x * bh;
+    const lty = ly + _surfaceNormal.y * bh;
+    const ltz = lz + _surfaceNormal.z * bh;
+
+    const rtx = rx + _surfaceNormal.x * bh;
+    const rty = ry + _surfaceNormal.y * bh;
+    const rtz = rz + _surfaceNormal.z * bh;
+
+    const base = i * 2;
+    // Left bumper: bottom (hf=0) then top (hf=1)
+    leftPosArr[base * 3]       = lx;  leftPosArr[base * 3 + 1]   = ly;  leftPosArr[base * 3 + 2]   = lz;
+    leftHFArr[base]            = 0;
+    leftPosArr[(base+1)*3]     = ltx; leftPosArr[(base+1)*3 + 1] = lty; leftPosArr[(base+1)*3 + 2] = ltz;
+    leftHFArr[base + 1]        = 1;
+
+    // Right bumper: bottom (hf=0) then top (hf=1)
+    rightPosArr[base * 3]      = rx;  rightPosArr[base * 3 + 1]  = ry;  rightPosArr[base * 3 + 2]  = rz;
+    rightHFArr[base]           = 0;
+    rightPosArr[(base+1)*3]    = rtx; rightPosArr[(base+1)*3 + 1] = rty; rightPosArr[(base+1)*3 + 2] = rtz;
+    rightHFArr[base + 1]       = 1;
+  }
+}
+
+function createRibbonGeos(segs) {
+  const vertCount = (segs + 1) * 2;
+
+  // Shared quad-strip index pattern (skip the gap at segs/2 hidden by mini-cube body)
+  const mainIndices = [];
+  const bumpIndices = [];
   for (let i = 0; i < segs; i++) {
-    if (i === segs / 2) continue; // gap hidden by mini-cube body
-    const a = i * 2;
-    const b = a + 1;
-    const c = a + 2;
-    const d = a + 3;
-    indices.push(a, b, c, b, d, c);
+    if (i === segs / 2) continue;
+    const a = i * 2, b = a + 1, c = a + 2, d = a + 3;
+    mainIndices.push(a, b, c, b, d, c);
+    bumpIndices.push(a, b, c, b, d, c);
   }
 
+  // Main ribbon
   const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
-  geo.setAttribute('uv',       new THREE.BufferAttribute(uvArray,  2));
-  geo.setIndex(indices);
-  return geo;
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertCount * 3), 3));
+  geo.setAttribute('uv',       new THREE.BufferAttribute(new Float32Array(vertCount * 2), 2));
+  geo.setIndex(mainIndices);
+
+  // Bumper geometries
+  function makeBumperGeo() {
+    const bg = new THREE.BufferGeometry();
+    bg.setAttribute('position',    new THREE.BufferAttribute(new Float32Array(vertCount * 3), 3));
+    bg.setAttribute('aHeightFrac', new THREE.BufferAttribute(new Float32Array(vertCount),     1));
+    bg.setIndex([...bumpIndices]);
+    return bg;
+  }
+
+  return { geo, leftGeo: makeBumperGeo(), rightGeo: makeBumperGeo() };
 }
 
 /**
- * MobiusTunnel — one Möbius ribbon per active antipodal sticker pair.
- * Props are compatible with the old WormholeTunnel for a drop-in swap.
+ * MobiusTunnel — one Möbius ribbon + two guard-rail bumpers per active antipodal sticker pair.
+ *
+ * Racing stripes scroll toward the center mini-cube from both tile ends (Rainbow Road feel).
+ * Bumpers on each ribbon edge physically rotate 180° over the ribbon length due to the
+ * Möbius half-twist, going from upright to inverted — demonstrating RP2 non-orientability.
  */
 const MobiusTunnel = ({
-  meshIdx1,
-  meshIdx2,
-  dirKey1,
-  dirKey2,
-  cubieRefs,
-  flips,
-  color1,
-  color2,
+  meshIdx1, meshIdx2, dirKey1, dirKey2, cubieRefs, flips, color1, color2,
 }) => {
-  const meshRef = useRef();
-  const pulseT  = useRef(Math.random() * Math.PI * 2);
+  const meshRef  = useRef();
+  const pulseT   = useRef(Math.random() * Math.PI * 2);
   const lastStartRef = useRef(new THREE.Vector3(Infinity, Infinity, Infinity));
   const lastEndRef   = useRef(new THREE.Vector3(Infinity, Infinity, Infinity));
 
-  const geo = useMemo(() => createRibbonGeo(RIBBON_SEGS), []);
+  const { geo, leftGeo, rightGeo } = useMemo(() => createRibbonGeos(RIBBON_SEGS), []);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const uniforms = useMemo(() => ({
-    uColorA: { value: new THREE.Color(color1) },
-    uColorB: { value: new THREE.Color(color2) },
+    uColorA:  { value: new THREE.Color(color1) },
+    uColorB:  { value: new THREE.Color(color2) },
     uOpacity: { value: 0.80 },
-  }), []); // created once; synced imperatively below
+    uTime:    { value: 0.0 },
+  }), []);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const bumperUniformsL = useMemo(() => ({
+    uColor:   { value: new THREE.Color(color1) },
+    uOpacity: { value: 0.85 },
+  }), []);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const bumperUniformsR = useMemo(() => ({
+    uColor:   { value: new THREE.Color(color2) },
+    uOpacity: { value: 0.85 },
+  }), []);
 
   useEffect(() => {
-    const g = geo;
-    return () => g.dispose();
-  }, [geo]);
+    const g = geo, lg = leftGeo, rg = rightGeo;
+    return () => { g.dispose(); lg.dispose(); rg.dispose(); };
+  }, [geo, leftGeo, rightGeo]);
 
   useFrame((_state, delta) => {
     const mesh1 = cubieRefs[meshIdx1];
@@ -201,15 +356,16 @@ const MobiusTunnel = ({
     _vStart.copy(_wPos1).addScaledVector(_faceNorm1, -FACE_OFFSET);
     _vEnd  .copy(_wPos2).addScaledVector(_faceNorm2, -FACE_OFFSET);
 
-    // Mini-cube face docking points in world space.
-    // The mini-cube centre is always at world origin (cube group is centred there).
-    // Its face A sits at faceNorm1 * MINI_FACE_R, face B at faceNorm2 * MINI_FACE_R.
+    // Mini-cube face docking points — centre always at world origin
     _midA.copy(_faceNorm1).multiplyScalar(MINI_FACE_R);
     _midB.copy(_faceNorm2).multiplyScalar(MINI_FACE_R);
 
     const moved =
       lastStartRef.current.distanceToSquared(_vStart) > REBUILD_EPS_SQ ||
       lastEndRef  .current.distanceToSquared(_vEnd)   > REBUILD_EPS_SQ;
+
+    // Tick the racing-stripes scroll every frame (no geometry rebuild required)
+    uniforms.uTime.value += delta;
 
     if (moved) {
       lastStartRef.current.copy(_vStart);
@@ -218,20 +374,22 @@ const MobiusTunnel = ({
       // Twist axis: overall start-to-end direction
       _axis.subVectors(_vEnd, _vStart).normalize();
 
-      // Initial cross-section direction: cross the ribbon axis with tile 1's face normal.
-      // This yields a vector that is both perpendicular to the ribbon axis (valid as a
-      // cross-section direction) AND tangent to the tile face — so the band lays flush
-      // against side tiles instead of cutting through them at an arbitrary angle.
-      // Degenerates when the ribbon runs exactly perpendicular to the face (direct
-      // face-to-centre connections); fall back to world-up / world-side in that case.
+      // Initial cross-section direction: tangent to tile 1's face surface.
+      // crossVectors(axis, faceNorm1) is perpendicular to both — the ribbon
+      // emerges flush from side/top/bottom tiles instead of cutting through them.
+      // Falls back to world-up/side for direct face-to-centre connections.
       _perpBase.crossVectors(_axis, _faceNorm1);
       if (_perpBase.lengthSq() < 0.001) _perpBase.crossVectors(_axis, _up);
       if (_perpBase.lengthSq() < 0.001) _perpBase.crossVectors(_axis, _side);
       _perpBase.normalize();
 
       const dead = flips >= FLIP_CAP;
-      uniforms.uColorA.value.set(dead ? '#555555' : color1);
-      uniforms.uColorB.value.set(dead ? '#444444' : color2);
+      const cA = dead ? '#555555' : color1;
+      const cB = dead ? '#444444' : color2;
+      uniforms.uColorA.value.set(cA);
+      uniforms.uColorB.value.set(cB);
+      bumperUniformsL.uColor.value.set(cA);
+      bumperUniformsR.uColor.value.set(cB);
 
       fillRibbon(
         geo.attributes.position.array,
@@ -240,27 +398,72 @@ const MobiusTunnel = ({
         _axis, _perpBase,
         RIBBON_SEGS, RIBBON_WIDTH
       );
-
       geo.attributes.position.needsUpdate = true;
       geo.attributes.uv.needsUpdate = true;
+
+      fillBumpers(
+        leftGeo.attributes.position.array,
+        rightGeo.attributes.position.array,
+        leftGeo.attributes.aHeightFrac.array,
+        rightGeo.attributes.aHeightFrac.array,
+        _vStart, _midA, _midB, _vEnd,
+        _axis, _perpBase,
+        RIBBON_SEGS, RIBBON_WIDTH
+      );
+      leftGeo.attributes.position.needsUpdate  = true;
+      leftGeo.attributes.aHeightFrac.needsUpdate = true;
+      rightGeo.attributes.position.needsUpdate = true;
+      rightGeo.attributes.aHeightFrac.needsUpdate = true;
     }
 
-    // Subtle opacity pulse — no geometry rebuild
+    // Subtle opacity pulse
     pulseT.current += delta * 1.5;
-    uniforms.uOpacity.value = 0.72 + Math.sin(pulseT.current) * 0.08;
+    uniforms.uOpacity.value    = 0.72 + Math.sin(pulseT.current) * 0.08;
+    bumperUniformsL.uOpacity.value = 0.80 + Math.sin(pulseT.current) * 0.05;
+    bumperUniformsR.uOpacity.value = 0.80 + Math.sin(pulseT.current) * 0.05;
   });
 
   return (
-    <mesh ref={meshRef} geometry={geo}>
-      <shaderMaterial
-        uniforms={uniforms}
-        vertexShader={vertexShader}
-        fragmentShader={fragmentShader}
-        side={THREE.DoubleSide}
-        transparent
-        depthWrite={false}
-      />
-    </mesh>
+    <>
+      {/* Main ribbon — racing stripes scroll toward the mini-cube */}
+      <mesh ref={meshRef} geometry={geo}>
+        <shaderMaterial
+          uniforms={uniforms}
+          vertexShader={vertexShader}
+          fragmentShader={fragmentShader}
+          side={THREE.DoubleSide}
+          transparent
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+        />
+      </mesh>
+
+      {/* Left guard rail — colorA; rotates to inverted at tile 2 */}
+      <mesh geometry={leftGeo}>
+        <shaderMaterial
+          uniforms={bumperUniformsL}
+          vertexShader={bumperVertexShader}
+          fragmentShader={bumperFragmentShader}
+          side={THREE.DoubleSide}
+          transparent
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+        />
+      </mesh>
+
+      {/* Right guard rail — colorB; rotates to inverted at tile 2 */}
+      <mesh geometry={rightGeo}>
+        <shaderMaterial
+          uniforms={bumperUniformsR}
+          vertexShader={bumperVertexShader}
+          fragmentShader={bumperFragmentShader}
+          side={THREE.DoubleSide}
+          transparent
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+        />
+      </mesh>
+    </>
   );
 };
 
