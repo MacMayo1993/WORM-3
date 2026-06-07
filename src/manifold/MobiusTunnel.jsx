@@ -1,4 +1,6 @@
 import { useRef, useEffect, useMemo } from 'react';
+import { useGameStore } from '../hooks/useGameStore.js';
+import { useShallow } from 'zustand/react/shallow';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { FLIP_CAP } from '../utils/constants.js';
@@ -49,14 +51,26 @@ const vertexShader = `
 // Both halves of the ribbon scroll toward the center mini-cube (halfPos mirrors
 // vUv.y so t=0 at tile ends, t=1 at the crossing).  Three coloured lanes
 // separated by white dividers race inward like Mario Kart Rainbow Road lanes.
+// uGrowT (0→1): tunnel birth grow-in — clips the ribbon so beams grow from each
+//   tile portal toward the center, meeting when uGrowT reaches 1.
+// uPulseBoost (0→1→0): subsequent-flip brightness burst.
 const fragmentShader = `
   uniform vec3  uColorA;
   uniform vec3  uColorB;
   uniform float uOpacity;
   uniform float uTime;
+  uniform float uGrowT;
+  uniform float uPulseBoost;
   varying vec2  vUv;
 
   void main() {
+    // Tunnel birth grow-in: vUv.y 0=tile1 end, 0.5=centre, 1=tile2 end.
+    // Left beam grows from 0 toward 0.5; right beam grows from 1 toward 0.5.
+    // Discard the ungrown middle until both beams meet at the centre.
+    float leftFront  = uGrowT * 0.5;
+    float rightFront = 1.0 - uGrowT * 0.5;
+    if (vUv.y > leftFront && vUv.y < rightFront) discard;
+
     // Mirror so stripes flow toward the centre from both tile ends.
     float halfPos = vUv.y < 0.5 ? vUv.y * 2.0 : (1.0 - vUv.y) * 2.0;
     float scroll  = fract(halfPos * 5.0 - uTime * 2.5);
@@ -94,7 +108,9 @@ const fragmentShader = `
     // else: fully transparent gap — cube geometry shows through (space feel)
 
     float edgeFade = smoothstep(0.0, 0.14, vUv.x) * smoothstep(1.0, 0.86, vUv.x);
-    gl_FragColor = vec4(col, uOpacity * edgeFade * mask);
+    // Pulse boost brightens color and bumps opacity on subsequent flips
+    float boostOpacity = uOpacity + uPulseBoost * 0.45;
+    gl_FragColor = vec4(col * (1.0 + uPulseBoost * 1.2), boostOpacity * edgeFade * mask);
   }
 `;
 
@@ -303,21 +319,27 @@ function createRibbonGeos(segs) {
  * Möbius half-twist, going from upright to inverted — demonstrating RP2 non-orientability.
  */
 const MobiusTunnel = ({
-  meshIdx1, meshIdx2, dirKey1, dirKey2, cubieRefs, flips, color1, color2,
+  meshIdx1, meshIdx2, dirKey1, dirKey2, cubieRefs, flips, color1, color2, tunnelId,
 }) => {
   const meshRef  = useRef();
   const pulseT   = useRef(Math.random() * Math.PI * 2);
   const lastStartRef = useRef(new THREE.Vector3(Infinity, Infinity, Infinity));
   const lastEndRef   = useRef(new THREE.Vector3(Infinity, Infinity, Infinity));
 
+  const { tunnelBirths, tunnelPulses } = useGameStore(
+    useShallow(s => ({ tunnelBirths: s.tunnelBirths, tunnelPulses: s.tunnelPulses }))
+  );
+
   const { geo, leftGeo, rightGeo } = useMemo(() => createRibbonGeos(RIBBON_SEGS), []);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const uniforms = useMemo(() => ({
-    uColorA:  { value: new THREE.Color(color1) },
-    uColorB:  { value: new THREE.Color(color2) },
-    uOpacity: { value: 0.80 },
-    uTime:    { value: 0.0 },
+    uColorA:     { value: new THREE.Color(color1) },
+    uColorB:     { value: new THREE.Color(color2) },
+    uOpacity:    { value: 0.80 },
+    uTime:       { value: 0.0 },
+    uGrowT:      { value: 1.0 },
+    uPulseBoost: { value: 0.0 },
   }), []);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -421,6 +443,24 @@ const MobiusTunnel = ({
     uniforms.uOpacity.value    = 0.72 + Math.sin(pulseT.current) * 0.08;
     bumperUniformsL.uOpacity.value = 0.80 + Math.sin(pulseT.current) * 0.05;
     bumperUniformsR.uOpacity.value = 0.80 + Math.sin(pulseT.current) * 0.05;
+
+    // Tunnel birth: grow-in from both portal ends toward centre (first flip only)
+    const birth = tunnelId ? tunnelBirths?.[tunnelId] : null;
+    if (birth) {
+      const rawT = (performance.now() - birth.startMs) / birth.durationMs;
+      uniforms.uGrowT.value = Math.min(1, Math.max(0, rawT));
+    } else {
+      uniforms.uGrowT.value = 1.0;
+    }
+
+    // Tunnel pulse: brightness burst on subsequent flips
+    const pulse = tunnelId ? tunnelPulses?.[tunnelId] : null;
+    if (pulse) {
+      const rawT = (performance.now() - pulse.startMs) / pulse.durationMs;
+      uniforms.uPulseBoost.value = rawT < 1 ? Math.sin(rawT * Math.PI) : 0;
+    } else {
+      uniforms.uPulseBoost.value = 0;
+    }
   });
 
   return (

@@ -247,6 +247,16 @@ export const useGameStore = create(
     toggleTunnels: () => set((state) => ({ showTunnels: !state.showTunnels })),
     toggleExploded: () => set((state) => ({ exploded: !state.exploded })),
     toggleNetPanel: () => set((state) => ({ showNetPanel: !state.showNetPanel })),
+
+    // ========================================================================
+    // FLIP TRAVEL FX STATE
+    // ========================================================================
+    // Per-cubie pop animations: { "x,y,z": { startMs, durationMs } }
+    cubiePops: {},
+    // Per-tunnel birth (first flip) animations: { pairId: { startMs, durationMs } }
+    tunnelBirths: {},
+    // Per-tunnel pulse (subsequent flip) animations: { pairId: { startMs, durationMs } }
+    tunnelPulses: {},
     cycleVisualMode: () => set((state) => {
       const modes = ['classic', 'grid', 'sudokube', 'colors'];
       const idx = modes.indexOf(state.visualMode);
