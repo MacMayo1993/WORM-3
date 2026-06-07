@@ -82,9 +82,11 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
               (y === centerCoord && z === centerCoord)
             );
 
+            const pairId = [gridId, antipodalGridId].sort().join('|');
             connections.push({
               id: gridId,
               gridId2: antipodalGridId,
+              pairId,
               meshIdx1: idx1,
               meshIdx2: idx2,
               dirKey1: dirKey,
@@ -114,6 +116,7 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
       {tunnelData.map((t) => (
         <MobiusTunnel
           key={t.id}
+          tunnelId={t.pairId}
           meshIdx1={t.meshIdx1}
           meshIdx2={t.meshIdx2}
           dirKey1={t.dirKey1}

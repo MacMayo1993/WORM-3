@@ -10,7 +10,7 @@ import { makeCubies } from '../game/cubeState.js';
 import { rotateSliceCubies } from '../game/cubeRotation.js';
 import { buildManifoldGridMap, flipStickerPair, findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
 import { healSticker as healStickerState } from '../game/cubeState.js';
-import { getStickerWorldPos } from '../game/coordinates.js';
+import { getStickerWorldPos, getManifoldGridId } from '../game/coordinates.js';
 import { play } from '../utils/audio.js';
 import { ANTIPODAL_COLOR } from '../utils/constants.js';
 import { resolveColors } from '../utils/colorSchemes.js';
@@ -158,6 +158,21 @@ export function useCubeState() {
 
     }
 
+    // Compute cubie pop keys and tunnel pair ID for animation state.
+    const now = performance.now();
+    const srcKey = `${pos.x},${pos.y},${pos.z}`;
+    const antKey = antipodalLoc ? `${antipodalLoc.x},${antipodalLoc.y},${antipodalLoc.z}` : null;
+    const isFirstFlipOnPair = sticker ? sticker.flips === 0 : false;
+    let pairId = null;
+    if (antipodalLoc && sticker) {
+      const antipodalSticker = currentCubies[antipodalLoc.x]?.[antipodalLoc.y]?.[antipodalLoc.z]?.stickers?.[antipodalLoc.dirKey];
+      if (antipodalSticker) {
+        const srcGridId = getManifoldGridId(sticker, currentSize);
+        const antGridId = getManifoldGridId(antipodalSticker, currentSize);
+        pairId = [srcGridId, antGridId].sort().join('|');
+      }
+    }
+
     // Batch all flip state changes into a single atomic setState (1 re-render instead of 5-6)
     const ts = Date.now();
     const isFirstFlip = !hasFlippedOnce;
@@ -167,6 +182,22 @@ export function useCubeState() {
       moveHistory: [...state.moveHistory, { type: 'flip', pos: { ...pos }, dirKey, timestamp: ts }].slice(-10),
       flipWaveOrigins: origins,
       blackHolePulse: ts,
+      // Cubie pop: both the clicked cubie and its antipodal partner burst outward
+      cubiePops: {
+        ...state.cubiePops,
+        [srcKey]: { startMs: now, durationMs: 300 },
+        ...(antKey ? { [antKey]: { startMs: now, durationMs: 300 } } : {}),
+      },
+      // Tunnel birth: first flip on this pair → grow-in animation on the Möbius ribbon
+      tunnelBirths: (isFirstFlipOnPair && pairId) ? {
+        ...state.tunnelBirths,
+        [pairId]: { startMs: now, durationMs: 700 },
+      } : state.tunnelBirths,
+      // Tunnel pulse: subsequent flips → brightness burst on the existing ribbon
+      tunnelPulses: (!isFirstFlipOnPair && pairId) ? {
+        ...state.tunnelPulses,
+        [pairId]: { startMs: now, durationMs: 400 },
+      } : state.tunnelPulses,
       ...(isFirstFlip ? { hasFlippedOnce: true } : {}),
     }));
 

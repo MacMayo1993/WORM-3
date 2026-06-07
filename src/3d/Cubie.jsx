@@ -1,4 +1,5 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
+import { useFrame } from '@react-three/fiber';
 import { RoundedBox } from '@react-three/drei';
 import * as THREE from 'three';
 import { COLORS, FACE_COLORS } from '../utils/constants.js';
@@ -106,13 +107,14 @@ const faceValue = (dirKey, x, y, z, size) => {
 const Cubie = React.forwardRef(function Cubie({
   position, cubie, size, onPointerDown,
 }, ref) {
-  const { hollowMode, mirrorMode, visualMode, explosionFactor, settings } = useGameStore(
+  const { hollowMode, mirrorMode, visualMode, explosionFactor, settings, cubiePops } = useGameStore(
     useShallow(s => ({
       hollowMode: s.hollowMode,
       mirrorMode: s.mirrorMode,
       visualMode: s.visualMode,
       explosionFactor: s.explosionT,
       settings: s.settings,
+      cubiePops: s.cubiePops,
     }))
   );
   // faceColors needed locally for wireframe edge coloring
@@ -321,7 +323,35 @@ const Cubie = React.forwardRef(function Cubie({
     return getMirrorDimensions(origHomeX, origHomeY, origHomeZ, size);
   }, [mirrorMode, origHomeX, origHomeY, origHomeZ, size]);
 
+  // Outer group for the cubie-pop burst animation (does not affect cubieRefs tracking).
+  const popGroupRef = useRef();
+  const popKey = `${cubie.x},${cubie.y},${cubie.z}`;
+
+  useFrame(() => {
+    if (!popGroupRef.current) return;
+    const entry = cubiePops[popKey];
+    if (!entry) {
+      popGroupRef.current.position.set(0, 0, 0);
+      return;
+    }
+    const rawT = (performance.now() - entry.startMs) / entry.durationMs;
+    if (rawT >= 1) {
+      popGroupRef.current.position.set(0, 0, 0);
+      return;
+    }
+    // Bell-curve pop: sin(t*π) peaks at t=0.5, magnitude 0.6 world units radially outward.
+    const popFactor = Math.sin(rawT * Math.PI) * 0.6;
+    const [px, py, pz] = explodedPos;
+    const len = Math.sqrt(px * px + py * py + pz * pz) || 1;
+    popGroupRef.current.position.set(
+      (px / len) * popFactor,
+      (py / len) * popFactor,
+      (pz / len) * popFactor
+    );
+  });
+
   return (
+    <group ref={popGroupRef}>
     <group position={explodedPos} ref={ref}>
       {/* Mirror mode: plain asymmetric box with chrome material, no stickers */}
       {mirrorMode ? (
@@ -380,6 +410,7 @@ const Cubie = React.forwardRef(function Cubie({
           {isEdge(position[1], -(size - 1) / 2) && meta('NY') && <StickerPlane key={stickerKey('NY')} currentDir="NY" meta={meta('NY')} pos={STICKER_POS.NY} rot={STICKER_ROT.NY} mode={visualMode} overlay={overlay('NY')} faceSize={size} {...gridPos('NY')} hollow={hollowMode} />}
         </>
       )}
+    </group>
     </group>
   );
 });
