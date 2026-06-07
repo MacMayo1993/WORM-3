@@ -188,8 +188,8 @@ export function useCubeState() {
       // Cubie pop: both the clicked cubie and its antipodal partner burst outward
       cubiePops: {
         ...state.cubiePops,
-        [srcKey]: { startMs: now, durationMs: 300 },
-        ...(antKey ? { [antKey]: { startMs: now, durationMs: 300 } } : {}),
+        [srcKey]: { startMs: now, durationMs: 600 },
+        ...(antKey ? { [antKey]: { startMs: now, durationMs: 600 } } : {}),
       },
       // Tunnel birth: first flip on this pair → grow-in animation on the Möbius ribbon
       tunnelBirths: (isFirstFlipOnPair && pairId) ? {
