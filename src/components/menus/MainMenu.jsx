@@ -3,6 +3,9 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import ParityWallet from '../overlays/ParityWallet.jsx';
 import { makeCubies } from '../../game/cubeState.js';
+import { useGameStore } from '../../hooks/useGameStore.js';
+import { COLOR_SCHEMES } from '../../utils/colorSchemes.js';
+import { CLASSIC_STYLE_KEYS, ANTIPODAL_STYLE_KEYS, LIVING_STYLE_KEYS } from '../../utils/tileStyleCatalog.js';
 import { rotateSliceCubies } from '../../game/cubeRotation.js';
 import { updateSharedTime } from '../../3d/styles/TileStyleMaterials.jsx';
 import MenuFlipWave from './MenuFlipWave.jsx';
@@ -1151,6 +1154,37 @@ const MainMenu = ({
 }) => {
   const [titleVisible, setTitleVisible] = useState(false);
   const [bottomVisible, setBottomVisible] = useState(false);
+
+  const setSettings = useGameStore((state) => state.setSettings);
+  const ownedItems = useGameStore((state) => state.ownedItems);
+
+  // Randomize color scheme + tile styles on every menu open
+  useEffect(() => {
+    const availableSchemes = Object.keys(COLOR_SCHEMES).filter(
+      key => key !== 'custom' && key !== 'biome' && ownedItems.includes(`scheme_${key}`)
+    );
+    const scheme = availableSchemes.length
+      ? availableSchemes[Math.floor(Math.random() * availableSchemes.length)]
+      : 'standard';
+
+    const allStyles = [...CLASSIC_STYLE_KEYS, ...ANTIPODAL_STYLE_KEYS, ...LIVING_STYLE_KEYS];
+    const ownedStyles = allStyles.filter(s => ownedItems.includes(`tile_${s}`));
+    const pool = ownedStyles.length >= 6 ? ownedStyles : allStyles;
+
+    // Fisher-Yates shuffle
+    const shuffled = [...pool];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+
+    const manifoldStyles = {};
+    for (let face = 1; face <= 6; face++) {
+      manifoldStyles[face] = shuffled[face - 1] || 'solid';
+    }
+
+    setSettings(prev => ({ ...prev, colorScheme: scheme, manifoldStyles }));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const t1 = setTimeout(() => setTitleVisible(true), 200);
