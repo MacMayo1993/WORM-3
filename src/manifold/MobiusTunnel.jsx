@@ -43,9 +43,10 @@ const vertexShader = `
   }
 `;
 
-// Fragment shader: front face = colorB (antipodal), back face = colorA.
-// The Möbius half-twist flips which is "front" between the two endpoints, so each
-// end of the band shows the opposing face's colour — encoding RP2 identification.
+// Fragment shader: color each arm of the band to match the spiral color on its tile.
+// vUv.y runs 0→1 along the ribbon (tile-1 end → tile-2 end), so the first arm shows
+// colorA (tile 1's face color) and the second arm shows colorB (tile 2's face color),
+// with a smooth blend at the centre where the band passes through the mini-cube.
 const fragmentShader = `
   uniform vec3 uColorA;
   uniform vec3 uColorB;
@@ -53,7 +54,8 @@ const fragmentShader = `
   varying vec2 vUv;
 
   void main() {
-    vec3 col = gl_FrontFacing ? uColorB : uColorA;
+    float blend = smoothstep(0.38, 0.62, vUv.y);
+    vec3 col = mix(uColorA, uColorB, blend);
     float edgeFade = smoothstep(0.0, 0.14, vUv.x) * smoothstep(1.0, 0.86, vUv.x);
     gl_FragColor = vec4(col, uOpacity * mix(0.5, 1.0, edgeFade));
   }
@@ -74,12 +76,21 @@ const fragmentShader = `
  * at the hidden interior — the two visible arcs each show a clean 90° arc of
  * solid ribbon with no apparent split.
  */
+// Minimum width multiplier at the centre (t=0.5): the band tapers to this fraction
+// of its full width as it funnels into the AntipodalMinicube at the cube's heart.
+const TAPER_MIN = 0.15;
+
 function fillRibbon(posArray, uvArray, startPos, midAPos, midBPos, endPos, axis, perpStart, segs, width) {
   const halfW = width / 2;
   const halfSegs = segs / 2; // segs is always even (32)
 
   for (let i = 0; i <= segs; i++) {
     const t = i / segs; // twist parameter: 0 → 1
+
+    // Taper: full width at each tile end (t=0, t=1), narrowest at the mini-cube (t=0.5).
+    // Math.abs(2t-1) is 1 at the ends and 0 at the centre.
+    const taper = TAPER_MIN + (1.0 - TAPER_MIN) * Math.abs(2.0 * t - 1.0);
+    const w = halfW * taper;
 
     // Piecewise centre-line position
     let cx, cy, cz;
@@ -101,7 +112,7 @@ function fillRibbon(posArray, uvArray, startPos, midAPos, midBPos, endPos, axis,
     _perpCurrent.copy(perpStart).applyAxisAngle(axis, t * Math.PI);
 
     for (let side = 0; side < 2; side++) {
-      const sign = side === 0 ? -halfW : halfW;
+      const sign = side === 0 ? -w : w;
       const vi = (i * 2 + side) * 3;
       posArray[vi]     = cx + _perpCurrent.x * sign;
       posArray[vi + 1] = cy + _perpCurrent.y * sign;
@@ -207,8 +218,14 @@ const MobiusTunnel = ({
       // Twist axis: overall start-to-end direction
       _axis.subVectors(_vEnd, _vStart).normalize();
 
-      // Initial cross-section direction (perpendicular to axis at t=0)
-      _perpBase.crossVectors(_axis, _up);
+      // Initial cross-section direction: cross the ribbon axis with tile 1's face normal.
+      // This yields a vector that is both perpendicular to the ribbon axis (valid as a
+      // cross-section direction) AND tangent to the tile face — so the band lays flush
+      // against side tiles instead of cutting through them at an arbitrary angle.
+      // Degenerates when the ribbon runs exactly perpendicular to the face (direct
+      // face-to-centre connections); fall back to world-up / world-side in that case.
+      _perpBase.crossVectors(_axis, _faceNorm1);
+      if (_perpBase.lengthSq() < 0.001) _perpBase.crossVectors(_axis, _up);
       if (_perpBase.lengthSq() < 0.001) _perpBase.crossVectors(_axis, _side);
       _perpBase.normalize();
 
