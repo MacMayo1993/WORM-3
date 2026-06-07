@@ -6,6 +6,7 @@ import { makeCubies } from '../../game/cubeState.js';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { COLOR_SCHEMES } from '../../utils/colorSchemes.js';
 import { CLASSIC_STYLE_KEYS, ANTIPODAL_STYLE_KEYS, LIVING_STYLE_KEYS } from '../../utils/tileStyleCatalog.js';
+import { BACKGROUNDS } from '../../utils/backgrounds.js';
 import { rotateSliceCubies } from '../../game/cubeRotation.js';
 import { updateSharedTime } from '../../3d/styles/TileStyleMaterials.jsx';
 import MenuFlipWave from './MenuFlipWave.jsx';
@@ -1183,7 +1184,9 @@ const MainMenu = ({
       manifoldStyles[face] = shuffled[face - 1] || 'solid';
     }
 
-    setSettings(prev => ({ ...prev, colorScheme: scheme, manifoldStyles }));
+    const backgroundTheme = BACKGROUNDS[Math.floor(Math.random() * BACKGROUNDS.length)].id;
+
+    setSettings(prev => ({ ...prev, colorScheme: scheme, manifoldStyles, backgroundTheme }));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
