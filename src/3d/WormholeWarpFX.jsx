@@ -73,11 +73,11 @@ export default function WormholeWarpFX({ wormPhase = 'crawling', enabled = true,
             vec3 colB = vec3(0.55, 0.05, 1.0);
             vec3 col = mix(colA, colB, spiral) * (rings * 0.75 + 0.35);
 
-            // EDGE-ONLY vignette — transparent in the centre so the camera
-            // animation is always visible, glowing only at the screen perimeter.
-            float edgeMask = smoothstep(0.55, 1.3, r);  // 0 at centre, 1 near edges
-            float alpha = edgeMask * (rings * 0.35 + 0.14) * uOpacity;
-            alpha = clamp(alpha, 0.0, 0.45);
+            // EDGE-ONLY vignette — transparent in the centre so ribbon geometry
+            // is always visible; only a thin border glow at the screen perimeter.
+            float edgeMask = smoothstep(0.72, 1.3, r);  // narrower edge band than before
+            float alpha = edgeMask * (rings * 0.20 + 0.06) * uOpacity;
+            alpha = clamp(alpha, 0.0, 0.16);
 
             if (alpha < 0.001) discard;
             gl_FragColor = vec4(col, alpha);
@@ -107,8 +107,8 @@ export default function WormholeWarpFX({ wormPhase = 'crawling', enabled = true,
     }
 
     if (enabled && !prevEnabledRef.current) {
-      // Snap to full opacity the instant the wormhole activates — no fade-in delay.
-      material.uniforms.uOpacity.value = 0.52;
+      // Subtle edge glow only — FPS ribbon camera provides the immersion.
+      material.uniforms.uOpacity.value = 0.22;
     } else if (!enabled && healFlashRef.current <= 0) {
       // Slow fade-out so the exit feels natural (skip while heal flash is decaying).
       material.uniforms.uOpacity.value = THREE.MathUtils.lerp(

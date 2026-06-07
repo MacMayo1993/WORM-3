@@ -73,6 +73,7 @@ import { getSkin, _hatAlignQuat, _hatYUp } from './wormCosmeticsData.js';
 import { getWormCharacter } from './wormCharacterData.js';
 import { EARN_ORB_COLLECT, EARN_WORM_SURVIVAL_TICK, EARN_WORM_HEALED_FACE, SURVIVAL_TICK_INTERVAL } from '../utils/economyConstants.js';
 import { liveRotation } from './liveRotation.js';
+import { tunnelState } from './tunnelProgressBridge.js';
 
 // Pre-allocated axis vector for applying liveRotation to the worm during scramble
 const _liveAxis = new THREE.Vector3();
@@ -535,7 +536,6 @@ function useWormCrawler(size, cubies) {
         useGameStore.setState({
             wormPhase: 'entering',
             wormOnFlippedTile: false,
-            visualMode: 'glass',
             wormTunnelCount: nextTunnelCount,
             showTunnels: true,
             wormActiveTunnelColors: {
@@ -641,7 +641,6 @@ function useWormCrawler(size, cubies) {
                     useGameStore.setState({
                         wormPhase: 'crawling',
                         wormOnFlippedTile: false,
-                        visualMode: prevVisualModeRef.current ?? 'classic',
                         showTunnels: prevShowTunnelsRef.current,
                         wormActiveTunnelColors: null,
                     });
@@ -1194,6 +1193,13 @@ const _camLookAheadVec = new THREE.Vector3();
 const _camTunnelTangent = new THREE.Vector3();
 const _camTunnelRight = new THREE.Vector3();
 const _camSurfCam = new THREE.Vector3();
+// Ribbon-camera scratch vectors — recomputed each frame from tunnel geometry
+const _ribVStart = new THREE.Vector3();
+const _ribVEnd   = new THREE.Vector3();
+const _ribMidA   = new THREE.Vector3();
+const _ribMidB   = new THREE.Vector3();
+const _ribAxis   = new THREE.Vector3();
+const _ribPerp   = new THREE.Vector3();
 
 // ─── Chase Camera (dynamic zoom based on tail length) ───────────────────────
 function WormChaseCamera({ worm, size }) {
@@ -1284,30 +1290,77 @@ function WormChaseCamera({ worm, size }) {
             camera.up.copy(_camUp);
             camera.lookAt(lookAtRef.current);
         } else if ((phase === 'entering' || phase === 'tunnel' || phase === 'exiting') && worm.activeTunnel.current) {
-            let t = worm.tunnelProgress.current;
-            if (phase === 'entering') t *= 0.35;
-            if (phase === 'exiting') t = 0.65 + (t * 0.35);
-            // FPS mode: camera rides at the head, tight lookahead so the ribbon walls
-            // fill the frame and the Möbius half-twist is felt as the cube flips around.
-            const tLook = Math.min(t + 0.06, 1);
-            getTunnelWorldPosInto(_camVec, worm.activeTunnel.current, t, size);
-            getTunnelWorldPosInto(_camLookVec, worm.activeTunnel.current, tLook, size);
+            // Map phase+progress to a single [0,1] parameter along the Möbius ribbon.
+            const tp = worm.tunnelProgress.current;
+            const t = phase === 'entering' ? tp * 0.33 :
+                      phase === 'tunnel'   ? 0.33 + tp * 0.34 :
+                                             0.67 + tp * 0.33;
 
-            const exitNormal = FACE_NORMALS[worm.activeTunnel.current.exit.dirKey] ?? FACE_NORMALS.PY;
-            const entryNormal = FACE_NORMALS[worm.activeTunnel.current.entry.dirKey] ?? FACE_NORMALS.PY;
-            _camUpVec.lerpVectors(entryNormal, exitNormal, t).normalize();
-            _camTunnelTangent.subVectors(_camLookVec, _camVec).normalize();
-            _camTunnelRight.crossVectors(_camTunnelTangent, _camUpVec).normalize();
-            // Subtle sway — camera at head position, ribbon walls visible on both sides
-            const sway = Math.sin(performance.now() * 0.0045) * 0.12;
-            _camSurfCam.copy(_camVec).addScaledVector(_camTunnelRight, sway);
+            // Publish to MobiusHUD's DOM RAF loop via the shared bridge
+            tunnelState.active = true;
+            tunnelState.t = t;
 
-            const alpha = Math.min(1, CAM_LERP * delta * 3.0);
+            const tunnel = worm.activeTunnel.current;
+            const entN = FACE_NORMALS[tunnel.entry.dirKey] ?? FACE_NORMALS.PY;
+            const extN = FACE_NORMALS[tunnel.exit.dirKey]  ?? FACE_NORMALS.PY;
+
+            // Ribbon anchor points — exactly matches MobiusTunnel.jsx geometry:
+            //   vStart/vEnd = cubie-centre stepped inward by FACE_OFFSET (0.52)
+            //   midA/midB   = face-normal × MINI_FACE_R (0.25), mini-cube docking
+            const FACE_OFF = 0.52, MINI_R = 0.25;
+            const ew = getStickerWorldPos(tunnel.entry.x, tunnel.entry.y, tunnel.entry.z, tunnel.entry.dirKey, size, 0);
+            const xw = getStickerWorldPos(tunnel.exit.x,  tunnel.exit.y,  tunnel.exit.z,  tunnel.exit.dirKey,  size, 0);
+            _ribVStart.set(ew[0] - entN.x * FACE_OFF, ew[1] - entN.y * FACE_OFF, ew[2] - entN.z * FACE_OFF);
+            _ribVEnd  .set(xw[0] - extN.x * FACE_OFF, xw[1] - extN.y * FACE_OFF, xw[2] - extN.z * FACE_OFF);
+            _ribMidA  .set(entN.x * MINI_R, entN.y * MINI_R, entN.z * MINI_R);
+            _ribMidB  .set(extN.x * MINI_R, extN.y * MINI_R, extN.z * MINI_R);
+
+            // Twist axis and initial perp (matching fillRibbon's perpBase in MobiusTunnel)
+            _ribAxis.subVectors(_ribVEnd, _ribVStart).normalize();
+            _ribPerp.crossVectors(_ribAxis, entN);
+            if (_ribPerp.lengthSq() < 0.001) { _ribPerp.set(0, 1, 0); _ribPerp.crossVectors(_ribAxis, _ribPerp); }
+            if (_ribPerp.lengthSq() < 0.001) { _ribPerp.set(0, 0, 1); _ribPerp.crossVectors(_ribAxis, _ribPerp); }
+            _ribPerp.normalize();
+
+            // Centerline position and tangent at t — piecewise matching fillRibbon:
+            //   first half  vStart→midA,  second half midB→vEnd
+            const tLook = Math.min(t + 0.06, 1.0);
+            if (t <= 0.5) {
+                _camSurfCam.lerpVectors(_ribVStart, _ribMidA, t * 2.0);
+                _camTunnelTangent.subVectors(_ribMidA, _ribVStart).normalize();
+            } else {
+                _camSurfCam.lerpVectors(_ribMidB, _ribVEnd, (t - 0.5) * 2.0);
+                _camTunnelTangent.subVectors(_ribVEnd, _ribMidB).normalize();
+            }
+            if (tLook <= 0.5) {
+                _camLookVec.lerpVectors(_ribVStart, _ribMidA, tLook * 2.0);
+            } else {
+                _camLookVec.lerpVectors(_ribMidB, _ribVEnd, (tLook - 0.5) * 2.0);
+            }
+
+            // Width direction with Möbius half-twist: perpBase rotates π over [0,1]
+            _camTunnelRight.copy(_ribPerp).applyAxisAngle(_ribAxis, t * Math.PI);
+
+            // Surface normal = tangent × perpCurrent — rotates 180° over the traversal.
+            // This is the physical expression of RP² non-orientability: camera "up"
+            // flips, so the world rolls over as you cross the midpoint.
+            _camUpVec.crossVectors(_camTunnelTangent, _camTunnelRight).normalize();
+
+            // Ride the ribbon: slightly above the surface + small forward offset
+            // to clear worm-head geometry without losing the close-up ribbon feel.
+            const RIDE_UP = 0.22, RIDE_FWD = 0.28;
+            _camSurfCam.addScaledVector(_camUpVec, RIDE_UP).addScaledVector(_camTunnelTangent, RIDE_FWD);
+            _camLookVec.addScaledVector(_camUpVec, RIDE_UP).addScaledVector(_camTunnelTangent, RIDE_FWD);
+
+            const alpha = Math.min(1, CAM_LERP * delta * 4.0);
             camPosRef.current.lerp(_camSurfCam, alpha);
             lookAtRef.current.lerp(_camLookVec, alpha);
             camera.position.copy(camPosRef.current);
             camera.up.copy(_camUpVec);
             camera.lookAt(lookAtRef.current);
+        } else {
+            tunnelState.active = false;
+            tunnelState.t = 0;
         }
     });
 
