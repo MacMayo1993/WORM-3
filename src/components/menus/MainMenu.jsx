@@ -660,7 +660,6 @@ const TileCardFace = ({ mode }) => (
   <div style={{
     width: '100%', height: '100%', boxSizing: 'border-box',
     background: '#0c0c1a', padding: '7px', borderRadius: '20px',
-    boxShadow: `0 0 64px ${mode.tileColor}30, 0 24px 56px rgba(0,0,0,0.75)`,
   }}>
     <div style={{
       background: mode.tileColor, borderRadius: '14px',
@@ -678,7 +677,8 @@ const TileCardFace = ({ mode }) => (
 
 // ─── Mode carousel overlay ────────────────────────────────────────────────────
 const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay, onRandom, onComingSoon, onHowToPlay }) => {
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [activeIndex, setActiveIndex] = useState(0);   // logical index — dots + handlePlay
+  const [displayIndex, setDisplayIndex] = useState(0); // visual index — colors + content
   const [rotationAngle, setRotationAngle] = useState(0);
   const [imgError, setImgError] = useState(false);
   const touchStartX = useRef(null);
@@ -697,7 +697,7 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
     };
   }, []);
 
-  useEffect(() => { setImgError(false); }, [activeIndex]);
+  useEffect(() => { setImgError(false); }, [displayIndex]);
 
   const navigate = useCallback((dir) => {
     if (animatingRef.current) return;
@@ -705,7 +705,11 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
     if (spinTimer.current) clearTimeout(spinTimer.current);
     setRotationAngle(a => a - dir * PRISM_FACE_ANGLE);
     setActiveIndex(i => (i + dir + N) % N);
-    spinTimer.current = setTimeout(() => { animatingRef.current = false; }, 560);
+    // displayIndex updates at animation end so panel colors/content don't flash mid-spin
+    spinTimer.current = setTimeout(() => {
+      setDisplayIndex(i => (i + dir + N) % N);
+      animatingRef.current = false;
+    }, 540);
   }, [N]);
 
   const selectIndex = useCallback((targetIndex) => {
@@ -720,7 +724,10 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
     if (spinTimer.current) clearTimeout(spinTimer.current);
     setRotationAngle(a => a - dir * steps * PRISM_FACE_ANGLE);
     setActiveIndex(targetIndex);
-    spinTimer.current = setTimeout(() => { animatingRef.current = false; }, 560);
+    spinTimer.current = setTimeout(() => {
+      setDisplayIndex(targetIndex);
+      animatingRef.current = false;
+    }, 540);
   }, [N]);
 
   useEffect(() => {
@@ -744,7 +751,7 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
     else if (id === 'how-to-play') onHowToPlay?.();
   }, [onCubeSelect, onWormSelect, onChaos, onFreeplay, onRandom, onComingSoon, onHowToPlay]);
 
-  const active = CAROUSEL_MODES[activeIndex];
+  const active = CAROUSEL_MODES[displayIndex]; // drives panel colors + info content
 
   const arrowStyle = {
     background: 'rgba(0,0,0,0.22)', border: '1.5px solid rgba(255,255,255,0.36)',
@@ -780,13 +787,13 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
         padding: '2px', borderRadius: '28px',
         background: RAINBOW_GRADIENT,
         boxShadow: `0 0 60px ${active.tileColor}28, 0 24px 64px rgba(0,0,0,0.65)`,
-        transition: 'box-shadow 350ms ease',
+        transition: 'box-shadow 540ms ease',
       }}>
         <div style={{
           borderRadius: '26px',
-          background: `linear-gradient(160deg, ${active.tileColor} 0%, ${active.tileColor}ee 100%)`,
+          backgroundColor: active.tileColor,
           boxShadow: 'inset 0 2px 0 rgba(255,255,255,0.22), inset 0 -8px 28px rgba(0,0,0,0.18)',
-          transition: 'background 350ms ease',
+          transition: 'background-color 540ms ease',
         }}>
 
           {/* ── Carousel section ── */}
@@ -822,7 +829,8 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
                   width: '100%', height: '100%', position: 'relative',
                   transformStyle: 'preserve-3d',
                   transform: `rotateY(${rotationAngle}deg)`,
-                  transition: 'transform 540ms cubic-bezier(0.34, 1.56, 0.64, 1)',
+                  transition: 'transform 540ms cubic-bezier(0.25, 0, 0.35, 1)',
+                  willChange: 'transform',
                 }}>
                   {CAROUSEL_MODES.map((mode, i) => (
                     <div key={mode.id} style={{
