@@ -128,6 +128,13 @@ export function useCubeState() {
     const sticker = currentCubies[pos.x]?.[pos.y]?.[pos.z]?.stickers?.[dirKey];
     const origins = [];
 
+    // Animation state vars — populated inside the if(sticker) block below
+    const now = performance.now();
+    const srcKey = `${pos.x},${pos.y},${pos.z}`;
+    let antKey = null;
+    let isFirstFlipOnPair = false;
+    let pairId = null;
+
     if (sticker) {
       const antipodalLoc = findAntipodalStickerByGrid(currentManifoldMap, sticker, currentSize);
       const antipodalColor = resolvedColorsRef.current[ANTIPODAL_COLOR[sticker.curr]];
@@ -156,20 +163,16 @@ export function useCubeState() {
         markFlipped(antipodalLoc.x, antipodalLoc.y, antipodalLoc.z, antipodalLoc.dirKey);
       }
 
-    }
-
-    // Compute cubie pop keys and tunnel pair ID for animation state.
-    const now = performance.now();
-    const srcKey = `${pos.x},${pos.y},${pos.z}`;
-    const antKey = antipodalLoc ? `${antipodalLoc.x},${antipodalLoc.y},${antipodalLoc.z}` : null;
-    const isFirstFlipOnPair = sticker ? sticker.flips === 0 : false;
-    let pairId = null;
-    if (antipodalLoc && sticker) {
-      const antipodalSticker = currentCubies[antipodalLoc.x]?.[antipodalLoc.y]?.[antipodalLoc.z]?.stickers?.[antipodalLoc.dirKey];
-      if (antipodalSticker) {
-        const srcGridId = getManifoldGridId(sticker, currentSize);
-        const antGridId = getManifoldGridId(antipodalSticker, currentSize);
-        pairId = [srcGridId, antGridId].sort().join('|');
+      // Compute animation keys
+      antKey = antipodalLoc ? `${antipodalLoc.x},${antipodalLoc.y},${antipodalLoc.z}` : null;
+      isFirstFlipOnPair = sticker.flips === 0;
+      if (antipodalLoc) {
+        const antipodalSticker = currentCubies[antipodalLoc.x]?.[antipodalLoc.y]?.[antipodalLoc.z]?.stickers?.[antipodalLoc.dirKey];
+        if (antipodalSticker) {
+          const srcGridId = getManifoldGridId(sticker, currentSize);
+          const antGridId = getManifoldGridId(antipodalSticker, currentSize);
+          pairId = [srcGridId, antGridId].sort().join('|');
+        }
       }
     }
 
