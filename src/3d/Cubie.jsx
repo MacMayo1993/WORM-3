@@ -107,14 +107,13 @@ const faceValue = (dirKey, x, y, z, size) => {
 const Cubie = React.forwardRef(function Cubie({
   position, cubie, size, onPointerDown,
 }, ref) {
-  const { hollowMode, mirrorMode, visualMode, explosionFactor, settings, cubiePops } = useGameStore(
+  const { hollowMode, mirrorMode, visualMode, explosionFactor, settings } = useGameStore(
     useShallow(s => ({
       hollowMode: s.hollowMode,
       mirrorMode: s.mirrorMode,
       visualMode: s.visualMode,
       explosionFactor: s.explosionT,
       settings: s.settings,
-      cubiePops: s.cubiePops,
     }))
   );
   // faceColors needed locally for wireframe edge coloring
@@ -329,41 +328,26 @@ const Cubie = React.forwardRef(function Cubie({
 
   useFrame(() => {
     if (!popGroupRef.current) return;
-    const entry = cubiePops[popKey];
+    // Read imperatively — avoids re-rendering all cubies whenever cubiePops changes.
+    const entry = useGameStore.getState().cubiePops[popKey];
     if (!entry) {
       popGroupRef.current.position.set(0, 0, 0);
-      popGroupRef.current.scale.set(1, 1, 1);
       return;
     }
     const rawT = (performance.now() - entry.startMs) / entry.durationMs;
     if (rawT >= 1) {
       popGroupRef.current.position.set(0, 0, 0);
-      popGroupRef.current.scale.set(1, 1, 1);
       return;
     }
-
-    // Asymmetric envelope: fast easeOutQuad rush (0→0.25), hover at peak (0.25→0.65), slow easeInQuad drift back.
-    let envelope;
-    if (rawT < 0.25) {
-      const t = rawT / 0.25;
-      envelope = 1 - (1 - t) * (1 - t);
-    } else if (rawT < 0.65) {
-      const hoverT = (rawT - 0.25) / 0.40;
-      envelope = 1.0 - 0.06 * Math.sin(hoverT * Math.PI * 2);
-    } else {
-      const t = (rawT - 0.65) / 0.35;
-      envelope = 1 - t * t;
-    }
-
+    // Smooth sine bell: peaks at t=0.5, fully symmetric, no oscillation.
+    const popFactor = Math.sin(rawT * Math.PI) * 1.5;
     const [px, py, pz] = explodedPos;
     const len = Math.sqrt(px * px + py * py + pz * pz) || 1;
-    const radial = envelope * 1.2;
     popGroupRef.current.position.set(
-      (px / len) * radial,
-      (py / len) * radial,
-      (pz / len) * radial
+      (px / len) * popFactor,
+      (py / len) * popFactor,
+      (pz / len) * popFactor
     );
-    popGroupRef.current.scale.set(1, 1, 1);
   });
 
   return (
