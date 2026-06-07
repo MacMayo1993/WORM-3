@@ -1,10 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
-
-// Approximate total tunnel traversal duration in ms:
-// entering (0.5s) + tunnel (1.92s) + exiting (0.625s) ≈ 3.05s
-const TOTAL_TUNNEL_MS = 3050;
+import { tunnelState } from './tunnelProgressBridge.js';
 
 export default function MobiusHUD() {
     const { wormHealerMode, wormPhase, tunnelColors } = useGameStore(
@@ -19,22 +16,20 @@ export default function MobiusHUD() {
         wormPhase === 'entering' || wormPhase === 'tunnel' || wormPhase === 'exiting'
     );
 
+    // dotT tracks tunnelState.t directly — driven by the exact same t value the
+    // ribbon camera uses, so the dot always matches the worm's ribbon position.
     const [dotT, setDotT] = useState(0);
     const rafRef = useRef(null);
-    const startRef = useRef(null);
 
     useEffect(() => {
         if (!isActive) {
             cancelAnimationFrame(rafRef.current);
             setDotT(0);
-            startRef.current = null;
             return;
         }
-        startRef.current = performance.now();
         const animate = () => {
-            const p = Math.min((performance.now() - startRef.current) / TOTAL_TUNNEL_MS, 1.0);
-            setDotT(p);
-            if (p < 1.0) rafRef.current = requestAnimationFrame(animate);
+            setDotT(tunnelState.t);
+            if (tunnelState.active) rafRef.current = requestAnimationFrame(animate);
         };
         rafRef.current = requestAnimationFrame(animate);
         return () => cancelAnimationFrame(rafRef.current);
@@ -43,7 +38,7 @@ export default function MobiusHUD() {
     if (!wormHealerMode) return null;
 
     const entryColor = tunnelColors?.entryColor ?? '#00bbff';
-    const exitColor = tunnelColors?.exitColor ?? '#ff7700';
+    const exitColor  = tunnelColors?.exitColor  ?? '#ff7700';
 
     // SVG layout constants
     const W = 220, H = 56;
@@ -51,7 +46,7 @@ export default function MobiusHUD() {
     const xL = 10, tL = 90, tR = 130, xR = 210;
     const tMid = (tL + tR) / 2;
 
-    // Dot travels linearly from xL to xR over the full tunnel duration
+    // Dot travels xL→xR tracking the exact ribbon parameter t
     const dotX = xL + dotT * (xR - xL);
 
     return (
@@ -97,7 +92,7 @@ export default function MobiusHUD() {
                 {/* Twist region: two crossing straps showing the Möbius half-twist.
                     Entry strap descends (top-left → bottom-right), exit strap ascends
                     (bottom-left → top-right). Together they form an X at the midpoint,
-                    demonstrating RP² non-orientability — left and right are swapped on exit. */}
+                    demonstrating RP² non-orientability. */}
                 <polygon
                     points={`${tL},${bY1} ${tR},${bMid} ${tR},${bY2} ${tL},${bMid}`}
                     fill={entryColor} opacity="0.72"
@@ -113,7 +108,7 @@ export default function MobiusHUD() {
                 {/* Right band — exit face color */}
                 <rect x={tR} y={bY1} width={xR - tR} height={bY2 - bY1} fill={exitColor} rx="3" opacity="0.78" />
 
-                {/* Centerline guides on each straight segment */}
+                {/* Centerline guides */}
                 <line x1={xL + 5} y1={bMid} x2={tL} y2={bMid} stroke="white" strokeWidth="0.75" opacity="0.18" />
                 <line x1={tR} y1={bMid} x2={xR - 5} y2={bMid} stroke="white" strokeWidth="0.75" opacity="0.18" />
 
@@ -135,7 +130,7 @@ export default function MobiusHUD() {
                     EXIT
                 </text>
 
-                {/* Animated worm-head dot tracking progress through the band */}
+                {/* Animated dot — position driven by exact ribbon parameter t */}
                 {isActive && dotT > 0 && (
                     <g filter="url(#mbDotGlow)">
                         <circle cx={dotX} cy={bMid} r={6.5} fill="white" opacity="0.8" />
