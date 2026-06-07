@@ -1,5 +1,5 @@
 import React, { useMemo, useDeferredValue } from 'react';
-import WormholeTunnel from './WormholeTunnel.jsx';
+import MobiusTunnel from './MobiusTunnel.jsx';
 import { FACE_COLORS, FLIP_CAP } from '../utils/constants.js';
 import { getManifoldGridId } from '../game/coordinates.js';
 import { findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
@@ -107,35 +107,21 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
     return connections.slice(0, MAX_TUNNELS);
   }, [deferredCubies, size, showTunnels, manifoldMap, fc]);
 
-  // B3: adaptive strand-count LOD based on how many tunnels are visible.
-  // With more tunnels each tunnel needs fewer strands to keep GPU work bounded.
-  //  1–6 tunnels   → moderate density (30 strands)
-  //  7–20 tunnels  → reduced density (15 strands)
-  // 21+ tunnels    → minimal density  (8 strands)
-  const n = tunnelData.length;
-  const maxStrands = n > 20 ? 8 : n > 6 ? 15 : 30;
-
   if (!showTunnels) return null;
 
   return (
     <group>
       {tunnelData.map((t) => (
-        <WormholeTunnel
+        <MobiusTunnel
           key={t.id}
-          gridId1={t.id}
-          gridId2={t.gridId2}
           meshIdx1={t.meshIdx1}
           meshIdx2={t.meshIdx2}
           dirKey1={t.dirKey1}
           dirKey2={t.dirKey2}
           cubieRefs={cubieRefs}
-          intensity={t.intensity}
           flips={t.flips}
           color1={t.color1}
           color2={t.color2}
-          isCenter={t.isCenter}
-          size={size}
-          maxStrands={maxStrands}
         />
       ))}
     </group>
