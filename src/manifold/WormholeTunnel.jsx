@@ -153,6 +153,11 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
   const atmosphereTubeRef = useRef();
   const atmosphereMatRef = useRef();
   const coreMatRef = useRef();
+  // Pre-allocated 3-point curve for the center rail — straight path, no corkscrew
+  const centerRailRef = useRef(null);
+  const centerRailCurveRef = useRef(new THREE.CatmullRomCurve3([
+    new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()
+  ]));
   const pulseT = useRef(Math.random() * Math.PI * 2);
   const strandsRef = useRef();
   const strandMatRef = useRef();
@@ -215,10 +220,12 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
     const ct = coreTubeRef.current;
     const lt = lightningRef.current;
     const at = atmosphereTubeRef.current;
+    const cr = centerRailRef.current;
     return () => {
       if (ct?.geometry) ct.geometry.dispose();
       if (lt?.geometry) lt.geometry.dispose();
       if (at?.geometry) at.geometry.dispose();
+      if (cr?.geometry) cr.geometry.dispose();
     };
   }, []);
 
@@ -331,6 +338,17 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
           if (oldAtmo) oldAtmo.dispose();
         }
 
+        // Center rail — clean straight path (no corkscrew displacement).
+        // This stripe cuts through the middle of the glowing core, like train tracks.
+        if (centerRailRef.current) {
+          centerRailCurveRef.current.points[0].copy(_vStart);
+          // points[1] is always origin — never changes
+          centerRailCurveRef.current.points[2].copy(_vEnd);
+          const oldRail = centerRailRef.current.geometry;
+          centerRailRef.current.geometry = new THREE.TubeGeometry(centerRailCurveRef.current, 14, 0.006, 5, false);
+          if (oldRail) oldRail.dispose();
+        }
+
         lastCoreGeometryBuildRef.current = t;
         lastCoreStartRef.current.copy(_vStart);
         lastCoreEndRef.current.copy(_vEnd);
@@ -355,7 +373,7 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
         const ag = _c1.g * 0.12 + 0.01;
         const ab = _c1.b * 0.12 + 0.07;
         atmosphereMatRef.current.color.setRGB(ar, ag, ab);
-        atmosphereMatRef.current.opacity = dead ? 0 : 0.84 + burstEnv * 0.10;
+        atmosphereMatRef.current.opacity = dead ? 0 : 0.91 + burstEnv * 0.07;
       }
       if (strandMatRef.current) {
         strandMatRef.current.uniforms.uTime.value = t;
@@ -642,6 +660,19 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
           transparent
           depthWrite={false}
           blending={THREE.AdditiveBlending}
+        />
+      </mesh>
+
+      {/* Center rail — thin dark stripe on the straight tunnel centerline (no corkscrew).
+          renderOrder=4 draws on top of the additive glow, cutting a track-like dark line
+          through the middle of the glowing core — train-track / road-center effect. */}
+      <mesh ref={centerRailRef} renderOrder={4}>
+        <tubeGeometry args={[new THREE.LineCurve3(new THREE.Vector3(-0.01, 0, 0), new THREE.Vector3(0.01, 0, 0)), 2, 0.006, 5, false]} />
+        <meshBasicMaterial
+          color="#000000"
+          transparent
+          opacity={0.88}
+          depthWrite={false}
         />
       </mesh>
 
