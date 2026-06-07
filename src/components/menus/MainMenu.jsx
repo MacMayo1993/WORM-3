@@ -982,30 +982,11 @@ const MenuStartButton = ({ visible, onClick }) => (
     transition: 'opacity 0.55s ease 0.1s, transform 0.55s cubic-bezier(0.22,1,0.36,1) 0.1s',
     pointerEvents: 'all',
   }}>
-    <div style={{
-      padding: '2.5px', borderRadius: '100px',
-      background: RAINBOW_GRADIENT,
-      boxShadow: '0 0 48px rgba(120,100,255,0.30), 0 0 96px rgba(60,60,200,0.14)',
-    }}>
-      <button
-        onClick={onClick}
-        style={{
-          display: 'block', background: 'rgba(6,10,24,0.88)', borderRadius: '100px', border: 'none',
-          padding: 0, cursor: 'pointer',
-          transition: 'transform 220ms cubic-bezier(0.34,1.56,0.64,1)',
-        }}
-        onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.04)'; }}
-        onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}
-      >
-        <span style={{
-          display: 'block', padding: '18px 72px',
-          fontSize: 'clamp(22px, 5vw, 34px)', fontWeight: 900, letterSpacing: '0.22em',
-          fontFamily: MENU_FONT,
-          background: RAINBOW_GRADIENT,
-          WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
-        }}>START</span>
-      </button>
-    </div>
+    <button
+      type="button"
+      className="worm-tactile-btn"
+      onClick={onClick}
+    >START</button>
   </div>
 );
 
@@ -1035,16 +1016,20 @@ const MenuTitleCard = ({ visible }) => (
     opacity: visible ? 1 : 0,
     transform: visible ? 'translateY(0)' : 'translateY(-18px)',
   }}>
-    <div style={menuStyles.titleCard}>
-      <h1 style={{
-        margin: 0, fontSize: 'clamp(54px,13vw,96px)', fontWeight: 900,
-        letterSpacing: '0.1em', lineHeight: 1, fontFamily: "'Courier New', monospace",
-        background: 'linear-gradient(100deg,#ef4444 0%,#f97316 18%,#eab308 36%,#22c55e 54%,#3b82f6 72%,#a855f7 90%,#ef4444 100%)',
-        WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
-        textAlign: 'center',
-      }}>
-        WORM<sup style={{ fontSize: '0.42em', verticalAlign: 'super', WebkitTextFillColor: 'transparent' }}>3</sup>
-      </h1>
+    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
+      <div style={{ display: 'flex' }}>
+        <span className="worm-title-letter" style={{ '--bounce-delay': '0s', color: '#ef4444' }}>W</span>
+        <span className="worm-title-letter" style={{ '--bounce-delay': '0.15s', color: '#f97316' }}>O</span>
+        <span className="worm-title-letter" style={{ '--bounce-delay': '0.30s', color: '#22c55e' }}>R</span>
+        <span className="worm-title-letter" style={{ '--bounce-delay': '0.45s', color: '#3b82f6' }}>M</span>
+      </div>
+      <div className="worm-cube-sup">
+        <div className="worm-cube-inner">
+          <div className="worm-cube-face worm-cube-face--front">3</div>
+          <div className="worm-cube-face worm-cube-face--right">3</div>
+          <div className="worm-cube-face worm-cube-face--top">3</div>
+        </div>
+      </div>
     </div>
   </div>
 );
