@@ -1322,35 +1322,22 @@ function WormChaseCamera({ worm, size }) {
             if (_ribPerp.lengthSq() < 0.001) { _ribPerp.set(0, 0, 1); _ribPerp.crossVectors(_ribAxis, _ribPerp); }
             _ribPerp.normalize();
 
-            // Centerline position and tangent at t — piecewise matching fillRibbon:
-            //   first half  vStart→midA,  second half midB→vEnd
+            // Camera flies through the actual tunnel centerline: Entry → Origin → Exit.
+            // getTunnelWorldPosInto matches the path used by WormholeTunnel.jsx geometry.
             const tLook = Math.min(t + 0.06, 1.0);
-            if (t <= 0.5) {
-                _camSurfCam.lerpVectors(_ribVStart, _ribMidA, t * 2.0);
-                _camTunnelTangent.subVectors(_ribMidA, _ribVStart).normalize();
-            } else {
-                _camSurfCam.lerpVectors(_ribMidB, _ribVEnd, (t - 0.5) * 2.0);
-                _camTunnelTangent.subVectors(_ribVEnd, _ribMidB).normalize();
-            }
-            if (tLook <= 0.5) {
-                _camLookVec.lerpVectors(_ribVStart, _ribMidA, tLook * 2.0);
-            } else {
-                _camLookVec.lerpVectors(_ribMidB, _ribVEnd, (tLook - 0.5) * 2.0);
-            }
+            getTunnelWorldPosInto(_camSurfCam, tunnel, t, size);
+            getTunnelWorldPosInto(_camLookVec, tunnel, tLook, size);
+            _camTunnelTangent.subVectors(_camLookVec, _camSurfCam);
+            if (_camTunnelTangent.lengthSq() < 0.0001) _camTunnelTangent.copy(_ribAxis);
+            _camTunnelTangent.normalize();
 
-            // Width direction with Möbius half-twist: perpBase rotates π over [0,1]
+            // Width direction with Möbius half-twist: perpBase rotates π over [0,1].
+            // _ribAxis/_ribPerp are from ribbon anchor points and set the twist axis that
+            // produces the RP² 180° roll-over as the camera crosses the cube midpoint.
             _camTunnelRight.copy(_ribPerp).applyAxisAngle(_ribAxis, t * Math.PI);
 
-            // Surface normal = tangent × perpCurrent — rotates 180° over the traversal.
-            // This is the physical expression of RP² non-orientability: camera "up"
-            // flips, so the world rolls over as you cross the midpoint.
+            // Camera "up" flips 180° over the traversal — the RP² non-orientability effect.
             _camUpVec.crossVectors(_camTunnelTangent, _camTunnelRight).normalize();
-
-            // Ride the ribbon: slightly above the surface + small forward offset
-            // to clear worm-head geometry without losing the close-up ribbon feel.
-            const RIDE_UP = 0.22, RIDE_FWD = 0.28;
-            _camSurfCam.addScaledVector(_camUpVec, RIDE_UP).addScaledVector(_camTunnelTangent, RIDE_FWD);
-            _camLookVec.addScaledVector(_camUpVec, RIDE_UP).addScaledVector(_camTunnelTangent, RIDE_FWD);
 
             const alpha = Math.min(1, CAM_LERP * delta * 4.0);
             camPosRef.current.lerp(_camSurfCam, alpha);

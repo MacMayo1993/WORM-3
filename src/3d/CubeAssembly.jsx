@@ -897,22 +897,29 @@ const CubeAssembly = React.memo(({
         )}
         {/* VoidCore: swirling wormhole-color rings at the cube's hollow center */}
         <VoidCore />
-        {items.map((it, idx) => {
-          // Skip the center cubie on odd-sized cubes — VoidCore occupies that space
-          const isCenterVoid = size % 2 !== 0 &&
-            it.pos[0] === 0 && it.pos[1] === 0 && it.pos[2] === 0;
-          if (isCenterVoid) return null;
-          return (
-            <Cubie
-              key={it.key}
-              ref={cubieRefCallbacks[idx]}
-              position={it.pos}
-              cubie={it.cubie}
-              size={size}
-              onPointerDown={onPointerDown}
-            />
-          );
-        })}
+        <group visible={!wormTunnelActive}>
+          {items.map((it, idx) => {
+            // Skip the center cubie on odd-sized cubes — VoidCore occupies that space
+            const isCenterVoid = size % 2 !== 0 &&
+              it.pos[0] === 0 && it.pos[1] === 0 && it.pos[2] === 0;
+            if (isCenterVoid) return null;
+            // Skip fully interior cubies — they are never visible from any camera angle.
+            // pos is in centered coords; a cubie is interior when all axes are strictly
+            // between -(size-1)/2 and +(size-1)/2 (i.e. it touches no face).
+            const half = (size - 1) / 2;
+            if (Math.abs(it.pos[0]) < half && Math.abs(it.pos[1]) < half && Math.abs(it.pos[2]) < half) return null;
+            return (
+              <Cubie
+                key={it.key}
+                ref={cubieRefCallbacks[idx]}
+                position={it.pos}
+                cubie={it.cubie}
+                size={size}
+                onPointerDown={onPointerDown}
+              />
+            );
+          })}
+        </group>
         {showCursor && cursor && (
           <CursorHighlight />
         )}
