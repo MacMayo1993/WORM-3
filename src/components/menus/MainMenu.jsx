@@ -608,6 +608,12 @@ export const RotatingBlackCube = ({ onCubeClick }) => {
 // ─── Mode carousel constants ──────────────────────────────────────────────────
 const RAINBOW_GRADIENT = 'linear-gradient(100deg,#ef4444 0%,#f97316 18%,#eab308 36%,#22c55e 54%,#3b82f6 72%,#a855f7 90%,#ef4444 100%)';
 
+// ─── Heptagonal prism geometry ───────────────────────────────────────────────
+const PRISM_FACE_ANGLE = 360 / 7; // ≈ 51.43° between adjacent faces
+const PRISM_W = 180;              // face width px
+const PRISM_H = 200;              // face height px
+const PRISM_R = Math.round(PRISM_W / (2 * Math.tan(Math.PI / 7))); // ≈ 187px
+
 // tileColor matches the game's 6 face colors; textColor ensures contrast on the tile
 const CAROUSEL_MODES = [
   {
@@ -670,33 +676,11 @@ const TileCardFace = ({ mode }) => (
   </div>
 );
 
-const TileCardSide = ({ mode, onClick, dir }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    style={{
-      background: 'none', border: 'none', padding: 0, cursor: 'pointer', flexShrink: 0,
-      transform: `rotateY(${dir > 0 ? 30 : -30}deg) scale(0.78)`,
-      opacity: 0.28, transition: 'opacity 280ms ease, transform 280ms ease',
-      transformStyle: 'preserve-3d', WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
-    }}
-  >
-    <div style={{ background: '#0c0c1a', padding: '5px', borderRadius: '14px', width: '68px' }}>
-      <div style={{ background: mode.tileColor, borderRadius: '10px', height: '104px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px', position: 'relative', overflow: 'hidden', boxShadow: 'inset 0 -4px 10px rgba(0,0,0,0.42), inset 3px 3px 8px rgba(255,255,255,0.18)' }}>
-        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'linear-gradient(135deg, rgba(255,255,255,0.20) 0%, transparent 50%, rgba(0,0,0,0.12) 100%)' }} />
-        <span style={{ position: 'relative', zIndex: 1, fontSize: '11px', fontWeight: 900, fontFamily: MENU_FONT, textAlign: 'center', lineHeight: 1.2, color: mode.textColor, textShadow: '0 1px 3px rgba(0,0,0,0.35)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{mode.label}</span>
-      </div>
-    </div>
-  </button>
-);
-
 // ─── Mode carousel overlay ────────────────────────────────────────────────────
 const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay, onRandom, onComingSoon, onHowToPlay }) => {
   const [activeIndex, setActiveIndex] = useState(0);
-  const [outgoingIndex, setOutgoingIndex] = useState(null);
-  const [animKey, setAnimKey] = useState(0);
+  const [rotationAngle, setRotationAngle] = useState(0);
   const [imgError, setImgError] = useState(false);
-  const [spinDir, setSpinDir] = useState(0);
   const touchStartX = useRef(null);
   const spinTimer = useRef(null);
   const activeIndexRef = useRef(0);
@@ -719,15 +703,9 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
     if (animatingRef.current) return;
     animatingRef.current = true;
     if (spinTimer.current) clearTimeout(spinTimer.current);
-    setOutgoingIndex(activeIndexRef.current);
-    setAnimKey(k => k + 1);
-    setSpinDir(dir);
+    setRotationAngle(a => a - dir * PRISM_FACE_ANGLE);
     setActiveIndex(i => (i + dir + N) % N);
-    spinTimer.current = setTimeout(() => {
-      setSpinDir(0);
-      setOutgoingIndex(null);
-      animatingRef.current = false;
-    }, 430);
+    spinTimer.current = setTimeout(() => { animatingRef.current = false; }, 560);
   }, [N]);
 
   const selectIndex = useCallback((targetIndex) => {
@@ -736,18 +714,13 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
     if (targetIndex === curr) return;
     const forwardSteps = (targetIndex - curr + N) % N;
     const backwardSteps = (curr - targetIndex + N) % N;
+    const steps = Math.min(forwardSteps, backwardSteps);
     const dir = forwardSteps <= backwardSteps ? 1 : -1;
     animatingRef.current = true;
     if (spinTimer.current) clearTimeout(spinTimer.current);
-    setOutgoingIndex(curr);
-    setAnimKey(k => k + 1);
-    setSpinDir(dir);
+    setRotationAngle(a => a - dir * steps * PRISM_FACE_ANGLE);
     setActiveIndex(targetIndex);
-    spinTimer.current = setTimeout(() => {
-      setSpinDir(0);
-      setOutgoingIndex(null);
-      animatingRef.current = false;
-    }, 430);
+    spinTimer.current = setTimeout(() => { animatingRef.current = false; }, 560);
   }, [N]);
 
   useEffect(() => {
@@ -771,12 +744,7 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
     else if (id === 'how-to-play') onHowToPlay?.();
   }, [onCubeSelect, onWormSelect, onChaos, onFreeplay, onRandom, onComingSoon, onHowToPlay]);
 
-  const prevIdx = (activeIndex - 1 + N) % N;
-  const nextIdx = (activeIndex + 1) % N;
-  const active   = CAROUSEL_MODES[activeIndex];
-  const prev     = CAROUSEL_MODES[prevIdx];
-  const next     = CAROUSEL_MODES[nextIdx];
-  const outgoing = outgoingIndex !== null ? CAROUSEL_MODES[outgoingIndex] : null;
+  const active = CAROUSEL_MODES[activeIndex];
 
   const arrowStyle = {
     background: 'rgba(0,0,0,0.22)', border: '1.5px solid rgba(255,255,255,0.36)',
@@ -799,26 +767,6 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
     >
       <MenuBackgroundOrbs />
       <style>{`
-        @keyframes cubeExitNext {
-          0%   { transform: rotateY(0deg)    scale(1);    filter: brightness(1); }
-          100% { transform: rotateY(-90deg)  scale(0.70); filter: brightness(0.28); }
-        }
-        @keyframes cubeEnterNext {
-          0%   { transform: rotateY(90deg)   scale(0.70); filter: brightness(0.28); }
-          100% { transform: rotateY(0deg)    scale(1);    filter: brightness(1); }
-        }
-        @keyframes cubeExitPrev {
-          0%   { transform: rotateY(0deg)   scale(1);    filter: brightness(1); }
-          100% { transform: rotateY(90deg)  scale(0.70); filter: brightness(0.28); }
-        }
-        @keyframes cubeEnterPrev {
-          0%   { transform: rotateY(-90deg) scale(0.70); filter: brightness(0.28); }
-          100% { transform: rotateY(0deg)   scale(1);    filter: brightness(1); }
-        }
-        .cube-exit-next  { animation: cubeExitNext  400ms cubic-bezier(0.55, 0, 1, 0.45) both; }
-        .cube-enter-next { animation: cubeEnterNext 400ms cubic-bezier(0, 0.55, 0.45, 1) 18ms both; }
-        .cube-exit-prev  { animation: cubeExitPrev  400ms cubic-bezier(0.55, 0, 1, 0.45) both; }
-        .cube-enter-prev { animation: cubeEnterPrev 400ms cubic-bezier(0, 0.55, 0.45, 1) 18ms both; }
         .mode-arrow-btn:active { background: rgba(255,255,255,0.22) !important; transform: scale(0.90) !important; }
         .mode-play-btn:active  { opacity: 0.80; transform: scale(0.98); }
       `}</style>
@@ -835,7 +783,7 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
         transition: 'box-shadow 350ms ease',
       }}>
         <div style={{
-          borderRadius: '26px', overflow: 'hidden',
+          borderRadius: '26px',
           background: `linear-gradient(160deg, ${active.tileColor} 0%, ${active.tileColor}ee 100%)`,
           boxShadow: 'inset 0 2px 0 rgba(255,255,255,0.22), inset 0 -8px 28px rgba(0,0,0,0.18)',
           transition: 'background 350ms ease',
@@ -851,7 +799,7 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
 
             {/* Card row — swipe gesture lives here only */}
             <div
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center', perspective: '1000px' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'center' }}
               onTouchStart={e => { touchStartX.current = e.touches[0].clientX; }}
               onTouchEnd={e => {
                 if (touchStartX.current === null) return;
@@ -868,35 +816,26 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
                 style={arrowStyle}
               >‹</button>
 
-              <TileCardSide mode={prev} onClick={() => navigate(-1)} dir={1} />
-
-              {/* Active card container — fixed size so both animation layers align */}
-              <div style={{
-                position: 'relative', flexShrink: 0,
-                width: 'min(196px, 50vw)', height: 'min(216px, 56vw)',
-                perspective: '900px',
-              }}>
-                {/* Outgoing card — only visible during animation */}
-                {outgoing && spinDir !== 0 && (
-                  <div
-                    key={`out-${animKey}`}
-                    className={spinDir > 0 ? 'cube-exit-next' : 'cube-exit-prev'}
-                    style={{ position: 'absolute', inset: 0, transformStyle: 'preserve-3d', transformOrigin: '50% 50%', willChange: 'transform' }}
-                  >
-                    <TileCardFace mode={outgoing} />
-                  </div>
-                )}
-                {/* Incoming card */}
-                <div
-                  key={`in-${animKey}`}
-                  className={spinDir !== 0 ? (spinDir > 0 ? 'cube-enter-next' : 'cube-enter-prev') : ''}
-                  style={{ position: 'absolute', inset: 0, transformStyle: 'preserve-3d', transformOrigin: '50% 50%', willChange: 'transform' }}
-                >
-                  <TileCardFace mode={active} />
+              {/* 7-face heptagonal prism — all modes connected as one solid object */}
+              <div style={{ perspective: '700px', flexShrink: 0, width: `${PRISM_W}px`, height: `${PRISM_H}px` }}>
+                <div style={{
+                  width: '100%', height: '100%', position: 'relative',
+                  transformStyle: 'preserve-3d',
+                  transform: `rotateY(${rotationAngle}deg)`,
+                  transition: 'transform 540ms cubic-bezier(0.34, 1.56, 0.64, 1)',
+                }}>
+                  {CAROUSEL_MODES.map((mode, i) => (
+                    <div key={mode.id} style={{
+                      position: 'absolute', inset: 0,
+                      transform: `rotateY(${i * PRISM_FACE_ANGLE}deg) translateZ(${PRISM_R}px)`,
+                      backfaceVisibility: 'hidden',
+                      WebkitBackfaceVisibility: 'hidden',
+                    }}>
+                      <TileCardFace mode={mode} />
+                    </div>
+                  ))}
                 </div>
               </div>
-
-              <TileCardSide mode={next} onClick={() => navigate(1)} dir={-1} />
 
               <button
                 type="button"
