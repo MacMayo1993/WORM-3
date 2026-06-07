@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import ParityWallet from '../overlays/ParityWallet.jsx';
@@ -14,41 +14,18 @@ import { ANTIPODAL_COLOR } from '../../utils/constants.js';
 const _SCHEME_KEYS = Object.keys(COLOR_SCHEMES).filter(k => k !== 'biome' && k !== 'custom');
 const _TILE_KEYS = [...CLASSIC_STYLE_KEYS, ...ANTIPODAL_STYLE_KEYS, ...LIVING_STYLE_KEYS];
 const _menuSchemeKey = _SCHEME_KEYS[Math.floor(Math.random() * _SCHEME_KEYS.length)];
-const _menuTileStyle = _TILE_KEYS[Math.floor(Math.random() * _TILE_KEYS.length)];
+const _menuFaceStyles = {};
+for (let f = 1; f <= 6; f++) {
+  _menuFaceStyles[f] = _TILE_KEYS[Math.floor(Math.random() * _TILE_KEYS.length)];
+}
 const MENU_FACE_COLORS = COLOR_SCHEMES[_menuSchemeKey]; // { 1: hex, 2: hex, ... }
-
-// ─── Per-face independent pulse timing ────────────────────────────────────────
-// Each of the 6 faces gets its own phase offset so all 6 colors are always
-// visible — staggered evenly across one full cycle (PULSE_CYCLE seconds).
-const PULSE_CYCLE = 3.6;   // full repeat period per face (seconds)
-const PULSE_DUR   = 0.90;  // active window within each cycle
-
-// Phase offsets: antipodal pairs fire together (0° apart), pairs 60° apart each.
-const FACE_PHASE = {
-  PZ:  0.0,                   // Red
-  NZ:  0.0,                   // Orange  (antipodal to Red, same phase)
-  PX:  PULSE_CYCLE / 3,       // Blue
-  NX:  PULSE_CYCLE / 3,       // Green   (antipodal to Blue, same phase)
-  PY:  (PULSE_CYCLE / 3) * 2, // White
-  NY:  (PULSE_CYCLE / 3) * 2, // Yellow  (antipodal to White, same phase)
-};
 
 const FACE_COLOR = {
   PX: '#3b82f6', NX: '#22c55e',
   PZ: '#ef4444', NZ: '#f97316',
   PY: '#eeeeee', NY: '#eab308',
 };
-// Face centers of a 3×3 cube (cubies at –1,0,+1 → surface at ±1.5)
-// Ring plane faces outward, so we rotate to match the outward normal
-const FACE_CFG = {
-  PX: { pos: [1.52, 0, 0], rot: [0, Math.PI / 2, 0] },
-  NX: { pos: [-1.52, 0, 0], rot: [0, -Math.PI / 2, 0] },
-  PY: { pos: [0, 1.52, 0], rot: [-Math.PI / 2, 0, 0] },
-  NY: { pos: [0, -1.52, 0], rot: [Math.PI / 2, 0, 0] },
-  PZ: { pos: [0, 0, 1.52], rot: [0, 0, 0] },
-  NZ: { pos: [0, 0, -1.52], rot: [0, Math.PI, 0] },
-};
-const FACE_KEYS = Object.keys(FACE_CFG);
+const FACE_KEYS = Object.keys(FACE_COLOR);
 
 // ─── Shared pulse state — written by FacePulses (WebGL), read by ScreenGlow (DOM) ──
 // Per-face rawP values (0→1) so all 6 colors are always independently visible.
@@ -104,255 +81,6 @@ const ScreenGlow = () => {
   );
 };
 
-// ─── Ray strand system — shoots outward from tile gaps like antipodal tunnel effects ──
-// In face-group local space: +Z is outward (face normal), XY is the face plane.
-// Strands originate from the 4 tile gap lines (# positions at ±0.5) and curve outward.
-const RAY_STRANDS = 14;   // per face — distributed across the 4 tile gap lines
-const RAY_PTS = 24;   // curve sample points per strand (more segments = worm-like motion)
-const WORM_BALLS = 7; // bead count per strand body
-
-// Pre-computed per-face strand paths — originate from the # grid lines at ±0.5 and
-// curve outward along the face normal (+Z), like light leaking through the tile seams.
-const _faceRayConfigs = (() => {
-  const rng = (() => { let s = 42; return () => { s = (s * 1664525 + 1013904223) & 0xffffffff; return (s >>> 0) / 0xffffffff; }; })();
-  const result = {};
-  FACE_KEYS.forEach(face => {
-    result[face] = Array.from({ length: RAY_STRANDS }, (_, i) => {
-      // Distribute evenly across the 4 # lines (tile gaps at sx=±0.5 and sy=±0.5)
-      const line = i % 4;
-      const slot = Math.floor(i / 4);
-      const slotsPerLine = Math.ceil(RAY_STRANDS / 4);  // 3 for 10 strands
-      const along = slotsPerLine > 1
-        ? (slot / (slotsPerLine - 1) - 0.5) * 2.6       // –1.3 … +1.3 along the gap line
-        : 0;
-
-      let sx, sy;
-      if (line === 0) { sx = along; sy = 0.5; }
-      else if (line === 1) { sx = along; sy = -0.5; }
-      else if (line === 2) { sx = 0.5; sy = along; }
-      else { sx = -0.5; sy = along; }
-
-      const len = 1.4 + rng() * 1.8;
-      const cpXOff = (rng() - 0.5) * 0.7;
-      const cpYOff = (rng() - 0.5) * 0.7;
-      const tipXOff = (rng() - 0.5) * 0.5;
-      const tipYOff = (rng() - 0.5) * 0.5;
-
-      const curve = new THREE.QuadraticBezierCurve3(
-        new THREE.Vector3(sx, sy, 0.06),
-        new THREE.Vector3(sx + cpXOff, sy + cpYOff, len * 0.45),
-        new THREE.Vector3(sx + tipXOff, sy + tipYOff, len)
-      );
-
-      const pts = curve.getPoints(RAY_PTS - 1);
-      const basePts = new Float32Array(RAY_PTS * 3);
-      pts.forEach((p, j) => { basePts[j * 3] = p.x; basePts[j * 3 + 1] = p.y; basePts[j * 3 + 2] = p.z; });
-
-      // Per-strand wobble profile used to sculpt a moving worm body along the sine rays.
-      const wiggleDirAngle = rng() * Math.PI * 2;
-      const wiggleDirX = Math.cos(wiggleDirAngle);
-      const wiggleDirY = Math.sin(wiggleDirAngle);
-
-      return {
-        id: i,
-        basePts,
-        sparkOffset: rng() * Math.PI * 2,
-        wiggleAmp: 0.035 + rng() * 0.045,
-        wiggleFreq: 1.7 + rng() * 1.9,
-        wiggleSpeed: 3.4 + rng() * 2.8,
-        wiggleDirX,
-        wiggleDirY,
-      };
-    });
-  });
-  return result;
-})();
-
-// Pre-computed Three.js color objects — no allocations in useFrame
-const _faceColorObj = {};
-FACE_KEYS.forEach(face => { _faceColorObj[face] = new THREE.Color(FACE_COLOR[face]); });
-
-const FacePulses = () => {
-  const lineRefs = useRef({});   // face → [line, ...]  (arrays)
-  const ballRefs = useRef({});   // face → [instancedMesh, ...]
-  const lightRefs = useRef({});
-  const tempObj = useMemo(() => new THREE.Object3D(), []);
-
-  useFrame((state) => {
-    const t = state.clock.elapsedTime;
-
-    FACE_KEYS.forEach(face => {
-      // Each face runs on its own clock offset by FACE_PHASE[face]
-      const tFace = (t + FACE_PHASE[face]) % PULSE_CYCLE;
-      const rawP = tFace < PULSE_DUR ? tFace / PULSE_DUR : 1.0;
-
-      // Write per-face rawP for ScreenGlow to read
-      _pulsePerFace[face] = rawP;
-
-      const lines = lineRefs.current[face];
-      const light = lightRefs.current[face];
-
-      if (!lines?.length) return;
-
-      if (rawP >= 1.0) {
-        lines.forEach(l => { if (l) l.visible = false; });
-        ballRefs.current[face]?.forEach(b => { if (b) b.visible = false; });
-        if (light) light.intensity = 0;
-        return;
-      }
-
-      const col = _faceColorObj[face];
-      const configs = _faceRayConfigs[face];
-
-      // Strands shoot outward in first half of pulse, then fade out in second half
-      const growth = Math.min(rawP * 2.2, 1.0);   // 0→1 over ~45% of pulse
-      const fade = rawP > 0.5 ? 1 - (rawP - 0.5) * 2 : 1.0;
-      const overall = Math.max(0, fade) * 0.85;
-
-      lines.forEach((line, i) => {
-        if (!line) return;
-        const cfg = configs[i];
-
-        // Sparkle shimmer
-        const spark = 0.8 + Math.sin(t * 5.5 + cfg.sparkOffset) * 0.2;
-        line.material.opacity = overall * spark;
-        line.visible = overall > 0.01;
-        const balls = ballRefs.current[face]?.[i];
-        if (balls) balls.visible = overall > 0.01;
-
-        // Growth: clip strand at current growth progress; collapsed points → tip of visible segment.
-        // Add a moving sinusoidal offset + segmented luminance for a worm-body look.
-        const pos = line.geometry.attributes.position.array;
-        const base = cfg.basePts;
-        const visibleEnd = growth * (RAY_PTS - 1);  // last visible point index (float)
-
-        for (let j = 0; j < RAY_PTS; j++) {
-          const clampedJ = Math.min(j, visibleEnd);
-          const lo = Math.floor(clampedJ);
-          const hi = Math.min(lo + 1, RAY_PTS - 1);
-          const f = clampedJ - lo;
-          const baseX = base[lo * 3] + (base[hi * 3] - base[lo * 3]) * f;
-          const baseY = base[lo * 3 + 1] + (base[hi * 3 + 1] - base[lo * 3 + 1]) * f;
-          const baseZ = base[lo * 3 + 2] + (base[hi * 3 + 2] - base[lo * 3 + 2]) * f;
-
-          const u = clampedJ / (RAY_PTS - 1);
-          const bodyEnvelope = Math.sin(Math.PI * Math.min(1, Math.max(0, u))) * 0.95;
-          const crawlWave = Math.sin(u * cfg.wiggleFreq * Math.PI * 2 - t * cfg.wiggleSpeed + cfg.sparkOffset);
-          const wormOffset = bodyEnvelope * crawlWave * cfg.wiggleAmp;
-
-          pos[j * 3] = baseX + cfg.wiggleDirX * wormOffset;
-          pos[j * 3 + 1] = baseY + cfg.wiggleDirY * wormOffset;
-          pos[j * 3 + 2] = baseZ;
-        }
-        line.geometry.attributes.position.needsUpdate = true;
-
-        const colors = line.geometry.attributes.color.array;
-        const headU = growth;
-        for (let j = 0; j < RAY_PTS; j++) {
-          const u = j / (RAY_PTS - 1);
-          const tail = Math.pow(Math.max(0, 1 - u), 0.4);
-          const segmentBand = 0.72 + 0.28 * Math.sin(u * 26 - t * 12 + cfg.sparkOffset);
-          const headGlow = Math.exp(-Math.pow((u - headU) / 0.12, 2)) * 0.65;
-          const glow = tail * segmentBand + headGlow;
-          colors[j * 3] = col.r * glow;
-          colors[j * 3 + 1] = col.g * glow;
-          colors[j * 3 + 2] = col.b * glow;
-        }
-        line.geometry.attributes.color.needsUpdate = true;
-
-        // Worm body beads: instanced spheres distributed from head backward.
-        if (balls) {
-          for (let b = 0; b < WORM_BALLS; b++) {
-            const behind = b / Math.max(1, WORM_BALLS - 1);
-            const u = Math.max(0, growth - behind * 0.22);
-            const pt = u * (RAY_PTS - 1);
-            const lo = Math.floor(pt);
-            const hi = Math.min(lo + 1, RAY_PTS - 1);
-            const f = pt - lo;
-            const x = pos[lo * 3] + (pos[hi * 3] - pos[lo * 3]) * f;
-            const y = pos[lo * 3 + 1] + (pos[hi * 3 + 1] - pos[lo * 3 + 1]) * f;
-            const z = pos[lo * 3 + 2] + (pos[hi * 3 + 2] - pos[lo * 3 + 2]) * f;
-
-            const headT = 1 - behind;
-            const scale = (0.018 + headT * 0.03) * (0.65 + overall * 0.7);
-            tempObj.position.set(x, y, z);
-            tempObj.scale.setScalar(scale);
-            tempObj.updateMatrix();
-            balls.setMatrixAt(b, tempObj.matrix);
-          }
-          balls.instanceMatrix.needsUpdate = true;
-        }
-      });
-
-      if (light) {
-        const lc = rawP < 0.25 ? rawP / 0.25 : Math.pow(1 - rawP, 0.6);
-        light.intensity = Math.max(0, lc) * 2.0;
-      }
-    });
-  });
-
-  return (
-    <>
-      {FACE_KEYS.map(face => {
-        const { pos, rot } = FACE_CFG[face];
-        const col = FACE_COLOR[face];
-        const lightPos = pos.map(v => v * 2.6);
-        const configs = _faceRayConfigs[face];
-        return (
-          <group key={face}>
-            <pointLight
-              ref={el => { lightRefs.current[face] = el; }}
-              position={lightPos} color={col} intensity={0} distance={10} decay={2}
-            />
-            <group position={pos} rotation={rot}>
-              {configs.map((cfg, i) => (
-                <line
-                  key={cfg.id}
-                  ref={el => {
-                    if (!lineRefs.current[face]) lineRefs.current[face] = [];
-                    lineRefs.current[face][i] = el;
-                  }}
-                  visible={false}
-                >
-                  <bufferGeometry>
-                    <bufferAttribute attach="attributes-position" count={RAY_PTS}
-                      array={new Float32Array(RAY_PTS * 3)} itemSize={3} usage={THREE.DynamicDrawUsage} />
-                    <bufferAttribute attach="attributes-color" count={RAY_PTS}
-                      array={new Float32Array(RAY_PTS * 3)} itemSize={3} usage={THREE.DynamicDrawUsage} />
-                  </bufferGeometry>
-                  <lineBasicMaterial vertexColors transparent opacity={0} depthWrite={false} />
-                </line>
-              ))}
-              {configs.map((cfg, i) => (
-                <instancedMesh
-                  key={`balls-${cfg.id}`}
-                  ref={el => {
-                    if (!ballRefs.current[face]) ballRefs.current[face] = [];
-                    ballRefs.current[face][i] = el;
-                  }}
-                  args={[null, null, WORM_BALLS]}
-                  visible={false}
-                >
-                  <sphereGeometry args={[1, 9, 9]} />
-                  <meshStandardMaterial
-                    color={col}
-                    emissive={col}
-                    emissiveIntensity={1.0}
-                    transparent
-                    opacity={0.88}
-                    roughness={0.2}
-                    metalness={0.0}
-                    depthWrite={false}
-                  />
-                </instancedMesh>
-              ))}
-            </group>
-          </group>
-        );
-      })}
-    </>
-  );
-};
 
 // ─── Shuffling cube — live Rubik's slice animation ────────────────────────────
 const STICKER_CFG = [
@@ -413,7 +141,7 @@ const ShuffleCubie = React.memo(({ cubie }) => {
           <group key={dir} position={pos} rotation={rot}>
             <mesh>
               <planeGeometry args={[0.80, 0.80]} />
-              <primitive attach="material" object={getTileStyleMaterial(_menuTileStyle, colorHex)} />
+              <primitive attach="material" object={getTileStyleMaterial(_menuFaceStyles[sticker.curr] || 'solid', colorHex)} />
             </mesh>
           </group>
         );
@@ -868,7 +596,6 @@ export const RotatingBlackCube = ({ onCubeClick }) => {
         onPointerLeave={handleCubeUp}
       >
         <ShufflingCube />
-        <FacePulses />
       </group>
     </>
   );
