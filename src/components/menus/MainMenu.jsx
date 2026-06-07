@@ -779,9 +779,9 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
   const outgoing = outgoingIndex !== null ? CAROUSEL_MODES[outgoingIndex] : null;
 
   const arrowStyle = {
-    background: 'rgba(255,255,255,0.08)', border: '1.5px solid rgba(255,255,255,0.16)',
+    background: 'rgba(0,0,0,0.22)', border: '1.5px solid rgba(255,255,255,0.36)',
     borderRadius: '50%', width: '42px', height: '42px', cursor: 'pointer', flexShrink: 0,
-    color: 'rgba(210,228,255,0.82)', fontSize: '26px', lineHeight: 1, fontWeight: 300,
+    color: '#fff', fontSize: '26px', lineHeight: 1, fontWeight: 300,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     transition: 'background 140ms ease, border-color 140ms ease, transform 100ms ease',
     WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
@@ -836,8 +836,9 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
       }}>
         <div style={{
           borderRadius: '26px', overflow: 'hidden',
-          background: 'linear-gradient(180deg, rgba(10,12,32,0.98) 0%, rgba(8,10,26,0.98) 100%)',
-          backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+          background: `linear-gradient(160deg, ${active.tileColor} 0%, ${active.tileColor}ee 100%)`,
+          boxShadow: 'inset 0 2px 0 rgba(255,255,255,0.22), inset 0 -8px 28px rgba(0,0,0,0.18)',
+          transition: 'background 350ms ease',
         }}>
 
           {/* ── Carousel section ── */}
@@ -845,7 +846,7 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
             <p style={{
               margin: '0 0 18px', textAlign: 'center',
               fontSize: '9px', fontWeight: 800, letterSpacing: '0.30em',
-              textTransform: 'uppercase', color: 'rgba(160,185,255,0.38)', fontFamily: MENU_FONT,
+              textTransform: 'uppercase', color: 'rgba(255,255,255,0.65)', fontFamily: MENU_FONT,
             }}>Choose your mode</p>
 
             {/* Card row — swipe gesture lives here only */}
@@ -917,9 +918,9 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
                   style={{
                     width: i === activeIndex ? '20px' : '6px', height: '6px',
                     borderRadius: '100px', border: 'none', cursor: 'pointer', padding: 0,
-                    background: i === activeIndex ? active.tileColor : 'rgba(255,255,255,0.20)',
+                    background: i === activeIndex ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.30)',
                     transition: 'width 300ms cubic-bezier(0.34,1.56,0.64,1), background 300ms ease',
-                    boxShadow: i === activeIndex ? `0 0 8px ${active.tileColor}88` : 'none',
+                    boxShadow: i === activeIndex ? '0 0 8px rgba(255,255,255,0.55)' : 'none',
                     WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
                   }}
                 />
@@ -928,22 +929,22 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
           </div>
 
           {/* ── Thin divider ── */}
-          <div style={{ height: '1px', background: 'rgba(255,255,255,0.06)', margin: '0 14px' }} />
+          <div style={{ height: '1px', background: 'rgba(255,255,255,0.22)', margin: '0 14px' }} />
 
           {/* ── Info section ── */}
           <div style={{ padding: '14px 14px 0' }}>
 
-            {/* Screenshot card with inner rainbow border */}
-            <div style={{ padding: '1.5px', borderRadius: '18px', background: RAINBOW_GRADIENT, boxShadow: `0 8px 28px rgba(0,0,0,0.34), 0 0 20px ${active.tileColor}18` }}>
+            {/* Screenshot card — dark glass inside the colored panel */}
+            <div style={{ padding: '1.5px', borderRadius: '18px', background: RAINBOW_GRADIENT, boxShadow: '0 8px 24px rgba(0,0,0,0.40)' }}>
               <div style={{
                 borderRadius: '16.5px', overflow: 'hidden',
-                background: `linear-gradient(145deg, ${active.tileColor}18 0%, rgba(8,10,26,0.96) 55%)`,
+                background: 'rgba(4,6,20,0.88)',
                 boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.10)',
               }}>
                 <div style={{
                   width: '100%', aspectRatio: '16/9',
                   position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: `radial-gradient(circle at 25% 20%, rgba(255,255,255,0.08), transparent 38%), linear-gradient(135deg, ${active.tileColor}18, rgba(6,10,24,0.88))`,
+                  background: 'linear-gradient(135deg, rgba(14,18,42,0.95), rgba(4,6,20,0.98))',
                   overflow: 'hidden',
                 }}>
                   {!imgError && (
@@ -955,7 +956,7 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
                     />
                   )}
                   {imgError && (
-                    <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.22em', textTransform: 'uppercase', color: `${active.tileColor}60`, fontFamily: MENU_FONT }}>
+                    <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', fontFamily: MENU_FONT }}>
                       screenshot coming soon
                     </span>
                   )}
@@ -963,18 +964,18 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
               </div>
             </div>
 
-            {/* How-to-play card with inner rainbow border */}
+            {/* How-to-play card — dark glass inside the colored panel */}
             <div style={{ marginTop: '10px', padding: '1.5px', borderRadius: '18px', background: RAINBOW_GRADIENT }}>
               <div style={{
                 padding: '14px 16px 16px', borderRadius: '16.5px',
-                background: 'linear-gradient(180deg, rgba(12,16,38,0.96), rgba(7,9,24,0.98))',
-                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)',
+                background: 'linear-gradient(180deg, rgba(6,8,24,0.92), rgba(4,6,18,0.96))',
+                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.10)',
               }}>
-                <p style={{ margin: '0 0 10px', fontSize: '9px', fontWeight: 800, letterSpacing: '0.24em', textTransform: 'uppercase', color: 'rgba(190,210,255,0.54)', fontFamily: MENU_FONT }}>How to play</p>
+                <p style={{ margin: '0 0 10px', fontSize: '9px', fontWeight: 800, letterSpacing: '0.24em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.55)', fontFamily: MENU_FONT }}>How to play</p>
                 {active.controls.map((ctrl, i) => (
                   <div key={i} style={{ display: 'flex', gap: '8px', margin: '5px 0', alignItems: 'flex-start' }}>
                     <span style={{ color: active.tileColor, fontSize: '14px', flexShrink: 0, lineHeight: 1.5 }}>·</span>
-                    <span style={{ fontSize: '13px', lineHeight: 1.55, color: 'rgba(226,235,255,0.76)', fontFamily: MENU_FONT }}>{ctrl}</span>
+                    <span style={{ fontSize: '13px', lineHeight: 1.55, color: 'rgba(230,238,255,0.82)', fontFamily: MENU_FONT }}>{ctrl}</span>
                   </div>
                 ))}
               </div>
@@ -989,16 +990,16 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
               onClick={handlePlay}
               style={{
                 display: 'block', width: '100%', padding: '16px', borderRadius: '100px',
-                border: `1.5px solid ${active.tileColor}90`,
-                background: `${active.tileColor}2a`,
-                color: active.tileColor, fontWeight: 800, fontSize: '14px', letterSpacing: '0.22em',
+                border: '1.5px solid rgba(255,255,255,0.55)',
+                background: 'rgba(0,0,0,0.28)',
+                color: '#fff', fontWeight: 800, fontSize: '14px', letterSpacing: '0.22em',
                 textTransform: 'uppercase', cursor: 'pointer', fontFamily: MENU_FONT,
-                boxShadow: `0 0 32px ${active.tileColor}24`,
+                boxShadow: '0 2px 16px rgba(0,0,0,0.30)',
                 transition: 'background 160ms ease, box-shadow 160ms ease, border-color 160ms ease',
                 WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = `${active.tileColor}42`; e.currentTarget.style.boxShadow = `0 0 48px ${active.tileColor}48`; }}
-              onMouseLeave={e => { e.currentTarget.style.background = `${active.tileColor}2a`; e.currentTarget.style.boxShadow = `0 0 32px ${active.tileColor}24`; }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(0,0,0,0.42)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.80)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(0,0,0,0.28)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.55)'; }}
             >PLAY →</button>
 
             <button
@@ -1006,14 +1007,14 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
               onClick={onBack}
               style={{
                 display: 'block', margin: '10px auto 0',
-                background: 'transparent', border: '1px solid rgba(255,255,255,0.14)',
+                background: 'transparent', border: '1px solid rgba(255,255,255,0.28)',
                 borderRadius: '100px', padding: '9px 28px',
-                color: 'rgba(180,200,255,0.50)', fontSize: '12px', fontWeight: 600,
+                color: 'rgba(255,255,255,0.60)', fontSize: '12px', fontWeight: 600,
                 letterSpacing: '0.10em', cursor: 'pointer', fontFamily: MENU_FONT,
                 WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
               }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.28)'; e.currentTarget.style.color = 'rgba(200,220,255,0.80)'; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.14)'; e.currentTarget.style.color = 'rgba(180,200,255,0.50)'; }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.55)'; e.currentTarget.style.color = 'rgba(255,255,255,0.90)'; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.28)'; e.currentTarget.style.color = 'rgba(255,255,255,0.60)'; }}
             >← Back</button>
           </div>
 
