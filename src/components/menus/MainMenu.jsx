@@ -833,6 +833,7 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
   const [displayIndex, setDisplayIndex] = useState(0); // visual index — colors + content
   const [rotationAngle, setRotationAngle] = useState(0);
   const [imgError, setImgError] = useState(false);
+  const [imgLoaded, setImgLoaded] = useState(false);
   const touchStartX = useRef(null);
   const spinTimer = useRef(null);
   const activeIndexRef = useRef(0);
@@ -849,7 +850,7 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
     };
   }, []);
 
-  useEffect(() => { setImgError(false); }, [displayIndex]);
+  useEffect(() => { setImgError(false); setImgLoaded(false); }, [displayIndex]);
 
   const navigate = useCallback((dir) => {
     if (animatingRef.current) return;
@@ -1053,7 +1054,13 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
                       <img
                         src={`${import.meta.env.BASE_URL}images/modes/${active.id}.jpg`}
                         alt={`${active.label} gameplay`}
-                        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                        style={{
+                          position: 'absolute', inset: 0, width: '100%', height: '100%',
+                          objectFit: 'cover', display: 'block',
+                          opacity: imgLoaded ? 1 : 0,
+                          transition: 'opacity 200ms ease',
+                        }}
+                        onLoad={() => setImgLoaded(true)}
                         onError={() => setImgError(true)}
                       />
                     )}
