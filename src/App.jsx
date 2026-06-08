@@ -559,6 +559,7 @@ export default function WORM3() {
 
   const handleWizardComplete = useCallback((wizardSettings) => {
     setShowFreeplayWizard(false);
+    useGameStore.getState().setRandomMode(false);
     const allStyles = ['solid', 'glossy', 'matte', 'metallic', 'carbonFiber', 'hexGrid', 'comic', 'cafeWall', 'hermanGrid', 'opticSpin', 'ouchi', 'scintillatingGrid', 'zoellner', 'kanizsa', 'grass', 'ice', 'sand', 'water', 'wood', 'circuit', 'holographic', 'pulse', 'lava', 'galaxy', 'neural'];
 
     // Build manifoldStyles — explicit per-face overrides take precedence.

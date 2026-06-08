@@ -3,7 +3,7 @@ import { useGameStore } from './useGameStore.js';
 import { COLOR_SCHEMES, TILE_STYLES } from '../utils/colorSchemes.js';
 import { clearMaterialCache } from '../3d/styles/TileStyleMaterials.jsx';
 
-const CYCLE_MS = 15000;
+const CYCLE_MS = 10000;
 
 const SCHEME_KEYS = Object.keys(COLOR_SCHEMES).filter(k => k !== 'biome' && k !== 'custom');
 const TILE_KEYS = Object.keys(TILE_STYLES);
@@ -14,8 +14,8 @@ function pick(arr) {
 
 function applyRandomStyle(setSettings, bumpTick) {
   const scheme = pick(SCHEME_KEYS);
-  const tile = pick(TILE_KEYS);
-  const manifoldStyles = { 1: tile, 2: tile, 3: tile, 4: tile, 5: tile, 6: tile };
+  const manifoldStyles = {};
+  for (let i = 1; i <= 6; i++) manifoldStyles[i] = pick(TILE_KEYS);
   clearMaterialCache();
   setSettings(prev => ({ ...prev, colorScheme: scheme, manifoldStyles }));
   bumpTick();
