@@ -35,19 +35,19 @@ const TextOverlay = ({ time }) => {
   const messages = useMemo(() => {
     const msgs = [];
 
-    // "A Rubik's Cube..." — appears as the black cube first emerges
+    // "You know the cube." — appears as the black cube first emerges
     if (time >= 0.6 && time < HINT_TILT_START) {
       msgs.push({
-        text: 'A Rubik\'s Cube with a secret...',
+        text: 'You know the cube.',
         opacity: Math.min(fadein(time, 0.6), fadeout(time, HINT_TILT_START - 0.2)),
         size: 'lg',
       });
     }
 
-    // "Six faces. Three antipodal pairs." — as blue reveals
+    // "Six faces. Billions of combinations." — as blue reveals
     if (time >= BLUE_REVEAL_START + 0.3 && time < GREEN_SHOW_START) {
       msgs.push({
-        text: 'Six faces. Three antipodal pairs.',
+        text: 'Six faces. Billions of combinations.',
         opacity: Math.min(fadein(time, BLUE_REVEAL_START + 0.3), fadeout(time, GREEN_SHOW_START - 0.3)),
         size: 'md',
         color: '#93c5fd', // blue-300
@@ -57,7 +57,7 @@ const TextOverlay = ({ time }) => {
     // Hint tilt caption
     if (time >= HINT_TILT_START + 0.2 && time < GREEN_SHOW_START) {
       msgs.push({
-        text: 'Every tile has an opposite...',
+        text: 'We connected the faces.',
         opacity: fadeWindow(time, HINT_TILT_START + 0.2, GREEN_SHOW_START),
         size: 'sm',
         italic: true,
@@ -78,7 +78,7 @@ const TextOverlay = ({ time }) => {
     // Full flip — tile turning
     if (time >= FULL_FLIP_START + 0.1 && time < FULL_FLIP_END + 0.4) {
       msgs.push({
-        text: 'Through the manifold...',
+        text: 'Flip a tile. It crosses to the other side.',
         opacity: fadeWindow(time, FULL_FLIP_START + 0.1, FULL_FLIP_END + 0.4),
         size: 'md',
         italic: true,
@@ -89,7 +89,7 @@ const TextOverlay = ({ time }) => {
     // Explosion phase
     if (time >= EXPLOSION_START + 0.3 && time < EXPLOSION_END - 0.5) {
       msgs.push({
-        text: 'Antipodal topology',
+        text: 'Upgraded.',
         opacity: fadeWindow(time, EXPLOSION_START + 0.3, EXPLOSION_END - 0.5),
         size: 'xl',
         mono: true,
@@ -111,7 +111,7 @@ const TextOverlay = ({ time }) => {
     // Implode / reassemble
     if (time >= IMPLODE_START && time < IMPLODE_END - 0.5) {
       msgs.push({
-        text: 'The cube remembers...',
+        text: 'Same cube. New physics.',
         opacity: fadeWindow(time, IMPLODE_START, IMPLODE_END - 0.5),
         size: 'md',
         italic: true,
@@ -212,7 +212,7 @@ const TextOverlay = ({ time }) => {
               color: 'rgba(255,255,255,0.5)',
               fontFamily: '"Courier New", monospace',
             }}>
-              An Interactive Topology Puzzle
+              Upgraded. Flipped.
             </p>
             <div style={{
               display: 'flex',
@@ -223,7 +223,7 @@ const TextOverlay = ({ time }) => {
               fontFamily: '"Georgia", serif',
               fontStyle: 'italic',
             }}>
-              <p style={{ margin: 0 }}>Tap any sticker to flip it through the manifold</p>
+              <p style={{ margin: 0 }}>Tap any sticker to send it through</p>
               <p style={{ margin: 0 }}>Drag to rotate and explore</p>
             </div>
           </div>
