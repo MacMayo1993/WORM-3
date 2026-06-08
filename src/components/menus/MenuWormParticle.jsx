@@ -62,7 +62,7 @@ const MenuWormParticle = ({ start, color1, startTime, onComplete }) => {
   const totalDuration = duration + retreatDur;
 
   const p = useMemo(() => ({
-    arcPhase    : Math.random() * Math.PI * 2,
+    arcPhase    : Math.random() * Math.PI,  // [0,π] keeps arc in upward hemisphere for side faces
     blinkInterval: 1.4 + Math.random() * 2.0,
     blinkDur    : 0.12,
     squishAmp   : 0.08 + Math.random() * 0.06,
@@ -142,7 +142,8 @@ const MenuWormParticle = ({ start, color1, startTime, onComplete }) => {
     const wLive = Math.sin(clockTime * 2.5) * 0.04;
 
     // Mutate pre-allocated curve points — zero allocations
-    curveData.pts[0].set(0, 0, 0).addScaledVector(_faceN, -0.20);
+    // pts[0] sits just above the surface so the worm is always visible (never inside the cube)
+    curveData.pts[0].set(0, 0, 0).addScaledVector(_faceN, 0.02);
     curveData.pts[1].set(0, 0, 0).addScaledVector(_faceN,  0.18);
     curveData.pts[2].set(0, 0, 0).addScaledVector(_faceN, 0.48).addScaledVector(_arcDir, 0.18).addScaledVector(_wigDir, wLive);
     curveData.pts[3].set(0, 0, 0).addScaledVector(_faceN, 0.58).addScaledVector(_arcDir, 0.36).addScaledVector(_wigDir, wLive * 1.2);
@@ -161,7 +162,7 @@ const MenuWormParticle = ({ start, color1, startTime, onComplete }) => {
       _tangent.subVectors(_lookPos, _headPos).normalize();
       if (_tangent.lengthSq() > 0.001) {
         _lookQuat.setFromUnitVectors(_fwdAxis, _tangent);
-        headGroupRef.current.quaternion.slerp(_lookQuat, inRetreat ? 0.25 : 0.5);
+        headGroupRef.current.quaternion.slerp(_lookQuat, inRetreat ? 0.55 : 0.5);
       }
 
       const squish = Math.sin(clockTime * p.squishFreq) * p.squishAmp;
@@ -211,24 +212,24 @@ const MenuWormParticle = ({ start, color1, startTime, onComplete }) => {
     <group position={start}>
       {/* ── Head group ────────────────────────────────────────────────────── */}
       <group ref={headGroupRef}>
-        <mesh geometry={wHeadGeo} renderOrder={5} scale={[1.16, 1.16, 1.16]} material={outlineMat} />
-        <mesh geometry={wHeadGeo} renderOrder={7} material={headMat} />
-        <mesh ref={eyeLRef} position={[-0.08, 0.10, 0.17]} geometry={wEyeGeo} renderOrder={8} material={eyeWhiteMat} />
-        <mesh ref={eyeRRef} position={[0.08, 0.10, 0.17]} geometry={wEyeGeo} renderOrder={8} material={eyeWhiteMat} />
-        <mesh position={[-0.08, 0.11, 0.20]} geometry={wPupilGeo} renderOrder={9} material={pupilMat} />
-        <mesh position={[0.08, 0.11, 0.20]} geometry={wPupilGeo} renderOrder={9} material={pupilMat} />
-        <mesh position={[0, -0.032, 0.17]} rotation={[0.25, 0, Math.PI]} renderOrder={8} geometry={wMouthGeo} material={mouthMat} />
-        <mesh ref={ant1StemRef} position={[-0.09, 0.22, 0.08]} rotation={[0, 0, 0.3]} geometry={wStemGeo} renderOrder={7} material={antennaMat} />
-        <mesh ref={ant2StemRef} position={[0.09, 0.22, 0.08]} rotation={[0, 0, -0.3]} geometry={wStemGeo} renderOrder={7} material={antennaMat} />
-        <mesh ref={ant1TipRef} position={[-0.06, 0.32, 0.08]} geometry={wTipGeo} renderOrder={8} material={tipMat} />
-        <mesh ref={ant2TipRef} position={[0.06, 0.32, 0.08]} geometry={wTipGeo} renderOrder={8} material={tipMat} />
+        <mesh geometry={wHeadGeo} renderOrder={25} scale={[1.16, 1.16, 1.16]} material={outlineMat} />
+        <mesh geometry={wHeadGeo} renderOrder={27} material={headMat} />
+        <mesh ref={eyeLRef} position={[-0.08, 0.10, 0.17]} geometry={wEyeGeo} renderOrder={28} material={eyeWhiteMat} />
+        <mesh ref={eyeRRef} position={[0.08, 0.10, 0.17]} geometry={wEyeGeo} renderOrder={28} material={eyeWhiteMat} />
+        <mesh position={[-0.08, 0.11, 0.20]} geometry={wPupilGeo} renderOrder={29} material={pupilMat} />
+        <mesh position={[0.08, 0.11, 0.20]} geometry={wPupilGeo} renderOrder={29} material={pupilMat} />
+        <mesh position={[0, -0.032, 0.17]} rotation={[0.25, 0, Math.PI]} renderOrder={28} geometry={wMouthGeo} material={mouthMat} />
+        <mesh ref={ant1StemRef} position={[-0.09, 0.22, 0.08]} rotation={[0, 0, 0.3]} geometry={wStemGeo} renderOrder={27} material={antennaMat} />
+        <mesh ref={ant2StemRef} position={[0.09, 0.22, 0.08]} rotation={[0, 0, -0.3]} geometry={wStemGeo} renderOrder={27} material={antennaMat} />
+        <mesh ref={ant1TipRef} position={[-0.06, 0.32, 0.08]} geometry={wTipGeo} renderOrder={28} material={tipMat} />
+        <mesh ref={ant2TipRef} position={[0.06, 0.32, 0.08]} geometry={wTipGeo} renderOrder={28} material={tipMat} />
       </group>
 
       {/* ── Body segments ─────────────────────────────────────────────────── */}
       {Array.from({ length: SEGMENT_COUNT }, (_, i) => (
         <group key={`seg-${i}`} ref={el => (segRefs.current[i] = el)}>
-          <mesh geometry={wSegGeos[i]} renderOrder={5} scale={[1.16, 1.16, 1.16]} material={outlineMat} />
-          <mesh renderOrder={6} geometry={wSegGeos[i]} material={segMats[i]} />
+          <mesh geometry={wSegGeos[i]} renderOrder={25} scale={[1.16, 1.16, 1.16]} material={outlineMat} />
+          <mesh renderOrder={26} geometry={wSegGeos[i]} material={segMats[i]} />
         </group>
       ))}
     </group>
