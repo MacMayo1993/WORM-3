@@ -10,15 +10,32 @@ import MenuFlipWave from './MenuFlipWave.jsx';
 import MenuTileOverlay from './MenuTileOverlay.jsx';
 import { ANTIPODAL_COLOR } from '../../utils/constants.js';
 
-// ─── Random scheme + tile style, picked once per page load ────────────────────
-const _SCHEME_KEYS = Object.keys(COLOR_SCHEMES).filter(k => k !== 'biome' && k !== 'custom');
-const _TILE_KEYS = [...CLASSIC_STYLE_KEYS, ...ANTIPODAL_STYLE_KEYS, ...LIVING_STYLE_KEYS];
-const _menuSchemeKey = _SCHEME_KEYS[Math.floor(Math.random() * _SCHEME_KEYS.length)];
-const _menuFaceStyles = {};
+// ─── Randomizable style state — re-picked every time the user taps the cube ──
+// biome is now included so its face palette appears in the rotation.
+const _SCHEME_KEYS = Object.keys(COLOR_SCHEMES).filter(k => k !== 'custom');
+const _TILE_KEYS   = [...CLASSIC_STYLE_KEYS, ...ANTIPODAL_STYLE_KEYS, ...LIVING_STYLE_KEYS];
+
+// Mutable state — rerandomizeMenuStyle() reassigns all three.
+let _menuSchemeKey  = _SCHEME_KEYS[Math.floor(Math.random() * _SCHEME_KEYS.length)];
+let _menuFaceStyles = {};
 for (let f = 1; f <= 6; f++) {
   _menuFaceStyles[f] = _TILE_KEYS[Math.floor(Math.random() * _TILE_KEYS.length)];
 }
-const MENU_FACE_COLORS = COLOR_SCHEMES[_menuSchemeKey]; // { 1: hex, 2: hex, ... }
+let MENU_FACE_COLORS = COLOR_SCHEMES[_menuSchemeKey] ?? COLOR_SCHEMES['classic']; // { 1: hex, 2: hex, ... }
+
+// Called by RotatingBlackCube after a direct cube-tap shake.
+// Also available externally so tests / storybook can reset state.
+function rerandomizeMenuStyle() {
+  _menuSchemeKey  = _SCHEME_KEYS[Math.floor(Math.random() * _SCHEME_KEYS.length)];
+  MENU_FACE_COLORS = COLOR_SCHEMES[_menuSchemeKey] ?? COLOR_SCHEMES['classic'];
+  for (let f = 1; f <= 6; f++) {
+    _menuFaceStyles[f] = _TILE_KEYS[Math.floor(Math.random() * _TILE_KEYS.length)];
+  }
+}
+
+// Callback set by ShufflingCube so RotatingBlackCube can trigger a re-scramble
+// + re-render without prop drilling through multiple layers.
+let _triggerStyleRefresh = null;
 
 const FACE_COLOR = {
   PX: '#3b82f6', NX: '#22c55e',
@@ -172,6 +189,7 @@ const ShufflingCube = ({ onFlip }) => {
   });
 
   const [flipWaves, setFlipWaves] = useState([]);
+  const [styleVersion, setStyleVersion] = useState(0);
   const cubeStateRef = useRef(cubeState);
   cubeStateRef.current = cubeState;
   const sliceGroupRef = useRef();
@@ -189,6 +207,25 @@ const ShufflingCube = ({ onFlip }) => {
   const handleWormComplete = useCallback(() => {
     wormCompletedRef.current = true;
   }, []);
+
+  // Register the style-refresh callback so RotatingBlackCube can trigger a full
+  // re-scramble + re-render after the user taps the cube directly.
+  useEffect(() => {
+    _triggerStyleRefresh = () => {
+      // Re-scramble cubies so newly picked colors look intentional, not leftover.
+      let cubies = makeCubies(3);
+      for (let i = 0; i < 12; i++) {
+        const m = MIDDLE_MOVES[Math.floor(Math.random() * MIDDLE_MOVES.length)];
+        cubies = rotateSliceCubies(cubies, 3, m.ax, m.sl, m.d);
+      }
+      setCubeState({ cubies, rotating: null });
+      setFlipWaves([]);
+      pipelineRef.current = 'idle';
+      nextSpawnAt.current = INITIAL_WORM_DELAY;
+      setStyleVersion(v => v + 1);
+    };
+    return () => { _triggerStyleRefresh = null; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useFrame(({ clock }) => {
     if (_carouselActive) return;
@@ -276,11 +313,11 @@ const ShufflingCube = ({ onFlip }) => {
   return (
     <>
       {staticCubies.map(c => (
-        <ShuffleCubie key={`${c.x}-${c.y}-${c.z}`} cubie={c} />
+        <ShuffleCubie key={`${c.x}-${c.y}-${c.z}-${styleVersion}`} cubie={c} />
       ))}
       <group ref={sliceGroupRef}>
         {sliceCubies.map(c => (
-          <ShuffleCubie key={`${c.x}-${c.y}-${c.z}`} cubie={c} />
+          <ShuffleCubie key={`${c.x}-${c.y}-${c.z}-${styleVersion}`} cubie={c} />
         ))}
       </group>
       {flipWaves.map(wave => (
@@ -570,6 +607,7 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
   const cubeRef = useRef();
   const shaking = useRef(false);
   const shakeStart = useRef(0);
+  const shakeIsExternalRef = useRef(false); // true = START button, false = direct tap
   const cubeTargetScale = useRef(1.022);
   const cubeCurrentScale = useRef(1.022);
   const onCubeClickRef = useRef(onCubeClick);
@@ -582,6 +620,7 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
 
     if (_externalShakeNeeded && !shaking.current) {
       _externalShakeNeeded = false;
+      shakeIsExternalRef.current = true;
       shaking.current = true;
       shakeStart.current = Date.now();
       cubeTargetScale.current = 0.950;
@@ -596,10 +635,12 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
         shaking.current = false;
         cubeTargetScale.current = 1.022;
         cubeRef.current.position.set(0, 0.45, 0);
-        if (_onShakeComplete) {
-          _onShakeComplete();
+        if (shakeIsExternalRef.current) {
+          shakeIsExternalRef.current = false;
+          _onShakeComplete?.();
         } else {
-          onCubeClickRef.current?.();
+          rerandomizeMenuStyle();
+          _triggerStyleRefresh?.();
         }
       } else {
         const intensity = 0.10 * (1 - elapsed / 540);
