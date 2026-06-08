@@ -138,7 +138,7 @@ const TextOverlay = ({ time }) => {
       alignItems: 'center',
       justifyContent: 'flex-end',
       paddingBottom: '80px',
-      fontFamily: '"Georgia", "Times New Roman", serif',
+      fontFamily: "'Bungee', cursive",
     }}>
       {/* Stacked message area */}
       <div style={{
@@ -157,11 +157,9 @@ const TextOverlay = ({ time }) => {
               color: msg.color || 'rgba(255, 255, 255, 0.92)',
               fontSize: sizeMap[msg.size] || '16px',
               fontStyle: msg.italic ? 'italic' : 'normal',
-              fontFamily: msg.mono
-                ? '"Courier New", "Courier", monospace'
-                : '"Georgia", "Times New Roman", serif',
-              fontWeight: msg.mono ? 600 : 400,
-              letterSpacing: msg.mono ? '0.12em' : '0.02em',
+              fontFamily: "'Bungee', cursive",
+              fontWeight: 400,
+              letterSpacing: msg.mono ? '0.10em' : '0.04em',
               textShadow: `0 0 20px ${msg.color || 'rgba(255,255,255,0.4)'}, 0 2px 6px rgba(0,0,0,0.8)`,
               transition: 'opacity 0.1s linear',
               textAlign: 'center',
@@ -234,8 +232,7 @@ const TextOverlay = ({ time }) => {
               gap: '8px',
               fontSize: '14px',
               color: 'rgba(255,255,255,0.7)',
-              fontFamily: '"Georgia", serif',
-              fontStyle: 'italic',
+              fontFamily: "'Bungee', cursive",
             }}>
               <p style={{ margin: 0 }}>Tap any sticker to send it through</p>
               <p style={{ margin: 0 }}>Drag to rotate and explore</p>
