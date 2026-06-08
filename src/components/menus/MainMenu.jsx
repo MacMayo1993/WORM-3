@@ -835,7 +835,9 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
   const [imgError, setImgError] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
   const [infoVisible, setInfoVisible] = useState(true);
+  const [pendingTileColor, setPendingTileColor] = useState(CAROUSEL_MODES[0].tileColor);
   const touchStartX = useRef(null);
+  const mouseStartX = useRef(null);
   const spinTimer = useRef(null);
   const fadeTimer = useRef(null);
   const activeIndexRef = useRef(0);
@@ -866,11 +868,13 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
     animatingRef.current = true;
     if (spinTimer.current) clearTimeout(spinTimer.current);
     if (fadeTimer.current) clearTimeout(fadeTimer.current);
+    const newIdx = (activeIndexRef.current + dir + N) % N;
+    setPendingTileColor(CAROUSEL_MODES[newIdx].tileColor);
     setRotationAngle(a => a - dir * PRISM_FACE_ANGLE);
-    setActiveIndex(i => (i + dir + N) % N);
+    setActiveIndex(newIdx);
     setInfoVisible(false);
     spinTimer.current = setTimeout(() => {
-      commitDisplay((activeIndexRef.current));
+      commitDisplay(newIdx);
     }, 540);
   }, [N, commitDisplay]);
 
@@ -885,6 +889,7 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
     animatingRef.current = true;
     if (spinTimer.current) clearTimeout(spinTimer.current);
     if (fadeTimer.current) clearTimeout(fadeTimer.current);
+    setPendingTileColor(CAROUSEL_MODES[targetIndex].tileColor);
     setRotationAngle(a => a - dir * steps * PRISM_FACE_ANGLE);
     setActiveIndex(targetIndex);
     setInfoVisible(false);
@@ -917,10 +922,11 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
   const active = CAROUSEL_MODES[displayIndex]; // drives panel colors + info content
 
   const arrowStyle = {
-    background: 'rgba(0,0,0,0.22)', border: '1.5px solid rgba(255,255,255,0.36)',
+    background: 'rgba(0,0,0,0.42)', border: '1.5px solid rgba(255,255,255,0.65)',
     borderRadius: '50%', width: '42px', height: '42px', cursor: 'pointer', flexShrink: 0,
     color: '#fff', fontSize: '26px', lineHeight: 1, fontWeight: 300,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.40)',
     transition: 'background 140ms ease, border-color 140ms ease, transform 100ms ease',
     WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
   };
@@ -949,12 +955,12 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
         marginBottom: 'max(20px, env(safe-area-inset-bottom, 20px))',
         padding: '2px', borderRadius: '28px',
         background: RAINBOW_GRADIENT,
-        boxShadow: `0 0 60px ${active.tileColor}28, 0 24px 64px rgba(0,0,0,0.65)`,
+        boxShadow: `0 0 60px ${pendingTileColor}28, 0 24px 64px rgba(0,0,0,0.65)`,
         transition: 'box-shadow 540ms ease',
       }}>
         <div style={{
           borderRadius: '26px',
-          backgroundColor: active.tileColor,
+          backgroundColor: pendingTileColor,
           boxShadow: 'inset 0 2px 0 rgba(255,255,255,0.22), inset 0 -8px 28px rgba(0,0,0,0.18)',
           transition: 'background-color 540ms ease',
         }}>
@@ -967,9 +973,9 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
               textTransform: 'uppercase', color: 'rgba(255,255,255,0.65)', fontFamily: MENU_FONT,
             }}>Choose your mode</p>
 
-            {/* Card row — swipe gesture lives here only */}
+            {/* Card row — swipe (touch) + drag (mouse) + arrow buttons */}
             <div
-              style={{ display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'center' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'center', userSelect: 'none' }}
               onTouchStart={e => { touchStartX.current = e.touches[0].clientX; }}
               onTouchEnd={e => {
                 if (touchStartX.current === null) return;
@@ -977,6 +983,14 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
                 touchStartX.current = null;
                 if (Math.abs(delta) > 40) navigate(delta < 0 ? 1 : -1);
               }}
+              onMouseDown={e => { mouseStartX.current = e.clientX; }}
+              onMouseUp={e => {
+                if (mouseStartX.current === null) return;
+                const delta = e.clientX - mouseStartX.current;
+                mouseStartX.current = null;
+                if (Math.abs(delta) > 40) navigate(delta < 0 ? 1 : -1);
+              }}
+              onMouseLeave={() => { mouseStartX.current = null; }}
             >
               <button
                 type="button"
