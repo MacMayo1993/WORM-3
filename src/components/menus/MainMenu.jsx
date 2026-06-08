@@ -669,6 +669,142 @@ const CAROUSEL_MODES = [
   },
 ];
 
+// ─── How-to-play mini tutorial ───────────────────────────────────────────────
+
+const HOW_TO_PLAY_STEPS = [
+  {
+    title: 'Welcome to WORM³',
+    lines: [
+      "A Rubik's Cube puzzle built on real projective plane topology.",
+      'Opposite faces are linked — flip one sticker and its antipodal partner changes too.',
+      'Solve the cube while managing wormhole connections across all six faces.',
+    ],
+  },
+  {
+    title: 'Antipodal Pairs',
+    lines: [
+      'Red ↔ Orange  ·  Green ↔ Blue  ·  White ↔ Yellow',
+      'Each face is permanently paired with the face directly across from it.',
+      'Small dot on a sticker = its original color before any flips.',
+    ],
+  },
+  {
+    title: 'Wormhole Tunnels',
+    lines: [
+      'Flip any sticker and a glowing tunnel appears connecting it to its partner.',
+      'Tunnels grow thicker and spark with electricity as flips accumulate.',
+      'Tally marks on each sticker count its total wormhole journeys.',
+      'Press T to toggle tunnel visibility on or off.',
+    ],
+  },
+  {
+    title: 'Basic Controls',
+    lines: [
+      'Drag anywhere on the canvas — rotate the cube freely 360°',
+      'Drag on a sticker — twist that row, column, or depth slice',
+      'Hold Shift + drag on a face — rotate the entire face CW / CCW',
+      'Mobile: tap and drag for all interactions, full touch support',
+    ],
+  },
+  {
+    title: 'Flipping Stickers',
+    lines: [
+      'Press G or tap Flip to toggle Flip Mode — then tap any sticker',
+      'Right-click (desktop) or long-press (mobile) to flip without Flip Mode',
+      'Press F to flip the sticker under the keyboard cursor',
+    ],
+  },
+  {
+    title: 'Visual Modes',
+    lines: [
+      'Press V to cycle: Classic → Grid → Sudokube → Colors',
+      'Classic: solid face colors  ·  Grid: manifold IDs (M1-001)',
+      'Sudokube: Latin square numbers  ·  Colors: custom palette',
+      'X — explode view  ·  T — tunnels  ·  N — flat net panel',
+    ],
+  },
+  {
+    title: 'Chaos (Disparity) Mode',
+    lines: [
+      'Press C or tap Chaos to toggle Disparity Mode.',
+      'Flipped stickers spread instability to their neighbors over time.',
+      'Level 1–5: occasional cascades → deep-manifold surges.',
+      'AUTO: cube rotates automatically based on instability level.',
+    ],
+  },
+  {
+    title: 'Keyboard Shortcuts',
+    lines: [
+      'Arrow Keys — cursor  ·  W/S — column  ·  A/D — row  ·  Q/E — face',
+      'G — flip mode  ·  F — flip at cursor  ·  C — chaos  ·  V — visual mode',
+      'X — explode  ·  T — tunnels  ·  N — net panel',
+      'H or ? — help  ·  Esc — close menus',
+    ],
+  },
+  {
+    title: 'Victory Conditions',
+    lines: [
+      'Classic: all six faces show a single uniform color',
+      'Sudokube: valid Latin squares on all faces (no repeats per row/col)',
+      'Ultimate: Classic AND Sudokube simultaneously',
+      'WORM³: solve after every sticker has traveled through a wormhole at least once',
+    ],
+  },
+];
+
+const HowToPlayMini = ({ tileColor }) => {
+  const [tutStep, setTutStep] = useState(0);
+  const total = HOW_TO_PLAY_STEPS.length;
+  const cur = HOW_TO_PLAY_STEPS[tutStep];
+  return (
+    <div style={{ padding: '1.5px', borderRadius: '18px', background: RAINBOW_GRADIENT, boxShadow: '0 8px 24px rgba(0,0,0,0.40)' }}>
+      <div style={{
+        borderRadius: '16.5px',
+        background: 'rgba(4,6,20,0.92)',
+        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.10)',
+        padding: '14px 16px 12px',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '9px' }}>
+          <p style={{ margin: 0, fontSize: '9px', fontWeight: 800, letterSpacing: '0.24em', textTransform: 'uppercase', color: tileColor, fontFamily: MENU_FONT }}>{cur.title}</p>
+          <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.40)', fontFamily: MENU_FONT }}>{tutStep + 1} / {total}</span>
+        </div>
+        {cur.lines.map((line, i) => (
+          <div key={i} style={{ display: 'flex', gap: '7px', margin: '4px 0', alignItems: 'flex-start' }}>
+            <span style={{ color: tileColor, fontSize: '14px', flexShrink: 0, lineHeight: 1.4 }}>·</span>
+            <span style={{ fontSize: '12px', lineHeight: 1.5, color: 'rgba(230,238,255,0.82)', fontFamily: MENU_FONT }}>{line}</span>
+          </div>
+        ))}
+        <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', marginTop: '12px' }}>
+          <button
+            type="button"
+            disabled={tutStep === 0}
+            onClick={() => setTutStep(t => t - 1)}
+            style={{
+              background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.20)',
+              borderRadius: '100px', color: tutStep === 0 ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.75)',
+              fontSize: '14px', width: '28px', height: '28px', cursor: tutStep === 0 ? 'default' : 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: MENU_FONT,
+              WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
+            }}
+          >‹</button>
+          <button
+            type="button"
+            disabled={tutStep === total - 1}
+            onClick={() => setTutStep(t => t + 1)}
+            style={{
+              background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.20)',
+              borderRadius: '100px', color: tutStep === total - 1 ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.75)',
+              fontSize: '14px', width: '28px', height: '28px', cursor: tutStep === total - 1 ? 'default' : 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: MENU_FONT,
+              WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
+            }}
+          >›</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── Cube-tile card sub-components ───────────────────────────────────────────
 
 // Fills its container — animation classes applied to the wrapper div
@@ -897,35 +1033,39 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
           {/* ── Info section ── */}
           <div style={{ padding: '14px 14px 0' }}>
 
-            {/* Screenshot card — dark glass inside the colored panel */}
-            <div style={{ padding: '1.5px', borderRadius: '18px', background: RAINBOW_GRADIENT, boxShadow: '0 8px 24px rgba(0,0,0,0.40)' }}>
-              <div style={{
-                borderRadius: '16.5px', overflow: 'hidden',
-                background: 'rgba(4,6,20,0.88)',
-                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.10)',
-              }}>
+            {/* Screenshot card or how-to-play mini widget */}
+            {active.id === 'how-to-play' ? (
+              <HowToPlayMini tileColor={active.tileColor} />
+            ) : (
+              <div style={{ padding: '1.5px', borderRadius: '18px', background: RAINBOW_GRADIENT, boxShadow: '0 8px 24px rgba(0,0,0,0.40)' }}>
                 <div style={{
-                  width: '100%', aspectRatio: '16/9',
-                  position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: 'linear-gradient(135deg, rgba(14,18,42,0.95), rgba(4,6,20,0.98))',
-                  overflow: 'hidden',
+                  borderRadius: '16.5px', overflow: 'hidden',
+                  background: 'rgba(4,6,20,0.88)',
+                  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.10)',
                 }}>
-                  {!imgError && (
-                    <img
-                      src={`${import.meta.env.BASE_URL}images/modes/${active.id}.jpg`}
-                      alt={`${active.label} gameplay`}
-                      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                      onError={() => setImgError(true)}
-                    />
-                  )}
-                  {imgError && (
-                    <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', fontFamily: MENU_FONT }}>
-                      screenshot coming soon
-                    </span>
-                  )}
+                  <div style={{
+                    width: '100%', aspectRatio: '16/9',
+                    position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: 'linear-gradient(135deg, rgba(14,18,42,0.95), rgba(4,6,20,0.98))',
+                    overflow: 'hidden',
+                  }}>
+                    {!imgError && (
+                      <img
+                        src={`${import.meta.env.BASE_URL}images/modes/${active.id}.jpg`}
+                        alt={`${active.label} gameplay`}
+                        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                        onError={() => setImgError(true)}
+                      />
+                    )}
+                    {imgError && (
+                      <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', fontFamily: MENU_FONT }}>
+                        screenshot coming soon
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* How-to-play card — dark glass inside the colored panel */}
             <div style={{ marginTop: '10px', padding: '1.5px', borderRadius: '18px', background: RAINBOW_GRADIENT }}>

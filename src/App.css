@@ -742,9 +742,8 @@ button:focus-visible,
   width: 100%;
   height: 100%;
   height: 100dvh;
-  /* Use dynamic viewport height on mobile */
-  background: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(12px);
+  background: rgba(6, 8, 22, 0.80);
+  backdrop-filter: blur(24px);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -754,18 +753,19 @@ button:focus-visible,
 }
 
 .tutorial-card {
-  background: var(--surface-base);
-  border: 1px solid var(--border-light);
+  background: rgba(10, 12, 30, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.10);
   padding: 2.5rem;
   max-width: 540px;
   width: 90%;
   max-height: 80%;
   max-height: calc(100dvh - 40px - var(--safe-area-inset-top) - var(--safe-area-inset-bottom));
   overflow-y: auto;
-  border-radius: 16px;
-  backdrop-filter: blur(20px);
-  box-shadow: var(--shadow-xl);
-  color: var(--text-primary);
+  border-radius: 20px;
+  backdrop-filter: blur(24px);
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.60), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  color: #e8edf8;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
 }
 
 .tutorial-actions {
@@ -775,23 +775,23 @@ button:focus-visible,
 }
 
 .bauhaus-btn {
-  padding: 12px 24px;
-  border: none;
-  background: var(--rubiks-blue);
+  padding: 10px 22px;
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  background: rgba(0, 0, 0, 0.28);
   color: #ffffff;
   cursor: pointer;
-  font-weight: 500;
-  font-family: 'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  letter-spacing: 0.02em;
-  transition: all 0.2s ease;
-  border-radius: 8px;
-  box-shadow: var(--shadow-md);
+  font-weight: 700;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  border-radius: 100px;
 }
 
 .bauhaus-btn:hover {
-  background: #1565c0;
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.65);
 }
 
 /* Drag Guide */

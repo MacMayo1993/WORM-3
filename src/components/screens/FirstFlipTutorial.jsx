@@ -1,267 +1,277 @@
 import React, { useState } from 'react';
 import { FACE_COLORS } from '../../utils/constants.js';
 
+const FONT = "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif";
+
+const steps = [
+  {
+    title: "You Just Made an Antipodal Flip!",
+    subtitle: "Your first journey through the manifold",
+    content: (
+      <>
+        <p style={{ margin: '0 0 14px 0' }}>
+          That color change you just saw? You sent a sticker through an <strong>antipodal tunnel</strong>—a wormhole connecting two opposite points on the cube's surface.
+        </p>
+        <p style={{ margin: '0 0 14px 0' }}>
+          In WORM³, opposite faces of the cube are secretly linked. Flip a sticker on one face and its partner on the opposite face changes color simultaneously.
+        </p>
+        <p style={{ margin: 0, color: 'rgba(200, 220, 255, 0.60)', fontStyle: 'italic' }}>
+          "Walk far enough in any direction and you return from the other side—inverted."
+        </p>
+      </>
+    ),
+  },
+  {
+    title: "Antipodal Pairs",
+    subtitle: "Every point has an opposite",
+    content: (
+      <>
+        <p style={{ margin: '0 0 14px 0' }}>Each face is permanently paired with the face directly across from it:</p>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          gap: '20px',
+          margin: '0 0 14px 0',
+          fontSize: '14px',
+          flexWrap: 'wrap',
+        }}>
+          <span><span style={{ color: FACE_COLORS[1] }}>■</span> Red ↔ Orange <span style={{ color: FACE_COLORS[4] }}>■</span></span>
+          <span><span style={{ color: FACE_COLORS[5] }}>■</span> Blue ↔ Green <span style={{ color: FACE_COLORS[2] }}>■</span></span>
+          <span><span style={{ color: FACE_COLORS[3] }}>■</span> White ↔ Yellow <span style={{ color: FACE_COLORS[6] }}>■</span></span>
+        </div>
+        <p style={{ margin: '0 0 10px 0' }}>
+          When a sticker flips, it takes on its <strong>antipodal color</strong>. The small dot on a flipped sticker shows its original color—a breadcrumb of where it came from.
+        </p>
+        <p style={{ margin: 0, color: 'rgba(200, 220, 255, 0.60)' }}>
+          Every flip affects two stickers at once: one on each side of the cube.
+        </p>
+      </>
+    ),
+  },
+  {
+    title: "Parity & Orientation",
+    subtitle: "The mathematics of flipping",
+    content: (
+      <>
+        <p style={{ margin: '0 0 14px 0' }}>
+          The <strong>EVEN / ODD</strong> parity indicator tracks the mathematical signature of all your flips combined.
+        </p>
+        <p style={{ margin: '0 0 14px 0' }}>
+          <strong>Even parity</strong> — the cube can return to its original state through flips alone.<br />
+          <strong>Odd parity</strong> — something is fundamentally "twisted" and needs an odd number of additional flips to unwind.
+        </p>
+        <p style={{ margin: '0 0 14px 0' }}>
+          <strong>Tally marks</strong> on each sticker count how many times it has traveled through the manifold. Two stickers showing the same color can have entirely different histories.
+        </p>
+        <p style={{ margin: 0, color: 'rgba(200, 220, 255, 0.60)', fontStyle: 'italic' }}>
+          This hidden memory of transformation is called <em>orientation</em>.
+        </p>
+      </>
+    ),
+  },
+  {
+    title: "Disparity Mode",
+    subtitle: "When the manifold fights back",
+    content: (
+      <>
+        <p style={{ margin: '0 0 14px 0' }}>
+          <strong>Disparity (Chaos) Mode</strong> introduces instability. Flipped stickers at the edges of face groups can spontaneously cascade to their neighbors.
+        </p>
+        <p style={{ margin: '0 0 10px 0' }}>Levels 1–5 control how aggressively chaos spreads:</p>
+        <ul style={{ margin: '0 0 14px 0', paddingLeft: '20px', fontSize: '13px', lineHeight: 1.7 }}>
+          <li><strong>L1:</strong> Gentle — occasional cascades</li>
+          <li><strong>L2:</strong> Moderate — regular spreading</li>
+          <li><strong>L3:</strong> Aggressive — rapid propagation</li>
+          <li><strong>L4:</strong> Heavy sustained chaos</li>
+          <li><strong>L5:</strong> Deep-manifold surges — strong hops with pacing control</li>
+        </ul>
+        <p style={{ margin: 0, color: 'rgba(200, 220, 255, 0.60)' }}>
+          Toggle Disparity Mode with the <strong>C</strong> key or the Chaos button in the menu.
+        </p>
+      </>
+    ),
+  },
+  {
+    title: "The Art of Solving",
+    subtitle: "Speed, strategy & elegance",
+    content: (
+      <>
+        <p style={{ margin: '0 0 10px 0' }}>Tips for mastering WORM³:</p>
+        <ul style={{ margin: '0 0 14px 0', paddingLeft: '20px', fontSize: '13px', lineHeight: 1.8 }}>
+          <li>Use <strong>Explode view (X)</strong> to see all antipodal connections clearly</li>
+          <li>Track parity — plan flips to stay on even parity when possible</li>
+          <li>In Disparity Mode, work from the center outward to minimize cascade spread</li>
+          <li>For WORM³ victory, ensure every sticker has flipped before your final solve</li>
+          <li>Use <strong>Teach Mode</strong> (available for 3×3) to learn step-by-step algorithms</li>
+        </ul>
+        <p style={{ margin: 0, color: 'rgba(200, 220, 255, 0.60)', fontStyle: 'italic' }}>
+          The topology is your friend once you learn to see it. Good luck, explorer!
+        </p>
+      </>
+    ),
+  },
+];
+
 const FirstFlipTutorial = ({ onClose, onMainMenu }) => {
   const [step, setStep] = useState(0);
-
-  const colors = {
-    ink: '#582f0e',
-    inkMedium: '#7f5539',
-    burntOrange: '#bc6c25',
-    avocado: '#606c38',
-    paper: '#f2e8cf',
-    paperCream: '#fefae0'
-  };
+  const cur = steps[step];
+  const total = steps.length;
 
   return (
     <div style={{
       position: 'fixed',
       inset: 0,
-      background: 'rgba(88, 47, 14, 0.7)',
-      backdropFilter: 'blur(4px)',
+      background: 'rgba(6, 8, 22, 0.80)',
+      backdropFilter: 'blur(24px)',
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
       zIndex: 2000,
-      fontFamily: 'Georgia, serif',
+      fontFamily: FONT,
       height: '100dvh',
       padding: 'env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px)',
-      boxSizing: 'border-box'
+      boxSizing: 'border-box',
     }}>
       <div style={{
-        background: colors.paper,
-        border: `3px solid ${colors.burntOrange}`,
-        borderRadius: '4px',
-        padding: '32px 40px',
-        maxWidth: '580px',
+        background: 'rgba(10, 12, 30, 0.96)',
+        border: '1px solid rgba(255, 255, 255, 0.10)',
+        borderRadius: '20px',
+        padding: '32px 36px',
+        maxWidth: '560px',
         width: '90%',
         maxHeight: 'calc(100dvh - 60px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))',
         overflow: 'auto',
-        boxShadow: `4px 4px 0 rgba(88, 47, 14, 0.2), 0 12px 40px rgba(88, 47, 14, 0.4)`,
-        boxSizing: 'border-box'
+        boxShadow: '0 32px 80px rgba(0, 0, 0, 0.60), 0 0 0 1px rgba(255, 255, 255, 0.06)',
+        boxSizing: 'border-box',
+        color: '#e8edf8',
       }}>
         <h2 style={{
-          margin: '0 0 8px 0',
-          fontSize: '28px',
-          fontStyle: 'italic',
-          fontWeight: 700,
-          color: colors.ink,
-          textAlign: 'center'
+          margin: '0 0 4px 0',
+          fontSize: '22px',
+          fontWeight: 800,
+          color: '#e8edf8',
+          letterSpacing: '-0.01em',
         }}>
-          {step === 0 && "You Just Made an Antipodal Flip!"}
-          {step === 1 && "Antipodal Pairs"}
-          {step === 2 && "Parity & Orientation"}
-          {step === 3 && "Disparity Mode"}
-          {step === 4 && "The Art of Solving"}
+          {cur.title}
         </h2>
 
         <p style={{
-          textAlign: 'center',
+          textAlign: 'left',
           fontSize: '11px',
-          letterSpacing: '0.15em',
+          letterSpacing: '0.14em',
           textTransform: 'uppercase',
-          color: colors.burntOrange,
-          margin: '0 0 24px 0'
+          color: 'rgba(200, 220, 255, 0.50)',
+          margin: '0 0 20px 0',
         }}>
-          {step === 0 && "Your first flip through the manifold"}
-          {step === 1 && "Every point has an opposite"}
-          {step === 2 && "The mathematics of flipping"}
-          {step === 3 && "When the manifold fights back"}
-          {step === 4 && "Speed, strategy & elegance"}
+          {cur.subtitle}
         </p>
 
         <div style={{
-          background: colors.paperCream,
-          border: `1px solid rgba(188, 108, 37, 0.3)`,
-          padding: '20px 24px',
-          marginBottom: '24px',
-          fontSize: '15px',
-          lineHeight: 1.8,
-          color: colors.inkMedium
+          background: 'rgba(255, 255, 255, 0.04)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          borderRadius: '12px',
+          padding: '18px 20px',
+          marginBottom: '22px',
+          fontSize: '14px',
+          lineHeight: 1.7,
+          color: 'rgba(200, 220, 255, 0.88)',
         }}>
-          {step === 0 && (
-            <>
-              <p style={{ margin: '0 0 16px 0' }}>
-                That color flip you just witnessed? You sent a sticker through an <strong style={{ color: colors.ink }}>antipodal tunnel</strong> —
-                a path connecting opposite points on the cube's surface.
-              </p>
-              <p style={{ margin: '0 0 16px 0' }}>
-                In the <strong style={{ color: colors.ink }}>Real Projective Plane</strong>, opposite points are considered
-                <em> the same point</em>. Walking infinitely far in any direction brings you back — but <em>inverted</em>.
-              </p>
-              <p style={{ margin: 0, fontStyle: 'italic', color: colors.burntOrange }}>
-                "Imagine walking so far you return from the other side..."
-              </p>
-            </>
-          )}
-
-          {step === 1 && (
-            <>
-              <p style={{ margin: '0 0 16px 0' }}>
-                Each face has a partner on the opposite side of the cube:
-              </p>
-              <div style={{
-                display: 'flex',
-                justifyContent: 'center',
-                gap: '24px',
-                margin: '16px 0',
-                fontSize: '14px'
-              }}>
-                <span><span style={{ color: FACE_COLORS[1] }}>■</span> Red ↔ Orange <span style={{ color: FACE_COLORS[4] }}>■</span></span>
-                <span><span style={{ color: FACE_COLORS[5] }}>■</span> Blue ↔ Green <span style={{ color: FACE_COLORS[2] }}>■</span></span>
-                <span><span style={{ color: FACE_COLORS[3] }}>■</span> White ↔ Yellow <span style={{ color: FACE_COLORS[6] }}>■</span></span>
-              </div>
-              <p style={{ margin: '16px 0 0 0' }}>
-                When you flip a sticker, it transforms into its <strong style={{ color: colors.ink }}>antipodal color</strong>.
-                The small circle on flipped tiles shows their <em>original</em> color — a breadcrumb trail of their journey.
-              </p>
-            </>
-          )}
-
-          {step === 2 && (
-            <>
-              <p style={{ margin: '0 0 16px 0' }}>
-                Notice the <strong style={{ color: colors.avocado }}>EVEN</strong> / <strong style={{ color: colors.burntOrange }}>ODD</strong> indicator?
-                That's <strong style={{ color: colors.ink }}>parity</strong> — the mathematical signature of your flips.
-              </p>
-              <p style={{ margin: '0 0 16px 0' }}>
-                • <strong>Even parity:</strong> The cube can return to its original state<br />
-                • <strong>Odd parity:</strong> Something is fundamentally "twisted"
-              </p>
-              <p style={{ margin: '0 0 16px 0' }}>
-                The <strong style={{ color: colors.ink }}>tally marks</strong> on each sticker count its journeys through the manifold.
-                A tile flipped 1000 times carries a different history than a fresh tile — even if they show the same color!
-              </p>
-              <p style={{ margin: 0, fontStyle: 'italic' }}>
-                This is <em>orientation</em>: the hidden memory of transformation.
-              </p>
-            </>
-          )}
-
-          {step === 3 && (
-            <>
-              <p style={{ margin: '0 0 16px 0' }}>
-                <strong style={{ color: '#9c4a1a' }}>Disparity Mode</strong> introduces <em>instability</em>.
-                Flipped tiles at the cube's edges can spontaneously cascade to their neighbors!
-              </p>
-              <p style={{ margin: '0 0 16px 0' }}>
-                <strong>Levels 1-5</strong> control how aggressively chaos spreads:
-              </p>
-              <ul style={{ margin: '0 0 16px 0', paddingLeft: '24px' }}>
-                <li>L1: Gentle — occasional cascades</li>
-                <li>L2: Moderate — regular spreading</li>
-                <li>L3: Aggressive — rapid propagation</li>
-                <li>L4: Maximum entropy — sustained chaos</li>
-                <li>L5: Deep-manifold surges — stronger hops with pacing control</li>
-              </ul>
-              <p style={{ margin: 0 }}>
-                Watch the <strong>Instability Tracker</strong> — when it goes critical, expect fireworks!
-              </p>
-            </>
-          )}
-
-          {step === 4 && (
-            <>
-              <p style={{ margin: '0 0 16px 0' }}>
-                <strong style={{ color: colors.ink }}>Solving faster</strong> isn't just about speed — it's about <em>understanding the structure</em>.
-              </p>
-              <p style={{ margin: '0 0 16px 0' }}>
-                <strong>Tips for mastery:</strong>
-              </p>
-              <ul style={{ margin: '0 0 16px 0', paddingLeft: '24px' }}>
-                <li>Use <strong>EXPLODE</strong> view to see all antipodal connections</li>
-                <li>Track parity — plan flips to maintain even state when possible</li>
-                <li>In Disparity Mode, work from center outward to minimize cascades</li>
-                <li>The <strong>face progress bars</strong> show which colors need attention</li>
-              </ul>
-              <p style={{ margin: 0, fontStyle: 'italic', color: colors.burntOrange }}>
-                The topology is your friend once you learn to see it. Good luck, explorer!
-              </p>
-            </>
-          )}
+          {cur.content}
         </div>
 
-        {/* Step indicators */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'center',
-          gap: '8px',
-          marginBottom: '20px'
-        }}>
-          {[0, 1, 2, 3, 4].map(i => (
-            <div
+        {/* Step dots */}
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '7px', marginBottom: '20px' }}>
+          {steps.map((_, i) => (
+            <button
               key={i}
+              type="button"
               onClick={() => setStep(i)}
               style={{
-                width: '10px',
-                height: '10px',
-                borderRadius: '50%',
-                background: step === i ? colors.burntOrange : 'rgba(188, 108, 37, 0.3)',
+                width: i === step ? '20px' : '6px',
+                height: '6px',
+                borderRadius: '100px',
+                border: 'none',
                 cursor: 'pointer',
-                transition: 'background 0.2s'
+                padding: 0,
+                background: i === step ? 'rgba(255,255,255,0.90)' : 'rgba(255,255,255,0.28)',
+                transition: 'width 300ms cubic-bezier(0.34,1.56,0.64,1), background 300ms ease',
+                boxShadow: i === step ? '0 0 8px rgba(255,255,255,0.50)' : 'none',
+                WebkitTapHighlightColor: 'transparent',
               }}
             />
           ))}
         </div>
 
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          gap: '12px'
-        }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'center' }}>
           <button
+            type="button"
             onClick={onClose}
             style={{
-              padding: '10px 24px',
-              background: 'transparent',
-              border: `2px solid ${colors.burntOrange}`,
-              color: colors.burntOrange,
-              fontFamily: 'Georgia, serif',
-              fontSize: '14px',
-              fontWeight: 600,
-              letterSpacing: '0.1em',
+              padding: '10px 22px',
+              border: '1.5px solid rgba(255, 255, 255, 0.28)',
+              background: 'rgba(0, 0, 0, 0.20)',
+              color: 'rgba(255, 255, 255, 0.65)',
+              fontFamily: FONT,
+              fontSize: '12px',
+              fontWeight: 700,
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
               cursor: 'pointer',
-              transition: 'all 0.2s'
+              borderRadius: '100px',
+              transition: 'background 0.15s ease, border-color 0.15s ease, color 0.15s ease',
+              WebkitTapHighlightColor: 'transparent',
             }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.55)'; e.currentTarget.style.color = '#fff'; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.28)'; e.currentTarget.style.color = 'rgba(255,255,255,0.65)'; }}
           >
             Skip
           </button>
 
-          {step < 4 ? (
+          {step < total - 1 ? (
             <button
+              type="button"
               onClick={() => setStep(s => s + 1)}
               style={{
-                padding: '10px 32px',
-                background: colors.burntOrange,
-                border: 'none',
-                color: colors.paperCream,
-                fontFamily: 'Georgia, serif',
-                fontSize: '14px',
-                fontWeight: 600,
-                letterSpacing: '0.1em',
+                padding: '10px 28px',
+                border: '1.5px solid rgba(255, 255, 255, 0.55)',
+                background: 'rgba(0, 0, 0, 0.28)',
+                color: '#ffffff',
+                fontFamily: FONT,
+                fontSize: '12px',
+                fontWeight: 700,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
                 cursor: 'pointer',
-                boxShadow: `0 2px 0 #9c4a1a`,
-                transition: 'all 0.2s'
+                borderRadius: '100px',
+                transition: 'background 0.15s ease, border-color 0.15s ease',
+                WebkitTapHighlightColor: 'transparent',
               }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.12)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.80)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(0,0,0,0.28)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.55)'; }}
             >
               Next →
             </button>
           ) : (
             <button
+              type="button"
               onClick={onClose}
               style={{
-                padding: '10px 32px',
-                background: colors.avocado,
-                border: 'none',
-                color: colors.paperCream,
-                fontFamily: 'Georgia, serif',
-                fontSize: '14px',
-                fontWeight: 600,
-                letterSpacing: '0.1em',
+                padding: '10px 28px',
+                border: '1.5px solid rgba(168, 85, 247, 0.70)',
+                background: 'rgba(168, 85, 247, 0.18)',
+                color: '#ffffff',
+                fontFamily: FONT,
+                fontSize: '12px',
+                fontWeight: 700,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
                 cursor: 'pointer',
-                boxShadow: `0 2px 0 #283618`,
-                transition: 'all 0.2s'
+                borderRadius: '100px',
+                transition: 'background 0.15s ease, border-color 0.15s ease',
+                WebkitTapHighlightColor: 'transparent',
               }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(168,85,247,0.32)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(168,85,247,0.18)'; }}
             >
               Start Exploring!
             </button>
@@ -269,14 +279,23 @@ const FirstFlipTutorial = ({ onClose, onMainMenu }) => {
         </div>
 
         {onMainMenu && (
-          <div style={{ textAlign: 'center', marginTop: '12px' }}>
+          <div style={{ textAlign: 'center', marginTop: '14px' }}>
             <button
+              type="button"
               onClick={onMainMenu}
               style={{
-                background: 'transparent', border: 'none', cursor: 'pointer',
-                color: colors.inkMedium, fontSize: '12px', opacity: 0.7,
-                fontFamily: 'Georgia, serif', padding: '2px',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                color: 'rgba(200, 220, 255, 0.40)',
+                fontSize: '12px',
+                fontFamily: FONT,
+                letterSpacing: '0.08em',
+                padding: '4px 8px',
+                transition: 'color 0.15s ease',
               }}
+              onMouseEnter={e => { e.currentTarget.style.color = 'rgba(200,220,255,0.75)'; }}
+              onMouseLeave={e => { e.currentTarget.style.color = 'rgba(200,220,255,0.40)'; }}
             >
               ← Main Menu
             </button>
