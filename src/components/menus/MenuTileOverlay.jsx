@@ -147,8 +147,8 @@ const MenuTileOverlay = ({ colorHex, antiColorHex }) => {
 
   return (
     <>
-      {/* Wispy double-helix ring — z=0.502 just above main disc */}
-      <mesh position={[0, 0, 0.502]} geometry={_sharedPlane} renderOrder={12}>
+      {/* Wispy double-helix ring — z=0.007 matching StickerPlane layout */}
+      <mesh position={[0, 0, 0.007]} geometry={_sharedPlane} renderOrder={12}>
         <shaderMaterial
           ref={wispyMatRef}
           vertexShader={_vert}
@@ -160,8 +160,8 @@ const MenuTileOverlay = ({ colorHex, antiColorHex }) => {
         />
       </mesh>
 
-      {/* Hazard crack overlay — z=0.503 */}
-      <mesh position={[0, 0, 0.503]} geometry={_sharedPlane} renderOrder={13}>
+      {/* Hazard crack overlay — z=0.010 */}
+      <mesh position={[0, 0, 0.010]} geometry={_sharedPlane} renderOrder={13}>
         <shaderMaterial
           ref={crackMatRef}
           vertexShader={_vert}
@@ -173,8 +173,8 @@ const MenuTileOverlay = ({ colorHex, antiColorHex }) => {
         />
       </mesh>
 
-      {/* Seam leak overlay — z=0.504 */}
-      <mesh position={[0, 0, 0.504]} geometry={_sharedPlane} renderOrder={14}>
+      {/* Seam leak overlay — z=0.012 */}
+      <mesh position={[0, 0, 0.012]} geometry={_sharedPlane} renderOrder={14}>
         <shaderMaterial
           ref={seamMatRef}
           vertexShader={_vert}
@@ -186,8 +186,8 @@ const MenuTileOverlay = ({ colorHex, antiColorHex }) => {
         />
       </mesh>
 
-      {/* Worm rim glow (heartbeat ring) — uses slightly larger plane, z=0.501 behind ring */}
-      <mesh position={[0, 0, 0.501]} geometry={_rimPlane} renderOrder={11}>
+      {/* Worm rim glow (heartbeat ring) — z=0.022 matching StickerPlane, uses larger plane */}
+      <mesh position={[0, 0, 0.022]} geometry={_rimPlane} renderOrder={11}>
         <shaderMaterial
           ref={rimMatRef}
           vertexShader={_vert}
