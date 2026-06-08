@@ -3367,10 +3367,15 @@ select.btn-compact:disabled {
 .worm-title-letter {
   display: inline-block;
   font-family: 'Bungee', cursive;
-  font-size: clamp(54px, 13vw, 96px);
+  font-size: clamp(70px, 18vw, 120px);
   letter-spacing: 5px;
   -webkit-text-stroke: 3px #1a1a2e;
-  text-shadow: 4px 4px 0px #1a1a2e;
+  text-shadow:
+    2px 2px 0 #1a1a2e,
+    4px 4px 0 #1a1a2e,
+    6px 6px 0 rgba(0, 0, 0, 0.55),
+    8px 8px 0 rgba(0, 0, 0, 0.30),
+    10px 10px 14px rgba(0, 0, 0, 0.45);
   line-height: 1;
   opacity: 0;
   transform: translateY(-50px) scale(0.8);
@@ -3379,11 +3384,11 @@ select.btn-compact:disabled {
 }
 
 .worm-cube-sup {
-  width: 40px;
-  height: 40px;
-  perspective: 400px;
-  margin-left: 10px;
-  margin-top: 15px;
+  width: 28px;
+  height: 28px;
+  perspective: 300px;
+  margin-left: 8px;
+  margin-top: 10px;
   opacity: 0;
   animation: wormBounceIn 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards;
   animation-delay: 0.60s;
@@ -3400,21 +3405,24 @@ select.btn-compact:disabled {
 
 .worm-cube-face {
   position: absolute;
-  width: 40px;
-  height: 40px;
+  width: 28px;
+  height: 28px;
   border: 2px solid #1a1a2e;
   font-family: 'Bungee', cursive;
-  color: white;
+  color: rgba(0, 0, 0, 0.80);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.5rem;
-  -webkit-text-stroke: 1px #1a1a2e;
+  font-size: 1.1rem;
+  -webkit-text-stroke: 0.5px #1a1a2e;
 }
 
-.worm-cube-face--front { transform: translateZ(20px); background: #8E44AD; }
-.worm-cube-face--right { transform: rotateY(90deg) translateZ(20px); background: #732D91; }
-.worm-cube-face--top   { transform: rotateX(90deg) translateZ(20px); background: #9B59B6; }
+.worm-cube-face--front  { transform: translateZ(14px);                   background: #eab308; }
+.worm-cube-face--right  { transform: rotateY(90deg)  translateZ(14px);   background: #ca9a07; }
+.worm-cube-face--top    { transform: rotateX(90deg)  translateZ(14px);   background: #f5c518; }
+.worm-cube-face--back   { transform: rotateY(180deg) translateZ(14px);   background: #b8890a; }
+.worm-cube-face--left   { transform: rotateY(-90deg) translateZ(14px);   background: #b8890a; }
+.worm-cube-face--bottom { transform: rotateX(-90deg) translateZ(14px);   background: #b8890a; }
 
 .worm-tactile-btn {
   font-family: 'Bungee', cursive;

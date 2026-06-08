@@ -545,8 +545,8 @@ export const RotatingBlackCube = ({ onCubeClick }) => {
   const cubeRef = useRef();
   const shaking = useRef(false);
   const shakeStart = useRef(0);
-  const cubeTargetScale = useRef(0.808);
-  const cubeCurrentScale = useRef(0.808);
+  const cubeTargetScale = useRef(0.889);
+  const cubeCurrentScale = useRef(0.889);
   const onCubeClickRef = useRef(onCubeClick);
   onCubeClickRef.current = onCubeClick;
 
@@ -562,7 +562,7 @@ export const RotatingBlackCube = ({ onCubeClick }) => {
       const elapsed = Date.now() - shakeStart.current;
       if (elapsed > 540) {
         shaking.current = false;
-        cubeTargetScale.current = 0.808;
+        cubeTargetScale.current = 0.889;
         cubeRef.current.position.set(0, 0.45, 0);
         onCubeClickRef.current?.();
       } else {
@@ -586,8 +586,8 @@ export const RotatingBlackCube = ({ onCubeClick }) => {
     shaking.current = true;
     shakeStart.current = Date.now();
   };
-  const handleCubeDown = () => { cubeTargetScale.current = 0.765; };
-  const handleCubeUp = () => { if (!shaking.current) cubeTargetScale.current = 0.808; };
+  const handleCubeDown = () => { cubeTargetScale.current = 0.842; };
+  const handleCubeUp = () => { if (!shaking.current) cubeTargetScale.current = 0.889; };
 
   return (
     <>
@@ -975,7 +975,7 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
 const MenuStartButton = ({ visible, onClick }) => (
   <div style={{
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    paddingBottom: 'max(48px, env(safe-area-inset-bottom, 48px))',
+    paddingBottom: 'max(110px, env(safe-area-inset-bottom, 110px))',
     display: 'flex', justifyContent: 'center', alignItems: 'center',
     opacity: visible ? 1 : 0,
     transform: visible ? 'none' : 'translateY(16px)',
@@ -1017,7 +1017,7 @@ const MenuTitleCard = ({ visible }) => (
     transform: visible ? 'translateY(0)' : 'translateY(-18px)',
   }}>
     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center' }}>
-      <div style={{ display: 'flex' }}>
+      <div style={{ display: 'flex', transform: 'skewX(-5deg)' }}>
         <span className="worm-title-letter" style={{ '--bounce-delay': '0s', color: '#ef4444' }}>W</span>
         <span className="worm-title-letter" style={{ '--bounce-delay': '0.15s', color: '#f97316' }}>O</span>
         <span className="worm-title-letter" style={{ '--bounce-delay': '0.30s', color: '#22c55e' }}>R</span>
@@ -1028,6 +1028,9 @@ const MenuTitleCard = ({ visible }) => (
           <div className="worm-cube-face worm-cube-face--front">3</div>
           <div className="worm-cube-face worm-cube-face--right">3</div>
           <div className="worm-cube-face worm-cube-face--top">3</div>
+          <div className="worm-cube-face worm-cube-face--back" />
+          <div className="worm-cube-face worm-cube-face--left" />
+          <div className="worm-cube-face worm-cube-face--bottom" />
         </div>
       </div>
     </div>
