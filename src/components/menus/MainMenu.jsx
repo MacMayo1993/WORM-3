@@ -160,7 +160,7 @@ const ShuffleCubie = React.memo(({ cubie }) => {
 });
 ShuffleCubie.displayName = 'ShuffleCubie';
 
-const ShufflingCube = () => {
+const ShufflingCube = ({ onFlip }) => {
   const [cubeState, setCubeState] = useState(() => {
     // Pre-scramble with middle-slice moves to get an interesting initial state
     let cubies = makeCubies(3);
@@ -254,6 +254,7 @@ const ShufflingCube = () => {
       pipelineRef.current = 'worm';
       setCubeState({ cubies: newCubies, rotating: null });
       setFlipWaves([wave]);
+      onFlip?.();
     }
 
     if (pipelineRef.current === 'worm' && wormCompletedRef.current) {
@@ -561,7 +562,7 @@ const MenuWorm = ({ onWormClick }) => {
 };
 
 // ─── Rotating cube + worm mascot — exported for App.jsx's shared Canvas ───────
-export const RotatingBlackCube = ({ onCubeClick }) => {
+export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
   const cubeRef = useRef();
   const shaking = useRef(false);
   const shakeStart = useRef(0);
@@ -604,9 +605,9 @@ export const RotatingBlackCube = ({ onCubeClick }) => {
       }
     } else {
       // Compound rotation shows all 6 faces over time
-      cubeRef.current.rotation.y = t * 0.20 + Math.sin(t * 0.09) * 0.55;
-      cubeRef.current.rotation.x = Math.sin(t * 0.13) * 0.48;
-      cubeRef.current.rotation.z = Math.sin(t * 0.07) * 0.18;
+      cubeRef.current.rotation.y = t * 0.24 + Math.sin(t * 0.108) * 0.55;
+      cubeRef.current.rotation.x = Math.sin(t * 0.156) * 0.48;
+      cubeRef.current.rotation.z = Math.sin(t * 0.084) * 0.18;
       cubeRef.current.position.set(0, 0.45, 0);
     }
   });
@@ -630,7 +631,7 @@ export const RotatingBlackCube = ({ onCubeClick }) => {
         onPointerUp={handleCubeUp}
         onPointerLeave={handleCubeUp}
       >
-        <ShufflingCube />
+        <ShufflingCube onFlip={onFlip} />
       </group>
     </>
   );
