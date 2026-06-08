@@ -834,8 +834,10 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
   const [rotationAngle, setRotationAngle] = useState(0);
   const [imgError, setImgError] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
+  const [infoVisible, setInfoVisible] = useState(true);
   const touchStartX = useRef(null);
   const spinTimer = useRef(null);
+  const fadeTimer = useRef(null);
   const activeIndexRef = useRef(0);
   const animatingRef = useRef(false);
   const N = CAROUSEL_MODES.length;
@@ -847,23 +849,30 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
     return () => {
       _carouselActive = false;
       if (spinTimer.current) clearTimeout(spinTimer.current);
+      if (fadeTimer.current) clearTimeout(fadeTimer.current);
     };
   }, []);
 
-  useEffect(() => { setImgError(false); setImgLoaded(false); }, [displayIndex]);
+  const commitDisplay = useCallback((newDisplayIndex) => {
+    setDisplayIndex(newDisplayIndex);
+    setImgError(false);
+    setImgLoaded(false);
+    setInfoVisible(true);
+    animatingRef.current = false;
+  }, []);
 
   const navigate = useCallback((dir) => {
     if (animatingRef.current) return;
     animatingRef.current = true;
     if (spinTimer.current) clearTimeout(spinTimer.current);
+    if (fadeTimer.current) clearTimeout(fadeTimer.current);
     setRotationAngle(a => a - dir * PRISM_FACE_ANGLE);
     setActiveIndex(i => (i + dir + N) % N);
-    // displayIndex updates at animation end so panel colors/content don't flash mid-spin
+    setInfoVisible(false);
     spinTimer.current = setTimeout(() => {
-      setDisplayIndex(i => (i + dir + N) % N);
-      animatingRef.current = false;
+      commitDisplay((activeIndexRef.current));
     }, 540);
-  }, [N]);
+  }, [N, commitDisplay]);
 
   const selectIndex = useCallback((targetIndex) => {
     if (animatingRef.current) return;
@@ -875,13 +884,14 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
     const dir = forwardSteps <= backwardSteps ? 1 : -1;
     animatingRef.current = true;
     if (spinTimer.current) clearTimeout(spinTimer.current);
+    if (fadeTimer.current) clearTimeout(fadeTimer.current);
     setRotationAngle(a => a - dir * steps * PRISM_FACE_ANGLE);
     setActiveIndex(targetIndex);
+    setInfoVisible(false);
     spinTimer.current = setTimeout(() => {
-      setDisplayIndex(targetIndex);
-      animatingRef.current = false;
+      commitDisplay(targetIndex);
     }, 540);
-  }, [N]);
+  }, [N, commitDisplay]);
 
   useEffect(() => {
     const handleKey = (e) => {
@@ -1032,7 +1042,7 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
           <div style={{ height: '1px', background: 'rgba(255,255,255,0.22)', margin: '0 14px' }} />
 
           {/* ── Info section ── */}
-          <div style={{ padding: '14px 14px 0' }}>
+          <div style={{ padding: '14px 14px 0', opacity: infoVisible ? 1 : 0, transition: 'opacity 160ms ease', pointerEvents: infoVisible ? 'auto' : 'none' }}>
 
             {/* Screenshot card or how-to-play mini widget */}
             {active.id === 'how-to-play' ? (
