@@ -102,7 +102,10 @@ export function useChaosWorker({
             key: `${c.from.join(',')}→${c.to.join(',')}`,
           }));
           const merged = [...prev, ...append];
-          return merged.length > MAX_CASCADES ? merged.slice(-MAX_CASCADES) : merged;
+          // Drop oldest entries when over the cap — skip entries with missing coords
+          // to avoid passing malformed data into ChaosWave's geometry creation.
+          const valid = merged.filter(c => c?.from && c?.to);
+          return valid.length > MAX_CASCADES ? valid.slice(-MAX_CASCADES) : valid;
         });
       }
 

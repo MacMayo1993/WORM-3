@@ -880,15 +880,17 @@ const CubeAssembly = React.memo(({
           manifoldMap={manifoldMap}
           cubieRefs={cubieRefs.current}
         />
-        {!isBiomeMode && cascades.map(c => (
-          <ChaosWave
-            key={c.id}
-            from={c.from}
-            to={c.to}
-            crossFace={c.crossFace}
-            onComplete={() => onCascadeComplete(c.id)}
-          />
-        ))}
+        {!isBiomeMode && cascades.map(c =>
+          c?.from && c?.to ? (
+            <ChaosWave
+              key={c.id}
+              from={c.from}
+              to={c.to}
+              crossFace={c.crossFace}
+              onComplete={() => onCascadeComplete(c.id)}
+            />
+          ) : null
+        )}
         {flipWaveOrigins && flipWaveOrigins.length > 0 && (
           <FlipPropagationWave
             origins={flipWaveOrigins}
