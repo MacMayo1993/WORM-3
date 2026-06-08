@@ -192,27 +192,41 @@ const TextOverlay = ({ time }) => {
             padding: '40px 56px',
             boxShadow: '0 0 60px rgba(99,102,241,0.25)',
           }}>
-            <h1 style={{
-              margin: '0 0 8px 0',
-              fontSize: 'clamp(42px, 8vw, 72px)',
-              fontFamily: '"Georgia", serif',
-              fontWeight: 700,
-              fontStyle: 'italic',
-              letterSpacing: '0.04em',
-              color: '#ffffff',
-              textShadow: '0 0 40px rgba(99,102,241,0.7)',
-            }}>
-              WORM³
-            </h1>
+            {/* WORM³ — antipodal colored Bungee letters, matching main menu style */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', margin: '0 0 8px 0' }}>
+              <div style={{ display: 'flex', transform: 'skewX(-5deg)' }}>
+                <span className="worm-title-letter" style={{ '--bounce-delay': '0s',    color: '#ef4444', fontSize: 'clamp(42px, 8vw, 72px)', letterSpacing: '2px', lineHeight: 1 }}>W</span>
+                <span className="worm-title-letter" style={{ '--bounce-delay': '0.10s', color: '#f97316', fontSize: 'clamp(42px, 8vw, 72px)', letterSpacing: '2px', lineHeight: 1 }}>O</span>
+                <span className="worm-title-letter" style={{ '--bounce-delay': '0.20s', color: '#22c55e', fontSize: 'clamp(42px, 8vw, 72px)', letterSpacing: '2px', lineHeight: 1 }}>R</span>
+                <span className="worm-title-letter" style={{ '--bounce-delay': '0.30s', color: '#3b82f6', fontSize: 'clamp(42px, 8vw, 72px)', letterSpacing: '2px', lineHeight: 1 }}>M</span>
+              </div>
+              {/* Scaled 3D cube superscript */}
+              <div style={{ position: 'relative', width: '16px', height: '16px', alignSelf: 'flex-start', marginLeft: '3px', marginTop: '4px', flexShrink: 0 }}>
+                <div style={{ position: 'absolute', top: 0, left: 0, transform: 'scale(0.57)', transformOrigin: 'top left' }}>
+                  <div className="worm-cube-sup" style={{ marginLeft: 0 }}>
+                    <div className="worm-cube-inner">
+                      <div className="worm-cube-face worm-cube-face--front">3</div>
+                      <div className="worm-cube-face worm-cube-face--right">3</div>
+                      <div className="worm-cube-face worm-cube-face--top">3</div>
+                      <div className="worm-cube-face worm-cube-face--back" />
+                      <div className="worm-cube-face worm-cube-face--left">3</div>
+                      <div className="worm-cube-face worm-cube-face--bottom" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            {/* Subtitle — Bungee font with Green↔Blue antipodal pair */}
             <p style={{
               margin: '0 0 24px 0',
+              fontFamily: "'Bungee', cursive",
               fontSize: '13px',
-              letterSpacing: '0.3em',
+              letterSpacing: '0.2em',
               textTransform: 'uppercase',
-              color: 'rgba(255,255,255,0.5)',
-              fontFamily: '"Courier New", monospace',
             }}>
-              Upgraded. Flipped.
+              <span style={{ color: '#22c55e' }}>Upgraded.</span>
+              {' '}
+              <span style={{ color: '#3b82f6' }}>Flipped.</span>
             </p>
             <div style={{
               display: 'flex',
