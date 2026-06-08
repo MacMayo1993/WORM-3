@@ -300,14 +300,15 @@ const spinRevealVertexShader = `
   }
 `;
 
-// Flip overlay shader: keeps the tile fully visible during the whole flip while
-// adding a restrained chromatic edge swirl. Intentionally avoids any white-phase
-// bridge so heavy disparity bursts cannot accumulate into a white wash.
+// Flip overlay shader: additive rim glow at the tile edge during the flip. Transparent in
+// the center so living/patterned tile styles show through — only the outer ring carries the
+// flip energy color. Uses AdditiveBlending so it brightens whatever is underneath rather
+// than covering it, which prevents a flat-color "flash" on textured or 3D-styled tiles.
 const spinRevealFragmentShader = `
   uniform vec3 uColor;
   uniform float uProgress; // 1 = calm, 0 = peak transition energy
   uniform float uTime;
-  uniform float uDissolve;
+  uniform float uDissolve; // flipSquish: 1=face-on (bright), 0=edge-on (dim)
   varying vec2 vUv;
 
   void main() {
@@ -315,31 +316,22 @@ const spinRevealFragmentShader = `
     float dist = length(uv);
     float angle = atan(uv.y, uv.x);
 
-    // Circular mask: 1 inside the sticker disc, fades to 0 at the corners.
-    // Used as alpha so the overlay is transparent outside the tile radius.
     float inDisc = 1.0 - smoothstep(0.44, 0.50, dist);
-
-    // Transition energy envelope: strongest near midpoint of each half.
     float energy = 1.0 - uProgress;
 
-    // Rotating edge wisps (chromatic-only; no neutral/white bridge).
-    float edgeBand = smoothstep(0.20, 0.40, dist) * (1.0 - smoothstep(0.40, 0.50, dist));
+    // Rim band — only covers the outer ring of the tile so the center is transparent.
+    float rim = smoothstep(0.30, 0.43, dist) * (1.0 - smoothstep(0.44, 0.50, dist));
+
+    // Rotating wisps confined to the rim band.
     float swirl = 0.5 + 0.5 * sin(angle * 10.0 - uTime * 7.0 + dist * 20.0);
-    float wisp = edgeBand * swirl * energy * inDisc;
+    float wisp = rim * swirl * energy;
 
-    // White-free transition: stay on-face-color through the entire handoff.
-    // Slight brighten/darken modulation preserves motion readability without
-    // introducing additive white accumulation under load.
-    float shade = 1.0 + (wisp - 0.5 * energy) * 0.18;
-    // uDissolve tracks scale.x squish (1=face-on, 0=edge-on): dim the tile as it rotates
-    // away to simulate 3D edge lighting during the card-flip.
-    float brightness = 0.35 + 0.65 * uDissolve;
-    vec3 col = clamp(uColor * shade * brightness, 0.0, 1.0);
+    // Edge-lighting: tile dims as it rotates edge-on (uDissolve tracks squish).
+    float brightness = 0.5 + 0.65 * uDissolve;
+    vec3 col = uColor * brightness * (1.0 + wisp * 0.5);
 
-    // Fully opaque within the disc — the main mesh is hidden during the flip so the
-    // spinReveal is the sole visible layer.  Any alpha < 1 lets background content show
-    // through (worm portal, hollow tiles, glass backplate), which reads as white.
-    float alpha = inDisc;
+    // Alpha: rim only — center stays at 0 so living/patterned content shows through.
+    float alpha = inDisc * clamp(rim * (0.7 + energy * 0.5) + wisp * 0.4, 0.0, 1.0);
     gl_FragColor = vec4(col, alpha);
   }
 `;
@@ -691,10 +683,17 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         spinRevealMatRef.current.uniforms.uProgress.value = 1.0;
         spinRevealRef.current.visible = true;
       }
-      // Hide the main disc entirely — spinReveal owns all visuals during the flip.
-      // Keeping the disc visible (even with mat.map=null) produced a white square behind the
-      // spinReveal circle because dropping the map also loses the disc alphaMap clip.
-      if (meshRef.current) meshRef.current.visible = false;
+      // Restore the correct FROM texture now that flipFromTexture is known, and ensure the
+      // mesh is visible so living/patterned styles show through the additive rim glow.
+      if (!isInstancedRef.current && meshRef.current) {
+        const mat = meshRef.current?.material;
+        if (mat?.color && flipFromColor.current) {
+          mat.map = flipFromTexture.current || null;
+          mat.color.set(flipFromTexture.current ? '#ffffff' : flipFromColor.current);
+          mat.needsUpdate = true;
+        }
+        meshRef.current.visible = true;
+      }
       // Keep instanceColorRef updated so the manager doesn't show stale color if the tile
       // transitions back to instanced rendering after the animation ends.
       if (isInstancedRef.current && flipFromColor.current) {
@@ -779,7 +778,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     // Single-boolean gate: skip the entire body on idle frames.
     // Ensure we trigger animation if the tile is flipped (since ghost tile needs uTime updates).
     // If we need to transition the ghost tile (e.g. going from active to dormant), run at least one more frame.
-    const anyActive = spinT.current > 0 || shakeT.current > 0 || showWormholeHazardFx || needsGhostUpdate || (spiderPlaneRef.current?.visible && !showGhostTile) || wormIntroT.current > 0 || healTRef.current >= 0;
+    // hasFlips keeps the loop alive so the indicator ring keeps pulsing on flipped tiles
+    // even when no other animation is running (e.g. healed tiles with flip history).
+    const anyActive = spinT.current > 0 || shakeT.current > 0 || showWormholeHazardFx || needsGhostUpdate || (spiderPlaneRef.current?.visible && !showGhostTile) || wormIntroT.current > 0 || healTRef.current >= 0 || (hasFlips && !isDead && !isSudokube);
     if (!anyActive) {
       isActiveRef.current = false;
       return;
@@ -838,13 +839,23 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         spinRevealMatRef.current.uniforms.uDissolve.value = flipSquish;
       }
 
-      // Midpoint: switch the spin-reveal colour from FROM to TO and begin the outside-in reveal.
+      // Midpoint: tile is at squish≈0 (near-invisible). Switch rim glow and mesh to TO color.
       if (prevRawP.current < 0.5 && rawP >= 0.5) {
         if (spinRevealRef.current && spinRevealMatRef.current && flipToColor.current) {
           spinRevealMatRef.current.uniforms.uColor.value.set(flipToColor.current);
           spinRevealMatRef.current.uniforms.uProgress.value = 0.0;
           spinRevealMatRef.current.uniforms.uDissolve.value = flipSquish;
           spinRevealRef.current.visible = true;
+        }
+        // Update main mesh to TO color while squish≈0 so no flash is visible.
+        if (!isInstancedRef.current && meshRef.current) {
+          const mat = meshRef.current?.material;
+          if (mat?.color) {
+            const finalTex = currTextureRef.current;
+            mat.map = finalTex || null;
+            mat.color.set(finalTex ? '#ffffff' : baseColorRef.current);
+            mat.needsUpdate = true;
+          }
         }
         // Ring opacity spike — event horizon signal.
         if (ringRef.current) {
@@ -1212,19 +1223,22 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     if (meshRef.current && meshRef.current.material && !isFlipping.current && spinT.current <= 0) {
       const mat = meshRef.current.material;
       if (isFlipPending) {
-        // Hide the main disc immediately — spinReveal will cover the tile.
-        // This closes the commit→paint gap before useEffect can fire, preventing any
-        // white flash from the mesh (textured tiles use '#ffffff' as materialColor).
-        meshRef.current.visible = false;
-        // Pre-activate spinReveal with the FROM color so there is no transparent frame
-        // between commit (where we hide the mesh) and the first paint.
-        if (spinRevealRef.current && spinRevealMatRef.current) {
-          const fromColor = fc[prevCurr.current];
-          if (fromColor) {
-            spinRevealMatRef.current.uniforms.uColor.value.set(fromColor);
-            spinRevealMatRef.current.uniforms.uProgress.value = 1.0;
-            spinRevealRef.current.visible = true;
-          }
+        // Paint the FROM color onto the mesh before the browser paints — closes the
+        // commit→paint gap that would otherwise show one frame of the already-updated
+        // TO color. The spinReveal is now an additive rim glow (not a full cover), so
+        // the mesh must hold the correct color itself.
+        const fromColor = fc[prevCurr.current];
+        if (mat.color && fromColor) {
+          mat.map = null; // texture restored in useEffect once flipFromTexture is known
+          mat.color.set(fromColor);
+          mat.needsUpdate = true;
+          meshRef.current.visible = true;
+        }
+        // Pre-activate spinReveal rim glow.
+        if (spinRevealRef.current && spinRevealMatRef.current && fromColor) {
+          spinRevealMatRef.current.uniforms.uColor.value.set(fromColor);
+          spinRevealMatRef.current.uniforms.uProgress.value = 1.0;
+          spinRevealRef.current.visible = true;
         }
       } else if (mat.color) {
         mat.color.set(materialColor);
@@ -1369,14 +1383,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         <meshBasicMaterial transparent opacity={0} blending={THREE.AdditiveBlending} depthWrite={false} />
       </mesh>
 
-      {/* Wormhole portal overlay — covers the tile during the flip animation.
-          Positioned slightly in front of the main mesh so depth-testing works correctly
-          without z-fighting.  depthTest must stay ON so that back-face flips don't bleed
-          over front-face tiles (the main cause of white-tile / outline artifacts).
-          renderOrder must be HIGH (above wispy ring=1, wormhole crack/winner=2) so the
-          flip animation paints cleanly over those per-tile additive overlays — otherwise
-          in disparity mode where every flipped tile carries a wispy ring, the additive ring
-          bleeds on top of the spin-reveal and the flip looks washed out / glitchy. */}
+      {/* Flip rim glow — additive edge ring that fires during the card-flip squish.
+          Transparent in the center so living/patterned tile styles show through.
+          AdditiveBlending adds energy to the tile surface rather than covering it. */}
       <mesh ref={spinRevealRef} position={[0, 0, 0.002]} visible={false} renderOrder={10}>
         <primitive object={_sharedStickerGeo} attach="geometry" />
         <shaderMaterial
@@ -1385,11 +1394,28 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           fragmentShader={spinRevealFragmentShader}
           uniforms={spinRevealUniforms}
           transparent
-          blending={THREE.NormalBlending}
+          blending={THREE.AdditiveBlending}
           depthTest={true}
           depthWrite={false}
         />
       </mesh>
+
+      {/* Persistent flip indicator ring — slow heartbeat pulse that shows a tile has crossed
+          the manifold at least once. Briefly flares bright at each new flip midpoint.
+          wired to ringRef which drives scale-pulse and opacity in useFrame. */}
+      {!isDead && !isSudokube && hasFlipHistory && (
+        <mesh ref={ringRef} position={[0, 0, 0.003]} renderOrder={2}>
+          <ringGeometry args={[0.40, 0.52, 48]} />
+          <meshBasicMaterial
+            color={baseColor}
+            transparent
+            opacity={0.85}
+            blending={THREE.AdditiveBlending}
+            depthWrite={false}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
+      )}
 
       {/* City Biome buildings — kept mounted during rotation so they don't pop/glitch */}
       {biomeEnabled && !isDead && stableCity && (
