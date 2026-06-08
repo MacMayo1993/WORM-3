@@ -7,6 +7,7 @@ import { CLASSIC_STYLE_KEYS, ANTIPODAL_STYLE_KEYS, LIVING_STYLE_KEYS } from '../
 import { rotateSliceCubies } from '../../game/cubeRotation.js';
 import { updateSharedTime, getTileStyleMaterial } from '../../3d/styles/TileStyleMaterials.jsx';
 import MenuFlipWave from './MenuFlipWave.jsx';
+import MenuTileOverlay from './MenuTileOverlay.jsx';
 import { ANTIPODAL_COLOR } from '../../utils/constants.js';
 
 // ─── Random scheme + tile style, picked once per page load ────────────────────
@@ -99,18 +100,12 @@ const STICKER_CFG = [
   { dir: 'PZ', pos: [0, 0,  0.501],  rot: [0, 0, 0] },
   { dir: 'NZ', pos: [0, 0, -0.501],  rot: [0, Math.PI, 0] },
 ];
-const ALL_MOVES    = ['col', 'row', 'depth'].flatMap(ax => [0, 1, 2].flatMap(sl => [1, -1].map(d => ({ ax, sl, d }))));
-// Per-flip-pair safe axis: middle slice of the PERPENDICULAR axis does not contain any
-// face center of the flipped pair. e.g. PZ center is at z=2, so depth sl=1 (z=1) is safe.
-const FLIP_PAIR_SAFE_AX = {
-  PZ: 'depth', NZ: 'depth',
-  PX: 'col',   NX: 'col',
-  PY: 'row',   NY: 'row',
-};
+// Only middle-slice moves (sl=1) — worms always go through center face tiles
+const MIDDLE_MOVES = ['col', 'row', 'depth'].flatMap(ax => [1, -1].map(d => ({ ax, sl: 1, d })));
 // Maps axis name → cubie coordinate property (for flat-array slice filtering)
-const AX_PROP = { col: 'x', row: 'y', depth: 'z' };
-const ANIM_DUR = 0.50;
-const PAUSE_DUR = 0.80;
+const AX_PROP   = { col: 'x', row: 'y', depth: 'z' };
+const ANIM_DUR  = 0.55;  // slice rotation animation duration
+const PAUSE_DUR = 1.20;  // pause after rotation before next worm spawns
 const easeIO = t => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
 
 // Antipodal center-sticker pairs used for the sporadic menu flips.
@@ -130,8 +125,7 @@ const MENU_FLIP_PAIRS = [
     { dir: 'NY', cubie: [1, 0, 1], pos: [0, -1.501, 0], rot: [ Math.PI / 2, 0, 0] },
   ],
 ];
-const MENU_FLIP_INTERVAL = 3.0;
-const MENU_FLIP_JITTER   = 0.6;
+const INITIAL_WORM_DELAY = 2.5; // seconds before the very first worm spawns
 
 const ShuffleCubie = React.memo(({ cubie }) => {
   const cx = cubie.x - 1, cy = cubie.y - 1, cz = cubie.z - 1;
@@ -144,13 +138,20 @@ const ShuffleCubie = React.memo(({ cubie }) => {
       {STICKER_CFG.map(({ dir, pos, rot }) => {
         const sticker = cubie.stickers?.[dir];
         if (!sticker) return null;
-        const colorHex = MENU_FACE_COLORS[sticker.curr] ?? '#888888';
+        const colorHex      = MENU_FACE_COLORS[sticker.curr] ?? '#888888';
+        const antiColorHex  = MENU_FACE_COLORS[ANTIPODAL_COLOR[sticker.curr]] ?? '#888888';
+        // Show the full tile overlay stack on stickers that a worm has passed through.
+        // curr !== orig means this sticker has been flipped an odd number of times.
+        const isFlipped = sticker.curr !== sticker.orig;
         return (
           <group key={dir} position={pos} rotation={rot}>
-            <mesh>
+            <mesh renderOrder={10}>
               <planeGeometry args={[0.80, 0.80]} />
               <primitive attach="material" object={getTileStyleMaterial(_menuFaceStyles[sticker.curr] || 'solid', colorHex)} />
             </mesh>
+            {isFlipped && (
+              <MenuTileOverlay colorHex={colorHex} antiColorHex={antiColorHex} />
+            )}
           </group>
         );
       })}
@@ -161,30 +162,40 @@ ShuffleCubie.displayName = 'ShuffleCubie';
 
 const ShufflingCube = () => {
   const [cubeState, setCubeState] = useState(() => {
+    // Pre-scramble with middle-slice moves to get an interesting initial state
     let cubies = makeCubies(3);
-    for (let i = 0; i < 18; i++) {
-      const m = ALL_MOVES[Math.floor(Math.random() * ALL_MOVES.length)];
+    for (let i = 0; i < 12; i++) {
+      const m = MIDDLE_MOVES[Math.floor(Math.random() * MIDDLE_MOVES.length)];
       cubies = rotateSliceCubies(cubies, 3, m.ax, m.sl, m.d);
     }
     return { cubies, rotating: null };
   });
 
   const [flipWaves, setFlipWaves] = useState([]);
-  const flipWavesRef = useRef([]);
-  flipWavesRef.current = flipWaves;
   const cubeStateRef = useRef(cubeState);
   cubeStateRef.current = cubeState;
   const sliceGroupRef = useRef();
-  const nextMoveAt  = useRef(0);   // independent rotation timer
-  const nextFlipAt  = useRef(3.0); // first flip after 3 s so the cube settles first
-  const flipIdRef   = useRef(0);
+  const flipIdRef = useRef(0);
+
+  // ── Sequential pipeline ──────────────────────────────────────────────────────
+  // 'idle'     → waiting for nextSpawnAt, then spawns a worm
+  // 'worm'     → worm is active, cube is still; wormCompleted ref gates the next step
+  // 'rotating' → playing the middle-slice rotation animation
+  const pipelineRef      = useRef('idle');
+  const wormCompletedRef = useRef(false);
+  const nextSpawnAt      = useRef(INITIAL_WORM_DELAY);
+
+  // Called by MenuFlipWave when the worm animation finishes
+  const handleWormComplete = useCallback(() => {
+    wormCompletedRef.current = true;
+  }, []);
 
   useFrame(({ clock }) => {
     if (_carouselActive) return;
     const t = clock.elapsedTime;
     const { rotating, cubies } = cubeStateRef.current;
 
-    // Slice rotation animation
+    // ── Slice rotation animation ─────────────────────────────────────────────
     if (rotating) {
       const progress = Math.min((t - rotating.startT) / ANIM_DUR, 1);
       const angle = easeIO(progress) * (Math.PI / 2) * rotating.d;
@@ -197,24 +208,16 @@ const ShufflingCube = () => {
       }
       if (progress >= 1) {
         const newCubies = rotateSliceCubies(cubies, 3, rotating.ax, rotating.sl, rotating.d);
-        nextMoveAt.current = t + PAUSE_DUR;
+        nextSpawnAt.current = t + PAUSE_DUR;
+        pipelineRef.current = 'idle';
         setCubeState({ cubies: newCubies, rotating: null });
       }
-    } else if (t >= nextMoveAt.current) {
-      // Continuous rotation — safe axis only while a worm wave is active so the
-      // spawned face center tile doesn't move under the worm during its animation.
-      const wave = flipWavesRef.current[0];
-      const m = wave
-        ? { ax: wave.safeAx, sl: 1, d: Math.random() < 0.5 ? 1 : -1 }
-        : ALL_MOVES[Math.floor(Math.random() * ALL_MOVES.length)];
-      setCubeState(prev => ({ ...prev, rotating: { ...m, startT: t } }));
+      return; // don't advance pipeline while animating
     }
 
-    // Sporadic antipodal flip — fires on a timer regardless of active waves so worms
-    // keep spawning continuously. Multiple waves are allowed concurrently.
-    if (!rotating && t >= nextFlipAt.current) {
-      nextFlipAt.current = t + MENU_FLIP_INTERVAL + (Math.random() * 2 - 1) * MENU_FLIP_JITTER;
-
+    // ── Pipeline state machine ────────────────────────────────────────────────
+    if (pipelineRef.current === 'idle' && t >= nextSpawnAt.current) {
+      // Pick a random antipodal pair and spawn a worm
       const pair = MENU_FLIP_PAIRS[Math.floor(Math.random() * MENU_FLIP_PAIRS.length)];
       const [sA, sB] = pair;
       const [ax, ay, az] = sA.cubie;
@@ -222,21 +225,7 @@ const ShufflingCube = () => {
       const stA = cubies[ax][ay][az].stickers[sA.dir];
       const stB = cubies[bx][by][bz].stickers[sB.dir];
 
-      // Append new wave so concurrent waves are allowed (multiple worm pairs on screen).
-      const safeAx = FLIP_PAIR_SAFE_AX[sA.dir];
-      const wid = ++flipIdRef.current;
-      setFlipWaves(prev => [...prev, {
-        id: wid,
-        safeAx,
-        startTime: t,
-        origins: [
-          { position: sA.pos, rotation: sA.rot, color: MENU_FACE_COLORS[stA.curr], id: `${wid}a` },
-          { position: sB.pos, rotation: sB.rot, color: MENU_FACE_COLORS[stB.curr], id: `${wid}b` },
-        ],
-      }]);
-
-      // Rotate the safe slice (computed above) coincident with the flip
-      const m = { ax: safeAx, sl: 1, d: Math.random() < 0.5 ? 1 : -1 };
+      // Flip the two center sticker colors
       const newCubies = cubies.map((plane, xi) =>
         plane.map((row, yi) =>
           row.map((cubie, zi) => {
@@ -250,29 +239,55 @@ const ShufflingCube = () => {
           })
         )
       );
-      setCubeState({ rotating: { ...m, startT: t }, cubies: newCubies });
+
+      const wid = ++flipIdRef.current;
+      const wave = {
+        id: wid,
+        startTime: t,
+        origins: [
+          { position: sA.pos, rotation: sA.rot, color: MENU_FACE_COLORS[stA.curr] },
+          { position: sB.pos, rotation: sB.rot, color: MENU_FACE_COLORS[stB.curr] },
+        ],
+      };
+
+      wormCompletedRef.current = false;
+      pipelineRef.current = 'worm';
+      setCubeState({ cubies: newCubies, rotating: null });
+      setFlipWaves([wave]);
+    }
+
+    if (pipelineRef.current === 'worm' && wormCompletedRef.current) {
+      // Worm fully retreated — start the middle-slice rotation
+      wormCompletedRef.current = false;
+      pipelineRef.current = 'rotating';
+      const m = MIDDLE_MOVES[Math.floor(Math.random() * MIDDLE_MOVES.length)];
+      setCubeState(prev => ({ ...prev, rotating: { ...m, startT: t } }));
+      setFlipWaves([]);
     }
   });
 
   const { cubies, rotating } = cubeState;
-  // makeCubies returns a 3D array [x][y][z]; flatten to a list of 27 cubie objects.
   const flatCubies = cubies.flat(2);
   const axProp = rotating ? AX_PROP[rotating.ax] : null;
   const staticCubies = rotating ? flatCubies.filter(c => c[axProp] !== rotating.sl) : flatCubies;
-  const sliceCubies = rotating ? flatCubies.filter(c => c[axProp] === rotating.sl) : [];
+  const sliceCubies  = rotating ? flatCubies.filter(c => c[axProp] === rotating.sl) : [];
 
   return (
     <>
-      {staticCubies.map(c => <ShuffleCubie key={`${c.x}-${c.y}-${c.z}`} cubie={c} />)}
+      {staticCubies.map(c => (
+        <ShuffleCubie key={`${c.x}-${c.y}-${c.z}`} cubie={c} />
+      ))}
       <group ref={sliceGroupRef}>
-        {sliceCubies.map(c => <ShuffleCubie key={`${c.x}-${c.y}-${c.z}`} cubie={c} />)}
+        {sliceCubies.map(c => (
+          <ShuffleCubie key={`${c.x}-${c.y}-${c.z}`} cubie={c} />
+        ))}
       </group>
       {flipWaves.map(wave => (
         <MenuFlipWave
           key={wave.id}
           origins={wave.origins}
           startTime={wave.startTime}
-          onComplete={() => setFlipWaves(prev => prev.filter(w => w.id !== wave.id))}
+          onComplete={handleWormComplete}
         />
       ))}
     </>
