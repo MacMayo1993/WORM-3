@@ -395,8 +395,8 @@ const MenuWorm = ({ onWormClick }) => {
 
     if (headRef.current) {
       headRef.current.position.set(hx, _SEG_Y[0], hz);
-      headRef.current.rotation.z = -Math.atan2(vx, 2.0) * 0.55 - smoothPtr.current.x * 0.20;
-      headRef.current.rotation.x =  Math.atan2(vz, 2.0) * 0.40 + smoothPtr.current.y * 0.14;
+      headRef.current.rotation.z = -Math.atan2(vx, 2.0) * 0.18 - smoothPtr.current.x * 0.10;
+      headRef.current.rotation.x =  Math.atan2(vz, 2.0) * 0.15 + smoothPtr.current.y * 0.08;
     }
     // Squash/stretch on sphere only — eyes/antennae stay round
     if (headMeshRef.current) {
@@ -473,9 +473,13 @@ const MenuWorm = ({ onWormClick }) => {
           <sphereGeometry args={[_SEG_R[0], 16, 12]} />
           <meshPhysicalMaterial
             color={_SEG_COL[0]} roughness={0.28} metalness={0.0}
-            emissive={_SEG_COL[0]} emissiveIntensity={0.20}
+            emissive={_SEG_COL[0]} emissiveIntensity={0.65}
             clearcoat={0.70} clearcoatRoughness={0.12}
           />
+          <mesh scale={1.10}>
+            <sphereGeometry args={[_SEG_R[0], 16, 12]} />
+            <meshBasicMaterial color="#001a08" side={THREE.BackSide} />
+          </mesh>
         </mesh>
         {/* Eyes */}
         <mesh ref={eyeLRef} position={[-0.10, 0.14, 0.22]}>
@@ -523,39 +527,55 @@ const MenuWorm = ({ onWormClick }) => {
         <sphereGeometry args={[_SEG_R[1], 16, 12]} />
         <meshPhysicalMaterial
           color={_SEG_COL[1]} roughness={0.30} metalness={0.0}
-          emissive={_SEG_COL[1]} emissiveIntensity={0.16}
+          emissive={_SEG_COL[1]} emissiveIntensity={0.58}
           clearcoat={0.60} clearcoatRoughness={0.15}
         />
+        <mesh scale={1.10}>
+          <sphereGeometry args={[_SEG_R[1], 16, 12]} />
+          <meshBasicMaterial color="#001a08" side={THREE.BackSide} />
+        </mesh>
       </mesh>
       <mesh ref={seg2Ref}>
         <sphereGeometry args={[_SEG_R[2], 16, 12]} />
         <meshPhysicalMaterial
           color={_SEG_COL[2]} roughness={0.32} metalness={0.0}
-          emissive={_SEG_COL[2]} emissiveIntensity={0.14}
+          emissive={_SEG_COL[2]} emissiveIntensity={0.52}
           clearcoat={0.55} clearcoatRoughness={0.18}
         />
+        <mesh scale={1.10}>
+          <sphereGeometry args={[_SEG_R[2], 16, 12]} />
+          <meshBasicMaterial color="#001a08" side={THREE.BackSide} />
+        </mesh>
       </mesh>
       <mesh ref={seg3Ref}>
         <sphereGeometry args={[_SEG_R[3], 14, 10]} />
         <meshPhysicalMaterial
           color={_SEG_COL[3]} roughness={0.34} metalness={0.0}
-          emissive={_SEG_COL[3]} emissiveIntensity={0.12}
+          emissive={_SEG_COL[3]} emissiveIntensity={0.46}
           clearcoat={0.50} clearcoatRoughness={0.20}
         />
+        <mesh scale={1.10}>
+          <sphereGeometry args={[_SEG_R[3], 14, 10]} />
+          <meshBasicMaterial color="#001a08" side={THREE.BackSide} />
+        </mesh>
       </mesh>
       <mesh ref={tailRef}>
         <sphereGeometry args={[_SEG_R[4], 12, 8]} />
         <meshPhysicalMaterial
           color={_SEG_COL[4]} roughness={0.36} metalness={0.0}
-          emissive={_SEG_COL[4]} emissiveIntensity={0.10}
+          emissive={_SEG_COL[4]} emissiveIntensity={0.40}
           clearcoat={0.45} clearcoatRoughness={0.22}
         />
+        <mesh scale={1.10}>
+          <sphereGeometry args={[_SEG_R[4], 12, 8]} />
+          <meshBasicMaterial color="#001a08" side={THREE.BackSide} />
+        </mesh>
       </mesh>
 
       {/* Soft glow halo */}
       <mesh position={[0, 0.44, 0]}>
         <sphereGeometry args={[0.52, 10, 10]} />
-        <meshBasicMaterial color="#00ff88" transparent opacity={0.05} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+        <meshBasicMaterial color="#00ff88" transparent opacity={0.12} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
       </mesh>
     </group>
   );
