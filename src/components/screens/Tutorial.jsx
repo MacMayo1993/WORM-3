@@ -10,29 +10,6 @@ const Tutorial = ({ onClose, onMainMenu }) => {
     return () => { document.body.style.overflow = ''; };
   }, []);
 
-  // Shared image style
-  const imageStyle = {
-    width: '100%',
-    maxWidth: '280px',
-    borderRadius: '8px',
-    border: '1px solid rgba(255, 255, 255, 0.2)',
-    margin: '8px auto',
-    display: 'block'
-  };
-
-  const imageRowStyle = {
-    display: 'flex',
-    gap: '12px',
-    justifyContent: 'center',
-    flexWrap: 'wrap',
-    margin: '12px 0'
-  };
-
-  const smallImageStyle = {
-    ...imageStyle,
-    maxWidth: '180px'
-  };
-
   const stepContent = {
     1: {
       title: "Welcome to WORM³",
