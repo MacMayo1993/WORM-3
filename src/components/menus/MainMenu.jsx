@@ -471,65 +471,61 @@ const MenuWorm = ({ onWormClick }) => {
         {/* Sphere only gets squash/stretch — eyes and antennae stay round */}
         <mesh ref={headMeshRef}>
           <sphereGeometry args={[_SEG_R[0], 16, 12]} />
-          <meshPhysicalMaterial
-            color={_SEG_COL[0]} roughness={0.28} metalness={0.0}
-            emissive={_SEG_COL[0]} emissiveIntensity={0.65}
-            clearcoat={0.70} clearcoatRoughness={0.12}
+          <meshStandardMaterial
+            color={_SEG_COL[0]} roughness={0.55} metalness={0.0}
+            emissive={_SEG_COL[0]} emissiveIntensity={1.1}
           />
+          {/* BackSide outline */}
           <mesh scale={1.10}>
             <sphereGeometry args={[_SEG_R[0], 16, 12]} />
             <meshBasicMaterial color="#001a08" side={THREE.BackSide} />
           </mesh>
         </mesh>
-        {/* Eyes */}
+        {/* Eyes — meshBasicMaterial ignores scene lighting for reliable contrast */}
         <mesh ref={eyeLRef} position={[-0.10, 0.14, 0.22]}>
-          <sphereGeometry args={[0.068, 10, 10]} />
-          <meshStandardMaterial color="#ffffff" roughness={0.1} />
+          <sphereGeometry args={[0.075, 10, 10]} />
+          <meshBasicMaterial color="#ffffff" />
         </mesh>
         <mesh ref={eyeRRef} position={[0.10, 0.14, 0.22]}>
-          <sphereGeometry args={[0.068, 10, 10]} />
-          <meshStandardMaterial color="#ffffff" roughness={0.1} />
+          <sphereGeometry args={[0.075, 10, 10]} />
+          <meshBasicMaterial color="#ffffff" />
         </mesh>
-        <mesh ref={pupilLRef} position={[-0.10, 0.145, 0.268]}>
-          <sphereGeometry args={[0.036, 8, 8]} />
-          <meshStandardMaterial color="#0a0a14" roughness={0.5} />
+        <mesh ref={pupilLRef} position={[-0.10, 0.145, 0.275]}>
+          <sphereGeometry args={[0.042, 8, 8]} />
+          <meshBasicMaterial color="#050510" />
         </mesh>
-        <mesh ref={pupilRRef} position={[0.10, 0.145, 0.268]}>
-          <sphereGeometry args={[0.036, 8, 8]} />
-          <meshStandardMaterial color="#0a0a14" roughness={0.5} />
+        <mesh ref={pupilRRef} position={[0.10, 0.145, 0.275]}>
+          <sphereGeometry args={[0.042, 8, 8]} />
+          <meshBasicMaterial color="#050510" />
         </mesh>
         {/* Smile */}
         <mesh position={[0, -0.04, 0.235]} rotation={[0.25, 0, Math.PI]}>
-          <torusGeometry args={[0.065, 0.018, 6, 14, Math.PI]} />
-          <meshStandardMaterial color="#0d2410" roughness={0.6} />
+          <torusGeometry args={[0.065, 0.020, 6, 14, Math.PI]} />
+          <meshBasicMaterial color="#041a0a" />
         </mesh>
         {/* Antennae */}
         <mesh position={[-0.13, 0.30, 0.10]} rotation={[0, 0, 0.32]}>
           <cylinderGeometry args={[0.013, 0.009, 0.28, 6]} />
-          <meshStandardMaterial color={_SEG_COL[0]} roughness={0.5} />
+          <meshBasicMaterial color={_SEG_COL[0]} />
         </mesh>
         <mesh position={[0.13, 0.30, 0.10]} rotation={[0, 0, -0.32]}>
           <cylinderGeometry args={[0.013, 0.009, 0.28, 6]} />
-          <meshStandardMaterial color={_SEG_COL[0]} roughness={0.5} />
+          <meshBasicMaterial color={_SEG_COL[0]} />
         </mesh>
         <mesh position={[-0.165, 0.41, 0.10]}>
           <sphereGeometry args={[0.026, 6, 6]} />
-          <meshStandardMaterial color="#b0ffda" emissive="#40ff99" emissiveIntensity={0.7} />
+          <meshBasicMaterial color="#80ffcc" />
         </mesh>
         <mesh position={[0.165, 0.41, 0.10]}>
           <sphereGeometry args={[0.026, 6, 6]} />
-          <meshStandardMaterial color="#b0ffda" emissive="#40ff99" emissiveIntensity={0.7} />
+          <meshBasicMaterial color="#80ffcc" />
         </mesh>
       </group>
 
       {/* ── Body segments — smooth round blobs ───────────────────────────── */}
       <mesh ref={seg1Ref}>
         <sphereGeometry args={[_SEG_R[1], 16, 12]} />
-        <meshPhysicalMaterial
-          color={_SEG_COL[1]} roughness={0.30} metalness={0.0}
-          emissive={_SEG_COL[1]} emissiveIntensity={0.58}
-          clearcoat={0.60} clearcoatRoughness={0.15}
-        />
+        <meshStandardMaterial color={_SEG_COL[1]} roughness={0.55} metalness={0.0} emissive={_SEG_COL[1]} emissiveIntensity={0.95} />
         <mesh scale={1.10}>
           <sphereGeometry args={[_SEG_R[1], 16, 12]} />
           <meshBasicMaterial color="#001a08" side={THREE.BackSide} />
@@ -537,11 +533,7 @@ const MenuWorm = ({ onWormClick }) => {
       </mesh>
       <mesh ref={seg2Ref}>
         <sphereGeometry args={[_SEG_R[2], 16, 12]} />
-        <meshPhysicalMaterial
-          color={_SEG_COL[2]} roughness={0.32} metalness={0.0}
-          emissive={_SEG_COL[2]} emissiveIntensity={0.52}
-          clearcoat={0.55} clearcoatRoughness={0.18}
-        />
+        <meshStandardMaterial color={_SEG_COL[2]} roughness={0.55} metalness={0.0} emissive={_SEG_COL[2]} emissiveIntensity={0.85} />
         <mesh scale={1.10}>
           <sphereGeometry args={[_SEG_R[2], 16, 12]} />
           <meshBasicMaterial color="#001a08" side={THREE.BackSide} />
@@ -549,11 +541,7 @@ const MenuWorm = ({ onWormClick }) => {
       </mesh>
       <mesh ref={seg3Ref}>
         <sphereGeometry args={[_SEG_R[3], 14, 10]} />
-        <meshPhysicalMaterial
-          color={_SEG_COL[3]} roughness={0.34} metalness={0.0}
-          emissive={_SEG_COL[3]} emissiveIntensity={0.46}
-          clearcoat={0.50} clearcoatRoughness={0.20}
-        />
+        <meshStandardMaterial color={_SEG_COL[3]} roughness={0.55} metalness={0.0} emissive={_SEG_COL[3]} emissiveIntensity={0.75} />
         <mesh scale={1.10}>
           <sphereGeometry args={[_SEG_R[3], 14, 10]} />
           <meshBasicMaterial color="#001a08" side={THREE.BackSide} />
@@ -561,11 +549,7 @@ const MenuWorm = ({ onWormClick }) => {
       </mesh>
       <mesh ref={tailRef}>
         <sphereGeometry args={[_SEG_R[4], 12, 8]} />
-        <meshPhysicalMaterial
-          color={_SEG_COL[4]} roughness={0.36} metalness={0.0}
-          emissive={_SEG_COL[4]} emissiveIntensity={0.40}
-          clearcoat={0.45} clearcoatRoughness={0.22}
-        />
+        <meshStandardMaterial color={_SEG_COL[4]} roughness={0.55} metalness={0.0} emissive={_SEG_COL[4]} emissiveIntensity={0.65} />
         <mesh scale={1.10}>
           <sphereGeometry args={[_SEG_R[4], 12, 8]} />
           <meshBasicMaterial color="#001a08" side={THREE.BackSide} />
