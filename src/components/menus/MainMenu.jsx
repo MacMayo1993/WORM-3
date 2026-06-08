@@ -1096,6 +1096,7 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
                   }}>
                     {!imgError && (
                       <img
+                        key={active.id}
                         src={`${import.meta.env.BASE_URL}images/modes/${active.id}.jpg`}
                         alt={`${active.label} gameplay`}
                         style={{
