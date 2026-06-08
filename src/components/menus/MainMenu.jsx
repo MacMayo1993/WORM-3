@@ -550,8 +550,8 @@ export const RotatingBlackCube = ({ onCubeClick }) => {
   const cubeRef = useRef();
   const shaking = useRef(false);
   const shakeStart = useRef(0);
-  const cubeTargetScale = useRef(0.889);
-  const cubeCurrentScale = useRef(0.889);
+  const cubeTargetScale = useRef(1.022);
+  const cubeCurrentScale = useRef(1.022);
   const onCubeClickRef = useRef(onCubeClick);
   onCubeClickRef.current = onCubeClick;
 
@@ -564,7 +564,7 @@ export const RotatingBlackCube = ({ onCubeClick }) => {
       _externalShakeNeeded = false;
       shaking.current = true;
       shakeStart.current = Date.now();
-      cubeTargetScale.current = 0.826;
+      cubeTargetScale.current = 0.950;
     }
 
     cubeCurrentScale.current += (cubeTargetScale.current - cubeCurrentScale.current) * Math.min(1, delta * 18);
@@ -574,7 +574,7 @@ export const RotatingBlackCube = ({ onCubeClick }) => {
       const elapsed = Date.now() - shakeStart.current;
       if (elapsed > 540) {
         shaking.current = false;
-        cubeTargetScale.current = 0.889;
+        cubeTargetScale.current = 1.022;
         cubeRef.current.position.set(0, 0.45, 0);
         if (_onShakeComplete) {
           _onShakeComplete();
@@ -602,8 +602,8 @@ export const RotatingBlackCube = ({ onCubeClick }) => {
     shaking.current = true;
     shakeStart.current = Date.now();
   };
-  const handleCubeDown = () => { cubeTargetScale.current = 0.842; };
-  const handleCubeUp = () => { if (!shaking.current) cubeTargetScale.current = 0.889; };
+  const handleCubeDown = () => { cubeTargetScale.current = 0.968; };
+  const handleCubeUp = () => { if (!shaking.current) cubeTargetScale.current = 1.022; };
 
   return (
     <>
