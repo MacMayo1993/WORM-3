@@ -38,11 +38,9 @@ const Tutorial = ({ onClose, onMainMenu }) => {
       title: "Welcome to WORM³",
       content: (
         <>
-          <p><b>WORM³</b> is a Rubik's Cube puzzle with a twist—literally through <b>wormholes</b>!</p>
-          <p>Before we dive in, let's understand the key concept that makes this puzzle unique: <b>antipodal pairs</b>.</p>
-          <p style={{ fontSize: '13px', marginTop: '12px', fontStyle: 'italic', color: 'rgba(255, 255, 255, 0.7)' }}>
-            Don't worry—it's simpler than it sounds!
-          </p>
+          <p><b>WORM³</b> is a Rubik's Cube puzzle built on real projective plane topology—every face is secretly connected to its opposite through <b>wormholes</b>.</p>
+          <p>Flip a sticker and it travels through the manifold, swapping color with its <b>antipodal partner</b> on the opposite side of the cube.</p>
+          <p>Solve the cube while managing these wormhole connections—that's what makes WORM³ unique.</p>
         </>
       )
     },
@@ -50,16 +48,16 @@ const Tutorial = ({ onClose, onMainMenu }) => {
       title: "What Are Antipodal Pairs?",
       content: (
         <>
-          <p>On any Rubik's Cube, every color has an <b>opposite</b>—the color on the face directly across from it. These opposites are called <b>antipodal pairs</b>.</p>
+          <p>Every face on the cube has an opposite directly across from it. These opposites are <b>antipodal pairs</b>—they share a wormhole connection.</p>
 
           <div style={{
-            background: 'rgba(255, 255, 255, 0.08)',
-            borderRadius: '8px',
+            background: 'rgba(255, 255, 255, 0.06)',
+            borderRadius: '10px',
             padding: '12px',
             margin: '12px 0',
-            border: '1px solid rgba(255, 255, 255, 0.1)'
+            border: '1px solid rgba(255, 255, 255, 0.10)'
           }}>
-            <p style={{ margin: '0 0 8px 0', fontWeight: 600, fontSize: '13px', color: 'rgba(255, 255, 255, 0.9)' }}>The Three Antipodal Pairs:</p>
+            <p style={{ margin: '0 0 8px 0', fontWeight: 700, fontSize: '13px', color: 'rgba(255, 255, 255, 0.85)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>The Three Antipodal Pairs:</p>
             <div style={{ display: 'flex', justifyContent: 'space-around', flexWrap: 'wrap', gap: '8px' }}>
               <span><span style={{ color: COLORS.red }}>●</span> Red ↔ Orange <span style={{ color: COLORS.orange }}>●</span></span>
               <span><span style={{ color: COLORS.green }}>●</span> Green ↔ Blue <span style={{ color: COLORS.blue }}>●</span></span>
@@ -67,17 +65,8 @@ const Tutorial = ({ onClose, onMainMenu }) => {
             </div>
           </div>
 
-          <p>Think of it like the Earth: if you're standing on one spot, your <b>antipodal point</b> is the exact opposite side of the planet—where you'd end up if you dug straight through!</p>
-
-          <img
-            src="/images/tutorial/solved-cube.png"
-            alt="Solved Rubik's cube showing green and orange faces"
-            style={imageStyle}
-            onError={(e) => { e.target.style.display = 'none'; }}
-          />
-          <p style={{ fontSize: '12px', textAlign: 'center', color: 'rgba(255, 255, 255, 0.6)', marginTop: '4px' }}>
-            A solved cube—green face visible, orange on the left (its pair, blue, is hidden on the right)
-          </p>
+          <p>Think of the Earth: your antipodal point is the exact opposite side of the planet—where you'd emerge if you dug straight through. In WORM³, flipping a sticker sends it on exactly that journey.</p>
+          <p style={{ fontSize: '13px', color: 'rgba(200, 220, 255, 0.70)' }}><b>Small circle on a sticker</b> = its original color, a breadcrumb of its journey through the manifold.</p>
         </>
       )
     },
@@ -85,35 +74,16 @@ const Tutorial = ({ onClose, onMainMenu }) => {
       title: "The Wormhole Connection",
       content: (
         <>
-          <p>In WORM³, antipodal stickers are <b>linked through wormholes</b>. When you flip one sticker, its antipodal partner flips too!</p>
+          <p>When you flip a sticker, a glowing <b>tunnel</b> appears connecting it to its antipodal partner. Both stickers swap colors simultaneously—you're changing two points at once.</p>
 
-          <p>Watch what happens when we flip the green center sticker:</p>
-
-          <div style={imageRowStyle}>
-            <div style={{ textAlign: 'center' }}>
-              <img
-                src="/images/tutorial/flip-result.png"
-                alt="Cube after flip - green sticker now shows blue"
-                style={smallImageStyle}
-                onError={(e) => { e.target.style.display = 'none'; }}
-              />
-              <p style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.6)', margin: '4px 0 0 0' }}>Green → Blue</p>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <img
-                src="/images/tutorial/exploded-tunnel.png"
-                alt="Exploded view showing wormhole tunnel between antipodal stickers"
-                style={smallImageStyle}
-                onError={(e) => { e.target.style.display = 'none'; }}
-              />
-              <p style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.6)', margin: '4px 0 0 0' }}>The wormhole tunnel</p>
-            </div>
+          <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: '10px', padding: '12px', margin: '12px 0', border: '1px solid rgba(255,255,255,0.10)', fontSize: '13px', lineHeight: 1.7 }}>
+            <p style={{ margin: '0 0 6px 0' }}>Tunnels grow <b>thicker and brighter</b> the more times a pair has been flipped.</p>
+            <p style={{ margin: '0 0 6px 0' }}><b>Tally marks</b> on each sticker count its total wormhole journeys.</p>
+            <p style={{ margin: 0 }}>Press <b>T</b> or use the Tunnels button to toggle tunnel visibility.</p>
           </div>
 
-          <p>The <b>tunnel</b> shows the wormhole connection. Both the green sticker AND its blue antipodal partner swapped colors simultaneously!</p>
-
-          <p style={{ fontSize: '13px', marginTop: '8px', color: 'rgba(255, 255, 255, 0.7)' }}>
-            <b>Key insight:</b> You're not just changing one sticker—you're affecting TWO stickers on opposite sides of the cube!
+          <p style={{ fontSize: '13px', color: 'rgba(200, 220, 255, 0.70)' }}>
+            <b>Key insight:</b> Every flip affects two stickers on opposite sides of the cube. Plan accordingly!
           </p>
         </>
       )
@@ -122,13 +92,11 @@ const Tutorial = ({ onClose, onMainMenu }) => {
       title: "Basic Controls",
       content: (
         <>
-          <p><b>Rotate Cube:</b> Drag anywhere to rotate freely in any direction (360° rotation!)</p>
-          <p><b>Twist Slices:</b> Drag on a face to rotate rows, columns, or depth slices</p>
-          <p><b>Face Twist:</b> Hold <b>Shift</b> while dragging to rotate the entire face clockwise/counter-clockwise</p>
-          <p><b>On Mobile:</b> Simply tap and drag—full touch support with responsive UI!</p>
-          <p style={{ fontSize: '13px', marginTop: '8px', color: 'rgba(255, 255, 255, 0.7)' }}>
-            <b>Tip:</b> You can drag in any direction continuously without hitting rotation limits
-          </p>
+          <p><b>Rotate Cube:</b> Drag anywhere on the canvas to spin the cube freely in any direction.</p>
+          <p><b>Twist a Slice:</b> Drag directly on a sticker to rotate that row, column, or depth slice.</p>
+          <p><b>Face Twist:</b> Hold <b>Shift</b> while dragging on a face to rotate the entire face clockwise or counter-clockwise.</p>
+          <p><b>Undo:</b> Use the Undo button (or the undo control in the menu) to reverse your last move.</p>
+          <p><b>On Mobile:</b> Tap and drag for all interactions—full touch support with responsive layout.</p>
         </>
       )
     },
@@ -136,21 +104,14 @@ const Tutorial = ({ onClose, onMainMenu }) => {
       title: "Flipping Through Wormholes",
       content: (
         <>
-          <p><b>Enable FLIP mode</b> (button at bottom), then tap/click any sticker to flip it!</p>
+          <p>Press <b>G</b> or tap the <b>Flip</b> button to toggle Flip Mode. In Flip Mode, tapping any sticker sends it through the wormhole.</p>
+          <p><b>Right-click</b> (or <b>long-press</b> on mobile) to flip a single sticker without enabling Flip Mode globally.</p>
+          <p>In Flip Mode with the keyboard cursor active, press <b>F</b> to flip the sticker under the cursor.</p>
 
-          <img
-            src="/images/tutorial/chaos-tunnels.png"
-            alt="Exploded cube showing multiple wormhole tunnels during chaos"
-            style={imageStyle}
-            onError={(e) => { e.target.style.display = 'none'; }}
-          />
-          <p style={{ fontSize: '12px', textAlign: 'center', color: 'rgba(255, 255, 255, 0.6)', marginTop: '4px' }}>
-            Multiple wormhole tunnels connecting flipped antipodal pairs
-          </p>
-
-          <p>Tunnels get <b>thicker and brighter</b> with more flips, and occasionally spark with electricity!</p>
-          <p><b>Tally marks</b> appear on stickers showing how many times they've been flipped.</p>
-          <p><b>Right-click</b> (or long-press on mobile) to flip without enabling FLIP mode.</p>
+          <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: '10px', padding: '12px', margin: '12px 0', border: '1px solid rgba(255,255,255,0.10)', fontSize: '13px', lineHeight: 1.7 }}>
+            <p style={{ margin: '0 0 4px 0' }}>Every flip is tracked—tally marks accumulate on each sticker.</p>
+            <p style={{ margin: 0 }}>The WORM³ victory condition requires <em>every</em> sticker to have flipped at least once.</p>
+          </div>
         </>
       )
     },
@@ -158,15 +119,16 @@ const Tutorial = ({ onClose, onMainMenu }) => {
       title: "Visual Modes",
       content: (
         <>
-          <p>Press the <b>CLASSIC</b> button or press <b>V</b> to cycle through visual modes:</p>
+          <p>Press <b>V</b> to cycle through four visual modes:</p>
           <ul style={{ margin: '8px 0', paddingLeft: '20px', fontSize: '14px', lineHeight: '1.8' }}>
-            <li><b>Classic:</b> Traditional Rubik's Cube appearance with solid colors</li>
-            <li><b>Grid:</b> Manifold IDs overlaid (M1-001 format) showing topology</li>
-            <li><b>Sudokube:</b> Latin square numbers (1-3 for 3×3) on each face</li>
-            <li><b>Wireframe:</b> Skeletal view with LED-style edges</li>
+            <li><b>Classic:</b> Standard face colors—the familiar Rubik's Cube look</li>
+            <li><b>Grid:</b> Manifold IDs overlaid on each sticker (M1-001 format)</li>
+            <li><b>Sudokube:</b> Latin square numbers (1–3 for 3×3) on each face</li>
+            <li><b>Colors:</b> Custom color palette from your settings applied to the cube</li>
           </ul>
-          <p><b>EXPLODE:</b> Spread the cube apart to see wormhole connections clearly!</p>
-          <p><b>TUNNELS:</b> Toggle wormhole visibility (press <b>T</b>)</p>
+          <p><b>Explode (X):</b> Spread the cubies apart to see all wormhole tunnel connections clearly.</p>
+          <p><b>Tunnels (T):</b> Toggle the glowing wormhole tunnel visualization on or off.</p>
+          <p><b>Net Panel (N):</b> Open a flat 2D map showing all six faces unfolded.</p>
         </>
       )
     },
@@ -174,21 +136,17 @@ const Tutorial = ({ onClose, onMainMenu }) => {
       title: "Disparity Mode",
       content: (
         <>
-          <p><b>DISPARITY Mode</b> makes unstable flipped stickers spread to their neighbors!</p>
+          <p>Press <b>C</b> or use the Chaos button to toggle <b>Disparity (Chaos) Mode</b>. Flipped stickers become unstable and can cascade to neighboring stickers over time.</p>
           <ul style={{ margin: '6px 0', paddingLeft: '20px', fontSize: '13px', lineHeight: '1.7' }}>
-            <li><b>Level 1:</b> Gentle, sparse propagation</li>
-            <li><b>Level 2:</b> Stable low-chaos spreading</li>
-            <li><b>Level 3:</b> Aggressive chain movement</li>
-            <li><b>Level 4:</b> Heavy sustained pressure</li>
-            <li><b>Level 5:</b> Deep-manifold surges (strong hops, throttled cadence)</li>
+            <li><b>Level 1:</b> Gentle, occasional cascades</li>
+            <li><b>Level 2:</b> Moderate, regular spreading</li>
+            <li><b>Level 3:</b> Aggressive chain propagation</li>
+            <li><b>Level 4:</b> Heavy sustained chaos</li>
+            <li><b>Level 5:</b> Deep-manifold surges — strong hops with pacing</li>
           </ul>
-          <p><b>AUTO Mode:</b> Enable within chaos for automatic rotations based on cube instability!</p>
-          <ul style={{ margin: '4px 0', paddingLeft: '20px', fontSize: '12px' }}>
-            <li>Stable cube = 10 seconds between rotations</li>
-            <li>Chaotic cube = as fast as 0.75 seconds!</li>
-          </ul>
-          <p style={{ fontSize: '13px', marginTop: '8px', color: 'rgba(255, 255, 255, 0.7)' }}>
-            The Tetris-style preview shows your next incoming rotation!
+          <p><b>AUTO Mode:</b> The cube rotates automatically based on instability — fast when chaotic, slow when stable.</p>
+          <p style={{ fontSize: '13px', color: 'rgba(200, 220, 255, 0.70)', marginTop: '6px' }}>
+            Chaos mode is used in the CHAOS game mode and can be toggled freely in Classic and Free Play.
           </p>
         </>
       )
@@ -197,23 +155,23 @@ const Tutorial = ({ onClose, onMainMenu }) => {
       title: "Keyboard Controls",
       content: (
         <>
-          <p><b>Arrow Keys:</b> Move cursor across faces (wraps around edges!)</p>
+          <p><b>Arrow Keys:</b> Move the cursor across stickers (wraps around face edges!)</p>
           <p><b>Slice Rotations:</b></p>
           <ul style={{ margin: '4px 0', paddingLeft: '20px', fontSize: '13px' }}>
-            <li><b>W/S:</b> Rotate column slice up/down</li>
-            <li><b>A/D:</b> Rotate row slice left/right</li>
-            <li><b>Q/E:</b> Rotate face counter-clockwise/clockwise</li>
+            <li><b>W / S:</b> Rotate column slice up / down</li>
+            <li><b>A / D:</b> Rotate row slice left / right</li>
+            <li><b>Q / E:</b> Rotate face counter-clockwise / clockwise</li>
           </ul>
           <p><b>Quick Toggles:</b></p>
           <ul style={{ margin: '4px 0', paddingLeft: '20px', fontSize: '13px' }}>
-            <li><b>F</b> - Flip sticker at cursor</li>
-            <li><b>G</b> - Toggle flip mode</li>
-            <li><b>C</b> - Toggle Disparity Mode</li>
-            <li><b>X</b> - Toggle explode view</li>
-            <li><b>T</b> - Toggle tunnels</li>
-            <li><b>V</b> - Cycle visual modes</li>
-            <li><b>Space</b> - Shuffle | <b>R</b> - Reset</li>
-            <li><b>H</b> or <b>?</b> - Help | <b>Esc</b> - Close menus</li>
+            <li><b>F</b> — Flip sticker at cursor (requires Flip Mode on)</li>
+            <li><b>G</b> — Toggle Flip Mode on / off</li>
+            <li><b>C</b> — Toggle Chaos (Disparity) Mode</li>
+            <li><b>V</b> — Cycle visual mode (Classic → Grid → Sudokube → Colors)</li>
+            <li><b>X</b> — Toggle explode view</li>
+            <li><b>T</b> — Toggle tunnel visibility</li>
+            <li><b>N</b> — Toggle net panel (flat 2D cube map)</li>
+            <li><b>H</b> or <b>?</b> — Help &nbsp;|&nbsp; <b>Esc</b> — Close menus</li>
           </ul>
         </>
       )
@@ -222,18 +180,15 @@ const Tutorial = ({ onClose, onMainMenu }) => {
       title: "Victory Conditions",
       content: (
         <>
-          <p>Four different ways to win—each more challenging!</p>
+          <p>Four ways to win—mix and match for the ultimate challenge:</p>
           <ul style={{ margin: '8px 0', paddingLeft: '20px', fontSize: '14px', lineHeight: '1.8' }}>
-            <li><b>Classic:</b> Solve all faces to uniform colors</li>
-            <li><b>Sudokube:</b> Valid Latin squares on all faces (no repeated numbers in rows/columns)</li>
-            <li><b>Ultimate:</b> Both Classic AND Sudokube simultaneously!</li>
-            <li><b>WORM³:</b> Solve with every sticker having traveled through a wormhole at least once!</li>
+            <li><b>Classic:</b> All six faces show a single uniform color</li>
+            <li><b>Sudokube:</b> Valid Latin squares on all faces — no repeated numbers in any row or column</li>
+            <li><b>Ultimate:</b> Classic AND Sudokube simultaneously — the hardest challenge</li>
+            <li><b>WORM³:</b> Solve the cube after every sticker has traveled through a wormhole at least once</li>
           </ul>
-          <p style={{ marginTop: '12px', padding: '12px', background: 'rgba(59, 130, 246, 0.15)', borderRadius: '8px', fontSize: '13px', border: '1px solid rgba(59, 130, 246, 0.3)' }}>
-            <b>Tip:</b> Use <b>SHUFFLE</b> to start a new game. Achievement badges appear when you complete each victory type!
-          </p>
-          <p style={{ marginTop: '12px', fontStyle: 'italic', fontSize: '13px', color: 'rgba(255, 255, 255, 0.7)', textAlign: 'center' }}>
-            Good luck, topologist! Press SHUFFLE to begin.
+          <p style={{ marginTop: '12px', padding: '12px', background: 'rgba(168, 85, 247, 0.12)', borderRadius: '10px', fontSize: '13px', border: '1px solid rgba(168, 85, 247, 0.28)' }}>
+            <b>Tip:</b> Hit <b>SHUFFLE</b> in the menu to scramble and start a new game. Victory badges unlock as you achieve each condition!
           </p>
         </>
       )
@@ -245,11 +200,11 @@ const Tutorial = ({ onClose, onMainMenu }) => {
   return (
     <div className="tutorial-overlay">
       <div className="tutorial-card" style={{ maxWidth: '620px' }}>
-        <h2 style={{ marginBottom: '4px', color: 'rgba(255, 255, 255, 0.95)', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>{currentStep.title}</h2>
-        <div style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.5)', marginBottom: '16px', letterSpacing: '0.08em', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
+        <h2 style={{ marginBottom: '4px', color: '#e8edf8', fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif', fontWeight: 800, letterSpacing: '-0.01em' }}>{currentStep.title}</h2>
+        <div style={{ fontSize: '11px', color: 'rgba(200, 220, 255, 0.50)', marginBottom: '16px', letterSpacing: '0.12em', textTransform: 'uppercase', fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif' }}>
           Step {step} of {totalSteps}
         </div>
-        <div style={{ fontSize: '14px', lineHeight: '1.6', color: 'rgba(255, 255, 255, 0.9)', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
+        <div style={{ fontSize: '14px', lineHeight: '1.65', color: 'rgba(200, 220, 255, 0.88)', fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif' }}>
           {currentStep.content}
         </div>
         <div className="tutorial-actions" style={{ marginTop: '20px' }}>
