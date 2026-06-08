@@ -1185,7 +1185,7 @@ const MenuTitleCard = ({ visible }) => (
           <div className="worm-cube-face worm-cube-face--right">3</div>
           <div className="worm-cube-face worm-cube-face--top">3</div>
           <div className="worm-cube-face worm-cube-face--back" />
-          <div className="worm-cube-face worm-cube-face--left" />
+          <div className="worm-cube-face worm-cube-face--left">3</div>
           <div className="worm-cube-face worm-cube-face--bottom" />
         </div>
       </div>
