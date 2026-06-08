@@ -85,6 +85,11 @@ const ScreenGlow = () => {
 // Plain module-level variable: no React state needed, just a synchronous gate.
 let _carouselActive = false;
 
+// ─── Cube-shake bridge — Start button triggers 3D shake remotely ─────────────
+let _externalShakeNeeded = false;
+// ─── Post-shake callback — MainMenu registers this to open the carousel ───────
+let _onShakeComplete = null;
+
 // ─── Shuffling cube — live Rubik's slice animation ────────────────────────────
 const STICKER_CFG = [
   { dir: 'PX', pos: [0.501, 0, 0],   rot: [0,  Math.PI / 2, 0] },
@@ -555,6 +560,13 @@ export const RotatingBlackCube = ({ onCubeClick }) => {
     const t = state.clock.elapsedTime;
     updateSharedTime(t);
 
+    if (_externalShakeNeeded && !shaking.current) {
+      _externalShakeNeeded = false;
+      shaking.current = true;
+      shakeStart.current = Date.now();
+      cubeTargetScale.current = 0.826;
+    }
+
     cubeCurrentScale.current += (cubeTargetScale.current - cubeCurrentScale.current) * Math.min(1, delta * 18);
     cubeRef.current.scale.setScalar(cubeCurrentScale.current);
 
@@ -564,7 +576,11 @@ export const RotatingBlackCube = ({ onCubeClick }) => {
         shaking.current = false;
         cubeTargetScale.current = 0.889;
         cubeRef.current.position.set(0, 0.45, 0);
-        onCubeClickRef.current?.();
+        if (_onShakeComplete) {
+          _onShakeComplete();
+        } else {
+          onCubeClickRef.current?.();
+        }
       } else {
         const intensity = 0.10 * (1 - elapsed / 540);
         cubeRef.current.position.x = Math.sin(t * 42) * intensity;
@@ -975,7 +991,7 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
 const MenuStartButton = ({ visible, onClick }) => (
   <div style={{
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    paddingBottom: 'max(110px, env(safe-area-inset-bottom, 110px))',
+    paddingBottom: 'max(120px, env(safe-area-inset-bottom, 120px))',
     display: 'flex', justifyContent: 'center', alignItems: 'center',
     opacity: visible ? 1 : 0,
     transform: visible ? 'none' : 'translateY(16px)',
@@ -1081,6 +1097,11 @@ const MainMenu = ({
     return () => { clearTimeout(t1); clearTimeout(t3); };
   }, []);
 
+  useEffect(() => {
+    _onShakeComplete = () => setShowCarousel(true);
+    return () => { _onShakeComplete = null; };
+  }, []);
+
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'transparent', zIndex: 9999, overflow: 'hidden', pointerEvents: 'none' }}>
       <MenuBackgroundOrbs />
@@ -1089,7 +1110,7 @@ const MainMenu = ({
       {showCarousel ? (
         <ModeCarousel
           onBack={() => setShowCarousel(false)}
-          onCubeSelect={onLevels}
+          onCubeSelect={onFreeplay}
           onWormSelect={onWormHealer}
           onChaos={onDisparity}
           onFreeplay={onFreeplay}
@@ -1098,7 +1119,7 @@ const MainMenu = ({
           onHowToPlay={onTeach}
         />
       ) : (
-        <MenuStartButton visible={bottomVisible} onClick={() => setShowCarousel(true)} />
+        <MenuStartButton visible={bottomVisible} onClick={() => { _externalShakeNeeded = true; }} />
       )}
     </div>
   );
