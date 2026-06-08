@@ -160,7 +160,7 @@ const ShuffleCubie = React.memo(({ cubie }) => {
 });
 ShuffleCubie.displayName = 'ShuffleCubie';
 
-const ShufflingCube = () => {
+const ShufflingCube = ({ onFlip }) => {
   const [cubeState, setCubeState] = useState(() => {
     // Pre-scramble with middle-slice moves to get an interesting initial state
     let cubies = makeCubies(3);
@@ -254,6 +254,7 @@ const ShufflingCube = () => {
       pipelineRef.current = 'worm';
       setCubeState({ cubies: newCubies, rotating: null });
       setFlipWaves([wave]);
+      onFlip?.();
     }
 
     if (pipelineRef.current === 'worm' && wormCompletedRef.current) {
@@ -561,7 +562,7 @@ const MenuWorm = ({ onWormClick }) => {
 };
 
 // ─── Rotating cube + worm mascot — exported for App.jsx's shared Canvas ───────
-export const RotatingBlackCube = ({ onCubeClick }) => {
+export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
   const cubeRef = useRef();
   const shaking = useRef(false);
   const shakeStart = useRef(0);
@@ -630,7 +631,7 @@ export const RotatingBlackCube = ({ onCubeClick }) => {
         onPointerUp={handleCubeUp}
         onPointerLeave={handleCubeUp}
       >
-        <ShufflingCube />
+        <ShufflingCube onFlip={onFlip} />
       </group>
     </>
   );

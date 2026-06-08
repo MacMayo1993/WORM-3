@@ -94,7 +94,7 @@ export default function BlackHoleEnvironment({ flipTrigger = 0, zoom = 1.65, orb
           for (int i = 0; i < 3; i++) {
             vec2 starCoord = coord * (10.0 + float(i) * 6.0);
             float starNoise = hash(floor(starCoord + float(i) * 100.0));
-            if (starNoise > 0.97) {
+            if (starNoise > 0.95) {
               float starDist = length(fract(starCoord) - 0.5);
               float twinkle = 0.7 + 0.3 * sin(time * (2.0 + starNoise * 3.0) + starNoise * 100.0);
               stars += smoothstep(0.06, 0.0, starDist) * (0.5 + starNoise * 0.5) * twinkle;
@@ -105,7 +105,7 @@ export default function BlackHoleEnvironment({ flipTrigger = 0, zoom = 1.65, orb
           for (int i = 0; i < 4; i++) {
             vec2 starCoord = coord * (20.0 + float(i) * 10.0);
             float starNoise = hash(floor(starCoord + float(i) * 200.0));
-            if (starNoise > 0.92) {
+            if (starNoise > 0.88) {
               float starDist = length(fract(starCoord) - 0.5);
               float twinkle = 0.8 + 0.2 * sin(time * (1.5 + starNoise * 2.0) + starNoise * 50.0);
               stars += smoothstep(0.04, 0.0, starDist) * (0.3 + starNoise * 0.3) * twinkle;
@@ -116,7 +116,7 @@ export default function BlackHoleEnvironment({ flipTrigger = 0, zoom = 1.65, orb
           for (int i = 0; i < 5; i++) {
             vec2 starCoord = coord * (40.0 + float(i) * 15.0);
             float starNoise = hash(floor(starCoord + float(i) * 300.0));
-            if (starNoise > 0.85) {
+            if (starNoise > 0.81) {
               float starDist = length(fract(starCoord) - 0.5);
               stars += smoothstep(0.025, 0.0, starDist) * 0.15 * starNoise;
             }
@@ -127,7 +127,7 @@ export default function BlackHoleEnvironment({ flipTrigger = 0, zoom = 1.65, orb
           for (int i = 0; i < 3; i++) {
             vec2 dustCoord = coord * (80.0 + float(i) * 30.0);
             float dustNoise = hash(floor(dustCoord + float(i) * 500.0));
-            if (dustNoise > 0.75) {
+            if (dustNoise > 0.72) {
               float dustDist = length(fract(dustCoord) - 0.5);
               starDust += smoothstep(0.02, 0.0, dustDist) * 0.08;
             }

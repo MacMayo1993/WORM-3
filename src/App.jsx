@@ -44,6 +44,7 @@ import {
 // 3D components
 import IntroScene from './components/intro/IntroScene.jsx';
 import BlackHoleEnvironment from './3d/BlackHoleEnvironment.jsx';
+import ShootingStars from './3d/ShootingStars.jsx';
 import { setSharedRenderer, tickPreviews, hasActivePreviews } from './3d/TilePreviewRenderer.js';
 
 // UI components
@@ -164,6 +165,9 @@ function CameraManager({ showWelcome, showMainMenu, cameraZ }) {
  * Rendered inside the shared Canvas so there is never a second WebGL context.
  */
 function MenuScene({ onCubeClick }) {
+  const [menuFlipTrigger, setMenuFlipTrigger] = React.useState(0);
+  const handleMenuFlip = React.useCallback(() => setMenuFlipTrigger(p => p + 1), []);
+
   return (
     <>
       <color attach="background" args={['#000005']} />
@@ -171,10 +175,11 @@ function MenuScene({ onCubeClick }) {
       <pointLight position={[8, 8, 10]} intensity={1.4} color="#a8d8ff" />
       <pointLight position={[-9, -8, 7]} intensity={0.7} color="#7aa3ff" />
       <Suspense fallback={null}>
-        <BlackHoleEnvironment zoom={1.2} orbitStrength={0.1} />
+        <BlackHoleEnvironment zoom={1.2} orbitStrength={0.1} flipTrigger={menuFlipTrigger} />
       </Suspense>
+      <ShootingStars />
       <Suspense fallback={null}>
-        <RotatingBlackCube onCubeClick={onCubeClick} />
+        <RotatingBlackCube onCubeClick={onCubeClick} onFlip={handleMenuFlip} />
       </Suspense>
       {!isMobile && (
         <EffectComposer>
