@@ -604,9 +604,9 @@ export const RotatingBlackCube = ({ onCubeClick }) => {
       }
     } else {
       // Compound rotation shows all 6 faces over time
-      cubeRef.current.rotation.y = t * 0.20 + Math.sin(t * 0.09) * 0.55;
-      cubeRef.current.rotation.x = Math.sin(t * 0.13) * 0.48;
-      cubeRef.current.rotation.z = Math.sin(t * 0.07) * 0.18;
+      cubeRef.current.rotation.y = t * 0.24 + Math.sin(t * 0.108) * 0.55;
+      cubeRef.current.rotation.x = Math.sin(t * 0.156) * 0.48;
+      cubeRef.current.rotation.z = Math.sin(t * 0.084) * 0.18;
       cubeRef.current.position.set(0, 0.45, 0);
     }
   });
