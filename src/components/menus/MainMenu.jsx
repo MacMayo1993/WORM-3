@@ -857,7 +857,7 @@ const TileCardFace = ({ mode }) => (
       boxShadow: ['inset 0 -6px 16px rgba(0,0,0,0.45)', 'inset 4px 4px 14px rgba(255,255,255,0.22)', 'inset -3px -3px 10px rgba(0,0,0,0.28)'].join(', '),
     }}>
       <div style={{ position: 'absolute', inset: 0, borderRadius: '14px', pointerEvents: 'none', background: 'linear-gradient(135deg, rgba(255,255,255,0.26) 0%, transparent 48%, rgba(0,0,0,0.14) 100%)' }} />
-      <div style={{ position: 'relative', zIndex: 1, textAlign: 'center', fontSize: 'clamp(26px,7vw,42px)', fontWeight: 900, lineHeight: 1, letterSpacing: '0.05em', fontFamily: MENU_FONT, color: mode.textColor, textShadow: '0 2px 6px rgba(0,0,0,0.40)' }}>{mode.label}</div>
+      <div style={{ position: 'relative', zIndex: 1, textAlign: 'center', fontSize: 'clamp(26px,7vw,42px)', fontWeight: 900, lineHeight: 1, letterSpacing: '0.05em', fontFamily: "'Bungee', cursive", color: mode.textColor, textShadow: '0 2px 6px rgba(0,0,0,0.40)' }}>{mode.label}</div>
       <p style={{ position: 'relative', zIndex: 1, margin: 0, maxWidth: '160px', textAlign: 'center', fontSize: '11px', lineHeight: 1.45, fontFamily: MENU_FONT, color: mode.textColor === '#fff' ? 'rgba(255,255,255,0.70)' : 'rgba(0,0,0,0.56)' }}>{mode.desc}</p>
     </div>
   </div>
@@ -1006,7 +1006,7 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
             <p style={{
               margin: '0 0 18px', textAlign: 'center',
               fontSize: '9px', fontWeight: 800, letterSpacing: '0.30em',
-              textTransform: 'uppercase', color: 'rgba(255,255,255,0.65)', fontFamily: MENU_FONT,
+              textTransform: 'uppercase', color: 'rgba(255,255,255,0.65)', fontFamily: "'Bungee', cursive",
             }}>Choose your mode</p>
 
             {/* Card row — swipe (touch) + drag (mouse) + arrow buttons */}
@@ -1163,7 +1163,7 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
                 border: '1.5px solid rgba(255,255,255,0.55)',
                 background: 'rgba(0,0,0,0.28)',
                 color: '#fff', fontWeight: 800, fontSize: '14px', letterSpacing: '0.22em',
-                textTransform: 'uppercase', cursor: 'pointer', fontFamily: MENU_FONT,
+                textTransform: 'uppercase', cursor: 'pointer', fontFamily: "'Bungee', cursive",
                 boxShadow: '0 2px 16px rgba(0,0,0,0.30)',
                 transition: 'background 160ms ease, box-shadow 160ms ease, border-color 160ms ease',
                 WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
