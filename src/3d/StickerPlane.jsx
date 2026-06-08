@@ -331,7 +331,10 @@ const spinRevealFragmentShader = `
     // Slight brighten/darken modulation preserves motion readability without
     // introducing additive white accumulation under load.
     float shade = 1.0 + (wisp - 0.5 * energy) * 0.18;
-    vec3 col = clamp(uColor * shade, 0.0, 1.0);
+    // uDissolve tracks scale.x squish (1=face-on, 0=edge-on): dim the tile as it rotates
+    // away to simulate 3D edge lighting during the card-flip.
+    float brightness = 0.35 + 0.65 * uDissolve;
+    vec3 col = clamp(uColor * shade * brightness, 0.0, 1.0);
 
     // Fully opaque within the disc — the main mesh is hidden during the flip so the
     // spinReveal is the sole visible layer.  Any alpha < 1 lets background content show
@@ -805,9 +808,14 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       spinT.current -= dt;
       const rawP = 1 - spinT.current;
 
-      // No geometry squish — the portal overlay handles the entire visual transition.
-      groupRef.current.scale.set(1, 1, 1);
-      groupRef.current.rotation.y = rot[1]; // fixed — never animates
+      // Card-flip squish: compress scale.x to 0 (tile rotates edge-on), swap color at the
+      // zero-width moment, then expand back. Ease-in-out makes the deceleration at the edge
+      // feel physical rather than mechanical.
+      const halfT = rawP < 0.5 ? rawP * 2.0 : (rawP - 0.5) * 2.0;
+      const easedHalf = halfT * halfT * (3.0 - 2.0 * halfT);
+      const flipSquish = Math.max(0.001, rawP < 0.5 ? 1.0 - easedHalf : easedHalf);
+      groupRef.current.scale.set(flipSquish, 1, 1);
+      groupRef.current.rotation.y = rot[1];
       groupRef.current.rotation.z = rot[2];
 
       // Broadcast flip progress so WormholeTunnel can arch-lift in sync.
@@ -827,7 +835,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         const contractProgress = Math.max(0.0, 1.0 - rawP / 0.5);
         spinRevealMatRef.current.uniforms.uProgress.value = contractProgress;
         spinRevealMatRef.current.uniforms.uTime.value = state.clock.elapsedTime;
-        spinRevealMatRef.current.uniforms.uDissolve.value = Math.min(1.0, rawP * 2.0);
+        spinRevealMatRef.current.uniforms.uDissolve.value = flipSquish;
       }
 
       // Midpoint: switch the spin-reveal colour from FROM to TO and begin the outside-in reveal.
@@ -835,7 +843,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         if (spinRevealRef.current && spinRevealMatRef.current && flipToColor.current) {
           spinRevealMatRef.current.uniforms.uColor.value.set(flipToColor.current);
           spinRevealMatRef.current.uniforms.uProgress.value = 0.0;
-          spinRevealMatRef.current.uniforms.uDissolve.value = 1.0;
+          spinRevealMatRef.current.uniforms.uDissolve.value = flipSquish;
           spinRevealRef.current.visible = true;
         }
         // Ring opacity spike — event horizon signal.
@@ -850,7 +858,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         const revealProgress = Math.min(1.0, (rawP - 0.5) * 2.0);
         spinRevealMatRef.current.uniforms.uProgress.value = revealProgress;
         spinRevealMatRef.current.uniforms.uTime.value = state.clock.elapsedTime;
-        spinRevealMatRef.current.uniforms.uDissolve.value = Math.max(0.0, (1.0 - rawP) * 2.0);
+        spinRevealMatRef.current.uniforms.uDissolve.value = flipSquish;
       }
 
       prevRawP.current = rawP;
