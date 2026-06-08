@@ -1082,7 +1082,7 @@ const MenuBackgroundOrbs = () => (
 
 // ─── Main component ───────────────────────────────────────────────────────────
 const MainMenu = ({
-  onPlay: _onPlay, onLevels, onFreeplay, onRandom, onCoop: _onCoop, onTeach,
+  onPlay: _onPlay, onLevels: _onLevels, onFreeplay, onRandom, onCoop: _onCoop, onTeach,
   onSettings: _onSettings, onBiome: _onBiome, onDisparity,
   onWormHealer, onHolonomy: _onHolonomy, onMerge: _onMerge,
   onStore: _onStore, onComingSoon, onMobiusCubelet: _onMobiusCubelet,
