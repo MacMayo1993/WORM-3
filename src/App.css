@@ -3367,9 +3367,9 @@ select.btn-compact:disabled {
 .worm-title-letter {
   display: inline-block;
   font-family: 'Bungee', cursive;
-  font-size: clamp(70px, 18vw, 120px);
+  font-size: clamp(95px, 26vw, 170px);
   letter-spacing: 5px;
-  -webkit-text-stroke: 3px #1a1a2e;
+  -webkit-text-stroke: 5px white;
   text-shadow:
     2px 2px 0 #1a1a2e,
     4px 4px 0 #1a1a2e,
@@ -3428,13 +3428,13 @@ select.btn-compact:disabled {
   font-family: 'Bungee', cursive;
   font-size: 2rem;
   color: white;
-  background-color: #2ECC71;
+  background-color: #6b7280;
   padding: 15px 50px;
-  border: 3px solid #1a1a2e;
+  border: 3px solid #000000;
   border-radius: 16px;
   cursor: pointer;
   outline: none;
-  box-shadow: 0 8px 0 #27AE60, 0 15px 20px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 8px 0 #374151, 0 15px 20px rgba(0, 0, 0, 0.4);
   transition: all 0.1s ease-in-out;
   animation: wormIdlePulse 2s infinite ease-in-out;
   -webkit-tap-highlight-color: transparent;
@@ -3447,7 +3447,7 @@ select.btn-compact:disabled {
 
 .worm-tactile-btn:active {
   transform: translateY(8px);
-  box-shadow: 0 0px 0 #27AE60, 0 5px 10px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 0px 0 #374151, 0 5px 10px rgba(0, 0, 0, 0.4);
   animation: none;
 }
 
