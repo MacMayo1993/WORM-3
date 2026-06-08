@@ -778,9 +778,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     // Single-boolean gate: skip the entire body on idle frames.
     // Ensure we trigger animation if the tile is flipped (since ghost tile needs uTime updates).
     // If we need to transition the ghost tile (e.g. going from active to dormant), run at least one more frame.
-    // hasFlips keeps the loop alive so the indicator ring keeps pulsing on flipped tiles
-    // even when no other animation is running (e.g. healed tiles with flip history).
-    const anyActive = spinT.current > 0 || shakeT.current > 0 || showWormholeHazardFx || needsGhostUpdate || (spiderPlaneRef.current?.visible && !showGhostTile) || wormIntroT.current > 0 || healTRef.current >= 0 || (hasFlips && !isDead && !isSudokube);
+    // wormhole keeps the loop alive so the indicator ring pulses while the tile is in disparity.
+    const anyActive = spinT.current > 0 || shakeT.current > 0 || showWormholeHazardFx || needsGhostUpdate || (spiderPlaneRef.current?.visible && !showGhostTile) || wormIntroT.current > 0 || healTRef.current >= 0 || (wormhole && !isSudokube);
     if (!anyActive) {
       isActiveRef.current = false;
       return;
@@ -1400,10 +1399,10 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         />
       </mesh>
 
-      {/* Persistent flip indicator ring — slow heartbeat pulse that shows a tile has crossed
-          the manifold at least once. Briefly flares bright at each new flip midpoint.
-          wired to ringRef which drives scale-pulse and opacity in useFrame. */}
-      {!isDead && !isSudokube && hasFlipHistory && (
+      {/* Parity ring — only shown when flips is ODD (curr !== orig), meaning the tile is
+          currently showing its antipodal face. Even flips = back to origin = no ring.
+          Briefly flares bright at each flip midpoint. */}
+      {!isDead && !isSudokube && isWormhole && (
         <mesh ref={ringRef} position={[0, 0, 0.003]} renderOrder={2}>
           <ringGeometry args={[0.40, 0.52, 48]} />
           <meshBasicMaterial
