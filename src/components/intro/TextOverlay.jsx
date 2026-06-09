@@ -22,10 +22,10 @@ const SEQUENCE = [
   { text: 'FLIP',    start: 6.4,  end: 8.3,  c: 2 }, // long hold — tile flip phase
   { text: 'THROUGH', start: 8.8,  end: 9.6,  c: 3 },
   { text: 'THE',     start: 9.7,  end: 10.4, c: 0 },
+  { text: 'CUBE',    start: 10.6, end: 14.5, c: 1 }, // holds until intro ends — reveal is the main menu
 ];
 
-const FLIP_MID  = 7.35; // exact midpoint of FLIP's timer — snap to antipodal
-const LOGO_START = 10.6;
+const FLIP_MID = 7.35; // exact midpoint of FLIP's timer — snap to antipodal
 
 // Drop shadow matching the main menu WORM letters (scaled ~65% for smaller font)
 const DROP_SHADOW = '1px 1px 0 #1a1a2e, 3px 3px 0 #1a1a2e, 4px 4px 0 rgba(0,0,0,0.55), 5px 5px 0 rgba(0,0,0,0.30), 7px 7px 10px rgba(0,0,0,0.45)';
@@ -44,8 +44,6 @@ const TextOverlay = ({ time }) => {
   const displayColor  = word ? (flipInverted ? C[ANTIPODAL[word.c]] : C[word.c]) : C[0];
   const strokeColor   = flipInverted ? 'black' : 'white';
 
-  const showLogo = time >= LOGO_START;
-
   return (
     <div style={{
       position: 'absolute',
@@ -55,7 +53,6 @@ const TextOverlay = ({ time }) => {
       alignItems: 'center',
       justifyContent: 'center',
     }}>
-      {/* Single word — centered, large, Bungee, with main-menu-style outline */}
       {word && (
         <div style={{
           opacity: word.opacity,
@@ -69,38 +66,6 @@ const TextOverlay = ({ time }) => {
           userSelect: 'none',
         }}>
           {word.text}
-        </div>
-      )}
-
-      {/* WORM³ — same as main menu: Bungee letters + 3D cube sup */}
-      {showLogo && (
-        <div style={{
-          position: 'absolute',
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'center',
-        }}>
-          <div style={{ display: 'flex', transform: 'skewX(-5deg)' }}>
-            <span className="worm-title-letter" style={{ '--bounce-delay': '0s',    color: '#ef4444', fontSize: 'clamp(64px, 16vw, 108px)', letterSpacing: '2px', lineHeight: 1 }}>W</span>
-            <span className="worm-title-letter" style={{ '--bounce-delay': '0.12s', color: '#f97316', fontSize: 'clamp(64px, 16vw, 108px)', letterSpacing: '2px', lineHeight: 1 }}>O</span>
-            <span className="worm-title-letter" style={{ '--bounce-delay': '0.24s', color: '#22c55e', fontSize: 'clamp(64px, 16vw, 108px)', letterSpacing: '2px', lineHeight: 1 }}>R</span>
-            <span className="worm-title-letter" style={{ '--bounce-delay': '0.36s', color: '#3b82f6', fontSize: 'clamp(64px, 16vw, 108px)', letterSpacing: '2px', lineHeight: 1 }}>M</span>
-          </div>
-          {/* Scaled 3D cube superscript */}
-          <div style={{ position: 'relative', width: '22px', height: '22px', alignSelf: 'flex-start', marginLeft: '4px', marginTop: '6px', flexShrink: 0 }}>
-            <div style={{ position: 'absolute', top: 0, left: 0, transform: 'scale(0.70)', transformOrigin: 'top left' }}>
-              <div className="worm-cube-sup" style={{ marginLeft: 0 }}>
-                <div className="worm-cube-inner">
-                  <div className="worm-cube-face worm-cube-face--front">3</div>
-                  <div className="worm-cube-face worm-cube-face--right">3</div>
-                  <div className="worm-cube-face worm-cube-face--top">3</div>
-                  <div className="worm-cube-face worm-cube-face--back" />
-                  <div className="worm-cube-face worm-cube-face--left">3</div>
-                  <div className="worm-cube-face worm-cube-face--bottom" />
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       )}
     </div>
