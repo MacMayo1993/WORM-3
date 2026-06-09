@@ -110,7 +110,15 @@ const fragmentShader = `
     float edgeFade = smoothstep(0.0, 0.14, vUv.x) * smoothstep(1.0, 0.86, vUv.x);
     // Pulse boost brightens color and bumps opacity on subsequent flips
     float boostOpacity = uOpacity + uPulseBoost * 0.45;
-    gl_FragColor = vec4(col * (1.0 + uPulseBoost * 1.2), boostOpacity * edgeFade * mask);
+
+    // Black border stripe along each ribbon edge — makes the tunnel feel solid underfoot
+    float leftEdge    = 1.0 - smoothstep(0.0, 0.055, vUv.x);
+    float rightEdge   = 1.0 - smoothstep(1.0, 0.945, vUv.x);
+    float edgeOutline = clamp(leftEdge + rightEdge, 0.0, 1.0);
+
+    vec3  finalCol   = mix(col * (1.0 + uPulseBoost * 1.2), vec3(0.0), edgeOutline);
+    float finalAlpha = max(boostOpacity * edgeFade * mask, edgeOutline * 0.88);
+    gl_FragColor = vec4(finalCol, finalAlpha);
   }
 `;
 
@@ -135,7 +143,15 @@ const bumperFragmentShader = `
 
   void main() {
     float topFade = 1.0 - smoothstep(0.6, 1.0, vHeightFrac);
-    gl_FragColor  = vec4(uColor * 1.8, uOpacity * topFade);
+
+    // Black outline at base and top of each guard rail — makes bumpers feel like solid barriers
+    float baseOutline = 1.0 - smoothstep(0.0, 0.15, vHeightFrac);
+    float topOutline  = (1.0 - smoothstep(1.0, 0.80, vHeightFrac)) * topFade;
+    float outline     = clamp(baseOutline + topOutline, 0.0, 1.0);
+
+    vec3  finalCol   = mix(uColor * 1.8, vec3(0.0), outline);
+    float finalAlpha = max(uOpacity * topFade, outline * 0.92);
+    gl_FragColor = vec4(finalCol, finalAlpha);
   }
 `;
 

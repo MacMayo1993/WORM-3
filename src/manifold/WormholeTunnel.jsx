@@ -163,6 +163,8 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
   const strandMatRef = useRef();
   const streaksRef = useRef();
   const streakMaterialRef = useRef();
+  const coreOutlineTubeRef = useRef();
+  const coreOutlineMatRef = useRef();
 
   const activeStreakCount = maxStrands > 30 ? STREAK_COUNT_HIGH : STREAK_COUNT_LOW;
   const streakSeed = useMemo(() => {
@@ -221,11 +223,13 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
     const lt = lightningRef.current;
     const at = atmosphereTubeRef.current;
     const cr = centerRailRef.current;
+    const co = coreOutlineTubeRef.current;
     return () => {
       if (ct?.geometry) ct.geometry.dispose();
       if (lt?.geometry) lt.geometry.dispose();
       if (at?.geometry) at.geometry.dispose();
       if (cr?.geometry) cr.geometry.dispose();
+      if (co?.geometry) co.geometry.dispose();
     };
   }, []);
 
@@ -330,6 +334,13 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
         coreTubeRef.current.geometry = new THREE.TubeGeometry(curveRef.current, 20, 0.02 * (1 + _explosionFactor * 2), 5, false);
         if (oldGeo) oldGeo.dispose();
 
+        // Black outline shell slightly thicker than the core — borders the glow for tangibility
+        if (coreOutlineTubeRef.current) {
+          const oldOutlineGeo = coreOutlineTubeRef.current.geometry;
+          coreOutlineTubeRef.current.geometry = new THREE.TubeGeometry(curveRef.current, 20, 0.035 * (1 + _explosionFactor * 2), 5, false);
+          if (oldOutlineGeo) oldOutlineGeo.dispose();
+        }
+
         // Atmosphere tube — wide BackSide tube visible only from inside the tunnel.
         // Radius 0.28 creates tunnel-wall feel when camera flies through on centerline.
         if (atmosphereTubeRef.current) {
@@ -362,6 +373,10 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
         coreMatRef.current.uniforms.uBurst.value = Math.min(1, burstEnv + _explosionFactor * 0.5);
         coreMatRef.current.uniforms.uDanger.value = dangerT;
         coreMatRef.current.uniforms.uDead.value = dead ? 1 : 0;
+      }
+
+      if (coreOutlineMatRef.current) {
+        coreOutlineMatRef.current.opacity = dead ? 0 : 0.72;
       }
 
       // Atmosphere tube: dark tinted walls that actually occlude the background.
@@ -645,6 +660,18 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
           transparent
           opacity={0.84}
           side={THREE.BackSide}
+          depthWrite={false}
+        />
+      </mesh>
+
+      {/* Black outline shell around core — borders the glow so the tunnel feels solid */}
+      <mesh ref={coreOutlineTubeRef} renderOrder={-1}>
+        <tubeGeometry args={[new THREE.LineCurve3(new THREE.Vector3(), new THREE.Vector3(0, 0, 0.1)), 2, 0.035, 5, false]} />
+        <meshBasicMaterial
+          ref={coreOutlineMatRef}
+          color="#000000"
+          transparent
+          opacity={0.72}
           depthWrite={false}
         />
       </mesh>
