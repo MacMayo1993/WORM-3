@@ -156,6 +156,10 @@ export default function GameScene({
 
   const isGlowWorm = wormHealerMode && wormCharacter === 'glow';
 
+  const isBlackholeBackground =
+    settings.backgroundTheme === 'blackhole' ||
+    currentLevelData?.background === 'blackhole';
+
   const wormholePhaseActive = wormHealerMode && (
     wormPhase === 'entering' || wormPhase === 'tunnel' || wormPhase === 'exiting'
   );
@@ -278,14 +282,18 @@ export default function GameScene({
         )}
 
         {/* Worm mode bloom — only affects the worm's bright emissive surfaces.
-            Glow worm uses a higher threshold (0.82) so only the worm's HDR emissive
-            blooms, not background tiles. Non-glow characters use a lower threshold
-            (0.6) for orb glow. */}
+            On non-blackhole backgrounds the threshold is raised to 0.96 so bright
+            background pixels and antipodal tile colors never bloom. */}
         {wormHealerMode && (
           <EffectComposer>
             <Bloom
               intensity={wormholePhaseActive ? 0.05 : (isGlowWorm ? 0.13 : 0.18)}
-              luminanceThreshold={wormholePhaseActive ? 0.97 : (isGlowWorm ? 0.91 : 0.74)}
+              luminanceThreshold={
+                !isBlackholeBackground ? 0.96
+                  : wormholePhaseActive ? 0.97
+                  : isGlowWorm ? 0.91
+                  : 0.74
+              }
               luminanceSmoothing={isGlowWorm ? 0.82 : 0.65}
               mipmapBlur
             />
