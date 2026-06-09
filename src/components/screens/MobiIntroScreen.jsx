@@ -26,7 +26,10 @@ export const MOBI_LINES_WORM = [
   "Hi...I'm Mobi!",
   "This ain't your mama's old Nokia SNAKE game....this is WORM^3",
   "In my world...Rubik's cubes are flat",
-  "but then we covered a secret....",
+  "But then one day....",
+  "We uncovered the TRUE secret of the cube.",
+  "Each tile has a twin!  And they can switch places!",
+  "But not for too long....",
 ];
 
 // Stub banks for future modes — fill these in whenever you're ready.
