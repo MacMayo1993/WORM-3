@@ -291,12 +291,11 @@ const healSealFragmentShader = `
 `;
 
 // ─── Eyelid blink overlay ─────────────────────────────────────────────────────
-// Fires on disparity (odd-flip) transitions. The tile squishes on scale.y while
-// this overlay draws:
-//   Phase 1 (uProgress 1→0, lids closing): bright edge gleam at top+bottom of
-//     the disc that brightens as the lids converge to the center pinpoint.
-//   Phase 2 (uProgress 0→1, lids opening): bright expanding iris ring sweeps
-//     from the center outward, revealing the antipodal color.
+// Fires on disparity (odd-flip) transitions.
+// The FROM-color mesh stays fully visible underneath; this overlay covers the full
+// tile disc with the TO color at ~0.5 alpha (NormalBlending), so both colors are
+// simultaneously visible — the quantum superposition / 50-50 blend moment.
+// The scale.y eyelid squish and the lid-edge gleam ride on top of that blend.
 const eyelidVertexShader = `
   varying vec2 vUv;
   void main() {
@@ -305,8 +304,8 @@ const eyelidVertexShader = `
   }
 `;
 const eyelidFragmentShader = `
-  uniform vec3  uColor;
-  uniform float uProgress; // 1 = fully open, 0 = fully closed
+  uniform vec3  uColorTo;  // the antipodal (destination) color
+  uniform float uProgress; // 1 = fully open, 0 = fully closed (= flipSquish)
   uniform float uTime;
   varying vec2 vUv;
 
@@ -314,32 +313,31 @@ const eyelidFragmentShader = `
     vec2 uv = vUv - 0.5;
     float dist = length(uv);
     float inDisc = 1.0 - smoothstep(0.43, 0.50, dist);
-    float closed  = 1.0 - uProgress;
+    float closed  = 1.0 - uProgress;  // 1 when squished shut, 0 when open
 
-    // Eyelid edge gleam — bright band at the top and bottom rim of the disc.
-    // As lids close (closed→1) the bands brighten and converge inward.
+    // Full-disc base at 0.5 alpha: overlaid on the FROM-color mesh via NormalBlending
+    // this gives exactly a 50/50 mix — both states visible simultaneously.
+    float baseAlpha = 0.50 * inDisc;
+
+    // Eyelid edge gleam — bright band at top and bottom rim, intensifies as lids close.
     float topBot  = abs(abs(uv.y) - 0.41);
     float lidEdge = (1.0 - smoothstep(0.0, 0.055, topBot)) * inDisc;
     float lidBright = 0.15 + closed * 0.85;
-
-    // Subtle arc shimmer along the lid boundary.
     float shimmer = (0.5 + 0.5 * sin(atan(uv.x, uv.y) * 8.0 - uTime * 6.0))
-                    * lidEdge * 0.35;
+                    * lidEdge * 0.30;
 
-    // Center pinpoint: flares when fully closed (closed ≈ 1).
+    // Center pinpoint: flares at the superposition peak (scale.y ≈ 0).
     float core = (1.0 - smoothstep(0.0, 0.09, dist)) * closed * closed;
 
-    // Iris ring: expands outward from center as the eye opens (phase 2).
-    float irisR  = uProgress * 0.44;
-    float iris   = (1.0 - smoothstep(0.0, 0.045, abs(dist - irisR)))
-                   * uProgress * inDisc;
+    // Iris ring sweeps outward from center as the eye opens (phase 2).
+    float irisR = uProgress * 0.44;
+    float iris  = (1.0 - smoothstep(0.0, 0.045, abs(dist - irisR))) * uProgress * inDisc;
 
-    vec3 col   = uColor * (1.5 + closed * 0.6);
-    float alpha = clamp(lidEdge * lidBright + core * 1.3 + iris * 0.65 + shimmer, 0.0, 0.95)
-                  * inDisc;
+    float alpha = clamp(baseAlpha + lidEdge * lidBright + core * 1.1 + iris * 0.55 + shimmer,
+                        0.0, 0.95);
 
     if (alpha < 0.001) discard;
-    gl_FragColor = vec4(col, alpha);
+    gl_FragColor = vec4(uColorTo, alpha);
   }
 `;
 
@@ -538,7 +536,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const eyelidOverlayRef = useRef();
   const eyelidMatRef = useRef();
   const [eyelidUniforms] = React.useState(() => ({
-    uColor: { value: new THREE.Color() },
+    uColorTo: { value: new THREE.Color() },
     uProgress: { value: 1.0 },
     uTime: { value: 0.0 },
   }));
@@ -745,8 +743,10 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       // Normal flip → spinning rim reveal.
       isDisparityFlipRef.current = flips % 2 === 1;
       if (isDisparityFlipRef.current) {
-        if (eyelidOverlayRef.current && eyelidMatRef.current && flipFromColor.current) {
-          eyelidMatRef.current.uniforms.uColor.value.set(flipFromColor.current);
+        // Overlay shows TO color at 0.5 alpha (NormalBlending) over the FROM mesh.
+        // Both colors simultaneously visible = superposition blend.
+        if (eyelidOverlayRef.current && eyelidMatRef.current && flipToColor.current) {
+          eyelidMatRef.current.uniforms.uColorTo.value.set(flipToColor.current);
           eyelidMatRef.current.uniforms.uProgress.value = 1.0;
           eyelidMatRef.current.uniforms.uTime.value = 0.0;
           eyelidOverlayRef.current.visible = true;
@@ -921,20 +921,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           eyelidMatRef.current.uniforms.uProgress.value = flipSquish;
           eyelidMatRef.current.uniforms.uTime.value = state.clock.elapsedTime;
         }
-        // Midpoint: swap eyelid color and mesh to TO color while squish≈0.
+        // Midpoint: ring flash only. Mesh keeps FROM color — overlay is already showing
+        // TO at 0.5 alpha, so both colors remain blended until the animation ends.
         if (prevRawP.current < 0.5 && rawP >= 0.5) {
-          if (eyelidMatRef.current && flipToColor.current) {
-            eyelidMatRef.current.uniforms.uColor.value.set(flipToColor.current);
-          }
-          if (!isInstancedRef.current && meshRef.current) {
-            const mat = meshRef.current?.material;
-            if (mat?.color) {
-              const finalTex = currTextureRef.current;
-              mat.map = finalTex || null;
-              mat.color.set(finalTex ? '#ffffff' : baseColorRef.current);
-              mat.needsUpdate = true;
-            }
-          }
           if (ringRef.current) { ringRef.current.material.opacity = 0.9; ringFlashRef.current = 1; }
         }
       } else {
@@ -1486,8 +1475,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         <meshBasicMaterial transparent opacity={0} blending={THREE.AdditiveBlending} depthWrite={false} />
       </mesh>
 
-      {/* Eyelid blink overlay — disparity flip: vertical squish with lid-edge gleam
-          and center pinpoint burst. Replaces spinReveal for odd-flip transitions. */}
+      {/* Eyelid blink overlay — disparity flip: NormalBlending at 0.5 alpha over the
+          FROM-color mesh gives a simultaneous 50/50 superposition of both colors.
+          Scale.y eyelid squish + lid-edge gleam ride on top of the blend. */}
       <mesh ref={eyelidOverlayRef} position={[0, 0, 0.002]} visible={false} renderOrder={10}>
         <primitive object={_sharedStickerGeo} attach="geometry" />
         <shaderMaterial
@@ -1498,7 +1488,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           transparent
           depthTest={true}
           depthWrite={false}
-          blending={THREE.AdditiveBlending}
+          blending={THREE.NormalBlending}
         />
       </mesh>
 
