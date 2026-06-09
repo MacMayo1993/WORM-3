@@ -147,7 +147,11 @@ export function useChaosWorker({
 
     if (chaosMode) {
       manifoldMapRef.current = buildManifoldGridMap(cubies, size);
-      useGameStore.getState().clearDisparityGame();
+      // Don't reset worm mode — initWormMode sets chaosLevel:1 so wormHealerMode
+      // would be cleared immediately by clearDisparityGame if we called it here.
+      if (!useGameStore.getState().wormHealerMode) {
+        useGameStore.getState().clearDisparityGame();
+      }
       worker.postMessage({
         type: 'START',
         payload: {
