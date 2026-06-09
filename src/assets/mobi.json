@@ -1,0 +1,32 @@
+{
+  "__placeholder": true,
+  "__instructions": [
+    "Replace this file with your exported Lottie JSON from Rive (https://rive.app) or After Effects.",
+    "Recommended export settings:",
+    "  - Format: Lottie JSON (.json)",
+    "  - Frame rate: 30fps",
+    "  - Loop: true (idle animation loops forever)",
+    "  - Dimensions: 300x450 or similar portrait aspect ratio",
+    "",
+    "Rive workflow:",
+    "  1. Design Mobi in Rive (free at rive.app)",
+    "  2. Add an 'idle' state machine with looping float/blink/antenna animations",
+    "  3. Optionally add a 'talk' state triggered while dialogue advances",
+    "  4. Export → Lottie → save as src/assets/mobi.json",
+    "",
+    "After Effects workflow:",
+    "  1. Animate Mobi in After Effects",
+    "  2. Use the Bodymovin plugin to export as Lottie JSON",
+    "  3. Save as src/assets/mobi.json"
+  ],
+  "v": "5.12.1",
+  "fr": 30,
+  "ip": 0,
+  "op": 60,
+  "w": 300,
+  "h": 450,
+  "nm": "mobi-placeholder",
+  "ddd": 0,
+  "assets": [],
+  "layers": []
+}

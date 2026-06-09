@@ -18,6 +18,8 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import LottiePlayer from 'react-lottie-player';
+import mobiLottie from '../../assets/mobi.json';
 
 // ── Dialogue banks ────────────────────────────────────────────────────────────
 // Export these so App.jsx (or any caller) can just import the right array.
@@ -76,43 +78,29 @@ if (typeof document !== 'undefined' && !document.getElementById(_STYLE_ID)) {
   document.head.appendChild(s);
 }
 
-// ── Mobi CSS character — styled after the 3D MenuWorm ────────────────────────
+// ── True if mobi.json is still the placeholder shipped with the repo ─────────
+const LOTTIE_READY = !mobiLottie.__placeholder;
+
+// ── CSS fallback — only shown until a real Lottie asset is dropped in ─────────
 
 const SEG_COLORS = ['#3be08a', '#2fd47e', '#24be72', '#1aa862', '#129650'];
-const SEG_SIZES  = [88, 76, 66, 56, 46]; // px — generous but readable at dialogue scale
+const SEG_SIZES  = [88, 76, 66, 56, 46];
 
-function MobiCharacter({ accentColor }) {
-  const glow = accentColor || '#3be08a';
-
+function MobiCSSFallback() {
   const segBobDelays = ['0s', '0.08s', '0.16s', '0.24s', '0.32s'];
-
   return (
     <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      gap: '3px',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
       animation: 'mobiFloat 2.8s ease-in-out infinite',
-      userSelect: 'none',
-      position: 'relative',
+      userSelect: 'none', position: 'relative',
     }}>
-
-      {/* Soft glow halo behind head */}
       <div style={{
-        position: 'absolute',
-        top: '30px',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        width: '110px',
-        height: '110px',
-        borderRadius: '50%',
+        position: 'absolute', top: '30px', left: '50%', transform: 'translateX(-50%)',
+        width: '110px', height: '110px', borderRadius: '50%',
         background: `radial-gradient(circle, ${SEG_COLORS[0]}55 0%, transparent 70%)`,
         animation: 'mobiHalo 2.8s ease-in-out infinite',
-        pointerEvents: 'none',
-        zIndex: 0,
+        pointerEvents: 'none', zIndex: 0,
       }} />
-
-      {/* Antennae */}
       <div style={{ display: 'flex', gap: '38px', marginBottom: '-4px', position: 'relative', zIndex: 1 }}>
         {[0, 1].map(i => (
           <div key={i} style={{
@@ -121,92 +109,64 @@ function MobiCharacter({ accentColor }) {
             animation: i === 0 ? 'mobiAnt1 1.8s ease-in-out infinite' : 'mobiAnt2 1.8s ease-in-out infinite',
             animationDelay: i === 0 ? '0s' : '0.3s',
           }}>
-            {/* Stem */}
-            <div style={{
-              width: '4px', height: '28px',
-              borderRadius: '2px',
-              background: SEG_COLORS[0],
-              boxShadow: `0 0 0 1.5px #001a08`,
-            }} />
-            {/* Tip — mint glow */}
-            <div style={{
-              width: '12px', height: '12px', borderRadius: '50%',
-              background: '#80ffcc',
-              boxShadow: `0 0 8px #80ffcc, 0 0 16px #80ffcc88, 0 0 0 2px #001a08`,
-              marginBottom: '2px',
-            }} />
+            <div style={{ width: '4px', height: '28px', borderRadius: '2px', background: SEG_COLORS[0], boxShadow: '0 0 0 1.5px #001a08' }} />
+            <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#80ffcc', boxShadow: '0 0 8px #80ffcc, 0 0 16px #80ffcc88, 0 0 0 2px #001a08', marginBottom: '2px' }} />
           </div>
         ))}
       </div>
-
-      {/* Head */}
       <div style={{
-        width: SEG_SIZES[0], height: SEG_SIZES[0],
-        borderRadius: '50%',
+        width: SEG_SIZES[0], height: SEG_SIZES[0], borderRadius: '50%',
         background: `radial-gradient(circle at 38% 35%, ${SEG_COLORS[0]}ee 0%, ${SEG_COLORS[1]} 60%, ${SEG_COLORS[2]} 100%)`,
         boxShadow: `0 0 0 4px #001a08, 0 6px 24px #001a0888, 0 0 32px ${SEG_COLORS[0]}66`,
-        display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
         gap: '7px', position: 'relative', zIndex: 1, flexShrink: 0,
       }}>
-
-        {/* Eyes row */}
         <div style={{ display: 'flex', gap: '14px', marginTop: '4px' }}>
           {[0, 1].map(e => (
-            <div key={e} style={{ position: 'relative' }}>
-              {/* White sclera */}
-              <div style={{
-                width: '20px', height: '20px', borderRadius: '50%',
-                background: '#ffffff',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.35)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                animation: 'mobiBlink 4s ease-in-out infinite',
-                animationDelay: e === 1 ? '0.05s' : '0s',
-                overflow: 'hidden',
-              }}>
-                {/* Pupil */}
-                <div style={{
-                  width: '11px', height: '11px', borderRadius: '50%',
-                  background: '#050510',
-                  position: 'relative',
-                }}>
-                  {/* Specular dot */}
-                  <div style={{
-                    position: 'absolute', top: '2px', left: '2px',
-                    width: '4px', height: '4px', borderRadius: '50%',
-                    background: 'rgba(255,255,255,0.7)',
-                  }} />
-                </div>
+            <div key={e} style={{
+              width: '20px', height: '20px', borderRadius: '50%', background: '#ffffff',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.35)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              animation: 'mobiBlink 4s ease-in-out infinite',
+              animationDelay: e === 1 ? '0.05s' : '0s', overflow: 'hidden',
+            }}>
+              <div style={{ width: '11px', height: '11px', borderRadius: '50%', background: '#050510', position: 'relative' }}>
+                <div style={{ position: 'absolute', top: '2px', left: '2px', width: '4px', height: '4px', borderRadius: '50%', background: 'rgba(255,255,255,0.7)' }} />
               </div>
             </div>
           ))}
         </div>
-
-        {/* Smile — arc via border trick */}
-        <div style={{
-          width: '30px', height: '14px',
-          borderBottom: '3px solid #041a0a',
-          borderLeft: '2px solid transparent',
-          borderRight: '2px solid transparent',
-          borderRadius: '0 0 16px 16px',
-          marginTop: '-2px',
-        }} />
+        <div style={{ width: '30px', height: '14px', borderBottom: '3px solid #041a0a', borderLeft: '2px solid transparent', borderRight: '2px solid transparent', borderRadius: '0 0 16px 16px', marginTop: '-2px' }} />
       </div>
-
-      {/* Body segments */}
       {SEG_SIZES.slice(1).map((sz, i) => (
         <div key={i} style={{
-          width: sz, height: sz,
-          borderRadius: '50%',
+          width: sz, height: sz, borderRadius: '50%',
           background: `radial-gradient(circle at 38% 35%, ${SEG_COLORS[i + 1]}ee 0%, ${SEG_COLORS[Math.min(i + 2, 4)]} 100%)`,
           boxShadow: `0 0 0 ${3 - Math.min(i, 1)}px #001a08, 0 4px 14px #001a0866, 0 0 18px ${SEG_COLORS[i + 1]}44`,
-          flexShrink: 0,
-          animation: 'mobiSegBob 2.8s ease-in-out infinite',
-          animationDelay: segBobDelays[i + 1],
-          zIndex: 1,
-          position: 'relative',
+          flexShrink: 0, animation: 'mobiSegBob 2.8s ease-in-out infinite',
+          animationDelay: segBobDelays[i + 1], zIndex: 1, position: 'relative',
         }} />
       ))}
+    </div>
+  );
+}
+
+// ── MobiCharacter — Lottie when asset is ready, CSS fallback until then ───────
+
+function MobiCharacter({ talking }) {
+  if (!LOTTIE_READY) return <MobiCSSFallback />;
+
+  return (
+    <div style={{ width: 180, flexShrink: 0, filter: 'drop-shadow(0 0 18px #3be08a44)' }}>
+      <LottiePlayer
+        loop
+        play
+        animationData={mobiLottie}
+        // When the Lottie has named segments you can swap them here:
+        // segments={talking ? [30, 60] : [0, 30]}
+        style={{ width: '100%', height: 'auto' }}
+        rendererSettings={{ preserveAspectRatio: 'xMidYMid meet' }}
+      />
     </div>
   );
 }
@@ -365,7 +325,7 @@ const MobiIntroScreen = ({ lines, modeName, accentColor, onComplete }) => {
       >
         {/* Mobi */}
         <div style={{ flexShrink: 0 }}>
-          <MobiCharacter accentColor={accent} />
+          <MobiCharacter talking={index < lines.length - 1} />
         </div>
 
         {/* Bubble + controls */}
