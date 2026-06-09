@@ -49,6 +49,7 @@ const FreeplaySetupWizard = React.lazy(() => import('./screens/FreeplaySetupWiza
 const RandomModeSetupWizard = React.lazy(() => import('./screens/RandomModeSetupWizard.jsx'));
 const CubeModeSelectScreen = React.lazy(() => import('./screens/CubeModeSelectScreen.jsx'));
 const WormModeSetupWizard = React.lazy(() => import('./screens/WormModeSetupWizard.jsx'));
+import MobiIntroScreen, { MOBI_LINES_WORM } from './screens/MobiIntroScreen.jsx';
 const DisparitySetupWizard = React.lazy(() => import('./screens/DisparitySetupWizard.jsx'));
 const MergeThemePicker = React.lazy(() => import('../modes/merge/index.js').then((m) => ({ default: m.MergeThemePicker })));
 const DisparityWinnerScreen = React.lazy(() => import('./screens/DisparityWinnerScreen.jsx'));
@@ -92,7 +93,7 @@ export default function UILayer({
 }) {
   const {
     sheetOpen, setSheetOpen, sheetMode, setSheetMode,
-    showFreeplayWizard, showRandomWizard, showWormModeWizard, showCubeModeSelect,
+    showFreeplayWizard, showRandomWizard, showWormModeWizard, showCubeModeSelect, showMobiIntro,
     showDisparityWizard, setShowDisparityWizard,
     showDisparityBetting,
     disparityWaitingFirstFlip, disparityCountdown,
@@ -113,7 +114,7 @@ export default function UILayer({
     onWizardComplete, onWizardCancel, onRandomWizardComplete, onRandomWizardCancel,
     onCubeModeRubiks, onCubeModeDisparity, onCubeModeBack, onDisparitySetupComplete,
     onBetPlaced, onBetSkipped,
-    onWormSetupComplete, onWormWizardCancel, onWormRetry, onWormNewGame,
+    onWormSetupComplete, onMobiIntroComplete, onWormWizardCancel, onWormRetry, onWormNewGame,
     onToggleHandsMode, onFaceRotate, onTileRotation, onTileFaceRotation,
     onVictoryContinue, onVictoryNewGame,
   } = handlers;
@@ -446,6 +447,15 @@ export default function UILayer({
         <Suspense fallback={null}>
           <WormModeSetupWizard onComplete={onWormSetupComplete} onCancel={onWormWizardCancel} initialSettings={settings} />
         </Suspense>
+      )}
+
+      {showMobiIntro && (
+        <MobiIntroScreen
+          lines={MOBI_LINES_WORM}
+          modeName="WORM MODE"
+          accentColor="#33ff66"
+          onComplete={onMobiIntroComplete}
+        />
       )}
 
       {showMergeThemePicker && (
