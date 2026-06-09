@@ -870,13 +870,15 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           // Set mesh to FROM (antipodal) color so it renders while eyelid overlay shows TO.
           if (!isInstancedRef.current) {
             const mat = meshRef.current?.material;
-            if (mat) mat.color.set(fromColor);
+            if (mat?.color) { mat.color.set(fromColor); mat.needsUpdate = true; }
           }
           flipFromColor.current = fromColor;
           flipToColor.current = toColor;
+          isFlipping.current = true;
           isDisparityFlipRef.current = true;
           spinT.current = 1;
           prevRawP.current = 0;
+          if (meshRef.current) meshRef.current.visible = true;
           if (eyelidOverlayRef.current && eyelidMatRef.current) {
             eyelidMatRef.current.uniforms.uColorTo.value.set(toColor);
             eyelidMatRef.current.uniforms.uProgress.value = 1.0;
