@@ -65,10 +65,6 @@ const WelcomeScreen = ({ onEnter, introTime }) => {
           ENTER
         </button>
       )}
-
-      <p className="welcome-hint" aria-live="polite">
-        {canSkip ? 'Press Enter to start instantly.' : 'Intro will be skippable in 2s.'}
-      </p>
     </div>
   );
 };
