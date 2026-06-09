@@ -63,7 +63,7 @@ function HudPanel({ modeName, text, lines, index, isLast, onAdvance, onSkip }) {
       position: 'relative',
       width: '100%',
       boxSizing: 'border-box',
-      background: 'linear-gradient(180deg, rgba(4,10,28,0.97) 0%, rgba(2,6,20,0.99) 100%)',
+      background: 'linear-gradient(180deg, rgba(2,6,18,0.99) 0%, rgba(1,3,10,0.99) 100%)',
       backdropFilter: 'blur(16px)',
       borderTop: `2px solid ${cyan}`,
       boxShadow: `0 -6px 40px rgba(0,229,255,0.1), inset 0 1px 0 rgba(0,229,255,0.08)`,
@@ -83,39 +83,55 @@ function HudPanel({ modeName, text, lines, index, isLast, onAdvance, onSkip }) {
         boxShadow: `0 0 14px ${cyan}88`,
       }} />
 
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      {/* Header — large title + badge, like Hades boon card */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'nowrap' }}>
         <span style={{
           fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif',
-          fontSize: 'clamp(11px, 1.8vw, 14px)',
+          fontSize: 'clamp(20px, 4vw, 28px)',
           fontWeight: '800',
-          letterSpacing: '0.18em',
+          letterSpacing: '0.06em',
           textTransform: 'uppercase',
-          color: cyan,
-          textShadow: `0 0 16px ${cyan}`,
+          color: '#f0f8ff',
+          textShadow: `0 0 24px ${cyan}66, 0 2px 4px rgba(0,0,0,0.8)`,
+          lineHeight: 1,
+          flexShrink: 0,
         }}>
           MOBI
         </span>
+        {/* Mode badge — Hades EPIC-style pill */}
         <span style={{
           fontFamily: 'system-ui, -apple-system, sans-serif',
-          fontSize: 'clamp(8px, 1.1vw, 10px)',
-          letterSpacing: '0.14em',
+          fontSize: 'clamp(8px, 1.2vw, 11px)',
+          fontWeight: '700',
+          letterSpacing: '0.16em',
           textTransform: 'uppercase',
-          color: `${cyan}55`,
-          fontWeight: '500',
+          color: cyan,
+          border: `1px solid ${cyan}`,
+          padding: '3px 8px',
+          borderRadius: '2px',
+          lineHeight: 1,
+          boxShadow: `0 0 10px ${cyan}33, inset 0 0 6px ${cyan}0d`,
+          flexShrink: 0,
         }}>
-          · {modeName || 'WORM MODE'}
+          {modeName || 'WORM MODE'}
         </span>
         <span style={{
           marginLeft: 'auto',
           fontFamily: 'system-ui, sans-serif',
           fontSize: 'clamp(9px, 1.1vw, 11px)',
           color: `${cyan}40`,
-          letterSpacing: '0.04em',
+          flexShrink: 0,
         }}>
           {String(index + 1).padStart(2, '0')} / {String(lines.length).padStart(2, '0')}
         </span>
       </div>
+
+      {/* Thin divider */}
+      <div style={{
+        height: '1px',
+        background: `linear-gradient(90deg, ${cyan}88, ${cyan}22, transparent)`,
+        margin: '0 0 2px',
+      }} />
 
       {/* Dialogue */}
       <div key={index} style={{
@@ -286,7 +302,7 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
             alt="Mobi"
             style={{
               display: 'block',
-              height: 'clamp(200px, 30vh, 360px)',
+              height: 'clamp(320px, 52vh, 560px)',
               width: 'auto',
               background: 'transparent',
             }}
@@ -311,7 +327,7 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
       {/* Click hint — floats above the panel */}
       <p style={{
         position: 'absolute',
-        bottom: 'clamp(135px, 20.5vh, 180px)',
+        bottom: 'clamp(145px, 21vh, 192px)',
         left: '50%',
         transform: 'translateX(-50%)',
         fontSize: '10px',
