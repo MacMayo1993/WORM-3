@@ -341,7 +341,6 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
     return null;
   }
 
-  const rowPadding = '0 16px 36px';
 
   return (
     <div
