@@ -328,27 +328,8 @@ const Cubie = React.forwardRef(function Cubie({
 
   useFrame(() => {
     if (!popGroupRef.current) return;
-    const store = useGameStore.getState();
-
-    // Heal collapse: all healed tiles shrink to near-zero simultaneously (superposition),
-    // then expand back with the restored color. Scale animation, no translation.
-    const healEntry = store.cubieHeals[popKey];
-    if (healEntry) {
-      const rawT = (performance.now() - healEntry.startMs) / healEntry.durationMs;
-      popGroupRef.current.position.set(0, 0, 0);
-      if (rawT >= 1) {
-        popGroupRef.current.scale.setScalar(1);
-      } else {
-        // 1 at start/end, dips to 0 at midpoint — collapse → merge → re-emerge.
-        const s = Math.max(0.001, 1 - Math.sin(rawT * Math.PI));
-        popGroupRef.current.scale.setScalar(s);
-      }
-      return;
-    }
-
-    // Normal cubie-pop burst (flip animation).
-    popGroupRef.current.scale.setScalar(1);
-    const entry = store.cubiePops[popKey];
+    // Read imperatively — avoids re-rendering all cubies whenever cubiePops changes.
+    const entry = useGameStore.getState().cubiePops[popKey];
     if (!entry) {
       popGroupRef.current.position.set(0, 0, 0);
       return;
