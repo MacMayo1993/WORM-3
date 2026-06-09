@@ -13,14 +13,13 @@ import ChaosWave from '../manifold/ChaosWave.jsx';
 import FlipPropagationWave from '../manifold/FlipPropagationWave.jsx';
 import { vibrate } from '../utils/audio.js';
 import { pressState } from '../worm/wormLogic.js';
-import { updateSharedTime, updateSharedTremor, warmUpDefaultStyles, healParticleMap } from './styles/TileStyleMaterials.jsx';
+import { updateSharedTime, updateSharedTremor, warmUpDefaultStyles } from './styles/TileStyleMaterials.jsx';
 import { StickerInstanceProvider } from './StickerInstances.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { resolveColors } from '../utils/colorSchemes.js';
 import { liveRotation, resetLiveRotation } from '../worm/liveRotation.js';
 import { liveCubies } from '../worm/liveCubies.js';
-import { getManifoldGridId } from '../game/coordinates.js';
 import { healSticker } from '../game/cubeState.js';
 import { EARN_DISPARITY_TILE_RESTORE } from '../utils/economyConstants.js';
 
@@ -511,18 +510,16 @@ const CubeAssembly = React.memo(({
                 }
               }
               let updated = liveCubs;
-              const healPops = {};
+              const healCollapses = {};
               const now = performance.now();
               for (const t of toHeal) {
-                const ts = updated[t.x]?.[t.y]?.[t.z]?.stickers[t.dirKey];
-                if (ts) healParticleMap.set(getManifoldGridId(ts, size), 1);
                 updated = healSticker(updated, size, t.x, t.y, t.z, t.dirKey);
-                healPops[`${t.x},${t.y},${t.z}`] = { startMs: now, durationMs: 600 };
+                healCollapses[`${t.x},${t.y},${t.z}`] = { startMs: now, durationMs: 700 };
               }
               useGameStore.setState((state) => ({
                 cubies: updated,
                 disparityParityScore: state.disparityParityScore + toHeal.length * EARN_DISPARITY_TILE_RESTORE,
-                cubiePops: { ...state.cubiePops, ...healPops },
+                cubieHeals: { ...state.cubieHeals, ...healCollapses },
               }));
               return;
             }
