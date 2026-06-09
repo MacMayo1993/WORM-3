@@ -13,7 +13,7 @@ import ChaosWave from '../manifold/ChaosWave.jsx';
 import FlipPropagationWave from '../manifold/FlipPropagationWave.jsx';
 import { vibrate } from '../utils/audio.js';
 import { pressState } from '../worm/wormLogic.js';
-import { updateSharedTime, updateSharedTremor, warmUpDefaultStyles, pendingHealAnimRemovals } from './styles/TileStyleMaterials.jsx';
+import { updateSharedTime, updateSharedTremor, warmUpDefaultStyles } from './styles/TileStyleMaterials.jsx';
 import { StickerInstanceProvider } from './StickerInstances.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
@@ -21,7 +21,6 @@ import { resolveColors } from '../utils/colorSchemes.js';
 import { liveRotation, resetLiveRotation } from '../worm/liveRotation.js';
 import { liveCubies } from '../worm/liveCubies.js';
 import { healSticker } from '../game/cubeState.js';
-import { getManifoldGridId } from '../game/coordinates.js';
 import { EARN_DISPARITY_TILE_RESTORE } from '../utils/economyConstants.js';
 
 // Reusable axis vectors and quaternion (allocated once, never recreated)
@@ -477,18 +476,14 @@ const CubeAssembly = React.memo(({
           const dirKey = dirFromNormal(ds.n);
           const store = useGameStore.getState();
 
-          // Disparity chaos mode: tapping a tile in disparity cascade-heals it and its
-          // adjacent disparity neighbors (4 cardinal, cross-face manifold aware).
-          // Score = healed_count × EARN_DISPARITY_TILE_RESTORE parity points.
+          // Disparity chaos mode: tapping a flipped tile wave-heals outward.
+          // Wave 0 = tapped tile (fires immediately), wave N = tiles N steps away
+          // on the same face. Each wave heals + pops its cubies outward.
           if (store.chaosLevel > 0) {
             const liveCubs = store.cubies;
             const tapped = liveCubs[x]?.[y]?.[z]?.stickers[dirKey];
             if (tapped && tapped.curr !== tapped.orig) {
-              // BFS flood-fill across this face: collect every connected flipped tile.
               const S = size;
-              const visited = new Set([`${x},${y},${z}`]);
-              const toHeal = [{ x, y, z, dirKey }];
-              const queue = [{ x, y, z }];
               const faceNeighbors = (cx, cy, cz) => {
                 if (dirKey === 'PX' || dirKey === 'NX')
                   return [{ x: cx, y: cy - 1, z: cz }, { x: cx, y: cy + 1, z: cz }, { x: cx, y: cy, z: cz - 1 }, { x: cx, y: cy, z: cz + 1 }];
@@ -496,34 +491,42 @@ const CubeAssembly = React.memo(({
                   return [{ x: cx - 1, y: cy, z: cz }, { x: cx + 1, y: cy, z: cz }, { x: cx, y: cy, z: cz - 1 }, { x: cx, y: cy, z: cz + 1 }];
                 return [{ x: cx - 1, y: cy, z: cz }, { x: cx + 1, y: cy, z: cz }, { x: cx, y: cy - 1, z: cz }, { x: cx, y: cy + 1, z: cz }];
               };
-              while (queue.length) {
-                const cur = queue.pop();
-                for (const n of faceNeighbors(cur.x, cur.y, cur.z)) {
-                  if (n.x < 0 || n.x >= S || n.y < 0 || n.y >= S || n.z < 0 || n.z >= S) continue;
-                  const key = `${n.x},${n.y},${n.z}`;
-                  if (visited.has(key)) continue;
-                  visited.add(key);
-                  const ns = liveCubs[n.x]?.[n.y]?.[n.z]?.stickers[dirKey];
-                  if (ns && ns.curr !== ns.orig) {
-                    toHeal.push({ ...n, dirKey });
-                    queue.push(n);
+              // BFS to build waves — each wave = tiles at same graph distance from tap.
+              const waves = [[{ x, y, z, dirKey }]];
+              const visited = new Set([`${x},${y},${z}`]);
+              let frontier = [{ x, y, z }];
+              while (frontier.length > 0) {
+                const nextFrontier = [];
+                const wave = [];
+                for (const cur of frontier) {
+                  for (const n of faceNeighbors(cur.x, cur.y, cur.z)) {
+                    if (n.x < 0 || n.x >= S || n.y < 0 || n.y >= S || n.z < 0 || n.z >= S) continue;
+                    const key = `${n.x},${n.y},${n.z}`;
+                    if (visited.has(key)) continue;
+                    visited.add(key);
+                    const ns = liveCubs[n.x]?.[n.y]?.[n.z]?.stickers[dirKey];
+                    if (ns && ns.curr !== ns.orig) { wave.push({ ...n, dirKey }); nextFrontier.push(n); }
                   }
                 }
+                if (wave.length > 0) waves.push(wave);
+                frontier = nextFrontier;
               }
-              let updated = liveCubs;
-              const healAnims = {};
-              for (const t of toHeal) {
-                const ts = liveCubs[t.x]?.[t.y]?.[t.z]?.stickers[t.dirKey];
-                if (ts) {
-                  healAnims[getManifoldGridId(ts, size)] = { fromFaceId: ts.curr, toFaceId: ts.orig };
-                }
-                updated = healSticker(updated, size, t.x, t.y, t.z, t.dirKey);
-              }
-              useGameStore.setState((state) => ({
-                cubies: updated,
-                disparityParityScore: state.disparityParityScore + toHeal.length * EARN_DISPARITY_TILE_RESTORE,
-                stickerHealAnims: { ...state.stickerHealAnims, ...healAnims },
-              }));
+              const totalHealed = waves.reduce((s, w) => s + w.length, 0);
+              // Award score up-front so the counter updates on tap.
+              useGameStore.setState((s) => ({ disparityParityScore: s.disparityParityScore + totalHealed * EARN_DISPARITY_TILE_RESTORE }));
+              waves.forEach((tiles, waveIdx) => {
+                const fire = () => {
+                  const now = performance.now();
+                  let updated = useGameStore.getState().cubies;
+                  const pops = {};
+                  for (const t of tiles) {
+                    updated = healSticker(updated, size, t.x, t.y, t.z, t.dirKey);
+                    pops[`${t.x},${t.y},${t.z}`] = { startMs: now, durationMs: 500 };
+                  }
+                  useGameStore.setState((s) => ({ cubies: updated, cubiePops: { ...s.cubiePops, ...pops } }));
+                };
+                if (waveIdx === 0) fire(); else setTimeout(fire, waveIdx * 130);
+              });
               return;
             }
           }
@@ -744,18 +747,6 @@ const CubeAssembly = React.memo(({
     // value instead of each independently running 3×sin + pow + max per frame.
     updateSharedTremor(state.clock.elapsedTime);
 
-    // Batch-remove consumed heal animation entries from the store — all StickerPlane
-    // components accumulate their gridIds here; one setState per frame instead of N.
-    if (pendingHealAnimRemovals.size > 0) {
-      const toRemove = [...pendingHealAnimRemovals];
-      pendingHealAnimRemovals.clear();
-      useGameStore.setState((s) => {
-        if (!s.stickerHealAnims || toRemove.every(k => !(k in s.stickerHealAnims))) return s;
-        const next = { ...s.stickerHealAnims };
-        toRemove.forEach(k => delete next[k]);
-        return { stickerHealAnims: next };
-      });
-    }
 
     // Apply live drag rotation - instant, follows finger
     if (liveDragRef.current && liveDragRef.current.basePositions) {

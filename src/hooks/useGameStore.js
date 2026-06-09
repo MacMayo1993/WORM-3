@@ -254,9 +254,6 @@ export const useGameStore = create(
     // ========================================================================
     // Per-cubie pop animations: { "x,y,z": { startMs, durationMs } }
     cubiePops: {},
-    // Disparity heal animations: { gridId: { fromFaceId, toFaceId } }
-    // Set before healSticker so StickerPlane's useEffect can trigger the eyelid blink.
-    stickerHealAnims: {},
     // Per-tunnel birth (first flip) animations: { pairId: { startMs, durationMs } }
     tunnelBirths: {},
     // Per-tunnel pulse (subsequent flip) animations: { pairId: { startMs, durationMs } }
