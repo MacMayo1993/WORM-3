@@ -491,13 +491,19 @@ const CubeAssembly = React.memo(({
                 if (ns && ns.curr !== ns.orig) toHeal.push(n);
               }
               let updated = liveCubs;
+              const healPops = {};
+              const now = performance.now();
               for (const t of toHeal) {
                 const ts = updated[t.x]?.[t.y]?.[t.z]?.stickers[t.dirKey];
                 if (ts) healBurstMap.set(getManifoldGridId(ts, size), 1);
                 updated = healSticker(updated, size, t.x, t.y, t.z, t.dirKey);
+                healPops[`${t.x},${t.y},${t.z}`] = { startMs: now, durationMs: 600 };
               }
-              store.setCubies(updated);
-              store.addDisparityParityScore(toHeal.length * EARN_DISPARITY_TILE_RESTORE);
+              useGameStore.setState((state) => ({
+                cubies: updated,
+                disparityParityScore: state.disparityParityScore + toHeal.length * EARN_DISPARITY_TILE_RESTORE,
+                cubiePops: { ...state.cubiePops, ...healPops },
+              }));
               return;
             }
           }
