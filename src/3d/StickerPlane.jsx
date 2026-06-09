@@ -11,7 +11,7 @@ import { FACE_CITIES, CITY_CONFIG } from '../modes/CityBiomeMode.js';
 import CityBuildings from './CityBuildings.jsx';
 import { BiomeGLBCluster, isGLBActive, isGLBFullFace } from './BiomeGLBCluster.jsx';
 import { SeamPulseOverlay } from './SeamPulseOverlay.jsx';
-import { getTileStyleMaterial, getGlassMaterial, sharedTremorState, flipBurstMap, healBurstMap, healParticleMap } from './styles/TileStyleMaterials.jsx';
+import { getTileStyleMaterial, getGlassMaterial, sharedTremorState, flipBurstMap, healBurstMap, healParticleMap, pendingHealAnimRemovals } from './styles/TileStyleMaterials.jsx';
 import { useStickerInstances } from './StickerInstances.jsx';
 import { getManifoldGridId } from '../game/coordinates.js';
 import GrassBlades from './styles/GrassBlades.jsx';
@@ -794,11 +794,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     const toColor = fc[healAnimEntry.toFaceId];
     if (!fromColor || !toColor) return;
     // Consume the entry from the store so it doesn't re-fire.
-    useGameStore.setState((s) => {
-      const next = { ...s.stickerHealAnims };
-      delete next[stickerGridIdRef.current];
-      return { stickerHealAnims: next };
-    });
+    // Use a ref to accumulate the key — CubeAssembly's useFrame sweeps all pending removals
+    // once per frame in a single setState call, avoiding N cascading Zustand notifications.
+    if (stickerGridIdRef.current) pendingHealAnimRemovals.add(stickerGridIdRef.current);
     // Set FROM color on the mesh so both colors are visible during the eyelid animation.
     if (!isInstancedRef.current && meshRef.current) {
       const mat = meshRef.current?.material;

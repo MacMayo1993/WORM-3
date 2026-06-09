@@ -203,6 +203,29 @@ function TilePreviewHost() {
   return null;
 }
 
+// Error boundary to catch Three.js renderer crashes (null .visible in scene traversal)
+// and attempt recovery by resetting stickerHealAnims to clear any bad state.
+class CanvasErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error) {
+    console.error('[WORM-3] Canvas error recovered:', error?.message);
+    // Clear any in-flight heal animations that may have caused corrupted scene state.
+    try { useGameStore.setState({ stickerHealAnims: {} }); } catch (_) {}
+    // Brief delay then re-mount the canvas subtree.
+    setTimeout(() => this.setState({ hasError: false }), 200);
+  }
+  render() {
+    if (this.state.hasError) return null;
+    return this.props.children;
+  }
+}
+
 export default function WORM3() {
   // ========================================================================
   // STATE FROM ZUSTAND STORE
@@ -1185,6 +1208,7 @@ export default function WORM3() {
 
       {/* Single persistent Canvas — never unmounts, eliminates context loss on intro→game.
           Also renders the main-menu cube scene so there is never a second WebGL context. */}
+      <CanvasErrorBoundary>
       <div className="canvas-container" onContextMenu={(e) => e.preventDefault()}>
         <Canvas
           camera={{ position: (showWelcome || showMainMenu) ? [0, 3, 12] : [0, 0, cameraZ], fov: 40 }}
@@ -1231,6 +1255,7 @@ export default function WORM3() {
           )}
         </Canvas>
       </div>
+      </CanvasErrorBoundary>
 
       {/* Antipodal PiP frame overlay — border + label drawn over the canvas scissor region */}
       {showAntipodalFrame && (

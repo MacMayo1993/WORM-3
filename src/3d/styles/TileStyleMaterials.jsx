@@ -54,6 +54,10 @@ export const healParticleMap = new Map();
 // blink animation showing the 50/50 superposition of both colors.
 export const healEyelidMap = new Map();
 
+// Pending removals for stickerHealAnims — stickers add their gridId here instead
+// of calling setState individually. CubeAssembly sweeps this once per frame.
+export const pendingHealAnimRemovals = new Set();
+
 /**
  * Recompute tremor state from the current elapsed clock time.
  * Must be called once per frame from CubeAssembly's useFrame, before any
