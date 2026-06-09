@@ -319,8 +319,8 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     backgroundTheme: initialSettings?.backgroundTheme || 'blackhole',
     // Per-face tile styles; null means "use global tileStyle"
     perFaceStyles: null,
-    wormSpeed: 1.0,
-    wormOrbCount: 5,
+    wormSpeed: 2.0,
+    wormOrbCount: 15,
     wormholeInterval: 10,
     wormColor: '#33ff66',
   });
@@ -699,31 +699,78 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
   };
 
 
-  const renderGameplay = () => (
-    <div style={{ display: 'grid', gap: '14px' }}>
-      <label style={{ display: 'grid', gap: '6px' }}>
-        <div style={{ fontSize: '12px', fontWeight: 700, color: 'rgba(200,220,255,0.65)' }}>Worm speed ({settings.wormSpeed.toFixed(1)}×)</div>
-        <input type="range" min="0.4" max="5.0" step="0.1" value={settings.wormSpeed}
-          onChange={e => select('wormSpeed', parseFloat(e.target.value))}
-          style={{ width: '100%', accentColor: '#60a5fa' }} />
-      </label>
+  const renderGameplay = () => {
+    const OptionGroup = ({ label, options, value, onChange, accent }) => (
+      <div style={{ display: 'grid', gap: '8px' }}>
+        <div style={{ fontSize: '12px', fontWeight: 700, color: 'rgba(200,220,255,0.65)', letterSpacing: '0.04em' }}>{label}</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+          {options.map(opt => {
+            const selected = value === opt.value;
+            return (
+              <button
+                key={opt.value}
+                onClick={() => onChange(opt.value)}
+                style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
+                  padding: '14px 8px 12px',
+                  borderRadius: '14px',
+                  border: selected ? `2px solid ${accent}` : '2px solid rgba(255,255,255,0.08)',
+                  background: selected ? `${accent}22` : 'rgba(255,255,255,0.05)',
+                  boxShadow: selected ? `0 0 14px ${accent}44` : 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.18s ease',
+                  outline: 'none',
+                  WebkitTapHighlightColor: 'transparent',
+                  fontFamily: 'inherit',
+                }}
+              >
+                <span style={{ fontSize: '13px', fontWeight: 700, color: selected ? '#e8edf8' : 'rgba(200,220,255,0.70)', letterSpacing: '-0.2px' }}>{opt.label}</span>
+                <span style={{ fontSize: '10px', color: selected ? accent : 'rgba(180,210,255,0.40)', fontWeight: 500 }}>{opt.hint}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
 
-      <label style={{ display: 'grid', gap: '6px' }}>
-        <div style={{ fontSize: '12px', fontWeight: 700, color: 'rgba(200,220,255,0.65)' }}>Orb count ({settings.wormOrbCount})</div>
-        <input type="range" min="2" max="25" step="1" value={settings.wormOrbCount}
-          onChange={e => select('wormOrbCount', parseInt(e.target.value, 10))}
-          style={{ width: '100%', accentColor: '#a78bfa' }} />
-      </label>
-
-      <label style={{ display: 'grid', gap: '6px' }}>
-        <div style={{ fontSize: '12px', fontWeight: 700, color: 'rgba(200,220,255,0.65)' }}>Wormhole spawn interval ({settings.wormholeInterval.toFixed(1)}s)</div>
-        <input type="range" min="3" max="20" step="0.5" value={settings.wormholeInterval}
-          onChange={e => select('wormholeInterval', parseFloat(e.target.value))}
-          style={{ width: '100%', accentColor: '#f59e0b' }} />
-      </label>
-
-    </div>
-  );
+    return (
+      <div style={{ display: 'grid', gap: '20px' }}>
+        <OptionGroup
+          label="Worm Speed"
+          accent="#60a5fa"
+          value={settings.wormSpeed}
+          onChange={v => select('wormSpeed', v)}
+          options={[
+            { value: 1.0,  label: 'Slow',    hint: '1.0×' },
+            { value: 2.0,  label: 'Average', hint: '2.0×' },
+            { value: 2.75, label: 'Fast',    hint: '2.75×' },
+          ]}
+        />
+        <OptionGroup
+          label="Orb Count"
+          accent="#a78bfa"
+          value={settings.wormOrbCount}
+          onChange={v => select('wormOrbCount', v)}
+          options={[
+            { value: 5,  label: 'Less',    hint: '5 orbs' },
+            { value: 15, label: 'Average', hint: '15 orbs' },
+            { value: 25, label: 'More',    hint: '25 orbs' },
+          ]}
+        />
+        <OptionGroup
+          label="Wormhole Duration"
+          accent="#f59e0b"
+          value={settings.wormholeInterval}
+          onChange={v => select('wormholeInterval', v)}
+          options={[
+            { value: 20, label: 'Slow',    hint: '20s' },
+            { value: 10, label: 'Average', hint: '10s' },
+            { value: 5,  label: 'Fast',    hint: '5s' },
+          ]}
+        />
+      </div>
+    );
+  };
 
   // ── Step 0: Character ───────────────────────────────────────────────────────
 

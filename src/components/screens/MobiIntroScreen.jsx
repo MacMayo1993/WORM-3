@@ -354,12 +354,12 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
         cursor: 'pointer',
       }}
     >
-      {/* Mobi — pinned bottom-left, 75% of screen height */}
+      {/* Mobi — pinned bottom-left, ~64% of screen height, shifted left */}
       <div style={{
         position: 'absolute',
         bottom: 0,
-        left: 0,
-        height: '75vh',
+        left: '-4vw',
+        height: '64vh',
         zIndex: 902,
         pointerEvents: 'none',
         animation: 'mobiSlideIn 0.5s ease forwards',
@@ -382,9 +382,8 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
         style={{
           position: 'absolute',
           /* Mouth is roughly 65% up from bottom of a 75vh image = ~49vh from bottom */
-          bottom: 'clamp(120px, 42vh, 58vh)',
-          /* Push right of Mobi — Mobi width ≈ height*aspectRatio, ~75vh * 0.55 ≈ 41vw on portrait */
-          left: 'clamp(160px, 38vw, 55vw)',
+          bottom: 'clamp(100px, 36vh, 50vh)',
+          left: 'clamp(130px, 32vw, 48vw)',
           right: '12px',
           zIndex: 901,
           pointerEvents: 'none',
