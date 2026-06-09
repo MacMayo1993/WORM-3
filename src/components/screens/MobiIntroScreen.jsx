@@ -123,7 +123,7 @@ function HudPanel({ modeName, text, lines, index, isLast, onAdvance, onSkip }) {
     <div style={{
       position: 'relative',
       flex: 1,
-      maxWidth: '580px',
+      maxWidth: '400px',
       animation: 'hudFadeIn 0.4s ease forwards',
     }}>
       {/* Outer border */}
@@ -154,7 +154,7 @@ function HudPanel({ modeName, text, lines, index, isLast, onAdvance, onSkip }) {
         <div style={{
           position: 'relative', zIndex: 1,
           borderBottom: `1px solid ${cyan}44`,
-          padding: '10px 18px',
+          padding: '8px 14px',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           background: `linear-gradient(90deg, ${cyan}18 0%, transparent 100%)`,
         }}>
@@ -179,7 +179,7 @@ function HudPanel({ modeName, text, lines, index, isLast, onAdvance, onSkip }) {
         {/* Mode badge strip */}
         <div style={{
           position: 'relative', zIndex: 1,
-          padding: '6px 18px',
+          padding: '4px 14px',
           borderBottom: `1px solid ${cyan}22`,
           background: `${cyan}0a`,
         }}>
@@ -195,8 +195,8 @@ function HudPanel({ modeName, text, lines, index, isLast, onAdvance, onSkip }) {
         {/* Dialogue text area */}
         <div style={{
           position: 'relative', zIndex: 1,
-          padding: '28px 24px 20px',
-          minHeight: '130px',
+          padding: '18px 20px 14px',
+          minHeight: '90px',
           display: 'flex', alignItems: 'center',
         }}>
           {/* Left accent bar */}
@@ -236,7 +236,7 @@ function HudPanel({ modeName, text, lines, index, isLast, onAdvance, onSkip }) {
         <div style={{
           position: 'relative', zIndex: 1,
           borderTop: `1px solid ${cyan}22`,
-          padding: '12px 18px',
+          padding: '8px 14px',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           background: `rgba(0,10,24,0.4)`,
         }}>
@@ -354,14 +354,13 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
         cursor: 'pointer',
       }}
     >
-      {/* Mobi — pinned bottom-left, ~64% of screen height, shifted left */}
+      {/* Mobi — pinned bottom-left, ~64% of screen height */}
       <div style={{
         position: 'absolute',
         bottom: 0,
-        left: '-8vw',
+        left: 0,
         height: '64vh',
-        maxWidth: '45vw',
-        overflow: 'hidden',
+        maxWidth: '38vw',
         zIndex: 902,
         pointerEvents: 'none',
         animation: 'mobiSlideIn 0.5s ease forwards',
@@ -385,8 +384,7 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
           position: 'absolute',
           /* Mouth is roughly 65% up from bottom of a 75vh image = ~49vh from bottom */
           bottom: 'clamp(100px, 36vh, 50vh)',
-          left: 'clamp(130px, 32vw, 48vw)',
-          right: '12px',
+          left: 'clamp(130px, 30vw, 46vw)',
           zIndex: 901,
           pointerEvents: 'none',
         }}
