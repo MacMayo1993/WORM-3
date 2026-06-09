@@ -20,6 +20,9 @@ import { useShallow } from 'zustand/react/shallow';
 import { resolveColors } from '../utils/colorSchemes.js';
 import { liveRotation, resetLiveRotation } from '../worm/liveRotation.js';
 import { liveCubies } from '../worm/liveCubies.js';
+import { healSticker } from '../game/cubeState.js';
+import { buildManifoldGridMap, findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
+import { EARN_DISPARITY_TILE_RESTORE } from '../utils/economyConstants.js';
 
 // Reusable axis vectors and quaternion (allocated once, never recreated)
 const _axisCol = new THREE.Vector3(1, 0, 0);
@@ -470,7 +473,78 @@ const CubeAssembly = React.memo(({
       const dx = clientX - ds.screenX, dy = clientY - ds.screenY;
       if (Math.hypot(dx, dy) < DRAG_THRESHOLD) {
         if (flipModeRef.current) {
-          onTapFlipRef.current(ds.pos, dirFromNormal(ds.n));
+          const { x, y, z } = ds.pos;
+          const dirKey = dirFromNormal(ds.n);
+          const store = useGameStore.getState();
+
+          // Disparity chaos mode: tapping a flipped tile wave-heals outward.
+          // Wave 0 = tapped tile (fires immediately), wave N = tiles N steps away
+          // on the same face. Each wave heals + pops its cubies outward.
+          if (store.chaosLevel > 0) {
+            const liveCubs = store.cubies;
+            const tapped = liveCubs[x]?.[y]?.[z]?.stickers[dirKey];
+            if (tapped && tapped.curr !== tapped.orig) {
+              const S = size;
+              const faceNeighbors = (cx, cy, cz) => {
+                if (dirKey === 'PX' || dirKey === 'NX')
+                  return [{ x: cx, y: cy - 1, z: cz }, { x: cx, y: cy + 1, z: cz }, { x: cx, y: cy, z: cz - 1 }, { x: cx, y: cy, z: cz + 1 }];
+                if (dirKey === 'PY' || dirKey === 'NY')
+                  return [{ x: cx - 1, y: cy, z: cz }, { x: cx + 1, y: cy, z: cz }, { x: cx, y: cy, z: cz - 1 }, { x: cx, y: cy, z: cz + 1 }];
+                return [{ x: cx - 1, y: cy, z: cz }, { x: cx + 1, y: cy, z: cz }, { x: cx, y: cy - 1, z: cz }, { x: cx, y: cy + 1, z: cz }];
+              };
+              // BFS to build waves — each wave = tiles at same graph distance from tap.
+              const waves = [[{ x, y, z, dirKey }]];
+              const visited = new Set([`${x},${y},${z}`]);
+              let frontier = [{ x, y, z }];
+              while (frontier.length > 0) {
+                const nextFrontier = [];
+                const wave = [];
+                for (const cur of frontier) {
+                  for (const n of faceNeighbors(cur.x, cur.y, cur.z)) {
+                    if (n.x < 0 || n.x >= S || n.y < 0 || n.y >= S || n.z < 0 || n.z >= S) continue;
+                    const key = `${n.x},${n.y},${n.z}`;
+                    if (visited.has(key)) continue;
+                    visited.add(key);
+                    const ns = liveCubs[n.x]?.[n.y]?.[n.z]?.stickers[dirKey];
+                    if (ns && ns.curr !== ns.orig) { wave.push({ ...n, dirKey }); nextFrontier.push(n); }
+                  }
+                }
+                if (wave.length > 0) waves.push(wave);
+                frontier = nextFrontier;
+              }
+              const totalHealed = waves.reduce((s, w) => s + w.length, 0);
+              // Build manifold map once from the snapshot so antipodal lookups are fast.
+              const manifoldMap = buildManifoldGridMap(liveCubs, size);
+              // Award score up-front so the counter updates on tap.
+              useGameStore.setState((s) => ({ disparityParityScore: s.disparityParityScore + totalHealed * EARN_DISPARITY_TILE_RESTORE }));
+              waves.forEach((tiles, waveIdx) => {
+                const fire = () => {
+                  const now = performance.now();
+                  let updated = useGameStore.getState().cubies;
+                  const pops = {};
+                  for (const t of tiles) {
+                    // Heal the tapped-face sticker.
+                    updated = healSticker(updated, size, t.x, t.y, t.z, t.dirKey);
+                    pops[`${t.x},${t.y},${t.z}`] = { startMs: now, durationMs: 500 };
+                    // Heal its antipodal pair — same logical sticker on the opposite face.
+                    const st = liveCubs[t.x]?.[t.y]?.[t.z]?.stickers[t.dirKey];
+                    if (st) {
+                      const anti = findAntipodalStickerByGrid(manifoldMap, st, size);
+                      if (anti) {
+                        updated = healSticker(updated, size, anti.x, anti.y, anti.z, anti.dirKey);
+                        pops[`${anti.x},${anti.y},${anti.z}`] = { startMs: now, durationMs: 500 };
+                      }
+                    }
+                  }
+                  useGameStore.setState((s) => ({ cubies: updated, cubiePops: { ...s.cubiePops, ...pops } }));
+                };
+                if (waveIdx === 0) fire(); else setTimeout(fire, waveIdx * 130);
+              });
+              return;
+            }
+          }
+
+          onTapFlipRef.current(ds.pos, dirKey);
         } else if (onSelectTileRef.current) {
           onSelectTileRef.current(ds.pos, dirFromNormal(ds.n));
         }
@@ -685,6 +759,7 @@ const CubeAssembly = React.memo(({
     // Pre-compute tremor surge once so all StickerPlane instances read a shared
     // value instead of each independently running 3×sin + pow + max per frame.
     updateSharedTremor(state.clock.elapsedTime);
+
 
     // Apply live drag rotation - instant, follows finger
     if (liveDragRef.current && liveDragRef.current.basePositions) {

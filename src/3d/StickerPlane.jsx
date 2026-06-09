@@ -11,7 +11,7 @@ import { FACE_CITIES, CITY_CONFIG } from '../modes/CityBiomeMode.js';
 import CityBuildings from './CityBuildings.jsx';
 import { BiomeGLBCluster, isGLBActive, isGLBFullFace } from './BiomeGLBCluster.jsx';
 import { SeamPulseOverlay } from './SeamPulseOverlay.jsx';
-import { getTileStyleMaterial, getGlassMaterial, sharedTremorState, flipBurstMap, healBurstMap } from './styles/TileStyleMaterials.jsx';
+import { getTileStyleMaterial, getGlassMaterial, sharedTremorState, flipBurstMap, healBurstMap, healParticleMap } from './styles/TileStyleMaterials.jsx';
 import { useStickerInstances } from './StickerInstances.jsx';
 import { getManifoldGridId } from '../game/coordinates.js';
 import GrassBlades from './styles/GrassBlades.jsx';
@@ -290,6 +290,57 @@ const healSealFragmentShader = `
   }
 `;
 
+// ─── Eyelid blink overlay ─────────────────────────────────────────────────────
+// Fires on disparity (odd-flip) transitions.
+// The FROM-color mesh stays fully visible underneath; this overlay covers the full
+// tile disc with the TO color at ~0.5 alpha (NormalBlending), so both colors are
+// simultaneously visible — the quantum superposition / 50-50 blend moment.
+// The scale.y eyelid squish and the lid-edge gleam ride on top of that blend.
+const eyelidVertexShader = `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+const eyelidFragmentShader = `
+  uniform vec3  uColorTo;  // the antipodal (destination) color
+  uniform float uProgress; // 1 = fully open, 0 = fully closed (= flipSquish)
+  uniform float uTime;
+  varying vec2 vUv;
+
+  void main() {
+    vec2 uv = vUv - 0.5;
+    float dist = length(uv);
+    float inDisc = 1.0 - smoothstep(0.43, 0.50, dist);
+    float closed  = 1.0 - uProgress;  // 1 when squished shut, 0 when open
+
+    // Full-disc base at 0.5 alpha: overlaid on the FROM-color mesh via NormalBlending
+    // this gives exactly a 50/50 mix — both states visible simultaneously.
+    float baseAlpha = 0.50 * inDisc;
+
+    // Eyelid edge gleam — bright band at top and bottom rim, intensifies as lids close.
+    float topBot  = abs(abs(uv.y) - 0.41);
+    float lidEdge = (1.0 - smoothstep(0.0, 0.055, topBot)) * inDisc;
+    float lidBright = 0.15 + closed * 0.85;
+    float shimmer = (0.5 + 0.5 * sin(atan(uv.x, uv.y) * 8.0 - uTime * 6.0))
+                    * lidEdge * 0.30;
+
+    // Center pinpoint: flares at the superposition peak (scale.y ≈ 0).
+    float core = (1.0 - smoothstep(0.0, 0.09, dist)) * closed * closed;
+
+    // Iris ring sweeps outward from center as the eye opens (phase 2).
+    float irisR = uProgress * 0.44;
+    float iris  = (1.0 - smoothstep(0.0, 0.045, abs(dist - irisR))) * uProgress * inDisc;
+
+    float alpha = clamp(baseAlpha + lidEdge * lidBright + core * 1.1 + iris * 0.55 + shimmer,
+                        0.0, 0.95);
+
+    if (alpha < 0.001) discard;
+    gl_FragColor = vec4(uColorTo, alpha);
+  }
+`;
+
 // Spin-reveal overlay: new tile face sweeps in from the outer rim toward the center
 // with a spinning arc glow at the leading edge. Used to replace the midpoint white flash.
 const spinRevealVertexShader = `
@@ -479,6 +530,16 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     uTime: { value: 0 },
     uIntensity: { value: 0 },
   }));
+  // Whether the current in-progress flip is a disparity (eyelid) flip.
+  const isDisparityFlipRef = useRef(false);
+  // Eyelid blink overlay — used instead of spinReveal for disparity flips.
+  const eyelidOverlayRef = useRef();
+  const eyelidMatRef = useRef();
+  const [eyelidUniforms] = React.useState(() => ({
+    uColorTo: { value: new THREE.Color() },
+    uProgress: { value: 1.0 },
+    uTime: { value: 0.0 },
+  }));
   // Spin reveal overlay — animates the new tile face in from the outer rim inward
   const spinRevealRef = useRef();
   const spinRevealMatRef = useRef();
@@ -514,6 +575,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       spiderMatRef.current?.dispose(); // eslint-disable-line react-hooks/exhaustive-deps
       crackMatRef.current?.dispose(); // eslint-disable-line react-hooks/exhaustive-deps
       seamLeakMatRef.current?.dispose(); // eslint-disable-line react-hooks/exhaustive-deps
+      eyelidMatRef.current?.dispose(); // eslint-disable-line react-hooks/exhaustive-deps
       spinRevealMatRef.current?.dispose(); // eslint-disable-line react-hooks/exhaustive-deps
       wispyRingMatRef.current?.dispose(); // eslint-disable-line react-hooks/exhaustive-deps
       wormRimMatRef.current?.dispose(); // eslint-disable-line react-hooks/exhaustive-deps
@@ -677,11 +739,25 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       prevRawP.current = 0;
       wormIntroT.current = 6.0;
       setShowWormIntro(true);
-      // Activate spin-reveal immediately with FROM color at full disc coverage.
-      if (spinRevealRef.current && spinRevealMatRef.current && flipFromColor.current) {
-        spinRevealMatRef.current.uniforms.uColor.value.set(flipFromColor.current);
-        spinRevealMatRef.current.uniforms.uProgress.value = 1.0;
-        spinRevealRef.current.visible = true;
+      // Disparity flip (odd flip count → tile enters wormhole state) → eyelid blink.
+      // Normal flip → spinning rim reveal.
+      isDisparityFlipRef.current = flips % 2 === 1;
+      if (isDisparityFlipRef.current) {
+        // Overlay shows TO color at 0.5 alpha (NormalBlending) over the FROM mesh.
+        // Both colors simultaneously visible = superposition blend.
+        if (eyelidOverlayRef.current && eyelidMatRef.current && flipToColor.current) {
+          eyelidMatRef.current.uniforms.uColorTo.value.set(flipToColor.current);
+          eyelidMatRef.current.uniforms.uProgress.value = 1.0;
+          eyelidMatRef.current.uniforms.uTime.value = 0.0;
+          eyelidOverlayRef.current.visible = true;
+        }
+      } else {
+        // Activate spin-reveal immediately with FROM color at full disc coverage.
+        if (spinRevealRef.current && spinRevealMatRef.current && flipFromColor.current) {
+          spinRevealMatRef.current.uniforms.uColor.value.set(flipFromColor.current);
+          spinRevealMatRef.current.uniforms.uProgress.value = 1.0;
+          spinRevealRef.current.visible = true;
+        }
       }
       // Restore the correct FROM texture now that flipFromTexture is known, and ensure the
       // mesh is visible so living/patterned styles show through the additive rim glow.
@@ -775,6 +851,13 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       healParticlesRef.current?.trigger(origHealColor);
     }
 
+    // Disparity tap-heal: particles only, no white seal overlay.
+    if (stickerGridIdRef.current && healParticleMap.get(stickerGridIdRef.current)) {
+      healParticleMap.delete(stickerGridIdRef.current);
+      const origHealColor = meta?.orig ? fc[meta.orig] : '#ffffff';
+      healParticlesRef.current?.trigger(origHealColor);
+    }
+
     // Single-boolean gate: skip the entire body on idle frames.
     // Ensure we trigger animation if the tile is flipped (since ghost tile needs uTime updates).
     // If we need to transition the ghost tile (e.g. going from active to dormant), run at least one more frame.
@@ -808,13 +891,17 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       spinT.current -= dt;
       const rawP = 1 - spinT.current;
 
-      // Card-flip squish: compress scale.x to 0 (tile rotates edge-on), swap color at the
-      // zero-width moment, then expand back. Ease-in-out makes the deceleration at the edge
-      // feel physical rather than mechanical.
+      // Card-flip squish: compress to 0 at midpoint then expand back.
+      // Eyelid (disparity) → squish scale.y (vertical, top+bottom converge to center).
+      // Normal flip → squish scale.x (horizontal card rotation).
       const halfT = rawP < 0.5 ? rawP * 2.0 : (rawP - 0.5) * 2.0;
       const easedHalf = halfT * halfT * (3.0 - 2.0 * halfT);
       const flipSquish = Math.max(0.001, rawP < 0.5 ? 1.0 - easedHalf : easedHalf);
-      groupRef.current.scale.set(flipSquish, 1, 1);
+      if (isDisparityFlipRef.current) {
+        groupRef.current.scale.set(1, flipSquish, 1);
+      } else {
+        groupRef.current.scale.set(flipSquish, 1, 1);
+      }
       groupRef.current.rotation.y = rot[1];
       groupRef.current.rotation.z = rot[2];
 
@@ -828,55 +915,61 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       groupRef.current.position.x = pos[0] + jX;
       groupRef.current.position.y = pos[1] + jY;
 
-      // First half: contract FROM colour disc into glass (progress 1.0 → 0.0 as tile squishes).
-      // The spin-reveal was activated at full disc coverage when the flip started; here we
-      // shrink it so the glass centre grows while the FROM colour ring collapses inward.
-      if (rawP < 0.5 && spinRevealRef.current && spinRevealMatRef.current) {
-        const contractProgress = Math.max(0.0, 1.0 - rawP / 0.5);
-        spinRevealMatRef.current.uniforms.uProgress.value = contractProgress;
-        spinRevealMatRef.current.uniforms.uTime.value = state.clock.elapsedTime;
-        spinRevealMatRef.current.uniforms.uDissolve.value = flipSquish;
-      }
-
-      // Midpoint: tile is at squish≈0 (near-invisible). Switch rim glow and mesh to TO color.
-      if (prevRawP.current < 0.5 && rawP >= 0.5) {
-        if (spinRevealRef.current && spinRevealMatRef.current && flipToColor.current) {
-          spinRevealMatRef.current.uniforms.uColor.value.set(flipToColor.current);
-          spinRevealMatRef.current.uniforms.uProgress.value = 0.0;
+      if (isDisparityFlipRef.current) {
+        // Eyelid overlay: uProgress tracks flipSquish directly (1=open, 0=closed).
+        if (eyelidOverlayRef.current && eyelidMatRef.current) {
+          eyelidMatRef.current.uniforms.uProgress.value = flipSquish;
+          eyelidMatRef.current.uniforms.uTime.value = state.clock.elapsedTime;
+        }
+        // Midpoint: ring flash only. Mesh keeps FROM color — overlay is already showing
+        // TO at 0.5 alpha, so both colors remain blended until the animation ends.
+        if (prevRawP.current < 0.5 && rawP >= 0.5) {
+          if (ringRef.current) { ringRef.current.material.opacity = 0.9; ringFlashRef.current = 1; }
+        }
+      } else {
+        // Normal flip — spinning rim reveal.
+        // First half: contract FROM colour disc into glass (progress 1.0 → 0.0 as tile squishes).
+        if (rawP < 0.5 && spinRevealRef.current && spinRevealMatRef.current) {
+          const contractProgress = Math.max(0.0, 1.0 - rawP / 0.5);
+          spinRevealMatRef.current.uniforms.uProgress.value = contractProgress;
+          spinRevealMatRef.current.uniforms.uTime.value = state.clock.elapsedTime;
           spinRevealMatRef.current.uniforms.uDissolve.value = flipSquish;
-          spinRevealRef.current.visible = true;
         }
-        // Update main mesh to TO color while squish≈0 so no flash is visible.
-        if (!isInstancedRef.current && meshRef.current) {
-          const mat = meshRef.current?.material;
-          if (mat?.color) {
-            const finalTex = currTextureRef.current;
-            mat.map = finalTex || null;
-            mat.color.set(finalTex ? '#ffffff' : baseColorRef.current);
-            mat.needsUpdate = true;
+        // Midpoint: switch rim glow and mesh to TO color.
+        if (prevRawP.current < 0.5 && rawP >= 0.5) {
+          if (spinRevealRef.current && spinRevealMatRef.current && flipToColor.current) {
+            spinRevealMatRef.current.uniforms.uColor.value.set(flipToColor.current);
+            spinRevealMatRef.current.uniforms.uProgress.value = 0.0;
+            spinRevealMatRef.current.uniforms.uDissolve.value = flipSquish;
+            spinRevealRef.current.visible = true;
           }
+          if (!isInstancedRef.current && meshRef.current) {
+            const mat = meshRef.current?.material;
+            if (mat?.color) {
+              const finalTex = currTextureRef.current;
+              mat.map = finalTex || null;
+              mat.color.set(finalTex ? '#ffffff' : baseColorRef.current);
+              mat.needsUpdate = true;
+            }
+          }
+          if (ringRef.current) { ringRef.current.material.opacity = 0.9; ringFlashRef.current = 1; }
         }
-        // Ring opacity spike — event horizon signal.
-        if (ringRef.current) {
-          ringRef.current.material.opacity = 0.9;
-          ringFlashRef.current = 1;
+        // Second half: drive the spin-reveal inward as the tile expands back.
+        if (rawP >= 0.5 && spinRevealRef.current && spinRevealMatRef.current) {
+          const revealProgress = Math.min(1.0, (rawP - 0.5) * 2.0);
+          spinRevealMatRef.current.uniforms.uProgress.value = revealProgress;
+          spinRevealMatRef.current.uniforms.uTime.value = state.clock.elapsedTime;
+          spinRevealMatRef.current.uniforms.uDissolve.value = flipSquish;
         }
-      }
-
-      // Second half: drive the spin-reveal inward as the tile expands back.
-      if (rawP >= 0.5 && spinRevealRef.current && spinRevealMatRef.current) {
-        const revealProgress = Math.min(1.0, (rawP - 0.5) * 2.0);
-        spinRevealMatRef.current.uniforms.uProgress.value = revealProgress;
-        spinRevealMatRef.current.uniforms.uTime.value = state.clock.elapsedTime;
-        spinRevealMatRef.current.uniforms.uDissolve.value = flipSquish;
       }
 
       prevRawP.current = rawP;
 
       if (spinT.current <= 0) {
         isFlipping.current = false;
-        // Hide spin-reveal and commit the final face color/texture to the mesh.
+        // Hide overlays and commit the final face color/texture to the mesh.
         if (spinRevealRef.current) spinRevealRef.current.visible = false;
+        if (eyelidOverlayRef.current) eyelidOverlayRef.current.visible = false;
         groupRef.current.scale.set(1, 1, 1);
         groupRef.current.rotation.y = rot[1];
         groupRef.current.rotation.z = rot[2];
@@ -1380,6 +1473,23 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       <mesh ref={flipOverlayRef} position={[0, 0, 0.003]}>
         <primitive object={_sharedStickerGeo} attach="geometry" />
         <meshBasicMaterial transparent opacity={0} blending={THREE.AdditiveBlending} depthWrite={false} />
+      </mesh>
+
+      {/* Eyelid blink overlay — disparity flip: NormalBlending at 0.5 alpha over the
+          FROM-color mesh gives a simultaneous 50/50 superposition of both colors.
+          Scale.y eyelid squish + lid-edge gleam ride on top of the blend. */}
+      <mesh ref={eyelidOverlayRef} position={[0, 0, 0.002]} visible={false} renderOrder={10}>
+        <primitive object={_sharedStickerGeo} attach="geometry" />
+        <shaderMaterial
+          ref={eyelidMatRef}
+          vertexShader={eyelidVertexShader}
+          fragmentShader={eyelidFragmentShader}
+          uniforms={eyelidUniforms}
+          transparent
+          depthTest={true}
+          depthWrite={false}
+          blending={THREE.NormalBlending}
+        />
       </mesh>
 
       {/* Flip rim glow — additive edge ring that fires during the card-flip squish.

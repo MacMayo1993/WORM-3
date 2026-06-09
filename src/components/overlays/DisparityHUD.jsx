@@ -61,6 +61,24 @@ const ALIVE_COUNT_BASE_STYLE = {
 const ALIVE_LABEL_STYLE = { fontSize: '11px', color: CLEAN_CARD.subtle, letterSpacing: '0.06em' };
 const ALIVE_TOTAL_STYLE = { fontSize: '10px', color: CLEAN_CARD.subtle, marginLeft: 'auto' };
 
+const PARITY_SCORE_BASE_STYLE = {
+  ...ALIVE_COUNT_BASE_STYLE,
+  background: CLEAN_CARD.bg,
+  border: `1.5px solid rgba(99,102,241,0.35)`,
+  marginBottom: '4px',
+};
+const PARITY_LABEL_STYLE = { fontSize: '11px', color: 'rgba(99,102,241,0.8)', letterSpacing: '0.06em' };
+const SCORE_GAIN_STYLE = {
+  position: 'absolute',
+  right: '10px',
+  top: '-14px',
+  fontSize: '11px',
+  fontWeight: 700,
+  color: '#818cf8',
+  pointerEvents: 'none',
+  animation: 'disparity-gain-float 1.2s ease-out forwards',
+};
+
 const WINNER_STYLE = {
   background: CLEAN_CARD.bg,
   border: '1.5px solid rgba(255, 215, 0, 0.5)',
@@ -94,12 +112,13 @@ const WINNER_PAIR_STYLE = { fontSize: '15px', letterSpacing: '0.06em', marginTop
  * Rendered whenever Disparity Mode (chaos) is active.
  */
 const DisparityHUD = () => {
-  const { disparityDeaths, disparityWinner, disparityEliminatedFaces, size } = useGameStore(
+  const { disparityDeaths, disparityWinner, disparityEliminatedFaces, size, disparityParityScore } = useGameStore(
     useShallow(s => ({
       disparityDeaths: s.disparityDeaths,
       disparityWinner: s.disparityWinner,
       disparityEliminatedFaces: s.disparityEliminatedFaces,
       size: s.size,
+      disparityParityScore: s.disparityParityScore,
     }))
   );
 
@@ -118,6 +137,23 @@ const DisparityHUD = () => {
     }
     prevAliveRef.current = aliveCount;
   }, [aliveCount]);
+
+  // Animate the parity score when it increases
+  const prevScoreRef = useRef(disparityParityScore);
+  const [scoreFlash, setScoreFlash] = useState(false);
+  const [scoreGain, setScoreGain] = useState(null);
+  useEffect(() => {
+    if (disparityParityScore > prevScoreRef.current) {
+      const gained = disparityParityScore - prevScoreRef.current;
+      setScoreFlash(true);
+      setScoreGain(gained);
+      const t1 = setTimeout(() => setScoreFlash(false), 400);
+      const t2 = setTimeout(() => setScoreGain(null), 1200);
+      prevScoreRef.current = disparityParityScore;
+      return () => { clearTimeout(t1); clearTimeout(t2); };
+    }
+    prevScoreRef.current = disparityParityScore;
+  }, [disparityParityScore]);
 
   // Face elimination banner: show the latest eliminated face for a brief period
   const [activeFaceElimination, setActiveFaceElimination] = useState(null);
@@ -177,7 +213,22 @@ const DisparityHUD = () => {
     lineHeight: 1,
   }), [counterFlash, aliveCount]);
 
-  if (!sortedGroups.length && !disparityWinner && aliveCount === totalTiles) return null;
+  const parityScoreStyle = useMemo(() => ({
+    ...PARITY_SCORE_BASE_STYLE,
+    boxShadow: scoreFlash ? '0 0 10px 3px rgba(99,102,241,0.4)' : 'none',
+    transition: 'box-shadow 0.3s',
+  }), [scoreFlash]);
+
+  const parityNumStyle = useMemo(() => ({
+    fontSize: scoreFlash ? '30px' : '26px',
+    fontWeight: 900,
+    color: '#818cf8',
+    transition: 'font-size 0.15s',
+    textShadow: scoreFlash ? '0 0 12px rgba(129,140,248,0.9)' : 'none',
+    lineHeight: 1,
+  }), [scoreFlash]);
+
+  if (!sortedGroups.length && !disparityWinner && aliveCount === totalTiles && disparityParityScore === 0) return null;
 
   return (
     <div style={CONTAINER_STYLE}>
@@ -191,6 +242,11 @@ const DisparityHUD = () => {
           60%  { transform: scale(1.04) translateY(-2px); opacity: 1; }
           100% { transform: scale(1) translateY(0); opacity: 1; }
         }
+        @keyframes disparity-gain-float {
+          0%   { opacity: 1; transform: translateY(0); }
+          70%  { opacity: 1; transform: translateY(-10px); }
+          100% { opacity: 0; transform: translateY(-16px); }
+        }
       `}</style>
       {/* Face elimination banner */}
       {activeFaceElimination != null && (
@@ -202,6 +258,18 @@ const DisparityHUD = () => {
         </div>
       )}
 
+      {/* Parity score — visible once any parity has been earned */}
+      {disparityParityScore > 0 && (
+        <div style={{ position: 'relative' }}>
+          {scoreGain != null && (
+            <div style={SCORE_GAIN_STYLE}>+{scoreGain}</div>
+          )}
+          <div style={parityScoreStyle}>
+            <span style={parityNumStyle}>{disparityParityScore}</span>
+            <span style={PARITY_LABEL_STYLE}>PARITY</span>
+          </div>
+        </div>
+      )}
       {/* Alive count — always visible once chaos has started (at least 1 death) */}
       {!disparityWinner && disparityDeaths.length > 0 && (
         <div style={aliveCountStyle}>

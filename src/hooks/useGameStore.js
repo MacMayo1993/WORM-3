@@ -111,6 +111,7 @@ const makeWormRuntimeDefaults = () => ({
   disparityWinner: null,
   showDisparityWinner: false,
   disparityEliminatedFaces: [],
+  disparityParityScore: 0,
   cascades: [],
   holonomyMode: false,
   wormHealedCount: 0,
@@ -314,6 +315,19 @@ export const useGameStore = create(
     // Configurable flip cap for Disparity Mode (overrides FLIP_CAP constant)
     disparityFlipCap: 25,
     setDisparityFlipCap: (v) => set({ disparityFlipCap: v }),
+
+    // Running parity score for the current disparity game session.
+    // Incremented by EARN_DISPARITY_TILE_RESTORE × healed-tile-count on each player heal.
+    // Reset by makeWormRuntimeDefaults (called from clearDisparityGame + initWormMode).
+    disparityParityScore: 0,
+    addDisparityParityScore: (points) => set((state) => ({
+      disparityParityScore: state.disparityParityScore + points,
+    })),
+
+    // Chosen game length for the current disparity session ('short' | 'medium' | 'long').
+    // Persists between sessions so the wizard remembers the last pick.
+    disparityGameLength: 'medium',
+    setDisparityGameLength: (v) => set({ disparityGameLength: v }),
 
     addDisparityDeath: (death) => set((state) => ({
       disparityDeaths: [...state.disparityDeaths, death],
