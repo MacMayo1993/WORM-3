@@ -13,13 +13,17 @@ import ChaosWave from '../manifold/ChaosWave.jsx';
 import FlipPropagationWave from '../manifold/FlipPropagationWave.jsx';
 import { vibrate } from '../utils/audio.js';
 import { pressState } from '../worm/wormLogic.js';
-import { updateSharedTime, updateSharedTremor, warmUpDefaultStyles } from './styles/TileStyleMaterials.jsx';
+import { updateSharedTime, updateSharedTremor, warmUpDefaultStyles, healBurstMap } from './styles/TileStyleMaterials.jsx';
 import { StickerInstanceProvider } from './StickerInstances.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { resolveColors } from '../utils/colorSchemes.js';
 import { liveRotation, resetLiveRotation } from '../worm/liveRotation.js';
 import { liveCubies } from '../worm/liveCubies.js';
+import { getManifoldNeighbors } from '../game/manifoldLogic.js';
+import { getManifoldGridId } from '../game/coordinates.js';
+import { healSticker } from '../game/cubeState.js';
+import { EARN_DISPARITY_TILE_RESTORE } from '../utils/economyConstants.js';
 
 // Reusable axis vectors and quaternion (allocated once, never recreated)
 const _axisCol = new THREE.Vector3(1, 0, 0);
@@ -470,7 +474,35 @@ const CubeAssembly = React.memo(({
       const dx = clientX - ds.screenX, dy = clientY - ds.screenY;
       if (Math.hypot(dx, dy) < DRAG_THRESHOLD) {
         if (flipModeRef.current) {
-          onTapFlipRef.current(ds.pos, dirFromNormal(ds.n));
+          const { x, y, z } = ds.pos;
+          const dirKey = dirFromNormal(ds.n);
+          const store = useGameStore.getState();
+
+          // Disparity chaos mode: tapping a tile in disparity cascade-heals it and its
+          // adjacent disparity neighbors (4 cardinal, cross-face manifold aware).
+          // Score = healed_count × EARN_DISPARITY_TILE_RESTORE parity points.
+          if (store.chaosLevel > 0) {
+            const liveCubs = store.cubies;
+            const tapped = liveCubs[x]?.[y]?.[z]?.stickers[dirKey];
+            if (tapped && tapped.curr !== tapped.orig) {
+              const toHeal = [{ x, y, z, dirKey }];
+              for (const n of getManifoldNeighbors(x, y, z, dirKey, size)) {
+                const ns = liveCubs[n.x]?.[n.y]?.[n.z]?.stickers[n.dirKey];
+                if (ns && ns.curr !== ns.orig) toHeal.push(n);
+              }
+              let updated = liveCubs;
+              for (const t of toHeal) {
+                const ts = updated[t.x]?.[t.y]?.[t.z]?.stickers[t.dirKey];
+                if (ts) healBurstMap.set(getManifoldGridId(ts, size), 1);
+                updated = healSticker(updated, size, t.x, t.y, t.z, t.dirKey);
+              }
+              store.setCubies(updated);
+              store.addDisparityParityScore(toHeal.length * EARN_DISPARITY_TILE_RESTORE);
+              return;
+            }
+          }
+
+          onTapFlipRef.current(ds.pos, dirKey);
         } else if (onSelectTileRef.current) {
           onSelectTileRef.current(ds.pos, dirFromNormal(ds.n));
         }
