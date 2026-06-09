@@ -11,7 +11,7 @@ import { FACE_CITIES, CITY_CONFIG } from '../modes/CityBiomeMode.js';
 import CityBuildings from './CityBuildings.jsx';
 import { BiomeGLBCluster, isGLBActive, isGLBFullFace } from './BiomeGLBCluster.jsx';
 import { SeamPulseOverlay } from './SeamPulseOverlay.jsx';
-import { getTileStyleMaterial, getGlassMaterial, sharedTremorState, flipBurstMap, healBurstMap } from './styles/TileStyleMaterials.jsx';
+import { getTileStyleMaterial, getGlassMaterial, sharedTremorState, flipBurstMap, healBurstMap, healParticleMap } from './styles/TileStyleMaterials.jsx';
 import { useStickerInstances } from './StickerInstances.jsx';
 import { getManifoldGridId } from '../game/coordinates.js';
 import GrassBlades from './styles/GrassBlades.jsx';
@@ -772,6 +772,13 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       healSealUniforms.uColor.value.set(origHealColor);
       healSealUniforms.uHealProgress.value = 0;
       if (healSealRef.current) healSealRef.current.visible = true;
+      healParticlesRef.current?.trigger(origHealColor);
+    }
+
+    // Disparity tap-heal: particles only, no white seal overlay.
+    if (stickerGridIdRef.current && healParticleMap.get(stickerGridIdRef.current)) {
+      healParticleMap.delete(stickerGridIdRef.current);
+      const origHealColor = meta?.orig ? fc[meta.orig] : '#ffffff';
       healParticlesRef.current?.trigger(origHealColor);
     }
 
