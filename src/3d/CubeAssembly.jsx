@@ -13,7 +13,7 @@ import ChaosWave from '../manifold/ChaosWave.jsx';
 import FlipPropagationWave from '../manifold/FlipPropagationWave.jsx';
 import { vibrate } from '../utils/audio.js';
 import { pressState } from '../worm/wormLogic.js';
-import { updateSharedTime, updateSharedTremor, warmUpDefaultStyles } from './styles/TileStyleMaterials.jsx';
+import { updateSharedTime, updateSharedTremor, warmUpDefaultStyles, pendingHealAnimRemovals } from './styles/TileStyleMaterials.jsx';
 import { StickerInstanceProvider } from './StickerInstances.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
@@ -743,6 +743,19 @@ const CubeAssembly = React.memo(({
     // Pre-compute tremor surge once so all StickerPlane instances read a shared
     // value instead of each independently running 3×sin + pow + max per frame.
     updateSharedTremor(state.clock.elapsedTime);
+
+    // Batch-remove consumed heal animation entries from the store — all StickerPlane
+    // components accumulate their gridIds here; one setState per frame instead of N.
+    if (pendingHealAnimRemovals.size > 0) {
+      const toRemove = [...pendingHealAnimRemovals];
+      pendingHealAnimRemovals.clear();
+      useGameStore.setState((s) => {
+        if (!s.stickerHealAnims || toRemove.every(k => !(k in s.stickerHealAnims))) return s;
+        const next = { ...s.stickerHealAnims };
+        toRemove.forEach(k => delete next[k]);
+        return { stickerHealAnims: next };
+      });
+    }
 
     // Apply live drag rotation - instant, follows finger
     if (liveDragRef.current && liveDragRef.current.basePositions) {
