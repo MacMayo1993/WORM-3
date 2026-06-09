@@ -20,7 +20,6 @@ import { useShallow } from 'zustand/react/shallow';
 import { resolveColors } from '../utils/colorSchemes.js';
 import { liveRotation, resetLiveRotation } from '../worm/liveRotation.js';
 import { liveCubies } from '../worm/liveCubies.js';
-import { getManifoldNeighbors } from '../game/manifoldLogic.js';
 import { getManifoldGridId } from '../game/coordinates.js';
 import { healSticker } from '../game/cubeState.js';
 import { EARN_DISPARITY_TILE_RESTORE } from '../utils/economyConstants.js';
@@ -486,7 +485,17 @@ const CubeAssembly = React.memo(({
             const tapped = liveCubs[x]?.[y]?.[z]?.stickers[dirKey];
             if (tapped && tapped.curr !== tapped.orig) {
               const toHeal = [{ x, y, z, dirKey }];
-              for (const n of getManifoldNeighbors(x, y, z, dirKey, size)) {
+              const S = size;
+              let sfCandidates;
+              if (dirKey === 'PX' || dirKey === 'NX') {
+                sfCandidates = [{ x, y: y - 1, z, dirKey }, { x, y: y + 1, z, dirKey }, { x, y, z: z - 1, dirKey }, { x, y, z: z + 1, dirKey }];
+              } else if (dirKey === 'PY' || dirKey === 'NY') {
+                sfCandidates = [{ x: x - 1, y, z, dirKey }, { x: x + 1, y, z, dirKey }, { x, y, z: z - 1, dirKey }, { x, y, z: z + 1, dirKey }];
+              } else {
+                sfCandidates = [{ x: x - 1, y, z, dirKey }, { x: x + 1, y, z, dirKey }, { x, y: y - 1, z, dirKey }, { x, y: y + 1, z, dirKey }];
+              }
+              for (const n of sfCandidates) {
+                if (n.x < 0 || n.x >= S || n.y < 0 || n.y >= S || n.z < 0 || n.z >= S) continue;
                 const ns = liveCubs[n.x]?.[n.y]?.[n.z]?.stickers[n.dirKey];
                 if (ns && ns.curr !== ns.orig) toHeal.push(n);
               }
