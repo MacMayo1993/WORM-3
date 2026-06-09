@@ -358,8 +358,10 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
       <div style={{
         position: 'absolute',
         bottom: 0,
-        left: '-4vw',
+        left: '-8vw',
         height: '64vh',
+        maxWidth: '45vw',
+        overflow: 'hidden',
         zIndex: 902,
         pointerEvents: 'none',
         animation: 'mobiSlideIn 0.5s ease forwards',
