@@ -484,20 +484,31 @@ const CubeAssembly = React.memo(({
             const liveCubs = store.cubies;
             const tapped = liveCubs[x]?.[y]?.[z]?.stickers[dirKey];
             if (tapped && tapped.curr !== tapped.orig) {
-              const toHeal = [{ x, y, z, dirKey }];
+              // BFS flood-fill across this face: collect every connected flipped tile.
               const S = size;
-              let sfCandidates;
-              if (dirKey === 'PX' || dirKey === 'NX') {
-                sfCandidates = [{ x, y: y - 1, z, dirKey }, { x, y: y + 1, z, dirKey }, { x, y, z: z - 1, dirKey }, { x, y, z: z + 1, dirKey }];
-              } else if (dirKey === 'PY' || dirKey === 'NY') {
-                sfCandidates = [{ x: x - 1, y, z, dirKey }, { x: x + 1, y, z, dirKey }, { x, y, z: z - 1, dirKey }, { x, y, z: z + 1, dirKey }];
-              } else {
-                sfCandidates = [{ x: x - 1, y, z, dirKey }, { x: x + 1, y, z, dirKey }, { x, y: y - 1, z, dirKey }, { x, y: y + 1, z, dirKey }];
-              }
-              for (const n of sfCandidates) {
-                if (n.x < 0 || n.x >= S || n.y < 0 || n.y >= S || n.z < 0 || n.z >= S) continue;
-                const ns = liveCubs[n.x]?.[n.y]?.[n.z]?.stickers[n.dirKey];
-                if (ns && ns.curr !== ns.orig) toHeal.push(n);
+              const visited = new Set([`${x},${y},${z}`]);
+              const toHeal = [{ x, y, z, dirKey }];
+              const queue = [{ x, y, z }];
+              const faceNeighbors = (cx, cy, cz) => {
+                if (dirKey === 'PX' || dirKey === 'NX')
+                  return [{ x: cx, y: cy - 1, z: cz }, { x: cx, y: cy + 1, z: cz }, { x: cx, y: cy, z: cz - 1 }, { x: cx, y: cy, z: cz + 1 }];
+                if (dirKey === 'PY' || dirKey === 'NY')
+                  return [{ x: cx - 1, y: cy, z: cz }, { x: cx + 1, y: cy, z: cz }, { x: cx, y: cy, z: cz - 1 }, { x: cx, y: cy, z: cz + 1 }];
+                return [{ x: cx - 1, y: cy, z: cz }, { x: cx + 1, y: cy, z: cz }, { x: cx, y: cy - 1, z: cz }, { x: cx, y: cy + 1, z: cz }];
+              };
+              while (queue.length) {
+                const cur = queue.pop();
+                for (const n of faceNeighbors(cur.x, cur.y, cur.z)) {
+                  if (n.x < 0 || n.x >= S || n.y < 0 || n.y >= S || n.z < 0 || n.z >= S) continue;
+                  const key = `${n.x},${n.y},${n.z}`;
+                  if (visited.has(key)) continue;
+                  visited.add(key);
+                  const ns = liveCubs[n.x]?.[n.y]?.[n.z]?.stickers[dirKey];
+                  if (ns && ns.curr !== ns.orig) {
+                    toHeal.push({ ...n, dirKey });
+                    queue.push(n);
+                  }
+                }
               }
               let updated = liveCubs;
               const healPops = {};
