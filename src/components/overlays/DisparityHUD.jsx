@@ -228,7 +228,7 @@ const DisparityHUD = () => {
     lineHeight: 1,
   }), [scoreFlash]);
 
-  if (!sortedGroups.length && !disparityWinner && aliveCount === totalTiles) return null;
+  if (!sortedGroups.length && !disparityWinner && aliveCount === totalTiles && disparityParityScore === 0) return null;
 
   return (
     <div style={CONTAINER_STYLE}>
@@ -258,8 +258,8 @@ const DisparityHUD = () => {
         </div>
       )}
 
-      {/* Parity score — visible once chaos has started */}
-      {disparityDeaths.length > 0 && (
+      {/* Parity score — visible once any parity has been earned */}
+      {disparityParityScore > 0 && (
         <div style={{ position: 'relative' }}>
           {scoreGain != null && (
             <div style={SCORE_GAIN_STYLE}>+{scoreGain}</div>

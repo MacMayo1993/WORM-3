@@ -42,6 +42,11 @@ export const flipBurstMap = new Map();
 // StickerPlane consumes + deletes the entry to trigger the heal seal animation.
 export const healBurstMap = new Map();
 
+// ─── Heal particle map ────────────────────────────────────────────────────────
+// Written by disparity tap-heal (key = sticker gridId, value = 1).
+// StickerPlane fires only the golden particle burst — no white seal overlay.
+export const healParticleMap = new Map();
+
 /**
  * Recompute tremor state from the current elapsed clock time.
  * Must be called once per frame from CubeAssembly's useFrame, before any
