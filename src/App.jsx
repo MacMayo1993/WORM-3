@@ -738,6 +738,7 @@ export default function WORM3() {
   const handleMobiIntroComplete = useCallback(() => {
     setShowMobiIntro(false);
     useGameStore.getState().setShowMainMenu(false);
+    const wizardSettings = pendingWormSettings.current;
     if (!wizardSettings) return;
     pendingWormSettings.current = null;
 
