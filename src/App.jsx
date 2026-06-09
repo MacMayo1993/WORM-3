@@ -355,7 +355,7 @@ export default function WORM3() {
   const wormholePhaseActive = wormHealerMode && (
     wormPhase === 'entering' || wormPhase === 'tunnel' || wormPhase === 'exiting'
   );
-  const showAntipodalFrame = !showWelcome && ((showAntipodalPiP || wormHealerMode) && !wormholePhaseActive);
+  const showAntipodalFrame = !showWelcome && (showAntipodalPiP && !wormholePhaseActive);
 
   // Bottom sheet state for new nav bar
   const [sheetOpen, setSheetOpen] = useState(false);
