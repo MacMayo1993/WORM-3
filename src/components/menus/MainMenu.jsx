@@ -1259,7 +1259,7 @@ const menuStyles = {
   },
 };
 
-const MenuTitleCard = ({ visible }) => (
+export const MenuTitleCard = ({ visible }) => (
   <div style={{
     ...menuStyles.titleWrap,
     opacity: visible ? 1 : 0,

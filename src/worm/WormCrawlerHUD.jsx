@@ -10,6 +10,7 @@ import { ANTIPODAL_COLOR } from '../utils/constants.js';
 import OrbInventoryHUD from './OrbInventoryHUD.jsx';
 import ParityWallet from '../components/overlays/ParityWallet.jsx';
 import { callWormTurn } from './wormTurnBridge.js';
+import { MenuTitleCard } from '../components/menus/MainMenu.jsx';
 
 const PHASE_META = {
     crawling: { label: 'CRAWLING', accent: '#38bdf8' },
@@ -938,12 +939,16 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                 </div>
             )}
 
-            {/* Scramble-solve countdown overlay — 3, 2, 1, WORM! */}
+            {/* Scramble-solve countdown overlay — 3, 2, 1, WORM^3 */}
             {wormGamePhase === 'countdown' && wormCountdownStep !== null && (
                 <div style={COUNTDOWN_OVERLAY_STYLE}>
-                    <div style={COUNTDOWN_NUMBER_STYLE}>
-                        {wormCountdownStep === 'go' ? 'WORM!' : wormCountdownStep}
-                    </div>
+                    {wormCountdownStep === 'go' ? (
+                        <MenuTitleCard visible />
+                    ) : (
+                        <div style={COUNTDOWN_NUMBER_STYLE}>
+                            {wormCountdownStep}
+                        </div>
+                    )}
                 </div>
             )}
 
