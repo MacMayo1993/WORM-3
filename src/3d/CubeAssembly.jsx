@@ -21,6 +21,7 @@ import { resolveColors } from '../utils/colorSchemes.js';
 import { liveRotation, resetLiveRotation } from '../worm/liveRotation.js';
 import { liveCubies } from '../worm/liveCubies.js';
 import { healSticker } from '../game/cubeState.js';
+import { buildManifoldGridMap, findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
 import { EARN_DISPARITY_TILE_RESTORE } from '../utils/economyConstants.js';
 
 // Reusable axis vectors and quaternion (allocated once, never recreated)
@@ -512,6 +513,8 @@ const CubeAssembly = React.memo(({
                 frontier = nextFrontier;
               }
               const totalHealed = waves.reduce((s, w) => s + w.length, 0);
+              // Build manifold map once from the snapshot so antipodal lookups are fast.
+              const manifoldMap = buildManifoldGridMap(liveCubs, size);
               // Award score up-front so the counter updates on tap.
               useGameStore.setState((s) => ({ disparityParityScore: s.disparityParityScore + totalHealed * EARN_DISPARITY_TILE_RESTORE }));
               waves.forEach((tiles, waveIdx) => {
@@ -520,8 +523,18 @@ const CubeAssembly = React.memo(({
                   let updated = useGameStore.getState().cubies;
                   const pops = {};
                   for (const t of tiles) {
+                    // Heal the tapped-face sticker.
                     updated = healSticker(updated, size, t.x, t.y, t.z, t.dirKey);
                     pops[`${t.x},${t.y},${t.z}`] = { startMs: now, durationMs: 500 };
+                    // Heal its antipodal pair — same logical sticker on the opposite face.
+                    const st = liveCubs[t.x]?.[t.y]?.[t.z]?.stickers[t.dirKey];
+                    if (st) {
+                      const anti = findAntipodalStickerByGrid(manifoldMap, st, size);
+                      if (anti) {
+                        updated = healSticker(updated, size, anti.x, anti.y, anti.z, anti.dirKey);
+                        pops[`${anti.x},${anti.y},${anti.z}`] = { startMs: now, durationMs: 500 };
+                      }
+                    }
                   }
                   useGameStore.setState((s) => ({ cubies: updated, cubiePops: { ...s.cubiePops, ...pops } }));
                 };
