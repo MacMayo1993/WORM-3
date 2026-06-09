@@ -724,7 +724,6 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                   fontFamily: 'inherit',
                 }}
               >
-                <span style={{ fontSize: '18px', lineHeight: 1 }}>{opt.icon}</span>
                 <span style={{ fontSize: '13px', fontWeight: 700, color: selected ? '#e8edf8' : 'rgba(200,220,255,0.70)', letterSpacing: '-0.2px' }}>{opt.label}</span>
                 <span style={{ fontSize: '10px', color: selected ? accent : 'rgba(180,210,255,0.40)', fontWeight: 500 }}>{opt.hint}</span>
               </button>
@@ -742,9 +741,9 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           value={settings.wormSpeed}
           onChange={v => select('wormSpeed', v)}
           options={[
-            { value: 1.0,  icon: '🐢', label: 'Slow',    hint: '1.0×' },
-            { value: 2.0,  icon: '🐍', label: 'Average', hint: '2.0×' },
-            { value: 2.75, icon: '⚡', label: 'Fast',    hint: '2.75×' },
+            { value: 1.0,  label: 'Slow',    hint: '1.0×' },
+            { value: 2.0,  label: 'Average', hint: '2.0×' },
+            { value: 2.75, label: 'Fast',    hint: '2.75×' },
           ]}
         />
         <OptionGroup
@@ -753,9 +752,9 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           value={settings.wormOrbCount}
           onChange={v => select('wormOrbCount', v)}
           options={[
-            { value: 5,  icon: '🫧', label: 'Less',    hint: '5 orbs' },
-            { value: 15, icon: '💠', label: 'Average', hint: '15 orbs' },
-            { value: 25, icon: '🌀', label: 'More',    hint: '25 orbs' },
+            { value: 5,  label: 'Less',    hint: '5 orbs' },
+            { value: 15, label: 'Average', hint: '15 orbs' },
+            { value: 25, label: 'More',    hint: '25 orbs' },
           ]}
         />
         <OptionGroup
@@ -764,9 +763,9 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           value={settings.wormholeInterval}
           onChange={v => select('wormholeInterval', v)}
           options={[
-            { value: 20, icon: '⏳', label: 'Slow',    hint: '20s' },
-            { value: 10, icon: '⏱️', label: 'Average', hint: '10s' },
-            { value: 5,  icon: '💨', label: 'Fast',    hint: '5s' },
+            { value: 20, label: 'Slow',    hint: '20s' },
+            { value: 10, label: 'Average', hint: '10s' },
+            { value: 5,  label: 'Fast',    hint: '5s' },
           ]}
         />
       </div>
