@@ -375,7 +375,6 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
             height: 'auto',
             display: 'block',
             filter: 'drop-shadow(0 0 28px rgba(0,229,255,0.5)) drop-shadow(0 8px 20px rgba(0,0,0,0.8))',
-            mixBlendMode: 'multiply',
           }}
           onError={e => { e.currentTarget.style.display = 'none'; }}
         />
