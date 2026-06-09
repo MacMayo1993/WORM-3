@@ -753,20 +753,9 @@ export default function WORM3() {
 
   const handleWormSetupComplete = useCallback((wizardSettings) => {
     setShowWormModeWizard(false);
-    // Keep the menu scene alive behind the intro so the canvas isn't blank
-    useGameStore.getState().setShowMainMenu(true);
-    pendingWormSettings.current = wizardSettings;
-    setShowMobiIntro(true);
-  }, []);
 
-  const handleMobiIntroComplete = useCallback(() => {
-    setShowMobiIntro(false);
-    useGameStore.getState().setShowMainMenu(false);
-    const wizardSettings = pendingWormSettings.current;
-    if (!wizardSettings) return;
-    pendingWormSettings.current = null;
-
-    // Build styling payload
+    // Apply visual settings immediately so the game scene shows the user's
+    // chosen background and cube behind the Mobi intro overlay.
     const allStyles = ['solid', 'glossy', 'matte', 'metallic', 'carbonFiber', 'hexGrid', 'comic', 'cafeWall', 'hermanGrid', 'opticSpin', 'ouchi', 'scintillatingGrid', 'zoellner', 'kanizsa', 'grass', 'ice', 'sand', 'water', 'wood', 'circuit', 'holographic', 'pulse', 'lava', 'galaxy', 'neural'];
     const manifoldStyles = {};
     [1, 2, 3, 4, 5, 6].forEach(id => {
@@ -790,24 +779,41 @@ export default function WORM3() {
     if (wizardSettings.customColors) newSettings.customColors = wizardSettings.customColors;
     setSettings(newSettings);
 
-    // Single atomic set: clears disparity fields, enables worm, and applies wizard settings.
-    useGameStore.getState().clearLevel();
-    useGameStore.getState().initWormMode(
-      undefined, undefined,
-      wizardSettings.wormSpeed ?? 1.0,
-      wizardSettings.wormOrbCount ?? 5,
-      wizardSettings.wormholeInterval ?? 10,
-      wizardSettings.wormColor ?? '#33ff66'
-    );
-
-    // Resize / reset cube AFTER worm mode is established
+    // Switch to game scene (showMainMenu already false), reset cube so it's
+    // visible and styled before the worm gameplay starts.
     const targetSize = wizardSettings.cubeSize || 3;
     if (targetSize !== size) {
       changeSize(targetSize);
     } else {
       reset();
     }
+
+    // Save only the gameplay params — worm mode itself starts after the intro.
+    pendingWormSettings.current = {
+      wormSpeed: wizardSettings.wormSpeed ?? 1.0,
+      wormOrbCount: wizardSettings.wormOrbCount ?? 5,
+      wormholeInterval: wizardSettings.wormholeInterval ?? 10,
+      wormColor: wizardSettings.wormColor ?? '#33ff66',
+    };
+    setShowMobiIntro(true);
   }, [settings, setSettings, reset, size, changeSize]);
+
+  const handleMobiIntroComplete = useCallback(() => {
+    setShowMobiIntro(false);
+    const params = pendingWormSettings.current;
+    if (!params) return;
+    pendingWormSettings.current = null;
+
+    // Now start the actual worm game.
+    useGameStore.getState().clearLevel();
+    useGameStore.getState().initWormMode(
+      undefined, undefined,
+      params.wormSpeed,
+      params.wormOrbCount,
+      params.wormholeInterval,
+      params.wormColor
+    );
+  }, []);
 
   const handleWormWizardCancel = useCallback(() => {
     setShowWormModeWizard(false);
