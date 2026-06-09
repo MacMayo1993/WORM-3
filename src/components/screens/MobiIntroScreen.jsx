@@ -310,7 +310,7 @@ function HudPanel({ modeName, text, lines, index, isLast, onAdvance, onSkip }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-const MobiIntroScreen = ({ lines, modeName, accentColor, onComplete }) => {
+const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
   const [index, setIndex] = useState(0);
   const isLast = index === lines.length - 1;
 
