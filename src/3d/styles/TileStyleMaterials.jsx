@@ -47,6 +47,13 @@ export const healBurstMap = new Map();
 // StickerPlane fires only the golden particle burst — no white seal overlay.
 export const healParticleMap = new Map();
 
+// ─── Heal eyelid map ──────────────────────────────────────────────────────────
+// Written by disparity tap-heal before healSticker is called.
+// key = sticker gridId, value = { fromFaceId, toFaceId }
+// StickerPlane picks this up before the anyActive gate and fires the eyelid
+// blink animation showing the 50/50 superposition of both colors.
+export const healEyelidMap = new Map();
+
 /**
  * Recompute tremor state from the current elapsed clock time.
  * Must be called once per frame from CubeAssembly's useFrame, before any
