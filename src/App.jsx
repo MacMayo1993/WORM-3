@@ -367,6 +367,10 @@ export default function WORM3() {
   const [showRandomWizard, setShowRandomWizard] = useState(false);
   const [showWormModeWizard, setShowWormModeWizard] = useState(false);
 
+  // Mobi intro — shown after setup wizard completes, before game is live
+  const [showMobiIntro, setShowMobiIntro] = useState(false);
+  const pendingWormSettings = React.useRef(null);
+
   // Merge Mode theme picker
   const [showMergeThemePicker, setShowMergeThemePicker] = useState(false);
 
@@ -725,6 +729,16 @@ export default function WORM3() {
 
   const handleWormSetupComplete = useCallback((wizardSettings) => {
     setShowWormModeWizard(false);
+    // Store settings and show Mobi intro before launching game
+    pendingWormSettings.current = wizardSettings;
+    setShowMobiIntro(true);
+  }, []);
+
+  const handleMobiIntroComplete = useCallback(() => {
+    setShowMobiIntro(false);
+    const wizardSettings = pendingWormSettings.current;
+    if (!wizardSettings) return;
+    pendingWormSettings.current = null;
 
     // Build styling payload
     const allStyles = ['solid', 'glossy', 'matte', 'metallic', 'carbonFiber', 'hexGrid', 'comic', 'cafeWall', 'hermanGrid', 'opticSpin', 'ouchi', 'scintillatingGrid', 'zoellner', 'kanizsa', 'grass', 'ice', 'sand', 'water', 'wood', 'circuit', 'holographic', 'pulse', 'lava', 'galaxy', 'neural'];
@@ -1284,7 +1298,7 @@ export default function WORM3() {
             performCursorRotation={performCursorRotation}
             ui={{
               sheetOpen, setSheetOpen, sheetMode, setSheetMode,
-              showFreeplayWizard, showRandomWizard, showWormModeWizard, showCubeModeSelect,
+              showFreeplayWizard, showRandomWizard, showWormModeWizard, showCubeModeSelect, showMobiIntro,
               showDisparityWizard, setShowDisparityWizard,
               showDisparityBetting,
               disparityWaitingFirstFlip, disparityCountdown,
@@ -1342,6 +1356,7 @@ export default function WORM3() {
               onBetPlaced: handleBetPlaced,
               onBetSkipped: handleBetSkipped,
               onWormSetupComplete: handleWormSetupComplete,
+              onMobiIntroComplete: handleMobiIntroComplete,
               onWormWizardCancel: handleWormWizardCancel,
               onWormRetry: handleWormRetry,
               onWormNewGame: handleWormNewGame,
