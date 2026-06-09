@@ -11,7 +11,7 @@ import { FACE_CITIES, CITY_CONFIG } from '../modes/CityBiomeMode.js';
 import CityBuildings from './CityBuildings.jsx';
 import { BiomeGLBCluster, isGLBActive, isGLBFullFace } from './BiomeGLBCluster.jsx';
 import { SeamPulseOverlay } from './SeamPulseOverlay.jsx';
-import { getTileStyleMaterial, getGlassMaterial, sharedTremorState, flipBurstMap, healBurstMap, healParticleMap, pendingHealAnimRemovals } from './styles/TileStyleMaterials.jsx';
+import { getTileStyleMaterial, getGlassMaterial, sharedTremorState, flipBurstMap, healBurstMap, healParticleMap } from './styles/TileStyleMaterials.jsx';
 import { useStickerInstances } from './StickerInstances.jsx';
 import { getManifoldGridId } from '../game/coordinates.js';
 import GrassBlades from './styles/GrassBlades.jsx';
@@ -644,8 +644,6 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // 54 stickers dying → 54×54 re-renders becomes 1 re-render per death event.
   const deadRankRaw = useGameStore((s) => s.disparityDeathByGridId?.[stickerGridIdRef.current]?.rank ?? null);
   const isWinnerTile = useGameStore((s) => s.chaosLevel > 0 && !!(s.disparityWinner?.pair?.includes(stickerGridIdRef.current)));
-  // Disparity heal animation trigger — non-null when CubeAssembly has queued an eyelid blink for this sticker.
-  const healAnimEntry = useGameStore((s) => stickerGridIdRef.current ? (s.stickerHealAnims?.[stickerGridIdRef.current] ?? null) : null);
   // Stable home key for Merge Mode tier lookup — same format as computeMergeRegions output.
   const mergeHomeKey = meta?.origPos
     ? `${meta.origPos.x}-${meta.origPos.y}-${meta.origPos.z}-${meta.origDir}`
@@ -784,50 +782,6 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     prevCurr.current = curr;
     prevFlips.current = flips;
   }, [meta?.curr, meta?.flips]);
-
-  // Disparity heal eyelid: fires when CubeAssembly queues a heal animation for this sticker.
-  // Runs via useEffect (reactive) rather than a module-level Map checked in useFrame, so the
-  // timing is deterministic — after React commits AND after prevCurr/prevFlips are updated.
-  useEffect(() => {
-    if (!healAnimEntry) return;
-    const fromColor = fc[healAnimEntry.fromFaceId];
-    const toColor = fc[healAnimEntry.toFaceId];
-    if (!fromColor || !toColor) return;
-    // Consume the entry from the store so it doesn't re-fire.
-    // Use a ref to accumulate the key — CubeAssembly's useFrame sweeps all pending removals
-    // once per frame in a single setState call, avoiding N cascading Zustand notifications.
-    if (stickerGridIdRef.current) pendingHealAnimRemovals.add(stickerGridIdRef.current);
-    // Set FROM color on the mesh so both colors are visible during the eyelid animation.
-    // The useLayoutEffect (which fires before this) already set the mesh to orig/TO color,
-    // so we must override it here — handles both standard and shader material paths.
-    if (!isInstancedRef.current && meshRef.current) {
-      const mat = meshRef.current?.material;
-      if (mat?.color) {
-        mat.color.set(fromColor);
-        mat.map = null;
-        mat.needsUpdate = true;
-      } else if (mat?.uniforms?.baseColor) {
-        // Shader material (tile style) — swap to a FROM-color version so the mesh
-        // shows the antipodal color while the eyelid overlay shows the orig color.
-        meshRef.current.material = getTileStyleMaterial(tileStyleRef.current, fromColor, false, null, antipodalHexRef.current);
-      }
-      meshRef.current.visible = true;
-    }
-    flipFromColor.current = fromColor;
-    flipToColor.current = toColor;
-    isFlipping.current = true;
-    isDisparityFlipRef.current = true;
-    spinT.current = 1;
-    prevRawP.current = 0;
-    if (eyelidOverlayRef.current && eyelidMatRef.current) {
-      eyelidMatRef.current.uniforms.uColorTo.value.set(toColor);
-      eyelidMatRef.current.uniforms.uProgress.value = 1.0;
-      eyelidMatRef.current.uniforms.uTime.value = 0.0;
-      eyelidOverlayRef.current.visible = true;
-    }
-    healParticlesRef.current?.trigger(toColor);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [healAnimEntry]);
 
   // Biome mode: restore anything left in transparent or hidden state from previous code —
   // runs once when biomeEnabled flips rather than every frame. FrontSide culling on the
