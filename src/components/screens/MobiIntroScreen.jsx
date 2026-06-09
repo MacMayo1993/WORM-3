@@ -17,9 +17,9 @@
  *   4. Render <MobiIntroScreen> with the appropriate props.
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import LottiePlayer from 'react-lottie-player';
-import mobiLottie from '../../assets/mobi.json';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Canvas } from '@react-three/fiber';
+import { MenuWorm } from '../menus/MainMenu.jsx';
 
 // ── Dialogue banks ────────────────────────────────────────────────────────────
 // Export these so App.jsx (or any caller) can just import the right array.
@@ -44,129 +44,26 @@ export const MOBI_LINES_MIRROR      = [];
 export const MOBI_LINES_CHAOS       = [];
 export const MOBI_LINES_CAMPAIGN    = [];
 
-// ── CSS keyframes injected once ───────────────────────────────────────────────
-const _STYLE_ID = 'mobi-keyframes';
-if (typeof document !== 'undefined' && !document.getElementById(_STYLE_ID)) {
-  const s = document.createElement('style');
-  s.id = _STYLE_ID;
-  s.textContent = `
-    @keyframes mobiFloat {
-      0%,100% { transform: translateY(0px); }
-      50%      { transform: translateY(-10px); }
-    }
-    @keyframes mobiAnt1 {
-      0%,100% { transform: rotate(18deg); }
-      50%      { transform: rotate(28deg); }
-    }
-    @keyframes mobiAnt2 {
-      0%,100% { transform: rotate(-18deg); }
-      50%      { transform: rotate(-28deg); }
-    }
-    @keyframes mobiBlink {
-      0%,90%,100% { transform: scaleY(1); }
-      95%          { transform: scaleY(0.05); }
-    }
-    @keyframes mobiHalo {
-      0%,100% { opacity: 0.18; transform: scale(1); }
-      50%      { opacity: 0.28; transform: scale(1.08); }
-    }
-    @keyframes mobiSegBob {
-      0%,100% { transform: translateY(0px) scale(1); }
-      50%      { transform: translateY(-5px) scale(1.03); }
-    }
-  `;
-  document.head.appendChild(s);
-}
+// ── MobiCharacter — the real 3D worm in a small transparent Canvas ───────────
 
-// ── True if mobi.json is still the placeholder shipped with the repo ─────────
-const LOTTIE_READY = !mobiLottie.__placeholder;
-
-// ── CSS fallback — only shown until a real Lottie asset is dropped in ─────────
-
-const SEG_COLORS = ['#3be08a', '#2fd47e', '#24be72', '#1aa862', '#129650'];
-const SEG_SIZES  = [88, 76, 66, 56, 46];
-
-function MobiCSSFallback() {
-  const segBobDelays = ['0s', '0.08s', '0.16s', '0.24s', '0.32s'];
+function MobiCharacter() {
   return (
     <div style={{
-      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
-      animation: 'mobiFloat 2.8s ease-in-out infinite',
-      userSelect: 'none', position: 'relative',
+      width: 160,
+      height: 260,
+      flexShrink: 0,
+      filter: 'drop-shadow(0 0 18px #3be08a44)',
     }}>
-      <div style={{
-        position: 'absolute', top: '30px', left: '50%', transform: 'translateX(-50%)',
-        width: '110px', height: '110px', borderRadius: '50%',
-        background: `radial-gradient(circle, ${SEG_COLORS[0]}55 0%, transparent 70%)`,
-        animation: 'mobiHalo 2.8s ease-in-out infinite',
-        pointerEvents: 'none', zIndex: 0,
-      }} />
-      <div style={{ display: 'flex', gap: '38px', marginBottom: '-4px', position: 'relative', zIndex: 1 }}>
-        {[0, 1].map(i => (
-          <div key={i} style={{
-            display: 'flex', flexDirection: 'column-reverse', alignItems: 'center',
-            transformOrigin: 'bottom center',
-            animation: i === 0 ? 'mobiAnt1 1.8s ease-in-out infinite' : 'mobiAnt2 1.8s ease-in-out infinite',
-            animationDelay: i === 0 ? '0s' : '0.3s',
-          }}>
-            <div style={{ width: '4px', height: '28px', borderRadius: '2px', background: SEG_COLORS[0], boxShadow: '0 0 0 1.5px #001a08' }} />
-            <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#80ffcc', boxShadow: '0 0 8px #80ffcc, 0 0 16px #80ffcc88, 0 0 0 2px #001a08', marginBottom: '2px' }} />
-          </div>
-        ))}
-      </div>
-      <div style={{
-        width: SEG_SIZES[0], height: SEG_SIZES[0], borderRadius: '50%',
-        background: `radial-gradient(circle at 38% 35%, ${SEG_COLORS[0]}ee 0%, ${SEG_COLORS[1]} 60%, ${SEG_COLORS[2]} 100%)`,
-        boxShadow: `0 0 0 4px #001a08, 0 6px 24px #001a0888, 0 0 32px ${SEG_COLORS[0]}66`,
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        gap: '7px', position: 'relative', zIndex: 1, flexShrink: 0,
-      }}>
-        <div style={{ display: 'flex', gap: '14px', marginTop: '4px' }}>
-          {[0, 1].map(e => (
-            <div key={e} style={{
-              width: '20px', height: '20px', borderRadius: '50%', background: '#ffffff',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.35)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              animation: 'mobiBlink 4s ease-in-out infinite',
-              animationDelay: e === 1 ? '0.05s' : '0s', overflow: 'hidden',
-            }}>
-              <div style={{ width: '11px', height: '11px', borderRadius: '50%', background: '#050510', position: 'relative' }}>
-                <div style={{ position: 'absolute', top: '2px', left: '2px', width: '4px', height: '4px', borderRadius: '50%', background: 'rgba(255,255,255,0.7)' }} />
-              </div>
-            </div>
-          ))}
-        </div>
-        <div style={{ width: '30px', height: '14px', borderBottom: '3px solid #041a0a', borderLeft: '2px solid transparent', borderRight: '2px solid transparent', borderRadius: '0 0 16px 16px', marginTop: '-2px' }} />
-      </div>
-      {SEG_SIZES.slice(1).map((sz, i) => (
-        <div key={i} style={{
-          width: sz, height: sz, borderRadius: '50%',
-          background: `radial-gradient(circle at 38% 35%, ${SEG_COLORS[i + 1]}ee 0%, ${SEG_COLORS[Math.min(i + 2, 4)]} 100%)`,
-          boxShadow: `0 0 0 ${3 - Math.min(i, 1)}px #001a08, 0 4px 14px #001a0866, 0 0 18px ${SEG_COLORS[i + 1]}44`,
-          flexShrink: 0, animation: 'mobiSegBob 2.8s ease-in-out infinite',
-          animationDelay: segBobDelays[i + 1], zIndex: 1, position: 'relative',
-        }} />
-      ))}
-    </div>
-  );
-}
-
-// ── MobiCharacter — Lottie when asset is ready, CSS fallback until then ───────
-
-function MobiCharacter({ talking }) {
-  if (!LOTTIE_READY) return <MobiCSSFallback />;
-
-  return (
-    <div style={{ width: 180, flexShrink: 0, filter: 'drop-shadow(0 0 18px #3be08a44)' }}>
-      <LottiePlayer
-        loop
-        play
-        animationData={mobiLottie}
-        // When the Lottie has named segments you can swap them here:
-        // segments={talking ? [30, 60] : [0, 30]}
-        style={{ width: '100%', height: 'auto' }}
-        rendererSettings={{ preserveAspectRatio: 'xMidYMid meet' }}
-      />
+      <Canvas
+        camera={{ position: [0, 1.45, 4.5], fov: 32 }}
+        gl={{ alpha: true, antialias: true }}
+        style={{ background: 'transparent' }}
+      >
+        <ambientLight intensity={1.6} />
+        <pointLight position={[8, 8, 10]} intensity={3.5} color="#a8d8ff" />
+        <pointLight position={[-9, -8, 7]} intensity={1.8} color="#7aa3ff" />
+        <MenuWorm />
+      </Canvas>
     </div>
   );
 }
@@ -325,7 +222,7 @@ const MobiIntroScreen = ({ lines, modeName, accentColor, onComplete }) => {
       >
         {/* Mobi */}
         <div style={{ flexShrink: 0 }}>
-          <MobiCharacter talking={index < lines.length - 1} />
+          <MobiCharacter />
         </div>
 
         {/* Bubble + controls */}
