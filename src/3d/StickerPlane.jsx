@@ -11,7 +11,7 @@ import { FACE_CITIES, CITY_CONFIG } from '../modes/CityBiomeMode.js';
 import CityBuildings from './CityBuildings.jsx';
 import { BiomeGLBCluster, isGLBActive, isGLBFullFace } from './BiomeGLBCluster.jsx';
 import { SeamPulseOverlay } from './SeamPulseOverlay.jsx';
-import { getTileStyleMaterial, getGlassMaterial, sharedTremorState, flipBurstMap, healBurstMap, healParticleMap } from './styles/TileStyleMaterials.jsx';
+import { getTileStyleMaterial, getGlassMaterial, sharedTremorState, flipBurstMap, healBurstMap, healParticleMap, healEyelidMap } from './styles/TileStyleMaterials.jsx';
 import { useStickerInstances } from './StickerInstances.jsx';
 import { getManifoldGridId } from '../game/coordinates.js';
 import GrassBlades from './styles/GrassBlades.jsx';
@@ -856,6 +856,36 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       healParticleMap.delete(stickerGridIdRef.current);
       const origHealColor = meta?.orig ? fc[meta.orig] : '#ffffff';
       healParticlesRef.current?.trigger(origHealColor);
+    }
+
+    // Disparity heal eyelid: 50/50 superposition blend as tile transitions disparity→parity.
+    // Must be before anyActive gate because after heal flips=0 → tile would be gated out.
+    if (stickerGridIdRef.current && spinT.current <= 0) {
+      const healEntry = healEyelidMap.get(stickerGridIdRef.current);
+      if (healEntry) {
+        healEyelidMap.delete(stickerGridIdRef.current);
+        const fromColor = fc[healEntry.fromFaceId];
+        const toColor = fc[healEntry.toFaceId];
+        if (fromColor && toColor && groupRef.current && meshRef.current) {
+          // Set mesh to FROM (antipodal) color so it renders while eyelid overlay shows TO.
+          if (!isInstancedRef.current) {
+            const mat = meshRef.current?.material;
+            if (mat) mat.color.set(fromColor);
+          }
+          flipFromColor.current = fromColor;
+          flipToColor.current = toColor;
+          isDisparityFlipRef.current = true;
+          spinT.current = 1;
+          prevRawP.current = 0;
+          if (eyelidOverlayRef.current && eyelidMatRef.current) {
+            eyelidMatRef.current.uniforms.uColorTo.value.set(toColor);
+            eyelidMatRef.current.uniforms.uProgress.value = 1.0;
+            eyelidMatRef.current.uniforms.uTime.value = 0.0;
+            eyelidOverlayRef.current.visible = true;
+          }
+          healParticlesRef.current?.trigger(toColor);
+        }
+      }
     }
 
     // Single-boolean gate: skip the entire body on idle frames.

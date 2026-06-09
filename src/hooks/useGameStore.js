@@ -254,8 +254,6 @@ export const useGameStore = create(
     // ========================================================================
     // Per-cubie pop animations: { "x,y,z": { startMs, durationMs } }
     cubiePops: {},
-    // Per-cubie heal collapse animations: { "x,y,z": { startMs, durationMs } }
-    cubieHeals: {},
     // Per-tunnel birth (first flip) animations: { pairId: { startMs, durationMs } }
     tunnelBirths: {},
     // Per-tunnel pulse (subsequent flip) animations: { pairId: { startMs, durationMs } }
