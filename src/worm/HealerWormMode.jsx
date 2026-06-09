@@ -1218,7 +1218,7 @@ function WormChaseCamera({ worm, size }) {
         // During the scramble, park the camera at a fixed overview angle so the full
         // cube is visible while it shuffles — the worm is hidden so there's nothing to follow.
         if (gamePhase === 'scrambling') {
-            const dist = 5.5 + size * 1.4;
+            const dist = 5 + size * 4.0;
             _camTargetCam.set(0.6, 1.1, 1).normalize().multiplyScalar(dist);
             _camTargetLook.set(0, 0, 0);
             camPosRef.current.lerp(_camTargetCam, Math.min(1, delta * 2.5));
