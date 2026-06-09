@@ -1250,7 +1250,7 @@ button:focus-visible,
   .top-bar-icon-btn {
     width: 34px;
     height: 34px;
-    color: #111827;
+    color: rgba(200, 220, 255, 0.80);
   }
 
   .chaos-pill,
