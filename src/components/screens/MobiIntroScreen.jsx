@@ -349,20 +349,17 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
         position: 'fixed',
         inset: 0,
         zIndex: 900,
-        display: 'flex',
-        alignItems: 'flex-end',
-        justifyContent: 'center',
         background: 'linear-gradient(to top, rgba(0,6,20,0.85) 0%, rgba(0,6,20,0.3) 45%, transparent 100%)',
         pointerEvents: 'auto',
         cursor: 'pointer',
       }}
     >
-      {/* Mobi — absolutely pinned bottom-left, never shrinks */}
+      {/* Mobi — pinned bottom-left, 75% of screen height */}
       <div style={{
         position: 'absolute',
         bottom: 0,
         left: 0,
-        width: 'clamp(180px, 28vw, 400px)',
+        height: '75vh',
         zIndex: 902,
         pointerEvents: 'none',
         animation: 'mobiSlideIn 0.5s ease forwards',
@@ -371,8 +368,8 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
           src={mobiImgSrc}
           alt="Mobi"
           style={{
-            width: '100%',
-            height: 'auto',
+            height: '100%',
+            width: 'auto',
             display: 'block',
             background: 'transparent',
           }}
@@ -380,20 +377,44 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
         />
       </div>
 
-      {/* HUD panel — sits at bottom, padded so it clears Mobi on the left */}
+      {/* Speech bubble — positioned upper-right, with tail pointing left toward Mobi's mouth */}
       <div
         style={{
-          width: '100%',
-          maxWidth: '900px',
-          padding: '0 16px 36px',
-          paddingLeft: 'max(16px, clamp(160px, 25vw, 360px))',
-          boxSizing: 'border-box',
-          pointerEvents: 'none',
-          position: 'relative',
+          position: 'absolute',
+          /* Mouth is roughly 65% up from bottom of a 75vh image = ~49vh from bottom */
+          bottom: 'clamp(120px, 42vh, 58vh)',
+          /* Push right of Mobi — Mobi width ≈ height*aspectRatio, ~75vh * 0.55 ≈ 41vw on portrait */
+          left: 'clamp(160px, 38vw, 55vw)',
+          right: '12px',
           zIndex: 901,
+          pointerEvents: 'none',
         }}
         onClick={e => e.stopPropagation()}
       >
+        {/* Tail pointing left */}
+        <div style={{
+          position: 'absolute',
+          left: '-22px',
+          top: '28px',
+          width: 0,
+          height: 0,
+          borderTop: '12px solid transparent',
+          borderBottom: '12px solid transparent',
+          borderRight: '22px solid rgba(0,229,255,0.35)',
+          filter: 'drop-shadow(-4px 0 6px rgba(0,229,255,0.3))',
+        }} />
+        {/* Inner tail (fill) */}
+        <div style={{
+          position: 'absolute',
+          left: '-18px',
+          top: '30px',
+          width: 0,
+          height: 0,
+          borderTop: '10px solid transparent',
+          borderBottom: '10px solid transparent',
+          borderRight: '18px solid rgba(2,12,30,0.92)',
+          zIndex: 1,
+        }} />
         <div style={{ pointerEvents: 'auto' }}>
           <HudPanel
             modeName={modeName}
