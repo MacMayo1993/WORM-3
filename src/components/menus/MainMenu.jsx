@@ -356,7 +356,7 @@ function _samplePath(path, behindDist) {
   return { x: p0.x + (p1.x - p0.x) * frac, z: p0.z + (p1.z - p0.z) * frac };
 }
 
-const MenuWorm = ({ onWormClick }) => {
+export const MenuWorm = ({ onWormClick }) => {
   const groupRef   = useRef();
   const headRef    = useRef();   // outer group: position + rotation
   const headMeshRef = useRef();  // sphere only: squash/stretch (eyes excluded)

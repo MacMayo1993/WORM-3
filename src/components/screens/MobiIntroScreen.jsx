@@ -18,6 +18,8 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { Canvas } from '@react-three/fiber';
+import { MenuWorm } from '../menus/MainMenu.jsx';
 
 // ── Dialogue banks ────────────────────────────────────────────────────────────
 // Export these so App.jsx (or any caller) can just import the right array.
@@ -42,90 +44,26 @@ export const MOBI_LINES_MIRROR      = [];
 export const MOBI_LINES_CHAOS       = [];
 export const MOBI_LINES_CAMPAIGN    = [];
 
-// ── Mobi CSS character ────────────────────────────────────────────────────────
+// ── MobiCharacter — the real 3D worm in a small transparent Canvas ───────────
 
-function MobiCharacter({ accentColor }) {
-  const glow   = accentColor || '#33ff66';
-  const body   = '#1a8c3a';
-  const belly  = '#2dd460';
-  const ant    = '#0e5c26';
-
+function MobiCharacter() {
   return (
     <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      gap: '5px',
-      filter: `drop-shadow(0 0 18px ${glow}55)`,
-      userSelect: 'none',
+      width: 160,
+      height: 260,
+      flexShrink: 0,
+      filter: 'drop-shadow(0 0 18px #3be08a44)',
     }}>
-      {/* Antennae */}
-      <div style={{ display: 'flex', gap: '20px', marginBottom: '2px' }}>
-        {[-1, 1].map((tilt, i) => (
-          <div key={i} style={{
-            display: 'flex', flexDirection: 'column-reverse', alignItems: 'center',
-            transform: `rotate(${tilt * 18}deg)`,
-            transformOrigin: 'bottom center',
-          }}>
-            <div style={{ width: '3px', height: '18px', borderRadius: '2px', background: ant }} />
-            <div style={{
-              width: '10px', height: '10px', borderRadius: '50%',
-              background: glow,
-              boxShadow: `0 0 8px ${glow}, 0 0 16px ${glow}88`,
-              marginBottom: '2px',
-            }} />
-          </div>
-        ))}
-      </div>
-
-      {/* Head */}
-      <div style={{
-        width: '72px', height: '72px', borderRadius: '50%',
-        background: body,
-        boxShadow: `0 0 22px ${glow}88`,
-        display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center',
-        gap: '6px', position: 'relative', flexShrink: 0,
-      }}>
-        {/* Eyes */}
-        <div style={{ display: 'flex', gap: '10px' }}>
-          {[0, 1].map(e => (
-            <div key={e} style={{
-              width: '13px', height: '13px', borderRadius: '50%',
-              background: '#fff',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#111' }} />
-            </div>
-          ))}
-        </div>
-        {/* Mouth dots */}
-        <div style={{ display: 'flex', gap: '4px', alignItems: 'flex-end' }}>
-          {[0, 1, 2].map(i => (
-            <div key={i} style={{
-              width: '4px', height: '4px', borderRadius: '50%',
-              background: '#111', opacity: 0.7,
-              marginBottom: i === 1 ? '-3px' : '0',
-            }} />
-          ))}
-        </div>
-      </div>
-
-      {/* Body segments */}
-      {[
-        { w: 60, h: 60 },
-        { w: 50, h: 50 },
-        { w: 40, h: 40 },
-        { w: 30, h: 30 },
-      ].map(({ w, h }, i) => (
-        <div key={i} style={{
-          width: w, height: h, borderRadius: '50%',
-          background: belly,
-          boxShadow: `0 0 8px ${glow}44`,
-          opacity: 1 - i * 0.08,
-          flexShrink: 0,
-        }} />
-      ))}
+      <Canvas
+        camera={{ position: [0, 1.45, 4.5], fov: 32 }}
+        gl={{ alpha: true, antialias: true }}
+        style={{ background: 'transparent' }}
+      >
+        <ambientLight intensity={1.6} />
+        <pointLight position={[8, 8, 10]} intensity={3.5} color="#a8d8ff" />
+        <pointLight position={[-9, -8, 7]} intensity={1.8} color="#7aa3ff" />
+        <MenuWorm />
+      </Canvas>
     </div>
   );
 }
@@ -284,7 +222,7 @@ const MobiIntroScreen = ({ lines, modeName, accentColor, onComplete }) => {
       >
         {/* Mobi */}
         <div style={{ flexShrink: 0 }}>
-          <MobiCharacter accentColor={accent} />
+          <MobiCharacter />
         </div>
 
         {/* Bubble + controls */}
