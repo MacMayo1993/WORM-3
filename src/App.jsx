@@ -800,20 +800,22 @@ export default function WORM3() {
 
   const handleMobiIntroComplete = useCallback(() => {
     setShowMobiIntro(false);
+    // Clear any lingering disparity state so worm mode starts clean.
+    setDisparityWaitingFirstFlip(false);
+    setDisparityCountdown(null);
     const params = pendingWormSettings.current;
-    if (!params) return;
     pendingWormSettings.current = null;
 
     // Now start the actual worm game.
     useGameStore.getState().clearLevel();
     useGameStore.getState().initWormMode(
       undefined, undefined,
-      params.wormSpeed,
-      params.wormOrbCount,
-      params.wormholeInterval,
-      params.wormColor
+      params?.wormSpeed,
+      params?.wormOrbCount,
+      params?.wormholeInterval,
+      params?.wormColor
     );
-  }, []);
+  }, [setDisparityWaitingFirstFlip, setDisparityCountdown]);
 
   const handleWormWizardCancel = useCallback(() => {
     setShowWormModeWizard(false);
