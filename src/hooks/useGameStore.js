@@ -481,11 +481,11 @@ export const useGameStore = create(
     // wormPaused:true — the scramble animation runs first; gameplay starts after countdown.
     // speed/orbCount/interval/color: when provided, overwrite the stored wizard settings atomically
     // so callers never need separate setWormSpeed/setWormOrbCount/… calls before this one.
-    initWormMode: (flipCap = 9999, chaosLevel = 1, speed = null, orbCount = null, interval = null, color = null) => set((state) => ({
+    initWormMode: (flipCap = 9999, _chaosLevel = 0, speed = null, orbCount = null, interval = null, color = null) => set((state) => ({
       ...makeWormRuntimeDefaults(),
       wormHealerMode: true,
       disparityFlipCap: flipCap,
-      chaosLevel,
+      chaosLevel: 0, // worm mode drives its own tile chaos; chaos worker must not run
       wormRunId: (state.wormRunId ?? 0) + 1,
       wormPaused: true, // overrides makeWormRuntimeDefaults wormPaused:false — scramble plays first
       wormSpeed: speed !== null ? Math.max(0.5, Math.min(3.0, speed)) : state.wormSpeed,

@@ -341,11 +341,6 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
     return null;
   }
 
-  const screenW = typeof window !== 'undefined' ? window.innerWidth : 800;
-  // On very narrow screens Mobi is smaller but always visible on the left.
-  const mobiWidth = screenW < 400 ? '80px' : screenW < 600 ? '110px' : 'clamp(160px, 22vw, 380px)';
-  const mobiMargin = screenW < 600 ? '-10px' : '-16px';
-  const rowPadding = screenW < 600 ? '0 8px 20px' : '0 32px 36px';
 
   return (
     <div
@@ -362,46 +357,44 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
         cursor: 'pointer',
       }}
     >
-      {/* Main layout row — pinned to bottom */}
+      {/* Mobi — absolutely pinned bottom-left, never shrinks */}
+      <div style={{
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        width: 'clamp(180px, 28vw, 400px)',
+        zIndex: 902,
+        pointerEvents: 'none',
+        animation: 'mobiSlideIn 0.5s ease forwards',
+      }}>
+        <img
+          src={mobiImgSrc}
+          alt="Mobi"
+          style={{
+            width: '100%',
+            height: 'auto',
+            display: 'block',
+            filter: 'drop-shadow(0 0 28px rgba(0,229,255,0.5)) drop-shadow(0 8px 20px rgba(0,0,0,0.8))',
+          }}
+          onError={e => { e.currentTarget.style.display = 'none'; }}
+        />
+      </div>
+
+      {/* HUD panel — sits at bottom, padded so it clears Mobi on the left */}
       <div
         style={{
-          display: 'flex',
-          alignItems: 'flex-end',
-          gap: '0px',
           width: '100%',
-          maxWidth: '1100px',
-          padding: rowPadding,
+          maxWidth: '900px',
+          padding: '0 16px 36px',
+          paddingLeft: 'max(16px, clamp(160px, 25vw, 360px))',
           boxSizing: 'border-box',
           pointerEvents: 'none',
+          position: 'relative',
+          zIndex: 901,
         }}
         onClick={e => e.stopPropagation()}
       >
-        {/* Mobi image — always left, scales down on mobile */}
-        <div style={{
-          flexShrink: 0,
-          width: mobiWidth,
-          alignSelf: 'flex-end',
-          animation: 'mobiSlideIn 0.5s ease forwards',
-          pointerEvents: 'none',
-          marginRight: mobiMargin,
-          zIndex: 2,
-          position: 'relative',
-        }}>
-          <img
-            src={mobiImgSrc}
-            alt="Mobi"
-            style={{
-              width: '100%',
-              height: 'auto',
-              display: 'block',
-              filter: 'drop-shadow(0 0 24px rgba(0,229,255,0.35)) drop-shadow(0 8px 16px rgba(0,0,0,0.7))',
-            }}
-            onError={e => { e.currentTarget.style.display = 'none'; }}
-          />
-        </div>
-
-        {/* HUD panel */}
-        <div style={{ flex: 1, minWidth: 0, pointerEvents: 'auto', zIndex: 1 }}>
+        <div style={{ pointerEvents: 'auto' }}>
           <HudPanel
             modeName={modeName}
             text={lines[index]}
@@ -429,7 +422,7 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
         whiteSpace: 'nowrap',
         textTransform: 'uppercase',
       }}>
-        {'Tap / Click anywhere · Space · → to continue'}
+        Tap / Click anywhere · Space · → to continue
       </p>
     </div>
   );
