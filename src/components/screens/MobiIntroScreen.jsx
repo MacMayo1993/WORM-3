@@ -2,25 +2,19 @@
 /**
  * MobiIntroScreen — reusable mascot-dialogue intro shown before any game mode.
  *
- * Usage:
- *   <MobiIntroScreen
- *     lines={['Hi...I'm Mobi!', 'This is WORM^3']}
- *     modeName="WORM MODE"
- *     accentColor="#33ff66"
- *     onComplete={handleDone}
- *   />
+ * Layout: Mobi image (left, full-height) + sci-fi HUD panel (right) with
+ * dialogue text. Drop public/Mobi.png into the repo to activate the image.
  *
  * To add this intro to a new mode:
- *   1. Define a MOBI_LINES_<MODE> array in this file (or pass inline).
- *   2. Add a `showMobiIntro` state + config in App.jsx.
- *   3. Set the config + show flag when entering that mode.
- *   4. Render <MobiIntroScreen> with the appropriate props.
+ *   1. Define a MOBI_LINES_<MODE> array below.
+ *   2. Add showMobiIntro state + pendingSettings ref in App.jsx.
+ *   3. Show the intro after the setup wizard completes.
+ *   4. Render <MobiIntroScreen> in UILayer with the right lines/modeName/accentColor.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
 
 // ── Dialogue banks ────────────────────────────────────────────────────────────
-// Export these so App.jsx (or any caller) can just import the right array.
 
 export const MOBI_LINES_WORM = [
   "Hi...I'm Mobi!",
@@ -33,136 +27,282 @@ export const MOBI_LINES_WORM = [
 ];
 
 // Stub banks for future modes — fill these in whenever you're ready.
-export const MOBI_LINES_FREEPLAY    = [];
-export const MOBI_LINES_TEACH       = [];
-export const MOBI_LINES_HOLONOMY    = [];
-export const MOBI_LINES_MERGE       = [];
-export const MOBI_LINES_HOLLOW      = [];
-export const MOBI_LINES_MIRROR      = [];
-export const MOBI_LINES_CHAOS       = [];
-export const MOBI_LINES_CAMPAIGN    = [];
+export const MOBI_LINES_FREEPLAY = [];
+export const MOBI_LINES_TEACH    = [];
+export const MOBI_LINES_HOLONOMY = [];
+export const MOBI_LINES_MERGE    = [];
+export const MOBI_LINES_HOLLOW   = [];
+export const MOBI_LINES_MIRROR   = [];
+export const MOBI_LINES_CHAOS    = [];
+export const MOBI_LINES_CAMPAIGN = [];
 
-// ── CSS keyframes ─────────────────────────────────────────────────────────────
-const _STYLE_ID = 'mobi-keyframes';
+// ── CSS keyframes (injected once) ────────────────────────────────────────────
+const _STYLE_ID = 'mobi-hud-keyframes';
 if (typeof document !== 'undefined' && !document.getElementById(_STYLE_ID)) {
   const s = document.createElement('style');
   s.id = _STYLE_ID;
   s.textContent = `
-    @keyframes mobiFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
-    @keyframes mobiAnt1  { 0%,100%{transform:rotate(18deg)} 50%{transform:rotate(28deg)} }
-    @keyframes mobiAnt2  { 0%,100%{transform:rotate(-18deg)} 50%{transform:rotate(-28deg)} }
-    @keyframes mobiBlink { 0%,90%,100%{transform:scaleY(1)} 95%{transform:scaleY(0.05)} }
-    @keyframes mobiSegBob{ 0%,100%{transform:translateY(0) scale(1)} 50%{transform:translateY(-5px) scale(1.03)} }
-    @keyframes mobiHalo  { 0%,100%{opacity:0.22;transform:scale(1)} 50%{opacity:0.35;transform:scale(1.10)} }
+    @keyframes hudScan {
+      0%   { background-position: 0 0; }
+      100% { background-position: 0 120px; }
+    }
+    @keyframes hudPulse {
+      0%,100% { opacity: 1; }
+      50%      { opacity: 0.6; }
+    }
+    @keyframes hudCornerBlink {
+      0%,100% { opacity: 1; }
+      50%      { opacity: 0.3; }
+    }
+    @keyframes mobiSlideIn {
+      from { transform: translateX(-40px); opacity: 0; }
+      to   { transform: translateX(0);     opacity: 1; }
+    }
+    @keyframes hudFadeIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes textFadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    @keyframes cursorBlink {
+      0%,100% { opacity: 1; }
+      50%      { opacity: 0; }
+    }
   `;
   document.head.appendChild(s);
 }
 
-const SEG_COLORS = ['#3be08a', '#2fd47e', '#24be72', '#1aa862', '#129650'];
-const SEG_SIZES  = [88, 76, 66, 56, 46];
+// ── HUD panel corner decoration ───────────────────────────────────────────────
+function HudCorner({ position }) {
+  const size = 18;
+  const thickness = 2;
+  const color = '#00e5ff';
 
-function MobiCharacter() {
+  const styles = {
+    position: 'absolute',
+    width: size, height: size,
+    ...(position.includes('top')    ? { top: -1 }    : { bottom: -1 }),
+    ...(position.includes('left')   ? { left: -1 }   : { right: -1 }),
+  };
+
+  const hBar = {
+    position: 'absolute',
+    height: thickness, width: size,
+    background: color,
+    boxShadow: `0 0 6px ${color}`,
+    top: position.includes('top') ? 0 : 'auto',
+    bottom: position.includes('bottom') ? 0 : 'auto',
+    left: 0,
+  };
+
+  const vBar = {
+    position: 'absolute',
+    width: thickness, height: size,
+    background: color,
+    boxShadow: `0 0 6px ${color}`,
+    top: 0,
+    left: position.includes('left') ? 0 : 'auto',
+    right: position.includes('right') ? 0 : 'auto',
+  };
+
   return (
-    <div style={{
-      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
-      animation: 'mobiFloat 2.8s ease-in-out infinite',
-      userSelect: 'none', position: 'relative', flexShrink: 0,
-    }}>
-      {/* Glow halo */}
-      <div style={{
-        position: 'absolute', top: '28px', left: '50%', transform: 'translateX(-50%)',
-        width: '120px', height: '120px', borderRadius: '50%',
-        background: `radial-gradient(circle, ${SEG_COLORS[0]}66 0%, transparent 70%)`,
-        animation: 'mobiHalo 2.8s ease-in-out infinite', pointerEvents: 'none', zIndex: 0,
-      }} />
-      {/* Antennae */}
-      <div style={{ display: 'flex', gap: '38px', marginBottom: '-4px', position: 'relative', zIndex: 1 }}>
-        {[0, 1].map(i => (
-          <div key={i} style={{
-            display: 'flex', flexDirection: 'column-reverse', alignItems: 'center',
-            transformOrigin: 'bottom center',
-            animation: i === 0 ? 'mobiAnt1 1.8s ease-in-out infinite' : 'mobiAnt2 1.8s ease-in-out infinite',
-            animationDelay: i === 1 ? '0.3s' : '0s',
-          }}>
-            <div style={{ width: '4px', height: '28px', borderRadius: '2px', background: SEG_COLORS[0], boxShadow: '0 0 0 1.5px #001a08' }} />
-            <div style={{ width: '13px', height: '13px', borderRadius: '50%', background: '#80ffcc', boxShadow: '0 0 10px #80ffcc, 0 0 20px #80ffcc88, 0 0 0 2px #001a08', marginBottom: '2px' }} />
-          </div>
-        ))}
-      </div>
-      {/* Head */}
-      <div style={{
-        width: SEG_SIZES[0], height: SEG_SIZES[0], borderRadius: '50%', zIndex: 1, flexShrink: 0,
-        background: `radial-gradient(circle at 38% 35%, ${SEG_COLORS[0]} 0%, ${SEG_COLORS[1]} 55%, ${SEG_COLORS[2]} 100%)`,
-        boxShadow: `0 0 0 4px #001a08, 0 6px 20px #001a0899, 0 0 36px ${SEG_COLORS[0]}77`,
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '7px',
-      }}>
-        <div style={{ display: 'flex', gap: '14px', marginTop: '4px' }}>
-          {[0, 1].map(e => (
-            <div key={e} style={{
-              width: '21px', height: '21px', borderRadius: '50%', background: '#fff',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              animation: 'mobiBlink 4s ease-in-out infinite',
-              animationDelay: e === 1 ? '0.06s' : '0s', overflow: 'hidden',
-            }}>
-              <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#050510', position: 'relative' }}>
-                <div style={{ position: 'absolute', top: '2px', left: '2px', width: '4px', height: '4px', borderRadius: '50%', background: 'rgba(255,255,255,0.75)' }} />
-              </div>
-            </div>
-          ))}
-        </div>
-        <div style={{ width: '32px', height: '14px', borderBottom: '3px solid #041a0a', borderLeft: '2px solid transparent', borderRight: '2px solid transparent', borderRadius: '0 0 18px 18px', marginTop: '-3px' }} />
-      </div>
-      {/* Body segments */}
-      {SEG_SIZES.slice(1).map((sz, i) => (
-        <div key={i} style={{
-          width: sz, height: sz, borderRadius: '50%', flexShrink: 0, zIndex: 1, position: 'relative',
-          background: `radial-gradient(circle at 38% 35%, ${SEG_COLORS[i + 1]} 0%, ${SEG_COLORS[Math.min(i + 2, 4)]} 100%)`,
-          boxShadow: `0 0 0 ${i < 2 ? 3 : 2}px #001a08, 0 4px 12px #001a0877, 0 0 20px ${SEG_COLORS[i + 1]}55`,
-          animation: 'mobiSegBob 2.8s ease-in-out infinite',
-          animationDelay: `${(i + 1) * 0.08}s`,
-        }} />
-      ))}
+    <div style={styles}>
+      <div style={hBar} />
+      <div style={vBar} />
     </div>
   );
 }
 
-// ── Speech bubble ─────────────────────────────────────────────────────────────
+// ── Sci-fi HUD panel ──────────────────────────────────────────────────────────
+function HudPanel({ modeName, text, lines, index, isLast, onAdvance, onSkip }) {
+  const cyan = '#00e5ff';
 
-function SpeechBubble({ text, accentColor }) {
-  const accent = accentColor || '#33ff66';
   return (
-    <div style={{ position: 'relative', maxWidth: '360px', width: '100%' }}>
-      {/* Tail pointing left toward Mobi */}
+    <div style={{
+      position: 'relative',
+      flex: 1,
+      maxWidth: '580px',
+      animation: 'hudFadeIn 0.4s ease forwards',
+    }}>
+      {/* Outer border */}
       <div style={{
-        position: 'absolute',
-        left: '-18px',
-        top: '32px',
-        width: 0, height: 0,
-        borderTop: '12px solid transparent',
-        borderBottom: '12px solid transparent',
-        borderRight: `20px solid rgba(255,255,255,0.95)`,
-        filter: 'drop-shadow(-2px 0 4px rgba(0,0,0,0.18))',
-      }} />
-
-      <div style={{
-        background: 'rgba(255,255,255,0.95)',
-        borderRadius: '20px',
-        padding: '24px 28px',
-        boxShadow: `0 8px 40px rgba(0,0,0,0.28), 0 0 0 2px ${accent}44`,
-        minHeight: '80px',
-        display: 'flex', alignItems: 'center',
+        position: 'relative',
+        border: `1px solid ${cyan}55`,
+        borderRadius: '4px',
+        background: 'rgba(2, 12, 30, 0.88)',
+        backdropFilter: 'blur(12px)',
+        boxShadow: `0 0 30px ${cyan}22, inset 0 0 40px rgba(0,20,40,0.6)`,
+        overflow: 'hidden',
       }}>
-        <p style={{
-          margin: 0,
-          fontSize: '18px',
-          fontWeight: '600',
-          color: '#1a1a2e',
-          lineHeight: 1.5,
-          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif',
+
+        {/* Scanline overlay */}
+        <div style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0,
+          backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,229,255,0.025) 3px, rgba(0,229,255,0.025) 4px)',
+          animation: 'hudScan 4s linear infinite',
+        }} />
+
+        {/* Corner decorations */}
+        <HudCorner position="top-left" />
+        <HudCorner position="top-right" />
+        <HudCorner position="bottom-left" />
+        <HudCorner position="bottom-right" />
+
+        {/* Header bar */}
+        <div style={{
+          position: 'relative', zIndex: 1,
+          borderBottom: `1px solid ${cyan}44`,
+          padding: '10px 18px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          background: `linear-gradient(90deg, ${cyan}18 0%, transparent 100%)`,
         }}>
-          {text}
-        </p>
+          <div style={{
+            fontFamily: '"Courier New", Courier, monospace',
+            fontSize: '13px', fontWeight: '700',
+            letterSpacing: '0.18em', textTransform: 'uppercase',
+            color: cyan,
+            textShadow: `0 0 10px ${cyan}`,
+          }}>
+            MOBI // GUIDE
+          </div>
+          <div style={{
+            fontFamily: '"Courier New", Courier, monospace',
+            fontSize: '10px', color: `${cyan}88`,
+            letterSpacing: '0.12em',
+          }}>
+            {String(index + 1).padStart(2, '0')} / {String(lines.length).padStart(2, '0')}
+          </div>
+        </div>
+
+        {/* Mode badge strip */}
+        <div style={{
+          position: 'relative', zIndex: 1,
+          padding: '6px 18px',
+          borderBottom: `1px solid ${cyan}22`,
+          background: `${cyan}0a`,
+        }}>
+          <span style={{
+            fontFamily: '"Courier New", Courier, monospace',
+            fontSize: '9px', letterSpacing: '0.22em',
+            color: `${cyan}77`, textTransform: 'uppercase',
+          }}>
+            ► {modeName || 'WORM MODE'}
+          </span>
+        </div>
+
+        {/* Dialogue text area */}
+        <div style={{
+          position: 'relative', zIndex: 1,
+          padding: '28px 24px 20px',
+          minHeight: '130px',
+          display: 'flex', alignItems: 'center',
+        }}>
+          {/* Left accent bar */}
+          <div style={{
+            position: 'absolute', left: 0, top: '20px', bottom: '20px',
+            width: '3px',
+            background: `linear-gradient(to bottom, transparent, ${cyan}, transparent)`,
+            boxShadow: `0 0 8px ${cyan}`,
+          }} />
+
+          <p key={index} style={{
+            margin: 0,
+            paddingLeft: '16px',
+            fontSize: 'clamp(15px, 2vw, 19px)',
+            fontWeight: '400',
+            color: '#cff4ff',
+            lineHeight: 1.65,
+            fontFamily: '"Courier New", Courier, monospace',
+            letterSpacing: '0.03em',
+            animation: 'textFadeIn 0.25s ease forwards',
+            textShadow: '0 0 20px rgba(0,229,255,0.2)',
+          }}>
+            {text}
+            {/* Blinking cursor */}
+            <span style={{
+              display: 'inline-block',
+              width: '2px', height: '1.1em',
+              background: cyan,
+              marginLeft: '4px',
+              verticalAlign: 'text-bottom',
+              animation: 'cursorBlink 1s step-end infinite',
+            }} />
+          </p>
+        </div>
+
+        {/* Footer — dots + button */}
+        <div style={{
+          position: 'relative', zIndex: 1,
+          borderTop: `1px solid ${cyan}22`,
+          padding: '12px 18px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          background: `rgba(0,10,24,0.4)`,
+        }}>
+          {/* Progress dots */}
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            {lines.map((_, i) => (
+              <div key={i} style={{
+                width: i === index ? '18px' : '6px',
+                height: '6px',
+                borderRadius: '3px',
+                background: i === index ? cyan : `${cyan}44`,
+                boxShadow: i === index ? `0 0 8px ${cyan}` : 'none',
+                transition: 'all 0.28s cubic-bezier(0.4,0,0.2,1)',
+              }} />
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            {/* Skip */}
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onSkip(); }}
+              style={{
+                background: 'none',
+                border: `1px solid ${cyan}33`,
+                color: `${cyan}66`,
+                fontSize: '11px', fontWeight: '600',
+                padding: '6px 14px',
+                borderRadius: '3px',
+                cursor: 'pointer',
+                fontFamily: '"Courier New", Courier, monospace',
+                letterSpacing: '0.1em',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.color = cyan; e.currentTarget.style.borderColor = `${cyan}88`; }}
+              onMouseLeave={e => { e.currentTarget.style.color = `${cyan}66`; e.currentTarget.style.borderColor = `${cyan}33`; }}
+            >
+              SKIP
+            </button>
+
+            {/* Next / Launch */}
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onAdvance(); }}
+              style={{
+                background: isLast ? cyan : 'transparent',
+                border: `1px solid ${cyan}`,
+                color: isLast ? '#001a24' : cyan,
+                fontSize: '12px', fontWeight: '700',
+                padding: '8px 22px',
+                borderRadius: '3px',
+                cursor: 'pointer',
+                fontFamily: '"Courier New", Courier, monospace',
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                boxShadow: isLast ? `0 0 20px ${cyan}88` : `0 0 8px ${cyan}33`,
+                transition: 'all 0.18s ease',
+                textShadow: isLast ? 'none' : `0 0 8px ${cyan}`,
+              }}
+              onMouseEnter={e => { e.currentTarget.style.boxShadow = `0 0 24px ${cyan}cc`; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+              onMouseLeave={e => { e.currentTarget.style.boxShadow = isLast ? `0 0 20px ${cyan}88` : `0 0 8px ${cyan}33`; e.currentTarget.style.transform = 'none'; }}
+            >
+              {isLast ? "► LAUNCH" : "NEXT ►"}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -172,15 +312,15 @@ function SpeechBubble({ text, accentColor }) {
 
 const MobiIntroScreen = ({ lines, modeName, accentColor, onComplete }) => {
   const [index, setIndex] = useState(0);
-  const accent = accentColor || '#33ff66';
   const isLast = index === lines.length - 1;
 
+  // Mobi.png lives at public/Mobi.png — drop the file there to activate it.
+  // BASE_URL handles the /WORM-3/ prefix in production.
+  const mobiImgSrc = `${import.meta.env.BASE_URL}Mobi.png`;
+
   const advance = useCallback(() => {
-    if (isLast) {
-      onComplete();
-    } else {
-      setIndex(i => i + 1);
-    }
+    if (isLast) onComplete();
+    else setIndex(i => i + 1);
   }, [isLast, onComplete]);
 
   useEffect(() => {
@@ -211,157 +351,81 @@ const MobiIntroScreen = ({ lines, modeName, accentColor, onComplete }) => {
         display: 'flex',
         alignItems: 'flex-end',
         justifyContent: 'center',
-        paddingBottom: '48px',
-        cursor: 'pointer',
-        // Subtle dark gradient at bottom so dialogue is always readable
-        background: 'linear-gradient(to top, rgba(8,10,22,0.72) 0%, transparent 55%)',
+        // Dark vignette at bottom keeps HUD readable over any background
+        background: 'linear-gradient(to top, rgba(0,6,20,0.85) 0%, rgba(0,6,20,0.3) 45%, transparent 100%)',
         pointerEvents: 'auto',
+        cursor: 'pointer',
       }}
     >
-      {/* Mode badge — top center */}
-      <div style={{
-        position: 'absolute',
-        top: '28px',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        background: `${accent}22`,
-        border: `1.5px solid ${accent}66`,
-        borderRadius: '20px',
-        padding: '5px 16px',
-        fontSize: '11px',
-        fontWeight: '700',
-        letterSpacing: '0.14em',
-        textTransform: 'uppercase',
-        color: accent,
-        fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif',
-        pointerEvents: 'none',
-      }}>
-        {modeName || 'WORM MODE'}
-      </div>
-
-      {/* Skip — top right */}
-      <button
-        type="button"
-        onClick={(e) => { e.stopPropagation(); onComplete(); }}
-        style={{
-          position: 'absolute',
-          top: '24px',
-          right: '28px',
-          background: 'rgba(255,255,255,0.08)',
-          border: '1px solid rgba(255,255,255,0.18)',
-          color: 'rgba(255,255,255,0.55)',
-          fontSize: '13px',
-          fontWeight: '500',
-          padding: '7px 16px',
-          borderRadius: '20px',
-          cursor: 'pointer',
-          fontFamily: 'inherit',
-          transition: 'all 0.15s ease',
-          pointerEvents: 'auto',
-        }}
-        onMouseEnter={e => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.background = 'rgba(255,255,255,0.15)'; }}
-        onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.55)'; e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; }}
-      >
-        Skip ▶
-      </button>
-
-      {/* Bottom dialogue row */}
+      {/* Main layout row — pinned to bottom */}
       <div
         style={{
           display: 'flex',
           alignItems: 'flex-end',
-          gap: '32px',
-          padding: '0 40px',
+          gap: '0px',
           width: '100%',
-          maxWidth: '800px',
+          maxWidth: '1100px',
+          padding: '0 32px 36px',
           boxSizing: 'border-box',
           pointerEvents: 'none',
         }}
-        onClick={(e) => e.stopPropagation()}
+        onClick={e => e.stopPropagation()}
       >
-        {/* Mobi */}
-        <div style={{ flexShrink: 0 }}>
-          <MobiCharacter />
+        {/* Mobi image — left, anchored to bottom */}
+        <div style={{
+          flexShrink: 0,
+          width: 'clamp(220px, 28vw, 400px)',
+          alignSelf: 'flex-end',
+          animation: 'mobiSlideIn 0.5s ease forwards',
+          pointerEvents: 'none',
+          marginRight: '-20px', // slight overlap into panel for depth
+          zIndex: 2,
+          position: 'relative',
+        }}>
+          <img
+            src={mobiImgSrc}
+            alt="Mobi"
+            style={{
+              width: '100%',
+              height: 'auto',
+              display: 'block',
+              // If image fails to load (not yet added), nothing shows — no error state needed
+              filter: 'drop-shadow(0 0 24px rgba(0,229,255,0.35)) drop-shadow(0 8px 16px rgba(0,0,0,0.7))',
+            }}
+            onError={e => { e.currentTarget.style.display = 'none'; }}
+          />
         </div>
 
-        {/* Bubble + controls */}
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '16px',
-          flex: 1,
-          pointerEvents: 'auto',
-        }}>
-          <SpeechBubble text={lines[index]} accentColor={accent} />
-
-          {/* Progress dots + Next button */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingLeft: '4px',
-          }}>
-            {/* Dot indicators */}
-            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-              {lines.map((_, i) => (
-                <div
-                  key={i}
-                  style={{
-                    width: i === index ? '20px' : '7px',
-                    height: '7px',
-                    borderRadius: '4px',
-                    background: i === index ? accent : 'rgba(255,255,255,0.30)',
-                    transition: 'all 0.28s cubic-bezier(0.4,0,0.2,1)',
-                    boxShadow: i === index ? `0 0 8px ${accent}88` : 'none',
-                  }}
-                />
-              ))}
-            </div>
-
-            {/* Next / Let's Go */}
-            <button
-              type="button"
-              onClick={advance}
-              style={{
-                background: isLast
-                  ? `linear-gradient(135deg, ${accent}, ${accent}cc)`
-                  : 'rgba(255,255,255,0.12)',
-                border: isLast ? 'none' : '1px solid rgba(255,255,255,0.22)',
-                color: isLast ? '#0a1a0a' : '#fff',
-                fontSize: '14px',
-                fontWeight: '700',
-                padding: '11px 24px',
-                borderRadius: '12px',
-                cursor: 'pointer',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif',
-                transition: 'all 0.18s ease',
-                letterSpacing: '0.02em',
-                boxShadow: isLast ? `0 4px 20px ${accent}55` : 'none',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.opacity = '0.88'; }}
-              onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.opacity = '1'; }}
-            >
-              {isLast ? "Let's Go!" : 'Next  ›'}
-            </button>
-          </div>
+        {/* HUD panel — right */}
+        <div style={{ flex: 1, pointerEvents: 'auto', zIndex: 1 }}>
+          <HudPanel
+            modeName={modeName}
+            text={lines[index]}
+            lines={lines}
+            index={index}
+            isLast={isLast}
+            onAdvance={advance}
+            onSkip={onComplete}
+          />
         </div>
       </div>
 
-      {/* Click-anywhere hint */}
+      {/* Click hint */}
       <p style={{
         position: 'absolute',
-        bottom: '14px',
+        bottom: '10px',
         left: '50%',
         transform: 'translateX(-50%)',
-        fontSize: '11px',
-        color: 'rgba(255,255,255,0.28)',
+        fontSize: '10px',
+        color: 'rgba(0,229,255,0.25)',
         margin: 0,
-        letterSpacing: '0.04em',
-        fontFamily: 'inherit',
+        letterSpacing: '0.12em',
+        fontFamily: '"Courier New", Courier, monospace',
         pointerEvents: 'none',
         whiteSpace: 'nowrap',
+        textTransform: 'uppercase',
       }}>
-        Click anywhere or press Space / → to continue
+        Click anywhere · Space · → to continue
       </p>
     </div>
   );
