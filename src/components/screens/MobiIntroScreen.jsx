@@ -341,6 +341,9 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
     return null;
   }
 
+  // On narrow screens (< 500px) hide the Mobi image so HUD gets full width
+  const isMobileNarrow = typeof window !== 'undefined' && window.innerWidth < 500;
+
   return (
     <div
       onClick={advance}
@@ -351,7 +354,6 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
         display: 'flex',
         alignItems: 'flex-end',
         justifyContent: 'center',
-        // Dark vignette at bottom keeps HUD readable over any background
         background: 'linear-gradient(to top, rgba(0,6,20,0.85) 0%, rgba(0,6,20,0.3) 45%, transparent 100%)',
         pointerEvents: 'auto',
         cursor: 'pointer',
@@ -365,39 +367,40 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
           gap: '0px',
           width: '100%',
           maxWidth: '1100px',
-          padding: '0 32px 36px',
+          padding: isMobileNarrow ? '0 12px 24px' : '0 32px 36px',
           boxSizing: 'border-box',
           pointerEvents: 'none',
         }}
         onClick={e => e.stopPropagation()}
       >
-        {/* Mobi image — left, anchored to bottom */}
-        <div style={{
-          flexShrink: 0,
-          width: 'clamp(220px, 28vw, 400px)',
-          alignSelf: 'flex-end',
-          animation: 'mobiSlideIn 0.5s ease forwards',
-          pointerEvents: 'none',
-          marginRight: '-20px', // slight overlap into panel for depth
-          zIndex: 2,
-          position: 'relative',
-        }}>
-          <img
-            src={mobiImgSrc}
-            alt="Mobi"
-            style={{
-              width: '100%',
-              height: 'auto',
-              display: 'block',
-              // If image fails to load (not yet added), nothing shows — no error state needed
-              filter: 'drop-shadow(0 0 24px rgba(0,229,255,0.35)) drop-shadow(0 8px 16px rgba(0,0,0,0.7))',
-            }}
-            onError={e => { e.currentTarget.style.display = 'none'; }}
-          />
-        </div>
+        {/* Mobi image — left, anchored to bottom; hidden on narrow mobile */}
+        {!isMobileNarrow && (
+          <div style={{
+            flexShrink: 0,
+            width: 'clamp(160px, 22vw, 380px)',
+            alignSelf: 'flex-end',
+            animation: 'mobiSlideIn 0.5s ease forwards',
+            pointerEvents: 'none',
+            marginRight: '-16px',
+            zIndex: 2,
+            position: 'relative',
+          }}>
+            <img
+              src={mobiImgSrc}
+              alt="Mobi"
+              style={{
+                width: '100%',
+                height: 'auto',
+                display: 'block',
+                filter: 'drop-shadow(0 0 24px rgba(0,229,255,0.35)) drop-shadow(0 8px 16px rgba(0,0,0,0.7))',
+              }}
+              onError={e => { e.currentTarget.style.display = 'none'; }}
+            />
+          </div>
+        )}
 
-        {/* HUD panel — right */}
-        <div style={{ flex: 1, pointerEvents: 'auto', zIndex: 1 }}>
+        {/* HUD panel */}
+        <div style={{ flex: 1, minWidth: 0, pointerEvents: 'auto', zIndex: 1 }}>
           <HudPanel
             modeName={modeName}
             text={lines[index]}
@@ -425,7 +428,7 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
         whiteSpace: 'nowrap',
         textTransform: 'uppercase',
       }}>
-        Click anywhere · Space · → to continue
+        {isMobileNarrow ? 'Tap anywhere to continue' : 'Click anywhere · Space · → to continue'}
       </p>
     </div>
   );
