@@ -18,8 +18,6 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Canvas } from '@react-three/fiber';
-import { MenuWorm } from '../menus/MainMenu.jsx';
 
 // ── Dialogue banks ────────────────────────────────────────────────────────────
 // Export these so App.jsx (or any caller) can just import the right array.
@@ -44,26 +42,87 @@ export const MOBI_LINES_MIRROR      = [];
 export const MOBI_LINES_CHAOS       = [];
 export const MOBI_LINES_CAMPAIGN    = [];
 
-// ── MobiCharacter — the real 3D worm in a small transparent Canvas ───────────
+// ── CSS keyframes ─────────────────────────────────────────────────────────────
+const _STYLE_ID = 'mobi-keyframes';
+if (typeof document !== 'undefined' && !document.getElementById(_STYLE_ID)) {
+  const s = document.createElement('style');
+  s.id = _STYLE_ID;
+  s.textContent = `
+    @keyframes mobiFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+    @keyframes mobiAnt1  { 0%,100%{transform:rotate(18deg)} 50%{transform:rotate(28deg)} }
+    @keyframes mobiAnt2  { 0%,100%{transform:rotate(-18deg)} 50%{transform:rotate(-28deg)} }
+    @keyframes mobiBlink { 0%,90%,100%{transform:scaleY(1)} 95%{transform:scaleY(0.05)} }
+    @keyframes mobiSegBob{ 0%,100%{transform:translateY(0) scale(1)} 50%{transform:translateY(-5px) scale(1.03)} }
+    @keyframes mobiHalo  { 0%,100%{opacity:0.22;transform:scale(1)} 50%{opacity:0.35;transform:scale(1.10)} }
+  `;
+  document.head.appendChild(s);
+}
+
+const SEG_COLORS = ['#3be08a', '#2fd47e', '#24be72', '#1aa862', '#129650'];
+const SEG_SIZES  = [88, 76, 66, 56, 46];
 
 function MobiCharacter() {
   return (
     <div style={{
-      width: 160,
-      height: 260,
-      flexShrink: 0,
-      filter: 'drop-shadow(0 0 18px #3be08a44)',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
+      animation: 'mobiFloat 2.8s ease-in-out infinite',
+      userSelect: 'none', position: 'relative', flexShrink: 0,
     }}>
-      <Canvas
-        camera={{ position: [0, 1.45, 4.5], fov: 32 }}
-        gl={{ alpha: true, antialias: true }}
-        style={{ background: 'transparent' }}
-      >
-        <ambientLight intensity={1.6} />
-        <pointLight position={[8, 8, 10]} intensity={3.5} color="#a8d8ff" />
-        <pointLight position={[-9, -8, 7]} intensity={1.8} color="#7aa3ff" />
-        <MenuWorm />
-      </Canvas>
+      {/* Glow halo */}
+      <div style={{
+        position: 'absolute', top: '28px', left: '50%', transform: 'translateX(-50%)',
+        width: '120px', height: '120px', borderRadius: '50%',
+        background: `radial-gradient(circle, ${SEG_COLORS[0]}66 0%, transparent 70%)`,
+        animation: 'mobiHalo 2.8s ease-in-out infinite', pointerEvents: 'none', zIndex: 0,
+      }} />
+      {/* Antennae */}
+      <div style={{ display: 'flex', gap: '38px', marginBottom: '-4px', position: 'relative', zIndex: 1 }}>
+        {[0, 1].map(i => (
+          <div key={i} style={{
+            display: 'flex', flexDirection: 'column-reverse', alignItems: 'center',
+            transformOrigin: 'bottom center',
+            animation: i === 0 ? 'mobiAnt1 1.8s ease-in-out infinite' : 'mobiAnt2 1.8s ease-in-out infinite',
+            animationDelay: i === 1 ? '0.3s' : '0s',
+          }}>
+            <div style={{ width: '4px', height: '28px', borderRadius: '2px', background: SEG_COLORS[0], boxShadow: '0 0 0 1.5px #001a08' }} />
+            <div style={{ width: '13px', height: '13px', borderRadius: '50%', background: '#80ffcc', boxShadow: '0 0 10px #80ffcc, 0 0 20px #80ffcc88, 0 0 0 2px #001a08', marginBottom: '2px' }} />
+          </div>
+        ))}
+      </div>
+      {/* Head */}
+      <div style={{
+        width: SEG_SIZES[0], height: SEG_SIZES[0], borderRadius: '50%', zIndex: 1, flexShrink: 0,
+        background: `radial-gradient(circle at 38% 35%, ${SEG_COLORS[0]} 0%, ${SEG_COLORS[1]} 55%, ${SEG_COLORS[2]} 100%)`,
+        boxShadow: `0 0 0 4px #001a08, 0 6px 20px #001a0899, 0 0 36px ${SEG_COLORS[0]}77`,
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '7px',
+      }}>
+        <div style={{ display: 'flex', gap: '14px', marginTop: '4px' }}>
+          {[0, 1].map(e => (
+            <div key={e} style={{
+              width: '21px', height: '21px', borderRadius: '50%', background: '#fff',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              animation: 'mobiBlink 4s ease-in-out infinite',
+              animationDelay: e === 1 ? '0.06s' : '0s', overflow: 'hidden',
+            }}>
+              <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#050510', position: 'relative' }}>
+                <div style={{ position: 'absolute', top: '2px', left: '2px', width: '4px', height: '4px', borderRadius: '50%', background: 'rgba(255,255,255,0.75)' }} />
+              </div>
+            </div>
+          ))}
+        </div>
+        <div style={{ width: '32px', height: '14px', borderBottom: '3px solid #041a0a', borderLeft: '2px solid transparent', borderRight: '2px solid transparent', borderRadius: '0 0 18px 18px', marginTop: '-3px' }} />
+      </div>
+      {/* Body segments */}
+      {SEG_SIZES.slice(1).map((sz, i) => (
+        <div key={i} style={{
+          width: sz, height: sz, borderRadius: '50%', flexShrink: 0, zIndex: 1, position: 'relative',
+          background: `radial-gradient(circle at 38% 35%, ${SEG_COLORS[i + 1]} 0%, ${SEG_COLORS[Math.min(i + 2, 4)]} 100%)`,
+          boxShadow: `0 0 0 ${i < 2 ? 3 : 2}px #001a08, 0 4px 12px #001a0877, 0 0 20px ${SEG_COLORS[i + 1]}55`,
+          animation: 'mobiSegBob 2.8s ease-in-out infinite',
+          animationDelay: `${(i + 1) * 0.08}s`,
+        }} />
+      ))}
     </div>
   );
 }

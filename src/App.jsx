@@ -729,14 +729,15 @@ export default function WORM3() {
 
   const handleWormSetupComplete = useCallback((wizardSettings) => {
     setShowWormModeWizard(false);
-    // Store settings and show Mobi intro before launching game
+    // Keep the menu scene alive behind the intro so the canvas isn't blank
+    useGameStore.getState().setShowMainMenu(true);
     pendingWormSettings.current = wizardSettings;
     setShowMobiIntro(true);
   }, []);
 
   const handleMobiIntroComplete = useCallback(() => {
     setShowMobiIntro(false);
-    const wizardSettings = pendingWormSettings.current;
+    useGameStore.getState().setShowMainMenu(false);
     if (!wizardSettings) return;
     pendingWormSettings.current = null;
 
