@@ -341,11 +341,7 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
     return null;
   }
 
-  const screenW = typeof window !== 'undefined' ? window.innerWidth : 800;
-  // On very narrow screens Mobi is smaller but always visible on the left.
-  const mobiWidth = screenW < 400 ? '80px' : screenW < 600 ? '110px' : 'clamp(160px, 22vw, 380px)';
-  const mobiMargin = screenW < 600 ? '-10px' : '-16px';
-  const rowPadding = screenW < 600 ? '0 8px 20px' : '0 32px 36px';
+  const rowPadding = '0 16px 36px';
 
   return (
     <div
@@ -370,20 +366,20 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
           gap: '0px',
           width: '100%',
           maxWidth: '1100px',
-          padding: rowPadding,
+          padding: '0 16px 36px',
           boxSizing: 'border-box',
           pointerEvents: 'none',
         }}
         onClick={e => e.stopPropagation()}
       >
-        {/* Mobi image — always left, scales down on mobile */}
+        {/* Mobi image — always big on the left */}
         <div style={{
           flexShrink: 0,
-          width: mobiWidth,
+          width: 'clamp(200px, 30vw, 420px)',
           alignSelf: 'flex-end',
           animation: 'mobiSlideIn 0.5s ease forwards',
           pointerEvents: 'none',
-          marginRight: mobiMargin,
+          marginRight: '-20px',
           zIndex: 2,
           position: 'relative',
         }}>
