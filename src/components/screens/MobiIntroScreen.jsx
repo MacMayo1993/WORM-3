@@ -58,6 +58,10 @@ if (typeof document !== 'undefined' && !document.getElementById(_STYLE_ID)) {
       from { transform: translateX(-40px); opacity: 0; }
       to   { transform: translateX(0);     opacity: 1; }
     }
+    @keyframes mobiSlideInRight {
+      from { transform: translateX(40px); opacity: 0; }
+      to   { transform: translateX(0);    opacity: 1; }
+    }
     @keyframes hudFadeIn {
       from { opacity: 0; transform: translateY(12px); }
       to   { opacity: 1; transform: translateY(0); }
@@ -354,16 +358,16 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
         cursor: 'pointer',
       }}
     >
-      {/* Mobi — pinned bottom-left, ~64% of screen height */}
+      {/* Mobi — pinned bottom-right, ~64% of screen height */}
       <div style={{
         position: 'absolute',
         bottom: 0,
-        left: 0,
+        right: 0,
         height: '64vh',
-        maxWidth: '38vw',
+        maxWidth: '42vw',
         zIndex: 902,
         pointerEvents: 'none',
-        animation: 'mobiSlideIn 0.5s ease forwards',
+        animation: 'mobiSlideInRight 0.5s ease forwards',
       }}>
         <img
           src={mobiImgSrc}
@@ -378,40 +382,40 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
         />
       </div>
 
-      {/* Speech bubble — positioned upper-right, with tail pointing left toward Mobi's mouth */}
+      {/* Speech bubble — left side, tail pointing right toward Mobi */}
       <div
         style={{
           position: 'absolute',
-          /* Mouth is roughly 65% up from bottom of a 75vh image = ~49vh from bottom */
           bottom: 'clamp(100px, 36vh, 50vh)',
-          left: 'clamp(130px, 30vw, 46vw)',
+          left: '8px',
+          right: 'clamp(120px, 38vw, 48vw)',
           zIndex: 901,
           pointerEvents: 'none',
         }}
         onClick={e => e.stopPropagation()}
       >
-        {/* Tail pointing left */}
+        {/* Tail pointing right toward Mobi */}
         <div style={{
           position: 'absolute',
-          left: '-22px',
+          right: '-22px',
           top: '28px',
           width: 0,
           height: 0,
           borderTop: '12px solid transparent',
           borderBottom: '12px solid transparent',
-          borderRight: '22px solid rgba(0,229,255,0.35)',
-          filter: 'drop-shadow(-4px 0 6px rgba(0,229,255,0.3))',
+          borderLeft: '22px solid rgba(0,229,255,0.35)',
+          filter: 'drop-shadow(4px 0 6px rgba(0,229,255,0.3))',
         }} />
         {/* Inner tail (fill) */}
         <div style={{
           position: 'absolute',
-          left: '-18px',
+          right: '-18px',
           top: '30px',
           width: 0,
           height: 0,
           borderTop: '10px solid transparent',
           borderBottom: '10px solid transparent',
-          borderRight: '18px solid rgba(2,12,30,0.92)',
+          borderLeft: '18px solid rgba(2,12,30,0.92)',
           zIndex: 1,
         }} />
         <div style={{ pointerEvents: 'auto' }}>
