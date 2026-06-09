@@ -51,6 +51,12 @@ const FLIP_CAP_PRESETS = [
   { label: 'Titan', value: 40, sub: 'War of attrition' },
 ];
 
+const GAME_LENGTH_OPTIONS = [
+  { value: 'short',  label: 'Short',  sub: '10 shuffles' },
+  { value: 'medium', label: 'Medium', sub: '20 shuffles' },
+  { value: 'long',   label: 'Long',   sub: '30 shuffles' },
+];
+
 const hexLum = hex => {
   const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
   return 0.299 * r + 0.587 * g + 0.114 * b;
@@ -261,6 +267,7 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
     visualMode: 'classic',
     flipMode: true,
     showTunnels: true,
+    gameLength: 'medium',
   });
   const [customPreview, setCustomPreview] = useState(null);
   const fileInputRef = useRef(null);
@@ -510,6 +517,24 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
             }}>
               <div>{p.label}</div>
               <div style={{ fontSize: '9px', marginTop: '2px', opacity: 0.75 }}>{p.sub}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(180,210,255,0.40)', marginBottom: '10px' }}>Game Length</div>
+        <div style={{ display: 'flex', gap: '6px' }}>
+          {GAME_LENGTH_OPTIONS.map(opt => (
+            <button key={opt.value} onClick={() => select('gameLength', opt.value)} style={{
+              flex: 1, padding: '8px 4px', border: `1.5px solid ${settings.gameLength === opt.value ? accent : 'rgba(255,255,255,0.12)'}`,
+              borderRadius: '10px', fontSize: '11px', fontWeight: settings.gameLength === opt.value ? '700' : '400',
+              background: settings.gameLength === opt.value ? `${accent}22` : 'rgba(255,255,255,0.05)',
+              color: settings.gameLength === opt.value ? accent : 'rgba(200,220,255,0.45)',
+              cursor: 'pointer', transition: 'all 0.15s', fontFamily: 'inherit', textAlign: 'center', lineHeight: 1.3,
+            }}>
+              <div>{opt.label}</div>
+              <div style={{ fontSize: '9px', marginTop: '2px', opacity: 0.75 }}>{opt.sub}</div>
             </button>
           ))}
         </div>
