@@ -798,9 +798,19 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     // once per frame in a single setState call, avoiding N cascading Zustand notifications.
     if (stickerGridIdRef.current) pendingHealAnimRemovals.add(stickerGridIdRef.current);
     // Set FROM color on the mesh so both colors are visible during the eyelid animation.
+    // The useLayoutEffect (which fires before this) already set the mesh to orig/TO color,
+    // so we must override it here — handles both standard and shader material paths.
     if (!isInstancedRef.current && meshRef.current) {
       const mat = meshRef.current?.material;
-      if (mat?.color) { mat.color.set(fromColor); mat.needsUpdate = true; }
+      if (mat?.color) {
+        mat.color.set(fromColor);
+        mat.map = null;
+        mat.needsUpdate = true;
+      } else if (mat?.uniforms?.baseColor) {
+        // Shader material (tile style) — swap to a FROM-color version so the mesh
+        // shows the antipodal color while the eyelid overlay shows the orig color.
+        meshRef.current.material = getTileStyleMaterial(tileStyleRef.current, fromColor, false, null, antipodalHexRef.current);
+      }
       meshRef.current.visible = true;
     }
     flipFromColor.current = fromColor;
