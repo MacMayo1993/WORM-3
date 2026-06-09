@@ -249,7 +249,7 @@ export default function UILayer({
         {(!wormHealerMode && (chaosMode || disparityWinner)) && <DisparityHUD />}
 
         {/* Healer Worm HUD Overlay */}
-        <HealerWormHUD onHome={onBackToMainMenu} onSettings={() => setShowSettings(true)} onRetry={onWormRetry} onNewGame={onWormNewGame} />
+        <HealerWormHUD onHome={onBackToMainMenu} onSettings={() => setShowSettings(true)} onToggleAntipodal={onToggleAntipodalPiP} antipodalActive={showAntipodalPiP} onRetry={onWormRetry} onNewGame={onWormNewGame} />
         {/* Möbius Band HUD — shows topology of active wormhole during tunnel traversal */}
         <MobiusHUD />
 

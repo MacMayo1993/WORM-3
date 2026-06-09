@@ -743,7 +743,7 @@ function WinnerScreen({ wormBodyTiles, wormSessionOrbs, parityPoints, wormTimeAl
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSize = 3, onHome, onSettings, wormAlive = true, showDeathMenu = false, deathDetails = null, onRetry, onNewGame }) {
+export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSize = 3, onHome, onSettings, onToggleAntipodal, antipodalActive = false, wormAlive = true, showDeathMenu = false, deathDetails = null, onRetry, onNewGame }) {
     const [isMinimized, setIsMinimized] = useState(false);
 
     // Reset minimize whenever a fresh death menu appears
@@ -834,6 +834,14 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                 <div style={TOP_BAR_LEFT_STYLE}>
                     {onHome && <button onPointerDown={onHome} style={buttonBase} aria-label="Home">⌂</button>}
                     {onSettings && <button onPointerDown={onSettings} style={buttonBase} aria-label="Settings">⚙</button>}
+                    {onToggleAntipodal && (
+                      <button
+                        onPointerDown={onToggleAntipodal}
+                        style={{ ...buttonBase, opacity: antipodalActive ? 1 : 0.45, fontSize: 15 }}
+                        aria-label="Toggle Antipodal Camera"
+                        title="Antipodal Camera"
+                      >⊕</button>
+                    )}
                     <div style={{ lineHeight: 1.1 }}>
                         <div style={STATUS_LABEL_STYLE}>WORM STATUS</div>
                         <div style={phaseNameStyle}>{phaseMeta.label}</div>
