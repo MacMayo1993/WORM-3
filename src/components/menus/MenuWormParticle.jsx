@@ -16,10 +16,6 @@ const _basePerp1 = new THREE.Vector3(1, 0, 0); // reused, never mutated
 const _headPos   = new THREE.Vector3();
 const _lookPos   = new THREE.Vector3();
 const _segPos    = new THREE.Vector3();
-const _creasePos = new THREE.Vector3();
-const _creaseTan = new THREE.Vector3();
-const _creaseQ   = new THREE.Quaternion();
-const _torusZ    = new THREE.Vector3(0, 0, 1);
 
 // ── Module-level shared geometries ────────────────────────────────────────────
 const wHeadGeo  = new THREE.SphereGeometry(0.22, 14, 12);
@@ -34,11 +30,10 @@ const wEyeGeo   = new THREE.SphereGeometry(0.050, 8, 8);
 const wPupilGeo = new THREE.SphereGeometry(0.026, 6, 6);
 const wStemGeo  = new THREE.CylinderGeometry(0.010, 0.007, 0.20, 6);
 const wTipGeo   = new THREE.SphereGeometry(0.020, 6, 6);
-const wMouthGeo  = new THREE.TorusGeometry(0.048, 0.013, 6, 12, Math.PI);
-const wCreaseGeo = new THREE.TorusGeometry(0.17, 0.026, 8, 18);
+const wMouthGeo = new THREE.TorusGeometry(0.048, 0.013, 6, 12, Math.PI);
 
 // ── Module-level shared materials — identical across all worm instances ────────
-const outlineMat  = new THREE.MeshBasicMaterial({ color: '#111111', side: THREE.BackSide, depthWrite: false, depthTest: false });
+const outlineMat  = new THREE.MeshBasicMaterial({ color: '#111111', side: THREE.BackSide, depthWrite: false });
 const eyeWhiteMat = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.1, depthWrite: false });
 const pupilMat    = new THREE.MeshStandardMaterial({ color: '#0a0a14', roughness: 0.5, depthWrite: false });
 const mouthMat    = new THREE.MeshStandardMaterial({ color: '#0d2410', roughness: 0.6, depthWrite: false });
@@ -61,8 +56,6 @@ const MenuWormParticle = ({ start, color1, startTime, onComplete }) => {
   const ant1TipRef   = useRef();
   const ant2TipRef   = useRef();
   const segRefs      = useRef([]);
-  const creaseRefs   = useRef([]);
-  const segTCache    = useRef(new Array(SEGMENT_COUNT).fill(0));
 
   const duration      = 2.0;
   const retreatDur    = 2.0;
@@ -108,11 +101,6 @@ const MenuWormParticle = ({ start, color1, startTime, onComplete }) => {
       transparent: true, opacity: 0, depthWrite: false,
     })
   ), [faceColor]);
-
-  // Per-instance crease materials so opacity can be controlled per-frame
-  const creaseMats = useMemo(() => Array.from({ length: SEGMENT_COUNT }, () =>
-    new THREE.MeshBasicMaterial({ color: '#080808', depthWrite: false, depthTest: false, transparent: true, opacity: 0.9 })
-  ), []);
 
   const blinkTimerRef   = useRef(0);
   const isBlinkingRef   = useRef(false);
@@ -214,7 +202,6 @@ const MenuWormParticle = ({ start, color1, startTime, onComplete }) => {
       if (!seg) continue;
       const lag  = (i + 1) / (SEGMENT_COUNT + 1);
       const segT = Math.max(0, Math.min(1, displayProgress * (1 - lag)));
-      segTCache.current[i] = segT;
       curveData.curve.getPoint(segT, _segPos);
       const wave  = Math.sin(clockTime * p.squishFreq - i * 0.8) * p.squishAmp;
       const taper = 1 - (i / (SEGMENT_COUNT - 1)) * 0.05;
@@ -222,22 +209,6 @@ const MenuWormParticle = ({ start, color1, startTime, onComplete }) => {
       seg.scale.set(taper * (1 + wave), taper * (1 - wave * 0.5), taper * (1 + wave));
       seg.visible = retreatFade > 0.02;
       if (seg.visible) segMats[i].opacity = (0.95 - (i / SEGMENT_COUNT) * 0.12) * retreatFade;
-    }
-
-    // ── Joint creases — dark torus rings at each segment boundary ────────────
-    for (let ci = 0; ci < SEGMENT_COUNT; ci++) {
-      const crease = creaseRefs.current[ci];
-      if (!crease) continue;
-      const tA   = ci === 0 ? displayProgress : segTCache.current[ci - 1];
-      const tB   = segTCache.current[ci];
-      const tMid = (tA + tB) / 2;
-      curveData.curve.getPoint(tMid, _creasePos);
-      curveData.curve.getTangent(tMid, _creaseTan).normalize();
-      if (_creaseTan.lengthSq() > 0.0001) _creaseQ.setFromUnitVectors(_torusZ, _creaseTan);
-      crease.position.copy(_creasePos);
-      crease.quaternion.copy(_creaseQ);
-      crease.visible = retreatFade > 0.02;
-      if (crease.visible) creaseMats[ci].opacity = retreatFade * 0.88;
     }
   });
 
@@ -266,11 +237,6 @@ const MenuWormParticle = ({ start, color1, startTime, onComplete }) => {
         </group>
       ))}
 
-      {/* ── Joint creases — dark torus rings that visually separate segments ── */}
-      {Array.from({ length: SEGMENT_COUNT }, (_, ci) => (
-        <mesh key={`crease-${ci}`} ref={el => (creaseRefs.current[ci] = el)}
-          geometry={wCreaseGeo} renderOrder={26} material={creaseMats[ci]} />
-      ))}
     </group>
   );
 };
