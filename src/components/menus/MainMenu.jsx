@@ -334,7 +334,7 @@ const ShufflingCube = ({ onFlip }) => {
 
 // ─── MenuWorm — round-blob worm mascot emerging from the cube's top face ──────
 const _SEG_Y         = [0.80, 0.55, 0.33, 0.15, 0.00]; // all segs above cube surface
-const _SEG_R         = [0.24, 0.22, 0.21, 0.20, 0.18];   // uniform blobs, gentle taper
+const _SEG_R         = [0.20, 0.185, 0.175, 0.165, 0.15];   // slimmer taper
 const _SEG_COL       = ['#3be08a', '#2fd47e', '#24be72', '#1aa862', '#129650'];
 const _PATH_MIN_DIST = 0.004;
 const _SEG_SPACING   = 0.22;
