@@ -1206,6 +1206,8 @@ function WormChaseCamera({ worm, size }) {
     const { camera, size: viewportSize } = useThree();
     const camPosRef = useRef(new THREE.Vector3(0, 6, 10));
     const lookAtRef = useRef(new THREE.Vector3(0, 0, 0));
+    const camUpRef = useRef(new THREE.Vector3(0, 1, 0));  // smoothed up — prevents instant snap
+    const prevPhaseRef = useRef('crawling');              // detect phase transitions for snap logic
     const zoomExtraRef = useRef(0);   // burst zoom accumulated
     const prevTailLen = useRef(BASE_TAIL_LENGTH);   // detect new parity pickups
 
@@ -1287,7 +1289,8 @@ function WormChaseCamera({ worm, size }) {
             camPosRef.current.lerp(_camTargetCam, alpha);
             lookAtRef.current.lerp(_camTargetLook, alpha);
             camera.position.copy(camPosRef.current);
-            camera.up.copy(_camUp);
+            camUpRef.current.lerp(_camUp, Math.min(1, CAM_LERP * delta)).normalize();
+            camera.up.copy(camUpRef.current);
             camera.lookAt(lookAtRef.current);
         } else if ((phase === 'entering' || phase === 'tunnel' || phase === 'exiting') && worm.activeTunnel.current) {
             // Map phase+progress to a single [0,1] parameter along the Möbius ribbon.
@@ -1350,16 +1353,26 @@ function WormChaseCamera({ worm, size }) {
             // Camera "up" flips 180° over the traversal — the RP² non-orientability effect.
             _camUpVec.crossVectors(_camTunnelTangent, _camTunnelRight).normalize();
 
+            // Snap position on the first frame we enter the tunnel so the camera doesn't
+            // swing through space for several frames while lerping from the surface position.
+            if (prevPhaseRef.current === 'crawling' && phase === 'entering') {
+                camPosRef.current.copy(_camSurfCam);
+                lookAtRef.current.copy(_camLookVec);
+            }
             const alpha = Math.min(1, CAM_LERP * delta * 4.0);
             camPosRef.current.lerp(_camSurfCam, alpha);
             lookAtRef.current.lerp(_camLookVec, alpha);
             camera.position.copy(camPosRef.current);
-            camera.up.copy(_camUpVec);
+            // Smooth the up vector so the Möbius 180° flip is gradual rather than instant.
+            camUpRef.current.lerp(_camUpVec, Math.min(1, CAM_LERP * delta * 3.0)).normalize();
+            camera.up.copy(camUpRef.current);
             camera.lookAt(lookAtRef.current);
         } else {
             tunnelState.active = false;
             tunnelState.t = 0;
         }
+
+        prevPhaseRef.current = phase;
     });
 
     return null;
