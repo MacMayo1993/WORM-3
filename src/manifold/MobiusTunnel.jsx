@@ -37,9 +37,6 @@ const _segTangent    = new THREE.Vector3();
 const _surfaceNormal = new THREE.Vector3();
 const _up            = new THREE.Vector3(0, 1, 0);
 const _side          = new THREE.Vector3(0, 0, 1);
-const _hoopDir       = new THREE.Vector3();
-const _hoopPos       = new THREE.Vector3();
-const _hoopQuat      = new THREE.Quaternion();
 
 // Vertex shader: pass UV through to fragment.
 const vertexShader = `
@@ -344,12 +341,6 @@ const MobiusTunnel = ({
   const pulseT   = useRef(Math.random() * Math.PI * 2);
   const lastStartRef = useRef(new THREE.Vector3(Infinity, Infinity, Infinity));
   const lastEndRef   = useRef(new THREE.Vector3(Infinity, Infinity, Infinity));
-  const hoop1Ref    = useRef();
-  const hoop2Ref    = useRef();
-  const hoop1MatRef = useRef();
-  const hoop2MatRef = useRef();
-  const hoop1TRef   = useRef(Math.random()); // staggered start phase so hoops don't sync
-  const hoop2TRef   = useRef(Math.random());
 
   const { tunnelBirths, tunnelPulses } = useGameStore(
     useShallow(s => ({ tunnelBirths: s.tunnelBirths, tunnelPulses: s.tunnelPulses }))
@@ -403,9 +394,10 @@ const MobiusTunnel = ({
     _vStart.copy(_wPos1).addScaledVector(_faceNorm1, -FACE_OFFSET);
     _vEnd  .copy(_wPos2).addScaledVector(_faceNorm2, -FACE_OFFSET);
 
-    // Mini-cube face docking points — centre always at world origin
-    _midA.copy(_faceNorm1).multiplyScalar(MINI_FACE_R);
-    _midB.copy(_faceNorm2).multiplyScalar(MINI_FACE_R);
+    // Mini-cube face docking points — use LOCAL color direction so the tunnel
+    // always routes through the correct colored face regardless of cube rotation.
+    _midA.set(n1[0], n1[1], n1[2]).multiplyScalar(MINI_FACE_R);
+    _midB.set(n2[0], n2[1], n2[2]).multiplyScalar(MINI_FACE_R);
 
     const moved =
       lastStartRef.current.distanceToSquared(_vStart) > REBUILD_EPS_SQ ||
@@ -487,35 +479,6 @@ const MobiusTunnel = ({
       uniforms.uPulseBoost.value = 0;
     }
 
-    // Hoop animation: each hoop travels tile face → VoidCore in 2 s then loops.
-    // Radius matches the ribbon taper at the hoop's current position along the path.
-    const hoopDead = flips >= FLIP_CAP;
-    if (hoop1Ref.current) {
-      hoop1TRef.current = (hoop1TRef.current + delta / 2.0) % 1.0;
-      const s1 = hoop1TRef.current;
-      const r1 = (RIBBON_WIDTH / 2) * (TAPER_MIN + (1 - TAPER_MIN) * (1 - s1));
-      _hoopPos.lerpVectors(_vStart, _midA, s1);
-      _hoopDir.subVectors(_midA, _vStart).normalize();
-      _hoopQuat.setFromUnitVectors(_side, _hoopDir);
-      hoop1Ref.current.position.copy(_hoopPos);
-      hoop1Ref.current.quaternion.copy(_hoopQuat);
-      hoop1Ref.current.scale.setScalar(r1);
-      hoop1Ref.current.visible = !hoopDead;
-      if (hoop1MatRef.current) hoop1MatRef.current.color.set(hoopDead ? '#555' : color1);
-    }
-    if (hoop2Ref.current) {
-      hoop2TRef.current = (hoop2TRef.current + delta / 2.0) % 1.0;
-      const s2 = hoop2TRef.current;
-      const r2 = (RIBBON_WIDTH / 2) * (TAPER_MIN + (1 - TAPER_MIN) * (1 - s2));
-      _hoopPos.lerpVectors(_vEnd, _midB, s2);
-      _hoopDir.subVectors(_midB, _vEnd).normalize();
-      _hoopQuat.setFromUnitVectors(_side, _hoopDir);
-      hoop2Ref.current.position.copy(_hoopPos);
-      hoop2Ref.current.quaternion.copy(_hoopQuat);
-      hoop2Ref.current.scale.setScalar(r2);
-      hoop2Ref.current.visible = !hoopDead;
-      if (hoop2MatRef.current) hoop2MatRef.current.color.set(hoopDead ? '#444' : color2);
-    }
   });
 
   return (
@@ -556,17 +519,6 @@ const MobiusTunnel = ({
         />
       </mesh>
 
-      {/* Hoop 1 — color1 ring, travels from tile 1 face toward VoidCore (2 s per loop) */}
-      <mesh ref={hoop1Ref} visible={false}>
-        <torusGeometry args={[1.0, 0.05, 8, 48]} />
-        <meshBasicMaterial ref={hoop1MatRef} color={color1} transparent opacity={0.9} depthWrite={false} />
-      </mesh>
-
-      {/* Hoop 2 — color2 ring, travels from tile 2 face toward VoidCore (2 s per loop) */}
-      <mesh ref={hoop2Ref} visible={false}>
-        <torusGeometry args={[1.0, 0.05, 8, 48]} />
-        <meshBasicMaterial ref={hoop2MatRef} color={color2} transparent opacity={0.9} depthWrite={false} />
-      </mesh>
     </>
   );
 };
