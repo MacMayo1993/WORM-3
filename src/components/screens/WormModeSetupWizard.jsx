@@ -528,8 +528,8 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.10)' }} />
         </div>
 
-        {/* Palette grid — name above dots, 4 columns, matching in-game settings */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '7px', paddingBottom: '8px' }}>
+        {/* Palette grid — 2 columns, name + preview beside all 5 color dots, matching Freeplay wizard */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '7px', paddingBottom: '8px' }}>
           {WIZARD_SCHEME_KEYS.filter(k => k !== 'custom').map(key => {
             const owned = ownedItems.includes(`scheme_${key}`);
             const selected = settings.colorScheme === key;
@@ -538,26 +538,25 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
               <button key={key}
                 style={{
                   ...S.card(selected),
-                  flexDirection: 'column', gap: '5px', padding: '8px 6px',
-                  opacity: owned ? 1 : 0.38,
-                  cursor: owned ? 'pointer' : 'not-allowed',
-                  position: 'relative',
+                  flexDirection: 'column', gap: '6px', padding: '10px 12px',
+                  ...(owned ? {} : { opacity: 0.42, cursor: 'not-allowed', pointerEvents: 'none' }),
                 }}
                 onClick={() => owned && select('colorScheme', key)}>
-                {!owned && <span style={{ position: 'absolute', top: 3, right: 4, fontSize: '8px' }}>🔒</span>}
-                <span style={{ fontSize: '10px', fontWeight: selected ? '600' : '400', color: selected ? '#e8edf8' : 'rgba(200,220,255,0.65)', lineHeight: 1.2, textAlign: 'center' }}>
-                  {SCHEME_LABELS[key]}
+                <span style={{ fontSize: '12px', fontWeight: selected ? '600' : '400', color: selected ? '#e8edf8' : 'rgba(200,220,255,0.65)', lineHeight: 1.2 }}>
+                  {SCHEME_LABELS[key]}{!owned ? ' 🔒' : ''}
                 </span>
-                <div style={{ width: '100%', borderRadius: '5px', overflow: 'hidden' }}>
-                  <TilePreviewCanvas styleKey={previewStyle} colorHex={colors[0] || '#4a7fa5'} size={56} />
-                </div>
-                <div style={{ display: 'flex', gap: '3px', justifyContent: 'center' }}>
-                  {colors.slice(1, 4).map((c, i) => (
-                    <div key={i} style={{ width: '10px', height: '10px', borderRadius: '50%', background: owned ? c : '#aaa', boxShadow: '0 1px 2px rgba(0,0,0,0.18)' }} />
-                  ))}
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '5px', overflow: 'hidden', flexShrink: 0 }}>
+                    <TilePreviewCanvas styleKey={previewStyle} colorHex={colors[0] || '#4a7fa5'} size={32} />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '3px', flex: 1 }}>
+                    {colors.slice(1).map((c, i) => (
+                      <div key={i} style={{ width: '100%', aspectRatio: '1', borderRadius: '50%', background: owned ? c : '#bbb', boxShadow: '0 1px 2px rgba(0,0,0,0.18)' }} />
+                    ))}
+                  </div>
                 </div>
                 {selected && (
-                  <div style={{ position: 'absolute', top: '5px', right: '5px' }}><Checkmark /></div>
+                  <div style={{ position: 'absolute', top: '8px', right: '8px' }}><Checkmark /></div>
                 )}
               </button>
             );

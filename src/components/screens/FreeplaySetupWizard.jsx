@@ -100,7 +100,7 @@ function extractColorsFromImage(img, count = 6) {
   return centroids.map(([r, g, b]) => '#' + [r, g, b].map(v => Math.max(0, Math.min(255, v)).toString(16).padStart(2, '0')).join(''));
 }
 
-function TilePreviewCanvas({ styleKey, colorHex = '#4a7fa5', size = 48, canvasStyle }) {
+function TilePreviewCanvas({ styleKey, colorHex = '#4a7fa5', size = 48 }) {
   const canvasRef = useRef(null);
   const idRef = useRef(null);
   React.useEffect(() => {
@@ -114,7 +114,7 @@ function TilePreviewCanvas({ styleKey, colorHex = '#4a7fa5', size = 48, canvasSt
   React.useEffect(() => {
     if (idRef.current !== null) updateTilePreview(idRef.current, styleKey, colorHex);
   }, [styleKey, colorHex]);
-  return <canvas ref={canvasRef} width={size} height={size} style={{ display: 'block', borderRadius: '6px', ...canvasStyle }} />;
+  return <canvas ref={canvasRef} width={size} height={size} style={{ display: 'block', borderRadius: '6px' }} />;
 }
 
 // ── Shared inline styles ──────────────────────────────────────────────────────
@@ -522,8 +522,8 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.10)' }} />
         </div>
 
-        {/* Palette grid — 4 columns: name → full-width preview → dots row */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '7px', paddingBottom: '8px' }}>
+        {/* Palette grid — name above dots, 2 columns, matching in-game settings */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '7px', paddingBottom: '8px' }}>
           {WIZARD_SCHEME_KEYS.filter(k => k !== 'custom').map(key => {
             const selected = settings.colorScheme === key;
             const owned = schemeOwned(key);
@@ -531,23 +531,25 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
             return (
               <button key={key} style={{
                 ...S.card(selected),
-                flexDirection: 'column', alignItems: 'center', gap: '5px', padding: '7px 6px 8px',
+                flexDirection: 'column', gap: '6px', padding: '10px 12px',
                 ...(owned ? {} : { opacity: 0.42, cursor: 'not-allowed', pointerEvents: 'none' }),
               }}
                 onClick={() => owned && select('colorScheme', key)}>
-                <span style={{ fontSize: '10px', fontWeight: selected ? '600' : '400', color: selected ? '#e8edf8' : 'rgba(200,220,255,0.65)', lineHeight: 1.2, textAlign: 'center', width: '100%' }}>
+                <span style={{ fontSize: '12px', fontWeight: selected ? '600' : '400', color: selected ? '#e8edf8' : 'rgba(200,220,255,0.65)', lineHeight: 1.2 }}>
                   {SCHEME_LABELS[key]}{!owned ? ' 🔒' : ''}
                 </span>
-                <div style={{ width: '100%', overflow: 'hidden', borderRadius: '5px' }}>
-                  <TilePreviewCanvas styleKey={previewStyle} colorHex={colors[0] || '#4a7fa5'} size={56} canvasStyle={{ width: '100%', height: 'auto' }} />
-                </div>
-                <div style={{ display: 'flex', gap: '3px', justifyContent: 'space-between', width: '100%' }}>
-                  {colors.slice(1).map((c, i) => (
-                    <div key={i} style={{ width: '9px', height: '9px', borderRadius: '50%', background: owned ? c : '#bbb', boxShadow: '0 1px 2px rgba(0,0,0,0.18)', flexShrink: 0 }} />
-                  ))}
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '5px', overflow: 'hidden', flexShrink: 0 }}>
+                    <TilePreviewCanvas styleKey={previewStyle} colorHex={colors[0] || '#4a7fa5'} size={32} />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '3px', flex: 1 }}>
+                    {colors.slice(1).map((c, i) => (
+                      <div key={i} style={{ width: '100%', aspectRatio: '1', borderRadius: '50%', background: owned ? c : '#bbb', boxShadow: '0 1px 2px rgba(0,0,0,0.18)' }} />
+                    ))}
+                  </div>
                 </div>
                 {selected && (
-                  <div style={{ position: 'absolute', top: '6px', right: '6px' }}><Checkmark /></div>
+                  <div style={{ position: 'absolute', top: '8px', right: '8px' }}><Checkmark /></div>
                 )}
               </button>
             );
