@@ -37,9 +37,17 @@ if (typeof document !== 'undefined' && !document.getElementById(_STYLE_ID)) {
       from { transform: translateX(-30px); opacity: 0; }
       to   { transform: translateX(0);     opacity: 1; }
     }
+    @keyframes mobiDissolveOut {
+      from { opacity: 1; transform: translateX(0) scale(1); }
+      to   { opacity: 0; transform: translateX(-22px) scale(0.95); }
+    }
     @keyframes panelRise {
       from { opacity: 0; transform: translateY(12px); }
       to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes panelFadeDown {
+      from { opacity: 1; transform: translateY(0); }
+      to   { opacity: 0; transform: translateY(10px); }
     }
     @keyframes textFadeIn {
       from { opacity: 0; }
@@ -97,20 +105,13 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
   const PANEL_H     = 'clamp(132px, 18vh, 172px)';
   const NAMEPLATE_H = 32;
 
-  // Per-element dissolve styles — applied on top of entry animations
-  const mobiDismiss = isDismissing ? {
-    animation: 'none',
-    opacity: 0,
-    transform: 'translateX(-18px) scale(0.96)',
-    transition: 'opacity 0.55s ease, transform 0.55s ease',
-  } : {};
+  const mobiAnim = isDismissing
+    ? 'mobiDissolveOut 0.55s ease forwards'
+    : 'mobiSlideIn 0.45s cubic-bezier(0.16,1,0.3,1) forwards';
 
-  const uiDismiss = isDismissing ? {
-    animation: 'none',
-    opacity: 0,
-    transform: 'translateY(8px)',
-    transition: 'opacity 0.35s ease, transform 0.35s ease',
-  } : {};
+  const uiAnim = isDismissing
+    ? 'panelFadeDown 0.35s ease forwards'
+    : 'panelRise 0.4s cubic-bezier(0.16,1,0.3,1) forwards';
 
   return (
     <div
@@ -120,16 +121,20 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
         inset: 0,
         zIndex: 900,
         background: 'linear-gradient(to top, rgba(0,0,0,0.45) 0%, transparent 50%)',
-        // Background blur while Mobi is talking; unblurs on dismiss
-        backdropFilter:       isDismissing ? 'blur(0px)' : 'blur(5px)',
-        WebkitBackdropFilter: isDismissing ? 'blur(0px)' : 'blur(5px)',
-        transition: isDismissing
-          ? 'backdrop-filter 0.7s ease, -webkit-backdrop-filter 0.7s ease'
-          : undefined,
         pointerEvents: isDismissing ? 'none' : 'auto',
         cursor: isDismissing ? 'default' : 'pointer',
       }}
     >
+      {/* Background blur layer — always transitioning so backdrop-filter animates correctly */}
+      <div style={{
+        position: 'absolute',
+        inset: 0,
+        zIndex: 0,
+        pointerEvents: 'none',
+        backdropFilter:       isDismissing ? 'blur(0px)' : 'blur(5px)',
+        WebkitBackdropFilter: isDismissing ? 'blur(0px)' : 'blur(5px)',
+        transition: 'backdrop-filter 0.7s ease, -webkit-backdrop-filter 0.7s ease',
+      }} />
       {/* ── Mobi portrait — bottom-left, behind panel (z:901 < panel z:903) ── */}
       <div style={{
         position: 'absolute',
@@ -138,8 +143,7 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
         zIndex: 901,
         pointerEvents: 'none',
         lineHeight: 0,
-        animation: 'mobiSlideIn 0.45s cubic-bezier(0.16,1,0.3,1) forwards',
-        ...mobiDismiss,
+        animation: mobiAnim,
       }}>
         <img
           src={mobiImgSrc}
@@ -156,8 +160,7 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
         left: 0,
         zIndex: 905,
         pointerEvents: 'none',
-        animation: 'panelRise 0.4s cubic-bezier(0.16,1,0.3,1) forwards',
-        ...uiDismiss,
+        animation: uiAnim,
       }}>
         {/* Outer layer = border color */}
         <div style={{
@@ -223,8 +226,7 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
           paddingRight:  'clamp(16px, 3vw, 32px)',
           paddingBottom: 'max(clamp(20px, 3.5vh, 30px), env(safe-area-inset-bottom, 0px))',
           boxSizing: 'border-box',
-          animation: 'panelRise 0.4s cubic-bezier(0.16,1,0.3,1) forwards',
-          ...uiDismiss,
+          animation: uiAnim,
         }}
         onClick={e => e.stopPropagation()}
       >
