@@ -45,6 +45,7 @@ const _segTangent    = new THREE.Vector3();
 const _surfaceNormal = new THREE.Vector3();
 const _up            = new THREE.Vector3(0, 1, 0);
 const _side          = new THREE.Vector3(0, 0, 1);
+const _portalPos     = new THREE.Vector3();
 
 // Vertex shader: pass UV through to fragment.
 const vertexShader = `
@@ -315,11 +316,13 @@ function createRibbonGeos(segs) {
 const MobiusTunnel = ({
   meshIdx1, meshIdx2, dirKey1, dirKey2, cubieRefs, flips, color1, color2, tunnelId,
 }) => {
-  const meshRef  = useRef();
-  const pulseT   = useRef(Math.random() * Math.PI * 2);
-  const dimRef   = useRef(DIM_OPACITY);   // current dim multiplier (lerped each frame)
-  const lastStartRef = useRef(new THREE.Vector3(Infinity, Infinity, Infinity));
-  const lastEndRef   = useRef(new THREE.Vector3(Infinity, Infinity, Infinity));
+  const meshRef        = useRef();
+  const pulseT         = useRef(Math.random() * Math.PI * 2);
+  const dimRef         = useRef(DIM_OPACITY);   // current dim multiplier (lerped each frame)
+  const lastStartRef   = useRef(new THREE.Vector3(Infinity, Infinity, Infinity));
+  const lastEndRef     = useRef(new THREE.Vector3(Infinity, Infinity, Infinity));
+  const exitPortalRef  = useRef();
+  const exitPortalMatRef = useRef();
 
   const { tunnelBirths, tunnelPulses } = useGameStore(
     useShallow(s => ({ tunnelBirths: s.tunnelBirths, tunnelPulses: s.tunnelPulses }))
@@ -409,6 +412,21 @@ const MobiusTunnel = ({
       bumperUniformsL.uColor.value.set(cA);
       bumperUniformsR.uColor.value.set(cB);
 
+      // Exit portal: colored glow plane just past VoidCore on the exit side, facing inward.
+      // Shows the exit destination while the camera is inside the tunnel looking ahead.
+      if (exitPortalRef.current && exitPortalMatRef.current) {
+        // Place in the gap between VoidCore face (_midB) and exit cubie
+        _portalPos.copy(_midB).addScaledVector(_faceNorm2, 0.15);
+        exitPortalRef.current.position.copy(_portalPos);
+        // Orient so front face (+Z) points toward tunnel interior (opposite to exit normal)
+        exitPortalRef.current.lookAt(
+          _portalPos.x - _faceNorm2.x,
+          _portalPos.y - _faceNorm2.y,
+          _portalPos.z - _faceNorm2.z
+        );
+        exitPortalMatRef.current.color.set(cB);
+      }
+
       fillRibbon(
         geo.attributes.position.array,
         geo.attributes.uv.array,
@@ -446,6 +464,9 @@ const MobiusTunnel = ({
     uniforms.uOpacity.value        = (0.90 + Math.sin(pulseT.current) * 0.04) * dim;
     bumperUniformsL.uOpacity.value = (0.92 + Math.sin(pulseT.current) * 0.03) * dim;
     bumperUniformsR.uOpacity.value = (0.92 + Math.sin(pulseT.current) * 0.03) * dim;
+    if (exitPortalMatRef.current) {
+      exitPortalMatRef.current.opacity = 0.75 * dim;
+    }
 
     // Tunnel birth: grow-in from both portal ends toward centre (first flip only)
     const birth = tunnelId ? tunnelBirths?.[tunnelId] : null;
@@ -502,6 +523,19 @@ const MobiusTunnel = ({
           side={THREE.DoubleSide}
           transparent
           depthWrite={false}
+        />
+      </mesh>
+
+      {/* Exit portal — glowing rectangle at exit VoidCore face; visible when inside tunnel */}
+      <mesh ref={exitPortalRef}>
+        <planeGeometry args={[0.62, 0.62]} />
+        <meshBasicMaterial
+          ref={exitPortalMatRef}
+          color={color2}
+          transparent
+          opacity={0.75}
+          depthWrite={false}
+          side={THREE.FrontSide}
         />
       </mesh>
 
