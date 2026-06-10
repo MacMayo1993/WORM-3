@@ -3444,13 +3444,13 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             {wormVisible && <GlowWormAura worm={worm} />}
             {wormVisible && <WormFace worm={worm} size={size} />}
             {wormVisible && <PortalGlow worm={worm} size={size} />}
-            <WormholeRings
+            {!wormInTunnel && <WormholeRings
                 cubies={cubies}
                 size={size}
                 worm={worm}
                 voidTunnelKeysRef={worm.voidTunnelKeysRef}
                 tunnelUseCountsRef={worm.tunnelUseCountsRef}
-            />
+            />}
             <TunnelHealProgress size={size} />
             <HeartBurstSystem worm={worm} size={size} />
             <OrbFlashSystem worm={worm} />
