@@ -818,7 +818,7 @@ const HowToPlayMini = ({ tileColor }) => {
   const total = HOW_TO_PLAY_STEPS.length;
   const cur = HOW_TO_PLAY_STEPS[tutStep];
   return (
-    <div style={{ padding: '1.5px', borderRadius: '18px', background: RAINBOW_GRADIENT, boxShadow: '0 8px 24px rgba(0,0,0,0.40)' }}>
+    <div style={{ padding: '1.5px', borderRadius: '18px', background: '#0c0c1a', boxShadow: '0 8px 24px rgba(0,0,0,0.40)' }}>
       <div style={{
         borderRadius: '16.5px',
         background: 'rgba(4,6,20,0.92)',
@@ -1015,8 +1015,8 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
         marginTop: 'max(20px, env(safe-area-inset-top, 20px))',
         marginBottom: 'max(20px, env(safe-area-inset-bottom, 20px))',
         padding: '2px', borderRadius: '28px',
-        background: RAINBOW_GRADIENT,
-        boxShadow: `0 0 60px ${pendingTileColor}28, 0 24px 64px rgba(0,0,0,0.65)`,
+        background: '#0c0c1a',
+        boxShadow: `0 24px 64px rgba(0,0,0,0.65)`,
         transition: 'box-shadow 540ms ease',
       }}>
         <div style={{
@@ -1123,7 +1123,7 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
             {active.id === 'how-to-play' ? (
               <HowToPlayMini tileColor={active.tileColor} />
             ) : (
-              <div style={{ padding: '1.5px', borderRadius: '18px', background: RAINBOW_GRADIENT, boxShadow: '0 8px 24px rgba(0,0,0,0.40)' }}>
+              <div style={{ padding: '1.5px', borderRadius: '18px', background: '#0c0c1a', boxShadow: '0 8px 24px rgba(0,0,0,0.40)' }}>
                 <div style={{
                   borderRadius: '16.5px', overflow: 'hidden',
                   background: 'rgba(4,6,20,0.88)',
@@ -1161,17 +1161,16 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
             )}
 
             {/* How-to-play card — dark glass inside the colored panel */}
-            <div style={{ marginTop: '10px', padding: '1.5px', borderRadius: '18px', background: RAINBOW_GRADIENT }}>
+            <div style={{ marginTop: '10px', padding: '2px', borderRadius: '18px', background: '#0c0c1a' }}>
               <div style={{
-                padding: '14px 16px 16px', borderRadius: '16.5px',
-                background: 'linear-gradient(180deg, rgba(6,8,24,0.92), rgba(4,6,18,0.96))',
-                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.10)',
+                padding: '14px 16px 16px', borderRadius: '16px',
+                background: '#ffffff',
               }}>
-                <p style={{ margin: '0 0 10px', fontSize: '9px', fontWeight: 800, letterSpacing: '0.24em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.55)', fontFamily: MENU_FONT }}>How to play</p>
+                <p style={{ margin: '0 0 10px', fontSize: '9px', fontWeight: 800, letterSpacing: '0.24em', textTransform: 'uppercase', color: 'rgba(0,0,0,0.45)', fontFamily: MENU_FONT }}>How to play</p>
                 {active.controls.map((ctrl, i) => (
                   <div key={i} style={{ display: 'flex', gap: '8px', margin: '5px 0', alignItems: 'flex-start' }}>
-                    <span style={{ color: active.tileColor, fontSize: '14px', flexShrink: 0, lineHeight: 1.5 }}>·</span>
-                    <span style={{ fontSize: '13px', lineHeight: 1.55, color: 'rgba(230,238,255,0.82)', fontFamily: MENU_FONT }}>{ctrl}</span>
+                    <span style={{ color: '#0c0c1a', fontSize: '14px', flexShrink: 0, lineHeight: 1.5 }}>·</span>
+                    <span style={{ fontSize: '13px', lineHeight: 1.55, color: '#1a1a2e', fontFamily: MENU_FONT }}>{ctrl}</span>
                   </div>
                 ))}
               </div>
