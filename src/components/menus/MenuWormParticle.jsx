@@ -3,19 +3,21 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
 // ── Module-level cached vectors — zero per-frame allocations ──────────────────
-const _faceN     = new THREE.Vector3();
-const _perp      = new THREE.Vector3();
-const _arcDir    = new THREE.Vector3();
-const _wigDir    = new THREE.Vector3();
-const _arcFwdVec = new THREE.Vector3();
-const _tangent   = new THREE.Vector3();
-const _lookQuat  = new THREE.Quaternion();
-const _fwdAxis   = new THREE.Vector3(0, 0, 1);
-const _basePerp0 = new THREE.Vector3(0, 1, 0); // reused, never mutated
-const _basePerp1 = new THREE.Vector3(1, 0, 0); // reused, never mutated
-const _headPos   = new THREE.Vector3();
-const _lookPos   = new THREE.Vector3();
-const _segPos    = new THREE.Vector3();
+const _faceN       = new THREE.Vector3();
+const _perp        = new THREE.Vector3();
+const _arcDir      = new THREE.Vector3();
+const _wigDir      = new THREE.Vector3();
+const _arcFwdVec   = new THREE.Vector3();
+const _tangent     = new THREE.Vector3();
+const _lookQuat    = new THREE.Quaternion();
+const _fwdAxis     = new THREE.Vector3(0, 0, 1);
+const _basePerp0   = new THREE.Vector3(0, 1, 0); // reused, never mutated
+const _basePerp1   = new THREE.Vector3(1, 0, 0); // reused, never mutated
+const _headPos     = new THREE.Vector3();
+const _lookPos     = new THREE.Vector3();
+const _segPos      = new THREE.Vector3();
+const _worldNormal = new THREE.Vector3();
+const _camDir      = new THREE.Vector3();
 
 // ── Module-level shared geometries ────────────────────────────────────────────
 const wHeadGeo  = new THREE.SphereGeometry(0.22, 14, 12);
@@ -50,6 +52,7 @@ const SEGMENT_COUNT = 5;
  * All materials are either module-scope singletons or useMemo instances.
  */
 const MenuWormParticle = ({ start, color1, startTime, onComplete }) => {
+  const rootGroupRef = useRef();
   const headGroupRef = useRef();
   const eyeLRef      = useRef();
   const eyeRRef      = useRef();
@@ -132,6 +135,22 @@ const MenuWormParticle = ({ start, color1, startTime, onComplete }) => {
 
     // Face normal + stable perpendicular basis — no allocations
     _faceN.set(...start).normalize();
+
+    // Cull worm when its face points away from camera.
+    // parent = MenuFlipWave outer group; parent.parent = rotating cube group.
+    const cubeMatrix = rootGroupRef.current?.parent?.parent?.matrixWorld;
+    if (cubeMatrix) {
+      _worldNormal.copy(_faceN).transformDirection(cubeMatrix);
+      state.camera.getWorldDirection(_camDir);
+      if (_worldNormal.dot(_camDir) > 0.1) {
+        if (headGroupRef.current) headGroupRef.current.visible = false;
+        for (let i = 0; i < SEGMENT_COUNT; i++) {
+          if (segRefs.current[i]) segRefs.current[i].visible = false;
+        }
+        return;
+      }
+    }
+
     const basePerp = Math.abs(_faceN.y) < 0.8 ? _basePerp0 : _basePerp1;
     _perp.crossVectors(_faceN, basePerp).normalize();
     _arcFwdVec.crossVectors(_perp, _faceN).normalize();
@@ -215,7 +234,7 @@ const MenuWormParticle = ({ start, color1, startTime, onComplete }) => {
   });
 
   return (
-    <group position={start}>
+    <group ref={rootGroupRef} position={start}>
       {/* ── Head group ────────────────────────────────────────────────────── */}
       <group ref={headGroupRef}>
         <mesh geometry={wHeadGeo} renderOrder={25} scale={[1.30, 1.30, 1.30]} material={outlineMat} />

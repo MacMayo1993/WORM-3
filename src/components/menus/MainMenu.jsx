@@ -509,7 +509,7 @@ export const MenuWorm = ({ onWormClick }) => {
         <mesh ref={headMeshRef}>
           <sphereGeometry args={[_SEG_R[0], 16, 12]} />
           <meshStandardMaterial
-            color={_SEG_COL[0]} roughness={0.22} metalness={0.0}
+            color={_SEG_COL[0]} roughness={0.55} metalness={0.0}
             emissive={_SEG_COL[0]} emissiveIntensity={1.1}
           />
           {/* BackSide outline */}
@@ -571,7 +571,7 @@ export const MenuWorm = ({ onWormClick }) => {
       {/* ── Body segments — smooth round blobs ───────────────────────────── */}
       <mesh ref={seg1Ref}>
         <sphereGeometry args={[_SEG_R[1], 16, 12]} />
-        <meshStandardMaterial color={_SEG_COL[1]} roughness={0.22} metalness={0.0} emissive={_SEG_COL[1]} emissiveIntensity={0.95} />
+        <meshStandardMaterial color={_SEG_COL[1]} roughness={0.55} metalness={0.0} emissive={_SEG_COL[1]} emissiveIntensity={0.95} />
         <mesh scale={1.14}>
           <sphereGeometry args={[_SEG_R[1], 16, 12]} />
           <meshBasicMaterial color="#06001a" side={THREE.BackSide} />
@@ -579,7 +579,7 @@ export const MenuWorm = ({ onWormClick }) => {
       </mesh>
       <mesh ref={seg2Ref}>
         <sphereGeometry args={[_SEG_R[2], 16, 12]} />
-        <meshStandardMaterial color={_SEG_COL[2]} roughness={0.22} metalness={0.0} emissive={_SEG_COL[2]} emissiveIntensity={0.85} />
+        <meshStandardMaterial color={_SEG_COL[2]} roughness={0.55} metalness={0.0} emissive={_SEG_COL[2]} emissiveIntensity={0.85} />
         <mesh scale={1.14}>
           <sphereGeometry args={[_SEG_R[2], 16, 12]} />
           <meshBasicMaterial color="#06001a" side={THREE.BackSide} />
@@ -587,7 +587,7 @@ export const MenuWorm = ({ onWormClick }) => {
       </mesh>
       <mesh ref={seg3Ref}>
         <sphereGeometry args={[_SEG_R[3], 14, 10]} />
-        <meshStandardMaterial color={_SEG_COL[3]} roughness={0.22} metalness={0.0} emissive={_SEG_COL[3]} emissiveIntensity={0.75} />
+        <meshStandardMaterial color={_SEG_COL[3]} roughness={0.55} metalness={0.0} emissive={_SEG_COL[3]} emissiveIntensity={0.75} />
         <mesh scale={1.14}>
           <sphereGeometry args={[_SEG_R[3], 14, 10]} />
           <meshBasicMaterial color="#06001a" side={THREE.BackSide} />
@@ -595,7 +595,7 @@ export const MenuWorm = ({ onWormClick }) => {
       </mesh>
       <mesh ref={tailRef}>
         <sphereGeometry args={[_SEG_R[4], 12, 8]} />
-        <meshStandardMaterial color={_SEG_COL[4]} roughness={0.22} metalness={0.0} emissive={_SEG_COL[4]} emissiveIntensity={0.65} />
+        <meshStandardMaterial color={_SEG_COL[4]} roughness={0.55} metalness={0.0} emissive={_SEG_COL[4]} emissiveIntensity={0.65} />
         <mesh scale={1.14}>
           <sphereGeometry args={[_SEG_R[4], 12, 8]} />
           <meshBasicMaterial color="#06001a" side={THREE.BackSide} />
