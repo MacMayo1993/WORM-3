@@ -4,6 +4,14 @@ import { useShallow } from 'zustand/react/shallow';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { FLIP_CAP } from '../utils/constants.js';
+import { tunnelState } from '../worm/tunnelProgressBridge.js';
+
+// Opacity multiplier when the worm is traversing a different tunnel.
+// Inactive tunnels stay at 5 % so the scene stays readable during worm mode.
+const DIM_OPACITY  = 0.05;
+const FULL_OPACITY = 1.0;
+const DIM_LERP_DOWN = 6;   // fade-out speed (× delta)
+const DIM_LERP_UP   = 20;  // snap-in speed  (× delta) — nearly instant
 
 const FACE_NORM_LOCAL = {
   PX: [1, 0, 0], NX: [-1, 0, 0],
@@ -309,6 +317,7 @@ const MobiusTunnel = ({
 }) => {
   const meshRef  = useRef();
   const pulseT   = useRef(Math.random() * Math.PI * 2);
+  const dimRef   = useRef(DIM_OPACITY);   // current dim multiplier (lerped each frame)
   const lastStartRef = useRef(new THREE.Vector3(Infinity, Infinity, Infinity));
   const lastEndRef   = useRef(new THREE.Vector3(Infinity, Infinity, Infinity));
 
@@ -425,11 +434,18 @@ const MobiusTunnel = ({
       rightGeo.attributes.aHeightFrac.needsUpdate = true;
     }
 
-    // Subtle opacity pulse
+    // Dim system: inactive tunnels fade to 5 %, active tunnel snaps to 100 %.
+    const isActive = tunnelState.active && tunnelState.activeTunnelId === tunnelId;
+    const targetDim = isActive ? FULL_OPACITY : DIM_OPACITY;
+    const lerpSpeed = targetDim > dimRef.current ? DIM_LERP_UP : DIM_LERP_DOWN;
+    dimRef.current += (targetDim - dimRef.current) * Math.min(1, delta * lerpSpeed);
+    const dim = dimRef.current;
+
+    // Subtle opacity pulse, scaled by dim factor
     pulseT.current += delta * 1.5;
-    uniforms.uOpacity.value    = 0.90 + Math.sin(pulseT.current) * 0.04;
-    bumperUniformsL.uOpacity.value = 0.92 + Math.sin(pulseT.current) * 0.03;
-    bumperUniformsR.uOpacity.value = 0.92 + Math.sin(pulseT.current) * 0.03;
+    uniforms.uOpacity.value        = (0.90 + Math.sin(pulseT.current) * 0.04) * dim;
+    bumperUniformsL.uOpacity.value = (0.92 + Math.sin(pulseT.current) * 0.03) * dim;
+    bumperUniformsR.uOpacity.value = (0.92 + Math.sin(pulseT.current) * 0.03) * dim;
 
     // Tunnel birth: grow-in from both portal ends toward centre (first flip only)
     const birth = tunnelId ? tunnelBirths?.[tunnelId] : null;
