@@ -1325,33 +1325,37 @@ function WormChaseCamera({ worm, size }) {
             if (_ribPerp.lengthSq() < 0.001) { _ribPerp.set(0, 0, 1); _ribPerp.crossVectors(_ribAxis, _ribPerp); }
             _ribPerp.normalize();
 
-            // Camera flies through the actual tunnel centerline: Entry → Origin → Exit.
-            // getTunnelWorldPosInto matches the path used by WormholeTunnel.jsx geometry.
-            const tLook = Math.min(t + 0.06, 1.0);
-            getTunnelWorldPosInto(_camSurfCam, tunnel, t, size);
-            getTunnelWorldPosInto(_camLookVec, tunnel, tLook, size);
+            // Worm's position along the tunnel path (what the camera looks at).
+            // A point slightly ahead gives us the forward tangent direction.
+            const tAhead = Math.min(t + 0.05, 1.0);
+            getTunnelWorldPosInto(_camLookVec, tunnel, t, size);     // worm position
+            getTunnelWorldPosInto(_camSurfCam, tunnel, tAhead, size); // ahead point (tangent)
 
-            // Extend the camera path outside the cube so the tunnel portal is visible
-            // before entry and after exit — approach from ~2 units outside the face.
+            // Slide both points outside the face during entry/exit approach.
             if (phase === 'entering') {
-                // Pull back along entry normal: 2 units outside at tp=0, 0 at tp=1
-                _camSurfCam.addScaledVector(entN, (1.0 - tp) * 2.0);
+                const pull = (1.0 - tp) * 2.0;
+                _camLookVec.addScaledVector(entN, pull);
+                _camSurfCam.addScaledVector(entN, pull);
             } else if (phase === 'exiting') {
-                // Push out along exit normal: 0 at tp=0, 2 units outside at tp=1
-                _camSurfCam.addScaledVector(extN, tp * 2.0);
-                _camLookVec.addScaledVector(extN, Math.min(tp + 0.1, 1.0) * 2.0);
+                const push = tp * 2.0;
+                _camLookVec.addScaledVector(extN, push);
+                _camSurfCam.addScaledVector(extN, Math.min(tp + 0.1, 1.0) * 2.0);
             }
-            _camTunnelTangent.subVectors(_camLookVec, _camSurfCam);
+
+            // Tunnel forward direction (worm's heading)
+            _camTunnelTangent.subVectors(_camSurfCam, _camLookVec);
             if (_camTunnelTangent.lengthSq() < 0.0001) _camTunnelTangent.copy(_ribAxis);
             _camTunnelTangent.normalize();
 
-            // Width direction with Möbius half-twist: perpBase rotates π over [0,1].
-            // _ribAxis/_ribPerp are from ribbon anchor points and set the twist axis that
-            // produces the RP² 180° roll-over as the camera crosses the cube midpoint.
+            // Möbius half-twist: perpBase rotates π over [0,1] for the RP² roll.
             _camTunnelRight.copy(_ribPerp).applyAxisAngle(_ribAxis, t * Math.PI);
-
-            // Camera "up" flips 180° over the traversal — the RP² non-orientability effect.
             _camUpVec.crossVectors(_camTunnelTangent, _camTunnelRight).normalize();
+
+            // Camera rides behind and above the worm so the player sees the full journey.
+            // _camLookVec stays as the worm position (look-at target).
+            _camSurfCam.copy(_camLookVec)
+                .addScaledVector(_camTunnelTangent, -TUNNEL_SURF_BACK)
+                .addScaledVector(_camUpVec, TUNNEL_SURF_UP);
 
             // Snap position AND up on the first frame we enter the tunnel.
             // Position snap prevents multi-frame lerp swing. Up snap is critical: at
@@ -3444,13 +3448,13 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             {wormVisible && <GlowWormAura worm={worm} />}
             {wormVisible && <WormFace worm={worm} size={size} />}
             {wormVisible && <PortalGlow worm={worm} size={size} />}
-            <WormholeRings
+            {!wormInTunnel && <WormholeRings
                 cubies={cubies}
                 size={size}
                 worm={worm}
                 voidTunnelKeysRef={worm.voidTunnelKeysRef}
                 tunnelUseCountsRef={worm.tunnelUseCountsRef}
-            />
+            />}
             <TunnelHealProgress size={size} />
             <HeartBurstSystem worm={worm} size={size} />
             <OrbFlashSystem worm={worm} />
