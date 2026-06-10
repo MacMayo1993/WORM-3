@@ -1353,11 +1353,15 @@ function WormChaseCamera({ worm, size }) {
             // Camera "up" flips 180° over the traversal — the RP² non-orientability effect.
             _camUpVec.crossVectors(_camTunnelTangent, _camTunnelRight).normalize();
 
-            // Snap position on the first frame we enter the tunnel so the camera doesn't
-            // swing through space for several frames while lerping from the surface position.
+            // Snap position AND up on the first frame we enter the tunnel.
+            // Position snap prevents multi-frame lerp swing. Up snap is critical: at
+            // tunnel entry the Möbius formula evaluates to an up vector that can be
+            // exactly antiparallel to the surface up — lerping through zero magnitude
+            // produces garbage orientations and the visible stutter.
             if (prevPhaseRef.current === 'crawling' && phase === 'entering') {
                 camPosRef.current.copy(_camSurfCam);
                 lookAtRef.current.copy(_camLookVec);
+                camUpRef.current.copy(_camUpVec);
             }
             const alpha = Math.min(1, CAM_LERP * delta * 4.0);
             camPosRef.current.lerp(_camSurfCam, alpha);
@@ -3436,8 +3440,6 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             <WormChaseCamera worm={worm} size={size} />
             <WormSwipeControls onTurn={worm.queueTurn} worm={worm} />
             <WormInteriorGlass worm={worm} size={size} />
-            <TunnelSurfFX worm={worm} size={size} />
-            <TunnelPortalRings worm={worm} size={size} />
             {wormVisible && <WormBody worm={worm} />}
             {wormVisible && <GlowWormAura worm={worm} />}
             {wormVisible && <WormFace worm={worm} size={size} />}
