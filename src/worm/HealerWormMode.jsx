@@ -1201,6 +1201,18 @@ const _ribMidB   = new THREE.Vector3();
 const _ribAxis   = new THREE.Vector3();
 const _ribPerp   = new THREE.Vector3();
 
+// Evaluate the same piecewise-linear centerline used by MobiusTunnel:
+//   t ∈ [0, 0.5]  → lerp(vStart, midA, t*2)
+//   t ∈ (0.5, 1]  → lerp(midB,  vEnd,  (t-0.5)*2)
+// This matches the visual tube exactly so the camera traces the drawn ribbon.
+function evalRibbonCenter(out, t, vStart, midA, midB, vEnd) {
+    if (t <= 0.5) {
+        out.lerpVectors(vStart, midA, t * 2);
+    } else {
+        out.lerpVectors(midB, vEnd, (t - 0.5) * 2);
+    }
+}
+
 // ─── Chase Camera (dynamic zoom based on tail length) ───────────────────────
 function WormChaseCamera({ worm, size }) {
     const { camera, size: viewportSize } = useThree();
@@ -1325,11 +1337,11 @@ function WormChaseCamera({ worm, size }) {
             if (_ribPerp.lengthSq() < 0.001) { _ribPerp.set(0, 0, 1); _ribPerp.crossVectors(_ribAxis, _ribPerp); }
             _ribPerp.normalize();
 
-            // Worm's position along the tunnel path (what the camera looks at).
-            // A point slightly ahead gives us the forward tangent direction.
+            // Worm position on the EXACT ribbon centerline (matches MobiusTunnel visuals).
+            // A point slightly ahead on the same ribbon gives the forward tangent.
             const tAhead = Math.min(t + 0.05, 1.0);
-            getTunnelWorldPosInto(_camLookVec, tunnel, t, size);     // worm position
-            getTunnelWorldPosInto(_camSurfCam, tunnel, tAhead, size); // ahead point (tangent)
+            evalRibbonCenter(_camLookVec, t,      _ribVStart, _ribMidA, _ribMidB, _ribVEnd);
+            evalRibbonCenter(_camSurfCam, tAhead, _ribVStart, _ribMidA, _ribMidB, _ribVEnd);
 
             // Slide both points outside the face during entry/exit approach.
             if (phase === 'entering') {

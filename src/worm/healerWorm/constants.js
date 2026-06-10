@@ -16,7 +16,7 @@ export const TUNNEL_SURF_FOV = 78;
 export const TUNNEL_SURF_BACK = 3.2; // camera behind worm during tunnel (was unused placeholder)
 export const TUNNEL_SURF_UP = 1.3;   // camera above worm during tunnel (was unused placeholder)
 export const TUNNEL_SURF_SWAY = 0.22;
-export const TUNNEL_SPEED_SCALE = 0.264; // 0.357 / 1.35 — 35% longer traversal time
+export const TUNNEL_SPEED_SCALE = 0.310; // slightly slower than original 0.357 (~13% longer)
 
 // Face outward normals.
 export const FACE_NORMALS = {
