@@ -1,7 +1,7 @@
 // src/components/screens/MobiIntroScreen.jsx
 /**
- * MobiIntroScreen — mascot-dialogue intro shown before any game mode.
- * Layout: Mobi portrait (bottom-left) + frosted-glass card floating over his head.
+ * MobiIntroScreen — Civ 6-style dialogue: full-width panel at bottom,
+ * character portrait on the left peaking above, nameplate tab on top-left edge.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -27,18 +27,18 @@ export const MOBI_LINES_MIRROR   = [];
 export const MOBI_LINES_CHAOS    = [];
 export const MOBI_LINES_CAMPAIGN = [];
 
-// ── CSS keyframes ─────────────────────────────────────────────────────────────
+// ── CSS ───────────────────────────────────────────────────────────────────────
 const _STYLE_ID = 'mobi-hud-keyframes';
 if (typeof document !== 'undefined' && !document.getElementById(_STYLE_ID)) {
   const s = document.createElement('style');
   s.id = _STYLE_ID;
   s.textContent = `
     @keyframes mobiSlideIn {
-      from { transform: translateX(-24px); opacity: 0; }
+      from { transform: translateX(-30px); opacity: 0; }
       to   { transform: translateX(0);     opacity: 1; }
     }
-    @keyframes cardSlideUp {
-      from { opacity: 0; transform: translateY(10px); }
+    @keyframes panelRise {
+      from { opacity: 0; transform: translateY(12px); }
       to   { opacity: 1; transform: translateY(0); }
     }
     @keyframes textFadeIn {
@@ -51,148 +51,6 @@ if (typeof document !== 'undefined' && !document.getElementById(_STYLE_ID)) {
     }
   `;
   document.head.appendChild(s);
-}
-
-// ── Floating dialogue card ────────────────────────────────────────────────────
-function DialogueCard({ modeName, text, lines, index, isLast, onAdvance, onSkip }) {
-  return (
-    <div style={{
-      background: 'rgba(255, 255, 255, 0.86)',
-      backdropFilter: 'blur(28px) saturate(180%)',
-      WebkitBackdropFilter: 'blur(28px) saturate(180%)',
-      borderRadius: '18px',
-      border: '1px solid rgba(255, 255, 255, 0.7)',
-      boxShadow: '0 12px 48px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.08)',
-      overflow: 'hidden',
-      animation: 'cardSlideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards',
-    }}>
-      {/* Label */}
-      <div style={{
-        padding: '13px 18px 8px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-      }}>
-        <span style={{
-          fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif',
-          fontSize: '10px',
-          fontWeight: '600',
-          letterSpacing: '0.11em',
-          textTransform: 'uppercase',
-          color: '#8e99aa',
-        }}>
-          MOBI · {modeName || 'Worm Mode'}
-        </span>
-        <span style={{
-          fontFamily: 'system-ui, sans-serif',
-          fontSize: '10px',
-          color: '#b0bac8',
-          letterSpacing: '0.04em',
-        }}>
-          {index + 1} / {lines.length}
-        </span>
-      </div>
-
-      {/* Thin rule */}
-      <div style={{ height: '1px', background: 'rgba(0, 0, 0, 0.07)', margin: '0 18px' }} />
-
-      {/* Dialogue text */}
-      <div key={index} style={{
-        padding: '12px 18px 14px',
-        animation: 'textFadeIn 0.2s ease forwards',
-      }}>
-        <p style={{
-          margin: 0,
-          fontFamily: 'system-ui, -apple-system, "Segoe UI", "Helvetica Neue", sans-serif',
-          fontSize: 'clamp(14px, 3.8vw, 17px)',
-          fontWeight: '500',
-          color: '#0d1117',
-          lineHeight: 1.5,
-          letterSpacing: '-0.01em',
-        }}>
-          {text}
-          <span style={{
-            display: 'inline-block',
-            width: '2px',
-            height: '1em',
-            background: '#0d1117',
-            marginLeft: '3px',
-            verticalAlign: 'middle',
-            opacity: 0.6,
-            animation: 'cursorBlink 1s step-end infinite',
-          }} />
-        </p>
-      </div>
-
-      {/* Footer */}
-      <div style={{
-        padding: '0 18px 13px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-      }}>
-        {/* Progress dots */}
-        <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
-          {lines.map((_, i) => (
-            <div key={i} style={{
-              width: i === index ? '16px' : '5px',
-              height: '5px',
-              borderRadius: '3px',
-              background: i === index ? '#0d1117' : '#cbd5e1',
-              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-            }} />
-          ))}
-        </div>
-
-        {/* Buttons */}
-        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onSkip(); }}
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              color: '#8e99aa',
-              fontSize: '12px',
-              fontWeight: '500',
-              padding: '6px 10px',
-              fontFamily: 'system-ui, sans-serif',
-              letterSpacing: '0.04em',
-              transition: 'color 0.15s',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.color = '#4a5568'; }}
-            onMouseLeave={e => { e.currentTarget.style.color = '#8e99aa'; }}
-          >
-            Skip
-          </button>
-
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onAdvance(); }}
-            style={{
-              background: '#0d1117',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '9px',
-              padding: '7px 18px',
-              fontSize: '12px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              fontFamily: 'system-ui, sans-serif',
-              letterSpacing: '0.03em',
-              boxShadow: isLast ? '0 4px 14px rgba(13,17,23,0.35)' : '0 2px 6px rgba(13,17,23,0.2)',
-              transition: 'all 0.18s ease',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 6px 18px rgba(13,17,23,0.3)'; }}
-            onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = isLast ? '0 4px 14px rgba(13,17,23,0.35)' : '0 2px 6px rgba(13,17,23,0.2)'; }}
-          >
-            {isLast ? '▶ Launch' : 'Next'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -226,8 +84,11 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
     return null;
   }
 
-  // Mobi image height — used to anchor the card just above his head
-  const MOBI_H = 'clamp(320px, 52vh, 560px)';
+  const accent = 'rgba(0, 210, 248, 0.85)';
+  const accentSolid = '#00d2f8';
+  // panel height — nameplate anchors to its top
+  const PANEL_H = 'clamp(108px, 15vh, 150px)';
+  const NAMEPLATE_H = 32;
 
   return (
     <div
@@ -236,55 +97,198 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
         position: 'fixed',
         inset: 0,
         zIndex: 900,
-        background: 'linear-gradient(to top, rgba(0,0,0,0.35) 0%, transparent 55%)',
+        background: 'linear-gradient(to top, rgba(0,0,0,0.45) 0%, transparent 50%)',
         pointerEvents: 'auto',
         cursor: 'pointer',
       }}
     >
-      {/* Mobi portrait — bottom-left */}
+      {/* ── Mobi portrait — bottom-left, behind panel (z:901 < panel z:903) ── */}
       <div style={{
         position: 'absolute',
         bottom: 0,
         left: 0,
         zIndex: 901,
         pointerEvents: 'none',
-        animation: 'mobiSlideIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards',
         lineHeight: 0,
+        animation: 'mobiSlideIn 0.45s cubic-bezier(0.16,1,0.3,1) forwards',
       }}>
         <img
           src={mobiImgSrc}
           alt="Mobi"
-          style={{
-            display: 'block',
-            height: MOBI_H,
-            width: 'auto',
-          }}
+          style={{ display: 'block', height: 'clamp(384px, 62vh, 672px)', width: 'auto' }}
           onError={e => { e.currentTarget.style.display = 'none'; }}
         />
       </div>
 
-      {/* Dialogue card — floats directly over Mobi's head */}
+      {/* ── Nameplate tab — sits directly on top-left edge of the panel ── */}
+      <div style={{
+        position: 'absolute',
+        bottom: PANEL_H,
+        left: 0,
+        zIndex: 905,
+        pointerEvents: 'none',
+        animation: 'panelRise 0.4s cubic-bezier(0.16,1,0.3,1) forwards',
+      }}>
+        {/* Outer layer = border color */}
+        <div style={{
+          background: accent,
+          clipPath: 'polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%)',
+          padding: '2px',
+          display: 'inline-block',
+        }}>
+          {/* Inner layer = fill */}
+          <div style={{
+            background: 'rgba(2, 7, 20, 0.97)',
+            height: NAMEPLATE_H,
+            padding: '0 22px 0 14px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+          }}>
+            <span style={{
+              fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif',
+              fontSize: 14,
+              fontWeight: 700,
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+              color: '#fff',
+            }}>
+              MOBI
+            </span>
+            <span style={{
+              fontFamily: 'system-ui, sans-serif',
+              fontSize: 9,
+              fontWeight: 600,
+              letterSpacing: '0.15em',
+              textTransform: 'uppercase',
+              color: accentSolid,
+              opacity: 0.85,
+            }}>
+              {modeName || 'WORM MODE'}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Dialogue panel — full screen width, anchored at bottom ── */}
       <div
         style={{
           position: 'absolute',
-          // bottom aligns with the top of the Mobi image (his head area)
-          bottom: 'calc(clamp(320px, 52vh, 560px) - 20px)',
-          left: '12px',
-          width: 'min(78vw, 340px)',
-          zIndex: 902,
+          bottom: 0,
+          left: 0,
+          right: 0,
+          minHeight: PANEL_H,
+          background: 'rgba(3, 7, 20, 0.92)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          borderTop: `2px solid ${accent}`,
+          boxShadow: `0 -2px 40px rgba(0,200,240,0.08)`,
+          zIndex: 903,
           pointerEvents: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          padding: 'clamp(12px, 2vh, 18px) clamp(16px, 3vw, 32px) clamp(10px, 1.6vh, 16px)',
+          boxSizing: 'border-box',
+          animation: 'panelRise 0.4s cubic-bezier(0.16,1,0.3,1) forwards',
         }}
         onClick={e => e.stopPropagation()}
       >
-        <DialogueCard
-          modeName={modeName}
-          text={lines[index]}
-          lines={lines}
-          index={index}
-          isLast={isLast}
-          onAdvance={advance}
-          onSkip={onComplete}
-        />
+        {/* Dialogue text */}
+        <div
+          key={index}
+          style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            animation: 'textFadeIn 0.2s ease forwards',
+          }}
+        >
+          <p style={{
+            margin: 0,
+            fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif',
+            fontSize: 'clamp(14px, 2.8vw, 18px)',
+            fontWeight: '450',
+            color: '#e6f2ff',
+            lineHeight: 1.5,
+            letterSpacing: '0.005em',
+          }}>
+            {lines[index]}
+            <span style={{
+              display: 'inline-block',
+              width: '2px',
+              height: '1em',
+              background: accentSolid,
+              marginLeft: '3px',
+              verticalAlign: 'middle',
+              opacity: 0.7,
+              animation: 'cursorBlink 1s step-end infinite',
+            }} />
+          </p>
+        </div>
+
+        {/* Footer: dots + buttons */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px' }}>
+          <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
+            {lines.map((_, i) => (
+              <div key={i} style={{
+                width: i === index ? '16px' : '5px',
+                height: '5px',
+                borderRadius: '3px',
+                background: i === index ? accentSolid : 'rgba(0,210,248,0.3)',
+                transition: 'all 0.3s cubic-bezier(0.4,0,0.2,1)',
+              }} />
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onComplete(); }}
+              style={{
+                background: 'none',
+                border: '1px solid rgba(255,255,255,0.18)',
+                color: 'rgba(255,255,255,0.45)',
+                fontSize: '11px',
+                fontWeight: '500',
+                padding: '5px 12px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontFamily: 'system-ui, sans-serif',
+                letterSpacing: '0.06em',
+                transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.8)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.4)'; }}
+              onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.45)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.18)'; }}
+            >
+              Skip
+            </button>
+
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); advance(); }}
+              style={{
+                background: isLast ? accentSolid : 'rgba(0,210,248,0.12)',
+                border: `1px solid ${accentSolid}`,
+                color: isLast ? '#000e1a' : accentSolid,
+                fontSize: '12px',
+                fontWeight: '700',
+                padding: '5px 20px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontFamily: 'system-ui, sans-serif',
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                boxShadow: isLast ? `0 0 18px ${accentSolid}99` : `0 0 8px ${accentSolid}33`,
+                transition: 'all 0.18s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.boxShadow = `0 0 22px ${accentSolid}cc`; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+              onMouseLeave={e => { e.currentTarget.style.boxShadow = isLast ? `0 0 18px ${accentSolid}99` : `0 0 8px ${accentSolid}33`; e.currentTarget.style.transform = 'none'; }}
+            >
+              {isLast ? '▶ Launch' : 'Next ▶'}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
