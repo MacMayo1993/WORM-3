@@ -32,6 +32,7 @@ import {
     TUNNEL_SURF_FOV,
     TUNNEL_SURF_BACK,
     TUNNEL_SURF_UP,
+    TUNNEL_LOOK_AHEAD,
     TUNNEL_SURF_SWAY,
     TUNNEL_SPEED_SCALE,
     FACE_NORMALS,
@@ -1325,24 +1326,12 @@ function WormChaseCamera({ worm, size }) {
             if (_ribPerp.lengthSq() < 0.001) { _ribPerp.set(0, 0, 1); _ribPerp.crossVectors(_ribAxis, _ribPerp); }
             _ribPerp.normalize();
 
-            // Worm's position along the tunnel path (what the camera looks at).
-            // A point slightly ahead gives us the forward tangent direction.
+            // Worm position at current t; a point slightly ahead gives the forward tangent.
             const tAhead = Math.min(t + 0.05, 1.0);
-            getTunnelWorldPosInto(_camLookVec, tunnel, t, size);     // worm position
-            getTunnelWorldPosInto(_camSurfCam, tunnel, tAhead, size); // ahead point (tangent)
+            getTunnelWorldPosInto(_camLookVec, tunnel, t, size);
+            getTunnelWorldPosInto(_camSurfCam, tunnel, tAhead, size);
 
-            // Slide both points outside the face during entry/exit approach.
-            if (phase === 'entering') {
-                const pull = (1.0 - tp) * 2.0;
-                _camLookVec.addScaledVector(entN, pull);
-                _camSurfCam.addScaledVector(entN, pull);
-            } else if (phase === 'exiting') {
-                const push = tp * 2.0;
-                _camLookVec.addScaledVector(extN, push);
-                _camSurfCam.addScaledVector(extN, Math.min(tp + 0.1, 1.0) * 2.0);
-            }
-
-            // Tunnel forward direction (worm's heading)
+            // Tunnel forward direction (worm's heading toward exit).
             _camTunnelTangent.subVectors(_camSurfCam, _camLookVec);
             if (_camTunnelTangent.lengthSq() < 0.0001) _camTunnelTangent.copy(_ribAxis);
             _camTunnelTangent.normalize();
@@ -1351,11 +1340,16 @@ function WormChaseCamera({ worm, size }) {
             _camTunnelRight.copy(_ribPerp).applyAxisAngle(_ribAxis, t * Math.PI);
             _camUpVec.crossVectors(_camTunnelTangent, _camTunnelRight).normalize();
 
-            // Camera rides behind and above the worm so the player sees the full journey.
-            // _camLookVec stays as the worm position (look-at target).
+            // Camera: close behind and above the worm on the ribbon surface.
             _camSurfCam.copy(_camLookVec)
                 .addScaledVector(_camTunnelTangent, -TUNNEL_SURF_BACK)
                 .addScaledVector(_camUpVec, TUNNEL_SURF_UP);
+
+            // Look-ahead: look forward along the tunnel rather than at the worm's current
+            // position.  Without this, when the worm is at the cube centre (t=0.5) the
+            // camera stares directly at the convergence point of all tunnel arms, producing
+            // a starburst.  Shifting the target ahead keeps the view looking into the tunnel.
+            _camLookVec.addScaledVector(_camTunnelTangent, TUNNEL_LOOK_AHEAD);
 
             // Snap position AND up on the first frame we enter the tunnel.
             // Position snap prevents multi-frame lerp swing. Up snap is critical: at
