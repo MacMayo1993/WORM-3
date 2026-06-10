@@ -22,9 +22,9 @@ const wHeadGeo  = new THREE.SphereGeometry(0.22, 14, 12);
 const wSegGeos  = [
   new THREE.SphereGeometry(0.21, 12, 10),
   new THREE.SphereGeometry(0.21, 10, 8),
-  new THREE.SphereGeometry(0.19, 10, 8),
-  new THREE.SphereGeometry(0.18, 8, 8),
-  new THREE.SphereGeometry(0.16, 8, 8),
+  new THREE.SphereGeometry(0.21, 10, 8),
+  new THREE.SphereGeometry(0.20, 8, 8),
+  new THREE.SphereGeometry(0.20, 8, 8),
 ];
 const wEyeGeo   = new THREE.SphereGeometry(0.050, 8, 8);
 const wPupilGeo = new THREE.SphereGeometry(0.026, 6, 6);
@@ -33,7 +33,7 @@ const wTipGeo   = new THREE.SphereGeometry(0.020, 6, 6);
 const wMouthGeo = new THREE.TorusGeometry(0.048, 0.013, 6, 12, Math.PI);
 
 // ── Module-level shared materials — identical across all worm instances ────────
-const outlineMat  = new THREE.MeshBasicMaterial({ color: '#111111', side: THREE.BackSide, depthWrite: false });
+const outlineMat  = new THREE.MeshBasicMaterial({ color: '#111111', side: THREE.BackSide, depthWrite: false, depthTest: false });
 const eyeWhiteMat = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.1, depthWrite: false });
 const pupilMat    = new THREE.MeshStandardMaterial({ color: '#0a0a14', roughness: 0.5, depthWrite: false });
 const mouthMat    = new THREE.MeshStandardMaterial({ color: '#0d2410', roughness: 0.6, depthWrite: false });
@@ -154,9 +154,12 @@ const MenuWormParticle = ({ start, color1, startTime, onComplete }) => {
     curveData.curve.getPoint(displayProgress, _headPos);
     curveData.curve.getPoint(Math.min(displayProgress + 0.06, 1), _lookPos);
 
+    // Fade worm out as it converges back into the hole during retreat
+    const retreatFade = inRetreat ? Math.max(0, Math.min(1, (retreatDur - retreatT) / 0.5)) : 1.0;
+
     // ── Head ──────────────────────────────────────────────────────────────────
     if (headGroupRef.current) {
-      headGroupRef.current.visible = alpha > 0.02;
+      headGroupRef.current.visible = alpha > 0.02 && !(inRetreat && displayProgress < 0.10);
       headGroupRef.current.position.copy(_headPos);
 
       _tangent.subVectors(_lookPos, _headPos).normalize();
@@ -201,10 +204,11 @@ const MenuWormParticle = ({ start, color1, startTime, onComplete }) => {
       const segT = Math.max(0, Math.min(1, displayProgress * (1 - lag)));
       curveData.curve.getPoint(segT, _segPos);
       const wave  = Math.sin(clockTime * p.squishFreq - i * 0.8) * p.squishAmp;
-      const taper = 1 - (i / (SEGMENT_COUNT - 1)) * 0.18;
+      const taper = 1 - (i / (SEGMENT_COUNT - 1)) * 0.05;
       seg.position.copy(_segPos);
       seg.scale.set(taper * (1 + wave), taper * (1 - wave * 0.5), taper * (1 + wave));
-      segMats[i].opacity = 0.95 - (i / SEGMENT_COUNT) * 0.12;
+      seg.visible = retreatFade > 0.02;
+      if (seg.visible) segMats[i].opacity = (0.95 - (i / SEGMENT_COUNT) * 0.12) * retreatFade;
     }
   });
 
@@ -212,7 +216,7 @@ const MenuWormParticle = ({ start, color1, startTime, onComplete }) => {
     <group position={start}>
       {/* ── Head group ────────────────────────────────────────────────────── */}
       <group ref={headGroupRef}>
-        <mesh geometry={wHeadGeo} renderOrder={25} scale={[1.16, 1.16, 1.16]} material={outlineMat} />
+        <mesh geometry={wHeadGeo} renderOrder={25} scale={[1.28, 1.28, 1.28]} material={outlineMat} />
         <mesh geometry={wHeadGeo} renderOrder={27} material={headMat} />
         <mesh ref={eyeLRef} position={[-0.08, 0.10, 0.17]} geometry={wEyeGeo} renderOrder={28} material={eyeWhiteMat} />
         <mesh ref={eyeRRef} position={[0.08, 0.10, 0.17]} geometry={wEyeGeo} renderOrder={28} material={eyeWhiteMat} />
@@ -228,7 +232,7 @@ const MenuWormParticle = ({ start, color1, startTime, onComplete }) => {
       {/* ── Body segments ─────────────────────────────────────────────────── */}
       {Array.from({ length: SEGMENT_COUNT }, (_, i) => (
         <group key={`seg-${i}`} ref={el => (segRefs.current[i] = el)}>
-          <mesh geometry={wSegGeos[i]} renderOrder={25} scale={[1.16, 1.16, 1.16]} material={outlineMat} />
+          <mesh geometry={wSegGeos[i]} renderOrder={25} scale={[1.28, 1.28, 1.28]} material={outlineMat} />
           <mesh renderOrder={26} geometry={wSegGeos[i]} material={segMats[i]} />
         </group>
       ))}
