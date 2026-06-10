@@ -37,9 +37,6 @@ const _segTangent    = new THREE.Vector3();
 const _surfaceNormal = new THREE.Vector3();
 const _up            = new THREE.Vector3(0, 1, 0);
 const _side          = new THREE.Vector3(0, 0, 1);
-const _hoopDir       = new THREE.Vector3();
-const _hoopPos       = new THREE.Vector3();
-const _hoopQuat      = new THREE.Quaternion();
 
 // Vertex shader: pass UV through to fragment.
 const vertexShader = `
@@ -50,13 +47,10 @@ const vertexShader = `
   }
 `;
 
-// Racing-stripes fragment shader.
-// Both halves of the ribbon scroll toward the center mini-cube (halfPos mirrors
-// vUv.y so t=0 at tile ends, t=1 at the crossing).  Three coloured lanes
-// separated by white dividers race inward like Mario Kart Rainbow Road lanes.
-// uGrowT (0→1): tunnel birth grow-in — clips the ribbon so beams grow from each
-//   tile portal toward the center, meeting when uGrowT reaches 1.
-// uPulseBoost (0→1→0): subsequent-flip brightness burst.
+// Ribbon fragment shader.
+// vUv.y: 0 = tile1 end, 0.5 = centre (VoidCore), 1 = tile2 end.
+// Each half is the solid color of its own tile — no cross-blending.
+// Scroll flows toward the centre from both ends so movement reads as "into the tunnel".
 const fragmentShader = `
   uniform vec3  uColorA;
   uniform vec3  uColorB;
@@ -67,60 +61,33 @@ const fragmentShader = `
   varying vec2  vUv;
 
   void main() {
-    // Tunnel birth grow-in: vUv.y 0=tile1 end, 0.5=centre, 1=tile2 end.
-    // Left beam grows from 0 toward 0.5; right beam grows from 1 toward 0.5.
-    // Discard the ungrown middle until both beams meet at the centre.
+    // Tunnel birth grow-in: left beam from tile1 toward centre, right beam from tile2.
     float leftFront  = uGrowT * 0.5;
     float rightFront = 1.0 - uGrowT * 0.5;
     if (vUv.y > leftFront && vUv.y < rightFront) discard;
 
-    // Mirror so stripes flow toward the centre from both tile ends.
+    // Each half shows only its own tile's color.
+    vec3 tileColor = vUv.y < 0.5 ? uColorA : uColorB;
+
+    // Scroll toward centre from each tile end (halfPos: 0=tile edge, 1=centre).
     float halfPos = vUv.y < 0.5 ? vUv.y * 2.0 : (1.0 - vUv.y) * 2.0;
-    float scroll  = fract(halfPos * 5.0 - uTime * 2.5);
-    float pos     = scroll * 5.0; // 0 → 5 within one repeat
+    float scroll  = fract(halfPos * 4.0 - uTime * 2.5);
 
-    vec3  col  = vec3(0.0);
-    float mask = 0.0;
+    // Leading-edge velocity spark
+    float spark     = (1.0 - smoothstep(0.0, 0.08, scroll)) * 0.6;
+    float intensity = 0.75 + spark + uPulseBoost * 0.3;
+    vec3  col       = tileColor * intensity;
 
-    // Velocity spark: white-hot flash at the leading edge of each repeat
-    float spark = (1.0 - smoothstep(0.0, 0.06, pos)) * 0.9;
-
-    if (pos < 1.1) {
-      // Lane A — colorA
-      mask = 1.0 - smoothstep(0.85, 1.1, pos);
-      col  = mix(uColorA * 1.5, vec3(1.2), spark);
-    } else if (pos < 1.5) {
-      // White lane divider
-      float d = (pos - 1.1) / 0.4;
-      mask = (1.0 - abs(d * 2.0 - 1.0)) * 0.75;
-      col  = vec3(1.0);
-    } else if (pos < 3.1) {
-      // Lane mid — blend of both antipodal colors
-      mask = 1.0 - smoothstep(2.85, 3.1, pos);
-      col  = mix(uColorA, uColorB, 0.5) * 1.6;
-    } else if (pos < 3.5) {
-      // White lane divider
-      float d = (pos - 3.1) / 0.4;
-      mask = (1.0 - abs(d * 2.0 - 1.0)) * 0.75;
-      col  = vec3(1.0);
-    } else if (pos < 4.6) {
-      // Lane B — colorB
-      mask = 1.0 - smoothstep(4.35, 4.6, pos);
-      col  = uColorB * 1.5;
-    }
-    // else: fully transparent gap — cube geometry shows through (space feel)
-
-    float edgeFade = smoothstep(0.0, 0.14, vUv.x) * smoothstep(1.0, 0.86, vUv.x);
-    // Pulse boost brightens color and bumps opacity on subsequent flips
+    float edgeFade    = smoothstep(0.0, 0.14, vUv.x) * smoothstep(1.0, 0.86, vUv.x);
     float boostOpacity = uOpacity + uPulseBoost * 0.45;
 
-    // Black border stripe along each ribbon edge — makes the tunnel feel solid underfoot
+    // Black border along each ribbon edge
     float leftEdge    = 1.0 - smoothstep(0.0, 0.055, vUv.x);
     float rightEdge   = 1.0 - smoothstep(1.0, 0.945, vUv.x);
     float edgeOutline = clamp(leftEdge + rightEdge, 0.0, 1.0);
 
     vec3  finalCol   = mix(col * (1.0 + uPulseBoost * 1.2), vec3(0.0), edgeOutline);
-    float finalAlpha = max(boostOpacity * edgeFade * mask, edgeOutline * 0.88);
+    float finalAlpha = max(boostOpacity * edgeFade, edgeOutline * 0.88);
     gl_FragColor = vec4(finalCol, finalAlpha);
   }
 `;
@@ -344,12 +311,6 @@ const MobiusTunnel = ({
   const pulseT   = useRef(Math.random() * Math.PI * 2);
   const lastStartRef = useRef(new THREE.Vector3(Infinity, Infinity, Infinity));
   const lastEndRef   = useRef(new THREE.Vector3(Infinity, Infinity, Infinity));
-  const hoop1Ref    = useRef();
-  const hoop2Ref    = useRef();
-  const hoop1MatRef = useRef();
-  const hoop2MatRef = useRef();
-  const hoop1TRef   = useRef(Math.random()); // staggered start phase so hoops don't sync
-  const hoop2TRef   = useRef(Math.random());
 
   const { tunnelBirths, tunnelPulses } = useGameStore(
     useShallow(s => ({ tunnelBirths: s.tunnelBirths, tunnelPulses: s.tunnelPulses }))
@@ -403,9 +364,10 @@ const MobiusTunnel = ({
     _vStart.copy(_wPos1).addScaledVector(_faceNorm1, -FACE_OFFSET);
     _vEnd  .copy(_wPos2).addScaledVector(_faceNorm2, -FACE_OFFSET);
 
-    // Mini-cube face docking points — centre always at world origin
-    _midA.copy(_faceNorm1).multiplyScalar(MINI_FACE_R);
-    _midB.copy(_faceNorm2).multiplyScalar(MINI_FACE_R);
+    // Mini-cube face docking points — use LOCAL color direction so the tunnel
+    // always routes through the correct colored face regardless of cube rotation.
+    _midA.set(n1[0], n1[1], n1[2]).multiplyScalar(MINI_FACE_R);
+    _midB.set(n2[0], n2[1], n2[2]).multiplyScalar(MINI_FACE_R);
 
     const moved =
       lastStartRef.current.distanceToSquared(_vStart) > REBUILD_EPS_SQ ||
@@ -487,35 +449,6 @@ const MobiusTunnel = ({
       uniforms.uPulseBoost.value = 0;
     }
 
-    // Hoop animation: each hoop travels tile face → VoidCore in 2 s then loops.
-    // Radius matches the ribbon taper at the hoop's current position along the path.
-    const hoopDead = flips >= FLIP_CAP;
-    if (hoop1Ref.current) {
-      hoop1TRef.current = (hoop1TRef.current + delta / 2.0) % 1.0;
-      const s1 = hoop1TRef.current;
-      const r1 = (RIBBON_WIDTH / 2) * (TAPER_MIN + (1 - TAPER_MIN) * (1 - s1));
-      _hoopPos.lerpVectors(_vStart, _midA, s1);
-      _hoopDir.subVectors(_midA, _vStart).normalize();
-      _hoopQuat.setFromUnitVectors(_side, _hoopDir);
-      hoop1Ref.current.position.copy(_hoopPos);
-      hoop1Ref.current.quaternion.copy(_hoopQuat);
-      hoop1Ref.current.scale.setScalar(r1);
-      hoop1Ref.current.visible = !hoopDead;
-      if (hoop1MatRef.current) hoop1MatRef.current.color.set(hoopDead ? '#555' : color1);
-    }
-    if (hoop2Ref.current) {
-      hoop2TRef.current = (hoop2TRef.current + delta / 2.0) % 1.0;
-      const s2 = hoop2TRef.current;
-      const r2 = (RIBBON_WIDTH / 2) * (TAPER_MIN + (1 - TAPER_MIN) * (1 - s2));
-      _hoopPos.lerpVectors(_vEnd, _midB, s2);
-      _hoopDir.subVectors(_midB, _vEnd).normalize();
-      _hoopQuat.setFromUnitVectors(_side, _hoopDir);
-      hoop2Ref.current.position.copy(_hoopPos);
-      hoop2Ref.current.quaternion.copy(_hoopQuat);
-      hoop2Ref.current.scale.setScalar(r2);
-      hoop2Ref.current.visible = !hoopDead;
-      if (hoop2MatRef.current) hoop2MatRef.current.color.set(hoopDead ? '#444' : color2);
-    }
   });
 
   return (
@@ -556,17 +489,6 @@ const MobiusTunnel = ({
         />
       </mesh>
 
-      {/* Hoop 1 — color1 ring, travels from tile 1 face toward VoidCore (2 s per loop) */}
-      <mesh ref={hoop1Ref} visible={false}>
-        <torusGeometry args={[1.0, 0.05, 8, 48]} />
-        <meshBasicMaterial ref={hoop1MatRef} color={color1} transparent opacity={0.9} depthWrite={false} />
-      </mesh>
-
-      {/* Hoop 2 — color2 ring, travels from tile 2 face toward VoidCore (2 s per loop) */}
-      <mesh ref={hoop2Ref} visible={false}>
-        <torusGeometry args={[1.0, 0.05, 8, 48]} />
-        <meshBasicMaterial ref={hoop2MatRef} color={color2} transparent opacity={0.9} depthWrite={false} />
-      </mesh>
     </>
   );
 };

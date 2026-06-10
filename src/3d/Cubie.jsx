@@ -105,7 +105,7 @@ const faceValue = (dirKey, x, y, z, size) => {
 };
 
 const Cubie = React.forwardRef(function Cubie({
-  position, cubie, size, onPointerDown,
+  position, cubie, size, wormMode = false, onPointerDown,
 }, ref) {
   const { hollowMode, mirrorMode, visualMode, explosionFactor, settings } = useGameStore(
     useShallow(s => ({
@@ -381,8 +381,9 @@ const Cubie = React.forwardRef(function Cubie({
             roughness={visualMode === 'wireframe' ? 0.9 : visualMode === 'glass' ? 0.05 : 0.25}
             metalness={visualMode === 'wireframe' ? 0 : visualMode === 'glass' ? 0.3 : 0.15}
             envMapIntensity={visualMode === 'glass' ? 0.8 : 0.4}
-            transparent={visualMode === 'glass'}
-            opacity={visualMode === 'glass' ? 0.12 : 1.0}
+            transparent={visualMode === 'glass' || wormMode}
+            opacity={wormMode ? 0.8 : visualMode === 'glass' ? 0.12 : 1.0}
+            side={wormMode ? THREE.DoubleSide : THREE.FrontSide}
           />
         </RoundedBox>
       )}

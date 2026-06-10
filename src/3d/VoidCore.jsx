@@ -43,8 +43,6 @@ const MINI_FACES = [
  * Rotates slowly so all faces are visible over time.
  */
 function AntipodalMinicube({ settings }) {
-  const groupRef = useRef();
-
   // Recompute only when colour scheme or biome face assignment changes.
   const fc = useMemo(
     () => resolveColors(settings, settings?.biomeMode?.faceAssignment) || {},
@@ -52,15 +50,8 @@ function AntipodalMinicube({ settings }) {
     [settings?.colorScheme, settings?.biomeMode?.faceAssignment]
   );
 
-  useFrame((_, dt) => {
-    if (groupRef.current) {
-      groupRef.current.rotation.y += dt * 0.28;
-      groupRef.current.rotation.x += dt * 0.09;
-    }
-  });
-
   return (
-    <group ref={groupRef}>
+    <group>
       <mesh geometry={minicubeBodyGeo}>
         <meshStandardMaterial color="#111111" roughness={0.3} metalness={0.4} />
       </mesh>
