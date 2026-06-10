@@ -974,7 +974,7 @@ const CubeAssembly = React.memo(({
         )}
         {/* VoidCore: swirling wormhole-color rings at the cube's hollow center */}
         <VoidCore />
-        <group visible={!wormTunnelActive}>
+        <group>
           {items.map((it, idx) => {
             // Skip the center cubie on odd-sized cubes — VoidCore occupies that space
             const isCenterVoid = size % 2 !== 0 &&
@@ -992,6 +992,7 @@ const CubeAssembly = React.memo(({
                 position={it.pos}
                 cubie={it.cubie}
                 size={size}
+                wormMode={wormHealerMode}
                 onPointerDown={onPointerDown}
               />
             );
