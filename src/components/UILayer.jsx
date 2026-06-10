@@ -49,7 +49,7 @@ const FreeplaySetupWizard = React.lazy(() => import('./screens/FreeplaySetupWiza
 const RandomModeSetupWizard = React.lazy(() => import('./screens/RandomModeSetupWizard.jsx'));
 const CubeModeSelectScreen = React.lazy(() => import('./screens/CubeModeSelectScreen.jsx'));
 const WormModeSetupWizard = React.lazy(() => import('./screens/WormModeSetupWizard.jsx'));
-import MobiIntroScreen, { MOBI_LINES_WORM } from './screens/MobiIntroScreen.jsx';
+import MobiIntroScreen from './screens/MobiIntroScreen.jsx';
 const DisparitySetupWizard = React.lazy(() => import('./screens/DisparitySetupWizard.jsx'));
 const MergeThemePicker = React.lazy(() => import('../modes/merge/index.js').then((m) => ({ default: m.MergeThemePicker })));
 const DisparityWinnerScreen = React.lazy(() => import('./screens/DisparityWinnerScreen.jsx'));
@@ -93,7 +93,8 @@ export default function UILayer({
 }) {
   const {
     sheetOpen, setSheetOpen, sheetMode, setSheetMode,
-    showFreeplayWizard, showRandomWizard, showWormModeWizard, showCubeModeSelect, showMobiIntro,
+    showFreeplayWizard, showRandomWizard, showWormModeWizard, showCubeModeSelect,
+    showMobiIntro, mobiLines, mobiModeName,
     showDisparityWizard, setShowDisparityWizard,
     showDisparityBetting,
     disparityWaitingFirstFlip, disparityCountdown,
@@ -451,9 +452,8 @@ export default function UILayer({
 
       {showMobiIntro && (
         <MobiIntroScreen
-          lines={MOBI_LINES_WORM}
-          modeName="WORM MODE"
-          accentColor="#33ff66"
+          lines={mobiLines}
+          modeName={mobiModeName}
           onComplete={onMobiIntroComplete}
         />
       )}

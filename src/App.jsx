@@ -50,6 +50,11 @@ import { setSharedRenderer, tickPreviews, hasActivePreviews } from './3d/TilePre
 // UI components
 import WelcomeScreen from './components/screens/WelcomeScreen.jsx';
 import Tutorial from './components/screens/Tutorial.jsx';
+import {
+  MOBI_LINES_WORM, MOBI_LINES_FREEPLAY, MOBI_LINES_RANDOM,
+  MOBI_LINES_TEACH, MOBI_LINES_HOLONOMY, MOBI_LINES_COOP,
+  MOBI_LINES_BIOME, MOBI_LINES_MERGE, MOBI_LINES_CHAOS, MOBI_LINES_CAMPAIGN,
+} from './components/screens/MobiIntroScreen.jsx';
 const ParityStoreScreen = React.lazy(() => import('./components/screens/ParityStoreScreen.jsx'));
 const GameScene = React.lazy(() => import('./3d/GameScene.jsx'));
 const UILayer = React.lazy(() => import('./components/UILayer.jsx'));
@@ -390,9 +395,18 @@ export default function WORM3() {
   const [showRandomWizard, setShowRandomWizard] = useState(false);
   const [showWormModeWizard, setShowWormModeWizard] = useState(false);
 
-  // Mobi intro — shown after setup wizard completes, before game is live
+  // Mobi intro — shown before any game mode goes live
   const [showMobiIntro, setShowMobiIntro] = useState(false);
-  const pendingWormSettings = React.useRef(null);
+  const [mobiLines, setMobiLines] = useState([]);
+  const [mobiModeName, setMobiModeName] = useState('');
+  const pendingMobiAction = useRef(null);
+
+  const launchWithMobi = useCallback((lines, modeName, postAction) => {
+    setMobiLines(lines);
+    setMobiModeName(modeName);
+    pendingMobiAction.current = postAction;
+    setShowMobiIntro(true);
+  }, []);
 
   // Merge Mode theme picker
   const [showMergeThemePicker, setShowMergeThemePicker] = useState(false);
@@ -539,8 +553,10 @@ export default function WORM3() {
   // Main menu action handlers
   const handleMenuPlay = useCallback(() => {
     useGameStore.getState().setShowMainMenu(false);
-    handleLevelSelect(1); // Start at level 1
-  }, [handleLevelSelect]);
+    launchWithMobi(MOBI_LINES_CAMPAIGN, 'CAMPAIGN', () => {
+      handleLevelSelect(1);
+    });
+  }, [handleLevelSelect, launchWithMobi]);
 
   const handleMenuCube = useCallback(() => {
     useGameStore.getState().setShowMainMenu(false);
@@ -582,7 +598,8 @@ export default function WORM3() {
     } else {
       animatedShuffle();
     }
-  }, [settings, setSettings, size, changeSize, setRotatedCubies, animatedShuffle]);
+    launchWithMobi(MOBI_LINES_RANDOM, 'RANDOM MODE', () => {});
+  }, [settings, setSettings, size, changeSize, setRotatedCubies, animatedShuffle, launchWithMobi]);
 
   const handleRandomWizardCancel = useCallback(() => {
     setShowRandomWizard(false);
@@ -641,7 +658,8 @@ export default function WORM3() {
     } else {
       animatedShuffle();
     }
-  }, [settings, setSettings, animatedShuffle, size, changeSize, setRotatedCubies]);
+    launchWithMobi(MOBI_LINES_FREEPLAY, 'FREEPLAY', () => {});
+  }, [settings, setSettings, animatedShuffle, size, changeSize, setRotatedCubies, launchWithMobi]);
 
   const handleWizardCancel = useCallback(() => {
     setShowFreeplayWizard(false);
@@ -718,33 +736,39 @@ export default function WORM3() {
   }, []);
 
   const handleBetPlaced = useCallback((bet) => {
-    // Wager already deducted in DisparityBettingScreen before calling this.
     useGameStore.getState().setActiveBet(bet);
     setShowDisparityBetting(false);
-    startDisparityGame(pendingWizardSettingsRef.current);
-  }, [startDisparityGame]);
+    launchWithMobi(MOBI_LINES_CHAOS, 'DISPARITY MODE', () => {
+      startDisparityGame(pendingWizardSettingsRef.current);
+    });
+  }, [startDisparityGame, launchWithMobi]);
 
   const handleBetSkipped = useCallback(() => {
     useGameStore.getState().clearActiveBet();
     setShowDisparityBetting(false);
-    startDisparityGame(pendingWizardSettingsRef.current);
-  }, [startDisparityGame]);
+    launchWithMobi(MOBI_LINES_CHAOS, 'DISPARITY MODE', () => {
+      startDisparityGame(pendingWizardSettingsRef.current);
+    });
+  }, [startDisparityGame, launchWithMobi]);
 
   const handleMenuCoop = useCallback(() => {
     useGameStore.getState().setShowMainMenu(false);
     useGameStore.getState().clearLevel();
     shuffle();
-    setCoopMode(true);
-  }, [shuffle]);
+    launchWithMobi(MOBI_LINES_COOP, 'CO-OP MODE', () => {
+      setCoopMode(true);
+    });
+  }, [shuffle, launchWithMobi]);
 
   const handleMenuTeach = useCallback(() => {
     useGameStore.getState().setShowMainMenu(false);
     useGameStore.getState().clearLevel();
     if (size !== 3) changeSize(3);
     shuffle();
-    // Enter teach mode on next tick so cubies are ready
-    setTimeout(() => teachMode.enterTeachMode(), 0);
-  }, [size, changeSize, shuffle, teachMode]);
+    launchWithMobi(MOBI_LINES_TEACH, 'TEACH MODE', () => {
+      setTimeout(() => teachMode.enterTeachMode(), 0);
+    });
+  }, [size, changeSize, shuffle, teachMode, launchWithMobi]);
 
   const handleMenuWormHealer = useCallback(() => {
     useGameStore.getState().setShowMainMenu(false);
@@ -788,34 +812,32 @@ export default function WORM3() {
       reset();
     }
 
-    // Save only the gameplay params — worm mode itself starts after the intro.
-    pendingWormSettings.current = {
+    const wormParams = {
       wormSpeed: wizardSettings.wormSpeed ?? 1.0,
       wormOrbCount: wizardSettings.wormOrbCount ?? 5,
       wormholeInterval: wizardSettings.wormholeInterval ?? 10,
       wormColor: wizardSettings.wormColor ?? '#33ff66',
     };
-    setShowMobiIntro(true);
-  }, [settings, setSettings, reset, size, changeSize]);
+    launchWithMobi(MOBI_LINES_WORM, 'WORM MODE', () => {
+      setDisparityWaitingFirstFlip(false);
+      setDisparityCountdown(null);
+      useGameStore.getState().clearLevel();
+      useGameStore.getState().initWormMode(
+        undefined, undefined,
+        wormParams.wormSpeed,
+        wormParams.wormOrbCount,
+        wormParams.wormholeInterval,
+        wormParams.wormColor
+      );
+    });
+  }, [settings, setSettings, reset, size, changeSize, setDisparityWaitingFirstFlip, setDisparityCountdown, launchWithMobi]);
 
   const handleMobiIntroComplete = useCallback(() => {
     setShowMobiIntro(false);
-    // Clear any lingering disparity state so worm mode starts clean.
-    setDisparityWaitingFirstFlip(false);
-    setDisparityCountdown(null);
-    const params = pendingWormSettings.current;
-    pendingWormSettings.current = null;
-
-    // Now start the actual worm game.
-    useGameStore.getState().clearLevel();
-    useGameStore.getState().initWormMode(
-      undefined, undefined,
-      params?.wormSpeed,
-      params?.wormOrbCount,
-      params?.wormholeInterval,
-      params?.wormColor
-    );
-  }, [setDisparityWaitingFirstFlip, setDisparityCountdown]);
+    const action = pendingMobiAction.current;
+    pendingMobiAction.current = null;
+    action?.();
+  }, []);
 
   const handleWormWizardCancel = useCallback(() => {
     setShowWormModeWizard(false);
@@ -852,7 +874,8 @@ export default function WORM3() {
     setSettings({ ...settings, biomeMode: { enabled: false, faceAssignment: null } });
     if (size !== 3) changeSize(3);
     reset();
-  }, [settings, setSettings, size, changeSize, reset]);
+    launchWithMobi(MOBI_LINES_HOLONOMY, 'HOLONOMY', () => {});
+  }, [settings, setSettings, size, changeSize, reset, launchWithMobi]);
 
   const handleMenuBiome = useCallback(() => {
     useGameStore.getState().setShowMainMenu(false);
@@ -863,10 +886,10 @@ export default function WORM3() {
       colorScheme: 'biome',
     });
     useGameStore.getState().clearLevel();
-    // Start solved so stable city cache populates before any rotation
     useGameStore.getState().resetGame();
     useGameStore.getState().setHasShuffled(true);
-  }, [settings, setSettings]);
+    launchWithMobi(MOBI_LINES_BIOME, 'BIOME MODE', () => {});
+  }, [settings, setSettings, launchWithMobi]);
 
   const handleMenuMerge = useCallback(() => {
     useGameStore.getState().setShowMainMenu(false);
@@ -876,12 +899,14 @@ export default function WORM3() {
   const handleMergeStart = useCallback((themeId) => {
     setShowMergeThemePicker(false);
     useGameStore.getState().setMergeTheme(themeId);
-    useGameStore.getState().setMergeMode(true);
     useGameStore.getState().clearLevel();
     useGameStore.getState().resetGame();
     useGameStore.getState().setHasShuffled(true);
     shuffle();
-  }, [shuffle]);
+    launchWithMobi(MOBI_LINES_MERGE, 'MERGE MODE', () => {
+      useGameStore.getState().setMergeMode(true);
+    });
+  }, [shuffle, launchWithMobi]);
 
   const handleMergeCancel = useCallback(() => {
     setShowMergeThemePicker(false);
@@ -1334,7 +1359,8 @@ export default function WORM3() {
             performCursorRotation={performCursorRotation}
             ui={{
               sheetOpen, setSheetOpen, sheetMode, setSheetMode,
-              showFreeplayWizard, showRandomWizard, showWormModeWizard, showCubeModeSelect, showMobiIntro,
+              showFreeplayWizard, showRandomWizard, showWormModeWizard, showCubeModeSelect,
+              showMobiIntro, mobiLines, mobiModeName,
               showDisparityWizard, setShowDisparityWizard,
               showDisparityBetting,
               disparityWaitingFirstFlip, disparityCountdown,

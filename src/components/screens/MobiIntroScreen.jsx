@@ -9,8 +9,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 // ── Dialogue banks ────────────────────────────────────────────────────────────
 
 export const MOBI_LINES_WORM = [
-  "Hi...I'm Mobi!",
-  "This ain't your mama's old Nokia SNAKE game....this is WORM^3",
+  "Aloha! I'm a Multi Orientable Block Intelligence...",
+  "...but you can call me Mobi for short!",
+  "This ain't your mama's old Nokia SNAKE game — this is WORM³",
   "In my world...Rubik's cubes are flat",
   "But then one day....",
   "We uncovered the TRUE secret of the cube.",
@@ -18,14 +19,101 @@ export const MOBI_LINES_WORM = [
   "But not for too long....",
 ];
 
-export const MOBI_LINES_FREEPLAY = [];
-export const MOBI_LINES_TEACH    = [];
-export const MOBI_LINES_HOLONOMY = [];
-export const MOBI_LINES_MERGE    = [];
-export const MOBI_LINES_HOLLOW   = [];
-export const MOBI_LINES_MIRROR   = [];
-export const MOBI_LINES_CHAOS    = [];
-export const MOBI_LINES_CAMPAIGN = [];
+export const MOBI_LINES_FREEPLAY = [
+  "Aloha! I'm a Multi Orientable Block Intelligence...",
+  "...but you can call me Mobi for short!",
+  "Welcome to Freeplay — the cube on your terms.",
+  "Scramble it, solve it, explore it. No objectives, no pressure.",
+  "Flip Mode is your best friend here — toggle it on to visit a tile's twin on the opposite face.",
+  "Ready? The cube's already shuffled. Dig in.",
+];
+
+export const MOBI_LINES_TEACH = [
+  "Aloha! I'm a Multi Orientable Block Intelligence...",
+  "...but you can call me Mobi for short!",
+  "Welcome to Teach Mode — I'll walk you through this one step at a time.",
+  "Three sub-modes: Guided, Demo, and Quiz. Start with Demo if you want to watch first.",
+  "The beginner method uses layers — bottom, middle, then top. Simple in theory.",
+  "Your move, student.",
+];
+
+export const MOBI_LINES_HOLONOMY = [
+  "Aloha! I'm a Multi Orientable Block Intelligence...",
+  "...but you can call me Mobi for short!",
+  "Holonomy Mode — where the cube has a memory.",
+  "On a flat surface, a rotation is just a rotation. But here? Space is curved.",
+  "Trace a closed loop and you return... but your orientation may not.",
+  "Explore what happens when geometry fights back.",
+];
+
+export const MOBI_LINES_MERGE = [
+  "Aloha! I'm a Multi Orientable Block Intelligence...",
+  "...but you can call me Mobi for short!",
+  "Welcome to Merge Mode!",
+  "Match identical tiles to merge them into higher values.",
+  "Think 2048 — except the board is a Rubik's Cube. And it rotates.",
+  "Plan your merges. The cube rewards patience over panic.",
+];
+
+export const MOBI_LINES_HOLLOW = [
+  "Aloha! I'm a Multi Orientable Block Intelligence...",
+  "...but you can call me Mobi for short!",
+  "Hollow Void — the shell remains, the core is gone.",
+  "Only the outer layer exists here. Rotate carefully.",
+  "Solve the surface. Ignore the void within.",
+];
+
+export const MOBI_LINES_MIRROR = [
+  "Aloha! I'm a Multi Orientable Block Intelligence...",
+  "...but you can call me Mobi for short!",
+  "Mirror Mode — every move you make, the other side mirrors it.",
+  "Symmetry is both your tool and your constraint.",
+  "Solve one half and the other follows. Or does it?",
+];
+
+export const MOBI_LINES_CHAOS = [
+  "Aloha! I'm a Multi Orientable Block Intelligence...",
+  "...but you can call me Mobi for short!",
+  "Disparity Mode. Some tiles have already... wandered.",
+  "Your job is to restore order — but the manifold has other ideas.",
+  "Every flip you make, the chaos counter rises. Flip smart.",
+  "You've placed your bet. Time to earn it.",
+];
+
+export const MOBI_LINES_CAMPAIGN = [
+  "Aloha! I'm a Multi Orientable Block Intelligence...",
+  "...but you can call me Mobi for short!",
+  "Ten levels. Three rule sets. One manifold.",
+  "Classic, Sudokube, Ultimate — each plays by different rules.",
+  "The cube always has a solution. So do you.",
+  "Let's begin.",
+];
+
+export const MOBI_LINES_COOP = [
+  "Aloha! I'm a Multi Orientable Block Intelligence...",
+  "...but you can call me Mobi for short!",
+  "Co-op Mode — one cube, two minds.",
+  "Coordinate. Don't cancel each other out.",
+  "The manifold doesn't care about your disagreements.",
+  "Solve it together.",
+];
+
+export const MOBI_LINES_BIOME = [
+  "Aloha! I'm a Multi Orientable Block Intelligence...",
+  "...but you can call me Mobi for short!",
+  "Biome Mode — six faces, six ecosystems.",
+  "Each face of the cube represents a living world.",
+  "Solve the cube to restore balance across all biomes.",
+  "Nature is watching.",
+];
+
+export const MOBI_LINES_RANDOM = [
+  "Aloha! I'm a Multi Orientable Block Intelligence...",
+  "...but you can call me Mobi for short!",
+  "Random Mode — the cube picks the rules. You just solve it.",
+  "Settings have been randomized. Embrace the chaos.",
+  "Every run is different. Adapt.",
+];
 
 // ── CSS ───────────────────────────────────────────────────────────────────────
 const _STYLE_ID = 'mobi-hud-keyframes';
