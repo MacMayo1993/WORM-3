@@ -352,7 +352,7 @@ const MobiusTunnel = ({
   const uniforms = useMemo(() => ({
     uColorA:     { value: new THREE.Color(color1) },
     uColorB:     { value: new THREE.Color(color2) },
-    uOpacity:    { value: 0.80 },
+    uOpacity:    { value: 0.92 },
     uTime:       { value: 0.0 },
     uGrowT:      { value: 1.0 },
     uPulseBoost: { value: 0.0 },
@@ -361,13 +361,13 @@ const MobiusTunnel = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const bumperUniformsL = useMemo(() => ({
     uColor:   { value: new THREE.Color(color1) },
-    uOpacity: { value: 0.85 },
+    uOpacity: { value: 0.93 },
   }), []);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const bumperUniformsR = useMemo(() => ({
     uColor:   { value: new THREE.Color(color2) },
-    uOpacity: { value: 0.85 },
+    uOpacity: { value: 0.93 },
   }), []);
 
   useEffect(() => {
@@ -456,9 +456,9 @@ const MobiusTunnel = ({
 
     // Subtle opacity pulse
     pulseT.current += delta * 1.5;
-    uniforms.uOpacity.value    = 0.72 + Math.sin(pulseT.current) * 0.08;
-    bumperUniformsL.uOpacity.value = 0.80 + Math.sin(pulseT.current) * 0.05;
-    bumperUniformsR.uOpacity.value = 0.80 + Math.sin(pulseT.current) * 0.05;
+    uniforms.uOpacity.value    = 0.90 + Math.sin(pulseT.current) * 0.04;
+    bumperUniformsL.uOpacity.value = 0.92 + Math.sin(pulseT.current) * 0.03;
+    bumperUniformsR.uOpacity.value = 0.92 + Math.sin(pulseT.current) * 0.03;
 
     // Tunnel birth: grow-in from both portal ends toward centre (first flip only)
     const birth = tunnelId ? tunnelBirths?.[tunnelId] : null;
@@ -490,7 +490,6 @@ const MobiusTunnel = ({
           side={THREE.DoubleSide}
           transparent
           depthWrite={false}
-          blending={THREE.AdditiveBlending}
         />
       </mesh>
 
@@ -503,7 +502,6 @@ const MobiusTunnel = ({
           side={THREE.DoubleSide}
           transparent
           depthWrite={false}
-          blending={THREE.AdditiveBlending}
         />
       </mesh>
 
@@ -516,7 +514,6 @@ const MobiusTunnel = ({
           side={THREE.DoubleSide}
           transparent
           depthWrite={false}
-          blending={THREE.AdditiveBlending}
         />
       </mesh>
     </>

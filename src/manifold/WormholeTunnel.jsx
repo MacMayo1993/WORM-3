@@ -388,12 +388,12 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
         const ag = _c1.g * 0.12 + 0.01;
         const ab = _c1.b * 0.12 + 0.07;
         atmosphereMatRef.current.color.setRGB(ar, ag, ab);
-        atmosphereMatRef.current.opacity = dead ? 0 : 0.91 + burstEnv * 0.07;
+        atmosphereMatRef.current.opacity = dead ? 0 : 0.97 + burstEnv * 0.03;
       }
       if (strandMatRef.current) {
         strandMatRef.current.uniforms.uTime.value = t;
         strandMatRef.current.uniforms.uBurst.value = burstEnv;
-        strandMatRef.current.uniforms.uOpacity.value = dead ? 0 : 0.6 + (burstEnv * 0.4);
+        strandMatRef.current.uniforms.uOpacity.value = dead ? 0 : 0.45 + (burstEnv * 0.25);
       }
     }
 
@@ -444,8 +444,8 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
 
       streaks.geometry.attributes.position.needsUpdate = true;
       streaks.geometry.attributes.color.needsUpdate = true;
-      streakMaterialRef.current.opacity = dead ? 0.06 : (0.22 + intensity * 0.12 + burstEnv * 0.18);
-      streakMaterialRef.current.size = dead ? 0.008 : (0.014 + intensity * 0.006);
+      streakMaterialRef.current.opacity = dead ? 0.02 : (0.06 + intensity * 0.04 + burstEnv * 0.08);
+      streakMaterialRef.current.size = dead ? 0.006 : (0.010 + intensity * 0.003);
       streaks.visible = active1 || active2;
     }
 
@@ -645,7 +645,6 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
           uniforms={strandUniforms}
           transparent
           depthWrite={false}
-          blending={THREE.AdditiveBlending}
         />
       </instancedMesh>
 
@@ -658,7 +657,7 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
           ref={atmosphereMatRef}
           color="#01010f"
           transparent
-          opacity={0.84}
+          opacity={0.97}
           side={THREE.BackSide}
           depthWrite={false}
         />
@@ -686,7 +685,6 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
           uniforms={tubeUniforms}
           transparent
           depthWrite={false}
-          blending={THREE.AdditiveBlending}
         />
       </mesh>
 
