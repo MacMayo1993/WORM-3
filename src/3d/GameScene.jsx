@@ -8,7 +8,7 @@
 import React, { Suspense, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Environment, Html } from '@react-three/drei';
-import { EffectComposer, Bloom } from '@react-three/postprocessing';
+// EffectComposer / Bloom removed — additive tunnel glow is sufficient without post-process bloom
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import CubeAssembly from './CubeAssembly.jsx';
@@ -134,7 +134,6 @@ export default function GameScene({
     wormPaused,
     holonomyMode,
     wormHealedCount,
-    wormCharacter,
   } = useGameStore(useShallow((s) => ({
     visualMode: s.visualMode,
     explosionT: s.explosionT,
@@ -151,14 +150,7 @@ export default function GameScene({
     wormPaused: s.wormPaused ?? false,
     holonomyMode: s.holonomyMode,
     wormHealedCount: s.wormHealedCount ?? 0,
-    wormCharacter: s.wormCharacter ?? 'classic',
   })));
-
-  const isGlowWorm = wormHealerMode && wormCharacter === 'glow';
-
-  const isBlackholeBackground =
-    settings.backgroundTheme === 'blackhole' ||
-    currentLevelData?.background === 'blackhole';
 
   const wormholePhaseActive = wormHealerMode && (
     wormPhase === 'entering' || wormPhase === 'tunnel' || wormPhase === 'exiting'
@@ -281,24 +273,6 @@ export default function GameScene({
           </Suspense>
         )}
 
-        {/* Worm mode bloom — only affects the worm's bright emissive surfaces.
-            On non-blackhole backgrounds the threshold is raised to 0.96 so bright
-            background pixels and antipodal tile colors never bloom. */}
-        {wormHealerMode && (
-          <EffectComposer>
-            <Bloom
-              intensity={wormholePhaseActive ? 0.05 : (isGlowWorm ? 0.13 : 0.18)}
-              luminanceThreshold={
-                !isBlackholeBackground ? 0.96
-                  : wormholePhaseActive ? 0.97
-                  : isGlowWorm ? 0.91
-                  : 0.74
-              }
-              luminanceSmoothing={isGlowWorm ? 0.82 : 0.65}
-              mipmapBlur
-            />
-          </EffectComposer>
-        )}
       </Suspense>
 
       {/* Antipodal PiP — only mounted when active so R3F auto-render stays live when off */}
