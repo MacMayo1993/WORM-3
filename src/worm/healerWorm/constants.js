@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
-export const CAM_HEIGHT_BASE = 5.2; // base height above worm
-export const CAM_BACK_BASE = 4.8; // base behind distance
+export const CAM_HEIGHT_BASE = 5.72; // base height above worm (×1.1 zoom-out)
+export const CAM_BACK_BASE = 5.28; // base behind distance (×1.1 zoom-out)
 export const LOOK_AHEAD = 1.8; // look-at ahead of worm
 export const CAM_LERP = 6; // camera smoothing (× delta)
 export const WORM_LIFT = 0.08; // worm sits right on tile surface
