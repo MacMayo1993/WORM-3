@@ -9,23 +9,70 @@ import React, { useState, useEffect, useCallback } from 'react';
 // ── Dialogue banks ────────────────────────────────────────────────────────────
 
 export const MOBI_LINES_WORM = [
-  "Hi...I'm Mobi!",
-  "This ain't your mama's old Nokia SNAKE game....this is WORM^3",
-  "In my world...Rubik's cubes are flat",
+  "Aloha! I'm a Multi Orientable Block Intelligence...",
+  "...but you can call me Mobi for short!",
+  "This ain't your mama's old Nokia SNAKE game — this is WORM³",
+  "In my world...Rubik's cubes are flat.",
   "But then one day....",
   "We uncovered the TRUE secret of the cube.",
   "Each tile has a twin!  And they can switch places!",
   "But not for too long....",
 ];
 
-export const MOBI_LINES_FREEPLAY = [];
-export const MOBI_LINES_TEACH    = [];
-export const MOBI_LINES_HOLONOMY = [];
-export const MOBI_LINES_MERGE    = [];
+export const MOBI_LINES_FREEPLAY = [
+  "Aloha! I'm a Multi Orientable Block Intelligence...",
+  "...but you can call me Mobi for short!",
+  "Freeplay — your sandbox, your rules.",
+  "Pick a size, choose your style, and scramble away.",
+  "No clock, no pressure. Just you and the cube.",
+  "Show me what you've got!",
+];
+
+export const MOBI_LINES_TEACH = [
+  "Aloha! I'm a Multi Orientable Block Intelligence...",
+  "...but you can call me Mobi for short!",
+  "So you want to learn the ways of the cube?",
+  "Teach Mode walks you through every algorithm, step by step.",
+  "Follow the highlights... and the cube will reveal its secrets.",
+];
+
+export const MOBI_LINES_HOLONOMY = [
+  "Aloha! I'm a Multi Orientable Block Intelligence...",
+  "...but you can call me Mobi for short!",
+  "Holonomy Mode. Now we're in deep territory.",
+  "Every move you make leaves a trace — a path through curved space.",
+  "Rotate a face and come back home... but you might not land where you started.",
+  "That's holonomy. Welcome to the geometry of the impossible.",
+];
+
+export const MOBI_LINES_MERGE = [
+  "Aloha! I'm a Multi Orientable Block Intelligence...",
+  "...but you can call me Mobi for short!",
+  "Merge Mode! Two worlds, one cube.",
+  "Each face tells half a story — your job is to reconcile the difference.",
+  "Match the themes. Merge the timelines. Ready?",
+];
+
+export const MOBI_LINES_CHAOS = [
+  "Aloha! I'm a Multi Orientable Block Intelligence...",
+  "...but you can call me Mobi for short!",
+  "Chaos Mode. I love this one.",
+  "Tiles will flip on their own. The cube fights back.",
+  "You flip one... it flips two more. Can you outpace the entropy?",
+  "Every move matters. Don't blink.",
+];
+
+export const MOBI_LINES_CAMPAIGN = [
+  "Aloha! I'm a Multi Orientable Block Intelligence...",
+  "...but you can call me Mobi for short!",
+  "The Campaign awaits. Ten levels of manifold mystery.",
+  "Each puzzle is handcrafted — a window into a different kind of space.",
+  "Solve them all, and you'll understand something most people never will.",
+  "Let's begin.",
+];
+
 export const MOBI_LINES_HOLLOW   = [];
 export const MOBI_LINES_MIRROR   = [];
-export const MOBI_LINES_CHAOS    = [];
-export const MOBI_LINES_CAMPAIGN = [];
 
 // ── CSS ───────────────────────────────────────────────────────────────────────
 const _STYLE_ID = 'mobi-hud-keyframes';

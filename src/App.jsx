@@ -50,6 +50,7 @@ import { setSharedRenderer, tickPreviews, hasActivePreviews } from './3d/TilePre
 // UI components
 import WelcomeScreen from './components/screens/WelcomeScreen.jsx';
 import Tutorial from './components/screens/Tutorial.jsx';
+import { MOBI_LINES_WORM, MOBI_LINES_FREEPLAY, MOBI_LINES_TEACH, MOBI_LINES_HOLONOMY, MOBI_LINES_MERGE, MOBI_LINES_CHAOS } from './components/screens/MobiIntroScreen.jsx';
 const ParityStoreScreen = React.lazy(() => import('./components/screens/ParityStoreScreen.jsx'));
 const GameScene = React.lazy(() => import('./3d/GameScene.jsx'));
 const UILayer = React.lazy(() => import('./components/UILayer.jsx'));
@@ -390,9 +391,10 @@ export default function WORM3() {
   const [showRandomWizard, setShowRandomWizard] = useState(false);
   const [showWormModeWizard, setShowWormModeWizard] = useState(false);
 
-  // Mobi intro — shown after setup wizard completes, before game is live
+  // Mobi intro — shown after setup completes, before game is live
   const [showMobiIntro, setShowMobiIntro] = useState(false);
-  const pendingWormSettings = React.useRef(null);
+  const [mobiIntroConfig, setMobiIntroConfig] = useState({ lines: [], modeName: '' });
+  const pendingMobiAction = React.useRef(null);
 
   // Merge Mode theme picker
   const [showMergeThemePicker, setShowMergeThemePicker] = useState(false);
@@ -595,9 +597,6 @@ export default function WORM3() {
     const allStyles = ['solid', 'glossy', 'matte', 'metallic', 'carbonFiber', 'hexGrid', 'comic', 'cafeWall', 'hermanGrid', 'opticSpin', 'ouchi', 'scintillatingGrid', 'zoellner', 'kanizsa', 'grass', 'ice', 'sand', 'water', 'wood', 'circuit', 'holographic', 'pulse', 'lava', 'galaxy', 'neural'];
 
     // Build manifoldStyles — explicit per-face overrides take precedence.
-    // Treat 'random' as unset: a per-face entry of 'random' is not a real style key
-    // and would reach the renderer as an unknown style (renders as solid).  This can
-    // happen if a stale perFaceStyles object was seeded from a 'random' global style.
     const manifoldStyles = {};
     [1, 2, 3, 4, 5, 6].forEach(id => {
       const perFace = wizardSettings.perFaceStyles?.[id];
@@ -621,26 +620,30 @@ export default function WORM3() {
       newSettings.customColors = wizardSettings.customColors;
     }
 
+    // Apply visual settings now so the scene is styled behind the Mobi intro.
     setSettings(newSettings);
     useGameStore.getState().clearLevel();
 
+    // Defer the actual shuffle to after Mobi finishes.
     const targetSize = wizardSettings.cubeSize || size;
-    if (targetSize !== size) {
-      // changeSize resets the cube to solved; we then manually shuffle with the new size
-      // because the `shuffle` callback closes over the old size and would mis-scramble.
-      changeSize(targetSize);
-      let state = makeCubies(targetSize);
-      for (let i = 0; i < 25; i++) {
-        const ax = ['row', 'col', 'depth'][Math.floor(Math.random() * 3)];
-        const slice = Math.floor(Math.random() * targetSize);
-        const dir = Math.random() > 0.5 ? 1 : -1;
-        state = rotateSliceCubies(state, targetSize, ax, slice, dir);
+    pendingMobiAction.current = () => {
+      if (targetSize !== size) {
+        changeSize(targetSize);
+        let state = makeCubies(targetSize);
+        for (let i = 0; i < 25; i++) {
+          const ax = ['row', 'col', 'depth'][Math.floor(Math.random() * 3)];
+          const slice = Math.floor(Math.random() * targetSize);
+          const dir = Math.random() > 0.5 ? 1 : -1;
+          state = rotateSliceCubies(state, targetSize, ax, slice, dir);
+        }
+        setRotatedCubies(state);
+        useGameStore.getState().setHasShuffled(true);
+      } else {
+        animatedShuffle();
       }
-      setRotatedCubies(state);
-      useGameStore.getState().setHasShuffled(true);
-    } else {
-      animatedShuffle();
-    }
+    };
+    setMobiIntroConfig({ lines: MOBI_LINES_FREEPLAY, modeName: 'FREEPLAY MODE' });
+    setShowMobiIntro(true);
   }, [settings, setSettings, animatedShuffle, size, changeSize, setRotatedCubies]);
 
   const handleWizardCancel = useCallback(() => {
@@ -713,8 +716,9 @@ export default function WORM3() {
   const handleDisparitySetupComplete = useCallback((wizardSettings) => {
     setShowDisparityWizard(false);
     pendingWizardSettingsRef.current = wizardSettings;
-    // Show betting screen so the player can wager before chaos starts.
-    setShowDisparityBetting(true);
+    pendingMobiAction.current = () => setShowDisparityBetting(true);
+    setMobiIntroConfig({ lines: MOBI_LINES_CHAOS, modeName: 'CHAOS MODE' });
+    setShowMobiIntro(true);
   }, []);
 
   const handleBetPlaced = useCallback((bet) => {
@@ -739,11 +743,14 @@ export default function WORM3() {
 
   const handleMenuTeach = useCallback(() => {
     useGameStore.getState().setShowMainMenu(false);
-    useGameStore.getState().clearLevel();
-    if (size !== 3) changeSize(3);
-    shuffle();
-    // Enter teach mode on next tick so cubies are ready
-    setTimeout(() => teachMode.enterTeachMode(), 0);
+    pendingMobiAction.current = () => {
+      useGameStore.getState().clearLevel();
+      if (size !== 3) changeSize(3);
+      shuffle();
+      setTimeout(() => teachMode.enterTeachMode(), 0);
+    };
+    setMobiIntroConfig({ lines: MOBI_LINES_TEACH, modeName: 'TEACH MODE' });
+    setShowMobiIntro(true);
   }, [size, changeSize, shuffle, teachMode]);
 
   const handleMenuWormHealer = useCallback(() => {
@@ -788,34 +795,31 @@ export default function WORM3() {
       reset();
     }
 
-    // Save only the gameplay params — worm mode itself starts after the intro.
-    pendingWormSettings.current = {
+    const params = {
       wormSpeed: wizardSettings.wormSpeed ?? 1.0,
       wormOrbCount: wizardSettings.wormOrbCount ?? 5,
       wormholeInterval: wizardSettings.wormholeInterval ?? 10,
       wormColor: wizardSettings.wormColor ?? '#33ff66',
     };
+    pendingMobiAction.current = () => {
+      setDisparityWaitingFirstFlip(false);
+      setDisparityCountdown(null);
+      useGameStore.getState().clearLevel();
+      useGameStore.getState().initWormMode(
+        undefined, undefined,
+        params.wormSpeed, params.wormOrbCount, params.wormholeInterval, params.wormColor
+      );
+    };
+    setMobiIntroConfig({ lines: MOBI_LINES_WORM, modeName: 'WORM MODE' });
     setShowMobiIntro(true);
-  }, [settings, setSettings, reset, size, changeSize]);
+  }, [settings, setSettings, reset, size, changeSize, setDisparityWaitingFirstFlip, setDisparityCountdown]);
 
   const handleMobiIntroComplete = useCallback(() => {
     setShowMobiIntro(false);
-    // Clear any lingering disparity state so worm mode starts clean.
-    setDisparityWaitingFirstFlip(false);
-    setDisparityCountdown(null);
-    const params = pendingWormSettings.current;
-    pendingWormSettings.current = null;
-
-    // Now start the actual worm game.
-    useGameStore.getState().clearLevel();
-    useGameStore.getState().initWormMode(
-      undefined, undefined,
-      params?.wormSpeed,
-      params?.wormOrbCount,
-      params?.wormholeInterval,
-      params?.wormColor
-    );
-  }, [setDisparityWaitingFirstFlip, setDisparityCountdown]);
+    const action = pendingMobiAction.current;
+    pendingMobiAction.current = null;
+    action?.();
+  }, []);
 
   const handleWormWizardCancel = useCallback(() => {
     setShowWormModeWizard(false);
@@ -846,12 +850,16 @@ export default function WORM3() {
 
   const handleMenuHolonomy = useCallback(() => {
     useGameStore.getState().setShowMainMenu(false);
-    useGameStore.getState().clearLevel();
-    useGameStore.getState().clearDisparityGame();
-    useGameStore.getState().setHolonomyMode(true);
-    setSettings({ ...settings, biomeMode: { enabled: false, faceAssignment: null } });
-    if (size !== 3) changeSize(3);
-    reset();
+    pendingMobiAction.current = () => {
+      useGameStore.getState().clearLevel();
+      useGameStore.getState().clearDisparityGame();
+      useGameStore.getState().setHolonomyMode(true);
+      setSettings({ ...settings, biomeMode: { enabled: false, faceAssignment: null } });
+      if (size !== 3) changeSize(3);
+      reset();
+    };
+    setMobiIntroConfig({ lines: MOBI_LINES_HOLONOMY, modeName: 'HOLONOMY MODE' });
+    setShowMobiIntro(true);
   }, [settings, setSettings, size, changeSize, reset]);
 
   const handleMenuBiome = useCallback(() => {
@@ -875,12 +883,16 @@ export default function WORM3() {
 
   const handleMergeStart = useCallback((themeId) => {
     setShowMergeThemePicker(false);
-    useGameStore.getState().setMergeTheme(themeId);
-    useGameStore.getState().setMergeMode(true);
-    useGameStore.getState().clearLevel();
-    useGameStore.getState().resetGame();
-    useGameStore.getState().setHasShuffled(true);
-    shuffle();
+    pendingMobiAction.current = () => {
+      useGameStore.getState().setMergeTheme(themeId);
+      useGameStore.getState().setMergeMode(true);
+      useGameStore.getState().clearLevel();
+      useGameStore.getState().resetGame();
+      useGameStore.getState().setHasShuffled(true);
+      shuffle();
+    };
+    setMobiIntroConfig({ lines: MOBI_LINES_MERGE, modeName: 'MERGE MODE' });
+    setShowMobiIntro(true);
   }, [shuffle]);
 
   const handleMergeCancel = useCallback(() => {
@@ -1334,7 +1346,7 @@ export default function WORM3() {
             performCursorRotation={performCursorRotation}
             ui={{
               sheetOpen, setSheetOpen, sheetMode, setSheetMode,
-              showFreeplayWizard, showRandomWizard, showWormModeWizard, showCubeModeSelect, showMobiIntro,
+              showFreeplayWizard, showRandomWizard, showWormModeWizard, showCubeModeSelect, showMobiIntro, mobiIntroConfig,
               showDisparityWizard, setShowDisparityWizard,
               showDisparityBetting,
               disparityWaitingFirstFlip, disparityCountdown,
