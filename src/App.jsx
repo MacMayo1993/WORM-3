@@ -1191,7 +1191,7 @@ export default function WORM3() {
   // ========================================================================
   // RENDER
   // ========================================================================
-  const cameraZ = (isMobile ? { 2: 12, 3: 17, 4: 25, 5: 38, 6: 52, 7: 68 } : { 2: 10, 3: 14, 4: 20, 5: 30, 6: 42, 7: 55 })[size] || 14;
+  const cameraZ = (isMobile ? { 2: 10, 3: 14, 4: 20, 5: 30, 6: 42, 7: 54 } : { 2: 8, 3: 11, 4: 16, 5: 24, 6: 34, 7: 44 })[size] || 11;
   const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const introPerformanceMode = isMobile || prefersReducedMotion;
 
