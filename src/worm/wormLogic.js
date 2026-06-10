@@ -3,7 +3,7 @@
 // Supports two modes: surface crawling (classic) and inside-tunnel traversal (new)
 
 import { getManifoldNeighbors, findAntipodalStickerByGrid, buildManifoldGridMap } from '../game/manifoldLogic.js';
-import { getStickerWorldPos } from '../game/coordinates.js';
+import { getStickerWorldPos, getManifoldGridId } from '../game/coordinates.js';
 import { FACE_COLORS } from '../utils/constants.js';
 import { getStickerSafe, isSurfaceSticker } from '../game/cubeState.js';
 import * as THREE from 'three';
@@ -126,8 +126,14 @@ export const getActiveTunnels = (cubies, size, cachedManifoldMap = null) => {
           // No Object.freeze — frozen objects prevent V8 property-access optimisation
           // and tunnel objects are already treated as immutable by all consumers.
           const id = entryKey < exitKey ? `${entryKey}|${exitKey}` : `${exitKey}|${entryKey}`;
+          // pairId matches WormholeNetwork's format so HealerWormMode can tell MobiusTunnel
+          // which tunnel is active for the 5 % → 100 % opacity dim system.
+          const entryGridId = getManifoldGridId(sticker, size);
+          const exitGridId  = getManifoldGridId(antipodal.sticker, size);
+          const pairId = [entryGridId, exitGridId].sort().join('|');
           tunnels.push({
             id,
+            pairId,
             entry: { x, y, z, dirKey },
             exit: { x: antipodal.x, y: antipodal.y, z: antipodal.z, dirKey: antipodal.dirKey },
             flips: Math.max(1, flips),

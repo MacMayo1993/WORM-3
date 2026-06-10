@@ -1300,9 +1300,10 @@ function WormChaseCamera({ worm, size }) {
                       phase === 'tunnel'   ? 0.33 + tp * 0.34 :
                                              0.67 + tp * 0.33;
 
-            // Publish to MobiusHUD's DOM RAF loop via the shared bridge
+            // Publish to MobiusHUD's DOM RAF loop and MobiusTunnel dim system.
             tunnelState.active = true;
             tunnelState.t = t;
+            tunnelState.activeTunnelId = tunnel.pairId ?? null;
 
             const tunnel = worm.activeTunnel.current;
             const entN = FACE_NORMALS[tunnel.entry.dirKey] ?? FACE_NORMALS.PY;
@@ -1372,6 +1373,7 @@ function WormChaseCamera({ worm, size }) {
         } else {
             tunnelState.active = false;
             tunnelState.t = 0;
+            tunnelState.activeTunnelId = null;
         }
 
         prevPhaseRef.current = phase;

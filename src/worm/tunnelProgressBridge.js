@@ -3,5 +3,6 @@
 // React state since the consumer does its own requestAnimationFrame.
 export const tunnelState = {
   active: false,
-  t: 0,  // 0→1 globally across entering(0–0.33) → tunnel(0.33–0.67) → exiting(0.67–1)
+  t: 0,            // 0→1 globally across entering(0–0.33) → tunnel(0.33–0.67) → exiting(0.67–1)
+  activeTunnelId: null, // pairId of the tunnel the worm is currently traversing (null when idle)
 };
