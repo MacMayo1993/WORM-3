@@ -12,9 +12,10 @@ export const GLASS_MIN_OPACITY = 0.12;
 export const GLASS_MAX_OPACITY = 0.28;
 export const GLASS_MIN_TRANSMISSION = 0.72;
 export const GLASS_MAX_TRANSMISSION = 0.95;
-export const TUNNEL_SURF_FOV = 78;
-export const TUNNEL_SURF_BACK = 3.2; // camera behind worm during tunnel (was unused placeholder)
-export const TUNNEL_SURF_UP = 1.3;   // camera above worm during tunnel (was unused placeholder)
+export const TUNNEL_SURF_FOV = 88;
+export const TUNNEL_SURF_BACK = 1.2;       // camera behind worm on ribbon surface
+export const TUNNEL_SURF_UP = 0.8;         // camera above ribbon surface normal
+export const TUNNEL_LOOK_AHEAD = 2.5;      // camera looks this far ahead along tunnel
 export const TUNNEL_SURF_SWAY = 0.22;
 export const TUNNEL_SPEED_SCALE = 0.264; // 0.357 / 1.35 — 35% longer traversal time
 
