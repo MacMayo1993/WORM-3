@@ -56,15 +56,23 @@ if (typeof document !== 'undefined' && !document.getElementById(_STYLE_ID)) {
 // ── Main component ────────────────────────────────────────────────────────────
 
 const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
-  const [index, setIndex] = useState(0);
+  const [index, setIndex]           = useState(0);
+  const [isDismissing, setDismissing] = useState(false);
   const isLast = index === lines.length - 1;
 
   const mobiImgSrc = `${import.meta.env.BASE_URL}Mobi.png`;
 
+  // Trigger dissolve then hand off to parent after animation finishes
+  const dismiss = useCallback(() => {
+    setDismissing(true);
+    setTimeout(() => onComplete(), 750);
+  }, [onComplete]);
+
   const advance = useCallback(() => {
-    if (isLast) onComplete();
+    if (isDismissing) return;
+    if (isLast) dismiss();
     else setIndex(i => i + 1);
-  }, [isLast, onComplete]);
+  }, [isDismissing, isLast, dismiss]);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -72,23 +80,37 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
         e.preventDefault();
         advance();
       } else if (e.key === 'Escape') {
-        onComplete();
+        dismiss();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [advance, onComplete]);
+  }, [advance, dismiss]);
 
   if (!lines || lines.length === 0) {
     onComplete();
     return null;
   }
 
-  const accent = 'rgba(0, 210, 248, 0.85)';
+  const accent      = 'rgba(0, 210, 248, 0.85)';
   const accentSolid = '#00d2f8';
-  // panel height — nameplate anchors to its top
-  const PANEL_H = 'clamp(132px, 18vh, 172px)';
+  const PANEL_H     = 'clamp(132px, 18vh, 172px)';
   const NAMEPLATE_H = 32;
+
+  // Per-element dissolve styles — applied on top of entry animations
+  const mobiDismiss = isDismissing ? {
+    animation: 'none',
+    opacity: 0,
+    transform: 'translateX(-18px) scale(0.96)',
+    transition: 'opacity 0.55s ease, transform 0.55s ease',
+  } : {};
+
+  const uiDismiss = isDismissing ? {
+    animation: 'none',
+    opacity: 0,
+    transform: 'translateY(8px)',
+    transition: 'opacity 0.35s ease, transform 0.35s ease',
+  } : {};
 
   return (
     <div
@@ -98,8 +120,14 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
         inset: 0,
         zIndex: 900,
         background: 'linear-gradient(to top, rgba(0,0,0,0.45) 0%, transparent 50%)',
-        pointerEvents: 'auto',
-        cursor: 'pointer',
+        // Background blur while Mobi is talking; unblurs on dismiss
+        backdropFilter:       isDismissing ? 'blur(0px)' : 'blur(5px)',
+        WebkitBackdropFilter: isDismissing ? 'blur(0px)' : 'blur(5px)',
+        transition: isDismissing
+          ? 'backdrop-filter 0.7s ease, -webkit-backdrop-filter 0.7s ease'
+          : undefined,
+        pointerEvents: isDismissing ? 'none' : 'auto',
+        cursor: isDismissing ? 'default' : 'pointer',
       }}
     >
       {/* ── Mobi portrait — bottom-left, behind panel (z:901 < panel z:903) ── */}
@@ -111,6 +139,7 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
         pointerEvents: 'none',
         lineHeight: 0,
         animation: 'mobiSlideIn 0.45s cubic-bezier(0.16,1,0.3,1) forwards',
+        ...mobiDismiss,
       }}>
         <img
           src={mobiImgSrc}
@@ -128,6 +157,7 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
         zIndex: 905,
         pointerEvents: 'none',
         animation: 'panelRise 0.4s cubic-bezier(0.16,1,0.3,1) forwards',
+        ...uiDismiss,
       }}>
         {/* Outer layer = border color */}
         <div style={{
@@ -188,12 +218,13 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
-          paddingTop: 'clamp(12px, 2vh, 18px)',
-          paddingLeft: 'clamp(16px, 3vw, 32px)',
-          paddingRight: 'clamp(16px, 3vw, 32px)',
+          paddingTop:    'clamp(12px, 2vh, 18px)',
+          paddingLeft:   'clamp(16px, 3vw, 32px)',
+          paddingRight:  'clamp(16px, 3vw, 32px)',
           paddingBottom: 'max(clamp(20px, 3.5vh, 30px), env(safe-area-inset-bottom, 0px))',
           boxSizing: 'border-box',
           animation: 'panelRise 0.4s cubic-bezier(0.16,1,0.3,1) forwards',
+          ...uiDismiss,
         }}
         onClick={e => e.stopPropagation()}
       >
@@ -247,7 +278,7 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); onComplete(); }}
+              onClick={(e) => { e.stopPropagation(); dismiss(); }}
               style={{
                 background: 'none',
                 border: '1px solid rgba(255,255,255,0.18)',
