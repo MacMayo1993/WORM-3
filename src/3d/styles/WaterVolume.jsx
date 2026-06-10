@@ -6,9 +6,9 @@
 //
 // The sticker's base 'water' shader renders the underwater floor below.
 
-import React, { useMemo } from 'react';
+import React from 'react';
 import * as THREE from 'three';
-import { sharedUniforms } from './TileStyleMaterials.jsx';
+import { sharedUniforms, getVolumeResource } from './TileStyleMaterials.jsx';
 
 const WATER_W = 0.78;   // width/height slightly inset from the 0.85 sticker
 const WATER_D = 0.13;   // depth of the water volume
@@ -133,10 +133,14 @@ const surfaceFragmentShader = `
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
+// Geometries/materials shared across all stickers via getVolumeResource —
+// materials vary only by face colour. Meshes set dispose={null} accordingly.
 export default function WaterVolume({ faceColor }) {
+  const colorKey = faceColor || '#3b82f6';
+
   // Build water colour from face colour, biased heavily toward blue-teal
-  const bodyMat = useMemo(() => {
-    const fc = new THREE.Color(faceColor || '#3b82f6');
+  const bodyMat = getVolumeResource(`water_bodyMat_${colorKey}`, () => {
+    const fc = new THREE.Color(colorKey);
     const wc = new THREE.Color(0.04, 0.20, 0.55);
     wc.lerp(fc, 0.22);
     return new THREE.ShaderMaterial({
@@ -150,10 +154,10 @@ export default function WaterVolume({ faceColor }) {
       side:           THREE.DoubleSide,
       depthWrite:     false,
     });
-  }, [faceColor]);
+  });
 
-  const surfMat = useMemo(() => {
-    const fc = new THREE.Color(faceColor || '#3b82f6');
+  const surfMat = getVolumeResource(`water_surfMat_${colorKey}`, () => {
+    const fc = new THREE.Color(colorKey);
     const wc = new THREE.Color(0.08, 0.30, 0.70);
     wc.lerp(fc, 0.18);
     return new THREE.ShaderMaterial({
@@ -167,13 +171,10 @@ export default function WaterVolume({ faceColor }) {
       side:           THREE.FrontSide,
       depthWrite:     false,
     });
-  }, [faceColor]);
+  });
 
-  const bodyGeo = useMemo(() => new THREE.BoxGeometry(WATER_W, WATER_W, WATER_D), []);
-  const surfGeo = useMemo(
-    () => new THREE.PlaneGeometry(WATER_W, WATER_W, SURF_SEGS, SURF_SEGS),
-    []
-  );
+  const bodyGeo = getVolumeResource('water_bodyGeo', () => new THREE.BoxGeometry(WATER_W, WATER_W, WATER_D));
+  const surfGeo = getVolumeResource('water_surfGeo', () => new THREE.PlaneGeometry(WATER_W, WATER_W, SURF_SEGS, SURF_SEGS));
 
   return (
     <>
@@ -181,6 +182,7 @@ export default function WaterVolume({ faceColor }) {
       <mesh
         geometry={bodyGeo}
         material={bodyMat}
+        dispose={null}
         position={[0, 0, WATER_D / 2 + 0.002]}
         frustumCulled={false}
         raycast={() => null}
@@ -190,6 +192,7 @@ export default function WaterVolume({ faceColor }) {
       <mesh
         geometry={surfGeo}
         material={surfMat}
+        dispose={null}
         position={[0, 0, WATER_D + 0.003]}
         frustumCulled={false}
         raycast={() => null}

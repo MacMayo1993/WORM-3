@@ -6,9 +6,9 @@
 //   3. Ice surface (displaced plane): barely-moving frost undulation, heavy Fresnel sheen,
 //      animated sparkle points mimicking light catching on crystal facets
 
-import React, { useMemo } from 'react';
+import React from 'react';
 import * as THREE from 'three';
-import { sharedUniforms } from './TileStyleMaterials.jsx';
+import { sharedUniforms, getVolumeResource } from './TileStyleMaterials.jsx';
 
 const ICE_W    = 0.78;
 const ICE_D    = 0.09;
@@ -160,42 +160,44 @@ const surfaceFragmentShader = `
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export default function IceVolume({ faceColor }) {
-  const iceCol = useMemo(() => {
-    const fc = new THREE.Color(faceColor || '#93c5fd');
-    const ic = new THREE.Color(0.72, 0.88, 1.0);
-    ic.lerp(fc, 0.25);
-    return ic;
-  }, [faceColor]);
+const iceColorFor = (faceColor) => {
+  const fc = new THREE.Color(faceColor || '#93c5fd');
+  const ic = new THREE.Color(0.72, 0.88, 1.0);
+  ic.lerp(fc, 0.25);
+  return ic;
+};
 
-  const bodyMat = useMemo(() => new THREE.ShaderMaterial({
-    uniforms: { iceColor: { value: iceCol }, time: sharedUniforms.time },
+// Geometries/materials shared across all stickers via getVolumeResource —
+// materials vary only by face colour. Meshes set dispose={null} accordingly.
+export default function IceVolume({ faceColor }) {
+  const colorKey = faceColor || '#93c5fd';
+
+  const bodyMat = getVolumeResource(`ice_bodyMat_${colorKey}`, () => new THREE.ShaderMaterial({
+    uniforms: { iceColor: { value: iceColorFor(colorKey) }, time: sharedUniforms.time },
     vertexShader:   bodyVertexShader,
     fragmentShader: bodyFragmentShader,
     transparent: true, side: THREE.DoubleSide, depthWrite: false,
-  }), [iceCol]);
+  }));
 
-  const surfMat = useMemo(() => new THREE.ShaderMaterial({
-    uniforms: { iceColor: { value: iceCol }, time: sharedUniforms.time },
+  const surfMat = getVolumeResource(`ice_surfMat_${colorKey}`, () => new THREE.ShaderMaterial({
+    uniforms: { iceColor: { value: iceColorFor(colorKey) }, time: sharedUniforms.time },
     vertexShader:   surfaceVertexShader,
     fragmentShader: surfaceFragmentShader,
     transparent: true, side: THREE.FrontSide, depthWrite: false,
-  }), [iceCol]);
+  }));
 
-  const bodyGeo = useMemo(() => new THREE.BoxGeometry(ICE_W, ICE_W, ICE_D), []);
-  const surfGeo = useMemo(
-    () => new THREE.PlaneGeometry(ICE_W, ICE_W, SURF_SEGS, SURF_SEGS), []
-  );
+  const bodyGeo = getVolumeResource('ice_bodyGeo', () => new THREE.BoxGeometry(ICE_W, ICE_W, ICE_D));
+  const surfGeo = getVolumeResource('ice_surfGeo', () => new THREE.PlaneGeometry(ICE_W, ICE_W, SURF_SEGS, SURF_SEGS));
 
   return (
     <>
       {/* Ice volume — crystal-clear box with cracked walls */}
-      <mesh geometry={bodyGeo} material={bodyMat}
+      <mesh geometry={bodyGeo} material={bodyMat} dispose={null}
         position={[0, 0, ICE_D / 2 + 0.002]}
         frustumCulled={false} raycast={() => null} />
 
       {/* Ice surface — barely-moving frost sheet with sparkle sheen */}
-      <mesh geometry={surfGeo} material={surfMat}
+      <mesh geometry={surfGeo} material={surfMat} dispose={null}
         position={[0, 0, ICE_D + 0.003]}
         frustumCulled={false} raycast={() => null} />
     </>

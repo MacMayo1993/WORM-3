@@ -6,9 +6,9 @@
 //   3. Lava surface (displaced plane): FBM-bubbling vertex displacement, specular on hot spots
 //   4. Embers (instanced sprites): 36 tiny glowing particles floating upward
 
-import React, { useMemo, useRef } from 'react';
+import React, { useRef } from 'react';
 import * as THREE from 'three';
-import { sharedUniforms } from './TileStyleMaterials.jsx';
+import { sharedUniforms, getVolumeResource } from './TileStyleMaterials.jsx';
 
 const LAVA_W  = 0.78;
 const LAVA_D  = 0.10;
@@ -213,45 +213,47 @@ const emberFragmentShader = `
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
+const lavaColorFor = (faceColor) => {
+  const fc = new THREE.Color(faceColor || '#ef4444');
+  const lc = new THREE.Color(0.80, 0.20, 0.02);
+  lc.lerp(fc, 0.30);
+  return lc;
+};
+
+// All geometries/materials are shared across stickers via getVolumeResource —
+// materials vary only by face colour, geometries not at all.  Ember start
+// positions/phases are therefore identical on every lava tile, but each tile's
+// orientation differs so the repetition isn't visually apparent.
 export default function LavaVolume({ faceColor }) {
   const emberMeshRef = useRef();
+  const colorKey = faceColor || '#ef4444';
 
-  const lavaCol = useMemo(() => {
-    const fc = new THREE.Color(faceColor || '#ef4444');
-    const lc = new THREE.Color(0.80, 0.20, 0.02);
-    lc.lerp(fc, 0.30);
-    return lc;
-  }, [faceColor]);
-
-  const bodyMat = useMemo(() => new THREE.ShaderMaterial({
-    uniforms: { lavaColor: { value: lavaCol }, time: sharedUniforms.time },
+  const bodyMat = getVolumeResource(`lava_bodyMat_${colorKey}`, () => new THREE.ShaderMaterial({
+    uniforms: { lavaColor: { value: lavaColorFor(colorKey) }, time: sharedUniforms.time },
     vertexShader:   bodyVertexShader,
     fragmentShader: bodyFragmentShader,
     transparent: true, side: THREE.DoubleSide, depthWrite: false,
-  }), [lavaCol]);
+  }));
 
-  const surfMat = useMemo(() => new THREE.ShaderMaterial({
-    uniforms: { lavaColor: { value: lavaCol }, time: sharedUniforms.time },
+  const surfMat = getVolumeResource(`lava_surfMat_${colorKey}`, () => new THREE.ShaderMaterial({
+    uniforms: { lavaColor: { value: lavaColorFor(colorKey) }, time: sharedUniforms.time },
     vertexShader:   surfaceVertexShader,
     fragmentShader: surfaceFragmentShader,
     transparent: true, side: THREE.FrontSide, depthWrite: false,
-  }), [lavaCol]);
+  }));
 
-  const emberMat = useMemo(() => new THREE.ShaderMaterial({
-    uniforms: { lavaColor: { value: lavaCol }, time: sharedUniforms.time },
+  const emberMat = getVolumeResource(`lava_emberMat_${colorKey}`, () => new THREE.ShaderMaterial({
+    uniforms: { lavaColor: { value: lavaColorFor(colorKey) }, time: sharedUniforms.time },
     vertexShader:   emberVertexShader,
     fragmentShader: emberFragmentShader,
     transparent: true, depthWrite: false,
     blending: THREE.AdditiveBlending,
-  }), [lavaCol]);
+  }));
 
-  const bodyGeo = useMemo(() => new THREE.BoxGeometry(LAVA_W, LAVA_W, LAVA_D), []);
-  const surfGeo = useMemo(
-    () => new THREE.PlaneGeometry(LAVA_W, LAVA_W, SURF_SEGS, SURF_SEGS), []
-  );
+  const bodyGeo = getVolumeResource('lava_bodyGeo', () => new THREE.BoxGeometry(LAVA_W, LAVA_W, LAVA_D));
+  const surfGeo = getVolumeResource('lava_surfGeo', () => new THREE.PlaneGeometry(LAVA_W, LAVA_W, SURF_SEGS, SURF_SEGS));
 
-  // Build ember geometry once
-  const emberGeo = useMemo(() => {
+  const emberGeo = getVolumeResource('lava_emberGeo', () => {
     const geo = new THREE.BufferGeometry();
     const positions = new Float32Array(EMBER_COUNT * 3);
     const phase     = new Float32Array(EMBER_COUNT);
@@ -271,22 +273,22 @@ export default function LavaVolume({ faceColor }) {
     geo.setAttribute('speed',    new THREE.BufferAttribute(speed, 1));
     geo.setAttribute('startPos', new THREE.BufferAttribute(startPos, 3));
     return geo;
-  }, []);
+  });
 
   return (
     <>
       {/* Lava body — glowing molten volume */}
-      <mesh geometry={bodyGeo} material={bodyMat}
+      <mesh geometry={bodyGeo} material={bodyMat} dispose={null}
         position={[0, 0, LAVA_D / 2 + 0.002]}
         frustumCulled={false} raycast={() => null} />
 
       {/* Lava surface — FBM-bubbling displaced plane */}
-      <mesh geometry={surfGeo} material={surfMat}
+      <mesh geometry={surfGeo} material={surfMat} dispose={null}
         position={[0, 0, LAVA_D + 0.003]}
         frustumCulled={false} raycast={() => null} />
 
       {/* Floating embers — additive point sprites */}
-      <points ref={emberMeshRef} geometry={emberGeo} material={emberMat}
+      <points ref={emberMeshRef} geometry={emberGeo} material={emberMat} dispose={null}
         position={[0, 0, LAVA_D + 0.004]}
         frustumCulled={false} raycast={() => null} />
     </>

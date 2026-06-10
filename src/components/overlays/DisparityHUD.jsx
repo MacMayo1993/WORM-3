@@ -182,16 +182,23 @@ const DisparityHUD = () => {
     return () => clearTimeout(timer);
   }, [disparityDeaths]);
 
-  // Group deaths by pairRank, only include visible groups
+  // Group deaths by pairRank, only include visible groups.
+  // Deaths are appended in rank order, so walk backward from the newest and
+  // stop at the oldest visible rank — only the recent window is scanned
+  // instead of the full death history (which grows to 6n² over a game).
   const sortedGroups = useMemo(() => {
-    const groups = {};
-    disparityDeaths.forEach((d) => {
+    if (!visiblePairRanks.size) return [];
+    const minVisible = Math.min(...visiblePairRanks);
+    const groups = new Map();
+    for (let i = disparityDeaths.length - 1; i >= 0; i--) {
+      const d = disparityDeaths[i];
       const pr = d.pairRank ?? d.rank;
-      if (!visiblePairRanks.has(pr)) return;
-      if (!groups[pr]) groups[pr] = [];
-      groups[pr].push(d);
-    });
-    return Object.entries(groups)
+      if (pr < minVisible) break;
+      if (!visiblePairRanks.has(pr)) continue;
+      if (!groups.has(pr)) groups.set(pr, []);
+      groups.get(pr).unshift(d); // restore chronological order within the pair
+    }
+    return [...groups.entries()]
       .sort(([a], [b]) => Number(b) - Number(a))
       .slice(0, MAX_PAIR_GROUPS);
   }, [disparityDeaths, visiblePairRanks]);

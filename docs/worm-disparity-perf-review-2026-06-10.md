@@ -155,12 +155,12 @@ WormChaseCamera (`:1212`), TunnelSurfFX (`:1385`), WormBody (`:1581`), GlowWormA
 
 ## Prioritized roadmap
 
-### Phase 1 — quick wins, low risk (target: ship together, ~1 day)
-1. Cache `wp` + `normal` in `allPositions` entries; early-exit empty WormholeRings frame (§2.1).
-2. Delete TopMenuBar interval scan; reuse worker metrics (§3.1).
-3. Raise `MAX_MAT_CACHE` to 500 + pre-warm current style's color combos (§1.3).
-4. DisparityHUD: subscribe to `length`/last element instead of the array (§3.3).
-5. Hoist volume-style geometries to module-level shared constants (§1.2 step 1).
+### Phase 1 — quick wins, low risk ✅ IMPLEMENTED (2026-06-10, this branch)
+1. ✅ Cache `wp` + `normal` in `allPositions` entries; early-exit empty WormholeRings frames; zero-out only up to last frame's high-water marks (was ~8,000 writes/frame at size 7 even when idle); upload instance buffers only when written (§2.1).
+2. ✅ TopMenuBar interval scans removed/guarded: chaos stats now pushed from the worker through the store (`chaosStats`), worker metrics extended with `totalFlips`/`deadTiles`, initial snapshot posted on START; the 200 ms completion-stats poll now skips when the cubies reference is unchanged (§3.1).
+3. ✅ `MAX_MAT_CACHE` raised to 500; warm-up extended to the equipped per-face styles and to explicit antipodal-partner color variants (§1.3).
+4. ✅ DisparityHUD `sortedGroups` walks backward from the newest death and stops at the oldest visible rank instead of rescanning the full death history (§3.3).
+5. ✅ Volume styles (lava, ice, water, neural, circuit, galaxy, wood, grass) share geometries and per-face-color materials at module level via `getVolumeResource`, with `dispose={null}` so R3F never disposes shared resources; was 3–6 fresh geometries + materials per sticker per mount (§1.2 step 1).
 
 ### Phase 2 — structural, medium risk (~2–4 days)
 6. Single animation-manager `useFrame` with an active-sticker registry; remove per-sticker callbacks (§1.1). **Biggest single gain.**
