@@ -96,27 +96,13 @@ const MenuWormParticle = ({ start, color1, startTime, onComplete }) => {
   }), [faceColor]);
 
   // One material per segment — transparent, opacity mutated in useFrame
-  // Color lerps toward teal with each segment for chromatic depth head→tail
-  const segMats = useMemo(() => {
-    const base = new THREE.Color(faceColor);
-    const teal = new THREE.Color('#00e8c0');
-    return Array.from({ length: SEGMENT_COUNT }, (_, i) => {
-      const c = base.clone().lerp(teal, i * 0.08);
-      return new THREE.MeshStandardMaterial({
-        color: c, roughness: 0.25, metalness: 0.05,
-        emissive: c, emissiveIntensity: 0.45 - i * 0.06,
-        transparent: true, opacity: 0, depthWrite: false,
-      });
-    });
-  }, [faceColor]);
-
-  // Per-segment inner additive glow — matches mascot subsurface warmth treatment
-  const segGlowMats = useMemo(() => Array.from({ length: SEGMENT_COUNT }, () =>
-    new THREE.MeshBasicMaterial({
-      color: '#80ffcc', transparent: true, opacity: 0,
-      depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending, toneMapped: false,
+  const segMats = useMemo(() => Array.from({ length: SEGMENT_COUNT }, (_, i) =>
+    new THREE.MeshStandardMaterial({
+      color: faceColor, roughness: 0.25, metalness: 0.05,
+      emissive: faceColor, emissiveIntensity: 0.45 - i * 0.06,
+      transparent: true, opacity: 0, depthWrite: false,
     })
-  ), []);
+  ), [faceColor]);
 
   const blinkTimerRef   = useRef(0);
   const isBlinkingRef   = useRef(false);
@@ -224,10 +210,7 @@ const MenuWormParticle = ({ start, color1, startTime, onComplete }) => {
       seg.position.copy(_segPos);
       seg.scale.set(taper * (1 + wave), taper * (1 - wave * 0.5), taper * (1 + wave));
       seg.visible = retreatFade > 0.02;
-      if (seg.visible) {
-        segMats[i].opacity = (0.95 - (i / SEGMENT_COUNT) * 0.12) * retreatFade;
-        segGlowMats[i].opacity = (0.20 - (i / SEGMENT_COUNT) * 0.03) * retreatFade;
-      }
+      if (seg.visible) segMats[i].opacity = (0.95 - (i / SEGMENT_COUNT) * 0.12) * retreatFade;
     }
   });
 
@@ -256,7 +239,6 @@ const MenuWormParticle = ({ start, color1, startTime, onComplete }) => {
         <group key={`seg-${i}`} ref={el => (segRefs.current[i] = el)}>
           <mesh geometry={wSegGeos[i]} renderOrder={25} scale={[1.30, 1.30, 1.30]} material={outlineMat} />
           <mesh renderOrder={26} geometry={wSegGeos[i]} material={segMats[i]} />
-          <mesh renderOrder={30} scale={[0.88, 0.88, 0.88]} geometry={wSegGeos[i]} material={segGlowMats[i]} />
         </group>
       ))}
 
