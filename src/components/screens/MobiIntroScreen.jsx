@@ -87,7 +87,7 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
   const accent = 'rgba(0, 210, 248, 0.85)';
   const accentSolid = '#00d2f8';
   // panel height — nameplate anchors to its top
-  const PANEL_H = 'clamp(108px, 15vh, 150px)';
+  const PANEL_H = 'clamp(132px, 18vh, 172px)';
   const NAMEPLATE_H = 32;
 
   return (
@@ -188,7 +188,10 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
-          padding: 'clamp(12px, 2vh, 18px) clamp(16px, 3vw, 32px) clamp(10px, 1.6vh, 16px)',
+          paddingTop: 'clamp(12px, 2vh, 18px)',
+          paddingLeft: 'clamp(16px, 3vw, 32px)',
+          paddingRight: 'clamp(16px, 3vw, 32px)',
+          paddingBottom: 'max(clamp(20px, 3.5vh, 30px), env(safe-area-inset-bottom, 0px))',
           boxSizing: 'border-box',
           animation: 'panelRise 0.4s cubic-bezier(0.16,1,0.3,1) forwards',
         }}
