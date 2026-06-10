@@ -8,7 +8,7 @@ const sharedWaveRingGeometry = new THREE.RingGeometry(0.8, 1.0, 32);
 const sharedInnerRingGeometry = new THREE.RingGeometry(0.3, 0.6, 32);
 const sharedFlashDisc = new THREE.CircleGeometry(0.52, 32);
 
-const WORM_TOTAL_DURATION = 2.0 + 2.0; // must match MenuWormParticle duration + retreatDur
+const WORM_TOTAL_DURATION = 3.0 + 0.15; // must match MenuWormParticle TRANSIT_DUR + buffer
 
 /**
  * Brief bright disc that pops open on the tile face when a flip triggers.
@@ -103,15 +103,15 @@ const MenuFlipWave = ({ origins, startTime, onComplete }) => {
         </group>
       ))}
 
-      {origins.map((origin, idx) => (
-        <MenuWormParticle
-          key={`worm-${idx}`}
-          start={origin.position}
-          color1={origin.color}
-          startTime={startTime}
-          onComplete={idx === 0 ? wormCompleted : undefined}
-        />
-      ))}
+      {/* Single transit worm arcs from origins[0] around the cube to origins[1] */}
+      <MenuWormParticle
+        key="transit"
+        start={origins[0].position}
+        end={origins[1].position}
+        color1={origins[0].color}
+        startTime={startTime}
+        onComplete={wormCompleted}
+      />
     </group>
   );
 };

@@ -11,8 +11,8 @@ const _arcFwdVec   = new THREE.Vector3();
 const _tangent     = new THREE.Vector3();
 const _lookQuat    = new THREE.Quaternion();
 const _fwdAxis     = new THREE.Vector3(0, 0, 1);
-const _basePerp0   = new THREE.Vector3(0, 1, 0); // reused, never mutated
-const _basePerp1   = new THREE.Vector3(1, 0, 0); // reused, never mutated
+const _basePerp0   = new THREE.Vector3(0, 1, 0);
+const _basePerp1   = new THREE.Vector3(1, 0, 0);
 const _headPos     = new THREE.Vector3();
 const _lookPos     = new THREE.Vector3();
 const _segPos      = new THREE.Vector3();
@@ -20,13 +20,13 @@ const _worldNormal = new THREE.Vector3();
 const _camDir      = new THREE.Vector3();
 
 // ── Module-level shared geometries ────────────────────────────────────────────
-const wHeadGeo  = new THREE.SphereGeometry(0.22, 14, 12);
+const wHeadGeo  = new THREE.SphereGeometry(0.185, 14, 12);
 const wSegGeos  = [
-  new THREE.SphereGeometry(0.21, 12, 10),
-  new THREE.SphereGeometry(0.21, 10, 8),
-  new THREE.SphereGeometry(0.21, 10, 8),
-  new THREE.SphereGeometry(0.20, 8, 8),
-  new THREE.SphereGeometry(0.20, 8, 8),
+  new THREE.SphereGeometry(0.175, 12, 10),
+  new THREE.SphereGeometry(0.175, 10, 8),
+  new THREE.SphereGeometry(0.175, 10, 8),
+  new THREE.SphereGeometry(0.165, 8, 8),
+  new THREE.SphereGeometry(0.165, 8, 8),
 ];
 const wEyeGeo   = new THREE.SphereGeometry(0.050, 8, 8);
 const wPupilGeo = new THREE.SphereGeometry(0.026, 6, 6);
@@ -34,9 +34,12 @@ const wStemGeo  = new THREE.CylinderGeometry(0.010, 0.007, 0.20, 6);
 const wTipGeo   = new THREE.SphereGeometry(0.020, 6, 6);
 const wMouthGeo = new THREE.TorusGeometry(0.048, 0.013, 6, 12, Math.PI);
 const wGlintGeo = new THREE.SphereGeometry(0.013, 5, 5);
-const wGlintMat = new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.90, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false });
+const wGlintMat = new THREE.MeshBasicMaterial({
+  color: '#ffffff', transparent: true, opacity: 0.90,
+  depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false,
+});
 
-// ── Module-level shared materials — identical across all worm instances ────────
+// ── Module-level shared materials ────────────────────────────────────────────
 const outlineMat  = new THREE.MeshBasicMaterial({ color: '#06001a', side: THREE.BackSide, depthWrite: false });
 const eyeWhiteMat = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.1, emissive: '#c8e8ff', emissiveIntensity: 0.25, depthWrite: false });
 const pupilMat    = new THREE.MeshStandardMaterial({ color: '#0a0a14', metalness: 0.6, roughness: 0.0, depthWrite: false });
@@ -44,14 +47,18 @@ const mouthMat    = new THREE.MeshStandardMaterial({ color: '#0d2410', roughness
 
 const STEM_HALF     = 0.10;
 const SEGMENT_COUNT = 5;
+const SEG_SPACING   = 0.22;  // physical arc-length gap between segments
+const TRANSIT_DUR   = 3.0;   // seconds for a full face-to-face transit
 
 /**
- * MenuWormParticle — menu-only worm with zero per-frame allocations.
- * Emerges from a flip tile along an arc, then retreats back into the hole.
- * Curve points and the CatmullRomCurve3 are pre-allocated via useMemo.
- * All materials are either module-scope singletons or useMemo instances.
+ * MenuWormParticle — menu-only worm.
+ *
+ * Without `end` prop: emerges from one tile along a short arc, retreats back.
+ * With `end` prop:    shoots from the start face, arcs around the outside of the
+ *                     cube (choosing a random equatorial direction via arcPhase),
+ *                     and enters the antipodal end face — showing the wormhole connection.
  */
-const MenuWormParticle = ({ start, color1, startTime, onComplete }) => {
+const MenuWormParticle = ({ start, end, color1, startTime, onComplete }) => {
   const rootGroupRef = useRef();
   const headGroupRef = useRef();
   const eyeLRef      = useRef();
@@ -64,10 +71,10 @@ const MenuWormParticle = ({ start, color1, startTime, onComplete }) => {
 
   const duration      = 2.0;
   const retreatDur    = 2.0;
-  const totalDuration = duration + retreatDur;
+  const totalDuration = end ? TRANSIT_DUR + 0.15 : duration + retreatDur;
 
   const p = useMemo(() => ({
-    arcPhase    : Math.random() * Math.PI,  // [0,π] keeps arc in upward hemisphere for side faces
+    arcPhase    : Math.random() * Math.PI,  // [0,π] → upper hemisphere arcs only
     blinkInterval: 1.4 + Math.random() * 2.0,
     blinkDur    : 0.12,
     squishAmp   : 0.08 + Math.random() * 0.06,
@@ -75,15 +82,49 @@ const MenuWormParticle = ({ start, color1, startTime, onComplete }) => {
     antennaPhase: Math.random() * Math.PI * 2,
   }), []);
 
-  // Pre-allocated curve — mutated in place each frame, never recreated
+  // Pre-allocated curve for emerge/retreat mode — mutated in place each frame
   const curveData = useMemo(() => {
     const pts = Array.from({ length: 5 }, () => new THREE.Vector3());
     return { pts, curve: new THREE.CatmullRomCurve3(pts) };
   }, []);
 
+  // Fixed arc for transit mode — computed once on mount from start → apex → end.
+  // The apex sits ~2.3 units from cube centre (cube half-width ≈ 1.5) so the path
+  // travels entirely outside the cube.  arcPhase picks which side to arc around.
+  const transitCurve = useMemo(() => {
+    if (!end) return null;
+    const startN = new THREE.Vector3(...start).normalize();
+    // Stable perpendicular basis identical to the emerge-mode logic
+    const basePerp = Math.abs(startN.y) < 0.8 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
+    const perp   = new THREE.Vector3().crossVectors(startN, basePerp).normalize();
+    const arcFwd = new THREE.Vector3().crossVectors(perp, startN).normalize();
+    // arcPhase in [0,π] rotates the equatorial crossing around the upper hemisphere
+    const arcDir = new THREE.Vector3()
+      .addScaledVector(perp, Math.cos(p.arcPhase))
+      .addScaledVector(arcFwd, Math.sin(p.arcPhase))
+      .normalize();
+
+    const R = 2.3; // outer radius of the arc apex
+    const pts = [
+      // P0 — on the start face surface
+      new THREE.Vector3(...start),
+      // P1 — launch: pull away from face in arcDir direction
+      new THREE.Vector3(...start).normalize().multiplyScalar(1.6).addScaledVector(arcDir, R * 0.42),
+      // P2 — apex: furthest from cube centre
+      arcDir.clone().multiplyScalar(R),
+      // P3 — approach: mirror of P1 on the end face side
+      new THREE.Vector3(...end).normalize().multiplyScalar(1.6).addScaledVector(arcDir, R * 0.42),
+      // P4 — on the end face surface
+      new THREE.Vector3(...end),
+    ];
+    const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.5);
+    curve.arcLengthDivisions = 200;
+    curve.updateArcLengths();
+    return curve;
+  }, [start, end]); // p.arcPhase captured from stable closure
+
   const faceColor = color1 || '#3be08a';
 
-  // Per-instance materials — cloned from base, keyed on faceColor
   const headMat = useMemo(() => new THREE.MeshStandardMaterial({
     color: faceColor, roughness: 0.25, metalness: 0.05,
     emissive: faceColor, emissiveIntensity: 0.7, depthWrite: false,
@@ -98,7 +139,6 @@ const MenuWormParticle = ({ start, color1, startTime, onComplete }) => {
     color: '#ffffff', emissive: faceColor, emissiveIntensity: 3.2, depthWrite: false,
   }), [faceColor]);
 
-  // One material per segment — transparent, opacity mutated in useFrame
   const segMats = useMemo(() => Array.from({ length: SEGMENT_COUNT }, (_, i) =>
     new THREE.MeshStandardMaterial({
       color: faceColor, roughness: 0.25, metalness: 0.05,
@@ -121,79 +161,27 @@ const MenuWormParticle = ({ start, color1, startTime, onComplete }) => {
       return;
     }
 
-    const tRaw    = Math.min(elapsed / duration, 1);
-    const progress = 1 - Math.pow(1 - tRaw, 3);
-    const alpha   = Math.min(1, elapsed / 0.25);
-
-    const inRetreat   = elapsed > duration;
-    const retreatT    = inRetreat ? elapsed - duration : 0;
-    const retreatProg = Math.min(1, retreatT / retreatDur);
-    const easeRetract = retreatProg < 0.5
-      ? 2 * retreatProg * retreatProg
-      : 1 - Math.pow(-2 * retreatProg + 2, 2) / 2;
-    const displayProgress = inRetreat ? 1 - easeRetract : progress;
-
-    // Face normal + stable perpendicular basis — no allocations
+    // Face normal — used by culling and the emerge/retreat path
     _faceN.set(...start).normalize();
 
-    // Cull worm when its face points away from camera.
-    // parent = MenuFlipWave outer group; parent.parent = rotating cube group.
-    const cubeMatrix = rootGroupRef.current?.parent?.parent?.matrixWorld;
-    if (cubeMatrix) {
-      _worldNormal.copy(_faceN).transformDirection(cubeMatrix);
-      state.camera.getWorldDirection(_camDir);
-      if (_worldNormal.dot(_camDir) > 0.1) {
-        if (headGroupRef.current) headGroupRef.current.visible = false;
-        for (let i = 0; i < SEGMENT_COUNT; i++) {
-          if (segRefs.current[i]) segRefs.current[i].visible = false;
+    // Cull emerge/retreat worms when their face points away from camera.
+    // Transit worms arc outside the cube so they skip culling entirely.
+    if (!end) {
+      const cubeMatrix = rootGroupRef.current?.parent?.parent?.matrixWorld;
+      if (cubeMatrix) {
+        _worldNormal.copy(_faceN).transformDirection(cubeMatrix);
+        state.camera.getWorldDirection(_camDir);
+        if (_worldNormal.dot(_camDir) > 0.1) {
+          if (headGroupRef.current) headGroupRef.current.visible = false;
+          for (let i = 0; i < SEGMENT_COUNT; i++) {
+            if (segRefs.current[i]) segRefs.current[i].visible = false;
+          }
+          return;
         }
-        return;
       }
     }
 
-    const basePerp = Math.abs(_faceN.y) < 0.8 ? _basePerp0 : _basePerp1;
-    _perp.crossVectors(_faceN, basePerp).normalize();
-    _arcFwdVec.crossVectors(_perp, _faceN).normalize();
-
-    const cosP = Math.cos(p.arcPhase);
-    const sinP = Math.sin(p.arcPhase);
-    _arcDir.copy(_perp).multiplyScalar(cosP).addScaledVector(_arcFwdVec, sinP);
-    _wigDir.copy(_perp).multiplyScalar(-sinP).addScaledVector(_arcFwdVec, cosP);
-
-    const wLive = Math.sin(clockTime * 2.5) * 0.04;
-
-    // Mutate pre-allocated curve points — zero allocations
-    // pts[0] sits just above the surface so the worm is always visible (never inside the cube)
-    curveData.pts[0].set(0, 0, 0).addScaledVector(_faceN, 0.02);
-    curveData.pts[1].set(0, 0, 0).addScaledVector(_faceN,  0.18);
-    curveData.pts[2].set(0, 0, 0).addScaledVector(_faceN, 0.48).addScaledVector(_arcDir, 0.18).addScaledVector(_wigDir, wLive);
-    curveData.pts[3].set(0, 0, 0).addScaledVector(_faceN, 0.58).addScaledVector(_arcDir, 0.36).addScaledVector(_wigDir, wLive * 1.2);
-    curveData.pts[4].set(0, 0, 0).addScaledVector(_faceN, 0.62).addScaledVector(_arcDir, 0.52).addScaledVector(_wigDir, wLive * 1.6);
-    curveData.curve.updateArcLengths();
-
-    // Sample curve into pre-allocated vectors
-    curveData.curve.getPoint(displayProgress, _headPos);
-    curveData.curve.getPoint(Math.min(displayProgress + 0.06, 1), _lookPos);
-
-    // Fade worm out as it converges back into the hole during retreat
-    const retreatFade = inRetreat ? Math.max(0, Math.min(1, (retreatDur - retreatT) / 0.5)) : 1.0;
-
-    // ── Head ──────────────────────────────────────────────────────────────────
-    if (headGroupRef.current) {
-      headGroupRef.current.visible = alpha > 0.02 && !(inRetreat && displayProgress < 0.10);
-      headGroupRef.current.position.copy(_headPos);
-
-      _tangent.subVectors(_lookPos, _headPos).normalize();
-      if (_tangent.lengthSq() > 0.001) {
-        _lookQuat.setFromUnitVectors(_fwdAxis, _tangent);
-        headGroupRef.current.quaternion.slerp(_lookQuat, inRetreat ? 0.55 : 0.5);
-      }
-
-      const squish = Math.sin(clockTime * p.squishFreq) * p.squishAmp;
-      headGroupRef.current.scale.set(1 + squish * 0.3, 1 - squish * 0.15, 1 + squish * 0.3);
-    }
-
-    // ── Blinking ──────────────────────────────────────────────────────────────
+    // ── Shared: blinking ─────────────────────────────────────────────────────
     const timeSinceBlink = clockTime - blinkTimerRef.current;
     if (!isBlinkingRef.current && timeSinceBlink > p.blinkInterval) {
       isBlinkingRef.current = true;
@@ -206,18 +194,112 @@ const MenuWormParticle = ({ start, color1, startTime, onComplete }) => {
     if (eyeLRef.current) eyeLRef.current.scale.set(1, eyeScaleY, 1);
     if (eyeRRef.current) eyeRRef.current.scale.set(1, eyeScaleY, 1);
 
-    // ── Antennae ──────────────────────────────────────────────────────────────
+    // ── Shared: antenna sway ─────────────────────────────────────────────────
     const r = 0.3 + Math.sin(clockTime * 6 + p.antennaPhase) * 0.12;
     if (ant1StemRef.current) ant1StemRef.current.rotation.z = r;
     if (ant2StemRef.current) ant2StemRef.current.rotation.z = -r;
-    if (ant1TipRef.current) {
+    if (ant1TipRef.current)
       ant1TipRef.current.position.set(-0.09 + Math.sin(r) * STEM_HALF, 0.22 + Math.cos(r) * STEM_HALF, 0.08);
-    }
-    if (ant2TipRef.current) {
-      ant2TipRef.current.position.set(0.09 - Math.sin(r) * STEM_HALF, 0.22 + Math.cos(r) * STEM_HALF, 0.08);
+    if (ant2TipRef.current)
+      ant2TipRef.current.position.set( 0.09 - Math.sin(r) * STEM_HALF, 0.22 + Math.cos(r) * STEM_HALF, 0.08);
+
+    // ── TRANSIT MODE — worm travels around cube from start face to end face ───
+    if (end && transitCurve) {
+      const tRaw  = Math.min(elapsed / TRANSIT_DUR, 1);
+      // Ease-in-out so the launch and arrival feel deliberate
+      const eased = tRaw < 0.5 ? 2 * tRaw * tRaw : -1 + (4 - 2 * tRaw) * tRaw;
+
+      // Fade in quickly at launch, fade out gently as the worm enters the end tile
+      const fadeIn  = Math.min(elapsed / 0.30, 1.0);
+      const fadeOut = tRaw > 0.82 ? Math.max(0, (1 - tRaw) / 0.18) : 1.0;
+      const alpha   = fadeIn * fadeOut;
+
+      const totalLen = transitCurve.getLength();
+
+      transitCurve.getPointAt(eased, _headPos);
+      transitCurve.getPointAt(Math.min(eased + 0.022, 1), _lookPos);
+
+      if (headGroupRef.current) {
+        headGroupRef.current.visible = alpha > 0.01;
+        headGroupRef.current.position.copy(_headPos);
+        _tangent.subVectors(_lookPos, _headPos).normalize();
+        if (_tangent.lengthSq() > 0.001) {
+          _lookQuat.setFromUnitVectors(_fwdAxis, _tangent);
+          headGroupRef.current.quaternion.slerp(_lookQuat, 0.5);
+        }
+        const squish = Math.sin(clockTime * p.squishFreq) * p.squishAmp;
+        // Scale the whole head group so it smoothly grows out of / shrinks into the tile
+        headGroupRef.current.scale.set(
+          (1 + squish * 0.3) * alpha,
+          (1 - squish * 0.15) * alpha,
+          (1 + squish * 0.3) * alpha,
+        );
+      }
+
+      const headArcDist = eased * totalLen;
+      for (let i = 0; i < SEGMENT_COUNT; i++) {
+        const seg = segRefs.current[i];
+        if (!seg) continue;
+        const segDist = Math.max(0, headArcDist - (i + 1) * SEG_SPACING);
+        transitCurve.getPointAt(segDist / totalLen, _segPos);
+        const wave  = Math.sin(clockTime * p.squishFreq - i * 0.8) * p.squishAmp;
+        const taper = 1 - (i / (SEGMENT_COUNT - 1)) * 0.05;
+        seg.position.copy(_segPos);
+        seg.scale.set(taper * (1 + wave), taper * (1 - wave * 0.5), taper * (1 + wave));
+        seg.visible = alpha > 0.01;
+        if (seg.visible) segMats[i].opacity = (0.95 - (i / SEGMENT_COUNT) * 0.12) * alpha;
+      }
+      return;
     }
 
-    // ── Body segments — opacity via direct material mutation ──────────────────
+    // ── EMERGE / RETREAT MODE — worm pops out of one tile and retreats back ───
+    const tRaw    = Math.min(elapsed / duration, 1);
+    const progress = 1 - Math.pow(1 - tRaw, 3);
+    const alpha   = Math.min(1, elapsed / 0.25);
+
+    const inRetreat   = elapsed > duration;
+    const retreatT    = inRetreat ? elapsed - duration : 0;
+    const retreatProg = Math.min(1, retreatT / retreatDur);
+    const easeRetract = retreatProg < 0.5
+      ? 2 * retreatProg * retreatProg
+      : 1 - Math.pow(-2 * retreatProg + 2, 2) / 2;
+    const displayProgress = inRetreat ? 1 - easeRetract : progress;
+
+    const basePerp = Math.abs(_faceN.y) < 0.8 ? _basePerp0 : _basePerp1;
+    _perp.crossVectors(_faceN, basePerp).normalize();
+    _arcFwdVec.crossVectors(_perp, _faceN).normalize();
+
+    const cosP = Math.cos(p.arcPhase);
+    const sinP = Math.sin(p.arcPhase);
+    _arcDir.copy(_perp).multiplyScalar(cosP).addScaledVector(_arcFwdVec, sinP);
+    _wigDir.copy(_perp).multiplyScalar(-sinP).addScaledVector(_arcFwdVec, cosP);
+
+    const wLive = Math.sin(clockTime * 2.5) * 0.04;
+
+    curveData.pts[0].set(0, 0, 0).addScaledVector(_faceN, 0.02);
+    curveData.pts[1].set(0, 0, 0).addScaledVector(_faceN,  0.18);
+    curveData.pts[2].set(0, 0, 0).addScaledVector(_faceN, 0.48).addScaledVector(_arcDir, 0.18).addScaledVector(_wigDir, wLive);
+    curveData.pts[3].set(0, 0, 0).addScaledVector(_faceN, 0.58).addScaledVector(_arcDir, 0.36).addScaledVector(_wigDir, wLive * 1.2);
+    curveData.pts[4].set(0, 0, 0).addScaledVector(_faceN, 0.62).addScaledVector(_arcDir, 0.52).addScaledVector(_wigDir, wLive * 1.6);
+    curveData.curve.updateArcLengths();
+
+    curveData.curve.getPoint(displayProgress, _headPos);
+    curveData.curve.getPoint(Math.min(displayProgress + 0.06, 1), _lookPos);
+
+    const retreatFade = inRetreat ? Math.max(0, Math.min(1, (retreatDur - retreatT) / 0.5)) : 1.0;
+
+    if (headGroupRef.current) {
+      headGroupRef.current.visible = alpha > 0.02 && !(inRetreat && displayProgress < 0.10);
+      headGroupRef.current.position.copy(_headPos);
+      _tangent.subVectors(_lookPos, _headPos).normalize();
+      if (_tangent.lengthSq() > 0.001) {
+        _lookQuat.setFromUnitVectors(_fwdAxis, _tangent);
+        headGroupRef.current.quaternion.slerp(_lookQuat, inRetreat ? 0.55 : 0.5);
+      }
+      const squish = Math.sin(clockTime * p.squishFreq) * p.squishAmp;
+      headGroupRef.current.scale.set(1 + squish * 0.3, 1 - squish * 0.15, 1 + squish * 0.3);
+    }
+
     for (let i = 0; i < SEGMENT_COUNT; i++) {
       const seg = segRefs.current[i];
       if (!seg) continue;
@@ -243,7 +325,6 @@ const MenuWormParticle = ({ start, color1, startTime, onComplete }) => {
         <mesh ref={eyeRRef} position={[0.08, 0.10, 0.17]} geometry={wEyeGeo} renderOrder={28} material={eyeWhiteMat} />
         <mesh position={[-0.08, 0.11, 0.20]} geometry={wPupilGeo} renderOrder={29} material={pupilMat} />
         <mesh position={[0.08, 0.11, 0.20]} geometry={wPupilGeo} renderOrder={29} material={pupilMat} />
-        {/* Glints — upper-left on left eye, upper-right on right eye */}
         <mesh position={[-0.093, 0.122, 0.213]} geometry={wGlintGeo} renderOrder={30} material={wGlintMat} />
         <mesh position={[0.093, 0.122, 0.213]} geometry={wGlintGeo} renderOrder={30} material={wGlintMat} />
         <mesh position={[0, -0.032, 0.17]} rotation={[0.25, 0, Math.PI]} renderOrder={28} geometry={wMouthGeo} material={mouthMat} />
@@ -260,7 +341,6 @@ const MenuWormParticle = ({ start, color1, startTime, onComplete }) => {
           <mesh renderOrder={26} geometry={wSegGeos[i]} material={segMats[i]} />
         </group>
       ))}
-
     </group>
   );
 };
