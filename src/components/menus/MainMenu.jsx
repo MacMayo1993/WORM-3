@@ -335,7 +335,7 @@ const ShufflingCube = ({ onFlip }) => {
 // ─── MenuWorm — round-blob worm mascot emerging from the cube's top face ──────
 const _SEG_Y         = [0.80, 0.55, 0.33, 0.15, 0.00]; // all segs above cube surface
 const _SEG_R         = [0.24, 0.22, 0.21, 0.20, 0.18];   // uniform blobs, gentle taper
-const _SEG_COL       = ['#3bffaa', '#28e890', '#18cc78', '#0eb060', '#0a8a48'];
+const _SEG_COL       = ['#3be08a', '#2fd47e', '#24be72', '#1aa862', '#129650'];
 const _PATH_MIN_DIST = 0.004;
 const _SEG_SPACING   = 0.22;
 const _MAX_PATH_LEN  = 4 * 0.22 + 0.15;
@@ -509,18 +509,13 @@ export const MenuWorm = ({ onWormClick }) => {
         <mesh ref={headMeshRef}>
           <sphereGeometry args={[_SEG_R[0], 16, 12]} />
           <meshStandardMaterial
-            color={_SEG_COL[0]} roughness={0.22} metalness={0.0}
-            emissive={_SEG_COL[0]} emissiveIntensity={1.55}
+            color={_SEG_COL[0]} roughness={0.55} metalness={0.0}
+            emissive={_SEG_COL[0]} emissiveIntensity={1.1}
           />
           {/* BackSide outline */}
           <mesh scale={1.14}>
             <sphereGeometry args={[_SEG_R[0], 16, 12]} />
             <meshBasicMaterial color="#06001a" side={THREE.BackSide} />
-          </mesh>
-          {/* Inner additive glow — subsurface-scatter warmth */}
-          <mesh scale={0.88} renderOrder={10}>
-            <sphereGeometry args={[_SEG_R[0], 10, 8]} />
-            <meshBasicMaterial color="#80ffcc" transparent opacity={0.28} depthWrite={false} depthTest={false} blending={THREE.AdditiveBlending} toneMapped={false} />
           </mesh>
         </mesh>
         {/* Eyes — standard material for wet-glass emissive sclera */}
@@ -576,50 +571,34 @@ export const MenuWorm = ({ onWormClick }) => {
       {/* ── Body segments — smooth round blobs ───────────────────────────── */}
       <mesh ref={seg1Ref}>
         <sphereGeometry args={[_SEG_R[1], 16, 12]} />
-        <meshStandardMaterial color={_SEG_COL[1]} roughness={0.22} metalness={0.0} emissive={_SEG_COL[1]} emissiveIntensity={1.20} />
+        <meshStandardMaterial color={_SEG_COL[1]} roughness={0.55} metalness={0.0} emissive={_SEG_COL[1]} emissiveIntensity={0.95} />
         <mesh scale={1.14}>
           <sphereGeometry args={[_SEG_R[1], 16, 12]} />
           <meshBasicMaterial color="#06001a" side={THREE.BackSide} />
         </mesh>
-        <mesh scale={0.88} renderOrder={10}>
-          <sphereGeometry args={[_SEG_R[1], 10, 8]} />
-          <meshBasicMaterial color="#80ffcc" transparent opacity={0.22} depthWrite={false} depthTest={false} blending={THREE.AdditiveBlending} toneMapped={false} />
-        </mesh>
       </mesh>
       <mesh ref={seg2Ref}>
         <sphereGeometry args={[_SEG_R[2], 16, 12]} />
-        <meshStandardMaterial color={_SEG_COL[2]} roughness={0.22} metalness={0.0} emissive={_SEG_COL[2]} emissiveIntensity={1.05} />
+        <meshStandardMaterial color={_SEG_COL[2]} roughness={0.55} metalness={0.0} emissive={_SEG_COL[2]} emissiveIntensity={0.85} />
         <mesh scale={1.14}>
           <sphereGeometry args={[_SEG_R[2], 16, 12]} />
           <meshBasicMaterial color="#06001a" side={THREE.BackSide} />
         </mesh>
-        <mesh scale={0.88} renderOrder={10}>
-          <sphereGeometry args={[_SEG_R[2], 10, 8]} />
-          <meshBasicMaterial color="#80ffcc" transparent opacity={0.20} depthWrite={false} depthTest={false} blending={THREE.AdditiveBlending} toneMapped={false} />
-        </mesh>
       </mesh>
       <mesh ref={seg3Ref}>
         <sphereGeometry args={[_SEG_R[3], 14, 10]} />
-        <meshStandardMaterial color={_SEG_COL[3]} roughness={0.22} metalness={0.0} emissive={_SEG_COL[3]} emissiveIntensity={0.90} />
+        <meshStandardMaterial color={_SEG_COL[3]} roughness={0.55} metalness={0.0} emissive={_SEG_COL[3]} emissiveIntensity={0.75} />
         <mesh scale={1.14}>
           <sphereGeometry args={[_SEG_R[3], 14, 10]} />
           <meshBasicMaterial color="#06001a" side={THREE.BackSide} />
         </mesh>
-        <mesh scale={0.88} renderOrder={10}>
-          <sphereGeometry args={[_SEG_R[3], 10, 8]} />
-          <meshBasicMaterial color="#80ffcc" transparent opacity={0.18} depthWrite={false} depthTest={false} blending={THREE.AdditiveBlending} toneMapped={false} />
-        </mesh>
       </mesh>
       <mesh ref={tailRef}>
         <sphereGeometry args={[_SEG_R[4], 12, 8]} />
-        <meshStandardMaterial color={_SEG_COL[4]} roughness={0.22} metalness={0.0} emissive={_SEG_COL[4]} emissiveIntensity={0.80} />
+        <meshStandardMaterial color={_SEG_COL[4]} roughness={0.55} metalness={0.0} emissive={_SEG_COL[4]} emissiveIntensity={0.65} />
         <mesh scale={1.14}>
           <sphereGeometry args={[_SEG_R[4], 12, 8]} />
           <meshBasicMaterial color="#06001a" side={THREE.BackSide} />
-        </mesh>
-        <mesh scale={0.88} renderOrder={10}>
-          <sphereGeometry args={[_SEG_R[4], 10, 8]} />
-          <meshBasicMaterial color="#80ffcc" transparent opacity={0.16} depthWrite={false} depthTest={false} blending={THREE.AdditiveBlending} toneMapped={false} />
         </mesh>
       </mesh>
 
