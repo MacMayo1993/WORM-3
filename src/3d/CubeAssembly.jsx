@@ -610,7 +610,10 @@ const CubeAssembly = React.memo(({
     const fc = resolveColors(settings, settings?.biomeMode?.faceAssignment);
     const colors = fc ? Object.values(fc) : [];
     if (colors.length === 0) return;
-    warmUpDefaultStyles(gl, camera, colors);
+    // Also warm the per-face styles currently equipped so the first flip of
+    // each face never pays a material-creation/compile stall mid-game.
+    const equippedStyles = Object.values(settings?.manifoldStyles ?? {});
+    warmUpDefaultStyles(gl, camera, colors, equippedStyles);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps -- intentional one-shot on mount
 
   // Camera auto-zoom: push camera out while explosion animates so the cube stays in view.

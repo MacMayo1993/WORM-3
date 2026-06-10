@@ -85,6 +85,11 @@ export function useChaosWorker({
     workerRef.current = worker;
 
     worker.onmessage = (e) => {
+      if (e.data.type === 'METRICS') {
+        // Initial snapshot posted on START so HUDs have data before the first tick.
+        useGameStore.getState().setChaosStats(e.data.payload.metrics);
+        return;
+      }
       if (e.data.type !== 'TICK') return;
       const { flips, cascades, deaths, eliminatedFaces, winner, metrics } = e.data.payload;
 
@@ -132,6 +137,9 @@ export function useChaosWorker({
       if (metrics) {
         disparityRef.current = metrics.disparity;
         flipPctRef.current = metrics.flipPct;
+        // Publish to the store so TopMenuBar can read live stats without
+        // re-scanning all stickers on its own interval.
+        useGameStore.getState().setChaosStats(metrics);
       }
     };
 

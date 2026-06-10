@@ -9,9 +9,9 @@
 // speed driven by the shared time uniform — giving true parallax when you view the
 // tile from different angles as the cube rotates.
 
-import React, { useMemo } from 'react';
+import React from 'react';
 import * as THREE from 'three';
-import { sharedUniforms } from './TileStyleMaterials.jsx';
+import { sharedUniforms, getVolumeResource } from './TileStyleMaterials.jsx';
 
 const GAL_W = 0.78;
 
@@ -89,16 +89,16 @@ const layerVertexShader = `
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
+// Geometries/materials shared across all stickers via getVolumeResource —
+// materials vary only by face colour. Meshes set dispose={null} accordingly.
 export default function GalaxyVolume({ faceColor }) {
-  const galaxyCol = useMemo(() => {
-    const fc = new THREE.Color(faceColor || '#3b82f6');
-    const gc = new THREE.Color(0.08, 0.04, 0.28);
-    gc.lerp(fc, 0.30);
-    return gc;
-  }, [faceColor]);
+  const colorKey = faceColor || '#3b82f6';
 
   // Three layers: distant, mid, close
-  const [matA, matB, matC] = useMemo(() => {
+  const [matA, matB, matC] = getVolumeResource(`galaxy_layerMats_${colorKey}`, () => {
+    const fc = new THREE.Color(colorKey);
+    const galaxyCol = new THREE.Color(0.08, 0.04, 0.28);
+    galaxyCol.lerp(fc, 0.30);
     const make = (fragSrc) => new THREE.ShaderMaterial({
       uniforms: { galaxyColor: { value: galaxyCol }, time: sharedUniforms.time },
       vertexShader:   layerVertexShader,
@@ -114,22 +114,22 @@ export default function GalaxyVolume({ faceColor }) {
       // Layer C — close: few large bright stars, fast drift, vivid nebula
       make(makeLayerShader(0.18, 0.28, -0.0060,  0.0035, 0.70, 10)),
     ];
-  }, [galaxyCol]);
+  });
 
-  const planeGeo = useMemo(() => new THREE.PlaneGeometry(GAL_W, GAL_W), []);
+  const planeGeo = getVolumeResource('galaxy_planeGeo', () => new THREE.PlaneGeometry(GAL_W, GAL_W));
 
   return (
     <>
       {/* Distant star field */}
-      <mesh geometry={planeGeo} material={matA}
+      <mesh geometry={planeGeo} material={matA} dispose={null}
         position={[0, 0, 0.04]} frustumCulled={false} raycast={() => null} />
 
       {/* Mid star field + nebula */}
-      <mesh geometry={planeGeo} material={matB}
+      <mesh geometry={planeGeo} material={matB} dispose={null}
         position={[0, 0, 0.09]} frustumCulled={false} raycast={() => null} />
 
       {/* Close bright stars + foreground glow */}
-      <mesh geometry={planeGeo} material={matC}
+      <mesh geometry={planeGeo} material={matC} dispose={null}
         position={[0, 0, 0.15]} frustumCulled={false} raycast={() => null} />
     </>
   );

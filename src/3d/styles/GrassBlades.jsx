@@ -2,9 +2,9 @@
 // Renders instanced grass blades that sway with wind animation.
 // Placed as a child of the sticker group so orientation is automatic.
 
-import React, { useMemo, useRef, useEffect } from 'react';
+import React, { useRef, useEffect } from 'react';
 import * as THREE from 'three';
-import { sharedUniforms } from './TileStyleMaterials.jsx';
+import { sharedUniforms, getVolumeResource } from './TileStyleMaterials.jsx';
 
 const BLADE_COUNT = 220;
 const STICKER_HALF = 0.85 / 2;
@@ -87,12 +87,14 @@ const grassFragmentShader = `
 
 export default function GrassBlades({ faceColor }) {
   const meshRef = useRef();
+  const colorKey = faceColor || '#22c55e';
 
-  const geometry = useMemo(() => getBladeGeometry(), []);
+  const geometry = getBladeGeometry();
 
-  const material = useMemo(() => {
+  // Material shared across all grass stickers of the same face colour.
+  const material = getVolumeResource(`grass_bladeMat_${colorKey}`, () => {
     // Green palette with subtle face-color tinting
-    const fc = new THREE.Color(faceColor || '#22c55e');
+    const fc = new THREE.Color(colorKey);
     const root = new THREE.Color(0x1a3d0f);
     const tip = new THREE.Color(0x6abf3a);
     root.lerp(fc, 0.12);
@@ -108,9 +110,11 @@ export default function GrassBlades({ faceColor }) {
       fragmentShader: grassFragmentShader,
       side: THREE.DoubleSide,
     });
-  }, [faceColor]);
+  });
 
-  // Populate instance matrices once on mount
+  // Populate instance matrices. material changes identity when faceColor
+  // changes, which makes R3F recreate the instancedMesh (args change) — so
+  // this effect re-runs on material to repopulate the new mesh's matrices.
   useEffect(() => {
     if (!meshRef.current) return;
 
@@ -131,12 +135,13 @@ export default function GrassBlades({ faceColor }) {
       meshRef.current.setMatrixAt(i, dummy.matrix);
     }
     meshRef.current.instanceMatrix.needsUpdate = true;
-  }, []);
+  }, [material]);
 
   return (
     <instancedMesh
       ref={meshRef}
       args={[geometry, material, BLADE_COUNT]}
+      dispose={null}
       frustumCulled={false}
       raycast={() => null}
     />

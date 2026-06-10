@@ -7,9 +7,9 @@
 //      above the surface, each firing at its own rate
 //   4. Signal layer (top plane): high-contrast synaptic arcs with traveling sparks
 
-import React, { useMemo, useRef, useEffect } from 'react';
+import React, { useRef, useEffect } from 'react';
 import * as THREE from 'three';
-import { sharedUniforms } from './TileStyleMaterials.jsx';
+import { sharedUniforms, getVolumeResource } from './TileStyleMaterials.jsx';
 
 const NEU_W      = 0.78;
 const NEU_D      = 0.14;
@@ -179,52 +179,49 @@ const signalFragmentShader = `
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
+const neuColorFor = (faceColor) => {
+  const fc = new THREE.Color(faceColor || '#3b82f6');
+  const nc = new THREE.Color(0.10, 0.28, 0.85);
+  nc.lerp(fc, 0.35);
+  return nc;
+};
+
+// Geometries/materials shared across all stickers via getVolumeResource —
+// materials vary only by face colour, geometries (including the per-instance
+// phase/fireRate attributes) not at all.  Soma pulse phases are therefore the
+// same on every neural tile, but the node *positions* stay per-tile random
+// (set per instancedMesh below), so tiles still read as distinct.
+// Meshes set dispose={null} so R3F never disposes the shared resources.
 export default function NeuralVolume({ faceColor }) {
   const meshRef = useRef();
+  const colorKey = faceColor || '#3b82f6';
 
-  const neuCol = useMemo(() => {
-    const fc = new THREE.Color(faceColor || '#3b82f6');
-    const nc = new THREE.Color(0.10, 0.28, 0.85);
-    nc.lerp(fc, 0.35);
-    return nc;
-  }, [faceColor]);
-
-  const bodyMat = useMemo(() => new THREE.ShaderMaterial({
-    uniforms: { neuColor: { value: neuCol }, time: sharedUniforms.time },
+  const bodyMat = getVolumeResource(`neural_bodyMat_${colorKey}`, () => new THREE.ShaderMaterial({
+    uniforms: { neuColor: { value: neuColorFor(colorKey) }, time: sharedUniforms.time },
     vertexShader: bodyVertexShader, fragmentShader: bodyFragmentShader,
     transparent: true, side: THREE.DoubleSide, depthWrite: false,
-  }), [neuCol]);
+  }));
 
-  // somaMat is intentionally stable (no neuCol dep) so that the instancedMesh
-  // args never change — R3F destroys and recreates the underlying Three.js object
-  // when args change, which would discard the instance matrices set below.
-  // Color updates are pushed imperatively via the useEffect that follows.
-  const somaMat = useMemo(() => new THREE.ShaderMaterial({
-    uniforms: { neuColor: { value: neuCol.clone() }, time: sharedUniforms.time },
+  const somaMat = getVolumeResource(`neural_somaMat_${colorKey}`, () => new THREE.ShaderMaterial({
+    uniforms: { neuColor: { value: neuColorFor(colorKey) }, time: sharedUniforms.time },
     vertexShader: somaVertexShader, fragmentShader: somaFragmentShader,
     transparent: true, depthWrite: false,
     blending: THREE.AdditiveBlending,
-  }), []); // mount-only — color kept in sync below
+  }));
 
-  // Sync colour uniform without recreating the material (and thus the mesh)
-  useEffect(() => {
-    somaMat.uniforms.neuColor.value.copy(neuCol);
-  }, [neuCol, somaMat]);
-
-  const signalMat = useMemo(() => new THREE.ShaderMaterial({
-    uniforms: { neuColor: { value: neuCol }, time: sharedUniforms.time },
+  const signalMat = getVolumeResource(`neural_signalMat_${colorKey}`, () => new THREE.ShaderMaterial({
+    uniforms: { neuColor: { value: neuColorFor(colorKey) }, time: sharedUniforms.time },
     vertexShader: signalVertexShader, fragmentShader: signalFragmentShader,
     transparent: true, side: THREE.FrontSide, depthWrite: false,
     blending: THREE.AdditiveBlending,
-  }), [neuCol]);
+  }));
 
-  const bodyGeo  = useMemo(() => new THREE.BoxGeometry(NEU_W, NEU_W, NEU_D), []);
-  const somaGeo  = useMemo(() => new THREE.IcosahedronGeometry(0.028, 1), []);
-  const planGeo  = useMemo(() => new THREE.PlaneGeometry(NEU_W, NEU_W), []);
+  const bodyGeo = getVolumeResource('neural_bodyGeo', () => new THREE.BoxGeometry(NEU_W, NEU_W, NEU_D));
+  const planGeo = getVolumeResource('neural_planGeo', () => new THREE.PlaneGeometry(NEU_W, NEU_W));
 
-  // Build instanced soma nodes with per-instance attributes
-  const somaInstGeo = useMemo(() => {
-    const geo = somaGeo.clone();
+  // Instanced soma nodes with per-instance attributes
+  const somaInstGeo = getVolumeResource('neural_somaInstGeo', () => {
+    const geo = new THREE.IcosahedronGeometry(0.028, 1);
     const phase    = new Float32Array(NODE_COUNT);
     const fireRate = new Float32Array(NODE_COUNT);
     for (let i = 0; i < NODE_COUNT; i++) {
@@ -234,9 +231,12 @@ export default function NeuralVolume({ faceColor }) {
     geo.setAttribute('phase',    new THREE.InstancedBufferAttribute(phase, 1));
     geo.setAttribute('fireRate', new THREE.InstancedBufferAttribute(fireRate, 1));
     return geo;
-  }, [somaGeo]);
+  });
 
-  // Position nodes randomly in XY, varying Z heights above the surface
+  // Position nodes randomly in XY, varying Z heights above the surface.
+  // somaMat changes identity when faceColor changes, which makes R3F recreate
+  // the instancedMesh (args change) — so this effect must re-run on somaMat to
+  // repopulate the new mesh's instance matrices.
   useEffect(() => {
     if (!meshRef.current) return;
     const dummy = new THREE.Object3D();
@@ -257,23 +257,23 @@ export default function NeuralVolume({ faceColor }) {
       meshRef.current.setMatrixAt(i, dummy.matrix);
     }
     meshRef.current.instanceMatrix.needsUpdate = true;
-  }, []);
+  }, [somaMat]);
 
   return (
     <>
       {/* Synapse volume — dark box with signal pulses on walls */}
-      <mesh geometry={bodyGeo} material={bodyMat}
+      <mesh geometry={bodyGeo} material={bodyMat} dispose={null}
         position={[0, 0, NEU_D / 2 + 0.002]}
         frustumCulled={false} raycast={() => null} />
 
       {/* Floating soma nodes — pulsing icosahedra at random heights */}
       <instancedMesh ref={meshRef}
-        args={[somaInstGeo, somaMat, NODE_COUNT]}
+        args={[somaInstGeo, somaMat, NODE_COUNT]} dispose={null}
         position={[0, 0, NEU_D / 2 + 0.002]}
         frustumCulled={false} raycast={() => null} />
 
       {/* Signal arc canopy — top surface with traveling sparks */}
-      <mesh geometry={planGeo} material={signalMat}
+      <mesh geometry={planGeo} material={signalMat} dispose={null}
         position={[0, 0, NEU_D + 0.003]}
         frustumCulled={false} raycast={() => null} />
     </>

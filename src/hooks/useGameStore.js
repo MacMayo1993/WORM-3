@@ -329,6 +329,11 @@ export const useGameStore = create(
     disparityGameLength: 'medium',
     setDisparityGameLength: (v) => set({ disparityGameLength: v }),
 
+    // Live chaos metrics pushed from the chaos worker on each productive tick.
+    // Read by TopMenuBar instead of re-scanning every sticker on an interval.
+    chaosStats: null,
+    setChaosStats: (v) => set({ chaosStats: v }),
+
     addDisparityDeath: (death) => set((state) => ({
       disparityDeaths: [...state.disparityDeaths, death],
       disparityDeathByGridId: {

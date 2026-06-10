@@ -7,9 +7,9 @@
 //      gives a deep hand-rubbed lacquer look.  Tiny dust mote sparkles animate
 //      on the surface to suggest depth in the finish.
 
-import React, { useMemo } from 'react';
+import React from 'react';
 import * as THREE from 'three';
-import { sharedUniforms } from './TileStyleMaterials.jsx';
+import { sharedUniforms, getVolumeResource } from './TileStyleMaterials.jsx';
 
 const WOOD_W    = 0.78;
 const SURF_SEGS = 14;
@@ -126,27 +126,27 @@ const surfaceFragmentShader = `
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
+// Geometry/material shared across all stickers via getVolumeResource —
+// material varies only by face colour. Mesh sets dispose={null} accordingly.
 export default function WoodVolume({ faceColor }) {
-  const woodCol = useMemo(() => {
-    const fc = new THREE.Color(faceColor || '#a16207');
+  const colorKey = faceColor || '#a16207';
+
+  const surfMat = getVolumeResource(`wood_surfMat_${colorKey}`, () => {
+    const fc = new THREE.Color(colorKey);
     const wc = new THREE.Color(0.62, 0.42, 0.22);
     wc.lerp(fc, 0.30);
-    return wc;
-  }, [faceColor]);
+    return new THREE.ShaderMaterial({
+      uniforms: { woodColor: { value: wc }, time: sharedUniforms.time },
+      vertexShader: surfaceVertexShader, fragmentShader: surfaceFragmentShader,
+      transparent: true, side: THREE.FrontSide, depthWrite: false,
+    });
+  });
 
-  const surfMat = useMemo(() => new THREE.ShaderMaterial({
-    uniforms: { woodColor: { value: woodCol }, time: sharedUniforms.time },
-    vertexShader: surfaceVertexShader, fragmentShader: surfaceFragmentShader,
-    transparent: true, side: THREE.FrontSide, depthWrite: false,
-  }), [woodCol]);
-
-  const surfGeo = useMemo(
-    () => new THREE.PlaneGeometry(WOOD_W, WOOD_W, SURF_SEGS, SURF_SEGS), []
-  );
+  const surfGeo = getVolumeResource('wood_surfGeo', () => new THREE.PlaneGeometry(WOOD_W, WOOD_W, SURF_SEGS, SURF_SEGS));
 
   return (
     /* Lacquered surface — ring-height displacement + deep specular/Fresnel sheen */
-    <mesh geometry={surfGeo} material={surfMat}
+    <mesh geometry={surfGeo} material={surfMat} dispose={null}
       position={[0, 0, 0.003]}
       frustumCulled={false} raycast={() => null} />
   );

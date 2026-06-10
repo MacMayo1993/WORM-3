@@ -1,5 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { FLIP_CAP } from '../../utils/constants.js';
+import { useGameStore } from '../../hooks/useGameStore.js';
 import ParityWallet from '../overlays/ParityWallet.jsx';
 
 // Must match MAX_CASCADES in useChaosMode.js — keeps the bolt display accurate
@@ -65,9 +66,14 @@ const TopMenuBar = ({
   // via the ref already kept for chaosStats above.
   const [faceStats, setFaceStats] = useState(() => ({ totalComplete: 0, totalStickers: 1, percent: 0 }));
 
+  const lastScannedCubiesRef = useRef(null);
   useEffect(() => {
     const compute = () => {
       const cur = cubiesStatRef.current;
+      // Skip the O(n³) scan entirely when the cube hasn't changed since the
+      // last poll — makes idle polling free at any cube size.
+      if (lastScannedCubiesRef.current === cur) return;
+      lastScannedCubiesRef.current = cur;
       const faces = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
       const faceTargets = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
       for (const L of cur) {
@@ -92,58 +98,27 @@ const TopMenuBar = ({
     return () => clearInterval(id);
   }, [size]); // cubies intentionally NOT a dep — read via cubiesStatRef
 
-  // ── Opt #5: chaosStats polled at 500 ms instead of recomputing on every
-  // cubies update (which fires every 80–250 ms during chaos mode).
-  // cubies is read through a ref so the interval callback is never stale.
+  // ── Chaos stats come from the chaos worker (pushed into the store on each
+  // productive tick + an initial snapshot on START). No main-thread sticker
+  // scan needed — the worker already walks the surface for its own accounting.
   const cubiesStatRef = useRef(cubies);
   cubiesStatRef.current = cubies;
-  const sizeStatRef = useRef(size);
-  sizeStatRef.current = size;
 
-  const [chaosStats, setChaosStats] = useState(null);
-
-  useEffect(() => {
-    if (!chaosMode) {
-      setChaosStats(null);
-      return;
-    }
-
-    const compute = () => {
-      const cur = cubiesStatRef.current;
-      const S = sizeStatRef.current;
-      let totalFlips = 0;
-      let flipActive = 0;
-      let deadTiles = 0;
-      let disparate = 0;
-      let edgeTotal = 0;
-
-      for (const L of cur) {
-        for (const R of L) {
-          for (const c of R) {
-            // Every key in c.stickers is an outward-facing (edge) sticker by
-            // construction — no isOnEdge guard needed.
-            for (const [_dir, st] of Object.entries(c.stickers)) {
-              edgeTotal++;
-              const flips = st.flips || 0;
-              totalFlips += flips;
-              if (flips > 0) flipActive++;
-              if (flips >= FLIP_CAP) deadTiles++;
-              if (st.curr !== st.orig) disparate++;
-            }
-          }
-        }
-      }
-
-      const flipPct = edgeTotal > 0 ? Math.round((flipActive / edgeTotal) * 100) : 0;
-      const disparityPct = edgeTotal > 0 ? Math.round((disparate / edgeTotal) * 100) : 0;
-      const deadPct = edgeTotal > 0 ? Math.round((deadTiles / edgeTotal) * 100) : 0;
-      setChaosStats({ totalFlips, flipActive, deadTiles, disparate, flipPct, disparityPct, deadPct, edgeTotal });
+  const workerStats = useGameStore((s) => s.chaosStats);
+  const chaosStats = useMemo(() => {
+    if (!chaosMode || !workerStats) return null;
+    const { totalFlips = 0, flipActive = 0, deadTiles = 0, disparity = 0, edgeTotal = 0, flipPct = 0 } = workerStats;
+    return {
+      totalFlips,
+      flipActive,
+      deadTiles,
+      edgeTotal,
+      flipPct,
+      disparate: disparity,
+      disparityPct: edgeTotal > 0 ? Math.round((disparity / edgeTotal) * 100) : 0,
+      deadPct: edgeTotal > 0 ? Math.round((deadTiles / edgeTotal) * 100) : 0,
     };
-
-    compute(); // immediate first snapshot when chaos activates
-    const id = setInterval(compute, 500);
-    return () => clearInterval(id);
-  }, [chaosMode, size]); // cubies intentionally NOT a dep — read via ref
+  }, [chaosMode, workerStats]);
 
   // Resolved face palette — safe fallbacks if faceColors not yet loaded
   const fc = faceColors || { 1: '#ef4444', 2: '#22c55e', 3: '#ffffff', 4: '#f97316', 5: '#3b82f6', 6: '#eab308' };

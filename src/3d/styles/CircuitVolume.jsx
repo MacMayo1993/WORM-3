@@ -7,9 +7,9 @@
 //   3. Component surface (plane): raised IC pads, LED pips, and trace highlight
 //      glow on the top face — animated pulses travel from chip to chip
 
-import React, { useMemo } from 'react';
+import React from 'react';
 import * as THREE from 'three';
-import { sharedUniforms } from './TileStyleMaterials.jsx';
+import { sharedUniforms, getVolumeResource } from './TileStyleMaterials.jsx';
 
 const PCB_W    = 0.78;
 const PCB_D    = 0.025;   // thin board
@@ -122,41 +122,43 @@ const surfaceFragmentShader = `
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export default function CircuitVolume({ faceColor }) {
-  const pcbCol = useMemo(() => {
-    const fc = new THREE.Color(faceColor || '#22c55e');
-    const pc = new THREE.Color(0.08, 0.45, 0.12);
-    pc.lerp(fc, 0.40);
-    return pc;
-  }, [faceColor]);
+const pcbColorFor = (faceColor) => {
+  const fc = new THREE.Color(faceColor || '#22c55e');
+  const pc = new THREE.Color(0.08, 0.45, 0.12);
+  pc.lerp(fc, 0.40);
+  return pc;
+};
 
-  const bodyMat = useMemo(() => new THREE.ShaderMaterial({
-    uniforms: { pcbColor: { value: pcbCol }, time: sharedUniforms.time },
+// Geometries/materials shared across all stickers via getVolumeResource —
+// materials vary only by face colour. Meshes set dispose={null} accordingly.
+export default function CircuitVolume({ faceColor }) {
+  const colorKey = faceColor || '#22c55e';
+
+  const bodyMat = getVolumeResource(`circuit_bodyMat_${colorKey}`, () => new THREE.ShaderMaterial({
+    uniforms: { pcbColor: { value: pcbColorFor(colorKey) }, time: sharedUniforms.time },
     vertexShader: bodyVertexShader, fragmentShader: bodyFragmentShader,
     transparent: true, side: THREE.DoubleSide, depthWrite: false,
-  }), [pcbCol]);
+  }));
 
-  const surfMat = useMemo(() => new THREE.ShaderMaterial({
-    uniforms: { pcbColor: { value: pcbCol }, time: sharedUniforms.time },
+  const surfMat = getVolumeResource(`circuit_surfMat_${colorKey}`, () => new THREE.ShaderMaterial({
+    uniforms: { pcbColor: { value: pcbColorFor(colorKey) }, time: sharedUniforms.time },
     vertexShader: surfaceVertexShader, fragmentShader: surfaceFragmentShader,
     transparent: true, side: THREE.FrontSide, depthWrite: false,
     blending: THREE.AdditiveBlending,
-  }), [pcbCol]);
+  }));
 
-  const bodyGeo = useMemo(() => new THREE.BoxGeometry(PCB_W, PCB_W, PCB_D), []);
-  const surfGeo = useMemo(
-    () => new THREE.PlaneGeometry(PCB_W, PCB_W, SURF_SEGS, SURF_SEGS), []
-  );
+  const bodyGeo = getVolumeResource('circuit_bodyGeo', () => new THREE.BoxGeometry(PCB_W, PCB_W, PCB_D));
+  const surfGeo = getVolumeResource('circuit_surfGeo', () => new THREE.PlaneGeometry(PCB_W, PCB_W, SURF_SEGS, SURF_SEGS));
 
   return (
     <>
       {/* PCB board volume — translucent green FR4 with trace glow on walls */}
-      <mesh geometry={bodyGeo} material={bodyMat}
+      <mesh geometry={bodyGeo} material={bodyMat} dispose={null}
         position={[0, 0, PCB_D / 2 + 0.002]}
         frustumCulled={false} raycast={() => null} />
 
       {/* Component layer — trace routes, IC pads, LED pips, signal pulses */}
-      <mesh geometry={surfGeo} material={surfMat}
+      <mesh geometry={surfGeo} material={surfMat} dispose={null}
         position={[0, 0, PCB_D + 0.003]}
         frustumCulled={false} raycast={() => null} />
     </>

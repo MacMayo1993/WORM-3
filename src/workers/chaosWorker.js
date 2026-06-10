@@ -43,7 +43,7 @@ let last = 0;
 
 // Cached result of the last computeChaosMetrics call.
 // Only refreshed when didWork is true, so the O(n) scan is skipped on idle ticks.
-let cachedMetrics = { disparity: 0, flipActive: 0, edgeTotal: 1 };
+let cachedMetrics = { disparity: 0, flipActive: 0, edgeTotal: 1, totalFlips: 0, deadTiles: 0 };
 
 let chains = [];
 // Living sticker index: Map<"x,y,z,dirKey", {x,y,z,dirKey}>.
@@ -73,16 +73,21 @@ const computeChaosMetrics = (cubeState, surfCoords) => {
   let disparity = 0;
   let flipActive = 0;
   let edgeTotal = 0;
+  let totalFlips = 0;
+  let deadTiles = 0;
   for (const [x, y, z] of surfCoords) {
     const c = cubeState[x][y][z];
     for (const key of Object.keys(c.stickers)) {
       const st = c.stickers[key];
       edgeTotal++;
       if (st.curr !== st.orig) disparity++;
-      if ((st.flips || 0) > 0) flipActive++;
+      const flips = st.flips || 0;
+      totalFlips += flips;
+      if (flips > 0) flipActive++;
+      if (flips >= flipCap) deadTiles++;
     }
   }
-  return { disparity, flipActive, edgeTotal };
+  return { disparity, flipActive, edgeTotal, totalFlips, deadTiles };
 };
 
 const getGridRC = (origPos, origDir, S) => {
@@ -448,7 +453,7 @@ const tick = (dtMs) => {
     deaths,
     eliminatedFaces: [...new Set(eliminatedFaces)],
     winner,
-    metrics: { disparity: cachedMetrics.disparity, flipPct },
+    metrics: { ...cachedMetrics, flipPct },
     didWork,
   };
 };
@@ -497,6 +502,18 @@ self.onmessage = (e) => {
       last = performance.now();
       resetChainState();
       running = true;
+      // Immediate metrics snapshot so HUDs have data before the first
+      // productive tick (replaces main-thread polling scans).
+      cachedMetrics = computeChaosMetrics(state, surfaceCoords);
+      self.postMessage({
+        type: 'METRICS',
+        payload: {
+          metrics: {
+            ...cachedMetrics,
+            flipPct: cachedMetrics.edgeTotal > 0 ? Math.round((cachedMetrics.flipActive / cachedMetrics.edgeTotal) * 100) : 0,
+          },
+        },
+      });
       if (timerId) clearTimeout(timerId);
       schedule();
       break;

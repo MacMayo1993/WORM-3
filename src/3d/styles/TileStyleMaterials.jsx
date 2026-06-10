@@ -87,9 +87,13 @@ if (import.meta.env.DEV) {
 }
 
 // ─── LRU material cache ───────────────────────────────────────────────────────
-// Key: "${style}_${colorHex}".  200 slots covers 20 styles × 6 face colors ×
-// several active color schemes with room to spare.  On eviction the GPU program
-// is disposed immediately so memory doesn't accumulate over long sessions.
+// Key: "${style}_${colorHex}[_${antipodalHex}]".  Antipodal styles multiply the
+// key space (style × faceColor × antipodalColor), so on a 6×6/7×7 cube with
+// heavy flip traffic the old 200-slot cap could overflow mid-game; each evicted
+// material disposes its GPU program, forcing a visible shader-recompile hitch
+// the next time that combo appears.  500 slots keeps every realistic combo
+// resident.  On eviction the GPU program is disposed immediately so memory
+// doesn't accumulate over long sessions.
 //
 // NOTE: clearMaterialCache() disposes everything at once and should be called
 // before a color-scheme change re-renders (e.g. at the top of the Zustand
@@ -97,7 +101,7 @@ if (import.meta.env.DEV) {
 // materials have already been created would dispose them out from under active
 // meshes.  The LRU cap handles slow drift (custom colour pickers, many style
 // previews) without needing precise timing.
-const MAX_MAT_CACHE = 200;
+const MAX_MAT_CACHE = 500;
 const materialCache = new Map();
 
 function _matCacheGet(key) {
@@ -118,6 +122,26 @@ function _matCachePut(key, mat) {
     materialCache.get(lruKey).dispose();
     materialCache.delete(lruKey);
   }
+}
+
+// ─── Shared volume-style resources ────────────────────────────────────────────
+// Volume tile styles (lava, ice, water, …) mount extra meshes per sticker.
+// Their geometries are identical for every sticker and their materials vary
+// only by face colour, so both are cached here at module level instead of
+// being re-created per StickerPlane mount — on a 6×6/7×7 cube that avoids
+// hundreds of duplicate geometries/materials and the GPU re-uploads caused by
+// R3F disposing per-mount copies on unmount.  Meshes using these shared
+// resources MUST set dispose={null} so R3F never disposes a shared object out
+// from under other stickers.  The cache is intentionally permanent: entry
+// count is bounded by styles × face colours used in a session.
+const volumeResourceCache = new Map();
+export function getVolumeResource(key, create) {
+  let res = volumeResourceCache.get(key);
+  if (res === undefined) {
+    res = create();
+    volumeResourceCache.set(key, res);
+  }
+  return res;
 }
 
 // Styles that use a second antipodalColor uniform (opposite face's color)
@@ -261,14 +285,24 @@ const DEFAULT_WARMUP_STYLES = ['solid', 'glossy', 'matte', 'metallic', 'circuit'
  *
  * @param {THREE.WebGLRenderer} renderer
  * @param {THREE.Camera}        camera
- * @param {string[]}            colorHexArray - one hex per cube face (length 6)
+ * @param {string[]}            colorHexArray - one hex per cube face (length 6,
+ *   ordered by face id so colorHexArray[(i+3)%6] is face i's antipodal partner)
+ * @param {string[]}            extraStyles - additional styles to warm (e.g. the
+ *   per-face styles currently equipped), so first flips never hit a cold cache
  */
-export function warmUpDefaultStyles(renderer, camera, colorHexArray) {
+export function warmUpDefaultStyles(renderer, camera, colorHexArray, extraStyles = []) {
   const scene = new THREE.Scene();
   const geo = new THREE.PlaneGeometry(0.1, 0.1);
-  for (const style of DEFAULT_WARMUP_STYLES) {
-    for (const colorHex of colorHexArray) {
-      scene.add(new THREE.Mesh(geo, getTileStyleMaterial(style, colorHex)));
+  const styles = new Set([...DEFAULT_WARMUP_STYLES, ...extraStyles]);
+  for (const style of styles) {
+    for (let i = 0; i < colorHexArray.length; i++) {
+      scene.add(new THREE.Mesh(geo, getTileStyleMaterial(style, colorHexArray[i])));
+      // Antipodal styles bake the partner color into the material — warm the
+      // exact in-play variant too, or the first flip pays the creation cost.
+      if (ANTIPODAL_STYLES.has(style) && colorHexArray.length === 6) {
+        const antipodalHex = colorHexArray[(i + 3) % 6];
+        scene.add(new THREE.Mesh(geo, getTileStyleMaterial(style, colorHexArray[i], false, null, antipodalHex)));
+      }
     }
   }
   renderer.compile(scene, camera);
