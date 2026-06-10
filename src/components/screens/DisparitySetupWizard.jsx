@@ -120,7 +120,7 @@ function extractColorsFromImage(img, count = 6) {
   return centroids.map(([r, g, b]) => `#${[r, g, b].map(v => Math.max(0, Math.min(255, v)).toString(16).padStart(2, '0')).join('')}`);
 }
 
-function TilePreviewCanvas({ styleKey, colorHex = '#4a7fa5', size = 48 }) {
+function TilePreviewCanvas({ styleKey, colorHex = '#4a7fa5', size = 48, canvasStyle }) {
   const canvasRef = useRef(null);
   const idRef = useRef(null);
 
@@ -137,7 +137,7 @@ function TilePreviewCanvas({ styleKey, colorHex = '#4a7fa5', size = 48 }) {
     if (idRef.current !== null) updateTilePreview(idRef.current, styleKey, colorHex);
   }, [styleKey, colorHex]);
 
-  return <canvas ref={canvasRef} width={size} height={size} style={{ display: 'block', borderRadius: '6px' }} />;
+  return <canvas ref={canvasRef} width={size} height={size} style={{ display: 'block', borderRadius: '6px', ...canvasStyle }} />;
 }
 
 const S = {
@@ -419,18 +419,20 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
             const owned = tileOwned(key);
             return (
               <button key={key} style={{
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
-                padding: '10px 6px 8px', borderRadius: '12px',
+                display: 'block', position: 'relative', padding: 0, borderRadius: '12px',
                 border: sel ? '2px solid rgba(255,255,255,0.40)' : '2px solid rgba(255,255,255,0.09)',
                 background: 'rgba(255,255,255,0.06)',
                 cursor: owned ? 'pointer' : 'not-allowed', outline: 'none',
                 WebkitTapHighlightColor: 'transparent', transition: 'all 0.15s ease',
-                fontFamily: 'inherit', opacity: owned ? 1 : 0.42,
+                fontFamily: 'inherit', opacity: owned ? 1 : 0.42, overflow: 'hidden',
               }} onClick={() => owned && applyGlobal(key)}>
-                <div style={{ opacity: owned ? 1 : 0.5 }}>
-                  <TilePreviewCanvas styleKey={key} colorHex={Object.values(resolvedColors)[0] || '#4a7fa5'} size={48} />
-                </div>
-                <span style={{ fontSize: '10px', fontWeight: sel ? '600' : '400', color: sel ? '#e8edf8' : 'rgba(200,220,255,0.55)', textAlign: 'center', lineHeight: 1.2 }}>
+                <TilePreviewCanvas styleKey={key} colorHex={Object.values(resolvedColors)[0] || '#4a7fa5'} size={56} canvasStyle={{ width: '100%', height: 'auto', borderRadius: 0 }} />
+                <span style={{
+                  position: 'absolute', bottom: 0, left: 0, right: 0, textAlign: 'center',
+                  padding: '14px 3px 4px', fontSize: '10px', fontWeight: sel ? '700' : '500',
+                  color: '#fff', textShadow: '-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000',
+                  lineHeight: 1.2, background: 'linear-gradient(to top, rgba(0,0,0,0.62) 0%, transparent 100%)',
+                }}>
                   {TILE_STYLES[key]?.label || key}{!owned ? ' 🔒' : ''}
                 </span>
               </button>
