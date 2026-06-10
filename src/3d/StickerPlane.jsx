@@ -104,29 +104,25 @@ const spiderVertexShader = `
 `;
 
 const spiderFragmentShader = `
-  uniform vec3 uColor;
+  uniform vec3  uColor;
   uniform float uTime;
   uniform float uBurst;
-  varying vec2 vUv;
-  
+  varying vec2  vUv;
+
   void main() {
-    vec2 uv = vUv - 0.5;
-    float dist = length(uv);
-    if (dist > 0.5) discard;
-    
-    float angle = atan(uv.y, uv.x);
-    
-    float spiral = sin(angle * 6.0 + dist * 30.0 - uTime * 15.0);
-    float lines = smoothstep(0.7, 1.0, spiral);
-    
-    float ripples = sin(dist * 40.0 + uTime * 10.0);
-    float rippleLines = smoothstep(0.8, 1.0, ripples);
-    
-    float activity = max(lines, rippleLines * 0.6);
-    float edgeFade = smoothstep(0.5, 0.2, dist);
-    float intensity = uBurst * activity * edgeFade;
-    
-    gl_FragColor = vec4(uColor * 2.0, intensity * 0.9);
+    // Square portal frame — glowing border, transparent center shows the tunnel within
+    float bw        = 0.09;
+    float leftEdge  = 1.0 - smoothstep(0.0, bw, vUv.x);
+    float rightEdge = smoothstep(1.0 - bw, 1.0, vUv.x);
+    float botEdge   = 1.0 - smoothstep(0.0, bw, vUv.y);
+    float topEdge   = smoothstep(1.0 - bw, 1.0, vUv.y);
+    float border    = clamp(leftEdge + rightEdge + botEdge + topEdge, 0.0, 1.0);
+    if (border < 0.01) discard;
+
+    // Gentle energy pulse rippling around the portal edge
+    float wave  = sin(uTime * 2.5 + (vUv.x + vUv.y) * 12.57) * 0.5 + 0.5;
+    float pulse = 0.65 + wave * 0.35;
+    gl_FragColor = vec4(uColor * 1.8 * pulse, border * uBurst);
   }
 `;
 
@@ -872,7 +868,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     // Update Ghost Tile spiral animation if flipped
     if (showGhostTile && spiderPlaneRef.current && spiderMatRef.current) {
       spiderPlaneRef.current.visible = true;
-      spiderMatRef.current.uniforms.uColor.value.set(baseColorRef.current);
+      spiderMatRef.current.uniforms.uColor.value.set(antipodalHexRef.current ?? baseColorRef.current);
       if (wormhole) {
         // Actively spinning disparate tile
         spiderMatRef.current.uniforms.uTime.value = state.clock.elapsedTime;
