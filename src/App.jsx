@@ -18,6 +18,7 @@ import './App.css';
 import { resolveBiomeManifoldStyles } from './modes/CityBiomeMode.js';
 import { completeLevel } from './utils/levels.js';
 import { resolveBet, calcPayout } from './utils/disparityBetting.js';
+import { vibrate } from './utils/audio.js';
 import { makeCubies } from './game/cubeState.js';
 import { rotateSliceCubies } from './game/cubeRotation.js';
 import { buildManifoldGridMap, flipStickerPair } from './game/manifoldLogic.js';
@@ -333,6 +334,7 @@ export default function WORM3() {
   const animatedShuffle = useCallback(() => {
     useGameStore.getState().setRotatedCubies(makeCubies(size));
     useGameStore.getState().resetGame();
+    vibrate([50, 30, 100]); // haptic: "game starting" double-bump
     const axes = ['row', 'col', 'depth'];
     const moves = Array.from({ length: 15 }, () => ({
       axis: axes[Math.floor(Math.random() * 3)],
@@ -593,20 +595,12 @@ export default function WORM3() {
     const targetSize = cubeSize || size;
     if (targetSize !== size) {
       changeSize(targetSize);
-      let state = makeCubies(targetSize);
-      for (let i = 0; i < 25; i++) {
-        const ax = ['row', 'col', 'depth'][Math.floor(Math.random() * 3)];
-        const slice = Math.floor(Math.random() * targetSize);
-        const dir = Math.random() > 0.5 ? 1 : -1;
-        state = rotateSliceCubies(state, targetSize, ax, slice, dir);
-      }
-      setRotatedCubies(state);
-      useGameStore.getState().setHasShuffled(true);
     } else {
-      animatedShuffle();
+      useGameStore.getState().setRotatedCubies(makeCubies(size));
+      useGameStore.getState().resetGame();
     }
-    launchWithMobi(MOBI_LINES_RANDOM, 'RANDOM MODE', () => {});
-  }, [settings, setSettings, size, changeSize, setRotatedCubies, animatedShuffle, launchWithMobi]);
+    launchWithMobi(MOBI_LINES_RANDOM, 'RANDOM MODE', () => { animatedShuffle(); });
+  }, [settings, setSettings, size, changeSize, animatedShuffle, launchWithMobi]);
 
   const handleRandomWizardCancel = useCallback(() => {
     setShowRandomWizard(false);
@@ -650,23 +644,14 @@ export default function WORM3() {
 
     const targetSize = wizardSettings.cubeSize || size;
     if (targetSize !== size) {
-      // changeSize resets the cube to solved; we then manually shuffle with the new size
-      // because the `shuffle` callback closes over the old size and would mis-scramble.
-      changeSize(targetSize);
-      let state = makeCubies(targetSize);
-      for (let i = 0; i < 25; i++) {
-        const ax = ['row', 'col', 'depth'][Math.floor(Math.random() * 3)];
-        const slice = Math.floor(Math.random() * targetSize);
-        const dir = Math.random() > 0.5 ? 1 : -1;
-        state = rotateSliceCubies(state, targetSize, ax, slice, dir);
-      }
-      setRotatedCubies(state);
-      useGameStore.getState().setHasShuffled(true);
+      changeSize(targetSize); // resets to solved; by the time postAction fires size is updated
     } else {
-      animatedShuffle();
+      useGameStore.getState().setRotatedCubies(makeCubies(size));
+      useGameStore.getState().resetGame();
     }
-    launchWithMobi(MOBI_LINES_FREEPLAY, 'FREEPLAY', () => {});
-  }, [settings, setSettings, animatedShuffle, size, changeSize, setRotatedCubies, launchWithMobi]);
+    // Cube is solved while MOBI intro plays; scramble fires when player taps through.
+    launchWithMobi(MOBI_LINES_FREEPLAY, 'FREEPLAY', () => { animatedShuffle(); });
+  }, [settings, setSettings, animatedShuffle, size, changeSize, launchWithMobi]);
 
   const handleWizardCancel = useCallback(() => {
     setShowFreeplayWizard(false);
@@ -745,18 +730,24 @@ export default function WORM3() {
   const handleBetPlaced = useCallback((bet) => {
     useGameStore.getState().setActiveBet(bet);
     setShowDisparityBetting(false);
+    useGameStore.getState().setRotatedCubies(makeCubies(size));
+    useGameStore.getState().resetGame();
     launchWithMobi(MOBI_LINES_CHAOS, 'DISPARITY MODE', () => {
+      vibrate([50, 30, 100]);
       startDisparityGame(pendingWizardSettingsRef.current);
     });
-  }, [startDisparityGame, launchWithMobi]);
+  }, [startDisparityGame, launchWithMobi, size]);
 
   const handleBetSkipped = useCallback(() => {
     useGameStore.getState().clearActiveBet();
     setShowDisparityBetting(false);
+    useGameStore.getState().setRotatedCubies(makeCubies(size));
+    useGameStore.getState().resetGame();
     launchWithMobi(MOBI_LINES_CHAOS, 'DISPARITY MODE', () => {
+      vibrate([50, 30, 100]);
       startDisparityGame(pendingWizardSettingsRef.current);
     });
-  }, [startDisparityGame, launchWithMobi]);
+  }, [startDisparityGame, launchWithMobi, size]);
 
   const handleMenuCoop = useCallback(() => {
     useGameStore.getState().setShowMainMenu(false);
@@ -826,6 +817,7 @@ export default function WORM3() {
       wormColor: wizardSettings.wormColor ?? '#33ff66',
     };
     launchWithMobi(MOBI_LINES_WORM, 'WORM MODE', () => {
+      vibrate([50, 30, 100]);
       setDisparityWaitingFirstFlip(false);
       setDisparityCountdown(null);
       useGameStore.getState().clearLevel();
