@@ -104,13 +104,19 @@ const MenuFlipWave = ({ origins, startTime, onComplete }) => {
       ))}
 
       {origins.map((origin, idx) => (
-        <MenuWormParticle
-          key={`worm-${idx}`}
-          start={origin.position}
-          color1={origin.color}
-          startTime={startTime}
-          onComplete={idx === 0 ? wormCompleted : undefined}
-        />
+        <React.Fragment key={`worms-${idx}`}>
+          <MenuWormParticle
+            start={origin.position}
+            color1={origin.color}
+            startTime={startTime}
+            onComplete={idx === 0 ? wormCompleted : undefined}
+          />
+          <MenuWormParticle
+            start={origin.position}
+            color1={origin.color}
+            startTime={startTime}
+          />
+        </React.Fragment>
       ))}
     </group>
   );
