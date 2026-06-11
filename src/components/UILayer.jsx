@@ -101,6 +101,7 @@ export default function UILayer({
     showAntipodalPiP, onToggleAntipodalPiP,
     showComingSoon, onCloseComingSoon,
     showMobiusCubelet, onCloseMobiusCubelet,
+    onOpenModeSelect,
   } = ui;
 
   const {
@@ -376,6 +377,7 @@ export default function UILayer({
 
       {showMainMenu && (
         <MainMenu
+          onOpenModeSelect={onOpenModeSelect}
           onPlay={onMenuPlay}
           onLevels={onMenuLevels}
           onFreeplay={onMenuFreeplay}

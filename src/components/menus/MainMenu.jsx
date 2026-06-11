@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { makeCubies } from '../../game/cubeState.js';
@@ -932,7 +932,7 @@ const FlatTileDeck = ({ activeIndex }) => (
 );
 
 // ─── Mode carousel overlay ────────────────────────────────────────────────────
-const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay, onRandom, onComingSoon, onHowToPlay }) => {
+export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay, onRandom, onComingSoon, onHowToPlay }) => {
   const [activeIndex, setActiveIndex] = useState(0);   // logical index — dots + handlePlay
   const [displayIndex, setDisplayIndex] = useState(0); // visual index — colors + content
   const [imgError, setImgError] = useState(false);
@@ -948,16 +948,6 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
   const N = CAROUSEL_MODES.length;
 
   activeIndexRef.current = activeIndex;
-
-  // Synchronously hide the WebGL canvas before the first paint so the GPU
-  // compositor never gets a chance to lock the canvas layer above this overlay.
-  // useLayoutEffect fires after DOM insertion but before the browser paints,
-  // unlike useEffect which fires after paint (too late for the compositor).
-  useLayoutEffect(() => {
-    const el = document.querySelector('.canvas-container');
-    if (el) el.style.opacity = '0.001';
-    return () => { if (el) el.style.opacity = ''; };
-  }, []);
 
   useEffect(() => {
     _carouselActive = true;
@@ -1363,14 +1353,13 @@ const MenuBackgroundOrbs = () => (
 
 // ─── Main component ───────────────────────────────────────────────────────────
 const MainMenu = ({
-  onPlay: _onPlay, onLevels: _onLevels, onFreeplay, onRandom, onCoop: _onCoop, onTeach,
-  onSettings: _onSettings, onBiome: _onBiome, onDisparity,
-  onWormHealer, onHolonomy: _onHolonomy, onMerge: _onMerge,
-  onStore: _onStore, onComingSoon, onMobiusCubelet: _onMobiusCubelet,
+  onPlay: _onPlay, onLevels: _onLevels, onFreeplay: _onFreeplay, onRandom: _onRandom, onCoop: _onCoop, onTeach: _onTeach,
+  onSettings: _onSettings, onBiome: _onBiome, onDisparity: _onDisparity,
+  onWormHealer: _onWormHealer, onHolonomy: _onHolonomy, onMerge: _onMerge,
+  onStore: _onStore, onComingSoon: _onComingSoon, onMobiusCubelet: _onMobiusCubelet, onOpenModeSelect,
 }) => {
   const [titleVisible, setTitleVisible] = useState(false);
   const [bottomVisible, setBottomVisible] = useState(false);
-  const [showCarousel, setShowCarousel] = useState(false);
 
   useEffect(() => {
     const t1 = setTimeout(() => setTitleVisible(true), 200);
@@ -1379,29 +1368,16 @@ const MainMenu = ({
   }, []);
 
   useEffect(() => {
-    _onShakeComplete = () => setShowCarousel(true);
+    _onShakeComplete = () => onOpenModeSelect?.();
     return () => { _onShakeComplete = null; };
-  }, []);
+  }, [onOpenModeSelect]);
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'transparent', zIndex: 9999, pointerEvents: 'none' }}>
       <MenuBackgroundOrbs />
       <ScreenGlow />
       <MenuTitleCard visible={titleVisible} />
-      {showCarousel ? (
-        <ModeCarousel
-          onBack={() => setShowCarousel(false)}
-          onCubeSelect={onFreeplay}
-          onWormSelect={onWormHealer}
-          onChaos={onDisparity}
-          onFreeplay={onFreeplay}
-          onRandom={onRandom}
-          onComingSoon={onComingSoon}
-          onHowToPlay={onTeach}
-        />
-      ) : (
-        <MenuStartButton visible={bottomVisible} onClick={() => { _externalShakeNeeded = true; }} />
-      )}
+      <MenuStartButton visible={bottomVisible} onClick={() => { _externalShakeNeeded = true; }} />
     </div>
   );
 };

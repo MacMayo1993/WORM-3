@@ -61,6 +61,9 @@ const UILayer = React.lazy(() => import('./components/UILayer.jsx'));
 const RotatingBlackCube = React.lazy(() =>
   import('./components/menus/MainMenu.jsx').then((mod) => ({ default: mod.RotatingBlackCube }))
 );
+const ModeCarousel = React.lazy(() =>
+  import('./components/menus/MainMenu.jsx').then((mod) => ({ default: mod.ModeCarousel }))
+);
 import { useTeachMode } from './teach/useTeachMode.js';
 import { useAntipodalIntegrity } from './hooks/useAntipodalIntegrity.js';
 import { isMobile } from './utils/device.js';
@@ -422,6 +425,9 @@ export default function WORM3() {
     setShowStore(false);
     useGameStore.getState().setShowMainMenu(true);
   }, []);
+
+  // Mode select carousel — lifted to App level to prevent WebGL bleed-through
+  const [showModeSelect, setShowModeSelect] = useState(false);
 
   // Coming Soon screen
   const [showComingSoon, setShowComingSoon] = useState(false);
@@ -1241,6 +1247,20 @@ export default function WORM3() {
   return (
     <div className={`full-screen${settings.backgroundTheme === 'dark' ? ' bg-dark' : settings.backgroundTheme === 'midnight' ? ' bg-midnight' : ''}${randomShaking ? ' random-shake' : ''}`}>
       {showTutorial && !showWelcome && <Tutorial onClose={closeTutorial} onMainMenu={() => { closeTutorial(); handleBackToMainMenu(); }} />}
+      {showModeSelect && (
+        <Suspense fallback={null}>
+          <ModeCarousel
+            onBack={() => setShowModeSelect(false)}
+            onCubeSelect={() => { setShowModeSelect(false); handleMenuFreeplay(); }}
+            onWormSelect={() => { setShowModeSelect(false); handleMenuWormHealer(); }}
+            onChaos={() => { setShowModeSelect(false); handleMenuDisparity(); }}
+            onFreeplay={() => { setShowModeSelect(false); handleMenuFreeplay(); }}
+            onRandom={() => { setShowModeSelect(false); handleMenuRandomMode(); }}
+            onComingSoon={() => { setShowModeSelect(false); handleMenuComingSoon(); }}
+            onHowToPlay={() => { setShowModeSelect(false); handleMenuTeach(); }}
+          />
+        </Suspense>
+      )}
 
       {/* Single persistent Canvas — never unmounts, eliminates context loss on intro→game.
           Also renders the main-menu cube scene so there is never a second WebGL context. */}
@@ -1263,7 +1283,7 @@ export default function WORM3() {
             />
           ) : showMainMenu ? (
             // Stop the cube/worm animation when a full-screen overlay covers the menu
-            showSettings ? <color attach="background" args={['#000005']} /> : (
+            showSettings || showModeSelect ? <color attach="background" args={['#000005']} /> : (
               <MenuScene onCubeClick={handleMenuCube} />
             )
           ) : (
@@ -1368,6 +1388,7 @@ export default function WORM3() {
               showAntipodalPiP, onToggleAntipodalPiP: () => setShowAntipodalPiP(v => !v),
               showComingSoon, onCloseComingSoon: () => { setShowComingSoon(false); useGameStore.getState().setShowMainMenu(true); },
               showMobiusCubelet, onCloseMobiusCubelet: () => { setShowMobiusCubelet(false); useGameStore.getState().setShowMainMenu(true); },
+              onOpenModeSelect: () => setShowModeSelect(true),
             }}
             handlers={{
               onReset: handleReset,
