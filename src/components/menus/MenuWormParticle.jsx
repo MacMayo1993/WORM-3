@@ -91,42 +91,50 @@ const MenuWormParticle = ({ start, end, color1, startTime, onComplete }) => {
   // Fixed arc for transit mode — all points in group-relative space
   // (rootGroupRef sits at 'start', so absolute = start + relative).
   //
-  // Path: emerge from face A → shoot outward → arc over the apex → approach face B → dive
-  // through face B so the cube geometry naturally occludes the worm as it enters the hole.
+  // 7-point path that traces the great circle from face A to face B through arcDir,
+  // with R=4.5 to safely clear cube corners (~2.6 from center to corner).
   const transitCurve = useMemo(() => {
     if (!end) return null;
     const startVec = new THREE.Vector3(...start);
     const endVec   = new THREE.Vector3(...end);
-    const startN   = startVec.clone().normalize();  // face A outward normal
-    const endN     = endVec.clone().normalize();    // face B outward normal (≈ -startN)
+    const startN   = startVec.clone().normalize();
+    const endN     = endVec.clone().normalize();
 
-    // Stable perpendicular basis — identical to emerge-mode logic
     const basePerp = Math.abs(startN.y) < 0.8 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
     const perp   = new THREE.Vector3().crossVectors(startN, basePerp).normalize();
     const arcFwd = new THREE.Vector3().crossVectors(perp, startN).normalize();
-    // arcPhase in [0,π] rotates the apex direction around the upper hemisphere
     const arcDir = new THREE.Vector3()
       .addScaledVector(perp, Math.cos(p.arcPhase))
       .addScaledVector(arcFwd, Math.sin(p.arcPhase))
       .normalize();
 
-    const R      = 2.4;   // apex radius — clears the cube (~1.5 half-width)
-    const launch = 0.7;   // units to shoot out before curving
-    const sink   = 0.5;   // units to dive past the far face surface (into the cube)
+    const R      = 4.5;   // large arc — clears cube corners (≈2.6 from center)
+    const launch = 1.2;   // shoot out before curving
+    const sink   = 0.6;   // dive past far face surface
 
-    // relEnd is the end face position expressed relative to the root group's origin (= start)
     const relEnd = endVec.clone().sub(startVec);
 
+    // Great-circle sample: P(θ) = (startN·cosθ + arcDir·sinθ).normalize() · R  (group-relative)
+    const gcp = (theta) =>
+      new THREE.Vector3()
+        .addScaledVector(startN, Math.cos(theta))
+        .addScaledVector(arcDir, Math.sin(theta))
+        .normalize()
+        .multiplyScalar(R)
+        .sub(startVec);
+
     const pts = [
-      new THREE.Vector3(0, 0, 0),                                   // P0: face A surface (group origin)
-      startN.clone().multiplyScalar(launch),                        // P1: shoot out from face A
-      arcDir.clone().multiplyScalar(R).sub(startVec),               // P2: apex (group-relative; world = arcDir*R)
-      endN.clone().multiplyScalar(launch).add(relEnd),              // P3: approach from outside face B
-      endN.clone().multiplyScalar(-sink).add(relEnd),               // P4: dive INTO face B — cube occludes worm
+      new THREE.Vector3(0, 0, 0),                          // P0: face A surface
+      startN.clone().multiplyScalar(launch),               // P1: shoot out
+      gcp(Math.PI / 4),                                    // P2: 45° on arc
+      gcp(Math.PI / 2),                                    // P3: apex (90°)
+      gcp(3 * Math.PI / 4),                                // P4: 135° on arc
+      endN.clone().multiplyScalar(launch).add(relEnd),     // P5: approach face B
+      endN.clone().multiplyScalar(-sink).add(relEnd),      // P6: dive INTO face B
     ];
 
     const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.5);
-    curve.arcLengthDivisions = 200;
+    curve.arcLengthDivisions = 300;
     curve.updateArcLengths();
     return curve;
   }, [start, end]); // p.arcPhase from stable closure
@@ -214,18 +222,25 @@ const MenuWormParticle = ({ start, end, color1, startTime, onComplete }) => {
     // ── TRANSIT MODE — worm travels around cube from start face to end face ───
     if (end && transitCurve) {
       const tRaw  = Math.min(elapsed / TRANSIT_DUR, 1);
-      // Ease-in-out so the launch and arrival feel deliberate
       const eased = tRaw < 0.5 ? 2 * tRaw * tRaw : -1 + (4 - 2 * tRaw) * tRaw;
 
-      // Fade in quickly at launch, fade out gently as the worm enters the end tile
       const fadeIn  = Math.min(elapsed / 0.30, 1.0);
-      const fadeOut = tRaw > 0.82 ? Math.max(0, (1 - tRaw) / 0.18) : 1.0;
+      const fadeOut = tRaw > 0.88 ? Math.max(0, (1 - tRaw) / 0.12) : 1.0;
       const alpha   = fadeIn * fadeOut;
 
       const totalLen = transitCurve.getLength();
 
+      // Wiggle: sinusoidal lateral body wave — peaks at mid-transit, zero at entry/exit
+      transitCurve.getTangentAt(Math.min(eased, 0.99), _tangent);
+      const wigUp = Math.abs(_tangent.y) < 0.9 ? _basePerp0 : _basePerp1;
+      _wigDir.crossVectors(_tangent, wigUp).normalize();
+      const wigAmp  = 0.15;
+      const wigFreq = 4.0;
+      const wigRamp = Math.sin(Math.PI * tRaw);  // 0 at both ends, 1 at midpoint
+
       transitCurve.getPointAt(eased, _headPos);
-      transitCurve.getPointAt(Math.min(eased + 0.022, 1), _lookPos);
+      transitCurve.getPointAt(Math.min(eased + 0.018, 1), _lookPos);
+      _headPos.addScaledVector(_wigDir, Math.sin(clockTime * wigFreq) * wigAmp * wigRamp);
 
       if (headGroupRef.current) {
         headGroupRef.current.visible = alpha > 0.01;
@@ -236,7 +251,6 @@ const MenuWormParticle = ({ start, end, color1, startTime, onComplete }) => {
           headGroupRef.current.quaternion.slerp(_lookQuat, 0.5);
         }
         const squish = Math.sin(clockTime * p.squishFreq) * p.squishAmp;
-        // Scale the whole head group so it smoothly grows out of / shrinks into the tile
         headGroupRef.current.scale.set(
           (1 + squish * 0.3) * alpha,
           (1 - squish * 0.15) * alpha,
@@ -250,6 +264,8 @@ const MenuWormParticle = ({ start, end, color1, startTime, onComplete }) => {
         if (!seg) continue;
         const segDist = Math.max(0, headArcDist - (i + 1) * SEG_SPACING);
         transitCurve.getPointAt(segDist / totalLen, _segPos);
+        // Each segment phase-shifted so the body undulates like a swimming snake
+        _segPos.addScaledVector(_wigDir, Math.sin(clockTime * wigFreq - (i + 1) * 0.7) * wigAmp * wigRamp);
         const wave  = Math.sin(clockTime * p.squishFreq - i * 0.8) * p.squishAmp;
         const taper = 1 - (i / (SEGMENT_COUNT - 1)) * 0.05;
         seg.position.copy(_segPos);
@@ -282,7 +298,7 @@ const MenuWormParticle = ({ start, end, color1, startTime, onComplete }) => {
     _arcDir.copy(_perp).multiplyScalar(cosP).addScaledVector(_arcFwdVec, sinP);
     _wigDir.copy(_perp).multiplyScalar(-sinP).addScaledVector(_arcFwdVec, cosP);
 
-    const wLive = Math.sin(clockTime * 2.5) * 0.04;
+    const wLive = Math.sin(clockTime * 3.0) * 0.09;
 
     curveData.pts[0].set(0, 0, 0).addScaledVector(_faceN, 0.02);
     curveData.pts[1].set(0, 0, 0).addScaledVector(_faceN,  0.18);
