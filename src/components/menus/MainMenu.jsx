@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { makeCubies } from '../../game/cubeState.js';
@@ -948,6 +948,16 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
   const N = CAROUSEL_MODES.length;
 
   activeIndexRef.current = activeIndex;
+
+  // Synchronously hide the WebGL canvas before the first paint so the GPU
+  // compositor never gets a chance to lock the canvas layer above this overlay.
+  // useLayoutEffect fires after DOM insertion but before the browser paints,
+  // unlike useEffect which fires after paint (too late for the compositor).
+  useLayoutEffect(() => {
+    const el = document.querySelector('.canvas-container');
+    if (el) el.style.opacity = '0.001';
+    return () => { if (el) el.style.opacity = ''; };
+  }, []);
 
   useEffect(() => {
     _carouselActive = true;
