@@ -1340,6 +1340,8 @@ function WormChaseCamera({ worm, size }) {
             // Möbius half-twist: perpBase rotates π over [0,1] for the RP² roll.
             _camTunnelRight.copy(_ribPerp).applyAxisAngle(_ribAxis, t * Math.PI);
             _camUpVec.crossVectors(_camTunnelTangent, _camTunnelRight).normalize();
+            // Guard: degenerate cross product (tangent ∥ right) would give zero up → NaN matrices.
+            if (_camUpVec.lengthSq() < 0.01) _camUpVec.set(0, 1, 0);
 
             // Camera: close behind and above the worm on the ribbon surface.
             _camSurfCam.copy(_camLookVec)
