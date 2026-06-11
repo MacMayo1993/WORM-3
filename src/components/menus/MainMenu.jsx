@@ -905,6 +905,12 @@ const TileCardFace = ({ mode }) => (
   </div>
 );
 
+
+const getViewportHeight = () => {
+  if (typeof window === 'undefined') return 0;
+  return Math.ceil(window.visualViewport?.height || window.innerHeight || document.documentElement.clientHeight || 0);
+};
+
 // 2-D deck carousel — no preserve-3d/translateZ so no GPU compositor layer is created
 // that would paint over sibling DOM content below it on mobile Chrome.
 const FlatTileDeck = ({ activeIndex }) => (
@@ -939,7 +945,7 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
   const [imgLoaded, setImgLoaded] = useState(false);
   const [infoVisible, setInfoVisible] = useState(true);
   const [pendingTileColor, setPendingTileColor] = useState(CAROUSEL_MODES[0].tileColor);
-  const [vh, setVh] = useState(() => window.innerHeight);
+  const [vh, setVh] = useState(getViewportHeight);
   const touchStartX = useRef(null);
   const mouseStartX = useRef(null);
   const spinTimer = useRef(null);
@@ -951,12 +957,23 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
   activeIndexRef.current = activeIndex;
 
   useEffect(() => {
-    const updateVh = () => setVh(window.innerHeight);
+    let raf = 0;
+    const updateVh = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => setVh(getViewportHeight()));
+    };
+    const timers = [0, 120, 360, 800].map(delay => setTimeout(updateVh, delay));
     window.addEventListener('resize', updateVh);
     window.addEventListener('orientationchange', updateVh);
+    window.visualViewport?.addEventListener('resize', updateVh);
+    window.visualViewport?.addEventListener('scroll', updateVh);
     return () => {
+      cancelAnimationFrame(raf);
+      timers.forEach(clearTimeout);
       window.removeEventListener('resize', updateVh);
       window.removeEventListener('orientationchange', updateVh);
+      window.visualViewport?.removeEventListener('resize', updateVh);
+      window.visualViewport?.removeEventListener('scroll', updateVh);
     };
   }, []);
 
@@ -1029,6 +1046,27 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
   }, [onCubeSelect, onWormSelect, onChaos, onFreeplay, onRandom, onComingSoon, onHowToPlay]);
 
   const active = CAROUSEL_MODES[displayIndex]; // drives panel colors + info content
+  const activeImageSrc = `${import.meta.env.BASE_URL}images/modes/${active.id}.jpg`;
+
+  useEffect(() => {
+    if (active.id === 'how-to-play') return;
+    let cancelled = false;
+    const image = new Image();
+    image.onload = () => {
+      if (!cancelled) {
+        setImgLoaded(true);
+        setImgError(false);
+      }
+    };
+    image.onerror = () => {
+      if (!cancelled) setImgError(true);
+    };
+    image.src = activeImageSrc;
+    if (image.complete && image.naturalWidth > 0) {
+      image.onload();
+    }
+    return () => { cancelled = true; };
+  }, [active.id, activeImageSrc]);
 
   const arrowStyle = {
     background: 'rgba(0,0,0,0.42)', border: '1.5px solid rgba(255,255,255,0.65)',
@@ -1043,8 +1081,8 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
   return createPortal(
     <div
       style={{
-        position: 'fixed', top: 0, left: 0, width: '100%', height: `${vh}px`,
-        zIndex: 10000, pointerEvents: 'auto',
+        position: 'fixed', top: 0, left: 0, width: '100%', height: `${vh}px`, minHeight: '100dvh',
+        zIndex: 10000, pointerEvents: 'auto', isolation: 'isolate',
       }}
     >
       {/* Backdrop layer: explicit pixel height so no compositing mis-sizing */}
@@ -1058,7 +1096,7 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
       <div style={{
         position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
         display: 'flex', flexDirection: 'column', alignItems: 'center',
-        overflowY: 'auto', zIndex: 1,
+        overflowY: 'auto', zIndex: 1, WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain',
       }}>
       <MenuBackgroundOrbs />
       <style>{`
@@ -1085,7 +1123,7 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
         }}>
 
           {/* ── Carousel section ── */}
-          <div style={{ padding: '22px 10px 14px' }}>
+          <div style={{ position: 'relative', zIndex: 1, padding: '22px 10px 14px', overflow: 'hidden', contain: 'paint' }}>
             <p style={{
               margin: '0 0 18px', textAlign: 'center',
               fontSize: '9px', fontWeight: 800, letterSpacing: '0.30em',
@@ -1155,7 +1193,7 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
           <div style={{ height: '1px', background: 'rgba(255,255,255,0.22)', margin: '0 14px' }} />
 
           {/* ── Info section ── */}
-          <div style={{ padding: '14px 14px 0', opacity: infoVisible ? 1 : 0, transition: 'opacity 160ms ease', pointerEvents: infoVisible ? 'auto' : 'none' }}>
+          <div style={{ position: 'relative', zIndex: 2, padding: '14px 14px 0', opacity: infoVisible ? 1 : 0, transition: 'opacity 160ms ease', pointerEvents: infoVisible ? 'auto' : 'none' }}>
 
             {/* Screenshot card or how-to-play mini widget */}
             {active.id === 'how-to-play' ? (
@@ -1176,7 +1214,7 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
                     {!imgError && (
                       <img
                         key={active.id}
-                        src={`${import.meta.env.BASE_URL}images/modes/${active.id}.jpg`}
+                        src={activeImageSrc}
                         alt={`${active.label} gameplay`}
                         style={{
                           position: 'absolute', inset: 0, width: '100%', height: '100%',
