@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { makeCubies } from '../../game/cubeState.js';
@@ -1010,16 +1011,28 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
     WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
   };
 
-  return (
+  return createPortal(
     <div
       style={{
-        position: 'absolute', inset: 0, zIndex: 10000,
-        background: 'rgba(4,6,18,0.97)',
-        backdropFilter: 'blur(28px)', WebkitBackdropFilter: 'blur(28px)',
-        display: 'flex', flexDirection: 'column', alignItems: 'center',
-        overflowY: 'auto', pointerEvents: 'auto',
+        position: 'fixed', inset: 0, zIndex: 10000,
+        pointerEvents: 'auto',
       }}
     >
+      {/* Backdrop layer: full-screen blur + dark overlay — kept separate from the
+          scroll layer so backdrop-filter never shares an element with overflow:auto,
+          which causes Chrome to mis-size the compositing layer to content height. */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        background: 'rgba(4,6,18,0.97)',
+        backdropFilter: 'blur(28px)', WebkitBackdropFilter: 'blur(28px)',
+      }} />
+
+      {/* Scroll layer: handles overflow and flex layout */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        overflowY: 'auto', zIndex: 1,
+      }}>
       <MenuBackgroundOrbs />
       <style>{`
         .mode-arrow-btn:active { background: rgba(255,255,255,0.22) !important; transform: scale(0.90) !important; }
@@ -1233,7 +1246,9 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
 
         </div>
       </div>
-    </div>
+      </div>{/* end scroll layer */}
+    </div>,
+    document.body
   );
 };
 
