@@ -701,7 +701,7 @@ const RAINBOW_GRADIENT = 'linear-gradient(100deg,#ef4444 0%,#f97316 18%,#eab308 
 // ─── Heptagonal prism geometry ───────────────────────────────────────────────
 const PRISM_FACE_ANGLE = 360 / 7; // ≈ 51.43° between adjacent faces
 const PRISM_W = 180;              // face width px
-const PRISM_H = 200;              // face height px
+const PRISM_H = 160;              // face height px
 const PRISM_R = Math.round(PRISM_W / (2 * Math.tan(Math.PI / 7))); // ≈ 187px
 
 // tileColor matches the game's 6 face colors; textColor ensures contrast on the tile
@@ -1012,7 +1012,7 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
         background: 'rgba(4,6,18,0.97)',
         backdropFilter: 'blur(28px)', WebkitBackdropFilter: 'blur(28px)',
         display: 'flex', flexDirection: 'column', alignItems: 'center',
-        overflowY: 'auto', pointerEvents: 'auto',
+        overflowY: 'auto', WebkitOverflowScrolling: 'touch', pointerEvents: 'auto',
       }}
     >
       <MenuBackgroundOrbs />
@@ -1040,9 +1040,9 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
         }}>
 
           {/* ── Carousel section ── */}
-          <div style={{ padding: '22px 10px 14px' }}>
+          <div style={{ padding: '14px 10px 10px', isolation: 'isolate' }}>
             <p style={{
-              margin: '0 0 18px', textAlign: 'center',
+              margin: '0 0 12px', textAlign: 'center',
               fontSize: '9px', fontWeight: 800, letterSpacing: '0.30em',
               textTransform: 'uppercase', color: 'rgba(255,255,255,0.65)', fontFamily: "'Bungee', cursive",
             }}>Choose your mode</p>
@@ -1106,7 +1106,7 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
             </div>
 
             {/* Dot indicators */}
-            <div style={{ display: 'flex', gap: '7px', marginTop: '16px', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ display: 'flex', gap: '7px', marginTop: '10px', alignItems: 'center', justifyContent: 'center' }}>
               {CAROUSEL_MODES.map((_, i) => (
                 <button
                   key={i}
@@ -1130,7 +1130,7 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
           <div style={{ height: '1px', background: 'rgba(255,255,255,0.22)', margin: '0 14px' }} />
 
           {/* ── Info section ── */}
-          <div style={{ padding: '14px 14px 0', opacity: infoVisible ? 1 : 0, transition: 'opacity 160ms ease', pointerEvents: infoVisible ? 'auto' : 'none' }}>
+          <div style={{ padding: '10px 14px 0', opacity: infoVisible ? 1 : 0, transition: 'opacity 160ms ease', pointerEvents: infoVisible ? 'auto' : 'none' }}>
 
             {/* Screenshot card or how-to-play mini widget */}
             {active.id === 'how-to-play' ? (
@@ -1143,7 +1143,7 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
                   boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.10)',
                 }}>
                   <div style={{
-                    width: '100%', aspectRatio: '16/9',
+                    width: '100%', aspectRatio: '2/1',
                     position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
                     background: 'linear-gradient(135deg, rgba(14,18,42,0.95), rgba(4,6,20,0.98))',
                     overflow: 'hidden',
@@ -1349,7 +1349,7 @@ const MainMenu = ({
   }, []);
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'transparent', zIndex: 9999, overflow: 'hidden', pointerEvents: 'none' }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'transparent', zIndex: 9999, overflow: 'clip', pointerEvents: 'none' }}>
       <MenuBackgroundOrbs />
       <ScreenGlow />
       <MenuTitleCard visible={titleVisible} />
