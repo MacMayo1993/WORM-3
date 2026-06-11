@@ -1263,9 +1263,11 @@ export default function WORM3() {
       )}
 
       {/* Single persistent Canvas — never unmounts, eliminates context loss on intro→game.
-          Also renders the main-menu cube scene so there is never a second WebGL context. */}
+          Also renders the main-menu cube scene so there is never a second WebGL context.
+          Hidden (not unmounted) when mode selector is open so the WebGL compositor layer
+          cannot bleed through the mode selector overlay on mobile Chrome. */}
       <CanvasErrorBoundary>
-      <div className="canvas-container" onContextMenu={(e) => e.preventDefault()}>
+      <div className="canvas-container" onContextMenu={(e) => e.preventDefault()} style={showModeSelect ? { display: 'none' } : undefined}>
         <Canvas
           camera={{ position: (showWelcome || showMainMenu) ? [0, 3, 12] : [0, 0, cameraZ], fov: 40 }}
           dpr={[1, 1.5]}

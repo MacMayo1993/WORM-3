@@ -1054,8 +1054,7 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
     <div
       style={{
         position: 'fixed', inset: 0, zIndex: 10000,
-        background: 'rgba(4,6,18,0.97)',
-        backdropFilter: 'blur(28px)', WebkitBackdropFilter: 'blur(28px)',
+        background: 'rgb(4,6,18)',
         display: 'flex', flexDirection: 'column', alignItems: 'center',
         overflowY: 'auto', pointerEvents: 'auto',
       }}
@@ -1100,7 +1099,10 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
                 if (touchStartX.current === null) return;
                 const delta = e.changedTouches[0].clientX - touchStartX.current;
                 touchStartX.current = null;
-                if (Math.abs(delta) > 40) navigate(delta < 0 ? 1 : -1);
+                if (Math.abs(delta) > 40) {
+                  e.preventDefault();
+                  navigate(delta < 0 ? 1 : -1);
+                }
               }}
               onMouseDown={e => { mouseStartX.current = e.clientX; }}
               onMouseUp={e => {
