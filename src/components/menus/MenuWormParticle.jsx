@@ -230,13 +230,13 @@ const MenuWormParticle = ({ start, end, color1, startTime, onComplete, arcPhase:
 
       const totalLen = transitCurve.getLength();
 
-      // Wiggle: sinusoidal lateral body wave — peaks at mid-transit, zero at entry/exit
+      // Wiggle: sinusoidal lateral body wave — floor of 0.25 so they always wriggle
       transitCurve.getTangentAt(Math.min(eased, 0.99), _tangent);
       const wigUp = Math.abs(_tangent.y) < 0.9 ? _basePerp0 : _basePerp1;
       _wigDir.crossVectors(_tangent, wigUp).normalize();
-      const wigAmp  = 0.15;
-      const wigFreq = 4.0;
-      const wigRamp = Math.sin(Math.PI * tRaw);  // 0 at both ends, 1 at midpoint
+      const wigAmp  = 0.38;
+      const wigFreq = 5.5;
+      const wigRamp = 0.25 + 0.75 * Math.sin(Math.PI * tRaw);
 
       transitCurve.getPointAt(eased, _headPos);
       transitCurve.getPointAt(Math.min(eased + 0.018, 1), _lookPos);
