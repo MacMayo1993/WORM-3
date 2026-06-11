@@ -64,7 +64,6 @@ const RotatingBlackCube = React.lazy(() =>
 import { useTeachMode } from './teach/useTeachMode.js';
 import { useAntipodalIntegrity } from './hooks/useAntipodalIntegrity.js';
 import { isMobile } from './utils/device.js';
-import { subscribeCarouselActive } from './components/menus/menuCarouselState.js';
 import { GREEN_SHOW_START, FULL_FLIP_START, EXPLOSION_START, EXPLOSION_END, IMPLODE_START, IMPLODE_END } from './components/intro/introTiming.js';
 // Lazy-loaded: not needed on initial render, deferred to reduce parse time
 const PlatformerWormMode = React.lazy(() => import('./worm/PlatformerWormMode.jsx'));
@@ -438,12 +437,6 @@ export default function WORM3() {
   const pendingWizardSettingsRef = useRef(null);
   // Countdown: null = not running, 3/2/1 = ticking, 'GO!' = flash before start
   const [disparityCountdown, setDisparityCountdown] = useState(null);
-
-  // Hides the WebGL canvas from the GPU compositor while the carousel overlay is open.
-  // Without this, the canvas hardware layer paints above fixed-position DOM elements
-  // regardless of z-index, making the carousel invisible on mobile Chrome.
-  const [carouselActive, setCarouselActiveLocal] = useState(false);
-  useEffect(() => subscribeCarouselActive(setCarouselActiveLocal), []);
 
   // ========================================================================
   // INTRO TIME — drives IntroBranch 3D content + WelcomeScreen DOM overlay
@@ -1252,7 +1245,7 @@ export default function WORM3() {
       {/* Single persistent Canvas — never unmounts, eliminates context loss on intro→game.
           Also renders the main-menu cube scene so there is never a second WebGL context. */}
       <CanvasErrorBoundary>
-      <div className="canvas-container" onContextMenu={(e) => e.preventDefault()} style={carouselActive ? { opacity: 0.001 } : undefined}>
+      <div className="canvas-container" onContextMenu={(e) => e.preventDefault()}>
         <Canvas
           camera={{ position: (showWelcome || showMainMenu) ? [0, 3, 12] : [0, 0, cameraZ], fov: 40 }}
           dpr={[1, 1.5]}
