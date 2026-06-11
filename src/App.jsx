@@ -331,14 +331,17 @@ export default function WORM3() {
 
   // Animated shuffle: resets to solved, then plays 15 quick layer rotations visually.
   // Uses a 50ms delay after reset so React commits the solved layout before animation starts.
+  // Reads size from store at call time to avoid stale closure when called from MOBI postAction.
   const animatedShuffle = useCallback(() => {
-    useGameStore.getState().setRotatedCubies(makeCubies(size));
+    cancelShuffle(); // clear any in-flight animation from a previous game
+    const currentSize = useGameStore.getState().size;
+    useGameStore.getState().setRotatedCubies(makeCubies(currentSize));
     useGameStore.getState().resetGame();
     vibrate([50, 30, 100]); // haptic: "game starting" double-bump
     const axes = ['row', 'col', 'depth'];
     const moves = Array.from({ length: 15 }, () => ({
       axis: axes[Math.floor(Math.random() * 3)],
-      sliceIndex: Math.floor(Math.random() * size),
+      sliceIndex: Math.floor(Math.random() * currentSize),
       dir: Math.random() > 0.5 ? 1 : -1,
     }));
     setTimeout(() => {
@@ -346,7 +349,7 @@ export default function WORM3() {
         useGameStore.getState().setHasShuffled(true);
       });
     }, 50);
-  }, [size, startAnimatedShuffle]);
+  }, [cancelShuffle, startAnimatedShuffle]);
 
   // Teach Mode — step-by-step algorithm teaching
   const teachMode = useTeachMode();
@@ -596,7 +599,7 @@ export default function WORM3() {
     if (targetSize !== size) {
       changeSize(targetSize);
     } else {
-      useGameStore.getState().setRotatedCubies(makeCubies(size));
+      useGameStore.getState().setRotatedCubies(makeCubies(targetSize));
       useGameStore.getState().resetGame();
     }
     launchWithMobi(MOBI_LINES_RANDOM, 'RANDOM MODE', () => { animatedShuffle(); });
@@ -646,7 +649,7 @@ export default function WORM3() {
     if (targetSize !== size) {
       changeSize(targetSize); // resets to solved; by the time postAction fires size is updated
     } else {
-      useGameStore.getState().setRotatedCubies(makeCubies(size));
+      useGameStore.getState().setRotatedCubies(makeCubies(targetSize));
       useGameStore.getState().resetGame();
     }
     // Cube is solved while MOBI intro plays; scramble fires when player taps through.
