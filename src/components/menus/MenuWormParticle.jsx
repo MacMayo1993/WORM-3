@@ -88,40 +88,48 @@ const MenuWormParticle = ({ start, end, color1, startTime, onComplete }) => {
     return { pts, curve: new THREE.CatmullRomCurve3(pts) };
   }, []);
 
-  // Fixed arc for transit mode — computed once on mount from start → apex → end.
-  // The apex sits ~2.3 units from cube centre (cube half-width ≈ 1.5) so the path
-  // travels entirely outside the cube.  arcPhase picks which side to arc around.
+  // Fixed arc for transit mode — all points in group-relative space
+  // (rootGroupRef sits at 'start', so absolute = start + relative).
+  //
+  // Path: emerge from face A → shoot outward → arc over the apex → approach face B → dive
+  // through face B so the cube geometry naturally occludes the worm as it enters the hole.
   const transitCurve = useMemo(() => {
     if (!end) return null;
-    const startN = new THREE.Vector3(...start).normalize();
-    // Stable perpendicular basis identical to the emerge-mode logic
+    const startVec = new THREE.Vector3(...start);
+    const endVec   = new THREE.Vector3(...end);
+    const startN   = startVec.clone().normalize();  // face A outward normal
+    const endN     = endVec.clone().normalize();    // face B outward normal (≈ -startN)
+
+    // Stable perpendicular basis — identical to emerge-mode logic
     const basePerp = Math.abs(startN.y) < 0.8 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
     const perp   = new THREE.Vector3().crossVectors(startN, basePerp).normalize();
     const arcFwd = new THREE.Vector3().crossVectors(perp, startN).normalize();
-    // arcPhase in [0,π] rotates the equatorial crossing around the upper hemisphere
+    // arcPhase in [0,π] rotates the apex direction around the upper hemisphere
     const arcDir = new THREE.Vector3()
       .addScaledVector(perp, Math.cos(p.arcPhase))
       .addScaledVector(arcFwd, Math.sin(p.arcPhase))
       .normalize();
 
-    const R = 2.3; // outer radius of the arc apex
+    const R      = 2.4;   // apex radius — clears the cube (~1.5 half-width)
+    const launch = 0.7;   // units to shoot out before curving
+    const sink   = 0.5;   // units to dive past the far face surface (into the cube)
+
+    // relEnd is the end face position expressed relative to the root group's origin (= start)
+    const relEnd = endVec.clone().sub(startVec);
+
     const pts = [
-      // P0 — on the start face surface
-      new THREE.Vector3(...start),
-      // P1 — launch: pull away from face in arcDir direction
-      new THREE.Vector3(...start).normalize().multiplyScalar(1.6).addScaledVector(arcDir, R * 0.42),
-      // P2 — apex: furthest from cube centre
-      arcDir.clone().multiplyScalar(R),
-      // P3 — approach: mirror of P1 on the end face side
-      new THREE.Vector3(...end).normalize().multiplyScalar(1.6).addScaledVector(arcDir, R * 0.42),
-      // P4 — on the end face surface
-      new THREE.Vector3(...end),
+      new THREE.Vector3(0, 0, 0),                                   // P0: face A surface (group origin)
+      startN.clone().multiplyScalar(launch),                        // P1: shoot out from face A
+      arcDir.clone().multiplyScalar(R).sub(startVec),               // P2: apex (group-relative; world = arcDir*R)
+      endN.clone().multiplyScalar(launch).add(relEnd),              // P3: approach from outside face B
+      endN.clone().multiplyScalar(-sink).add(relEnd),               // P4: dive INTO face B — cube occludes worm
     ];
+
     const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.5);
     curve.arcLengthDivisions = 200;
     curve.updateArcLengths();
     return curve;
-  }, [start, end]); // p.arcPhase captured from stable closure
+  }, [start, end]); // p.arcPhase from stable closure
 
   const faceColor = color1 || '#3be08a';
 
