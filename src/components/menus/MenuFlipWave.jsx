@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import MenuWormParticle from './MenuWormParticle.jsx';
@@ -41,11 +41,15 @@ const TileFlash = ({ startTime, color }) => {
  * Progress is tracked via useRef (never useState) so useFrame never triggers React re-renders.
  */
 const MenuFlipWave = ({ origins, startTime, onComplete }) => {
+  // Single shared arc phase so both worms ride the same great circle, 180° apart.
+  // Worm A uses +phase, worm B uses -phase → arcDir_B = -arcDir_A → antipodal on the circle.
+  const sharedArcPhase = useMemo(() => Math.random() * Math.PI, []);
   const progressRef = useRef(0);
   const ringsRef = useRef([]);
   const onCompleteCalledRef = useRef(false);
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
+  const wormsCompletedRef = useRef(0);
 
   // Fallback timeout in case worm's onComplete is never called
   useEffect(() => {
@@ -76,7 +80,6 @@ const MenuFlipWave = ({ origins, startTime, onComplete }) => {
 
   if (!origins || origins.length === 0) return null;
 
-  const wormsCompletedRef = useRef(0);
   const wormCompleted = () => {
     wormsCompletedRef.current += 1;
     if (wormsCompletedRef.current < 2) return;
@@ -106,13 +109,14 @@ const MenuFlipWave = ({ origins, startTime, onComplete }) => {
         </group>
       ))}
 
-      {/* Two antipodal worms shoot simultaneously — each entering the other's hole */}
+      {/* Two antipodal worms on the same great circle, 180° apart */}
       <MenuWormParticle
         key="transit-a"
         start={origins[0].position}
         end={origins[1].position}
         color1={origins[0].color}
         startTime={startTime}
+        arcPhase={sharedArcPhase}
         onComplete={wormCompleted}
       />
       <MenuWormParticle
@@ -121,6 +125,7 @@ const MenuFlipWave = ({ origins, startTime, onComplete }) => {
         end={origins[0].position}
         color1={origins[1].color}
         startTime={startTime}
+        arcPhase={-sharedArcPhase}
         onComplete={wormCompleted}
       />
     </group>
