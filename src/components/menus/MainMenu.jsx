@@ -702,11 +702,9 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
 // ─── Mode carousel constants ──────────────────────────────────────────────────
 const RAINBOW_GRADIENT = 'linear-gradient(100deg,#ef4444 0%,#f97316 18%,#eab308 36%,#22c55e 54%,#3b82f6 72%,#a855f7 90%,#ef4444 100%)';
 
-// ─── Heptagonal prism geometry ───────────────────────────────────────────────
-const PRISM_FACE_ANGLE = 360 / 7; // ≈ 51.43° between adjacent faces
-const PRISM_W = 180;              // face width px
-const PRISM_H = 200;              // face height px
-const PRISM_R = Math.round(PRISM_W / (2 * Math.tan(Math.PI / 7))); // ≈ 187px
+// ─── Mode deck geometry ─────────────────────────────────────────────────────
+const PRISM_W = 180;              // card width px
+const PRISM_H = 200;              // card height px
 
 // tileColor matches the game's 6 face colors; textColor ensures contrast on the tile
 const CAROUSEL_MODES = [
@@ -905,17 +903,6 @@ const TileCardFace = ({ mode }) => (
   </div>
 );
 
-
-const getViewportHeight = () => {
-  if (typeof window === 'undefined') return 0;
-  return Math.ceil(window.visualViewport?.height || window.innerHeight || document.documentElement.clientHeight || 0);
-};
-
-const getIsMobileCarousel = () => {
-  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
-  return window.matchMedia('(max-width: 700px), (pointer: coarse)').matches;
-};
-
 const FlatTileDeck = ({ activeIndex }) => (
   <div style={{ position: 'relative', width: `${PRISM_W}px`, height: `${PRISM_H}px`, flexShrink: 0, overflow: 'visible' }}>
     {CAROUSEL_MODES.map((mode, i) => {
@@ -923,7 +910,6 @@ const FlatTileDeck = ({ activeIndex }) => (
       if (slot > CAROUSEL_MODES.length / 2) slot -= CAROUSEL_MODES.length;
       const isVisible = Math.abs(slot) <= 1;
       const x = slot === 0 ? 0 : slot < 0 ? -118 : 118;
-      const transform = `translateX(${x}px) scale(${slot === 0 ? 1 : 0.84}) rotate(${slot * 7}deg)`;
       return (
         <div
           key={mode.id}
@@ -932,7 +918,7 @@ const FlatTileDeck = ({ activeIndex }) => (
             position: 'absolute', inset: 0,
             zIndex: slot === 0 ? 3 : 2 - Math.abs(slot),
             opacity: isVisible ? 1 : 0,
-            transform,
+            transform: `translateX(${x}px) scale(${slot === 0 ? 1 : 0.84}) rotate(${slot * 7}deg)`,
             transformOrigin: '50% 58%',
             transition: 'transform 360ms cubic-bezier(0.25, 0, 0.35, 1), opacity 180ms ease',
             pointerEvents: 'none',
@@ -949,13 +935,11 @@ const FlatTileDeck = ({ activeIndex }) => (
 const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay, onRandom, onComingSoon, onHowToPlay }) => {
   const [activeIndex, setActiveIndex] = useState(0);   // logical index — dots + handlePlay
   const [displayIndex, setDisplayIndex] = useState(0); // visual index — colors + content
-  const [rotationAngle, setRotationAngle] = useState(0);
   const [imgError, setImgError] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
   const [infoVisible, setInfoVisible] = useState(true);
   const [pendingTileColor, setPendingTileColor] = useState(CAROUSEL_MODES[0].tileColor);
-  const [vh, setVh] = useState(getViewportHeight);
-  const [useFlatCarousel, setUseFlatCarousel] = useState(getIsMobileCarousel);
+  const [vh, setVh] = useState(() => window.innerHeight);
   const touchStartX = useRef(null);
   const mouseStartX = useRef(null);
   const spinTimer = useRef(null);
@@ -967,26 +951,12 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
   activeIndexRef.current = activeIndex;
 
   useEffect(() => {
-    let raf = 0;
-    const updateViewportState = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        setVh(getViewportHeight());
-        setUseFlatCarousel(getIsMobileCarousel());
-      });
-    };
-    const timers = [0, 120, 360, 800].map(delay => setTimeout(updateViewportState, delay));
-    window.addEventListener('resize', updateViewportState);
-    window.addEventListener('orientationchange', updateViewportState);
-    window.visualViewport?.addEventListener('resize', updateViewportState);
-    window.visualViewport?.addEventListener('scroll', updateViewportState);
+    const updateVh = () => setVh(window.innerHeight);
+    window.addEventListener('resize', updateVh);
+    window.addEventListener('orientationchange', updateVh);
     return () => {
-      cancelAnimationFrame(raf);
-      timers.forEach(clearTimeout);
-      window.removeEventListener('resize', updateViewportState);
-      window.removeEventListener('orientationchange', updateViewportState);
-      window.visualViewport?.removeEventListener('resize', updateViewportState);
-      window.visualViewport?.removeEventListener('scroll', updateViewportState);
+      window.removeEventListener('resize', updateVh);
+      window.removeEventListener('orientationchange', updateVh);
     };
   }, []);
 
@@ -1016,7 +986,6 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
     if (fadeTimer.current) clearTimeout(fadeTimer.current);
     const newIdx = (activeIndexRef.current + dir + N) % N;
     setPendingTileColor(CAROUSEL_MODES[newIdx].tileColor);
-    setRotationAngle(a => a - dir * PRISM_FACE_ANGLE);
     setActiveIndex(newIdx);
     setInfoVisible(false);
     spinTimer.current = setTimeout(() => {
@@ -1028,15 +997,10 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
     if (animatingRef.current) return;
     const curr = activeIndexRef.current;
     if (targetIndex === curr) return;
-    const forwardSteps = (targetIndex - curr + N) % N;
-    const backwardSteps = (curr - targetIndex + N) % N;
-    const steps = Math.min(forwardSteps, backwardSteps);
-    const dir = forwardSteps <= backwardSteps ? 1 : -1;
     animatingRef.current = true;
     if (spinTimer.current) clearTimeout(spinTimer.current);
     if (fadeTimer.current) clearTimeout(fadeTimer.current);
     setPendingTileColor(CAROUSEL_MODES[targetIndex].tileColor);
-    setRotationAngle(a => a - dir * steps * PRISM_FACE_ANGLE);
     setActiveIndex(targetIndex);
     setInfoVisible(false);
     spinTimer.current = setTimeout(() => {
@@ -1066,27 +1030,6 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
   }, [onCubeSelect, onWormSelect, onChaos, onFreeplay, onRandom, onComingSoon, onHowToPlay]);
 
   const active = CAROUSEL_MODES[displayIndex]; // drives panel colors + info content
-  const activeImageSrc = `${import.meta.env.BASE_URL}images/modes/${active.id}.jpg`;
-
-  useEffect(() => {
-    if (active.id === 'how-to-play') return;
-    let cancelled = false;
-    const image = new Image();
-    image.onload = () => {
-      if (!cancelled) {
-        setImgLoaded(true);
-        setImgError(false);
-      }
-    };
-    image.onerror = () => {
-      if (!cancelled) setImgError(true);
-    };
-    image.src = activeImageSrc;
-    if (image.complete && image.naturalWidth > 0) {
-      image.onload();
-    }
-    return () => { cancelled = true; };
-  }, [active.id, activeImageSrc]);
 
   const arrowStyle = {
     background: 'rgba(0,0,0,0.42)', border: '1.5px solid rgba(255,255,255,0.65)',
@@ -1101,26 +1044,24 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
   return createPortal(
     <div
       style={{
-        position: 'fixed', top: 0, left: 0, width: '100%', height: `${vh}px`, minHeight: '100dvh',
-        zIndex: 10000, pointerEvents: 'auto', isolation: 'isolate',
+        position: 'fixed', top: 0, left: 0, width: '100%', height: `${vh}px`,
+        zIndex: 10000, pointerEvents: 'auto',
       }}
     >
       {/* Backdrop layer: explicit pixel height so no compositing mis-sizing */}
       <div style={{
         position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-        background: useFlatCarousel
-          ? 'radial-gradient(circle at 18% 12%, rgba(59,130,246,0.20), transparent 34%), radial-gradient(circle at 82% 22%, rgba(249,115,22,0.16), transparent 30%), #040612'
-          : 'rgba(4,6,18,0.97)',
-        backdropFilter: useFlatCarousel ? 'none' : 'blur(28px)', WebkitBackdropFilter: useFlatCarousel ? 'none' : 'blur(28px)',
+        background: 'rgba(4,6,18,0.97)',
+        backdropFilter: 'blur(28px)', WebkitBackdropFilter: 'blur(28px)',
       }} />
 
       {/* Scroll layer: handles overflow and flex layout */}
       <div style={{
         position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
         display: 'flex', flexDirection: 'column', alignItems: 'center',
-        overflowY: 'auto', zIndex: 1, WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain',
+        overflowY: 'auto', zIndex: 1,
       }}>
-      {!useFlatCarousel && <MenuBackgroundOrbs />}
+      <MenuBackgroundOrbs />
       <style>{`
         .mode-arrow-btn:active { background: rgba(255,255,255,0.22) !important; transform: scale(0.90) !important; }
         .mode-play-btn:active  { opacity: 0.80; transform: scale(0.98); }
@@ -1145,7 +1086,7 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
         }}>
 
           {/* ── Carousel section ── */}
-          <div style={{ position: 'relative', zIndex: 1, padding: '22px 10px 14px', overflow: 'hidden', contain: 'paint' }}>
+          <div style={{ padding: '22px 10px 14px' }}>
             <p style={{
               margin: '0 0 18px', textAlign: 'center',
               fontSize: '9px', fontWeight: 800, letterSpacing: '0.30em',
@@ -1179,31 +1120,8 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
                 style={arrowStyle}
               >‹</button>
 
-              {useFlatCarousel ? (
-                <FlatTileDeck activeIndex={activeIndex} />
-              ) : (
-                /* 7-face heptagonal prism — all modes connected as one solid object */
-                <div style={{ perspective: '700px', flexShrink: 0, width: `${PRISM_W}px`, height: `${PRISM_H}px` }}>
-                  <div style={{
-                    width: '100%', height: '100%', position: 'relative',
-                    transformStyle: 'preserve-3d',
-                    transform: `rotateY(${rotationAngle}deg)`,
-                    transition: 'transform 540ms cubic-bezier(0.25, 0, 0.35, 1)',
-                    willChange: 'transform',
-                  }}>
-                    {CAROUSEL_MODES.map((mode, i) => (
-                      <div key={mode.id} style={{
-                        position: 'absolute', inset: 0,
-                        transform: `rotateY(${i * PRISM_FACE_ANGLE}deg) translateZ(${PRISM_R}px)`,
-                        backfaceVisibility: 'hidden',
-                        WebkitBackfaceVisibility: 'hidden',
-                      }}>
-                        <TileCardFace mode={mode} />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {/* 2D deck avoids mobile CSS-3D compositing bugs that can cover the screenshot area. */}
+              <FlatTileDeck activeIndex={activeIndex} />
 
               <button
                 type="button"
@@ -1239,7 +1157,7 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
           <div style={{ height: '1px', background: 'rgba(255,255,255,0.22)', margin: '0 14px' }} />
 
           {/* ── Info section ── */}
-          <div style={{ position: 'relative', zIndex: 2, padding: '14px 14px 0', opacity: infoVisible ? 1 : 0, transition: 'opacity 160ms ease', pointerEvents: infoVisible ? 'auto' : 'none' }}>
+          <div style={{ padding: '14px 14px 0', opacity: infoVisible ? 1 : 0, transition: 'opacity 160ms ease', pointerEvents: infoVisible ? 'auto' : 'none' }}>
 
             {/* Screenshot card or how-to-play mini widget */}
             {active.id === 'how-to-play' ? (
@@ -1260,7 +1178,7 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
                     {!imgError && (
                       <img
                         key={active.id}
-                        src={activeImageSrc}
+                        src={`${import.meta.env.BASE_URL}images/modes/${active.id}.jpg`}
                         alt={`${active.label} gameplay`}
                         style={{
                           position: 'absolute', inset: 0, width: '100%', height: '100%',
@@ -1270,7 +1188,6 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
                         }}
                         loading="eager"
                         decoding="async"
-                        fetchPriority={activeIndex === displayIndex ? 'high' : 'auto'}
                         onLoad={() => setImgLoaded(true)}
                         onError={() => setImgError(true)}
                       />
