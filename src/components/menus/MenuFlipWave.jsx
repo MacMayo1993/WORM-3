@@ -76,7 +76,10 @@ const MenuFlipWave = ({ origins, startTime, onComplete }) => {
 
   if (!origins || origins.length === 0) return null;
 
+  const wormsCompletedRef = useRef(0);
   const wormCompleted = () => {
+    wormsCompletedRef.current += 1;
+    if (wormsCompletedRef.current < 2) return;
     if (onCompleteCalledRef.current) return;
     onCompleteCalledRef.current = true;
     onComplete?.();
@@ -103,12 +106,20 @@ const MenuFlipWave = ({ origins, startTime, onComplete }) => {
         </group>
       ))}
 
-      {/* Single transit worm arcs from origins[0] around the cube to origins[1] */}
+      {/* Two antipodal worms shoot simultaneously — each entering the other's hole */}
       <MenuWormParticle
-        key="transit"
+        key="transit-a"
         start={origins[0].position}
         end={origins[1].position}
         color1={origins[0].color}
+        startTime={startTime}
+        onComplete={wormCompleted}
+      />
+      <MenuWormParticle
+        key="transit-b"
+        start={origins[1].position}
+        end={origins[0].position}
+        color1={origins[1].color}
         startTime={startTime}
         onComplete={wormCompleted}
       />
