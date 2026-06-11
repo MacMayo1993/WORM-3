@@ -702,11 +702,9 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
 // ─── Mode carousel constants ──────────────────────────────────────────────────
 const RAINBOW_GRADIENT = 'linear-gradient(100deg,#ef4444 0%,#f97316 18%,#eab308 36%,#22c55e 54%,#3b82f6 72%,#a855f7 90%,#ef4444 100%)';
 
-// ─── Heptagonal prism geometry ───────────────────────────────────────────────
-const PRISM_FACE_ANGLE = 360 / 7; // ≈ 51.43° between adjacent faces
-const PRISM_W = 180;              // face width px
-const PRISM_H = 200;              // face height px
-const PRISM_R = Math.round(PRISM_W / (2 * Math.tan(Math.PI / 7))); // ≈ 187px
+// ─── Mode deck geometry ─────────────────────────────────────────────────────
+const PRISM_W = 180;              // card width px
+const PRISM_H = 200;              // card height px
 
 // tileColor matches the game's 6 face colors; textColor ensures contrast on the tile
 const CAROUSEL_MODES = [
@@ -911,11 +909,38 @@ const getViewportHeight = () => {
   return Math.ceil(window.visualViewport?.height || window.innerHeight || document.documentElement.clientHeight || 0);
 };
 
+const FlatTileDeck = ({ activeIndex }) => (
+  <div style={{ position: 'relative', width: `${PRISM_W}px`, height: `${PRISM_H}px`, flexShrink: 0, overflow: 'visible' }}>
+    {CAROUSEL_MODES.map((mode, i) => {
+      let slot = (i - activeIndex + CAROUSEL_MODES.length) % CAROUSEL_MODES.length;
+      if (slot > CAROUSEL_MODES.length / 2) slot -= CAROUSEL_MODES.length;
+      const isVisible = Math.abs(slot) <= 1;
+      const x = slot === 0 ? 0 : slot < 0 ? -118 : 118;
+      return (
+        <div
+          key={mode.id}
+          aria-hidden={slot !== 0}
+          style={{
+            position: 'absolute', inset: 0,
+            zIndex: slot === 0 ? 3 : 2 - Math.abs(slot),
+            opacity: isVisible ? 1 : 0,
+            transform: `translateX(${x}px) scale(${slot === 0 ? 1 : 0.84}) rotate(${slot * 7}deg)`,
+            transformOrigin: '50% 58%',
+            transition: 'transform 360ms cubic-bezier(0.25, 0, 0.35, 1), opacity 180ms ease',
+            pointerEvents: 'none',
+          }}
+        >
+          <TileCardFace mode={mode} />
+        </div>
+      );
+    })}
+  </div>
+);
+
 // ─── Mode carousel overlay ────────────────────────────────────────────────────
 const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay, onRandom, onComingSoon, onHowToPlay }) => {
   const [activeIndex, setActiveIndex] = useState(0);   // logical index — dots + handlePlay
   const [displayIndex, setDisplayIndex] = useState(0); // visual index — colors + content
-  const [rotationAngle, setRotationAngle] = useState(0);
   const [imgError, setImgError] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
   const [infoVisible, setInfoVisible] = useState(true);
@@ -978,7 +1003,6 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
     if (fadeTimer.current) clearTimeout(fadeTimer.current);
     const newIdx = (activeIndexRef.current + dir + N) % N;
     setPendingTileColor(CAROUSEL_MODES[newIdx].tileColor);
-    setRotationAngle(a => a - dir * PRISM_FACE_ANGLE);
     setActiveIndex(newIdx);
     setInfoVisible(false);
     spinTimer.current = setTimeout(() => {
@@ -990,15 +1014,10 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
     if (animatingRef.current) return;
     const curr = activeIndexRef.current;
     if (targetIndex === curr) return;
-    const forwardSteps = (targetIndex - curr + N) % N;
-    const backwardSteps = (curr - targetIndex + N) % N;
-    const steps = Math.min(forwardSteps, backwardSteps);
-    const dir = forwardSteps <= backwardSteps ? 1 : -1;
     animatingRef.current = true;
     if (spinTimer.current) clearTimeout(spinTimer.current);
     if (fadeTimer.current) clearTimeout(fadeTimer.current);
     setPendingTileColor(CAROUSEL_MODES[targetIndex].tileColor);
-    setRotationAngle(a => a - dir * steps * PRISM_FACE_ANGLE);
     setActiveIndex(targetIndex);
     setInfoVisible(false);
     spinTimer.current = setTimeout(() => {
@@ -1139,27 +1158,8 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
                 style={arrowStyle}
               >‹</button>
 
-              {/* 7-face heptagonal prism — all modes connected as one solid object */}
-              <div style={{ perspective: '700px', flexShrink: 0, width: `${PRISM_W}px`, height: `${PRISM_H}px` }}>
-                <div style={{
-                  width: '100%', height: '100%', position: 'relative',
-                  transformStyle: 'preserve-3d',
-                  transform: `rotateY(${rotationAngle}deg)`,
-                  transition: 'transform 540ms cubic-bezier(0.25, 0, 0.35, 1)',
-                  willChange: 'transform',
-                }}>
-                  {CAROUSEL_MODES.map((mode, i) => (
-                    <div key={mode.id} style={{
-                      position: 'absolute', inset: 0,
-                      transform: `rotateY(${i * PRISM_FACE_ANGLE}deg) translateZ(${PRISM_R}px)`,
-                      backfaceVisibility: 'hidden',
-                      WebkitBackfaceVisibility: 'hidden',
-                    }}>
-                      <TileCardFace mode={mode} />
-                    </div>
-                  ))}
-                </div>
-              </div>
+              {/* 2D deck avoids mobile CSS-3D compositing bugs that can cover the screenshot area. */}
+              <FlatTileDeck activeIndex={activeIndex} />
 
               <button
                 type="button"
@@ -1224,6 +1224,8 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
                           opacity: imgLoaded ? 1 : 0,
                           transition: 'opacity 200ms ease',
                         }}
+                        loading="eager"
+                        decoding="async"
                         onLoad={() => setImgLoaded(true)}
                         onError={() => setImgError(true)}
                       />
