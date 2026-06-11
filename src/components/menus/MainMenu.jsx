@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { createPortal } from 'react-dom';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { makeCubies } from '../../game/cubeState.js';
@@ -906,46 +905,15 @@ const TileCardFace = ({ mode }) => (
 );
 
 
-const getViewportHeight = () => {
-  if (typeof window === 'undefined') return 0;
-  return Math.ceil(window.visualViewport?.height || window.innerHeight || document.documentElement.clientHeight || 0);
-};
-
-// 2-D deck carousel — no preserve-3d/translateZ so no GPU compositor layer is created
-// that would paint over sibling DOM content below it on mobile Chrome.
-const FlatTileDeck = ({ activeIndex }) => (
-  <div style={{ position: 'relative', width: `${PRISM_W}px`, height: `${PRISM_H}px`, flexShrink: 0, overflow: 'visible' }}>
-    {CAROUSEL_MODES.map((mode, i) => {
-      let slot = (i - activeIndex + CAROUSEL_MODES.length) % CAROUSEL_MODES.length;
-      if (slot > CAROUSEL_MODES.length / 2) slot -= CAROUSEL_MODES.length;
-      const isVisible = Math.abs(slot) <= 1;
-      const x = slot === 0 ? 0 : slot < 0 ? -118 : 118;
-      return (
-        <div key={mode.id} aria-hidden={slot !== 0} style={{
-          position: 'absolute', inset: 0,
-          zIndex: slot === 0 ? 3 : 2 - Math.abs(slot),
-          opacity: isVisible ? 1 : 0,
-          transform: `translateX(${x}px) scale(${slot === 0 ? 1 : 0.84}) rotate(${slot * 7}deg)`,
-          transformOrigin: '50% 58%',
-          transition: 'transform 360ms cubic-bezier(0.25, 0, 0.35, 1), opacity 180ms ease',
-          pointerEvents: 'none',
-        }}>
-          <TileCardFace mode={mode} />
-        </div>
-      );
-    })}
-  </div>
-);
-
 // ─── Mode carousel overlay ────────────────────────────────────────────────────
 const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay, onRandom, onComingSoon, onHowToPlay }) => {
   const [activeIndex, setActiveIndex] = useState(0);   // logical index — dots + handlePlay
   const [displayIndex, setDisplayIndex] = useState(0); // visual index — colors + content
+  const [rotationAngle, setRotationAngle] = useState(0);
   const [imgError, setImgError] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
   const [infoVisible, setInfoVisible] = useState(true);
   const [pendingTileColor, setPendingTileColor] = useState(CAROUSEL_MODES[0].tileColor);
-  const [vh, setVh] = useState(getViewportHeight);
   const touchStartX = useRef(null);
   const mouseStartX = useRef(null);
   const spinTimer = useRef(null);
@@ -955,27 +923,6 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
   const N = CAROUSEL_MODES.length;
 
   activeIndexRef.current = activeIndex;
-
-  useEffect(() => {
-    let raf = 0;
-    const updateVh = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => setVh(getViewportHeight()));
-    };
-    const timers = [0, 120, 360, 800].map(delay => setTimeout(updateVh, delay));
-    window.addEventListener('resize', updateVh);
-    window.addEventListener('orientationchange', updateVh);
-    window.visualViewport?.addEventListener('resize', updateVh);
-    window.visualViewport?.addEventListener('scroll', updateVh);
-    return () => {
-      cancelAnimationFrame(raf);
-      timers.forEach(clearTimeout);
-      window.removeEventListener('resize', updateVh);
-      window.removeEventListener('orientationchange', updateVh);
-      window.visualViewport?.removeEventListener('resize', updateVh);
-      window.visualViewport?.removeEventListener('scroll', updateVh);
-    };
-  }, []);
 
   useEffect(() => {
     _carouselActive = true;
@@ -1003,6 +950,7 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
     if (fadeTimer.current) clearTimeout(fadeTimer.current);
     const newIdx = (activeIndexRef.current + dir + N) % N;
     setPendingTileColor(CAROUSEL_MODES[newIdx].tileColor);
+    setRotationAngle(a => a - dir * PRISM_FACE_ANGLE);
     setActiveIndex(newIdx);
     setInfoVisible(false);
     spinTimer.current = setTimeout(() => {
@@ -1012,17 +960,23 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
 
   const selectIndex = useCallback((targetIndex) => {
     if (animatingRef.current) return;
-    if (targetIndex === activeIndexRef.current) return;
+    const curr = activeIndexRef.current;
+    if (targetIndex === curr) return;
+    const forwardSteps = (targetIndex - curr + N) % N;
+    const backwardSteps = (curr - targetIndex + N) % N;
+    const steps = Math.min(forwardSteps, backwardSteps);
+    const dir = forwardSteps <= backwardSteps ? 1 : -1;
     animatingRef.current = true;
     if (spinTimer.current) clearTimeout(spinTimer.current);
     if (fadeTimer.current) clearTimeout(fadeTimer.current);
     setPendingTileColor(CAROUSEL_MODES[targetIndex].tileColor);
+    setRotationAngle(a => a - dir * steps * PRISM_FACE_ANGLE);
     setActiveIndex(targetIndex);
     setInfoVisible(false);
     spinTimer.current = setTimeout(() => {
       commitDisplay(targetIndex);
     }, 540);
-  }, [commitDisplay]);
+  }, [N, commitDisplay]);
 
   useEffect(() => {
     const handleKey = (e) => {
@@ -1078,26 +1032,16 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
     WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
   };
 
-  return createPortal(
+  return (
     <div
       style={{
-        position: 'fixed', top: 0, left: 0, width: '100%', height: `${vh}px`, minHeight: '100dvh',
-        zIndex: 10000, pointerEvents: 'auto', isolation: 'isolate',
-      }}
-    >
-      {/* Backdrop layer: explicit pixel height so no compositing mis-sizing */}
-      <div style={{
-        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+        position: 'fixed', inset: 0, zIndex: 10000,
         background: 'rgba(4,6,18,0.97)',
         backdropFilter: 'blur(28px)', WebkitBackdropFilter: 'blur(28px)',
-      }} />
-
-      {/* Scroll layer: handles overflow and flex layout */}
-      <div style={{
-        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
         display: 'flex', flexDirection: 'column', alignItems: 'center',
-        overflowY: 'auto', zIndex: 1, WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain',
-      }}>
+        overflowY: 'auto', pointerEvents: 'auto',
+      }}
+    >
       <MenuBackgroundOrbs />
       <style>{`
         .mode-arrow-btn:active { background: rgba(255,255,255,0.22) !important; transform: scale(0.90) !important; }
@@ -1123,7 +1067,7 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
         }}>
 
           {/* ── Carousel section ── */}
-          <div style={{ position: 'relative', zIndex: 1, padding: '22px 10px 14px', overflow: 'hidden', contain: 'paint' }}>
+          <div style={{ padding: '22px 10px 14px' }}>
             <p style={{
               margin: '0 0 18px', textAlign: 'center',
               fontSize: '9px', fontWeight: 800, letterSpacing: '0.30em',
@@ -1157,7 +1101,27 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
                 style={arrowStyle}
               >‹</button>
 
-              <FlatTileDeck activeIndex={activeIndex} />
+              {/* 7-face heptagonal prism */}
+              <div style={{ perspective: '700px', flexShrink: 0, width: `${PRISM_W}px`, height: `${PRISM_H}px` }}>
+                <div style={{
+                  width: '100%', height: '100%', position: 'relative',
+                  transformStyle: 'preserve-3d',
+                  transform: `rotateY(${rotationAngle}deg)`,
+                  transition: 'transform 540ms cubic-bezier(0.25, 0, 0.35, 1)',
+                  willChange: 'transform',
+                }}>
+                  {CAROUSEL_MODES.map((mode, i) => (
+                    <div key={mode.id} style={{
+                      position: 'absolute', inset: 0,
+                      transform: `rotateY(${i * PRISM_FACE_ANGLE}deg) translateZ(${PRISM_R}px)`,
+                      backfaceVisibility: 'hidden',
+                      WebkitBackfaceVisibility: 'hidden',
+                    }}>
+                      <TileCardFace mode={mode} />
+                    </div>
+                  ))}
+                </div>
+              </div>
 
               <button
                 type="button"
@@ -1291,9 +1255,7 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
 
         </div>
       </div>
-      </div>{/* end scroll layer */}
-    </div>,
-    document.body
+    </div>
   );
 };
 
