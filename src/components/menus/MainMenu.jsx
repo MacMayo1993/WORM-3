@@ -150,7 +150,7 @@ const ShuffleCubie = React.memo(({ cubie }) => {
     <group position={[cx, cy, cz]}>
       <mesh>
         <boxGeometry args={[0.93, 0.93, 0.93]} />
-        <meshStandardMaterial color="#1c1c30" roughness={0.55} metalness={0.4} emissive="#0d0d1e" emissiveIntensity={0.6} />
+        <meshStandardMaterial color="#1c1c30" roughness={0.28} metalness={0.72} emissive="#0d0d1e" emissiveIntensity={0.6} />
       </mesh>
       {STICKER_CFG.map(({ dir, pos, rot }) => {
         const sticker = cubie.stickers?.[dir];
@@ -1301,11 +1301,12 @@ export const MenuTitleCard = ({ visible }) => (
 
 // ─── Ambient background orbs ─────────────────────────────────────────────────
 const ORB_DEFS = [
-  { color: '#3b82f6', top: '-18%',  left: '-12%',  size: '58vmax', anim: 'orbDrift1 30s ease-in-out infinite alternate',          opacity: 0.30 },
-  { color: '#a855f7', bottom: '-22%',right: '-16%', size: '62vmax', anim: 'orbDrift2 36s ease-in-out infinite alternate',          opacity: 0.24 },
-  { color: '#f97316', top: '15%',   right: '-18%',  size: '46vmax', anim: 'orbDrift3 24s ease-in-out infinite alternate',          opacity: 0.18 },
-  { color: '#22c55e', bottom: '8%', left: '-14%',   size: '42vmax', anim: 'orbDrift1 28s ease-in-out infinite alternate-reverse',  opacity: 0.15 },
-  { color: '#eab308', top: '44%',   left: '28%',    size: '36vmax', anim: 'orbDrift2 40s ease-in-out infinite alternate',          opacity: 0.11 },
+  { color: '#3b82f6', top: '-18%',  left: '-12%',  size: '58vmax', anim: 'orbDrift1 30s ease-in-out infinite alternate',          opacity: 0.36 },
+  { color: '#a855f7', bottom: '-22%',right: '-16%', size: '62vmax', anim: 'orbDrift2 36s ease-in-out infinite alternate',          opacity: 0.28 },
+  { color: '#f97316', top: '15%',   right: '-18%',  size: '46vmax', anim: 'orbDrift3 24s ease-in-out infinite alternate',          opacity: 0.20 },
+  { color: '#22c55e', bottom: '8%', left: '-14%',   size: '42vmax', anim: 'orbDrift1 28s ease-in-out infinite alternate-reverse',  opacity: 0.17 },
+  { color: '#eab308', top: '44%',   left: '28%',    size: '36vmax', anim: 'orbDrift2 40s ease-in-out infinite alternate',          opacity: 0.13 },
+  { color: '#7dd3fc', bottom: '18%',right: '22%',   size: '52vmax', anim: 'orbDrift3 44s ease-in-out infinite alternate-reverse',  opacity: 0.18 },
 ];
 
 const MenuBackgroundOrbs = () => (

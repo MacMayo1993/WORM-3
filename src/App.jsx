@@ -175,10 +175,11 @@ function MenuScene({ onCubeClick }) {
 
   return (
     <>
-      <color attach="background" args={['#000005']} />
-      <ambientLight intensity={1.6} />
-      <pointLight position={[8, 8, 10]} intensity={3.5} color="#a8d8ff" />
-      <pointLight position={[-9, -8, 7]} intensity={1.8} color="#7aa3ff" />
+      <color attach="background" args={['#05091a']} />
+      <ambientLight intensity={2.1} />
+      <pointLight position={[8, 8, 10]} intensity={5.5} color="#c0e4ff" />
+      <pointLight position={[-9, -8, 7]} intensity={2.8} color="#7aa3ff" />
+      <pointLight position={[0, -6, -8]} intensity={1.4} color="#4a90d9" />
       <Suspense fallback={null}>
         <BlackHoleEnvironment zoom={1.2} orbitStrength={0.1} flipTrigger={menuFlipTrigger} />
       </Suspense>
@@ -188,7 +189,7 @@ function MenuScene({ onCubeClick }) {
       </Suspense>
       {!isMobile && (
         <EffectComposer>
-          <Bloom intensity={0.55} luminanceThreshold={0.12} luminanceSmoothing={0.85} mipmapBlur />
+          <Bloom intensity={0.70} luminanceThreshold={0.08} luminanceSmoothing={0.85} mipmapBlur />
           <Vignette offset={0.38} darkness={0.82} />
         </EffectComposer>
       )}
