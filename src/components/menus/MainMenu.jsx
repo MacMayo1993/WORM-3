@@ -699,13 +699,6 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
 };
 
 // ─── Mode carousel constants ──────────────────────────────────────────────────
-const RAINBOW_GRADIENT = 'linear-gradient(100deg,#ef4444 0%,#f97316 18%,#eab308 36%,#22c55e 54%,#3b82f6 72%,#a855f7 90%,#ef4444 100%)';
-
-// ─── Heptagonal prism geometry ───────────────────────────────────────────────
-const PRISM_FACE_ANGLE = 360 / 7; // ≈ 51.43° between adjacent faces
-const PRISM_W = 180;              // face width px
-const PRISM_H = 200;              // face height px
-const PRISM_R = Math.round(PRISM_W / (2 * Math.tan(Math.PI / 7))); // ≈ 187px
 
 // tileColor matches the game's 6 face colors; textColor ensures contrast on the tile
 const CAROUSEL_MODES = [
@@ -882,71 +875,22 @@ const HowToPlayMini = ({ tileColor }) => {
   );
 };
 
-// ─── Cube-tile card sub-components ───────────────────────────────────────────
+// ─── Mode carousel overlay ───────────────────────────────────────────────────
+// Clean, single-card implementation. No overlapping absolutely-positioned tiles,
+// no CSS transform transitions on positioned elements → no GPU compositor ordering
+// issues on mobile Chrome.
 
-// Fills its container — animation classes applied to the wrapper div
-const TileCardFace = ({ mode }) => (
-  <div style={{
-    width: '100%', height: '100%', boxSizing: 'border-box',
-    background: '#0c0c1a', padding: '7px', borderRadius: '20px',
-  }}>
-    <div style={{
-      background: mode.tileColor, borderRadius: '14px',
-      width: '100%', height: '100%', boxSizing: 'border-box',
-      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px',
-      position: 'relative', overflow: 'hidden',
-      boxShadow: ['inset 0 -6px 16px rgba(0,0,0,0.45)', 'inset 4px 4px 14px rgba(255,255,255,0.22)', 'inset -3px -3px 10px rgba(0,0,0,0.28)'].join(', '),
-    }}>
-      <div style={{ position: 'absolute', inset: 0, borderRadius: '14px', pointerEvents: 'none', background: 'linear-gradient(135deg, rgba(255,255,255,0.26) 0%, transparent 48%, rgba(0,0,0,0.14) 100%)' }} />
-      <div style={{ position: 'relative', zIndex: 1, textAlign: 'center', fontSize: 'clamp(26px,7vw,42px)', fontWeight: 900, lineHeight: 1, letterSpacing: '0.05em', fontFamily: "'Bungee', cursive", color: mode.textColor, textShadow: '0 2px 6px rgba(0,0,0,0.40)' }}>{mode.label}</div>
-      <p style={{ position: 'relative', zIndex: 1, margin: 0, maxWidth: '160px', textAlign: 'center', fontSize: '11px', lineHeight: 1.45, fontFamily: MENU_FONT, color: mode.textColor === '#fff' ? 'rgba(255,255,255,0.70)' : 'rgba(0,0,0,0.56)' }}>{mode.desc}</p>
-    </div>
-  </div>
-);
-
-
-// 2-D deck — pure translateX/scale/rotate (no Z axis), so animating never
-// creates a preserve-3d GPU compositor layer that paints over DOM siblings.
-const FlatTileDeck = ({ activeIndex }) => (
-  <div style={{ position: 'relative', width: `${PRISM_W}px`, height: `${PRISM_H}px`, flexShrink: 0, overflow: 'visible' }}>
-    {CAROUSEL_MODES.map((mode, i) => {
-      let slot = (i - activeIndex + CAROUSEL_MODES.length) % CAROUSEL_MODES.length;
-      if (slot > CAROUSEL_MODES.length / 2) slot -= CAROUSEL_MODES.length;
-      const isVisible = Math.abs(slot) <= 1;
-      const x = slot === 0 ? 0 : slot < 0 ? -118 : 118;
-      return (
-        <div key={mode.id} aria-hidden={slot !== 0} style={{
-          position: 'absolute', inset: 0,
-          zIndex: slot === 0 ? 3 : 2 - Math.abs(slot),
-          opacity: isVisible ? 1 : 0,
-          transform: `translateX(${x}px) scale(${slot === 0 ? 1 : 0.84}) rotate(${slot * 7}deg)`,
-          transformOrigin: '50% 58%',
-          transition: 'transform 360ms cubic-bezier(0.25, 0, 0.35, 1), opacity 180ms ease',
-          pointerEvents: 'none',
-        }}>
-          <TileCardFace mode={mode} />
-        </div>
-      );
-    })}
-  </div>
-);
-
-// ─── Mode carousel overlay ────────────────────────────────────────────────────
 export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay, onRandom, onComingSoon, onHowToPlay }) => {
-  const [activeIndex, setActiveIndex] = useState(0);   // logical index — dots + handlePlay
-  const [displayIndex, setDisplayIndex] = useState(0); // visual index — colors + content
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [show, setShow] = useState(true);
   const [imgError, setImgError] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
-  const [infoVisible, setInfoVisible] = useState(true);
-  const [pendingTileColor, setPendingTileColor] = useState(CAROUSEL_MODES[0].tileColor);
   const touchStartX = useRef(null);
   const mouseStartX = useRef(null);
-  const spinTimer = useRef(null);
-  const fadeTimer = useRef(null);
-  const activeIndexRef = useRef(0);
   const animatingRef = useRef(false);
+  const activeIndexRef = useRef(0);
+  const timerRef = useRef(null);
   const N = CAROUSEL_MODES.length;
-
   activeIndexRef.current = activeIndex;
 
   useEffect(() => {
@@ -955,55 +899,44 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
     return () => {
       _carouselActive = false;
       setCarouselActive(false);
-      if (spinTimer.current) clearTimeout(spinTimer.current);
-      if (fadeTimer.current) clearTimeout(fadeTimer.current);
+      if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, []);
-
-  const commitDisplay = useCallback((newDisplayIndex) => {
-    setDisplayIndex(newDisplayIndex);
-    setImgError(false);
-    setImgLoaded(false);
-    setInfoVisible(true);
-    animatingRef.current = false;
   }, []);
 
   const navigate = useCallback((dir) => {
     if (animatingRef.current) return;
     animatingRef.current = true;
-    if (spinTimer.current) clearTimeout(spinTimer.current);
-    if (fadeTimer.current) clearTimeout(fadeTimer.current);
-    const newIdx = (activeIndexRef.current + dir + N) % N;
-    setPendingTileColor(CAROUSEL_MODES[newIdx].tileColor);
-    setActiveIndex(newIdx);
-    setInfoVisible(false);
-    spinTimer.current = setTimeout(() => {
-      commitDisplay(newIdx);
-    }, 540);
-  }, [N, commitDisplay]);
+    setShow(false);
+    timerRef.current = setTimeout(() => {
+      setActiveIndex(i => (i + dir + N) % N);
+      setImgError(false);
+      setImgLoaded(false);
+      setShow(true);
+      animatingRef.current = false;
+    }, 180);
+  }, [N]);
 
-  const selectIndex = useCallback((targetIndex) => {
-    if (animatingRef.current) return;
-    if (targetIndex === activeIndexRef.current) return;
+  const selectIndex = useCallback((target) => {
+    if (animatingRef.current || target === activeIndexRef.current) return;
     animatingRef.current = true;
-    if (spinTimer.current) clearTimeout(spinTimer.current);
-    if (fadeTimer.current) clearTimeout(fadeTimer.current);
-    setPendingTileColor(CAROUSEL_MODES[targetIndex].tileColor);
-    setActiveIndex(targetIndex);
-    setInfoVisible(false);
-    spinTimer.current = setTimeout(() => {
-      commitDisplay(targetIndex);
-    }, 540);
-  }, [commitDisplay]);
+    setShow(false);
+    timerRef.current = setTimeout(() => {
+      setActiveIndex(target);
+      setImgError(false);
+      setImgLoaded(false);
+      setShow(true);
+      animatingRef.current = false;
+    }, 180);
+  }, []);
 
   useEffect(() => {
-    const handleKey = (e) => {
+    const fn = (e) => {
       if (e.key === 'ArrowLeft') navigate(-1);
       if (e.key === 'ArrowRight') navigate(1);
       if (e.key === 'Escape') onBack();
     };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
+    window.addEventListener('keydown', fn);
+    return () => window.removeEventListener('keydown', fn);
   }, [navigate, onBack]);
 
   const handlePlay = useCallback(() => {
@@ -1017,243 +950,161 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
     else if (id === 'how-to-play') onHowToPlay?.();
   }, [onCubeSelect, onWormSelect, onChaos, onFreeplay, onRandom, onComingSoon, onHowToPlay]);
 
-  const active = CAROUSEL_MODES[displayIndex]; // drives panel colors + info content
-  const activeImageSrc = `${import.meta.env.BASE_URL}images/modes/${active.id}.jpg`;
-
-  useEffect(() => {
-    if (active.id === 'how-to-play') return;
-    let cancelled = false;
-    const image = new Image();
-    image.onload = () => {
-      if (!cancelled) {
-        setImgLoaded(true);
-        setImgError(false);
-      }
-    };
-    image.onerror = () => {
-      if (!cancelled) setImgError(true);
-    };
-    image.src = activeImageSrc;
-    if (image.complete && image.naturalWidth > 0) {
-      image.onload();
-    }
-    return () => { cancelled = true; };
-  }, [active.id, activeImageSrc]);
+  const mode = CAROUSEL_MODES[activeIndex];
+  const activeImageSrc = `${import.meta.env.BASE_URL}images/modes/${mode.id}.jpg`;
+  const opacity = show ? 1 : 0;
 
   const arrowStyle = {
-    background: 'rgba(0,0,0,0.42)', border: '1.5px solid rgba(255,255,255,0.65)',
-    borderRadius: '50%', width: '42px', height: '42px', cursor: 'pointer', flexShrink: 0,
-    color: '#fff', fontSize: '26px', lineHeight: 1, fontWeight: 300,
+    background: 'rgba(255,255,255,0.08)', border: '1.5px solid rgba(255,255,255,0.30)',
+    borderRadius: '50%', width: '40px', height: '40px', flexShrink: 0,
+    color: '#fff', fontSize: '24px', lineHeight: 1,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.40)',
-    transition: 'background 140ms ease, border-color 140ms ease, transform 100ms ease',
-    WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
+    cursor: 'pointer', WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
   };
 
   return (
-    <div
-      style={{
-        position: 'fixed', inset: 0, zIndex: 10000,
-        background: 'rgb(4,6,18)',
-        display: 'flex', flexDirection: 'column', alignItems: 'center',
-        overflowY: 'auto', pointerEvents: 'auto',
-      }}
-    >
-      <MenuBackgroundOrbs />
+    <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: '#040612', overflowY: 'auto' }}>
       <style>{`
-        .mode-arrow-btn:active { background: rgba(255,255,255,0.22) !important; transform: scale(0.90) !important; }
-        .mode-play-btn:active  { opacity: 0.80; transform: scale(0.98); }
+        .mc-arrow:active { background: rgba(255,255,255,0.22) !important; }
+        .mc-play:active  { opacity: 0.80 !important; transform: scale(0.98) !important; }
       `}</style>
 
-      {/* ── Unified rainbow-bordered panel ── */}
+      {/* Scroll column — everything in normal document flow, no stacking context tricks */}
       <div style={{
-        position: 'relative', zIndex: 1, flexShrink: 0,
-        width: 'min(390px, 96vw)',
-        marginTop: 'max(20px, env(safe-area-inset-top, 20px))',
-        marginBottom: 'max(20px, env(safe-area-inset-bottom, 20px))',
-        padding: '2px', borderRadius: '28px',
-        background: '#0c0c1a',
-        boxShadow: `0 24px 64px rgba(0,0,0,0.65)`,
-        transition: 'box-shadow 540ms ease',
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        minHeight: '100%', boxSizing: 'border-box',
+        paddingTop: 'max(24px, env(safe-area-inset-top, 24px))',
+        paddingBottom: 'max(24px, env(safe-area-inset-bottom, 24px))',
+        paddingLeft: '12px', paddingRight: '12px',
       }}>
-        <div style={{
-          borderRadius: '26px',
-          backgroundColor: pendingTileColor,
-          boxShadow: 'inset 0 2px 0 rgba(255,255,255,0.22), inset 0 -8px 28px rgba(0,0,0,0.18)',
-          transition: 'background-color 540ms ease',
-        }}>
 
-          {/* ── Carousel section ── */}
-          <div style={{ padding: '22px 10px 14px' }}>
-            <p style={{
-              margin: '0 0 18px', textAlign: 'center',
-              fontSize: '9px', fontWeight: 800, letterSpacing: '0.30em',
-              textTransform: 'uppercase', color: 'rgba(255,255,255,0.65)', fontFamily: "'Bungee', cursive",
-            }}>Choose your mode</p>
+        <p style={{ margin: '0 0 16px', fontSize: '9px', fontWeight: 800, letterSpacing: '0.30em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.55)', fontFamily: "'Bungee', cursive" }}>
+          Choose your mode
+        </p>
 
-            {/* Card row — swipe (touch) + drag (mouse) + arrow buttons */}
-            <div
-              style={{ display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'center', userSelect: 'none' }}
-              onTouchStart={e => { touchStartX.current = e.touches[0].clientX; }}
-              onTouchEnd={e => {
-                if (touchStartX.current === null) return;
-                const delta = e.changedTouches[0].clientX - touchStartX.current;
-                touchStartX.current = null;
-                if (Math.abs(delta) > 40) {
-                  e.preventDefault();
-                  navigate(delta < 0 ? 1 : -1);
-                }
-              }}
-              onMouseDown={e => { mouseStartX.current = e.clientX; }}
-              onMouseUp={e => {
-                if (mouseStartX.current === null) return;
-                const delta = e.clientX - mouseStartX.current;
-                mouseStartX.current = null;
-                if (Math.abs(delta) > 40) navigate(delta < 0 ? 1 : -1);
-              }}
-              onMouseLeave={() => { mouseStartX.current = null; }}
-            >
-              <button
-                type="button"
-                className="mode-arrow-btn"
-                aria-label="Previous mode"
-                onClick={() => navigate(-1)}
-                style={arrowStyle}
-              >‹</button>
-
-              <FlatTileDeck activeIndex={activeIndex} />
-
-              <button
-                type="button"
-                className="mode-arrow-btn"
-                aria-label="Next mode"
-                onClick={() => navigate(1)}
-                style={arrowStyle}
-              >›</button>
-            </div>
-
-            {/* Dot indicators */}
-            <div style={{ display: 'flex', gap: '7px', marginTop: '16px', alignItems: 'center', justifyContent: 'center' }}>
-              {CAROUSEL_MODES.map((_, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  aria-label={`Show ${CAROUSEL_MODES[i].label} mode`}
-                  onClick={() => selectIndex(i)}
-                  style={{
-                    width: i === activeIndex ? '20px' : '6px', height: '6px',
-                    borderRadius: '100px', border: 'none', cursor: 'pointer', padding: 0,
-                    background: i === activeIndex ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.30)',
-                    transition: 'width 300ms cubic-bezier(0.34,1.56,0.64,1), background 300ms ease',
-                    boxShadow: i === activeIndex ? '0 0 8px rgba(255,255,255,0.55)' : 'none',
-                    WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
-                  }}
-                />
-              ))}
-            </div>
+        {/* Mode tile — single card, no overlapping positioned siblings */}
+        <div
+          style={{
+            width: 'min(360px, 92vw)',
+            borderRadius: '22px', overflow: 'hidden',
+            background: mode.tileColor,
+            boxShadow: 'inset 0 -8px 20px rgba(0,0,0,0.40), inset 4px 4px 16px rgba(255,255,255,0.18), 0 8px 32px rgba(0,0,0,0.50)',
+            padding: '36px 20px', textAlign: 'center',
+            opacity, transition: 'opacity 160ms ease',
+            userSelect: 'none',
+          }}
+          onTouchStart={e => { touchStartX.current = e.touches[0].clientX; }}
+          onTouchEnd={e => {
+            if (touchStartX.current === null) return;
+            const delta = e.changedTouches[0].clientX - touchStartX.current;
+            touchStartX.current = null;
+            if (Math.abs(delta) > 40) { e.preventDefault(); navigate(delta < 0 ? 1 : -1); }
+          }}
+          onMouseDown={e => { mouseStartX.current = e.clientX; }}
+          onMouseUp={e => {
+            if (mouseStartX.current === null) return;
+            const delta = e.clientX - mouseStartX.current;
+            mouseStartX.current = null;
+            if (Math.abs(delta) > 40) navigate(delta < 0 ? 1 : -1);
+          }}
+          onMouseLeave={() => { mouseStartX.current = null; }}
+        >
+          <div style={{ fontSize: 'clamp(28px,8vw,44px)', fontWeight: 900, fontFamily: "'Bungee', cursive", color: mode.textColor, lineHeight: 1, textShadow: '0 2px 8px rgba(0,0,0,0.35)' }}>
+            {mode.label}
           </div>
-
-          {/* ── Thin divider ── */}
-          <div style={{ height: '1px', background: 'rgba(255,255,255,0.22)', margin: '0 14px' }} />
-
-          {/* ── Info section ── */}
-          <div style={{ position: 'relative', zIndex: 2, padding: '14px 14px 0', opacity: infoVisible ? 1 : 0, transition: 'opacity 160ms ease', pointerEvents: infoVisible ? 'auto' : 'none' }}>
-
-            {/* Screenshot card or how-to-play mini widget */}
-            {active.id === 'how-to-play' ? (
-              <HowToPlayMini tileColor={active.tileColor} />
-            ) : (
-              <div style={{ padding: '1.5px', borderRadius: '18px', background: '#0c0c1a', boxShadow: '0 8px 24px rgba(0,0,0,0.40)' }}>
-                <div style={{
-                  borderRadius: '16.5px', overflow: 'hidden',
-                  background: 'rgba(4,6,20,0.88)',
-                  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.10)',
-                }}>
-                  <div style={{
-                    width: '100%', aspectRatio: '16/9',
-                    position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: 'linear-gradient(135deg, rgba(14,18,42,0.95), rgba(4,6,20,0.98))',
-                    overflow: 'hidden',
-                  }}>
-                    {!imgError && (
-                      <img
-                        key={active.id}
-                        src={activeImageSrc}
-                        alt={`${active.label} gameplay`}
-                        style={{
-                          position: 'absolute', inset: 0, width: '100%', height: '100%',
-                          objectFit: 'cover', display: 'block',
-                          opacity: imgLoaded ? 1 : 0,
-                          transition: 'opacity 200ms ease',
-                        }}
-                        onLoad={() => setImgLoaded(true)}
-                        onError={() => setImgError(true)}
-                      />
-                    )}
-                    {imgError && (
-                      <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', fontFamily: MENU_FONT }}>
-                        screenshot coming soon
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* How-to-play card — dark glass inside the colored panel */}
-            <div style={{ marginTop: '10px', padding: '2px', borderRadius: '18px', background: '#0c0c1a' }}>
-              <div style={{
-                padding: '14px 16px 16px', borderRadius: '16px',
-                background: '#ffffff',
-              }}>
-                <p style={{ margin: '0 0 10px', fontSize: '9px', fontWeight: 800, letterSpacing: '0.24em', textTransform: 'uppercase', color: 'rgba(0,0,0,0.45)', fontFamily: MENU_FONT }}>How to play</p>
-                {active.controls.map((ctrl, i) => (
-                  <div key={i} style={{ display: 'flex', gap: '8px', margin: '5px 0', alignItems: 'flex-start' }}>
-                    <span style={{ color: '#0c0c1a', fontSize: '14px', flexShrink: 0, lineHeight: 1.5 }}>·</span>
-                    <span style={{ fontSize: '13px', lineHeight: 1.55, color: '#1a1a2e', fontFamily: MENU_FONT }}>{ctrl}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* ── Action buttons ── */}
-          <div style={{ padding: '14px 14px max(16px, env(safe-area-inset-bottom, 16px))' }}>
-            <button
-              type="button"
-              className="mode-play-btn"
-              onClick={handlePlay}
-              style={{
-                display: 'block', width: '100%', padding: '16px', borderRadius: '100px',
-                border: '1.5px solid rgba(255,255,255,0.55)',
-                background: 'rgba(0,0,0,0.28)',
-                color: '#fff', fontWeight: 800, fontSize: '14px', letterSpacing: '0.22em',
-                textTransform: 'uppercase', cursor: 'pointer', fontFamily: "'Bungee', cursive",
-                boxShadow: '0 2px 16px rgba(0,0,0,0.30)',
-                transition: 'background 160ms ease, box-shadow 160ms ease, border-color 160ms ease',
-                WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(0,0,0,0.42)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.80)'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(0,0,0,0.28)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.55)'; }}
-            >PLAY →</button>
-
-            <button
-              type="button"
-              onClick={onBack}
-              style={{
-                display: 'block', margin: '10px auto 0',
-                background: 'transparent', border: '1px solid rgba(255,255,255,0.28)',
-                borderRadius: '100px', padding: '9px 28px',
-                color: 'rgba(255,255,255,0.60)', fontSize: '12px', fontWeight: 600,
-                letterSpacing: '0.10em', cursor: 'pointer', fontFamily: MENU_FONT,
-                WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.55)'; e.currentTarget.style.color = 'rgba(255,255,255,0.90)'; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.28)'; e.currentTarget.style.color = 'rgba(255,255,255,0.60)'; }}
-            >← Back</button>
-          </div>
-
+          <p style={{ margin: '10px 0 0', fontSize: '13px', lineHeight: 1.5, fontFamily: MENU_FONT, color: mode.textColor === '#fff' ? 'rgba(255,255,255,0.80)' : 'rgba(0,0,0,0.65)' }}>
+            {mode.desc}
+          </p>
         </div>
+
+        {/* Navigation: ← dots → */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '14px' }}>
+          <button type="button" className="mc-arrow" aria-label="Previous mode" onClick={() => navigate(-1)} style={arrowStyle}>‹</button>
+          <div style={{ display: 'flex', gap: '7px', alignItems: 'center' }}>
+            {CAROUSEL_MODES.map((_, i) => (
+              <button
+                key={i} type="button" aria-label={`Show ${CAROUSEL_MODES[i].label} mode`}
+                onClick={() => selectIndex(i)}
+                style={{
+                  width: i === activeIndex ? '20px' : '6px', height: '6px',
+                  borderRadius: '100px', border: 'none', cursor: 'pointer', padding: 0,
+                  background: i === activeIndex ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.30)',
+                  transition: 'width 300ms cubic-bezier(0.34,1.56,0.64,1), background 300ms ease',
+                  boxShadow: i === activeIndex ? '0 0 8px rgba(255,255,255,0.55)' : 'none',
+                  WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
+                }}
+              />
+            ))}
+          </div>
+          <button type="button" className="mc-arrow" aria-label="Next mode" onClick={() => navigate(1)} style={arrowStyle}>›</button>
+        </div>
+
+        {/* Info section — screenshot + controls — plain block flow, no stacking games */}
+        <div style={{ width: 'min(360px, 92vw)', marginTop: '14px', opacity, transition: 'opacity 160ms ease' }}>
+
+          {mode.id === 'how-to-play' ? (
+            <HowToPlayMini tileColor={mode.tileColor} />
+          ) : (
+            <div style={{ borderRadius: '16px', overflow: 'hidden', background: 'rgba(4,6,20,0.88)' }}>
+              <div style={{ width: '100%', aspectRatio: '16/9', position: 'relative', overflow: 'hidden', background: 'linear-gradient(135deg, rgba(14,18,42,0.95), rgba(4,6,20,0.98))' }}>
+                {!imgError && (
+                  <img
+                    key={mode.id} src={activeImageSrc} alt={`${mode.label} gameplay`}
+                    style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: imgLoaded ? 1 : 0, transition: 'opacity 200ms ease' }}
+                    onLoad={() => setImgLoaded(true)}
+                    onError={() => setImgError(true)}
+                  />
+                )}
+                {imgError && (
+                  <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: 700, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', fontFamily: MENU_FONT }}>
+                    screenshot coming soon
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div style={{ marginTop: '12px', borderRadius: '16px', background: '#ffffff', padding: '14px 16px 16px' }}>
+            <p style={{ margin: '0 0 10px', fontSize: '9px', fontWeight: 800, letterSpacing: '0.24em', textTransform: 'uppercase', color: 'rgba(0,0,0,0.45)', fontFamily: MENU_FONT }}>How to play</p>
+            {mode.controls.map((ctrl, i) => (
+              <div key={i} style={{ display: 'flex', gap: '8px', margin: '5px 0', alignItems: 'flex-start' }}>
+                <span style={{ color: '#0c0c1a', fontSize: '14px', flexShrink: 0, lineHeight: 1.5 }}>·</span>
+                <span style={{ fontSize: '13px', lineHeight: 1.55, color: '#1a1a2e', fontFamily: MENU_FONT }}>{ctrl}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Action buttons */}
+        <div style={{ width: 'min(360px, 92vw)', marginTop: '14px' }}>
+          <button
+            type="button" className="mc-play" onClick={handlePlay}
+            style={{
+              display: 'block', width: '100%', padding: '16px', borderRadius: '100px',
+              border: '1.5px solid rgba(255,255,255,0.55)',
+              background: mode.tileColor, color: mode.textColor,
+              fontWeight: 800, fontSize: '14px', letterSpacing: '0.22em',
+              textTransform: 'uppercase', cursor: 'pointer', fontFamily: "'Bungee', cursive",
+              boxShadow: '0 2px 16px rgba(0,0,0,0.30)',
+              transition: 'opacity 160ms ease, transform 100ms ease',
+              WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
+            }}
+          >PLAY →</button>
+          <button
+            type="button" onClick={onBack}
+            style={{
+              display: 'block', margin: '10px auto 0',
+              background: 'transparent', border: '1px solid rgba(255,255,255,0.28)',
+              borderRadius: '100px', padding: '9px 28px',
+              color: 'rgba(255,255,255,0.60)', fontSize: '12px', fontWeight: 600,
+              letterSpacing: '0.10em', cursor: 'pointer', fontFamily: MENU_FONT,
+              WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.55)'; e.currentTarget.style.color = 'rgba(255,255,255,0.90)'; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.28)'; e.currentTarget.style.color = 'rgba(255,255,255,0.60)'; }}
+          >← Back</button>
+        </div>
+
       </div>
     </div>
   );
