@@ -1,6 +1,7 @@
 import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import { isCarouselActive } from './menuCarouselState.js';
 
 // ── Module-level cached vectors — zero per-frame allocations ──────────────────
 const _faceN       = new THREE.Vector3();
@@ -168,6 +169,7 @@ const MenuWormParticle = ({ start, end, color1, startTime, onComplete, arcPhase:
   const hasCompletedRef = useRef(false);
 
   useFrame((state) => {
+    if (isCarouselActive()) return;
     const clockTime = state.clock.getElapsedTime();
     if (clockTime < startTime) return;
 

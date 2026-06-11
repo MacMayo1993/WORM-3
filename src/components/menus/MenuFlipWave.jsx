@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import MenuWormParticle from './MenuWormParticle.jsx';
+import { isCarouselActive } from './menuCarouselState.js';
 
 // Shared geometries — created once for all MenuFlipWave instances
 const sharedWaveRingGeometry = new THREE.RingGeometry(0.8, 1.0, 32);
@@ -67,7 +68,7 @@ const MenuFlipWave = ({ origins, startTime, onComplete }) => {
   }, []);
 
   useFrame((_state, delta) => {
-    if (progressRef.current >= 1) return;
+    if (isCarouselActive() || progressRef.current >= 1) return;
     progressRef.current = Math.min(1, progressRef.current + delta * 1.2);
     const easeOut = 1 - Math.pow(1 - progressRef.current, 3);
     ringsRef.current.forEach((ring) => {
