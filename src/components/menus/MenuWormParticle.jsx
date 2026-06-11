@@ -58,7 +58,7 @@ const TRANSIT_DUR   = 3.0;   // seconds for a full face-to-face transit
  *                     cube (choosing a random equatorial direction via arcPhase),
  *                     and enters the antipodal end face — showing the wormhole connection.
  */
-const MenuWormParticle = ({ start, end, color1, startTime, onComplete }) => {
+const MenuWormParticle = ({ start, end, color1, startTime, onComplete, arcPhase: arcPhaseProp }) => {
   const rootGroupRef = useRef();
   const headGroupRef = useRef();
   const eyeLRef      = useRef();
@@ -74,7 +74,7 @@ const MenuWormParticle = ({ start, end, color1, startTime, onComplete }) => {
   const totalDuration = end ? TRANSIT_DUR + 0.15 : duration + retreatDur;
 
   const p = useMemo(() => ({
-    arcPhase    : Math.random() * Math.PI,  // [0,π] → upper hemisphere arcs only
+    arcPhase    : arcPhaseProp !== undefined ? arcPhaseProp : Math.random() * Math.PI,  // [0,π] → upper hemisphere arcs only
     blinkInterval: 1.4 + Math.random() * 2.0,
     blinkDur    : 0.12,
     squishAmp   : 0.08 + Math.random() * 0.06,
