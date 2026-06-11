@@ -100,7 +100,7 @@ const ScreenGlow = () => {
 };
 
 
-import { setCarouselActive, isCarouselActive } from './menuCarouselState.js';
+import { setCarouselActive } from './menuCarouselState.js';
 
 // ─── Carousel-active flag — set by MainMenu, read by all useFrame hooks ────────
 // Shared via menuCarouselState.js so MenuFlipWave / MenuWormParticle can gate
