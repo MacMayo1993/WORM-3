@@ -914,6 +914,7 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
   const [imgLoaded, setImgLoaded] = useState(false);
   const [infoVisible, setInfoVisible] = useState(true);
   const [pendingTileColor, setPendingTileColor] = useState(CAROUSEL_MODES[0].tileColor);
+  const [vh, setVh] = useState(() => window.innerHeight);
   const touchStartX = useRef(null);
   const mouseStartX = useRef(null);
   const spinTimer = useRef(null);
@@ -923,6 +924,16 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
   const N = CAROUSEL_MODES.length;
 
   activeIndexRef.current = activeIndex;
+
+  useEffect(() => {
+    const updateVh = () => setVh(window.innerHeight);
+    window.addEventListener('resize', updateVh);
+    window.addEventListener('orientationchange', updateVh);
+    return () => {
+      window.removeEventListener('resize', updateVh);
+      window.removeEventListener('orientationchange', updateVh);
+    };
+  }, []);
 
   useEffect(() => {
     _carouselActive = true;
@@ -1014,22 +1025,20 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
   return createPortal(
     <div
       style={{
-        position: 'fixed', inset: 0, zIndex: 10000,
-        pointerEvents: 'auto',
+        position: 'fixed', top: 0, left: 0, width: '100%', height: `${vh}px`,
+        zIndex: 10000, pointerEvents: 'auto',
       }}
     >
-      {/* Backdrop layer: full-screen blur + dark overlay — kept separate from the
-          scroll layer so backdrop-filter never shares an element with overflow:auto,
-          which causes Chrome to mis-size the compositing layer to content height. */}
+      {/* Backdrop layer: explicit pixel height so no compositing mis-sizing */}
       <div style={{
-        position: 'absolute', inset: 0,
+        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
         background: 'rgba(4,6,18,0.97)',
         backdropFilter: 'blur(28px)', WebkitBackdropFilter: 'blur(28px)',
       }} />
 
       {/* Scroll layer: handles overflow and flex layout */}
       <div style={{
-        position: 'absolute', inset: 0,
+        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
         display: 'flex', flexDirection: 'column', alignItems: 'center',
         overflowY: 'auto', zIndex: 1,
       }}>
