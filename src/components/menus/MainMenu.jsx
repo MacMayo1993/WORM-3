@@ -1349,7 +1349,7 @@ const MainMenu = ({
   }, []);
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'transparent', zIndex: 9999, overflow: 'hidden', pointerEvents: 'none' }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'transparent', zIndex: 9999, pointerEvents: 'none' }}>
       <MenuBackgroundOrbs />
       <ScreenGlow />
       <MenuTitleCard visible={titleVisible} />
