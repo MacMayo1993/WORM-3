@@ -99,9 +99,12 @@ const ScreenGlow = () => {
 };
 
 
+import { setCarouselActive, isCarouselActive } from './menuCarouselState.js';
+
 // ─── Carousel-active flag — set by MainMenu, read by all useFrame hooks ────────
-// Plain module-level variable: no React state needed, just a synchronous gate.
-let _carouselActive = false;
+// Shared via menuCarouselState.js so MenuFlipWave / MenuWormParticle can gate
+// their useFrame loops without creating a circular import.
+let _carouselActive = false; // kept for the local reads below; setCarouselActive syncs the shared module
 
 // ─── Cube-shake bridge — Start button triggers 3D shake remotely ─────────────
 let _externalShakeNeeded = false;
@@ -922,8 +925,10 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
 
   useEffect(() => {
     _carouselActive = true;
+    setCarouselActive(true);
     return () => {
       _carouselActive = false;
+      setCarouselActive(false);
       if (spinTimer.current) clearTimeout(spinTimer.current);
       if (fadeTimer.current) clearTimeout(fadeTimer.current);
     };
@@ -1008,7 +1013,7 @@ const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay,
   return (
     <div
       style={{
-        position: 'fixed', inset: 0, zIndex: 10000,
+        position: 'absolute', inset: 0, zIndex: 10000,
         background: 'rgba(4,6,18,0.97)',
         backdropFilter: 'blur(28px)', WebkitBackdropFilter: 'blur(28px)',
         display: 'flex', flexDirection: 'column', alignItems: 'center',
