@@ -963,7 +963,17 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: '#040612', overflowY: 'auto' }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 10000, overflowY: 'auto' }}>
+
+      {/* Forest background — extended past edges so blur doesn't show white borders */}
+      <div style={{ position: 'fixed', inset: '-40px', zIndex: 0, pointerEvents: 'none',
+        backgroundImage: `url(${import.meta.env.BASE_URL}environments/thumbnails/forest.png)`,
+        backgroundSize: 'cover', backgroundPosition: 'center',
+        filter: 'blur(28px) brightness(0.45)',
+      }} />
+      {/* Dark tint over the blurred forest */}
+      <div style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none', background: 'rgba(4,6,18,0.55)' }} />
+
       <style>{`
         .mc-arrow:active { background: rgba(255,255,255,0.22) !important; }
         .mc-play:active  { opacity: 0.80 !important; transform: scale(0.98) !important; }
@@ -971,6 +981,7 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
 
       {/* Scroll column — everything in normal document flow, no stacking context tricks */}
       <div style={{
+        position: 'relative', zIndex: 1,
         display: 'flex', flexDirection: 'column', alignItems: 'center',
         minHeight: '100%', boxSizing: 'border-box',
         paddingTop: 'max(24px, env(safe-area-inset-top, 24px))',
