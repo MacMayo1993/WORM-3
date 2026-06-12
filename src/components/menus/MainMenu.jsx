@@ -406,12 +406,13 @@ export const MenuWorm = ({ onWormClick }) => {
     smoothPtr.current.y += (pointer.y - smoothPtr.current.y) * Math.min(1, delta * 5);
 
     const isWiggle = wiggling.current;
-    const freq = isWiggle ? 8.5 : 1.6;
-    const ampX = isWiggle ? 0.27 : 0.16;
-    const ampZ = isWiggle ? 0.13 : 0.07;
+    const freq = isWiggle ? 8.5 : 3.0;
+    const ampX = isWiggle ? 0.27 : 0.22;
+    const ampZ = isWiggle ? 0.13 : 0.11;
 
     const hx = Math.sin(t * freq) * ampX;
-    const hz = Math.sin(t * freq * 0.55 + 1.0) * ampZ;
+    // Second harmonic on Z gives an organic figure-8 path so the body always has curvature to follow
+    const hz = Math.sin(t * freq * 0.55 + 1.0) * ampZ + Math.sin(t * freq * 0.37 + 2.1) * ampZ * 0.45;
 
     // ── Distance-based path recording ──────────────────────────────────────
     const prev = prevHead.current;
@@ -445,7 +446,7 @@ export const MenuWorm = ({ onWormClick }) => {
       headMeshRef.current.scale.set(squash, stretch, squash);
     }
 
-    // ── Body segments: path position + squash/stretch ────────────────────────
+    // ── Body segments: path position + squash/stretch + vertical body-wave ───
     const bodyRefs = [seg1Ref, seg2Ref, seg3Ref, tailRef];
     bodyRefs.forEach((ref, i) => {
       if (!ref.current) return;
@@ -453,7 +454,9 @@ export const MenuWorm = ({ onWormClick }) => {
       const segSpeed = speed * Math.max(0.35, 1 - i * 0.18);
       const stretch  = 1 + Math.min(segSpeed * 0.25, 0.25);
       const squash   = 1 / Math.sqrt(stretch);
-      ref.current.position.set(pos.x, _SEG_Y[i + 1], pos.z);
+      // Traveling wave ripples down the spine — phase advances per segment
+      const yWave   = Math.sin(t * freq - (i + 1) * 0.55) * (isWiggle ? 0.04 : 0.018);
+      ref.current.position.set(pos.x, _SEG_Y[i + 1] + yWave, pos.z);
       ref.current.scale.set(squash, stretch, squash);
     });
 
@@ -481,7 +484,7 @@ export const MenuWorm = ({ onWormClick }) => {
     // ── Group bob + master scale ────────────────────────────────────────────
     groupRef.current.position.y = 1.45 + (isWiggle
       ? Math.abs(Math.sin(t * 14)) * 0.20
-      : Math.sin(t * 1.5) * 0.06);
+      : Math.sin(t * freq * 0.28) * 0.045 + Math.sin(t * freq * 0.17 + 1.3) * 0.02);
     currentScale.current += (targetScale.current - currentScale.current) * Math.min(1, delta * 16);
     groupRef.current.scale.setScalar(currentScale.current);
   });
