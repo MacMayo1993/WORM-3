@@ -94,6 +94,8 @@ const MenuWormParticle = ({ start, end, color1, startTime, onComplete, arcPhase:
   //
   // 7-point path that traces the great circle from face A to face B through arcDir,
   // with R=4.5 to safely clear cube corners (~2.6 from center to corner).
+  // Also pre-computes a stable wigDir (perpendicular to the arc plane) so the
+  // body-wave direction never flips as the path tangent changes mid-transit.
   const transitCurve = useMemo(() => {
     if (!end) return null;
     const startVec = new THREE.Vector3(...start);
@@ -108,6 +110,10 @@ const MenuWormParticle = ({ start, end, color1, startTime, onComplete, arcPhase:
       .addScaledVector(perp, Math.cos(p.arcPhase))
       .addScaledVector(arcFwd, Math.sin(p.arcPhase))
       .normalize();
+
+    // Stable wiggle direction: perpendicular to the arc plane (arcDir × startN).
+    // Constant for the entire transit so the body-wave never snaps/glitches.
+    const wigDir = new THREE.Vector3().crossVectors(arcDir, startN).normalize();
 
     const R      = 4.5;   // large arc — clears cube corners (≈2.6 from center)
     const launch = 1.2;   // shoot out before curving
@@ -137,7 +143,7 @@ const MenuWormParticle = ({ start, end, color1, startTime, onComplete, arcPhase:
     const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.5);
     curve.arcLengthDivisions = 300;
     curve.updateArcLengths();
-    return curve;
+    return { curve, wigDir };
   }, [start, end]); // p.arcPhase from stable closure
 
   const faceColor = color1 || '#3be08a';
@@ -168,7 +174,7 @@ const MenuWormParticle = ({ start, end, color1, startTime, onComplete, arcPhase:
   const isBlinkingRef   = useRef(false);
   const hasCompletedRef = useRef(false);
 
-  useFrame((state) => {
+  useFrame((state, delta) => {
     if (isCarouselActive()) return;
     const clockTime = state.clock.getElapsedTime();
     if (clockTime < startTime) return;
@@ -223,6 +229,7 @@ const MenuWormParticle = ({ start, end, color1, startTime, onComplete, arcPhase:
 
     // ── TRANSIT MODE — worm travels around cube from start face to end face ───
     if (end && transitCurve) {
+      const { curve: tc, wigDir } = transitCurve;
       const tRaw  = Math.min(elapsed / TRANSIT_DUR, 1);
       const eased = tRaw < 0.5 ? 2 * tRaw * tRaw : -1 + (4 - 2 * tRaw) * tRaw;
 
@@ -230,19 +237,20 @@ const MenuWormParticle = ({ start, end, color1, startTime, onComplete, arcPhase:
       const fadeOut = tRaw > 0.88 ? Math.max(0, (1 - tRaw) / 0.12) : 1.0;
       const alpha   = fadeIn * fadeOut;
 
-      const totalLen = transitCurve.getLength();
+      const totalLen = tc.getLength();
 
-      // Wiggle: sinusoidal lateral body wave — floor of 0.25 so they always wriggle
-      transitCurve.getTangentAt(Math.min(eased, 0.99), _tangent);
-      const wigUp = Math.abs(_tangent.y) < 0.9 ? _basePerp0 : _basePerp1;
-      _wigDir.crossVectors(_tangent, wigUp).normalize();
-      const wigAmp  = 0.38;
-      const wigFreq = 5.5;
-      const wigRamp = 0.25 + 0.75 * Math.sin(Math.PI * tRaw);
+      // Stable lateral body-wave: wigDir is fixed (perpendicular to arc plane),
+      // never flips as the path tangent changes — eliminates glitch/snap mid-transit.
+      const wigAmp  = 0.30;
+      const wigFreq = 6.5;
+      const wigRamp = 0.30 + 0.70 * Math.sin(Math.PI * tRaw); // always ≥0.30
 
-      transitCurve.getPointAt(eased, _headPos);
-      transitCurve.getPointAt(Math.min(eased + 0.018, 1), _lookPos);
-      _headPos.addScaledVector(_wigDir, Math.sin(clockTime * wigFreq) * wigAmp * wigRamp);
+      tc.getPointAt(eased, _headPos);
+      _headPos.addScaledVector(wigDir, Math.sin(clockTime * wigFreq) * wigAmp * wigRamp);
+
+      // Look target: sample slightly ahead and apply matching wiggle offset
+      tc.getPointAt(Math.min(eased + 0.015, 1), _lookPos);
+      _lookPos.addScaledVector(wigDir, Math.sin(clockTime * wigFreq + 0.10) * wigAmp * wigRamp);
 
       if (headGroupRef.current) {
         headGroupRef.current.visible = alpha > 0.01;
@@ -250,7 +258,8 @@ const MenuWormParticle = ({ start, end, color1, startTime, onComplete, arcPhase:
         _tangent.subVectors(_lookPos, _headPos).normalize();
         if (_tangent.lengthSq() > 0.001) {
           _lookQuat.setFromUnitVectors(_fwdAxis, _tangent);
-          headGroupRef.current.quaternion.slerp(_lookQuat, 0.5);
+          // Delta-time normalised slerp — smooth at any frame-rate, no jitter
+          headGroupRef.current.quaternion.slerp(_lookQuat, Math.min(1, delta * 12));
         }
         const squish = Math.sin(clockTime * p.squishFreq) * p.squishAmp;
         headGroupRef.current.scale.set(
@@ -265,9 +274,9 @@ const MenuWormParticle = ({ start, end, color1, startTime, onComplete, arcPhase:
         const seg = segRefs.current[i];
         if (!seg) continue;
         const segDist = Math.max(0, headArcDist - (i + 1) * SEG_SPACING);
-        transitCurve.getPointAt(segDist / totalLen, _segPos);
-        // Each segment phase-shifted so the body undulates like a swimming snake
-        _segPos.addScaledVector(_wigDir, Math.sin(clockTime * wigFreq - (i + 1) * 0.7) * wigAmp * wigRamp);
+        tc.getPointAt(segDist / totalLen, _segPos);
+        // Traveling sine wave down the spine — phase delay per segment
+        _segPos.addScaledVector(wigDir, Math.sin(clockTime * wigFreq - (i + 1) * 0.7) * wigAmp * wigRamp);
         const wave  = Math.sin(clockTime * p.squishFreq - i * 0.8) * p.squishAmp;
         const taper = 1 - (i / (SEGMENT_COUNT - 1)) * 0.05;
         seg.position.copy(_segPos);
