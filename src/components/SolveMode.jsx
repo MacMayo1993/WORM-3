@@ -1,5 +1,5 @@
 // src/components/SolveMode.jsx
-// Guided solve mode with CFOP step tracking and algorithm hints
+// Guided solve mode with CFOP step tracking, algorithm hints, and Kociemba auto-solver
 
 import React, { useState, useMemo, useCallback } from 'react';
 import {
@@ -11,6 +11,7 @@ import {
   OLL_HINTS,
   PLL_HINTS
 } from '../game/solveDetection.js';
+import { useKociembaSolver } from '../teach/useKociembaSolver.js';
 
 const STEPS = [
   { id: 'whiteCross', name: 'White Cross', shortName: 'Cross', description: 'Form a cross on the white face with edges matching center colors' },
@@ -73,6 +74,120 @@ const AlgorithmCard = ({ hint, expanded, onToggle }) => (
     )}
   </div>
 );
+
+// Auto-solve panel using Kociemba two-phase algorithm
+const AutoSolvePanel = ({ cubies, size, isSolved }) => {
+  const { status, solutionStr, moves, moveIndex, error, solve, play, pause, stepForward, reset } =
+    useKociembaSolver(cubies, size);
+
+  const canPlay = (status === 'ready' || status === 'done') && moves.length > 0;
+  const isPlaying = status === 'playing';
+  const isDone = status === 'done';
+  const hasSolution = status === 'ready' || status === 'playing' || status === 'done';
+
+  const btnStyle = (color, disabled) => ({
+    background: disabled ? 'rgba(255,255,255,0.05)' : `rgba(${color},0.15)`,
+    border: `1px solid rgba(${color},${disabled ? 0.2 : 0.5})`,
+    color: disabled ? 'rgba(255,255,255,0.3)' : `rgb(${color})`,
+    padding: '5px 10px',
+    borderRadius: '4px',
+    cursor: disabled ? 'default' : 'pointer',
+    fontSize: '11px',
+    fontFamily: "'Courier New', monospace",
+    transition: 'all 0.2s ease',
+  });
+
+  return (
+    <div style={{ padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+        <span style={{ fontSize: '11px', opacity: 0.6, letterSpacing: '0.1em' }}>KOCIEMBA AUTO-SOLVE</span>
+        {hasSolution && (
+          <button onClick={reset} style={{ background: 'none', border: 'none', color: '#9c6644', cursor: 'pointer', fontSize: '10px', textDecoration: 'underline' }}>
+            Reset
+          </button>
+        )}
+      </div>
+
+      {size !== 3 && (
+        <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', textAlign: 'center', padding: '8px 0' }}>
+          3×3 only
+        </div>
+      )}
+
+      {size === 3 && status === 'idle' && (
+        <button
+          onClick={isSolved ? undefined : solve}
+          disabled={isSolved}
+          style={{ ...btnStyle('33,150,243', isSolved), width: '100%', padding: '8px', fontSize: '12px' }}
+        >
+          {isSolved ? 'Already Solved!' : 'Generate Optimal Solution'}
+        </button>
+      )}
+
+      {size === 3 && status === 'solving' && (
+        <div style={{ textAlign: 'center', fontSize: '12px', color: '#fefae0', padding: '8px 0' }}>
+          <span style={{ opacity: 0.7 }}>Solving</span>
+          <span style={{ animation: 'pulse 1s infinite', marginLeft: 4 }}>...</span>
+        </div>
+      )}
+
+      {size === 3 && status === 'error' && (
+        <div style={{ fontSize: '11px', color: '#f87171', padding: '4px 0' }}>
+          {error}
+          <button onClick={reset} style={{ marginLeft: 8, background: 'none', border: 'none', color: '#9c6644', cursor: 'pointer', fontSize: '10px', textDecoration: 'underline' }}>
+            Retry
+          </button>
+        </div>
+      )}
+
+      {size === 3 && hasSolution && (
+        <>
+          <div style={{
+            background: 'rgba(0,0,0,0.3)',
+            borderRadius: '6px',
+            padding: '8px 10px',
+            marginBottom: '8px',
+            fontFamily: "'Courier New', monospace",
+            fontSize: '11px',
+            color: isDone ? '#00ff88' : '#fefae0',
+            lineHeight: 1.5,
+            wordBreak: 'break-all',
+          }}>
+            {solutionStr || '(empty — already solved)'}
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <span style={{ fontSize: '10px', color: isDone ? '#00ff88' : 'rgba(255,255,255,0.5)' }}>
+              {isDone ? 'Complete!' : `Move ${moveIndex} / ${moves.length}`}
+            </span>
+            {moves.length > 0 && (
+              <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)' }}>
+                {moves.length} move{moves.length !== 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <button
+              onClick={isPlaying ? pause : play}
+              disabled={!canPlay && !isPlaying}
+              style={{ ...btnStyle('33,150,243', !canPlay && !isPlaying), flex: 1 }}
+            >
+              {isPlaying ? 'PAUSE' : isDone ? 'REPLAY' : 'PLAY ALL'}
+            </button>
+            <button
+              onClick={stepForward}
+              disabled={isPlaying || moveIndex >= moves.length}
+              style={btnStyle('156,102,68', isPlaying || moveIndex >= moves.length)}
+            >
+              STEP
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
 
 export default function SolveMode({
   cubies,
@@ -307,6 +422,9 @@ export default function SolveMode({
           )}
         </div>
       </div>
+
+      {/* Auto-Solve Panel */}
+      <AutoSolvePanel cubies={cubies} size={size} isSolved={progress.solved} />
 
       {/* Footer Tips */}
       <div style={{
