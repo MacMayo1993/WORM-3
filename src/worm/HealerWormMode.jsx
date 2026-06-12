@@ -1292,14 +1292,9 @@ function WormChaseCamera({ worm, size }) {
                 .addScaledVector(_camForward, -camBack);
             _camTargetLook.copy(_camWormWorld).addScaledVector(_camForward, LOOK_AHEAD);
 
-            // Camera UP: world-Y for side faces (no roll).
-            const absNormalY = Math.abs(_camNormal.y);
-            if (absNormalY > 0.8) {
-                const upArr = DIR_FORWARD[dirKey]?.['up'] ?? [0, 0, -1];
-                _camUp.set(upArr[0], upArr[1], upArr[2]);
-            } else {
-                _camUp.set(0, 1, 0);
-            }
+            // Camera UP: always world-Y so the horizon stays level.
+            // Bottom face is the only case where Y-up would flip the view.
+            _camUp.set(0, _camNormal.y < -0.8 ? -1 : 1, 0);
 
             const alpha = Math.min(1, CAM_LERP * delta);
             camPosRef.current.lerp(_camTargetCam, alpha);
