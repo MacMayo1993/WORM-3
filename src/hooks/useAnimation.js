@@ -9,7 +9,7 @@ import { useCallback, useRef } from 'react';
 import { useGameStore } from './useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { rotateSliceCubies } from '../game/cubeRotation.js';
-import { play } from '../utils/audio.js';
+import { play, vibrate } from '../utils/audio.js';
 import gsap from 'gsap';
 import {
   getAntipodalSliceIndex,
@@ -127,6 +127,7 @@ export function useAnimation() {
         }
         // Shuffle move: commit silently — no moves counter, no undo history, no echo.
         play('/sounds/rotate.mp3', 0.6);
+        vibrate(12);
         useGameStore.setState((state) => ({
           cubies: rotateSliceCubies(state.cubies, size, axis, sliceIndex, dir),
           rotationEpoch: state.rotationEpoch + 1,
