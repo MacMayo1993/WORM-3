@@ -1266,12 +1266,27 @@ function WormChaseCamera({ worm, size }) {
         if (phase === 'crawling' || !worm.activeTunnel.current) {
             // Smooth interpolated worm world position (copy into scratch — no .clone())
             _camWormWorld.copy(worm.headInterpPos.current);
-            const { dirKey } = worm.pos.current;
             _camNormal.copy(worm.currentNormal.current);
-            const fwdArr = DIR_FORWARD[dirKey]?.[worm.moveDir.current] ?? [0, 0, -1];
-            _camForward.set(fwdArr[0], fwdArr[1], fwdArr[2]);
 
-            // Camera position: above worm (along face normal) + behind (backward along forward).
+            // Derive forward from actual tile displacement — guaranteed correct direction
+            // regardless of face/moveDir coordinate conventions.
+            if (worm.prevWorldPos.current && worm.curWorldPos.current) {
+                _camForward.subVectors(worm.curWorldPos.current, worm.prevWorldPos.current);
+                if (_camForward.lengthSq() < 0.0001) {
+                    // Worm hasn't moved yet — fall back to DIR_FORWARD lookup
+                    const { dirKey } = worm.pos.current;
+                    const fwdArr = DIR_FORWARD[dirKey]?.[worm.moveDir.current] ?? [0, 0, -1];
+                    _camForward.set(fwdArr[0], fwdArr[1], fwdArr[2]);
+                } else {
+                    _camForward.normalize();
+                }
+            } else {
+                const { dirKey } = worm.pos.current;
+                const fwdArr = DIR_FORWARD[dirKey]?.[worm.moveDir.current] ?? [0, 0, -1];
+                _camForward.set(fwdArr[0], fwdArr[1], fwdArr[2]);
+            }
+
+            // Camera: behind worm (opposite of forward) + above face (along normal).
             _camTargetCam.copy(_camWormWorld)
                 .addScaledVector(_camNormal, camHeight)
                 .addScaledVector(_camForward, -camBack);
