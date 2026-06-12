@@ -1234,7 +1234,7 @@ function WormChaseCamera({ worm, size }) {
 
         // Use a continuous portrait factor so camera framing doesn't jump at aspect=1.
         const portraitFactor = THREE.MathUtils.clamp((1 - viewportAspect) / 0.45, 0, 1);
-        const baseFov = THREE.MathUtils.lerp(50, 62, portraitFactor);
+        const baseFov = THREE.MathUtils.lerp(62, 75, portraitFactor);
         const tunnelMix = phase === 'tunnel' ? 1 : (phase === 'entering' || phase === 'exiting' ? 0.35 : 0);
         const targetFov = THREE.MathUtils.lerp(baseFov, TUNNEL_SURF_FOV, tunnelMix);
         const fovAlpha = Math.min(1, delta * 6);
