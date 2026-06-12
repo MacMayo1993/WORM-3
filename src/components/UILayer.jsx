@@ -311,6 +311,7 @@ export default function UILayer({
           <BottomNavBar
             onReset={onReset}
             onShuffle={currentLevelData ? onShuffleForLevel : onShuffle}
+            chaosMode={chaosMode}
             solveModeActive={solveModeActive}
             teachModeActive={teachMode.active}
             onToggleSolve={() => { setSolveModeActive(!solveModeActive); if (!solveModeActive) setSolveFocusedStep(null); else setSolveHighlights([]); }}

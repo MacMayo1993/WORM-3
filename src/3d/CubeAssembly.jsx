@@ -308,6 +308,7 @@ const CubeAssembly = React.memo(({
 
       // Start live drag if threshold exceeded
       if (!liveDragRef.current && dist >= DRAG_THRESHOLD) {
+        if (useGameStore.getState().chaosLevel > 0) return; // chaos mode: cube auto-shuffles, no manual moves
         if (gsapAnimRef.current) return;
         const m = mapSwipe(ds.n, dx, dy, ds.shiftKey);
         if (m) {

@@ -16,7 +16,8 @@ const BottomNavBar = ({
   onToggleViews,
   onToggleMore,
   moreOpen,
-  viewsOpen
+  viewsOpen,
+  chaosMode
 }) => {
   // Central button cycles: normal -> solve -> teach -> normal
   const centralState = solveModeActive ? 'solve' : teachModeActive ? 'teach' : 'idle';
@@ -44,17 +45,19 @@ const BottomNavBar = ({
         <span className="bottom-nav-label" style={{ color: '#F44336' }}>Reset</span>
       </button>
 
-      {/* Shuffle */}
-      <button className="bottom-nav-item" onClick={onShuffle} title="Shuffle (S)">
-        <svg className="bottom-nav-icon" viewBox="0 0 24 24" fill="none" stroke="#4CAF50" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <polyline points="16 3 21 3 21 8" />
-          <line x1="4" y1="20" x2="21" y2="3" />
-          <polyline points="21 16 21 21 16 21" />
-          <line x1="15" y1="15" x2="21" y2="21" />
-          <line x1="4" y1="4" x2="9" y2="9" />
-        </svg>
-        <span className="bottom-nav-label" style={{ color: '#4CAF50' }}>Shuffle</span>
-      </button>
+      {/* Shuffle — hidden during disparity/chaos mode (cube auto-shuffles itself) */}
+      {!chaosMode && (
+        <button className="bottom-nav-item" onClick={onShuffle} title="Shuffle (S)">
+          <svg className="bottom-nav-icon" viewBox="0 0 24 24" fill="none" stroke="#4CAF50" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="16 3 21 3 21 8" />
+            <line x1="4" y1="20" x2="21" y2="3" />
+            <polyline points="21 16 21 21 16 21" />
+            <line x1="15" y1="15" x2="21" y2="21" />
+            <line x1="4" y1="4" x2="9" y2="9" />
+          </svg>
+          <span className="bottom-nav-label" style={{ color: '#4CAF50' }}>Shuffle</span>
+        </button>
+      )}
 
       {/* Central: Solve / Teach toggle */}
       <button
