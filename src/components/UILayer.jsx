@@ -97,7 +97,7 @@ export default function UILayer({
     showMobiIntro, mobiLines, mobiModeName,
     showDisparityWizard, setShowDisparityWizard,
     showDisparityBetting,
-    disparityWaitingFirstFlip, disparityCountdown,
+    disparityCountdown,
     showAntipodalPiP, onToggleAntipodalPiP,
     showComingSoon, onCloseComingSoon,
     showMobiusCubelet, onCloseMobiusCubelet,
@@ -476,27 +476,6 @@ export default function UILayer({
         </Suspense>
       )}
 
-      {/* Disparity "tap to begin" hint */}
-      {disparityWaitingFirstFlip && (
-        <div style={{
-          position: 'fixed', bottom: '110px', left: '50%', transform: 'translateX(-50%)',
-          zIndex: 500, pointerEvents: 'none',
-          fontFamily: "-apple-system, 'Helvetica Neue', Roboto, sans-serif",
-        }}>
-          <div style={{
-            background: 'rgba(0,0,0,0.78)', borderRadius: '14px', padding: '14px 22px',
-            textAlign: 'center', boxShadow: '0 4px 24px rgba(0,0,0,0.35)',
-            backdropFilter: 'blur(10px)', whiteSpace: 'nowrap',
-          }}>
-            <div style={{ fontSize: '15px', fontWeight: '600', color: '#fff', marginBottom: '3px' }}>
-              Tap any tile to begin
-            </div>
-            <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', lineHeight: 1.4 }}>
-              Your chosen tile starts the disparity cascade
-            </div>
-          </div>
-        </div>
-      )}
 
       {showHelp && <HelpMenu onClose={() => setShowHelp(false)} />}
 
