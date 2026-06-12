@@ -1218,9 +1218,9 @@ function WormChaseCamera({ worm, size }) {
         const tailLen = worm.tailLength.current;
         const viewportAspect = viewportSize.width / Math.max(1, viewportSize.height);
 
-        // During the scramble, park the camera at a fixed overview angle so the full
-        // cube is visible while it shuffles — the worm is hidden so there's nothing to follow.
-        if (gamePhase === 'scrambling') {
+        // Only use the overview during the INITIAL scramble (worm has never moved).
+        // Mid-game auto-rotation scrambles keep the follow camera so the view doesn't snap away.
+        if (gamePhase === 'scrambling' && !worm.prevWorldPos.current) {
             const dist = 5 + size * 4.0;
             _camTargetCam.set(0.6, 1.1, 1).normalize().multiplyScalar(dist);
             _camTargetLook.set(0, 0, 0);
@@ -1258,7 +1258,7 @@ function WormChaseCamera({ worm, size }) {
         // Cap is size-relative: a full-coverage snake should just fit in frame.
         const MAX_PERM_ZOOM = size * 2.6;
         const permZoom = Math.min(tailLen * 0.028, MAX_PERM_ZOOM);
-        const aspectZoomBoost = THREE.MathUtils.lerp(0, 2.2, portraitFactor);
+        const aspectZoomBoost = THREE.MathUtils.lerp(0, 0.4, portraitFactor);
         const extraZoom = permZoom + Math.min(zoomExtraRef.current, MAX_EXTRA_ZOOM);
         const camHeight = CAM_HEIGHT_BASE + extraZoom + aspectZoomBoost;
         const camBack = CAM_BACK_BASE + extraZoom * 0.8 + aspectZoomBoost * 0.9;
@@ -1268,20 +1268,20 @@ function WormChaseCamera({ worm, size }) {
             _camWormWorld.copy(worm.headInterpPos.current);
             _camNormal.copy(worm.currentNormal.current);
 
+            const { dirKey } = worm.pos.current;
+
             // Derive forward from actual tile displacement — guaranteed correct direction
             // regardless of face/moveDir coordinate conventions.
             if (worm.prevWorldPos.current && worm.curWorldPos.current) {
                 _camForward.subVectors(worm.curWorldPos.current, worm.prevWorldPos.current);
                 if (_camForward.lengthSq() < 0.0001) {
                     // Worm hasn't moved yet — fall back to DIR_FORWARD lookup
-                    const { dirKey } = worm.pos.current;
                     const fwdArr = DIR_FORWARD[dirKey]?.[worm.moveDir.current] ?? [0, 0, -1];
                     _camForward.set(fwdArr[0], fwdArr[1], fwdArr[2]);
                 } else {
                     _camForward.normalize();
                 }
             } else {
-                const { dirKey } = worm.pos.current;
                 const fwdArr = DIR_FORWARD[dirKey]?.[worm.moveDir.current] ?? [0, 0, -1];
                 _camForward.set(fwdArr[0], fwdArr[1], fwdArr[2]);
             }
