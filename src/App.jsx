@@ -18,6 +18,7 @@ import './App.css';
 import { resolveBiomeManifoldStyles } from './modes/CityBiomeMode.js';
 import { completeLevel } from './utils/levels.js';
 import { resolveBet, calcPayout } from './utils/disparityBetting.js';
+import { DISPARITY_GAME_LENGTHS } from './utils/economyConstants.js';
 import { vibrate } from './utils/audio.js';
 import { makeCubies } from './game/cubeState.js';
 import { rotateSliceCubies } from './game/cubeRotation.js';
@@ -440,14 +441,18 @@ export default function WORM3() {
   // Möbius Cubelet visualization
   const [showMobiusCubelet, setShowMobiusCubelet] = useState(false);
 
-  // Disparity Mode wizard + betting screen + first-flip gate
+  // Disparity Mode wizard + betting screen
   const [showDisparityWizard, setShowDisparityWizard] = useState(false);
   const [showDisparityBetting, setShowDisparityBetting] = useState(false);
-  const [disparityWaitingFirstFlip, setDisparityWaitingFirstFlip] = useState(false);
   const pendingDisparityLevelRef = useRef(3);
   const pendingWizardSettingsRef = useRef(null);
   // Countdown: null = not running, 3/2/1 = ticking, 'GO!' = flash before start
   const [disparityCountdown, setDisparityCountdown] = useState(null);
+  // Solve (unscramble) sequence state
+  const disparityReverseMovesRef = useRef([]);
+  const disparitySolveQueueRef = useRef([]);
+  const disparitySolveActiveRef = useRef(false);
+  const disparitySolveIntervalRef = useRef(null);
 
   // ========================================================================
   // INTRO TIME — drives IntroBranch 3D content + WelcomeScreen DOM overlay
@@ -534,13 +539,15 @@ export default function WORM3() {
     );
   }, []);
 
-  // 3-2-1-GO countdown before chaos begins
+  // 3-2-1-GO countdown before chaos begins, then starts the solve sequence
   useEffect(() => {
     if (disparityCountdown === null) return;
     if (disparityCountdown === 'GO!') {
       const t = setTimeout(() => {
         setDisparityCountdown(null);
         setChaosLevel(pendingDisparityLevelRef.current);
+        // Begin playing the reverse moves — cube unshuffles itself
+        startSolveSequence(disparityReverseMovesRef.current);
       }, 600);
       return () => clearTimeout(t);
     }
@@ -550,7 +557,75 @@ export default function WORM3() {
       }, 900);
       return () => clearTimeout(t);
     }
-  }, [disparityCountdown, setChaosLevel]);
+  }, [disparityCountdown, setChaosLevel]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Stop solve sequence as soon as the chaos worker declares a winner
+  useEffect(() => {
+    return useGameStore.subscribe(
+      (s) => s.showDisparityWinner,
+      (show) => {
+        if (show) {
+          disparitySolveActiveRef.current = false;
+          if (disparitySolveIntervalRef.current) {
+            clearTimeout(disparitySolveIntervalRef.current);
+            disparitySolveIntervalRef.current = null;
+          }
+        }
+      }
+    );
+  }, []);
+
+  // Fires the pre-computed reverse moves one by one at a steady pace.
+  // Called after the 3-2-1-GO countdown finishes.
+  const startSolveSequence = useCallback((moves) => {
+    if (!moves || !moves.length) return;
+    disparitySolveQueueRef.current = [...moves];
+    disparitySolveActiveRef.current = true;
+
+    const MOVE_INTERVAL_MS = 1500; // pace between each unshuffle move
+
+    const fireNext = () => {
+      if (!disparitySolveActiveRef.current) return;
+
+      // Stop if chaos worker already declared a winner
+      if (useGameStore.getState().disparityWinner) {
+        disparitySolveActiveRef.current = false;
+        return;
+      }
+
+      if (disparitySolveQueueRef.current.length === 0) {
+        // All reverse moves played — game is over
+        disparitySolveActiveRef.current = false;
+        const s = useGameStore.getState();
+        if (!s.disparityWinner) {
+          // Chaos didn't kill anyone outright; show winner screen anyway
+          useGameStore.getState().setDisparityWinner({ pair: [] });
+          useGameStore.getState().setShowDisparityWinner(true);
+        }
+        return;
+      }
+
+      // Wait for the current face-rotation animation to finish before firing
+      const tryFire = () => {
+        if (!disparitySolveActiveRef.current) return;
+        if (useGameStore.getState().animState) {
+          disparitySolveIntervalRef.current = setTimeout(tryFire, 50);
+          return;
+        }
+        const move = disparitySolveQueueRef.current.shift();
+        if (!move) { disparitySolveActiveRef.current = false; return; }
+        const { axis, sliceIndex, dir } = move;
+        useGameStore.getState().setAnimState({ axis, sliceIndex, dir, t: 0 });
+        useGameStore.getState().setPendingMove({ axis, sliceIndex, dir });
+        disparitySolveIntervalRef.current = setTimeout(fireNext, MOVE_INTERVAL_MS);
+      };
+
+      tryFire();
+    };
+
+    // Brief pause before first move so "GO!" banner can be seen
+    disparitySolveIntervalRef.current = setTimeout(fireNext, 400);
+  }, []);
 
   // ========================================================================
   // HANDLERS
@@ -676,8 +751,8 @@ export default function WORM3() {
     useGameStore.getState().setShowMainMenu(true);
   }, []);
 
-  // Applies wizard settings and begins the waiting-for-first-flip phase.
-  // Called after the betting screen (or immediately if skipped/no PP).
+  // Applies wizard settings, scrambles the cube N times, then starts the
+  // 3-2-1-GO countdown before the cube unshuffles itself.
   const startDisparityGame = useCallback((wizardSettings) => {
     useGameStore.getState().clearLevel();
     useGameStore.getState().clearDisparityGame();
@@ -720,8 +795,29 @@ export default function WORM3() {
     } else {
       reset();
     }
-    setDisparityWaitingFirstFlip(true);
-  }, [size, settings, setSettings, changeSize, setVisualMode, setFlipMode, setShowTunnels, setChaosLevel, reset]);
+
+    // Generate forward scramble moves, then compute the exact reverse sequence.
+    // Use getState().size so we read the freshly-set size after changeSize().
+    setTimeout(() => {
+      const freshSize = useGameStore.getState().size;
+      const numMoves = DISPARITY_GAME_LENGTHS[wizardSettings.gameLength] ?? DISPARITY_GAME_LENGTHS.medium;
+      const axes = ['row', 'col', 'depth'];
+      const forwardMoves = Array.from({ length: numMoves }, () => ({
+        axis: axes[Math.floor(Math.random() * 3)],
+        sliceIndex: Math.floor(Math.random() * freshSize),
+        dir: Math.random() > 0.5 ? 1 : -1,
+      }));
+      // Reverse = play the moves backwards with opposite direction
+      disparityReverseMovesRef.current = forwardMoves.slice().reverse().map(m => ({ ...m, dir: -m.dir }));
+
+      cancelShuffle();
+      useGameStore.getState().setRotatedCubies(makeCubies(freshSize));
+      startAnimatedShuffle(forwardMoves, () => {
+        // Scramble finished — start 3-2-1-GO countdown
+        setDisparityCountdown(3);
+      });
+    }, 50);
+  }, [size, settings, setSettings, changeSize, setVisualMode, setFlipMode, setShowTunnels, setChaosLevel, reset, cancelShuffle, startAnimatedShuffle]);
 
   const handleDisparitySetupComplete = useCallback((wizardSettings) => {
     setShowDisparityWizard(false);
@@ -821,7 +917,6 @@ export default function WORM3() {
     };
     launchWithMobi(MOBI_LINES_WORM, 'WORM MODE', () => {
       vibrate([50, 30, 100]);
-      setDisparityWaitingFirstFlip(false);
       setDisparityCountdown(null);
       useGameStore.getState().clearLevel();
       useGameStore.getState().initWormMode(
@@ -832,7 +927,7 @@ export default function WORM3() {
         wormParams.wormColor
       );
     });
-  }, [settings, setSettings, reset, size, changeSize, setDisparityWaitingFirstFlip, setDisparityCountdown, launchWithMobi]);
+  }, [settings, setSettings, reset, size, changeSize, setDisparityCountdown, launchWithMobi]);
 
   const handleMobiIntroComplete = useCallback(() => {
     setShowMobiIntro(false);
@@ -920,29 +1015,15 @@ export default function WORM3() {
     markTutorialDone();
   }, [setShowTutorial, markTutorialDone]);
 
-  // Tap flip handler — also serves as the "pick first tile" entry point for disparity mode
   const onTapFlip = useCallback((pos, dirKey) => {
-    if (disparityWaitingFirstFlip) {
-      flipSticker(pos, dirKey);
-      setDisparityWaitingFirstFlip(false);
-      setDisparityCountdown(3); // start 3-2-1-GO countdown
-      return;
-    }
     flipSticker(pos, dirKey);
-  }, [flipSticker, disparityWaitingFirstFlip]);
+  }, [flipSticker]);
 
   const onFlipWaveComplete = useCallback(() => {
     setFlipWaveOrigins([]);
   }, [setFlipWaveOrigins]);
 
-  // Handle tile selection — also catches the "pick first tile" tap when flipMode is off
   const handleSelectTile = useCallback((pos, dirKey) => {
-    if (disparityWaitingFirstFlip) {
-      flipSticker(pos, dirKey);
-      setDisparityWaitingFirstFlip(false);
-      setDisparityCountdown(3); // start 3-2-1-GO countdown
-      return;
-    }
     const newCursor = cubePosToCursor(pos, dirKey);
     useGameStore.getState().setCursor(newCursor);
     setShowCursor(true);
@@ -952,7 +1033,7 @@ export default function WORM3() {
     if (isMobile) return;
 
     setSelectedTileForRotation({ pos, dirKey, cursor: newCursor });
-  }, [disparityWaitingFirstFlip, flipSticker, cubePosToCursor, setShowCursor, setSelectedTileForRotation]);
+  }, [cubePosToCursor, setShowCursor, setSelectedTileForRotation]);
 
   // Face rotation handlers
   const handleFaceRotationMode = useCallback((target) => {
@@ -1193,7 +1274,8 @@ export default function WORM3() {
   const handleReset = useCallback(() => {
     reset();
     setDisparityCountdown(null);
-    setDisparityWaitingFirstFlip(false);
+    disparitySolveActiveRef.current = false;
+    if (disparitySolveIntervalRef.current) { clearTimeout(disparitySolveIntervalRef.current); disparitySolveIntervalRef.current = null; }
     // reset() calls resetGame() which clears chaosLevel. Re-apply the level's
     // configured chaos so the mode stays active after a keyboard/button reset.
     const savedChaosLevel = currentLevelData?.chaosLevel ?? 0;
@@ -1381,7 +1463,7 @@ export default function WORM3() {
               showMobiIntro, mobiLines, mobiModeName,
               showDisparityWizard, setShowDisparityWizard,
               showDisparityBetting,
-              disparityWaitingFirstFlip, disparityCountdown,
+              disparityCountdown,
               showAntipodalPiP, onToggleAntipodalPiP: () => setShowAntipodalPiP(v => !v),
               showComingSoon, onCloseComingSoon: () => { setShowComingSoon(false); useGameStore.getState().setShowMainMenu(true); },
               showMobiusCubelet, onCloseMobiusCubelet: () => { setShowMobiusCubelet(false); useGameStore.getState().setShowMainMenu(true); },
