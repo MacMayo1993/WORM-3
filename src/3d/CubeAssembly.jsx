@@ -583,6 +583,15 @@ const CubeAssembly = React.memo(({
     }
   }, [handsMode, camera]);
 
+  // Flush TrackballControls internal state when worm mode activates so its
+  // damping momentum doesn't fight the WormChaseCamera on the first frames.
+  useEffect(() => {
+    if (wormHealerMode && controlsRef.current) {
+      controlsRef.current.target.set(0, 0, 0);
+      controlsRef.current.reset();
+    }
+  }, [wormHealerMode]);
+
   // Programmatic camera orbit for mobile view-rotation buttons.
   // Rotates the camera position 45° around the world Y axis so the user can
   // inspect all sides of the cube without needing empty canvas space to drag.
@@ -1019,7 +1028,7 @@ const CubeAssembly = React.memo(({
           noRotate={handsMode ? true : false}
           minDistance={5}
           maxDistance={MAX_DISTANCE_BY_SIZE[size] || 28}
-          enabled={(!handsMode || explosionFactor > 0) && !animState && !dragStart && controlsEnabledRef.current && !wormTunnelActive}
+          enabled={!wormHealerMode && (!handsMode || explosionFactor > 0) && !animState && !dragStart && controlsEnabledRef.current && !wormTunnelActive}
           staticMoving={false}
           dynamicDampingFactor={isTouchDevice ? 0.15 : 0.08}
           rotateSpeed={isTouchDevice ? 0.8 : 1.2}
