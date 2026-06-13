@@ -336,7 +336,6 @@ export default function WORM3() {
   const animatedShuffle = useCallback(() => {
     cancelShuffle(); // clear any in-flight animation from a previous game
     const currentSize = useGameStore.getState().size;
-    useGameStore.getState().setRotatedCubies(makeCubies(currentSize));
     useGameStore.getState().resetGame();
     vibrate([50, 30, 100]); // haptic: "game starting" double-bump
     const axes = ['row', 'col', 'depth'];
