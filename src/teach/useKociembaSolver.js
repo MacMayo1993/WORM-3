@@ -23,6 +23,7 @@ export function useKociembaSolver(cubies, size) {
   const pendingNextRef = useRef(false);
   const movesRef = useRef([]);
   const moveIndexRef = useRef(0);
+  const solveIdRef = useRef(0);
 
   useEffect(() => { movesRef.current = moves; }, [moves]);
   useEffect(() => { moveIndexRef.current = moveIndex; }, [moveIndex]);
@@ -74,6 +75,7 @@ export function useKociembaSolver(cubies, size) {
       setStatus('error');
       return;
     }
+    const sid = ++solveIdRef.current;
     setStatus('solving');
     setError(null);
     setSolutionStr('');
@@ -86,9 +88,11 @@ export function useKociembaSolver(cubies, size) {
 
     try {
       const { solve: kociembaSolve } = await import('kociemba-wasm');
+      if (sid !== solveIdRef.current) return; // a newer solve started while WASM was loading
       const cubeStr = cubiesToKociembaString(cubies);
       if (!cubeStr) throw new Error('Cannot solve: cube has modified stickers (chaos / flip / manifold mode). Reset to a clean state first.');
       const sol = await kociembaSolve(cubeStr);
+      if (sid !== solveIdRef.current) return; // a newer solve started while kociemba was computing
       const trimmed = (sol || '').trim();
       // Filter identity moves (kociemba can return no-ops for solved cube)
       const parsed = trimmed ? parseAlgorithm(trimmed, 3) : [];
@@ -103,6 +107,7 @@ export function useKociembaSolver(cubies, size) {
         pushLayerHighlight(0, parsed);
       }
     } catch (err) {
+      if (sid !== solveIdRef.current) return; // stale error, discard
       setError(err.message || 'Solver failed');
       setStatus('error');
       setKociembaLayerHighlight(null);
