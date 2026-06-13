@@ -609,10 +609,12 @@ export const useGameStore = create(
     solveModeActive: false,
     solveFocusedStep: null,
     solveHighlights: [],
+    kociembaLayerHighlight: null,
 
     setSolveModeActive: (solveModeActive) => set({ solveModeActive }),
     setSolveFocusedStep: (solveFocusedStep) => set({ solveFocusedStep }),
     setSolveHighlights: (solveHighlights) => set({ solveHighlights }),
+    setKociembaLayerHighlight: (kociembaLayerHighlight) => set({ kociembaLayerHighlight }),
 
     // ========================================================================
     // TEACH MODE STATE

@@ -1,461 +1,258 @@
 // src/components/SolveMode.jsx
-// Guided solve mode with CFOP step tracking, algorithm hints, and Kociemba auto-solver
+// Compact floating solve panel — positioned bottom-right so the cube stays visible.
+// Shows Kociemba solution + animated layer highlights, plus a mini CFOP progress strip.
 
-import React, { useState, useMemo, useCallback } from 'react';
-import {
-  checkSolveProgress,
-  getHintForState,
-  getPiecesToHighlight,
-  WHITE_CROSS_HINTS,
-  F2L_HINTS,
-  OLL_HINTS,
-  PLL_HINTS
-} from '../game/solveDetection.js';
+import React, { useMemo, useRef, useEffect } from 'react';
+import { checkSolveProgress } from '../game/solveDetection.js';
 import { useKociembaSolver } from '../teach/useKociembaSolver.js';
 
+// ── CFOP mini progress strip ──────────────────────────────────────────────────
+
 const STEPS = [
-  { id: 'whiteCross', name: 'White Cross', shortName: 'Cross', description: 'Form a cross on the white face with edges matching center colors' },
-  { id: 'f2l', name: 'F2L', shortName: 'F2L', description: 'First Two Layers - pair corners and edges' },
-  { id: 'oll', name: 'OLL', shortName: 'OLL', description: 'Orient Last Layer - make yellow face all yellow' },
-  { id: 'pll', name: 'PLL', shortName: 'PLL', description: 'Permute Last Layer - final solve' },
+  { id: 'whiteCross', label: 'Cross' },
+  { id: 'f2l',        label: 'F2L'   },
+  { id: 'oll',        label: 'OLL'   },
+  { id: 'pll',        label: 'PLL'   },
 ];
 
-// Progress bar component
-const ProgressBar = ({ value, max, color = '#00ff88' }) => (
-  <div style={{
-    width: '100%',
-    height: '4px',
-    background: 'rgba(255,255,255,0.1)',
-    borderRadius: '2px',
-    overflow: 'hidden'
-  }}>
-    <div style={{
-      width: `${(value / max) * 100}%`,
-      height: '100%',
-      background: color,
-      transition: 'width 0.3s ease'
-    }} />
-  </div>
-);
-
-// Algorithm card component
-const AlgorithmCard = ({ hint, expanded, onToggle }) => (
-  <div
-    style={{
-      background: 'rgba(255,255,255,0.05)',
-      borderRadius: '8px',
-      padding: '10px 12px',
-      cursor: 'pointer',
-      border: '1px solid rgba(255,255,255,0.1)',
-      transition: 'all 0.2s ease'
-    }}
-    onClick={onToggle}
-  >
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-      <span style={{ fontWeight: 600, color: '#fefae0' }}>{hint.name}</span>
-      <span style={{ opacity: 0.5, fontSize: '12px' }}>{expanded ? '[-]' : '[+]'}</span>
-    </div>
-    {expanded && (
-      <div style={{ marginTop: '8px', fontSize: '12px' }}>
-        <p style={{ color: '#aaa', margin: '4px 0' }}>{hint.description}</p>
-        <p style={{ color: '#9c6644', margin: '4px 0' }}>Situation: {hint.situation}</p>
-        <div style={{
-          background: 'rgba(0,0,0,0.3)',
-          padding: '8px 10px',
-          borderRadius: '4px',
-          marginTop: '8px',
-          fontFamily: "'Courier New', monospace",
-          color: '#00ff88',
-          fontSize: '13px'
-        }}>
-          {hint.algorithm}
-        </div>
-      </div>
-    )}
-  </div>
-);
-
-// Auto-solve panel using Kociemba two-phase algorithm
-const AutoSolvePanel = ({ cubies, size, isSolved }) => {
-  const { status, solutionStr, moves, moveIndex, error, solve, play, pause, stepForward, reset } =
-    useKociembaSolver(cubies, size);
-
-  const canPlay = (status === 'ready' || status === 'done') && moves.length > 0;
-  const isPlaying = status === 'playing';
-  const isDone = status === 'done';
-  const hasSolution = status === 'ready' || status === 'playing' || status === 'done';
-
-  const btnStyle = (color, disabled) => ({
-    background: disabled ? 'rgba(255,255,255,0.05)' : `rgba(${color},0.15)`,
-    border: `1px solid rgba(${color},${disabled ? 0.2 : 0.5})`,
-    color: disabled ? 'rgba(255,255,255,0.3)' : `rgb(${color})`,
-    padding: '5px 10px',
-    borderRadius: '4px',
-    cursor: disabled ? 'default' : 'pointer',
-    fontSize: '11px',
-    fontFamily: "'Courier New', monospace",
-    transition: 'all 0.2s ease',
-  });
-
+function CfopStrip({ progress }) {
   return (
-    <div style={{ padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-        <span style={{ fontSize: '11px', opacity: 0.6, letterSpacing: '0.1em' }}>KOCIEMBA AUTO-SOLVE</span>
-        {hasSolution && (
-          <button onClick={reset} style={{ background: 'none', border: 'none', color: '#9c6644', cursor: 'pointer', fontSize: '10px', textDecoration: 'underline' }}>
-            Reset
-          </button>
-        )}
-      </div>
-
-      {size !== 3 && (
-        <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', textAlign: 'center', padding: '8px 0' }}>
-          3×3 only
-        </div>
-      )}
-
-      {size === 3 && status === 'idle' && (
-        <button
-          onClick={isSolved ? undefined : solve}
-          disabled={isSolved}
-          style={{ ...btnStyle('33,150,243', isSolved), width: '100%', padding: '8px', fontSize: '12px' }}
-        >
-          {isSolved ? 'Already Solved!' : 'Generate Optimal Solution'}
-        </button>
-      )}
-
-      {size === 3 && status === 'solving' && (
-        <div style={{ textAlign: 'center', fontSize: '12px', color: '#fefae0', padding: '8px 0' }}>
-          <span style={{ opacity: 0.7 }}>Solving</span>
-          <span style={{ animation: 'pulse 1s infinite', marginLeft: 4 }}>...</span>
-        </div>
-      )}
-
-      {size === 3 && status === 'error' && (
-        <div style={{ fontSize: '11px', color: '#f87171', padding: '4px 0' }}>
-          {error}
-          <button onClick={reset} style={{ marginLeft: 8, background: 'none', border: 'none', color: '#9c6644', cursor: 'pointer', fontSize: '10px', textDecoration: 'underline' }}>
-            Retry
-          </button>
-        </div>
-      )}
-
-      {size === 3 && hasSolution && (
-        <>
-          <div style={{
-            background: 'rgba(0,0,0,0.3)',
-            borderRadius: '6px',
-            padding: '8px 10px',
-            marginBottom: '8px',
+    <div style={{ display: 'flex', gap: 4, padding: '6px 12px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+      {STEPS.map((s) => {
+        const st = progress[s.id] || {};
+        const done = st.complete;
+        const active = progress.currentStep === s.id && !progress.solved;
+        return (
+          <div key={s.id} style={{
+            flex: 1, textAlign: 'center', fontSize: 9,
             fontFamily: "'Courier New', monospace",
-            fontSize: '11px',
-            color: isDone ? '#00ff88' : '#fefae0',
-            lineHeight: 1.5,
-            wordBreak: 'break-all',
+            color: done ? '#00ff88' : active ? '#fefae0' : 'rgba(255,255,255,0.35)',
+            paddingBottom: 2,
+            borderBottom: `2px solid ${done ? '#00ff88' : active ? '#fefae0' : 'transparent'}`,
+            transition: 'all 0.3s',
           }}>
-            {solutionStr || '(empty — already solved)'}
+            <div style={{ fontWeight: done || active ? 700 : 400 }}>{s.label}</div>
+            <div style={{ opacity: 0.7 }}>{st.solvedCount ?? 0}/{st.total ?? '?'}</div>
           </div>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <span style={{ fontSize: '10px', color: isDone ? '#00ff88' : 'rgba(255,255,255,0.5)' }}>
-              {isDone ? 'Complete!' : `Move ${moveIndex} / ${moves.length}`}
-            </span>
-            {moves.length > 0 && (
-              <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)' }}>
-                {moves.length} move{moves.length !== 1 ? 's' : ''}
-              </span>
-            )}
-          </div>
-
-          <div style={{ display: 'flex', gap: '6px' }}>
-            <button
-              onClick={isPlaying ? pause : play}
-              disabled={!canPlay && !isPlaying}
-              style={{ ...btnStyle('33,150,243', !canPlay && !isPlaying), flex: 1 }}
-            >
-              {isPlaying ? 'PAUSE' : isDone ? 'REPLAY' : 'PLAY ALL'}
-            </button>
-            <button
-              onClick={stepForward}
-              disabled={isPlaying || moveIndex >= moves.length}
-              style={btnStyle('156,102,68', isPlaying || moveIndex >= moves.length)}
-            >
-              STEP
-            </button>
-          </div>
-        </>
-      )}
-    </div>
-  );
-};
-
-export default function SolveMode({
-  cubies,
-  size,
-  onClose,
-  onHighlightChange,
-  focusedStep,
-  onFocusStep
-}) {
-  const [expandedHint, setExpandedHint] = useState(null);
-  const [showAllHints, setShowAllHints] = useState(false);
-
-  // Calculate solve progress
-  const progress = useMemo(() => {
-    return checkSolveProgress(cubies, size);
-  }, [cubies, size]);
-
-  // Get hints for current/focused step
-  const currentHint = useMemo(() => {
-    const step = focusedStep || progress.currentStep;
-    return getHintForState(cubies, size, step);
-  }, [cubies, size, focusedStep, progress.currentStep]);
-
-  // Get highlights for visualization
-  const highlights = useMemo(() => {
-    const step = focusedStep || progress.currentStep;
-    return getPiecesToHighlight(cubies, size, step);
-  }, [cubies, size, focusedStep, progress.currentStep]);
-
-  // Notify parent of highlight changes
-  React.useEffect(() => {
-    if (onHighlightChange) {
-      onHighlightChange(highlights);
-    }
-  }, [highlights, onHighlightChange]);
-
-  const handleStepClick = useCallback((stepId) => {
-    onFocusStep?.(stepId === focusedStep ? null : stepId);
-    setExpandedHint(null);
-  }, [focusedStep, onFocusStep]);
-
-  const getStepStatus = (stepId) => {
-    switch (stepId) {
-      case 'whiteCross': return progress.whiteCross;
-      case 'f2l': return progress.f2l;
-      case 'oll': return progress.oll;
-      case 'pll': return progress.pll;
-      default: return { complete: false, solvedCount: 0, total: 1 };
-    }
-  };
-
-  const getStepColor = (stepId) => {
-    const status = getStepStatus(stepId);
-    if (status.complete) return '#00ff88';
-    if (progress.currentStep === stepId) return '#fefae0';
-    return 'rgba(255,255,255,0.4)';
-  };
-
-  const activeStep = focusedStep || progress.currentStep;
-  const allHints = {
-    whiteCross: WHITE_CROSS_HINTS,
-    f2l: F2L_HINTS,
-    oll: OLL_HINTS,
-    pll: PLL_HINTS
-  };
-
-  return (
-    <div style={{
-      position: 'fixed',
-      right: '20px',
-      top: '80px',
-      width: '320px',
-      maxHeight: 'calc(100vh - 160px)',
-      background: 'rgba(0,0,0,0.85)',
-      backdropFilter: 'blur(10px)',
-      borderRadius: '12px',
-      border: '1px solid rgba(255,255,255,0.1)',
-      color: 'white',
-      fontFamily: "'Courier New', monospace",
-      zIndex: 1000,
-      display: 'flex',
-      flexDirection: 'column',
-      overflow: 'hidden'
-    }}>
-      {/* Header */}
-      <div style={{
-        padding: '16px',
-        borderBottom: '1px solid rgba(255,255,255,0.1)',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      }}>
-        <div>
-          <h3 style={{ margin: 0, fontSize: '14px', letterSpacing: '0.1em', color: '#fefae0' }}>
-            SOLVE MODE
-          </h3>
-          <p style={{ margin: '4px 0 0', fontSize: '10px', opacity: 0.6 }}>
-            CFOP Method Tutorial
-          </p>
-        </div>
-        <button
-          onClick={onClose}
-          style={{
-            background: 'none',
-            border: '1px solid rgba(255,255,255,0.2)',
-            color: 'white',
-            padding: '4px 10px',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '12px'
-          }}
-        >
-          CLOSE
-        </button>
-      </div>
-
-      {/* Steps Overview */}
-      <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-          {STEPS.map((step, _idx) => {
-            const status = getStepStatus(step.id);
-            const isActive = activeStep === step.id;
-            const isFocused = focusedStep === step.id;
-
-            return (
-              <button
-                key={step.id}
-                onClick={() => handleStepClick(step.id)}
-                style={{
-                  flex: 1,
-                  padding: '8px 4px',
-                  background: isActive ? 'rgba(255,255,255,0.1)' : 'transparent',
-                  border: isFocused ? '2px solid #fefae0' : '1px solid rgba(255,255,255,0.2)',
-                  borderRadius: '6px',
-                  color: getStepColor(step.id),
-                  cursor: 'pointer',
-                  fontSize: '10px',
-                  fontFamily: "'Courier New', monospace",
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                <div style={{ fontWeight: 600 }}>{step.shortName}</div>
-                <div style={{ fontSize: '9px', opacity: 0.7, marginTop: '2px' }}>
-                  {status.solvedCount}/{status.total}
-                </div>
-                <ProgressBar
-                  value={status.solvedCount}
-                  max={status.total}
-                  color={status.complete ? '#00ff88' : '#fefae0'}
-                />
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Current Step Info */}
-        <div style={{
-          background: 'rgba(255,255,255,0.05)',
-          borderRadius: '6px',
-          padding: '10px 12px',
-          fontSize: '11px'
-        }}>
-          <div style={{ color: '#fefae0', fontWeight: 600, marginBottom: '4px' }}>
-            {STEPS.find(s => s.id === activeStep)?.name || 'Solved'}
-          </div>
-          <div style={{ color: '#aaa', lineHeight: 1.4 }}>
-            {STEPS.find(s => s.id === activeStep)?.description || 'Congratulations! Cube is solved.'}
-          </div>
-        </div>
-      </div>
-
-      {/* Status Message */}
-      <div style={{
-        padding: '12px 16px',
-        background: 'rgba(254,250,224,0.05)',
-        borderBottom: '1px solid rgba(255,255,255,0.1)',
-        fontSize: '12px',
-        color: currentHint.hints?.length === 0 ? '#00ff88' : '#fefae0'
-      }}>
-        {currentHint.message}
-      </div>
-
-      {/* Algorithms Section */}
-      <div style={{
-        flex: 1,
-        overflowY: 'auto',
-        padding: '12px 16px'
-      }}>
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '10px'
-        }}>
-          <span style={{ fontSize: '11px', opacity: 0.6, letterSpacing: '0.1em' }}>
-            ALGORITHMS
-          </span>
-          <button
-            onClick={() => setShowAllHints(!showAllHints)}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#9c6644',
-              cursor: 'pointer',
-              fontSize: '10px',
-              textDecoration: 'underline'
-            }}
-          >
-            {showAllHints ? 'Show Relevant' : 'Show All'}
-          </button>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {(showAllHints ? allHints[activeStep] || [] : currentHint.hints || []).map((hint, idx) => (
-            <AlgorithmCard
-              key={idx}
-              hint={hint}
-              expanded={expandedHint === idx}
-              onToggle={() => setExpandedHint(expandedHint === idx ? null : idx)}
-            />
-          ))}
-
-          {(!showAllHints && (!currentHint.hints || currentHint.hints.length === 0)) && (
-            <div style={{
-              textAlign: 'center',
-              padding: '20px',
-              color: '#00ff88',
-              fontSize: '12px'
-            }}>
-              Step complete! Click next step or continue solving.
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Auto-Solve Panel */}
-      <AutoSolvePanel cubies={cubies} size={size} isSolved={progress.solved} />
-
-      {/* Footer Tips */}
-      <div style={{
-        padding: '12px 16px',
-        borderTop: '1px solid rgba(255,255,255,0.1)',
-        fontSize: '10px',
-        color: '#9c6644',
-        background: 'rgba(0,0,0,0.3)'
-      }}>
-        <strong>Tip:</strong> {
-          activeStep === 'whiteCross' ? 'Look for white edges and bring them to the top face.' :
-          activeStep === 'f2l' ? 'Find corner-edge pairs and insert them together.' :
-          activeStep === 'oll' ? 'Focus on making the yellow face all yellow.' :
-          activeStep === 'pll' ? 'Look for headlights (two same-colored pieces side by side).' :
-          'Great job solving the cube!'
-        }
-      </div>
+        );
+      })}
     </div>
   );
 }
 
-// Compact toggle button for mobile/minimal UI
+// ── Move chip (one notation token) ──────────────────────────────────────────
+
+function MoveChip({ notation, state }) {
+  // state: 'done' | 'next' | 'upcoming'
+  const bg = state === 'done'     ? 'rgba(255,255,255,0.07)'
+           : state === 'next'     ? 'rgba(0,217,255,0.20)'
+           :                        'rgba(255,255,255,0.04)';
+  const border = state === 'next' ? '1px solid rgba(0,217,255,0.7)' : '1px solid rgba(255,255,255,0.10)';
+  const color  = state === 'done' ? 'rgba(255,255,255,0.35)'
+               : state === 'next' ? '#00d9ff'
+               :                    'rgba(255,255,255,0.75)';
+  return (
+    <span style={{
+      display: 'inline-block',
+      padding: '3px 6px',
+      borderRadius: 4,
+      background: bg,
+      border,
+      color,
+      fontSize: 11,
+      fontFamily: "'Courier New', monospace",
+      fontWeight: state === 'next' ? 700 : 400,
+      whiteSpace: 'nowrap',
+      animation: state === 'next' ? 'kociemba-pulse 1s ease-in-out infinite' : 'none',
+      flexShrink: 0,
+    }}>
+      {notation}
+    </span>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
+export default function SolveMode({ cubies, size, onClose }) {
+  const progress = useMemo(() => checkSolveProgress(cubies, size), [cubies, size]);
+  const { status, moves, moveIndex, error, play, pause, stepForward } =
+    useKociembaSolver(cubies, size);
+
+  const scrollRef = useRef(null);
+
+  // Keep the current (next) move chip visible in the scroll container
+  useEffect(() => {
+    if (!scrollRef.current || !moves.length) return;
+    const chips = scrollRef.current.querySelectorAll('[data-move-idx]');
+    const chip = chips[moveIndex];
+    if (chip) chip.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  }, [moveIndex, moves]);
+
+  const isPlaying = status === 'playing';
+  const isDone    = status === 'done';
+  const hasMoves  = moves.length > 0;
+  const canPlay   = hasMoves && (status === 'ready' || isDone);
+  const alreadySolved = progress.solved && size === 3;
+
+  const statusLabel = {
+    idle:    'Analyzing…',
+    solving: 'Solving…',
+    ready:   `${moves.length} moves`,
+    playing: `Move ${moveIndex} / ${moves.length}`,
+    done:    alreadySolved ? 'Solved!' : 'Cube solved!',
+    error:   'Error',
+  }[status] ?? '';
+
+  const statusColor = isDone ? '#00ff88' : status === 'error' ? '#f87171' : 'rgba(255,255,255,0.55)';
+
+  return (
+    <>
+      <style>{`
+        @keyframes kociemba-pulse {
+          0%,100% { box-shadow: 0 0 0 0 rgba(0,217,255,0.6); }
+          50%      { box-shadow: 0 0 8px 3px rgba(0,217,255,0.35); }
+        }
+      `}</style>
+
+      <div style={{
+        position: 'fixed',
+        right: 16,
+        bottom: 72,          /* sits just above the bottom nav bar */
+        width: 272,
+        background: 'rgba(8,8,12,0.88)',
+        backdropFilter: 'blur(14px)',
+        WebkitBackdropFilter: 'blur(14px)',
+        borderRadius: 12,
+        border: '1px solid rgba(255,255,255,0.10)',
+        color: 'white',
+        zIndex: 1000,
+        overflow: 'hidden',
+        fontFamily: "'Courier New', monospace",
+        userSelect: 'none',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+      }}>
+
+        {/* ── Header ─────────────────────────────────────── */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '8px 12px',
+        }}>
+          <span style={{ fontSize: 10, letterSpacing: '0.12em', opacity: 0.6 }}>
+            KOCIEMBA SOLVER
+          </span>
+          <span style={{ fontSize: 11, color: statusColor, fontWeight: 600 }}>
+            {statusLabel}
+          </span>
+          <button onClick={onClose} style={{
+            background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)',
+            cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: '0 2px',
+          }}>✕</button>
+        </div>
+
+        {/* ── CFOP mini strip ────────────────────────────── */}
+        {size === 3 && <CfopStrip progress={progress} />}
+
+        {/* ── Solution tokens ────────────────────────────── */}
+        {hasMoves && (
+          <div
+            ref={scrollRef}
+            style={{
+              display: 'flex', gap: 4, padding: '8px 10px',
+              overflowX: 'auto', scrollbarWidth: 'none',
+            }}
+          >
+            {moves.map((m, i) => (
+              <MoveChip
+                key={i}
+                notation={m.notation ?? `M${i}`}
+                state={i < moveIndex ? 'done' : i === moveIndex ? 'next' : 'upcoming'}
+                data-move-idx={i}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* ── Status messages ────────────────────────────── */}
+        {status === 'idle' && size !== 3 && (
+          <div style={{ padding: '10px 12px', fontSize: 11, color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>
+            3×3 only
+          </div>
+        )}
+        {status === 'idle' && size === 3 && !hasMoves && (
+          <div style={{ padding: '8px 12px', fontSize: 11, color: 'rgba(255,255,255,0.5)', textAlign: 'center' }}>
+            Waiting for cube state…
+          </div>
+        )}
+        {status === 'solving' && (
+          <div style={{ padding: '8px 12px', fontSize: 11, color: '#fefae0', textAlign: 'center' }}>
+            Computing optimal solution…
+          </div>
+        )}
+        {status === 'error' && (
+          <div style={{ padding: '8px 12px', fontSize: 11, color: '#f87171' }}>
+            {error}
+          </div>
+        )}
+        {isDone && (
+          <div style={{ padding: '6px 12px', fontSize: 11, color: '#00ff88', textAlign: 'center', fontWeight: 600 }}>
+            {alreadySolved ? '✓ Already solved!' : '✓ Cube solved!'}
+          </div>
+        )}
+
+        {/* ── Controls ───────────────────────────────────── */}
+        {size === 3 && (hasMoves || isPlaying) && (
+          <div style={{
+            display: 'flex', gap: 6, padding: '8px 10px',
+            borderTop: '1px solid rgba(255,255,255,0.07)',
+          }}>
+            <button
+              onClick={isPlaying ? pause : play}
+              disabled={!isPlaying && !canPlay}
+              style={ctrlBtn(isPlaying ? '#00d9ff' : '#00ff88', !isPlaying && !canPlay)}
+            >
+              {isPlaying ? '⏸ PAUSE' : isDone ? '↺ REPLAY' : '▶ PLAY'}
+            </button>
+            <button
+              onClick={stepForward}
+              disabled={isPlaying || moveIndex >= moves.length}
+              style={ctrlBtn('#fbbf24', isPlaying || moveIndex >= moves.length)}
+            >
+              ⏭ STEP
+            </button>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+function ctrlBtn(accent, disabled) {
+  return {
+    flex: 1, padding: '6px 0', borderRadius: 6,
+    background: disabled ? 'rgba(255,255,255,0.04)' : `rgba(${hexToRgb(accent)},0.14)`,
+    border: `1px solid ${disabled ? 'rgba(255,255,255,0.10)' : accent}`,
+    color: disabled ? 'rgba(255,255,255,0.25)' : accent,
+    cursor: disabled ? 'default' : 'pointer',
+    fontSize: 11, fontFamily: "'Courier New', monospace", fontWeight: 600,
+    transition: 'all 0.15s',
+  };
+}
+
+function hexToRgb(hex) {
+  // accepts #rrggbb or rgb(...) strings
+  const m = hex.match(/^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+  if (m) return `${parseInt(m[1],16)},${parseInt(m[2],16)},${parseInt(m[3],16)}`;
+  const r = hex.match(/\d+/g);
+  return r ? r.slice(0,3).join(',') : '255,255,255';
+}
+
+// Compact toggle used by BottomNavBar (unchanged)
 export function SolveModeButton({ active, onClick }) {
   return (
     <button
       onClick={onClick}
       className={`btn-compact text ${active ? 'active' : ''}`}
-      style={{
-        color: active ? '#00ff88' : undefined,
-        borderColor: active ? '#00ff88' : undefined
-      }}
+      style={{ color: active ? '#00ff88' : undefined, borderColor: active ? '#00ff88' : undefined }}
     >
       SOLVE
     </button>

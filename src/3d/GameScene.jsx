@@ -127,6 +127,7 @@ export default function GameScene({
     antipodalIntegrityMode,
     solveModeActive,
     solveHighlights,
+    kociembaLayerHighlight,
     size,
     cubies,
     wormHealerMode,
@@ -143,6 +144,7 @@ export default function GameScene({
     antipodalIntegrityMode: s.antipodalIntegrityMode,
     solveModeActive: s.solveModeActive,
     solveHighlights: s.solveHighlights,
+    kociembaLayerHighlight: s.kociembaLayerHighlight,
     size: s.size,
     cubies: s.cubies,
     wormHealerMode: s.wormHealerMode,
@@ -244,6 +246,15 @@ export default function GameScene({
             axis={layerHighlight.axis}
             sliceIndex={layerHighlight.sliceIndex}
             dir={layerHighlight.dir}
+            size={size}
+          />
+        )}
+
+        {solveModeActive && kociembaLayerHighlight && (
+          <LayerHighlight
+            axis={kociembaLayerHighlight.axis}
+            sliceIndex={kociembaLayerHighlight.sliceIndex}
+            dir={kociembaLayerHighlight.dir}
             size={size}
           />
         )}
