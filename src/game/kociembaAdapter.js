@@ -11,8 +11,9 @@
 
 const COLOR_TO_FACE = { 1: 'F', 2: 'L', 3: 'U', 4: 'B', 5: 'R', 6: 'D' };
 
+// Returns '?' sentinel for unrecognised/missing sticker colours so validation catches it.
 function g(cubies, x, y, z, dir) {
-  return COLOR_TO_FACE[cubies[x]?.[y]?.[z]?.stickers?.[dir]?.curr] ?? 'U';
+  return COLOR_TO_FACE[cubies[x]?.[y]?.[z]?.stickers?.[dir]?.curr] ?? '?';
 }
 
 /**
@@ -60,5 +61,15 @@ export function cubiesToKociembaString(cubies) {
     g(cubies,2,1,0,'NZ')+g(cubies,1,1,0,'NZ')+g(cubies,0,1,0,'NZ')+
     g(cubies,2,0,0,'NZ')+g(cubies,1,0,0,'NZ')+g(cubies,0,0,0,'NZ');
 
-  return u + r + f + d + l + b;
+  const str = u + r + f + d + l + b;
+
+  // Reject any state that doesn't have exactly 9 of every face letter.
+  // This catches chaos-mode stickers, flip damage, manifold colours, and
+  // any other situation where a sticker colour wasn't in COLOR_TO_FACE.
+  if (str.length !== 54) return null;
+  for (const face of ['U', 'R', 'F', 'D', 'L', 'B']) {
+    if ((str.split(face).length - 1) !== 9) return null;
+  }
+
+  return str;
 }

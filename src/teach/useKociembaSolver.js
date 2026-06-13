@@ -86,7 +86,7 @@ export function useKociembaSolver(cubies, size) {
     try {
       const { solve: kociembaSolve } = await import('kociemba-wasm');
       const cubeStr = cubiesToKociembaString(cubies);
-      if (!cubeStr) throw new Error('Invalid cube state');
+      if (!cubeStr) throw new Error('Cannot solve: cube has modified stickers (chaos / flip / manifold mode). Reset to a clean state first.');
       const sol = await kociembaSolve(cubeStr);
       const trimmed = (sol || '').trim();
       // Filter identity moves (kociemba can return no-ops for solved cube)
