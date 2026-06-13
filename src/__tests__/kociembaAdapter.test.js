@@ -45,4 +45,36 @@ describe('cubiesToKociembaString', () => {
     // D face (positions 27-35) should remain all D stickers
     expect(str.slice(27, 36)).toBe('DDDDDDDDD');
   });
+
+  // Verified against kociemba-wasm Cube class (c.action('R').toString())
+  it('R move produces exact kociemba-wasm expected string', () => {
+    const cubies = rotateSliceCubies(makeCubies(3), 3, 'col', 2, -1); // R move
+    const str = cubiesToKociembaString(cubies);
+    expect(str).toBe('UUFUUFUUFRRRRRRRRRFFDFFDFFDDDBDDBDDBLLLLLLLLLUBBUBBUBB');
+  });
+
+  // Verify L move — right column of B face gets U stickers, etc.
+  it('L move produces correct face count distribution', () => {
+    const cubies = rotateSliceCubies(makeCubies(3), 3, 'col', 0, 1); // L move
+    const str = cubiesToKociembaString(cubies);
+    expect(str).toHaveLength(54);
+    for (const face of ['U', 'R', 'F', 'D', 'L', 'B']) {
+      expect(str.split(face).length - 1).toBe(9);
+    }
+    // L and R face centers unchanged
+    expect(str[13]).toBe('R');
+    expect(str[40]).toBe('L');
+  });
+
+  // Verify F move
+  it('F move produces correct face count distribution', () => {
+    const cubies = rotateSliceCubies(makeCubies(3), 3, 'depth', 2, -1); // F move
+    const str = cubiesToKociembaString(cubies);
+    expect(str).toHaveLength(54);
+    for (const face of ['U', 'R', 'F', 'D', 'L', 'B']) {
+      expect(str.split(face).length - 1).toBe(9);
+    }
+    // F face center unchanged
+    expect(str[22]).toBe('F');
+  });
 });
