@@ -825,14 +825,16 @@ const CubeAssembly = React.memo(({
 
     // Calculate incremental rotation from GSAP progress
     const currentProgress = animProgressRef.current.value;
+    const animTurns = animState.numTurns ?? 1;
+    const quarterTurns = (Math.PI / 2) * animTurns;
     liveRotation.active = true;
     liveRotation.axis = axis;
     liveRotation.sliceIndex = sliceIndex;
-    liveRotation.angle = currentProgress * (Math.PI / 2) * dir;
+    liveRotation.angle = currentProgress * quarterTurns * dir;
     const deltaProgress = currentProgress - prevProgressRef.current;
     prevProgressRef.current = currentProgress;
 
-    const dRot = deltaProgress * (Math.PI / 2);
+    const dRot = deltaProgress * quarterTurns;
 
     // Apply rotation only to cubies in the slice (avoid iterating all 125 to skip 88%)
     const sliceSet = sliceIndicesRef.current;

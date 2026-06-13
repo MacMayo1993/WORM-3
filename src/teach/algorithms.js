@@ -15,15 +15,12 @@ export function parseAlgorithm(notation, size = 3) {
 
   for (const token of tokens) {
     if (token.endsWith('2')) {
-      const expanded = expandMove(token, size);
-      for (const rot of expanded) {
-        moves.push({ ...rot, notation: token });
-      }
+      const base = token.slice(0, -1);
+      const rot = namedMoveToRotation(base, size);
+      if (rot) moves.push({ ...rot, notation: token, numTurns: 2 });
     } else {
       const rot = namedMoveToRotation(token, size);
-      if (rot) {
-        moves.push({ ...rot, notation: token });
-      }
+      if (rot) moves.push({ ...rot, notation: token, numTurns: 1 });
     }
   }
 

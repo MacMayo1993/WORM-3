@@ -159,15 +159,20 @@ export function useAnimation() {
       // between them, preventing a frame where new sticker colours appear at old (rotated)
       // mesh positions (the "colour glitch after rotations").
       if (!isEcho) {
+        const numTurns = pm.numTurns ?? 1;
         play('/sounds/rotate.mp3');
-        useGameStore.setState((state) => ({
-          cubies: rotateSliceCubies(state.cubies, size, axis, sliceIndex, dir),
-          rotationEpoch: state.rotationEpoch + 1,
-          moves: state.moves + 1,
-          moveHistory: [...state.moveHistory, { type: 'rotation', axis, dir, sliceIndex, numTurns: 1, timestamp: Date.now() }].slice(-10),
-          animState: null,
-          pendingMove: null,
-        }));
+        useGameStore.setState((state) => {
+          let c = state.cubies;
+          for (let i = 0; i < numTurns; i++) c = rotateSliceCubies(c, size, axis, sliceIndex, dir);
+          return {
+            cubies: c,
+            rotationEpoch: state.rotationEpoch + 1,
+            moves: state.moves + numTurns,
+            moveHistory: [...state.moveHistory, { type: 'rotation', axis, dir, sliceIndex, numTurns, timestamp: Date.now() }].slice(-10),
+            animState: null,
+            pendingMove: null,
+          };
+        });
       } else {
         // Echo rotation - quieter sound; only bump cubies + reversalCount
         play('/sounds/rotate.mp3', 0.7);

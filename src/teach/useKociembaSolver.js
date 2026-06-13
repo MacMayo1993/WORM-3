@@ -44,8 +44,9 @@ export function useKociembaSolver(cubies, size) {
       return;
     }
     const move = list[idx];
-    setAnimState({ axis: move.axis, dir: move.dir, sliceIndex: move.sliceIndex, t: 0 });
-    setPendingMove({ axis: move.axis, dir: move.dir, sliceIndex: move.sliceIndex });
+    const numTurns = move.numTurns ?? 1;
+    setAnimState({ axis: move.axis, dir: move.dir, sliceIndex: move.sliceIndex, t: 0, numTurns });
+    setPendingMove({ axis: move.axis, dir: move.dir, sliceIndex: move.sliceIndex, numTurns });
     pendingNextRef.current = true;
     const next = idx + 1;
     moveIndexRef.current = next;
