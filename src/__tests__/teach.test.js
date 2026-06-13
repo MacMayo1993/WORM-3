@@ -78,10 +78,11 @@ describe('parseAlgorithm', () => {
     expect(moves.length).toBe(4);
   });
 
-  it('expands double moves (e.g. R2) into two moves', () => {
+  it('encodes double moves (e.g. R2) as a single entry with numTurns: 2', () => {
     const moves = parseAlgorithm('R2', 3);
-    // R2 expands to 2 quarter-turn moves
-    expect(moves.length).toBe(2);
+    expect(moves.length).toBe(1);
+    expect(moves[0].numTurns).toBe(2);
+    expect(moves[0].notation).toBe('R2');
   });
 
   it('preserves notation label on each move', () => {
