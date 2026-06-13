@@ -162,7 +162,7 @@ const Cubie = React.forwardRef(function Cubie({
       const { r, c } = faceRCFor(m.origDir, m.origPos.x, m.origPos.y, m.origPos.z, size);
       const idx = r * size + c + 1;
       const idStr = String(idx).padStart(3, '0');
-      return `M${m.curr}-${idStr}`;
+      return `M${m.orig}-${idStr}`;
     }
     if (visualMode === 'sudokube') {
       const v = faceValue(dirKey, cubie.x, cubie.y, cubie.z, size);
