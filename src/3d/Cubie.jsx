@@ -162,7 +162,11 @@ const Cubie = React.forwardRef(function Cubie({
       const { r, c } = faceRCFor(m.origDir, m.origPos.x, m.origPos.y, m.origPos.z, size);
       const idx = r * size + c + 1;
       const idStr = String(idx).padStart(3, '0');
-      return `M${m.curr}-${idStr}`;
+      // Swap X/Z antipodal pairs (1↔4, 2↔5) so face IDs match user convention.
+      // Y-axis pair (3, 6) is already correct and is left unchanged.
+      const GRID_FACE = { 1: 4, 2: 5, 4: 1, 5: 2 };
+      const faceId = GRID_FACE[m.orig] ?? m.orig;
+      return `M${faceId}-${idStr}`;
     }
     if (visualMode === 'sudokube') {
       const v = faceValue(dirKey, cubie.x, cubie.y, cubie.z, size);
