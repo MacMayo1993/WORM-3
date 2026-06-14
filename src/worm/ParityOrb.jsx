@@ -73,27 +73,21 @@ function _mkMobius(R, w) {
 // Pre-built once, shared across all instances.  geometry={} prop prevents disposal.
 const _orbGeos = {
   normal: {
-    core:         _mkMobius(0.22, 0.090),                          // Möbius strip (was OctahedronGeometry)
-    innerCore:    new THREE.SphereGeometry(0.075, 6, 6),
-    shell:        new THREE.SphereGeometry(0.22, 8, 8),
-    innerGlow:    new THREE.SphereGeometry(0.30, 6, 6),
-    ringA:        new THREE.TorusGeometry(0.350, 0.012, 6, 18),
-    ringB:        new THREE.TorusGeometry(0.350 * 0.95, 0.010, 6, 18),
+    core:         _mkMobius(0.30, 0.120),                          // Möbius strip — dominant visible shape
+    ringA:        new THREE.TorusGeometry(0.400, 0.011, 6, 18),    // orbit rings sit just outside the strip
+    ringB:        new THREE.TorusGeometry(0.400 * 0.92, 0.009, 6, 18),
     electron:     new THREE.SphereGeometry(0.042, 7, 7),
-    glow:         new THREE.SphereGeometry(0.50, 8, 8),
+    glow:         new THREE.SphereGeometry(0.58, 8, 8),            // outer ambient aura (BackSide only)
   },
   target: {
-    core:         _mkMobius(0.28, 0.112),                          // Möbius strip, larger for target
-    innerCore:    new THREE.SphereGeometry(0.092, 8, 8),
-    shell:        new THREE.SphereGeometry(0.27, 10, 10),
-    innerGlow:    new THREE.SphereGeometry(0.37, 8, 8),
-    ringA:        new THREE.TorusGeometry(0.420, 0.015, 8, 24),
-    ringB:        new THREE.TorusGeometry(0.420 * 0.95, 0.012, 8, 24),
-    ringC:        new THREE.TorusGeometry(0.420 * 1.05, 0.010, 8, 24),
+    core:         _mkMobius(0.38, 0.152),                          // Möbius strip, larger for target
+    ringA:        new THREE.TorusGeometry(0.500, 0.015, 8, 24),
+    ringB:        new THREE.TorusGeometry(0.500 * 0.92, 0.012, 8, 24),
+    ringC:        new THREE.TorusGeometry(0.500 * 1.08, 0.010, 8, 24),
     electron:     new THREE.SphereGeometry(0.052, 8, 8),
     electronGlow: new THREE.SphereGeometry(0.088, 6, 6),
-    glow:         new THREE.SphereGeometry(0.60, 10, 10),
-    lockRing:     new THREE.TorusGeometry(0.5, 0.03, 8, 36),
+    glow:         new THREE.SphereGeometry(0.72, 10, 10),
+    lockRing:     new THREE.TorusGeometry(0.62, 0.03, 8, 36),
   },
 };
 
@@ -172,50 +166,15 @@ function SingleOrb({
   return (
     <group ref={orbGroupRef} position={[position[0], position[1], position[2]]}>
 
-      {/* Möbius strip core — DoubleSide so the full twisted band is visible as it spins */}
+      {/* Möbius strip — the entire visible orb shape. DoubleSide so the twist reads clearly. */}
       <mesh ref={coreRef} geometry={g.core}>
         <meshStandardMaterial
           color={color}
           emissive={color}
-          emissiveIntensity={isTarget ? 2.2 : 1.6}
-          metalness={0.20}
-          roughness={0.08}
+          emissiveIntensity={isTarget ? 2.4 : 1.8}
+          metalness={0.15}
+          roughness={0.06}
           side={THREE.DoubleSide}
-        />
-      </mesh>
-
-      {/* Inner plasma core — bright hot center, counter-spins vs crystal */}
-      <mesh ref={innerCoreRef} geometry={g.innerCore}>
-        <meshBasicMaterial
-          color={color}
-          transparent
-          opacity={0.92}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-          toneMapped={false}
-        />
-      </mesh>
-
-      {/* Energy shell — outer transparent envelope */}
-      <mesh ref={shellRef} geometry={g.shell}>
-        <meshBasicMaterial
-          color={color}
-          transparent
-          opacity={isTarget ? 0.22 : 0.14}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-        />
-      </mesh>
-
-      {/* Inner tight aura — main color, close-in glow halo */}
-      <mesh ref={innerGlowRef} geometry={g.innerGlow}>
-        <meshBasicMaterial
-          color={color}
-          transparent
-          opacity={isTarget ? 0.28 : 0.18}
-          side={THREE.BackSide}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
         />
       </mesh>
 
