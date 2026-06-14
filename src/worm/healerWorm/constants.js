@@ -13,8 +13,8 @@ export const GLASS_MAX_OPACITY = 0.28;
 export const GLASS_MIN_TRANSMISSION = 0.72;
 export const GLASS_MAX_TRANSMISSION = 0.95;
 export const TUNNEL_SURF_FOV = 95;
-export const TUNNEL_SURF_BACK = 0.2;       // camera behind worm along tunnel axis
-export const TUNNEL_SURF_UP = 0.10;        // raise camera above ribbon surface; nonzero value causes Möbius orbit (camera rolls 180° over tunnel) — intentional RP² effect
+export const TUNNEL_SURF_BACK = 0.24;      // camera behind worm along tunnel axis (×1.2 = 20% zoom-out)
+export const TUNNEL_SURF_UP = 0.12;        // raise camera above ribbon surface; nonzero value causes Möbius orbit (camera rolls 180° over tunnel) — intentional RP² effect
 export const TUNNEL_LOOK_AHEAD = 1.8;      // 1 arm-length ahead; keeps exit in view without shooting past the cube
 export const TUNNEL_SURF_SWAY = 0.22;
 export const TUNNEL_SPEED_SCALE = 0.50; // 0.264 was 35% slower than original; 0.50 keeps traversal snappy
