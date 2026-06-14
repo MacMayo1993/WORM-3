@@ -383,10 +383,11 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
       // Normal blending means 82% of the dark tunnel color shows, blocking background.
       // The additive core tube + streaks then glow on top for the wormhole energy feel.
       if (atmosphereMatRef.current) {
-        // Very dark base tinted with entry-side tunnel color (12%) — nearly black but hued
-        const ar = _c1.r * 0.12 + 0.01;
-        const ag = _c1.g * 0.12 + 0.01;
-        const ab = _c1.b * 0.12 + 0.07;
+        // Vivid dark tint from entry-face color (was 0.12 = nearly invisible; 0.42 = clearly colored).
+        // Base blue-shift (0.18) ensures dark-hued faces still feel like deep space.
+        const ar = _c1.r * 0.42 + 0.02;
+        const ag = _c1.g * 0.42 + 0.02;
+        const ab = _c1.b * 0.42 + 0.18;
         atmosphereMatRef.current.color.setRGB(ar, ag, ab);
         atmosphereMatRef.current.opacity = dead ? 0 : 0.97 + burstEnv * 0.03;
       }

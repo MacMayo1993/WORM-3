@@ -17,7 +17,7 @@ export const TUNNEL_SURF_BACK = 0.2;       // camera behind worm along tunnel ax
 export const TUNNEL_SURF_UP = 0.10;        // raise camera above ribbon surface; nonzero value causes Möbius orbit (camera rolls 180° over tunnel) — intentional RP² effect
 export const TUNNEL_LOOK_AHEAD = 1.8;      // 1 arm-length ahead; keeps exit in view without shooting past the cube
 export const TUNNEL_SURF_SWAY = 0.22;
-export const TUNNEL_SPEED_SCALE = 0.264; // 0.357 / 1.35 — 35% longer traversal time
+export const TUNNEL_SPEED_SCALE = 0.50; // 0.264 was 35% slower than original; 0.50 keeps traversal snappy
 
 // Face outward normals.
 export const FACE_NORMALS = {

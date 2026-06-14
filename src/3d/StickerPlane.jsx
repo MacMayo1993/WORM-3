@@ -1373,6 +1373,20 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         />
       </mesh>
 
+      {/* Antipodal back face — visible from inside the cube; shows the RP² partner tile
+          at 80% scale so the interior reads as distinct from the front face. */}
+      {antipodalHex && (
+        <mesh position={[0, 0, -0.012]} rotation={[0, Math.PI, 0]} scale={[0.8, 0.8, 1]}>
+          <primitive object={_sharedStickerGeo} attach="geometry" />
+          <meshStandardMaterial
+            color={antipodalHex}
+            roughness={0.45}
+            metalness={0.08}
+            side={THREE.FrontSide}
+          />
+        </mesh>
+      )}
+
       <group ref={innerGroupRef}>
         {/* Background quad — full-square mesh 1 mm behind the disc-clipped main sticker
             so the white '#ffffff' texture-tint does not bleed through the transparent disc
