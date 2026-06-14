@@ -33,30 +33,66 @@ export const ORB_TYPES = {
   magnet: { electronColor: '#ffdd88', electronEmissive: '#ffaa00', glowBoost: 1.5 },
 };
 
+// ── Möbius strip geometry factory ───────────────────────────────────────────
+// Creates a mathematically correct Möbius strip: a band that makes one 180°
+// half-twist as it loops around. The last ring reconnects to the first ring
+// with vertices flipped top-to-bottom — that's the defining Möbius closure.
+function _mkMobius(R, w) {
+  const uS = 48, vS = 3, cols = vS + 1;
+  const pos = [], uvs = [], idx = [];
+  for (let i = 0; i <= uS; i++) {
+    const u = (i / uS) * Math.PI * 2;
+    for (let j = 0; j <= vS; j++) {
+      const v = (j / vS) * 2 - 1;
+      pos.push(
+        (R + w * v * Math.cos(u * 0.5)) * Math.cos(u),
+        (R + w * v * Math.cos(u * 0.5)) * Math.sin(u),
+        w * v * Math.sin(u * 0.5)
+      );
+      uvs.push(i / uS, j / vS);
+    }
+  }
+  for (let i = 0; i < uS; i++) {
+    for (let j = 0; j < vS; j++) {
+      const a = i * cols + j, b = i * cols + j + 1;
+      const last = i === uS - 1;
+      const c = last ? vS - j     : (i + 1) * cols + j;
+      const d = last ? vS - j - 1 : (i + 1) * cols + j + 1;
+      idx.push(a, b, c, b, d, c);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+}
+
 // ── Shared module-level geometries (M2) ─────────────────────────────────────
 // Pre-built once, shared across all instances.  geometry={} prop prevents disposal.
 const _orbGeos = {
   normal: {
-    core:         new THREE.OctahedronGeometry(0.16, 1),
+    core:         _mkMobius(0.22, 0.090),                          // Möbius strip (was OctahedronGeometry)
     innerCore:    new THREE.SphereGeometry(0.075, 6, 6),
-    shell:        new THREE.SphereGeometry(0.22, 8, 8),            // was 20×20
-    innerGlow:    new THREE.SphereGeometry(0.30, 6, 6),            // was 12×12
-    ringA:        new THREE.TorusGeometry(0.350, 0.012, 6, 18),    // was 8×32; 2 rings only
+    shell:        new THREE.SphereGeometry(0.22, 8, 8),
+    innerGlow:    new THREE.SphereGeometry(0.30, 6, 6),
+    ringA:        new THREE.TorusGeometry(0.350, 0.012, 6, 18),
     ringB:        new THREE.TorusGeometry(0.350 * 0.95, 0.010, 6, 18),
     electron:     new THREE.SphereGeometry(0.042, 7, 7),
-    glow:         new THREE.SphereGeometry(0.50, 8, 8),            // was 16×16
+    glow:         new THREE.SphereGeometry(0.50, 8, 8),
   },
   target: {
-    core:         new THREE.OctahedronGeometry(0.20, 1),
+    core:         _mkMobius(0.28, 0.112),                          // Möbius strip, larger for target
     innerCore:    new THREE.SphereGeometry(0.092, 8, 8),
-    shell:        new THREE.SphereGeometry(0.27, 10, 10),          // was 20×20
-    innerGlow:    new THREE.SphereGeometry(0.37, 8, 8),            // was 12×12
-    ringA:        new THREE.TorusGeometry(0.420, 0.015, 8, 24),    // was 8×32
+    shell:        new THREE.SphereGeometry(0.27, 10, 10),
+    innerGlow:    new THREE.SphereGeometry(0.37, 8, 8),
+    ringA:        new THREE.TorusGeometry(0.420, 0.015, 8, 24),
     ringB:        new THREE.TorusGeometry(0.420 * 0.95, 0.012, 8, 24),
     ringC:        new THREE.TorusGeometry(0.420 * 1.05, 0.010, 8, 24),
     electron:     new THREE.SphereGeometry(0.052, 8, 8),
     electronGlow: new THREE.SphereGeometry(0.088, 6, 6),
-    glow:         new THREE.SphereGeometry(0.60, 10, 10),          // was 16×16
+    glow:         new THREE.SphereGeometry(0.60, 10, 10),
     lockRing:     new THREE.TorusGeometry(0.5, 0.03, 8, 36),
   },
 };
@@ -136,19 +172,15 @@ function SingleOrb({
   return (
     <group ref={orbGroupRef} position={[position[0], position[1], position[2]]}>
 
-      {/* Crystal core outline — back-face scale trick */}
-      <mesh ref={outlineRef} geometry={g.core}>
-        <meshBasicMaterial color="#000000" side={THREE.BackSide} />
-      </mesh>
-
-      {/* Crystal nucleus — OctahedronGeometry for faceted gem look */}
+      {/* Möbius strip core — DoubleSide so the full twisted band is visible as it spins */}
       <mesh ref={coreRef} geometry={g.core}>
         <meshStandardMaterial
           color={color}
           emissive={color}
-          emissiveIntensity={isTarget ? 2.0 : 1.4}
-          metalness={0.35}
-          roughness={0.10}
+          emissiveIntensity={isTarget ? 2.2 : 1.6}
+          metalness={0.20}
+          roughness={0.08}
+          side={THREE.DoubleSide}
         />
       </mesh>
 
