@@ -122,7 +122,8 @@ function TilePreviewCanvas({ styleKey, colorHex = '#4a7fa5', size = 48, canvasSt
 
 // ── Shared inline styles ──────────────────────────────────────────────────────
 
-// isMobile imported from utils/device.js
+const ACCENT = '#6A2C91';
+const ACCENT_SHADOW = '#3d1854';
 
 const S = {
   overlay: {
@@ -131,9 +132,9 @@ const S = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: 'rgba(8,10,22,0.72)',
-    backdropFilter: 'blur(24px)',
-    WebkitBackdropFilter: 'blur(24px)',
+    background: 'rgba(160,152,140,0.60)',
+    backdropFilter: 'blur(18px)',
+    WebkitBackdropFilter: 'blur(18px)',
     zIndex: 1000,
     fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif',
     padding: isMobile ? '12px' : '0',
@@ -142,15 +143,15 @@ const S = {
   },
 
   sheet: {
-    background: 'rgba(14,17,38,0.94)',
-    borderRadius: isMobile ? '18px' : '24px',
+    background: '#f5f0e8',
+    borderRadius: isMobile ? '16px' : '20px',
     width: 'min(640px, 100%)',
     maxHeight: isMobile ? '92vh' : '88vh',
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
-    boxShadow: '0 32px 80px rgba(0,0,0,0.60), 0 0 0 1px rgba(255,255,255,0.06)',
-    border: '1px solid rgba(255,255,255,0.06)',
+    boxShadow: '0 20px 56px rgba(0,0,0,0.22), 0 2px 8px rgba(0,0,0,0.10)',
+    border: '1px solid #cec8be',
     animation: 'modalSheetIn 0.30s cubic-bezier(0.22, 1, 0.36, 1)',
   },
 
@@ -166,25 +167,26 @@ const S = {
   },
 
   dot: (active, current) => ({
-    height: '3px',
-    borderRadius: '2px',
-    background: current ? '#a855f7' : active ? 'rgba(168,85,247,0.50)' : 'rgba(255,255,255,0.15)',
+    height: '8px',
+    borderRadius: '3px',
+    background: current ? ACCENT : active ? `${ACCENT}66` : '#cec8be',
     flex: current ? '2' : '1',
     transition: 'all 0.35s cubic-bezier(0.4,0,0.2,1)',
+    boxShadow: current ? `0 1px 4px ${ACCENT}55` : 'none',
   }),
 
   title: {
     fontSize: '24px',
     fontWeight: '700',
     letterSpacing: '-0.5px',
-    color: '#e8edf8',
+    color: '#1e1612',
     margin: '0 0 4px',
     lineHeight: 1.15,
   },
 
   subtitle: {
     fontSize: '13px',
-    color: 'rgba(200,220,255,0.65)',
+    color: '#7a6e62',
     margin: '0 0 20px',
     fontWeight: '400',
   },
@@ -194,19 +196,21 @@ const S = {
     overflowY: 'auto',
     flex: 1,
     scrollbarWidth: 'thin',
-    scrollbarColor: 'rgba(255,255,255,0.15) transparent',
+    scrollbarColor: '#c4beb6 transparent',
   },
 
-  // Generic card with optional selected state
   card: (selected) => ({
     display: 'flex',
     padding: '14px 16px',
-    borderRadius: '14px',
-    border: selected ? '2px solid rgba(168,85,247,0.55)' : '2px solid rgba(255,255,255,0.08)',
-    background: selected ? 'rgba(168,85,247,0.18)' : 'rgba(255,255,255,0.05)',
-    boxShadow: selected ? '0 0 14px rgba(168,85,247,0.22)' : 'none',
+    borderRadius: '10px',
+    border: selected ? `2px solid ${ACCENT}` : '2px solid #d6d0c8',
+    background: selected ? `${ACCENT}12` : '#ffffff',
+    boxShadow: selected
+      ? 'inset 0 2px 5px rgba(0,0,0,0.10), 0 1px 0 rgba(255,255,255,0.6)'
+      : '0 3px 0 #c4beb6, 0 4px 10px rgba(0,0,0,0.06)',
+    transform: selected ? 'translateY(1px)' : 'none',
     cursor: 'pointer',
-    transition: 'all 0.18s ease',
+    transition: 'all 0.15s ease',
     outline: 'none',
     WebkitTapHighlightColor: 'transparent',
     textAlign: 'left',
@@ -216,17 +220,17 @@ const S = {
   }),
 
   checkmark: {
-    width: '18px',
-    height: '18px',
-    borderRadius: '50%',
-    background: '#a855f7',
+    width: '20px',
+    height: '20px',
+    borderRadius: '5px',
+    background: ACCENT,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
+    boxShadow: `0 2px 0 ${ACCENT_SHADOW}`,
   },
 
-  // Background grid
   bgGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(3, 1fr)',
@@ -235,9 +239,10 @@ const S = {
   },
 
   bgCard: (selected) => ({
-    borderRadius: '12px',
+    borderRadius: '10px',
     overflow: 'hidden',
-    border: selected ? '2.5px solid #a855f7' : '2.5px solid transparent',
+    border: selected ? `3px solid ${ACCENT}` : '3px solid transparent',
+    boxShadow: selected ? `0 0 0 1px ${ACCENT}44` : '0 2px 6px rgba(0,0,0,0.10)',
     cursor: 'pointer',
     transition: 'all 0.18s ease',
     outline: 'none',
@@ -265,34 +270,35 @@ const S = {
     justifyContent: 'space-between',
     alignItems: 'center',
     flexShrink: 0,
-    borderTop: '1px solid rgba(255,255,255,0.08)',
+    borderTop: '1px solid #d6d0c8',
+    background: '#ede8df',
   },
 
   btnSecondary: {
     background: 'none',
-    border: 'none',
+    border: '1.5px solid #d6d0c8',
     fontSize: '15px',
     fontWeight: '500',
-    color: 'rgba(200,220,255,0.55)',
+    color: '#7a6e62',
     cursor: 'pointer',
     padding: '10px 16px',
     borderRadius: '10px',
-    transition: 'color 0.15s ease',
+    transition: 'all 0.15s ease',
     fontFamily: 'inherit',
   },
 
   btnPrimary: {
-    background: 'linear-gradient(135deg, #a855f7, #c084fc)',
+    background: ACCENT,
     border: 'none',
     fontSize: '15px',
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#fff',
     cursor: 'pointer',
     padding: '12px 28px',
-    borderRadius: '12px',
-    transition: 'opacity 0.15s ease, transform 0.12s ease',
+    borderRadius: '10px',
+    transition: 'all 0.12s ease',
     fontFamily: 'inherit',
-    boxShadow: '0 4px 20px rgba(168,85,247,0.40)',
+    boxShadow: `0 4px 0 ${ACCENT_SHADOW}, 0 6px 16px ${ACCENT}44`,
   },
 };
 
@@ -383,15 +389,14 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           return (
             <button key={n} style={{ ...S.card(selected), flexDirection: 'column', gap: '12px', padding: '18px 16px' }}
               onClick={() => setCubeSize(n)}>
-              {/* Loaded tile style preview + cube face density thumbnail */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{
                   width: '44px',
                   height: '44px',
                   borderRadius: '8px',
                   overflow: 'hidden',
-                  border: `1px solid ${selected ? 'rgba(255,255,255,0.40)' : 'rgba(255,255,255,0.15)'}`,
-                  background: 'rgba(255,255,255,0.06)',
+                  border: `1px solid ${selected ? 'rgba(0,0,0,0.15)' : '#d6d0c8'}`,
+                  background: '#f0ebe2',
                 }}>
                   <TilePreviewCanvas
                     styleKey={settings.tileStyle === 'random' ? 'solid' : (settings.tileStyle || 'solid')}
@@ -409,7 +414,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                     <div key={i} style={{
                       aspectRatio: '1',
                       borderRadius: '3px',
-                      background: selected ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.20)',
+                      background: selected ? ACCENT : '#d4cfc5',
                       transition: 'background 0.18s ease',
                     }} />
                   ))}
@@ -418,13 +423,13 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
 
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '3px' }}>
-                  <span style={{ fontSize: '16px', fontWeight: '700', color: '#e8edf8', letterSpacing: '-0.4px' }}>{name}</span>
+                  <span style={{ fontSize: '16px', fontWeight: '700', color: '#1e1612', letterSpacing: '-0.4px' }}>{name}</span>
                   <span style={{
                     fontSize: '10px', fontWeight: '600', letterSpacing: '0.04em',
-                    textTransform: 'uppercase', color: selected ? '#e8edf8' : 'rgba(180,210,255,0.40)',
+                    textTransform: 'uppercase', color: selected ? ACCENT : '#9a8e82',
                   }}>{tag}</span>
                 </div>
-                <div style={{ fontSize: '12px', color: 'rgba(180,210,255,0.50)' }}>{desc}</div>
+                <div style={{ fontSize: '12px', color: '#9a8e82' }}>{desc}</div>
               </div>
 
               {selected && (
@@ -454,9 +459,9 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
             )}
             <div style={S.bgLabel}>{opt.label}</div>
             {selected && (
-              <div style={{ position: 'absolute', top: '7px', right: '7px', width: '20px', height: '20px', borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 6px rgba(0,0,0,0.25)' }}>
+              <div style={{ position: 'absolute', top: '7px', right: '7px', width: '20px', height: '20px', borderRadius: '5px', background: ACCENT, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 2px 0 ${ACCENT_SHADOW}` }}>
                 <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                  <path d="M1 4L3.5 6.5L9 1" stroke="#0a0a0a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </div>
             )}
@@ -476,7 +481,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
 
     return (
       <>
-        {/* Image upload — shown at top, prominent */}
+        {/* Image upload */}
         <div style={{ marginBottom: '16px' }}>
           <button
             style={{
@@ -487,31 +492,29 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
             }}
             onClick={() => fileInputRef.current?.click()}
           >
-            {/* Preview or placeholder */}
             {customPreview ? (
               <img src={customPreview} alt="Uploaded"
                 style={{ width: '56px', height: '36px', objectFit: 'cover', borderRadius: '8px', flexShrink: 0 }} />
             ) : (
               <div style={{
                 width: '56px', height: '36px', borderRadius: '8px',
-                background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center',
+                background: '#f0ebe2', border: '1px solid #d6d0c8', display: 'flex', alignItems: 'center',
                 justifyContent: 'center', fontSize: '10px', fontWeight: 600, letterSpacing: '0.06em',
-                color: 'rgba(200,220,255,0.35)', flexShrink: 0,
+                color: '#9a8e82', flexShrink: 0,
               }}>IMG</div>
             )}
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '14px', fontWeight: settings.colorScheme === 'custom' ? '600' : '500', color: '#e8edf8' }}>
+              <div style={{ fontSize: '14px', fontWeight: settings.colorScheme === 'custom' ? '600' : '500', color: '#1e1612' }}>
                 Extract from Image
               </div>
-              <div style={{ fontSize: '12px', color: 'rgba(200,220,255,0.65)', marginTop: '2px' }}>
+              <div style={{ fontSize: '12px', color: '#7a6e62', marginTop: '2px' }}>
                 {customPreview ? 'Tap to change image' : 'Upload a photo to auto-generate a palette'}
               </div>
             </div>
-            {/* Extracted color dots when active */}
             {resolvedCustom && (
               <div style={{ display: 'flex', gap: '3px', flexShrink: 0 }}>
                 {[1, 2, 3, 4, 5, 6].map(i => (
-                  <div key={i} style={{ width: '12px', height: '12px', borderRadius: '50%', background: resolvedCustom[i], boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+                  <div key={i} style={{ width: '12px', height: '12px', borderRadius: '3px', background: resolvedCustom[i], boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
                 ))}
               </div>
             )}
@@ -523,12 +526,11 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
 
         {/* Divider */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
-          <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.10)' }} />
-          <span style={{ fontSize: '11px', fontWeight: '600', letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(180,210,255,0.40)' }}>Presets</span>
-          <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.10)' }} />
+          <div style={{ flex: 1, height: '1px', background: '#d6d0c8' }} />
+          <span style={{ fontSize: '11px', fontWeight: '600', letterSpacing: '0.06em', textTransform: 'uppercase', color: '#9a8e82' }}>Presets</span>
+          <div style={{ flex: 1, height: '1px', background: '#d6d0c8' }} />
         </div>
 
-        {/* Palette grid — 2 columns, name + preview beside all 5 color dots, matching Freeplay wizard */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '7px', paddingBottom: '8px' }}>
           {WIZARD_SCHEME_KEYS.filter(k => k !== 'custom').map(key => {
             const owned = ownedItems.includes(`scheme_${key}`);
@@ -542,7 +544,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                   ...(owned ? {} : { opacity: 0.42, cursor: 'not-allowed', pointerEvents: 'none' }),
                 }}
                 onClick={() => owned && select('colorScheme', key)}>
-                <span style={{ fontSize: '12px', fontWeight: selected ? '600' : '400', color: selected ? '#e8edf8' : 'rgba(200,220,255,0.65)', lineHeight: 1.2 }}>
+                <span style={{ fontSize: '12px', fontWeight: selected ? '600' : '400', color: selected ? '#1e1612' : '#7a6e62', lineHeight: 1.2 }}>
                   {SCHEME_LABELS[key]}{!owned ? ' 🔒' : ''}
                 </span>
                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
@@ -551,7 +553,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '3px', flex: 1 }}>
                     {colors.slice(1).map((c, i) => (
-                      <div key={i} style={{ width: '100%', aspectRatio: '1', borderRadius: '50%', background: owned ? c : '#bbb', boxShadow: '0 1px 2px rgba(0,0,0,0.18)' }} />
+                      <div key={i} style={{ width: '100%', aspectRatio: '1', borderRadius: '3px', background: owned ? c : '#bbb', boxShadow: '0 1px 2px rgba(0,0,0,0.18)' }} />
                     ))}
                   </div>
                 </div>
@@ -573,7 +575,6 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       ? settings.customColors
       : COLOR_SCHEMES[settings.colorScheme] || COLOR_SCHEMES.standard;
 
-    // The global style (null when per-face styles diverge)
     const perFace = settings.perFaceStyles;
     const faceValues = [1, 2, 3, 4, 5, 6].map(id => (perFace?.[id]) || settings.tileStyle || 'solid');
     const globalStyle = faceValues.every(v => v === faceValues[0]) ? faceValues[0] : null;
@@ -584,17 +585,13 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     };
 
     const applyPerFace = (faceId, key) => {
-      // Only track faces that have been explicitly overridden.
-      // Starting from settings.perFaceStyles || {} avoids copying 'random' (or any
-      // global tileStyle) into entries for untouched faces, which would cause those
-      // faces to get the literal string 'random' written into manifoldStyles.
       const current = settings.perFaceStyles || {};
       setSettings(s => ({ ...s, perFaceStyles: { ...current, [faceId]: key } }));
     };
 
     const StyleGrid = ({ keys, label }) => (
       <div style={{ marginBottom: '20px' }}>
-        <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(180,210,255,0.40)', marginBottom: '8px' }}>
+        <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9a8e82', marginBottom: '8px' }}>
           {label}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '7px' }}>
@@ -603,9 +600,13 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
             const sel = globalStyle === key;
             return (
               <button key={key} style={{
-                display: 'block', position: 'relative', padding: 0, borderRadius: '12px',
-                border: sel ? '2px solid rgba(255,255,255,0.40)' : '2px solid rgba(255,255,255,0.09)',
-                background: 'rgba(255,255,255,0.06)',
+                display: 'block', position: 'relative', padding: 0, borderRadius: '10px',
+                border: sel ? `2px solid ${ACCENT}` : '2px solid #d6d0c8',
+                background: '#f0ebe2',
+                boxShadow: sel
+                  ? 'inset 0 2px 4px rgba(0,0,0,0.10)'
+                  : '0 2px 0 #c4beb6, 0 3px 6px rgba(0,0,0,0.06)',
+                transform: sel ? 'translateY(1px)' : 'none',
                 cursor: owned ? 'pointer' : 'not-allowed',
                 opacity: owned ? 1 : 0.38,
                 outline: 'none', WebkitTapHighlightColor: 'transparent',
@@ -636,8 +637,8 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
             onClick={() => applyGlobal('random')}
           >
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '14px', fontWeight: '600', color: '#e8edf8' }}>Random Mix</div>
-              <div style={{ fontSize: '12px', color: 'rgba(200,220,255,0.65)', marginTop: '2px' }}>Different style on every face</div>
+              <div style={{ fontSize: '14px', fontWeight: '600', color: '#1e1612' }}>Random Mix</div>
+              <div style={{ fontSize: '12px', color: '#7a6e62', marginTop: '2px' }}>Different style on every face</div>
             </div>
             {settings.tileStyle === 'random' && !perFace && <Checkmark />}
           </button>
@@ -649,25 +650,23 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
 
         {/* Per-face overrides */}
         <div style={{ marginBottom: '8px' }}>
-          <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(180,210,255,0.40)', marginBottom: '10px' }}>
+          <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9a8e82', marginBottom: '10px' }}>
             Per Face
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
             {[1, 2, 3, 4, 5, 6].map(faceId => {
-              // 'random' is not a selectable per-face option; fall back to 'solid' so the
-              // select box has a valid value when the global style is Random Mix.
               const globalFallback = settings.tileStyle === 'random' ? 'solid' : (settings.tileStyle || 'solid');
               const faceStyle = perFace?.[faceId] || globalFallback;
               const faceColor = resolvedColors[faceId] || '#4a7fa5';
               return (
                 <div key={faceId} style={{
                   display: 'flex', flexDirection: 'column', gap: '6px',
-                  padding: '10px', borderRadius: '12px', background: 'rgba(255,255,255,0.06)',
-                  border: `2px solid ${faceColor}44`,
+                  padding: '10px', borderRadius: '10px', background: '#f0ebe2',
+                  border: `2px solid ${faceColor}55`,
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: faceColor, flexShrink: 0 }} />
-                    <span style={{ fontSize: '11px', fontWeight: '600', color: 'rgba(200,220,255,0.65)' }}>{FACE_LABELS[faceId]}</span>
+                    <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: faceColor, flexShrink: 0, boxShadow: '0 1px 0 rgba(0,0,0,0.20)' }} />
+                    <span style={{ fontSize: '11px', fontWeight: '600', color: '#7a6e62' }}>{FACE_LABELS[faceId]}</span>
                   </div>
                   <TilePreviewCanvas styleKey={faceStyle === 'random' ? 'solid' : faceStyle} colorHex={faceColor} size={36} />
                   <select
@@ -675,8 +674,8 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                     onChange={e => applyPerFace(faceId, e.target.value)}
                     style={{
                       fontSize: '10px', padding: '4px 6px', borderRadius: '6px',
-                      border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)',
-                      color: '#e8edf8', fontFamily: 'inherit', cursor: 'pointer',
+                      border: '1px solid #d6d0c8', background: '#f7f3ec',
+                      color: '#1e1612', fontFamily: 'inherit', cursor: 'pointer',
                       appearance: 'none', WebkitAppearance: 'none',
                     }}
                   >
@@ -703,7 +702,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
   const renderGameplay = () => {
     const OptionGroup = ({ label, options, value, onChange, accent }) => (
       <div style={{ display: 'grid', gap: '8px' }}>
-        <div style={{ fontSize: '12px', fontWeight: 700, color: 'rgba(200,220,255,0.65)', letterSpacing: '0.04em' }}>{label}</div>
+        <div style={{ fontSize: '12px', fontWeight: 700, color: '#7a6e62', letterSpacing: '0.04em' }}>{label}</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
           {options.map(opt => {
             const selected = value === opt.value;
@@ -714,19 +713,20 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                 style={{
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
                   padding: '14px 8px 12px',
-                  borderRadius: '14px',
-                  border: selected ? `2px solid ${accent}` : '2px solid rgba(255,255,255,0.08)',
-                  background: selected ? `${accent}22` : 'rgba(255,255,255,0.05)',
-                  boxShadow: selected ? `0 0 14px ${accent}44` : 'none',
+                  borderRadius: '10px',
+                  border: selected ? `2px solid ${accent}` : '2px solid #d6d0c8',
+                  background: selected ? `${accent}14` : '#ffffff',
+                  boxShadow: selected ? 'inset 0 2px 4px rgba(0,0,0,0.08)' : '0 2px 0 #c4beb6, 0 3px 6px rgba(0,0,0,0.06)',
+                  transform: selected ? 'translateY(1px)' : 'none',
                   cursor: 'pointer',
-                  transition: 'all 0.18s ease',
+                  transition: 'all 0.15s ease',
                   outline: 'none',
                   WebkitTapHighlightColor: 'transparent',
                   fontFamily: 'inherit',
                 }}
               >
-                <span style={{ fontSize: '13px', fontWeight: 700, color: selected ? '#e8edf8' : 'rgba(200,220,255,0.70)', letterSpacing: '-0.2px' }}>{opt.label}</span>
-                <span style={{ fontSize: '10px', color: selected ? accent : 'rgba(180,210,255,0.40)', fontWeight: 500 }}>{opt.hint}</span>
+                <span style={{ fontSize: '13px', fontWeight: 700, color: selected ? accent : '#7a6e62', letterSpacing: '-0.2px' }}>{opt.label}</span>
+                <span style={{ fontSize: '10px', color: selected ? accent : '#9a8e82', fontWeight: 500 }}>{opt.hint}</span>
               </button>
             );
           })}
@@ -738,7 +738,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       <div style={{ display: 'grid', gap: '20px' }}>
         <OptionGroup
           label="Worm Speed"
-          accent="#60a5fa"
+          accent="#1565C0"
           value={settings.wormSpeed}
           onChange={v => select('wormSpeed', v)}
           options={[
@@ -749,7 +749,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
         />
         <OptionGroup
           label="Orb Count"
-          accent="#a78bfa"
+          accent={ACCENT}
           value={settings.wormOrbCount}
           onChange={v => select('wormOrbCount', v)}
           options={[
@@ -760,7 +760,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
         />
         <OptionGroup
           label="Wormhole Duration"
-          accent="#f59e0b"
+          accent="#b58a00"
           value={settings.wormholeInterval}
           onChange={v => select('wormholeInterval', v)}
           options={[
@@ -893,13 +893,13 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
         <div style={{
           display: 'grid',
           gridTemplateColumns: isMobile ? '1fr' : '44% 56%',
-          borderRadius: '20px',
+          borderRadius: '16px',
           overflow: 'hidden',
-          border: '1.5px solid rgba(0,0,0,0.1)',
-          boxShadow: '0 6px 28px rgba(0,0,0,0.14)',
+          border: '1.5px solid #cec8be',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.10)',
         }}>
 
-          {/* LEFT — dark spotlight stage */}
+          {/* LEFT — dark spotlight stage (intentionally dark for worm glow effect) */}
           <div style={{
             background: `radial-gradient(ellipse at 50% 30%, ${activeSkin.glow}2e 0%, #0d0818 55%, #060410 100%)`,
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
@@ -1075,9 +1075,9 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           </div>
         </div>
 
-        {/* ── Skin picker — compact horizontal scroll ── */}
+        {/* ── Skin picker ── */}
         <div>
-          <div style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(180,210,255,0.40)', letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: '8px' }}>Skin</div>
+          <div style={{ fontSize: '11px', fontWeight: 700, color: '#9a8e82', letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: '8px' }}>Skin</div>
           <div style={{ display: 'flex', gap: '7px', overflowX: 'auto', paddingBottom: '4px' }}>
             {WORM_SKINS.map(skin => {
               const owned = ownedItems.includes(`skin_${skin.id}`);
@@ -1086,17 +1086,18 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                 <button key={skin.id} onClick={() => owned && setWormSkin(skin.id)} style={{
                   ...chipBase, flexShrink: 0,
                   padding: '8px 10px 6px',
-                  background: selected ? `${skin.body}22` : 'rgba(255,255,255,0.06)',
-                  border: selected ? `2px solid ${skin.body}` : '2px solid transparent',
+                  background: selected ? '#ffffff' : '#f0ebe2',
+                  border: selected ? `2px solid ${skin.body}` : '2px solid #d6d0c8',
+                  boxShadow: selected ? `0 3px 0 ${skin.body}66` : '0 2px 0 #c4beb6',
+                  transform: selected ? 'translateY(0)' : 'none',
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px',
-                  boxShadow: selected ? `0 0 10px ${skin.glow}55` : 'none',
                   opacity: owned ? 1 : 0.4,
                   cursor: owned ? 'pointer' : 'not-allowed',
                   position: 'relative',
                   minWidth: '58px',
                 }}>
-                  <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: owned ? skin.body : '#888', boxShadow: owned ? `0 0 8px ${skin.glow}88` : 'none' }} />
-                  <span style={{ fontSize: '9px', fontWeight: 700, color: selected ? skin.body : 'rgba(200,220,255,0.50)', letterSpacing: '0.06em' }}>{skin.label}</span>
+                  <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: owned ? skin.body : '#bbb', boxShadow: owned ? `0 2px 4px ${skin.glow}66` : 'none' }} />
+                  <span style={{ fontSize: '9px', fontWeight: 700, color: selected ? skin.body : '#9a8e82', letterSpacing: '0.06em' }}>{skin.label}</span>
                   {!owned && <span style={{ position: 'absolute', top: '3px', right: '3px', fontSize: '8px' }}>🔒</span>}
                 </button>
               );
@@ -1106,7 +1107,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
 
         {/* ── Hat picker ── */}
         <div>
-          <div style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(180,210,255,0.40)', letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: '8px' }}>Hat</div>
+          <div style={{ fontSize: '11px', fontWeight: 700, color: '#9a8e82', letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: '8px' }}>Hat</div>
           <div style={{ display: 'flex', gap: '7px', flexWrap: 'wrap' }}>
             {WORM_HATS.map(hat => {
               const owned = ownedItems.includes(`hat_${hat.id}`);
@@ -1115,15 +1116,16 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                 <button key={hat.id} onClick={() => owned && setWormHat(hat.id)} style={{
                   ...chipBase,
                   padding: '9px 14px',
-                  background: selected ? 'rgba(168,85,247,0.18)' : 'rgba(255,255,255,0.06)',
-                  border: selected ? '2px solid #a855f7' : '2px solid transparent',
+                  background: selected ? `${ACCENT}12` : '#f0ebe2',
+                  border: selected ? `2px solid ${ACCENT}` : '2px solid #d6d0c8',
+                  boxShadow: selected ? `inset 0 2px 4px rgba(0,0,0,0.08)` : '0 2px 0 #c4beb6',
+                  transform: selected ? 'translateY(1px)' : 'none',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   minWidth: '60px',
-                  boxShadow: selected ? '0 0 10px rgba(168,85,247,0.3)' : 'none',
                   opacity: owned ? 1 : 0.4,
                   cursor: owned ? 'pointer' : 'not-allowed',
                 }}>
-                  <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', color: selected ? '#c084fc' : 'rgba(200,220,255,0.55)' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', color: selected ? ACCENT : '#7a6e62' }}>
                     {hat.label}{!owned ? ' 🔒' : ''}
                   </span>
                 </button>
@@ -1158,10 +1160,10 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           {/* Mode identity badge */}
           <div style={{
             display: 'inline-flex', alignItems: 'center', gap: '6px',
-            background: 'rgba(168,85,247,0.14)', border: '1.5px solid rgba(168,85,247,0.40)',
-            borderRadius: '20px', padding: '4px 12px', marginBottom: '16px',
-            fontSize: '11px', fontWeight: '700', letterSpacing: '0.12em',
-            textTransform: 'uppercase', color: '#c084fc',
+            background: ACCENT, borderRadius: '6px', padding: '4px 12px', marginBottom: '16px',
+            fontSize: '11px', fontWeight: '800', letterSpacing: '0.12em',
+            textTransform: 'uppercase', color: '#fff',
+            boxShadow: `0 2px 0 ${ACCENT_SHADOW}`,
           }}>
             WORM MODE
           </div>
@@ -1186,8 +1188,8 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           <button
             style={S.btnSecondary}
             onClick={handleBack}
-            onMouseEnter={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.85)'; }}
-            onMouseLeave={e => { e.currentTarget.style.color = 'rgba(200,220,255,0.55)'; }}
+            onMouseEnter={e => { e.currentTarget.style.color = '#1e1612'; e.currentTarget.style.borderColor = '#b8b2aa'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = '#7a6e62'; e.currentTarget.style.borderColor = '#d6d0c8'; }}
           >
             {step === 0 ? 'Cancel' : 'Back'}
           </button>
@@ -1195,10 +1197,10 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           <button
             style={S.btnPrimary}
             onClick={handleNext}
-            onMouseEnter={e => { e.currentTarget.style.opacity = '0.82'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+            onMouseEnter={e => { e.currentTarget.style.opacity = '0.88'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
             onMouseLeave={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = 'none'; }}
-            onMouseDown={e => { e.currentTarget.style.transform = 'scale(0.97)'; }}
-            onMouseUp={e => { e.currentTarget.style.transform = 'translateY(-1px)'; }}
+            onMouseDown={e => { e.currentTarget.style.transform = 'translateY(3px)'; e.currentTarget.style.boxShadow = `0 1px 0 ${ACCENT_SHADOW}`; }}
+            onMouseUp={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = `0 4px 0 ${ACCENT_SHADOW}, 0 6px 16px ${ACCENT}44`; }}
           >
             {step === totalSteps - 1 ? 'Start Playing' : 'Continue'}
           </button>

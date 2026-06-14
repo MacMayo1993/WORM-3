@@ -8,22 +8,21 @@ const panelStyle = {
   alignItems: 'center',
   justifyContent: 'center',
   padding: '24px',
-  background: 'rgba(8, 10, 22, 0.72)',
-  backdropFilter: 'blur(24px)',
-  WebkitBackdropFilter: 'blur(24px)',
+  background: 'rgba(160,152,140,0.60)',
+  backdropFilter: 'blur(18px)',
+  WebkitBackdropFilter: 'blur(18px)',
   fontFamily: 'var(--ui-font, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif)',
   animation: 'modalBackdropIn 0.22s ease',
 };
 
 const cardStyle = {
   width: 'min(760px, 100%)',
-  borderRadius: '28px',
-  padding: '28px',
-  border: '1px solid rgba(255, 255, 255, 0.06)',
-  background: 'rgba(14, 17, 38, 0.94)',
-  boxShadow: '0 32px 80px rgba(0,0,0,0.60), 0 0 0 1px rgba(255,255,255,0.06)',
-  backdropFilter: 'blur(24px)',
-  color: '#e8edf8',
+  borderRadius: '20px',
+  padding: '32px',
+  border: '1px solid #cec8be',
+  background: '#f5f0e8',
+  boxShadow: '0 20px 56px rgba(0,0,0,0.22), 0 2px 8px rgba(0,0,0,0.10)',
+  color: '#1e1612',
   animation: 'modalSheetIn 0.30s cubic-bezier(0.22, 1, 0.36, 1)',
 };
 
@@ -34,25 +33,23 @@ const optionGridStyle = {
   marginTop: '24px',
 };
 
-const optionButtonStyle = (accent, accentHex) => ({
+const optionButtonBase = {
   textAlign: 'left',
   minHeight: '190px',
-  borderRadius: '22px',
-  padding: '22px',
-  border: `1px solid ${accentHex}40`,
-  background: 'rgba(255, 255, 255, 0.05)',
-  color: '#e8edf8',
+  borderRadius: '16px',
+  padding: '24px',
   cursor: 'pointer',
-  boxShadow: `0 2px 12px ${accentHex}10`,
-  transition: 'transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease, background 160ms ease',
-});
+  transition: 'all 0.15s ease',
+  outline: 'none',
+  fontFamily: 'inherit',
+};
 
 const CubeModeSelectScreen = ({ onRubiks, onDisparity, onBack }) => (
   <div style={panelStyle} role="dialog" aria-modal="true" aria-labelledby="cube-mode-title">
     <section style={cardStyle}>
       <p style={{
         margin: '0 0 8px',
-        color: 'rgba(180, 210, 255, 0.40)',
+        color: '#9a8e82',
         fontSize: '12px',
         fontWeight: 800,
         letterSpacing: '0.24em',
@@ -60,10 +57,10 @@ const CubeModeSelectScreen = ({ onRubiks, onDisparity, onBack }) => (
       }}>
         Cube path
       </p>
-      <h2 id="cube-mode-title" style={{ margin: 0, fontSize: 'clamp(2rem, 6vw, 3.4rem)', lineHeight: 0.95, letterSpacing: '-0.06em', color: '#e8edf8' }}>
+      <h2 id="cube-mode-title" style={{ margin: 0, fontSize: 'clamp(2rem, 6vw, 3.4rem)', lineHeight: 0.95, letterSpacing: '-0.06em', color: '#1e1612' }}>
         Choose your cube mode
       </h2>
-      <p style={{ margin: '14px 0 0', color: 'rgba(200, 220, 255, 0.65)', fontSize: '16px', lineHeight: 1.55 }}>
+      <p style={{ margin: '14px 0 0', color: '#7a6e62', fontSize: '16px', lineHeight: 1.55 }}>
         Pick the ruleset first, then we'll send you into the matching setup wizard for cube size, palette, tiles, and start options.
       </p>
 
@@ -71,22 +68,28 @@ const CubeModeSelectScreen = ({ onRubiks, onDisparity, onBack }) => (
         <button
           type="button"
           onClick={onRubiks}
-          style={optionButtonStyle('#3b82f6', '#1e88e5')}
+          style={{
+            ...optionButtonBase,
+            border: '2px solid #d6d0c8',
+            background: '#ffffff',
+            boxShadow: '0 4px 0 #c4beb6, 0 6px 16px rgba(0,0,0,0.08)',
+            color: '#1e1612',
+          }}
           onMouseEnter={(event) => {
-            event.currentTarget.style.transform = 'translateY(-3px)';
-            event.currentTarget.style.background = 'rgba(30,136,229,0.18)';
-            event.currentTarget.style.borderColor = 'rgba(30,136,229,0.55)';
-            event.currentTarget.style.boxShadow = '0 8px 28px rgba(30,136,229,0.22)';
+            event.currentTarget.style.border = '2px solid #1565C0';
+            event.currentTarget.style.background = '#1565C012';
+            event.currentTarget.style.boxShadow = 'inset 0 2px 6px rgba(0,0,0,0.08), 0 1px 0 rgba(255,255,255,0.6)';
+            event.currentTarget.style.transform = 'translateY(2px)';
           }}
           onMouseLeave={(event) => {
+            event.currentTarget.style.border = '2px solid #d6d0c8';
+            event.currentTarget.style.background = '#ffffff';
+            event.currentTarget.style.boxShadow = '0 4px 0 #c4beb6, 0 6px 16px rgba(0,0,0,0.08)';
             event.currentTarget.style.transform = 'none';
-            event.currentTarget.style.background = 'rgba(255,255,255,0.05)';
-            event.currentTarget.style.borderColor = 'rgba(30,136,229,0.25)';
-            event.currentTarget.style.boxShadow = '0 2px 12px rgba(30,136,229,0.10)';
           }}
         >
-          <span style={{ display: 'block', fontSize: '22px', fontWeight: 900, letterSpacing: '-0.03em', color: '#60a5fa' }}>Rubik's Mode</span>
-          <span style={{ display: 'block', marginTop: '10px', color: 'rgba(200, 220, 255, 0.65)', lineHeight: 1.45 }}>
+          <span style={{ display: 'block', fontSize: '22px', fontWeight: 900, letterSpacing: '-0.03em', color: '#1565C0' }}>Rubik's Mode</span>
+          <span style={{ display: 'block', marginTop: '10px', color: '#7a6e62', lineHeight: 1.45 }}>
             Classic cube play with the freeplay setup wizard before shuffling into the board.
           </span>
         </button>
@@ -94,22 +97,28 @@ const CubeModeSelectScreen = ({ onRubiks, onDisparity, onBack }) => (
         <button
           type="button"
           onClick={onDisparity}
-          style={optionButtonStyle('#f97316', '#f97316')}
+          style={{
+            ...optionButtonBase,
+            border: '2px solid #d6d0c8',
+            background: '#ffffff',
+            boxShadow: '0 4px 0 #c4beb6, 0 6px 16px rgba(0,0,0,0.08)',
+            color: '#1e1612',
+          }}
           onMouseEnter={(event) => {
-            event.currentTarget.style.transform = 'translateY(-3px)';
-            event.currentTarget.style.background = 'rgba(249,115,22,0.18)';
-            event.currentTarget.style.borderColor = 'rgba(249,115,22,0.55)';
-            event.currentTarget.style.boxShadow = '0 8px 28px rgba(249,115,22,0.22)';
+            event.currentTarget.style.border = '2px solid #C44B00';
+            event.currentTarget.style.background = '#C44B0012';
+            event.currentTarget.style.boxShadow = 'inset 0 2px 6px rgba(0,0,0,0.08), 0 1px 0 rgba(255,255,255,0.6)';
+            event.currentTarget.style.transform = 'translateY(2px)';
           }}
           onMouseLeave={(event) => {
+            event.currentTarget.style.border = '2px solid #d6d0c8';
+            event.currentTarget.style.background = '#ffffff';
+            event.currentTarget.style.boxShadow = '0 4px 0 #c4beb6, 0 6px 16px rgba(0,0,0,0.08)';
             event.currentTarget.style.transform = 'none';
-            event.currentTarget.style.background = 'rgba(255,255,255,0.05)';
-            event.currentTarget.style.borderColor = 'rgba(249,115,22,0.25)';
-            event.currentTarget.style.boxShadow = '0 2px 12px rgba(249,115,22,0.10)';
           }}
         >
-          <span style={{ display: 'block', fontSize: '22px', fontWeight: 900, letterSpacing: '-0.03em', color: '#fb923c' }}>Disparity Mode</span>
-          <span style={{ display: 'block', marginTop: '10px', color: 'rgba(200, 220, 255, 0.65)', lineHeight: 1.45 }}>
+          <span style={{ display: 'block', fontSize: '22px', fontWeight: 900, letterSpacing: '-0.03em', color: '#C44B00' }}>Disparity Mode</span>
+          <span style={{ display: 'block', marginTop: '10px', color: '#7a6e62', lineHeight: 1.45 }}>
             Antipodal flip survival, betting, and chaos tuning through the disparity wizard.
           </span>
         </button>
@@ -120,18 +129,20 @@ const CubeModeSelectScreen = ({ onRubiks, onDisparity, onBack }) => (
         onClick={onBack}
         style={{
           marginTop: '22px',
-          border: '1px solid rgba(255, 255, 255, 0.12)',
-          background: 'rgba(255, 255, 255, 0.06)',
-          color: 'rgba(200, 220, 255, 0.65)',
+          border: '1.5px solid #d6d0c8',
+          background: '#f0ebe2',
+          color: '#7a6e62',
           borderRadius: '999px',
           padding: '10px 18px',
           cursor: 'pointer',
           fontWeight: 600,
           fontSize: '14px',
-          transition: 'background 0.15s ease, border-color 0.15s ease',
+          transition: 'all 0.15s ease',
+          boxShadow: '0 2px 0 #c4beb6',
+          fontFamily: 'inherit',
         }}
-        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.10)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.20)'; }}
-        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; }}
+        onMouseEnter={e => { e.currentTarget.style.background = '#e8e2d8'; e.currentTarget.style.color = '#1e1612'; }}
+        onMouseLeave={e => { e.currentTarget.style.background = '#f0ebe2'; e.currentTarget.style.color = '#7a6e62'; }}
       >
         ← Back to opening screen
       </button>

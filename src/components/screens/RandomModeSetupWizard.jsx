@@ -43,32 +43,37 @@ const SIZES = [
   { n: 7, name: '7×7×7', tag: 'Titan',   desc: '294 stickers of insanity' },
 ];
 
+const ACCENT = '#C44B00';
+const ACCENT_SHADOW = '#7a2e00';
+
 const S = {
   overlay: {
     position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-    background: 'rgba(8,10,22,0.72)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
+    background: 'rgba(160,152,140,0.60)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)',
     zIndex: 1000, fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif',
     animation: 'modalBackdropIn 0.22s ease',
   },
   sheet: {
-    background: 'rgba(14,17,38,0.94)', borderRadius: '24px', width: 'min(560px, 96vw)',
+    background: '#f5f0e8', borderRadius: '20px', width: 'min(560px, 96vw)',
     maxHeight: '88vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
-    boxShadow: '0 32px 80px rgba(0,0,0,0.60), 0 0 0 1px rgba(255,255,255,0.06)',
-    border: '1px solid rgba(255,255,255,0.06)', animation: 'modalSheetIn 0.30s cubic-bezier(0.22, 1, 0.36, 1)',
+    boxShadow: '0 20px 56px rgba(0,0,0,0.22), 0 2px 8px rgba(0,0,0,0.10)',
+    border: '1px solid #cec8be', animation: 'modalSheetIn 0.30s cubic-bezier(0.22, 1, 0.36, 1)',
   },
   header: { padding: '28px 32px 0', flexShrink: 0 },
   dot: (active, current) => ({
-    height: '3px', borderRadius: '2px',
-    background: current ? '#f97316' : active ? 'rgba(249,115,22,0.50)' : 'rgba(255,255,255,0.15)',
+    height: '8px', borderRadius: '3px',
+    background: current ? ACCENT : active ? `${ACCENT}66` : '#cec8be',
     flex: current ? '2' : '1', transition: 'all 0.35s cubic-bezier(0.4,0,0.2,1)',
+    boxShadow: current ? `0 1px 4px ${ACCENT}55` : 'none',
   }),
-  title: { fontSize: '22px', fontWeight: '700', letterSpacing: '-0.5px', color: '#e8edf8', margin: '0 0 4px', lineHeight: 1.15 },
-  subtitle: { fontSize: '13px', color: 'rgba(200,220,255,0.65)', margin: '0 0 16px', fontWeight: '400' },
-  body: { padding: '0 32px', overflowY: 'auto', flex: 1, scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.15) transparent' },
+  title: { fontSize: '22px', fontWeight: '700', letterSpacing: '-0.5px', color: '#1e1612', margin: '0 0 4px', lineHeight: 1.15 },
+  subtitle: { fontSize: '13px', color: '#7a6e62', margin: '0 0 16px', fontWeight: '400' },
+  body: { padding: '0 32px', overflowY: 'auto', flex: 1, scrollbarWidth: 'thin', scrollbarColor: '#c4beb6 transparent' },
   bgGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', paddingBottom: '8px' },
   bgCard: (selected) => ({
-    borderRadius: '12px', overflow: 'hidden',
-    border: selected ? '2.5px solid #f97316' : '2.5px solid transparent',
+    borderRadius: '10px', overflow: 'hidden',
+    border: selected ? `3px solid ${ACCENT}` : '3px solid transparent',
+    boxShadow: selected ? `0 0 0 1px ${ACCENT}44` : '0 2px 6px rgba(0,0,0,0.10)',
     cursor: 'pointer', transition: 'all 0.18s ease', outline: 'none', position: 'relative',
     aspectRatio: '4/3', WebkitTapHighlightColor: 'transparent',
   }),
@@ -79,27 +84,30 @@ const S = {
   },
   sizeCard: (selected) => ({
     display: 'flex', flexDirection: 'column', gap: '10px', padding: '14px 14px',
-    borderRadius: '14px',
-    border: selected ? '2px solid rgba(249,115,22,0.65)' : '2px solid rgba(255,255,255,0.08)',
-    background: selected ? 'rgba(249,115,22,0.14)' : 'rgba(255,255,255,0.05)',
-    boxShadow: selected ? '0 0 14px rgba(249,115,22,0.22)' : 'none',
+    borderRadius: '10px',
+    border: selected ? `2px solid ${ACCENT}` : '2px solid #d6d0c8',
+    background: selected ? `${ACCENT}12` : '#ffffff',
+    boxShadow: selected
+      ? 'inset 0 2px 5px rgba(0,0,0,0.10), 0 1px 0 rgba(255,255,255,0.6)'
+      : '0 3px 0 #c4beb6, 0 4px 10px rgba(0,0,0,0.06)',
+    transform: selected ? 'translateY(1px)' : 'none',
     cursor: 'pointer', transition: 'all 0.18s ease', outline: 'none',
     WebkitTapHighlightColor: 'transparent', textAlign: 'left', fontFamily: 'inherit', position: 'relative',
   }),
   footer: {
     padding: '16px 32px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    flexShrink: 0, borderTop: '1px solid rgba(255,255,255,0.08)',
+    flexShrink: 0, borderTop: '1px solid #d6d0c8', background: '#ede8df',
   },
   btnSecondary: {
-    background: 'none', border: 'none', fontSize: '15px', fontWeight: '500',
-    color: 'rgba(200,220,255,0.55)', cursor: 'pointer', padding: '10px 16px',
-    borderRadius: '10px', transition: 'color 0.15s ease', fontFamily: 'inherit',
+    background: 'none', border: '1.5px solid #d6d0c8', fontSize: '15px', fontWeight: '500',
+    color: '#7a6e62', cursor: 'pointer', padding: '10px 16px',
+    borderRadius: '10px', transition: 'all 0.15s ease', fontFamily: 'inherit',
   },
   btnPrimary: {
-    background: 'linear-gradient(135deg, #ea580c, #f97316)', border: 'none', fontSize: '15px',
-    fontWeight: '600', color: '#fff', cursor: 'pointer', padding: '12px 28px',
-    borderRadius: '12px', transition: 'opacity 0.15s ease, transform 0.12s ease',
-    fontFamily: 'inherit', boxShadow: '0 4px 20px rgba(249,115,22,0.40)',
+    background: ACCENT, border: 'none', fontSize: '15px',
+    fontWeight: '700', color: '#fff', cursor: 'pointer', padding: '12px 28px',
+    borderRadius: '10px', transition: 'all 0.12s ease',
+    fontFamily: 'inherit', boxShadow: `0 4px 0 ${ACCENT_SHADOW}, 0 6px 16px ${ACCENT}44`,
   },
 };
 
@@ -134,7 +142,7 @@ const RandomModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
             )}
             <div style={S.bgLabel}>{opt.label}</div>
             {selected && (
-              <div style={{ position: 'absolute', top: '7px', right: '7px', width: '20px', height: '20px', borderRadius: '50%', background: '#f97316', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 6px rgba(0,0,0,0.25)' }}>
+              <div style={{ position: 'absolute', top: '7px', right: '7px', width: '20px', height: '20px', borderRadius: '5px', background: ACCENT, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 2px 0 ${ACCENT_SHADOW}` }}>
                 <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
                   <path d="M1 4L3.5 6.5L9 1" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
@@ -159,21 +167,21 @@ const RandomModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                 {Array.from({ length: n * n }).map((_, i) => (
                   <div key={i} style={{
                     aspectRatio: '1', borderRadius: '2px',
-                    background: selected ? 'rgba(249,115,22,0.85)' : 'rgba(255,255,255,0.20)',
+                    background: selected ? ACCENT : '#d4cfc5',
                     transition: 'background 0.18s ease',
                   }} />
                 ))}
               </div>
               <div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px', marginBottom: '2px' }}>
-                  <span style={{ fontSize: '15px', fontWeight: '700', color: '#e8edf8', letterSpacing: '-0.4px' }}>{name}</span>
-                  <span style={{ fontSize: '10px', fontWeight: '600', letterSpacing: '0.04em', textTransform: 'uppercase', color: selected ? 'rgba(249,115,22,0.9)' : 'rgba(180,210,255,0.40)' }}>{tag}</span>
+                  <span style={{ fontSize: '15px', fontWeight: '700', color: '#1e1612', letterSpacing: '-0.4px' }}>{name}</span>
+                  <span style={{ fontSize: '10px', fontWeight: '600', letterSpacing: '0.04em', textTransform: 'uppercase', color: selected ? ACCENT : '#9a8e82' }}>{tag}</span>
                 </div>
-                <div style={{ fontSize: '11px', color: 'rgba(180,210,255,0.45)' }}>{desc}</div>
+                <div style={{ fontSize: '11px', color: '#9a8e82' }}>{desc}</div>
               </div>
             </div>
             {selected && (
-              <div style={{ position: 'absolute', top: '10px', right: '10px', width: '18px', height: '18px', borderRadius: '50%', background: '#f97316', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ position: 'absolute', top: '10px', right: '10px', width: '20px', height: '20px', borderRadius: '5px', background: ACCENT, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 2px 0 ${ACCENT_SHADOW}` }}>
                 <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
                   <path d="M1 4L3.5 6.5L9 1" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
@@ -196,10 +204,10 @@ const RandomModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     <div style={S.overlay}>
       <div style={S.sheet}>
         <div style={S.header}>
-          {/* Orange pill badge */}
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(249,115,22,0.15)', border: '1px solid rgba(249,115,22,0.35)', borderRadius: '100px', padding: '4px 10px', marginBottom: '14px' }}>
+          {/* Badge */}
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: ACCENT, borderRadius: '6px', padding: '4px 12px', marginBottom: '14px', boxShadow: `0 2px 0 ${ACCENT_SHADOW}` }}>
             <span style={{ fontSize: '13px' }}>🎲</span>
-            <span style={{ fontSize: '11px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#f97316' }}>Random Mode</span>
+            <span style={{ fontSize: '11px', fontWeight: '800', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#fff' }}>Random Mode</span>
           </div>
           <div style={{ display: 'flex', gap: '6px', marginBottom: '20px' }}>
             {STEPS.map((_, i) => <div key={i} style={S.dot(i <= step, i === step)} />)}
@@ -216,15 +224,15 @@ const RandomModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
 
         <div style={S.footer}>
           <button style={S.btnSecondary} onClick={handleBack}
-            onMouseEnter={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.85)'; }}
-            onMouseLeave={e => { e.currentTarget.style.color = 'rgba(200,220,255,0.55)'; }}>
+            onMouseEnter={e => { e.currentTarget.style.color = '#1e1612'; e.currentTarget.style.borderColor = '#b8b2aa'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = '#7a6e62'; e.currentTarget.style.borderColor = '#d6d0c8'; }}>
             {step === 0 ? 'Cancel' : 'Back'}
           </button>
           <button style={S.btnPrimary} onClick={handleNext}
-            onMouseEnter={e => { e.currentTarget.style.opacity = '0.82'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+            onMouseEnter={e => { e.currentTarget.style.opacity = '0.88'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
             onMouseLeave={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = 'none'; }}
-            onMouseDown={e => { e.currentTarget.style.transform = 'scale(0.97)'; }}
-            onMouseUp={e => { e.currentTarget.style.transform = 'translateY(-1px)'; }}>
+            onMouseDown={e => { e.currentTarget.style.transform = 'translateY(3px)'; e.currentTarget.style.boxShadow = `0 1px 0 ${ACCENT_SHADOW}`; }}
+            onMouseUp={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = `0 4px 0 ${ACCENT_SHADOW}, 0 6px 16px ${ACCENT}44`; }}>
             {step === totalSteps - 1 ? 'Start Random Mode' : 'Continue'}
           </button>
         </div>
