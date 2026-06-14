@@ -731,7 +731,7 @@ const CAROUSEL_MODES = [
     controls: ['Color scheme changes every 15 s', 'Cube and tiles transform live', 'Keep solving through the shifts', 'Style variety makes every run fresh'],
   },
   {
-    id: 'store', label: 'STORE', tileColor: '#92400e', textColor: '#fff',
+    id: 'store', label: 'STORE', tileColor: '#0891B2', textColor: '#fff',
     desc: 'Spend Parity Points on skins, hats, palettes, and tile styles.',
     controls: ['Earn PP by collecting orbs in Worm mode', 'Win Disparity bets for extra points', 'Unlock worm skins, hats, and color schemes', 'Cosmetics carry across every game mode'],
   },
