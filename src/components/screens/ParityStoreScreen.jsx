@@ -9,8 +9,8 @@ import {
   unregisterTilePreview,
 } from '../../3d/TilePreviewRenderer.js';
 
-const ACCENT = '#A05A00';
-const ACCENT_SHADOW = '#5c3200';
+const ACCENT = '#0891B2';
+const ACCENT_SHADOW = '#0e6985';
 const FONT = "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif";
 const TOUCH = { touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' };
 
