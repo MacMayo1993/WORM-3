@@ -37,29 +37,27 @@ export const ORB_TYPES = {
 // Pre-built once, shared across all instances.  geometry={} prop prevents disposal.
 const _orbGeos = {
   normal: {
-    core:         new THREE.OctahedronGeometry(0.16, 1),           // crystal-faceted nucleus
-    innerCore:    new THREE.SphereGeometry(0.075, 8, 8),           // hot plasma center
-    shell:        new THREE.SphereGeometry(0.22, 20, 20),
-    innerGlow:    new THREE.SphereGeometry(0.30, 12, 12),          // tight inner aura
-    ringA:        new THREE.TorusGeometry(0.350, 0.012, 8, 32),    // thicker rings
-    ringB:        new THREE.TorusGeometry(0.350 * 0.95, 0.010, 8, 32),
-    ringC:        new THREE.TorusGeometry(0.350 * 1.05, 0.008, 8, 32),
-    electron:     new THREE.SphereGeometry(0.042, 10, 10),
-    electronGlow: new THREE.SphereGeometry(0.072, 6, 6),           // electron halo
-    glow:         new THREE.SphereGeometry(0.50, 16, 16),          // larger outer aura
+    core:         new THREE.OctahedronGeometry(0.16, 1),
+    innerCore:    new THREE.SphereGeometry(0.075, 6, 6),
+    shell:        new THREE.SphereGeometry(0.22, 8, 8),            // was 20×20
+    innerGlow:    new THREE.SphereGeometry(0.30, 6, 6),            // was 12×12
+    ringA:        new THREE.TorusGeometry(0.350, 0.012, 6, 18),    // was 8×32; 2 rings only
+    ringB:        new THREE.TorusGeometry(0.350 * 0.95, 0.010, 6, 18),
+    electron:     new THREE.SphereGeometry(0.042, 7, 7),
+    glow:         new THREE.SphereGeometry(0.50, 8, 8),            // was 16×16
   },
   target: {
     core:         new THREE.OctahedronGeometry(0.20, 1),
     innerCore:    new THREE.SphereGeometry(0.092, 8, 8),
-    shell:        new THREE.SphereGeometry(0.27, 20, 20),
-    innerGlow:    new THREE.SphereGeometry(0.37, 12, 12),
-    ringA:        new THREE.TorusGeometry(0.420, 0.015, 8, 32),
-    ringB:        new THREE.TorusGeometry(0.420 * 0.95, 0.012, 8, 32),
-    ringC:        new THREE.TorusGeometry(0.420 * 1.05, 0.010, 8, 32),
-    electron:     new THREE.SphereGeometry(0.052, 10, 10),
+    shell:        new THREE.SphereGeometry(0.27, 10, 10),          // was 20×20
+    innerGlow:    new THREE.SphereGeometry(0.37, 8, 8),            // was 12×12
+    ringA:        new THREE.TorusGeometry(0.420, 0.015, 8, 24),    // was 8×32
+    ringB:        new THREE.TorusGeometry(0.420 * 0.95, 0.012, 8, 24),
+    ringC:        new THREE.TorusGeometry(0.420 * 1.05, 0.010, 8, 24),
+    electron:     new THREE.SphereGeometry(0.052, 8, 8),
     electronGlow: new THREE.SphereGeometry(0.088, 6, 6),
-    glow:         new THREE.SphereGeometry(0.60, 16, 16),
-    lockRing:     new THREE.TorusGeometry(0.5, 0.03, 10, 48),
+    glow:         new THREE.SphereGeometry(0.60, 10, 10),          // was 16×16
+    lockRing:     new THREE.TorusGeometry(0.5, 0.03, 8, 36),
   },
 };
 
@@ -82,9 +80,9 @@ function SingleOrb({
   const orbitSystemRef = useRef();
   const ringARef       = useRef();
   const ringBRef       = useRef();
-  const ringCRef       = useRef();
+  const ringCRef       = useRef();   // target only
   const electronRefs     = useRef([]);
-  const electronGlowRefs = useRef([]);
+  const electronGlowRefs = useRef([]); // target only
   const outlineRef     = useRef();
 
   const timeOffset = useMemo(() => Math.random() * Math.PI * 2, []);
@@ -197,11 +195,14 @@ function SingleOrb({
         <mesh ref={ringBRef} geometry={g.ringB} rotation={[-0.6, 0, 0.5]}>
           <meshBasicMaterial color={antipodalColor} transparent opacity={0.34} depthWrite={false} />
         </mesh>
-        <mesh ref={ringCRef} geometry={g.ringC} rotation={[0, 0.85, -0.35]}>
-          <meshBasicMaterial color={color} transparent opacity={0.28} depthWrite={false} />
-        </mesh>
+        {/* Third ring — target only (geometry only exists on target set) */}
+        {isTarget && g.ringC && (
+          <mesh ref={ringCRef} geometry={g.ringC} rotation={[0, 0.85, -0.35]}>
+            <meshBasicMaterial color={color} transparent opacity={0.28} depthWrite={false} />
+          </mesh>
+        )}
 
-        {/* Electrons with glow halos */}
+        {/* Electrons — glow halos only on target orbs (saves 3 draw calls per normal orb) */}
         {Array.from({ length: 3 }, (_, i) => (
           <React.Fragment key={i}>
             <mesh ref={(el) => { electronRefs.current[i] = el; }} geometry={g.electron}>
@@ -213,15 +214,17 @@ function SingleOrb({
                 roughness={0}
               />
             </mesh>
-            <mesh ref={(el) => { electronGlowRefs.current[i] = el; }} geometry={g.electronGlow}>
-              <meshBasicMaterial
-                color={typeConfig.electronColor}
-                transparent
-                opacity={0.45}
-                blending={THREE.AdditiveBlending}
-                depthWrite={false}
-              />
-            </mesh>
+            {isTarget && g.electronGlow && (
+              <mesh ref={(el) => { electronGlowRefs.current[i] = el; }} geometry={g.electronGlow}>
+                <meshBasicMaterial
+                  color={typeConfig.electronColor}
+                  transparent
+                  opacity={0.45}
+                  blending={THREE.AdditiveBlending}
+                  depthWrite={false}
+                />
+              </mesh>
+            )}
           </React.Fragment>
         ))}
       </group>
@@ -245,13 +248,10 @@ function SingleOrb({
         </mesh>
       )}
 
-      {/* Point light — full intensity on target, subtle ambient on all orbs */}
-      <pointLight
-        color={color}
-        intensity={isTarget ? 1.1 : 0.22}
-        distance={isTarget ? 3.3 : 1.8}
-        decay={2}
-      />
+      {/* Point light — target orbs only; non-target glow via emissive + AdditiveBlending */}
+      {isTarget && (
+        <pointLight color={color} intensity={1.1} distance={3.3} decay={2} />
+      )}
     </group>
   );
 }
@@ -353,7 +353,7 @@ export default function ParityOrbs({
 
       if (ringA) ringA.rotation.z = time * 1.5;
       if (ringB) ringB.rotation.x = time * 1.2;
-      if (ringC) ringC.rotation.y = time * 1.35;
+      if (isTarget && ringC) ringC.rotation.y = time * 1.35;
 
       // ── Electrons + halos ──────────────────────────────────────────────────
       const elRadius    = isTarget ? 0.43 : 0.36;
@@ -368,10 +368,13 @@ export default function ParityOrbs({
         const elScale = (isTarget ? 1.15 : 1) * (1 + Math.sin(time * 8 + i * 2) * 0.18);
         el.scale.setScalar(elScale);
 
-        const elGlow = electronGlows[i];
-        if (elGlow) {
-          elGlow.position.copy(el.position);
-          elGlow.scale.setScalar(elScale * 1.6);
+        // Electron glow halos are target-only
+        if (isTarget) {
+          const elGlow = electronGlows[i];
+          if (elGlow) {
+            elGlow.position.copy(el.position);
+            elGlow.scale.setScalar(elScale * 1.6);
+          }
         }
       }
 
@@ -418,10 +421,12 @@ export default function ParityOrbs({
             el.material.emissive?.copy(_rainbowColor);
             el.material.color.copy(_rainbowColor);
           }
-          const elGlow = electronGlows[i];
-          if (elGlow && elGlow.material) {
-            _rainbowColor.setHSL((hue + i * 0.33) % 1, 1.0, 0.75);
-            elGlow.material.color.copy(_rainbowColor);
+          if (isTarget) {
+            const elGlow = electronGlows[i];
+            if (elGlow && elGlow.material) {
+              _rainbowColor.setHSL((hue + i * 0.33) % 1, 1.0, 0.75);
+              elGlow.material.color.copy(_rainbowColor);
+            }
           }
         }
         if (glow && glow.material) {
