@@ -42,7 +42,7 @@ const BG_OPTIONS = BACKGROUNDS.map(bg => ({
 const WIZARD_SCHEME_KEYS = Object.keys(SCHEME_LABELS).filter(k => k !== 'biome');
 const FACE_LABELS = { 1: 'Front', 2: 'Left', 3: 'Top', 4: 'Back', 5: 'Right', 6: 'Bottom' };
 const LEVEL_LABELS = { 1: 'Low', 2: 'Medium', 3: 'High', 4: 'Extreme', 5: 'Maximum' };
-const LEVEL_ACCENT = { 1: '#34c759', 2: '#ffcc00', 3: '#ff9500', 4: '#ff3b30', 5: '#af52de' };
+const LEVEL_ACCENT = { 1: '#2d7a3a', 2: '#b58a00', 3: '#c45000', 4: '#c0392b', 5: '#7b2d8b' };
 
 const FLIP_CAP_PRESETS = [
   { label: 'Fragile', value: 6, sub: 'Fast massacre' },
@@ -140,6 +140,9 @@ function TilePreviewCanvas({ styleKey, colorHex = '#4a7fa5', size = 48, canvasSt
   return <canvas ref={canvasRef} width={size} height={size} style={{ display: 'block', borderRadius: '6px', ...canvasStyle }} />;
 }
 
+const ACCENT = '#C44B00';
+const ACCENT_SHADOW = '#7a2e00';
+
 const S = {
   overlay: {
     position: 'fixed',
@@ -147,9 +150,9 @@ const S = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: 'rgba(8,10,22,0.72)',
-    backdropFilter: 'blur(24px)',
-    WebkitBackdropFilter: 'blur(24px)',
+    background: 'rgba(160,152,140,0.60)',
+    backdropFilter: 'blur(18px)',
+    WebkitBackdropFilter: 'blur(18px)',
     zIndex: 1000,
     fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif',
     padding: isMobile ? '12px' : '0',
@@ -157,44 +160,48 @@ const S = {
     animation: 'modalBackdropIn 0.22s ease',
   },
   sheet: {
-    background: 'rgba(14,17,38,0.94)',
-    borderRadius: isMobile ? '18px' : '24px',
+    background: '#f5f0e8',
+    borderRadius: isMobile ? '16px' : '20px',
     width: 'min(640px, 100%)',
     maxHeight: isMobile ? '92vh' : '88vh',
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
-    boxShadow: '0 32px 80px rgba(0,0,0,0.60), 0 0 0 1px rgba(255,255,255,0.06)',
-    border: '1px solid rgba(255,255,255,0.06)',
+    boxShadow: '0 20px 56px rgba(0,0,0,0.22), 0 2px 8px rgba(0,0,0,0.10)',
+    border: '1px solid #cec8be',
     animation: 'modalSheetIn 0.30s cubic-bezier(0.22, 1, 0.36, 1)',
   },
   header: { padding: isMobile ? '20px 20px 0' : '32px 36px 0', flexShrink: 0 },
   stepIndicator: { display: 'flex', gap: '6px', marginBottom: '24px' },
   dot: (active, current) => ({
-    height: '3px',
-    borderRadius: '2px',
-    background: current ? '#f97316' : active ? 'rgba(249,115,22,0.50)' : 'rgba(255,255,255,0.15)',
+    height: '8px',
+    borderRadius: '3px',
+    background: current ? ACCENT : active ? `${ACCENT}66` : '#cec8be',
     flex: current ? '2' : '1',
     transition: 'all 0.35s cubic-bezier(0.4,0,0.2,1)',
+    boxShadow: current ? `0 1px 4px ${ACCENT}55` : 'none',
   }),
-  title: { fontSize: '24px', fontWeight: '700', letterSpacing: '-0.5px', color: '#e8edf8', margin: '0 0 4px', lineHeight: 1.15 },
-  subtitle: { fontSize: '13px', color: 'rgba(200,220,255,0.65)', margin: '0 0 20px', fontWeight: '400' },
+  title: { fontSize: '24px', fontWeight: '700', letterSpacing: '-0.5px', color: '#1e1612', margin: '0 0 4px', lineHeight: 1.15 },
+  subtitle: { fontSize: '13px', color: '#7a6e62', margin: '0 0 20px', fontWeight: '400' },
   body: {
     padding: isMobile ? '0 20px' : '0 36px',
     overflowY: 'auto',
     flex: 1,
     scrollbarWidth: 'thin',
-    scrollbarColor: 'rgba(255,255,255,0.15) transparent',
+    scrollbarColor: '#c4beb6 transparent',
   },
   card: (selected) => ({
     display: 'flex',
     padding: '14px 16px',
-    borderRadius: '14px',
-    border: selected ? '2px solid rgba(249,115,22,0.55)' : '2px solid rgba(255,255,255,0.08)',
-    background: selected ? 'rgba(249,115,22,0.18)' : 'rgba(255,255,255,0.05)',
-    boxShadow: selected ? '0 0 14px rgba(249,115,22,0.22)' : 'none',
+    borderRadius: '10px',
+    border: selected ? `2px solid ${ACCENT}` : '2px solid #d6d0c8',
+    background: selected ? `${ACCENT}12` : '#ffffff',
+    boxShadow: selected
+      ? 'inset 0 2px 5px rgba(0,0,0,0.10), 0 1px 0 rgba(255,255,255,0.6)'
+      : '0 3px 0 #c4beb6, 0 4px 10px rgba(0,0,0,0.06)',
+    transform: selected ? 'translateY(1px)' : 'none',
     cursor: 'pointer',
-    transition: 'all 0.18s ease',
+    transition: 'all 0.15s ease',
     outline: 'none',
     WebkitTapHighlightColor: 'transparent',
     textAlign: 'left',
@@ -202,12 +209,13 @@ const S = {
     fontFamily: 'inherit',
     position: 'relative',
   }),
-  checkmark: { width: '18px', height: '18px', borderRadius: '50%', background: '#f97316', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  checkmark: { width: '20px', height: '20px', borderRadius: '5px', background: ACCENT, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: `0 2px 0 ${ACCENT_SHADOW}` },
   bgGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', paddingBottom: '8px' },
   bgCard: (selected) => ({
-    borderRadius: '12px',
+    borderRadius: '10px',
     overflow: 'hidden',
-    border: selected ? '2.5px solid #f97316' : '2.5px solid transparent',
+    border: selected ? `3px solid ${ACCENT}` : '3px solid transparent',
+    boxShadow: selected ? `0 0 0 1px ${ACCENT}44` : '0 2px 6px rgba(0,0,0,0.10)',
     cursor: 'pointer',
     transition: 'all 0.18s ease',
     outline: 'none',
@@ -226,16 +234,17 @@ const S = {
     justifyContent: 'space-between',
     alignItems: 'center',
     flexShrink: 0,
-    borderTop: '1px solid rgba(255,255,255,0.08)',
+    borderTop: '1px solid #d6d0c8',
+    background: '#ede8df',
   },
   btnSecondary: {
-    background: 'none', border: 'none', fontSize: '15px', fontWeight: '500', color: 'rgba(200,220,255,0.55)',
-    cursor: 'pointer', padding: '10px 16px', borderRadius: '10px', transition: 'color 0.15s ease', fontFamily: 'inherit',
+    background: 'none', border: '1.5px solid #d6d0c8', fontSize: '15px', fontWeight: '500', color: '#7a6e62',
+    cursor: 'pointer', padding: '10px 16px', borderRadius: '10px', transition: 'all 0.15s ease', fontFamily: 'inherit',
   },
   btnPrimary: {
-    background: 'linear-gradient(135deg, #f97316, #fb923c)', border: 'none', fontSize: '15px', fontWeight: '600', color: '#fff',
-    cursor: 'pointer', padding: '12px 28px', borderRadius: '12px', transition: 'opacity 0.15s ease, transform 0.12s ease', fontFamily: 'inherit',
-    boxShadow: '0 4px 20px rgba(249,115,22,0.40)',
+    background: ACCENT, border: 'none', fontSize: '15px', fontWeight: '700', color: '#fff',
+    cursor: 'pointer', padding: '12px 28px', borderRadius: '10px', transition: 'all 0.12s ease', fontFamily: 'inherit',
+    boxShadow: `0 4px 0 ${ACCENT_SHADOW}, 0 6px 16px ${ACCENT}44`,
   },
 };
 
@@ -322,9 +331,9 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
             )}
             <div style={S.bgLabel}>{opt.label}</div>
             {selected && (
-              <div style={{ position: 'absolute', top: '7px', right: '7px', width: '20px', height: '20px', borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 6px rgba(0,0,0,0.25)' }}>
+              <div style={{ position: 'absolute', top: '7px', right: '7px', width: '20px', height: '20px', borderRadius: '5px', background: ACCENT, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 2px 0 ${ACCENT_SHADOW}` }}>
                 <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                  <path d="M1 4L3.5 6.5L9 1" stroke="#0a0a0a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </div>
             )}
@@ -344,15 +353,15 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
             {customPreview ? (
               <img src={customPreview} alt="Uploaded" style={{ width: '56px', height: '36px', objectFit: 'cover', borderRadius: '8px', flexShrink: 0 }} />
             ) : (
-              <div style={{ width: '56px', height: '36px', borderRadius: '8px', background: 'rgba(0,0,0,0.07)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 600, letterSpacing: '0.06em', color: 'rgba(200,220,255,0.35)', flexShrink: 0 }}>IMG</div>
+              <div style={{ width: '56px', height: '36px', borderRadius: '8px', background: '#f0ebe2', border: '1px solid #d6d0c8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 600, letterSpacing: '0.06em', color: '#9a8e82', flexShrink: 0 }}>IMG</div>
             )}
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '14px', fontWeight: settings.colorScheme === 'custom' ? '600' : '500', color: '#e8edf8' }}>Extract from Image</div>
-              <div style={{ fontSize: '12px', color: 'rgba(200,220,255,0.65)', marginTop: '2px' }}>{customPreview ? 'Tap to change image' : 'Upload a photo to auto-generate a palette'}</div>
+              <div style={{ fontSize: '14px', fontWeight: settings.colorScheme === 'custom' ? '600' : '500', color: '#1e1612' }}>Extract from Image</div>
+              <div style={{ fontSize: '12px', color: '#7a6e62', marginTop: '2px' }}>{customPreview ? 'Tap to change image' : 'Upload a photo to auto-generate a palette'}</div>
             </div>
             {resolvedCustom && (
               <div style={{ display: 'flex', gap: '3px', flexShrink: 0 }}>
-                {[1, 2, 3, 4, 5, 6].map(i => <div key={i} style={{ width: '12px', height: '12px', borderRadius: '50%', background: resolvedCustom[i], boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />)}
+                {[1, 2, 3, 4, 5, 6].map(i => <div key={i} style={{ width: '12px', height: '12px', borderRadius: '3px', background: resolvedCustom[i], boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />)}
               </div>
             )}
             {settings.colorScheme === 'custom' && <div style={{ marginLeft: 'auto' }}><Checkmark /></div>}
@@ -360,9 +369,9 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
-          <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.10)' }} />
-          <span style={{ fontSize: '11px', fontWeight: '600', letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(180,210,255,0.40)' }}>Presets</span>
-          <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.10)' }} />
+          <div style={{ flex: 1, height: '1px', background: '#d6d0c8' }} />
+          <span style={{ fontSize: '11px', fontWeight: '600', letterSpacing: '0.06em', textTransform: 'uppercase', color: '#9a8e82' }}>Presets</span>
+          <div style={{ flex: 1, height: '1px', background: '#d6d0c8' }} />
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '7px', paddingBottom: '8px' }}>
@@ -375,7 +384,7 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
                 ...S.card(selected), flexDirection: 'column', gap: '6px', padding: '10px 12px',
                 ...(owned ? {} : { opacity: 0.42, cursor: 'not-allowed', pointerEvents: 'none' }),
               }} onClick={() => owned && select('colorScheme', key)}>
-                <span style={{ fontSize: '12px', fontWeight: selected ? '600' : '400', color: selected ? '#e8edf8' : 'rgba(200,220,255,0.65)', lineHeight: 1.2 }}>
+                <span style={{ fontSize: '12px', fontWeight: selected ? '600' : '400', color: selected ? '#1e1612' : '#7a6e62', lineHeight: 1.2 }}>
                   {SCHEME_LABELS[key]}{!owned ? ' 🔒' : ''}
                 </span>
                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
@@ -383,7 +392,7 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
                     <TilePreviewCanvas styleKey={previewStyle} colorHex={colors[0] || '#4a7fa5'} size={32} />
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '3px', flex: 1 }}>
-                    {colors.slice(1).map((c, i) => <div key={i} style={{ width: '100%', aspectRatio: '1', borderRadius: '50%', background: owned ? c : '#bbb', boxShadow: '0 1px 2px rgba(0,0,0,0.18)' }} />)}
+                    {colors.slice(1).map((c, i) => <div key={i} style={{ width: '100%', aspectRatio: '1', borderRadius: '3px', background: owned ? c : '#bbb', boxShadow: '0 1px 2px rgba(0,0,0,0.18)' }} />)}
                   </div>
                 </div>
                 {selected && <div style={{ position: 'absolute', top: '8px', right: '8px' }}><Checkmark /></div>}
@@ -412,16 +421,20 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
 
     const StyleGrid = ({ keys, label }) => (
       <div style={{ marginBottom: '20px' }}>
-        <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(180,210,255,0.40)', marginBottom: '8px' }}>{label}</div>
+        <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9a8e82', marginBottom: '8px' }}>{label}</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '7px' }}>
           {keys.map(key => {
             const sel = globalStyle === key;
             const owned = tileOwned(key);
             return (
               <button key={key} style={{
-                display: 'block', position: 'relative', padding: 0, borderRadius: '12px',
-                border: sel ? '2px solid rgba(255,255,255,0.40)' : '2px solid rgba(255,255,255,0.09)',
-                background: 'rgba(255,255,255,0.06)',
+                display: 'block', position: 'relative', padding: 0, borderRadius: '10px',
+                border: sel ? `2px solid ${ACCENT}` : '2px solid #d6d0c8',
+                background: '#f0ebe2',
+                boxShadow: sel
+                  ? 'inset 0 2px 4px rgba(0,0,0,0.10)'
+                  : '0 2px 0 #c4beb6, 0 3px 6px rgba(0,0,0,0.06)',
+                transform: sel ? 'translateY(1px)' : 'none',
                 cursor: owned ? 'pointer' : 'not-allowed', outline: 'none',
                 WebkitTapHighlightColor: 'transparent', transition: 'all 0.15s ease',
                 fontFamily: 'inherit', opacity: owned ? 1 : 0.42, overflow: 'hidden',
@@ -447,8 +460,8 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
         <div style={{ marginBottom: '18px' }}>
           <button style={{ ...S.card(settings.tileStyle === 'random' && !perFace), flexDirection: 'row', alignItems: 'center', gap: '14px' }} onClick={() => applyGlobal('random')}>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '14px', fontWeight: '600', color: '#e8edf8' }}>Random Mix</div>
-              <div style={{ fontSize: '12px', color: 'rgba(200,220,255,0.65)', marginTop: '2px' }}>Different style on every face</div>
+              <div style={{ fontSize: '14px', fontWeight: '600', color: '#1e1612' }}>Random Mix</div>
+              <div style={{ fontSize: '12px', color: '#7a6e62', marginTop: '2px' }}>Different style on every face</div>
             </div>
             {settings.tileStyle === 'random' && !perFace && <Checkmark />}
           </button>
@@ -459,22 +472,21 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
         <StyleGrid keys={LIVING_STYLE_KEYS} label="Living" />
 
         <div style={{ marginBottom: '8px' }}>
-          <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(180,210,255,0.40)', marginBottom: '10px' }}>Per Face</div>
+          <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9a8e82', marginBottom: '10px' }}>Per Face</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
             {[1, 2, 3, 4, 5, 6].map(faceId => {
               const globalFallback = settings.tileStyle === 'random' ? 'solid' : (settings.tileStyle || 'solid');
               const rawStyle = perFace?.[faceId] || globalFallback;
-              // If the saved style is no longer owned, fall back to solid
               const faceStyle = tileOwned(rawStyle) ? rawStyle : 'solid';
               const faceColor = resolvedColors[faceId] || '#4a7fa5';
               return (
-                <div key={faceId} style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '10px', borderRadius: '12px', background: 'rgba(255,255,255,0.06)', border: `2px solid ${faceColor}44` }}>
+                <div key={faceId} style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '10px', borderRadius: '10px', background: '#f0ebe2', border: `2px solid ${faceColor}55` }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: faceColor, flexShrink: 0 }} />
-                    <span style={{ fontSize: '11px', fontWeight: '600', color: 'rgba(200,220,255,0.65)' }}>{FACE_LABELS[faceId]}</span>
+                    <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: faceColor, flexShrink: 0, boxShadow: '0 1px 0 rgba(0,0,0,0.20)' }} />
+                    <span style={{ fontSize: '11px', fontWeight: '600', color: '#7a6e62' }}>{FACE_LABELS[faceId]}</span>
                   </div>
                   <TilePreviewCanvas styleKey={faceStyle === 'random' ? 'solid' : faceStyle} colorHex={faceColor} size={36} />
-                  <select value={faceStyle} onChange={e => applyPerFace(faceId, e.target.value)} style={{ fontSize: '10px', padding: '4px 6px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.08)', color: '#e8edf8', fontFamily: 'inherit', cursor: 'pointer', appearance: 'none', WebkitAppearance: 'none' }}>
+                  <select value={faceStyle} onChange={e => applyPerFace(faceId, e.target.value)} style={{ fontSize: '10px', padding: '4px 6px', borderRadius: '6px', border: '1px solid #d6d0c8', background: '#f7f3ec', color: '#1e1612', fontFamily: 'inherit', cursor: 'pointer', appearance: 'none', WebkitAppearance: 'none' }}>
                     <optgroup label="Classic">{CLASSIC_STYLE_KEYS.filter(tileOwned).map(k => <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>)}</optgroup>
                     <optgroup label="Antipodal Op Art">{ANTIPODAL_STYLE_KEYS.filter(tileOwned).map(k => <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>)}</optgroup>
                     <optgroup label="Living">{LIVING_STYLE_KEYS.filter(tileOwned).map(k => <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>)}</optgroup>
@@ -492,15 +504,18 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
   const renderGameplay = () => (
     <div style={{ display: 'grid', gap: '18px' }}>
       <div>
-        <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(180,210,255,0.40)', marginBottom: '10px' }}>
+        <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9a8e82', marginBottom: '10px' }}>
           Disparity Level <span style={{ color: accent }}>{LEVEL_LABELS[settings.disparityLevel]}</span>
         </div>
         <div style={{ display: 'flex', gap: '6px' }}>
           {[1, 2, 3, 4, 5].map(n => (
             <button key={n} onClick={() => select('disparityLevel', n)} style={{
-              flex: 1, padding: '9px 0', border: `1.5px solid ${settings.disparityLevel === n ? LEVEL_ACCENT[n] : 'rgba(255,255,255,0.12)'}`,
-              borderRadius: '10px', fontSize: '14px', fontWeight: settings.disparityLevel === n ? '700' : '400',
-              background: settings.disparityLevel === n ? `${LEVEL_ACCENT[n]}22` : 'rgba(255,255,255,0.05)', color: settings.disparityLevel === n ? LEVEL_ACCENT[n] : 'rgba(200,220,255,0.45)',
+              flex: 1, padding: '9px 0', border: `2px solid ${settings.disparityLevel === n ? LEVEL_ACCENT[n] : '#d6d0c8'}`,
+              borderRadius: '10px', fontSize: '14px', fontWeight: settings.disparityLevel === n ? '700' : '500',
+              background: settings.disparityLevel === n ? `${LEVEL_ACCENT[n]}18` : '#ffffff',
+              color: settings.disparityLevel === n ? LEVEL_ACCENT[n] : '#9a8e82',
+              boxShadow: settings.disparityLevel === n ? 'inset 0 2px 4px rgba(0,0,0,0.08)' : '0 2px 0 #c4beb6',
+              transform: settings.disparityLevel === n ? 'translateY(1px)' : 'none',
               cursor: 'pointer', transition: 'all 0.15s', fontFamily: 'inherit',
             }}>{n}</button>
           ))}
@@ -508,13 +523,16 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
       </div>
 
       <div>
-        <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(180,210,255,0.40)', marginBottom: '10px' }}>Tile Endurance</div>
+        <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9a8e82', marginBottom: '10px' }}>Tile Endurance</div>
         <div style={{ display: 'flex', gap: '6px' }}>
           {FLIP_CAP_PRESETS.map(p => (
             <button key={p.value} onClick={() => select('flipCap', p.value)} style={{
-              flex: 1, padding: '8px 4px', border: `1.5px solid ${settings.flipCap === p.value ? accent : 'rgba(255,255,255,0.12)'}`,
-              borderRadius: '10px', fontSize: '11px', fontWeight: settings.flipCap === p.value ? '700' : '400',
-              background: settings.flipCap === p.value ? `${accent}22` : 'rgba(255,255,255,0.05)', color: settings.flipCap === p.value ? accent : 'rgba(200,220,255,0.45)',
+              flex: 1, padding: '8px 4px', border: `2px solid ${settings.flipCap === p.value ? accent : '#d6d0c8'}`,
+              borderRadius: '10px', fontSize: '11px', fontWeight: settings.flipCap === p.value ? '700' : '500',
+              background: settings.flipCap === p.value ? `${accent}18` : '#ffffff',
+              color: settings.flipCap === p.value ? accent : '#9a8e82',
+              boxShadow: settings.flipCap === p.value ? 'inset 0 2px 4px rgba(0,0,0,0.08)' : '0 2px 0 #c4beb6',
+              transform: settings.flipCap === p.value ? 'translateY(1px)' : 'none',
               cursor: 'pointer', transition: 'all 0.15s', fontFamily: 'inherit', textAlign: 'center', lineHeight: 1.3,
             }}>
               <div>{p.label}</div>
@@ -525,14 +543,16 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
       </div>
 
       <div>
-        <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(180,210,255,0.40)', marginBottom: '10px' }}>Game Length</div>
+        <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9a8e82', marginBottom: '10px' }}>Game Length</div>
         <div style={{ display: 'flex', gap: '6px' }}>
           {GAME_LENGTH_OPTIONS.map(opt => (
             <button key={opt.value} onClick={() => select('gameLength', opt.value)} style={{
-              flex: 1, padding: '8px 4px', border: `1.5px solid ${settings.gameLength === opt.value ? accent : 'rgba(255,255,255,0.12)'}`,
-              borderRadius: '10px', fontSize: '11px', fontWeight: settings.gameLength === opt.value ? '700' : '400',
-              background: settings.gameLength === opt.value ? `${accent}22` : 'rgba(255,255,255,0.05)',
-              color: settings.gameLength === opt.value ? accent : 'rgba(200,220,255,0.45)',
+              flex: 1, padding: '8px 4px', border: `2px solid ${settings.gameLength === opt.value ? accent : '#d6d0c8'}`,
+              borderRadius: '10px', fontSize: '11px', fontWeight: settings.gameLength === opt.value ? '700' : '500',
+              background: settings.gameLength === opt.value ? `${accent}18` : '#ffffff',
+              color: settings.gameLength === opt.value ? accent : '#9a8e82',
+              boxShadow: settings.gameLength === opt.value ? 'inset 0 2px 4px rgba(0,0,0,0.08)' : '0 2px 0 #c4beb6',
+              transform: settings.gameLength === opt.value ? 'translateY(1px)' : 'none',
               cursor: 'pointer', transition: 'all 0.15s', fontFamily: 'inherit', textAlign: 'center', lineHeight: 1.3,
             }}>
               <div>{opt.label}</div>
@@ -565,19 +585,19 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
           return (
             <button key={n} style={{ ...S.card(selected), flexDirection: 'column', gap: '12px', padding: '18px 16px' }} onClick={() => setCubeSize(n)}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ width: '44px', height: '44px', borderRadius: '8px', overflow: 'hidden', border: `1px solid ${selected ? 'rgba(255,255,255,0.40)' : 'rgba(255,255,255,0.15)'}`, background: 'rgba(255,255,255,0.06)' }}>
+                <div style={{ width: '44px', height: '44px', borderRadius: '8px', overflow: 'hidden', border: `1px solid ${selected ? 'rgba(0,0,0,0.15)' : '#d6d0c8'}`, background: '#f0ebe2' }}>
                   <TilePreviewCanvas styleKey={settings.tileStyle === 'random' ? 'solid' : (settings.tileStyle || 'solid')} colorHex={resolvedColors[1] || '#4a7fa5'} size={44} />
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: `repeat(${n}, 1fr)`, gap: '3px', width: '44px' }}>
-                  {Array.from({ length: n * n }).map((_, i) => <div key={i} style={{ aspectRatio: '1', borderRadius: '3px', background: selected ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.20)', transition: 'background 0.18s ease' }} />)}
+                  {Array.from({ length: n * n }).map((_, i) => <div key={i} style={{ aspectRatio: '1', borderRadius: '3px', background: selected ? ACCENT : '#d4cfc5', transition: 'background 0.18s ease' }} />)}
                 </div>
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '3px' }}>
-                  <span style={{ fontSize: '16px', fontWeight: '700', color: '#e8edf8', letterSpacing: '-0.4px' }}>{name}</span>
-                  <span style={{ fontSize: '10px', fontWeight: '600', letterSpacing: '0.04em', textTransform: 'uppercase', color: selected ? '#e8edf8' : 'rgba(180,210,255,0.40)' }}>{tag}</span>
+                  <span style={{ fontSize: '16px', fontWeight: '700', color: '#1e1612', letterSpacing: '-0.4px' }}>{name}</span>
+                  <span style={{ fontSize: '10px', fontWeight: '600', letterSpacing: '0.04em', textTransform: 'uppercase', color: selected ? ACCENT : '#9a8e82' }}>{tag}</span>
                 </div>
-                <div style={{ fontSize: '12px', color: 'rgba(180,210,255,0.50)' }}>{desc}</div>
+                <div style={{ fontSize: '12px', color: '#9a8e82' }}>{desc}</div>
               </div>
               {selected && <div style={{ position: 'absolute', top: '12px', right: '12px' }}><Checkmark /></div>}
             </button>
@@ -602,7 +622,12 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
       <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
       <div style={S.sheet}>
         <div style={S.header}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(249,115,22,0.14)', border: '1.5px solid rgba(249,115,22,0.40)', borderRadius: '20px', padding: '4px 12px', marginBottom: '16px', fontSize: '11px', fontWeight: '700', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#fb923c' }}>
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: '6px',
+            background: ACCENT, borderRadius: '6px', padding: '4px 12px', marginBottom: '16px',
+            fontSize: '11px', fontWeight: '800', letterSpacing: '0.12em', textTransform: 'uppercase', color: '#fff',
+            boxShadow: `0 2px 0 ${ACCENT_SHADOW}`,
+          }}>
             DISPARITY MODE
           </div>
           <div style={S.stepIndicator}>{STEPS.map((_, i) => <div key={i} style={S.dot(i <= step, i === step)} />)}</div>
@@ -616,18 +641,18 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
           <button
             style={S.btnSecondary}
             onClick={handleBack}
-            onMouseEnter={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.85)'; }}
-            onMouseLeave={e => { e.currentTarget.style.color = 'rgba(200,220,255,0.55)'; }}
+            onMouseEnter={e => { e.currentTarget.style.color = '#1e1612'; e.currentTarget.style.borderColor = '#b8b2aa'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = '#7a6e62'; e.currentTarget.style.borderColor = '#d6d0c8'; }}
           >
             {step === 0 ? 'Cancel' : 'Back'}
           </button>
           <button
             style={S.btnPrimary}
             onClick={handleNext}
-            onMouseEnter={e => { e.currentTarget.style.opacity = '0.82'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+            onMouseEnter={e => { e.currentTarget.style.opacity = '0.88'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
             onMouseLeave={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = 'none'; }}
-            onMouseDown={e => { e.currentTarget.style.transform = 'scale(0.97)'; }}
-            onMouseUp={e => { e.currentTarget.style.transform = 'translateY(-1px)'; }}
+            onMouseDown={e => { e.currentTarget.style.transform = 'translateY(3px)'; e.currentTarget.style.boxShadow = `0 1px 0 ${ACCENT_SHADOW}`; }}
+            onMouseUp={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = `0 4px 0 ${ACCENT_SHADOW}, 0 6px 16px ${ACCENT}44`; }}
           >
             {step === totalSteps - 1 ? 'Start Playing' : 'Continue'}
           </button>
@@ -648,15 +673,14 @@ const ToggleRow = ({ label, sub, value, onChange }) => (
       gap: '12px',
       padding: '12px 14px',
       textAlign: 'left',
-      border: value ? '2px solid rgba(249,115,22,0.55)' : '1.5px solid rgba(255,255,255,0.10)',
     }}
   >
     <div>
-      <div style={{ fontSize: '14px', fontWeight: '600', color: '#e8edf8' }}>{label}</div>
-      {sub && <div style={{ fontSize: '12px', color: 'rgba(200,220,255,0.55)', marginTop: '1px' }}>{sub}</div>}
+      <div style={{ fontSize: '14px', fontWeight: '600', color: '#1e1612' }}>{label}</div>
+      {sub && <div style={{ fontSize: '12px', color: '#7a6e62', marginTop: '1px' }}>{sub}</div>}
     </div>
-    <div style={{ width: '44px', height: '26px', borderRadius: '14px', background: value ? '#f97316' : 'rgba(255,255,255,0.18)', position: 'relative', transition: 'background 0.2s ease', flexShrink: 0 }}>
-      <div style={{ position: 'absolute', top: '3px', left: value ? '21px' : '3px', width: '20px', height: '20px', borderRadius: '50%', background: '#fff', transition: 'left 0.2s ease' }} />
+    <div style={{ width: '44px', height: '26px', borderRadius: '14px', background: value ? ACCENT : '#d6d0c8', position: 'relative', transition: 'background 0.2s ease', flexShrink: 0, boxShadow: value ? `0 2px 0 ${ACCENT_SHADOW}` : '0 2px 0 #b8b2aa' }}>
+      <div style={{ position: 'absolute', top: '3px', left: value ? '21px' : '3px', width: '20px', height: '20px', borderRadius: '50%', background: '#fff', transition: 'left 0.2s ease', boxShadow: '0 1px 3px rgba(0,0,0,0.20)' }} />
     </div>
   </button>
 );
