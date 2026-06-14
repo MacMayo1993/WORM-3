@@ -731,6 +731,11 @@ const CAROUSEL_MODES = [
     controls: ['Color scheme changes every 15 s', 'Cube and tiles transform live', 'Keep solving through the shifts', 'Style variety makes every run fresh'],
   },
   {
+    id: 'store', label: 'STORE', tileColor: '#92400e', textColor: '#fff',
+    desc: 'Spend Parity Points on skins, hats, palettes, and tile styles.',
+    controls: ['Earn PP by collecting orbs in Worm mode', 'Win Disparity bets for extra points', 'Unlock worm skins, hats, and color schemes', 'Cosmetics carry across every game mode'],
+  },
+  {
     id: 'coming-soon', label: 'COMING SOON', tileColor: '#e8e8e0', textColor: 'rgba(0,0,0,0.70)',
     desc: 'Story, Holonomy, Biome, Merge — arriving soon.',
     controls: ['Story: 10-level campaign with cutscenes', 'Holonomy: loop visualization mode', 'Biome: city face-specific environments', 'Merge: block-merging puzzle variant'],
@@ -883,7 +888,7 @@ const HowToPlayMini = ({ tileColor }) => {
 // no CSS transform transitions on positioned elements → no GPU compositor ordering
 // issues on mobile Chrome.
 
-export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay, onRandom, onComingSoon, onHowToPlay }) => {
+export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay, onRandom, onStore, onComingSoon, onHowToPlay }) => {
   const [activeIndex, setActiveIndex] = useState(0);
   const [show, setShow] = useState(true);
   const [imgError, setImgError] = useState(false);
@@ -949,9 +954,10 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
     else if (id === 'chaos')       onChaos?.();
     else if (id === 'freeplay')    onFreeplay?.();
     else if (id === 'random')      onRandom?.();
+    else if (id === 'store')       onStore?.();
     else if (id === 'coming-soon') onComingSoon?.();
     else if (id === 'how-to-play') onHowToPlay?.();
-  }, [onCubeSelect, onWormSelect, onChaos, onFreeplay, onRandom, onComingSoon, onHowToPlay]);
+  }, [onCubeSelect, onWormSelect, onChaos, onFreeplay, onRandom, onStore, onComingSoon, onHowToPlay]);
 
   const mode = CAROUSEL_MODES[activeIndex];
   const activeImageSrc = `${import.meta.env.BASE_URL}images/modes/${mode.id}.jpg`;

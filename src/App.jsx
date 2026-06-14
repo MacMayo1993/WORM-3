@@ -1332,6 +1332,7 @@ export default function WORM3() {
             onChaos={() => { setShowModeSelect(false); handleMenuDisparity(); }}
             onFreeplay={() => { setShowModeSelect(false); handleMenuFreeplay(); }}
             onRandom={() => { setShowModeSelect(false); handleMenuRandomMode(); }}
+            onStore={() => { setShowModeSelect(false); handleOpenStore(); }}
             onComingSoon={() => { setShowModeSelect(false); handleMenuComingSoon(); }}
             onHowToPlay={() => { setShowModeSelect(false); handleMenuTeach(); }}
           />
