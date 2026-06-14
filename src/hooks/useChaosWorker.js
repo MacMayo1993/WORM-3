@@ -130,8 +130,16 @@ export function useChaosWorker({
       if (winner?.length) {
         // Flush any lingering bolt visuals when the winner pair is finalized.
         setCascades([]);
-        useGameStore.getState().setDisparityWinner({ pair: winner });
-        useGameStore.getState().setShowDisparityWinner(true);
+        const finalWinner = winner;
+        const announce = () => {
+          useGameStore.getState().setDisparityWinner({ pair: finalWinner });
+          useGameStore.getState().setShowDisparityWinner(true);
+        };
+        // When deaths arrive in the same tick as the winner, the 500ms death
+        // animation in StickerPlane.jsx hasn't started yet. Delay long enough
+        // for those animations to finish before showing the winner screen.
+        if (deaths?.length > 0) setTimeout(announce, 700);
+        else announce();
       }
 
       if (metrics) {
