@@ -1,51 +1,64 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 
-/**
- * FloatingHUD - Minimal auto-fading HUD
- *
- * Shows brief notifications (parity change, chaos level, etc.)
- * Auto-fades after 4s of inactivity
- */
 const FloatingHUD = ({ metrics, chaosLevel, chaosMode }) => {
-  const [message, setMessage] = useState(null);
-  const [visible, setVisible] = useState(false);
-  const fadeTimer = useRef(null);
+  const [queue, setQueue] = useState([]);
   const prevParity = useRef(metrics.flips % 2);
   const prevChaosLevel = useRef(chaosLevel);
+  const idRef = useRef(0);
 
-  // Watch for parity change
+  const push = useCallback((msg) => {
+    const id = ++idRef.current;
+    // Cap at 3 queued so a burst of events doesn't pile up forever
+    setQueue(prev => [...prev, { id, msg }].slice(-3));
+  }, []);
+
+  // Auto-advance: when the head message changes, start its 4s timer
+  const headId = queue[0]?.id;
+  useEffect(() => {
+    if (!headId) return;
+    const t = setTimeout(() => setQueue(prev => prev.slice(1)), 4000);
+    return () => clearTimeout(t);
+  }, [headId]);
+
   useEffect(() => {
     const newParity = metrics.flips % 2;
     if (newParity !== prevParity.current) {
       prevParity.current = newParity;
-      showMessage(`Parity flipped — ${newParity === 0 ? 'Even' : 'Odd'}`);
+      push(`Parity flipped — ${newParity === 0 ? 'Even' : 'Odd'}`);
     }
-  }, [metrics.flips]);
+  }, [metrics.flips, push]);
 
-  // Watch for chaos level change
   useEffect(() => {
     if (chaosMode && chaosLevel !== prevChaosLevel.current) {
       prevChaosLevel.current = chaosLevel;
-      showMessage(`Disparity Level ${chaosLevel}`);
+      push(`Disparity Level ${chaosLevel}`);
     }
-  }, [chaosLevel, chaosMode]);
+  }, [chaosLevel, chaosMode, push]);
 
-  const showMessage = (msg) => {
-    setMessage(msg);
-    setVisible(true);
-    if (fadeTimer.current) clearTimeout(fadeTimer.current);
-    fadeTimer.current = setTimeout(() => setVisible(false), 4000);
-  };
-
-  useEffect(() => {
-    return () => { if (fadeTimer.current) clearTimeout(fadeTimer.current); };
-  }, []);
-
-  if (!message) return null;
+  if (queue.length === 0) return null;
 
   return (
-    <div className={`floating-hud ${visible ? 'floating-hud-visible' : 'floating-hud-hidden'}`}>
-      {message}
+    <div style={{
+      position: 'fixed',
+      bottom: '80px',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      display: 'flex',
+      flexDirection: 'column-reverse',
+      alignItems: 'center',
+      gap: '6px',
+      zIndex: 200,
+      pointerEvents: 'none',
+    }}>
+      {queue.map((item, i) => (
+        <div
+          key={item.id}
+          className="floating-hud floating-hud-visible"
+          style={i > 0 ? { opacity: 0.40, transform: `scale(${0.92 - i * 0.04})`, fontSize: '11px' } : undefined}
+        >
+          {item.msg}
+        </div>
+      ))}
     </div>
   );
 };

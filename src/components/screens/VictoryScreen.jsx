@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { VICTORY } from '../../utils/constants.js';
 
 const VictoryScreen = ({
@@ -14,6 +14,36 @@ const VictoryScreen = ({
   onMainMenu = null
 }) => {
   const [showConfetti, _setShowConfetti] = useState(true);
+
+  // Stable confetti config — computed once per win type, not on every render
+  const CONFETTI_COLORS = ['#ef4444', '#22c55e', '#3b82f6', '#eab308', '#f97316', '#ffffff', '#a855f7', '#ec4899'];
+  const confettiParticles = useMemo(() => {
+    const count = winType === VICTORY.ULTIMATE ? 65 : 35;
+    return Array.from({ length: count }).map((_, i) => {
+      const phi = i * 137.508; // golden-angle spread avoids clumping
+      return {
+        id: i,
+        color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+        left: `${((phi % 360) / 360) * 100}%`,
+        width: 6 + (i % 4) * 3,
+        height: i % 5 === 0 ? 14 : i % 3 === 0 ? 8 : 10,
+        radius: i % 3 === 0 ? '50%' : i % 4 === 0 ? '2px' : '0',
+        duration: 2.2 + (i % 9) * 0.35,
+        delay: (i * 0.08) % 2.5,
+        rotation: i % 2 === 0 ? 540 : -360,
+      };
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [winType]);
+
+  const wormParticles = useMemo(() => (
+    Array.from({ length: 32 }).map((_, i) => ({
+      id: i,
+      left: `${((i * 137.508) % 360 / 360) * 100}%`,
+      duration: 2.2 + (i % 7) * 0.4,
+      delay: (i * 0.09) % 2,
+    }))
+  ), []);
 
   const formatTime = (s) => {
     const mins = Math.floor(s / 60);
@@ -79,49 +109,37 @@ const VictoryScreen = ({
       padding: 'env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px)',
       boxSizing: 'border-box'
     }}>
-      {/* Confetti particles for ultimate win */}
-      {winType === VICTORY.ULTIMATE && showConfetti && (
-        <div style={{
-          position: 'absolute',
-          top: 0, left: 0, right: 0, bottom: 0,
-          overflow: 'hidden',
-          pointerEvents: 'none'
-        }}>
-          {Array.from({ length: 50 }).map((_, i) => (
-            <div key={i} style={{
+      {/* Confetti — all non-worm wins */}
+      {winType !== VICTORY.WORM && showConfetti && (
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden', pointerEvents: 'none' }}>
+          {confettiParticles.map(p => (
+            <div key={p.id} style={{
               position: 'absolute',
-              width: '10px',
-              height: '10px',
-              background: ['#ef4444', '#22c55e', '#3b82f6', '#eab308', '#f97316', '#ffffff'][i % 6],
-              left: `${Math.random() * 100}%`,
+              width: `${p.width}px`,
+              height: `${p.height}px`,
+              background: p.color,
+              left: p.left,
               top: '-20px',
-              borderRadius: i % 2 === 0 ? '50%' : '0',
-              animation: `confetti-fall ${2 + Math.random() * 3}s linear infinite`,
-              animationDelay: `${Math.random() * 2}s`
+              borderRadius: p.radius,
+              animation: `confetti-fall ${p.duration}s linear infinite`,
+              animationDelay: `${p.delay}s`,
             }} />
           ))}
         </div>
       )}
 
-      {/* WORM particles for worm victory */}
+      {/* Worm particles for worm victory */}
       {winType === VICTORY.WORM && showConfetti && (
-        <div style={{
-          position: 'absolute',
-          top: 0, left: 0, right: 0, bottom: 0,
-          overflow: 'hidden',
-          pointerEvents: 'none'
-        }}>
-          {Array.from({ length: 30 }).map((_, i) => (
-            <div key={i} style={{
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden', pointerEvents: 'none' }}>
+          {wormParticles.map(p => (
+            <div key={p.id} style={{
               position: 'absolute',
               fontSize: '24px',
-              left: `${Math.random() * 100}%`,
+              left: p.left,
               top: '-40px',
-              animation: `worm-wiggle ${2 + Math.random() * 3}s linear infinite`,
-              animationDelay: `${Math.random() * 2}s`
-            }}>
-              ◎
-            </div>
+              animation: `worm-wiggle ${p.duration}s linear infinite`,
+              animationDelay: `${p.delay}s`,
+            }}>◎</div>
           ))}
         </div>
       )}
@@ -419,15 +437,21 @@ const VictoryScreen = ({
           to { opacity: 1; transform: scale(1); }
         }
         @keyframes confetti-fall {
-          0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
-          100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+          0%   { transform: translateY(-20px) rotate(0deg) skewX(0deg); opacity: 1; }
+          60%  { opacity: 1; }
+          100% { transform: translateY(100vh) rotate(540deg) skewX(12deg); opacity: 0; }
         }
         @keyframes worm-wiggle {
-          0% { transform: translateY(-40px) rotate(0deg) translateX(0px); opacity: 1; }
-          25% { transform: translateY(25vh) rotate(15deg) translateX(20px); opacity: 1; }
-          50% { transform: translateY(50vh) rotate(-15deg) translateX(-20px); opacity: 1; }
-          75% { transform: translateY(75vh) rotate(10deg) translateX(15px); opacity: 1; }
+          0%   { transform: translateY(-40px) rotate(0deg) translateX(0px); opacity: 1; }
+          25%  { transform: translateY(25vh) rotate(15deg) translateX(20px); opacity: 1; }
+          50%  { transform: translateY(50vh) rotate(-15deg) translateX(-20px); opacity: 1; }
+          75%  { transform: translateY(75vh) rotate(10deg) translateX(15px); opacity: 1; }
           100% { transform: translateY(100vh) rotate(0deg) translateX(0px); opacity: 0; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          @keyframes confetti-fall { from {} to {} }
+          @keyframes worm-wiggle   { from {} to {} }
+          @keyframes fadeIn        { from {} to {} }
         }
       `}</style>
     </div>

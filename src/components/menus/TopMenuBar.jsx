@@ -215,17 +215,10 @@ const TopMenuBar = ({
       {chaosMode && chaosStats && (
         <>
           {/* Stats row */}
-          <div style={{
-            width: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '18px',
-            padding: '3px 16px 4px',
-            borderTop: `1px solid ${hexToRgba(fc[5], 0.18)}`,
-            fontSize: '11px',
-            fontFamily: "'Courier New', monospace",
-            flexWrap: 'wrap',
-          }}>
+          <div
+            className="chaos-stats-row"
+            style={{ borderTop: `1px solid ${hexToRgba(fc[5], 0.18)}` }}
+          >
             <ChaosStatItem
               label="FLIPS"
               value={chaosStats.totalFlips}

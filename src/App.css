@@ -1035,6 +1035,35 @@ button:focus-visible,
   @keyframes wormIdlePulse { from {} to {} }
 }
 
+/* ── Chaos stats row — horizontal strip inside top bar ───────────────────── */
+.chaos-stats-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 3px 16px 4px;
+  font-size: 11px;
+  font-family: 'Courier New', monospace;
+  flex-wrap: wrap;
+}
+
+/* On narrow screens: scroll horizontally instead of wrapping */
+@media (max-width: 520px) {
+  .chaos-stats-row {
+    gap: 12px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    padding: 3px 12px 5px;
+  }
+
+  .chaos-stats-row::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 /* ── Dark-panel scrollbars (settings, help, store modals) ─────────────────── */
 .settings-panel::-webkit-scrollbar,
 .tutorial-card::-webkit-scrollbar,
