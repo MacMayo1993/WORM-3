@@ -9,6 +9,9 @@ import { getSegmentWorldPos, getTunnelWorldPosInto } from './wormLogic.js';
 import { liveCubies } from './liveCubies.js';
 import { SURFACE_OFFSET } from '../utils/constants.js';
 
+// Orbs float this far above the tile surface so they're visible from any angle
+const HOVER_ABOVE = 0.28;
+
 const BOB_NORMALS = {
   PX: [1, 0, 0], NX: [-1, 0, 0],
   PY: [0, 1, 0], NY: [0, -1, 0],
@@ -296,13 +299,13 @@ export default function ParityOrbs({
 
       if (cubie) {
         _scratchBob.set(bn[0], bn[1], bn[2]).applyQuaternion(cubie.quaternion);
-        _scratchPos.copy(cubie.position).addScaledVector(_scratchBob, SURFACE_OFFSET);
+        _scratchPos.copy(cubie.position).addScaledVector(_scratchBob, SURFACE_OFFSET + HOVER_ABOVE);
         if (elevated) _scratchPos.addScaledVector(_scratchBob, 1.2);
         const bobAmt = Math.sin(time * 2.1) * (isTarget ? 0.13 : 0.06);
         _scratchPos.addScaledVector(_scratchBob, bobAmt);
         group.position.copy(_scratchPos);
       } else {
-        const _bob = Math.sin(time * 2.1) * (isTarget ? 0.13 : 0.06);
+        const _bob = HOVER_ABOVE + Math.sin(time * 2.1) * (isTarget ? 0.13 : 0.06);
         group.position.set(
           position[0] + bn[0] * _bob,
           position[1] + bn[1] * _bob,
