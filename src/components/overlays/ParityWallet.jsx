@@ -29,11 +29,11 @@ export default function ParityWallet({ dark = false }) {
 
   const upColor   = '#4ade80';
   const downColor = '#f87171';
-  const baseColor = dark ? '#818cf8' : '#6366f1';
-  const numColor  = dark ? '#a5b4fc' : '#4f46e5';
-  const subColor  = dark ? 'rgba(165,180,252,0.55)' : 'rgba(79,70,229,0.55)';
-  const borderBase = dark ? 'rgba(99,102,241,0.30)' : 'rgba(99,102,241,0.22)';
-  const bgBase     = dark ? 'rgba(99,102,241,0.12)' : 'rgba(99,102,241,0.07)';
+  const baseColor = dark ? '#22d3ee' : '#0e7490';
+  const numColor  = dark ? '#22d3ee' : '#0891B2';
+  const subColor  = dark ? 'rgba(34,211,238,0.55)' : 'rgba(8,145,178,0.55)';
+  const borderBase = dark ? 'rgba(8,145,178,0.30)' : 'rgba(8,145,178,0.22)';
+  const bgBase     = dark ? 'rgba(8,145,178,0.12)' : 'rgba(8,145,178,0.07)';
 
   const flashColor  = flash === 'up' ? upColor : flash === 'down' ? downColor : null;
   const borderColor = flashColor ? `${flashColor}45` : borderBase;
