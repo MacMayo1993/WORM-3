@@ -1,6 +1,6 @@
 // src/worm/OrbInventoryHUD.jsx
 // 2D HUD showing the worm's color-orb inventory (used for tunnel healing).
-// Crystal-gem dot aesthetic to match the 3D orb visual design.
+// Möbius-strip dot aesthetic to match the RP² manifold theme.
 
 import React from 'react';
 import { isMobile } from '../utils/device.js';
@@ -9,17 +9,32 @@ const FACE_ORDER  = [1, 2, 3, 4, 5, 6];
 const FONT        = "'Courier New', monospace";
 const isSmall     = typeof window !== 'undefined' && window.innerWidth < 380;
 
-// Luminance check — returns true for near-white face colors
-const isLightColor = (hex) => {
-  if (!hex || hex.length < 7) return false;
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.82;
+// Möbius strip icon — figure-8 with a visible crossing (front strand over back)
+const MobiusIcon = ({ color, size = 18 }) => {
+  const h = Math.round(size * 0.62);
+  return (
+    <svg width={size} height={h} viewBox="-15 -9.5 30 19" fill="none" style={{ display: 'block', flexShrink: 0 }}>
+      {/* Left lobe — back half, dimmed */}
+      <path
+        d="M 0,0 C -1.5,-7 -13,-7 -13,0 C -13,7 -1.5,7 0,0"
+        stroke={color} strokeWidth="2.2" strokeOpacity="0.48" strokeLinecap="round"
+      />
+      {/* Right lobe — back half, dimmed */}
+      <path
+        d="M 0,0 C 1.5,7 13,7 13,0 C 13,-7 1.5,-7 0,0"
+        stroke={color} strokeWidth="2.2" strokeOpacity="0.48" strokeLinecap="round"
+      />
+      {/* Crossing mask — punches out behind the front strand */}
+      <path d="M -3.5,-3 L 3.5,3" stroke="rgba(10,12,28,0.95)" strokeWidth="5" strokeLinecap="round" />
+      {/* Front crossing strand */}
+      <path d="M -3.5,3 L 3.5,-3" stroke={color} strokeWidth="2.4" strokeLinecap="round" />
+      {/* Soft glow on front strand */}
+      <path d="M -3.5,3 L 3.5,-3" stroke={color} strokeWidth="5.5" strokeOpacity="0.18" strokeLinecap="round" />
+      {/* Outer glow ring around entire icon */}
+      <ellipse cx="0" cy="0" rx="13.5" ry="8" stroke={color} strokeWidth="0.7" strokeOpacity="0.22" />
+    </svg>
+  );
 };
-
-// Hexagon clip-path — gives each orb dot a crystal/gem silhouette
-const HEX_CLIP = 'polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%)';
 
 export default function OrbInventoryHUD({ orbInventory, faceColors }) {
   if (!orbInventory || !faceColors) return null;
@@ -27,8 +42,8 @@ export default function OrbInventoryHUD({ orbInventory, faceColors }) {
   const activeEntries = FACE_ORDER.filter(faceId => (orbInventory[faceId] ?? 0) > 0);
   if (activeEntries.length === 0) return null;
 
-  const gemSize  = isSmall ? 9  : isMobile ? 11 : 14;
-  const fontSize = isSmall ? 12 : isMobile ? 13 : 15;
+  const iconSize  = isSmall ? 16 : isMobile ? 18 : 22;
+  const fontSize  = isSmall ? 12 : isMobile ? 13 : 15;
 
   return (
     <div style={{
@@ -56,7 +71,7 @@ export default function OrbInventoryHUD({ orbInventory, faceColors }) {
         Orbs
       </div>
 
-      {/* Gem row */}
+      {/* Orb row */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
@@ -71,20 +86,11 @@ export default function OrbInventoryHUD({ orbInventory, faceColors }) {
         {activeEntries.map(faceId => {
           const count = orbInventory[faceId];
           const color = faceColors[faceId] ?? '#888888';
-          const light = isLightColor(color);
 
           return (
-            <div key={faceId} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              {/* Crystal-gem dot */}
-              <div style={{
-                width:  gemSize,
-                height: gemSize,
-                background: color,
-                clipPath: HEX_CLIP,
-                flexShrink: 0,
-                boxShadow: `0 0 6px ${color}, 0 0 14px ${color}55`,
-                outline: light ? '1px solid rgba(255,255,255,0.30)' : 'none',
-              }} />
+            <div key={faceId} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              {/* Möbius strip icon */}
+              <MobiusIcon color={color} size={iconSize} />
 
               {/* Count */}
               <span style={{
