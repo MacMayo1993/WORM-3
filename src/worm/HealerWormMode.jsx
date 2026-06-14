@@ -30,10 +30,6 @@ import {
     GLASS_MIN_TRANSMISSION,
     GLASS_MAX_TRANSMISSION,
     TUNNEL_SURF_FOV,
-    TUNNEL_SURF_BACK,
-    TUNNEL_SURF_UP,
-    TUNNEL_LOOK_AHEAD,
-    TUNNEL_SURF_SWAY,
     TUNNEL_SPEED_SCALE,
     FACE_NORMALS,
     DIR_FORWARD,
@@ -911,7 +907,7 @@ function useWormCrawler(size, cubies) {
                     if (activeTunnel.current) {
                         // Head travels first third of the tunnel (entry face → cube interior)
                         const tunnelT = tunnelProgress.current * 0.33;
-                        getTunnelWorldPosInto(headInterpPos.current, activeTunnel.current, tunnelT, size);
+                        getTunnelWorldPosInto(headInterpPos.current, activeTunnel.current, tunnelT, size, useGameStore.getState().explosionT);
                         const entryN = FACE_NORMALS[activeTunnel.current.entry.dirKey];
                         if (entryN) currentNormal.current.copy(entryN);
                     }
@@ -933,7 +929,7 @@ function useWormCrawler(size, cubies) {
                     if (activeTunnel.current) {
                         // Head travels middle third of the tunnel (through cube core)
                         const tunnelT = 0.33 + tunnelProgress.current * 0.34;
-                        getTunnelWorldPosInto(headInterpPos.current, activeTunnel.current, tunnelT, size);
+                        getTunnelWorldPosInto(headInterpPos.current, activeTunnel.current, tunnelT, size, useGameStore.getState().explosionT);
                         // Switch normal to exit face at the midpoint
                         const n = tunnelProgress.current > 0.5
                             ? FACE_NORMALS[activeTunnel.current.exit.dirKey]
@@ -965,7 +961,7 @@ function useWormCrawler(size, cubies) {
                     if (activeTunnel.current) {
                         // Head travels final third of the tunnel (cube interior → exit face)
                         const tunnelT = 0.67 + tunnelProgress.current * 0.33;
-                        getTunnelWorldPosInto(headInterpPos.current, activeTunnel.current, tunnelT, size);
+                        getTunnelWorldPosInto(headInterpPos.current, activeTunnel.current, tunnelT, size, useGameStore.getState().explosionT);
                         const exitN = FACE_NORMALS[activeTunnel.current.exit.dirKey];
                         if (exitN) currentNormal.current.copy(exitN);
                     }
@@ -1235,7 +1231,7 @@ function WormChaseCamera({ worm, size }) {
         // Use a continuous portrait factor so camera framing doesn't jump at aspect=1.
         const portraitFactor = THREE.MathUtils.clamp((1 - viewportAspect) / 0.45, 0, 1);
         const baseFov = THREE.MathUtils.lerp(70, 82, portraitFactor);
-        const tunnelMix = phase === 'tunnel' ? 1 : (phase === 'entering' || phase === 'exiting' ? 0.35 : 0);
+        const tunnelMix = 0;
         const targetFov = THREE.MathUtils.lerp(baseFov, TUNNEL_SURF_FOV, tunnelMix);
         const fovAlpha = Math.min(1, delta * 6);
         const nextFov = THREE.MathUtils.lerp(camera.fov, targetFov, fovAlpha);
@@ -1263,6 +1259,13 @@ function WormChaseCamera({ worm, size }) {
         const extraZoom = permZoom + Math.min(zoomExtraRef.current, MAX_EXTRA_ZOOM);
         const camHeight = CAM_HEIGHT_BASE + extraZoom + aspectZoomBoost;
         const camBack = CAM_BACK_BASE + extraZoom * 0.8 + aspectZoomBoost * 0.9;
+
+        // Explode cube on tunnel entry, implode when crawling resumes.
+        if (phase === 'entering' && prevPhaseRef.current === 'crawling') {
+            useGameStore.getState().setExploded(true);
+        } else if (phase === 'crawling' && prevPhaseRef.current === 'exiting') {
+            useGameStore.getState().setExploded(false);
+        }
 
         if (phase === 'crawling' || !worm.activeTunnel.current) {
             // Smooth interpolated worm world position (copy into scratch — no .clone())
@@ -1305,82 +1308,51 @@ function WormChaseCamera({ worm, size }) {
             camera.up.copy(camUpRef.current);
             camera.lookAt(lookAtRef.current);
         } else if ((phase === 'entering' || phase === 'tunnel' || phase === 'exiting') && worm.activeTunnel.current) {
-            // Map phase+progress to a single [0,1] parameter along the Möbius ribbon.
+            // Cube explodes outward during tunnel traversal; surface-follow camera tracks the worm.
             const tp = worm.tunnelProgress.current;
             const t = phase === 'entering' ? tp * 0.33 :
                       phase === 'tunnel'   ? 0.33 + tp * 0.34 :
                                              0.67 + tp * 0.33;
-
             const tunnel = worm.activeTunnel.current;
+            const explosionFactor = useGameStore.getState().explosionT;
 
             // Publish to MobiusHUD's DOM RAF loop and MobiusTunnel dim system.
             tunnelState.active = true;
             tunnelState.t = t;
             tunnelState.activeTunnelId = tunnel.pairId ?? null;
-            const entN = FACE_NORMALS[tunnel.entry.dirKey] ?? FACE_NORMALS.PY;
-            const extN = FACE_NORMALS[tunnel.exit.dirKey]  ?? FACE_NORMALS.PY;
 
-            // Ribbon anchor points — exactly matches MobiusTunnel.jsx geometry:
-            //   vStart/vEnd = cubie-centre stepped inward by FACE_OFFSET (0.52)
-            //   midA/midB   = face-normal × MINI_FACE_R (0.25), mini-cube docking
-            const FACE_OFF = 0.52, MINI_R = 0.25;
-            const ew = getStickerWorldPos(tunnel.entry.x, tunnel.entry.y, tunnel.entry.z, tunnel.entry.dirKey, size, 0);
-            const xw = getStickerWorldPos(tunnel.exit.x,  tunnel.exit.y,  tunnel.exit.z,  tunnel.exit.dirKey,  size, 0);
-            _ribVStart.set(ew[0] - entN.x * FACE_OFF, ew[1] - entN.y * FACE_OFF, ew[2] - entN.z * FACE_OFF);
-            _ribVEnd  .set(xw[0] - extN.x * FACE_OFF, xw[1] - extN.y * FACE_OFF, xw[2] - extN.z * FACE_OFF);
-            _ribMidA  .set(entN.x * MINI_R, entN.y * MINI_R, entN.z * MINI_R);
-            _ribMidB  .set(extN.x * MINI_R, extN.y * MINI_R, extN.z * MINI_R);
+            // Worm position: headInterpPos already has explosionFactor applied from phase handlers.
+            _camWormWorld.copy(worm.headInterpPos.current);
+            _camNormal.copy(worm.currentNormal.current);
 
-            // Twist axis and initial perp (matching fillRibbon's perpBase in MobiusTunnel)
-            _ribAxis.subVectors(_ribVEnd, _ribVStart).normalize();
-            _ribPerp.crossVectors(_ribAxis, entN);
-            if (_ribPerp.lengthSq() < 0.001) { _ribPerp.set(0, 1, 0); _ribPerp.crossVectors(_ribAxis, _ribPerp); }
-            if (_ribPerp.lengthSq() < 0.001) { _ribPerp.set(0, 0, 1); _ribPerp.crossVectors(_ribAxis, _ribPerp); }
-            _ribPerp.normalize();
-
-            // Worm position at current t; a point slightly ahead gives the forward tangent.
+            // Tunnel tangent: direction from current to slightly-ahead position (explosion-scaled).
             const tAhead = Math.min(t + 0.05, 1.0);
-            getTunnelWorldPosInto(_camLookVec, tunnel, t, size);
-            getTunnelWorldPosInto(_camSurfCam, tunnel, tAhead, size);
-
-            // Tunnel forward direction (worm's heading toward exit).
+            getTunnelWorldPosInto(_camLookVec, tunnel, t, size, explosionFactor);
+            getTunnelWorldPosInto(_camSurfCam, tunnel, tAhead, size, explosionFactor);
             _camTunnelTangent.subVectors(_camSurfCam, _camLookVec);
-            if (_camTunnelTangent.lengthSq() < 0.0001) _camTunnelTangent.copy(_ribAxis);
-            _camTunnelTangent.normalize();
-
-            // Möbius half-twist: perpBase rotates π over [0,1] for the RP² roll.
-            _camTunnelRight.copy(_ribPerp).applyAxisAngle(_ribAxis, t * Math.PI);
-            _camUpVec.crossVectors(_camTunnelTangent, _camTunnelRight).normalize();
-            // Guard: degenerate cross product (tangent ∥ right) would give zero up → NaN matrices.
-            if (_camUpVec.lengthSq() < 0.01) _camUpVec.set(0, 1, 0);
-
-            // Camera: close behind and above the worm on the ribbon surface.
-            _camSurfCam.copy(_camLookVec)
-                .addScaledVector(_camTunnelTangent, -TUNNEL_SURF_BACK)
-                .addScaledVector(_camUpVec, TUNNEL_SURF_UP);
-
-            // Look-ahead: look forward along the tunnel rather than at the worm's current
-            // position.  Without this, when the worm is at the cube centre (t=0.5) the
-            // camera stares directly at the convergence point of all tunnel arms, producing
-            // a starburst.  Shifting the target ahead keeps the view looking into the tunnel.
-            _camLookVec.addScaledVector(_camTunnelTangent, TUNNEL_LOOK_AHEAD);
-
-            // Snap position AND up on the first frame we enter the tunnel.
-            // Position snap prevents multi-frame lerp swing. Up snap is critical: at
-            // tunnel entry the Möbius formula evaluates to an up vector that can be
-            // exactly antiparallel to the surface up — lerping through zero magnitude
-            // produces garbage orientations and the visible stutter.
-            if (prevPhaseRef.current === 'crawling' && phase === 'entering') {
-                camPosRef.current.copy(_camSurfCam);
-                lookAtRef.current.copy(_camLookVec);
-                camUpRef.current.copy(_camUpVec);
+            if (_camTunnelTangent.lengthSq() < 0.0001) {
+                _camTunnelTangent.copy(FACE_NORMALS[tunnel.entry.dirKey] ?? FACE_NORMALS.PY).negate();
+            } else {
+                _camTunnelTangent.normalize();
             }
-            const alpha = Math.min(1, CAM_LERP * delta * 4.0);
-            camPosRef.current.lerp(_camSurfCam, alpha);
-            lookAtRef.current.lerp(_camLookVec, alpha);
+
+            // Surface-follow camera: behind and above the worm along tunnel direction.
+            _camTargetCam.copy(_camWormWorld)
+                .addScaledVector(_camNormal, camHeight)
+                .addScaledVector(_camTunnelTangent, -camBack);
+            _camTargetLook.copy(_camWormWorld).addScaledVector(_camTunnelTangent, LOOK_AHEAD);
+            _camUp.set(0, _camNormal.y < -0.8 ? -1 : 1, 0);
+
+            if (prevPhaseRef.current === 'crawling' && phase === 'entering') {
+                camPosRef.current.copy(_camTargetCam);
+                lookAtRef.current.copy(_camTargetLook);
+                camUpRef.current.copy(_camUp);
+            }
+            const alpha = Math.min(1, CAM_LERP * delta);
+            camPosRef.current.lerp(_camTargetCam, alpha);
+            lookAtRef.current.lerp(_camTargetLook, alpha);
             camera.position.copy(camPosRef.current);
-            // Smooth the up vector so the Möbius 180° flip is gradual rather than instant.
-            camUpRef.current.lerp(_camUpVec, Math.min(1, CAM_LERP * delta * 3.0)).normalize();
+            camUpRef.current.lerp(_camUp, Math.min(1, CAM_LERP * delta)).normalize();
             camera.up.copy(camUpRef.current);
             camera.lookAt(lookAtRef.current);
         } else {
