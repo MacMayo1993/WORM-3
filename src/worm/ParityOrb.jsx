@@ -1,6 +1,6 @@
 // src/worm/ParityOrb.jsx
-// Collectible parity orbs with pulsing glow effect
-// Supports both surface mode and tunnel mode
+// Collectible parity orbs — crystal-core visual design with inner plasma,
+// dual-layer aura, electron halos, and type-system foundation for power-ups.
 
 import React, { useRef, useMemo, useEffect, useCallback } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -9,103 +9,120 @@ import { getSegmentWorldPos, getTunnelWorldPosInto } from './wormLogic.js';
 import { liveCubies } from './liveCubies.js';
 import { SURFACE_OFFSET } from '../utils/constants.js';
 
-// Face-normal directions for bob animation — indexed by dirKey
 const BOB_NORMALS = {
   PX: [1, 0, 0], NX: [-1, 0, 0],
   PY: [0, 1, 0], NY: [0, -1, 0],
   PZ: [0, 0, 1], NZ: [0, 0, -1],
 };
 
-// Scratch vectors used per-frame in the animator (never allocated during render).
+// Scratch vectors — never allocated during render
 const _scratchPos = new THREE.Vector3();
 const _scratchBob = new THREE.Vector3();
 const _rainbowColor = new THREE.Color();
 const _tunnelOrbScratch = new THREE.Vector3();
 
+// ── Orb type definitions — foundation for power-up variants ─────────────────
+// 'parity' is the standard collectible. Reserved slots for future power-ups.
+export const ORB_TYPES = {
+  parity: { electronColor: '#c6f6ff', electronEmissive: '#80e8ff', glowBoost: 1.0 },
+  speed:  { electronColor: '#ffcc44', electronEmissive: '#ff9900', glowBoost: 1.3 },
+  shield: { electronColor: '#88ccff', electronEmissive: '#4499ee', glowBoost: 0.8 },
+  magnet: { electronColor: '#ffdd88', electronEmissive: '#ffaa00', glowBoost: 1.5 },
+};
+
 // ── Shared module-level geometries (M2) ─────────────────────────────────────
-// Pre-built once at module load, shared across all SingleOrb instances.
-// Using the geometry={} prop (not JSX children) prevents R3F auto-disposal.
+// Pre-built once, shared across all instances.  geometry={} prop prevents disposal.
 const _orbGeos = {
   normal: {
-    core:      new THREE.IcosahedronGeometry(0.16, 2),
-    shell:     new THREE.SphereGeometry(0.21, 20, 20),
-    ringA:     new THREE.TorusGeometry(0.35, 0.008, 8, 32),
-    ringB:     new THREE.TorusGeometry(0.35 * 0.95, 0.008, 8, 32),
-    ringC:     new THREE.TorusGeometry(0.35 * 1.05, 0.006, 8, 32),
-    electron:  new THREE.SphereGeometry(0.035, 10, 10),
-    glow:      new THREE.SphereGeometry(0.42, 18, 18),
+    core:         new THREE.OctahedronGeometry(0.16, 1),           // crystal-faceted nucleus
+    innerCore:    new THREE.SphereGeometry(0.075, 8, 8),           // hot plasma center
+    shell:        new THREE.SphereGeometry(0.22, 20, 20),
+    innerGlow:    new THREE.SphereGeometry(0.30, 12, 12),          // tight inner aura
+    ringA:        new THREE.TorusGeometry(0.350, 0.012, 8, 32),    // thicker rings
+    ringB:        new THREE.TorusGeometry(0.350 * 0.95, 0.010, 8, 32),
+    ringC:        new THREE.TorusGeometry(0.350 * 1.05, 0.008, 8, 32),
+    electron:     new THREE.SphereGeometry(0.042, 10, 10),
+    electronGlow: new THREE.SphereGeometry(0.072, 6, 6),           // electron halo
+    glow:         new THREE.SphereGeometry(0.50, 16, 16),          // larger outer aura
   },
   target: {
-    core:      new THREE.IcosahedronGeometry(0.2, 2),
-    shell:     new THREE.SphereGeometry(0.26, 20, 20),
-    ringA:     new THREE.TorusGeometry(0.42, 0.01, 8, 32),
-    ringB:     new THREE.TorusGeometry(0.42 * 0.95, 0.01, 8, 32),
-    ringC:     new THREE.TorusGeometry(0.42 * 1.05, 0.008, 8, 32),
-    electron:  new THREE.SphereGeometry(0.045, 10, 10),
-    glow:      new THREE.SphereGeometry(0.52, 18, 18),
-    lockRing:  new THREE.TorusGeometry(0.5, 0.03, 10, 48),
+    core:         new THREE.OctahedronGeometry(0.20, 1),
+    innerCore:    new THREE.SphereGeometry(0.092, 8, 8),
+    shell:        new THREE.SphereGeometry(0.27, 20, 20),
+    innerGlow:    new THREE.SphereGeometry(0.37, 12, 12),
+    ringA:        new THREE.TorusGeometry(0.420, 0.015, 8, 32),
+    ringB:        new THREE.TorusGeometry(0.420 * 0.95, 0.012, 8, 32),
+    ringC:        new THREE.TorusGeometry(0.420 * 1.05, 0.010, 8, 32),
+    electron:     new THREE.SphereGeometry(0.052, 10, 10),
+    electronGlow: new THREE.SphereGeometry(0.088, 6, 6),
+    glow:         new THREE.SphereGeometry(0.60, 16, 16),
+    lockRing:     new THREE.TorusGeometry(0.5, 0.03, 10, 48),
   },
 };
 
-// SingleOrb renders geometry and registers its refs with the parent animator.
-// It has NO useFrame — all animation is driven by the single OrbAnimator in ParityOrbs.
-function SingleOrb({ position, color = '#ffd700', antipodalColor = '#ffd700', collected = false, isTarget = false, elevated = false, dirKey = 'PY', orbKey, registerAnim, unregisterAnim, gridX = -1, gridY = -1, gridZ = -1, isGlowWorm = false }) {
-  const orbGroupRef = useRef();
-  const coreRef = useRef();
-  const shellRef = useRef();
-  const glowRef = useRef();
-  const targetGlowRef = useRef();
+// SingleOrb renders geometry and registers refs with the parent OrbAnimator.
+// NO useFrame here — all animation driven by the single loop in ParityOrbs.
+function SingleOrb({
+  position, color = '#ffd700', antipodalColor = '#ffd700',
+  collected = false, isTarget = false, elevated = false,
+  dirKey = 'PY', orbKey, type = 'parity',
+  registerAnim, unregisterAnim,
+  gridX = -1, gridY = -1, gridZ = -1, isGlowWorm = false,
+}) {
+  const orbGroupRef    = useRef();
+  const coreRef        = useRef();
+  const innerCoreRef   = useRef();
+  const shellRef       = useRef();
+  const innerGlowRef   = useRef();
+  const glowRef        = useRef();
+  const targetGlowRef  = useRef();
   const orbitSystemRef = useRef();
-  const ringARef = useRef();
-  const ringBRef = useRef();
-  const ringCRef = useRef();
-  const electronRefs = useRef([]);
-  const outlineRef = useRef();
+  const ringARef       = useRef();
+  const ringBRef       = useRef();
+  const ringCRef       = useRef();
+  const electronRefs     = useRef([]);
+  const electronGlowRefs = useRef([]);
+  const outlineRef     = useRef();
+
   const timeOffset = useMemo(() => Math.random() * Math.PI * 2, []);
-  // All orbs get a black outline for definition; white orbs especially need it
-  const outlineColor = '#000000';
 
-  // Keep mutable refs so the animator always reads current values without causing re-renders
-  const isTargetRef = useRef(isTarget);
-  isTargetRef.current = isTarget;
-  const elevatedRef = useRef(elevated);
-  elevatedRef.current = elevated;
-  const positionRef = useRef(position);
-  positionRef.current = position;
-  const dirKeyRef = useRef(dirKey);
-  dirKeyRef.current = dirKey;
-  const gridXRef = useRef(gridX);
-  gridXRef.current = gridX;
-  const gridYRef = useRef(gridY);
-  gridYRef.current = gridY;
-  const gridZRef = useRef(gridZ);
-  gridZRef.current = gridZ;
-  const isGlowWormRef = useRef(isGlowWorm);
-  isGlowWormRef.current = isGlowWorm;
+  // Mutable refs so the animator always reads current values without causing re-renders
+  const isTargetRef   = useRef(isTarget);   isTargetRef.current   = isTarget;
+  const elevatedRef   = useRef(elevated);   elevatedRef.current   = elevated;
+  const positionRef   = useRef(position);   positionRef.current   = position;
+  const dirKeyRef     = useRef(dirKey);     dirKeyRef.current     = dirKey;
+  const gridXRef      = useRef(gridX);      gridXRef.current      = gridX;
+  const gridYRef      = useRef(gridY);      gridYRef.current      = gridY;
+  const gridZRef      = useRef(gridZ);      gridZRef.current      = gridZ;
+  const isGlowWormRef = useRef(isGlowWorm); isGlowWormRef.current = isGlowWorm;
+  const typeRef       = useRef(type);       typeRef.current       = type;
 
-  // Register animation refs with parent on mount, unregister on unmount
   useEffect(() => {
     registerAnim(orbKey, {
-      get group() { return orbGroupRef.current; },
-      get core() { return coreRef.current; },
-      get shell() { return shellRef.current; },
-      get glow() { return glowRef.current; },
-      get targetGlow() { return targetGlowRef.current; },
-      get orbitSystem() { return orbitSystemRef.current; },
-      get ringA() { return ringARef.current; },
-      get ringB() { return ringBRef.current; },
-      get ringC() { return ringCRef.current; },
-      get electrons() { return electronRefs.current; },
-      get outline() { return outlineRef.current; },
-      get isTarget() { return isTargetRef.current; },
-      get elevated() { return elevatedRef.current; },
-      get position() { return positionRef.current; },
-      get dirKey() { return dirKeyRef.current; },
-      get gridX() { return gridXRef.current; },
-      get gridY() { return gridYRef.current; },
-      get gridZ() { return gridZRef.current; },
-      get isGlowWorm() { return isGlowWormRef.current; },
-      timeOffset
+      get group()         { return orbGroupRef.current; },
+      get core()          { return coreRef.current; },
+      get innerCore()     { return innerCoreRef.current; },
+      get shell()         { return shellRef.current; },
+      get innerGlow()     { return innerGlowRef.current; },
+      get glow()          { return glowRef.current; },
+      get targetGlow()    { return targetGlowRef.current; },
+      get orbitSystem()   { return orbitSystemRef.current; },
+      get ringA()         { return ringARef.current; },
+      get ringB()         { return ringBRef.current; },
+      get ringC()         { return ringCRef.current; },
+      get electrons()     { return electronRefs.current; },
+      get electronGlows() { return electronGlowRefs.current; },
+      get outline()       { return outlineRef.current; },
+      get isTarget()      { return isTargetRef.current; },
+      get elevated()      { return elevatedRef.current; },
+      get position()      { return positionRef.current; },
+      get dirKey()        { return dirKeyRef.current; },
+      get gridX()         { return gridXRef.current; },
+      get gridY()         { return gridYRef.current; },
+      get gridZ()         { return gridZRef.current; },
+      get isGlowWorm()    { return isGlowWormRef.current; },
+      get type()          { return typeRef.current; },
+      timeOffset,
     });
     return () => unregisterAnim(orbKey);
   }, [orbKey, timeOffset, registerAnim, unregisterAnim]);
@@ -113,26 +130,40 @@ function SingleOrb({ position, color = '#ffd700', antipodalColor = '#ffd700', co
   if (collected) return null;
 
   const g = isTarget ? _orbGeos.target : _orbGeos.normal;
+  const typeConfig = ORB_TYPES[type] || ORB_TYPES.parity;
 
   return (
     <group ref={orbGroupRef} position={[position[0], position[1], position[2]]}>
-      {/* Core outline — back-face scale trick; black for white orbs, white for everything else */}
+
+      {/* Crystal core outline — back-face scale trick */}
       <mesh ref={outlineRef} geometry={g.core}>
-        <meshBasicMaterial color={outlineColor} side={THREE.BackSide} />
+        <meshBasicMaterial color="#000000" side={THREE.BackSide} />
       </mesh>
 
-      {/* Core nucleus */}
+      {/* Crystal nucleus — OctahedronGeometry for faceted gem look */}
       <mesh ref={coreRef} geometry={g.core}>
         <meshStandardMaterial
           color={color}
           emissive={color}
-          emissiveIntensity={isTarget ? 2.0 : 1.35}
-          metalness={0.22}
-          roughness={0.15}
+          emissiveIntensity={isTarget ? 2.0 : 1.4}
+          metalness={0.35}
+          roughness={0.10}
         />
       </mesh>
 
-      {/* Energy shell */}
+      {/* Inner plasma core — bright hot center, counter-spins vs crystal */}
+      <mesh ref={innerCoreRef} geometry={g.innerCore}>
+        <meshBasicMaterial
+          color={color}
+          transparent
+          opacity={0.92}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+          toneMapped={false}
+        />
+      </mesh>
+
+      {/* Energy shell — outer transparent envelope */}
       <mesh ref={shellRef} geometry={g.shell}>
         <meshBasicMaterial
           color={color}
@@ -143,22 +174,52 @@ function SingleOrb({ position, color = '#ffd700', antipodalColor = '#ffd700', co
         />
       </mesh>
 
+      {/* Inner tight aura — main color, close-in glow halo */}
+      <mesh ref={innerGlowRef} geometry={g.innerGlow}>
+        <meshBasicMaterial
+          color={color}
+          transparent
+          opacity={isTarget ? 0.28 : 0.18}
+          side={THREE.BackSide}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+        />
+      </mesh>
+
       {/* Electron orbital rings + electrons */}
       <group ref={orbitSystemRef}>
         <mesh ref={ringARef} geometry={g.ringA} rotation={[0.3, 0.4, 0]}>
-          <meshBasicMaterial color={color} transparent opacity={0.38} depthWrite={false} />
+          <meshBasicMaterial color={color} transparent opacity={0.42} depthWrite={false} />
         </mesh>
         <mesh ref={ringBRef} geometry={g.ringB} rotation={[-0.6, 0, 0.5]}>
-          <meshBasicMaterial color={antipodalColor} transparent opacity={0.3} depthWrite={false} />
+          <meshBasicMaterial color={antipodalColor} transparent opacity={0.34} depthWrite={false} />
         </mesh>
         <mesh ref={ringCRef} geometry={g.ringC} rotation={[0, 0.85, -0.35]}>
-          <meshBasicMaterial color={color} transparent opacity={0.26} depthWrite={false} />
+          <meshBasicMaterial color={color} transparent opacity={0.28} depthWrite={false} />
         </mesh>
 
+        {/* Electrons with glow halos */}
         {Array.from({ length: 3 }, (_, i) => (
-          <mesh key={i} geometry={g.electron} ref={(el) => { electronRefs.current[i] = el; }}>
-            <meshBasicMaterial color="#c6f6ff" transparent opacity={0.92} blending={THREE.AdditiveBlending} depthWrite={false} />
-          </mesh>
+          <React.Fragment key={i}>
+            <mesh ref={(el) => { electronRefs.current[i] = el; }} geometry={g.electron}>
+              <meshStandardMaterial
+                color={typeConfig.electronColor}
+                emissive={typeConfig.electronEmissive}
+                emissiveIntensity={1.6}
+                metalness={0}
+                roughness={0}
+              />
+            </mesh>
+            <mesh ref={(el) => { electronGlowRefs.current[i] = el; }} geometry={g.electronGlow}>
+              <meshBasicMaterial
+                color={typeConfig.electronColor}
+                transparent
+                opacity={0.45}
+                blending={THREE.AdditiveBlending}
+                depthWrite={false}
+              />
+            </mesh>
+          </React.Fragment>
         ))}
       </group>
 
@@ -167,7 +228,7 @@ function SingleOrb({ position, color = '#ffd700', antipodalColor = '#ffd700', co
         <meshBasicMaterial
           color={antipodalColor}
           transparent
-          opacity={isTarget ? 0.48 : 0.28}
+          opacity={isTarget ? 0.50 : 0.30}
           side={THREE.BackSide}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
@@ -176,48 +237,56 @@ function SingleOrb({ position, color = '#ffd700', antipodalColor = '#ffd700', co
 
       {/* Target lock ring */}
       {isTarget && (
-        <mesh ref={targetGlowRef} geometry={g.lockRing}>
-          <meshBasicMaterial color="#ffffff" transparent opacity={0.3} blending={THREE.AdditiveBlending} depthWrite={false} />
+        <mesh ref={targetGlowRef} geometry={_orbGeos.target.lockRing}>
+          <meshBasicMaterial color="#ffffff" transparent opacity={0.30} blending={THREE.AdditiveBlending} depthWrite={false} />
         </mesh>
       )}
 
-      {/* Point light only on the target orb — 15 point lights was a significant GPU cost */}
-      {isTarget && (
-        <pointLight color={color} intensity={1.1} distance={3.3} decay={2} />
-      )}
+      {/* Point light — full intensity on target, subtle ambient on all orbs */}
+      <pointLight
+        color={color}
+        intensity={isTarget ? 1.1 : 0.22}
+        distance={isTarget ? 3.3 : 1.8}
+        decay={2}
+      />
     </group>
   );
 }
 
 /**
- * @param {Object} props
- * @param {Array} props.orbs - Orb positions (surface or tunnel)
- * @param {number} props.size - Cube size
+ * ParityOrbs — renders all active orbs and drives their animation via a single useFrame.
+ *
+ * @param {Array}  props.orbs            - Orb data (surface or tunnel)
+ * @param {number} props.size            - Cube size
  * @param {number} props.explosionFactor - Explosion animation factor
- * @param {string} props.mode - 'surface' or 'tunnel'
- * @param {string} props.targetTunnelId - ID of tunnel to highlight (for tunnel mode)
+ * @param {string} props.mode            - 'surface' | 'tunnel'
+ * @param {string} props.targetTunnelId  - Tunnel to highlight
+ * @param {boolean} props.isGlowWorm     - Glow worm visual mode
  */
-export default function ParityOrbs({ orbs, size, explosionFactor = 0, mode = 'surface', targetTunnelId = null, isGlowWorm = false }) {
+export default function ParityOrbs({
+  orbs, size, explosionFactor = 0,
+  mode = 'surface', targetTunnelId = null, isGlowWorm = false,
+}) {
   const isTunnelMode = mode === 'tunnel';
 
-  // Single animation registry — all orb refs stored here, driven by one useFrame
   const animMapRef = useRef(new Map());
-
-  const registerAnim = useCallback((key, refs) => { animMapRef.current.set(key, refs); }, []);
+  const registerAnim   = useCallback((key, refs) => { animMapRef.current.set(key, refs); }, []);
   const unregisterAnim = useCallback((key) => { animMapRef.current.delete(key); }, []);
 
-  // Single useFrame drives ALL orb animations — replaces N individual useFrame callbacks
   useFrame((state) => {
     const t = state.clock.elapsedTime;
 
     for (const refs of animMapRef.current.values()) {
-      const { group, core, shell, glow, targetGlow, orbitSystem, ringA, ringB, ringC, electrons, outline, isTarget, position, dirKey, gridX, gridY, gridZ, timeOffset } = refs;
+      const {
+        group, core, innerCore, innerGlow, shell, glow, targetGlow,
+        orbitSystem, ringA, ringB, ringC,
+        electrons, electronGlows, outline,
+        isTarget, position, dirKey, gridX, gridY, gridZ, timeOffset,
+      } = refs;
       if (!group || !core) continue;
       const time = t + timeOffset;
 
-      // Whole-orb position — read live cubie transform so the orb is "glued" to its tile.
-      // CubeAssembly runs at useFrame priority -1 (before our priority 0), so cubieRefs
-      // already hold the final world position/quaternion for this frame by the time we run.
+      // ── World position — glued to live cubie transform ─────────────────────
       const bn = BOB_NORMALS[dirKey] || BOB_NORMALS.PY;
       const { elevated } = refs;
       const lSize = liveCubies.size;
@@ -226,18 +295,13 @@ export default function ParityOrbs({ orbs, size, explosionFactor = 0, mode = 'su
         : null;
 
       if (cubie) {
-        // Rotate the face normal by the cubie's live quaternion to get the world-space normal.
         _scratchBob.set(bn[0], bn[1], bn[2]).applyQuaternion(cubie.quaternion);
-        // Sticker world position = cubie center + rotated normal * SURFACE_OFFSET
         _scratchPos.copy(cubie.position).addScaledVector(_scratchBob, SURFACE_OFFSET);
-        // Elevated orbs hover above the surface
         if (elevated) _scratchPos.addScaledVector(_scratchBob, 1.2);
-        // Bob along face normal
         const bobAmt = Math.sin(time * 2.1) * (isTarget ? 0.13 : 0.06);
         _scratchPos.addScaledVector(_scratchBob, bobAmt);
         group.position.copy(_scratchPos);
       } else {
-        // Fallback: use pre-computed static position (tunnel mode, or cubie ref not ready)
         const _bob = Math.sin(time * 2.1) * (isTarget ? 0.13 : 0.06);
         group.position.set(
           position[0] + bn[0] * _bob,
@@ -246,75 +310,98 @@ export default function ParityOrbs({ orbs, size, explosionFactor = 0, mode = 'su
         );
       }
 
-      // Core quantum-spin wobble
+      // ── Crystal core spin ──────────────────────────────────────────────────
       core.rotation.y = time * (isTarget ? 1.7 : 1.0);
       core.rotation.x = Math.sin(time * 1.4) * 0.2;
-      core.scale.setScalar(1 + Math.sin(time * (isTarget ? 5.2 : 3.8)) * (isTarget ? 0.18 : 0.1));
+      core.scale.setScalar(1 + Math.sin(time * (isTarget ? 5.2 : 3.8)) * (isTarget ? 0.18 : 0.10));
 
-      // Outline tracks core scale, slightly larger for the rim
       if (outline) {
         outline.rotation.y = core.rotation.y;
         outline.rotation.x = core.rotation.x;
-        outline.scale.setScalar(core.scale.x * 1.2);
+        outline.scale.setScalar(core.scale.x * 1.22);
       }
 
-      // Shell counter-spin
+      // ── Inner plasma core — counter-spins for parallax depth ──────────────
+      if (innerCore) {
+        innerCore.rotation.y = -time * 2.5;
+        innerCore.rotation.z =  time * 1.8;
+        innerCore.scale.setScalar(1 + Math.sin(time * 6.0) * 0.30);
+      }
+
+      // ── Energy shell ───────────────────────────────────────────────────────
       if (shell) {
         shell.rotation.y = -time * 0.65;
-        shell.rotation.x = time * 0.35;
+        shell.rotation.x =  time * 0.35;
         shell.scale.setScalar(1 + Math.sin(time * 2.8) * 0.06);
       }
 
-      // Orbit system rotation
+      // ── Inner glow — pulses offset from outer glow ─────────────────────────
+      if (innerGlow) {
+        innerGlow.material.opacity = (isTarget ? 0.28 : 0.18) + Math.sin(time * 3.8 + 1.2) * 0.07;
+        innerGlow.scale.setScalar(1 + Math.sin(time * 3.2) * 0.05);
+      }
+
+      // ── Orbit system ───────────────────────────────────────────────────────
       if (orbitSystem) {
         orbitSystem.rotation.y = time * (isTarget ? 2.6 : 1.8);
         orbitSystem.rotation.x = Math.sin(time * 0.8) * 0.65;
         orbitSystem.rotation.z = Math.cos(time * 0.55) * 0.5;
       }
 
-      // Ring rotations
       if (ringA) ringA.rotation.z = time * 1.5;
       if (ringB) ringB.rotation.x = time * 1.2;
       if (ringC) ringC.rotation.y = time * 1.35;
 
-      // Electron orbital paths
-      const elRadius = isTarget ? 0.43 : 0.36;
-      const elBaseSpeed = isTarget ? 2.4 : 1.8;
+      // ── Electrons + halos ──────────────────────────────────────────────────
+      const elRadius    = isTarget ? 0.43 : 0.36;
+      const elBaseSpeed = isTarget ? 2.4  : 1.8;
       for (let i = 0; i < electrons.length; i++) {
         const el = electrons[i];
         if (!el) continue;
         const phase = time * (elBaseSpeed + i * 0.35) + i * (Math.PI * 2 / 3);
-        if (i === 0) el.position.set(Math.cos(phase) * elRadius, Math.sin(phase) * elRadius, 0);
+        if      (i === 0) el.position.set(Math.cos(phase) * elRadius, Math.sin(phase) * elRadius, 0);
         else if (i === 1) el.position.set(Math.cos(phase) * elRadius, 0, Math.sin(phase) * elRadius);
-        else el.position.set(0, Math.cos(phase) * elRadius, Math.sin(phase) * elRadius);
-        el.scale.setScalar((isTarget ? 1.15 : 1) * (1 + Math.sin(time * 8 + i * 2) * 0.18));
+        else              el.position.set(0, Math.cos(phase) * elRadius, Math.sin(phase) * elRadius);
+        const elScale = (isTarget ? 1.15 : 1) * (1 + Math.sin(time * 8 + i * 2) * 0.18);
+        el.scale.setScalar(elScale);
+
+        const elGlow = electronGlows[i];
+        if (elGlow) {
+          elGlow.position.copy(el.position);
+          elGlow.scale.setScalar(elScale * 1.6);
+        }
       }
 
-      // Outer aura pulse
+      // ── Outer aura pulse ───────────────────────────────────────────────────
+      const { type } = refs;
+      const glowBoost = (ORB_TYPES[type] || ORB_TYPES.parity).glowBoost;
       if (glow) {
-        glow.material.opacity = (isTarget ? 0.48 : 0.28) + Math.sin(time * 4.5) * 0.14;
+        glow.material.opacity = ((isTarget ? 0.50 : 0.30) + Math.sin(time * 4.5) * 0.14) * glowBoost;
         glow.scale.setScalar(1 + Math.sin(time * 2.7) * 0.08);
       }
 
-      // Glow worm mode: pulse emissive intensity at the same frequency as the worm's point light
+      // ── Glow worm emissive pulse ───────────────────────────────────────────
       const { isGlowWorm } = refs;
-      if (isGlowWorm && core && core.material && !elevated) {
-        const baseIntensity = isTarget ? 2.0 : 1.35;
-        core.material.emissiveIntensity = baseIntensity + Math.sin(t * 4.0) * 0.9;
-        if (glow) {
-          glow.material.opacity = (isTarget ? 0.62 : 0.48) + Math.sin(t * 4.0) * 0.22;
-        }
+      if (isGlowWorm && core.material && !elevated) {
+        const baseI = isTarget ? 2.0 : 1.4;
+        core.material.emissiveIntensity = baseI + Math.sin(t * 4.0) * 0.9;
+        if (glow) glow.material.opacity = (isTarget ? 0.65 : 0.50) + Math.sin(t * 4.0) * 0.22;
       }
 
-      // Rainbow pulse for elevated orbs (on flipped tiles)
+      // ── Rainbow cycle for elevated (flipped-tile) orbs ────────────────────
       if (elevated) {
-        const hue = (time * 0.3) % 1; // full cycle every ~3.3 s
+        const hue = (time * 0.3) % 1;
         _rainbowColor.setHSL(hue, 1.0, 0.62);
-        if (core && core.material) {
+        if (core.material) {
           core.material.color.copy(_rainbowColor);
           core.material.emissive.copy(_rainbowColor);
         }
+        if (innerCore && innerCore.material) innerCore.material.color.copy(_rainbowColor);
         if (shell && shell.material) shell.material.color.copy(_rainbowColor);
+        if (innerGlow && innerGlow.material) {
+          _rainbowColor.setHSL((hue + 0.15) % 1, 1.0, 0.70);
+          innerGlow.material.color.copy(_rainbowColor);
+        }
         _rainbowColor.setHSL((hue + 0.33) % 1, 1.0, 0.62);
         if (ringA && ringA.material) ringA.material.color.copy(_rainbowColor);
         _rainbowColor.setHSL((hue + 0.67) % 1, 1.0, 0.62);
@@ -325,7 +412,13 @@ export default function ParityOrbs({ orbs, size, explosionFactor = 0, mode = 'su
           const el = electrons[i];
           if (el && el.material) {
             _rainbowColor.setHSL((hue + i * 0.33) % 1, 1.0, 0.75);
+            el.material.emissive?.copy(_rainbowColor);
             el.material.color.copy(_rainbowColor);
+          }
+          const elGlow = electronGlows[i];
+          if (elGlow && elGlow.material) {
+            _rainbowColor.setHSL((hue + i * 0.33) % 1, 1.0, 0.75);
+            elGlow.material.color.copy(_rainbowColor);
           }
         }
         if (glow && glow.material) {
@@ -334,17 +427,15 @@ export default function ParityOrbs({ orbs, size, explosionFactor = 0, mode = 'su
         }
       }
 
-      // Target lock ring
+      // ── Target lock ring ───────────────────────────────────────────────────
       if (targetGlow && isTarget) {
         targetGlow.rotation.z = time * 0.9;
         targetGlow.scale.setScalar(1 + Math.sin(time * 6.5) * 0.2);
         targetGlow.material.opacity = 0.22 + Math.sin(time * 6.2) * 0.08;
       }
     }
-
   });
 
-  // Calculate world positions for all orbs
   const orbData = useMemo(() => {
     return orbs.map((orb) => {
       let position;
@@ -356,26 +447,30 @@ export default function ParityOrbs({ orbs, size, explosionFactor = 0, mode = 'su
         key = `${orb.tunnelId}-${orb.t}`;
       } else {
         position = getSegmentWorldPos(orb, size, explosionFactor);
-        // Elevated orbs (on flipped tiles) hover well above the surface so the worm must jump to collect them
         if (orb.elevated) {
           const bn = BOB_NORMALS[orb.dirKey] || BOB_NORMALS.PY;
           const ELEVATED_HOVER = 1.2;
-          position = [position[0] + bn[0] * ELEVATED_HOVER, position[1] + bn[1] * ELEVATED_HOVER, position[2] + bn[2] * ELEVATED_HOVER];
+          position = [
+            position[0] + bn[0] * ELEVATED_HOVER,
+            position[1] + bn[1] * ELEVATED_HOVER,
+            position[2] + bn[2] * ELEVATED_HOVER,
+          ];
         }
         key = `${orb.x}-${orb.y}-${orb.z}-${orb.dirKey}`;
       }
 
       return {
         position,
-        color: orb.color || '#ffd700',
+        color:          orb.color          || '#ffd700',
         antipodalColor: orb.antipodalColor || orb.color || '#ffd700',
-        dirKey: orb.dirKey || 'PY',
+        dirKey:         orb.dirKey         || 'PY',
+        type:           orb.type           || 'parity',
         key,
-        isTarget: isTunnelMode && orb.tunnelId === targetTunnelId,
-        elevated: orb.elevated || false,
-        gridX: orb.x ?? -1,
-        gridY: orb.y ?? -1,
-        gridZ: orb.z ?? -1,
+        isTarget:  isTunnelMode && orb.tunnelId === targetTunnelId,
+        elevated:  orb.elevated || false,
+        gridX:     orb.x  ?? -1,
+        gridY:     orb.y  ?? -1,
+        gridZ:     orb.z  ?? -1,
       };
     });
   }, [orbs, size, explosionFactor, isTunnelMode, targetTunnelId]);
@@ -390,6 +485,7 @@ export default function ParityOrbs({ orbs, size, explosionFactor = 0, mode = 'su
           color={data.color}
           antipodalColor={data.antipodalColor}
           dirKey={data.dirKey}
+          type={data.type}
           isTarget={data.isTarget}
           elevated={data.elevated}
           gridX={data.gridX}
@@ -404,27 +500,23 @@ export default function ParityOrbs({ orbs, size, explosionFactor = 0, mode = 'su
   );
 }
 
-// Shared geometry for collect-effect particles (one sphere, used by all instances).
+// ── Collect effect ───────────────────────────────────────────────────────────
 const _collectSphere = new THREE.SphereGeometry(0.08, 8, 8);
-// Scratch Object3D for matrix updates.
-const _collectDummy = new THREE.Object3D();
+const _collectDummy  = new THREE.Object3D();
 const COLLECT_PARTICLE_COUNT = 12;
 
-// Explosion effect when orb is collected
 export function OrbCollectEffect({ position, color = '#ffd700', onDone }) {
-  const meshRef = useRef();
+  const meshRef  = useRef();
   const bloomRef = useRef();
-  const timeRef = useRef(0);
+  const timeRef  = useRef(0);
   const calledDoneRef = useRef(false);
 
-  // Random velocities are stable for the lifetime of this effect.
   const velocities = useMemo(
-    () =>
-      Array.from({ length: COLLECT_PARTICLE_COUNT }, () => ({
-        x: (Math.random() - 0.5) * 2,
-        y: (Math.random() - 0.5) * 2,
-        z: (Math.random() - 0.5) * 2
-      })),
+    () => Array.from({ length: COLLECT_PARTICLE_COUNT }, () => ({
+      x: (Math.random() - 0.5) * 2,
+      y: (Math.random() - 0.5) * 2,
+      z: (Math.random() - 0.5) * 2,
+    })),
     []
   );
 
@@ -432,7 +524,6 @@ export function OrbCollectEffect({ position, color = '#ffd700', onDone }) {
     timeRef.current += delta;
     const t = timeRef.current;
 
-    // Particle burst: spreads outward and fades over 0.5 s
     const mesh = meshRef.current;
     if (mesh && t < 0.5) {
       const alpha = Math.max(0, 1 - t * 2);
@@ -447,14 +538,12 @@ export function OrbCollectEffect({ position, color = '#ffd700', onDone }) {
       mesh.material.opacity = alpha;
     }
 
-    // Expanding color bloom: grows from orb-size to ~3.5 units and fades over 0.45 s
     if (bloomRef.current) {
       const bloomT = Math.min(1, t / 0.45);
       bloomRef.current.scale.setScalar(0.3 + bloomT * 3.2);
       bloomRef.current.material.opacity = Math.max(0, 0.65 * (1 - bloomT));
     }
 
-    // Notify parent when fully complete
     if (t >= 0.5 && !calledDoneRef.current) {
       calledDoneRef.current = true;
       onDone?.();
@@ -463,10 +552,7 @@ export function OrbCollectEffect({ position, color = '#ffd700', onDone }) {
 
   return (
     <group position={position}>
-      <instancedMesh
-        ref={meshRef}
-        args={[_collectSphere, null, COLLECT_PARTICLE_COUNT]}
-      >
+      <instancedMesh ref={meshRef} args={[_collectSphere, null, COLLECT_PARTICLE_COUNT]}>
         <meshBasicMaterial
           color={color}
           transparent
@@ -476,7 +562,6 @@ export function OrbCollectEffect({ position, color = '#ffd700', onDone }) {
           toneMapped={false}
         />
       </instancedMesh>
-      {/* Expanding color bloom sphere — the main bloom in the orb's inherent color */}
       <mesh ref={bloomRef} scale={[0.3, 0.3, 0.3]}>
         <sphereGeometry args={[1, 14, 14]} />
         <meshBasicMaterial
