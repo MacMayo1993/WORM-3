@@ -1008,7 +1008,10 @@ button:focus-visible,
 @media (prefers-reduced-motion: reduce) {
   .enter-btn,
   .chaos-pill,
-  .pedagogical-hint p {
+  .pedagogical-hint p,
+  .mobile-touch-hint,
+  .sheet-backdrop,
+  .worm-tactile-btn {
     animation: none !important;
   }
 
@@ -1016,10 +1019,43 @@ button:focus-visible,
   .enter-btn,
   .top-bar-icon-btn,
   .intro-message,
-  .intro-final-card {
+  .intro-final-card,
+  .sheet-container,
+  .net-panel,
+  .floating-hud {
     transition: none !important;
     transform: none !important;
   }
+
+  /* Kill orbDrift keyframes so inline-style animations also go still */
+  @keyframes orbDrift1 { from {} to {} }
+  @keyframes orbDrift2 { from {} to {} }
+  @keyframes orbDrift3 { from {} to {} }
+  @keyframes rainbow-shift { from {} to {} }
+  @keyframes wormIdlePulse { from {} to {} }
+}
+
+/* ── Dark-panel scrollbars (settings, help, store modals) ─────────────────── */
+.settings-panel::-webkit-scrollbar,
+.tutorial-card::-webkit-scrollbar,
+.sheet-container::-webkit-scrollbar {
+  width: 4px;
+}
+.settings-panel::-webkit-scrollbar-track,
+.tutorial-card::-webkit-scrollbar-track,
+.sheet-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+.settings-panel::-webkit-scrollbar-thumb,
+.tutorial-card::-webkit-scrollbar-thumb,
+.sheet-container::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 2px;
+}
+.settings-panel::-webkit-scrollbar-thumb:hover,
+.tutorial-card::-webkit-scrollbar-thumb:hover,
+.sheet-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.28);
 }
 
 /* Responsive Adjustments */

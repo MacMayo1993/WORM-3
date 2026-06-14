@@ -10,12 +10,10 @@ import React, { useEffect } from 'react';
 import TextOverlay from '../intro/TextOverlay.jsx';
 
 const WelcomeScreen = ({ onEnter, introTime }) => {
-  const canSkip = introTime >= 2;
-
   useEffect(() => {
     const onKeyDown = (event) => {
       const key = event.key.toLowerCase();
-      if (key === 'enter' || (canSkip && key === 's')) {
+      if (key === 'enter' || key === 's') {
         event.preventDefault();
         onEnter();
       }
@@ -23,7 +21,7 @@ const WelcomeScreen = ({ onEnter, introTime }) => {
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [canSkip, onEnter]);
+  }, [onEnter]);
 
   return (
     <div
@@ -32,22 +30,20 @@ const WelcomeScreen = ({ onEnter, introTime }) => {
     >
       <TextOverlay time={introTime} />
 
-      {canSkip && (
-        <button
-          type="button"
-          aria-label="Skip intro and enter game"
-          className="skip-intro-btn"
-          onClick={onEnter}
-          style={{
-            background: 'rgba(255,255,255,0.1)',
-            color: 'rgba(255,255,255,0.75)',
-            border: '1px solid rgba(255,255,255,0.2)',
-            pointerEvents: 'auto',
-          }}
-        >
-          Skip ►
-        </button>
-      )}
+      <button
+        type="button"
+        aria-label="Skip intro and enter game"
+        className="skip-intro-btn"
+        onClick={onEnter}
+        style={{
+          background: 'rgba(255,255,255,0.1)',
+          color: 'rgba(255,255,255,0.75)',
+          border: '1px solid rgba(255,255,255,0.2)',
+          pointerEvents: 'auto',
+        }}
+      >
+        Skip ►
+      </button>
 
       {introTime >= 10 && (
         <button
