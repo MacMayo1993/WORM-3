@@ -1254,10 +1254,11 @@ function WormChaseCamera({ worm, size }) {
             zoomExtraRef.current = Math.max(0, zoomExtraRef.current - delta * 3.0);
         }
 
-        // Permanent zoom grows gently with snake length so you always see the whole cube + worm.
-        // Cap is size-relative: a full-coverage snake should just fit in frame.
+        // Permanent zoom scales with orbs collected so the longer worm always fits in frame.
+        // Each orb adds 0.18 units of pull-back; cap is size-relative.
         const MAX_PERM_ZOOM = size * 2.6;
-        const permZoom = Math.min(tailLen * 0.028, MAX_PERM_ZOOM);
+        const orbCount = Math.max(0, Math.floor((tailLen - BASE_TAIL_LENGTH) / ORB_SEGMENT_GROWTH));
+        const permZoom = Math.min(orbCount * 0.18, MAX_PERM_ZOOM);
         const aspectZoomBoost = THREE.MathUtils.lerp(0, 0.4, portraitFactor);
         const extraZoom = permZoom + Math.min(zoomExtraRef.current, MAX_EXTRA_ZOOM);
         const camHeight = CAM_HEIGHT_BASE + extraZoom + aspectZoomBoost;
@@ -1863,24 +1864,14 @@ function WormBody({ worm }) {
             // Color per segment
             const orbPickupIndex = Math.floor((i - BASE_TAIL_LENGTH) / ORB_SEGMENT_GROWTH);
             const hasOrbColor = orbPickupIndex >= 0 && orbPickupIndex < orbColors.length;
-            if (hasOrbColor) {
+            if (i === 0 && _isGlow) {
+                // Glow head — use base worm color; GlowWormAura point light provides visible glow
+                _bodyColor.set(baseColor);
+            } else if (hasOrbColor) {
                 _bodyColor.set(orbColors[orbPickupIndex]);
             } else if (_isInch) {
                 // Alternating body/belly bands for visible ring pattern
                 _bodyColor.set(i % 2 === 0 ? baseColor : bellyCol);
-            } else if (_isGlow) {
-                // Glow worm keeps piece-wise orb colors along its body.
-                // When there are fewer orb colors than rendered segments,
-                // continue the palette in repeating ORB_SEGMENT_GROWTH bands.
-                if (orbColors.length > 0) {
-                    const bandIndex = Math.max(0, Math.floor(i / ORB_SEGMENT_GROWTH));
-                    const cyc = orbColors[bandIndex % orbColors.length];
-                    const bandPhase = Math.sin(i * 1.8 - time * 4.8);
-                    _bodyColor.set(cyc).multiplyScalar(0.82 + bandPhase * 0.18);
-                } else {
-                    const bandPhase = Math.sin(i * 2.2 - time * 5.0);
-                    _bodyColor.set(baseColor).multiplyScalar(0.65 + bandPhase * 0.35);
-                }
             } else {
                 _bodyColor.set(baseColor);
             }
@@ -1914,12 +1905,9 @@ function WormBody({ worm }) {
             <meshStandardMaterial
                 color="white"
                 emissive="white"
-                emissiveIntensity={isGlow ? 1.2 : 0.22}
+                emissiveIntensity={0.22}
                 roughness={0.28}
                 metalness={0}
-                transparent={isGlow}
-                opacity={isGlow ? 0.92 : 1}
-                toneMapped={!isGlow}
             />
         </instancedMesh>
     );
