@@ -1471,37 +1471,60 @@ function TunnelSurfFX({ worm, size }) {
     );
 }
 
-// ─── Tunnel Interior View — cubie grid + exit face sticker wall ──────────────
-// During wormhole traversal, renders:
-//   1. Box-edge outlines for every cubie — the "black plastic skeleton" of the cube
-//   2. A size×size grid of correctly-coloured sticker tiles on the exit face,
-//      facing inward so the camera flying through the tunnel sees the back wall.
+// ─── Tunnel Interior View — all 6 inner faces of the Rubik's cube ────────────
+// During wormhole traversal shows the coloured back-sides of every sticker on
+// all 6 faces so the camera looks like it is inside the cube.
 
-// Per-face Euler to rotate a PlaneGeometry (default normal +Z) so it faces inward
-// (toward the camera that is approaching from outside the cube through the tunnel).
+// Euler angles to rotate a PlaneGeometry (default +Z normal) so its front face
+// points INWARD (toward the cube centre) for each cube face direction.
 const _INWARD_FACE_EULER = {
-    PZ: [0, Math.PI, 0],       // face exit is +Z; inward normal = -Z
-    NZ: [0, 0, 0],              // face exit is -Z; inward normal = +Z (default)
-    PX: [0, -Math.PI / 2, 0],  // face exit is +X; inward normal = -X
-    NX: [0, Math.PI / 2, 0],   // face exit is -X; inward normal = +X
-    PY: [Math.PI / 2, 0, 0],   // face exit is +Y; inward normal = -Y
-    NY: [-Math.PI / 2, 0, 0],  // face exit is -Y; inward normal = +Y
+    PZ: [0, Math.PI, 0],
+    NZ: [0, 0, 0],
+    PX: [0, -Math.PI / 2, 0],
+    NX: [0, Math.PI / 2, 0],
+    PY: [Math.PI / 2, 0, 0],
+    NY: [-Math.PI / 2, 0, 0],
 };
 const _tivColor = new THREE.Color();
+
+// All 6 faces with their (a,b) → (sx,sy,sz) mapping.
+const _FACE_DEFS = [
+    { dirKey: 'PZ', pos: (a, b, n) => [a, b, n] },
+    { dirKey: 'NZ', pos: (a, b)    => [a, b, 0] },
+    { dirKey: 'PX', pos: (a, b, n) => [n, a, b] },
+    { dirKey: 'NX', pos: (a, b)    => [0, a, b] },
+    { dirKey: 'PY', pos: (a, b, n) => [a, n, b] },
+    { dirKey: 'NY', pos: (a, b)    => [a, 0, b] },
+];
 
 function TunnelInteriorView({ worm, size }) {
     const wireMatRef = useRef();
     const stickerMeshesRef = useRef([]);
     const opacityRef = useRef(0);
-    const lastTunnelIdRef = useRef(null);
-    const cubieMapRef = useRef({});
-    const lastCubiesRef = useRef(null);
 
-    // One merged BufferGeometry with all 12 edges for every cubie — single draw call.
+    // Precompute every surface sticker's position, rotation, and grid coords.
+    const stickerLayout = useMemo(() => {
+        const n = size - 1;
+        const layout = [];
+        for (const { dirKey, pos } of _FACE_DEFS) {
+            const [rx, ry, rz] = _INWARD_FACE_EULER[dirKey];
+            for (let a = 0; a < size; a++) {
+                for (let b = 0; b < size; b++) {
+                    const [sx, sy, sz] = pos(a, b, n);
+                    const wp = getStickerWorldPos(sx, sy, sz, dirKey, size, 0);
+                    if (!wp) continue;
+                    layout.push({ sx, sy, sz, dirKey, px: wp[0], py: wp[1], pz: wp[2], rx, ry, rz });
+                }
+            }
+        }
+        return layout;
+    }, [size]);
+
+    // One merged BufferGeometry of 12-edge outlines for every cubie.
     const edgeGeo = useMemo(() => {
         const k = (size - 1) / 2;
-        const hs = 0.46; // half-size — tiny gap between adjacent cubies
-        const pts = new Float32Array(size ** 3 * 72); // 12 edges × 2 pts × 3 floats
+        const hs = 0.46;
+        const pts = new Float32Array(size ** 3 * 72);
         let i = 0;
         const ln = (ax, ay, az, bx, by, bz) => {
             pts[i++]=ax; pts[i++]=ay; pts[i++]=az;
@@ -1509,13 +1532,10 @@ function TunnelInteriorView({ worm, size }) {
         };
         for (let x = 0; x < size; x++) for (let y = 0; y < size; y++) for (let z = 0; z < size; z++) {
             const cx=x-k, cy=y-k, cz=z-k;
-            // X-aligned edges
             ln(cx-hs,cy-hs,cz-hs, cx+hs,cy-hs,cz-hs); ln(cx-hs,cy+hs,cz-hs, cx+hs,cy+hs,cz-hs);
             ln(cx-hs,cy-hs,cz+hs, cx+hs,cy-hs,cz+hs); ln(cx-hs,cy+hs,cz+hs, cx+hs,cy+hs,cz+hs);
-            // Y-aligned edges
             ln(cx-hs,cy-hs,cz-hs, cx-hs,cy+hs,cz-hs); ln(cx+hs,cy-hs,cz-hs, cx+hs,cy+hs,cz-hs);
             ln(cx-hs,cy-hs,cz+hs, cx-hs,cy+hs,cz+hs); ln(cx+hs,cy-hs,cz+hs, cx+hs,cy+hs,cz+hs);
-            // Z-aligned edges
             ln(cx-hs,cy-hs,cz-hs, cx-hs,cy-hs,cz+hs); ln(cx+hs,cy-hs,cz-hs, cx+hs,cy-hs,cz+hs);
             ln(cx-hs,cy+hs,cz-hs, cx-hs,cy+hs,cz+hs); ln(cx+hs,cy+hs,cz-hs, cx+hs,cy+hs,cz+hs);
         }
@@ -1524,20 +1544,28 @@ function TunnelInteriorView({ worm, size }) {
         return geo;
     }, [size]);
 
-    // Shared plane geometry for all exit-face sticker tiles.
     const planeGeo = useMemo(() => new THREE.PlaneGeometry(0.88, 0.88), []);
+
+    // Set static positions/rotations after mount (or size change).
+    useEffect(() => {
+        stickerLayout.forEach(({ px, py, pz, rx, ry, rz }, i) => {
+            const m = stickerMeshesRef.current[i];
+            if (!m) return;
+            m.position.set(px, py, pz);
+            m.rotation.set(rx, ry, rz);
+        });
+    }, [stickerLayout]);
 
     useEffect(() => () => { edgeGeo.dispose(); planeGeo.dispose(); }, [edgeGeo, planeGeo]);
 
     useFrame((_, delta) => {
         const phase = worm.phase.current;
-        const tunnel = worm.activeTunnel.current;
-        const active = (phase === 'entering' || phase === 'tunnel' || phase === 'exiting') && !!tunnel;
+        const active = phase === 'entering' || phase === 'tunnel' || phase === 'exiting';
 
-        opacityRef.current += ((active ? 1 : 0) - opacityRef.current) * Math.min(1, delta * (active ? 6 : 3));
+        opacityRef.current += ((active ? 1 : 0) - opacityRef.current) * Math.min(1, delta * (active ? 8 : 4));
         const opacity = opacityRef.current;
 
-        if (wireMatRef.current) wireMatRef.current.opacity = opacity * 0.35;
+        if (wireMatRef.current) wireMatRef.current.opacity = opacity * 0.45;
 
         const meshes = stickerMeshesRef.current;
         if (!active || opacity < 0.01) {
@@ -1545,73 +1573,39 @@ function TunnelInteriorView({ worm, size }) {
             return;
         }
 
-        // Rebuild cubie lookup map only when the cubies array reference changes (i.e. after a rotation).
         const st = useGameStore.getState();
-        if (st.cubies !== lastCubiesRef.current) {
-            lastCubiesRef.current = st.cubies;
-            cubieMapRef.current = {};
-            for (const c of st.cubies) cubieMapRef.current[`${c.x},${c.y},${c.z}`] = c;
-        }
+        const cubies = st.cubies;
         const fc = resolveColors(st.settings, st.settings?.biomeMode?.faceAssignment) || FACE_COLORS;
 
-        const exitDirKey = tunnel.exit.dirKey;
-        const tunnelId = tunnel.pairId ?? (tunnel.entry.dirKey + tunnel.exit.dirKey);
-        const tunnelChanged = tunnelId !== lastTunnelIdRef.current;
-        if (tunnelChanged) lastTunnelIdRef.current = tunnelId;
-
-        const [rx, ry, rz] = _INWARD_FACE_EULER[exitDirKey] ?? _INWARD_FACE_EULER.PZ;
-
-        let si = 0;
-        for (let u = 0; u < size; u++) {
-            for (let v = 0; v < size; v++) {
-                const mesh = meshes[si++];
-                if (!mesh) continue;
-
-                // Map (u, v) to cube grid coords for this exit face.
-                let sx, sy, sz;
-                switch (exitDirKey) {
-                    case 'PZ': sx=u; sy=v; sz=size-1; break;
-                    case 'NZ': sx=u; sy=v; sz=0;      break;
-                    case 'PX': sx=size-1; sy=v; sz=u; break;
-                    case 'NX': sx=0; sy=v; sz=u;      break;
-                    case 'PY': sx=u; sy=size-1; sz=v; break;
-                    default:   sx=u; sy=0; sz=v;       // NY
-                }
-
-                // Position and orient sticker planes when the tunnel changes (not every frame).
-                if (tunnelChanged) {
-                    const wp = getStickerWorldPos(sx, sy, sz, exitDirKey, size, 0);
-                    mesh.position.set(wp[0], wp[1], wp[2]);
-                    mesh.rotation.set(rx, ry, rz);
-                }
-
-                // Update sticker colour from live cube state.
-                const cubie = cubieMapRef.current[`${sx},${sy},${sz}`];
-                const faceId = cubie?.stickers?.[exitDirKey]?.curr;
-                _tivColor.set(faceId ? (fc[faceId] ?? '#404040') : '#282828');
-                mesh.material.color.copy(_tivColor);
-                mesh.material.opacity = opacity * 0.92;
-                mesh.visible = true;
-            }
+        for (let i = 0; i < stickerLayout.length; i++) {
+            const { sx, sy, sz, dirKey } = stickerLayout[i];
+            const mesh = meshes[i];
+            if (!mesh) continue;
+            // Correct 3D array access: cubies[x][y][z]
+            const faceId = cubies?.[sx]?.[sy]?.[sz]?.stickers?.[dirKey]?.curr;
+            _tivColor.set(faceId ? (fc[faceId] ?? '#444') : '#1a1a1a');
+            mesh.material.color.copy(_tivColor);
+            mesh.material.opacity = opacity;
+            mesh.visible = true;
         }
     });
 
     return (
         <>
-            {/* Cubie skeleton — one draw call for all size³ box outlines */}
+            {/* Black plastic skeleton — all cubie edges in one draw call */}
             <lineSegments geometry={edgeGeo} frustumCulled={false}>
-                <lineBasicMaterial ref={wireMatRef} color="#667788" transparent opacity={0} depthWrite={false} />
+                <lineBasicMaterial ref={wireMatRef} color="#222222" transparent opacity={0} depthWrite={false} />
             </lineSegments>
-            {/* Exit-face sticker grid — size² planes, colours updated imperatively */}
-            {Array.from({ length: size * size }, (_, i) => (
+            {/* All 6 faces × size² sticker planes, coloured imperatively */}
+            {stickerLayout.map((_, i) => (
                 <mesh
                     key={i}
-                    geometry={planeGeo}
                     ref={el => { stickerMeshesRef.current[i] = el; }}
                     visible={false}
                     frustumCulled={false}
                 >
-                    <meshBasicMaterial color="#282828" transparent opacity={0} depthWrite={false} />
+                    <primitive object={planeGeo} attach="geometry" />
+                    <meshBasicMaterial color="#1a1a1a" transparent opacity={0} side={THREE.DoubleSide} depthWrite={false} />
                 </mesh>
             ))}
         </>
@@ -3586,7 +3580,6 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         <>
             <WormChaseCamera worm={worm} size={size} />
             <WormSwipeControls onTurn={worm.queueTurn} worm={worm} />
-            <WormInteriorGlass worm={worm} size={size} />
             <TunnelInteriorView worm={worm} size={size} />
             {wormVisible && <WormBody worm={worm} />}
             {wormVisible && <GlowWormAura worm={worm} />}
