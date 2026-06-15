@@ -73,21 +73,23 @@ function _mkMobius(R, w) {
 // Pre-built once, shared across all instances.  geometry={} prop prevents disposal.
 const _orbGeos = {
   normal: {
-    core:         _mkMobius(0.30, 0.120),                          // Möbius strip — dominant visible shape
-    ringA:        new THREE.TorusGeometry(0.400, 0.011, 6, 18),    // orbit rings sit just outside the strip
-    ringB:        new THREE.TorusGeometry(0.400 * 0.92, 0.009, 6, 18),
+    sphere:       new THREE.SphereGeometry(0.20, 16, 16),          // main spherical body
+    core:         _mkMobius(0.24, 0.08),                           // Möbius strip — smaller accent ring, antipodal color
+    ringA:        new THREE.TorusGeometry(0.370, 0.011, 6, 18),    // orbit rings sit just outside the strip
+    ringB:        new THREE.TorusGeometry(0.370 * 0.92, 0.009, 6, 18),
     electron:     new THREE.SphereGeometry(0.042, 7, 7),
-    glow:         new THREE.SphereGeometry(0.58, 8, 8),            // outer ambient aura (BackSide only)
+    glow:         new THREE.SphereGeometry(0.52, 8, 8),            // outer ambient aura (BackSide only)
   },
   target: {
-    core:         _mkMobius(0.38, 0.152),                          // Möbius strip, larger for target
-    ringA:        new THREE.TorusGeometry(0.500, 0.015, 8, 24),
-    ringB:        new THREE.TorusGeometry(0.500 * 0.92, 0.012, 8, 24),
-    ringC:        new THREE.TorusGeometry(0.500 * 1.08, 0.010, 8, 24),
+    sphere:       new THREE.SphereGeometry(0.26, 18, 18),          // main spherical body, larger for target
+    core:         _mkMobius(0.30, 0.10),                           // Möbius strip, antipodal color
+    ringA:        new THREE.TorusGeometry(0.460, 0.015, 8, 24),
+    ringB:        new THREE.TorusGeometry(0.460 * 0.92, 0.012, 8, 24),
+    ringC:        new THREE.TorusGeometry(0.460 * 1.08, 0.010, 8, 24),
     electron:     new THREE.SphereGeometry(0.052, 8, 8),
     electronGlow: new THREE.SphereGeometry(0.088, 6, 6),
-    glow:         new THREE.SphereGeometry(0.72, 10, 10),
-    lockRing:     new THREE.TorusGeometry(0.62, 0.03, 8, 36),
+    glow:         new THREE.SphereGeometry(0.66, 10, 10),
+    lockRing:     new THREE.TorusGeometry(0.56, 0.03, 8, 36),
   },
 };
 
@@ -166,12 +168,24 @@ function SingleOrb({
   return (
     <group ref={orbGroupRef} position={[position[0], position[1], position[2]]}>
 
-      {/* Möbius strip — the entire visible orb shape. DoubleSide so the twist reads clearly. */}
-      <mesh ref={coreRef} geometry={g.core}>
+      {/* Spherical orb body — main visible shape */}
+      <mesh ref={shellRef} geometry={g.sphere}>
         <meshStandardMaterial
           color={color}
           emissive={color}
-          emissiveIntensity={isTarget ? 2.4 : 1.8}
+          emissiveIntensity={isTarget ? 2.8 : 2.0}
+          metalness={0.1}
+          roughness={0.15}
+          toneMapped={false}
+        />
+      </mesh>
+
+      {/* Möbius strip — antipodal-color accent orbiting the sphere. DoubleSide so the twist reads clearly. */}
+      <mesh ref={coreRef} geometry={g.core}>
+        <meshStandardMaterial
+          color={antipodalColor}
+          emissive={antipodalColor}
+          emissiveIntensity={isTarget ? 1.8 : 1.2}
           metalness={0.15}
           roughness={0.06}
           side={THREE.DoubleSide}
@@ -322,11 +336,9 @@ export default function ParityOrbs({
         innerCore.scale.setScalar(1 + Math.sin(time * 6.0) * 0.30);
       }
 
-      // ── Energy shell ───────────────────────────────────────────────────────
+      // ── Sphere body — gentle breathing pulse ───────────────────────────────
       if (shell) {
-        shell.rotation.y = -time * 0.65;
-        shell.rotation.x =  time * 0.35;
-        shell.scale.setScalar(1 + Math.sin(time * 2.8) * 0.06);
+        shell.scale.setScalar(1 + Math.sin(time * (isTarget ? 4.0 : 3.0)) * (isTarget ? 0.10 : 0.07));
       }
 
       // ── Inner glow — pulses offset from outer glow ─────────────────────────
@@ -379,9 +391,9 @@ export default function ParityOrbs({
 
       // ── Glow worm emissive pulse ───────────────────────────────────────────
       const { isGlowWorm } = refs;
-      if (isGlowWorm && core.material && !elevated) {
-        const baseI = isTarget ? 2.0 : 1.4;
-        core.material.emissiveIntensity = baseI + Math.sin(t * 4.0) * 0.9;
+      if (isGlowWorm && !elevated) {
+        if (shell && shell.material) shell.material.emissiveIntensity = (isTarget ? 3.4 : 2.6) + Math.sin(t * 4.0) * 0.9;
+        if (core && core.material) core.material.emissiveIntensity = (isTarget ? 2.4 : 1.8) + Math.sin(t * 4.0) * 0.6;
         if (glow) glow.material.opacity = (isTarget ? 0.65 : 0.50) + Math.sin(t * 4.0) * 0.22;
       }
 
@@ -389,12 +401,16 @@ export default function ParityOrbs({
       if (elevated) {
         const hue = (time * 0.3) % 1;
         _rainbowColor.setHSL(hue, 1.0, 0.62);
-        if (core.material) {
+        if (shell && shell.material) {
+          shell.material.color.copy(_rainbowColor);
+          shell.material.emissive.copy(_rainbowColor);
+        }
+        if (core && core.material) {
+          _rainbowColor.setHSL((hue + 0.5) % 1, 1.0, 0.62);
           core.material.color.copy(_rainbowColor);
           core.material.emissive.copy(_rainbowColor);
         }
         if (innerCore && innerCore.material) innerCore.material.color.copy(_rainbowColor);
-        if (shell && shell.material) shell.material.color.copy(_rainbowColor);
         if (innerGlow && innerGlow.material) {
           _rainbowColor.setHSL((hue + 0.15) % 1, 1.0, 0.70);
           innerGlow.material.color.copy(_rainbowColor);
