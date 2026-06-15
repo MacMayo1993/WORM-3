@@ -10,7 +10,7 @@ import { useGameStore } from '../hooks/useGameStore.js';
 import WormHat3D from './wormCosmetics.jsx';
 import { getSkin } from './wormCosmeticsData.js';
 import { getWormCharacter } from './wormCharacterData.js';
-Q
+
 const EYE_WHITE = '#ffffff';
 const PUPIL = '#111111';
 const HISTORY_SIZE = 100;
