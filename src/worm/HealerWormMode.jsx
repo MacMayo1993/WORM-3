@@ -1739,6 +1739,7 @@ const _headPathPoint = { pos: _bodyHeadPos, normal: _bodyNormal };
 function WormBody({ worm }) {
     const meshRef = useRef();       // sphere body (classic / inch / glow)
     const boxMeshRef = useRef();    // box body (book worm only)
+    const glowAltRef = useRef();    // additive overlay — even glow segments only
     const wormSkinId = useGameStore(s => s.wormSkin ?? 'slime');
     const wormCharacterId = useGameStore(s => s.wormCharacter ?? 'classic');
     const wormCharacter = getWormCharacter(wormCharacterId);
@@ -1785,6 +1786,7 @@ function WormBody({ worm }) {
 
         let walkIndex = 0;
         let cumulativeDist = 0;
+        let altIdx = 0; // index into glowAltRef (even glow segments)
 
         const visibleCount = Math.min(MAX_TAIL, tLen);
         mesh.count = visibleCount;
@@ -1799,7 +1801,7 @@ function WormBody({ worm }) {
             if (i === 0) {
                 // Head
                 _wormDummy.position.copy(_bodyHeadPos);
-                _wormDummy.scale.setScalar(0.07);
+                _wormDummy.scale.setScalar(0.092);
             } else {
                 // Inch worm: asymmetric 2-phase traveling wave — rear bunches up fast (arch),
                 // releases slowly (extend), so segments gather then lunge rather than sine-oscillate.
@@ -1807,8 +1809,8 @@ function WormBody({ worm }) {
                     const ph = ((time * 1.5 - i * 0.6) % 1.0 + 1.0) % 1.0;
                     const wL = ph < 0.35 ? ph / 0.35 : 1.0 - (ph - 0.35) / 0.65;
                     const wave = wL * wL * (3 - 2 * wL); // smoothstep, no sinusoid
-                    return i * 0.14 - wave * 0.055;       // max bunching: 0.055 per segment
-                })() : i * 0.14;
+                    return i * 0.085 - wave * 0.038;      // tighter spacing — segments merge
+                })() : i * 0.09;
 
                 // Clones — parametrically walk backwards along the curve to exact target distance
                 let foundPosition = false;
@@ -1850,21 +1852,31 @@ function WormBody({ worm }) {
                     const ph = ((time * 1.5 - i * 0.6) % 1.0 + 1.0) % 1.0;
                     const wL = ph < 0.35 ? ph / 0.35 : 1.0 - (ph - 0.35) / 0.65;
                     const wave = wL * wL * (3 - 2 * wL);
-                    const sc = 0.065 - wave * 0.02; // 0.065 (extended) → 0.045 (gathered)
+                    const sc = 0.085 - wave * 0.025; // 0.085 (extended) → 0.060 (gathered)
                     _wormDummy.scale.setScalar(sc);
                 } else if (_isBook) {
                     _wormDummy.scale.set(0.088, 0.055, 0.1);
                 } else if (_isGlow) {
                     // Slightly varied glow segment sizes
-                    const glowSc = 0.068 + Math.sin(time * 3.5 + i * 1.6) * 0.01;
+                    const glowSc = 0.088 + Math.sin(time * 3.5 + i * 1.6) * 0.01;
                     _wormDummy.scale.setScalar(glowSc);
                 } else {
-                    _wormDummy.scale.setScalar(0.07);
+                    _wormDummy.scale.setScalar(0.09);
                 }
             }
 
             _wormDummy.updateMatrix();
             mesh.setMatrixAt(i, _wormDummy.matrix);
+
+            // Glow worm: write even segments to additive overlay at 1.4× scale
+            if (_isGlow && i % 2 === 0) {
+                const altMesh = glowAltRef.current;
+                if (altMesh) {
+                    _wormDummy.scale.setScalar(_wormDummy.scale.x * 1.4);
+                    _wormDummy.updateMatrix();
+                    altMesh.setMatrixAt(altIdx++, _wormDummy.matrix);
+                }
+            }
 
             // Color per segment
             const orbPickupIndex = Math.floor((i - BASE_TAIL_LENGTH) / ORB_SEGMENT_GROWTH);
@@ -1885,6 +1897,12 @@ function WormBody({ worm }) {
 
         mesh.instanceMatrix.needsUpdate = true;
         if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+
+        // Update glow overlay count
+        if (_isGlow) {
+            const altMesh = glowAltRef.current;
+            if (altMesh) { altMesh.count = altIdx; altMesh.instanceMatrix.needsUpdate = true; }
+        }
     });
 
     return isBook ? (
@@ -1905,16 +1923,26 @@ function WormBody({ worm }) {
            IMPORTANT: material color must be white so per-instance colors (setColorAt)
            pass through unmodified. Three.js multiplies instanceColor × material.color,
            so any non-white material color taints every orb pickup color. */
-        <instancedMesh ref={meshRef} args={[undefined, undefined, MAX_TAIL]} frustumCulled={false}>
-            <sphereGeometry args={[1, 12, 12]} />
-            <meshStandardMaterial
-                color="white"
-                emissive="white"
-                emissiveIntensity={0.22}
-                roughness={0.28}
-                metalness={0}
-            />
-        </instancedMesh>
+        <>
+            <instancedMesh ref={meshRef} args={[undefined, undefined, MAX_TAIL]} frustumCulled={false}>
+                <sphereGeometry args={[1, 12, 12]} />
+                <meshStandardMaterial
+                    color="white"
+                    emissive="white"
+                    emissiveIntensity={0.22}
+                    roughness={0.28}
+                    metalness={0}
+                    toneMapped={false}
+                />
+            </instancedMesh>
+            {isGlow && (
+                <instancedMesh ref={glowAltRef} args={[undefined, undefined, MAX_TAIL]} frustumCulled={false}>
+                    <sphereGeometry args={[1, 10, 10]} />
+                    <meshBasicMaterial color={skin.glow} transparent opacity={0.7}
+                        blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+                </instancedMesh>
+            )}
+        </>
     );
 }
 
@@ -1936,13 +1964,13 @@ function GlowWormAura({ worm }) {
         if (lightRef.current) {
             lightRef.current.position.copy(worm.headInterpPos.current)
                 .addScaledVector(worm.currentNormal.current, WORM_LIFT + 0.1);
-            lightRef.current.intensity = 0.4 + Math.sin(t * 4.0) * 0.12;
+            lightRef.current.intensity = 1.2 + Math.sin(t * 4.0) * 0.4;
         }
     });
 
     if (!isGlow) return null;
 
-    return <pointLight ref={lightRef} color={glowColor} intensity={0.7} distance={3.0} decay={2} />;
+    return <pointLight ref={lightRef} color={glowColor} intensity={2.0} distance={5.5} decay={2} />;
 }
 
 // Pre-allocated scratch vector for PortalGlow
