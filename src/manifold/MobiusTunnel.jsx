@@ -7,8 +7,8 @@ import { FLIP_CAP } from '../utils/constants.js';
 import { tunnelState } from '../worm/tunnelProgressBridge.js';
 
 // Opacity multiplier when the worm is traversing a different tunnel.
-// Inactive tunnels stay at 5 % so the scene stays readable during worm mode.
-const DIM_OPACITY  = 0.05;
+// Inactive tunnels stay at 75 % — fully visible at all times in worm mode.
+const DIM_OPACITY  = 0.75;
 const FULL_OPACITY = 1.0;
 const DIM_LERP_DOWN = 6;   // fade-out speed (× delta)
 const DIM_LERP_UP   = 20;  // snap-in speed  (× delta) — nearly instant

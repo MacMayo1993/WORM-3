@@ -642,7 +642,7 @@ function useWormCrawler(size, cubies) {
                     useGameStore.setState({
                         wormPhase: 'crawling',
                         wormOnFlippedTile: false,
-                        showTunnels: prevShowTunnelsRef.current,
+                        showTunnels: true,
                         wormActiveTunnelColors: null,
                     });
                     onFlippedTile.current = false;
