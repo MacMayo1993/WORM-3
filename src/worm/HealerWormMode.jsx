@@ -17,6 +17,7 @@ import { healSticker, getStickerSafe } from '../game/cubeState.js';
 import { rotateVec90 } from '../game/cubeRotation.js';
 import { DIR_TO_VEC, VEC_TO_DIR, ANTIPODAL_COLOR, FACE_COLORS } from '../utils/constants.js';
 import { resolveColors } from '../utils/colorSchemes.js';
+import { getTileStyleMaterial } from '../3d/styles/TileStyleMaterials.jsx';
 import {
     CAM_HEIGHT_BASE,
     CAM_BACK_BASE,
@@ -1475,6 +1476,9 @@ function TunnelSurfFX({ worm, size }) {
 // During wormhole traversal shows the coloured back-sides of every sticker on
 // all 6 faces so the camera looks like it is inside the cube.
 
+// Maps each face direction to its antipodal (opposite) face direction.
+const ANTIPODAL_DIRKEY = { PZ: 'NZ', NZ: 'PZ', PX: 'NX', NX: 'PX', PY: 'NY', NY: 'PY' };
+
 // Euler angles to rotate a PlaneGeometry (default +Z normal) so its front face
 // points INWARD (toward the cube centre) for each cube face direction.
 const _INWARD_FACE_EULER = {
@@ -1485,8 +1489,6 @@ const _INWARD_FACE_EULER = {
     PY: [Math.PI / 2, 0, 0],
     NY: [-Math.PI / 2, 0, 0],
 };
-const _tivColor = new THREE.Color();
-
 // All 6 faces with their (a,b) → (sx,sy,sz) mapping.
 const _FACE_DEFS = [
     { dirKey: 'PZ', pos: (a, b, n) => [a, b, n] },
@@ -1502,18 +1504,22 @@ function TunnelInteriorView({ worm, size }) {
     const stickerMeshesRef = useRef([]);
     const opacityRef = useRef(0);
 
-    // Precompute every surface sticker's position, rotation, and grid coords.
+    // Precompute every surface sticker's position, rotation, grid coords, and antipodal coords.
     const stickerLayout = useMemo(() => {
         const n = size - 1;
         const layout = [];
         for (const { dirKey, pos } of _FACE_DEFS) {
             const [rx, ry, rz] = _INWARD_FACE_EULER[dirKey];
+            const antiDirKey = ANTIPODAL_DIRKEY[dirKey];
             for (let a = 0; a < size; a++) {
                 for (let b = 0; b < size; b++) {
                     const [sx, sy, sz] = pos(a, b, n);
                     const wp = getStickerWorldPos(sx, sy, sz, dirKey, size, 0);
                     if (!wp) continue;
-                    layout.push({ sx, sy, sz, dirKey, px: wp[0], py: wp[1], pz: wp[2], rx, ry, rz });
+                    layout.push({
+                        sx, sy, sz, dirKey, px: wp[0], py: wp[1], pz: wp[2], rx, ry, rz,
+                        ax: n - sx, ay: n - sy, az: n - sz, antiDirKey,
+                    });
                 }
             }
         }
@@ -1575,17 +1581,22 @@ function TunnelInteriorView({ worm, size }) {
 
         const st = useGameStore.getState();
         const cubies = st.cubies;
-        const fc = resolveColors(st.settings, st.settings?.biomeMode?.faceAssignment) || FACE_COLORS;
+        const settings = st.settings;
+        const fc = resolveColors(settings, settings?.biomeMode?.faceAssignment) || FACE_COLORS;
+        const manifoldStyles = settings?.manifoldStyles ?? {};
 
         for (let i = 0; i < stickerLayout.length; i++) {
-            const { sx, sy, sz, dirKey } = stickerLayout[i];
+            const { ax, ay, az, antiDirKey } = stickerLayout[i];
             const mesh = meshes[i];
             if (!mesh) continue;
-            // Correct 3D array access: cubies[x][y][z]
-            const faceId = cubies?.[sx]?.[sy]?.[sz]?.stickers?.[dirKey]?.curr;
-            _tivColor.set(faceId ? (fc[faceId] ?? '#444') : '#1a1a1a');
-            mesh.material.color.copy(_tivColor);
-            mesh.material.opacity = opacity;
+            // Look up the antipodal sticker so interior shows the connected face's style.
+            const antipodalFaceId = cubies?.[ax]?.[ay]?.[az]?.stickers?.[antiDirKey]?.curr;
+            if (!antipodalFaceId) { mesh.visible = false; continue; }
+            const colorHex = fc[antipodalFaceId] ?? '#444';
+            const style = manifoldStyles[antipodalFaceId] ?? 'solid';
+            const antiColorHex = fc[ANTIPODAL_COLOR[antipodalFaceId]] ?? '#ffffff';
+            const newMat = getTileStyleMaterial(style, colorHex, false, null, antiColorHex);
+            if (mesh.material !== newMat) mesh.material = newMat;
             mesh.visible = true;
         }
     });
