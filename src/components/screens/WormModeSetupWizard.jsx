@@ -798,131 +798,167 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     const isInch = wormCharacterId === 'inch';
     const isGlow = wormCharacterId === 'glow';
     const isBook = wormCharacterId === 'book';
-    const HEAD_SZ = isInch ? 50 : 60;
-    const bodySegs = isInch
-      ? [{w: 42, h: 24, dx: -5}, {w: 34, h: 20, dx: 5}]
-      : isBook
-        ? [{w: 50, h: 50, dx: 0}, {w: 42, h: 42, dx: 0}, {w: 34, h: 34, dx: 0}]
-        : [{w: 50, h: 50, dx: 0}, {w: 42, h: 42, dx: 0}, {w: 34, h: 34, dx: 0}, {w: 26, h: 26, dx: 0}];
+    // ── SVG worm preview ────────────────────────────────────────────────────────
+    const renderWormSVG = () => {
+      const W = 224, H = 120;
+      const headCx = 170, headCy = 60, headR = 27;
+      const neckX = headCx - headR + 6; // 149
+      const neckY = headCy;             // 60
 
-    const HatPreview = ({ hatId }) => {
-      if (hatId === 'tophat') return (
-        <div style={{ position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)', marginBottom: '1px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <div style={{ width: '22px', height: '20px', background: '#111', borderRadius: '3px 3px 0 0' }} />
-          <div style={{ width: '22px', height: '4px', background: '#ef4444' }} />
-          <div style={{ width: '36px', height: '5px', background: '#111', borderRadius: '2px' }} />
-        </div>
-      );
-      if (hatId === 'party') return (
-        <div style={{ position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)', marginBottom: '1px' }}>
-          <svg width="34" height="32" viewBox="0 0 34 32" fill="none">
-            <polygon points="17,1 32,31 2,31" fill="#f97316" />
-            <line x1="8" y1="22" x2="26" y2="22" stroke="#ef4444" strokeWidth="2" />
-            <line x1="12" y1="13" x2="22" y2="13" stroke="#eab308" strokeWidth="2" />
-            <circle cx="17" cy="2" r="2.5" fill="white" />
-          </svg>
-        </div>
-      );
-      if (hatId === 'crown') return (
-        <div style={{ position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)', marginBottom: '1px' }}>
-          <svg width="40" height="24" viewBox="0 0 40 24" fill="none">
-            <polygon points="2,22 8,8 14,18 20,2 26,18 32,8 38,22" fill="#f59e0b" stroke="#fbbf24" strokeWidth="1" strokeLinejoin="round" />
-            <rect x="2" y="18" width="36" height="5" rx="2" fill="#f59e0b" />
-            <circle cx="20" cy="4" r="2" fill="#fde68a" />
-            <circle cx="8" cy="10" r="1.5" fill="#fde68a" />
-            <circle cx="32" cy="10" r="1.5" fill="#fde68a" />
-          </svg>
-        </div>
-      );
-      if (hatId === 'halo') return (
-        <div style={{ position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)', marginBottom: '4px' }}>
-          <svg width="40" height="14" viewBox="0 0 40 14" fill="none">
-            <ellipse cx="20" cy="7" rx="17" ry="5" stroke="#fde68a" strokeWidth="3" fill="none" filter="url(#haloGlow)" />
-            <defs>
-              <filter id="haloGlow">
-                <feGaussianBlur stdDeviation="1.5" result="blur" />
-                <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-              </filter>
-            </defs>
-          </svg>
-        </div>
-      );
-      return null;
-    };
+      // Inchworm: quadratic arch. Others: gentle cubic S-curve.
+      const bodyPath = isInch
+        ? `M 58,72 Q 100,18 ${neckX},${neckY}`
+        : `M 38,63 C 72,56 114,68 ${neckX},${neckY}`;
+      const bodyWidth = isInch ? 20 : 27;
 
-    const AntennaPreview = () => {
-      if (isInch) return null;
-      const tipSz = isGlow ? 10 : 7;
-      const stalkH = isGlow ? 22 : 14;
+      // Bezier helper for segment-ring positions along the cubic body path
+      const bezierPt = t => {
+        const [p0x, p0y, p1x, p1y, p2x, p2y, p3x, p3y] = [38, 63, 72, 56, 114, 68, neckX, neckY];
+        const mt = 1 - t;
+        return [
+          mt*mt*mt*p0x + 3*mt*mt*t*p1x + 3*mt*t*t*p2x + t*t*t*p3x,
+          mt*mt*mt*p0y + 3*mt*mt*t*p1y + 3*mt*t*t*p2y + t*t*t*p3y,
+        ];
+      };
+
       return (
-        <div style={{
-          position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)',
-          display: 'flex', gap: isGlow ? '24px' : '16px',
-          marginBottom: '2px', pointerEvents: 'none',
-        }}>
-          {[-1, 1].map((tilt, j) => (
-            <div key={j} style={{
-              display: 'flex', flexDirection: 'column-reverse', alignItems: 'center',
-              transform: `rotate(${tilt * 16}deg)`,
-              transformOrigin: 'bottom center',
-            }}>
-              <div style={{ width: '3px', height: stalkH, borderRadius: '2px', background: activeSkin.antenna }} />
-              <div style={{
-                width: tipSz, height: tipSz, borderRadius: '50%',
-                background: activeSkin.glow,
-                boxShadow: isGlow ? `0 0 8px ${activeSkin.glow}, 0 0 16px ${activeSkin.glow}88` : 'none',
-                marginBottom: '2px',
-              }} />
-            </div>
-          ))}
-        </div>
+        <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ overflow: 'visible', display: 'block', flexShrink: 0 }}>
+
+          {/* Glow bloom behind body */}
+          {isGlow && (
+            <path d={bodyPath} stroke={activeSkin.glow} strokeWidth={bodyWidth + 18} fill="none" strokeLinecap="round" opacity={0.14} />
+          )}
+
+          {/* Body stroke — thick rounded path */}
+          <path d={bodyPath} stroke={activeSkin.belly} strokeWidth={bodyWidth} fill="none" strokeLinecap="round" />
+
+          {/* Subtle segment rings along body (non-inchworm) */}
+          {!isInch && [0.25, 0.50, 0.72].map((t, idx) => {
+            const [bx, by] = bezierPt(t);
+            return (
+              <ellipse key={idx} cx={bx} cy={by} rx={5 + idx * 2} ry={bodyWidth / 2 + 1}
+                fill={activeSkin.body} opacity={0.22} style={{ pointerEvents: 'none' }} />
+            );
+          })}
+
+          {/* Glow worm bioluminescent rings */}
+          {isGlow && [0.28, 0.58].map((t, idx) => {
+            const [bx, by] = bezierPt(t);
+            return (
+              <ellipse key={idx} cx={bx} cy={by} rx={22} ry={17}
+                fill="none" stroke={activeSkin.glow} strokeWidth="2.5" opacity={0.45} />
+            );
+          })}
+
+          {/* Inchworm prolegs at arch base and near head */}
+          {isInch && (<>
+            <line x1={neckX - 5} y1={neckY + 7} x2={neckX - 14} y2={neckY + 19} stroke={activeSkin.belly} strokeWidth="3" strokeLinecap="round" />
+            <line x1={neckX + 3} y1={neckY + 7} x2={neckX + 5} y2={neckY + 19} stroke={activeSkin.belly} strokeWidth="3" strokeLinecap="round" />
+            <line x1="56" y1="72" x2="46" y2="84" stroke={activeSkin.belly} strokeWidth="3" strokeLinecap="round" />
+            <line x1="62" y1="72" x2="66" y2="84" stroke={activeSkin.belly} strokeWidth="3" strokeLinecap="round" />
+          </>)}
+
+          {/* Head circle */}
+          <circle cx={headCx} cy={headCy} r={headR} fill={activeSkin.body} />
+          {isGlow && (
+            <circle cx={headCx} cy={headCy} r={headR + 7} fill="none" stroke={activeSkin.glow} strokeWidth="2.5" opacity={0.32} />
+          )}
+
+          {/* Book glasses lens fills (before eyes) */}
+          {isBook && (<>
+            <circle cx={headCx - 10} cy={headCy - 6} r={8} fill="rgba(255,255,255,0.88)" />
+            <circle cx={headCx + 10} cy={headCy - 6} r={8} fill="rgba(255,255,255,0.88)" />
+          </>)}
+
+          {/* Eyes */}
+          <circle cx={headCx - 10} cy={headCy - 6} r="7" fill="white" />
+          <circle cx={headCx + 10} cy={headCy - 6} r="7" fill="white" />
+          <circle cx={headCx - 8} cy={headCy - 6} r="4" fill="#111" />
+          <circle cx={headCx + 12} cy={headCy - 6} r="4" fill="#111" />
+          <circle cx={headCx - 6} cy={headCy - 8} r="1.5" fill="white" />
+          <circle cx={headCx + 14} cy={headCy - 8} r="1.5" fill="white" />
+
+          {/* Book glasses ring overlay */}
+          {isBook && (<>
+            <circle cx={headCx - 10} cy={headCy - 6} r={8} fill="none" stroke="#222" strokeWidth="1.8" />
+            <circle cx={headCx + 10} cy={headCy - 6} r={8} fill="none" stroke="#222" strokeWidth="1.8" />
+            <line x1={headCx - 2} y1={headCy - 6} x2={headCx + 2} y2={headCy - 6} stroke="#222" strokeWidth="1.5" />
+          </>)}
+
+          {/* Smile */}
+          <path d={`M ${headCx - 8},${headCy + 5} Q ${headCx},${headCy + 12} ${headCx + 8},${headCy + 5}`}
+            stroke="#222" strokeWidth="2" fill="none" strokeLinecap="round" opacity="0.75" />
+
+          {/* Antennae */}
+          {!isInch && (<>
+            <line x1={headCx - 8} y1={headCy - headR + 4} x2={headCx - 22} y2={headCy - headR - 17}
+              stroke={activeSkin.antenna} strokeWidth="2.5" strokeLinecap="round" />
+            <circle cx={headCx - 22} cy={headCy - headR - 17} r="4.5" fill={activeSkin.glow} />
+            <line x1={headCx + 8} y1={headCy - headR + 4} x2={headCx + 22} y2={headCy - headR - 17}
+              stroke={activeSkin.antenna} strokeWidth="2.5" strokeLinecap="round" />
+            <circle cx={headCx + 22} cy={headCy - headR - 17} r="4.5" fill={activeSkin.glow} />
+          </>)}
+          {isInch && (<>
+            <line x1={headCx - 5} y1={headCy - headR + 4} x2={headCx - 12} y2={headCy - headR - 9}
+              stroke={activeSkin.antenna} strokeWidth="2" strokeLinecap="round" />
+            <circle cx={headCx - 12} cy={headCy - headR - 9} r="3" fill={activeSkin.glow} />
+            <line x1={headCx + 5} y1={headCy - headR + 4} x2={headCx + 12} y2={headCy - headR - 9}
+              stroke={activeSkin.antenna} strokeWidth="2" strokeLinecap="round" />
+            <circle cx={headCx + 12} cy={headCy - headR - 9} r="3" fill={activeSkin.glow} />
+          </>)}
+
+          {/* Hats */}
+          {wormHatId === 'tophat' && (<>
+            <rect x={headCx - 13} y={headCy - headR - 26} width="26" height="21" rx="3" fill="#111" />
+            <rect x={headCx - 20} y={headCy - headR - 6} width="40" height="6" rx="2" fill="#111" />
+            <rect x={headCx - 12} y={headCy - headR - 8} width="24" height="4" fill="#ef4444" />
+          </>)}
+          {wormHatId === 'party' && (<>
+            <polygon points={`${headCx},${headCy - headR - 25} ${headCx - 17},${headCy - headR} ${headCx + 17},${headCy - headR}`} fill="#f97316" />
+            <line x1={headCx - 9} y1={headCy - headR - 14} x2={headCx + 9} y2={headCy - headR - 14} stroke="#ef4444" strokeWidth="1.5" />
+            <circle cx={headCx} cy={headCy - headR - 25} r="2.5" fill="white" />
+          </>)}
+          {wormHatId === 'crown' && (<>
+            <polygon points={`${headCx - 18},${headCy - headR} ${headCx - 10},${headCy - headR - 16} ${headCx},${headCy - headR - 8} ${headCx + 10},${headCy - headR - 16} ${headCx + 18},${headCy - headR}`} fill="#f59e0b" />
+            <rect x={headCx - 18} y={headCy - headR - 2} width="36" height="8" rx="2" fill="#f59e0b" />
+          </>)}
+          {wormHatId === 'halo' && (
+            <ellipse cx={headCx} cy={headCy - headR - 8} rx="19" ry="6"
+              fill="none" stroke="#fde68a" strokeWidth="3.5" opacity="0.9" />
+          )}
+        </svg>
       );
     };
-
-    const STAT_ROWS = [
-      { label: 'Speed',   key: 'speed',   color: '#f59e0b' },
-      { label: 'Healing', key: 'healing', color: '#22c55e' },
-      { label: 'Agility', key: 'agility', color: '#60a5fa' },
-      { label: 'Glow',    key: 'glow',    color: '#c084fc' },
-    ];
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
         {/* ── Hero-select card ── */}
         <div style={{
-          display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : '44% 56%',
           borderRadius: '16px',
           overflow: 'hidden',
-          border: '1.5px solid #cec8be',
-          boxShadow: '0 4px 16px rgba(0,0,0,0.10)',
+          border: '1.5px solid rgba(255,255,255,0.10)',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.22)',
         }}>
-
-          {/* LEFT — dark spotlight stage (intentionally dark for worm glow effect) */}
           <div style={{
-            background: `radial-gradient(ellipse at 50% 30%, ${activeSkin.glow}2e 0%, #0d0818 55%, #060410 100%)`,
+            background: `radial-gradient(ellipse at 60% 50%, ${activeSkin.glow}22 0%, #0d0818 55%, #060410 100%)`,
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            padding: isMobile ? '28px 16px 22px' : '32px 12px 22px',
+            padding: isMobile ? '24px 12px 20px' : '28px 16px 22px',
             position: 'relative',
-            minHeight: isMobile ? '230px' : '300px',
-            gap: '14px',
+            minHeight: isMobile ? '200px' : '240px',
+            gap: '12px',
             transition: 'background 0.4s ease',
           }}>
-            {/* Floor glow ellipse */}
+            {/* Floor glow */}
             <div style={{
-              position: 'absolute', bottom: '26px', left: '50%', transform: 'translateX(-50%)',
-              width: '88px', height: '18px',
-              background: `radial-gradient(ellipse, ${activeSkin.glow}55 0%, transparent 70%)`,
-              borderRadius: '50%',
-              transition: 'background 0.4s ease',
-              pointerEvents: 'none',
+              position: 'absolute', bottom: '16px', left: '50%', transform: 'translateX(-50%)',
+              width: '160px', height: '16px',
+              background: `radial-gradient(ellipse, ${activeSkin.glow}44 0%, transparent 70%)`,
+              borderRadius: '50%', pointerEvents: 'none', transition: 'background 0.4s ease',
             }} />
 
-            {/* Arrows + worm */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '14px' : '10px', width: '100%', justifyContent: 'center', position: 'relative', zIndex: 1 }}>
-
-              {/* Prev */}
+            {/* Arrows + SVG worm */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '8px' : '14px', justifyContent: 'center', position: 'relative', zIndex: 1 }}>
               <button onClick={prevChar} style={{
                 background: 'rgba(255,255,255,0.1)', border: '1.5px solid rgba(255,255,255,0.22)',
                 color: '#fff', width: '34px', height: '34px', borderRadius: '50%',
@@ -932,69 +968,8 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                 paddingBottom: '1px',
               }}>‹</button>
 
-              {/* Worm body */}
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', transition: 'opacity 0.2s ease' }}>
-                <div style={{ position: 'relative', display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
-                  <HatPreview hatId={wormHatId} />
-                  <div style={{
-                    width: HEAD_SZ, height: HEAD_SZ,
-                    borderRadius: isBook ? '14px' : '50%',
-                    background: activeSkin.body,
-                    boxShadow: isGlow
-                      ? `0 0 32px ${activeSkin.glow}cc, 0 0 16px ${activeSkin.glow}88`
-                      : `0 0 22px ${activeSkin.glow}88`,
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                    gap: '4px', position: 'relative', flexShrink: 0, transition: 'all 0.3s ease',
-                  }}>
-                    <AntennaPreview />
-                    <div style={{ display: 'flex', gap: '7px' }}>
-                      {[0, 1].map(e => (
-                        <div key={e} style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <div style={{ width: '4.5px', height: '4.5px', borderRadius: '50%', background: '#111' }} />
-                        </div>
-                      ))}
-                    </div>
-                    <div style={{ display: 'flex', gap: '3px', alignItems: 'flex-end' }}>
-                      {[0, 1, 2].map(i => (
-                        <div key={i} style={{ width: '3.5px', height: '3.5px', borderRadius: '50%', background: '#111', opacity: 0.7, marginBottom: i === 1 ? '-2px' : '0' }} />
-                      ))}
-                    </div>
-                    {isBook && (
-                      <div style={{ position: 'absolute', top: '13px', display: 'flex', gap: '4px' }}>
-                        <div style={{ width: '14px', height: '11px', border: '2px solid rgba(17,17,17,0.85)', borderRadius: '50%', boxSizing: 'border-box' }} />
-                        <div style={{ width: '14px', height: '11px', border: '2px solid rgba(17,17,17,0.85)', borderRadius: '50%', boxSizing: 'border-box' }} />
-                      </div>
-                    )}
-                  </div>
-                </div>
+              {renderWormSVG()}
 
-                {bodySegs.map(({ w, h, dx }, i) => (
-                  <div key={i} style={{
-                    width: w, height: h,
-                    borderRadius: isBook ? '9px' : '50%',
-                    background: activeSkin.belly,
-                    flexShrink: 0,
-                    boxShadow: isGlow
-                      ? `0 0 16px ${activeSkin.glow}cc, 0 0 8px ${activeSkin.glow}88`
-                      : `0 0 8px ${activeSkin.glow}44`,
-                    outline: isGlow ? `1.5px solid ${activeSkin.glow}66` : 'none',
-                    transform: dx !== 0 ? `translateX(${dx}px)` : 'none',
-                    opacity: 1 - i * 0.07,
-                    transition: 'all 0.25s ease',
-                  }} />
-                ))}
-
-                {isGlow && (
-                  <div style={{
-                    width: 19, height: 19, borderRadius: '50%',
-                    background: '#ccffaa',
-                    boxShadow: `0 0 12px #ccffaacc, 0 0 24px #ccffaa88`,
-                    opacity: 0.85,
-                  }} />
-                )}
-              </div>
-
-              {/* Next */}
               <button onClick={nextChar} style={{
                 background: 'rgba(255,255,255,0.1)', border: '1.5px solid rgba(255,255,255,0.22)',
                 color: '#fff', width: '34px', height: '34px', borderRadius: '50%',
@@ -1003,6 +978,23 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                 flexShrink: 0, fontFamily: 'inherit', transition: 'all 0.15s ease',
                 paddingBottom: '1px',
               }}>›</button>
+            </div>
+
+            {/* Name, type, special */}
+            <div style={{ textAlign: 'center', zIndex: 1 }}>
+              <div style={{ fontSize: isMobile ? '17px' : '20px', fontWeight: '800', color: '#fff', letterSpacing: '-0.2px', lineHeight: 1.1, marginBottom: '6px' }}>
+                {activeCharacter.label.toUpperCase()}
+              </div>
+              <div style={{
+                display: 'inline-flex', alignItems: 'center',
+                background: `${activeSkin.glow}28`, border: `1px solid ${activeSkin.glow}55`,
+                color: activeSkin.glow, fontSize: '9px', fontWeight: '800',
+                letterSpacing: '0.16em', textTransform: 'uppercase', padding: '3px 10px', borderRadius: '20px',
+                marginBottom: '7px',
+              }}>{activeCharacter.type}</div>
+              <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.58)', fontStyle: 'italic', maxWidth: '280px', lineHeight: 1.5 }}>
+                {activeCharacter.special}
+              </div>
             </div>
 
             {/* Page dots */}
@@ -1016,61 +1008,6 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                   transition: 'all 0.28s cubic-bezier(0.4,0,0.2,1)',
                 }} />
               ))}
-            </div>
-          </div>
-
-          {/* RIGHT — parchment stats panel */}
-          <div style={{
-            background: 'linear-gradient(155deg, #fdf6e3 0%, #f5e4c0 100%)',
-            padding: '22px 18px',
-            display: 'flex', flexDirection: 'column', gap: '10px',
-            borderLeft: isMobile ? 'none' : '1.5px solid rgba(139,90,43,0.18)',
-            borderTop: isMobile ? '1.5px solid rgba(139,90,43,0.18)' : 'none',
-          }}>
-
-            {/* Name + type badge */}
-            <div>
-              <div style={{
-                fontSize: isMobile ? '17px' : '20px', fontWeight: '800',
-                letterSpacing: '-0.2px', color: '#2d1400', lineHeight: 1.1, marginBottom: '7px',
-              }}>{activeCharacter.label.toUpperCase()}</div>
-              <div style={{
-                display: 'inline-flex', alignItems: 'center',
-                background: '#5c2d0a', color: '#ffd077',
-                fontSize: '9px', fontWeight: '800', letterSpacing: '0.16em',
-                textTransform: 'uppercase', padding: '3px 10px', borderRadius: '20px',
-              }}>{activeCharacter.type}</div>
-            </div>
-
-            <div style={{ height: '1px', background: 'rgba(139,90,43,0.22)' }} />
-
-            {/* Stat bars */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {STAT_ROWS.map(({ label, key, color }) => {
-                const val = activeCharacter.stats[key];
-                return (
-                  <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <span style={{ fontSize: '10px', fontWeight: '700', color: '#5c2d0a', width: '46px', textTransform: 'uppercase', letterSpacing: '0.04em', flexShrink: 0 }}>{label}</span>
-                    <div style={{ flex: 1, height: '7px', borderRadius: '4px', background: 'rgba(0,0,0,0.12)', overflow: 'hidden' }}>
-                      <div style={{
-                        height: '100%', width: `${val}%`, borderRadius: '4px',
-                        background: `linear-gradient(90deg, ${color}bb, ${color})`,
-                        boxShadow: `0 0 5px ${color}77`,
-                        transition: 'width 0.45s cubic-bezier(0.4,0,0.2,1)',
-                      }} />
-                    </div>
-                    <span style={{ fontSize: '11px', fontWeight: '800', color: '#2d1400', width: '26px', textAlign: 'right', flexShrink: 0 }}>{val}</span>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div style={{ height: '1px', background: 'rgba(139,90,43,0.22)' }} />
-
-            {/* Special ability */}
-            <div style={{ fontSize: '10.5px', lineHeight: 1.5, color: '#5c2d0a' }}>
-              <span style={{ fontWeight: '800', color: '#2d1400', fontSize: '10px', display: 'block', marginBottom: '3px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>★ Special</span>
-              <span style={{ fontStyle: 'italic' }}>{activeCharacter.special}</span>
             </div>
           </div>
         </div>
