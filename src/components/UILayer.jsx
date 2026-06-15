@@ -564,7 +564,7 @@ export default function UILayer({
         </Suspense>
       )}
 
-      {isMobile && !wormHealerMode && !showTutorial && !showMainMenu && (
+      {isMobile && !wormHealerMode && !showTutorial && !showMainMenu && !showDisparityWizard && !showDisparityBetting && !showFreeplayWizard && !showRandomWizard && !showWormModeWizard && (
         <MobileControls
           onShowSettings={() => setShowSettings(true)} onShowHelp={() => setShowHelp(true)}
           flipMode={flipMode} onToggleFlip={() => setFlipMode(!flipMode)}
