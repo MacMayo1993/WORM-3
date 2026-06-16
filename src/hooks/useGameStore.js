@@ -47,6 +47,7 @@ const loadPersistedState = () => {
     const wormSkin = localStorage.getItem('worm3_skin') || 'slime';
     const wormHat = localStorage.getItem('worm3_hat') || 'none';
     const wormCharacter = localStorage.getItem(WORM_CHARACTER_KEY) || 'classic';
+    const wormShowTrail = localStorage.getItem('worm3_show_trail') !== 'false'; // default true
     const parityPoints = parseInt(localStorage.getItem(PARITY_POINTS_KEY) ?? '0', 10) || 0;
     const ownedItems = [...DEFAULT_OWNED]; // DEV: all items unlocked for store testing
     const safeParityPoints = Math.max(parityPoints, 10000); // DEV: floor wallet at 10 000 for store testing
@@ -79,6 +80,7 @@ const loadPersistedState = () => {
       wormSkin: safeSkin,
       wormHat: safeHat,
       wormCharacter,
+      wormShowTrail,
       parityPoints: safeParityPoints,
       ownedItems,
     };
@@ -92,6 +94,7 @@ const loadPersistedState = () => {
       wormSkin: 'slime',
       wormHat: 'none',
       wormCharacter: 'classic',
+      wormShowTrail: true,
       parityPoints: 0,
       ownedItems: [...DEFAULT_OWNED],
     };
@@ -390,6 +393,11 @@ export const useGameStore = create(
     setWormCharacter: (id) => {
       try { localStorage.setItem(WORM_CHARACTER_KEY, id); } catch { }
       set({ wormCharacter: id });
+    },
+    wormShowTrail: persistedState.wormShowTrail ?? true,
+    setWormShowTrail: (v) => {
+      try { localStorage.setItem('worm3_show_trail', String(v)); } catch { }
+      set({ wormShowTrail: v });
     },
 
     // ── Economy ──────────────────────────────────────────────────────────────
