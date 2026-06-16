@@ -1503,6 +1503,8 @@ function TunnelInteriorView({ worm, size }) {
     const wireMatRef = useRef();
     const stickerMeshesRef = useRef([]);
     const opacityRef = useRef(0);
+    const prevPhaseRef = useRef('crawling');
+    const stickerMatsAssigned = useRef(false);
 
     // Precompute every surface sticker's position, rotation, grid coords, and antipodal coords.
     const stickerLayout = useMemo(() => {
@@ -1566,38 +1568,50 @@ function TunnelInteriorView({ worm, size }) {
 
     useFrame((_, delta) => {
         const phase = worm.phase.current;
+        const prevPhase = prevPhaseRef.current;
         const active = phase === 'entering' || phase === 'tunnel' || phase === 'exiting';
 
-        opacityRef.current += ((active ? 1 : 0) - opacityRef.current) * Math.min(1, delta * (active ? 8 : 4));
+        // Batch-assign sticker materials ONCE on tunnel entry (opacity still ~0, so no visible pop).
+        // Avoids 54+ per-frame GPU state changes that caused hitching on the first visible frame.
+        if (prevPhase === 'crawling' && phase === 'entering') {
+            const st = useGameStore.getState();
+            const { cubies, settings } = st;
+            const fc = resolveColors(settings, settings?.biomeMode?.faceAssignment) || FACE_COLORS;
+            const manifoldStyles = settings?.manifoldStyles ?? {};
+            for (let i = 0; i < stickerLayout.length; i++) {
+                const { ax, ay, az, antiDirKey } = stickerLayout[i];
+                const mesh = stickerMeshesRef.current[i];
+                if (!mesh) continue;
+                const antipodalFaceId = cubies?.[ax]?.[ay]?.[az]?.stickers?.[antiDirKey]?.curr;
+                if (!antipodalFaceId) { mesh.visible = false; continue; }
+                const colorHex = fc[antipodalFaceId] ?? '#444';
+                const style = manifoldStyles[antipodalFaceId] ?? 'solid';
+                const antiColorHex = fc[ANTIPODAL_COLOR[antipodalFaceId]] ?? '#ffffff';
+                mesh.material = getTileStyleMaterial(style, colorHex, false, null, antiColorHex);
+                mesh.visible = false; // revealed gradually by opacity ramp
+            }
+            stickerMatsAssigned.current = true;
+        }
+        // Clear assignment flag on tunnel exit so the next transit gets fresh sticker colors
+        if (!active && prevPhase !== 'crawling') stickerMatsAssigned.current = false;
+
+        prevPhaseRef.current = phase;
+
+        opacityRef.current += ((active ? 1 : 0) - opacityRef.current) * Math.min(1, delta * (active ? 10 : 5));
         const opacity = opacityRef.current;
 
         if (wireMatRef.current) wireMatRef.current.opacity = opacity * 0.45;
 
         const meshes = stickerMeshesRef.current;
-        if (!active || opacity < 0.01) {
+        if (!active || opacity < 0.01 || !stickerMatsAssigned.current) {
             for (const m of meshes) if (m) m.visible = false;
             return;
         }
 
-        const st = useGameStore.getState();
-        const cubies = st.cubies;
-        const settings = st.settings;
-        const fc = resolveColors(settings, settings?.biomeMode?.faceAssignment) || FACE_COLORS;
-        const manifoldStyles = settings?.manifoldStyles ?? {};
-
+        // Materials already assigned — just reveal stickers as opacity ramps in
         for (let i = 0; i < stickerLayout.length; i++) {
-            const { ax, ay, az, antiDirKey } = stickerLayout[i];
             const mesh = meshes[i];
-            if (!mesh) continue;
-            // Look up the antipodal sticker so interior shows the connected face's style.
-            const antipodalFaceId = cubies?.[ax]?.[ay]?.[az]?.stickers?.[antiDirKey]?.curr;
-            if (!antipodalFaceId) { mesh.visible = false; continue; }
-            const colorHex = fc[antipodalFaceId] ?? '#444';
-            const style = manifoldStyles[antipodalFaceId] ?? 'solid';
-            const antiColorHex = fc[ANTIPODAL_COLOR[antipodalFaceId]] ?? '#ffffff';
-            const newMat = getTileStyleMaterial(style, colorHex, false, null, antiColorHex);
-            if (mesh.material !== newMat) mesh.material = newMat;
-            mesh.visible = true;
+            if (mesh) mesh.visible = true;
         }
     });
 
@@ -1740,6 +1754,7 @@ function WormBody({ worm }) {
     const meshRef = useRef();       // sphere body (classic / inch / glow)
     const boxMeshRef = useRef();    // box body (book worm only)
     const glowAltRef = useRef();    // additive overlay — even glow segments only
+    const transitScaleRef = useRef(1); // dissolve: 1 on surface, 0 inside tunnel
     const wormSkinId = useGameStore(s => s.wormSkin ?? 'slime');
     const wormCharacterId = useGameStore(s => s.wormCharacter ?? 'classic');
     const wormCharacter = getWormCharacter(wormCharacterId);
@@ -1783,6 +1798,19 @@ function WormBody({ worm }) {
         _pathPointsBuffer.length = steps.count + 1;
         _pathPointsBuffer[0] = _headPathPoint;
         for (let j = 0; j < steps.count; j++) _pathPointsBuffer[j + 1] = shAt(steps, j);
+
+        // Dissolve: shrink all segments as worm enters tunnel, re-expand on exit.
+        // Crawling → 1.0, any tunnel phase → 0.0 (fast lerp so it clears in ~0.3s).
+        const _phase = worm.phase.current;
+        const targetTS = _phase === 'crawling' ? 1.0 : 0.0;
+        transitScaleRef.current += (targetTS - transitScaleRef.current) * Math.min(1, delta * 9);
+        const transitScale = transitScaleRef.current;
+
+        if (transitScale < 0.015) {
+            mesh.count = 0;
+            if (glowAltRef.current) glowAltRef.current.count = 0;
+            return;
+        }
 
         let walkIndex = 0;
         let cumulativeDist = 0;
@@ -1865,6 +1893,7 @@ function WormBody({ worm }) {
                 }
             }
 
+            if (transitScale < 1) _wormDummy.scale.multiplyScalar(transitScale);
             _wormDummy.updateMatrix();
             mesh.setMatrixAt(i, _wormDummy.matrix);
 
@@ -1964,7 +1993,9 @@ function GlowWormAura({ worm }) {
         if (lightRef.current) {
             lightRef.current.position.copy(worm.headInterpPos.current)
                 .addScaledVector(worm.currentNormal.current, WORM_LIFT + 0.1);
-            lightRef.current.intensity = 1.2 + Math.sin(t * 4.0) * 0.4;
+            // Zero out during tunnel transit — worm body is dissolved, light should vanish too
+            const inTunnel = worm.phase.current !== 'crawling';
+            lightRef.current.intensity = inTunnel ? 0 : 1.2 + Math.sin(t * 4.0) * 0.4;
         }
     });
 
@@ -1986,7 +2017,8 @@ function PortalGlow({ worm, size }) {
         const n = FACE_NORMALS[dirKey] ?? FACE_NORMALS.PZ;
         _glowPos.set(wp[0], wp[1], wp[2]).addScaledVector(n, 0.2);
         meshRef.current.position.copy(_glowPos);
-        meshRef.current.material.opacity = worm.onFlippedTile.current
+        const inTunnel = worm.phase.current !== 'crawling';
+        meshRef.current.material.opacity = (!inTunnel && worm.onFlippedTile.current)
             ? 0.3 + Math.sin(clock.elapsedTime * 6) * 0.2
             : 0;
     });
@@ -2015,11 +2047,23 @@ function WormFace({ worm, size }) {
     const hatGroupRef = useRef();
     const glassLeftRef = useRef();
     const glassRightRef = useRef();
+    const faceOpacityRef = useRef(1);
     const wormHatId = useGameStore(s => s.wormHat ?? 'none');
     const wormCharacterId = useGameStore(s => s.wormCharacter ?? 'classic');
     const isBook = wormCharacterId === 'book';
 
-    useFrame(() => {
+    useFrame((_, delta) => {
+        // Match the worm body dissolve: hide face whenever worm is in tunnel transit
+        const crawling = worm.phase.current === 'crawling';
+        faceOpacityRef.current += ((crawling ? 1 : 0) - faceOpacityRef.current) * Math.min(1, delta * 9);
+        const faceVisible = faceOpacityRef.current > 0.05;
+        if (leftEyeRef.current)  leftEyeRef.current.visible  = faceVisible;
+        if (rightEyeRef.current) rightEyeRef.current.visible = faceVisible;
+        for (const ref of smileRefs) if (ref.current) ref.current.visible = faceVisible;
+        if (hatGroupRef.current)    hatGroupRef.current.visible    = faceVisible;
+        if (glassLeftRef.current)   glassLeftRef.current.visible   = faceVisible;
+        if (glassRightRef.current)  glassRightRef.current.visible  = faceVisible;
+        if (!faceVisible) return;
         const { dirKey } = worm.pos.current;
         const normal = FACE_NORMALS[dirKey] ?? FACE_NORMALS.PZ;
         const fwdArr = DIR_FORWARD[dirKey]?.[worm.moveDir.current] ?? [0, 1, 0];
@@ -3613,17 +3657,18 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     });
 
     const wormInTunnel = wormPhaseReactive === 'entering' || wormPhaseReactive === 'tunnel' || wormPhaseReactive === 'exiting';
-    const wormVisible = wormGamePhase !== 'scrambling' && !wormInTunnel;
+    const wormAlive = wormGamePhase !== 'scrambling';
 
     return (
         <>
             <WormChaseCamera worm={worm} size={size} />
             <WormSwipeControls onTurn={worm.queueTurn} worm={worm} />
             <TunnelInteriorView worm={worm} size={size} />
-            {wormVisible && <WormBody worm={worm} />}
-            {wormVisible && <GlowWormAura worm={worm} />}
-            {wormVisible && <WormFace worm={worm} size={size} />}
-            {wormVisible && <PortalGlow worm={worm} size={size} />}
+            {/* Always mounted — each component handles its own dissolve via worm.phase.current */}
+            {wormAlive && <WormBody worm={worm} />}
+            {wormAlive && <GlowWormAura worm={worm} />}
+            {wormAlive && <WormFace worm={worm} size={size} />}
+            {wormAlive && <PortalGlow worm={worm} size={size} />}
             {!wormInTunnel && <WormholeRings
                 cubies={cubies}
                 size={size}
