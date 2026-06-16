@@ -145,6 +145,34 @@ function getSliceSurfaceStickers(size, axis, sliceIndex) {
     return stickers;
 }
 
+// Scratch object reused by parseTileKey — avoids per-entry object allocation
+const _parseTile = { x: 0, y: 0, z: 0, dirKey: '' };
+
+// Parse a "x,y,z,dirKey" tile key into out without allocating an array.
+function parseTileKey(key, out) {
+    const c1 = key.indexOf(',');
+    const c2 = key.indexOf(',', c1 + 1);
+    const c3 = key.indexOf(',', c2 + 1);
+    out.x = parseInt(key, 10);
+    out.y = parseInt(key.substring(c1 + 1), 10);
+    out.z = parseInt(key.substring(c2 + 1), 10);
+    out.dirKey = key.substring(c3 + 1);
+    return out;
+}
+
+// Extract a single coordinate (0=x,1=y,2=z) from a tile key without allocating.
+function tileKeyCoordAt(key, idx) {
+    let commasSeen = 0, start = 0;
+    for (let i = 0; i < key.length; i++) {
+        if (key.charCodeAt(i) === 44) { // ','
+            if (commasSeen === idx) return parseInt(key.substring(start, i), 10);
+            commasSeen++;
+            start = i + 1;
+        }
+    }
+    return parseInt(key.substring(start), 10);
+}
+
 // Returns null | { type:'death' } | { type:'cut', cutTrailIdx }
 // Rules:
 //   - Entire worm on slice → travels with rotation, null (no harm)
@@ -153,7 +181,7 @@ function getSliceSurfaceStickers(size, axis, sliceIndex) {
 function checkWormHitBySlice(worm, axis, sliceIndex) {
     const head = worm.pos.current;
     const axisCoord = axis === 'col' ? 'x' : axis === 'row' ? 'y' : 'z';
-    const partsIdx = axis === 'col' ? 0 : axis === 'row' ? 1 : 2;
+    const coordIdx  = axis === 'col' ? 0 : axis === 'row' ? 1 : 2;
     const headOnSlice = head[axisCoord] === sliceIndex;
     const trail = worm.tileTrail.current;
 
@@ -166,7 +194,7 @@ function checkWormHitBySlice(worm, axis, sliceIndex) {
     if (!headOnSlice) {
         // Head is off the slice — cut if any active body tile is on it
         for (let i = 1; i < bodyEnd; i++) {
-            if (Number(ttAt(trail, i).split(',')[partsIdx]) === sliceIndex) {
+            if (tileKeyCoordAt(ttAt(trail, i), coordIdx) === sliceIndex) {
                 return { type: 'cut', cutTrailIdx: i };
             }
         }
@@ -176,7 +204,7 @@ function checkWormHitBySlice(worm, axis, sliceIndex) {
     // Head is on the slice — death only if any active body tile is OFF the slice
     // (if the entire active body is on the slice the worm travels with the rotation)
     for (let i = 1; i < bodyEnd; i++) {
-        if (Number(ttAt(trail, i).split(',')[partsIdx]) !== sliceIndex) {
+        if (tileKeyCoordAt(ttAt(trail, i), coordIdx) !== sliceIndex) {
             return { type: 'death' };
         }
     }
@@ -195,6 +223,11 @@ function cutWormTail(worm, cutTrailIdx) {
     if (worm.orbPickupColorsRef.current.length > orbsLeft) worm.orbPickupColorsRef.current.length = orbsLeft;
     useGameStore.getState().setWormBodyTiles(orbsLeft);
 }
+
+// ─── Scratch vectors for world-position writes (avoids per-tile-step Vector3 allocation) ──
+// Two dedicated slots so prevWorldPos and curWorldPos never alias the same object.
+const _curWP  = new THREE.Vector3();
+const _prevWP = new THREE.Vector3();
 
 // ─── Scratch vectors for evaluatePosAndNormal (avoids per-sub-step allocations) ──
 const _evalHPos = new THREE.Vector3();
@@ -327,8 +360,8 @@ function useWormCrawler(size, cubies) {
 
     // Smooth inter-tile interpolation
     const interpT = useRef(1);          // 0→1 between prev and current tile
-    const prevWorldPos = useRef(null);       // world pos of previous tile
-    const curWorldPos = useRef(null);       // world pos of current tile
+    const prevWorldPos = useRef(null);  // null = no prev yet; otherwise = _prevWP (module-level)
+    const curWorldPos = useRef(_curWP); // always valid; writes go through _curWP.set()
     const headInterpPos = useRef(new THREE.Vector3());
     const currentNormal = useRef(new THREE.Vector3(0, 0, 1));
 
@@ -378,11 +411,6 @@ function useWormCrawler(size, cubies) {
         }
         tunnelLookupRef.current = lookup;
     }, [cubies, size]);
-
-    // Compute world centroid of current grid tile
-    const getWorldPos = (p) => new THREE.Vector3(
-        ...getStickerWorldPos(p.x, p.y, p.z, p.dirKey, size, 0)
-    );
 
     // Jump offset height at current jumpT
     const jumpLift = () => isJumping.current
@@ -588,6 +616,8 @@ function useWormCrawler(size, cubies) {
         if (!alive.current) return;
         if (wormPausedRef.current) return;
 
+        const st = useGameStore.getState();
+
         // Track time alive in a ref only; published to the store on death or win
         // to avoid 10Hz Zustand updates that would re-render the entire HUD tree.
         timeAliveRef.current += delta;
@@ -596,11 +626,11 @@ function useWormCrawler(size, cubies) {
         survivalTickRef.current += delta;
         if (survivalTickRef.current >= SURVIVAL_TICK_INTERVAL) {
             survivalTickRef.current -= SURVIVAL_TICK_INTERVAL;
-            useGameStore.getState().earnCoins(EARN_WORM_SURVIVAL_TICK);
+            st.earnCoins(EARN_WORM_SURVIVAL_TICK);
         }
 
         // In finalHealing / solved phases no new wormholes spawn — player heals the remaining ones.
-        const gamePhaseNow = useGameStore.getState().wormGamePhase;
+        const gamePhaseNow = st.wormGamePhase;
         const noMoreSpawns = gamePhaseNow === 'finalHealing' || gamePhaseNow === 'solved';
         wormholeTimer.current -= delta;
         if (wormholeTimer.current <= 0) {
@@ -611,7 +641,7 @@ function useWormCrawler(size, cubies) {
         const countdownDeci = Math.round(countdown * 10);
         if (countdownDeci !== lastCountdownDeci.current) {
             lastCountdownDeci.current = countdownDeci;
-            useGameStore.getState().setWormholeCountdown(countdown);
+            st.setWormholeCountdown(countdown);
         }
 
         // Always advance jump
@@ -726,7 +756,7 @@ function useWormCrawler(size, cubies) {
 
                     // --- Continuous path recording for contiguous touching clones ---
                     const pWorld = prevWorldPos.current;
-                    const cWorld = curWorldPos.current ?? getWorldPos(pos.current);
+                    const cWorld = curWorldPos.current;
 
                     // Writes the interpolated ground position into outPos (module-level scratch or a direct ref).
                     // Returns cNorm — a direct reference to a FACE_NORMALS constant in the straight-crawl case
@@ -791,7 +821,8 @@ function useWormCrawler(size, cubies) {
                         stepAcc.current -= STEP_SEC;
                         interpT.current = 0;
                         lastRecordedT.current = 0;
-                        prevWorldPos.current = getWorldPos(pos.current);
+                        _prevWP.copy(_curWP);
+                        prevWorldPos.current = _prevWP;
                         prevDirKey.current = pos.current.dirKey;
 
                         const oldDirKey = pos.current.dirKey;
@@ -847,14 +878,14 @@ function useWormCrawler(size, cubies) {
                         }
 
                         // Immediately update curWorldPos so the interpolation target is correct
-                        curWorldPos.current = getWorldPos(pos.current);
+                        { const _wp = getStickerWorldPos(pos.current.x, pos.current.y, pos.current.z, pos.current.dirKey, size, 0); _curWP.set(_wp[0], _wp[1], _wp[2]); curWorldPos.current = _curWP; }
 
                         // Powerup collision
                         const { x, y, z, dirKey } = pos.current;
                         const puIdx = powerupsRef.current.findIndex(p => p.x === x && p.y === y && p.z === z && p.dirKey === dirKey);
                         if (puIdx !== -1) {
                             const pickedUp = powerupsRef.current[puIdx];
-                            const liveCubies = useGameStore.getState().cubies;
+                            const liveCubies = st.cubies;
                             const pickedSticker = getStickerSafe(liveCubies, pickedUp.x, pickedUp.y, pickedUp.z, pickedUp.dirKey);
                             // Orbs on flipped tiles hover above the surface — worm must jump to reach them
                             const tileIsFlipped = !!(pickedSticker && pickedSticker.curr !== pickedSticker.orig);
@@ -862,7 +893,7 @@ function useWormCrawler(size, cubies) {
                                 // Worm crawled onto the tile but didn't jump — orb is out of reach
                             } else {
                                 const pickedFaceId = pickedSticker ? pickedSticker.curr : 0;
-                                const liveColors = resolveColors(useGameStore.getState().settings);
+                                const liveColors = resolveColors(st.settings);
                                 const pickedColor = ensureOrbContrast((pickedFaceId && liveColors[pickedFaceId]) ?? '#22ff88');
                                 applyOrbPickupGrowth(pickedColor, pickedFaceId);
                                 pendingOrbFlashRef.current = { color: pickedColor, pos: curWorldPos.current.toArray() };
@@ -870,7 +901,7 @@ function useWormCrawler(size, cubies) {
                                 const next = [...powerupsRef.current];
                                 next[puIdx] = newPowerup;
                                 powerupsRef.current = next;
-                                useGameStore.getState().setWormPowerups(next);
+                                st.setWormPowerups(next);
                             }
                         }
 
@@ -885,7 +916,7 @@ function useWormCrawler(size, cubies) {
 
                         if (onFlippedTile.current !== lastFlippedRef.current) {
                             lastFlippedRef.current = onFlippedTile.current;
-                            useGameStore.getState().setWormOnFlippedTile(onFlippedTile.current);
+                            st.setWormOnFlippedTile(onFlippedTile.current);
                         }
 
                         if (isFlipped) {
@@ -960,7 +991,7 @@ function useWormCrawler(size, cubies) {
                     if (activeTunnel.current) {
                         const ex = activeTunnel.current.exit;
                         pos.current = { x: ex.x, y: ex.y, z: ex.z, dirKey: ex.dirKey };
-                        curWorldPos.current = getWorldPos(pos.current);
+                        { const _wp = getStickerWorldPos(pos.current.x, pos.current.y, pos.current.z, pos.current.dirKey, size, 0); _curWP.set(_wp[0], _wp[1], _wp[2]); curWorldPos.current = _curWP; }
                     }
                 },
                 update(delta) {
@@ -1056,7 +1087,7 @@ function useWormCrawler(size, cubies) {
         crossingCorner.current = false;
         interpT.current = 1;
         prevWorldPos.current = null;
-        curWorldPos.current = getWorldPos(startPos);
+        { const _wp = getStickerWorldPos(startPos.x, startPos.y, startPos.z, startPos.dirKey, size, 0); _curWP.set(_wp[0], _wp[1], _wp[2]); curWorldPos.current = _curWP; }
         headInterpPos.current.copy(curWorldPos.current);
         currentNormal.current.copy(FACE_NORMALS[startPos.dirKey] ?? new THREE.Vector3(0, 0, 1));
         isJumping.current = false;
@@ -1139,9 +1170,7 @@ function useWormCrawler(size, cubies) {
                 // Rotate the worm's logical grid position so it stays on its tile
                 const newPos = rotateTilePosition(pos.current, axis, sliceIndex, dir, size);
                 pos.current = newPos;
-                curWorldPos.current = new THREE.Vector3(
-                    ...getStickerWorldPos(newPos.x, newPos.y, newPos.z, newPos.dirKey, size, 0)
-                );
+                { const _wp = getStickerWorldPos(newPos.x, newPos.y, newPos.z, newPos.dirKey, size, 0); _curWP.set(_wp[0], _wp[1], _wp[2]); curWorldPos.current = _curWP; }
                 // When paused (e.g. during opening scramble), snap the render position too so
                 // the worm lands correctly on its tile after the rotation animation finishes.
                 if (wormPausedRef.current) {
@@ -1150,11 +1179,8 @@ function useWormCrawler(size, cubies) {
 
                 // Rotate the self-collision tile trail
                 ttMapInPlace(tileTrail.current, key => {
-                    const [tx, ty, tz, tdirKey] = key.split(',');
-                    const r = rotateTilePosition(
-                        { x: Number(tx), y: Number(ty), z: Number(tz), dirKey: tdirKey },
-                        axis, sliceIndex, dir, size
-                    );
+                    parseTileKey(key, _parseTile);
+                    const r = rotateTilePosition(_parseTile, axis, sliceIndex, dir, size);
                     return `${r.x},${r.y},${r.z},${r.dirKey}`;
                 });
 
