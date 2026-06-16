@@ -217,7 +217,7 @@ export const useGameStore = create(
     // ========================================================================
     visualMode: 'classic', // 'classic', 'grid', 'sudokube', 'colors'
     flipMode: false,
-    showTunnels: true,
+    showTunnels: false,
     exploded: false,
     explosionT: 0,
     showNetPanel: false,

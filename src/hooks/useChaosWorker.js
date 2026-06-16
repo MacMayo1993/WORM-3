@@ -135,11 +135,10 @@ export function useChaosWorker({
           useGameStore.getState().setDisparityWinner({ pair: finalWinner });
           useGameStore.getState().setShowDisparityWinner(true);
         };
-        // When deaths arrive in the same tick as the winner, the 500ms death
-        // animation in StickerPlane.jsx hasn't started yet. Delay long enough
-        // for those animations to finish before showing the winner screen.
-        if (deaths?.length > 0) setTimeout(announce, 700);
-        else announce();
+        // Always delay: the final deaths may have arrived in a prior TICK whose
+        // 500ms animation is still playing. The unconditional 700ms window lets
+        // all in-flight death animations finish before the winner screen appears.
+        setTimeout(announce, 700);
       }
 
       if (metrics) {

@@ -275,7 +275,7 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
     flipCap: 15,
     visualMode: 'classic',
     flipMode: true,
-    showTunnels: true,
+    showTunnels: false,
     gameLength: 'medium',
   });
   const [customPreview, setCustomPreview] = useState(null);
