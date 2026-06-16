@@ -778,9 +778,11 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
   const wormSkinId = useGameStore(s => s.wormSkin ?? 'slime');
   const wormHatId = useGameStore(s => s.wormHat ?? 'none');
   const wormCharacterId = useGameStore(s => s.wormCharacter ?? 'classic');
+  const wormShowTrail = useGameStore(s => s.wormShowTrail ?? true);
   const setWormSkin = useGameStore(s => s.setWormSkin);
   const setWormHat = useGameStore(s => s.setWormHat);
   const setWormCharacter = useGameStore(s => s.setWormCharacter);
+  const setWormShowTrail = useGameStore(s => s.setWormShowTrail);
   const ownedItems = useGameStore(s => s.ownedItems);
   const activeSkin = WORM_SKINS.find(s => s.id === wormSkinId) ?? WORM_SKINS[0];
   const activeCharacter = WORM_CHARACTERS.find(c => c.id === wormCharacterId) ?? WORM_CHARACTERS[0];
@@ -1064,6 +1066,33 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                 }}>
                   <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', color: selected ? ACCENT : '#7a6e62' }}>
                     {hat.label}{!owned ? ' 🔒' : ''}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── Trail toggle ── */}
+        <div>
+          <div style={{ fontSize: '11px', fontWeight: 700, color: '#9a8e82', letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: '4px' }}>Trail</div>
+          <div style={{ fontSize: '10px', color: 'rgba(0,0,0,0.38)', marginBottom: '8px' }}>Mark tiles you've visited</div>
+          <div style={{ display: 'flex', gap: '7px' }}>
+            {[{ val: true, label: 'On' }, { val: false, label: 'Off' }].map(({ val, label }) => {
+              const selected = wormShowTrail === val;
+              const accent = activeSkin.glow;
+              return (
+                <button key={String(val)} onClick={() => setWormShowTrail(val)} style={{
+                  ...chipBase,
+                  padding: '9px 22px',
+                  background: selected ? `${accent}18` : '#f0ebe2',
+                  border: selected ? `2px solid ${accent}` : '2px solid #d6d0c8',
+                  boxShadow: selected ? `inset 0 2px 4px rgba(0,0,0,0.08)` : '0 2px 0 #c4beb6',
+                  transform: selected ? 'translateY(1px)' : 'none',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', color: selected ? accent : '#7a6e62' }}>
+                    {label}
                   </span>
                 </button>
               );
