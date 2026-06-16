@@ -17,6 +17,7 @@ const S = {
     padding: '12px',
     fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif',
     animation: 'modalBackdropIn 0.22s ease',
+    pointerEvents: 'auto',
   },
   sheet: {
     background: '#f5f0e8', borderRadius: '20px', width: 'min(600px, 100%)',
