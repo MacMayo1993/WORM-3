@@ -433,10 +433,18 @@ const tick = (dtMs) => {
   const aliveAfterDeaths = surfaceStickers - deadTileSet.size;
   if (!winnerAnnounced && aliveAfterDeaths <= 2 && aliveAfterDeaths > 0 && deathRank > 0) {
     winnerAnnounced = true;
-    // Read winner IDs directly from the living-sticker index — no surface scan needed.
-    winner = [...livingStickers.values()].map(({ x, y, z, dirKey }) =>
-      getManifoldGridId(state[x][y][z].stickers[dirKey], size)
-    );
+    // Scan state directly for alive stickers so rotations don't corrupt the list.
+    // livingStickers physical keys become stale after SYNC_CUBIES; deadTileSet
+    // manifold IDs are rotation-stable and are the canonical source of truth.
+    winner = [];
+    for (const [x, y, z] of surfaceCoords) {
+      for (const dirKey of Object.keys(state[x][y][z].stickers)) {
+        const st = state[x][y][z].stickers[dirKey];
+        if (!deadTileSet.has(getManifoldGridId(st, size))) {
+          winner.push(getManifoldGridId(st, size));
+        }
+      }
+    }
     running = false;
   }
 
@@ -519,10 +527,24 @@ self.onmessage = (e) => {
       break;
     }
 
-    case 'SYNC_CUBIES':
+    case 'SYNC_CUBIES': {
       state = payload.cubies;
       manifoldMapCache = null;
+      // After a cube rotation every sticker's physical (x,y,z,dirKey) changes.
+      // Rebuild the physical-key index from the new positions so checkDeath
+      // deletes the correct slot and findChainStart reads the right stickers.
+      livingStickers = new Map();
+      for (const [x, y, z] of surfaceCoords) {
+        for (const dirKey of Object.keys(state[x][y][z].stickers)) {
+          const st = state[x][y][z].stickers[dirKey];
+          const gridId = getManifoldGridId(st, size);
+          if (!deadTileSet.has(gridId)) {
+            livingStickers.set(`${x},${y},${z},${dirKey}`, { x, y, z, dirKey });
+          }
+        }
+      }
       break;
+    }
 
     case 'SET_FLIP_CAP':
       flipCap = payload.disparityFlipCap;
