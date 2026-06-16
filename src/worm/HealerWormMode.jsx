@@ -2142,6 +2142,7 @@ function WormTrail({ worm, size: _size }) {
 const _faceRight = new THREE.Vector3();
 const _faceForward = new THREE.Vector3();
 const _faceHeadPos = new THREE.Vector3();
+const _faceTunnelAhead = new THREE.Vector3(); // scratch for tunnel tangent during enter/exit
 // Glasses orientation — torus axis (Y) aligned to face-forward so ring appears circular
 const _glassAxisY = new THREE.Vector3(0, 1, 0);
 const _glassQuat = new THREE.Quaternion();
@@ -2171,29 +2172,53 @@ function WormFace({ worm, size }) {
         if (glassLeftRef.current)   glassLeftRef.current.visible   = faceVisible;
         if (glassRightRef.current)  glassRightRef.current.visible  = faceVisible;
         if (!faceVisible) return;
-        const { dirKey } = worm.pos.current;
-        const normal = FACE_NORMALS[dirKey] ?? FACE_NORMALS.PZ;
-        const fwdArr = DIR_FORWARD[dirKey]?.[worm.moveDir.current] ?? [0, 1, 0];
-        _faceForward.set(fwdArr[0], fwdArr[1], fwdArr[2]);
+
+        const phase = worm.phase.current;
+        const inTransit = (phase === 'entering' || phase === 'exiting') && worm.activeTunnel.current;
+
+        let normal;
+        if (inTransit) {
+            // During entering/exiting the head is driven by getTunnelWorldPosInto, not surface
+            // interp. Read headInterpPos/currentNormal which are always current.
+            _faceHeadPos.copy(worm.headInterpPos.current);
+            normal = worm.currentNormal.current;
+
+            // Derive forward from the tunnel tangent at the current parametric position.
+            const tp = worm.tunnelProgress.current;
+            const t = phase === 'entering' ? tp * 0.33 : 0.67 + tp * 0.33;
+            const tAhead = Math.min(t + 0.02, 1.0);
+            getTunnelWorldPosInto(_faceTunnelAhead, worm.activeTunnel.current, tAhead, size);
+            _faceForward.copy(_faceTunnelAhead).sub(_faceHeadPos);
+            if (_faceForward.lengthSq() < 0.0001) _faceForward.set(0, 0, 1);
+            _faceForward.normalize();
+
+            _faceHeadPos.addScaledVector(normal, WORM_LIFT + 0.09);
+        } else {
+            const { dirKey } = worm.pos.current;
+            normal = FACE_NORMALS[dirKey] ?? FACE_NORMALS.PZ;
+            const fwdArr = DIR_FORWARD[dirKey]?.[worm.moveDir.current] ?? [0, 1, 0];
+            _faceForward.set(fwdArr[0], fwdArr[1], fwdArr[2]);
+
+            // Interpolated head world pos (copy into scratch — no .clone())
+            const prev = worm.prevWorldPos.current;
+            const cur = worm.curWorldPos.current;
+            if (!cur) {
+                const wp = getStickerWorldPos(worm.pos.current.x, worm.pos.current.y,
+                    worm.pos.current.z, dirKey, size, 0);
+                _faceHeadPos.set(wp[0], wp[1], wp[2]);
+            } else if (prev && worm.interpT.current < 1) {
+                _faceHeadPos.lerpVectors(prev, cur, worm.interpT.current);
+            } else {
+                _faceHeadPos.copy(cur);
+            }
+            const jumpLiftVal = worm.isJumping.current
+                ? Math.sin(worm.jumpT.current * Math.PI) * 0.55 : 0;
+            _faceHeadPos.addScaledVector(normal, WORM_LIFT + jumpLiftVal + 0.09);
+        }
 
         // Rightward axis in the face plane
         _faceRight.crossVectors(_faceForward, normal).normalize();
-
-        // Interpolated head world pos (copy into scratch — no .clone())
-        const prev = worm.prevWorldPos.current;
-        const cur = worm.curWorldPos.current;
-        if (!cur) {
-            const wp = getStickerWorldPos(worm.pos.current.x, worm.pos.current.y,
-                worm.pos.current.z, dirKey, size, 0);
-            _faceHeadPos.set(wp[0], wp[1], wp[2]);
-        } else if (prev && worm.interpT.current < 1) {
-            _faceHeadPos.lerpVectors(prev, cur, worm.interpT.current);
-        } else {
-            _faceHeadPos.copy(cur);
-        }
-        const jumpLiftVal = worm.isJumping.current
-            ? Math.sin(worm.jumpT.current * Math.PI) * 0.55 : 0;
-        _faceHeadPos.addScaledVector(normal, WORM_LIFT + jumpLiftVal + 0.09);
+        if (_faceRight.lengthSq() < 0.001) _faceRight.set(1, 0, 0);
 
         const S = 0.022;
         if (leftEyeRef.current) {
