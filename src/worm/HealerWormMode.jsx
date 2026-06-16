@@ -232,6 +232,7 @@ const _prevWP = new THREE.Vector3();
 // ─── Scratch vectors for evaluatePosAndNormal (avoids per-sub-step allocations) ──
 const _evalHPos = new THREE.Vector3();
 const _evalCornerVtx = new THREE.Vector3();
+const _evalCornerNorm = new THREE.Vector3(); // reused for face-crossing normal blend
 // Extra scratch for computing the lifted position before writing into stepHistory
 const _evalLiftedPos = new THREE.Vector3();
 
@@ -528,7 +529,7 @@ function useWormCrawler(size, cubies) {
 
             if (n > 0) {
                 tailLength.current = Math.max(BASE_TAIL_LENGTH, tailLength.current - n);
-                orbPickupColorsRef.current = orbPickupColorsRef.current.slice(0, -(n / ORB_SEGMENT_GROWTH));
+                orbPickupColorsRef.current.length = Math.max(0, orbPickupColorsRef.current.length - Math.round(n / ORB_SEGMENT_GROWTH));
                 const orbsLeft = Math.max(0, Math.floor((tailLength.current - BASE_TAIL_LENGTH) / ORB_SEGMENT_GROWTH));
                 useGameStore.setState({
                     wormBodyTiles: orbsLeft,
@@ -582,7 +583,7 @@ function useWormCrawler(size, cubies) {
 
     const applyOrbPickupGrowth = (color, faceId) => {
         tailLength.current = Math.min(tailLength.current + ORB_SEGMENT_GROWTH, MAX_TAIL);
-        orbPickupColorsRef.current = [...orbPickupColorsRef.current, color];
+        orbPickupColorsRef.current.push(color);
         const orbCountOnWorm = Math.max(0, Math.floor((tailLength.current - BASE_TAIL_LENGTH) / ORB_SEGMENT_GROWTH));
         // PP are NOT awarded on pickup — only banked when the player wins (cube solved).
         // Track session total separately for the in-game counter.
@@ -779,7 +780,8 @@ function useWormCrawler(size, cubies) {
                                     cNorm = newNormal;
                                 } else {
                                     outPos.copy(_evalCornerVtx);
-                                    cNorm = new THREE.Vector3().lerpVectors(oldNormal, newNormal, (tValue - 0.45) / 0.10).normalize();
+                                    _evalCornerNorm.lerpVectors(oldNormal, newNormal, (tValue - 0.45) / 0.10).normalize();
+                                    cNorm = _evalCornerNorm;
                                 }
                             } else {
                                 outPos.copy(pWorld).lerp(cWorld, tValue);
@@ -898,10 +900,8 @@ function useWormCrawler(size, cubies) {
                                 applyOrbPickupGrowth(pickedColor, pickedFaceId);
                                 pendingOrbFlashRef.current = { color: pickedColor, pos: curWorldPos.current.toArray() };
                                 const newPowerup = { ...randomFreeTile(size, [...powerupsRef.current, pos.current]), type: 'apple' };
-                                const next = [...powerupsRef.current];
-                                next[puIdx] = newPowerup;
-                                powerupsRef.current = next;
-                                st.setWormPowerups(next);
+                                powerupsRef.current[puIdx] = newPowerup;
+                                st.setWormPowerups(powerupsRef.current.slice());
                             }
                         }
 
@@ -1162,9 +1162,9 @@ function useWormCrawler(size, cubies) {
 
                 // Rotate powerups
                 if (powerupsRef.current.length) {
-                    const rotated = powerupsRef.current.map(p => rotateTilePosition(p, axis, sliceIndex, dir, size));
-                    powerupsRef.current = rotated;
-                    useGameStore.getState().setWormPowerups(rotated);
+                    const pu = powerupsRef.current;
+                    for (let i = 0; i < pu.length; i++) pu[i] = rotateTilePosition(pu[i], axis, sliceIndex, dir, size);
+                    useGameStore.getState().setWormPowerups(pu.slice());
                 }
 
                 // Rotate the worm's logical grid position so it stays on its tile
