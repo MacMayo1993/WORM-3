@@ -1815,10 +1815,11 @@ function WormBody({ worm }) {
         _pathPointsBuffer[0] = _headPathPoint;
         for (let j = 0; j < steps.count; j++) _pathPointsBuffer[j + 1] = shAt(steps, j);
 
-        // Dissolve: shrink all segments as worm enters tunnel, re-expand on exit.
-        // Crawling → 1.0, any tunnel phase → 0.0 (fast lerp so it clears in ~0.3s).
+        // Dissolve: shrink all segments only while inside the Möbius ribbon (tunnel phase).
+        // Worm remains visible during entering and exiting so the player sees it approach
+        // and emerge. Tunnel → 0.0, all other phases → 1.0.
         const _phase = worm.phase.current;
-        const targetTS = _phase === 'crawling' ? 1.0 : 0.0;
+        const targetTS = _phase === 'tunnel' ? 0.0 : 1.0;
         transitScaleRef.current += (targetTS - transitScaleRef.current) * Math.min(1, delta * 9);
         const transitScale = transitScaleRef.current;
 
@@ -2009,8 +2010,8 @@ function GlowWormAura({ worm }) {
         if (lightRef.current) {
             lightRef.current.position.copy(worm.headInterpPos.current)
                 .addScaledVector(worm.currentNormal.current, WORM_LIFT + 0.1);
-            // Zero out during tunnel transit — worm body is dissolved, light should vanish too
-            const inTunnel = worm.phase.current !== 'crawling';
+            // Zero out only while inside the Möbius ribbon — worm is visible during entering/exiting
+            const inTunnel = worm.phase.current === 'tunnel';
             lightRef.current.intensity = inTunnel ? 0 : 1.2 + Math.sin(t * 4.0) * 0.4;
         }
     });
@@ -2159,8 +2160,8 @@ function WormFace({ worm, size }) {
     const isBook = wormCharacterId === 'book';
 
     useFrame((_, delta) => {
-        // Match the worm body dissolve: hide face whenever worm is in tunnel transit
-        const crawling = worm.phase.current === 'crawling';
+        // Match the worm body dissolve: hide face only while inside the Möbius ribbon
+        const crawling = worm.phase.current !== 'tunnel';
         faceOpacityRef.current += ((crawling ? 1 : 0) - faceOpacityRef.current) * Math.min(1, delta * 9);
         const faceVisible = faceOpacityRef.current > 0.05;
         if (leftEyeRef.current)  leftEyeRef.current.visible  = faceVisible;
