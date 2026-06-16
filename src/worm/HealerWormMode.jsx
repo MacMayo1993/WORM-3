@@ -76,6 +76,8 @@ import { getWormCharacter } from './wormCharacterData.js';
 import { EARN_ORB_COLLECT, EARN_WORM_SURVIVAL_TICK, EARN_WORM_HEALED_FACE, SURVIVAL_TICK_INTERVAL } from '../utils/economyConstants.js';
 import { liveRotation } from './liveRotation.js';
 import { tunnelState } from './tunnelProgressBridge.js';
+import { liveCubies } from './liveCubies.js';
+import { SURFACE_OFFSET } from '../utils/constants.js';
 
 // Pre-allocated axis vector for applying liveRotation to the worm during scramble
 const _liveAxis = new THREE.Vector3();
@@ -1736,6 +1738,15 @@ function WormSwipeControls({ onTurn, worm }) {
     return null;
 }
 
+// ─── Worm Trail scratch — zero per-frame allocation ───────────────────────────
+const _trailDummy = new THREE.Object3D();
+const _trailPos   = new THREE.Vector3();
+const _trailNorm  = new THREE.Vector3();
+const _trailColor = new THREE.Color();
+const _trailRingZ = new THREE.Vector3(0, 0, 1); // ringGeometry default normal
+const TRAIL_CAP   = 80;   // newest N tile visits rendered
+const TRAIL_LIFT  = 0.025; // hover distance above tile surface
+
 // ─── Worm Body (head = smooth lerp; body = per-step tile history) ─────────────
 const _wormDummy = new THREE.Object3D();
 // Pre-allocated scratch objects — avoids per-frame GC pressure from WormBody loop
@@ -2028,6 +2039,96 @@ function PortalGlow({ worm, size }) {
             <ringGeometry args={[0.4, 0.7, 32]} />
             <meshBasicMaterial color="#ff00ff" transparent opacity={0} side={THREE.DoubleSide} />
         </mesh>
+    );
+}
+
+// ─── Worm Trail ───────────────────────────────────────────────────────────────
+// Renders a fading ring at each tile the worm has visited — newest = bright + large,
+// oldest = dim + small. Rings stick to their tiles and follow cube rotations via liveCubies.
+function WormTrail({ worm, size: _size }) {
+    const meshRef = useRef();
+    const wormSkinId = useGameStore(s => s.wormSkin ?? 'slime');
+    const wormShowTrail = useGameStore(s => s.wormShowTrail ?? true);
+    const skin = getSkin(wormSkinId);
+    const skinRef = useRef(skin);
+    skinRef.current = skin;
+
+    useFrame(() => {
+        const mesh = meshRef.current;
+        if (!mesh) return;
+
+        if (!wormShowTrail) { mesh.count = 0; return; }
+
+        const trail = worm.tileTrail.current;
+        const count = trail.count;
+        if (count === 0) { mesh.count = 0; return; }
+
+        const lSize = liveCubies.size;
+        const capCount = Math.min(count, TRAIL_CAP);
+        let visible = 0;
+        const currentSkin = skinRef.current;
+
+        for (let i = 0; i < capCount; i++) {
+            const key = ttAt(trail, i); // i=0 is newest
+            if (!key) continue;
+
+            // Parse "x,y,z,dirKey" without split() to avoid string allocations
+            const c1 = key.indexOf(',');
+            const c2 = key.indexOf(',', c1 + 1);
+            const c3 = key.indexOf(',', c2 + 1);
+            const tx  = parseInt(key.substring(0, c1));
+            const ty  = parseInt(key.substring(c1 + 1, c2));
+            const tz  = parseInt(key.substring(c2 + 1, c3));
+            const tdk = key.substring(c3 + 1);
+
+            // Get live cubie mesh so ring follows cube rotations
+            const cubie = (lSize > 0 && liveCubies.refs)
+                ? liveCubies.refs[tx * lSize * lSize + ty * lSize + tz]
+                : null;
+            if (!cubie) continue;
+
+            const localNorm = FACE_NORMALS[tdk];
+            if (!localNorm) continue;
+
+            // Face normal in world space (accounts for current cube rotation)
+            _trailNorm.copy(localNorm).applyQuaternion(cubie.quaternion);
+            // Place ring just above the tile surface
+            _trailPos.copy(cubie.position).addScaledVector(_trailNorm, SURFACE_OFFSET + TRAIL_LIFT);
+
+            // Orient ring to lie flat on the tile (align ring +Z normal to face normal)
+            _trailDummy.position.copy(_trailPos);
+            _trailDummy.quaternion.setFromUnitVectors(_trailRingZ, _trailNorm);
+
+            // Smoothstep fade: newest (i=0) = full size, oldest = tiny
+            const fade = 1 - i / capCount;
+            const fs   = fade * fade * (3 - 2 * fade); // smoothstep
+            _trailDummy.scale.setScalar(fs * 0.82 + 0.04);
+            _trailDummy.updateMatrix();
+            mesh.setMatrixAt(visible, _trailDummy.matrix);
+
+            // Encode fade as color brightness — works naturally with AdditiveBlending
+            _trailColor.set(currentSkin.body).multiplyScalar(0.20 + fs * 0.80);
+            mesh.setColorAt(visible, _trailColor);
+            visible++;
+        }
+
+        mesh.count = visible;
+        mesh.instanceMatrix.needsUpdate = true;
+        if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    });
+
+    return (
+        <instancedMesh ref={meshRef} args={[undefined, undefined, TRAIL_CAP]} frustumCulled={false}>
+            <ringGeometry args={[0.20, 0.42, 24]} />
+            <meshBasicMaterial
+                color="white"
+                transparent
+                opacity={0.55}
+                blending={THREE.AdditiveBlending}
+                depthWrite={false}
+                toneMapped={false}
+            />
+        </instancedMesh>
     );
 }
 
@@ -3665,6 +3766,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             <WormSwipeControls onTurn={worm.queueTurn} worm={worm} />
             <TunnelInteriorView worm={worm} size={size} />
             {/* Always mounted — each component handles its own dissolve via worm.phase.current */}
+            {wormAlive && <WormTrail worm={worm} size={size} />}
             {wormAlive && <WormBody worm={worm} />}
             {wormAlive && <GlowWormAura worm={worm} />}
             {wormAlive && <WormFace worm={worm} size={size} />}
