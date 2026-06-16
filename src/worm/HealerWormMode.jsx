@@ -12,7 +12,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { getStickerWorldPos, getManifoldGridId } from '../game/coordinates.js';
 import { getNextSurfacePosition, getActiveTunnels, getTunnelWorldPosInto, turnWorm, getStableKey, findStickerByStableKey } from './wormLogic.js';
 import { setWormTurnCallback } from './wormTurnBridge.js';
-import { buildManifoldGridMap, flipStickerPair } from '../game/manifoldLogic.js';
+import { buildManifoldGridMap, flipStickerPair, findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
 import { healSticker, getStickerSafe } from '../game/cubeState.js';
 import { rotateVec90 } from '../game/cubeRotation.js';
 import { DIR_TO_VEC, VEC_TO_DIR, ANTIPODAL_COLOR, FACE_COLORS } from '../utils/constants.js';
@@ -1479,7 +1479,6 @@ function TunnelSurfFX({ worm, size }) {
 // all 6 faces so the camera looks like it is inside the cube.
 
 // Maps each face direction to its antipodal (opposite) face direction.
-const ANTIPODAL_DIRKEY = { PZ: 'NZ', NZ: 'PZ', PX: 'NX', NX: 'PX', PY: 'NY', NY: 'PY' };
 
 // Euler angles to rotate a PlaneGeometry (default +Z normal) so its front face
 // points INWARD (toward the cube centre) for each cube face direction.
@@ -1508,13 +1507,15 @@ function TunnelInteriorView({ worm, size }) {
     const prevPhaseRef = useRef('crawling');
     const stickerMatsAssigned = useRef(false);
 
-    // Precompute every surface sticker's position, rotation, grid coords, and antipodal coords.
+    // Precompute every surface sticker's world position and rotation (size-dependent only).
+    // Antipodal partner resolution is deferred to tunnel-entry time so it always reflects
+    // the current manifold map rather than the geometric (n-sx, n-sy, n-sz) position that
+    // becomes wrong after any slice rotation or scramble.
     const stickerLayout = useMemo(() => {
         const n = size - 1;
         const layout = [];
         for (const { dirKey, pos } of _FACE_DEFS) {
             const [rx, ry, rz] = _INWARD_FACE_EULER[dirKey];
-            const antiDirKey = ANTIPODAL_DIRKEY[dirKey];
             for (let a = 0; a < size; a++) {
                 for (let b = 0; b < size; b++) {
                     const [sx, sy, sz] = pos(a, b, n);
@@ -1522,7 +1523,6 @@ function TunnelInteriorView({ worm, size }) {
                     if (!wp) continue;
                     layout.push({
                         sx, sy, sz, dirKey, px: wp[0], py: wp[1], pz: wp[2], rx, ry, rz,
-                        ax: n - sx, ay: n - sy, az: n - sz, antiDirKey,
                     });
                 }
             }
@@ -1575,16 +1575,21 @@ function TunnelInteriorView({ worm, size }) {
 
         // Batch-assign sticker materials ONCE on tunnel entry (opacity still ~0, so no visible pop).
         // Avoids 54+ per-frame GPU state changes that caused hitching on the first visible frame.
+        // Partner sticker is resolved via the manifold map so scrambled/rotated states are correct.
         if (prevPhase === 'crawling' && phase === 'entering') {
             const st = useGameStore.getState();
             const { cubies, settings } = st;
             const fc = resolveColors(settings, settings?.biomeMode?.faceAssignment) || FACE_COLORS;
             const manifoldStyles = settings?.manifoldStyles ?? {};
+            const manifoldMap = buildManifoldGridMap(cubies, size);
             for (let i = 0; i < stickerLayout.length; i++) {
-                const { ax, ay, az, antiDirKey } = stickerLayout[i];
+                const { sx, sy, sz, dirKey } = stickerLayout[i];
                 const mesh = stickerMeshesRef.current[i];
                 if (!mesh) continue;
-                const antipodalFaceId = cubies?.[ax]?.[ay]?.[az]?.stickers?.[antiDirKey]?.curr;
+                const sticker = cubies?.[sx]?.[sy]?.[sz]?.stickers?.[dirKey];
+                if (!sticker) { mesh.visible = false; continue; }
+                const antipodalLoc = findAntipodalStickerByGrid(manifoldMap, sticker, size);
+                const antipodalFaceId = antipodalLoc?.sticker?.curr;
                 if (!antipodalFaceId) { mesh.visible = false; continue; }
                 const colorHex = fc[antipodalFaceId] ?? '#444';
                 const style = manifoldStyles[antipodalFaceId] ?? 'solid';
