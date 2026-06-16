@@ -1787,7 +1787,7 @@ function WormBody({ worm }) {
     const isBookRef = useRef(isBook);
     isBookRef.current = isBook;
 
-    useFrame((state) => {
+    useFrame((state, delta) => {
         // Copy head/normal into scratch vectors (avoids .clone() allocation)
         _bodyHeadPos.copy(worm.headInterpPos.current);
         _bodyNormal.copy(worm.currentNormal.current);
