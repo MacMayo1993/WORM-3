@@ -5,6 +5,7 @@ import { BACKGROUNDS, getBackgroundUrl } from '../../utils/backgrounds.js';
 import { registerTilePreview, updateTilePreview, unregisterTilePreview } from '../../3d/TilePreviewRenderer.js';
 import { isMobile } from '../../utils/device.js';
 import { useGameStore } from '../../hooks/useGameStore.js';
+import { extractColorsFromImage } from '../../utils/colorExtraction.js';
 
 const BG_PREVIEWS = {
   blackhole: 'radial-gradient(circle, #1a0033 0%, #000000 100%)',
@@ -62,63 +63,11 @@ const hexLum = hex => {
   return 0.299 * r + 0.587 * g + 0.114 * b;
 };
 
-function extractColorsFromImage(img, count = 6) {
-  const canvas = document.createElement('canvas');
-  const size = 64;
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(img, 0, 0, size, size);
-  const data = ctx.getImageData(0, 0, size, size).data;
-  const pixels = [];
-  for (let i = 0; i < data.length; i += 4) {
-    const r = data[i], g = data[i + 1], b = data[i + 2];
-    const brightness = r * 0.299 + g * 0.587 + b * 0.114;
-    if (brightness > 20 && brightness < 240) pixels.push([r, g, b]);
-  }
-  if (pixels.length < count) {
-    const fallback = [];
-    for (let i = 0; i < count; i++) {
-      const idx = Math.floor((i / count) * data.length / 4) * 4;
-      fallback.push([data[idx], data[idx + 1], data[idx + 2]]);
-    }
-    return fallback.map(([r, g, b]) => `#${[r, g, b].map(v => v.toString(16).padStart(2, '0')).join('')}`);
-  }
-  const centroids = [];
-  for (let i = 0; i < count; i++) centroids.push([...pixels[Math.floor((i / count) * pixels.length)]]);
-  for (let iter = 0; iter < 10; iter++) {
-    const clusters = Array.from({ length: count }, () => []);
-    for (const px of pixels) {
-      let minDist = Infinity;
-      let best = 0;
-      for (let c = 0; c < count; c++) {
-        const dr = px[0] - centroids[c][0], dg = px[1] - centroids[c][1], db = px[2] - centroids[c][2];
-        const dist = dr * dr + dg * dg + db * db;
-        if (dist < minDist) {
-          minDist = dist;
-          best = c;
-        }
-      }
-      clusters[best].push(px);
-    }
-    for (let c = 0; c < count; c++) {
-      if (!clusters[c].length) continue;
-      const sum = [0, 0, 0];
-      for (const px of clusters[c]) {
-        sum[0] += px[0];
-        sum[1] += px[1];
-        sum[2] += px[2];
-      }
-      centroids[c] = [Math.round(sum[0] / clusters[c].length), Math.round(sum[1] / clusters[c].length), Math.round(sum[2] / clusters[c].length)];
-    }
-  }
-  centroids.sort((a, b) => {
-    const hA = Math.atan2(Math.sqrt(3) * (a[1] - a[2]), 2 * a[0] - a[1] - a[2]);
-    const hB = Math.atan2(Math.sqrt(3) * (b[1] - b[2]), 2 * b[0] - b[1] - b[2]);
-    return hA - hB;
-  });
-  return centroids.map(([r, g, b]) => `#${[r, g, b].map(v => Math.max(0, Math.min(255, v)).toString(16).padStart(2, '0')).join('')}`);
-}
+// COLOR_SCHEMES is static, so the per-scheme sorted preview swatches only need
+// computing once at module load rather than re-sorting on every render.
+const SORTED_SCHEME_COLORS = Object.fromEntries(
+  WIZARD_SCHEME_KEYS.map(key => [key, Object.values(COLOR_SCHEMES[key] || {}).slice(0, 6).sort((a, b) => hexLum(b) - hexLum(a))])
+);
 
 function TilePreviewCanvas({ styleKey, colorHex = '#4a7fa5', size = 48, canvasStyle }) {
   const canvasRef = useRef(null);
@@ -378,7 +327,7 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
           {WIZARD_SCHEME_KEYS.filter(k => k !== 'custom').map(key => {
             const selected = settings.colorScheme === key;
             const owned = schemeOwned(key);
-            const colors = Object.values(COLOR_SCHEMES[key] || {}).slice(0, 6).sort((a, b) => hexLum(b) - hexLum(a));
+            const colors = SORTED_SCHEME_COLORS[key] || [];
             return (
               <button key={key} style={{
                 ...S.card(selected), flexDirection: 'column', gap: '6px', padding: '10px 12px',
@@ -392,7 +341,7 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
                     <TilePreviewCanvas styleKey={previewStyle} colorHex={colors[0] || '#4a7fa5'} size={32} />
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '3px', flex: 1 }}>
-                    {colors.slice(1).map((c, i) => <div key={i} style={{ width: '100%', aspectRatio: '1', borderRadius: '3px', background: owned ? c : '#bbb', boxShadow: '0 1px 2px rgba(0,0,0,0.18)' }} />)}
+                    {colors.slice(1).map((c, i) => <div key={`${c}-${i}`} style={{ width: '100%', aspectRatio: '1', borderRadius: '3px', background: owned ? c : '#bbb', boxShadow: '0 1px 2px rgba(0,0,0,0.18)' }} />)}
                   </div>
                 </div>
                 {selected && <div style={{ position: 'absolute', top: '8px', right: '8px' }}><Checkmark /></div>}
@@ -474,7 +423,12 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
         <div style={{ marginBottom: '8px' }}>
           <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9a8e82', marginBottom: '10px' }}>Per Face</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-            {[1, 2, 3, 4, 5, 6].map(faceId => {
+            {(() => {
+              // Computed once for all 6 faces below instead of re-filtering per face.
+              const ownedClassic = CLASSIC_STYLE_KEYS.filter(tileOwned);
+              const ownedAntipodal = ANTIPODAL_STYLE_KEYS.filter(tileOwned);
+              const ownedLiving = LIVING_STYLE_KEYS.filter(tileOwned);
+              return [1, 2, 3, 4, 5, 6].map(faceId => {
               const globalFallback = settings.tileStyle === 'random' ? 'solid' : (settings.tileStyle || 'solid');
               const rawStyle = perFace?.[faceId] || globalFallback;
               const faceStyle = tileOwned(rawStyle) ? rawStyle : 'solid';
@@ -487,13 +441,14 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
                   </div>
                   <TilePreviewCanvas styleKey={faceStyle === 'random' ? 'solid' : faceStyle} colorHex={faceColor} size={36} />
                   <select value={faceStyle} onChange={e => applyPerFace(faceId, e.target.value)} style={{ fontSize: '10px', padding: '4px 6px', borderRadius: '6px', border: '1px solid #d6d0c8', background: '#f7f3ec', color: '#1e1612', fontFamily: 'inherit', cursor: 'pointer', appearance: 'none', WebkitAppearance: 'none' }}>
-                    <optgroup label="Classic">{CLASSIC_STYLE_KEYS.filter(tileOwned).map(k => <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>)}</optgroup>
-                    <optgroup label="Antipodal Op Art">{ANTIPODAL_STYLE_KEYS.filter(tileOwned).map(k => <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>)}</optgroup>
-                    <optgroup label="Living">{LIVING_STYLE_KEYS.filter(tileOwned).map(k => <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>)}</optgroup>
+                    <optgroup label="Classic">{ownedClassic.map(k => <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>)}</optgroup>
+                    <optgroup label="Antipodal Op Art">{ownedAntipodal.map(k => <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>)}</optgroup>
+                    <optgroup label="Living">{ownedLiving.map(k => <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>)}</optgroup>
                   </select>
                 </div>
               );
-            })}
+              });
+            })()}
           </div>
         </div>
       </>
@@ -630,7 +585,7 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
           }}>
             DISPARITY MODE
           </div>
-          <div style={S.stepIndicator}>{STEPS.map((_, i) => <div key={i} style={S.dot(i <= step, i === step)} />)}</div>
+          <div style={S.stepIndicator}>{STEPS.map((label, i) => <div key={label} style={S.dot(i <= step, i === step)} />)}</div>
           <h2 style={S.title}>{stepTitles[step]}</h2>
           <p style={S.subtitle}>{stepSubtitles[step]}</p>
         </div>

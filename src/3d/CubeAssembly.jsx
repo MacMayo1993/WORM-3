@@ -38,6 +38,11 @@ const _basisU = new THREE.Vector3();
 const _swipe = new THREE.Vector3();
 const _projected = new THREE.Vector3();
 const _rotAxis = new THREE.Vector3();
+// Scratch objects for normalFromEvent() — avoids a Matrix3/Matrix4 allocation
+// on every pointer-down event (the resulting Vector3 must stay an owned clone;
+// see comment at its usage site).
+const _normalMat3 = new THREE.Matrix3();
+const _identityMat4 = new THREE.Matrix4();
 
 // Pre-allocated pool for live drag base positions/rotations.
 // Max supported cube size is 7, so a rotated slice can contain up to 7² = 49 cubies.
@@ -150,10 +155,13 @@ const CubeAssembly = React.memo(({
     return { right: _basisR, upScreen: _basisU };
   };
 
+  // Result is stored in dragData.n and read across the full pointermove gesture
+  // (not consumed immediately), so it must be an owned Vector3, not shared scratch.
+  // This only runs once per pointer-down, not per frame, so the allocation is cheap.
   const normalFromEvent = e => {
     const n = (e?.face?.normal || new THREE.Vector3(0, 0, 1)).clone();
-    const nm = new THREE.Matrix3().getNormalMatrix(e?.object?.matrixWorld ?? new THREE.Matrix4());
-    n.applyNormalMatrix(nm).normalize();
+    _normalMat3.getNormalMatrix(e?.object?.matrixWorld ?? _identityMat4);
+    n.applyNormalMatrix(_normalMat3).normalize();
     return n;
   };
 
