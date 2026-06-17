@@ -887,7 +887,12 @@ function useWormCrawler(size, cubies) {
                         const puIdx = powerupsRef.current.findIndex(p => p.x === x && p.y === y && p.z === z && p.dirKey === dirKey);
                         if (puIdx !== -1) {
                             const pickedUp = powerupsRef.current[puIdx];
-                            const liveCubies = st.cubies;
+                            // Re-read fresh state rather than the `st` snapshot captured at the top of
+                            // this tick: spawnWormholePair() may have flipped a sticker pair earlier in
+                            // this same tick (line ~638), and `st.cubies` would still point at the
+                            // pre-spawn snapshot — causing a just-elevated orb tile to be misread as
+                            // unflipped and allow a ground pickup instead of requiring a jump.
+                            const liveCubies = useGameStore.getState().cubies;
                             const pickedSticker = getStickerSafe(liveCubies, pickedUp.x, pickedUp.y, pickedUp.z, pickedUp.dirKey);
                             // Orbs on flipped tiles hover above the surface — worm must jump to reach them
                             const tileIsFlipped = !!(pickedSticker && pickedSticker.curr !== pickedSticker.orig);
