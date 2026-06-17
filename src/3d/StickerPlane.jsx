@@ -477,7 +477,7 @@ function TombstoneGhost() {
 const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay, mode, faceRow, faceCol, faceSize, hollow, currentDir: _currentDir }) {
   // Static game config — set once at game start, rarely changes during active play.
   // Kept in one shallow selector so tile-style/palette changes still reach all stickers.
-  const { biomeEnabled, chaosLevel, disparityFlipCap, settings, faceTextures, mergeMode, mergeTheme, wormHealerMode } = useGameStore(
+  const { biomeEnabled, chaosLevel, disparityFlipCap, settings, faceTextures, mergeMode, mergeTheme, wormHealerMode, perfReducedFX } = useGameStore(
     useShallow((s) => ({
       biomeEnabled: s.settings?.biomeMode?.enabled ?? false,
       chaosLevel: s.chaosLevel,
@@ -487,6 +487,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       mergeMode: s.mergeMode,
       mergeTheme: s.mergeTheme,
       wormHealerMode: s.wormHealerMode ?? false,
+      perfReducedFX: s.perfReducedFX ?? false,
     }))
   );
   const fc = useMemo(
@@ -1242,7 +1243,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // neural, circuit, galaxy, wood, grass) adds 3-6 extra meshes/draw calls on top of the
   // already-large sticker count (294 at size 7). Hide the volume layer and fall back to
   // the flat shader-styled sticker quad beneath it, which is unaffected by this flag.
-  const suppressVolumeFX = (faceSize ?? 3) >= 6;
+  // Also drops on perfReducedFX (set by App.jsx's PerformanceMonitor on a sustained frame-
+  // rate decline) so smaller cube sizes get the same fallback on underpowered devices.
+  const suppressVolumeFX = (faceSize ?? 3) >= 6 || perfReducedFX;
 
   // Use shader material for non-solid styles (when no texture is applied)
   const useShaderStyle = !isGlass && tileStyle !== 'solid' && !currTexture && !isSudokube && !glbFullFace;

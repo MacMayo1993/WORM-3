@@ -134,6 +134,44 @@ export const buildManifoldGridMap = (cubies, size) => {
   return map;
 };
 
+// Incremental variant of buildManifoldGridMap. Callers that rebuild this map on every
+// cubies change (flips fire ~12×/sec at chaos L4) can hold a `cache` object across calls
+// (e.g. in a useRef) instead of paying the full O(size³×6) rebuild every time.
+//
+// Correctness: a gridId is derived from a sticker's orig/origPos/origDir, which are fixed
+// at creation and never change — only WHICH (x,y,z,dirKey) cell currently holds that
+// sticker changes (via rotation), or its curr/flips changes in place (via a flip, no
+// position change). Cubies arrays use a shallow-clone-with-shared-refs pattern (see
+// flipStickerPair/rotateSliceCubies): only cells whose cubie object actually changed get a
+// new reference. So diffing cell references against the previous call and re-deriving
+// gridId entries for just the changed cells always converges to the same map a full
+// rebuild would produce — unchanged cells' entries are untouched because their stickers
+// (and thus gridIds) didn't change either.
+export const buildManifoldGridMapIncremental = (cubies, size, cache) => {
+  if (!cache.map || cache.size !== size || !cache.prevCubies) {
+    cache.map = buildManifoldGridMap(cubies, size);
+    cache.prevCubies = cubies;
+    cache.size = size;
+    return cache.map;
+  }
+
+  const { map, prevCubies } = cache;
+  for (let x = 0; x < size; x++) {
+    for (let y = 0; y < size; y++) {
+      for (let z = 0; z < size; z++) {
+        const c = cubies[x][y][z];
+        if (c === prevCubies[x]?.[y]?.[z]) continue;
+        for (const [dKey, st] of Object.entries(c.stickers)) {
+          const gridId = getManifoldGridId(st, size);
+          map.set(gridId, { x, y, z, dirKey: dKey, sticker: st });
+        }
+      }
+    }
+  }
+  cache.prevCubies = cubies;
+  return map;
+};
+
 // Find antipodal sticker using manifold-grid mapping
 export const findAntipodalStickerByGrid = (manifoldMap, sticker, size) => {
   const { r, c } = getGridRC(sticker.origPos, sticker.origDir, size);
