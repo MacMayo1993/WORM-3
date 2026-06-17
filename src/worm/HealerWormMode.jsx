@@ -12,7 +12,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { getStickerWorldPos, getManifoldGridId } from '../game/coordinates.js';
 import { getNextSurfacePosition, getActiveTunnels, getTunnelWorldPosInto, turnWorm, getStableKey, findStickerByStableKey } from './wormLogic.js';
 import { setWormTurnCallback } from './wormTurnBridge.js';
-import { buildManifoldGridMap, flipStickerPair, findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
+import { buildManifoldGridMap, buildManifoldGridMapIncremental, flipStickerPair, findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
 import { healSticker, getStickerSafe } from '../game/cubeState.js';
 import { rotateVec90 } from '../game/cubeRotation.js';
 import { DIR_TO_VEC, VEC_TO_DIR, ANTIPODAL_COLOR, FACE_COLORS } from '../utils/constants.js';
@@ -396,9 +396,14 @@ function useWormCrawler(size, cubies) {
     // O(1) tunnel endpoint lookup — rebuilt whenever cubies change via the effect below.
     // Both the manifold map and tunnel list are built in one pass to avoid a second O(size³×6) scan.
     const tunnelLookupRef = useRef(new Map());
+    // This effect reruns on every cubies change (not debounced — tunnel lookup must stay
+    // exact for gameplay), which is ~12×/sec at chaos L4. The manifold map itself is the
+    // cheaper of the two passes to make incremental: hold it across calls and patch only
+    // the handful of cells that actually changed instead of rebuilding all size³×6 entries.
+    const manifoldMapCacheRef = useRef({ map: null, prevCubies: null, size: null });
     React.useEffect(() => {
         // Build manifold map once and share it with getActiveTunnels to avoid a second rebuild
-        const manifoldMap = buildManifoldGridMap(cubies, size);
+        const manifoldMap = buildManifoldGridMapIncremental(cubies, size, manifoldMapCacheRef.current);
         const tunnels = getActiveTunnels(cubies, size, manifoldMap);
 
         const encodeTile = (p) => `${p.x},${p.y},${p.z},${p.dirKey}`;
@@ -2742,6 +2747,10 @@ function TunnelHealProgress({ size }) {
 }
 
 function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUseCountsRef }) {
+    // Patched incrementally instead of rebuilt from scratch on every debounce tick (see
+    // buildManifoldGridMapIncremental) — only the cells that changed since the last tick
+    // get their gridId entries recomputed.
+    const manifoldMapCacheRef = useRef({ map: null, prevCubies: null, size: null });
     const liveRef = useRef();       // live wormhole rings (neon pink)
     const voidOuterRef = useRef();  // void outer ring (sickly green, slow reverse)
     const voidInnerRef = useRef();  // void inner ring (near-black, counter-rotating)
@@ -2798,7 +2807,7 @@ function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUseCountsR
     // All flipped surface positions, augmented with canonical tunnel key so
     // WormholeRings can tell live vs void without re-running manifold logic per frame.
     const allPositions = React.useMemo(() => {
-        const manifoldMap = buildManifoldGridMap(debouncedCubies, size);
+        const manifoldMap = buildManifoldGridMapIncremental(debouncedCubies, size, manifoldMapCacheRef.current);
         const tunnels = getActiveTunnels(debouncedCubies, size, manifoldMap);
         // Build tile-key → canonical-tunnel-key lookup (covers both entry and exit)
         const tunnelKeyMap = new Map();

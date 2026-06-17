@@ -162,6 +162,16 @@ export const useGameStore = create(
       : (state) => ({ cubies, rotationEpoch: state.rotationEpoch + 1, lastRotation: null })),
 
     // ========================================================================
+    // ADAPTIVE QUALITY
+    // ========================================================================
+    // Set by PerformanceMonitor (App.jsx) when the measured frame rate sustains a
+    // decline/incline over a rolling window. Consumers that already gate expensive
+    // per-sticker effects on cube size (e.g. StickerPlane's suppressVolumeFX) read
+    // this to also drop to the cheaper tier on underpowered devices regardless of size.
+    perfReducedFX: false,
+    setPerfReducedFX: (perfReducedFX) => set({ perfReducedFX }),
+
+    // ========================================================================
     // GAME SESSION STATE
     // ========================================================================
     moves: 0,

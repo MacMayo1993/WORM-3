@@ -8,7 +8,7 @@
 
 import React, { useState, useRef, useEffect, useCallback, useMemo, Suspense } from 'react';
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
-import { Environment } from '@react-three/drei';
+import { Environment, PerformanceMonitor } from '@react-three/drei';
 import { EffectComposer, Bloom, Vignette, ChromaticAberration } from '@react-three/postprocessing';
 import { BlendFunction } from 'postprocessing';
 import { Vector2 } from 'three';
@@ -384,6 +384,13 @@ export default function WORM3() {
 
   // Antipodal PiP — second camera from opposite side of the cube
   const [showAntipodalPiP, setShowAntipodalPiP] = useState(false);
+
+  // Adaptive quality: PerformanceMonitor (rendered inside the Canvas below) adjusts
+  // this DPR range and the store's perfReducedFX flag when the rolling-average frame
+  // rate sustains a decline/incline, so underpowered devices fall back automatically
+  // instead of only being gated by a static cube-size threshold.
+  const [dpr, setDpr] = useState([1, 1.5]);
+  const setPerfReducedFX = useGameStore((s) => s.setPerfReducedFX);
 
   const { wormHealerMode, wormPhase } = useGameStore(useShallow((s) => ({
     wormHealerMode: s.wormHealerMode,
@@ -1346,10 +1353,14 @@ export default function WORM3() {
       <div className="canvas-container" onContextMenu={(e) => e.preventDefault()} style={showModeSelect ? { display: 'none' } : undefined}>
         <Canvas
           camera={{ position: (showWelcome || showMainMenu) ? [0, 3, 12] : [0, 0, cameraZ], fov: 40 }}
-          dpr={[1, 1.5]}
+          dpr={dpr}
           gl={{ powerPreference: 'high-performance', antialias: true }}
           frameloop="always"
         >
+          <PerformanceMonitor
+            onDecline={() => { setDpr([0.75, 1]); setPerfReducedFX(true); }}
+            onIncline={() => { setDpr([1, 1.5]); setPerfReducedFX(false); }}
+          />
           <CameraManager showWelcome={showWelcome} showMainMenu={showMainMenu} cameraZ={cameraZ} />
           <TilePreviewHost />
           {showWelcome ? (
