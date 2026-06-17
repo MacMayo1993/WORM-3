@@ -15,6 +15,7 @@ import { vibrate } from '../utils/audio.js';
 import { pressState } from '../worm/wormLogic.js';
 import { updateSharedTime, updateSharedTremor, warmUpDefaultStyles } from './styles/TileStyleMaterials.jsx';
 import { StickerInstanceProvider } from './StickerInstances.jsx';
+import StickerAnimationDriver from './StickerAnimationDriver.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { resolveColors } from '../utils/colorSchemes.js';
@@ -975,6 +976,7 @@ const CubeAssembly = React.memo(({
 
   return (
     <StickerInstanceProvider>
+      <StickerAnimationDriver />
       <group ref={cubeGroupRef}>
         <WormholeNetwork
           manifoldMap={manifoldMap}

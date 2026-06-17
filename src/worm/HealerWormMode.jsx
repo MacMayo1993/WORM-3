@@ -70,6 +70,7 @@ import {
 import ParityOrbs, { OrbCollectEffect } from './ParityOrb.jsx';
 import { isMobile as _isMobile } from '../utils/device.js';
 import { healBurstMap } from '../3d/styles/TileStyleMaterials.jsx';
+import { activateSticker } from '../3d/StickerAnimationManager.js';
 import WormHat3D from './wormCosmetics.jsx';
 import { getSkin, _hatAlignQuat, _hatYUp } from './wormCosmeticsData.js';
 import { getWormCharacter } from './wormCharacterData.js';
@@ -1038,8 +1039,16 @@ function useWormCrawler(size, cubies) {
                             // Write healBurstMap for both tiles BEFORE healing (sticker orig fields intact)
                             const entrySticker = getStickerSafe(exitStore.cubies, entry.x, entry.y, entry.z, entry.dirKey);
                             const exitStickerData = getStickerSafe(exitStore.cubies, exitTile.x, exitTile.y, exitTile.z, exitTile.dirKey);
-                            if (entrySticker) healBurstMap.set(getManifoldGridId(entrySticker, size), 1);
-                            if (exitStickerData) healBurstMap.set(getManifoldGridId(exitStickerData, size), 1);
+                            if (entrySticker) {
+                                const entryGridId = getManifoldGridId(entrySticker, size);
+                                healBurstMap.set(entryGridId, 1);
+                                activateSticker(entryGridId);
+                            }
+                            if (exitStickerData) {
+                                const exitGridId = getManifoldGridId(exitStickerData, size);
+                                healBurstMap.set(exitGridId, 1);
+                                activateSticker(exitGridId);
+                            }
                             healFiredRef.current = true;
                             let healed = healSticker(exitStore.cubies, size, entry.x, entry.y, entry.z, entry.dirKey);
                             healed = healSticker(healed, size, exitTile.x, exitTile.y, exitTile.z, exitTile.dirKey);
@@ -2386,6 +2395,22 @@ function PowerupOrbs({ size }) {
     })));
     const faceColors = useMemo(() => resolveColors(settings), [settings]);
 
+    // Cheap signature of just the orb-tile stickers' colors. `cubies` gets a new
+    // array reference on every single rotation/flip, but only a handful of tiles
+    // (the ~24 orb positions) actually matter here — keying the heavier `orbs`
+    // memo below on this signature instead of raw `cubies` lets it skip
+    // recomputing (and keep returning the same array reference) on every move
+    // that doesn't touch an orb tile.
+    const orbSignature = useMemo(() => {
+        if (!wormPowerups || !cubies) return '';
+        let sig = wormPowerups.length + '|';
+        for (const p of wormPowerups) {
+            const sticker = getStickerSafe(cubies, p.x, p.y, p.z, p.dirKey);
+            sig += `${p.x},${p.y},${p.z},${p.dirKey}:${sticker?.curr ?? 0},${sticker?.orig ?? 0};`;
+        }
+        return sig;
+    }, [wormPowerups, cubies]);
+
     const orbs = useMemo(() => {
         if (!wormPowerups || !cubies) return [];
         return wormPowerups.map(p => {
@@ -2398,7 +2423,8 @@ function PowerupOrbs({ size }) {
             const elevated = !!(sticker && sticker.curr !== sticker.orig);
             return { ...p, color, antipodalColor, elevated };
         });
-    }, [wormPowerups, cubies, faceColors]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [orbSignature, faceColors]);
 
     return <ParityOrbs orbs={orbs} size={size} isGlowWorm={wormCharacter === 'glow'} />;
 }
