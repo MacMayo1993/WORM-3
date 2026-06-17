@@ -1,3 +1,5 @@
+import { rotateSliceCubies } from '../game/cubeRotation.js';
+
 const ANTIPODAL_COLOR = {
   1: 4,
   2: 5,
@@ -492,6 +494,22 @@ const schedule = () => {
   if (running) timerId = setTimeout(schedule, 16);
 };
 
+// After a cube rotation every sticker's physical (x,y,z,dirKey) changes.
+// Rebuild the physical-key index from the new positions so checkDeath
+// deletes the correct slot and findChainStart reads the right stickers.
+function rebuildLivingStickers() {
+  livingStickers = new Map();
+  for (const [x, y, z] of surfaceCoords) {
+    for (const dirKey of Object.keys(state[x][y][z].stickers)) {
+      const st = state[x][y][z].stickers[dirKey];
+      const gridId = getManifoldGridId(st, size);
+      if (!deadTileSet.has(gridId)) {
+        livingStickers.set(`${x},${y},${z},${dirKey}`, { x, y, z, dirKey });
+      }
+    }
+  }
+}
+
 self.onmessage = (e) => {
   const { type, payload } = e.data;
 
@@ -530,19 +548,19 @@ self.onmessage = (e) => {
     case 'SYNC_CUBIES': {
       state = payload.cubies;
       manifoldMapCache = null;
-      // After a cube rotation every sticker's physical (x,y,z,dirKey) changes.
-      // Rebuild the physical-key index from the new positions so checkDeath
-      // deletes the correct slot and findChainStart reads the right stickers.
-      livingStickers = new Map();
-      for (const [x, y, z] of surfaceCoords) {
-        for (const dirKey of Object.keys(state[x][y][z].stickers)) {
-          const st = state[x][y][z].stickers[dirKey];
-          const gridId = getManifoldGridId(st, size);
-          if (!deadTileSet.has(gridId)) {
-            livingStickers.set(`${x},${y},${z},${dirKey}`, { x, y, z, dirKey });
-          }
-        }
+      rebuildLivingStickers();
+      break;
+    }
+
+    case 'ROTATE_SLICE': {
+      // Lightweight counterpart to SYNC_CUBIES: replay a single-slice rotation on the
+      // worker's own state instead of receiving a full structured-cloned cubies array.
+      const { axis, sliceIndex, dir, numTurns } = payload;
+      for (let i = 0; i < (numTurns ?? 1); i++) {
+        state = rotateSliceCubies(state, size, axis, sliceIndex, dir);
       }
+      manifoldMapCache = null;
+      rebuildLivingStickers();
       break;
     }
 

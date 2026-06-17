@@ -145,15 +145,21 @@ export const useGameStore = create(
     size: 3,
     cubies: makeCubies(3),
     rotationEpoch: 0,
+    // Describes the single slice rotation that produced the latest rotationEpoch
+    // bump: { axis, sliceIndex, dir, numTurns }. Null means the cubies array was
+    // replaced wholesale (size change, shuffle, loaded state) rather than rotated,
+    // so consumers (e.g. the chaos worker sync) must fall back to a full resync
+    // instead of replaying a single-slice move.
+    lastRotation: null,
 
-    setSize: (size) => set((state) => ({ size, cubies: makeCubies(size), rotationEpoch: state.rotationEpoch + 1 })),
+    setSize: (size) => set((state) => ({ size, cubies: makeCubies(size), rotationEpoch: state.rotationEpoch + 1, lastRotation: null })),
     setCubies: (cubies) => set(typeof cubies === 'function'
       ? (state) => ({ cubies: cubies(state.cubies) })
       : { cubies }),
     // Like setCubies but also increments rotationEpoch so manifoldMap rebuilds
     setRotatedCubies: (cubies) => set(typeof cubies === 'function'
-      ? (state) => ({ cubies: cubies(state.cubies), rotationEpoch: state.rotationEpoch + 1 })
-      : (state) => ({ cubies, rotationEpoch: state.rotationEpoch + 1 })),
+      ? (state) => ({ cubies: cubies(state.cubies), rotationEpoch: state.rotationEpoch + 1, lastRotation: null })
+      : (state) => ({ cubies, rotationEpoch: state.rotationEpoch + 1, lastRotation: null })),
 
     // ========================================================================
     // GAME SESSION STATE

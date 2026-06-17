@@ -108,6 +108,7 @@ export function useCubeState() {
     useGameStore.setState((state) => ({
       cubies: rotateSliceCubies(state.cubies, size, axis, sliceIndex, dir),
       rotationEpoch: state.rotationEpoch + 1,
+      lastRotation: { axis, sliceIndex, dir },
       moves: state.moves + 1,
       moveHistory: [...state.moveHistory, { type: 'rotation', axis, dir, sliceIndex, timestamp: Date.now() }].slice(-10),
     }));
