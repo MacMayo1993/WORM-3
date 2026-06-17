@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import { isTileInSlice } from '../worm/wormLogic.js';
+import { rotateVec90 } from '../game/cubeRotation.js';
 
 describe('isTileInSlice', () => {
   it('matches on the x coordinate for the col axis', () => {
@@ -34,6 +35,29 @@ describe('live-rotation ride lands exactly on a lattice cell (no drift)', () => 
     depth: new THREE.Vector3(0, 0, 1),
   };
   const v = new THREE.Vector3();
+
+  // The whole no-snap guarantee rests on the live ride/bake transform —
+  // applyAxisAngle(unitAxis, dir·π/2) — being identical to the logical cube turn
+  // (rotateVec90). If these ever diverge, the head and body would jump 90° at commit.
+  it('applyAxisAngle(unitAxis, dir·π/2) equals rotateVec90 for all axes/dirs', () => {
+    const axisVecs = { col: new THREE.Vector3(1, 0, 0), row: new THREE.Vector3(0, 1, 0), depth: new THREE.Vector3(0, 0, 1) };
+    const samples = [
+      [1, 0, 0], [0, 1, 0], [0, 0, 1], [-1, 0, 0], [0, -1, 0], [0, 0, -1],
+      [0.7, -1.3, 0.4], [-0.5, 0.9, -1.1], [1.0, 1.0, 1.0],
+    ];
+    const out = new THREE.Vector3();
+    for (const axis of ['col', 'row', 'depth']) {
+      for (const dir of [1, -1]) {
+        for (const [vx, vy, vz] of samples) {
+          const [ex, ey, ez] = rotateVec90(vx, vy, vz, axis, dir);
+          out.set(vx, vy, vz).applyAxisAngle(axisVecs[axis], dir * (Math.PI / 2));
+          expect(out.x).toBeCloseTo(ex, 9);
+          expect(out.y).toBeCloseTo(ey, 9);
+          expect(out.z).toBeCloseTo(ez, 9);
+        }
+      }
+    }
+  });
 
   for (const size of [2, 3, 4, 5]) {
     const k = (size - 1) / 2;

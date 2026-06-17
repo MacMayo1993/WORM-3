@@ -83,6 +83,8 @@ import { SURFACE_OFFSET } from '../utils/constants.js';
 
 // Pre-allocated axis vector for applying liveRotation to the worm during scramble
 const _liveAxis = new THREE.Vector3();
+// Axis scratch for baking a committed turn into the worm's position history.
+const _bakeAxis = new THREE.Vector3();
 const _tunnelDirScratch = new THREE.Vector3();
 
 // Make the worm's head ride a slice that is mid-rotation so it turns *with* the cube
@@ -263,18 +265,23 @@ const _evalLiftedPos = new THREE.Vector3();
 // ─── Step History Circular Buffer ────────────────────────────────────────────
 // Pre-allocated ring of {pos, normal} objects — eliminates per-step Vector3
 // allocations and O(N) unshift that grows to 60 000 elements at MAX_TAIL.
+// Each slot also carries the grid cell (tx,ty,tz) the point sits in, so the body
+// can ride a mid-rotation slice (and bake the turn at commit) without snapping.
 function makeStepHistory(capacity) {
     return {
-        buf: Array.from({ length: capacity }, () => ({ pos: new THREE.Vector3(), normal: new THREE.Vector3() })),
+        buf: Array.from({ length: capacity }, () => ({ pos: new THREE.Vector3(), normal: new THREE.Vector3(), tx: -1, ty: -1, tz: -1 })),
         head: 0,   // next write slot; newest entry is at (head-1+capacity)%capacity
         count: 0,
         capacity,
     };
 }
-function shPush(sh, pos, normal) {
+function shPush(sh, pos, normal, tx, ty, tz) {
     const slot = sh.buf[sh.head];
     slot.pos.copy(pos);
     slot.normal.copy(normal);
+    slot.tx = tx;
+    slot.ty = ty;
+    slot.tz = tz;
     sh.head = (sh.head + 1) % sh.capacity;
     if (sh.count < sh.capacity) sh.count++;
 }
@@ -846,7 +853,14 @@ function useWormCrawler(size, cubies) {
                         const ptJump = jumpTAtR > 0 ? Math.sin(jumpTAtR * Math.PI) * JUMP_HEIGHT : 0;
                         // Compute lifted pos into module-level scratch, then copy into pre-allocated ring slot.
                         _evalLiftedPos.copy(_evalHPos).addScaledVector(ptNorm, WORM_LIFT + ptJump);
-                        shPush(stepHistory.current, _evalLiftedPos, ptNorm);
+                        // Tag the point with the grid cell it occupies, derived from the pre-lift
+                        // surface point (origin-centred coords → nearest lattice index). Used to ride
+                        // a mid-rotation slice and to bake the turn into history at commit.
+                        const _hk = (size - 1) / 2;
+                        const _htx = Math.min(size - 1, Math.max(0, Math.round(_evalHPos.x + _hk)));
+                        const _hty = Math.min(size - 1, Math.max(0, Math.round(_evalHPos.y + _hk)));
+                        const _htz = Math.min(size - 1, Math.max(0, Math.round(_evalHPos.z + _hk)));
+                        shPush(stepHistory.current, _evalLiftedPos, ptNorm, _htx, _hty, _htz);
                         lastRecordedT.current += 0.02; // A guaranteed resolution of 50 mathematical sub-steps per tile traverse
                     }
                     // -----------------------------------------------------------
@@ -1232,6 +1246,30 @@ function useWormCrawler(size, cubies) {
                     const r = rotateTilePosition(_parseTile, axis, sliceIndex, dir, size);
                     return `${r.x},${r.y},${r.z},${r.dirKey}`;
                 });
+
+                // Bake the committed turn into the body's position history: rotate the world
+                // position, surface normal, and grid tag of every recorded point that sat in the
+                // rotated slice. This uses the same predicate (isTileInSlice) and the same signed
+                // angle the body ride applied mid-tween, so ridden segments land seamlessly with
+                // no snap-back to their pre-rotation positions.
+                {
+                    const sh = stepHistory.current;
+                    if (sh.count > 0) {
+                        const k = (size - 1) / 2;
+                        const ang = dir * (Math.PI / 2);
+                        _bakeAxis.set(axis === 'col' ? 1 : 0, axis === 'row' ? 1 : 0, axis === 'depth' ? 1 : 0);
+                        for (let i = 0; i < sh.count; i++) {
+                            const slot = sh.buf[(sh.head - 1 - i + sh.capacity) % sh.capacity];
+                            if (slot.tx < 0 || !isTileInSlice(axis, sliceIndex, slot.tx, slot.ty, slot.tz)) continue;
+                            slot.pos.applyAxisAngle(_bakeAxis, ang);
+                            slot.normal.applyAxisAngle(_bakeAxis, ang).normalize();
+                            const [rx, ry, rz] = rotateVec90(slot.tx - k, slot.ty - k, slot.tz - k, axis, dir);
+                            slot.tx = Math.round(rx + k);
+                            slot.ty = Math.round(ry + k);
+                            slot.tz = Math.round(rz + k);
+                        }
+                    }
+                }
 
                 // If mid-tunnel, rotate active tunnel endpoints so exit snap lands on the correct tile
                 if (activeTunnel.current) {
@@ -1837,9 +1875,15 @@ const _bodyClonePos = new THREE.Vector3();
 const _bodyCloneNormal = new THREE.Vector3();
 const _bodySegForward = new THREE.Vector3();
 const _bodySideVec = new THREE.Vector3();
-// Stable path-points buffer: reused every frame to avoid spread-array allocation
+// Scratch used to ride mid-rotation body points without mutating the history ring.
+const _bodyRideAxis = new THREE.Vector3();
+const _bodyEffA = new THREE.Vector3();
+const _bodyEffB = new THREE.Vector3();
+// Stable path-points buffer: reused every frame to avoid spread-array allocation.
+// The head point carries a sentinel tile (tx<0) so the body ride never rotates it —
+// the head's world position is already ridden upstream in the main worm useFrame.
 const _pathPointsBuffer = [];
-const _headPathPoint = { pos: _bodyHeadPos, normal: _bodyNormal };
+const _headPathPoint = { pos: _bodyHeadPos, normal: _bodyNormal, tx: -1, ty: -1, tz: -1 };
 
 function WormBody({ worm }) {
     const meshRef = useRef();       // sphere body (classic / inch / glow)
@@ -1893,6 +1937,25 @@ function WormBody({ worm }) {
         _pathPointsBuffer.length = steps.count + 1;
         _pathPointsBuffer[0] = _headPathPoint;
         for (let j = 0; j < steps.count; j++) _pathPointsBuffer[j + 1] = shAt(steps, j);
+
+        // Ride: while a slice is mid-rotation, body points sitting in that slice must turn
+        // with the cube. We rotate their world position about the slice axis on the fly (into
+        // scratch vectors, never mutating the ring) by the exact signed angle CubeAssembly
+        // applies to the cubies — so the body stays glued to the surface through the tween and,
+        // because commit bakes the same turn into history, there is no snap when it lands.
+        const _ride = liveRotation.active;
+        const _rAxis = liveRotation.axis;
+        const _rSlice = liveRotation.sliceIndex;
+        const _rAngle = liveRotation.angle;
+        if (_ride) _bodyRideAxis.set(_rAxis === 'col' ? 1 : 0, _rAxis === 'row' ? 1 : 0, _rAxis === 'depth' ? 1 : 0);
+        // Returns the effective (possibly ridden) world position for a path point, writing into
+        // `out` only when a rotation is applied; otherwise returns the point's own vector.
+        const effPos = (pt, out) => {
+            if (_ride && pt.tx >= 0 && isTileInSlice(_rAxis, _rSlice, pt.tx, pt.ty, pt.tz)) {
+                return out.copy(pt.pos).applyAxisAngle(_bodyRideAxis, _rAngle);
+            }
+            return pt.pos;
+        };
 
         // Dissolve: shrink all segments only while inside the Möbius ribbon (tunnel phase).
         // Worm remains visible during entering and exiting so the player sees it approach
@@ -1966,17 +2029,24 @@ function WormBody({ worm }) {
                 while (walkIndex < _pathPointsBuffer.length - 1) {
                     const ptA = _pathPointsBuffer[walkIndex];
                     const ptB = _pathPointsBuffer[walkIndex + 1];
-                    const distToNext = ptA.pos.distanceTo(ptB.pos);
+                    const aPos = effPos(ptA, _bodyEffA);
+                    const bPos = effPos(ptB, _bodyEffB);
+                    const distToNext = aPos.distanceTo(bPos);
 
                     if (cumulativeDist + distToNext >= targetDist) {
                         // Found the bracket on the curve! Interpolate exact point.
                         const t = distToNext > 0 ? (targetDist - cumulativeDist) / distToNext : 0;
                         // Use scratch vectors instead of .clone() to avoid GC pressure
-                        _bodyClonePos.lerpVectors(ptA.pos, ptB.pos, t);
+                        _bodyClonePos.lerpVectors(aPos, bPos, t);
                         _bodyCloneNormal.lerpVectors(ptA.normal, ptB.normal, t).normalize();
+                        // Keep the surface normal consistent with a ridden segment so the
+                        // wiggle/orientation track the rotating face rather than the old one.
+                        if (_ride && ptA.tx >= 0 && isTileInSlice(_rAxis, _rSlice, ptA.tx, ptA.ty, ptA.tz)) {
+                            _bodyCloneNormal.applyAxisAngle(_bodyRideAxis, _rAngle).normalize();
+                        }
 
                         // Calculate forward/side vector for the wiggle at this exact localized point
-                        _bodySegForward.subVectors(ptA.pos, ptB.pos).normalize();
+                        _bodySegForward.subVectors(aPos, bPos).normalize();
                         _bodySideVec.crossVectors(_bodyCloneNormal, _bodySegForward).normalize();
 
                         const wiggleAmp = _isInch ? 0.0 : 0.08 * Math.sin(fade * Math.PI);
@@ -1991,7 +2061,7 @@ function WormBody({ worm }) {
 
                 // If the track runs out (just spawned and moving), freeze at the last known point.
                 if (!foundPosition && _pathPointsBuffer.length > 0) {
-                    _bodyClonePos.copy(_pathPointsBuffer[_pathPointsBuffer.length - 1].pos);
+                    _bodyClonePos.copy(effPos(_pathPointsBuffer[_pathPointsBuffer.length - 1], _bodyEffA));
                 }
 
                 _wormDummy.position.copy(_bodyClonePos);
