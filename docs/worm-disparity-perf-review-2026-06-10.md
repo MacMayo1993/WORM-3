@@ -164,7 +164,7 @@ WormChaseCamera (`:1212`), TunnelSurfFX (`:1385`), WormBody (`:1581`), GlowWormA
 
 ### Phase 2 — structural, medium risk (~2–4 days)
 6. Single animation-manager `useFrame` with an active-sticker registry; remove per-sticker callbacks (§1.1). **Biggest single gain.**
-7. Worker-side rotation: post rotation params instead of cloning cubies; drop the per-rotation main-thread manifold rebuild (§3.2).
+7. ✅ Worker-side rotation: `lastRotation` posted as a lightweight `ROTATE_SLICE` message instead of cloning cubies; main-thread manifold rebuild is now lazy (invalidated on rotation, rebuilt on the next flip-bearing TICK) instead of eager per rotation (§3.2).
 8. WormBody tail LOD + color-epoch updates (§2.3).
 
 ### Phase 3 — polish (~as needed)

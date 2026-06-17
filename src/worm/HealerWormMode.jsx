@@ -220,7 +220,10 @@ function cutWormTail(worm, cutTrailIdx) {
     // BODY_BALL_SPACING = 0.14 converts: tailLength = tiles / BODY_BALL_SPACING
     worm.tailLength.current = Math.max(BASE_TAIL_LENGTH, Math.round(cutTrailIdx / BODY_BALL_SPACING));
     const orbsLeft = Math.max(0, Math.floor((worm.tailLength.current - BASE_TAIL_LENGTH) / ORB_SEGMENT_GROWTH));
-    if (worm.orbPickupColorsRef.current.length > orbsLeft) worm.orbPickupColorsRef.current.length = orbsLeft;
+    if (worm.orbPickupColorsRef.current.length > orbsLeft) {
+        worm.orbPickupColorsRef.current.length = orbsLeft;
+        worm.colorEpochRef.current++;
+    }
     useGameStore.getState().setWormBodyTiles(orbsLeft);
 }
 
@@ -530,6 +533,7 @@ function useWormCrawler(size, cubies) {
             if (n > 0) {
                 tailLength.current = Math.max(BASE_TAIL_LENGTH, tailLength.current - n);
                 orbPickupColorsRef.current.length = Math.max(0, orbPickupColorsRef.current.length - Math.round(n / ORB_SEGMENT_GROWTH));
+                colorEpochRef.current++;
                 const orbsLeft = Math.max(0, Math.floor((tailLength.current - BASE_TAIL_LENGTH) / ORB_SEGMENT_GROWTH));
                 useGameStore.setState({
                     wormBodyTiles: orbsLeft,
@@ -580,10 +584,14 @@ function useWormCrawler(size, cubies) {
 
     // Colors of each collected orb, in pickup order — used by WormBody to color segments
     const orbPickupColorsRef = useRef([]);
+    // Bumped whenever orbPickupColorsRef's contents change, so WormBody can skip
+    // re-writing the instanced color buffer on frames where nothing changed.
+    const colorEpochRef = useRef(0);
 
     const applyOrbPickupGrowth = (color, faceId) => {
         tailLength.current = Math.min(tailLength.current + ORB_SEGMENT_GROWTH, MAX_TAIL);
         orbPickupColorsRef.current.push(color);
+        colorEpochRef.current++;
         const orbCountOnWorm = Math.max(0, Math.floor((tailLength.current - BASE_TAIL_LENGTH) / ORB_SEGMENT_GROWTH));
         // PP are NOT awarded on pickup — only banked when the player wins (cube solved).
         // Track session total separately for the in-game counter.
@@ -1103,6 +1111,7 @@ function useWormCrawler(size, cubies) {
         selfCollisionGraceStepsRef.current = 0;
         tailLength.current = BASE_TAIL_LENGTH;
         orbPickupColorsRef.current = [];
+        colorEpochRef.current++;
         shReset(stepHistory.current);
         lastRecordedT.current = 0;
         healedRef.current = 0;
@@ -1206,7 +1215,7 @@ function useWormCrawler(size, cubies) {
         pos, moveDir, phase, tunnelProgress, activeTunnel, onFlippedTile,
         interpT, prevWorldPos, curWorldPos, jumpT, isJumping, jumpLift,
         headInterpPos, currentNormal,
-        tailLength, stepHistory, orbPickupColorsRef, tick, queueTurn,
+        tailLength, stepHistory, orbPickupColorsRef, colorEpochRef, tick, queueTurn,
         voidTunnelKeysRef, tunnelUseCountsRef,
         willHealRef, healFiredRef, pendingHealBurstRef, pendingOrbFlashRef,
         tileTrail, killWorm,
@@ -1822,6 +1831,10 @@ function WormBody({ worm }) {
     isGlowRef.current = isGlow;
     const isBookRef = useRef(isBook);
     isBookRef.current = isBook;
+    // Tracks the inputs that affect per-segment color so the instanced color buffer
+    // is only rewritten on frames where something actually changed (orb pickup,
+    // skin/character swap, or tail length change) instead of every frame.
+    const prevColorStateRef = useRef({ epoch: -1, visibleCount: -1, baseColor: null, bellyCol: null, isGlow: null, isInch: null });
 
     useFrame((state, delta) => {
         // Copy head/normal into scratch vectors (avoids .clone() allocation)
@@ -1870,6 +1883,21 @@ function WormBody({ worm }) {
         const orbColors = worm.orbPickupColorsRef.current;
         const baseColor = wormColorRef.current;
         const bellyCol = bellyColorRef.current;
+
+        // Per-segment color only changes on orb pickup/deposit, skin/character swap, or
+        // tail growth — not every frame. Skip the setColorAt pass + GPU upload otherwise.
+        const colorEpoch = worm.colorEpochRef?.current ?? 0;
+        const prevCS = prevColorStateRef.current;
+        const colorDirty = colorEpoch !== prevCS.epoch || visibleCount !== prevCS.visibleCount ||
+            baseColor !== prevCS.baseColor || bellyCol !== prevCS.bellyCol || _isGlow !== prevCS.isGlow || _isInch !== prevCS.isInch;
+        if (colorDirty) {
+            prevCS.epoch = colorEpoch;
+            prevCS.visibleCount = visibleCount;
+            prevCS.baseColor = baseColor;
+            prevCS.bellyCol = bellyCol;
+            prevCS.isGlow = _isGlow;
+            prevCS.isInch = _isInch;
+        }
 
         for (let i = 0; i < visibleCount; i++) {
             const fade = 1 - i / tLen;
@@ -1955,25 +1983,27 @@ function WormBody({ worm }) {
                 }
             }
 
-            // Color per segment
-            const orbPickupIndex = Math.floor((i - BASE_TAIL_LENGTH) / ORB_SEGMENT_GROWTH);
-            const hasOrbColor = orbPickupIndex >= 0 && orbPickupIndex < orbColors.length;
-            if (i === 0 && _isGlow) {
-                // Glow head — use base worm color; GlowWormAura point light provides visible glow
-                _bodyColor.set(baseColor);
-            } else if (hasOrbColor) {
-                _bodyColor.set(orbColors[orbPickupIndex]);
-            } else if (_isInch) {
-                // Alternating body/belly bands for visible ring pattern
-                _bodyColor.set(i % 2 === 0 ? baseColor : bellyCol);
-            } else {
-                _bodyColor.set(baseColor);
+            // Color per segment — only recomputed when colorDirty (see above)
+            if (colorDirty) {
+                const orbPickupIndex = Math.floor((i - BASE_TAIL_LENGTH) / ORB_SEGMENT_GROWTH);
+                const hasOrbColor = orbPickupIndex >= 0 && orbPickupIndex < orbColors.length;
+                if (i === 0 && _isGlow) {
+                    // Glow head — use base worm color; GlowWormAura point light provides visible glow
+                    _bodyColor.set(baseColor);
+                } else if (hasOrbColor) {
+                    _bodyColor.set(orbColors[orbPickupIndex]);
+                } else if (_isInch) {
+                    // Alternating body/belly bands for visible ring pattern
+                    _bodyColor.set(i % 2 === 0 ? baseColor : bellyCol);
+                } else {
+                    _bodyColor.set(baseColor);
+                }
+                mesh.setColorAt(i, _bodyColor);
             }
-            mesh.setColorAt(i, _bodyColor);
         }
 
         mesh.instanceMatrix.needsUpdate = true;
-        if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+        if (mesh.instanceColor && colorDirty) mesh.instanceColor.needsUpdate = true;
 
         // Update glow overlay count
         if (_isGlow) {
