@@ -154,7 +154,11 @@ export function useChaosWorker({
       worker.terminate();
       workerRef.current = null;
     };
-  }, [addDisparityDeathsBulk, addDisparityEliminatedFacesBulk, cubiesRef, disparityFlipCap, disparityRef, flipPctRef, setCascades, setCubies, size]);
+    // disparityFlipCap is intentionally excluded: the handler reads disparityFlipCapRef
+    // (synced above) and flip-cap changes are propagated via the dedicated SET_FLIP_CAP
+    // effect below. Including the raw value here would terminate and recreate the whole
+    // worker thread on every flip-cap change instead of sending a lightweight message.
+  }, [addDisparityDeathsBulk, addDisparityEliminatedFacesBulk, cubiesRef, disparityRef, flipPctRef, setCascades, setCubies, size]);
 
   useEffect(() => {
     const worker = workerRef.current;

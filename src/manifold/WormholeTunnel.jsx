@@ -44,6 +44,17 @@ const CORE_REBUILD_POS_EPS_SQ = 1e-4;
 const LIGHTNING_REBUILD_POS_EPS_SQ = 1e-4;
 const LIGHTNING_RADIUS_EPS = 1e-4;
 
+// With many tunnels active simultaneously (chaos mode can spawn 100+), rebuilding
+// every tunnel's TubeGeometry at the base FPS multiplies into thousands of
+// alloc+dispose calls/sec — the dominant cost behind the tunnel-mode stutter.
+// Scale the per-tunnel rebuild interval down as tunnel count grows so the total
+// rebuild rate across all tunnels stays roughly bounded instead of growing linearly.
+let activeTunnelCount = 0;
+const TUNNEL_COUNT_PER_FPS_STEP = 40;
+const fpsThrottleDivisor = () => Math.max(1, Math.ceil(activeTunnelCount / TUNNEL_COUNT_PER_FPS_STEP));
+const coreGeometryInterval = () => (1 / CORE_GEOMETRY_FPS) * fpsThrottleDivisor();
+const lightningGeometryInterval = () => (1 / LIGHTNING_GEOMETRY_FPS) * fpsThrottleDivisor();
+
 const FACE_NORM_LOCAL = {
   PX: [1, 0, 0], NX: [-1, 0, 0],
   PY: [0, 1, 0], NY: [0, -1, 0],
@@ -219,6 +230,11 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
   const lastLightningRadiusRef = useRef(-1);
 
   useEffect(() => {
+    activeTunnelCount++;
+    return () => { activeTunnelCount--; };
+  }, []);
+
+  useEffect(() => {
     const ct = coreTubeRef.current;
     const lt = lightningRef.current;
     const at = atmosphereTubeRef.current;
@@ -328,7 +344,7 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
       const coreMoved =
         lastCoreStartRef.current.distanceToSquared(_vStart) > CORE_REBUILD_POS_EPS_SQ ||
         lastCoreEndRef.current.distanceToSquared(_vEnd) > CORE_REBUILD_POS_EPS_SQ;
-      if (coreMoved || (t - lastCoreGeometryBuildRef.current >= 1 / CORE_GEOMETRY_FPS)) {
+      if (coreMoved || (t - lastCoreGeometryBuildRef.current >= coreGeometryInterval())) {
         const oldGeo = coreTubeRef.current.geometry;
         // 20 segments along tube, 5 radial segments
         coreTubeRef.current.geometry = new THREE.TubeGeometry(curveRef.current, 20, 0.02 * (1 + _explosionFactor * 2), 5, false);
@@ -505,7 +521,7 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
           lastLightningStartRef.current.distanceToSquared(_vStart) > LIGHTNING_REBUILD_POS_EPS_SQ ||
           lastLightningEndRef.current.distanceToSquared(_vEnd) > LIGHTNING_REBUILD_POS_EPS_SQ ||
           Math.abs(lightningRadius - lastLightningRadiusRef.current) > LIGHTNING_RADIUS_EPS;
-        if (lightningMoved || (t - lastLightningGeometryBuildRef.current >= 1 / LIGHTNING_GEOMETRY_FPS)) {
+        if (lightningMoved || (t - lastLightningGeometryBuildRef.current >= lightningGeometryInterval())) {
           const oldGeo = lightningLine.geometry;
           lightningLine.geometry = new THREE.TubeGeometry(lightningCurveRef.current, LIGHTNING_PTS * 2, lightningRadius, 4, false);
           if (oldGeo) oldGeo.dispose();
