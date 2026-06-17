@@ -22,7 +22,8 @@ import { DISPARITY_GAME_LENGTHS } from './utils/economyConstants.js';
 import { vibrate } from './utils/audio.js';
 import { makeCubies } from './game/cubeState.js';
 import { rotateSliceCubies } from './game/cubeRotation.js';
-import { buildManifoldGridMap, flipStickerPair } from './game/manifoldLogic.js';
+import { flipStickerPair } from './game/manifoldLogic.js';
+import { getManifoldMap } from './game/manifoldMapStore.js';
 import { clearRefractory } from './game/refractoryMap.js';
 
 // Hooks
@@ -1227,7 +1228,7 @@ export default function WORM3() {
     // (only `curr` and `flips` change).  Rebuilding it per flip was O(size³) wasted
     // work — on a 5×5 at 80 % disparity that was 120 full O(N³) scans.
     let state = cubies;
-    const manifoldMap = buildManifoldGridMap(state, size);
+    const manifoldMap = getManifoldMap(state, size, useGameStore.getState().rotationEpoch);
 
     const count = Math.min(targetFlips, candidates.length);
     for (let i = 0; i < count; i++) {

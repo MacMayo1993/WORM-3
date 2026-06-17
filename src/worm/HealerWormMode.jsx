@@ -13,6 +13,7 @@ import { getStickerWorldPos, getManifoldGridId } from '../game/coordinates.js';
 import { getNextSurfacePosition, getActiveTunnels, getTunnelWorldPosInto, turnWorm, getStableKey, findStickerByStableKey } from './wormLogic.js';
 import { setWormTurnCallback } from './wormTurnBridge.js';
 import { buildManifoldGridMap, buildManifoldGridMapIncremental, flipStickerPair, findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
+import { getManifoldMap } from '../game/manifoldMapStore.js';
 import { healSticker, getStickerSafe } from '../game/cubeState.js';
 import { rotateVec90 } from '../game/cubeRotation.js';
 import { DIR_TO_VEC, VEC_TO_DIR, ANTIPODAL_COLOR, FACE_COLORS } from '../utils/constants.js';
@@ -323,6 +324,9 @@ function useWormCrawler(size, cubies) {
     const wormPausedRef = useRef(false);
     wormPausedRef.current = wormPaused;
 
+    // Drives the shared manifold-map owner; advances only on geometry changes (rotations).
+    const rotationEpoch = useGameStore((s) => s.rotationEpoch);
+
     // Mutable refs for values captured by tick/PHASE_HANDLERS that change between renders.
     // Reading via ref avoids adding them to tick's useCallback deps, preventing tick from
     // being recreated (and the callback reference replaced) on every cube rotation or setting change.
@@ -397,13 +401,11 @@ function useWormCrawler(size, cubies) {
     // Both the manifold map and tunnel list are built in one pass to avoid a second O(size³×6) scan.
     const tunnelLookupRef = useRef(new Map());
     // This effect reruns on every cubies change (not debounced — tunnel lookup must stay
-    // exact for gameplay), which is ~12×/sec at chaos L4. The manifold map itself is the
-    // cheaper of the two passes to make incremental: hold it across calls and patch only
-    // the handful of cells that actually changed instead of rebuilding all size³×6 entries.
-    const manifoldMapCacheRef = useRef({ map: null, prevCubies: null, size: null });
+    // exact for gameplay), which is ~12×/sec at chaos L4. The manifold map comes from the
+    // single shared owner keyed on rotationEpoch, so flips reuse it for free and the only
+    // rebuild cost is paid once per rotation across all consumers.
     React.useEffect(() => {
-        // Build manifold map once and share it with getActiveTunnels to avoid a second rebuild
-        const manifoldMap = buildManifoldGridMapIncremental(cubies, size, manifoldMapCacheRef.current);
+        const manifoldMap = getManifoldMap(cubies, size, rotationEpoch);
         const tunnels = getActiveTunnels(cubies, size, manifoldMap);
 
         const encodeTile = (p) => `${p.x},${p.y},${p.z},${p.dirKey}`;
@@ -420,7 +422,7 @@ function useWormCrawler(size, cubies) {
             lookup.set(encodeTile(tunnel.exit), { tunnel, tunnelKey, reversed: true });
         }
         tunnelLookupRef.current = lookup;
-    }, [cubies, size]);
+    }, [cubies, size, rotationEpoch]);
 
     // Jump offset height at current jumpT
     const jumpLift = () => isJumping.current
@@ -617,7 +619,7 @@ function useWormCrawler(size, cubies) {
         const tile = randomUnflippedTile(cubiesRef.current, size, [pos.current]);
         if (!tile) return;
         useGameStore.setState((state) => {
-            const mm = buildManifoldGridMap(state.cubies, size);
+            const mm = getManifoldMap(state.cubies, size, state.rotationEpoch);
             return {
                 cubies: flipStickerPair(state.cubies, size, tile.x, tile.y, tile.z, tile.dirKey, mm)
             };
@@ -1635,7 +1637,7 @@ function TunnelInteriorView({ worm, size }) {
             const { cubies, settings } = st;
             const fc = resolveColors(settings, settings?.biomeMode?.faceAssignment) || FACE_COLORS;
             const manifoldStyles = settings?.manifoldStyles ?? {};
-            const manifoldMap = buildManifoldGridMap(cubies, size);
+            const manifoldMap = getManifoldMap(cubies, size, st.rotationEpoch);
             for (let i = 0; i < stickerLayout.length; i++) {
                 const { sx, sy, sz, dirKey } = stickerLayout[i];
                 const mesh = stickerMeshesRef.current[i];
@@ -2699,6 +2701,9 @@ function TunnelHealProgress({ size }) {
         if (partial.length === 0) return [];
         // Build the manifold map once and share it across all findStickerByStableKey calls.
         // Without this, each call rebuilt an O(size³×6) map — 3 tunnels = 3× the work.
+        // NOTE: this operates on the *debounced* cubies snapshot, not the live epoch's, so it
+        // intentionally bypasses the shared manifoldMapStore owner (which is keyed on the live
+        // rotationEpoch) and builds against this lagged snapshot directly.
         const mm = buildManifoldGridMap(cubies, size);
         return partial
             .map(([key, p]) => {
@@ -3846,7 +3851,12 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             finalHealCheckTimer.current += delta;
             if (finalHealCheckTimer.current >= 0.5) {
                 finalHealCheckTimer.current = 0;
-                const remaining = getActiveTunnels(useGameStore.getState().cubies, size);
+                const liveState = useGameStore.getState();
+                const remaining = getActiveTunnels(
+                    liveState.cubies,
+                    size,
+                    getManifoldMap(liveState.cubies, size, liveState.rotationEpoch)
+                );
                 if (remaining.length === 0) {
                     gameModePhaseRef.current = 'solved';
                     const bodyOrbs = useGameStore.getState().wormBodyTiles ?? 0;
