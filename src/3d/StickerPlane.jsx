@@ -13,6 +13,7 @@ import { BiomeGLBCluster, isGLBActive, isGLBFullFace } from './BiomeGLBCluster.j
 import { SeamPulseOverlay } from './SeamPulseOverlay.jsx';
 import { getTileStyleMaterial, getGlassMaterial, sharedTremorState, flipBurstMap, healBurstMap, healParticleMap } from './styles/TileStyleMaterials.jsx';
 import { useStickerInstances } from './StickerInstances.jsx';
+import { registerSticker, unregisterSticker, activateSticker, deactivateSticker, wispyTime } from './StickerAnimationManager.js';
 import { getManifoldGridId } from '../game/coordinates.js';
 import GrassBlades from './styles/GrassBlades.jsx';
 import WaterVolume from './styles/WaterVolume.jsx';
@@ -384,10 +385,6 @@ const spinRevealFragmentShader = `
 `;
 
 
-// Shared time uniform — all wispy ring materials reference this single object so only
-// one value write per frame is needed regardless of how many tiles are on screen.
-const _wispyT = { value: 0.0 };
-
 // Module-level frame counter for tremor sub-sampling.
 // Tremor is a slow organic vibration (~10–40 Hz signal content); computing it at
 // 30 Hz instead of 60 Hz is imperceptible and halves the trig cost per wormhole tile.
@@ -550,7 +547,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const [wispyRingUniforms] = React.useState(() => ({
     uColor: { value: new THREE.Color() },
     uAntiColor: { value: new THREE.Color() },
-    uTime: _wispyT, // shared reference — updated once per frame externally
+    uTime: wispyTime, // shared reference — updated once per frame externally
     uLens: { value: 0.0 },
   }));
   // Worm-mode rim glow — heartbeat ring on flipped tiles in worm healer mode
@@ -599,6 +596,11 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // Cleared when all transient effects (flip, shake, tremor) finish, avoiding
   // the multi-condition bail-out that evaluated several ref lookups every frame.
   const isActiveRef = useRef(false);
+  // Holds the real tick body, reassigned every render so it always closes over this
+  // render's refs/props — exactly like useFrame's own internal callback ref. The
+  // StickerAnimationManager registers a stable wrapper around this once on mount and
+  // only invokes it while this sticker's key is in the active set.
+  const tickImplRef = useRef(null);
   const flipFromColor = useRef(null);
   const flipToColor = useRef(null);
   const flipFromTexture = useRef(null);
@@ -654,6 +656,19 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     };
   }, []);
 
+  // Register this sticker's tick with the shared animation manager once on mount.
+  // The wrapper forwards to tickImplRef so it stays valid even though tickImplRef.current
+  // is reassigned every render. Tiles that already sit in a persistent wormhole state at
+  // mount (loaded mid-game, or surviving a re-mount) activate immediately so their ring/
+  // hazard fx start running without waiting for a flip event.
+  useEffect(() => {
+    const key = stickerGridIdRef.current;
+    registerSticker(key, (state, delta) => tickImplRef.current?.(state, delta));
+    const hasFlipsAtMount = (meta?.flips ?? 0) > 0;
+    if (hasFlipsAtMount && meta?.curr !== meta?.orig) activateSticker(key);
+    return () => unregisterSticker(key);
+  }, []);
+
   // Death rank from Disparity Mode — null if not in disparity game or tile not yet dead
   const deadRank = isDead ? deadRankRaw : null;
 
@@ -687,11 +702,13 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     if (isDead && !wasDeadRef.current) {
       wasDeadRef.current = true;
       deathAnimT.current = 0; // start implosion
+      activateSticker(stickerGridIdRef.current);
     } else if (!isDead && wasDeadRef.current) {
       // Game was reset — wipe the death animation so no stale tombstone shows
       wasDeadRef.current = false;
       deathAnimT.current = -1;
       setDeathAnimDone(false);
+      activateSticker(stickerGridIdRef.current);
     }
   }, [isDead]);
 
@@ -711,6 +728,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     if (didFlip && (didAntipodalColorSwap || curr === prevVal)) {
       // Mark as animating to prevent React state from interrupting
       isFlipping.current = true;
+      activateSticker(stickerGridIdRef.current);
       // Store the colors for the flip animation
       // flipToColor is the ANTIPODAL color (what we're flipping TO)
       flipFromColor.current = fc[prevVal];
@@ -796,7 +814,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     }
   }, [biomeEnabled]);
 
-  useFrame((state, delta) => {
+  tickImplRef.current = (state, delta) => {
     // Death implosion animation — -1 = idle (not started), 0..1 = playing, ≥1 = done
     // Check this FIRST: pure ref reads, no meta prop access, has its own early return.
     if (deathAnimT.current >= 0 && deathAnimT.current < 1 && groupRef.current) {
@@ -816,10 +834,6 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       }
       return; // skip other animations while dying
     }
-
-    // Keep the shared wispy ring time current — single cheap write before any early return
-    // so spinning rings stay animated even on otherwise-idle tiles.
-    _wispyT.value = state.clock.elapsedTime;
 
     // Compute flip state once — hasFlips guards wormhole so meta?.flips is only
     // read once per frame instead of twice (was separate wormhole + hasFlips lines).
@@ -861,6 +875,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     const anyActive = spinT.current > 0 || shakeT.current > 0 || showWormholeHazardFx || needsGhostUpdate || (spiderPlaneRef.current?.visible && !showGhostTile) || wormIntroT.current > 0 || healTRef.current >= 0 || (wormhole && !isSudokube);
     if (!anyActive) {
       isActiveRef.current = false;
+      deactivateSticker(stickerGridIdRef.current);
       return;
     }
     isActiveRef.current = true;
@@ -1101,7 +1116,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       groupRef.current.position.y = pos[1] + jY * mult;
       groupRef.current.position.z = pos[2] + jZ * mult;
     }
-  });
+  };
 
   const isSudokube = mode === 'sudokube';
   const isGlass = mode === 'glass';

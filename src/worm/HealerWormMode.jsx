@@ -70,6 +70,7 @@ import {
 import ParityOrbs, { OrbCollectEffect } from './ParityOrb.jsx';
 import { isMobile as _isMobile } from '../utils/device.js';
 import { healBurstMap } from '../3d/styles/TileStyleMaterials.jsx';
+import { activateSticker } from '../3d/StickerAnimationManager.js';
 import WormHat3D from './wormCosmetics.jsx';
 import { getSkin, _hatAlignQuat, _hatYUp } from './wormCosmeticsData.js';
 import { getWormCharacter } from './wormCharacterData.js';
@@ -1038,8 +1039,16 @@ function useWormCrawler(size, cubies) {
                             // Write healBurstMap for both tiles BEFORE healing (sticker orig fields intact)
                             const entrySticker = getStickerSafe(exitStore.cubies, entry.x, entry.y, entry.z, entry.dirKey);
                             const exitStickerData = getStickerSafe(exitStore.cubies, exitTile.x, exitTile.y, exitTile.z, exitTile.dirKey);
-                            if (entrySticker) healBurstMap.set(getManifoldGridId(entrySticker, size), 1);
-                            if (exitStickerData) healBurstMap.set(getManifoldGridId(exitStickerData, size), 1);
+                            if (entrySticker) {
+                                const entryGridId = getManifoldGridId(entrySticker, size);
+                                healBurstMap.set(entryGridId, 1);
+                                activateSticker(entryGridId);
+                            }
+                            if (exitStickerData) {
+                                const exitGridId = getManifoldGridId(exitStickerData, size);
+                                healBurstMap.set(exitGridId, 1);
+                                activateSticker(exitGridId);
+                            }
                             healFiredRef.current = true;
                             let healed = healSticker(exitStore.cubies, size, entry.x, entry.y, entry.z, entry.dirKey);
                             healed = healSticker(healed, size, exitTile.x, exitTile.y, exitTile.z, exitTile.dirKey);
