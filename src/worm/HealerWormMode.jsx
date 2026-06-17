@@ -3330,7 +3330,9 @@ const _zAxis     = new THREE.Vector3(0, 0, 1);
 function SliceWarningLights({ pendingRotRef, warningProgressRef, size, cubies }) {
     const lightGroupRef = useRef();
     const ringRef       = useRef();
+    const borderRef     = useRef();
     const customGeoRef  = useRef(null); // tracks geometries we created so we can dispose them
+    const customBorderGeoRef = useRef(null);
     const dataRef       = useRef(null);
     const lastKeyRef    = useRef(null);
     const spinAngleRef  = useRef(0);
@@ -3338,7 +3340,8 @@ function SliceWarningLights({ pendingRotRef, warningProgressRef, size, cubies })
     useFrame(({ clock }, delta) => {
         const lgroup = lightGroupRef.current;
         const ring   = ringRef.current;
-        if (!lgroup || !ring) return;
+        const border = borderRef.current;
+        if (!lgroup || !ring || !border) return;
 
         const pending = pendingRotRef.current;
         const t  = clock.elapsedTime;
@@ -3347,12 +3350,14 @@ function SliceWarningLights({ pendingRotRef, warningProgressRef, size, cubies })
         if (!pending) {
             for (const l of lgroup.children) l.intensity = 0;
             ring.visible = false;
+            border.visible = false;
             lastKeyRef.current = null;
             dataRef.current    = null;
             return;
         }
 
         ring.visible = true;
+        border.visible = true;
 
         // Recompute when the slice identity changes
         const key = `${pending.axis}-${pending.sliceIndex}`;
@@ -3386,9 +3391,9 @@ function SliceWarningLights({ pendingRotRef, warningProgressRef, size, cubies })
             // ── Ring position ─────────────────────────────────────────────────
             // Tile grid index i maps to world coord  i - (size-1)/2
             const sliceW = sliceIndex - (size - 1) / 2;
-            if (axis === 'col')        ring.position.set(sliceW, 0, 0);
-            else if (axis === 'row')   ring.position.set(0, sliceW, 0);
-            else                       ring.position.set(0, 0, sliceW);
+            if (axis === 'col')        { ring.position.set(sliceW, 0, 0); border.position.set(sliceW, 0, 0); }
+            else if (axis === 'row')   { ring.position.set(0, sliceW, 0); border.position.set(0, sliceW, 0); }
+            else                       { ring.position.set(0, 0, sliceW); border.position.set(0, 0, sliceW); }
 
             // ── Ring geometry — sized to cube, rainbow vertex colors ───────────
             // Outer corner of any cube face is (size-1)/2 * sqrt(2) from center;
@@ -3396,6 +3401,7 @@ function SliceWarningLights({ pendingRotRef, warningProgressRef, size, cubies })
             const halfExt    = (size - 1) / 2;
             const ringRadius = halfExt * Math.SQRT2 * 1.15;
             const ringTube   = Math.max(0.11, halfExt * 0.1);
+            const borderTube = ringTube * 1.3; // slightly larger so it rims the colorful ring as a defining edge
 
             if (customGeoRef.current) { customGeoRef.current.dispose(); customGeoRef.current = null; }
             const geo = new THREE.TorusGeometry(ringRadius, ringTube, RADIAL_SEGS, TUBULAR_SEGS);
@@ -3419,6 +3425,11 @@ function SliceWarningLights({ pendingRotRef, warningProgressRef, size, cubies })
             geo.setAttribute('color', new THREE.BufferAttribute(colorArr, 3));
             customGeoRef.current = geo;
             ring.geometry = geo;
+
+            if (customBorderGeoRef.current) { customBorderGeoRef.current.dispose(); customBorderGeoRef.current = null; }
+            const borderGeo = new THREE.TorusGeometry(ringRadius, borderTube, RADIAL_SEGS, TUBULAR_SEGS);
+            customBorderGeoRef.current = borderGeo;
+            border.geometry = borderGeo;
 
             // ── Ring orientation ──────────────────────────────────────────────
             // Default TorusGeometry: XY plane, hole (symmetry axis) along Z.
@@ -3455,10 +3466,14 @@ function SliceWarningLights({ pendingRotRef, warningProgressRef, size, cubies })
         spinAngleRef.current += delta * (1.2 + wp * 2.5) * pending.dir;
         _ringSpinQ.setFromAxisAngle(rotAxis, spinAngleRef.current);
         ring.quaternion.multiplyQuaternions(_ringSpinQ, baseQ);
+        border.quaternion.copy(ring.quaternion);
 
         const pulse = 0.85 + 0.15 * Math.sin(t * 7);
         ring.material.opacity = (0.8 + wp * 0.2) * pulse;
-        ring.scale.setScalar(1 + Math.sin(t * 4) * 0.02);
+        const scale = 1 + Math.sin(t * 4) * 0.02;
+        ring.scale.setScalar(scale);
+        border.scale.setScalar(scale);
+        border.material.opacity = 0.75 + wp * 0.2;
     });
 
     return (
@@ -3468,11 +3483,17 @@ function SliceWarningLights({ pendingRotRef, warningProgressRef, size, cubies })
                     <pointLight key={i} intensity={0} distance={30} decay={2} castShadow={false} />
                 ))}
             </group>
+            {/* Black outline ring — slightly larger than the colorful ring, drawn first so
+                it rims the bright ring with a defined edge instead of bleeding into the background. */}
+            <mesh ref={borderRef} visible={false} renderOrder={1}>
+                <torusGeometry args={[1, 0.05, RADIAL_SEGS, TUBULAR_SEGS]} />
+                <meshBasicMaterial color="#000000" transparent opacity={0.8} depthWrite={false} />
+            </mesh>
             {/* Rainbow spinning ring — geometry set imperatively in useFrame to scale with cube size */}
-            <mesh ref={ringRef} visible={false} renderOrder={999}>
+            <mesh ref={ringRef} visible={false} renderOrder={2}>
                 <torusGeometry args={[1, 0.04, RADIAL_SEGS, TUBULAR_SEGS]} />
                 <meshBasicMaterial vertexColors transparent opacity={0.9}
-                    blending={THREE.AdditiveBlending} depthWrite={false} depthTest={false} />
+                    blending={THREE.AdditiveBlending} depthWrite={false} />
             </mesh>
         </>
     );
