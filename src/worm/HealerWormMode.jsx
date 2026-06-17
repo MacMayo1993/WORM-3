@@ -1885,9 +1885,9 @@ function WormBody({ worm }) {
         let walkIndex = 0;
         let cumulativeDist = 0;
         let altIdx = 0; // index into glowAltRef (even glow segments)
+        let writeIdx = 0; // compacted instance slot — advances only for segments actually drawn
 
         const visibleCount = Math.min(MAX_TAIL, tLen);
-        mesh.count = visibleCount;
 
         const orbColors = worm.orbPickupColorsRef.current;
         const baseColor = wormColorRef.current;
@@ -1909,6 +1909,15 @@ function WormBody({ worm }) {
         }
 
         for (let i = 0; i < visibleCount; i++) {
+            // Distance LOD: segments far behind the head are visually indistinguishable at
+            // gameplay camera distance, so thin them out — every segment near the head,
+            // every 2nd beyond 200, every 4th beyond 600. Skipped segments never run the
+            // curve-walk math below; the walk's cumulative distance naturally catches up to
+            // the next rendered segment's (larger) target distance. The rendered segment is
+            // scaled up to fill the gap left by its skipped neighbors.
+            const lodStep = i < 200 ? 1 : (i < 600 ? 2 : 4);
+            if (i !== 0 && i % lodStep !== 0) continue;
+
             const fade = 1 - i / tLen;
 
             if (i === 0) {
@@ -1979,11 +1988,15 @@ function WormBody({ worm }) {
             }
 
             if (transitScale < 1) _wormDummy.scale.multiplyScalar(transitScale);
+            // Compensate for the longitudinal gap left by skipped neighbors so the tail
+            // still reads as continuous instead of visibly beaded out at long lengths.
+            if (lodStep > 1) _wormDummy.scale.multiplyScalar(lodStep);
             _wormDummy.updateMatrix();
-            mesh.setMatrixAt(i, _wormDummy.matrix);
+            mesh.setMatrixAt(writeIdx, _wormDummy.matrix);
 
-            // Glow worm: write even segments to additive overlay at 1.4× scale
-            if (_isGlow && i % 2 === 0) {
+            // Glow worm: write every other *drawn* segment to additive overlay at 1.4× scale
+            // (writeIdx, not i, so the ratio holds regardless of LOD thinning).
+            if (_isGlow && writeIdx % 2 === 0) {
                 const altMesh = glowAltRef.current;
                 if (altMesh) {
                     _wormDummy.scale.setScalar(_wormDummy.scale.x * 1.4);
@@ -2002,15 +2015,19 @@ function WormBody({ worm }) {
                 } else if (hasOrbColor) {
                     _bodyColor.set(orbColors[orbPickupIndex]);
                 } else if (_isInch) {
-                    // Alternating body/belly bands for visible ring pattern
-                    _bodyColor.set(i % 2 === 0 ? baseColor : bellyCol);
+                    // Alternating body/belly bands for visible ring pattern. Uses writeIdx
+                    // (not i) so bands keep alternating once LOD thinning makes consecutive
+                    // drawn segments an even number of real segments apart.
+                    _bodyColor.set(writeIdx % 2 === 0 ? baseColor : bellyCol);
                 } else {
                     _bodyColor.set(baseColor);
                 }
-                mesh.setColorAt(i, _bodyColor);
+                mesh.setColorAt(writeIdx, _bodyColor);
             }
+            writeIdx++;
         }
 
+        mesh.count = writeIdx;
         mesh.instanceMatrix.needsUpdate = true;
         if (mesh.instanceColor && colorDirty) mesh.instanceColor.needsUpdate = true;
 
