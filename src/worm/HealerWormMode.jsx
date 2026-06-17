@@ -2386,6 +2386,22 @@ function PowerupOrbs({ size }) {
     })));
     const faceColors = useMemo(() => resolveColors(settings), [settings]);
 
+    // Cheap signature of just the orb-tile stickers' colors. `cubies` gets a new
+    // array reference on every single rotation/flip, but only a handful of tiles
+    // (the ~24 orb positions) actually matter here — keying the heavier `orbs`
+    // memo below on this signature instead of raw `cubies` lets it skip
+    // recomputing (and keep returning the same array reference) on every move
+    // that doesn't touch an orb tile.
+    const orbSignature = useMemo(() => {
+        if (!wormPowerups || !cubies) return '';
+        let sig = wormPowerups.length + '|';
+        for (const p of wormPowerups) {
+            const sticker = getStickerSafe(cubies, p.x, p.y, p.z, p.dirKey);
+            sig += `${p.x},${p.y},${p.z},${p.dirKey}:${sticker?.curr ?? 0},${sticker?.orig ?? 0};`;
+        }
+        return sig;
+    }, [wormPowerups, cubies]);
+
     const orbs = useMemo(() => {
         if (!wormPowerups || !cubies) return [];
         return wormPowerups.map(p => {
@@ -2398,7 +2414,8 @@ function PowerupOrbs({ size }) {
             const elevated = !!(sticker && sticker.curr !== sticker.orig);
             return { ...p, color, antipodalColor, elevated };
         });
-    }, [wormPowerups, cubies, faceColors]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [orbSignature, faceColors]);
 
     return <ParityOrbs orbs={orbs} size={size} isGlowWorm={wormCharacter === 'glow'} />;
 }
