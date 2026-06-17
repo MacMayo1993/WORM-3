@@ -8,7 +8,8 @@ import { useCallback, useMemo, useRef } from 'react';
 import { useGameStore } from './useGameStore.js';
 import { makeCubies } from '../game/cubeState.js';
 import { rotateSliceCubies } from '../game/cubeRotation.js';
-import { buildManifoldGridMap, flipStickerPair, findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
+import { flipStickerPair, findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
+import { getManifoldMap } from '../game/manifoldMapStore.js';
 import { healSticker as healStickerState } from '../game/cubeState.js';
 import { getStickerWorldPos, getManifoldGridId } from '../game/coordinates.js';
 import { play } from '../utils/audio.js';
@@ -55,17 +56,14 @@ export function useCubeState() {
   const resolvedColorsRef = useRef(resolvedColors);
   resolvedColorsRef.current = resolvedColors;
 
-  // Build manifold map.
-  // Only rebuilds when cube geometry changes (rotations/size changes), not on
-  // sticker flips. rotationEpoch is bumped by setRotatedCubies/setSize.
-  // We read from cubiesRef.current so we always get the post-rotation snapshot
-  // even if React hasn't re-rendered yet.
+  // Manifold map comes from the single shared owner (manifoldMapStore), keyed on
+  // (size, rotationEpoch). It only rebuilds when cube geometry changes (rotations/size),
+  // never on sticker flips, and returns a fresh Map reference whenever the epoch advances
+  // so memoized prop consumers re-render — while staying reference-stable across flips.
   const manifoldMap = useMemo(() => {
-    const c = cubiesRef.current;
-    if (!c || c.length !== size) return new Map();
-    return buildManifoldGridMap(c, size);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rotationEpoch, size]);
+    if (!cubies || cubies.length !== size) return new Map();
+    return getManifoldMap(cubies, size, rotationEpoch);
+  }, [cubies, size, rotationEpoch]);
   const manifoldMapRef = useRef(manifoldMap);
   manifoldMapRef.current = manifoldMap;
 

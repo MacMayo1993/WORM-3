@@ -10,9 +10,10 @@ import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { getStickerWorldPos, getManifoldGridId } from '../game/coordinates.js';
-import { getNextSurfacePosition, getActiveTunnels, getTunnelWorldPosInto, turnWorm, getStableKey, findStickerByStableKey } from './wormLogic.js';
+import { getNextSurfacePosition, getActiveTunnels, getTunnelWorldPosInto, turnWorm, getStableKey, findStickerByStableKey, isTileInSlice } from './wormLogic.js';
 import { setWormTurnCallback } from './wormTurnBridge.js';
 import { buildManifoldGridMap, buildManifoldGridMapIncremental, flipStickerPair, findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
+import { getManifoldMap } from '../game/manifoldMapStore.js';
 import { healSticker, getStickerSafe } from '../game/cubeState.js';
 import { rotateVec90 } from '../game/cubeRotation.js';
 import { DIR_TO_VEC, VEC_TO_DIR, ANTIPODAL_COLOR, FACE_COLORS } from '../utils/constants.js';
@@ -82,7 +83,28 @@ import { SURFACE_OFFSET } from '../utils/constants.js';
 
 // Pre-allocated axis vector for applying liveRotation to the worm during scramble
 const _liveAxis = new THREE.Vector3();
+// Axis scratch for baking a committed turn into the worm's position history.
+const _bakeAxis = new THREE.Vector3();
 const _tunnelDirScratch = new THREE.Vector3();
+
+// Make the worm's head ride a slice that is mid-rotation so it turns *with* the cube
+// instead of snapping into place only when the rotation commits. We rotate the already
+// positioned headInterpPos about the slice axis (through the cube centre) by the exact
+// signed angle CubeAssembly applies to the cubie meshes — same axis convention, same
+// angle — so head and tile stay glued together for the whole tween. The cube is centred
+// at the origin and getStickerWorldPos returns origin-centred coords, so applyAxisAngle
+// about the unit axis reproduces the slice transform (including any face-normal lift).
+// No-op unless a rotation is live and the worm sits in the rotating slice.
+// Returns true if it adjusted the head position.
+function rideLiveRotation(worm) {
+    if (!liveRotation.active) return false;
+    const { axis, sliceIndex, angle } = liveRotation;
+    const { x, y, z } = worm.pos.current;
+    if (!isTileInSlice(axis, sliceIndex, x, y, z)) return false;
+    _liveAxis.set(axis === 'col' ? 1 : 0, axis === 'row' ? 1 : 0, axis === 'depth' ? 1 : 0);
+    worm.headInterpPos.current.applyAxisAngle(_liveAxis, angle);
+    return true;
+}
 // Duration of the worm's entrance wiggle after the shuffle finishes
 const SPAWN_DURATION = 0.75;
 
@@ -243,18 +265,23 @@ const _evalLiftedPos = new THREE.Vector3();
 // ─── Step History Circular Buffer ────────────────────────────────────────────
 // Pre-allocated ring of {pos, normal} objects — eliminates per-step Vector3
 // allocations and O(N) unshift that grows to 60 000 elements at MAX_TAIL.
+// Each slot also carries the grid cell (tx,ty,tz) the point sits in, so the body
+// can ride a mid-rotation slice (and bake the turn at commit) without snapping.
 function makeStepHistory(capacity) {
     return {
-        buf: Array.from({ length: capacity }, () => ({ pos: new THREE.Vector3(), normal: new THREE.Vector3() })),
+        buf: Array.from({ length: capacity }, () => ({ pos: new THREE.Vector3(), normal: new THREE.Vector3(), tx: -1, ty: -1, tz: -1 })),
         head: 0,   // next write slot; newest entry is at (head-1+capacity)%capacity
         count: 0,
         capacity,
     };
 }
-function shPush(sh, pos, normal) {
+function shPush(sh, pos, normal, tx, ty, tz) {
     const slot = sh.buf[sh.head];
     slot.pos.copy(pos);
     slot.normal.copy(normal);
+    slot.tx = tx;
+    slot.ty = ty;
+    slot.tz = tz;
     sh.head = (sh.head + 1) % sh.capacity;
     if (sh.count < sh.capacity) sh.count++;
 }
@@ -322,6 +349,9 @@ function useWormCrawler(size, cubies) {
     );
     const wormPausedRef = useRef(false);
     wormPausedRef.current = wormPaused;
+
+    // Drives the shared manifold-map owner; advances only on geometry changes (rotations).
+    const rotationEpoch = useGameStore((s) => s.rotationEpoch);
 
     // Mutable refs for values captured by tick/PHASE_HANDLERS that change between renders.
     // Reading via ref avoids adding them to tick's useCallback deps, preventing tick from
@@ -397,13 +427,11 @@ function useWormCrawler(size, cubies) {
     // Both the manifold map and tunnel list are built in one pass to avoid a second O(size³×6) scan.
     const tunnelLookupRef = useRef(new Map());
     // This effect reruns on every cubies change (not debounced — tunnel lookup must stay
-    // exact for gameplay), which is ~12×/sec at chaos L4. The manifold map itself is the
-    // cheaper of the two passes to make incremental: hold it across calls and patch only
-    // the handful of cells that actually changed instead of rebuilding all size³×6 entries.
-    const manifoldMapCacheRef = useRef({ map: null, prevCubies: null, size: null });
+    // exact for gameplay), which is ~12×/sec at chaos L4. The manifold map comes from the
+    // single shared owner keyed on rotationEpoch, so flips reuse it for free and the only
+    // rebuild cost is paid once per rotation across all consumers.
     React.useEffect(() => {
-        // Build manifold map once and share it with getActiveTunnels to avoid a second rebuild
-        const manifoldMap = buildManifoldGridMapIncremental(cubies, size, manifoldMapCacheRef.current);
+        const manifoldMap = getManifoldMap(cubies, size, rotationEpoch);
         const tunnels = getActiveTunnels(cubies, size, manifoldMap);
 
         const encodeTile = (p) => `${p.x},${p.y},${p.z},${p.dirKey}`;
@@ -420,7 +448,7 @@ function useWormCrawler(size, cubies) {
             lookup.set(encodeTile(tunnel.exit), { tunnel, tunnelKey, reversed: true });
         }
         tunnelLookupRef.current = lookup;
-    }, [cubies, size]);
+    }, [cubies, size, rotationEpoch]);
 
     // Jump offset height at current jumpT
     const jumpLift = () => isJumping.current
@@ -617,7 +645,7 @@ function useWormCrawler(size, cubies) {
         const tile = randomUnflippedTile(cubiesRef.current, size, [pos.current]);
         if (!tile) return;
         useGameStore.setState((state) => {
-            const mm = buildManifoldGridMap(state.cubies, size);
+            const mm = getManifoldMap(state.cubies, size, state.rotationEpoch);
             return {
                 cubies: flipStickerPair(state.cubies, size, tile.x, tile.y, tile.z, tile.dirKey, mm)
             };
@@ -825,7 +853,14 @@ function useWormCrawler(size, cubies) {
                         const ptJump = jumpTAtR > 0 ? Math.sin(jumpTAtR * Math.PI) * JUMP_HEIGHT : 0;
                         // Compute lifted pos into module-level scratch, then copy into pre-allocated ring slot.
                         _evalLiftedPos.copy(_evalHPos).addScaledVector(ptNorm, WORM_LIFT + ptJump);
-                        shPush(stepHistory.current, _evalLiftedPos, ptNorm);
+                        // Tag the point with the grid cell it occupies, derived from the pre-lift
+                        // surface point (origin-centred coords → nearest lattice index). Used to ride
+                        // a mid-rotation slice and to bake the turn into history at commit.
+                        const _hk = (size - 1) / 2;
+                        const _htx = Math.min(size - 1, Math.max(0, Math.round(_evalHPos.x + _hk)));
+                        const _hty = Math.min(size - 1, Math.max(0, Math.round(_evalHPos.y + _hk)));
+                        const _htz = Math.min(size - 1, Math.max(0, Math.round(_evalHPos.z + _hk)));
+                        shPush(stepHistory.current, _evalLiftedPos, ptNorm, _htx, _hty, _htz);
                         lastRecordedT.current += 0.02; // A guaranteed resolution of 50 mathematical sub-steps per tile traverse
                     }
                     // -----------------------------------------------------------
@@ -1211,6 +1246,30 @@ function useWormCrawler(size, cubies) {
                     const r = rotateTilePosition(_parseTile, axis, sliceIndex, dir, size);
                     return `${r.x},${r.y},${r.z},${r.dirKey}`;
                 });
+
+                // Bake the committed turn into the body's position history: rotate the world
+                // position, surface normal, and grid tag of every recorded point that sat in the
+                // rotated slice. This uses the same predicate (isTileInSlice) and the same signed
+                // angle the body ride applied mid-tween, so ridden segments land seamlessly with
+                // no snap-back to their pre-rotation positions.
+                {
+                    const sh = stepHistory.current;
+                    if (sh.count > 0) {
+                        const k = (size - 1) / 2;
+                        const ang = dir * (Math.PI / 2);
+                        _bakeAxis.set(axis === 'col' ? 1 : 0, axis === 'row' ? 1 : 0, axis === 'depth' ? 1 : 0);
+                        for (let i = 0; i < sh.count; i++) {
+                            const slot = sh.buf[(sh.head - 1 - i + sh.capacity) % sh.capacity];
+                            if (slot.tx < 0 || !isTileInSlice(axis, sliceIndex, slot.tx, slot.ty, slot.tz)) continue;
+                            slot.pos.applyAxisAngle(_bakeAxis, ang);
+                            slot.normal.applyAxisAngle(_bakeAxis, ang).normalize();
+                            const [rx, ry, rz] = rotateVec90(slot.tx - k, slot.ty - k, slot.tz - k, axis, dir);
+                            slot.tx = Math.round(rx + k);
+                            slot.ty = Math.round(ry + k);
+                            slot.tz = Math.round(rz + k);
+                        }
+                    }
+                }
 
                 // If mid-tunnel, rotate active tunnel endpoints so exit snap lands on the correct tile
                 if (activeTunnel.current) {
@@ -1635,7 +1694,7 @@ function TunnelInteriorView({ worm, size }) {
             const { cubies, settings } = st;
             const fc = resolveColors(settings, settings?.biomeMode?.faceAssignment) || FACE_COLORS;
             const manifoldStyles = settings?.manifoldStyles ?? {};
-            const manifoldMap = buildManifoldGridMap(cubies, size);
+            const manifoldMap = getManifoldMap(cubies, size, st.rotationEpoch);
             for (let i = 0; i < stickerLayout.length; i++) {
                 const { sx, sy, sz, dirKey } = stickerLayout[i];
                 const mesh = stickerMeshesRef.current[i];
@@ -1816,9 +1875,15 @@ const _bodyClonePos = new THREE.Vector3();
 const _bodyCloneNormal = new THREE.Vector3();
 const _bodySegForward = new THREE.Vector3();
 const _bodySideVec = new THREE.Vector3();
-// Stable path-points buffer: reused every frame to avoid spread-array allocation
+// Scratch used to ride mid-rotation body points without mutating the history ring.
+const _bodyRideAxis = new THREE.Vector3();
+const _bodyEffA = new THREE.Vector3();
+const _bodyEffB = new THREE.Vector3();
+// Stable path-points buffer: reused every frame to avoid spread-array allocation.
+// The head point carries a sentinel tile (tx<0) so the body ride never rotates it —
+// the head's world position is already ridden upstream in the main worm useFrame.
 const _pathPointsBuffer = [];
-const _headPathPoint = { pos: _bodyHeadPos, normal: _bodyNormal };
+const _headPathPoint = { pos: _bodyHeadPos, normal: _bodyNormal, tx: -1, ty: -1, tz: -1 };
 
 function WormBody({ worm }) {
     const meshRef = useRef();       // sphere body (classic / inch / glow)
@@ -1872,6 +1937,25 @@ function WormBody({ worm }) {
         _pathPointsBuffer.length = steps.count + 1;
         _pathPointsBuffer[0] = _headPathPoint;
         for (let j = 0; j < steps.count; j++) _pathPointsBuffer[j + 1] = shAt(steps, j);
+
+        // Ride: while a slice is mid-rotation, body points sitting in that slice must turn
+        // with the cube. We rotate their world position about the slice axis on the fly (into
+        // scratch vectors, never mutating the ring) by the exact signed angle CubeAssembly
+        // applies to the cubies — so the body stays glued to the surface through the tween and,
+        // because commit bakes the same turn into history, there is no snap when it lands.
+        const _ride = liveRotation.active;
+        const _rAxis = liveRotation.axis;
+        const _rSlice = liveRotation.sliceIndex;
+        const _rAngle = liveRotation.angle;
+        if (_ride) _bodyRideAxis.set(_rAxis === 'col' ? 1 : 0, _rAxis === 'row' ? 1 : 0, _rAxis === 'depth' ? 1 : 0);
+        // Returns the effective (possibly ridden) world position for a path point, writing into
+        // `out` only when a rotation is applied; otherwise returns the point's own vector.
+        const effPos = (pt, out) => {
+            if (_ride && pt.tx >= 0 && isTileInSlice(_rAxis, _rSlice, pt.tx, pt.ty, pt.tz)) {
+                return out.copy(pt.pos).applyAxisAngle(_bodyRideAxis, _rAngle);
+            }
+            return pt.pos;
+        };
 
         // Dissolve: shrink all segments only while inside the Möbius ribbon (tunnel phase).
         // Worm remains visible during entering and exiting so the player sees it approach
@@ -1945,17 +2029,24 @@ function WormBody({ worm }) {
                 while (walkIndex < _pathPointsBuffer.length - 1) {
                     const ptA = _pathPointsBuffer[walkIndex];
                     const ptB = _pathPointsBuffer[walkIndex + 1];
-                    const distToNext = ptA.pos.distanceTo(ptB.pos);
+                    const aPos = effPos(ptA, _bodyEffA);
+                    const bPos = effPos(ptB, _bodyEffB);
+                    const distToNext = aPos.distanceTo(bPos);
 
                     if (cumulativeDist + distToNext >= targetDist) {
                         // Found the bracket on the curve! Interpolate exact point.
                         const t = distToNext > 0 ? (targetDist - cumulativeDist) / distToNext : 0;
                         // Use scratch vectors instead of .clone() to avoid GC pressure
-                        _bodyClonePos.lerpVectors(ptA.pos, ptB.pos, t);
+                        _bodyClonePos.lerpVectors(aPos, bPos, t);
                         _bodyCloneNormal.lerpVectors(ptA.normal, ptB.normal, t).normalize();
+                        // Keep the surface normal consistent with a ridden segment so the
+                        // wiggle/orientation track the rotating face rather than the old one.
+                        if (_ride && ptA.tx >= 0 && isTileInSlice(_rAxis, _rSlice, ptA.tx, ptA.ty, ptA.tz)) {
+                            _bodyCloneNormal.applyAxisAngle(_bodyRideAxis, _rAngle).normalize();
+                        }
 
                         // Calculate forward/side vector for the wiggle at this exact localized point
-                        _bodySegForward.subVectors(ptA.pos, ptB.pos).normalize();
+                        _bodySegForward.subVectors(aPos, bPos).normalize();
                         _bodySideVec.crossVectors(_bodyCloneNormal, _bodySegForward).normalize();
 
                         const wiggleAmp = _isInch ? 0.0 : 0.08 * Math.sin(fade * Math.PI);
@@ -1970,7 +2061,7 @@ function WormBody({ worm }) {
 
                 // If the track runs out (just spawned and moving), freeze at the last known point.
                 if (!foundPosition && _pathPointsBuffer.length > 0) {
-                    _bodyClonePos.copy(_pathPointsBuffer[_pathPointsBuffer.length - 1].pos);
+                    _bodyClonePos.copy(effPos(_pathPointsBuffer[_pathPointsBuffer.length - 1], _bodyEffA));
                 }
 
                 _wormDummy.position.copy(_bodyClonePos);
@@ -2699,6 +2790,9 @@ function TunnelHealProgress({ size }) {
         if (partial.length === 0) return [];
         // Build the manifold map once and share it across all findStickerByStableKey calls.
         // Without this, each call rebuilt an O(size³×6) map — 3 tunnels = 3× the work.
+        // NOTE: this operates on the *debounced* cubies snapshot, not the live epoch's, so it
+        // intentionally bypasses the shared manifoldMapStore owner (which is keyed on the live
+        // rotationEpoch) and builds against this lagged snapshot directly.
         const mm = buildManifoldGridMap(cubies, size);
         return partial
             .map(([key, p]) => {
@@ -3762,6 +3856,14 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     useFrame((_, delta) => {
         worm.tick(delta);
 
+        // While a slice the worm sits on is mid-rotation during live play, ride it so the
+        // worm visually turns with the cube rather than snapping into place only when the
+        // rotation commits. Only meaningful on the surface (crawling); tunnel phases aren't
+        // anchored to a slice, and other game phases position the worm themselves.
+        if (gameModePhaseRef.current === 'active' && worm.phase.current === 'crawling') {
+            rideLiveRotation(worm);
+        }
+
         const store = useGameStore.getState();
 
         // ── Phase: scrambling ──────────────────────────────────────────────────
@@ -3770,23 +3872,12 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         // rotating slice instead of staying frozen in world space.
         if (gameModePhaseRef.current === 'scrambling') {
             if (liveRotation.active) {
-                const { axis, sliceIndex, angle } = liveRotation;
+                // The worm is frozen during the scramble, so tick() didn't refresh
+                // headInterpPos — seed it from the flat tile position before riding the slice.
                 const { x, y, z, dirKey } = worm.pos.current;
-                const wormInSlice = (
-                    (axis === 'col'   && x === sliceIndex) ||
-                    (axis === 'row'   && y === sliceIndex) ||
-                    (axis === 'depth' && z === sliceIndex)
-                );
-                if (wormInSlice) {
-                    const wp = getStickerWorldPos(x, y, z, dirKey, size, 0);
-                    worm.headInterpPos.current.set(wp[0], wp[1], wp[2]);
-                    _liveAxis.set(
-                        axis === 'col' ? 1 : 0,
-                        axis === 'row' ? 1 : 0,
-                        axis === 'depth' ? 1 : 0
-                    );
-                    worm.headInterpPos.current.applyAxisAngle(_liveAxis, angle);
-                }
+                const wp = getStickerWorldPos(x, y, z, dirKey, size, 0);
+                worm.headInterpPos.current.set(wp[0], wp[1], wp[2]);
+                rideLiveRotation(worm);
             }
             return;
         }
@@ -3846,7 +3937,12 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             finalHealCheckTimer.current += delta;
             if (finalHealCheckTimer.current >= 0.5) {
                 finalHealCheckTimer.current = 0;
-                const remaining = getActiveTunnels(useGameStore.getState().cubies, size);
+                const liveState = useGameStore.getState();
+                const remaining = getActiveTunnels(
+                    liveState.cubies,
+                    size,
+                    getManifoldMap(liveState.cubies, size, liveState.rotationEpoch)
+                );
                 if (remaining.length === 0) {
                     gameModePhaseRef.current = 'solved';
                     const bodyOrbs = useGameStore.getState().wormBodyTiles ?? 0;

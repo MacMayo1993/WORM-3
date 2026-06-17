@@ -35,6 +35,21 @@ const TUNNEL_SELF_COLLISION_THRESHOLD = 0.05;
  */
 
 /**
+ * Whether a grid cell lies in the slice being rotated.
+ *
+ * The axis names map to grid coordinates the same way they do everywhere in the
+ * rotation pipeline (CubeAssembly, cubeRotation): 'col' → x, 'row' → y, 'depth' → z.
+ * Used to decide whether the worm (or any tile-anchored object) should ride a slice
+ * that is mid-rotation so it turns with the cube instead of snapping at commit time.
+ */
+export function isTileInSlice(axis, sliceIndex, x, y, z) {
+  if (axis === 'col') return x === sliceIndex;
+  if (axis === 'row') return y === sliceIndex;
+  if (axis === 'depth') return z === sliceIndex;
+  return false;
+}
+
+/**
  * Returns a rotation-stable key for a surface sticker using origPos + origDir.
  * The key survives cube rotations because origPos/origDir never change.
  * Returns null if the sticker cannot be found.
