@@ -3,6 +3,10 @@ import * as THREE from 'three';
 export const CAM_HEIGHT_BASE = 1.08;  // base height above worm
 export const CAM_BACK_BASE = 2.4;    // base behind distance
 export const LOOK_AHEAD = 4.0;      // look-at ahead of worm
+// How far to pull the crawl camera's look target back toward the cube centre so the
+// whole cube stays framed instead of the camera staring off the worm's nose.
+// 0 = pure chase (worm centred, cube drifts off-screen), 1 = always look at cube centre.
+export const CAM_CENTER_BIAS = 0.35;
 export const CAM_LERP = 8;          // camera smoothing (× delta)
 export const WORM_LIFT = 0.08; // worm sits right on tile surface
 export const ZOOM_BURST = 0.8; // brief camera pull-back on pickup (decays fast)

@@ -157,9 +157,10 @@ export default function GameScene({
   const wormholePhaseActive = wormHealerMode && (
     wormPhase === 'entering' || wormPhase === 'tunnel' || wormPhase === 'exiting'
   );
-  // In Healer WORM mode, always show antipodal PiP except during wormhole travel,
-  // where the dedicated tunnel camera takes over.
-  const shouldShowAntipodalPiP = (showAntipodalPiP || wormHealerMode) && !wormholePhaseActive;
+  // Antipodal PiP is shown only when the player toggles it on (in any mode), and is
+  // suppressed during wormhole travel where the dedicated tunnel camera takes over.
+  // (Previously worm mode force-showed it, which made the HUD toggle a no-op there.)
+  const shouldShowAntipodalPiP = showAntipodalPiP && !wormholePhaseActive;
 
   // Memoize the BACKGROUNDS array search — avoids re-iterating on every render.
   // Only recomputes when the user actually changes their background theme.
