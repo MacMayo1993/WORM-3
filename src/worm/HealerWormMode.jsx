@@ -3365,13 +3365,16 @@ function SliceWarningLights({ pendingRotRef, warningProgressRef, size, cubies })
             // add 15% margin so the ring clearly floats outside.
             const halfExt    = (size - 1) / 2;
             const ringRadius = halfExt * Math.SQRT2 * 1.15;
-            const ringTube   = Math.max(0.06, halfExt * 0.055);
+            const ringTube   = Math.max(0.11, halfExt * 0.1);
 
             if (customGeoRef.current) { customGeoRef.current.dispose(); customGeoRef.current = null; }
             const geo = new THREE.TorusGeometry(ringRadius, ringTube, RADIAL_SEGS, TUBULAR_SEGS);
 
-            // Vertex colors: cycle through all 6 face colors equally around the ring
-            const colors6  = [1, 2, 3, 4, 5, 6].map(id => new THREE.Color(faceColors[id] ?? '#ffffff'));
+            // Vertex colors: cycle through all 6 face colors equally around the ring.
+            // Boosted past 1.0 — additive blending only reads as "bright" when the
+            // source color itself is hot, otherwise the ring reads as a dim tint.
+            const COLOR_BOOST = 1.6;
+            const colors6  = [1, 2, 3, 4, 5, 6].map(id => new THREE.Color(faceColors[id] ?? '#ffffff').multiplyScalar(COLOR_BOOST));
             const vertCount = (RADIAL_SEGS + 1) * (TUBULAR_SEGS + 1);
             const colorArr  = new Float32Array(vertCount * 3);
             let ci = 0;
@@ -3423,8 +3426,8 @@ function SliceWarningLights({ pendingRotRef, warningProgressRef, size, cubies })
         _ringSpinQ.setFromAxisAngle(rotAxis, spinAngleRef.current);
         ring.quaternion.multiplyQuaternions(_ringSpinQ, baseQ);
 
-        const pulse = 0.7 + 0.3 * Math.sin(t * 7);
-        ring.material.opacity = (0.55 + wp * 0.4) * pulse;
+        const pulse = 0.85 + 0.15 * Math.sin(t * 7);
+        ring.material.opacity = (0.8 + wp * 0.2) * pulse;
         ring.scale.setScalar(1 + Math.sin(t * 4) * 0.02);
     });
 
@@ -3436,10 +3439,10 @@ function SliceWarningLights({ pendingRotRef, warningProgressRef, size, cubies })
                 ))}
             </group>
             {/* Rainbow spinning ring — geometry set imperatively in useFrame to scale with cube size */}
-            <mesh ref={ringRef} visible={false}>
+            <mesh ref={ringRef} visible={false} renderOrder={999}>
                 <torusGeometry args={[1, 0.04, RADIAL_SEGS, TUBULAR_SEGS]} />
                 <meshBasicMaterial vertexColors transparent opacity={0.9}
-                    blending={THREE.AdditiveBlending} depthWrite={false} />
+                    blending={THREE.AdditiveBlending} depthWrite={false} depthTest={false} />
             </mesh>
         </>
     );
