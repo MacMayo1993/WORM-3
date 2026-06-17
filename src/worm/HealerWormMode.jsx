@@ -23,6 +23,7 @@ import {
     CAM_HEIGHT_BASE,
     CAM_BACK_BASE,
     LOOK_AHEAD,
+    CAM_CENTER_BIAS,
     CAM_LERP,
     WORM_LIFT,
     ZOOM_BURST,
@@ -1408,6 +1409,9 @@ function WormChaseCamera({ worm, size }) {
                 .addScaledVector(_camNormal, camHeight)
                 .addScaledVector(_camForward, -camBack);
             _camTargetLook.copy(_camWormWorld).addScaledVector(_camForward, LOOK_AHEAD);
+            // Pull the look target partway toward the cube centre (origin) so the whole cube
+            // stays framed rather than drifting off-screen as the camera tracks the worm.
+            _camTargetLook.multiplyScalar(1 - CAM_CENTER_BIAS);
 
             // Camera UP: always world-Y so the horizon stays level.
             // Bottom face is the only case where Y-up would flip the view.
