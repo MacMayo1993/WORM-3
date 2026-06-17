@@ -593,14 +593,13 @@ export default function WORM3() {
       }
 
       if (disparitySolveQueueRef.current.length === 0) {
-        // All reverse moves played — game is over
+        // All reverse moves played — the cosmetic unshuffle animation is done,
+        // but that's unrelated to the chaos elimination battle's progress. The
+        // worker keeps running and will declare the real winner (see
+        // useChaosWorker.js) once it actually narrows living stickers down to
+        // a final antipodal pair. Forcing a fake winner here used to end the
+        // game while the cube still showed many active tiles.
         disparitySolveActiveRef.current = false;
-        const s = useGameStore.getState();
-        if (!s.disparityWinner) {
-          // Chaos didn't kill anyone outright; show winner screen anyway
-          useGameStore.getState().setDisparityWinner({ pair: [] });
-          useGameStore.getState().setShowDisparityWinner(true);
-        }
         return;
       }
 
