@@ -163,13 +163,13 @@ WormChaseCamera (`:1212`), TunnelSurfFX (`:1385`), WormBody (`:1581`), GlowWormA
 5. ✅ Volume styles (lava, ice, water, neural, circuit, galaxy, wood, grass) share geometries and per-face-color materials at module level via `getVolumeResource`, with `dispose={null}` so R3F never disposes shared resources; was 3–6 fresh geometries + materials per sticker per mount (§1.2 step 1).
 
 ### Phase 2 — structural, medium risk (~2–4 days)
-6. Single animation-manager `useFrame` with an active-sticker registry; remove per-sticker callbacks (§1.1). **Biggest single gain.**
+6. ✅ Single animation-manager `useFrame` with an active-sticker registry; per-sticker callbacks removed (§1.1). `StickerAnimationManager.js` holds the registry + active set, `StickerAnimationDriver.jsx` is the one `useFrame` (mounted inside `StickerInstanceProvider` to preserve frame-ordering), `StickerPlane.jsx` registers a stable wrapper once on mount and activates/deactivates at the same discrete events the old `anyActive` gate already detected. **Biggest single gain.**
 7. ✅ Worker-side rotation: `lastRotation` posted as a lightweight `ROTATE_SLICE` message instead of cloning cubies; main-thread manifold rebuild is now lazy (invalidated on rotation, rebuilt on the next flip-bearing TICK) instead of eager per rotation (§3.2).
-8. WormBody tail LOD + color-epoch updates (§2.3).
+8. WormBody tail LOD + color-epoch updates (§2.3) — color-epoch done; distance-LOD on the tail still open.
 
 ### Phase 3 — polish (~as needed)
 9. ✅ Auto-fallback to flat shader styles at `size >= 6` (§1.2): `StickerPlane.jsx`'s volume group (`GrassBlades`/`WaterVolume`/`LavaVolume`/`IceVolume`/`GalaxyVolume`/`NeuralVolume`/`CircuitVolume`/`WoodVolume`) is now set `visible={false}` via a `suppressVolumeFX` flag when the cube size is 6 or 7, leaving the already-present flat shader-styled sticker quad as the fallback. Full instanced-volume-styles rework remains a longer-term option if the visual loss at 6-7 is judged too aggressive.
-10. Incremental manifold-map maintenance from flip events (§2.2).
+10. ✅ `WormholeRings`' cubies debounce (§2.2) is now phase-aware: 400 ms during `crawling` (rings already throttle to 20 Hz there, so the extra latency is invisible) vs. the original 200 ms during `entering`/`tunnel`/`exiting` where the 60 Hz ring cadence needs the tighter resync. Full incremental manifold-map maintenance (patching the map/tunnel set in O(1) per flip instead of rebuilding) remains open as the higher-effort option if the debounce alone isn't enough at chaos L4-5.
 11. ✅ Stable cubie identity across rotations for cheap memo bailouts (§1.4) — already implemented: `rotateSliceCubies` (`src/game/cubeRotation.js`) only replaces cubie object references for cubies inside the rotating slice, and `Cubie.jsx`'s `cubiePropsAreEqual` comparator relies on that reference equality to bail out early for the ~6/7ths of the cube that didn't rotate.
 12. Adaptive quality tier (dynamic DPR clamp / effect toggles keyed to a moving frame-time average) — see also `docs/rendering-optimization-audit.md` §B; sizes 6–7 could default to the reduced tier.
 

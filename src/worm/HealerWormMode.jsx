@@ -2766,13 +2766,17 @@ function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUseCountsR
         return s;
     }, [MAX_RINGS]);
 
-    // Debounce cubies so the O(size³×6) scan only reruns every 200 ms instead
-    // of on every individual sticker flip (~12×/sec at chaos L4).
+    // Debounce cubies so the O(size³×6) scan only reruns every 200-400 ms instead
+    // of on every individual sticker flip (~12×/sec at chaos L4). Crawling phase can
+    // tolerate the longer delay since the rings already throttle to 20 Hz there; tunnel
+    // phases (entering/tunnel/exiting) keep the tighter delay for the 60 Hz ring cadence.
     const [debouncedCubies, setDebouncedCubies] = useState(cubies);
     useEffect(() => {
-        const timer = setTimeout(() => setDebouncedCubies(cubies), 200);
+        const phase = worm?.phase?.current ?? 'crawling';
+        const delayMs = phase === 'crawling' ? 400 : 200;
+        const timer = setTimeout(() => setDebouncedCubies(cubies), delayMs);
         return () => clearTimeout(timer);
-    }, [cubies]);
+    }, [cubies, worm]);
 
     // All flipped surface positions, augmented with canonical tunnel key so
     // WormholeRings can tell live vs void without re-running manifold logic per frame.
