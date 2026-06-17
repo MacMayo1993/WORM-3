@@ -10,7 +10,7 @@ import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { getStickerWorldPos, getManifoldGridId } from '../game/coordinates.js';
-import { getNextSurfacePosition, getActiveTunnels, getTunnelWorldPosInto, turnWorm, getStableKey, findStickerByStableKey } from './wormLogic.js';
+import { getNextSurfacePosition, getActiveTunnels, getTunnelWorldPosInto, turnWorm, getStableKey, findStickerByStableKey, isTileInSlice } from './wormLogic.js';
 import { setWormTurnCallback } from './wormTurnBridge.js';
 import { buildManifoldGridMap, buildManifoldGridMapIncremental, flipStickerPair, findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
 import { getManifoldMap } from '../game/manifoldMapStore.js';
@@ -84,6 +84,25 @@ import { SURFACE_OFFSET } from '../utils/constants.js';
 // Pre-allocated axis vector for applying liveRotation to the worm during scramble
 const _liveAxis = new THREE.Vector3();
 const _tunnelDirScratch = new THREE.Vector3();
+
+// Make the worm's head ride a slice that is mid-rotation so it turns *with* the cube
+// instead of snapping into place only when the rotation commits. We rotate the already
+// positioned headInterpPos about the slice axis (through the cube centre) by the exact
+// signed angle CubeAssembly applies to the cubie meshes — same axis convention, same
+// angle — so head and tile stay glued together for the whole tween. The cube is centred
+// at the origin and getStickerWorldPos returns origin-centred coords, so applyAxisAngle
+// about the unit axis reproduces the slice transform (including any face-normal lift).
+// No-op unless a rotation is live and the worm sits in the rotating slice.
+// Returns true if it adjusted the head position.
+function rideLiveRotation(worm) {
+    if (!liveRotation.active) return false;
+    const { axis, sliceIndex, angle } = liveRotation;
+    const { x, y, z } = worm.pos.current;
+    if (!isTileInSlice(axis, sliceIndex, x, y, z)) return false;
+    _liveAxis.set(axis === 'col' ? 1 : 0, axis === 'row' ? 1 : 0, axis === 'depth' ? 1 : 0);
+    worm.headInterpPos.current.applyAxisAngle(_liveAxis, angle);
+    return true;
+}
 // Duration of the worm's entrance wiggle after the shuffle finishes
 const SPAWN_DURATION = 0.75;
 
@@ -3767,6 +3786,14 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     useFrame((_, delta) => {
         worm.tick(delta);
 
+        // While a slice the worm sits on is mid-rotation during live play, ride it so the
+        // worm visually turns with the cube rather than snapping into place only when the
+        // rotation commits. Only meaningful on the surface (crawling); tunnel phases aren't
+        // anchored to a slice, and other game phases position the worm themselves.
+        if (gameModePhaseRef.current === 'active' && worm.phase.current === 'crawling') {
+            rideLiveRotation(worm);
+        }
+
         const store = useGameStore.getState();
 
         // ── Phase: scrambling ──────────────────────────────────────────────────
@@ -3775,23 +3802,12 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         // rotating slice instead of staying frozen in world space.
         if (gameModePhaseRef.current === 'scrambling') {
             if (liveRotation.active) {
-                const { axis, sliceIndex, angle } = liveRotation;
+                // The worm is frozen during the scramble, so tick() didn't refresh
+                // headInterpPos — seed it from the flat tile position before riding the slice.
                 const { x, y, z, dirKey } = worm.pos.current;
-                const wormInSlice = (
-                    (axis === 'col'   && x === sliceIndex) ||
-                    (axis === 'row'   && y === sliceIndex) ||
-                    (axis === 'depth' && z === sliceIndex)
-                );
-                if (wormInSlice) {
-                    const wp = getStickerWorldPos(x, y, z, dirKey, size, 0);
-                    worm.headInterpPos.current.set(wp[0], wp[1], wp[2]);
-                    _liveAxis.set(
-                        axis === 'col' ? 1 : 0,
-                        axis === 'row' ? 1 : 0,
-                        axis === 'depth' ? 1 : 0
-                    );
-                    worm.headInterpPos.current.applyAxisAngle(_liveAxis, angle);
-                }
+                const wp = getStickerWorldPos(x, y, z, dirKey, size, 0);
+                worm.headInterpPos.current.set(wp[0], wp[1], wp[2]);
+                rideLiveRotation(worm);
             }
             return;
         }
