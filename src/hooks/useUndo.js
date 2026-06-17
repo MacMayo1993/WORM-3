@@ -53,6 +53,7 @@ export function useUndo(startAnimation) {
           return {
             cubies: c,
             rotationEpoch: state.rotationEpoch + 1,
+            lastRotation: { axis, sliceIndex, dir: -dir, numTurns: turns },
             moves: Math.max(0, state.moves - turns),
             moveHistory: state.moveHistory.slice(0, -1),
           };

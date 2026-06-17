@@ -94,6 +94,12 @@ export function useChaosWorker({
       const { flips, cascades, deaths, eliminatedFaces, winner, metrics } = e.data.payload;
 
       if (flips?.length > 0) {
+        // manifoldMapRef may have been invalidated (set to null) by the rotationEpoch
+        // effect below — rebuild lazily here, on the next flip, instead of eagerly on
+        // every rotation. This keeps the rotation-completion frame cheap.
+        if (!manifoldMapRef.current) {
+          manifoldMapRef.current = buildManifoldGridMap(cubiesRef.current, size);
+        }
         const next = applyChaosFlipsBatch(cubiesRef.current, flips, size, manifoldMapRef.current, disparityFlipCapRef.current);
         setCubies(next);
       }
@@ -189,11 +195,23 @@ export function useChaosWorker({
   useEffect(() => {
     if (!workerRef.current || !chaosMode) return;
     // Use cubiesRef to read current state without triggering on every chaos flip.
-    // SYNC_CUBIES must only fire on actual cube rotations (rotationEpoch), not on
+    // This effect must only fire on actual cube rotations (rotationEpoch), not on
     // every disparity flip — otherwise the worker state rolls back to the main
     // thread's lagging snapshot and M2/corner stickers spaz from being re-flipped.
-    manifoldMapRef.current = buildManifoldGridMap(cubiesRef.current, size);
-    workerRef.current.postMessage({ type: 'SYNC_CUBIES', payload: { cubies: cubiesRef.current } });
+    const lastRotation = useGameStore.getState().lastRotation;
+    if (lastRotation) {
+      // Single-slice rotation: replay the lightweight move params on the worker's
+      // own state instead of structured-cloning the entire cubies array across the
+      // postMessage boundary. Invalidate the cached manifold map rather than rebuild
+      // it eagerly — the next TICK that actually applies a flip will rebuild it lazily.
+      manifoldMapRef.current = null;
+      workerRef.current.postMessage({ type: 'ROTATE_SLICE', payload: lastRotation });
+    } else {
+      // Full resync (size change, shuffle reset, loaded state) — no single move to
+      // replay, so fall back to a full clone + eager rebuild.
+      manifoldMapRef.current = buildManifoldGridMap(cubiesRef.current, size);
+      workerRef.current.postMessage({ type: 'SYNC_CUBIES', payload: { cubies: cubiesRef.current } });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chaosMode, rotationEpoch]);
 

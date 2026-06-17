@@ -164,13 +164,13 @@ WormChaseCamera (`:1212`), TunnelSurfFX (`:1385`), WormBody (`:1581`), GlowWormA
 
 ### Phase 2 — structural, medium risk (~2–4 days)
 6. Single animation-manager `useFrame` with an active-sticker registry; remove per-sticker callbacks (§1.1). **Biggest single gain.**
-7. Worker-side rotation: post rotation params instead of cloning cubies; drop the per-rotation main-thread manifold rebuild (§3.2).
+7. ✅ Worker-side rotation: `lastRotation` posted as a lightweight `ROTATE_SLICE` message instead of cloning cubies; main-thread manifold rebuild is now lazy (invalidated on rotation, rebuilt on the next flip-bearing TICK) instead of eager per rotation (§3.2).
 8. WormBody tail LOD + color-epoch updates (§2.3).
 
 ### Phase 3 — polish (~as needed)
-9. Instanced volume styles, or auto-fallback to flat shader styles at `size >= 6` (§1.2) — the fallback alone is a 1-hour change with most of the benefit.
+9. ✅ Auto-fallback to flat shader styles at `size >= 6` (§1.2): `StickerPlane.jsx`'s volume group (`GrassBlades`/`WaterVolume`/`LavaVolume`/`IceVolume`/`GalaxyVolume`/`NeuralVolume`/`CircuitVolume`/`WoodVolume`) is now set `visible={false}` via a `suppressVolumeFX` flag when the cube size is 6 or 7, leaving the already-present flat shader-styled sticker quad as the fallback. Full instanced-volume-styles rework remains a longer-term option if the visual loss at 6-7 is judged too aggressive.
 10. Incremental manifold-map maintenance from flip events (§2.2).
-11. Stable cubie identity across rotations for cheap memo bailouts (§1.4).
+11. ✅ Stable cubie identity across rotations for cheap memo bailouts (§1.4) — already implemented: `rotateSliceCubies` (`src/game/cubeRotation.js`) only replaces cubie object references for cubies inside the rotating slice, and `Cubie.jsx`'s `cubiePropsAreEqual` comparator relies on that reference equality to bail out early for the ~6/7ths of the cube that didn't rotate.
 12. Adaptive quality tier (dynamic DPR clamp / effect toggles keyed to a moving frame-time average) — see also `docs/rendering-optimization-audit.md` §B; sizes 6–7 could default to the reduced tier.
 
 **Combined expected effect at size 7:** Phases 1–2 should recover roughly 5–9 ms/frame in worm mode and remove the per-rotation/per-death hitches in disparity mode — enough to bring 6–7 in line with how 3–5 feels today.

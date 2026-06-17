@@ -1223,6 +1223,12 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // Full-face GLBs (arch, volcano) cover the entire sticker — suppress shader + volumes beneath them.
   const glbFullFace = biomeEnabled && !!stableCity && isGLBFullFace(stableCity);
 
+  // Performance fallback: at size >= 6 each sticker's 3D volume style (lava, ice, water,
+  // neural, circuit, galaxy, wood, grass) adds 3-6 extra meshes/draw calls on top of the
+  // already-large sticker count (294 at size 7). Hide the volume layer and fall back to
+  // the flat shader-styled sticker quad beneath it, which is unaffected by this flag.
+  const suppressVolumeFX = (faceSize ?? 3) >= 6;
+
   // Use shader material for non-solid styles (when no texture is applied)
   const useShaderStyle = !isGlass && tileStyle !== 'solid' && !currTexture && !isSudokube && !glbFullFace;
   const styleMaterial = useMemo(() => {
@@ -1434,8 +1440,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           )}
         </mesh>}
 
-        {/* 3D style volumes — suppressed for full-face GLBs that cover the entire tile */}
-        <group visible={!glbFullFace}>
+        {/* 3D style volumes — suppressed for full-face GLBs that cover the entire tile,
+            and at size >= 6 as a performance fallback (see suppressVolumeFX above) */}
+        <group visible={!glbFullFace && !suppressVolumeFX}>
           {/* 3D grass blades overlay */}
           {tileStyle === 'grass' && !isGlass && !isSudokube && !currTexture && (
             <GrassBlades faceColor={baseColor} />

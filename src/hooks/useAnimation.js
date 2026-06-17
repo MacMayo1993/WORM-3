@@ -111,6 +111,7 @@ export function useAnimation() {
         useGameStore.setState((state) => ({
           cubies: rotateSliceCubies(state.cubies, size, axis, sliceIndex, dir),
           rotationEpoch: state.rotationEpoch + 1,
+          lastRotation: { axis, sliceIndex, dir },
           animState: null,
           pendingMove: null,
         }));
@@ -131,6 +132,7 @@ export function useAnimation() {
         useGameStore.setState((state) => ({
           cubies: rotateSliceCubies(state.cubies, size, axis, sliceIndex, dir),
           rotationEpoch: state.rotationEpoch + 1,
+          lastRotation: { axis, sliceIndex, dir },
           animState: null,
           pendingMove: null,
         }));
@@ -167,6 +169,7 @@ export function useAnimation() {
           return {
             cubies: c,
             rotationEpoch: state.rotationEpoch + 1,
+            lastRotation: { axis, sliceIndex, dir, numTurns },
             moves: state.moves + numTurns,
             moveHistory: [...state.moveHistory, { type: 'rotation', axis, dir, sliceIndex, numTurns, timestamp: Date.now() }].slice(-10),
             animState: null,
@@ -179,6 +182,7 @@ export function useAnimation() {
         useGameStore.setState((state) => ({
           cubies: rotateSliceCubies(state.cubies, size, axis, sliceIndex, dir),
           rotationEpoch: state.rotationEpoch + 1,
+          lastRotation: { axis, sliceIndex, dir },
           reversalCount: state.reversalCount + 1,
           animState: null,
           pendingMove: null,
@@ -267,6 +271,7 @@ export function useAnimation() {
         return {
           cubies: c,
           rotationEpoch: state.rotationEpoch + 1,
+          lastRotation: { axis, sliceIndex, dir, numTurns },
           moves: state.moves + numTurns,
           moveHistory: [...state.moveHistory, { type: 'rotation', axis, dir, sliceIndex, numTurns, timestamp: Date.now() }].slice(-10),
         };
