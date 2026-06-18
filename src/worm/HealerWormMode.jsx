@@ -1489,58 +1489,74 @@ function WormChaseCamera({ worm, size }) {
             camUpRef.current.lerp(_camUp, Math.min(1, crawlK * delta)).normalize();
             camera.up.copy(camUpRef.current);
             camera.lookAt(lookAtRef.current);
-        } else if ((phase === 'windup' || phase === 'entering' || phase === 'tunnel' || phase === 'exiting') && worm.activeTunnel.current) {
-            // Map phase+progress to a single [0,1] parameter for the HUD dot / dim system.
+        } else if ((phase === 'windup' || phase === 'entering' || phase === 'exiting') && worm.activeTunnel.current) {
+            // Suck-in (windup + entering) and spit-out (exiting) are watched from OUTSIDE the cube,
+            // so the player sees the worm swirl into the entry hole and burst out of the exit hole
+            // against the (now visible) cube. The middle 'tunnel' beat rides inside — see below.
             const tp = worm.tunnelProgress.current;
-            const t = phase === 'windup'   ? 0 :
-                      phase === 'entering' ? tp * 0.33 :
-                      phase === 'tunnel'   ? 0.33 + tp * 0.34 :
-                                             0.67 + tp * 0.33;
             const tunnel = worm.activeTunnel.current;
-            const onEntrySide = phase === 'windup' || phase === 'entering';
-            const onExitSide  = phase === 'exiting';
+            const onExitSide = phase === 'exiting';
 
-            // Publish to MobiusHUD's DOM RAF loop and MobiusTunnel dim system.
+            // Publish [0,1] progress to MobiusHUD's DOM RAF loop and the MobiusTunnel dim system.
             tunnelState.active = true;
-            tunnelState.t = t;
+            tunnelState.t = phase === 'windup' ? 0 : phase === 'entering' ? tp * 0.33 : 0.67 + tp * 0.33;
             tunnelState.activeTunnelId = tunnel.pairId ?? null;
 
             const entN = FACE_NORMALS[tunnel.entry.dirKey] ?? FACE_NORMALS.PY;
             const extN = FACE_NORMALS[tunnel.exit.dirKey]  ?? FACE_NORMALS.PY;
-
-            // Watch the holes from OUTSIDE the cube. The worm dives in through an opaque face, so
-            // a camera that rides in behind it sees nothing. Instead frame the entry hole from
-            // outside as the worm is sucked in, glide across during the middle, then frame the
-            // exit hole as it bursts out.
             const ew = getStickerWorldPos(tunnel.entry.x, tunnel.entry.y, tunnel.entry.z, tunnel.entry.dirKey, size, 0);
             const xw = getStickerWorldPos(tunnel.exit.x,  tunnel.exit.y,  tunnel.exit.z,  tunnel.exit.dirKey,  size, 0);
             _ribVStart.set(ew[0], ew[1], ew[2]); // entry hole (surface)
             _ribVEnd  .set(xw[0], xw[1], xw[2]); // exit hole (surface)
 
-            // External vantage per hole: pulled out along the face normal and lifted in world-Y so
-            // the worm and the swirl/burst stay framed against the cube.
-            const portalDist = 4.0 + size * 1.15;
-            const portalUp   = 2.0 + size * 0.45;
-            _camSurfCam.copy(_ribVStart).addScaledVector(entN, portalDist); _camSurfCam.y += portalUp; // entry cam pose
-            _ribMidA  .copy(_ribVEnd  ).addScaledVector(extN, portalDist); _ribMidA.y   += portalUp;   // exit cam pose
-
-            if (onEntrySide) { // windup + entering — frame the entry hole
-                _camTargetCam.copy(_camSurfCam);
-                _camTargetLook.copy(_ribVStart);
-            } else if (onExitSide) { // exiting + windout — frame the exit hole
-                _camTargetCam.copy(_ribMidA);
-                _camTargetLook.copy(_ribVEnd);
-            } else { // tunnel — glide from the entry view across to the exit view
-                _camTargetCam.lerpVectors(_camSurfCam, _ribMidA, tp);
-                _camTargetLook.lerpVectors(_ribVStart, _ribVEnd, tp);
-            }
+            // External vantage: pulled out along the active hole's face normal and lifted in
+            // world-Y so the swirl/burst and the cube stay framed together.
+            const portalDist = 2.8 + size * 0.85;
+            const portalUp   = 1.3 + size * 0.32;
+            const hole  = onExitSide ? _ribVEnd : _ribVStart;
+            const holeN = onExitSide ? extN : entN;
+            _camTargetCam.copy(hole).addScaledVector(holeN, portalDist); _camTargetCam.y += portalUp;
+            _camTargetLook.copy(hole);
 
             // World-up, flipped only when looking at a bottom-facing hole to avoid inversion.
-            const lookN = onExitSide ? extN : entN;
-            _camUp.set(0, lookN.y < -0.85 ? -1 : 1, 0);
+            _camUp.set(0, holeN.y < -0.85 ? -1 : 1, 0);
 
-            const k = phase === 'tunnel' ? 2.0 : 3.0;
-            const a = Math.min(1, k * delta);
+            const a = Math.min(1, 3.0 * delta);
+            camPosRef.current.lerp(_camTargetCam, a);
+            lookAtRef.current.lerp(_camTargetLook, a);
+            camera.position.copy(camPosRef.current);
+            camUpRef.current.lerp(_camUp, a).normalize();
+            camera.up.copy(camUpRef.current);
+            camera.lookAt(lookAtRef.current);
+        } else if (phase === 'tunnel' && worm.activeTunnel.current) {
+            // Möbius ride: chase the worm head along the rendered ribbon centerline from INSIDE
+            // the hollow cube (exterior cubies are hidden this phase), so the worm appears to ride
+            // directly on the band. The head travels the middle third of the ribbon (near the core).
+            const tp = worm.tunnelProgress.current;
+            const tunnel = worm.activeTunnel.current;
+
+            tunnelState.active = true;
+            tunnelState.t = 0.33 + tp * 0.34;
+            tunnelState.activeTunnelId = tunnel.pairId ?? null;
+
+            const tHead = 0.33 + tp * 0.34;
+            getTunnelWorldPosInto(_camLookVec, tunnel, tHead, size);                            // head pos
+            getTunnelWorldPosInto(_camLookAheadVec, tunnel, Math.min(tHead + 0.05, 1), size);    // just ahead
+            _camTunnelTangent.subVectors(_camLookAheadVec, _camLookVec);
+            if (_camTunnelTangent.lengthSq() < 1e-6) _camTunnelTangent.set(0, 0, -1);
+            else _camTunnelTangent.normalize();
+
+            // World-up, swapped to Z when the ribbon runs near-vertical (avoids a gimbal flip).
+            _camUp.set(0, 1, 0);
+            if (Math.abs(_camTunnelTangent.y) > 0.95) _camUp.set(0, 0, 1);
+
+            // Sit close behind + slightly above the head (the tunnel head stays near the core, so
+            // these are small fixed offsets that keep the camera inside the shell).
+            const back = 0.8, up = 0.35, lookAhead = 0.55;
+            _camTargetCam.copy(_camLookVec).addScaledVector(_camTunnelTangent, -back).addScaledVector(_camUp, up);
+            _camTargetLook.copy(_camLookVec).addScaledVector(_camTunnelTangent, lookAhead);
+
+            const a = Math.min(1, 2.0 * delta);
             camPosRef.current.lerp(_camTargetCam, a);
             lookAtRef.current.lerp(_camTargetLook, a);
             camera.position.copy(camPosRef.current);
@@ -2044,11 +2060,10 @@ function WormBody({ worm, size }) {
             return pt.pos;
         };
 
-        // Dissolve: shrink all segments only while inside the Möbius ribbon (tunnel phase).
-        // Worm remains visible during entering and exiting so the player sees it approach
-        // and emerge. Tunnel → 0.0, all other phases → 1.0.
+        // Worm stays visible through the whole Möbius ride now (the tunnel camera rides inside on
+        // the band, so the player watches the worm ride it). No dissolve.
         const _phase = worm.phase.current;
-        const targetTS = _phase === 'tunnel' ? 0.0 : 1.0;
+        const targetTS = 1.0;
         transitScaleRef.current += (targetTS - transitScaleRef.current) * Math.min(1, delta * 9);
         const transitScale = transitScaleRef.current;
 
@@ -2066,11 +2081,13 @@ function WormBody({ worm, size }) {
         // climbs out the body is spat from the exit hole. Segments that haven't reached the
         // mouth yet stay on the surface (entering) or are hidden until they emerge (exiting).
         const _funnelTunnel = worm.activeTunnel.current;
-        const _funnelOn = (_phase === 'entering' || _phase === 'exiting') && !!_funnelTunnel;
+        const _funnelOn = (_phase === 'entering' || _phase === 'tunnel' || _phase === 'exiting') && !!_funnelTunnel;
         let _headTunT = -1, _segDt = 0.02;
         if (_funnelOn) {
             const _tprog = worm.tunnelProgress.current;
-            _headTunT = _phase === 'entering' ? _tprog * 0.33 : 0.67 + _tprog * 0.33;
+            _headTunT = _phase === 'entering' ? _tprog * 0.33
+                      : _phase === 'tunnel'   ? 0.33 + _tprog * 0.34
+                      :                         0.67 + _tprog * 0.33;
             getTunnelWorldPosInto(_tunFunnelA, _funnelTunnel, 0, size);
             getTunnelWorldPosInto(_tunFunnelB, _funnelTunnel, 1, size);
             const _tunLen = _tunFunnelA.distanceTo(_tunFunnelB) * 1.7 + 0.001; // curve factor
@@ -2501,9 +2518,9 @@ function WormFace({ worm, size }) {
     const isBook = wormCharacterId === 'book';
 
     useFrame((_, delta) => {
-        // Match the worm body dissolve: hide face only while inside the Möbius ribbon
-        const crawling = worm.phase.current !== 'tunnel';
-        faceOpacityRef.current += ((crawling ? 1 : 0) - faceOpacityRef.current) * Math.min(1, delta * 9);
+        // Face stays visible through the whole Möbius ride now (worm rides the band on-camera).
+        const showFace = true;
+        faceOpacityRef.current += ((showFace ? 1 : 0) - faceOpacityRef.current) * Math.min(1, delta * 9);
         const faceVisible = faceOpacityRef.current > 0.05;
         if (leftEyeRef.current)  leftEyeRef.current.visible  = faceVisible;
         if (rightEyeRef.current) rightEyeRef.current.visible = faceVisible;
@@ -2514,18 +2531,18 @@ function WormFace({ worm, size }) {
         if (!faceVisible) return;
 
         const phase = worm.phase.current;
-        const inTransit = (phase === 'entering' || phase === 'exiting') && worm.activeTunnel.current;
+        const inTransit = (phase === 'entering' || phase === 'tunnel' || phase === 'exiting') && worm.activeTunnel.current;
 
         let normal;
         if (inTransit) {
-            // During entering/exiting the head is driven by getTunnelWorldPosInto, not surface
-            // interp. Read headInterpPos/currentNormal which are always current.
+            // During entering/tunnel/exiting the head is driven by getTunnelWorldPosInto, not
+            // surface interp. Read headInterpPos/currentNormal which are always current.
             _faceHeadPos.copy(worm.headInterpPos.current);
             normal = worm.currentNormal.current;
 
             // Derive forward from the tunnel tangent at the current parametric position.
             const tp = worm.tunnelProgress.current;
-            const t = phase === 'entering' ? tp * 0.33 : 0.67 + tp * 0.33;
+            const t = phase === 'entering' ? tp * 0.33 : phase === 'tunnel' ? 0.33 + tp * 0.34 : 0.67 + tp * 0.33;
             const tAhead = Math.min(t + 0.02, 1.0);
             getTunnelWorldPosInto(_faceTunnelAhead, worm.activeTunnel.current, tAhead, size);
             _faceForward.copy(_faceTunnelAhead).sub(_faceHeadPos);
