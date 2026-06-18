@@ -2182,11 +2182,18 @@ function WormBody({ worm, size }) {
 
                 // Funnel override: pull segments that have crossed the mouth onto the ribbon.
                 let _funnelHide = false;
+                let _funnelPop = 1;
                 if (_funnelOn) {
                     const _segParam = _headTunT - i * _segDt;
                     if (_segParam >= 0) {
                         // In the tunnel — ride the ribbon one spacing behind the segment ahead.
                         getTunnelWorldPosInto(_bodyClonePos, _funnelTunnel, _segParam > 1 ? 1 : _segParam, size);
+                        if (_phase === 'exiting') {
+                            // Squash-and-pop: each segment bulges as it bursts out of the exit
+                            // mouth (param ≈ 1), then settles back to normal size as it travels out.
+                            const _d = Math.abs(_segParam - 1.0);
+                            _funnelPop = 1 + 0.6 * Math.max(0, 1 - _d / 0.14);
+                        }
                     } else if (_phase === 'exiting') {
                         // Tail hasn't emerged from the exit hole yet — keep it hidden rather than
                         // show it on the now-stale entry-side surface trail.
@@ -2210,6 +2217,7 @@ function WormBody({ worm, size }) {
                     _wormDummy.scale.setScalar(0.09);
                 }
                 if (_funnelHide) _wormDummy.scale.setScalar(0.00001); // tail not yet spat out
+                else if (_funnelPop !== 1) _wormDummy.scale.multiplyScalar(_funnelPop); // burst-out pop
             }
 
             if (transitScale < 1) _wormDummy.scale.multiplyScalar(transitScale);
@@ -3596,6 +3604,132 @@ function TunnelPortalRings({ worm, size }) {
     );
 }
 
+// ─── Tunnel Portal FX ─────────────────────────────────────────────────────────
+// Punchy moment effects layered on the wormhole transition:
+//   • Entry vortex — a stack of concentric rings forming a funnel mouth at the entry hole.
+//     They spin (faster as the worm dives) and pull inward, so the worm is visibly *sucked*
+//     down a swirling throat.
+//   • Exit burst — a one-shot shockwave ring + flash that fires the instant the worm breaks
+//     out of the exit hole, so it reads as being *spat out*.
+const _fxPos = new THREE.Vector3();
+const _fxNormal = new THREE.Vector3();
+const _fxQuat = new THREE.Quaternion();
+const _fxRingUp = new THREE.Vector3(0, 0, 1); // ring/torus geometry lies in XY → flat normal is +Z
+const VORTEX_RINGS = 4;
+
+function TunnelPortalFX({ worm, size }) {
+    const colors = useGameStore(s => s.wormActiveTunnelColors);
+    const entryColor = colors?.entryColor ?? '#33ddff';
+    const exitColor = colors?.exitColor ?? '#ff8833';
+
+    const vortexRef = useRef();
+    const vortexRingRefs = useRef([]);
+    const burstRef = useRef();
+    const burstFlashRef = useRef();
+    const burstTRef = useRef(-1);   // -1 idle, else 0..1 burst progress
+    const firedRef = useRef(false); // one-shot guard per traversal
+
+    useFrame(({ clock }, delta) => {
+        const phase = worm.phase.current;
+        const tunnel = worm.activeTunnel.current;
+        const prog = worm.tunnelProgress.current;
+        const t = clock.elapsedTime;
+
+        // ── Entry vortex (sucked in) ───────────────────────────────────────────
+        const vGroup = vortexRef.current;
+        if (vGroup) {
+            const showVortex = phase === 'entering' && !!tunnel;
+            vGroup.visible = showVortex;
+            if (showVortex) {
+                getTunnelWorldPosInto(_fxPos, tunnel, 0, size); // entry mouth
+                _fxNormal.copy(FACE_NORMALS[tunnel.entry.dirKey] ?? FACE_NORMALS.PY);
+                _fxQuat.setFromUnitVectors(_fxRingUp, _fxNormal);
+                vGroup.position.copy(_fxPos);
+                vGroup.quaternion.copy(_fxQuat);
+
+                const spin = t * 7 + prog * 14;           // accelerates as the worm dives
+                const shrink = 1 - Math.min(1, prog) * 0.65; // funnel narrows inward
+                const envelope = Math.sin(Math.min(1, prog * 1.15) * Math.PI); // fade in then out
+                for (let i = 0; i < VORTEX_RINGS; i++) {
+                    const r = vortexRingRefs.current[i];
+                    if (!r) continue;
+                    r.rotation.z = spin * (1 + i * 0.35);
+                    const baseR = 1 - i * 0.2;
+                    r.scale.setScalar(Math.max(0.02, baseR * shrink));
+                    r.position.z = -i * 0.16 * (0.6 + shrink); // recede into the hole (−normal)
+                    if (r.material) r.material.opacity = Math.max(0, envelope * (0.55 - i * 0.09));
+                }
+            }
+        }
+
+        // ── Exit burst (spat out) ──────────────────────────────────────────────
+        // Fire once, the instant the head breaks out of the exit mouth.
+        if (phase === 'exiting' && tunnel && !firedRef.current && prog > 0.55) {
+            firedRef.current = true;
+            burstTRef.current = 0;
+            getTunnelWorldPosInto(_fxPos, tunnel, 1, size); // exit mouth
+            _fxNormal.copy(FACE_NORMALS[tunnel.exit.dirKey] ?? FACE_NORMALS.PY);
+            _fxQuat.setFromUnitVectors(_fxRingUp, _fxNormal);
+            if (burstRef.current) {
+                burstRef.current.position.copy(_fxPos).addScaledVector(_fxNormal, 0.12);
+                burstRef.current.quaternion.copy(_fxQuat);
+            }
+            if (burstFlashRef.current) {
+                burstFlashRef.current.position.copy(_fxPos).addScaledVector(_fxNormal, 0.12);
+            }
+        }
+        if (phase === 'crawling') firedRef.current = false; // re-arm for the next tunnel
+
+        if (burstTRef.current >= 0) {
+            burstTRef.current = Math.min(1.0001, burstTRef.current + delta / 0.5);
+            const bt = burstTRef.current;
+            const ease = 1 - (1 - bt) * (1 - bt); // ease-out expansion
+            if (burstRef.current) {
+                burstRef.current.visible = bt < 1;
+                burstRef.current.scale.setScalar(0.15 + ease * 2.0);
+                if (burstRef.current.material) burstRef.current.material.opacity = (1 - bt) * 0.85;
+            }
+            if (burstFlashRef.current) {
+                burstFlashRef.current.visible = bt < 0.6;
+                burstFlashRef.current.scale.setScalar(0.25 + ease * 0.7);
+                if (burstFlashRef.current.material) burstFlashRef.current.material.opacity = Math.max(0, 0.6 - bt) * 1.4;
+            }
+            if (bt >= 1) burstTRef.current = -1;
+        } else {
+            if (burstRef.current) burstRef.current.visible = false;
+            if (burstFlashRef.current) burstFlashRef.current.visible = false;
+        }
+    });
+
+    return (
+        <>
+            {/* Entry vortex — concentric funnel rings */}
+            <group ref={vortexRef} visible={false}>
+                {Array.from({ length: VORTEX_RINGS }, (_, i) => (
+                    <mesh key={i} ref={el => (vortexRingRefs.current[i] = el)}>
+                        <torusGeometry args={[0.5, 0.045, 8, 36]} />
+                        <meshBasicMaterial color={entryColor} transparent opacity={0}
+                            blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+                    </mesh>
+                ))}
+            </group>
+
+            {/* Exit shockwave ring */}
+            <mesh ref={burstRef} visible={false}>
+                <ringGeometry args={[0.46, 0.6, 44]} />
+                <meshBasicMaterial color={exitColor} transparent opacity={0} side={THREE.DoubleSide}
+                    blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+            </mesh>
+            {/* Exit flash pop */}
+            <mesh ref={burstFlashRef} visible={false}>
+                <sphereGeometry args={[0.5, 16, 16]} />
+                <meshBasicMaterial color={exitColor} transparent opacity={0}
+                    blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+            </mesh>
+        </>
+    );
+}
+
 // ─── Slice Warning Lights ─────────────────────────────────────────────────────
 // Visual warning for the about-to-rotate slice:
 //   1. Spinning rainbow torus ring — encircles the cube at the slice plane, sized to the
@@ -4178,6 +4312,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             {wormAlive && <GlowWormAura worm={worm} />}
             {wormAlive && <WormFace worm={worm} size={size} />}
             {wormAlive && <PortalGlow worm={worm} size={size} />}
+            {wormAlive && <TunnelPortalFX worm={worm} size={size} />}
             {!wormInTunnel && <WormholeRings
                 cubies={cubies}
                 size={size}
