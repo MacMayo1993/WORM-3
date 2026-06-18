@@ -1406,7 +1406,7 @@ function WormChaseCamera({ worm, size }) {
             : phase === 'entering' ? THREE.MathUtils.clamp(_tp, 0, 1)
             : phase === 'exiting'  ? THREE.MathUtils.clamp(1 - _tp, 0, 1)
             : 0;
-        const targetFov = THREE.MathUtils.lerp(baseFov, baseFov + 8, tunnelMix); // mild widen for the portal view
+        const targetFov = THREE.MathUtils.lerp(baseFov, baseFov + 16, tunnelMix); // widen for the portal/tunnel view
         const fovAlpha = Math.min(1, delta * 6);
         const nextFov = THREE.MathUtils.lerp(camera.fov, targetFov, fovAlpha);
         if (Math.abs(nextFov - camera.fov) > 0.01) {
@@ -1550,13 +1550,14 @@ function WormChaseCamera({ worm, size }) {
             _camUp.set(0, 1, 0);
             if (Math.abs(_camTunnelTangent.y) > 0.95) _camUp.set(0, 0, 1);
 
-            // Sit close behind + slightly above the head (the tunnel head stays near the core, so
-            // these are small fixed offsets that keep the camera inside the shell).
-            const back = 0.8, up = 0.35, lookAhead = 0.55;
+            // Sit behind + above the head. The tunnel head stays near the core, so a little extra
+            // pull-back keeps the camera near the shell edge — far enough to see the worm ride the
+            // band and the surrounding interior, while a wider tunnel FOV (above) shows more still.
+            const back = 1.15 + size * 0.1, up = 0.55, lookAhead = 0.7;
             _camTargetCam.copy(_camLookVec).addScaledVector(_camTunnelTangent, -back).addScaledVector(_camUp, up);
             _camTargetLook.copy(_camLookVec).addScaledVector(_camTunnelTangent, lookAhead);
 
-            const a = Math.min(1, 2.0 * delta);
+            const a = Math.min(1, 2.5 * delta);
             camPosRef.current.lerp(_camTargetCam, a);
             lookAtRef.current.lerp(_camTargetLook, a);
             camera.position.copy(camPosRef.current);
@@ -1999,7 +2000,11 @@ function WormBody({ worm, size }) {
         _bodyNormal.copy(worm.currentNormal.current);
 
         const currentJumpVal = worm.isJumping.current ? Math.sin(worm.jumpT.current * Math.PI) * 0.55 : 0;
-        _bodyHeadPos.addScaledVector(_bodyNormal, WORM_LIFT + currentJumpVal);
+        // On the surface the head sits WORM_LIFT above the tile. Inside the wormhole (entering/
+        // tunnel/exiting) the body segments ride the ribbon centerline exactly, so the head must
+        // too — no face-normal lift, or it floats off the band.
+        const _bodyTransit = worm.phase.current === 'entering' || worm.phase.current === 'tunnel' || worm.phase.current === 'exiting';
+        _bodyHeadPos.addScaledVector(_bodyNormal, _bodyTransit ? 0 : WORM_LIFT + currentJumpVal);
 
         const _isInch = isInchRef.current;
         const _isGlow = isGlowRef.current;
@@ -2549,7 +2554,9 @@ function WormFace({ worm, size }) {
             if (_faceForward.lengthSq() < 0.0001) _faceForward.set(0, 0, 1);
             _faceForward.normalize();
 
-            _faceHeadPos.addScaledVector(normal, WORM_LIFT + 0.09);
+            // Head rides the ribbon centerline this phase (no WORM_LIFT — matches WormBody); the
+            // 0.09 keeps the face on the head sphere's front surface.
+            _faceHeadPos.addScaledVector(normal, 0.09);
         } else {
             const { dirKey } = worm.pos.current;
             normal = FACE_NORMALS[dirKey] ?? FACE_NORMALS.PZ;
