@@ -1929,13 +1929,16 @@ const _bodySideVec = new THREE.Vector3();
 const _bodyRideAxis = new THREE.Vector3();
 const _bodyEffA = new THREE.Vector3();
 const _bodyEffB = new THREE.Vector3();
+// Scratch for the suck-in / spit-out tunnel funnel (body segments streamed along the ribbon).
+const _tunFunnelA = new THREE.Vector3();
+const _tunFunnelB = new THREE.Vector3();
 // Stable path-points buffer: reused every frame to avoid spread-array allocation.
 // The head point carries a sentinel tile (tx<0) so the body ride never rotates it —
 // the head's world position is already ridden upstream in the main worm useFrame.
 const _pathPointsBuffer = [];
 const _headPathPoint = { pos: _bodyHeadPos, normal: _bodyNormal, tx: -1, ty: -1, tz: -1 };
 
-function WormBody({ worm }) {
+function WormBody({ worm, size }) {
     const meshRef = useRef();       // sphere body (classic / inch / glow)
     const boxMeshRef = useRef();    // box body (book worm only)
     const glowAltRef = useRef();    // additive overlay — even glow segments only
@@ -2057,6 +2060,25 @@ function WormBody({ worm }) {
             return;
         }
 
+        // ── Suck-in / spit-out funnel ──────────────────────────────────────────
+        // During entering/exiting the head already follows the Möbius ribbon (the main worm
+        // useFrame writes headInterpPos along the tunnel). Stream the body behind it along the
+        // same ribbon: each segment sits one spacing further back in tunnel-parameter space, so
+        // as the head dives in the body gets vacuumed through the entry hole, and as the head
+        // climbs out the body is spat from the exit hole. Segments that haven't reached the
+        // mouth yet stay on the surface (entering) or are hidden until they emerge (exiting).
+        const _funnelTunnel = worm.activeTunnel.current;
+        const _funnelOn = (_phase === 'entering' || _phase === 'exiting') && !!_funnelTunnel;
+        let _headTunT = -1, _segDt = 0.02;
+        if (_funnelOn) {
+            const _tprog = worm.tunnelProgress.current;
+            _headTunT = _phase === 'entering' ? _tprog * 0.33 : 0.67 + _tprog * 0.33;
+            getTunnelWorldPosInto(_tunFunnelA, _funnelTunnel, 0, size);
+            getTunnelWorldPosInto(_tunFunnelB, _funnelTunnel, 1, size);
+            const _tunLen = _tunFunnelA.distanceTo(_tunFunnelB) * 1.7 + 0.001; // curve factor
+            _segDt = 0.095 / _tunLen; // match the on-surface body spacing at the mouth
+        }
+
         let walkIndex = 0;
         let cumulativeDist = 0;
         let altIdx = 0; // index into glowAltRef (even glow segments)
@@ -2158,6 +2180,21 @@ function WormBody({ worm }) {
                     _bodyClonePos.copy(effPos(_pathPointsBuffer[_pathPointsBuffer.length - 1], _bodyEffA));
                 }
 
+                // Funnel override: pull segments that have crossed the mouth onto the ribbon.
+                let _funnelHide = false;
+                if (_funnelOn) {
+                    const _segParam = _headTunT - i * _segDt;
+                    if (_segParam >= 0) {
+                        // In the tunnel — ride the ribbon one spacing behind the segment ahead.
+                        getTunnelWorldPosInto(_bodyClonePos, _funnelTunnel, _segParam > 1 ? 1 : _segParam, size);
+                    } else if (_phase === 'exiting') {
+                        // Tail hasn't emerged from the exit hole yet — keep it hidden rather than
+                        // show it on the now-stale entry-side surface trail.
+                        _funnelHide = true;
+                    }
+                    // entering & _segParam < 0: leave it on the surface, trailing toward the hole.
+                }
+
                 _wormDummy.position.copy(_bodyClonePos);
                 if (_isInch) {
                     // Segments fatten at the hump's peak, thin elsewhere — only while moving.
@@ -2172,6 +2209,7 @@ function WormBody({ worm }) {
                 } else {
                     _wormDummy.scale.setScalar(0.09);
                 }
+                if (_funnelHide) _wormDummy.scale.setScalar(0.00001); // tail not yet spat out
             }
 
             if (transitScale < 1) _wormDummy.scale.multiplyScalar(transitScale);
@@ -4136,7 +4174,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             <TunnelInteriorView worm={worm} size={size} />
             {/* Always mounted — each component handles its own dissolve via worm.phase.current */}
             {wormAlive && <WormTrail worm={worm} size={size} />}
-            {wormAlive && <WormBody worm={worm} />}
+            {wormAlive && <WormBody worm={worm} size={size} />}
             {wormAlive && <GlowWormAura worm={worm} />}
             {wormAlive && <WormFace worm={worm} size={size} />}
             {wormAlive && <PortalGlow worm={worm} size={size} />}
