@@ -698,10 +698,14 @@ function useWormCrawler(size, cubies) {
         // In finalHealing / solved phases no new wormholes spawn — player heals the remaining ones.
         const gamePhaseNow = st.wormGamePhase;
         const noMoreSpawns = gamePhaseNow === 'finalHealing' || gamePhaseNow === 'solved';
-        wormholeTimer.current -= delta;
-        if (wormholeTimer.current <= 0) {
-            if (!noMoreSpawns) spawnWormholePair();
-            wormholeTimer.current = wormholeIntervalRef.current;
+        // Pause wormhole spawning (antipodal tile flips) while the worm is travelling inside a
+        // wormhole — freeze the clock so no flips happen until it crawls back out.
+        if (phase.current === 'crawling') {
+            wormholeTimer.current -= delta;
+            if (wormholeTimer.current <= 0) {
+                if (!noMoreSpawns) spawnWormholePair();
+                wormholeTimer.current = wormholeIntervalRef.current;
+            }
         }
         const countdown = noMoreSpawns ? 0 : Math.max(0, Math.ceil(wormholeTimer.current * 10) / 10);
         const countdownDeci = Math.round(countdown * 10);
@@ -1018,7 +1022,7 @@ function useWormCrawler(size, cubies) {
                 // enter() is intentionally absent: beginTunnelTransition sets wormPhase/'glass'
                 // immediately on the same tick the transition is triggered — no one-frame delay.
                 update(delta) {
-                    tunnelProgress.current += delta * (1.8 * TUNNEL_SPEED_SCALE);
+                    tunnelProgress.current += delta * (1.2 * TUNNEL_SPEED_SCALE);
                     if (activeTunnel.current) {
                         // Head travels first third of the tunnel (entry face → cube interior)
                         const tunnelT = tunnelProgress.current * 0.33;
@@ -1537,10 +1541,11 @@ function WormChaseCamera({ worm, size }) {
             if (prevPhaseRef.current === 'crawling' && phase === 'entering') {
                 camUpRef.current.copy(_camUpVec);
             }
-            // Gentle glide while 'entering' (fly the camera into the tunnel); snappy follow once
-            // inside ('tunnel'/'exiting') so the camera stays locked behind the diving worm.
-            const posK = phase === 'entering' ? 3.0 : CAM_LERP * 4.0;
-            const upK  = phase === 'entering' ? 3.0 : CAM_LERP * 3.0;
+            // Follow the worm into the hole while 'entering' — fast enough to dive in with it and
+            // keep it framed (so the suck-in is actually visible past the opaque face), but still
+            // eased rather than a one-frame teleport; snappy lock-on once inside.
+            const posK = phase === 'entering' ? 5.5 : CAM_LERP * 4.0;
+            const upK  = phase === 'entering' ? 5.0 : CAM_LERP * 3.0;
             const alpha = Math.min(1, posK * delta);
             camPosRef.current.lerp(_camSurfCam, alpha);
             lookAtRef.current.lerp(_camLookVec, alpha);
@@ -3641,8 +3646,11 @@ function TunnelPortalFX({ worm, size }) {
             const showVortex = phase === 'entering' && !!tunnel;
             vGroup.visible = showVortex;
             if (showVortex) {
-                getTunnelWorldPosInto(_fxPos, tunnel, 0, size); // entry mouth
+                // Sit the swirl on the entry FACE SURFACE (just outside) so it is visible from
+                // outside the cube as the worm is sucked down through it.
+                const ewp = getStickerWorldPos(tunnel.entry.x, tunnel.entry.y, tunnel.entry.z, tunnel.entry.dirKey, size, 0);
                 _fxNormal.copy(FACE_NORMALS[tunnel.entry.dirKey] ?? FACE_NORMALS.PY);
+                _fxPos.set(ewp[0], ewp[1], ewp[2]).addScaledVector(_fxNormal, 0.08);
                 _fxQuat.setFromUnitVectors(_fxRingUp, _fxNormal);
                 vGroup.position.copy(_fxPos);
                 vGroup.quaternion.copy(_fxQuat);
@@ -3667,8 +3675,10 @@ function TunnelPortalFX({ worm, size }) {
         if (phase === 'exiting' && tunnel && !firedRef.current && prog > 0.55) {
             firedRef.current = true;
             burstTRef.current = 0;
-            getTunnelWorldPosInto(_fxPos, tunnel, 1, size); // exit mouth
+            // Burst on the exit FACE SURFACE (just outside) so the spit-out reads from outside.
+            const xwp = getStickerWorldPos(tunnel.exit.x, tunnel.exit.y, tunnel.exit.z, tunnel.exit.dirKey, size, 0);
             _fxNormal.copy(FACE_NORMALS[tunnel.exit.dirKey] ?? FACE_NORMALS.PY);
+            _fxPos.set(xwp[0], xwp[1], xwp[2]).addScaledVector(_fxNormal, 0.12);
             _fxQuat.setFromUnitVectors(_fxRingUp, _fxNormal);
             if (burstRef.current) {
                 burstRef.current.position.copy(_fxPos).addScaledVector(_fxNormal, 0.12);
@@ -4230,6 +4240,10 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
 
         // ── Phase: active — inverse-rotation hazard ────────────────────────────
         if (!store.wormAlive || store.wormPaused) return;
+
+        // Pause the rotation hazard entirely while the worm is inside a wormhole: freeze the
+        // clock and the warning beam so nothing charges or fires until it emerges (crawling).
+        if (worm.phase.current !== 'crawling') return;
 
         autoTimerRef.current += delta;
         const warningStart = ACTIVE_ROTATE_INTERVAL - AUTO_ROTATE_WARNING;
