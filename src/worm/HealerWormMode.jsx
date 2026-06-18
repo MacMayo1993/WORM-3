@@ -1143,36 +1143,7 @@ function useWormCrawler(size, cubies) {
                         }
                         // else: partial/no deposit — tunnel stays flipped, progress persists
 
-                        if (voidKillState) {
-                            // Skip the flourish so the pending void-kill resolves promptly.
-                            activeTunnel.current = null;
-                            phase.current = 'crawling';
-                        } else {
-                            // Wind-out flourish (reverse spiral above the exit hole) before crawling.
-                            // activeTunnel stays set for the spiral; it's cleared at windout's end.
-                            phase.current = 'windout';
-                        }
-                    }
-                    return false;
-                },
-            },
-
-            // Wind-out: the worm rises out of the exit hole and spirals open above it, then
-            // settles and resumes crawling — the wind-up flourish played in reverse.
-            windout: {
-                enter() {
-                    useGameStore.getState().setWormPhase('windout');
-                },
-                update(delta) {
-                    tunnelProgress.current += delta * (1.5 * TUNNEL_SPEED_SCALE);
-                    if (activeTunnel.current) {
-                        const s = Math.max(0, 1 - tunnelProgress.current); // 1 (hole) → 0 (far/lifted)
-                        getWindWorldPosInto(headInterpPos.current, activeTunnel.current, 'exit', s, size);
-                        const exitN = FACE_NORMALS[activeTunnel.current.exit.dirKey];
-                        if (exitN) currentNormal.current.copy(exitN);
-                    }
-                    if (tunnelProgress.current >= 1) {
-                        tunnelProgress.current = 0;
+                        // Tunnel travel complete — resume crawling on the exit tile.
                         activeTunnel.current = null;
                         phase.current = 'crawling';
                         // crawling.enter() fires next tick → grace steps + Zustand crawling reset
@@ -1518,17 +1489,16 @@ function WormChaseCamera({ worm, size }) {
             camUpRef.current.lerp(_camUp, Math.min(1, crawlK * delta)).normalize();
             camera.up.copy(camUpRef.current);
             camera.lookAt(lookAtRef.current);
-        } else if ((phase === 'windup' || phase === 'entering' || phase === 'tunnel' || phase === 'exiting' || phase === 'windout') && worm.activeTunnel.current) {
+        } else if ((phase === 'windup' || phase === 'entering' || phase === 'tunnel' || phase === 'exiting') && worm.activeTunnel.current) {
             // Map phase+progress to a single [0,1] parameter for the HUD dot / dim system.
             const tp = worm.tunnelProgress.current;
             const t = phase === 'windup'   ? 0 :
-                      phase === 'windout'  ? 1 :
                       phase === 'entering' ? tp * 0.33 :
                       phase === 'tunnel'   ? 0.33 + tp * 0.34 :
                                              0.67 + tp * 0.33;
             const tunnel = worm.activeTunnel.current;
             const onEntrySide = phase === 'windup' || phase === 'entering';
-            const onExitSide  = phase === 'windout' || phase === 'exiting';
+            const onExitSide  = phase === 'exiting';
 
             // Publish to MobiusHUD's DOM RAF loop and MobiusTunnel dim system.
             tunnelState.active = true;
@@ -2107,15 +2077,10 @@ function WormBody({ worm, size }) {
             _segDt = 0.095 / _tunLen; // match the on-surface body spacing at the mouth
         }
 
-        // Wind-up / wind-out: body coils behind the head along the spiral above the hole.
-        const _windOn = (_phase === 'windup' || _phase === 'windout') && !!_funnelTunnel;
-        const _windSide = _phase === 'windout' ? 'exit' : 'entry';
+        // Wind-up: body coils behind the head along the spiral above the entry hole.
+        const _windOn = _phase === 'windup' && !!_funnelTunnel;
         const _windSegDt = 0.07; // spacing between segments in spiral-s units
-        let _windHeadS = 0;
-        if (_windOn) {
-            const _wprog = worm.tunnelProgress.current;
-            _windHeadS = _phase === 'windup' ? Math.min(1, _wprog) : Math.max(0, 1 - _wprog);
-        }
+        const _windHeadS = _windOn ? Math.min(1, worm.tunnelProgress.current) : 0;
 
         let walkIndex = 0;
         let cumulativeDist = 0;
@@ -2239,16 +2204,12 @@ function WormBody({ worm, size }) {
                     }
                     // entering & _segParam < 0: leave it on the surface, trailing toward the hole.
                 } else if (_windOn) {
-                    // Coil the body behind the head along the spiral. windup: segments trail
-                    // OUTWARD (smaller s); windout: they trail back toward the hole (larger s).
-                    const _segS = _phase === 'windup' ? (_windHeadS - i * _windSegDt) : (_windHeadS + i * _windSegDt);
+                    // Coil the body behind the head along the entry spiral; segments trail
+                    // OUTWARD (smaller s). _segS < 0 → still on the surface trail (keep normal).
+                    const _segS = _windHeadS - i * _windSegDt;
                     if (_segS >= 0 && _segS <= 1) {
-                        getWindWorldPosInto(_bodyClonePos, _funnelTunnel, _windSide, _segS, size);
-                    } else if (_phase === 'windout' && _segS > 1) {
-                        // Still down in the hole, not yet risen out — hide until it emerges.
-                        _funnelHide = true;
+                        getWindWorldPosInto(_bodyClonePos, _funnelTunnel, 'entry', _segS, size);
                     }
-                    // windup & _segS < 0: still on the surface trail — keep the normal position.
                 }
 
                 _wormDummy.position.copy(_bodyClonePos);
@@ -4356,7 +4317,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         }
     });
 
-    const wormInTunnel = wormPhaseReactive === 'windup' || wormPhaseReactive === 'entering' || wormPhaseReactive === 'tunnel' || wormPhaseReactive === 'exiting' || wormPhaseReactive === 'windout';
+    const wormInTunnel = wormPhaseReactive === 'windup' || wormPhaseReactive === 'entering' || wormPhaseReactive === 'tunnel' || wormPhaseReactive === 'exiting';
     const wormAlive = wormGamePhase !== 'scrambling';
 
     return (
