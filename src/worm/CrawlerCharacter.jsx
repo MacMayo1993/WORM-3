@@ -57,7 +57,7 @@ function cbRead(cb, offset) {
   return cb.buf[idx];
 }
 
-export default function CrawlerCharacter({ position, forward, face, jumpHeight, velocity, alive = true }) {
+export default function CrawlerCharacter({ position, forward, face, jumpHeight, velocity, alive = true, orbCount = 0 }) {
   const wormSkinId = useGameStore(s => s.wormSkin);
   const wormHatId = useGameStore(s => s.wormHat);
   const wormCharacterId = useGameStore(s => s.wormCharacter ?? 'classic');
@@ -122,8 +122,9 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
     _invQuat.copy(quaternion).invert();
 
     const moveFactor = Math.min(1, velocity || 0);
-    // Advance the accordion gait by how fast the worm is moving (frozen when idle).
-    if (isInch) inchGaitRef.current += moveFactor * delta * 1.6;
+    // Advance the accordion gait by how fast the worm is moving (frozen when idle). Slow rate
+    // (0.8) gives a deliberate squish→expand rather than a fast flutter.
+    if (isInch) inchGaitRef.current += moveFactor * delta * 0.8;
     for (let i = 1; i < segmentOffsets.length; i++) {
       const segGroup = bodySegmentRefs.current[i];
       if (!segGroup) continue;
@@ -144,17 +145,17 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
       }
 
       if (isInch) {
-        // Classic inchworm Ω-loop, synced to movement: the body scrunches together and the
-        // middle rears UP into a tall hump (gather), then flattens and reaches forward
-        // (extend) — 45% gather / 55% extend. The whole short body pulses as one. Amplitude
-        // scales with moveFactor so it flattens to its spread-out resting pose when stopped.
+        // Classic inchworm Ω-loop, synced to movement: a slow, symmetric accordion squish→
+        // expand (raised-cosine pulse, no snap). On the squish the body scrunches together and
+        // the middle rears UP into a hump; then it eases back out flat. Amplitude scales with
+        // moveFactor (flat at rest) and the hump grows taller the more orbs are carried.
         const N = segmentOffsets.length;
         const gp = (inchGaitRef.current % 1.0 + 1.0) % 1.0;
-        const pL = gp < 0.45 ? gp / 0.45 : 1.0 - (gp - 0.45) / 0.55;
-        const pulse = pL * pL * (3 - 2 * pL) * moveFactor; // smoothstep — distinct phases
-        const arch = Math.sin(Math.PI * (i / (N - 1))); // peaks mid-body, 0 at head & tail
-        _segPos.y += arch * pulse * 0.32;            // middle rears up into a tall hump
-        _segPos.z += pulse * (0.08 + i * 0.06);      // body scrunches toward the head
+        const pulse = (0.5 - 0.5 * Math.cos(gp * Math.PI * 2)) * moveFactor; // smooth, symmetric
+        const arch = Math.sin(Math.PI * (i / (N - 1)));   // peaks mid-body, 0 at head & tail
+        const humpHeight = 0.24 + Math.min(orbCount, 14) * 0.03; // taller with more orbs
+        _segPos.y += arch * pulse * humpHeight;            // middle rears up into the hump
+        _segPos.z += pulse * (0.08 + i * 0.06);            // body scrunches toward the head
       }
 
       segGroup.position.copy(_segPos);

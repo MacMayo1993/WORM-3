@@ -1984,15 +1984,16 @@ function WormBody({ worm }) {
         prevInterpTRef.current = _interpNow;
         const _moveTarget = (worm.phase.current === 'crawling' && _dCrawl > 1e-5) ? 1 : 0;
         gaitMoveRef.current += (_moveTarget - gaitMoveRef.current) * Math.min(1, delta * 6);
-        gaitPhaseRef.current += _dCrawl;                  // +1 accordion squeeze per tile crawled
+        gaitPhaseRef.current += _dCrawl;                  // accordion phase advances with crawl distance
         const _gaitMove = gaitMoveRef.current;
         const _gaitPhase = gaitPhaseRef.current;
-        // One synchronized rise→fall pulse per tile crawled drives a single inchworm hump:
-        // the body scrunches + the middle rears up (gather, 45%), then flattens + reaches
-        // forward (extend, 55%). Global (no per-segment phase) so there is only ever one hump.
-        const _gaitCyc = (_gaitPhase % 1 + 1) % 1;
-        const _gaitPL = _gaitCyc < 0.45 ? _gaitCyc / 0.45 : 1.0 - (_gaitCyc - 0.45) / 0.55;
-        const _gaitPulse = _gaitPL * _gaitPL * (3 - 2 * _gaitPL) * _gaitMove;
+        // Slow, symmetric accordion: one smooth squish→expand roughly every 2 tiles crawled
+        // (rate 0.5). A raised-cosine pulse (no snap) eases the body together in the middle and
+        // back out. Global — only ever one hump — and it rears taller the more orbs are carried.
+        const _gaitCyc = ((_gaitPhase * 0.5) % 1 + 1) % 1;
+        const _gaitPulse = (0.5 - 0.5 * Math.cos(_gaitCyc * Math.PI * 2)) * _gaitMove;
+        const _orbCount = worm.orbPickupColorsRef.current?.length ?? 0;
+        const _humpHeight = 0.15 + Math.min(_orbCount, 14) * 0.028; // 0.15 → ~0.54 as orbs stack up
 
         // Rebuild path-points buffer in-place (no array allocation or spread)
         _pathPointsBuffer.length = steps.count + 1;
@@ -2119,8 +2120,8 @@ function WormBody({ worm }) {
                         const wigglePhase = i * (_isWiggle ? 0.5 : 0.8) - time * (_isWiggle ? 8.0 : 6.0);
                         _bodyClonePos.addScaledVector(_bodySideVec, Math.sin(wigglePhase) * wiggleAmp);
                         // Inch Worm: raise the body's middle up off the surface along the normal
-                        // so it arches into a single tall inchworm hump on the gather pulse.
-                        if (_isInch) _bodyClonePos.addScaledVector(_bodyCloneNormal, _inchArch * _gaitPulse * 0.22);
+                        // so it arches into a single inchworm hump on the squish — taller with orbs.
+                        if (_isInch) _bodyClonePos.addScaledVector(_bodyCloneNormal, _inchArch * _gaitPulse * _humpHeight);
                         foundPosition = true;
                         break;
                     }
