@@ -129,9 +129,12 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
       _segPos.y += Math.sin(timeRef.current * 6 + i * 0.8) * 0.02 * moveFactor;
 
       if (isWiggle) {
-        // Sidewinder: strong side-to-side lateral wave travelling down the body.
-        _segPos.x += Math.sin(timeRef.current * 9 + i * 1.3) * 0.14 * moveFactor;
-        _segPos.y += Math.sin(timeRef.current * 9 + i * 1.3) * 0.03 * moveFactor;
+        // Sidewinder: a wide, smooth side-to-side wave travelling down the body. Keep the
+        // per-segment phase step gentle so the few body segments read as a coherent S-curve
+        // rather than snapping to opposite sides.
+        const wigglePhase = timeRef.current * 8 + i * 0.8;
+        _segPos.x += Math.sin(wigglePhase) * 0.12 * moveFactor;
+        _segPos.y += Math.sin(wigglePhase) * 0.03 * moveFactor;
       }
 
       if (isInch) {
