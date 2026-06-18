@@ -90,6 +90,116 @@ const WormHat3D = React.memo(function WormHat3D({ type, scale = 0.28 }) {
     );
   }
 
+  if (type === 'beanie') {
+    return (
+      <group>
+        {/* Snug knit dome (top hemisphere only) */}
+        <mesh position={[0, s * 0.78, 0]}>
+          <sphereGeometry args={[s * 1.04, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.55]} />
+          <meshStandardMaterial color="#6d28d9" roughness={0.9} metalness={0} />
+        </mesh>
+        {/* Folded brim */}
+        <mesh position={[0, s * 0.84, 0]} rotation={[Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[s * 0.98, s * 0.22, 10, 24]} />
+          <meshStandardMaterial color="#5b21b6" roughness={0.95} />
+        </mesh>
+        {/* Pom-pom */}
+        <mesh position={[0, s * 1.72, 0]}>
+          <sphereGeometry args={[s * 0.28, 10, 10]} />
+          <meshStandardMaterial color="#ede9fe" roughness={1} />
+        </mesh>
+      </group>
+    );
+  }
+
+  if (type === 'wizard') {
+    const stars = [
+      [s * 0.34, s * 1.6, s * 0.55],
+      [-s * 0.42, s * 2.35, s * 0.32],
+      [s * 0.12, s * 2.95, -s * 0.4]
+    ];
+    return (
+      <group>
+        {/* Wide brim */}
+        <mesh position={[0, s * 0.88, 0]}>
+          <cylinderGeometry args={[s * 1.55, s * 1.55, s * 0.1, 24]} />
+          <meshStandardMaterial color="#3b0764" roughness={0.6} />
+        </mesh>
+        {/* Tall pointed cone */}
+        <mesh position={[0, s * 2.15, 0]}>
+          <coneGeometry args={[s * 0.95, s * 2.6, 24]} />
+          <meshStandardMaterial color="#4c1d95" emissive="#1e1b4b" emissiveIntensity={0.25} roughness={0.6} />
+        </mesh>
+        {/* Glowing stars */}
+        {stars.map((p, i) => (
+          <mesh key={i} position={p}>
+            <octahedronGeometry args={[s * 0.16, 0]} />
+            <meshStandardMaterial color="#fde68a" emissive="#fde68a" emissiveIntensity={1.2} />
+          </mesh>
+        ))}
+      </group>
+    );
+  }
+
+  if (type === 'flower') {
+    const petals = 6;
+    return (
+      <group position={[0, s * 1.1, 0]}>
+        {/* Short green stem */}
+        <mesh position={[0, -s * 0.45, 0]}>
+          <cylinderGeometry args={[s * 0.06, s * 0.06, s * 0.7, 8]} />
+          <meshStandardMaterial color="#16a34a" roughness={0.7} />
+        </mesh>
+        {/* Petals */}
+        {Array.from({ length: petals }, (_, i) => {
+          const a = (i / petals) * Math.PI * 2;
+          return (
+            <mesh key={i} position={[Math.cos(a) * s * 0.5, 0, Math.sin(a) * s * 0.5]} scale={[s * 0.42, s * 0.16, s * 0.26]}>
+              <sphereGeometry args={[1, 10, 10]} />
+              <meshStandardMaterial color="#f472b6" roughness={0.55} />
+            </mesh>
+          );
+        })}
+        {/* Center pollen */}
+        <mesh>
+          <sphereGeometry args={[s * 0.3, 12, 12]} />
+          <meshStandardMaterial color="#facc15" emissive="#facc15" emissiveIntensity={0.45} />
+        </mesh>
+      </group>
+    );
+  }
+
+  if (type === 'grad') {
+    return (
+      <group position={[0, s * 0.95, 0]}>
+        {/* Cap base */}
+        <mesh>
+          <cylinderGeometry args={[s * 0.78, s * 0.86, s * 0.5, 16]} />
+          <meshStandardMaterial color="#111827" roughness={0.7} />
+        </mesh>
+        {/* Mortarboard */}
+        <mesh position={[0, s * 0.3, 0]}>
+          <boxGeometry args={[s * 2.0, s * 0.12, s * 2.0]} />
+          <meshStandardMaterial color="#111827" roughness={0.55} />
+        </mesh>
+        {/* Center button */}
+        <mesh position={[0, s * 0.4, 0]}>
+          <sphereGeometry args={[s * 0.12, 8, 8]} />
+          <meshStandardMaterial color="#fbbf24" metalness={0.5} roughness={0.3} />
+        </mesh>
+        {/* Tassel cord + knob hanging off one corner */}
+        <mesh position={[s * 0.9, s * 0.16, s * 0.9]}>
+          <cylinderGeometry args={[s * 0.03, s * 0.03, s * 0.7, 6]} />
+          <meshStandardMaterial color="#fbbf24" />
+        </mesh>
+        <mesh position={[s * 0.9, -s * 0.18, s * 0.9]}>
+          <sphereGeometry args={[s * 0.14, 8, 8]} />
+          <meshStandardMaterial color="#fbbf24" emissive="#fbbf24" emissiveIntensity={0.3} />
+        </mesh>
+      </group>
+    );
+  }
+
   return null;
 });
 

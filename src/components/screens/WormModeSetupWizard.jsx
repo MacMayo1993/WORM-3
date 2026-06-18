@@ -751,6 +751,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     const isGlow = wormCharacterId === 'glow';
     const isBook = wormCharacterId === 'book';
     const isWiggle = wormCharacterId === 'wiggle';
+    const isPrism = wormCharacterId === 'prism';
     // ── SVG worm preview ────────────────────────────────────────────────────────
     const renderWormSVG = () => {
       const W = 224, H = 120;
@@ -779,13 +780,27 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       return (
         <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ overflow: 'visible', display: 'block', flexShrink: 0 }}>
 
+          {/* Prism rainbow gradient — used for body + head when the Prism Worm is selected */}
+          {isPrism && (
+            <defs>
+              <linearGradient id="prismGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#ef4444" />
+                <stop offset="20%" stopColor="#f59e0b" />
+                <stop offset="40%" stopColor="#facc15" />
+                <stop offset="60%" stopColor="#22c55e" />
+                <stop offset="80%" stopColor="#3b82f6" />
+                <stop offset="100%" stopColor="#a855f7" />
+              </linearGradient>
+            </defs>
+          )}
+
           {/* Glow bloom behind body */}
           {isGlow && (
             <path d={bodyPath} stroke={activeSkin.glow} strokeWidth={bodyWidth + 18} fill="none" strokeLinecap="round" opacity={0.14} />
           )}
 
           {/* Body stroke — thick rounded path */}
-          <path d={bodyPath} stroke={activeSkin.belly} strokeWidth={bodyWidth} fill="none" strokeLinecap="round" />
+          <path d={bodyPath} stroke={isPrism ? 'url(#prismGrad)' : activeSkin.belly} strokeWidth={bodyWidth} fill="none" strokeLinecap="round" />
 
           {/* Subtle segment rings along body (non-inchworm, non-wiggle — wiggle uses a wavy path) */}
           {!isInch && !isWiggle && [0.25, 0.50, 0.72].map((t, idx) => {
@@ -814,7 +829,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           </>)}
 
           {/* Head circle */}
-          <circle cx={headCx} cy={headCy} r={headR} fill={activeSkin.body} />
+          <circle cx={headCx} cy={headCy} r={headR} fill={isPrism ? 'url(#prismGrad)' : activeSkin.body} />
           {isGlow && (
             <circle cx={headCx} cy={headCy} r={headR + 7} fill="none" stroke={activeSkin.glow} strokeWidth="2.5" opacity={0.32} />
           )}

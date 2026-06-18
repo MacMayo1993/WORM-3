@@ -42,6 +42,14 @@ export const WORM_CHARACTERS = [
     stats: { speed: 80, healing: 50, agility: 100, glow: 20 },
     special: 'Sidewinder — body slithers in a wide snaking wave, the most agile crawler',
   },
+  {
+    id: 'prism',
+    label: 'Prism Worm',
+    type: 'Trickster',
+    subtitle: 'Rainbow wildcard crawler',
+    stats: { speed: 70, healing: 55, agility: 75, glow: 60 },
+    special: 'Spectrum — body cycles every color; carried orbs deposit as any color (wildcard)',
+  }
 ];
 
 export function getWormCharacter(id) {

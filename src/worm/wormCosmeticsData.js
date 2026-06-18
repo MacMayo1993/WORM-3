@@ -12,6 +12,13 @@ export const WORM_SKINS = [
   { id: 'cherry', label: 'Cherry', body: '#ec4899', belly: '#db2777', antenna: '#fbcfe8', glow: '#f472b6' },
   { id: 'ice',    label: 'Ice',    body: '#bae6fd', belly: '#7dd3fc', antenna: '#e0f2fe', glow: '#38bdf8' },
   { id: 'void',   label: 'Void',   body: '#6366f1', belly: '#4338ca', antenna: '#c7d2fe', glow: '#818cf8' },
+  { id: 'toxic',  label: 'Toxic',  body: '#a3e635', belly: '#65a30d', antenna: '#d9f99d', glow: '#bef264' },
+  { id: 'bubble', label: 'Bubblegum', body: '#f9a8d4', belly: '#db2777', antenna: '#fce7f3', glow: '#f472b6' },
+  { id: 'galaxy', label: 'Galaxy', body: '#7c3aed', belly: '#5b21b6', antenna: '#ddd6fe', glow: '#a78bfa' },
+  { id: 'coral',  label: 'Coral',  body: '#fb7185', belly: '#e11d48', antenna: '#fecdd3', glow: '#fda4af' },
+  { id: 'mono',   label: 'Mono',   body: '#e5e7eb', belly: '#9ca3af', antenna: '#f9fafb', glow: '#d1d5db' },
+  { id: 'sunset', label: 'Sunset', body: '#f97316', belly: '#be185d', antenna: '#fdba74', glow: '#fb7185' },
+  { id: 'emerald', label: 'Emerald', body: '#10b981', belly: '#047857', antenna: '#a7f3d0', glow: '#34d399' }
 ];
 
 export const WORM_HATS = [
@@ -20,6 +27,10 @@ export const WORM_HATS = [
   { id: 'party',  label: 'Party' },
   { id: 'crown',  label: 'Crown' },
   { id: 'halo',   label: 'Halo' },
+  { id: 'beanie', label: 'Beanie' },
+  { id: 'wizard', label: 'Wizard' },
+  { id: 'flower', label: 'Flower' },
+  { id: 'grad',   label: 'Grad Cap' }
 ];
 
 export function getSkin(id) {
