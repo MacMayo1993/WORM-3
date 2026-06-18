@@ -32,11 +32,6 @@ import {
     GLASS_MAX_OPACITY,
     GLASS_MIN_TRANSMISSION,
     GLASS_MAX_TRANSMISSION,
-    TUNNEL_SURF_FOV,
-    TUNNEL_SURF_BACK,
-    TUNNEL_SURF_UP,
-    TUNNEL_LOOK_AHEAD,
-    TUNNEL_SURF_SWAY,
     TUNNEL_SPEED_SCALE,
     FACE_NORMALS,
     DIR_FORWARD,
@@ -1388,7 +1383,7 @@ function WormChaseCamera({ worm, size }) {
             : phase === 'entering' ? THREE.MathUtils.clamp(_tp, 0, 1)
             : phase === 'exiting'  ? THREE.MathUtils.clamp(1 - _tp, 0, 1)
             : 0;
-        const targetFov = THREE.MathUtils.lerp(baseFov, TUNNEL_SURF_FOV, tunnelMix);
+        const targetFov = THREE.MathUtils.lerp(baseFov, baseFov + 8, tunnelMix); // mild widen for the portal view
         const fovAlpha = Math.min(1, delta * 6);
         const nextFov = THREE.MathUtils.lerp(camera.fov, targetFov, fovAlpha);
         if (Math.abs(nextFov - camera.fov) > 0.01) {
@@ -1472,86 +1467,58 @@ function WormChaseCamera({ worm, size }) {
             camera.up.copy(camUpRef.current);
             camera.lookAt(lookAtRef.current);
         } else if ((phase === 'entering' || phase === 'tunnel' || phase === 'exiting') && worm.activeTunnel.current) {
-            // Map phase+progress to a single [0,1] parameter along the Möbius ribbon.
+            // Map phase+progress to a single [0,1] parameter for the HUD dot / dim system.
             const tp = worm.tunnelProgress.current;
             const t = phase === 'entering' ? tp * 0.33 :
                       phase === 'tunnel'   ? 0.33 + tp * 0.34 :
                                              0.67 + tp * 0.33;
-
             const tunnel = worm.activeTunnel.current;
 
             // Publish to MobiusHUD's DOM RAF loop and MobiusTunnel dim system.
             tunnelState.active = true;
             tunnelState.t = t;
             tunnelState.activeTunnelId = tunnel.pairId ?? null;
+
             const entN = FACE_NORMALS[tunnel.entry.dirKey] ?? FACE_NORMALS.PY;
             const extN = FACE_NORMALS[tunnel.exit.dirKey]  ?? FACE_NORMALS.PY;
 
-            // Ribbon anchor points — exactly matches MobiusTunnel.jsx geometry:
-            //   vStart/vEnd = cubie-centre stepped inward by FACE_OFFSET (0.52)
-            //   midA/midB   = face-normal × MINI_FACE_R (0.25), mini-cube docking
-            const FACE_OFF = 0.52, MINI_R = 0.25;
+            // Watch the holes from OUTSIDE the cube. The worm dives in through an opaque face, so
+            // a camera that rides in behind it sees nothing. Instead frame the entry hole from
+            // outside as the worm is sucked in, glide across during the middle, then frame the
+            // exit hole as it bursts out.
             const ew = getStickerWorldPos(tunnel.entry.x, tunnel.entry.y, tunnel.entry.z, tunnel.entry.dirKey, size, 0);
             const xw = getStickerWorldPos(tunnel.exit.x,  tunnel.exit.y,  tunnel.exit.z,  tunnel.exit.dirKey,  size, 0);
-            _ribVStart.set(ew[0] - entN.x * FACE_OFF, ew[1] - entN.y * FACE_OFF, ew[2] - entN.z * FACE_OFF);
-            _ribVEnd  .set(xw[0] - extN.x * FACE_OFF, xw[1] - extN.y * FACE_OFF, xw[2] - extN.z * FACE_OFF);
-            _ribMidA  .set(entN.x * MINI_R, entN.y * MINI_R, entN.z * MINI_R);
-            _ribMidB  .set(extN.x * MINI_R, extN.y * MINI_R, extN.z * MINI_R);
+            _ribVStart.set(ew[0], ew[1], ew[2]); // entry hole (surface)
+            _ribVEnd  .set(xw[0], xw[1], xw[2]); // exit hole (surface)
 
-            // Twist axis and initial perp (matching fillRibbon's perpBase in MobiusTunnel)
-            _ribAxis.subVectors(_ribVEnd, _ribVStart).normalize();
-            _ribPerp.crossVectors(_ribAxis, entN);
-            if (_ribPerp.lengthSq() < 0.001) { _ribPerp.set(0, 1, 0); _ribPerp.crossVectors(_ribAxis, _ribPerp); }
-            if (_ribPerp.lengthSq() < 0.001) { _ribPerp.set(0, 0, 1); _ribPerp.crossVectors(_ribAxis, _ribPerp); }
-            _ribPerp.normalize();
+            // External vantage per hole: pulled out along the face normal and lifted in world-Y so
+            // the worm and the swirl/burst stay framed against the cube.
+            const portalDist = 4.0 + size * 1.15;
+            const portalUp   = 2.0 + size * 0.45;
+            _camSurfCam.copy(_ribVStart).addScaledVector(entN, portalDist); _camSurfCam.y += portalUp; // entry cam pose
+            _ribMidA  .copy(_ribVEnd  ).addScaledVector(extN, portalDist); _ribMidA.y   += portalUp;   // exit cam pose
 
-            // Worm position at current t; a point slightly ahead gives the forward tangent.
-            const tAhead = Math.min(t + 0.05, 1.0);
-            getTunnelWorldPosInto(_camLookVec, tunnel, t, size);
-            getTunnelWorldPosInto(_camSurfCam, tunnel, tAhead, size);
-
-            // Tunnel forward direction (worm's heading toward exit).
-            _camTunnelTangent.subVectors(_camSurfCam, _camLookVec);
-            if (_camTunnelTangent.lengthSq() < 0.0001) _camTunnelTangent.copy(_ribAxis);
-            _camTunnelTangent.normalize();
-
-            // Möbius half-twist: perpBase rotates π over [0,1] for the RP² roll.
-            _camTunnelRight.copy(_ribPerp).applyAxisAngle(_ribAxis, t * Math.PI);
-            _camUpVec.crossVectors(_camTunnelTangent, _camTunnelRight).normalize();
-            // Guard: degenerate cross product (tangent ∥ right) would give zero up → NaN matrices.
-            if (_camUpVec.lengthSq() < 0.01) _camUpVec.set(0, 1, 0);
-
-            // Camera: close behind and above the worm on the ribbon surface.
-            _camSurfCam.copy(_camLookVec)
-                .addScaledVector(_camTunnelTangent, -TUNNEL_SURF_BACK)
-                .addScaledVector(_camUpVec, TUNNEL_SURF_UP);
-
-            // Look-ahead: look forward along the tunnel rather than at the worm's current
-            // position.  Without this, when the worm is at the cube centre (t=0.5) the
-            // camera stares directly at the convergence point of all tunnel arms, producing
-            // a starburst.  Shifting the target ahead keeps the view looking into the tunnel.
-            _camLookVec.addScaledVector(_camTunnelTangent, TUNNEL_LOOK_AHEAD);
-
-            // Snap ONLY the up vector on the first entering frame. Up snap is critical: at
-            // tunnel entry the Möbius formula can evaluate to an up vector exactly antiparallel
-            // to the crawl up — lerping through zero magnitude produces garbage orientations and
-            // a visible stutter. Position and look-at are deliberately NOT snapped: letting them
-            // glide in from the chase framing turns entering the wormhole into a cinematic dive
-            // instead of a hard cut to an extreme close-up (the old jarring "can't see it" jump).
-            if (prevPhaseRef.current === 'crawling' && phase === 'entering') {
-                camUpRef.current.copy(_camUpVec);
+            if (phase === 'entering') {
+                _camTargetCam.copy(_camSurfCam);
+                _camTargetLook.copy(_ribVStart);
+            } else if (phase === 'exiting') {
+                _camTargetCam.copy(_ribMidA);
+                _camTargetLook.copy(_ribVEnd);
+            } else { // tunnel — glide from the entry view across to the exit view
+                _camTargetCam.lerpVectors(_camSurfCam, _ribMidA, tp);
+                _camTargetLook.lerpVectors(_ribVStart, _ribVEnd, tp);
             }
-            // Follow the worm into the hole while 'entering' — fast enough to dive in with it and
-            // keep it framed (so the suck-in is actually visible past the opaque face), but still
-            // eased rather than a one-frame teleport; snappy lock-on once inside.
-            const posK = phase === 'entering' ? 5.5 : CAM_LERP * 4.0;
-            const upK  = phase === 'entering' ? 5.0 : CAM_LERP * 3.0;
-            const alpha = Math.min(1, posK * delta);
-            camPosRef.current.lerp(_camSurfCam, alpha);
-            lookAtRef.current.lerp(_camLookVec, alpha);
+
+            // World-up, flipped only when looking at a bottom-facing hole to avoid inversion.
+            const lookN = phase === 'exiting' ? extN : entN;
+            _camUp.set(0, lookN.y < -0.85 ? -1 : 1, 0);
+
+            const k = phase === 'tunnel' ? 2.0 : 3.0;
+            const a = Math.min(1, k * delta);
+            camPosRef.current.lerp(_camTargetCam, a);
+            lookAtRef.current.lerp(_camTargetLook, a);
             camera.position.copy(camPosRef.current);
-            // Smooth the up vector so the Möbius 180° flip is gradual rather than instant.
-            camUpRef.current.lerp(_camUpVec, Math.min(1, upK * delta)).normalize();
+            camUpRef.current.lerp(_camUp, a).normalize();
             camera.up.copy(camUpRef.current);
             camera.lookAt(lookAtRef.current);
         } else {
