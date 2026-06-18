@@ -2057,10 +2057,13 @@ function WormBody({ worm }) {
                         _bodySegForward.subVectors(aPos, bPos).normalize();
                         _bodySideVec.crossVectors(_bodyCloneNormal, _bodySegForward).normalize();
 
-                        // Wiggle Worm is a sidewinder: a much wider, tighter, faster
-                        // travelling wave so the whole body slithers like a snake.
-                        const wiggleAmp = _isInch ? 0.0 : (_isWiggle ? 0.30 : 0.08) * Math.sin(fade * Math.PI);
-                        const wigglePhase = i * (_isWiggle ? 1.5 : 0.8) - time * (_isWiggle ? 10.0 : 6.0);
+                        // Wiggle Worm is a sidewinder: a wide, smooth lateral wave that
+                        // travels down the whole body like a snake. The wave must span many
+                        // segments (small phase-step → long spatial wavelength); a large
+                        // phase-step would alias the closely-spaced (0.09 apart) segments into
+                        // a jagged scatter instead of a coherent S-curve.
+                        const wiggleAmp = _isInch ? 0.0 : (_isWiggle ? 0.26 : 0.08) * Math.sin(fade * Math.PI);
+                        const wigglePhase = i * (_isWiggle ? 0.5 : 0.8) - time * (_isWiggle ? 8.0 : 6.0);
                         _bodyClonePos.addScaledVector(_bodySideVec, Math.sin(wigglePhase) * wiggleAmp);
                         foundPosition = true;
                         break;
