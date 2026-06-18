@@ -1018,7 +1018,7 @@ function useWormCrawler(size, cubies) {
                 // enter() is intentionally absent: beginTunnelTransition sets wormPhase/'glass'
                 // immediately on the same tick the transition is triggered — no one-frame delay.
                 update(delta) {
-                    tunnelProgress.current += delta * (2.5 * TUNNEL_SPEED_SCALE);
+                    tunnelProgress.current += delta * (1.8 * TUNNEL_SPEED_SCALE);
                     if (activeTunnel.current) {
                         // Head travels first third of the tunnel (entry face → cube interior)
                         const tunnelT = tunnelProgress.current * 0.33;
@@ -1072,7 +1072,7 @@ function useWormCrawler(size, cubies) {
                     }
                 },
                 update(delta) {
-                    tunnelProgress.current += delta * (2.0 * TUNNEL_SPEED_SCALE);
+                    tunnelProgress.current += delta * (1.6 * TUNNEL_SPEED_SCALE);
                     if (activeTunnel.current) {
                         // Head travels final third of the tunnel (cube interior → exit face)
                         const tunnelT = 0.67 + tunnelProgress.current * 0.33;
@@ -1350,6 +1350,7 @@ function WormChaseCamera({ worm, size }) {
     const prevPhaseRef = useRef('crawling');              // detect phase transitions for snap logic
     const zoomExtraRef = useRef(0);   // burst zoom accumulated
     const prevTailLen = useRef(BASE_TAIL_LENGTH);   // detect new parity pickups
+    const postTunnelEaseRef = useRef(0);  // seconds remaining of gentle re-framing after exiting a tunnel
 
     useFrame((_, delta) => {
         const gamePhase = useGameStore.getState().wormGamePhase ?? 'active';
@@ -1374,7 +1375,15 @@ function WormChaseCamera({ worm, size }) {
         // Use a continuous portrait factor so camera framing doesn't jump at aspect=1.
         const portraitFactor = THREE.MathUtils.clamp((1 - viewportAspect) / 0.45, 0, 1);
         const baseFov = THREE.MathUtils.lerp(70, 82, portraitFactor);
-        const tunnelMix = phase === 'tunnel' ? 1 : (phase === 'entering' || phase === 'exiting' ? 0.35 : 0);
+        // Continuous tunnel FOV ramp: 0 while crawling, eases 0→1 across 'entering', holds 1
+        // through 'tunnel', eases 1→0 across 'exiting'. A smooth curve (no discrete jumps at
+        // phase boundaries) means the camera zooms into the wormhole and back out cinematically
+        // instead of snapping its field of view.
+        const _tp = worm.tunnelProgress.current;
+        const tunnelMix = phase === 'tunnel' ? 1
+            : phase === 'entering' ? THREE.MathUtils.clamp(_tp, 0, 1)
+            : phase === 'exiting'  ? THREE.MathUtils.clamp(1 - _tp, 0, 1)
+            : 0;
         const targetFov = THREE.MathUtils.lerp(baseFov, TUNNEL_SURF_FOV, tunnelMix);
         const fovAlpha = Math.min(1, delta * 6);
         const nextFov = THREE.MathUtils.lerp(camera.fov, targetFov, fovAlpha);
@@ -1439,11 +1448,23 @@ function WormChaseCamera({ worm, size }) {
             // Bottom face is the only case where Y-up would flip the view.
             _camUp.set(0, _camNormal.y < -0.8 ? -1 : 1, 0);
 
-            const alpha = Math.min(1, CAM_LERP * delta);
+            // Just resumed crawling after a tunnel: ease the camera back to the chase framing
+            // over ~0.7s instead of yanking it, so the worm doesn't pop straight to gameplay.
+            if (prevPhaseRef.current === 'exiting' || prevPhaseRef.current === 'tunnel' || prevPhaseRef.current === 'entering') {
+                postTunnelEaseRef.current = 0.7;
+            }
+            let crawlK = CAM_LERP;
+            if (postTunnelEaseRef.current > 0) {
+                postTunnelEaseRef.current = Math.max(0, postTunnelEaseRef.current - delta);
+                // ramp the smoothing rate from gentle (3) up to normal (CAM_LERP) as the ease expires
+                crawlK = THREE.MathUtils.lerp(3.0, CAM_LERP, 1 - postTunnelEaseRef.current / 0.7);
+            }
+
+            const alpha = Math.min(1, crawlK * delta);
             camPosRef.current.lerp(_camTargetCam, alpha);
             lookAtRef.current.lerp(_camTargetLook, alpha);
             camera.position.copy(camPosRef.current);
-            camUpRef.current.lerp(_camUp, Math.min(1, CAM_LERP * delta)).normalize();
+            camUpRef.current.lerp(_camUp, Math.min(1, crawlK * delta)).normalize();
             camera.up.copy(camUpRef.current);
             camera.lookAt(lookAtRef.current);
         } else if ((phase === 'entering' || phase === 'tunnel' || phase === 'exiting') && worm.activeTunnel.current) {
@@ -1507,22 +1528,25 @@ function WormChaseCamera({ worm, size }) {
             // a starburst.  Shifting the target ahead keeps the view looking into the tunnel.
             _camLookVec.addScaledVector(_camTunnelTangent, TUNNEL_LOOK_AHEAD);
 
-            // Snap position AND up on the first frame we enter the tunnel.
-            // Position snap prevents multi-frame lerp swing. Up snap is critical: at
-            // tunnel entry the Möbius formula evaluates to an up vector that can be
-            // exactly antiparallel to the surface up — lerping through zero magnitude
-            // produces garbage orientations and the visible stutter.
+            // Snap ONLY the up vector on the first entering frame. Up snap is critical: at
+            // tunnel entry the Möbius formula can evaluate to an up vector exactly antiparallel
+            // to the crawl up — lerping through zero magnitude produces garbage orientations and
+            // a visible stutter. Position and look-at are deliberately NOT snapped: letting them
+            // glide in from the chase framing turns entering the wormhole into a cinematic dive
+            // instead of a hard cut to an extreme close-up (the old jarring "can't see it" jump).
             if (prevPhaseRef.current === 'crawling' && phase === 'entering') {
-                camPosRef.current.copy(_camSurfCam);
-                lookAtRef.current.copy(_camLookVec);
                 camUpRef.current.copy(_camUpVec);
             }
-            const alpha = Math.min(1, CAM_LERP * delta * 4.0);
+            // Gentle glide while 'entering' (fly the camera into the tunnel); snappy follow once
+            // inside ('tunnel'/'exiting') so the camera stays locked behind the diving worm.
+            const posK = phase === 'entering' ? 3.0 : CAM_LERP * 4.0;
+            const upK  = phase === 'entering' ? 3.0 : CAM_LERP * 3.0;
+            const alpha = Math.min(1, posK * delta);
             camPosRef.current.lerp(_camSurfCam, alpha);
             lookAtRef.current.lerp(_camLookVec, alpha);
             camera.position.copy(camPosRef.current);
             // Smooth the up vector so the Möbius 180° flip is gradual rather than instant.
-            camUpRef.current.lerp(_camUpVec, Math.min(1, CAM_LERP * delta * 3.0)).normalize();
+            camUpRef.current.lerp(_camUpVec, Math.min(1, upK * delta)).normalize();
             camera.up.copy(camUpRef.current);
             camera.lookAt(lookAtRef.current);
         } else {
@@ -1984,15 +2008,16 @@ function WormBody({ worm }) {
         prevInterpTRef.current = _interpNow;
         const _moveTarget = (worm.phase.current === 'crawling' && _dCrawl > 1e-5) ? 1 : 0;
         gaitMoveRef.current += (_moveTarget - gaitMoveRef.current) * Math.min(1, delta * 6);
-        gaitPhaseRef.current += _dCrawl;                  // +1 accordion squeeze per tile crawled
+        gaitPhaseRef.current += _dCrawl;                  // accordion phase advances with crawl distance
         const _gaitMove = gaitMoveRef.current;
         const _gaitPhase = gaitPhaseRef.current;
-        // One synchronized rise→fall pulse per tile crawled drives a single inchworm hump:
-        // the body scrunches + the middle rears up (gather, 45%), then flattens + reaches
-        // forward (extend, 55%). Global (no per-segment phase) so there is only ever one hump.
-        const _gaitCyc = (_gaitPhase % 1 + 1) % 1;
-        const _gaitPL = _gaitCyc < 0.45 ? _gaitCyc / 0.45 : 1.0 - (_gaitCyc - 0.45) / 0.55;
-        const _gaitPulse = _gaitPL * _gaitPL * (3 - 2 * _gaitPL) * _gaitMove;
+        // Slow, symmetric accordion: one smooth squish→expand roughly every 2 tiles crawled
+        // (rate 0.5). A raised-cosine pulse (no snap) eases the body together in the middle and
+        // back out. Global — only ever one hump — and it rears taller the more orbs are carried.
+        const _gaitCyc = ((_gaitPhase * 0.5) % 1 + 1) % 1;
+        const _gaitPulse = (0.5 - 0.5 * Math.cos(_gaitCyc * Math.PI * 2)) * _gaitMove;
+        const _orbCount = worm.orbPickupColorsRef.current?.length ?? 0;
+        const _humpHeight = 0.15 + Math.min(_orbCount, 14) * 0.028; // 0.15 → ~0.54 as orbs stack up
 
         // Rebuild path-points buffer in-place (no array allocation or spread)
         _pathPointsBuffer.length = steps.count + 1;
@@ -2119,8 +2144,8 @@ function WormBody({ worm }) {
                         const wigglePhase = i * (_isWiggle ? 0.5 : 0.8) - time * (_isWiggle ? 8.0 : 6.0);
                         _bodyClonePos.addScaledVector(_bodySideVec, Math.sin(wigglePhase) * wiggleAmp);
                         // Inch Worm: raise the body's middle up off the surface along the normal
-                        // so it arches into a single tall inchworm hump on the gather pulse.
-                        if (_isInch) _bodyClonePos.addScaledVector(_bodyCloneNormal, _inchArch * _gaitPulse * 0.22);
+                        // so it arches into a single inchworm hump on the squish — taller with orbs.
+                        if (_isInch) _bodyClonePos.addScaledVector(_bodyCloneNormal, _inchArch * _gaitPulse * _humpHeight);
                         foundPosition = true;
                         break;
                     }

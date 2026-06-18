@@ -197,6 +197,7 @@ function CrawlerScene({ cubies, size, faceColors, crawlerState, orbs, rotationAn
           jumpHeight={crawlerState.jumpHeight}
           velocity={crawlerState.velocity}
           alive={crawlerState.alive}
+          orbCount={orbs.filter(o => o.collected).length}
         />
       )}
 
