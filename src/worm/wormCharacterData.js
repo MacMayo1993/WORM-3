@@ -34,6 +34,14 @@ export const WORM_CHARACTERS = [
     stats: { speed: 40, healing: 75, agility: 50, glow: 15 },
     special: "Scholar's Eye — highlights the most efficient heal path once per run",
   },
+  {
+    id: 'wiggle',
+    label: 'Wiggle Worm',
+    type: 'Dancer',
+    subtitle: 'Hyper-flexible sidewinder',
+    stats: { speed: 80, healing: 50, agility: 100, glow: 20 },
+    special: 'Sidewinder — body slithers in a wide snaking wave, the most agile crawler',
+  },
 ];
 
 export function getWormCharacter(id) {

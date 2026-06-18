@@ -750,6 +750,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     const isInch = wormCharacterId === 'inch';
     const isGlow = wormCharacterId === 'glow';
     const isBook = wormCharacterId === 'book';
+    const isWiggle = wormCharacterId === 'wiggle';
     // ── SVG worm preview ────────────────────────────────────────────────────────
     const renderWormSVG = () => {
       const W = 224, H = 120;
@@ -757,11 +758,13 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       const neckX = headCx - headR + 6; // 149
       const neckY = headCy;             // 60
 
-      // Inchworm: quadratic arch. Others: gentle cubic S-curve.
+      // Inchworm: quadratic arch. Wiggle: pronounced multi-wave slither. Others: gentle cubic S-curve.
       const bodyPath = isInch
         ? `M 58,72 Q 100,18 ${neckX},${neckY}`
+        : isWiggle
+        ? `M 30,60 Q 52,30 74,60 T 118,60 T ${neckX},${neckY}`
         : `M 38,63 C 72,56 114,68 ${neckX},${neckY}`;
-      const bodyWidth = isInch ? 20 : 27;
+      const bodyWidth = isInch ? 20 : isWiggle ? 21 : 27;
 
       // Bezier helper for segment-ring positions along the cubic body path
       const bezierPt = t => {
@@ -784,8 +787,8 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           {/* Body stroke — thick rounded path */}
           <path d={bodyPath} stroke={activeSkin.belly} strokeWidth={bodyWidth} fill="none" strokeLinecap="round" />
 
-          {/* Subtle segment rings along body (non-inchworm) */}
-          {!isInch && [0.25, 0.50, 0.72].map((t, idx) => {
+          {/* Subtle segment rings along body (non-inchworm, non-wiggle — wiggle uses a wavy path) */}
+          {!isInch && !isWiggle && [0.25, 0.50, 0.72].map((t, idx) => {
             const [bx, by] = bezierPt(t);
             return (
               <ellipse key={idx} cx={bx} cy={by} rx={5 + idx * 2} ry={bodyWidth / 2 + 1}

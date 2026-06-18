@@ -70,6 +70,7 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
   const isInch = wormCharacter.id === 'inch';
   const isGlow = wormCharacter.id === 'glow';
   const isBook = wormCharacter.id === 'book';
+  const isWiggle = wormCharacter.id === 'wiggle';
   const segmentOffsets = isInch ? [0, -0.18, -0.38] : [0, -0.28, -0.52, -0.73];
   const historyStep = isInch ? 11 : HISTORY_STEP;
 
@@ -126,6 +127,12 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
 
       _segPos.copy(sampled).sub(_rootPos).applyQuaternion(_invQuat);
       _segPos.y += Math.sin(timeRef.current * 6 + i * 0.8) * 0.02 * moveFactor;
+
+      if (isWiggle) {
+        // Sidewinder: strong side-to-side lateral wave travelling down the body.
+        _segPos.x += Math.sin(timeRef.current * 9 + i * 1.3) * 0.14 * moveFactor;
+        _segPos.y += Math.sin(timeRef.current * 9 + i * 1.3) * 0.03 * moveFactor;
+      }
 
       if (isInch) {
         // Two-phase gait: rear bunches up fast (gather), then slowly extends forward.
@@ -510,14 +517,30 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
           renderOrder={5}
         >
           <sphereGeometry args={[0.08, 8, 8]} />
-          <meshBasicMaterial
-            color={GLOW_COLOR}
-            transparent
-            opacity={0}
-            blending={THREE.AdditiveBlending}
-            depthWrite={false}
-            toneMapped={false}
-          />
+          {isGlow ? (
+            // Glow worm keeps its bioluminescent additive bloom trail.
+            <meshBasicMaterial
+              color={GLOW_COLOR}
+              transparent
+              opacity={0}
+              blending={THREE.AdditiveBlending}
+              depthWrite={false}
+              toneMapped={false}
+            />
+          ) : (
+            // Everyone else leaves wet, glossy slime droplets.
+            <meshStandardMaterial
+              color={GLOW_COLOR}
+              emissive={GLOW_COLOR}
+              emissiveIntensity={0.3}
+              roughness={0.1}
+              metalness={0}
+              transparent
+              opacity={0}
+              depthWrite={false}
+              toneMapped={false}
+            />
+          )}
         </mesh>
       ))}
     </group>
