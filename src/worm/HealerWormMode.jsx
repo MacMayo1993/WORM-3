@@ -1942,6 +1942,11 @@ function WormBody({ worm }) {
     isWiggleRef.current = isWiggle;
     const isPrismRef = useRef(isPrism);
     isPrismRef.current = isPrism;
+    // Inch Worm accordion gait state — advances with real crawl distance (not wall-clock),
+    // so the body bunches/extends in lockstep with movement and relaxes when the worm stops.
+    const gaitPhaseRef = useRef(0);
+    const prevInterpTRef = useRef(0);
+    const gaitMoveRef = useRef(0);
     // Tracks the inputs that affect per-segment color so the instanced color buffer
     // is only rewritten on frames where something actually changed (orb pickup,
     // skin/character swap, or tail length change) instead of every frame.
@@ -1966,6 +1971,22 @@ function WormBody({ worm }) {
         const tLen = worm.tailLength.current;
         const steps = worm.stepHistory.current;
         const time = state.clock.getElapsedTime();
+
+        // ── Inch Worm accordion driver ─────────────────────────────────────────
+        // interpT runs 0→1 within each tile step; its per-frame delta (with wrap) is the
+        // distance actually crawled this frame. Accumulate it into a gait phase so the
+        // compress→extend cycle stays synced to real movement, and ease a 0..1 "moving"
+        // factor that drops to 0 when idle so the body smoothly spreads back out at rest.
+        const _interpNow = worm.interpT.current;
+        let _dCrawl = _interpNow - prevInterpTRef.current;
+        if (_dCrawl < -0.5) _dCrawl += 1;                 // wrapped into the next tile
+        if (_dCrawl < 0 || _dCrawl > 0.5) _dCrawl = 0;    // reset / teleport guard
+        prevInterpTRef.current = _interpNow;
+        const _moveTarget = (worm.phase.current === 'crawling' && _dCrawl > 1e-5) ? 1 : 0;
+        gaitMoveRef.current += (_moveTarget - gaitMoveRef.current) * Math.min(1, delta * 6);
+        gaitPhaseRef.current += _dCrawl;                  // +1 accordion squeeze per tile crawled
+        const _gaitMove = gaitMoveRef.current;
+        const _gaitPhase = gaitPhaseRef.current;
 
         // Rebuild path-points buffer in-place (no array allocation or spread)
         _pathPointsBuffer.length = steps.count + 1;
@@ -2053,10 +2074,13 @@ function WormBody({ worm }) {
                 // Inch worm: asymmetric 2-phase traveling wave — rear bunches up fast (arch),
                 // releases slowly (extend), so segments gather then lunge rather than sine-oscillate.
                 const targetDist = _isInch ? (() => {
-                    const ph = ((time * 1.5 - i * 0.6) % 1.0 + 1.0) % 1.0;
+                    // Compression wave keyed to crawl distance: one squeeze travels tail→head
+                    // per tile. Amplitude scales with _gaitMove, so segments bunch while the
+                    // worm inches and relax to the full spread (i * 0.095) when it stops.
+                    const ph = ((_gaitPhase - i * 0.55) % 1.0 + 1.0) % 1.0;
                     const wL = ph < 0.35 ? ph / 0.35 : 1.0 - (ph - 0.35) / 0.65;
                     const wave = wL * wL * (3 - 2 * wL); // smoothstep, no sinusoid
-                    return i * 0.085 - wave * 0.038;      // tighter spacing — segments merge
+                    return i * 0.095 - wave * 0.05 * _gaitMove; // spread at rest, gather while moving
                 })() : i * 0.09;
 
                 // Clones — parametrically walk backwards along the curve to exact target distance
@@ -2107,11 +2131,12 @@ function WormBody({ worm }) {
 
                 _wormDummy.position.copy(_bodyClonePos);
                 if (_isInch) {
-                    // Scale mirrors the same 2-phase wave: compressed (gathered) = smaller
-                    const ph = ((time * 1.5 - i * 0.6) % 1.0 + 1.0) % 1.0;
+                    // Scale mirrors the gait: segments fatten where the body bunches into the
+                    // accordion hump, thin where it stretches — and only while actually moving.
+                    const ph = ((_gaitPhase - i * 0.55) % 1.0 + 1.0) % 1.0;
                     const wL = ph < 0.35 ? ph / 0.35 : 1.0 - (ph - 0.35) / 0.65;
                     const wave = wL * wL * (3 - 2 * wL);
-                    const sc = 0.085 - wave * 0.025; // 0.085 (extended) → 0.060 (gathered)
+                    const sc = 0.082 + wave * 0.03 * _gaitMove; // 0.082 (rest/extended) → fatter when gathered
                     _wormDummy.scale.setScalar(sc);
                 } else if (_isBook) {
                     _wormDummy.scale.set(0.088, 0.055, 0.1);

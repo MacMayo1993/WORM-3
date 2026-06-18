@@ -78,6 +78,9 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
   const groupRef = useRef();
   const bodyRootRef = useRef();
   const timeRef = useRef(0);
+  // Inch Worm accordion gait — accumulates only while the worm is actually moving so the
+  // bunch→extend cycle is synced to locomotion and freezes (spread out) when it stops.
+  const inchGaitRef = useRef(0);
   const positionHistory = useRef(makeCircularBuffer(HISTORY_SIZE));
   const bodySegmentRefs = useRef([]);
   const connectorRefs = useRef([]);
@@ -119,6 +122,8 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
     _invQuat.copy(quaternion).invert();
 
     const moveFactor = Math.min(1, velocity || 0);
+    // Advance the accordion gait by how fast the worm is moving (frozen when idle).
+    if (isInch) inchGaitRef.current += moveFactor * delta * 1.6;
     for (let i = 1; i < segmentOffsets.length; i++) {
       const segGroup = bodySegmentRefs.current[i];
       if (!segGroup) continue;
@@ -139,13 +144,15 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
       }
 
       if (isInch) {
-        // Two-phase gait: rear bunches up fast (gather), then slowly extends forward.
-        // Period ~0.83s — 40% gather, 60% extend for the "inch then lunge" feel.
-        const gaitRaw = (timeRef.current * 1.2) % 1.0;
+        // Accordion gait synced to movement: the gather travels down the body (rear segments
+        // lag via the i-phase offset), bunching toward the head, then the front extends
+        // forward — 40% gather, 60% extend for the "inch then lunge" feel. Amplitude scales
+        // with moveFactor so the body relaxes to its spread-out resting pose when stopped.
+        const gaitRaw = ((inchGaitRef.current - i * 0.15) % 1.0 + 1.0) % 1.0;
         const gL = gaitRaw < 0.4 ? gaitRaw / 0.4 : 1.0 - (gaitRaw - 0.4) / 0.6;
-        const gait = gL * gL * (3 - 2 * gL); // smoothstep — no sine, distinct phases
-        _segPos.z += gait * (i === 1 ? 0.13 : 0.21); // rear bunches toward head
-        _segPos.y += gait * (i === 1 ? 0.03 : 0.07); // arch upward while gathered
+        const gait = gL * gL * (3 - 2 * gL) * moveFactor; // smoothstep — distinct phases
+        _segPos.z += gait * (i === 1 ? 0.16 : 0.26); // rear bunches toward head
+        _segPos.y += gait * (i === 1 ? 0.04 : 0.09); // arch upward while gathered
       }
 
       segGroup.position.copy(_segPos);
@@ -301,7 +308,7 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
             : (isHead ? 0.28 : 0.24 - i * 0.02);
           const segBob = Math.sin(t * 6 + i * 0.8) * 0.02 * Math.min(1, velocity || 0);
           const segColor = isHead ? BODY_COLOR : BELLY_COLOR;
-          const stretch = isInch && !isHead ? 1 + Math.sin(t * 8 + i) * 0.24 : 1;
+          const stretch = isInch && !isHead ? 1 + Math.sin(t * 8 + i) * 0.24 * Math.min(1, velocity || 0) : 1;
 
           return (
             <group ref={el => (bodySegmentRefs.current[i] = el)} key={i} position={[0, segBob + bobble, zOff]}>
