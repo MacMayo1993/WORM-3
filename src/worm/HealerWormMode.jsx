@@ -562,7 +562,13 @@ function useWormCrawler(size, cubies) {
             const healingProgress = depositState.wormHealingProgress ?? {};
             const progress = healingProgress[stableKey] ?? { deposited: 0, faceId: entryFaceId };
             const segmentsOnWorm = tailLength.current - BASE_TAIL_LENGTH;
-            const available = depositState.wormOrbInventory?.[entryFaceId] ?? 0;
+            const inv = depositState.wormOrbInventory ?? {};
+            // Prism Worm — "Spectrum" wildcard: orbs of ANY face color pay toward any
+            // tunnel, so it draws from the whole inventory instead of only the matching face.
+            const isPrism = (depositState.wormCharacter ?? 'classic') === 'prism';
+            const available = isPrism
+                ? Object.values(inv).reduce((sum, v) => sum + (v || 0), 0)
+                : (inv[entryFaceId] ?? 0);
             const n = Math.min(available, HEAL_COST - progress.deposited, segmentsOnWorm);
 
             if (n > 0) {
@@ -570,12 +576,28 @@ function useWormCrawler(size, cubies) {
                 orbPickupColorsRef.current.length = Math.max(0, orbPickupColorsRef.current.length - Math.round(n / ORB_SEGMENT_GROWTH));
                 colorEpochRef.current++;
                 const orbsLeft = Math.max(0, Math.floor((tailLength.current - BASE_TAIL_LENGTH) / ORB_SEGMENT_GROWTH));
+
+                // Deduct n orbs. Non-prism pulls from the matching face; prism drains the
+                // matching face first, then spills into the remaining faces (wildcard pay).
+                let nextInv;
+                if (isPrism) {
+                    nextInv = { ...inv };
+                    let remaining = n;
+                    const drainOrder = [entryFaceId, ...Object.keys(nextInv).map(Number).filter(f => f !== entryFaceId)];
+                    for (const f of drainOrder) {
+                        if (remaining <= 0) break;
+                        const have = nextInv[f] ?? 0;
+                        const take = Math.min(have, remaining);
+                        nextInv[f] = have - take;
+                        remaining -= take;
+                    }
+                } else {
+                    nextInv = { ...inv, [entryFaceId]: (inv[entryFaceId] ?? 0) - n };
+                }
+
                 useGameStore.setState({
                     wormBodyTiles: orbsLeft,
-                    wormOrbInventory: {
-                        ...(depositState.wormOrbInventory ?? {}),
-                        [entryFaceId]: (depositState.wormOrbInventory?.[entryFaceId] ?? 0) - n,
-                    },
+                    wormOrbInventory: nextInv,
                     wormHealingProgress: {
                         ...healingProgress,
                         [stableKey]: { deposited: progress.deposited + n, faceId: entryFaceId },
