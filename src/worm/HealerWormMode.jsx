@@ -1867,7 +1867,7 @@ const _trailNorm  = new THREE.Vector3();
 const _trailColor = new THREE.Color();
 const _trailRingZ = new THREE.Vector3(0, 0, 1); // ringGeometry default normal
 const TRAIL_CAP   = 80;   // newest N tile visits rendered
-const TRAIL_LIFT  = 0.025; // hover distance above tile surface
+const TRAIL_LIFT  = 0.045; // hover distance above tile surface (raised so filled slime discs don't z-fight)
 
 // ─── Worm Body (head = smooth lerp; body = per-step tile history) ─────────────
 const _wormDummy = new THREE.Object3D();
@@ -1900,6 +1900,7 @@ function WormBody({ worm }) {
     const isInch = wormCharacter.id === 'inch';
     const isGlow = wormCharacter.id === 'glow';
     const isBook = wormCharacter.id === 'book';
+    const isWiggle = wormCharacter.id === 'wiggle';
     const skin = getSkin(wormSkinId);
     const wormColor = skin.body;
     const bellyColor = skin.belly;
@@ -1914,6 +1915,8 @@ function WormBody({ worm }) {
     isGlowRef.current = isGlow;
     const isBookRef = useRef(isBook);
     isBookRef.current = isBook;
+    const isWiggleRef = useRef(isWiggle);
+    isWiggleRef.current = isWiggle;
     // Tracks the inputs that affect per-segment color so the instanced color buffer
     // is only rewritten on frames where something actually changed (orb pickup,
     // skin/character swap, or tail length change) instead of every frame.
@@ -1930,6 +1933,7 @@ function WormBody({ worm }) {
         const _isInch = isInchRef.current;
         const _isGlow = isGlowRef.current;
         const _isBook = isBookRef.current;
+        const _isWiggle = isWiggleRef.current;
         const mesh = _isBook ? boxMeshRef.current : meshRef.current;
         if (!mesh) return;
 
@@ -2053,8 +2057,10 @@ function WormBody({ worm }) {
                         _bodySegForward.subVectors(aPos, bPos).normalize();
                         _bodySideVec.crossVectors(_bodyCloneNormal, _bodySegForward).normalize();
 
-                        const wiggleAmp = _isInch ? 0.0 : 0.08 * Math.sin(fade * Math.PI);
-                        const wigglePhase = i * 0.8 - time * 6.0;
+                        // Wiggle Worm is a sidewinder: a much wider, tighter, faster
+                        // travelling wave so the whole body slithers like a snake.
+                        const wiggleAmp = _isInch ? 0.0 : (_isWiggle ? 0.30 : 0.08) * Math.sin(fade * Math.PI);
+                        const wigglePhase = i * (_isWiggle ? 1.5 : 0.8) - time * (_isWiggle ? 10.0 : 6.0);
                         _bodyClonePos.addScaledVector(_bodySideVec, Math.sin(wigglePhase) * wiggleAmp);
                         foundPosition = true;
                         break;
@@ -2312,13 +2318,20 @@ function WormTrail({ worm, size: _size }) {
 
     return (
         <instancedMesh ref={meshRef} args={[undefined, undefined, TRAIL_CAP]} frustumCulled={false}>
-            <ringGeometry args={[0.20, 0.42, 24]} />
-            <meshBasicMaterial
+            {/* Filled discs (not outline rings) read as gooey slime puddles left behind on
+                each tile. Low roughness + normal blending gives a wet, translucent sheen that
+                catches the scene lights as the worm crawls, instead of a neon additive marker. */}
+            <circleGeometry args={[0.5, 20]} />
+            <meshStandardMaterial
                 color="white"
+                emissive="white"
+                emissiveIntensity={0.18}
+                roughness={0.12}
+                metalness={0}
                 transparent
-                opacity={0.55}
-                blending={THREE.AdditiveBlending}
+                opacity={0.74}
                 depthWrite={false}
+                side={THREE.DoubleSide}
                 toneMapped={false}
             />
         </instancedMesh>
