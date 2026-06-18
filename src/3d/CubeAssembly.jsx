@@ -113,7 +113,11 @@ const CubeAssembly = React.memo(({
       flipWaveOrigins: s.flipWaveOrigins,
       handsMode: s.handsMode,
       wormHealerMode: s.wormHealerMode,
-      wormTunnelActive: s.wormHealerMode && s.wormPhase !== 'crawling' && s.wormPhase !== 'dead',
+      // Hide the exterior cube ONLY during the immersive 'tunnel' beat (camera rides inside the
+      // hollow cube on the Möbius ribbon). During windup/entering/exiting the camera watches the
+      // entry/exit holes from OUTSIDE, so the cube must stay visible to see the worm get sucked
+      // in and spat out.
+      wormTunnelActive: s.wormHealerMode && s.wormPhase === 'tunnel',
       isBiomeMode: s.settings?.biomeMode?.enabled,
       rotationEpoch: s.rotationEpoch,
       settings: s.settings,
