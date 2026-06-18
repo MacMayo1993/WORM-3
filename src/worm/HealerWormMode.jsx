@@ -1987,6 +1987,12 @@ function WormBody({ worm }) {
         gaitPhaseRef.current += _dCrawl;                  // +1 accordion squeeze per tile crawled
         const _gaitMove = gaitMoveRef.current;
         const _gaitPhase = gaitPhaseRef.current;
+        // One synchronized rise→fall pulse per tile crawled drives a single inchworm hump:
+        // the body scrunches + the middle rears up (gather, 45%), then flattens + reaches
+        // forward (extend, 55%). Global (no per-segment phase) so there is only ever one hump.
+        const _gaitCyc = (_gaitPhase % 1 + 1) % 1;
+        const _gaitPL = _gaitCyc < 0.45 ? _gaitCyc / 0.45 : 1.0 - (_gaitCyc - 0.45) / 0.55;
+        const _gaitPulse = _gaitPL * _gaitPL * (3 - 2 * _gaitPL) * _gaitMove;
 
         // Rebuild path-points buffer in-place (no array allocation or spread)
         _pathPointsBuffer.length = steps.count + 1;
@@ -2071,18 +2077,12 @@ function WormBody({ worm }) {
                 _wormDummy.position.copy(_bodyHeadPos);
                 _wormDummy.scale.setScalar(0.092);
             } else {
-                // Inch Worm accordion: a compression+lift wave travels down the body, keyed to
-                // crawl distance. At each crest the body scrunches together AND arches up off the
-                // surface into a tall inchworm hump; between crests it stretches flat. Amplitude
-                // scales with _gaitMove so it relaxes to the full spread (i * 0.095) at rest.
-                // Wavelength ≈ 1 tile of body (i * 0.11) so a short worm shows one clean hump.
-                let _inchWave = 0;
-                if (_isInch) {
-                    const ph = ((_gaitPhase - i * 0.11) % 1.0 + 1.0) % 1.0;
-                    const wL = ph < 0.4 ? ph / 0.4 : 1.0 - (ph - 0.4) / 0.6;
-                    _inchWave = wL * wL * (3 - 2 * wL); // smoothstep, no sinusoid
-                }
-                const targetDist = _isInch ? (i * 0.095 - _inchWave * 0.05 * _gaitMove) : i * 0.09;
+                // Inch Worm: a single hump locked to the middle of the body (sin profile over
+                // the whole length → 0 at head & tail, peak at centre). It rears up and the
+                // body scrunches on the gather pulse, then flattens to the full spread when the
+                // pulse falls / the worm rests. One arch only, regardless of body length.
+                const _inchArch = (_isInch && visibleCount > 1) ? Math.sin(Math.PI * (i / (visibleCount - 1))) : 0;
+                const targetDist = _isInch ? (i * 0.095 * (1 - _gaitPulse * 0.28)) : i * 0.09;
 
                 // Clones — parametrically walk backwards along the curve to exact target distance
                 let foundPosition = false;
@@ -2118,9 +2118,9 @@ function WormBody({ worm }) {
                         const wiggleAmp = _isInch ? 0.0 : (_isWiggle ? 0.26 : 0.08) * Math.sin(fade * Math.PI);
                         const wigglePhase = i * (_isWiggle ? 0.5 : 0.8) - time * (_isWiggle ? 8.0 : 6.0);
                         _bodyClonePos.addScaledVector(_bodySideVec, Math.sin(wigglePhase) * wiggleAmp);
-                        // Inch Worm: raise the bunched crest up off the surface along the normal
-                        // so the scrunched section arches into a tall inchworm hump.
-                        if (_isInch) _bodyClonePos.addScaledVector(_bodyCloneNormal, _inchWave * 0.18 * _gaitMove);
+                        // Inch Worm: raise the body's middle up off the surface along the normal
+                        // so it arches into a single tall inchworm hump on the gather pulse.
+                        if (_isInch) _bodyClonePos.addScaledVector(_bodyCloneNormal, _inchArch * _gaitPulse * 0.22);
                         foundPosition = true;
                         break;
                     }
@@ -2135,9 +2135,8 @@ function WormBody({ worm }) {
 
                 _wormDummy.position.copy(_bodyClonePos);
                 if (_isInch) {
-                    // Segments fatten where the body bunches into the hump, thin where it
-                    // stretches — and only while actually moving (reuses the gait wave).
-                    const sc = 0.082 + _inchWave * 0.03 * _gaitMove; // 0.082 (rest/extended) → fatter when gathered
+                    // Segments fatten at the hump's peak, thin elsewhere — only while moving.
+                    const sc = 0.082 + _inchArch * _gaitPulse * 0.03; // 0.082 (rest/extended) → fatter at the hump
                     _wormDummy.scale.setScalar(sc);
                 } else if (_isBook) {
                     _wormDummy.scale.set(0.088, 0.055, 0.1);
