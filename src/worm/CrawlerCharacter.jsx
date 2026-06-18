@@ -144,15 +144,17 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
       }
 
       if (isInch) {
-        // Accordion gait synced to movement: the gather travels down the body (rear segments
-        // lag via the i-phase offset), bunching toward the head, then the front extends
-        // forward — 40% gather, 60% extend for the "inch then lunge" feel. Amplitude scales
-        // with moveFactor so the body relaxes to its spread-out resting pose when stopped.
-        const gaitRaw = ((inchGaitRef.current - i * 0.15) % 1.0 + 1.0) % 1.0;
-        const gL = gaitRaw < 0.4 ? gaitRaw / 0.4 : 1.0 - (gaitRaw - 0.4) / 0.6;
-        const gait = gL * gL * (3 - 2 * gL) * moveFactor; // smoothstep — distinct phases
-        _segPos.z += gait * (i === 1 ? 0.16 : 0.26); // rear bunches toward head
-        _segPos.y += gait * (i === 1 ? 0.04 : 0.09); // arch upward while gathered
+        // Classic inchworm Ω-loop, synced to movement: the body scrunches together and the
+        // middle rears UP into a tall hump (gather), then flattens and reaches forward
+        // (extend) — 45% gather / 55% extend. The whole short body pulses as one. Amplitude
+        // scales with moveFactor so it flattens to its spread-out resting pose when stopped.
+        const N = segmentOffsets.length;
+        const gp = (inchGaitRef.current % 1.0 + 1.0) % 1.0;
+        const pL = gp < 0.45 ? gp / 0.45 : 1.0 - (gp - 0.45) / 0.55;
+        const pulse = pL * pL * (3 - 2 * pL) * moveFactor; // smoothstep — distinct phases
+        const arch = Math.sin(Math.PI * (i / (N - 1))); // peaks mid-body, 0 at head & tail
+        _segPos.y += arch * pulse * 0.32;            // middle rears up into a tall hump
+        _segPos.z += pulse * (0.08 + i * 0.06);      // body scrunches toward the head
       }
 
       segGroup.position.copy(_segPos);
