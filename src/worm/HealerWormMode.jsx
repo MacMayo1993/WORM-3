@@ -10,7 +10,7 @@ import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { getStickerWorldPos, getManifoldGridId } from '../game/coordinates.js';
-import { getNextSurfacePosition, getActiveTunnels, getTunnelWorldPosInto, turnWorm, getStableKey, findStickerByStableKey, isTileInSlice } from './wormLogic.js';
+import { getNextSurfacePosition, getActiveTunnels, getTunnelWorldPosInto, getWindWorldPosInto, turnWorm, getStableKey, findStickerByStableKey, isTileInSlice } from './wormLogic.js';
 import { setWormTurnCallback } from './wormTurnBridge.js';
 import { buildManifoldGridMap, buildManifoldGridMapIncremental, flipStickerPair, findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
 import { getManifoldMap } from '../game/manifoldMapStore.js';
@@ -614,7 +614,8 @@ function useWormCrawler(size, cubies) {
         const exitTileKey = tileKey(tunnel.exit);
         ttFilterInPlace(tileTrail.current, k => k !== exitTileKey);
         tunnelProgress.current = 0;
-        phase.current = 'entering';
+        // Start with the wind-up flourish (spiral circle above the entry hole) before the dive.
+        phase.current = 'windup';
         onFlippedTile.current = false;
         lastFlippedRef.current = false;
         const prevState = useGameStore.getState();
@@ -623,7 +624,7 @@ function useWormCrawler(size, cubies) {
         const nextTunnelCount = (prevState.wormTunnelCount ?? 0) + 1;
         const fc = resolveColors(prevState.settings, prevState.settings?.biomeMode?.faceAssignment) || FACE_COLORS;
         useGameStore.setState({
-            wormPhase: 'entering',
+            wormPhase: 'windup',
             wormOnFlippedTile: false,
             wormTunnelCount: nextTunnelCount,
             showTunnels: true,
@@ -1013,9 +1014,30 @@ function useWormCrawler(size, cubies) {
                 },
             },
 
+            // Wind-up: the worm orbits in a shrinking circle above the entry hole, then is
+            // pulled into it — a flourish that plays before the dive. beginTunnelTransition sets
+            // wormPhase:'windup' directly, so no enter() here (avoids a double set).
+            windup: {
+                update(delta) {
+                    tunnelProgress.current += delta * (1.5 * TUNNEL_SPEED_SCALE);
+                    if (activeTunnel.current) {
+                        const s = Math.min(1, tunnelProgress.current); // 0 (far/lifted) → 1 (on hole)
+                        getWindWorldPosInto(headInterpPos.current, activeTunnel.current, 'entry', s, size);
+                        const entryN = FACE_NORMALS[activeTunnel.current.entry.dirKey];
+                        if (entryN) currentNormal.current.copy(entryN);
+                    }
+                    if (tunnelProgress.current >= 1) {
+                        tunnelProgress.current = 0;
+                        phase.current = 'entering'; // entering.enter() fires next tick
+                    }
+                    return false;
+                },
+            },
+
             entering: {
-                // enter() is intentionally absent: beginTunnelTransition sets wormPhase/'glass'
-                // immediately on the same tick the transition is triggered — no one-frame delay.
+                enter() {
+                    useGameStore.getState().setWormPhase('entering');
+                },
                 update(delta) {
                     tunnelProgress.current += delta * (1.2 * TUNNEL_SPEED_SCALE);
                     if (activeTunnel.current) {
@@ -1081,17 +1103,13 @@ function useWormCrawler(size, cubies) {
                     }
                     if (tunnelProgress.current >= 1) {
                         const voidKillState = pendingVoidKillRef.current;
-                        const exitedTunnel = activeTunnel.current; // capture before null
+                        const exitedTunnel = activeTunnel.current; // capture (kept alive for windout)
                         const exitStableKey = currentTunnelStableKeyRef.current;
                         tunnelProgress.current = 0;
-                        activeTunnel.current = null;
                         currentTunnelStableKeyRef.current = null;
                         if (voidKillState) {
                             pendingVoidKillRef.current = { ...voidKillState, armed: true };
                         }
-
-                        phase.current = 'crawling';
-                        // crawling.enter() fires next tick → grace steps + Zustand crawling reset
 
                         // Heal immediately at exit completion (not deferred) when enough orbs deposited.
                         const exitStore = useGameStore.getState();
@@ -1124,6 +1142,40 @@ function useWormCrawler(size, cubies) {
                             pendingHealBurstRef.current = { exitTile: exitedTunnel.exit, entryTile: exitedTunnel.entry };
                         }
                         // else: partial/no deposit — tunnel stays flipped, progress persists
+
+                        if (voidKillState) {
+                            // Skip the flourish so the pending void-kill resolves promptly.
+                            activeTunnel.current = null;
+                            phase.current = 'crawling';
+                        } else {
+                            // Wind-out flourish (reverse spiral above the exit hole) before crawling.
+                            // activeTunnel stays set for the spiral; it's cleared at windout's end.
+                            phase.current = 'windout';
+                        }
+                    }
+                    return false;
+                },
+            },
+
+            // Wind-out: the worm rises out of the exit hole and spirals open above it, then
+            // settles and resumes crawling — the wind-up flourish played in reverse.
+            windout: {
+                enter() {
+                    useGameStore.getState().setWormPhase('windout');
+                },
+                update(delta) {
+                    tunnelProgress.current += delta * (1.5 * TUNNEL_SPEED_SCALE);
+                    if (activeTunnel.current) {
+                        const s = Math.max(0, 1 - tunnelProgress.current); // 1 (hole) → 0 (far/lifted)
+                        getWindWorldPosInto(headInterpPos.current, activeTunnel.current, 'exit', s, size);
+                        const exitN = FACE_NORMALS[activeTunnel.current.exit.dirKey];
+                        if (exitN) currentNormal.current.copy(exitN);
+                    }
+                    if (tunnelProgress.current >= 1) {
+                        tunnelProgress.current = 0;
+                        activeTunnel.current = null;
+                        phase.current = 'crawling';
+                        // crawling.enter() fires next tick → grace steps + Zustand crawling reset
                     }
                     return false;
                 },
@@ -1449,7 +1501,7 @@ function WormChaseCamera({ worm, size }) {
 
             // Just resumed crawling after a tunnel: ease the camera back to the chase framing
             // over ~0.7s instead of yanking it, so the worm doesn't pop straight to gameplay.
-            if (prevPhaseRef.current === 'exiting' || prevPhaseRef.current === 'tunnel' || prevPhaseRef.current === 'entering') {
+            if (prevPhaseRef.current !== 'crawling') {
                 postTunnelEaseRef.current = 0.7;
             }
             let crawlK = CAM_LERP;
@@ -1466,13 +1518,17 @@ function WormChaseCamera({ worm, size }) {
             camUpRef.current.lerp(_camUp, Math.min(1, crawlK * delta)).normalize();
             camera.up.copy(camUpRef.current);
             camera.lookAt(lookAtRef.current);
-        } else if ((phase === 'entering' || phase === 'tunnel' || phase === 'exiting') && worm.activeTunnel.current) {
+        } else if ((phase === 'windup' || phase === 'entering' || phase === 'tunnel' || phase === 'exiting' || phase === 'windout') && worm.activeTunnel.current) {
             // Map phase+progress to a single [0,1] parameter for the HUD dot / dim system.
             const tp = worm.tunnelProgress.current;
-            const t = phase === 'entering' ? tp * 0.33 :
+            const t = phase === 'windup'   ? 0 :
+                      phase === 'windout'  ? 1 :
+                      phase === 'entering' ? tp * 0.33 :
                       phase === 'tunnel'   ? 0.33 + tp * 0.34 :
                                              0.67 + tp * 0.33;
             const tunnel = worm.activeTunnel.current;
+            const onEntrySide = phase === 'windup' || phase === 'entering';
+            const onExitSide  = phase === 'windout' || phase === 'exiting';
 
             // Publish to MobiusHUD's DOM RAF loop and MobiusTunnel dim system.
             tunnelState.active = true;
@@ -1498,10 +1554,10 @@ function WormChaseCamera({ worm, size }) {
             _camSurfCam.copy(_ribVStart).addScaledVector(entN, portalDist); _camSurfCam.y += portalUp; // entry cam pose
             _ribMidA  .copy(_ribVEnd  ).addScaledVector(extN, portalDist); _ribMidA.y   += portalUp;   // exit cam pose
 
-            if (phase === 'entering') {
+            if (onEntrySide) { // windup + entering — frame the entry hole
                 _camTargetCam.copy(_camSurfCam);
                 _camTargetLook.copy(_ribVStart);
-            } else if (phase === 'exiting') {
+            } else if (onExitSide) { // exiting + windout — frame the exit hole
                 _camTargetCam.copy(_ribMidA);
                 _camTargetLook.copy(_ribVEnd);
             } else { // tunnel — glide from the entry view across to the exit view
@@ -1510,7 +1566,7 @@ function WormChaseCamera({ worm, size }) {
             }
 
             // World-up, flipped only when looking at a bottom-facing hole to avoid inversion.
-            const lookN = phase === 'exiting' ? extN : entN;
+            const lookN = onExitSide ? extN : entN;
             _camUp.set(0, lookN.y < -0.85 ? -1 : 1, 0);
 
             const k = phase === 'tunnel' ? 2.0 : 3.0;
@@ -2051,6 +2107,16 @@ function WormBody({ worm, size }) {
             _segDt = 0.095 / _tunLen; // match the on-surface body spacing at the mouth
         }
 
+        // Wind-up / wind-out: body coils behind the head along the spiral above the hole.
+        const _windOn = (_phase === 'windup' || _phase === 'windout') && !!_funnelTunnel;
+        const _windSide = _phase === 'windout' ? 'exit' : 'entry';
+        const _windSegDt = 0.07; // spacing between segments in spiral-s units
+        let _windHeadS = 0;
+        if (_windOn) {
+            const _wprog = worm.tunnelProgress.current;
+            _windHeadS = _phase === 'windup' ? Math.min(1, _wprog) : Math.max(0, 1 - _wprog);
+        }
+
         let walkIndex = 0;
         let cumulativeDist = 0;
         let altIdx = 0; // index into glowAltRef (even glow segments)
@@ -2172,6 +2238,17 @@ function WormBody({ worm, size }) {
                         _funnelHide = true;
                     }
                     // entering & _segParam < 0: leave it on the surface, trailing toward the hole.
+                } else if (_windOn) {
+                    // Coil the body behind the head along the spiral. windup: segments trail
+                    // OUTWARD (smaller s); windout: they trail back toward the hole (larger s).
+                    const _segS = _phase === 'windup' ? (_windHeadS - i * _windSegDt) : (_windHeadS + i * _windSegDt);
+                    if (_segS >= 0 && _segS <= 1) {
+                        getWindWorldPosInto(_bodyClonePos, _funnelTunnel, _windSide, _segS, size);
+                    } else if (_phase === 'windout' && _segS > 1) {
+                        // Still down in the hole, not yet risen out — hide until it emerges.
+                        _funnelHide = true;
+                    }
+                    // windup & _segS < 0: still on the surface trail — keep the normal position.
                 }
 
                 _wormDummy.position.copy(_bodyClonePos);
@@ -3610,7 +3687,7 @@ function TunnelPortalFX({ worm, size }) {
         // ── Entry vortex (sucked in) ───────────────────────────────────────────
         const vGroup = vortexRef.current;
         if (vGroup) {
-            const showVortex = phase === 'entering' && !!tunnel;
+            const showVortex = (phase === 'windup' || phase === 'entering') && !!tunnel;
             vGroup.visible = showVortex;
             if (showVortex) {
                 // Sit the swirl on the entry FACE SURFACE (just outside) so it is visible from
@@ -4279,7 +4356,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         }
     });
 
-    const wormInTunnel = wormPhaseReactive === 'entering' || wormPhaseReactive === 'tunnel' || wormPhaseReactive === 'exiting';
+    const wormInTunnel = wormPhaseReactive === 'windup' || wormPhaseReactive === 'entering' || wormPhaseReactive === 'tunnel' || wormPhaseReactive === 'exiting' || wormPhaseReactive === 'windout';
     const wormAlive = wormGamePhase !== 'scrambling';
 
     return (
