@@ -1901,6 +1901,7 @@ function WormBody({ worm }) {
     const isGlow = wormCharacter.id === 'glow';
     const isBook = wormCharacter.id === 'book';
     const isWiggle = wormCharacter.id === 'wiggle';
+    const isPrism = wormCharacter.id === 'prism';
     const skin = getSkin(wormSkinId);
     const wormColor = skin.body;
     const bellyColor = skin.belly;
@@ -1917,6 +1918,8 @@ function WormBody({ worm }) {
     isBookRef.current = isBook;
     const isWiggleRef = useRef(isWiggle);
     isWiggleRef.current = isWiggle;
+    const isPrismRef = useRef(isPrism);
+    isPrismRef.current = isPrism;
     // Tracks the inputs that affect per-segment color so the instanced color buffer
     // is only rewritten on frames where something actually changed (orb pickup,
     // skin/character swap, or tail length change) instead of every frame.
@@ -1934,6 +1937,7 @@ function WormBody({ worm }) {
         const _isGlow = isGlowRef.current;
         const _isBook = isBookRef.current;
         const _isWiggle = isWiggleRef.current;
+        const _isPrism = isPrismRef.current;
         const mesh = _isBook ? boxMeshRef.current : meshRef.current;
         if (!mesh) return;
 
@@ -1994,7 +1998,9 @@ function WormBody({ worm }) {
         // tail growth — not every frame. Skip the setColorAt pass + GPU upload otherwise.
         const colorEpoch = worm.colorEpochRef?.current ?? 0;
         const prevCS = prevColorStateRef.current;
-        const colorDirty = colorEpoch !== prevCS.epoch || visibleCount !== prevCS.visibleCount ||
+        // Prism cycles its hue continuously, so its color buffer must be rewritten every
+        // frame; all other characters only recolor when an input actually changes.
+        const colorDirty = _isPrism || colorEpoch !== prevCS.epoch || visibleCount !== prevCS.visibleCount ||
             baseColor !== prevCS.baseColor || bellyCol !== prevCS.bellyCol || _isGlow !== prevCS.isGlow || _isInch !== prevCS.isInch;
         if (colorDirty) {
             prevCS.epoch = colorEpoch;
@@ -2118,7 +2124,10 @@ function WormBody({ worm }) {
             if (colorDirty) {
                 const orbPickupIndex = Math.floor((i - BASE_TAIL_LENGTH) / ORB_SEGMENT_GROWTH);
                 const hasOrbColor = orbPickupIndex >= 0 && orbPickupIndex < orbColors.length;
-                if (i === 0 && _isGlow) {
+                if (_isPrism) {
+                    // Spectrum: a rainbow that flows down the body and scrolls over time.
+                    _bodyColor.setHSL(((i * 0.022) + time * 0.12) % 1, 0.85, 0.6);
+                } else if (i === 0 && _isGlow) {
                     // Glow head — use base worm color; GlowWormAura point light provides visible glow
                     _bodyColor.set(baseColor);
                 } else if (hasOrbColor) {

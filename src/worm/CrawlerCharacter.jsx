@@ -71,6 +71,7 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
   const isGlow = wormCharacter.id === 'glow';
   const isBook = wormCharacter.id === 'book';
   const isWiggle = wormCharacter.id === 'wiggle';
+  const isPrism = wormCharacter.id === 'prism';
   const segmentOffsets = isInch ? [0, -0.18, -0.38] : [0, -0.28, -0.52, -0.73];
   const historyStep = isInch ? 11 : HISTORY_STEP;
 
@@ -180,6 +181,29 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
       _connQuat.setFromUnitVectors(_localUp, _connDir);
       conn.quaternion.copy(_connQuat);
       conn.scale.y = dist;
+    }
+
+    // Prism: each segment cycles through a rainbow that flows down the body over time.
+    if (isPrism) {
+      for (let pi = 0; pi < segmentOffsets.length; pi++) {
+        const segGrp = bodySegmentRefs.current[pi];
+        if (!segGrp || !segGrp.children[0]) continue;
+        const mat = segGrp.children[0].material;
+        if (!mat) continue;
+        const hue = ((pi * 0.12) + timeRef.current * 0.15) % 1;
+        mat.color.setHSL(hue, 0.85, 0.6);
+        if (mat.emissive) {
+          mat.emissive.setHSL(hue, 0.85, 0.5);
+          mat.emissiveIntensity = 0.35;
+        }
+      }
+      for (let ci = 0; ci < connectorRefs.current.length; ci++) {
+        const conn = connectorRefs.current[ci];
+        if (!conn || !conn.material) continue;
+        const hue = ((ci * 0.12 + 0.06) + timeRef.current * 0.15) % 1;
+        conn.material.color.setHSL(hue, 0.85, 0.6);
+        if (conn.material.emissive) conn.material.emissive.setHSL(hue, 0.85, 0.5);
+      }
     }
 
     // Alternating emissive glow for glow worm segments
