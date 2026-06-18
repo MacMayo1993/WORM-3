@@ -179,8 +179,7 @@ export const getTunnelWorldPosInto = (out, tunnel, t, size, explosionFactor = 0)
   const k = (size - 1) / 2;
   const scale = 1 + explosionFactor * 1.8;
 
-  // Use the geometric center of each face tile (not sticker offset).
-  // Write into pre-allocated scratch vectors to avoid per-call heap allocation.
+  // Cube-cell centers of the entry/exit tiles (scaled out during the explosion anim).
   _tunnelEntry.set(
     (tunnel.entry.x - k) * scale,
     (tunnel.entry.y - k) * scale,
@@ -191,16 +190,38 @@ export const getTunnelWorldPosInto = (out, tunnel, t, size, explosionFactor = 0)
     (tunnel.exit.y - k) * scale,
     (tunnel.exit.z - k) * scale
   );
-  // _tunnelCore is always (0,0,0) — no need to re-set.
 
-  // Enforce exact path: entry tile center -> void core center -> exit tile center.
-  if (t <= 0.5) {
-    const localT = Math.max(0, t) * 2;
-    return out.lerpVectors(_tunnelEntry, _tunnelCore, localT);
+  // Reconstruct the SAME centerline the ribbon mesh is built from (MobiusTunnel fillRibbon):
+  //   vStart = entryCenter − entryNormal·FACE_OFFSET ,  midA = entryNormal·MINI_FACE_R
+  //   vEnd   = exitCenter  − exitNormal·FACE_OFFSET  ,  midB = exitNormal·MINI_FACE_R
+  // Path: vStart → midA over t∈[0,0.5], then midB → vEnd over t∈[0.5,1]. The mini-cube
+  // docking points (midA/midB) stay fixed near the core regardless of the explosion scale.
+  const en = TUNNEL_FACE_NORMALS[tunnel.entry.dirKey] || ZERO3;
+  const xn = TUNNEL_FACE_NORMALS[tunnel.exit.dirKey] || ZERO3;
+  _tunVStart.set(
+    _tunnelEntry.x - en[0] * TUNNEL_FACE_OFFSET,
+    _tunnelEntry.y - en[1] * TUNNEL_FACE_OFFSET,
+    _tunnelEntry.z - en[2] * TUNNEL_FACE_OFFSET
+  );
+  _tunVEnd.set(
+    _tunnelExit.x - xn[0] * TUNNEL_FACE_OFFSET,
+    _tunnelExit.y - xn[1] * TUNNEL_FACE_OFFSET,
+    _tunnelExit.z - xn[2] * TUNNEL_FACE_OFFSET
+  );
+  _tunMidA.set(en[0] * TUNNEL_MINI_FACE_R, en[1] * TUNNEL_MINI_FACE_R, en[2] * TUNNEL_MINI_FACE_R);
+  _tunMidB.set(xn[0] * TUNNEL_MINI_FACE_R, xn[1] * TUNNEL_MINI_FACE_R, xn[2] * TUNNEL_MINI_FACE_R);
+
+  // Continuous 3-part route so there is no teleport across the core:
+  //   t∈[0,0.4]  vStart → midA  (entry ribbon arm — matches the rendered mesh)
+  //   t∈[0.4,0.6] midA  → midB  (through the mini-cube void core)
+  //   t∈[0.6,1]  midB  → vEnd   (exit ribbon arm — matches the rendered mesh)
+  if (t <= 0.4) {
+    return out.lerpVectors(_tunVStart, _tunMidA, Math.max(0, t) / 0.4);
   }
-
-  const localT = (Math.min(1, t) - 0.5) * 2;
-  return out.lerpVectors(_tunnelCore, _tunnelExit, localT);
+  if (t <= 0.6) {
+    return out.lerpVectors(_tunMidA, _tunMidB, (t - 0.4) / 0.2);
+  }
+  return out.lerpVectors(_tunMidB, _tunVEnd, (Math.min(1, t) - 0.6) / 0.4);
 };
 
 /**
@@ -265,6 +286,23 @@ const _tunnelEntry = new THREE.Vector3();
 const _tunnelExit = new THREE.Vector3();
 const _tunnelCore = new THREE.Vector3(0, 0, 0);
 const _tunnelResult = new THREE.Vector3();
+// Ribbon-centerline anchors — must match MobiusTunnel.jsx fillRibbon exactly so the worm
+// rides the rendered Möbius band rather than a separate straight core path.
+const _tunVStart = new THREE.Vector3();
+const _tunVEnd = new THREE.Vector3();
+const _tunMidA = new THREE.Vector3();
+const _tunMidB = new THREE.Vector3();
+// Face outward normals keyed by dirKey (plain arrays — avoids importing the THREE.Vector3
+// table from healerWorm/constants and the circular dependency that would create).
+const TUNNEL_FACE_NORMALS = {
+  PX: [1, 0, 0], NX: [-1, 0, 0],
+  PY: [0, 1, 0], NY: [0, -1, 0],
+  PZ: [0, 0, 1], NZ: [0, 0, -1]
+};
+const ZERO3 = [0, 0, 0];
+// Geometry constants — keep in sync with MobiusTunnel.jsx.
+const TUNNEL_FACE_OFFSET = 0.52;
+const TUNNEL_MINI_FACE_R = 0.25;
 // Reusable scratch vectors for findNextTunnel — avoids per-call allocation
 const _findExitVec = new THREE.Vector3();
 const _scratchVec1 = new THREE.Vector3();
