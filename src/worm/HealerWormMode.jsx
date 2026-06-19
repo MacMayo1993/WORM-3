@@ -1093,7 +1093,7 @@ function useWormCrawler(size, cubies) {
                     }
                 },
                 update(delta) {
-                    tunnelProgress.current += delta * (1.6 * TUNNEL_SPEED_SCALE);
+                    tunnelProgress.current += delta * (1.0 * TUNNEL_SPEED_SCALE);
                     if (activeTunnel.current) {
                         // Head travels final third of the tunnel (cube interior → exit face)
                         const tunnelT = 0.67 + tunnelProgress.current * 0.33;
@@ -1143,7 +1143,31 @@ function useWormCrawler(size, cubies) {
                         }
                         // else: partial/no deposit — tunnel stays flipped, progress persists
 
-                        // Tunnel travel complete — resume crawling on the exit tile.
+                        // Tunnel travel complete — windout spiral plays before resuming crawl.
+                        // activeTunnel.current stays alive so windout can animate the exit spiral.
+                        phase.current = 'windout';
+                    }
+                    return false;
+                },
+            },
+            // Wind-out: mirrors windup — the worm spirals UP from the exit hole and settles on
+            // the surface, giving the "riding the Möbius strip back up and out" visual.
+            // s runs 1→0: start at exit hole (s=1, env=0), rise to peak orbit (s=0.5, env=1),
+            // settle on surface tile (s=0, env=0).
+            windout: {
+                enter() {
+                    useGameStore.getState().setWormPhase('windout');
+                },
+                update(delta) {
+                    tunnelProgress.current += delta * (1.5 * TUNNEL_SPEED_SCALE);
+                    if (activeTunnel.current) {
+                        const s = 1.0 - Math.min(1, tunnelProgress.current);
+                        getWindWorldPosInto(headInterpPos.current, activeTunnel.current, 'exit', s, size);
+                        const exitN = FACE_NORMALS[activeTunnel.current.exit.dirKey];
+                        if (exitN) currentNormal.current.copy(exitN);
+                    }
+                    if (tunnelProgress.current >= 1) {
+                        tunnelProgress.current = 0;
                         activeTunnel.current = null;
                         phase.current = 'crawling';
                         // crawling.enter() fires next tick → grace steps + Zustand crawling reset
@@ -1489,17 +1513,17 @@ function WormChaseCamera({ worm, size }) {
             camUpRef.current.lerp(_camUp, Math.min(1, crawlK * delta)).normalize();
             camera.up.copy(camUpRef.current);
             camera.lookAt(lookAtRef.current);
-        } else if ((phase === 'windup' || phase === 'entering' || phase === 'exiting') && worm.activeTunnel.current) {
-            // Suck-in (windup + entering) and spit-out (exiting) are watched from OUTSIDE the cube,
-            // so the player sees the worm swirl into the entry hole and burst out of the exit hole
-            // against the (now visible) cube. The middle 'tunnel' beat rides inside — see below.
+        } else if ((phase === 'windup' || phase === 'entering' || phase === 'exiting' || phase === 'windout') && worm.activeTunnel.current) {
+            // Suck-in (windup + entering), spit-out (exiting), and spiral-out (windout) are all
+            // watched from OUTSIDE the cube so the player sees the full entry/exit flourish.
+            // The middle 'tunnel' beat rides inside — see below.
             const tp = worm.tunnelProgress.current;
             const tunnel = worm.activeTunnel.current;
-            const onExitSide = phase === 'exiting';
+            const onExitSide = phase === 'exiting' || phase === 'windout';
 
             // Publish [0,1] progress to MobiusHUD's DOM RAF loop and the MobiusTunnel dim system.
             tunnelState.active = true;
-            tunnelState.t = phase === 'windup' ? 0 : phase === 'entering' ? tp * 0.33 : 0.67 + tp * 0.33;
+            tunnelState.t = phase === 'windup' ? 0 : phase === 'entering' ? tp * 0.33 : phase === 'windout' ? 1.0 : 0.67 + tp * 0.33;
             tunnelState.activeTunnelId = tunnel.pairId ?? null;
 
             const entN = FACE_NORMALS[tunnel.entry.dirKey] ?? FACE_NORMALS.PY;
@@ -3658,6 +3682,8 @@ function TunnelPortalFX({ worm, size }) {
 
     const vortexRef = useRef();
     const vortexRingRefs = useRef([]);
+    const exitVortexRef = useRef();
+    const exitVortexRingRefs = useRef([]);
     const burstRef = useRef();
     const burstFlashRef = useRef();
     const burstTRef = useRef(-1);   // -1 idle, else 0..1 burst progress
@@ -3695,6 +3721,37 @@ function TunnelPortalFX({ worm, size }) {
                     r.scale.setScalar(Math.max(0.02, baseR * shrink));
                     r.position.z = -i * 0.16 * (0.6 + shrink); // recede into the hole (−normal)
                     if (r.material) r.material.opacity = Math.max(0, envelope * (0.55 - i * 0.09));
+                }
+            }
+        }
+
+        // ── Exit vortex (windout — spiraling back up to the surface) ──────────
+        // Mirror of the entry vortex: rings EXPAND outward from the exit hole as the
+        // worm corkscrews up. Counter-spins so it visually reads as "unwinding."
+        const exGroup = exitVortexRef.current;
+        if (exGroup) {
+            const showExitVortex = phase === 'windout' && !!tunnel;
+            exGroup.visible = showExitVortex;
+            if (showExitVortex) {
+                const xwp = getStickerWorldPos(tunnel.exit.x, tunnel.exit.y, tunnel.exit.z, tunnel.exit.dirKey, size, 0);
+                _fxNormal.copy(FACE_NORMALS[tunnel.exit.dirKey] ?? FACE_NORMALS.PY);
+                _fxPos.set(xwp[0], xwp[1], xwp[2]).addScaledVector(_fxNormal, 0.08);
+                _fxQuat.setFromUnitVectors(_fxRingUp, _fxNormal);
+                exGroup.position.copy(_fxPos);
+                exGroup.quaternion.copy(_fxQuat);
+
+                // prog 0→1 over windout: rings expand and fade as the worm rises and settles
+                const expand = 0.35 + Math.min(1, prog) * 1.2; // grow outward
+                const envelope = Math.sin(Math.min(1, prog * 1.15) * Math.PI);
+                const spin = -t * 6 - prog * 10; // counter-spin vs entry
+                for (let i = 0; i < VORTEX_RINGS; i++) {
+                    const r = exitVortexRingRefs.current[i];
+                    if (!r) continue;
+                    r.rotation.z = spin * (1 + i * 0.35);
+                    const baseR = 0.5 + i * 0.18; // outer rings larger than entry (spreading out)
+                    r.scale.setScalar(baseR * expand);
+                    r.position.z = i * 0.12 * expand; // extend above the hole (+normal)
+                    if (r.material) r.material.opacity = Math.max(0, envelope * (0.50 - i * 0.08));
                 }
             }
         }
@@ -3748,6 +3805,17 @@ function TunnelPortalFX({ worm, size }) {
                     <mesh key={i} ref={el => (vortexRingRefs.current[i] = el)}>
                         <torusGeometry args={[0.5, 0.045, 8, 36]} />
                         <meshBasicMaterial color={entryColor} transparent opacity={0}
+                            blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+                    </mesh>
+                ))}
+            </group>
+
+            {/* Exit vortex — concentric expanding rings that unwind as the worm spirals out */}
+            <group ref={exitVortexRef} visible={false}>
+                {Array.from({ length: VORTEX_RINGS }, (_, i) => (
+                    <mesh key={i} ref={el => (exitVortexRingRefs.current[i] = el)}>
+                        <torusGeometry args={[0.5, 0.045, 8, 36]} />
+                        <meshBasicMaterial color={exitColor} transparent opacity={0}
                             blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
                     </mesh>
                 ))}
@@ -4341,7 +4409,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         }
     });
 
-    const wormInTunnel = wormPhaseReactive === 'windup' || wormPhaseReactive === 'entering' || wormPhaseReactive === 'tunnel' || wormPhaseReactive === 'exiting';
+    const wormInTunnel = wormPhaseReactive === 'windup' || wormPhaseReactive === 'entering' || wormPhaseReactive === 'tunnel' || wormPhaseReactive === 'exiting' || wormPhaseReactive === 'windout';
     const wormAlive = wormGamePhase !== 'scrambling';
 
     return (
