@@ -2033,10 +2033,11 @@ function WormBody({ worm, size }) {
         _bodyNormal.copy(worm.currentNormal.current);
 
         const currentJumpVal = worm.isJumping.current ? Math.sin(worm.jumpT.current * Math.PI) * 0.55 : 0;
-        // On the surface the head sits WORM_LIFT above the tile. Inside the wormhole (entering/
-        // tunnel/exiting) the body segments ride the ribbon centerline exactly, so the head must
-        // too — no face-normal lift, or it floats off the band.
-        const _bodyTransit = worm.phase.current === 'entering' || worm.phase.current === 'tunnel' || worm.phase.current === 'exiting';
+        // During transit (entering/tunnel/exiting) and the windout spiral the body segments ride
+        // the ribbon/spiral centerline exactly — no face-normal lift, or the head floats off.
+        // windout uses getWindWorldPosInto which supplies its own lift, so WORM_LIFT must not
+        // be added again here (face is already placed at headInterpPos + 0.09, consistent).
+        const _bodyTransit = worm.phase.current === 'entering' || worm.phase.current === 'tunnel' || worm.phase.current === 'exiting' || worm.phase.current === 'windout';
         _bodyHeadPos.addScaledVector(_bodyNormal, _bodyTransit ? 0 : WORM_LIFT + currentJumpVal);
 
         const _isInch = isInchRef.current;
