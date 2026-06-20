@@ -13,7 +13,7 @@ import ChaosWave from '../manifold/ChaosWave.jsx';
 import FlipPropagationWave from '../manifold/FlipPropagationWave.jsx';
 import { vibrate } from '../utils/audio.js';
 import { pressState } from '../worm/wormLogic.js';
-import { updateSharedTime, updateSharedTremor, warmUpDefaultStyles, healParticleMap } from './styles/TileStyleMaterials.jsx';
+import { updateSharedTime, updateSharedTremor, warmUpDefaultStyles } from './styles/TileStyleMaterials.jsx';
 import { StickerInstanceProvider } from './StickerInstances.jsx';
 import StickerAnimationDriver from './StickerAnimationDriver.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
@@ -23,7 +23,6 @@ import { liveRotation, resetLiveRotation } from '../worm/liveRotation.js';
 import { liveCubies } from '../worm/liveCubies.js';
 import { healSticker } from '../game/cubeState.js';
 import { buildManifoldGridMap, findAntipodalStickerByGrid, getManifoldNeighbors } from '../game/manifoldLogic.js';
-import { getManifoldGridId } from '../game/coordinates.js';
 import { EARN_DISPARITY_TILE_RESTORE } from '../utils/economyConstants.js';
 
 // Reusable axis vectors and quaternion (allocated once, never recreated)
@@ -529,29 +528,25 @@ const CubeAssembly = React.memo(({
               const totalHealed = waves.reduce((s, w) => s + w.length, 0);
               // Award score up-front so the counter updates on tap.
               useGameStore.setState((s) => ({ disparityParityScore: s.disparityParityScore + totalHealed * EARN_DISPARITY_TILE_RESTORE }));
-              // Fire the golden heal-particle burst on a sticker by its (rotation-stable)
-              // manifold grid id — StickerPlane consumes this map one-shot per tile.
-              const fireHealParticles = (st) => {
-                if (st) healParticleMap.set(getManifoldGridId(st, size), 1);
-              };
               waves.forEach((tiles, waveIdx) => {
                 const fire = () => {
                   const now = performance.now();
                   let updated = useGameStore.getState().cubies;
                   const pops = {};
                   for (const t of tiles) {
-                    // Heal the tapped tile and trigger its particle burst.
+                    // Heal the tapped tile — the cubie-pop (below) is the only feedback:
+                    // the tile simply springs back to its true color. No white particle
+                    // burst / seal overlay here; that read as a white tile slapped over
+                    // the sticker and broke immersion.
                     const st = liveCubs[t.x]?.[t.y]?.[t.z]?.stickers?.[t.dirKey];
                     updated = healSticker(updated, size, t.x, t.y, t.z, t.dirKey);
                     pops[`${t.x},${t.y},${t.z}`] = { startMs: now, durationMs: 500 };
-                    fireHealParticles(st);
                     // Heal its antipodal pair — same logical sticker on the opposite face.
                     if (st) {
                       const anti = findAntipodalStickerByGrid(manifoldMap, st, size);
                       if (anti) {
                         updated = healSticker(updated, size, anti.x, anti.y, anti.z, anti.dirKey);
                         pops[`${anti.x},${anti.y},${anti.z}`] = { startMs: now, durationMs: 500 };
-                        fireHealParticles(anti.sticker);
                       }
                     }
                   }
