@@ -1959,6 +1959,10 @@ const _trailPos   = new THREE.Vector3();
 const _trailNorm  = new THREE.Vector3();
 const _trailColor = new THREE.Color();
 const _trailRingZ = new THREE.Vector3(0, 0, 1); // ringGeometry default normal
+const _trailPrevPos = new THREE.Vector3(); // newer neighbor's position, for tangent/stretch
+const _trailTangent = new THREE.Vector3();
+const _trailXAxis    = new THREE.Vector3();
+const _trailMat       = new THREE.Matrix4();
 const TRAIL_CAP   = 80;   // newest N tile visits rendered
 const TRAIL_LIFT  = 0.045; // hover distance above tile surface (raised so filled slime discs don't z-fight)
 
@@ -2453,8 +2457,12 @@ function PortalGlow({ worm, size }) {
 }
 
 // ─── Worm Trail ───────────────────────────────────────────────────────────────
-// Renders a fading ring at each tile the worm has visited — newest = bright + large,
-// oldest = dim + small. Rings stick to their tiles and follow cube rotations via liveCubies.
+// Renders a fading, brush-stroke-shaped daub at each tile the worm has visited —
+// newest = bright + wide, oldest = dim + thin. Index 0 of tileTrail is the tile the
+// head is currently moving INTO (pushed the instant a step begins, before the head's
+// smooth interpolation has caught up), so it is used only as a stretch target for
+// index 1's daub and is never rendered itself — this keeps the trail entirely behind
+// the head instead of flashing a disc out in front of it.
 function WormTrail({ worm, size: _size }) {
     const meshRef = useRef();
     const wormSkinId = useGameStore(s => s.wormSkin ?? 'slime');
@@ -2471,16 +2479,19 @@ function WormTrail({ worm, size: _size }) {
 
         const trail = worm.tileTrail.current;
         const count = trail.count;
-        if (count === 0) { mesh.count = 0; return; }
+        if (count < 2) { mesh.count = 0; return; }
 
         const lSize = liveCubies.size;
         const capCount = Math.min(count, TRAIL_CAP);
         let visible = 0;
+        let havePrev = false;
         const currentSkin = skinRef.current;
 
+        // i=0 is the head's destination tile (not rendered); seed _trailPrevPos/Norm from
+        // it so index 1's daub can stretch toward the head instead of starting from nothing.
         for (let i = 0; i < capCount; i++) {
-            const key = ttAt(trail, i); // i=0 is newest
-            if (!key) continue;
+            const key = ttAt(trail, i);
+            if (!key) { havePrev = false; continue; }
 
             // Parse "x,y,z,dirKey" without split() to avoid string allocations
             const c1 = key.indexOf(',');
@@ -2491,28 +2502,52 @@ function WormTrail({ worm, size: _size }) {
             const tz  = parseInt(key.substring(c2 + 1, c3));
             const tdk = key.substring(c3 + 1);
 
-            // Get live cubie mesh so ring follows cube rotations
+            // Get live cubie mesh so the daub follows cube rotations
             const cubie = (lSize > 0 && liveCubies.refs)
                 ? liveCubies.refs[tx * lSize * lSize + ty * lSize + tz]
                 : null;
-            if (!cubie) continue;
+            if (!cubie) { havePrev = false; continue; }
 
             const localNorm = FACE_NORMALS[tdk];
-            if (!localNorm) continue;
+            if (!localNorm) { havePrev = false; continue; }
 
             // Face normal in world space (accounts for current cube rotation)
             _trailNorm.copy(localNorm).applyQuaternion(cubie.quaternion);
-            // Place ring just above the tile surface
+            // Place daub just above the tile surface
             _trailPos.copy(cubie.position).addScaledVector(_trailNorm, SURFACE_OFFSET + TRAIL_LIFT);
 
-            // Orient ring to lie flat on the tile (align ring +Z normal to face normal)
-            _trailDummy.position.copy(_trailPos);
-            _trailDummy.quaternion.setFromUnitVectors(_trailRingZ, _trailNorm);
+            if (i === 0) {
+                // Seed only — the destination tile sits ahead of the head, so skip rendering it.
+                _trailPrevPos.copy(_trailPos);
+                havePrev = true;
+                continue;
+            }
 
-            // Smoothstep fade: newest (i=0) = full size, oldest = tiny
-            const fade = 1 - i / capCount;
+            _trailDummy.position.copy(_trailPos);
+
+            // Smoothstep fade: i=1 (newest rendered) = full size, oldest = tiny
+            const fade = 1 - (i - 1) / capCount;
             const fs   = fade * fade * (3 - 2 * fade); // smoothstep
-            _trailDummy.scale.setScalar(fs * 0.82 + 0.04);
+
+            if (havePrev) {
+                // Stretch a thin oval toward the newer neighbor so consecutive daubs read as
+                // one continuous painted stroke instead of a row of separate puddles.
+                _trailTangent.subVectors(_trailPrevPos, _trailPos);
+                const tanLenSq = _trailTangent.lengthSq();
+                if (tanLenSq > 1e-6) {
+                    _trailTangent.multiplyScalar(1 / Math.sqrt(tanLenSq));
+                    _trailXAxis.crossVectors(_trailTangent, _trailNorm).normalize();
+                    _trailMat.makeBasis(_trailXAxis, _trailTangent, _trailNorm);
+                    _trailDummy.quaternion.setFromRotationMatrix(_trailMat);
+                    _trailDummy.scale.set(fs * 0.30 + 0.03, fs * 0.95 + 0.08, 1);
+                } else {
+                    _trailDummy.quaternion.setFromUnitVectors(_trailRingZ, _trailNorm);
+                    _trailDummy.scale.setScalar(fs * 0.30 + 0.03);
+                }
+            } else {
+                _trailDummy.quaternion.setFromUnitVectors(_trailRingZ, _trailNorm);
+                _trailDummy.scale.setScalar(fs * 0.30 + 0.03);
+            }
             _trailDummy.updateMatrix();
             mesh.setMatrixAt(visible, _trailDummy.matrix);
 
@@ -2520,6 +2555,9 @@ function WormTrail({ worm, size: _size }) {
             _trailColor.set(currentSkin.body).multiplyScalar(0.20 + fs * 0.80);
             mesh.setColorAt(visible, _trailColor);
             visible++;
+
+            _trailPrevPos.copy(_trailPos);
+            havePrev = true;
         }
 
         mesh.count = visible;
@@ -2529,10 +2567,11 @@ function WormTrail({ worm, size: _size }) {
 
     return (
         <instancedMesh ref={meshRef} args={[undefined, undefined, TRAIL_CAP]} frustumCulled={false}>
-            {/* Filled discs (not outline rings) read as gooey slime puddles left behind on
-                each tile. Low roughness + normal blending gives a wet, translucent sheen that
-                catches the scene lights as the worm crawls, instead of a neon additive marker. */}
-            <circleGeometry args={[0.5, 20]} />
+            {/* Thin, elongated discs stretched toward the next-newer tile read as a continuous
+                painted slime stroke behind the worm. Low roughness + normal blending gives a
+                wet, translucent sheen that catches the scene lights as the worm crawls, instead
+                of a neon additive marker. */}
+            <circleGeometry args={[0.5, 16]} />
             <meshStandardMaterial
                 color="white"
                 emissive="white"
