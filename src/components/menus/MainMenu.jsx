@@ -6,6 +6,7 @@ import { COLOR_SCHEMES } from '../../utils/colorSchemes.js';
 import { CLASSIC_STYLE_KEYS, ANTIPODAL_STYLE_KEYS, LIVING_STYLE_KEYS } from '../../utils/tileStyleCatalog.js';
 import { rotateSliceCubies } from '../../game/cubeRotation.js';
 import { updateSharedTime, getTileStyleMaterial } from '../../3d/styles/TileStyleMaterials.jsx';
+import { vibrate } from '../../utils/audio.js';
 import MenuFlipWave from './MenuFlipWave.jsx';
 import MenuTileOverlay from './MenuTileOverlay.jsx';
 import { ANTIPODAL_COLOR } from '../../utils/constants.js';
@@ -658,6 +659,7 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
           shakeIsExternalRef.current = false;
           _onShakeComplete?.();
         } else {
+          vibrate(20);
           rerandomizeMenuStyle();
           _triggerStyleRefresh?.();
         }
