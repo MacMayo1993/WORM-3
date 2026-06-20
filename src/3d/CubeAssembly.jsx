@@ -97,6 +97,7 @@ const CubeAssembly = React.memo(({
     handsMode,
     wormHealerMode,
     wormTunnelActive,
+    wormExitRideActive,
     isBiomeMode,
     rotationEpoch,
     settings,
@@ -114,10 +115,14 @@ const CubeAssembly = React.memo(({
       handsMode: s.handsMode,
       wormHealerMode: s.wormHealerMode,
       // Hide the exterior cube ONLY during the immersive 'tunnel' beat (camera rides inside the
-      // hollow cube on the Möbius ribbon). During windup/entering/exiting the camera watches the
-      // entry/exit holes from OUTSIDE, so the cube must stay visible to see the worm get sucked
-      // in and spat out.
+      // hollow cube on the Möbius ribbon). During windup/entering the camera watches the
+      // entry hole from OUTSIDE, so the cube must stay visible to see the worm get sucked in.
       wormTunnelActive: s.wormHealerMode && s.wormPhase === 'tunnel',
+      // The camera also rides inside the cube for the whole 'exiting' phase (the trip back up
+      // the exit arm), but unlike 'tunnel' we still want the per-cubie groups mounted so the
+      // antipodal back-face stickers render — only the opaque solid body needs to disappear so
+      // it stops occluding them from the inside.
+      wormExitRideActive: s.wormHealerMode && s.wormPhase === 'exiting',
       isBiomeMode: s.settings?.biomeMode?.enabled,
       rotationEpoch: s.rotationEpoch,
       settings: s.settings,
@@ -1029,6 +1034,7 @@ const CubeAssembly = React.memo(({
                 cubie={it.cubie}
                 size={size}
                 wormMode={wormHealerMode}
+                hideBody={wormExitRideActive}
                 onPointerDown={onPointerDown}
               />
             );

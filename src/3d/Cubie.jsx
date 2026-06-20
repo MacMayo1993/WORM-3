@@ -105,7 +105,7 @@ const faceValue = (dirKey, x, y, z, size) => {
 };
 
 const Cubie = React.forwardRef(function Cubie({
-  position, cubie, size, wormMode = false, onPointerDown,
+  position, cubie, size, wormMode = false, hideBody = false, onPointerDown,
 }, ref) {
   const { hollowMode, mirrorMode, visualMode, explosionFactor, settings } = useGameStore(
     useShallow(s => ({
@@ -378,6 +378,13 @@ const Cubie = React.forwardRef(function Cubie({
             </mesh>
           ))}
         </>
+      ) : hideBody ? (
+        // Exit-arm ride: camera is inside the cube and the solid body would occlude the
+        // antipodal back-face stickers, so swap it for an invisible hit box (pointer
+        // interaction stays intact, but nothing opaque sits between camera and stickers).
+        <mesh onPointerDown={handleDown} visible={false}>
+          <boxGeometry args={[0.98, 0.98, 0.98]} />
+        </mesh>
       ) : (
         <RoundedBox args={[0.98, 0.98, 0.98]} radius={0.08} smoothness={4} onPointerDown={handleDown} castShadow receiveShadow>
           <meshStandardMaterial
@@ -431,6 +438,7 @@ const _DIRS = ['PX', 'NX', 'PY', 'NY', 'PZ', 'NZ'];
 // comparison element-wise so future refactors can't silently regress it.
 function cubiePropsAreEqual(prev, next) {
   if (prev.size !== next.size || prev.onPointerDown !== next.onPointerDown) return false;
+  if (prev.wormMode !== next.wormMode || prev.hideBody !== next.hideBody) return false;
   if (
     prev.position[0] !== next.position[0] ||
     prev.position[1] !== next.position[1] ||
