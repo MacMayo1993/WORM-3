@@ -406,6 +406,7 @@ const wispyRingFragmentShader = `
   uniform vec3 uAntiColor;  // antipodal face color (strand B)
   uniform float uTime;
   uniform float uLens; // 0 = normal tile, 1 = wormhole — enables subtle gravitational barrel distortion
+  uniform float uFlipRatio; // 0..1 = flips / flipCap — the closer to death, the hotter + faster the ring
   varying vec2 vUv;
 
   void main() {
@@ -423,6 +424,11 @@ const wispyRingFragmentShader = `
     // Clip to tile disc boundary
     float inDisc = 1.0 - smoothstep(0.44, 0.50, dist);
 
+    // Heartbeat pulse — speeds up as the tile accumulates flips so a near-dead
+    // tile visibly throbs with urgency. uFlipRatio 0 → calm, 1 → frantic.
+    float pulseHz = 1.4 + uFlipRatio * 6.0;
+    float pulse   = 0.5 + 0.5 * sin(uTime * pulseHz); // 0..1
+
     // Double-helix: two thin strands braiding around r0.
     // Each strand weaves in/out of the base radius using a sinusoidal offset;
     // strand B is exactly half a period (PI) behind strand A so they always
@@ -430,7 +436,7 @@ const wispyRingFragmentShader = `
     float r0        = 0.36;   // base ring radius
     float weave     = 0.030;  // radial weave amplitude (thinner = smaller)
     float turns     = 4.0;    // helix turns around the ring (integer → seamless loop)
-    float speed     = 1.6;    // rotation speed
+    float speed     = 1.6 + uFlipRatio * 2.6; // spins faster as it nears the cap
     float phase     = angle * turns - uTime * speed;
 
     float rA = r0 + weave * sin(phase);
@@ -450,10 +456,24 @@ const wispyRingFragmentShader = `
 
     // Blend the two strand colors; where they overlap use a weighted average
     float total = gA + gB;
-    vec3 col = total > 0.001 ? (uColor * gA + uAntiColor * gB) / total : uColor;
+    vec3 strandCol = total > 0.001 ? (uColor * gA + uAntiColor * gB) / total : uColor;
 
-    float alpha = clamp(total, 0.0, 1.0) * 0.92;
-    gl_FragColor = vec4(col * 1.3, alpha);
+    // Antipodal glow halo — a broad, soft band in the antipodal color sitting
+    // under the crisp strands. Makes the ring read as a distinct colored glow at
+    // a glance; it brightens with flip count and breathes with the heartbeat.
+    float glowSigma = 0.058;
+    float glow      = exp(-pow(dist - r0, 2.0) / (2.0 * glowSigma * glowSigma)) * inDisc;
+    float glowAmp   = (0.18 + 0.62 * uFlipRatio) * (0.55 + 0.45 * pulse);
+    float glowI     = glow * glowAmp;
+
+    // Compose strands + antipodal glow, weighting color by each contribution.
+    float sumI = total + glowI;
+    vec3 col = sumI > 0.001 ? (strandCol * total + uAntiColor * glowI) / sumI : uColor;
+
+    float alpha = clamp(sumI, 0.0, 1.0) * 0.92;
+    // Whole ring breathes brighter on each beat (stronger pulse near death).
+    float breathe = 1.0 + (0.12 + 0.28 * uFlipRatio) * (pulse - 0.5) * 2.0;
+    gl_FragColor = vec4(col * 1.3 * breathe, alpha);
   }
 `;
 
@@ -550,6 +570,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     uAntiColor: { value: new THREE.Color() },
     uTime: wispyTime, // shared reference — updated once per frame externally
     uLens: { value: 0.0 },
+    uFlipRatio: { value: 0.0 }, // flips / flipCap — drives glow strength + pulse speed
   }));
   // Worm-mode rim glow — heartbeat ring on flipped tiles in worm healer mode
   const wormRimGroupRef = useRef();
@@ -1368,6 +1389,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       wispyRingMatRef.current.uniforms.uColor.value.set(materialColor);
       wispyRingMatRef.current.uniforms.uAntiColor.value.set(antipodalHexRef.current ?? materialColor);
       wispyRingMatRef.current.uniforms.uLens.value = (meta?.flips > 0 && meta?.curr !== meta?.orig) ? 1.0 : 0.0;
+      wispyRingMatRef.current.uniforms.uFlipRatio.value = effectiveFlipCap > 0 ? Math.min(1, (meta?.flips ?? 0) / effectiveFlipCap) : 0;
     }
   }, [isInstanceable, materialColor, renderTexture, tileStyle, meta?.curr, meta?.flips]);
   const isWormhole = meta?.flips > 0 && meta?.curr !== meta?.orig;
