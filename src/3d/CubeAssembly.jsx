@@ -13,7 +13,7 @@ import ChaosWave from '../manifold/ChaosWave.jsx';
 import FlipPropagationWave from '../manifold/FlipPropagationWave.jsx';
 import { vibrate } from '../utils/audio.js';
 import { pressState } from '../worm/wormLogic.js';
-import { updateSharedTime, updateSharedTremor, warmUpDefaultStyles } from './styles/TileStyleMaterials.jsx';
+import { updateSharedTime, updateSharedTremor, warmUpDefaultStyles, healParticleMap } from './styles/TileStyleMaterials.jsx';
 import { StickerInstanceProvider } from './StickerInstances.jsx';
 import StickerAnimationDriver from './StickerAnimationDriver.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
@@ -22,7 +22,8 @@ import { resolveColors } from '../utils/colorSchemes.js';
 import { liveRotation, resetLiveRotation } from '../worm/liveRotation.js';
 import { liveCubies } from '../worm/liveCubies.js';
 import { healSticker } from '../game/cubeState.js';
-import { buildManifoldGridMap, findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
+import { buildManifoldGridMap, findAntipodalStickerByGrid, getManifoldNeighbors } from '../game/manifoldLogic.js';
+import { getManifoldGridId } from '../game/coordinates.js';
 import { EARN_DISPARITY_TILE_RESTORE } from '../utils/economyConstants.js';
 
 // Reusable axis vectors and quaternion (allocated once, never recreated)
@@ -500,55 +501,57 @@ const CubeAssembly = React.memo(({
             const liveCubs = store.cubies;
             const tapped = liveCubs[x]?.[y]?.[z]?.stickers[dirKey];
             if (tapped && tapped.curr !== tapped.orig) {
-              const S = size;
-              const faceNeighbors = (cx, cy, cz) => {
-                if (dirKey === 'PX' || dirKey === 'NX')
-                  return [{ x: cx, y: cy - 1, z: cz }, { x: cx, y: cy + 1, z: cz }, { x: cx, y: cy, z: cz - 1 }, { x: cx, y: cy, z: cz + 1 }];
-                if (dirKey === 'PY' || dirKey === 'NY')
-                  return [{ x: cx - 1, y: cy, z: cz }, { x: cx + 1, y: cy, z: cz }, { x: cx, y: cy, z: cz - 1 }, { x: cx, y: cy, z: cz + 1 }];
-                return [{ x: cx - 1, y: cy, z: cz }, { x: cx + 1, y: cy, z: cz }, { x: cx, y: cy - 1, z: cz }, { x: cx, y: cy + 1, z: cz }];
-              };
-              // BFS to build waves — each wave = tiles at same graph distance from tap.
+              // Build manifold map once from the snapshot so antipodal lookups are fast.
+              const manifoldMap = buildManifoldGridMap(liveCubs, size);
+              // BFS over the MANIFOLD neighbourhood (not just the tapped face) so the
+              // heal follows damage across seams onto adjacent sides — chaos chains
+              // spread cross-face, so a face-only heal left orphaned damage on the
+              // neighbouring faces it had jumped to. Key visited state per sticker
+              // (x,y,z,dirKey) since corner cubies host multiple stickers.
               const waves = [[{ x, y, z, dirKey }]];
-              const visited = new Set([`${x},${y},${z}`]);
-              let frontier = [{ x, y, z }];
+              const visited = new Set([`${x},${y},${z},${dirKey}`]);
+              let frontier = [{ x, y, z, dirKey }];
               while (frontier.length > 0) {
                 const nextFrontier = [];
                 const wave = [];
                 for (const cur of frontier) {
-                  for (const n of faceNeighbors(cur.x, cur.y, cur.z)) {
-                    if (n.x < 0 || n.x >= S || n.y < 0 || n.y >= S || n.z < 0 || n.z >= S) continue;
-                    const key = `${n.x},${n.y},${n.z}`;
+                  for (const n of getManifoldNeighbors(cur.x, cur.y, cur.z, cur.dirKey, size)) {
+                    const key = `${n.x},${n.y},${n.z},${n.dirKey}`;
                     if (visited.has(key)) continue;
                     visited.add(key);
-                    const ns = liveCubs[n.x]?.[n.y]?.[n.z]?.stickers[dirKey];
-                    if (ns && ns.curr !== ns.orig) { wave.push({ ...n, dirKey }); nextFrontier.push(n); }
+                    const ns = liveCubs[n.x]?.[n.y]?.[n.z]?.stickers?.[n.dirKey];
+                    if (ns && ns.curr !== ns.orig) { wave.push(n); nextFrontier.push(n); }
                   }
                 }
                 if (wave.length > 0) waves.push(wave);
                 frontier = nextFrontier;
               }
               const totalHealed = waves.reduce((s, w) => s + w.length, 0);
-              // Build manifold map once from the snapshot so antipodal lookups are fast.
-              const manifoldMap = buildManifoldGridMap(liveCubs, size);
               // Award score up-front so the counter updates on tap.
               useGameStore.setState((s) => ({ disparityParityScore: s.disparityParityScore + totalHealed * EARN_DISPARITY_TILE_RESTORE }));
+              // Fire the golden heal-particle burst on a sticker by its (rotation-stable)
+              // manifold grid id — StickerPlane consumes this map one-shot per tile.
+              const fireHealParticles = (st) => {
+                if (st) healParticleMap.set(getManifoldGridId(st, size), 1);
+              };
               waves.forEach((tiles, waveIdx) => {
                 const fire = () => {
                   const now = performance.now();
                   let updated = useGameStore.getState().cubies;
                   const pops = {};
                   for (const t of tiles) {
-                    // Heal the tapped-face sticker.
+                    // Heal the tapped tile and trigger its particle burst.
+                    const st = liveCubs[t.x]?.[t.y]?.[t.z]?.stickers?.[t.dirKey];
                     updated = healSticker(updated, size, t.x, t.y, t.z, t.dirKey);
                     pops[`${t.x},${t.y},${t.z}`] = { startMs: now, durationMs: 500 };
+                    fireHealParticles(st);
                     // Heal its antipodal pair — same logical sticker on the opposite face.
-                    const st = liveCubs[t.x]?.[t.y]?.[t.z]?.stickers[t.dirKey];
                     if (st) {
                       const anti = findAntipodalStickerByGrid(manifoldMap, st, size);
                       if (anti) {
                         updated = healSticker(updated, size, anti.x, anti.y, anti.z, anti.dirKey);
                         pops[`${anti.x},${anti.y},${anti.z}`] = { startMs: now, durationMs: 500 };
+                        fireHealParticles(anti.sticker);
                       }
                     }
                   }

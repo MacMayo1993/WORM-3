@@ -282,10 +282,14 @@ const findChainStart = () => {
     return { tile: { ...pick, flips: 1 }, strength: 1 };
   }
 
-  const totalWeight = candidates.reduce((sum, c) => sum + c.flips, 0);
+  // Weight restarts QUADRATICALLY by flip count. Linear weighting spread chains
+  // evenly across all damaged tiles, so damage never concentrated enough to reach
+  // the cap. Squaring makes a chain far more likely to resume a near-cap tile and
+  // finish the kill instead of scattering fresh flips across the whole surface.
+  const totalWeight = candidates.reduce((sum, c) => sum + c.flips * c.flips, 0);
   let roll = Math.random() * totalWeight;
   for (const c of candidates) {
-    roll -= c.flips;
+    roll -= c.flips * c.flips;
     if (roll <= 0) return { tile: c, strength: 1 };
   }
   return { tile: candidates[candidates.length - 1], strength: 1 };
@@ -395,8 +399,14 @@ const tick = (dtMs) => {
       if (!nst || (nst.flips || 0) >= flipCap) continue;
 
       const crossFace = isCrossFaceNeighbor(chain.tile.dirKey, neighbor.dirKey);
-      const seamWeight = crossFace ? 4 : (isOnSeam(neighbor.x, neighbor.y, neighbor.z, neighbor.dirKey, size) ? 2 : 1);
-      validNeighbors.push({ ...neighbor, flips: nst.flips || 0, seamWeight, crossFace });
+      const nFlips = nst.flips || 0;
+      // Bias the walk toward already-damaged neighbours. Without this the chain
+      // wandered onto fresh tiles every step, smearing 1 flip everywhere and
+      // rarely pushing any single tile over the cap. Weighting by accumulated
+      // flips makes chains snowball into existing damage and convert it to kills.
+      const damageWeight = 1 + nFlips * 1.5;
+      const seamWeight = (crossFace ? 4 : (isOnSeam(neighbor.x, neighbor.y, neighbor.z, neighbor.dirKey, size) ? 2 : 1)) * damageWeight;
+      validNeighbors.push({ ...neighbor, flips: nFlips, seamWeight, crossFace });
     }
 
     const pool = [...validNeighbors];
@@ -411,8 +421,12 @@ const tick = (dtMs) => {
         }
       }
       const neighbor = pool.splice(pick, 1)[0];
-      const flipBoost = neighbor.flips > 0 ? 1.15 : 1.0;
-      const propagateChance = chain.strength * basePropagation * flipBoost;
+      // Finisher boost: the closer a neighbour is to the flip cap, the more likely
+      // the chain commits to it — so near-dead tiles get pushed over the edge
+      // instead of being abandoned one flip short of dying.
+      const capProximity = flipCap > 0 ? neighbor.flips / flipCap : 0;
+      const flipBoost = 1.0 + capProximity * 1.4;
+      const propagateChance = Math.min(1, chain.strength * basePropagation * flipBoost);
       if (Math.random() < propagateChance) {
         // Only emit a cascade bolt for hops between *different* cubies.
         // Same-cubie cross-face hops (corner NX→NY→NZ) are topologically valid but
