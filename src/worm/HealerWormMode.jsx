@@ -1421,13 +1421,13 @@ function WormChaseCamera({ worm, size }) {
         // Use a continuous portrait factor so camera framing doesn't jump at aspect=1.
         const portraitFactor = THREE.MathUtils.clamp((1 - viewportAspect) / 0.45, 0, 1);
         const baseFov = THREE.MathUtils.lerp(70, 82, portraitFactor);
-        // Continuous tunnel FOV ramp. Exiting is split: first half uses the inside camera
-        // (FOV stays wide so the player watches the worm ride the exit ribbon arm), then
-        // the second half transitions to the external view as the worm pops out of the hole.
+        // Continuous tunnel FOV ramp: stays wide through 'entering', 'tunnel', and the whole of
+        // 'exiting' (the inside ribbon camera rides along for the full exit-arm traversal), then
+        // eases back down once 'windout' takes over with the external view.
         const _tp = worm.tunnelProgress.current;
         const tunnelMix = phase === 'tunnel' ? 1
             : phase === 'entering' ? THREE.MathUtils.clamp(_tp, 0, 1)
-            : phase === 'exiting'  ? (_tp <= 0.5 ? 1.0 : THREE.MathUtils.clamp(1 - (_tp - 0.5) * 2, 0, 1))
+            : phase === 'exiting'  ? 1
             : 0;
         const targetFov = THREE.MathUtils.lerp(baseFov, baseFov + 16, tunnelMix); // widen for the portal/tunnel view
         const fovAlpha = Math.min(1, delta * 6);
@@ -1539,9 +1539,9 @@ function WormChaseCamera({ worm, size }) {
             camUpRef.current.lerp(_camUp, a).normalize();
             camera.up.copy(camUpRef.current);
             camera.lookAt(lookAtRef.current);
-        } else if ((phase === 'tunnel' || (phase === 'exiting' && _tp <= 0.5)) && worm.activeTunnel.current) {
-            // Inside ribbon camera: follows the worm along the full ribbon ride including the
-            // exit arm (first half of exiting) so the player sees the Möbius strip exit climb.
+        } else if ((phase === 'tunnel' || phase === 'exiting') && worm.activeTunnel.current) {
+            // Inside ribbon camera: follows the worm along the full ribbon ride, including the
+            // entire exit arm, so the player sees the whole Möbius strip exit climb up close.
             const tp = worm.tunnelProgress.current;
             const tunnel = worm.activeTunnel.current;
 
@@ -1570,14 +1570,13 @@ function WormChaseCamera({ worm, size }) {
             camUpRef.current.lerp(_camUp, a).normalize();
             camera.up.copy(camUpRef.current);
             camera.lookAt(lookAtRef.current);
-        } else if (((phase === 'exiting' && _tp > 0.5) || phase === 'windout') && worm.activeTunnel.current) {
-            // Exit-side external view: second half of exiting (worm bursting out of hole) and
-            // the windout spiral flourish above the exit tile, watched from outside the cube.
-            const tp = worm.tunnelProgress.current;
+        } else if (phase === 'windout' && worm.activeTunnel.current) {
+            // Exit-side external view: the windout spiral flourish above the exit tile,
+            // watched from outside the cube once the worm has fully ridden the exit ribbon.
             const tunnel = worm.activeTunnel.current;
 
             tunnelState.active = true;
-            tunnelState.t = phase === 'windout' ? 1.0 : 0.67 + tp * 0.33;
+            tunnelState.t = 1.0;
             tunnelState.activeTunnelId = tunnel.pairId ?? null;
 
             const extN = FACE_NORMALS[tunnel.exit.dirKey] ?? FACE_NORMALS.PY;
