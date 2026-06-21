@@ -110,6 +110,15 @@ export function StickerInstanceProvider({ children }) {
   // call; skipped when unchanged to avoid redundant GPU uploads every frame.
   // Initialised to NaN so the first upload always fires (NaN !== anything).
   const lastColorsRef = useRef(new Float32Array(MAX_INSTANCES * 3).fill(NaN));
+  // Per-slot cached world matrix — 16 floats per slot.  Compared before each
+  // setMatrixAt; the matrix write (and the whole-buffer instanceMatrix GPU
+  // re-upload it triggers) is skipped when a sticker's transform is unchanged
+  // since last frame — the common case when the cube sits at rest.  Float64
+  // (not Float32) so the stored elements match matrixWorld.elements bit-for-bit;
+  // cube matrices come from rotations/sqrt and aren't float32-exact, so a float32
+  // cache would mis-compare every frame and never skip.  NaN-seeded so the first
+  // upload always fires.
+  const lastMatricesRef = useRef(new Float64Array(MAX_INSTANCES * 16).fill(NaN));
 
   // ── Public API ──────────────────────────────────────────────────────────────
 
@@ -162,6 +171,10 @@ export function StickerInstanceProvider({ children }) {
     lastColorsRef.current[base] = NaN;
     lastColorsRef.current[base + 1] = NaN;
     lastColorsRef.current[base + 2] = NaN;
+    // Invalidate the cached matrix too — we just wrote _zeroMatrix into the slot,
+    // so a future owner (or reactivation) must re-upload its real matrix.
+    const mbase = entry.slot * 16;
+    lastMatricesRef.current.fill(NaN, mbase, mbase + 16);
   }, [instanceMesh]);
 
   // ── Per-frame update ────────────────────────────────────────────────────────
@@ -194,6 +207,11 @@ export function StickerInstanceProvider({ children }) {
         // an unchanged buffer every frame (common in biome/shader/glass modes).
         if (!zeroedSlotsRef.current.has(slot)) {
           instanceMesh.setMatrixAt(slot, _zeroMatrix);
+          // Invalidate the matrix cache: the slot now holds _zeroMatrix, so when
+          // this sticker reactivates its real (possibly unchanged) matrix must be
+          // re-uploaded rather than skipped as "unchanged".
+          const mbase = slot * 16;
+          lastMatricesRef.current.fill(NaN, mbase, mbase + 16);
           matDirty = true;
           zeroedSlotsRef.current.add(slot);
         }
@@ -208,8 +226,22 @@ export function StickerInstanceProvider({ children }) {
       // incorporate GSAP-driven cubie rotations and TrackballControls camera
       // rotation that occurred this frame before our callback.
       groupRef.current.updateWorldMatrix(true, false);
-      instanceMesh.setMatrixAt(slot, groupRef.current.matrixWorld);
-      matDirty = true;
+      // Upload the world matrix only when it has actually changed since last frame.
+      // At rest (no drag / GSAP turn / flip-squish) the recomputed matrix is
+      // bit-identical, so this skips both the setMatrixAt buffer copy and the
+      // whole-buffer instanceMatrix GPU re-upload that needsUpdate forces.
+      const me = groupRef.current.matrixWorld.elements;
+      const mbase = slot * 16;
+      const lm = lastMatricesRef.current;
+      let mChanged = false;
+      for (let k = 0; k < 16; k++) {
+        if (lm[mbase + k] !== me[k]) { mChanged = true; break; }
+      }
+      if (mChanged) {
+        instanceMesh.setMatrixAt(slot, groupRef.current.matrixWorld);
+        lm.set(me, mbase);
+        matDirty = true;
+      }
 
       // Upload the current colour only when it has changed since the last frame.
       // Comparing the raw r/g/b floats is cheaper than a setColorAt + GPU upload
