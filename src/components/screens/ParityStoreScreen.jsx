@@ -113,6 +113,40 @@ const HatIcon = ({ hatId, color = '#9a8e82', size = 30 }) => {
       <ellipse cx="16" cy="13" rx="12" ry="4" fill={color} opacity="0.15" />
     </svg>
   );
+  if (hatId === 'beanie') return (
+    <svg width={size} height={size} viewBox="0 0 32 32">
+      <path d="M 6 20 Q 16 2 26 20 Z" fill={color} />
+      <rect x="4" y="19" width="24" height="5" rx="2.5" fill={color} />
+      <rect x="4" y="19" width="24" height="5" rx="2.5" fill="rgba(0,0,0,0.18)" />
+      <circle cx="16" cy="4.5" r="2.6" fill={color} />
+    </svg>
+  );
+  if (hatId === 'wizard') return (
+    <svg width={size} height={size} viewBox="0 0 32 32">
+      <ellipse cx="16" cy="25" rx="12" ry="3" fill={color} />
+      <polygon points="16,3 8,25 24,25" fill={color} />
+      <circle cx="15" cy="17" r="1.6" fill="#fde68a" />
+      <circle cx="18" cy="11" r="1.2" fill="#fde68a" />
+    </svg>
+  );
+  if (hatId === 'flower') return (
+    <svg width={size} height={size} viewBox="0 0 32 32">
+      <line x1="16" y1="28" x2="16" y2="15" stroke={color} strokeWidth="2.5" strokeLinecap="round" />
+      {[0, 1, 2, 3, 4, 5].map(i => {
+        const a = (i / 6) * Math.PI * 2;
+        return <circle key={i} cx={16 + Math.cos(a) * 6} cy={13 + Math.sin(a) * 6} r="3.5" fill={color} />;
+      })}
+      <circle cx="16" cy="13" r="3.5" fill="#facc15" />
+    </svg>
+  );
+  if (hatId === 'grad') return (
+    <svg width={size} height={size} viewBox="0 0 32 32">
+      <path d="M 9 13 L 9 20 Q 16 24 23 20 L 23 13 Z" fill={color} />
+      <polygon points="16,6 29,12 16,18 3,12" fill={color} />
+      <line x1="26" y1="12" x2="26" y2="22" stroke="#fbbf24" strokeWidth="1.5" />
+      <circle cx="26" cy="23" r="2" fill="#fbbf24" />
+    </svg>
+  );
   return null;
 };
 

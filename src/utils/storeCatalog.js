@@ -23,6 +23,10 @@ export const STORE_HATS = [
   { id: 'hat_party',  type: 'hat', category: 'hats', hatId: 'party',  label: 'Party',   price: 100 },
   { id: 'hat_crown',  type: 'hat', category: 'hats', hatId: 'crown',  label: 'Crown',   price: 150 },
   { id: 'hat_halo',   type: 'hat', category: 'hats', hatId: 'halo',   label: 'Halo',    price: 200 },
+  { id: 'hat_beanie', type: 'hat', category: 'hats', hatId: 'beanie', label: 'Beanie',  price: 150 },
+  { id: 'hat_flower', type: 'hat', category: 'hats', hatId: 'flower', label: 'Flower',  price: 150 },
+  { id: 'hat_wizard', type: 'hat', category: 'hats', hatId: 'wizard', label: 'Wizard',  price: 200 },
+  { id: 'hat_grad',   type: 'hat', category: 'hats', hatId: 'grad',   label: 'Grad Cap', price: 200 },
 ];
 
 // ── Color Schemes ─────────────────────────────────────────────────────────────
