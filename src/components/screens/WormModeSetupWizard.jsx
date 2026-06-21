@@ -896,6 +896,48 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
             <ellipse cx={headCx} cy={headCy - headR - 8} rx="19" ry="6"
               fill="none" stroke="#fde68a" strokeWidth="3.5" opacity="0.9" />
           )}
+          {wormHatId === 'beanie' && (<>
+            {/* Knit dome over the crown */}
+            <path d={`M ${headCx - 21},${headCy - headR + 7} Q ${headCx},${headCy - headR - 24} ${headCx + 21},${headCy - headR + 7} Z`} fill="#6d28d9" />
+            {/* Folded brim */}
+            <rect x={headCx - 22} y={headCy - headR + 2} width="44" height="9" rx="4.5" fill="#5b21b6" />
+            {/* Pom-pom */}
+            <circle cx={headCx} cy={headCy - headR - 22} r="5" fill="#ede9fe" />
+          </>)}
+          {wormHatId === 'wizard' && (<>
+            {/* Wide brim */}
+            <ellipse cx={headCx} cy={headCy - headR + 3} rx="25" ry="6" fill="#3b0764" />
+            {/* Tall pointed cone */}
+            <polygon points={`${headCx},${headCy - headR - 32} ${headCx - 16},${headCy - headR + 3} ${headCx + 16},${headCy - headR + 3}`} fill="#4c1d95" />
+            {/* Glowing stars */}
+            <circle cx={headCx - 4} cy={headCy - headR - 8} r="2.2" fill="#fde68a" />
+            <circle cx={headCx + 5} cy={headCy - headR - 19} r="1.7" fill="#fde68a" />
+          </>)}
+          {wormHatId === 'flower' && (<>
+            {/* Short stem */}
+            <line x1={headCx} y1={headCy - headR + 5} x2={headCx} y2={headCy - headR - 10} stroke="#16a34a" strokeWidth="3" strokeLinecap="round" />
+            {/* Petals */}
+            {[0, 1, 2, 3, 4, 5].map(i => {
+              const a = (i / 6) * Math.PI * 2;
+              return (
+                <circle key={i} cx={headCx + Math.cos(a) * 9} cy={(headCy - headR - 15) + Math.sin(a) * 9} r="4.5" fill="#f472b6" />
+              );
+            })}
+            {/* Pollen center */}
+            <circle cx={headCx} cy={headCy - headR - 15} r="5" fill="#facc15" />
+          </>)}
+          {wormHatId === 'grad' && (<>
+            {/* Cap band */}
+            <path d={`M ${headCx - 11},${headCy - headR - 4} Q ${headCx},${headCy - headR + 2} ${headCx + 11},${headCy - headR - 4} L ${headCx + 11},${headCy - headR - 11} L ${headCx - 11},${headCy - headR - 11} Z`} fill="#111827" />
+            {/* Mortarboard */}
+            <polygon points={`${headCx},${headCy - headR - 18} ${headCx + 22},${headCy - headR - 10} ${headCx},${headCy - headR - 2} ${headCx - 22},${headCy - headR - 10}`} fill="#1f2937" />
+            {/* Center button */}
+            <circle cx={headCx} cy={headCy - headR - 10} r="2.5" fill="#fbbf24" />
+            {/* Tassel cord + knob */}
+            <path d={`M ${headCx},${headCy - headR - 10} L ${headCx + 20},${headCy - headR - 8} L ${headCx + 20},${headCy - headR + 5}`}
+              stroke="#fbbf24" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+            <circle cx={headCx + 20} cy={headCy - headR + 7} r="3" fill="#fbbf24" />
+          </>)}
         </svg>
       );
     };
