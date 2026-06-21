@@ -1524,7 +1524,10 @@ function WormChaseCamera({ worm, size }) {
 
             const entN = FACE_NORMALS[tunnel.entry.dirKey] ?? FACE_NORMALS.PY;
             const ew = getStickerWorldPos(tunnel.entry.x, tunnel.entry.y, tunnel.entry.z, tunnel.entry.dirKey, size, 0);
-            _ribVStart.set(ew[0], ew[1], ew[2]);
+            // getStickerWorldPos returns cubieCenter + SURFACE_OFFSET·normal (outward sticker
+            // surface), but MobiusTunnel's vStart is cubieCenter − FACE_OFFSET·normal (inward) —
+            // subtract twice the offset to land exactly on the rendered ribbon's start point.
+            _ribVStart.set(ew[0], ew[1], ew[2]).addScaledVector(entN, -2 * SURFACE_OFFSET);
 
             const portalDist = 2.8 + size * 0.85;
             const portalUp   = 1.3 + size * 0.32;
@@ -1581,7 +1584,8 @@ function WormChaseCamera({ worm, size }) {
 
             const extN = FACE_NORMALS[tunnel.exit.dirKey] ?? FACE_NORMALS.PY;
             const xw = getStickerWorldPos(tunnel.exit.x, tunnel.exit.y, tunnel.exit.z, tunnel.exit.dirKey, size, 0);
-            _ribVEnd.set(xw[0], xw[1], xw[2]);
+            // Same inward correction as the entry anchor above — match MobiusTunnel's vEnd.
+            _ribVEnd.set(xw[0], xw[1], xw[2]).addScaledVector(extN, -2 * SURFACE_OFFSET);
 
             const portalDist = 2.8 + size * 0.85;
             const portalUp   = 1.3 + size * 0.32;
