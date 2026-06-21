@@ -32,6 +32,7 @@ export function useKeyboardControls({ onMove, onFlip }) {
     cycleVisualMode,
     toggleChaos,
     setShowCursor,
+    toggleDevConsole,
     wormHealerMode,
     wormPaused,
   } = useGameStore(useShallow((state) => ({
@@ -50,6 +51,7 @@ export function useKeyboardControls({ onMove, onFlip }) {
     cycleVisualMode: state.cycleVisualMode,
     toggleChaos: state.toggleChaos,
     setShowCursor: state.setShowCursor,
+    toggleDevConsole: state.toggleDevConsole,
     wormHealerMode: state.wormHealerMode,
     wormPaused: state.wormPaused ?? false,
   })));
@@ -95,6 +97,7 @@ export function useKeyboardControls({ onMove, onFlip }) {
     toggleChaos,
     setShowCursor,
     setShowLevelTutorial,
+    toggleDevConsole,
     wormHealerMode,
     wormPaused,
   });
@@ -119,6 +122,7 @@ export function useKeyboardControls({ onMove, onFlip }) {
       toggleChaos,
       setShowCursor,
       setShowLevelTutorial,
+      toggleDevConsole,
       wormHealerMode,
       wormPaused,
     };
@@ -141,6 +145,7 @@ export function useKeyboardControls({ onMove, onFlip }) {
     toggleChaos,
     setShowCursor,
     setShowLevelTutorial,
+    toggleDevConsole,
     wormHealerMode,
     wormPaused,
   ]);
@@ -166,6 +171,7 @@ export function useKeyboardControls({ onMove, onFlip }) {
         toggleChaos: latestToggleChaos,
         setShowCursor: latestSetShowCursor,
         setShowLevelTutorial: latestSetShowLevelTutorial,
+        toggleDevConsole: latestToggleDevConsole,
         wormHealerMode: latestWormHealerMode,
         wormPaused: latestWormPaused,
       } = latestRef.current;
@@ -281,6 +287,13 @@ export function useKeyboardControls({ onMove, onFlip }) {
           break;
         case 'v':
           latestCycleVisualMode();
+          break;
+        case '`':
+          // Dev console is a development-only tool — only reachable in dev builds.
+          if (import.meta.env.DEV) {
+            e.preventDefault();
+            latestToggleDevConsole();
+          }
           break;
         case 'c':
           if (!latestCurrentLevelData || latestCurrentLevelData.features.chaos) {
