@@ -14,6 +14,13 @@ export const STORE_SKINS = [
   { id: 'skin_ice',    type: 'skin', category: 'skins', skinId: 'ice',    label: 'Ice',    price: 200, body: '#bae6fd', belly: '#7dd3fc', glow: '#38bdf8' },
   { id: 'skin_void',   type: 'skin', category: 'skins', skinId: 'void',   label: 'Void',   price: 200, body: '#6366f1', belly: '#4338ca', glow: '#818cf8' },
   { id: 'skin_gold',   type: 'skin', category: 'skins', skinId: 'gold',   label: 'Gold',   price: 300, body: '#f59e0b', belly: '#d97706', glow: '#fbbf24' },
+  { id: 'skin_coral',  type: 'skin', category: 'skins', skinId: 'coral',  label: 'Coral',     price: 150, body: '#fb7185', belly: '#e11d48', glow: '#fda4af' },
+  { id: 'skin_emerald', type: 'skin', category: 'skins', skinId: 'emerald', label: 'Emerald',  price: 150, body: '#10b981', belly: '#047857', glow: '#34d399' },
+  { id: 'skin_sunset', type: 'skin', category: 'skins', skinId: 'sunset', label: 'Sunset',    price: 150, body: '#f97316', belly: '#be185d', glow: '#fb7185' },
+  { id: 'skin_toxic',  type: 'skin', category: 'skins', skinId: 'toxic',  label: 'Toxic',     price: 200, body: '#a3e635', belly: '#65a30d', glow: '#bef264' },
+  { id: 'skin_bubble', type: 'skin', category: 'skins', skinId: 'bubble', label: 'Bubblegum', price: 200, body: '#f9a8d4', belly: '#db2777', glow: '#f472b6' },
+  { id: 'skin_mono',   type: 'skin', category: 'skins', skinId: 'mono',   label: 'Mono',      price: 200, body: '#e5e7eb', belly: '#9ca3af', glow: '#d1d5db' },
+  { id: 'skin_galaxy', type: 'skin', category: 'skins', skinId: 'galaxy', label: 'Galaxy',    price: 300, body: '#7c3aed', belly: '#5b21b6', glow: '#a78bfa' },
 ];
 
 // ── Hats ──────────────────────────────────────────────────────────────────────
