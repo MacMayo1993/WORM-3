@@ -11,6 +11,7 @@ import OrbInventoryHUD from './OrbInventoryHUD.jsx';
 import ParityWallet from '../components/overlays/ParityWallet.jsx';
 import { callWormTurn } from './wormTurnBridge.js';
 import { MenuTitleCard } from '../components/menus/MainMenu.jsx';
+import DeathScreen from './DeathScreens.jsx';
 
 const PHASE_META = {
     crawling: { label: 'CRAWLING', accent: '#38bdf8' },
@@ -195,20 +196,6 @@ const PAUSE_CARD_STYLE = {
 const PAUSE_TITLE_STYLE = { color: palette.subText, fontSize: 11, fontWeight: 700, letterSpacing: 1.0 };
 const PAUSE_HEADING_STYLE = { color: palette.text, fontSize: 26, fontWeight: 800, marginTop: 4, marginBottom: 14 };
 
-const PAUSE_STATS_STYLE = {
-    padding: '10px 12px',
-    borderRadius: 10,
-    border: `1px solid ${palette.border}`,
-    background: 'rgba(255,255,255,0.78)',
-    textAlign: 'left',
-    fontSize: 12,
-    color: palette.subText,
-    lineHeight: 1.8,
-    marginBottom: 16,
-};
-
-const PAUSE_STAT_VALUE_STYLE = { color: palette.text, fontWeight: 700 };
-
 const RESUME_BTN_STYLE = {
     minWidth: 120,
     borderRadius: 12,
@@ -313,89 +300,6 @@ const DPAD_BTN_STYLE = {
     fontWeight: 700,
     cursor: 'pointer',
     boxShadow: palette.shadow,
-    touchAction: 'manipulation',
-    WebkitTapHighlightColor: 'transparent',
-};
-
-const DEATH_OVERLAY_STYLE = {
-    position: 'absolute',
-    inset: 0,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: 'rgba(2, 6, 23, 0.55)',
-    backdropFilter: 'blur(4px)',
-    pointerEvents: 'auto',
-};
-
-const DEATH_CARD_STYLE = {
-    width: 'min(92vw, 380px)',
-    borderRadius: 16,
-    border: `1px solid ${palette.border}`,
-    background: 'rgba(255, 255, 255, 0.94)',
-    boxShadow: palette.shadow,
-    padding: 18,
-    textAlign: 'center',
-};
-
-const DEATH_TITLE_STYLE = { color: palette.subText, fontSize: 12, fontWeight: 700, letterSpacing: 1.0 };
-const DEATH_HEADING_STYLE = { color: palette.text, fontSize: 24, fontWeight: 800, marginTop: 4 };
-const DEATH_SUBTITLE_STYLE = { color: palette.subText, fontSize: 13, marginTop: 8 };
-
-const DEATH_DETAILS_STYLE = {
-    marginTop: 10,
-    padding: '8px 10px',
-    borderRadius: 10,
-    border: `1px solid ${palette.border}`,
-    background: 'rgba(255,255,255,0.78)',
-    textAlign: 'left',
-    fontSize: 11,
-    color: palette.subText,
-    fontFamily: "'SF Mono', ui-monospace, Menlo, monospace",
-    lineHeight: 1.35,
-};
-
-const DEATH_DETAIL_VALUE_STYLE = { color: palette.text };
-
-const DEATH_BTN_ROW_STYLE = { marginTop: 16, display: 'flex', gap: 10, justifyContent: 'center' };
-
-const RETRY_BTN_STYLE = {
-    minWidth: 120,
-    borderRadius: 12,
-    padding: '10px 16px',
-    fontSize: 14,
-    fontWeight: 800,
-    letterSpacing: 0.7,
-    color: '#f8fafc',
-    background: 'linear-gradient(135deg, #2563eb, #7c3aed)',
-    border: `1px solid ${palette.strongBorder}`,
-    cursor: 'pointer',
-};
-
-const NEW_GAME_BTN_STYLE = {
-    minWidth: 120,
-    borderRadius: 12,
-    padding: '10px 16px',
-    fontSize: 14,
-    fontWeight: 800,
-    letterSpacing: 0.7,
-    color: '#f8fafc',
-    background: 'linear-gradient(135deg, #334155, #1e293b)',
-    border: `1px solid ${palette.border}`,
-    cursor: 'pointer',
-};
-
-const EXAMINE_BTN_STYLE = {
-    minWidth: 100,
-    borderRadius: 12,
-    padding: '10px 14px',
-    fontSize: 13,
-    fontWeight: 800,
-    letterSpacing: 0.5,
-    color: '#fff',
-    background: 'linear-gradient(135deg, #dc2626, #991b1b)',
-    border: '1px solid rgba(220,38,38,0.5)',
-    cursor: 'pointer',
     touchAction: 'manipulation',
     WebkitTapHighlightColor: 'transparent',
 };
@@ -812,10 +716,6 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
     const phaseMeta = PHASE_META[phase] || { label: phase || 'CRAWLING', accent: '#93c5fd' };
     const isPortalReady = wormAlive && onFlippedTile && phase === 'crawling';
 
-    const isVoidedDeath = deathDetails?.reason === 'voided' || deathDetails?.reason === 'void-zone' || deathDetails?.reason === 'void-tunnel-exhausted';
-    const deathTitle = isVoidedDeath ? 'VOID BREACH' : 'WORM COLLISION';
-    const deathHeading = isVoidedDeath ? 'You have been VOIDED!' : 'You hit your tail.';
-
     const phaseNameStyle = useMemo(
         () => ({ fontSize: 13, fontWeight: 700, color: phaseMeta.accent }),
         [phaseMeta.accent]
@@ -976,46 +876,17 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
             )}
 
             {showDeathMenu && !isMinimized && (
-                <div style={DEATH_OVERLAY_STYLE}>
-                    <div style={DEATH_CARD_STYLE}>
-                        <div style={DEATH_TITLE_STYLE}>{deathTitle}</div>
-                        <div style={DEATH_HEADING_STYLE}>{deathHeading}</div>
-                        <div style={PAUSE_STATS_STYLE}>
-                            <div>Time alive: <b style={PAUSE_STAT_VALUE_STYLE}>{formatTime(wormTimeAlive)}</b></div>
-                            <div>Tiles healed: <b style={PAUSE_STAT_VALUE_STYLE}>{wormHealedCount}</b></div>
-                            <div>Wormholes used: <b style={PAUSE_STAT_VALUE_STYLE}>{wormTunnelCount}</b></div>
-                            <div>Orbs on worm: <b style={PAUSE_STAT_VALUE_STYLE}>{wormBodyTiles}</b></div>
-                        </div>
-                        {isVoidedDeath && (
-                            <div style={DEATH_DETAILS_STYLE}>
-                                <div>Reason: <b style={DEATH_DETAIL_VALUE_STYLE}>Void breach</b></div>
-                                <div>Head tile: <b style={DEATH_DETAIL_VALUE_STYLE}>{deathDetails?.headTile ?? 'n/a'}</b></div>
-                                <div>Tunnel key: <b style={DEATH_DETAIL_VALUE_STYLE}>{deathDetails?.tunnelKey ?? 'n/a'}</b></div>
-                            </div>
-                        )}
-                        {deathDetails?.reason === 'self-collision' && (
-                            <div style={DEATH_DETAILS_STYLE}>
-                                <div>Reason: <b style={DEATH_DETAIL_VALUE_STYLE}>Self-collision</b></div>
-                                <div>Head tile: <b style={DEATH_DETAIL_VALUE_STYLE}>{deathDetails.headTile ?? 'n/a'}</b></div>
-                                <div>Body tile hit: <b style={DEATH_DETAIL_VALUE_STYLE}>{deathDetails.collisionTile ?? 'n/a'}</b></div>
-                                <div>Impact progress: <b style={DEATH_DETAIL_VALUE_STYLE}>{deathDetails.progress ?? 'n/a'}</b></div>
-                            </div>
-                        )}
-                        <div style={DEATH_BTN_ROW_STYLE}>
-                            {deathDetails?.reason === 'self-collision' && (
-                                <button onPointerDown={() => setIsMinimized(true)} style={EXAMINE_BTN_STYLE}>
-                                    Examine
-                                </button>
-                            )}
-                            <button onPointerDown={onRetry} style={RETRY_BTN_STYLE}>
-                                Retry
-                            </button>
-                            <button onPointerDown={onNewGame} style={NEW_GAME_BTN_STYLE}>
-                                New Game
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                <DeathScreen
+                    deathDetails={deathDetails}
+                    wormTimeAlive={wormTimeAlive}
+                    wormHealedCount={wormHealedCount}
+                    wormTunnelCount={wormTunnelCount}
+                    wormBodyTiles={wormBodyTiles}
+                    formatTime={formatTime}
+                    onRetry={onRetry}
+                    onNewGame={onNewGame}
+                    onExamine={() => setIsMinimized(true)}
+                />
             )}
 
         </div>
