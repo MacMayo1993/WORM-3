@@ -724,13 +724,15 @@ const CubeAssembly = React.memo(({
     const isShuffle = !!animState?.isShuffle;
     const isFast = isHands || isShuffle;
     // Worm-mode hazard rotations (the auto inverse-turns that grind through the worm)
-    // run 40% slower so the slice menacingly creeps through. The opening scramble
-    // (isShuffle) and normal cube solving keep their snappy timing.
+    // run far slower than a normal turn so the slice menacingly creeps through instead
+    // of snapping — the slow execution itself is the "looming danger" payoff after the
+    // warning beam counts down. The opening scramble (isShuffle) and normal cube
+    // solving keep their snappy timing.
     const isWormHazard = !isFast && useGameStore.getState().wormHealerMode;
     const baseDuration = isFast ? 0.12 : 0.35;
     gsapAnimRef.current = gsap.to(animProgressRef.current, {
       value: 1,
-      duration: isWormHazard ? baseDuration * 1.4 : baseDuration,
+      duration: isWormHazard ? baseDuration * 2.6 : baseDuration,
       ease: isFast ? "power2.out" : "back.out(1.4)",
       onComplete: () => {
         gsapAnimRef.current = null;

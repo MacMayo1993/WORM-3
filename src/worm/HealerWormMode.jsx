@@ -3939,6 +3939,7 @@ function SliceWarningLights({ pendingRotRef, warningProgressRef, size, cubies })
     const lightGroupRef = useRef();
     const ringRef       = useRef();
     const borderRef     = useRef();
+    const hazardBoxRef  = useRef();
     const customGeoRef  = useRef(null); // tracks geometries we created so we can dispose them
     const customBorderGeoRef = useRef(null);
     const dataRef       = useRef(null);
@@ -3949,7 +3950,8 @@ function SliceWarningLights({ pendingRotRef, warningProgressRef, size, cubies })
         const lgroup = lightGroupRef.current;
         const ring   = ringRef.current;
         const border = borderRef.current;
-        if (!lgroup || !ring || !border) return;
+        const box    = hazardBoxRef.current;
+        if (!lgroup || !ring || !border || !box) return;
 
         const pending = pendingRotRef.current;
         const t  = clock.elapsedTime;
@@ -3959,6 +3961,7 @@ function SliceWarningLights({ pendingRotRef, warningProgressRef, size, cubies })
             for (const l of lgroup.children) l.intensity = 0;
             ring.visible = false;
             border.visible = false;
+            box.visible = false;
             lastKeyRef.current = null;
             dataRef.current    = null;
             return;
@@ -3966,6 +3969,7 @@ function SliceWarningLights({ pendingRotRef, warningProgressRef, size, cubies })
 
         ring.visible = true;
         border.visible = true;
+        box.visible = true;
 
         // Recompute when the slice identity changes
         const key = `${pending.axis}-${pending.sliceIndex}`;
@@ -4082,6 +4086,31 @@ function SliceWarningLights({ pendingRotRef, warningProgressRef, size, cubies })
         ring.scale.setScalar(scale);
         border.scale.setScalar(scale);
         border.material.opacity = 0.75 + wp * 0.2;
+
+        // ── 3. Hazard box — flash/shake/pulse skin hugging the actual layer ────
+        // Sized to the slice's real volume (full cube footprint, one cubie thick along
+        // the rotation axis) so it reads as the layer itself rattling rather than a
+        // separate decoration. Everything ramps with wp: calm and barely-there right
+        // after the warning arms, frantic by the time the rotation is about to fire.
+        const halfExt = (size - 1) / 2;
+        const sliceW  = pending.sliceIndex - halfExt;
+        let baseX = 0, baseY = 0, baseZ = 0;
+        let dimX = size * 0.97, dimY = size * 0.97, dimZ = size * 0.97;
+        if (pending.axis === 'col')      { baseX = sliceW; dimX = 0.94; }
+        else if (pending.axis === 'row') { baseY = sliceW; dimY = 0.94; }
+        else                             { baseZ = sliceW; dimZ = 0.94; }
+
+        const shakeAmp = 0.05 * wp * wp; // negligible early, rattling hard near zero
+        const jx = (Math.sin(t * 37 + 1.3) + Math.sin(t * 53 + 4.1)) * 0.5 * shakeAmp;
+        const jy = (Math.sin(t * 41 + 2.7) + Math.sin(t * 59 + 0.6)) * 0.5 * shakeAmp;
+        const jz = (Math.sin(t * 47 + 5.2) + Math.sin(t * 61 + 3.4)) * 0.5 * shakeAmp;
+        box.position.set(baseX + jx, baseY + jy, baseZ + jz);
+
+        const boxPulse = 1 + Math.sin(t * (5 + wp * 10)) * 0.06 * wp;
+        box.scale.set(dimX * boxPulse, dimY * boxPulse, dimZ * boxPulse);
+
+        const flashStrobe = 0.5 + 0.5 * Math.sin(t * (6 + wp * 24));
+        box.material.opacity = (0.05 + wp * 0.4) * flashStrobe;
     });
 
     return (
@@ -4101,6 +4130,13 @@ function SliceWarningLights({ pendingRotRef, warningProgressRef, size, cubies })
             <mesh ref={ringRef} visible={false} renderOrder={2}>
                 <torusGeometry args={[1, 0.04, RADIAL_SEGS, TUBULAR_SEGS]} />
                 <meshBasicMaterial vertexColors transparent opacity={0.9}
+                    blending={THREE.AdditiveBlending} depthWrite={false} />
+            </mesh>
+            {/* Hazard box — hugs the threatened layer's volume and flashes/shakes/pulses;
+                position/scale/opacity driven imperatively in useFrame. */}
+            <mesh ref={hazardBoxRef} visible={false} renderOrder={3}>
+                <boxGeometry args={[1, 1, 1]} />
+                <meshBasicMaterial color="#ff2d3d" transparent opacity={0} side={THREE.DoubleSide}
                     blending={THREE.AdditiveBlending} depthWrite={false} />
             </mesh>
         </>
