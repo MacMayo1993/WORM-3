@@ -1967,8 +1967,55 @@ const _trailPrevPos = new THREE.Vector3(); // newer neighbor's position, for tan
 const _trailTangent = new THREE.Vector3();
 const _trailXAxis    = new THREE.Vector3();
 const _trailMat       = new THREE.Matrix4();
-const TRAIL_CAP   = 80;   // newest N tile visits rendered
+// Wavy-stroke scratch: the trail is rebuilt each frame along the worm's recorded tile
+// path, subdivided and offset laterally so it mirrors the character's gait — a Wiggle Worm
+// leaves a serpentine trail, Classic a gentle wave, Inch Worm a straight crawl line.
+const _trailCA   = new THREE.Vector3(); // centerline surface point of the newer tile
+const _trailNA   = new THREE.Vector3(); // its world normal
+const _trailCB   = new THREE.Vector3(); // centerline surface point of the older tile
+const _trailNB   = new THREE.Vector3(); // its world normal
+const _trailSub  = new THREE.Vector3(); // interpolated centerline point between A and B
+const _trailSubN = new THREE.Vector3(); // interpolated normal
+const _trailSide = new THREE.Vector3(); // lateral (wiggle) axis in the tangent plane
+const _trailStretch = new THREE.Vector3(); // wavy-path tangent toward the previous daub
+const TRAIL_CAP   = 80;   // newest N tile visits scanned for the path spine
+const TRAIL_DAUB_CAP = 256; // max daubs painted along the subdivided wavy stroke
+const TRAIL_SUB_STEP = 0.09; // spacing between daubs along the path (world units)
 const TRAIL_LIFT  = 0.045; // hover distance above tile surface (raised so filled slime discs don't z-fight)
+
+// Lateral wiggle the trail inherits from each gait, matched to WormBody's body wave (its
+// phase-step ÷ the 0.09 body-segment spacing) so the painted path mirrors how that
+// character slithers. amp = lateral reach in world units, k = spatial frequency (rad/unit).
+function trailGaitParams(charId) {
+    if (charId === 'wiggle') return { amp: 0.26, k: 0.5 / 0.09 };
+    if (charId === 'inch')   return { amp: 0.0,  k: 0 };
+    return { amp: 0.08, k: 0.8 / 0.09 }; // classic / glow / book / prism
+}
+
+// Resolve a tileTrail entry to its world surface point + normal. Reads the live cubie
+// transform every frame so the trail stays glued to the surface through cube rotations.
+// Returns false if the tile/cubie is unavailable.
+function resolveTrailTile(trail, i, lSize, outPos, outNorm) {
+    const key = ttAt(trail, i);
+    if (!key) return false;
+    // Parse "x,y,z,dirKey" without split() to avoid string allocations
+    const c1 = key.indexOf(',');
+    const c2 = key.indexOf(',', c1 + 1);
+    const c3 = key.indexOf(',', c2 + 1);
+    const tx  = parseInt(key.substring(0, c1));
+    const ty  = parseInt(key.substring(c1 + 1, c2));
+    const tz  = parseInt(key.substring(c2 + 1, c3));
+    const tdk = key.substring(c3 + 1);
+    const cubie = (lSize > 0 && liveCubies.refs)
+        ? liveCubies.refs[tx * lSize * lSize + ty * lSize + tz]
+        : null;
+    if (!cubie) return false;
+    const localNorm = FACE_NORMALS[tdk];
+    if (!localNorm) return false;
+    outNorm.copy(localNorm).applyQuaternion(cubie.quaternion);
+    outPos.copy(cubie.position).addScaledVector(outNorm, SURFACE_OFFSET + TRAIL_LIFT);
+    return true;
+}
 
 // ─── Worm Body (head = smooth lerp; body = per-step tile history) ─────────────
 const _wormDummy = new THREE.Object3D();
@@ -2474,6 +2521,9 @@ function WormTrail({ worm, size: _size }) {
     const skin = getSkin(wormSkinId);
     const skinRef = useRef(skin);
     skinRef.current = skin;
+    const wormCharacterId = useGameStore(s => s.wormCharacter ?? 'classic');
+    const gaitRef = useRef(trailGaitParams(wormCharacterId));
+    gaitRef.current = trailGaitParams(wormCharacterId);
 
     useFrame(() => {
         const mesh = meshRef.current;
@@ -2487,81 +2537,79 @@ function WormTrail({ worm, size: _size }) {
 
         const lSize = liveCubies.size;
         const capCount = Math.min(count, TRAIL_CAP);
+        const currentSkin = skinRef.current;
+        const { amp, k } = gaitRef.current;
+
+        // Seed the spine at the newest rendered tile. Index 0 is the tile the head is moving
+        // INTO (sits ahead of the head), so the spine starts at index 1 — entirely behind it.
+        let aIdx = 1;
+        let haveA = false;
+        for (; aIdx < capCount; aIdx++) { if (resolveTrailTile(trail, aIdx, lSize, _trailCA, _trailNA)) { haveA = true; break; } }
+        if (!haveA) { mesh.count = 0; return; }
+
         let visible = 0;
         let havePrev = false;
-        const currentSkin = skinRef.current;
+        let dist = 0; // distance walked back from the tail along the spine — drives the frozen wave
 
-        // i=0 is the head's destination tile (not rendered); seed _trailPrevPos/Norm from
-        // it so index 1's daub can stretch toward the head instead of starting from nothing.
-        for (let i = 0; i < capCount; i++) {
-            const key = ttAt(trail, i);
-            if (!key) { havePrev = false; continue; }
+        for (let i = aIdx + 1; i < capCount && visible < TRAIL_DAUB_CAP; i++) {
+            // Skip unavailable tiles; the segment simply bridges A → next valid tile.
+            if (!resolveTrailTile(trail, i, lSize, _trailCB, _trailNB)) continue;
 
-            // Parse "x,y,z,dirKey" without split() to avoid string allocations
-            const c1 = key.indexOf(',');
-            const c2 = key.indexOf(',', c1 + 1);
-            const c3 = key.indexOf(',', c2 + 1);
-            const tx  = parseInt(key.substring(0, c1));
-            const ty  = parseInt(key.substring(c1 + 1, c2));
-            const tz  = parseInt(key.substring(c2 + 1, c3));
-            const tdk = key.substring(c3 + 1);
+            _trailTangent.subVectors(_trailCA, _trailCB); // points toward the newer tile
+            const segLen = _trailTangent.length();
+            if (segLen > 1e-5) {
+                _trailTangent.multiplyScalar(1 / segLen);
+                const nSub = Math.max(1, Math.ceil(segLen / TRAIL_SUB_STEP));
+                for (let s = 0; s < nSub && visible < TRAIL_DAUB_CAP; s++) {
+                    const t = s / nSub; // 0 at A (newer) → 1 at B (older)
+                    _trailSub.lerpVectors(_trailCA, _trailCB, t);
+                    _trailSubN.lerpVectors(_trailNA, _trailNB, t).normalize();
 
-            // Get live cubie mesh so the daub follows cube rotations
-            const cubie = (lSize > 0 && liveCubies.refs)
-                ? liveCubies.refs[tx * lSize * lSize + ty * lSize + tz]
-                : null;
-            if (!cubie) { havePrev = false; continue; }
+                    const fade = 1 - visible / TRAIL_DAUB_CAP; // newest = bright/wide, oldest = dim/thin
+                    const fs   = fade * fade * (3 - 2 * fade);  // smoothstep
 
-            const localNorm = FACE_NORMALS[tdk];
-            if (!localNorm) { havePrev = false; continue; }
+                    // Frozen lateral wiggle baked along the path — this is the gait signature that
+                    // makes a Wiggle Worm leave a serpentine trail and an Inch Worm a straight one.
+                    const d = dist + t * segLen;
+                    _trailSide.crossVectors(_trailSubN, _trailTangent).normalize();
+                    _trailPos.copy(_trailSub).addScaledVector(_trailSide, amp * fs * Math.sin(d * k));
 
-            // Face normal in world space (accounts for current cube rotation)
-            _trailNorm.copy(localNorm).applyQuaternion(cubie.quaternion);
-            // Place daub just above the tile surface
-            _trailPos.copy(cubie.position).addScaledVector(_trailNorm, SURFACE_OFFSET + TRAIL_LIFT);
+                    _trailDummy.position.copy(_trailPos);
+                    if (havePrev) {
+                        // Stretch a thin oval toward the previous (newer) daub so the wavy line
+                        // reads as one continuous painted stroke instead of separate puddles.
+                        _trailStretch.subVectors(_trailPrevPos, _trailPos);
+                        const tl = _trailStretch.lengthSq();
+                        if (tl > 1e-6) {
+                            _trailStretch.multiplyScalar(1 / Math.sqrt(tl));
+                            _trailXAxis.crossVectors(_trailStretch, _trailSubN).normalize();
+                            _trailMat.makeBasis(_trailXAxis, _trailStretch, _trailSubN);
+                            _trailDummy.quaternion.setFromRotationMatrix(_trailMat);
+                            _trailDummy.scale.set(fs * 0.16 + 0.03, fs * 0.34 + 0.05, 1);
+                        } else {
+                            _trailDummy.quaternion.setFromUnitVectors(_trailRingZ, _trailSubN);
+                            _trailDummy.scale.setScalar(fs * 0.16 + 0.03);
+                        }
+                    } else {
+                        _trailDummy.quaternion.setFromUnitVectors(_trailRingZ, _trailSubN);
+                        _trailDummy.scale.setScalar(fs * 0.16 + 0.03);
+                    }
+                    _trailDummy.updateMatrix();
+                    mesh.setMatrixAt(visible, _trailDummy.matrix);
 
-            if (i === 0) {
-                // Seed only — the destination tile sits ahead of the head, so skip rendering it.
-                _trailPrevPos.copy(_trailPos);
-                havePrev = true;
-                continue;
-            }
+                    // Encode fade as color brightness
+                    _trailColor.set(currentSkin.body).multiplyScalar(0.20 + fs * 0.80);
+                    mesh.setColorAt(visible, _trailColor);
+                    visible++;
 
-            _trailDummy.position.copy(_trailPos);
-
-            // Smoothstep fade: i=1 (newest rendered) = full size, oldest = tiny
-            const fade = 1 - (i - 1) / capCount;
-            const fs   = fade * fade * (3 - 2 * fade); // smoothstep
-
-            if (havePrev) {
-                // Stretch a thin oval toward the newer neighbor so consecutive daubs read as
-                // one continuous painted stroke instead of a row of separate puddles.
-                _trailTangent.subVectors(_trailPrevPos, _trailPos);
-                const tanLenSq = _trailTangent.lengthSq();
-                if (tanLenSq > 1e-6) {
-                    _trailTangent.multiplyScalar(1 / Math.sqrt(tanLenSq));
-                    _trailXAxis.crossVectors(_trailTangent, _trailNorm).normalize();
-                    _trailMat.makeBasis(_trailXAxis, _trailTangent, _trailNorm);
-                    _trailDummy.quaternion.setFromRotationMatrix(_trailMat);
-                    _trailDummy.scale.set(fs * 0.30 + 0.03, fs * 0.95 + 0.08, 1);
-                } else {
-                    _trailDummy.quaternion.setFromUnitVectors(_trailRingZ, _trailNorm);
-                    _trailDummy.scale.setScalar(fs * 0.30 + 0.03);
+                    _trailPrevPos.copy(_trailPos);
+                    havePrev = true;
                 }
-            } else {
-                _trailDummy.quaternion.setFromUnitVectors(_trailRingZ, _trailNorm);
-                _trailDummy.scale.setScalar(fs * 0.30 + 0.03);
             }
-            _trailDummy.updateMatrix();
-            mesh.setMatrixAt(visible, _trailDummy.matrix);
 
-            // Encode fade as color brightness — works naturally with AdditiveBlending
-            _trailColor.set(currentSkin.body).multiplyScalar(0.20 + fs * 0.80);
-            mesh.setColorAt(visible, _trailColor);
-            visible++;
-
-            _trailPrevPos.copy(_trailPos);
-            havePrev = true;
+            dist += segLen;
+            _trailCA.copy(_trailCB);
+            _trailNA.copy(_trailNB);
         }
 
         mesh.count = visible;
@@ -2570,7 +2618,7 @@ function WormTrail({ worm, size: _size }) {
     });
 
     return (
-        <instancedMesh ref={meshRef} args={[undefined, undefined, TRAIL_CAP]} frustumCulled={false}>
+        <instancedMesh ref={meshRef} args={[undefined, undefined, TRAIL_DAUB_CAP]} frustumCulled={false}>
             {/* Thin, elongated discs stretched toward the next-newer tile read as a continuous
                 painted slime stroke behind the worm. Low roughness + normal blending gives a
                 wet, translucent sheen that catches the scene lights as the worm crawls, instead
