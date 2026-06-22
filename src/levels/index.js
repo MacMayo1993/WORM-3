@@ -70,7 +70,7 @@ export {
 // LEVEL DATA
 // ============================================================================
 
-export { STORY_LEVELS, getStoryLevel, getStoryLevelIds } from './data/index.js';
+export { STORY_LEVELS, getStoryLevel, getStoryLevelIds, CUBE_CAMPAIGN_LEVELS, getCubeCampaignLevel, getCubeCampaignLevelIds } from './data/index.js';
 
 // ============================================================================
 // LEVEL PACKS

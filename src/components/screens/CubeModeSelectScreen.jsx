@@ -28,7 +28,7 @@ const cardStyle = {
 
 const optionGridStyle = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
   gap: '16px',
   marginTop: '24px',
 };
@@ -61,7 +61,7 @@ const CubeModeSelectScreen = ({ onRubiks, onDisparity, onBack }) => (
         Choose your cube mode
       </h2>
       <p style={{ margin: '14px 0 0', color: '#7a6e62', fontSize: '16px', lineHeight: 1.55 }}>
-        Pick the ruleset first, then we'll send you into the matching setup wizard for cube size, palette, tiles, and start options.
+        Pick classic freeplay setup or the antipodal Disparity ruleset. The main CUBE tile now starts the progressive campaign.
       </p>
 
       <div style={optionGridStyle}>

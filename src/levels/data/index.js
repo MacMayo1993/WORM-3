@@ -13,27 +13,19 @@ import level07 from './level-07-sudokube-veil.js';
 import level08 from './level-08-ultimate-seam.js';
 import level09 from './level-09-quotient-collapse.js';
 import level10 from './level-10-black-hole.js';
+import { CUBE_CAMPAIGN_LEVELS, getCubeCampaignLevel } from './cube-campaign.js';
 
 /**
  * All story campaign levels in order
  */
-export const STORY_LEVELS = [
-  level01,
-  level02,
-  level03,
-  level04,
-  level05,
-  level06,
-  level07,
-  level08,
-  level09,
-  level10,
-];
+export const STORY_LEVELS = CUBE_CAMPAIGN_LEVELS;
 
 /**
  * Individual level exports for direct access
  */
 export {
+  CUBE_CAMPAIGN_LEVELS,
+  getCubeCampaignLevel,
   level01,
   level02,
   level03,
@@ -61,4 +53,9 @@ export function getStoryLevel(id) {
  */
 export function getStoryLevelIds() {
   return STORY_LEVELS.map(level => level.id);
+}
+
+/** All progressive CUBE Campaign level IDs. */
+export function getCubeCampaignLevelIds() {
+  return CUBE_CAMPAIGN_LEVELS.map(level => level.id);
 }
