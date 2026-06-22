@@ -732,7 +732,7 @@ const CubeAssembly = React.memo(({
     const baseDuration = isFast ? 0.12 : 0.35;
     gsapAnimRef.current = gsap.to(animProgressRef.current, {
       value: 1,
-      duration: isWormHazard ? baseDuration * 2.6 : baseDuration,
+      duration: isWormHazard ? baseDuration * 4.0 : baseDuration,
       ease: isFast ? "power2.out" : "back.out(1.4)",
       onComplete: () => {
         gsapAnimRef.current = null;
