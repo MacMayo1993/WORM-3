@@ -135,7 +135,7 @@ export function useLevelSystem() {
   }, [completedLevels]);
 
   // Check if there's a next level
-  const hasNextLevel = currentLevel && currentLevel < 10;
+  const hasNextLevel = Boolean(currentLevel && (getNextLevel(currentLevel)));
 
   return {
     // State

@@ -644,17 +644,16 @@ export default function WORM3() {
   }, [setShowWelcome, markIntroSeen]);
 
   // Main menu action handlers
-  const handleMenuPlay = useCallback(() => {
+  const handleStartCampaign = useCallback(() => {
     useGameStore.getState().setShowMainMenu(false);
-    launchWithMobi(MOBI_LINES_CAMPAIGN, 'CAMPAIGN', () => {
+    setShowCubeModeSelect(false);
+    launchWithMobi(MOBI_LINES_CAMPAIGN, 'CUBE CAMPAIGN', () => {
       handleLevelSelect(1);
     });
   }, [handleLevelSelect, launchWithMobi]);
 
-  const handleMenuCube = useCallback(() => {
-    useGameStore.getState().setShowMainMenu(false);
-    setShowCubeModeSelect(true);
-  }, []);
+  const handleMenuPlay = handleStartCampaign;
+  const handleMenuCube = handleStartCampaign;
 
   const handleMenuFreeplay = useCallback(() => {
     useGameStore.getState().setShowMainMenu(false);
@@ -1122,7 +1121,7 @@ export default function WORM3() {
     cancelShuffle();
     const levelSize = currentLevelData?.cubeSize || size;
     let state = makeCubies(levelSize);
-    const shuffleCount = currentLevelData ? Math.min(25, 10 + currentLevel * 2) : 25;
+    const shuffleCount = currentLevelData ? (currentLevelData.scrambleMoves ?? Math.min(25, 10 + currentLevel * 2)) : 25;
     for (let i = 0; i < shuffleCount; i++) {
       const ax = ['row', 'col', 'depth'][Math.floor(Math.random() * 3)];
       const slice = Math.floor(Math.random() * levelSize);
