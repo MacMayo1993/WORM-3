@@ -2545,9 +2545,12 @@ function WormTrail({ worm, size: _size }) {
         const currentSkin = skinRef.current;
         const { amp, omega } = gaitRef.current;
 
-        // Seed the spine at the newest rendered tile. Index 0 is the tile the head is moving
-        // INTO (sits ahead of the head), so the spine starts at index 1 — entirely behind it.
-        let aIdx = 1;
+        // Start the painted path BEHIND the tail, not under the worm. The body covers
+        // ceil(tailLength × BODY_BALL_SPACING) tiles (the same span the self-collision check
+        // uses); drawing the trail under those tiles makes it fight the body's own wiggle and
+        // read as a second, misaligned snake. Skipping them lets it emerge from the tail.
+        const bodyTiles = Math.max(1, Math.ceil(worm.tailLength.current * BODY_BALL_SPACING));
+        let aIdx = Math.min(bodyTiles, capCount - 1);
         let haveA = false;
         for (; aIdx < capCount; aIdx++) { if (resolveTrailTile(trail, aIdx, lSize, _trailCA, _trailNA)) { haveA = true; break; } }
         if (!haveA) { mesh.count = 0; return; }
