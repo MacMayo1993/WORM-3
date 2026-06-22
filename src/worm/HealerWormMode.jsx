@@ -10,7 +10,7 @@ import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { getStickerWorldPos, getManifoldGridId } from '../game/coordinates.js';
-import { getNextSurfacePosition, getActiveTunnels, getTunnelWorldPosInto, getWindWorldPosInto, turnWorm, getStableKey, findStickerByStableKey, isTileInSlice } from './wormLogic.js';
+import { getNextSurfacePosition, getActiveTunnels, getTunnelWorldPosInto, getWindWorldPosInto, turnWorm, getStableKey, findStickerByStableKey, isTileInSlice, makeTunnelCenterline, buildTunnelCenterlineInto, tunnelTToArc, getTunnelArcPosInto } from './wormLogic.js';
 import { setWormTurnCallback } from './wormTurnBridge.js';
 import { buildManifoldGridMap, buildManifoldGridMapIncremental, flipStickerPair, findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
 import { getManifoldMap } from '../game/manifoldMapStore.js';
@@ -2037,8 +2037,8 @@ const _bodyRideAxis = new THREE.Vector3();
 const _bodyEffA = new THREE.Vector3();
 const _bodyEffB = new THREE.Vector3();
 // Scratch for the suck-in / spit-out tunnel funnel (body segments streamed along the ribbon).
-const _tunFunnelA = new THREE.Vector3();
-const _tunFunnelB = new THREE.Vector3();
+// Centerline is sampled by world arc-length so segments stay evenly spaced (no stretched beads).
+const _funnelCenterline = makeTunnelCenterline();
 // Stable path-points buffer: reused every frame to avoid spread-array allocation.
 // The head point carries a sentinel tile (tx<0) so the body ride never rotates it —
 // the head's world position is already ridden upstream in the main worm useFrame.
@@ -2180,16 +2180,16 @@ function WormBody({ worm, size }) {
         // mouth yet stay on the surface (entering) or are hidden until they emerge (exiting).
         const _funnelTunnel = worm.activeTunnel.current;
         const _funnelOn = (_phase === 'entering' || _phase === 'tunnel' || _phase === 'exiting') && !!_funnelTunnel;
-        let _headTunT = -1, _segDt = 0.02;
+        let _headTunArc = -1;
         if (_funnelOn) {
             const _tprog = worm.tunnelProgress.current;
-            _headTunT = _phase === 'entering' ? _tprog * 0.33
-                      : _phase === 'tunnel'   ? 0.33 + _tprog * 0.34
-                      :                         0.67 + _tprog * 0.33;
-            getTunnelWorldPosInto(_tunFunnelA, _funnelTunnel, 0, size);
-            getTunnelWorldPosInto(_tunFunnelB, _funnelTunnel, 1, size);
-            const _tunLen = _tunFunnelA.distanceTo(_tunFunnelB) * 1.7 + 0.001; // curve factor
-            _segDt = 0.095 / _tunLen; // match the on-surface body spacing at the mouth
+            const _headTunT = _phase === 'entering' ? _tprog * 0.33
+                            : _phase === 'tunnel'   ? 0.33 + _tprog * 0.34
+                            :                         0.67 + _tprog * 0.33;
+            // Build the centerline once per frame, then place each body segment by world
+            // arc-length behind the head so they stay evenly spaced (matches surface spacing).
+            buildTunnelCenterlineInto(_funnelCenterline, _funnelTunnel, size);
+            _headTunArc = tunnelTToArc(_funnelCenterline, _headTunT);
         }
 
         // Wind-up: body coils behind the head along the spiral above the entry hole.
@@ -2309,22 +2309,25 @@ function WormBody({ worm, size }) {
                 let _funnelHide = false;
                 let _funnelPop = 1;
                 if (_funnelOn) {
-                    const _segParam = _headTunT - i * _segDt;
-                    if (_segParam >= 0) {
+                    // Each segment sits a fixed world distance (0.09 — the surface spacing)
+                    // further back along the centerline, so the body reads as a continuous
+                    // worm through the tunnel instead of stretched, separated beads.
+                    const _segArc = _headTunArc - i * 0.09;
+                    if (_segArc >= 0) {
                         // In the tunnel — ride the ribbon one spacing behind the segment ahead.
-                        getTunnelWorldPosInto(_bodyClonePos, _funnelTunnel, _segParam > 1 ? 1 : _segParam, size);
+                        getTunnelArcPosInto(_bodyClonePos, _funnelCenterline, _segArc);
                         if (_phase === 'exiting') {
                             // Squash-and-pop: each segment bulges as it bursts out of the exit
-                            // mouth (param ≈ 1), then settles back to normal size as it travels out.
-                            const _d = Math.abs(_segParam - 1.0);
-                            _funnelPop = 1 + 0.6 * Math.max(0, 1 - _d / 0.14);
+                            // mouth (arc ≈ total), then settles back to normal size as it travels out.
+                            const _d = Math.abs(_segArc - _funnelCenterline.total);
+                            _funnelPop = 1 + 0.6 * Math.max(0, 1 - _d / 0.18);
                         }
                     } else if (_phase === 'exiting') {
                         // Tail hasn't emerged from the exit hole yet — keep it hidden rather than
                         // show it on the now-stale entry-side surface trail.
                         _funnelHide = true;
                     }
-                    // entering & _segParam < 0: leave it on the surface, trailing toward the hole.
+                    // entering & _segArc < 0: leave it on the surface, trailing toward the hole.
                 } else if (_windOn) {
                     // Coil the body behind the head along the entry spiral; segments trail
                     // OUTWARD (smaller s). _segS < 0 → still on the surface trail (keep normal).

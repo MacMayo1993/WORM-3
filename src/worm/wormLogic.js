@@ -234,6 +234,72 @@ export const getTunnelWorldPos = (tunnel, t, size, explosionFactor = 0) => {
   return [_tunnelResult.x, _tunnelResult.y, _tunnelResult.z];
 };
 
+// ── Arc-length-aware tunnel sampling ──────────────────────────────────────────
+// The centerline above is piecewise-linear with THREE legs of UNEQUAL world
+// length but FIXED parameter spans (0.4 / 0.2 / 0.4). Stepping uniformly in `t`
+// therefore spaces points unevenly in world space — bunched on the short core
+// leg, stretched out on the long entry/exit arms. Body segments sampled that way
+// read as stretched, separated beads instead of a continuous worm. These helpers
+// sample by true world arc-length so segments stay evenly spaced (matching the
+// on-surface body spacing) all the way through the tunnel.
+
+/** Allocate a reusable centerline scratch object. Fill via buildTunnelCenterlineInto. */
+export const makeTunnelCenterline = () => ({
+  vStart: new THREE.Vector3(),
+  midA: new THREE.Vector3(),
+  midB: new THREE.Vector3(),
+  vEnd: new THREE.Vector3(),
+  l1: 0,
+  l2: 0,
+  l3: 0,
+  total: 0
+});
+
+/**
+ * Fill `cl` (from makeTunnelCenterline) with the tunnel's centerline control
+ * points and per-leg world lengths. Reuses module scratch — call once per frame.
+ */
+export const buildTunnelCenterlineInto = (cl, tunnel, size, explosionFactor = 0) => {
+  const k = (size - 1) / 2;
+  const scale = 1 + explosionFactor * 1.8;
+  _tunnelEntry.set((tunnel.entry.x - k) * scale, (tunnel.entry.y - k) * scale, (tunnel.entry.z - k) * scale);
+  _tunnelExit.set((tunnel.exit.x - k) * scale, (tunnel.exit.y - k) * scale, (tunnel.exit.z - k) * scale);
+  const en = TUNNEL_FACE_NORMALS[tunnel.entry.dirKey] || ZERO3;
+  const xn = TUNNEL_FACE_NORMALS[tunnel.exit.dirKey] || ZERO3;
+  cl.vStart.set(
+    _tunnelEntry.x - en[0] * TUNNEL_FACE_OFFSET,
+    _tunnelEntry.y - en[1] * TUNNEL_FACE_OFFSET,
+    _tunnelEntry.z - en[2] * TUNNEL_FACE_OFFSET
+  );
+  cl.vEnd.set(
+    _tunnelExit.x - xn[0] * TUNNEL_FACE_OFFSET,
+    _tunnelExit.y - xn[1] * TUNNEL_FACE_OFFSET,
+    _tunnelExit.z - xn[2] * TUNNEL_FACE_OFFSET
+  );
+  cl.midA.set(en[0] * TUNNEL_MINI_FACE_R, en[1] * TUNNEL_MINI_FACE_R, en[2] * TUNNEL_MINI_FACE_R);
+  cl.midB.set(xn[0] * TUNNEL_MINI_FACE_R, xn[1] * TUNNEL_MINI_FACE_R, xn[2] * TUNNEL_MINI_FACE_R);
+  cl.l1 = cl.vStart.distanceTo(cl.midA);
+  cl.l2 = cl.midA.distanceTo(cl.midB);
+  cl.l3 = cl.midB.distanceTo(cl.vEnd);
+  cl.total = cl.l1 + cl.l2 + cl.l3;
+  return cl;
+};
+
+/** Convert a parametric position t (0..1) to world arc-length along a built centerline. */
+export const tunnelTToArc = (cl, t) => {
+  if (t <= 0.4) return (Math.max(0, t) / 0.4) * cl.l1;
+  if (t <= 0.6) return cl.l1 + ((t - 0.4) / 0.2) * cl.l2;
+  return cl.l1 + cl.l2 + ((Math.min(1, t) - 0.6) / 0.4) * cl.l3;
+};
+
+/** Write the world position at a given world arc-length (clamped to [0,total]) into `out`. */
+export const getTunnelArcPosInto = (out, cl, arc) => {
+  const a = arc < 0 ? 0 : arc > cl.total ? cl.total : arc;
+  if (a <= cl.l1) return out.lerpVectors(cl.vStart, cl.midA, cl.l1 > 0 ? a / cl.l1 : 0);
+  if (a <= cl.l1 + cl.l2) return out.lerpVectors(cl.midA, cl.midB, cl.l2 > 0 ? (a - cl.l1) / cl.l2 : 0);
+  return out.lerpVectors(cl.midB, cl.vEnd, cl.l3 > 0 ? (a - cl.l1 - cl.l2) / cl.l3 : 0);
+};
+
 /**
  * Create initial worm inside a random tunnel
  * @param {Array} tunnels - Available tunnels
