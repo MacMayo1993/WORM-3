@@ -140,6 +140,11 @@ export function createLevel(overrides) {
     // Scramble depth for this level. null = let the shuffler fall back to its
     // default count (so freeplay/legacy levels keep their old behavior).
     scrambleMoves: overrides.scrambleMoves ?? null,
+    // Optional deterministic scramble. When set, the shuffler applies exactly
+    // these moves instead of a random scramble — used for hand-authored
+    // teaching levels (e.g. "undo this one middle-layer turn"). Each entry is
+    // { axis: 'row'|'col'|'depth', sliceIndex: number, dir: 1|-1 }.
+    scrambleSequence: overrides.scrambleSequence ?? null,
 
     // Visual settings
     background: overrides.background || BACKGROUNDS.ABSTRACT,
@@ -155,6 +160,9 @@ export function createLevel(overrides) {
       title: overrides.tutorial?.title || overrides.name || `Level ${overrides.id}`,
       text: overrides.tutorial?.text || '',
       tip: overrides.tutorial?.tip || '',
+      // Optional hand-authored Mobi dialogue lines for the level briefing.
+      // When omitted, the level screen derives lines from text/tip.
+      mobiLines: overrides.tutorial?.mobiLines || null,
     },
 
     // Win conditions
@@ -229,6 +237,7 @@ export function createLevelPack(overrides) {
  * @property {string} title - Tutorial title
  * @property {string} text - Main tutorial text
  * @property {string} tip - Helpful tip
+ * @property {string[]|null} mobiLines - Optional Mobi dialogue lines for the briefing
  */
 
 /**
@@ -245,6 +254,7 @@ export function createLevelPack(overrides) {
  * @property {string} description - Short description
  * @property {number} cubeSize - Cube dimension (2-5)
  * @property {number|null} scrambleMoves - Scramble depth (null = shuffler default)
+ * @property {Array<{axis:string,sliceIndex:number,dir:number}>|null} scrambleSequence - Deterministic scramble moves (null = random)
  * @property {number} chaosLevel - Chaos intensity (0-4)
  * @property {string} mode - Game mode
  * @property {string} background - Background environment
