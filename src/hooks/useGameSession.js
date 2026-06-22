@@ -22,6 +22,7 @@ export function useGameSession() {
   const victory = useGameStore((state) => state.victory);
   const achievedWins = useGameStore((state) => state.achievedWins);
   const chaosLevel = useGameStore((state) => state.chaosLevel);
+  const visualMode = useGameStore((state) => state.visualMode);
 
   const setGameTime = useGameStore((state) => state.setGameTime);
   const setVictory = useGameStore((state) => state.setVictory);
@@ -63,11 +64,15 @@ export function useGameSession() {
     } else if (wins.rubiks && !achievedWins.rubiks) {
       setVictory(VICTORY.RUBIKS);
       setAchievedWins((prev) => ({ ...prev, rubiks: true }));
-    } else if (wins.sudokube && !achievedWins.sudokube) {
+    } else if (wins.sudokube && !achievedWins.sudokube && visualMode === 'sudokube') {
+      // Only surface the standalone Sudokube victory when the player is actually
+      // playing Sudokube. The position-derived Latin squares can line up
+      // incidentally during a normal classic solve, and popping a "Sudokube
+      // Complete!" screen mid-game breaks immersion.
       setVictory(VICTORY.SUDOKUBE);
       setAchievedWins((prev) => ({ ...prev, sudokube: true }));
     }
-  }, [cubies, size, hasShuffled, victory, achievedWins, chaosLevel, setVictory, setAchievedWins]);
+  }, [cubies, size, hasShuffled, victory, achievedWins, chaosLevel, visualMode, setVictory, setAchievedWins]);
 
   // Format time for display
   const formatTime = useCallback((seconds) => {
