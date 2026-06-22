@@ -137,6 +137,9 @@ export function createLevel(overrides) {
     cubeSize: overrides.cubeSize || 3,
     chaosLevel: overrides.chaosLevel || 0,
     mode: overrides.mode || GAME_MODES.CLASSIC,
+    // Scramble depth for this level. null = let the shuffler fall back to its
+    // default count (so freeplay/legacy levels keep their old behavior).
+    scrambleMoves: overrides.scrambleMoves ?? null,
 
     // Visual settings
     background: overrides.background || BACKGROUNDS.ABSTRACT,
@@ -241,6 +244,7 @@ export function createLevelPack(overrides) {
  * @property {string} name - Display name
  * @property {string} description - Short description
  * @property {number} cubeSize - Cube dimension (2-5)
+ * @property {number|null} scrambleMoves - Scramble depth (null = shuffler default)
  * @property {number} chaosLevel - Chaos intensity (0-4)
  * @property {string} mode - Game mode
  * @property {string} background - Background environment

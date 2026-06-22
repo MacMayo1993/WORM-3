@@ -316,7 +316,7 @@ export default function WORM3() {
   const { setShowCursor, cursorToCubePos, cubePosToCursor } = useCursor();
 
   const {
-    currentLevel, currentLevelData, handleLevelSelect,
+    currentLevel, currentLevelData, hasNextLevel, handleLevelSelect,
     handleCutsceneComplete, handleTutorialClose: levelTutorialClose,
     handleBackToMainMenu, handleNextLevel: levelHandleNextLevel
   } = useLevelSystem();
@@ -1333,7 +1333,7 @@ export default function WORM3() {
         <Suspense fallback={null}>
           <ModeCarousel
             onBack={() => setShowModeSelect(false)}
-            onCubeSelect={() => { setShowModeSelect(false); handleMenuFreeplay(); }}
+            onCubeSelect={() => { setShowModeSelect(false); handleStartCampaign(); }}
             onWormSelect={() => { setShowModeSelect(false); handleMenuWormHealer(); }}
             onChaos={() => { setShowModeSelect(false); handleMenuDisparity(); }}
             onFreeplay={() => { setShowModeSelect(false); handleMenuFreeplay(); }}
@@ -1464,6 +1464,7 @@ export default function WORM3() {
             gameTime={gameTime}
             currentLevel={currentLevel}
             currentLevelData={currentLevelData}
+            hasNextLevel={hasNextLevel}
             antipodalData={antipodalData}
             teachMode={teachMode}
             performCursorRotation={performCursorRotation}

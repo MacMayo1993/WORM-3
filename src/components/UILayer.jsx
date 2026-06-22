@@ -83,6 +83,7 @@ export default function UILayer({
   gameTime,
   currentLevel,
   currentLevelData,
+  hasNextLevel,
   antipodalData,
   teachMode,
   performCursorRotation,
@@ -533,7 +534,7 @@ export default function UILayer({
             winType={victory} moves={moves} time={gameTime}
             onContinue={onVictoryContinue} onNewGame={onVictoryNewGame}
             currentLevel={currentLevel} levelData={currentLevelData}
-            onNextLevel={onNextLevel} hasNextLevel={currentLevel && currentLevel < 10}
+            onNextLevel={onNextLevel} hasNextLevel={hasNextLevel}
             onMainMenu={() => { onSetVictory(null); onBackToMainMenu(); }}
           />
         </Suspense>
