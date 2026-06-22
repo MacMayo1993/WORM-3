@@ -295,6 +295,8 @@ function shReset(sh) { sh.head = 0; sh.count = 0; }
 function makeTileTrail(capacity) {
     return {
         buf: new Array(capacity).fill(''),
+        seq: new Float64Array(capacity), // monotonic lay-down order per slot — anchors the painted trail wave in place
+        nextSeq: 0,
         head: 0,   // head is the slot of index-0 (newest entry)
         count: 0,
         capacity,
@@ -304,12 +306,13 @@ function makeTileTrail(capacity) {
 function ttPush(tt, key) {
     tt.head = (tt.head - 1 + tt.capacity) % tt.capacity;
     tt.buf[tt.head] = key;
+    tt.seq[tt.head] = tt.nextSeq++;
     if (tt.count < tt.capacity) tt.count++;
 }
 // i=0 → newest (current tile), i=count-1 → oldest
 function ttAt(tt, i) { return tt.buf[(tt.head + i) % tt.capacity]; }
 function ttTrimTo(tt, maxCount) { if (maxCount < tt.count) tt.count = maxCount; }
-function ttReset(tt, initialKey) { tt.head = 0; tt.buf[0] = initialKey; tt.count = 1; }
+function ttReset(tt, initialKey) { tt.head = 0; tt.buf[0] = initialKey; tt.seq[0] = 0; tt.nextSeq = 1; tt.count = 1; }
 // Transform every key in place (used when cube rotates to re-encode tile coords).
 function ttMapInPlace(tt, fn) {
     for (let i = 0; i < tt.count; i++) {
@@ -324,7 +327,7 @@ function ttFilterInPlace(tt, fn) {
         const src = (tt.head + i) % tt.capacity;
         if (fn(tt.buf[src])) {
             const dst = (tt.head + keep) % tt.capacity;
-            if (dst !== src) tt.buf[dst] = tt.buf[src];
+            if (dst !== src) { tt.buf[dst] = tt.buf[src]; tt.seq[dst] = tt.seq[src]; }
             keep++;
         }
     }
@@ -1983,13 +1986,15 @@ const TRAIL_DAUB_CAP = 256; // max daubs painted along the subdivided wavy strok
 const TRAIL_SUB_STEP = 0.09; // spacing between daubs along the path (world units)
 const TRAIL_LIFT  = 0.045; // hover distance above tile surface (raised so filled slime discs don't z-fight)
 
-// Lateral wiggle the trail inherits from each gait, matched to WormBody's body wave (its
-// phase-step ÷ the 0.09 body-segment spacing) so the painted path mirrors how that
-// character slithers. amp = lateral reach in world units, k = spatial frequency (rad/unit).
+// Lateral wiggle the trail inherits from each gait, so the painted path mirrors how that
+// character slithers. amp = lateral reach in world units; omega = wave phase advanced per
+// visited tile (so wavelength ≈ 2π/omega tiles). Phase is driven by each tile's fixed
+// lay-down sequence number, which keeps the wave frozen in place as the worm crawls away
+// instead of scrolling along with it.
 function trailGaitParams(charId) {
-    if (charId === 'wiggle') return { amp: 0.26, k: 0.5 / 0.09 };
-    if (charId === 'inch')   return { amp: 0.0,  k: 0 };
-    return { amp: 0.08, k: 0.8 / 0.09 }; // classic / glow / book / prism
+    if (charId === 'wiggle') return { amp: 0.26, omega: 2.4 }; // ~2.6-tile serpentine
+    if (charId === 'inch')   return { amp: 0.0,  omega: 0 };   // straight crawl line
+    return { amp: 0.08, omega: 1.5 }; // classic / glow / book / prism — gentle ~4-tile wave
 }
 
 // Resolve a tileTrail entry to its world surface point + normal. Reads the live cubie
@@ -2538,7 +2543,7 @@ function WormTrail({ worm, size: _size }) {
         const lSize = liveCubies.size;
         const capCount = Math.min(count, TRAIL_CAP);
         const currentSkin = skinRef.current;
-        const { amp, k } = gaitRef.current;
+        const { amp, omega } = gaitRef.current;
 
         // Seed the spine at the newest rendered tile. Index 0 is the tile the head is moving
         // INTO (sits ahead of the head), so the spine starts at index 1 — entirely behind it.
@@ -2546,14 +2551,15 @@ function WormTrail({ worm, size: _size }) {
         let haveA = false;
         for (; aIdx < capCount; aIdx++) { if (resolveTrailTile(trail, aIdx, lSize, _trailCA, _trailNA)) { haveA = true; break; } }
         if (!haveA) { mesh.count = 0; return; }
+        let seqA = trail.seq[(trail.head + aIdx) % trail.capacity];
 
         let visible = 0;
         let havePrev = false;
-        let dist = 0; // distance walked back from the tail along the spine — drives the frozen wave
 
         for (let i = aIdx + 1; i < capCount && visible < TRAIL_DAUB_CAP; i++) {
             // Skip unavailable tiles; the segment simply bridges A → next valid tile.
             if (!resolveTrailTile(trail, i, lSize, _trailCB, _trailNB)) continue;
+            const seqB = trail.seq[(trail.head + i) % trail.capacity];
 
             _trailTangent.subVectors(_trailCA, _trailCB); // points toward the newer tile
             const segLen = _trailTangent.length();
@@ -2570,9 +2576,11 @@ function WormTrail({ worm, size: _size }) {
 
                     // Frozen lateral wiggle baked along the path — this is the gait signature that
                     // makes a Wiggle Worm leave a serpentine trail and an Inch Worm a straight one.
-                    const d = dist + t * segLen;
+                    // Phase is driven by the tile's fixed lay-down sequence (not distance from the
+                    // moving head), so the wave stays painted in place as the worm crawls on.
+                    const seqInterp = seqA + (seqB - seqA) * t;
                     _trailSide.crossVectors(_trailSubN, _trailTangent).normalize();
-                    _trailPos.copy(_trailSub).addScaledVector(_trailSide, amp * fs * Math.sin(d * k));
+                    _trailPos.copy(_trailSub).addScaledVector(_trailSide, amp * Math.sin(seqInterp * omega));
 
                     _trailDummy.position.copy(_trailPos);
                     if (havePrev) {
@@ -2607,9 +2615,9 @@ function WormTrail({ worm, size: _size }) {
                 }
             }
 
-            dist += segLen;
             _trailCA.copy(_trailCB);
             _trailNA.copy(_trailNB);
+            seqA = seqB;
         }
 
         mesh.count = visible;

@@ -75,7 +75,7 @@ export const SURFACE_JUMP_TILE_SPAN = 1;  // jump distance is fixed to one trave
 // ─── Auto-rotation hazard ─────────────────────────────────────────────────────
 export const AUTO_ROTATE_INTERVAL_MIN = 9;   // kept for non-scramble modes
 export const AUTO_ROTATE_INTERVAL_MAX = 15;
-export const AUTO_ROTATE_WARNING = 2.5;      // seconds of beam warning before rotation fires
+export const AUTO_ROTATE_WARNING = 3.75;     // seconds of beam warning before rotation fires (longer telegraph so the turn looms)
 
 // ─── Scramble-solve game mode ─────────────────────────────────────────────────
 export const SCRAMBLE_STEPS = 15;            // moves in the opening scramble
