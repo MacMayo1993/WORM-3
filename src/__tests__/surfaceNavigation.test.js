@@ -90,12 +90,16 @@ describe('healing cost constants', () => {
     expect(HEAL_COST).toBe(4);
   });
 
-  it('ORB_SEGMENT_GROWTH equals 2 (each orb grows tail by 2)', () => {
-    expect(ORB_SEGMENT_GROWTH).toBe(2);
+  it('ORB_SEGMENT_GROWTH equals 3 (each orb grows tail by 3)', () => {
+    expect(ORB_SEGMENT_GROWTH).toBe(3);
   });
 
-  it('exactly two orb pickups satisfy the heal cost', () => {
-    expect(ORB_SEGMENT_GROWTH * 2).toBe(HEAL_COST);
+  it('a single orb pickup is not enough to fully heal a tunnel', () => {
+    expect(ORB_SEGMENT_GROWTH).toBeLessThan(HEAL_COST);
+  });
+
+  it('two orb pickups cover the heal cost', () => {
+    expect(ORB_SEGMENT_GROWTH * 2).toBeGreaterThanOrEqual(HEAL_COST);
   });
 });
 

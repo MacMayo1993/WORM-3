@@ -51,7 +51,7 @@ export const INITIAL_POS = (size) => {
 };
 
 export const DEFAULT_POWERUP_COUNT = 5;
-export const ORB_SEGMENT_GROWTH = 2; // every orb adds exactly 2 visual balls
+export const ORB_SEGMENT_GROWTH = 3; // every orb adds exactly 3 visual balls
 export const STEPS_PER_TILE = 50; // sub-steps recorded per tile (0.02 resolution)
 export const BODY_BALL_SPACING = 0.14; // matches WormBody clone spacing along the trail
 export const BASE_TAIL_LENGTH = 4;
@@ -66,7 +66,7 @@ export const WORMHOLE_MAX_TRAVERSALS = 3;
 // Tail segments needed to visually cover all tiles: totalTiles / (0.14 unit spacing / ~1 unit per tile)
 // For 5×5 (150 tiles): ~1100 segments. Round up generously.
 export const MAX_TAIL = 1200;
-export const HEAL_COST = 4; // worm segments required to fully heal one tunnel (= 2 orb pickups)
+export const HEAL_COST = 4; // worm segments (balls) required to fully heal one tunnel
 
 // Surface-worm jump physics (distinct from crawlerPhysics.js JUMP_HEIGHT which is 0.35).
 export const SURFACE_JUMP_HEIGHT = 1.5;   // tall arc — astronaut bounding in low gravity
