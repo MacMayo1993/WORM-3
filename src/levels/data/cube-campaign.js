@@ -9,21 +9,31 @@ const cubeTags = [LEVEL_TAGS.TUTORIAL, LEVEL_TAGS.PUZZLE];
 export const CUBE_CAMPAIGN_LEVELS = [
   createLevel({
     id: 1,
-    name: '3×3 First Turns',
-    description: 'Meet the 3×3 cube with a tiny scramble.',
+    name: 'The Middle Layer',
+    description: 'One middle-layer turn is out of place. Spin it back.',
     cubeSize: 3,
-    scrambleMoves: 3,
+    // Deterministic teaching scramble: a single turn of the middle horizontal
+    // layer. The whole level is solved by rotating that one layer back.
+    scrambleSequence: [{ axis: 'row', sliceIndex: 1, dir: 1 }],
     chaosLevel: 0,
     mode: GAME_MODES.CLASSIC,
     background: BACKGROUNDS.DAYCARE,
     features: { rotations: true, tunnels: false, flips: false, chaos: false, explode: false, parity: false, net: false },
     tutorial: {
-      title: 'CUBE 1: First Turns',
-      text: 'Start on a true 3×3 cube. This lesson uses only a few slice turns so you can see how rows, columns, and depth slices move stickers around.',
-      tip: 'Try undoing the shuffle mentally: watch one color band, then rotate the matching slice back into place.',
+      title: 'CUBE 1: The Middle Layer',
+      text: 'This is a real 3×3 cube, but only the middle layer is out of place. Turn it back to solve the whole cube.',
+      tip: 'Grab any tile on the middle horizontal band and rotate that layer until the colors line up again.',
+      mobiLines: [
+        "Aloha! I'm a Multi Orientable Block Intelligence...",
+        "...but you can call me Mobi for short!",
+        "Welcome to your very first cube. Take a breath — this one is easy.",
+        "I gave the middle layer a single twist. That's the only thing out of place.",
+        "Your one job: rotate that middle band back until every face lines up.",
+        "Grab a middle tile, spin the layer the other way, and you've solved it. Let's go!",
+      ],
     },
     winCondition: WIN_CONDITIONS.CLASSIC,
-    winMessage: 'Nice! You restored a light 3×3 scramble.',
+    winMessage: 'That\'s it! One clean middle-layer turn and the cube is solved.',
     difficulty: DIFFICULTY.TUTORIAL,
     tags: cubeTags,
     requirements: { previousLevel: null, stars: 0, achievements: [] },

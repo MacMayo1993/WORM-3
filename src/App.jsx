@@ -56,7 +56,7 @@ import Tutorial from './components/screens/Tutorial.jsx';
 import {
   MOBI_LINES_WORM, MOBI_LINES_FREEPLAY, MOBI_LINES_RANDOM,
   MOBI_LINES_TEACH, MOBI_LINES_HOLONOMY, MOBI_LINES_COOP,
-  MOBI_LINES_BIOME, MOBI_LINES_MERGE, MOBI_LINES_CHAOS, MOBI_LINES_CAMPAIGN,
+  MOBI_LINES_BIOME, MOBI_LINES_MERGE, MOBI_LINES_CHAOS,
 } from './components/screens/MobiIntroScreen.jsx';
 const ParityStoreScreen = React.lazy(() => import('./components/screens/ParityStoreScreen.jsx'));
 const GameScene = React.lazy(() => import('./3d/GameScene.jsx'));
@@ -647,10 +647,10 @@ export default function WORM3() {
   const handleStartCampaign = useCallback(() => {
     useGameStore.getState().setShowMainMenu(false);
     setShowCubeModeSelect(false);
-    launchWithMobi(MOBI_LINES_CAMPAIGN, 'CUBE CAMPAIGN', () => {
-      handleLevelSelect(1);
-    });
-  }, [handleLevelSelect, launchWithMobi]);
+    // Go straight into level 1 — Mobi greets the player on the level screen
+    // itself (see LevelTutorial), so no separate pre-campaign intro is needed.
+    handleLevelSelect(1);
+  }, [handleLevelSelect]);
 
   const handleMenuPlay = handleStartCampaign;
   const handleMenuCube = handleStartCampaign;
@@ -1121,12 +1121,20 @@ export default function WORM3() {
     cancelShuffle();
     const levelSize = currentLevelData?.cubeSize || size;
     let state = makeCubies(levelSize);
-    const shuffleCount = currentLevelData ? (currentLevelData.scrambleMoves ?? Math.min(25, 10 + currentLevel * 2)) : 25;
-    for (let i = 0; i < shuffleCount; i++) {
-      const ax = ['row', 'col', 'depth'][Math.floor(Math.random() * 3)];
-      const slice = Math.floor(Math.random() * levelSize);
-      const dir = Math.random() > 0.5 ? 1 : -1;
-      state = rotateSliceCubies(state, levelSize, ax, slice, dir);
+    const scrambleSequence = currentLevelData?.scrambleSequence;
+    if (scrambleSequence && scrambleSequence.length) {
+      // Hand-authored deterministic scramble (e.g. a single middle-layer turn).
+      for (const { axis, sliceIndex, dir } of scrambleSequence) {
+        state = rotateSliceCubies(state, levelSize, axis, sliceIndex, dir);
+      }
+    } else {
+      const shuffleCount = currentLevelData ? (currentLevelData.scrambleMoves ?? Math.min(25, 10 + currentLevel * 2)) : 25;
+      for (let i = 0; i < shuffleCount; i++) {
+        const ax = ['row', 'col', 'depth'][Math.floor(Math.random() * 3)];
+        const slice = Math.floor(Math.random() * levelSize);
+        const dir = Math.random() > 0.5 ? 1 : -1;
+        state = rotateSliceCubies(state, levelSize, ax, slice, dir);
+      }
     }
     setRotatedCubies(state);
     // Save the level's chaos setting before resetGame() wipes it.
