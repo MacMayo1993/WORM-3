@@ -647,10 +647,10 @@ export default function WORM3() {
   const handleStartCampaign = useCallback(() => {
     useGameStore.getState().setShowMainMenu(false);
     setShowCubeModeSelect(false);
-    // Go straight into level 1 — Mobi greets the player on the level screen
-    // itself (see LevelTutorial), so no separate pre-campaign intro is needed.
-    handleLevelSelect(1);
-  }, [handleLevelSelect]);
+    // Open the level selector first; picking a level runs handleLevelSelect,
+    // which then shows the Mobi level briefing before play.
+    useGameStore.getState().setShowLevelSelect(true);
+  }, []);
 
   const handleMenuPlay = handleStartCampaign;
   const handleMenuCube = handleStartCampaign;

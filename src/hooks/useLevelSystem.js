@@ -52,6 +52,13 @@ export function useLevelSystem() {
     // while the tutorial/cutscene is shown. The real shuffle happens on close.
     useGameStore.getState().setHasShuffled(false);
 
+    // Start every level with a clean win state. achievedWins persists across a
+    // session, and the victory check is gated by !achievedWins[type] (to avoid
+    // re-firing after "Keep Playing"). Clearing it here guarantees the win screen
+    // shows each time the player solves a level, regardless of how they got here.
+    useGameStore.getState().setVictory(null);
+    useGameStore.getState().setAchievedWins({ rubiks: false, sudokube: false, ultimate: false, worm: false });
+
     // Apply level settings
     if (levelData) {
       setSize(levelData.cubeSize);
