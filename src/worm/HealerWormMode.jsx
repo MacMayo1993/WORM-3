@@ -4150,14 +4150,18 @@ function SliceWarningLights({ pendingRotRef, warningProgressRef, size, cubies })
         border.material.opacity = 0.75 + wp * 0.2;
 
         // ── 3. Hazard box — flash/shake/pulse skin hugging the actual layer ────
-        // Sized to the slice's real volume (full cube footprint, one cubie thick along
-        // the rotation axis) so it reads as the layer itself rattling rather than a
-        // separate decoration. Everything ramps with wp: calm and barely-there right
-        // after the warning arms, frantic by the time the rotation is about to fire.
+        // Sized to the slice's real volume (one cubie thick along the rotation axis).
+        // The cross-section spans just PAST the outer sticker surface so the red
+        // field coats the layer's exposed faces and is visible from OUTSIDE the cube
+        // — not only from the inside tunnel camera. Everything ramps with wp: calm
+        // right after the warning arms, frantic by the time the rotation fires.
         const halfExt = (size - 1) / 2;
         const sliceW  = pending.sliceIndex - halfExt;
         let baseX = 0, baseY = 0, baseZ = 0;
-        let dimX = size * 0.97, dimY = size * 0.97, dimZ = size * 0.97;
+        // size + 0.4 reaches ~0.18 beyond the sticker surface on every side, so the
+        // slab's perimeter faces sheathe the layer's outer tiles in red.
+        const fieldSpan = size + 0.4;
+        let dimX = fieldSpan, dimY = fieldSpan, dimZ = fieldSpan;
         if (pending.axis === 'col')      { baseX = sliceW; dimX = 0.94; }
         else if (pending.axis === 'row') { baseY = sliceW; dimY = 0.94; }
         else                             { baseZ = sliceW; dimZ = 0.94; }
