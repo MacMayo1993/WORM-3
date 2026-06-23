@@ -10,6 +10,8 @@ import StickerPlane from './StickerPlane.jsx';
 import WireframeEdge from './WireframeEdge.jsx';
 import { getMirrorDimensions } from '../game/mirrorBlocks.js';
 import { resolveColors } from '../utils/colorSchemes.js';
+// Canonical Latin-square value (matches win detection in winDetection.js).
+import { faceValue as latinValue } from '../game/coordinates.js';
 
 // Hollow cube edge beams — 12 beams forming a skeletal cube frame
 const EDGE_H = 0.49; // half of cube size
@@ -98,12 +100,6 @@ const faceRCFor = (dirKey, x, y, z, size) => {
   return { r: size - 1 - z, c: x };
 };
 
-const faceValue = (dirKey, x, y, z, size) => {
-  const { r, c } = faceRCFor(dirKey, x, y, z, size);
-  // Latin square: value = (row + col) mod size + 1
-  return ((r + c) % size) + 1;
-};
-
 const Cubie = React.forwardRef(function Cubie({
   position, cubie, size, wormMode = false, hideBody = false, onPointerDown,
 }, ref) {
@@ -169,8 +165,13 @@ const Cubie = React.forwardRef(function Cubie({
       return `M${faceId}-${idStr}`;
     }
     if (visualMode === 'sudokube') {
-      const v = faceValue(dirKey, cubie.x, cubie.y, cubie.z, size);
-      return String(v);
+      // Show the sticker's IDENTITY value (from its original face + position),
+      // not its current cell. Using the current position made faceValue collapse
+      // to ((r+c)%size)+1 for every cell — a perfect Latin square at all times —
+      // so the numbers never tracked the stickers and the puzzle was unsolvable.
+      // This matches the value used by checkSudokubeSolved in win detection.
+      if (!m.origPos) return '';
+      return String(latinValue(m.origDir, m.origPos.x, m.origPos.y, m.origPos.z, size));
     }
     return '';
   };
