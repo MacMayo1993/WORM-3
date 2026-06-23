@@ -22,6 +22,7 @@ export function useGameSession() {
   const victory = useGameStore((state) => state.victory);
   const achievedWins = useGameStore((state) => state.achievedWins);
   const chaosLevel = useGameStore((state) => state.chaosLevel);
+  const visualMode = useGameStore((state) => state.visualMode);
 
   const setGameTime = useGameStore((state) => state.setGameTime);
   const setVictory = useGameStore((state) => state.setVictory);
@@ -53,21 +54,25 @@ export function useGameSession() {
 
     const wins = detectWinConditions(cubies, size);
 
-    // Prioritize worm victory (rarest), then ultimate, then individual wins
+    // Prioritize worm victory (rarest), then ultimate, then the classic solve.
     if (wins.worm && !achievedWins.worm) {
       setVictory(VICTORY.WORM);
       setAchievedWins((prev) => ({ ...prev, worm: true }));
-    } else if (wins.ultimate && !achievedWins.ultimate) {
+    } else if (wins.ultimate && !achievedWins.ultimate && visualMode === 'sudokube') {
+      // Ultimate (colors + Latin squares) is only celebrated when the player is
+      // actually pursuing it in Sudokube mode. A color-solved classic cube
+      // incidentally satisfies the Latin-square condition, so without this gate
+      // every ordinary classic solve would pop the Ultimate screen instead of
+      // the classic "Cube Solved!".
       setVictory(VICTORY.ULTIMATE);
       setAchievedWins((prev) => ({ ...prev, ultimate: true, rubiks: true, sudokube: true }));
     } else if (wins.rubiks && !achievedWins.rubiks) {
       setVictory(VICTORY.RUBIKS);
       setAchievedWins((prev) => ({ ...prev, rubiks: true }));
-    } else if (wins.sudokube && !achievedWins.sudokube) {
-      setVictory(VICTORY.SUDOKUBE);
-      setAchievedWins((prev) => ({ ...prev, sudokube: true }));
     }
-  }, [cubies, size, hasShuffled, victory, achievedWins, chaosLevel, setVictory, setAchievedWins]);
+    // Note: the standalone Sudokube victory was removed — the position-derived
+    // Latin squares lined up incidentally during normal play and broke immersion.
+  }, [cubies, size, hasShuffled, victory, achievedWins, chaosLevel, visualMode, setVictory, setAchievedWins]);
 
   // Format time for display
   const formatTime = useCallback((seconds) => {

@@ -1,6 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { VICTORY } from '../../utils/constants.js';
 
+/**
+ * VictoryScreen — themed to match the dark "Mobi" UI (LevelTutorial / MobiIntro):
+ * dark navy panel, accent glow per win type, system-ui type, accent-filled
+ * primary actions. The standalone Sudokube victory was removed.
+ */
+
 const VictoryScreen = ({
   winType,
   moves,
@@ -13,10 +19,9 @@ const VictoryScreen = ({
   hasNextLevel = false,
   onMainMenu = null
 }) => {
-  const [showConfetti, _setShowConfetti] = useState(true);
+  const [showConfetti] = useState(true);
 
-  // Stable confetti config — computed once per win type, not on every render
-  const CONFETTI_COLORS = ['#ef4444', '#22c55e', '#3b82f6', '#eab308', '#f97316', '#ffffff', '#a855f7', '#ec4899'];
+  const CONFETTI_COLORS = ['#00d2f8', '#22c55e', '#3b82f6', '#eab308', '#f97316', '#ffffff', '#a855f7', '#ec4899'];
   const confettiParticles = useMemo(() => {
     const count = winType === VICTORY.ULTIMATE ? 65 : 35;
     return Array.from({ length: count }).map((_, i) => {
@@ -30,7 +35,6 @@ const VictoryScreen = ({
         radius: i % 3 === 0 ? '50%' : i % 4 === 0 ? '2px' : '0',
         duration: 2.2 + (i % 9) * 0.35,
         delay: (i * 0.08) % 2.5,
-        rotation: i % 2 === 0 ? 540 : -360,
       };
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -51,67 +55,85 @@ const VictoryScreen = ({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Use level-specific win message if available
   const levelWinMessage = levelData?.winMessage;
 
+  // Per-win theming — all share the dark Mobi panel, only the accent changes.
   const winConfig = {
     rubiks: {
       title: 'Cube Solved!',
       subtitle: 'Classic Victory',
-      description: 'You\'ve arranged all faces with uniform colors!',
-      color: '#43a047',
-      gradientFrom: '#43a047',
-      gradientTo: '#2e7d32',
-      bgGradient: 'linear-gradient(135deg, #f1f8e9, #c5e1a5)'
-    },
-    sudokube: {
-      title: 'Sudokube Complete!',
-      subtitle: 'Latin Square Master',
-      description: 'Every face is a perfect Latin square - no repeated numbers in any row or column!',
-      color: '#1e88e5',
-      gradientFrom: '#1e88e5',
-      gradientTo: '#1565c0',
-      bgGradient: 'linear-gradient(135deg, #e3f2fd, #90caf9)'
+      description: "You've arranged every face with a single uniform color.",
+      accent: '#00d2f8',
     },
     ultimate: {
-      title: 'ULTIMATE VICTORY!',
+      title: 'Ultimate Victory!',
       subtitle: 'Topology Grandmaster',
-      description: 'Incredible! You\'ve achieved the impossible - solving both the colors AND the Latin squares simultaneously!',
-      color: '#fdd835',
-      gradientFrom: '#fdd835',
-      gradientTo: '#f9a825',
-      bgGradient: 'linear-gradient(135deg, #fffde7, #fff59d)'
+      description: "Incredible — colors AND Latin squares solved at the same time.",
+      accent: '#fdd835',
     },
     worm: {
-      title: 'WORM³ COMPLETE!',
-      subtitle: 'Secret Achievement Unlocked',
-      description: 'You\'ve solved the ENTIRE CUBE through the WORMHOLES! Every single sticker traveled through antipodal space. You are a true master of manifold topology!',
-      color: '#fb8c00',
-      gradientFrom: '#fb8c00',
-      gradientTo: '#f57c00',
-      bgGradient: 'linear-gradient(135deg, #fff3e0, #ffcc80)'
-    }
+      title: 'WORM³ Complete!',
+      subtitle: 'Secret Achievement',
+      description: "You solved the entire cube through the WORMHOLES — every sticker traveled through antipodal space.",
+      accent: '#fb8c00',
+    },
   };
 
   const config = winConfig[winType] || winConfig.rubiks;
+  const accent = config.accent;
+
+  // Shared button styles ----------------------------------------------------
+  const primaryBtn = {
+    background: accent,
+    border: `1px solid ${accent}`,
+    color: '#00121b',
+    fontSize: '13px',
+    fontWeight: 700,
+    padding: '11px 26px',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif',
+    letterSpacing: '0.06em',
+    textTransform: 'uppercase',
+    boxShadow: `0 0 18px ${accent}66`,
+    transition: 'all 0.18s',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  };
+  const outlineBtn = {
+    background: 'transparent',
+    border: '1px solid rgba(255,255,255,0.2)',
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: '13px',
+    fontWeight: 600,
+    padding: '11px 22px',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif',
+    letterSpacing: '0.04em',
+    transition: 'all 0.18s',
+  };
 
   return (
     <div style={{
       position: 'fixed',
-      top: 0, left: 0, right: 0, bottom: 0,
+      inset: 0,
       height: '100dvh',
-      background: config.bgGradient,
+      background: 'radial-gradient(120% 120% at 50% 0%, rgba(0,40,60,0.35) 0%, rgba(0,0,0,0.78) 60%)',
+      backdropFilter: 'blur(8px)',
+      WebkitBackdropFilter: 'blur(8px)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       zIndex: 3000,
-      animation: 'fadeIn 0.5s ease-out',
-      padding: 'env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px)',
+      animation: 'vsFadeIn 0.45s ease-out',
+      padding: 'max(16px, env(safe-area-inset-top, 0px)) 16px max(16px, env(safe-area-inset-bottom, 0px))',
       boxSizing: 'border-box'
     }}>
-      {/* Confetti — all non-worm wins */}
+      {/* Confetti — non-worm wins */}
       {winType !== VICTORY.WORM && showConfetti && (
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden', pointerEvents: 'none' }}>
+        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
           {confettiParticles.map(p => (
             <div key={p.id} style={{
               position: 'absolute',
@@ -121,7 +143,7 @@ const VictoryScreen = ({
               left: p.left,
               top: '-20px',
               borderRadius: p.radius,
-              animation: `confetti-fall ${p.duration}s linear infinite`,
+              animation: `vsConfettiFall ${p.duration}s linear infinite`,
               animationDelay: `${p.delay}s`,
             }} />
           ))}
@@ -130,14 +152,15 @@ const VictoryScreen = ({
 
       {/* Worm particles for worm victory */}
       {winType === VICTORY.WORM && showConfetti && (
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden', pointerEvents: 'none' }}>
+        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
           {wormParticles.map(p => (
             <div key={p.id} style={{
               position: 'absolute',
               fontSize: '24px',
               left: p.left,
               top: '-40px',
-              animation: `worm-wiggle ${p.duration}s linear infinite`,
+              color: accent,
+              animation: `vsWormWiggle ${p.duration}s linear infinite`,
               animationDelay: `${p.delay}s`,
             }}>◎</div>
           ))}
@@ -145,48 +168,51 @@ const VictoryScreen = ({
       )}
 
       <div style={{
-        textAlign: 'center',
-        maxWidth: '550px',
-        width: '90%',
-        padding: '48px',
-        maxHeight: 'calc(100dvh - 40px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))',
-        overflowY: 'auto',
-        background: '#ffffff',
-        borderRadius: '16px',
-        boxShadow: '0 2px 6px 2px rgba(60, 64, 67, 0.15), 0 8px 24px 4px rgba(60, 64, 67, 0.15)',
-        border: `3px solid ${config.color}`,
         position: 'relative',
-        boxSizing: 'border-box'
+        textAlign: 'center',
+        maxWidth: '460px',
+        width: '92%',
+        padding: 'clamp(28px, 5vw, 40px)',
+        maxHeight: 'calc(100dvh - 32px)',
+        overflowY: 'auto',
+        background: 'rgba(3, 7, 20, 0.96)',
+        borderRadius: '16px',
+        border: `1px solid ${accent}`,
+        boxShadow: `0 24px 70px rgba(0,0,0,0.6), 0 0 60px ${accent}33`,
+        boxSizing: 'border-box',
+        animation: 'vsPanelRise 0.45s cubic-bezier(0.16,1,0.3,1)'
       }}>
-        {/* Decorative top bar */}
+        {/* Accent top bar */}
         <div style={{
           position: 'absolute',
           top: 0, left: 0, right: 0,
-          height: '6px',
-          background: `linear-gradient(90deg, ${config.gradientFrom}, ${config.gradientTo})`
+          height: '3px',
+          background: `linear-gradient(90deg, transparent, ${accent}, transparent)`,
+          borderRadius: '16px 16px 0 0'
         }} />
 
         {/* Title */}
         <h1 style={{
-          fontSize: winType === VICTORY.ULTIMATE || winType === VICTORY.WORM ? '42px' : '36px',
-          fontWeight: 700,
-          margin: '0 0 8px 0',
-          color: config.color,
-          fontFamily: 'Georgia, serif',
-          letterSpacing: '1px',
-          textShadow: winType === VICTORY.ULTIMATE || winType === VICTORY.WORM ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
+          fontSize: 'clamp(26px, 6vw, 36px)',
+          fontWeight: 800,
+          margin: '0 0 6px 0',
+          color: accent,
+          fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif',
+          letterSpacing: '0.01em',
+          textShadow: `0 0 24px ${accent}55`
         }}>
           {config.title}
         </h1>
 
         {/* Subtitle */}
         <p style={{
-          fontSize: '14px',
-          color: '#5f6368',
-          marginBottom: '20px',
-          fontFamily: "'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-          fontWeight: 500,
-          letterSpacing: '0.05em',
+          fontSize: '12px',
+          color: accent,
+          opacity: 0.85,
+          margin: '0 0 18px 0',
+          fontFamily: 'system-ui, sans-serif',
+          fontWeight: 700,
+          letterSpacing: '0.18em',
           textTransform: 'uppercase'
         }}>
           {config.subtitle}
@@ -194,32 +220,32 @@ const VictoryScreen = ({
 
         {/* Description */}
         <p style={{
-          fontSize: '16px',
-          color: '#202124',
-          marginBottom: '28px',
-          lineHeight: 1.7,
-          fontFamily: "'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+          fontSize: '15px',
+          color: '#cfe6f2',
+          margin: '0 0 22px 0',
+          lineHeight: 1.6,
+          fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif'
         }}>
           {levelWinMessage || config.description}
         </p>
 
-        {/* Level indicator when playing a level */}
+        {/* Level indicator */}
         {currentLevel && (
           <div style={{
             display: 'inline-block',
             marginBottom: '20px',
-            padding: '8px 20px',
-            background: `${config.color}15`,
+            padding: '6px 16px',
+            background: `${accent}1a`,
             borderRadius: '20px',
-            border: `1px solid ${config.color}30`
+            border: `1px solid ${accent}40`
           }}>
             <span style={{
-              fontSize: '13px',
-              fontWeight: 600,
-              color: config.color,
-              fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+              fontSize: '11px',
+              fontWeight: 700,
+              color: accent,
+              fontFamily: 'system-ui, sans-serif',
               textTransform: 'uppercase',
-              letterSpacing: '0.1em'
+              letterSpacing: '0.12em'
             }}>
               Level {currentLevel} Complete
             </span>
@@ -230,138 +256,63 @@ const VictoryScreen = ({
         <div style={{
           display: 'flex',
           justifyContent: 'center',
-          gap: '32px',
-          marginBottom: '32px',
-          padding: '20px',
-          background: '#f8f9fa',
-          borderRadius: '12px',
-          border: '1px solid #e8eaed'
+          gap: '12px',
+          marginBottom: '26px',
         }}>
-          <div>
-            <div style={{
-              fontSize: '11px',
-              textTransform: 'uppercase',
-              color: '#5f6368',
-              letterSpacing: '0.1em',
-              marginBottom: '4px',
-              fontWeight: 600
-            }}>Moves</div>
-            <div style={{
-              fontSize: '28px',
-              fontWeight: 700,
-              color: '#202124',
-              fontFamily: "'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-            }}>{moves}</div>
-          </div>
-          <div style={{
-            width: '1px',
-            background: '#e8eaed'
-          }} />
-          <div>
-            <div style={{
-              fontSize: '11px',
-              textTransform: 'uppercase',
-              color: '#5f6368',
-              letterSpacing: '0.1em',
-              marginBottom: '4px',
-              fontWeight: 600
-            }}>Time</div>
-            <div style={{
-              fontSize: '28px',
-              fontWeight: 700,
-              color: '#202124',
-              fontFamily: "'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-            }}>{formatTime(time)}</div>
-          </div>
+          {[{ label: 'Moves', value: moves }, { label: 'Time', value: formatTime(time) }].map((stat) => (
+            <div key={stat.label} style={{
+              flex: 1,
+              maxWidth: '150px',
+              padding: '14px 10px',
+              background: 'rgba(255,255,255,0.04)',
+              borderRadius: '10px',
+              border: '1px solid rgba(255,255,255,0.08)'
+            }}>
+              <div style={{
+                fontSize: '10px', textTransform: 'uppercase', color: 'rgba(255,255,255,0.45)',
+                letterSpacing: '0.12em', marginBottom: '6px', fontWeight: 700,
+                fontFamily: 'system-ui, sans-serif'
+              }}>{stat.label}</div>
+              <div style={{
+                fontSize: '26px', fontWeight: 800, color: '#fff',
+                fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif'
+              }}>{stat.value}</div>
+            </div>
+          ))}
         </div>
 
         {/* Buttons */}
-        <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
           <button
             onClick={onContinue}
-            style={{
-              background: '#ffffff',
-              border: `1px solid #e8eaed`,
-              color: '#202124',
-              fontSize: '14px',
-              fontWeight: 500,
-              padding: '12px 24px',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontFamily: "'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-              transition: 'all 0.2s',
-              boxShadow: '0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15)'
-            }}
-            onMouseEnter={e => {
-              e.target.style.background = '#f8f9fa';
-              e.target.style.boxShadow = '0 1px 3px 0 rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15)';
-            }}
-            onMouseLeave={e => {
-              e.target.style.background = '#ffffff';
-              e.target.style.boxShadow = '0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15)';
-            }}
+            style={outlineBtn}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.45)'; e.currentTarget.style.color = '#fff'; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)'; e.currentTarget.style.color = 'rgba(255,255,255,0.75)'; }}
           >
             Keep Playing
           </button>
-          {/* Next Level button - shown when playing a level and there's a next level */}
+
           {hasNextLevel && onNextLevel && (
             <button
               onClick={onNextLevel}
-              style={{
-                background: '#1e88e5',
-                border: 'none',
-                color: '#ffffff',
-                fontSize: '14px',
-                fontWeight: 500,
-                padding: '12px 24px',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                boxShadow: '0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15)',
-                fontFamily: "'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-                transition: 'all 0.2s',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}
-              onMouseEnter={e => {
-                e.target.style.transform = 'translateY(-2px)';
-                e.target.style.boxShadow = '0 1px 3px 0 rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15)';
-                e.target.style.background = '#1565c0';
-              }}
-              onMouseLeave={e => {
-                e.target.style.transform = 'translateY(0)';
-                e.target.style.boxShadow = '0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15)';
-                e.target.style.background = '#1e88e5';
-              }}
+              style={primaryBtn}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = `0 0 24px ${accent}aa`; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = `0 0 18px ${accent}66`; }}
             >
-              Next Level
-              <span style={{ fontSize: '18px' }}>→</span>
+              Next Level <span style={{ fontSize: '16px' }}>→</span>
             </button>
           )}
+
           <button
             onClick={onNewGame}
-            style={{
-              background: hasNextLevel
-                ? '#f8f9fa'
-                : config.color,
-              border: hasNextLevel ? '1px solid #e8eaed' : 'none',
-              color: hasNextLevel ? '#202124' : '#ffffff',
-              fontSize: '14px',
-              fontWeight: 500,
-              padding: '12px 24px',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              boxShadow: '0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15)',
-              fontFamily: "'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-              transition: 'all 0.2s'
-            }}
+            style={hasNextLevel ? outlineBtn : primaryBtn}
             onMouseEnter={e => {
-              e.target.style.transform = 'translateY(-2px)';
-              e.target.style.boxShadow = '0 1px 3px 0 rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15)';
+              if (hasNextLevel) { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.45)'; e.currentTarget.style.color = '#fff'; }
+              else { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = `0 0 24px ${accent}aa`; }
             }}
             onMouseLeave={e => {
-              e.target.style.transform = 'translateY(0)';
-              e.target.style.boxShadow = '0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15)';
+              if (hasNextLevel) { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)'; e.currentTarget.style.color = 'rgba(255,255,255,0.75)'; }
+              else { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = `0 0 18px ${accent}66`; }
             }}
           >
             {currentLevel ? 'Retry Level' : 'New Puzzle'}
@@ -370,61 +321,41 @@ const VictoryScreen = ({
 
         {/* Main Menu escape hatch */}
         {onMainMenu && (
-          <div style={{ marginTop: '14px', textAlign: 'center' }}>
+          <div style={{ marginTop: '16px' }}>
             <button
               onClick={onMainMenu}
               style={{
                 background: 'transparent', border: 'none', cursor: 'pointer',
-                color: '#5f6368', fontSize: '13px', padding: '4px 8px',
-                fontFamily: "'Roboto', 'Product Sans', 'Google Sans', -apple-system, sans-serif",
+                color: 'rgba(255,255,255,0.4)', fontSize: '12px', padding: '4px 8px',
+                fontFamily: 'system-ui, sans-serif', letterSpacing: '0.04em'
               }}
+              onMouseEnter={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.75)'; }}
+              onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.4)'; }}
             >
               ← Main Menu
             </button>
           </div>
         )}
 
-        {/* Achievement hint for non-ultimate wins */}
-        {winType !== VICTORY.ULTIMATE && winType !== VICTORY.WORM && (
+        {/* Secret achievement message for worm victory */}
+        {winType === VICTORY.WORM && (
           <div style={{
-            marginTop: '24px',
-            padding: '12px 16px',
-            background: 'rgba(234,179,8,0.1)',
-            borderRadius: '6px',
-            border: '1px solid rgba(234,179,8,0.3)'
+            marginTop: '22px',
+            padding: '14px 18px',
+            background: `${accent}1a`,
+            borderRadius: '10px',
+            border: `1px solid ${accent}55`
           }}>
             <p style={{
               margin: 0,
               fontSize: '13px',
-              color: '#92400e',
-              fontStyle: 'italic'
-            }}>
-              {winType === VICTORY.RUBIKS
-                ? 'Challenge: Can you also solve the Sudokube (Latin squares) for the Ultimate Victory?'
-                : 'Challenge: Can you also solve the colors for the Ultimate Victory?'}
-            </p>
-          </div>
-        )}
-
-        {/* Secret achievement message for worm victory */}
-        {winType === VICTORY.WORM && (
-          <div style={{
-            marginTop: '24px',
-            padding: '16px 20px',
-            background: 'rgba(188, 108, 37, 0.15)',
-            borderRadius: '8px',
-            border: '2px solid rgba(188, 108, 37, 0.4)'
-          }}>
-            <p style={{
-              margin: 0,
-              fontSize: '14px',
-              color: '#7f2d0e',
+              color: '#ffd9b0',
               fontWeight: 600,
-              textAlign: 'center'
+              fontFamily: 'system-ui, sans-serif'
             }}>
-              You've discovered the SECRET WORM VICTORY!<br/>
-              <span style={{ fontSize: '12px', fontWeight: 'normal', fontStyle: 'italic' }}>
-                The rarest achievement - solving through pure manifold chaos!
+              You discovered the SECRET WORM VICTORY!<br/>
+              <span style={{ fontSize: '11px', fontWeight: 400, opacity: 0.85 }}>
+                The rarest achievement — solving through pure manifold chaos.
               </span>
             </p>
           </div>
@@ -432,16 +363,14 @@ const VictoryScreen = ({
       </div>
 
       <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: scale(0.95); }
-          to { opacity: 1; transform: scale(1); }
-        }
-        @keyframes confetti-fall {
+        @keyframes vsFadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes vsPanelRise { from { opacity: 0; transform: translateY(14px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        @keyframes vsConfettiFall {
           0%   { transform: translateY(-20px) rotate(0deg) skewX(0deg); opacity: 1; }
           60%  { opacity: 1; }
           100% { transform: translateY(100vh) rotate(540deg) skewX(12deg); opacity: 0; }
         }
-        @keyframes worm-wiggle {
+        @keyframes vsWormWiggle {
           0%   { transform: translateY(-40px) rotate(0deg) translateX(0px); opacity: 1; }
           25%  { transform: translateY(25vh) rotate(15deg) translateX(20px); opacity: 1; }
           50%  { transform: translateY(50vh) rotate(-15deg) translateX(-20px); opacity: 1; }
@@ -449,9 +378,10 @@ const VictoryScreen = ({
           100% { transform: translateY(100vh) rotate(0deg) translateX(0px); opacity: 0; }
         }
         @media (prefers-reduced-motion: reduce) {
-          @keyframes confetti-fall { from {} to {} }
-          @keyframes worm-wiggle   { from {} to {} }
-          @keyframes fadeIn        { from {} to {} }
+          @keyframes vsConfettiFall { from {} to {} }
+          @keyframes vsWormWiggle   { from {} to {} }
+          @keyframes vsFadeIn       { from {} to {} }
+          @keyframes vsPanelRise    { from {} to {} }
         }
       `}</style>
     </div>

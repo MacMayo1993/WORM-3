@@ -171,6 +171,7 @@ describe('detectWinConditions', () => {
     const result = detectWinConditions(cubies, 3);
 
     expect(result.rubiks).toBe(false);
+    expect(result.sudokube).toBe(false);
     expect(result.ultimate).toBe(false);
     expect(result.worm).toBe(false);
   });
