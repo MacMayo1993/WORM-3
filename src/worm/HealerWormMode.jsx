@@ -526,17 +526,20 @@ function useWormCrawler(size, cubies) {
         const traversals = tunnelUseCountsRef.current.get(tunnelKey) ?? 0;
         const nextTraversals = traversals + 1;
         tunnelUseCountsRef.current.set(tunnelKey, nextTraversals);
-        if (nextTraversals === WORMHOLE_MAX_TRAVERSALS) {
-            // Final free traversal — worm completes this tunnel, then dies when it steps
-            // off the exit tile. Arms the deferred kill checked in the crawling phase.
+        // The first WORMHOLE_MAX_TRAVERSALS passes through a tunnel are safe. The
+        // next one is the "void" traversal: the worm completes the tunnel, then
+        // collapses when it steps off the exit tile (deferred kill, checked in the
+        // crawling phase). With the default of 3 safe traversals this is the
+        // documented "void on the 4th" behavior.
+        if (nextTraversals === WORMHOLE_MAX_TRAVERSALS + 1) {
             pendingVoidKillRef.current = {
                 tunnelKey,
                 exitTileKey: tileKey(tunnel.exit),
                 armed: false,
             };
         }
-        if (nextTraversals > WORMHOLE_MAX_TRAVERSALS) {
-            // 4th touch: this tunnel is now fully void and kills immediately on contact.
+        if (nextTraversals > WORMHOLE_MAX_TRAVERSALS + 1) {
+            // Past the void traversal the tunnel is fully collapsed and kills on contact.
             voidTunnelKeysRef.current.add(tunnelKey);
             pendingVoidKillRef.current = null;
             killWorm({
