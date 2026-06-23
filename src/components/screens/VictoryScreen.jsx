@@ -23,7 +23,7 @@ const VictoryScreen = ({
 
   const CONFETTI_COLORS = ['#00d2f8', '#22c55e', '#3b82f6', '#eab308', '#f97316', '#ffffff', '#a855f7', '#ec4899'];
   const confettiParticles = useMemo(() => {
-    const count = winType === VICTORY.ULTIMATE ? 65 : 35;
+    const count = 35;
     return Array.from({ length: count }).map((_, i) => {
       const phi = i * 137.508; // golden-angle spread avoids clumping
       return {
@@ -58,18 +58,13 @@ const VictoryScreen = ({
   const levelWinMessage = levelData?.winMessage;
 
   // Per-win theming — all share the dark Mobi panel, only the accent changes.
+  // Only the classic and worm victories remain (Sudokube/Ultimate were removed).
   const winConfig = {
     rubiks: {
       title: 'Cube Solved!',
       subtitle: 'Classic Victory',
       description: "You've arranged every face with a single uniform color.",
       accent: '#00d2f8',
-    },
-    ultimate: {
-      title: 'Ultimate Victory!',
-      subtitle: 'Topology Grandmaster',
-      description: "Incredible — colors AND Latin squares solved at the same time.",
-      accent: '#fdd835',
     },
     worm: {
       title: 'WORM³ Complete!',
