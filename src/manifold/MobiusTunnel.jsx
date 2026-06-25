@@ -3,7 +3,6 @@ import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { LoftGeometry } from '../3d/geometries/LoftGeometry.js';
 import { FLIP_CAP } from '../utils/constants.js';
 import { tunnelState } from '../worm/tunnelProgressBridge.js';
 
@@ -22,23 +21,11 @@ const FACE_NORM_LOCAL = {
 
 const FACE_OFFSET    = 0.52;
 const RIBBON_WIDTH   = 0.85;
-const RIBBON_SEGS    = 64;   // must be even — split evenly across the two arms
-const ROWS_PER_ARM   = RIBBON_SEGS / 2 + 1;
+const RIBBON_SEGS    = 64;   // must be even — doubled from 32 for smoother curves
 const REBUILD_EPS_SQ = 1e-4;
 const MINI_FACE_R    = 0.25; // must match MINI_S in VoidCore.jsx
 const TAPER_MIN      = 0.15; // narrowest fraction of full width at the mini-cube
 const BUMPER_HEIGHT  = 0.30; // guard-rail height at full width — increased from 0.22
-const TROUGH_DEPTH   = 0.05; // channel depth at full width — gives the ribbon real cross-section
-const INNER_FRAC     = 0.55; // fraction of half-width where the channel floor sits
-
-// Geometry rebuild is throttled and scaled down as tunnel count grows, the same
-// strategy WormholeTunnel uses to keep total alloc+dispose rate bounded when
-// chaos mode spawns 100+ tunnels at once.
-let activeMobiusCount = 0;
-const MOBIUS_REBUILD_FPS = 12;
-const MOBIUS_COUNT_PER_FPS_STEP = 30;
-const mobiusRebuildInterval = () =>
-  (1 / MOBIUS_REBUILD_FPS) * Math.max(1, Math.ceil(activeMobiusCount / MOBIUS_COUNT_PER_FPS_STEP));
 
 // Module-level cached objects — no per-frame allocation.
 const _wPos1         = new THREE.Vector3();
@@ -54,9 +41,8 @@ const _midB          = new THREE.Vector3();
 const _axis          = new THREE.Vector3();
 const _perpBase      = new THREE.Vector3();
 const _perpCurrent   = new THREE.Vector3();
-const _armTangent    = new THREE.Vector3();
+const _segTangent    = new THREE.Vector3();
 const _surfaceNormal = new THREE.Vector3();
-const _midC          = new THREE.Vector3();
 const _up            = new THREE.Vector3(0, 1, 0);
 const _side          = new THREE.Vector3(0, 0, 1);
 const _portalPos     = new THREE.Vector3();
@@ -71,9 +57,7 @@ const vertexShader = `
 `;
 
 // Ribbon fragment shader.
-// LoftGeometry's UV convention is (alongPath, acrossSection) — opposite of the old
-// hand-rolled strip, so vUv.x now carries what used to be vUv.y and vice versa.
-// vUv.x: 0 = tile1 end, 0.5 = centre (VoidCore), 1 = tile2 end.
+// vUv.y: 0 = tile1 end, 0.5 = centre (VoidCore), 1 = tile2 end.
 // Each half is the solid color of its own tile — no cross-blending.
 // Scroll flows toward the centre from both ends so movement reads as "into the tunnel".
 // uScrollSpeed is modulated by tunnel progress so it accelerates at the Möbius midpoint.
@@ -91,21 +75,21 @@ const fragmentShader = `
     // Tunnel birth grow-in: left beam from tile1 toward centre, right beam from tile2.
     float leftFront  = uGrowT * 0.5;
     float rightFront = 1.0 - uGrowT * 0.5;
-    if (vUv.x > leftFront && vUv.x < rightFront) discard;
+    if (vUv.y > leftFront && vUv.y < rightFront) discard;
 
     // Each half shows only its own tile's color.
-    vec3 tileColor = vUv.x < 0.5 ? uColorA : uColorB;
+    vec3 tileColor = vUv.y < 0.5 ? uColorA : uColorB;
 
     // Scroll toward centre from each tile end (halfPos: 0=tile edge, 1=centre).
-    float halfPos = vUv.x < 0.5 ? vUv.x * 2.0 : (1.0 - vUv.x) * 2.0;
+    float halfPos = vUv.y < 0.5 ? vUv.y * 2.0 : (1.0 - vUv.y) * 2.0;
     float scroll  = fract(halfPos * 4.0 - uTime * uScrollSpeed);
 
     // Leading-edge velocity spark
     float spark = (1.0 - smoothstep(0.0, 0.08, scroll)) * 0.6;
 
-    // Cylindrical depth illusion across the channel cross-section (now backed by
-    // real loft geometry depth, not just a fake shading curve on a flat plane).
-    float centerBulge = 1.0 - pow(abs(vUv.y * 2.0 - 1.0), 0.6);
+    // Cylindrical depth illusion: ribbon reads as a 3D tube rather than a flat band.
+    // centerBulge peaks at U=0.5 (ribbon centre) and falls off toward edges.
+    float centerBulge = 1.0 - pow(abs(vUv.x * 2.0 - 1.0), 0.6);
     float shading = 0.58 + centerBulge * 0.64;
 
     // Depth fade: full intensity where the worm is (near halfPos=1 / midpoint),
@@ -115,12 +99,12 @@ const fragmentShader = `
     float intensity  = (0.75 + spark + uPulseBoost * 0.3) * shading * depthFade;
     vec3  col        = tileColor * intensity;
 
-    float edgeFade    = smoothstep(0.0, 0.14, vUv.y) * smoothstep(1.0, 0.86, vUv.y);
+    float edgeFade    = smoothstep(0.0, 0.14, vUv.x) * smoothstep(1.0, 0.86, vUv.x);
     float boostOpacity = uOpacity + uPulseBoost * 0.45;
 
     // Black border along each ribbon edge
-    float leftEdge    = 1.0 - smoothstep(0.0, 0.055, vUv.y);
-    float rightEdge   = 1.0 - smoothstep(1.0, 0.945, vUv.y);
+    float leftEdge    = 1.0 - smoothstep(0.0, 0.055, vUv.x);
+    float rightEdge   = 1.0 - smoothstep(1.0, 0.945, vUv.x);
     float edgeOutline = clamp(leftEdge + rightEdge, 0.0, 1.0);
 
     vec3  finalCol   = mix(col * (1.0 + uPulseBoost * 1.2), vec3(0.0), edgeOutline);
@@ -176,92 +160,176 @@ const bumperFragmentShader = `
 `;
 
 /**
- * Sample one straight arm (start→end) into pre-allocated point pools: a 4-point
- * channel cross-section for the ribbon (outer-left, inner-left, inner-right,
- * outer-right — a shallow trough rather than a flat 2-point strip) and 2-point
- * cross-sections for the left/right bumpers (base, top).
- *
- * `tFrom`/`tTo` are the absolute [0,1] twist parameters for this arm — the
- * Möbius half-twist (perpCurrent rotated by t*PI) must stay continuous across
- * both arms even though each arm is lofted as its own geometry.
+ * Fill position + UV buffers for the Möbius ribbon.
+ * Path: startPos → midAPos (first arm) | gap (mini-cube interior) | midBPos → endPos (second arm).
+ * Width tapers from full at tile ends to TAPER_MIN fraction at the mini-cube crossing.
+ * Cross-section direction (_perpCurrent) rotates π via applyAxisAngle — the Möbius half-twist.
  */
-function sampleArm(startPos, endPos, tFrom, tTo, axis, perpStart, width, ribbonRows, leftRows, rightRows) {
-  const halfW = width / 2;
-  _armTangent.subVectors(endPos, startPos).normalize();
+function fillRibbon(posArray, uvArray, startPos, midAPos, midBPos, endPos, axis, perpStart, segs, width) {
+  const halfW    = width / 2;
+  const halfSegs = segs / 2;
 
-  for (let i = 0; i < ROWS_PER_ARM; i++) {
-    const s = i / (ROWS_PER_ARM - 1);
-    const t = tFrom + (tTo - tFrom) * s;
+  for (let i = 0; i <= segs; i++) {
+    const t     = i / segs;
     const taper = TAPER_MIN + (1.0 - TAPER_MIN) * Math.abs(2.0 * t - 1.0);
     const w     = halfW * taper;
-    const depth = TROUGH_DEPTH * taper;
-    const bh    = BUMPER_HEIGHT * taper;
 
-    _midC.copy(startPos).lerp(endPos, s);
+    let cx, cy, cz;
+    if (i <= halfSegs) {
+      const s = i / halfSegs;
+      cx = startPos.x + (midAPos.x - startPos.x) * s;
+      cy = startPos.y + (midAPos.y - startPos.y) * s;
+      cz = startPos.z + (midAPos.z - startPos.z) * s;
+    } else {
+      const s = (i - halfSegs) / halfSegs;
+      cx = midBPos.x + (endPos.x - midBPos.x) * s;
+      cy = midBPos.y + (endPos.y - midBPos.y) * s;
+      cz = midBPos.z + (endPos.z - midBPos.z) * s;
+    }
+
     _perpCurrent.copy(perpStart).applyAxisAngle(axis, t * Math.PI);
 
-    _surfaceNormal.crossVectors(_armTangent, _perpCurrent);
-    if (_surfaceNormal.lengthSq() < 0.001) _surfaceNormal.crossVectors(_up, _perpCurrent);
+    for (let side = 0; side < 2; side++) {
+      const sign = side === 0 ? -w : w;
+      const vi   = (i * 2 + side) * 3;
+      posArray[vi]     = cx + _perpCurrent.x * sign;
+      posArray[vi + 1] = cy + _perpCurrent.y * sign;
+      posArray[vi + 2] = cz + _perpCurrent.z * sign;
+      const ui = (i * 2 + side) * 2;
+      uvArray[ui]     = side;
+      uvArray[ui + 1] = t;
+    }
+  }
+}
+
+/**
+ * Fill left and right bumper geometry buffers, including aTripFrac (t along ribbon).
+ *
+ * Each bumper is a thin wall that rises from a ribbon edge in the direction of the
+ * ribbon's surface normal (= segTangent × perpCurrent).  Because perpCurrent rotates
+ * π over the full ribbon length (the Möbius half-twist), the surface normal also
+ * rotates π — the bumper that is upright at tile 1 ends inverted at tile 2,
+ * demonstrating RP2 non-orientability.
+ */
+function fillBumpers(
+  leftPosArr, rightPosArr, leftHFArr, rightHFArr, leftTFArr, rightTFArr,
+  startPos, midAPos, midBPos, endPos,
+  axis, perpStart, segs, width
+) {
+  const halfW    = width / 2;
+  const halfSegs = segs / 2;
+
+  // Segment tangents for each arm (constant within each half)
+  const tAx = midAPos.x - startPos.x;
+  const tAy = midAPos.y - startPos.y;
+  const tAz = midAPos.z - startPos.z;
+  const tALen = Math.sqrt(tAx * tAx + tAy * tAy + tAz * tAz) || 1;
+
+  const tBx = endPos.x - midBPos.x;
+  const tBy = endPos.y - midBPos.y;
+  const tBz = endPos.z - midBPos.z;
+  const tBLen = Math.sqrt(tBx * tBx + tBy * tBy + tBz * tBz) || 1;
+
+  for (let i = 0; i <= segs; i++) {
+    const t     = i / segs;
+    const taper = TAPER_MIN + (1.0 - TAPER_MIN) * Math.abs(2.0 * t - 1.0);
+    const w     = halfW * taper;
+    const bh    = BUMPER_HEIGHT * taper;
+
+    // Centre position (same piecewise formula as fillRibbon)
+    let cx, cy, cz;
+    if (i <= halfSegs) {
+      const s = i / halfSegs;
+      cx = startPos.x + (midAPos.x - startPos.x) * s;
+      cy = startPos.y + (midAPos.y - startPos.y) * s;
+      cz = startPos.z + (midAPos.z - startPos.z) * s;
+    } else {
+      const s = (i - halfSegs) / halfSegs;
+      cx = midBPos.x + (endPos.x - midBPos.x) * s;
+      cy = midBPos.y + (endPos.y - midBPos.y) * s;
+      cz = midBPos.z + (endPos.z - midBPos.z) * s;
+    }
+
+    // Width (cross-section) direction with Möbius half-twist
+    _perpCurrent.copy(perpStart).applyAxisAngle(axis, t * Math.PI);
+
+    // Segment tangent for this arm
+    if (i <= halfSegs) {
+      _segTangent.set(tAx / tALen, tAy / tALen, tAz / tALen);
+    } else {
+      _segTangent.set(tBx / tBLen, tBy / tBLen, tBz / tBLen);
+    }
+
+    // Surface normal: tangent × perpCurrent — rotates 180° over the ribbon length
+    _surfaceNormal.crossVectors(_segTangent, _perpCurrent);
+    if (_surfaceNormal.lengthSq() < 0.001) {
+      _surfaceNormal.crossVectors(_up, _perpCurrent);
+    }
     _surfaceNormal.normalize();
 
-    const row = ribbonRows[i];
-    row[0].copy(_midC).addScaledVector(_perpCurrent, -w);
-    row[1].copy(_midC).addScaledVector(_perpCurrent, -w * INNER_FRAC).addScaledVector(_surfaceNormal, -depth);
-    row[2].copy(_midC).addScaledVector(_perpCurrent,  w * INNER_FRAC).addScaledVector(_surfaceNormal, -depth);
-    row[3].copy(_midC).addScaledVector(_perpCurrent,  w);
+    // Ribbon edge positions
+    const lx = cx - _perpCurrent.x * w;
+    const ly = cy - _perpCurrent.y * w;
+    const lz = cz - _perpCurrent.z * w;
 
-    const lrow = leftRows[i];
-    lrow[0].copy(_midC).addScaledVector(_perpCurrent, -w);
-    lrow[1].copy(lrow[0]).addScaledVector(_surfaceNormal, bh);
+    const rx = cx + _perpCurrent.x * w;
+    const ry = cy + _perpCurrent.y * w;
+    const rz = cz + _perpCurrent.z * w;
 
-    const rrow = rightRows[i];
-    rrow[0].copy(_midC).addScaledVector(_perpCurrent, w);
-    rrow[1].copy(rrow[0]).addScaledVector(_surfaceNormal, bh);
+    // Bumper top positions (edge + surface-normal * height)
+    const ltx = lx + _surfaceNormal.x * bh;
+    const lty = ly + _surfaceNormal.y * bh;
+    const ltz = lz + _surfaceNormal.z * bh;
+
+    const rtx = rx + _surfaceNormal.x * bh;
+    const rty = ry + _surfaceNormal.y * bh;
+    const rtz = rz + _surfaceNormal.z * bh;
+
+    const base = i * 2;
+    // Left bumper: bottom (hf=0) then top (hf=1)
+    leftPosArr[base * 3]       = lx;  leftPosArr[base * 3 + 1]   = ly;  leftPosArr[base * 3 + 2]   = lz;
+    leftHFArr[base]            = 0;   leftTFArr[base]             = t;
+    leftPosArr[(base+1)*3]     = ltx; leftPosArr[(base+1)*3 + 1] = lty; leftPosArr[(base+1)*3 + 2] = ltz;
+    leftHFArr[base + 1]        = 1;   leftTFArr[base + 1]         = t;
+
+    // Right bumper: bottom (hf=0) then top (hf=1)
+    rightPosArr[base * 3]      = rx;  rightPosArr[base * 3 + 1]  = ry;  rightPosArr[base * 3 + 2]  = rz;
+    rightHFArr[base]           = 0;   rightTFArr[base]            = t;
+    rightPosArr[(base+1)*3]    = rtx; rightPosArr[(base+1)*3 + 1] = rty; rightPosArr[(base+1)*3 + 2] = rtz;
+    rightHFArr[base + 1]       = 1;   rightTFArr[base + 1]        = t;
   }
 }
 
-// Each arm's LoftGeometry independently normalizes its U (along-path) coordinate
-// to [0,1]; squeeze it into the arm's half of the full ribbon so the two arms
-// read as one continuous [0,1] path once merged (tile1 → centre → tile2).
-function rescaleU(geo, uMin, uMax) {
-  const uv = geo.attributes.uv.array;
-  for (let i = 0; i < uv.length; i += 2) {
-    uv[i] = uMin + uv[i] * (uMax - uMin);
+function createRibbonGeos(segs) {
+  const vertCount = (segs + 1) * 2;
+
+  // Shared quad-strip index pattern (skip the gap at segs/2 hidden by mini-cube body)
+  const mainIndices = [];
+  const bumpIndices = [];
+  for (let i = 0; i < segs; i++) {
+    if (i === segs / 2) continue;
+    const a = i * 2, b = a + 1, c = a + 2, d = a + 3;
+    mainIndices.push(a, b, c, b, d, c);
+    bumpIndices.push(a, b, c, b, d, c);
   }
-}
 
-// Concatenate two same-topology LoftGeometry outputs into one BufferGeometry,
-// offsetting the second arm's indices past the first arm's vertex count.
-// Disposes both source geometries once their buffers are copied.
-function mergeLofts(geoA, geoB) {
-  const merged = new THREE.BufferGeometry();
+  // Main ribbon
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertCount * 3), 3));
+  geo.setAttribute('uv',       new THREE.BufferAttribute(new Float32Array(vertCount * 2), 2));
+  geo.setIndex(mainIndices);
 
-  const posA = geoA.attributes.position.array, posB = geoB.attributes.position.array;
-  const uvA  = geoA.attributes.uv.array,       uvB  = geoB.attributes.uv.array;
-  const nA   = geoA.attributes.normal.array,   nB   = geoB.attributes.normal.array;
-  const vertCountA = posA.length / 3;
+  // Bumper geometries — include aTripFrac (t along ribbon) for the flip-point highlight
+  function makeBumperGeo() {
+    const bg = new THREE.BufferGeometry();
+    bg.setAttribute('position',    new THREE.BufferAttribute(new Float32Array(vertCount * 3), 3));
+    bg.setAttribute('aHeightFrac', new THREE.BufferAttribute(new Float32Array(vertCount),     1));
+    bg.setAttribute('aTripFrac',   new THREE.BufferAttribute(new Float32Array(vertCount),     1));
+    bg.setIndex([...bumpIndices]);
+    return bg;
+  }
 
-  const position = new Float32Array(posA.length + posB.length);
-  position.set(posA, 0); position.set(posB, posA.length);
-  const uv = new Float32Array(uvA.length + uvB.length);
-  uv.set(uvA, 0); uv.set(uvB, uvA.length);
-  const normal = new Float32Array(nA.length + nB.length);
-  normal.set(nA, 0); normal.set(nB, nA.length);
-
-  const idxA = geoA.index.array, idxB = geoB.index.array;
-  const index = new idxA.constructor(idxA.length + idxB.length);
-  index.set(idxA, 0);
-  for (let i = 0; i < idxB.length; i++) index[idxA.length + i] = idxB[i] + vertCountA;
-
-  merged.setAttribute('position', new THREE.BufferAttribute(position, 3));
-  merged.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
-  merged.setAttribute('normal', new THREE.BufferAttribute(normal, 3));
-  merged.setIndex(new THREE.BufferAttribute(index, 1));
-
-  geoA.dispose();
-  geoB.dispose();
-
-  return merged;
+  return { geo, leftGeo: makeBumperGeo(), rightGeo: makeBumperGeo() };
 }
 
 /**
@@ -281,14 +349,11 @@ const MobiusTunnel = ({
   meshIdx1, meshIdx2, dirKey1, dirKey2, cubieRefs, flips, color1, color2, tunnelId,
 }) => {
   const meshRef          = useRef();
-  const leftMeshRef       = useRef();
-  const rightMeshRef      = useRef();
   const pulseT           = useRef(Math.random() * Math.PI * 2);
   const portalPulseT     = useRef(Math.random() * Math.PI * 2);
   const dimRef           = useRef(DIM_OPACITY);
   const lastStartRef     = useRef(new THREE.Vector3(Infinity, Infinity, Infinity));
   const lastEndRef       = useRef(new THREE.Vector3(Infinity, Infinity, Infinity));
-  const lastBuildTRef    = useRef(-Infinity);
 
   // Exit portal refs — group holds position/orientation; children animate independently
   const exitPortalGroupRef  = useRef();
@@ -301,37 +366,7 @@ const MobiusTunnel = ({
     useShallow(s => ({ tunnelBirths: s.tunnelBirths, tunnelPulses: s.tunnelPulses }))
   );
 
-  // Reusable point pools, two arms × ROWS_PER_ARM rows — sampled in place every
-  // rebuild instead of allocating fresh Vector3s (LoftGeometry itself still
-  // allocates a fresh BufferGeometry per rebuild, same alloc/dispose pattern
-  // WormholeTunnel already uses for its TubeGeometry).
-  const pools = useMemo(() => {
-    const makeRows = (cols) => [0, 1].map(() =>
-      Array.from({ length: ROWS_PER_ARM }, () =>
-        Array.from({ length: cols }, () => new THREE.Vector3())
-      )
-    );
-    return { ribbon: makeRows(4), left: makeRows(2), right: makeRows(2) };
-  }, []);
-
-  // Bumper height/trip-fraction attributes are pure functions of row/column index,
-  // independent of position, so they're computed once and reattached to each new
-  // merged geometry rather than recomputed every rebuild.
-  const bumperExtras = useMemo(() => {
-    const vertCount = ROWS_PER_ARM * 2 * 2; // 2 arms × ROWS_PER_ARM rows × 2 cols
-    const heightFrac = new Float32Array(vertCount);
-    const tripFrac   = new Float32Array(vertCount);
-    for (let arm = 0; arm < 2; arm++) {
-      for (let i = 0; i < ROWS_PER_ARM; i++) {
-        const s = i / (ROWS_PER_ARM - 1);
-        const t = arm === 0 ? s * 0.5 : 0.5 + s * 0.5;
-        const base = (arm * ROWS_PER_ARM + i) * 2;
-        heightFrac[base] = 0; heightFrac[base + 1] = 1;
-        tripFrac[base]   = t; tripFrac[base + 1]   = t;
-      }
-    }
-    return { heightFrac, tripFrac };
-  }, []);
+  const { geo, leftGeo, rightGeo } = useMemo(() => createRibbonGeos(RIBBON_SEGS), []);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const uniforms = useMemo(() => ({
@@ -357,22 +392,11 @@ const MobiusTunnel = ({
   }), []);
 
   useEffect(() => {
-    activeMobiusCount++;
-    return () => { activeMobiusCount--; };
-  }, []);
+    const g = geo, lg = leftGeo, rg = rightGeo;
+    return () => { g.dispose(); lg.dispose(); rg.dispose(); };
+  }, [geo, leftGeo, rightGeo]);
 
-  useEffect(() => {
-    const m  = meshRef.current;
-    const lm = leftMeshRef.current;
-    const rm = rightMeshRef.current;
-    return () => {
-      if (m?.geometry)  m.geometry.dispose();
-      if (lm?.geometry) lm.geometry.dispose();
-      if (rm?.geometry) rm.geometry.dispose();
-    };
-  }, []);
-
-  useFrame((state, delta) => {
+  useFrame((_state, delta) => {
     const mesh1 = cubieRefs[meshIdx1];
     const mesh2 = cubieRefs[meshIdx2];
     if (!mesh1 || !mesh2 || !meshRef.current) return;
@@ -410,9 +434,7 @@ const MobiusTunnel = ({
       : 1.0;
     uniforms.uTime.value += delta;
 
-    const elapsed = state.clock.elapsedTime;
-    if (moved && (elapsed - lastBuildTRef.current >= mobiusRebuildInterval())) {
-      lastBuildTRef.current = elapsed;
+    if (moved) {
       lastStartRef.current.copy(_vStart);
       lastEndRef  .current.copy(_vEnd);
 
@@ -449,45 +471,33 @@ const MobiusTunnel = ({
         if (exitPortalGlowRef.current)  exitPortalGlowRef.current.material.color.set(cB);
       }
 
-      // Sample both arms (start→midA, midB→end), Möbius twist parameterized by
-      // the absolute t∈[0,1] across the *whole* path so it stays continuous.
-      sampleArm(_vStart, _midA, 0, 0.5, _axis, _perpBase, RIBBON_WIDTH,
-        pools.ribbon[0], pools.left[0], pools.right[0]);
-      sampleArm(_midB, _vEnd, 0.5, 1, _axis, _perpBase, RIBBON_WIDTH,
-        pools.ribbon[1], pools.left[1], pools.right[1]);
+      fillRibbon(
+        geo.attributes.position.array,
+        geo.attributes.uv.array,
+        _vStart, _midA, _midB, _vEnd,
+        _axis, _perpBase,
+        RIBBON_SEGS, RIBBON_WIDTH
+      );
+      geo.attributes.position.needsUpdate = true;
+      geo.attributes.uv.needsUpdate = true;
 
-      const ribbonA = new LoftGeometry(pools.ribbon[0], { closed: false });
-      const ribbonB = new LoftGeometry(pools.ribbon[1], { closed: false });
-      rescaleU(ribbonA, 0, 0.5);
-      rescaleU(ribbonB, 0.5, 1);
-      const ribbonGeo = mergeLofts(ribbonA, ribbonB);
-
-      const leftA = new LoftGeometry(pools.left[0], { closed: false });
-      const leftB = new LoftGeometry(pools.left[1], { closed: false });
-      const leftGeo = mergeLofts(leftA, leftB);
-      leftGeo.setAttribute('aHeightFrac', new THREE.BufferAttribute(bumperExtras.heightFrac, 1));
-      leftGeo.setAttribute('aTripFrac', new THREE.BufferAttribute(bumperExtras.tripFrac, 1));
-
-      const rightA = new LoftGeometry(pools.right[0], { closed: false });
-      const rightB = new LoftGeometry(pools.right[1], { closed: false });
-      const rightGeo = mergeLofts(rightA, rightB);
-      rightGeo.setAttribute('aHeightFrac', new THREE.BufferAttribute(bumperExtras.heightFrac, 1));
-      rightGeo.setAttribute('aTripFrac', new THREE.BufferAttribute(bumperExtras.tripFrac, 1));
-
-      const oldRibbon = meshRef.current.geometry;
-      meshRef.current.geometry = ribbonGeo;
-      if (oldRibbon) oldRibbon.dispose();
-
-      if (leftMeshRef.current) {
-        const oldLeft = leftMeshRef.current.geometry;
-        leftMeshRef.current.geometry = leftGeo;
-        if (oldLeft) oldLeft.dispose();
-      }
-      if (rightMeshRef.current) {
-        const oldRight = rightMeshRef.current.geometry;
-        rightMeshRef.current.geometry = rightGeo;
-        if (oldRight) oldRight.dispose();
-      }
+      fillBumpers(
+        leftGeo.attributes.position.array,
+        rightGeo.attributes.position.array,
+        leftGeo.attributes.aHeightFrac.array,
+        rightGeo.attributes.aHeightFrac.array,
+        leftGeo.attributes.aTripFrac.array,
+        rightGeo.attributes.aTripFrac.array,
+        _vStart, _midA, _midB, _vEnd,
+        _axis, _perpBase,
+        RIBBON_SEGS, RIBBON_WIDTH
+      );
+      leftGeo.attributes.position.needsUpdate    = true;
+      leftGeo.attributes.aHeightFrac.needsUpdate  = true;
+      leftGeo.attributes.aTripFrac.needsUpdate    = true;
+      rightGeo.attributes.position.needsUpdate   = true;
+      rightGeo.attributes.aHeightFrac.needsUpdate = true;
+      rightGeo.attributes.aTripFrac.needsUpdate   = true;
     }
 
     // Dim system: inactive tunnels fade to 75%, active tunnel snaps to 100%.
@@ -550,7 +560,7 @@ const MobiusTunnel = ({
   return (
     <>
       {/* Main ribbon — racing stripes scroll toward the mini-cube, speed ramps at midpoint */}
-      <mesh ref={meshRef}>
+      <mesh ref={meshRef} geometry={geo}>
         <shaderMaterial
           uniforms={uniforms}
           vertexShader={vertexShader}
@@ -562,7 +572,7 @@ const MobiusTunnel = ({
       </mesh>
 
       {/* Left guard rail — colorA; rotates to inverted at tile 2 via Möbius twist */}
-      <mesh ref={leftMeshRef}>
+      <mesh geometry={leftGeo}>
         <shaderMaterial
           uniforms={bumperUniformsL}
           vertexShader={bumperVertexShader}
@@ -574,7 +584,7 @@ const MobiusTunnel = ({
       </mesh>
 
       {/* Right guard rail — colorB; rotates to inverted at tile 2 via Möbius twist */}
-      <mesh ref={rightMeshRef}>
+      <mesh geometry={rightGeo}>
         <shaderMaterial
           uniforms={bumperUniformsR}
           vertexShader={bumperVertexShader}
