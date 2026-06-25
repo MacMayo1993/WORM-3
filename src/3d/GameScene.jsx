@@ -226,21 +226,23 @@ export default function GameScene({
           healMoment={wormHealedCount}
         />
 
-        <CubeAssembly
-          size={size}
-          cubies={cubies}
-          onMove={wormHealerMode && wormPaused ? null : onMove}
-          onTapFlip={onTapFlip}
-          animState={animState}
-          onAnimComplete={onAnimComplete}
-          onCascadeComplete={onCascadeComplete}
-          manifoldMap={manifoldMap}
-          onSelectTile={onSelectTile}
-          onClearTileSelection={onClearTileSelection}
-          onFlipWaveComplete={onFlipWaveComplete}
-          solveHighlights={solveModeActive || teachModeActive ? solveHighlights : []}
-          onFaceRotationMode={onFaceRotationMode}
-        />
+        <group visible={!wormholePhaseActive}>
+          <CubeAssembly
+            size={size}
+            cubies={cubies}
+            onMove={wormHealerMode && wormPaused ? null : onMove}
+            onTapFlip={onTapFlip}
+            animState={animState}
+            onAnimComplete={onAnimComplete}
+            onCascadeComplete={onCascadeComplete}
+            manifoldMap={manifoldMap}
+            onSelectTile={onSelectTile}
+            onClearTileSelection={onClearTileSelection}
+            onFlipWaveComplete={onFlipWaveComplete}
+            solveHighlights={solveModeActive || teachModeActive ? solveHighlights : []}
+            onFaceRotationMode={onFaceRotationMode}
+          />
+        </group>
 
         {teachModeActive && layerHighlight && (
           <LayerHighlight

@@ -1722,6 +1722,7 @@ const _FACE_DEFS = [
 
 function TunnelInteriorView({ worm, size }) {
     const wireMatRef = useRef();
+    const backingMatRef = useRef();
     const stickerMeshesRef = useRef([]);
     const opacityRef = useRef(0);
     const prevPhaseRef = useRef('crawling');
@@ -1776,6 +1777,13 @@ function TunnelInteriorView({ worm, size }) {
 
     const planeGeo = useMemo(() => new THREE.PlaneGeometry(0.88, 0.88), []);
 
+    // Solid black backing box, seen from inside (BackSide) — sits just beyond the sticker
+    // planes so it shows through the gaps between tiles instead of background/exterior cube.
+    const backingGeo = useMemo(() => {
+        const half = (size - 1) / 2 + SURFACE_OFFSET + 0.03;
+        return new THREE.BoxGeometry(half * 2, half * 2, half * 2);
+    }, [size]);
+
     // Set static positions/rotations after mount (or size change).
     useEffect(() => {
         stickerLayout.forEach(({ px, py, pz, rx, ry, rz }, i) => {
@@ -1786,7 +1794,7 @@ function TunnelInteriorView({ worm, size }) {
         });
     }, [stickerLayout]);
 
-    useEffect(() => () => { edgeGeo.dispose(); planeGeo.dispose(); }, [edgeGeo, planeGeo]);
+    useEffect(() => () => { edgeGeo.dispose(); planeGeo.dispose(); backingGeo.dispose(); }, [edgeGeo, planeGeo, backingGeo]);
 
     useFrame((_, delta) => {
         const phase = worm.phase.current;
@@ -1828,6 +1836,7 @@ function TunnelInteriorView({ worm, size }) {
         const opacity = opacityRef.current;
 
         if (wireMatRef.current) wireMatRef.current.opacity = opacity * 0.45;
+        if (backingMatRef.current) backingMatRef.current.opacity = opacity;
 
         const meshes = stickerMeshesRef.current;
         if (!active || opacity < 0.01 || !stickerMatsAssigned.current) {
@@ -1844,6 +1853,10 @@ function TunnelInteriorView({ worm, size }) {
 
     return (
         <>
+            {/* Solid black backing — fills the gaps between tiles like real Rubik's plastic */}
+            <mesh geometry={backingGeo} frustumCulled={false}>
+                <meshBasicMaterial ref={backingMatRef} color="#000000" side={THREE.BackSide} transparent opacity={0} depthWrite={true} />
+            </mesh>
             {/* Black plastic skeleton — all cubie edges in one draw call */}
             <lineSegments geometry={edgeGeo} frustumCulled={false}>
                 <lineBasicMaterial ref={wireMatRef} color="#222222" transparent opacity={0} depthWrite={false} />
