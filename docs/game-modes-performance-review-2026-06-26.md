@@ -61,32 +61,21 @@ is tightest, and *on top of* the work the chaos worker is already doing off-thre
 | b | `computeAntipodalIntegrity` | `src/game/antipodalIntegrity.js:36-84` via `src/hooks/useAntipodalIntegrity.js:12` | **n³** scan + a `Set` + ~600 template-string keys + ~150 nested objects (`pairs`) | only `integrity` is used by the HUD; **`pairs` only used in Antipodal Integrity mode** |
 | c | `detectWinConditions` → `checkSudokubeSolved` | `src/game/winDetection.js:139-146`, called from `src/hooks/useGameSession.js:54` | six Latin-square face scans, each building a size×size grid | **never** — Sudokube/Ultimate screens were removed |
 
-**(c) is fixed in this branch** — see "Implemented" below.
+**All three are addressed in this branch** — see "Implemented" below. (b) was the worst
+offender: it allocated a `Set`, two template-literal strings per sticker (~600 at size 7),
+and a `pairs` array of ~150 objects-with-two-nested-objects **on every chaos tick**, while
+its `pairs` array was only ever read when the Antipodal Integrity mode was active. The
+whole feature has been removed, so that scan no longer exists in any mode. (a) is now a
+surface-only scan, and (c) no longer runs the dead Sudokube check.
 
-**(a) and (b) remain and are the bigger structural cost** because, unlike (c), they are
-*not* gated out during chaos. `computeAntipodalIntegrity` is the worst offender: it
-allocates a `Set`, two template-literal strings per sticker (~600 at size 7), and a
-`pairs` array of ~150 objects-with-two-nested-objects — **on every chaos tick** — and the
-`pairs` array is only ever read when `antipodalIntegrityMode` is active
-(`AntipodalVisualization.jsx:111`, gated by `GameScene.jsx:310`). In every other mode it
-is built and immediately thrown away.
+**Notes on what was considered for (a):** gating the `metrics` recompute out during chaos
+was rejected — `TopMenuBar` already ignores `metrics` (it reads worker `chaosStats`), but
+`FloatingHUD` still reads `metrics.flips` live during chaos for its parity readout, so
+freezing it would visibly stall that HUD. The surface-only scan keeps it correct while
+cutting the iteration to the cubies that actually hold stickers.
 
-**Fix:**
-1. **Antipodal (b):** make the scan allocation-free — pick the canonical half of each pair
-   by a numeric index comparison instead of a `Set` + string keys, and only build the
-   `pairs` array behind an `includePairs` flag that `useAntipodalIntegrity` passes as
-   `antipodalIntegrityMode`. Keep `includePairs` defaulting to `true` so the existing
-   `antipodalIntegrity.test.js` contract (`pairs.length === 27`) stays green. Removes
-   ~750 allocations per scan in all non-antipodal modes.
-2. **Metrics (a):** during chaos (`chaosLevel > 0`), stop rescanning — the worker already
-   reports `totalFlips`/`deadTiles` in `chaosStats` (`useChaosWorker.js:155`). Derive the
-   HUD's `metrics.flips` from `chaosStats` and freeze the memo's full recompute, the same
-   way `TopMenuBar` was already converted in the 2026-06-10 Phase 1 work (§3.1).
-3. **Both:** consider keying these memos on a cheap derived signature rather than the whole
-   `cubies` reference where a frozen value is acceptable mid-cascade.
-
-**Expected gain:** removes 2 full-cube scans + ~750 allocations from every chaos/worm
-flip tick — directly attacks the residual main-thread cost during the heaviest modes.
+**Expected gain:** removes one full-cube scan + ~750 allocations per chaos/worm flip tick
+(the antipodal scan) outright, and trims the remaining `metrics` scan to the surface shell.
 
 ---
 
@@ -101,14 +90,14 @@ Classic/Sudokube/Ultimate/Worm normal play.
 This is the exact anti-pattern the 2026-06-10 review eliminated for stickers (§1.1), but it
 was never applied to the cubie pop layer.
 
-**Fix:** route cubie pops through the existing `StickerAnimationManager` active-set pattern
-— register a per-cubie tick, activate it only when a pop is enqueued for that `popKey`,
-and deactivate from inside the tick when `rawT >= 1`. Idle cubies then cost zero. A cheap
-interim fix is to gate the per-frame `position.set(0,0,0)` behind a `wasPoppedRef` so idle
-frames do no writes (removes the writes but keeps the dispatch overhead).
+**Partially fixed in this branch:** the per-frame `position.set(0,0,0)` write is now gated
+behind a `poppedRef` so idle cubies early-out without writing (removes ~218 redundant
+transform writes/frame in every non-disparity mode). The remaining structural step — fold
+cubie pops into the `StickerAnimationManager` active set so idle cubies don't even dispatch
+a `useFrame` — is left for a follow-up that benefits from in-browser verification.
 
-**Expected gain:** removes ~218 store reads + ~218 redundant transform writes per frame in
-every non-disparity mode.
+**Expected gain (done):** ~218 redundant transform writes/frame removed in every
+non-disparity mode. **Remaining:** ~218 `useFrame` dispatches/frame (the manager fold).
 
 ---
 
@@ -124,27 +113,30 @@ also means:
   shadow-casting cubies at size 7 this is a real per-frame cost the 2026-06-10 review
   predated (shadows were added in recent commits `e2b8471`, `d1f8307`).
 
-**Fix:**
-- Gate `shadows` and the N8AO pass off for the **menu/intro** scenes (they don't need cube
-  self-shadowing), or drop to a small `shadow-mapSize` there.
-- Consider `frameloop="demand"` for the menu and for visually-static overlays/sub-scenes,
-  invalidating on interaction only (the rendering audit §E already recommended this).
-- Tie shadow-map size and the N8AO pass to the existing `perfReducedFX` tier and/or cube
-  size, so size 6–7 and underpowered devices shed them automatically.
+**Already partly handled (verified):** the shadow-casting light and the N8AO pass live in
+`GameScene` (gameplay only), and both are gated by `shadowsOn`/`aoEnabled`
+(`GameScene.jsx:165-170`) off mobile, off `perfReducedFX`, and off wireframe/glass. The
+menu renders `MenuScene` (no shadow-casting light), so it pays no shadow/AO cost — and when
+a full-screen overlay (settings / mode select) covers the menu, the scene collapses to a
+flat `<color>` clear (`App.jsx:1384`). So the worst of F3 is already mitigated.
 
-**Expected gain:** large idle-power/thermal win on the menu (the most-visited screen), and
-removes a per-frame shadow cost from large-cube gameplay.
+**Remaining (left as recommendation — needs in-browser tuning, not changed here):**
+- `frameloop="demand"` for the menu/intro so the idle menu stops re-rendering at 60 fps.
+  Risky on the single persistent Canvas (it also hosts gameplay), so deferred.
+- Drop `directionalLight` `shadow-mapSize` from `2048²` toward `1024²` at size ≥ 6 to keep
+  the per-frame shadow pass cheap on the largest cubes.
+
+**Expected gain:** idle-power/thermal win on the menu; smaller shadow pass at large sizes.
 
 ---
 
-### F4 — `metrics` scan walks interior cubies it can never use (minor)
+### F4 — `metrics` scan walks interior cubies it can never use (FIXED)
 
-**`src/hooks/useCubeState.js:76-86`** — the triple loop iterates the full `n³` lattice,
-including interior cubies. Interior cubies carry an empty `stickers` object so the inner
-loop is skipped, but the `n³` iteration itself still runs (343 iterations at size 7 vs the
-~218 that actually hold stickers). Subsumed by the F1(a) fix; if F1(a) is deferred, at
-least skip interior cubies with the same `x>0 && x<size-1 && …` guard used by
-`winDetection.js:14`.
+**`src/hooks/useCubeState.js`** — the triple loop iterated the full `n³` lattice including
+interior cubies (343 iterations at size 7 vs the ~218 that actually hold stickers). Now
+skips fully-interior cubies with the same shell guard `winDetection.js:14` uses, and
+switched to indexed loops + `for…in` (no `Object.keys` array per cubie). Behavior-identical
+(interior cubies carry no stickers, so they contributed nothing to the counts).
 
 ---
 
@@ -159,15 +151,16 @@ depending on `achievedWins.rubiks`/`.worm` booleans would be tighter.
 
 ## Per-mode notes
 
-- **Classic / Sudokube / Ultimate** — share the move pipeline; F1(c) (fixed) and F1(a)/F2
-  were the only per-move waste. Otherwise clean. (Note: the "Sudokube"/"Ultimate" *win
-  screens* were removed, so `checkSudokubeSolved` was dead weight — see F1c.)
-- **Worm / Healer** — heaviest mode, already deeply reviewed (2026-06-10 Part 2). F1(a)/F1(b)
-  still apply here at full frequency because heals/tile-chaos mutate `cubies` continuously
-  while `chaosLevel` is 0, so neither scan is gated. F2's idle cubie loop also runs here.
-- **Disparity / Chaos** — worker-side accounting is correctly off-thread, but F1(a)/F1(b)
-  re-introduce two main-thread full-cube scans on every TICK. Closing F1 is the single
-  biggest remaining disparity-mode win after the 2026-06-10 work.
+- **Classic / Sudokube / Ultimate** — share the move pipeline; F1(c) (fixed) was the only
+  per-move waste. (The "Sudokube"/"Ultimate" *win screens* were removed, so
+  `checkSudokubeSolved` was dead weight — see F1c.)
+- **Worm / Healer** — heaviest mode, already deeply reviewed (2026-06-10 Part 2). Heals and
+  tile-chaos mutate `cubies` continuously while `chaosLevel` is 0, so this is where the F1
+  scans hit hardest — removing the antipodal-integrity scan and trimming `metrics` to the
+  surface shell directly cut that per-mutation cost. F2's idle cubie writes are gated now.
+- **Disparity / Chaos** — worker-side accounting is correctly off-thread. The one remaining
+  main-thread full-cube scan per TICK (the antipodal-integrity I(T) metric) is now gone with
+  the feature; `metrics` is surface-only.
 - **Teach / Solve** — `TeachMode.jsx` has no frame loops; `SolveMode.jsx:77` memoizes
   `checkSolveProgress` on `cubies` (recomputes once per move only). Healthy.
 - **Holonomy / Merge / Hollow / Mirror / Random** — no new hot-path issues found;
@@ -175,38 +168,59 @@ depending on `achievedWins.rubiks`/`.worm` booleans would be tighter.
 
 ---
 
-## Implemented in this branch (low-risk, behavior-preserving)
+## Implemented in this branch
+
+**F1(b) — removed the Antipodal Integrity feature entirely (the worst per-tick scan).**
+The I(T) integrity metric, its real-time visualization, and its HUD are deleted:
+`game/antipodalIntegrity.js`, `hooks/useAntipodalIntegrity.js`,
+`3d/AntipodalVisualization.jsx`, `components/overlays/AntipodalHUD.jsx`, and the dead
+`coming-soon/game/cubeVerifier.js` (integrity-gated, referenced only by its own test) +
+both their test files. All wiring is gone: the `antipodalIntegrityMode` store flag and its
+setters, the `useAntipodalIntegrity()` call in `App.jsx`, the `antipodalData` props, the
+`GameScene` render branch, the `UILayer` HUD, and the "I(T)" toggle in
+`SecondaryModesSheet`. The separate **Antipodal Mode** (echo / Mirror-Quotient rotations,
+`AntipodalModeEffects`/`AntipodalModeHUD`) and the **Antipodal PiP** camera are unrelated
+and were left intact. Net: the highest-frequency main-thread allocator (a `Set` + ~600
+strings + ~150 objects per chaos tick) is gone in every mode.
 
 **F1(c) — stop computing the unused Sudokube/Ultimate win conditions on every move.**
-`src/hooks/useGameSession.js` now calls `checkRubiksSolved` + `allStickersFlipped`
-directly (the only two conditions the live game still surfaces) instead of
-`detectWinConditions`, which additionally ran `checkSudokubeSolved` (six Latin-square face
-scans) purely to populate the removed screens. `winDetection.js` is untouched, so its
-public API and `winDetection.test.js` are unaffected. `checkRubiksSolved` is shared by both
-remaining conditions and `allStickersFlipped` only runs once the cube is already solved, so
-the common (unsolved) path is now a single surface scan with an early-out instead of three
-full scans.
+`useGameSession.js` now calls `checkRubiksSolved` + `allStickersFlipped` directly instead of
+`detectWinConditions` (which also ran `checkSudokubeSolved` — six Latin-square face scans —
+purely for the removed screens). `winDetection.js` and its tests are untouched.
 
-Everything else above is left as a recommendation: F1(a)/F1(b) touch shared logic and mode
-gating that warrant a playtest pass, F2/F3 are structural and benefit from in-browser
-profiling to tune thresholds.
+**F2 (partial) — gate the per-cubie pop animation's idle writes.** `Cubie.jsx`'s pop
+`useFrame` now early-outs via a `poppedRef` instead of writing `position.set(0,0,0)` every
+frame, removing ~218 redundant transform writes/frame in every non-disparity mode. The
+deeper fold into `StickerAnimationManager` (to drop the dispatches too) is left as a
+follow-up.
+
+**F4 — surface-only `metrics` scan.** `useCubeState.js` skips fully-interior cubies and
+drops the per-cubie `Object.keys` allocation; behavior-identical.
+
+Verified: `npm run build` succeeds, full test suite green (303 tests), lint clean (no new
+warnings).
+
+The remaining items (F2 manager fold, F3 menu `frameloop="demand"` + large-cube shadow-map
+sizing, F5 effect-dep tightening) are left as recommendations that benefit from in-browser
+profiling.
 
 ---
 
 ## Prioritized roadmap
 
-**Phase 1 — main-thread scan reduction (highest value, medium risk)**
-1. F1(b): allocation-free `computeAntipodalIntegrity` + `includePairs` flag.
-2. F1(a): derive `metrics` from worker `chaosStats` during chaos; freeze full recompute.
-3. ✅ F1(c): skip `checkSudokubeSolved` in the live win check (done).
+**Phase 1 — main-thread scan reduction (highest value)**
+1. ✅ F1(b): Antipodal Integrity removed — its per-tick scan no longer exists.
+2. ✅ F1(c): skip `checkSudokubeSolved` in the live win check.
+3. ✅ F4: surface-only `metrics` scan.
 
-**Phase 2 — frame-loop hygiene (medium risk, big idle win)**
-4. F2: fold cubie pops into the `StickerAnimationManager` active set.
-5. F3: disable shadows/N8AO and use `frameloop="demand"` for the menu/intro; tie
-   shadow-map size + N8AO to `perfReducedFX`/size for gameplay.
+**Phase 2 — frame-loop hygiene**
+4. ◐ F2: idle pop writes gated (done); fold cubie pops into `StickerAnimationManager` to
+   drop the ~218 idle dispatches/frame (remaining).
+5. F3: `frameloop="demand"` for the menu/intro; drop `shadow-mapSize` at size ≥ 6
+   (shadows/N8AO are already gated off mobile/`perfReducedFX`/wireframe/glass).
 
 **Phase 3 — polish**
-6. F4/F5: surface-only metrics scan; tighten effect deps.
+6. F5: tighten the win-detection effect deps to the `achievedWins` booleans.
 
 **Success metric:** during Disparity/Worm at size 7, no main-thread full-cube scan should
 run more than once per committed rotation — the high-frequency flip stream should touch the

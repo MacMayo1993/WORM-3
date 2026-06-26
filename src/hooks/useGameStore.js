@@ -651,16 +651,6 @@ export const useGameStore = create(
     setTeachModeActive: (teachModeActive) => set({ teachModeActive }),
 
     // ========================================================================
-    // ANTIPODAL INTEGRITY MODE
-    // ========================================================================
-    antipodalIntegrityMode: false,
-
-    setAntipodalIntegrityMode: (antipodalIntegrityMode) => set({ antipodalIntegrityMode }),
-    toggleAntipodalIntegrityMode: () => set((state) => ({
-      antipodalIntegrityMode: !state.antipodalIntegrityMode
-    })),
-
-    // ========================================================================
     // ANTIPODAL MODE - "Mirror Quotient" (Enhanced RP² Dynamics)
     // ========================================================================
     antipodalMode: false,

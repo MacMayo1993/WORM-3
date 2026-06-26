@@ -330,18 +330,23 @@ const Cubie = React.forwardRef(function Cubie({
   // Outer group for the cubie-pop burst animation (does not affect cubieRefs tracking).
   const popGroupRef = useRef();
   const popKey = `${cubie.x},${cubie.y},${cubie.z}`;
+  // True while this cubie's pop group is displaced from the origin. Lets idle cubies
+  // (the common case — pops only fire on disparity heal taps) early-out without writing
+  // position every frame. Every visible cubie runs this useFrame, so without the gate the
+  // whole shell paid a store read + a position.set(0,0,0) per frame in every mode.
+  const poppedRef = useRef(false);
 
   useFrame(() => {
     if (!popGroupRef.current) return;
     // Read imperatively — avoids re-rendering all cubies whenever cubiePops changes.
     const entry = useGameStore.getState().cubiePops[popKey];
-    if (!entry) {
-      popGroupRef.current.position.set(0, 0, 0);
-      return;
-    }
-    const rawT = (performance.now() - entry.startMs) / entry.durationMs;
-    if (rawT >= 1) {
-      popGroupRef.current.position.set(0, 0, 0);
+    const rawT = entry ? (performance.now() - entry.startMs) / entry.durationMs : 1;
+    if (!entry || rawT >= 1) {
+      // Pop finished or never started: snap back to origin exactly once, then stay idle.
+      if (poppedRef.current) {
+        popGroupRef.current.position.set(0, 0, 0);
+        poppedRef.current = false;
+      }
       return;
     }
     // Smooth sine bell: peaks at t=0.5, fully symmetric, no oscillation.
@@ -353,6 +358,7 @@ const Cubie = React.forwardRef(function Cubie({
       (py / len) * popFactor,
       (pz / len) * popFactor
     );
+    poppedRef.current = true;
   });
 
   return (

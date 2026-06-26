@@ -37,7 +37,6 @@ const SecondaryModesSheet = ({
   size, onChangeSize, sizeLocked,
   // Advanced
   handsMode, onToggleHands,
-  antipodalIntegrityMode, onToggleIntegrity,
   // Leaderboard
   showLeaderboard, onToggleLeaderboard,
   // Level
@@ -131,7 +130,6 @@ const SecondaryModesSheet = ({
               <div className="sheet-group-title">Advanced</div>
               <div className="sheet-grid">
                 <SheetItem label="Hands" active={handsMode} onClick={onToggleHands} color="#ff6b35" />
-                <SheetItem label="I(T)" active={antipodalIntegrityMode} onClick={onToggleIntegrity} color="#a78bfa" />
               </div>
             </div>
 

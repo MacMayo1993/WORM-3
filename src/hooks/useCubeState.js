@@ -67,25 +67,34 @@ export function useCubeState() {
   const manifoldMapRef = useRef(manifoldMap);
   manifoldMapRef.current = manifoldMap;
 
-  // Calculate metrics
+  // Calculate metrics. Only surface cubies carry stickers, so skip the fully-interior
+  // cubies entirely instead of walking the whole n³ lattice — this memo recomputes on
+  // every cubies change, including the high-frequency chaos/worm flip stream.
   const metrics = useMemo(() => {
     let flips = 0,
       wormholes = 0,
       off = 0,
       total = 0;
-    for (const L of cubies)
-      for (const R of L)
-        for (const c of R) {
-          for (const k of Object.keys(c.stickers)) {
-            const s = c.stickers[k];
+    const last = size - 1;
+    for (let x = 0; x < size; x++) {
+      const onXFace = x === 0 || x === last;
+      for (let y = 0; y < size; y++) {
+        const onYFace = y === 0 || y === last;
+        for (let z = 0; z < size; z++) {
+          if (!onXFace && !onYFace && z !== 0 && z !== last) continue; // interior: no stickers
+          const stickers = cubies[x][y][z].stickers;
+          for (const k in stickers) {
+            const s = stickers[k];
             flips += s.flips || 0;
             total++;
             if (s.curr !== s.orig) off++;
             if (s.flips > 0 && s.curr !== s.orig) wormholes++;
           }
         }
-    return { flips, wormholes, entropy: Math.round((off / total) * 100) };
-  }, [cubies]);
+      }
+    }
+    return { flips, wormholes, entropy: total ? Math.round((off / total) * 100) : 0 };
+  }, [cubies, size]);
 
   // Get rotation direction for sticker
   const getRotationForDir = useCallback((dir) => {
