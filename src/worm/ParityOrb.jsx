@@ -73,9 +73,9 @@ function _mkMobius(R, w) {
 // Pre-built once, shared across all instances.  geometry={} prop prevents disposal.
 const _orbGeos = {
   normal: {
-    shell:        new THREE.IcosahedronGeometry(0.21, 0),          // faceted gem shell (glassy, iridescent)
-    innerCore:    new THREE.IcosahedronGeometry(0.115, 0),         // bright energy core seen through the shell
-    innerGlow:    new THREE.SphereGeometry(0.30, 10, 10),          // soft additive inner halo
+    shell:        new THREE.SphereGeometry(0.21, 32, 32),          // smooth glassy, iridescent gem shell
+    innerCore:    new THREE.SphereGeometry(0.115, 20, 20),         // bright energy core seen through the shell
+    innerGlow:    new THREE.SphereGeometry(0.30, 12, 12),          // soft additive inner halo
     core:         _mkMobius(0.24, 0.08),                           // Möbius strip — smaller accent ring, antipodal color
     ringA:        new THREE.TorusGeometry(0.370, 0.011, 6, 18),    // orbit rings sit just outside the strip
     ringB:        new THREE.TorusGeometry(0.370 * 0.92, 0.009, 6, 18),
@@ -83,9 +83,9 @@ const _orbGeos = {
     glow:         new THREE.SphereGeometry(0.52, 8, 8),            // outer ambient aura (BackSide only)
   },
   target: {
-    shell:        new THREE.IcosahedronGeometry(0.27, 0),          // larger faceted gem for target
-    innerCore:    new THREE.IcosahedronGeometry(0.15, 0),
-    innerGlow:    new THREE.SphereGeometry(0.40, 10, 10),
+    shell:        new THREE.SphereGeometry(0.27, 36, 36),          // larger smooth gem for target
+    innerCore:    new THREE.SphereGeometry(0.15, 24, 24),
+    innerGlow:    new THREE.SphereGeometry(0.40, 12, 12),
     core:         _mkMobius(0.30, 0.10),                           // Möbius strip, antipodal color
     ringA:        new THREE.TorusGeometry(0.460, 0.015, 8, 24),
     ringB:        new THREE.TorusGeometry(0.460 * 0.92, 0.012, 8, 24),
@@ -172,10 +172,10 @@ function SingleOrb({
   return (
     <group ref={orbGroupRef} position={[position[0], position[1], position[2]]}>
 
-      {/* Faceted gem shell — glassy + iridescent so it catches the light and shimmers
-          with view angle. Low emissive (vs the old flat glowing ball) so the facets,
-          clearcoat sheen and thin-film iridescence actually read; the brightness now
-          comes from the inner core glowing through, not a blown-out surface. */}
+      {/* Smooth glassy gem shell — iridescent + clearcoat so it catches the light and
+          shimmers with view angle. Low emissive (vs the old flat glowing ball) so the
+          sheen and thin-film iridescence actually read; the brightness now comes from
+          the inner core glowing through, not a blown-out surface. */}
       <mesh ref={shellRef} geometry={g.shell}>
         <meshPhysicalMaterial
           color={color}
