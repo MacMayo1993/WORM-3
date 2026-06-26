@@ -2061,8 +2061,9 @@ const TRAIL_FADE_FLOOR = 0.22; // oldest daubs never fade below this, so the who
 // Local additive glow halo over the recent trail daubs — mirrors the Glow worm's glowAltRef
 // overlay. This is plain extra geometry sitting on the trail's surface positions: there is NO
 // post-processing pass, so by construction it cannot bloom the background or the cube interior.
-const TRAIL_GLOW_CAP = 700;   // most-recent daubs that also get a glow halo
-const TRAIL_GLOW_SCALE = 2.6; // halo disc size relative to its trail daub
+const TRAIL_GLOW_CAP = 200;   // ONLY the freshest daubs glow — keeps old, over-traversed areas
+                              // (e.g. the face centre) from stacking additive halos into a blinding blob
+const TRAIL_GLOW_SCALE = 1.7; // halo disc size relative to its trail daub
 const TRAIL_LIFT  = 0.045; // hover distance above tile surface (raised so filled slime discs don't z-fight)
 
 // Lateral wiggle the trail inherits from each gait, so the painted path mirrors how that
@@ -2699,14 +2700,14 @@ function WormTrail({ worm, size: _size }) {
                             _trailXAxis.crossVectors(_trailStretch, _trailSubN).normalize();
                             _trailMat.makeBasis(_trailXAxis, _trailStretch, _trailSubN);
                             _trailDummy.quaternion.setFromRotationMatrix(_trailMat);
-                            _trailDummy.scale.set(fs * 0.16 + 0.03, fs * 0.34 + 0.05, 1);
+                            _trailDummy.scale.set((fs * 0.16 + 0.03) * 0.6, fs * 0.34 + 0.05, 1);
                         } else {
                             _trailDummy.quaternion.setFromUnitVectors(_trailRingZ, _trailSubN);
-                            _trailDummy.scale.setScalar(fs * 0.16 + 0.03);
+                            _trailDummy.scale.setScalar((fs * 0.16 + 0.03) * 0.6);
                         }
                     } else {
                         _trailDummy.quaternion.setFromUnitVectors(_trailRingZ, _trailSubN);
-                        _trailDummy.scale.setScalar(fs * 0.16 + 0.03);
+                        _trailDummy.scale.setScalar((fs * 0.16 + 0.03) * 0.6);
                     }
                     _trailDummy.updateMatrix();
                     mesh.setMatrixAt(visible, _trailDummy.matrix);
@@ -2721,7 +2722,7 @@ function WormTrail({ worm, size: _size }) {
                         _trailDummy.scale.multiplyScalar(TRAIL_GLOW_SCALE);
                         _trailDummy.updateMatrix();
                         glowMesh.setMatrixAt(visible, _trailDummy.matrix);
-                        _trailGlowColor.set(currentSkin.glow).multiplyScalar(0.30 + fs * 0.70);
+                        _trailGlowColor.set(currentSkin.glow).multiplyScalar(0.14 + fs * 0.36);
                         glowMesh.setColorAt(visible, _trailGlowColor);
                         glowCount = visible + 1;
                     }
@@ -2777,7 +2778,7 @@ function WormTrail({ worm, size: _size }) {
                 <meshBasicMaterial
                     color="white"
                     transparent
-                    opacity={0.32}
+                    opacity={0.12}
                     blending={THREE.AdditiveBlending}
                     depthWrite={false}
                     side={THREE.DoubleSide}
