@@ -68,7 +68,6 @@ const ModeCarousel = React.lazy(() =>
   import('./components/menus/MainMenu.jsx').then((mod) => ({ default: mod.ModeCarousel }))
 );
 import { useTeachMode } from './teach/useTeachMode.js';
-import { useAntipodalIntegrity } from './hooks/useAntipodalIntegrity.js';
 import { isMobile } from './utils/device.js';
 import { GREEN_SHOW_START, FULL_FLIP_START, EXPLOSION_START, EXPLOSION_END, IMPLODE_START, IMPLODE_END } from './components/intro/introTiming.js';
 // Lazy-loaded: not needed on initial render, deferred to reduce parse time
@@ -373,9 +372,6 @@ export default function WORM3() {
       return () => clearTimeout(id);
     }
   }, [randomStyleTick]);
-
-  // Antipodal integrity — real-time I(T) metric from the paper
-  const antipodalData = useAntipodalIntegrity();
 
   // Intro time — drives IntroBranch (3D) and WelcomeScreen DOM overlay in sync
   const [introTime, setIntroTime] = useState(0);
@@ -1397,7 +1393,6 @@ export default function WORM3() {
                 onFaceRotationMode={handleFaceRotationMode}
                 animState={animState}
                 manifoldMap={manifoldMap}
-                antipodalData={antipodalData}
                 teachModeActive={teachMode.active}
                 layerHighlight={teachMode.layerHighlight}
                 onHeal={healSticker}
@@ -1474,7 +1469,6 @@ export default function WORM3() {
             currentLevel={currentLevel}
             currentLevelData={currentLevelData}
             hasNextLevel={hasNextLevel}
-            antipodalData={antipodalData}
             teachMode={teachMode}
             performCursorRotation={performCursorRotation}
             ui={{

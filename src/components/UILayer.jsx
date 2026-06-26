@@ -30,7 +30,6 @@ import RotationPreview from './overlays/RotationPreview.jsx';
 import FaceRotationButtons from './overlays/FaceRotationButtons.jsx';
 import TileRotationSelector from './overlays/TileRotationSelector.jsx';
 import HandsOverlay from './overlays/HandsOverlay.jsx';
-import AntipodalHUD from './overlays/AntipodalHUD.jsx';
 import AntipodalModeHUD from './overlays/AntipodalModeHUD.jsx';
 import EchoRotationIndicator from './overlays/EchoRotationIndicator.jsx';
 import DisparityHUD from './overlays/DisparityHUD.jsx';
@@ -84,7 +83,6 @@ export default function UILayer({
   currentLevel,
   currentLevelData,
   hasNextLevel,
-  antipodalData,
   teachMode,
   performCursorRotation,
   // Local UI state (App.jsx useState values)
@@ -157,7 +155,7 @@ export default function UILayer({
   // Visual state — change on user preference changes
   const {
     flipMode, visualMode, exploded, showTunnels, hollowMode,
-    antipodalIntegrityMode, disparityWinner,
+    disparityWinner,
     faceRotationTarget, selectedTileForRotation,
     savedCubeState, solveFocusedStep,
   } = useGameStore(useShallow(s => ({
@@ -166,7 +164,6 @@ export default function UILayer({
     exploded: s.exploded,
     showTunnels: s.showTunnels,
     hollowMode: s.hollowMode,
-    antipodalIntegrityMode: s.antipodalIntegrityMode,
     disparityWinner: s.disparityWinner,
     faceRotationTarget: s.faceRotationTarget,
     selectedTileForRotation: s.selectedTileForRotation,
@@ -180,7 +177,7 @@ export default function UILayer({
     setShowNetPanel, toggleLeaderboard, setFlipMode, setVisualMode,
     setExploded, setShowTunnels, setFaceRotationTarget, setSelectedTileForRotation,
     setShowDevConsole, setSolveModeActive, setSolveFocusedStep, setSolveHighlights,
-    setAntipodalIntegrityMode, toggleHollowMode, triggerCameraOrbit,
+    toggleHollowMode, triggerCameraOrbit,
   } = useGameStore(useShallow(s => ({
     setShowLevelSelect: s.setShowLevelSelect,
     setShowSettings: s.setShowSettings,
@@ -198,7 +195,6 @@ export default function UILayer({
     setSolveModeActive: s.setSolveModeActive,
     setSolveFocusedStep: s.setSolveFocusedStep,
     setSolveHighlights: s.setSolveHighlights,
-    setAntipodalIntegrityMode: s.setAntipodalIntegrityMode,
     toggleHollowMode: s.toggleHollowMode,
     triggerCameraOrbit: s.triggerCameraOrbit,
   })));
@@ -360,8 +356,6 @@ export default function UILayer({
         sizeLocked={!!currentLevelData}
         handsMode={handsMode}
         onToggleHands={onToggleHandsMode}
-        antipodalIntegrityMode={antipodalIntegrityMode}
-        onToggleIntegrity={() => setAntipodalIntegrityMode(!antipodalIntegrityMode)}
         showLeaderboard={showLeaderboard}
         onToggleLeaderboard={toggleLeaderboard}
         currentLevelData={currentLevelData}
@@ -618,17 +612,6 @@ export default function UILayer({
           recentMoves={handsMoveHistory}
           lastMove={handsMoveHistory.length > 0 ? handsMoveHistory[handsMoveHistory.length - 1] : null}
           tps={handsTps}
-        />
-      )}
-
-      {antipodalIntegrityMode && !wormHealerMode && (
-        <AntipodalHUD
-          integrity={antipodalData.integrity}
-          preserved={antipodalData.preserved}
-          total={antipodalData.total}
-          regime={antipodalData.regime}
-          kStar={antipodalData.kStar}
-          onClose={() => setAntipodalIntegrityMode(false)}
         />
       )}
 

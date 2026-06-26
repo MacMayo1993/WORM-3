@@ -35,5 +35,4 @@ export { useKeyboardControls } from './useKeyboardControls.js';
 export { useHandsMode } from './useHandsMode.js';
 export { useUndo } from './useUndo.js';
 export { useParityDecay } from './useParityDecay.js';
-export { useAntipodalIntegrity } from './useAntipodalIntegrity.js';
 export { useRandomMode } from './useRandomMode.js';

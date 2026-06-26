@@ -17,7 +17,6 @@ import BlackHoleEnvironment from './BlackHoleEnvironment.jsx';
 import { getLevelBackground } from './LifeJourneyBackgrounds.jsx';
 import { BACKGROUNDS, getBackgroundUrl } from '../utils/backgrounds.js';
 import LayerHighlight from '../teach/LayerHighlight.jsx';
-import AntipodalVisualization from './AntipodalVisualization.jsx';
 import AntipodalModeEffects from './AntipodalModeEffects.jsx';
 import WormholeWarpFX from './WormholeWarpFX.jsx';
 import AntipodalPiP from './AntipodalPiP.jsx';
@@ -92,7 +91,6 @@ class ErrorBoundary3D extends React.Component {
  *   onSelectTile, onClearTileSelection, onFlipWaveComplete, onFaceRotationMode
  *   animState        — from useAnimation hook (also in store, but kept as prop per plan)
  *   manifoldMap      — computed in useCubeState
- *   antipodalData    — from useAntipodalIntegrity hook
  *   teachModeActive  — from useTeachMode
  *   layerHighlight   — from teachMode.layerHighlight
  */
@@ -112,7 +110,6 @@ export default function GameScene({
   // computed / hook-derived data
   animState,
   manifoldMap,
-  antipodalData,
   teachModeActive,
   layerHighlight,
   // PiP toggle
@@ -125,7 +122,6 @@ export default function GameScene({
     currentLevelData,
     blackHolePulse,
     settings,
-    antipodalIntegrityMode,
     solveModeActive,
     solveHighlights,
     kociembaLayerHighlight,
@@ -143,7 +139,6 @@ export default function GameScene({
     currentLevelData: s.currentLevelData,
     blackHolePulse: s.blackHolePulse,
     settings: s.settings,
-    antipodalIntegrityMode: s.antipodalIntegrityMode,
     solveModeActive: s.solveModeActive,
     solveHighlights: s.solveHighlights,
     kociembaLayerHighlight: s.kociembaLayerHighlight,
@@ -307,13 +302,6 @@ export default function GameScene({
           />
         )}
 
-        {antipodalIntegrityMode && antipodalData && (
-          <AntipodalVisualization
-            antipodalData={antipodalData}
-            size={size}
-            explosionFactor={explosionT}
-          />
-        )}
         <AntipodalModeEffects />
 
         {wormHealerMode && (

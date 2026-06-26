@@ -99,7 +99,7 @@ function EchoTether({ echo, size }) {
     return geo;
   }, [particlePositions]);
 
-  // Color based on axis (matching AntipodalVisualization)
+  // Color based on rotation axis
   const color = useMemo(() => {
     switch (echo.axis) {
       case 'col': return '#22c55e'; // green for X
