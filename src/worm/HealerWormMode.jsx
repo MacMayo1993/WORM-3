@@ -2033,6 +2033,7 @@ const _trailDummy = new THREE.Object3D();
 const _trailPos   = new THREE.Vector3();
 const _trailNorm  = new THREE.Vector3();
 const _trailColor = new THREE.Color();
+const _trailGlowColor = new THREE.Color(); // additive halo tint (skin glow colour)
 const _trailRingZ = new THREE.Vector3(0, 0, 1); // ringGeometry default normal
 const _trailPrevPos = new THREE.Vector3(); // newer neighbor's position, for tangent/stretch
 const _trailTangent = new THREE.Vector3();
@@ -2057,6 +2058,11 @@ const TRAIL_HISTORY_CAP = 8000; // tiles of route retained for rendering (decoup
 const TRAIL_DAUB_CAP = 4000;    // instanced discs painted along the (LOD-thinned) full route
 const TRAIL_SUB_STEP = 0.09; // base spacing between daubs near the head (world units); grows with age
 const TRAIL_FADE_FLOOR = 0.22; // oldest daubs never fade below this, so the whole route stays a faint "where I've been" map
+// Local additive glow halo over the recent trail daubs — mirrors the Glow worm's glowAltRef
+// overlay. This is plain extra geometry sitting on the trail's surface positions: there is NO
+// post-processing pass, so by construction it cannot bloom the background or the cube interior.
+const TRAIL_GLOW_CAP = 700;   // most-recent daubs that also get a glow halo
+const TRAIL_GLOW_SCALE = 2.6; // halo disc size relative to its trail daub
 const TRAIL_LIFT  = 0.045; // hover distance above tile surface (raised so filled slime discs don't z-fight)
 
 // Lateral wiggle the trail inherits from each gait, so the painted path mirrors how that
@@ -2603,6 +2609,7 @@ function PortalGlow({ worm, size }) {
 // the head instead of flashing a disc out in front of it.
 function WormTrail({ worm, size: _size }) {
     const meshRef = useRef();
+    const glowRef = useRef(); // additive glow-halo overlay for the recent trail
     const wormSkinId = useGameStore(s => s.wormSkin ?? 'slime');
     const wormShowTrail = useGameStore(s => s.wormShowTrail ?? true);
     const skin = getSkin(wormSkinId);
@@ -2615,12 +2622,13 @@ function WormTrail({ worm, size: _size }) {
     useFrame(() => {
         const mesh = meshRef.current;
         if (!mesh) return;
+        const glowMesh = glowRef.current;
 
-        if (!wormShowTrail) { mesh.count = 0; return; }
+        if (!wormShowTrail) { mesh.count = 0; if (glowMesh) glowMesh.count = 0; return; }
 
         const trail = worm.pathHistory.current;
         const count = trail.count;
-        if (count < 2) { mesh.count = 0; return; }
+        if (count < 2) { mesh.count = 0; if (glowMesh) glowMesh.count = 0; return; }
 
         const lSize = liveCubies.size;
         const capCount = count; // render the full retained route, not a fixed window
@@ -2636,10 +2644,11 @@ function WormTrail({ worm, size: _size }) {
         let aIdx = bodyTiles;
         let haveA = false;
         for (; aIdx < capCount; aIdx++) { if (resolveTrailTile(trail, aIdx, lSize, _trailCA, _trailNA)) { haveA = true; break; } }
-        if (!haveA) { mesh.count = 0; return; }
+        if (!haveA) { mesh.count = 0; if (glowMesh) glowMesh.count = 0; return; }
         let seqA = trail.seq[(trail.head + aIdx) % trail.capacity];
 
         let visible = 0;
+        let glowCount = 0;
         let havePrev = false;
 
         // Age-based level-of-detail: the route nearest the worm is sampled densely for a smooth
@@ -2705,6 +2714,17 @@ function WormTrail({ worm, size: _size }) {
                     // Encode fade as color brightness
                     _trailColor.set(currentSkin.body).multiplyScalar(0.20 + fs * 0.80);
                     mesh.setColorAt(visible, _trailColor);
+
+                    // Recent daubs also get a soft additive glow halo in the skin's glow colour,
+                    // scaled up from the same daub transform. Purely local geometry — no bloom pass.
+                    if (glowMesh && visible < TRAIL_GLOW_CAP) {
+                        _trailDummy.scale.multiplyScalar(TRAIL_GLOW_SCALE);
+                        _trailDummy.updateMatrix();
+                        glowMesh.setMatrixAt(visible, _trailDummy.matrix);
+                        _trailGlowColor.set(currentSkin.glow).multiplyScalar(0.30 + fs * 0.70);
+                        glowMesh.setColorAt(visible, _trailGlowColor);
+                        glowCount = visible + 1;
+                    }
                     visible++;
 
                     _trailPrevPos.copy(_trailPos);
@@ -2721,28 +2741,50 @@ function WormTrail({ worm, size: _size }) {
         mesh.count = visible;
         mesh.instanceMatrix.needsUpdate = true;
         if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+
+        if (glowMesh) {
+            glowMesh.count = glowCount;
+            glowMesh.instanceMatrix.needsUpdate = true;
+            if (glowMesh.instanceColor) glowMesh.instanceColor.needsUpdate = true;
+        }
     });
 
     return (
-        <instancedMesh ref={meshRef} args={[undefined, undefined, TRAIL_DAUB_CAP]} frustumCulled={false}>
-            {/* Thin, elongated discs stretched toward the next-newer tile read as a continuous
-                painted slime stroke behind the worm. Low roughness + normal blending gives a
-                wet, translucent sheen that catches the scene lights as the worm crawls, instead
-                of a neon additive marker. */}
-            <circleGeometry args={[0.5, 16]} />
-            <meshStandardMaterial
-                color="white"
-                emissive="white"
-                emissiveIntensity={0.18}
-                roughness={0.12}
-                metalness={0}
-                transparent
-                opacity={0.74}
-                depthWrite={false}
-                side={THREE.DoubleSide}
-                toneMapped={false}
-            />
-        </instancedMesh>
+        <>
+            <instancedMesh ref={meshRef} args={[undefined, undefined, TRAIL_DAUB_CAP]} frustumCulled={false}>
+                {/* Thin, elongated discs stretched toward the next-newer tile read as a continuous
+                    painted slime stroke behind the worm. Low roughness + normal blending gives a
+                    wet, translucent sheen that catches the scene lights as the worm crawls, instead
+                    of a neon additive marker. */}
+                <circleGeometry args={[0.5, 16]} />
+                <meshStandardMaterial
+                    color="white"
+                    emissive="white"
+                    emissiveIntensity={0.18}
+                    roughness={0.12}
+                    metalness={0}
+                    transparent
+                    opacity={0.74}
+                    depthWrite={false}
+                    side={THREE.DoubleSide}
+                    toneMapped={false}
+                />
+            </instancedMesh>
+            {/* Additive glow halo over the recent trail — local geometry only, never a screen
+                pass, so it can't touch the background or the cube interior. */}
+            <instancedMesh ref={glowRef} args={[undefined, undefined, TRAIL_GLOW_CAP]} frustumCulled={false}>
+                <circleGeometry args={[0.5, 16]} />
+                <meshBasicMaterial
+                    color="white"
+                    transparent
+                    opacity={0.32}
+                    blending={THREE.AdditiveBlending}
+                    depthWrite={false}
+                    side={THREE.DoubleSide}
+                    toneMapped={false}
+                />
+            </instancedMesh>
+        </>
     );
 }
 
