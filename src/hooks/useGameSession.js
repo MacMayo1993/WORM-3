@@ -6,7 +6,7 @@
 
 import { useEffect, useCallback, useRef } from 'react';
 import { useGameStore } from './useGameStore.js';
-import { detectWinConditions } from '../game/winDetection.js';
+import { checkRubiksSolved, allStickersFlipped } from '../game/winDetection.js';
 import { VICTORY } from '../utils/constants.js';
 
 /**
@@ -51,15 +51,22 @@ export function useGameSession() {
     // win conditions don't apply. Re-runs once when chaosLevel drops back to 0.
     if (chaosLevel > 0) return;
 
-    const wins = detectWinConditions(cubies, size);
-
     // Only two victories remain: the Worm secret win (rarest) and the classic
     // solve. The Sudokube / Ultimate (Latin-square) screens were removed — their
     // condition lines up incidentally during normal play and broke immersion.
-    if (wins.worm && !achievedWins.worm) {
+    //
+    // Compute only what those two conditions need instead of detectWinConditions,
+    // which also runs checkSudokubeSolved (six Latin-square face scans building a
+    // size×size grid each) on every move just to feed the removed screens — pure
+    // wasted work in this hot path. checkRubiksSolved is shared by both live wins;
+    // allStickersFlipped only runs once the cube is already fully solved.
+    const rubiksSolved = checkRubiksSolved(cubies, size);
+    const wormWin = rubiksSolved && allStickersFlipped(cubies, size);
+
+    if (wormWin && !achievedWins.worm) {
       setVictory(VICTORY.WORM);
       setAchievedWins((prev) => ({ ...prev, worm: true }));
-    } else if (wins.rubiks && !achievedWins.rubiks) {
+    } else if (rubiksSolved && !achievedWins.rubiks) {
       setVictory(VICTORY.RUBIKS);
       setAchievedWins((prev) => ({ ...prev, rubiks: true }));
     }
