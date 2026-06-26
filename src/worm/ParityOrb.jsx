@@ -167,7 +167,6 @@ function SingleOrb({
   if (collected) return null;
 
   const g = isTarget ? _orbGeos.target : _orbGeos.normal;
-  const typeConfig = ORB_TYPES[type] || ORB_TYPES.parity;
 
   return (
     <group ref={orbGroupRef} position={[position[0], position[1], position[2]]}>
@@ -247,31 +246,8 @@ function SingleOrb({
           </mesh>
         )}
 
-        {/* Electrons — glow halos only on target orbs (saves 3 draw calls per normal orb) */}
-        {Array.from({ length: 3 }, (_, i) => (
-          <React.Fragment key={i}>
-            <mesh ref={(el) => { electronRefs.current[i] = el; }} geometry={g.electron}>
-              <meshStandardMaterial
-                color={typeConfig.electronColor}
-                emissive={typeConfig.electronEmissive}
-                emissiveIntensity={1.6}
-                metalness={0}
-                roughness={0}
-              />
-            </mesh>
-            {isTarget && g.electronGlow && (
-              <mesh ref={(el) => { electronGlowRefs.current[i] = el; }} geometry={g.electronGlow}>
-                <meshBasicMaterial
-                  color={typeConfig.electronColor}
-                  transparent
-                  opacity={0.45}
-                  blending={THREE.AdditiveBlending}
-                  depthWrite={false}
-                />
-              </mesh>
-            )}
-          </React.Fragment>
-        ))}
+        {/* Orbiting electrons removed — the small low-poly glowing spheres read as faceted
+            "icosahedron" clutter around the orb. The clean orbit rings stay. */}
       </group>
 
       {/* Outer aura — antipodal color flags the manifold pair */}
