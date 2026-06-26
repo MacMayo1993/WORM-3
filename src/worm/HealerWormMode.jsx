@@ -2627,6 +2627,11 @@ function WormTrail({ worm, size: _size }) {
 
         if (!wormShowTrail) { mesh.count = 0; if (glowMesh) glowMesh.count = 0; return; }
 
+        // Hide the surface trail whenever the worm is not crawling on the surface — during
+        // wormhole entry/tunnel/exit and the wind spirals the camera is inside the cube, and
+        // the surface daubs would otherwise shine through. Only the cube interior should show.
+        if (worm.phase.current !== 'crawling') { mesh.count = 0; if (glowMesh) glowMesh.count = 0; return; }
+
         const trail = worm.pathHistory.current;
         const count = trail.count;
         if (count < 2) { mesh.count = 0; if (glowMesh) glowMesh.count = 0; return; }
@@ -2636,13 +2641,13 @@ function WormTrail({ worm, size: _size }) {
         const currentSkin = skinRef.current;
         const { amp, omega } = gaitRef.current;
 
-        // Seed the spine at the worm's TAIL, not just behind the head. The body orbs already
-        // occupy the first ceil(tailLength × BODY_BALL_SPACING) tiles behind the head (the same
-        // measure used by the self-collision/body scan), so the painted trail should begin at
-        // the last orb and stream backward from there. Seeding at index 1 made the trail start
-        // under the 2nd/3rd orb and visibly overlap the body.
+        // Seed the spine just UNDER the last body orb so the slime appears to ooze straight
+        // out of the tail. The body spans ~tailLength × BODY_BALL_SPACING tiles behind the head;
+        // seeding one tile short of that end makes the freshest daubs overlap the last orb (no
+        // gap) and then stream backward. Seeding exactly at the body end left a visible gap;
+        // seeding near index 1 painted under the whole body near the head.
         const bodyTiles = Math.max(1, Math.ceil(worm.tailLength.current * BODY_BALL_SPACING));
-        let aIdx = bodyTiles;
+        let aIdx = Math.max(1, bodyTiles - 1);
         let haveA = false;
         for (; aIdx < capCount; aIdx++) { if (resolveTrailTile(trail, aIdx, lSize, _trailCA, _trailNA)) { haveA = true; break; } }
         if (!haveA) { mesh.count = 0; if (glowMesh) glowMesh.count = 0; return; }

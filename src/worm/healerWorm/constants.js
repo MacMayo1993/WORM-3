@@ -53,7 +53,13 @@ export const INITIAL_POS = (size) => {
 export const DEFAULT_POWERUP_COUNT = 5;
 export const ORB_SEGMENT_GROWTH = 3; // every orb adds exactly 3 visual balls
 export const STEPS_PER_TILE = 50; // sub-steps recorded per tile (0.02 resolution)
-export const BODY_BALL_SPACING = 0.14; // matches WormBody clone spacing along the trail
+// World-space distance between visible body balls — MUST match WormBody's placement
+// (segment i sits at i * 0.09 world units, see HealerWormMode targetDist). It
+// drives how many tiles the body is assumed to occupy for self-collision, tail-cut
+// length, and the trail start. It had drifted to 0.14 (~1.56x too long), which made
+// the collision/trail "tail" extend well past the body you actually see — causing
+// false-positive tail-bite deaths and a trail that started too far behind the tail.
+export const BODY_BALL_SPACING = 0.09;
 export const BASE_TAIL_LENGTH = 4;
 export const DEFAULT_WORMHOLE_FLIP_INTERVAL = 10; // seconds between guaranteed antipodal wormhole spawns
 export const MAX_JUMPS = 2;
