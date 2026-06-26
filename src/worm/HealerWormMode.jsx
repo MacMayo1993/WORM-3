@@ -4403,11 +4403,24 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     useEffect(() => {
         const generateScramble = () => {
             const axes = ['col', 'row', 'depth'];
-            const seq = Array.from({ length: SCRAMBLE_STEPS }, () => ({
-                axis: axes[Math.floor(Math.random() * 3)],
-                dir: Math.random() < 0.5 ? 1 : -1,
-                sliceIndex: Math.floor(Math.random() * size),
-            }));
+            // Standard scramble-generator rule (as used by WCA-style scramblers): never turn
+            // the same layer (axis + sliceIndex) twice in a row. Without this, a random pick
+            // can re-select the same layer immediately — most visibly when the direction also
+            // flips, which just turns the previous move straight back (clockwise then
+            // counterclockwise cancelling out to nothing).
+            const seq = [];
+            let prevAxis = null;
+            let prevSlice = null;
+            for (let i = 0; i < SCRAMBLE_STEPS; i++) {
+                let axis, sliceIndex;
+                do {
+                    axis = axes[Math.floor(Math.random() * 3)];
+                    sliceIndex = Math.floor(Math.random() * size);
+                } while (axis === prevAxis && sliceIndex === prevSlice);
+                seq.push({ axis, dir: Math.random() < 0.5 ? 1 : -1, sliceIndex, wormScramble: true });
+                prevAxis = axis;
+                prevSlice = sliceIndex;
+            }
             scrambleSeqRef.current  = seq;
             // Inverse = reversed sequence with each dir flipped
             inverseQueueRef.current = [...seq].reverse().map(m => ({ ...m, dir: -m.dir }));
