@@ -1804,7 +1804,7 @@ function TunnelInteriorView({ worm, size }) {
         // Batch-assign sticker materials ONCE on tunnel entry (opacity still ~0, so no visible pop).
         // Avoids 54+ per-frame GPU state changes that caused hitching on the first visible frame.
         // Partner sticker is resolved via the manifold map so scrambled/rotated states are correct.
-        if (prevPhase === 'crawling' && phase === 'entering') {
+        if (prevPhase === 'windup' && phase === 'entering') {
             const st = useGameStore.getState();
             const { cubies, settings } = st;
             const fc = resolveColors(settings, settings?.biomeMode?.faceAssignment) || FACE_COLORS;
