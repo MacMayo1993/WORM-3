@@ -73,7 +73,9 @@ function _mkMobius(R, w) {
 // Pre-built once, shared across all instances.  geometry={} prop prevents disposal.
 const _orbGeos = {
   normal: {
-    sphere:       new THREE.SphereGeometry(0.20, 16, 16),          // main spherical body
+    shell:        new THREE.IcosahedronGeometry(0.21, 0),          // faceted gem shell (glassy, iridescent)
+    innerCore:    new THREE.IcosahedronGeometry(0.115, 0),         // bright energy core seen through the shell
+    innerGlow:    new THREE.SphereGeometry(0.30, 10, 10),          // soft additive inner halo
     core:         _mkMobius(0.24, 0.08),                           // Möbius strip — smaller accent ring, antipodal color
     ringA:        new THREE.TorusGeometry(0.370, 0.011, 6, 18),    // orbit rings sit just outside the strip
     ringB:        new THREE.TorusGeometry(0.370 * 0.92, 0.009, 6, 18),
@@ -81,7 +83,9 @@ const _orbGeos = {
     glow:         new THREE.SphereGeometry(0.52, 8, 8),            // outer ambient aura (BackSide only)
   },
   target: {
-    sphere:       new THREE.SphereGeometry(0.26, 18, 18),          // main spherical body, larger for target
+    shell:        new THREE.IcosahedronGeometry(0.27, 0),          // larger faceted gem for target
+    innerCore:    new THREE.IcosahedronGeometry(0.15, 0),
+    innerGlow:    new THREE.SphereGeometry(0.40, 10, 10),
     core:         _mkMobius(0.30, 0.10),                           // Möbius strip, antipodal color
     ringA:        new THREE.TorusGeometry(0.460, 0.015, 8, 24),
     ringB:        new THREE.TorusGeometry(0.460 * 0.92, 0.012, 8, 24),
@@ -168,14 +172,50 @@ function SingleOrb({
   return (
     <group ref={orbGroupRef} position={[position[0], position[1], position[2]]}>
 
-      {/* Spherical orb body — main visible shape */}
-      <mesh ref={shellRef} geometry={g.sphere}>
+      {/* Faceted gem shell — glassy + iridescent so it catches the light and shimmers
+          with view angle. Low emissive (vs the old flat glowing ball) so the facets,
+          clearcoat sheen and thin-film iridescence actually read; the brightness now
+          comes from the inner core glowing through, not a blown-out surface. */}
+      <mesh ref={shellRef} geometry={g.shell}>
+        <meshPhysicalMaterial
+          color={color}
+          emissive={color}
+          emissiveIntensity={isTarget ? 0.85 : 0.6}
+          metalness={0}
+          roughness={0.06}
+          iridescence={1}
+          iridescenceIOR={1.4}
+          clearcoat={1}
+          clearcoatRoughness={0.08}
+          transparent
+          opacity={0.78}
+          depthWrite={false}
+          toneMapped={false}
+        />
+      </mesh>
+
+      {/* Inner energy core — a small, bright, counter-spinning faceted gem that glows
+          through the glassy shell, giving the orb visible depth and a molten centre. */}
+      <mesh ref={innerCoreRef} geometry={g.innerCore}>
         <meshStandardMaterial
           color={color}
           emissive={color}
-          emissiveIntensity={isTarget ? 2.8 : 2.0}
-          metalness={0.1}
-          roughness={0.15}
+          emissiveIntensity={isTarget ? 2.6 : 2.0}
+          metalness={0}
+          roughness={0.1}
+          toneMapped={false}
+        />
+      </mesh>
+
+      {/* Inner additive halo — soft bloom around the core, pulsed by the animator. */}
+      <mesh ref={innerGlowRef} geometry={g.innerGlow}>
+        <meshBasicMaterial
+          color={color}
+          transparent
+          opacity={0.18}
+          blending={THREE.AdditiveBlending}
+          side={THREE.BackSide}
+          depthWrite={false}
           toneMapped={false}
         />
       </mesh>
