@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
-import { isTileInSlice } from '../worm/wormLogic.js';
+import { isTileInSlice, rotateMoveDir } from '../worm/wormLogic.js';
 import { rotateVec90 } from '../game/cubeRotation.js';
+import { DIR_FORWARD } from '../worm/healerWorm/constants.js';
+import { DIR_TO_VEC, VEC_TO_DIR } from '../utils/constants.js';
 
 describe('isTileInSlice', () => {
   it('matches on the x coordinate for the col axis', () => {
@@ -57,6 +59,41 @@ describe('live-rotation ride lands exactly on a lattice cell (no drift)', () => 
         }
       }
     }
+  });
+
+  // After a slice rotation carries the worm's tile to a new face, the worm must keep heading
+  // the SAME way in world space ("continue in the same direction, now rotated"). rotateMoveDir
+  // picks the move-direction on the new face whose world-forward equals the rotated old forward.
+  describe('rotateMoveDir preserves the worm\'s world-space heading', () => {
+    const FACES = ['PX', 'NX', 'PY', 'NY', 'PZ', 'NZ'];
+    const MOVES = ['up', 'down', 'left', 'right'];
+    // rotateVec90 can emit -0 (e.g. -dir*0); DIR_FORWARD uses literal +0, and toEqual
+    // distinguishes the two. Normalise -0 → 0 for the array comparison (rotateMoveDir
+    // itself is unaffected — it selects via dot product).
+    const norm0 = (v) => v.map((n) => (n === 0 ? 0 : n));
+
+    for (const axis of ['col', 'row', 'depth']) {
+      for (const dir of [1, -1]) {
+        it(`${axis} dir ${dir}: heading on the new face matches the rotated old heading`, () => {
+          for (const face of FACES) {
+            // The face the worm's tile lands on after the slice turn (same transform the cube uses).
+            const [nvx, nvy, nvz] = rotateVec90(DIR_TO_VEC[face][0], DIR_TO_VEC[face][1], DIR_TO_VEC[face][2], axis, dir);
+            const newFace = VEC_TO_DIR(nvx, nvy, nvz);
+            for (const m of MOVES) {
+              const fwd = DIR_FORWARD[face][m];
+              const [rx, ry, rz] = rotateVec90(fwd[0], fwd[1], fwd[2], axis, dir);
+              const newMove = rotateMoveDir(m, face, newFace, axis, dir);
+              // The new face's forward for newMove must equal the rotated old-forward exactly.
+              expect(norm0(DIR_FORWARD[newFace][newMove])).toEqual(norm0([rx, ry, rz]));
+            }
+          }
+        });
+      }
+    }
+
+    it('matches the worked example: right on PY through a depth turn becomes up on NX', () => {
+      expect(rotateMoveDir('right', 'PY', 'NX', 'depth', 1)).toBe('up');
+    });
   });
 
   for (const size of [2, 3, 4, 5]) {

@@ -10,7 +10,7 @@ import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { getStickerWorldPos, getManifoldGridId } from '../game/coordinates.js';
-import { getNextSurfacePosition, getActiveTunnels, getTunnelWorldPosInto, getWindWorldPosInto, turnWorm, getStableKey, findStickerByStableKey, isTileInSlice, makeTunnelCenterline, buildTunnelCenterlineInto, tunnelTToArc, getTunnelArcPosInto } from './wormLogic.js';
+import { getNextSurfacePosition, getActiveTunnels, getTunnelWorldPosInto, getWindWorldPosInto, turnWorm, getStableKey, findStickerByStableKey, isTileInSlice, rotateMoveDir, makeTunnelCenterline, buildTunnelCenterlineInto, tunnelTToArc, getTunnelArcPosInto } from './wormLogic.js';
 import { setWormTurnCallback } from './wormTurnBridge.js';
 import { buildManifoldGridMap, buildManifoldGridMapIncremental, flipStickerPair, findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
 import { getManifoldMap } from '../game/manifoldMapStore.js';
@@ -79,26 +79,68 @@ import { SURFACE_OFFSET } from '../utils/constants.js';
 
 // Pre-allocated axis vector for applying liveRotation to the worm during scramble
 const _liveAxis = new THREE.Vector3();
+// Scratch endpoints for the live-rotation head ride (lerp source/target), so a head
+// straddling the slice boundary can rotate each endpoint independently without allocating.
+const _rideP = new THREE.Vector3();
+const _rideC = new THREE.Vector3();
 // Axis scratch for baking a committed turn into the worm's position history.
 const _bakeAxis = new THREE.Vector3();
 const _tunnelDirScratch = new THREE.Vector3();
 
 // Make the worm's head ride a slice that is mid-rotation so it turns *with* the cube
-// instead of snapping into place only when the rotation commits. We rotate the already
-// positioned headInterpPos about the slice axis (through the cube centre) by the exact
-// signed angle CubeAssembly applies to the cubie meshes — same axis convention, same
-// angle — so head and tile stay glued together for the whole tween. The cube is centred
-// at the origin and getStickerWorldPos returns origin-centred coords, so applyAxisAngle
-// about the unit axis reproduces the slice transform (including any face-normal lift).
-// No-op unless a rotation is live and the worm sits in the rotating slice.
-// Returns true if it adjusted the head position.
+// instead of snapping into place only when the rotation commits. We rotate about the slice
+// axis (through the cube centre) by the exact signed angle CubeAssembly applies to the cubie
+// meshes — same axis convention, same angle. The cube is centred at the origin and
+// getStickerWorldPos returns origin-centred coords, so applyAxisAngle about the unit axis
+// reproduces the slice transform.
+//
+// The head is rendered at lerp(prevWorldPos, curWorldPos, interpT). When the worm is mid-step
+// crossing the slice boundary, exactly one endpoint sits in the rotating slice, so we rotate
+// each endpoint INDEPENDENTLY (the in-slice end swings with the cube, the out-of-slice end
+// stays put) and re-lerp — instead of rotating the whole head only when the target tile is in
+// the slice, which both missed the crossing case and jumped the head to its pre-rotation
+// source at commit. Corner wraps follow a bezier arc that can't be rebuilt from endpoints, so
+// they keep the simpler whole-head rotation. No-op unless a rotation is live and the head
+// touches the rotating slice. Returns true if it adjusted the head position.
 function rideLiveRotation(worm) {
     if (!liveRotation.active) return false;
     const { axis, sliceIndex, angle } = liveRotation;
-    const { x, y, z } = worm.pos.current;
-    if (!isTileInSlice(axis, sliceIndex, x, y, z)) return false;
+    const cur = worm.pos.current;
+    const prev = worm.prevTile.current;
+    const curIn = isTileInSlice(axis, sliceIndex, cur.x, cur.y, cur.z);
+    const prevIn = prev ? isTileInSlice(axis, sliceIndex, prev.x, prev.y, prev.z) : false;
+    if (!curIn && !prevIn) return false;
+
     _liveAxis.set(axis === 'col' ? 1 : 0, axis === 'row' ? 1 : 0, axis === 'depth' ? 1 : 0);
-    worm.headInterpPos.current.applyAxisAngle(_liveAxis, angle);
+
+    // Corner wrap: head is on a bezier arc, not an endpoint lerp — rotate the whole head
+    // (and its normal) only when the tile it currently sits on rides the slice.
+    if (worm.crossingCorner.current) {
+        if (curIn) {
+            worm.headInterpPos.current.applyAxisAngle(_liveAxis, angle);
+            worm.currentNormal.current.applyAxisAngle(_liveAxis, angle).normalize();
+        }
+        return curIn;
+    }
+
+    const t = worm.interpT.current;
+    const P = worm.prevWorldPos.current;
+    const C = worm.curWorldPos.current;
+    if (P && t < 1) {
+        _rideP.copy(P);
+        if (prevIn) _rideP.applyAxisAngle(_liveAxis, angle);
+        _rideC.copy(C);
+        if (curIn) _rideC.applyAxisAngle(_liveAxis, angle);
+        worm.headInterpPos.current.copy(_rideP).lerp(_rideC, t);
+    } else if (curIn) {
+        // Fully on the current tile — rotate the head with the slice.
+        worm.headInterpPos.current.applyAxisAngle(_liveAxis, angle);
+    }
+    // The head sits on `cur`; rotate its surface normal with the slice when cur rides so the
+    // worm's orientation turns with the cube too (straight crawl keeps prev/cur on one face).
+    if (curIn) {
+        worm.currentNormal.current.applyAxisAngle(_liveAxis, angle).normalize();
+    }
     return true;
 }
 // Duration of the worm's entrance wiggle after the shuffle finishes
@@ -384,6 +426,10 @@ function useWormCrawler(size, cubies) {
     const onFlippedTile = useRef(false);
     const lastFlippedRef = useRef(false);
     const prevDirKey = useRef(null);
+    // The grid tile the head is interpolating FROM (the lerp source). Tracked explicitly so a
+    // mid-step rotation can rotate this source in lockstep with the slice — otherwise the head
+    // would lerp from the tile's pre-rotation world position and snap when the turn commits.
+    const prevTile = useRef(null);
     const lastRecordedT = useRef(0);
     const crossingCorner = useRef(false);
     const pendingSelfCollision = useRef(null);
@@ -927,6 +973,9 @@ function useWormCrawler(size, cubies) {
                         _prevWP.copy(_curWP);
                         prevWorldPos.current = _prevWP;
                         prevDirKey.current = pos.current.dirKey;
+                        // Snapshot the tile we're leaving as the interpolation source so a
+                        // mid-step slice rotation can ride/commit it correctly.
+                        prevTile.current = { x: pos.current.x, y: pos.current.y, z: pos.current.z, dirKey: pos.current.dirKey };
 
                         const oldDirKey = pos.current.dirKey;
                         const next = getNextSurfacePosition(pos.current, moveDir.current, size);
@@ -1245,6 +1294,7 @@ function useWormCrawler(size, cubies) {
         onFlippedTile.current = false;
         lastFlippedRef.current = false;
         prevDirKey.current = null;
+        prevTile.current = null;
         crossingCorner.current = false;
         interpT.current = 1;
         prevWorldPos.current = null;
@@ -1330,10 +1380,37 @@ function useWormCrawler(size, cubies) {
                     useGameStore.getState().setWormPowerups(pu.slice());
                 }
 
-                // Rotate the worm's logical grid position so it stays on its tile
-                const newPos = rotateTilePosition(pos.current, axis, sliceIndex, dir, size);
+                // Rotate the worm's logical grid position so it stays on its tile.
+                // rotateTilePosition returns the SAME object when the tile wasn't in the slice,
+                // so `newPos !== oldPos` is an exact "did this tile ride the slice" test.
+                const oldPos = pos.current;
+                const newPos = rotateTilePosition(oldPos, axis, sliceIndex, dir, size);
                 pos.current = newPos;
                 { const _wp = getStickerWorldPos(newPos.x, newPos.y, newPos.z, newPos.dirKey, size, 0); _curWP.set(_wp[0], _wp[1], _wp[2]); curWorldPos.current = _curWP; }
+
+                // The worm's tile rode the slice: rotate its heading so it keeps the same WORLD
+                // direction — "continue in the same direction it was going, but now rotated."
+                // Skipped while paused (opening scramble) so the pre-game starting heading is untouched.
+                if (newPos !== oldPos && !wormPausedRef.current) {
+                    moveDir.current = rotateMoveDir(moveDir.current, oldPos.dirKey, newPos.dirKey, axis, dir);
+                }
+
+                // Keep the interpolation SOURCE glued to the surface: if the worm is mid-step and
+                // the tile it is coming FROM also rode the slice, rotate that source tile + world
+                // position too. Without this the head lerps from the pre-rotation source and
+                // visibly snaps to where the tile used to be at the end of the turn.
+                if (prevTile.current) {
+                    const rPrev = rotateTilePosition(prevTile.current, axis, sliceIndex, dir, size);
+                    if (rPrev !== prevTile.current) {
+                        prevTile.current = rPrev;
+                        prevDirKey.current = rPrev.dirKey;
+                        if (prevWorldPos.current) {
+                            const _wp = getStickerWorldPos(rPrev.x, rPrev.y, rPrev.z, rPrev.dirKey, size, 0);
+                            prevWorldPos.current.set(_wp[0], _wp[1], _wp[2]);
+                        }
+                    }
+                }
+
                 // When paused (e.g. during opening scramble), snap the render position too so
                 // the worm lands correctly on its tile after the rotation animation finishes.
                 if (wormPausedRef.current) {
@@ -1389,7 +1466,7 @@ function useWormCrawler(size, cubies) {
 
     return {
         pos, moveDir, phase, tunnelProgress, activeTunnel, onFlippedTile,
-        interpT, prevWorldPos, curWorldPos, jumpT, isJumping, jumpLift,
+        interpT, prevWorldPos, curWorldPos, prevTile, crossingCorner, jumpT, isJumping, jumpLift,
         headInterpPos, currentNormal,
         tailLength, stepHistory, orbPickupColorsRef, colorEpochRef, tick, queueTurn,
         voidTunnelKeysRef, tunnelUseCountsRef,

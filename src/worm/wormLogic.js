@@ -6,6 +6,8 @@ import { getManifoldNeighbors, findAntipodalStickerByGrid, buildManifoldGridMap 
 import { getStickerWorldPos, getManifoldGridId } from '../game/coordinates.js';
 import { FACE_COLORS } from '../utils/constants.js';
 import { getStickerSafe, isSurfaceSticker } from '../game/cubeState.js';
+import { rotateVec90 } from '../game/cubeRotation.js';
+import { DIR_FORWARD } from './healerWorm/constants.js';
 import * as THREE from 'three';
 
 // ============================================================================
@@ -838,6 +840,35 @@ export const turnWorm = (currentDir, turn) => {
     return dirs[(idx + 3) % 4]; // +3 is same as -1 mod 4
   }
   return currentDir;
+};
+
+/**
+ * Rotate a worm move-direction through a 90° slice rotation so the worm keeps the SAME
+ * world-space heading after the cube turns under it — "continue in the same direction it was
+ * going, but now rotated." The world-forward vector of the old (direction, face) pair is
+ * rotated by the slice turn, then matched to the move-direction on the NEW face whose
+ * world-forward is closest. All vectors are axis-aligned, so the best match is exact.
+ *
+ * @param {'up'|'down'|'left'|'right'} moveDir - heading relative to the old face
+ * @param {string} oldDirKey - face the worm sat on before the turn
+ * @param {string} newDirKey - face the worm's tile landed on after the turn
+ * @param {'col'|'row'|'depth'} axis - rotation axis
+ * @param {1|-1} dir - rotation direction
+ * @returns {'up'|'down'|'left'|'right'} the rotated move-direction
+ */
+export const rotateMoveDir = (moveDir, oldDirKey, newDirKey, axis, dir) => {
+  const fwd = DIR_FORWARD[oldDirKey]?.[moveDir];
+  const candidates = DIR_FORWARD[newDirKey];
+  if (!fwd || !candidates) return moveDir;
+  const [rx, ry, rz] = rotateVec90(fwd[0], fwd[1], fwd[2], axis, dir);
+  let best = moveDir;
+  let bestDot = -Infinity;
+  for (const m of ['up', 'right', 'down', 'left']) {
+    const c = candidates[m];
+    const d = c[0] * rx + c[1] * ry + c[2] * rz;
+    if (d > bestDot) { bestDot = d; best = m; }
+  }
+  return best;
 };
 
 /**
