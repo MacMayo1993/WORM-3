@@ -98,6 +98,7 @@ const CubeAssembly = React.memo(({
     wormHealerMode,
     wormTunnelActive,
     wormExitRideActive,
+    wormholeBodyHidden,
     isBiomeMode,
     rotationEpoch,
     settings,
@@ -123,6 +124,13 @@ const CubeAssembly = React.memo(({
       // antipodal back-face stickers render — only the opaque solid body needs to disappear so
       // it stops occluding them from the inside.
       wormExitRideActive: s.wormHealerMode && s.wormPhase === 'exiting',
+      // Hides the solid cube body (and unrelated interaction overlays) for the whole tunnel
+      // traversal so it doesn't z-fight with TunnelInteriorView's coincident antipodal stickers.
+      // Deliberately does NOT cover WormholeNetwork/VoidCore below — the Möbius ribbons and the
+      // void-core swirl are the wormhole's own visual and must stay visible through the trip.
+      wormholeBodyHidden: s.wormHealerMode && (
+        s.wormPhase === 'entering' || s.wormPhase === 'tunnel' || s.wormPhase === 'exiting'
+      ),
       isBiomeMode: s.settings?.biomeMode?.enabled,
       rotationEpoch: s.rotationEpoch,
       settings: s.settings,
@@ -996,71 +1004,75 @@ const CubeAssembly = React.memo(({
           manifoldMap={manifoldMap}
           cubieRefs={cubieRefs.current}
         />
-        {!isBiomeMode && cascades.map(c =>
-          c?.from && c?.to ? (
-            <ChaosWave
-              key={c.id}
-              from={c.from}
-              to={c.to}
-              crossFace={c.crossFace}
-              onComplete={() => onCascadeComplete(c.id)}
-            />
-          ) : null
-        )}
-        {flipWaveOrigins && flipWaveOrigins.length > 0 && (
-          <FlipPropagationWave
-            origins={flipWaveOrigins}
-            onComplete={onFlipWaveComplete}
-          />
-        )}
         {/* VoidCore: swirling wormhole-color rings at the cube's hollow center */}
         <VoidCore />
-        {!wormTunnelActive && <group>
-          {items.map((it, idx) => {
-            // Skip the center cubie on odd-sized cubes — VoidCore occupies that space
-            const isCenterVoid = size % 2 !== 0 &&
-              it.pos[0] === 0 && it.pos[1] === 0 && it.pos[2] === 0;
-            if (isCenterVoid) return null;
-            // Skip fully interior cubies — they are never visible from any camera angle.
-            // pos is in centered coords; a cubie is interior when all axes are strictly
-            // between -(size-1)/2 and +(size-1)/2 (i.e. it touches no face).
-            const half = (size - 1) / 2;
-            if (Math.abs(it.pos[0]) < half && Math.abs(it.pos[1]) < half && Math.abs(it.pos[2]) < half) return null;
-            return (
-              <Cubie
-                key={it.key}
-                ref={cubieRefCallbacks[idx]}
-                position={it.pos}
-                cubie={it.cubie}
-                size={size}
-                wormMode={wormHealerMode}
-                hideBody={wormExitRideActive}
-                onPointerDown={onPointerDown}
+        {/* Solid body + interaction overlays only — hidden for the whole tunnel traversal so they
+            don't z-fight with TunnelInteriorView, while the Möbius ribbons and VoidCore above stay visible. */}
+        <group visible={!wormholeBodyHidden}>
+          {!isBiomeMode && cascades.map(c =>
+            c?.from && c?.to ? (
+              <ChaosWave
+                key={c.id}
+                from={c.from}
+                to={c.to}
+                crossFace={c.crossFace}
+                onComplete={() => onCascadeComplete(c.id)}
               />
-            );
-          })}
-        </group>}
-        {showCursor && cursor && (
-          <CursorHighlight />
-        )}
-        {solveHighlights && solveHighlights.length > 0 && (
-          <SolveHighlight
-            highlights={solveHighlights}
+            ) : null
+          )}
+          {flipWaveOrigins && flipWaveOrigins.length > 0 && (
+            <FlipPropagationWave
+              origins={flipWaveOrigins}
+              onComplete={onFlipWaveComplete}
+            />
+          )}
+          {!wormTunnelActive && <group>
+            {items.map((it, idx) => {
+              // Skip the center cubie on odd-sized cubes — VoidCore occupies that space
+              const isCenterVoid = size % 2 !== 0 &&
+                it.pos[0] === 0 && it.pos[1] === 0 && it.pos[2] === 0;
+              if (isCenterVoid) return null;
+              // Skip fully interior cubies — they are never visible from any camera angle.
+              // pos is in centered coords; a cubie is interior when all axes are strictly
+              // between -(size-1)/2 and +(size-1)/2 (i.e. it touches no face).
+              const half = (size - 1) / 2;
+              if (Math.abs(it.pos[0]) < half && Math.abs(it.pos[1]) < half && Math.abs(it.pos[2]) < half) return null;
+              return (
+                <Cubie
+                  key={it.key}
+                  ref={cubieRefCallbacks[idx]}
+                  position={it.pos}
+                  cubie={it.cubie}
+                  size={size}
+                  wormMode={wormHealerMode}
+                  hideBody={wormExitRideActive}
+                  onPointerDown={onPointerDown}
+                />
+              );
+            })}
+          </group>}
+          {showCursor && cursor && (
+            <CursorHighlight />
+          )}
+          {solveHighlights && solveHighlights.length > 0 && (
+            <SolveHighlight
+              highlights={solveHighlights}
+            />
+          )}
+          {/* DragGuide removed - real-time cube rotation provides visual feedback */}
+          <TrackballControls
+            ref={controlsRef}
+            noPan={true}
+            noZoom={handsMode && explosionFactor === 0}
+            noRotate={handsMode ? true : false}
+            minDistance={5}
+            maxDistance={MAX_DISTANCE_BY_SIZE[size] || 28}
+            enabled={!wormHealerMode && (!handsMode || explosionFactor > 0) && !animState && !dragStart && controlsEnabledRef.current && !wormTunnelActive}
+            staticMoving={false}
+            dynamicDampingFactor={isTouchDevice ? 0.15 : 0.08}
+            rotateSpeed={isTouchDevice ? 0.8 : 1.2}
           />
-        )}
-        {/* DragGuide removed - real-time cube rotation provides visual feedback */}
-        <TrackballControls
-          ref={controlsRef}
-          noPan={true}
-          noZoom={handsMode && explosionFactor === 0}
-          noRotate={handsMode ? true : false}
-          minDistance={5}
-          maxDistance={MAX_DISTANCE_BY_SIZE[size] || 28}
-          enabled={!wormHealerMode && (!handsMode || explosionFactor > 0) && !animState && !dragStart && controlsEnabledRef.current && !wormTunnelActive}
-          staticMoving={false}
-          dynamicDampingFactor={isTouchDevice ? 0.15 : 0.08}
-          rotateSpeed={isTouchDevice ? 0.8 : 1.2}
-        />
+        </group>
       </group>
     </StickerInstanceProvider>
   );
