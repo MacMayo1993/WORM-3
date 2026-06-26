@@ -4084,9 +4084,9 @@ function SliceWarningLights({ pendingRotRef, warningProgressRef, size, cubies })
 
             // ── Ring geometry — sized to cube, rainbow vertex colors ───────────
             // Outer corner of any cube face is (size-1)/2 * sqrt(2) from center;
-            // add 15% margin so the ring clearly floats outside.
+            // add margin so the ring clearly floats outside instead of cutting through the cube.
             const halfExt    = (size - 1) / 2;
-            const ringRadius = halfExt * Math.SQRT2 * 1.15;
+            const ringRadius = halfExt * Math.SQRT2 * 1.3225;
             const ringTube   = Math.max(0.11, halfExt * 0.1);
             const borderTube = ringTube * 1.3; // slightly larger so it rims the colorful ring as a defining edge
 
