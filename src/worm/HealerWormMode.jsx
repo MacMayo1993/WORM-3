@@ -969,6 +969,21 @@ function useWormCrawler(size, cubies) {
                     // When navigating a corner, traversing double the distance means we should theoretically
                     // give it more time so the speed looks constant, but the Bezier arc covers it nicely.
                     if (stepAcc.current >= STEP_SEC) {
+                        // Defer the tile-crossing while a live slice rotation is carrying the worm's
+                        // current tile. getNextSurfacePosition resolves the destination from pos.current's
+                        // grid coords, but those aren't rotated until the turn COMMITS (rotationEpoch).
+                        // Crossing now — e.g. at 99% of an almost-finished turn — would send the head to
+                        // the tile's pre-rotation neighbour and snap it back to "where the tile came from"
+                        // when the rotation finally commits. Hold the accumulator at the threshold and let
+                        // rideLiveRotation keep the head gliding on the slice until pos.current updates to
+                        // the committed (rotated) tile, then cross from there.
+                        if (
+                            liveRotation.active &&
+                            isTileInSlice(liveRotation.axis, liveRotation.sliceIndex, pos.current.x, pos.current.y, pos.current.z)
+                        ) {
+                            stepAcc.current = STEP_SEC;
+                            return false;
+                        }
                         stepAcc.current -= STEP_SEC;
                         interpT.current = 0;
                         lastRecordedT.current = 0;
