@@ -415,6 +415,10 @@ function useWormCrawler(size, cubies) {
     const lastCountdownDeci = useRef(-1);
     const alive = useRef(true);
     const tileTrail = useRef(makeTileTrail(MAX_TAIL));
+    // Render-only full-route history for the persistent worm trail. Kept separate from
+    // tileTrail (which gameplay trims on cuts and scans for self-collision) so the painted
+    // route can extend far beyond the visible body without affecting gameplay.
+    const pathHistory = useRef(makeTileTrail(TRAIL_HISTORY_CAP));
     const deathMenuTimer = useRef(null);
     const tunnelUseCountsRef = useRef(new Map());
     const voidTunnelKeysRef = useRef(new Set());
@@ -744,6 +748,9 @@ function useWormCrawler(size, cubies) {
                     // The grace period covers the initial steps where the trail is too short to
                     // reliably catch real collisions.
                     ttReset(tileTrail.current, tileKey(pos.current));
+                    // Möbius travel teleports the worm to a new surface region, so the painted
+                    // route restarts here too (cross-tunnel persistence is a separate follow-up).
+                    ttReset(pathHistory.current, tileKey(pos.current));
                     useGameStore.setState({
                         wormPhase: 'crawling',
                         wormOnFlippedTile: false,
@@ -953,6 +960,7 @@ function useWormCrawler(size, cubies) {
                             pos.current = nextPos;
                             if (nextOnSurface) {
                                 ttPush(tileTrail.current, nextKey);
+                                ttPush(pathHistory.current, nextKey);
                             }
                             if (next.moveDir) moveDir.current = next.moveDir;
 
@@ -1263,6 +1271,7 @@ function useWormCrawler(size, cubies) {
         powerupsRef.current = initial;
         alive.current = true;
         ttReset(tileTrail.current, tileKey(startPos));
+        ttReset(pathHistory.current, tileKey(startPos));
         timeAliveRef.current = 0;
         survivalTickRef.current = 0;
         useGameStore.setState({
@@ -1331,12 +1340,15 @@ function useWormCrawler(size, cubies) {
                     headInterpPos.current.copy(curWorldPos.current);
                 }
 
-                // Rotate the self-collision tile trail
-                ttMapInPlace(tileTrail.current, key => {
+                // Rotate the self-collision tile trail AND the render-only path history so the
+                // painted route stays glued to the surface through the turn (same remap fn).
+                const _remapTileKey = key => {
                     parseTileKey(key, _parseTile);
                     const r = rotateTilePosition(_parseTile, axis, sliceIndex, dir, size);
                     return `${r.x},${r.y},${r.z},${r.dirKey}`;
-                });
+                };
+                ttMapInPlace(tileTrail.current, _remapTileKey);
+                ttMapInPlace(pathHistory.current, _remapTileKey);
 
                 // Bake the committed turn into the body's position history: rotate the world
                 // position, surface normal, and grid tag of every recorded point that sat in the
@@ -1382,7 +1394,7 @@ function useWormCrawler(size, cubies) {
         tailLength, stepHistory, orbPickupColorsRef, colorEpochRef, tick, queueTurn,
         voidTunnelKeysRef, tunnelUseCountsRef,
         willHealRef, healFiredRef, pendingHealBurstRef, pendingOrbFlashRef,
-        tileTrail, killWorm,
+        tileTrail, pathHistory, killWorm,
         timeAliveRef,
     };
 }
@@ -2037,9 +2049,14 @@ const _trailSub  = new THREE.Vector3(); // interpolated centerline point between
 const _trailSubN = new THREE.Vector3(); // interpolated normal
 const _trailSide = new THREE.Vector3(); // lateral (wiggle) axis in the tangent plane
 const _trailStretch = new THREE.Vector3(); // wavy-path tangent toward the previous daub
-const TRAIL_CAP   = 80;   // newest N tile visits scanned for the path spine
-const TRAIL_DAUB_CAP = 256; // max daubs painted along the subdivided wavy stroke
-const TRAIL_SUB_STEP = 0.09; // spacing between daubs along the path (world units)
+// The persistent trail paints the worm's full route on the current surface traversal
+// (reset only when it dives through a Möbius tunnel). Older history is rendered with
+// progressively coarser tile-LOD + daub spacing so per-frame work and the instanced-disc
+// budget stay bounded no matter how long the run gets.
+const TRAIL_HISTORY_CAP = 8000; // tiles of route retained for rendering (decoupled from the gameplay body trail)
+const TRAIL_DAUB_CAP = 4000;    // instanced discs painted along the (LOD-thinned) full route
+const TRAIL_SUB_STEP = 0.09; // base spacing between daubs near the head (world units); grows with age
+const TRAIL_FADE_FLOOR = 0.22; // oldest daubs never fade below this, so the whole route stays a faint "where I've been" map
 const TRAIL_LIFT  = 0.045; // hover distance above tile surface (raised so filled slime discs don't z-fight)
 
 // Lateral wiggle the trail inherits from each gait, so the painted path mirrors how that
@@ -2449,7 +2466,13 @@ function WormBody({ worm, size }) {
                     // Glow head — use base worm color; GlowWormAura point light provides visible glow
                     _bodyColor.set(baseColor);
                 } else if (hasOrbColor) {
-                    _bodyColor.set(orbColors[orbPickupIndex]);
+                    // Each orb grows a trio of segments (ORB_SEGMENT_GROWTH): 2 in the worm's
+                    // own colour + 1 accent in the picked-up orb's colour — e.g. an emerald
+                    // worm that eats a yellow orb grows 2 emerald + 1 yellow. The accent sits
+                    // on the middle segment of the trio so each orb reads as one clean band
+                    // separated from its neighbours by the worm's base colour.
+                    const trioOffset = (i - BASE_TAIL_LENGTH) % ORB_SEGMENT_GROWTH;
+                    _bodyColor.set(trioOffset === 1 ? orbColors[orbPickupIndex] : baseColor);
                 } else if (_isInch) {
                     // Alternating body/belly bands for visible ring pattern. Uses writeIdx
                     // (not i) so bands keep alternating once LOD thinning makes consecutive
@@ -2595,18 +2618,22 @@ function WormTrail({ worm, size: _size }) {
 
         if (!wormShowTrail) { mesh.count = 0; return; }
 
-        const trail = worm.tileTrail.current;
+        const trail = worm.pathHistory.current;
         const count = trail.count;
         if (count < 2) { mesh.count = 0; return; }
 
         const lSize = liveCubies.size;
-        const capCount = Math.min(count, TRAIL_CAP);
+        const capCount = count; // render the full retained route, not a fixed window
         const currentSkin = skinRef.current;
         const { amp, omega } = gaitRef.current;
 
-        // Seed the spine at the newest rendered tile. Index 0 is the tile the head is moving
-        // INTO (sits ahead of the head), so the spine starts at index 1 — entirely behind it.
-        let aIdx = 1;
+        // Seed the spine at the worm's TAIL, not just behind the head. The body orbs already
+        // occupy the first ceil(tailLength × BODY_BALL_SPACING) tiles behind the head (the same
+        // measure used by the self-collision/body scan), so the painted trail should begin at
+        // the last orb and stream backward from there. Seeding at index 1 made the trail start
+        // under the 2nd/3rd orb and visibly overlap the body.
+        const bodyTiles = Math.max(1, Math.ceil(worm.tailLength.current * BODY_BALL_SPACING));
+        let aIdx = bodyTiles;
         let haveA = false;
         for (; aIdx < capCount; aIdx++) { if (resolveTrailTile(trail, aIdx, lSize, _trailCA, _trailNA)) { haveA = true; break; } }
         if (!haveA) { mesh.count = 0; return; }
@@ -2615,22 +2642,33 @@ function WormTrail({ worm, size: _size }) {
         let visible = 0;
         let havePrev = false;
 
-        for (let i = aIdx + 1; i < capCount && visible < TRAIL_DAUB_CAP; i++) {
+        // Age-based level-of-detail: the route nearest the worm is sampled densely for a smooth
+        // stroke, while older history is walked with progressively larger tile strides and daub
+        // spacing so the whole route fits inside the daub budget at bounded per-frame cost. `i`
+        // advances by lodStep (in tiles); subStep widens the daub spacing to match.
+        let i = aIdx;
+        while (i < capCount && visible < TRAIL_DAUB_CAP) {
+            const age = i - aIdx;
+            const lodStep = age < 60 ? 1 : age < 180 ? 2 : age < 500 ? 4 : 8;
+            const subStep = age < 60 ? TRAIL_SUB_STEP : age < 180 ? 0.22 : age < 500 ? 0.45 : 0.9;
+            const nextI = i + lodStep;
             // Skip unavailable tiles; the segment simply bridges A → next valid tile.
-            if (!resolveTrailTile(trail, i, lSize, _trailCB, _trailNB)) continue;
-            const seqB = trail.seq[(trail.head + i) % trail.capacity];
+            if (!resolveTrailTile(trail, nextI, lSize, _trailCB, _trailNB)) { i = nextI; continue; }
+            const seqB = trail.seq[(trail.head + nextI) % trail.capacity];
 
             _trailTangent.subVectors(_trailCA, _trailCB); // points toward the newer tile
             const segLen = _trailTangent.length();
             if (segLen > 1e-5) {
                 _trailTangent.multiplyScalar(1 / segLen);
-                const nSub = Math.max(1, Math.ceil(segLen / TRAIL_SUB_STEP));
+                const nSub = Math.max(1, Math.ceil(segLen / subStep));
                 for (let s = 0; s < nSub && visible < TRAIL_DAUB_CAP; s++) {
                     const t = s / nSub; // 0 at A (newer) → 1 at B (older)
                     _trailSub.lerpVectors(_trailCA, _trailCB, t);
                     _trailSubN.lerpVectors(_trailNA, _trailNB, t).normalize();
 
-                    const fade = 1 - visible / TRAIL_DAUB_CAP; // newest = bright/wide, oldest = dim/thin
+                    // Newest = bright/wide, oldest = dim/thin, but floored so the full route
+                    // stays visible as a faint "where I've been" map instead of fading to nothing.
+                    const fade = Math.max(TRAIL_FADE_FLOOR, 1 - visible / TRAIL_DAUB_CAP);
                     const fs   = fade * fade * (3 - 2 * fade);  // smoothstep
 
                     // Frozen lateral wiggle baked along the path — this is the gait signature that
@@ -2677,6 +2715,7 @@ function WormTrail({ worm, size: _size }) {
             _trailCA.copy(_trailCB);
             _trailNA.copy(_trailNB);
             seqA = seqB;
+            i = nextI;
         }
 
         mesh.count = visible;
