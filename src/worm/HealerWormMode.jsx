@@ -4099,10 +4099,15 @@ function SliceWarningLights({ pendingRotRef, warningProgressRef, size, cubies })
             else                       { ring.position.set(0, 0, sliceW); border.position.set(0, 0, sliceW); }
 
             // ── Ring geometry — sized to cube, rainbow vertex colors ───────────
-            // Outer corner of any cube face is (size-1)/2 * sqrt(2) from center;
-            // add margin so the ring clearly floats outside instead of cutting through the cube.
+            // halfExt * sqrt(2) is only the corner of the CUBIE LATTICE (centers of the
+            // outermost cubies) — the rendered cube extends another ~0.49-0.51 units past
+            // that out to the body/sticker surface (see Cubie.jsx EDGE_H / STICKER_POS), so
+            // the true rendered corner must include that before the clearance margin is
+            // applied, otherwise the ring undershoots and cuts through the cube's corners.
             const halfExt    = (size - 1) / 2;
-            const ringRadius = halfExt * Math.SQRT2 * 1.3225;
+            const CUBIE_OUTER_HALF = 0.51;
+            const cubeCornerRadius = (halfExt + CUBIE_OUTER_HALF) * Math.SQRT2;
+            const ringRadius = cubeCornerRadius * 1.3225;
             const ringTube   = Math.max(0.11, halfExt * 0.1);
             const borderTube = ringTube * 1.3; // slightly larger so it rims the colorful ring as a defining edge
 
