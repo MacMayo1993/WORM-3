@@ -737,10 +737,13 @@ const CubeAssembly = React.memo(({
     // warning beam counts down. The opening scramble (isShuffle) and normal cube
     // solving keep their snappy timing.
     const isWormHazard = !isFast && useGameStore.getState().wormHealerMode;
+    // Worm-mode opening scramble runs 33% slower than a normal shuffle so each layer
+    // turn reads clearly instead of flickering by at the snappy default shuffle speed.
+    const isWormScramble = !!animState?.wormScramble;
     const baseDuration = isFast ? 0.12 : 0.35;
     gsapAnimRef.current = gsap.to(animProgressRef.current, {
       value: 1,
-      duration: isWormHazard ? baseDuration * 4.0 : baseDuration,
+      duration: isWormHazard ? baseDuration * 4.0 : isWormScramble ? baseDuration * 1.33 : baseDuration,
       ease: isFast ? "power2.out" : "back.out(1.4)",
       onComplete: () => {
         gsapAnimRef.current = null;
