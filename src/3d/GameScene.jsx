@@ -8,7 +8,7 @@
 import React, { Suspense, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Environment, Html } from '@react-three/drei';
-import { EffectComposer, N8AO } from '@react-three/postprocessing';
+import { EffectComposer, N8AO, Bloom } from '@react-three/postprocessing';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { isMobile } from '../utils/device.js';
@@ -168,6 +168,13 @@ export default function GameScene({
   // sustained-low-FPS, and the translucent wireframe/glass modes that don't read
   // occlusion usefully).
   const aoEnabled = shadowsOn;
+
+  // Selective bloom — the parity orbs (and other emissive, toneMapped={false}
+  // materials) are authored with emissiveIntensity > 1 specifically so a bloom
+  // pass makes their light bleed into the scene instead of clamping to flat
+  // bright color. Kept on across devices (it's the headline visual), and only
+  // dropped when the PerformanceMonitor has flagged a sustained FPS decline.
+  const bloomEnabled = !perfReducedFX;
 
   const wormholePhaseActive = wormHealerMode && (
     wormPhase === 'entering' || wormPhase === 'tunnel' || wormPhase === 'exiting'
@@ -343,9 +350,20 @@ export default function GameScene({
           two-camera pass) which an EffectComposer cannot share, so AO and the PiP are
           mutually exclusive — toggling the PiP on gracefully drops AO for that view.
           Gated off on mobile / low-FPS / wireframe / glass via aoEnabled. */}
-      {aoEnabled && !shouldShowAntipodalPiP && (
+      {(aoEnabled || bloomEnabled) && !shouldShowAntipodalPiP && (
         <EffectComposer multisampling={4}>
-          <N8AO aoRadius={0.55} distanceFalloff={1} intensity={2.2} quality="medium" halfRes />
+          {aoEnabled && (
+            <N8AO aoRadius={0.55} distanceFalloff={1} intensity={2.2} quality="medium" halfRes />
+          )}
+          {bloomEnabled && (
+            <Bloom
+              mipmapBlur
+              intensity={0.9}
+              luminanceThreshold={0.55}
+              luminanceSmoothing={0.25}
+              radius={0.7}
+            />
+          )}
         </EffectComposer>
       )}
     </>
