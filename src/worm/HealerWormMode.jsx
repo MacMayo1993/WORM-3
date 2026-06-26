@@ -2449,7 +2449,13 @@ function WormBody({ worm, size }) {
                     // Glow head — use base worm color; GlowWormAura point light provides visible glow
                     _bodyColor.set(baseColor);
                 } else if (hasOrbColor) {
-                    _bodyColor.set(orbColors[orbPickupIndex]);
+                    // Each orb grows a trio of segments (ORB_SEGMENT_GROWTH): 2 in the worm's
+                    // own colour + 1 accent in the picked-up orb's colour — e.g. an emerald
+                    // worm that eats a yellow orb grows 2 emerald + 1 yellow. The accent sits
+                    // on the middle segment of the trio so each orb reads as one clean band
+                    // separated from its neighbours by the worm's base colour.
+                    const trioOffset = (i - BASE_TAIL_LENGTH) % ORB_SEGMENT_GROWTH;
+                    _bodyColor.set(trioOffset === 1 ? orbColors[orbPickupIndex] : baseColor);
                 } else if (_isInch) {
                     // Alternating body/belly bands for visible ring pattern. Uses writeIdx
                     // (not i) so bands keep alternating once LOD thinning makes consecutive
@@ -2604,9 +2610,13 @@ function WormTrail({ worm, size: _size }) {
         const currentSkin = skinRef.current;
         const { amp, omega } = gaitRef.current;
 
-        // Seed the spine at the newest rendered tile. Index 0 is the tile the head is moving
-        // INTO (sits ahead of the head), so the spine starts at index 1 — entirely behind it.
-        let aIdx = 1;
+        // Seed the spine at the worm's TAIL, not just behind the head. The body orbs already
+        // occupy the first ceil(tailLength × BODY_BALL_SPACING) tiles behind the head (the same
+        // measure used by the self-collision/body scan), so the painted trail should begin at
+        // the last orb and stream backward from there. Seeding at index 1 made the trail start
+        // under the 2nd/3rd orb and visibly overlap the body.
+        const bodyTiles = Math.max(1, Math.ceil(worm.tailLength.current * BODY_BALL_SPACING));
+        let aIdx = bodyTiles;
         let haveA = false;
         for (; aIdx < capCount; aIdx++) { if (resolveTrailTile(trail, aIdx, lSize, _trailCA, _trailNA)) { haveA = true; break; } }
         if (!haveA) { mesh.count = 0; return; }
