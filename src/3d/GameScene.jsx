@@ -169,8 +169,29 @@ export default function GameScene({
     [settings.backgroundTheme]
   );
 
+  // Depth fog — only enabled over the dark black-hole space background. Photo-panorama
+  // and HDRI preset backgrounds render as a sharp image behind the scene, so fogging the
+  // cubies toward a flat color in front of them would look wrong; we gate it out for those.
+  // The black-hole path is the default fallback (see background selection below), so we
+  // mirror that condition: a level background that isn't a photo, or free-play with no
+  // photo/preset background resolving to the black hole.
+  const fogEnabled = useMemo(() => {
+    if (currentLevelData) {
+      // Level scenes: fog the dark cosmic backgrounds, not bright HDRI 'city' lighting envs.
+      return !currentLevelData.background || currentLevelData.background === 'blackhole';
+    }
+    if (settings.backgroundTheme === 'blackhole') return true;
+    if (bgConfig?.file) return false; // user-selected photo panorama
+    if (PHOTO_PRESETS.has(settings.backgroundTheme)) return false; // HDRI preset
+    return true; // falls through to the black-hole default
+  }, [currentLevelData, settings.backgroundTheme, bgConfig]);
+
   return (
     <>
+      {/* Exp² depth fog over the dark space background. Density is low so the assembled
+          cube stays crisp, but reads clearly once cubies spread apart in the explosion
+          and during worm-tunnel travel, adding atmospheric depth at zero pipeline cost. */}
+      {fogEnabled && <fogExp2 attach="fog" args={['#05050f', 0.028]} />}
       {/* Lights — intensity varies by visualMode */}
       <ambientLight intensity={visualMode === 'wireframe' ? 0.2 : visualMode === 'glass' ? 0.5 : 0.8} />
       <directionalLight
