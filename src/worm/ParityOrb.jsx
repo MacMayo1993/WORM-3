@@ -75,24 +75,24 @@ const _orbGeos = {
   normal: {
     shell:        new THREE.SphereGeometry(0.21, 32, 32),          // smooth glassy, iridescent gem shell
     innerCore:    new THREE.SphereGeometry(0.115, 20, 20),         // bright energy core seen through the shell
-    innerGlow:    new THREE.SphereGeometry(0.30, 12, 12),          // soft additive inner halo
+    innerGlow:    new THREE.SphereGeometry(0.30, 24, 18),          // soft additive inner halo (smooth, not faceted)
     core:         _mkMobius(0.24, 0.08),                           // Möbius strip — smaller accent ring, antipodal color
     ringA:        new THREE.TorusGeometry(0.370, 0.011, 6, 18),    // orbit rings sit just outside the strip
     ringB:        new THREE.TorusGeometry(0.370 * 0.92, 0.009, 6, 18),
     electron:     new THREE.SphereGeometry(0.042, 7, 7),
-    glow:         new THREE.SphereGeometry(0.52, 8, 8),            // outer ambient aura (BackSide only)
+    glow:         new THREE.SphereGeometry(0.52, 40, 28),          // outer ambient aura — smooth round glow (was octagonal at 8 segs)
   },
   target: {
     shell:        new THREE.SphereGeometry(0.27, 36, 36),          // larger smooth gem for target
     innerCore:    new THREE.SphereGeometry(0.15, 24, 24),
-    innerGlow:    new THREE.SphereGeometry(0.40, 12, 12),
+    innerGlow:    new THREE.SphereGeometry(0.40, 24, 18),
     core:         _mkMobius(0.30, 0.10),                           // Möbius strip, antipodal color
     ringA:        new THREE.TorusGeometry(0.460, 0.015, 8, 24),
     ringB:        new THREE.TorusGeometry(0.460 * 0.92, 0.012, 8, 24),
     ringC:        new THREE.TorusGeometry(0.460 * 1.08, 0.010, 8, 24),
     electron:     new THREE.SphereGeometry(0.052, 8, 8),
     electronGlow: new THREE.SphereGeometry(0.088, 6, 6),
-    glow:         new THREE.SphereGeometry(0.66, 10, 10),
+    glow:         new THREE.SphereGeometry(0.66, 40, 28),          // outer ambient aura — smooth round glow (was decagonal at 10 segs)
     lockRing:     new THREE.TorusGeometry(0.56, 0.03, 8, 36),
   },
 };
@@ -167,7 +167,6 @@ function SingleOrb({
   if (collected) return null;
 
   const g = isTarget ? _orbGeos.target : _orbGeos.normal;
-  const typeConfig = ORB_TYPES[type] || ORB_TYPES.parity;
 
   return (
     <group ref={orbGroupRef} position={[position[0], position[1], position[2]]}>
@@ -247,31 +246,8 @@ function SingleOrb({
           </mesh>
         )}
 
-        {/* Electrons — glow halos only on target orbs (saves 3 draw calls per normal orb) */}
-        {Array.from({ length: 3 }, (_, i) => (
-          <React.Fragment key={i}>
-            <mesh ref={(el) => { electronRefs.current[i] = el; }} geometry={g.electron}>
-              <meshStandardMaterial
-                color={typeConfig.electronColor}
-                emissive={typeConfig.electronEmissive}
-                emissiveIntensity={1.6}
-                metalness={0}
-                roughness={0}
-              />
-            </mesh>
-            {isTarget && g.electronGlow && (
-              <mesh ref={(el) => { electronGlowRefs.current[i] = el; }} geometry={g.electronGlow}>
-                <meshBasicMaterial
-                  color={typeConfig.electronColor}
-                  transparent
-                  opacity={0.45}
-                  blending={THREE.AdditiveBlending}
-                  depthWrite={false}
-                />
-              </mesh>
-            )}
-          </React.Fragment>
-        ))}
+        {/* Orbiting electrons removed — the small low-poly glowing spheres read as faceted
+            "icosahedron" clutter around the orb. The clean orbit rings stay. */}
       </group>
 
       {/* Outer aura — antipodal color flags the manifold pair */}
