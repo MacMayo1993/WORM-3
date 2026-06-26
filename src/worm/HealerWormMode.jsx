@@ -816,13 +816,29 @@ function useWormCrawler(size, cubies) {
                             // (which is almost always true for the first few tiles of a jump) kills you.
                             pendingSelfCollision.current = null;
                         } else if (interpT.current >= SELF_COLLISION_TRIGGER_PROGRESS) {
-                            killWorm({
-                                reason: 'self-collision',
-                                progress: Number(interpT.current.toFixed(2)),
-                                headTile: tileKey(pos.current),
-                                collisionTile: pendingSelfCollision.current?.key ?? null,
-                            });
-                            return true;
+                            // Re-validate against the LIVE trail before confirming the kill. A slice-rotation
+                            // hazard can call cutWormTail() between the frame that armed pendingSelfCollision
+                            // and this confirmation frame, severing the exact body segment that caused the
+                            // original detection — without this check that stale flag still fires a kill even
+                            // though the colliding tail tile no longer exists ("false tail bite" after a cut).
+                            const collisionKey = pendingSelfCollision.current.key;
+                            const occupiedTilesNow = Math.max(1, Math.ceil((tailLength.current * BODY_BALL_SPACING) / 1.0));
+                            const trailLimitNow = Math.min(occupiedTilesNow, tileTrail.current.count);
+                            let stillPresent = false;
+                            for (let ti = 1; ti < trailLimitNow; ti++) {
+                                if (ttAt(tileTrail.current, ti) === collisionKey) { stillPresent = true; break; }
+                            }
+                            if (!stillPresent) {
+                                pendingSelfCollision.current = null;
+                            } else {
+                                killWorm({
+                                    reason: 'self-collision',
+                                    progress: Number(interpT.current.toFixed(2)),
+                                    headTile: tileKey(pos.current),
+                                    collisionTile: collisionKey,
+                                });
+                                return true;
+                            }
                         }
                     }
 
