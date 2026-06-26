@@ -11,6 +11,7 @@ import { Environment, Html } from '@react-three/drei';
 // EffectComposer / Bloom removed — additive tunnel glow is sufficient without post-process bloom
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
+import { isMobile } from '../utils/device.js';
 import CubeAssembly from './CubeAssembly.jsx';
 import BlackHoleEnvironment from './BlackHoleEnvironment.jsx';
 import { getLevelBackground } from './LifeJourneyBackgrounds.jsx';
@@ -135,6 +136,7 @@ export default function GameScene({
     wormPaused,
     holonomyMode,
     wormHealedCount,
+    perfReducedFX,
   } = useGameStore(useShallow((s) => ({
     visualMode: s.visualMode,
     explosionT: s.explosionT,
@@ -152,7 +154,15 @@ export default function GameScene({
     wormPaused: s.wormPaused ?? false,
     holonomyMode: s.holonomyMode,
     wormHealedCount: s.wormHealedCount ?? 0,
+    perfReducedFX: s.perfReducedFX ?? false,
   })));
+
+  // Cube self-shadowing — the cubie bodies already declare cast/receiveShadow, so the
+  // only thing needed is an enabled shadow-casting light (Canvas has `shadows`). The
+  // shadow-map render pass is the cost, so we gate it off on mobile and whenever the
+  // PerformanceMonitor has flagged a sustained frame-rate decline. Wireframe/glass modes
+  // skip it too — their translucent bodies don't read shadows usefully.
+  const shadowsOn = !isMobile && !perfReducedFX && visualMode !== 'wireframe' && visualMode !== 'glass';
 
   const wormholePhaseActive = wormHealerMode && (
     wormPhase === 'entering' || wormPhase === 'tunnel' || wormPhase === 'exiting'
@@ -169,15 +179,47 @@ export default function GameScene({
     [settings.backgroundTheme]
   );
 
+  // Depth fog — only enabled over the dark black-hole space background. Photo-panorama
+  // and HDRI preset backgrounds render as a sharp image behind the scene, so fogging the
+  // cubies toward a flat color in front of them would look wrong; we gate it out for those.
+  // The black-hole path is the default fallback (see background selection below), so we
+  // mirror that condition: a level background that isn't a photo, or free-play with no
+  // photo/preset background resolving to the black hole.
+  const fogEnabled = useMemo(() => {
+    if (currentLevelData) {
+      // Level scenes: fog the dark cosmic backgrounds, not bright HDRI 'city' lighting envs.
+      return !currentLevelData.background || currentLevelData.background === 'blackhole';
+    }
+    if (settings.backgroundTheme === 'blackhole') return true;
+    if (bgConfig?.file) return false; // user-selected photo panorama
+    if (PHOTO_PRESETS.has(settings.backgroundTheme)) return false; // HDRI preset
+    return true; // falls through to the black-hole default
+  }, [currentLevelData, settings.backgroundTheme, bgConfig]);
+
   return (
     <>
+      {/* Exp² depth fog over the dark space background. Density is low so the assembled
+          cube stays crisp, but reads clearly once cubies spread apart in the explosion
+          and during worm-tunnel travel, adding atmospheric depth at zero pipeline cost. */}
+      {fogEnabled && <fogExp2 attach="fog" args={['#05050f', 0.028]} />}
       {/* Lights — intensity varies by visualMode */}
       <ambientLight intensity={visualMode === 'wireframe' ? 0.2 : visualMode === 'glass' ? 0.5 : 0.8} />
       <directionalLight
         position={[5, 8, 5]}
         intensity={visualMode === 'wireframe' ? 0.3 : visualMode === 'glass' ? 1.6 : 1.2}
-        castShadow
-        shadow-mapSize={[1024, 1024]}
+        castShadow={shadowsOn}
+        shadow-mapSize={[2048, 2048]}
+        shadow-bias={-0.0004}
+        shadow-normalBias={0.025}
+        // Tight ortho frustum sized to the cube plus its explosion spread (cubies
+        // expand to ~±6 units). A snug frustum keeps shadow-map texels dense for
+        // crisp contact shadows in the inter-cubie crevices and rounded bevels.
+        shadow-camera-near={0.5}
+        shadow-camera-far={40}
+        shadow-camera-left={-9}
+        shadow-camera-right={9}
+        shadow-camera-top={9}
+        shadow-camera-bottom={-9}
       />
       <pointLight position={[10, 10, 10]} intensity={visualMode === 'wireframe' ? 0.3 : visualMode === 'glass' ? 1.0 : 0.8} />
       <pointLight position={[-10, -10, -10]} intensity={visualMode === 'wireframe' ? 0.2 : visualMode === 'glass' ? 0.5 : 0.6} />
