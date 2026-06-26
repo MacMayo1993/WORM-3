@@ -73,7 +73,10 @@ function _mkMobius(R, w) {
 // Pre-built once, shared across all instances.  geometry={} prop prevents disposal.
 const _orbGeos = {
   normal: {
-    sphere:       new THREE.SphereGeometry(0.20, 16, 16),          // main spherical body
+    sphere:       new THREE.SphereGeometry(0.20, 20, 20),          // glassy outer shell — inner plasma reads through it
+    fresnel:      new THREE.SphereGeometry(0.205, 24, 24),         // rim-light shell, just outside the body silhouette
+    innerCore:    new THREE.IcosahedronGeometry(0.105, 1),         // crystalline plasma heart, counter-spins for parallax
+    innerGlow:    new THREE.SphereGeometry(0.165, 14, 14),         // soft volumetric haze between core and shell
     core:         _mkMobius(0.24, 0.08),                           // Möbius strip — smaller accent ring, antipodal color
     ringA:        new THREE.TorusGeometry(0.370, 0.011, 6, 18),    // orbit rings sit just outside the strip
     ringB:        new THREE.TorusGeometry(0.370 * 0.92, 0.009, 6, 18),
@@ -81,7 +84,10 @@ const _orbGeos = {
     glow:         new THREE.SphereGeometry(0.52, 8, 8),            // outer ambient aura (BackSide only)
   },
   target: {
-    sphere:       new THREE.SphereGeometry(0.26, 18, 18),          // main spherical body, larger for target
+    sphere:       new THREE.SphereGeometry(0.26, 24, 24),          // glassy outer shell, larger for target
+    fresnel:      new THREE.SphereGeometry(0.267, 28, 28),         // rim-light shell
+    innerCore:    new THREE.IcosahedronGeometry(0.14, 1),          // plasma heart
+    innerGlow:    new THREE.SphereGeometry(0.215, 16, 16),         // volumetric haze
     core:         _mkMobius(0.30, 0.10),                           // Möbius strip, antipodal color
     ringA:        new THREE.TorusGeometry(0.460, 0.015, 8, 24),
     ringB:        new THREE.TorusGeometry(0.460 * 0.92, 0.012, 8, 24),
@@ -92,6 +98,32 @@ const _orbGeos = {
     lockRing:     new THREE.TorusGeometry(0.56, 0.03, 8, 36),
   },
 };
+
+// ── Fresnel rim shader ──────────────────────────────────────────────────────
+// View-dependent rim glow: dim through the center, blazing at grazing angles.
+// This is what turns the body from a painted marble into a glowing energy orb.
+// toneMapped={false} + additive output means the Bloom pass blooms the silhouette.
+const _fresnelVert = `
+  varying vec3 vNormalW;
+  varying vec3 vViewDir;
+  void main() {
+    vec4 worldPos = modelMatrix * vec4(position, 1.0);
+    vNormalW = normalize(mat3(modelMatrix) * normal);
+    vViewDir = normalize(cameraPosition - worldPos.xyz);
+    gl_Position = projectionMatrix * viewMatrix * worldPos;
+  }
+`;
+const _fresnelFrag = `
+  uniform vec3 uColor;
+  uniform float uPower;
+  uniform float uIntensity;
+  varying vec3 vNormalW;
+  varying vec3 vViewDir;
+  void main() {
+    float f = pow(1.0 - clamp(dot(normalize(vNormalW), normalize(vViewDir)), 0.0, 1.0), uPower);
+    gl_FragColor = vec4(uColor * f * uIntensity, f);
+  }
+`;
 
 // SingleOrb renders geometry and registers refs with the parent OrbAnimator.
 // NO useFrame here — all animation driven by the single loop in ParityOrbs.
@@ -113,11 +145,21 @@ function SingleOrb({
   const ringARef       = useRef();
   const ringBRef       = useRef();
   const ringCRef       = useRef();   // target only
+  const fresnelRef     = useRef();
   const electronRefs     = useRef([]);
   const electronGlowRefs = useRef([]); // target only
   const outlineRef     = useRef();
 
   const timeOffset = useMemo(() => Math.random() * Math.PI * 2, []);
+
+  // Per-orb Fresnel uniforms (memoized so the material identity is stable across
+  // re-renders; the animator mutates uColor/uIntensity in place for glow-worm &
+  // rainbow modes). Rim leans on the body color, target orbs glow a touch hotter.
+  const fresnelUniforms = useMemo(() => ({
+    uColor:     { value: new THREE.Color(color) },
+    uPower:     { value: 2.6 },
+    uIntensity: { value: isTarget ? 2.0 : 1.5 },
+  }), [color, isTarget]);
 
   // Mutable refs so the animator always reads current values without causing re-renders
   const isTargetRef   = useRef(isTarget);   isTargetRef.current   = isTarget;
@@ -143,6 +185,7 @@ function SingleOrb({
       get ringA()         { return ringARef.current; },
       get ringB()         { return ringBRef.current; },
       get ringC()         { return ringCRef.current; },
+      get fresnel()       { return fresnelRef.current; },
       get electrons()     { return electronRefs.current; },
       get electronGlows() { return electronGlowRefs.current; },
       get outline()       { return outlineRef.current; },
@@ -168,14 +211,59 @@ function SingleOrb({
   return (
     <group ref={orbGroupRef} position={[position[0], position[1], position[2]]}>
 
-      {/* Spherical orb body — main visible shape */}
+      {/* Inner plasma heart — a faceted crystalline core that counter-spins
+          inside the glassy shell, giving the orb visible internal energy/depth. */}
+      <mesh ref={innerCoreRef} geometry={g.innerCore}>
+        <meshStandardMaterial
+          color="#ffffff"
+          emissive={color}
+          emissiveIntensity={isTarget ? 3.4 : 2.6}
+          metalness={0}
+          roughness={0.1}
+          toneMapped={false}
+        />
+      </mesh>
+
+      {/* Volumetric haze — soft additive glow filling the gap between core and
+          shell so the interior reads as luminous gas, not empty space. */}
+      <mesh ref={innerGlowRef} geometry={g.innerGlow}>
+        <meshBasicMaterial
+          color={color}
+          transparent
+          opacity={isTarget ? 0.28 : 0.18}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+          side={THREE.BackSide}
+          toneMapped={false}
+        />
+      </mesh>
+
+      {/* Glassy outer shell — translucent so the plasma heart shows through.
+          The animator still drives its emissive/color (glow-worm + rainbow). */}
       <mesh ref={shellRef} geometry={g.sphere}>
         <meshStandardMaterial
           color={color}
           emissive={color}
-          emissiveIntensity={isTarget ? 2.8 : 2.0}
-          metalness={0.1}
-          roughness={0.15}
+          emissiveIntensity={isTarget ? 2.4 : 1.7}
+          metalness={0.25}
+          roughness={0.08}
+          transparent
+          opacity={0.55}
+          depthWrite={false}
+          toneMapped={false}
+        />
+      </mesh>
+
+      {/* Fresnel rim — view-dependent silhouette glow that the Bloom pass
+          turns into a halo. The signature "energy orb" read. */}
+      <mesh ref={fresnelRef} geometry={g.fresnel}>
+        <shaderMaterial
+          vertexShader={_fresnelVert}
+          fragmentShader={_fresnelFrag}
+          uniforms={fresnelUniforms}
+          transparent
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
           toneMapped={false}
         />
       </mesh>
@@ -286,7 +374,7 @@ export default function ParityOrbs({
 
     for (const refs of animMapRef.current.values()) {
       const {
-        group, core, innerCore, innerGlow, shell, glow, targetGlow,
+        group, core, innerCore, innerGlow, shell, glow, targetGlow, fresnel,
         orbitSystem, ringA, ringB, ringC,
         electrons, electronGlows, outline,
         isTarget, position, dirKey, gridX, gridY, gridZ, timeOffset,
@@ -395,6 +483,7 @@ export default function ParityOrbs({
         if (shell && shell.material) shell.material.emissiveIntensity = (isTarget ? 3.4 : 2.6) + Math.sin(t * 4.0) * 0.9;
         if (core && core.material) core.material.emissiveIntensity = (isTarget ? 2.4 : 1.8) + Math.sin(t * 4.0) * 0.6;
         if (glow) glow.material.opacity = (isTarget ? 0.65 : 0.50) + Math.sin(t * 4.0) * 0.22;
+        if (fresnel && fresnel.material.uniforms) fresnel.material.uniforms.uIntensity.value = (isTarget ? 2.6 : 2.1) + Math.sin(t * 4.0) * 0.7;
       }
 
       // ── Rainbow cycle for elevated (flipped-tile) orbs ────────────────────
@@ -405,6 +494,7 @@ export default function ParityOrbs({
           shell.material.color.copy(_rainbowColor);
           shell.material.emissive.copy(_rainbowColor);
         }
+        if (fresnel && fresnel.material.uniforms) fresnel.material.uniforms.uColor.value.copy(_rainbowColor);
         if (core && core.material) {
           _rainbowColor.setHSL((hue + 0.5) % 1, 1.0, 0.62);
           core.material.color.copy(_rainbowColor);
