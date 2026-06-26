@@ -250,17 +250,7 @@ function SingleOrb({
             "icosahedron" clutter around the orb. The clean orbit rings stay. */}
       </group>
 
-      {/* Outer aura — antipodal color flags the manifold pair */}
-      <mesh ref={glowRef} geometry={g.glow}>
-        <meshBasicMaterial
-          color={antipodalColor}
-          transparent
-          opacity={isTarget ? 0.50 : 0.30}
-          side={THREE.BackSide}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-        />
-      </mesh>
+      {/* Outer aura removed per design — the orb reads off the gem, core glow and rings. */}
 
       {/* Target lock ring */}
       {isTarget && (
