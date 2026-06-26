@@ -11,6 +11,7 @@ import { Environment, Html } from '@react-three/drei';
 // EffectComposer / Bloom removed — additive tunnel glow is sufficient without post-process bloom
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
+import { isMobile } from '../utils/device.js';
 import CubeAssembly from './CubeAssembly.jsx';
 import BlackHoleEnvironment from './BlackHoleEnvironment.jsx';
 import { getLevelBackground } from './LifeJourneyBackgrounds.jsx';
@@ -135,6 +136,7 @@ export default function GameScene({
     wormPaused,
     holonomyMode,
     wormHealedCount,
+    perfReducedFX,
   } = useGameStore(useShallow((s) => ({
     visualMode: s.visualMode,
     explosionT: s.explosionT,
@@ -152,7 +154,15 @@ export default function GameScene({
     wormPaused: s.wormPaused ?? false,
     holonomyMode: s.holonomyMode,
     wormHealedCount: s.wormHealedCount ?? 0,
+    perfReducedFX: s.perfReducedFX ?? false,
   })));
+
+  // Cube self-shadowing — the cubie bodies already declare cast/receiveShadow, so the
+  // only thing needed is an enabled shadow-casting light (Canvas has `shadows`). The
+  // shadow-map render pass is the cost, so we gate it off on mobile and whenever the
+  // PerformanceMonitor has flagged a sustained frame-rate decline. Wireframe/glass modes
+  // skip it too — their translucent bodies don't read shadows usefully.
+  const shadowsOn = !isMobile && !perfReducedFX && visualMode !== 'wireframe' && visualMode !== 'glass';
 
   const wormholePhaseActive = wormHealerMode && (
     wormPhase === 'entering' || wormPhase === 'tunnel' || wormPhase === 'exiting'
@@ -197,8 +207,19 @@ export default function GameScene({
       <directionalLight
         position={[5, 8, 5]}
         intensity={visualMode === 'wireframe' ? 0.3 : visualMode === 'glass' ? 1.6 : 1.2}
-        castShadow
-        shadow-mapSize={[1024, 1024]}
+        castShadow={shadowsOn}
+        shadow-mapSize={[2048, 2048]}
+        shadow-bias={-0.0004}
+        shadow-normalBias={0.025}
+        // Tight ortho frustum sized to the cube plus its explosion spread (cubies
+        // expand to ~±6 units). A snug frustum keeps shadow-map texels dense for
+        // crisp contact shadows in the inter-cubie crevices and rounded bevels.
+        shadow-camera-near={0.5}
+        shadow-camera-far={40}
+        shadow-camera-left={-9}
+        shadow-camera-right={9}
+        shadow-camera-top={9}
+        shadow-camera-bottom={-9}
       />
       <pointLight position={[10, 10, 10]} intensity={visualMode === 'wireframe' ? 0.3 : visualMode === 'glass' ? 1.0 : 0.8} />
       <pointLight position={[-10, -10, -10]} intensity={visualMode === 'wireframe' ? 0.2 : visualMode === 'glass' ? 0.5 : 0.6} />

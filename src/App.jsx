@@ -1363,6 +1363,7 @@ export default function WORM3() {
           camera={{ position: (showWelcome || showMainMenu) ? [0, 3, 12] : [0, 0, cameraZ], fov: 40 }}
           dpr={dpr}
           gl={{ powerPreference: 'high-performance', antialias: true }}
+          shadows
           frameloop="always"
         >
           <PerformanceMonitor
