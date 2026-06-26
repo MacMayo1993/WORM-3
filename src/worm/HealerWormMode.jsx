@@ -79,67 +79,69 @@ import { SURFACE_OFFSET } from '../utils/constants.js';
 
 // Pre-allocated axis vector for applying liveRotation to the worm during scramble
 const _liveAxis = new THREE.Vector3();
-// Scratch endpoints for the live-rotation head ride (lerp source/target), so a head
-// straddling the slice boundary can rotate each endpoint independently without allocating.
-const _rideP = new THREE.Vector3();
-const _rideC = new THREE.Vector3();
+// Scratch for reading live tile transforms straight off the cubie meshes.
+const _meshHeadC = new THREE.Vector3();
+const _meshHeadP = new THREE.Vector3();
+const _meshNorm = new THREE.Vector3();
+const _meshNormP = new THREE.Vector3();
 // Axis scratch for baking a committed turn into the worm's position history.
 const _bakeAxis = new THREE.Vector3();
 const _tunnelDirScratch = new THREE.Vector3();
 
-// Make the worm's head ride a slice that is mid-rotation so it turns *with* the cube
-// instead of snapping into place only when the rotation commits. We rotate about the slice
-// axis (through the cube centre) by the exact signed angle CubeAssembly applies to the cubie
-// meshes — same axis convention, same angle. The cube is centred at the origin and
-// getStickerWorldPos returns origin-centred coords, so applyAxisAngle about the unit axis
-// reproduces the slice transform.
+// Read a tile's live world surface position + outward normal straight from its cubie mesh —
+// the SAME source the body trail uses (resolveTrailTile). Returns false if the mesh isn't
+// available. liveCubies.refs are CubeAssembly's per-cubie groups, indexed by grid cell.
+function readLiveTile(tile, outPos, outNorm) {
+    const lc = liveCubies.refs;
+    const lsz = liveCubies.size;
+    if (!lc || lsz <= 0) return false;
+    const mesh = lc[tile.x * lsz * lsz + tile.y * lsz + tile.z];
+    const localNorm = FACE_NORMALS[tile.dirKey];
+    if (!mesh || !localNorm) return false;
+    // Use the cubie group's LOCAL position/quaternion (the cube group is untransformed, so
+    // local == world) — matches resolveTrailTile and avoids a stale matrixWorld read this
+    // frame, since CubeAssembly's useFrames mutate position/quaternion, not matrixWorld.
+    outNorm.copy(localNorm).applyQuaternion(mesh.quaternion).normalize();
+    outPos.copy(mesh.position).addScaledVector(outNorm, SURFACE_OFFSET);
+    return true;
+}
+
+// Anchor the worm's head to the LIVE cubie meshes instead of the grid-math rest position, so
+// it rides a mid-rotation slice and lands on the committed tile automatically — exactly like
+// the body trail, which reads the same meshes. This is what makes the turn seamless: the
+// previous manual approach rotated the grid-math head by liveRotation.angle during the tween,
+// then handed back to a grid position that only became correct once the worm's rotationEpoch
+// subscription had rotated pos.current — a different point in the frame than this useFrame, so
+// the head popped to the tile's pre-rotation spot for the gap. CubeAssembly's priority -2
+// useFrame snaps the cubie meshes to their committed grid slots before this (priority 0) runs,
+// so reading the meshes here is always the already-correct position, tween or settled.
 //
-// The head is rendered at lerp(prevWorldPos, curWorldPos, interpT). When the worm is mid-step
-// crossing the slice boundary, exactly one endpoint sits in the rotating slice, so we rotate
-// each endpoint INDEPENDENTLY (the in-slice end swings with the cube, the out-of-slice end
-// stays put) and re-lerp — instead of rotating the whole head only when the target tile is in
-// the slice, which both missed the crossing case and jumped the head to its pre-rotation
-// source at commit. Corner wraps follow a bezier arc that can't be rebuilt from endpoints, so
-// they keep the simpler whole-head rotation. No-op unless a rotation is live and the head
-// touches the rotating slice. Returns true if it adjusted the head position.
+// Corner wraps follow a bezier arc that can't be rebuilt from two endpoints, so they keep the
+// grid-math head from tick() and ride it by the live angle. Returns true if it set the head.
 function rideLiveRotation(worm) {
-    if (!liveRotation.active) return false;
-    const { axis, sliceIndex, angle } = liveRotation;
     const cur = worm.pos.current;
-    const prev = worm.prevTile.current;
-    const curIn = isTileInSlice(axis, sliceIndex, cur.x, cur.y, cur.z);
-    const prevIn = prev ? isTileInSlice(axis, sliceIndex, prev.x, prev.y, prev.z) : false;
-    if (!curIn && !prevIn) return false;
 
-    _liveAxis.set(axis === 'col' ? 1 : 0, axis === 'row' ? 1 : 0, axis === 'depth' ? 1 : 0);
-
-    // Corner wrap: head is on a bezier arc, not an endpoint lerp — rotate the whole head
-    // (and its normal) only when the tile it currently sits on rides the slice.
     if (worm.crossingCorner.current) {
-        if (curIn) {
-            worm.headInterpPos.current.applyAxisAngle(_liveAxis, angle);
-            worm.currentNormal.current.applyAxisAngle(_liveAxis, angle).normalize();
-        }
-        return curIn;
+        if (!liveRotation.active) return false;
+        const { axis, sliceIndex, angle } = liveRotation;
+        if (!isTileInSlice(axis, sliceIndex, cur.x, cur.y, cur.z)) return false;
+        _liveAxis.set(axis === 'col' ? 1 : 0, axis === 'row' ? 1 : 0, axis === 'depth' ? 1 : 0);
+        worm.headInterpPos.current.applyAxisAngle(_liveAxis, angle);
+        worm.currentNormal.current.applyAxisAngle(_liveAxis, angle).normalize();
+        return true;
     }
 
+    // Straight crawl: lerp between the source and target tiles' CURRENT mesh-surface positions.
+    if (!readLiveTile(cur, _meshHeadC, _meshNorm)) return false;
     const t = worm.interpT.current;
-    const P = worm.prevWorldPos.current;
-    const C = worm.curWorldPos.current;
-    if (P && t < 1) {
-        _rideP.copy(P);
-        if (prevIn) _rideP.applyAxisAngle(_liveAxis, angle);
-        _rideC.copy(C);
-        if (curIn) _rideC.applyAxisAngle(_liveAxis, angle);
-        worm.headInterpPos.current.copy(_rideP).lerp(_rideC, t);
-    } else if (curIn) {
-        // Fully on the current tile — rotate the head with the slice.
-        worm.headInterpPos.current.applyAxisAngle(_liveAxis, angle);
-    }
-    // The head sits on `cur`; rotate its surface normal with the slice when cur rides so the
-    // worm's orientation turns with the cube too (straight crawl keeps prev/cur on one face).
-    if (curIn) {
-        worm.currentNormal.current.applyAxisAngle(_liveAxis, angle).normalize();
+    const prev = worm.prevTile.current;
+    if (t < 1 && prev && readLiveTile(prev, _meshHeadP, _meshNormP)) {
+        worm.headInterpPos.current.copy(_meshHeadP).lerp(_meshHeadC, t);
+        // Blend the normal the same way so orientation follows through a face-crossing step.
+        worm.currentNormal.current.copy(_meshNormP).lerp(_meshNorm, t).normalize();
+    } else {
+        worm.headInterpPos.current.copy(_meshHeadC);
+        worm.currentNormal.current.copy(_meshNorm);
     }
     return true;
 }
