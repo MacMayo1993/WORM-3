@@ -2603,13 +2603,22 @@ function WormBody({ worm, size }) {
            so any non-white material color taints every orb pickup color. */
         <>
             <instancedMesh ref={meshRef} args={[undefined, undefined, MAX_TAIL]} frustumCulled={false}>
-                <sphereGeometry args={[1, 12, 12]} />
-                <meshStandardMaterial
+                <sphereGeometry args={[1, 16, 16]} />
+                {/* Wet-slime body: a clearcoat layer gives a glossy highlight that slides
+                    over each segment as the worm crawls, reading as a moist, jelly-like
+                    surface instead of a flat matte ball. color MUST stay white so the
+                    per-instance orb colours (setColorAt) pass through untinted. */}
+                <meshPhysicalMaterial
                     color="white"
                     emissive="white"
                     emissiveIntensity={0.22}
-                    roughness={0.28}
+                    roughness={0.35}
                     metalness={0}
+                    clearcoat={1}
+                    clearcoatRoughness={0.12}
+                    sheen={0.4}
+                    sheenRoughness={0.6}
+                    sheenColor="#ffffff"
                     toneMapped={false}
                 />
             </instancedMesh>
@@ -3311,7 +3320,79 @@ function HeartBurst({ id, wp, onDone }) {
     );
 }
 
-// Watches for heal events from the worm hook and manages active HeartBurst instances.
+// 3D heal burst — an expanding shockwave + flash on the tile the worm emerges from, so the
+// wormhole exit reads as a pop of healing energy instead of the worm just sliding through a
+// plain tile. The ring meshes live in the local XY plane (ringGeometry faces +Z), and the
+// group is rotated so local +Z aligns with the tile's surface normal — the rings lie flat on
+// the face and expand outward across it.
+const _healNormalScratch = new THREE.Vector3();
+const _healRingZ = new THREE.Vector3(0, 0, 1);
+
+function HealBurst3D({ wp, normal, color = '#3affb0', onDone }) {
+    const ringRef = useRef();
+    const coreRingRef = useRef();
+    const flashRef = useRef();
+    const tRef = useRef(0);
+    const doneRef = useRef(false);
+
+    const quat = useMemo(() => {
+        const n = new THREE.Vector3(normal[0], normal[1], normal[2]).normalize();
+        return new THREE.Quaternion().setFromUnitVectors(_healRingZ, n);
+    }, [normal]);
+
+    useFrame((_s, dt) => {
+        tRef.current += dt;
+        const t = tRef.current;
+        const DUR = 0.95;
+        const p = Math.min(1, t / DUR);
+        const ease = 1 - Math.pow(1 - p, 3); // easeOutCubic
+
+        if (ringRef.current) {
+            const s = 0.15 + ease * 1.75;
+            ringRef.current.scale.set(s, s, 1);
+            ringRef.current.material.opacity = (1 - p) * 0.9;
+        }
+        if (coreRingRef.current) {
+            const p2 = Math.min(1, t / (DUR * 0.65));
+            const e2 = 1 - Math.pow(1 - p2, 3);
+            const s = 0.1 + e2 * 1.05;
+            coreRingRef.current.scale.set(s, s, 1);
+            coreRingRef.current.material.opacity = (1 - p2) * 0.75;
+        }
+        if (flashRef.current) {
+            const fp = Math.min(1, t / 0.28);
+            flashRef.current.scale.setScalar(0.2 + fp * 0.95);
+            flashRef.current.material.opacity = (1 - fp) * 0.85;
+        }
+        if (p >= 1 && !doneRef.current) { doneRef.current = true; onDone?.(); }
+    });
+
+    return (
+        <group position={wp} quaternion={quat}>
+            {/* Outer healing shockwave ring */}
+            <mesh ref={ringRef}>
+                <ringGeometry args={[0.34, 0.5, 48]} />
+                <meshBasicMaterial color={color} transparent opacity={0.9} side={THREE.DoubleSide}
+                    blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+            </mesh>
+            {/* Inner bright ring */}
+            <mesh ref={coreRingRef}>
+                <ringGeometry args={[0.16, 0.28, 40]} />
+                <meshBasicMaterial color="#ffffff" transparent opacity={0.75} side={THREE.DoubleSide}
+                    blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+            </mesh>
+            {/* Emergence flash just above the tile */}
+            <mesh ref={flashRef} position={[0, 0, 0.06]}>
+                <sphereGeometry args={[0.3, 16, 16]} />
+                <meshBasicMaterial color={color} transparent opacity={0.85}
+                    blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+            </mesh>
+        </group>
+    );
+}
+
+// Watches for heal events from the worm hook and manages active burst instances (the 3D
+// emergence shockwave plus the floating hearts).
 function HeartBurstSystem({ worm, size }) {
     const [bursts, setBursts] = useState([]);
 
@@ -3321,20 +3402,36 @@ function HeartBurstSystem({ worm, size }) {
         worm.pendingHealBurstRef.current = null;
         const wp = getStickerWorldPos(exitTile.x, exitTile.y, exitTile.z, exitTile.dirKey, size, 0);
         if (!wp) return;
+        // World-space surface normal of the exit tile (from the live cubie transform) so the
+        // shockwave lies flat on whichever face the worm emerges from, even after rotations.
+        const lSize = liveCubies.size;
+        const cubie = (lSize > 0 && liveCubies.refs)
+            ? liveCubies.refs[exitTile.x * lSize * lSize + exitTile.y * lSize + exitTile.z]
+            : null;
+        const localN = FACE_NORMALS[exitTile.dirKey];
+        let normal = [0, 1, 0];
+        if (cubie && localN) {
+            _healNormalScratch.copy(localN).applyQuaternion(cubie.quaternion);
+            normal = [_healNormalScratch.x, _healNormalScratch.y, _healNormalScratch.z];
+        } else if (localN) {
+            normal = [localN.x, localN.y, localN.z];
+        }
         const id = Date.now();
-        setBursts(prev => [...prev, { id, wp: [wp[0], wp[1], wp[2]] }]);
+        setBursts(prev => [...prev, { id, wp: [wp[0], wp[1], wp[2]], normal }]);
     });
 
     if (bursts.length === 0) return null;
     return (
         <>
             {bursts.map(burst => (
-                <HeartBurst
-                    key={burst.id}
-                    id={burst.id}
-                    wp={burst.wp}
-                    onDone={() => setBursts(prev => prev.filter(b => b.id !== burst.id))}
-                />
+                <React.Fragment key={burst.id}>
+                    <HealBurst3D wp={burst.wp} normal={burst.normal} />
+                    <HeartBurst
+                        id={burst.id}
+                        wp={burst.wp}
+                        onDone={() => setBursts(prev => prev.filter(b => b.id !== burst.id))}
+                    />
+                </React.Fragment>
             ))}
         </>
     );
