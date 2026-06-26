@@ -6,7 +6,7 @@ import * as THREE from 'three';
  * BlackHoleEnvironment - A dynamic 3D black hole background
  * Provides an immersive, panoramic black hole effect as part of the 3D scene
  */
-export default function BlackHoleEnvironment({ flipTrigger = 0, zoom = 1.65, orbitStrength = 0.03 }) {
+export default function BlackHoleEnvironment({ flipTrigger = 0, zoom = 1.65, orbitStrength = 0.03, tint = null }) {
   const sphereRef = useRef();
   const materialRef = useRef();
   const [pulseIntensity, setPulseIntensity] = useState(0);
@@ -24,6 +24,7 @@ export default function BlackHoleEnvironment({ flipTrigger = 0, zoom = 1.65, orb
         pulseIntensity: { value: 0 },
         zoom: { value: zoom },
         centerOffset: { value: new THREE.Vector2(0, 0) },
+        uTint: { value: new THREE.Color(1, 1, 1) },
       },
       vertexShader: `
         varying vec3 vPosition;
@@ -40,6 +41,7 @@ export default function BlackHoleEnvironment({ flipTrigger = 0, zoom = 1.65, orb
         uniform float pulseIntensity;
         uniform float zoom;
         uniform vec2 centerOffset;
+        uniform vec3 uTint;
         varying vec3 vPosition;
         varying vec2 vUv;
 
@@ -232,6 +234,9 @@ export default function BlackHoleEnvironment({ flipTrigger = 0, zoom = 1.65, orb
             color += finalStarColor * stars * pulseIntensity * 0.5;
           }
 
+          // Optional colour cast (e.g. the cool blue used in the intro). Defaults to white.
+          color *= uTint;
+
           gl_FragColor = vec4(color, 1.0);
         }
       `,
@@ -243,6 +248,7 @@ export default function BlackHoleEnvironment({ flipTrigger = 0, zoom = 1.65, orb
       materialRef.current.uniforms.time.value = state.clock.elapsedTime;
       materialRef.current.uniforms.pulseIntensity.value = pulseIntensity;
       materialRef.current.uniforms.zoom.value = zoom;
+      if (tint) materialRef.current.uniforms.uTint.value.set(tint[0], tint[1], tint[2]);
 
       const t = state.clock.elapsedTime * 0.08;
       const orbitRadius = orbitStrength * (0.7 + 0.3 * Math.sin(state.clock.elapsedTime * 0.11));
