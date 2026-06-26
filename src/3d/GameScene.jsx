@@ -8,7 +8,7 @@
 import React, { Suspense, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Environment, Html } from '@react-three/drei';
-// EffectComposer / Bloom removed — additive tunnel glow is sufficient without post-process bloom
+import { EffectComposer, N8AO } from '@react-three/postprocessing';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { isMobile } from '../utils/device.js';
@@ -163,6 +163,11 @@ export default function GameScene({
   // PerformanceMonitor has flagged a sustained frame-rate decline. Wireframe/glass modes
   // skip it too — their translucent bodies don't read shadows usefully.
   const shadowsOn = !isMobile && !perfReducedFX && visualMode !== 'wireframe' && visualMode !== 'glass';
+
+  // Ambient occlusion shares the same capability gate as shadows (skip mobile,
+  // sustained-low-FPS, and the translucent wireframe/glass modes that don't read
+  // occlusion usefully).
+  const aoEnabled = shadowsOn;
 
   const wormholePhaseActive = wormHealerMode && (
     wormPhase === 'entering' || wormPhase === 'tunnel' || wormPhase === 'exiting'
@@ -331,6 +336,18 @@ export default function GameScene({
 
       {/* Antipodal PiP — only mounted when active so R3F auto-render stays live when off */}
       {shouldShowAntipodalPiP && <AntipodalPiP />}
+
+      {/* Ambient occlusion — soft contact shadows in the inter-cubie seams and rounded
+          bevels, the single biggest "machined-cube" upgrade for this geometry. Mounted
+          only when the PiP is OFF: AntipodalPiP hand-drives the render loop (manual
+          two-camera pass) which an EffectComposer cannot share, so AO and the PiP are
+          mutually exclusive — toggling the PiP on gracefully drops AO for that view.
+          Gated off on mobile / low-FPS / wireframe / glass via aoEnabled. */}
+      {aoEnabled && !shouldShowAntipodalPiP && (
+        <EffectComposer multisampling={4}>
+          <N8AO aoRadius={0.55} distanceFalloff={1} intensity={2.2} quality="medium" halfRes />
+        </EffectComposer>
+      )}
     </>
   );
 }
