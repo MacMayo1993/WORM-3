@@ -1416,6 +1416,7 @@ function WormChaseCamera({ worm, size }) {
     const lookAtRef = useRef(new THREE.Vector3(0, 0, 0));
     const camUpRef = useRef(new THREE.Vector3(0, 1, 0));  // smoothed up — prevents instant snap
     const prevPhaseRef = useRef('crawling');              // detect phase transitions for snap logic
+    const prevGamePhaseRef = useRef('scrambling');         // detect entry into the opening scramble
     const zoomExtraRef = useRef(0);   // burst zoom accumulated
     const prevTailLen = useRef(BASE_TAIL_LENGTH);   // detect new parity pickups
     const postTunnelEaseRef = useRef(0);  // seconds remaining of gentle re-framing after exiting a tunnel
@@ -1426,19 +1427,42 @@ function WormChaseCamera({ worm, size }) {
         const tailLen = worm.tailLength.current;
         const viewportAspect = viewportSize.width / Math.max(1, viewportSize.height);
 
-        // Only use the overview during the INITIAL scramble (worm has never moved).
-        // Mid-game auto-rotation scrambles keep the follow camera so the view doesn't snap away.
-        if (gamePhase === 'scrambling' && !worm.prevWorldPos.current) {
+        // Only use the overview during the INITIAL scramble. wormGamePhase is set to
+        // 'scrambling' exactly once, at game start (mid-game auto-rotation hazards only
+        // touch gameModePhaseRef, never wormGamePhase), so this alone identifies the
+        // opening scramble — do NOT also gate on !worm.prevWorldPos.current: that ref is
+        // reset to null by a separate React effect (useWormCrawler's run-reset effect)
+        // that fires strictly AFTER the synchronous Zustand subscriber which sets
+        // wormGamePhase here, so any useFrame tick landing in that gap would see
+        // gamePhase === 'scrambling' but a still-stale, non-null prevWorldPos left over
+        // from the previous run — falling through to the normal chase-cam branch with
+        // leftover position/up-vector data (the intermittent "starts inside the cube /
+        // upside down" glitch).
+        if (gamePhase === 'scrambling') {
             const dist = 5 + size * 4.0;
             _camTargetCam.set(0.6, 1.1, 1).normalize().multiplyScalar(dist);
             _camTargetLook.set(0, 0, 0);
-            camPosRef.current.lerp(_camTargetCam, Math.min(1, delta * 2.5));
-            lookAtRef.current.lerp(_camTargetLook, Math.min(1, delta * 2.5));
+            // Snap straight to the overview framing the instant a new run's scramble
+            // begins, instead of lerping in from wherever the camera was left at the end
+            // of the previous run — that leftover state can be deep inside the cube (or
+            // up-side down) and lerping from it produced a brief but visible swoop through
+            // the cube that differed run to run. Snapping makes the opening shot identical
+            // on every iteration.
+            if (prevGamePhaseRef.current !== 'scrambling') {
+                camPosRef.current.copy(_camTargetCam);
+                lookAtRef.current.copy(_camTargetLook);
+            } else {
+                camPosRef.current.lerp(_camTargetCam, Math.min(1, delta * 2.5));
+                lookAtRef.current.lerp(_camTargetLook, Math.min(1, delta * 2.5));
+            }
             camera.position.copy(camPosRef.current);
             camera.up.set(0, 1, 0);
+            camUpRef.current.set(0, 1, 0);
             camera.lookAt(lookAtRef.current);
+            prevGamePhaseRef.current = gamePhase;
             return;
         }
+        prevGamePhaseRef.current = gamePhase;
 
         // Use a continuous portrait factor so camera framing doesn't jump at aspect=1.
         const portraitFactor = THREE.MathUtils.clamp((1 - viewportAspect) / 0.45, 0, 1);
