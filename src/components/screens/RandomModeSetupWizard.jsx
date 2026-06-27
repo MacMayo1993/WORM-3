@@ -196,7 +196,7 @@ const RandomModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
   const stepContent = [renderBackgrounds, renderSize];
   const stepTitles = ['Pick Your Scene', 'Cube Size'];
   const stepSubtitles = [
-    'This stays fixed — color schemes and tile styles will cycle automatically every 10 seconds.',
+    'This stays fixed — color schemes, tile styles, and a per-cubelet mix of view styles will cycle automatically every 10 seconds.',
     'Pick your puzzle dimensions — stays fixed during play.',
   ];
 
