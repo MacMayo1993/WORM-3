@@ -969,17 +969,23 @@ function useWormCrawler(size, cubies) {
                     // When navigating a corner, traversing double the distance means we should theoretically
                     // give it more time so the speed looks constant, but the Bezier arc covers it nicely.
                     if (stepAcc.current >= STEP_SEC) {
-                        // Defer the tile-crossing while a live slice rotation is carrying the worm's
-                        // current tile. getNextSurfacePosition resolves the destination from pos.current's
-                        // grid coords, but those aren't rotated until the turn COMMITS (rotationEpoch).
-                        // Crossing now — e.g. at 99% of an almost-finished turn — would send the head to
-                        // the tile's pre-rotation neighbour and snap it back to "where the tile came from"
-                        // when the rotation finally commits. Hold the accumulator at the threshold and let
-                        // rideLiveRotation keep the head gliding on the slice until pos.current updates to
-                        // the committed (rotated) tile, then cross from there.
+                        // Peek the prospective destination (pure — no mutation) so we can tell whether
+                        // crossing this step would touch a slice that is mid-rotation.
+                        const peekNext = getNextSurfacePosition(pos.current, moveDir.current, size);
+
+                        // Defer the tile-crossing while a live slice rotation involves EITHER the worm's
+                        // current tile OR the tile it is about to step onto. Until the turn COMMITS
+                        // (rotationEpoch) those grid coords are still pre-rotation: crossing now — e.g. at
+                        // 99% of an almost-finished turn — resolves the destination in pre-rotation space
+                        // and snaps the head to where that tile *started* the animation, a spot the worm
+                        // never actually reached. Hold the accumulator at the threshold; rideLiveRotation
+                        // keeps the head gliding on the live meshes until the rotation commits and
+                        // pos.current reflects the rotated grid, then we cross cleanly from there.
                         if (
-                            liveRotation.active &&
-                            isTileInSlice(liveRotation.axis, liveRotation.sliceIndex, pos.current.x, pos.current.y, pos.current.z)
+                            liveRotation.active && (
+                                isTileInSlice(liveRotation.axis, liveRotation.sliceIndex, pos.current.x, pos.current.y, pos.current.z) ||
+                                (peekNext && isTileInSlice(liveRotation.axis, liveRotation.sliceIndex, peekNext.x, peekNext.y, peekNext.z))
+                            )
                         ) {
                             stepAcc.current = STEP_SEC;
                             return false;
@@ -995,7 +1001,7 @@ function useWormCrawler(size, cubies) {
                         prevTile.current = { x: pos.current.x, y: pos.current.y, z: pos.current.z, dirKey: pos.current.dirKey };
 
                         const oldDirKey = pos.current.dirKey;
-                        const next = getNextSurfacePosition(pos.current, moveDir.current, size);
+                        const next = peekNext;
 
                         // We clear the corner navigation flag unless we're about to cross one right now
                         crossingCorner.current = false;
