@@ -58,7 +58,7 @@ const SecondaryModesSheet = ({
             <div className="sheet-group">
               <div className="sheet-group-title">Visual Style</div>
               <div className="sheet-grid">
-                {['classic', 'grid', 'sudokube', 'wireframe', 'glass'].map((m) => (
+                {['classic', 'grid', 'sudokube', 'wireframe', 'glass', 'chrome', 'sphere', 'neon', 'gap', 'heatmap'].map((m) => (
                   <SheetItem
                     key={m}
                     label={m === 'sudokube' ? 'Sudoku' : m.charAt(0).toUpperCase() + m.slice(1)}

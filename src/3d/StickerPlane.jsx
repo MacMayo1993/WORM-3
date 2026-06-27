@@ -1142,6 +1142,15 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
   const isSudokube = mode === 'sudokube';
   const isGlass = mode === 'glass';
+  // Heatmap mode tints every tile by how "settled" it is: a tile still showing its
+  // original face colour (never flipped through the manifold) reads green; each flip
+  // pushes the hue toward red, so active wormhole zones glow hot.
+  const isHeatmap = mode === 'heatmap';
+  const heatColor = isHeatmap
+    ? (meta && meta.curr === meta.orig
+        ? '#22c55e'
+        : `hsl(${Math.max(0, 110 - ((meta?.flips ?? 1) * 35))}, 85%, 52%)`)
+    : null;
 
   // Biome mode: city identity tracks flip parity.
   // Even flips (0, 2, 4…): sticker is on its home face → use meta.orig city.
@@ -1185,7 +1194,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         : (meta?.curr ? fc[meta.curr] : COLORS.black); // normal mode: show current face color
   // Full-face GLBs (colosseum, volcano) cover the sticker completely.
   // Use city-specific bgColor so edge gaps match the model's ground material, falling back to near-black.
-  const materialColor = currTextureReady ? '#ffffff'
+  const materialColor = isHeatmap ? heatColor
+    : currTextureReady ? '#ffffff'
     : (biomeEnabled && stableCity && isGLBFullFace(stableCity)) ? (CITY_CONFIG[stableCity]?.bgColor ?? '#0d0d0d')
       : baseColor;
 
@@ -1202,7 +1212,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // In biome mode the ground texture IS the tile style — force solid so no
   // shader layer renders underneath the buildings.
   const _styleKey = biomeEnabled ? cityFace : meta?.orig;
-  const tileStyle = biomeGroundTexture
+  const tileStyle = isHeatmap
+    ? 'solid' // heatmap paints a flat tint; no shader/pattern layer on top
+    : biomeGroundTexture
     ? 'solid'
     : stableCity
       ? (CITY_CONFIG[stableCity]?.tileStyle ?? 'solid')
