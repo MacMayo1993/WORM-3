@@ -10,6 +10,7 @@ import StickerPlane from './StickerPlane.jsx';
 import WireframeEdge from './WireframeEdge.jsx';
 import { getMirrorDimensions } from '../game/mirrorBlocks.js';
 import { resolveColors } from '../utils/colorSchemes.js';
+import { PER_CUBELET_VIEW_STYLES, LED_EDGE_MODES, pickCubeletViewStyle, bodyMaterialProps } from './cubeViewStyles.js';
 // Canonical Latin-square value (matches win detection in winDetection.js).
 import { faceValue as latinValue } from '../game/coordinates.js';
 
@@ -79,18 +80,6 @@ const STICKER_ROT = {
   NY: [Math.PI / 2, 0, 0],
 };
 
-// Per-cubelet view styles used by Random Mode. These are the sticker-compatible
-// View-tab looks; 'hollow' is intentionally excluded because it's a whole-cube
-// structural mode (it removes bodies/stickers in favour of void beams) and cannot
-// be mixed per cubelet.
-const PER_CUBELET_VIEW_STYLES = [
-  'classic', 'grid', 'sudokube', 'wireframe', 'glass',
-  'chrome', 'balloon', 'neon', 'gap', 'lego'
-];
-
-// Modes that draw glowing LED edges over the cubie body.
-const LED_EDGE_MODES = new Set(['wireframe', 'neon']);
-
 // Lego studs: a 2x2 grid of studs per face. Each face gets a group whose +Y axis is
 // rotated to the outward face normal; studs are then offset in the in-plane (X,Z) axes.
 const LEGO_STUD_OFFSETS = [[-0.2, -0.2], [0.2, -0.2], [-0.2, 0.2], [0.2, 0.2]];
@@ -104,28 +93,6 @@ const LEGO_FACE_TRANSFORMS = {
   PY: { pos: [0, 0.49, 0], rot: [0, 0, 0] },
   NY: { pos: [0, -0.49, 0], rot: [Math.PI, 0, 0] }
 };
-
-// Body material parameters per view style. The cubie "body" is the frame the stickers
-// sit on; swapping its material is what gives chrome/neon/etc. their whole-cube identity.
-// wormMode transparency/side is layered on top of these at render time.
-function bodyMaterialProps(mode) {
-  switch (mode) {
-    case 'wireframe':
-      return { color: '#000000', roughness: 0.9, metalness: 0, envMapIntensity: 0.4 };
-    case 'glass':
-      return { color: '#111111', roughness: 0.05, metalness: 0.3, envMapIntensity: 0.8, transparent: true, opacity: 0.12 };
-    case 'chrome':
-      return { color: '#d6d9dd', roughness: 0.06, metalness: 1.0, envMapIntensity: 1.25 };
-    case 'neon':
-      return { color: '#08080c', roughness: 0.3, metalness: 0.35, envMapIntensity: 0.5, emissive: '#0a0014', emissiveIntensity: 0.4 };
-    case 'balloon': // shiny rubbery body behind the puffed dome tiles
-      return { color: '#14141a', roughness: 0.12, metalness: 0.1, envMapIntensity: 0.9 };
-    case 'lego': // glossy ABS plastic
-      return { color: '#15151a', roughness: 0.35, metalness: 0.0, envMapIntensity: 0.6 };
-    default: // classic, grid, sudokube, gap
-      return { color: '#0a0a0a', roughness: 0.25, metalness: 0.15, envMapIntensity: 0.4 };
-  }
-}
 
 // A 2x2 grid of Lego studs on a given face, colored to match the face's sticker.
 // Each stud is a cylinder with a slightly narrower raised top for that crisp molded look.
@@ -148,15 +115,6 @@ function LegoStuds({ dir, color }) {
       ))}
     </group>
   );
-}
-
-// Deterministically map a cubelet (by its stable home position) + the current random
-// cycle to one view style. Stable within a cycle so the look follows the physical
-// piece through rotations; reshuffles when `tick` changes (every Random Mode cycle).
-function pickCubeletViewStyle(ox, oy, oz, tick) {
-  let h = (ox * 73856093) ^ (oy * 19349663) ^ (oz * 83492791) ^ (tick * 2654435761);
-  h = (h ^ (h >>> 13)) >>> 0;
-  return PER_CUBELET_VIEW_STYLES[h % PER_CUBELET_VIEW_STYLES.length];
 }
 
 // Helper functions for grid and sudokube modes
