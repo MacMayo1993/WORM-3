@@ -80,11 +80,11 @@ const STICKER_ROT = {
   NY: [Math.PI / 2, 0, 0],
 };
 
-// Lego studs: a 2x2 grid of studs per face. Each face gets a group whose +Y axis is
-// rotated to the outward face normal; studs are then offset in the in-plane (X,Z) axes.
-const LEGO_STUD_OFFSETS = [[-0.2, -0.2], [0.2, -0.2], [-0.2, 0.2], [0.2, 0.2]];
-const LEGO_STUD_GEO = [0.115, 0.115, 0.13, 18];      // main stud cylinder
-const LEGO_STUD_TOP_GEO = [0.088, 0.088, 0.05, 18];  // raised inner lip (the classic stud top)
+// Lego stud: a single molded stud centered on each face. The face group's +Y axis is
+// rotated to the outward normal, then the stud is built up the local +Y axis.
+const LEGO_STUD_BODY_GEO = [0.2, 0.21, 0.14, 26];   // slightly tapered cylinder (radiusTop < bottom)
+const LEGO_STUD_RING_GEO = [0.14, 0.022, 10, 28];   // torus — embossed ring on the stud top
+const LEGO_STUD_PIP_GEO = [0.055, 0.055, 0.05, 18]; // small raised center pip
 const LEGO_FACE_TRANSFORMS = {
   PZ: { pos: [0, 0, 0.49], rot: [Math.PI / 2, 0, 0] },
   NZ: { pos: [0, 0, -0.49], rot: [-Math.PI / 2, 0, 0] },
@@ -94,25 +94,25 @@ const LEGO_FACE_TRANSFORMS = {
   NY: { pos: [0, -0.49, 0], rot: [Math.PI, 0, 0] }
 };
 
-// A 2x2 grid of Lego studs on a given face, colored to match the face's sticker.
-// Each stud is a cylinder with a slightly narrower raised top for that crisp molded look.
-function LegoStuds({ dir, color }) {
+// A single detailed Lego stud on a given face, colored to match the face's sticker:
+// a tapered cylinder body, an embossed ring on top, and a small center pip.
+function LegoStud({ dir, color }) {
   const t = LEGO_FACE_TRANSFORMS[dir];
   if (!t) return null;
   return (
     <group position={t.pos} rotation={t.rot}>
-      {LEGO_STUD_OFFSETS.map(([ox, oz], i) => (
-        <group key={i} position={[ox, 0, oz]}>
-          <mesh position={[0, 0.065, 0]} castShadow>
-            <cylinderGeometry args={LEGO_STUD_GEO} />
-            <meshStandardMaterial color={color} roughness={0.35} metalness={0} envMapIntensity={0.6} />
-          </mesh>
-          <mesh position={[0, 0.145, 0]} castShadow>
-            <cylinderGeometry args={LEGO_STUD_TOP_GEO} />
-            <meshStandardMaterial color={color} roughness={0.3} metalness={0} envMapIntensity={0.7} />
-          </mesh>
-        </group>
-      ))}
+      <mesh position={[0, 0.07, 0]} castShadow>
+        <cylinderGeometry args={LEGO_STUD_BODY_GEO} />
+        <meshStandardMaterial color={color} roughness={0.35} metalness={0} envMapIntensity={0.6} />
+      </mesh>
+      <mesh position={[0, 0.142, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+        <torusGeometry args={LEGO_STUD_RING_GEO} />
+        <meshStandardMaterial color={color} roughness={0.28} metalness={0} envMapIntensity={0.75} />
+      </mesh>
+      <mesh position={[0, 0.155, 0]} castShadow>
+        <cylinderGeometry args={LEGO_STUD_PIP_GEO} />
+        <meshStandardMaterial color={color} roughness={0.3} metalness={0} envMapIntensity={0.7} />
+      </mesh>
     </group>
   );
 }
@@ -490,15 +490,15 @@ const Cubie = React.forwardRef(function Cubie({
         </>
       )}
 
-      {/* Lego studs — a 2x2 grid on each visible face, colored by the face's current sticker */}
+      {/* Lego stud — one detailed stud on each visible face, colored by the face's current sticker */}
       {isLego && !mirrorMode && !hollowMode && (
         <>
-          {isEdge(position[2], (size - 1) / 2) && meta('PZ') && <LegoStuds dir="PZ" color={getEdgeColor('PZ')} />}
-          {isEdge(position[2], -(size - 1) / 2) && meta('NZ') && <LegoStuds dir="NZ" color={getEdgeColor('NZ')} />}
-          {isEdge(position[0], (size - 1) / 2) && meta('PX') && <LegoStuds dir="PX" color={getEdgeColor('PX')} />}
-          {isEdge(position[0], -(size - 1) / 2) && meta('NX') && <LegoStuds dir="NX" color={getEdgeColor('NX')} />}
-          {isEdge(position[1], (size - 1) / 2) && meta('PY') && <LegoStuds dir="PY" color={getEdgeColor('PY')} />}
-          {isEdge(position[1], -(size - 1) / 2) && meta('NY') && <LegoStuds dir="NY" color={getEdgeColor('NY')} />}
+          {isEdge(position[2], (size - 1) / 2) && meta('PZ') && <LegoStud dir="PZ" color={getEdgeColor('PZ')} />}
+          {isEdge(position[2], -(size - 1) / 2) && meta('NZ') && <LegoStud dir="NZ" color={getEdgeColor('NZ')} />}
+          {isEdge(position[0], (size - 1) / 2) && meta('PX') && <LegoStud dir="PX" color={getEdgeColor('PX')} />}
+          {isEdge(position[0], -(size - 1) / 2) && meta('NX') && <LegoStud dir="NX" color={getEdgeColor('NX')} />}
+          {isEdge(position[1], (size - 1) / 2) && meta('PY') && <LegoStud dir="PY" color={getEdgeColor('PY')} />}
+          {isEdge(position[1], -(size - 1) / 2) && meta('NY') && <LegoStud dir="NY" color={getEdgeColor('NY')} />}
         </>
       )}
     </group>
