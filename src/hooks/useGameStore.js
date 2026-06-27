@@ -278,7 +278,7 @@ export const useGameStore = create(
     // Per-tunnel pulse (subsequent flip) animations: { pairId: { startMs, durationMs } }
     tunnelPulses: {},
     cycleVisualMode: () => set((state) => {
-      const modes = ['classic', 'grid', 'sudokube', 'wireframe', 'glass', 'chrome', 'sphere', 'neon', 'gap', 'heatmap'];
+      const modes = ['classic', 'grid', 'sudokube', 'wireframe', 'glass', 'chrome', 'balloon', 'neon', 'gap', 'lego'];
       const idx = modes.indexOf(state.visualMode);
       return { visualMode: modes[(idx + 1) % modes.length] };
     }),
