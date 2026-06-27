@@ -34,6 +34,22 @@ import { MergeTileOverlay } from '../modes/merge/index.js';
 
 // Shared geometries used only by StickerPlane itself (not by extracted sub-components).
 const _sharedStickerGeo = new THREE.PlaneGeometry(0.85, 0.85);
+// Balloon mode: a sticker quad bulged into a convex dome along +Z, keeping the default
+// 0..1 plane UVs so every tile-style shader/texture maps exactly as on the flat plane —
+// the tile "carries" its style but puffs outward like an over-inflated cushion.
+function _makeBulgedStickerGeo(size, seg, bulge) {
+  const geo = new THREE.PlaneGeometry(size, size, seg, seg);
+  const pos = geo.attributes.position;
+  const maxR = (size / 2) * Math.SQRT2;
+  for (let i = 0; i < pos.count; i++) {
+    const r = Math.min(1, Math.hypot(pos.getX(i), pos.getY(i)) / maxR);
+    pos.setZ(i, Math.cos(r * Math.PI * 0.5) * bulge); // cosine falloff: peak center, flat edges
+  }
+  pos.needsUpdate = true;
+  geo.computeVertexNormals();
+  return geo;
+}
+const _balloonStickerGeo = _makeBulgedStickerGeo(0.85, 16, 0.26);
 // Slightly larger plane for the worm-mode rim glow — extends the halo beyond the tile edge.
 const _wormRimGlowGeo = new THREE.PlaneGeometry(1.05, 1.05);
 // Circular alpha map — clips the base sticker mesh to a disc matching the overlay shader
@@ -1142,6 +1158,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
   const isSudokube = mode === 'sudokube';
   const isGlass = mode === 'glass';
+  const isBalloon = mode === 'balloon';
 
   // Biome mode: city identity tracks flip parity.
   // Even flips (0, 2, 4…): sticker is on its home face → use meta.orig city.
@@ -1286,6 +1303,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // Skip for hollow frame geometry (different UV layout, textures not applicable)
   useLayoutEffect(() => {
     if (hollow) return;
+    if (isBalloon) return; // bulged geometry uses its own default UVs (shared, no per-tile slice)
     if (biomeGroundTexture) return; // ground texture is full-tile, don't slice UVs
     if (!geoRef.current || faceRow == null || faceCol == null || !faceSize) return;
     const uvs = geoRef.current.attributes.uv;;
@@ -1301,7 +1319,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       uvs.setXY(2, u0, v0); uvs.setXY(3, u1, v0);
     }
     uvs.needsUpdate = true;
-  }, [hollow, biomeGroundTexture, currTexture, faceRow, faceCol, faceSize]);
+  }, [hollow, isBalloon, biomeGroundTexture, currTexture, faceRow, faceCol, faceSize]);
 
   // ── InstancedMesh eligibility ────────────────────────────────────────────────
   // A sticker is "instanceable" when it renders as a plain solid-colour quad with
@@ -1317,6 +1335,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     !hollow &&
     !isGlass &&
     !isSudokube &&
+    !isBalloon && // balloon tiles need the bulged individual mesh, not the flat instanced quad
     !biomeEnabled &&
     !currTexture &&
     tileStyle === 'solid' &&
@@ -1455,6 +1474,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         {!isInstanceable && <mesh ref={meshRef} key={hollow ? 'frame' : 'plane'}>
           {hollow ? (
             <shapeGeometry args={[_stickerFrameShape]} />
+          ) : isBalloon ? (
+            // Balloon mode: bulged dome geometry (shared) — carries the tile style, puffed out.
+            <primitive object={_balloonStickerGeo} attach="geometry" />
           ) : faceRow != null ? (
             // Face-texture mode (Sudokube): per-instance geometry so UVs can be patched.
             <planeGeometry ref={geoRef} args={[0.85, 0.85]} />
