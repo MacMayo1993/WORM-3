@@ -91,13 +91,18 @@ const PER_CUBELET_VIEW_STYLES = [
 // Modes that draw glowing LED edges over the cubie body.
 const LED_EDGE_MODES = new Set(['wireframe', 'neon']);
 
-// Balloon ("over-inflated") body: a sphere a bit larger than its cell so neighbours
-// press together. Stickers ride out to the sphere surface as colored panels.
-const BALLOON_RADIUS = 0.6;
-const STICKER_POS_BALLOON = {
-  PZ: [0, 0, BALLOON_RADIUS], NZ: [0, 0, -BALLOON_RADIUS],
-  PX: [BALLOON_RADIUS, 0, 0], NX: [-BALLOON_RADIUS, 0, 0],
-  PY: [0, BALLOON_RADIUS, 0], NY: [0, -BALLOON_RADIUS, 0]
+// Balloon mode: each face is a convex domed "puffed tile" that bulges outward like an
+// over-inflated cushion, colored by that face's sticker. The dome is a top hemisphere
+// (oriented along the face normal) flattened a little so it reads as a puff, not a ball.
+const BALLOON_DOME_ARGS = [0.48, 22, 12, 0, Math.PI * 2, 0, Math.PI / 2];
+const BALLOON_DOME_SCALE = [1, 0.62, 1]; // flatten along the bulge axis (local +Y)
+const BALLOON_TILE_TRANSFORMS = {
+  PZ: { pos: [0, 0, 0.44], rot: [Math.PI / 2, 0, 0] },
+  NZ: { pos: [0, 0, -0.44], rot: [-Math.PI / 2, 0, 0] },
+  PX: { pos: [0.44, 0, 0], rot: [0, 0, -Math.PI / 2] },
+  NX: { pos: [-0.44, 0, 0], rot: [0, 0, Math.PI / 2] },
+  PY: { pos: [0, 0.44, 0], rot: [0, 0, 0] },
+  NY: { pos: [0, -0.44, 0], rot: [Math.PI, 0, 0] }
 };
 
 // Lego studs: one cylinder centered on each visible face, oriented along the face normal.
@@ -141,6 +146,18 @@ function LegoStud({ dir, color }) {
     <mesh position={t.pos} rotation={t.rot} castShadow>
       <cylinderGeometry args={STUD_GEO_ARGS} />
       <meshStandardMaterial color={color} roughness={0.35} metalness={0} envMapIntensity={0.6} />
+    </mesh>
+  );
+}
+
+// A convex "puffed tile" — a colored dome bulging out of a face for balloon mode.
+function BalloonTile({ dir, color }) {
+  const t = BALLOON_TILE_TRANSFORMS[dir];
+  if (!t) return null;
+  return (
+    <mesh position={t.pos} rotation={t.rot} scale={BALLOON_DOME_SCALE} castShadow>
+      <sphereGeometry args={BALLOON_DOME_ARGS} />
+      <meshStandardMaterial color={color} roughness={0.22} metalness={0.05} envMapIntensity={0.8} />
     </mesh>
   );
 }
@@ -210,11 +227,9 @@ const Cubie = React.forwardRef(function Cubie({
   );
 
   // Derived per-style render switches.
-  const isBalloonBody = effectiveVisualMode === 'balloon';
+  const isBalloon = effectiveVisualMode === 'balloon';
   const isLego = effectiveVisualMode === 'lego';
   const showLedEdges = LED_EDGE_MODES.has(effectiveVisualMode);
-  // Sticker offsets ride out to the balloon surface in balloon mode, flat faces otherwise.
-  const SP = isBalloonBody ? STICKER_POS_BALLOON : STICKER_POS;
   // Gap mode shrinks the whole cubie in place so visible gaps open between pieces.
   const contentScale = effectiveVisualMode === 'gap' ? 0.82 : 1;
   // Body material props (+ wormMode transparency layered on).
@@ -499,13 +514,6 @@ const Cubie = React.forwardRef(function Cubie({
         <mesh onPointerDown={handleDown} visible={false}>
           <boxGeometry args={[0.98, 0.98, 0.98]} />
         </mesh>
-      ) : isBalloonBody ? (
-        // Balloon body — an over-inflated sphere larger than its cell so neighbours press
-        // together; stickers ride out to the surface (STICKER_POS_BALLOON) as colored panels.
-        <mesh onPointerDown={handleDown} castShadow receiveShadow>
-          <sphereGeometry args={[BALLOON_RADIUS, 28, 28]} />
-          <meshStandardMaterial {...bodyMatProps} />
-        </mesh>
       ) : (
         <RoundedBox args={[0.98, 0.98, 0.98]} radius={0.08} smoothness={4} onPointerDown={handleDown} castShadow receiveShadow>
           <meshStandardMaterial {...bodyMatProps} />
@@ -524,15 +532,27 @@ const Cubie = React.forwardRef(function Cubie({
         />
       ))}
 
-      {/* Stickers — frame-shaped when hollow, solid plane otherwise; none in mirror/wireframe mode */}
-      {effectiveVisualMode !== 'wireframe' && !mirrorMode && (
+      {/* Stickers — frame-shaped when hollow, solid plane otherwise; none in mirror/wireframe/balloon mode */}
+      {effectiveVisualMode !== 'wireframe' && !isBalloon && !mirrorMode && (
         <>
-          {isEdge(position[2], (size - 1) / 2) && meta('PZ') && <StickerPlane key={stickerKey('PZ')} currentDir="PZ" meta={meta('PZ')} pos={SP.PZ} rot={STICKER_ROT.PZ} mode={effectiveVisualMode} overlay={overlay('PZ')} faceSize={size} {...gridPos('PZ')} hollow={hollowMode} />}
-          {isEdge(position[2], -(size - 1) / 2) && meta('NZ') && <StickerPlane key={stickerKey('NZ')} currentDir="NZ" meta={meta('NZ')} pos={SP.NZ} rot={STICKER_ROT.NZ} mode={effectiveVisualMode} overlay={overlay('NZ')} faceSize={size} {...gridPos('NZ')} hollow={hollowMode} />}
-          {isEdge(position[0], (size - 1) / 2) && meta('PX') && <StickerPlane key={stickerKey('PX')} currentDir="PX" meta={meta('PX')} pos={SP.PX} rot={STICKER_ROT.PX} mode={effectiveVisualMode} overlay={overlay('PX')} faceSize={size} {...gridPos('PX')} hollow={hollowMode} />}
-          {isEdge(position[0], -(size - 1) / 2) && meta('NX') && <StickerPlane key={stickerKey('NX')} currentDir="NX" meta={meta('NX')} pos={SP.NX} rot={STICKER_ROT.NX} mode={effectiveVisualMode} overlay={overlay('NX')} faceSize={size} {...gridPos('NX')} hollow={hollowMode} />}
-          {isEdge(position[1], (size - 1) / 2) && meta('PY') && <StickerPlane key={stickerKey('PY')} currentDir="PY" meta={meta('PY')} pos={SP.PY} rot={STICKER_ROT.PY} mode={effectiveVisualMode} overlay={overlay('PY')} faceSize={size} {...gridPos('PY')} hollow={hollowMode} />}
-          {isEdge(position[1], -(size - 1) / 2) && meta('NY') && <StickerPlane key={stickerKey('NY')} currentDir="NY" meta={meta('NY')} pos={SP.NY} rot={STICKER_ROT.NY} mode={effectiveVisualMode} overlay={overlay('NY')} faceSize={size} {...gridPos('NY')} hollow={hollowMode} />}
+          {isEdge(position[2], (size - 1) / 2) && meta('PZ') && <StickerPlane key={stickerKey('PZ')} currentDir="PZ" meta={meta('PZ')} pos={STICKER_POS.PZ} rot={STICKER_ROT.PZ} mode={effectiveVisualMode} overlay={overlay('PZ')} faceSize={size} {...gridPos('PZ')} hollow={hollowMode} />}
+          {isEdge(position[2], -(size - 1) / 2) && meta('NZ') && <StickerPlane key={stickerKey('NZ')} currentDir="NZ" meta={meta('NZ')} pos={STICKER_POS.NZ} rot={STICKER_ROT.NZ} mode={effectiveVisualMode} overlay={overlay('NZ')} faceSize={size} {...gridPos('NZ')} hollow={hollowMode} />}
+          {isEdge(position[0], (size - 1) / 2) && meta('PX') && <StickerPlane key={stickerKey('PX')} currentDir="PX" meta={meta('PX')} pos={STICKER_POS.PX} rot={STICKER_ROT.PX} mode={effectiveVisualMode} overlay={overlay('PX')} faceSize={size} {...gridPos('PX')} hollow={hollowMode} />}
+          {isEdge(position[0], -(size - 1) / 2) && meta('NX') && <StickerPlane key={stickerKey('NX')} currentDir="NX" meta={meta('NX')} pos={STICKER_POS.NX} rot={STICKER_ROT.NX} mode={effectiveVisualMode} overlay={overlay('NX')} faceSize={size} {...gridPos('NX')} hollow={hollowMode} />}
+          {isEdge(position[1], (size - 1) / 2) && meta('PY') && <StickerPlane key={stickerKey('PY')} currentDir="PY" meta={meta('PY')} pos={STICKER_POS.PY} rot={STICKER_ROT.PY} mode={effectiveVisualMode} overlay={overlay('PY')} faceSize={size} {...gridPos('PY')} hollow={hollowMode} />}
+          {isEdge(position[1], -(size - 1) / 2) && meta('NY') && <StickerPlane key={stickerKey('NY')} currentDir="NY" meta={meta('NY')} pos={STICKER_POS.NY} rot={STICKER_ROT.NY} mode={effectiveVisualMode} overlay={overlay('NY')} faceSize={size} {...gridPos('NY')} hollow={hollowMode} />}
+        </>
+      )}
+
+      {/* Balloon — a convex puffed-out colored dome on each visible face */}
+      {isBalloon && !mirrorMode && !hollowMode && (
+        <>
+          {isEdge(position[2], (size - 1) / 2) && meta('PZ') && <BalloonTile dir="PZ" color={getEdgeColor('PZ')} />}
+          {isEdge(position[2], -(size - 1) / 2) && meta('NZ') && <BalloonTile dir="NZ" color={getEdgeColor('NZ')} />}
+          {isEdge(position[0], (size - 1) / 2) && meta('PX') && <BalloonTile dir="PX" color={getEdgeColor('PX')} />}
+          {isEdge(position[0], -(size - 1) / 2) && meta('NX') && <BalloonTile dir="NX" color={getEdgeColor('NX')} />}
+          {isEdge(position[1], (size - 1) / 2) && meta('PY') && <BalloonTile dir="PY" color={getEdgeColor('PY')} />}
+          {isEdge(position[1], -(size - 1) / 2) && meta('NY') && <BalloonTile dir="NY" color={getEdgeColor('NY')} />}
         </>
       )}
 
