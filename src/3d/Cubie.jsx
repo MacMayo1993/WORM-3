@@ -91,29 +91,18 @@ const PER_CUBELET_VIEW_STYLES = [
 // Modes that draw glowing LED edges over the cubie body.
 const LED_EDGE_MODES = new Set(['wireframe', 'neon']);
 
-// Balloon mode: each face is a convex domed "puffed tile" that bulges outward like an
-// over-inflated cushion, colored by that face's sticker. The dome is a top hemisphere
-// (oriented along the face normal) flattened a little so it reads as a puff, not a ball.
-const BALLOON_DOME_ARGS = [0.48, 22, 12, 0, Math.PI * 2, 0, Math.PI / 2];
-const BALLOON_DOME_SCALE = [1, 0.62, 1]; // flatten along the bulge axis (local +Y)
-const BALLOON_TILE_TRANSFORMS = {
-  PZ: { pos: [0, 0, 0.44], rot: [Math.PI / 2, 0, 0] },
-  NZ: { pos: [0, 0, -0.44], rot: [-Math.PI / 2, 0, 0] },
-  PX: { pos: [0.44, 0, 0], rot: [0, 0, -Math.PI / 2] },
-  NX: { pos: [-0.44, 0, 0], rot: [0, 0, Math.PI / 2] },
-  PY: { pos: [0, 0.44, 0], rot: [0, 0, 0] },
-  NY: { pos: [0, -0.44, 0], rot: [Math.PI, 0, 0] }
-};
-
-// Lego studs: one cylinder centered on each visible face, oriented along the face normal.
-const STUD_GEO_ARGS = [0.22, 0.22, 0.16, 20];
-const STUD_TRANSFORMS = {
-  PZ: { pos: [0, 0, 0.56], rot: [Math.PI / 2, 0, 0] },
-  NZ: { pos: [0, 0, -0.56], rot: [Math.PI / 2, 0, 0] },
-  PX: { pos: [0.56, 0, 0], rot: [0, 0, Math.PI / 2] },
-  NX: { pos: [-0.56, 0, 0], rot: [0, 0, Math.PI / 2] },
-  PY: { pos: [0, 0.56, 0], rot: [0, 0, 0] },
-  NY: { pos: [0, -0.56, 0], rot: [0, 0, 0] }
+// Lego studs: a 2x2 grid of studs per face. Each face gets a group whose +Y axis is
+// rotated to the outward face normal; studs are then offset in the in-plane (X,Z) axes.
+const LEGO_STUD_OFFSETS = [[-0.2, -0.2], [0.2, -0.2], [-0.2, 0.2], [0.2, 0.2]];
+const LEGO_STUD_GEO = [0.115, 0.115, 0.13, 18];      // main stud cylinder
+const LEGO_STUD_TOP_GEO = [0.088, 0.088, 0.05, 18];  // raised inner lip (the classic stud top)
+const LEGO_FACE_TRANSFORMS = {
+  PZ: { pos: [0, 0, 0.49], rot: [Math.PI / 2, 0, 0] },
+  NZ: { pos: [0, 0, -0.49], rot: [-Math.PI / 2, 0, 0] },
+  PX: { pos: [0.49, 0, 0], rot: [0, 0, -Math.PI / 2] },
+  NX: { pos: [-0.49, 0, 0], rot: [0, 0, Math.PI / 2] },
+  PY: { pos: [0, 0.49, 0], rot: [0, 0, 0] },
+  NY: { pos: [0, -0.49, 0], rot: [Math.PI, 0, 0] }
 };
 
 // Body material parameters per view style. The cubie "body" is the frame the stickers
@@ -129,7 +118,7 @@ function bodyMaterialProps(mode) {
       return { color: '#d6d9dd', roughness: 0.06, metalness: 1.0, envMapIntensity: 1.25 };
     case 'neon':
       return { color: '#08080c', roughness: 0.3, metalness: 0.35, envMapIntensity: 0.5, emissive: '#0a0014', emissiveIntensity: 0.4 };
-    case 'balloon': // shiny rubbery sphere
+    case 'balloon': // shiny rubbery body behind the puffed dome tiles
       return { color: '#14141a', roughness: 0.12, metalness: 0.1, envMapIntensity: 0.9 };
     case 'lego': // glossy ABS plastic
       return { color: '#15151a', roughness: 0.35, metalness: 0.0, envMapIntensity: 0.6 };
@@ -138,27 +127,26 @@ function bodyMaterialProps(mode) {
   }
 }
 
-// A single Lego stud (cylinder) on a given face, colored to match the face's sticker.
-function LegoStud({ dir, color }) {
-  const t = STUD_TRANSFORMS[dir];
+// A 2x2 grid of Lego studs on a given face, colored to match the face's sticker.
+// Each stud is a cylinder with a slightly narrower raised top for that crisp molded look.
+function LegoStuds({ dir, color }) {
+  const t = LEGO_FACE_TRANSFORMS[dir];
   if (!t) return null;
   return (
-    <mesh position={t.pos} rotation={t.rot} castShadow>
-      <cylinderGeometry args={STUD_GEO_ARGS} />
-      <meshStandardMaterial color={color} roughness={0.35} metalness={0} envMapIntensity={0.6} />
-    </mesh>
-  );
-}
-
-// A convex "puffed tile" — a colored dome bulging out of a face for balloon mode.
-function BalloonTile({ dir, color }) {
-  const t = BALLOON_TILE_TRANSFORMS[dir];
-  if (!t) return null;
-  return (
-    <mesh position={t.pos} rotation={t.rot} scale={BALLOON_DOME_SCALE} castShadow>
-      <sphereGeometry args={BALLOON_DOME_ARGS} />
-      <meshStandardMaterial color={color} roughness={0.22} metalness={0.05} envMapIntensity={0.8} />
-    </mesh>
+    <group position={t.pos} rotation={t.rot}>
+      {LEGO_STUD_OFFSETS.map(([ox, oz], i) => (
+        <group key={i} position={[ox, 0, oz]}>
+          <mesh position={[0, 0.065, 0]} castShadow>
+            <cylinderGeometry args={LEGO_STUD_GEO} />
+            <meshStandardMaterial color={color} roughness={0.35} metalness={0} envMapIntensity={0.6} />
+          </mesh>
+          <mesh position={[0, 0.145, 0]} castShadow>
+            <cylinderGeometry args={LEGO_STUD_TOP_GEO} />
+            <meshStandardMaterial color={color} roughness={0.3} metalness={0} envMapIntensity={0.7} />
+          </mesh>
+        </group>
+      ))}
+    </group>
   );
 }
 
@@ -227,7 +215,6 @@ const Cubie = React.forwardRef(function Cubie({
   );
 
   // Derived per-style render switches.
-  const isBalloon = effectiveVisualMode === 'balloon';
   const isLego = effectiveVisualMode === 'lego';
   const showLedEdges = LED_EDGE_MODES.has(effectiveVisualMode);
   // Gap mode shrinks the whole cubie in place so visible gaps open between pieces.
@@ -532,8 +519,9 @@ const Cubie = React.forwardRef(function Cubie({
         />
       ))}
 
-      {/* Stickers — frame-shaped when hollow, solid plane otherwise; none in mirror/wireframe/balloon mode */}
-      {effectiveVisualMode !== 'wireframe' && !isBalloon && !mirrorMode && (
+      {/* Stickers — frame-shaped when hollow, solid plane otherwise; none in mirror/wireframe mode.
+          Balloon mode renders these too — StickerPlane swaps in a bulged dome geometry. */}
+      {effectiveVisualMode !== 'wireframe' && !mirrorMode && (
         <>
           {isEdge(position[2], (size - 1) / 2) && meta('PZ') && <StickerPlane key={stickerKey('PZ')} currentDir="PZ" meta={meta('PZ')} pos={STICKER_POS.PZ} rot={STICKER_ROT.PZ} mode={effectiveVisualMode} overlay={overlay('PZ')} faceSize={size} {...gridPos('PZ')} hollow={hollowMode} />}
           {isEdge(position[2], -(size - 1) / 2) && meta('NZ') && <StickerPlane key={stickerKey('NZ')} currentDir="NZ" meta={meta('NZ')} pos={STICKER_POS.NZ} rot={STICKER_ROT.NZ} mode={effectiveVisualMode} overlay={overlay('NZ')} faceSize={size} {...gridPos('NZ')} hollow={hollowMode} />}
@@ -544,27 +532,15 @@ const Cubie = React.forwardRef(function Cubie({
         </>
       )}
 
-      {/* Balloon — a convex puffed-out colored dome on each visible face */}
-      {isBalloon && !mirrorMode && !hollowMode && (
-        <>
-          {isEdge(position[2], (size - 1) / 2) && meta('PZ') && <BalloonTile dir="PZ" color={getEdgeColor('PZ')} />}
-          {isEdge(position[2], -(size - 1) / 2) && meta('NZ') && <BalloonTile dir="NZ" color={getEdgeColor('NZ')} />}
-          {isEdge(position[0], (size - 1) / 2) && meta('PX') && <BalloonTile dir="PX" color={getEdgeColor('PX')} />}
-          {isEdge(position[0], -(size - 1) / 2) && meta('NX') && <BalloonTile dir="NX" color={getEdgeColor('NX')} />}
-          {isEdge(position[1], (size - 1) / 2) && meta('PY') && <BalloonTile dir="PY" color={getEdgeColor('PY')} />}
-          {isEdge(position[1], -(size - 1) / 2) && meta('NY') && <BalloonTile dir="NY" color={getEdgeColor('NY')} />}
-        </>
-      )}
-
-      {/* Lego studs — a cylinder on each visible face, colored by the face's current sticker */}
+      {/* Lego studs — a 2x2 grid on each visible face, colored by the face's current sticker */}
       {isLego && !mirrorMode && !hollowMode && (
         <>
-          {isEdge(position[2], (size - 1) / 2) && meta('PZ') && <LegoStud dir="PZ" color={getEdgeColor('PZ')} />}
-          {isEdge(position[2], -(size - 1) / 2) && meta('NZ') && <LegoStud dir="NZ" color={getEdgeColor('NZ')} />}
-          {isEdge(position[0], (size - 1) / 2) && meta('PX') && <LegoStud dir="PX" color={getEdgeColor('PX')} />}
-          {isEdge(position[0], -(size - 1) / 2) && meta('NX') && <LegoStud dir="NX" color={getEdgeColor('NX')} />}
-          {isEdge(position[1], (size - 1) / 2) && meta('PY') && <LegoStud dir="PY" color={getEdgeColor('PY')} />}
-          {isEdge(position[1], -(size - 1) / 2) && meta('NY') && <LegoStud dir="NY" color={getEdgeColor('NY')} />}
+          {isEdge(position[2], (size - 1) / 2) && meta('PZ') && <LegoStuds dir="PZ" color={getEdgeColor('PZ')} />}
+          {isEdge(position[2], -(size - 1) / 2) && meta('NZ') && <LegoStuds dir="NZ" color={getEdgeColor('NZ')} />}
+          {isEdge(position[0], (size - 1) / 2) && meta('PX') && <LegoStuds dir="PX" color={getEdgeColor('PX')} />}
+          {isEdge(position[0], -(size - 1) / 2) && meta('NX') && <LegoStuds dir="NX" color={getEdgeColor('NX')} />}
+          {isEdge(position[1], (size - 1) / 2) && meta('PY') && <LegoStuds dir="PY" color={getEdgeColor('PY')} />}
+          {isEdge(position[1], -(size - 1) / 2) && meta('NY') && <LegoStuds dir="NY" color={getEdgeColor('NY')} />}
         </>
       )}
     </group>
