@@ -79,6 +79,21 @@ const STICKER_ROT = {
   NY: [Math.PI / 2, 0, 0],
 };
 
+// Per-cubelet view styles used by Random Mode. These are the sticker-compatible
+// View-tab looks; 'hollow' is intentionally excluded because it's a whole-cube
+// structural mode (it removes bodies/stickers in favour of void beams) and cannot
+// be mixed per cubelet.
+const PER_CUBELET_VIEW_STYLES = ['classic', 'grid', 'sudokube', 'wireframe', 'glass'];
+
+// Deterministically map a cubelet (by its stable home position) + the current random
+// cycle to one view style. Stable within a cycle so the look follows the physical
+// piece through rotations; reshuffles when `tick` changes (every Random Mode cycle).
+function pickCubeletViewStyle(ox, oy, oz, tick) {
+  let h = (ox * 73856093) ^ (oy * 19349663) ^ (oz * 83492791) ^ (tick * 2654435761);
+  h = (h ^ (h >>> 13)) >>> 0;
+  return PER_CUBELET_VIEW_STYLES[h % PER_CUBELET_VIEW_STYLES.length];
+}
+
 // Helper functions for grid and sudokube modes
 const faceRCFor = (dirKey, x, y, z, size) => {
   if (dirKey === 'PZ') {
@@ -103,17 +118,36 @@ const faceRCFor = (dirKey, x, y, z, size) => {
 const Cubie = React.forwardRef(function Cubie({
   position, cubie, size, wormMode = false, hideBody = false, onPointerDown,
 }, ref) {
-  const { hollowMode, mirrorMode, visualMode, explosionFactor, settings } = useGameStore(
+  const { hollowMode, mirrorMode, visualMode, explosionFactor, settings, randomMode, randomStyleTick } = useGameStore(
     useShallow(s => ({
       hollowMode: s.hollowMode,
       mirrorMode: s.mirrorMode,
       visualMode: s.visualMode,
       explosionFactor: s.explosionT,
       settings: s.settings,
+      randomMode: s.randomMode,
+      randomStyleTick: s.randomStyleTick,
     }))
   );
   // faceColors needed locally for wireframe edge coloring
   const faceColors = useMemo(() => resolveColors(settings, settings?.biomeMode?.faceAssignment), [settings]);
+
+  // Physical-piece identity (original home position). origPos is set once in makeCubies
+  // and preserved through every move, so it's stable across rotations. Interior pieces
+  // (no stickers) fall back to their current grid position.
+  const _firstStickerOrigPos = Object.values(cubie.stickers)[0]?.origPos;
+  const origHomeX = _firstStickerOrigPos?.x ?? cubie.x;
+  const origHomeY = _firstStickerOrigPos?.y ?? cubie.y;
+  const origHomeZ = _firstStickerOrigPos?.z ?? cubie.z;
+
+  // In Random Mode each cubelet wears its own view style, reshuffled every cycle
+  // (randomStyleTick). Keyed by the piece's home position so the style follows the
+  // physical cubelet through rotations rather than flickering. Outside Random Mode the
+  // global View-tab visualMode applies to the whole cube exactly as before.
+  const effectiveVisualMode = useMemo(
+    () => (randomMode ? pickCubeletViewStyle(origHomeX, origHomeY, origHomeZ, randomStyleTick) : visualMode),
+    [randomMode, randomStyleTick, visualMode, origHomeX, origHomeY, origHomeZ]
+  );
   const isEdge = (p, v) => Math.abs(p - v) < 0.01;
 
   const explodedPos = useMemo(() => {
@@ -154,7 +188,7 @@ const Cubie = React.forwardRef(function Cubie({
 
   const overlay = (dirKey) => {
     const m = meta(dirKey); if (!m) return '';
-    if (visualMode === 'grid') {
+    if (effectiveVisualMode === 'grid') {
       const { r, c } = faceRCFor(m.origDir, m.origPos.x, m.origPos.y, m.origPos.z, size);
       const idx = r * size + c + 1;
       const idStr = String(idx).padStart(3, '0');
@@ -164,7 +198,7 @@ const Cubie = React.forwardRef(function Cubie({
       const faceId = GRID_FACE[m.orig] ?? m.orig;
       return `M${faceId}-${idStr}`;
     }
-    if (visualMode === 'sudokube') {
+    if (effectiveVisualMode === 'sudokube') {
       // Show the sticker's IDENTITY value (from its original face + position),
       // not its current cell. Using the current position made faceValue collapse
       // to ((r+c)%size)+1 for every cell — a perfect Latin square at all times —
@@ -196,11 +230,11 @@ const Cubie = React.forwardRef(function Cubie({
   // Memoized so the template-literal is not evaluated on every render; in non-wireframe
   // mode the memo short-circuits immediately (no string allocation at all).
   const stickerColorKey = useMemo(
-    () => visualMode === 'wireframe'
+    () => effectiveVisualMode === 'wireframe'
       ? `${cubie.stickers.PZ?.curr},${cubie.stickers.NZ?.curr},${cubie.stickers.PX?.curr},${cubie.stickers.NX?.curr},${cubie.stickers.PY?.curr},${cubie.stickers.NY?.curr}`
       : '',
     [
-      visualMode,
+      effectiveVisualMode,
       cubie.stickers.PZ?.curr, cubie.stickers.NZ?.curr,
       cubie.stickers.PX?.curr, cubie.stickers.NX?.curr,
       cubie.stickers.PY?.curr, cubie.stickers.NY?.curr,
@@ -221,7 +255,7 @@ const Cubie = React.forwardRef(function Cubie({
 
   // Generate wireframe edges for wireframe mode ONLY
   const wireframeEdges = useMemo(() => {
-    if (visualMode !== 'wireframe') return [];
+    if (effectiveVisualMode !== 'wireframe') return [];
 
     const halfSize = 0.49;
     const eps = 0.01;
@@ -306,22 +340,13 @@ const Cubie = React.forwardRef(function Cubie({
     }
 
     return edgeList;
-  }, [visualMode, isOnEdge, size, faceColors, stickerColorKey]);
+  }, [effectiveVisualMode, isOnEdge, size, faceColors, stickerColorKey]);
 
   // Mirror mode: derive this piece's intrinsic box dimensions from its *original*
-  // home position (origPos), not its current grid slot.  rotateSliceCubies writes
-  // new x/y/z on every move, but origPos is set once in makeCubies and preserved
-  // by the {...src} spread in rotateSliceCubies.  Using origPos means each piece
-  // keeps its own unique shape as it travels around the lattice — the core
-  // mechanic of a mirror cube.  Interior pieces (no stickers) use current
-  // position as a safe fallback; they're not part of the scramble identity.
-  //
-  // Use primitive origPos coordinates as deps instead of `cubie.stickers` (a new
-  // object reference on every rotation) to avoid spurious recalculations.
-  const _firstStickerOrigPos = Object.values(cubie.stickers)[0]?.origPos;
-  const origHomeX = _firstStickerOrigPos?.x ?? cubie.x;
-  const origHomeY = _firstStickerOrigPos?.y ?? cubie.y;
-  const origHomeZ = _firstStickerOrigPos?.z ?? cubie.z;
+  // home position (origHomeX/Y/Z above), not its current grid slot. rotateSliceCubies
+  // writes new x/y/z on every move, but origPos is set once in makeCubies and preserved
+  // by the {...src} spread, so each piece keeps its own unique shape as it travels
+  // around the lattice — the core mechanic of a mirror cube.
   const mirrorDims = useMemo(() => {
     if (!mirrorMode) return null;
     return getMirrorDimensions(origHomeX, origHomeY, origHomeZ, size);
@@ -381,7 +406,7 @@ const Cubie = React.forwardRef(function Cubie({
           {HOLLOW_EDGES.map((edge, idx) => (
             <mesh key={idx} position={edge.pos} castShadow receiveShadow>
               <boxGeometry args={BEAM_DIMS[edge.geo]} />
-              <primitive object={getHollowBeamMaterial(visualMode)} attach="material" />
+              <primitive object={getHollowBeamMaterial(effectiveVisualMode)} attach="material" />
             </mesh>
           ))}
         </>
@@ -395,19 +420,19 @@ const Cubie = React.forwardRef(function Cubie({
       ) : (
         <RoundedBox args={[0.98, 0.98, 0.98]} radius={0.08} smoothness={4} onPointerDown={handleDown} castShadow receiveShadow>
           <meshStandardMaterial
-            color={visualMode === 'wireframe' ? "#000000" : visualMode === 'glass' ? "#111111" : "#0a0a0a"}
-            roughness={visualMode === 'wireframe' ? 0.9 : visualMode === 'glass' ? 0.05 : 0.25}
-            metalness={visualMode === 'wireframe' ? 0 : visualMode === 'glass' ? 0.3 : 0.15}
-            envMapIntensity={visualMode === 'glass' ? 0.8 : 0.4}
-            transparent={visualMode === 'glass' || wormMode}
-            opacity={wormMode ? 0.8 : visualMode === 'glass' ? 0.12 : 1.0}
+            color={effectiveVisualMode === 'wireframe' ? "#000000" : effectiveVisualMode === 'glass' ? "#111111" : "#0a0a0a"}
+            roughness={effectiveVisualMode === 'wireframe' ? 0.9 : effectiveVisualMode === 'glass' ? 0.05 : 0.25}
+            metalness={effectiveVisualMode === 'wireframe' ? 0 : effectiveVisualMode === 'glass' ? 0.3 : 0.15}
+            envMapIntensity={effectiveVisualMode === 'glass' ? 0.8 : 0.4}
+            transparent={effectiveVisualMode === 'glass' || wormMode}
+            opacity={wormMode ? 0.8 : effectiveVisualMode === 'glass' ? 0.12 : 1.0}
             side={wormMode ? THREE.DoubleSide : THREE.FrontSide}
           />
         </RoundedBox>
       )}
 
       {/* LED Wireframe edges ONLY in wireframe mode (skip in hollow/mirror mode) */}
-      {visualMode === 'wireframe' && !hollowMode && !mirrorMode && wireframeEdges.map((edge, idx) => (
+      {effectiveVisualMode === 'wireframe' && !hollowMode && !mirrorMode && wireframeEdges.map((edge, idx) => (
         <WireframeEdge
           key={idx}
           start={edge.start}
@@ -419,14 +444,14 @@ const Cubie = React.forwardRef(function Cubie({
       ))}
 
       {/* Stickers — frame-shaped when hollow, solid plane otherwise; none in mirror mode */}
-      {visualMode !== 'wireframe' && !mirrorMode && (
+      {effectiveVisualMode !== 'wireframe' && !mirrorMode && (
         <>
-          {isEdge(position[2], (size - 1) / 2) && meta('PZ') && <StickerPlane key={stickerKey('PZ')} currentDir="PZ" meta={meta('PZ')} pos={STICKER_POS.PZ} rot={STICKER_ROT.PZ} mode={visualMode} overlay={overlay('PZ')} faceSize={size} {...gridPos('PZ')} hollow={hollowMode} />}
-          {isEdge(position[2], -(size - 1) / 2) && meta('NZ') && <StickerPlane key={stickerKey('NZ')} currentDir="NZ" meta={meta('NZ')} pos={STICKER_POS.NZ} rot={STICKER_ROT.NZ} mode={visualMode} overlay={overlay('NZ')} faceSize={size} {...gridPos('NZ')} hollow={hollowMode} />}
-          {isEdge(position[0], (size - 1) / 2) && meta('PX') && <StickerPlane key={stickerKey('PX')} currentDir="PX" meta={meta('PX')} pos={STICKER_POS.PX} rot={STICKER_ROT.PX} mode={visualMode} overlay={overlay('PX')} faceSize={size} {...gridPos('PX')} hollow={hollowMode} />}
-          {isEdge(position[0], -(size - 1) / 2) && meta('NX') && <StickerPlane key={stickerKey('NX')} currentDir="NX" meta={meta('NX')} pos={STICKER_POS.NX} rot={STICKER_ROT.NX} mode={visualMode} overlay={overlay('NX')} faceSize={size} {...gridPos('NX')} hollow={hollowMode} />}
-          {isEdge(position[1], (size - 1) / 2) && meta('PY') && <StickerPlane key={stickerKey('PY')} currentDir="PY" meta={meta('PY')} pos={STICKER_POS.PY} rot={STICKER_ROT.PY} mode={visualMode} overlay={overlay('PY')} faceSize={size} {...gridPos('PY')} hollow={hollowMode} />}
-          {isEdge(position[1], -(size - 1) / 2) && meta('NY') && <StickerPlane key={stickerKey('NY')} currentDir="NY" meta={meta('NY')} pos={STICKER_POS.NY} rot={STICKER_ROT.NY} mode={visualMode} overlay={overlay('NY')} faceSize={size} {...gridPos('NY')} hollow={hollowMode} />}
+          {isEdge(position[2], (size - 1) / 2) && meta('PZ') && <StickerPlane key={stickerKey('PZ')} currentDir="PZ" meta={meta('PZ')} pos={STICKER_POS.PZ} rot={STICKER_ROT.PZ} mode={effectiveVisualMode} overlay={overlay('PZ')} faceSize={size} {...gridPos('PZ')} hollow={hollowMode} />}
+          {isEdge(position[2], -(size - 1) / 2) && meta('NZ') && <StickerPlane key={stickerKey('NZ')} currentDir="NZ" meta={meta('NZ')} pos={STICKER_POS.NZ} rot={STICKER_ROT.NZ} mode={effectiveVisualMode} overlay={overlay('NZ')} faceSize={size} {...gridPos('NZ')} hollow={hollowMode} />}
+          {isEdge(position[0], (size - 1) / 2) && meta('PX') && <StickerPlane key={stickerKey('PX')} currentDir="PX" meta={meta('PX')} pos={STICKER_POS.PX} rot={STICKER_ROT.PX} mode={effectiveVisualMode} overlay={overlay('PX')} faceSize={size} {...gridPos('PX')} hollow={hollowMode} />}
+          {isEdge(position[0], -(size - 1) / 2) && meta('NX') && <StickerPlane key={stickerKey('NX')} currentDir="NX" meta={meta('NX')} pos={STICKER_POS.NX} rot={STICKER_ROT.NX} mode={effectiveVisualMode} overlay={overlay('NX')} faceSize={size} {...gridPos('NX')} hollow={hollowMode} />}
+          {isEdge(position[1], (size - 1) / 2) && meta('PY') && <StickerPlane key={stickerKey('PY')} currentDir="PY" meta={meta('PY')} pos={STICKER_POS.PY} rot={STICKER_ROT.PY} mode={effectiveVisualMode} overlay={overlay('PY')} faceSize={size} {...gridPos('PY')} hollow={hollowMode} />}
+          {isEdge(position[1], -(size - 1) / 2) && meta('NY') && <StickerPlane key={stickerKey('NY')} currentDir="NY" meta={meta('NY')} pos={STICKER_POS.NY} rot={STICKER_ROT.NY} mode={effectiveVisualMode} overlay={overlay('NY')} faceSize={size} {...gridPos('NY')} hollow={hollowMode} />}
         </>
       )}
     </group>
