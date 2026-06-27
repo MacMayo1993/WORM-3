@@ -78,6 +78,11 @@ export const HEAL_COST = 4; // worm segments (balls) required to fully heal one 
 export const SURFACE_JUMP_HEIGHT = 1.5;   // tall arc — astronaut bounding in low gravity
 export const SURFACE_JUMP_TILE_SPAN = 1;  // jump distance is fixed to one traversed tile regardless of speed
 
+// ─── Speed boost (HUD button beside JUMP) ─────────────────────────────────────
+export const BOOST_MULTIPLIER = 2.4;  // crawl-speed multiplier while boosting
+export const BOOST_DURATION = 1.5;    // seconds the boost lasts
+export const BOOST_COOLDOWN = 4.0;    // seconds before boost can be used again
+
 // ─── Auto-rotation hazard ─────────────────────────────────────────────────────
 export const AUTO_ROTATE_INTERVAL_MIN = 9;   // kept for non-scramble modes
 export const AUTO_ROTATE_INTERVAL_MAX = 15;
