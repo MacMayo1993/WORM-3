@@ -83,7 +83,31 @@ const STICKER_ROT = {
 // View-tab looks; 'hollow' is intentionally excluded because it's a whole-cube
 // structural mode (it removes bodies/stickers in favour of void beams) and cannot
 // be mixed per cubelet.
-const PER_CUBELET_VIEW_STYLES = ['classic', 'grid', 'sudokube', 'wireframe', 'glass'];
+const PER_CUBELET_VIEW_STYLES = [
+  'classic', 'grid', 'sudokube', 'wireframe', 'glass',
+  'chrome', 'sphere', 'neon', 'gap', 'heatmap'
+];
+
+// Modes that draw glowing LED edges over the cubie body.
+const LED_EDGE_MODES = new Set(['wireframe', 'neon']);
+
+// Body material parameters per view style. The cubie "body" is the frame the stickers
+// sit on; swapping its material is what gives chrome/neon/etc. their whole-cube identity.
+// wormMode transparency/side is layered on top of these at render time.
+function bodyMaterialProps(mode) {
+  switch (mode) {
+    case 'wireframe':
+      return { color: '#000000', roughness: 0.9, metalness: 0, envMapIntensity: 0.4 };
+    case 'glass':
+      return { color: '#111111', roughness: 0.05, metalness: 0.3, envMapIntensity: 0.8, transparent: true, opacity: 0.12 };
+    case 'chrome':
+      return { color: '#d6d9dd', roughness: 0.06, metalness: 1.0, envMapIntensity: 1.25 };
+    case 'neon':
+      return { color: '#08080c', roughness: 0.3, metalness: 0.35, envMapIntensity: 0.5, emissive: '#0a0014', emissiveIntensity: 0.4 };
+    default: // classic, grid, sudokube, sphere, gap, heatmap
+      return { color: '#0a0a0a', roughness: 0.25, metalness: 0.15, envMapIntensity: 0.4 };
+  }
+}
 
 // Deterministically map a cubelet (by its stable home position) + the current random
 // cycle to one view style. Stable within a cycle so the look follows the physical
@@ -148,6 +172,24 @@ const Cubie = React.forwardRef(function Cubie({
     () => (randomMode ? pickCubeletViewStyle(origHomeX, origHomeY, origHomeZ, randomStyleTick) : visualMode),
     [randomMode, randomStyleTick, visualMode, origHomeX, origHomeY, origHomeZ]
   );
+
+  // Derived per-style render switches.
+  const isSphereBody = effectiveVisualMode === 'sphere';
+  const showLedEdges = LED_EDGE_MODES.has(effectiveVisualMode);
+  // Gap mode shrinks the whole cubie in place so visible gaps open between pieces.
+  const contentScale = effectiveVisualMode === 'gap' ? 0.82 : 1;
+  // Body material props (+ wormMode transparency layered on).
+  const _bmp = bodyMaterialProps(effectiveVisualMode);
+  const bodyMatProps = {
+    color: _bmp.color,
+    roughness: _bmp.roughness,
+    metalness: _bmp.metalness,
+    envMapIntensity: _bmp.envMapIntensity,
+    transparent: !!_bmp.transparent || wormMode,
+    opacity: wormMode ? 0.8 : (_bmp.opacity ?? 1.0),
+    side: wormMode ? THREE.DoubleSide : THREE.FrontSide,
+    ...(_bmp.emissive ? { emissive: _bmp.emissive, emissiveIntensity: _bmp.emissiveIntensity ?? 1 } : {})
+  };
   const isEdge = (p, v) => Math.abs(p - v) < 0.01;
 
   const explodedPos = useMemo(() => {
@@ -230,7 +272,7 @@ const Cubie = React.forwardRef(function Cubie({
   // Memoized so the template-literal is not evaluated on every render; in non-wireframe
   // mode the memo short-circuits immediately (no string allocation at all).
   const stickerColorKey = useMemo(
-    () => effectiveVisualMode === 'wireframe'
+    () => LED_EDGE_MODES.has(effectiveVisualMode)
       ? `${cubie.stickers.PZ?.curr},${cubie.stickers.NZ?.curr},${cubie.stickers.PX?.curr},${cubie.stickers.NX?.curr},${cubie.stickers.PY?.curr},${cubie.stickers.NY?.curr}`
       : '',
     [
@@ -255,7 +297,7 @@ const Cubie = React.forwardRef(function Cubie({
 
   // Generate wireframe edges for wireframe mode ONLY
   const wireframeEdges = useMemo(() => {
-    if (effectiveVisualMode !== 'wireframe') return [];
+    if (!LED_EDGE_MODES.has(effectiveVisualMode)) return [];
 
     const halfSize = 0.49;
     const eps = 0.01;
@@ -389,6 +431,7 @@ const Cubie = React.forwardRef(function Cubie({
   return (
     <group ref={popGroupRef}>
     <group position={explodedPos} ref={ref}>
+    <group scale={contentScale}>
       {/* Mirror mode: plain asymmetric box with chrome material, no stickers */}
       {mirrorMode ? (
         <mesh onPointerDown={handleDown} castShadow receiveShadow>
@@ -417,22 +460,20 @@ const Cubie = React.forwardRef(function Cubie({
         <mesh onPointerDown={handleDown} visible={false}>
           <boxGeometry args={[0.98, 0.98, 0.98]} />
         </mesh>
+      ) : isSphereBody ? (
+        // Sphere ("ball cube") body — stickers sit just outside the surface as colored caps.
+        <mesh onPointerDown={handleDown} castShadow receiveShadow>
+          <sphereGeometry args={[0.52, 24, 24]} />
+          <meshStandardMaterial {...bodyMatProps} />
+        </mesh>
       ) : (
         <RoundedBox args={[0.98, 0.98, 0.98]} radius={0.08} smoothness={4} onPointerDown={handleDown} castShadow receiveShadow>
-          <meshStandardMaterial
-            color={effectiveVisualMode === 'wireframe' ? "#000000" : effectiveVisualMode === 'glass' ? "#111111" : "#0a0a0a"}
-            roughness={effectiveVisualMode === 'wireframe' ? 0.9 : effectiveVisualMode === 'glass' ? 0.05 : 0.25}
-            metalness={effectiveVisualMode === 'wireframe' ? 0 : effectiveVisualMode === 'glass' ? 0.3 : 0.15}
-            envMapIntensity={effectiveVisualMode === 'glass' ? 0.8 : 0.4}
-            transparent={effectiveVisualMode === 'glass' || wormMode}
-            opacity={wormMode ? 0.8 : effectiveVisualMode === 'glass' ? 0.12 : 1.0}
-            side={wormMode ? THREE.DoubleSide : THREE.FrontSide}
-          />
+          <meshStandardMaterial {...bodyMatProps} />
         </RoundedBox>
       )}
 
-      {/* LED Wireframe edges ONLY in wireframe mode (skip in hollow/mirror mode) */}
-      {effectiveVisualMode === 'wireframe' && !hollowMode && !mirrorMode && wireframeEdges.map((edge, idx) => (
+      {/* LED edges for wireframe + neon (skip in hollow/mirror mode) */}
+      {showLedEdges && !hollowMode && !mirrorMode && wireframeEdges.map((edge, idx) => (
         <WireframeEdge
           key={idx}
           start={edge.start}
@@ -443,7 +484,7 @@ const Cubie = React.forwardRef(function Cubie({
         />
       ))}
 
-      {/* Stickers — frame-shaped when hollow, solid plane otherwise; none in mirror mode */}
+      {/* Stickers — frame-shaped when hollow, solid plane otherwise; none in mirror/wireframe mode */}
       {effectiveVisualMode !== 'wireframe' && !mirrorMode && (
         <>
           {isEdge(position[2], (size - 1) / 2) && meta('PZ') && <StickerPlane key={stickerKey('PZ')} currentDir="PZ" meta={meta('PZ')} pos={STICKER_POS.PZ} rot={STICKER_ROT.PZ} mode={effectiveVisualMode} overlay={overlay('PZ')} faceSize={size} {...gridPos('PZ')} hollow={hollowMode} />}
@@ -454,6 +495,7 @@ const Cubie = React.forwardRef(function Cubie({
           {isEdge(position[1], -(size - 1) / 2) && meta('NY') && <StickerPlane key={stickerKey('NY')} currentDir="NY" meta={meta('NY')} pos={STICKER_POS.NY} rot={STICKER_ROT.NY} mode={effectiveVisualMode} overlay={overlay('NY')} faceSize={size} {...gridPos('NY')} hollow={hollowMode} />}
         </>
       )}
+    </group>
     </group>
     </group>
   );

@@ -49,10 +49,11 @@ const TopMenuBar = ({
   showAntipodalPiP,
   onToggleAntipodalPiP,
 }) => {
-  const modeLabel = visualMode === 'classic' ? 'Classic' :
-                   visualMode === 'grid' ? 'Grid' :
-                   visualMode === 'sudokube' ? 'Sudoku' :
-                   visualMode === 'wireframe' ? 'Wire' : 'Glass';
+  const VISUAL_MODE_LABELS = {
+    classic: 'Classic', grid: 'Grid', sudokube: 'Sudoku', wireframe: 'Wire', glass: 'Glass',
+    chrome: 'Chrome', sphere: 'Sphere', neon: 'Neon', gap: 'Gap', heatmap: 'Heatmap'
+  };
+  const modeLabel = VISUAL_MODE_LABELS[visualMode] || 'Classic';
 
   const levelLabel = currentLevelData
     ? `Level ${currentLevelData.id} — ${currentLevelData.name}`
