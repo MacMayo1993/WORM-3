@@ -15,10 +15,10 @@ export const LED_EDGE_MODES = new Set(['wireframe', 'neon']);
 // Deterministically map a cubelet (by its stable home position) + a cycle seed to one
 // view style. Stable within a cycle so the look follows the physical piece through
 // rotations; reshuffles when `tick` changes.
-export function pickCubeletViewStyle(ox, oy, oz, tick) {
+export function pickCubeletViewStyle(ox, oy, oz, tick, pool = PER_CUBELET_VIEW_STYLES) {
   let h = (ox * 73856093) ^ (oy * 19349663) ^ (oz * 83492791) ^ (tick * 2654435761);
   h = (h ^ (h >>> 13)) >>> 0;
-  return PER_CUBELET_VIEW_STYLES[h % PER_CUBELET_VIEW_STYLES.length];
+  return pool[h % pool.length];
 }
 
 // Body material parameters per view style. The cubie "body" is the frame the stickers

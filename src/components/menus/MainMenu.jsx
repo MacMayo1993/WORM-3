@@ -6,7 +6,7 @@ import { makeCubies } from '../../game/cubeState.js';
 import { COLOR_SCHEMES } from '../../utils/colorSchemes.js';
 import { CLASSIC_STYLE_KEYS, ANTIPODAL_STYLE_KEYS, LIVING_STYLE_KEYS } from '../../utils/tileStyleCatalog.js';
 import { rotateSliceCubies } from '../../game/cubeRotation.js';
-import { bodyMaterialProps, pickCubeletViewStyle, LED_EDGE_MODES } from '../../3d/cubeViewStyles.js';
+import { bodyMaterialProps, pickCubeletViewStyle, LED_EDGE_MODES, PER_CUBELET_VIEW_STYLES } from '../../3d/cubeViewStyles.js';
 import { updateSharedTime, getTileStyleMaterial } from '../../3d/styles/TileStyleMaterials.jsx';
 import { vibrate } from '../../utils/audio.js';
 import MenuFlipWave from './MenuFlipWave.jsx';
@@ -155,25 +155,14 @@ const MENU_FLIP_PAIRS = [
 const INITIAL_WORM_DELAY = 2.5; // seconds before the very first worm spawns
 
 // ─── Menu cube view-style geometry (mirrors Random Mode's per-cubelet styles) ──
-// Balloon: a sticker plane bulged into a convex dome along +Z (keeps 0..1 UVs).
-function _makeMenuBulgedGeo(size, seg, bulge) {
-  const geo = new THREE.PlaneGeometry(size, size, seg, seg);
-  const pos = geo.attributes.position;
-  const maxR = (size / 2) * Math.SQRT2;
-  for (let i = 0; i < pos.count; i++) {
-    const r = Math.min(1, Math.hypot(pos.getX(i), pos.getY(i)) / maxR);
-    pos.setZ(i, Math.cos(r * Math.PI * 0.5) * bulge);
-  }
-  pos.needsUpdate = true;
-  geo.computeVertexNormals();
-  return geo;
-}
-const _menuBulgedGeo = _makeMenuBulgedGeo(0.80, 14, 0.22);
+// Balloon is intentionally excluded on the menu cube.
+const MENU_VIEW_STYLES = PER_CUBELET_VIEW_STYLES.filter(s => s !== 'balloon');
 
-// Lego: a 2x2 stud grid per face, group +Y rotated to the outward face normal.
-const MENU_STUD_OFFSETS = [[-0.19, -0.19], [0.19, -0.19], [-0.19, 0.19], [0.19, 0.19]];
-const MENU_STUD_GEO = [0.1, 0.1, 0.12, 16];
-const MENU_STUD_TOP_GEO = [0.076, 0.076, 0.045, 16];
+// Lego: one detailed stud per face — tapered body, embossed ring, center pip.
+// The face group's +Y axis is rotated to the outward normal; the stud builds up +Y.
+const MENU_STUD_BODY_GEO = [0.17, 0.18, 0.13, 22];
+const MENU_STUD_RING_GEO = [0.12, 0.019, 8, 24];
+const MENU_STUD_PIP_GEO = [0.046, 0.046, 0.045, 16];
 const MENU_LEGO_FACE = {
   PZ: { pos: [0, 0, 0.47], rot: [Math.PI / 2, 0, 0] },
   NZ: { pos: [0, 0, -0.47], rot: [-Math.PI / 2, 0, 0] },
@@ -182,33 +171,32 @@ const MENU_LEGO_FACE = {
   PY: { pos: [0, 0.47, 0], rot: [0, 0, 0] },
   NY: { pos: [0, -0.47, 0], rot: [Math.PI, 0, 0] }
 };
-function MenuLegoStuds({ dir, color }) {
+function MenuLegoStud({ dir, color }) {
   const t = MENU_LEGO_FACE[dir];
   if (!t) return null;
   return (
     <group position={t.pos} rotation={t.rot}>
-      {MENU_STUD_OFFSETS.map(([ox, oz], i) => (
-        <group key={i} position={[ox, 0, oz]}>
-          <mesh position={[0, 0.06, 0]}>
-            <cylinderGeometry args={MENU_STUD_GEO} />
-            <meshStandardMaterial color={color} roughness={0.35} metalness={0} />
-          </mesh>
-          <mesh position={[0, 0.125, 0]}>
-            <cylinderGeometry args={MENU_STUD_TOP_GEO} />
-            <meshStandardMaterial color={color} roughness={0.3} metalness={0} />
-          </mesh>
-        </group>
-      ))}
+      <mesh position={[0, 0.065, 0]}>
+        <cylinderGeometry args={MENU_STUD_BODY_GEO} />
+        <meshStandardMaterial color={color} roughness={0.35} metalness={0} />
+      </mesh>
+      <mesh position={[0, 0.132, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={MENU_STUD_RING_GEO} />
+        <meshStandardMaterial color={color} roughness={0.28} metalness={0} />
+      </mesh>
+      <mesh position={[0, 0.143, 0]}>
+        <cylinderGeometry args={MENU_STUD_PIP_GEO} />
+        <meshStandardMaterial color={color} roughness={0.3} metalness={0} />
+      </mesh>
     </group>
   );
 }
 
 const ShuffleCubie = React.memo(({ cubie }) => {
   const cx = cubie.x - 1, cy = cubie.y - 1, cz = cubie.z - 1;
-  // Each cubelet wears its own whole-cube view style, same as Random Mode.
-  const vmode = pickCubeletViewStyle(cubie.x, cubie.y, cubie.z, _menuViewEpoch);
+  // Each cubelet wears its own whole-cube view style, same as Random Mode (no balloon).
+  const vmode = pickCubeletViewStyle(cubie.x, cubie.y, cubie.z, _menuViewEpoch, MENU_VIEW_STYLES);
   const isWire = vmode === 'wireframe';
-  const isBalloon = vmode === 'balloon';
   const isLego = vmode === 'lego';
   const showEdges = LED_EDGE_MODES.has(vmode);
   const contentScale = vmode === 'gap' ? 0.82 : 1;
@@ -232,7 +220,7 @@ const ShuffleCubie = React.memo(({ cubie }) => {
           {showEdges && <Edges color={edgeColor} />}
         </mesh>
 
-        {/* Stickers — hidden in wireframe; bulged into domes in balloon mode */}
+        {/* Stickers — hidden in wireframe */}
         {!isWire && STICKER_CFG.map(({ dir, pos, rot }) => {
           const sticker = cubie.stickers?.[dir];
           if (!sticker) return null;
@@ -243,8 +231,8 @@ const ShuffleCubie = React.memo(({ cubie }) => {
           const isFlipped = sticker.curr !== sticker.orig;
           return (
             <group key={dir} position={pos} rotation={rot}>
-              <mesh renderOrder={10} geometry={isBalloon ? _menuBulgedGeo : undefined}>
-                {!isBalloon && <planeGeometry args={[0.80, 0.80]} />}
+              <mesh renderOrder={10}>
+                <planeGeometry args={[0.80, 0.80]} />
                 <primitive attach="material" object={getTileStyleMaterial(_menuFaceStyles[sticker.curr] || 'solid', colorHex)} />
               </mesh>
               {isFlipped && (
@@ -254,12 +242,12 @@ const ShuffleCubie = React.memo(({ cubie }) => {
           );
         })}
 
-        {/* Lego studs on each face */}
+        {/* Lego stud on each face */}
         {isLego && STICKER_CFG.map(({ dir }) => {
           const sticker = cubie.stickers?.[dir];
           if (!sticker) return null;
           const colorHex = MENU_FACE_COLORS[sticker.curr] ?? '#888888';
-          return <MenuLegoStuds key={`stud-${dir}`} dir={dir} color={colorHex} />;
+          return <MenuLegoStud key={`stud-${dir}`} dir={dir} color={colorHex} />;
         })}
       </group>
     </group>
