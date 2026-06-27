@@ -38,9 +38,17 @@ const MINI_FACES = [
 ];
 
 /**
- * A tiny 1×1 cube at the void centre whose six sticker faces show the live
+ * A tiny 1×1 cube at the void centre whose six sticker faces show the
  * antipodal face-colour assignments (Red↔Orange, Green↔Blue, White↔Yellow).
- * Rotates slowly so all faces are visible over time.
+ *
+ * It is deliberately axis-aligned (NOT rotated): each face points in the same
+ * direction as the matching centre tile of the real cube (MINI_FACES mirrors
+ * Cubie.jsx STICKER_POS / DIR_TO_COLOR), so every middle tile shoots its
+ * antipodal tunnel straight through the mini cube and out the antipodal-coloured
+ * face on the opposite side.
+ *
+ * The body and stickers are kept highly transparent so the tunnels — and the
+ * cube behind the void — remain visible through the centre.
  */
 function AntipodalMinicube({ settings }) {
   // Recompute only when colour scheme or biome face assignment changes.
@@ -53,16 +61,26 @@ function AntipodalMinicube({ settings }) {
   return (
     <group>
       <mesh geometry={minicubeBodyGeo}>
-        <meshStandardMaterial color="#111111" roughness={0.3} metalness={0.4} />
+        <meshStandardMaterial
+          color="#111111"
+          roughness={0.3}
+          metalness={0.4}
+          transparent
+          opacity={0.18}
+          depthWrite={false}
+        />
       </mesh>
       {MINI_FACES.map(({ id, pos, rot }) => (
         <mesh key={id} geometry={minicubeStickerGeo} position={pos} rotation={rot}>
           <meshStandardMaterial
             color={fc[id] || '#888888'}
             emissive={fc[id] || '#888888'}
-            emissiveIntensity={0.25}
+            emissiveIntensity={0.45}
             roughness={0.2}
             metalness={0.05}
+            transparent
+            opacity={0.55}
+            depthWrite={false}
           />
         </mesh>
       ))}
