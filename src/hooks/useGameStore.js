@@ -105,10 +105,8 @@ const loadPersistedState = () => {
 const persistedState = loadPersistedState();
 const MAX_UNDO_HISTORY = 10;
 
-// All runtime worm fields that must be reset on both session start (initWormMode)
-// and session end (clearDisparityGame). Extracted here so both callers share the same
-// key list and a forgotten field can't silently differ between the two resets.
-const makeWormRuntimeDefaults = () => ({
+// Disparity-specific runtime fields reset on session start/end.
+const makeDisparityRuntimeDefaults = () => ({
   disparityDeaths: [],
   disparityDeathByGridId: {},
   disparityWinner: null,
@@ -117,6 +115,10 @@ const makeWormRuntimeDefaults = () => ({
   disparityParityScore: 0,
   cascades: [],
   holonomyMode: false,
+});
+
+// Worm session fields reset on each worm run.
+const makeWormSessionDefaults = () => ({
   wormHealedCount: 0,
   wormPhase: 'crawling',
   wormOnFlippedTile: false,
@@ -135,6 +137,95 @@ const makeWormRuntimeDefaults = () => ({
   wormCountdownStep: null,
   wormSessionOrbs: 0,
   wormActiveTunnelColors: null,
+});
+
+// ========================================================================
+// WORM MODE SLICE — all worm-related state, setters, and lifecycle actions
+// ========================================================================
+const createWormSlice = (set, _get) => ({
+  // ── Mode flag ─────────────────────────────────────────────────────────────
+  wormHealerMode: false,
+  setWormHealerMode: (v) => set({ wormHealerMode: v }),
+
+  // ── Config (persists across sessions or set by wizard) ────────────────────
+  wormRunId: 0,
+  wormSpeed: 1.0,
+  setWormSpeed: (v) => set({ wormSpeed: v }),
+  wormBoostState: 'ready',
+  setWormBoostState: (v) => set({ wormBoostState: v }),
+  wormOrbCount: 5,
+  setWormOrbCount: (v) => set({ wormOrbCount: Math.max(1, Math.min(24, Math.round(v))) }),
+  wormholeInterval: 10,
+  setWormholeInterval: (v) => set({ wormholeInterval: Math.max(2, Math.min(30, Number(v))) }),
+  wormColor: '#33ff66',
+  setWormColor: (v) => set({ wormColor: v || '#33ff66' }),
+  wormSkin: persistedState.wormSkin,
+  setWormSkin: (id) => {
+    try { localStorage.setItem('worm3_skin', id); } catch { }
+    set({ wormSkin: id });
+  },
+  wormHat: persistedState.wormHat,
+  setWormHat: (id) => {
+    try { localStorage.setItem('worm3_hat', id); } catch { }
+    set({ wormHat: id });
+  },
+  wormCharacter: persistedState.wormCharacter ?? 'classic',
+  setWormCharacter: (id) => {
+    try { localStorage.setItem(WORM_CHARACTER_KEY, id); } catch { }
+    set({ wormCharacter: id });
+  },
+  wormShowTrail: persistedState.wormShowTrail ?? true,
+  setWormShowTrail: (v) => {
+    try { localStorage.setItem('worm3_show_trail', String(v)); } catch { }
+    set({ wormShowTrail: v });
+  },
+
+  // ── Controls ──────────────────────────────────────────────────────────────
+  wormControlMode: 'non-oriented',
+  setWormControlMode: (v) => set({ wormControlMode: v }),
+  toggleWormControlMode: () => set((state) => ({
+    wormControlMode: state.wormControlMode === 'non-oriented' ? 'oriented' : 'non-oriented'
+  })),
+
+  // ── Session state (reset by makeWormSessionDefaults) ──────────────────────
+  ...makeWormSessionDefaults(),
+  setWormHealedCount: (v) => set({ wormHealedCount: v }),
+  setWormPhase: (v) => set({ wormPhase: v }),
+  setWormOnFlippedTile: (v) => set({ wormOnFlippedTile: v }),
+  setWormBodyTiles: (v) => set({ wormBodyTiles: v }),
+  setWormPowerups: (v) => set({ wormPowerups: v }),
+  setWormholeCountdown: (v) => set({ wormholeCountdown: v }),
+  setWormAlive: (v) => set({ wormAlive: v }),
+  setShowWormDeathMenu: (v) => set({ showWormDeathMenu: v }),
+  setWormDeathDetails: (v) => set({ wormDeathDetails: v }),
+  setWormPaused: (v) => set({ wormPaused: v }),
+  setWormTimeAlive: (v) => set({ wormTimeAlive: v }),
+  setWormTunnelCount: (v) => set({ wormTunnelCount: v }),
+  setWormOrbInventory: (v) => set({ wormOrbInventory: v }),
+  setWormHealingProgress: (v) => set({ wormHealingProgress: v }),
+  setWormGamePhase: (v) => set({ wormGamePhase: v }),
+  setWormCountdownStep: (v) => set({ wormCountdownStep: v }),
+  setWormSessionOrbs: (v) => set({ wormSessionOrbs: v }),
+
+  // ── Lifecycle ─────────────────────────────────────────────────────────────
+  clearDisparityGame: () => set({
+    ...makeDisparityRuntimeDefaults(),
+    ...makeWormSessionDefaults(),
+    wormHealerMode: false,
+  }),
+  initWormMode: (flipCap = 9999, _chaosLevel = 0, speed = null, orbCount = null, interval = null, color = null) => set((state) => ({
+    ...makeDisparityRuntimeDefaults(),
+    ...makeWormSessionDefaults(),
+    wormHealerMode: true,
+    disparityFlipCap: flipCap,
+    chaosLevel: 0,
+    wormRunId: (state.wormRunId ?? 0) + 1,
+    wormPaused: true,
+    wormSpeed: speed !== null ? Math.max(0.5, Math.min(3.0, speed)) : state.wormSpeed,
+    wormOrbCount: orbCount !== null ? Math.max(1, Math.min(24, Math.round(orbCount))) : state.wormOrbCount,
+    wormholeInterval: interval !== null ? Math.max(2, Math.min(30, Number(interval))) : state.wormholeInterval,
+    wormColor: color !== null ? (color || '#33ff66') : state.wormColor,
+  })),
 });
 
 export const useGameStore = create(
@@ -328,7 +419,6 @@ export const useGameStore = create(
     showDisparityWinner: false,
     // Face elimination events: array of faceNum (1-6) values in order they were eliminated
     disparityEliminatedFaces: [],
-    wormHealerMode: false,
     holonomyMode: false,
 
     // Configurable flip cap for Disparity Mode (overrides FLIP_CAP constant).
@@ -387,40 +477,7 @@ export const useGameStore = create(
       if (!faces?.length) return state;
       return { disparityEliminatedFaces: [...state.disparityEliminatedFaces, ...faces] };
     }),
-    setWormHealerMode: (v) => set({ wormHealerMode: v }),
     setHolonomyMode: (v) => set({ holonomyMode: v }),
-    wormRunId: 0,
-    wormSpeed: 1.0,
-    setWormSpeed: (v) => set({ wormSpeed: v }),
-    // Speed-boost button state: 'ready' | 'active' | 'cooldown'
-    wormBoostState: 'ready',
-    setWormBoostState: (v) => set({ wormBoostState: v }),
-    wormOrbCount: 5,
-    setWormOrbCount: (v) => set({ wormOrbCount: Math.max(1, Math.min(24, Math.round(v))) }),
-    wormholeInterval: 10,
-    setWormholeInterval: (v) => set({ wormholeInterval: Math.max(2, Math.min(30, Number(v))) }),
-    wormColor: '#33ff66',
-    setWormColor: (v) => set({ wormColor: v || '#33ff66' }),
-    wormSkin: persistedState.wormSkin,
-    setWormSkin: (id) => {
-      try { localStorage.setItem('worm3_skin', id); } catch { }
-      set({ wormSkin: id });
-    },
-    wormHat: persistedState.wormHat,
-    setWormHat: (id) => {
-      try { localStorage.setItem('worm3_hat', id); } catch { }
-      set({ wormHat: id });
-    },
-    wormCharacter: persistedState.wormCharacter ?? 'classic',
-    setWormCharacter: (id) => {
-      try { localStorage.setItem(WORM_CHARACTER_KEY, id); } catch { }
-      set({ wormCharacter: id });
-    },
-    wormShowTrail: persistedState.wormShowTrail ?? true,
-    setWormShowTrail: (v) => {
-      try { localStorage.setItem('worm3_show_trail', String(v)); } catch { }
-      set({ wormShowTrail: v });
-    },
 
     // ── Economy ──────────────────────────────────────────────────────────────
     parityPoints: persistedState.parityPoints,
@@ -469,65 +526,10 @@ export const useGameStore = create(
     betStreak: 0,
     setBetStreak: (v) => set({ betStreak: v }),
 
-    wormControlMode: 'non-oriented', // 'non-oriented' (relative turns) | 'oriented' (camera-relative)
-    setWormControlMode: (v) => set({ wormControlMode: v }),
-    toggleWormControlMode: () => set((state) => ({
-      wormControlMode: state.wormControlMode === 'non-oriented' ? 'oriented' : 'non-oriented'
-    })),
-    wormHealedCount: 0,
-    setWormHealedCount: (v) => set({ wormHealedCount: v }),
-    wormPhase: 'crawling',
-    setWormPhase: (v) => set({ wormPhase: v }),
-    wormOnFlippedTile: false,
-    setWormOnFlippedTile: (v) => set({ wormOnFlippedTile: v }),
-    wormBodyTiles: 0,
-    setWormBodyTiles: (v) => set({ wormBodyTiles: v }),
-    wormPowerups: [],
-    setWormPowerups: (v) => set({ wormPowerups: v }),
-    wormholeCountdown: 0,
-    setWormholeCountdown: (v) => set({ wormholeCountdown: v }),
-    wormAlive: true,
-    setWormAlive: (v) => set({ wormAlive: v }),
-    showWormDeathMenu: false,
-    setShowWormDeathMenu: (v) => set({ showWormDeathMenu: v }),
-    wormDeathDetails: null,
-    setWormDeathDetails: (v) => set({ wormDeathDetails: v }),
-    wormPaused: false,
-    setWormPaused: (v) => set({ wormPaused: v }),
-    wormTimeAlive: 0,
-    setWormTimeAlive: (v) => set({ wormTimeAlive: v }),
-    wormTunnelCount: 0,
-    setWormTunnelCount: (v) => set({ wormTunnelCount: v }),
-    wormOrbInventory: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
-    setWormOrbInventory: (v) => set({ wormOrbInventory: v }),
-    wormHealingProgress: {},
-    setWormHealingProgress: (v) => set({ wormHealingProgress: v }),
-    wormActiveTunnelColors: null,
-    // ── Scramble-solve game phase ────────────────────────────────────────────
-    wormGamePhase: 'scrambling',   // 'scrambling' | 'spawning' | 'countdown' | 'active' | 'finalHealing' | 'solved'
-    setWormGamePhase: (v) => set({ wormGamePhase: v }),
-    wormCountdownStep: null,       // null | 3 | 2 | 1 | 'go'
-    setWormCountdownStep: (v) => set({ wormCountdownStep: v }),
-    wormSessionOrbs: 0,            // orbs picked up this run (shown in HUD; NOT auto-banked)
-    setWormSessionOrbs: (v) => set({ wormSessionOrbs: v }),
-    clearDisparityGame: () => set({ ...makeWormRuntimeDefaults(), wormHealerMode: false }),
-    // Atomic init for Worm Mode — clears disparity state AND enables worm in one set()
-    // so wormHealerMode:true can never be clobbered by the reset.
-    // wormPaused:true — the scramble animation runs first; gameplay starts after countdown.
-    // speed/orbCount/interval/color: when provided, overwrite the stored wizard settings atomically
-    // so callers never need separate setWormSpeed/setWormOrbCount/… calls before this one.
-    initWormMode: (flipCap = 9999, _chaosLevel = 0, speed = null, orbCount = null, interval = null, color = null) => set((state) => ({
-      ...makeWormRuntimeDefaults(),
-      wormHealerMode: true,
-      disparityFlipCap: flipCap,
-      chaosLevel: 0, // worm mode drives its own tile chaos; chaos worker must not run
-      wormRunId: (state.wormRunId ?? 0) + 1,
-      wormPaused: true, // overrides makeWormRuntimeDefaults wormPaused:false — scramble plays first
-      wormSpeed: speed !== null ? Math.max(0.5, Math.min(3.0, speed)) : state.wormSpeed,
-      wormOrbCount: orbCount !== null ? Math.max(1, Math.min(24, Math.round(orbCount))) : state.wormOrbCount,
-      wormholeInterval: interval !== null ? Math.max(2, Math.min(30, Number(interval))) : state.wormholeInterval,
-      wormColor: color !== null ? (color || '#33ff66') : state.wormColor,
-    })),
+    // ========================================================================
+    // WORM MODE (all worm state via slice)
+    // ========================================================================
+    ...createWormSlice(set, get),
 
     // ========================================================================
     // ANIMATION STATE
