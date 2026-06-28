@@ -26,7 +26,7 @@ export const CUBE_CAMPAIGN_LEVELS = [
       mobiLines: [
         "Aloha! I'm a Multi Orientable Block Intelligence...",
         "...but you can call me Mobi for short!",
-        "Welcome to your very first cube. Take a breath — this one is easy.",
+        "Welcome to your very first cube. Take a breath. This one is easy.",
         "I gave the middle layer a single twist. That's the only thing out of place.",
         "Your one job: rotate that middle band back until every face lines up.",
         "Grab a middle tile, spin the layer the other way, and you've solved it. Let's go!",
@@ -41,12 +41,12 @@ export const CUBE_CAMPAIGN_LEVELS = [
   createLevel({
     id: 2,
     name: 'Through the Cube',
-    description: 'Every center shows its antipodal twin. Flip them back through the cube.',
+    description: 'The middle tile of each side is wrong. Tap them to flip the colors back.',
     cubeSize: 3,
     // The cube is solved EXCEPT all six face centers show their antipodal color.
     // flipStickerPair flips a sticker AND its antipodal partner, so flipping the three
     // "near" centers (front/right/top) during setup flips all six centers. The player
-    // then flips those same three back — three flips fixes all six.
+    // then flips those same three back, so three flips fix all six.
     flipSequence: [
       { x: 1, y: 1, z: 2, dirKey: 'PZ' }, // front center  (also flips back center)
       { x: 2, y: 1, z: 1, dirKey: 'PX' }, // right center  (also flips left center)
@@ -58,23 +58,23 @@ export const CUBE_CAMPAIGN_LEVELS = [
     features: { rotations: true, tunnels: true, flips: true, chaos: false, explode: false, parity: false, net: false },
     tutorial: {
       title: 'CUBE 2: Through the Cube',
-      text: 'This cube is already solved except for the six center tiles — the single tile in the middle of each face. Each center is showing the color from the exact opposite side of the cube. Tap a wrong-colored center to flip it back through the cube; its twin on the far side flips back at the same time, so three taps fixes all six.',
-      tip: 'Flip mode is already on — just tap, no buttons or turns needed. Only tap centers that still look wrong; each tap repairs a pair, so you only need three taps total.',
+      text: 'This cube is almost solved. Only the six middle tiles are wrong, one in the center of each side. Each one shows the color from the other side of the cube. Tap a wrong middle tile to flip it back. The matching tile on the far side flips back too, so three taps fix all six.',
+      tip: 'Tapping is already turned on, so just tap. Tap only the middle tiles that still look wrong. Each tap fixes two tiles at once, so you only need three taps.',
       mobiLines: [
-        "Welcome back! Last time you turned a layer. Today you learn something only WORM³ can do.",
-        "Look closely — this cube is ALREADY solved. Every face is a single solid color...",
-        "...except the one tile in the very middle of each face. Those six centers are the wrong color.",
-        "Here's the secret: each of those centers is showing the color from the EXACT opposite side of the cube.",
-        "That's a flip — the tile folds straight through the center of the cube to meet its twin on the far side.",
-        "To fix one, just TAP it. No buttons, no turning — I've already switched flip mode on for you.",
-        "Watch closely when you do: the tile you tap flips home... AND its twin on the opposite face flips home too!",
-        "So you don't need six taps — only three. Each tap repairs a whole pair at once.",
-        "Tap any center that still looks wrong, and ignore the ones that already match their face.",
-        "Go on — make your very first flip. This little move through the cube is the heart of everything in WORM³.",
+        "Welcome back! Last time you turned a layer. Now let's try something new.",
+        "Look closely. This cube is almost solved. Every side is one color.",
+        "But the tile in the middle of each side is the wrong color. There are six of them.",
+        "Each middle tile is showing the color from the other side of the cube.",
+        "You can fix it with a flip. A flip sends a tile through the cube to the other side.",
+        "Just tap a middle tile. You do not need any buttons. Tapping is already turned on.",
+        "When you tap one, it flips back. The matching tile on the far side flips back too!",
+        "So you only need three taps. Each tap fixes two tiles at once.",
+        "Tap the middle tiles that still look wrong. Leave the ones that already match.",
+        "Try your first flip now. This is the special move that makes this game fun!",
       ],
     },
     winCondition: WIN_CONDITIONS.CLASSIC,
-    winMessage: 'Three flips, six centers home — flips can solve the cube too!',
+    winMessage: 'Three taps, six tiles fixed. Now you know how to flip!',
     difficulty: DIFFICULTY.TUTORIAL,
     tags: cubeTags,
     requirements: { previousLevel: 1, stars: 0, achievements: [] },
@@ -158,7 +158,7 @@ export const CUBE_CAMPAIGN_LEVELS = [
       tip: 'When stuck, isolate one face, then use flips to reason about the opposite face instead of guessing.',
     },
     winCondition: WIN_CONDITIONS.CLASSIC,
-    winMessage: 'CUBE Campaign complete — you are ready for Rubik\'s freeplay.',
+    winMessage: 'CUBE Campaign complete. You are ready for Rubik\'s freeplay.',
     difficulty: DIFFICULTY.MEDIUM,
     tags: cubeTags,
     requirements: { previousLevel: 5, stars: 0, achievements: [] },
