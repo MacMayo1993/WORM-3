@@ -432,6 +432,11 @@ function useWormCrawler(size, cubies) {
     // Speed-boost timers (seconds): one counts down the active boost, the other its cooldown.
     const boostActiveT = useRef(0);
     const boostCooldownT = useRef(0);
+    // Tracks the previous frame's STEP_SEC so stepAcc can be rescaled when the crawl speed
+    // changes mid-step (boost toggling, or the speed slider) — keeps stepAcc/STEP_SEC (which
+    // equals interpT) consistent so a speed change never force-crosses a tile early and
+    // scatters the body trail.
+    const prevStepSecRef = useRef(null);
     const onFlippedTile = useRef(false);
     const lastFlippedRef = useRef(false);
     const prevDirKey = useRef(null);
@@ -759,6 +764,15 @@ function useWormCrawler(size, cubies) {
         }
         const boostMult = boostActiveT.current > 0 ? BOOST_MULTIPLIER : 1;
         const STEP_SEC = 1.0 / (wormSpeedRef.current * boostMult);
+
+        // If the crawl speed changed since last frame, rescale the in-progress step accumulator
+        // so its fraction (== interpT) is preserved across the change. Without this, a speed
+        // change mid-step desyncs stepAcc from interpT and force-crosses tiles early, which
+        // makes the head jump and the body trail fly around.
+        if (prevStepSecRef.current && prevStepSecRef.current !== STEP_SEC && stepAcc.current > 0) {
+            stepAcc.current *= STEP_SEC / prevStepSecRef.current;
+        }
+        prevStepSecRef.current = STEP_SEC;
 
         const st = useGameStore.getState();
 
@@ -1347,6 +1361,7 @@ function useWormCrawler(size, cubies) {
         pendingTurns.current = [];
         boostActiveT.current = 0;
         boostCooldownT.current = 0;
+        prevStepSecRef.current = null;
         useGameStore.getState().setWormBoostState('ready');
         onFlippedTile.current = false;
         lastFlippedRef.current = false;
