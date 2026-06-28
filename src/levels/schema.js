@@ -145,6 +145,12 @@ export function createLevel(overrides) {
     // teaching levels (e.g. "undo this one middle-layer turn"). Each entry is
     // { axis: 'row'|'col'|'depth', sliceIndex: number, dir: 1|-1 }.
     scrambleSequence: overrides.scrambleSequence ?? null,
+    // Optional deterministic antipodal flips applied AFTER the scramble, to author
+    // flip-teaching puzzles (e.g. "every center shows its antipodal twin — flip them
+    // back"). Each entry { x, y, z, dirKey } is flipped via flipStickerPair, which also
+    // flips that sticker's antipodal partner — so listing one sticker per antipodal pair
+    // is enough. null = no setup flips.
+    flipSequence: overrides.flipSequence ?? null,
 
     // Visual settings
     background: overrides.background || BACKGROUNDS.ABSTRACT,
@@ -255,6 +261,7 @@ export function createLevelPack(overrides) {
  * @property {number} cubeSize - Cube dimension (2-5)
  * @property {number|null} scrambleMoves - Scramble depth (null = shuffler default)
  * @property {Array<{axis:string,sliceIndex:number,dir:number}>|null} scrambleSequence - Deterministic scramble moves (null = random)
+ * @property {Array<{x:number,y:number,z:number,dirKey:string}>|null} flipSequence - Deterministic antipodal flips applied after the scramble (null = none)
  * @property {number} chaosLevel - Chaos intensity (0-4)
  * @property {string} mode - Game mode
  * @property {string} background - Background environment

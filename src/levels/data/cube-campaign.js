@@ -26,7 +26,7 @@ export const CUBE_CAMPAIGN_LEVELS = [
       mobiLines: [
         "Aloha! I'm a Multi Orientable Block Intelligence...",
         "...but you can call me Mobi for short!",
-        "Welcome to your very first cube. Take a breath — this one is easy.",
+        "Welcome to your very first cube. Take a breath. This one is easy.",
         "I gave the middle layer a single twist. That's the only thing out of place.",
         "Your one job: rotate that middle band back until every face lines up.",
         "Grab a middle tile, spin the layer the other way, and you've solved it. Let's go!",
@@ -40,21 +40,41 @@ export const CUBE_CAMPAIGN_LEVELS = [
   }),
   createLevel({
     id: 2,
-    name: 'Rows and Columns',
-    description: 'Practice horizontal and vertical slice turns.',
+    name: 'Through the Cube',
+    description: 'The middle tile of each side is wrong. Tap them to flip the colors back.',
     cubeSize: 3,
-    scrambleMoves: 5,
+    // The cube is solved EXCEPT all six face centers show their antipodal color.
+    // flipStickerPair flips a sticker AND its antipodal partner, so flipping the three
+    // "near" centers (front/right/top) during setup flips all six centers. The player
+    // then flips those same three back, so three flips fix all six.
+    flipSequence: [
+      { x: 1, y: 1, z: 2, dirKey: 'PZ' }, // front center  (also flips back center)
+      { x: 2, y: 1, z: 1, dirKey: 'PX' }, // right center  (also flips left center)
+      { x: 1, y: 2, z: 1, dirKey: 'PY' }, // top center    (also flips bottom center)
+    ],
     chaosLevel: 0,
     mode: GAME_MODES.CLASSIC,
     background: BACKGROUNDS.ELEMENTARY,
-    features: { rotations: true, tunnels: false, flips: false, chaos: false, explode: false, parity: false, net: false },
+    features: { rotations: true, tunnels: true, flips: true, chaos: false, explode: false, parity: false, net: false },
     tutorial: {
-      title: 'CUBE 2: Rows and Columns',
-      text: 'The scramble is still short, but it mixes more axes. Notice that a turn affects four side faces and leaves the opposite parallel slices untouched.',
-      tip: 'Before every move, pick one sticker and predict where it will land.',
+      title: 'CUBE 2: Through the Cube',
+      text: 'This cube is almost solved. Only the six middle tiles are wrong, one in the center of each side. Each one shows the color from the other side of the cube. Tap a wrong middle tile to flip it back. The matching tile on the far side flips back too, so three taps fix all six.',
+      tip: 'Tapping is already turned on, so just tap. Tap only the middle tiles that still look wrong. Each tap fixes two tiles at once, so you only need three taps.',
+      mobiLines: [
+        "Welcome back! Last time you turned a layer. Now let's try something new.",
+        "Look closely. This cube is almost solved. Every side is one color.",
+        "But the tile in the middle of each side is the wrong color. There are six of them.",
+        "Each middle tile is showing the color from the other side of the cube.",
+        "You can fix it with a flip. A flip sends a tile through the cube to the other side.",
+        "Just tap a middle tile. You do not need any buttons. Tapping is already turned on.",
+        "When you tap one, it flips back. The matching tile on the far side flips back too!",
+        "So you only need three taps. Each tap fixes two tiles at once.",
+        "Tap the middle tiles that still look wrong. Leave the ones that already match.",
+        "Try your first flip now. This is the special move that makes this game fun!",
+      ],
     },
     winCondition: WIN_CONDITIONS.CLASSIC,
-    winMessage: 'Rows and columns are starting to make sense.',
+    winMessage: 'Three taps, six tiles fixed. Now you know how to flip!',
     difficulty: DIFFICULTY.TUTORIAL,
     tags: cubeTags,
     requirements: { previousLevel: 1, stars: 0, achievements: [] },
@@ -138,7 +158,7 @@ export const CUBE_CAMPAIGN_LEVELS = [
       tip: 'When stuck, isolate one face, then use flips to reason about the opposite face instead of guessing.',
     },
     winCondition: WIN_CONDITIONS.CLASSIC,
-    winMessage: 'CUBE Campaign complete — you are ready for Rubik\'s freeplay.',
+    winMessage: 'CUBE Campaign complete. You are ready for Rubik\'s freeplay.',
     difficulty: DIFFICULTY.MEDIUM,
     tags: cubeTags,
     requirements: { previousLevel: 5, stars: 0, achievements: [] },
