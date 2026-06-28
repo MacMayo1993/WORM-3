@@ -164,6 +164,7 @@ export function useWormCrawler(size, cubies) {
     // route can extend far beyond the visible body without affecting gameplay.
     const pathHistory = useRef(makeTileTrail(TRAIL_HISTORY_CAP));
     const deathMenuTimer = useRef(null);
+    const phaseHandlersRef = useRef(null);
     const tunnelUseCountsRef = useRef(new Map());
     const voidTunnelKeysRef = useRef(new Set());
     const pendingVoidKillRef = useRef(null);
@@ -502,11 +503,13 @@ export function useWormCrawler(size, cubies) {
         }
 
         // ── Phase handlers ───────────────────────────────────────────────────────
-        // Each phase owns its update logic plus optional enter()/exit() hooks that
-        // fire exactly once per phase transition (detected via prevPhaseRef).
-        // Defined inline so they always close over the current cubies, wormSpeed, etc.
-        // update() returns true to signal an early exit (replaces bare `return`s).
-        const PHASE_HANDLERS = {
+        // Built once per size change and cached — avoids re-creating ~12 function
+        // objects on every frame. Handlers close over stable refs and imported
+        // functions; the three `st.*` call-sites were replaced with getState()
+        // so the cached closures never hold a stale store snapshot.
+        if (!phaseHandlersRef.current || phaseHandlersRef._size !== size) {
+        phaseHandlersRef._size = size;
+        phaseHandlersRef.current = {
             crawling: {
                 // enter() fires once when transitioning back from 'exiting'.
                 enter() {
@@ -782,13 +785,13 @@ export function useWormCrawler(size, cubies) {
                                 // Worm crawled onto the tile but didn't jump — orb is out of reach
                             } else {
                                 const pickedFaceId = pickedSticker ? pickedSticker.curr : 0;
-                                const liveColors = resolveColors(st.settings);
+                                const liveColors = resolveColors(useGameStore.getState().settings);
                                 const pickedColor = ensureOrbContrast((pickedFaceId && liveColors[pickedFaceId]) ?? '#22ff88');
                                 applyOrbPickupGrowth(pickedColor, pickedFaceId);
                                 pendingOrbFlashRef.current = { color: pickedColor, pos: curWorldPos.current.toArray() };
                                 const newPowerup = { ...randomFreeTile(size, [...powerupsRef.current, pos.current]), type: 'apple' };
                                 powerupsRef.current[puIdx] = newPowerup;
-                                st.setWormPowerups(powerupsRef.current.slice());
+                                useGameStore.getState().setWormPowerups(powerupsRef.current.slice());
                             }
                         }
 
@@ -803,7 +806,7 @@ export function useWormCrawler(size, cubies) {
 
                         if (onFlippedTile.current !== lastFlippedRef.current) {
                             lastFlippedRef.current = onFlippedTile.current;
-                            st.setWormOnFlippedTile(onFlippedTile.current);
+                            useGameStore.getState().setWormOnFlippedTile(onFlippedTile.current);
                         }
 
                         if (isFlipped) {
@@ -986,6 +989,8 @@ export function useWormCrawler(size, cubies) {
                 },
             },
         };
+        }
+        const PHASE_HANDLERS = phaseHandlersRef.current;
 
         // ── Dispatch: detect phase transitions, then run the active handler ──────
         const currentPhase = phase.current;
