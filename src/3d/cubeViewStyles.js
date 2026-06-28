@@ -6,7 +6,7 @@
 // because it's a whole-cube structural mode that can't be mixed per cubelet.
 export const PER_CUBELET_VIEW_STYLES = [
   'classic', 'grid', 'sudokube', 'wireframe', 'glass',
-  'chrome', 'balloon', 'neon', 'gap', 'lego'
+  'chrome', 'neon', 'gap', 'lego'
 ];
 
 // Modes that draw glowing LED edges over the cubie body.
@@ -34,8 +34,6 @@ export function bodyMaterialProps(mode) {
       return { color: '#d6d9dd', roughness: 0.06, metalness: 1.0, envMapIntensity: 1.25 };
     case 'neon':
       return { color: '#08080c', roughness: 0.3, metalness: 0.35, envMapIntensity: 0.5, emissive: '#0a0014', emissiveIntensity: 0.4 };
-    case 'balloon': // shiny rubbery body behind the puffed dome tiles
-      return { color: '#14141a', roughness: 0.12, metalness: 0.1, envMapIntensity: 0.9 };
     case 'lego': // glossy ABS plastic
       return { color: '#15151a', roughness: 0.35, metalness: 0.0, envMapIntensity: 0.6 };
     default: // classic, grid, sudokube, gap

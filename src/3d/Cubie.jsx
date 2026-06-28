@@ -174,11 +174,9 @@ const Cubie = React.forwardRef(function Cubie({
 
   // Derived per-style render switches.
   const isLego = effectiveVisualMode === 'lego';
-  const isBalloon = effectiveVisualMode === 'balloon';
   const showLedEdges = LED_EDGE_MODES.has(effectiveVisualMode);
   // Gap mode shrinks the whole cubie in place so visible gaps open between pieces.
-  // Balloon over-inflates it a touch so neighbours press together like full balloons.
-  const contentScale = effectiveVisualMode === 'gap' ? 0.82 : isBalloon ? 1.05 : 1;
+  const contentScale = effectiveVisualMode === 'gap' ? 0.82 : 1;
   // Body material props (+ wormMode transparency layered on).
   const _bmp = bodyMaterialProps(effectiveVisualMode);
   const bodyMatProps = {
@@ -461,12 +459,6 @@ const Cubie = React.forwardRef(function Cubie({
         <mesh onPointerDown={handleDown} visible={false}>
           <boxGeometry args={[0.98, 0.98, 0.98]} />
         </mesh>
-      ) : isBalloon ? (
-        // Balloon body — a heavily inflated "pillow" cubelet (large corner radius) so the
-        // whole piece puffs out, not just the dome tiles riding on it.
-        <RoundedBox args={[0.98, 0.98, 0.98]} radius={0.45} smoothness={6} onPointerDown={handleDown} castShadow receiveShadow>
-          <meshStandardMaterial {...bodyMatProps} />
-        </RoundedBox>
       ) : (
         <RoundedBox args={[0.98, 0.98, 0.98]} radius={0.08} smoothness={4} onPointerDown={handleDown} castShadow receiveShadow>
           <meshStandardMaterial {...bodyMatProps} />
@@ -485,8 +477,7 @@ const Cubie = React.forwardRef(function Cubie({
         />
       ))}
 
-      {/* Stickers — frame-shaped when hollow, solid plane otherwise; none in mirror/wireframe mode.
-          Balloon mode renders these too — StickerPlane swaps in a bulged dome geometry. */}
+      {/* Stickers — frame-shaped when hollow, solid plane otherwise; none in mirror/wireframe mode. */}
       {effectiveVisualMode !== 'wireframe' && !mirrorMode && (
         <>
           {isEdge(position[2], (size - 1) / 2) && meta('PZ') && <StickerPlane key={stickerKey('PZ')} currentDir="PZ" meta={meta('PZ')} pos={STICKER_POS.PZ} rot={STICKER_ROT.PZ} mode={effectiveVisualMode} overlay={overlay('PZ')} faceSize={size} {...gridPos('PZ')} hollow={hollowMode} />}

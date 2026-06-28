@@ -25,7 +25,7 @@ for (let f = 1; f <= 6; f++) {
   _menuFaceStyles[f] = _TILE_KEYS[Math.floor(Math.random() * _TILE_KEYS.length)];
 }
 let MENU_FACE_COLORS = COLOR_SCHEMES[_menuSchemeKey] ?? COLOR_SCHEMES['classic']; // { 1: hex, 2: hex, ... }
-// Seed for the per-cubelet whole-cube view styles (chrome, balloon, neon, gap, lego, …),
+// Seed for the per-cubelet whole-cube view styles (chrome, neon, gap, lego, …),
 // mirroring Random Mode. Re-rolled on every cube tap so the styles reshuffle each time.
 let _menuViewEpoch = Math.floor(Math.random() * 1e9);
 
@@ -155,8 +155,7 @@ const MENU_FLIP_PAIRS = [
 const INITIAL_WORM_DELAY = 2.5; // seconds before the very first worm spawns
 
 // ─── Menu cube view-style geometry (mirrors Random Mode's per-cubelet styles) ──
-// Balloon is intentionally excluded on the menu cube.
-const MENU_VIEW_STYLES = PER_CUBELET_VIEW_STYLES.filter(s => s !== 'balloon');
+const MENU_VIEW_STYLES = PER_CUBELET_VIEW_STYLES;
 
 // Lego: one detailed stud per face — tapered body, embossed ring, center pip.
 // The face group's +Y axis is rotated to the outward normal; the stud builds up +Y.
@@ -194,7 +193,7 @@ function MenuLegoStud({ dir, color }) {
 
 const ShuffleCubie = React.memo(({ cubie }) => {
   const cx = cubie.x - 1, cy = cubie.y - 1, cz = cubie.z - 1;
-  // Each cubelet wears its own whole-cube view style, same as Random Mode (no balloon).
+  // Each cubelet wears its own whole-cube view style, same as Random Mode.
   const vmode = pickCubeletViewStyle(cubie.x, cubie.y, cubie.z, _menuViewEpoch, MENU_VIEW_STYLES);
   const isWire = vmode === 'wireframe';
   const isLego = vmode === 'lego';

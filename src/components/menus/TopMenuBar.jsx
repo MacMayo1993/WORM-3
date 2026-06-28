@@ -51,7 +51,7 @@ const TopMenuBar = ({
 }) => {
   const VISUAL_MODE_LABELS = {
     classic: 'Classic', grid: 'Grid', sudokube: 'Sudoku', wireframe: 'Wire', glass: 'Glass',
-    chrome: 'Chrome', balloon: 'Balloon', neon: 'Neon', gap: 'Gap', lego: 'Lego'
+    chrome: 'Chrome', neon: 'Neon', gap: 'Gap', lego: 'Lego'
   };
   const modeLabel = VISUAL_MODE_LABELS[visualMode] || 'Classic';
 
