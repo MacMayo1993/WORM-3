@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { Environment, TrackballControls } from '@react-three/drei';
+import { Environment, TrackballControls, View, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 
 import SimpleCubeRenderer from './SimpleCubeRenderer.jsx';
@@ -141,7 +141,10 @@ const CONFIG = {
 // ============================================================================
 // MANIFOLDER VIEW (Left canvas) — Overview camera showing the full cube
 // ============================================================================
-function ManifoldScene({ cubies, size, faceColors, crawlerWorldPos, orbs, rotationAnim, isGlowChar }) {
+function ManifoldScene({ cubies, size, faceColors, crawlerWorldPos, orbs, rotationAnim, isGlowChar, trackRef }) {
+  const [domEl, setDomEl] = useState(null);
+  useEffect(() => { setDomEl(trackRef.current); }, [trackRef]);
+
   return (
     <>
       <ambientLight intensity={0.6} />
@@ -150,7 +153,6 @@ function ManifoldScene({ cubies, size, faceColors, crawlerWorldPos, orbs, rotati
 
       <SimpleCubeRenderer cubies={cubies} size={size} faceColors={faceColors} rotationAnim={rotationAnim} />
 
-      {/* Crawler position marker visible from overview */}
       {crawlerWorldPos && (
         <mesh position={crawlerWorldPos.toArray()}>
           <sphereGeometry args={[0.2, 12, 12]} />
@@ -158,20 +160,22 @@ function ManifoldScene({ cubies, size, faceColors, crawlerWorldPos, orbs, rotati
         </mesh>
       )}
 
-      {/* Orbs */}
       {orbs.map((orb) => (
         <CrawlerOrb key={orb.id} position={orb.position} collected={orb.collected} color="#ffd700" isGlowChar={isGlowChar} />
       ))}
 
-      <TrackballControls
-        noPan
-        noZoom={false}
-        minDistance={5}
-        maxDistance={28}
-        staticMoving={false}
-        dynamicDampingFactor={0.08}
-        rotateSpeed={1.2}
-      />
+      {domEl && (
+        <TrackballControls
+          domElement={domEl}
+          noPan
+          noZoom={false}
+          minDistance={5}
+          maxDistance={28}
+          staticMoving={false}
+          dynamicDampingFactor={0.08}
+          rotateSpeed={1.2}
+        />
+      )}
       <Environment preset="city" />
     </>
   );
@@ -608,11 +612,32 @@ export default function PlatformerWormMode({ cubies: initialCubies, size, faceCo
   // Compute crawler world position for the manifolder view marker
   const crawlerWorldPos = crawlerDisplay?.position || null;
 
+  const rootRef = useRef(null);
+  const manifoldTrackRef = useRef(null);
+  const crawlerTrackRef = useRef(null);
+
   return (
-    <div style={{ ...styles.root, flexDirection: isPortrait ? 'column' : 'row' }}>
-      {/* Left/top canvas: Manifolder overview */}
-      <div style={isPortrait ? styles.topPanel : styles.leftPanel}>
-        <Canvas camera={{ position: [0, 2, cameraZ], fov: 40 }}>
+    <div ref={rootRef} style={{ ...styles.root, flexDirection: isPortrait ? 'column' : 'row' }}>
+      {/* Tracking panels — define where each View renders via scissor */}
+      <div ref={manifoldTrackRef} style={isPortrait ? styles.topPanel : styles.leftPanel}>
+        <div style={styles.panelLabel}>
+          <span style={{ color: '#60a5fa' }}>MANIFOLDER</span>
+        </div>
+      </div>
+      <div ref={crawlerTrackRef} style={isPortrait ? styles.bottomPanel : styles.rightPanel}>
+        <div style={styles.panelLabel}>
+          <span style={{ color: '#00ff88' }}>CRAWLER</span>
+        </div>
+      </div>
+
+      {/* Single Canvas — scissor-rendered into both panels */}
+      <Canvas
+        style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}
+        eventSource={rootRef}
+        eventPrefix="client"
+      >
+        <View track={manifoldTrackRef} index={1}>
+          <PerspectiveCamera makeDefault position={[0, 2, cameraZ]} fov={40} />
           <Suspense fallback={null}>
             <ManifoldScene
               cubies={cubies}
@@ -622,17 +647,12 @@ export default function PlatformerWormMode({ cubies: initialCubies, size, faceCo
               orbs={orbsDisplay}
               rotationAnim={rotationAnim}
               isGlowChar={isGlowChar}
+              trackRef={manifoldTrackRef}
             />
           </Suspense>
-        </Canvas>
-        <div style={styles.panelLabel}>
-          <span style={{ color: '#60a5fa' }}>MANIFOLDER</span>
-        </div>
-      </div>
-
-      {/* Right/bottom canvas: Crawler view */}
-      <div style={isPortrait ? styles.bottomPanel : styles.rightPanel}>
-        <Canvas camera={{ position: [0, 0, 10], fov: 55 }}>
+        </View>
+        <View track={crawlerTrackRef} index={2}>
+          <PerspectiveCamera makeDefault position={[0, 0, 10]} fov={55} />
           <Suspense fallback={null}>
             <CrawlerScene
               cubies={cubies}
@@ -643,7 +663,6 @@ export default function PlatformerWormMode({ cubies: initialCubies, size, faceCo
               rotationAnim={rotationAnim}
               isGlowChar={isGlowChar}
             />
-            {/* Game loop runs here (needs useFrame) */}
             <CrawlerGameLoop
               crawlerRef={crawlerRef}
               inputRef={inputRef}
@@ -658,11 +677,8 @@ export default function PlatformerWormMode({ cubies: initialCubies, size, faceCo
               lastParityDamage={lastParityDamage}
             />
           </Suspense>
-        </Canvas>
-        <div style={styles.panelLabel}>
-          <span style={{ color: '#00ff88' }}>CRAWLER</span>
-        </div>
-      </div>
+        </View>
+      </Canvas>
 
       {/* HUD overlay */}
       <PlatformerHUD
@@ -729,5 +745,6 @@ const styles = {
     position: 'absolute', bottom: '8px', left: '50%', transform: 'translateX(-50%)',
     fontSize: '10px', fontFamily: "'Courier New', monospace",
     fontWeight: 'bold', letterSpacing: '0.2em', opacity: 0.4,
+    pointerEvents: 'none',
   },
 };
