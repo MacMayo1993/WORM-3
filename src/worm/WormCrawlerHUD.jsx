@@ -10,6 +10,7 @@ import { ANTIPODAL_COLOR } from '../utils/constants.js';
 import OrbInventoryHUD from './OrbInventoryHUD.jsx';
 import ParityWallet from '../components/overlays/ParityWallet.jsx';
 import { callWormTurn } from './wormTurnBridge.js';
+import { BOOST_COOLDOWN } from './healerWorm/constants.js';
 import { MenuTitleCard } from '../components/menus/MainMenu.jsx';
 import DeathScreen from './DeathScreens.jsx';
 
@@ -243,7 +244,60 @@ const JUMP_WRAP_STYLE = {
     position: 'absolute',
     bottom: 'calc(4px + env(safe-area-inset-bottom, 0px))',
     left: 4,
-    pointerEvents: 'auto'
+    pointerEvents: 'auto',
+    display: 'flex',
+    alignItems: 'flex-end',
+    gap: 8,
+};
+
+// ─── Boost button (beside JUMP) ───────────────────────────────────────────────
+const BOOST_BTN_BASE = {
+    position: 'relative',
+    overflow: 'hidden',
+    minWidth: 92,
+    borderRadius: 18,
+    padding: '22px 14px',
+    fontSize: 26,
+    fontWeight: 800,
+    color: '#fff',
+    boxShadow: palette.shadow,
+    cursor: 'pointer',
+    touchAction: 'manipulation',
+    WebkitTapHighlightColor: 'transparent',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+};
+
+const BOOST_BTN_READY = {
+    ...BOOST_BTN_BASE,
+    background: 'linear-gradient(135deg, #f59e0b, #f97316)',
+    border: '1px solid rgba(249,115,22,0.7)',
+    boxShadow: `${palette.shadow}, 0 0 14px #f97316`,
+};
+
+const BOOST_BTN_ACTIVE = {
+    ...BOOST_BTN_BASE,
+    background: 'linear-gradient(135deg, #fde047, #f97316)',
+    border: '1px solid #fde047',
+    boxShadow: `${palette.shadow}, 0 0 22px #fde047, 0 0 44px #f97316`,
+};
+
+const BOOST_BTN_COOLDOWN = {
+    ...BOOST_BTN_BASE,
+    background: 'linear-gradient(135deg, #475569, #334155)',
+    border: `1px solid ${palette.border}`,
+    cursor: 'default',
+    color: 'rgba(255,255,255,0.5)',
+};
+
+const BOOST_FILL_STYLE = {
+    position: 'absolute',
+    left: 0,
+    bottom: 0,
+    width: '100%',
+    background: 'rgba(249,115,22,0.5)',
+    pointerEvents: 'none',
 };
 
 const JUMP_BTN_BASE = {
@@ -645,6 +699,50 @@ function WinnerScreen({ wormBodyTiles, wormSessionOrbs, parityPoints, wormTimeAl
     );
 }
 
+// ─── Boost button — speed burst, recharges after use ──────────────────────────
+function BoostButton({ wormAlive }) {
+    const boostState = useGameStore(s => s.wormBoostState ?? 'ready');
+    // Fill rises 0→100% over the cooldown so the button visibly recharges.
+    const [fillPct, setFillPct] = useState(100);
+
+    useEffect(() => {
+        if (boostState !== 'cooldown') {
+            setFillPct(boostState === 'ready' ? 100 : 0);
+            return;
+        }
+        setFillPct(0);
+        const start = Date.now();
+        const id = setInterval(() => {
+            const p = Math.min(1, (Date.now() - start) / (BOOST_COOLDOWN * 1000));
+            setFillPct(p * 100);
+            if (p >= 1) clearInterval(id);
+        }, 60);
+        return () => clearInterval(id);
+    }, [boostState]);
+
+    const handleBoost = () => {
+        if (!wormAlive || boostState !== 'ready') return;
+        callWormTurn('boost');
+    };
+
+    const style = boostState === 'active' ? BOOST_BTN_ACTIVE
+        : boostState === 'cooldown' ? BOOST_BTN_COOLDOWN
+        : BOOST_BTN_READY;
+
+    return (
+        <button
+            onPointerDown={handleBoost}
+            onTouchStart={e => { e.preventDefault(); handleBoost(); }}
+            style={style}
+            aria-label="Boost"
+            title="Speed boost"
+        >
+            {boostState === 'cooldown' && <div style={{ ...BOOST_FILL_STYLE, height: `${fillPct}%` }} />}
+            <span style={{ position: 'relative', zIndex: 1 }}>⚡</span>
+        </button>
+    );
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSize = 3, onHome, onSettings, onToggleAntipodal, antipodalActive = false, wormAlive = true, showDeathMenu = false, deathDetails = null, onRetry, onNewGame }) {
@@ -804,7 +902,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                 </div>
             )}
 
-            {/* Jump button */}
+            {/* Jump + Boost buttons */}
             <div style={JUMP_WRAP_STYLE}>
                 <button
                     onPointerDown={handleJumpAction}
@@ -813,6 +911,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                 >
                     ⤴ JUMP
                 </button>
+                <BoostButton wormAlive={wormAlive} />
             </div>
 
             {/* D-pad */}

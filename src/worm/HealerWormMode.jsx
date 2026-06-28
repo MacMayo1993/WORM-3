@@ -52,6 +52,9 @@ import {
     HEAL_COST,
     SURFACE_JUMP_HEIGHT,
     SURFACE_JUMP_TILE_SPAN,
+    BOOST_MULTIPLIER,
+    BOOST_DURATION,
+    BOOST_COOLDOWN,
     AUTO_ROTATE_INTERVAL_MIN,
     AUTO_ROTATE_INTERVAL_MAX,
     AUTO_ROTATE_WARNING,
@@ -73,6 +76,7 @@ import { getSkin, _hatAlignQuat, _hatYUp } from './wormCosmeticsData.js';
 import { getWormCharacter } from './wormCharacterData.js';
 import { EARN_ORB_COLLECT, EARN_WORM_SURVIVAL_TICK, EARN_WORM_HEALED_FACE, SURVIVAL_TICK_INTERVAL } from '../utils/economyConstants.js';
 import { liveRotation } from './liveRotation.js';
+import { vibrate } from '../utils/audio.js';
 import { tunnelState } from './tunnelProgressBridge.js';
 import { liveCubies } from './liveCubies.js';
 import { SURFACE_OFFSET } from '../utils/constants.js';
@@ -425,6 +429,14 @@ function useWormCrawler(size, cubies) {
     const prevShowTunnelsRef = useRef(false);
     const stepAcc = useRef(0);
     const pendingTurns = useRef([]);
+    // Speed-boost timers (seconds): one counts down the active boost, the other its cooldown.
+    const boostActiveT = useRef(0);
+    const boostCooldownT = useRef(0);
+    // Tracks the previous frame's STEP_SEC so stepAcc can be rescaled when the crawl speed
+    // changes mid-step (boost toggling, or the speed slider) — keeps stepAcc/STEP_SEC (which
+    // equals interpT) consistent so a speed change never force-crosses a tile early and
+    // scatters the body trail.
+    const prevStepSecRef = useRef(null);
     const onFlippedTile = useRef(false);
     const lastFlippedRef = useRef(false);
     const prevDirKey = useRef(null);
@@ -731,10 +743,36 @@ function useWormCrawler(size, cubies) {
 
     // ── Per-frame simulation ──────────────────────────────────────────────────
     const tick = useCallback((delta) => {
-        const STEP_SEC = 1.0 / wormSpeedRef.current;
-
         if (!alive.current) return;
         if (wormPausedRef.current) return;
+
+        // ── Speed boost: drain the active window, then run the cooldown, publishing
+        // each state transition to the store so the HUD button reflects ready/active/cooldown.
+        if (boostActiveT.current > 0) {
+            boostActiveT.current -= delta;
+            if (boostActiveT.current <= 0) {
+                boostActiveT.current = 0;
+                boostCooldownT.current = BOOST_COOLDOWN;
+                useGameStore.getState().setWormBoostState('cooldown');
+            }
+        } else if (boostCooldownT.current > 0) {
+            boostCooldownT.current -= delta;
+            if (boostCooldownT.current <= 0) {
+                boostCooldownT.current = 0;
+                useGameStore.getState().setWormBoostState('ready');
+            }
+        }
+        const boostMult = boostActiveT.current > 0 ? BOOST_MULTIPLIER : 1;
+        const STEP_SEC = 1.0 / (wormSpeedRef.current * boostMult);
+
+        // If the crawl speed changed since last frame, rescale the in-progress step accumulator
+        // so its fraction (== interpT) is preserved across the change. Without this, a speed
+        // change mid-step desyncs stepAcc from interpT and force-crosses tiles early, which
+        // makes the head jump and the body trail fly around.
+        if (prevStepSecRef.current && prevStepSecRef.current !== STEP_SEC && stepAcc.current > 0) {
+            stepAcc.current *= STEP_SEC / prevStepSecRef.current;
+        }
+        prevStepSecRef.current = STEP_SEC;
 
         const st = useGameStore.getState();
 
@@ -818,7 +856,14 @@ function useWormCrawler(size, cubies) {
                     // Apply pending turn — RELATIVE to current heading
                     if (pendingTurns.current.length > 0) {
                         const t = pendingTurns.current.shift();
-                        if (t === 'jump') {
+                        if (t === 'boost') {
+                            // Ignore if already boosting or recharging.
+                            if (boostActiveT.current <= 0 && boostCooldownT.current <= 0) {
+                                boostActiveT.current = BOOST_DURATION;
+                                useGameStore.getState().setWormBoostState('active');
+                                vibrate(18);
+                            }
+                        } else if (t === 'jump') {
                             startJump();
                         } else if (wormControlModeRef.current === 'oriented') {
                             if (t === 'up' || t === 'down' || t === 'left' || t === 'right') {
@@ -1314,6 +1359,10 @@ function useWormCrawler(size, cubies) {
         activeTunnel.current = null;
         stepAcc.current = 0;
         pendingTurns.current = [];
+        boostActiveT.current = 0;
+        boostCooldownT.current = 0;
+        prevStepSecRef.current = null;
+        useGameStore.getState().setWormBoostState('ready');
         onFlippedTile.current = false;
         lastFlippedRef.current = false;
         prevDirKey.current = null;

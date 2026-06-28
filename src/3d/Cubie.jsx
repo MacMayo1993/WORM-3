@@ -10,6 +10,7 @@ import StickerPlane from './StickerPlane.jsx';
 import WireframeEdge from './WireframeEdge.jsx';
 import { getMirrorDimensions } from '../game/mirrorBlocks.js';
 import { resolveColors } from '../utils/colorSchemes.js';
+import { PER_CUBELET_VIEW_STYLES, LED_EDGE_MODES, pickCubeletViewStyle, bodyMaterialProps } from './cubeViewStyles.js';
 // Canonical Latin-square value (matches win detection in winDetection.js).
 import { faceValue as latinValue } from '../game/coordinates.js';
 
@@ -79,68 +80,41 @@ const STICKER_ROT = {
   NY: [Math.PI / 2, 0, 0],
 };
 
-// Per-cubelet view styles used by Random Mode. These are the sticker-compatible
-// View-tab looks; 'hollow' is intentionally excluded because it's a whole-cube
-// structural mode (it removes bodies/stickers in favour of void beams) and cannot
-// be mixed per cubelet.
-const PER_CUBELET_VIEW_STYLES = [
-  'classic', 'grid', 'sudokube', 'wireframe', 'glass',
-  'chrome', 'neon', 'gap', 'lego'
-];
-
-// Modes that draw glowing LED edges over the cubie body.
-const LED_EDGE_MODES = new Set(['wireframe', 'neon']);
-
-// Lego studs: one cylinder centered on each visible face, oriented along the face normal.
-const STUD_GEO_ARGS = [0.22, 0.22, 0.16, 20];
-const STUD_TRANSFORMS = {
-  PZ: { pos: [0, 0, 0.56], rot: [Math.PI / 2, 0, 0] },
-  NZ: { pos: [0, 0, -0.56], rot: [Math.PI / 2, 0, 0] },
-  PX: { pos: [0.56, 0, 0], rot: [0, 0, Math.PI / 2] },
-  NX: { pos: [-0.56, 0, 0], rot: [0, 0, Math.PI / 2] },
-  PY: { pos: [0, 0.56, 0], rot: [0, 0, 0] },
-  NY: { pos: [0, -0.56, 0], rot: [0, 0, 0] }
+// Lego stud: a single molded stud centered on each face. The face group's +Y axis is
+// rotated to the outward normal, then the stud is built up the local +Y axis.
+const LEGO_STUD_BODY_GEO = [0.2, 0.21, 0.14, 26];   // slightly tapered cylinder (radiusTop < bottom)
+const LEGO_STUD_RING_GEO = [0.14, 0.022, 10, 28];   // torus — embossed ring on the stud top
+const LEGO_STUD_PIP_GEO = [0.055, 0.055, 0.05, 18]; // small raised center pip
+const LEGO_FACE_TRANSFORMS = {
+  PZ: { pos: [0, 0, 0.49], rot: [Math.PI / 2, 0, 0] },
+  NZ: { pos: [0, 0, -0.49], rot: [-Math.PI / 2, 0, 0] },
+  PX: { pos: [0.49, 0, 0], rot: [0, 0, -Math.PI / 2] },
+  NX: { pos: [-0.49, 0, 0], rot: [0, 0, Math.PI / 2] },
+  PY: { pos: [0, 0.49, 0], rot: [0, 0, 0] },
+  NY: { pos: [0, -0.49, 0], rot: [Math.PI, 0, 0] }
 };
 
-// Body material parameters per view style. The cubie "body" is the frame the stickers
-// sit on; swapping its material is what gives chrome/neon/etc. their whole-cube identity.
-// wormMode transparency/side is layered on top of these at render time.
-function bodyMaterialProps(mode) {
-  switch (mode) {
-    case 'wireframe':
-      return { color: '#000000', roughness: 0.9, metalness: 0, envMapIntensity: 0.4 };
-    case 'glass':
-      return { color: '#111111', roughness: 0.05, metalness: 0.3, envMapIntensity: 0.8, transparent: true, opacity: 0.12 };
-    case 'chrome':
-      return { color: '#d6d9dd', roughness: 0.06, metalness: 1.0, envMapIntensity: 1.25 };
-    case 'neon':
-      return { color: '#08080c', roughness: 0.3, metalness: 0.35, envMapIntensity: 0.5, emissive: '#0a0014', emissiveIntensity: 0.4 };
-    case 'lego': // glossy ABS plastic
-      return { color: '#15151a', roughness: 0.35, metalness: 0.0, envMapIntensity: 0.6 };
-    default: // classic, grid, sudokube, gap
-      return { color: '#0a0a0a', roughness: 0.25, metalness: 0.15, envMapIntensity: 0.4 };
-  }
-}
-
-// A single Lego stud (cylinder) on a given face, colored to match the face's sticker.
+// A single detailed Lego stud on a given face, colored to match the face's sticker:
+// a tapered cylinder body, an embossed ring on top, and a small center pip.
 function LegoStud({ dir, color }) {
-  const t = STUD_TRANSFORMS[dir];
+  const t = LEGO_FACE_TRANSFORMS[dir];
   if (!t) return null;
   return (
-    <mesh position={t.pos} rotation={t.rot} castShadow>
-      <cylinderGeometry args={STUD_GEO_ARGS} />
-      <meshStandardMaterial color={color} roughness={0.35} metalness={0} envMapIntensity={0.6} />
-    </mesh>
+    <group position={t.pos} rotation={t.rot}>
+      <mesh position={[0, 0.07, 0]} castShadow>
+        <cylinderGeometry args={LEGO_STUD_BODY_GEO} />
+        <meshStandardMaterial color={color} roughness={0.35} metalness={0} envMapIntensity={0.6} />
+      </mesh>
+      <mesh position={[0, 0.142, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+        <torusGeometry args={LEGO_STUD_RING_GEO} />
+        <meshStandardMaterial color={color} roughness={0.28} metalness={0} envMapIntensity={0.75} />
+      </mesh>
+      <mesh position={[0, 0.155, 0]} castShadow>
+        <cylinderGeometry args={LEGO_STUD_PIP_GEO} />
+        <meshStandardMaterial color={color} roughness={0.3} metalness={0} envMapIntensity={0.7} />
+      </mesh>
+    </group>
   );
-}
-
-// Deterministically map a cubelet (by its stable home position) + the current random
-// cycle to one view style. Stable within a cycle so the look follows the physical
-// piece through rotations; reshuffles when `tick` changes (every Random Mode cycle).
-function pickCubeletViewStyle(ox, oy, oz, tick) {
-  let h = (ox * 73856093) ^ (oy * 19349663) ^ (oz * 83492791) ^ (tick * 2654435761);
-  h = (h ^ (h >>> 13)) >>> 0;
-  return PER_CUBELET_VIEW_STYLES[h % PER_CUBELET_VIEW_STYLES.length];
 }
 
 // Helper functions for grid and sudokube modes
@@ -201,7 +175,6 @@ const Cubie = React.forwardRef(function Cubie({
   // Derived per-style render switches.
   const isLego = effectiveVisualMode === 'lego';
   const showLedEdges = LED_EDGE_MODES.has(effectiveVisualMode);
-  const SP = STICKER_POS;
   // Gap mode shrinks the whole cubie in place so visible gaps open between pieces.
   const contentScale = effectiveVisualMode === 'gap' ? 0.82 : 1;
   // Body material props (+ wormMode transparency layered on).
@@ -504,19 +477,19 @@ const Cubie = React.forwardRef(function Cubie({
         />
       ))}
 
-      {/* Stickers — frame-shaped when hollow, solid plane otherwise; none in mirror/wireframe mode */}
+      {/* Stickers — frame-shaped when hollow, solid plane otherwise; none in mirror/wireframe mode. */}
       {effectiveVisualMode !== 'wireframe' && !mirrorMode && (
         <>
-          {isEdge(position[2], (size - 1) / 2) && meta('PZ') && <StickerPlane key={stickerKey('PZ')} currentDir="PZ" meta={meta('PZ')} pos={SP.PZ} rot={STICKER_ROT.PZ} mode={effectiveVisualMode} overlay={overlay('PZ')} faceSize={size} {...gridPos('PZ')} hollow={hollowMode} />}
-          {isEdge(position[2], -(size - 1) / 2) && meta('NZ') && <StickerPlane key={stickerKey('NZ')} currentDir="NZ" meta={meta('NZ')} pos={SP.NZ} rot={STICKER_ROT.NZ} mode={effectiveVisualMode} overlay={overlay('NZ')} faceSize={size} {...gridPos('NZ')} hollow={hollowMode} />}
-          {isEdge(position[0], (size - 1) / 2) && meta('PX') && <StickerPlane key={stickerKey('PX')} currentDir="PX" meta={meta('PX')} pos={SP.PX} rot={STICKER_ROT.PX} mode={effectiveVisualMode} overlay={overlay('PX')} faceSize={size} {...gridPos('PX')} hollow={hollowMode} />}
-          {isEdge(position[0], -(size - 1) / 2) && meta('NX') && <StickerPlane key={stickerKey('NX')} currentDir="NX" meta={meta('NX')} pos={SP.NX} rot={STICKER_ROT.NX} mode={effectiveVisualMode} overlay={overlay('NX')} faceSize={size} {...gridPos('NX')} hollow={hollowMode} />}
-          {isEdge(position[1], (size - 1) / 2) && meta('PY') && <StickerPlane key={stickerKey('PY')} currentDir="PY" meta={meta('PY')} pos={SP.PY} rot={STICKER_ROT.PY} mode={effectiveVisualMode} overlay={overlay('PY')} faceSize={size} {...gridPos('PY')} hollow={hollowMode} />}
-          {isEdge(position[1], -(size - 1) / 2) && meta('NY') && <StickerPlane key={stickerKey('NY')} currentDir="NY" meta={meta('NY')} pos={SP.NY} rot={STICKER_ROT.NY} mode={effectiveVisualMode} overlay={overlay('NY')} faceSize={size} {...gridPos('NY')} hollow={hollowMode} />}
+          {isEdge(position[2], (size - 1) / 2) && meta('PZ') && <StickerPlane key={stickerKey('PZ')} currentDir="PZ" meta={meta('PZ')} pos={STICKER_POS.PZ} rot={STICKER_ROT.PZ} mode={effectiveVisualMode} overlay={overlay('PZ')} faceSize={size} {...gridPos('PZ')} hollow={hollowMode} />}
+          {isEdge(position[2], -(size - 1) / 2) && meta('NZ') && <StickerPlane key={stickerKey('NZ')} currentDir="NZ" meta={meta('NZ')} pos={STICKER_POS.NZ} rot={STICKER_ROT.NZ} mode={effectiveVisualMode} overlay={overlay('NZ')} faceSize={size} {...gridPos('NZ')} hollow={hollowMode} />}
+          {isEdge(position[0], (size - 1) / 2) && meta('PX') && <StickerPlane key={stickerKey('PX')} currentDir="PX" meta={meta('PX')} pos={STICKER_POS.PX} rot={STICKER_ROT.PX} mode={effectiveVisualMode} overlay={overlay('PX')} faceSize={size} {...gridPos('PX')} hollow={hollowMode} />}
+          {isEdge(position[0], -(size - 1) / 2) && meta('NX') && <StickerPlane key={stickerKey('NX')} currentDir="NX" meta={meta('NX')} pos={STICKER_POS.NX} rot={STICKER_ROT.NX} mode={effectiveVisualMode} overlay={overlay('NX')} faceSize={size} {...gridPos('NX')} hollow={hollowMode} />}
+          {isEdge(position[1], (size - 1) / 2) && meta('PY') && <StickerPlane key={stickerKey('PY')} currentDir="PY" meta={meta('PY')} pos={STICKER_POS.PY} rot={STICKER_ROT.PY} mode={effectiveVisualMode} overlay={overlay('PY')} faceSize={size} {...gridPos('PY')} hollow={hollowMode} />}
+          {isEdge(position[1], -(size - 1) / 2) && meta('NY') && <StickerPlane key={stickerKey('NY')} currentDir="NY" meta={meta('NY')} pos={STICKER_POS.NY} rot={STICKER_ROT.NY} mode={effectiveVisualMode} overlay={overlay('NY')} faceSize={size} {...gridPos('NY')} hollow={hollowMode} />}
         </>
       )}
 
-      {/* Lego studs — a cylinder on each visible face, colored by the face's current sticker */}
+      {/* Lego stud — one detailed stud on each visible face, colored by the face's current sticker */}
       {isLego && !mirrorMode && !hollowMode && (
         <>
           {isEdge(position[2], (size - 1) / 2) && meta('PZ') && <LegoStud dir="PZ" color={getEdgeColor('PZ')} />}

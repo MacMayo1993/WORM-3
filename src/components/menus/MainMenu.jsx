@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useFrame } from '@react-three/fiber';
+import { Edges } from '@react-three/drei';
 import * as THREE from 'three';
 import { makeCubies } from '../../game/cubeState.js';
 import { COLOR_SCHEMES } from '../../utils/colorSchemes.js';
 import { CLASSIC_STYLE_KEYS, ANTIPODAL_STYLE_KEYS, LIVING_STYLE_KEYS } from '../../utils/tileStyleCatalog.js';
 import { rotateSliceCubies } from '../../game/cubeRotation.js';
+import { bodyMaterialProps, pickCubeletViewStyle, LED_EDGE_MODES, PER_CUBELET_VIEW_STYLES } from '../../3d/cubeViewStyles.js';
 import { updateSharedTime, getTileStyleMaterial } from '../../3d/styles/TileStyleMaterials.jsx';
 import { vibrate } from '../../utils/audio.js';
 import MenuFlipWave from './MenuFlipWave.jsx';
@@ -23,6 +25,9 @@ for (let f = 1; f <= 6; f++) {
   _menuFaceStyles[f] = _TILE_KEYS[Math.floor(Math.random() * _TILE_KEYS.length)];
 }
 let MENU_FACE_COLORS = COLOR_SCHEMES[_menuSchemeKey] ?? COLOR_SCHEMES['classic']; // { 1: hex, 2: hex, ... }
+// Seed for the per-cubelet whole-cube view styles (chrome, neon, gap, lego, …),
+// mirroring Random Mode. Re-rolled on every cube tap so the styles reshuffle each time.
+let _menuViewEpoch = Math.floor(Math.random() * 1e9);
 
 // Called by RotatingBlackCube after a direct cube-tap shake.
 // Also available externally so tests / storybook can reset state.
@@ -32,6 +37,7 @@ function rerandomizeMenuStyle() {
   for (let f = 1; f <= 6; f++) {
     _menuFaceStyles[f] = _TILE_KEYS[Math.floor(Math.random() * _TILE_KEYS.length)];
   }
+  _menuViewEpoch = Math.floor(Math.random() * 1e9);
 }
 
 // Callback set by ShufflingCube so RotatingBlackCube can trigger a re-scramble
@@ -148,34 +154,101 @@ const MENU_FLIP_PAIRS = [
 ];
 const INITIAL_WORM_DELAY = 2.5; // seconds before the very first worm spawns
 
+// ─── Menu cube view-style geometry (mirrors Random Mode's per-cubelet styles) ──
+const MENU_VIEW_STYLES = PER_CUBELET_VIEW_STYLES;
+
+// Lego: one detailed stud per face — tapered body, embossed ring, center pip.
+// The face group's +Y axis is rotated to the outward normal; the stud builds up +Y.
+const MENU_STUD_BODY_GEO = [0.17, 0.18, 0.13, 22];
+const MENU_STUD_RING_GEO = [0.12, 0.019, 8, 24];
+const MENU_STUD_PIP_GEO = [0.046, 0.046, 0.045, 16];
+const MENU_LEGO_FACE = {
+  PZ: { pos: [0, 0, 0.47], rot: [Math.PI / 2, 0, 0] },
+  NZ: { pos: [0, 0, -0.47], rot: [-Math.PI / 2, 0, 0] },
+  PX: { pos: [0.47, 0, 0], rot: [0, 0, -Math.PI / 2] },
+  NX: { pos: [-0.47, 0, 0], rot: [0, 0, Math.PI / 2] },
+  PY: { pos: [0, 0.47, 0], rot: [0, 0, 0] },
+  NY: { pos: [0, -0.47, 0], rot: [Math.PI, 0, 0] }
+};
+function MenuLegoStud({ dir, color }) {
+  const t = MENU_LEGO_FACE[dir];
+  if (!t) return null;
+  return (
+    <group position={t.pos} rotation={t.rot}>
+      <mesh position={[0, 0.065, 0]}>
+        <cylinderGeometry args={MENU_STUD_BODY_GEO} />
+        <meshStandardMaterial color={color} roughness={0.35} metalness={0} />
+      </mesh>
+      <mesh position={[0, 0.132, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={MENU_STUD_RING_GEO} />
+        <meshStandardMaterial color={color} roughness={0.28} metalness={0} />
+      </mesh>
+      <mesh position={[0, 0.143, 0]}>
+        <cylinderGeometry args={MENU_STUD_PIP_GEO} />
+        <meshStandardMaterial color={color} roughness={0.3} metalness={0} />
+      </mesh>
+    </group>
+  );
+}
+
 const ShuffleCubie = React.memo(({ cubie }) => {
   const cx = cubie.x - 1, cy = cubie.y - 1, cz = cubie.z - 1;
+  // Each cubelet wears its own whole-cube view style, same as Random Mode.
+  const vmode = pickCubeletViewStyle(cubie.x, cubie.y, cubie.z, _menuViewEpoch, MENU_VIEW_STYLES);
+  const isWire = vmode === 'wireframe';
+  const isLego = vmode === 'lego';
+  const showEdges = LED_EDGE_MODES.has(vmode);
+  const contentScale = vmode === 'gap' ? 0.82 : 1;
+  const bmp = bodyMaterialProps(vmode);
+  const edgeColor = MENU_FACE_COLORS[1] ?? '#7df9ff';
   return (
     <group position={[cx, cy, cz]}>
-      <mesh>
-        <boxGeometry args={[0.93, 0.93, 0.93]} />
-        <meshStandardMaterial color="#1c1c30" roughness={0.28} metalness={0.72} emissive="#0d0d1e" emissiveIntensity={0.6} />
-      </mesh>
-      {STICKER_CFG.map(({ dir, pos, rot }) => {
-        const sticker = cubie.stickers?.[dir];
-        if (!sticker) return null;
-        const colorHex      = MENU_FACE_COLORS[sticker.curr] ?? '#888888';
-        const antiColorHex  = MENU_FACE_COLORS[ANTIPODAL_COLOR[sticker.curr]] ?? '#888888';
-        // Show the full tile overlay stack on stickers that a worm has passed through.
-        // curr !== orig means this sticker has been flipped an odd number of times.
-        const isFlipped = sticker.curr !== sticker.orig;
-        return (
-          <group key={dir} position={pos} rotation={rot}>
-            <mesh renderOrder={10}>
-              <planeGeometry args={[0.80, 0.80]} />
-              <primitive attach="material" object={getTileStyleMaterial(_menuFaceStyles[sticker.curr] || 'solid', colorHex)} />
-            </mesh>
-            {isFlipped && (
-              <MenuTileOverlay colorHex={colorHex} antiColorHex={antiColorHex} />
-            )}
-          </group>
-        );
-      })}
+      <group scale={contentScale}>
+        <mesh>
+          <boxGeometry args={[0.93, 0.93, 0.93]} />
+          <meshStandardMaterial
+            color={bmp.color}
+            roughness={bmp.roughness}
+            metalness={bmp.metalness}
+            envMapIntensity={bmp.envMapIntensity}
+            transparent={!!bmp.transparent}
+            opacity={bmp.opacity ?? 1}
+            emissive={bmp.emissive ?? '#000000'}
+            emissiveIntensity={bmp.emissiveIntensity ?? 0}
+          />
+          {showEdges && <Edges color={edgeColor} />}
+        </mesh>
+
+        {/* Stickers — hidden in wireframe */}
+        {!isWire && STICKER_CFG.map(({ dir, pos, rot }) => {
+          const sticker = cubie.stickers?.[dir];
+          if (!sticker) return null;
+          const colorHex      = MENU_FACE_COLORS[sticker.curr] ?? '#888888';
+          const antiColorHex  = MENU_FACE_COLORS[ANTIPODAL_COLOR[sticker.curr]] ?? '#888888';
+          // Show the full tile overlay stack on stickers that a worm has passed through.
+          // curr !== orig means this sticker has been flipped an odd number of times.
+          const isFlipped = sticker.curr !== sticker.orig;
+          return (
+            <group key={dir} position={pos} rotation={rot}>
+              <mesh renderOrder={10}>
+                <planeGeometry args={[0.80, 0.80]} />
+                <primitive attach="material" object={getTileStyleMaterial(_menuFaceStyles[sticker.curr] || 'solid', colorHex)} />
+              </mesh>
+              {isFlipped && (
+                <MenuTileOverlay colorHex={colorHex} antiColorHex={antiColorHex} />
+              )}
+            </group>
+          );
+        })}
+
+        {/* Lego stud on each face */}
+        {isLego && STICKER_CFG.map(({ dir }) => {
+          const sticker = cubie.stickers?.[dir];
+          if (!sticker) return null;
+          const colorHex = MENU_FACE_COLORS[sticker.curr] ?? '#888888';
+          return <MenuLegoStud key={`stud-${dir}`} dir={dir} color={colorHex} />;
+        })}
+      </group>
     </group>
   );
 });

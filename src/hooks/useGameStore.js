@@ -392,6 +392,9 @@ export const useGameStore = create(
     wormRunId: 0,
     wormSpeed: 1.0,
     setWormSpeed: (v) => set({ wormSpeed: v }),
+    // Speed-boost button state: 'ready' | 'active' | 'cooldown'
+    wormBoostState: 'ready',
+    setWormBoostState: (v) => set({ wormBoostState: v }),
     wormOrbCount: 5,
     setWormOrbCount: (v) => set({ wormOrbCount: Math.max(1, Math.min(24, Math.round(v))) }),
     wormholeInterval: 10,
