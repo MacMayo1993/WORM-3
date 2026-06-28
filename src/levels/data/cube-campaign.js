@@ -40,21 +40,37 @@ export const CUBE_CAMPAIGN_LEVELS = [
   }),
   createLevel({
     id: 2,
-    name: 'Rows and Columns',
-    description: 'Practice horizontal and vertical slice turns.',
+    name: 'Through the Cube',
+    description: 'Every center shows its antipodal twin. Flip them back through the cube.',
     cubeSize: 3,
-    scrambleMoves: 5,
+    // The cube is solved EXCEPT all six face centers show their antipodal color.
+    // flipStickerPair flips a sticker AND its antipodal partner, so flipping the three
+    // "near" centers (front/right/top) during setup flips all six centers. The player
+    // then flips those same three back — three flips fixes all six.
+    flipSequence: [
+      { x: 1, y: 1, z: 2, dirKey: 'PZ' }, // front center  (also flips back center)
+      { x: 2, y: 1, z: 1, dirKey: 'PX' }, // right center  (also flips left center)
+      { x: 1, y: 2, z: 1, dirKey: 'PY' }, // top center    (also flips bottom center)
+    ],
     chaosLevel: 0,
     mode: GAME_MODES.CLASSIC,
     background: BACKGROUNDS.ELEMENTARY,
-    features: { rotations: true, tunnels: false, flips: false, chaos: false, explode: false, parity: false, net: false },
+    features: { rotations: true, tunnels: true, flips: true, chaos: false, explode: false, parity: false, net: false },
     tutorial: {
-      title: 'CUBE 2: Rows and Columns',
-      text: 'The scramble is still short, but it mixes more axes. Notice that a turn affects four side faces and leaves the opposite parallel slices untouched.',
-      tip: 'Before every move, pick one sticker and predict where it will land.',
+      title: 'CUBE 2: Through the Cube',
+      text: 'This cube is already solved — except every center tile shows its antipodal twin, the color from the opposite side. Tapping a center flips it straight through the cube and back. Fix the three odd center pairs to solve it.',
+      tip: 'Tap a mismatched center. Each flip travels through the cube and fixes the opposite center too — so three taps cleans up all six. Only tap centers that still look wrong.',
+      mobiLines: [
+        "Back again! Ready to learn the cube's secret shortcut?",
+        "Every center tile is showing the color from the OPPOSITE side of the cube.",
+        "That's a flip — the tile folded straight through the manifold to its antipodal twin.",
+        "Tap a wrong-looking center and watch: it flips back... and so does the center across from it!",
+        "Two centers fixed per tap. Three taps total and the whole cube snaps solved.",
+        "Go on — flip them home. This is the move that makes WORM³ special.",
+      ],
     },
     winCondition: WIN_CONDITIONS.CLASSIC,
-    winMessage: 'Rows and columns are starting to make sense.',
+    winMessage: 'Three flips, six centers home — flips can solve the cube too!',
     difficulty: DIFFICULTY.TUTORIAL,
     tags: cubeTags,
     requirements: { previousLevel: 1, stars: 0, achievements: [] },

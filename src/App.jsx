@@ -22,7 +22,7 @@ import { DISPARITY_GAME_LENGTHS } from './utils/economyConstants.js';
 import { vibrate } from './utils/audio.js';
 import { makeCubies } from './game/cubeState.js';
 import { rotateSliceCubies } from './game/cubeRotation.js';
-import { flipStickerPair } from './game/manifoldLogic.js';
+import { flipStickerPair, buildManifoldGridMap } from './game/manifoldLogic.js';
 import { getManifoldMap } from './game/manifoldMapStore.js';
 import { clearRefractory } from './game/refractoryMap.js';
 
@@ -1131,6 +1131,16 @@ export default function WORM3() {
         const slice = Math.floor(Math.random() * levelSize);
         const dir = Math.random() > 0.5 ? 1 : -1;
         state = rotateSliceCubies(state, levelSize, ax, slice, dir);
+      }
+    }
+    // Hand-authored antipodal flips (flip-teaching levels). flipStickerPair also flips the
+    // antipodal partner, so one entry per pair is enough. Flips don't move stickers, so a
+    // single manifold map built from the scrambled state is valid for the whole sequence.
+    const flipSequence = currentLevelData?.flipSequence;
+    if (flipSequence && flipSequence.length) {
+      const flipMap = buildManifoldGridMap(state, levelSize);
+      for (const { x, y, z, dirKey } of flipSequence) {
+        state = flipStickerPair(state, levelSize, x, y, z, dirKey, flipMap);
       }
     }
     setRotatedCubies(state);

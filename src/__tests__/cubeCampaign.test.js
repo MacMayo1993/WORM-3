@@ -4,6 +4,7 @@ import { CUBE_CAMPAIGN_LEVELS, getCubeCampaignLevel } from '../levels/data/cube-
 import { getNextLevel, getLevel } from '../levels/index.js';
 import { makeCubies } from '../game/cubeState.js';
 import { rotateSliceCubies } from '../game/cubeRotation.js';
+import { buildManifoldGridMap, flipStickerPair } from '../game/manifoldLogic.js';
 
 // makeCubies returns a 3D array [x][y][z]; flatten then snapshot each sticker's
 // current color so two cube states can be compared for equality.
@@ -29,12 +30,48 @@ describe('createLevel scrambleMoves', () => {
 
 describe('CUBE campaign levels', () => {
   it('carries each level scrambleMoves through createLevel', () => {
-    // Level 1 uses a deterministic scrambleSequence instead of a random count.
-    const expected = { 2: 5, 3: 4, 4: 6, 5: 8, 6: 12 };
+    // Level 1 uses a deterministic scrambleSequence and level 2 a flipSequence,
+    // so neither carries a random scrambleMoves count.
+    const expected = { 3: 4, 4: 6, 5: 8, 6: 12 };
     for (const level of CUBE_CAMPAIGN_LEVELS) {
-      if (level.id === 1) continue;
+      if (level.id === 1 || level.id === 2) continue;
       expect(level.scrambleMoves).toBe(expected[level.id]);
     }
+  });
+
+  it('level 2 flips all six centers to their antipodal and is solved by flipping them back', () => {
+    const level2 = getCubeCampaignLevel(2);
+    const size = level2.cubeSize;
+    expect(level2.features.flips).toBe(true);
+    expect(level2.scrambleMoves).toBeNull();
+    expect(level2.flipSequence).toHaveLength(3);
+
+    const solved = makeCubies(size);
+    const map = buildManifoldGridMap(solved, size);
+
+    // Apply the setup flips.
+    let state = solved;
+    for (const { x, y, z, dirKey } of level2.flipSequence) {
+      state = flipStickerPair(state, size, x, y, z, dirKey, map);
+    }
+
+    // Exactly the six face centers must now show a non-original (antipodal) color.
+    const CENTERS = [
+      { x: 1, y: 1, z: 2, d: 'PZ' }, { x: 1, y: 1, z: 0, d: 'NZ' },
+      { x: 2, y: 1, z: 1, d: 'PX' }, { x: 0, y: 1, z: 1, d: 'NX' },
+      { x: 1, y: 2, z: 1, d: 'PY' }, { x: 1, y: 0, z: 1, d: 'NY' },
+    ];
+    for (const c of CENTERS) {
+      const st = state[c.x][c.y][c.z].stickers[c.d];
+      expect(st.curr).not.toBe(st.orig); // flipped
+    }
+    expect(solvedKey(state)).not.toBe(solvedKey(solved));
+
+    // Flipping the same three centers again restores the solved cube.
+    for (const { x, y, z, dirKey } of level2.flipSequence) {
+      state = flipStickerPair(state, size, x, y, z, dirKey, map);
+    }
+    expect(solvedKey(state)).toBe(solvedKey(solved));
   });
 
   it('scrambles level 1 with a single middle-layer turn', () => {
