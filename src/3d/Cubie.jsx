@@ -85,20 +85,11 @@ const STICKER_ROT = {
 // be mixed per cubelet.
 const PER_CUBELET_VIEW_STYLES = [
   'classic', 'grid', 'sudokube', 'wireframe', 'glass',
-  'chrome', 'balloon', 'neon', 'gap', 'lego'
+  'chrome', 'neon', 'gap', 'lego'
 ];
 
 // Modes that draw glowing LED edges over the cubie body.
 const LED_EDGE_MODES = new Set(['wireframe', 'neon']);
-
-// Balloon ("over-inflated") body: a sphere a bit larger than its cell so neighbours
-// press together. Stickers ride out to the sphere surface as colored panels.
-const BALLOON_RADIUS = 0.6;
-const STICKER_POS_BALLOON = {
-  PZ: [0, 0, BALLOON_RADIUS], NZ: [0, 0, -BALLOON_RADIUS],
-  PX: [BALLOON_RADIUS, 0, 0], NX: [-BALLOON_RADIUS, 0, 0],
-  PY: [0, BALLOON_RADIUS, 0], NY: [0, -BALLOON_RADIUS, 0]
-};
 
 // Lego studs: one cylinder centered on each visible face, oriented along the face normal.
 const STUD_GEO_ARGS = [0.22, 0.22, 0.16, 20];
@@ -124,8 +115,6 @@ function bodyMaterialProps(mode) {
       return { color: '#d6d9dd', roughness: 0.06, metalness: 1.0, envMapIntensity: 1.25 };
     case 'neon':
       return { color: '#08080c', roughness: 0.3, metalness: 0.35, envMapIntensity: 0.5, emissive: '#0a0014', emissiveIntensity: 0.4 };
-    case 'balloon': // shiny rubbery sphere
-      return { color: '#14141a', roughness: 0.12, metalness: 0.1, envMapIntensity: 0.9 };
     case 'lego': // glossy ABS plastic
       return { color: '#15151a', roughness: 0.35, metalness: 0.0, envMapIntensity: 0.6 };
     default: // classic, grid, sudokube, gap
@@ -210,11 +199,9 @@ const Cubie = React.forwardRef(function Cubie({
   );
 
   // Derived per-style render switches.
-  const isBalloonBody = effectiveVisualMode === 'balloon';
   const isLego = effectiveVisualMode === 'lego';
   const showLedEdges = LED_EDGE_MODES.has(effectiveVisualMode);
-  // Sticker offsets ride out to the balloon surface in balloon mode, flat faces otherwise.
-  const SP = isBalloonBody ? STICKER_POS_BALLOON : STICKER_POS;
+  const SP = STICKER_POS;
   // Gap mode shrinks the whole cubie in place so visible gaps open between pieces.
   const contentScale = effectiveVisualMode === 'gap' ? 0.82 : 1;
   // Body material props (+ wormMode transparency layered on).
@@ -498,13 +485,6 @@ const Cubie = React.forwardRef(function Cubie({
         // interaction stays intact, but nothing opaque sits between camera and stickers).
         <mesh onPointerDown={handleDown} visible={false}>
           <boxGeometry args={[0.98, 0.98, 0.98]} />
-        </mesh>
-      ) : isBalloonBody ? (
-        // Balloon body — an over-inflated sphere larger than its cell so neighbours press
-        // together; stickers ride out to the surface (STICKER_POS_BALLOON) as colored panels.
-        <mesh onPointerDown={handleDown} castShadow receiveShadow>
-          <sphereGeometry args={[BALLOON_RADIUS, 28, 28]} />
-          <meshStandardMaterial {...bodyMatProps} />
         </mesh>
       ) : (
         <RoundedBox args={[0.98, 0.98, 0.98]} radius={0.08} smoothness={4} onPointerDown={handleDown} castShadow receiveShadow>
