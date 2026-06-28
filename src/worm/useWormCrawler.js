@@ -3,10 +3,10 @@ import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { getStickerWorldPos, getManifoldGridId } from '../game/coordinates.js';
-import { getNextSurfacePosition, getActiveTunnels, getTunnelWorldPosInto, getWindWorldPosInto, turnWorm, getStableKey, isTileInSlice, rotateMoveDir } from './wormLogic.js';
-import { flipStickerPair } from '../game/manifoldLogic.js';
+import { getNextSurfacePosition, getTunnelWorldPosInto, getWindWorldPosInto, turnWorm, getStableKey, isTileInSlice, rotateMoveDir } from './wormLogic.js';
+import { flipStickerPair, findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
 import { getManifoldMap } from '../game/manifoldMapStore.js';
-import { healSticker, getStickerSafe } from '../game/cubeState.js';
+import { healSticker, getStickerSafe, isSurfaceSticker } from '../game/cubeState.js';
 import { rotateVec90 } from '../game/cubeRotation.js';
 import { DIR_TO_VEC, VEC_TO_DIR, FACE_COLORS } from '../utils/constants.js';
 import { resolveColors } from '../utils/colorSchemes.js';
@@ -180,20 +180,40 @@ export function useWormCrawler(size, cubies) {
     // rebuild cost is paid once per rotation across all consumers.
     React.useEffect(() => {
         const manifoldMap = getManifoldMap(cubies, size, rotationEpoch);
-        const tunnels = getActiveTunnels(cubies, size, manifoldMap);
-
-        const encodeTile = (p) => `${p.x},${p.y},${p.z},${p.dirKey}`;
-        const canonical = (tunnel) => {
-            const a = encodeTile(tunnel.entry);
-            const b = encodeTile(tunnel.exit);
-            return a < b ? `${a}|${b}` : `${b}|${a}`;
-        };
-
         const lookup = new Map();
-        for (const tunnel of tunnels) {
-            const tunnelKey = canonical(tunnel);
-            lookup.set(encodeTile(tunnel.entry), { tunnel, tunnelKey, reversed: false });
-            lookup.set(encodeTile(tunnel.exit), { tunnel, tunnelKey, reversed: true });
+        const seen = new Set();
+        for (let x = 0; x < size; x++) {
+            for (let y = 0; y < size; y++) {
+                for (let z = 0; z < size; z++) {
+                    const cubie = cubies[x]?.[y]?.[z];
+                    if (!cubie) continue;
+                    for (const dirKey of Object.keys(cubie.stickers || {})) {
+                        const sticker = cubie.stickers[dirKey];
+                        if (!sticker || sticker.curr === sticker.orig) continue;
+                        if (!isSurfaceSticker(x, y, z, dirKey, size)) continue;
+                        const entryKey = `${x},${y},${z},${dirKey}`;
+                        if (seen.has(entryKey)) continue;
+                        const antipodal = findAntipodalStickerByGrid(manifoldMap, sticker, size);
+                        if (!antipodal) continue;
+                        const exitKey = `${antipodal.x},${antipodal.y},${antipodal.z},${antipodal.dirKey}`;
+                        seen.add(entryKey);
+                        seen.add(exitKey);
+                        const tunnelKey = entryKey < exitKey ? `${entryKey}|${exitKey}` : `${exitKey}|${entryKey}`;
+                        const entryGridId = getManifoldGridId(sticker, size);
+                        const exitGridId = getManifoldGridId(antipodal.sticker, size);
+                        const pairId = [entryGridId, exitGridId].sort().join('|');
+                        const tunnel = {
+                            entry: { x, y, z, dirKey },
+                            exit: { x: antipodal.x, y: antipodal.y, z: antipodal.z, dirKey: antipodal.dirKey },
+                            entryColor: sticker.curr,
+                            exitColor: antipodal.sticker?.curr || sticker.curr,
+                            pairId,
+                        };
+                        lookup.set(entryKey, { tunnel, tunnelKey, reversed: false });
+                        lookup.set(exitKey, { tunnel, tunnelKey, reversed: true });
+                    }
+                }
+            }
         }
         tunnelLookupRef.current = lookup;
     }, [cubies, size, rotationEpoch]);
