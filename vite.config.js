@@ -32,7 +32,8 @@ export default defineConfig({
           }
           if (id.includes('/node_modules/three/')) return 'vendor-three';
           if (id.includes('/node_modules/gsap/')) return 'vendor-gsap';
-          if (id.includes('/node_modules/zustand/')) return 'vendor-zustand';
+          if (id.includes('/node_modules/use-sync-external-store/')) return 'vendor-react3d';
+          if (id.includes('/node_modules/zustand/')) return 'vendor-react3d';
           if (id.includes('/node_modules/kociemba-wasm/')) return 'vendor-kociemba';
         },
       },
