@@ -75,8 +75,6 @@ const GLANCE_STRIP_STYLE = {
     justifyContent: 'space-between',
     gap: 6,
     pointerEvents: 'none',
-    borderTop: '2px solid transparent',
-    overflow: 'hidden',
 };
 
 const GLANCE_CHIP_STYLE = {
@@ -174,7 +172,7 @@ const BOOST_FILL_STYLE = {
 const DPAD_STYLE = {
     display: 'grid',
     gridTemplateColumns: '56px 56px 56px',
-    gridTemplateRows: '56px 56px',
+    gridTemplateRows: '56px 56px 56px',
     gap: 4,
 };
 
@@ -182,7 +180,7 @@ const DPAD_DIRS = [
     ['↑', 'up', 1, 0],
     ['←', 'left', 0, 1],
     ['→', 'right', 2, 1],
-    ['↓', 'down', 1, 1],
+    ['↓', 'down', 1, 2],
 ];
 
 const DPAD_BTN_BASE = {
@@ -783,14 +781,16 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
         border: `1px solid ${BORDER}`,
     };
 
-    // 6-color gradient for glance strip top border
+    // 6-color gradient for glance strip accent bar
     const gradientBorder = `linear-gradient(90deg, ${fc[1] || FACE_FALLBACKS[1]}, ${fc[2] || FACE_FALLBACKS[2]}, ${fc[3] || FACE_FALLBACKS[3]}, ${fc[4] || FACE_FALLBACKS[4]}, ${fc[5] || FACE_FALLBACKS[5]}, ${fc[6] || FACE_FALLBACKS[6]})`;
 
     return (
         <div style={ROOT_STYLE}>
 
             {/* ── Zone 1: Glance Strip (info only, no touch targets) ── */}
-            <div style={{ ...GLANCE_STRIP_STYLE, borderImage: `${gradientBorder} 1`, borderImageSlice: 1 }}>
+            <div style={GLANCE_STRIP_STYLE}>
+                {/* Gradient accent bar (rendered as a child div so borderRadius is preserved) */}
+                <div style={{ position: 'absolute', top: 0, left: 12, right: 12, height: 2, borderRadius: 1, background: gradientBorder, pointerEvents: 'none' }} />
                 {/* Phase label */}
                 <div style={{
                     ...GLANCE_CHIP_STYLE,
