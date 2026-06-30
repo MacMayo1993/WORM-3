@@ -52,13 +52,13 @@ export default function MobiusHUD() {
     return (
         <div style={{
             position: 'fixed',
-            bottom: '90px',
+            top: '62px',
             left: '50%',
-            transform: 'translateX(-50%)',
+            transform: `translateX(-50%) translateY(${isActive ? '0' : '-20px'})`,
             pointerEvents: 'none',
             zIndex: 900,
             opacity: isActive ? 1 : 0,
-            transition: 'opacity 0.3s ease',
+            transition: 'opacity 0.3s ease, transform 0.3s ease',
         }}>
             <div style={{
                 color: 'rgba(255,255,255,0.48)',
