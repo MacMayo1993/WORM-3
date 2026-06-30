@@ -167,6 +167,115 @@ export const getActiveTunnels = (cubies, size, cachedManifoldMap = null) => {
   return tunnels;
 };
 
+// ─── Worm tunnel-entry lookup (tileKey → { tunnel, tunnelKey, reversed }) ──────
+// The crawler resolves "is the tile under my head a wormhole, and where does it
+// exit?" every step, so it keeps an O(1) tileKey lookup rather than rescanning.
+// Two builders share one core so the cheap incremental update is guaranteed to
+// produce byte-identical entries to a from-scratch full rebuild.
+//
+// Canonical orientation: the endpoint with the smaller tileKey is always the
+// `entry` (reversed:false) and its partner the `exit` (reversed:true). This
+// matches the x→y→z scan order of a full rebuild (single-digit coords make string
+// order == numeric order), so either path yields the same lookup for a given cube.
+
+const _TUNNEL_DIRS = ['PX', 'NX', 'PY', 'NY', 'PZ', 'NZ'];
+
+// Build the two lookup entries for a flipped surface sticker, or null if it has no
+// resolvable antipodal partner. Pure — does not touch any Map.
+function _tunnelEntriesForSticker(x, y, z, dirKey, sticker, manifoldMap, size) {
+  const antipodal = findAntipodalStickerByGrid(manifoldMap, sticker, size);
+  if (!antipodal) return null;
+  const keyA = `${x},${y},${z},${dirKey}`;
+  const keyB = `${antipodal.x},${antipodal.y},${antipodal.z},${antipodal.dirKey}`;
+  // Smaller tileKey is the canonical entry (matches the full-scan iteration order).
+  const aIsEntry = keyA <= keyB;
+  const entryKey = aIsEntry ? keyA : keyB;
+  const exitKey = aIsEntry ? keyB : keyA;
+  const entryLoc = aIsEntry
+    ? { x, y, z, dirKey }
+    : { x: antipodal.x, y: antipodal.y, z: antipodal.z, dirKey: antipodal.dirKey };
+  const exitLoc = aIsEntry
+    ? { x: antipodal.x, y: antipodal.y, z: antipodal.z, dirKey: antipodal.dirKey }
+    : { x, y, z, dirKey };
+  const entrySticker = aIsEntry ? sticker : antipodal.sticker;
+  const exitSticker = aIsEntry ? antipodal.sticker : sticker;
+  const tunnelKey = `${entryKey}|${exitKey}`;
+  const entryGridId = getManifoldGridId(entrySticker, size);
+  const exitGridId = getManifoldGridId(exitSticker, size);
+  const pairId = [entryGridId, exitGridId].sort().join('|');
+  const tunnel = {
+    entry: entryLoc,
+    exit: exitLoc,
+    entryColor: entrySticker.curr,
+    exitColor: exitSticker?.curr || entrySticker.curr,
+    pairId,
+  };
+  return { tunnel, tunnelKey, entryKey, exitKey };
+}
+
+// Re-add the tunnels for every flipped surface sticker on `cubie` into `lookup`,
+// skipping any tunnelKey already added this pass (each tunnel is set once, from its
+// canonical entry endpoint — both endpoint entries are written together).
+function _addTunnelsForCubie(lookup, cubie, x, y, z, manifoldMap, size, seen) {
+  if (!cubie) return;
+  for (const dirKey of Object.keys(cubie.stickers || {})) {
+    const sticker = cubie.stickers[dirKey];
+    if (!sticker || sticker.curr === sticker.orig) continue;
+    if (!isSurfaceSticker(x, y, z, dirKey, size)) continue;
+    const built = _tunnelEntriesForSticker(x, y, z, dirKey, sticker, manifoldMap, size);
+    if (!built) continue;
+    if (seen.has(built.tunnelKey)) continue;
+    seen.add(built.tunnelKey);
+    lookup.set(built.entryKey, { tunnel: built.tunnel, tunnelKey: built.tunnelKey, reversed: false });
+    lookup.set(built.exitKey, { tunnel: built.tunnel, tunnelKey: built.tunnelKey, reversed: true });
+  }
+}
+
+// Full rebuild — scans every cubie. Used on first build, size change, and after any
+// rotation (which changes geometry and so the cached manifold map's epoch).
+export function buildTunnelLookup(cubies, size, manifoldMap) {
+  const lookup = new Map();
+  const seen = new Set();
+  for (let x = 0; x < size; x++) {
+    for (let y = 0; y < size; y++) {
+      for (let z = 0; z < size; z++) {
+        _addTunnelsForCubie(lookup, cubies[x]?.[y]?.[z], x, y, z, manifoldMap, size, seen);
+      }
+    }
+  }
+  return lookup;
+}
+
+// Incremental update — only re-examines cubies whose object identity changed since
+// `prevCubies`. Valid ONLY when geometry is unchanged (same rotation epoch): a flip
+// or heal swaps the two endpoint cubie objects together, so any tunnel touching a
+// changed cubie is fully rebuilt below, and tunnels on untouched cubies keep their
+// (still-correct) entries. Mutates `lookup` in place and returns it.
+export function updateTunnelLookupIncremental(lookup, cubies, prevCubies, size, manifoldMap) {
+  const changed = [];
+  for (let x = 0; x < size; x++) {
+    for (let y = 0; y < size; y++) {
+      for (let z = 0; z < size; z++) {
+        const c = cubies[x]?.[y]?.[z];
+        if (c === prevCubies?.[x]?.[y]?.[z]) continue;
+        changed.push(x, y, z);
+        // Drop every tileKey this cubie could own; pass 2 re-adds whatever is still a
+        // tunnel. Deleting a non-existent key is a harmless no-op.
+        for (let d = 0; d < _TUNNEL_DIRS.length; d++) lookup.delete(`${x},${y},${z},${_TUNNEL_DIRS[d]}`);
+      }
+    }
+  }
+  if (changed.length === 0) return lookup;
+  // Pass 2 after all deletes, so a tunnel spanning two changed cubies isn't clobbered
+  // by the second cubie's delete sweep after the first cubie re-adds it.
+  const seen = new Set();
+  for (let i = 0; i < changed.length; i += 3) {
+    const x = changed[i], y = changed[i + 1], z = changed[i + 2];
+    _addTunnelsForCubie(lookup, cubies[x]?.[y]?.[z], x, y, z, manifoldMap, size, seen);
+  }
+  return lookup;
+}
+
 /**
  * Write the world position along a tunnel at parameter t (0-1) into `out`.
  * Use this in render/physics loops to avoid allocating a throwaway [x, y, z] array.

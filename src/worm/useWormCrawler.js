@@ -3,10 +3,10 @@ import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { getStickerWorldPos, getManifoldGridId } from '../game/coordinates.js';
-import { getNextSurfacePosition, getTunnelWorldPosInto, getWindWorldPosInto, turnWorm, getStableKey, isTileInSlice, rotateMoveDir } from './wormLogic.js';
-import { flipStickerPair, findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
+import { getNextSurfacePosition, getTunnelWorldPosInto, getWindWorldPosInto, turnWorm, getStableKey, isTileInSlice, rotateMoveDir, buildTunnelLookup, updateTunnelLookupIncremental } from './wormLogic.js';
+import { flipStickerPair } from '../game/manifoldLogic.js';
 import { getManifoldMap } from '../game/manifoldMapStore.js';
-import { healSticker, getStickerSafe, isSurfaceSticker } from '../game/cubeState.js';
+import { healSticker, getStickerSafe } from '../game/cubeState.js';
 import { rotateVec90 } from '../game/cubeRotation.js';
 import { DIR_TO_VEC, VEC_TO_DIR, FACE_COLORS } from '../utils/constants.js';
 import { resolveColors } from '../utils/colorSchemes.js';
@@ -38,6 +38,7 @@ import {
     BOOST_MULTIPLIER,
     BOOST_DURATION,
     BOOST_COOLDOWN,
+    MAX_TICK_DELTA,
 } from './healerWorm/constants.js';
 import {
     isSurfaceTilePos,
@@ -172,51 +173,27 @@ export function useWormCrawler(size, cubies) {
     const currentTunnelKeyRef = useRef(null); // canonical position key of the tunnel being traversed (for use-count cleanup on heal)
     const pendingHealBurstRef = useRef(null);  // set when a heal fires; consumed by HeartBurstSystem
     const pendingOrbFlashRef = useRef(null);   // set when glow worm picks up orb; consumed by OrbFlashSystem
-    // O(1) tunnel endpoint lookup — rebuilt whenever cubies change via the effect below.
-    // Both the manifold map and tunnel list are built in one pass to avoid a second O(size³×6) scan.
+    // O(1) tunnel endpoint lookup — kept exact (not debounced) because the crawler resolves it
+    // every step. This effect reruns on every cubies change, which is ~12×/sec at chaos L4.
     const tunnelLookupRef = useRef(new Map());
-    // This effect reruns on every cubies change (not debounced — tunnel lookup must stay
-    // exact for gameplay), which is ~12×/sec at chaos L4. The manifold map comes from the
-    // single shared owner keyed on rotationEpoch, so flips reuse it for free and the only
-    // rebuild cost is paid once per rotation across all consumers.
+    // Tracks the inputs of the last lookup build so the effect can do a cheap incremental update
+    // (only the cubies that actually changed) on a flip, falling back to a full rebuild only on
+    // first run, a size change, or a rotation (which advances rotationEpoch and rebuilds the
+    // shared manifold map). A flip swaps both antipodal endpoint cubie objects together at a
+    // fixed geometry, so the incremental pass stays exact — see updateTunnelLookupIncremental.
+    const tunnelLookupCacheRef = useRef({ prevCubies: null, prevEpoch: null, size: null });
     React.useEffect(() => {
         const manifoldMap = getManifoldMap(cubies, size, rotationEpoch);
-        const lookup = new Map();
-        const seen = new Set();
-        for (let x = 0; x < size; x++) {
-            for (let y = 0; y < size; y++) {
-                for (let z = 0; z < size; z++) {
-                    const cubie = cubies[x]?.[y]?.[z];
-                    if (!cubie) continue;
-                    for (const dirKey of Object.keys(cubie.stickers || {})) {
-                        const sticker = cubie.stickers[dirKey];
-                        if (!sticker || sticker.curr === sticker.orig) continue;
-                        if (!isSurfaceSticker(x, y, z, dirKey, size)) continue;
-                        const entryKey = `${x},${y},${z},${dirKey}`;
-                        if (seen.has(entryKey)) continue;
-                        const antipodal = findAntipodalStickerByGrid(manifoldMap, sticker, size);
-                        if (!antipodal) continue;
-                        const exitKey = `${antipodal.x},${antipodal.y},${antipodal.z},${antipodal.dirKey}`;
-                        seen.add(entryKey);
-                        seen.add(exitKey);
-                        const tunnelKey = entryKey < exitKey ? `${entryKey}|${exitKey}` : `${exitKey}|${entryKey}`;
-                        const entryGridId = getManifoldGridId(sticker, size);
-                        const exitGridId = getManifoldGridId(antipodal.sticker, size);
-                        const pairId = [entryGridId, exitGridId].sort().join('|');
-                        const tunnel = {
-                            entry: { x, y, z, dirKey },
-                            exit: { x: antipodal.x, y: antipodal.y, z: antipodal.z, dirKey: antipodal.dirKey },
-                            entryColor: sticker.curr,
-                            exitColor: antipodal.sticker?.curr || sticker.curr,
-                            pairId,
-                        };
-                        lookup.set(entryKey, { tunnel, tunnelKey, reversed: false });
-                        lookup.set(exitKey, { tunnel, tunnelKey, reversed: true });
-                    }
-                }
-            }
+        const cache = tunnelLookupCacheRef.current;
+        const canIncrement = cache.prevCubies && cache.size === size && cache.prevEpoch === rotationEpoch;
+        if (canIncrement) {
+            updateTunnelLookupIncremental(tunnelLookupRef.current, cubies, cache.prevCubies, size, manifoldMap);
+        } else {
+            tunnelLookupRef.current = buildTunnelLookup(cubies, size, manifoldMap);
         }
-        tunnelLookupRef.current = lookup;
+        cache.prevCubies = cubies;
+        cache.prevEpoch = rotationEpoch;
+        cache.size = size;
     }, [cubies, size, rotationEpoch]);
 
     // Jump offset height at current jumpT
@@ -453,20 +430,33 @@ export function useWormCrawler(size, cubies) {
         if (!alive.current) return;
         if (wormPausedRef.current) return;
 
+        // Clamp the frame delta so a hitch can't advance the simulation by a huge jump. Without
+        // this, one long frame inflates interpT and the step accumulator at once, teleporting the
+        // head several tiles forward — which in a snake-like mode scatters the body trail and can
+        // slam the worm into its own tail unfairly. Every downstream clock in this tick (jump,
+        // wormhole spawn, boost, movement) reads this value, so they all pause together through a
+        // stall and resume cleanly instead of lurching.
+        if (delta > MAX_TICK_DELTA) delta = MAX_TICK_DELTA;
+
         // ── Speed boost: drain the active window, then run the cooldown, publishing
         // each state transition to the store so the HUD button reflects ready/active/cooldown.
-        if (boostActiveT.current > 0) {
-            boostActiveT.current -= delta;
-            if (boostActiveT.current <= 0) {
-                boostActiveT.current = 0;
-                boostCooldownT.current = BOOST_COOLDOWN;
-                useGameStore.getState().setWormBoostState('cooldown');
-            }
-        } else if (boostCooldownT.current > 0) {
-            boostCooldownT.current -= delta;
-            if (boostCooldownT.current <= 0) {
-                boostCooldownT.current = 0;
-                useGameStore.getState().setWormBoostState('ready');
+        // Frozen outside the crawling phase — a boost activated right before a wormhole dive
+        // shouldn't burn its window (or recharge) during transit, when movement runs at fixed
+        // tunnel speed and the buff does nothing.
+        if (phase.current === 'crawling') {
+            if (boostActiveT.current > 0) {
+                boostActiveT.current -= delta;
+                if (boostActiveT.current <= 0) {
+                    boostActiveT.current = 0;
+                    boostCooldownT.current = BOOST_COOLDOWN;
+                    useGameStore.getState().setWormBoostState('cooldown');
+                }
+            } else if (boostCooldownT.current > 0) {
+                boostCooldownT.current -= delta;
+                if (boostCooldownT.current <= 0) {
+                    boostCooldownT.current = 0;
+                    useGameStore.getState().setWormBoostState('ready');
+                }
             }
         }
         const boostMult = boostActiveT.current > 0 ? BOOST_MULTIPLIER : 1;
