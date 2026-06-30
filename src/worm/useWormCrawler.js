@@ -984,6 +984,13 @@ export function useWormCrawler(size, cubies) {
                             if (exitTunnelKey) {
                                 tunnelUseCountsRef.current.delete(exitTunnelKey);
                                 voidTunnelKeysRef.current.delete(exitTunnelKey);
+                                // If this heal landed on the void traversal, a void kill was armed
+                                // for this same tunnel just above. The tunnel is now healed and gone,
+                                // so cancel that pending kill — otherwise the crawling handler still
+                                // collapses the worm the moment it leaves the exit tile.
+                                if (pendingVoidKillRef.current?.tunnelKey === exitTunnelKey) {
+                                    pendingVoidKillRef.current = null;
+                                }
                             }
                         }
                         // else: partial/no deposit — tunnel stays flipped, progress persists
