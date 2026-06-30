@@ -689,7 +689,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
         if (showDeathMenu) setIsMinimized(false);
     }, [showDeathMenu]);
 
-    const { wormSpeed, wormHealedCount, wormBodyTiles, wormholeCountdown, wormControlMode, wormTimeAlive, wormTunnelCount, wormColor, wormOrbInventory, settings, setWormSpeed, toggleWormControlMode, wormGamePhase, wormCountdownStep, wormSessionOrbs, parityPoints } = useGameStore(
+    const { wormSpeed, wormHealedCount, wormBodyTiles, wormholeCountdown, wormControlMode, wormTimeAlive, wormTunnelCount, wormColor, wormOrbInventory, settings, setWormSpeed, toggleWormControlMode, setWormPaused, wormGamePhase, wormCountdownStep, wormSessionOrbs, parityPoints } = useGameStore(
         useShallow(s => ({
             wormSpeed: s.wormSpeed ?? 1.0,
             wormHealedCount: s.wormHealedCount ?? 0,
@@ -703,6 +703,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
             settings: s.settings,
             setWormSpeed: s.setWormSpeed,
             toggleWormControlMode: s.toggleWormControlMode,
+            setWormPaused: s.setWormPaused,
             wormGamePhase: s.wormGamePhase ?? 'active',
             wormCountdownStep: s.wormCountdownStep ?? null,
             wormSessionOrbs: s.wormSessionOrbs ?? 0,
@@ -744,6 +745,21 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
         if (!wormAlive) return;
         callWormTurn('jump');
     }, [wormAlive]);
+
+    // The pause menu must freeze the live simulation, not just overlay it. wormPaused is the
+    // flag the crawler tick and rotation hazard check, but it's also owned by the game-phase
+    // machine during scramble/countdown/solved — so only drive it here during actual gameplay,
+    // otherwise resuming could release the worm mid-countdown.
+    const canPause = wormAlive && (wormGamePhase === 'active' || wormGamePhase === 'finalHealing');
+    const handlePause = useCallback(() => {
+        if (!canPause) return;
+        setIsPaused(true);
+        setWormPaused(true);
+    }, [canPause, setWormPaused]);
+    const handleResume = useCallback(() => {
+        setIsPaused(false);
+        setWormPaused(false);
+    }, [setWormPaused]);
 
     const phaseMeta = PHASE_META[phase] || { label: phase || 'CRAWLING', faceId: 2 };
     const phaseColor = fc[phaseMeta.faceId] || FACE_FALLBACKS[phaseMeta.faceId];
@@ -856,7 +872,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                 {/* Center: Pause button */}
                 <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 8 }}>
                     <button
-                        onPointerDown={() => setIsPaused(true)}
+                        onPointerDown={handlePause}
                         style={PAUSE_BTN_STYLE}
                         aria-label="Pause"
                     >
@@ -883,7 +899,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
             {/* ── Pause Menu Overlay ── */}
             {isPaused && (
                 <PauseMenu
-                    onResume={() => setIsPaused(false)}
+                    onResume={handleResume}
                     onHome={onHome}
                     onSettings={onSettings}
                     onToggleAntipodal={onToggleAntipodal}
