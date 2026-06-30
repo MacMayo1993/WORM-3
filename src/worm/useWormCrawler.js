@@ -38,6 +38,7 @@ import {
     BOOST_MULTIPLIER,
     BOOST_DURATION,
     BOOST_COOLDOWN,
+    MAX_TICK_DELTA,
 } from './healerWorm/constants.js';
 import {
     isSurfaceTilePos,
@@ -453,20 +454,33 @@ export function useWormCrawler(size, cubies) {
         if (!alive.current) return;
         if (wormPausedRef.current) return;
 
+        // Clamp the frame delta so a hitch can't advance the simulation by a huge jump. Without
+        // this, one long frame inflates interpT and the step accumulator at once, teleporting the
+        // head several tiles forward — which in a snake-like mode scatters the body trail and can
+        // slam the worm into its own tail unfairly. Every downstream clock in this tick (jump,
+        // wormhole spawn, boost, movement) reads this value, so they all pause together through a
+        // stall and resume cleanly instead of lurching.
+        if (delta > MAX_TICK_DELTA) delta = MAX_TICK_DELTA;
+
         // ── Speed boost: drain the active window, then run the cooldown, publishing
         // each state transition to the store so the HUD button reflects ready/active/cooldown.
-        if (boostActiveT.current > 0) {
-            boostActiveT.current -= delta;
-            if (boostActiveT.current <= 0) {
-                boostActiveT.current = 0;
-                boostCooldownT.current = BOOST_COOLDOWN;
-                useGameStore.getState().setWormBoostState('cooldown');
-            }
-        } else if (boostCooldownT.current > 0) {
-            boostCooldownT.current -= delta;
-            if (boostCooldownT.current <= 0) {
-                boostCooldownT.current = 0;
-                useGameStore.getState().setWormBoostState('ready');
+        // Frozen outside the crawling phase — a boost activated right before a wormhole dive
+        // shouldn't burn its window (or recharge) during transit, when movement runs at fixed
+        // tunnel speed and the buff does nothing.
+        if (phase.current === 'crawling') {
+            if (boostActiveT.current > 0) {
+                boostActiveT.current -= delta;
+                if (boostActiveT.current <= 0) {
+                    boostActiveT.current = 0;
+                    boostCooldownT.current = BOOST_COOLDOWN;
+                    useGameStore.getState().setWormBoostState('cooldown');
+                }
+            } else if (boostCooldownT.current > 0) {
+                boostCooldownT.current -= delta;
+                if (boostCooldownT.current <= 0) {
+                    boostCooldownT.current = 0;
+                    useGameStore.getState().setWormBoostState('ready');
+                }
             }
         }
         const boostMult = boostActiveT.current > 0 ? BOOST_MULTIPLIER : 1;

@@ -83,6 +83,14 @@ export const BOOST_MULTIPLIER = 2.4;  // crawl-speed multiplier while boosting
 export const BOOST_DURATION = 1.5;    // seconds the boost lasts
 export const BOOST_COOLDOWN = 4.0;    // seconds before boost can be used again
 
+// ─── Frame delta clamp ────────────────────────────────────────────────────────
+// Upper bound on the per-tick delta. A hitch (tab refocus, GC pause, alt-tab) can
+// hand useFrame a delta of several hundred ms; feeding that straight into the
+// simulation inflates interpT and the step accumulator at once, teleporting the
+// worm forward multiple tiles — which scatters the body trail and can slam it into
+// its own tail unfairly. 0.1s (≈ 6 frames @60Hz) never bites in normal play.
+export const MAX_TICK_DELTA = 0.1;
+
 // ─── Auto-rotation hazard ─────────────────────────────────────────────────────
 export const AUTO_ROTATE_INTERVAL_MIN = 9;   // kept for non-scramble modes
 export const AUTO_ROTATE_INTERVAL_MAX = 15;
