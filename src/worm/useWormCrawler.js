@@ -169,6 +169,7 @@ export function useWormCrawler(size, cubies) {
     const voidTunnelKeysRef = useRef(new Set());
     const pendingVoidKillRef = useRef(null);
     const currentTunnelStableKeyRef = useRef(null); // stable key of the tunnel being traversed
+    const currentTunnelKeyRef = useRef(null); // canonical position key of the tunnel being traversed (for use-count cleanup on heal)
     const pendingHealBurstRef = useRef(null);  // set when a heal fires; consumed by HeartBurstSystem
     const pendingOrbFlashRef = useRef(null);   // set when glow worm picks up orb; consumed by OrbFlashSystem
     // O(1) tunnel endpoint lookup — rebuilt whenever cubies change via the effect below.
@@ -326,6 +327,7 @@ export function useWormCrawler(size, cubies) {
         const entryFaceId = entrySticker?.curr ?? 0;
         const stableKey = getStableKey(x, y, z, dirKey, liveCubies);
         currentTunnelStableKeyRef.current = stableKey;
+        currentTunnelKeyRef.current = tunnelKey;
 
         if (stableKey && entryFaceId) {
             const depositState = useGameStore.getState();
@@ -938,8 +940,10 @@ export function useWormCrawler(size, cubies) {
                         const voidKillState = pendingVoidKillRef.current;
                         const exitedTunnel = activeTunnel.current; // capture (kept alive for windout)
                         const exitStableKey = currentTunnelStableKeyRef.current;
+                        const exitTunnelKey = currentTunnelKeyRef.current;
                         tunnelProgress.current = 0;
                         currentTunnelStableKeyRef.current = null;
+                        currentTunnelKeyRef.current = null;
                         if (voidKillState) {
                             pendingVoidKillRef.current = { ...voidKillState, armed: true };
                         }
@@ -973,6 +977,14 @@ export function useWormCrawler(size, cubies) {
                             exitStore.setWormHealedCount(healedRef.current);
                             useGameStore.getState().earnCoins(EARN_WORM_HEALED_FACE);
                             pendingHealBurstRef.current = { exitTile: exitedTunnel.exit, entryTile: exitedTunnel.entry };
+                            // Tunnel fully healed → it disappears from the board. Drop its traversal
+                            // bookkeeping so a future antipodal flip that lands on the same coordinates
+                            // starts fresh, instead of inheriting this tunnel's (possibly critical) use
+                            // count or void flag and collapsing the worm prematurely on first re-entry.
+                            if (exitTunnelKey) {
+                                tunnelUseCountsRef.current.delete(exitTunnelKey);
+                                voidTunnelKeysRef.current.delete(exitTunnelKey);
+                            }
                         }
                         // else: partial/no deposit — tunnel stays flipped, progress persists
 

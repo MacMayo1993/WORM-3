@@ -509,10 +509,22 @@ function WormBody({ worm, size }) {
         const _orbCount = worm.orbPickupColorsRef.current?.length ?? 0;
         const _humpHeight = 0.15 + Math.min(_orbCount, 14) * 0.028; // 0.15 → ~0.54 as orbs stack up
 
-        // Rebuild path-points buffer in-place (no array allocation or spread)
-        _pathPointsBuffer.length = steps.count + 1;
+        // Rebuild path-points buffer in-place (no array allocation or spread).
+        // Only fill as many step-history points as the visible body can actually walk back
+        // to. The tail reaches ~visibleCount × spacing world units behind the head, and the
+        // ring stores STEPS_PER_TILE points per ~1-unit tile, so the curve-walk below never
+        // needs more than that many points. The ring's `count` saturates to its full capacity
+        // (MAX_TAIL × STEPS_PER_TILE = 60 000) over a long run regardless of how short the worm
+        // actually is, so capping here keeps this per-frame copy proportional to body length
+        // instead of paying for 60 000 ref writes every frame for a 4-segment worm.
+        const _bodyReach = Math.min(MAX_TAIL, tLen) * (_isInch ? 0.095 : BODY_BALL_SPACING);
+        // ×2 headroom covers corner arcs (which lengthen the path) + 2 spare tiles of margin,
+        // so the walk's last segment finds its bracket rather than freezing at the buffer end.
+        const _neededSteps = Math.ceil(_bodyReach * STEPS_PER_TILE * 2) + STEPS_PER_TILE * 2;
+        const _fillCount = Math.min(steps.count, _neededSteps);
+        _pathPointsBuffer.length = _fillCount + 1;
         _pathPointsBuffer[0] = _headPathPoint;
-        for (let j = 0; j < steps.count; j++) _pathPointsBuffer[j + 1] = shAt(steps, j);
+        for (let j = 0; j < _fillCount; j++) _pathPointsBuffer[j + 1] = shAt(steps, j);
 
         // Ride: while a slice is mid-rotation, body points sitting in that slice must turn
         // with the cube. We rotate their world position about the slice axis on the fly (into
