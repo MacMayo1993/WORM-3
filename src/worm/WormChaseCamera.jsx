@@ -35,6 +35,10 @@ const _camLookAheadVec = new THREE.Vector3();
 const _camTunnelTangent = new THREE.Vector3();
 const _camTunnelRight = new THREE.Vector3();
 const _camSurfCam = new THREE.Vector3();
+// Face-transition blend scratch — slerp normal and lerp forward over ~250ms
+const _rawNormal = new THREE.Vector3();
+const _rawForward = new THREE.Vector3();
+const FACE_TRANS_DURATION = 0.25;
 // Ribbon-camera scratch vectors — recomputed each frame from tunnel geometry
 const _ribVStart = new THREE.Vector3();
 const _ribVEnd   = new THREE.Vector3();
@@ -52,6 +56,12 @@ export default function WormChaseCamera({ worm, size }) {
     const prevPhaseRef = useRef('crawling');              // detect phase transitions for snap logic
     const prevGamePhaseRef = useRef('scrambling');         // detect entry into the opening scramble
     const zoomExtraRef = useRef(0);   // burst zoom accumulated
+    const prevDirKeyRef = useRef(null);                   // detect face boundary crossings
+    const faceTransT = useRef(0);                         // countdown timer for face-transition blend
+    const oldNormalRef = useRef(new THREE.Vector3());     // normal at moment of face change
+    const oldForwardRef = useRef(new THREE.Vector3());    // forward at moment of face change
+    const lastNormalRef = useRef(new THREE.Vector3(0, 0, 1));   // blended normal from previous frame
+    const lastForwardRef = useRef(new THREE.Vector3(0, 0, -1)); // blended forward from previous frame
     const prevTailLen = useRef(BASE_TAIL_LENGTH);   // detect new parity pickups
     const postTunnelEaseRef = useRef(0);  // seconds remaining of gentle re-framing after exiting a tunnel
 
@@ -85,6 +95,8 @@ export default function WormChaseCamera({ worm, size }) {
             if (prevGamePhaseRef.current !== 'scrambling') {
                 camPosRef.current.copy(_camTargetCam);
                 lookAtRef.current.copy(_camTargetLook);
+                prevDirKeyRef.current = null;
+                faceTransT.current = 0;
             } else {
                 camPosRef.current.lerp(_camTargetCam, Math.min(1, delta * 2.5));
                 lookAtRef.current.lerp(_camTargetLook, Math.min(1, delta * 2.5));
@@ -140,25 +152,49 @@ export default function WormChaseCamera({ worm, size }) {
         if (phase === 'crawling' || !worm.activeTunnel.current) {
             // Smooth interpolated worm world position (copy into scratch — no .clone())
             _camWormWorld.copy(worm.headInterpPos.current);
-            _camNormal.copy(worm.currentNormal.current);
 
             const { dirKey } = worm.pos.current;
 
-            // Derive forward from actual tile displacement — guaranteed correct direction
-            // regardless of face/moveDir coordinate conventions.
+            // Compute the raw (unblended) normal and forward for this frame.
+            _rawNormal.copy(worm.currentNormal.current);
+
             if (worm.prevWorldPos.current && worm.curWorldPos.current) {
-                _camForward.subVectors(worm.curWorldPos.current, worm.prevWorldPos.current);
-                if (_camForward.lengthSq() < 0.0001) {
-                    // Worm hasn't moved yet — fall back to DIR_FORWARD lookup
+                _rawForward.subVectors(worm.curWorldPos.current, worm.prevWorldPos.current);
+                if (_rawForward.lengthSq() < 0.0001) {
                     const fwdArr = DIR_FORWARD[dirKey]?.[worm.moveDir.current] ?? [0, 0, -1];
-                    _camForward.set(fwdArr[0], fwdArr[1], fwdArr[2]);
+                    _rawForward.set(fwdArr[0], fwdArr[1], fwdArr[2]);
                 } else {
-                    _camForward.normalize();
+                    _rawForward.normalize();
                 }
             } else {
                 const fwdArr = DIR_FORWARD[dirKey]?.[worm.moveDir.current] ?? [0, 0, -1];
-                _camForward.set(fwdArr[0], fwdArr[1], fwdArr[2]);
+                _rawForward.set(fwdArr[0], fwdArr[1], fwdArr[2]);
             }
+
+            // Detect face boundary crossing — start a smooth blend from the
+            // camera's previous normal/forward toward the new face's values.
+            if (prevDirKeyRef.current !== null && prevDirKeyRef.current !== dirKey) {
+                oldNormalRef.current.copy(lastNormalRef.current);
+                oldForwardRef.current.copy(lastForwardRef.current);
+                faceTransT.current = FACE_TRANS_DURATION;
+            }
+            prevDirKeyRef.current = dirKey;
+
+            // Blend normal and forward during a face transition so the camera
+            // target doesn't jump when the surface normal changes direction.
+            if (faceTransT.current > 0) {
+                faceTransT.current = Math.max(0, faceTransT.current - delta);
+                const t = 1 - faceTransT.current / FACE_TRANS_DURATION;
+                const eased = t * t * (3 - 2 * t); // smoothstep
+                _camNormal.copy(oldNormalRef.current).lerp(_rawNormal, eased).normalize();
+                _camForward.copy(oldForwardRef.current).lerp(_rawForward, eased).normalize();
+            } else {
+                _camNormal.copy(_rawNormal);
+                _camForward.copy(_rawForward);
+            }
+
+            lastNormalRef.current.copy(_camNormal);
+            lastForwardRef.current.copy(_camForward);
 
             // Camera: behind worm (opposite of forward) + above face (along normal).
             _camTargetCam.copy(_camWormWorld)
