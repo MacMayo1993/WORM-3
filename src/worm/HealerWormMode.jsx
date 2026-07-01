@@ -349,7 +349,6 @@ const _trailStretch = new THREE.Vector3(); // wavy-path tangent toward the previ
 // (reset only when it dives through a Möbius tunnel). Older history is rendered with
 // progressively coarser tile-LOD + daub spacing so per-frame work and the instanced-disc
 // budget stay bounded no matter how long the run gets.
-const TRAIL_HISTORY_CAP = 8000; // tiles of route retained for rendering (decoupled from the gameplay body trail)
 const TRAIL_DAUB_CAP = 4000;    // instanced discs painted along the (LOD-thinned) full route
 const TRAIL_SUB_STEP = 0.09; // base spacing between daubs near the head (world units); grows with age
 const TRAIL_FADE_FLOOR = 0.22; // oldest daubs never fade below this, so the whole route stays a faint "where I've been" map

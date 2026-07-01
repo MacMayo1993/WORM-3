@@ -39,6 +39,7 @@ import {
     BOOST_DURATION,
     BOOST_COOLDOWN,
     MAX_TICK_DELTA,
+    TRAIL_HISTORY_CAP,
 } from './healerWorm/constants.js';
 import {
     isSurfaceTilePos,
@@ -64,9 +65,6 @@ const _evalCornerNorm = new THREE.Vector3(); // reused for face-crossing normal 
 // Extra scratch for computing the lifted position before writing into stepHistory
 const _evalLiftedPos = new THREE.Vector3();
 
-
-// The persistent trail paints the worm's full route on the current surface traversal
-const TRAIL_HISTORY_CAP = 8000;
 
 export function useWormCrawler(size, cubies) {
     const { wormSpeed, wormControlMode, wormRunId, wormOrbCount, wormholeInterval, wormPaused } = useGameStore(

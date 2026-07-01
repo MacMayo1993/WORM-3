@@ -74,6 +74,11 @@ export const WORMHOLE_MAX_TRAVERSALS = 3;
 export const MAX_TAIL = 1200;
 export const HEAL_COST = 4; // worm segments (balls) required to fully heal one tunnel
 
+// Render-only full-route trail history: how many tiles of the worm's path are retained for
+// painting the persistent "where I've been" trail (see useWormCrawler's pathHistory ring).
+// Decoupled from the gameplay body trail (tileTrail), which is bounded by MAX_TAIL.
+export const TRAIL_HISTORY_CAP = 8000;
+
 // Surface-worm jump physics (distinct from crawlerPhysics.js JUMP_HEIGHT which is 0.35).
 export const SURFACE_JUMP_HEIGHT = 1.5;   // tall arc — astronaut bounding in low gravity
 export const SURFACE_JUMP_TILE_SPAN = 1;  // jump distance is fixed to one traversed tile regardless of speed
