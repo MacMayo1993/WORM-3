@@ -1157,8 +1157,14 @@ export function useWormCrawler(size, cubies) {
 
                 // The worm's tile rode the slice: rotate its heading so it keeps the same WORLD
                 // direction — "continue in the same direction it was going, but now rotated."
-                // Skipped while paused (opening scramble) so the pre-game starting heading is untouched.
-                if (newPos !== oldPos && !wormPausedRef.current) {
+                // Skipped ONLY during the opening scramble, where the pre-game starting heading
+                // must stay untouched. This is gated on the game phase, not wormPaused: a user
+                // pause also raises wormPaused, but a hazard rotation triggered during live play
+                // (they are deliberately slow, and the pause button stays available) still has to
+                // commit its heading update — otherwise the worm resumes crawling in the wrong
+                // direction after unpause because its logical heading was left in the old face frame.
+                const inOpeningScramble = useGameStore.getState().wormGamePhase === 'scrambling';
+                if (newPos !== oldPos && !inOpeningScramble) {
                     moveDir.current = rotateMoveDir(moveDir.current, oldPos.dirKey, newPos.dirKey, axis, dir);
                 }
 
