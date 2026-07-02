@@ -10,9 +10,10 @@ import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { getStickerWorldPos } from '../game/coordinates.js';
-import { getActiveTunnels, getTunnelWorldPosInto, getWindWorldPosInto, findStickerByStableKey, isTileInSlice, makeTunnelCenterline, buildTunnelCenterlineInto, tunnelTToArc, getTunnelArcPosInto } from './wormLogic.js';
+import { getTunnelWorldPosInto, getWindWorldPosInto, findStickerByStableKey, isTileInSlice, makeTunnelCenterline, buildTunnelCenterlineInto, tunnelTToArc, getTunnelArcPosInto } from './wormLogic.js';
+import { getTunnelLookup, hasActiveTunnels } from './tunnelRegistry.js';
 import { setWormTurnCallback } from './wormTurnBridge.js';
-import { buildManifoldGridMap, buildManifoldGridMapIncremental, findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
+import { buildManifoldGridMap, findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
 import { getManifoldMap } from '../game/manifoldMapStore.js';
 import { getStickerSafe } from '../game/cubeState.js';
 import { DIR_TO_VEC, VEC_TO_DIR, ANTIPODAL_COLOR, FACE_COLORS, SURFACE_OFFSET } from '../utils/constants.js';
@@ -1416,15 +1417,6 @@ function WormInteriorGlass({ worm, size }) {
     );
 }
 
-// ─── Module-level helpers for canonical tunnel key (mirrors useWormCrawler logic) ─
-// Used by WormholeRings to check void-tunnel membership without prop-drilling.
-const _tileKeyStr = (p) => `${p.x},${p.y},${p.z},${p.dirKey}`;
-const _canonicalTunnelKeyStr = (tunnel) => {
-    const a = _tileKeyStr(tunnel.entry);
-    const b = _tileKeyStr(tunnel.exit);
-    return a < b ? `${a}|${b}` : `${b}|${a}`;
-};
-
 // ─── Wormhole portal rings — spinning neon rings at every flipped tile ────────
 // Gives players a clear visual cue for all wormhole locations on the cube surface.
 const _ringDummy = new THREE.Object3D();
@@ -1729,10 +1721,6 @@ function TunnelHealProgress({ size }) {
 }
 
 function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUseCountsRef }) {
-    // Patched incrementally instead of rebuilt from scratch on every debounce tick (see
-    // buildManifoldGridMapIncremental) — only the cells that changed since the last tick
-    // get their gridId entries recomputed.
-    const manifoldMapCacheRef = useRef({ map: null, prevCubies: null, size: null });
     const liveRef = useRef();       // live wormhole rings (neon pink)
     const voidOuterRef = useRef();  // void outer ring (sickly green, slow reverse)
     const voidInnerRef = useRef();  // void inner ring (near-black, counter-rotating)
@@ -1786,18 +1774,14 @@ function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUseCountsR
         return () => clearTimeout(timer);
     }, [cubies, worm]);
 
-    // All flipped surface positions, augmented with canonical tunnel key so
+    // All flipped surface positions, augmented with the canonical tunnel key so
     // WormholeRings can tell live vs void without re-running manifold logic per frame.
+    // The positions scan the debounced snapshot (throttle is decorative-only); the
+    // tunnelKey annotation reads the SHARED live registry — never build tunnel data
+    // from the lagged snapshot (see tunnelRegistry.js contract).
     const allPositions = React.useMemo(() => {
-        const manifoldMap = buildManifoldGridMapIncremental(debouncedCubies, size, manifoldMapCacheRef.current);
-        const tunnels = getActiveTunnels(debouncedCubies, size, manifoldMap);
-        // Build tile-key → canonical-tunnel-key lookup (covers both entry and exit)
-        const tunnelKeyMap = new Map();
-        for (const t of tunnels) {
-            const ck = _canonicalTunnelKeyStr(t);
-            tunnelKeyMap.set(_tileKeyStr(t.entry), ck);
-            tunnelKeyMap.set(_tileKeyStr(t.exit), ck);
-        }
+        const live = useGameStore.getState();
+        const tunnelLookup = getTunnelLookup(live.cubies, size, live.rotationEpoch);
 
         const result = [];
         const dirs = ['PX', 'NX', 'PY', 'NY', 'PZ', 'NZ'];
@@ -1817,7 +1801,7 @@ function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUseCountsR
                         if (!isVisible) continue;
                         result.push({
                             x, y, z, dirKey: dk,
-                            tunnelKey: tunnelKeyMap.get(`${x},${y},${z},${dk}`) ?? null,
+                            tunnelKey: tunnelLookup.get(`${x},${y},${z},${dk}`)?.tunnelKey ?? null,
                             // Cache world position + normal once — constant for the lifetime
                             // of this entry, so the frame loop never recomputes/reallocates.
                             wp: getStickerWorldPos(x, y, z, dk, size, 0),
@@ -3034,17 +3018,12 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         // ── Phase: finalHealing — all rotations done, heal remaining tunnels ───
         if (gameModePhaseRef.current === 'finalHealing') {
             if (!store.wormAlive) return;
-            // Throttle the expensive tunnel scan to once every 0.5 s
+            // Throttled 0.5 s check; the shared registry makes this O(1) between flips.
             finalHealCheckTimer.current += delta;
             if (finalHealCheckTimer.current >= 0.5) {
                 finalHealCheckTimer.current = 0;
                 const liveState = useGameStore.getState();
-                const remaining = getActiveTunnels(
-                    liveState.cubies,
-                    size,
-                    getManifoldMap(liveState.cubies, size, liveState.rotationEpoch)
-                );
-                if (remaining.length === 0) {
+                if (!hasActiveTunnels(liveState.cubies, size, liveState.rotationEpoch)) {
                     gameModePhaseRef.current = 'solved';
                     const bodyOrbs = useGameStore.getState().wormBodyTiles ?? 0;
                     // 2× multiplier: reward for clearing all tunnels before the clock ran out

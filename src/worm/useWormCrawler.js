@@ -3,7 +3,8 @@ import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { getStickerWorldPos, getManifoldGridId } from '../game/coordinates.js';
-import { getNextSurfacePosition, getTunnelWorldPosInto, getWindWorldPosInto, turnWorm, getStableKey, isTileInSlice, rotateMoveDir, buildTunnelLookup, updateTunnelLookupIncremental } from './wormLogic.js';
+import { getNextSurfacePosition, getTunnelWorldPosInto, getWindWorldPosInto, turnWorm, getStableKey, isTileInSlice, rotateMoveDir } from './wormLogic.js';
+import { getTunnelLookup } from './tunnelRegistry.js';
 import { flipStickerPair } from '../game/manifoldLogic.js';
 import { getManifoldMap } from '../game/manifoldMapStore.js';
 import { healSticker, getStickerSafe } from '../game/cubeState.js';
@@ -78,9 +79,6 @@ export function useWormCrawler(size, cubies) {
     );
     const wormPausedRef = useRef(false);
     wormPausedRef.current = wormPaused;
-
-    // Drives the shared manifold-map owner; advances only on geometry changes (rotations).
-    const rotationEpoch = useGameStore((s) => s.rotationEpoch);
 
     // Mutable refs for values captured by tick/PHASE_HANDLERS that change between renders.
     // Reading via ref avoids adding them to tick's useCallback deps, preventing tick from
@@ -170,29 +168,6 @@ export function useWormCrawler(size, cubies) {
     const currentTunnelKeyRef = useRef(null); // canonical position key of the tunnel being traversed (for use-count cleanup on heal)
     const pendingHealBurstRef = useRef(null);  // set when a heal fires; consumed by HeartBurstSystem
     const pendingOrbFlashRef = useRef(null);   // set when glow worm picks up orb; consumed by OrbFlashSystem
-    // O(1) tunnel endpoint lookup — kept exact (not debounced) because the crawler resolves it
-    // every step. This effect reruns on every cubies change, which is ~12×/sec at chaos L4.
-    const tunnelLookupRef = useRef(new Map());
-    // Tracks the inputs of the last lookup build so the effect can do a cheap incremental update
-    // (only the cubies that actually changed) on a flip, falling back to a full rebuild only on
-    // first run, a size change, or a rotation (which advances rotationEpoch and rebuilds the
-    // shared manifold map). A flip swaps both antipodal endpoint cubie objects together at a
-    // fixed geometry, so the incremental pass stays exact — see updateTunnelLookupIncremental.
-    const tunnelLookupCacheRef = useRef({ prevCubies: null, prevEpoch: null, size: null });
-    React.useEffect(() => {
-        const manifoldMap = getManifoldMap(cubies, size, rotationEpoch);
-        const cache = tunnelLookupCacheRef.current;
-        const canIncrement = cache.prevCubies && cache.size === size && cache.prevEpoch === rotationEpoch;
-        if (canIncrement) {
-            updateTunnelLookupIncremental(tunnelLookupRef.current, cubies, cache.prevCubies, size, manifoldMap);
-        } else {
-            tunnelLookupRef.current = buildTunnelLookup(cubies, size, manifoldMap);
-        }
-        cache.prevCubies = cubies;
-        cache.prevEpoch = rotationEpoch;
-        cache.size = size;
-    }, [cubies, size, rotationEpoch]);
-
     // Jump offset height at current jumpT
     const jumpLift = () => isJumping.current
         ? Math.sin(jumpT.current * Math.PI) * JUMP_HEIGHT
@@ -210,7 +185,11 @@ export function useWormCrawler(size, cubies) {
     const tileKey = useCallback((p) => `${p.x},${p.y},${p.z},${p.dirKey}`, []);
 
     const resolveTunnelAtTile = useCallback((x, y, z, dirKey) => {
-        const hit = tunnelLookupRef.current.get(tileKey({ x, y, z, dirKey }));
+        // Query the shared registry synchronously with the LIVE store state. The previous
+        // effect-maintained local lookup could lag the store by one render, so the first
+        // tick after a flip (spawnWormholePair sets state mid-tick) read a stale map.
+        const st = useGameStore.getState();
+        const hit = getTunnelLookup(st.cubies, size, st.rotationEpoch).get(tileKey({ x, y, z, dirKey }));
         if (!hit) return null;
 
         if (hit.reversed) {
@@ -224,7 +203,7 @@ export function useWormCrawler(size, cubies) {
             tunnel: hit.tunnel,
             tunnelKey: hit.tunnelKey,
         };
-    }, [tileKey]);
+    }, [size, tileKey]);
 
     const killWorm = useCallback((details = null) => {
         if (!alive.current) return;

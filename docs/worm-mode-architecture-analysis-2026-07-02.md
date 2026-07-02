@@ -345,3 +345,10 @@ a second ref. Works, but reads as a bug. One-line cleanup.
   (`computeOrbDeposit` with the Prism wildcard drain, `classifyTraversal`, `isHealReady`,
   `orbsCarried`), consumed by `useWormCrawler`/`cutWormTail` and covered by
   `wormEconomy.test.js` (deposit caps, drain order, void thresholds, invariants).
+- **F3 (+P5)** — single shared tunnel registry (`tunnelRegistry.js`, memoized on cubies
+  identity + size + rotationEpoch, incremental on same-epoch flips). The crawler now
+  queries it synchronously with live store state (closing the one-frame staleness
+  window), WormholeRings annotates from it instead of running its own
+  `getActiveTunnels` + incremental-manifold-map system, and the finalHealing sweep is
+  a `hasActiveTunnels` check. `getActiveTunnels` itself became dead and was deleted.
+  Covered by `tunnelRegistry.test.js`.
