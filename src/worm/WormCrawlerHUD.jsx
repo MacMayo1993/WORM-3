@@ -586,8 +586,12 @@ function BoostButton({ wormAlive, fc }) {
 
 // ─── Pause Menu Overlay ──────────────────────────────────────────────────────
 
-function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalActive, wormControlMode, toggleWormControlMode, wormSpeed, setWormSpeed, wormAlive, wormHealedCount, wormSessionOrbs, wormholeCountdown, wormTimeAlive, wormGamePhase, formatTime, fc }) {
+function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalActive, wormControlMode, toggleWormControlMode, wormSpeed, setWormSpeed, wormAlive, wormHealedCount, wormSessionOrbs, wormTimeAlive, wormGamePhase, formatTime, fc }) {
     const green = fc[2] || FACE_FALLBACKS[2];
+    // Subscribed here (not in the main HUD selector) on purpose: the countdown updates
+    // at 10 Hz while crawling, and this menu is the only place the value is displayed —
+    // keeping it out of the main selector stops the whole HUD re-rendering every tick.
+    const wormholeCountdown = useGameStore(s => s.wormholeCountdown ?? 0);
 
     return (
         <div style={PAUSE_OVERLAY_STYLE} onPointerDown={onResume}>
@@ -689,12 +693,13 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
         if (showDeathMenu) setIsMinimized(false);
     }, [showDeathMenu]);
 
-    const { wormSpeed, wormHealedCount, wormBodyTiles, wormholeCountdown, wormControlMode, wormTimeAlive, wormTunnelCount, wormColor, wormOrbInventory, settings, setWormSpeed, toggleWormControlMode, setWormPaused, wormGamePhase, wormCountdownStep, wormSessionOrbs, parityPoints } = useGameStore(
+    const { wormSpeed, wormHealedCount, wormBodyTiles, wormControlMode, wormTimeAlive, wormTunnelCount, wormColor, wormOrbInventory, settings, setWormSpeed, toggleWormControlMode, setWormPaused, wormGamePhase, wormCountdownStep, wormSessionOrbs, parityPoints } = useGameStore(
         useShallow(s => ({
             wormSpeed: s.wormSpeed ?? 1.0,
             wormHealedCount: s.wormHealedCount ?? 0,
             wormBodyTiles: s.wormBodyTiles ?? 0,
-            wormholeCountdown: s.wormholeCountdown ?? 0,
+            // NOTE: wormholeCountdown deliberately NOT selected here — it updates at 10 Hz
+            // and is only shown inside PauseMenu, which subscribes to it itself.
             wormControlMode: s.wormControlMode ?? 'non-oriented',
             wormTimeAlive: s.wormTimeAlive ?? 0,
             wormTunnelCount: s.wormTunnelCount ?? 0,
@@ -911,7 +916,6 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                     wormAlive={wormAlive}
                     wormHealedCount={wormHealedCount}
                     wormSessionOrbs={wormSessionOrbs}
-                    wormholeCountdown={wormholeCountdown}
                     wormTimeAlive={wormTimeAlive}
                     wormGamePhase={wormGamePhase}
                     formatTime={formatTime}
