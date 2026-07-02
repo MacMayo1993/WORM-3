@@ -352,3 +352,9 @@ a second ref. Works, but reads as a bug. One-line cleanup.
   `getActiveTunnels` + incremental-manifold-map system, and the finalHealing sweep is
   a `hasActiveTunnels` check. `getActiveTunnels` itself became dead and was deleted.
   Covered by `tunnelRegistry.test.js`.
+- **A1** — `HealerWormMode.jsx` carved into `healerWorm/` modules (3,228 → ~320 lines;
+  one file per render subsystem, extracted verbatim). Three more dead components found
+  and dropped during the split: `TunnelSurfFX`, `WormInteriorGlass`, and
+  `TunnelPortalRings` were defined but never rendered. Verified behavior-preserving by
+  driving the built app with Playwright against the pre-branch baseline (identical
+  boot→menu→wizard→scramble behavior, zero JS errors on both).
