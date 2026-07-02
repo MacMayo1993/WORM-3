@@ -30,9 +30,7 @@ import {
     TUNNEL_TRIGGER_PROGRESS,
     SELF_COLLISION_TRIGGER_PROGRESS,
     SELF_COLLISION_GRACE_STEPS_AFTER_TUNNEL,
-    WORMHOLE_MAX_TRAVERSALS,
     MAX_TAIL,
-    HEAL_COST,
     SURFACE_JUMP_HEIGHT,
     SURFACE_JUMP_TILE_SPAN,
     BOOST_MULTIPLIER,
@@ -46,6 +44,7 @@ import {
     randomFreeTile,
     randomUnflippedTile,
 } from './healerWorm/surfaceTiles.js';
+import { computeOrbDeposit, classifyTraversal, orbsCarried, isHealReady } from './healerWorm/economy.js';
 import { makeStepHistory, shPush, shReset, makeTileTrail, ttPush, ttAt, ttReset, ttMapInPlace, ttFilterInPlace } from './circularBuffers.js';
 import { rotateTilePosition, parseTileKey, _parseTile, ensureOrbContrast } from './wormHelpers.js';
 
@@ -268,22 +267,20 @@ export function useWormCrawler(size, cubies) {
             return;
         }
 
-        const traversals = tunnelUseCountsRef.current.get(tunnelKey) ?? 0;
-        const nextTraversals = traversals + 1;
+        const nextTraversals = (tunnelUseCountsRef.current.get(tunnelKey) ?? 0) + 1;
         tunnelUseCountsRef.current.set(tunnelKey, nextTraversals);
-        // The first WORMHOLE_MAX_TRAVERSALS passes through a tunnel are safe. The
-        // next one is the "void" traversal: the worm completes the tunnel, then
-        // collapses when it steps off the exit tile (deferred kill, checked in the
-        // crawling phase). With the default of 3 safe traversals this is the
-        // documented "void on the 4th" behavior.
-        if (nextTraversals === WORMHOLE_MAX_TRAVERSALS + 1) {
+        // Safe/void-arm/collapse thresholds live in healerWorm/economy.js — see
+        // classifyTraversal for the "void on the 4th traversal" rule.
+        const traversalVerdict = classifyTraversal(nextTraversals);
+        if (traversalVerdict === 'void-arm') {
+            // The worm completes this tunnel, then collapses when it steps off the
+            // exit tile (deferred kill, checked in the crawling phase).
             pendingVoidKillRef.current = {
                 tunnelKey,
                 exitTileKey: tileKey(tunnel.exit),
                 armed: false,
             };
-        }
-        if (nextTraversals > WORMHOLE_MAX_TRAVERSALS + 1) {
+        } else if (traversalVerdict === 'collapse') {
             // Past the void traversal the tunnel is fully collapsed and kills on contact.
             voidTunnelKeysRef.current.add(tunnelKey);
             pendingVoidKillRef.current = null;
@@ -308,46 +305,26 @@ export function useWormCrawler(size, cubies) {
             const depositState = useGameStore.getState();
             const healingProgress = depositState.wormHealingProgress ?? {};
             const progress = healingProgress[stableKey] ?? { deposited: 0, faceId: entryFaceId };
-            const segmentsOnWorm = tailLength.current - BASE_TAIL_LENGTH;
-            const inv = depositState.wormOrbInventory ?? {};
-            // Prism Worm — "Spectrum" wildcard: orbs of ANY face color pay toward any
-            // tunnel, so it draws from the whole inventory instead of only the matching face.
-            const isPrism = (depositState.wormCharacter ?? 'classic') === 'prism';
-            const available = isPrism
-                ? Object.values(inv).reduce((sum, v) => sum + (v || 0), 0)
-                : (inv[entryFaceId] ?? 0);
-            const n = Math.min(available, HEAL_COST - progress.deposited, segmentsOnWorm);
+            // Deposit rules (caps + Prism Worm wildcard drain) are pure functions in
+            // healerWorm/economy.js; here we only apply the result to refs + the store.
+            const deposit = computeOrbDeposit({
+                inventory: depositState.wormOrbInventory,
+                deposited: progress.deposited,
+                entryFaceId,
+                tailLength: tailLength.current,
+                isPrism: (depositState.wormCharacter ?? 'classic') === 'prism',
+            });
 
-            if (n > 0) {
-                tailLength.current = Math.max(BASE_TAIL_LENGTH, tailLength.current - n);
-                orbPickupColorsRef.current.length = Math.max(0, orbPickupColorsRef.current.length - Math.round(n / ORB_SEGMENT_GROWTH));
+            if (deposit) {
+                tailLength.current = deposit.nextTailLength;
+                orbPickupColorsRef.current.length = Math.max(0, orbPickupColorsRef.current.length - deposit.colorsToDrop);
                 colorEpochRef.current++;
-                const orbsLeft = Math.max(0, Math.floor((tailLength.current - BASE_TAIL_LENGTH) / ORB_SEGMENT_GROWTH));
-
-                // Deduct n orbs. Non-prism pulls from the matching face; prism drains the
-                // matching face first, then spills into the remaining faces (wildcard pay).
-                let nextInv;
-                if (isPrism) {
-                    nextInv = { ...inv };
-                    let remaining = n;
-                    const drainOrder = [entryFaceId, ...Object.keys(nextInv).map(Number).filter(f => f !== entryFaceId)];
-                    for (const f of drainOrder) {
-                        if (remaining <= 0) break;
-                        const have = nextInv[f] ?? 0;
-                        const take = Math.min(have, remaining);
-                        nextInv[f] = have - take;
-                        remaining -= take;
-                    }
-                } else {
-                    nextInv = { ...inv, [entryFaceId]: (inv[entryFaceId] ?? 0) - n };
-                }
-
                 useGameStore.setState({
-                    wormBodyTiles: orbsLeft,
-                    wormOrbInventory: nextInv,
+                    wormBodyTiles: deposit.orbsLeft,
+                    wormOrbInventory: deposit.nextInventory,
                     wormHealingProgress: {
                         ...healingProgress,
-                        [stableKey]: { deposited: progress.deposited + n, faceId: entryFaceId },
+                        [stableKey]: { deposited: deposit.nextDeposited, faceId: entryFaceId },
                     },
                 });
             }
@@ -356,7 +333,7 @@ export function useWormCrawler(size, cubies) {
 
         // Determine whether this tunnel traversal will heal on exit (for portal ring pop fx).
         const postDepositProgress = useGameStore.getState().wormHealingProgress?.[stableKey];
-        willHealRef.current = (postDepositProgress?.deposited ?? 0) >= HEAL_COST;
+        willHealRef.current = isHealReady(postDepositProgress?.deposited);
 
         activeTunnel.current = tunnel;
         pendingTunnelTrigger.current = null;
@@ -397,7 +374,7 @@ export function useWormCrawler(size, cubies) {
         tailLength.current = Math.min(tailLength.current + ORB_SEGMENT_GROWTH, MAX_TAIL);
         orbPickupColorsRef.current.push(color);
         colorEpochRef.current++;
-        const orbCountOnWorm = Math.max(0, Math.floor((tailLength.current - BASE_TAIL_LENGTH) / ORB_SEGMENT_GROWTH));
+        const orbCountOnWorm = orbsCarried(tailLength.current);
         // PP are NOT awarded on pickup — only banked when the player wins (cube solved).
         // Track session total separately for the in-game counter.
         useGameStore.setState((state) => ({
@@ -941,7 +918,7 @@ export function useWormCrawler(size, cubies) {
                         // Heal immediately at exit completion (not deferred) when enough orbs deposited.
                         const exitStore = useGameStore.getState();
                         const exitProgress = exitStableKey ? (exitStore.wormHealingProgress?.[exitStableKey]) : null;
-                        if (exitProgress?.deposited >= HEAL_COST && exitedTunnel) {
+                        if (isHealReady(exitProgress?.deposited) && exitedTunnel) {
                             const { entry, exit: exitTile } = exitedTunnel;
                             // Write healBurstMap for both tiles BEFORE healing (sticker orig fields intact)
                             const entrySticker = getStickerSafe(exitStore.cubies, entry.x, entry.y, entry.z, entry.dirKey);
