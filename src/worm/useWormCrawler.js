@@ -517,9 +517,11 @@ export function useWormCrawler(size, cubies) {
         // objects on every frame. Handlers close over stable refs and imported
         // functions; the three `st.*` call-sites were replaced with getState()
         // so the cached closures never hold a stale store snapshot.
-        if (!phaseHandlersRef.current || phaseHandlersRef._size !== size) {
-        phaseHandlersRef._size = size;
+        if (!phaseHandlersRef.current || phaseHandlersRef.current._size !== size) {
         phaseHandlersRef.current = {
+            // Size the handlers were built for — never matches a phase name, so the
+            // dispatch below can't accidentally look it up as a handler.
+            _size: size,
             crawling: {
                 // enter() fires once when transitioning back from 'exiting'.
                 enter() {
@@ -1211,7 +1213,15 @@ export function useWormCrawler(size, cubies) {
                         const k = (size - 1) / 2;
                         const ang = dir * (Math.PI / 2);
                         _bakeAxis.set(axis === 'col' ? 1 : 0, axis === 'row' ? 1 : 0, axis === 'depth' ? 1 : 0);
-                        for (let i = 0; i < sh.count; i++) {
+                        // Only bake as far back as the visible body can walk — the same reach
+                        // cap (×2 headroom for corner arcs + 2 spare tiles) WormBody uses for
+                        // its per-frame path fill. sh.count saturates at capacity (60 000)
+                        // over a long run regardless of body length, and entries beyond the
+                        // reach are never rendered or collided against, so rotating them on
+                        // every hazard turn is pure waste.
+                        const bakeReach = Math.min(MAX_TAIL, tailLength.current) * BODY_BALL_SPACING;
+                        const bakeLimit = Math.min(sh.count, Math.ceil(bakeReach * STEPS_PER_TILE * 2) + STEPS_PER_TILE * 2);
+                        for (let i = 0; i < bakeLimit; i++) {
                             const slot = sh.buf[(sh.head - 1 - i + sh.capacity) % sh.capacity];
                             if (slot.tx < 0 || !isTileInSlice(axis, sliceIndex, slot.tx, slot.ty, slot.tz)) continue;
                             slot.pos.applyAxisAngle(_bakeAxis, ang);
