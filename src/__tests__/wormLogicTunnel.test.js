@@ -1,44 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { createInitialTunnelWorm, findNextTunnel, getTunnelSideKey, checkSelfCollision, getNextSurfacePosition, getTunnelWorldPosInto, makeTunnelCenterline, buildTunnelCenterlineInto, tunnelTToArc, getTunnelArcPosInto } from '../worm/wormLogic.js';
+import { getNextSurfacePosition, getTunnelWorldPosInto, makeTunnelCenterline, buildTunnelCenterlineInto, tunnelTToArc, getTunnelArcPosInto } from '../worm/wormLogic.js';
 import * as THREE from 'three';
-
-describe('tunnel worm logic', () => {
-  const size = 3;
-
-  const tunnelA = {
-    id: 'tunnel-a',
-    entry: { x: 0, y: 1, z: 1, dirKey: 'NX' },
-    exit: { x: 2, y: 1, z: 1, dirKey: 'PX' }
-  };
-
-  const tunnelB = {
-    id: 'tunnel-b',
-    entry: { x: 2, y: 1, z: 2, dirKey: 'PZ' },
-    exit: { x: 0, y: 1, z: 2, dirKey: 'NZ' }
-  };
-
-  it('initial tunnel worm starts with forward tunnel direction', () => {
-    const worm = createInitialTunnelWorm([tunnelA], 3);
-    expect(worm).toHaveLength(3);
-    expect(worm.every(seg => seg.direction === 1)).toBe(true);
-  });
-
-  it('finds a next tunnel entry when side is active', () => {
-    const result = findNextTunnel(tunnelA.exit, [tunnelA, tunnelB], tunnelA.id, size, new Set());
-    expect(result).toBeTruthy();
-    expect(result.tunnel.id).toBe('tunnel-b');
-    expect(result.enteredSideKey).toBe(getTunnelSideKey(tunnelB.entry));
-  });
-
-  it('skips tunnels when the chosen entry side was already consumed', () => {
-    const inactive = new Set([getTunnelSideKey(tunnelB.entry)]);
-    const result = findNextTunnel(tunnelA.exit, [tunnelA, tunnelB], tunnelA.id, size, inactive);
-    expect(result).toBeTruthy();
-    expect(result.tunnel.id).toBe('tunnel-b');
-    expect(result.enteredSideKey).toBe(getTunnelSideKey(tunnelB.exit));
-    expect(result.enterFromEntry).toBe(false);
-  });
-});
 
 // ─── arc-length tunnel sampling (worm body spacing in the wormhole) ───────────
 describe('tunnel arc-length sampling', () => {
@@ -86,36 +48,6 @@ describe('tunnel arc-length sampling', () => {
       expect(a).toBeGreaterThanOrEqual(prev);
       prev = a;
     }
-  });
-});
-
-// ─── checkSelfCollision ───────────────────────────────────────────────────────
-describe('checkSelfCollision', () => {
-  const h = (x, y, z, dirKey = 'PZ') => ({ x, y, z, dirKey });
-
-  it('returns false when fewer than 3 segments', () => {
-    expect(checkSelfCollision(h(1, 1, 2), [h(1, 1, 2), h(1, 1, 1)])).toBe(false);
-  });
-
-  it('returns false when head matches only the tail (not growing)', () => {
-    // tail is excluded when isGrowing=false
-    const segs = [h(1, 1, 2), h(1, 1, 1), h(1, 1, 0)];
-    expect(checkSelfCollision(h(1, 1, 0), segs, false)).toBe(false);
-  });
-
-  it('returns true when head matches a non-tail body segment', () => {
-    const segs = [h(2, 1, 2), h(1, 1, 2), h(1, 1, 1), h(1, 1, 0)];
-    expect(checkSelfCollision(h(1, 1, 2), segs)).toBe(true);
-  });
-
-  it('returns true when head matches tail while growing', () => {
-    const segs = [h(1, 1, 2), h(1, 1, 1), h(1, 1, 0)];
-    expect(checkSelfCollision(h(1, 1, 0), segs, true)).toBe(true);
-  });
-
-  it('returns false when head does not match any body segment', () => {
-    const segs = [h(0, 1, 2), h(0, 1, 1), h(0, 1, 0), h(0, 0, 0)];
-    expect(checkSelfCollision(h(1, 0, 0), segs)).toBe(false);
   });
 });
 

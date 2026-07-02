@@ -327,3 +327,17 @@ a second ref. Works, but reads as a bug. One-line cleanup.
 10. F4 — gate run resets on `wormRunId` only.
 11. P6 — single-context split-screen for the co-op platformer.
 12. P4, P7, F6, A2, A3 — batch alongside adjacent work.
+
+## Implemented on this branch
+
+- **P1** — WormholeRings now sets `mesh.count` per frame (capacity-based write guards);
+  the zero-scale scrubbing pass is gone.
+- **P2** — `wormholeCountdown` moved out of the main HUD selector into `PauseMenu`,
+  its only display site.
+- **P3** — rotation-commit history bake capped to body reach (WormBody's formula).
+- **A4** — phase-handler cache size stored inside the cached object.
+- **F1 (dead-code half)** — legacy segment-worm APIs deleted from `wormLogic.js`
+  (1,353 → 661 lines), including the orphaned `pressState`/worm-weight system and its
+  never-firing per-frame reader in `CubeAssembly`; `getActiveTunnels` no longer
+  allocates the two per-tunnel world-position vectors that only `findNextTunnel`
+  consumed. The tunnelGeometry/tunnelRegistry/surfaceNavigation file split remains open.
