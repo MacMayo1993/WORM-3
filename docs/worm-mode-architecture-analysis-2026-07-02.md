@@ -341,3 +341,7 @@ a second ref. Works, but reads as a bug. One-line cleanup.
   never-firing per-frame reader in `CubeAssembly`; `getActiveTunnels` no longer
   allocates the two per-tunnel world-position vectors that only `findNextTunnel`
   consumed. The tunnelGeometry/tunnelRegistry/surfaceNavigation file split remains open.
+- **F2** — orb/heal/void economy extracted to `healerWorm/economy.js` as pure functions
+  (`computeOrbDeposit` with the Prism wildcard drain, `classifyTraversal`, `isHealReady`,
+  `orbsCarried`), consumed by `useWormCrawler`/`cutWormTail` and covered by
+  `wormEconomy.test.js` (deposit caps, drain order, void thresholds, invariants).

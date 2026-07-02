@@ -11,9 +11,9 @@ import {
     STEPS_PER_TILE,
     BODY_BALL_SPACING,
     BASE_TAIL_LENGTH,
-    ORB_SEGMENT_GROWTH,
     WORM_LIFT,
 } from './healerWorm/constants.js';
+import { orbsCarried } from './healerWorm/economy.js';
 import { SURFACE_OFFSET } from '../utils/constants.js';
 
 // Pre-allocated axis vector for applying liveRotation to the worm during scramble
@@ -185,7 +185,7 @@ export function cutWormTail(worm, cutTrailIdx) {
     const histLen = cutTrailIdx * STEPS_PER_TILE;
     shTrimTo(worm.stepHistory.current, histLen);
     worm.tailLength.current = Math.max(BASE_TAIL_LENGTH, Math.round(cutTrailIdx / BODY_BALL_SPACING));
-    const orbsLeft = Math.max(0, Math.floor((worm.tailLength.current - BASE_TAIL_LENGTH) / ORB_SEGMENT_GROWTH));
+    const orbsLeft = orbsCarried(worm.tailLength.current);
     if (worm.orbPickupColorsRef.current.length > orbsLeft) {
         worm.orbPickupColorsRef.current.length = orbsLeft;
         worm.colorEpochRef.current++;
