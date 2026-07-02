@@ -7,9 +7,12 @@ import { FLIP_CAP } from '../utils/constants.js';
 import { tunnelState } from '../worm/tunnelProgressBridge.js';
 
 // Opacity multiplier when the worm is traversing a different tunnel.
-// Inactive tunnels stay at 75 % — fully visible at all times in worm mode.
-const DIM_OPACITY  = 0.75;
-const FULL_OPACITY = 1.0;
+// While a traversal is underway, tunnels the worm is NOT in recede to this
+// faint level so the active tunnel reads clearly. When no traversal is
+// underway (WORM_IDLE_OPACITY) every tunnel stays comfortably visible.
+const DIM_OPACITY       = 0.22;
+const WORM_IDLE_OPACITY = 0.75;
+const FULL_OPACITY      = 1.0;
 const DIM_LERP_DOWN = 6;   // fade-out speed (× delta)
 const DIM_LERP_UP   = 20;  // snap-in speed  (× delta) — nearly instant
 
@@ -351,7 +354,7 @@ const MobiusTunnel = ({
   const meshRef          = useRef();
   const pulseT           = useRef(Math.random() * Math.PI * 2);
   const portalPulseT     = useRef(Math.random() * Math.PI * 2);
-  const dimRef           = useRef(DIM_OPACITY);
+  const dimRef           = useRef(WORM_IDLE_OPACITY);
   const lastStartRef     = useRef(new THREE.Vector3(Infinity, Infinity, Infinity));
   const lastEndRef       = useRef(new THREE.Vector3(Infinity, Infinity, Infinity));
 
@@ -500,8 +503,15 @@ const MobiusTunnel = ({
       rightGeo.attributes.aTripFrac.needsUpdate   = true;
     }
 
-    // Dim system: inactive tunnels fade to 75%, active tunnel snaps to 100%.
-    const targetDim = isActive ? FULL_OPACITY : DIM_OPACITY;
+    // Dim system:
+    //  • worm traversing this tunnel  → full brightness (snaps in)
+    //  • worm traversing another one  → recede to DIM_OPACITY so it doesn't compete
+    //  • no traversal underway        → all tunnels stay at the comfortable idle level
+    const targetDim = isActive
+      ? FULL_OPACITY
+      : tunnelState.active
+        ? DIM_OPACITY
+        : WORM_IDLE_OPACITY;
     const lerpSpeed = targetDim > dimRef.current ? DIM_LERP_UP : DIM_LERP_DOWN;
     dimRef.current += (targetDim - dimRef.current) * Math.min(1, delta * lerpSpeed);
     const dim = dimRef.current;
