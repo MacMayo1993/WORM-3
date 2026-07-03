@@ -781,24 +781,24 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
 // tileColor matches the game's 6 face colors; textColor ensures contrast on the tile
 const CAROUSEL_MODES = [
   {
-    id: 'cube', label: 'CUBE', tileColor: '#3b82f6', textColor: '#fff',
-    desc: "Classic Rubik's cube solving with full setup wizard.",
-    controls: ['Drag face edges to rotate slices', 'Tap a tile to toggle Flip mode', 'Undo moves with the undo button', 'Hit Shuffle to scramble and start'],
-  },
-  {
     id: 'worm', label: 'WORM', tileColor: '#22c55e', textColor: '#fff',
     desc: 'Co-op worm healer mode on a living antipodal cube.',
     controls: ['Worm follows your cursor or touch', 'Healed tiles restore the cube face', 'Collect orbs scattered across faces', 'Avoid flipped chaos tiles'],
   },
   {
+    id: 'freeplay', label: 'CUBE', tileColor: '#eab308', textColor: 'rgba(0,0,0,0.80)',
+    desc: "Classic Rubik's cube solving — your cube, your rules.",
+    controls: ['Pick cube size 2×2 through 5×5', 'Choose color scheme and tile style', 'Drag face edges to rotate slices', 'Solve at your own pace'],
+  },
+  {
+    id: 'cube', label: 'STORY', tileColor: '#3b82f6', textColor: '#fff',
+    desc: 'The 10-level Life Journey campaign, from daycare to the singularity.',
+    controls: ['Beat a level to unlock the next', 'Each level teaches a new mechanic', 'Mobi guides you along the way', 'Earn star ratings on every level'],
+  },
+  {
     id: 'chaos', label: 'CHAOS', tileColor: '#f97316', textColor: '#fff',
     desc: 'Antipodal flip survival with betting and chaos tuning.',
     controls: ['Tiles flip automatically over time', 'Bet Parity Points before the round', 'Set chaos level 1–5 in the wizard', 'Survive until the last tile falls'],
-  },
-  {
-    id: 'freeplay', label: 'FREE PLAY', tileColor: '#eab308', textColor: 'rgba(0,0,0,0.80)',
-    desc: 'Unlimited customization — your cube, your rules.',
-    controls: ['Pick cube size 2×2 through 5×5', 'Choose color scheme and tile style', 'Solve at your own pace', 'No time limit or win condition'],
   },
   {
     id: 'random', label: 'RANDOM', tileColor: '#ef4444', textColor: '#fff',
@@ -812,8 +812,8 @@ const CAROUSEL_MODES = [
   },
   {
     id: 'coming-soon', label: 'COMING SOON', tileColor: '#e8e8e0', textColor: 'rgba(0,0,0,0.70)',
-    desc: 'Story, Holonomy, Biome, Merge — arriving soon.',
-    controls: ['Story: 10-level campaign with cutscenes', 'Holonomy: loop visualization mode', 'Biome: city face-specific environments', 'Merge: block-merging puzzle variant'],
+    desc: 'Holonomy, Biome, Merge — arriving soon.',
+    controls: ['Holonomy: loop visualization mode', 'Biome: city face-specific environments', 'Merge: block-merging puzzle variant'],
   },
   {
     id: 'how-to-play', label: 'HOW TO PLAY', tileColor: '#a855f7', textColor: '#fff',
