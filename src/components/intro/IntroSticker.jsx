@@ -60,11 +60,11 @@ const IntroSticker = ({ pos, rot, color, styleKey, flipRotation = 0, emissiveBoo
         <mesh renderOrder={0} position={[0, 0, -0.001]}>
           <planeGeometry args={[0.96, 0.96]} />
           <meshStandardMaterial
-            color="#111111"
-            roughness={0.9}
-            metalness={0.0}
+            color="#1a1a2a"
+            roughness={0.7}
+            metalness={0.1}
             transparent
-            opacity={0.6}
+            opacity={0.7}
           />
         </mesh>
       </group>

@@ -63,7 +63,7 @@ const IntroCubie = React.forwardRef(({
       return FACE_COLORS[colorMap[antipodalMap[face]]];
     }
     const reveal = faceReveal[face] ?? 1; // undefined → treat as fully revealed
-    if (reveal < 0.01) return '#0a0a0a';  // black — unrevealed (intro only)
+    if (reveal < 0.01) return '#1a1a2a';  // dark charcoal — unrevealed (intro only)
     return FACE_COLORS[colorMap[face]];
   };
 
@@ -91,10 +91,10 @@ const IntroCubie = React.forwardRef(({
       {/* Cubie body */}
       <RoundedBox args={[0.98, 0.98, 0.98]} radius={0.06} smoothness={4}>
         <meshStandardMaterial
-          color="#080808"
-          roughness={0.15}
-          metalness={0.3}
-          envMapIntensity={0.5}
+          color="#1c1c2e"
+          roughness={0.25}
+          metalness={0.4}
+          envMapIntensity={0.8}
         />
       </RoundedBox>
 
