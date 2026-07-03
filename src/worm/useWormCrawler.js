@@ -13,7 +13,7 @@ import { resolveColors } from '../utils/colorSchemes.js';
 import { healBurstMap } from '../3d/styles/TileStyleMaterials.jsx';
 import { activateSticker } from '../3d/StickerAnimationManager.js';
 import { EARN_ORB_COLLECT, EARN_WORM_SURVIVAL_TICK, EARN_WORM_HEALED_FACE, SURVIVAL_TICK_INTERVAL } from '../utils/economyConstants.js';
-import { vibrate } from '../utils/audio.js';
+import { feel } from '../utils/feel.js';
 import {
     WORM_LIFT,
     TUNNEL_SPEED_SCALE,
@@ -96,6 +96,10 @@ export function useWormCrawler(size, cubies) {
     const timeAliveRef = useRef(0);
     const survivalTickRef = useRef(0);
     const healedRef = useRef(0);
+    // Orb-pickup combo: consecutive pickups within COMBO_WINDOW seconds escalate the
+    // pickup pitch + haptic (rising reward), decaying back to 0 when the player idles.
+    const orbComboRef = useRef(0);
+    const lastOrbTimeRef = useRef(-999);
     // willHealRef: true when the active tunnel has enough deposited orbs to heal on exit.
     // Consumed by TunnelPortalRings to show the pop-and-seal animation instead of a fade.
     const willHealRef = useRef(false);
@@ -203,6 +207,7 @@ export function useWormCrawler(size, cubies) {
         isJumping.current = true;
         jumpT.current = 0.001;
         jumpCount.current += 1;
+        feel('jump');
         // If the player jumps early on a flipped tile, don't auto-enter the tunnel.
         pendingTunnelTrigger.current = null;
     }, []);
@@ -230,6 +235,7 @@ export function useWormCrawler(size, cubies) {
         if (!alive.current) return;
         alive.current = false;
         phase.current = 'dead';
+        feel('death');
 
         if (deathMenuTimer.current) {
             clearTimeout(deathMenuTimer.current);
@@ -345,6 +351,7 @@ export function useWormCrawler(size, cubies) {
         tunnelProgress.current = 0;
         // Start with the wind-up flourish (spiral circle above the entry hole) before the dive.
         phase.current = 'windup';
+        feel('dive');
         onFlippedTile.current = false;
         lastFlippedRef.current = false;
         const prevState = useGameStore.getState();
@@ -537,7 +544,7 @@ export function useWormCrawler(size, cubies) {
                             if (boostActiveT.current <= 0 && boostCooldownT.current <= 0) {
                                 boostActiveT.current = BOOST_DURATION;
                                 useGameStore.getState().setWormBoostState('active');
-                                vibrate(18);
+                                feel('boost');
                             }
                         } else if (t === 'jump') {
                             startJump();
@@ -778,6 +785,11 @@ export function useWormCrawler(size, cubies) {
                                 const pickedColor = ensureOrbContrast((pickedFaceId && liveColors[pickedFaceId]) ?? '#22ff88');
                                 applyOrbPickupGrowth(pickedColor, pickedFaceId);
                                 pendingOrbFlashRef.current = { color: pickedColor, pos: curWorldPos.current.toArray() };
+                                // Combo climbs when pickups come in quick succession (≤2s apart).
+                                const _nowT = timeAliveRef.current;
+                                orbComboRef.current = (_nowT - lastOrbTimeRef.current <= 2.0) ? orbComboRef.current + 1 : 0;
+                                lastOrbTimeRef.current = _nowT;
+                                feel('orb', { combo: orbComboRef.current });
                                 const newPowerup = { ...randomFreeTile(size, [...powerupsRef.current, pos.current]), type: 'apple' };
                                 powerupsRef.current[puIdx] = newPowerup;
                                 useGameStore.getState().setWormPowerups(powerupsRef.current.slice());
@@ -918,7 +930,8 @@ export function useWormCrawler(size, cubies) {
                         // Heal immediately at exit completion (not deferred) when enough orbs deposited.
                         const exitStore = useGameStore.getState();
                         const exitProgress = exitStableKey ? (exitStore.wormHealingProgress?.[exitStableKey]) : null;
-                        if (isHealReady(exitProgress?.deposited) && exitedTunnel) {
+                        const didHeal = isHealReady(exitProgress?.deposited) && !!exitedTunnel;
+                        if (didHeal) {
                             const { entry, exit: exitTile } = exitedTunnel;
                             // Write healBurstMap for both tiles BEFORE healing (sticker orig fields intact)
                             const entrySticker = getStickerSafe(exitStore.cubies, entry.x, entry.y, entry.z, entry.dirKey);
@@ -961,6 +974,10 @@ export function useWormCrawler(size, cubies) {
                             }
                         }
                         // else: partial/no deposit — tunnel stays flipped, progress persists
+
+                        // One resolution cue per traversal: triumphant chime on a heal, otherwise
+                        // a plain pop as the worm bursts back out of the exit hole.
+                        feel(didHeal ? 'heal' : 'exit');
 
                         // Tunnel travel complete — windout spiral plays before resuming crawl.
                         // activeTunnel.current stays alive so windout can animate the exit spiral.
