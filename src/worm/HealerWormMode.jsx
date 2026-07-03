@@ -58,6 +58,7 @@ import { rideLiveRotation, getSliceSurfaceStickers, _parseTile, checkWormHitBySl
 import { useWormCrawler } from './useWormCrawler.js';
 import WormChaseCamera from './WormChaseCamera.jsx';
 import WormSwipeControls from './WormSwipeControls.jsx';
+import { UI_FONT, DISPLAY_FONT } from '../utils/uiTheme.js';
 
 
 
@@ -1713,7 +1714,7 @@ function TunnelHealProgress({ size }) {
                             justifyContent: 'center',
                             fontSize: _isMobile ? '15px' : '13px',
                             fontWeight: 900,
-                            fontFamily: "'Arial Rounded MT Bold', 'Nunito', Arial, sans-serif",
+                            fontFamily: UI_FONT,
                             border: '2.5px solid #ffffff',
                             boxShadow: `0 0 10px ${color}, 0 2px 6px rgba(0,0,0,0.5)`,
                             lineHeight: 1,
@@ -1836,10 +1837,17 @@ function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUseCountsR
     // - During normal crawling, animate rings at a lower cadence to cut per-frame CPU load.
     const frameBudgetRef = useRef(0);
     const lastPhaseRef = useRef('crawling');
-    // High-water marks of slots written last frame, so the zero-out pass only
-    // touches slots that could hold stale data instead of every unused slot.
-    const prevIdxRef = useRef({ live: 0, void: 0, bubble: 0, spark: 0, pole: 0, tape: 0, frame: 0 });
     const clearedRef = useRef(false);
+
+    // Instance capacities. Writes are contiguous from slot 0, so the frame loop sets
+    // each mesh.count to the number of slots actually written — the GPU then skips the
+    // (previously zero-scaled) unused instances entirely instead of running the vertex
+    // stage over the full worst-case allocation every frame (~4 000 instances at size 5).
+    const MAX_BUBBLES = MAX_RINGS * BUBBLES_PER_VOID;
+    const MAX_SPARKS = MAX_RINGS * SPARKS_PER_CRITICAL;
+    const MAX_POLES = MAX_RINGS * POLES_PER_TILE;
+    const MAX_TAPES = MAX_RINGS * TAPES_PER_TILE;
+    const MAX_VOID_FRAME_SEGMENTS = MAX_RINGS * FRAME_SEGMENTS_PER_VOID;
 
     useFrame(({ clock }, delta) => {
         const phase = worm?.phase?.current ?? 'crawling';
@@ -1856,7 +1864,7 @@ function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUseCountsR
         if (frameBudgetRef.current < targetStep) return;
         frameBudgetRef.current = 0;
 
-        // Nothing to render and previous slots already zeroed — skip all work.
+        // Nothing to render and counts already zeroed last pass — skip all work.
         if (allPositions.length === 0 && clearedRef.current) return;
 
         const liveMesh = liveRef.current;
@@ -1911,7 +1919,7 @@ function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUseCountsR
                 voidInner.setMatrixAt(voidIdx, _ringDummy.matrix);
 
                 // Void swamp bubbles — rising gas from the dead portal
-                for (let b = 0; b < BUBBLES_PER_VOID && bubbleIdx < bubbles.count; b++) {
+                for (let b = 0; b < BUBBLES_PER_VOID && bubbleIdx < MAX_BUBBLES; b++) {
                     const si = (i * BUBBLES_PER_VOID + b) * 3;
                     const phase = (t * 0.55 + bubbleSeeds[si + 2]) % 1;
                     const lift = phase * 0.72;
@@ -1950,7 +1958,7 @@ function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUseCountsR
                     if (_voidArcRight.lengthSq() < 1e-4) _voidArcRight.set(1, 0, 0);
                     _voidArcRight.normalize();
                     _voidArcForward.crossVectors(n, _voidArcRight).normalize();
-                    for (let sp = 0; sp < SPARKS_PER_CRITICAL && sparkIdx < sparks.count; sp++) {
+                    for (let sp = 0; sp < SPARKS_PER_CRITICAL && sparkIdx < MAX_SPARKS; sp++) {
                         const si = (i * SPARKS_PER_CRITICAL + sp) * 3;
                         const phase = (t * (2.5 + sp * 0.15) + bubbleSeeds[si + 2]) % 1;
                         const radial = 0.08 + Math.sin(phase * Math.PI * 2 + sp) * 0.035;
@@ -1987,7 +1995,7 @@ function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUseCountsR
                     [-half, half]
                 ];
                 
-                for (let c = 0; c < 4 && poleIdx < poles.count; c++) {
+                for (let c = 0; c < 4 && poleIdx < MAX_POLES; c++) {
                     const cx = corners[c][0];
                     const cy = corners[c][1];
                     _cautionDummy.position.set(
@@ -2008,7 +2016,7 @@ function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUseCountsR
                 
                 const loopT = t * 0.8 + i * 2.3;
 
-                for (let e = 0; e < 4 && tapeIdx < tapes.count; e++) {
+                for (let e = 0; e < 4 && tapeIdx < MAX_TAPES; e++) {
                     const si = (i * TAPES_PER_TILE + e) * 3;
                     const c1 = corners[e];
                     const c2 = corners[(e + 1) % 4];
@@ -2088,85 +2096,58 @@ function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUseCountsR
                 _voidFrameDummy.quaternion.setFromUnitVectors(_voidArcAxisY, _tapeForward);
                 _voidFrameDummy.scale.set(thickness, longEdge, thickness);
                 _voidFrameDummy.updateMatrix();
-                if (frameIdx < voidFrames.count) voidFrames.setMatrixAt(frameIdx++, _voidFrameDummy.matrix);
+                if (frameIdx < MAX_VOID_FRAME_SEGMENTS) voidFrames.setMatrixAt(frameIdx++, _voidFrameDummy.matrix);
 
                 _voidFrameDummy.position.set(wp[0], wp[1], wp[2]).addScaledVector(n, lift).addScaledVector(_tapeRight, -half);
                 _voidFrameDummy.quaternion.setFromUnitVectors(_voidArcAxisY, _tapeForward);
                 _voidFrameDummy.scale.set(thickness, longEdge, thickness);
                 _voidFrameDummy.updateMatrix();
-                if (frameIdx < voidFrames.count) voidFrames.setMatrixAt(frameIdx++, _voidFrameDummy.matrix);
+                if (frameIdx < MAX_VOID_FRAME_SEGMENTS) voidFrames.setMatrixAt(frameIdx++, _voidFrameDummy.matrix);
 
                 _voidFrameDummy.position.set(wp[0], wp[1], wp[2]).addScaledVector(n, lift).addScaledVector(_tapeForward, half);
                 _voidFrameDummy.quaternion.setFromUnitVectors(_voidArcAxisY, _tapeRight);
                 _voidFrameDummy.scale.set(thickness, longEdge, thickness);
                 _voidFrameDummy.updateMatrix();
-                if (frameIdx < voidFrames.count) voidFrames.setMatrixAt(frameIdx++, _voidFrameDummy.matrix);
+                if (frameIdx < MAX_VOID_FRAME_SEGMENTS) voidFrames.setMatrixAt(frameIdx++, _voidFrameDummy.matrix);
 
                 _voidFrameDummy.position.set(wp[0], wp[1], wp[2]).addScaledVector(n, lift).addScaledVector(_tapeForward, -half);
                 _voidFrameDummy.quaternion.setFromUnitVectors(_voidArcAxisY, _tapeRight);
                 _voidFrameDummy.scale.set(thickness, longEdge, thickness);
                 _voidFrameDummy.updateMatrix();
-                if (frameIdx < voidFrames.count) voidFrames.setMatrixAt(frameIdx++, _voidFrameDummy.matrix);
+                if (frameIdx < MAX_VOID_FRAME_SEGMENTS) voidFrames.setMatrixAt(frameIdx++, _voidFrameDummy.matrix);
             }
         }
 
-        // Zero out stale slots so nothing stale renders — only up to last frame's
-        // high-water mark instead of the full instance count (which is 6n² × up to
-        // 7 sub-instances and would mean thousands of writes per frame when idle).
-        const prev = prevIdxRef.current;
-        _ringDummy.position.set(0, 0, 0);
-        _ringDummy.scale.setScalar(0);
-        _ringDummy.updateMatrix();
-        for (let i = liveIdx; i < prev.live; i++) liveMesh.setMatrixAt(i, _ringDummy.matrix);
-        for (let i = voidIdx; i < prev.void; i++) {
-            voidOuter.setMatrixAt(i, _ringDummy.matrix);
-            voidInner.setMatrixAt(i, _ringDummy.matrix);
-        }
-        _bubbleDummy.scale.setScalar(0);
-        _bubbleDummy.updateMatrix();
-        for (let i = bubbleIdx; i < prev.bubble; i++) bubbles.setMatrixAt(i, _bubbleDummy.matrix);
-        _sparkDummy.scale.setScalar(0);
-        _sparkDummy.updateMatrix();
-        for (let i = sparkIdx; i < prev.spark; i++) sparks.setMatrixAt(i, _sparkDummy.matrix);
-        _cautionDummy.scale.setScalar(0);
-        _cautionDummy.updateMatrix();
-        for (let i = poleIdx; i < prev.pole; i++) poles.setMatrixAt(i, _cautionDummy.matrix);
-        for (let i = tapeIdx; i < prev.tape; i++) tapes.setMatrixAt(i, _cautionDummy.matrix);
-        _voidFrameDummy.scale.setScalar(0);
-        _voidFrameDummy.updateMatrix();
-        for (let i = frameIdx; i < prev.frame; i++) voidFrames.setMatrixAt(i, _voidFrameDummy.matrix);
+        // Draw only the slots written this frame. Writes are contiguous from 0, so
+        // shrinking mesh.count culls every unused instance on the GPU — no zero-scale
+        // matrix scrubbing needed, and re-growth overwrites slots before exposing them.
+        liveMesh.count = liveIdx;
+        voidOuter.count = voidIdx;
+        voidInner.count = voidIdx;
+        bubbles.count = bubbleIdx;
+        sparks.count = sparkIdx;
+        poles.count = poleIdx;
+        tapes.count = tapeIdx;
+        voidFrames.count = frameIdx;
 
-        // Re-upload only buffers that were written this frame (active instances or
-        // a stale range that just got zeroed) — skips idle GPU uploads entirely.
-        if (liveIdx > 0 || prev.live > liveIdx) {
+        // Re-upload only buffers that were written this frame — skips idle GPU uploads.
+        if (liveIdx > 0) {
             liveMesh.instanceMatrix.needsUpdate = true;
             if (liveMesh.instanceColor) liveMesh.instanceColor.needsUpdate = true;
         }
-        if (voidIdx > 0 || prev.void > voidIdx) {
+        if (voidIdx > 0) {
             voidOuter.instanceMatrix.needsUpdate = true;
             voidInner.instanceMatrix.needsUpdate = true;
         }
-        if (bubbleIdx > 0 || prev.bubble > bubbleIdx) bubbles.instanceMatrix.needsUpdate = true;
-        if (sparkIdx > 0 || prev.spark > sparkIdx) sparks.instanceMatrix.needsUpdate = true;
-        if (poleIdx > 0 || prev.pole > poleIdx) poles.instanceMatrix.needsUpdate = true;
-        if (tapeIdx > 0 || prev.tape > tapeIdx) tapes.instanceMatrix.needsUpdate = true;
-        if (frameIdx > 0 || prev.frame > frameIdx) voidFrames.instanceMatrix.needsUpdate = true;
+        if (bubbleIdx > 0) bubbles.instanceMatrix.needsUpdate = true;
+        if (sparkIdx > 0) sparks.instanceMatrix.needsUpdate = true;
+        if (poleIdx > 0) poles.instanceMatrix.needsUpdate = true;
+        if (tapeIdx > 0) tapes.instanceMatrix.needsUpdate = true;
+        if (frameIdx > 0) voidFrames.instanceMatrix.needsUpdate = true;
 
-        prev.live = liveIdx;
-        prev.void = voidIdx;
-        prev.bubble = bubbleIdx;
-        prev.spark = sparkIdx;
-        prev.pole = poleIdx;
-        prev.tape = tapeIdx;
-        prev.frame = frameIdx;
         clearedRef.current = allPositions.length === 0;
     });
 
-    const MAX_BUBBLES = MAX_RINGS * BUBBLES_PER_VOID;
-    const MAX_SPARKS = MAX_RINGS * SPARKS_PER_CRITICAL;
-    const MAX_POLES = MAX_RINGS * POLES_PER_TILE;
-    const MAX_TAPES = MAX_RINGS * TAPES_PER_TILE;
-    const MAX_VOID_FRAME_SEGMENTS = MAX_RINGS * FRAME_SEGMENTS_PER_VOID;
     return (
         <>
             {/* Live wormhole rings — bright neon pink, fast spin */}
@@ -2865,7 +2846,7 @@ function ThunkEffect({ thunkRef }) {
             <group ref={groupRef} visible={false}>
                 <Html center distanceFactor={10}>
                     <div ref={divRef} style={{
-                        fontFamily: "'Impact', 'Arial Black', sans-serif",
+                        fontFamily: DISPLAY_FONT,
                         fontSize: '54px',
                         fontWeight: 900,
                         color: '#ffdd00',

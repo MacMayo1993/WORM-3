@@ -1,9 +1,10 @@
 /**
  * VoidCore
  *
- * Animated wormhole-color rings at the cube's center void.
- * Renders 3 orbital lineLoop rings that cycle through all active tunnel
- * colors (stickers that have been flipped at least once).
+ * Animated wormhole-color core at the cube's center void.
+ * Renders the antipodal mini-cube, a glowing plasma core, and orbiting
+ * electric sparks colored from the active tunnel palette (stickers that
+ * have been flipped at least once).
  *
  * Visible on all cube sizes. For odd-sized cubes (3×3, 5×5) the center
  * cubie is skipped in CubeAssembly so VoidCore fills that space. For
@@ -17,7 +18,6 @@ import { resolveColors } from '../utils/colorSchemes.js';
 
 // Shared geometries to avoid reallocation
 const innerGeo = new THREE.SphereGeometry(0.28, 32, 32);
-const outerGeo = new THREE.IcosahedronGeometry(0.38, 1);
 const sparkGeo = new THREE.SphereGeometry(0.015, 6, 6);
 
 // Mini cube geometry — shared across all mounts
@@ -148,8 +148,6 @@ function VoidCore() {
 
   const innerCoreRef = useRef();
   const innerMatRef = useRef();
-  const outerCageRef = useRef();
-  const outerCageRef2 = useRef();
   const sparksRef = useRef();
   const tRef = useRef(0);
 
@@ -199,10 +197,6 @@ function VoidCore() {
     uniforms.uColor1.value.copy(palette[0]);
     uniforms.uColor2.value.copy(palette[palette.length > 1 ? 1 : 0]);
 
-    // Color wireframes
-    if (outerCageRef.current) outerCageRef.current.material.color.copy(palette[0]);
-    if (outerCageRef2.current) outerCageRef2.current.material.color.copy(palette[palette.length > 1 ? 1 : 0]);
-
     // Also color sparks
     const mesh = sparksRef.current;
     if (mesh) {
@@ -237,18 +231,6 @@ function VoidCore() {
       innerCoreRef.current.rotation.z = t * 0.3;
       const scale = 1.0 + Math.sin(t * 15.0) * 0.02;
       innerCoreRef.current.scale.setScalar(scale);
-    }
-
-    // Spin the outer wireframe cages rapidly on different axes like a gyroscope
-    if (outerCageRef.current) {
-      outerCageRef.current.rotation.x = t * 2.0;
-      outerCageRef.current.rotation.y = t * 1.5;
-      outerCageRef.current.material.opacity = uniforms.uOpacity.value * 0.15;
-    }
-    if (outerCageRef2.current) {
-      outerCageRef2.current.rotation.x = -t * 1.2;
-      outerCageRef2.current.rotation.z = t * 2.5;
-      outerCageRef2.current.material.opacity = uniforms.uOpacity.value * 0.15;
     }
 
     // Animate the electric sparks
@@ -288,26 +270,6 @@ function VoidCore() {
           vertexShader={coreVertexShader}
           fragmentShader={coreFragmentShader}
           uniforms={uniforms}
-          transparent={true}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-        />
-      </mesh>
-
-      <mesh ref={outerCageRef} geometry={outerGeo}>
-        <meshBasicMaterial
-          color="#ffffff"
-          wireframe={true}
-          transparent={true}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-        />
-      </mesh>
-
-      <mesh ref={outerCageRef2} geometry={outerGeo} scale={1.05}>
-        <meshBasicMaterial
-          color="#ffffff"
-          wireframe={true}
           transparent={true}
           blending={THREE.AdditiveBlending}
           depthWrite={false}

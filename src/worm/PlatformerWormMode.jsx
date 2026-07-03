@@ -26,6 +26,7 @@ import {
 import { rotateSliceCubies } from '../game/cubeRotation.js';
 import { play } from '../utils/audio.js';
 import { isMobile as isMobileDevice } from '../utils/device.js';
+import { UI_FONT } from '../utils/uiTheme.js';
 
 // Module-level scratch objects — never reallocated per frame
 const _camNormal = new THREE.Vector3();
@@ -743,7 +744,7 @@ const styles = {
   },
   panelLabel: {
     position: 'absolute', bottom: '8px', left: '50%', transform: 'translateX(-50%)',
-    fontSize: '10px', fontFamily: "'Courier New', monospace",
+    fontSize: '10px', fontFamily: UI_FONT,
     fontWeight: 'bold', letterSpacing: '0.2em', opacity: 0.4,
     pointerEvents: 'none',
   },

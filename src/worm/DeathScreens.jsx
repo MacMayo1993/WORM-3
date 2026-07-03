@@ -2,6 +2,7 @@
 // Full-screen death takeovers for Worm Healer mode — a distinct themed
 // experience per death cause instead of one generic "you died" card.
 import React from 'react';
+import { UI_FONT, DISPLAY_FONT } from '../utils/uiTheme.js';
 
 // ─── Death-cause classification ───────────────────────────────────────────────
 function classifyDeath(reason) {
@@ -41,7 +42,7 @@ const OVERLAY_BASE_STYLE = {
     justifyContent: 'center',
     pointerEvents: 'auto',
     overflow: 'hidden',
-    fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif",
+    fontFamily: UI_FONT,
     textAlign: 'center',
     padding: 'env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px)',
     boxSizing: 'border-box',
@@ -167,7 +168,7 @@ function TailBiteDeathScreen({ deathDetails, stats, onRetry, onNewGame, onExamin
             <div style={cardStyle('rgba(248,113,113,0.35)')}>
                 <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 3, color: 'rgba(254,202,202,0.7)', textTransform: 'uppercase' }}>WORM COLLISION</div>
                 <div style={{
-                    fontFamily: "'Impact', 'Arial Black', sans-serif",
+                    fontFamily: DISPLAY_FONT,
                     fontSize: 'clamp(40px, 9vw, 72px)', fontWeight: 900, letterSpacing: '-1px',
                     color: '#fecaca', marginTop: 4,
                     textShadow: '-3px -3px 0 #7f1d1d, 3px -3px 0 #7f1d1d, -3px 3px 0 #7f1d1d, 3px 3px 0 #7f1d1d, 0 0 36px rgba(248,113,113,0.6)',
@@ -233,7 +234,7 @@ function EventHorizonDeathScreen({ deathDetails, stats, onRetry, onNewGame }) {
             <div style={cardStyle('rgba(167,139,250,0.35)')}>
                 <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 3, color: 'rgba(196,181,253,0.7)', textTransform: 'uppercase' }}>VOID BREACH</div>
                 <div style={{
-                    fontFamily: "'Impact', 'Arial Black', sans-serif",
+                    fontFamily: DISPLAY_FONT,
                     fontSize: 'clamp(30px, 7vw, 56px)', fontWeight: 900, letterSpacing: '-1px',
                     color: '#ddd6fe', marginTop: 4,
                     animation: 'eh-glitch 0.9s ease-out 1 forwards',
@@ -295,7 +296,7 @@ function SlicedDeathScreen({ deathDetails, stats, onRetry, onNewGame }) {
             <div style={cardStyle('rgba(226,232,240,0.3)')}>
                 <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 3, color: 'rgba(226,232,240,0.65)', textTransform: 'uppercase' }}>SLICE COLLISION</div>
                 <div style={{
-                    fontFamily: "'Impact', 'Arial Black', sans-serif",
+                    fontFamily: DISPLAY_FONT,
                     fontSize: 'clamp(44px, 10vw, 80px)', fontWeight: 900, letterSpacing: '-1px',
                     color: '#f1f5f9', marginTop: 4,
                     textShadow: '-3px -3px 0 #7f1d1d, 3px -3px 0 #7f1d1d, -3px 3px 0 #7f1d1d, 3px 3px 0 #7f1d1d, 0 0 30px rgba(248,113,113,0.5)',

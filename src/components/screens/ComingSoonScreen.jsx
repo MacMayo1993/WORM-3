@@ -1,5 +1,6 @@
 // src/components/screens/ComingSoonScreen.jsx
 import React, { useState, useEffect } from 'react';
+import { UI_FONT, GLASS_PANEL } from '../../utils/uiTheme.js';
 
 const MODES = [
   {
@@ -57,7 +58,7 @@ const Tag = ({ label, color }) => (
       color: `${color}cc`,
       background: `${color}18`,
       border: `1px solid ${color}30`,
-      fontFamily: "-apple-system, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif",
+      fontFamily: UI_FONT,
     }}
   >
     {label}
@@ -128,7 +129,7 @@ const ModeCard = ({ item, isSelected, onClick }) => {
                 fontSize: '15px',
                 fontWeight: 700,
                 color: isSelected ? item.color : `${item.color}cc`,
-                fontFamily: "-apple-system, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif",
+                fontFamily: UI_FONT,
                 transition: 'color 0.2s ease',
               }}
             >
@@ -145,7 +146,7 @@ const ModeCard = ({ item, isSelected, onClick }) => {
                 border: `1px solid ${item.color}28`,
                 borderRadius: '4px',
                 padding: '2px 6px',
-                fontFamily: "-apple-system, 'SF Pro Text', system-ui, sans-serif",
+                fontFamily: UI_FONT,
               }}
             >
               Coming Soon
@@ -166,7 +167,7 @@ const ModeCard = ({ item, isSelected, onClick }) => {
                 fontSize: '13px',
                 lineHeight: 1.6,
                 color: 'rgba(200,220,255,0.78)',
-                fontFamily: "-apple-system, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif",
+                fontFamily: UI_FONT,
               }}
             >
               {item.description}
@@ -185,7 +186,7 @@ const ModeCard = ({ item, isSelected, onClick }) => {
                 margin: 0,
                 fontSize: '12px',
                 color: 'rgba(160,185,255,0.45)',
-                fontFamily: "-apple-system, 'SF Pro Text', system-ui, sans-serif",
+                fontFamily: UI_FONT,
                 fontStyle: 'italic',
               }}
             >
@@ -222,7 +223,7 @@ export default function ComingSoonScreen({ onBack }) {
         position: 'fixed',
         inset: 0,
         zIndex: 9999,
-        background: 'rgba(4,6,18,0.92)',
+        background: GLASS_PANEL,
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
         display: 'flex',
@@ -265,7 +266,7 @@ export default function ComingSoonScreen({ onBack }) {
             color: 'rgba(180,210,255,0.75)',
             fontSize: '13px',
             fontWeight: 600,
-            fontFamily: "-apple-system, 'SF Pro Text', system-ui, sans-serif",
+            fontFamily: UI_FONT,
             marginBottom: '28px',
             transition: 'background 0.2s ease',
           }}
@@ -286,7 +287,7 @@ export default function ComingSoonScreen({ onBack }) {
               fontSize: 'clamp(28px,7vw,40px)',
               fontWeight: 900,
               letterSpacing: '0.04em',
-              fontFamily: "'Courier New', monospace",
+              fontFamily: UI_FONT,
               background: 'linear-gradient(100deg,#ef4444 0%,#f97316 25%,#a78bfa 60%,#00f5ff 100%)',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
@@ -300,7 +301,7 @@ export default function ComingSoonScreen({ onBack }) {
               margin: 0,
               fontSize: '13px',
               color: 'rgba(160,185,255,0.60)',
-              fontFamily: "-apple-system, 'SF Pro Text', system-ui, sans-serif",
+              fontFamily: UI_FONT,
               lineHeight: 1.5,
               letterSpacing: '0.02em',
             }}
@@ -328,7 +329,7 @@ export default function ComingSoonScreen({ onBack }) {
             textAlign: 'center',
             fontSize: '11px',
             color: 'rgba(120,150,220,0.35)',
-            fontFamily: "-apple-system, 'SF Pro Text', system-ui, sans-serif",
+            fontFamily: UI_FONT,
             letterSpacing: '0.08em',
           }}
         >

@@ -12,6 +12,7 @@ import { vibrate } from '../../utils/audio.js';
 import MenuFlipWave from './MenuFlipWave.jsx';
 import MenuTileOverlay from './MenuTileOverlay.jsx';
 import { ANTIPODAL_COLOR } from '../../utils/constants.js';
+import { UI_FONT, GLASS_PANEL, DISPLAY_FONT } from '../../utils/uiTheme.js';
 
 // ─── Randomizable style state — re-picked every time the user taps the cube ──
 // biome is now included so its face palette appears in the rotation.
@@ -781,24 +782,24 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
 // tileColor matches the game's 6 face colors; textColor ensures contrast on the tile
 const CAROUSEL_MODES = [
   {
-    id: 'cube', label: 'CUBE', tileColor: '#3b82f6', textColor: '#fff',
-    desc: "Classic Rubik's cube solving with full setup wizard.",
-    controls: ['Drag face edges to rotate slices', 'Tap a tile to toggle Flip mode', 'Undo moves with the undo button', 'Hit Shuffle to scramble and start'],
-  },
-  {
     id: 'worm', label: 'WORM', tileColor: '#22c55e', textColor: '#fff',
     desc: 'Co-op worm healer mode on a living antipodal cube.',
     controls: ['Worm follows your cursor or touch', 'Healed tiles restore the cube face', 'Collect orbs scattered across faces', 'Avoid flipped chaos tiles'],
   },
   {
+    id: 'freeplay', label: 'CUBE', tileColor: '#eab308', textColor: 'rgba(0,0,0,0.80)',
+    desc: "Classic Rubik's cube solving — your cube, your rules.",
+    controls: ['Pick cube size 2×2 through 5×5', 'Choose color scheme and tile style', 'Drag face edges to rotate slices', 'Solve at your own pace'],
+  },
+  {
+    id: 'cube', label: 'STORY', tileColor: '#3b82f6', textColor: '#fff',
+    desc: 'The 10-level Life Journey campaign, from daycare to the singularity.',
+    controls: ['Beat a level to unlock the next', 'Each level teaches a new mechanic', 'Mobi guides you along the way', 'Earn star ratings on every level'],
+  },
+  {
     id: 'chaos', label: 'CHAOS', tileColor: '#f97316', textColor: '#fff',
     desc: 'Antipodal flip survival with betting and chaos tuning.',
     controls: ['Tiles flip automatically over time', 'Bet Parity Points before the round', 'Set chaos level 1–5 in the wizard', 'Survive until the last tile falls'],
-  },
-  {
-    id: 'freeplay', label: 'FREE PLAY', tileColor: '#eab308', textColor: 'rgba(0,0,0,0.80)',
-    desc: 'Unlimited customization — your cube, your rules.',
-    controls: ['Pick cube size 2×2 through 5×5', 'Choose color scheme and tile style', 'Solve at your own pace', 'No time limit or win condition'],
   },
   {
     id: 'random', label: 'RANDOM', tileColor: '#ef4444', textColor: '#fff',
@@ -812,8 +813,8 @@ const CAROUSEL_MODES = [
   },
   {
     id: 'coming-soon', label: 'COMING SOON', tileColor: '#e8e8e0', textColor: 'rgba(0,0,0,0.70)',
-    desc: 'Story, Holonomy, Biome, Merge — arriving soon.',
-    controls: ['Story: 10-level campaign with cutscenes', 'Holonomy: loop visualization mode', 'Biome: city face-specific environments', 'Merge: block-merging puzzle variant'],
+    desc: 'Holonomy, Biome, Merge — arriving soon.',
+    controls: ['Holonomy: loop visualization mode', 'Biome: city face-specific environments', 'Merge: block-merging puzzle variant'],
   },
   {
     id: 'how-to-play', label: 'HOW TO PLAY', tileColor: '#a855f7', textColor: '#fff',
@@ -913,7 +914,7 @@ const HowToPlayMini = ({ tileColor }) => {
     <div style={{ padding: '1.5px', borderRadius: '18px', background: '#0c0c1a', boxShadow: '0 8px 24px rgba(0,0,0,0.40)' }}>
       <div style={{
         borderRadius: '16.5px',
-        background: 'rgba(4,6,20,0.92)',
+        background: GLASS_PANEL,
         boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.10)',
         padding: '14px 16px 12px',
       }}>
@@ -1073,7 +1074,7 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
         paddingLeft: '12px', paddingRight: '12px',
       }}>
 
-        <p style={{ margin: '0 0 16px', fontSize: '9px', fontWeight: 800, letterSpacing: '0.30em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.55)', fontFamily: "'Bungee', cursive" }}>
+        <p style={{ margin: '0 0 16px', fontSize: '9px', fontWeight: 800, letterSpacing: '0.30em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.55)', fontFamily: DISPLAY_FONT }}>
           Choose your mode
         </p>
 
@@ -1104,7 +1105,7 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
           }}
           onMouseLeave={() => { mouseStartX.current = null; }}
         >
-          <div style={{ fontSize: 'clamp(28px,8vw,44px)', fontWeight: 900, fontFamily: "'Bungee', cursive", color: mode.textColor, lineHeight: 1, textShadow: '0 2px 8px rgba(0,0,0,0.35)' }}>
+          <div style={{ fontSize: 'clamp(28px,8vw,44px)', fontWeight: 900, fontFamily: DISPLAY_FONT, color: mode.textColor, lineHeight: 1, textShadow: '0 2px 8px rgba(0,0,0,0.35)' }}>
             {mode.label}
           </div>
           <p style={{ margin: '10px 0 0', fontSize: '13px', lineHeight: 1.5, fontFamily: MENU_FONT, color: mode.textColor === '#fff' ? 'rgba(255,255,255,0.80)' : 'rgba(0,0,0,0.65)' }}>
@@ -1140,7 +1141,7 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
           {mode.id === 'how-to-play' ? (
             <HowToPlayMini tileColor={mode.tileColor} />
           ) : (
-            <div style={{ borderRadius: '16px', overflow: 'hidden', background: 'rgba(4,6,20,0.88)' }}>
+            <div style={{ borderRadius: '16px', overflow: 'hidden', background: GLASS_PANEL }}>
               <div style={{ width: '100%', aspectRatio: '16/9', position: 'relative', overflow: 'hidden', background: 'linear-gradient(135deg, rgba(14,18,42,0.95), rgba(4,6,20,0.98))' }}>
                 {!imgError && (
                   <img
@@ -1179,7 +1180,7 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
               border: '1.5px solid rgba(255,255,255,0.55)',
               background: mode.tileColor, color: mode.textColor,
               fontWeight: 800, fontSize: '14px', letterSpacing: '0.22em',
-              textTransform: 'uppercase', cursor: 'pointer', fontFamily: "'Bungee', cursive",
+              textTransform: 'uppercase', cursor: 'pointer', fontFamily: DISPLAY_FONT,
               boxShadow: '0 2px 16px rgba(0,0,0,0.30)',
               transition: 'opacity 160ms ease, transform 100ms ease',
               WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
@@ -1224,7 +1225,7 @@ const MenuStartButton = ({ visible, onClick }) => (
   </div>
 );
 
-const MENU_FONT = "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif";
+const MENU_FONT = UI_FONT;
 const menuStyles = {
   titleWrap: {
     position: 'absolute', top: 0, left: 0, right: 0,

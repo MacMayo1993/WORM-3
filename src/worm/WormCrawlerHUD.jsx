@@ -14,6 +14,7 @@ import { callWormTurn } from './wormTurnBridge.js';
 import { BOOST_COOLDOWN } from './healerWorm/constants.js';
 import { MenuTitleCard } from '../components/menus/MainMenu.jsx';
 import DeathScreen from './DeathScreens.jsx';
+import { UI_FONT, DISPLAY_FONT } from '../utils/uiTheme.js';
 
 const PHASE_META = {
     crawling: { label: 'CRAWLING', faceId: 2 },
@@ -46,7 +47,7 @@ const colorDistance = (a, b) => {
 
 // ─── Style constants ─────────────────────────────────────────────────────────
 
-const FONT = "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif";
+const FONT = UI_FONT;
 const SHADOW = '0 4px 16px rgba(15, 23, 42, 0.18)';
 const BORDER = 'rgba(15, 23, 42, 0.12)';
 const PANEL_BG = 'rgba(255, 255, 255, 0.92)';
@@ -369,7 +370,7 @@ const WINNER_STARS_STYLE = {
 };
 
 const WINNER_TITLE_STYLE = {
-    fontFamily: "'Impact', 'Arial Black', sans-serif",
+    fontFamily: DISPLAY_FONT,
     fontSize: 'clamp(52px, 11vw, 96px)', fontWeight: 900, letterSpacing: '-2px',
     color: '#ffdd00',
     textShadow: '-4px -4px 0 #cc2200, 4px -4px 0 #cc2200, -4px 4px 0 #cc2200, 4px 4px 0 #cc2200, 0 0 40px rgba(255,221,0,0.5)',
@@ -397,7 +398,7 @@ const WINNER_STAT_LABEL_STYLE = {
 const WINNER_STAT_VALUE_STYLE = { fontSize: 20, fontWeight: 800, color: '#fff', lineHeight: 1.1 };
 
 const WINNER_PP_STYLE = {
-    fontFamily: "'Impact', 'Arial Black', sans-serif",
+    fontFamily: DISPLAY_FONT,
     fontSize: 'clamp(28px, 6vw, 44px)', color: '#c4b5fd', letterSpacing: '-1px',
     textShadow: '-2px -2px 0 #5b21b6, 2px -2px 0 #5b21b6, -2px 2px 0 #5b21b6, 2px 2px 0 #5b21b6',
     marginBottom: 6, textAlign: 'center',
@@ -442,7 +443,7 @@ const PODIUM_BASE_STYLE = {
 };
 
 const PODIUM_LABEL_STYLE = {
-    fontFamily: "'Impact', 'Arial Black', sans-serif",
+    fontFamily: DISPLAY_FONT,
     fontSize: 18, fontWeight: 900, color: '#3d2000', letterSpacing: 2,
     textShadow: '0 1px 0 rgba(255,255,255,0.3)',
 };
@@ -586,7 +587,7 @@ function BoostButton({ wormAlive, fc }) {
 
 // ─── Pause Menu Overlay ──────────────────────────────────────────────────────
 
-function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalActive, wormControlMode, toggleWormControlMode, wormSpeed, setWormSpeed, wormAlive, wormHealedCount, wormSessionOrbs, wormholeCountdown, wormTimeAlive, wormGamePhase, formatTime, fc }) {
+function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalActive, wormControlMode, toggleWormControlMode, wormSpeed, setWormSpeed, wormAlive, wormHealedCount, wormSessionOrbs, wormTimeAlive, wormGamePhase, formatTime, fc }) {
     const green = fc[2] || FACE_FALLBACKS[2];
     const sfxOn = useGameStore(s => s.settings?.sfx ?? true);
     const hapticsOn = useGameStore(s => s.settings?.haptics ?? true);
@@ -597,6 +598,10 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
         fontSize: 12, fontWeight: 700, color: '#0f172a',
         cursor: 'pointer', touchAction: 'manipulation',
     });
+    // Subscribed here (not in the main HUD selector) on purpose: the countdown updates
+    // at 10 Hz while crawling, and this menu is the only place the value is displayed —
+    // keeping it out of the main selector stops the whole HUD re-rendering every tick.
+    const wormholeCountdown = useGameStore(s => s.wormholeCountdown ?? 0);
 
     return (
         <div style={PAUSE_OVERLAY_STYLE} onPointerDown={onResume}>
@@ -710,12 +715,13 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
         if (showDeathMenu) setIsMinimized(false);
     }, [showDeathMenu]);
 
-    const { wormSpeed, wormHealedCount, wormBodyTiles, wormholeCountdown, wormControlMode, wormTimeAlive, wormTunnelCount, wormColor, wormOrbInventory, settings, setWormSpeed, toggleWormControlMode, setWormPaused, wormGamePhase, wormCountdownStep, wormSessionOrbs, parityPoints } = useGameStore(
+    const { wormSpeed, wormHealedCount, wormBodyTiles, wormControlMode, wormTimeAlive, wormTunnelCount, wormColor, wormOrbInventory, settings, setWormSpeed, toggleWormControlMode, setWormPaused, wormGamePhase, wormCountdownStep, wormSessionOrbs, parityPoints } = useGameStore(
         useShallow(s => ({
             wormSpeed: s.wormSpeed ?? 1.0,
             wormHealedCount: s.wormHealedCount ?? 0,
             wormBodyTiles: s.wormBodyTiles ?? 0,
-            wormholeCountdown: s.wormholeCountdown ?? 0,
+            // NOTE: wormholeCountdown deliberately NOT selected here — it updates at 10 Hz
+            // and is only shown inside PauseMenu, which subscribes to it itself.
             wormControlMode: s.wormControlMode ?? 'non-oriented',
             wormTimeAlive: s.wormTimeAlive ?? 0,
             wormTunnelCount: s.wormTunnelCount ?? 0,
@@ -932,7 +938,6 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                     wormAlive={wormAlive}
                     wormHealedCount={wormHealedCount}
                     wormSessionOrbs={wormSessionOrbs}
-                    wormholeCountdown={wormholeCountdown}
                     wormTimeAlive={wormTimeAlive}
                     wormGamePhase={wormGamePhase}
                     formatTime={formatTime}

@@ -6,6 +6,7 @@ import { gsap } from 'gsap';
 import BlackHoleEnvironment from '../../3d/BlackHoleEnvironment.jsx';
 import { FACE_COLORS } from '../../utils/constants.js';
 import { vibrate } from '../../utils/audio.js';
+import { UI_FONT } from '../../utils/uiTheme.js';
 
 // Simplified cubie for cutscene performance
 const CutsceneCubie = ({ position, size, scale = 1, emissiveIntensity = 0 }) => {
@@ -477,7 +478,7 @@ const CutsceneOverlay = ({ progress, phase: _phase }) => {
       justifyContent: 'center',
       textAlign: 'center',
       pointerEvents: 'none',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      fontFamily: UI_FONT,
       padding: '20px'
     }}>
       {getOverlayContent()}
@@ -574,7 +575,7 @@ const Level10Cutscene = ({ onComplete, onSkip }) => {
             borderRadius: '8px',
             fontSize: '14px',
             cursor: 'pointer',
-            fontFamily: '-apple-system, sans-serif',
+            fontFamily: UI_FONT,
             letterSpacing: '0.1em',
             transition: 'all 0.2s',
             zIndex: 10
