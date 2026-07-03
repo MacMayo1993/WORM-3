@@ -120,9 +120,9 @@ function IntroBranch({ time, onComplete, reducedMotion = false, performanceMode 
   return (
     <>
       <color attach="background" args={['#05050f']} />
-      <ambientLight intensity={0.6} />
-      <pointLight position={[10, 10, 10]} intensity={1.8} />
-      <pointLight position={[-10, -10, -10]} intensity={1.2} />
+      <ambientLight intensity={1.0} />
+      <pointLight position={[10, 10, 10]} intensity={2.2} />
+      <pointLight position={[-10, -10, -10]} intensity={1.6} />
       {/* Cool blue cast on the intro black hole so the opening matches the main-menu vibe */}
       <BlackHoleEnvironment zoom={1.2} orbitStrength={0.1} tint={[0.72, 0.9, 1.3]} />
       <IntroScene time={time} onComplete={onComplete} />
