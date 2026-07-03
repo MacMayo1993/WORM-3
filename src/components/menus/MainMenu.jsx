@@ -1036,7 +1036,8 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
   }, [onCubeSelect, onWormSelect, onChaos, onFreeplay, onRandom, onStore, onComingSoon, onHowToPlay]);
 
   const mode = CAROUSEL_MODES[activeIndex];
-  const activeImageSrc = `${import.meta.env.BASE_URL}images/modes/${mode.id}.jpg`;
+  const imageId = mode.id === 'coming-soon' ? 'comingsoon' : mode.id;
+  const activeImageSrc = `${import.meta.env.BASE_URL}images/modes/${imageId}.jpg`;
   const opacity = show ? 1 : 0;
 
   const arrowStyle = {
@@ -1142,7 +1143,7 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
 
           {mode.id === 'how-to-play' ? (
             <HowToPlayMini tileColor={mode.tileColor} />
-          ) : (
+          ) : mode.id === 'store' ? null : (
             <div style={{ borderRadius: '16px', overflow: 'hidden', background: GLASS_PANEL }}>
               <div style={{ width: '100%', aspectRatio: '16/9', position: 'relative', overflow: 'hidden', background: 'linear-gradient(135deg, rgba(14,18,42,0.95), rgba(4,6,20,0.98))' }}>
                 {!imgError && (
