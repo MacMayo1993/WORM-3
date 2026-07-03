@@ -588,6 +588,15 @@ function BoostButton({ wormAlive, fc }) {
 
 function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalActive, wormControlMode, toggleWormControlMode, wormSpeed, setWormSpeed, wormAlive, wormHealedCount, wormSessionOrbs, wormholeCountdown, wormTimeAlive, wormGamePhase, formatTime, fc }) {
     const green = fc[2] || FACE_FALLBACKS[2];
+    const sfxOn = useGameStore(s => s.settings?.sfx ?? true);
+    const hapticsOn = useGameStore(s => s.settings?.haptics ?? true);
+    const setSettings = useGameStore(s => s.setSettings);
+    const feelChipStyle = (on) => ({
+        borderRadius: 999, border: `1px solid ${on ? `${green}66` : BORDER}`,
+        background: on ? `${green}18` : 'rgba(15, 23, 42, 0.06)', padding: '5px 12px',
+        fontSize: 12, fontWeight: 700, color: '#0f172a',
+        cursor: 'pointer', touchAction: 'manipulation',
+    });
 
     return (
         <div style={PAUSE_OVERLAY_STYLE} onPointerDown={onResume}>
@@ -635,6 +644,18 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
                     >
                         {wormControlMode === 'oriented' ? 'ORIENTED' : 'NON-ORIENTED'}
                     </button>
+                </div>
+
+                <div style={PAUSE_ROW_STYLE}>
+                    <span style={PAUSE_ROW_LABEL_STYLE}>Feel</span>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                        <button onPointerDown={() => setSettings?.(s => ({ ...s, sfx: !(s.sfx ?? true) }))} style={feelChipStyle(sfxOn)}>
+                            {sfxOn ? '🔊 SFX' : '🔇 SFX'}
+                        </button>
+                        <button onPointerDown={() => setSettings?.(s => ({ ...s, haptics: !(s.haptics ?? true) }))} style={feelChipStyle(hapticsOn)}>
+                            {hapticsOn ? '📳 Haptics' : '📴 Haptics'}
+                        </button>
+                    </div>
                 </div>
 
                 {/* Action buttons */}

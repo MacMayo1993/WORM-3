@@ -46,6 +46,7 @@ import {
 } from './healerWorm/constants.js';
 import ParityOrbs, { OrbCollectEffect } from './ParityOrb.jsx';
 import { isMobile as _isMobile } from '../utils/device.js';
+import { feel, setFeelEnabled } from '../utils/feel.js';
 import WormHat3D from './wormCosmetics.jsx';
 import { getSkin, _hatAlignQuat, _hatYUp } from './wormCosmeticsData.js';
 import { getWormCharacter } from './wormCharacterData.js';
@@ -2907,6 +2908,11 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     const wormGamePhase = useGameStore(s => s.wormGamePhase ?? 'scrambling');
     const wormPhaseReactive = useGameStore(s => s.wormPhase ?? 'crawling');
 
+    // Keep the feel layer's SFX/haptics channels in sync with the player's settings.
+    const sfxOn = useGameStore(s => s.settings?.sfx ?? true);
+    const hapticsOn = useGameStore(s => s.settings?.haptics ?? true);
+    useEffect(() => { setFeelEnabled({ sfx: sfxOn, haptics: hapticsOn }); }, [sfxOn, hapticsOn]);
+
     // ── Auto-rotation hazard state ─────────────────────────────────────────────
     const autoTimerRef      = useRef(0);
     const pendingRotRef     = useRef(null);   // {axis,dir,sliceIndex} during warning window
@@ -3029,13 +3035,14 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             const step = Math.floor(countdownTimerRef.current / COUNTDOWN_STEP_DURATION);
             if (step !== countdownStepRef.current) {
                 countdownStepRef.current = step;
-                if      (step === 0) useGameStore.setState({ wormCountdownStep: 3 });
-                else if (step === 1) useGameStore.setState({ wormCountdownStep: 2 });
-                else if (step === 2) useGameStore.setState({ wormCountdownStep: 1 });
+                if      (step === 0) { useGameStore.setState({ wormCountdownStep: 3 }); feel('countdownBeat'); }
+                else if (step === 1) { useGameStore.setState({ wormCountdownStep: 2 }); feel('countdownBeat'); }
+                else if (step === 2) { useGameStore.setState({ wormCountdownStep: 1 }); feel('countdownBeat'); }
                 else if (step === 3) {
                     // 'go' beat — HUD displays WORM! in the purple-glow countdown style.
                     // No separate ThunkEffect pop here; the HUD text IS the cool WORM display.
                     useGameStore.setState({ wormCountdownStep: 'go' });
+                    feel('countdownGo');
                 } else if (step >= 4) {
                     // Countdown done — release the worm
                     gameModePhaseRef.current = 'active';
@@ -3138,6 +3145,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                     worm.killWorm({ reason: 'slice-rotation', axis, sliceIndex });
                 } else {
                     cutWormTail(worm, hit.cutTrailIdx);
+                    feel('cut');
                 }
             }
 

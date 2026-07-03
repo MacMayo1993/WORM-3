@@ -290,6 +290,8 @@ export const DEFAULT_SETTINGS = {
   colorScheme: 'standard',
   customColors: null,
   backgroundTheme: 'blackhole',
+  sfx: true,
+  haptics: true,
   showStats: true,
   showManifoldFooter: true,
   showFaceProgress: true,
