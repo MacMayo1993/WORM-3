@@ -1,4 +1,5 @@
 import React from 'react';
+import { UI_FONT } from '../../utils/uiTheme.js';
 
 const panelStyle = {
   position: 'fixed',
@@ -11,7 +12,7 @@ const panelStyle = {
   background: 'rgba(160,152,140,0.60)',
   backdropFilter: 'blur(18px)',
   WebkitBackdropFilter: 'blur(18px)',
-  fontFamily: 'var(--ui-font, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif)',
+  fontFamily: UI_FONT,
   animation: 'modalBackdropIn 0.22s ease',
 };
 

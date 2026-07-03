@@ -8,10 +8,11 @@ import {
   updateTilePreview,
   unregisterTilePreview,
 } from '../../3d/TilePreviewRenderer.js';
+import { UI_FONT, PAPER_BACKDROP_BLUR, PAPER_BACKDROP } from '../../utils/uiTheme.js';
 
 const ACCENT = '#0891B2';
 const ACCENT_SHADOW = '#0e6985';
-const FONT = "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif";
+const FONT = UI_FONT;
 const TOUCH = { touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' };
 
 const SKINS   = getSkins();
@@ -181,8 +182,8 @@ const PreviewModal = ({ item, owned, pp, onClose, onBuy, onEquip }) => {
       style={{
         position: 'fixed', inset: 0, zIndex: 100000,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'rgba(160,152,140,0.72)',
-        backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
+        background: PAPER_BACKDROP,
+        backdropFilter: PAPER_BACKDROP_BLUR, WebkitBackdropFilter: PAPER_BACKDROP_BLUR,
       }}
       onClick={onClose}
     >

@@ -4,6 +4,7 @@
 
 import React from 'react';
 import { isMobile } from '../utils/device.js';
+import { UI_FONT } from '../utils/uiTheme.js';
 
 export default function PlatformerHUD({
   // Game state
@@ -197,7 +198,7 @@ const styles = {
     position: 'absolute', inset: 0,
     pointerEvents: 'none',
     zIndex: 100,
-    fontFamily: "'Courier New', monospace",
+    fontFamily: UI_FONT,
   },
   topBar: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -289,7 +290,7 @@ const styles = {
   },
   startButton: {
     marginTop: '20px', padding: '16px 40px',
-    fontSize: '16px', fontFamily: "'Courier New', monospace",
+    fontSize: '16px', fontFamily: UI_FONT,
     fontWeight: 'bold', letterSpacing: '0.1em',
     color: '#00ff88', background: 'rgba(0, 255, 136, 0.15)',
     border: '2px solid #00ff88', borderRadius: '8px',
@@ -301,7 +302,7 @@ const styles = {
   },
   btn: {
     padding: '12px 24px', fontSize: '14px',
-    fontFamily: "'Courier New', monospace", fontWeight: 'bold',
+    fontFamily: UI_FONT, fontWeight: 'bold',
     color: '#60a5fa', background: 'transparent',
     border: '2px solid #60a5fa', borderRadius: '6px',
     cursor: 'pointer', letterSpacing: '0.1em',

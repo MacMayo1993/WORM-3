@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { LEVELS, isLevelUnlocked, loadProgress } from '../../utils/levels.js';
+import { UI_FONT } from '../../utils/uiTheme.js';
 
 // We only track completion (not per-level star tiers), so a completed level
 // shows a full row of gold stars and the counter is derived from that.
@@ -44,7 +45,7 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
-      fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif',
+      fontFamily: UI_FONT,
       animation: 'lvSelIn 0.3s ease',
       padding: 'max(14px, env(safe-area-inset-top, 0px)) 14px max(14px, env(safe-area-inset-bottom, 0px))',
       boxSizing: 'border-box',

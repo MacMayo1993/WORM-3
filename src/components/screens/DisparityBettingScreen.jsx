@@ -4,6 +4,7 @@ import {
   BET_TYPES, FACE_INFO, ANTIPODAL_PAIRS, calcPayout, streakMultiplier,
 } from '../../utils/disparityBetting.js';
 import { BET_MIN, BET_MAX } from '../../utils/economyConstants.js';
+import { UI_FONT } from '../../utils/uiTheme.js';
 
 const ACCENT = '#C44B00';
 const ACCENT_SHADOW = '#7a2e00';
@@ -15,7 +16,7 @@ const S = {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     background: 'rgba(160,152,140,0.60)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)',
     padding: '12px',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif',
+    fontFamily: UI_FONT,
     animation: 'modalBackdropIn 0.22s ease',
     pointerEvents: 'auto',
   },
@@ -73,7 +74,7 @@ const S = {
   },
   hint: {
     fontSize: '12px', color: '#9a8e82',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif',
+    fontFamily: UI_FONT,
     textAlign: 'center',
   },
   primaryBtn: (enabled) => ({

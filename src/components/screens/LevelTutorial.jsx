@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { getNewFeatures } from '../../utils/levels.js';
+import { UI_FONT, GLASS_PANEL_DEEP, GLASS_PANEL } from '../../utils/uiTheme.js';
 
 /**
  * Level Tutorial — Mobi-driven level briefing.
@@ -141,7 +142,7 @@ const LevelTutorial = ({ level, onClose, onMainMenu }) => {
           display: 'inline-block',
         }}>
           <div style={{
-            background: 'rgba(2, 7, 20, 0.97)',
+            background: GLASS_PANEL_DEEP,
             height: NAMEPLATE_H,
             padding: '0 24px 0 14px',
             display: 'flex',
@@ -149,12 +150,12 @@ const LevelTutorial = ({ level, onClose, onMainMenu }) => {
             gap: '10px',
           }}>
             <span style={{
-              fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif',
+              fontFamily: UI_FONT,
               fontSize: 14, fontWeight: 700, letterSpacing: '0.1em',
               textTransform: 'uppercase', color: '#fff',
             }}>MOBI</span>
             <span style={{
-              fontFamily: 'system-ui, sans-serif',
+              fontFamily: UI_FONT,
               fontSize: 9, fontWeight: 600, letterSpacing: '0.15em',
               textTransform: 'uppercase', color: accentSolid, opacity: 0.9,
             }}>
@@ -173,7 +174,7 @@ const LevelTutorial = ({ level, onClose, onMainMenu }) => {
           left: 0,
           right: 0,
           minHeight: PANEL_H,
-          background: 'rgba(3, 7, 20, 0.93)',
+          background: GLASS_PANEL,
           backdropFilter: 'blur(12px)',
           WebkitBackdropFilter: 'blur(12px)',
           borderTop: `2px solid ${accent}`,
@@ -197,7 +198,7 @@ const LevelTutorial = ({ level, onClose, onMainMenu }) => {
         }}>
           <span style={{
             fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase',
-            color: accentSolid, opacity: 0.85, fontFamily: 'system-ui, sans-serif',
+            color: accentSolid, opacity: 0.85, fontFamily: UI_FONT,
           }}>
             {`${level.cubeSize}×${level.cubeSize}`} · {level.difficulty}
           </span>
@@ -205,7 +206,7 @@ const LevelTutorial = ({ level, onClose, onMainMenu }) => {
             <span key={i} style={{
               fontSize: 10, padding: '2px 8px', borderRadius: '5px',
               background: 'rgba(34, 197, 94, 0.14)', border: '1px solid rgba(34, 197, 94, 0.3)',
-              color: '#4ade80', fontFamily: 'system-ui, sans-serif', fontWeight: 600,
+              color: '#4ade80', fontFamily: UI_FONT, fontWeight: 600,
             }}>
               ✦ {feat}
             </span>
@@ -216,7 +217,7 @@ const LevelTutorial = ({ level, onClose, onMainMenu }) => {
         <div key={index} style={{ flex: 1, display: 'flex', alignItems: 'center', animation: 'ltTextFade 0.2s ease forwards' }}>
           <p style={{
             margin: 0,
-            fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif',
+            fontFamily: UI_FONT,
             fontSize: 'clamp(14px, 2.8vw, 18px)',
             fontWeight: 450,
             color: '#e6f2ff',
@@ -255,7 +256,7 @@ const LevelTutorial = ({ level, onClose, onMainMenu }) => {
                   background: 'none', border: '1px solid rgba(255,255,255,0.18)',
                   color: 'rgba(255,255,255,0.45)', fontSize: '11px', fontWeight: 500,
                   padding: '5px 12px', borderRadius: '4px', cursor: 'pointer',
-                  fontFamily: 'system-ui, sans-serif', letterSpacing: '0.06em', transition: 'all 0.15s',
+                  fontFamily: UI_FONT, letterSpacing: '0.06em', transition: 'all 0.15s',
                 }}
                 onMouseEnter={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.8)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.4)'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.45)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.18)'; }}
@@ -272,7 +273,7 @@ const LevelTutorial = ({ level, onClose, onMainMenu }) => {
                 color: isLast ? '#000e1a' : accentSolid,
                 fontSize: '12px', fontWeight: 700,
                 padding: '6px 22px', borderRadius: '4px', cursor: 'pointer',
-                fontFamily: 'system-ui, sans-serif', letterSpacing: '0.08em', textTransform: 'uppercase',
+                fontFamily: UI_FONT, letterSpacing: '0.08em', textTransform: 'uppercase',
                 boxShadow: isLast ? `0 0 18px ${accentSolid}99` : `0 0 8px ${accentSolid}33`,
                 transition: 'all 0.18s',
               }}

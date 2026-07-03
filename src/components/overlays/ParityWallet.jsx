@@ -7,8 +7,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useGameStore } from '../../hooks/useGameStore.js';
+import { UI_FONT } from '../../utils/uiTheme.js';
 
-const FONT = "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif";
+const FONT = UI_FONT;
 
 export default function ParityWallet({ dark = false }) {
   const parityPoints = useGameStore((s) => s.parityPoints);

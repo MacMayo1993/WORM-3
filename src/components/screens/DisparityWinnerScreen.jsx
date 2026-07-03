@@ -5,8 +5,9 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { FACE_COLORS } from '../../utils/constants.js';
+import { UI_FONT } from '../../utils/uiTheme.js';
 
-const FONT = "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif";
+const FONT = UI_FONT;
 
 // Extract face number from a gridId like "M3-007" → 3
 const faceNumFromGridId = (gridId) => {

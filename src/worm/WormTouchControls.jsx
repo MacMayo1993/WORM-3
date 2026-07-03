@@ -3,6 +3,7 @@
 // Swipe gestures trigger cube rotations, tap buttons for camera toggle
 
 import React, { useRef, useCallback, useState, useEffect } from 'react';
+import { UI_FONT } from '../utils/uiTheme.js';
 
 const SWIPE_THRESHOLD = 50; // Minimum swipe distance in pixels
 const SWIPE_TIMEOUT = 300;  // Max time for a swipe gesture
@@ -178,7 +179,7 @@ const styles = {
     borderRadius: '12px',
     border: '2px solid #00ff88',
     color: '#00ff88',
-    fontFamily: "'Courier New', monospace",
+    fontFamily: UI_FONT,
     fontSize: '14px',
     textAlign: 'center',
     pointerEvents: 'none',
@@ -205,7 +206,7 @@ const styles = {
     background: 'rgba(0, 20, 10, 0.8)',
     color: '#00ff88',
     fontSize: '14px',
-    fontFamily: "'Courier New', monospace",
+    fontFamily: UI_FONT,
     fontWeight: 'bold',
     cursor: 'pointer',
     display: 'flex',

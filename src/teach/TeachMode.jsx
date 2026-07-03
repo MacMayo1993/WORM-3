@@ -2,6 +2,7 @@
 // Teach Mode UI — Instructor panel with sub-modes: Guided, Demo, Quiz
 
 import React, { useState } from 'react';
+import { UI_FONT } from '../utils/uiTheme.js';
 
 // ─── Module-level style constants (never reallocated) ─────────────────────────
 const TABS_CONTAINER_STYLE = {
@@ -19,7 +20,7 @@ const WHYCARD_OUTER_BUTTON_STYLE = {
   padding: '7px 10px',
   background: 'none',
   border: 'none',
-  fontFamily: "'Courier New', monospace",
+  fontFamily: UI_FONT,
   fontSize: '11px',
   fontWeight: 'bold',
   cursor: 'pointer',
@@ -62,7 +63,7 @@ const TM_PANEL_STYLE = {
   zIndex: 600,
   display: 'flex',
   flexDirection: 'column',
-  fontFamily: "'Courier New', monospace",
+  fontFamily: UI_FONT,
   color: '#e0e0e0',
   overflowY: 'auto',
   WebkitOverflowScrolling: 'touch',
@@ -161,7 +162,7 @@ const SubModeTabs = ({ subMode, onSwitch }) => {
               border: `1px solid ${active ? 'rgba(0,217,255,0.6)' : 'rgba(255,255,255,0.1)'}`,
               background: active ? 'rgba(0,217,255,0.15)' : 'rgba(255,255,255,0.03)',
               color: active ? '#00d9ff' : 'rgba(255,255,255,0.4)',
-              fontFamily: "'Courier New', monospace",
+              fontFamily: UI_FONT,
               fontSize: '11px',
               fontWeight: active ? 'bold' : 'normal',
               cursor: 'pointer',
@@ -312,7 +313,7 @@ const QuizPanel = ({
               border: `1px solid ${borderColor}`,
               background: bgColor,
               color: labelColor,
-              fontFamily: "'Courier New', monospace",
+              fontFamily: UI_FONT,
               fontSize: '12px',
               textAlign: 'left',
               cursor: quizAnswered === null ? 'pointer' : 'default',
@@ -361,7 +362,7 @@ const QuizPanel = ({
               border: '1px solid rgba(0,217,255,0.35)',
               background: 'rgba(0,217,255,0.1)',
               color: '#00d9ff',
-              fontFamily: "'Courier New', monospace",
+              fontFamily: UI_FONT,
               fontSize: '12px',
               fontWeight: 'bold',
               cursor: 'pointer',
@@ -544,7 +545,7 @@ const AlgorithmCard = ({
                   color: canExecute ? '#00d9ff' : 'rgba(255,255,255,0.2)',
                   fontSize: '12px',
                   fontWeight: 'bold',
-                  fontFamily: "'Courier New', monospace",
+                  fontFamily: UI_FONT,
                   cursor: canExecute ? 'pointer' : 'default',
                   touchAction: 'manipulation',
                   WebkitTapHighlightColor: 'transparent',
@@ -567,7 +568,7 @@ const AlgorithmCard = ({
                 color: isPlaying ? '#ffa500' : '#00ff88',
                 fontSize: '12px',
                 fontWeight: 'bold',
-                fontFamily: "'Courier New', monospace",
+                fontFamily: UI_FONT,
                 cursor: 'pointer',
                 touchAction: 'manipulation',
                 WebkitTapHighlightColor: 'transparent',
@@ -587,7 +588,7 @@ const AlgorithmCard = ({
                 color: 'rgba(255,255,255,0.5)',
                 fontSize: '12px',
                 fontWeight: 'bold',
-                fontFamily: "'Courier New', monospace",
+                fontFamily: UI_FONT,
                 cursor: 'pointer',
                 touchAction: 'manipulation',
                 WebkitTapHighlightColor: 'transparent',

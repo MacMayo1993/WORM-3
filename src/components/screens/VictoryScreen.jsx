@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { VICTORY } from '../../utils/constants.js';
+import { UI_FONT, GLASS_PANEL } from '../../utils/uiTheme.js';
 
 /**
  * VictoryScreen — themed to match the dark "Mobi" UI (LevelTutorial / MobiIntro):
@@ -87,7 +88,7 @@ const VictoryScreen = ({
     padding: '11px 26px',
     borderRadius: '6px',
     cursor: 'pointer',
-    fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif',
+    fontFamily: UI_FONT,
     letterSpacing: '0.06em',
     textTransform: 'uppercase',
     boxShadow: `0 0 18px ${accent}66`,
@@ -105,7 +106,7 @@ const VictoryScreen = ({
     padding: '11px 22px',
     borderRadius: '6px',
     cursor: 'pointer',
-    fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif',
+    fontFamily: UI_FONT,
     letterSpacing: '0.04em',
     transition: 'all 0.18s',
   };
@@ -170,7 +171,7 @@ const VictoryScreen = ({
         padding: 'clamp(28px, 5vw, 40px)',
         maxHeight: 'calc(100dvh - 32px)',
         overflowY: 'auto',
-        background: 'rgba(3, 7, 20, 0.96)',
+        background: GLASS_PANEL,
         borderRadius: '16px',
         border: `1px solid ${accent}`,
         boxShadow: `0 24px 70px rgba(0,0,0,0.6), 0 0 60px ${accent}33`,
@@ -192,7 +193,7 @@ const VictoryScreen = ({
           fontWeight: 800,
           margin: '0 0 6px 0',
           color: accent,
-          fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif',
+          fontFamily: UI_FONT,
           letterSpacing: '0.01em',
           textShadow: `0 0 24px ${accent}55`
         }}>
@@ -205,7 +206,7 @@ const VictoryScreen = ({
           color: accent,
           opacity: 0.85,
           margin: '0 0 18px 0',
-          fontFamily: 'system-ui, sans-serif',
+          fontFamily: UI_FONT,
           fontWeight: 700,
           letterSpacing: '0.18em',
           textTransform: 'uppercase'
@@ -219,7 +220,7 @@ const VictoryScreen = ({
           color: '#cfe6f2',
           margin: '0 0 22px 0',
           lineHeight: 1.6,
-          fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif'
+          fontFamily: UI_FONT
         }}>
           {levelWinMessage || config.description}
         </p>
@@ -238,7 +239,7 @@ const VictoryScreen = ({
               fontSize: '11px',
               fontWeight: 700,
               color: accent,
-              fontFamily: 'system-ui, sans-serif',
+              fontFamily: UI_FONT,
               textTransform: 'uppercase',
               letterSpacing: '0.12em'
             }}>
@@ -266,11 +267,11 @@ const VictoryScreen = ({
               <div style={{
                 fontSize: '10px', textTransform: 'uppercase', color: 'rgba(255,255,255,0.45)',
                 letterSpacing: '0.12em', marginBottom: '6px', fontWeight: 700,
-                fontFamily: 'system-ui, sans-serif'
+                fontFamily: UI_FONT
               }}>{stat.label}</div>
               <div style={{
                 fontSize: '26px', fontWeight: 800, color: '#fff',
-                fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif'
+                fontFamily: UI_FONT
               }}>{stat.value}</div>
             </div>
           ))}
@@ -322,7 +323,7 @@ const VictoryScreen = ({
               style={{
                 background: 'transparent', border: 'none', cursor: 'pointer',
                 color: 'rgba(255,255,255,0.4)', fontSize: '12px', padding: '4px 8px',
-                fontFamily: 'system-ui, sans-serif', letterSpacing: '0.04em'
+                fontFamily: UI_FONT, letterSpacing: '0.04em'
               }}
               onMouseEnter={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.75)'; }}
               onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.4)'; }}
@@ -346,7 +347,7 @@ const VictoryScreen = ({
               fontSize: '13px',
               color: '#ffd9b0',
               fontWeight: 600,
-              fontFamily: 'system-ui, sans-serif'
+              fontFamily: UI_FONT
             }}>
               You discovered the SECRET WORM VICTORY!<br/>
               <span style={{ fontSize: '11px', fontWeight: 400, opacity: 0.85 }}>

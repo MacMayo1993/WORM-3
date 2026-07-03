@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { FACE_COLORS } from '../../utils/constants.js';
+import { UI_FONT } from '../../utils/uiTheme.js';
 
 const FACE_NAMES = { 1: 'RED', 2: 'GREEN', 3: 'WHITE', 4: 'ORANGE', 5: 'BLUE', 6: 'YELLOW' };
 const FACE_ELIMINATION_LIFETIME = 2500; // ms to show the face elimination banner
@@ -33,7 +34,7 @@ const FACE_ELIM_BANNER_STYLE = {
   border: `1.5px solid ${CLEAN_CARD.border}`,
   borderRadius: '12px',
   padding: '8px 14px',
-  fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif",
+  fontFamily: UI_FONT,
   textAlign: 'center',
   backdropFilter: 'blur(18px)',
   marginBottom: '4px',
@@ -50,7 +51,7 @@ const FACE_ELIM_LABEL_STYLE = {
 const ALIVE_COUNT_BASE_STYLE = {
   borderRadius: '12px',
   padding: '8px 14px',
-  fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif",
+  fontFamily: UI_FONT,
   display: 'flex',
   alignItems: 'baseline',
   gap: '6px',
@@ -85,7 +86,7 @@ const WINNER_STYLE = {
   borderRadius: '12px',
   padding: '12px 18px',
   color: '#FFD700',
-  fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif",
+  fontFamily: UI_FONT,
   fontSize: '13px',
   fontWeight: 'bold',
   textAlign: 'center',
@@ -330,7 +331,7 @@ const DEATH_ENTRY_BASE_STYLE = {
   borderRadius: '10px',
   padding: '4px 10px',
   color: '#b91c1c',
-  fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif",
+  fontFamily: UI_FONT,
   fontSize: '11px',
   backdropFilter: 'blur(18px)',
   whiteSpace: 'nowrap',

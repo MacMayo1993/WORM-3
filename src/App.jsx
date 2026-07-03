@@ -58,6 +58,7 @@ import {
   MOBI_LINES_TEACH, MOBI_LINES_HOLONOMY, MOBI_LINES_COOP,
   MOBI_LINES_BIOME, MOBI_LINES_MERGE, MOBI_LINES_CHAOS,
 } from './components/screens/MobiIntroScreen.jsx';
+import { UI_FONT } from './utils/uiTheme.js';
 const ParityStoreScreen = React.lazy(() => import('./components/screens/ParityStoreScreen.jsx'));
 const GameScene = React.lazy(() => import('./3d/GameScene.jsx'));
 const UILayer = React.lazy(() => import('./components/UILayer.jsx'));
@@ -1327,7 +1328,7 @@ export default function WORM3() {
 
   if (coopMode) {
     return (
-      <Suspense fallback={<div style={{ background: '#000', width: '100vw', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#60a5fa', fontFamily: "'Courier New', monospace" }}>Loading Co-op Crawler...</div>}>
+      <Suspense fallback={<div style={{ background: '#000', width: '100vw', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#60a5fa', fontFamily: UI_FONT }}>Loading Co-op Crawler...</div>}>
         <PlatformerWormMode
           cubies={cubies}
           size={size}
@@ -1438,7 +1439,7 @@ export default function WORM3() {
             top: '4px',
             left: '6px',
             fontSize: '9px',
-            fontFamily: "'Courier New', monospace",
+            fontFamily: UI_FONT,
             fontWeight: 700,
             letterSpacing: '0.1em',
             color: 'rgba(0, 217, 255, 0.85)',

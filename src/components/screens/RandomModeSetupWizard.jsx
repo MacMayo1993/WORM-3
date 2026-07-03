@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { BACKGROUNDS, getBackgroundUrl } from '../../utils/backgrounds.js';
+import { UI_FONT } from '../../utils/uiTheme.js';
 
 const BG_PREVIEWS = {
   blackhole: 'radial-gradient(circle, #1a0033 0%, #000000 100%)',
@@ -50,7 +51,7 @@ const S = {
   overlay: {
     position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
     background: 'rgba(160,152,140,0.60)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)',
-    zIndex: 1000, fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif',
+    zIndex: 1000, fontFamily: UI_FONT,
     animation: 'modalBackdropIn 0.22s ease',
   },
   sheet: {

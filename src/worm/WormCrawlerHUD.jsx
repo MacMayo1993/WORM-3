@@ -14,6 +14,7 @@ import { callWormTurn } from './wormTurnBridge.js';
 import { BOOST_COOLDOWN } from './healerWorm/constants.js';
 import { MenuTitleCard } from '../components/menus/MainMenu.jsx';
 import DeathScreen from './DeathScreens.jsx';
+import { UI_FONT, DISPLAY_FONT } from '../utils/uiTheme.js';
 
 const PHASE_META = {
     crawling: { label: 'CRAWLING', faceId: 2 },
@@ -46,7 +47,7 @@ const colorDistance = (a, b) => {
 
 // ─── Style constants ─────────────────────────────────────────────────────────
 
-const FONT = "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif";
+const FONT = UI_FONT;
 const SHADOW = '0 4px 16px rgba(15, 23, 42, 0.18)';
 const BORDER = 'rgba(15, 23, 42, 0.12)';
 const PANEL_BG = 'rgba(255, 255, 255, 0.92)';
@@ -369,7 +370,7 @@ const WINNER_STARS_STYLE = {
 };
 
 const WINNER_TITLE_STYLE = {
-    fontFamily: "'Impact', 'Arial Black', sans-serif",
+    fontFamily: DISPLAY_FONT,
     fontSize: 'clamp(52px, 11vw, 96px)', fontWeight: 900, letterSpacing: '-2px',
     color: '#ffdd00',
     textShadow: '-4px -4px 0 #cc2200, 4px -4px 0 #cc2200, -4px 4px 0 #cc2200, 4px 4px 0 #cc2200, 0 0 40px rgba(255,221,0,0.5)',
@@ -397,7 +398,7 @@ const WINNER_STAT_LABEL_STYLE = {
 const WINNER_STAT_VALUE_STYLE = { fontSize: 20, fontWeight: 800, color: '#fff', lineHeight: 1.1 };
 
 const WINNER_PP_STYLE = {
-    fontFamily: "'Impact', 'Arial Black', sans-serif",
+    fontFamily: DISPLAY_FONT,
     fontSize: 'clamp(28px, 6vw, 44px)', color: '#c4b5fd', letterSpacing: '-1px',
     textShadow: '-2px -2px 0 #5b21b6, 2px -2px 0 #5b21b6, -2px 2px 0 #5b21b6, 2px 2px 0 #5b21b6',
     marginBottom: 6, textAlign: 'center',
@@ -442,7 +443,7 @@ const PODIUM_BASE_STYLE = {
 };
 
 const PODIUM_LABEL_STYLE = {
-    fontFamily: "'Impact', 'Arial Black', sans-serif",
+    fontFamily: DISPLAY_FONT,
     fontSize: 18, fontWeight: 900, color: '#3d2000', letterSpacing: 2,
     textShadow: '0 1px 0 rgba(255,255,255,0.3)',
 };

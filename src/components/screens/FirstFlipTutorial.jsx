@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { FACE_COLORS } from '../../utils/constants.js';
+import { UI_FONT, GLASS_PANEL, GLASS_BACKDROP } from '../../utils/uiTheme.js';
 
-const FONT = "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif";
+const FONT = UI_FONT;
 
 const steps = [
   {
@@ -121,7 +122,7 @@ const FirstFlipTutorial = ({ onClose, onMainMenu }) => {
     <div style={{
       position: 'fixed',
       inset: 0,
-      background: 'rgba(6, 8, 22, 0.80)',
+      background: GLASS_BACKDROP,
       backdropFilter: 'blur(24px)',
       display: 'flex',
       justifyContent: 'center',
@@ -133,7 +134,7 @@ const FirstFlipTutorial = ({ onClose, onMainMenu }) => {
       boxSizing: 'border-box',
     }}>
       <div style={{
-        background: 'rgba(10, 12, 30, 0.96)',
+        background: GLASS_PANEL,
         border: '1px solid rgba(255, 255, 255, 0.10)',
         borderRadius: '20px',
         padding: '32px 36px',

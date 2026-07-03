@@ -169,3 +169,4 @@ import { COLORS, ANTIPODAL_COLOR, DIR_VECTORS } from './utils/constants.js';
 - Animations use both GSAP and requestAnimationFrame
 - Mobile support is built-in with touch controls (`MobileControls.jsx`) and responsive layout
 - Cube sizes range from 2×2 to 5×5, configurable per level
+- **UI theme**: shared tokens live in `src/utils/uiTheme.js` — `UI_FONT` (body text, mirrors `--ui-font` in App.css), `DISPLAY_FONT` (Bungee, big titles), `PAPER_*` (cream setup-modal family: wizards, store, help), `GLASS_*` (dark navy in-game overlay family: tutorials, victory, HUD cards). Import these instead of hardcoding font stacks or panel colors; bare `monospace` is reserved for manifold grid IDs and algorithm notation

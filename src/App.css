@@ -61,7 +61,7 @@ body {
 
 body {
   background: #000000;
-  font-family: 'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--ui-font);
 }
 
 .full-screen {
@@ -76,7 +76,7 @@ body {
   overflow: hidden;
   background: #000000;
   color: var(--text-primary);
-  font-family: 'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--ui-font);
   position: relative;
   box-sizing: border-box;
 }
@@ -117,7 +117,7 @@ body {
   border-radius: 12px;
   backdrop-filter: blur(12px);
   box-shadow: var(--shadow-md);
-  font-family: 'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--ui-font);
 }
 
 /* ========================================
@@ -524,7 +524,7 @@ button:focus-visible,
   cursor: pointer;
   transition: all 0.2s ease;
   font-size: 13px;
-  font-family: 'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--ui-font);
   font-weight: 500;
   letter-spacing: 0.02em;
   border-radius: 8px;
@@ -717,7 +717,7 @@ button:focus-visible,
   backdrop-filter: blur(24px);
   box-shadow: 0 32px 80px rgba(0, 0, 0, 0.60), 0 0 0 1px rgba(255, 255, 255, 0.06);
   color: #e8edf8;
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+  font-family: var(--ui-font);
 }
 
 .tutorial-actions {
@@ -733,7 +733,7 @@ button:focus-visible,
   color: #ffffff;
   cursor: pointer;
   font-weight: 700;
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+  font-family: var(--ui-font);
   font-size: 12px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -788,7 +788,7 @@ button:focus-visible,
   flex-direction: column;
   justify-content: space-between;
   padding: 40px;
-  font-family: 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--ui-font);
 }
 
 .intro-messages {
@@ -841,7 +841,7 @@ button:focus-visible,
   font-weight: 700;
   font-style: normal;
   letter-spacing: 0.05em;
-  font-family: 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--ui-font);
   filter: drop-shadow(0 4px 12px rgba(59, 130, 246, 0.4));
 }
 
@@ -853,7 +853,7 @@ button:focus-visible,
   text-transform: uppercase;
   font-style: normal;
   font-weight: 400;
-  font-family: 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--ui-font);
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
 }
 
@@ -862,7 +862,7 @@ button:focus-visible,
   color: rgba(255, 255, 255, 0.8);
   font-size: 16px;
   letter-spacing: 0.01em;
-  font-family: 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--ui-font);
   font-style: normal;
   font-weight: 400;
 }
@@ -881,7 +881,7 @@ button:focus-visible,
   background: rgba(50, 60, 80, 0.8);
   border: 1px solid rgba(255, 255, 255, 0.15);
   color: rgba(255, 255, 255, 0.9);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--ui-font);
   font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.05em;
@@ -1311,7 +1311,7 @@ button:focus-visible,
 }
 
 .net-panel-title {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--ui-font);
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.12em;
@@ -1513,7 +1513,7 @@ button:focus-visible,
   color: #ffffff;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  font-family: 'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--ui-font);
   text-shadow:
     -1px -1px 0 #000,
     1px -1px 0 #000,
@@ -1585,7 +1585,7 @@ button:focus-visible,
 .settings-radio-label {
   font-size: 14px;
   color: rgba(255, 255, 255, 0.87);
-  font-family: 'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--ui-font);
 }
 
 .scheme-preview {
@@ -1667,7 +1667,7 @@ button:focus-visible,
   background: rgba(255, 255, 255, 0.04);
   color: rgba(255, 255, 255, 0.7);
   font-size: 12px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--ui-font);
   cursor: pointer;
   transition: all 0.15s ease;
   letter-spacing: 0.03em;
@@ -1779,7 +1779,7 @@ button:focus-visible,
   margin: 0 0 10px;
   font-size: 11px;
   color: rgba(255, 255, 255, 0.55);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--ui-font);
 }
 
 /* Tile Style Grid */
@@ -1825,7 +1825,7 @@ button:focus-visible,
   border-radius: 4px;
   color: rgba(255, 255, 255, 0.9);
   cursor: pointer;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--ui-font);
 }
 
 .tile-style-select:hover {
@@ -1883,7 +1883,7 @@ button:focus-visible,
 .color-picker-label {
   font-size: 10px;
   color: rgba(255, 255, 255, 0.65);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--ui-font);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -1912,7 +1912,7 @@ button:focus-visible,
 .toggle-label {
   font-size: 14px;
   color: rgba(255, 255, 255, 0.87);
-  font-family: 'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--ui-font);
 }
 
 .toggle-switch {
@@ -1963,7 +1963,7 @@ button:focus-visible,
   color: rgba(255, 255, 255, 0.55);
   font-size: 12px;
   font-weight: 600;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--ui-font);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   padding: 10px 4px 9px;
@@ -2034,7 +2034,7 @@ button:focus-visible,
   font-size: 10px;
   font-weight: 500;
   color: rgba(255, 255, 255, 0.8);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--ui-font);
   line-height: 1.2;
 }
 
@@ -2114,7 +2114,7 @@ button:focus-visible,
   border-radius: 6px;
   color: rgba(255, 255, 255, 0.85);
   cursor: pointer;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--ui-font);
   transition: border-color 0.15s ease;
 }
 
@@ -2181,7 +2181,7 @@ button:focus-visible,
   padding: 12px 20px;
   color: rgba(255, 255, 255, 0.85);
   font-size: 13px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--ui-font);
   text-align: center;
   backdrop-filter: blur(12px);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
@@ -2374,7 +2374,7 @@ select.locked:hover {
 }
 
 .level-badge-name {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--ui-font);
   font-size: 12px;
   color: rgba(255, 255, 255, 0.7);
   text-transform: uppercase;
@@ -2737,7 +2737,7 @@ select.btn-compact:disabled {
   font-size: 26px;
   font-weight: 700;
   color: #1e1e18;
-  font-family: 'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--ui-font);
   letter-spacing: 0.4px;
   text-shadow: 1px 1px 0 rgba(255, 255, 255, 0.55);
 }
@@ -2746,7 +2746,7 @@ select.btn-compact:disabled {
   margin: 0;
   font-size: 13px;
   color: #58584e;
-  font-family: 'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--ui-font);
 }
 
 /* Screen area: recessed LCD panel */
@@ -2817,7 +2817,7 @@ select.btn-compact:disabled {
   font-weight: 600;
   color: #1e1e18;
   text-align: center;
-  font-family: 'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--ui-font);
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
@@ -2852,7 +2852,7 @@ select.btn-compact:disabled {
   padding: 11px 20px;
   font-size: 14px;
   font-weight: 700;
-  font-family: 'Roboto', 'Product Sans', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--ui-font);
   border: none;
   border-radius: 6px;
   cursor: pointer;

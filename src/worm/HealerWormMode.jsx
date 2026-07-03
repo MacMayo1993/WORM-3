@@ -57,6 +57,7 @@ import { rideLiveRotation, getSliceSurfaceStickers, _parseTile, checkWormHitBySl
 import { useWormCrawler } from './useWormCrawler.js';
 import WormChaseCamera from './WormChaseCamera.jsx';
 import WormSwipeControls from './WormSwipeControls.jsx';
+import { UI_FONT, DISPLAY_FONT } from '../utils/uiTheme.js';
 
 
 
@@ -1712,7 +1713,7 @@ function TunnelHealProgress({ size }) {
                             justifyContent: 'center',
                             fontSize: _isMobile ? '15px' : '13px',
                             fontWeight: 900,
-                            fontFamily: "'Arial Rounded MT Bold', 'Nunito', Arial, sans-serif",
+                            fontFamily: UI_FONT,
                             border: '2.5px solid #ffffff',
                             boxShadow: `0 0 10px ${color}, 0 2px 6px rgba(0,0,0,0.5)`,
                             lineHeight: 1,
@@ -2844,7 +2845,7 @@ function ThunkEffect({ thunkRef }) {
             <group ref={groupRef} visible={false}>
                 <Html center distanceFactor={10}>
                     <div ref={divRef} style={{
-                        fontFamily: "'Impact', 'Arial Black', sans-serif",
+                        fontFamily: DISPLAY_FONT,
                         fontSize: '54px',
                         fontWeight: 900,
                         color: '#ffdd00',

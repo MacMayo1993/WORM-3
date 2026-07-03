@@ -5,6 +5,7 @@ import { BACKGROUNDS, getBackgroundUrl } from '../../utils/backgrounds.js';
 import { registerTilePreview, updateTilePreview, unregisterTilePreview } from '../../3d/TilePreviewRenderer.js';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { extractColorsFromImage } from '../../utils/colorExtraction.js';
+import { UI_FONT } from '../../utils/uiTheme.js';
 
 const BG_PREVIEWS = {
   blackhole: 'radial-gradient(circle, #1a0033 0%, #000000 100%)',
@@ -83,7 +84,7 @@ const S = {
     backdropFilter: 'blur(18px)',
     WebkitBackdropFilter: 'blur(18px)',
     zIndex: 1000,
-    fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif',
+    fontFamily: UI_FONT,
     animation: 'modalBackdropIn 0.22s ease',
   },
 

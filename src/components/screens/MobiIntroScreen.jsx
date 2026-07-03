@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { UI_FONT, GLASS_PANEL_DEEP, GLASS_PANEL } from '../../utils/uiTheme.js';
 
 // ── Dialogue banks ────────────────────────────────────────────────────────────
 
@@ -259,7 +260,7 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
         }}>
           {/* Inner layer = fill */}
           <div style={{
-            background: 'rgba(2, 7, 20, 0.97)',
+            background: GLASS_PANEL_DEEP,
             height: NAMEPLATE_H,
             padding: '0 22px 0 14px',
             display: 'flex',
@@ -267,7 +268,7 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
             gap: '10px',
           }}>
             <span style={{
-              fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif',
+              fontFamily: UI_FONT,
               fontSize: 14,
               fontWeight: 700,
               letterSpacing: '0.1em',
@@ -277,7 +278,7 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
               MOBI
             </span>
             <span style={{
-              fontFamily: 'system-ui, sans-serif',
+              fontFamily: UI_FONT,
               fontSize: 9,
               fontWeight: 600,
               letterSpacing: '0.15em',
@@ -299,7 +300,7 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
           left: 0,
           right: 0,
           minHeight: PANEL_H,
-          background: 'rgba(3, 7, 20, 0.92)',
+          background: GLASS_PANEL,
           backdropFilter: 'blur(12px)',
           WebkitBackdropFilter: 'blur(12px)',
           borderTop: `2px solid ${accent}`,
@@ -330,7 +331,7 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
         >
           <p style={{
             margin: 0,
-            fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif',
+            fontFamily: UI_FONT,
             fontSize: 'clamp(14px, 2.8vw, 18px)',
             fontWeight: '450',
             color: '#e6f2ff',
@@ -378,7 +379,7 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
                 padding: '5px 12px',
                 borderRadius: '4px',
                 cursor: 'pointer',
-                fontFamily: 'system-ui, sans-serif',
+                fontFamily: UI_FONT,
                 letterSpacing: '0.06em',
                 transition: 'all 0.15s',
               }}
@@ -400,7 +401,7 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
                 padding: '5px 20px',
                 borderRadius: '4px',
                 cursor: 'pointer',
-                fontFamily: 'system-ui, sans-serif',
+                fontFamily: UI_FONT,
                 letterSpacing: '0.08em',
                 textTransform: 'uppercase',
                 boxShadow: isLast ? `0 0 18px ${accentSolid}99` : `0 0 8px ${accentSolid}33`,
