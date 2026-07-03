@@ -1219,11 +1219,14 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
 };
 
 // ─── Start button ─────────────────────────────────────────────────────────────
+const FEEDBACK_URL = 'https://docs.google.com/forms/d/e/1FAIpQLScYKKOXc6c3vdqpmWWv0J3lMd90-GOfp0TxxxHelxjIjMdrvw/viewform';
+
 const MenuStartButton = ({ visible, onClick }) => (
   <div style={{
     position: 'absolute', bottom: 0, left: 0, right: 0,
     paddingBottom: 'max(120px, env(safe-area-inset-bottom, 120px))',
-    display: 'flex', justifyContent: 'center', alignItems: 'center',
+    display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
+    gap: '14px',
     opacity: visible ? 1 : 0,
     transform: visible ? 'none' : 'translateY(16px)',
     transition: 'opacity 0.55s ease 0.1s, transform 0.55s cubic-bezier(0.22,1,0.36,1) 0.1s',
@@ -1234,6 +1237,25 @@ const MenuStartButton = ({ visible, onClick }) => (
       className="worm-tactile-btn"
       onClick={onClick}
     >START</button>
+    <button
+      type="button"
+      onClick={() => window.open(FEEDBACK_URL, '_blank', 'noopener,noreferrer')}
+      style={{
+        background: 'transparent',
+        border: '1px solid rgba(120, 160, 255, 0.18)',
+        borderRadius: '10px',
+        padding: '7px 18px',
+        color: 'rgba(200, 220, 255, 0.5)',
+        fontSize: '12px',
+        fontWeight: 600,
+        fontFamily: UI_FONT,
+        letterSpacing: '0.06em',
+        cursor: 'pointer',
+        transition: 'color 0.2s, border-color 0.2s',
+      }}
+      onMouseEnter={(e) => { e.target.style.color = 'rgba(200, 220, 255, 0.8)'; e.target.style.borderColor = 'rgba(120, 160, 255, 0.35)'; }}
+      onMouseLeave={(e) => { e.target.style.color = 'rgba(200, 220, 255, 0.5)'; e.target.style.borderColor = 'rgba(120, 160, 255, 0.18)'; }}
+    >Give Feedback</button>
   </div>
 );
 
