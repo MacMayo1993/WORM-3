@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { COLORS } from '../../utils/constants.js';
+import { UI_FONT } from '../../utils/uiTheme.js';
 
 const Tutorial = ({ onClose, onMainMenu }) => {
   const [step, setStep] = useState(1);
@@ -177,11 +178,11 @@ const Tutorial = ({ onClose, onMainMenu }) => {
   return (
     <div className="tutorial-overlay">
       <div className="tutorial-card" style={{ maxWidth: '620px' }}>
-        <h2 style={{ marginBottom: '4px', color: '#e8edf8', fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif', fontWeight: 800, letterSpacing: '-0.01em' }}>{currentStep.title}</h2>
-        <div style={{ fontSize: '11px', color: 'rgba(200, 220, 255, 0.50)', marginBottom: '16px', letterSpacing: '0.12em', textTransform: 'uppercase', fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif' }}>
+        <h2 style={{ marginBottom: '4px', color: '#e8edf8', fontFamily: UI_FONT, fontWeight: 800, letterSpacing: '-0.01em' }}>{currentStep.title}</h2>
+        <div style={{ fontSize: '11px', color: 'rgba(200, 220, 255, 0.50)', marginBottom: '16px', letterSpacing: '0.12em', textTransform: 'uppercase', fontFamily: UI_FONT }}>
           Step {step} of {totalSteps}
         </div>
-        <div style={{ fontSize: '14px', lineHeight: '1.65', color: 'rgba(200, 220, 255, 0.88)', fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif' }}>
+        <div style={{ fontSize: '14px', lineHeight: '1.65', color: 'rgba(200, 220, 255, 0.88)', fontFamily: UI_FONT }}>
           {currentStep.content}
         </div>
         <div className="tutorial-actions" style={{ marginTop: '20px' }}>

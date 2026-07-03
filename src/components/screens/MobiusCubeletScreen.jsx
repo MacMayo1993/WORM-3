@@ -9,6 +9,7 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Environment } from '@react-three/drei';
 import MobiusCubelet from '../../3d/MobiusCubelet.jsx';
+import { UI_FONT, GLASS_PANEL } from '../../utils/uiTheme.js';
 
 // Antipodal pair legend entries
 const LEGEND = [
@@ -41,7 +42,7 @@ function LegendRow({ colorA, colorB, label, sub }) {
             fontSize: '13px',
             fontWeight: 700,
             color: 'rgba(220,235,255,0.90)',
-            fontFamily: "-apple-system, 'SF Pro Text', system-ui, sans-serif",
+            fontFamily: UI_FONT,
           }}
         >
           {label}
@@ -50,7 +51,7 @@ function LegendRow({ colorA, colorB, label, sub }) {
           style={{
             fontSize: '11px',
             color: 'rgba(160,190,255,0.50)',
-            fontFamily: "-apple-system, 'SF Pro Text', system-ui, sans-serif",
+            fontFamily: UI_FONT,
             marginTop: '2px',
           }}
         >
@@ -81,7 +82,7 @@ export default function MobiusCubeletScreen({ onBack }) {
         position: 'fixed',
         inset: 0,
         zIndex: 9999,
-        background: 'rgba(3,5,15,0.96)',
+        background: GLASS_PANEL,
         backdropFilter: 'blur(24px)',
         WebkitBackdropFilter: 'blur(24px)',
         display: 'flex',
@@ -117,7 +118,7 @@ export default function MobiusCubeletScreen({ onBack }) {
             color: 'rgba(180,210,255,0.75)',
             fontSize: '13px',
             fontWeight: 600,
-            fontFamily: "-apple-system, 'SF Pro Text', system-ui, sans-serif",
+            fontFamily: UI_FONT,
             flexShrink: 0,
           }}
           onMouseEnter={e => { e.currentTarget.style.background = 'rgba(120,160,255,0.15)'; }}
@@ -136,7 +137,7 @@ export default function MobiusCubeletScreen({ onBack }) {
               margin: 0,
               fontSize: 'clamp(20px, 5vw, 30px)',
               fontWeight: 900,
-              fontFamily: "'Courier New', monospace",
+              fontFamily: UI_FONT,
               letterSpacing: '0.03em',
               background: 'linear-gradient(100deg,#ef4444 0%,#f97316 30%,#3b82f6 65%,#eab308 100%)',
               WebkitBackgroundClip: 'text',
@@ -151,7 +152,7 @@ export default function MobiusCubeletScreen({ onBack }) {
               margin: '4px 0 0',
               fontSize: '12px',
               color: 'rgba(160,190,255,0.50)',
-              fontFamily: "-apple-system, 'SF Pro Text', system-ui, sans-serif",
+              fontFamily: UI_FONT,
               lineHeight: 1.4,
             }}
           >
@@ -212,7 +213,7 @@ export default function MobiusCubeletScreen({ onBack }) {
               transform: 'translateX(-50%)',
               fontSize: '11px',
               color: 'rgba(140,170,255,0.40)',
-              fontFamily: "-apple-system, 'SF Pro Text', system-ui, sans-serif",
+              fontFamily: UI_FONT,
               letterSpacing: '0.08em',
               pointerEvents: 'none',
             }}
@@ -239,7 +240,7 @@ export default function MobiusCubeletScreen({ onBack }) {
             letterSpacing: '0.16em',
             textTransform: 'uppercase',
             color: 'rgba(140,170,255,0.40)',
-            fontFamily: "-apple-system, 'SF Pro Text', system-ui, sans-serif",
+            fontFamily: UI_FONT,
             marginBottom: '4px',
           }}
         >

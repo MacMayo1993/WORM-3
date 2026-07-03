@@ -9,6 +9,7 @@ import React, { useMemo } from 'react';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { calculateEchoSync } from '../../game/antipodalMode.js';
+import { UI_FONT } from '../../utils/uiTheme.js';
 
 // ─── Static style constants ───────────────────────────────────────────────────
 const CONTAINER_STYLE = {
@@ -20,7 +21,7 @@ const CONTAINER_STYLE = {
   borderRadius: '8px',
   padding: '12px 16px',
   color: '#e5e7eb',
-  fontFamily: "'Courier New', monospace",
+  fontFamily: UI_FONT,
   fontSize: '12px',
   zIndex: 200,
   backdropFilter: 'blur(8px)',

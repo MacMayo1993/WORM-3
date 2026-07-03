@@ -4,9 +4,10 @@
 //   compact=false — standalone floating panel (legacy, used on desktop)
 
 import React from 'react';
+import { UI_FONT } from '../utils/uiTheme.js';
 
 const FACE_ORDER = [1, 2, 3, 4, 5, 6];
-const FONT = "'Courier New', monospace";
+const FONT = UI_FONT;
 
 const OrbCoin = ({ color, count, coinSize, fontSize }) => (
   <div
