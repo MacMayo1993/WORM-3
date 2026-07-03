@@ -12,7 +12,7 @@ import { vibrate } from '../../utils/audio.js';
 import MenuFlipWave from './MenuFlipWave.jsx';
 import MenuTileOverlay from './MenuTileOverlay.jsx';
 import { ANTIPODAL_COLOR } from '../../utils/constants.js';
-import { UI_FONT, GLASS_PANEL, DISPLAY_FONT } from '../../utils/uiTheme.js';
+import { UI_FONT, GLASS_PANEL, GLASS_PANEL_BORDER, GLASS_TEXT, DISPLAY_FONT } from '../../utils/uiTheme.js';
 
 // ─── Randomizable style state — re-picked every time the user taps the cube ──
 // biome is now included so its face palette appears in the rotation.
@@ -787,7 +787,7 @@ const CAROUSEL_MODES = [
     controls: ['Worm follows your cursor or touch', 'Healed tiles restore the cube face', 'Collect orbs scattered across faces', 'Avoid flipped chaos tiles'],
   },
   {
-    id: 'freeplay', label: 'CUBE', tileColor: '#eab308', textColor: 'rgba(0,0,0,0.80)',
+    id: 'freeplay', label: 'CUBE', tileColor: '#eab308', textColor: '#fff',
     desc: "Classic Rubik's cube solving — your cube, your rules.",
     controls: ['Pick cube size 2×2 through 5×5', 'Choose color scheme and tile style', 'Drag face edges to rotate slices', 'Solve at your own pace'],
   },
@@ -1083,7 +1083,9 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
           style={{
             width: 'min(360px, 92vw)',
             borderRadius: '22px', overflow: 'hidden',
-            background: mode.tileColor,
+            // Glossy candy sheen — a diagonal light→dark glaze over the face color gives the
+            // flat tile depth without needing per-color math.
+            background: `linear-gradient(157deg, rgba(255,255,255,0.20), rgba(0,0,0,0.08) 52%, rgba(0,0,0,0.24)), ${mode.tileColor}`,
             boxShadow: 'inset 0 -8px 20px rgba(0,0,0,0.40), inset 4px 4px 16px rgba(255,255,255,0.18), 0 8px 32px rgba(0,0,0,0.50)',
             padding: '36px 20px', textAlign: 'center',
             opacity, transition: 'opacity 160ms ease',
@@ -1105,7 +1107,7 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
           }}
           onMouseLeave={() => { mouseStartX.current = null; }}
         >
-          <div style={{ fontSize: 'clamp(28px,8vw,44px)', fontWeight: 900, fontFamily: DISPLAY_FONT, color: mode.textColor, lineHeight: 1, textShadow: '0 2px 8px rgba(0,0,0,0.35)' }}>
+          <div style={{ fontSize: 'clamp(28px,8vw,44px)', fontWeight: 900, fontFamily: DISPLAY_FONT, color: mode.textColor, lineHeight: 1, textShadow: '0 2px 10px rgba(0,0,0,0.45), 0 1px 2px rgba(0,0,0,0.40)' }}>
             {mode.label}
           </div>
           <p style={{ margin: '10px 0 0', fontSize: '13px', lineHeight: 1.5, fontFamily: MENU_FONT, color: mode.textColor === '#fff' ? 'rgba(255,255,255,0.80)' : 'rgba(0,0,0,0.65)' }}>
@@ -1160,12 +1162,22 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
             </div>
           )}
 
-          <div style={{ marginTop: '12px', borderRadius: '16px', background: '#ffffff', padding: '14px 16px 16px' }}>
-            <p style={{ margin: '0 0 10px', fontSize: '9px', fontWeight: 800, letterSpacing: '0.24em', textTransform: 'uppercase', color: 'rgba(0,0,0,0.45)', fontFamily: MENU_FONT }}>How to play</p>
+          <div style={{
+            marginTop: '12px', borderRadius: '16px',
+            background: 'linear-gradient(180deg, rgba(13,17,40,0.96), rgba(4,6,20,0.97))',
+            border: `1px solid ${GLASS_PANEL_BORDER}`,
+            padding: '15px 18px 17px', position: 'relative', overflow: 'hidden',
+          }}>
+            {/* Mode-tinted accent edge along the top */}
+            <div aria-hidden style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: `linear-gradient(90deg, ${mode.tileColor}, transparent 78%)` }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 12px' }}>
+              <span aria-hidden style={{ width: '5px', height: '14px', borderRadius: '3px', background: mode.tileColor, boxShadow: `0 0 9px ${mode.tileColor}` }} />
+              <span style={{ fontSize: '9px', fontWeight: 800, letterSpacing: '0.24em', textTransform: 'uppercase', color: mode.tileColor, fontFamily: MENU_FONT }}>How to play</span>
+            </div>
             {mode.controls.map((ctrl, i) => (
-              <div key={i} style={{ display: 'flex', gap: '8px', margin: '5px 0', alignItems: 'flex-start' }}>
-                <span style={{ color: '#0c0c1a', fontSize: '14px', flexShrink: 0, lineHeight: 1.5 }}>·</span>
-                <span style={{ fontSize: '13px', lineHeight: 1.55, color: '#1a1a2e', fontFamily: MENU_FONT }}>{ctrl}</span>
+              <div key={i} style={{ display: 'flex', gap: '11px', margin: '7px 0', alignItems: 'flex-start' }}>
+                <span aria-hidden style={{ width: '6px', height: '6px', borderRadius: '50%', background: mode.tileColor, boxShadow: `0 0 6px ${mode.tileColor}`, marginTop: '6px', flexShrink: 0 }} />
+                <span style={{ fontSize: '13px', lineHeight: 1.55, color: GLASS_TEXT, fontFamily: MENU_FONT }}>{ctrl}</span>
               </div>
             ))}
           </div>
