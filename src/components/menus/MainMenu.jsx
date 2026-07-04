@@ -32,6 +32,9 @@ let _menuViewEpoch = Math.floor(Math.random() * 1e9);
 
 // Called by RotatingBlackCube after a direct cube-tap shake.
 // Also available externally so tests / storybook can reset state.
+let _orbColorVersion = 0;
+let _orbColorListener = null;
+
 function rerandomizeMenuStyle() {
   _menuSchemeKey  = _SCHEME_KEYS[Math.floor(Math.random() * _SCHEME_KEYS.length)];
   MENU_FACE_COLORS = COLOR_SCHEMES[_menuSchemeKey] ?? COLOR_SCHEMES['classic'];
@@ -39,6 +42,8 @@ function rerandomizeMenuStyle() {
     _menuFaceStyles[f] = _TILE_KEYS[Math.floor(Math.random() * _TILE_KEYS.length)];
   }
   _menuViewEpoch = Math.floor(Math.random() * 1e9);
+  _orbColorVersion++;
+  _orbColorListener?.(_orbColorVersion);
 }
 
 // Callback set by ShufflingCube so RotatingBlackCube can trigger a re-scramble
@@ -1309,31 +1314,43 @@ export const MenuTitleCard = ({ visible }) => (
 
 
 // ─── Ambient background orbs ─────────────────────────────────────────────────
-const ORB_DEFS = [
-  { color: '#3b82f6', top: '-18%',  left: '-12%',  size: '58vmax', anim: 'orbDrift1 30s ease-in-out infinite alternate',          opacity: 0.36 },
-  { color: '#a855f7', bottom: '-22%',right: '-16%', size: '62vmax', anim: 'orbDrift2 36s ease-in-out infinite alternate',          opacity: 0.28 },
-  { color: '#f97316', top: '15%',   right: '-18%',  size: '46vmax', anim: 'orbDrift3 24s ease-in-out infinite alternate',          opacity: 0.20 },
-  { color: '#22c55e', bottom: '8%', left: '-14%',   size: '42vmax', anim: 'orbDrift1 28s ease-in-out infinite alternate-reverse',  opacity: 0.17 },
-  { color: '#eab308', top: '44%',   left: '28%',    size: '36vmax', anim: 'orbDrift2 40s ease-in-out infinite alternate',          opacity: 0.13 },
-  { color: '#7dd3fc', bottom: '18%',right: '22%',   size: '52vmax', anim: 'orbDrift3 44s ease-in-out infinite alternate-reverse',  opacity: 0.18 },
+const ORB_LAYOUT = [
+  { faceId: 5, top: '-18%',  left: '-12%',  size: '58vmax', anim: 'orbDrift1 30s ease-in-out infinite alternate',          opacity: 0.36 },
+  { faceId: 3, bottom: '-22%',right: '-16%', size: '62vmax', anim: 'orbDrift2 36s ease-in-out infinite alternate',          opacity: 0.28 },
+  { faceId: 4, top: '15%',   right: '-18%',  size: '46vmax', anim: 'orbDrift3 24s ease-in-out infinite alternate',          opacity: 0.20 },
+  { faceId: 2, bottom: '8%', left: '-14%',   size: '42vmax', anim: 'orbDrift1 28s ease-in-out infinite alternate-reverse',  opacity: 0.17 },
+  { faceId: 6, top: '44%',   left: '28%',    size: '36vmax', anim: 'orbDrift2 40s ease-in-out infinite alternate',          opacity: 0.13 },
+  { faceId: 1, bottom: '18%',right: '22%',   size: '52vmax', anim: 'orbDrift3 44s ease-in-out infinite alternate-reverse',  opacity: 0.18 },
 ];
 
-const MenuBackgroundOrbs = () => (
-  <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', zIndex: 0, pointerEvents: 'none' }}>
-    {ORB_DEFS.map((orb, i) => (
-      <div key={i} style={{
-        position: 'absolute',
-        width: orb.size, height: orb.size,
-        top: orb.top, left: orb.left, bottom: orb.bottom, right: orb.right,
-        borderRadius: '50%',
-        background: `radial-gradient(circle, ${orb.color} 0%, transparent 70%)`,
-        filter: 'blur(72px)',
-        opacity: orb.opacity,
-        animation: orb.anim,
-      }} />
-    ))}
-  </div>
-);
+const MenuBackgroundOrbs = () => {
+  const [_v, setV] = useState(_orbColorVersion);
+  useEffect(() => {
+    _orbColorListener = setV;
+    return () => { _orbColorListener = null; };
+  }, []);
+
+  return (
+    <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', zIndex: 0, pointerEvents: 'none' }}>
+      {ORB_LAYOUT.map((orb, i) => {
+        const color = MENU_FACE_COLORS[orb.faceId] ?? '#888888';
+        return (
+          <div key={i} style={{
+            position: 'absolute',
+            width: orb.size, height: orb.size,
+            top: orb.top, left: orb.left, bottom: orb.bottom, right: orb.right,
+            borderRadius: '50%',
+            background: `radial-gradient(circle, ${color} 0%, transparent 70%)`,
+            filter: 'blur(72px)',
+            opacity: orb.opacity,
+            animation: orb.anim,
+            transition: 'background 1.2s ease',
+          }} />
+        );
+      })}
+    </div>
+  );
+};
 
 // ─── Main component ───────────────────────────────────────────────────────────
 const MainMenu = ({
