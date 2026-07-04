@@ -15,6 +15,7 @@ import { vibrate } from '../utils/audio.js';
 import { updateSharedTime, updateSharedTremor, warmUpDefaultStyles } from './styles/TileStyleMaterials.jsx';
 import { StickerInstanceProvider } from './StickerInstances.jsx';
 import StickerAnimationDriver from './StickerAnimationDriver.jsx';
+import SliceSnapFlash from './SliceSnapFlash.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { resolveColors } from '../utils/colorSchemes.js';
@@ -993,6 +994,7 @@ const CubeAssembly = React.memo(({
               highlights={solveHighlights}
             />
           )}
+          <SliceSnapFlash size={size} />
           {/* DragGuide removed - real-time cube rotation provides visual feedback */}
           <TrackballControls
             ref={controlsRef}

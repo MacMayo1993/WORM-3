@@ -26,6 +26,7 @@ import WoodVolume from './styles/WoodVolume.jsx';
 import { BIOME_GROUND_TEXTURES } from './BiomeGroundTextures.js';
 import { resolveColors } from '../utils/colorSchemes.js';
 import FlipParticles from './FlipParticles.jsx';
+import FlipShockwaveRing from './FlipShockwaveRing.jsx';
 import HealParticles from './HealParticles.jsx';
 import ParityBreakthrough from './ParityBreakthrough.jsx';
 import StickerWorm from './StickerWorm.jsx';
@@ -73,6 +74,14 @@ const _discAlphaMap = (() => {
   tex.needsUpdate = true;
   return tex;
 })();
+const _faceNormals = {
+  PX: new THREE.Vector3(1, 0, 0),
+  NX: new THREE.Vector3(-1, 0, 0),
+  PY: new THREE.Vector3(0, 1, 0),
+  NY: new THREE.Vector3(0, -1, 0),
+  PZ: new THREE.Vector3(0, 0, 1),
+  NZ: new THREE.Vector3(0, 0, -1),
+};
 // Scratch vectors for biome edge-on fade.
 const _normal = new THREE.Vector3();
 const _worldQuat = new THREE.Quaternion();
@@ -696,6 +705,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
   // Imperative ref to FlipParticles — avoids re-rendering StickerPlane on every flip.
   const flipParticlesRef = useRef();
+  const shockwaveRef = useRef();
 
   // Register with the InstancedMesh batch manager.
   // useLayoutEffect so registration completes before the first WebGL frame —
@@ -999,6 +1009,13 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       prevRawP.current = rawP;
 
       if (spinT.current <= 0) {
+        if (isFlipping.current && shockwaveRef.current && _currentDir) {
+          shockwaveRef.current.trigger(
+            _faceNormals[_currentDir] || _faceNormals.PZ,
+            baseColorRef.current || '#ffffff',
+            state.clock
+          );
+        }
         isFlipping.current = false;
         // Hide overlays and commit the final face color/texture to the mesh.
         if (spinRevealRef.current) spinRevealRef.current.visible = false;
@@ -1778,6 +1795,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
       {/* Particle burst effect during flip (manual + chaos/disparity). */}
       <FlipParticles ref={flipParticlesRef} />
+      <FlipShockwaveRing ref={shockwaveRef} />
 
       {/* Heal seal overlay — golden convergence ring + color bloom on wormhole heal. */}
       <mesh ref={healSealRef} position={[0, 0, 0.004]} visible={false} renderOrder={11}>
