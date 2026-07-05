@@ -36,7 +36,7 @@ const FACE_ELIM_BANNER_STYLE = {
   padding: '8px 14px',
   fontFamily: UI_FONT,
   textAlign: 'center',
-  backdropFilter: 'blur(18px)',
+  /* backdrop-filter removed — expensive compositor layer on mobile GPUs */
   marginBottom: '4px',
   animation: 'disparity-face-elim 0.35s cubic-bezier(0.22,1,0.36,1) forwards',
 };
@@ -55,7 +55,7 @@ const ALIVE_COUNT_BASE_STYLE = {
   display: 'flex',
   alignItems: 'baseline',
   gap: '6px',
-  backdropFilter: 'blur(18px)',
+  /* backdrop-filter removed — expensive compositor layer on mobile GPUs */
   marginBottom: '4px',
 };
 
@@ -90,7 +90,7 @@ const WINNER_STYLE = {
   fontSize: '13px',
   fontWeight: 'bold',
   textAlign: 'center',
-  backdropFilter: 'blur(10px)',
+  /* backdrop-filter removed — expensive compositor layer on mobile GPUs */
   textShadow: '0 0 12px rgba(255, 215, 0, 0.7)',
   lineHeight: 1.5,
   marginBottom: '4px',
@@ -333,7 +333,7 @@ const DEATH_ENTRY_BASE_STYLE = {
   color: '#b91c1c',
   fontFamily: UI_FONT,
   fontSize: '11px',
-  backdropFilter: 'blur(18px)',
+  /* backdrop-filter removed — expensive compositor layer on mobile GPUs */
   whiteSpace: 'nowrap',
   letterSpacing: '0.04em',
 };

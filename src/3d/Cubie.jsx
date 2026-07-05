@@ -96,20 +96,20 @@ const LEGO_FACE_TRANSFORMS = {
 
 // A single detailed Lego stud on a given face, colored to match the face's sticker:
 // a tapered cylinder body, an embossed ring on top, and a small center pip.
-function LegoStud({ dir, color }) {
+function LegoStud({ dir, color, enableShadows = true }) {
   const t = LEGO_FACE_TRANSFORMS[dir];
   if (!t) return null;
   return (
     <group position={t.pos} rotation={t.rot}>
-      <mesh position={[0, 0.07, 0]} castShadow>
+      <mesh position={[0, 0.07, 0]} castShadow={enableShadows}>
         <cylinderGeometry args={LEGO_STUD_BODY_GEO} />
         <meshStandardMaterial color={color} roughness={0.35} metalness={0} envMapIntensity={0.6} />
       </mesh>
-      <mesh position={[0, 0.142, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+      <mesh position={[0, 0.142, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow={enableShadows}>
         <torusGeometry args={LEGO_STUD_RING_GEO} />
         <meshStandardMaterial color={color} roughness={0.28} metalness={0} envMapIntensity={0.75} />
       </mesh>
-      <mesh position={[0, 0.155, 0]} castShadow>
+      <mesh position={[0, 0.155, 0]} castShadow={enableShadows}>
         <cylinderGeometry args={LEGO_STUD_PIP_GEO} />
         <meshStandardMaterial color={color} roughness={0.3} metalness={0} envMapIntensity={0.7} />
       </mesh>
@@ -141,7 +141,7 @@ const faceRCFor = (dirKey, x, y, z, size) => {
 const Cubie = React.forwardRef(function Cubie({
   position, cubie, size, wormMode = false, hideBody = false, onPointerDown,
 }, ref) {
-  const { hollowMode, mirrorMode, visualMode, explosionFactor, settings, randomMode, randomStyleTick } = useGameStore(
+  const { hollowMode, mirrorMode, visualMode, explosionFactor, settings, randomMode, randomStyleTick, perfReducedFX } = useGameStore(
     useShallow(s => ({
       hollowMode: s.hollowMode,
       mirrorMode: s.mirrorMode,
@@ -150,8 +150,10 @@ const Cubie = React.forwardRef(function Cubie({
       settings: s.settings,
       randomMode: s.randomMode,
       randomStyleTick: s.randomStyleTick,
+      perfReducedFX: s.perfReducedFX,
     }))
   );
+  const enableShadows = !perfReducedFX;
   // faceColors needed locally for wireframe edge coloring
   const faceColors = useMemo(() => resolveColors(settings, settings?.biomeMode?.faceAssignment), [settings]);
 
@@ -433,7 +435,7 @@ const Cubie = React.forwardRef(function Cubie({
     <group scale={contentScale}>
       {/* Mirror mode: plain asymmetric box with chrome material, no stickers */}
       {mirrorMode ? (
-        <mesh onPointerDown={handleDown} castShadow receiveShadow>
+        <mesh onPointerDown={handleDown} castShadow={enableShadows} receiveShadow={enableShadows}>
           <boxGeometry args={mirrorDims} />
           <meshStandardMaterial color="#c8c8c8" roughness={0.08} metalness={0.92} envMapIntensity={1.2} />
         </mesh>
@@ -446,7 +448,7 @@ const Cubie = React.forwardRef(function Cubie({
 
           {/* 12 edge beams forming a hollow cube frame */}
           {HOLLOW_EDGES.map((edge, idx) => (
-            <mesh key={idx} position={edge.pos} castShadow receiveShadow>
+            <mesh key={idx} position={edge.pos} castShadow={enableShadows} receiveShadow={enableShadows}>
               <boxGeometry args={BEAM_DIMS[edge.geo]} />
               <primitive object={getHollowBeamMaterial(effectiveVisualMode)} attach="material" />
             </mesh>
@@ -460,7 +462,7 @@ const Cubie = React.forwardRef(function Cubie({
           <boxGeometry args={[0.98, 0.98, 0.98]} />
         </mesh>
       ) : (
-        <RoundedBox args={[0.98, 0.98, 0.98]} radius={0.08} smoothness={4} onPointerDown={handleDown} castShadow receiveShadow>
+        <RoundedBox args={[0.98, 0.98, 0.98]} radius={0.08} smoothness={4} onPointerDown={handleDown} castShadow={enableShadows} receiveShadow={enableShadows}>
           <meshStandardMaterial {...bodyMatProps} />
         </RoundedBox>
       )}
@@ -492,12 +494,12 @@ const Cubie = React.forwardRef(function Cubie({
       {/* Lego stud — one detailed stud on each visible face, colored by the face's current sticker */}
       {isLego && !mirrorMode && !hollowMode && (
         <>
-          {isEdge(position[2], (size - 1) / 2) && meta('PZ') && <LegoStud dir="PZ" color={getEdgeColor('PZ')} />}
-          {isEdge(position[2], -(size - 1) / 2) && meta('NZ') && <LegoStud dir="NZ" color={getEdgeColor('NZ')} />}
-          {isEdge(position[0], (size - 1) / 2) && meta('PX') && <LegoStud dir="PX" color={getEdgeColor('PX')} />}
-          {isEdge(position[0], -(size - 1) / 2) && meta('NX') && <LegoStud dir="NX" color={getEdgeColor('NX')} />}
-          {isEdge(position[1], (size - 1) / 2) && meta('PY') && <LegoStud dir="PY" color={getEdgeColor('PY')} />}
-          {isEdge(position[1], -(size - 1) / 2) && meta('NY') && <LegoStud dir="NY" color={getEdgeColor('NY')} />}
+          {isEdge(position[2], (size - 1) / 2) && meta('PZ') && <LegoStud dir="PZ" color={getEdgeColor('PZ')} enableShadows={enableShadows} />}
+          {isEdge(position[2], -(size - 1) / 2) && meta('NZ') && <LegoStud dir="NZ" color={getEdgeColor('NZ')} enableShadows={enableShadows} />}
+          {isEdge(position[0], (size - 1) / 2) && meta('PX') && <LegoStud dir="PX" color={getEdgeColor('PX')} enableShadows={enableShadows} />}
+          {isEdge(position[0], -(size - 1) / 2) && meta('NX') && <LegoStud dir="NX" color={getEdgeColor('NX')} enableShadows={enableShadows} />}
+          {isEdge(position[1], (size - 1) / 2) && meta('PY') && <LegoStud dir="PY" color={getEdgeColor('PY')} enableShadows={enableShadows} />}
+          {isEdge(position[1], -(size - 1) / 2) && meta('NY') && <LegoStud dir="NY" color={getEdgeColor('NY')} enableShadows={enableShadows} />}
         </>
       )}
     </group>
