@@ -692,8 +692,10 @@ const schedule = () => {
   if (conwayAcc >= conwayPeriod) {
     const conwayPayload = conwayTick();
     if (conwayPayload) {
-      // Merge Conway results into a TICK message so the main thread can apply them.
-      // Conway births are regular flips; recoveries are a new operation type.
+      // Reuse the cachedMetrics snapshot from the last chain tick instead of
+      // running a second O(n) scan. The Conway tick only mutates a handful of
+      // stickers (capped), so the cached values are close enough until the
+      // next chain tick refreshes them.
       const mergedPayload = {
         flips: conwayPayload.flips,
         cascades: conwayPayload.cascades,
@@ -701,13 +703,9 @@ const schedule = () => {
         deaths: [],
         eliminatedFaces: [],
         winner: null,
-        metrics: computeChaosMetrics(state, surfaceCoords),
+        metrics: null,
         didWork: true,
       };
-      mergedPayload.metrics.flipPct = mergedPayload.metrics.edgeTotal > 0
-        ? Math.round((mergedPayload.metrics.flipActive / mergedPayload.metrics.edgeTotal) * 100)
-        : 0;
-      cachedMetrics = mergedPayload.metrics;
       self.postMessage({ type: 'TICK', payload: mergedPayload });
     }
     conwayAcc = 0;

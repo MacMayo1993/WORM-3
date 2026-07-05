@@ -61,18 +61,16 @@ const TopMenuBar = ({
 
   const centerText = levelLabel || `${modeLabel} ${size}×${size}`;
 
-  // ── Opt: faceStats polled at 200 ms instead of O(N³) on every cubies change.
-  // During chaos mode this cuts from 12×/s to 5×/s; during normal play the
-  // 200ms lag after each move is imperceptible.  cubies is always read fresh
-  // via the ref already kept for chaosStats above.
+  // ── Opt: faceStats polled at 200–800 ms instead of O(N³) on every cubies change.
+  // During chaos mode the poll interval is widened to 800ms since the worker
+  // already pushes live chaos stats — the O(n³) face scan is purely supplemental
+  // and doesn't need to fire 5×/s when the cube changes on every chaos TICK.
   const [faceStats, setFaceStats] = useState(() => ({ totalComplete: 0, totalStickers: 1, percent: 0 }));
 
   const lastScannedCubiesRef = useRef(null);
   useEffect(() => {
     const compute = () => {
       const cur = cubiesStatRef.current;
-      // Skip the O(n³) scan entirely when the cube hasn't changed since the
-      // last poll — makes idle polling free at any cube size.
       if (lastScannedCubiesRef.current === cur) return;
       lastScannedCubiesRef.current = cur;
       const faces = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
@@ -94,10 +92,11 @@ const TopMenuBar = ({
       setFaceStats({ totalComplete, totalStickers, percent: Math.round((totalComplete / totalStickers) * 100) });
     };
 
-    compute(); // immediate snapshot on mount / size change
-    const id = setInterval(compute, 200);
+    compute();
+    const pollInterval = chaosMode ? 800 : 200;
+    const id = setInterval(compute, pollInterval);
     return () => clearInterval(id);
-  }, [size]); // cubies intentionally NOT a dep — read via cubiesStatRef
+  }, [size, chaosMode]); // cubies intentionally NOT a dep — read via cubiesStatRef
 
   // ── Chaos stats come from the chaos worker (pushed into the store on each
   // productive tick + an initial snapshot on START). No main-thread sticker
