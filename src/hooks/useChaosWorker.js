@@ -109,6 +109,7 @@ export function useChaosWorker({
   const workerRef = useRef(null);
   const manifoldMapRef = useRef(null);
   const disparityFlipCapRef = useRef(disparityFlipCap);
+  const lastStatsFlushRef = useRef(0);
 
   useEffect(() => {
     disparityFlipCapRef.current = disparityFlipCap;
@@ -190,9 +191,14 @@ export function useChaosWorker({
       if (metrics) {
         disparityRef.current = metrics.disparity;
         flipPctRef.current = metrics.flipPct;
-        // Publish to the store so TopMenuBar can read live stats without
-        // re-scanning all stickers on its own interval.
-        useGameStore.getState().setChaosStats(metrics);
+        // Throttle store updates to ~3×/s instead of every TICK (~5-12×/s).
+        // The refs above are updated immediately for internal consumers;
+        // only the TopMenuBar HUD subscription needs the store write.
+        const now = performance.now();
+        if (now - lastStatsFlushRef.current > 300) {
+          lastStatsFlushRef.current = now;
+          useGameStore.getState().setChaosStats(metrics);
+        }
       }
     };
 
