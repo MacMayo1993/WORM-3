@@ -585,18 +585,22 @@ const tick = (dtMs) => {
       validNeighbors.push({ ...neighbor, flips: nFlips, seamWeight, crossFace });
     }
 
-    const pool = [...validNeighbors];
-    while (pool.length > 0) {
-      let roll = Math.random() * pool.reduce((s, n) => s + n.seamWeight, 0);
-      let pick = pool.length - 1;
-      for (let i = 0; i < pool.length; i++) {
-        roll -= pool[i].seamWeight;
+    let poolLen = validNeighbors.length;
+    while (poolLen > 0) {
+      let totalWeight = 0;
+      for (let i = 0; i < poolLen; i++) totalWeight += validNeighbors[i].seamWeight;
+      let roll = Math.random() * totalWeight;
+      let pick = poolLen - 1;
+      for (let i = 0; i < poolLen; i++) {
+        roll -= validNeighbors[i].seamWeight;
         if (roll <= 0) {
           pick = i;
           break;
         }
       }
-      const neighbor = pool.splice(pick, 1)[0];
+      const neighbor = validNeighbors[pick];
+      validNeighbors[pick] = validNeighbors[poolLen - 1];
+      poolLen--;
       // Finisher boost: the closer a neighbour is to the flip cap, the more likely
       // the chain commits to it — so near-dead tiles get pushed over the edge
       // instead of being abandoned one flip short of dying.
@@ -652,7 +656,7 @@ const tick = (dtMs) => {
     flips,
     cascades,
     deaths,
-    eliminatedFaces: [...new Set(eliminatedFaces)],
+    eliminatedFaces: eliminatedFaces.length > 0 ? [...new Set(eliminatedFaces)] : eliminatedFaces,
     winner,
     metrics: { ...cachedMetrics, flipPct },
     didWork,
@@ -711,7 +715,7 @@ const schedule = () => {
     conwayAcc = 0;
   }
 
-  if (running) timerId = setTimeout(schedule, 16);
+  if (running) timerId = setTimeout(schedule, size >= 5 ? 32 : 16);
 };
 
 // After a cube rotation every sticker's physical (x,y,z,dirKey) changes.
