@@ -5,11 +5,7 @@ import { ANTIPODAL_COLOR } from '../utils/constants.js';
 
 const MAX_CASCADES = 6;
 
-function applyChaosFlipsBatch(state, flips, size, manifoldMap, flipCap) {
-  if (!flips?.length || !manifoldMap) return state;
-
-  // Lazy copy-on-write: only clone the x-layer and y-row arrays that contain a
-  // touched cubie. Avoids the O(size²) upfront clone of the entire 3-D array.
+function makeCowWriter(state) {
   let next = state;
   const touchedCubies = new Map();
 
@@ -29,6 +25,14 @@ function applyChaosFlipsBatch(state, flips, size, manifoldMap, flipCap) {
     touchedCubies.set(key, cloned);
     return cloned;
   };
+
+  return { get: () => next, getCubieForWrite };
+}
+
+function applyChaosFlipsBatch(state, flips, size, manifoldMap, flipCap) {
+  if (!flips?.length || !manifoldMap) return state;
+
+  const { get, getCubieForWrite } = makeCowWriter(state);
 
   const applyOne = (loc) => {
     if (!loc) return;
@@ -52,7 +56,37 @@ function applyChaosFlipsBatch(state, flips, size, manifoldMap, flipCap) {
     applyOne(anti);
   }
 
-  return next;
+  return get();
+}
+
+function applyChaosRecoveriesBatch(state, recoveries, size, manifoldMap) {
+  if (!recoveries?.length || !manifoldMap) return state;
+
+  const { get, getCubieForWrite } = makeCowWriter(state);
+
+  const recoverOne = (loc) => {
+    if (!loc) return;
+    const c = getCubieForWrite(loc.x, loc.y, loc.z);
+    const st = c.stickers[loc.dirKey];
+    if (!st) return;
+    const currentFlips = st.flips || 0;
+    if (currentFlips <= 0) return;
+    c.stickers[loc.dirKey] = {
+      ...st,
+      curr: ANTIPODAL_COLOR[st.curr],
+      flips: currentFlips - 1,
+    };
+  };
+
+  for (const [x, y, z, dirKey] of recoveries) {
+    const sticker = state[x]?.[y]?.[z]?.stickers?.[dirKey];
+    if (!sticker) continue;
+    const anti = findAntipodalStickerByGrid(manifoldMap, sticker, size);
+    recoverOne({ x, y, z, dirKey });
+    recoverOne(anti);
+  }
+
+  return get();
 }
 
 export function useChaosWorker({
@@ -91,16 +125,22 @@ export function useChaosWorker({
         return;
       }
       if (e.data.type !== 'TICK') return;
-      const { flips, cascades, deaths, eliminatedFaces, winner, metrics } = e.data.payload;
+      const { flips, cascades, recoveries, deaths, eliminatedFaces, winner, metrics } = e.data.payload;
 
-      if (flips?.length > 0) {
+      if (flips?.length > 0 || recoveries?.length > 0) {
         // manifoldMapRef may have been invalidated (set to null) by the rotationEpoch
         // effect below — rebuild lazily here, on the next flip, instead of eagerly on
         // every rotation. This keeps the rotation-completion frame cheap.
         if (!manifoldMapRef.current) {
           manifoldMapRef.current = buildManifoldGridMap(cubiesRef.current, size);
         }
-        const next = applyChaosFlipsBatch(cubiesRef.current, flips, size, manifoldMapRef.current, disparityFlipCapRef.current);
+        let next = cubiesRef.current;
+        if (flips?.length > 0) {
+          next = applyChaosFlipsBatch(next, flips, size, manifoldMapRef.current, disparityFlipCapRef.current);
+        }
+        if (recoveries?.length > 0) {
+          next = applyChaosRecoveriesBatch(next, recoveries, size, manifoldMapRef.current);
+        }
         setCubies(next);
       }
 
