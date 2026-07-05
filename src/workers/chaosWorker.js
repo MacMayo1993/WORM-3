@@ -34,12 +34,13 @@ const CONWAY_RULES = [
   { birth: new Set([1, 2]), survive: new Set([1, 2, 3, 4]), recoveryRate: 0.1, period: 1000 },
 ];
 
-// Conway generation cadence per level (ms between full-surface evaluations)
+// Conway generation cadence per level (BASE ms between full-surface evaluations).
+// Actual period is scaled up by sizePenalty for larger cubes.
 const conwayPeriodByLevel = [0, 2200, 1800, 1400, 1600, 1000];
-// Max births per Conway tick to avoid frame spikes on large cubes
-const conwayBirthCapByLevel = [0, 3, 4, 6, 5, 8];
+// Max births per Conway tick (absolute cap regardless of cube size)
+const conwayBirthCapByLevel = [0, 3, 4, 5, 4, 6];
 // Max recoveries per Conway tick
-const conwayRecoveryCapByLevel = [0, 2, 3, 4, 3, 2];
+const conwayRecoveryCapByLevel = [0, 2, 2, 3, 2, 2];
 
 // Level profile (1..5):
 // L1-L2: sparse, exploratory spread
@@ -50,14 +51,22 @@ const delayByLevel = [0, 420, 280, 220, 170, 190];
 const basePropByLevel = [0, 0.35, 0.45, 0.55, 0.65, 0.80];
 const decayByLevel = [0, 0.68, 0.74, 0.80, 0.86, 0.93];
 const cooldownByLevel = [0, 1700, 1100, 850, 650, 520]; // ms — compared against cooldownAcc (real ms)
-const chainCapByLevel = [0, 3, 4, 6, 8, 10];
+const chainCapByLevel = [0, 2, 3, 4, 5, 6];
+
+// Size penalty: slows tick frequency and caps chains on larger cubes.
+// 3x3→1.0, 4x4→1.2, 5x5→1.5, 6x6→1.8, 7x7→2.1
+const computeSizePenalty = (S) => 1 + (S - 3) * 0.35;
 
 const computeSizeScale = (stickers) => {
-  // Keep growth sub-linear on large cubes to avoid worker/main-thread burst
-  // overload (7x7 has 294 surface stickers vs 54 on 3x3).
-  // 3x3:1, 5x5:2, 6x6:3, 7x7:3
-  return Math.max(1, Math.ceil(stickers / 96));
+  // Chain count multiplier. Kept at 1 for cubes ≤5x5; only bump to 2 for 6x6+.
+  // Previous formula (ceil(stickers/96)) gave 4× on 7x7 which overloaded the main thread.
+  if (stickers <= 150) return 1; // 3x3=54, 4x4=96, 5x5=150
+  return 2; // 6x6=216, 7x7=294
 };
+
+// Maximum total operations (flips + cascades) the chain tick can emit per cycle.
+// Prevents burst frames from overwhelming the main-thread React reconciler.
+const MAX_OPS_PER_CHAIN_TICK = 6;
 
 let state = null;
 let running = false;
@@ -307,30 +316,38 @@ const findChainStart = () => {
   // livingStickers is maintained incrementally; dead tiles are removed on death.
   if (!livingStickers.size) return null;
 
-  const candidates = [];
+  // Single-pass weighted reservoir sampling (Efraimidis–Spirakis).
+  // Avoids building a full candidates array on large cubes (294 stickers on 7x7).
+  // Weight = flips² so chains concentrate on near-dead tiles.
+  let bestTile = null;
+  let bestKey = -Infinity;
+  let anyFlipped = false;
+
   for (const { x, y, z, dirKey } of livingStickers.values()) {
     const st = state[x][y][z].stickers[dirKey];
-    if (st.flips > 0) candidates.push({ x, y, z, dirKey, flips: st.flips });
+    const flips = st.flips || 0;
+    if (flips <= 0) continue;
+    anyFlipped = true;
+    const weight = flips * flips;
+    const key = Math.pow(Math.random(), 1 / weight);
+    if (key > bestKey) {
+      bestKey = key;
+      bestTile = { x, y, z, dirKey, flips };
+    }
   }
 
-  if (!candidates.length) {
-    // No flipped tiles yet — pick any living tile as a fresh start.
-    const values = [...livingStickers.values()];
-    const pick = values[Math.floor(Math.random() * values.length)];
-    return { tile: { ...pick, flips: 1 }, strength: 1 };
+  if (!anyFlipped) {
+    // No flipped tiles yet — pick a random living tile as a fresh start.
+    // Use index-based random pick to avoid spreading all values into an array.
+    const targetIdx = Math.floor(Math.random() * livingStickers.size);
+    let idx = 0;
+    for (const loc of livingStickers.values()) {
+      if (idx === targetIdx) return { tile: { ...loc, flips: 1 }, strength: 1 };
+      idx++;
+    }
   }
 
-  // Weight restarts QUADRATICALLY by flip count. Linear weighting spread chains
-  // evenly across all damaged tiles, so damage never concentrated enough to reach
-  // the cap. Squaring makes a chain far more likely to resume a near-cap tile and
-  // finish the kill instead of scattering fresh flips across the whole surface.
-  const totalWeight = candidates.reduce((sum, c) => sum + c.flips * c.flips, 0);
-  let roll = Math.random() * totalWeight;
-  for (const c of candidates) {
-    roll -= c.flips * c.flips;
-    if (roll <= 0) return { tile: c, strength: 1 };
-  }
-  return { tile: candidates[candidates.length - 1], strength: 1 };
+  return bestTile ? { tile: bestTile, strength: 1 } : null;
 };
 
 // ─── Conway Generation Evaluation ────────────────────────────────────────────
@@ -421,17 +438,19 @@ const conwayTick = () => {
   const outFlips = [];
   for (const [x, y, z, dirKey] of births) {
     flipStickerPairLocal(state, x, y, z, dirKey, manifoldMapCache, outFlips);
-    // Emit cascade visual from a random infected neighbor to the birth site
-    const neighbors = neighborCache.get(`${x},${y},${z},${dirKey}`);
-    if (neighbors) {
-      const infectedNeighbor = neighbors.find((n) => {
-        const nst = state[n.x]?.[n.y]?.[n.z]?.stickers?.[n.dirKey];
-        return nst && (nst.flips || 0) > 0 && (nst.flips || 0) < flipCap;
-      });
-      if (infectedNeighbor && !(infectedNeighbor.x === x && infectedNeighbor.y === y && infectedNeighbor.z === z)) {
-        const from = getStickerWorldPos(infectedNeighbor.x, infectedNeighbor.y, infectedNeighbor.z, infectedNeighbor.dirKey, size, explosionT);
-        const to = getStickerWorldPos(x, y, z, dirKey, size, explosionT);
-        cascades.push({ from, to, crossFace: infectedNeighbor.dirKey !== dirKey });
+    // Emit at most 2 cascade visuals per Conway tick to avoid GPU overload
+    if (cascades.length < 2) {
+      const neighbors = neighborCache.get(`${x},${y},${z},${dirKey}`);
+      if (neighbors) {
+        const infectedNeighbor = neighbors.find((n) => {
+          const nst = state[n.x]?.[n.y]?.[n.z]?.stickers?.[n.dirKey];
+          return nst && (nst.flips || 0) > 0 && (nst.flips || 0) < flipCap;
+        });
+        if (infectedNeighbor && !(infectedNeighbor.x === x && infectedNeighbor.y === y && infectedNeighbor.z === z)) {
+          const from = getStickerWorldPos(infectedNeighbor.x, infectedNeighbor.y, infectedNeighbor.z, infectedNeighbor.dirKey, size, explosionT);
+          const to = getStickerWorldPos(x, y, z, dirKey, size, explosionT);
+          cascades.push({ from, to, crossFace: infectedNeighbor.dirKey !== dirKey });
+        }
       }
     }
   }
@@ -461,8 +480,13 @@ const tick = (dtMs) => {
   const deaths = [];
   const eliminatedFaces = [];
   let producedDeaths = false;
+  let opsEmitted = 0;
 
   for (const chain of chains) {
+    // Budget gate: stop processing chains once we've emitted enough operations
+    // for this tick. Remaining chains will process on the next cycle.
+    if (opsEmitted >= MAX_OPS_PER_CHAIN_TICK) break;
+
     if (chain.inCooldown) {
       // Accumulate real ms so cooldownDuration values (ms) work as intended.
       chain.cooldownAcc += dtMs;
@@ -490,6 +514,7 @@ const tick = (dtMs) => {
 
     const current = chain.tile;
     flipStickerPairLocal(state, current.x, current.y, current.z, current.dirKey, manifoldMapCache, flips);
+    opsEmitted++;
 
     const chainDeaths = [];
     const checkDeath = (loc) => {
@@ -584,10 +609,11 @@ const tick = (dtMs) => {
         // produce an impact sphere right on the neighboring sticker, making it
         // appear to randomly spaz/flash even though its flip count hasn't changed.
         const sameCubie = neighbor.x === current.x && neighbor.y === current.y && neighbor.z === current.z;
-        if (!sameCubie) {
+        if (!sameCubie && cascades.length < 3) {
           const from = getStickerWorldPos(current.x, current.y, current.z, current.dirKey, size, explosionT);
           const to = getStickerWorldPos(neighbor.x, neighbor.y, neighbor.z, neighbor.dirKey, size, explosionT);
           cascades.push({ from, to, crossFace: neighbor.crossFace });
+          opsEmitted++;
         }
         chain.tile = { x: neighbor.x, y: neighbor.y, z: neighbor.z, dirKey: neighbor.dirKey };
         chain.visited.add(`${neighbor.x},${neighbor.y},${neighbor.z},${neighbor.dirKey}`);
@@ -642,11 +668,13 @@ const schedule = () => {
   conwayAcc += dt;
 
   const level = Math.max(1, Math.min(MAX_LEVEL, chaosLevel));
+  const sizePenalty = computeSizePenalty(size);
   const tickPeriod = delayByLevel[level] || 250;
   // Use cached metrics (updated each tick) to avoid iterating all stickers every 16 ms.
   const activeRatio = cachedMetrics.edgeTotal > 0 ? (cachedMetrics.flipActive / cachedMetrics.edgeTotal) : 0;
   const chainPressure = Math.min(1, chains.length / 12);
-  const effectivePeriod = Math.round(tickPeriod * (0.9 + activeRatio * 1.1) * (1 + chainPressure * 0.6));
+  // sizePenalty slows the tick on large cubes so we don't flood the main thread.
+  const effectivePeriod = Math.round(tickPeriod * (0.9 + activeRatio * 1.1) * (1 + chainPressure * 0.6) * sizePenalty);
 
   if (tickAcc >= effectivePeriod) {
     // Pass accumulated real ms to tick() so chain cooldowns run in wall-clock time.
@@ -659,7 +687,8 @@ const schedule = () => {
 
   // Conway generation runs on its own slower cadence — evaluates the full surface
   // and produces emergent birth/recovery patterns independent of chain walks.
-  const conwayPeriod = conwayPeriodByLevel[level] || 2000;
+  // Scale period by sizePenalty so larger cubes don't fire Conway as aggressively.
+  const conwayPeriod = Math.round((conwayPeriodByLevel[level] || 2000) * sizePenalty);
   if (conwayAcc >= conwayPeriod) {
     const conwayPayload = conwayTick();
     if (conwayPayload) {

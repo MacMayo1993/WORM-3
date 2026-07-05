@@ -3,7 +3,7 @@ import { useGameStore } from './useGameStore.js';
 import { buildManifoldGridMap, findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
 import { ANTIPODAL_COLOR } from '../utils/constants.js';
 
-const MAX_CASCADES = 6;
+const MAX_CASCADES = 4;
 
 function makeCowWriter(state) {
   let next = state;
