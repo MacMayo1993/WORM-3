@@ -68,8 +68,6 @@ const GLANCE_STRIP_STYLE = {
     borderRadius: 12,
     padding: '8px 12px',
     background: PANEL_BG,
-    backdropFilter: 'blur(18px)',
-    WebkitBackdropFilter: 'blur(18px)',
     boxShadow: SHADOW,
     display: 'flex',
     alignItems: 'center',
@@ -227,8 +225,7 @@ const PAUSE_OVERLAY_STYLE = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: 'rgba(2, 6, 23, 0.55)',
-    backdropFilter: 'blur(6px)',
+    background: 'rgba(2, 6, 23, 0.72)',
     pointerEvents: 'auto',
     zIndex: 10,
 };
@@ -387,7 +384,7 @@ const WINNER_STATS_STYLE = {
 
 const WINNER_STAT_BOX_STYLE = {
     borderRadius: 12, border: '1px solid rgba(255,255,255,0.12)',
-    background: 'rgba(255,255,255,0.07)', backdropFilter: 'blur(8px)',
+    background: 'rgba(255,255,255,0.10)',
     padding: '10px 16px', textAlign: 'center', minWidth: 90,
 };
 
