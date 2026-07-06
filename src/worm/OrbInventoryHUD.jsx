@@ -69,8 +69,6 @@ export default function OrbInventoryHUD({ orbInventory, faceColors, compact = fa
             background: 'rgba(15, 20, 40, 0.94)',
             borderRadius: 14,
             border: '1px solid rgba(150, 180, 255, 0.3)',
-            backdropFilter: 'blur(14px)',
-            WebkitBackdropFilter: 'blur(14px)',
             boxShadow: '0 8px 28px rgba(0, 0, 0, 0.45)',
             whiteSpace: 'nowrap',
           }}
@@ -126,8 +124,6 @@ export default function OrbInventoryHUD({ orbInventory, faceColors, compact = fa
           background: 'linear-gradient(180deg, rgba(16,20,40,0.94) 0%, rgba(8,10,24,0.94) 100%)',
           borderRadius: '16px',
           border: '1.5px solid rgba(150,180,255,0.35)',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
           boxShadow: '0 4px 20px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04) inset',
         }}
       >

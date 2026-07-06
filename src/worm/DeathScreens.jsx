@@ -55,7 +55,6 @@ const cardStyle = (borderColor) => ({
     border: `1px solid ${borderColor}`,
     borderRadius: 20,
     padding: '28px 26px',
-    backdropFilter: 'blur(6px)',
     maxWidth: 'min(92vw, 420px)',
 });
 
