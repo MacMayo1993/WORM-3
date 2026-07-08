@@ -232,6 +232,10 @@ export function getTileStyleMaterial(style, colorHex, useTexture = false, textur
     transparent: isGlass,
     depthWrite: !isGlass,
     blending: THREE.NormalBlending,
+    // orbChamber ray-traces its sphere using screen-space derivatives (dFdx/dFdy)
+    // to build a UV-aligned tangent frame; enabling this extension keeps that
+    // shader compiling on WebGL1 too. It's inert for shaders that don't use them.
+    extensions: { derivatives: true },
   });
 
   _matCachePut(cacheKey, material);

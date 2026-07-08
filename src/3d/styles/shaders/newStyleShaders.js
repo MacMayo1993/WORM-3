@@ -481,69 +481,111 @@ export const newStyleShaders = {
 
   // Orb Chamber - glass porthole with a recessed, face-colored sphere inside.
   // On a corner cubelet the three exposed stickers read as three colored balls.
+  // The ball is genuinely ray-traced behind the glass in the tile's tangent
+  // space, so it parallaxes against its chamber wall as the cube rotates — the
+  // depth cue that actually sells the 3D illusion (a flat painted sphere can't).
   orbChamber: `
     uniform vec3 baseColor;
     uniform float time;
     varying vec2 vUv;
+    varying vec3 vNormal;
+    varying vec3 vViewPosition;
 
     void main() {
-      vec2 p = vUv - 0.5;
+      vec2 p = vUv - 0.5;              // position on the glass surface, -0.5..0.5
       float r = length(p);
 
-      // Rounded porthole window mask — center visible, edges darkened.
-      float chamber = 1.0 - smoothstep(0.47, 0.505, r);
+      // ── Tangent frame aligned to UV (cotangent frame from screen derivatives).
+      // Maps tangent space (x=U, y=V, z=surface normal toward viewer) to view space.
+      vec3 pos = -vViewPosition;       // view-space fragment position
+      vec3 dpdx = dFdx(pos);
+      vec3 dpdy = dFdy(pos);
+      vec2 duvx = dFdx(vUv);
+      vec2 duvy = dFdy(vUv);
+      vec3 N = normalize(vNormal);
+      vec3 dp2perp = cross(dpdy, N);
+      vec3 dp1perp = cross(N, dpdx);
+      vec3 T = dp2perp * duvx.x + dp1perp * duvy.x;
+      vec3 B = dp2perp * duvx.y + dp1perp * duvy.y;
+      float invmax = inversesqrt(max(dot(T, T), dot(B, B)));
+      T *= invmax; B *= invmax;
 
-      // Fake internal sphere projected into the sticker surface.
-      vec2 sphereCenter = vec2(0.0, -0.015);
-      float sphereRadius = 0.31;
-      float d = length(p - sphereCenter);
-      float sphereMask = 1.0 - smoothstep(sphereRadius, sphereRadius + 0.025, d);
-      float z = sqrt(max(0.0, sphereRadius * sphereRadius - d * d));
-      vec3 n = normalize(vec3((p - sphereCenter) / sphereRadius, z / sphereRadius));
+      // View direction (fragment → camera) transformed into tangent space.
+      vec3 V = normalize(vViewPosition);
+      vec3 vT = vec3(dot(V, T), dot(V, B), dot(V, N));
 
-      // Fixed fake lighting.
-      vec3 lightDir = normalize(vec3(-0.45, 0.55, 0.75));
-      vec3 viewDir = vec3(0.0, 0.0, 1.0);
-      vec3 halfDir = normalize(lightDir + viewDir);
-      float diffuse = max(dot(n, lightDir), 0.0);
-      float spec = pow(max(dot(n, halfDir), 0.0), 42.0);
+      // ── Ray from the glass surface into the recessed chamber (−z is deeper).
+      vec3 ro = vec3(p, 0.0);
+      vec3 rd = normalize(-vT);        // rd.z < 0: marches away from the viewer
 
-      // Soft animated haze / bokeh behind the ball.
-      float haze = 0.5 + 0.5 * sin((p.x + p.y) * 12.0 + time * 0.5);
-      vec3 chamberBg = baseColor * 0.055 + baseColor * haze * 0.045;
+      // Chamber: a box of half-extent 0.5 in the plane, depth 0..-boxDepth.
+      float boxDepth = 0.6;
+      // Ball recessed inside, slightly above centre; a tiny hover keeps it alive.
+      vec3 sc = vec3(0.0, -0.02 + sin(time * 0.7) * 0.012, -0.34);
+      float R = 0.3;
 
-      // Ball shading.
-      vec3 ballDark = baseColor * 0.28;
-      vec3 ballMid = baseColor * 0.95;
-      vec3 ballBright = mix(baseColor * 1.4, vec3(1.0), 0.22);
-      vec3 ballCol = mix(ballDark, ballMid, diffuse);
-      ballCol += ballBright * spec * 0.75;
+      // Fixed light in tangent space → stable regardless of face orientation.
+      vec3 L = normalize(vec3(-0.4, 0.5, 0.72));
 
-      // Fake depth-of-field: soften contrast toward the sphere edge.
-      float focus = smoothstep(0.03, 0.20, abs(z - sphereRadius * 0.82));
-      float sphereEdge = smoothstep(sphereRadius * 0.72, sphereRadius, d);
-      ballCol = mix(ballCol, baseColor * 0.30, focus * 0.25 + sphereEdge * 0.22);
+      // Analytic ray/sphere intersection (rd normalized).
+      vec3 oc = ro - sc;
+      float b = dot(oc, rd);
+      float c = dot(oc, oc) - R * R;
+      float h = b * b - c;
+      float tHit = (h > 0.0) ? (-b - sqrt(h)) : -1.0;
+      bool hitBall = tHit > 0.0;
 
-      // Glass rim glow.
+      vec3 interior;
+      if (hitBall) {
+        vec3 hp = ro + rd * tHit;
+        vec3 nrm = normalize(hp - sc);
+        vec3 toEye = -rd;              // toward the viewer
+        vec3 hlf = normalize(L + toEye);
+        float diff = max(dot(nrm, L), 0.0);
+        float spec = pow(max(dot(nrm, hlf), 0.0), 48.0);
+        float fres = pow(1.0 - max(dot(nrm, toEye), 0.0), 3.0);
+        // Occlusion: darker on the underside where it meets the chamber floor.
+        float ao = smoothstep(-R * 0.9, R * 0.6, hp.y - sc.y) * 0.5 + 0.5;
+
+        vec3 ballDark = baseColor * 0.16;
+        vec3 ballLit  = baseColor * 1.05;
+        interior = mix(ballDark, ballLit, diff) * ao;
+        interior += vec3(1.0) * spec * 0.8;                     // hot highlight
+        interior += mix(baseColor * 1.3, vec3(1.0), 0.4) * fres * 0.4; // rim light
+      } else {
+        // Missed the ball → hit the back wall of the chamber.
+        float tb = -boxDepth / min(rd.z, -0.001);
+        vec3 wp = ro + rd * tb;
+        float wv = 1.0 - smoothstep(0.15, 0.72, length(wp.xy));  // centre vignette
+        interior = baseColor * 0.05 * (0.4 + wv * 0.9);
+        // Soft contact shadow the ball casts onto the wall (light ≈ from front).
+        float shad = smoothstep(R * 1.5, R * 0.55, length(wp.xy - sc.xy));
+        interior *= 1.0 - shad * 0.55;
+        // Faint animated bokeh haze deep in the chamber.
+        float haze = 0.5 + 0.5 * sin((wp.x + wp.y) * 10.0 + time * 0.5);
+        interior += baseColor * haze * 0.03 * wv;
+      }
+
+      // ── Glass front (locked to the surface, not parallaxed → reads as a pane).
       float rim = smoothstep(0.34, 0.49, r) * (1.0 - smoothstep(0.48, 0.51, r));
       vec3 rimCol = mix(baseColor * 1.2, vec3(0.75, 0.95, 1.0), 0.65);
 
-      // Diagonal reflection slash.
-      float slash = smoothstep(0.035, 0.0, abs((p.x + p.y * 0.55) - 0.10));
+      float slash = smoothstep(0.035, 0.0, abs((p.x + p.y * 0.55) - 0.1));
       slash *= smoothstep(0.46, 0.08, r);
 
-      // Small animated glint.
       float glint = smoothstep(0.06, 0.0, length(p - vec2(-0.17, 0.19)));
       glint *= 0.75 + 0.25 * sin(time * 1.4);
 
-      vec3 col = chamberBg;
-      col = mix(col, ballCol, sphereMask);
+      // Rounded porthole mask.
+      float chamber = 1.0 - smoothstep(0.47, 0.505, r);
+
+      vec3 col = interior;
       col += rimCol * rim * 0.75;
-      col += vec3(1.0) * slash * 0.11;
+      col += vec3(1.0) * slash * 0.1;
       col += vec3(1.0, 0.95, 0.82) * glint * 0.45;
 
-      vec3 outside = baseColor * 0.035;
-      col = mix(outside, col, chamber);
+      vec3 frame = baseColor * 0.03;
+      col = mix(frame, col, chamber);
 
       gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
     }
