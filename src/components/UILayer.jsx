@@ -201,10 +201,16 @@ export default function UILayer({
     triggerCameraOrbit: s.triggerCameraOrbit,
   })));
 
+  const hasFullScreenOverlay = showFreeplayWizard || showRandomWizard || showWormModeWizard
+    || showDisparityWizard || showDisparityBetting || showCubeModeSelect || showLevelSelect
+    || showComingSoon || showMobiusCubelet || showMobiIntro || victory || showMergeThemePicker;
+
+  const showGameHUD = !wormHealerMode && !showMainMenu && !hasFullScreenOverlay;
+
   return (
     <>
       <div className="ui-layer">
-        {!wormHealerMode && !showMainMenu && <TopMenuBar
+        {showGameHUD && <TopMenuBar
           metrics={metrics}
           size={size}
           visualMode={visualMode}
@@ -306,7 +312,7 @@ export default function UILayer({
         <TileLeaderboard cubies={cubies} size={size} chaosMode={chaosMode} visible={showLeaderboard} onClose={toggleLeaderboard} />
 
         {/* Bottom Navigation Bar */}
-        {!wormHealerMode && !showMainMenu && (
+        {showGameHUD && (
           <BottomNavBar
             onReset={onReset}
             onShuffle={currentLevelData ? onShuffleForLevel : onShuffle}
@@ -325,7 +331,7 @@ export default function UILayer({
       </div>
 
       {/* Secondary Modes Bottom Sheet */}
-      {!wormHealerMode && !showMainMenu && <SecondaryModesSheet
+      {showGameHUD && <SecondaryModesSheet
         open={sheetOpen}
         onClose={() => setSheetOpen(false)}
         mode={sheetMode}
