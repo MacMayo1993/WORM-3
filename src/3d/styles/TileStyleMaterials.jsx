@@ -262,6 +262,7 @@ const ANIMATED_STYLES = new Set([
   'oilSlick', 'constellation', 'waveform', 'dnaHelix', 'neonSign',
   'prismBloom', 'magnetFlux', 'liquidChrome', 'auroraWeave', 'plasmaCells',
   'quantumScanlines', 'emberstorm', 'fractalPulse', 'bioLattice', 'stellarLensing',
+  'orbChamber',
 ]);
 
 /**

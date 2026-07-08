@@ -1,7 +1,8 @@
 // New tile style shaders: stainedGlass, fingerprint, topographic, mandelbrot, penrose,
 //                         oilSlick, constellation, waveform, dnaHelix, neonSign,
 //                         prismBloom, magnetFlux, liquidChrome, auroraWeave, plasmaCells,
-//                         quantumScanlines, emberstorm, fractalPulse, bioLattice, stellarLensing
+//                         quantumScanlines, emberstorm, fractalPulse, bioLattice, stellarLensing,
+//                         orbChamber
 
 export const newStyleShaders = {
   // Stained Glass - cathedral leaded glass with radial + concentric segments
@@ -474,6 +475,76 @@ export const newStyleShaders = {
       float ring = smoothstep(0.34, 0.30, abs(length(d) - 0.28));
       vec3 starColor = mix(vec3(1.0), baseColor * 1.5, 0.5);
       vec3 col = baseColor * 0.06 + starColor * stars + baseColor * ring * 0.9;
+      gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+    }
+  `,
+
+  // Orb Chamber - glass porthole with a recessed, face-colored sphere inside.
+  // On a corner cubelet the three exposed stickers read as three colored balls.
+  orbChamber: `
+    uniform vec3 baseColor;
+    uniform float time;
+    varying vec2 vUv;
+
+    void main() {
+      vec2 p = vUv - 0.5;
+      float r = length(p);
+
+      // Rounded porthole window mask — center visible, edges darkened.
+      float chamber = 1.0 - smoothstep(0.47, 0.505, r);
+
+      // Fake internal sphere projected into the sticker surface.
+      vec2 sphereCenter = vec2(0.0, -0.015);
+      float sphereRadius = 0.31;
+      float d = length(p - sphereCenter);
+      float sphereMask = 1.0 - smoothstep(sphereRadius, sphereRadius + 0.025, d);
+      float z = sqrt(max(0.0, sphereRadius * sphereRadius - d * d));
+      vec3 n = normalize(vec3((p - sphereCenter) / sphereRadius, z / sphereRadius));
+
+      // Fixed fake lighting.
+      vec3 lightDir = normalize(vec3(-0.45, 0.55, 0.75));
+      vec3 viewDir = vec3(0.0, 0.0, 1.0);
+      vec3 halfDir = normalize(lightDir + viewDir);
+      float diffuse = max(dot(n, lightDir), 0.0);
+      float spec = pow(max(dot(n, halfDir), 0.0), 42.0);
+
+      // Soft animated haze / bokeh behind the ball.
+      float haze = 0.5 + 0.5 * sin((p.x + p.y) * 12.0 + time * 0.5);
+      vec3 chamberBg = baseColor * 0.055 + baseColor * haze * 0.045;
+
+      // Ball shading.
+      vec3 ballDark = baseColor * 0.28;
+      vec3 ballMid = baseColor * 0.95;
+      vec3 ballBright = mix(baseColor * 1.4, vec3(1.0), 0.22);
+      vec3 ballCol = mix(ballDark, ballMid, diffuse);
+      ballCol += ballBright * spec * 0.75;
+
+      // Fake depth-of-field: soften contrast toward the sphere edge.
+      float focus = smoothstep(0.03, 0.20, abs(z - sphereRadius * 0.82));
+      float sphereEdge = smoothstep(sphereRadius * 0.72, sphereRadius, d);
+      ballCol = mix(ballCol, baseColor * 0.30, focus * 0.25 + sphereEdge * 0.22);
+
+      // Glass rim glow.
+      float rim = smoothstep(0.34, 0.49, r) * (1.0 - smoothstep(0.48, 0.51, r));
+      vec3 rimCol = mix(baseColor * 1.2, vec3(0.75, 0.95, 1.0), 0.65);
+
+      // Diagonal reflection slash.
+      float slash = smoothstep(0.035, 0.0, abs((p.x + p.y * 0.55) - 0.10));
+      slash *= smoothstep(0.46, 0.08, r);
+
+      // Small animated glint.
+      float glint = smoothstep(0.06, 0.0, length(p - vec2(-0.17, 0.19)));
+      glint *= 0.75 + 0.25 * sin(time * 1.4);
+
+      vec3 col = chamberBg;
+      col = mix(col, ballCol, sphereMask);
+      col += rimCol * rim * 0.75;
+      col += vec3(1.0) * slash * 0.11;
+      col += vec3(1.0, 0.95, 0.82) * glint * 0.45;
+
+      vec3 outside = baseColor * 0.035;
+      col = mix(outside, col, chamber);
+
       gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
     }
   `,
