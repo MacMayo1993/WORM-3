@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { VICTORY } from '../../utils/constants.js';
-import { UI_FONT, GLASS_PANEL } from '../../utils/uiTheme.js';
+import { UI_FONT, GLASS_PANEL, GLASS_PANEL_BORDER, GLASS_TEXT, GLASS_TEXT_MUTED, GLASS_TEXT_SOFT, GLASS_SHADOW } from '../../utils/uiTheme.js';
 
 /**
  * VictoryScreen — themed to match the dark "Mobi" UI (LevelTutorial / MobiIntro):
@@ -174,7 +174,7 @@ const VictoryScreen = ({
         background: GLASS_PANEL,
         borderRadius: '16px',
         border: `1px solid ${accent}`,
-        boxShadow: `0 24px 70px rgba(0,0,0,0.6), 0 0 60px ${accent}33`,
+        boxShadow: `${GLASS_SHADOW}, 0 0 60px ${accent}33`,
         boxSizing: 'border-box',
         animation: 'vsPanelRise 0.45s cubic-bezier(0.16,1,0.3,1)'
       }}>
@@ -217,7 +217,7 @@ const VictoryScreen = ({
         {/* Description */}
         <p style={{
           fontSize: '15px',
-          color: '#cfe6f2',
+          color: GLASS_TEXT_SOFT,
           margin: '0 0 22px 0',
           lineHeight: 1.6,
           fontFamily: UI_FONT
@@ -262,10 +262,10 @@ const VictoryScreen = ({
               padding: '14px 10px',
               background: 'rgba(255,255,255,0.04)',
               borderRadius: '10px',
-              border: '1px solid rgba(255,255,255,0.08)'
+              border: `1px solid ${GLASS_PANEL_BORDER}`
             }}>
               <div style={{
-                fontSize: '10px', textTransform: 'uppercase', color: 'rgba(255,255,255,0.45)',
+                fontSize: '10px', textTransform: 'uppercase', color: GLASS_TEXT_MUTED,
                 letterSpacing: '0.12em', marginBottom: '6px', fontWeight: 700,
                 fontFamily: UI_FONT
               }}>{stat.label}</div>

@@ -12,6 +12,7 @@
  */
 
 import React, { Suspense } from 'react';
+import { MONO_FONT } from '../utils/uiTheme.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -226,7 +227,7 @@ export default function UILayer({
               position: 'fixed', bottom: '20px', left: '20px',
               background: 'rgba(0, 217, 255, 0.15)', border: '2px solid rgba(0, 217, 255, 0.4)',
               borderRadius: '8px', padding: '8px 16px', color: '#00d9ff',
-              fontFamily: "'Courier New', monospace", fontSize: '14px', fontWeight: 'bold',
+              fontFamily: MONO_FONT, fontSize: '14px', fontWeight: 'bold',
               zIndex: 100, backdropFilter: 'blur(10px)', cursor: 'pointer',
             }}
             onClick={undo}
@@ -261,7 +262,7 @@ export default function UILayer({
           }}>
             <div key={disparityCountdown} style={{
               fontSize: disparityCountdown === 'GO!' ? '6rem' : '9rem',
-              fontWeight: 900, fontFamily: 'monospace',
+              fontWeight: 900, fontFamily: MONO_FONT,
               color: disparityCountdown === 'GO!' ? '#22c55e' : '#ef4444',
               textShadow: `0 0 40px ${disparityCountdown === 'GO!' ? '#22c55e' : '#ef4444'}`,
               animation: 'disparity-cd-pop 0.3s cubic-bezier(0.22,1,0.36,1) forwards',

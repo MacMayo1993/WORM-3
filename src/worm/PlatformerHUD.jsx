@@ -4,7 +4,7 @@
 
 import React from 'react';
 import { isMobile } from '../utils/device.js';
-import { UI_FONT } from '../utils/uiTheme.js';
+import { UI_FONT, GLASS_PANEL, GLASS_PANEL_DEEP, GLASS_PANEL_BORDER, GLASS_TEXT } from '../utils/uiTheme.js';
 
 export default function PlatformerHUD({
   // Game state
@@ -203,8 +203,8 @@ const styles = {
   topBar: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
     padding: isMobile ? '6px 8px' : '8px 16px',
-    background: 'linear-gradient(180deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.3) 100%)',
-    borderBottom: '1px solid rgba(100, 100, 255, 0.3)',
+    background: `linear-gradient(180deg, ${GLASS_PANEL_DEEP} 0%, rgba(0,0,0,0.3) 100%)`,
+    borderBottom: `1px solid ${GLASS_PANEL_BORDER}`,
   },
   playerLabel: {
     display: 'flex', alignItems: 'center', gap: '8px',
@@ -266,13 +266,13 @@ const styles = {
   },
   overlay: {
     position: 'fixed', inset: 0,
-    background: 'rgba(0,0,0,0.85)',
+    background: GLASS_PANEL_DEEP,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     pointerEvents: 'auto', zIndex: 200,
   },
   overlayBox: {
     textAlign: 'center', padding: isMobile ? '24px' : '40px',
-    background: 'rgba(20, 20, 30, 0.95)',
+    background: GLASS_PANEL_DEEP,
     borderRadius: '12px',
     border: '2px solid #60a5fa',
     boxShadow: '0 0 30px rgba(96, 165, 250, 0.3)',

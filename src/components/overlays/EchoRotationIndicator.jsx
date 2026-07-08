@@ -6,6 +6,7 @@
  */
 
 import React, { useMemo } from 'react';
+import { MONO_FONT } from '../../utils/uiTheme.js';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -34,7 +35,7 @@ const DOT_BASE_STYLE = {
 const LABEL_BASE_STYLE = {
   fontSize: '12px',
   fontWeight: 600,
-  fontFamily: "'Courier New', monospace",
+  fontFamily: MONO_FONT,
   letterSpacing: '0.1em',
   textTransform: 'uppercase',
 };

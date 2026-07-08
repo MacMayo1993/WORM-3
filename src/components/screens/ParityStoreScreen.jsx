@@ -193,11 +193,11 @@ const PreviewModal = ({ item, owned, pp, onClose, onBuy, onEquip }) => {
     >
       <div
         style={{
-          background: PAPER_SHEET, border: '1px solid #cec8be',
+          background: PAPER_SHEET, border: `1px solid ${PAPER_BORDER}`,
           borderRadius: '20px', padding: '28px 24px 22px',
           width: 'min(300px, calc(100vw - 40px))',
           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px',
-          boxShadow: '0 20px 56px rgba(0,0,0,0.22), 0 2px 8px rgba(0,0,0,0.10)',
+          boxShadow: PAPER_SHADOW,
           fontFamily: FONT,
         }}
         onClick={e => e.stopPropagation()}
@@ -205,8 +205,8 @@ const PreviewModal = ({ item, owned, pp, onClose, onBuy, onEquip }) => {
         {/* Large preview */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '130px',
-          background: '#fff', borderRadius: '14px', border: '1.5px solid #d6d0c8',
-          width: '100%', boxShadow: '0 3px 0 #c4beb6',
+          background: PAPER_SHEET_RAISED, borderRadius: '14px', border: `1.5px solid ${PAPER_BORDER_SOFT}`,
+          width: '100%', boxShadow: `0 3px 0 ${PAPER_CARD_SHADOW}`,
         }}>
           {item.type === 'skin' && <WormBody skin={item} size={120} />}
           {item.type === 'hat' && (
@@ -269,9 +269,9 @@ const PreviewModal = ({ item, owned, pp, onClose, onBuy, onEquip }) => {
             ) : (
               <div style={{
                 width: '100%', padding: '12px', borderRadius: '10px', textAlign: 'center',
-                background: '#fff', border: '1.5px solid #d6d0c8',
+                background: PAPER_SHEET_RAISED, border: `1.5px solid ${PAPER_BORDER_SOFT}`,
                 color: PAPER_TEXT_FAINT, fontSize: '12px', fontWeight: 600, fontFamily: FONT,
-                boxShadow: '0 2px 0 #c4beb6',
+                boxShadow: `0 2px 0 ${PAPER_CARD_SHADOW}`,
               }}>
                 Need {item.price - pp} more PP to unlock
               </div>
@@ -282,9 +282,9 @@ const PreviewModal = ({ item, owned, pp, onClose, onBuy, onEquip }) => {
         <button
           style={{
             ...TOUCH, width: '100%', padding: '10px', borderRadius: '10px',
-            background: PAPER_BG_MUTED, border: '1.5px solid #d6d0c8',
+            background: PAPER_BG_MUTED, border: `1.5px solid ${PAPER_BORDER_SOFT}`,
             color: PAPER_TEXT_MUTED, fontSize: '13px', fontWeight: 600,
-            cursor: 'pointer', fontFamily: FONT, boxShadow: '0 2px 0 #c4beb6',
+            cursor: 'pointer', fontFamily: FONT, boxShadow: `0 2px 0 ${PAPER_CARD_SHADOW}`,
           }}
           onClick={onClose}
         >Cancel</button>
@@ -305,12 +305,12 @@ const ItemCard = ({ item, owned, equipped, pp, onPreview, onEquip }) => {
       style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '7px',
         padding: '12px 8px 10px',
-        background: equipped ? `${ac}10` : '#ffffff',
-        border: equipped ? `2px solid ${ac}` : '2px solid #d6d0c8',
+        background: equipped ? `${ac}10` : PAPER_SHEET_RAISED,
+        border: equipped ? `2px solid ${ac}` : `2px solid ${PAPER_BORDER_SOFT}`,
         borderRadius: '12px', cursor: 'pointer', position: 'relative',
         boxShadow: equipped
           ? 'inset 0 2px 4px rgba(0,0,0,0.08)'
-          : '0 3px 0 #c4beb6, 0 4px 8px rgba(0,0,0,0.06)',
+          : `0 3px 0 ${PAPER_CARD_SHADOW}, 0 4px 8px rgba(0,0,0,0.06)`,
         transform: equipped ? 'translateY(1px)' : 'none',
         opacity: locked && !canAfford ? 0.6 : 1,
         transition: 'all 0.15s ease',
@@ -502,8 +502,8 @@ const ParityStoreScreen = ({ onClose }) => {
           {/* PP balance */}
           <div style={{
             padding: '8px 14px', borderRadius: '12px',
-            background: '#fff', border: '1.5px solid #d6d0c8',
-            boxShadow: '0 3px 0 #c4beb6',
+            background: PAPER_SHEET_RAISED, border: `1.5px solid ${PAPER_BORDER_SOFT}`,
+            boxShadow: `0 3px 0 ${PAPER_CARD_SHADOW}`,
             textAlign: 'right',
           }}>
             <div style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: PAPER_TEXT_FAINT }}>Balance</div>
@@ -517,10 +517,10 @@ const ParityStoreScreen = ({ onClose }) => {
             onPointerDown={onClose}
             style={{
               ...TOUCH, width: 40, height: 40, borderRadius: '12px',
-              background: '#fff', border: '1.5px solid #d6d0c8',
+              background: PAPER_SHEET_RAISED, border: `1.5px solid ${PAPER_BORDER_SOFT}`,
               color: PAPER_TEXT_MUTED, cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 2px 0 #c4beb6', fontFamily: FONT,
+              boxShadow: `0 2px 0 ${PAPER_CARD_SHADOW}`, fontFamily: FONT,
             }}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
@@ -541,12 +541,12 @@ const ParityStoreScreen = ({ onClose }) => {
               style={{
                 ...TOUCH,
                 padding: '8px 18px', borderRadius: '10px', cursor: 'pointer',
-                background: active ? '#fff' : 'transparent',
-                border: active ? `2px solid ${t.accent}` : '2px solid #d6d0c8',
+                background: active ? PAPER_SHEET_RAISED : 'transparent',
+                border: active ? `2px solid ${t.accent}` : `2px solid ${PAPER_BORDER_SOFT}`,
                 color: active ? t.accent : PAPER_TEXT_MUTED,
                 fontSize: '12px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
                 fontFamily: FONT, whiteSpace: 'nowrap',
-                boxShadow: active ? `inset 0 2px 4px rgba(0,0,0,0.06)` : '0 2px 0 #c4beb6',
+                boxShadow: active ? `inset 0 2px 4px rgba(0,0,0,0.06)` : `0 2px 0 ${PAPER_CARD_SHADOW}`,
                 transform: active ? 'translateY(1px)' : 'none',
                 transition: 'all 0.15s ease',
               }}
@@ -556,10 +556,10 @@ const ParityStoreScreen = ({ onClose }) => {
       </div>
 
       {/* Divider */}
-      <div style={{ margin: '14px 20px 0', borderTop: '1px solid #d6d0c8', flexShrink: 0 }} />
+      <div style={{ margin: '14px 20px 0', borderTop: `1px solid ${PAPER_BORDER_SOFT}`, flexShrink: 0 }} />
 
       {/* Content */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '14px 20px 16px', scrollbarWidth: 'thin', scrollbarColor: '#c4beb6 transparent' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '14px 20px 16px', scrollbarWidth: 'thin', scrollbarColor: `${PAPER_CARD_SHADOW} transparent` }}>
         {tab === 'skins'   && renderItems(SKINS)}
         {tab === 'hats'    && renderItems(HATS)}
         {tab === 'schemes' && renderItems(SCHEMES)}
@@ -575,7 +575,7 @@ const ParityStoreScreen = ({ onClose }) => {
       {/* Footer hint */}
       <div style={{
         padding: '10px 20px 18px', textAlign: 'center',
-        borderTop: '1px solid #d6d0c8', flexShrink: 0,
+        borderTop: `1px solid ${PAPER_BORDER_SOFT}`, flexShrink: 0,
         background: PAPER_FOOTER_BG,
       }}>
         <span style={{ fontSize: '11px', color: PAPER_TEXT_FAINT, fontFamily: FONT }}>

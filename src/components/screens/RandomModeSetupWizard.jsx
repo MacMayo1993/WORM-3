@@ -1,32 +1,13 @@
 import React, { useState } from 'react';
 import { BACKGROUNDS, getBackgroundUrl } from '../../utils/backgrounds.js';
-import { UI_FONT } from '../../utils/uiTheme.js';
-
-const BG_PREVIEWS = {
-  blackhole: 'radial-gradient(circle, #1a0033 0%, #000000 100%)',
-  cave: 'linear-gradient(135deg, #3d2817 0%, #1a120a 100%)',
-  beach: 'linear-gradient(180deg, #87ceeb 0%, #f4e4c1 70%, #c2b280 100%)',
-  forest: 'linear-gradient(180deg, #6b8e23 0%, #2d5016 50%, #1a2f0f 100%)',
-  park: 'linear-gradient(180deg, #a8d5ba 0%, #7cb89d 50%, #4a7c59 100%)',
-  night: 'linear-gradient(180deg, #0f0f23 0%, #1a1a3e 50%, #050510 100%)',
-  city: 'linear-gradient(180deg, #4a5568 0%, #2d3748 50%, #1a202c 100%)',
-  apartment: 'linear-gradient(135deg, #f5f5dc 0%, #deb887 50%, #cd853f 100%)',
-  lobby: 'linear-gradient(135deg, #e8e8e8 0%, #b8b8b8 50%, #707070 100%)',
-  warehouse: 'linear-gradient(180deg, #6e6e6e 0%, #4a4a4a 50%, #2c2c2c 100%)',
-  studio: 'linear-gradient(180deg, #ffffff 0%, #f0f0f0 50%, #d0d0d0 100%)',
-  dark: 'linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%)',
-  midnight: 'linear-gradient(135deg, #191970 0%, #0c0c38 100%)',
-  cobblestone: 'linear-gradient(135deg, #8b8b8b 0%, #555555 100%)',
-  desert: 'linear-gradient(180deg, #edc9af 0%, #d2b48c 100%)',
-  fireplace: 'linear-gradient(135deg, #5c2c2c 0%, #2a1a1a 100%)',
-  lounge: 'linear-gradient(135deg, #4a3b2a 0%, #2a221a 100%)',
-  paris: 'linear-gradient(180deg, #aaddff 0%, #dceeff 100%)',
-  shanghai: 'linear-gradient(180deg, #1a2a6c 0%, #b21f1f 100%)',
-  snow: 'linear-gradient(180deg, #eef7ff 0%, #cceeff 100%)',
-  stadium: 'linear-gradient(180deg, #3a7bd5 0%, #3a6073 100%)',
-  sunset: 'linear-gradient(180deg, #ff7e5f 0%, #feb47b 100%)',
-  umbrella: 'linear-gradient(135deg, #ff9966 0%, #ff5e62 100%)',
-};
+import {
+  UI_FONT,
+  PAPER_BACKDROP, PAPER_BACKDROP_BLUR,
+  PAPER_SHEET, PAPER_SHEET_RAISED, PAPER_BORDER, PAPER_BORDER_SOFT,
+  PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT,
+  PAPER_FOOTER_BG, PAPER_BG_MUTED, PAPER_CARD_SHADOW, PAPER_SHADOW,
+} from '../../utils/uiTheme.js';
+import { BG_PREVIEWS } from '../../utils/bgPreviews.js';
 
 const BG_OPTIONS = BACKGROUNDS.map(bg => ({
   value: bg.id,
@@ -50,26 +31,26 @@ const ACCENT_SHADOW = '#7a2e00';
 const S = {
   overlay: {
     position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-    background: 'rgba(160,152,140,0.60)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)',
+    background: PAPER_BACKDROP, backdropFilter: PAPER_BACKDROP_BLUR, WebkitBackdropFilter: PAPER_BACKDROP_BLUR,
     zIndex: 1000, fontFamily: UI_FONT,
     animation: 'modalBackdropIn 0.22s ease',
   },
   sheet: {
-    background: '#f5f0e8', borderRadius: '20px', width: 'min(560px, 96vw)',
+    background: PAPER_SHEET, borderRadius: '20px', width: 'min(560px, 96vw)',
     maxHeight: '88vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
-    boxShadow: '0 20px 56px rgba(0,0,0,0.22), 0 2px 8px rgba(0,0,0,0.10)',
+    boxShadow: PAPER_SHADOW,
     border: '1px solid #cec8be', animation: 'modalSheetIn 0.30s cubic-bezier(0.22, 1, 0.36, 1)',
   },
   header: { padding: '28px 32px 0', flexShrink: 0 },
   dot: (active, current) => ({
     height: '8px', borderRadius: '3px',
-    background: current ? ACCENT : active ? `${ACCENT}66` : '#cec8be',
+    background: current ? ACCENT : active ? `${ACCENT}66` : PAPER_BORDER,
     flex: current ? '2' : '1', transition: 'all 0.35s cubic-bezier(0.4,0,0.2,1)',
     boxShadow: current ? `0 1px 4px ${ACCENT}55` : 'none',
   }),
-  title: { fontSize: '22px', fontWeight: '700', letterSpacing: '-0.5px', color: '#1e1612', margin: '0 0 4px', lineHeight: 1.15 },
-  subtitle: { fontSize: '13px', color: '#7a6e62', margin: '0 0 16px', fontWeight: '400' },
-  body: { padding: '0 32px', overflowY: 'auto', flex: 1, scrollbarWidth: 'thin', scrollbarColor: '#c4beb6 transparent' },
+  title: { fontSize: '22px', fontWeight: '700', letterSpacing: '-0.5px', color: PAPER_TEXT, margin: '0 0 4px', lineHeight: 1.15 },
+  subtitle: { fontSize: '13px', color: PAPER_TEXT_MUTED, margin: '0 0 16px', fontWeight: '400' },
+  body: { padding: '0 32px', overflowY: 'auto', flex: 1, scrollbarWidth: 'thin', scrollbarColor: `${PAPER_CARD_SHADOW} transparent` },
   bgGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', paddingBottom: '8px' },
   bgCard: (selected) => ({
     borderRadius: '10px', overflow: 'hidden',
@@ -87,21 +68,21 @@ const S = {
     display: 'flex', flexDirection: 'column', gap: '10px', padding: '14px 14px',
     borderRadius: '10px',
     border: selected ? `2px solid ${ACCENT}` : '2px solid #d6d0c8',
-    background: selected ? `${ACCENT}12` : '#ffffff',
+    background: selected ? `${ACCENT}12` : PAPER_SHEET_RAISED,
     boxShadow: selected
       ? 'inset 0 2px 5px rgba(0,0,0,0.10), 0 1px 0 rgba(255,255,255,0.6)'
-      : '0 3px 0 #c4beb6, 0 4px 10px rgba(0,0,0,0.06)',
+      : `0 3px 0 ${PAPER_CARD_SHADOW}, 0 4px 10px rgba(0,0,0,0.06)`,
     transform: selected ? 'translateY(1px)' : 'none',
     cursor: 'pointer', transition: 'all 0.18s ease', outline: 'none',
     WebkitTapHighlightColor: 'transparent', textAlign: 'left', fontFamily: 'inherit', position: 'relative',
   }),
   footer: {
     padding: '16px 32px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    flexShrink: 0, borderTop: '1px solid #d6d0c8', background: '#ede8df',
+    flexShrink: 0, borderTop: '1px solid #d6d0c8', background: PAPER_FOOTER_BG,
   },
   btnSecondary: {
     background: 'none', border: '1.5px solid #d6d0c8', fontSize: '15px', fontWeight: '500',
-    color: '#7a6e62', cursor: 'pointer', padding: '10px 16px',
+    color: PAPER_TEXT_MUTED, cursor: 'pointer', padding: '10px 16px',
     borderRadius: '10px', transition: 'all 0.15s ease', fontFamily: 'inherit',
   },
   btnPrimary: {
@@ -175,10 +156,10 @@ const RandomModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
               </div>
               <div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px', marginBottom: '2px' }}>
-                  <span style={{ fontSize: '15px', fontWeight: '700', color: '#1e1612', letterSpacing: '-0.4px' }}>{name}</span>
-                  <span style={{ fontSize: '10px', fontWeight: '600', letterSpacing: '0.04em', textTransform: 'uppercase', color: selected ? ACCENT : '#9a8e82' }}>{tag}</span>
+                  <span style={{ fontSize: '15px', fontWeight: '700', color: PAPER_TEXT, letterSpacing: '-0.4px' }}>{name}</span>
+                  <span style={{ fontSize: '10px', fontWeight: '600', letterSpacing: '0.04em', textTransform: 'uppercase', color: selected ? ACCENT : PAPER_TEXT_FAINT }}>{tag}</span>
                 </div>
-                <div style={{ fontSize: '11px', color: '#9a8e82' }}>{desc}</div>
+                <div style={{ fontSize: '11px', color: PAPER_TEXT_FAINT }}>{desc}</div>
               </div>
             </div>
             {selected && (
@@ -225,8 +206,8 @@ const RandomModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
 
         <div style={S.footer}>
           <button style={S.btnSecondary} onClick={handleBack}
-            onMouseEnter={e => { e.currentTarget.style.color = '#1e1612'; e.currentTarget.style.borderColor = '#b8b2aa'; }}
-            onMouseLeave={e => { e.currentTarget.style.color = '#7a6e62'; e.currentTarget.style.borderColor = '#d6d0c8'; }}>
+            onMouseEnter={e => { e.currentTarget.style.color = PAPER_TEXT; e.currentTarget.style.borderColor = '#b8b2aa'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = PAPER_TEXT_MUTED; e.currentTarget.style.borderColor = PAPER_BORDER_SOFT; }}>
             {step === 0 ? 'Cancel' : 'Back'}
           </button>
           <button style={S.btnPrimary} onClick={handleNext}

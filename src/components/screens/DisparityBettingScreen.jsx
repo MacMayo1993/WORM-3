@@ -18,26 +18,26 @@ const S = {
   overlay: {
     position: 'fixed', inset: 0, zIndex: 9998,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    background: 'rgba(160,152,140,0.60)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)',
+    background: PAPER_BACKDROP, backdropFilter: PAPER_BACKDROP_BLUR, WebkitBackdropFilter: PAPER_BACKDROP_BLUR,
     padding: '12px',
     fontFamily: UI_FONT,
     animation: 'modalBackdropIn 0.22s ease',
     pointerEvents: 'auto',
   },
   sheet: {
-    background: '#f5f0e8', borderRadius: '20px', width: 'min(600px, 100%)',
+    background: PAPER_SHEET, borderRadius: '20px', width: 'min(600px, 100%)',
     maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
-    boxShadow: '0 20px 56px rgba(0,0,0,0.22), 0 2px 8px rgba(0,0,0,0.10)',
-    border: '1px solid #cec8be', animation: 'modalSheetIn 0.30s cubic-bezier(0.22, 1, 0.36, 1)',
+    boxShadow: PAPER_SHADOW,
+    border: `1px solid ${PAPER_BORDER}`, animation: 'modalSheetIn 0.30s cubic-bezier(0.22, 1, 0.36, 1)',
   },
   header: { padding: '24px 28px 16px', flexShrink: 0 },
   body: {
     padding: '0 28px', overflowY: 'auto', flex: 1,
-    scrollbarWidth: 'thin', scrollbarColor: '#c4beb6 transparent',
+    scrollbarWidth: 'thin', scrollbarColor: `${PAPER_CARD_SHADOW} transparent`,
   },
   footer: {
     padding: '16px 28px 22px', display: 'flex', flexDirection: 'column', gap: '10px',
-    flexShrink: 0, borderTop: '1px solid #d6d0c8', background: '#ede8df',
+    flexShrink: 0, borderTop: `1px solid ${PAPER_BORDER_SOFT}`, background: PAPER_FOOTER_BG,
   },
   badge: {
     display: 'inline-flex', alignItems: 'center', gap: '6px',
@@ -46,17 +46,17 @@ const S = {
   },
   wallet: {
     padding: '10px 14px', borderRadius: '12px',
-    background: '#ffffff', border: '1.5px solid #d6d0c8',
+    background: PAPER_SHEET_RAISED, border: `1.5px solid ${PAPER_BORDER_SOFT}`,
     boxShadow: '0 2px 4px rgba(0,0,0,0.06)',
     textAlign: 'right', flexShrink: 0,
   },
   betCard: (selected) => ({
     flex: '1 1 130px', minWidth: '120px', maxWidth: '200px',
     padding: '14px 12px 12px',
-    background: selected ? `${ACCENT}14` : '#ffffff',
-    border: selected ? `2px solid ${ACCENT}` : '2px solid #d6d0c8',
+    background: selected ? `${ACCENT}14` : PAPER_SHEET_RAISED,
+    border: selected ? `2px solid ${ACCENT}` : `2px solid ${PAPER_BORDER_SOFT}`,
     borderRadius: '12px', cursor: 'pointer', textAlign: 'left',
-    boxShadow: selected ? `inset 0 2px 4px rgba(0,0,0,0.06)` : '0 3px 0 #c4beb6, 0 4px 10px rgba(0,0,0,0.06)',
+    boxShadow: selected ? `inset 0 2px 4px rgba(0,0,0,0.06)` : `0 3px 0 ${PAPER_CARD_SHADOW}, 0 4px 10px rgba(0,0,0,0.06)`,
     transform: selected ? 'translateY(1px)' : 'none',
     transition: 'all 0.15s ease', position: 'relative',
     fontFamily: 'inherit',
@@ -65,7 +65,7 @@ const S = {
   stepDot: (done, active) => ({
     width: '22px', height: '22px', borderRadius: '6px', flexShrink: 0,
     background: done ? ACCENT : active ? `${ACCENT}20` : '#e8e2da',
-    border: done ? 'none' : active ? `2px solid ${ACCENT}` : '2px solid #d6d0c8',
+    border: done ? 'none' : active ? `2px solid ${ACCENT}` : `2px solid ${PAPER_BORDER_SOFT}`,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     fontSize: '10px', fontWeight: 800,
     color: done ? '#fff' : active ? ACCENT : '#a09890',
@@ -77,25 +77,25 @@ const S = {
     textTransform: 'uppercase', color: '#a09890',
   },
   hint: {
-    fontSize: '12px', color: '#9a8e82',
+    fontSize: '12px', color: PAPER_TEXT_FAINT,
     fontFamily: UI_FONT,
     textAlign: 'center',
   },
   primaryBtn: (enabled) => ({
     flex: 1, padding: '14px 20px', borderRadius: '10px',
     cursor: enabled ? 'pointer' : 'not-allowed',
-    background: enabled ? ACCENT : '#d6d0c8',
+    background: enabled ? ACCENT : PAPER_BORDER_SOFT,
     border: 'none', fontFamily: 'inherit', fontSize: '14px', fontWeight: 800,
     color: enabled ? '#fff' : '#a09890',
     transition: 'all 0.12s ease',
-    boxShadow: enabled ? `0 4px 0 ${ACCENT_SHADOW}, 0 6px 16px ${ACCENT}44` : '0 3px 0 #c4beb6',
+    boxShadow: enabled ? `0 4px 0 ${ACCENT_SHADOW}, 0 6px 16px ${ACCENT}44` : `0 3px 0 ${PAPER_CARD_SHADOW}`,
     touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
   }),
   skipBtn: {
     padding: '14px 18px', borderRadius: '10px', cursor: 'pointer',
-    background: 'none', border: '1.5px solid #d6d0c8',
+    background: 'none', border: `1.5px solid ${PAPER_BORDER_SOFT}`,
     fontFamily: 'inherit', fontSize: '14px', fontWeight: 600,
-    color: '#7a6e62', whiteSpace: 'nowrap',
+    color: PAPER_TEXT_MUTED, whiteSpace: 'nowrap',
     boxShadow: 'none',
     touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
   },
@@ -121,17 +121,17 @@ const BetTypeCard = ({ betType, selected, onSelect }) => (
     <div style={{
       position: 'absolute', top: '8px', right: '8px',
       background: selected ? ACCENT : '#e8e2da',
-      border: selected ? 'none' : '1.5px solid #d6d0c8',
+      border: selected ? 'none' : `1.5px solid ${PAPER_BORDER_SOFT}`,
       borderRadius: '6px', padding: '2px 7px',
       fontSize: '11px', fontWeight: 900,
-      color: selected ? '#fff' : '#9a8e82',
+      color: selected ? '#fff' : PAPER_TEXT_FAINT,
       boxShadow: selected ? `0 2px 0 ${ACCENT_SHADOW}` : 'none',
       fontFamily: 'inherit',
     }}>{betType.odds}×</div>
-    <div style={{ fontSize: '12px', fontWeight: 800, letterSpacing: '-0.02em', color: selected ? ACCENT : '#1e1612', fontFamily: 'inherit', marginBottom: '4px', paddingRight: '36px' }}>
+    <div style={{ fontSize: '12px', fontWeight: 800, letterSpacing: '-0.02em', color: selected ? ACCENT : PAPER_TEXT, fontFamily: 'inherit', marginBottom: '4px', paddingRight: '36px' }}>
       {betType.label}
     </div>
-    <div style={{ fontSize: '11px', lineHeight: 1.45, color: '#7a6e62', fontFamily: 'inherit' }}>
+    <div style={{ fontSize: '11px', lineHeight: 1.45, color: PAPER_TEXT_MUTED, fontFamily: 'inherit' }}>
       {betType.tagline}
     </div>
   </button>
@@ -147,11 +147,11 @@ const FacePicker = ({ value, onChange }) => (
         <button key={id} onPointerDown={() => onChange(faceId)} style={{
           display: 'flex', alignItems: 'center', gap: '6px',
           padding: '7px 13px', borderRadius: '100px', cursor: 'pointer',
-          border: selected ? `2px solid ${info.hex}` : '2px solid #d6d0c8',
-          background: selected ? `${info.hex}20` : '#ffffff',
+          border: selected ? `2px solid ${info.hex}` : `2px solid ${PAPER_BORDER_SOFT}`,
+          background: selected ? `${info.hex}20` : PAPER_SHEET_RAISED,
           fontFamily: 'inherit', fontSize: '12px', fontWeight: 700,
-          color: selected ? info.hex : '#7a6e62',
-          boxShadow: selected ? 'none' : '0 2px 0 #c4beb6',
+          color: selected ? info.hex : PAPER_TEXT_MUTED,
+          boxShadow: selected ? 'none' : `0 2px 0 ${PAPER_CARD_SHADOW}`,
           transform: selected ? 'translateY(1px)' : 'none',
           transition: 'all 0.15s ease',
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
@@ -175,11 +175,11 @@ const PairPicker = ({ value, onChange }) => (
         <button key={pair.id} onPointerDown={() => onChange(pair.id)} style={{
           display: 'flex', alignItems: 'center', gap: '6px',
           padding: '8px 14px', borderRadius: '100px', cursor: 'pointer',
-          border: selected ? `2px solid ${pair.color}` : '2px solid #d6d0c8',
-          background: selected ? `${pair.color}20` : '#ffffff',
+          border: selected ? `2px solid ${pair.color}` : `2px solid ${PAPER_BORDER_SOFT}`,
+          background: selected ? `${pair.color}20` : PAPER_SHEET_RAISED,
           fontFamily: 'inherit', fontSize: '12px', fontWeight: 700,
-          color: selected ? pair.color : '#7a6e62',
-          boxShadow: selected ? 'none' : '0 2px 0 #c4beb6',
+          color: selected ? pair.color : PAPER_TEXT_MUTED,
+          boxShadow: selected ? 'none' : `0 2px 0 ${PAPER_CARD_SHADOW}`,
           transform: selected ? 'translateY(1px)' : 'none',
           transition: 'all 0.15s ease',
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
@@ -205,17 +205,17 @@ const SpeedPicker = ({ value, onChange }) => (
       return (
         <button key={opt.id} onPointerDown={() => onChange(opt.id)} style={{
           flex: 1, padding: '14px', borderRadius: '12px', cursor: 'pointer',
-          border: selected ? `2px solid ${opt.color}` : '2px solid #d6d0c8',
-          background: selected ? `${opt.color}14` : '#ffffff',
+          border: selected ? `2px solid ${opt.color}` : `2px solid ${PAPER_BORDER_SOFT}`,
+          background: selected ? `${opt.color}14` : PAPER_SHEET_RAISED,
           textAlign: 'center',
-          boxShadow: selected ? 'none' : '0 3px 0 #c4beb6',
+          boxShadow: selected ? 'none' : `0 3px 0 ${PAPER_CARD_SHADOW}`,
           transform: selected ? 'translateY(1px)' : 'none',
           transition: 'all 0.15s ease',
           fontFamily: 'inherit',
           touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
         }}>
-          <div style={{ fontSize: '14px', fontWeight: 800, color: selected ? opt.color : '#1e1612' }}>{opt.label}</div>
-          <div style={{ fontSize: '11px', color: '#9a8e82', marginTop: '2px' }}>{opt.sub}</div>
+          <div style={{ fontSize: '14px', fontWeight: 800, color: selected ? opt.color : PAPER_TEXT }}>{opt.label}</div>
+          <div style={{ fontSize: '11px', color: PAPER_TEXT_FAINT, marginTop: '2px' }}>{opt.sub}</div>
         </button>
       );
     })}
@@ -274,10 +274,10 @@ const DisparityBettingScreen = ({ onBetPlaced, onSkip }) => {
                     <span style={{ fontSize: '13px' }}>🎲</span>
                     <span style={{ fontSize: '11px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#fff' }}>Parity Roulette</span>
                   </div>
-                  <h2 style={{ margin: 0, fontSize: 'clamp(20px,5vw,26px)', fontWeight: 900, color: '#1e1612', letterSpacing: '-0.04em', lineHeight: 1.1 }}>
+                  <h2 style={{ margin: 0, fontSize: 'clamp(20px,5vw,26px)', fontWeight: 900, color: PAPER_TEXT, letterSpacing: '-0.04em', lineHeight: 1.1 }}>
                     Place Your Bet
                   </h2>
-                  <p style={{ margin: '6px 0 0', fontSize: '13px', color: '#7a6e62', lineHeight: 1.5 }}>
+                  <p style={{ margin: '6px 0 0', fontSize: '13px', color: PAPER_TEXT_MUTED, lineHeight: 1.5 }}>
                     Pick a wager before the round starts — wins are paid in PP.
                   </p>
                 </div>
@@ -285,7 +285,7 @@ const DisparityBettingScreen = ({ onBetPlaced, onSkip }) => {
                 {/* Wallet */}
                 <div style={S.wallet}>
                   <div style={{ fontSize: '9px', fontWeight: 800, letterSpacing: '0.16em', textTransform: 'uppercase', color: '#a09890' }}>Balance</div>
-                  <div style={{ fontSize: '18px', fontWeight: 900, color: '#1e1612' }}>{parityPoints} <span style={{ fontSize: '11px', color: '#9a8e82', fontWeight: 600 }}>PP</span></div>
+                  <div style={{ fontSize: '18px', fontWeight: 900, color: PAPER_TEXT }}>{parityPoints} <span style={{ fontSize: '11px', color: PAPER_TEXT_FAINT, fontWeight: 600 }}>PP</span></div>
                   {betStreak > 0 && (
                     <div style={{ fontSize: '10px', color: ACCENT, fontWeight: 700, marginTop: '2px' }}>
                       {betStreak}× streak · {mult.toFixed(1)}× bonus
@@ -310,7 +310,7 @@ const DisparityBettingScreen = ({ onBetPlaced, onSkip }) => {
               <StepLabel n={2} done={pick !== null} active={!!betDef && pick === null} label="Make Your Pick" />
               {betDef ? (
                 <>
-                  <p style={{ margin: '0 0 10px', fontSize: '12px', color: '#7a6e62', lineHeight: 1.5 }}>{betDef.desc}</p>
+                  <p style={{ margin: '0 0 10px', fontSize: '12px', color: PAPER_TEXT_MUTED, lineHeight: 1.5 }}>{betDef.desc}</p>
                   {(selectedType === 'SURVIVOR' || selectedType === 'FIRST_OUT') && <FacePicker value={pick} onChange={setPick} />}
                   {selectedType === 'PAIR' && <PairPicker value={pick} onChange={setPick} />}
                   {selectedType === 'SPEED' && <SpeedPicker value={pick} onChange={setPick} />}
@@ -333,11 +333,11 @@ const DisparityBettingScreen = ({ onBetPlaced, onSkip }) => {
                     <button key={preset} onPointerDown={() => !disabled && setWager(preset)} style={{
                       padding: '6px 14px', borderRadius: '100px',
                       cursor: disabled ? 'not-allowed' : 'pointer',
-                      border: active ? `2px solid ${ACCENT}` : '2px solid #d6d0c8',
-                      background: active ? `${ACCENT}14` : '#ffffff',
+                      border: active ? `2px solid ${ACCENT}` : `2px solid ${PAPER_BORDER_SOFT}`,
+                      background: active ? `${ACCENT}14` : PAPER_SHEET_RAISED,
                       fontFamily: 'inherit', fontSize: '12px', fontWeight: 700,
-                      color: active ? ACCENT : disabled ? '#c4beb6' : '#7a6e62',
-                      boxShadow: active ? 'none' : '0 2px 0 #c4beb6',
+                      color: active ? ACCENT : disabled ? PAPER_CARD_SHADOW : PAPER_TEXT_MUTED,
+                      boxShadow: active ? 'none' : `0 2px 0 ${PAPER_CARD_SHADOW}`,
                       transform: active ? 'translateY(1px)' : 'none',
                       opacity: disabled ? 0.4 : 1,
                       transition: 'all 0.13s ease',
@@ -348,11 +348,11 @@ const DisparityBettingScreen = ({ onBetPlaced, onSkip }) => {
                 {maxWager > 0 && !WAGER_PRESETS.includes(maxWager) && (
                   <button onPointerDown={() => setWager(maxWager)} style={{
                     padding: '6px 14px', borderRadius: '100px', cursor: 'pointer',
-                    border: wager === maxWager ? `2px solid ${ACCENT}` : '2px solid #d6d0c8',
-                    background: wager === maxWager ? `${ACCENT}14` : '#ffffff',
+                    border: wager === maxWager ? `2px solid ${ACCENT}` : `2px solid ${PAPER_BORDER_SOFT}`,
+                    background: wager === maxWager ? `${ACCENT}14` : PAPER_SHEET_RAISED,
                     fontFamily: 'inherit', fontSize: '12px', fontWeight: 700,
-                    color: wager === maxWager ? ACCENT : '#7a6e62',
-                    boxShadow: wager === maxWager ? 'none' : '0 2px 0 #c4beb6',
+                    color: wager === maxWager ? ACCENT : PAPER_TEXT_MUTED,
+                    boxShadow: wager === maxWager ? 'none' : `0 2px 0 ${PAPER_CARD_SHADOW}`,
                     transform: wager === maxWager ? 'translateY(1px)' : 'none',
                     touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
                   }}>All-in ({maxWager} PP)</button>
@@ -369,7 +369,7 @@ const DisparityBettingScreen = ({ onBetPlaced, onSkip }) => {
                   <div>
                     <div style={{ fontSize: '9px', fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#a09890' }}>Potential win</div>
                     <div style={{ fontSize: '22px', fontWeight: 900, color: ACCENT, letterSpacing: '-0.03em' }}>+{profit} PP</div>
-                    <div style={{ fontSize: '10px', color: '#9a8e82', marginTop: '1px' }}>{effectiveOdds}× odds{mult > 1 ? ` · ${mult.toFixed(1)}× streak` : ''}</div>
+                    <div style={{ fontSize: '10px', color: PAPER_TEXT_FAINT, marginTop: '1px' }}>{effectiveOdds}× odds{mult > 1 ? ` · ${mult.toFixed(1)}× streak` : ''}</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: '9px', fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#a09890' }}>If you lose</div>

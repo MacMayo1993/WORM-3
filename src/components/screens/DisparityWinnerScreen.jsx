@@ -279,10 +279,10 @@ export default function DisparityWinnerScreen({ onDismiss }) {
               userSelect: 'none',
             }}
           >
-            <span style={{ fontSize: '0.65rem', color: 'rgba(0,0,0,0.5)', fontFamily: 'monospace', letterSpacing: '0.05em', marginBottom: 4 }}>
+            <span style={{ fontSize: '0.65rem', color: 'rgba(0,0,0,0.5)', fontFamily: MONO_FONT, letterSpacing: '0.05em', marginBottom: 4 }}>
               WINNER
             </span>
-            <span style={{ fontSize: '1.6rem', fontWeight: 900, fontFamily: 'monospace', color: '#000', letterSpacing: '0.03em' }}>
+            <span style={{ fontSize: '1.6rem', fontWeight: 900, fontFamily: MONO_FONT, color: '#000', letterSpacing: '0.03em' }}>
               {winnerGridId}
             </span>
           </div>
@@ -311,10 +311,10 @@ export default function DisparityWinnerScreen({ onDismiss }) {
                 userSelect: 'none',
               }}
             >
-              <span style={{ fontSize: '0.65rem', color: 'rgba(0,0,0,0.5)', fontFamily: 'monospace', letterSpacing: '0.05em', marginBottom: 4 }}>
+              <span style={{ fontSize: '0.65rem', color: 'rgba(0,0,0,0.5)', fontFamily: MONO_FONT, letterSpacing: '0.05em', marginBottom: 4 }}>
                 ANTIPODAL
               </span>
-              <span style={{ fontSize: '1.6rem', fontWeight: 900, fontFamily: 'monospace', color: '#000', letterSpacing: '0.03em' }}>
+              <span style={{ fontSize: '1.6rem', fontWeight: 900, fontFamily: MONO_FONT, color: '#000', letterSpacing: '0.03em' }}>
                 {antipodalGridId}
               </span>
             </div>
@@ -427,7 +427,7 @@ export default function DisparityWinnerScreen({ onDismiss }) {
                 boxShadow: `0 0 6px ${winnerColor}`,
               }}
             />
-            <span style={{ color: winnerColor, fontFamily: 'monospace', fontWeight: 700, fontSize: '0.85rem' }}>
+            <span style={{ color: winnerColor, fontFamily: MONO_FONT, fontWeight: 700, fontSize: '0.85rem' }}>
               {winnerGridId}
             </span>
             {antipodalGridId && (
@@ -443,7 +443,7 @@ export default function DisparityWinnerScreen({ onDismiss }) {
                     boxShadow: `0 0 4px ${antipodalColor}`,
                   }}
                 />
-                <span style={{ color: antipodalColor, fontFamily: 'monospace', fontWeight: 700, fontSize: '0.85rem' }}>
+                <span style={{ color: antipodalColor, fontFamily: MONO_FONT, fontWeight: 700, fontSize: '0.85rem' }}>
                   {antipodalGridId}
                 </span>
               </>
@@ -479,7 +479,7 @@ export default function DisparityWinnerScreen({ onDismiss }) {
                     opacity: 0.8,
                   }}
                 />
-                <span style={{ color: '#8888aa', fontFamily: 'monospace', fontSize: '0.8rem' }}>
+                <span style={{ color: '#8888aa', fontFamily: MONO_FONT, fontSize: '0.8rem' }}>
                   {entry.gridId}
                   {entry.endGridId && entry.endGridId !== entry.gridId && (
                     <span style={{ color: '#555' }}> → {entry.endGridId}</span>
