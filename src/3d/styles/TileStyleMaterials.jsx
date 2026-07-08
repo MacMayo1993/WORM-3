@@ -13,11 +13,19 @@ import { newStyleShaders } from './shaders/newStyleShaders.js';
 // Shared time uniform updated by useFrame in parent
 export const sharedUniforms = {
   time: { value: 0 },
+  // "Spin energy" in [0,1]: spikes while a layer is rotating and decays after,
+  // so styles like orbChamber can jostle their contents in reaction to the turn.
+  spin: { value: 0 },
 };
 
 // Update time uniform (call from useFrame)
 export function updateSharedTime(elapsed) {
   sharedUniforms.time.value = elapsed;
+}
+
+// Update spin-energy uniform (call from useFrame). Value is clamped to [0,1].
+export function updateSharedSpin(energy) {
+  sharedUniforms.spin.value = energy < 0 ? 0 : energy > 1 ? 1 : energy;
 }
 
 // ─── Shared tremor state ─────────────────────────────────────────────────────
@@ -210,6 +218,7 @@ export function getTileStyleMaterial(style, colorHex, useTexture = false, textur
   const uniforms = {
     baseColor: { value: color },
     time: sharedUniforms.time,
+    spin: sharedUniforms.spin,
   };
 
   // Antipodal patterns need a second color uniform.  Use the provided antipodal

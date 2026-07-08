@@ -12,7 +12,7 @@ import WormholeNetwork from '../manifold/WormholeNetwork.jsx';
 import ChaosWave from '../manifold/ChaosWave.jsx';
 import FlipPropagationWave from '../manifold/FlipPropagationWave.jsx';
 import { vibrate } from '../utils/audio.js';
-import { updateSharedTime, updateSharedTremor, warmUpDefaultStyles } from './styles/TileStyleMaterials.jsx';
+import { updateSharedTime, updateSharedTremor, updateSharedSpin, warmUpDefaultStyles } from './styles/TileStyleMaterials.jsx';
 import { StickerInstanceProvider } from './StickerInstances.jsx';
 import StickerAnimationDriver from './StickerAnimationDriver.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
@@ -647,6 +647,15 @@ const CubeAssembly = React.memo(({
   const wasExploding = useRef(false);
   const prevEfRef2 = useRef(0);
 
+  // Spin-energy tracking for reactive tile styles (orbChamber): derive the
+  // rotation's angular speed from liveRotation.angle frame-to-frame, feed it to
+  // the shared `spin` uniform with a fast attack / slow decay so the tiles keep
+  // jostling briefly after the turn settles.
+  const spinEnergyRef = useRef(0);
+  const prevRotAngleRef = useRef(0);
+  const wasRotActiveRef = useRef(false);
+  const prevSpinTimeRef = useRef(0);
+
 
   useFrame(() => {
     const ef = explosionFactorRef.current;
@@ -798,6 +807,29 @@ const CubeAssembly = React.memo(({
     // Pre-compute tremor surge once so all StickerPlane instances read a shared
     // value instead of each independently running 3×sin + pow + max per frame.
     updateSharedTremor(state.clock.elapsedTime);
+
+    // Derive spin energy from the rotation in progress (reads liveRotation as
+    // filled by the previous frame — one-frame lag is imperceptible). Angular
+    // speed is normalized so a brisk quarter-turn saturates the effect; energy
+    // attacks instantly and decays smoothly so orbChamber balls keep bouncing
+    // for a moment after the layer settles.
+    {
+      const now = state.clock.elapsedTime;
+      const dt = Math.max(1e-3, now - prevSpinTimeRef.current);
+      prevSpinTimeRef.current = now;
+      const rotActive = liveRotation.active;
+      let angSpeed = 0;
+      if (rotActive && wasRotActiveRef.current) {
+        angSpeed = Math.abs(liveRotation.angle - prevRotAngleRef.current) / dt;
+      }
+      prevRotAngleRef.current = rotActive ? liveRotation.angle : 0;
+      wasRotActiveRef.current = rotActive;
+      // ~6 rad/s (a fast quarter-turn) → full energy.
+      const target = rotActive ? Math.min(1, angSpeed / 6) : 0;
+      const e = spinEnergyRef.current;
+      spinEnergyRef.current = e < target ? target : e * 0.9;
+      updateSharedSpin(spinEnergyRef.current);
+    }
 
 
     // Apply live drag rotation - instant, follows finger
