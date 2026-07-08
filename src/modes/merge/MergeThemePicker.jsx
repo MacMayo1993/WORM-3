@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UI_FONT } from '../../utils/uiTheme.js';
+import { UI_FONT, GLASS_TEXT, GLASS_TEXT_MUTED } from '../../utils/uiTheme.js';
 
 const THEMES = [
   { id: 'pokemon', label: 'Pokémon', color: '#FFCB05', accent: '#3B4CCA', emoji: '⚡', desc: 'Catch & evolve' },
@@ -91,8 +91,8 @@ const TierLegend = () => (
           fontSize: '11px', fontWeight: 700, color,
         }}>{tier}</div>
         <div>
-          <div style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(220,235,255,0.9)', fontFamily: UI_FONT }}>{label}</div>
-          <div style={{ fontSize: '10px', color: 'rgba(150,175,210,0.6)', fontFamily: UI_FONT }}>{desc}</div>
+          <div style={{ fontSize: '11px', fontWeight: 600, color: GLASS_TEXT, fontFamily: UI_FONT }}>{label}</div>
+          <div style={{ fontSize: '10px', color: GLASS_TEXT_MUTED, fontFamily: UI_FONT }}>{desc}</div>
         </div>
       </div>
     ))}

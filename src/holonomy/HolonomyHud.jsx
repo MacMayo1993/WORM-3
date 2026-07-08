@@ -2,6 +2,7 @@
 // DOM overlay for Holonomy Mode — shows φ, parity, seam stats, and live 2×2 matrix.
 
 import React, { useState, useEffect, useRef } from 'react';
+import { UI_FONT, MONO_FONT, GLASS_PANEL, GLASS_PANEL_BORDER, GLASS_TEXT } from '../utils/uiTheme.js';
 
 const fmt = (n) => (n >= 0 ? '+' : '') + n.toFixed(3);
 const fmtDeg = (r) => ((r * 180) / Math.PI).toFixed(1) + '°';
@@ -42,14 +43,14 @@ export default function HolonomyHUD({
         <div style={{
             position: 'fixed', top: 0, left: 0, right: 0,
             pointerEvents: 'none', zIndex: 500,
-            fontFamily: "'Courier New', monospace",
+            fontFamily: MONO_FONT,
         }}>
             {/* Top info bar */}
             <div style={{
                 display: 'flex', justifyContent: 'center', padding: '10px 0 0',
             }}>
                 <div style={{
-                    background: 'rgba(0,0,0,0.72)',
+                    background: GLASS_PANEL,
                     border: '1.5px solid rgba(0,245,255,0.3)',
                     borderRadius: 12,
                     padding: '8px 20px',
@@ -133,7 +134,7 @@ export default function HolonomyHUD({
                     pointerEvents: 'auto',
                 }}>
                     <div style={{
-                        background: 'rgba(0,0,0,0.78)',
+                        background: GLASS_PANEL,
                         border: '1px solid rgba(0,245,255,0.25)',
                         borderRadius: 10, padding: '8px 20px',
                         backdropFilter: 'blur(10px)',
@@ -186,7 +187,7 @@ export default function HolonomyHUD({
                     }}>
                         {isFlipped ? '⚡ LOOP CLOSED' : '✓ LOOP CLOSED'}
                     </div>
-                    <div style={{ color: '#fff', fontSize: 16, marginTop: 8 }}>
+                    <div style={{ color: GLASS_TEXT, fontSize: 16, marginTop: 8, fontFamily: UI_FONT }}>
                         {isFlipped
                             ? `NON-TRIVIAL HOLONOMY — MÖBIUS LOOP DETECTED`
                             : `Trivial loop — bundle is orientable here`}

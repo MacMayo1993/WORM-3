@@ -9,7 +9,7 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Environment } from '@react-three/drei';
 import MobiusCubelet from '../../3d/MobiusCubelet.jsx';
-import { UI_FONT, GLASS_PANEL } from '../../utils/uiTheme.js';
+import { UI_FONT, GLASS_PANEL, GLASS_PANEL_BORDER } from '../../utils/uiTheme.js';
 
 // Antipodal pair legend entries
 const LEGEND = [
@@ -28,7 +28,7 @@ function LegendRow({ colorA, colorB, label, sub }) {
         padding: '8px 12px',
         borderRadius: '10px',
         background: 'rgba(255,255,255,0.04)',
-        border: '1px solid rgba(255,255,255,0.07)',
+        border: `1px solid ${GLASS_PANEL_BORDER}`,
       }}
     >
       {/* Two-colour swatch */}

@@ -2,14 +2,14 @@
 // Teach Mode UI — Instructor panel with sub-modes: Guided, Demo, Quiz
 
 import React, { useState } from 'react';
-import { UI_FONT } from '../utils/uiTheme.js';
+import { UI_FONT, MONO_FONT, GLASS_PANEL, GLASS_PANEL_DEEP, GLASS_PANEL_BORDER, GLASS_TEXT, GLASS_TEXT_MUTED } from '../utils/uiTheme.js';
 
 // ─── Module-level style constants (never reallocated) ─────────────────────────
 const TABS_CONTAINER_STYLE = {
   display: 'flex',
   gap: '4px',
   padding: '8px 16px',
-  borderBottom: '1px solid rgba(0, 217, 255, 0.15)',
+  borderBottom: `1px solid ${GLASS_PANEL_BORDER}`,
   flexShrink: 0,
 };
 
@@ -57,9 +57,9 @@ const TM_PANEL_STYLE = {
   maxWidth: 'calc(100vw - 20px)',
   height: '100%',
   maxHeight: '100dvh',
-  background: 'rgba(10, 12, 20, 0.95)',
+  background: GLASS_PANEL_DEEP,
   backdropFilter: 'blur(20px)',
-  borderRight: '1px solid rgba(0, 217, 255, 0.2)',
+  borderRight: `1px solid ${GLASS_PANEL_BORDER}`,
   zIndex: 600,
   display: 'flex',
   flexDirection: 'column',
@@ -71,7 +71,7 @@ const TM_PANEL_STYLE = {
 
 const TM_HEADER_STYLE = {
   padding: '16px',
-  borderBottom: '1px solid rgba(0, 217, 255, 0.15)',
+  borderBottom: `1px solid ${GLASS_PANEL_BORDER}`,
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'center',
@@ -97,7 +97,7 @@ const TM_CLOSE_BTN_STYLE = {
 
 const TM_SECTION_STYLE = {
   padding: '12px 16px',
-  borderBottom: '1px solid rgba(0, 217, 255, 0.1)',
+  borderBottom: `1px solid ${GLASS_PANEL_BORDER}`,
   flexShrink: 0,
 };
 
@@ -106,7 +106,7 @@ const TM_STAGES_BAR_ROW_STYLE = { display: 'flex', gap: '3px', marginBottom: '6p
 
 const TM_ALL_STAGES_SECTION_STYLE = {
   padding: '12px 16px',
-  borderTop: '1px solid rgba(0, 217, 255, 0.1)',
+  borderTop: `1px solid ${GLASS_PANEL_BORDER}`,
 };
 
 const TM_SECTION_SUB_LABEL_STYLE = { fontSize: '10px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px' };
@@ -131,7 +131,7 @@ const TM_ALGO_CARD_STYLE = {
 };
 
 const TM_ALGO_CARD_NAME_STYLE = { fontWeight: 'bold', color: '#00d9ff', fontSize: '10px' };
-const TM_ALGO_CARD_NOTATION_STYLE = { fontFamily: 'monospace', fontSize: '12px', color: '#fbbf24', margin: '2px 0' };
+const TM_ALGO_CARD_NOTATION_STYLE = { fontFamily: MONO_FONT, fontSize: '12px', color: '#fbbf24', margin: '2px 0' };
 const TM_ALGO_CARD_WHEN_STYLE = { fontSize: '10px', color: 'rgba(255,255,255,0.4)' };
 
 const TM_ALGO_LIST_LABEL_STYLE = { fontSize: '10px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px' };
@@ -433,7 +433,7 @@ const AlgorithmCard = ({
           {algo.name}
         </div>
         <div style={{
-          fontFamily: 'monospace',
+          fontFamily: MONO_FONT,
           fontSize: '14px',
           color: '#fbbf24',
           margin: '4px 0',
@@ -457,7 +457,7 @@ const AlgorithmCard = ({
       {isSelected && algoMoves.length > 0 && (subMode === 'guided' || subMode === 'demo') && (
         <div style={{
           padding: '8px 12px 12px',
-          borderTop: '1px solid rgba(0, 217, 255, 0.15)',
+          borderTop: `1px solid ${GLASS_PANEL_BORDER}`,
           marginTop: '8px',
         }}>
           {/* Move sequence visualization */}
@@ -474,7 +474,7 @@ const AlgorithmCard = ({
                   padding: '3px 6px',
                   borderRadius: '4px',
                   fontSize: '12px',
-                  fontFamily: 'monospace',
+                  fontFamily: MONO_FONT,
                   fontWeight: 'bold',
                   background: i < currentStep
                     ? 'rgba(0, 255, 136, 0.2)'
@@ -717,7 +717,7 @@ const TeachMode = ({
         {currentStage && !isSolved && subMode !== 'quiz' && (
           <div style={{
             padding: '12px 16px',
-            borderBottom: '1px solid rgba(0, 217, 255, 0.1)',
+            borderBottom: `1px solid ${GLASS_PANEL_BORDER}`,
           }}>
             <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#fff', marginBottom: '8px' }}>
               {currentStage.goal}

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useGameStore } from '../hooks/useGameStore.js';
+import { MONO_FONT } from '../utils/uiTheme.js';
 import { useShallow } from 'zustand/react/shallow';
 import { tunnelState } from './tunnelProgressBridge.js';
 
@@ -70,7 +71,7 @@ export default function MobiusHUD() {
             <div style={{
                 color: 'rgba(255,255,255,0.48)',
                 fontSize: '8px',
-                fontFamily: 'monospace',
+                fontFamily: MONO_FONT,
                 letterSpacing: '2.5px',
                 textAlign: 'center',
                 marginBottom: '2px',
@@ -115,15 +116,15 @@ export default function MobiusHUD() {
                 <circle cx={xR} cy={bMid} r={4.5} fill={exitColor} />
 
                 <text x={xL + (tL - xL) / 2} y={bY2 + 12} textAnchor="middle"
-                    fill={entryColor} fontSize="7.5" fontFamily="monospace" opacity="0.75">
+                    fill={entryColor} fontSize="7.5" fontFamily={MONO_FONT} opacity="0.75">
                     ENTRY
                 </text>
                 <text x={tMid} y={bY2 + 12} textAnchor="middle"
-                    fill="rgba(255,255,255,0.42)" fontSize="7.5" fontFamily="monospace">
+                    fill="rgba(255,255,255,0.42)" fontSize="7.5" fontFamily={MONO_FONT}>
                     ½π
                 </text>
                 <text x={tR + (xR - tR) / 2} y={bY2 + 12} textAnchor="middle"
-                    fill={exitColor} fontSize="7.5" fontFamily="monospace" opacity="0.75">
+                    fill={exitColor} fontSize="7.5" fontFamily={MONO_FONT} opacity="0.75">
                     EXIT
                 </text>
 

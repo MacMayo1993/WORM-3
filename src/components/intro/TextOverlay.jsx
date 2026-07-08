@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { DISPLAY_FONT } from '../../utils/uiTheme.js';
 
 const ease     = t => t < 0.5 ? 4 * t ** 3 : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const clamp01  = t => Math.max(0, Math.min(1, t));
@@ -57,7 +58,7 @@ const TextOverlay = ({ time }) => {
         <div style={{
           opacity: word.opacity,
           color: displayColor,
-          fontFamily: "'Bungee', cursive",
+          fontFamily: DISPLAY_FONT,
           fontSize: 'clamp(64px, 16vw, 108px)',
           letterSpacing: '0.04em',
           WebkitTextStroke: `3px ${strokeColor}`,

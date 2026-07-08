@@ -9,14 +9,14 @@ import React, { useMemo } from 'react';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { calculateEchoSync } from '../../game/antipodalMode.js';
-import { UI_FONT } from '../../utils/uiTheme.js';
+import { UI_FONT, GLASS_PANEL_DEEP, GLASS_PANEL_BORDER } from '../../utils/uiTheme.js';
 
 // ─── Static style constants ───────────────────────────────────────────────────
 const CONTAINER_STYLE = {
   position: 'fixed',
   bottom: '80px',
   right: '16px',
-  background: 'rgba(0, 0, 0, 0.85)',
+  background: GLASS_PANEL_DEEP,
   border: '1px solid rgba(59, 130, 246, 0.6)',
   borderRadius: '8px',
   padding: '12px 16px',
@@ -61,7 +61,7 @@ const REVERSAL_ROW_STYLE = {
   justifyContent: 'space-between',
   alignItems: 'center',
   paddingTop: '8px',
-  borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+  borderTop: `1px solid ${GLASS_PANEL_BORDER}`,
 };
 
 const REVERSAL_LABEL_STYLE = { fontSize: '10px', color: '#9ca3af' };
@@ -71,7 +71,7 @@ const REVERSAL_VALUE_STYLE = { fontSize: '16px', fontWeight: 'bold', color: '#60
 const ECHO_ACTIVE_SECTION_STYLE = {
   marginTop: '8px',
   paddingTop: '8px',
-  borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+  borderTop: `1px solid ${GLASS_PANEL_BORDER}`,
   display: 'flex',
   alignItems: 'center',
   gap: '8px',
