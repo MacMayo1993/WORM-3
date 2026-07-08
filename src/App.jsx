@@ -46,7 +46,7 @@ import {
 
 // 3D components
 import IntroScene from './components/intro/IntroScene.jsx';
-import BlackHoleEnvironment from './3d/BlackHoleEnvironment.jsx';
+import NebulaEnvironment from './3d/NebulaEnvironment.jsx';
 import ShootingStars from './3d/ShootingStars.jsx';
 import { setSharedRenderer, tickPreviews, hasActivePreviews } from './3d/TilePreviewRenderer.js';
 
@@ -126,8 +126,14 @@ function IntroBranch({ time, onComplete, reducedMotion = false, performanceMode 
       <pointLight position={[-10, -10, -10]} intensity={1.6} />
       <pointLight position={[-6, 2, 8]} intensity={1.4} color="#4a7ccc" />
       <pointLight position={[5, -4, -6]} intensity={0.8} color="#2a4a8a" />
-      {/* Cool blue cast on the intro black hole so the opening matches the main-menu vibe */}
-      <BlackHoleEnvironment zoom={1.2} orbitStrength={0.1} tint={[0.72, 0.9, 1.3]} />
+      {/* Volumetric nebula backdrop shared with the main menu. */}
+      <NebulaEnvironment
+        variant="intro"
+        speed={reducedMotion ? 0.25 : 0.7}
+        density={performanceMode ? 0.65 : 1}
+        structure={0.9}
+        performanceMode={performanceMode}
+      />
       <IntroScene time={time} onComplete={onComplete} />
       <Suspense fallback={null}>
         <Environment preset="city" />
@@ -191,7 +197,14 @@ function MenuScene({ onCubeClick }) {
       <pointLight position={[-9, -8, 7]} intensity={2.8} color="#7aa3ff" />
       <pointLight position={[0, -6, -8]} intensity={1.4} color="#4a90d9" />
       <Suspense fallback={null}>
-        <BlackHoleEnvironment zoom={1.2} orbitStrength={0.1} flipTrigger={menuFlipTrigger} />
+        <NebulaEnvironment
+          variant="menu"
+          pulseTrigger={menuFlipTrigger}
+          speed={0.55}
+          density={isMobile ? 0.55 : 0.95}
+          structure={1.08}
+          performanceMode={isMobile}
+        />
       </Suspense>
       <ShootingStars />
       <Suspense fallback={null}>
