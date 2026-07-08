@@ -59,6 +59,7 @@ import {
   MOBI_LINES_BIOME, MOBI_LINES_MERGE, MOBI_LINES_CHAOS,
 } from './components/screens/MobiIntroScreen.jsx';
 import { UI_FONT } from './utils/uiTheme.js';
+import ScreenTransition from './components/ScreenTransition.jsx';
 const ParityStoreScreen = React.lazy(() => import('./components/screens/ParityStoreScreen.jsx'));
 const GameScene = React.lazy(() => import('./3d/GameScene.jsx'));
 const UILayer = React.lazy(() => import('./components/UILayer.jsx'));
@@ -1346,7 +1347,9 @@ export default function WORM3() {
 
   return (
     <div className={`full-screen${settings.backgroundTheme === 'dark' ? ' bg-dark' : settings.backgroundTheme === 'midnight' ? ' bg-midnight' : ''}${randomShaking ? ' random-shake' : ''}`}>
-      {showTutorial && !showWelcome && <Tutorial onClose={closeTutorial} onMainMenu={() => { closeTutorial(); handleBackToMainMenu(); }} />}
+      <ScreenTransition show={showTutorial && !showWelcome}>
+        <Tutorial onClose={closeTutorial} onMainMenu={() => { closeTutorial(); handleBackToMainMenu(); }} />
+      </ScreenTransition>
       {showModeSelect && (
         <Suspense fallback={null}>
           <ModeCarousel
@@ -1563,11 +1566,11 @@ export default function WORM3() {
       )}
 
       {/* Parity Store — mounted at app root so it's above every overlay */}
-      {showStore && (
+      <ScreenTransition show={showStore}>
         <Suspense fallback={null}>
           <ParityStoreScreen onClose={handleCloseStore} />
         </Suspense>
-      )}
+      </ScreenTransition>
     </div>
   );
 }

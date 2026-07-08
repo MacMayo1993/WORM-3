@@ -54,9 +54,9 @@ const undoButtonStyle = {
   width: '54px',
   height: '54px',
   fontSize: '22px',
-  background: 'rgba(0, 200, 230, 0.12)',
-  borderColor: 'rgba(0, 200, 230, 0.45)',
-  boxShadow: '0 4px 20px rgba(0, 200, 230, 0.20)',
+  background: 'rgba(0, 0, 0, 0.85)',
+  borderColor: 'rgba(255, 255, 255, 0.25)',
+  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.40)',
   position: 'relative'
 };
 
@@ -117,7 +117,7 @@ const undoBadgeStyle = {
   position: 'absolute',
   top: '-4px',
   right: '-4px',
-  background: 'rgba(0, 217, 255, 0.9)',
+  background: '#fff',
   color: '#000',
   borderRadius: '50%',
   width: '20px',
@@ -165,7 +165,7 @@ const MobileControls = React.memo(({
             style={undoButtonStyle}
             aria-label={`Undo last move (${undoCount} available)`}
           >
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00d9ff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 10h10a5 5 0 0 1 0 10H9"/>
               <polyline points="7 14 3 10 7 6"/>
             </svg>
