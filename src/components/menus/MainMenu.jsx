@@ -1056,14 +1056,10 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 10000, overflowY: 'auto' }}>
 
-      {/* Forest background — extended past edges so blur doesn't show white borders */}
-      <div style={{ position: 'fixed', inset: '-40px', zIndex: 0, pointerEvents: 'none',
-        backgroundImage: `url(${import.meta.env.BASE_URL}environments/thumbnails/forest.png)`,
-        backgroundSize: 'cover', backgroundPosition: 'center',
-        filter: 'blur(28px) brightness(0.45)',
+      {/* Transparent cosmic wash — lets the shared R3F nebula show through behind the menu. */}
+      <div style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none',
+        background: 'radial-gradient(circle at 50% 28%, rgba(90,130,255,0.18), rgba(4,6,18,0.38) 62%, rgba(2,3,10,0.66) 100%)',
       }} />
-      {/* Dark tint over the blurred forest */}
-      <div style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none', background: 'rgba(4,6,18,0.55)' }} />
 
       <style>{`
         .mc-arrow:active { background: rgba(255,255,255,0.22) !important; }
