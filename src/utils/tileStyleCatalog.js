@@ -18,7 +18,7 @@ export const LIVING_STYLE_KEYS = [
   'lava', 'galaxy', 'neural', 'moireRings', 'moireLines', 'infinityTunnel',
   'vortex', 'shockwave', 'solar',
   'oilSlick', 'constellation', 'neonSign',
-  'prismBloom', 'magnetFlux', 'liquidChrome', 'auroraWeave', 'plasmaCells',
+  'prismBloom', 'magnetFlux', 'liquidChrome', 'orbChamber', 'auroraWeave', 'plasmaCells',
   'quantumScanlines', 'emberstorm', 'fractalPulse', 'bioLattice', 'stellarLensing',
 ];
 

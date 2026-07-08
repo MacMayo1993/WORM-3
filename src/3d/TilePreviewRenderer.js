@@ -21,6 +21,7 @@ const ANIMATED_STYLE_SET = new Set([
   'oilSlick', 'constellation', 'waveform', 'dnaHelix', 'neonSign',
   'prismBloom', 'magnetFlux', 'liquidChrome', 'auroraWeave', 'plasmaCells',
   'quantumScanlines', 'emberstorm', 'fractalPulse', 'bioLattice', 'stellarLensing',
+  'orbChamber',
 ]);
 
 export function isAnimatedPreviewStyle(styleKey) {

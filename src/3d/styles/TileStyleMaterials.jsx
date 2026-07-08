@@ -150,7 +150,7 @@ const ANTIPODAL_STYLES = new Set([
   'cornerAccent', 'innerDisc', 'crossPlus', 'borderFrame', 'thinHatch', 'dotRing',
   'opConcentric', 'opRadialSpokes', 'opTiltMosaic', 'opDiamondWave', 'opBullseyeSteps',
   'opWarpGrid', 'opChevronBands', 'opInterferencePlaid', 'opRibbonTwist', 'opPinwheel',
-  'waveform', 'dnaHelix',
+  'waveform', 'dnaHelix', 'orbChamber',
 ]);
 
 /**
@@ -232,6 +232,10 @@ export function getTileStyleMaterial(style, colorHex, useTexture = false, textur
     transparent: isGlass,
     depthWrite: !isGlass,
     blending: THREE.NormalBlending,
+    // orbChamber ray-traces its sphere using screen-space derivatives (dFdx/dFdy)
+    // to build a UV-aligned tangent frame; enabling this extension keeps that
+    // shader compiling on WebGL1 too. It's inert for shaders that don't use them.
+    extensions: { derivatives: true },
   });
 
   _matCachePut(cacheKey, material);
@@ -262,6 +266,7 @@ const ANIMATED_STYLES = new Set([
   'oilSlick', 'constellation', 'waveform', 'dnaHelix', 'neonSign',
   'prismBloom', 'magnetFlux', 'liquidChrome', 'auroraWeave', 'plasmaCells',
   'quantumScanlines', 'emberstorm', 'fractalPulse', 'bioLattice', 'stellarLensing',
+  'orbChamber',
 ]);
 
 /**
