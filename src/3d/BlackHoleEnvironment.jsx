@@ -2,10 +2,6 @@ import React, { useRef, useMemo, useState, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
-/**
- * BlackHoleEnvironment - A dynamic 3D black hole background
- * Provides an immersive, panoramic black hole effect as part of the 3D scene
- */
 export default function BlackHoleEnvironment({ flipTrigger = 0, zoom = 1.65, orbitStrength = 0.03, tint = null }) {
   const sphereRef = useRef();
   const materialRef = useRef();
@@ -15,7 +11,6 @@ export default function BlackHoleEnvironment({ flipTrigger = 0, zoom = 1.65, orb
     if (flipTrigger > 0) setPulseIntensity(1.0);
   }, [flipTrigger]);
 
-  // Custom shader for smooth black hole effect
   const shaderMaterial = useMemo(() => {
     return new THREE.ShaderMaterial({
       side: THREE.BackSide,
@@ -45,196 +40,254 @@ export default function BlackHoleEnvironment({ flipTrigger = 0, zoom = 1.65, orb
         varying vec3 vPosition;
         varying vec2 vUv;
 
-        // Smooth noise function
-        float hash(vec2 p) {
+        // ---- ACES filmic tone mapping ----
+        mat3 ACESInputMat = mat3(
+          0.59719, 0.07600, 0.02840,
+          0.35458, 0.90834, 0.13383,
+          0.04823, 0.01566, 0.83777
+        );
+        mat3 ACESOutputMat = mat3(
+           1.60475, -0.10208, -0.00327,
+          -0.53108,  1.10813, -0.07276,
+          -0.07367, -0.00605,  1.07602
+        );
+        vec3 RRTAndODTFit(vec3 v) {
+          vec3 a = v * (v + 0.0245786) - 0.000090537;
+          vec3 b = v * (0.983729 * v + 0.4329510) + 0.238081;
+          return a / b;
+        }
+        vec3 ACESFilmic(vec3 color) {
+          color = ACESInputMat * color;
+          color = RRTAndODTFit(color);
+          color = ACESOutputMat * color;
+          return clamp(color, 0.0, 1.0);
+        }
+
+        // ---- Rotation helper ----
+        mat2 rot2(float a) {
+          float s = sin(a), c = cos(a);
+          return mat2(c, -s, s, c);
+        }
+
+        // ---- Noise functions ----
+        float hash21(vec2 p) {
           return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+        }
+
+        float hash11(float p) {
+          return fract(sin(p * 127.1) * 43758.5453);
         }
 
         float noise(vec2 p) {
           vec2 i = floor(p);
           vec2 f = fract(p);
           f = f * f * (3.0 - 2.0 * f);
-
-          float a = hash(i);
-          float b = hash(i + vec2(1.0, 0.0));
-          float c = hash(i + vec2(0.0, 1.0));
-          float d = hash(i + vec2(1.0, 1.0));
-
+          float a = hash21(i);
+          float b = hash21(i + vec2(1.0, 0.0));
+          float c = hash21(i + vec2(0.0, 1.0));
+          float d = hash21(i + vec2(1.0, 1.0));
           return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
         }
 
-        // Fractal brownian motion for nebulae
-        float fbm(vec2 p) {
+        float fbm(vec2 p, int octaves) {
           float value = 0.0;
-          float amplitude = 0.5;
-          for (int i = 0; i < 4; i++) {
-            value += amplitude * noise(p);
-            p *= 2.0;
-            amplitude *= 0.5;
+          float amp = 0.5;
+          float freq = 1.0;
+          for (int i = 0; i < 6; i++) {
+            if (i >= octaves) break;
+            value += amp * noise(p * freq);
+            freq *= 2.0;
+            amp *= 0.5;
           }
           return value;
         }
 
+        // Volumetric noise for 3D-like nebula density
+        float nebulaDensity(vec2 p, float t) {
+          float n = 0.0;
+          n += fbm(p * 2.0 + vec2(t * 0.015, t * 0.01), 5) * 0.6;
+          n += fbm(p * 4.0 - vec2(t * 0.02, -t * 0.008), 4) * 0.3;
+          n += fbm(p * 8.0 + vec2(-t * 0.03, t * 0.025), 3) * 0.1;
+          return clamp(n, 0.0, 1.0);
+        }
+
+        // ---- Film grain ----
+        float grain(vec2 uv, float t) {
+          return hash21(uv * 800.0 + fract(t * 7.13) * 100.0) * 0.04 - 0.02;
+        }
+
         void main() {
-          // Convert to spherical coordinates
           vec3 dir = normalize(vPosition);
           float theta = atan(dir.z, dir.x);
           float phi = acos(dir.y);
 
-          // Center of black hole
           vec2 center = vec2(0.5, 0.5) + centerOffset;
           vec2 coord = vec2(theta / (2.0 * 3.14159) + 0.5, phi / 3.14159);
 
-          // Distance from center (event horizon).
-          // zoom > 1 shrinks the event horizon so more of the black hole shape is visible.
           float dist = length(coord - center) * zoom;
 
-          // === ENHANCED STARS ===
+          // ---- Schwarzschild-style gravitational lensing ----
+          float rs = 0.18;  // Schwarzschild radius
+          vec2 toCenter = coord - center;
+          float r = length(toCenter);
+          float deflection = rs / max(r * zoom, 0.001);
+          deflection = min(deflection, 2.0);
+          float angle = atan(toCenter.y, toCenter.x);
+          float lensedR = r + deflection * 0.08 * sin(r * 30.0 - time * 0.3);
+          vec2 lensedCoord = center + vec2(cos(angle), sin(angle)) * lensedR;
+
+          // ---- DEEP SPACE BASE ----
+          float gradient = smoothstep(0.0, 0.8, dist);
+          vec3 deepSpace = vec3(0.005, 0.005, 0.015);
+
+          // ---- ENHANCED STAR FIELD ----
           float stars = 0.0;
 
-          // Layer 1: Bright prominent stars (sparse)
+          // Bright stars (sparse, twinkling)
           for (int i = 0; i < 3; i++) {
-            vec2 starCoord = coord * (10.0 + float(i) * 6.0);
-            float starNoise = hash(floor(starCoord + float(i) * 100.0));
-            if (starNoise > 0.95) {
-              float starDist = length(fract(starCoord) - 0.5);
-              float twinkle = 0.7 + 0.3 * sin(time * (2.0 + starNoise * 3.0) + starNoise * 100.0);
-              stars += smoothstep(0.06, 0.0, starDist) * (0.5 + starNoise * 0.5) * twinkle;
+            vec2 sc = lensedCoord * (12.0 + float(i) * 7.0);
+            float sn = hash21(floor(sc + float(i) * 100.0));
+            if (sn > 0.94) {
+              float sd = length(fract(sc) - 0.5);
+              float twinkle = 0.6 + 0.4 * sin(time * (1.5 + sn * 4.0) + sn * 80.0);
+              stars += smoothstep(0.07, 0.0, sd) * (0.5 + sn * 0.5) * twinkle;
             }
           }
 
-          // Layer 2: Medium stars (more frequent)
+          // Medium stars
           for (int i = 0; i < 4; i++) {
-            vec2 starCoord = coord * (20.0 + float(i) * 10.0);
-            float starNoise = hash(floor(starCoord + float(i) * 200.0));
-            if (starNoise > 0.88) {
-              float starDist = length(fract(starCoord) - 0.5);
-              float twinkle = 0.8 + 0.2 * sin(time * (1.5 + starNoise * 2.0) + starNoise * 50.0);
-              stars += smoothstep(0.04, 0.0, starDist) * (0.3 + starNoise * 0.3) * twinkle;
+            vec2 sc = lensedCoord * (22.0 + float(i) * 11.0);
+            float sn = hash21(floor(sc + float(i) * 200.0));
+            if (sn > 0.86) {
+              float sd = length(fract(sc) - 0.5);
+              float twinkle = 0.8 + 0.2 * sin(time * (1.0 + sn * 2.5) + sn * 60.0);
+              stars += smoothstep(0.04, 0.0, sd) * (0.25 + sn * 0.3) * twinkle;
             }
           }
 
-          // Layer 3: Faint distant stars (dense field)
+          // Faint dense field
           for (int i = 0; i < 5; i++) {
-            vec2 starCoord = coord * (40.0 + float(i) * 15.0);
-            float starNoise = hash(floor(starCoord + float(i) * 300.0));
-            if (starNoise > 0.81) {
-              float starDist = length(fract(starCoord) - 0.5);
-              stars += smoothstep(0.025, 0.0, starDist) * 0.15 * starNoise;
+            vec2 sc = lensedCoord * (45.0 + float(i) * 16.0);
+            float sn = hash21(floor(sc + float(i) * 300.0));
+            if (sn > 0.79) {
+              float sd = length(fract(sc) - 0.5);
+              stars += smoothstep(0.025, 0.0, sd) * 0.12 * sn;
             }
           }
 
-          // Layer 4: Very faint background star dust (milky way effect)
+          // Star dust (milky way band)
+          float dustBand = exp(-8.0 * pow(coord.y - 0.48 + sin(coord.x * 3.0) * 0.06, 2.0));
           float starDust = 0.0;
           for (int i = 0; i < 3; i++) {
-            vec2 dustCoord = coord * (80.0 + float(i) * 30.0);
-            float dustNoise = hash(floor(dustCoord + float(i) * 500.0));
-            if (dustNoise > 0.72) {
-              float dustDist = length(fract(dustCoord) - 0.5);
-              starDust += smoothstep(0.02, 0.0, dustDist) * 0.08;
+            vec2 dc = lensedCoord * (90.0 + float(i) * 35.0);
+            float dn = hash21(floor(dc + float(i) * 500.0));
+            if (dn > 0.7) {
+              float dd = length(fract(dc) - 0.5);
+              starDust += smoothstep(0.02, 0.0, dd) * 0.06;
             }
           }
+          starDust *= dustBand * 1.5;
 
-          // === NEBULAE / GAS CLOUDS ===
-          // Subtle colored nebula regions
-          float nebula1 = fbm(coord * 3.0 + vec2(time * 0.02, 0.0));
-          float nebula2 = fbm(coord * 4.0 + vec2(0.0, time * 0.015));
-          float nebulaMask = smoothstep(0.4, 0.7, nebula1) * smoothstep(0.35, 0.65, nebula2);
-          nebulaMask *= smoothstep(0.2, 0.5, dist); // Fade near black hole
+          // Star colors: white / warm / blue based on hash
+          float starColorSeed = hash21(lensedCoord * 50.0);
+          vec3 starColor = vec3(0.92, 0.95, 1.0);
+          if (starColorSeed > 0.7) starColor = vec3(1.0, 0.92, 0.75);
+          if (starColorSeed > 0.9) starColor = vec3(0.72, 0.85, 1.0);
 
-          vec3 nebulaColor1 = vec3(0.15, 0.05, 0.2); // Deep purple
-          vec3 nebulaColor2 = vec3(0.05, 0.1, 0.2);  // Deep blue
-          vec3 nebulaColor3 = vec3(0.2, 0.08, 0.05); // Deep red/brown
+          // ---- VOLUMETRIC NEBULA ----
+          float nDensity = nebulaDensity(lensedCoord * 1.5, time);
+          float nebulaShape = smoothstep(0.35, 0.7, nDensity);
+          nebulaShape *= smoothstep(0.15, 0.45, dist);  // fade near BH
+          nebulaShape *= 0.5 + 0.5 * dustBand;          // concentrate near galactic plane
 
-          float nebulaSelect = noise(coord * 2.0);
-          vec3 nebula = mix(nebulaColor1, nebulaColor2, nebulaSelect);
-          nebula = mix(nebula, nebulaColor3, noise(coord * 3.0 + 10.0));
+          // Nebula color palette: deep purples, blues, reds
+          float colorSel = noise(lensedCoord * 2.5 + time * 0.01);
+          float colorSel2 = noise(lensedCoord * 3.5 + 10.0);
+          vec3 nebCol = vec3(0.0);
+          nebCol += mix(vec3(0.20, 0.04, 0.30), vec3(0.04, 0.10, 0.28), colorSel);
+          nebCol = mix(nebCol, vec3(0.28, 0.06, 0.04), smoothstep(0.5, 0.8, colorSel2));
+          // Bright emission edges
+          float nebulaEdge = smoothstep(0.55, 0.65, nDensity) - smoothstep(0.65, 0.8, nDensity);
+          vec3 emissionColor = mix(vec3(0.5, 0.2, 0.8), vec3(0.2, 0.6, 0.9), colorSel);
 
-          // Gravitational lensing - warp space near event horizon
-          float lensing = smoothstep(0.5, 0.1, dist);
-          float warpAngle = theta + lensing * sin(time * 0.2 + dist * 10.0) * 0.5;
+          // ---- ACCRETION DISK ----
+          float diskAngle = theta + time * 0.25;
+          float diskWarp = diskAngle + deflection * sin(dist * 20.0) * 0.4;
 
-          // Event horizon - absolute darkness at center
-          float eventHorizon = smoothstep(0.25, 0.15, dist);
+          // Multi-ring structure
+          float ring1 = smoothstep(0.45, 0.22, dist) * smoothstep(0.15, 0.20, dist);
+          float ring2 = smoothstep(0.38, 0.25, dist) * smoothstep(0.19, 0.24, dist);
+          float ringPattern = sin(diskWarp * 14.0 + dist * 30.0) * 0.5 + 0.5;
+          float ringFine = sin(diskWarp * 40.0 + dist * 80.0) * 0.3 + 0.7;
+          float turbulence = noise(coord * 18.0 + time * 0.2) * 0.2;
+          float diskGlow = (ring1 * ringPattern + ring2 * ringFine * 0.5) * (1.0 + turbulence);
 
-          // Accretion disk - rotating matter being pulled in
-          float angle = warpAngle + time * 0.2;
-          float diskPattern = sin(angle * 12.0 + dist * 25.0) * 0.5 + 0.5;
-          float diskRadius = smoothstep(0.45, 0.2, dist) * smoothstep(0.15, 0.22, dist);
-          float diskGlow = diskRadius * diskPattern;
+          // Doppler beaming: blueshift on approaching side, redshift on receding
+          float dopplerPhase = sin(diskAngle) * 0.5 + 0.5;
+          vec3 accretionHot = vec3(1.0, 0.85, 0.5);   // white-hot approaching
+          vec3 accretionWarm = vec3(0.95, 0.4, 0.08);  // orange receding
+          vec3 accretionCool = vec3(0.6, 0.15, 0.05);  // deep red far receding
+          vec3 accretionBlue = vec3(0.35, 0.55, 1.0);  // blue-shifted
+          vec3 diskColor = mix(accretionWarm, accretionHot, dopplerPhase);
+          diskColor = mix(diskColor, accretionBlue, pow(dopplerPhase, 3.0) * 0.4);
+          diskColor = mix(accretionCool, diskColor, smoothstep(0.0, 0.3, dopplerPhase));
 
-          // Photon sphere - light bending around the singularity
-          float photonSphere = smoothstep(0.18, 0.16, abs(dist - 0.17)) * 0.8;
+          // ---- PHOTON SPHERE / INNERMOST RING ----
+          float photonRing = smoothstep(0.015, 0.0, abs(dist - rs * zoom * 0.95)) * 1.2;
+          vec3 photonColor = vec3(1.0, 0.95, 0.65);
 
-          // Hawking radiation glow at event horizon edge
-          float hawkingGlow = smoothstep(0.2, 0.16, abs(dist - 0.18)) * 0.6;
+          // Hawking glow at event horizon boundary
+          float hawking = smoothstep(0.02, 0.0, abs(dist - rs * zoom)) * 0.7;
+          vec3 hawkingColor = vec3(1.0, 0.5, 0.2);
 
-          // Turbulence in the accretion disk
-          float turbulence = noise(coord * 15.0 + time * 0.15) * 0.2;
+          // ---- EVENT HORIZON ----
+          float eventHorizon = smoothstep(rs * zoom + 0.02, rs * zoom - 0.01, dist);
 
-          // Gradient from event horizon to deep space
-          float gradient = smoothstep(0.0, 0.8, dist);
+          // ---- COMPOSE FINAL COLOR ----
+          vec3 color = mix(vec3(0.0), deepSpace, gradient);
 
-          // Color scheme
-          vec3 deepSpace = vec3(0.01, 0.01, 0.02); // Nearly black
-          vec3 eventHorizonColor = vec3(0.0, 0.0, 0.0); // Pure black
-          vec3 accretionOrange = vec3(0.9, 0.4, 0.1); // Hot orange
-          vec3 accretionBlue = vec3(0.3, 0.5, 1.0); // Blue-shifted light
-          vec3 photonYellow = vec3(1.0, 0.9, 0.5); // Yellow photon ring
-          vec3 starColor = vec3(0.9, 0.95, 1.0); // Cool white stars
-          vec3 warmStarColor = vec3(1.0, 0.9, 0.7); // Warm yellow stars
-          vec3 blueStarColor = vec3(0.7, 0.85, 1.0); // Blue stars
+          // Nebula (behind disk)
+          color += nebCol * nebulaShape * 0.20;
+          color += emissionColor * nebulaEdge * 0.25;
 
-          // Build the final color
-          vec3 color = mix(eventHorizonColor, deepSpace, gradient);
+          // Star dust
+          color += vec3(0.55, 0.6, 0.8) * starDust * gradient;
 
-          // Add nebula (very subtle, behind everything)
-          color += nebula * nebulaMask * 0.15;
+          // Stars (dimmed near BH)
+          color += starColor * stars * gradient * 0.85;
 
-          // Add star dust (milky way glow)
-          color += vec3(0.6, 0.65, 0.8) * starDust * gradient;
+          // Accretion disk
+          color += diskColor * diskGlow * 0.85;
 
-          // Add stars with color variation (dimmed near event horizon)
-          float starColorMix = hash(coord * 50.0);
-          vec3 finalStarColor = mix(starColor, warmStarColor, step(0.7, starColorMix));
-          finalStarColor = mix(finalStarColor, blueStarColor, step(0.9, starColorMix));
-          color += finalStarColor * stars * gradient * 0.9;
+          // Photon sphere
+          color += photonColor * photonRing;
 
-          // Add accretion disk glow
-          color += accretionOrange * diskGlow * 0.7;
-          color += accretionBlue * diskGlow * diskPattern * 0.3;
+          // Hawking radiation
+          color += hawkingColor * hawking;
 
-          // Add photon sphere
-          color += photonYellow * photonSphere;
+          // Event horizon cutoff
+          color *= (1.0 - eventHorizon * 0.97);
 
-          // Add Hawking radiation
-          color += accretionOrange * hawkingGlow * 0.5;
-
-          // Add turbulence
-          color += vec3(turbulence * 0.1);
-
-          // Darken the event horizon
-          color *= (1.0 - eventHorizon * 0.95);
-
-          // Pulse effect on flip - brightens the entire black hole
+          // ---- PULSE ON FLIP ----
           if (pulseIntensity > 0.0) {
-            // Pulse is stronger near the event horizon
-            float pulseFalloff = smoothstep(0.8, 0.0, dist);
-            vec3 pulseColor = vec3(1.0, 0.6, 0.3); // Bright orange-white flash
-            float pulseStrength = pulseIntensity * pulseFalloff * 0.8;
-            color += pulseColor * pulseStrength;
-
-            // Intensify accretion disk during pulse
-            color += accretionOrange * diskGlow * pulseIntensity * 2.0;
-
-            // Brighten photon sphere
-            color += photonYellow * photonSphere * pulseIntensity * 1.5;
-
-            // Make stars twinkle more during pulse
-            color += finalStarColor * stars * pulseIntensity * 0.5;
+            float pulseFalloff = smoothstep(0.9, 0.0, dist);
+            vec3 pulseCol = vec3(1.0, 0.65, 0.35);
+            float pStr = pulseIntensity * pulseFalloff * 0.9;
+            color += pulseCol * pStr;
+            color += diskColor * diskGlow * pulseIntensity * 2.5;
+            color += photonColor * photonRing * pulseIntensity * 2.0;
+            color += starColor * stars * pulseIntensity * 0.4;
           }
 
-          // Optional colour cast (e.g. the cool blue used in the intro). Defaults to white.
+          // ---- ACES TONE MAP ----
+          color *= 1.4;  // exposure boost
+          color = ACESFilmic(color);
+
+          // ---- FILM GRAIN ----
+          float g = grain(vUv, time);
+          color += vec3(g);
+
+          // Optional tint
           color *= uTint;
 
           gl_FragColor = vec4(color, 1.0);
@@ -258,9 +311,8 @@ export default function BlackHoleEnvironment({ flipTrigger = 0, zoom = 1.65, orb
       );
     }
 
-    // Decay pulse intensity smoothly
     if (pulseIntensity > 0) {
-      setPulseIntensity((prev) => Math.max(0, prev - delta * 2.5)); // Decay over ~0.4 seconds
+      setPulseIntensity((prev) => Math.max(0, prev - delta * 2.5));
     }
   });
 
