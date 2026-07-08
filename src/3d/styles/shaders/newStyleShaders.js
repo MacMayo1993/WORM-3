@@ -488,6 +488,7 @@ export const newStyleShaders = {
     uniform vec3 baseColor;
     uniform vec3 antipodalColor;
     uniform float time;
+    uniform float spin;              // 0..1 rotation energy — jostles the ball
     varying vec2 vUv;
     varying vec3 vNormal;
     varying vec3 vViewPosition;
@@ -521,9 +522,25 @@ export const newStyleShaders = {
 
       // Chamber: a box of half-extent 0.5 in the plane, depth 0..-boxDepth.
       float boxDepth = 0.6;
-      // Ball recessed inside, slightly above centre; a tiny hover keeps it alive.
-      vec3 sc = vec3(0.0, -0.02 + sin(time * 0.7) * 0.012, -0.34);
-      float R = 0.3;
+      // Ball recessed inside, drifting on a slow Lissajous orbit + depth bob so
+      // it visibly floats around within the chamber.
+      float R = 0.15;
+      vec3 sc = vec3(
+        sin(time * 0.55) * 0.17,
+        cos(time * 0.43) * 0.13 - 0.02,
+        -0.34 + sin(time * 0.37) * 0.07
+      );
+
+      // Rotation jostle: while a layer spins, the ball gets thrown around the
+      // chamber with a fast, chaotic wobble that eases out as the turn settles.
+      float sp = clamp(spin, 0.0, 1.0);
+      float bounce = sp * 0.22;
+      sc.x += sin(time * 17.0) * bounce + sin(time * 9.3 + 1.7) * bounce * 0.6;
+      sc.y += cos(time * 14.5 + 0.6) * bounce + sin(time * 11.1) * bounce * 0.5;
+      sc.z += sin(time * 12.7 + 2.1) * bounce * 0.5;
+      // Keep the jostled ball inside the chamber walls.
+      sc.xy = clamp(sc.xy, vec2(-0.33), vec2(0.29));
+      sc.z = clamp(sc.z, -0.42, -0.2);
 
       // Fixed light in tangent space → stable regardless of face orientation.
       vec3 L = normalize(vec3(-0.4, 0.5, 0.72));
