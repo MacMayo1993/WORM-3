@@ -24,6 +24,10 @@ const PALETTES = {
 };
 
 function makeNebulaFragmentShader(stepCount) {
+  // Per-step density compensation: fewer steps deposit more per sample so the overall
+  // brightness/opacity stays constant no matter the quality tier. Referenced to 32 steps,
+  // which was the original full-quality march.
+  const stepComp = (32 / stepCount).toFixed(4);
   return `
     varying vec3 vWorldPosition;
 
@@ -67,10 +71,12 @@ function makeNebulaFragmentShader(stepCount) {
       return mix(nxy0, nxy1, f.z);
     }
 
+    // 3-octave fBm — one octave lighter than before; the dropped octave is imperceptible
+    // in a soft volumetric cloud but removes 25% of the noise cost per call.
     float fbm(vec3 p) {
       float v = 0.0;
       float a = 0.5;
-      for (int i = 0; i < 4; i++) {
+      for (int i = 0; i < 3; i++) {
         v += a * noise3(p);
         p = p * 2.05 + vec3(7.1, 3.7, 5.3);
         a *= 0.5;
@@ -81,7 +87,7 @@ function makeNebulaFragmentShader(stepCount) {
     float ridge(vec3 p) {
       float v = 0.0;
       float a = 0.55;
-      for (int i = 0; i < 4; i++) {
+      for (int i = 0; i < 3; i++) {
         float n = noise3(p);
         n = 1.0 - abs(n * 2.0 - 1.0);
         v += n * n * a;
@@ -91,9 +97,12 @@ function makeNebulaFragmentShader(stepCount) {
       return v;
     }
 
+    // Vein filaments — was two full fBm calls (8 noise samples); now a 2-octave base plus a
+    // single low-frequency warp (3 noise samples) for the same threaded look at ~⅓ the cost.
     float veinNoise(vec3 p) {
-      float n = fbm(p);
-      float lines = abs(fract(n * 7.0 + fbm(p * 0.55) * 1.6) - 0.5);
+      float n = noise3(p) * 0.6 + noise3(p * 2.03 + vec3(7.1, 3.7, 5.3)) * 0.3;
+      float warp = noise3(p * 0.55 + vec3(4.2, 1.3, 9.0));
+      float lines = abs(fract(n * 7.0 + warp * 1.6) - 0.5);
       return smoothstep(0.085, 0.0, lines);
     }
 
@@ -117,14 +126,23 @@ function makeNebulaFragmentShader(stepCount) {
       float t = max(bounds.x, 0.0);
       float endT = bounds.y;
       float stepSize = (endT - t) / float(${stepCount});
+      // Per-pixel jitter of the first sample hides the slice banding that fewer steps would
+      // otherwise reveal — a cheap dither that buys back most of the reduced-step quality.
+      float jitter = hash31(vec3(gl_FragCoord.xy, 1.0));
+      t += stepSize * jitter;
       vec3 accum = vec3(0.0);
       float alpha = 0.0;
 
       for (int i = 0; i < ${stepCount}; i++) {
         if (t > endT || alpha > 0.96) break;
         vec3 pos = ro + rd * t;
-        vec3 p = pos * 0.075;
 
+        // Radial falloff is cheap; skip the expensive noise entirely where the nebula has
+        // faded to nothing (far shell) — most rays exit the box through empty space.
+        float radial = 1.0 - smoothstep(4.0, 18.5, length(pos));
+        if (radial < 0.02) { t += stepSize; continue; }
+
+        vec3 p = pos * 0.075;
         p.xy += vec2(sin(uTime * 0.08), cos(uTime * 0.06)) * 0.45;
         p.z += uTime * 0.055;
 
@@ -132,10 +150,9 @@ function makeNebulaFragmentShader(stepCount) {
         float ridges = ridge(p * 1.65 + vec3(0.0, uRidgeTime * 0.06, 0.0));
         float veins = veinNoise(p * 2.25 + vec3(uVeinTime * 0.05, 0.0, -uVeinTime * 0.04));
 
-        float radial = 1.0 - smoothstep(4.0, 18.5, length(pos));
         float density = smoothstep(0.38, 0.82, cloud + ridges * 0.55) * radial;
         density += veins * 0.22 * radial;
-        density *= 0.072 * uDensityMult * (1.0 + uPulse * 0.75);
+        density *= 0.072 * ${stepComp} * uDensityMult * (1.0 + uPulse * 0.75);
 
         vec3 nebulaColor = mix(uColorOuter, uColorMid, smoothstep(0.18, 0.78, cloud));
         nebulaColor = mix(nebulaColor, uColorCore, smoothstep(0.58, 1.18, ridges + veins * 0.65));
@@ -144,7 +161,7 @@ function makeNebulaFragmentShader(stepCount) {
         float starSeed = hash31(floor(pos * 0.75));
         float starCell = smoothstep(0.992, 1.0, starSeed);
         nebulaColor += vec3(0.9, 0.96, 1.0) * starCell * radial * 1.4;
-        density += starCell * 0.015;
+        density += starCell * 0.015 * ${stepComp};
 
         float oneMinusAlpha = 1.0 - alpha;
         accum += nebulaColor * density * oneMinusAlpha;
@@ -205,7 +222,7 @@ export default function NebulaEnvironment({
       uColorVein: { value: new THREE.Color(palette.vein) },
     },
     vertexShader,
-    fragmentShader: makeNebulaFragmentShader(performanceMode ? 18 : 32),
+    fragmentShader: makeNebulaFragmentShader(performanceMode ? 12 : 22),
   }), [density, structure, palette.core, palette.mid, palette.outer, palette.vein, performanceMode]);
 
   useEffect(() => () => shaderMaterial.dispose(), [shaderMaterial]);
