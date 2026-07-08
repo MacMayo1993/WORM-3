@@ -8,7 +8,11 @@ import {
   updateTilePreview,
   unregisterTilePreview,
 } from '../../3d/TilePreviewRenderer.js';
-import { UI_FONT, PAPER_BACKDROP_BLUR, PAPER_BACKDROP } from '../../utils/uiTheme.js';
+import {
+  UI_FONT, PAPER_BACKDROP, PAPER_BACKDROP_BLUR, PAPER_SHEET, PAPER_SHEET_RAISED,
+  PAPER_BORDER, PAPER_BORDER_SOFT, PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT,
+  PAPER_FOOTER_BG, PAPER_BG_MUTED, PAPER_CARD_SHADOW, PAPER_SHADOW,
+} from '../../utils/uiTheme.js';
 
 const ACCENT = '#0891B2';
 const ACCENT_SHADOW = '#0e6985';
@@ -79,7 +83,7 @@ const WormBody = ({ skin, size = 46 }) => (
 );
 
 // ── Hat icon ──────────────────────────────────────────────────────────────────
-const HatIcon = ({ hatId, color = '#9a8e82', size = 30 }) => {
+const HatIcon = ({ hatId, color = PAPER_TEXT_FAINT, size = 30 }) => {
   if (hatId === 'none') return (
     <svg width={size} height={size} viewBox="0 0 32 32">
       <circle cx="16" cy="16" r="12" stroke={color} strokeWidth="1.5" fill="none" strokeDasharray="4 3" opacity="0.5" />
@@ -189,7 +193,7 @@ const PreviewModal = ({ item, owned, pp, onClose, onBuy, onEquip }) => {
     >
       <div
         style={{
-          background: '#f5f0e8', border: '1px solid #cec8be',
+          background: PAPER_SHEET, border: '1px solid #cec8be',
           borderRadius: '20px', padding: '28px 24px 22px',
           width: 'min(300px, calc(100vw - 40px))',
           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px',
@@ -226,8 +230,8 @@ const PreviewModal = ({ item, owned, pp, onClose, onBuy, onEquip }) => {
 
         {/* Name + type */}
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '18px', fontWeight: 800, color: '#1e1612', letterSpacing: '-0.03em' }}>{item.label}</div>
-          <div style={{ fontSize: '11px', color: '#9a8e82', marginTop: '3px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+          <div style={{ fontSize: '18px', fontWeight: 800, color: PAPER_TEXT, letterSpacing: '-0.03em' }}>{item.label}</div>
+          <div style={{ fontSize: '11px', color: PAPER_TEXT_FAINT, marginTop: '3px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
             {item.type === 'skin' ? 'Worm Skin' : item.type === 'hat' ? 'Hat' : item.type === 'scheme' ? 'Color Palette' : 'Tile Style'}
           </div>
         </div>
@@ -247,9 +251,9 @@ const PreviewModal = ({ item, owned, pp, onClose, onBuy, onEquip }) => {
         ) : (
           <>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px' }}>
-              <span style={{ fontSize: '24px', fontWeight: 900, color: canAfford ? ac : '#c4beb6', fontFamily: FONT }}>{item.price}</span>
-              <span style={{ fontSize: '14px', fontWeight: 700, color: canAfford ? ac : '#c4beb6', fontFamily: FONT }}>PP</span>
-              <span style={{ fontSize: '11px', color: '#9a8e82', marginLeft: '4px' }}>you have {pp}</span>
+              <span style={{ fontSize: '24px', fontWeight: 900, color: canAfford ? ac : PAPER_CARD_SHADOW, fontFamily: FONT }}>{item.price}</span>
+              <span style={{ fontSize: '14px', fontWeight: 700, color: canAfford ? ac : PAPER_CARD_SHADOW, fontFamily: FONT }}>PP</span>
+              <span style={{ fontSize: '11px', color: PAPER_TEXT_FAINT, marginLeft: '4px' }}>you have {pp}</span>
             </div>
             {canAfford ? (
               <button
@@ -266,7 +270,7 @@ const PreviewModal = ({ item, owned, pp, onClose, onBuy, onEquip }) => {
               <div style={{
                 width: '100%', padding: '12px', borderRadius: '10px', textAlign: 'center',
                 background: '#fff', border: '1.5px solid #d6d0c8',
-                color: '#9a8e82', fontSize: '12px', fontWeight: 600, fontFamily: FONT,
+                color: PAPER_TEXT_FAINT, fontSize: '12px', fontWeight: 600, fontFamily: FONT,
                 boxShadow: '0 2px 0 #c4beb6',
               }}>
                 Need {item.price - pp} more PP to unlock
@@ -278,8 +282,8 @@ const PreviewModal = ({ item, owned, pp, onClose, onBuy, onEquip }) => {
         <button
           style={{
             ...TOUCH, width: '100%', padding: '10px', borderRadius: '10px',
-            background: '#f0ebe2', border: '1.5px solid #d6d0c8',
-            color: '#7a6e62', fontSize: '13px', fontWeight: 600,
+            background: PAPER_BG_MUTED, border: '1.5px solid #d6d0c8',
+            color: PAPER_TEXT_MUTED, fontSize: '13px', fontWeight: 600,
             cursor: 'pointer', fontFamily: FONT, boxShadow: '0 2px 0 #c4beb6',
           }}
           onClick={onClose}
@@ -331,7 +335,7 @@ const ItemCard = ({ item, owned, equipped, pp, onPreview, onEquip }) => {
         {item.type === 'skin' && <WormBody skin={item} size={46} />}
         {item.type === 'hat' && (
           <div style={{ width: 46, height: 46, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <HatIcon hatId={item.hatId} color={equipped ? ac : '#9a8e82'} size={30} />
+            <HatIcon hatId={item.hatId} color={equipped ? ac : PAPER_TEXT_FAINT} size={30} />
           </div>
         )}
         {item.type === 'scheme' && (
@@ -346,24 +350,24 @@ const ItemCard = ({ item, owned, equipped, pp, onPreview, onEquip }) => {
       <span style={{
         fontSize: item.type === 'tile' ? '9px' : '10px',
         fontWeight: 700, letterSpacing: '0.03em',
-        color: equipped ? '#1e1612' : '#7a6e62',
+        color: equipped ? PAPER_TEXT : PAPER_TEXT_MUTED,
         fontFamily: FONT, textAlign: 'center', lineHeight: 1.2,
       }}>{item.label}</span>
 
       {/* Price / status */}
       {owned ? (
-        <span style={{ fontSize: '9px', fontWeight: 600, color: equipped ? ac : '#9a8e82', fontFamily: FONT }}>
+        <span style={{ fontSize: '9px', fontWeight: 600, color: equipped ? ac : PAPER_TEXT_FAINT, fontFamily: FONT }}>
           {equipped ? 'Active' : 'Tap to equip'}
         </span>
       ) : (
         <div style={{
           display: 'flex', alignItems: 'baseline', gap: '2px',
           padding: '2px 7px', borderRadius: '6px',
-          background: canAfford ? `${ac}14` : '#f0ebe2',
-          border: `1px solid ${canAfford ? ac + '44' : '#d6d0c8'}`,
+          background: canAfford ? `${ac}14` : PAPER_BG_MUTED,
+          border: `1px solid ${canAfford ? ac + '44' : PAPER_BORDER_SOFT}`,
         }}>
-          <span style={{ fontSize: '9px', fontWeight: 700, color: canAfford ? ac : '#9a8e82', fontFamily: FONT }}>PP</span>
-          <span style={{ fontSize: '11px', fontWeight: 800, color: canAfford ? ac : '#9a8e82', fontFamily: FONT }}>{item.price}</span>
+          <span style={{ fontSize: '9px', fontWeight: 700, color: canAfford ? ac : PAPER_TEXT_FAINT, fontFamily: FONT }}>PP</span>
+          <span style={{ fontSize: '11px', fontWeight: 800, color: canAfford ? ac : PAPER_TEXT_FAINT, fontFamily: FONT }}>{item.price}</span>
         </div>
       )}
     </div>
@@ -375,7 +379,7 @@ const TileSection = ({ label, items, renderItems }) => items.length === 0 ? null
   <div style={{ marginBottom: '20px' }}>
     <div style={{
       fontSize: '10px', fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase',
-      color: '#9a8e82', fontFamily: FONT, marginBottom: '8px', paddingBottom: '6px',
+      color: PAPER_TEXT_FAINT, fontFamily: FONT, marginBottom: '8px', paddingBottom: '6px',
       borderBottom: '1px solid #e8e2d8',
     }}>{label}</div>
     {renderItems(items)}
@@ -470,7 +474,7 @@ const ParityStoreScreen = ({ onClose }) => {
     <div style={{
       position: 'fixed', inset: 0, zIndex: 99999,
       display: 'flex', flexDirection: 'column',
-      background: '#f5f0e8',
+      background: PAPER_SHEET,
       fontFamily: FONT,
       pointerEvents: 'auto',
     }}>
@@ -490,7 +494,7 @@ const ParityStoreScreen = ({ onClose }) => {
             <span style={{ fontSize: '11px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#fff' }}>Parity Store</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-            <span style={{ fontSize: '28px', fontWeight: 900, color: '#1e1612', letterSpacing: '-0.04em', lineHeight: 1 }}>Your Collection</span>
+            <span style={{ fontSize: '28px', fontWeight: 900, color: PAPER_TEXT, letterSpacing: '-0.04em', lineHeight: 1 }}>Your Collection</span>
           </div>
         </div>
 
@@ -502,9 +506,9 @@ const ParityStoreScreen = ({ onClose }) => {
             boxShadow: '0 3px 0 #c4beb6',
             textAlign: 'right',
           }}>
-            <div style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#9a8e82' }}>Balance</div>
+            <div style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: PAPER_TEXT_FAINT }}>Balance</div>
             <div style={{ fontSize: '20px', fontWeight: 900, color: ACCENT, letterSpacing: '-0.03em' }}>
-              {parityPoints} <span style={{ fontSize: '12px', fontWeight: 700, color: '#9a8e82' }}>PP</span>
+              {parityPoints} <span style={{ fontSize: '12px', fontWeight: 700, color: PAPER_TEXT_FAINT }}>PP</span>
             </div>
           </div>
 
@@ -514,7 +518,7 @@ const ParityStoreScreen = ({ onClose }) => {
             style={{
               ...TOUCH, width: 40, height: 40, borderRadius: '12px',
               background: '#fff', border: '1.5px solid #d6d0c8',
-              color: '#7a6e62', cursor: 'pointer',
+              color: PAPER_TEXT_MUTED, cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               boxShadow: '0 2px 0 #c4beb6', fontFamily: FONT,
             }}
@@ -539,7 +543,7 @@ const ParityStoreScreen = ({ onClose }) => {
                 padding: '8px 18px', borderRadius: '10px', cursor: 'pointer',
                 background: active ? '#fff' : 'transparent',
                 border: active ? `2px solid ${t.accent}` : '2px solid #d6d0c8',
-                color: active ? t.accent : '#7a6e62',
+                color: active ? t.accent : PAPER_TEXT_MUTED,
                 fontSize: '12px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
                 fontFamily: FONT, whiteSpace: 'nowrap',
                 boxShadow: active ? `inset 0 2px 4px rgba(0,0,0,0.06)` : '0 2px 0 #c4beb6',
@@ -572,9 +576,9 @@ const ParityStoreScreen = ({ onClose }) => {
       <div style={{
         padding: '10px 20px 18px', textAlign: 'center',
         borderTop: '1px solid #d6d0c8', flexShrink: 0,
-        background: '#ede8df',
+        background: PAPER_FOOTER_BG,
       }}>
-        <span style={{ fontSize: '11px', color: '#9a8e82', fontFamily: FONT }}>
+        <span style={{ fontSize: '11px', color: PAPER_TEXT_FAINT, fontFamily: FONT }}>
           Earn PP by collecting orbs in Worm mode and winning Disparity bets
         </span>
       </div>
@@ -583,7 +587,7 @@ const ParityStoreScreen = ({ onClose }) => {
       {toast && (
         <div style={{
           position: 'fixed', bottom: '80px', left: '50%', transform: 'translateX(-50%)',
-          background: '#f5f0e8', border: `1.5px solid ${toast.ok ? activeTabAccent : '#c44b00'}`,
+          background: PAPER_SHEET, border: `1.5px solid ${toast.ok ? activeTabAccent : '#c44b00'}`,
           borderRadius: '12px', padding: '10px 20px',
           color: toast.ok ? activeTabAccent : '#c44b00',
           fontSize: '13px', fontWeight: 700, fontFamily: FONT,

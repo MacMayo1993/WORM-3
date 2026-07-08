@@ -6,33 +6,14 @@ import { registerTilePreview, updateTilePreview, unregisterTilePreview } from '.
 import { isMobile } from '../../utils/device.js';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { extractColorsFromImage } from '../../utils/colorExtraction.js';
-import { UI_FONT } from '../../utils/uiTheme.js';
-
-const BG_PREVIEWS = {
-  blackhole: 'radial-gradient(circle, #1a0033 0%, #000000 100%)',
-  cave: 'linear-gradient(135deg, #3d2817 0%, #1a120a 100%)',
-  beach: 'linear-gradient(180deg, #87ceeb 0%, #f4e4c1 70%, #c2b280 100%)',
-  forest: 'linear-gradient(180deg, #6b8e23 0%, #2d5016 50%, #1a2f0f 100%)',
-  park: 'linear-gradient(180deg, #a8d5ba 0%, #7cb89d 50%, #4a7c59 100%)',
-  night: 'linear-gradient(180deg, #0f0f23 0%, #1a1a3e 50%, #050510 100%)',
-  city: 'linear-gradient(180deg, #4a5568 0%, #2d3748 50%, #1a202c 100%)',
-  apartment: 'linear-gradient(135deg, #f5f5dc 0%, #deb887 50%, #cd853f 100%)',
-  lobby: 'linear-gradient(135deg, #e8e8e8 0%, #b8b8b8 50%, #707070 100%)',
-  warehouse: 'linear-gradient(180deg, #6e6e6e 0%, #4a4a4a 50%, #2c2c2c 100%)',
-  studio: 'linear-gradient(180deg, #ffffff 0%, #f0f0f0 50%, #d0d0d0 100%)',
-  dark: 'linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%)',
-  midnight: 'linear-gradient(135deg, #191970 0%, #0c0c38 100%)',
-  cobblestone: 'linear-gradient(135deg, #8b8b8b 0%, #555555 100%)',
-  desert: 'linear-gradient(180deg, #edc9af 0%, #d2b48c 100%)',
-  fireplace: 'linear-gradient(135deg, #5c2c2c 0%, #2a1a1a 100%)',
-  lounge: 'linear-gradient(135deg, #4a3b2a 0%, #2a221a 100%)',
-  paris: 'linear-gradient(180deg, #aaddff 0%, #dceeff 100%)',
-  shanghai: 'linear-gradient(180deg, #1a2a6c 0%, #b21f1f 100%)',
-  snow: 'linear-gradient(180deg, #eef7ff 0%, #cceeff 100%)',
-  stadium: 'linear-gradient(180deg, #3a7bd5 0%, #3a6073 100%)',
-  sunset: 'linear-gradient(180deg, #ff7e5f 0%, #feb47b 100%)',
-  umbrella: 'linear-gradient(135deg, #ff9966 0%, #ff5e62 100%)',
-};
+import {
+  UI_FONT,
+  PAPER_BACKDROP, PAPER_BACKDROP_BLUR,
+  PAPER_SHEET, PAPER_SHEET_RAISED, PAPER_BORDER, PAPER_BORDER_SOFT,
+  PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT,
+  PAPER_FOOTER_BG, PAPER_BG_MUTED, PAPER_CARD_SHADOW, PAPER_SHADOW,
+} from '../../utils/uiTheme.js';
+import { BG_PREVIEWS } from '../../utils/bgPreviews.js';
 
 const BG_OPTIONS = BACKGROUNDS.map(bg => ({
   value: bg.id,
@@ -100,9 +81,9 @@ const S = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: 'rgba(160,152,140,0.60)',
-    backdropFilter: 'blur(18px)',
-    WebkitBackdropFilter: 'blur(18px)',
+    background: PAPER_BACKDROP,
+    backdropFilter: PAPER_BACKDROP_BLUR,
+    WebkitBackdropFilter: PAPER_BACKDROP_BLUR,
     zIndex: 1000,
     fontFamily: UI_FONT,
     padding: isMobile ? '12px' : '0',
@@ -110,14 +91,14 @@ const S = {
     animation: 'modalBackdropIn 0.22s ease',
   },
   sheet: {
-    background: '#f5f0e8',
+    background: PAPER_SHEET,
     borderRadius: isMobile ? '16px' : '20px',
     width: 'min(640px, 100%)',
     maxHeight: isMobile ? '92vh' : '88vh',
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
-    boxShadow: '0 20px 56px rgba(0,0,0,0.22), 0 2px 8px rgba(0,0,0,0.10)',
+    boxShadow: PAPER_SHADOW,
     border: '1px solid #cec8be',
     animation: 'modalSheetIn 0.30s cubic-bezier(0.22, 1, 0.36, 1)',
   },
@@ -126,29 +107,29 @@ const S = {
   dot: (active, current) => ({
     height: '8px',
     borderRadius: '3px',
-    background: current ? ACCENT : active ? `${ACCENT}66` : '#cec8be',
+    background: current ? ACCENT : active ? `${ACCENT}66` : PAPER_BORDER,
     flex: current ? '2' : '1',
     transition: 'all 0.35s cubic-bezier(0.4,0,0.2,1)',
     boxShadow: current ? `0 1px 4px ${ACCENT}55` : 'none',
   }),
-  title: { fontSize: '24px', fontWeight: '700', letterSpacing: '-0.5px', color: '#1e1612', margin: '0 0 4px', lineHeight: 1.15 },
-  subtitle: { fontSize: '13px', color: '#7a6e62', margin: '0 0 20px', fontWeight: '400' },
+  title: { fontSize: '24px', fontWeight: '700', letterSpacing: '-0.5px', color: PAPER_TEXT, margin: '0 0 4px', lineHeight: 1.15 },
+  subtitle: { fontSize: '13px', color: PAPER_TEXT_MUTED, margin: '0 0 20px', fontWeight: '400' },
   body: {
     padding: isMobile ? '0 20px' : '0 36px',
     overflowY: 'auto',
     flex: 1,
     scrollbarWidth: 'thin',
-    scrollbarColor: '#c4beb6 transparent',
+    scrollbarColor: `${PAPER_CARD_SHADOW} transparent`,
   },
   card: (selected) => ({
     display: 'flex',
     padding: '14px 16px',
     borderRadius: '10px',
     border: selected ? `2px solid ${ACCENT}` : '2px solid #d6d0c8',
-    background: selected ? `${ACCENT}12` : '#ffffff',
+    background: selected ? `${ACCENT}12` : PAPER_SHEET_RAISED,
     boxShadow: selected
       ? 'inset 0 2px 5px rgba(0,0,0,0.10), 0 1px 0 rgba(255,255,255,0.6)'
-      : '0 3px 0 #c4beb6, 0 4px 10px rgba(0,0,0,0.06)',
+      : `0 3px 0 ${PAPER_CARD_SHADOW}, 0 4px 10px rgba(0,0,0,0.06)`,
     transform: selected ? 'translateY(1px)' : 'none',
     cursor: 'pointer',
     transition: 'all 0.15s ease',
@@ -185,10 +166,10 @@ const S = {
     alignItems: 'center',
     flexShrink: 0,
     borderTop: '1px solid #d6d0c8',
-    background: '#ede8df',
+    background: PAPER_FOOTER_BG,
   },
   btnSecondary: {
-    background: 'none', border: '1.5px solid #d6d0c8', fontSize: '15px', fontWeight: '500', color: '#7a6e62',
+    background: 'none', border: '1.5px solid #d6d0c8', fontSize: '15px', fontWeight: '500', color: PAPER_TEXT_MUTED,
     cursor: 'pointer', padding: '10px 16px', borderRadius: '10px', transition: 'all 0.15s ease', fontFamily: 'inherit',
   },
   btnPrimary: {
@@ -303,11 +284,11 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
             {customPreview ? (
               <img src={customPreview} alt="Uploaded" style={{ width: '56px', height: '36px', objectFit: 'cover', borderRadius: '8px', flexShrink: 0 }} />
             ) : (
-              <div style={{ width: '56px', height: '36px', borderRadius: '8px', background: '#f0ebe2', border: '1px solid #d6d0c8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 600, letterSpacing: '0.06em', color: '#9a8e82', flexShrink: 0 }}>IMG</div>
+              <div style={{ width: '56px', height: '36px', borderRadius: '8px', background: PAPER_BG_MUTED, border: '1px solid #d6d0c8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 600, letterSpacing: '0.06em', color: PAPER_TEXT_FAINT, flexShrink: 0 }}>IMG</div>
             )}
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '14px', fontWeight: settings.colorScheme === 'custom' ? '600' : '500', color: '#1e1612' }}>Extract from Image</div>
-              <div style={{ fontSize: '12px', color: '#7a6e62', marginTop: '2px' }}>{customPreview ? 'Tap to change image' : 'Upload a photo to auto-generate a palette'}</div>
+              <div style={{ fontSize: '14px', fontWeight: settings.colorScheme === 'custom' ? '600' : '500', color: PAPER_TEXT }}>Extract from Image</div>
+              <div style={{ fontSize: '12px', color: PAPER_TEXT_MUTED, marginTop: '2px' }}>{customPreview ? 'Tap to change image' : 'Upload a photo to auto-generate a palette'}</div>
             </div>
             {resolvedCustom && (
               <div style={{ display: 'flex', gap: '3px', flexShrink: 0 }}>
@@ -319,9 +300,9 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
-          <div style={{ flex: 1, height: '1px', background: '#d6d0c8' }} />
-          <span style={{ fontSize: '11px', fontWeight: '600', letterSpacing: '0.06em', textTransform: 'uppercase', color: '#9a8e82' }}>Presets</span>
-          <div style={{ flex: 1, height: '1px', background: '#d6d0c8' }} />
+          <div style={{ flex: 1, height: '1px', background: PAPER_BORDER_SOFT }} />
+          <span style={{ fontSize: '11px', fontWeight: '600', letterSpacing: '0.06em', textTransform: 'uppercase', color: PAPER_TEXT_FAINT }}>Presets</span>
+          <div style={{ flex: 1, height: '1px', background: PAPER_BORDER_SOFT }} />
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '7px', paddingBottom: '8px' }}>
@@ -334,7 +315,7 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
                 ...S.card(selected), flexDirection: 'column', gap: '6px', padding: '10px 12px',
                 ...(owned ? {} : { opacity: 0.42, cursor: 'not-allowed', pointerEvents: 'none' }),
               }} onClick={() => owned && select('colorScheme', key)}>
-                <span style={{ fontSize: '12px', fontWeight: selected ? '600' : '400', color: selected ? '#1e1612' : '#7a6e62', lineHeight: 1.2 }}>
+                <span style={{ fontSize: '12px', fontWeight: selected ? '600' : '400', color: selected ? PAPER_TEXT : PAPER_TEXT_MUTED, lineHeight: 1.2 }}>
                   {SCHEME_LABELS[key]}{!owned ? ' 🔒' : ''}
                 </span>
                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
@@ -371,7 +352,7 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
 
     const StyleGrid = ({ keys, label }) => (
       <div style={{ marginBottom: '20px' }}>
-        <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9a8e82', marginBottom: '8px' }}>{label}</div>
+        <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: PAPER_TEXT_FAINT, marginBottom: '8px' }}>{label}</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '7px' }}>
           {keys.map(key => {
             const sel = globalStyle === key;
@@ -380,10 +361,10 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
               <button key={key} style={{
                 display: 'block', position: 'relative', padding: 0, borderRadius: '10px',
                 border: sel ? `2px solid ${ACCENT}` : '2px solid #d6d0c8',
-                background: '#f0ebe2',
+                background: PAPER_BG_MUTED,
                 boxShadow: sel
                   ? 'inset 0 2px 4px rgba(0,0,0,0.10)'
-                  : '0 2px 0 #c4beb6, 0 3px 6px rgba(0,0,0,0.06)',
+                  : `0 2px 0 ${PAPER_CARD_SHADOW}, 0 3px 6px rgba(0,0,0,0.06)`,
                 transform: sel ? 'translateY(1px)' : 'none',
                 cursor: owned ? 'pointer' : 'not-allowed', outline: 'none',
                 WebkitTapHighlightColor: 'transparent', transition: 'all 0.15s ease',
@@ -410,8 +391,8 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
         <div style={{ marginBottom: '18px' }}>
           <button style={{ ...S.card(settings.tileStyle === 'random' && !perFace), flexDirection: 'row', alignItems: 'center', gap: '14px' }} onClick={() => applyGlobal('random')}>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '14px', fontWeight: '600', color: '#1e1612' }}>Random Mix</div>
-              <div style={{ fontSize: '12px', color: '#7a6e62', marginTop: '2px' }}>Different style on every face</div>
+              <div style={{ fontSize: '14px', fontWeight: '600', color: PAPER_TEXT }}>Random Mix</div>
+              <div style={{ fontSize: '12px', color: PAPER_TEXT_MUTED, marginTop: '2px' }}>Different style on every face</div>
             </div>
             {settings.tileStyle === 'random' && !perFace && <Checkmark />}
           </button>
@@ -422,7 +403,7 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
         <StyleGrid keys={LIVING_STYLE_KEYS} label="Living" />
 
         <div style={{ marginBottom: '8px' }}>
-          <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9a8e82', marginBottom: '10px' }}>Per Face</div>
+          <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: PAPER_TEXT_FAINT, marginBottom: '10px' }}>Per Face</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
             {(() => {
               // Computed once for all 6 faces below instead of re-filtering per face.
@@ -435,13 +416,13 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
               const faceStyle = tileOwned(rawStyle) ? rawStyle : 'solid';
               const faceColor = resolvedColors[faceId] || '#4a7fa5';
               return (
-                <div key={faceId} style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '10px', borderRadius: '10px', background: '#f0ebe2', border: `2px solid ${faceColor}55` }}>
+                <div key={faceId} style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '10px', borderRadius: '10px', background: PAPER_BG_MUTED, border: `2px solid ${faceColor}55` }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
                     <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: faceColor, flexShrink: 0, boxShadow: '0 1px 0 rgba(0,0,0,0.20)' }} />
-                    <span style={{ fontSize: '11px', fontWeight: '600', color: '#7a6e62' }}>{FACE_LABELS[faceId]}</span>
+                    <span style={{ fontSize: '11px', fontWeight: '600', color: PAPER_TEXT_MUTED }}>{FACE_LABELS[faceId]}</span>
                   </div>
                   <TilePreviewCanvas styleKey={faceStyle === 'random' ? 'solid' : faceStyle} colorHex={faceColor} size={36} />
-                  <select value={faceStyle} onChange={e => applyPerFace(faceId, e.target.value)} style={{ fontSize: '10px', padding: '4px 6px', borderRadius: '6px', border: '1px solid #d6d0c8', background: '#f7f3ec', color: '#1e1612', fontFamily: 'inherit', cursor: 'pointer', appearance: 'none', WebkitAppearance: 'none' }}>
+                  <select value={faceStyle} onChange={e => applyPerFace(faceId, e.target.value)} style={{ fontSize: '10px', padding: '4px 6px', borderRadius: '6px', border: '1px solid #d6d0c8', background: '#f7f3ec', color: PAPER_TEXT, fontFamily: 'inherit', cursor: 'pointer', appearance: 'none', WebkitAppearance: 'none' }}>
                     <optgroup label="Classic">{ownedClassic.map(k => <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>)}</optgroup>
                     <optgroup label="Antipodal Op Art">{ownedAntipodal.map(k => <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>)}</optgroup>
                     <optgroup label="Living">{ownedLiving.map(k => <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>)}</optgroup>
@@ -460,17 +441,17 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
   const renderGameplay = () => (
     <div style={{ display: 'grid', gap: '18px' }}>
       <div>
-        <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9a8e82', marginBottom: '10px' }}>
+        <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: PAPER_TEXT_FAINT, marginBottom: '10px' }}>
           Disparity Level <span style={{ color: accent }}>{LEVEL_LABELS[settings.disparityLevel]}</span>
         </div>
         <div style={{ display: 'flex', gap: '6px' }}>
           {[1, 2, 3, 4, 5].map(n => (
             <button key={n} onClick={() => select('disparityLevel', n)} style={{
-              flex: 1, padding: '9px 0', border: `2px solid ${settings.disparityLevel === n ? LEVEL_ACCENT[n] : '#d6d0c8'}`,
+              flex: 1, padding: '9px 0', border: `2px solid ${settings.disparityLevel === n ? LEVEL_ACCENT[n] : PAPER_BORDER_SOFT}`,
               borderRadius: '10px', fontSize: '14px', fontWeight: settings.disparityLevel === n ? '700' : '500',
-              background: settings.disparityLevel === n ? `${LEVEL_ACCENT[n]}18` : '#ffffff',
-              color: settings.disparityLevel === n ? LEVEL_ACCENT[n] : '#9a8e82',
-              boxShadow: settings.disparityLevel === n ? 'inset 0 2px 4px rgba(0,0,0,0.08)' : '0 2px 0 #c4beb6',
+              background: settings.disparityLevel === n ? `${LEVEL_ACCENT[n]}18` : PAPER_SHEET_RAISED,
+              color: settings.disparityLevel === n ? LEVEL_ACCENT[n] : PAPER_TEXT_FAINT,
+              boxShadow: settings.disparityLevel === n ? 'inset 0 2px 4px rgba(0,0,0,0.08)' : `0 2px 0 ${PAPER_CARD_SHADOW}`,
               transform: settings.disparityLevel === n ? 'translateY(1px)' : 'none',
               cursor: 'pointer', transition: 'all 0.15s', fontFamily: 'inherit',
             }}>{n}</button>
@@ -479,15 +460,15 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
       </div>
 
       <div>
-        <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9a8e82', marginBottom: '10px' }}>Tile Endurance</div>
+        <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: PAPER_TEXT_FAINT, marginBottom: '10px' }}>Tile Endurance</div>
         <div style={{ display: 'flex', gap: '6px' }}>
           {FLIP_CAP_PRESETS.map(p => (
             <button key={p.value} onClick={() => select('flipCap', p.value)} style={{
-              flex: 1, padding: '8px 4px', border: `2px solid ${settings.flipCap === p.value ? accent : '#d6d0c8'}`,
+              flex: 1, padding: '8px 4px', border: `2px solid ${settings.flipCap === p.value ? accent : PAPER_BORDER_SOFT}`,
               borderRadius: '10px', fontSize: '11px', fontWeight: settings.flipCap === p.value ? '700' : '500',
-              background: settings.flipCap === p.value ? `${accent}18` : '#ffffff',
-              color: settings.flipCap === p.value ? accent : '#9a8e82',
-              boxShadow: settings.flipCap === p.value ? 'inset 0 2px 4px rgba(0,0,0,0.08)' : '0 2px 0 #c4beb6',
+              background: settings.flipCap === p.value ? `${accent}18` : PAPER_SHEET_RAISED,
+              color: settings.flipCap === p.value ? accent : PAPER_TEXT_FAINT,
+              boxShadow: settings.flipCap === p.value ? 'inset 0 2px 4px rgba(0,0,0,0.08)' : `0 2px 0 ${PAPER_CARD_SHADOW}`,
               transform: settings.flipCap === p.value ? 'translateY(1px)' : 'none',
               cursor: 'pointer', transition: 'all 0.15s', fontFamily: 'inherit', textAlign: 'center', lineHeight: 1.3,
             }}>
@@ -499,15 +480,15 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
       </div>
 
       <div>
-        <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9a8e82', marginBottom: '10px' }}>Game Length</div>
+        <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: PAPER_TEXT_FAINT, marginBottom: '10px' }}>Game Length</div>
         <div style={{ display: 'flex', gap: '6px' }}>
           {GAME_LENGTH_OPTIONS.map(opt => (
             <button key={opt.value} onClick={() => select('gameLength', opt.value)} style={{
-              flex: 1, padding: '8px 4px', border: `2px solid ${settings.gameLength === opt.value ? accent : '#d6d0c8'}`,
+              flex: 1, padding: '8px 4px', border: `2px solid ${settings.gameLength === opt.value ? accent : PAPER_BORDER_SOFT}`,
               borderRadius: '10px', fontSize: '11px', fontWeight: settings.gameLength === opt.value ? '700' : '500',
-              background: settings.gameLength === opt.value ? `${accent}18` : '#ffffff',
-              color: settings.gameLength === opt.value ? accent : '#9a8e82',
-              boxShadow: settings.gameLength === opt.value ? 'inset 0 2px 4px rgba(0,0,0,0.08)' : '0 2px 0 #c4beb6',
+              background: settings.gameLength === opt.value ? `${accent}18` : PAPER_SHEET_RAISED,
+              color: settings.gameLength === opt.value ? accent : PAPER_TEXT_FAINT,
+              boxShadow: settings.gameLength === opt.value ? 'inset 0 2px 4px rgba(0,0,0,0.08)' : `0 2px 0 ${PAPER_CARD_SHADOW}`,
               transform: settings.gameLength === opt.value ? 'translateY(1px)' : 'none',
               cursor: 'pointer', transition: 'all 0.15s', fontFamily: 'inherit', textAlign: 'center', lineHeight: 1.3,
             }}>
@@ -541,7 +522,7 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
           return (
             <button key={n} style={{ ...S.card(selected), flexDirection: 'column', gap: '12px', padding: '18px 16px' }} onClick={() => setCubeSize(n)}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ width: '44px', height: '44px', borderRadius: '8px', overflow: 'hidden', border: `1px solid ${selected ? 'rgba(0,0,0,0.15)' : '#d6d0c8'}`, background: '#f0ebe2' }}>
+                <div style={{ width: '44px', height: '44px', borderRadius: '8px', overflow: 'hidden', border: `1px solid ${selected ? 'rgba(0,0,0,0.15)' : PAPER_BORDER_SOFT}`, background: PAPER_BG_MUTED }}>
                   <TilePreviewCanvas styleKey={settings.tileStyle === 'random' ? 'solid' : (settings.tileStyle || 'solid')} colorHex={resolvedColors[1] || '#4a7fa5'} size={44} />
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: `repeat(${n}, 1fr)`, gap: '3px', width: '44px' }}>
@@ -550,10 +531,10 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '3px' }}>
-                  <span style={{ fontSize: '16px', fontWeight: '700', color: '#1e1612', letterSpacing: '-0.4px' }}>{name}</span>
-                  <span style={{ fontSize: '10px', fontWeight: '600', letterSpacing: '0.04em', textTransform: 'uppercase', color: selected ? ACCENT : '#9a8e82' }}>{tag}</span>
+                  <span style={{ fontSize: '16px', fontWeight: '700', color: PAPER_TEXT, letterSpacing: '-0.4px' }}>{name}</span>
+                  <span style={{ fontSize: '10px', fontWeight: '600', letterSpacing: '0.04em', textTransform: 'uppercase', color: selected ? ACCENT : PAPER_TEXT_FAINT }}>{tag}</span>
                 </div>
-                <div style={{ fontSize: '12px', color: '#9a8e82' }}>{desc}</div>
+                <div style={{ fontSize: '12px', color: PAPER_TEXT_FAINT }}>{desc}</div>
               </div>
               {selected && <div style={{ position: 'absolute', top: '12px', right: '12px' }}><Checkmark /></div>}
             </button>
@@ -597,8 +578,8 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
           <button
             style={S.btnSecondary}
             onClick={handleBack}
-            onMouseEnter={e => { e.currentTarget.style.color = '#1e1612'; e.currentTarget.style.borderColor = '#b8b2aa'; }}
-            onMouseLeave={e => { e.currentTarget.style.color = '#7a6e62'; e.currentTarget.style.borderColor = '#d6d0c8'; }}
+            onMouseEnter={e => { e.currentTarget.style.color = PAPER_TEXT; e.currentTarget.style.borderColor = '#b8b2aa'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = PAPER_TEXT_MUTED; e.currentTarget.style.borderColor = PAPER_BORDER_SOFT; }}
           >
             {step === 0 ? 'Cancel' : 'Back'}
           </button>
@@ -632,10 +613,10 @@ const ToggleRow = ({ label, sub, value, onChange }) => (
     }}
   >
     <div>
-      <div style={{ fontSize: '14px', fontWeight: '600', color: '#1e1612' }}>{label}</div>
-      {sub && <div style={{ fontSize: '12px', color: '#7a6e62', marginTop: '1px' }}>{sub}</div>}
+      <div style={{ fontSize: '14px', fontWeight: '600', color: PAPER_TEXT }}>{label}</div>
+      {sub && <div style={{ fontSize: '12px', color: PAPER_TEXT_MUTED, marginTop: '1px' }}>{sub}</div>}
     </div>
-    <div style={{ width: '44px', height: '26px', borderRadius: '14px', background: value ? ACCENT : '#d6d0c8', position: 'relative', transition: 'background 0.2s ease', flexShrink: 0, boxShadow: value ? `0 2px 0 ${ACCENT_SHADOW}` : '0 2px 0 #b8b2aa' }}>
+    <div style={{ width: '44px', height: '26px', borderRadius: '14px', background: value ? ACCENT : PAPER_BORDER_SOFT, position: 'relative', transition: 'background 0.2s ease', flexShrink: 0, boxShadow: value ? `0 2px 0 ${ACCENT_SHADOW}` : '0 2px 0 #b8b2aa' }}>
       <div style={{ position: 'absolute', top: '3px', left: value ? '21px' : '3px', width: '20px', height: '20px', borderRadius: '50%', background: '#fff', transition: 'left 0.2s ease', boxShadow: '0 1px 3px rgba(0,0,0,0.20)' }} />
     </div>
   </button>

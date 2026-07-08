@@ -5,6 +5,7 @@
 import React, { useMemo, useRef, useEffect } from 'react';
 import { checkSolveProgress } from '../game/solveDetection.js';
 import { useKociembaSolver } from '../teach/useKociembaSolver.js';
+import { UI_FONT, MONO_FONT, GLASS_PANEL, GLASS_PANEL_BORDER, GLASS_TEXT, GLASS_TEXT_MUTED } from '../utils/uiTheme.js';
 
 // ── CFOP mini progress strip ──────────────────────────────────────────────────
 
@@ -25,7 +26,7 @@ function CfopStrip({ progress }) {
         return (
           <div key={s.id} style={{
             flex: 1, textAlign: 'center', fontSize: 9,
-            fontFamily: "'Courier New', monospace",
+            fontFamily: MONO_FONT,
             color: done ? '#00ff88' : active ? '#fefae0' : 'rgba(255,255,255,0.35)',
             paddingBottom: 2,
             borderBottom: `2px solid ${done ? '#00ff88' : active ? '#fefae0' : 'transparent'}`,
@@ -60,7 +61,7 @@ function MoveChip({ notation, state }) {
       border,
       color,
       fontSize: 11,
-      fontFamily: "'Courier New', monospace",
+      fontFamily: MONO_FONT,
       fontWeight: state === 'next' ? 700 : 400,
       whiteSpace: 'nowrap',
       animation: state === 'next' ? 'kociemba-pulse 1s ease-in-out infinite' : 'none',
@@ -119,15 +120,15 @@ export default function SolveMode({ cubies, size, onClose }) {
         right: 16,
         bottom: 72,          /* sits just above the bottom nav bar */
         width: 272,
-        background: 'rgba(8,8,12,0.88)',
+        background: GLASS_PANEL,
         backdropFilter: 'blur(14px)',
         WebkitBackdropFilter: 'blur(14px)',
         borderRadius: 12,
-        border: '1px solid rgba(255,255,255,0.10)',
-        color: 'white',
+        border: `1px solid ${GLASS_PANEL_BORDER}`,
+        color: GLASS_TEXT,
         zIndex: 1000,
         overflow: 'hidden',
-        fontFamily: "'Courier New', monospace",
+        fontFamily: MONO_FONT,
         userSelect: 'none',
         boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
       }}>
@@ -233,7 +234,7 @@ function ctrlBtn(accent, disabled) {
     border: `1px solid ${disabled ? 'rgba(255,255,255,0.10)' : accent}`,
     color: disabled ? 'rgba(255,255,255,0.25)' : accent,
     cursor: disabled ? 'default' : 'pointer',
-    fontSize: 11, fontFamily: "'Courier New', monospace", fontWeight: 600,
+    fontSize: 11, fontFamily: MONO_FONT, fontWeight: 600,
     transition: 'all 0.15s',
   };
 }

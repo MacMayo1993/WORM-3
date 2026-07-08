@@ -5,7 +5,7 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { FACE_COLORS } from '../../utils/constants.js';
-import { UI_FONT } from '../../utils/uiTheme.js';
+import { UI_FONT, MONO_FONT } from '../../utils/uiTheme.js';
 
 const FONT = UI_FONT;
 

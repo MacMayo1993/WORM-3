@@ -4,7 +4,11 @@ import {
   BET_TYPES, FACE_INFO, ANTIPODAL_PAIRS, calcPayout, streakMultiplier,
 } from '../../utils/disparityBetting.js';
 import { BET_MIN, BET_MAX } from '../../utils/economyConstants.js';
-import { UI_FONT } from '../../utils/uiTheme.js';
+import {
+  UI_FONT, PAPER_BACKDROP, PAPER_BACKDROP_BLUR, PAPER_SHEET, PAPER_SHEET_RAISED,
+  PAPER_BORDER, PAPER_BORDER_SOFT, PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT,
+  PAPER_FOOTER_BG, PAPER_BG_MUTED, PAPER_CARD_SHADOW, PAPER_SHADOW,
+} from '../../utils/uiTheme.js';
 
 const ACCENT = '#C44B00';
 const ACCENT_SHADOW = '#7a2e00';
