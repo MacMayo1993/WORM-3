@@ -521,9 +521,14 @@ export const newStyleShaders = {
 
       // Chamber: a box of half-extent 0.5 in the plane, depth 0..-boxDepth.
       float boxDepth = 0.6;
-      // Ball recessed inside, slightly above centre; a tiny hover keeps it alive.
-      vec3 sc = vec3(0.0, -0.02 + sin(time * 0.7) * 0.012, -0.34);
-      float R = 0.3;
+      // Ball recessed inside, drifting on a slow Lissajous orbit + depth bob so
+      // it visibly floats around within the chamber.
+      float R = 0.15;
+      vec3 sc = vec3(
+        sin(time * 0.55) * 0.17,
+        cos(time * 0.43) * 0.13 - 0.02,
+        -0.34 + sin(time * 0.37) * 0.07
+      );
 
       // Fixed light in tangent space → stable regardless of face orientation.
       vec3 L = normalize(vec3(-0.4, 0.5, 0.72));
