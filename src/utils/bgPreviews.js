@@ -1,6 +1,5 @@
 export const BG_PREVIEWS = {
   blackhole: 'radial-gradient(circle, #1a0033 0%, #000000 100%)',
-  nebula: 'radial-gradient(ellipse, #3d0a4a 0%, #0a1030 50%, #020108 100%)',
   cave: 'linear-gradient(135deg, #3d2817 0%, #1a120a 100%)',
   beach: 'linear-gradient(180deg, #87ceeb 0%, #f4e4c1 70%, #c2b280 100%)',
   forest: 'linear-gradient(180deg, #6b8e23 0%, #2d5016 50%, #1a2f0f 100%)',

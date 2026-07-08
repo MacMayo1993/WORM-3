@@ -14,7 +14,6 @@ import { useShallow } from 'zustand/react/shallow';
 import { isMobile } from '../utils/device.js';
 import CubeAssembly from './CubeAssembly.jsx';
 import BlackHoleEnvironment from './BlackHoleEnvironment.jsx';
-import NebulaEnvironment from './NebulaEnvironment.jsx';
 import { getLevelBackground } from './LifeJourneyBackgrounds.jsx';
 import { BACKGROUNDS, getBackgroundUrl } from '../utils/backgrounds.js';
 import LayerHighlight from '../teach/LayerHighlight.jsx';
@@ -189,9 +188,9 @@ export default function GameScene({
   const fogEnabled = useMemo(() => {
     if (currentLevelData) {
       // Level scenes: fog the dark cosmic backgrounds, not bright HDRI 'city' lighting envs.
-      return !currentLevelData.background || currentLevelData.background === 'blackhole' || currentLevelData.background === 'nebula';
+      return !currentLevelData.background || currentLevelData.background === 'blackhole';
     }
-    if (settings.backgroundTheme === 'blackhole' || settings.backgroundTheme === 'nebula') return true;
+    if (settings.backgroundTheme === 'blackhole') return true;
     if (bgConfig?.file) return false; // user-selected photo panorama
     if (PHOTO_PRESETS.has(settings.backgroundTheme)) return false; // HDRI preset
     return true; // falls through to the black-hole default
@@ -241,13 +240,10 @@ export default function GameScene({
       <Suspense fallback={null}>
         {/* Level-specific backgrounds */}
         {currentLevelData?.background === 'blackhole' && <BlackHoleEnvironment flipTrigger={blackHolePulse} />}
-        {currentLevelData?.background === 'nebula' && <NebulaEnvironment flipTrigger={blackHolePulse} />}
-        {currentLevelData?.background && currentLevelData.background !== 'blackhole' && currentLevelData.background !== 'nebula' &&
+        {currentLevelData?.background && currentLevelData.background !== 'blackhole' &&
           getLevelBackground(currentLevelData.background, blackHolePulse)}
         {/* Free play: Black Hole */}
         {!currentLevelData && settings.backgroundTheme === 'blackhole' && <BlackHoleEnvironment flipTrigger={blackHolePulse} />}
-        {/* Free play: Nebula */}
-        {!currentLevelData && settings.backgroundTheme === 'nebula' && <NebulaEnvironment flipTrigger={blackHolePulse} />}
         {/* Free play: interactive photo panoramas */}
         {!currentLevelData && bgConfig?.file && (
           <ErrorBoundary3D>
@@ -260,7 +256,6 @@ export default function GameScene({
           </ErrorBoundary3D>
         )}
         {!currentLevelData && !bgConfig?.file && !PHOTO_PRESETS.has(settings.backgroundTheme) &&
-          settings.backgroundTheme !== 'nebula' &&
           (settings.backgroundTheme === 'blackhole' || !bgConfig) && (
           <BlackHoleEnvironment flipTrigger={blackHolePulse} />
         )}
