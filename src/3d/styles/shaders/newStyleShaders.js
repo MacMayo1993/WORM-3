@@ -486,6 +486,7 @@ export const newStyleShaders = {
   // depth cue that actually sells the 3D illusion (a flat painted sphere can't).
   orbChamber: `
     uniform vec3 baseColor;
+    uniform vec3 antipodalColor;
     uniform float time;
     varying vec2 vUv;
     varying vec3 vNormal;
@@ -547,23 +548,26 @@ export const newStyleShaders = {
         // Occlusion: darker on the underside where it meets the chamber floor.
         float ao = smoothstep(-R * 0.9, R * 0.6, hp.y - sc.y) * 0.5 + 0.5;
 
-        vec3 ballDark = baseColor * 0.16;
-        vec3 ballLit  = baseColor * 1.05;
+        // The ball is the antipodal (opposite-face) color — the chamber shows
+        // this face's color, so each porthole reads as "the other side inside".
+        vec3 ballDark = antipodalColor * 0.16;
+        vec3 ballLit  = antipodalColor * 1.05;
         interior = mix(ballDark, ballLit, diff) * ao;
-        interior += vec3(1.0) * spec * 0.8;                     // hot highlight
-        interior += mix(baseColor * 1.3, vec3(1.0), 0.4) * fres * 0.4; // rim light
+        interior += vec3(1.0) * spec * 0.8;                          // hot highlight
+        interior += mix(antipodalColor * 1.3, vec3(1.0), 0.4) * fres * 0.4; // rim light
       } else {
         // Missed the ball → hit the back wall of the chamber.
         float tb = -boxDepth / min(rd.z, -0.001);
         vec3 wp = ro + rd * tb;
         float wv = 1.0 - smoothstep(0.15, 0.72, length(wp.xy));  // centre vignette
-        interior = baseColor * 0.05 * (0.4 + wv * 0.9);
+        // Chamber interior clearly shows THIS face's color (the "inside view").
+        interior = baseColor * (0.16 + wv * 0.34);
         // Soft contact shadow the ball casts onto the wall (light ≈ from front).
         float shad = smoothstep(R * 1.5, R * 0.55, length(wp.xy - sc.xy));
-        interior *= 1.0 - shad * 0.55;
+        interior *= 1.0 - shad * 0.5;
         // Faint animated bokeh haze deep in the chamber.
         float haze = 0.5 + 0.5 * sin((wp.x + wp.y) * 10.0 + time * 0.5);
-        interior += baseColor * haze * 0.03 * wv;
+        interior += baseColor * haze * 0.04 * wv;
       }
 
       // ── Glass front (locked to the surface, not parallaxed → reads as a pane).

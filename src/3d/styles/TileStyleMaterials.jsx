@@ -150,7 +150,7 @@ const ANTIPODAL_STYLES = new Set([
   'cornerAccent', 'innerDisc', 'crossPlus', 'borderFrame', 'thinHatch', 'dotRing',
   'opConcentric', 'opRadialSpokes', 'opTiltMosaic', 'opDiamondWave', 'opBullseyeSteps',
   'opWarpGrid', 'opChevronBands', 'opInterferencePlaid', 'opRibbonTwist', 'opPinwheel',
-  'waveform', 'dnaHelix',
+  'waveform', 'dnaHelix', 'orbChamber',
 ]);
 
 /**
