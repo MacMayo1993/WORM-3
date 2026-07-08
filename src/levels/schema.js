@@ -41,6 +41,7 @@ export const BACKGROUNDS = {
   ROCKET: 'rocket',
   MOON: 'moon',
   BLACKHOLE: 'blackhole',
+  NEBULA: 'nebula',
   // Extensible for custom backgrounds
   SPACE: 'space',
   FOREST: 'forest',
