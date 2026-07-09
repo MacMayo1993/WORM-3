@@ -827,7 +827,6 @@ export const newStyleShaders = {
     uniform float spin;
     uniform float spinAxis;
     uniform float spinSlice;
-    uniform float diceRoll;
     varying vec2 vUv;
     varying vec3 vNormal;
     varying vec3 vViewPosition;
@@ -896,13 +895,12 @@ export const newStyleShaders = {
       float seed = fract(sin(dot(snapped.xy + snapped.z * 1.7, vec2(12.9898, 78.233))) * 43758.5453);
       float seed2 = fract(seed * 7.31 + 0.137);
 
-      // Rest orientation = fixed seed offset + accumulated roll from past
-      // rotations. diceRoll grows only while spin energy is nonzero, so each
-      // layer turn advances the die to a new face. Seed-derived multipliers
-      // ensure every die on the cube lands differently.
+      // Rest orientation from snapped grid position — rotated tiles land at a
+      // new grid cell so their seed (and thus die face) changes automatically;
+      // non-rotated tiles keep the same position and the same face.
       float sp2 = sp * sp;
-      float ra = seed * 20.0 + diceRoll * (1.0 + seed * 0.7) + sp2 * (6.283 + seed * 3.0);
-      float rb = seed2 * 20.0 + diceRoll * (0.8 + seed2 * 0.6) + sp2 * (4.712 + seed2 * 2.5);
+      float ra = seed * 20.0 + sp2 * (6.283 + seed * 3.0);
+      float rb = seed2 * 20.0 + sp2 * (4.712 + seed2 * 2.5);
       mat3 R    = rotY(rb) * rotX(ra);          // die local → chamber space
       mat3 Rinv = rotX(-ra) * rotY(-rb);        // inverse (avoids transpose())
 
