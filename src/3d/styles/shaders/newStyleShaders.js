@@ -2,7 +2,7 @@
 //                         oilSlick, constellation, waveform, dnaHelix, neonSign,
 //                         prismBloom, magnetFlux, liquidChrome, auroraWeave, plasmaCells,
 //                         quantumScanlines, emberstorm, fractalPulse, bioLattice, stellarLensing,
-//                         orbChamber, liquidTank, dice, sandChamber
+//                         orbChamber, liquidTank, dice, sandChamber, lavaLamp
 
 export const newStyleShaders = {
   // Stained Glass - cathedral leaded glass with radial + concentric segments
@@ -1106,6 +1106,156 @@ export const newStyleShaders = {
       col += vec3(1.0) * slash * 0.06;
 
       // Frame outside the jar: this face's color (bright), never black.
+      vec3 frame = baseColor * 0.72;
+      col = mix(frame, col, chamber);
+
+      gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+    }
+  `,
+
+  // Lava Lamp - metaball blobs raymarched in true depth behind the glass. The
+  // blobs rise/fall along real-world gravity, morph (pulsing radii), and merge /
+  // pinch off as they pass — the classic lava-lamp motion. Lava is the antipodal
+  // color; the fluid/glass/frame is this face's color (no black).
+  lavaLamp: `
+    precision highp float;
+    uniform vec3 baseColor;
+    uniform vec3 antipodalColor;
+    uniform float time;
+    uniform float spin;
+    uniform float spinAxis;
+    uniform float spinSlice;
+    varying vec2 vUv;
+    varying vec3 vNormal;
+    varying vec3 vViewPosition;
+    varying vec3 vTileCenter;
+    varying vec3 vWorldNormal;
+
+    // Metaball scalar field. Blobs bob along gravity (upT), sway (rightT), pulse
+    // their radius (morph), and get thrown while the slice turns (jit). A wide
+    // flat puddle sits at the bottom so blobs neck off from it like a real lamp.
+    float lavaField(vec3 q, vec2 upT, vec2 rightT, float t, float ph, float jit) {
+      float f = 0.0;
+      for (int i = 0; i < 4; i++) {
+        float fi = float(i);
+        float travel = sin(t * (0.16 + 0.03 * fi) + ph + fi * 2.1);   // -1..1 slow rise/fall
+        float yy = travel * 0.32;
+        float xx = sin(t * (0.11 + 0.03 * fi) + ph + fi * 1.3) * 0.11 + sin(travel * 3.0) * 0.03;
+        float zz = -0.26 + sin(t * 0.22 + fi * 1.7) * 0.10;
+        xx += sin(t * 15.0 + fi) * 0.08 * jit;
+        yy += cos(t * 13.0 + fi) * 0.08 * jit;
+        vec2 c2 = rightT * xx + upT * yy;
+        vec3 d = q - vec3(c2, zz);
+        float R = 0.095 + 0.025 * sin(t * 0.5 + fi * 1.9);   // pulsing size → morph
+        f += R * R / (dot(d, d) + 0.003);
+      }
+      // Small bottom puddle: flattened along gravity so it reads as a reservoir
+      // that blobs neck off from.
+      vec3 d = q - vec3(upT * -0.44, -0.24);
+      float up = dot(d.xy, upT);
+      float side = dot(d.xy, rightT);
+      f += 0.055 / (side * side * 0.6 + up * up * 4.0 + d.z * d.z + 0.003);
+      return f;
+    }
+
+    void main() {
+      vec2 p = vUv - 0.5;
+
+      // Tall rounded-rect lamp vessel.
+      vec2 qd = abs(p) - vec2(0.34, 0.45);
+      float rr = min(max(qd.x, qd.y), 0.0) + length(max(qd, vec2(0.0))) - 0.06;
+      float chamber = 1.0 - smoothstep(0.0, 0.015, rr);
+
+      // Tangent frame from screen derivatives.
+      vec3 pos3 = -vViewPosition;
+      vec3 dpdx = dFdx(pos3); vec3 dpdy = dFdy(pos3);
+      vec2 duvx = dFdx(vUv); vec2 duvy = dFdy(vUv);
+      vec3 N = normalize(vNormal);
+      vec3 dp2perp = cross(dpdy, N);
+      vec3 dp1perp = cross(N, dpdx);
+      vec3 T = dp2perp * duvx.x + dp1perp * duvy.x;
+      vec3 Bt = dp2perp * duvx.y + dp1perp * duvy.y;
+      float invmax = inversesqrt(max(dot(T, T), dot(Bt, Bt)));
+      T *= invmax; Bt *= invmax;
+      vec3 V = normalize(vViewPosition);
+      vec3 vT = vec3(dot(V, T), dot(V, Bt), dot(V, N));
+
+      // World-up projected into the tile plane → gravity direction on the face.
+      vec3 upView = (viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz;
+      vec2 upT = vec2(dot(upView, T), dot(upView, Bt));
+      float upLen = length(upT);
+      upT = upLen > 0.001 ? upT / upLen : vec2(0.0, 1.0);
+      vec2 rightT = vec2(-upT.y, upT.x);
+
+      // Slice membership → the turning slice's lamps get shaken.
+      float axisCoord = spinAxis < 0.5 ? vTileCenter.x
+                      : spinAxis < 1.5 ? vTileCenter.y
+                      : vTileCenter.z;
+      float member = 1.0 - smoothstep(0.55, 0.78, abs(axisCoord - spinSlice));
+      float sp = clamp(spin * member, 0.0, 1.0);
+
+      // Per-tile phase so no two lamps are in sync.
+      float ph = fract(sin(dot(vTileCenter.xy + vTileCenter.z * 1.7, vec2(12.9898, 78.233))) * 43758.5453) * 6.2831;
+
+      // Raymarch the metaball field through the chamber depth.
+      vec3 ro = vec3(p, 0.0);
+      vec3 rd = normalize(-vT);
+      float dt = 0.55 / (max(0.2, -rd.z) * 22.0);
+      float t = 0.0;
+      float cover = 0.0;
+      float hitT = -1.0;
+      for (int i = 0; i < 22; i++) {
+        vec3 q = ro + rd * t;
+        float F = lavaField(q, upT, rightT, time, ph, sp);
+        cover += smoothstep(1.0, 1.35, F);
+        if (hitT < 0.0 && F > 1.15) hitT = t;
+        t += dt;
+      }
+      cover = clamp(cover * 0.17, 0.0, 1.0);
+
+      // Surface normal from the field gradient at the first crossing.
+      vec3 nrm = vec3(0.0, 0.0, 1.0);
+      if (hitT > 0.0) {
+        vec3 q = ro + rd * hitT;
+        vec2 e = vec2(0.02, 0.0);
+        float fx = lavaField(q + e.xyy, upT, rightT, time, ph, sp) - lavaField(q - e.xyy, upT, rightT, time, ph, sp);
+        float fy = lavaField(q + e.yxy, upT, rightT, time, ph, sp) - lavaField(q - e.yxy, upT, rightT, time, ph, sp);
+        float fz = lavaField(q + e.yyx, upT, rightT, time, ph, sp) - lavaField(q - e.yyx, upT, rightT, time, ph, sp);
+        nrm = normalize(-vec3(fx, fy, fz));
+      }
+
+      // Lava shading: glowing, translucent, thicker where coverage is high.
+      vec3 L = normalize(vec3(-0.3, 0.6, 0.72));
+      vec3 toEye = -rd;
+      float diff = max(dot(nrm, L), 0.0);
+      float spec = pow(max(dot(reflect(-L, nrm), toEye), 0.0), 30.0);
+      float fres = pow(1.0 - max(dot(nrm, toEye), 0.0), 3.0);
+      // Translucent glow: thin edges deep, thick core hot (cover ≈ ray thickness).
+      vec3 lavaDeep = antipodalColor * 0.5;
+      vec3 lavaHot  = mix(antipodalColor, vec3(1.0, 0.92, 0.5), 0.4);
+      vec3 lava = mix(lavaDeep, lavaHot, cover);
+      lava = mix(lava, lava * 1.12, diff * 0.5);
+      lava += vec3(1.0) * spec * 0.5;
+      lava += mix(antipodalColor, vec3(1.0), 0.5) * fres * 0.35;
+
+      // Fluid background: this face's color, warmer/brighter toward the bottom,
+      // with a heat-glow "bulb" at the base. No black.
+      float upCoord = dot(p, upT);                      // -0.5 (bottom) .. 0.5 (top)
+      float grad = smoothstep(0.5, -0.5, upCoord);      // 1 at the bottom
+      vec3 fluid = baseColor * (0.28 + grad * 0.3);
+      float bulb = smoothstep(0.42, 0.0, length(p - upT * -0.42));
+      fluid += mix(baseColor, antipodalColor, 0.45) * bulb * 0.4;
+
+      vec3 col = mix(fluid, lava, cover);
+      col += antipodalColor * cover * 0.15;             // emissive bleed
+
+      // Glass front: bright rim + a diagonal reflection.
+      float rimEdge = smoothstep(0.05, 0.0, abs(rr + 0.03));
+      col += mix(baseColor * 1.3, vec3(1.0), 0.5) * rimEdge * 0.5;
+      float slash = smoothstep(0.03, 0.0, abs((p.x + p.y * 0.5) - 0.12)) * smoothstep(0.4, 0.05, length(p));
+      col += vec3(1.0) * slash * 0.07;
+
+      // Frame outside the vessel: this face's color (bright), never black.
       vec3 frame = baseColor * 0.72;
       col = mix(frame, col, chamber);
 
