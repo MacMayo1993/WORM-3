@@ -829,7 +829,7 @@ const CubeAssembly = React.memo(({
       // ~6 rad/s (a fast quarter-turn) → full energy.
       const target = rotActive ? Math.min(1, angSpeed / 6) : 0;
       const e = spinEnergyRef.current;
-      spinEnergyRef.current = e < target ? target : e * 0.9;
+      spinEnergyRef.current = e < target ? target : e * 0.95;
 
       // Latch which slice is turning (world coord along its axis) while active,
       // and hold it through the energy decay so the just-moved tiles keep
