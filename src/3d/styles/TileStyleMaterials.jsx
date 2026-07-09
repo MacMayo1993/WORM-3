@@ -24,6 +24,9 @@ export const sharedUniforms = {
   // so this stays correct throughout the turn.
   spinAxis: { value: 0 },
   spinSlice: { value: 0 },
+  // Monotonically increasing accumulator driven by spin energy so the dice
+  // style settles to a new random orientation after every layer rotation.
+  diceRoll: { value: 0 },
 };
 
 // Update time uniform (call from useFrame)
@@ -36,6 +39,11 @@ export function updateSharedSpin(energy, axis, slice) {
   sharedUniforms.spin.value = energy < 0 ? 0 : energy > 1 ? 1 : energy;
   sharedUniforms.spinAxis.value = axis;
   sharedUniforms.spinSlice.value = slice;
+}
+
+// Accumulate dice roll from spin energy (call from useFrame).
+export function updateDiceRoll(dt, spinEnergy) {
+  sharedUniforms.diceRoll.value += dt * spinEnergy * 7.0;
 }
 
 // ─── Shared tremor state ─────────────────────────────────────────────────────
@@ -231,6 +239,7 @@ export function getTileStyleMaterial(style, colorHex, useTexture = false, textur
     spin: sharedUniforms.spin,
     spinAxis: sharedUniforms.spinAxis,
     spinSlice: sharedUniforms.spinSlice,
+    diceRoll: sharedUniforms.diceRoll,
   };
 
   // Antipodal patterns need a second color uniform.  Use the provided antipodal
