@@ -208,10 +208,18 @@ export default function BlackHoleEnvironment({ flipTrigger = 0, zoom = 1.65, orb
           float diskTurb = fbm(vec2(diskAngle * 3.0, dist * 10.0) + time * 0.1) * 0.5 + 0.5;
           diskGlow *= mix(0.6, 1.0, diskTurb);
 
-          // Photon sphere with cinematic glow falloff
+          // Photon sphere with cinematic glow falloff. The chromatic offsets are
+          // inspired by the referenced CodePen's post-process lensing shader, but kept
+          // procedural so this environment stays a single R3F background mesh.
           float photonRing = abs(dist - 0.17);
           float photonSphere = smoothstep(0.02, 0.0, photonRing) * 1.2;
           float photonOuter = smoothstep(0.06, 0.02, photonRing) * 0.3;
+          float lensFalloff = smoothstep(0.56, 0.12, dist);
+          float lensArc = pow(max(0.0, 1.0 - abs(dist - 0.28) * 9.0), 2.0) * lensFalloff;
+          vec2 radialDir = normalize((coord - center) * zoom + vec2(0.0001));
+          float chromaR = fbm((coord + radialDir * 0.010) * 34.0 + vec2(time * 0.18, -time * 0.07));
+          float chromaB = fbm((coord - radialDir * 0.012) * 36.0 + vec2(-time * 0.11, time * 0.15));
+          vec3 chromaticLensing = vec3(chromaR * 1.2, 0.55 + diskTurb * 0.5, chromaB * 1.25) * lensArc;
 
           // Hawking radiation — subtle thermal glow with flicker
           float hawkingRing = abs(dist - 0.18);
@@ -227,10 +235,11 @@ export default function BlackHoleEnvironment({ flipTrigger = 0, zoom = 1.65, orb
           // Color scheme — richer HDR palette for ACES mapping
           vec3 deepSpace = vec3(0.01, 0.01, 0.02);
           vec3 eventHorizonColor = vec3(0.0, 0.0, 0.0);
-          vec3 accretionHot = vec3(1.2, 0.5, 0.08);
-          vec3 accretionWarm = vec3(0.9, 0.3, 0.05);
-          vec3 accretionBlue = vec3(0.3, 0.5, 1.2);
-          vec3 photonYellow = vec3(1.4, 1.1, 0.5);
+          vec3 accretionHot = vec3(1.35, 0.62, 0.12);
+          vec3 accretionWarm = vec3(0.95, 0.32, 0.06);
+          vec3 accretionRose = vec3(1.05, 0.22, 0.55);
+          vec3 accretionBlue = vec3(0.25, 0.45, 1.35);
+          vec3 photonYellow = vec3(1.5, 1.18, 0.56);
           vec3 starColor = vec3(0.9, 0.95, 1.0);
           vec3 warmStarColor = vec3(1.0, 0.9, 0.7);
           vec3 blueStarColor = vec3(0.7, 0.85, 1.0);
@@ -250,15 +259,20 @@ export default function BlackHoleEnvironment({ flipTrigger = 0, zoom = 1.65, orb
           finalStarColor = mix(finalStarColor, blueStarColor, step(0.9, starColorMix));
           color += finalStarColor * stars * gradient * 0.9;
 
-          // Add accretion disk — temperature gradient from hot inner to cool outer
+          // Add accretion disk — temperature gradient from hot inner to cool outer,
+          // plus a CodePen-style multi-band violet/blue outer rim and hot white core.
           float tempGradient = smoothstep(0.4, 0.18, dist);
           vec3 diskColor = mix(accretionWarm, accretionHot, tempGradient);
-          diskColor = mix(diskColor, accretionBlue, diskPattern * (1.0 - tempGradient) * 0.4);
-          color += diskColor * diskGlow * 0.8;
+          diskColor = mix(diskColor, accretionRose, diskPattern * smoothstep(0.18, 0.55, dist) * 0.28);
+          diskColor = mix(diskColor, accretionBlue, diskPattern * (1.0 - tempGradient) * 0.46);
+          diskColor = mix(diskColor, vec3(1.45, 1.18, 0.82), pow(tempGradient, 3.0) * 0.38);
+          float dopplerBoost = 0.72 + 0.42 * smoothstep(-0.25, 0.85, sin(diskAngle + time * 0.25));
+          color += diskColor * diskGlow * 0.9 * dopplerBoost;
 
-          // Add photon sphere
+          // Add photon sphere, Fresnel-like back glow, and procedural chromatic lensing
           color += photonYellow * photonSphere;
           color += photonYellow * photonOuter * 0.5;
+          color += chromaticLensing * 0.28;
 
           // Add Hawking radiation
           color += accretionHot * hawkingGlow * 0.6;
@@ -266,8 +280,10 @@ export default function BlackHoleEnvironment({ flipTrigger = 0, zoom = 1.65, orb
           // Add turbulence
           color += vec3(turbulence * 0.1);
 
-          // Darken the event horizon
-          color *= (1.0 - eventHorizon * 0.95);
+          // Darken the event horizon while preserving a thin fiery back-side rim.
+          float horizonRim = smoothstep(0.19, 0.15, dist) * smoothstep(0.10, 0.15, dist);
+          color += vec3(1.0, 0.38, 0.08) * horizonRim * (0.24 + 0.18 * sin(time * 2.5));
+          color *= (1.0 - eventHorizon * 0.96);
 
           // Pulse effect on flip - brightens the entire black hole
           if (pulseIntensity > 0.0) {
