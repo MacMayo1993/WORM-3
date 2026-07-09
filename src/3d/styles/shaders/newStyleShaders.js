@@ -1211,38 +1211,34 @@ export const newStyleShaders = {
         cover += smoothstep(0.8, 1.55, F);          // wide, soft → antialiased
         t += dt;
       }
-      cover = clamp(cover * 0.14, 0.0, 1.0);
+      cover = clamp(cover * 0.16, 0.0, 1.0);
 
-      // Normal from the screen-space gradient of coverage. This inherits the
-      // (smooth) coverage's antialiasing, gives a rounded blob look, and avoids
-      // the hard first-hit threshold that produced the speckle.
-      vec2 cg = vec2(dFdx(cover), dFdy(cover));
-      vec3 nrm = normalize(vec3(-cg * 9.0, 0.5));
+      float upCoord = dot(p, upT);                      // -0.5 (bottom) .. 0.5 (top)
 
-      // Lava shading: glowing, translucent, thicker where coverage is high.
-      vec3 L = normalize(vec3(-0.3, 0.6, 0.72));
-      vec3 toEye = vec3(0.0, 0.0, 1.0);
-      float diff = max(dot(nrm, L), 0.0);
-      float spec = pow(max(dot(reflect(-L, nrm), toEye), 0.0), 30.0);
-      float fres = pow(1.0 - max(dot(nrm, toEye), 0.0), 3.0);
-      // Translucent glow: thin edges deep, thick core hot (cover ≈ ray thickness).
-      vec3 lavaDeep = antipodalColor * 0.5;
-      vec3 lavaHot  = mix(antipodalColor, vec3(1.0, 0.92, 0.5), 0.4);
-      vec3 lava = mix(lavaDeep, lavaHot, cover);
-      lava = mix(lava, lava * 1.12, diff * 0.5);
-      lava += vec3(1.0) * spec * 0.5;
-      lava += mix(antipodalColor, vec3(1.0), 0.5) * fres * 0.35;
+      // Lava shading is derived ONLY from coverage (ray thickness) — no per-pixel
+      // normal and no screen-space derivatives, so the raymarch's step
+      // quantization can't be amplified into the dither grain that showed up on
+      // mobile mid-rotation / after zoom. Backlit translucent blobs read fine
+      // without a bump normal.
+      vec3 lavaDeep = antipodalColor * 0.55;
+      vec3 lavaHot  = mix(antipodalColor, vec3(1.0, 0.92, 0.5), 0.45);
+      vec3 lava = mix(lavaDeep, lavaHot, smoothstep(0.12, 0.9, cover));
+      // Consistent soft top-lighting from world-up (smooth; no derivatives).
+      lava *= 0.84 + 0.3 * smoothstep(-0.35, 0.35, upCoord);
+      // Bright translucent rim just inside the silhouette, straight from cover.
+      float rimGlow = smoothstep(0.08, 0.32, cover) * (1.0 - smoothstep(0.5, 0.95, cover));
+      lava += mix(antipodalColor, vec3(1.0), 0.6) * rimGlow * 0.35;
+      lava += antipodalColor * cover * 0.18;            // emissive bleed
 
       // Fluid background: this face's color, warmer/brighter toward the bottom,
       // with a heat-glow "bulb" at the base. No black.
-      float upCoord = dot(p, upT);                      // -0.5 (bottom) .. 0.5 (top)
       float grad = smoothstep(0.5, -0.5, upCoord);      // 1 at the bottom
       vec3 fluid = baseColor * (0.28 + grad * 0.3);
       float bulb = smoothstep(0.42, 0.0, length(p - upT * -0.42));
       fluid += mix(baseColor, antipodalColor, 0.45) * bulb * 0.4;
 
-      vec3 col = mix(fluid, lava, cover);
-      col += antipodalColor * cover * 0.15;             // emissive bleed
+      // Smooth coverage-based silhouette blend → antialiased edges, no grain.
+      vec3 col = mix(fluid, lava, smoothstep(0.04, 0.5, cover));
 
       // Glass front: bright rim + a diagonal reflection.
       float rimEdge = smoothstep(0.05, 0.0, abs(rr + 0.03));
