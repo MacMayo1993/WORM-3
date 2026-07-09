@@ -278,6 +278,7 @@ export const TILE_STYLES = {
   magnetFlux:   { label: 'Magnet Flux',   cost: 'med', type: 'animated' },
   liquidChrome: { label: 'Liquid Chrome', cost: 'med', type: 'animated' },
   orbChamber:   { label: 'Orb Chamber',   cost: 'med', type: 'animated' },
+  liquidTank:   { label: 'Liquid Tank',   cost: 'med', type: 'animated' },
   auroraWeave:  { label: 'Aurora Weave',  cost: 'med', type: 'animated' },
   plasmaCells:  { label: 'Plasma Cells',  cost: 'med', type: 'animated' },
   quantumScanlines: { label: 'Quantum Scanlines', cost: 'med', type: 'animated' },

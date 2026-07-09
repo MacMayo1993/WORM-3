@@ -6,11 +6,16 @@ export const baseVertexShader = `
   // World-space center of this tile (mesh origin). Constant across the tile, so
   // reactive styles (orbChamber) can test which rotation slice the tile is in.
   varying vec3 vTileCenter;
+  // World-space position of this fragment — lets styles keep effects level to
+  // gravity (liquidTank's waterline) regardless of how the cube is viewed.
+  varying vec3 vWorldPos;
 
   void main() {
     vUv = uv;
     vNormal = normalize(normalMatrix * normal);
     vTileCenter = modelMatrix[3].xyz;
+    vec4 worldPos = modelMatrix * vec4(position, 1.0);
+    vWorldPos = worldPos.xyz;
     vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
     vViewPosition = -mvPosition.xyz;
     gl_Position = projectionMatrix * mvPosition;
