@@ -2,7 +2,7 @@
 //                         oilSlick, constellation, waveform, dnaHelix, neonSign,
 //                         prismBloom, magnetFlux, liquidChrome, auroraWeave, plasmaCells,
 //                         quantumScanlines, emberstorm, fractalPulse, bioLattice, stellarLensing,
-//                         orbChamber
+//                         orbChamber, liquidTank
 
 export const newStyleShaders = {
   // Stained Glass - cathedral leaded glass with radial + concentric segments
@@ -615,6 +615,127 @@ export const newStyleShaders = {
       col += rimCol * rim * 0.75;
       col += vec3(1.0) * slash * 0.1;
       col += vec3(1.0, 0.95, 0.82) * glint * 0.45;
+
+      vec3 frame = baseColor * 0.03;
+      col = mix(frame, col, chamber);
+
+      gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+    }
+  `,
+
+  // Liquid Tank - each tile is a little glass tank. The liquid (antipodal color)
+  // stays level to real-world gravity as you orbit the cube, refracts a parallax
+  // floor, and sloshes when its slice is turned. Tank/air is this face's color.
+  liquidTank: `
+    uniform vec3 baseColor;
+    uniform vec3 antipodalColor;
+    uniform float time;
+    uniform float spin;
+    uniform float spinAxis;
+    uniform float spinSlice;
+    varying vec2 vUv;
+    varying vec3 vNormal;
+    varying vec3 vViewPosition;
+    varying vec3 vTileCenter;
+    varying vec3 vWorldPos;
+
+    void main() {
+      vec2 p = vUv - 0.5;
+
+      // Rounded-rectangle tank window (SDF: <0 inside).
+      vec2 q = abs(p) - vec2(0.43);
+      float rr = min(max(q.x, q.y), 0.0) + length(max(q, vec2(0.0))) - 0.05;
+      float chamber = 1.0 - smoothstep(0.0, 0.02, rr);
+
+      // Tangent frame from screen derivatives (UV-aligned) → maps tangent→view.
+      vec3 pos = -vViewPosition;
+      vec3 dpdx = dFdx(pos);
+      vec3 dpdy = dFdy(pos);
+      vec2 duvx = dFdx(vUv);
+      vec2 duvy = dFdy(vUv);
+      vec3 N = normalize(vNormal);
+      vec3 dp2perp = cross(dpdy, N);
+      vec3 dp1perp = cross(N, dpdx);
+      vec3 T = dp2perp * duvx.x + dp1perp * duvy.x;
+      vec3 B = dp2perp * duvx.y + dp1perp * duvy.y;
+      float invmax = inversesqrt(max(dot(T, T), dot(B, B)));
+      T *= invmax; B *= invmax;
+      vec3 V = normalize(vViewPosition);
+      vec3 vT = vec3(dot(V, T), dot(V, B), dot(V, N));
+
+      // Ray into the tank; the back wall gives the floor a parallax depth cue.
+      vec3 ro = vec3(p, 0.0);
+      vec3 rd = normalize(-vT);
+      float boxDepth = 0.55;
+      float tb = -boxDepth / min(rd.z, -0.001);
+      vec3 wp = ro + rd * tb;
+
+      // Slice membership → only the tiles being turned slosh.
+      float axisCoord = spinAxis < 0.5 ? vTileCenter.x
+                      : spinAxis < 1.5 ? vTileCenter.y
+                      : vTileCenter.z;
+      float member = 1.0 - smoothstep(0.55, 0.78, abs(axisCoord - spinSlice));
+      float sp = clamp(spin * member, 0.0, 1.0);
+
+      // Gravity-aligned coordinates from the WORLD position: vertical = world Y,
+      // so the waterline stays level however the cube is oriented/viewed.
+      vec3 wofs = vWorldPos - vTileCenter;
+      float hv = wofs.y;              // world-vertical offset from tile center
+      float hh = wofs.x - wofs.z;     // a world-horizontal axis (for ripples/tilt)
+
+      // Liquid surface height (world-vertical). Idle ripple + violent slosh.
+      float surface = 0.05
+        + sin(hh * 9.0 + time * 1.6) * 0.015
+        + sin(hh * 5.0 - time * 1.1) * 0.009
+        + sin(time * 0.7) * 0.006
+        + hh * sin(time * 9.0) * 0.5 * sp
+        + sin(hh * 14.0 - time * 20.0) * 0.05 * sp;
+
+      float belowness = surface - hv;                    // >0 → under water
+      float water = smoothstep(-0.012, 0.02, belowness);
+
+      // Liquid volume: antipodal color, darker with depth, animated caustics,
+      // and a bright sunlit band just under the surface.
+      float depthT = clamp(belowness * 1.4, 0.0, 1.0);
+      float caustic = 0.5 + 0.5 * sin(wp.x * 16.0 + time * 1.3) * sin(wp.y * 16.0 - time * 1.1);
+      vec3 liquidCol = mix(antipodalColor, antipodalColor * 0.32, depthT);
+      liquidCol += antipodalColor * caustic * 0.18 * (1.0 - depthT);
+      liquidCol += mix(antipodalColor * 1.3, vec3(1.0), 0.3) * smoothstep(0.08, 0.0, belowness) * 0.35;
+
+      // Air above the waterline: faint dry-tank tint (this face's color) with a
+      // hint of the parallax back wall.
+      float floorPat = 0.5 + 0.5 * sin(wp.x * 12.0) * sin(wp.y * 12.0 + time * 0.4);
+      vec3 airCol = baseColor * (0.12 + floorPat * 0.06);
+
+      vec3 col = mix(airCol, liquidCol, water);
+
+      // Surface line: bright meniscus with a moving specular sparkle.
+      float surfBand = smoothstep(0.025, 0.0, abs(belowness));
+      float sparkle = pow(0.5 + 0.5 * sin(hh * 40.0 - time * 6.0), 8.0);
+      vec3 surfCol = mix(antipodalColor * 1.5, vec3(1.0), 0.55);
+      col += surfCol * surfBand * (0.5 + 0.5 * sparkle);
+
+      // A few rising bubbles, faster and wilder while sloshing (only in liquid).
+      for (int i = 0; i < 3; i++) {
+        float fi = float(i);
+        float speed = 0.22 + fi * 0.10 + sp * 0.8;
+        vec2 bpos = vec2(sin(fi * 2.3 + time * (0.4 + fi * 0.2)) * 0.24,
+                         fract(fi * 0.37 + time * speed) * 0.7 - 0.4);
+        float bub = smoothstep(0.034, 0.018, length(p - bpos));
+        col += vec3(1.0) * bub * water * 0.45;
+      }
+
+      // Glass tank front: inner rim, diagonal reflection, glancing fresnel sheen.
+      float rimEdge = smoothstep(0.055, 0.0, abs(rr + 0.03));
+      vec3 rimCol = mix(baseColor * 1.2, vec3(0.8, 0.95, 1.0), 0.6);
+      col += rimCol * rimEdge * 0.55;
+
+      float slash = smoothstep(0.03, 0.0, abs((p.x + p.y * 0.5) - 0.13));
+      slash *= smoothstep(0.42, 0.05, length(p));
+      col += vec3(1.0) * slash * 0.08;
+
+      float fres = pow(1.0 - max(vT.z, 0.0), 3.0);
+      col += vec3(0.7, 0.85, 1.0) * fres * 0.14;
 
       vec3 frame = baseColor * 0.03;
       col = mix(frame, col, chamber);

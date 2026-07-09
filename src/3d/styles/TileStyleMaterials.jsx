@@ -168,7 +168,7 @@ const ANTIPODAL_STYLES = new Set([
   'cornerAccent', 'innerDisc', 'crossPlus', 'borderFrame', 'thinHatch', 'dotRing',
   'opConcentric', 'opRadialSpokes', 'opTiltMosaic', 'opDiamondWave', 'opBullseyeSteps',
   'opWarpGrid', 'opChevronBands', 'opInterferencePlaid', 'opRibbonTwist', 'opPinwheel',
-  'waveform', 'dnaHelix', 'orbChamber',
+  'waveform', 'dnaHelix', 'orbChamber', 'liquidTank',
 ]);
 
 /**
@@ -287,7 +287,7 @@ const ANIMATED_STYLES = new Set([
   'oilSlick', 'constellation', 'waveform', 'dnaHelix', 'neonSign',
   'prismBloom', 'magnetFlux', 'liquidChrome', 'auroraWeave', 'plasmaCells',
   'quantumScanlines', 'emberstorm', 'fractalPulse', 'bioLattice', 'stellarLensing',
-  'orbChamber',
+  'orbChamber', 'liquidTank',
 ]);
 
 /**
