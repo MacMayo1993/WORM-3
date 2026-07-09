@@ -387,7 +387,7 @@ export function useWormCrawler(size, cubies) {
     // re-writing the instanced color buffer on frames where nothing changed.
     const colorEpochRef = useRef(0);
 
-    const applyOrbPickupGrowth = (color, faceId) => {
+    const applyOrbPickupGrowth = useCallback((color, faceId) => {
         tailLength.current = Math.min(tailLength.current + ORB_SEGMENT_GROWTH, MAX_TAIL);
         orbPickupColorsRef.current.push(color);
         colorEpochRef.current++;
@@ -404,7 +404,38 @@ export function useWormCrawler(size, cubies) {
                 },
             } : {}),
         }));
-    };
+    }, []);
+
+    // Attempt to pick up a powerup sitting on the given tile (the worm's current cell).
+    // Shared by the step-commit path and the rotation-commit path — a rest-read landing
+    // defers pickup until the slice commits, then re-checks here so an orb that rode the
+    // rotating slice into the cell the worm occupies is still collected on contact.
+    const tryPickupPowerupAt = useCallback((x, y, z, dirKey) => {
+        const puIdx = powerupsRef.current.findIndex(p => p.x === x && p.y === y && p.z === z && p.dirKey === dirKey);
+        if (puIdx === -1) return;
+        const pickedUp = powerupsRef.current[puIdx];
+        // Read fresh store state rather than any tick-scope snapshot: spawnWormholePair() may
+        // have flipped a sticker pair earlier in the same tick, and a rotation commit may have
+        // just replaced the cubies array — a stale read would misjudge the hover rule below.
+        const liveCubies = useGameStore.getState().cubies;
+        const pickedSticker = getStickerSafe(liveCubies, pickedUp.x, pickedUp.y, pickedUp.z, pickedUp.dirKey);
+        // Orbs on flipped tiles hover above the surface — worm must jump to reach them.
+        const tileIsFlipped = !!(pickedSticker && pickedSticker.curr !== pickedSticker.orig);
+        if (tileIsFlipped && !isJumping.current) return; // crawled on without jumping — out of reach
+        const pickedFaceId = pickedSticker ? pickedSticker.curr : 0;
+        const liveColors = resolveColors(useGameStore.getState().settings);
+        const pickedColor = ensureOrbContrast((pickedFaceId && liveColors[pickedFaceId]) ?? '#22ff88');
+        applyOrbPickupGrowth(pickedColor, pickedFaceId);
+        pendingOrbFlashRef.current = { color: pickedColor, pos: curWorldPos.current.toArray() };
+        // Combo climbs when pickups come in quick succession (≤2s apart).
+        const _nowT = timeAliveRef.current;
+        orbComboRef.current = (_nowT - lastOrbTimeRef.current <= 2.0) ? orbComboRef.current + 1 : 0;
+        lastOrbTimeRef.current = _nowT;
+        feel('orb', { combo: orbComboRef.current });
+        const newPowerup = { ...randomFreeTile(size, [...powerupsRef.current, pos.current]), type: 'apple' };
+        powerupsRef.current[puIdx] = newPowerup;
+        useGameStore.getState().setWormPowerups(powerupsRef.current.slice());
+    }, [size, applyOrbPickupGrowth]);
 
     const spawnWormholePair = () => {
         const tile = randomUnflippedTile(cubiesRef.current, size, [pos.current]);
@@ -798,39 +829,10 @@ export function useWormCrawler(size, cubies) {
                         // While rest-reading, this cell's occupant (sticker, orb, tunnel mouth) is
                         // still mid-flight — what actually lands here is only knowable at commit,
                         // so pickup and flipped-tile detection are deferred. The rotationEpoch
-                        // handler re-runs the flipped check on the landed sticker.
+                        // handler re-runs both on the landed contents.
                         const destMidRotation = !!(restReadSlice.current &&
                             isTileInSlice(restReadSlice.current.axis, restReadSlice.current.sliceIndex, x, y, z));
-                        const puIdx = destMidRotation ? -1 : powerupsRef.current.findIndex(p => p.x === x && p.y === y && p.z === z && p.dirKey === dirKey);
-                        if (puIdx !== -1) {
-                            const pickedUp = powerupsRef.current[puIdx];
-                            // Re-read fresh state rather than the `st` snapshot captured at the top of
-                            // this tick: spawnWormholePair() may have flipped a sticker pair earlier in
-                            // this same tick (line ~638), and `st.cubies` would still point at the
-                            // pre-spawn snapshot — causing a just-elevated orb tile to be misread as
-                            // unflipped and allow a ground pickup instead of requiring a jump.
-                            const liveCubies = useGameStore.getState().cubies;
-                            const pickedSticker = getStickerSafe(liveCubies, pickedUp.x, pickedUp.y, pickedUp.z, pickedUp.dirKey);
-                            // Orbs on flipped tiles hover above the surface — worm must jump to reach them
-                            const tileIsFlipped = !!(pickedSticker && pickedSticker.curr !== pickedSticker.orig);
-                            if (tileIsFlipped && !isJumping.current) {
-                                // Worm crawled onto the tile but didn't jump — orb is out of reach
-                            } else {
-                                const pickedFaceId = pickedSticker ? pickedSticker.curr : 0;
-                                const liveColors = resolveColors(useGameStore.getState().settings);
-                                const pickedColor = ensureOrbContrast((pickedFaceId && liveColors[pickedFaceId]) ?? '#22ff88');
-                                applyOrbPickupGrowth(pickedColor, pickedFaceId);
-                                pendingOrbFlashRef.current = { color: pickedColor, pos: curWorldPos.current.toArray() };
-                                // Combo climbs when pickups come in quick succession (≤2s apart).
-                                const _nowT = timeAliveRef.current;
-                                orbComboRef.current = (_nowT - lastOrbTimeRef.current <= 2.0) ? orbComboRef.current + 1 : 0;
-                                lastOrbTimeRef.current = _nowT;
-                                feel('orb', { combo: orbComboRef.current });
-                                const newPowerup = { ...randomFreeTile(size, [...powerupsRef.current, pos.current]), type: 'apple' };
-                                powerupsRef.current[puIdx] = newPowerup;
-                                useGameStore.getState().setWormPowerups(powerupsRef.current.slice());
-                            }
-                        }
+                        if (!destMidRotation) tryPickupPowerupAt(x, y, z, dirKey);
 
                         // Flipped tile detection
                         const sticker = destMidRotation ? null : cubiesRef.current?.[x]?.[y]?.[z]?.stickers?.[dirKey];
@@ -1060,7 +1062,7 @@ export function useWormCrawler(size, cubies) {
         }
         if (PHASE_HANDLERS[currentPhase].update(delta, STEP_SEC)) return;
 
-    }, [size, beginTunnelTransition, resolveTunnelAtTile, killWorm]);
+    }, [size, beginTunnelTransition, resolveTunnelAtTile, killWorm, tryPickupPowerupAt]);
 
 
 
@@ -1245,14 +1247,17 @@ export function useWormCrawler(size, cubies) {
                 ttMapInPlace(pathHistory.current, _remapTileKey);
                 restKeys.clear();
 
-                // Deferred flipped-tile detection for a rest-read landing: the step onto this
-                // cell couldn't read its sticker (the occupant was mid-flight). Now that the
-                // rotation committed, read what actually landed under the worm. Void-zone
-                // refinement is skipped here — beginTunnelTransition re-resolves the tunnel
-                // (and handles void kills) when the trigger actually fires.
+                // Deferred pickup + flipped-tile detection for a rest-read landing: the step
+                // onto this cell couldn't read its contents (the occupant was mid-flight). Now
+                // that the rotation committed, check what actually landed under the worm —
+                // including an orb that rode the slice into this cell (powerupsRef was rotated
+                // above, so the lookup sees committed coordinates). Void-zone refinement is
+                // skipped here — beginTunnelTransition re-resolves the tunnel (and handles
+                // void kills) when the trigger actually fires.
                 if (restMatches && phase.current === 'crawling' &&
                     isTileInSlice(axis, sliceIndex, pos.current.x, pos.current.y, pos.current.z)) {
                     const { x, y, z, dirKey } = pos.current;
+                    tryPickupPowerupAt(x, y, z, dirKey);
                     const landed = useGameStore.getState().cubies?.[x]?.[y]?.[z]?.stickers?.[dirKey];
                     const landedFlipped = !!(landed && landed.curr !== landed.orig);
                     onFlippedTile.current = landedFlipped;
@@ -1306,7 +1311,7 @@ export function useWormCrawler(size, cubies) {
             }
         );
         return unsub;
-    }, [size]);
+    }, [size, tryPickupPowerupAt]);
 
     return {
         pos, moveDir, phase, tunnelProgress, activeTunnel, onFlippedTile,
