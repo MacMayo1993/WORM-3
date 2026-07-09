@@ -9,6 +9,7 @@ Live demo: https://macmayo1993.github.io/WORM-3/
 ## Table of Contents
 
 - [Project Overview](#project-overview)
+- [The Antipodal Flip — The Core Innovation](#the-antipodal-flip--the-core-innovation)
 - [Gameplay Systems](#gameplay-systems)
   - [Core Cube Rules](#core-cube-rules)
   - [Puzzle Rule Sets](#puzzle-rule-sets)
@@ -24,6 +25,7 @@ Live demo: https://macmayo1993.github.io/WORM-3/
   - [Hands Mode Keymap](#hands-mode-keymap)
   - [WORM Healer Control Styles](#worm-healer-control-styles)
 - [Visual + World Systems](#visual--world-systems)
+- [Tile Styles & Depth Illusions](#tile-styles--depth-illusions)
 - [Audio / Feedback / HUD](#audio--feedback--hud)
 - [Tech Architecture](#tech-architecture)
 - [Codebase Map](#codebase-map)
@@ -44,6 +46,45 @@ WORM-3 combines:
 - A **Zustand global store** coordinating game state, menus, overlays, settings, run/session telemetry, and mode toggles.
 
 Design intent: opposite faces/points are treated as identified through quotient-like antipodal mapping, so orientation, pathing, and parity behaviors differ from standard cube games.
+
+---
+
+## The Antipodal Flip — The Core Innovation
+
+Everything else in WORM-3 grows out of one idea that a standard Rubik's cube does not have: **opposite faces are the same place.**
+
+### What a standard cube can't do
+
+A classic Rubik's cube is an *orientable* puzzle. Its only move is the **rotation** — you permute where stickers sit, but a red sticker stays red, the six faces are independent, and the whole state space is a single group of position permutations. There is exactly one kind of "wrongness" (a piece is in the wrong spot) and exactly one win condition (each face one color).
+
+WORM-3 keeps rotations, then adds a move that is impossible on a normal cube — the **antipodal flip** — by treating the cube as a quotient in which each face is identified with the face on the opposite side (an RP²-inspired identification):
+
+- **Red ↔ Orange**
+- **Green ↔ Blue**
+- **White ↔ Yellow**
+
+### The flip
+
+Tapping a sticker (when flip interactions are enabled) **flips it to its antipodal partner color** — and, because the two sides are the *same identified point*, it **simultaneously flips its antipodal twin** on the opposite side of the cube. One input, two coordinated changes across the manifold. This is not a rotation and cannot be expressed as any sequence of rotations; it is a topological identification operation unique to this geometry.
+
+Mechanically, the flip adds a **second, independent axis of state** on top of position:
+
+- Every sticker carries a **flip count / parity** in addition to where it sits.
+- Rotations shuffle *positions*; flips toggle *identity* across the antipodal seam.
+- Solving therefore means satisfying **two** state dimensions at once, not one.
+
+### Why it matters — the possibilities it unlocks
+
+Because opposite points are identified and each sticker has its own flip parity, a single mechanic opens up gameplay a normal cube structurally cannot support:
+
+- **Wormholes & traversal (the WORM modes).** If a face and its antipode are the same place, you can travel *through* the cube from one to the other. That identification is literally a tunnel — so the same cube state powers real-time crawling, tunnel routing, and chase-cam action, not just puzzle-solving.
+- **Elimination & survival (Disparity / Chaos).** Flip parity accumulates. Push a sticker past its **flip cap** and it is eliminated; flips propagate in cascades, faces can be wiped out, and the last surviving antipodal pair wins. A second state axis turns a solve puzzle into a battle-royale of tiles.
+- **Path-dependent orientation (Holonomy).** On an RP²-flavored surface, transport around a loop can come back flipped. Moving a worm or tracing a path is order-sensitive in a way a sphere-topology cube never is.
+- **Identity that travels with parity (Biome / Merge).** Because a flip swaps a tile *across* the seam, higher-level identity can ride on it: in Biome/City mode a flip swaps a tile's city to the antipodal face's city; Merge mode grows connected regions across that same identified surface.
+- **New win conditions.** Classic color restoration, Sudokube constraints, and Ultimate all reinterpret "solved" over the identified surface rather than six independent faces.
+- **A visible topology.** Parity indicators, the Antipodal Integrity overlay, the tunnel network, and the depth-illusion tile styles all exist to make the identification legible while you play.
+
+In short: the rotation gives WORM-3 a Rubik's cube's body; the antipodal flip gives it a different **topology**, and every mode in the list below is a different game you can play once opposite is the same as here.
 
 ---
 
@@ -225,6 +266,37 @@ Both styles can be toggled in the mode-specific UI.
 
 ---
 
+## Tile Styles & Depth Illusions
+
+Every sticker can be re-skinned with a **tile style** — a GPU shader that draws the tile procedurally instead of using a flat color. Styles are cached per (style × face color) material, shared across all tiles that use them, and grouped in the store/settings catalog into three sections:
+
+- **Classic** — solids, metals, and print-like patterns.
+- **Antipodal Op Art** — geometric patterns that pair each face color with its antipodal partner color (polka dots, chevrons, moiré, pinwheels, …), turning the flip relationship into a visual motif.
+- **Living** — animated and volumetric styles (grass, ice, lava, galaxy, neural, plasma, …), including the depth-illusion chambers below.
+
+### The depth-illusion chambers
+
+A family of **Living** styles makes each flat sticker read as a little glass chamber with a real 3D object recessed *behind* its surface. They're built on one shared shader toolkit so they behave consistently and stay cheap:
+
+- **View-dependent parallax.** A tangent frame reconstructed from screen-space derivatives lets each style ray-trace its interior, so the object **shifts as you orbit the cube** — genuine depth, not a painted-on picture.
+- **Antipodal color pairing.** The chamber/glass renders in the tile's own face color while the *contents* render in the **antipodal partner color** — so every chamber is also a little visualization of the flip relationship.
+- **Gravity-bound.** World-space position and normal are used to keep liquids and sand **level to real gravity** and blobs rising correctly, no matter how the cube is oriented or viewed.
+- **Rotation-reactive.** Slice membership + a spin-energy signal mean **only the tiles on the layer you actually turn** react — they slosh, jostle, pour, or re-roll, while the rest hold still.
+
+The chambers:
+
+| Style | What's inside | Notable behavior |
+|-------|---------------|------------------|
+| **Orb Chamber** | A recessed ball | Parallaxes against its chamber wall; jostles when its slice turns |
+| **Liquid Tank** | Water with a caustic floor | Waterline stays level to gravity; side faces show a waterline, top/bottom a pool; sloshes on turns |
+| **Dice** | A tumbling six-sided die | Re-rolls to a random face on each turn; per-cell roll state means a tile never repeats a face when it returns to a spot |
+| **Sand Chamber** | Grainy sand | Piles at world-down and pours to the new low side when a slice reorients |
+| **Lava Lamp** | Metaball blobs | Rise/fall with gravity, morph, and merge / pinch off a bottom puddle |
+
+Tile-style thumbnails are rendered through a shared preview renderer (no second WebGL context, so it's mobile-safe), and animated styles advance from a shared `time` uniform driven once per frame.
+
+---
+
 ## Audio / Feedback / HUD
 
 - Audio utility hooks for game feedback (flip, shuffle, victory sounds).
@@ -301,6 +373,8 @@ src/
 │   ├── Cubie.jsx           #   Individual cube piece
 │   ├── StickerPlane.jsx    #   Per-sticker rendering, flip animations, health bars, wormhole FX
 │   ├── GameScene.jsx       #   Canvas orchestrator + post-processing chain
+│   ├── styles/             #   Tile-style shader materials + shaders (orbChamber, liquidTank,
+│   │                       #   dice, sandChamber, lavaLamp, and the Classic/Op-Art/Living sets)
 │   └── ...                 #   Biome clusters, wormhole tunnels, antipodal visualization
 │
 ├── components/
