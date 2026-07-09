@@ -827,6 +827,9 @@ export const newStyleShaders = {
     uniform float spin;
     uniform float spinAxis;
     uniform float spinSlice;
+    uniform sampler2D cellRoll;             // per-cell roll count (R channel, 0..255)
+    uniform float cellGridN;                // grid cells per axis (cube size)
+    uniform float cellK;                    // (size-1)/2 → maps world coord to cell index
     varying vec2 vUv;
     varying vec3 vNormal;
     varying vec3 vViewPosition;
@@ -891,13 +894,22 @@ export const newStyleShaders = {
       float member = 1.0 - smoothstep(0.55, 0.78, abs(axisCoord - spinSlice));
       float sp = clamp(spin * member, 0.0, 1.0);
 
-      // Per-tile seed from snapped center → stable during rotation.
-      float seed = fract(sin(dot(snapped.xy + snapped.z * 1.7, vec2(12.9898, 78.233))) * 43758.5453);
-      float seed2 = fract(seed * 7.31 + 0.137);
+      // How many times this die's grid cell has been rotated through. Folded
+      // into the seed so a cell that returns later shows a FRESH face (the count
+      // only ever rises), while non-rotated cells keep their count → same face.
+      vec3 gcell = clamp(snapped + vec3(cellK), vec3(0.0), vec3(cellGridN - 1.0));
+      float texelX = gcell.x + gcell.y * cellGridN;
+      float u = (texelX + 0.5) / (cellGridN * cellGridN);
+      float v = (gcell.z + 0.5) / cellGridN;
+      float rollN = texture2D(cellRoll, vec2(u, v)).r * 255.0;
 
-      // Rest orientation from snapped grid position — rotated tiles land at a
-      // new grid cell so their seed (and thus die face) changes automatically;
-      // non-rotated tiles keep the same position and the same face.
+      // Per-tile seed from snapped center + roll count → stable during rotation.
+      float seed = fract(sin(dot(snapped.xy + snapped.z * 1.7 + rollN * 1.7, vec2(12.9898, 78.233))) * 43758.5453);
+      float seed2 = fract(seed * 7.31 + 0.137 + rollN * 0.313);
+
+      // Rest orientation from snapped cell + roll count — rotated tiles land at a
+      // new cell (and that slice's counts were just bumped) so their die face
+      // changes; non-rotated tiles keep their cell and count, holding their face.
       float sp2 = sp * sp;
       float ra = seed * 20.0 + sp2 * (6.283 + seed * 3.0);
       float rb = seed2 * 20.0 + sp2 * (4.712 + seed2 * 2.5);

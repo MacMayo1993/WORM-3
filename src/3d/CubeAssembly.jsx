@@ -12,7 +12,7 @@ import WormholeNetwork from '../manifold/WormholeNetwork.jsx';
 import ChaosWave from '../manifold/ChaosWave.jsx';
 import FlipPropagationWave from '../manifold/FlipPropagationWave.jsx';
 import { vibrate } from '../utils/audio.js';
-import { updateSharedTime, updateSharedTremor, updateSharedSpin, updateDiceRoll, warmUpDefaultStyles } from './styles/TileStyleMaterials.jsx';
+import { updateSharedTime, updateSharedTremor, updateSharedSpin, updateDiceRoll, setDiceCellState, warmUpDefaultStyles } from './styles/TileStyleMaterials.jsx';
 import { StickerInstanceProvider } from './StickerInstances.jsx';
 import StickerAnimationDriver from './StickerAnimationDriver.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
@@ -658,6 +658,26 @@ const CubeAssembly = React.memo(({
   const latchedSpinAxisRef = useRef(0);
   const latchedSpinSliceRef = useRef(0);
 
+  // Per-cell dice-roll state: a data texture (R = roll count) indexed by grid
+  // cell, bumped for the rotating slice on every turn. The dice style folds it
+  // into its face hash so a cell that a tile revisits never repeats its face,
+  // while non-rotated cells hold. Rebuilt when the cube size changes.
+  const cellRollTexRef = useRef(null);
+  const cellRollDataRef = useRef(null);
+  useEffect(() => {
+    const w = size * size, h = size;
+    const data = new Uint8Array(w * h * 4);
+    for (let i = 0; i < w * h; i++) data[i * 4 + 3] = 255; // opaque
+    const tex = new THREE.DataTexture(data, w, h, THREE.RGBAFormat);
+    tex.minFilter = THREE.NearestFilter;
+    tex.magFilter = THREE.NearestFilter;
+    tex.needsUpdate = true;
+    cellRollDataRef.current = data;
+    cellRollTexRef.current = tex;
+    setDiceCellState(tex, size, (size - 1) / 2);
+    return () => tex.dispose();
+  }, [size]);
+
 
   useFrame(() => {
     const ef = explosionFactorRef.current;
@@ -825,6 +845,26 @@ const CubeAssembly = React.memo(({
         angSpeed = Math.abs(liveRotation.angle - prevRotAngleRef.current) / dt;
       }
       prevRotAngleRef.current = rotActive ? liveRotation.angle : 0;
+      // Dice: on the frame a turn begins, bump the roll count of every cell in
+      // the rotating slice so their dice re-roll to a fresh face and a returning
+      // cell never repeats. Non-rotated cells are untouched → they hold.
+      if (rotActive && !wasRotActiveRef.current && cellRollDataRef.current) {
+        const data = cellRollDataRef.current;
+        const n = size;
+        const ax = liveRotation.axis;
+        const si = liveRotation.sliceIndex;
+        for (let a = 0; a < n; a++) {
+          for (let b = 0; b < n; b++) {
+            let cx, cy, cz;
+            if (ax === 'col') { cx = si; cy = a; cz = b; }
+            else if (ax === 'row') { cx = a; cy = si; cz = b; }
+            else { cx = a; cy = b; cz = si; }
+            const off = (cz * (n * n) + cx + cy * n) * 4;
+            data[off] = (data[off] + 1) & 255;
+          }
+        }
+        cellRollTexRef.current.needsUpdate = true;
+      }
       wasRotActiveRef.current = rotActive;
       // ~6 rad/s (a fast quarter-turn) → full energy.
       const target = rotActive ? Math.min(1, angSpeed / 6) : 0;
