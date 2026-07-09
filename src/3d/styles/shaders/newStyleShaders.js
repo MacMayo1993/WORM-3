@@ -2,7 +2,7 @@
 //                         oilSlick, constellation, waveform, dnaHelix, neonSign,
 //                         prismBloom, magnetFlux, liquidChrome, auroraWeave, plasmaCells,
 //                         quantumScanlines, emberstorm, fractalPulse, bioLattice, stellarLensing,
-//                         orbChamber, liquidTank, dice
+//                         orbChamber, liquidTank, dice, sandChamber
 
 export const newStyleShaders = {
   // Stained Glass - cathedral leaded glass with radial + concentric segments
@@ -917,6 +917,123 @@ export const newStyleShaders = {
       col += vec3(1.0) * slash * 0.1;
       col += vec3(1.0, 0.95, 0.82) * glint * 0.4;
       vec3 frame = baseColor * 0.03;
+      col = mix(frame, col, chamber);
+
+      gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+    }
+  `,
+
+  // Sand Chamber - a jar of grainy sand that piles at real-world down and stays
+  // level as you orbit. When a slice turns, the tile reorients, so the sand
+  // pours to the new low side and re-settles (and grains kick up mid-turn).
+  // Sand is the antipodal color; jar/air/frame is this face's color (no black).
+  sandChamber: `
+    precision highp float;
+    uniform vec3 baseColor;
+    uniform vec3 antipodalColor;
+    uniform float time;
+    uniform float spin;
+    uniform float spinAxis;
+    uniform float spinSlice;
+    varying vec2 vUv;
+    varying vec3 vNormal;
+    varying vec3 vViewPosition;
+    varying vec3 vTileCenter;
+    varying vec3 vWorldPos;
+    varying vec3 vWorldNormal;
+
+    float hash21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+    float vnoise(vec2 p) {
+      vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+      float a = hash21(i), b = hash21(i + vec2(1.0, 0.0)), c = hash21(i + vec2(0.0, 1.0)), d = hash21(i + vec2(1.0, 1.0));
+      return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+    }
+
+    void main() {
+      vec2 p = vUv - 0.5;
+
+      // Rounded-rectangle jar.
+      vec2 qd = abs(p) - vec2(0.44);
+      float rr = min(max(qd.x, qd.y), 0.0) + length(max(qd, vec2(0.0))) - 0.05;
+      float chamber = 1.0 - smoothstep(0.0, 0.015, rr);
+
+      // Tangent frame → parallax back wall for the empty region.
+      vec3 pos = -vViewPosition;
+      vec3 dpdx = dFdx(pos); vec3 dpdy = dFdy(pos);
+      vec2 duvx = dFdx(vUv); vec2 duvy = dFdy(vUv);
+      vec3 N = normalize(vNormal);
+      vec3 dp2perp = cross(dpdy, N);
+      vec3 dp1perp = cross(N, dpdx);
+      vec3 T = dp2perp * duvx.x + dp1perp * duvy.x;
+      vec3 Bt = dp2perp * duvx.y + dp1perp * duvy.y;
+      float invmax = inversesqrt(max(dot(T, T), dot(Bt, Bt)));
+      T *= invmax; Bt *= invmax;
+      vec3 V = normalize(vViewPosition);
+      vec3 vT = vec3(dot(V, T), dot(V, Bt), dot(V, N));
+      vec3 ro = vec3(p, 0.0);
+      vec3 rd = normalize(-vT);
+      float tb = -0.5 / min(rd.z, -0.001);
+      vec2 wallUv = (ro + rd * tb).xy;
+
+      // Slice membership → only turning tiles pour / kick up grains.
+      float axisCoord = spinAxis < 0.5 ? vTileCenter.x
+                      : spinAxis < 1.5 ? vTileCenter.y
+                      : vTileCenter.z;
+      float member = 1.0 - smoothstep(0.55, 0.78, abs(axisCoord - spinSlice));
+      float sp = clamp(spin * member, 0.0, 1.0);
+
+      // Face orientation + gravity-aligned coords (vertical = world Y).
+      float gUp = abs(dot(normalize(vWorldNormal), vec3(0.0, 1.0, 0.0)));
+      vec3 wofs = vWorldPos - vTileCenter;
+      float hv = wofs.y;
+      float hh = wofs.x - wofs.z;
+
+      // Sand surface (world-vertical): jagged grainy crest, churned + tilted
+      // while the slice turns (the world-level pour itself is automatic — the
+      // tile reorients, so hv sweeps and the sand region follows gravity).
+      float jag   = (vnoise(vec2(hh * 7.0 + vTileCenter.x * 5.0, time * 0.3)) - 0.5) * 0.05;
+      float churn = (vnoise(vec2(hh * 10.0, time * 3.0)) - 0.5) * 0.06 * sp;
+      float slope = hh * 0.5 * sp;
+      float sandLevel = 0.02 + jag + churn + slope;
+      float belowness = sandLevel - hv;
+      float sandSide = smoothstep(-0.02, 0.02, belowness);
+      float sand = mix(sandSide, 1.0, gUp);   // top/bottom faces = a full sand bed
+
+      // Grain texture (per-tile varied, stable on the tile face).
+      vec2 gco = (p + 0.5) * 55.0 + vTileCenter.xy * 17.0;
+      float grain = vnoise(gco * 0.5) * 0.6 + hash21(floor(gco)) * 0.4;
+      vec3 sandDark  = antipodalColor * 0.55;
+      vec3 sandLight = mix(antipodalColor, vec3(1.0), 0.38);
+      vec3 sandCol = mix(sandDark, sandLight, grain);
+      float depthT = clamp(belowness, 0.0, 1.0);
+      sandCol *= mix(1.0, 0.72, depthT * (1.0 - gUp));                        // deeper = darker (sides)
+      sandCol += sandLight * smoothstep(0.05, 0.0, belowness) * (1.0 - gUp) * 0.35; // sunlit crest
+      sandCol = max(sandCol, antipodalColor * 0.45);                         // never black
+
+      // Air above the sand: this face's color with a faint parallax back wall.
+      vec3 air = baseColor * 0.8 + baseColor * (vnoise(wallUv * 6.0) - 0.5) * 0.06;
+
+      vec3 col = mix(air, sandCol, sand);
+
+      // Grainy crest highlight (side faces).
+      col += sandLight * smoothstep(0.03, 0.0, abs(belowness)) * (1.0 - gUp) * 0.4;
+
+      // Falling grains during a pour (only while the slice turns).
+      for (int i = 0; i < 5; i++) {
+        float fi = float(i);
+        float gx = (hash21(vec2(fi, 3.1)) - 0.5) * 0.55;
+        float gy = 0.42 - fract(hash21(vec2(fi, 7.7)) + time * (1.6 + fi * 0.25)) * 0.85;
+        col += sandLight * smoothstep(0.018, 0.006, length(p - vec2(gx, gy))) * sp * 0.7;
+      }
+
+      // Glass jar front: bright inner rim + a diagonal reflection.
+      float rimEdge = smoothstep(0.05, 0.0, abs(rr + 0.025));
+      col += mix(baseColor * 1.3, vec3(1.0), 0.5) * rimEdge * 0.5;
+      float slash = smoothstep(0.03, 0.0, abs((p.x + p.y * 0.5) - 0.14)) * smoothstep(0.42, 0.05, length(p));
+      col += vec3(1.0) * slash * 0.06;
+
+      // Frame outside the jar: this face's color (bright), never black.
+      vec3 frame = baseColor * 0.72;
       col = mix(frame, col, chamber);
 
       gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);

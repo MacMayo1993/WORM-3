@@ -280,6 +280,7 @@ export const TILE_STYLES = {
   orbChamber:   { label: 'Orb Chamber',   cost: 'med', type: 'animated' },
   liquidTank:   { label: 'Liquid Tank',   cost: 'med', type: 'animated' },
   dice:         { label: 'Dice',          cost: 'med', type: 'animated' },
+  sandChamber:  { label: 'Sand Chamber',  cost: 'med', type: 'animated' },
   auroraWeave:  { label: 'Aurora Weave',  cost: 'med', type: 'animated' },
   plasmaCells:  { label: 'Plasma Cells',  cost: 'med', type: 'animated' },
   quantumScanlines: { label: 'Quantum Scanlines', cost: 'med', type: 'animated' },
