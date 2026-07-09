@@ -95,6 +95,7 @@ export default function UILayer({
   const {
     sheetOpen, setSheetOpen, sheetMode, setSheetMode,
     showFreeplayWizard, showRandomWizard, showWormModeWizard, showCubeModeSelect,
+    showModeSelect,
     showMobiIntro, mobiLines, mobiModeName,
     showDisparityWizard, setShowDisparityWizard,
     showDisparityBetting,
@@ -202,7 +203,7 @@ export default function UILayer({
   })));
 
   const hasFullScreenOverlay = showFreeplayWizard || showRandomWizard || showWormModeWizard
-    || showDisparityWizard || showDisparityBetting || showCubeModeSelect || showLevelSelect
+    || showModeSelect || showDisparityWizard || showDisparityBetting || showCubeModeSelect || showLevelSelect
     || showComingSoon || showMobiusCubelet || showMobiIntro || victory || showMergeThemePicker;
 
   const showGameHUD = !wormHealerMode && !showMainMenu && !hasFullScreenOverlay;
@@ -379,7 +380,7 @@ export default function UILayer({
         </div>
       )}
 
-      {showMainMenu && (
+      {showMainMenu && !showModeSelect && (
         <MainMenu
           onOpenModeSelect={onOpenModeSelect}
           onPlay={onMenuPlay}
