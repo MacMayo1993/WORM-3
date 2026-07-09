@@ -489,9 +489,12 @@ export const newStyleShaders = {
     uniform vec3 antipodalColor;
     uniform float time;
     uniform float spin;              // 0..1 rotation energy — jostles the ball
+    uniform float spinAxis;          // 0=X, 1=Y, 2=Z: axis of the turning slice
+    uniform float spinSlice;         // that axis's world coord of the turning slice
     varying vec2 vUv;
     varying vec3 vNormal;
     varying vec3 vViewPosition;
+    varying vec3 vTileCenter;        // world-space center of this tile
 
     void main() {
       vec2 p = vUv - 0.5;              // position on the glass surface, -0.5..0.5
@@ -531,9 +534,17 @@ export const newStyleShaders = {
         -0.34 + sin(time * 0.37) * 0.07
       );
 
-      // Rotation jostle: while a layer spins, the ball gets thrown around the
-      // chamber with a fast, chaotic wobble that eases out as the turn settles.
-      float sp = clamp(spin, 0.0, 1.0);
+      // Rotation jostle: only tiles ON the turning slice react. Pick this tile's
+      // coordinate along the rotation axis and compare it to the slice's — a tile
+      // is a member when they line up (tolerance covers side + outer-face tiles).
+      float axisCoord = spinAxis < 0.5 ? vTileCenter.x
+                      : spinAxis < 1.5 ? vTileCenter.y
+                      : vTileCenter.z;
+      float member = 1.0 - smoothstep(0.55, 0.78, abs(axisCoord - spinSlice));
+
+      // While that slice spins, the ball gets thrown around the chamber with a
+      // fast, chaotic wobble that eases out as the turn settles.
+      float sp = clamp(spin * member, 0.0, 1.0);
       float bounce = sp * 0.22;
       sc.x += sin(time * 17.0) * bounce + sin(time * 9.3 + 1.7) * bounce * 0.6;
       sc.y += cos(time * 14.5 + 0.6) * bounce + sin(time * 11.1) * bounce * 0.5;

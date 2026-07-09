@@ -655,6 +655,8 @@ const CubeAssembly = React.memo(({
   const prevRotAngleRef = useRef(0);
   const wasRotActiveRef = useRef(false);
   const prevSpinTimeRef = useRef(0);
+  const latchedSpinAxisRef = useRef(0);
+  const latchedSpinSliceRef = useRef(0);
 
 
   useFrame(() => {
@@ -828,7 +830,21 @@ const CubeAssembly = React.memo(({
       const target = rotActive ? Math.min(1, angSpeed / 6) : 0;
       const e = spinEnergyRef.current;
       spinEnergyRef.current = e < target ? target : e * 0.9;
-      updateSharedSpin(spinEnergyRef.current);
+
+      // Latch which slice is turning (world coord along its axis) while active,
+      // and hold it through the energy decay so the just-moved tiles keep
+      // jostling. Cubie centers sit at (index - k) * expansionFactor; the slice's
+      // axis coordinate is invariant under its own rotation, so this identifies
+      // exactly the tiles that moved.
+      if (rotActive) {
+        latchedSpinAxisRef.current =
+          liveRotation.axis === 'row' ? 1 : liveRotation.axis === 'depth' ? 2 : 0;
+        const kCenter = (size - 1) / 2;
+        const expMult = size >= 4 ? 1.53 : 1.8;
+        const exp = 1 + explosionFactorRef.current * expMult;
+        latchedSpinSliceRef.current = (liveRotation.sliceIndex - kCenter) * exp;
+      }
+      updateSharedSpin(spinEnergyRef.current, latchedSpinAxisRef.current, latchedSpinSliceRef.current);
     }
 
 
