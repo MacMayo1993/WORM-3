@@ -484,20 +484,21 @@ export const newStyleShaders = {
   // The ball is genuinely ray-traced behind the glass in the tile's tangent
   // space, so it parallaxes against its chamber wall as the cube rotates — the
   // depth cue that actually sells the 3D illusion (a flat painted sphere can't).
-  // Three balls on independent Lissajous orbits with pairwise collision repulsion.
+  // Three balls sitting on the chamber floor, rolling and bouncing off walls
+  // and each other. Triangle-wave paths give sharp wall ricochets; pairwise
+  // repulsion handles ball-ball collisions. Spin jostle scatters them hard.
   orbChamber: `
     uniform vec3 baseColor;
     uniform vec3 antipodalColor;
     uniform float time;
-    uniform float spin;              // 0..1 rotation energy — jostles the balls
-    uniform float spinAxis;          // 0=X, 1=Y, 2=Z: axis of the turning slice
-    uniform float spinSlice;         // that axis's world coord of the turning slice
+    uniform float spin;
+    uniform float spinAxis;
+    uniform float spinSlice;
     varying vec2 vUv;
     varying vec3 vNormal;
     varying vec3 vViewPosition;
-    varying vec3 vTileCenter;        // world-space center of this tile
+    varying vec3 vTileCenter;
 
-    // Ray-sphere intersection; returns t of nearest hit or -1.0.
     float raySphere(vec3 ro, vec3 rd, vec3 sc, float sr) {
       vec3 oc = ro - sc;
       float b = dot(oc, rd);
@@ -506,11 +507,13 @@ export const newStyleShaders = {
       return (h > 0.0) ? (-b - sqrt(h)) : -1.0;
     }
 
+    // Triangle wave: linear motion with sharp reversals at walls → [-1, 1].
+    float tri(float t) { return abs(fract(t * 0.5 + 0.25) * 2.0 - 1.0) * 2.0 - 1.0; }
+
     void main() {
       vec2 p = vUv - 0.5;
       float r = length(p);
 
-      // ── Tangent frame aligned to UV (cotangent frame from screen derivatives).
       vec3 pos = -vViewPosition;
       vec3 dpdx = dFdx(pos);
       vec3 dpdy = dFdy(pos);
@@ -532,65 +535,71 @@ export const newStyleShaders = {
 
       float boxDepth = 0.6;
       float bR = 0.09;
+      float floorZ = -(boxDepth - bR - 0.01);
+      float wallExtent = 0.34;
 
-      // Three independent Lissajous orbits (phase-offset so they don't start clustered).
-      vec3 c0 = vec3(sin(time * 0.55) * 0.17,
-                     cos(time * 0.43) * 0.14 - 0.02,
-                     -0.33 + sin(time * 0.37) * 0.07);
-      vec3 c1 = vec3(cos(time * 0.47 + 1.9) * 0.16,
-                     sin(time * 0.61 + 2.5) * 0.13 - 0.01,
-                     -0.34 + cos(time * 0.41 + 0.7) * 0.06);
-      vec3 c2 = vec3(sin(time * 0.39 + 3.8) * 0.15,
-                     cos(time * 0.53 + 4.3) * 0.12 - 0.03,
-                     -0.35 + sin(time * 0.45 + 2.1) * 0.05);
+      // Triangle-wave rolling: each ball bounces wall-to-wall at its own
+      // speed and phase, filling the chamber with energetic ricochets.
+      vec3 c0 = vec3(tri(time * 0.37       ) * wallExtent,
+                     tri(time * 0.29 + 0.73) * wallExtent,
+                     floorZ);
+      vec3 c1 = vec3(tri(time * 0.43 + 1.90) * wallExtent,
+                     tri(time * 0.31 + 2.50) * wallExtent,
+                     floorZ);
+      vec3 c2 = vec3(tri(time * 0.33 + 3.80) * wallExtent,
+                     tri(time * 0.41 + 4.30) * wallExtent,
+                     floorZ);
 
-      // Slice membership → only tiles on the turning slice jostle.
+      // Slice membership.
       float axisCoord = spinAxis < 0.5 ? vTileCenter.x
                       : spinAxis < 1.5 ? vTileCenter.y
                       : vTileCenter.z;
       float member = 1.0 - smoothstep(0.55, 0.78, abs(axisCoord - spinSlice));
       float sp = clamp(spin * member, 0.0, 1.0);
-      float bounce = sp * 0.22;
 
-      // Spin jostle — each ball gets its own chaotic wobble frequencies.
-      c0.x += sin(time * 17.0) * bounce + sin(time * 9.3 + 1.7) * bounce * 0.6;
-      c0.y += cos(time * 14.5 + 0.6) * bounce;
-      c0.z += sin(time * 12.7 + 2.1) * bounce * 0.5;
+      // Spin jostle — much more violent, balls scatter hard on rotation.
+      float bounce = sp * 0.38;
+      c0.x += sin(time * 21.0) * bounce + sin(time * 13.3 + 1.7) * bounce * 0.7;
+      c0.y += cos(time * 18.5 + 0.6) * bounce + sin(time * 11.1) * bounce * 0.5;
 
-      c1.x += cos(time * 15.3 + 0.9) * bounce + sin(time * 10.7) * bounce * 0.5;
-      c1.y += sin(time * 16.1 + 1.4) * bounce;
-      c1.z += cos(time * 11.3 + 3.0) * bounce * 0.5;
+      c1.x += cos(time * 19.3 + 0.9) * bounce + sin(time * 14.7) * bounce * 0.6;
+      c1.y += sin(time * 22.1 + 1.4) * bounce + cos(time * 12.3) * bounce * 0.5;
 
-      c2.x += sin(time * 13.9 + 2.4) * bounce + cos(time * 11.9 + 0.3) * bounce * 0.6;
-      c2.y += cos(time * 18.3 + 3.7) * bounce;
-      c2.z += sin(time * 14.1 + 1.1) * bounce * 0.5;
+      c2.x += sin(time * 17.9 + 2.4) * bounce + cos(time * 15.9 + 0.3) * bounce * 0.7;
+      c2.y += cos(time * 24.3 + 3.7) * bounce + sin(time * 10.7) * bounce * 0.4;
 
-      // Pairwise collision repulsion — push apart when overlapping.
+      // Clamp to walls FIRST so jostle can't push balls outside before collision
+      // resolution — otherwise two balls jostled past the same wall snap onto the
+      // same clamped corner and render as one merged sphere.
+      float wlo = -wallExtent; float whi = wallExtent;
+      c0.xy = clamp(c0.xy, vec2(wlo), vec2(whi));
+      c1.xy = clamp(c1.xy, vec2(wlo), vec2(whi));
+      c2.xy = clamp(c2.xy, vec2(wlo), vec2(whi));
+
+      // Pairwise collision repulsion (2D since they share the floor).
       float minSep = bR * 2.3;
-      vec3 d01 = c1 - c0; float len01 = max(length(d01), 0.001);
-      float push01 = max(0.0, minSep - len01) * 0.5;
-      vec3 n01 = d01 / len01;
-      c0 -= n01 * push01; c1 += n01 * push01;
+      vec2 d01 = c1.xy - c0.xy; float len01 = max(length(d01), 0.001);
+      float push01 = max(0.0, minSep - len01) * 0.55;
+      vec2 n01 = d01 / len01;
+      c0.xy -= n01 * push01; c1.xy += n01 * push01;
 
-      vec3 d02 = c2 - c0; float len02 = max(length(d02), 0.001);
-      float push02 = max(0.0, minSep - len02) * 0.5;
-      vec3 n02 = d02 / len02;
-      c0 -= n02 * push02; c2 += n02 * push02;
+      vec2 d02 = c2.xy - c0.xy; float len02 = max(length(d02), 0.001);
+      float push02 = max(0.0, minSep - len02) * 0.55;
+      vec2 n02 = d02 / len02;
+      c0.xy -= n02 * push02; c2.xy += n02 * push02;
 
-      vec3 d12 = c2 - c1; float len12 = max(length(d12), 0.001);
-      float push12 = max(0.0, minSep - len12) * 0.5;
-      vec3 n12 = d12 / len12;
-      c1 -= n12 * push12; c2 += n12 * push12;
+      vec2 d12 = c2.xy - c1.xy; float len12 = max(length(d12), 0.001);
+      float push12 = max(0.0, minSep - len12) * 0.55;
+      vec2 n12 = d12 / len12;
+      c1.xy -= n12 * push12; c2.xy += n12 * push12;
 
-      // Clamp all balls inside the chamber.
-      float lo = -0.30 + bR; float hi = 0.28 - bR;
-      float zlo = -0.44 + bR; float zhi = -0.18 - bR;
-      c0.xy = clamp(c0.xy, vec2(lo), vec2(hi)); c0.z = clamp(c0.z, zlo, zhi);
-      c1.xy = clamp(c1.xy, vec2(lo), vec2(hi)); c1.z = clamp(c1.z, zlo, zhi);
-      c2.xy = clamp(c2.xy, vec2(lo), vec2(hi)); c2.z = clamp(c2.z, zlo, zhi);
+      // Final clamp after collision resolution (repulsion can push past walls).
+      c0.xy = clamp(c0.xy, vec2(wlo), vec2(whi));
+      c1.xy = clamp(c1.xy, vec2(wlo), vec2(whi));
+      c2.xy = clamp(c2.xy, vec2(wlo), vec2(whi));
 
-      // Fixed light in tangent space.
-      vec3 L = normalize(vec3(-0.4, 0.5, 0.72));
+      // Light angled from above-left.
+      vec3 L = normalize(vec3(-0.4, 0.55, 0.72));
 
       // Ray-sphere intersection: test all 3, pick nearest hit.
       float t0 = raySphere(ro, rd, c0, bR);
@@ -612,30 +621,30 @@ export const newStyleShaders = {
         float diff = max(dot(nrm, L), 0.0);
         float spec = pow(max(dot(nrm, hlf), 0.0), 48.0);
         float fres = pow(1.0 - max(dot(nrm, toEye), 0.0), 3.0);
-        float ao = smoothstep(-bR * 0.9, bR * 0.6, hp.y - hitCenter.y) * 0.5 + 0.5;
 
         vec3 ballDark = antipodalColor * 0.16;
         vec3 ballLit  = antipodalColor * 1.05;
-        interior = mix(ballDark, ballLit, diff) * ao;
+        interior = mix(ballDark, ballLit, diff);
         interior += vec3(1.0) * spec * 0.8;
         interior += mix(antipodalColor * 1.3, vec3(1.0), 0.4) * fres * 0.4;
       } else {
-        // Missed all balls → back wall with combined shadows.
+        // Missed all balls → floor with contact shadows beneath each ball.
         float tb = -boxDepth / min(rd.z, -0.001);
         vec3 wp = ro + rd * tb;
         float wv = 1.0 - smoothstep(0.15, 0.72, length(wp.xy));
-        interior = baseColor * (0.16 + wv * 0.34);
+        interior = baseColor * (0.18 + wv * 0.32);
 
-        float shad = smoothstep(bR * 1.8, bR * 0.5, length(wp.xy - c0.xy))
-                   + smoothstep(bR * 1.8, bR * 0.5, length(wp.xy - c1.xy))
-                   + smoothstep(bR * 1.8, bR * 0.5, length(wp.xy - c2.xy));
-        interior *= 1.0 - min(shad, 1.0) * 0.5;
+        // Contact shadows: tight dark circles directly under each ball.
+        float shad = smoothstep(bR * 1.4, bR * 0.3, length(wp.xy - c0.xy))
+                   + smoothstep(bR * 1.4, bR * 0.3, length(wp.xy - c1.xy))
+                   + smoothstep(bR * 1.4, bR * 0.3, length(wp.xy - c2.xy));
+        interior *= 1.0 - min(shad, 1.0) * 0.6;
 
         float haze = 0.5 + 0.5 * sin((wp.x + wp.y) * 10.0 + time * 0.5);
         interior += baseColor * haze * 0.04 * wv;
       }
 
-      // ── Glass front (locked to the surface, not parallaxed → reads as a pane).
+      // ── Glass front.
       float rim = smoothstep(0.34, 0.49, r) * (1.0 - smoothstep(0.48, 0.51, r));
       vec3 rimCol = mix(baseColor * 1.2, vec3(0.75, 0.95, 1.0), 0.65);
 
@@ -862,15 +871,22 @@ export const newStyleShaders = {
       vec3 rd = normalize(-vT);
       float boxDepth = 0.6;
 
+      // Snap tile center to nearest grid point so the seed stays stable while
+      // cubies are mid-rotation (modelMatrix[3] drifts continuously during a
+      // turn, producing random hash noise if fed straight into the seed).
+      vec3 snapped = round(vTileCenter);
+
       // Slice membership → only the tiles being turned spin up / get thrown.
+      // axisCoord uses the raw vTileCenter: the coordinate along the rotation
+      // axis is invariant under that rotation, so it's always exact.
       float axisCoord = spinAxis < 0.5 ? vTileCenter.x
                       : spinAxis < 1.5 ? vTileCenter.y
                       : vTileCenter.z;
       float member = 1.0 - smoothstep(0.55, 0.78, abs(axisCoord - spinSlice));
       float sp = clamp(spin * member, 0.0, 1.0);
 
-      // Per-tile seed from world center → every die gets a unique rest pose.
-      float seed = fract(sin(dot(vTileCenter.xy + vTileCenter.z * 1.7, vec2(12.9898, 78.233))) * 43758.5453);
+      // Per-tile seed from snapped center → stable during rotation.
+      float seed = fract(sin(dot(snapped.xy + snapped.z * 1.7, vec2(12.9898, 78.233))) * 43758.5453);
       float seed2 = fract(seed * 7.31 + 0.137);
 
       // Static rest orientation from seed; only tumbles while its slice turns.
