@@ -494,6 +494,7 @@ export const newStyleShaders = {
     uniform float spin;
     uniform float spinAxis;
     uniform float spinSlice;
+    uniform float diceRoll;
     varying vec2 vUv;
     varying vec3 vNormal;
     varying vec3 vViewPosition;
@@ -538,16 +539,19 @@ export const newStyleShaders = {
       float floorZ = -(boxDepth - bR - 0.01);
       float wallExtent = 0.34;
 
-      // Triangle-wave rolling: each ball bounces wall-to-wall at its own
-      // speed and phase, filling the chamber with energetic ricochets.
-      vec3 c0 = vec3(tri(time * 0.37       ) * wallExtent,
-                     tri(time * 0.29 + 0.73) * wallExtent,
+      // diceRoll accumulates during every rotation → each ball uses it as a
+      // phase offset with different multipliers so rotations scramble all
+      // three paths independently instead of orbiting in sync.
+      float dr = diceRoll;
+
+      vec3 c0 = vec3(tri(time * 0.37 + dr * 1.13       ) * wallExtent,
+                     tri(time * 0.29 + dr * 0.87 + 0.73) * wallExtent,
                      floorZ);
-      vec3 c1 = vec3(tri(time * 0.43 + 1.90) * wallExtent,
-                     tri(time * 0.31 + 2.50) * wallExtent,
+      vec3 c1 = vec3(tri(time * 0.43 + dr * 1.51 + 1.90) * wallExtent,
+                     tri(time * 0.31 + dr * 0.63 + 2.50) * wallExtent,
                      floorZ);
-      vec3 c2 = vec3(tri(time * 0.33 + 3.80) * wallExtent,
-                     tri(time * 0.41 + 4.30) * wallExtent,
+      vec3 c2 = vec3(tri(time * 0.33 + dr * 1.29 + 3.80) * wallExtent,
+                     tri(time * 0.41 + dr * 0.97 + 4.30) * wallExtent,
                      floorZ);
 
       // Slice membership.
@@ -557,8 +561,10 @@ export const newStyleShaders = {
       float member = 1.0 - smoothstep(0.55, 0.78, abs(axisCoord - spinSlice));
       float sp = clamp(spin * member, 0.0, 1.0);
 
-      // Spin jostle — much more violent, balls scatter hard on rotation.
-      float bounce = sp * 0.38;
+      // sqrt extends the tail so balls keep knocking around well after
+      // the layer settles (sp=0.04 → spSlow=0.2 → still visible bounce).
+      float spSlow = sqrt(sp);
+      float bounce = spSlow * 0.38;
       c0.x += sin(time * 21.0) * bounce + sin(time * 13.3 + 1.7) * bounce * 0.7;
       c0.y += cos(time * 18.5 + 0.6) * bounce + sin(time * 11.1) * bounce * 0.5;
 
