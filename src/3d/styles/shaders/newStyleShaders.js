@@ -568,6 +568,14 @@ export const newStyleShaders = {
       c2.x += sin(time * 17.9 + 2.4) * bounce + cos(time * 15.9 + 0.3) * bounce * 0.7;
       c2.y += cos(time * 24.3 + 3.7) * bounce + sin(time * 10.7) * bounce * 0.4;
 
+      // Clamp to walls FIRST so jostle can't push balls outside before collision
+      // resolution — otherwise two balls jostled past the same wall snap onto the
+      // same clamped corner and render as one merged sphere.
+      float wlo = -wallExtent; float whi = wallExtent;
+      c0.xy = clamp(c0.xy, vec2(wlo), vec2(whi));
+      c1.xy = clamp(c1.xy, vec2(wlo), vec2(whi));
+      c2.xy = clamp(c2.xy, vec2(wlo), vec2(whi));
+
       // Pairwise collision repulsion (2D since they share the floor).
       float minSep = bR * 2.3;
       vec2 d01 = c1.xy - c0.xy; float len01 = max(length(d01), 0.001);
@@ -585,8 +593,7 @@ export const newStyleShaders = {
       vec2 n12 = d12 / len12;
       c1.xy -= n12 * push12; c2.xy += n12 * push12;
 
-      // Hard clamp to chamber walls (balls bounce back inside).
-      float wlo = -wallExtent; float whi = wallExtent;
+      // Final clamp after collision resolution (repulsion can push past walls).
       c0.xy = clamp(c0.xy, vec2(wlo), vec2(whi));
       c1.xy = clamp(c1.xy, vec2(wlo), vec2(whi));
       c2.xy = clamp(c2.xy, vec2(wlo), vec2(whi));
@@ -864,15 +871,22 @@ export const newStyleShaders = {
       vec3 rd = normalize(-vT);
       float boxDepth = 0.6;
 
+      // Snap tile center to nearest grid point so the seed stays stable while
+      // cubies are mid-rotation (modelMatrix[3] drifts continuously during a
+      // turn, producing random hash noise if fed straight into the seed).
+      vec3 snapped = round(vTileCenter);
+
       // Slice membership → only the tiles being turned spin up / get thrown.
+      // axisCoord uses the raw vTileCenter: the coordinate along the rotation
+      // axis is invariant under that rotation, so it's always exact.
       float axisCoord = spinAxis < 0.5 ? vTileCenter.x
                       : spinAxis < 1.5 ? vTileCenter.y
                       : vTileCenter.z;
       float member = 1.0 - smoothstep(0.55, 0.78, abs(axisCoord - spinSlice));
       float sp = clamp(spin * member, 0.0, 1.0);
 
-      // Per-tile seed from world center → every die gets a unique rest pose.
-      float seed = fract(sin(dot(vTileCenter.xy + vTileCenter.z * 1.7, vec2(12.9898, 78.233))) * 43758.5453);
+      // Per-tile seed from snapped center → stable during rotation.
+      float seed = fract(sin(dot(snapped.xy + snapped.z * 1.7, vec2(12.9898, 78.233))) * 43758.5453);
       float seed2 = fract(seed * 7.31 + 0.137);
 
       // Static rest orientation from seed; only tumbles while its slice turns.
