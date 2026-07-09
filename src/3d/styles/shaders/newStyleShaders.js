@@ -769,6 +769,7 @@ export const newStyleShaders = {
   // independently; a slice turn spins that slice's dice up hard. Die body is the
   // antipodal color, chamber is this face's color.
   dice: `
+    precision highp float;                 // box intersection needs highp on mobile
     uniform vec3 baseColor;
     uniform vec3 antipodalColor;
     uniform float time;
@@ -783,7 +784,13 @@ export const newStyleShaders = {
     mat3 rotX(float a) { float c = cos(a), s = sin(a); return mat3(1.0, 0.0, 0.0, 0.0, c, s, 0.0, -s, c); }
     mat3 rotY(float a) { float c = cos(a), s = sin(a); return mat3(c, 0.0, -s, 0.0, 1.0, 0.0, s, 0.0, c); }
 
-    float pipDot(vec2 fc, vec2 c) { return smoothstep(0.17, 0.12, length(fc - c)); }
+    // Antialiased pip: smoothstep width follows the on-screen pixel size so the
+    // dots don't shimmer/speckle when the die is small or spinning fast.
+    float pipDot(vec2 fc, vec2 c) {
+      float d = length(fc - c);
+      float w = fwidth(d) + 0.006;
+      return smoothstep(0.15 + w, 0.15 - w, d);
+    }
     // Standard die pip layout for face value v (1..6).
     float pipMask(vec2 fc, float v) {
       float m = 0.0;
@@ -845,7 +852,12 @@ export const newStyleShaders = {
       // Ray/box (slab) intersection in the die's local space.
       vec3 roL = Rinv * (ro - sc);
       vec3 rdL = Rinv * rd;
-      vec3 mi = 1.0 / rdL;
+      // Guard the reciprocal: as the die tumbles, rdL components pass through 0,
+      // and 1.0/0 overflows to Inf/NaN (garbage speckle in mediump on mobile).
+      // Nudge near-zero components to a small finite value → ray treated as
+      // parallel to that slab, which is the correct limit.
+      vec3 rdSafe = rdL + step(abs(rdL), vec3(1e-3)) * 1e-3;
+      vec3 mi = 1.0 / rdSafe;
       vec3 nq = mi * roL;
       vec3 kq = abs(mi) * bhalf;
       vec3 t1 = -nq - kq;
@@ -873,7 +885,7 @@ export const newStyleShaders = {
         float spec = pow(max(dot(nrm, hlf), 0.0), 36.0);
 
         vec3 dieBody = mix(antipodalColor, vec3(1.0), 0.55);   // colored die body
-        vec3 pipCol  = antipodalColor * 0.1;                   // dark pips
+        vec3 pipCol  = antipodalColor * 0.22;                  // dark (not black) pips
         vec3 faceCol = mix(dieBody, pipCol, pipMask(fc, faceVal));
         // Bevel: darken toward face edges so the cube edges read.
         float edge = smoothstep(1.0, 0.86, max(abs(fc.x), abs(fc.y)));
