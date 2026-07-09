@@ -16,6 +16,14 @@ export const sharedUniforms = {
   // "Spin energy" in [0,1]: spikes while a layer is rotating and decays after,
   // so styles like orbChamber can jostle their contents in reaction to the turn.
   spin: { value: 0 },
+  // Which slice is turning, so only the moving tiles react:
+  //   spinAxis  → 0 = X (col), 1 = Y (row), 2 = Z (depth)
+  //   spinSlice → that axis's world coordinate of the rotating slice
+  // A tile jostles only when its own world center lines up with spinSlice on
+  // spinAxis. Rotation about an axis leaves that axis's coordinate invariant,
+  // so this stays correct throughout the turn.
+  spinAxis: { value: 0 },
+  spinSlice: { value: 0 },
 };
 
 // Update time uniform (call from useFrame)
@@ -23,9 +31,11 @@ export function updateSharedTime(elapsed) {
   sharedUniforms.time.value = elapsed;
 }
 
-// Update spin-energy uniform (call from useFrame). Value is clamped to [0,1].
-export function updateSharedSpin(energy) {
+// Update spin uniforms (call from useFrame). Energy is clamped to [0,1].
+export function updateSharedSpin(energy, axis, slice) {
   sharedUniforms.spin.value = energy < 0 ? 0 : energy > 1 ? 1 : energy;
+  sharedUniforms.spinAxis.value = axis;
+  sharedUniforms.spinSlice.value = slice;
 }
 
 // ─── Shared tremor state ─────────────────────────────────────────────────────
@@ -219,6 +229,8 @@ export function getTileStyleMaterial(style, colorHex, useTexture = false, textur
     baseColor: { value: color },
     time: sharedUniforms.time,
     spin: sharedUniforms.spin,
+    spinAxis: sharedUniforms.spinAxis,
+    spinSlice: sharedUniforms.spinSlice,
   };
 
   // Antipodal patterns need a second color uniform.  Use the provided antipodal
