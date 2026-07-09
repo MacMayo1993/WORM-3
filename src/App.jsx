@@ -1504,6 +1504,7 @@ export default function WORM3() {
             ui={{
               sheetOpen, setSheetOpen, sheetMode, setSheetMode,
               showFreeplayWizard, showRandomWizard, showWormModeWizard, showCubeModeSelect,
+              showModeSelect,
               showMobiIntro, mobiLines, mobiModeName,
               showDisparityWizard, setShowDisparityWizard,
               showDisparityBetting,
