@@ -2,7 +2,7 @@
 //                         oilSlick, constellation, waveform, dnaHelix, neonSign,
 //                         prismBloom, magnetFlux, liquidChrome, auroraWeave, plasmaCells,
 //                         quantumScanlines, emberstorm, fractalPulse, bioLattice, stellarLensing,
-//                         orbChamber, liquidTank
+//                         orbChamber, liquidTank, dice
 
 export const newStyleShaders = {
   // Stained Glass - cathedral leaded glass with radial + concentric segments
@@ -737,6 +737,153 @@ export const newStyleShaders = {
       float fres = pow(1.0 - max(vT.z, 0.0), 3.0);
       col += vec3(0.7, 0.85, 1.0) * fres * 0.14;
 
+      vec3 frame = baseColor * 0.03;
+      col = mix(frame, col, chamber);
+
+      gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+    }
+  `,
+
+  // Dice - a ray-traced six-sided die floating in each tile's glass chamber.
+  // Every tile seeds its own tumble from its world position, so all dice rotate
+  // independently; a slice turn spins that slice's dice up hard. Die body is the
+  // antipodal color, chamber is this face's color.
+  dice: `
+    uniform vec3 baseColor;
+    uniform vec3 antipodalColor;
+    uniform float time;
+    uniform float spin;
+    uniform float spinAxis;
+    uniform float spinSlice;
+    varying vec2 vUv;
+    varying vec3 vNormal;
+    varying vec3 vViewPosition;
+    varying vec3 vTileCenter;
+
+    mat3 rotX(float a) { float c = cos(a), s = sin(a); return mat3(1.0, 0.0, 0.0, 0.0, c, s, 0.0, -s, c); }
+    mat3 rotY(float a) { float c = cos(a), s = sin(a); return mat3(c, 0.0, -s, 0.0, 1.0, 0.0, s, 0.0, c); }
+
+    float pipDot(vec2 fc, vec2 c) { return smoothstep(0.17, 0.12, length(fc - c)); }
+    // Standard die pip layout for face value v (1..6).
+    float pipMask(vec2 fc, float v) {
+      float m = 0.0;
+      if (mod(v, 2.0) > 0.5) m = max(m, pipDot(fc, vec2(0.0)));            // center: 1,3,5
+      if (v > 1.5) { m = max(m, pipDot(fc, vec2(-0.5, 0.5)));             // TL+BR: 2+
+                     m = max(m, pipDot(fc, vec2(0.5, -0.5))); }
+      if (v > 3.5) { m = max(m, pipDot(fc, vec2(0.5, 0.5)));              // TR+BL: 4+
+                     m = max(m, pipDot(fc, vec2(-0.5, -0.5))); }
+      if (v > 5.5) { m = max(m, pipDot(fc, vec2(-0.5, 0.0)));             // ML+MR: 6
+                     m = max(m, pipDot(fc, vec2(0.5, 0.0))); }
+      return m;
+    }
+
+    void main() {
+      vec2 p = vUv - 0.5;
+      float r = length(p);
+
+      // Tangent frame (UV-aligned) from screen derivatives → tangent→view.
+      vec3 pos = -vViewPosition;
+      vec3 dpdx = dFdx(pos); vec3 dpdy = dFdy(pos);
+      vec2 duvx = dFdx(vUv); vec2 duvy = dFdy(vUv);
+      vec3 N = normalize(vNormal);
+      vec3 dp2perp = cross(dpdy, N);
+      vec3 dp1perp = cross(N, dpdx);
+      vec3 T = dp2perp * duvx.x + dp1perp * duvy.x;
+      vec3 B = dp2perp * duvx.y + dp1perp * duvy.y;
+      float invmax = inversesqrt(max(dot(T, T), dot(B, B)));
+      T *= invmax; B *= invmax;
+      vec3 V = normalize(vViewPosition);
+      vec3 vT = vec3(dot(V, T), dot(V, B), dot(V, N));
+
+      vec3 ro = vec3(p, 0.0);
+      vec3 rd = normalize(-vT);
+      float boxDepth = 0.6;
+
+      // Slice membership → only the tiles being turned spin up / get thrown.
+      float axisCoord = spinAxis < 0.5 ? vTileCenter.x
+                      : spinAxis < 1.5 ? vTileCenter.y
+                      : vTileCenter.z;
+      float member = 1.0 - smoothstep(0.55, 0.78, abs(axisCoord - spinSlice));
+      float sp = clamp(spin * member, 0.0, 1.0);
+
+      // Per-tile seed from world center → every die tumbles on its own.
+      float seed = fract(sin(dot(vTileCenter.xy + vTileCenter.z * 1.7, vec2(12.9898, 78.233))) * 43758.5453);
+      float seed2 = fract(seed * 7.31 + 0.137);
+
+      // Independent continuous tumble; spins up hard while its slice turns.
+      float ra = time * (0.5 + seed * 0.9)  + seed * 20.0  + sp * time * 9.0;
+      float rb = time * (0.4 + seed2 * 0.8) + seed2 * 20.0 + sp * time * 7.0;
+      mat3 R    = rotY(rb) * rotX(ra);          // die local → chamber space
+      mat3 Rinv = rotX(-ra) * rotY(-rb);        // inverse (avoids transpose())
+
+      // Die center: gentle per-tile hover + jostle when its slice turns.
+      vec3 sc = vec3(sin(time * 0.6 + seed * 6.0) * 0.03 + sin(time * 15.0) * 0.15 * sp,
+                     -0.02 + cos(time * 0.5 + seed * 6.0) * 0.03 + cos(time * 13.0) * 0.15 * sp,
+                     -0.34 + sin(time * 11.0) * 0.06 * sp);
+      float bhalf = 0.22;
+
+      // Ray/box (slab) intersection in the die's local space.
+      vec3 roL = Rinv * (ro - sc);
+      vec3 rdL = Rinv * rd;
+      vec3 mi = 1.0 / rdL;
+      vec3 nq = mi * roL;
+      vec3 kq = abs(mi) * bhalf;
+      vec3 t1 = -nq - kq;
+      vec3 t2 = -nq + kq;
+      float tN = max(max(t1.x, t1.y), t1.z);
+      float tF = min(min(t2.x, t2.y), t2.z);
+
+      vec3 interior;
+      if (tN <= tF && tF > 0.0) {
+        // Local face normal (exactly one axis).
+        vec3 oN = -sign(rdL) * step(t1.yzx, t1.xyz) * step(t1.zxy, t1.xyz);
+        vec3 hitL = roL + rdL * tN;
+        // Face value (opposite faces sum to 7) and in-face coords.
+        float faceVal; vec2 fc;
+        if (abs(oN.x) > 0.5)      { faceVal = oN.x > 0.0 ? 1.0 : 6.0; fc = hitL.zy; }
+        else if (abs(oN.y) > 0.5) { faceVal = oN.y > 0.0 ? 2.0 : 5.0; fc = hitL.xz; }
+        else                      { faceVal = oN.z > 0.0 ? 3.0 : 4.0; fc = hitL.xy; }
+        fc /= bhalf;
+
+        vec3 nrm = R * oN;
+        vec3 L = normalize(vec3(-0.4, 0.55, 0.75));
+        vec3 toEye = -rd;
+        vec3 hlf = normalize(L + toEye);
+        float diff = max(dot(nrm, L), 0.0);
+        float spec = pow(max(dot(nrm, hlf), 0.0), 36.0);
+
+        vec3 dieBody = mix(antipodalColor, vec3(1.0), 0.55);   // colored die body
+        vec3 pipCol  = antipodalColor * 0.1;                   // dark pips
+        vec3 faceCol = mix(dieBody, pipCol, pipMask(fc, faceVal));
+        // Bevel: darken toward face edges so the cube edges read.
+        float edge = smoothstep(1.0, 0.86, max(abs(fc.x), abs(fc.y)));
+        faceCol *= 0.72 + 0.28 * edge;
+
+        interior = faceCol * (0.32 + 0.68 * diff);
+        interior += vec3(1.0) * spec * 0.5;
+      } else {
+        // Miss → chamber back wall.
+        float tb = -boxDepth / min(rd.z, -0.001);
+        vec3 wp = ro + rd * tb;
+        float wv = 1.0 - smoothstep(0.15, 0.72, length(wp.xy));
+        interior = baseColor * (0.14 + wv * 0.30);
+        float haze = 0.5 + 0.5 * sin((wp.x + wp.y) * 10.0 + time * 0.5);
+        interior += baseColor * haze * 0.03 * wv;
+      }
+
+      // Glass front (surface-locked): rim, reflection slash, glint.
+      float rim = smoothstep(0.34, 0.49, r) * (1.0 - smoothstep(0.48, 0.51, r));
+      vec3 rimCol = mix(baseColor * 1.2, vec3(0.8, 0.95, 1.0), 0.6);
+      float slash = smoothstep(0.035, 0.0, abs((p.x + p.y * 0.55) - 0.1));
+      slash *= smoothstep(0.46, 0.08, r);
+      float glint = smoothstep(0.06, 0.0, length(p - vec2(-0.17, 0.19)));
+      glint *= 0.75 + 0.25 * sin(time * 1.4);
+      float chamber = 1.0 - smoothstep(0.47, 0.505, r);
+
+      vec3 col = interior;
+      col += rimCol * rim * 0.7;
+      col += vec3(1.0) * slash * 0.1;
+      col += vec3(1.0, 0.95, 0.82) * glint * 0.4;
       vec3 frame = baseColor * 0.03;
       col = mix(frame, col, chamber);
 
