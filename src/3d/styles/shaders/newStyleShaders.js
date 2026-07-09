@@ -833,20 +833,23 @@ export const newStyleShaders = {
       float member = 1.0 - smoothstep(0.55, 0.78, abs(axisCoord - spinSlice));
       float sp = clamp(spin * member, 0.0, 1.0);
 
-      // Per-tile seed from world center → every die tumbles on its own.
+      // Per-tile seed from world center → every die gets a unique rest pose.
       float seed = fract(sin(dot(vTileCenter.xy + vTileCenter.z * 1.7, vec2(12.9898, 78.233))) * 43758.5453);
       float seed2 = fract(seed * 7.31 + 0.137);
 
-      // Independent continuous tumble; spins up hard while its slice turns.
-      float ra = time * (0.5 + seed * 0.9)  + seed * 20.0  + sp * time * 9.0;
-      float rb = time * (0.4 + seed2 * 0.8) + seed2 * 20.0 + sp * time * 7.0;
+      // Static rest orientation from seed; only tumbles while its slice turns.
+      // sp² easing gives a smooth roll-and-settle with no time-proportional term,
+      // so there is no discontinuity when spin energy decays back to zero.
+      float sp2 = sp * sp;
+      float ra = seed * 20.0 + sp2 * (6.283 + seed * 3.0);
+      float rb = seed2 * 20.0 + sp2 * (4.712 + seed2 * 2.5);
       mat3 R    = rotY(rb) * rotX(ra);          // die local → chamber space
       mat3 Rinv = rotX(-ra) * rotY(-rb);        // inverse (avoids transpose())
 
-      // Die center: gentle per-tile hover + jostle when its slice turns.
-      vec3 sc = vec3(sin(time * 0.6 + seed * 6.0) * 0.03 + sin(time * 15.0) * 0.15 * sp,
-                     -0.02 + cos(time * 0.5 + seed * 6.0) * 0.03 + cos(time * 13.0) * 0.15 * sp,
-                     -0.34 + sin(time * 11.0) * 0.06 * sp);
+      // Die center: only jostle while its slice turns.
+      vec3 sc = vec3(sin(time * 15.0) * 0.15 * sp2,
+                     -0.02 + cos(time * 13.0) * 0.15 * sp2,
+                     -0.34 + sin(time * 11.0) * 0.06 * sp2);
       float bhalf = 0.22;
 
       // Ray/box (slab) intersection in the die's local space.
