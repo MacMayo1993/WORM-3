@@ -9,11 +9,15 @@ export const baseVertexShader = `
   // World-space position of this fragment — lets styles keep effects level to
   // gravity (liquidTank's waterline) regardless of how the cube is viewed.
   varying vec3 vWorldPos;
+  // World-space face normal — lets styles tell a side face from a top/bottom one
+  // (liquidTank switches between waterline and top-down pool rendering).
+  varying vec3 vWorldNormal;
 
   void main() {
     vUv = uv;
     vNormal = normalize(normalMatrix * normal);
     vTileCenter = modelMatrix[3].xyz;
+    vWorldNormal = normalize(mat3(modelMatrix) * normal);
     vec4 worldPos = modelMatrix * vec4(position, 1.0);
     vWorldPos = worldPos.xyz;
     vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
