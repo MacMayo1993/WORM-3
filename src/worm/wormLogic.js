@@ -31,6 +31,39 @@ export function isTileInSlice(axis, sliceIndex, x, y, z) {
 }
 
 /**
+ * Advance the worm's "rest-read" state at a step commit.
+ *
+ * While a slice is mid-rotation, a worm crossing onto one of its cells from static ground
+ * is stepping onto the CELL — whose occupant is still in flight — not riding the slice.
+ * That step must read the slice at its end-of-rotation state: lerp to the cell's rest
+ * position and stay on the cell when the rotation commits, instead of chasing the outgoing
+ * tile and being carried to wherever it lands (a visible teleport, then a snap at commit).
+ *
+ * Transition rules for the returned descriptor (null | {axis, sliceIndex}):
+ *   • crossing from static ground onto the rotating slice arms it,
+ *   • steps that still touch the same rotating slice (along it, or back off it) keep the
+ *     current state — a rider keeps riding, a rest-read crosser keeps rest-reading,
+ *   • a step fully on static ground, no active rotation, or a different rotation clears it.
+ *
+ * @param {null|{axis:string,sliceIndex:number}} current - descriptor from the previous step
+ * @param {boolean} rotationActive - is a slice rotation currently animating
+ * @param {string} axis - active rotation axis ('col'|'row'|'depth')
+ * @param {number} sliceIndex - active rotation slice index
+ * @param {null|{x,y,z}} prevTile - tile the step leaves from (null on the first step)
+ * @param {{x,y,z}} nextTile - tile the step lands on
+ * @returns {null|{axis:string,sliceIndex:number}} the new rest-read descriptor
+ */
+export function nextRestRead(current, rotationActive, axis, sliceIndex, prevTile, nextTile) {
+  if (!rotationActive) return null;
+  const kept = current && current.axis === axis && current.sliceIndex === sliceIndex ? current : null;
+  const prevIn = !!prevTile && isTileInSlice(axis, sliceIndex, prevTile.x, prevTile.y, prevTile.z);
+  const nextIn = isTileInSlice(axis, sliceIndex, nextTile.x, nextTile.y, nextTile.z);
+  if (!prevIn && nextIn) return kept ?? { axis, sliceIndex };
+  if (!prevIn && !nextIn) return null;
+  return kept;
+}
+
+/**
  * Returns a rotation-stable key for a surface sticker using origPos + origDir.
  * The key survives cube rotations because origPos/origDir never change.
  * Returns null if the sticker cannot be found.

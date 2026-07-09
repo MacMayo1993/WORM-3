@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
-import { isTileInSlice, rotateMoveDir } from '../worm/wormLogic.js';
+import { isTileInSlice, nextRestRead, rotateMoveDir } from '../worm/wormLogic.js';
 import { rotateVec90 } from '../game/cubeRotation.js';
 import { DIR_FORWARD } from '../worm/healerWorm/constants.js';
 import { DIR_TO_VEC, VEC_TO_DIR } from '../utils/constants.js';
@@ -23,6 +23,53 @@ describe('isTileInSlice', () => {
 
   it('returns false for an unknown axis', () => {
     expect(isTileInSlice('nope', 0, 0, 0, 0)).toBe(false);
+  });
+});
+
+describe('nextRestRead — end-of-rotation read for steps crossing a mid-rotation slice', () => {
+  // 5×5 cube, row slice y=2 rotating. Static tiles have y≠2; slice tiles have y=2.
+  const staticA = { x: 0, y: 1, z: 4 };
+  const staticB = { x: 0, y: 0, z: 4 };
+  const sliceA = { x: 0, y: 2, z: 4 };
+  const sliceB = { x: 1, y: 2, z: 4 };
+  const armed = { axis: 'row', sliceIndex: 2 };
+
+  it('stays clear when no rotation is animating', () => {
+    expect(nextRestRead(null, false, 'row', 2, staticA, sliceA)).toBeNull();
+    expect(nextRestRead(armed, false, 'row', 2, staticA, sliceA)).toBeNull();
+  });
+
+  it('arms when crossing from static ground onto the rotating slice', () => {
+    expect(nextRestRead(null, true, 'row', 2, staticA, sliceA)).toEqual({ axis: 'row', sliceIndex: 2 });
+  });
+
+  it('arms on the first step (no source tile yet) onto the rotating slice', () => {
+    expect(nextRestRead(null, true, 'row', 2, null, sliceA)).toEqual({ axis: 'row', sliceIndex: 2 });
+  });
+
+  it('stays armed while stepping along the rotating slice', () => {
+    expect(nextRestRead(armed, true, 'row', 2, sliceA, sliceB)).toBe(armed);
+  });
+
+  it('stays armed while stepping back off the slice (the lerp source is still a rest-read cell)', () => {
+    expect(nextRestRead(armed, true, 'row', 2, sliceA, staticA)).toBe(armed);
+  });
+
+  it('clears once both step endpoints are on static ground', () => {
+    expect(nextRestRead(armed, true, 'row', 2, staticA, staticB)).toBeNull();
+  });
+
+  it('keeps a rider riding: a worm already on the slice never arms by stepping within it', () => {
+    expect(nextRestRead(null, true, 'row', 2, sliceA, sliceB)).toBeNull();
+    expect(nextRestRead(null, true, 'row', 2, sliceA, staticA)).toBeNull();
+  });
+
+  it('drops a descriptor from a previous rotation when a different one is animating', () => {
+    // Same step shape, but the live rotation is now col/0 — the old row/2 state must not leak.
+    expect(nextRestRead(armed, true, 'col', 3, sliceA, sliceB)).toBeNull();
+    // And crossing into the NEW rotating slice re-arms for that rotation.
+    expect(nextRestRead(armed, true, 'col', 0, { x: 1, y: 2, z: 4 }, { x: 0, y: 2, z: 4 }))
+      .toEqual({ axis: 'col', sliceIndex: 0 });
   });
 });
 

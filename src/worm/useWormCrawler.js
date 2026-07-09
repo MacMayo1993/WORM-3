@@ -3,7 +3,8 @@ import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { getStickerWorldPos, getManifoldGridId } from '../game/coordinates.js';
-import { getNextSurfacePosition, getTunnelWorldPosInto, getWindWorldPosInto, turnWorm, getStableKey, isTileInSlice, rotateMoveDir, buildTunnelLookup, updateTunnelLookupIncremental } from './wormLogic.js';
+import { getNextSurfacePosition, getTunnelWorldPosInto, getWindWorldPosInto, turnWorm, getStableKey, isTileInSlice, nextRestRead, rotateMoveDir, buildTunnelLookup, updateTunnelLookupIncremental } from './wormLogic.js';
+import { liveRotation } from './liveRotation.js';
 import { flipStickerPair } from '../game/manifoldLogic.js';
 import { getManifoldMap } from '../game/manifoldMapStore.js';
 import { healSticker, getStickerSafe } from '../game/cubeState.js';
@@ -130,6 +131,15 @@ export function useWormCrawler(size, cubies) {
     // mid-step rotation can rotate this source in lockstep with the slice — otherwise the head
     // would lerp from the tile's pre-rotation world position and snap when the turn commits.
     const prevTile = useRef(null);
+    // Non-null while the current step must read a mid-rotation slice at its committed
+    // (end-of-rotation) state — armed when the head crosses from static ground onto a cell
+    // of the rotating slice. The worm then targets the CELL's rest position instead of
+    // chasing the outgoing tile, and stays on the cell when the rotation commits.
+    // See nextRestRead in wormLogic.js for the full transition rules.
+    const restReadSlice = useRef(null);
+    // Trail keys laid down while rest-reading. These cells were occupied at their rest
+    // positions (the worm did not ride the slice), so the commit-time trail remap skips them.
+    const restReadTileKeys = useRef(new Set());
     const lastRecordedT = useRef(0);
     const crossingCorner = useRef(false);
     const pendingSelfCollision = useRef(null);
@@ -688,7 +698,15 @@ export function useWormCrawler(size, cubies) {
                         const _htx = Math.min(size - 1, Math.max(0, Math.round(_evalHPos.x + _hk)));
                         const _hty = Math.min(size - 1, Math.max(0, Math.round(_evalHPos.y + _hk)));
                         const _htz = Math.min(size - 1, Math.max(0, Math.round(_evalHPos.z + _hk)));
-                        shPush(stepHistory.current, _evalLiftedPos, ptNorm, _htx, _hty, _htz);
+                        // Points recorded while rest-reading a mid-rotation slice already sit at
+                        // their committed positions — the -1 sentinel opts them out of the body
+                        // ride/bake, which would otherwise swing them along with the outgoing slice.
+                        const _rrs = restReadSlice.current;
+                        if (_rrs && isTileInSlice(_rrs.axis, _rrs.sliceIndex, _htx, _hty, _htz)) {
+                            shPush(stepHistory.current, _evalLiftedPos, ptNorm, -1, -1, -1);
+                        } else {
+                            shPush(stepHistory.current, _evalLiftedPos, ptNorm, _htx, _hty, _htz);
+                        }
                         lastRecordedT.current += 0.02; // A guaranteed resolution of 50 mathematical sub-steps per tile traverse
                     }
                     // -----------------------------------------------------------
@@ -717,6 +735,14 @@ export function useWormCrawler(size, cubies) {
                             const crossedFace = next.dirKey !== oldDirKey;
                             const nextPos = { x: next.x, y: next.y, z: next.z, dirKey: next.dirKey };
                             const nextKey = tileKey(nextPos);
+                            // End-of-rotation read: a step crossing onto a mid-rotation slice
+                            // targets the cell's committed state instead of chasing the tile
+                            // that is currently rotating away.
+                            restReadSlice.current = nextRestRead(
+                                restReadSlice.current, liveRotation.active, liveRotation.axis, liveRotation.sliceIndex,
+                                prevTile.current, nextPos
+                            );
+                            if (!restReadSlice.current) restReadTileKeys.current.clear();
                             // tailLength is measured in visual balls, not tiles.
                             // Convert to approximate occupied tile count so collision checks align with what players see.
                             const occupiedTiles = Math.max(1, Math.ceil((tailLength.current * BODY_BALL_SPACING) / 1.0));
@@ -740,6 +766,10 @@ export function useWormCrawler(size, cubies) {
                             if (nextOnSurface) {
                                 ttPush(tileTrail.current, nextKey);
                                 ttPush(pathHistory.current, nextKey);
+                                const _rr = restReadSlice.current;
+                                if (_rr && isTileInSlice(_rr.axis, _rr.sliceIndex, nextPos.x, nextPos.y, nextPos.z)) {
+                                    restReadTileKeys.current.add(nextKey);
+                                }
                             }
                             if (next.moveDir) moveDir.current = next.moveDir;
 
@@ -765,7 +795,13 @@ export function useWormCrawler(size, cubies) {
 
                         // Powerup collision
                         const { x, y, z, dirKey } = pos.current;
-                        const puIdx = powerupsRef.current.findIndex(p => p.x === x && p.y === y && p.z === z && p.dirKey === dirKey);
+                        // While rest-reading, this cell's occupant (sticker, orb, tunnel mouth) is
+                        // still mid-flight — what actually lands here is only knowable at commit,
+                        // so pickup and flipped-tile detection are deferred. The rotationEpoch
+                        // handler re-runs the flipped check on the landed sticker.
+                        const destMidRotation = !!(restReadSlice.current &&
+                            isTileInSlice(restReadSlice.current.axis, restReadSlice.current.sliceIndex, x, y, z));
+                        const puIdx = destMidRotation ? -1 : powerupsRef.current.findIndex(p => p.x === x && p.y === y && p.z === z && p.dirKey === dirKey);
                         if (puIdx !== -1) {
                             const pickedUp = powerupsRef.current[puIdx];
                             // Re-read fresh state rather than the `st` snapshot captured at the top of
@@ -797,7 +833,7 @@ export function useWormCrawler(size, cubies) {
                         }
 
                         // Flipped tile detection
-                        const sticker = cubiesRef.current?.[x]?.[y]?.[z]?.stickers?.[dirKey];
+                        const sticker = destMidRotation ? null : cubiesRef.current?.[x]?.[y]?.[z]?.stickers?.[dirKey];
                         const isFlipped = !!(sticker && sticker.curr !== sticker.orig);
                         const resolved = isFlipped ? resolveTunnelAtTile(x, y, z, dirKey) : null;
                         const isVoidZone = !!(resolved && voidTunnelKeysRef.current.has(resolved.tunnelKey));
@@ -1058,6 +1094,8 @@ export function useWormCrawler(size, cubies) {
         lastFlippedRef.current = false;
         prevDirKey.current = null;
         prevTile.current = null;
+        restReadSlice.current = null;
+        restReadTileKeys.current.clear();
         crossingCorner.current = false;
         interpT.current = 1;
         prevWorldPos.current = null;
@@ -1136,6 +1174,14 @@ export function useWormCrawler(size, cubies) {
                 if (!rot) return;
                 const { axis, dir, sliceIndex } = rot;
 
+                // Steps taken in rest-read mode did NOT ride this slice: the worm targeted its
+                // cells' committed rest positions, so its position, heading, lerp source and the
+                // trail entries it laid down stay put at commit instead of being carried 90°.
+                const restRead = restReadSlice.current;
+                const restMatches = !!(restRead && restRead.axis === axis && restRead.sliceIndex === sliceIndex);
+                restReadSlice.current = null;
+                const restKeys = restReadTileKeys.current;
+
                 // Rotate powerups
                 if (powerupsRef.current.length) {
                     const pu = powerupsRef.current;
@@ -1147,7 +1193,7 @@ export function useWormCrawler(size, cubies) {
                 // rotateTilePosition returns the SAME object when the tile wasn't in the slice,
                 // so `newPos !== oldPos` is an exact "did this tile ride the slice" test.
                 const oldPos = pos.current;
-                const newPos = rotateTilePosition(oldPos, axis, sliceIndex, dir, size);
+                const newPos = restMatches ? oldPos : rotateTilePosition(oldPos, axis, sliceIndex, dir, size);
                 pos.current = newPos;
                 { const _wp = getStickerWorldPos(newPos.x, newPos.y, newPos.z, newPos.dirKey, size, 0); _curWP.set(_wp[0], _wp[1], _wp[2]); curWorldPos.current = _curWP; }
 
@@ -1168,7 +1214,7 @@ export function useWormCrawler(size, cubies) {
                 // the tile it is coming FROM also rode the slice, rotate that source tile + world
                 // position too. Without this the head lerps from the pre-rotation source and
                 // visibly snaps to where the tile used to be at the end of the turn.
-                if (prevTile.current) {
+                if (prevTile.current && !restMatches) {
                     const rPrev = rotateTilePosition(prevTile.current, axis, sliceIndex, dir, size);
                     if (rPrev !== prevTile.current) {
                         prevTile.current = rPrev;
@@ -1189,12 +1235,33 @@ export function useWormCrawler(size, cubies) {
                 // Rotate the self-collision tile trail AND the render-only path history so the
                 // painted route stays glued to the surface through the turn (same remap fn).
                 const _remapTileKey = key => {
+                    // Cells occupied in rest space didn't ride the slice — their keys stay put.
+                    if (restMatches && restKeys.has(key)) return key;
                     parseTileKey(key, _parseTile);
                     const r = rotateTilePosition(_parseTile, axis, sliceIndex, dir, size);
                     return `${r.x},${r.y},${r.z},${r.dirKey}`;
                 };
                 ttMapInPlace(tileTrail.current, _remapTileKey);
                 ttMapInPlace(pathHistory.current, _remapTileKey);
+                restKeys.clear();
+
+                // Deferred flipped-tile detection for a rest-read landing: the step onto this
+                // cell couldn't read its sticker (the occupant was mid-flight). Now that the
+                // rotation committed, read what actually landed under the worm. Void-zone
+                // refinement is skipped here — beginTunnelTransition re-resolves the tunnel
+                // (and handles void kills) when the trigger actually fires.
+                if (restMatches && phase.current === 'crawling' &&
+                    isTileInSlice(axis, sliceIndex, pos.current.x, pos.current.y, pos.current.z)) {
+                    const { x, y, z, dirKey } = pos.current;
+                    const landed = useGameStore.getState().cubies?.[x]?.[y]?.[z]?.stickers?.[dirKey];
+                    const landedFlipped = !!(landed && landed.curr !== landed.orig);
+                    onFlippedTile.current = landedFlipped;
+                    if (landedFlipped !== lastFlippedRef.current) {
+                        lastFlippedRef.current = landedFlipped;
+                        useGameStore.getState().setWormOnFlippedTile(landedFlipped);
+                    }
+                    if (landedFlipped) pendingTunnelTrigger.current = { x, y, z, dirKey };
+                }
 
                 // Bake the committed turn into the body's position history: rotate the world
                 // position, surface normal, and grid tag of every recorded point that sat in the
@@ -1243,7 +1310,7 @@ export function useWormCrawler(size, cubies) {
 
     return {
         pos, moveDir, phase, tunnelProgress, activeTunnel, onFlippedTile,
-        interpT, prevWorldPos, curWorldPos, prevTile, crossingCorner, jumpT, isJumping, jumpLift,
+        interpT, prevWorldPos, curWorldPos, prevTile, restReadSlice, crossingCorner, jumpT, isJumping, jumpLift,
         headInterpPos, currentNormal,
         tailLength, stepHistory, orbPickupColorsRef, colorEpochRef, tick, queueTurn,
         voidTunnelKeysRef, tunnelUseCountsRef,
