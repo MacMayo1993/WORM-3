@@ -27,7 +27,29 @@ export const sharedUniforms = {
   // Monotonically increasing accumulator driven by spin energy so the dice
   // style settles to a new random orientation after every layer rotation.
   diceRoll: { value: 0 },
+  // Per-cell dice roll state. `cellRoll` is a data texture (R channel) holding
+  // how many times each grid cell has been rotated through; the dice style folds
+  // it into its face hash so a returning cell never repeats while non-rotated
+  // cells hold. `cellGridN` = cube size, `cellK` = (size-1)/2. Managed by
+  // CubeAssembly; a 1×1 zero placeholder keeps materials valid before mount.
+  cellRoll: { value: _makePlaceholderCellTex() },
+  cellGridN: { value: 1 },
+  cellK: { value: 0 },
 };
+
+function _makePlaceholderCellTex() {
+  const tex = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1, THREE.RGBAFormat);
+  tex.needsUpdate = true;
+  return tex;
+}
+
+// Point the dice style at CubeAssembly's per-cell roll texture (call on cube
+// (re)creation and when the size changes).
+export function setDiceCellState(texture, gridN, k) {
+  sharedUniforms.cellRoll.value = texture;
+  sharedUniforms.cellGridN.value = gridN;
+  sharedUniforms.cellK.value = k;
+}
 
 // Update time uniform (call from useFrame)
 export function updateSharedTime(elapsed) {
@@ -240,6 +262,9 @@ export function getTileStyleMaterial(style, colorHex, useTexture = false, textur
     spinAxis: sharedUniforms.spinAxis,
     spinSlice: sharedUniforms.spinSlice,
     diceRoll: sharedUniforms.diceRoll,
+    cellRoll: sharedUniforms.cellRoll,
+    cellGridN: sharedUniforms.cellGridN,
+    cellK: sharedUniforms.cellK,
   };
 
   // Antipodal patterns need a second color uniform.  Use the provided antipodal
