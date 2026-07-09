@@ -484,11 +484,12 @@ export const newStyleShaders = {
   // The ball is genuinely ray-traced behind the glass in the tile's tangent
   // space, so it parallaxes against its chamber wall as the cube rotates — the
   // depth cue that actually sells the 3D illusion (a flat painted sphere can't).
+  // Three balls on independent Lissajous orbits with pairwise collision repulsion.
   orbChamber: `
     uniform vec3 baseColor;
     uniform vec3 antipodalColor;
     uniform float time;
-    uniform float spin;              // 0..1 rotation energy — jostles the ball
+    uniform float spin;              // 0..1 rotation energy — jostles the balls
     uniform float spinAxis;          // 0=X, 1=Y, 2=Z: axis of the turning slice
     uniform float spinSlice;         // that axis's world coord of the turning slice
     varying vec2 vUv;
@@ -496,13 +497,21 @@ export const newStyleShaders = {
     varying vec3 vViewPosition;
     varying vec3 vTileCenter;        // world-space center of this tile
 
+    // Ray-sphere intersection; returns t of nearest hit or -1.0.
+    float raySphere(vec3 ro, vec3 rd, vec3 sc, float sr) {
+      vec3 oc = ro - sc;
+      float b = dot(oc, rd);
+      float c = dot(oc, oc) - sr * sr;
+      float h = b * b - c;
+      return (h > 0.0) ? (-b - sqrt(h)) : -1.0;
+    }
+
     void main() {
-      vec2 p = vUv - 0.5;              // position on the glass surface, -0.5..0.5
+      vec2 p = vUv - 0.5;
       float r = length(p);
 
       // ── Tangent frame aligned to UV (cotangent frame from screen derivatives).
-      // Maps tangent space (x=U, y=V, z=surface normal toward viewer) to view space.
-      vec3 pos = -vViewPosition;       // view-space fragment position
+      vec3 pos = -vViewPosition;
       vec3 dpdx = dFdx(pos);
       vec3 dpdy = dFdy(pos);
       vec2 duvx = dFdx(vUv);
@@ -515,85 +524,113 @@ export const newStyleShaders = {
       float invmax = inversesqrt(max(dot(T, T), dot(B, B)));
       T *= invmax; B *= invmax;
 
-      // View direction (fragment → camera) transformed into tangent space.
       vec3 V = normalize(vViewPosition);
       vec3 vT = vec3(dot(V, T), dot(V, B), dot(V, N));
 
-      // ── Ray from the glass surface into the recessed chamber (−z is deeper).
       vec3 ro = vec3(p, 0.0);
-      vec3 rd = normalize(-vT);        // rd.z < 0: marches away from the viewer
+      vec3 rd = normalize(-vT);
 
-      // Chamber: a box of half-extent 0.5 in the plane, depth 0..-boxDepth.
       float boxDepth = 0.6;
-      // Ball recessed inside, drifting on a slow Lissajous orbit + depth bob so
-      // it visibly floats around within the chamber.
-      float R = 0.15;
-      vec3 sc = vec3(
-        sin(time * 0.55) * 0.17,
-        cos(time * 0.43) * 0.13 - 0.02,
-        -0.34 + sin(time * 0.37) * 0.07
-      );
+      float bR = 0.09;
 
-      // Rotation jostle: only tiles ON the turning slice react. Pick this tile's
-      // coordinate along the rotation axis and compare it to the slice's — a tile
-      // is a member when they line up (tolerance covers side + outer-face tiles).
+      // Three independent Lissajous orbits (phase-offset so they don't start clustered).
+      vec3 c0 = vec3(sin(time * 0.55) * 0.17,
+                     cos(time * 0.43) * 0.14 - 0.02,
+                     -0.33 + sin(time * 0.37) * 0.07);
+      vec3 c1 = vec3(cos(time * 0.47 + 1.9) * 0.16,
+                     sin(time * 0.61 + 2.5) * 0.13 - 0.01,
+                     -0.34 + cos(time * 0.41 + 0.7) * 0.06);
+      vec3 c2 = vec3(sin(time * 0.39 + 3.8) * 0.15,
+                     cos(time * 0.53 + 4.3) * 0.12 - 0.03,
+                     -0.35 + sin(time * 0.45 + 2.1) * 0.05);
+
+      // Slice membership → only tiles on the turning slice jostle.
       float axisCoord = spinAxis < 0.5 ? vTileCenter.x
                       : spinAxis < 1.5 ? vTileCenter.y
                       : vTileCenter.z;
       float member = 1.0 - smoothstep(0.55, 0.78, abs(axisCoord - spinSlice));
-
-      // While that slice spins, the ball gets thrown around the chamber with a
-      // fast, chaotic wobble that eases out as the turn settles.
       float sp = clamp(spin * member, 0.0, 1.0);
       float bounce = sp * 0.22;
-      sc.x += sin(time * 17.0) * bounce + sin(time * 9.3 + 1.7) * bounce * 0.6;
-      sc.y += cos(time * 14.5 + 0.6) * bounce + sin(time * 11.1) * bounce * 0.5;
-      sc.z += sin(time * 12.7 + 2.1) * bounce * 0.5;
-      // Keep the jostled ball inside the chamber walls.
-      sc.xy = clamp(sc.xy, vec2(-0.33), vec2(0.29));
-      sc.z = clamp(sc.z, -0.42, -0.2);
 
-      // Fixed light in tangent space → stable regardless of face orientation.
+      // Spin jostle — each ball gets its own chaotic wobble frequencies.
+      c0.x += sin(time * 17.0) * bounce + sin(time * 9.3 + 1.7) * bounce * 0.6;
+      c0.y += cos(time * 14.5 + 0.6) * bounce;
+      c0.z += sin(time * 12.7 + 2.1) * bounce * 0.5;
+
+      c1.x += cos(time * 15.3 + 0.9) * bounce + sin(time * 10.7) * bounce * 0.5;
+      c1.y += sin(time * 16.1 + 1.4) * bounce;
+      c1.z += cos(time * 11.3 + 3.0) * bounce * 0.5;
+
+      c2.x += sin(time * 13.9 + 2.4) * bounce + cos(time * 11.9 + 0.3) * bounce * 0.6;
+      c2.y += cos(time * 18.3 + 3.7) * bounce;
+      c2.z += sin(time * 14.1 + 1.1) * bounce * 0.5;
+
+      // Pairwise collision repulsion — push apart when overlapping.
+      float minSep = bR * 2.3;
+      vec3 d01 = c1 - c0; float len01 = max(length(d01), 0.001);
+      float push01 = max(0.0, minSep - len01) * 0.5;
+      vec3 n01 = d01 / len01;
+      c0 -= n01 * push01; c1 += n01 * push01;
+
+      vec3 d02 = c2 - c0; float len02 = max(length(d02), 0.001);
+      float push02 = max(0.0, minSep - len02) * 0.5;
+      vec3 n02 = d02 / len02;
+      c0 -= n02 * push02; c2 += n02 * push02;
+
+      vec3 d12 = c2 - c1; float len12 = max(length(d12), 0.001);
+      float push12 = max(0.0, minSep - len12) * 0.5;
+      vec3 n12 = d12 / len12;
+      c1 -= n12 * push12; c2 += n12 * push12;
+
+      // Clamp all balls inside the chamber.
+      float lo = -0.30 + bR; float hi = 0.28 - bR;
+      float zlo = -0.44 + bR; float zhi = -0.18 - bR;
+      c0.xy = clamp(c0.xy, vec2(lo), vec2(hi)); c0.z = clamp(c0.z, zlo, zhi);
+      c1.xy = clamp(c1.xy, vec2(lo), vec2(hi)); c1.z = clamp(c1.z, zlo, zhi);
+      c2.xy = clamp(c2.xy, vec2(lo), vec2(hi)); c2.z = clamp(c2.z, zlo, zhi);
+
+      // Fixed light in tangent space.
       vec3 L = normalize(vec3(-0.4, 0.5, 0.72));
 
-      // Analytic ray/sphere intersection (rd normalized).
-      vec3 oc = ro - sc;
-      float b = dot(oc, rd);
-      float c = dot(oc, oc) - R * R;
-      float h = b * b - c;
-      float tHit = (h > 0.0) ? (-b - sqrt(h)) : -1.0;
-      bool hitBall = tHit > 0.0;
+      // Ray-sphere intersection: test all 3, pick nearest hit.
+      float t0 = raySphere(ro, rd, c0, bR);
+      float t1 = raySphere(ro, rd, c1, bR);
+      float t2 = raySphere(ro, rd, c2, bR);
+
+      float tHit = -1.0;
+      vec3 hitCenter = c0;
+      if (t0 > 0.0) { tHit = t0; hitCenter = c0; }
+      if (t1 > 0.0 && (tHit < 0.0 || t1 < tHit)) { tHit = t1; hitCenter = c1; }
+      if (t2 > 0.0 && (tHit < 0.0 || t2 < tHit)) { tHit = t2; hitCenter = c2; }
 
       vec3 interior;
-      if (hitBall) {
+      if (tHit > 0.0) {
         vec3 hp = ro + rd * tHit;
-        vec3 nrm = normalize(hp - sc);
-        vec3 toEye = -rd;              // toward the viewer
+        vec3 nrm = normalize(hp - hitCenter);
+        vec3 toEye = -rd;
         vec3 hlf = normalize(L + toEye);
         float diff = max(dot(nrm, L), 0.0);
         float spec = pow(max(dot(nrm, hlf), 0.0), 48.0);
         float fres = pow(1.0 - max(dot(nrm, toEye), 0.0), 3.0);
-        // Occlusion: darker on the underside where it meets the chamber floor.
-        float ao = smoothstep(-R * 0.9, R * 0.6, hp.y - sc.y) * 0.5 + 0.5;
+        float ao = smoothstep(-bR * 0.9, bR * 0.6, hp.y - hitCenter.y) * 0.5 + 0.5;
 
-        // The ball is the antipodal (opposite-face) color — the chamber shows
-        // this face's color, so each porthole reads as "the other side inside".
         vec3 ballDark = antipodalColor * 0.16;
         vec3 ballLit  = antipodalColor * 1.05;
         interior = mix(ballDark, ballLit, diff) * ao;
-        interior += vec3(1.0) * spec * 0.8;                          // hot highlight
-        interior += mix(antipodalColor * 1.3, vec3(1.0), 0.4) * fres * 0.4; // rim light
+        interior += vec3(1.0) * spec * 0.8;
+        interior += mix(antipodalColor * 1.3, vec3(1.0), 0.4) * fres * 0.4;
       } else {
-        // Missed the ball → hit the back wall of the chamber.
+        // Missed all balls → back wall with combined shadows.
         float tb = -boxDepth / min(rd.z, -0.001);
         vec3 wp = ro + rd * tb;
-        float wv = 1.0 - smoothstep(0.15, 0.72, length(wp.xy));  // centre vignette
-        // Chamber interior clearly shows THIS face's color (the "inside view").
+        float wv = 1.0 - smoothstep(0.15, 0.72, length(wp.xy));
         interior = baseColor * (0.16 + wv * 0.34);
-        // Soft contact shadow the ball casts onto the wall (light ≈ from front).
-        float shad = smoothstep(R * 1.5, R * 0.55, length(wp.xy - sc.xy));
-        interior *= 1.0 - shad * 0.5;
-        // Faint animated bokeh haze deep in the chamber.
+
+        float shad = smoothstep(bR * 1.8, bR * 0.5, length(wp.xy - c0.xy))
+                   + smoothstep(bR * 1.8, bR * 0.5, length(wp.xy - c1.xy))
+                   + smoothstep(bR * 1.8, bR * 0.5, length(wp.xy - c2.xy));
+        interior *= 1.0 - min(shad, 1.0) * 0.5;
+
         float haze = 0.5 + 0.5 * sin((wp.x + wp.y) * 10.0 + time * 0.5);
         interior += baseColor * haze * 0.04 * wv;
       }
@@ -608,7 +645,6 @@ export const newStyleShaders = {
       float glint = smoothstep(0.06, 0.0, length(p - vec2(-0.17, 0.19)));
       glint *= 0.75 + 0.25 * sin(time * 1.4);
 
-      // Rounded porthole mask.
       float chamber = 1.0 - smoothstep(0.47, 0.505, r);
 
       vec3 col = interior;
