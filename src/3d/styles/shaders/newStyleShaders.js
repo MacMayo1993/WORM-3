@@ -1146,15 +1146,15 @@ export const newStyleShaders = {
         yy += cos(t * 13.0 + fi) * 0.08 * jit;
         vec2 c2 = rightT * xx + upT * yy;
         vec3 d = q - vec3(c2, zz);
-        float R = 0.095 + 0.025 * sin(t * 0.5 + fi * 1.9);   // pulsing size → morph
-        f += R * R / (dot(d, d) + 0.003);
+        float R = 0.115 + 0.025 * sin(t * 0.5 + fi * 1.9);   // pulsing size → morph
+        f += R * R / (dot(d, d) + 0.010);                    // fatter/softer → less aliasing
       }
       // Small bottom puddle: flattened along gravity so it reads as a reservoir
       // that blobs neck off from.
       vec3 d = q - vec3(upT * -0.44, -0.24);
       float up = dot(d.xy, upT);
       float side = dot(d.xy, rightT);
-      f += 0.055 / (side * side * 0.6 + up * up * 4.0 + d.z * d.z + 0.003);
+      f += 0.07 / (side * side * 0.6 + up * up * 4.0 + d.z * d.z + 0.010);
       return f;
     }
 
@@ -1197,36 +1197,31 @@ export const newStyleShaders = {
       // Per-tile phase so no two lamps are in sync.
       float ph = fract(sin(dot(vTileCenter.xy + vTileCenter.z * 1.7, vec2(12.9898, 78.233))) * 43758.5453) * 6.2831;
 
-      // Raymarch the metaball field through the chamber depth.
+      // Raymarch the metaball field through the chamber. The step covers a fixed
+      // chamber depth; flooring -rd.z stops dt from blowing up at grazing angles
+      // (which caused the blobs to speckle/vanish after rotations and on zoom).
       vec3 ro = vec3(p, 0.0);
       vec3 rd = normalize(-vT);
-      float dt = 0.55 / (max(0.2, -rd.z) * 22.0);
+      float dt = 0.55 / (max(0.42, -rd.z) * 26.0);
       float t = 0.0;
       float cover = 0.0;
-      float hitT = -1.0;
-      for (int i = 0; i < 22; i++) {
+      for (int i = 0; i < 26; i++) {
         vec3 q = ro + rd * t;
         float F = lavaField(q, upT, rightT, time, ph, sp);
-        cover += smoothstep(1.0, 1.35, F);
-        if (hitT < 0.0 && F > 1.15) hitT = t;
+        cover += smoothstep(0.8, 1.55, F);          // wide, soft → antialiased
         t += dt;
       }
-      cover = clamp(cover * 0.17, 0.0, 1.0);
+      cover = clamp(cover * 0.14, 0.0, 1.0);
 
-      // Surface normal from the field gradient at the first crossing.
-      vec3 nrm = vec3(0.0, 0.0, 1.0);
-      if (hitT > 0.0) {
-        vec3 q = ro + rd * hitT;
-        vec2 e = vec2(0.02, 0.0);
-        float fx = lavaField(q + e.xyy, upT, rightT, time, ph, sp) - lavaField(q - e.xyy, upT, rightT, time, ph, sp);
-        float fy = lavaField(q + e.yxy, upT, rightT, time, ph, sp) - lavaField(q - e.yxy, upT, rightT, time, ph, sp);
-        float fz = lavaField(q + e.yyx, upT, rightT, time, ph, sp) - lavaField(q - e.yyx, upT, rightT, time, ph, sp);
-        nrm = normalize(-vec3(fx, fy, fz));
-      }
+      // Normal from the screen-space gradient of coverage. This inherits the
+      // (smooth) coverage's antialiasing, gives a rounded blob look, and avoids
+      // the hard first-hit threshold that produced the speckle.
+      vec2 cg = vec2(dFdx(cover), dFdy(cover));
+      vec3 nrm = normalize(vec3(-cg * 9.0, 0.5));
 
       // Lava shading: glowing, translucent, thicker where coverage is high.
       vec3 L = normalize(vec3(-0.3, 0.6, 0.72));
-      vec3 toEye = -rd;
+      vec3 toEye = vec3(0.0, 0.0, 1.0);
       float diff = max(dot(nrm, L), 0.0);
       float spec = pow(max(dot(reflect(-L, nrm), toEye), 0.0), 30.0);
       float fres = pow(1.0 - max(dot(nrm, toEye), 0.0), 3.0);
