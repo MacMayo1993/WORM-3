@@ -12,7 +12,7 @@ import WormholeNetwork from '../manifold/WormholeNetwork.jsx';
 import ChaosWave from '../manifold/ChaosWave.jsx';
 import FlipPropagationWave from '../manifold/FlipPropagationWave.jsx';
 import { vibrate } from '../utils/audio.js';
-import { updateSharedTime, updateSharedTremor, updateSharedSpin, warmUpDefaultStyles } from './styles/TileStyleMaterials.jsx';
+import { updateSharedTime, updateSharedTremor, updateSharedSpin, updateDiceRoll, warmUpDefaultStyles } from './styles/TileStyleMaterials.jsx';
 import { StickerInstanceProvider } from './StickerInstances.jsx';
 import StickerAnimationDriver from './StickerAnimationDriver.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
@@ -845,6 +845,7 @@ const CubeAssembly = React.memo(({
         latchedSpinSliceRef.current = (liveRotation.sliceIndex - kCenter) * exp;
       }
       updateSharedSpin(spinEnergyRef.current, latchedSpinAxisRef.current, latchedSpinSliceRef.current);
+      updateDiceRoll(dt, spinEnergyRef.current);
     }
 
 
