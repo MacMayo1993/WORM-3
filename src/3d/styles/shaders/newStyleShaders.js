@@ -1126,35 +1126,36 @@ export const newStyleShaders = {
     uniform float spinAxis;
     uniform float spinSlice;
     varying vec2 vUv;
-    varying vec3 vNormal;
-    varying vec3 vViewPosition;
     varying vec3 vTileCenter;
-    varying vec3 vWorldNormal;
 
-    // Metaball scalar field. Blobs bob along gravity (upT), sway (rightT), pulse
-    // their radius (morph), and get thrown while the slice turns (jit). A wide
-    // flat puddle sits at the bottom so blobs neck off from it like a real lamp.
-    float lavaField(vec3 q, vec2 upT, vec2 rightT, float t, float ph, float jit) {
+    // Smooth 2D metaball field in tile UV space.  The previous lava-lamp shader
+    // rebuilt a tangent frame from screen-space derivatives and then raymarched
+    // through that frame; during live slice drags, zooms, and camera rotations
+    // those derivatives can jump a pixel at a time, which made the blobs look
+    // grainy or glitchy.  This version is intentionally local-UV based, so the
+    // pattern moves with the sticker and stays stable at every viewing angle.
+    float lavaField(vec2 p, float t, float ph, float jit) {
       float f = 0.0;
-      for (int i = 0; i < 4; i++) {
+      for (int i = 0; i < 5; i++) {
         float fi = float(i);
-        float travel = sin(t * (0.16 + 0.03 * fi) + ph + fi * 2.1);   // -1..1 slow rise/fall
-        float yy = travel * 0.32;
-        float xx = sin(t * (0.11 + 0.03 * fi) + ph + fi * 1.3) * 0.11 + sin(travel * 3.0) * 0.03;
-        float zz = -0.26 + sin(t * 0.22 + fi * 1.7) * 0.10;
-        xx += sin(t * 15.0 + fi) * 0.08 * jit;
-        yy += cos(t * 13.0 + fi) * 0.08 * jit;
-        vec2 c2 = rightT * xx + upT * yy;
-        vec3 d = q - vec3(c2, zz);
-        float R = 0.115 + 0.025 * sin(t * 0.5 + fi * 1.9);   // pulsing size → morph
-        f += R * R / (dot(d, d) + 0.010);                    // fatter/softer → less aliasing
+        float travel = sin(t * (0.16 + 0.025 * fi) + ph + fi * 2.12);
+        float y = travel * 0.33;
+        float x = sin(t * (0.10 + 0.03 * fi) + ph + fi * 1.31) * 0.12
+                + sin(travel * 2.8 + fi) * 0.035;
+        // Slow, smooth shake while the tile's slice is being dragged.  Avoid
+        // high-frequency jitter here; high temporal frequencies alias badly on
+        // mobile and were perceived as grain during rotations.
+        x += sin(t * 3.2 + ph + fi * 1.7) * 0.055 * jit;
+        y += cos(t * 2.8 + ph + fi * 1.1) * 0.045 * jit;
+        vec2 d = p - vec2(x, y);
+        float r = 0.13 + 0.025 * sin(t * 0.45 + ph + fi * 1.9);
+        f += (r * r) / (dot(d, d) + 0.012);
       }
-      // Small bottom puddle: flattened along gravity so it reads as a reservoir
-      // that blobs neck off from.
-      vec3 d = q - vec3(upT * -0.44, -0.24);
-      float up = dot(d.xy, upT);
-      float side = dot(d.xy, rightT);
-      f += 0.07 / (side * side * 0.6 + up * up * 4.0 + d.z * d.z + 0.010);
+
+      // Warm bottom reservoir with a flattened silhouette, giving blobs
+      // something to visually neck off from without any raymarch quantization.
+      vec2 d = p - vec2(0.0, -0.43);
+      f += 0.095 / (d.x * d.x * 0.65 + d.y * d.y * 5.0 + 0.012);
       return f;
     }
 
@@ -1166,28 +1167,7 @@ export const newStyleShaders = {
       float rr = min(max(qd.x, qd.y), 0.0) + length(max(qd, vec2(0.0))) - 0.06;
       float chamber = 1.0 - smoothstep(0.0, 0.015, rr);
 
-      // Tangent frame from screen derivatives.
-      vec3 pos3 = -vViewPosition;
-      vec3 dpdx = dFdx(pos3); vec3 dpdy = dFdy(pos3);
-      vec2 duvx = dFdx(vUv); vec2 duvy = dFdy(vUv);
-      vec3 N = normalize(vNormal);
-      vec3 dp2perp = cross(dpdy, N);
-      vec3 dp1perp = cross(N, dpdx);
-      vec3 T = dp2perp * duvx.x + dp1perp * duvy.x;
-      vec3 Bt = dp2perp * duvx.y + dp1perp * duvy.y;
-      float invmax = inversesqrt(max(dot(T, T), dot(Bt, Bt)));
-      T *= invmax; Bt *= invmax;
-      vec3 V = normalize(vViewPosition);
-      vec3 vT = vec3(dot(V, T), dot(V, Bt), dot(V, N));
-
-      // World-up projected into the tile plane → gravity direction on the face.
-      vec3 upView = (viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz;
-      vec2 upT = vec2(dot(upView, T), dot(upView, Bt));
-      float upLen = length(upT);
-      upT = upLen > 0.001 ? upT / upLen : vec2(0.0, 1.0);
-      vec2 rightT = vec2(-upT.y, upT.x);
-
-      // Slice membership → the turning slice's lamps get shaken.
+      // Slice membership → only the turning slice's lamps get a gentle shake.
       float axisCoord = spinAxis < 0.5 ? vTileCenter.x
                       : spinAxis < 1.5 ? vTileCenter.y
                       : vTileCenter.z;
@@ -1197,48 +1177,28 @@ export const newStyleShaders = {
       // Per-tile phase so no two lamps are in sync.
       float ph = fract(sin(dot(vTileCenter.xy + vTileCenter.z * 1.7, vec2(12.9898, 78.233))) * 43758.5453) * 6.2831;
 
-      // Raymarch the metaball field through the chamber. The step covers a fixed
-      // chamber depth; flooring -rd.z stops dt from blowing up at grazing angles
-      // (which caused the blobs to speckle/vanish after rotations and on zoom).
-      vec3 ro = vec3(p, 0.0);
-      vec3 rd = normalize(-vT);
-      float dt = 0.55 / (max(0.42, -rd.z) * 26.0);
-      float t = 0.0;
-      float cover = 0.0;
-      for (int i = 0; i < 26; i++) {
-        vec3 q = ro + rd * t;
-        float F = lavaField(q, upT, rightT, time, ph, sp);
-        cover += smoothstep(0.8, 1.55, F);          // wide, soft → antialiased
-        t += dt;
-      }
-      cover = clamp(cover * 0.16, 0.0, 1.0);
+      float F = lavaField(p, time, ph, sp);
+      // fwidth anti-aliases the blob edge based on the final scalar field only;
+      // it does not affect the coordinate system, so camera motion cannot warp
+      // or re-seed the lava pattern.
+      float aa = max(fwidth(F) * 0.65, 0.012);
+      float cover = smoothstep(0.92 - aa, 0.92 + aa, F);
 
-      float upCoord = dot(p, upT);                      // -0.5 (bottom) .. 0.5 (top)
+      float grad = smoothstep(0.5, -0.5, p.y);      // 1 at the bottom
 
-      // Lava shading is derived ONLY from coverage (ray thickness) — no per-pixel
-      // normal and no screen-space derivatives, so the raymarch's step
-      // quantization can't be amplified into the dither grain that showed up on
-      // mobile mid-rotation / after zoom. Backlit translucent blobs read fine
-      // without a bump normal.
       vec3 lavaDeep = antipodalColor * 0.55;
       vec3 lavaHot  = mix(antipodalColor, vec3(1.0, 0.92, 0.5), 0.45);
-      vec3 lava = mix(lavaDeep, lavaHot, smoothstep(0.12, 0.9, cover));
-      // Consistent soft top-lighting from world-up (smooth; no derivatives).
-      lava *= 0.84 + 0.3 * smoothstep(-0.35, 0.35, upCoord);
-      // Bright translucent rim just inside the silhouette, straight from cover.
-      float rimGlow = smoothstep(0.08, 0.32, cover) * (1.0 - smoothstep(0.5, 0.95, cover));
-      lava += mix(antipodalColor, vec3(1.0), 0.6) * rimGlow * 0.35;
-      lava += antipodalColor * cover * 0.18;            // emissive bleed
+      vec3 lava = mix(lavaDeep, lavaHot, smoothstep(0.0, 1.0, cover));
+      lava *= 0.86 + 0.28 * smoothstep(-0.35, 0.35, p.y);
+      float rimGlow = smoothstep(0.08, 0.32, cover) * (1.0 - smoothstep(0.55, 0.96, cover));
+      lava += mix(antipodalColor, vec3(1.0), 0.6) * rimGlow * 0.32;
+      lava += antipodalColor * cover * 0.16;
 
-      // Fluid background: this face's color, warmer/brighter toward the bottom,
-      // with a heat-glow "bulb" at the base. No black.
-      float grad = smoothstep(0.5, -0.5, upCoord);      // 1 at the bottom
       vec3 fluid = baseColor * (0.28 + grad * 0.3);
-      float bulb = smoothstep(0.42, 0.0, length(p - upT * -0.42));
+      float bulb = smoothstep(0.42, 0.0, length(p - vec2(0.0, -0.42)));
       fluid += mix(baseColor, antipodalColor, 0.45) * bulb * 0.4;
 
-      // Smooth coverage-based silhouette blend → antialiased edges, no grain.
-      vec3 col = mix(fluid, lava, smoothstep(0.04, 0.5, cover));
+      vec3 col = mix(fluid, lava, smoothstep(0.04, 0.55, cover));
 
       // Glass front: bright rim + a diagonal reflection.
       float rimEdge = smoothstep(0.05, 0.0, abs(rr + 0.03));
@@ -1246,7 +1206,6 @@ export const newStyleShaders = {
       float slash = smoothstep(0.03, 0.0, abs((p.x + p.y * 0.5) - 0.12)) * smoothstep(0.4, 0.05, length(p));
       col += vec3(1.0) * slash * 0.07;
 
-      // Frame outside the vessel: this face's color (bright), never black.
       vec3 frame = baseColor * 0.72;
       col = mix(frame, col, chamber);
 
