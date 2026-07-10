@@ -1246,6 +1246,8 @@ export const newStyleShaders = {
       vec3 snapped = round(vTileCenter);
       float seed  = fract(sin(dot(snapped.xy + snapped.z * 1.7, vec2(12.9898, 78.233))) * 43758.5453);
       float seed2 = fract(seed * 7.31 + 0.137);
+      float seed3 = fract(seed2 * 3.47 + 0.891);
+      float seed4 = fract(seed3 * 5.19 + 0.623);
 
       float axisCoord = spinAxis < 0.5 ? vTileCenter.x
                       : spinAxis < 1.5 ? vTileCenter.y
@@ -1253,41 +1255,53 @@ export const newStyleShaders = {
       float member = 1.0 - smoothstep(0.55, 0.78, abs(axisCoord - spinSlice));
       float sp = clamp(spin * member, 0.0, 1.0);
 
-      // Gentle eye drift
-      float mx = sin(time * (0.37 + seed * 0.25) + seed * 6.283) * 0.03;
-      float my = sin(time * (0.29 + seed2 * 0.2) + seed2 * 6.283) * 0.025;
-      mx += sp * sin(seed * 31.0) * 0.05;
-      my += sp * cos(seed2 * 31.0) * 0.05;
+      // --- Gaze direction: each eye looks independently ---
+      // Slow Lissajous with per-tile frequency/phase so every eye differs
+      float lx = sin(time * (0.2 + seed * 0.3) + seed * 6.283) * 0.3;
+      float ly = sin(time * (0.15 + seed2 * 0.25) + seed2 * 6.283) * 0.3;
+      // Startle jolt on spin
+      lx += sp * sin(seed3 * 31.0) * 0.15;
+      ly += sp * cos(seed4 * 31.0) * 0.15;
 
-      // Background = antipodalColor (visible around eyeball)
-      vec3 bg = antipodalColor * 0.7;
-      bg = max(bg, antipodalColor * 0.25 + vec3(0.03));
+      // --- Socket / chamber for 3D depth ---
+      float chamberR = 0.47;
+      float chamber = 1.0 - smoothstep(chamberR - 0.01, chamberR + 0.01, r);
 
-      // Eyeball sphere
-      float eyeR = 0.40;
-      vec2 ec = p - vec2(mx, my);
-      float d = length(ec);
+      // Background = antipodalColor inside the socket
+      vec3 bg = antipodalColor * 0.65;
+      bg = max(bg, antipodalColor * 0.2 + vec3(0.03));
 
-      vec3 col = bg;
+      // Shadow ring inside socket rim for depth
+      float rimShadow = smoothstep(chamberR, chamberR - 0.12, r);
+      vec3 socketCol = bg * (0.4 + rimShadow * 0.6);
+
+      // Outer frame
+      vec3 frame = antipodalColor * 0.06;
+
+      // Eyeball sphere (fixed position, iris moves on it)
+      float eyeR = 0.38;
+      float d = length(p);
+
+      vec3 col = socketCol;
 
       if (d < eyeR) {
-        vec2 sn2 = ec / eyeR;
+        vec2 sn2 = p / eyeR;
         float sn2Len = length(sn2);
         float nz = sqrt(max(1.0 - sn2Len * sn2Len, 0.0));
         vec3 hn = vec3(sn2, nz);
-        float angle = atan(sn2.y, sn2.x);
 
         // --- Pure white sclera ---
         vec3 sclera = vec3(1.0, 0.99, 0.98);
         float edgeFade = smoothstep(0.4, 1.0, sn2Len);
-        sclera *= 1.0 - edgeFade * 0.12;
+        sclera *= 1.0 - edgeFade * 0.1;
 
-        // Subtle veins only at outer edge of sclera
+        // Subtle veins at outer sclera
+        float vAngle = atan(sn2.y, sn2.x);
         float veinLine = 0.0;
         for (int i = 0; i < 5; i++) {
           float fi = float(i);
           float a0 = fi * 1.257 + seed * 6.283;
-          float da = angle - a0;
+          float da = vAngle - a0;
           da = da - 6.2832 * floor((da + 3.1416) / 6.2832);
           float wave = sin(sn2Len * (10.0 + fi * 4.0) + seed * 15.0 + fi) * 0.04;
           float branch = smoothstep(0.04 + wave, 0.0, abs(da))
@@ -1296,30 +1310,32 @@ export const newStyleShaders = {
           veinLine = max(veinLine, branch * mix(1.0, 0.3, smoothstep(0.55, 0.95, sn2Len)));
         }
         sclera = mix(sclera, vec3(0.8, 0.25, 0.2), veinLine * 0.5);
+        sclera = mix(sclera, vec3(0.92, 0.78, 0.75), smoothstep(0.85, 1.0, sn2Len) * 0.18);
 
-        // Very slight pink at extreme edge
-        sclera = mix(sclera, vec3(0.9, 0.75, 0.72), smoothstep(0.85, 1.0, sn2Len) * 0.2);
+        // --- Iris (offset by gaze direction) ---
+        vec2 irisUV = sn2 - lx * vec2(0.35, 0.0) - ly * vec2(0.0, 0.35);
+        float irisD = length(irisUV);
+        float irisAngle = atan(irisUV.y, irisUV.x);
 
-        // --- Iris = baseColor ---
         float irisOuterR = 0.48;
         float pupilR = 0.13 + sp * 0.03;
-        float irisMask = smoothstep(irisOuterR + 0.01, irisOuterR - 0.03, sn2Len);
+        float irisMask = smoothstep(irisOuterR + 0.01, irisOuterR - 0.03, irisD);
 
         // Limbal ring
-        float limbal = smoothstep(irisOuterR - 0.08, irisOuterR - 0.005, sn2Len);
+        float limbal = smoothstep(irisOuterR - 0.08, irisOuterR - 0.005, irisD);
 
         // Radial fibers
-        float f1 = sin(angle * 55.0 + sn2Len * 18.0) * 0.5 + 0.5;
-        float f2 = sin(angle * 80.0 - sn2Len * 12.0 + seed * 30.0) * 0.5 + 0.5;
-        float f3 = sin(angle * 35.0 + sn2Len * 7.0 + seed2 * 20.0) * 0.5 + 0.5;
-        float fn = eyeNoise(vec2(angle * 8.0 + seed * 5.0, sn2Len * 22.0));
+        float f1 = sin(irisAngle * 55.0 + irisD * 18.0) * 0.5 + 0.5;
+        float f2 = sin(irisAngle * 80.0 - irisD * 12.0 + seed * 30.0) * 0.5 + 0.5;
+        float f3 = sin(irisAngle * 35.0 + irisD * 7.0 + seed2 * 20.0) * 0.5 + 0.5;
+        float fn = eyeNoise(vec2(irisAngle * 8.0 + seed * 5.0, irisD * 22.0));
         float fibers = f1 * 0.3 + f2 * 0.25 + f3 * 0.2 + fn * 0.25;
 
         // Collarette
-        float coll = smoothstep(0.03, 0.0, abs(sn2Len - (pupilR + 0.08)));
+        float coll = smoothstep(0.03, 0.0, abs(irisD - (pupilR + 0.08)));
 
-        // Iris color
-        float radialT = smoothstep(pupilR + 0.01, irisOuterR - 0.02, sn2Len);
+        // Iris color from baseColor
+        float radialT = smoothstep(pupilR + 0.01, irisOuterR - 0.02, irisD);
         vec3 irisInner = baseColor * 1.5 + vec3(0.1, 0.07, 0.02);
         vec3 irisOuter = baseColor * 0.55;
         vec3 irisCol = mix(irisInner, irisOuter, radialT);
@@ -1328,36 +1344,47 @@ export const newStyleShaders = {
         irisCol = mix(irisCol, baseColor * 0.08, limbal * 0.7);
 
         // Crypts
-        float crypts = eyeNoise(vec2(angle * 4.0 + seed * 7.0, sn2Len * 14.0 + seed2 * 5.0));
+        float crypts = eyeNoise(vec2(irisAngle * 4.0 + seed * 7.0, irisD * 14.0 + seed2 * 5.0));
         irisCol = mix(irisCol, baseColor * 0.15, smoothstep(0.6, 0.8, crypts) * 0.18 * (1.0 - limbal));
 
         // Pupil
-        float pupilMask = 1.0 - smoothstep(pupilR - 0.01, pupilR + 0.01, sn2Len);
+        float pupilMask = 1.0 - smoothstep(pupilR - 0.01, pupilR + 0.01, irisD);
         irisCol = mix(irisCol, vec3(0.005), pupilMask);
 
-        // White sclera outside, colored iris inside
+        // Sclera + iris
         col = mix(sclera, irisCol, irisMask);
 
-        // Specular highlights
-        float hl1 = smoothstep(0.1, 0.0, length(sn2 - vec2(-0.12, 0.16)));
+        // Specular highlights (follow gaze slightly)
+        vec2 hlBase = vec2(-0.1, 0.14);
+        vec2 hlShift = vec2(lx, ly) * 0.1;
+        float hl1 = smoothstep(0.1, 0.0, length(sn2 - hlBase - hlShift));
         col += vec3(1.0) * hl1 * 0.85;
-        float hl2 = smoothstep(0.04, 0.0, length(sn2 - vec2(0.05, -0.06)));
+        float hl2 = smoothstep(0.04, 0.0, length(sn2 - vec2(0.05, -0.05) - hlShift));
         col += vec3(1.0) * hl2 * 0.3;
 
-        // Lighting
+        // Lighting — stronger contrast for 3D pop
         vec3 lightDir = normalize(vec3(0.3, 0.5, 1.0));
         float diff = max(dot(hn, lightDir), 0.0);
-        col *= 0.85 + diff * 0.18;
-        col *= 0.9 + smoothstep(0.0, 0.3, nz) * 0.1;
+        col *= 0.72 + diff * 0.32;
 
-        // Fresnel sheen on iris
-        float fresnel = pow(1.0 - nz, 3.5);
-        col += vec3(0.12) * fresnel * irisMask;
+        // Rim darkening for spherical depth
+        float rimDark = pow(1.0 - nz, 2.5);
+        col *= 1.0 - rimDark * 0.25;
+
+        // Fresnel sheen
+        col += vec3(0.1) * rimDark * irisMask;
       }
 
-      // Soft edge blend into background
-      float edge = smoothstep(eyeR - 0.005, eyeR + 0.005, d);
-      col = mix(col, bg, edge);
+      // Shadow under eyeball in socket
+      float underShadow = smoothstep(eyeR + 0.06, eyeR + 0.005, d);
+      col *= 1.0 - underShadow * 0.3 * (1.0 - step(eyeR, d));
+
+      // Contact shadow just outside sphere edge
+      float contactShadow = smoothstep(eyeR + 0.04, eyeR + 0.002, d) * step(eyeR, d);
+      col *= 1.0 - contactShadow * 0.45;
+
+      // Blend to frame outside chamber
+      col = mix(frame, col, chamber);
 
       gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
     }
