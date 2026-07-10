@@ -1255,13 +1255,25 @@ export const newStyleShaders = {
       float member = 1.0 - smoothstep(0.55, 0.78, abs(axisCoord - spinSlice));
       float sp = clamp(spin * member, 0.0, 1.0);
 
-      // --- Gaze direction: each eye looks independently ---
-      // Slow Lissajous with per-tile frequency/phase so every eye differs
-      float lx = sin(time * (0.2 + seed * 0.3) + seed * 6.283) * 0.3;
-      float ly = sin(time * (0.15 + seed2 * 0.25) + seed2 * 6.283) * 0.3;
-      // Startle jolt on spin
-      lx += sp * sin(seed3 * 31.0) * 0.15;
-      ly += sp * cos(seed4 * 31.0) * 0.15;
+      // --- Gaze direction: saccade-style darting with holds ---
+      // Multiple layered sine waves at different speeds create darting motion
+      // with natural pauses when waves align
+      float t1 = time + seed * 100.0;
+      float t2 = time + seed2 * 100.0;
+      // Fast saccade components
+      float saccX = sin(t1 * 1.7) * 0.25
+                   + sin(t1 * 0.7 + seed * 4.0) * 0.35
+                   + sin(t1 * 3.1 + seed3 * 9.0) * 0.12;
+      float saccY = sin(t2 * 1.3) * 0.25
+                   + sin(t2 * 0.5 + seed2 * 5.0) * 0.35
+                   + sin(t2 * 2.7 + seed4 * 8.0) * 0.12;
+      // Quantize into snap positions (dart-and-hold)
+      float snapStr = 0.55;
+      float lx = mix(saccX, floor(saccX * 3.0 + 0.5) / 3.0, snapStr);
+      float ly = mix(saccY, floor(saccY * 3.0 + 0.5) / 3.0, snapStr);
+      // Clamp range and add spin startle
+      lx = clamp(lx, -0.7, 0.7) + sp * sin(seed3 * 31.0) * 0.15;
+      ly = clamp(ly, -0.7, 0.7) + sp * cos(seed4 * 31.0) * 0.15;
 
       // --- Socket / chamber for 3D depth ---
       float chamberR = 0.47;
