@@ -1255,21 +1255,17 @@ export const newStyleShaders = {
       float member = 1.0 - smoothstep(0.55, 0.78, abs(axisCoord - spinSlice));
       float sp = clamp(spin * member, 0.0, 1.0);
 
-      // --- Whole eye movement ---
+      // --- Whole eye moves as one unit (iris always centered) ---
       float t1 = time + seed * 100.0;
       float t2 = time + seed2 * 100.0;
-      // Iris gaze direction
-      float lx = sin(t1 * 0.8) * 0.4
-               + sin(t1 * 0.35 + seed * 4.0) * 0.45
-               + sin(t1 * 1.6 + seed3 * 9.0) * 0.15;
-      float ly = sin(t2 * 0.6) * 0.4
-               + sin(t2 * 0.28 + seed2 * 5.0) * 0.45
-               + sin(t2 * 1.4 + seed4 * 8.0) * 0.15;
-      lx = clamp(lx, -1.0, 1.0) + sp * sin(seed3 * 31.0) * 0.2;
-      ly = clamp(ly, -1.0, 1.0) + sp * cos(seed4 * 31.0) * 0.2;
-      // Whole ball shifts with gaze (smaller amount)
-      float mx = lx * 0.04;
-      float my = ly * 0.04;
+      float mx = sin(t1 * 0.8) * 0.06
+               + sin(t1 * 0.35 + seed * 4.0) * 0.07
+               + sin(t1 * 1.6 + seed3 * 9.0) * 0.03;
+      float my = sin(t2 * 0.6) * 0.06
+               + sin(t2 * 0.28 + seed2 * 5.0) * 0.07
+               + sin(t2 * 1.4 + seed4 * 8.0) * 0.03;
+      mx += sp * sin(seed3 * 31.0) * 0.04;
+      my += sp * cos(seed4 * 31.0) * 0.04;
 
       // --- Chamber / frame ---
       float chamberR = 0.48;
@@ -1307,29 +1303,36 @@ export const newStyleShaders = {
         vec3 sclera = vec3(1.0, 0.99, 0.97);
         sclera *= 1.0 - smoothstep(0.4, 1.0, sn2Len) * 0.08;
 
-        // Animated veins — crawl and pulse
+        // Blood vessels — radial lines from iris outward with wobble
         float vAngle = atan(sn2.y, sn2.x);
-        float veinTime = time * 0.15;
+        float veinTime = time * 0.12;
         float veinLine = 0.0;
-        for (int i = 0; i < 6; i++) {
+        // Fade: vessels only visible from iris edge outward
+        float vFade = smoothstep(0.42, 0.55, sn2Len) * (1.0 - smoothstep(0.92, 1.0, sn2Len));
+        for (int i = 0; i < 7; i++) {
           float fi = float(i);
-          float a0 = fi * 1.047 + seed * 6.283;
+          float a0 = fi * 0.898 + seed * 6.283;
           float da = vAngle - a0;
           da = da - 6.2832 * floor((da + 3.1416) / 6.2832);
-          float wave = sin(sn2Len * (8.0 + fi * 3.0) + veinTime * (1.0 + fi * 0.4) + seed * 15.0 + fi) * 0.05;
-          float branch = smoothstep(0.045 + wave, 0.0, abs(da))
-                       * smoothstep(0.4, 0.6, sn2Len)
-                       * (1.0 - smoothstep(0.9, 1.0, sn2Len));
-          veinLine = max(veinLine, branch * mix(1.0, 0.3, smoothstep(0.5, 0.95, sn2Len)));
+          // Wobble the vein path sideways as it extends outward
+          float wobble = sin(sn2Len * 14.0 + fi * 3.7 + veinTime * (0.8 + fi * 0.3)) * 0.025
+                       + sin(sn2Len * 7.0 + fi * 1.3 + seed * 10.0) * 0.015;
+          // Thinner as they go outward
+          float thickness = mix(0.035, 0.012, smoothstep(0.5, 0.95, sn2Len));
+          float v = smoothstep(thickness, 0.0, abs(da + wobble)) * vFade;
+          veinLine = max(veinLine, v);
         }
-        float pulse = 0.7 + 0.3 * sin(time * 1.2 + seed * 5.0);
-        sclera = mix(sclera, vec3(0.78, 0.2, 0.16), veinLine * 0.55 * pulse);
-        sclera = mix(sclera, vec3(0.92, 0.78, 0.74), smoothstep(0.85, 1.0, sn2Len) * 0.15);
+        // Fine capillary noise overlay
+        float capillary = eyeNoise(vec2(vAngle * 6.0 + seed * 8.0, sn2Len * 15.0 + veinTime));
+        veinLine += smoothstep(0.6, 0.8, capillary) * vFade * 0.15;
+        // Subtle pulse
+        float pulse = 0.75 + 0.25 * sin(time * 1.2 + seed * 5.0);
+        sclera = mix(sclera, vec3(0.75, 0.18, 0.14), veinLine * 0.5 * pulse);
+        sclera = mix(sclera, vec3(0.92, 0.78, 0.74), smoothstep(0.85, 1.0, sn2Len) * 0.12);
 
-        // --- Iris (offset by gaze) ---
-        vec2 irisUV = sn2 - vec2(lx, ly) * 0.55;
-        float irisD = length(irisUV);
-        float irisAngle = atan(irisUV.y, irisUV.x);
+        // --- Iris (always centered on eyeball) ---
+        float irisD = sn2Len;
+        float irisAngle = atan(sn2.y, sn2.x);
 
         float irisOuterR = 0.48;
         float pupilR = 0.13 + sp * 0.03;
@@ -1361,11 +1364,10 @@ export const newStyleShaders = {
 
         col = mix(sclera, irisCol, irisMask);
 
-        // Specular highlights (shift with gaze)
-        vec2 hlShift = vec2(lx, ly) * 0.08;
-        float hl1 = smoothstep(0.1, 0.0, length(sn2 - vec2(-0.1, 0.14) - hlShift));
+        // Specular highlights
+        float hl1 = smoothstep(0.1, 0.0, length(sn2 - vec2(-0.1, 0.14)));
         col += vec3(1.0) * hl1 * 0.9;
-        float hl2 = smoothstep(0.04, 0.0, length(sn2 - vec2(0.06, -0.06) - hlShift));
+        float hl2 = smoothstep(0.04, 0.0, length(sn2 - vec2(0.06, -0.06)));
         col += vec3(1.0) * hl2 * 0.3;
 
         // 3D lighting
