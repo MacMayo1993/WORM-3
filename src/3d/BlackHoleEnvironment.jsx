@@ -1,24 +1,34 @@
-import React, { useRef, useMemo, useState, useEffect } from 'react';
+import React, { useRef, useMemo, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import { isMobile } from '../utils/device.js';
 
 /**
  * BlackHoleEnvironment - A dynamic 3D black hole background
- * Provides an immersive, panoramic black hole effect as part of the 3D scene
+ * Provides an immersive, panoramic black hole effect as part of the 3D scene.
+ *
+ * Used by the intro animation, the main menu, and the blackhole level/theme.
+ * The heavy lifting happens in the fragment shader, so the star field is built
+ * from a handful of unrolled jittered-grid layers (instead of nested loops) and
+ * the nebula reuses its fbm samples as color selectors. Mobile compiles a
+ * LOW_FX variant with fewer octaves and no star dust/spikes/turbulence.
  */
 export default function BlackHoleEnvironment({ flipTrigger = 0, zoom = 1.65, orbitStrength = 0.03, tint = null }) {
-  const sphereRef = useRef();
   const materialRef = useRef();
-  const [pulseIntensity, setPulseIntensity] = useState(0);
+  // Pulse lives in a ref and is written straight to the uniform — decaying it
+  // through setState would re-render the canvas tree every frame of the decay.
+  const pulseRef = useRef(0);
 
   useEffect(() => {
-    if (flipTrigger > 0) setPulseIntensity(1.0);
+    if (flipTrigger > 0) pulseRef.current = 1.0;
   }, [flipTrigger]);
 
   // Custom shader for smooth black hole effect
   const shaderMaterial = useMemo(() => {
     return new THREE.ShaderMaterial({
       side: THREE.BackSide,
+      depthWrite: false,
+      defines: isMobile ? { LOW_FX: '' } : {},
       uniforms: {
         time: { value: 0 },
         pulseIntensity: { value: 0 },
@@ -28,11 +38,9 @@ export default function BlackHoleEnvironment({ flipTrigger = 0, zoom = 1.65, orb
       },
       vertexShader: `
         varying vec3 vPosition;
-        varying vec2 vUv;
 
         void main() {
           vPosition = position;
-          vUv = uv;
           gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
         }
       `,
@@ -43,7 +51,6 @@ export default function BlackHoleEnvironment({ flipTrigger = 0, zoom = 1.65, orb
         uniform vec2 centerOffset;
         uniform vec3 uTint;
         varying vec3 vPosition;
-        varying vec2 vUv;
 
         // Smooth noise function
         float hash(vec2 p) {
@@ -67,7 +74,12 @@ export default function BlackHoleEnvironment({ flipTrigger = 0, zoom = 1.65, orb
         float fbm(vec2 p) {
           float value = 0.0;
           float amplitude = 0.5;
-          for (int i = 0; i < 4; i++) {
+          #ifdef LOW_FX
+          const int OCTAVES = 2;
+          #else
+          const int OCTAVES = 3;
+          #endif
+          for (int i = 0; i < OCTAVES; i++) {
             value += amplitude * noise(p);
             p *= 2.0;
             amplitude *= 0.5;
@@ -75,11 +87,34 @@ export default function BlackHoleEnvironment({ flipTrigger = 0, zoom = 1.65, orb
           return value;
         }
 
+        // One jittered-grid star layer. Stars spawn in grid cells whose hash
+        // clears the threshold, offset randomly inside the cell so no grid
+        // pattern shows. twinkleAmp > 0 makes the layer shimmer over time.
+        float starLayer(vec2 p, float threshold, float size, float twinkleAmp) {
+          vec2 cell = floor(p);
+          float h = hash(cell);
+          if (h < threshold) return 0.0;
+          vec2 jitter = vec2(hash(cell + 17.3), hash(cell + 41.7)) - 0.5;
+          vec2 f = fract(p) - 0.5 - jitter * 0.55;
+          float brightness = (h - threshold) / (1.0 - threshold);
+          float twinkle = 1.0 - twinkleAmp + twinkleAmp * (0.5 + 0.5 * sin(time * (1.5 + h * 3.0) + h * 100.0));
+          float star = smoothstep(size, 0.0, length(f)) * (0.35 + 0.65 * brightness) * twinkle;
+          #ifndef LOW_FX
+          // Diffraction cross on the very brightest stars
+          if (h > 0.965) {
+            float spike = smoothstep(0.42, 0.0, abs(f.x)) * smoothstep(0.035, 0.0, abs(f.y))
+                        + smoothstep(0.42, 0.0, abs(f.y)) * smoothstep(0.035, 0.0, abs(f.x));
+            star += spike * 0.4 * twinkle;
+          }
+          #endif
+          return star;
+        }
+
         void main() {
           // Convert to spherical coordinates
           vec3 dir = normalize(vPosition);
           float theta = atan(dir.z, dir.x);
-          float phi = acos(dir.y);
+          float phi = acos(clamp(dir.y, -1.0, 1.0));
 
           // Center of black hole
           vec2 center = vec2(0.5, 0.5) + centerOffset;
@@ -89,66 +124,33 @@ export default function BlackHoleEnvironment({ flipTrigger = 0, zoom = 1.65, orb
           // zoom > 1 shrinks the event horizon so more of the black hole shape is visible.
           float dist = length(coord - center) * zoom;
 
-          // === ENHANCED STARS ===
+          // The star/nebula field drifts very slowly behind the (fixed) black
+          // hole for a subtle parallax feel.
+          vec2 sky = coord + vec2(time * 0.0015, 0.0);
+
+          // === STARS === (unrolled jittered-grid layers)
           float stars = 0.0;
+          stars += starLayer(sky * 12.0, 0.80, 0.10, 0.30) * 0.95; // bright, sparse, twinkling
+          stars += starLayer(sky * 27.0, 0.84, 0.13, 0.15) * 0.55; // medium
+          stars += starLayer(sky * 55.0, 0.80, 0.16, 0.0) * 0.28;  // faint dense field
 
-          // Layer 1: Bright prominent stars (sparse)
-          for (int i = 0; i < 3; i++) {
-            vec2 starCoord = coord * (10.0 + float(i) * 6.0);
-            float starNoise = hash(floor(starCoord + float(i) * 100.0));
-            if (starNoise > 0.95) {
-              float starDist = length(fract(starCoord) - 0.5);
-              float twinkle = 0.7 + 0.3 * sin(time * (2.0 + starNoise * 3.0) + starNoise * 100.0);
-              stars += smoothstep(0.06, 0.0, starDist) * (0.5 + starNoise * 0.5) * twinkle;
-            }
-          }
-
-          // Layer 2: Medium stars (more frequent)
-          for (int i = 0; i < 4; i++) {
-            vec2 starCoord = coord * (20.0 + float(i) * 10.0);
-            float starNoise = hash(floor(starCoord + float(i) * 200.0));
-            if (starNoise > 0.88) {
-              float starDist = length(fract(starCoord) - 0.5);
-              float twinkle = 0.8 + 0.2 * sin(time * (1.5 + starNoise * 2.0) + starNoise * 50.0);
-              stars += smoothstep(0.04, 0.0, starDist) * (0.3 + starNoise * 0.3) * twinkle;
-            }
-          }
-
-          // Layer 3: Faint distant stars (dense field)
-          for (int i = 0; i < 5; i++) {
-            vec2 starCoord = coord * (40.0 + float(i) * 15.0);
-            float starNoise = hash(floor(starCoord + float(i) * 300.0));
-            if (starNoise > 0.81) {
-              float starDist = length(fract(starCoord) - 0.5);
-              stars += smoothstep(0.025, 0.0, starDist) * 0.15 * starNoise;
-            }
-          }
-
-          // Layer 4: Very faint background star dust (milky way effect)
+          // Very faint background star dust (milky way effect)
+          #ifndef LOW_FX
+          float starDust = starLayer(sky * 95.0, 0.72, 0.22, 0.0) * 0.10;
+          #else
           float starDust = 0.0;
-          for (int i = 0; i < 3; i++) {
-            vec2 dustCoord = coord * (80.0 + float(i) * 30.0);
-            float dustNoise = hash(floor(dustCoord + float(i) * 500.0));
-            if (dustNoise > 0.72) {
-              float dustDist = length(fract(dustCoord) - 0.5);
-              starDust += smoothstep(0.02, 0.0, dustDist) * 0.08;
-            }
-          }
+          #endif
 
           // === NEBULAE / GAS CLOUDS ===
-          // Subtle colored nebula regions
-          float nebula1 = fbm(coord * 3.0 + vec2(time * 0.02, 0.0));
-          float nebula2 = fbm(coord * 4.0 + vec2(0.0, time * 0.015));
-          float nebulaMask = smoothstep(0.4, 0.7, nebula1) * smoothstep(0.35, 0.65, nebula2);
+          // Two fbm fields shape the clouds and double as color selectors.
+          float nebula1 = fbm(sky * 3.0 + vec2(time * 0.02, 0.0));
+          float nebula2 = fbm(sky * 4.0 + vec2(0.0, time * 0.015));
+          float nebulaMask = smoothstep(0.38, 0.72, nebula1) * smoothstep(0.33, 0.68, nebula2);
           nebulaMask *= smoothstep(0.2, 0.5, dist); // Fade near black hole
 
-          vec3 nebulaColor1 = vec3(0.15, 0.05, 0.2); // Deep purple
-          vec3 nebulaColor2 = vec3(0.05, 0.1, 0.2);  // Deep blue
-          vec3 nebulaColor3 = vec3(0.2, 0.08, 0.05); // Deep red/brown
-
-          float nebulaSelect = noise(coord * 2.0);
-          vec3 nebula = mix(nebulaColor1, nebulaColor2, nebulaSelect);
-          nebula = mix(nebula, nebulaColor3, noise(coord * 3.0 + 10.0));
+          vec3 nebula = mix(vec3(0.17, 0.06, 0.28), vec3(0.05, 0.11, 0.26), smoothstep(0.3, 0.7, nebula2)); // violet -> indigo
+          nebula = mix(nebula, vec3(0.03, 0.15, 0.17), smoothstep(0.45, 0.8, nebula1));                     // teal pockets
+          nebula += vec3(0.22, 0.06, 0.20) * smoothstep(0.32, 0.6, nebula1 * nebula2);                      // magenta cores
 
           // Gravitational lensing - warp space near event horizon
           float lensing = smoothstep(0.5, 0.1, dist);
@@ -169,14 +171,11 @@ export default function BlackHoleEnvironment({ flipTrigger = 0, zoom = 1.65, orb
           // Hawking radiation glow at event horizon edge
           float hawkingGlow = smoothstep(0.2, 0.16, abs(dist - 0.18)) * 0.6;
 
-          // Turbulence in the accretion disk
-          float turbulence = noise(coord * 15.0 + time * 0.15) * 0.2;
-
           // Gradient from event horizon to deep space
           float gradient = smoothstep(0.0, 0.8, dist);
 
           // Color scheme
-          vec3 deepSpace = vec3(0.01, 0.01, 0.02); // Nearly black
+          vec3 deepSpace = vec3(0.012, 0.012, 0.025); // Nearly black with a blue lean
           vec3 eventHorizonColor = vec3(0.0, 0.0, 0.0); // Pure black
           vec3 accretionOrange = vec3(0.9, 0.4, 0.1); // Hot orange
           vec3 accretionBlue = vec3(0.3, 0.5, 1.0); // Blue-shifted light
@@ -188,14 +187,14 @@ export default function BlackHoleEnvironment({ flipTrigger = 0, zoom = 1.65, orb
           // Build the final color
           vec3 color = mix(eventHorizonColor, deepSpace, gradient);
 
-          // Add nebula (very subtle, behind everything)
-          color += nebula * nebulaMask * 0.15;
+          // Add nebula (subtle, behind everything)
+          color += nebula * nebulaMask * 0.24;
 
           // Add star dust (milky way glow)
           color += vec3(0.6, 0.65, 0.8) * starDust * gradient;
 
           // Add stars with color variation (dimmed near event horizon)
-          float starColorMix = hash(coord * 50.0);
+          float starColorMix = hash(floor(sky * 50.0));
           vec3 finalStarColor = mix(starColor, warmStarColor, step(0.7, starColorMix));
           finalStarColor = mix(finalStarColor, blueStarColor, step(0.9, starColorMix));
           color += finalStarColor * stars * gradient * 0.9;
@@ -210,8 +209,11 @@ export default function BlackHoleEnvironment({ flipTrigger = 0, zoom = 1.65, orb
           // Add Hawking radiation
           color += accretionOrange * hawkingGlow * 0.5;
 
-          // Add turbulence
+          // Turbulence shimmer in the accretion disk region
+          #ifndef LOW_FX
+          float turbulence = noise(sky * 15.0 + time * 0.15) * 0.2;
           color += vec3(turbulence * 0.1);
+          #endif
 
           // Darken the event horizon
           color *= (1.0 - eventHorizon * 0.95);
@@ -241,32 +243,35 @@ export default function BlackHoleEnvironment({ flipTrigger = 0, zoom = 1.65, orb
         }
       `,
     });
-  }, [zoom]);
+    // Material is created once; zoom/tint are fed through uniforms each frame.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useFrame((state, delta) => {
-    if (materialRef.current) {
-      materialRef.current.uniforms.time.value = state.clock.elapsedTime;
-      materialRef.current.uniforms.pulseIntensity.value = pulseIntensity;
-      materialRef.current.uniforms.zoom.value = zoom;
-      if (tint) materialRef.current.uniforms.uTint.value.set(tint[0], tint[1], tint[2]);
+    const mat = materialRef.current;
+    if (!mat) return;
 
-      const t = state.clock.elapsedTime * 0.08;
-      const orbitRadius = orbitStrength * (0.7 + 0.3 * Math.sin(state.clock.elapsedTime * 0.11));
-      materialRef.current.uniforms.centerOffset.value.set(
-        Math.cos(t) * orbitRadius,
-        Math.sin(t * 1.17) * orbitRadius * 0.7
-      );
-    }
+    mat.uniforms.time.value = state.clock.elapsedTime;
+    mat.uniforms.zoom.value = zoom;
+    if (tint) mat.uniforms.uTint.value.setRGB(tint[0], tint[1], tint[2]);
 
-    // Decay pulse intensity smoothly
-    if (pulseIntensity > 0) {
-      setPulseIntensity((prev) => Math.max(0, prev - delta * 2.5)); // Decay over ~0.4 seconds
+    const t = state.clock.elapsedTime * 0.08;
+    const orbitRadius = orbitStrength * (0.7 + 0.3 * Math.sin(state.clock.elapsedTime * 0.11));
+    mat.uniforms.centerOffset.value.set(
+      Math.cos(t) * orbitRadius,
+      Math.sin(t * 1.17) * orbitRadius * 0.7
+    );
+
+    // Decay pulse intensity smoothly (~0.4s), without touching React state
+    if (pulseRef.current > 0) {
+      pulseRef.current = Math.max(0, pulseRef.current - delta * 2.5);
     }
+    mat.uniforms.pulseIntensity.value = pulseRef.current;
   });
 
   return (
-    <mesh ref={sphereRef}>
-      <sphereGeometry args={[100, 64, 64]} />
+    <mesh frustumCulled={false}>
+      <sphereGeometry args={[100, 48, 32]} />
       <primitive object={shaderMaterial} ref={materialRef} attach="material" />
     </mesh>
   );

@@ -81,12 +81,54 @@ const _ease = t => t < 0.5 ? 4 * t ** 3 : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const _prog = (t, s, e) => _clamp((t - s) / (e - s));
 const _chromaticVec = new Vector2(0, 0);
 
+// Cool blue cast on the intro black hole so the opening matches the main-menu vibe
+const INTRO_BH_TINT = [0.72, 0.9, 1.3];
+
+/**
+ * EnvBoundary — drei's <Environment preset> fetches its HDR from a CDN at
+ * runtime; if that fetch fails (offline, blocked, flaky network) the thrown
+ * error would otherwise bubble up and take down the whole Canvas. Degrade to
+ * "no environment map" instead — lights still carry the scene.
+ */
+class EnvBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { failed: false };
+  }
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  componentDidCatch() {
+    console.warn('[WORM-3] Environment map failed to load — continuing without reflections.');
+  }
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
+}
+
 /**
  * IntroBranch — 3D content rendered inside the Canvas during the welcome/intro.
  * Contains IntroScene, post-processing, and intro lights.
  * Unmounting is avoided by conditionally hiding it (never fully unmounting the Canvas).
+ *
+ * Self-clocked: keeping the intro clock here (instead of App-level state)
+ * means only this subtree re-renders per frame, not the whole App.
  */
-function IntroBranch({ time, onComplete, reducedMotion = false, performanceMode = false }) {
+function IntroBranch({ onComplete, reducedMotion = false, performanceMode = false }) {
+  const [time, setTime] = useState(0);
+  // Plain rAF, not useFrame: setState from inside R3F's frame loop flushes
+  // synchronous re-renders mid-loop and collapses the frame rate.
+  useEffect(() => {
+    const start = performance.now();
+    let raf;
+    const tick = (now) => {
+      setTime((now - start) / 1000);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
   const bloomIntensity = useMemo(() => {
     const base = reducedMotion ? 0.25 : 0.6;
 
@@ -123,12 +165,13 @@ function IntroBranch({ time, onComplete, reducedMotion = false, performanceMode 
       <ambientLight intensity={0.6} />
       <pointLight position={[10, 10, 10]} intensity={1.8} />
       <pointLight position={[-10, -10, -10]} intensity={1.2} />
-      {/* Cool blue cast on the intro black hole so the opening matches the main-menu vibe */}
-      <BlackHoleEnvironment zoom={1.2} orbitStrength={0.1} tint={[0.72, 0.9, 1.3]} />
+      <BlackHoleEnvironment zoom={1.2} orbitStrength={0.1} tint={INTRO_BH_TINT} />
       <IntroScene time={time} onComplete={onComplete} />
-      <Suspense fallback={null}>
-        <Environment preset="city" />
-      </Suspense>
+      <EnvBoundary>
+        <Suspense fallback={null}>
+          <Environment preset="city" />
+        </Suspense>
+      </EnvBoundary>
       {!performanceMode && (
         <EffectComposer>
           <Bloom
@@ -375,9 +418,6 @@ export default function WORM3() {
     }
   }, [randomStyleTick]);
 
-  // Intro time — drives IntroBranch (3D) and WelcomeScreen DOM overlay in sync
-  const [introTime, setIntroTime] = useState(0);
-
   // Co-op Crawler mode
   const [coopMode, setCoopMode] = useState(false);
 
@@ -458,21 +498,6 @@ export default function WORM3() {
   const disparitySolveQueueRef = useRef([]);
   const disparitySolveActiveRef = useRef(false);
   const disparitySolveIntervalRef = useRef(null);
-
-  // ========================================================================
-  // INTRO TIME — drives IntroBranch 3D content + WelcomeScreen DOM overlay
-  // ========================================================================
-  useEffect(() => {
-    if (!showWelcome) return;
-    const start = performance.now();
-    let raf;
-    const tick = (now) => {
-      setIntroTime((now - start) / 1000);
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [showWelcome]);
 
   // ========================================================================
   // EXPLOSION ANIMATION
@@ -1382,7 +1407,6 @@ export default function WORM3() {
           <TilePreviewHost />
           {showWelcome ? (
             <IntroBranch
-              time={introTime}
               onComplete={handleWelcomeComplete}
               reducedMotion={prefersReducedMotion}
               performanceMode={introPerformanceMode}
@@ -1453,7 +1477,7 @@ export default function WORM3() {
 
       {/* Welcome DOM overlay — transparent background, Canvas shows through */}
       {showWelcome && (
-        <WelcomeScreen onEnter={handleWelcomeComplete} introTime={introTime} />
+        <WelcomeScreen onEnter={handleWelcomeComplete} />
       )}
 
       {!showWelcome && (

@@ -2,14 +2,27 @@
 /**
  * WelcomeScreen — pure DOM overlay rendered on top of the single persistent Canvas.
  * All 3D content (IntroScene, EffectComposer) lives in App.jsx's Canvas IntroBranch.
- * Receives introTime from App so the TextOverlay and buttons stay in sync with the
- * 3D animation without needing their own RAF loop.
+ * Self-clocked with its own rAF loop so per-frame intro time stays out of App
+ * state (which would re-render the whole App tree at 60fps during the intro).
  */
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import TextOverlay from '../intro/TextOverlay.jsx';
 
-const WelcomeScreen = ({ onEnter, introTime }) => {
+const WelcomeScreen = ({ onEnter }) => {
+  const [introTime, setIntroTime] = useState(0);
+
+  useEffect(() => {
+    const start = performance.now();
+    let raf;
+    const tick = (now) => {
+      setIntroTime((now - start) / 1000);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
   useEffect(() => {
     const onKeyDown = (event) => {
       const key = event.key.toLowerCase();
