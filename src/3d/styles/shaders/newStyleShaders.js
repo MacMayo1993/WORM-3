@@ -1255,17 +1255,20 @@ export const newStyleShaders = {
       float member = 1.0 - smoothstep(0.55, 0.78, abs(axisCoord - spinSlice));
       float sp = clamp(spin * member, 0.0, 1.0);
 
-      // --- Whole eye moves as one unit (iris always centered) ---
+      // --- Gaze direction (iris moves on sphere surface) ---
       float t1 = time + seed * 100.0;
       float t2 = time + seed2 * 100.0;
-      float mx = sin(t1 * 0.8) * 0.06
-               + sin(t1 * 0.35 + seed * 4.0) * 0.07
-               + sin(t1 * 1.6 + seed3 * 9.0) * 0.03;
-      float my = sin(t2 * 0.6) * 0.06
-               + sin(t2 * 0.28 + seed2 * 5.0) * 0.07
-               + sin(t2 * 1.4 + seed4 * 8.0) * 0.03;
-      mx += sp * sin(seed3 * 31.0) * 0.04;
-      my += sp * cos(seed4 * 31.0) * 0.04;
+      float gazeX = sin(t1 * 0.8) * 0.28
+                   + sin(t1 * 0.35 + seed * 4.0) * 0.22
+                   + sin(t1 * 1.6 + seed3 * 9.0) * 0.1;
+      float gazeY = sin(t2 * 0.6) * 0.28
+                   + sin(t2 * 0.28 + seed2 * 5.0) * 0.22
+                   + sin(t2 * 1.4 + seed4 * 8.0) * 0.1;
+      gazeX += sp * sin(seed3 * 31.0) * 0.1;
+      gazeY += sp * cos(seed4 * 31.0) * 0.1;
+      // Eyeball shifts slightly in socket to follow gaze
+      float mx = gazeX * 0.06;
+      float my = gazeY * 0.06;
 
       // --- Chamber / frame ---
       float chamberR = 0.48;
@@ -1330,9 +1333,10 @@ export const newStyleShaders = {
         sclera = mix(sclera, vec3(0.75, 0.18, 0.14), veinLine * 0.5 * pulse);
         sclera = mix(sclera, vec3(0.92, 0.78, 0.74), smoothstep(0.85, 1.0, sn2Len) * 0.12);
 
-        // --- Iris (always centered on eyeball) ---
-        float irisD = sn2Len;
-        float irisAngle = atan(sn2.y, sn2.x);
+        // --- Iris (shifts with gaze direction) ---
+        vec2 irisUV = sn2 - vec2(gazeX, gazeY) * 0.35;
+        float irisD = length(irisUV);
+        float irisAngle = atan(irisUV.y, irisUV.x);
 
         float irisOuterR = 0.48;
         float pupilR = 0.13 + sp * 0.03;
