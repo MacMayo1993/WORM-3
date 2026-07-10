@@ -289,6 +289,7 @@ export const TILE_STYLES = {
   fractalPulse: { label: 'Fractal Pulse', cost: 'med', type: 'animated' },
   bioLattice:   { label: 'Bio-Lattice',   cost: 'med', type: 'animated' },
   stellarLensing: { label: 'Stellar Lensing', cost: 'med', type: 'animated' },
+  eyeball:        { label: 'Eyeball',         cost: 'med', type: 'animated' },
 };
 
 export const DEFAULT_SETTINGS = {
