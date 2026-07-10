@@ -11,23 +11,62 @@ const ANTIPODAL_COLOR = {
 
 const MAX_LEVEL = 5;
 
+// ─── Conway's Game of Life propagation rules ─────────────────────────────────
+// Each level uses a different B/S rulestring adapted for the 4–6 neighbor
+// manifold grid. Chains ignite; Conway spreads and recovers.
+//
+// "Infected" = flips > 0 && flips < flipCap (alive in Conway terms)
+// Birth: healthy sticker gains a flip if infected-neighbor count ∈ birthSet
+// Survival: infected sticker keeps its flips if infected-neighbor count ∈ surviveSet
+// Recovery: infected sticker loses a flip if it FAILS the survival check
+
+const CONWAY_RULES = [
+  null, // index 0 unused
+  // L1: B3/S12 — gentle Life analog for 4-neighbor grid; self-regulating
+  { birth: new Set([3]), survive: new Set([1, 2]), recoveryRate: 0.3, period: 2200 },
+  // L2: B23/S12 — HighLife analog; replicator-like spread from 2 neighbors
+  { birth: new Set([2, 3]), survive: new Set([1, 2]), recoveryRate: 0.25, period: 1800 },
+  // L3: B2/S — Seeds analog; explosive but ephemeral, constant turnover
+  { birth: new Set([2]), survive: new Set([]), recoveryRate: 0.5, period: 1400 },
+  // L4: B34/S234 — Day & Night inspired; mirrors antipodal duality
+  { birth: new Set([3, 4]), survive: new Set([2, 3, 4]), recoveryRate: 0.15, period: 1600 },
+  // L5: B12/S1234 — aggressive; spreads fast, very persistent, hard to kill
+  { birth: new Set([1, 2]), survive: new Set([1, 2, 3, 4]), recoveryRate: 0.1, period: 1000 },
+];
+
+// Conway generation cadence per level (BASE ms between full-surface evaluations).
+// Actual period is scaled up by sizePenalty for larger cubes.
+const conwayPeriodByLevel = [0, 2200, 1800, 1400, 1600, 1000];
+// Max births per Conway tick (absolute cap regardless of cube size)
+const conwayBirthCapByLevel = [0, 3, 4, 5, 4, 6];
+// Max recoveries per Conway tick
+const conwayRecoveryCapByLevel = [0, 2, 2, 3, 2, 2];
+
 // Level profile (1..5):
 // L1-L2: sparse, exploratory spread
 // L3-L4: sustained chain movement
 // L5: high propagation, but fewer starts and longer cadence to avoid frame spikes
-const numChainsByLevel = [0, 1, 1, 2, 2, 2];
+const numChainsByLevel = [0, 1, 1, 1, 2, 2];
 const delayByLevel = [0, 420, 280, 220, 170, 190];
-const basePropByLevel = [0, 0.40, 0.55, 0.68, 0.78, 0.92];
+const basePropByLevel = [0, 0.35, 0.45, 0.55, 0.65, 0.80];
 const decayByLevel = [0, 0.68, 0.74, 0.80, 0.86, 0.93];
 const cooldownByLevel = [0, 1700, 1100, 850, 650, 520]; // ms — compared against cooldownAcc (real ms)
-const chainCapByLevel = [0, 4, 5, 8, 10, 12];
+const chainCapByLevel = [0, 2, 3, 4, 5, 6];
+
+// Size penalty: slows tick frequency and caps chains on larger cubes.
+// 3x3→1.0, 4x4→1.2, 5x5→1.5, 6x6→1.8, 7x7→2.1
+const computeSizePenalty = (S) => 1 + (S - 3) * 0.35;
 
 const computeSizeScale = (stickers) => {
-  // Keep growth sub-linear on large cubes to avoid worker/main-thread burst
-  // overload (7x7 has 294 surface stickers vs 54 on 3x3).
-  // 3x3:1, 5x5:2, 6x6:3, 7x7:3
-  return Math.max(1, Math.ceil(stickers / 96));
+  // Chain count multiplier. Kept at 1 for cubes ≤5x5; only bump to 2 for 6x6+.
+  // Previous formula (ceil(stickers/96)) gave 4× on 7x7 which overloaded the main thread.
+  if (stickers <= 150) return 1; // 3x3=54, 4x4=96, 5x5=150
+  return 2; // 6x6=216, 7x7=294
 };
+
+// Maximum total operations (flips + cascades) the chain tick can emit per cycle.
+// Prevents burst frames from overwhelming the main-thread React reconciler.
+const MAX_OPS_PER_CHAIN_TICK = 6;
 
 let state = null;
 let running = false;
@@ -56,6 +95,12 @@ let deathRank = 0;
 let pairDeathCount = 0;
 let winnerAnnounced = false;
 let faceAliveMap = new Map([[1, 0], [2, 0], [3, 0], [4, 0], [5, 0], [6, 0]]);
+
+// Conway generation state
+let conwayAcc = 0; // ms accumulator for Conway tick cadence
+// Neighbor cache: Map<"x,y,z,dirKey", [{x,y,z,dirKey}, ...]>
+// Built once per size, invalidated on size change. Avoids recomputing neighbors every generation.
+let neighborCache = null;
 
 const buildSurfaceCoords = (S) => {
   const coords = [];
@@ -229,6 +274,8 @@ const resetChainState = () => {
   pairDeathCount = 0;
   winnerAnnounced = false;
   faceAliveMap = new Map([[1, 0], [2, 0], [3, 0], [4, 0], [5, 0], [6, 0]]);
+  conwayAcc = 0;
+  neighborCache = null;
 
   // Rebuild the living-sticker index from all surface stickers.
   // state must be set before resetChainState() is called (guaranteed by START handler).
@@ -269,30 +316,153 @@ const findChainStart = () => {
   // livingStickers is maintained incrementally; dead tiles are removed on death.
   if (!livingStickers.size) return null;
 
-  const candidates = [];
+  // Single-pass weighted reservoir sampling (Efraimidis–Spirakis).
+  // Avoids building a full candidates array on large cubes (294 stickers on 7x7).
+  // Weight = flips² so chains concentrate on near-dead tiles.
+  let bestTile = null;
+  let bestKey = -Infinity;
+  let anyFlipped = false;
+
   for (const { x, y, z, dirKey } of livingStickers.values()) {
     const st = state[x][y][z].stickers[dirKey];
-    if (st.flips > 0) candidates.push({ x, y, z, dirKey, flips: st.flips });
+    const flips = st.flips || 0;
+    if (flips <= 0) continue;
+    anyFlipped = true;
+    const weight = flips * flips;
+    const key = Math.pow(Math.random(), 1 / weight);
+    if (key > bestKey) {
+      bestKey = key;
+      bestTile = { x, y, z, dirKey, flips };
+    }
   }
 
-  if (!candidates.length) {
-    // No flipped tiles yet — pick any living tile as a fresh start.
-    const values = [...livingStickers.values()];
-    const pick = values[Math.floor(Math.random() * values.length)];
-    return { tile: { ...pick, flips: 1 }, strength: 1 };
+  if (!anyFlipped) {
+    // No flipped tiles yet — pick a random living tile as a fresh start.
+    // Use index-based random pick to avoid spreading all values into an array.
+    const targetIdx = Math.floor(Math.random() * livingStickers.size);
+    let idx = 0;
+    for (const loc of livingStickers.values()) {
+      if (idx === targetIdx) return { tile: { ...loc, flips: 1 }, strength: 1 };
+      idx++;
+    }
   }
 
-  // Weight restarts QUADRATICALLY by flip count. Linear weighting spread chains
-  // evenly across all damaged tiles, so damage never concentrated enough to reach
-  // the cap. Squaring makes a chain far more likely to resume a near-cap tile and
-  // finish the kill instead of scattering fresh flips across the whole surface.
-  const totalWeight = candidates.reduce((sum, c) => sum + c.flips * c.flips, 0);
-  let roll = Math.random() * totalWeight;
-  for (const c of candidates) {
-    roll -= c.flips * c.flips;
-    if (roll <= 0) return { tile: c, strength: 1 };
+  return bestTile ? { tile: bestTile, strength: 1 } : null;
+};
+
+// ─── Conway Generation Evaluation ────────────────────────────────────────────
+// Evaluates all living stickers simultaneously against the current level's B/S
+// rulestring. Returns births (new infections) and recoveries (healed stickers).
+
+const buildNeighborCache = (S) => {
+  const cache = new Map();
+  for (const [x, y, z] of surfaceCoords) {
+    if (!state[x]?.[y]?.[z]) continue;
+    for (const dirKey of Object.keys(state[x][y][z].stickers)) {
+      cache.set(`${x},${y},${z},${dirKey}`, getManifoldNeighbors(x, y, z, dirKey, S));
+    }
   }
-  return { tile: candidates[candidates.length - 1], strength: 1 };
+  return cache;
+};
+
+const recoverStickerPairLocal = (cubeState, x, y, z, dirKey, manifoldMap, outRecoveries) => {
+  const sticker = cubeState[x]?.[y]?.[z]?.stickers?.[dirKey];
+  if (!sticker) return;
+
+  const applyRecover = (loc, emitOp = false) => {
+    if (!loc) return;
+    const st = cubeState[loc.x][loc.y][loc.z].stickers[loc.dirKey];
+    const currentFlips = st.flips || 0;
+    if (currentFlips <= 0 || currentFlips >= flipCap) return;
+    st.curr = ANTIPODAL_COLOR[st.curr];
+    st.flips = currentFlips - 1;
+    if (emitOp) outRecoveries.push([loc.x, loc.y, loc.z, loc.dirKey]);
+  };
+
+  applyRecover({ x, y, z, dirKey }, true);
+  const anti = findAntipodalStickerByGrid(manifoldMap, sticker, size);
+  applyRecover(anti, false);
+};
+
+const conwayTick = () => {
+  if (!state || animating) return null;
+  if (!manifoldMapCache) manifoldMapCache = buildManifoldGridMap(state, size);
+  if (!neighborCache) neighborCache = buildNeighborCache(size);
+
+  const level = Math.max(1, Math.min(MAX_LEVEL, chaosLevel));
+  const rules = CONWAY_RULES[level];
+  if (!rules) return null;
+
+  const { birth: birthSet, survive: surviveSet, recoveryRate } = rules;
+  const birthCap = conwayBirthCapByLevel[level] || 4;
+  const recoveryCap = conwayRecoveryCapByLevel[level] || 3;
+
+  const births = []; // [x,y,z,dirKey] — healthy stickers to infect
+  const recoveries = []; // [x,y,z,dirKey] — infected stickers to heal
+  const cascades = [];
+
+  // Snapshot: evaluate all stickers against current state (synchronous generation)
+  for (const [key, loc] of livingStickers) {
+    const st = state[loc.x]?.[loc.y]?.[loc.z]?.stickers?.[loc.dirKey];
+    if (!st) continue;
+
+    const neighbors = neighborCache.get(key);
+    if (!neighbors) continue;
+
+    // Count infected neighbors (flips > 0 and not dead)
+    let infectedCount = 0;
+    for (const n of neighbors) {
+      const nst = state[n.x]?.[n.y]?.[n.z]?.stickers?.[n.dirKey];
+      if (nst && (nst.flips || 0) > 0 && (nst.flips || 0) < flipCap) {
+        infectedCount++;
+      }
+    }
+
+    const currentFlips = st.flips || 0;
+    const isInfected = currentFlips > 0;
+
+    if (!isInfected) {
+      // Birth check: healthy sticker with right number of infected neighbors
+      if (birthSet.has(infectedCount) && births.length < birthCap) {
+        births.push([loc.x, loc.y, loc.z, loc.dirKey]);
+      }
+    } else {
+      // Survival check: infected sticker without enough support recovers
+      if (!surviveSet.has(infectedCount) && Math.random() < recoveryRate && recoveries.length < recoveryCap) {
+        recoveries.push([loc.x, loc.y, loc.z, loc.dirKey]);
+      }
+    }
+  }
+
+  // Apply births (flip sticker + antipodal pair)
+  const outFlips = [];
+  for (const [x, y, z, dirKey] of births) {
+    flipStickerPairLocal(state, x, y, z, dirKey, manifoldMapCache, outFlips);
+    // Emit at most 2 cascade visuals per Conway tick to avoid GPU overload
+    if (cascades.length < 2) {
+      const neighbors = neighborCache.get(`${x},${y},${z},${dirKey}`);
+      if (neighbors) {
+        const infectedNeighbor = neighbors.find((n) => {
+          const nst = state[n.x]?.[n.y]?.[n.z]?.stickers?.[n.dirKey];
+          return nst && (nst.flips || 0) > 0 && (nst.flips || 0) < flipCap;
+        });
+        if (infectedNeighbor && !(infectedNeighbor.x === x && infectedNeighbor.y === y && infectedNeighbor.z === z)) {
+          const from = getStickerWorldPos(infectedNeighbor.x, infectedNeighbor.y, infectedNeighbor.z, infectedNeighbor.dirKey, size, explosionT);
+          const to = getStickerWorldPos(x, y, z, dirKey, size, explosionT);
+          cascades.push({ from, to, crossFace: infectedNeighbor.dirKey !== dirKey });
+        }
+      }
+    }
+  }
+
+  // Apply recoveries (decrement flip on sticker + antipodal pair)
+  const outRecoveries = [];
+  for (const [x, y, z, dirKey] of recoveries) {
+    recoverStickerPairLocal(state, x, y, z, dirKey, manifoldMapCache, outRecoveries);
+  }
+
+  const didWork = outFlips.length > 0 || outRecoveries.length > 0;
+  return didWork ? { flips: outFlips, recoveries: outRecoveries, cascades } : null;
 };
 
 // dtMs: real milliseconds elapsed since the previous tick (used for cooldown accumulation).
@@ -310,8 +480,13 @@ const tick = (dtMs) => {
   const deaths = [];
   const eliminatedFaces = [];
   let producedDeaths = false;
+  let opsEmitted = 0;
 
   for (const chain of chains) {
+    // Budget gate: stop processing chains once we've emitted enough operations
+    // for this tick. Remaining chains will process on the next cycle.
+    if (opsEmitted >= MAX_OPS_PER_CHAIN_TICK) break;
+
     if (chain.inCooldown) {
       // Accumulate real ms so cooldownDuration values (ms) work as intended.
       chain.cooldownAcc += dtMs;
@@ -339,6 +514,7 @@ const tick = (dtMs) => {
 
     const current = chain.tile;
     flipStickerPairLocal(state, current.x, current.y, current.z, current.dirKey, manifoldMapCache, flips);
+    opsEmitted++;
 
     const chainDeaths = [];
     const checkDeath = (loc) => {
@@ -409,18 +585,22 @@ const tick = (dtMs) => {
       validNeighbors.push({ ...neighbor, flips: nFlips, seamWeight, crossFace });
     }
 
-    const pool = [...validNeighbors];
-    while (pool.length > 0) {
-      let roll = Math.random() * pool.reduce((s, n) => s + n.seamWeight, 0);
-      let pick = pool.length - 1;
-      for (let i = 0; i < pool.length; i++) {
-        roll -= pool[i].seamWeight;
+    let poolLen = validNeighbors.length;
+    while (poolLen > 0) {
+      let totalWeight = 0;
+      for (let i = 0; i < poolLen; i++) totalWeight += validNeighbors[i].seamWeight;
+      let roll = Math.random() * totalWeight;
+      let pick = poolLen - 1;
+      for (let i = 0; i < poolLen; i++) {
+        roll -= validNeighbors[i].seamWeight;
         if (roll <= 0) {
           pick = i;
           break;
         }
       }
-      const neighbor = pool.splice(pick, 1)[0];
+      const neighbor = validNeighbors[pick];
+      validNeighbors[pick] = validNeighbors[poolLen - 1];
+      poolLen--;
       // Finisher boost: the closer a neighbour is to the flip cap, the more likely
       // the chain commits to it — so near-dead tiles get pushed over the edge
       // instead of being abandoned one flip short of dying.
@@ -433,10 +613,11 @@ const tick = (dtMs) => {
         // produce an impact sphere right on the neighboring sticker, making it
         // appear to randomly spaz/flash even though its flip count hasn't changed.
         const sameCubie = neighbor.x === current.x && neighbor.y === current.y && neighbor.z === current.z;
-        if (!sameCubie) {
+        if (!sameCubie && cascades.length < 3) {
           const from = getStickerWorldPos(current.x, current.y, current.z, current.dirKey, size, explosionT);
           const to = getStickerWorldPos(neighbor.x, neighbor.y, neighbor.z, neighbor.dirKey, size, explosionT);
           cascades.push({ from, to, crossFace: neighbor.crossFace });
+          opsEmitted++;
         }
         chain.tile = { x: neighbor.x, y: neighbor.y, z: neighbor.z, dirKey: neighbor.dirKey };
         chain.visited.add(`${neighbor.x},${neighbor.y},${neighbor.z},${neighbor.dirKey}`);
@@ -475,7 +656,7 @@ const tick = (dtMs) => {
     flips,
     cascades,
     deaths,
-    eliminatedFaces: [...new Set(eliminatedFaces)],
+    eliminatedFaces: eliminatedFaces.length > 0 ? [...new Set(eliminatedFaces)] : eliminatedFaces,
     winner,
     metrics: { ...cachedMetrics, flipPct },
     didWork,
@@ -488,13 +669,16 @@ const schedule = () => {
   const dt = now - last;
   last = now;
   tickAcc += dt;
+  conwayAcc += dt;
 
   const level = Math.max(1, Math.min(MAX_LEVEL, chaosLevel));
+  const sizePenalty = computeSizePenalty(size);
   const tickPeriod = delayByLevel[level] || 250;
   // Use cached metrics (updated each tick) to avoid iterating all stickers every 16 ms.
   const activeRatio = cachedMetrics.edgeTotal > 0 ? (cachedMetrics.flipActive / cachedMetrics.edgeTotal) : 0;
   const chainPressure = Math.min(1, chains.length / 12);
-  const effectivePeriod = Math.round(tickPeriod * (0.9 + activeRatio * 1.1) * (1 + chainPressure * 0.6));
+  // sizePenalty slows the tick on large cubes so we don't flood the main thread.
+  const effectivePeriod = Math.round(tickPeriod * (0.9 + activeRatio * 1.1) * (1 + chainPressure * 0.6) * sizePenalty);
 
   if (tickAcc >= effectivePeriod) {
     // Pass accumulated real ms to tick() so chain cooldowns run in wall-clock time.
@@ -505,7 +689,33 @@ const schedule = () => {
     tickAcc = 0;
   }
 
-  if (running) timerId = setTimeout(schedule, 16);
+  // Conway generation runs on its own slower cadence — evaluates the full surface
+  // and produces emergent birth/recovery patterns independent of chain walks.
+  // Scale period by sizePenalty so larger cubes don't fire Conway as aggressively.
+  const conwayPeriod = Math.round((conwayPeriodByLevel[level] || 2000) * sizePenalty);
+  if (conwayAcc >= conwayPeriod) {
+    const conwayPayload = conwayTick();
+    if (conwayPayload) {
+      // Reuse the cachedMetrics snapshot from the last chain tick instead of
+      // running a second O(n) scan. The Conway tick only mutates a handful of
+      // stickers (capped), so the cached values are close enough until the
+      // next chain tick refreshes them.
+      const mergedPayload = {
+        flips: conwayPayload.flips,
+        cascades: conwayPayload.cascades,
+        recoveries: conwayPayload.recoveries,
+        deaths: [],
+        eliminatedFaces: [],
+        winner: null,
+        metrics: null,
+        didWork: true,
+      };
+      self.postMessage({ type: 'TICK', payload: mergedPayload });
+    }
+    conwayAcc = 0;
+  }
+
+  if (running) timerId = setTimeout(schedule, size >= 5 ? 32 : 16);
 };
 
 // After a cube rotation every sticker's physical (x,y,z,dirKey) changes.
@@ -562,6 +772,7 @@ self.onmessage = (e) => {
     case 'SYNC_CUBIES': {
       state = payload.cubies;
       manifoldMapCache = null;
+      neighborCache = null;
       rebuildLivingStickers();
       break;
     }
@@ -574,6 +785,7 @@ self.onmessage = (e) => {
         state = rotateSliceCubies(state, size, axis, sliceIndex, dir);
       }
       manifoldMapCache = null;
+      neighborCache = null;
       rebuildLivingStickers();
       break;
     }

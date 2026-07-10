@@ -12,7 +12,7 @@ import WormholeNetwork from '../manifold/WormholeNetwork.jsx';
 import ChaosWave from '../manifold/ChaosWave.jsx';
 import FlipPropagationWave from '../manifold/FlipPropagationWave.jsx';
 import { vibrate } from '../utils/audio.js';
-import { updateSharedTime, updateSharedTremor, warmUpDefaultStyles } from './styles/TileStyleMaterials.jsx';
+import { updateSharedTime, updateSharedTremor, updateSharedSpin, updateDiceRoll, setDiceCellState, warmUpDefaultStyles } from './styles/TileStyleMaterials.jsx';
 import { StickerInstanceProvider } from './StickerInstances.jsx';
 import StickerAnimationDriver from './StickerAnimationDriver.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
@@ -647,6 +647,37 @@ const CubeAssembly = React.memo(({
   const wasExploding = useRef(false);
   const prevEfRef2 = useRef(0);
 
+  // Spin-energy tracking for reactive tile styles (orbChamber): derive the
+  // rotation's angular speed from liveRotation.angle frame-to-frame, feed it to
+  // the shared `spin` uniform with a fast attack / slow decay so the tiles keep
+  // jostling briefly after the turn settles.
+  const spinEnergyRef = useRef(0);
+  const prevRotAngleRef = useRef(0);
+  const wasRotActiveRef = useRef(false);
+  const prevSpinTimeRef = useRef(0);
+  const latchedSpinAxisRef = useRef(0);
+  const latchedSpinSliceRef = useRef(0);
+
+  // Per-cell dice-roll state: a data texture (R = roll count) indexed by grid
+  // cell, bumped for the rotating slice on every turn. The dice style folds it
+  // into its face hash so a cell that a tile revisits never repeats its face,
+  // while non-rotated cells hold. Rebuilt when the cube size changes.
+  const cellRollTexRef = useRef(null);
+  const cellRollDataRef = useRef(null);
+  useEffect(() => {
+    const w = size * size, h = size;
+    const data = new Uint8Array(w * h * 4);
+    for (let i = 0; i < w * h; i++) data[i * 4 + 3] = 255; // opaque
+    const tex = new THREE.DataTexture(data, w, h, THREE.RGBAFormat);
+    tex.minFilter = THREE.NearestFilter;
+    tex.magFilter = THREE.NearestFilter;
+    tex.needsUpdate = true;
+    cellRollDataRef.current = data;
+    cellRollTexRef.current = tex;
+    setDiceCellState(tex, size, (size - 1) / 2);
+    return () => tex.dispose();
+  }, [size]);
+
 
   useFrame(() => {
     const ef = explosionFactorRef.current;
@@ -798,6 +829,64 @@ const CubeAssembly = React.memo(({
     // Pre-compute tremor surge once so all StickerPlane instances read a shared
     // value instead of each independently running 3×sin + pow + max per frame.
     updateSharedTremor(state.clock.elapsedTime);
+
+    // Derive spin energy from the rotation in progress (reads liveRotation as
+    // filled by the previous frame — one-frame lag is imperceptible). Angular
+    // speed is normalized so a brisk quarter-turn saturates the effect; energy
+    // attacks instantly and decays smoothly so orbChamber balls keep bouncing
+    // for a moment after the layer settles.
+    {
+      const now = state.clock.elapsedTime;
+      const dt = Math.max(1e-3, now - prevSpinTimeRef.current);
+      prevSpinTimeRef.current = now;
+      const rotActive = liveRotation.active;
+      let angSpeed = 0;
+      if (rotActive && wasRotActiveRef.current) {
+        angSpeed = Math.abs(liveRotation.angle - prevRotAngleRef.current) / dt;
+      }
+      prevRotAngleRef.current = rotActive ? liveRotation.angle : 0;
+      // Dice: on the frame a turn begins, bump the roll count of every cell in
+      // the rotating slice so their dice re-roll to a fresh face and a returning
+      // cell never repeats. Non-rotated cells are untouched → they hold.
+      if (rotActive && !wasRotActiveRef.current && cellRollDataRef.current) {
+        const data = cellRollDataRef.current;
+        const n = size;
+        const ax = liveRotation.axis;
+        const si = liveRotation.sliceIndex;
+        for (let a = 0; a < n; a++) {
+          for (let b = 0; b < n; b++) {
+            let cx, cy, cz;
+            if (ax === 'col') { cx = si; cy = a; cz = b; }
+            else if (ax === 'row') { cx = a; cy = si; cz = b; }
+            else { cx = a; cy = b; cz = si; }
+            const off = (cz * (n * n) + cx + cy * n) * 4;
+            data[off] = (data[off] + 1) & 255;
+          }
+        }
+        cellRollTexRef.current.needsUpdate = true;
+      }
+      wasRotActiveRef.current = rotActive;
+      // ~6 rad/s (a fast quarter-turn) → full energy.
+      const target = rotActive ? Math.min(1, angSpeed / 6) : 0;
+      const e = spinEnergyRef.current;
+      spinEnergyRef.current = e < target ? target : e * 0.95;
+
+      // Latch which slice is turning (world coord along its axis) while active,
+      // and hold it through the energy decay so the just-moved tiles keep
+      // jostling. Cubie centers sit at (index - k) * expansionFactor; the slice's
+      // axis coordinate is invariant under its own rotation, so this identifies
+      // exactly the tiles that moved.
+      if (rotActive) {
+        latchedSpinAxisRef.current =
+          liveRotation.axis === 'row' ? 1 : liveRotation.axis === 'depth' ? 2 : 0;
+        const kCenter = (size - 1) / 2;
+        const expMult = size >= 4 ? 1.53 : 1.8;
+        const exp = 1 + explosionFactorRef.current * expMult;
+        latchedSpinSliceRef.current = (liveRotation.sliceIndex - kCenter) * exp;
+      }
+      updateSharedSpin(spinEnergyRef.current, latchedSpinAxisRef.current, latchedSpinSliceRef.current);
+      updateDiceRoll(dt, spinEnergyRef.current);
+    }
 
 
     // Apply live drag rotation - instant, follows finger

@@ -1,7 +1,8 @@
 // New tile style shaders: stainedGlass, fingerprint, topographic, mandelbrot, penrose,
 //                         oilSlick, constellation, waveform, dnaHelix, neonSign,
 //                         prismBloom, magnetFlux, liquidChrome, auroraWeave, plasmaCells,
-//                         quantumScanlines, emberstorm, fractalPulse, bioLattice, stellarLensing
+//                         quantumScanlines, emberstorm, fractalPulse, bioLattice, stellarLensing,
+//                         orbChamber, liquidTank, dice, sandChamber, lavaLamp
 
 export const newStyleShaders = {
   // Stained Glass - cathedral leaded glass with radial + concentric segments
@@ -474,6 +475,781 @@ export const newStyleShaders = {
       float ring = smoothstep(0.34, 0.30, abs(length(d) - 0.28));
       vec3 starColor = mix(vec3(1.0), baseColor * 1.5, 0.5);
       vec3 col = baseColor * 0.06 + starColor * stars + baseColor * ring * 0.9;
+      gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+    }
+  `,
+
+  // Orb Chamber - glass porthole with a recessed, face-colored sphere inside.
+  // On a corner cubelet the three exposed stickers read as three colored balls.
+  // The ball is genuinely ray-traced behind the glass in the tile's tangent
+  // space, so it parallaxes against its chamber wall as the cube rotates — the
+  // depth cue that actually sells the 3D illusion (a flat painted sphere can't).
+  // Three balls sitting on the chamber floor, rolling and bouncing off walls
+  // and each other. Triangle-wave paths give sharp wall ricochets; pairwise
+  // repulsion handles ball-ball collisions. Spin jostle scatters them hard.
+  orbChamber: `
+    uniform vec3 baseColor;
+    uniform vec3 antipodalColor;
+    uniform float time;
+    uniform float spin;
+    uniform float spinAxis;
+    uniform float spinSlice;
+    uniform float diceRoll;
+    varying vec2 vUv;
+    varying vec3 vNormal;
+    varying vec3 vViewPosition;
+    varying vec3 vTileCenter;
+
+    float raySphere(vec3 ro, vec3 rd, vec3 sc, float sr) {
+      vec3 oc = ro - sc;
+      float b = dot(oc, rd);
+      float c = dot(oc, oc) - sr * sr;
+      float h = b * b - c;
+      return (h > 0.0) ? (-b - sqrt(h)) : -1.0;
+    }
+
+    // Triangle wave: linear motion with sharp reversals at walls → [-1, 1].
+    float tri(float t) { return abs(fract(t * 0.5 + 0.25) * 2.0 - 1.0) * 2.0 - 1.0; }
+
+    void main() {
+      vec2 p = vUv - 0.5;
+      float r = length(p);
+
+      vec3 pos = -vViewPosition;
+      vec3 dpdx = dFdx(pos);
+      vec3 dpdy = dFdy(pos);
+      vec2 duvx = dFdx(vUv);
+      vec2 duvy = dFdy(vUv);
+      vec3 N = normalize(vNormal);
+      vec3 dp2perp = cross(dpdy, N);
+      vec3 dp1perp = cross(N, dpdx);
+      vec3 T = dp2perp * duvx.x + dp1perp * duvy.x;
+      vec3 B = dp2perp * duvx.y + dp1perp * duvy.y;
+      float invmax = inversesqrt(max(dot(T, T), dot(B, B)));
+      T *= invmax; B *= invmax;
+
+      vec3 V = normalize(vViewPosition);
+      vec3 vT = vec3(dot(V, T), dot(V, B), dot(V, N));
+
+      vec3 ro = vec3(p, 0.0);
+      vec3 rd = normalize(-vT);
+
+      float boxDepth = 0.6;
+      float bR = 0.09;
+      float floorZ = -(boxDepth - bR - 0.01);
+      float wallExtent = 0.34;
+
+      // diceRoll accumulates during every rotation → each ball uses it as a
+      // phase offset with different multipliers so rotations scramble all
+      // three paths independently instead of orbiting in sync.
+      float dr = diceRoll;
+
+      vec3 c0 = vec3(tri(time * 0.37 + dr * 1.13       ) * wallExtent,
+                     tri(time * 0.29 + dr * 0.87 + 0.73) * wallExtent,
+                     floorZ);
+      vec3 c1 = vec3(tri(time * 0.43 + dr * 1.51 + 1.90) * wallExtent,
+                     tri(time * 0.31 + dr * 0.63 + 2.50) * wallExtent,
+                     floorZ);
+      vec3 c2 = vec3(tri(time * 0.33 + dr * 1.29 + 3.80) * wallExtent,
+                     tri(time * 0.41 + dr * 0.97 + 4.30) * wallExtent,
+                     floorZ);
+
+      // Slice membership.
+      float axisCoord = spinAxis < 0.5 ? vTileCenter.x
+                      : spinAxis < 1.5 ? vTileCenter.y
+                      : vTileCenter.z;
+      float member = 1.0 - smoothstep(0.55, 0.78, abs(axisCoord - spinSlice));
+      float sp = clamp(spin * member, 0.0, 1.0);
+
+      // sqrt extends the tail so balls keep knocking around well after
+      // the layer settles (sp=0.04 → spSlow=0.2 → still visible bounce).
+      float spSlow = sqrt(sp);
+      float bounce = spSlow * 0.38;
+      c0.x += sin(time * 21.0) * bounce + sin(time * 13.3 + 1.7) * bounce * 0.7;
+      c0.y += cos(time * 18.5 + 0.6) * bounce + sin(time * 11.1) * bounce * 0.5;
+
+      c1.x += cos(time * 19.3 + 0.9) * bounce + sin(time * 14.7) * bounce * 0.6;
+      c1.y += sin(time * 22.1 + 1.4) * bounce + cos(time * 12.3) * bounce * 0.5;
+
+      c2.x += sin(time * 17.9 + 2.4) * bounce + cos(time * 15.9 + 0.3) * bounce * 0.7;
+      c2.y += cos(time * 24.3 + 3.7) * bounce + sin(time * 10.7) * bounce * 0.4;
+
+      // Clamp to walls FIRST so jostle can't push balls outside before collision
+      // resolution — otherwise two balls jostled past the same wall snap onto the
+      // same clamped corner and render as one merged sphere.
+      float wlo = -wallExtent; float whi = wallExtent;
+      c0.xy = clamp(c0.xy, vec2(wlo), vec2(whi));
+      c1.xy = clamp(c1.xy, vec2(wlo), vec2(whi));
+      c2.xy = clamp(c2.xy, vec2(wlo), vec2(whi));
+
+      // Pairwise collision repulsion (2D since they share the floor).
+      float minSep = bR * 2.3;
+      vec2 d01 = c1.xy - c0.xy; float len01 = max(length(d01), 0.001);
+      float push01 = max(0.0, minSep - len01) * 0.55;
+      vec2 n01 = d01 / len01;
+      c0.xy -= n01 * push01; c1.xy += n01 * push01;
+
+      vec2 d02 = c2.xy - c0.xy; float len02 = max(length(d02), 0.001);
+      float push02 = max(0.0, minSep - len02) * 0.55;
+      vec2 n02 = d02 / len02;
+      c0.xy -= n02 * push02; c2.xy += n02 * push02;
+
+      vec2 d12 = c2.xy - c1.xy; float len12 = max(length(d12), 0.001);
+      float push12 = max(0.0, minSep - len12) * 0.55;
+      vec2 n12 = d12 / len12;
+      c1.xy -= n12 * push12; c2.xy += n12 * push12;
+
+      // Final clamp after collision resolution (repulsion can push past walls).
+      c0.xy = clamp(c0.xy, vec2(wlo), vec2(whi));
+      c1.xy = clamp(c1.xy, vec2(wlo), vec2(whi));
+      c2.xy = clamp(c2.xy, vec2(wlo), vec2(whi));
+
+      // Light angled from above-left.
+      vec3 L = normalize(vec3(-0.4, 0.55, 0.72));
+
+      // Ray-sphere intersection: test all 3, pick nearest hit.
+      float t0 = raySphere(ro, rd, c0, bR);
+      float t1 = raySphere(ro, rd, c1, bR);
+      float t2 = raySphere(ro, rd, c2, bR);
+
+      float tHit = -1.0;
+      vec3 hitCenter = c0;
+      if (t0 > 0.0) { tHit = t0; hitCenter = c0; }
+      if (t1 > 0.0 && (tHit < 0.0 || t1 < tHit)) { tHit = t1; hitCenter = c1; }
+      if (t2 > 0.0 && (tHit < 0.0 || t2 < tHit)) { tHit = t2; hitCenter = c2; }
+
+      vec3 interior;
+      if (tHit > 0.0) {
+        vec3 hp = ro + rd * tHit;
+        vec3 nrm = normalize(hp - hitCenter);
+        vec3 toEye = -rd;
+        vec3 hlf = normalize(L + toEye);
+        float diff = max(dot(nrm, L), 0.0);
+        float spec = pow(max(dot(nrm, hlf), 0.0), 48.0);
+        float fres = pow(1.0 - max(dot(nrm, toEye), 0.0), 3.0);
+
+        vec3 ballDark = antipodalColor * 0.16;
+        vec3 ballLit  = antipodalColor * 1.05;
+        interior = mix(ballDark, ballLit, diff);
+        interior += vec3(1.0) * spec * 0.8;
+        interior += mix(antipodalColor * 1.3, vec3(1.0), 0.4) * fres * 0.4;
+      } else {
+        // Missed all balls → floor with contact shadows beneath each ball.
+        float tb = -boxDepth / min(rd.z, -0.001);
+        vec3 wp = ro + rd * tb;
+        float wv = 1.0 - smoothstep(0.15, 0.72, length(wp.xy));
+        interior = baseColor * (0.18 + wv * 0.32);
+
+        // Contact shadows: tight dark circles directly under each ball.
+        float shad = smoothstep(bR * 1.4, bR * 0.3, length(wp.xy - c0.xy))
+                   + smoothstep(bR * 1.4, bR * 0.3, length(wp.xy - c1.xy))
+                   + smoothstep(bR * 1.4, bR * 0.3, length(wp.xy - c2.xy));
+        interior *= 1.0 - min(shad, 1.0) * 0.6;
+
+        float haze = 0.5 + 0.5 * sin((wp.x + wp.y) * 10.0 + time * 0.5);
+        interior += baseColor * haze * 0.04 * wv;
+      }
+
+      // ── Glass front.
+      float rim = smoothstep(0.34, 0.49, r) * (1.0 - smoothstep(0.48, 0.51, r));
+      vec3 rimCol = mix(baseColor * 1.2, vec3(0.75, 0.95, 1.0), 0.65);
+
+      float slash = smoothstep(0.035, 0.0, abs((p.x + p.y * 0.55) - 0.1));
+      slash *= smoothstep(0.46, 0.08, r);
+
+      float glint = smoothstep(0.06, 0.0, length(p - vec2(-0.17, 0.19)));
+      glint *= 0.75 + 0.25 * sin(time * 1.4);
+
+      float chamber = 1.0 - smoothstep(0.47, 0.505, r);
+
+      vec3 col = interior;
+      col += rimCol * rim * 0.75;
+      col += vec3(1.0) * slash * 0.1;
+      col += vec3(1.0, 0.95, 0.82) * glint * 0.45;
+
+      vec3 frame = baseColor * 0.03;
+      col = mix(frame, col, chamber);
+
+      gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+    }
+  `,
+
+  // Liquid Tank - each tile is a little glass tank. The liquid (antipodal color)
+  // stays level to real-world gravity as you orbit the cube, refracts a parallax
+  // caustic floor, and sloshes when its slice is turned. Side faces show a
+  // waterline; top/bottom faces show a top-down shimmering pool. The liquid is
+  // the antipodal color; the tank/air/frame is this face's color (no black).
+  liquidTank: `
+    uniform vec3 baseColor;
+    uniform vec3 antipodalColor;
+    uniform float time;
+    uniform float spin;
+    uniform float spinAxis;
+    uniform float spinSlice;
+    varying vec2 vUv;
+    varying vec3 vNormal;
+    varying vec3 vViewPosition;
+    varying vec3 vTileCenter;
+    varying vec3 vWorldPos;
+    varying vec3 vWorldNormal;
+
+    // Cheap domain-warped caustic web (bright thin lines).
+    float caustic(vec2 pt, float t) {
+      vec2 q = pt;
+      q += 0.4 * vec2(sin(q.y * 3.0 + t), cos(q.x * 3.1 - t * 0.9));
+      float v = sin(q.x * 6.0 + t * 1.3) + sin(q.y * 6.3 - t * 1.1) + sin((q.x + q.y) * 4.0 + t * 0.7);
+      return pow(0.5 + 0.5 * sin(v * 1.2), 4.0);
+    }
+
+    void main() {
+      vec2 p = vUv - 0.5;
+
+      // Rounded-rectangle tank window (SDF: <0 inside).
+      vec2 qd = abs(p) - vec2(0.44);
+      float rr = min(max(qd.x, qd.y), 0.0) + length(max(qd, vec2(0.0))) - 0.05;
+      float chamber = 1.0 - smoothstep(0.0, 0.015, rr);
+
+      // Tangent frame from screen derivatives (UV-aligned) → maps tangent→view.
+      vec3 pos = -vViewPosition;
+      vec3 dpdx = dFdx(pos);
+      vec3 dpdy = dFdy(pos);
+      vec2 duvx = dFdx(vUv);
+      vec2 duvy = dFdy(vUv);
+      vec3 N = normalize(vNormal);
+      vec3 dp2perp = cross(dpdy, N);
+      vec3 dp1perp = cross(N, dpdx);
+      vec3 T = dp2perp * duvx.x + dp1perp * duvy.x;
+      vec3 B = dp2perp * duvx.y + dp1perp * duvy.y;
+      float invmax = inversesqrt(max(dot(T, T), dot(B, B)));
+      T *= invmax; B *= invmax;
+      vec3 V = normalize(vViewPosition);
+      vec3 vT = vec3(dot(V, T), dot(V, B), dot(V, N));
+
+      // Ray into the tank; the back wall gives the floor a parallax depth cue.
+      vec3 ro = vec3(p, 0.0);
+      vec3 rd = normalize(-vT);
+      float boxDepth = 0.5;
+      float tb = -boxDepth / min(rd.z, -0.001);
+      vec2 floorUv = (ro + rd * tb).xy;   // parallaxed floor sample point
+
+      // Slice membership → only the tiles being turned slosh.
+      float axisCoord = spinAxis < 0.5 ? vTileCenter.x
+                      : spinAxis < 1.5 ? vTileCenter.y
+                      : vTileCenter.z;
+      float member = 1.0 - smoothstep(0.55, 0.78, abs(axisCoord - spinSlice));
+      float sp = clamp(spin * member, 0.0, 1.0);
+
+      // Face orientation: 1 on top/bottom (gravity-perpendicular), 0 on sides.
+      float gUp = abs(dot(normalize(vWorldNormal), vec3(0.0, 1.0, 0.0)));
+
+      // Gravity-aligned coords (vertical = world Y) so the waterline stays level.
+      vec3 wofs = vWorldPos - vTileCenter;
+      float hv = wofs.y;
+      float hh = wofs.x - wofs.z;
+
+      // Waterline height (world-vertical): idle ripple + violent slosh on turns.
+      float surface = 0.06
+        + sin(hh * 8.0 + time * 1.6) * 0.016
+        + sin(hh * 5.0 - time * 1.1) * 0.010
+        + hh * sin(time * 8.0) * 0.55 * sp
+        + sin(hh * 15.0 - time * 20.0) * 0.05 * sp;
+      float belowness = surface - hv;
+      float waterSide = smoothstep(-0.015, 0.02, belowness);
+      // Top/bottom faces read as a full pool viewed from above.
+      float water = mix(waterSide, 1.0, gUp);
+
+      // Depth drives color richness + how much the caustic floor shows through.
+      float depth = mix(clamp(belowness * 1.1, 0.05, 1.0), 0.5, gUp);
+
+      // Parallax caustic floor (two octaves; shifts with view = real depth).
+      float ca = caustic(floorUv * 3.2 + vTileCenter.xy * 2.0, time * 0.8)
+               + 0.5 * caustic(floorUv * 6.0 - vTileCenter.xy, time * 1.15);
+
+      // Liquid (antipodal): bright shallow → saturated deep. Never black.
+      vec3 shallow = mix(antipodalColor, vec3(1.0), 0.30);
+      vec3 deep    = antipodalColor * 0.6;
+      vec3 liquid  = mix(shallow, deep, depth);
+      liquid += antipodalColor * ca * (0.55 - depth * 0.3);
+      liquid = max(liquid, antipodalColor * 0.42);
+      // Sunlit band just under the surface (side faces).
+      liquid += mix(antipodalColor * 1.2, vec3(1.0), 0.4) * smoothstep(0.09, 0.0, belowness) * (1.0 - gUp) * 0.4;
+
+      // Air above the waterline (side faces): this face's color, bright, with a
+      // faint hint of the caustic floor. No black.
+      vec3 air = baseColor * 0.82 + baseColor * ca * 0.06;
+
+      vec3 col = mix(air, liquid, water);
+
+      // Reflective surface: glancing fresnel sheen + moving specular streaks.
+      float fres = pow(1.0 - max(vT.z, 0.0), 3.0);
+      float streak = pow(0.5 + 0.5 * sin(hh * 22.0 - time * 4.0 + ca * 3.0), 12.0);
+      vec3 sheen = mix(vec3(1.0), shallow, 0.3);
+      col += sheen * (fres * 0.22 + streak * 0.35 * water);
+
+      // Meniscus surface line (side faces only).
+      float surfBand = smoothstep(0.03, 0.0, abs(belowness)) * (1.0 - gUp);
+      col += mix(antipodalColor * 1.3, vec3(1.0), 0.6) * surfBand * 0.85;
+
+      // Rising bubbles as bright rings (no black centers), only within liquid.
+      for (int i = 0; i < 3; i++) {
+        float fi = float(i);
+        float speed = 0.2 + fi * 0.1 + sp * 0.7;
+        vec2 bp = vec2(sin(fi * 2.7 + time * (0.4 + fi * 0.2)) * 0.26,
+                       fract(fi * 0.4 + time * speed) * 0.72 - 0.4);
+        float d = length(p - bp);
+        float ring = smoothstep(0.03, 0.023, d) - smoothstep(0.019, 0.012, d);
+        col += vec3(1.0) * max(ring, 0.0) * water * 0.5;
+      }
+
+      // Glass tank front: bright inner rim + a diagonal reflection.
+      float rimEdge = smoothstep(0.05, 0.0, abs(rr + 0.025));
+      col += mix(baseColor * 1.3, vec3(1.0), 0.5) * rimEdge * 0.5;
+      float slash = smoothstep(0.03, 0.0, abs((p.x + p.y * 0.5) - 0.14)) * smoothstep(0.42, 0.05, length(p));
+      col += vec3(1.0) * slash * 0.08;
+
+      // Frame outside the tank: this face's color (bright), never black.
+      vec3 frame = baseColor * 0.72;
+      col = mix(frame, col, chamber);
+
+      gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+    }
+  `,
+
+  // Dice - a ray-traced six-sided die floating in each tile's glass chamber.
+  // Every tile seeds its own tumble from its world position, so all dice rotate
+  // independently; a slice turn spins that slice's dice up hard. Die body is the
+  // antipodal color, chamber is this face's color.
+  dice: `
+    precision highp float;                 // box intersection needs highp on mobile
+    uniform vec3 baseColor;
+    uniform vec3 antipodalColor;
+    uniform float time;
+    uniform float spin;
+    uniform float spinAxis;
+    uniform float spinSlice;
+    uniform sampler2D cellRoll;             // per-cell roll count (R channel, 0..255)
+    uniform float cellGridN;                // grid cells per axis (cube size)
+    uniform float cellK;                    // (size-1)/2 → maps world coord to cell index
+    varying vec2 vUv;
+    varying vec3 vNormal;
+    varying vec3 vViewPosition;
+    varying vec3 vTileCenter;
+
+    mat3 rotX(float a) { float c = cos(a), s = sin(a); return mat3(1.0, 0.0, 0.0, 0.0, c, s, 0.0, -s, c); }
+    mat3 rotY(float a) { float c = cos(a), s = sin(a); return mat3(c, 0.0, -s, 0.0, 1.0, 0.0, s, 0.0, c); }
+
+    // Antialiased pip: smoothstep width follows the on-screen pixel size so the
+    // dots don't shimmer/speckle when the die is small or spinning fast.
+    float pipDot(vec2 fc, vec2 c) {
+      float d = length(fc - c);
+      float w = fwidth(d) + 0.006;
+      return smoothstep(0.15 + w, 0.15 - w, d);
+    }
+    // Standard die pip layout for face value v (1..6).
+    float pipMask(vec2 fc, float v) {
+      float m = 0.0;
+      if (mod(v, 2.0) > 0.5) m = max(m, pipDot(fc, vec2(0.0)));            // center: 1,3,5
+      if (v > 1.5) { m = max(m, pipDot(fc, vec2(-0.5, 0.5)));             // TL+BR: 2+
+                     m = max(m, pipDot(fc, vec2(0.5, -0.5))); }
+      if (v > 3.5) { m = max(m, pipDot(fc, vec2(0.5, 0.5)));              // TR+BL: 4+
+                     m = max(m, pipDot(fc, vec2(-0.5, -0.5))); }
+      if (v > 5.5) { m = max(m, pipDot(fc, vec2(-0.5, 0.0)));             // ML+MR: 6
+                     m = max(m, pipDot(fc, vec2(0.5, 0.0))); }
+      return m;
+    }
+
+    void main() {
+      vec2 p = vUv - 0.5;
+      float r = length(p);
+
+      // Tangent frame (UV-aligned) from screen derivatives → tangent→view.
+      vec3 pos = -vViewPosition;
+      vec3 dpdx = dFdx(pos); vec3 dpdy = dFdy(pos);
+      vec2 duvx = dFdx(vUv); vec2 duvy = dFdy(vUv);
+      vec3 N = normalize(vNormal);
+      vec3 dp2perp = cross(dpdy, N);
+      vec3 dp1perp = cross(N, dpdx);
+      vec3 T = dp2perp * duvx.x + dp1perp * duvy.x;
+      vec3 B = dp2perp * duvx.y + dp1perp * duvy.y;
+      float invmax = inversesqrt(max(dot(T, T), dot(B, B)));
+      T *= invmax; B *= invmax;
+      vec3 V = normalize(vViewPosition);
+      vec3 vT = vec3(dot(V, T), dot(V, B), dot(V, N));
+
+      vec3 ro = vec3(p, 0.0);
+      vec3 rd = normalize(-vT);
+      float boxDepth = 0.6;
+
+      // Snap tile center to nearest grid point so the seed stays stable while
+      // cubies are mid-rotation (modelMatrix[3] drifts continuously during a
+      // turn, producing random hash noise if fed straight into the seed).
+      vec3 snapped = round(vTileCenter);
+
+      // Slice membership → only the tiles being turned spin up / get thrown.
+      // axisCoord uses the raw vTileCenter: the coordinate along the rotation
+      // axis is invariant under that rotation, so it's always exact.
+      float axisCoord = spinAxis < 0.5 ? vTileCenter.x
+                      : spinAxis < 1.5 ? vTileCenter.y
+                      : vTileCenter.z;
+      float member = 1.0 - smoothstep(0.55, 0.78, abs(axisCoord - spinSlice));
+      float sp = clamp(spin * member, 0.0, 1.0);
+
+      // How many times this die's grid cell has been rotated through. Folded
+      // into the seed so a cell that returns later shows a FRESH face (the count
+      // only ever rises), while non-rotated cells keep their count → same face.
+      vec3 gcell = clamp(snapped + vec3(cellK), vec3(0.0), vec3(cellGridN - 1.0));
+      float texelX = gcell.x + gcell.y * cellGridN;
+      float u = (texelX + 0.5) / (cellGridN * cellGridN);
+      float v = (gcell.z + 0.5) / cellGridN;
+      float rollN = texture2D(cellRoll, vec2(u, v)).r * 255.0;
+
+      // Per-tile seed from snapped center + roll count → stable during rotation.
+      float seed = fract(sin(dot(snapped.xy + snapped.z * 1.7 + rollN * 1.7, vec2(12.9898, 78.233))) * 43758.5453);
+      float seed2 = fract(seed * 7.31 + 0.137 + rollN * 0.313);
+
+      // Rest orientation from snapped cell + roll count — rotated tiles land at a
+      // new cell (and that slice's counts were just bumped) so their die face
+      // changes; non-rotated tiles keep their cell and count, holding their face.
+      float sp2 = sp * sp;
+      float ra = seed * 20.0 + sp2 * (6.283 + seed * 3.0);
+      float rb = seed2 * 20.0 + sp2 * (4.712 + seed2 * 2.5);
+      mat3 R    = rotY(rb) * rotX(ra);          // die local → chamber space
+      mat3 Rinv = rotX(-ra) * rotY(-rb);        // inverse (avoids transpose())
+
+      // Die center: only jostle while its slice turns.
+      vec3 sc = vec3(sin(time * 15.0) * 0.15 * sp2,
+                     -0.02 + cos(time * 13.0) * 0.15 * sp2,
+                     -0.34 + sin(time * 11.0) * 0.06 * sp2);
+      float bhalf = 0.22;
+
+      // Ray/box (slab) intersection in the die's local space.
+      vec3 roL = Rinv * (ro - sc);
+      vec3 rdL = Rinv * rd;
+      // Guard the reciprocal: as the die tumbles, rdL components pass through 0,
+      // and 1.0/0 overflows to Inf/NaN (garbage speckle in mediump on mobile).
+      // Nudge near-zero components to a small finite value → ray treated as
+      // parallel to that slab, which is the correct limit.
+      vec3 rdSafe = rdL + step(abs(rdL), vec3(1e-3)) * 1e-3;
+      vec3 mi = 1.0 / rdSafe;
+      vec3 nq = mi * roL;
+      vec3 kq = abs(mi) * bhalf;
+      vec3 t1 = -nq - kq;
+      vec3 t2 = -nq + kq;
+      float tN = max(max(t1.x, t1.y), t1.z);
+      float tF = min(min(t2.x, t2.y), t2.z);
+
+      vec3 interior;
+      if (tN <= tF && tF > 0.0) {
+        // Local face normal (exactly one axis).
+        vec3 oN = -sign(rdL) * step(t1.yzx, t1.xyz) * step(t1.zxy, t1.xyz);
+        vec3 hitL = roL + rdL * tN;
+        // Face value (opposite faces sum to 7) and in-face coords.
+        float faceVal; vec2 fc;
+        if (abs(oN.x) > 0.5)      { faceVal = oN.x > 0.0 ? 1.0 : 6.0; fc = hitL.zy; }
+        else if (abs(oN.y) > 0.5) { faceVal = oN.y > 0.0 ? 2.0 : 5.0; fc = hitL.xz; }
+        else                      { faceVal = oN.z > 0.0 ? 3.0 : 4.0; fc = hitL.xy; }
+        fc /= bhalf;
+
+        vec3 nrm = R * oN;
+        vec3 L = normalize(vec3(-0.4, 0.55, 0.75));
+        vec3 toEye = -rd;
+        vec3 hlf = normalize(L + toEye);
+        float diff = max(dot(nrm, L), 0.0);
+        float spec = pow(max(dot(nrm, hlf), 0.0), 36.0);
+
+        vec3 dieBody = mix(antipodalColor, vec3(1.0), 0.55);   // colored die body
+        vec3 pipCol  = antipodalColor * 0.22;                  // dark (not black) pips
+        vec3 faceCol = mix(dieBody, pipCol, pipMask(fc, faceVal));
+        // Bevel: darken toward face edges so the cube edges read.
+        float edge = smoothstep(1.0, 0.86, max(abs(fc.x), abs(fc.y)));
+        faceCol *= 0.72 + 0.28 * edge;
+
+        interior = faceCol * (0.32 + 0.68 * diff);
+        interior += vec3(1.0) * spec * 0.5;
+      } else {
+        // Miss → chamber back wall.
+        float tb = -boxDepth / min(rd.z, -0.001);
+        vec3 wp = ro + rd * tb;
+        float wv = 1.0 - smoothstep(0.15, 0.72, length(wp.xy));
+        interior = baseColor * (0.14 + wv * 0.30);
+        float haze = 0.5 + 0.5 * sin((wp.x + wp.y) * 10.0 + time * 0.5);
+        interior += baseColor * haze * 0.03 * wv;
+      }
+
+      // Glass front (surface-locked): rim, reflection slash, glint.
+      float rim = smoothstep(0.34, 0.49, r) * (1.0 - smoothstep(0.48, 0.51, r));
+      vec3 rimCol = mix(baseColor * 1.2, vec3(0.8, 0.95, 1.0), 0.6);
+      float slash = smoothstep(0.035, 0.0, abs((p.x + p.y * 0.55) - 0.1));
+      slash *= smoothstep(0.46, 0.08, r);
+      float glint = smoothstep(0.06, 0.0, length(p - vec2(-0.17, 0.19)));
+      glint *= 0.75 + 0.25 * sin(time * 1.4);
+      float chamber = 1.0 - smoothstep(0.47, 0.505, r);
+
+      vec3 col = interior;
+      col += rimCol * rim * 0.7;
+      col += vec3(1.0) * slash * 0.1;
+      col += vec3(1.0, 0.95, 0.82) * glint * 0.4;
+      vec3 frame = baseColor * 0.03;
+      col = mix(frame, col, chamber);
+
+      gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+    }
+  `,
+
+  // Sand Chamber - a jar of grainy sand that piles at real-world down and stays
+  // level as you orbit. When a slice turns, the tile reorients, so the sand
+  // pours to the new low side and re-settles (and grains kick up mid-turn).
+  // Sand is the antipodal color; jar/air/frame is this face's color (no black).
+  sandChamber: `
+    precision highp float;
+    uniform vec3 baseColor;
+    uniform vec3 antipodalColor;
+    uniform float time;
+    uniform float spin;
+    uniform float spinAxis;
+    uniform float spinSlice;
+    varying vec2 vUv;
+    varying vec3 vNormal;
+    varying vec3 vViewPosition;
+    varying vec3 vTileCenter;
+    varying vec3 vWorldPos;
+    varying vec3 vWorldNormal;
+
+    float hash21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+    float vnoise(vec2 p) {
+      vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+      float a = hash21(i), b = hash21(i + vec2(1.0, 0.0)), c = hash21(i + vec2(0.0, 1.0)), d = hash21(i + vec2(1.0, 1.0));
+      return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+    }
+
+    void main() {
+      vec2 p = vUv - 0.5;
+
+      // Rounded-rectangle jar.
+      vec2 qd = abs(p) - vec2(0.44);
+      float rr = min(max(qd.x, qd.y), 0.0) + length(max(qd, vec2(0.0))) - 0.05;
+      float chamber = 1.0 - smoothstep(0.0, 0.015, rr);
+
+      // Tangent frame → parallax back wall for the empty region.
+      vec3 pos = -vViewPosition;
+      vec3 dpdx = dFdx(pos); vec3 dpdy = dFdy(pos);
+      vec2 duvx = dFdx(vUv); vec2 duvy = dFdy(vUv);
+      vec3 N = normalize(vNormal);
+      vec3 dp2perp = cross(dpdy, N);
+      vec3 dp1perp = cross(N, dpdx);
+      vec3 T = dp2perp * duvx.x + dp1perp * duvy.x;
+      vec3 Bt = dp2perp * duvx.y + dp1perp * duvy.y;
+      float invmax = inversesqrt(max(dot(T, T), dot(Bt, Bt)));
+      T *= invmax; Bt *= invmax;
+      vec3 V = normalize(vViewPosition);
+      vec3 vT = vec3(dot(V, T), dot(V, Bt), dot(V, N));
+      vec3 ro = vec3(p, 0.0);
+      vec3 rd = normalize(-vT);
+      float tb = -0.5 / min(rd.z, -0.001);
+      vec2 wallUv = (ro + rd * tb).xy;
+
+      // Slice membership → only turning tiles pour / kick up grains.
+      float axisCoord = spinAxis < 0.5 ? vTileCenter.x
+                      : spinAxis < 1.5 ? vTileCenter.y
+                      : vTileCenter.z;
+      float member = 1.0 - smoothstep(0.55, 0.78, abs(axisCoord - spinSlice));
+      float sp = clamp(spin * member, 0.0, 1.0);
+
+      // Face orientation + gravity-aligned coords (vertical = world Y).
+      float gUp = abs(dot(normalize(vWorldNormal), vec3(0.0, 1.0, 0.0)));
+      vec3 wofs = vWorldPos - vTileCenter;
+      float hv = wofs.y;
+      float hh = wofs.x - wofs.z;
+
+      // Sand surface (world-vertical): jagged grainy crest, churned + tilted
+      // while the slice turns (the world-level pour itself is automatic — the
+      // tile reorients, so hv sweeps and the sand region follows gravity).
+      float jag   = (vnoise(vec2(hh * 7.0 + vTileCenter.x * 5.0, time * 0.3)) - 0.5) * 0.05;
+      float churn = (vnoise(vec2(hh * 10.0, time * 3.0)) - 0.5) * 0.06 * sp;
+      float slope = hh * 0.5 * sp;
+      float sandLevel = 0.02 + jag + churn + slope;
+      float belowness = sandLevel - hv;
+      float sandSide = smoothstep(-0.02, 0.02, belowness);
+      float sand = mix(sandSide, 1.0, gUp);   // top/bottom faces = a full sand bed
+
+      // Grain texture (per-tile varied, stable on the tile face).
+      vec2 gco = (p + 0.5) * 55.0 + vTileCenter.xy * 17.0;
+      float grain = vnoise(gco * 0.5) * 0.6 + hash21(floor(gco)) * 0.4;
+      vec3 sandDark  = antipodalColor * 0.55;
+      vec3 sandLight = mix(antipodalColor, vec3(1.0), 0.38);
+      vec3 sandCol = mix(sandDark, sandLight, grain);
+      float depthT = clamp(belowness, 0.0, 1.0);
+      sandCol *= mix(1.0, 0.72, depthT * (1.0 - gUp));                        // deeper = darker (sides)
+      sandCol += sandLight * smoothstep(0.05, 0.0, belowness) * (1.0 - gUp) * 0.35; // sunlit crest
+      sandCol = max(sandCol, antipodalColor * 0.45);                         // never black
+
+      // Air above the sand: this face's color with a faint parallax back wall.
+      vec3 air = baseColor * 0.8 + baseColor * (vnoise(wallUv * 6.0) - 0.5) * 0.06;
+
+      vec3 col = mix(air, sandCol, sand);
+
+      // Grainy crest highlight (side faces).
+      col += sandLight * smoothstep(0.03, 0.0, abs(belowness)) * (1.0 - gUp) * 0.4;
+
+      // Falling grains during a pour (only while the slice turns).
+      for (int i = 0; i < 5; i++) {
+        float fi = float(i);
+        float gx = (hash21(vec2(fi, 3.1)) - 0.5) * 0.55;
+        float gy = 0.42 - fract(hash21(vec2(fi, 7.7)) + time * (1.6 + fi * 0.25)) * 0.85;
+        col += sandLight * smoothstep(0.018, 0.006, length(p - vec2(gx, gy))) * sp * 0.7;
+      }
+
+      // Glass jar front: bright inner rim + a diagonal reflection.
+      float rimEdge = smoothstep(0.05, 0.0, abs(rr + 0.025));
+      col += mix(baseColor * 1.3, vec3(1.0), 0.5) * rimEdge * 0.5;
+      float slash = smoothstep(0.03, 0.0, abs((p.x + p.y * 0.5) - 0.14)) * smoothstep(0.42, 0.05, length(p));
+      col += vec3(1.0) * slash * 0.06;
+
+      // Frame outside the jar: this face's color (bright), never black.
+      vec3 frame = baseColor * 0.72;
+      col = mix(frame, col, chamber);
+
+      gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+    }
+  `,
+
+  // Lava Lamp - metaball blobs raymarched in true depth behind the glass. The
+  // blobs rise/fall along real-world gravity, morph (pulsing radii), and merge /
+  // pinch off as they pass — the classic lava-lamp motion. Lava is the antipodal
+  // color; the fluid/glass/frame is this face's color (no black).
+  lavaLamp: `
+    precision highp float;
+    uniform vec3 baseColor;
+    uniform vec3 antipodalColor;
+    uniform float time;
+    uniform float spin;
+    uniform float spinAxis;
+    uniform float spinSlice;
+    varying vec2 vUv;
+    varying vec3 vNormal;
+    varying vec3 vViewPosition;
+    varying vec3 vTileCenter;
+    varying vec3 vWorldNormal;
+
+    // Metaball scalar field. Blobs bob along gravity (upT), sway (rightT), pulse
+    // their radius (morph), and get thrown while the slice turns (jit). A wide
+    // flat puddle sits at the bottom so blobs neck off from it like a real lamp.
+    float lavaField(vec3 q, vec2 upT, vec2 rightT, float t, float ph, float jit) {
+      float f = 0.0;
+      for (int i = 0; i < 4; i++) {
+        float fi = float(i);
+        float travel = sin(t * (0.16 + 0.03 * fi) + ph + fi * 2.1);   // -1..1 slow rise/fall
+        float yy = travel * 0.32;
+        float xx = sin(t * (0.11 + 0.03 * fi) + ph + fi * 1.3) * 0.11 + sin(travel * 3.0) * 0.03;
+        float zz = -0.26 + sin(t * 0.22 + fi * 1.7) * 0.10;
+        xx += sin(t * 15.0 + fi) * 0.08 * jit;
+        yy += cos(t * 13.0 + fi) * 0.08 * jit;
+        vec2 c2 = rightT * xx + upT * yy;
+        vec3 d = q - vec3(c2, zz);
+        float R = 0.115 + 0.025 * sin(t * 0.5 + fi * 1.9);   // pulsing size → morph
+        f += R * R / (dot(d, d) + 0.010);                    // fatter/softer → less aliasing
+      }
+      // Small bottom puddle: flattened along gravity so it reads as a reservoir
+      // that blobs neck off from.
+      vec3 d = q - vec3(upT * -0.44, -0.24);
+      float up = dot(d.xy, upT);
+      float side = dot(d.xy, rightT);
+      f += 0.07 / (side * side * 0.6 + up * up * 4.0 + d.z * d.z + 0.010);
+      return f;
+    }
+
+    void main() {
+      vec2 p = vUv - 0.5;
+
+      // Tall rounded-rect lamp vessel.
+      vec2 qd = abs(p) - vec2(0.34, 0.45);
+      float rr = min(max(qd.x, qd.y), 0.0) + length(max(qd, vec2(0.0))) - 0.06;
+      float chamber = 1.0 - smoothstep(0.0, 0.015, rr);
+
+      // Tangent frame from screen derivatives.
+      vec3 pos3 = -vViewPosition;
+      vec3 dpdx = dFdx(pos3); vec3 dpdy = dFdy(pos3);
+      vec2 duvx = dFdx(vUv); vec2 duvy = dFdy(vUv);
+      vec3 N = normalize(vNormal);
+      vec3 dp2perp = cross(dpdy, N);
+      vec3 dp1perp = cross(N, dpdx);
+      vec3 T = dp2perp * duvx.x + dp1perp * duvy.x;
+      vec3 Bt = dp2perp * duvx.y + dp1perp * duvy.y;
+      float invmax = inversesqrt(max(dot(T, T), dot(Bt, Bt)));
+      T *= invmax; Bt *= invmax;
+      vec3 V = normalize(vViewPosition);
+      vec3 vT = vec3(dot(V, T), dot(V, Bt), dot(V, N));
+
+      // World-up projected into the tile plane → gravity direction on the face.
+      vec3 upView = (viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz;
+      vec2 upT = vec2(dot(upView, T), dot(upView, Bt));
+      float upLen = length(upT);
+      upT = upLen > 0.001 ? upT / upLen : vec2(0.0, 1.0);
+      vec2 rightT = vec2(-upT.y, upT.x);
+
+      // Slice membership → the turning slice's lamps get shaken.
+      float axisCoord = spinAxis < 0.5 ? vTileCenter.x
+                      : spinAxis < 1.5 ? vTileCenter.y
+                      : vTileCenter.z;
+      float member = 1.0 - smoothstep(0.55, 0.78, abs(axisCoord - spinSlice));
+      float sp = clamp(spin * member, 0.0, 1.0);
+
+      // Per-tile phase so no two lamps are in sync.
+      float ph = fract(sin(dot(vTileCenter.xy + vTileCenter.z * 1.7, vec2(12.9898, 78.233))) * 43758.5453) * 6.2831;
+
+      // Raymarch the metaball field through the chamber. The step covers a fixed
+      // chamber depth; flooring -rd.z stops dt from blowing up at grazing angles
+      // (which caused the blobs to speckle/vanish after rotations and on zoom).
+      vec3 ro = vec3(p, 0.0);
+      vec3 rd = normalize(-vT);
+      float dt = 0.55 / (max(0.42, -rd.z) * 26.0);
+      float t = 0.0;
+      float cover = 0.0;
+      for (int i = 0; i < 26; i++) {
+        vec3 q = ro + rd * t;
+        float F = lavaField(q, upT, rightT, time, ph, sp);
+        cover += smoothstep(0.8, 1.55, F);          // wide, soft → antialiased
+        t += dt;
+      }
+      cover = clamp(cover * 0.16, 0.0, 1.0);
+
+      float upCoord = dot(p, upT);                      // -0.5 (bottom) .. 0.5 (top)
+
+      // Lava shading is derived ONLY from coverage (ray thickness) — no per-pixel
+      // normal and no screen-space derivatives, so the raymarch's step
+      // quantization can't be amplified into the dither grain that showed up on
+      // mobile mid-rotation / after zoom. Backlit translucent blobs read fine
+      // without a bump normal.
+      vec3 lavaDeep = antipodalColor * 0.55;
+      vec3 lavaHot  = mix(antipodalColor, vec3(1.0, 0.92, 0.5), 0.45);
+      vec3 lava = mix(lavaDeep, lavaHot, smoothstep(0.12, 0.9, cover));
+      // Consistent soft top-lighting from world-up (smooth; no derivatives).
+      lava *= 0.84 + 0.3 * smoothstep(-0.35, 0.35, upCoord);
+      // Bright translucent rim just inside the silhouette, straight from cover.
+      float rimGlow = smoothstep(0.08, 0.32, cover) * (1.0 - smoothstep(0.5, 0.95, cover));
+      lava += mix(antipodalColor, vec3(1.0), 0.6) * rimGlow * 0.35;
+      lava += antipodalColor * cover * 0.18;            // emissive bleed
+
+      // Fluid background: this face's color, warmer/brighter toward the bottom,
+      // with a heat-glow "bulb" at the base. No black.
+      float grad = smoothstep(0.5, -0.5, upCoord);      // 1 at the bottom
+      vec3 fluid = baseColor * (0.28 + grad * 0.3);
+      float bulb = smoothstep(0.42, 0.0, length(p - upT * -0.42));
+      fluid += mix(baseColor, antipodalColor, 0.45) * bulb * 0.4;
+
+      // Smooth coverage-based silhouette blend → antialiased edges, no grain.
+      vec3 col = mix(fluid, lava, smoothstep(0.04, 0.5, cover));
+
+      // Glass front: bright rim + a diagonal reflection.
+      float rimEdge = smoothstep(0.05, 0.0, abs(rr + 0.03));
+      col += mix(baseColor * 1.3, vec3(1.0), 0.5) * rimEdge * 0.5;
+      float slash = smoothstep(0.03, 0.0, abs((p.x + p.y * 0.5) - 0.12)) * smoothstep(0.4, 0.05, length(p));
+      col += vec3(1.0) * slash * 0.07;
+
+      // Frame outside the vessel: this face's color (bright), never black.
+      vec3 frame = baseColor * 0.72;
+      col = mix(frame, col, chamber);
+
       gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
     }
   `,

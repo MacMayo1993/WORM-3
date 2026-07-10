@@ -68,8 +68,6 @@ const GLANCE_STRIP_STYLE = {
     borderRadius: 12,
     padding: '8px 12px',
     background: PANEL_BG,
-    backdropFilter: 'blur(18px)',
-    WebkitBackdropFilter: 'blur(18px)',
     boxShadow: SHADOW,
     display: 'flex',
     alignItems: 'center',
@@ -227,8 +225,7 @@ const PAUSE_OVERLAY_STYLE = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: 'rgba(2, 6, 23, 0.55)',
-    backdropFilter: 'blur(6px)',
+    background: 'rgba(2, 6, 23, 0.72)',
     pointerEvents: 'auto',
     zIndex: 10,
 };
@@ -387,7 +384,7 @@ const WINNER_STATS_STYLE = {
 
 const WINNER_STAT_BOX_STYLE = {
     borderRadius: 12, border: '1px solid rgba(255,255,255,0.12)',
-    background: 'rgba(255,255,255,0.07)', backdropFilter: 'blur(8px)',
+    background: 'rgba(255,255,255,0.10)',
     padding: '10px 16px', textAlign: 'center', minWidth: 90,
 };
 
@@ -589,6 +586,15 @@ function BoostButton({ wormAlive, fc }) {
 
 function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalActive, wormControlMode, toggleWormControlMode, wormSpeed, setWormSpeed, wormAlive, wormHealedCount, wormSessionOrbs, wormTimeAlive, wormGamePhase, formatTime, fc }) {
     const green = fc[2] || FACE_FALLBACKS[2];
+    const sfxOn = useGameStore(s => s.settings?.sfx ?? true);
+    const hapticsOn = useGameStore(s => s.settings?.haptics ?? true);
+    const setSettings = useGameStore(s => s.setSettings);
+    const feelChipStyle = (on) => ({
+        borderRadius: 999, border: `1px solid ${on ? `${green}66` : BORDER}`,
+        background: on ? `${green}18` : 'rgba(15, 23, 42, 0.06)', padding: '5px 12px',
+        fontSize: 12, fontWeight: 700, color: '#0f172a',
+        cursor: 'pointer', touchAction: 'manipulation',
+    });
     // Subscribed here (not in the main HUD selector) on purpose: the countdown updates
     // at 10 Hz while crawling, and this menu is the only place the value is displayed —
     // keeping it out of the main selector stops the whole HUD re-rendering every tick.
@@ -640,6 +646,18 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
                     >
                         {wormControlMode === 'oriented' ? 'ORIENTED' : 'NON-ORIENTED'}
                     </button>
+                </div>
+
+                <div style={PAUSE_ROW_STYLE}>
+                    <span style={PAUSE_ROW_LABEL_STYLE}>Feel</span>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                        <button onPointerDown={() => setSettings?.(s => ({ ...s, sfx: !(s.sfx ?? true) }))} style={feelChipStyle(sfxOn)}>
+                            {sfxOn ? '🔊 SFX' : '🔇 SFX'}
+                        </button>
+                        <button onPointerDown={() => setSettings?.(s => ({ ...s, haptics: !(s.haptics ?? true) }))} style={feelChipStyle(hapticsOn)}>
+                            {hapticsOn ? '📳 Haptics' : '📴 Haptics'}
+                        </button>
+                    </div>
                 </div>
 
                 {/* Action buttons */}

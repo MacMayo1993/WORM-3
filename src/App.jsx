@@ -46,7 +46,7 @@ import {
 
 // 3D components
 import IntroScene from './components/intro/IntroScene.jsx';
-import BlackHoleEnvironment from './3d/BlackHoleEnvironment.jsx';
+import NebulaEnvironment from './3d/NebulaEnvironment.jsx';
 import ShootingStars from './3d/ShootingStars.jsx';
 import { setSharedRenderer, tickPreviews, hasActivePreviews } from './3d/TilePreviewRenderer.js';
 
@@ -59,6 +59,7 @@ import {
   MOBI_LINES_BIOME, MOBI_LINES_MERGE, MOBI_LINES_CHAOS,
 } from './components/screens/MobiIntroScreen.jsx';
 import { UI_FONT } from './utils/uiTheme.js';
+import ScreenTransition from './components/ScreenTransition.jsx';
 const ParityStoreScreen = React.lazy(() => import('./components/screens/ParityStoreScreen.jsx'));
 const GameScene = React.lazy(() => import('./3d/GameScene.jsx'));
 const UILayer = React.lazy(() => import('./components/UILayer.jsx'));
@@ -80,9 +81,6 @@ const _clamp = (t, a = 0, b = 1) => Math.max(a, Math.min(b, t));
 const _ease = t => t < 0.5 ? 4 * t ** 3 : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const _prog = (t, s, e) => _clamp((t - s) / (e - s));
 const _chromaticVec = new Vector2(0, 0);
-
-// Cool blue cast on the intro black hole so the opening matches the main-menu vibe
-const INTRO_BH_TINT = [0.72, 0.9, 1.3];
 
 /**
  * EnvBoundary — drei's <Environment preset> fetches its HDR from a CDN at
@@ -162,10 +160,19 @@ function IntroBranch({ onComplete, reducedMotion = false, performanceMode = fals
   return (
     <>
       <color attach="background" args={['#05050f']} />
-      <ambientLight intensity={0.6} />
-      <pointLight position={[10, 10, 10]} intensity={1.8} />
-      <pointLight position={[-10, -10, -10]} intensity={1.2} />
-      <BlackHoleEnvironment zoom={1.2} orbitStrength={0.1} tint={INTRO_BH_TINT} />
+      <ambientLight intensity={1.0} />
+      <pointLight position={[10, 10, 10]} intensity={2.2} />
+      <pointLight position={[-10, -10, -10]} intensity={1.6} />
+      <pointLight position={[-6, 2, 8]} intensity={1.4} color="#4a7ccc" />
+      <pointLight position={[5, -4, -6]} intensity={0.8} color="#2a4a8a" />
+      {/* Volumetric nebula backdrop shared with the main menu. */}
+      <NebulaEnvironment
+        variant="intro"
+        speed={reducedMotion ? 0.25 : 0.7}
+        density={performanceMode ? 0.65 : 1}
+        structure={0.9}
+        performanceMode={performanceMode}
+      />
       <IntroScene time={time} onComplete={onComplete} />
       <EnvBoundary>
         <Suspense fallback={null}>
@@ -231,7 +238,14 @@ function MenuScene({ onCubeClick }) {
       <pointLight position={[-9, -8, 7]} intensity={2.8} color="#7aa3ff" />
       <pointLight position={[0, -6, -8]} intensity={1.4} color="#4a90d9" />
       <Suspense fallback={null}>
-        <BlackHoleEnvironment zoom={1.2} orbitStrength={0.1} flipTrigger={menuFlipTrigger} />
+        <NebulaEnvironment
+          variant="menu"
+          pulseTrigger={menuFlipTrigger}
+          speed={0.55}
+          density={isMobile ? 0.55 : 0.95}
+          structure={1.08}
+          performanceMode={isMobile}
+        />
       </Suspense>
       <ShootingStars />
       <Suspense fallback={null}>
@@ -1369,7 +1383,9 @@ export default function WORM3() {
 
   return (
     <div className={`full-screen${settings.backgroundTheme === 'dark' ? ' bg-dark' : settings.backgroundTheme === 'midnight' ? ' bg-midnight' : ''}${randomShaking ? ' random-shake' : ''}`}>
-      {showTutorial && !showWelcome && <Tutorial onClose={closeTutorial} onMainMenu={() => { closeTutorial(); handleBackToMainMenu(); }} />}
+      <ScreenTransition show={showTutorial && !showWelcome}>
+        <Tutorial onClose={closeTutorial} onMainMenu={() => { closeTutorial(); handleBackToMainMenu(); }} />
+      </ScreenTransition>
       {showModeSelect && (
         <Suspense fallback={null}>
           <ModeCarousel
@@ -1510,6 +1526,7 @@ export default function WORM3() {
             ui={{
               sheetOpen, setSheetOpen, sheetMode, setSheetMode,
               showFreeplayWizard, showRandomWizard, showWormModeWizard, showCubeModeSelect,
+              showModeSelect,
               showMobiIntro, mobiLines, mobiModeName,
               showDisparityWizard, setShowDisparityWizard,
               showDisparityBetting,
@@ -1585,11 +1602,11 @@ export default function WORM3() {
       )}
 
       {/* Parity Store — mounted at app root so it's above every overlay */}
-      {showStore && (
+      <ScreenTransition show={showStore}>
         <Suspense fallback={null}>
           <ParityStoreScreen onClose={handleCloseStore} />
         </Suspense>
-      )}
+      </ScreenTransition>
     </div>
   );
 }

@@ -2,7 +2,7 @@
 // Full-screen death takeovers for Worm Healer mode — a distinct themed
 // experience per death cause instead of one generic "you died" card.
 import React from 'react';
-import { UI_FONT, DISPLAY_FONT } from '../utils/uiTheme.js';
+import { UI_FONT, DISPLAY_FONT, MONO_FONT } from '../utils/uiTheme.js';
 
 // ─── Death-cause classification ───────────────────────────────────────────────
 function classifyDeath(reason) {
@@ -55,7 +55,6 @@ const cardStyle = (borderColor) => ({
     border: `1px solid ${borderColor}`,
     borderRadius: 20,
     padding: '28px 26px',
-    backdropFilter: 'blur(6px)',
     maxWidth: 'min(92vw, 420px)',
 });
 
@@ -126,7 +125,7 @@ function DetailBox({ borderColor, textColor, valueColor, lines }) {
             textAlign: 'left',
             fontSize: 11,
             color: textColor,
-            fontFamily: "'SF Mono', ui-monospace, Menlo, monospace",
+            fontFamily: MONO_FONT,
             lineHeight: 1.4,
         }}>
             {lines.map(([label, value]) => (

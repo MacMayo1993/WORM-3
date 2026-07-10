@@ -5,6 +5,7 @@
 import React, { useMemo, useRef, useEffect } from 'react';
 import { checkSolveProgress } from '../game/solveDetection.js';
 import { useKociembaSolver } from '../teach/useKociembaSolver.js';
+import { UI_FONT, MONO_FONT, GLASS_PANEL, GLASS_PANEL_BORDER, GLASS_TEXT, GLASS_TEXT_MUTED } from '../utils/uiTheme.js';
 
 // ── CFOP mini progress strip ──────────────────────────────────────────────────
 
@@ -17,7 +18,7 @@ const STEPS = [
 
 function CfopStrip({ progress }) {
   return (
-    <div style={{ display: 'flex', gap: 4, padding: '6px 12px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+    <div style={{ display: 'flex', gap: 4, padding: '6px 12px', borderBottom: `1px solid ${GLASS_PANEL_BORDER}` }}>
       {STEPS.map((s) => {
         const st = progress[s.id] || {};
         const done = st.complete;
@@ -25,7 +26,7 @@ function CfopStrip({ progress }) {
         return (
           <div key={s.id} style={{
             flex: 1, textAlign: 'center', fontSize: 9,
-            fontFamily: "'Courier New', monospace",
+            fontFamily: MONO_FONT,
             color: done ? '#00ff88' : active ? '#fefae0' : 'rgba(255,255,255,0.35)',
             paddingBottom: 2,
             borderBottom: `2px solid ${done ? '#00ff88' : active ? '#fefae0' : 'transparent'}`,
@@ -47,7 +48,7 @@ function MoveChip({ notation, state }) {
   const bg = state === 'done'     ? 'rgba(255,255,255,0.07)'
            : state === 'next'     ? 'rgba(0,217,255,0.20)'
            :                        'rgba(255,255,255,0.04)';
-  const border = state === 'next' ? '1px solid rgba(0,217,255,0.7)' : '1px solid rgba(255,255,255,0.10)';
+  const border = state === 'next' ? '1px solid rgba(0,217,255,0.7)' : `1px solid ${GLASS_PANEL_BORDER}`;
   const color  = state === 'done' ? 'rgba(255,255,255,0.35)'
                : state === 'next' ? '#00d9ff'
                :                    'rgba(255,255,255,0.75)';
@@ -60,7 +61,7 @@ function MoveChip({ notation, state }) {
       border,
       color,
       fontSize: 11,
-      fontFamily: "'Courier New', monospace",
+      fontFamily: MONO_FONT,
       fontWeight: state === 'next' ? 700 : 400,
       whiteSpace: 'nowrap',
       animation: state === 'next' ? 'kociemba-pulse 1s ease-in-out infinite' : 'none',
@@ -103,7 +104,7 @@ export default function SolveMode({ cubies, size, onClose }) {
     error:   'Error',
   }[status] ?? '';
 
-  const statusColor = isDone ? '#00ff88' : status === 'error' ? '#f87171' : 'rgba(255,255,255,0.55)';
+  const statusColor = isDone ? '#00ff88' : status === 'error' ? '#f87171' : GLASS_TEXT_MUTED;
 
   return (
     <>
@@ -119,15 +120,15 @@ export default function SolveMode({ cubies, size, onClose }) {
         right: 16,
         bottom: 72,          /* sits just above the bottom nav bar */
         width: 272,
-        background: 'rgba(8,8,12,0.88)',
+        background: GLASS_PANEL,
         backdropFilter: 'blur(14px)',
         WebkitBackdropFilter: 'blur(14px)',
         borderRadius: 12,
-        border: '1px solid rgba(255,255,255,0.10)',
-        color: 'white',
+        border: `1px solid ${GLASS_PANEL_BORDER}`,
+        color: GLASS_TEXT,
         zIndex: 1000,
         overflow: 'hidden',
-        fontFamily: "'Courier New', monospace",
+        fontFamily: MONO_FONT,
         userSelect: 'none',
         boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
       }}>
@@ -137,7 +138,7 @@ export default function SolveMode({ cubies, size, onClose }) {
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '8px 12px',
         }}>
-          <span style={{ fontSize: 10, letterSpacing: '0.12em', opacity: 0.6 }}>
+          <span style={{ fontSize: 10, letterSpacing: '0.12em', opacity: 0.6, fontFamily: UI_FONT }}>
             KOCIEMBA SOLVER
           </span>
           <span style={{ fontSize: 11, color: statusColor, fontWeight: 600 }}>
@@ -203,7 +204,7 @@ export default function SolveMode({ cubies, size, onClose }) {
         {size === 3 && (hasMoves || isPlaying) && (
           <div style={{
             display: 'flex', gap: 6, padding: '8px 10px',
-            borderTop: '1px solid rgba(255,255,255,0.07)',
+            borderTop: `1px solid ${GLASS_PANEL_BORDER}`,
           }}>
             <button
               onClick={isPlaying ? pause : play}
@@ -230,10 +231,10 @@ function ctrlBtn(accent, disabled) {
   return {
     flex: 1, padding: '6px 0', borderRadius: 6,
     background: disabled ? 'rgba(255,255,255,0.04)' : `rgba(${hexToRgb(accent)},0.14)`,
-    border: `1px solid ${disabled ? 'rgba(255,255,255,0.10)' : accent}`,
+    border: `1px solid ${disabled ? GLASS_PANEL_BORDER : accent}`,
     color: disabled ? 'rgba(255,255,255,0.25)' : accent,
     cursor: disabled ? 'default' : 'pointer',
-    fontSize: 11, fontFamily: "'Courier New', monospace", fontWeight: 600,
+    fontSize: 11, fontFamily: MONO_FONT, fontWeight: 600,
     transition: 'all 0.15s',
   };
 }

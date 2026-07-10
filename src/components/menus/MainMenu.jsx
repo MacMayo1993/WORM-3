@@ -12,7 +12,7 @@ import { vibrate } from '../../utils/audio.js';
 import MenuFlipWave from './MenuFlipWave.jsx';
 import MenuTileOverlay from './MenuTileOverlay.jsx';
 import { ANTIPODAL_COLOR } from '../../utils/constants.js';
-import { UI_FONT, GLASS_PANEL, DISPLAY_FONT } from '../../utils/uiTheme.js';
+import { UI_FONT, GLASS_PANEL, GLASS_PANEL_BORDER, GLASS_TEXT, DISPLAY_FONT } from '../../utils/uiTheme.js';
 
 // ─── Randomizable style state — re-picked every time the user taps the cube ──
 // biome is now included so its face palette appears in the rotation.
@@ -32,6 +32,9 @@ let _menuViewEpoch = Math.floor(Math.random() * 1e9);
 
 // Called by RotatingBlackCube after a direct cube-tap shake.
 // Also available externally so tests / storybook can reset state.
+let _orbColorVersion = 0;
+let _orbColorListener = null;
+
 function rerandomizeMenuStyle() {
   _menuSchemeKey  = _SCHEME_KEYS[Math.floor(Math.random() * _SCHEME_KEYS.length)];
   MENU_FACE_COLORS = COLOR_SCHEMES[_menuSchemeKey] ?? COLOR_SCHEMES['classic'];
@@ -39,6 +42,8 @@ function rerandomizeMenuStyle() {
     _menuFaceStyles[f] = _TILE_KEYS[Math.floor(Math.random() * _TILE_KEYS.length)];
   }
   _menuViewEpoch = Math.floor(Math.random() * 1e9);
+  _orbColorVersion++;
+  _orbColorListener?.(_orbColorVersion);
 }
 
 // Callback set by ShufflingCube so RotatingBlackCube can trigger a re-scramble
@@ -787,7 +792,7 @@ const CAROUSEL_MODES = [
     controls: ['Worm follows your cursor or touch', 'Healed tiles restore the cube face', 'Collect orbs scattered across faces', 'Avoid flipped chaos tiles'],
   },
   {
-    id: 'freeplay', label: 'CUBE', tileColor: '#eab308', textColor: 'rgba(0,0,0,0.80)',
+    id: 'freeplay', label: 'CUBE', tileColor: '#eab308', textColor: '#fff',
     desc: "Classic Rubik's cube solving — your cube, your rules.",
     controls: ['Pick cube size 2×2 through 5×5', 'Choose color scheme and tile style', 'Drag face edges to rotate slices', 'Solve at your own pace'],
   },
@@ -1036,7 +1041,8 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
   }, [onCubeSelect, onWormSelect, onChaos, onFreeplay, onRandom, onStore, onComingSoon, onHowToPlay]);
 
   const mode = CAROUSEL_MODES[activeIndex];
-  const activeImageSrc = `${import.meta.env.BASE_URL}images/modes/${mode.id}.jpg`;
+  const imageId = mode.id === 'coming-soon' ? 'comingsoon' : mode.id;
+  const activeImageSrc = `${import.meta.env.BASE_URL}images/modes/${imageId}.jpg`;
   const opacity = show ? 1 : 0;
 
   const arrowStyle = {
@@ -1050,14 +1056,10 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 10000, overflowY: 'auto' }}>
 
-      {/* Forest background — extended past edges so blur doesn't show white borders */}
-      <div style={{ position: 'fixed', inset: '-40px', zIndex: 0, pointerEvents: 'none',
-        backgroundImage: `url(${import.meta.env.BASE_URL}environments/thumbnails/forest.png)`,
-        backgroundSize: 'cover', backgroundPosition: 'center',
-        filter: 'blur(28px) brightness(0.45)',
+      {/* Transparent cosmic wash — lets the shared R3F nebula show through behind the menu. */}
+      <div style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none',
+        background: 'radial-gradient(circle at 50% 28%, rgba(90,130,255,0.18), rgba(4,6,18,0.38) 62%, rgba(2,3,10,0.66) 100%)',
       }} />
-      {/* Dark tint over the blurred forest */}
-      <div style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none', background: 'rgba(4,6,18,0.55)' }} />
 
       <style>{`
         .mc-arrow:active { background: rgba(255,255,255,0.22) !important; }
@@ -1083,7 +1085,9 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
           style={{
             width: 'min(360px, 92vw)',
             borderRadius: '22px', overflow: 'hidden',
-            background: mode.tileColor,
+            // Glossy candy sheen — a diagonal light→dark glaze over the face color gives the
+            // flat tile depth without needing per-color math.
+            background: `linear-gradient(157deg, rgba(255,255,255,0.20), rgba(0,0,0,0.08) 52%, rgba(0,0,0,0.24)), ${mode.tileColor}`,
             boxShadow: 'inset 0 -8px 20px rgba(0,0,0,0.40), inset 4px 4px 16px rgba(255,255,255,0.18), 0 8px 32px rgba(0,0,0,0.50)',
             padding: '36px 20px', textAlign: 'center',
             opacity, transition: 'opacity 160ms ease',
@@ -1105,7 +1109,7 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
           }}
           onMouseLeave={() => { mouseStartX.current = null; }}
         >
-          <div style={{ fontSize: 'clamp(28px,8vw,44px)', fontWeight: 900, fontFamily: DISPLAY_FONT, color: mode.textColor, lineHeight: 1, textShadow: '0 2px 8px rgba(0,0,0,0.35)' }}>
+          <div style={{ fontSize: 'clamp(28px,8vw,44px)', fontWeight: 900, fontFamily: DISPLAY_FONT, color: mode.textColor, lineHeight: 1, textShadow: '0 2px 10px rgba(0,0,0,0.45), 0 1px 2px rgba(0,0,0,0.40)' }}>
             {mode.label}
           </div>
           <p style={{ margin: '10px 0 0', fontSize: '13px', lineHeight: 1.5, fontFamily: MENU_FONT, color: mode.textColor === '#fff' ? 'rgba(255,255,255,0.80)' : 'rgba(0,0,0,0.65)' }}>
@@ -1140,7 +1144,7 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
 
           {mode.id === 'how-to-play' ? (
             <HowToPlayMini tileColor={mode.tileColor} />
-          ) : (
+          ) : mode.id === 'store' ? null : (
             <div style={{ borderRadius: '16px', overflow: 'hidden', background: GLASS_PANEL }}>
               <div style={{ width: '100%', aspectRatio: '16/9', position: 'relative', overflow: 'hidden', background: 'linear-gradient(135deg, rgba(14,18,42,0.95), rgba(4,6,20,0.98))' }}>
                 {!imgError && (
@@ -1160,12 +1164,22 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
             </div>
           )}
 
-          <div style={{ marginTop: '12px', borderRadius: '16px', background: '#ffffff', padding: '14px 16px 16px' }}>
-            <p style={{ margin: '0 0 10px', fontSize: '9px', fontWeight: 800, letterSpacing: '0.24em', textTransform: 'uppercase', color: 'rgba(0,0,0,0.45)', fontFamily: MENU_FONT }}>How to play</p>
+          <div style={{
+            marginTop: '12px', borderRadius: '16px',
+            background: 'linear-gradient(180deg, rgba(13,17,40,0.96), rgba(4,6,20,0.97))',
+            border: `1px solid ${GLASS_PANEL_BORDER}`,
+            padding: '15px 18px 17px', position: 'relative', overflow: 'hidden',
+          }}>
+            {/* Mode-tinted accent edge along the top */}
+            <div aria-hidden style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: `linear-gradient(90deg, ${mode.tileColor}, transparent 78%)` }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 12px' }}>
+              <span aria-hidden style={{ width: '5px', height: '14px', borderRadius: '3px', background: mode.tileColor, boxShadow: `0 0 9px ${mode.tileColor}` }} />
+              <span style={{ fontSize: '9px', fontWeight: 800, letterSpacing: '0.24em', textTransform: 'uppercase', color: mode.tileColor, fontFamily: MENU_FONT }}>How to play</span>
+            </div>
             {mode.controls.map((ctrl, i) => (
-              <div key={i} style={{ display: 'flex', gap: '8px', margin: '5px 0', alignItems: 'flex-start' }}>
-                <span style={{ color: '#0c0c1a', fontSize: '14px', flexShrink: 0, lineHeight: 1.5 }}>·</span>
-                <span style={{ fontSize: '13px', lineHeight: 1.55, color: '#1a1a2e', fontFamily: MENU_FONT }}>{ctrl}</span>
+              <div key={i} style={{ display: 'flex', gap: '11px', margin: '7px 0', alignItems: 'flex-start' }}>
+                <span aria-hidden style={{ width: '6px', height: '6px', borderRadius: '50%', background: mode.tileColor, boxShadow: `0 0 6px ${mode.tileColor}`, marginTop: '6px', flexShrink: 0 }} />
+                <span style={{ fontSize: '13px', lineHeight: 1.55, color: GLASS_TEXT, fontFamily: MENU_FONT }}>{ctrl}</span>
               </div>
             ))}
           </div>
@@ -1207,11 +1221,14 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
 };
 
 // ─── Start button ─────────────────────────────────────────────────────────────
+const FEEDBACK_URL = 'https://docs.google.com/forms/d/e/1FAIpQLScYKKOXc6c3vdqpmWWv0J3lMd90-GOfp0TxxxHelxjIjMdrvw/viewform';
+
 const MenuStartButton = ({ visible, onClick }) => (
   <div style={{
     position: 'absolute', bottom: 0, left: 0, right: 0,
     paddingBottom: 'max(120px, env(safe-area-inset-bottom, 120px))',
-    display: 'flex', justifyContent: 'center', alignItems: 'center',
+    display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
+    gap: '14px',
     opacity: visible ? 1 : 0,
     transform: visible ? 'none' : 'translateY(16px)',
     transition: 'opacity 0.55s ease 0.1s, transform 0.55s cubic-bezier(0.22,1,0.36,1) 0.1s',
@@ -1222,6 +1239,25 @@ const MenuStartButton = ({ visible, onClick }) => (
       className="worm-tactile-btn"
       onClick={onClick}
     >START</button>
+    <button
+      type="button"
+      onClick={() => window.open(FEEDBACK_URL, '_blank', 'noopener,noreferrer')}
+      style={{
+        background: 'transparent',
+        border: '1px solid rgba(120, 160, 255, 0.18)',
+        borderRadius: '10px',
+        padding: '7px 18px',
+        color: 'rgba(200, 220, 255, 0.5)',
+        fontSize: '12px',
+        fontWeight: 600,
+        fontFamily: UI_FONT,
+        letterSpacing: '0.06em',
+        cursor: 'pointer',
+        transition: 'color 0.2s, border-color 0.2s',
+      }}
+      onMouseEnter={(e) => { e.target.style.color = 'rgba(200, 220, 255, 0.8)'; e.target.style.borderColor = 'rgba(120, 160, 255, 0.35)'; }}
+      onMouseLeave={(e) => { e.target.style.color = 'rgba(200, 220, 255, 0.5)'; e.target.style.borderColor = 'rgba(120, 160, 255, 0.18)'; }}
+    >Give Feedback</button>
   </div>
 );
 
@@ -1274,31 +1310,43 @@ export const MenuTitleCard = ({ visible }) => (
 
 
 // ─── Ambient background orbs ─────────────────────────────────────────────────
-const ORB_DEFS = [
-  { color: '#3b82f6', top: '-18%',  left: '-12%',  size: '58vmax', anim: 'orbDrift1 30s ease-in-out infinite alternate',          opacity: 0.36 },
-  { color: '#a855f7', bottom: '-22%',right: '-16%', size: '62vmax', anim: 'orbDrift2 36s ease-in-out infinite alternate',          opacity: 0.28 },
-  { color: '#f97316', top: '15%',   right: '-18%',  size: '46vmax', anim: 'orbDrift3 24s ease-in-out infinite alternate',          opacity: 0.20 },
-  { color: '#22c55e', bottom: '8%', left: '-14%',   size: '42vmax', anim: 'orbDrift1 28s ease-in-out infinite alternate-reverse',  opacity: 0.17 },
-  { color: '#eab308', top: '44%',   left: '28%',    size: '36vmax', anim: 'orbDrift2 40s ease-in-out infinite alternate',          opacity: 0.13 },
-  { color: '#7dd3fc', bottom: '18%',right: '22%',   size: '52vmax', anim: 'orbDrift3 44s ease-in-out infinite alternate-reverse',  opacity: 0.18 },
+const ORB_LAYOUT = [
+  { faceId: 5, top: '-18%',  left: '-12%',  size: '58vmax', anim: 'orbDrift1 30s ease-in-out infinite alternate',          opacity: 0.36 },
+  { faceId: 3, bottom: '-22%',right: '-16%', size: '62vmax', anim: 'orbDrift2 36s ease-in-out infinite alternate',          opacity: 0.28 },
+  { faceId: 4, top: '15%',   right: '-18%',  size: '46vmax', anim: 'orbDrift3 24s ease-in-out infinite alternate',          opacity: 0.20 },
+  { faceId: 2, bottom: '8%', left: '-14%',   size: '42vmax', anim: 'orbDrift1 28s ease-in-out infinite alternate-reverse',  opacity: 0.17 },
+  { faceId: 6, top: '44%',   left: '28%',    size: '36vmax', anim: 'orbDrift2 40s ease-in-out infinite alternate',          opacity: 0.13 },
+  { faceId: 1, bottom: '18%',right: '22%',   size: '52vmax', anim: 'orbDrift3 44s ease-in-out infinite alternate-reverse',  opacity: 0.18 },
 ];
 
-const MenuBackgroundOrbs = () => (
-  <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', zIndex: 0, pointerEvents: 'none' }}>
-    {ORB_DEFS.map((orb, i) => (
-      <div key={i} style={{
-        position: 'absolute',
-        width: orb.size, height: orb.size,
-        top: orb.top, left: orb.left, bottom: orb.bottom, right: orb.right,
-        borderRadius: '50%',
-        background: `radial-gradient(circle, ${orb.color} 0%, transparent 70%)`,
-        filter: 'blur(72px)',
-        opacity: orb.opacity,
-        animation: orb.anim,
-      }} />
-    ))}
-  </div>
-);
+const MenuBackgroundOrbs = () => {
+  const [_v, setV] = useState(_orbColorVersion);
+  useEffect(() => {
+    _orbColorListener = setV;
+    return () => { _orbColorListener = null; };
+  }, []);
+
+  return (
+    <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', zIndex: 0, pointerEvents: 'none' }}>
+      {ORB_LAYOUT.map((orb, i) => {
+        const color = MENU_FACE_COLORS[orb.faceId] ?? '#888888';
+        return (
+          <div key={i} style={{
+            position: 'absolute',
+            width: orb.size, height: orb.size,
+            top: orb.top, left: orb.left, bottom: orb.bottom, right: orb.right,
+            borderRadius: '50%',
+            background: `radial-gradient(circle, ${color} 0%, transparent 70%)`,
+            filter: 'blur(72px)',
+            opacity: orb.opacity,
+            animation: orb.anim,
+            transition: 'background 1.2s ease',
+          }} />
+        );
+      })}
+    </div>
+  );
+};
 
 // ─── Main component ───────────────────────────────────────────────────────────
 const MainMenu = ({

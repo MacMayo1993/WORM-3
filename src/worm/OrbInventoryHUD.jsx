@@ -4,7 +4,7 @@
 //   compact=false — standalone floating panel (legacy, used on desktop)
 
 import React from 'react';
-import { UI_FONT } from '../utils/uiTheme.js';
+import { UI_FONT, GLASS_PANEL, GLASS_PANEL_BORDER } from '../utils/uiTheme.js';
 
 const FACE_ORDER = [1, 2, 3, 4, 5, 6];
 const FONT = UI_FONT;
@@ -66,11 +66,9 @@ export default function OrbInventoryHUD({ orbInventory, faceColors, compact = fa
             alignItems: 'center',
             gap: 8,
             padding: '8px 12px',
-            background: 'rgba(15, 20, 40, 0.94)',
+            background: GLASS_PANEL,
             borderRadius: 14,
-            border: '1px solid rgba(150, 180, 255, 0.3)',
-            backdropFilter: 'blur(14px)',
-            WebkitBackdropFilter: 'blur(14px)',
+            border: `1px solid ${GLASS_PANEL_BORDER}`,
             boxShadow: '0 8px 28px rgba(0, 0, 0, 0.45)',
             whiteSpace: 'nowrap',
           }}
@@ -123,11 +121,9 @@ export default function OrbInventoryHUD({ orbInventory, faceColors, compact = fa
           alignItems: 'center',
           gap: 14,
           padding: '10px 18px',
-          background: 'linear-gradient(180deg, rgba(16,20,40,0.94) 0%, rgba(8,10,24,0.94) 100%)',
+          background: `linear-gradient(180deg, ${GLASS_PANEL} 0%, rgba(8,10,24,0.94) 100%)`,
           borderRadius: '16px',
-          border: '1.5px solid rgba(150,180,255,0.35)',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
+          border: `1.5px solid ${GLASS_PANEL_BORDER}`,
           boxShadow: '0 4px 20px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04) inset',
         }}
       >

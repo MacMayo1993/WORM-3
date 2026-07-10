@@ -1,4 +1,5 @@
 import React from 'react';
+import { UI_FONT } from '../../utils/uiTheme.js';
 
 const Section = ({ title, children }) => (
   <section style={{ marginBottom: '24px' }}>
@@ -55,7 +56,7 @@ const KeyRow = ({ keys, desc }) => (
           borderRadius: '5px',
           fontSize: '11px',
           fontWeight: 600,
-          fontFamily: 'var(--ui-font)',
+          fontFamily: UI_FONT,
           color: '#e8edf8',
           minWidth: '22px',
         }}>{k.trim()}</kbd>
@@ -97,7 +98,7 @@ const HelpMenu = ({ onClose }) => (
         boxShadow: '0 32px 80px rgba(0,0,0,0.60), 0 0 0 1px rgba(255,255,255,0.06)',
         backdropFilter: 'blur(24px)',
         boxSizing: 'border-box',
-        fontFamily: 'var(--ui-font)',
+        fontFamily: UI_FONT,
         animation: 'modalSheetIn 0.30s cubic-bezier(0.22, 1, 0.36, 1)',
       }}
     >

@@ -1,10 +1,135 @@
 import React, { useState } from 'react';
 
-/**
- * Mobile-optimized floating controls for touch devices
- * Provides quick access to settings, help, and essential game controls
- */
-const MobileControls = ({
+const buttonStyle = {
+  width: '48px',
+  height: '48px',
+  borderRadius: '50%',
+  border: '1px solid rgba(255, 255, 255, 0.10)',
+  background: 'rgba(14, 17, 38, 0.92)',
+  color: 'rgba(200, 220, 255, 0.80)',
+  fontSize: '18px',
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  boxShadow: '0 2px 12px rgba(0, 0, 0, 0.40)',
+  transition: 'all 0.15s ease',
+  WebkitTapHighlightColor: 'transparent',
+  touchAction: 'manipulation'
+};
+
+const smallButtonStyle = {
+  ...buttonStyle,
+  width: '42px',
+  height: '42px',
+  fontSize: '14px'
+};
+
+const activeSmallButtonStyle = {
+  ...smallButtonStyle,
+  background: 'rgba(59, 130, 246, 0.35)',
+  borderColor: 'rgba(96, 165, 250, 0.55)'
+};
+
+const orbitButtonStyle = {
+  ...smallButtonStyle,
+  background: 'rgba(251, 191, 36, 0.15)',
+  borderColor: 'rgba(251, 191, 36, 0.5)',
+};
+
+const shuffleButtonStyle = {
+  ...smallButtonStyle,
+  background: 'rgba(34, 197, 94, 0.8)',
+  borderColor: 'rgba(74, 222, 128, 0.5)'
+};
+
+const resetButtonStyle = {
+  ...smallButtonStyle,
+  background: 'rgba(100, 116, 139, 0.8)',
+  borderColor: 'rgba(148, 163, 184, 0.5)'
+};
+
+const undoButtonStyle = {
+  ...buttonStyle,
+  width: '54px',
+  height: '54px',
+  fontSize: '22px',
+  background: 'rgba(0, 0, 0, 0.85)',
+  borderColor: 'rgba(255, 255, 255, 0.25)',
+  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.40)',
+  position: 'relative'
+};
+
+const settingsButtonStyle = {
+  ...buttonStyle,
+  width: '54px',
+  height: '54px',
+  fontSize: '22px',
+  background: 'linear-gradient(135deg, rgba(30, 136, 229, 0.80), rgba(37, 99, 235, 0.80))',
+  borderColor: 'rgba(96, 165, 250, 0.40)',
+  boxShadow: '0 4px 20px rgba(30, 136, 229, 0.35)'
+};
+
+const toggleButtonStyle = {
+  ...buttonStyle,
+  width: '40px',
+  height: '40px',
+  fontSize: '18px',
+};
+
+const undoContainerStyle = {
+  position: 'fixed',
+  bottom: 'calc(100px + env(safe-area-inset-bottom, 0px))',
+  left: '16px',
+  zIndex: 500,
+  pointerEvents: 'auto'
+};
+
+const rightContainerStyle = {
+  position: 'fixed',
+  bottom: 'calc(100px + env(safe-area-inset-bottom, 0px))',
+  right: '16px',
+  zIndex: 500,
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: '10px',
+  pointerEvents: 'auto'
+};
+
+const expandedMenuStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '8px',
+  animation: 'fadeInUp 0.2s ease'
+};
+
+const flipLabelStyle = { fontSize: '10px', fontWeight: 600, letterSpacing: '0.02em' };
+const teachLabelStyle = { fontSize: '9px', fontWeight: 700 };
+const teachActiveButtonStyle = {
+  ...smallButtonStyle,
+  background: 'rgba(251, 191, 36, 0.8)',
+  borderColor: 'rgba(251, 191, 36, 0.5)',
+  color: '#000'
+};
+
+const undoBadgeStyle = {
+  position: 'absolute',
+  top: '-4px',
+  right: '-4px',
+  background: '#fff',
+  color: '#000',
+  borderRadius: '50%',
+  width: '20px',
+  height: '20px',
+  fontSize: '11px',
+  fontWeight: 'bold',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center'
+};
+
+const MobileControls = React.memo(({
   onShowSettings,
   onShowHelp,
   flipMode,
@@ -30,90 +155,22 @@ const MobileControls = ({
 }) => {
   const [expanded, setExpanded] = useState(false);
 
-  const buttonStyle = {
-    width: '48px',
-    height: '48px',
-    borderRadius: '50%',
-    border: '1px solid rgba(255, 255, 255, 0.10)',
-    background: 'rgba(14, 17, 38, 0.88)',
-    backdropFilter: 'blur(16px)',
-    WebkitBackdropFilter: 'blur(16px)',
-    color: 'rgba(200, 220, 255, 0.80)',
-    fontSize: '18px',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    boxShadow: '0 2px 12px rgba(0, 0, 0, 0.40)',
-    transition: 'all 0.15s ease',
-    WebkitTapHighlightColor: 'transparent',
-    touchAction: 'manipulation'
-  };
-
-  const _activeButtonStyle = {
-    ...buttonStyle,
-    background: 'rgba(59, 130, 246, 0.35)',
-    borderColor: 'rgba(96, 165, 250, 0.55)'
-  };
-
-  const smallButtonStyle = {
-    ...buttonStyle,
-    width: '42px',
-    height: '42px',
-    fontSize: '14px'
-  };
-
-  const activeSmallButtonStyle = {
-    ...smallButtonStyle,
-    background: 'rgba(59, 130, 246, 0.35)',
-    borderColor: 'rgba(96, 165, 250, 0.55)'
-  };
-
   return (
     <>
       {/* Left side - Undo button (always visible when available) */}
       {canUndo && (
-        <div style={{
-          position: 'fixed',
-          bottom: 'calc(100px + env(safe-area-inset-bottom, 0px))',
-          left: '16px',
-          zIndex: 500,
-          pointerEvents: 'auto'
-        }}>
+        <div style={undoContainerStyle}>
           <button
             onClick={onUndo}
-            style={{
-              ...buttonStyle,
-              width: '54px',
-              height: '54px',
-              fontSize: '22px',
-              background: 'rgba(0, 200, 230, 0.12)',
-              borderColor: 'rgba(0, 200, 230, 0.45)',
-              boxShadow: '0 4px 20px rgba(0, 200, 230, 0.20)',
-              position: 'relative'
-            }}
+            style={undoButtonStyle}
             aria-label={`Undo last move (${undoCount} available)`}
           >
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00d9ff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 10h10a5 5 0 0 1 0 10H9"/>
               <polyline points="7 14 3 10 7 6"/>
             </svg>
             {undoCount > 0 && (
-              <span style={{
-                position: 'absolute',
-                top: '-4px',
-                right: '-4px',
-                background: 'rgba(0, 217, 255, 0.9)',
-                color: '#000',
-                borderRadius: '50%',
-                width: '20px',
-                height: '20px',
-                fontSize: '11px',
-                fontWeight: 'bold',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
+              <span style={undoBadgeStyle}>
                 {undoCount}
               </span>
             )}
@@ -122,25 +179,10 @@ const MobileControls = ({
       )}
 
       {/* Right side - Settings FAB */}
-      <div style={{
-        position: 'fixed',
-        bottom: 'calc(100px + env(safe-area-inset-bottom, 0px))',
-        right: '16px',
-        zIndex: 500,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: '10px',
-        pointerEvents: 'auto'
-      }}>
+      <div style={rightContainerStyle}>
         {/* Expanded menu */}
         {expanded && (
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px',
-            animation: 'fadeInUp 0.2s ease'
-          }}>
+          <div style={expandedMenuStyle}>
             {/* Help */}
             <button
               onClick={() => { onShowHelp(); setExpanded(false); }}
@@ -154,11 +196,7 @@ const MobileControls = ({
             {onOrbitCCW && (
               <button
                 onClick={onOrbitCCW}
-                style={{
-                  ...smallButtonStyle,
-                  background: 'rgba(251, 191, 36, 0.15)',
-                  borderColor: 'rgba(251, 191, 36, 0.5)',
-                }}
+                style={orbitButtonStyle}
                 aria-label="Rotate view left"
                 title="Rotate view left"
               >
@@ -174,11 +212,7 @@ const MobileControls = ({
             {onOrbitCW && (
               <button
                 onClick={onOrbitCW}
-                style={{
-                  ...smallButtonStyle,
-                  background: 'rgba(251, 191, 36, 0.15)',
-                  borderColor: 'rgba(251, 191, 36, 0.5)',
-                }}
+                style={orbitButtonStyle}
                 aria-label="Rotate view right"
                 title="Rotate view right"
               >
@@ -224,7 +258,7 @@ const MobileControls = ({
               style={flipMode ? activeSmallButtonStyle : smallButtonStyle}
               aria-label="Toggle flip mode"
             >
-              <span style={{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.02em' }}>FLIP</span>
+              <span style={flipLabelStyle}>FLIP</span>
             </button>
 
             {/* Tunnels toggle */}
@@ -259,33 +293,24 @@ const MobileControls = ({
               style={showNetPanel ? activeSmallButtonStyle : smallButtonStyle}
               aria-label="Toggle net view"
             >
-              <span style={{ fontSize: '10px', fontWeight: 600 }}>NET</span>
+              <span style={flipLabelStyle}>NET</span>
             </button>
 
             {/* Teach mode toggle */}
             {cubeSize === 3 && (
               <button
                 onClick={() => { onToggleTeachMode(); setExpanded(false); }}
-                style={teachModeActive ? {
-                  ...smallButtonStyle,
-                  background: 'rgba(251, 191, 36, 0.8)',
-                  borderColor: 'rgba(251, 191, 36, 0.5)',
-                  color: '#000'
-                } : smallButtonStyle}
+                style={teachModeActive ? teachActiveButtonStyle : smallButtonStyle}
                 aria-label="Toggle teach mode"
               >
-                <span style={{ fontSize: '9px', fontWeight: 700 }}>TEACH</span>
+                <span style={teachLabelStyle}>TEACH</span>
               </button>
             )}
 
             {/* Shuffle */}
             <button
               onClick={() => { onShuffle(); setExpanded(false); }}
-              style={{
-                ...smallButtonStyle,
-                background: 'rgba(34, 197, 94, 0.8)',
-                borderColor: 'rgba(74, 222, 128, 0.5)'
-              }}
+              style={shuffleButtonStyle}
               aria-label="Shuffle"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -300,11 +325,7 @@ const MobileControls = ({
             {/* Reset */}
             <button
               onClick={() => { onReset(); setExpanded(false); }}
-              style={{
-                ...smallButtonStyle,
-                background: 'rgba(100, 116, 139, 0.8)',
-                borderColor: 'rgba(148, 163, 184, 0.5)'
-              }}
+              style={resetButtonStyle}
               aria-label="Reset"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -318,15 +339,7 @@ const MobileControls = ({
         {/* Settings button (main FAB) */}
         <button
           onClick={() => { onShowSettings(); setExpanded(false); }}
-          style={{
-            ...buttonStyle,
-            width: '54px',
-            height: '54px',
-            fontSize: '22px',
-            background: 'linear-gradient(135deg, rgba(30, 136, 229, 0.80), rgba(37, 99, 235, 0.80))',
-            borderColor: 'rgba(96, 165, 250, 0.40)',
-            boxShadow: '0 4px 20px rgba(30, 136, 229, 0.35)'
-          }}
+          style={settingsButtonStyle}
           aria-label="Settings"
         >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -338,12 +351,7 @@ const MobileControls = ({
         {/* Toggle expand button */}
         <button
           onClick={() => setExpanded(!expanded)}
-          style={{
-            ...buttonStyle,
-            width: '40px',
-            height: '40px',
-            fontSize: '18px',
-          }}
+          style={toggleButtonStyle}
           aria-label={expanded ? "Close menu" : "Open menu"}
         >
           {expanded ? '×' : '☰'}
@@ -365,6 +373,6 @@ const MobileControls = ({
       `}</style>
     </>
   );
-};
+});
 
 export default MobileControls;

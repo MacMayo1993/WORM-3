@@ -44,6 +44,16 @@ export function readLiveTile(tile, outPos, outNorm) {
 export function rideLiveRotation(worm) {
     const cur = worm.pos.current;
 
+    // Rest-read: the current step crossed onto (or is stepping back off) a mid-rotation
+    // slice from static ground. tick()'s grid math already targets the committed
+    // end-of-rotation positions, so skip live anchoring entirely — following the live
+    // meshes here would chase the outgoing tile (a visible teleport onto the rotating
+    // layer) and then snap when the rotation commits.
+    const rr = worm.restReadSlice?.current;
+    if (rr && liveRotation.active && rr.axis === liveRotation.axis && rr.sliceIndex === liveRotation.sliceIndex) {
+        return false;
+    }
+
     if (worm.crossingCorner.current) {
         if (!liveRotation.active) return false;
         const { axis, sliceIndex, angle } = liveRotation;

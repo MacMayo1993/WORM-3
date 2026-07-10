@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { FACE_COLORS, ANTIPODAL_COLOR, FLIP_CAP, getHalfLifeMultiplier } from '../utils/constants.js';
@@ -100,10 +100,23 @@ const FlipPropagationWave = ({ origins, onComplete }) => {
  *   0-49 flips = slow breath, 50+ = 2x, 75+ = 4x, etc.
  * At FLIP_CAP the tile is dead — flat gray, no pulse.
  */
+const computeHeatHSL = (intensity) => {
+  if (intensity < 0.33) return [0.55 - intensity * 0.5, 1, 0.5];
+  if (intensity < 0.66) return [0.15, 1, 0.5];
+  return [0.05 - (intensity - 0.66) * 0.15, 1, 0.5 + intensity * 0.3];
+};
+
 export const ChaosHeatMap = ({ position, rotation, flips, maxFlips = 10 }) => {
   const glowRef = useRef();
   const pulseRef = useRef(0);
   const dead = flips >= FLIP_CAP;
+
+  const intensity = Math.min(1, flips / maxFlips);
+  const heatColor = useMemo(() => {
+    if (dead || flips === 0) return null;
+    const [h, s, l] = computeHeatHSL(intensity);
+    return new THREE.Color().setHSL(h, s, l);
+  }, [dead, flips, intensity]);
 
   useFrame((_state, delta) => {
     if (!glowRef.current) return;
@@ -124,7 +137,6 @@ export const ChaosHeatMap = ({ position, rotation, flips, maxFlips = 10 }) => {
     const bump2 = Math.exp(-Math.pow((t - 1.8) * 4, 2)) * 0.6;
     const heartbeat = bump1 + bump2;
 
-    const intensity = Math.min(1, flips / maxFlips);
     glowRef.current.material.opacity = intensity * (0.3 + heartbeat * 0.5);
 
     const scale = 1 + heartbeat * 0.15 * intensity;
@@ -147,17 +159,6 @@ export const ChaosHeatMap = ({ position, rotation, flips, maxFlips = 10 }) => {
         </mesh>
       </group>
     );
-  }
-
-  const intensity = Math.min(1, flips / maxFlips);
-  const heatColor = new THREE.Color();
-
-  if (intensity < 0.33) {
-    heatColor.setHSL(0.55 - intensity * 0.5, 1, 0.5);
-  } else if (intensity < 0.66) {
-    heatColor.setHSL(0.15, 1, 0.5);
-  } else {
-    heatColor.setHSL(0.05 - (intensity - 0.66) * 0.15, 1, 0.5 + intensity * 0.3);
   }
 
   return (

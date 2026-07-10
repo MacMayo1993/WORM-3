@@ -96,20 +96,20 @@ const LEGO_FACE_TRANSFORMS = {
 
 // A single detailed Lego stud on a given face, colored to match the face's sticker:
 // a tapered cylinder body, an embossed ring on top, and a small center pip.
-function LegoStud({ dir, color }) {
+function LegoStud({ dir, color, enableShadows = true }) {
   const t = LEGO_FACE_TRANSFORMS[dir];
   if (!t) return null;
   return (
     <group position={t.pos} rotation={t.rot}>
-      <mesh position={[0, 0.07, 0]} castShadow>
+      <mesh position={[0, 0.07, 0]} castShadow={enableShadows}>
         <cylinderGeometry args={LEGO_STUD_BODY_GEO} />
         <meshStandardMaterial color={color} roughness={0.35} metalness={0} envMapIntensity={0.6} />
       </mesh>
-      <mesh position={[0, 0.142, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+      <mesh position={[0, 0.142, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow={enableShadows}>
         <torusGeometry args={LEGO_STUD_RING_GEO} />
         <meshStandardMaterial color={color} roughness={0.28} metalness={0} envMapIntensity={0.75} />
       </mesh>
-      <mesh position={[0, 0.155, 0]} castShadow>
+      <mesh position={[0, 0.155, 0]} castShadow={enableShadows}>
         <cylinderGeometry args={LEGO_STUD_PIP_GEO} />
         <meshStandardMaterial color={color} roughness={0.3} metalness={0} envMapIntensity={0.7} />
       </mesh>
@@ -141,7 +141,7 @@ const faceRCFor = (dirKey, x, y, z, size) => {
 const Cubie = React.forwardRef(function Cubie({
   position, cubie, size, wormMode = false, hideBody = false, onPointerDown,
 }, ref) {
-  const { hollowMode, mirrorMode, visualMode, explosionFactor, settings, randomMode, randomStyleTick } = useGameStore(
+  const { hollowMode, mirrorMode, visualMode, explosionFactor, settings, randomMode, randomStyleTick, perfReducedFX } = useGameStore(
     useShallow(s => ({
       hollowMode: s.hollowMode,
       mirrorMode: s.mirrorMode,
@@ -150,8 +150,10 @@ const Cubie = React.forwardRef(function Cubie({
       settings: s.settings,
       randomMode: s.randomMode,
       randomStyleTick: s.randomStyleTick,
+      perfReducedFX: s.perfReducedFX,
     }))
   );
+  const enableShadows = !perfReducedFX;
   // faceColors needed locally for wireframe edge coloring
   const faceColors = useMemo(() => resolveColors(settings, settings?.biomeMode?.faceAssignment), [settings]);
 
@@ -163,13 +165,27 @@ const Cubie = React.forwardRef(function Cubie({
   const origHomeY = _firstStickerOrigPos?.y ?? cubie.y;
   const origHomeZ = _firstStickerOrigPos?.z ?? cubie.z;
 
+  // Worm mode: pieces carrying a flipped (wormhole) sticker wear the neon view style —
+  // dark emissive body + pulsing LED edge frame — isolated to just those tiles so the
+  // antipodal flip reads instantly against the rest of the cube. wormFlipKey encodes
+  // per-face flip state as a primitive string, so the memos below only recompute when a
+  // flip actually lands or heals; the LED frame itself is gated to the flipped faces.
+  const isFaceFlipped = (dirKey) => {
+    const s = cubie.stickers[dirKey];
+    return !!(s && s.flips > 0 && s.curr !== s.orig);
+  };
+  const wormFlipKey = wormMode
+    ? _DIRS.reduce((acc, d) => acc + (isFaceFlipped(d) ? '1' : '0'), '')
+    : '';
+  const wormNeon = wormFlipKey.indexOf('1') !== -1;
+
   // In Random Mode each cubelet wears its own view style, reshuffled every cycle
   // (randomStyleTick). Keyed by the piece's home position so the style follows the
   // physical cubelet through rotations rather than flickering. Outside Random Mode the
   // global View-tab visualMode applies to the whole cube exactly as before.
   const effectiveVisualMode = useMemo(
-    () => (randomMode ? pickCubeletViewStyle(origHomeX, origHomeY, origHomeZ, randomStyleTick) : visualMode),
-    [randomMode, randomStyleTick, visualMode, origHomeX, origHomeY, origHomeZ]
+    () => (wormNeon ? 'neon' : randomMode ? pickCubeletViewStyle(origHomeX, origHomeY, origHomeZ, randomStyleTick) : visualMode),
+    [wormNeon, randomMode, randomStyleTick, visualMode, origHomeX, origHomeY, origHomeZ]
   );
 
   // Derived per-style render switches.
@@ -302,8 +318,12 @@ const Cubie = React.forwardRef(function Cubie({
     const eps = 0.01;
     const edgeList = [];
 
+    // Worm-neon isolation: the LED frame outlines the flipped (wormhole) faces only,
+    // so the glow traces the tile itself rather than every exposed face of the piece.
+    const faceGlows = (onEdge, dirKey) => onEdge && (!wormNeon || isFaceFlipped(dirKey));
+
     // Front face (PZ) - 4 edges
-    if (isOnEdge.pz) {
+    if (faceGlows(isOnEdge.pz, 'PZ')) {
       const color = getEdgeColor('PZ');
       const intensity = 1.0;
 
@@ -316,7 +336,7 @@ const Cubie = React.forwardRef(function Cubie({
     }
 
     // Back face (NZ) - 4 edges
-    if (isOnEdge.nz) {
+    if (faceGlows(isOnEdge.nz, 'NZ')) {
       const color = getEdgeColor('NZ');
       const intensity = 1.0;
 
@@ -329,7 +349,7 @@ const Cubie = React.forwardRef(function Cubie({
     }
 
     // Right face (PX) - 4 edges (all edges, not just 2)
-    if (isOnEdge.px) {
+    if (faceGlows(isOnEdge.px, 'PX')) {
       const color = getEdgeColor('PX');
       const intensity = 1.0;
 
@@ -342,7 +362,7 @@ const Cubie = React.forwardRef(function Cubie({
     }
 
     // Left face (NX) - 4 edges
-    if (isOnEdge.nx) {
+    if (faceGlows(isOnEdge.nx, 'NX')) {
       const color = getEdgeColor('NX');
       const intensity = 1.0;
 
@@ -355,7 +375,7 @@ const Cubie = React.forwardRef(function Cubie({
     }
 
     // Top face (PY) - 4 edges
-    if (isOnEdge.py) {
+    if (faceGlows(isOnEdge.py, 'PY')) {
       const color = getEdgeColor('PY');
       const intensity = 1.0;
 
@@ -368,7 +388,7 @@ const Cubie = React.forwardRef(function Cubie({
     }
 
     // Bottom face (NY) - 4 edges
-    if (isOnEdge.ny) {
+    if (faceGlows(isOnEdge.ny, 'NY')) {
       const color = getEdgeColor('NY');
       const intensity = 1.0;
 
@@ -381,7 +401,7 @@ const Cubie = React.forwardRef(function Cubie({
     }
 
     return edgeList;
-  }, [effectiveVisualMode, isOnEdge, size, faceColors, stickerColorKey]);
+  }, [effectiveVisualMode, isOnEdge, size, faceColors, stickerColorKey, wormNeon, wormFlipKey]);
 
   // Mirror mode: derive this piece's intrinsic box dimensions from its *original*
   // home position (origHomeX/Y/Z above), not its current grid slot. rotateSliceCubies
@@ -433,7 +453,7 @@ const Cubie = React.forwardRef(function Cubie({
     <group scale={contentScale}>
       {/* Mirror mode: plain asymmetric box with chrome material, no stickers */}
       {mirrorMode ? (
-        <mesh onPointerDown={handleDown} castShadow receiveShadow>
+        <mesh onPointerDown={handleDown} castShadow={enableShadows} receiveShadow={enableShadows}>
           <boxGeometry args={mirrorDims} />
           <meshStandardMaterial color="#c8c8c8" roughness={0.08} metalness={0.92} envMapIntensity={1.2} />
         </mesh>
@@ -446,7 +466,7 @@ const Cubie = React.forwardRef(function Cubie({
 
           {/* 12 edge beams forming a hollow cube frame */}
           {HOLLOW_EDGES.map((edge, idx) => (
-            <mesh key={idx} position={edge.pos} castShadow receiveShadow>
+            <mesh key={idx} position={edge.pos} castShadow={enableShadows} receiveShadow={enableShadows}>
               <boxGeometry args={BEAM_DIMS[edge.geo]} />
               <primitive object={getHollowBeamMaterial(effectiveVisualMode)} attach="material" />
             </mesh>
@@ -460,7 +480,7 @@ const Cubie = React.forwardRef(function Cubie({
           <boxGeometry args={[0.98, 0.98, 0.98]} />
         </mesh>
       ) : (
-        <RoundedBox args={[0.98, 0.98, 0.98]} radius={0.08} smoothness={4} onPointerDown={handleDown} castShadow receiveShadow>
+        <RoundedBox args={[0.98, 0.98, 0.98]} radius={0.08} smoothness={4} onPointerDown={handleDown} castShadow={enableShadows} receiveShadow={enableShadows}>
           <meshStandardMaterial {...bodyMatProps} />
         </RoundedBox>
       )}
@@ -492,12 +512,12 @@ const Cubie = React.forwardRef(function Cubie({
       {/* Lego stud — one detailed stud on each visible face, colored by the face's current sticker */}
       {isLego && !mirrorMode && !hollowMode && (
         <>
-          {isEdge(position[2], (size - 1) / 2) && meta('PZ') && <LegoStud dir="PZ" color={getEdgeColor('PZ')} />}
-          {isEdge(position[2], -(size - 1) / 2) && meta('NZ') && <LegoStud dir="NZ" color={getEdgeColor('NZ')} />}
-          {isEdge(position[0], (size - 1) / 2) && meta('PX') && <LegoStud dir="PX" color={getEdgeColor('PX')} />}
-          {isEdge(position[0], -(size - 1) / 2) && meta('NX') && <LegoStud dir="NX" color={getEdgeColor('NX')} />}
-          {isEdge(position[1], (size - 1) / 2) && meta('PY') && <LegoStud dir="PY" color={getEdgeColor('PY')} />}
-          {isEdge(position[1], -(size - 1) / 2) && meta('NY') && <LegoStud dir="NY" color={getEdgeColor('NY')} />}
+          {isEdge(position[2], (size - 1) / 2) && meta('PZ') && <LegoStud dir="PZ" color={getEdgeColor('PZ')} enableShadows={enableShadows} />}
+          {isEdge(position[2], -(size - 1) / 2) && meta('NZ') && <LegoStud dir="NZ" color={getEdgeColor('NZ')} enableShadows={enableShadows} />}
+          {isEdge(position[0], (size - 1) / 2) && meta('PX') && <LegoStud dir="PX" color={getEdgeColor('PX')} enableShadows={enableShadows} />}
+          {isEdge(position[0], -(size - 1) / 2) && meta('NX') && <LegoStud dir="NX" color={getEdgeColor('NX')} enableShadows={enableShadows} />}
+          {isEdge(position[1], (size - 1) / 2) && meta('PY') && <LegoStud dir="PY" color={getEdgeColor('PY')} enableShadows={enableShadows} />}
+          {isEdge(position[1], -(size - 1) / 2) && meta('NY') && <LegoStud dir="NY" color={getEdgeColor('NY')} enableShadows={enableShadows} />}
         </>
       )}
     </group>

@@ -12,8 +12,10 @@
  */
 
 import React, { Suspense } from 'react';
+import { MONO_FONT } from '../utils/uiTheme.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
+import ScreenTransition from './ScreenTransition.jsx';
 
 // Always-loaded UI components
 import TopMenuBar from './menus/TopMenuBar.jsx';
@@ -93,6 +95,7 @@ export default function UILayer({
   const {
     sheetOpen, setSheetOpen, sheetMode, setSheetMode,
     showFreeplayWizard, showRandomWizard, showWormModeWizard, showCubeModeSelect,
+    showModeSelect,
     showMobiIntro, mobiLines, mobiModeName,
     showDisparityWizard, setShowDisparityWizard,
     showDisparityBetting,
@@ -199,10 +202,16 @@ export default function UILayer({
     triggerCameraOrbit: s.triggerCameraOrbit,
   })));
 
+  const hasFullScreenOverlay = showFreeplayWizard || showRandomWizard || showWormModeWizard
+    || showModeSelect || showDisparityWizard || showDisparityBetting || showCubeModeSelect || showLevelSelect
+    || showComingSoon || showMobiusCubelet || showMobiIntro || victory || showMergeThemePicker;
+
+  const showGameHUD = !wormHealerMode && !showMainMenu && !hasFullScreenOverlay;
+
   return (
     <>
       <div className="ui-layer">
-        {!wormHealerMode && !showMainMenu && <TopMenuBar
+        {showGameHUD && <TopMenuBar
           metrics={metrics}
           size={size}
           visualMode={visualMode}
@@ -224,9 +233,9 @@ export default function UILayer({
           <div
             style={{
               position: 'fixed', bottom: '20px', left: '20px',
-              background: 'rgba(0, 217, 255, 0.15)', border: '2px solid rgba(0, 217, 255, 0.4)',
-              borderRadius: '8px', padding: '8px 16px', color: '#00d9ff',
-              fontFamily: "'Courier New', monospace", fontSize: '14px', fontWeight: 'bold',
+              background: 'rgba(0, 0, 0, 0.80)', border: '2px solid rgba(255, 255, 255, 0.25)',
+              borderRadius: '8px', padding: '8px 16px', color: '#ffffff',
+              fontFamily: MONO_FONT, fontSize: '14px', fontWeight: 'bold',
               zIndex: 100, backdropFilter: 'blur(10px)', cursor: 'pointer',
             }}
             onClick={undo}
@@ -261,7 +270,7 @@ export default function UILayer({
           }}>
             <div key={disparityCountdown} style={{
               fontSize: disparityCountdown === 'GO!' ? '6rem' : '9rem',
-              fontWeight: 900, fontFamily: 'monospace',
+              fontWeight: 900, fontFamily: MONO_FONT,
               color: disparityCountdown === 'GO!' ? '#22c55e' : '#ef4444',
               textShadow: `0 0 40px ${disparityCountdown === 'GO!' ? '#22c55e' : '#ef4444'}`,
               animation: 'disparity-cd-pop 0.3s cubic-bezier(0.22,1,0.36,1) forwards',
@@ -280,14 +289,14 @@ export default function UILayer({
         )}
 
         {/* Disparity Betting Screen — intercepts before chaos starts */}
-        {showDisparityBetting && (
+        <ScreenTransition show={showDisparityBetting}>
           <Suspense fallback={null}>
             <DisparityBettingScreen onBetPlaced={onBetPlaced} onSkip={onBetSkipped} />
           </Suspense>
-        )}
+        </ScreenTransition>
 
         {/* Disparity Winner — cinematic celebration screen */}
-        {showDisparityWinner && (
+        <ScreenTransition show={showDisparityWinner}>
           <Suspense fallback={null}>
             <DisparityWinnerScreen
               onDismiss={() => {
@@ -298,13 +307,13 @@ export default function UILayer({
               }}
             />
           </Suspense>
-        )}
+        </ScreenTransition>
 
         {/* Tile Leaderboard — live flip stats in chaos mode, toggled via Views sheet */}
         <TileLeaderboard cubies={cubies} size={size} chaosMode={chaosMode} visible={showLeaderboard} onClose={toggleLeaderboard} />
 
         {/* Bottom Navigation Bar */}
-        {!wormHealerMode && !showMainMenu && (
+        {showGameHUD && (
           <BottomNavBar
             onReset={onReset}
             onShuffle={currentLevelData ? onShuffleForLevel : onShuffle}
@@ -323,7 +332,7 @@ export default function UILayer({
       </div>
 
       {/* Secondary Modes Bottom Sheet */}
-      {!wormHealerMode && !showMainMenu && <SecondaryModesSheet
+      {showGameHUD && <SecondaryModesSheet
         open={sheetOpen}
         onClose={() => setSheetOpen(false)}
         mode={sheetMode}
@@ -371,7 +380,7 @@ export default function UILayer({
         </div>
       )}
 
-      {showMainMenu && (
+      {showMainMenu && !showModeSelect && (
         <MainMenu
           onOpenModeSelect={onOpenModeSelect}
           onPlay={onMenuPlay}
@@ -392,25 +401,25 @@ export default function UILayer({
         />
       )}
 
-      {showComingSoon && (
+      <ScreenTransition show={showComingSoon}>
         <Suspense fallback={null}>
           <ComingSoonScreen onBack={onCloseComingSoon} />
         </Suspense>
-      )}
+      </ScreenTransition>
 
-      {showMobiusCubelet && (
+      <ScreenTransition show={showMobiusCubelet}>
         <Suspense fallback={null}>
           <MobiusCubeletScreen onBack={onCloseMobiusCubelet} />
         </Suspense>
-      )}
+      </ScreenTransition>
 
-      {showLevelSelect && (
+      <ScreenTransition show={showLevelSelect}>
         <Suspense fallback={null}>
           <LevelSelectScreen onSelectLevel={onLevelSelect} onBack={onBackToMainMenu} />
         </Suspense>
-      )}
+      </ScreenTransition>
 
-      {showSettings && (
+      <ScreenTransition show={showSettings}>
         <SettingsMenu
           onClose={() => setShowSettings(false)}
           settings={settings}
@@ -418,9 +427,9 @@ export default function UILayer({
           faceImages={faceImages}
           onFaceImage={onFaceImage}
         />
-      )}
+      </ScreenTransition>
 
-      {showCubeModeSelect && (
+      <ScreenTransition show={showCubeModeSelect}>
         <Suspense fallback={null}>
           <CubeModeSelectScreen
             onRubiks={onCubeModeRubiks}
@@ -428,25 +437,25 @@ export default function UILayer({
             onBack={onCubeModeBack}
           />
         </Suspense>
-      )}
+      </ScreenTransition>
 
-      {showFreeplayWizard && (
+      <ScreenTransition show={showFreeplayWizard}>
         <Suspense fallback={null}>
           <FreeplaySetupWizard onComplete={onWizardComplete} onCancel={onWizardCancel} initialSettings={settings} />
         </Suspense>
-      )}
+      </ScreenTransition>
 
-      {showRandomWizard && (
+      <ScreenTransition show={showRandomWizard}>
         <Suspense fallback={null}>
           <RandomModeSetupWizard onComplete={onRandomWizardComplete} onCancel={onRandomWizardCancel} initialSettings={settings} />
         </Suspense>
-      )}
+      </ScreenTransition>
 
-      {showWormModeWizard && (
+      <ScreenTransition show={showWormModeWizard}>
         <Suspense fallback={null}>
           <WormModeSetupWizard onComplete={onWormSetupComplete} onCancel={onWormWizardCancel} initialSettings={settings} />
         </Suspense>
-      )}
+      </ScreenTransition>
 
       {showMobiIntro && (
         <MobiIntroScreen
@@ -456,23 +465,25 @@ export default function UILayer({
         />
       )}
 
-      {showMergeThemePicker && (
+      <ScreenTransition show={showMergeThemePicker}>
         <Suspense fallback={null}>
           <MergeThemePicker onStart={onMergeStart} onBack={onMergeCancel} />
         </Suspense>
-      )}
+      </ScreenTransition>
 
-      {showDisparityWizard && (
+      <ScreenTransition show={showDisparityWizard}>
         <Suspense fallback={null}>
           <DisparitySetupWizard
             onStart={onDisparitySetupComplete}
             onCancel={() => { setShowDisparityWizard(false); useGameStore.getState().setShowMainMenu(true); }}
           />
         </Suspense>
-      )}
+      </ScreenTransition>
 
 
-      {showHelp && <HelpMenu onClose={() => setShowHelp(false)} />}
+      <ScreenTransition show={showHelp}>
+        <HelpMenu onClose={() => setShowHelp(false)} />
+      </ScreenTransition>
 
       {showFirstFlipTutorial && (
         <FirstFlipTutorial
@@ -522,7 +533,7 @@ export default function UILayer({
         </Suspense>
       )}
 
-      {victory && (
+      <ScreenTransition show={!!victory}>
         <Suspense fallback={null}>
           <VictoryScreen
             winType={victory} moves={moves} time={gameTime}
@@ -532,7 +543,7 @@ export default function UILayer({
             onMainMenu={() => { onSetVictory(null); onBackToMainMenu(); }}
           />
         </Suspense>
-      )}
+      </ScreenTransition>
 
       {showCutscene && currentLevel === 10 && (
         <Suspense fallback={null}>

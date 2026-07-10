@@ -1,8 +1,9 @@
-import React, { useRef, useEffect, useMemo } from 'react';
+import React, { useRef, useEffect, useMemo, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { FLIP_CAP, getHalfLifeMultiplier } from '../utils/constants.js';
 import { flipBurstMap } from '../3d/styles/TileStyleMaterials.jsx';
+import TunnelSparkShower from './TunnelSparkShower.jsx';
 
 // Lightning bolt / Core Tube point count
 const LIGHTNING_PTS = 40;
@@ -176,6 +177,13 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
   const streakMaterialRef = useRef();
   const coreOutlineTubeRef = useRef();
   const coreOutlineMatRef = useRef();
+
+  const [sparks, setSparks] = useState([]);
+  const sparkCooldownRef = useRef(0);
+  const sparkPos1Ref = useRef([0, 0, 0]);
+  const sparkPos2Ref = useRef([0, 0, 0]);
+  const sparkNorm1Ref = useRef([0, 0, 1]);
+  const sparkNorm2Ref = useRef([0, 0, -1]);
 
   const activeStreakCount = maxStrands > 30 ? STREAK_COUNT_HIGH : STREAK_COUNT_LOW;
   const streakSeed = useMemo(() => {
@@ -569,6 +577,24 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
       }
     }
 
+    // SPARK SHOWER — fires once per burst at both tunnel mouths
+    if (burstEnv > 0.5 && !dead && t > sparkCooldownRef.current) {
+      sparkCooldownRef.current = t + 0.4;
+      sparkPos1Ref.current = [_wPos1.x + _faceNorm1.x * 0.06, _wPos1.y + _faceNorm1.y * 0.06, _wPos1.z + _faceNorm1.z * 0.06];
+      sparkPos2Ref.current = [_wPos2.x + _faceNorm2.x * 0.06, _wPos2.y + _faceNorm2.y * 0.06, _wPos2.z + _faceNorm2.z * 0.06];
+      sparkNorm1Ref.current = [_faceNorm1.x, _faceNorm1.y, _faceNorm1.z];
+      sparkNorm2Ref.current = [_faceNorm2.x, _faceNorm2.y, _faceNorm2.z];
+      setSparks([{
+        id: t,
+        time: t,
+        p1: [...sparkPos1Ref.current], n1: [...sparkNorm1Ref.current],
+        p2: [...sparkPos2Ref.current], n2: [...sparkNorm2Ref.current],
+      }]);
+    }
+    if (sparks.length > 0 && t - sparks[0].time > 0.5) {
+      setSparks([]);
+    }
+
     // UPDATE STRANDS (Feeding into the main tunnel from the 8 spiral arms + center)
     const strands = strandsRef.current;
     if (strands) {
@@ -773,6 +799,13 @@ const WormholeTunnel = ({ gridId1, gridId2, meshIdx1, meshIdx2, dirKey1, dirKey2
           side={THREE.DoubleSide}
         />
       </mesh>
+
+      {sparks.map(s => (
+        <React.Fragment key={s.id}>
+          {active1 && <TunnelSparkShower position={s.p1} normal={s.n1} color={color1} startTime={s.time} />}
+          {active2 && <TunnelSparkShower position={s.p2} normal={s.n2} color={color2} startTime={s.time} />}
+        </React.Fragment>
+      ))}
     </group>
   );
 };

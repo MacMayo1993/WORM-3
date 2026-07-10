@@ -4,6 +4,7 @@
 
 import { useEffect, useRef, useCallback, useMemo } from 'react';
 import { useGameStore } from './useGameStore.js';
+import { useShallow } from 'zustand/react/shallow';
 import { useChaosWorker } from './useChaosWorker.js';
 
 const buildSurfaceCoords = (S) => {
@@ -38,27 +39,36 @@ const computeChaosMetrics = (state, surfCoords) => {
 export const chaosCountdownState = { countdown: 0 };
 
 export function useChaosMode() {
-  const chaosLevel = useGameStore((state) => state.chaosLevel);
-  const setChaosLevel = useGameStore((state) => state.setChaosLevel);
-  const disparityFlipCap = useGameStore((state) => state.disparityFlipCap);
-  const autoRotateEnabled = useGameStore((state) => state.autoRotateEnabled);
-  const setAutoRotateEnabled = useGameStore((state) => state.setAutoRotateEnabled);
-  const cascades = useGameStore((state) => state.cascades);
-  const setCascades = useGameStore((state) => state.setCascades);
-  const explosionT = useGameStore((state) => state.explosionT);
-  const size = useGameStore((state) => state.size);
-  const animState = useGameStore((state) => state.animState);
-  const cubies = useGameStore((state) => state.cubies);
-  const setCubies = useGameStore((state) => state.setCubies);
-  const rotationEpoch = useGameStore((state) => state.rotationEpoch);
-  const addDisparityDeathsBulk = useGameStore((state) => state.addDisparityDeathsBulk);
-  const addDisparityEliminatedFacesBulk = useGameStore((state) => state.addDisparityEliminatedFacesBulk);
-
-  const upcomingRotation = useGameStore((state) => state.upcomingRotation);
-  const setUpcomingRotation = useGameStore((state) => state.setUpcomingRotation);
-  const setRotationCountdown = useGameStore((state) => state.setRotationCountdown);
-  const setAnimState = useGameStore((state) => state.setAnimState);
-  const setPendingMove = useGameStore((state) => state.setPendingMove);
+  const {
+    chaosLevel, setChaosLevel, disparityFlipCap,
+    autoRotateEnabled, setAutoRotateEnabled,
+    cascades, setCascades, explosionT, size, animState,
+    cubies, setCubies, rotationEpoch,
+    addDisparityDeathsBulk, addDisparityEliminatedFacesBulk,
+    upcomingRotation, setUpcomingRotation, setRotationCountdown,
+    setAnimState, setPendingMove,
+  } = useGameStore(useShallow(s => ({
+    chaosLevel: s.chaosLevel,
+    setChaosLevel: s.setChaosLevel,
+    disparityFlipCap: s.disparityFlipCap,
+    autoRotateEnabled: s.autoRotateEnabled,
+    setAutoRotateEnabled: s.setAutoRotateEnabled,
+    cascades: s.cascades,
+    setCascades: s.setCascades,
+    explosionT: s.explosionT,
+    size: s.size,
+    animState: s.animState,
+    cubies: s.cubies,
+    setCubies: s.setCubies,
+    rotationEpoch: s.rotationEpoch,
+    addDisparityDeathsBulk: s.addDisparityDeathsBulk,
+    addDisparityEliminatedFacesBulk: s.addDisparityEliminatedFacesBulk,
+    upcomingRotation: s.upcomingRotation,
+    setUpcomingRotation: s.setUpcomingRotation,
+    setRotationCountdown: s.setRotationCountdown,
+    setAnimState: s.setAnimState,
+    setPendingMove: s.setPendingMove,
+  })));
 
   const chaosMode = chaosLevel > 0;
 

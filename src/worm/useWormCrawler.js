@@ -3,7 +3,8 @@ import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { getStickerWorldPos, getManifoldGridId } from '../game/coordinates.js';
-import { getNextSurfacePosition, getTunnelWorldPosInto, getWindWorldPosInto, turnWorm, getStableKey, isTileInSlice, rotateMoveDir, buildTunnelLookup, updateTunnelLookupIncremental } from './wormLogic.js';
+import { getNextSurfacePosition, getTunnelWorldPosInto, getWindWorldPosInto, turnWorm, getStableKey, isTileInSlice, nextRestRead, rotateMoveDir, buildTunnelLookup, updateTunnelLookupIncremental } from './wormLogic.js';
+import { liveRotation } from './liveRotation.js';
 import { flipStickerPair } from '../game/manifoldLogic.js';
 import { getManifoldMap } from '../game/manifoldMapStore.js';
 import { healSticker, getStickerSafe } from '../game/cubeState.js';
@@ -13,7 +14,7 @@ import { resolveColors } from '../utils/colorSchemes.js';
 import { healBurstMap } from '../3d/styles/TileStyleMaterials.jsx';
 import { activateSticker } from '../3d/StickerAnimationManager.js';
 import { EARN_ORB_COLLECT, EARN_WORM_SURVIVAL_TICK, EARN_WORM_HEALED_FACE, SURVIVAL_TICK_INTERVAL } from '../utils/economyConstants.js';
-import { vibrate } from '../utils/audio.js';
+import { feel } from '../utils/feel.js';
 import {
     WORM_LIFT,
     TUNNEL_SPEED_SCALE,
@@ -96,6 +97,10 @@ export function useWormCrawler(size, cubies) {
     const timeAliveRef = useRef(0);
     const survivalTickRef = useRef(0);
     const healedRef = useRef(0);
+    // Orb-pickup combo: consecutive pickups within COMBO_WINDOW seconds escalate the
+    // pickup pitch + haptic (rising reward), decaying back to 0 when the player idles.
+    const orbComboRef = useRef(0);
+    const lastOrbTimeRef = useRef(-999);
     // willHealRef: true when the active tunnel has enough deposited orbs to heal on exit.
     // Consumed by TunnelPortalRings to show the pop-and-seal animation instead of a fade.
     const willHealRef = useRef(false);
@@ -126,6 +131,15 @@ export function useWormCrawler(size, cubies) {
     // mid-step rotation can rotate this source in lockstep with the slice — otherwise the head
     // would lerp from the tile's pre-rotation world position and snap when the turn commits.
     const prevTile = useRef(null);
+    // Non-null while the current step must read a mid-rotation slice at its committed
+    // (end-of-rotation) state — armed when the head crosses from static ground onto a cell
+    // of the rotating slice. The worm then targets the CELL's rest position instead of
+    // chasing the outgoing tile, and stays on the cell when the rotation commits.
+    // See nextRestRead in wormLogic.js for the full transition rules.
+    const restReadSlice = useRef(null);
+    // Trail keys laid down while rest-reading. These cells were occupied at their rest
+    // positions (the worm did not ride the slice), so the commit-time trail remap skips them.
+    const restReadTileKeys = useRef(new Set());
     const lastRecordedT = useRef(0);
     const crossingCorner = useRef(false);
     const pendingSelfCollision = useRef(null);
@@ -203,6 +217,7 @@ export function useWormCrawler(size, cubies) {
         isJumping.current = true;
         jumpT.current = 0.001;
         jumpCount.current += 1;
+        feel('jump');
         // If the player jumps early on a flipped tile, don't auto-enter the tunnel.
         pendingTunnelTrigger.current = null;
     }, []);
@@ -230,6 +245,7 @@ export function useWormCrawler(size, cubies) {
         if (!alive.current) return;
         alive.current = false;
         phase.current = 'dead';
+        feel('death');
 
         if (deathMenuTimer.current) {
             clearTimeout(deathMenuTimer.current);
@@ -345,6 +361,7 @@ export function useWormCrawler(size, cubies) {
         tunnelProgress.current = 0;
         // Start with the wind-up flourish (spiral circle above the entry hole) before the dive.
         phase.current = 'windup';
+        feel('dive');
         onFlippedTile.current = false;
         lastFlippedRef.current = false;
         const prevState = useGameStore.getState();
@@ -370,7 +387,7 @@ export function useWormCrawler(size, cubies) {
     // re-writing the instanced color buffer on frames where nothing changed.
     const colorEpochRef = useRef(0);
 
-    const applyOrbPickupGrowth = (color, faceId) => {
+    const applyOrbPickupGrowth = useCallback((color, faceId) => {
         tailLength.current = Math.min(tailLength.current + ORB_SEGMENT_GROWTH, MAX_TAIL);
         orbPickupColorsRef.current.push(color);
         colorEpochRef.current++;
@@ -387,7 +404,38 @@ export function useWormCrawler(size, cubies) {
                 },
             } : {}),
         }));
-    };
+    }, []);
+
+    // Attempt to pick up a powerup sitting on the given tile (the worm's current cell).
+    // Shared by the step-commit path and the rotation-commit path — a rest-read landing
+    // defers pickup until the slice commits, then re-checks here so an orb that rode the
+    // rotating slice into the cell the worm occupies is still collected on contact.
+    const tryPickupPowerupAt = useCallback((x, y, z, dirKey) => {
+        const puIdx = powerupsRef.current.findIndex(p => p.x === x && p.y === y && p.z === z && p.dirKey === dirKey);
+        if (puIdx === -1) return;
+        const pickedUp = powerupsRef.current[puIdx];
+        // Read fresh store state rather than any tick-scope snapshot: spawnWormholePair() may
+        // have flipped a sticker pair earlier in the same tick, and a rotation commit may have
+        // just replaced the cubies array — a stale read would misjudge the hover rule below.
+        const liveCubies = useGameStore.getState().cubies;
+        const pickedSticker = getStickerSafe(liveCubies, pickedUp.x, pickedUp.y, pickedUp.z, pickedUp.dirKey);
+        // Orbs on flipped tiles hover above the surface — worm must jump to reach them.
+        const tileIsFlipped = !!(pickedSticker && pickedSticker.curr !== pickedSticker.orig);
+        if (tileIsFlipped && !isJumping.current) return; // crawled on without jumping — out of reach
+        const pickedFaceId = pickedSticker ? pickedSticker.curr : 0;
+        const liveColors = resolveColors(useGameStore.getState().settings);
+        const pickedColor = ensureOrbContrast((pickedFaceId && liveColors[pickedFaceId]) ?? '#22ff88');
+        applyOrbPickupGrowth(pickedColor, pickedFaceId);
+        pendingOrbFlashRef.current = { color: pickedColor, pos: curWorldPos.current.toArray() };
+        // Combo climbs when pickups come in quick succession (≤2s apart).
+        const _nowT = timeAliveRef.current;
+        orbComboRef.current = (_nowT - lastOrbTimeRef.current <= 2.0) ? orbComboRef.current + 1 : 0;
+        lastOrbTimeRef.current = _nowT;
+        feel('orb', { combo: orbComboRef.current });
+        const newPowerup = { ...randomFreeTile(size, [...powerupsRef.current, pos.current]), type: 'apple' };
+        powerupsRef.current[puIdx] = newPowerup;
+        useGameStore.getState().setWormPowerups(powerupsRef.current.slice());
+    }, [size, applyOrbPickupGrowth]);
 
     const spawnWormholePair = () => {
         const tile = randomUnflippedTile(cubiesRef.current, size, [pos.current]);
@@ -537,7 +585,7 @@ export function useWormCrawler(size, cubies) {
                             if (boostActiveT.current <= 0 && boostCooldownT.current <= 0) {
                                 boostActiveT.current = BOOST_DURATION;
                                 useGameStore.getState().setWormBoostState('active');
-                                vibrate(18);
+                                feel('boost');
                             }
                         } else if (t === 'jump') {
                             startJump();
@@ -681,7 +729,15 @@ export function useWormCrawler(size, cubies) {
                         const _htx = Math.min(size - 1, Math.max(0, Math.round(_evalHPos.x + _hk)));
                         const _hty = Math.min(size - 1, Math.max(0, Math.round(_evalHPos.y + _hk)));
                         const _htz = Math.min(size - 1, Math.max(0, Math.round(_evalHPos.z + _hk)));
-                        shPush(stepHistory.current, _evalLiftedPos, ptNorm, _htx, _hty, _htz);
+                        // Points recorded while rest-reading a mid-rotation slice already sit at
+                        // their committed positions — the -1 sentinel opts them out of the body
+                        // ride/bake, which would otherwise swing them along with the outgoing slice.
+                        const _rrs = restReadSlice.current;
+                        if (_rrs && isTileInSlice(_rrs.axis, _rrs.sliceIndex, _htx, _hty, _htz)) {
+                            shPush(stepHistory.current, _evalLiftedPos, ptNorm, -1, -1, -1);
+                        } else {
+                            shPush(stepHistory.current, _evalLiftedPos, ptNorm, _htx, _hty, _htz);
+                        }
                         lastRecordedT.current += 0.02; // A guaranteed resolution of 50 mathematical sub-steps per tile traverse
                     }
                     // -----------------------------------------------------------
@@ -710,6 +766,14 @@ export function useWormCrawler(size, cubies) {
                             const crossedFace = next.dirKey !== oldDirKey;
                             const nextPos = { x: next.x, y: next.y, z: next.z, dirKey: next.dirKey };
                             const nextKey = tileKey(nextPos);
+                            // End-of-rotation read: a step crossing onto a mid-rotation slice
+                            // targets the cell's committed state instead of chasing the tile
+                            // that is currently rotating away.
+                            restReadSlice.current = nextRestRead(
+                                restReadSlice.current, liveRotation.active, liveRotation.axis, liveRotation.sliceIndex,
+                                prevTile.current, nextPos
+                            );
+                            if (!restReadSlice.current) restReadTileKeys.current.clear();
                             // tailLength is measured in visual balls, not tiles.
                             // Convert to approximate occupied tile count so collision checks align with what players see.
                             const occupiedTiles = Math.max(1, Math.ceil((tailLength.current * BODY_BALL_SPACING) / 1.0));
@@ -733,6 +797,10 @@ export function useWormCrawler(size, cubies) {
                             if (nextOnSurface) {
                                 ttPush(tileTrail.current, nextKey);
                                 ttPush(pathHistory.current, nextKey);
+                                const _rr = restReadSlice.current;
+                                if (_rr && isTileInSlice(_rr.axis, _rr.sliceIndex, nextPos.x, nextPos.y, nextPos.z)) {
+                                    restReadTileKeys.current.add(nextKey);
+                                }
                             }
                             if (next.moveDir) moveDir.current = next.moveDir;
 
@@ -758,34 +826,16 @@ export function useWormCrawler(size, cubies) {
 
                         // Powerup collision
                         const { x, y, z, dirKey } = pos.current;
-                        const puIdx = powerupsRef.current.findIndex(p => p.x === x && p.y === y && p.z === z && p.dirKey === dirKey);
-                        if (puIdx !== -1) {
-                            const pickedUp = powerupsRef.current[puIdx];
-                            // Re-read fresh state rather than the `st` snapshot captured at the top of
-                            // this tick: spawnWormholePair() may have flipped a sticker pair earlier in
-                            // this same tick (line ~638), and `st.cubies` would still point at the
-                            // pre-spawn snapshot — causing a just-elevated orb tile to be misread as
-                            // unflipped and allow a ground pickup instead of requiring a jump.
-                            const liveCubies = useGameStore.getState().cubies;
-                            const pickedSticker = getStickerSafe(liveCubies, pickedUp.x, pickedUp.y, pickedUp.z, pickedUp.dirKey);
-                            // Orbs on flipped tiles hover above the surface — worm must jump to reach them
-                            const tileIsFlipped = !!(pickedSticker && pickedSticker.curr !== pickedSticker.orig);
-                            if (tileIsFlipped && !isJumping.current) {
-                                // Worm crawled onto the tile but didn't jump — orb is out of reach
-                            } else {
-                                const pickedFaceId = pickedSticker ? pickedSticker.curr : 0;
-                                const liveColors = resolveColors(useGameStore.getState().settings);
-                                const pickedColor = ensureOrbContrast((pickedFaceId && liveColors[pickedFaceId]) ?? '#22ff88');
-                                applyOrbPickupGrowth(pickedColor, pickedFaceId);
-                                pendingOrbFlashRef.current = { color: pickedColor, pos: curWorldPos.current.toArray() };
-                                const newPowerup = { ...randomFreeTile(size, [...powerupsRef.current, pos.current]), type: 'apple' };
-                                powerupsRef.current[puIdx] = newPowerup;
-                                useGameStore.getState().setWormPowerups(powerupsRef.current.slice());
-                            }
-                        }
+                        // While rest-reading, this cell's occupant (sticker, orb, tunnel mouth) is
+                        // still mid-flight — what actually lands here is only knowable at commit,
+                        // so pickup and flipped-tile detection are deferred. The rotationEpoch
+                        // handler re-runs both on the landed contents.
+                        const destMidRotation = !!(restReadSlice.current &&
+                            isTileInSlice(restReadSlice.current.axis, restReadSlice.current.sliceIndex, x, y, z));
+                        if (!destMidRotation) tryPickupPowerupAt(x, y, z, dirKey);
 
                         // Flipped tile detection
-                        const sticker = cubiesRef.current?.[x]?.[y]?.[z]?.stickers?.[dirKey];
+                        const sticker = destMidRotation ? null : cubiesRef.current?.[x]?.[y]?.[z]?.stickers?.[dirKey];
                         const isFlipped = !!(sticker && sticker.curr !== sticker.orig);
                         const resolved = isFlipped ? resolveTunnelAtTile(x, y, z, dirKey) : null;
                         const isVoidZone = !!(resolved && voidTunnelKeysRef.current.has(resolved.tunnelKey));
@@ -918,7 +968,8 @@ export function useWormCrawler(size, cubies) {
                         // Heal immediately at exit completion (not deferred) when enough orbs deposited.
                         const exitStore = useGameStore.getState();
                         const exitProgress = exitStableKey ? (exitStore.wormHealingProgress?.[exitStableKey]) : null;
-                        if (isHealReady(exitProgress?.deposited) && exitedTunnel) {
+                        const didHeal = isHealReady(exitProgress?.deposited) && !!exitedTunnel;
+                        if (didHeal) {
                             const { entry, exit: exitTile } = exitedTunnel;
                             // Write healBurstMap for both tiles BEFORE healing (sticker orig fields intact)
                             const entrySticker = getStickerSafe(exitStore.cubies, entry.x, entry.y, entry.z, entry.dirKey);
@@ -961,6 +1012,10 @@ export function useWormCrawler(size, cubies) {
                             }
                         }
                         // else: partial/no deposit — tunnel stays flipped, progress persists
+
+                        // One resolution cue per traversal: triumphant chime on a heal, otherwise
+                        // a plain pop as the worm bursts back out of the exit hole.
+                        feel(didHeal ? 'heal' : 'exit');
 
                         // Tunnel travel complete — windout spiral plays before resuming crawl.
                         // activeTunnel.current stays alive so windout can animate the exit spiral.
@@ -1007,7 +1062,7 @@ export function useWormCrawler(size, cubies) {
         }
         if (PHASE_HANDLERS[currentPhase].update(delta, STEP_SEC)) return;
 
-    }, [size, beginTunnelTransition, resolveTunnelAtTile, killWorm]);
+    }, [size, beginTunnelTransition, resolveTunnelAtTile, killWorm, tryPickupPowerupAt]);
 
 
 
@@ -1041,6 +1096,8 @@ export function useWormCrawler(size, cubies) {
         lastFlippedRef.current = false;
         prevDirKey.current = null;
         prevTile.current = null;
+        restReadSlice.current = null;
+        restReadTileKeys.current.clear();
         crossingCorner.current = false;
         interpT.current = 1;
         prevWorldPos.current = null;
@@ -1119,6 +1176,14 @@ export function useWormCrawler(size, cubies) {
                 if (!rot) return;
                 const { axis, dir, sliceIndex } = rot;
 
+                // Steps taken in rest-read mode did NOT ride this slice: the worm targeted its
+                // cells' committed rest positions, so its position, heading, lerp source and the
+                // trail entries it laid down stay put at commit instead of being carried 90°.
+                const restRead = restReadSlice.current;
+                const restMatches = !!(restRead && restRead.axis === axis && restRead.sliceIndex === sliceIndex);
+                restReadSlice.current = null;
+                const restKeys = restReadTileKeys.current;
+
                 // Rotate powerups
                 if (powerupsRef.current.length) {
                     const pu = powerupsRef.current;
@@ -1130,7 +1195,7 @@ export function useWormCrawler(size, cubies) {
                 // rotateTilePosition returns the SAME object when the tile wasn't in the slice,
                 // so `newPos !== oldPos` is an exact "did this tile ride the slice" test.
                 const oldPos = pos.current;
-                const newPos = rotateTilePosition(oldPos, axis, sliceIndex, dir, size);
+                const newPos = restMatches ? oldPos : rotateTilePosition(oldPos, axis, sliceIndex, dir, size);
                 pos.current = newPos;
                 { const _wp = getStickerWorldPos(newPos.x, newPos.y, newPos.z, newPos.dirKey, size, 0); _curWP.set(_wp[0], _wp[1], _wp[2]); curWorldPos.current = _curWP; }
 
@@ -1151,7 +1216,7 @@ export function useWormCrawler(size, cubies) {
                 // the tile it is coming FROM also rode the slice, rotate that source tile + world
                 // position too. Without this the head lerps from the pre-rotation source and
                 // visibly snaps to where the tile used to be at the end of the turn.
-                if (prevTile.current) {
+                if (prevTile.current && !restMatches) {
                     const rPrev = rotateTilePosition(prevTile.current, axis, sliceIndex, dir, size);
                     if (rPrev !== prevTile.current) {
                         prevTile.current = rPrev;
@@ -1172,12 +1237,36 @@ export function useWormCrawler(size, cubies) {
                 // Rotate the self-collision tile trail AND the render-only path history so the
                 // painted route stays glued to the surface through the turn (same remap fn).
                 const _remapTileKey = key => {
+                    // Cells occupied in rest space didn't ride the slice — their keys stay put.
+                    if (restMatches && restKeys.has(key)) return key;
                     parseTileKey(key, _parseTile);
                     const r = rotateTilePosition(_parseTile, axis, sliceIndex, dir, size);
                     return `${r.x},${r.y},${r.z},${r.dirKey}`;
                 };
                 ttMapInPlace(tileTrail.current, _remapTileKey);
                 ttMapInPlace(pathHistory.current, _remapTileKey);
+                restKeys.clear();
+
+                // Deferred pickup + flipped-tile detection for a rest-read landing: the step
+                // onto this cell couldn't read its contents (the occupant was mid-flight). Now
+                // that the rotation committed, check what actually landed under the worm —
+                // including an orb that rode the slice into this cell (powerupsRef was rotated
+                // above, so the lookup sees committed coordinates). Void-zone refinement is
+                // skipped here — beginTunnelTransition re-resolves the tunnel (and handles
+                // void kills) when the trigger actually fires.
+                if (restMatches && phase.current === 'crawling' &&
+                    isTileInSlice(axis, sliceIndex, pos.current.x, pos.current.y, pos.current.z)) {
+                    const { x, y, z, dirKey } = pos.current;
+                    tryPickupPowerupAt(x, y, z, dirKey);
+                    const landed = useGameStore.getState().cubies?.[x]?.[y]?.[z]?.stickers?.[dirKey];
+                    const landedFlipped = !!(landed && landed.curr !== landed.orig);
+                    onFlippedTile.current = landedFlipped;
+                    if (landedFlipped !== lastFlippedRef.current) {
+                        lastFlippedRef.current = landedFlipped;
+                        useGameStore.getState().setWormOnFlippedTile(landedFlipped);
+                    }
+                    if (landedFlipped) pendingTunnelTrigger.current = { x, y, z, dirKey };
+                }
 
                 // Bake the committed turn into the body's position history: rotate the world
                 // position, surface normal, and grid tag of every recorded point that sat in the
@@ -1222,11 +1311,11 @@ export function useWormCrawler(size, cubies) {
             }
         );
         return unsub;
-    }, [size]);
+    }, [size, tryPickupPowerupAt]);
 
     return {
         pos, moveDir, phase, tunnelProgress, activeTunnel, onFlippedTile,
-        interpT, prevWorldPos, curWorldPos, prevTile, crossingCorner, jumpT, isJumping, jumpLift,
+        interpT, prevWorldPos, curWorldPos, prevTile, restReadSlice, crossingCorner, jumpT, isJumping, jumpLift,
         headInterpPos, currentNormal,
         tailLength, stepHistory, orbPickupColorsRef, colorEpochRef, tick, queueTurn,
         voidTunnelKeysRef, tunnelUseCountsRef,

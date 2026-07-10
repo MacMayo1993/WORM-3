@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { LEVELS, isLevelUnlocked, loadProgress } from '../../utils/levels.js';
-import { UI_FONT } from '../../utils/uiTheme.js';
+import { UI_FONT, GLASS_PANEL_BORDER } from '../../utils/uiTheme.js';
 
 // We only track completion (not per-level star tiers), so a completed level
 // shows a full row of gold stars and the counter is derived from that.

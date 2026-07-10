@@ -6,7 +6,7 @@ import { gsap } from 'gsap';
 import BlackHoleEnvironment from '../../3d/BlackHoleEnvironment.jsx';
 import { FACE_COLORS } from '../../utils/constants.js';
 import { vibrate } from '../../utils/audio.js';
-import { UI_FONT } from '../../utils/uiTheme.js';
+import { UI_FONT, MONO_FONT } from '../../utils/uiTheme.js';
 
 // Simplified cubie for cutscene performance
 const CutsceneCubie = ({ position, size, scale = 1, emissiveIntensity = 0 }) => {
@@ -411,7 +411,7 @@ const CutsceneOverlay = ({ progress, phase: _phase }) => {
             fontSize: 'clamp(10px, 2vw, 16px)',
             color: '#4ecdc4',
             marginTop: '12px',
-            fontFamily: '"Courier New", monospace',
+            fontFamily: MONO_FONT,
             opacity: 0.8
           }}>
             k* = 0.721 — RP² TOPOLOGY ENGAGED
