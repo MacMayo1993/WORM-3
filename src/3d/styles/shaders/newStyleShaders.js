@@ -1255,13 +1255,17 @@ export const newStyleShaders = {
       float member = 1.0 - smoothstep(0.55, 0.78, abs(axisCoord - spinSlice));
       float sp = clamp(spin * member, 0.0, 1.0);
 
-      // --- Gaze direction: each eye looks independently ---
-      // Slow Lissajous with per-tile frequency/phase so every eye differs
-      float lx = sin(time * (0.2 + seed * 0.3) + seed * 6.283) * 0.3;
-      float ly = sin(time * (0.15 + seed2 * 0.25) + seed2 * 6.283) * 0.3;
-      // Startle jolt on spin
-      lx += sp * sin(seed3 * 31.0) * 0.15;
-      ly += sp * cos(seed4 * 31.0) * 0.15;
+      // --- Gaze direction: smooth continuous roaming ---
+      float t1 = time + seed * 100.0;
+      float t2 = time + seed2 * 100.0;
+      float lx = sin(t1 * 0.8) * 0.4
+               + sin(t1 * 0.35 + seed * 4.0) * 0.45
+               + sin(t1 * 1.6 + seed3 * 9.0) * 0.15;
+      float ly = sin(t2 * 0.6) * 0.4
+               + sin(t2 * 0.28 + seed2 * 5.0) * 0.45
+               + sin(t2 * 1.4 + seed4 * 8.0) * 0.15;
+      lx = clamp(lx, -1.0, 1.0) + sp * sin(seed3 * 31.0) * 0.2;
+      ly = clamp(ly, -1.0, 1.0) + sp * cos(seed4 * 31.0) * 0.2;
 
       // --- Socket / chamber for 3D depth ---
       float chamberR = 0.47;
@@ -1313,7 +1317,7 @@ export const newStyleShaders = {
         sclera = mix(sclera, vec3(0.92, 0.78, 0.75), smoothstep(0.85, 1.0, sn2Len) * 0.18);
 
         // --- Iris (offset by gaze direction) ---
-        vec2 irisUV = sn2 - lx * vec2(0.35, 0.0) - ly * vec2(0.0, 0.35);
+        vec2 irisUV = sn2 - vec2(lx, ly) * 0.55;
         float irisD = length(irisUV);
         float irisAngle = atan(irisUV.y, irisUV.x);
 
@@ -1382,6 +1386,31 @@ export const newStyleShaders = {
       // Contact shadow just outside sphere edge
       float contactShadow = smoothstep(eyeR + 0.04, eyeR + 0.002, d) * step(eyeR, d);
       col *= 1.0 - contactShadow * 0.45;
+
+      // --- Sporadic blink (darkens the whole eyeball) ---
+      float blinkPeriod = 2.5 + seed3 * 5.0;
+      float blinkT = mod(time + seed * 50.0, blinkPeriod);
+      float blink = 0.0;
+      // Primary blink
+      if (blinkT < 0.2)
+        blink = sin(blinkT / 0.2 * 3.14159);
+      // Occasional double-blink
+      if (seed > 0.5) {
+        float blink2T = mod(time + seed * 50.0 + 0.32, blinkPeriod);
+        if (blink2T < 0.15)
+          blink = max(blink, sin(blink2T / 0.15 * 3.14159) * 0.9);
+      }
+      // Close during spin
+      blink = max(blink, sp * 0.6);
+      // Apply: shrink visible area from top and bottom like closing eyelids
+      if (d < eyeR && blink > 0.01) {
+        float halfClose = blink * eyeR;
+        float upperLid = smoothstep(halfClose, halfClose - 0.015, p.y);
+        float lowerLid = smoothstep(-halfClose, -halfClose + 0.015, -p.y);
+        float lidCover = 1.0 - upperLid * lowerLid;
+        vec3 lidCol = antipodalColor * 0.35 + vec3(0.02);
+        col = mix(col, lidCol, lidCover);
+      }
 
       // Blend to frame outside chamber
       col = mix(frame, col, chamber);
