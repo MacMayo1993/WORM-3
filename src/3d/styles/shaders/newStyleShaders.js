@@ -2,7 +2,7 @@
 //                         oilSlick, constellation, waveform, dnaHelix, neonSign,
 //                         prismBloom, magnetFlux, liquidChrome, auroraWeave, plasmaCells,
 //                         quantumScanlines, emberstorm, fractalPulse, bioLattice, stellarLensing,
-//                         orbChamber, liquidTank, dice, sandChamber, lavaLamp
+//                         orbChamber, liquidTank, dice, sandChamber, lavaLamp, eyeball
 
 export const newStyleShaders = {
   // Stained Glass - cathedral leaded glass with radial + concentric segments
@@ -1209,6 +1209,181 @@ export const newStyleShaders = {
       vec3 frame = baseColor * 0.72;
       col = mix(frame, col, chamber);
 
+      gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+    }
+  `,
+
+  // Realistic eyeball in a chamber. White sclera, colored iris with radial
+  // fibers / limbal ring / collarette, per-tile random blinking with curved
+  // eyelids, Lissajous eye movement, spin-startle reaction.
+  eyeball: `
+    uniform vec3 baseColor;
+    uniform vec3 antipodalColor;
+    uniform float time;
+    uniform float spin;
+    uniform float spinAxis;
+    uniform float spinSlice;
+    varying vec2 vUv;
+    varying vec3 vNormal;
+    varying vec3 vViewPosition;
+    varying vec3 vTileCenter;
+
+    float eyeHash(vec2 p) {
+      return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+    }
+    float eyeNoise(vec2 p) {
+      vec2 i = floor(p);
+      vec2 f = fract(p);
+      f = f * f * (3.0 - 2.0 * f);
+      return mix(
+        mix(eyeHash(i), eyeHash(i + vec2(1.0, 0.0)), f.x),
+        mix(eyeHash(i + vec2(0.0, 1.0)), eyeHash(i + vec2(1.0, 1.0)), f.x),
+        f.y
+      );
+    }
+
+    void main() {
+      vec2 p = vUv - 0.5;
+      float r = length(p);
+
+      // Cotangent-frame parallax ray
+      vec3 pos = -vViewPosition;
+      vec3 dpdx = dFdx(pos);
+      vec3 dpdy = dFdy(pos);
+      vec2 duvx = dFdx(vUv);
+      vec2 duvy = dFdy(vUv);
+      vec3 N = normalize(vNormal);
+      vec3 dp2perp = cross(dpdy, N);
+      vec3 dp1perp = cross(N, dpdx);
+      vec3 T = dp2perp * duvx.x + dp1perp * duvy.x;
+      vec3 B = dp2perp * duvx.y + dp1perp * duvy.y;
+      float invmax = inversesqrt(max(dot(T, T), dot(B, B)));
+      T *= invmax; B *= invmax;
+      vec3 V = normalize(vViewPosition);
+      vec3 vT = vec3(dot(V, T), dot(V, B), dot(V, N));
+      vec3 ro = vec3(p, 0.0);
+      vec3 rd = normalize(-vT);
+
+      // Per-tile seeds
+      vec3 snapped = round(vTileCenter);
+      float seed  = fract(sin(dot(snapped.xy + snapped.z * 1.7, vec2(12.9898, 78.233))) * 43758.5453);
+      float seed2 = fract(seed * 7.31 + 0.137);
+      float seed3 = fract(seed2 * 3.47 + 0.891);
+
+      // Spin membership (layer detection)
+      float axisCoord = spinAxis < 0.5 ? vTileCenter.x
+                      : spinAxis < 1.5 ? vTileCenter.y
+                      : vTileCenter.z;
+      float member = 1.0 - smoothstep(0.55, 0.78, abs(axisCoord - spinSlice));
+      float sp = clamp(spin * member, 0.0, 1.0);
+
+      // Eye movement: gentle Lissajous drift + spin startle jolt
+      float mx = sin(time * (0.37 + seed * 0.25) + seed * 6.283) * 0.055;
+      float my = sin(time * (0.29 + seed2 * 0.2) + seed2 * 6.283) * 0.04;
+      mx += sp * sin(seed * 31.0) * 0.1;
+      my += sp * cos(seed2 * 31.0) * 0.1;
+
+      // Ray-sphere intersection for eyeball
+      float eyeR = 0.3;
+      vec3 sc = vec3(mx, my, -0.2);
+      vec3 oc = ro - sc;
+      float bv = dot(oc, rd);
+      float cv = dot(oc, oc) - eyeR * eyeR;
+      float disc = bv * bv - cv;
+
+      float chamberR = 0.48;
+      float chamber = 1.0 - smoothstep(chamberR - 0.015, chamberR + 0.015, r);
+      vec3 col = antipodalColor * 0.12;
+
+      if (disc > 0.0) {
+        float t = -bv - sqrt(disc);
+        if (t > 0.0) {
+          vec3 hn = normalize(ro + rd * t - sc);
+          float irisR = length(hn.xy);
+          float irisAngle = atan(hn.y, hn.x);
+
+          // Sclera with subtle edge-darkening and veins
+          vec3 sclera = vec3(0.96, 0.94, 0.92);
+          float edgeDark = smoothstep(0.3, 0.95, irisR);
+          sclera *= 1.0 - edgeDark * 0.15;
+          float vein = eyeNoise(vec2(irisAngle * 4.0 + seed * 10.0, irisR * 6.0));
+          sclera = mix(sclera, vec3(0.85, 0.6, 0.6), step(0.65, vein) * edgeDark * 0.3);
+
+          // Iris mask and parameters
+          float irisOuterR = 0.38;
+          float pupilR = 0.11 + sp * 0.04;
+          float irisMask = smoothstep(irisOuterR + 0.015, irisOuterR - 0.02, irisR);
+
+          // Limbal ring (dark iris border)
+          float limbal = smoothstep(irisOuterR - 0.07, irisOuterR - 0.01, irisR);
+
+          // Radial fibers (two frequency layers)
+          float f1 = (sin(irisAngle * 47.0 + irisR * 14.0) * 0.5 + 0.5)
+                   * eyeNoise(vec2(irisAngle * 6.0 + seed * 5.0, irisR * 18.0));
+          float f2 = sin(irisAngle * 73.0 - irisR * 9.0 + seed * 20.0) * 0.5 + 0.5;
+          float fibers = mix(f1, f2, 0.3);
+
+          // Collarette (lighter ring around pupil)
+          float coll = smoothstep(pupilR + 0.02, pupilR + 0.06, irisR)
+                     * (1.0 - smoothstep(pupilR + 0.06, pupilR + 0.12, irisR));
+
+          // Iris color: radial gradient + fibers + collarette + limbal darkening
+          float radialT = smoothstep(pupilR + 0.02, irisOuterR - 0.02, irisR);
+          vec3 irisCol = mix(baseColor * 1.35 + vec3(0.08), baseColor * 0.5, radialT);
+          irisCol += baseColor * fibers * 0.22;
+          irisCol += vec3(0.1) * coll;
+          irisCol = mix(irisCol, baseColor * 0.1, limbal * 0.65);
+
+          // Crypts (small darker patches in mid-iris)
+          float crypts = eyeNoise(vec2(irisAngle * 3.0 + seed * 7.0, irisR * 12.0 + seed2 * 5.0));
+          irisCol = mix(irisCol, baseColor * 0.25, smoothstep(0.55, 0.75, crypts) * 0.15 * (1.0 - limbal));
+
+          // Pupil
+          irisCol = mix(irisCol, vec3(0.012), 1.0 - smoothstep(pupilR - 0.015, pupilR + 0.012, irisR));
+
+          col = mix(sclera, irisCol, irisMask);
+
+          // Corneal highlights
+          col += vec3(1.0) * smoothstep(0.065, 0.0, length(hn.xy - vec2(-0.1, 0.14))) * 0.55;
+          col += vec3(1.0) * smoothstep(0.03, 0.0, length(hn.xy - vec2(-0.05, 0.06))) * 0.25;
+
+          // Diffuse + AO
+          col *= 0.75 + max(dot(hn, normalize(vec3(0.3, 0.4, 1.0))), 0.0) * 0.25;
+          col *= 0.85 + smoothstep(0.0, 0.2, hn.z) * 0.15;
+        }
+      }
+
+      // --- Blinking ---
+      float blinkPeriod = 3.0 + seed3 * 4.0;
+      float blinkPhase = mod(time + seed * 100.0, blinkPeriod);
+      float lidClose = 0.0;
+      if (blinkPhase < 0.18)
+        lidClose = sin(blinkPhase / 0.18 * 3.14159);
+      if (seed > 0.6) {
+        float bp2 = mod(time + seed * 100.0 + 0.35, blinkPeriod);
+        if (bp2 < 0.12)
+          lidClose = max(lidClose, sin(bp2 / 0.12 * 3.14159) * 0.85);
+      }
+      lidClose = max(lidClose, sp * 0.7);
+
+      // Curved eyelids (almond-shaped opening)
+      vec2 ep = p - vec2(mx, my);
+      float openGap = eyeR * 1.05 * (1.0 - lidClose);
+      float exn = ep.x / eyeR;
+      float upperEdge = openGap * (1.0 - 2.5 * exn * exn);
+      float lowerEdge = openGap * (1.0 - 1.8 * exn * exn);
+      float upperCover = smoothstep(upperEdge - 0.01, upperEdge + 0.01, ep.y);
+      float lowerCover = 1.0 - smoothstep(-lowerEdge - 0.01, -lowerEdge + 0.01, ep.y);
+      float lidMask = max(upperCover, lowerCover);
+
+      vec3 skinCol = antipodalColor * 0.3 + vec3(0.04, 0.02, 0.015);
+      float eyeRegion = 1.0 - smoothstep(eyeR + 0.02, eyeR + 0.08, length(ep));
+      col = mix(col, skinCol, lidMask * eyeRegion * chamber);
+
+      // Lid crease shadow
+      col -= vec3(0.035) * smoothstep(0.015, 0.0, abs(ep.y - upperEdge)) * step(0.03, openGap) * eyeRegion * chamber;
+
+      col = mix(antipodalColor * 0.08, col, chamber);
       gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
     }
   `,
