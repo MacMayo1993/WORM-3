@@ -1387,31 +1387,6 @@ export const newStyleShaders = {
       float contactShadow = smoothstep(eyeR + 0.04, eyeR + 0.002, d) * step(eyeR, d);
       col *= 1.0 - contactShadow * 0.45;
 
-      // --- Sporadic blink (darkens the whole eyeball) ---
-      float blinkPeriod = 2.5 + seed3 * 5.0;
-      float blinkT = mod(time + seed * 50.0, blinkPeriod);
-      float blink = 0.0;
-      // Primary blink
-      if (blinkT < 0.2)
-        blink = sin(blinkT / 0.2 * 3.14159);
-      // Occasional double-blink
-      if (seed > 0.5) {
-        float blink2T = mod(time + seed * 50.0 + 0.32, blinkPeriod);
-        if (blink2T < 0.15)
-          blink = max(blink, sin(blink2T / 0.15 * 3.14159) * 0.9);
-      }
-      // Close during spin
-      blink = max(blink, sp * 0.6);
-      // Apply: shrink visible area from top and bottom like closing eyelids
-      if (d < eyeR && blink > 0.01) {
-        float halfClose = blink * eyeR;
-        float upperLid = smoothstep(halfClose, halfClose - 0.015, p.y);
-        float lowerLid = smoothstep(-halfClose, -halfClose + 0.015, -p.y);
-        float lidCover = 1.0 - upperLid * lowerLid;
-        vec3 lidCol = antipodalColor * 0.35 + vec3(0.02);
-        col = mix(col, lidCol, lidCover);
-      }
-
       // Blend to frame outside chamber
       col = mix(frame, col, chamber);
 
