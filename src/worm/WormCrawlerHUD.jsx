@@ -11,6 +11,7 @@ import { ANTIPODAL_COLOR } from '../utils/constants.js';
 import OrbInventoryHUD from './OrbInventoryHUD.jsx';
 import ParityWallet from '../components/overlays/ParityWallet.jsx';
 import { callWormTurn } from './wormTurnBridge.js';
+import { wormClock } from './wormClock.js';
 import { BOOST_COOLDOWN } from './healerWorm/constants.js';
 import { MenuTitleCard } from '../components/menus/MainMenu.jsx';
 import DeathScreen from './DeathScreens.jsx';
@@ -595,10 +596,11 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
         fontSize: 12, fontWeight: 700, color: '#0f172a',
         cursor: 'pointer', touchAction: 'manipulation',
     });
-    // Subscribed here (not in the main HUD selector) on purpose: the countdown updates
-    // at 10 Hz while crawling, and this menu is the only place the value is displayed —
-    // keeping it out of the main selector stops the whole HUD re-rendering every tick.
-    const wormholeCountdown = useGameStore(s => s.wormholeCountdown ?? 0);
+    // Read from the wormClock bridge (not the store) on purpose: the countdown changes
+    // every frame while crawling but the crawler tick is frozen while paused, so a
+    // mount-time snapshot is exact for as long as this menu is visible. Keeping it out
+    // of the store removes a 10 Hz set() whose only effect was selector churn app-wide.
+    const wormholeCountdown = wormClock.countdown;
 
     return (
         <div style={PAUSE_OVERLAY_STYLE} onPointerDown={onResume}>
@@ -717,8 +719,8 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
             wormSpeed: s.wormSpeed ?? 1.0,
             wormHealedCount: s.wormHealedCount ?? 0,
             wormBodyTiles: s.wormBodyTiles ?? 0,
-            // NOTE: wormholeCountdown deliberately NOT selected here — it updates at 10 Hz
-            // and is only shown inside PauseMenu, which subscribes to it itself.
+            // NOTE: the wormhole countdown lives in the wormClock bridge (not the store) —
+            // it changes every frame and is only shown inside PauseMenu, which snapshots it.
             wormControlMode: s.wormControlMode ?? 'non-oriented',
             wormTimeAlive: s.wormTimeAlive ?? 0,
             wormTunnelCount: s.wormTunnelCount ?? 0,

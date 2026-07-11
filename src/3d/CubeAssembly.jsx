@@ -23,6 +23,7 @@ import { liveCubies } from '../worm/liveCubies.js';
 import { healSticker } from '../game/cubeState.js';
 import { buildManifoldGridMap, findAntipodalStickerByGrid, getManifoldNeighbors } from '../game/manifoldLogic.js';
 import { EARN_DISPARITY_TILE_RESTORE } from '../utils/economyConstants.js';
+import { pruneExpiredFx } from '../utils/transientFx.js';
 
 // Reusable axis vectors and quaternion (allocated once, never recreated)
 const _axisCol = new THREE.Vector3(1, 0, 0);
@@ -552,7 +553,7 @@ const CubeAssembly = React.memo(({
                       }
                     }
                   }
-                  useGameStore.setState((s) => ({ cubies: updated, cubiePops: { ...s.cubiePops, ...pops } }));
+                  useGameStore.setState((s) => ({ cubies: updated, cubiePops: { ...pruneExpiredFx(s.cubiePops, now), ...pops } }));
                 };
                 if (waveIdx === 0) fire(); else setTimeout(fire, waveIdx * 130);
               });

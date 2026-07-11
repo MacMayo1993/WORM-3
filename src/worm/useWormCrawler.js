@@ -48,6 +48,7 @@ import {
 import { computeOrbDeposit, classifyTraversal, orbsCarried, isHealReady } from './healerWorm/economy.js';
 import { makeStepHistory, shPush, shReset, makeTileTrail, ttPush, ttAt, ttReset, ttMapInPlace, ttFilterInPlace } from './circularBuffers.js';
 import { rotateTilePosition, parseTileKey, _parseTile, ensureOrbContrast } from './wormHelpers.js';
+import { wormClock } from './wormClock.js';
 
 // Axis scratch for baking a committed turn into the worm's position history.
 const _bakeAxis = new THREE.Vector3();
@@ -168,7 +169,6 @@ export function useWormCrawler(size, cubies) {
     const powerupsRef = useRef([]);  // local fast-access copy of wormPowerups
     const stepHistory = useRef(makeStepHistory(MAX_TAIL * STEPS_PER_TILE)); // pre-allocated ring, used by WormBody
     const wormholeTimer = useRef(DEFAULT_WORMHOLE_FLIP_INTERVAL);
-    const lastCountdownDeci = useRef(-1);
     const alive = useRef(true);
     const tileTrail = useRef(makeTileTrail(MAX_TAIL));
     // Render-only full-route history for the persistent worm trail. Kept separate from
@@ -519,12 +519,11 @@ export function useWormCrawler(size, cubies) {
                 wormholeTimer.current = wormholeIntervalRef.current;
             }
         }
-        const countdown = noMoreSpawns ? 0 : Math.max(0, Math.ceil(wormholeTimer.current * 10) / 10);
-        const countdownDeci = Math.round(countdown * 10);
-        if (countdownDeci !== lastCountdownDeci.current) {
-            lastCountdownDeci.current = countdownDeci;
-            st.setWormholeCountdown(countdown);
-        }
+        // Published through the wormClock bridge, NOT the store: the countdown is only
+        // displayed in the pause menu, and this tick bails out while paused, so the value
+        // is frozen for the entire time it is visible. A store write every decisecond
+        // bought nothing except re-running every subscriber's selector across the app.
+        wormClock.countdown = noMoreSpawns ? 0 : Math.max(0, Math.ceil(wormholeTimer.current * 10) / 10);
 
         // Always advance jump
         if (isJumping.current) {
@@ -1133,7 +1132,6 @@ export function useWormCrawler(size, cubies) {
             wormOrbInventory: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
             wormHealingProgress: {},
             wormHealedCount: 0,
-            wormholeCountdown: wormholeInterval,
             wormAlive: true,
             showWormDeathMenu: false,
             wormDeathDetails: null,
@@ -1146,7 +1144,7 @@ export function useWormCrawler(size, cubies) {
             wormTunnelCount: 0,
         });
         wormholeTimer.current = wormholeInterval;
-        lastCountdownDeci.current = Math.round(wormholeInterval * 10);
+        wormClock.countdown = wormholeInterval;
     }, [size, wormRunId, wormOrbCount, wormholeInterval]);
 
     useEffect(() => () => {

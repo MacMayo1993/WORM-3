@@ -115,6 +115,10 @@ const makeDisparityRuntimeDefaults = () => ({
   disparityParityScore: 0,
   cascades: [],
   holonomyMode: false,
+  // Transient FX maps — animations from a previous session are irrelevant.
+  cubiePops: {},
+  tunnelBirths: {},
+  tunnelPulses: {},
 });
 
 // Worm session fields reset on each worm run.
@@ -124,7 +128,6 @@ const makeWormSessionDefaults = () => ({
   wormOnFlippedTile: false,
   wormBodyTiles: 0,
   wormPowerups: [],
-  wormholeCountdown: 0,
   wormAlive: true,
   showWormDeathMenu: false,
   wormDeathDetails: null,
@@ -194,7 +197,6 @@ const createWormSlice = (set, _get) => ({
   setWormOnFlippedTile: (v) => set({ wormOnFlippedTile: v }),
   setWormBodyTiles: (v) => set({ wormBodyTiles: v }),
   setWormPowerups: (v) => set({ wormPowerups: v }),
-  setWormholeCountdown: (v) => set({ wormholeCountdown: v }),
   setWormAlive: (v) => set({ wormAlive: v }),
   setShowWormDeathMenu: (v) => set({ showWormDeathMenu: v }),
   setWormDeathDetails: (v) => set({ wormDeathDetails: v }),
@@ -304,6 +306,9 @@ export const useGameStore = create(
       flipWaveOrigins: [],
       exploded: false,
       explosionT: 0,
+      cubiePops: {},
+      tunnelBirths: {},
+      tunnelPulses: {},
     }),
 
     // ========================================================================
