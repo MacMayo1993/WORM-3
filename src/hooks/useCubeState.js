@@ -17,6 +17,7 @@ import { ANTIPODAL_COLOR } from '../utils/constants.js';
 import { resolveColors } from '../utils/colorSchemes.js';
 import { isInRefractory, markFlipped, clearRefractory } from '../game/refractoryMap.js';
 import { computeMergeRegions } from '../modes/merge/index.js';
+import { pruneExpiredFx } from '../utils/transientFx.js';
 
 // Recompute merge region tiers from the current store state and persist them.
 // Called imperatively after every rotation/shuffle when merge mode is active.
@@ -193,22 +194,24 @@ export function useCubeState() {
       moveHistory: [...state.moveHistory, { type: 'flip', pos: { ...pos }, dirKey, timestamp: ts }].slice(-10),
       flipWaveOrigins: origins,
       blackHolePulse: ts,
-      // Cubie pop: both the clicked cubie and its antipodal partner burst outward
+      // Cubie pop: both the clicked cubie and its antipodal partner burst outward.
+      // Each map is pruned of already-finished animations on the way through so
+      // it stays bounded to the pops/births/pulses actually in flight.
       cubiePops: {
-        ...state.cubiePops,
+        ...pruneExpiredFx(state.cubiePops, now),
         [srcKey]: { startMs: now, durationMs: 600 },
         ...(antKey ? { [antKey]: { startMs: now, durationMs: 600 } } : {}),
       },
       // Tunnel birth: first flip on this pair → grow-in animation on the Möbius ribbon
       tunnelBirths: (isFirstFlipOnPair && pairId) ? {
-        ...state.tunnelBirths,
+        ...pruneExpiredFx(state.tunnelBirths, now),
         [pairId]: { startMs: now, durationMs: 700 },
-      } : state.tunnelBirths,
+      } : pruneExpiredFx(state.tunnelBirths, now),
       // Tunnel pulse: subsequent flips → brightness burst on the existing ribbon
       tunnelPulses: (!isFirstFlipOnPair && pairId) ? {
-        ...state.tunnelPulses,
+        ...pruneExpiredFx(state.tunnelPulses, now),
         [pairId]: { startMs: now, durationMs: 400 },
-      } : state.tunnelPulses,
+      } : pruneExpiredFx(state.tunnelPulses, now),
       ...(isFirstFlip ? { hasFlippedOnce: true } : {}),
     }));
 
