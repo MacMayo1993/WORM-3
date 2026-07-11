@@ -1,0 +1,1162 @@
+// src/worm/healerWorm/wormSim.js
+//
+// Pure(-ish) worm simulation core, extracted from useWormCrawler.js (2026-07).
+//
+// All gameplay state lives in ONE plain object (makeWormSim) and is advanced by
+// module-level functions — no React, no Zustand import, no audio. Everything the
+// sim needs from the outside world comes through a `ctx` port supplied by the
+// caller (useWormCrawler in production, a stub in tests):
+//
+//   reads  — ctx.getCubies(), getGamePhase(), isPaused(), getSpeed(),
+//            getControlMode(), getWormholeInterval(), isPrismCharacter(),
+//            getOrbInventory(), getHealingProgress(), getOrbColor(faceId),
+//            resolveTunnel(x, y, z, dirKey)
+//   writes — ctx.feel(name, opts), onDeath(details, timeAlive),
+//            onTunnelEnter(tunnel), onCrawlResume(), onPhase(phase),
+//            onBoostState(state), onSurvivalTick(), spawnWormholePair(tile),
+//            onFlippedTile(bool), applyDeposit(deposit, stableKey, faceId),
+//            onOrbPickup(faceId, orbCount), onPowerupsChanged(list),
+//            applyHeal(entry, exitTile, stableKey, healedCount)
+//
+// Each ctx write method corresponds 1:1 to a store/feel call-site in the
+// pre-extraction hook, so the control flow in here is a verbatim translation of
+// the original tick (refs → sim fields). The split makes the crawl/turn/tunnel
+// state machine deterministic and unit-testable: drive stepWormSim with fixed
+// dt values and a stubbed ctx, then assert on the sim object.
+//
+// The sim DOES read the shared `liveRotation` bridge (mid-rotation slice state
+// written by CubeAssembly each frame) — it is a plain mutable module, settable
+// from tests, and injecting it through ctx would only obscure the contract.
+
+import * as THREE from 'three';
+import { getStickerWorldPos } from '../../game/coordinates.js';
+import { getStickerSafe } from '../../game/cubeState.js';
+import { rotateVec90 } from '../../game/cubeRotation.js';
+import {
+    getNextSurfacePosition,
+    getTunnelWorldPosInto,
+    getWindWorldPosInto,
+    turnWorm,
+    getStableKey,
+    isTileInSlice,
+    nextRestRead,
+    rotateMoveDir,
+} from '../wormLogic.js';
+import { liveRotation } from '../liveRotation.js';
+import { rotateTilePosition, parseTileKey, _parseTile } from '../wormHelpers.js';
+import {
+    makeStepHistory, shPush, shReset,
+    makeTileTrail, ttPush, ttAt, ttReset, ttMapInPlace, ttFilterInPlace,
+} from '../circularBuffers.js';
+import { isSurfaceTilePos, randomFreeTile, randomUnflippedTile } from './surfaceTiles.js';
+import { computeOrbDeposit, classifyTraversal, orbsCarried, isHealReady } from './economy.js';
+import { SURVIVAL_TICK_INTERVAL } from '../../utils/economyConstants.js';
+import {
+    WORM_LIFT,
+    TUNNEL_SPEED_SCALE,
+    FACE_NORMALS,
+    INITIAL_DIR,
+    INITIAL_POS,
+    ORB_SEGMENT_GROWTH,
+    STEPS_PER_TILE,
+    BODY_BALL_SPACING,
+    BASE_TAIL_LENGTH,
+    DEFAULT_WORMHOLE_FLIP_INTERVAL,
+    MAX_JUMPS,
+    TUNNEL_TRIGGER_PROGRESS,
+    SELF_COLLISION_TRIGGER_PROGRESS,
+    SELF_COLLISION_GRACE_STEPS_AFTER_TUNNEL,
+    MAX_TAIL,
+    SURFACE_JUMP_HEIGHT,
+    SURFACE_JUMP_TILE_SPAN,
+    BOOST_MULTIPLIER,
+    BOOST_DURATION,
+    BOOST_COOLDOWN,
+    MAX_TICK_DELTA,
+    TRAIL_HISTORY_CAP,
+} from './constants.js';
+
+// Axis scratch for baking a committed turn into the worm's position history.
+const _bakeAxis = new THREE.Vector3();
+
+// ─── Scratch vectors for evaluatePosAndNormal (avoids per-sub-step allocations) ──
+const _evalHPos = new THREE.Vector3();
+const _evalCornerVtx = new THREE.Vector3();
+const _evalCornerNorm = new THREE.Vector3(); // reused for face-crossing normal blend
+// Extra scratch for computing the lifted position before writing into stepHistory
+const _evalLiftedPos = new THREE.Vector3();
+
+export const tileKey = (p) => `${p.x},${p.y},${p.z},${p.dirKey}`;
+
+/**
+ * Allocate a fresh worm simulation state object. All gameplay state — position,
+ * phase, trails, timers, tunnel bookkeeping — lives here as plain fields
+ * (plus a few owned THREE.Vector3 / ring-buffer instances). One sim per run;
+ * reuse across runs via resetWormSim.
+ */
+export function makeWormSim(size) {
+    const sim = {
+        // ── Core movement ──────────────────────────────────────────────────────
+        pos: INITIAL_POS(size),
+        moveDir: INITIAL_DIR,
+        phase: 'crawling',
+        prevPhase: 'crawling',
+        alive: true,
+        stepAcc: 0,
+        pendingTurns: [],
+        // Tracks the previous frame's STEP_SEC so stepAcc can be rescaled when the crawl
+        // speed changes mid-step (boost toggling, or the speed slider) — keeps
+        // stepAcc/STEP_SEC (which equals interpT) consistent so a speed change never
+        // force-crosses a tile early and scatters the body trail.
+        prevStepSec: null,
+        // Smooth inter-tile interpolation
+        interpT: 1,               // 0→1 between prev and current tile
+        prevWorldPos: null,       // null = no prev yet; otherwise aliases _prevWP below
+        curWorldPos: null,        // always aliases _curWP below (set in makeWormSim tail)
+        headInterpPos: new THREE.Vector3(),
+        currentNormal: new THREE.Vector3(0, 0, 1),
+        // Owned world-position slots — two dedicated vectors so prevWorldPos and
+        // curWorldPos never alias the same object.
+        _curWP: new THREE.Vector3(),
+        _prevWP: new THREE.Vector3(),
+        prevDirKey: null,
+        // The grid tile the head is interpolating FROM (the lerp source). Tracked
+        // explicitly so a mid-step rotation can rotate this source in lockstep with the
+        // slice — otherwise the head would lerp from the tile's pre-rotation world
+        // position and snap when the turn commits.
+        prevTile: null,
+        crossingCorner: false,
+        lastRecordedT: 0,
+
+        // ── Rest-read (mid-rotation slice crossing) ───────────────────────────
+        // Non-null while the current step must read a mid-rotation slice at its
+        // committed (end-of-rotation) state. See nextRestRead in wormLogic.js.
+        restReadSlice: null,
+        // Trail keys laid down while rest-reading — skipped by the commit-time remap.
+        restReadTileKeys: new Set(),
+
+        // ── Jump ───────────────────────────────────────────────────────────────
+        jumpT: 0,                 // 0 = grounded, >0 = in air
+        isJumping: false,
+        jumpCount: 0,
+
+        // ── Boost ──────────────────────────────────────────────────────────────
+        boostActiveT: 0,
+        boostCooldownT: 0,
+
+        // ── Tunnels / wormholes ────────────────────────────────────────────────
+        tunnelProgress: 0,
+        activeTunnel: null,
+        pendingTunnelTrigger: null,
+        onFlippedTile: false,
+        lastFlipped: false,
+        wormholeTimer: DEFAULT_WORMHOLE_FLIP_INTERVAL,
+        wormholeCountdown: DEFAULT_WORMHOLE_FLIP_INTERVAL,
+        tunnelUseCounts: new Map(),
+        voidTunnelKeys: new Set(),
+        pendingVoidKill: null,
+        currentTunnelStableKey: null, // stable key of the tunnel being traversed
+        currentTunnelKey: null,       // canonical key (for use-count cleanup on heal)
+
+        // ── Collision ──────────────────────────────────────────────────────────
+        pendingSelfCollision: null,
+        selfCollisionGraceSteps: 0,
+
+        // ── Body / trails ──────────────────────────────────────────────────────
+        tailLength: BASE_TAIL_LENGTH,
+        powerups: [],
+        stepHistory: makeStepHistory(MAX_TAIL * STEPS_PER_TILE),
+        tileTrail: makeTileTrail(MAX_TAIL),
+        // Render-only full-route history for the persistent worm trail.
+        pathHistory: makeTileTrail(TRAIL_HISTORY_CAP),
+        orbPickupColors: [],
+        colorEpoch: 0,
+
+        // ── Session counters ───────────────────────────────────────────────────
+        timeAlive: 0,
+        survivalTick: 0,
+        healed: 0,
+        // Orb-pickup combo: consecutive pickups within 2 s escalate pitch + haptic.
+        orbCombo: 0,
+        lastOrbTime: -999,
+
+        // ── One-shot flags consumed by renderers ──────────────────────────────
+        willHeal: false,
+        healFired: false,
+        pendingHealBurst: null,
+        pendingOrbFlash: null,
+    };
+    sim.curWorldPos = sim._curWP;
+    return sim;
+}
+
+const setCurWorldPosFromTile = (sim, size) => {
+    const wp = getStickerWorldPos(sim.pos.x, sim.pos.y, sim.pos.z, sim.pos.dirKey, size, 0);
+    sim._curWP.set(wp[0], wp[1], wp[2]);
+    sim.curWorldPos = sim._curWP;
+};
+
+/**
+ * Full run reset (retry / new setup / size change). Spawns the initial powerups
+ * into sim.powerups; the caller publishes them to the store.
+ */
+export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
+    const startPos = INITIAL_POS(size);
+    const initial = [];
+    for (let i = 0; i < orbCount; i++) {
+        initial.push({ ...randomFreeTile(size, [...initial, startPos]), type: 'apple' });
+    }
+
+    sim.pos = startPos;
+    sim.moveDir = INITIAL_DIR;
+    sim.phase = 'crawling';
+    sim.prevPhase = 'crawling';
+    sim.tunnelProgress = 0;
+    sim.activeTunnel = null;
+    sim.stepAcc = 0;
+    sim.pendingTurns = [];
+    sim.boostActiveT = 0;
+    sim.boostCooldownT = 0;
+    sim.prevStepSec = null;
+    sim.onFlippedTile = false;
+    sim.lastFlipped = false;
+    sim.prevDirKey = null;
+    sim.prevTile = null;
+    sim.restReadSlice = null;
+    sim.restReadTileKeys.clear();
+    sim.crossingCorner = false;
+    sim.interpT = 1;
+    sim.prevWorldPos = null;
+    setCurWorldPosFromTile(sim, size);
+    sim.headInterpPos.copy(sim.curWorldPos);
+    sim.currentNormal.copy(FACE_NORMALS[startPos.dirKey] ?? FACE_NORMALS.PZ);
+    sim.isJumping = false;
+    sim.jumpT = 0;
+    sim.jumpCount = 0;
+    sim.pendingTunnelTrigger = null;
+    sim.pendingSelfCollision = null;
+    sim.selfCollisionGraceSteps = 0;
+    sim.tailLength = BASE_TAIL_LENGTH;
+    sim.orbPickupColors = [];
+    sim.colorEpoch++;
+    shReset(sim.stepHistory);
+    sim.lastRecordedT = 0;
+    sim.healed = 0;
+    sim.tunnelUseCounts = new Map();
+    sim.voidTunnelKeys = new Set();
+    sim.pendingVoidKill = null;
+    sim.currentTunnelStableKey = null;
+    sim.currentTunnelKey = null;
+    sim.willHeal = false;
+    sim.healFired = false;
+    sim.pendingHealBurst = null;
+    sim.pendingOrbFlash = null;
+    sim.orbCombo = 0;
+    sim.lastOrbTime = -999;
+
+    sim.powerups = initial;
+    sim.alive = true;
+    ttReset(sim.tileTrail, tileKey(startPos));
+    ttReset(sim.pathHistory, tileKey(startPos));
+    sim.timeAlive = 0;
+    sim.survivalTick = 0;
+    sim.wormholeTimer = wormholeInterval;
+    sim.wormholeCountdown = wormholeInterval;
+    return sim;
+}
+
+/** Jump offset height at current jumpT. */
+export const jumpLiftOf = (sim) => sim.isJumping
+    ? Math.sin(sim.jumpT * Math.PI) * SURFACE_JUMP_HEIGHT
+    : 0;
+
+export function startJump(sim, ctx) {
+    if (sim.jumpCount >= MAX_JUMPS) return;
+    sim.isJumping = true;
+    sim.jumpT = 0.001;
+    sim.jumpCount += 1;
+    ctx.feel('jump');
+    // If the player jumps early on a flipped tile, don't auto-enter the tunnel.
+    sim.pendingTunnelTrigger = null;
+}
+
+export function queueTurn(sim, dir) {
+    const q = sim.pendingTurns;
+    if (q.length >= 3) q.shift();
+    if (q[q.length - 1] !== dir) q.push(dir);
+}
+
+export function killWormSim(sim, ctx, details = null) {
+    if (!sim.alive) return;
+    sim.alive = false;
+    sim.phase = 'dead';
+    ctx.feel('death');
+    ctx.onDeath(details, Math.floor(sim.timeAlive));
+}
+
+function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey) {
+    const resolved = ctx.resolveTunnel(x, y, z, dirKey);
+    if (!resolved) return;
+
+    const { tunnel, tunnelKey } = resolved;
+
+    if (sim.voidTunnelKeys.has(tunnelKey)) {
+        killWormSim(sim, ctx, {
+            reason: 'voided',
+            tunnelKey,
+            headTile: tileKey({ x, y, z, dirKey }),
+        });
+        return;
+    }
+
+    const nextTraversals = (sim.tunnelUseCounts.get(tunnelKey) ?? 0) + 1;
+    sim.tunnelUseCounts.set(tunnelKey, nextTraversals);
+    // Safe/void-arm/collapse thresholds live in economy.js — see classifyTraversal
+    // for the "void on the 4th traversal" rule.
+    const traversalVerdict = classifyTraversal(nextTraversals);
+    if (traversalVerdict === 'void-arm') {
+        // The worm completes this tunnel, then collapses when it steps off the
+        // exit tile (deferred kill, checked in the crawling phase).
+        sim.pendingVoidKill = {
+            tunnelKey,
+            exitTileKey: tileKey(tunnel.exit),
+            armed: false,
+        };
+    } else if (traversalVerdict === 'collapse') {
+        // Past the void traversal the tunnel is fully collapsed and kills on contact.
+        sim.voidTunnelKeys.add(tunnelKey);
+        sim.pendingVoidKill = null;
+        killWormSim(sim, ctx, {
+            reason: 'voided',
+            tunnelKey,
+            headTile: tileKey({ x, y, z, dirKey }),
+            traversals: nextTraversals,
+        });
+        return;
+    }
+
+    // ── DEPOSIT ORBS ──────────────────────────────────────────────────────
+    const liveCubies = ctx.getCubies();
+    const entrySticker = liveCubies?.[x]?.[y]?.[z]?.stickers?.[dirKey];
+    const entryFaceId = entrySticker?.curr ?? 0;
+    const stableKey = getStableKey(x, y, z, dirKey, liveCubies);
+    sim.currentTunnelStableKey = stableKey;
+    sim.currentTunnelKey = tunnelKey;
+
+    if (stableKey && entryFaceId) {
+        const healingProgress = ctx.getHealingProgress() ?? {};
+        const progress = healingProgress[stableKey] ?? { deposited: 0, faceId: entryFaceId };
+        // Deposit rules (caps + Prism Worm wildcard drain) are pure functions in
+        // economy.js; here we only apply the result to the sim + (via ctx) the store.
+        const deposit = computeOrbDeposit({
+            inventory: ctx.getOrbInventory(),
+            deposited: progress.deposited,
+            entryFaceId,
+            tailLength: sim.tailLength,
+            isPrism: ctx.isPrismCharacter(),
+        });
+
+        if (deposit) {
+            sim.tailLength = deposit.nextTailLength;
+            sim.orbPickupColors.length = Math.max(0, sim.orbPickupColors.length - deposit.colorsToDrop);
+            sim.colorEpoch++;
+            ctx.applyDeposit(deposit, stableKey, entryFaceId);
+        }
+    }
+    // ── END DEPOSIT ───────────────────────────────────────────────────────
+
+    // Determine whether this tunnel traversal will heal on exit (for portal ring pop fx).
+    const postDepositProgress = ctx.getHealingProgress()?.[stableKey];
+    sim.willHeal = isHealReady(postDepositProgress?.deposited);
+
+    sim.activeTunnel = tunnel;
+    sim.pendingTunnelTrigger = null;
+    sim.pendingSelfCollision = null;
+    // Remove the exit portal tile from the trail so the head landing on it after
+    // exiting the tunnel doesn't immediately trigger a false self-collision.
+    const exitTileKey = tileKey(tunnel.exit);
+    ttFilterInPlace(sim.tileTrail, k => k !== exitTileKey);
+    sim.tunnelProgress = 0;
+    // Start with the wind-up flourish (spiral circle above the entry hole) before the dive.
+    sim.phase = 'windup';
+    ctx.feel('dive');
+    sim.onFlippedTile = false;
+    sim.lastFlipped = false;
+    ctx.onTunnelEnter(tunnel);
+}
+
+function applyOrbPickupGrowth(sim, ctx, color, faceId) {
+    sim.tailLength = Math.min(sim.tailLength + ORB_SEGMENT_GROWTH, MAX_TAIL);
+    sim.orbPickupColors.push(color);
+    sim.colorEpoch++;
+    // PP are NOT awarded on pickup — only banked when the player wins (cube solved).
+    ctx.onOrbPickup(faceId, orbsCarried(sim.tailLength));
+}
+
+// Attempt to pick up a powerup sitting on the given tile (the worm's current cell).
+// Shared by the step-commit path and the rotation-commit path — a rest-read landing
+// defers pickup until the slice commits, then re-checks here so an orb that rode the
+// rotating slice into the cell the worm occupies is still collected on contact.
+function tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey) {
+    const puIdx = sim.powerups.findIndex(p => p.x === x && p.y === y && p.z === z && p.dirKey === dirKey);
+    if (puIdx === -1) return;
+    const pickedUp = sim.powerups[puIdx];
+    // Read fresh cubies rather than any tick-scope snapshot: spawnWormholePair() may
+    // have flipped a sticker pair earlier in the same tick, and a rotation commit may
+    // have just replaced the cubies array — a stale read would misjudge the hover rule.
+    const liveCubies = ctx.getCubies();
+    const pickedSticker = getStickerSafe(liveCubies, pickedUp.x, pickedUp.y, pickedUp.z, pickedUp.dirKey);
+    // Orbs on flipped tiles hover above the surface — worm must jump to reach them.
+    const tileIsFlipped = !!(pickedSticker && pickedSticker.curr !== pickedSticker.orig);
+    if (tileIsFlipped && !sim.isJumping) return; // crawled on without jumping — out of reach
+    const pickedFaceId = pickedSticker ? pickedSticker.curr : 0;
+    const pickedColor = ctx.getOrbColor(pickedFaceId);
+    applyOrbPickupGrowth(sim, ctx, pickedColor, pickedFaceId);
+    sim.pendingOrbFlash = { color: pickedColor, pos: sim.curWorldPos.toArray() };
+    // Combo climbs when pickups come in quick succession (≤2s apart).
+    sim.orbCombo = (sim.timeAlive - sim.lastOrbTime <= 2.0) ? sim.orbCombo + 1 : 0;
+    sim.lastOrbTime = sim.timeAlive;
+    ctx.feel('orb', { combo: sim.orbCombo });
+    sim.powerups[puIdx] = { ...randomFreeTile(size, [...sim.powerups, sim.pos]), type: 'apple' };
+    ctx.onPowerupsChanged(sim.powerups.slice());
+}
+
+// Writes the interpolated ground position into outPos (module-level scratch or a
+// sim-owned vector). Returns the surface normal — a direct reference to a
+// FACE_NORMALS constant in the straight-crawl case (no allocation), or the shared
+// corner-blend scratch for the rare corner-lerp midpoint.
+function evaluatePosAndNormal(sim, tValue, outPos) {
+    const pWorld = sim.prevWorldPos;
+    const cWorld = sim.curWorldPos;
+    outPos.copy(cWorld);
+    let cNorm = FACE_NORMALS[sim.pos.dirKey] ?? FACE_NORMALS.PZ;
+
+    if (pWorld && tValue < 1) {
+        if (sim.crossingCorner) {
+            const oldNormal = FACE_NORMALS[sim.prevDirKey];
+            const newNormal = FACE_NORMALS[sim.pos.dirKey];
+            _evalCornerVtx.copy(pWorld).addScaledVector(newNormal, 0.52);
+
+            if (tValue < 0.45) {
+                outPos.copy(pWorld).lerp(_evalCornerVtx, tValue / 0.45);
+                cNorm = oldNormal;
+            } else if (tValue > 0.55) {
+                outPos.copy(_evalCornerVtx).lerp(cWorld, (tValue - 0.55) / 0.45);
+                cNorm = newNormal;
+            } else {
+                outPos.copy(_evalCornerVtx);
+                _evalCornerNorm.lerpVectors(oldNormal, newNormal, (tValue - 0.45) / 0.10).normalize();
+                cNorm = _evalCornerNorm;
+            }
+        } else {
+            outPos.copy(pWorld).lerp(cWorld, tValue);
+        }
+    }
+    return cNorm;
+}
+
+// ─── Phase handlers ───────────────────────────────────────────────────────────
+// Same dispatch structure as the pre-extraction hook: enter() fires exactly once
+// per transition, update() runs every tick; update returning true ends the tick.
+
+const PHASE_HANDLERS = {
+    crawling: {
+        // enter() fires once when transitioning back from 'exiting'/'windout'.
+        enter(sim, _size, ctx) {
+            sim.selfCollisionGraceSteps = SELF_COLLISION_GRACE_STEPS_AFTER_TUNNEL;
+            // Clear the pre-tunnel tile trail. The body traveled through the tunnel so those
+            // old surface positions no longer reliably reflect where body segments are.
+            // Resetting to just the exit tile lets the collision window rebuild naturally,
+            // preventing false-positive self-collision deaths in the post-tunnel window.
+            // The grace period covers the initial steps where the trail is too short to
+            // reliably catch real collisions.
+            ttReset(sim.tileTrail, tileKey(sim.pos));
+            // Möbius travel teleports the worm to a new surface region, so the painted
+            // route restarts here too (cross-tunnel persistence is a separate follow-up).
+            ttReset(sim.pathHistory, tileKey(sim.pos));
+            ctx.onCrawlResume();
+            sim.onFlippedTile = false;
+            sim.lastFlipped = false;
+        },
+        update(sim, size, ctx, delta, STEP_SEC) {
+            const headOnSurface = isSurfaceTilePos(sim.pos, size);
+            if (!headOnSurface) {
+                sim.pendingSelfCollision = null;
+                sim.pendingTunnelTrigger = null;
+            }
+
+            // Apply pending turn — RELATIVE to current heading
+            if (sim.pendingTurns.length > 0) {
+                const t = sim.pendingTurns.shift();
+                if (t === 'boost') {
+                    // Ignore if already boosting or recharging.
+                    if (sim.boostActiveT <= 0 && sim.boostCooldownT <= 0) {
+                        sim.boostActiveT = BOOST_DURATION;
+                        ctx.onBoostState('active');
+                        ctx.feel('boost');
+                    }
+                } else if (t === 'jump') {
+                    startJump(sim, ctx);
+                } else if (ctx.getControlMode() === 'oriented') {
+                    if (t === 'up' || t === 'down' || t === 'left' || t === 'right') {
+                        sim.moveDir = t;
+                    }
+                } else {
+                    if (t === 'left' || t === 'right') {
+                        sim.moveDir = turnWorm(sim.moveDir, t);
+                    }
+                    if (t === 'down') sim.moveDir = turnWorm(turnWorm(sim.moveDir, 'left'), 'left');
+                }
+            }
+
+            // Advance interpolation
+            if (sim.interpT < 1) {
+                sim.interpT = Math.min(1, sim.interpT + delta / STEP_SEC);
+            }
+
+            if (sim.pendingVoidKill?.armed) {
+                const { tunnelKey, exitTileKey } = sim.pendingVoidKill;
+                const headTileKey = tileKey(sim.pos);
+                const hasClearedExitTile = headTileKey !== exitTileKey;
+                const fullyOnNextTile = sim.interpT >= 1;
+
+                if (headOnSurface && hasClearedExitTile && fullyOnNextTile) {
+                    sim.pendingVoidKill = null;
+                    sim.voidTunnelKeys.add(tunnelKey);
+                    killWormSim(sim, ctx, { reason: 'voided', tunnelKey, exitTileKey, headTile: headTileKey });
+                    return true;
+                }
+            }
+
+            if (headOnSurface && sim.pendingTunnelTrigger) {
+                const { x, y, z, dirKey } = sim.pendingTunnelTrigger;
+                if (sim.interpT >= TUNNEL_TRIGGER_PROGRESS && !sim.isJumping) {
+                    beginTunnelTransition(sim, size, ctx, x, y, z, dirKey);
+                    return true;
+                }
+            }
+
+            if (headOnSurface && sim.pendingSelfCollision) {
+                if (sim.selfCollisionGraceSteps > 0) {
+                    sim.pendingSelfCollision = null;
+                } else if (sim.isJumping) {
+                    // Allow jumping over your own body tile before impact threshold.
+                    sim.pendingSelfCollision = null;
+                } else if (sim.pendingTunnelTrigger) {
+                    // Prioritize wormhole entry over self-collision on the same tile.
+                    // This fixes the bug where entering a wormhole whose entrance is occupied
+                    // by your tail (almost always true for the first few tiles of a jump)
+                    // kills you.
+                    sim.pendingSelfCollision = null;
+                } else if (sim.interpT >= SELF_COLLISION_TRIGGER_PROGRESS) {
+                    // Re-validate against the LIVE trail before confirming the kill. A
+                    // slice-rotation hazard can call cutWormTail() between the frame that
+                    // armed pendingSelfCollision and this confirmation frame, severing the
+                    // exact body segment that caused the original detection — without this
+                    // check that stale flag still fires a kill even though the colliding
+                    // tail tile no longer exists ("false tail bite" after a cut).
+                    const collisionKey = sim.pendingSelfCollision.key;
+                    const occupiedTilesNow = Math.max(1, Math.ceil((sim.tailLength * BODY_BALL_SPACING) / 1.0));
+                    const trailLimitNow = Math.min(occupiedTilesNow, sim.tileTrail.count);
+                    let stillPresent = false;
+                    for (let ti = 1; ti < trailLimitNow; ti++) {
+                        if (ttAt(sim.tileTrail, ti) === collisionKey) { stillPresent = true; break; }
+                    }
+                    if (!stillPresent) {
+                        sim.pendingSelfCollision = null;
+                    } else {
+                        killWormSim(sim, ctx, {
+                            reason: 'self-collision',
+                            progress: Number(sim.interpT.toFixed(2)),
+                            headTile: tileKey(sim.pos),
+                            collisionTile: collisionKey,
+                        });
+                        return true;
+                    }
+                }
+            }
+
+            // --- Continuous path recording for contiguous touching clones ---
+            // Write head position directly into the live vectors — zero allocations.
+            const headNorm = evaluatePosAndNormal(sim, sim.interpT, sim.headInterpPos);
+            sim.currentNormal.copy(headNorm);
+
+            // Back-fill step history so it is completely framerate independent.
+            // If the game lags and skips 0.3 seconds, this perfectly reconstructs the 15
+            // missing physics frames along the true 3D edge curve.
+            while (sim.lastRecordedT <= sim.interpT) {
+                // _evalHPos is module scratch; ptNorm is a FACE_NORMALS ref (no alloc)
+                // except at the corner midpoint.
+                const ptNorm = evaluatePosAndNormal(sim, sim.lastRecordedT, _evalHPos);
+
+                // Chain-fountain: each history entry records the jump height that was active
+                // at THAT spatial position. Since jumpT and interpT advance at identical
+                // rates (both scale by delta/STEP_SEC), the jumpT at any recorded position r
+                // is: jumpT_now - (interpT_now - r). Clamping to [0,1] naturally zeroes out
+                // positions before the jump started or after it ended. Body segments then
+                // inherit the arc as they travel through this stored lift — exactly like
+                // beads lifting off one-by-one in a chain fountain.
+                const jumpTAtR = sim.isJumping
+                    ? Math.max(0, Math.min(1, sim.jumpT - (sim.interpT - sim.lastRecordedT)))
+                    : 0;
+                const ptJump = jumpTAtR > 0 ? Math.sin(jumpTAtR * Math.PI) * SURFACE_JUMP_HEIGHT : 0;
+                // Compute lifted pos into module-level scratch, then copy into the ring slot.
+                _evalLiftedPos.copy(_evalHPos).addScaledVector(ptNorm, WORM_LIFT + ptJump);
+                // Tag the point with the grid cell it occupies, derived from the pre-lift
+                // surface point (origin-centred coords → nearest lattice index). Used to ride
+                // a mid-rotation slice and to bake the turn into history at commit.
+                const _hk = (size - 1) / 2;
+                const _htx = Math.min(size - 1, Math.max(0, Math.round(_evalHPos.x + _hk)));
+                const _hty = Math.min(size - 1, Math.max(0, Math.round(_evalHPos.y + _hk)));
+                const _htz = Math.min(size - 1, Math.max(0, Math.round(_evalHPos.z + _hk)));
+                // Points recorded while rest-reading a mid-rotation slice already sit at
+                // their committed positions — the -1 sentinel opts them out of the body
+                // ride/bake, which would otherwise swing them along with the outgoing slice.
+                const _rrs = sim.restReadSlice;
+                if (_rrs && isTileInSlice(_rrs.axis, _rrs.sliceIndex, _htx, _hty, _htz)) {
+                    shPush(sim.stepHistory, _evalLiftedPos, ptNorm, -1, -1, -1);
+                } else {
+                    shPush(sim.stepHistory, _evalLiftedPos, ptNorm, _htx, _hty, _htz);
+                }
+                sim.lastRecordedT += 0.02; // 50 mathematical sub-steps per tile traverse
+            }
+            // -----------------------------------------------------------
+
+            sim.stepAcc += delta;
+            // When navigating a corner, traversing double the distance means we should
+            // theoretically give it more time so the speed looks constant, but the Bezier
+            // arc covers it nicely.
+            if (sim.stepAcc >= STEP_SEC) {
+                sim.stepAcc -= STEP_SEC;
+                sim.interpT = 0;
+                sim.lastRecordedT = 0;
+                sim._prevWP.copy(sim._curWP);
+                sim.prevWorldPos = sim._prevWP;
+                sim.prevDirKey = sim.pos.dirKey;
+                // Snapshot the tile we're leaving as the interpolation source so a
+                // mid-step slice rotation can ride/commit it correctly.
+                sim.prevTile = { x: sim.pos.x, y: sim.pos.y, z: sim.pos.z, dirKey: sim.pos.dirKey };
+
+                const oldDirKey = sim.pos.dirKey;
+                const next = getNextSurfacePosition(sim.pos, sim.moveDir, size);
+
+                // We clear the corner navigation flag unless we're about to cross one right now
+                sim.crossingCorner = false;
+
+                if (next) {
+                    const crossedFace = next.dirKey !== oldDirKey;
+                    const nextPos = { x: next.x, y: next.y, z: next.z, dirKey: next.dirKey };
+                    const nextKey = tileKey(nextPos);
+                    // End-of-rotation read: a step crossing onto a mid-rotation slice
+                    // targets the cell's committed state instead of chasing the tile
+                    // that is currently rotating away.
+                    sim.restReadSlice = nextRestRead(
+                        sim.restReadSlice, liveRotation.active, liveRotation.axis, liveRotation.sliceIndex,
+                        sim.prevTile, nextPos
+                    );
+                    if (!sim.restReadSlice) sim.restReadTileKeys.clear();
+                    // tailLength is measured in visual balls, not tiles. Convert to
+                    // approximate occupied tile count so collision checks align with what
+                    // players see.
+                    const occupiedTiles = Math.max(1, Math.ceil((sim.tailLength * BODY_BALL_SPACING) / 1.0));
+                    const bodyTilesBehindHead = Math.max(0, occupiedTiles - 1);
+                    // Direct indexed scan over tileTrail avoids allocating an intermediate
+                    // slice just for Array.includes(). bodyTilesBehindHead ≤ ~167 at MAX_TAIL.
+                    const trailLimit = Math.min(1 + bodyTilesBehindHead, sim.tileTrail.count);
+                    let bodyHit = false;
+                    for (let ti = 1; ti < trailLimit; ti++) {
+                        if (ttAt(sim.tileTrail, ti) === nextKey) { bodyHit = true; break; }
+                    }
+                    const nextOnSurface = isSurfaceTilePos(nextPos, size);
+                    const selfHit = nextOnSurface && sim.selfCollisionGraceSteps <= 0 && bodyHit;
+                    if (selfHit) {
+                        // Defer self-hit until we've penetrated the tile by 40%.
+                        // This gives players a short reaction window to jump over their body.
+                        sim.pendingSelfCollision = { key: nextKey };
+                    }
+
+                    sim.pos = nextPos;
+                    if (nextOnSurface) {
+                        ttPush(sim.tileTrail, nextKey);
+                        ttPush(sim.pathHistory, nextKey);
+                        const _rr = sim.restReadSlice;
+                        if (_rr && isTileInSlice(_rr.axis, _rr.sliceIndex, nextPos.x, nextPos.y, nextPos.z)) {
+                            sim.restReadTileKeys.add(nextKey);
+                        }
+                    }
+                    if (next.moveDir) sim.moveDir = next.moveDir;
+
+                    if (crossedFace) {
+                        sim.crossingCorner = true;
+                    }
+
+                    sim.pendingTunnelTrigger = null;
+                    if (!selfHit) {
+                        sim.pendingSelfCollision = null;
+                    }
+                    if (sim.selfCollisionGraceSteps > 0) {
+                        sim.selfCollisionGraceSteps -= 1;
+                    }
+                } else {
+                    sim.moveDir = turnWorm(turnWorm(sim.moveDir, 'left'), 'left');
+                    sim.pendingTunnelTrigger = null;
+                    sim.pendingSelfCollision = null;
+                }
+
+                // Immediately update curWorldPos so the interpolation target is correct
+                setCurWorldPosFromTile(sim, size);
+
+                // Powerup collision
+                const { x, y, z, dirKey } = sim.pos;
+                // While rest-reading, this cell's occupant (sticker, orb, tunnel mouth) is
+                // still mid-flight — what actually lands here is only knowable at commit,
+                // so pickup and flipped-tile detection are deferred. applyRotationToSim
+                // re-runs both on the landed contents.
+                const destMidRotation = !!(sim.restReadSlice &&
+                    isTileInSlice(sim.restReadSlice.axis, sim.restReadSlice.sliceIndex, x, y, z));
+                if (!destMidRotation) tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey);
+
+                // Flipped tile detection
+                const sticker = destMidRotation ? null : ctx.getCubies()?.[x]?.[y]?.[z]?.stickers?.[dirKey];
+                const isFlipped = !!(sticker && sticker.curr !== sticker.orig);
+                const resolved = isFlipped ? ctx.resolveTunnel(x, y, z, dirKey) : null;
+                const isVoidZone = !!(resolved && sim.voidTunnelKeys.has(resolved.tunnelKey));
+                sim.onFlippedTile = isFlipped && !isVoidZone;
+
+                // Flipped tiles are instant wormholes unless the player is currently
+                // jumping over them.
+                if (sim.onFlippedTile !== sim.lastFlipped) {
+                    sim.lastFlipped = sim.onFlippedTile;
+                    ctx.onFlippedTile(sim.onFlippedTile);
+                }
+
+                if (isFlipped) {
+                    sim.pendingTunnelTrigger = { x, y, z, dirKey };
+                    // Swept-entry guard: if the step accumulator remainder indicates the worm
+                    // has already spent ≥ TUNNEL_TRIGGER_PROGRESS of this tile's step time on
+                    // the flipped tile (possible after a lag spike where delta > STEP_SEC),
+                    // fire the tunnel transition immediately. Without this, the deferred
+                    // trigger can be cleared by a second step firing in the following frame
+                    // before interpT reaches the threshold.
+                    if (!sim.isJumping && sim.stepAcc / STEP_SEC >= TUNNEL_TRIGGER_PROGRESS) {
+                        sim.pendingTunnelTrigger = null;
+                        beginTunnelTransition(sim, size, ctx, x, y, z, dirKey);
+                        return true;
+                    }
+                }
+            }
+            return false;
+        },
+    },
+
+    // Wind-up: the worm orbits in a shrinking circle above the entry hole, then is
+    // pulled into it — a flourish that plays before the dive. beginTunnelTransition
+    // publishes wormPhase:'windup' via ctx.onTunnelEnter, so no enter() here.
+    windup: {
+        update(sim, size, _ctx, delta) {
+            sim.tunnelProgress += delta * (1.5 * TUNNEL_SPEED_SCALE);
+            if (sim.activeTunnel) {
+                const s = Math.min(1, sim.tunnelProgress); // 0 (far/lifted) → 1 (on hole)
+                getWindWorldPosInto(sim.headInterpPos, sim.activeTunnel, 'entry', s, size);
+                const entryN = FACE_NORMALS[sim.activeTunnel.entry.dirKey];
+                if (entryN) sim.currentNormal.copy(entryN);
+            }
+            if (sim.tunnelProgress >= 1) {
+                sim.tunnelProgress = 0;
+                sim.phase = 'entering'; // entering.enter() fires next tick
+            }
+            return false;
+        },
+    },
+
+    entering: {
+        enter(_sim, _size, ctx) {
+            ctx.onPhase('entering');
+        },
+        update(sim, size, _ctx, delta) {
+            sim.tunnelProgress += delta * (1.2 * TUNNEL_SPEED_SCALE);
+            if (sim.activeTunnel) {
+                // Head travels first third of the tunnel (entry face → cube interior)
+                const tunnelT = sim.tunnelProgress * 0.33;
+                getTunnelWorldPosInto(sim.headInterpPos, sim.activeTunnel, tunnelT, size);
+                const entryN = FACE_NORMALS[sim.activeTunnel.entry.dirKey];
+                if (entryN) sim.currentNormal.copy(entryN);
+            }
+            if (sim.tunnelProgress >= 1) {
+                sim.tunnelProgress = 0;
+                sim.phase = 'tunnel';
+                // tunnel.enter() fires next tick → ctx.onPhase('tunnel')
+            }
+            return false;
+        },
+    },
+
+    tunnel: {
+        enter(_sim, _size, ctx) {
+            ctx.onPhase('tunnel');
+        },
+        update(sim, size, _ctx, delta) {
+            sim.tunnelProgress += delta * (0.65 * TUNNEL_SPEED_SCALE);
+            if (sim.activeTunnel) {
+                // Head travels middle third of the tunnel (through cube core)
+                const tunnelT = 0.33 + sim.tunnelProgress * 0.34;
+                getTunnelWorldPosInto(sim.headInterpPos, sim.activeTunnel, tunnelT, size);
+                // Switch normal to exit face at the midpoint
+                const n = sim.tunnelProgress > 0.5
+                    ? FACE_NORMALS[sim.activeTunnel.exit.dirKey]
+                    : FACE_NORMALS[sim.activeTunnel.entry.dirKey];
+                if (n) sim.currentNormal.copy(n);
+            }
+            if (sim.tunnelProgress >= 1) {
+                sim.tunnelProgress = 0;
+                sim.phase = 'exiting';
+                // exiting.enter() fires next tick → ctx.onPhase + pos snap to exit tile
+            }
+            return false;
+        },
+    },
+
+    exiting: {
+        enter(sim, size, ctx) {
+            ctx.onPhase('exiting');
+            // Snap the logical grid position to the exit tile so crawling
+            // resumes from the correct sticker when this phase completes.
+            if (sim.activeTunnel) {
+                const ex = sim.activeTunnel.exit;
+                sim.pos = { x: ex.x, y: ex.y, z: ex.z, dirKey: ex.dirKey };
+                setCurWorldPosFromTile(sim, size);
+            }
+        },
+        update(sim, size, ctx, delta) {
+            sim.tunnelProgress += delta * (1.0 * TUNNEL_SPEED_SCALE);
+            if (sim.activeTunnel) {
+                // Head travels final third of the tunnel (cube interior → exit face)
+                const tunnelT = 0.67 + sim.tunnelProgress * 0.33;
+                getTunnelWorldPosInto(sim.headInterpPos, sim.activeTunnel, tunnelT, size);
+                const exitN = FACE_NORMALS[sim.activeTunnel.exit.dirKey];
+                if (exitN) sim.currentNormal.copy(exitN);
+            }
+            if (sim.tunnelProgress >= 1) {
+                const voidKillState = sim.pendingVoidKill;
+                const exitedTunnel = sim.activeTunnel; // capture (kept alive for windout)
+                const exitStableKey = sim.currentTunnelStableKey;
+                const exitTunnelKey = sim.currentTunnelKey;
+                sim.tunnelProgress = 0;
+                sim.currentTunnelStableKey = null;
+                sim.currentTunnelKey = null;
+                if (voidKillState) {
+                    sim.pendingVoidKill = { ...voidKillState, armed: true };
+                }
+
+                // Heal immediately at exit completion (not deferred) when enough orbs
+                // were deposited.
+                const exitProgress = exitStableKey ? (ctx.getHealingProgress()?.[exitStableKey]) : null;
+                const didHeal = isHealReady(exitProgress?.deposited) && !!exitedTunnel;
+                if (didHeal) {
+                    const { entry, exit: exitTile } = exitedTunnel;
+                    sim.healFired = true;
+                    sim.healed += 1;
+                    // Store writes + heal-burst FX (both tiles) happen in the adapter.
+                    ctx.applyHeal(entry, exitTile, exitStableKey, sim.healed);
+                    sim.pendingHealBurst = { exitTile: exitedTunnel.exit, entryTile: exitedTunnel.entry };
+                    // Tunnel fully healed → it disappears from the board. Drop its traversal
+                    // bookkeeping so a future antipodal flip that lands on the same
+                    // coordinates starts fresh, instead of inheriting this tunnel's (possibly
+                    // critical) use count or void flag and collapsing the worm prematurely on
+                    // first re-entry.
+                    if (exitTunnelKey) {
+                        sim.tunnelUseCounts.delete(exitTunnelKey);
+                        sim.voidTunnelKeys.delete(exitTunnelKey);
+                        // If this heal landed on the void traversal, a void kill was armed
+                        // for this same tunnel just above. The tunnel is now healed and gone,
+                        // so cancel that pending kill — otherwise the crawling handler still
+                        // collapses the worm the moment it leaves the exit tile.
+                        if (sim.pendingVoidKill?.tunnelKey === exitTunnelKey) {
+                            sim.pendingVoidKill = null;
+                        }
+                    }
+                }
+                // else: partial/no deposit — tunnel stays flipped, progress persists
+
+                // One resolution cue per traversal: triumphant chime on a heal, otherwise
+                // a plain pop as the worm bursts back out of the exit hole.
+                ctx.feel(didHeal ? 'heal' : 'exit');
+
+                // Tunnel travel complete — windout spiral plays before resuming crawl.
+                // sim.activeTunnel stays alive so windout can animate the exit spiral.
+                sim.phase = 'windout';
+            }
+            return false;
+        },
+    },
+
+    // Wind-out: mirrors windup — the worm spirals UP from the exit hole and settles on
+    // the surface, giving the "riding the Möbius strip back up and out" visual.
+    // s runs 1→0: start at exit hole (s=1, env=0), rise to peak orbit (s=0.5, env=1),
+    // settle on surface tile (s=0, env=0).
+    windout: {
+        enter(_sim, _size, ctx) {
+            ctx.onPhase('windout');
+        },
+        update(sim, size, _ctx, delta) {
+            sim.tunnelProgress += delta * (1.5 * TUNNEL_SPEED_SCALE);
+            if (sim.activeTunnel) {
+                const s = 1.0 - Math.min(1, sim.tunnelProgress);
+                getWindWorldPosInto(sim.headInterpPos, sim.activeTunnel, 'exit', s, size);
+                const exitN = FACE_NORMALS[sim.activeTunnel.exit.dirKey];
+                if (exitN) sim.currentNormal.copy(exitN);
+            }
+            if (sim.tunnelProgress >= 1) {
+                sim.tunnelProgress = 0;
+                sim.activeTunnel = null;
+                sim.phase = 'crawling';
+                // crawling.enter() fires next tick → grace steps + crawl-resume publish
+            }
+            return false;
+        },
+    },
+};
+
+/**
+ * Advance the simulation by one frame. Mirrors the pre-extraction tick():
+ * clamps the delta, runs boost/wormhole/jump clocks, then dispatches to the
+ * active phase handler (firing enter()/exit() exactly once per transition).
+ */
+export function stepWormSim(sim, delta, size, ctx) {
+    if (!sim.alive) return;
+    if (ctx.isPaused()) return;
+
+    // Clamp the frame delta so a hitch can't advance the simulation by a huge jump.
+    // Without this, one long frame inflates interpT and the step accumulator at once,
+    // teleporting the head several tiles forward — which in a snake-like mode scatters
+    // the body trail and can slam the worm into its own tail unfairly. Every downstream
+    // clock in this tick (jump, wormhole spawn, boost, movement) reads this value, so
+    // they all pause together through a stall and resume cleanly instead of lurching.
+    if (delta > MAX_TICK_DELTA) delta = MAX_TICK_DELTA;
+
+    // ── Speed boost: drain the active window, then run the cooldown, publishing
+    // each state transition so the HUD button reflects ready/active/cooldown.
+    // Frozen outside the crawling phase — a boost activated right before a wormhole
+    // dive shouldn't burn its window (or recharge) during transit, when movement runs
+    // at fixed tunnel speed and the buff does nothing.
+    if (sim.phase === 'crawling') {
+        if (sim.boostActiveT > 0) {
+            sim.boostActiveT -= delta;
+            if (sim.boostActiveT <= 0) {
+                sim.boostActiveT = 0;
+                sim.boostCooldownT = BOOST_COOLDOWN;
+                ctx.onBoostState('cooldown');
+            }
+        } else if (sim.boostCooldownT > 0) {
+            sim.boostCooldownT -= delta;
+            if (sim.boostCooldownT <= 0) {
+                sim.boostCooldownT = 0;
+                ctx.onBoostState('ready');
+            }
+        }
+    }
+    const boostMult = sim.boostActiveT > 0 ? BOOST_MULTIPLIER : 1;
+    const STEP_SEC = 1.0 / (ctx.getSpeed() * boostMult);
+
+    // If the crawl speed changed since last frame, rescale the in-progress step
+    // accumulator so its fraction (== interpT) is preserved across the change. Without
+    // this, a speed change mid-step desyncs stepAcc from interpT and force-crosses
+    // tiles early, which makes the head jump and the body trail fly around.
+    if (sim.prevStepSec && sim.prevStepSec !== STEP_SEC && sim.stepAcc > 0) {
+        sim.stepAcc *= STEP_SEC / sim.prevStepSec;
+    }
+    sim.prevStepSec = STEP_SEC;
+
+    sim.timeAlive += delta;
+
+    // Earn parity points for surviving (1 PP per SURVIVAL_TICK_INTERVAL seconds)
+    sim.survivalTick += delta;
+    if (sim.survivalTick >= SURVIVAL_TICK_INTERVAL) {
+        sim.survivalTick -= SURVIVAL_TICK_INTERVAL;
+        ctx.onSurvivalTick();
+    }
+
+    // In finalHealing / solved phases no new wormholes spawn — player heals the
+    // remaining ones.
+    const gamePhaseNow = ctx.getGamePhase();
+    const noMoreSpawns = gamePhaseNow === 'finalHealing' || gamePhaseNow === 'solved';
+    // Pause wormhole spawning (antipodal tile flips) while the worm is travelling
+    // inside a wormhole — freeze the clock so no flips happen until it crawls back out.
+    if (sim.phase === 'crawling') {
+        sim.wormholeTimer -= delta;
+        if (sim.wormholeTimer <= 0) {
+            if (!noMoreSpawns) {
+                const tile = randomUnflippedTile(ctx.getCubies(), size, [sim.pos]);
+                if (tile) ctx.spawnWormholePair(tile);
+            }
+            sim.wormholeTimer = ctx.getWormholeInterval();
+        }
+    }
+    sim.wormholeCountdown = noMoreSpawns ? 0 : Math.max(0, Math.ceil(sim.wormholeTimer * 10) / 10);
+
+    // Always advance jump
+    if (sim.isJumping) {
+        // Tie jump progress to tile-traverse progress so the speed slider never changes
+        // jump distance.
+        sim.jumpT += (delta / STEP_SEC) / SURFACE_JUMP_TILE_SPAN;
+        if (sim.jumpT >= 1) {
+            sim.jumpT = 0;
+            sim.isJumping = false;
+            sim.jumpCount = 0;
+        }
+    }
+
+    // ── Dispatch: detect phase transitions, then run the active handler ──────
+    const currentPhase = sim.phase;
+    if (sim.prevPhase !== currentPhase) {
+        PHASE_HANDLERS[sim.prevPhase]?.exit?.(sim, size, ctx);
+        PHASE_HANDLERS[currentPhase]?.enter?.(sim, size, ctx);
+        sim.prevPhase = currentPhase;
+    }
+    PHASE_HANDLERS[currentPhase].update(sim, size, ctx, delta, STEP_SEC);
+}
+
+/**
+ * Apply a committed cube rotation to the sim — the exact logic that previously
+ * lived in useWormCrawler's rotationEpoch subscription. Transforms the worm's
+ * position/heading, powerups, both trails, the step-history bake, and any
+ * in-flight tunnel so everything stays glued to the surface through the turn.
+ *
+ * @param {object} rot - { axis, dir, sliceIndex } of the committed move
+ * @param {object} opts - { inOpeningScramble, paused } snapshot flags
+ */
+export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, paused }) {
+    const { axis, dir, sliceIndex } = rot;
+
+    // Steps taken in rest-read mode did NOT ride this slice: the worm targeted its
+    // cells' committed rest positions, so its position, heading, lerp source and the
+    // trail entries it laid down stay put at commit instead of being carried 90°.
+    const restRead = sim.restReadSlice;
+    const restMatches = !!(restRead && restRead.axis === axis && restRead.sliceIndex === sliceIndex);
+    sim.restReadSlice = null;
+    const restKeys = sim.restReadTileKeys;
+
+    // Rotate powerups
+    if (sim.powerups.length) {
+        const pu = sim.powerups;
+        for (let i = 0; i < pu.length; i++) pu[i] = rotateTilePosition(pu[i], axis, sliceIndex, dir, size);
+        ctx.onPowerupsChanged(pu.slice());
+    }
+
+    // Rotate the worm's logical grid position so it stays on its tile.
+    // rotateTilePosition returns the SAME object when the tile wasn't in the slice,
+    // so `newPos !== oldPos` is an exact "did this tile ride the slice" test.
+    const oldPos = sim.pos;
+    const newPos = restMatches ? oldPos : rotateTilePosition(oldPos, axis, sliceIndex, dir, size);
+    sim.pos = newPos;
+    setCurWorldPosFromTile(sim, size);
+
+    // The worm's tile rode the slice: rotate its heading so it keeps the same WORLD
+    // direction — "continue in the same direction it was going, but now rotated."
+    // Skipped ONLY during the opening scramble, where the pre-game starting heading
+    // must stay untouched. This is gated on the game phase, not the pause flag: a user
+    // pause also pauses the sim, but a hazard rotation triggered during live play
+    // (they are deliberately slow, and the pause button stays available) still has to
+    // commit its heading update — otherwise the worm resumes crawling in the wrong
+    // direction after unpause because its logical heading was left in the old face frame.
+    if (newPos !== oldPos && !inOpeningScramble) {
+        sim.moveDir = rotateMoveDir(sim.moveDir, oldPos.dirKey, newPos.dirKey, axis, dir);
+    }
+
+    // Keep the interpolation SOURCE glued to the surface: if the worm is mid-step and
+    // the tile it is coming FROM also rode the slice, rotate that source tile + world
+    // position too. Without this the head lerps from the pre-rotation source and
+    // visibly snaps to where the tile used to be at the end of the turn.
+    if (sim.prevTile && !restMatches) {
+        const rPrev = rotateTilePosition(sim.prevTile, axis, sliceIndex, dir, size);
+        if (rPrev !== sim.prevTile) {
+            sim.prevTile = rPrev;
+            sim.prevDirKey = rPrev.dirKey;
+            if (sim.prevWorldPos) {
+                const _wp = getStickerWorldPos(rPrev.x, rPrev.y, rPrev.z, rPrev.dirKey, size, 0);
+                sim.prevWorldPos.set(_wp[0], _wp[1], _wp[2]);
+            }
+        }
+    }
+
+    // When paused (e.g. during the opening scramble), snap the render position too so
+    // the worm lands correctly on its tile after the rotation animation finishes.
+    if (paused) {
+        sim.headInterpPos.copy(sim.curWorldPos);
+    }
+
+    // Rotate the self-collision tile trail AND the render-only path history so the
+    // painted route stays glued to the surface through the turn (same remap fn).
+    const _remapTileKey = key => {
+        // Cells occupied in rest space didn't ride the slice — their keys stay put.
+        if (restMatches && restKeys.has(key)) return key;
+        parseTileKey(key, _parseTile);
+        const r = rotateTilePosition(_parseTile, axis, sliceIndex, dir, size);
+        return `${r.x},${r.y},${r.z},${r.dirKey}`;
+    };
+    ttMapInPlace(sim.tileTrail, _remapTileKey);
+    ttMapInPlace(sim.pathHistory, _remapTileKey);
+    restKeys.clear();
+
+    // Deferred pickup + flipped-tile detection for a rest-read landing: the step
+    // onto this cell couldn't read its contents (the occupant was mid-flight). Now
+    // that the rotation committed, check what actually landed under the worm —
+    // including an orb that rode the slice into this cell (sim.powerups was rotated
+    // above, so the lookup sees committed coordinates). Void-zone refinement is
+    // skipped here — beginTunnelTransition re-resolves the tunnel (and handles
+    // void kills) when the trigger actually fires.
+    if (restMatches && sim.phase === 'crawling' &&
+        isTileInSlice(axis, sliceIndex, sim.pos.x, sim.pos.y, sim.pos.z)) {
+        const { x, y, z, dirKey } = sim.pos;
+        tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey);
+        const landed = ctx.getCubies()?.[x]?.[y]?.[z]?.stickers?.[dirKey];
+        const landedFlipped = !!(landed && landed.curr !== landed.orig);
+        sim.onFlippedTile = landedFlipped;
+        if (landedFlipped !== sim.lastFlipped) {
+            sim.lastFlipped = landedFlipped;
+            ctx.onFlippedTile(landedFlipped);
+        }
+        if (landedFlipped) sim.pendingTunnelTrigger = { x, y, z, dirKey };
+    }
+
+    // Bake the committed turn into the body's position history: rotate the world
+    // position, surface normal, and grid tag of every recorded point that sat in the
+    // rotated slice. This uses the same predicate (isTileInSlice) and the same signed
+    // angle the body ride applied mid-tween, so ridden segments land seamlessly with
+    // no snap-back to their pre-rotation positions.
+    {
+        const sh = sim.stepHistory;
+        if (sh.count > 0) {
+            const k = (size - 1) / 2;
+            const ang = dir * (Math.PI / 2);
+            _bakeAxis.set(axis === 'col' ? 1 : 0, axis === 'row' ? 1 : 0, axis === 'depth' ? 1 : 0);
+            // Only bake as far back as the visible body can walk — the same reach
+            // cap (×2 headroom for corner arcs + 2 spare tiles) WormBody uses for
+            // its per-frame path fill. sh.count saturates at capacity (60 000)
+            // over a long run regardless of body length, and entries beyond the
+            // reach are never rendered or collided against, so rotating them on
+            // every hazard turn is pure waste.
+            const bakeReach = Math.min(MAX_TAIL, sim.tailLength) * BODY_BALL_SPACING;
+            const bakeLimit = Math.min(sh.count, Math.ceil(bakeReach * STEPS_PER_TILE * 2) + STEPS_PER_TILE * 2);
+            for (let i = 0; i < bakeLimit; i++) {
+                const slot = sh.buf[(sh.head - 1 - i + sh.capacity) % sh.capacity];
+                if (slot.tx < 0 || !isTileInSlice(axis, sliceIndex, slot.tx, slot.ty, slot.tz)) continue;
+                slot.pos.applyAxisAngle(_bakeAxis, ang);
+                slot.normal.applyAxisAngle(_bakeAxis, ang).normalize();
+                const [rx, ry, rz] = rotateVec90(slot.tx - k, slot.ty - k, slot.tz - k, axis, dir);
+                slot.tx = Math.round(rx + k);
+                slot.ty = Math.round(ry + k);
+                slot.tz = Math.round(rz + k);
+            }
+        }
+    }
+
+    // If mid-tunnel, rotate active tunnel endpoints so exit snap lands on the correct tile
+    if (sim.activeTunnel) {
+        sim.activeTunnel = {
+            ...sim.activeTunnel,
+            entry: rotateTilePosition(sim.activeTunnel.entry, axis, sliceIndex, dir, size),
+            exit: rotateTilePosition(sim.activeTunnel.exit, axis, sliceIndex, dir, size),
+        };
+    }
+}
