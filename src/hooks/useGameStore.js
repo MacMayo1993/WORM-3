@@ -11,6 +11,7 @@ import { makeCubies } from '../game/cubeState.js';
 import { DEFAULT_SETTINGS } from '../utils/colorSchemes.js';
 import { isMobile } from '../utils/device.js';
 import { DEFAULT_OWNED, ALL_ITEMS_OWNED } from '../utils/storeCatalog.js';
+import { STARTING_BANKROLL } from '../utils/economyConstants.js';
 import { MODES } from '../utils/constants.js';
 
 const SETTINGS_STORAGE_KEY = 'worm3_settings';
@@ -54,7 +55,12 @@ const loadPersistedState = () => {
     const wormHat = localStorage.getItem('worm3_hat') || 'none';
     const wormCharacter = localStorage.getItem(WORM_CHARACTER_KEY) || 'classic';
     const wormShowTrail = localStorage.getItem('worm3_show_trail') !== 'false'; // default true
-    const parityPoints = parseInt(localStorage.getItem(PARITY_POINTS_KEY) ?? '0', 10) || 0;
+    // A missing key means a brand-new player: seed the starting bankroll so the
+    // betting feature is reachable on day one. (An existing "0" stays 0 — the
+    // player spent it; the grant is one-time by construction since every
+    // earn/spend persists the key.)
+    const rawParityPoints = localStorage.getItem(PARITY_POINTS_KEY);
+    const parityPoints = rawParityPoints == null ? STARTING_BANKROLL : (parseInt(rawParityPoints, 10) || 0);
     let storedOwned = [];
     try {
       const rawOwned = JSON.parse(localStorage.getItem(OWNED_ITEMS_KEY) ?? '[]');
@@ -110,7 +116,7 @@ const loadPersistedState = () => {
       wormHat: 'none',
       wormCharacter: 'classic',
       wormShowTrail: true,
-      parityPoints: 0,
+      parityPoints: STARTING_BANKROLL, // storage unavailable — new-player experience
       ownedItems: [...DEFAULT_OWNED],
       betStreak: 0,
     };
@@ -456,6 +462,17 @@ export const useGameStore = create(
     addDisparityParityScore: (points) => set((state) => ({
       disparityParityScore: state.disparityParityScore + points,
     })),
+    // Convert the session's parity score into wallet PP and zero it. Called at
+    // round end (winner shown) and on round abandonment (chaos STOP) — the
+    // zeroing makes it idempotent, so both call sites firing is safe. Without
+    // this the score was HUD-only and healed-tile earnings evaporated.
+    cashOutParityScore: () => set((state) => {
+      const score = Math.round(state.disparityParityScore || 0);
+      if (score <= 0) return state;
+      const next = Math.max(0, (state.parityPoints || 0) + score);
+      try { localStorage.setItem(PARITY_POINTS_KEY, String(next)); } catch { }
+      return { parityPoints: next, disparityParityScore: 0 };
+    }),
 
     // Chosen game length for the current disparity session ('short' | 'medium' | 'long').
     // Persists between sessions so the wizard remembers the last pick.

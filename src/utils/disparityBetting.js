@@ -53,11 +53,40 @@ export const BET_TYPES = {
     id: 'SPEED',
     label: 'Speed Round',
     tagline: 'Fast or slow collapse?',
-    desc: 'Will this round end in under 60 seconds from the first death? Bet on the pace.',
+    desc: 'Will the collapse (first death to last) beat the typical pace for your settings? A near coin flip.',
     odds: 1.8,
     icon: 'Z',
   },
 };
+
+// ── SPEED benchmark ───────────────────────────────────────────────────────────
+// Median round durations (first→last death, seconds) measured with
+// scripts/measureSpeedOdds.mjs — 300 headless rounds per cell on a 3×3.
+// The FAST/SLOW threshold tracks the median for the round's settings so the
+// bet is a genuine ~50/50 (matching its 1.8× odds). The old fixed 60 s
+// threshold was 96–100% SLOW across every configuration.
+// Keys are the wizard's flip-cap tiers; index is chaos level 1–5.
+const SPEED_MEDIANS = {
+  6:  [0, 160, 110, 120, 40, 60],
+  15: [0, 455, 295, 410, 75, 120],
+  25: [0, 800, 515, 850, 100, 150],
+  40: [0, 1300, 865, 1530, 135, 180],
+};
+
+export function speedThresholdFor(chaosLevel, flipCap) {
+  const level = Math.max(1, Math.min(5, Math.round(chaosLevel || 3)));
+  const cap = Number(flipCap) || 15;
+  let bestTier = 15;
+  for (const tier of Object.keys(SPEED_MEDIANS).map(Number)) {
+    if (Math.abs(tier - cap) < Math.abs(bestTier - cap)) bestTier = tier;
+  }
+  return SPEED_MEDIANS[bestTier][level];
+}
+
+// "7 min" / "45s" — for benchmark display in the betting UI.
+export function formatSpeedThreshold(sec) {
+  return sec >= 120 ? `${Math.round(sec / 60)} min` : `${sec}s`;
+}
 
 // ── Streak multiplier ─────────────────────────────────────────────────────────
 // Consecutive wins boost payout. Capped at +50%.
@@ -79,7 +108,7 @@ export function getWinnerFaces(pair) {
 // Returns { won: bool, description: string } — or { won: false, push: true,
 // description } when the round produced no meaningful outcome for the bet
 // (the wager should be returned, not lost).
-export function resolveBet(bet, { disparityDeaths, disparityWinner, disparityEliminatedFaces }) {
+export function resolveBet(bet, { disparityDeaths, disparityWinner, disparityEliminatedFaces, chaosLevel, disparityFlipCap }) {
   if (!bet || !disparityWinner?.pair?.length) return null;
 
   const { type, pick } = bet;
@@ -136,14 +165,16 @@ export function resolveBet(bet, { disparityDeaths, disparityWinner, disparityEli
       };
     }
     const elapsed = (sorted[sorted.length - 1].timestamp - sorted[0].timestamp) / 1000;
-    const threshold = 60; // seconds
+    // Threshold = measured median for the round's chaos level + flip cap, so
+    // FAST/SLOW is a real coin flip at any settings.
+    const threshold = speedThresholdFor(chaosLevel, disparityFlipCap);
     const wasFast = elapsed < threshold;
     const won = pick === 'FAST' ? wasFast : !wasFast;
     return {
       won,
       description: won
-        ? `Round lasted ${Math.round(elapsed)}s — ${pick === 'FAST' ? 'fast as predicted' : 'nice and slow'}.`
-        : `Round lasted ${Math.round(elapsed)}s — ${pick === 'FAST' ? 'too slow' : 'ended too fast'}.`,
+        ? `Round lasted ${Math.round(elapsed)}s vs the ${threshold}s benchmark — ${pick === 'FAST' ? 'fast as predicted' : 'nice and slow'}.`
+        : `Round lasted ${Math.round(elapsed)}s vs the ${threshold}s benchmark — ${pick === 'FAST' ? 'too slow' : 'ended too fast'}.`,
     };
   }
 

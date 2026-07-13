@@ -289,5 +289,46 @@ can be shared too. Drift has already crept in: the worker's metrics include
     session instead of tearing down and remounting once per fired rotation, and the
     duplicated interval math is collapsed into one `targetInterval()` helper.
 
-**Still open:** SPEED's true fast/slow split should be measured per chaos level before
-trusting its 1.8× odds (needs gameplay telemetry, not static analysis).
+**Pass 4 (economy earn loop + testable sim + SPEED odds from data):**
+
+22. **🔴 FIXED — disparity earnings evaporated.** `disparityParityScore` (5 PP per healed
+    tile) was HUD-only: no code ever converted it to wallet PP, and `clearDisparityGame`
+    zeroed it. New `cashOutParityScore()` action pays it into the wallet at round end
+    (winner shown) and on abandonment (chaos STOP) — idempotent, so both firing is safe.
+23. **🔴 FIXED — no on-ramp to the betting feature.** With the dev floor gone a fresh
+    wallet was 0 PP and `BET_MIN` is 10. New `STARTING_BANKROLL = 100` is granted once,
+    when no wallet key has ever been persisted (a spent-to-zero wallet stays 0).
+24. **§ sim extraction** — all chaos game rules moved to `src/game/chaosSim.js`
+    (`createChaosSim(config)`: closure state, injectable clock); the worker is now a
+    ~130-line scheduling/postMessage adapter. `src/__tests__/chaosSim.test.js` drives
+    full headless rounds on a virtual clock and locks in the invariants: antipodal pairs
+    flip together, complete 52-death ledger with clean 1..52 ranks, two-tile antipodal
+    winner, exactly-4 face eliminations, rotation survival, flip-cap sweep, level-change
+    ledger preservation, pause behavior.
+25. **SPEED odds finally measured** (`scripts/measureSpeedOdds.mjs`, 200–300 headless
+    rounds per configuration): the fixed 60 s threshold was **96–100 % SLOW in every
+    cell** — median collapse times run 40 s (L4/cap 6) to ~25 min (L3/cap 40). Betting
+    FAST was a guaranteed loss; SLOW a guaranteed 1.8× win. Fixed by making the
+    threshold the *measured median for the round's settings* (`speedThresholdFor(level,
+    flipCap)`, nearest-tier lookup over the four wizard cap tiers), which makes the bet
+    the ~50/50 its 1.8× odds assume. The betting screen shows the real benchmark on the
+    FAST/SLOW cards, and the result description cites it. Re-run the script after any
+    chaos tuning change and refresh `SPEED_MEDIANS`.
+
+**Pass 5 (structure + resilience):**
+
+26. **Disparity flow extracted from App.jsx** into `src/hooks/useDisparityGame.js`
+    (317 lines): wizard/betting UI state, the 3-2-1-GO countdown, the auto-unshuffle
+    solve sequence, round start, and the bet-resolution subscription. App.jsx shrinks
+    1,613 → ~1,370 lines and exposes a single `cancelDisparityRun()` for reset/mode
+    switches. Verified end-to-end in a real browser (Playwright + dev server): mode
+    carousel → wizard → betting screen → SPEED cards showing the dynamic "< 7 min"
+    benchmark → bet placed (wallet debited exactly once) → Mobi intro → live round,
+    with zero page errors.
+27. **Worker crash safety**: `worker.onerror`/`onmessageerror` now end the round via
+    `setChaosLevel(0)`, which reuses the STOP path — the stamped bet is refunded, the
+    parity score cashed out, and cascade visuals cleared — instead of freezing silently
+    with a wager on the table.
+
+**Still open:** nothing. Future hygiene: re-measure `SPEED_MEDIANS` when chaos pacing
+constants change (the script makes this a one-liner).

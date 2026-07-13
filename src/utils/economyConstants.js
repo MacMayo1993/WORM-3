@@ -29,3 +29,9 @@ export const PRICE_BUNDLE = 500;
 // ── Disparity betting limits ──────────────────────────────────────────────────
 export const BET_MIN = 10;
 export const BET_MAX = 500;
+
+// ── Starting bankroll ─────────────────────────────────────────────────────────
+// Granted once, when no wallet has ever been persisted, so a brand-new player
+// can reach the betting feature without first grinding Worm mode. A player who
+// spends down to exactly 0 keeps 0 — the grant never repeats.
+export const STARTING_BANKROLL = 100;

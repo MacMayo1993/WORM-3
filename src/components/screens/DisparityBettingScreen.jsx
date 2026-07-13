@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import {
-  BET_TYPES, FACE_INFO, ANTIPODAL_PAIRS, calcPayout, streakMultiplier,
+  BET_TYPES, FACE_INFO, ANTIPODAL_PAIRS, calcPayout, streakMultiplier, formatSpeedThreshold,
 } from '../../utils/disparityBetting.js';
 import { BET_MIN, BET_MAX } from '../../utils/economyConstants.js';
 import {
@@ -195,11 +195,13 @@ const PairPicker = ({ value, onChange }) => (
 );
 
 // ── Speed picker ──────────────────────────────────────────────────────────────
-const SpeedPicker = ({ value, onChange }) => (
+// thresholdSec is the measured median collapse time for the chosen settings —
+// FAST/SLOW is judged against it, so the sub-labels must show the real number.
+const SpeedPicker = ({ value, onChange, thresholdSec }) => (
   <div style={{ display: 'flex', gap: '10px' }}>
     {[
-      { id: 'FAST', label: 'Fast', sub: '< 60 sec', color: '#c45000' },
-      { id: 'SLOW', label: 'Slow', sub: '> 60 sec', color: '#1565C0' },
+      { id: 'FAST', label: 'Fast', sub: thresholdSec ? `< ${formatSpeedThreshold(thresholdSec)}` : 'beats the typical pace', color: '#c45000' },
+      { id: 'SLOW', label: 'Slow', sub: thresholdSec ? `> ${formatSpeedThreshold(thresholdSec)}` : 'outlasts the typical pace', color: '#1565C0' },
     ].map(opt => {
       const selected = value === opt.id;
       return (
@@ -223,7 +225,7 @@ const SpeedPicker = ({ value, onChange }) => (
 );
 
 // ── Main component ────────────────────────────────────────────────────────────
-const DisparityBettingScreen = ({ onBetPlaced, onSkip }) => {
+const DisparityBettingScreen = ({ onBetPlaced, onSkip, speedThresholdSec = null }) => {
   const parityPoints = useGameStore(s => s.parityPoints);
   const betStreak = useGameStore(s => s.betStreak);
 
@@ -317,7 +319,7 @@ const DisparityBettingScreen = ({ onBetPlaced, onSkip }) => {
                   <p style={{ margin: '0 0 10px', fontSize: '12px', color: PAPER_TEXT_MUTED, lineHeight: 1.5 }}>{betDef.desc}</p>
                   {(selectedType === 'SURVIVOR' || selectedType === 'FIRST_OUT') && <FacePicker value={pick} onChange={setPick} />}
                   {selectedType === 'PAIR' && <PairPicker value={pick} onChange={setPick} />}
-                  {selectedType === 'SPEED' && <SpeedPicker value={pick} onChange={setPick} />}
+                  {selectedType === 'SPEED' && <SpeedPicker value={pick} onChange={setPick} thresholdSec={speedThresholdSec} />}
                 </>
               ) : (
                 <p style={{ margin: '0 0 10px', fontSize: '12px', color: '#a09890', lineHeight: 1.5 }}>Select a bet type above first.</p>
