@@ -121,6 +121,7 @@ export default function UILayer({
     onWormSetupComplete, onMobiIntroComplete, onWormWizardCancel, onWormRetry, onWormNewGame,
     onToggleHandsMode, onFaceRotate, onTileRotation, onTileFaceRotation,
     onVictoryContinue, onVictoryNewGame,
+    onDemo,
   } = handlers;
 
   // ── Zustand store reads ──────────────────────────────────────────────────
@@ -398,6 +399,7 @@ export default function UILayer({
           onStore={onMenuStore}
           onComingSoon={onMenuComingSoon}
           onMobiusCubelet={onMenuMobiusCubelet}
+          onDemo={onDemo}
         />
       )}
 

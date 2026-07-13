@@ -765,6 +765,24 @@ export const useGameStore = create(
     }),
 
     // ========================================================================
+    // DEMO MODE
+    // ========================================================================
+    demoMode: false,
+    demoStep: null,
+
+    startDemo: () => set({
+      demoMode: true,
+      demoStep: 'baby-cube',
+      showMainMenu: false,
+    }),
+    setDemoStep: (demoStep) => set({ demoStep }),
+    exitDemo: () => set({
+      demoMode: false,
+      demoStep: null,
+      showMainMenu: true,
+    }),
+
+    // ========================================================================
     // MERGE MODE
     // ========================================================================
     mergeMode: false,

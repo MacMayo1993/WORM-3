@@ -74,6 +74,8 @@ import { GREEN_SHOW_START, FULL_FLIP_START, EXPLOSION_START, EXPLOSION_END, IMPL
 // Lazy-loaded: not needed on initial render, deferred to reduce parse time
 const PlatformerWormMode = React.lazy(() => import('./worm/PlatformerWormMode.jsx'));
 const HollowVoidCube = React.lazy(() => import('./3d/HollowVoidCube.jsx'));
+const DemoEndScreen = React.lazy(() => import('./components/screens/DemoEndScreen.jsx'));
+import { DemoProgressBar, DemoStepIntro, DEMO_STEP_IDS } from './components/screens/DemoFlowController.jsx';
 
 
 const _clamp = (t, a = 0, b = 1) => Math.max(a, Math.min(b, t));
@@ -410,6 +412,36 @@ export default function WORM3() {
     wormHealerMode: s.wormHealerMode,
     wormPhase: s.wormPhase,
   })));
+
+  const { demoMode, demoStep } = useGameStore(useShallow((s) => ({
+    demoMode: s.demoMode,
+    demoStep: s.demoStep,
+  })));
+
+  const [demoStepIntroVisible, setDemoStepIntroVisible] = useState(false);
+
+  const handleStartDemo = useCallback(() => {
+    useGameStore.getState().startDemo();
+    setDemoStepIntroVisible(true);
+  }, []);
+
+  const handleDemoStepContinue = useCallback(() => {
+    setDemoStepIntroVisible(false);
+  }, []);
+
+  const handleDemoReplay = useCallback(() => {
+    useGameStore.getState().startDemo();
+    setDemoStepIntroVisible(true);
+  }, []);
+
+  const handleDemoFreeplay = useCallback(() => {
+    useGameStore.getState().exitDemo();
+    handleMenuFreeplay();
+  }, [handleMenuFreeplay]);
+
+  const handleExitDemo = useCallback(() => {
+    useGameStore.getState().exitDemo();
+  }, []);
   const wormholePhaseActive = wormHealerMode && (
     wormPhase === 'entering' || wormPhase === 'tunnel' || wormPhase === 'exiting'
   );
@@ -1326,6 +1358,7 @@ export default function WORM3() {
               onMenuStore: handleOpenStore,
               onMenuComingSoon: handleMenuComingSoon,
               onMenuMobiusCubelet: handleMenuMobiusCubelet,
+              onDemo: handleStartDemo,
               showMergeThemePicker,
               onMergeStart: handleMergeStart,
               onMergeCancel: handleMergeCancel,
@@ -1352,6 +1385,21 @@ export default function WORM3() {
               onVictoryContinue: handleVictoryContinue,
               onVictoryNewGame: handleVictoryNewGame,
             }}
+          />
+        </Suspense>
+      )}
+
+      {/* Demo mode overlays */}
+      {demoMode && <DemoProgressBar currentStep={demoStep} />}
+      {demoMode && demoStepIntroVisible && demoStep && demoStep !== 'end' && (
+        <DemoStepIntro step={demoStep} onContinue={handleDemoStepContinue} />
+      )}
+      {demoMode && demoStep === 'end' && (
+        <Suspense fallback={null}>
+          <DemoEndScreen
+            onReplay={handleDemoReplay}
+            onFreeplay={handleDemoFreeplay}
+            onExit={handleExitDemo}
           />
         </Suspense>
       )}

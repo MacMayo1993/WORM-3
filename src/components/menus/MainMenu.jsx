@@ -1223,7 +1223,7 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
 // ─── Start button ─────────────────────────────────────────────────────────────
 const FEEDBACK_URL = 'https://docs.google.com/forms/d/e/1FAIpQLScYKKOXc6c3vdqpmWWv0J3lMd90-GOfp0TxxxHelxjIjMdrvw/viewform';
 
-const MenuStartButton = ({ visible, onClick }) => (
+const MenuStartButton = ({ visible, onClick, onDemo }) => (
   <div style={{
     position: 'absolute', bottom: 0, left: 0, right: 0,
     paddingBottom: 'max(120px, env(safe-area-inset-bottom, 120px))',
@@ -1239,6 +1239,26 @@ const MenuStartButton = ({ visible, onClick }) => (
       className="worm-tactile-btn"
       onClick={onClick}
     >START</button>
+    {onDemo && (
+      <button
+        type="button"
+        onClick={onDemo}
+        style={{
+          background: 'linear-gradient(135deg, #3b82f6, #6366f1)',
+          border: 'none',
+          borderRadius: '10px',
+          padding: '10px 28px',
+          color: '#fff',
+          fontSize: '13px',
+          fontWeight: 700,
+          fontFamily: UI_FONT,
+          letterSpacing: '0.08em',
+          cursor: 'pointer',
+          textTransform: 'uppercase',
+          boxShadow: '0 2px 12px rgba(59,130,246,0.35)',
+        }}
+      >Start Demo</button>
+    )}
     <button
       type="button"
       onClick={() => window.open(FEEDBACK_URL, '_blank', 'noopener,noreferrer')}
@@ -1354,6 +1374,7 @@ const MainMenu = ({
   onSettings: _onSettings, onBiome: _onBiome, onDisparity: _onDisparity,
   onWormHealer: _onWormHealer, onHolonomy: _onHolonomy, onMerge: _onMerge,
   onStore: _onStore, onComingSoon: _onComingSoon, onMobiusCubelet: _onMobiusCubelet, onOpenModeSelect,
+  onDemo,
 }) => {
   const [titleVisible, setTitleVisible] = useState(false);
   const [bottomVisible, setBottomVisible] = useState(false);
@@ -1374,7 +1395,7 @@ const MainMenu = ({
       <MenuBackgroundOrbs />
       <ScreenGlow />
       <MenuTitleCard visible={titleVisible} />
-      <MenuStartButton visible={bottomVisible} onClick={() => { _externalShakeNeeded = true; }} />
+      <MenuStartButton visible={bottomVisible} onClick={() => { _externalShakeNeeded = true; }} onDemo={onDemo} />
     </div>
   );
 };
