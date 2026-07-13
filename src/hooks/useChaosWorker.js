@@ -123,6 +123,17 @@ export function useChaosWorker({
     const worker = new Worker(new URL('../workers/chaosWorker.js', import.meta.url), { type: 'module' });
     workerRef.current = worker;
 
+    // If the sim thread ever crashes mid-round the game would otherwise freeze
+    // silently with a wager on the table. Ending the round via setChaosLevel(0)
+    // reuses the STOP path below: the stamped bet is refunded, the parity score
+    // is cashed out, and lingering cascade visuals are cleared.
+    const failRound = (err) => {
+      console.error('[chaosWorker] worker error — ending chaos round safely', err);
+      useGameStore.getState().setChaosLevel(0);
+    };
+    worker.onerror = failRound;
+    worker.onmessageerror = failRound;
+
     worker.onmessage = (e) => {
       if (e.data.type === 'METRICS') {
         // Initial snapshot posted on START so HUDs have data before the first tick.

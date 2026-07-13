@@ -28,6 +28,7 @@ export { useCubeState } from './useCubeState.js';
 export { useGameSession } from './useGameSession.js';
 export { useAnimation } from './useAnimation.js';
 export { useChaosMode } from './useChaosMode.js';
+export { useDisparityGame } from './useDisparityGame.js';
 export { useCursor } from './useCursor.js';
 export { useLevelSystem } from './useLevelSystem.js';
 export { useSettings } from './useSettings.js';

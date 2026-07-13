@@ -315,6 +315,20 @@ can be shared too. Drift has already crept in: the worker's metrics include
     FAST/SLOW cards, and the result description cites it. Re-run the script after any
     chaos tuning change and refresh `SPEED_MEDIANS`.
 
-**Still open:** nothing from the original audit. Future hygiene: re-measure
-`SPEED_MEDIANS` when chaos pacing constants change (the script makes this a one-liner),
-and consider extracting the disparity flow from App.jsx into a `useDisparityGame` hook.
+**Pass 5 (structure + resilience):**
+
+26. **Disparity flow extracted from App.jsx** into `src/hooks/useDisparityGame.js`
+    (317 lines): wizard/betting UI state, the 3-2-1-GO countdown, the auto-unshuffle
+    solve sequence, round start, and the bet-resolution subscription. App.jsx shrinks
+    1,613 → ~1,370 lines and exposes a single `cancelDisparityRun()` for reset/mode
+    switches. Verified end-to-end in a real browser (Playwright + dev server): mode
+    carousel → wizard → betting screen → SPEED cards showing the dynamic "< 7 min"
+    benchmark → bet placed (wallet debited exactly once) → Mobi intro → live round,
+    with zero page errors.
+27. **Worker crash safety**: `worker.onerror`/`onmessageerror` now end the round via
+    `setChaosLevel(0)`, which reuses the STOP path — the stamped bet is refunded, the
+    parity score cashed out, and cascade visuals cleared — instead of freezing silently
+    with a wager on the table.
+
+**Still open:** nothing. Future hygiene: re-measure `SPEED_MEDIANS` when chaos pacing
+constants change (the script makes this a one-liner).
