@@ -1,7 +1,7 @@
 // src/game/manifoldLogic.js
 // Manifold topology and antipodal flipping logic
 import { ANTIPODAL_COLOR, FLIP_CAP } from '../utils/constants.js';
-import { getGridRC, getManifoldGridId } from './coordinates.js';
+import { getGridRC, getManifoldGridId } from './gridIds.js';
 
 // Get manifold neighbors for a sticker - includes cross-face neighbors at edges
 // Returns array of {x, y, z, dirKey} for each neighbor

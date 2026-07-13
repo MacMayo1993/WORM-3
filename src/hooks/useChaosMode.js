@@ -6,32 +6,7 @@ import { useEffect, useRef, useCallback, useMemo } from 'react';
 import { useGameStore } from './useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { useChaosWorker } from './useChaosWorker.js';
-
-const buildSurfaceCoords = (S) => {
-  const coords = [];
-  for (let x = 0; x < S; x++)
-    for (let y = 0; y < S; y++)
-      for (let z = 0; z < S; z++)
-        if (x === 0 || x === S - 1 || y === 0 || y === S - 1 || z === 0 || z === S - 1)
-          coords.push([x, y, z]);
-  return coords;
-};
-
-const computeChaosMetrics = (state, surfCoords) => {
-  let disparity = 0;
-  let flipActive = 0;
-  let edgeTotal = 0;
-  for (const [x, y, z] of surfCoords) {
-    const c = state[x][y][z];
-    for (const key of Object.keys(c.stickers)) {
-      const st = c.stickers[key];
-      edgeTotal++;
-      if (st.curr !== st.orig) disparity++;
-      if ((st.flips || 0) > 0) flipActive++;
-    }
-  }
-  return { disparity, flipActive, edgeTotal };
-};
+import { buildSurfaceCoords, computeChaosMetrics } from '../game/chaosMetrics.js';
 
 // Mutable object shared with RotationPreview for zero-overhead countdown display.
 // RotationPreview polls this in its own RAF loop and mutates the DOM directly,
@@ -137,8 +112,24 @@ export function useChaosMode() {
       return;
     }
 
-    if (!upcomingRotation) {
-      setUpcomingRotation(generateRandomRotation(size));
+    // Interval shrinks from 10 s toward 0.75 s as disparity grows.
+    const targetInterval = () => {
+      const maxDisparity = sizeRef.current * sizeRef.current * 6;
+      const disparityRatio = Math.min(1, disparityRef.current / maxDisparity);
+      const maxInterval = 10000;
+      const minInterval = 750;
+      return maxInterval - disparityRatio * (maxInterval - minInterval);
+    };
+
+    // Seed the first upcoming rotation (or replace one that is invalid for the
+    // current cube size). Reading the ref instead of the store value keeps
+    // `upcomingRotation` out of this effect's deps, so the RAF loop below
+    // survives the whole chaos session instead of tearing down and remounting
+    // once per fired rotation.
+    if (!upcomingRotationRef.current || upcomingRotationRef.current.sliceIndex >= size) {
+      const seeded = generateRandomRotation(size);
+      upcomingRotationRef.current = seeded;
+      setUpcomingRotation(seeded);
     }
 
     let raf = 0;
@@ -153,14 +144,6 @@ export function useChaosMode() {
         return;
       }
 
-      const disparity = disparityRef.current;
-      const maxDisparity = sizeRef.current * sizeRef.current * 6;
-      const disparityRatio = Math.min(1, disparity / maxDisparity);
-
-      const maxInterval = 10000;
-      const minInterval = 750;
-      const targetInterval = maxInterval - disparityRatio * (maxInterval - minInterval);
-
       const newCountdown = countdownRef.current - dt;
       if (newCountdown <= 0) {
         const nextRotation = upcomingRotationRef.current;
@@ -174,11 +157,12 @@ export function useChaosMode() {
         const generated = generateRandomRotation(sizeRef.current);
         setUpcomingRotation(generated);
         upcomingRotationRef.current = generated;
-        countdownRef.current = targetInterval;
-        chaosCountdownState.countdown = targetInterval;
+        const interval = targetInterval();
+        countdownRef.current = interval;
+        chaosCountdownState.countdown = interval;
         // Notify Zustand once per rotation cycle (not per frame) so listeners
         // that genuinely need the reset value (e.g. DisparityHUD) can react.
-        setRotationCountdown(targetInterval);
+        setRotationCountdown(interval);
       } else {
         countdownRef.current = newCountdown;
         // Write directly to the shared mutable object — RotationPreview reads
@@ -189,17 +173,14 @@ export function useChaosMode() {
       raf = requestAnimationFrame(loop);
     };
 
-    const disparity = disparityRef.current;
-    const maxDisparity = size * size * 6;
-    const disparityRatio = Math.min(1, disparity / maxDisparity);
-    const initialCountdown = 10000 - disparityRatio * 9250;
+    const initialCountdown = targetInterval();
     countdownRef.current = initialCountdown;
     chaosCountdownState.countdown = initialCountdown;
     setRotationCountdown(initialCountdown);
 
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [autoRotateEnabled, chaosMode, size, upcomingRotation, generateRandomRotation, setAnimState, setPendingMove, setUpcomingRotation, setRotationCountdown]);
+  }, [autoRotateEnabled, chaosMode, size, generateRandomRotation, setAnimState, setPendingMove, setUpcomingRotation, setRotationCountdown]);
 
   const onCascadeComplete = useCallback((id) => {
     setCascades((prev) => prev.filter((c) => c.id !== id));

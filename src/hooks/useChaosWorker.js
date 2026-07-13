@@ -59,7 +59,7 @@ function applyChaosFlipsBatch(state, flips, size, manifoldMap, flipCap) {
   return get();
 }
 
-function applyChaosRecoveriesBatch(state, recoveries, size, manifoldMap) {
+function applyChaosRecoveriesBatch(state, recoveries, size, manifoldMap, flipCap) {
   if (!recoveries?.length || !manifoldMap) return state;
 
   const { get, getCubieForWrite } = makeCowWriter(state);
@@ -70,7 +70,10 @@ function applyChaosRecoveriesBatch(state, recoveries, size, manifoldMap) {
     const st = c.stickers[loc.dirKey];
     if (!st) return;
     const currentFlips = st.flips || 0;
-    if (currentFlips <= 0) return;
+    // Mirror the worker's guard exactly: dead tiles (at the cap) never recover.
+    // Without the cap check the main thread could revive a pair member the
+    // worker skipped, permanently desyncing the two copies of the cube.
+    if (currentFlips <= 0 || currentFlips >= flipCap) return;
     c.stickers[loc.dirKey] = {
       ...st,
       curr: ANTIPODAL_COLOR[st.curr],
@@ -110,6 +113,7 @@ export function useChaosWorker({
   const manifoldMapRef = useRef(null);
   const disparityFlipCapRef = useRef(disparityFlipCap);
   const lastStatsFlushRef = useRef(0);
+  const winnerTimeoutRef = useRef(null);
 
   useEffect(() => {
     disparityFlipCapRef.current = disparityFlipCap;
@@ -140,7 +144,7 @@ export function useChaosWorker({
           next = applyChaosFlipsBatch(next, flips, size, manifoldMapRef.current, disparityFlipCapRef.current);
         }
         if (recoveries?.length > 0) {
-          next = applyChaosRecoveriesBatch(next, recoveries, size, manifoldMapRef.current);
+          next = applyChaosRecoveriesBatch(next, recoveries, size, manifoldMapRef.current, disparityFlipCapRef.current);
         }
         setCubies(next);
       }
@@ -185,7 +189,13 @@ export function useChaosWorker({
         // Always delay: the final deaths may have arrived in a prior TICK whose
         // 500ms animation is still playing. The unconditional 700ms window lets
         // all in-flight death animations finish before the winner screen appears.
-        setTimeout(announce, 700);
+        // Track the timer so exiting chaos mode inside the window cancels it —
+        // otherwise the winner screen pops over whatever mode the player is in.
+        if (winnerTimeoutRef.current) clearTimeout(winnerTimeoutRef.current);
+        winnerTimeoutRef.current = setTimeout(() => {
+          winnerTimeoutRef.current = null;
+          announce();
+        }, 700);
       }
 
       if (metrics) {
@@ -205,6 +215,10 @@ export function useChaosWorker({
     return () => {
       worker.terminate();
       workerRef.current = null;
+      if (winnerTimeoutRef.current) {
+        clearTimeout(winnerTimeoutRef.current);
+        winnerTimeoutRef.current = null;
+      }
     };
     // disparityFlipCap is intentionally excluded: the handler reads disparityFlipCapRef
     // (synced above) and flip-cap changes are propagated via the dedicated SET_FLIP_CAP
@@ -235,6 +249,18 @@ export function useChaosWorker({
 
     worker.postMessage({ type: 'STOP' });
     setCascades([]);
+    if (winnerTimeoutRef.current) {
+      clearTimeout(winnerTimeoutRef.current);
+      winnerTimeoutRef.current = null;
+    }
+    // Chaos stopped without this round resolving — refund any bet stamped for
+    // it. (A resolved bet was already cleared by the resolver; a bet placed
+    // for the *next* round hasn't been stamped with a roundId yet, so it is
+    // deliberately left alone.)
+    const bet = useGameStore.getState().activeBet;
+    if (bet && bet.roundId != null) {
+      useGameStore.getState().refundActiveBet();
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chaosMode]);
 

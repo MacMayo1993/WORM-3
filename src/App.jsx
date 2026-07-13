@@ -532,6 +532,13 @@ export default function WORM3() {
         const s = useGameStore.getState();
         const activeBet = s.activeBet;
         if (!activeBet) return;
+        // A bet may only resolve against the round it was stamped for. A stale
+        // bet (its round was abandoned; this winner is from a later chaos
+        // session) is refunded rather than resolved against a random outcome.
+        if (activeBet.roundId !== s.disparityRoundId) {
+          useGameStore.getState().refundActiveBet();
+          return;
+        }
         const result = resolveBet(activeBet, {
           disparityDeaths: s.disparityDeaths,
           disparityWinner: s.disparityWinner,
@@ -539,12 +546,22 @@ export default function WORM3() {
         });
         if (!result) return;
         const streak = s.betStreak || 0;
+        if (result.push) {
+          // No meaningful outcome for this bet (e.g. SPEED with too few
+          // eliminations) — return the wager and leave the streak untouched.
+          useGameStore.getState().setLastBetResult({
+            won: false, push: true, payout: 0, net: 0, loss: 0,
+            description: result.description, wager: activeBet.wager,
+          });
+          useGameStore.getState().refundActiveBet();
+          return;
+        }
         if (result.won) {
           const payout = calcPayout(activeBet.wager, activeBet.odds, streak);
           useGameStore.getState().earnCoins(payout);
           useGameStore.getState().setBetStreak(streak + 1);
           useGameStore.getState().setLastBetResult({
-            won: true, payout, loss: 0,
+            won: true, payout, net: payout - activeBet.wager, loss: 0,
             description: result.description, wager: activeBet.wager,
           });
         } else {
@@ -775,6 +792,9 @@ export default function WORM3() {
   const startDisparityGame = useCallback((wizardSettings) => {
     useGameStore.getState().clearLevel();
     useGameStore.getState().clearDisparityGame();
+    // Stamp the freshly-placed bet (if any) with this round's id so the
+    // resolver can tell it apart from bets orphaned by abandoned rounds.
+    useGameStore.getState().beginDisparityRound();
     if (wizardSettings.flipCap != null) useGameStore.getState().setDisparityFlipCap(wizardSettings.flipCap);
     if (wizardSettings.gameLength != null) useGameStore.getState().setDisparityGameLength(wizardSettings.gameLength);
 
@@ -841,6 +861,9 @@ export default function WORM3() {
   const handleDisparitySetupComplete = useCallback((wizardSettings) => {
     setShowDisparityWizard(false);
     pendingWizardSettingsRef.current = wizardSettings;
+    // Any bet still active here belongs to a round that never resolved
+    // (the player quit mid-round) — return the wager before taking a new bet.
+    useGameStore.getState().refundActiveBet();
     // Show betting screen so the player can wager before chaos starts.
     setShowDisparityBetting(true);
   }, []);

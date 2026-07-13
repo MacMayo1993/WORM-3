@@ -361,23 +361,29 @@ export default function DisparityWinnerScreen({ onDismiss }) {
             marginBottom: '1rem',
             padding: '14px 18px',
             borderRadius: '14px',
-            background: lastBetResult.won ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.10)',
-            border: `1.5px solid ${lastBetResult.won ? 'rgba(34,197,94,0.4)' : 'rgba(239,68,68,0.35)'}`,
+            background: lastBetResult.push ? 'rgba(148,163,184,0.10)'
+              : lastBetResult.won ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.10)',
+            border: `1.5px solid ${lastBetResult.push ? 'rgba(148,163,184,0.35)'
+              : lastBetResult.won ? 'rgba(34,197,94,0.4)' : 'rgba(239,68,68,0.35)'}`,
             boxShadow: lastBetResult.won ? '0 0 24px rgba(34,197,94,0.15)' : 'none',
             animation: 'dws-tagline-in 0.4s ease-out 0.05s both',
             display: 'flex', alignItems: 'center', gap: '14px',
           }}
         >
-          <div style={{ fontSize: '1rem', fontWeight: 800, lineHeight: 1, flexShrink: 0, color: lastBetResult.won ? '#4ade80' : '#f87171' }}>
-            {lastBetResult.won ? '+' : '−'}
+          <div style={{ fontSize: '1rem', fontWeight: 800, lineHeight: 1, flexShrink: 0, color: lastBetResult.push ? '#94a3b8' : lastBetResult.won ? '#4ade80' : '#f87171' }}>
+            {lastBetResult.push ? '=' : lastBetResult.won ? '+' : '−'}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{
               fontSize: '11px', fontWeight: 800, letterSpacing: '0.16em', textTransform: 'uppercase',
-              color: lastBetResult.won ? '#4ade80' : '#f87171',
+              color: lastBetResult.push ? '#94a3b8' : lastBetResult.won ? '#4ade80' : '#f87171',
               fontFamily: FONT, marginBottom: '3px',
             }}>
-              {lastBetResult.won ? `Won +${lastBetResult.payout} PP` : `Lost ${lastBetResult.wager} PP`}
+              {lastBetResult.push
+                ? `Push — ${lastBetResult.wager} PP returned`
+                : lastBetResult.won
+                  ? `Won +${lastBetResult.net ?? lastBetResult.payout} PP`
+                  : `Lost ${lastBetResult.wager} PP`}
             </div>
             <div style={{
               fontSize: '12px', color: 'rgba(180,210,255,0.65)',
