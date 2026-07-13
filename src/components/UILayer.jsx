@@ -28,6 +28,7 @@ import SettingsMenu from './menus/SettingsMenu.jsx';
 import HelpMenu from './menus/HelpMenu.jsx';
 import MobileControls from './menus/MobileControls.jsx';
 import FirstFlipTutorial from './screens/FirstFlipTutorial.jsx';
+import FirstFlipCaption from './overlays/FirstFlipCaption.jsx';
 import RotationPreview from './overlays/RotationPreview.jsx';
 import FaceRotationButtons from './overlays/FaceRotationButtons.jsx';
 import TileRotationSelector from './overlays/TileRotationSelector.jsx';
@@ -486,6 +487,8 @@ export default function UILayer({
       <ScreenTransition show={showHelp}>
         <HelpMenu onClose={() => setShowHelp(false)} />
       </ScreenTransition>
+
+      <FirstFlipCaption />
 
       {showFirstFlipTutorial && (
         <FirstFlipTutorial

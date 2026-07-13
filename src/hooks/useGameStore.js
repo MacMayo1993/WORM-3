@@ -842,6 +842,11 @@ export const useGameStore = create(
     // FLIP STATE
     // ========================================================================
     hasFlippedOnce: persistedState.hasFlippedOnce,
+    firstFlipHighlightPair: null,
+    showFirstFlipCaption: false,
+
+    setFirstFlipHighlightPair: (pair) => set({ firstFlipHighlightPair: pair }),
+    setShowFirstFlipCaption: (v) => set({ showFirstFlipCaption: v }),
 
     setHasFlippedOnce: (hasFlippedOnce) => {
       try {

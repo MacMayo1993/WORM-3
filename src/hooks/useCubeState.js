@@ -188,36 +188,33 @@ export function useCubeState() {
     // Batch all flip state changes into a single atomic setState (1 re-render instead of 5-6)
     const ts = Date.now();
     const isFirstFlip = !hasFlippedOnce;
+    const popDuration = isFirstFlip ? 1200 : 600;
+    const tunnelBirthDuration = isFirstFlip ? 1400 : 700;
     useGameStore.setState((state) => ({
       cubies: flipStickerPair(state.cubies, state.cubies.length, pos.x, pos.y, pos.z, dirKey, currentManifoldMap),
       moves: state.moves + 1,
       moveHistory: [...state.moveHistory, { type: 'flip', pos: { ...pos }, dirKey, timestamp: ts }].slice(-10),
       flipWaveOrigins: origins,
       blackHolePulse: ts,
-      // Cubie pop: both the clicked cubie and its antipodal partner burst outward.
-      // Each map is pruned of already-finished animations on the way through so
-      // it stays bounded to the pops/births/pulses actually in flight.
       cubiePops: {
         ...pruneExpiredFx(state.cubiePops, now),
-        [srcKey]: { startMs: now, durationMs: 600 },
-        ...(antKey ? { [antKey]: { startMs: now, durationMs: 600 } } : {}),
+        [srcKey]: { startMs: now, durationMs: popDuration },
+        ...(antKey ? { [antKey]: { startMs: now, durationMs: popDuration } } : {}),
       },
-      // Tunnel birth: first flip on this pair → grow-in animation on the Möbius ribbon
       tunnelBirths: (isFirstFlipOnPair && pairId) ? {
         ...pruneExpiredFx(state.tunnelBirths, now),
-        [pairId]: { startMs: now, durationMs: 700 },
+        [pairId]: { startMs: now, durationMs: tunnelBirthDuration },
       } : pruneExpiredFx(state.tunnelBirths, now),
-      // Tunnel pulse: subsequent flips → brightness burst on the existing ribbon
       tunnelPulses: (!isFirstFlipOnPair && pairId) ? {
         ...pruneExpiredFx(state.tunnelPulses, now),
         [pairId]: { startMs: now, durationMs: 400 },
       } : pruneExpiredFx(state.tunnelPulses, now),
-      ...(isFirstFlip ? { hasFlippedOnce: true } : {}),
+      ...(isFirstFlip ? { hasFlippedOnce: true, firstFlipHighlightPair: null } : {}),
     }));
 
-    // First flip tutorial trigger (runs after state is set, uses timeout so it fires after render)
     if (isFirstFlip) {
-      setTimeout(() => setShowFirstFlipTutorial(true), 600);
+      setTimeout(() => useGameStore.getState().setShowFirstFlipCaption(true), 400);
+      setTimeout(() => setShowFirstFlipTutorial(true), 3000);
     }
   }, [getRotationForDir, hasFlippedOnce, setShowFirstFlipTutorial]);
 
