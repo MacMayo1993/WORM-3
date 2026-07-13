@@ -117,7 +117,7 @@ export default function UILayer({
     showMergeThemePicker, onMergeStart, onMergeCancel,
     onWizardComplete, onWizardCancel, onRandomWizardComplete, onRandomWizardCancel,
     onCubeModeRubiks, onCubeModeDisparity, onCubeModeBack, onDisparitySetupComplete,
-    onBetPlaced, onBetSkipped,
+    onBetPlaced, onBetSkipped, speedThresholdSec,
     onWormSetupComplete, onMobiIntroComplete, onWormWizardCancel, onWormRetry, onWormNewGame,
     onToggleHandsMode, onFaceRotate, onTileRotation, onTileFaceRotation,
     onVictoryContinue, onVictoryNewGame,
@@ -291,7 +291,7 @@ export default function UILayer({
         {/* Disparity Betting Screen — intercepts before chaos starts */}
         <ScreenTransition show={showDisparityBetting}>
           <Suspense fallback={null}>
-            <DisparityBettingScreen onBetPlaced={onBetPlaced} onSkip={onBetSkipped} />
+            <DisparityBettingScreen onBetPlaced={onBetPlaced} onSkip={onBetSkipped} speedThresholdSec={speedThresholdSec} />
           </Suspense>
         </ScreenTransition>
 

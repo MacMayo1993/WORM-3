@@ -62,6 +62,16 @@ describe('disparity bet lifecycle', () => {
     expect(useGameStore.getState().activeBet).toBeNull();
   });
 
+  it('cashOutParityScore converts healed-tile score into wallet PP exactly once', () => {
+    useGameStore.setState({ disparityParityScore: 45 });
+    useGameStore.getState().cashOutParityScore();
+    expect(useGameStore.getState().parityPoints).toBe(1045);
+    expect(useGameStore.getState().disparityParityScore).toBe(0);
+    // Second call (e.g. winner path then STOP path) is a no-op.
+    useGameStore.getState().cashOutParityScore();
+    expect(useGameStore.getState().parityPoints).toBe(1045);
+  });
+
   it('setBetStreak persists the streak alongside the wallet', () => {
     useGameStore.getState().setBetStreak(4);
     expect(useGameStore.getState().betStreak).toBe(4);

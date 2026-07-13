@@ -17,7 +17,7 @@ import './App.css';
 // Utils
 import { resolveBiomeManifoldStyles } from './modes/CityBiomeMode.js';
 import { completeLevel } from './utils/levels.js';
-import { resolveBet, calcPayout } from './utils/disparityBetting.js';
+import { resolveBet, calcPayout, speedThresholdFor } from './utils/disparityBetting.js';
 import { DISPARITY_GAME_LENGTHS } from './utils/economyConstants.js';
 import { vibrate } from './utils/audio.js';
 import { makeCubies } from './game/cubeState.js';
@@ -465,6 +465,8 @@ export default function WORM3() {
   // Disparity Mode wizard + betting screen
   const [showDisparityWizard, setShowDisparityWizard] = useState(false);
   const [showDisparityBetting, setShowDisparityBetting] = useState(false);
+  // SPEED bet benchmark (median seconds) for the wizard settings being bet on.
+  const [speedThresholdSec, setSpeedThresholdSec] = useState(null);
   const pendingDisparityLevelRef = useRef(3);
   const pendingWizardSettingsRef = useRef(null);
   // Countdown: null = not running, 3/2/1 = ticking, 'GO!' = flash before start
@@ -530,6 +532,9 @@ export default function WORM3() {
       (show) => {
         if (!show) return;
         const s = useGameStore.getState();
+        // Round over — convert healed-tile parity score into wallet PP
+        // (idempotent: the action zeroes the score it cashes).
+        useGameStore.getState().cashOutParityScore();
         const activeBet = s.activeBet;
         if (!activeBet) return;
         // A bet may only resolve against the round it was stamped for. A stale
@@ -543,6 +548,9 @@ export default function WORM3() {
           disparityDeaths: s.disparityDeaths,
           disparityWinner: s.disparityWinner,
           disparityEliminatedFaces: s.disparityEliminatedFaces,
+          // SPEED's fast/slow threshold is the measured median for these settings.
+          chaosLevel: s.chaosLevel,
+          disparityFlipCap: s.disparityFlipCap,
         });
         if (!result) return;
         const streak = s.betStreak || 0;
@@ -864,6 +872,8 @@ export default function WORM3() {
     // Any bet still active here belongs to a round that never resolved
     // (the player quit mid-round) — return the wager before taking a new bet.
     useGameStore.getState().refundActiveBet();
+    // SPEED benchmark for the chosen settings, shown on the betting screen.
+    setSpeedThresholdSec(speedThresholdFor(wizardSettings.disparityLevel, wizardSettings.flipCap));
     // Show betting screen so the player can wager before chaos starts.
     setShowDisparityBetting(true);
   }, []);
@@ -1586,6 +1596,7 @@ export default function WORM3() {
               onDisparitySetupComplete: handleDisparitySetupComplete,
               onBetPlaced: handleBetPlaced,
               onBetSkipped: handleBetSkipped,
+              speedThresholdSec,
               onWormSetupComplete: handleWormSetupComplete,
               onMobiIntroComplete: handleMobiIntroComplete,
               onWormWizardCancel: handleWormWizardCancel,

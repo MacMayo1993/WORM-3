@@ -261,6 +261,9 @@ export function useChaosWorker({
     if (bet && bet.roundId != null) {
       useGameStore.getState().refundActiveBet();
     }
+    // Tiles healed before the round was abandoned were still earned — cash the
+    // parity score out rather than letting clearDisparityGame discard it.
+    useGameStore.getState().cashOutParityScore();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chaosMode]);
 

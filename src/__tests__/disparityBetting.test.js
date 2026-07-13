@@ -8,6 +8,8 @@ import {
   getFaceFromGridId,
   getWinnerFaces,
   resolveBet,
+  speedThresholdFor,
+  formatSpeedThreshold,
 } from '../utils/disparityBetting.js';
 
 // The chaos worker always finishes with an antipodal pair, e.g. Red/Orange.
@@ -165,20 +167,27 @@ describe('resolveBet', () => {
       { timestamp: 1_000_000 + (seconds * 1000) / 2 },
       { timestamp: 1_000_000 + seconds * 1000 },
     ];
+    // L4 @ flip cap 6 has a measured median (threshold) of 40s.
+    const speedCtx = (over = {}) => ctx({ chaosLevel: 4, disparityFlipCap: 6, ...over });
 
-    it('FAST wins when the round runs under 60s from first to last death', () => {
-      expect(resolveBet({ type: 'SPEED', pick: 'FAST' }, ctx({ disparityDeaths: deathsSpanning(30) })).won).toBe(true);
-      expect(resolveBet({ type: 'SPEED', pick: 'SLOW' }, ctx({ disparityDeaths: deathsSpanning(30) })).won).toBe(false);
+    it('FAST wins when the round beats the settings-specific benchmark', () => {
+      expect(resolveBet({ type: 'SPEED', pick: 'FAST' }, speedCtx({ disparityDeaths: deathsSpanning(20) })).won).toBe(true);
+      expect(resolveBet({ type: 'SPEED', pick: 'SLOW' }, speedCtx({ disparityDeaths: deathsSpanning(20) })).won).toBe(false);
     });
 
-    it('SLOW wins when the round runs over 60s', () => {
-      expect(resolveBet({ type: 'SPEED', pick: 'SLOW' }, ctx({ disparityDeaths: deathsSpanning(90) })).won).toBe(true);
-      expect(resolveBet({ type: 'SPEED', pick: 'FAST' }, ctx({ disparityDeaths: deathsSpanning(90) })).won).toBe(false);
+    it('SLOW wins when the round outlasts the benchmark', () => {
+      expect(resolveBet({ type: 'SPEED', pick: 'SLOW' }, speedCtx({ disparityDeaths: deathsSpanning(90) })).won).toBe(true);
+      expect(resolveBet({ type: 'SPEED', pick: 'FAST' }, speedCtx({ disparityDeaths: deathsSpanning(90) })).won).toBe(false);
+    });
+
+    it('mentions the benchmark in the result description', () => {
+      const res = resolveBet({ type: 'SPEED', pick: 'FAST' }, speedCtx({ disparityDeaths: deathsSpanning(20) }));
+      expect(res.description).toContain(`${speedThresholdFor(4, 6)}s benchmark`);
     });
 
     it('sorts death timestamps before measuring', () => {
       const shuffled = [{ timestamp: 1_090_000 }, { timestamp: 1_000_000 }, { timestamp: 1_050_000 }];
-      expect(resolveBet({ type: 'SPEED', pick: 'SLOW' }, ctx({ disparityDeaths: shuffled })).won).toBe(true);
+      expect(resolveBet({ type: 'SPEED', pick: 'SLOW' }, speedCtx({ disparityDeaths: shuffled })).won).toBe(true);
     });
 
     it('pushes (wager returned) when there are fewer than two deaths to time', () => {
@@ -190,6 +199,37 @@ describe('resolveBet', () => {
       const oneDeath = resolveBet({ type: 'SPEED', pick: 'FAST' }, ctx({ disparityDeaths: [{ timestamp: 1 }] }));
       expect(oneDeath.push).toBe(true);
     });
+  });
+});
+
+// ─── SPEED benchmark lookup ───────────────────────────────────────────────────
+
+describe('speedThresholdFor', () => {
+  it('rises with flip cap and falls with chaos level', () => {
+    expect(speedThresholdFor(1, 6)).toBeLessThan(speedThresholdFor(1, 40));
+    expect(speedThresholdFor(4, 15)).toBeLessThan(speedThresholdFor(1, 15));
+  });
+
+  it('snaps unknown caps to the nearest measured tier', () => {
+    expect(speedThresholdFor(3, 14)).toBe(speedThresholdFor(3, 15));
+    expect(speedThresholdFor(3, 9999)).toBe(speedThresholdFor(3, 40));
+  });
+
+  it('defaults to level 3 / cap 15 when settings are missing', () => {
+    expect(speedThresholdFor(undefined, undefined)).toBe(speedThresholdFor(3, 15));
+  });
+
+  it('clamps out-of-range levels (0 counts as "not set" and takes the default)', () => {
+    expect(speedThresholdFor(-1, 15)).toBe(speedThresholdFor(1, 15));
+    expect(speedThresholdFor(99, 15)).toBe(speedThresholdFor(5, 15));
+    expect(speedThresholdFor(0, 15)).toBe(speedThresholdFor(3, 15));
+  });
+});
+
+describe('formatSpeedThreshold', () => {
+  it('shows seconds under two minutes, minutes above', () => {
+    expect(formatSpeedThreshold(75)).toBe('75s');
+    expect(formatSpeedThreshold(455)).toBe('8 min');
   });
 });
 
