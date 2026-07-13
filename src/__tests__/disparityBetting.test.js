@@ -181,11 +181,14 @@ describe('resolveBet', () => {
       expect(resolveBet({ type: 'SPEED', pick: 'SLOW' }, ctx({ disparityDeaths: shuffled })).won).toBe(true);
     });
 
-    // Documents current behavior: with fewer than two deaths elapsed is 0,
-    // which counts as fast. A real round produces ~size²·6−2 deaths before a
-    // winner exists, so this path is theoretical.
-    it('treats fewer than two deaths as a fast round', () => {
-      expect(resolveBet({ type: 'SPEED', pick: 'FAST' }, ctx({ disparityDeaths: [] })).won).toBe(true);
+    it('pushes (wager returned) when there are fewer than two deaths to time', () => {
+      for (const pick of ['FAST', 'SLOW']) {
+        const res = resolveBet({ type: 'SPEED', pick }, ctx({ disparityDeaths: [] }));
+        expect(res.push).toBe(true);
+        expect(res.won).toBe(false);
+      }
+      const oneDeath = resolveBet({ type: 'SPEED', pick: 'FAST' }, ctx({ disparityDeaths: [{ timestamp: 1 }] }));
+      expect(oneDeath.push).toBe(true);
     });
   });
 });

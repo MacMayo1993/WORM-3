@@ -61,4 +61,12 @@ describe('disparity bet lifecycle', () => {
     expect(useGameStore.getState().parityPoints).toBe(1000);
     expect(useGameStore.getState().activeBet).toBeNull();
   });
+
+  it('setBetStreak persists the streak alongside the wallet', () => {
+    useGameStore.getState().setBetStreak(4);
+    expect(useGameStore.getState().betStreak).toBe(4);
+    expect(localStorage.getItem('worm3_bet_streak')).toBe('4');
+    useGameStore.getState().setBetStreak(0);
+    expect(localStorage.getItem('worm3_bet_streak')).toBe('0');
+  });
 });

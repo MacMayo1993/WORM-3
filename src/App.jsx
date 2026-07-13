@@ -546,6 +546,16 @@ export default function WORM3() {
         });
         if (!result) return;
         const streak = s.betStreak || 0;
+        if (result.push) {
+          // No meaningful outcome for this bet (e.g. SPEED with too few
+          // eliminations) — return the wager and leave the streak untouched.
+          useGameStore.getState().setLastBetResult({
+            won: false, push: true, payout: 0, net: 0, loss: 0,
+            description: result.description, wager: activeBet.wager,
+          });
+          useGameStore.getState().refundActiveBet();
+          return;
+        }
         if (result.won) {
           const payout = calcPayout(activeBet.wager, activeBet.odds, streak);
           useGameStore.getState().earnCoins(payout);

@@ -1,13 +1,19 @@
 import { rotateSliceCubies } from '../game/cubeRotation.js';
-
-const ANTIPODAL_COLOR = {
-  1: 4,
-  2: 5,
-  3: 6,
-  4: 1,
-  5: 2,
-  6: 3,
-};
+import { ANTIPODAL_COLOR } from '../utils/constants.js';
+// Canonical grid/manifold math shared with the main thread. The worker used to
+// carry its own copies, which had drifted for the NX/NY/NZ faces — the worker
+// paired antipodal stickers differently than the main-thread replay, silently
+// desyncing the two cubes and printing death-log grid IDs that didn't match
+// the labels on the tiles. Never re-inline these.
+import { getManifoldGridId, faceRCFor, getStickerWorldPos } from '../game/gridIds.js';
+import {
+  buildManifoldGridMap,
+  findAntipodalStickerByGrid,
+  getManifoldNeighbors,
+  isOnSeam,
+  isCrossFaceNeighbor,
+} from '../game/manifoldLogic.js';
+import { buildSurfaceCoords, computeChaosMetrics } from '../game/chaosMetrics.js';
 
 const MAX_LEVEL = 5;
 
@@ -101,150 +107,6 @@ let conwayAcc = 0; // ms accumulator for Conway tick cadence
 // Neighbor cache: Map<"x,y,z,dirKey", [{x,y,z,dirKey}, ...]>
 // Built once per size, invalidated on size change. Avoids recomputing neighbors every generation.
 let neighborCache = null;
-
-const buildSurfaceCoords = (S) => {
-  const coords = [];
-  for (let x = 0; x < S; x++) {
-    for (let y = 0; y < S; y++) {
-      for (let z = 0; z < S; z++) {
-        if (x === 0 || x === S - 1 || y === 0 || y === S - 1 || z === 0 || z === S - 1) {
-          coords.push([x, y, z]);
-        }
-      }
-    }
-  }
-  return coords;
-};
-
-const computeChaosMetrics = (cubeState, surfCoords) => {
-  let disparity = 0;
-  let flipActive = 0;
-  let edgeTotal = 0;
-  let totalFlips = 0;
-  let deadTiles = 0;
-  for (const [x, y, z] of surfCoords) {
-    const c = cubeState[x][y][z];
-    for (const key of Object.keys(c.stickers)) {
-      const st = c.stickers[key];
-      edgeTotal++;
-      if (st.curr !== st.orig) disparity++;
-      const flips = st.flips || 0;
-      totalFlips += flips;
-      if (flips > 0) flipActive++;
-      if (flips >= flipCap) deadTiles++;
-    }
-  }
-  return { disparity, flipActive, edgeTotal, totalFlips, deadTiles };
-};
-
-const getGridRC = (origPos, origDir, S) => {
-  const { x, y, z } = origPos;
-  if (origDir === 'PZ') return { r: S - 1 - y, c: x };
-  if (origDir === 'NZ') return { r: S - 1 - y, c: S - 1 - x };
-  if (origDir === 'PX') return { r: S - 1 - y, c: S - 1 - z };
-  if (origDir === 'NX') return { r: S - 1 - y, c: z };
-  if (origDir === 'PY') return { r: z, c: x };
-  return { r: S - 1 - z, c: x };
-};
-
-const getManifoldGridId = (sticker, S) => {
-  const { r, c } = getGridRC(sticker.origPos, sticker.origDir, S);
-  const idx = r * S + c + 1;
-  return `M${sticker.orig}-${String(idx).padStart(3, '0')}`;
-};
-
-const faceRCFor = (dirKey, x, y, z, S) => {
-  if (dirKey === 'PZ') return { r: S - 1 - y, c: x };
-  if (dirKey === 'NZ') return { r: S - 1 - y, c: S - 1 - x };
-  if (dirKey === 'PX') return { r: S - 1 - y, c: S - 1 - z };
-  if (dirKey === 'NX') return { r: S - 1 - y, c: z };
-  if (dirKey === 'PY') return { r: z, c: x };
-  return { r: S - 1 - z, c: x };
-};
-
-const getStickerWorldPos = (x, y, z, dirKey, S, explosionFactor = 0) => {
-  const k = (S - 1) / 2;
-  const base = [x - k, y - k, z - k];
-  const exploded = [
-    base[0] * (1 + explosionFactor * 1.8),
-    base[1] * (1 + explosionFactor * 1.8),
-    base[2] * (1 + explosionFactor * 1.8),
-  ];
-
-  const offset = 0.52;
-  switch (dirKey) {
-    case 'PX': return [exploded[0] + offset, exploded[1], exploded[2]];
-    case 'NX': return [exploded[0] - offset, exploded[1], exploded[2]];
-    case 'PY': return [exploded[0], exploded[1] + offset, exploded[2]];
-    case 'NY': return [exploded[0], exploded[1] - offset, exploded[2]];
-    case 'PZ': return [exploded[0], exploded[1], exploded[2] + offset];
-    case 'NZ': return [exploded[0], exploded[1], exploded[2] - offset];
-    default: return exploded;
-  }
-};
-
-const buildManifoldGridMap = (cubies, S) => {
-  const map = new Map();
-  for (let x = 0; x < S; x++) {
-    for (let y = 0; y < S; y++) {
-      for (let z = 0; z < S; z++) {
-        const c = cubies[x][y][z];
-        for (const [dKey, st] of Object.entries(c.stickers)) {
-          map.set(getManifoldGridId(st, S), { x, y, z, dirKey: dKey, sticker: st });
-        }
-      }
-    }
-  }
-  return map;
-};
-
-const findAntipodalStickerByGrid = (manifoldMap, sticker, S) => {
-  const { r, c } = getGridRC(sticker.origPos, sticker.origDir, S);
-  const idx = r * S + c + 1;
-  const antipodalManifold = ANTIPODAL_COLOR[sticker.orig];
-  const antipodalGridId = `M${antipodalManifold}-${String(idx).padStart(3, '0')}`;
-  return manifoldMap.get(antipodalGridId) || null;
-};
-
-const getManifoldNeighbors = (x, y, z, dirKey, S) => {
-  const neighbors = [];
-  const add = (nx, ny, nz, nDir) => {
-    if (nx >= 0 && nx < S && ny >= 0 && ny < S && nz >= 0 && nz < S) neighbors.push({ x: nx, y: ny, z: nz, dirKey: nDir });
-  };
-
-  if (dirKey === 'PX' || dirKey === 'NX') {
-    const xi = dirKey === 'PX' ? S - 1 : 0;
-    add(xi, y - 1, z, dirKey); add(xi, y + 1, z, dirKey); add(xi, y, z - 1, dirKey); add(xi, y, z + 1, dirKey);
-    if (y === S - 1) add(x, S - 1, z, 'PY');
-    if (y === 0) add(x, 0, z, 'NY');
-    if (z === S - 1) add(x, y, S - 1, 'PZ');
-    if (z === 0) add(x, y, 0, 'NZ');
-  } else if (dirKey === 'PY' || dirKey === 'NY') {
-    const yi = dirKey === 'PY' ? S - 1 : 0;
-    add(x - 1, yi, z, dirKey); add(x + 1, yi, z, dirKey); add(x, yi, z - 1, dirKey); add(x, yi, z + 1, dirKey);
-    if (x === S - 1) add(S - 1, y, z, 'PX');
-    if (x === 0) add(0, y, z, 'NX');
-    if (z === S - 1) add(x, y, S - 1, 'PZ');
-    if (z === 0) add(x, y, 0, 'NZ');
-  } else {
-    const zi = dirKey === 'PZ' ? S - 1 : 0;
-    add(x - 1, y, zi, dirKey); add(x + 1, y, zi, dirKey); add(x, y - 1, zi, dirKey); add(x, y + 1, zi, dirKey);
-    if (x === S - 1) add(S - 1, y, z, 'PX');
-    if (x === 0) add(0, y, z, 'NX');
-    if (y === S - 1) add(x, S - 1, z, 'PY');
-    if (y === 0) add(x, 0, z, 'NY');
-  }
-  return neighbors;
-};
-
-const isOnSeam = (x, y, z, dirKey, S) => {
-  const s = S - 1;
-  if (dirKey === 'PX' || dirKey === 'NX') return y === 0 || y === s || z === 0 || z === s;
-  if (dirKey === 'PY' || dirKey === 'NY') return x === 0 || x === s || z === 0 || z === s;
-  return x === 0 || x === s || y === 0 || y === s;
-};
-
-const isCrossFaceNeighbor = (sourceDirKey, neighborDirKey) => sourceDirKey !== neighborDirKey;
 
 const flipStickerPairLocal = (cubeState, x, y, z, dirKey, manifoldMap, outFlips) => {
   const sticker = cubeState[x]?.[y]?.[z]?.stickers?.[dirKey];
@@ -441,6 +303,19 @@ const recoverStickerPairLocal = (cubeState, x, y, z, dirKey, manifoldMap, outRec
   applyRecover(anti, false);
 };
 
+// Uniformly sample k items from arr (partial Fisher–Yates; mutates arr's order).
+const sampleK = (arr, k) => {
+  if (arr.length <= k) return arr;
+  for (let i = 0; i < k; i++) {
+    const j = i + Math.floor(Math.random() * (arr.length - i));
+    const tmp = arr[i];
+    arr[i] = arr[j];
+    arr[j] = tmp;
+  }
+  arr.length = k;
+  return arr;
+};
+
 const conwayTick = () => {
   if (!state || animating) return null;
   if (!manifoldMapCache) manifoldMapCache = buildManifoldGridMap(state, size);
@@ -454,8 +329,8 @@ const conwayTick = () => {
   const birthCap = conwayBirthCapByLevel[level] || 4;
   const recoveryCap = conwayRecoveryCapByLevel[level] || 3;
 
-  const births = []; // [x,y,z,dirKey] — healthy stickers to infect
-  const recoveries = []; // [x,y,z,dirKey] — infected stickers to heal
+  const birthCandidates = []; // [x,y,z,dirKey] — healthy stickers eligible to infect
+  const recoveryCandidates = []; // [x,y,z,dirKey] — infected stickers eligible to heal
   const cascades = [];
 
   // Snapshot: evaluate all stickers against current state (synchronous generation)
@@ -480,16 +355,22 @@ const conwayTick = () => {
 
     if (!isInfected) {
       // Birth check: healthy sticker with right number of infected neighbors
-      if (birthSet.has(infectedCount) && births.length < birthCap) {
-        births.push([loc.x, loc.y, loc.z, loc.dirKey]);
+      if (birthSet.has(infectedCount)) {
+        birthCandidates.push([loc.x, loc.y, loc.z, loc.dirKey]);
       }
     } else {
       // Survival check: infected sticker without enough support recovers
-      if (!surviveSet.has(infectedCount) && Math.random() < recoveryRate && recoveries.length < recoveryCap) {
-        recoveries.push([loc.x, loc.y, loc.z, loc.dirKey]);
+      if (!surviveSet.has(infectedCount) && Math.random() < recoveryRate) {
+        recoveryCandidates.push([loc.x, loc.y, loc.z, loc.dirKey]);
       }
     }
   }
+
+  // Sample the per-tick caps uniformly from the full candidate pools. Taking
+  // the first N as candidates appear would always favour stickers early in
+  // livingStickers' insertion order — a deterministic spatial bias.
+  const births = sampleK(birthCandidates, birthCap);
+  const recoveries = sampleK(recoveryCandidates, recoveryCap);
 
   // Apply births (flip sticker + antipodal pair)
   const outFlips = [];
@@ -673,7 +554,7 @@ const tick = (dtMs) => {
   // Only recompute the O(n) metrics scan when something actually changed this tick.
   const didWork = flips.length > 0 || cascades.length > 0 || producedDeaths || !!winner;
   if (didWork) {
-    cachedMetrics = computeChaosMetrics(state, surfaceCoords);
+    cachedMetrics = computeChaosMetrics(state, surfaceCoords, flipCap);
   }
   const flipPct = cachedMetrics.edgeTotal > 0 ? Math.round((cachedMetrics.flipActive / cachedMetrics.edgeTotal) * 100) : 0;
 
@@ -788,7 +669,7 @@ self.onmessage = (e) => {
       running = true;
       // Immediate metrics snapshot so HUDs have data before the first
       // productive tick (replaces main-thread polling scans).
-      cachedMetrics = computeChaosMetrics(state, surfaceCoords);
+      cachedMetrics = computeChaosMetrics(state, surfaceCoords, flipCap);
       self.postMessage({
         type: 'METRICS',
         payload: {
@@ -824,9 +705,44 @@ self.onmessage = (e) => {
       break;
     }
 
-    case 'SET_FLIP_CAP':
+    case 'SET_FLIP_CAP': {
+      const prevCap = flipCap;
       flipCap = payload.disparityFlipCap;
+      // Lowering the cap can put already-damaged tiles at/over it. Sweep them
+      // into the death ledger now — otherwise they'd be stranded (too damaged
+      // to flip or recover, never registered as dead) until a chain wandered by.
+      if (running && state && flipCap < prevCap) {
+        if (!manifoldMapCache) manifoldMapCache = buildManifoldGridMap(state, size);
+        const deaths = [];
+        const eliminatedFaces = [];
+        for (const loc of [...livingStickers.values()]) {
+          const st = state[loc.x]?.[loc.y]?.[loc.z]?.stickers?.[loc.dirKey];
+          if (st && (st.flips || 0) >= flipCap) {
+            checkPairDeaths(loc, deaths, eliminatedFaces);
+          }
+        }
+        if (deaths.length > 0) {
+          cachedMetrics = computeChaosMetrics(state, surfaceCoords, flipCap);
+          self.postMessage({
+            type: 'TICK',
+            payload: {
+              flips: [],
+              cascades: [],
+              recoveries: [],
+              deaths,
+              eliminatedFaces: [...new Set(eliminatedFaces)],
+              winner: null, // winner detection stays with the next chain tick
+              metrics: {
+                ...cachedMetrics,
+                flipPct: cachedMetrics.edgeTotal > 0 ? Math.round((cachedMetrics.flipActive / cachedMetrics.edgeTotal) * 100) : 0,
+              },
+              didWork: true,
+            },
+          });
+        }
+      }
       break;
+    }
 
     case 'SET_CHAOS_LEVEL':
       chaosLevel = payload.chaosLevel;

@@ -76,7 +76,9 @@ export function getWinnerFaces(pair) {
 }
 
 // ── Bet resolution ────────────────────────────────────────────────────────────
-// Returns { won: bool, description: string }
+// Returns { won: bool, description: string } — or { won: false, push: true,
+// description } when the round produced no meaningful outcome for the bet
+// (the wager should be returned, not lost).
 export function resolveBet(bet, { disparityDeaths, disparityWinner, disparityEliminatedFaces }) {
   if (!bet || !disparityWinner?.pair?.length) return null;
 
@@ -125,9 +127,15 @@ export function resolveBet(bet, { disparityDeaths, disparityWinner, disparityEli
   if (type === 'SPEED') {
     // Duration from first death event to last
     const sorted = [...(disparityDeaths || [])].sort((a, b) => a.timestamp - b.timestamp);
-    const elapsed = sorted.length >= 2
-      ? (sorted[sorted.length - 1].timestamp - sorted[0].timestamp) / 1000
-      : 0;
+    if (sorted.length < 2) {
+      // Not enough eliminations to time the round — push, wager returned.
+      return {
+        won: false,
+        push: true,
+        description: 'Too few eliminations to time the round — wager returned.',
+      };
+    }
+    const elapsed = (sorted[sorted.length - 1].timestamp - sorted[0].timestamp) / 1000;
     const threshold = 60; // seconds
     const wasFast = elapsed < threshold;
     const won = pick === 'FAST' ? wasFast : !wasFast;

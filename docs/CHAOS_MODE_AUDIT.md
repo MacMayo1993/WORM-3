@@ -147,7 +147,7 @@ if not, ignore `SET_CHAOS_LEVEL` while a disparity round is live.
 that window, the winner screen still pops over whatever mode they're now in. Store the
 timer id and clear it in the effect cleanup / on `STOP`.
 
-### 2.5 🔵 Minor
+### 2.5 ✅ FIXED (pass 3) — Minor
 - Conway **birth/recovery caps are filled in Map-insertion order** (`births.length <
   birthCap` inside the scan), so stickers early in `livingStickers` win the birth lottery
   every generation — a deterministic spatial bias. Reservoir-sample the candidates
@@ -167,7 +167,7 @@ already known (`effectivePeriod − tickAcc`, `conwayPeriod − conwayAcc`); sle
 `min(...)` of those (clamped to ≥16 ms) cuts idle worker wakeups by ~90% — meaningful on
 mobile batteries. Low risk since all cooldowns are already wall-clock (`dtMs`) based.
 
-### 3.2 Auto-rotate effect churns every rotation cycle
+### 3.2 ✅ FIXED (pass 3) — Auto-rotate effect churned every rotation cycle
 `useChaosMode.js:202` — the RAF-loop effect lists `upcomingRotation` in its deps, so each
 fired rotation (loop calls `setUpcomingRotation`) tears down and rebuilds the loop, and
 the initial-countdown block (lines 192-198) duplicates the in-loop interval math (156-162)
@@ -175,7 +175,7 @@ just to survive the remount. Keeping `upcomingRotation` in a ref (publishing to 
 for the HUD only) makes the effect mount once per chaos session and deletes the
 duplicated countdown code.
 
-### 3.3 Duplicated pure logic between worker and hooks
+### 3.3 ✅ FIXED (pass 3) — Duplicated pure logic between worker and hooks (was hiding a real desync bug)
 `buildSurfaceCoords` and `computeChaosMetrics` exist in both `useChaosMode.js` and
 `chaosWorker.js`, and the worker re-implements `getGridRC` / `getManifoldGridId` /
 `buildManifoldGridMap` / `findAntipodalStickerByGrid` from `src/game/manifoldLogic.js`.
@@ -252,6 +252,42 @@ can be shared too. Drift has already crept in: the worker's metrics include
     tests added to `disparityBetting.test.js` (SURVIVOR = PAIR pricing, FIRST_OUT = 2×,
     house edge on every line).
 
-**Still open:** §1.6 SPEED <2-deaths rule and `betStreak` persistence (design calls),
-§2.5 Conway insertion-order bias and `SET_FLIP_CAP` stranding (minor), §3.2 auto-rotate
-effect churn, §3.3 worker/hook logic dedup (refactors).
+**Pass 3 (remaining items + a bug the dedup uncovered):**
+
+15. **🔴 NEW FINDING, FIXED — the worker's grid formulas had drifted from the canonical
+    ones.** While executing the §3.3 dedup, comparing the worker's local `getGridRC` /
+    `faceRCFor` against `src/game/coordinates.js` revealed different formulas for the
+    NX, NY, and NZ faces (e.g. worker NZ used `r = S−1−y`; canonical is `r = y`). Since
+    antipodal partners are matched by grid index, **the worker paired most stickers with
+    a different partner than the main-thread replay did** — every chaos flip/recovery
+    could mutate a different second tile on each side, silently desyncing the rendered
+    cube from the simulation, and death-log/winner grid IDs didn't match the IDs painted
+    on tiles. This was almost certainly the root cause of the historical "M2/corner
+    stickers spaz" artifacts noted in code comments. Fixed by the §3.3 dedup: the worker
+    now imports the one canonical implementation.
+16. **§3.3** — pure grid math extracted to `src/game/gridIds.js` (no Three.js import, so
+    the worker bundle stays ~13 KB); `coordinates.js` re-exports it for its ~20 existing
+    importers; `manifoldLogic.js` now imports from `gridIds.js`. The worker's local
+    copies of `ANTIPODAL_COLOR`, `getGridRC`, `getManifoldGridId`, `faceRCFor`,
+    `getStickerWorldPos`, `buildManifoldGridMap`, `findAntipodalStickerByGrid`,
+    `getManifoldNeighbors`, `isOnSeam`, and `isCrossFaceNeighbor` are deleted in favor of
+    the shared modules. `buildSurfaceCoords`/`computeChaosMetrics` unified in
+    `src/game/chaosMetrics.js`, shared by the worker and `useChaosMode`.
+17. **§1.6** — SPEED with <2 deaths is now an explicit **push**: `resolveBet` returns
+    `{ push: true }`, the resolver returns the wager and leaves the streak untouched,
+    and the winner banner shows a neutral "Push — wager returned" state.
+18. **§1.6** — `betStreak` now persists to `localStorage` (`worm3_bet_streak`) alongside
+    the wallet; a page reload no longer destroys an earned payout multiplier.
+19. **§2.5** — Conway births/recoveries are now sampled uniformly from the full
+    candidate pool (partial Fisher–Yates) instead of taking the first N in
+    `livingStickers` insertion order, removing the deterministic spatial bias.
+20. **§2.5** — `SET_FLIP_CAP` that lowers the cap now sweeps living stickers at/over the
+    new cap into the death ledger and emits a deaths-only TICK, instead of stranding
+    them (unable to flip or recover, never registered dead).
+21. **§3.2** — the auto-rotate RAF loop now seeds/reads the upcoming rotation from a ref,
+    removing `upcomingRotation` from the effect deps: the loop survives the whole chaos
+    session instead of tearing down and remounting once per fired rotation, and the
+    duplicated interval math is collapsed into one `targetInterval()` helper.
+
+**Still open:** SPEED's true fast/slow split should be measured per chaos level before
+trusting its 1.8× odds (needs gameplay telemetry, not static analysis).

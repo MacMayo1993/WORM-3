@@ -18,6 +18,7 @@ const SETTINGS_VERSION_KEY = 'worm3_settings_version';
 const CURRENT_SETTINGS_VERSION = 1;
 const PARITY_POINTS_KEY = 'worm3_parity_points';
 const OWNED_ITEMS_KEY = 'worm3_owned_items';
+const BET_STREAK_KEY = 'worm3_bet_streak';
 const WORM_CHARACTER_KEY = 'worm3_character';
 
 // Dev/preview builds get a padded wallet and a fully unlocked store so the
@@ -63,6 +64,7 @@ const loadPersistedState = () => {
       ? [...ALL_ITEMS_OWNED]
       : [...new Set([...DEFAULT_OWNED, ...storedOwned])];
     const safeParityPoints = DEV_FREE_ECONOMY ? Math.max(parityPoints, 10000) : parityPoints;
+    const betStreak = Math.max(0, parseInt(localStorage.getItem(BET_STREAK_KEY) ?? '0', 10) || 0);
 
     // Guard: reset cosmetics/settings to defaults if the saved value isn't owned
     const safeSkin = ownedItems.includes(`skin_${wormSkin}`) ? wormSkin : 'slime';
@@ -95,6 +97,7 @@ const loadPersistedState = () => {
       wormShowTrail,
       parityPoints: safeParityPoints,
       ownedItems,
+      betStreak,
     };
   } catch {
     return {
@@ -109,6 +112,7 @@ const loadPersistedState = () => {
       wormShowTrail: true,
       parityPoints: 0,
       ownedItems: [...DEFAULT_OWNED],
+      betStreak: 0,
     };
   }
 };
@@ -565,9 +569,14 @@ export const useGameStore = create(
     lastBetResult: null,
     setLastBetResult: (result) => set({ lastBetResult: result }),
     clearLastBetResult: () => set({ lastBetResult: null }),
-    // betStreak: consecutive wins (persisted in memory only, resets on page reload)
-    betStreak: 0,
-    setBetStreak: (v) => set({ betStreak: v }),
+    // betStreak: consecutive wins. Persisted like the wallet — the streak is
+    // part of the wallet's earning power (up to +50% payout), so losing it to
+    // a page reload read as a bug.
+    betStreak: persistedState.betStreak,
+    setBetStreak: (v) => {
+      try { localStorage.setItem(BET_STREAK_KEY, String(v)); } catch { }
+      set({ betStreak: v });
+    },
 
     // ========================================================================
     // WORM MODE (all worm state via slice)
