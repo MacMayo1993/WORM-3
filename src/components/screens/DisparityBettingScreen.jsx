@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import {
   BET_TYPES, FACE_INFO, ANTIPODAL_PAIRS, calcPayout, streakMultiplier,
@@ -246,9 +246,13 @@ const DisparityBettingScreen = ({ onBetPlaced, onSkip }) => {
 
   const canPlace = !!(selectedType && pick !== null && wager >= BET_MIN && wager <= maxWager);
 
+  // Guards against a fast double-tap firing pointerdown twice before the
+  // screen unmounts, which would deduct the wager twice.
+  const placedRef = useRef(false);
   const handlePlace = () => {
-    if (!canPlace) return;
-    useGameStore.getState().spendCoins(wager);
+    if (!canPlace || placedRef.current) return;
+    if (!useGameStore.getState().spendCoins(wager)) return;
+    placedRef.current = true;
     onBetPlaced({ type: selectedType, pick, wager, odds: effectiveOdds, potentialWin, placedAt: Date.now(), streak: betStreak });
   };
 
