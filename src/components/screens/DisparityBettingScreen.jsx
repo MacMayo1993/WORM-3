@@ -349,7 +349,7 @@ const DisparityBettingScreen = ({ onBetPlaced, onSkip }) => {
                     }}>{preset} PP</button>
                   );
                 })}
-                {maxWager > 0 && !WAGER_PRESETS.includes(maxWager) && (
+                {maxWager >= BET_MIN && !WAGER_PRESETS.includes(maxWager) && (
                   <button onPointerDown={() => setWager(maxWager)} style={{
                     padding: '6px 14px', borderRadius: '100px', cursor: 'pointer',
                     border: wager === maxWager ? `2px solid ${ACCENT}` : `2px solid ${PAPER_BORDER_SOFT}`,

@@ -268,30 +268,87 @@ const flipStickerPairLocal = (cubeState, x, y, z, dirKey, manifoldMap, outFlips)
   applyFlip(anti, false);
 };
 
-const resetChainState = () => {
-  deadTileSet = new Set();
-  deathRank = 0;
-  pairDeathCount = 0;
-  winnerAnnounced = false;
-  faceAliveMap = new Map([[1, 0], [2, 0], [3, 0], [4, 0], [5, 0], [6, 0]]);
+// ─── Death bookkeeping (shared by chain and Conway ticks) ────────────────────
+
+const DIR_TO_FACE = { PZ: 1, NX: 2, PY: 3, NZ: 4, PX: 5, NY: 6 };
+
+// Collect a death at loc if its sticker just hit the flip cap: mark it dead
+// and drop it from the living index. Actual event emission happens in
+// registerDeaths so a pair dying together shares one pairRank.
+const collectDeathAt = (loc, pending) => {
+  if (!loc) return;
+  const st = state[loc.x]?.[loc.y]?.[loc.z]?.stickers?.[loc.dirKey];
+  if (!st) return;
+  const gridId = getManifoldGridId(st, size);
+  if ((st.flips || 0) >= flipCap && !deadTileSet.has(gridId) && surfaceStickers - deadTileSet.size > 2) {
+    deadTileSet.add(gridId);
+    pending.push({ st, gridId, ...loc });
+    // O(1) removal — Map key matches the format used when inserting.
+    livingStickers.delete(`${loc.x},${loc.y},${loc.z},${loc.dirKey}`);
+  }
+};
+
+// Assign ranks, emit death events, and decrement face-alive counts (emitting
+// face eliminations when a face's last tile dies). Returns true if any died.
+const registerDeaths = (pending, outDeaths, outEliminatedFaces) => {
+  if (!pending.length) return false;
+  pairDeathCount += 1;
+  for (const { st, gridId, x, y, z, dirKey } of pending) {
+    deathRank += 1;
+    const { r, c } = faceRCFor(dirKey, x, y, z, size);
+    const endFaceId = DIR_TO_FACE[dirKey] ?? st.curr;
+    const endGridId = `M${endFaceId}-${String(r * size + c + 1).padStart(3, '0')}`;
+    outDeaths.push({ gridId, endGridId, rank: deathRank, pairRank: pairDeathCount, timestamp: Date.now() });
+
+    const faceNum = st.orig;
+    if (faceNum) {
+      const prev = faceAliveMap.get(faceNum) ?? 1;
+      const next = Math.max(0, prev - 1);
+      faceAliveMap.set(faceNum, next);
+      if (next === 0) outEliminatedFaces.push(faceNum);
+    }
+  }
+  return true;
+};
+
+// Check a sticker and its antipodal partner for cap-deaths and register them.
+const checkPairDeaths = (loc, outDeaths, outEliminatedFaces) => {
+  const pending = [];
+  collectDeathAt(loc, pending);
+  const st = state[loc.x]?.[loc.y]?.[loc.z]?.stickers?.[loc.dirKey];
+  if (st && manifoldMapCache) {
+    collectDeathAt(findAntipodalStickerByGrid(manifoldMapCache, st, size), pending);
+  }
+  return registerDeaths(pending, outDeaths, outEliminatedFaces);
+};
+
+// preserveDeaths: keep the death ledger (deadTileSet, ranks, face counts,
+// winner flag) across the reset. Used for mid-round chaos-level changes so a
+// level switch doesn't resurrect dead tiles or re-fire face eliminations.
+const resetChainState = (preserveDeaths = false) => {
+  if (!preserveDeaths) {
+    deadTileSet = new Set();
+    deathRank = 0;
+    pairDeathCount = 0;
+    winnerAnnounced = false;
+    faceAliveMap = new Map([[1, 0], [2, 0], [3, 0], [4, 0], [5, 0], [6, 0]]);
+  }
   conwayAcc = 0;
   neighborCache = null;
 
-  // Rebuild the living-sticker index from all surface stickers.
+  // Rebuild the living-sticker index (skips tiles already in deadTileSet).
   // state must be set before resetChainState() is called (guaranteed by START handler).
   livingStickers = new Map();
   if (state) {
-    for (const [x, y, z] of surfaceCoords) {
-      for (const dirKey of Object.keys(state[x][y][z].stickers)) {
-        livingStickers.set(`${x},${y},${z},${dirKey}`, { x, y, z, dirKey });
-      }
-    }
+    rebuildLivingStickers();
     // Seed face alive counts HERE, before any tick runs, so that death tracking
     // on tick 1 never sees a zero-count face and fires false elimination events.
-    for (const [x, y, z] of surfaceCoords) {
-      const c = state[x][y][z];
-      for (const st of Object.values(c.stickers)) {
-        if (st.orig) faceAliveMap.set(st.orig, (faceAliveMap.get(st.orig) ?? 0) + 1);
+    if (!preserveDeaths) {
+      for (const [x, y, z] of surfaceCoords) {
+        const c = state[x][y][z];
+        for (const st of Object.values(c.stickers)) {
+          if (st.orig) faceAliveMap.set(st.orig, (faceAliveMap.get(st.orig) ?? 0) + 1);
+        }
       }
     }
   }
@@ -436,8 +493,14 @@ const conwayTick = () => {
 
   // Apply births (flip sticker + antipodal pair)
   const outFlips = [];
+  const outDeaths = [];
+  const outEliminatedFaces = [];
   for (const [x, y, z, dirKey] of births) {
     flipStickerPairLocal(state, x, y, z, dirKey, manifoldMapCache, outFlips);
+    // A birth can push the antipodal partner (or, with flipCap 1, the sticker
+    // itself) over the cap — register those deaths here just like the chain
+    // tick does, so no capped tile escapes the death ledger.
+    checkPairDeaths({ x, y, z, dirKey }, outDeaths, outEliminatedFaces);
     // Emit at most 2 cascade visuals per Conway tick to avoid GPU overload
     if (cascades.length < 2) {
       const neighbors = neighborCache.get(`${x},${y},${z},${dirKey}`);
@@ -461,8 +524,8 @@ const conwayTick = () => {
     recoverStickerPairLocal(state, x, y, z, dirKey, manifoldMapCache, outRecoveries);
   }
 
-  const didWork = outFlips.length > 0 || outRecoveries.length > 0;
-  return didWork ? { flips: outFlips, recoveries: outRecoveries, cascades } : null;
+  const didWork = outFlips.length > 0 || outRecoveries.length > 0 || outDeaths.length > 0;
+  return didWork ? { flips: outFlips, recoveries: outRecoveries, cascades, deaths: outDeaths, eliminatedFaces: outEliminatedFaces } : null;
 };
 
 // dtMs: real milliseconds elapsed since the previous tick (used for cooldown accumulation).
@@ -516,46 +579,8 @@ const tick = (dtMs) => {
     flipStickerPairLocal(state, current.x, current.y, current.z, current.dirKey, manifoldMapCache, flips);
     opsEmitted++;
 
-    const chainDeaths = [];
-    const checkDeath = (loc) => {
-      if (!loc) return;
-      const st = state[loc.x]?.[loc.y]?.[loc.z]?.stickers?.[loc.dirKey];
-      if (!st) return;
-      const gridId = getManifoldGridId(st, size);
-      if ((st.flips || 0) >= flipCap && !deadTileSet.has(gridId) && surfaceStickers - deadTileSet.size > 2) {
-        deadTileSet.add(gridId);
-        chainDeaths.push({ st, gridId, ...loc });
-        // O(1) removal — Map key matches the format used when inserting in resetChainState.
-        livingStickers.delete(`${loc.x},${loc.y},${loc.z},${loc.dirKey}`);
-      }
-    };
-
-    checkDeath(current);
-    const currentSticker = state[current.x]?.[current.y]?.[current.z]?.stickers?.[current.dirKey];
-    if (currentSticker) {
-      const antiLoc = findAntipodalStickerByGrid(manifoldMapCache, currentSticker, size);
-      checkDeath(antiLoc);
-    }
-
-    if (chainDeaths.length > 0) {
-      pairDeathCount += 1;
+    if (checkPairDeaths(current, deaths, eliminatedFaces)) {
       producedDeaths = true;
-      const DIR_TO_FACE = { PZ: 1, NX: 2, PY: 3, NZ: 4, PX: 5, NY: 6 };
-      for (const { st, gridId, x, y, z, dirKey: ddk } of chainDeaths) {
-        deathRank += 1;
-        const { r, c } = faceRCFor(ddk, x, y, z, size);
-        const endFaceId = DIR_TO_FACE[ddk] ?? st.curr;
-        const endGridId = `M${endFaceId}-${String(r * size + c + 1).padStart(3, '0')}`;
-        deaths.push({ gridId, endGridId, rank: deathRank, pairRank: pairDeathCount, timestamp: Date.now() });
-
-        const faceNum = st.orig;
-        if (faceNum) {
-          const prev = faceAliveMap.get(faceNum) ?? 1;
-          const next = Math.max(0, prev - 1);
-          faceAliveMap.set(faceNum, next);
-          if (next === 0) eliminatedFaces.push(faceNum);
-        }
-      }
     }
 
     chain.strength *= strengthDecay;
@@ -704,8 +729,10 @@ const schedule = () => {
         flips: conwayPayload.flips,
         cascades: conwayPayload.cascades,
         recoveries: conwayPayload.recoveries,
-        deaths: [],
-        eliminatedFaces: [],
+        deaths: conwayPayload.deaths,
+        eliminatedFaces: conwayPayload.eliminatedFaces,
+        // Winner detection stays with the chain tick, which re-evaluates the
+        // alive count every cycle — at most one chain period behind a Conway kill.
         winner: null,
         metrics: null,
         didWork: true,
@@ -715,7 +742,14 @@ const schedule = () => {
     conwayAcc = 0;
   }
 
-  if (running) timerId = setTimeout(schedule, size >= 5 ? 32 : 16);
+  if (running) {
+    // Sleep until the next chain or Conway tick is actually due instead of
+    // polling every 16 ms — all cooldowns are wall-clock (dtMs) based, so the
+    // sim advances identically while idle wakeups drop by ~90%.
+    const untilChain = Math.max(0, effectivePeriod - tickAcc);
+    const untilConway = Math.max(0, conwayPeriod - conwayAcc);
+    timerId = setTimeout(schedule, Math.max(16, Math.min(untilChain, untilConway)));
+  }
 };
 
 // After a cube rotation every sticker's physical (x,y,z,dirKey) changes.
@@ -796,7 +830,9 @@ self.onmessage = (e) => {
 
     case 'SET_CHAOS_LEVEL':
       chaosLevel = payload.chaosLevel;
-      resetChainState();
+      // Preserve the death ledger: a mid-round level change re-tunes the chains
+      // but must not resurrect dead tiles or re-fire face eliminations.
+      resetChainState(true);
       break;
 
     case 'SET_EXPLOSION':

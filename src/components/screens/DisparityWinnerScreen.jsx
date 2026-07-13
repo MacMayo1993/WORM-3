@@ -377,7 +377,9 @@ export default function DisparityWinnerScreen({ onDismiss }) {
               color: lastBetResult.won ? '#4ade80' : '#f87171',
               fontFamily: FONT, marginBottom: '3px',
             }}>
-              {lastBetResult.won ? `Won +${lastBetResult.payout} PP` : `Lost ${lastBetResult.wager} PP`}
+              {lastBetResult.won
+                ? `Won +${lastBetResult.net ?? lastBetResult.payout} PP`
+                : `Lost ${lastBetResult.wager} PP`}
             </div>
             <div style={{
               fontSize: '12px', color: 'rgba(180,210,255,0.65)',

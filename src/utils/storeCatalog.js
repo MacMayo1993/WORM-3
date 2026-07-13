@@ -123,10 +123,13 @@ export const STORE_ITEMS = [
   ...STORE_TILES,
 ];
 
-// All items unlocked — store is free during development/preview.
-export const DEFAULT_OWNED = STORE_ITEMS.map(i => i.id);
+// Production defaults: only free (price 0) items are owned out of the box.
+export const DEFAULT_OWNED = STORE_ITEMS.filter(i => i.price === 0).map(i => i.id);
 // custom scheme is always accessible but not "purchasable"
 if (!DEFAULT_OWNED.includes('scheme_custom')) DEFAULT_OWNED.push('scheme_custom');
+
+// Every item unlocked — dev/preview builds only (see loadPersistedState).
+export const ALL_ITEMS_OWNED = [...new Set([...STORE_ITEMS.map(i => i.id), 'scheme_custom'])];
 
 export const getStoreItem = (id) => STORE_ITEMS.find(i => i.id === id) ?? null;
 

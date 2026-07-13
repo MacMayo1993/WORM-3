@@ -19,29 +19,34 @@ export const ANTIPODAL_PAIRS = [
 ];
 
 // ── Bet type definitions ──────────────────────────────────────────────────────
+// Odds are total payout multipliers on the wager (stake is deducted at bet
+// time). The final winning pair is always one of the three antipodal pairs, so
+// picking a face (SURVIVOR) and picking its pair (PAIR) are the same 1-in-3
+// event — both pay 2.7× (fair odds 3×, ~10% house edge). FIRST_OUT is 1-in-6
+// (fair 6×) and pays 5.4×. The streak bonus (up to +50%) is the player's edge.
 export const BET_TYPES = {
   SURVIVOR: {
     id: 'SURVIVOR',
     label: 'Last Color',
     tagline: 'One face survives to the end',
-    desc: 'Pick the face color that will have a tile in the final winning pair. 1-in-6 shot.',
-    odds: 4,
+    desc: 'Pick the face color that will have a tile in the final winning pair. 1-in-3 shot.',
+    odds: 2.7,
     icon: 'S',
   },
   PAIR: {
     id: 'PAIR',
     label: 'Exact Pair',
     tagline: 'Name the winning antipodal pair',
-    desc: 'Call the exact antipodal pairing that outlasts all others. Red-Orange, Green-Blue, or White-Yellow.',
-    odds: 8,
+    desc: 'Call the antipodal pairing that outlasts all others: Red-Orange, Green-Blue, or White-Yellow. 1-in-3 shot.',
+    odds: 2.7,
     icon: 'P',
   },
   FIRST_OUT: {
     id: 'FIRST_OUT',
     label: 'First Fall',
     tagline: 'Who collapses first?',
-    desc: 'Pick which face color loses all its tiles before anyone else. First blood.',
-    odds: 4,
+    desc: 'Pick which face color loses all its tiles before anyone else. First blood — a true 1-in-6 long shot.',
+    odds: 5.4,
     icon: 'F',
   },
   SPEED: {

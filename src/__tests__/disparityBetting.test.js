@@ -198,4 +198,22 @@ describe('BET_TYPES odds', () => {
       expect(bt.odds).toBeGreaterThan(1);
     }
   });
+
+  // The final winning pair is always antipodal, so "face X in the final pair"
+  // and "the pair containing X wins" are the same 1-in-3 event — they must pay
+  // the same or one bet strictly dominates the other.
+  it('SURVIVOR and PAIR (the same 1-in-3 event) pay the same', () => {
+    expect(BET_TYPES.SURVIVOR.odds).toBe(BET_TYPES.PAIR.odds);
+  });
+
+  it('FIRST_OUT (1-in-6) pays exactly double the 1-in-3 bets', () => {
+    expect(BET_TYPES.FIRST_OUT.odds).toBeCloseTo(BET_TYPES.PAIR.odds * 2);
+  });
+
+  it('no bet is player-favored before the streak bonus (house edge on every line)', () => {
+    const trueProbability = { SURVIVOR: 1 / 3, PAIR: 1 / 3, FIRST_OUT: 1 / 6 };
+    for (const [id, p] of Object.entries(trueProbability)) {
+      expect(BET_TYPES[id].odds * p).toBeLessThan(1);
+    }
+  });
 });

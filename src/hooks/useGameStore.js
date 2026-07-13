@@ -10,7 +10,7 @@ import { subscribeWithSelector } from 'zustand/middleware';
 import { makeCubies } from '../game/cubeState.js';
 import { DEFAULT_SETTINGS } from '../utils/colorSchemes.js';
 import { isMobile } from '../utils/device.js';
-import { DEFAULT_OWNED } from '../utils/storeCatalog.js';
+import { DEFAULT_OWNED, ALL_ITEMS_OWNED } from '../utils/storeCatalog.js';
 import { MODES } from '../utils/constants.js';
 
 const SETTINGS_STORAGE_KEY = 'worm3_settings';
@@ -19,6 +19,11 @@ const CURRENT_SETTINGS_VERSION = 1;
 const PARITY_POINTS_KEY = 'worm3_parity_points';
 const OWNED_ITEMS_KEY = 'worm3_owned_items';
 const WORM_CHARACTER_KEY = 'worm3_character';
+
+// Dev/preview builds get a padded wallet and a fully unlocked store so the
+// economy can be exercised without grinding. Production builds load the real
+// persisted wallet and purchases.
+const DEV_FREE_ECONOMY = !!import.meta.env?.DEV;
 
 const migrateSettings = (rawSettings, version) => {
   if (!rawSettings || typeof rawSettings !== 'object') return { ...DEFAULT_SETTINGS };
@@ -49,8 +54,15 @@ const loadPersistedState = () => {
     const wormCharacter = localStorage.getItem(WORM_CHARACTER_KEY) || 'classic';
     const wormShowTrail = localStorage.getItem('worm3_show_trail') !== 'false'; // default true
     const parityPoints = parseInt(localStorage.getItem(PARITY_POINTS_KEY) ?? '0', 10) || 0;
-    const ownedItems = [...DEFAULT_OWNED]; // DEV: all items unlocked for store testing
-    const safeParityPoints = Math.max(parityPoints, 10000); // DEV: floor wallet at 10 000 for store testing
+    let storedOwned = [];
+    try {
+      const rawOwned = JSON.parse(localStorage.getItem(OWNED_ITEMS_KEY) ?? '[]');
+      if (Array.isArray(rawOwned)) storedOwned = rawOwned;
+    } catch { /* corrupted owned-items entry — fall back to defaults */ }
+    const ownedItems = DEV_FREE_ECONOMY
+      ? [...ALL_ITEMS_OWNED]
+      : [...new Set([...DEFAULT_OWNED, ...storedOwned])];
+    const safeParityPoints = DEV_FREE_ECONOMY ? Math.max(parityPoints, 10000) : parityPoints;
 
     // Guard: reset cosmetics/settings to defaults if the saved value isn't owned
     const safeSkin = ownedItems.includes(`skin_${wormSkin}`) ? wormSkin : 'slime';
@@ -519,10 +531,36 @@ export const useGameStore = create(
     },
 
     // ── Disparity betting ─────────────────────────────────────────────────────
-    // activeBet: { type, pick, wager, odds, potentialWin, placedAt, streak }
+    // activeBet: { type, pick, wager, odds, potentialWin, placedAt, streak, roundId }
     activeBet: null,
     setActiveBet: (bet) => set({ activeBet: bet }),
     clearActiveBet: () => set({ activeBet: null }),
+    // Monotonic round counter. beginDisparityRound stamps the pending bet with
+    // the new round's id so a bet can only ever resolve against the round it
+    // was placed for — a bet orphaned by an abandoned round is refunded
+    // (refundActiveBet) instead of silently riding the next chaos winner.
+    disparityRoundId: 0,
+    beginDisparityRound: () => set((state) => {
+      const nextId = state.disparityRoundId + 1;
+      const bet = state.activeBet;
+      if (bet && bet.roundId != null) {
+        // Already-stamped bet from an earlier round reached a new round start —
+        // its round never resolved, so refund it rather than adopting it.
+        const pts = Math.max(0, (state.parityPoints || 0) + Math.round(bet.wager || 0));
+        try { localStorage.setItem(PARITY_POINTS_KEY, String(pts)); } catch { }
+        return { disparityRoundId: nextId, activeBet: null, parityPoints: pts };
+      }
+      return {
+        disparityRoundId: nextId,
+        activeBet: bet ? { ...bet, roundId: nextId } : null,
+      };
+    }),
+    refundActiveBet: () => set((state) => {
+      if (!state.activeBet) return state;
+      const next = Math.max(0, (state.parityPoints || 0) + Math.round(state.activeBet.wager || 0));
+      try { localStorage.setItem(PARITY_POINTS_KEY, String(next)); } catch { }
+      return { parityPoints: next, activeBet: null };
+    }),
     // lastBetResult: { won, payout, description, wager }
     lastBetResult: null,
     setLastBetResult: (result) => set({ lastBetResult: result }),
