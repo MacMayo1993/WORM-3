@@ -68,7 +68,7 @@ const DemoStepIntro = ({ step, onContinue }) => {
     'baby-cube': 'Learn to rotate the cube.',
     'twin-paradox': 'Opposite faces are linked.',
     'flip-gateway': 'One flip. Two linked tiles.',
-    'worm-traversal': 'Travel through the cube.',
+    'worm-traversal': 'Travel through the wormholes you opened.',
     'chaos-forecast': 'Predict which pair survives.',
     'cosmetic-reward': 'Spend your Parity Points.',
   };
@@ -135,6 +135,7 @@ const DemoStepIntro = ({ step, onContinue }) => {
 
 const DEMO_LEVEL_CONFIGS = {
   'baby-cube': {
+    type: 'cube',
     cubeSize: 2,
     scrambleSequence: [{ axis: 'row', sliceIndex: 0, dir: 1 }],
     flipSequence: null,
@@ -142,6 +143,7 @@ const DEMO_LEVEL_CONFIGS = {
     chaosLevel: 0,
   },
   'twin-paradox': {
+    type: 'cube',
     cubeSize: 2,
     scrambleSequence: null,
     flipSequence: [
@@ -151,6 +153,7 @@ const DEMO_LEVEL_CONFIGS = {
     chaosLevel: 0,
   },
   'flip-gateway': {
+    type: 'cube',
     cubeSize: 3,
     scrambleSequence: [
       { axis: 'row', sliceIndex: 1, dir: 1 },
@@ -161,6 +164,14 @@ const DEMO_LEVEL_CONFIGS = {
     ],
     features: { rotations: true, tunnels: true, flips: true },
     chaosLevel: 0,
+  },
+  'worm-traversal': {
+    type: 'worm',
+    cubeSize: 3,
+    wormSpeed: 0.8,
+    wormOrbCount: 3,
+    wormholeInterval: 8,
+    wormColor: '#33ff66',
   },
 };
 

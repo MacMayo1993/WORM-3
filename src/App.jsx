@@ -425,6 +425,23 @@ export default function WORM3() {
     if (!config) return;
     cancelShuffle();
     const store = useGameStore.getState();
+    store.clearLevel();
+
+    if (config.type === 'worm') {
+      const targetSize = config.cubeSize || 3;
+      if (targetSize !== store.size) changeSize(targetSize);
+      else reset();
+      store.setFlipMode(true);
+      store.setShowTunnels(true);
+      store.setVisualMode('classic');
+      cancelDisparityRun();
+      store.initWormMode(
+        undefined, undefined,
+        config.wormSpeed, config.wormOrbCount,
+        config.wormholeInterval, config.wormColor,
+      );
+      return;
+    }
 
     if (config.cubeSize !== store.size) {
       changeSize(config.cubeSize);
@@ -433,7 +450,6 @@ export default function WORM3() {
     store.setShowTunnels(config.features.tunnels);
     store.setVisualMode('classic');
     store.setChaosLevel(config.chaosLevel);
-    store.clearLevel();
 
     let state = makeCubies(config.cubeSize);
     if (config.scrambleSequence) {
@@ -451,7 +467,7 @@ export default function WORM3() {
     store.resetGame();
     clearRefractory();
     store.setHasShuffled(true);
-  }, [cancelShuffle, changeSize, setRotatedCubies]);
+  }, [cancelShuffle, changeSize, setRotatedCubies, reset, cancelDisparityRun]);
 
   const handleStartDemo = useCallback(() => {
     useGameStore.getState().startDemo();
@@ -490,6 +506,22 @@ export default function WORM3() {
     }, 1200);
     return () => clearTimeout(timer);
   }, [demoMode, victory, demoStep, setVictory]);
+
+  // Advance demo step when the worm mode completes (solved phase)
+  const wormGamePhase = useGameStore((s) => s.wormGamePhase);
+  useEffect(() => {
+    if (!demoMode || demoStep !== 'worm-traversal') return;
+    if (wormGamePhase !== 'solved') return;
+    const idx = DEMO_STEP_IDS.indexOf('worm-traversal');
+    const nextStep = DEMO_STEP_IDS[idx + 1] || 'end';
+    const timer = setTimeout(() => {
+      useGameStore.getState().clearDisparityGame();
+      useGameStore.getState().setDemoStep(nextStep);
+      if (nextStep !== 'end') setDemoStepIntroVisible(true);
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [demoMode, demoStep, wormGamePhase]);
+
   const wormholePhaseActive = wormHealerMode && (
     wormPhase === 'entering' || wormPhase === 'tunnel' || wormPhase === 'exiting'
   );
