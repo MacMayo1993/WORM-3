@@ -61,16 +61,17 @@ export const BET_TYPES = {
 
 // ── SPEED benchmark ───────────────────────────────────────────────────────────
 // Median round durations (first→last death, seconds) measured with
-// scripts/measureSpeedOdds.mjs — 300 headless rounds per cell on a 3×3.
+// scripts/measureSpeedOdds.mjs — 250 headless rounds per cell on a 3×3,
+// after the 2026-07 chaos pacing retune (see game/chaosSim.js).
 // The FAST/SLOW threshold tracks the median for the round's settings so the
 // bet is a genuine ~50/50 (matching its 1.8× odds). The old fixed 60 s
 // threshold was 96–100% SLOW across every configuration.
 // Keys are the wizard's flip-cap tiers; index is chaos level 1–5.
 const SPEED_MEDIANS = {
-  6:  [0, 160, 110, 120, 40, 60],
-  15: [0, 455, 295, 410, 75, 120],
-  25: [0, 800, 515, 850, 100, 150],
-  40: [0, 1300, 865, 1530, 135, 180],
+  6:  [0, 66, 60, 40, 28, 23],
+  15: [0, 143, 129, 79, 57, 52],
+  25: [0, 226, 203, 118, 72, 72],
+  40: [0, 343, 314, 167, 92, 86],
 };
 
 export function speedThresholdFor(chaosLevel, flipCap) {

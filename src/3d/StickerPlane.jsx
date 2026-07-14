@@ -1567,15 +1567,17 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
       {/* Parity ring — only shown when flips is ODD (curr !== orig), meaning the tile is
           currently showing its antipodal face. Even flips = back to origin = no ring.
-          Briefly flares bright at each flip midpoint. */}
+          Briefly flares bright at each flip midpoint.
+          Colored with the ANTIPODAL scheme color of the displayed face (= the tile's
+          origin color on odd flips) and normal-blended: the old same-color additive
+          ring saturated against its own tile and read as plain white. */}
       {!isDead && !isSudokube && isWormhole && (
         <mesh ref={ringRef} position={[0, 0, 0.003]} renderOrder={2}>
           <ringGeometry args={[0.40, 0.52, 48]} />
           <meshBasicMaterial
-            color={baseColor}
+            color={antipodalHex ?? baseColor}
             transparent
             opacity={0.85}
-            blending={THREE.AdditiveBlending}
             depthWrite={false}
             side={THREE.DoubleSide}
           />
