@@ -423,153 +423,6 @@ export default function WORM3() {
   const [demoForecastVisible, setDemoForecastVisible] = useState(false);
   const demoForecastPickRef = useRef(null);
 
-  const applyDemoStepConfig = useCallback((stepId) => {
-    const config = DEMO_LEVEL_CONFIGS[stepId];
-    if (!config) return;
-    cancelShuffle();
-    const store = useGameStore.getState();
-    store.clearLevel();
-
-    if (config.type === 'worm') {
-      const targetSize = config.cubeSize || 3;
-      if (targetSize !== store.size) changeSize(targetSize);
-      else reset();
-      store.setFlipMode(true);
-      store.setShowTunnels(true);
-      store.setVisualMode('classic');
-      cancelDisparityRun();
-      store.initWormMode(
-        undefined, undefined,
-        config.wormSpeed, config.wormOrbCount,
-        config.wormholeInterval, config.wormColor,
-      );
-      return;
-    }
-
-    if (config.type === 'chaos') {
-      setDemoForecastVisible(true);
-      return;
-    }
-
-    if (config.cubeSize !== store.size) {
-      changeSize(config.cubeSize);
-    }
-    store.setFlipMode(config.features.flips);
-    store.setShowTunnels(config.features.tunnels);
-    store.setVisualMode('classic');
-    store.setChaosLevel(config.chaosLevel);
-
-    let state = makeCubies(config.cubeSize);
-    if (config.scrambleSequence) {
-      for (const { axis, sliceIndex, dir } of config.scrambleSequence) {
-        state = rotateSliceCubies(state, config.cubeSize, axis, sliceIndex, dir);
-      }
-    }
-    if (config.flipSequence) {
-      const flipMap = buildManifoldGridMap(state, config.cubeSize);
-      for (const { x, y, z, dirKey } of config.flipSequence) {
-        state = flipStickerPair(state, config.cubeSize, x, y, z, dirKey, flipMap);
-      }
-    }
-    setRotatedCubies(state);
-    store.resetGame();
-    clearRefractory();
-    store.setHasShuffled(true);
-  }, [cancelShuffle, changeSize, setRotatedCubies, reset, cancelDisparityRun]);
-
-  const handleDemoForecastPick = useCallback((pair) => {
-    setDemoForecastVisible(false);
-    demoForecastPickRef.current = pair;
-    const config = DEMO_LEVEL_CONFIGS['chaos-forecast'];
-    handleDisparitySetupComplete({
-      cubeSize: config.cubeSize,
-      disparityLevel: config.disparityLevel,
-      flipCap: config.flipCap,
-      gameLength: config.gameLength,
-      flipMode: true,
-      showTunnels: true,
-      visualMode: 'classic',
-      tileStyle: 'solid',
-    });
-    setTimeout(() => handleBetSkipped(), 100);
-  }, [handleDisparitySetupComplete, handleBetSkipped]);
-
-  const handleStartDemo = useCallback(() => {
-    useGameStore.getState().startDemo();
-    setDemoStepIntroVisible(true);
-  }, []);
-
-  const handleDemoStepContinue = useCallback(() => {
-    setDemoStepIntroVisible(false);
-    applyDemoStepConfig(useGameStore.getState().demoStep);
-  }, [applyDemoStepConfig]);
-
-  const handleDemoReplay = useCallback(() => {
-    useGameStore.getState().startDemo();
-    setDemoStepIntroVisible(true);
-  }, []);
-
-  const handleDemoFreeplay = useCallback(() => {
-    useGameStore.getState().exitDemo();
-    handleMenuFreeplay();
-  }, [handleMenuFreeplay]);
-
-  const handleExitDemo = useCallback(() => {
-    useGameStore.getState().exitDemo();
-  }, []);
-
-  // Advance demo step when the player solves a demo level
-  useEffect(() => {
-    if (!demoMode || !victory || !demoStep) return;
-    const idx = DEMO_STEP_IDS.indexOf(demoStep);
-    if (idx < 0) return;
-    const nextStep = DEMO_STEP_IDS[idx + 1] || 'end';
-    const timer = setTimeout(() => {
-      setVictory(null);
-      useGameStore.getState().setDemoStep(nextStep);
-      if (nextStep !== 'end') setDemoStepIntroVisible(true);
-    }, 1200);
-    return () => clearTimeout(timer);
-  }, [demoMode, victory, demoStep, setVictory]);
-
-  // Advance demo step when the worm mode completes (solved phase)
-  const wormGamePhase = useGameStore((s) => s.wormGamePhase);
-  useEffect(() => {
-    if (!demoMode || demoStep !== 'worm-traversal') return;
-    if (wormGamePhase !== 'solved') return;
-    const idx = DEMO_STEP_IDS.indexOf('worm-traversal');
-    const nextStep = DEMO_STEP_IDS[idx + 1] || 'end';
-    const timer = setTimeout(() => {
-      useGameStore.getState().clearDisparityGame();
-      useGameStore.getState().setDemoStep(nextStep);
-      if (nextStep !== 'end') setDemoStepIntroVisible(true);
-    }, 2000);
-    return () => clearTimeout(timer);
-  }, [demoMode, demoStep, wormGamePhase]);
-
-  // Advance demo step when the chaos forecast winner is dismissed
-  const handleDemoDisparityDismiss = useCallback(() => {
-    if (!demoMode || demoStep !== 'chaos-forecast') return;
-    const store = useGameStore.getState();
-    const pick = demoForecastPickRef.current;
-    const winner = store.disparityWinner;
-    const winnerFaceIds = winner?.pair?.map((gid) => {
-      const m = gid.match(/^M(\d+)-/);
-      return m ? parseInt(m[1], 10) : 0;
-    }) || [];
-    const correct = pick && pick.faceIds.some((f) => winnerFaceIds.includes(f));
-    const reward = correct ? 200 : 50;
-    store.earnCoins(reward);
-    store.clearDisparityGame();
-    store.setChaosLevel(0);
-    demoForecastPickRef.current = null;
-
-    const idx = DEMO_STEP_IDS.indexOf('chaos-forecast');
-    const nextStep = DEMO_STEP_IDS[idx + 1] || 'end';
-    useGameStore.getState().setDemoStep(nextStep);
-    if (nextStep !== 'end') setDemoStepIntroVisible(true);
-  }, [demoMode, demoStep]);
-
   const wormholePhaseActive = wormHealerMode && (
     wormPhase === 'entering' || wormPhase === 'tunnel' || wormPhase === 'exiting'
   );
@@ -633,6 +486,154 @@ export default function WORM3() {
     setChaosLevel, setVisualMode, setFlipMode, setShowTunnels,
     launchWithMobi, mobiLines: MOBI_LINES_CHAOS,
   });
+
+  const handleDemoForecastPick = useCallback((pair) => {
+    setDemoForecastVisible(false);
+    demoForecastPickRef.current = pair;
+    const config = DEMO_LEVEL_CONFIGS['chaos-forecast'];
+    handleDisparitySetupComplete({
+      cubeSize: config.cubeSize,
+      disparityLevel: config.disparityLevel,
+      flipCap: config.flipCap,
+      gameLength: config.gameLength,
+      flipMode: true,
+      showTunnels: true,
+      visualMode: 'classic',
+      tileStyle: 'solid',
+    });
+    setTimeout(() => handleBetSkipped(), 100);
+  }, [handleDisparitySetupComplete, handleBetSkipped]);
+
+  const applyDemoStepConfig = useCallback((stepId) => {
+    const config = DEMO_LEVEL_CONFIGS[stepId];
+    if (!config) return;
+    cancelShuffle();
+    const store = useGameStore.getState();
+    store.clearLevel();
+
+    if (config.type === 'worm') {
+      const targetSize = config.cubeSize || 3;
+      if (targetSize !== store.size) changeSize(targetSize);
+      else reset();
+      store.setFlipMode(true);
+      store.setShowTunnels(true);
+      store.setVisualMode('classic');
+      cancelDisparityRun();
+      store.initWormMode(
+        undefined, undefined,
+        config.wormSpeed, config.wormOrbCount,
+        config.wormholeInterval, config.wormColor,
+      );
+      return;
+    }
+
+    if (config.type === 'chaos') {
+      setDemoForecastVisible(true);
+      return;
+    }
+
+    if (config.cubeSize !== store.size) {
+      changeSize(config.cubeSize);
+    }
+    store.setFlipMode(config.features.flips);
+    store.setShowTunnels(config.features.tunnels);
+    store.setVisualMode('classic');
+    store.setChaosLevel(config.chaosLevel);
+
+    let state = makeCubies(config.cubeSize);
+    if (config.scrambleSequence) {
+      for (const { axis, sliceIndex, dir } of config.scrambleSequence) {
+        state = rotateSliceCubies(state, config.cubeSize, axis, sliceIndex, dir);
+      }
+    }
+    if (config.flipSequence) {
+      const flipMap = buildManifoldGridMap(state, config.cubeSize);
+      for (const { x, y, z, dirKey } of config.flipSequence) {
+        state = flipStickerPair(state, config.cubeSize, x, y, z, dirKey, flipMap);
+      }
+    }
+    setRotatedCubies(state);
+    store.resetGame();
+    clearRefractory();
+    store.setHasShuffled(true);
+  }, [cancelShuffle, changeSize, setRotatedCubies, reset, cancelDisparityRun]);
+
+  const handleStartDemo = useCallback(() => {
+    useGameStore.getState().startDemo();
+    setDemoStepIntroVisible(true);
+  }, []);
+
+  const handleDemoStepContinue = useCallback(() => {
+    setDemoStepIntroVisible(false);
+    applyDemoStepConfig(useGameStore.getState().demoStep);
+  }, [applyDemoStepConfig]);
+
+  const handleDemoReplay = useCallback(() => {
+    useGameStore.getState().startDemo();
+    setDemoStepIntroVisible(true);
+  }, []);
+
+  const handleDemoFreeplay = useCallback(() => {
+    useGameStore.getState().exitDemo();
+    useGameStore.getState().setShowMainMenu(false);
+    setShowFreeplayWizard(true);
+  }, []);
+
+  const handleExitDemo = useCallback(() => {
+    useGameStore.getState().exitDemo();
+  }, []);
+
+  // Advance demo step when the player solves a demo level
+  useEffect(() => {
+    if (!demoMode || !victory || !demoStep) return;
+    const idx = DEMO_STEP_IDS.indexOf(demoStep);
+    if (idx < 0) return;
+    const nextStep = DEMO_STEP_IDS[idx + 1] || 'end';
+    const timer = setTimeout(() => {
+      setVictory(null);
+      useGameStore.getState().setDemoStep(nextStep);
+      if (nextStep !== 'end') setDemoStepIntroVisible(true);
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [demoMode, victory, demoStep, setVictory]);
+
+  // Advance demo step when the worm mode completes (solved phase)
+  const wormGamePhase = useGameStore((s) => s.wormGamePhase);
+  useEffect(() => {
+    if (!demoMode || demoStep !== 'worm-traversal') return;
+    if (wormGamePhase !== 'solved') return;
+    const idx = DEMO_STEP_IDS.indexOf('worm-traversal');
+    const nextStep = DEMO_STEP_IDS[idx + 1] || 'end';
+    const timer = setTimeout(() => {
+      useGameStore.getState().clearDisparityGame();
+      useGameStore.getState().setDemoStep(nextStep);
+      if (nextStep !== 'end') setDemoStepIntroVisible(true);
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [demoMode, demoStep, wormGamePhase]);
+
+  // Advance demo step when the chaos forecast winner is dismissed
+  const handleDemoDisparityDismiss = useCallback(() => {
+    if (!demoMode || demoStep !== 'chaos-forecast') return;
+    const store = useGameStore.getState();
+    const pick = demoForecastPickRef.current;
+    const winner = store.disparityWinner;
+    const winnerFaceIds = winner?.pair?.map((gid) => {
+      const m = gid.match(/^M(\d+)-/);
+      return m ? parseInt(m[1], 10) : 0;
+    }) || [];
+    const correct = pick && pick.faceIds.some((f) => winnerFaceIds.includes(f));
+    const reward = correct ? 200 : 50;
+    store.earnCoins(reward);
+    store.clearDisparityGame();
+    store.setChaosLevel(0);
+    demoForecastPickRef.current = null;
+
+    const idx = DEMO_STEP_IDS.indexOf('chaos-forecast');
+    const nextStep = DEMO_STEP_IDS[idx + 1] || 'end';
+    useGameStore.getState().setDemoStep(nextStep);
+    if (nextStep !== 'end') setDemoStepIntroVisible(true);
+  }, [demoMode, demoStep]);
 
   // ========================================================================
   // INTRO TIME — drives IntroBranch 3D content + WelcomeScreen DOM overlay
