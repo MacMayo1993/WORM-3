@@ -765,6 +765,24 @@ export const useGameStore = create(
     }),
 
     // ========================================================================
+    // DEMO MODE
+    // ========================================================================
+    demoMode: false,
+    demoStep: null,
+
+    startDemo: () => set({
+      demoMode: true,
+      demoStep: 'baby-cube',
+      showMainMenu: false,
+    }),
+    setDemoStep: (demoStep) => set({ demoStep }),
+    exitDemo: () => set({
+      demoMode: false,
+      demoStep: null,
+      showMainMenu: true,
+    }),
+
+    // ========================================================================
     // MERGE MODE
     // ========================================================================
     mergeMode: false,
@@ -824,6 +842,11 @@ export const useGameStore = create(
     // FLIP STATE
     // ========================================================================
     hasFlippedOnce: persistedState.hasFlippedOnce,
+    firstFlipHighlightPair: null,
+    showFirstFlipCaption: false,
+
+    setFirstFlipHighlightPair: (pair) => set({ firstFlipHighlightPair: pair }),
+    setShowFirstFlipCaption: (v) => set({ showFirstFlipCaption: v }),
 
     setHasFlippedOnce: (hasFlippedOnce) => {
       try {

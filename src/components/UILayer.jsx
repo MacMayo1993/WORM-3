@@ -28,6 +28,7 @@ import SettingsMenu from './menus/SettingsMenu.jsx';
 import HelpMenu from './menus/HelpMenu.jsx';
 import MobileControls from './menus/MobileControls.jsx';
 import FirstFlipTutorial from './screens/FirstFlipTutorial.jsx';
+import FirstFlipCaption from './overlays/FirstFlipCaption.jsx';
 import RotationPreview from './overlays/RotationPreview.jsx';
 import FaceRotationButtons from './overlays/FaceRotationButtons.jsx';
 import TileRotationSelector from './overlays/TileRotationSelector.jsx';
@@ -121,6 +122,8 @@ export default function UILayer({
     onWormSetupComplete, onMobiIntroComplete, onWormWizardCancel, onWormRetry, onWormNewGame,
     onToggleHandsMode, onFaceRotate, onTileRotation, onTileFaceRotation,
     onVictoryContinue, onVictoryNewGame,
+    onDemo,
+    onDemoDisparityDismiss,
   } = handlers;
 
   // ── Zustand store reads ──────────────────────────────────────────────────
@@ -136,7 +139,7 @@ export default function UILayer({
     showMainMenu, showTutorial, showLevelSelect, showSettings, showHelp,
     showFirstFlipTutorial, showCutscene, showLevelTutorial, showNetPanel,
     showLeaderboard, showMobileTouchHint, showDevConsole, solveModeActive,
-    showDisparityWinner, wormHealerMode,
+    showDisparityWinner, wormHealerMode, demoMode,
   } = useGameStore(useShallow(s => ({
     showMainMenu: s.showMainMenu,
     showTutorial: s.showTutorial,
@@ -153,6 +156,7 @@ export default function UILayer({
     solveModeActive: s.solveModeActive,
     showDisparityWinner: s.showDisparityWinner,
     wormHealerMode: s.wormHealerMode,
+    demoMode: s.demoMode,
   })));
 
   // Visual state — change on user preference changes
@@ -299,7 +303,7 @@ export default function UILayer({
         <ScreenTransition show={showDisparityWinner}>
           <Suspense fallback={null}>
             <DisparityWinnerScreen
-              onDismiss={() => {
+              onDismiss={demoMode && onDemoDisparityDismiss ? onDemoDisparityDismiss : () => {
                 useGameStore.getState().clearDisparityGame();
                 useGameStore.getState().clearLastBetResult();
                 useGameStore.getState().setChaosLevel(0);
@@ -398,6 +402,7 @@ export default function UILayer({
           onStore={onMenuStore}
           onComingSoon={onMenuComingSoon}
           onMobiusCubelet={onMenuMobiusCubelet}
+          onDemo={onDemo}
         />
       )}
 
@@ -484,6 +489,8 @@ export default function UILayer({
       <ScreenTransition show={showHelp}>
         <HelpMenu onClose={() => setShowHelp(false)} />
       </ScreenTransition>
+
+      <FirstFlipCaption />
 
       {showFirstFlipTutorial && (
         <FirstFlipTutorial

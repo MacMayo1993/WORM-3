@@ -4,7 +4,7 @@
  * Manages cube state, rotations, flips, and related operations.
  */
 
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useGameStore } from './useGameStore.js';
 import { makeCubies } from '../game/cubeState.js';
 import { rotateSliceCubies } from '../game/cubeRotation.js';
@@ -123,8 +123,17 @@ export function useCubeState() {
     updateMergeTiers();
   }, [size]);
 
+  // Pending first-flip highlight timer — when the player's very first flip is
+  // intercepted, the highlight rings + tether are shown for 800ms before the
+  // actual flip executes, so they see both linked tiles light up first.
+  const firstFlipTimerRef = useRef(null);
+  useEffect(() => () => { if (firstFlipTimerRef.current) clearTimeout(firstFlipTimerRef.current); }, []);
+
   // Flip sticker pair
   const flipSticker = useCallback((pos, dirKey) => {
+    // Block taps while the first-flip highlight is showing
+    if (firstFlipTimerRef.current) return;
+
     // Refractory period — tile can't flip again within 7 seconds
     if (isInRefractory(pos.x, pos.y, pos.z, dirKey)) return;
 
@@ -135,6 +144,31 @@ export function useCubeState() {
     // change cube geometry so the cached map is always valid here.
     const currentManifoldMap = manifoldMapRef.current;
     const sticker = currentCubies[pos.x]?.[pos.y]?.[pos.z]?.stickers?.[dirKey];
+
+    // ── First-flip interception ───────────────────────────────────────────
+    // Before the very first flip, show the antipodal pair highlight for 800ms
+    // so the player sees both linked tiles light up before the flip fires.
+    if (!hasFlippedOnce && sticker) {
+      const antipodalLoc = findAntipodalStickerByGrid(currentManifoldMap, sticker, currentSize);
+      if (antipodalLoc) {
+        const antSticker = currentCubies[antipodalLoc.x]?.[antipodalLoc.y]?.[antipodalLoc.z]?.stickers?.[antipodalLoc.dirKey];
+        useGameStore.getState().setFirstFlipHighlightPair({
+          source: { x: pos.x, y: pos.y, z: pos.z, dir: dirKey, faceId: sticker.curr },
+          antipodal: {
+            x: antipodalLoc.x, y: antipodalLoc.y, z: antipodalLoc.z,
+            dir: antipodalLoc.dirKey,
+            faceId: antSticker?.curr,
+          },
+        });
+        play('/sounds/rotate.mp3');
+        firstFlipTimerRef.current = setTimeout(() => {
+          firstFlipTimerRef.current = null;
+          flipSticker(pos, dirKey);
+        }, 800);
+        return;
+      }
+    }
+
     const origins = [];
 
     // Animation state vars — populated inside the if(sticker) block below
@@ -188,36 +222,33 @@ export function useCubeState() {
     // Batch all flip state changes into a single atomic setState (1 re-render instead of 5-6)
     const ts = Date.now();
     const isFirstFlip = !hasFlippedOnce;
+    const popDuration = isFirstFlip ? 1200 : 600;
+    const tunnelBirthDuration = isFirstFlip ? 1400 : 700;
     useGameStore.setState((state) => ({
       cubies: flipStickerPair(state.cubies, state.cubies.length, pos.x, pos.y, pos.z, dirKey, currentManifoldMap),
       moves: state.moves + 1,
       moveHistory: [...state.moveHistory, { type: 'flip', pos: { ...pos }, dirKey, timestamp: ts }].slice(-10),
       flipWaveOrigins: origins,
       blackHolePulse: ts,
-      // Cubie pop: both the clicked cubie and its antipodal partner burst outward.
-      // Each map is pruned of already-finished animations on the way through so
-      // it stays bounded to the pops/births/pulses actually in flight.
       cubiePops: {
         ...pruneExpiredFx(state.cubiePops, now),
-        [srcKey]: { startMs: now, durationMs: 600 },
-        ...(antKey ? { [antKey]: { startMs: now, durationMs: 600 } } : {}),
+        [srcKey]: { startMs: now, durationMs: popDuration },
+        ...(antKey ? { [antKey]: { startMs: now, durationMs: popDuration } } : {}),
       },
-      // Tunnel birth: first flip on this pair → grow-in animation on the Möbius ribbon
       tunnelBirths: (isFirstFlipOnPair && pairId) ? {
         ...pruneExpiredFx(state.tunnelBirths, now),
-        [pairId]: { startMs: now, durationMs: 700 },
+        [pairId]: { startMs: now, durationMs: tunnelBirthDuration },
       } : pruneExpiredFx(state.tunnelBirths, now),
-      // Tunnel pulse: subsequent flips → brightness burst on the existing ribbon
       tunnelPulses: (!isFirstFlipOnPair && pairId) ? {
         ...pruneExpiredFx(state.tunnelPulses, now),
         [pairId]: { startMs: now, durationMs: 400 },
       } : pruneExpiredFx(state.tunnelPulses, now),
-      ...(isFirstFlip ? { hasFlippedOnce: true } : {}),
+      ...(isFirstFlip ? { hasFlippedOnce: true, firstFlipHighlightPair: null } : {}),
     }));
 
-    // First flip tutorial trigger (runs after state is set, uses timeout so it fires after render)
     if (isFirstFlip) {
-      setTimeout(() => setShowFirstFlipTutorial(true), 600);
+      setTimeout(() => useGameStore.getState().setShowFirstFlipCaption(true), 400);
+      setTimeout(() => setShowFirstFlipTutorial(true), 3000);
     }
   }, [getRotationForDir, hasFlippedOnce, setShowFirstFlipTutorial]);
 
