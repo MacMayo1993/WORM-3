@@ -330,5 +330,24 @@ can be shared too. Drift has already crept in: the worker's metrics include
     parity score cashed out, and cascade visuals cleared — instead of freezing silently
     with a wager on the table.
 
+**Pass 6 (pacing retune + ring color, by user request):**
+
+28. **Chaos pacing retuned ~3–5× faster** ("tiles dying way too slowly"): faster chain
+    ticks, more chains (L1 +1, L3 +1), longer chain life, shorter cooldowns, more Conway
+    births on a faster cadence, lower recovery rates; `MAX_OPS_PER_CHAIN_TICK` 6 → 9.
+    Post-tune medians (first→last death, 3×3, cap 15): L1 143 s, L2 129 s, L3 79 s,
+    L4 57 s, L5 52 s — monotonic across levels at every cap tier (was 454/295/408/75/118
+    with L2>L3 and L4>L5 inversions). `SPEED_MEDIANS` refreshed from 250-round
+    measurements per cell. Verified live: 60+ flips and 50–70 % active board within
+    seconds of a real L3 round starting.
+29. **Conway tests de-mirrored**: `conwayPropagation.test.js` / `conwaySizeScaling.test.js`
+    now import the real constants from `game/chaosSim.js` instead of hand-maintained
+    copies (which the pacing retune would have silently orphaned).
+30. **Flipped-tile parity ring recolored**: the ring was tinted with the tile's own
+    color and additively blended over that same color, saturating to plain white. Now
+    it uses the **antipodal scheme color** of the displayed face (= the tile's origin
+    color on odd flips) with normal blending — verified in-browser: green ring on blue
+    tiles, red ring on orange tiles, etc.
+
 **Still open:** nothing. Future hygiene: re-measure `SPEED_MEDIANS` when chaos pacing
 constants change (the script makes this a one-liner).

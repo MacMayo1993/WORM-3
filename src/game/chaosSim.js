@@ -31,37 +31,41 @@ const MAX_LEVEL = 5;
 // Survival: infected sticker keeps its flips if infected-neighbor count ∈ surviveSet
 // Recovery: infected sticker loses a flip if it FAILS the survival check
 
+// Pacing retuned 2026-07 ("tiles dying way too slowly"): pre-tune medians ran
+// 5–14 min at the standard cap. Targets are monotonic L1→L5, roughly 4–1 min
+// at cap 15. Re-run scripts/measureSpeedOdds.mjs and refresh SPEED_MEDIANS in
+// utils/disparityBetting.js after ANY change to the constants below.
 export const CONWAY_RULES = [
   null, // index 0 unused
   // L1: B3/S12 — gentle Life analog for 4-neighbor grid; self-regulating
-  { birth: new Set([3]), survive: new Set([1, 2]), recoveryRate: 0.3, period: 2200 },
+  { birth: new Set([3]), survive: new Set([1, 2]), recoveryRate: 0.22, period: 1600 },
   // L2: B23/S12 — HighLife analog; replicator-like spread from 2 neighbors
-  { birth: new Set([2, 3]), survive: new Set([1, 2]), recoveryRate: 0.25, period: 1800 },
+  { birth: new Set([2, 3]), survive: new Set([1, 2]), recoveryRate: 0.18, period: 1300 },
   // L3: B2/S — Seeds analog; explosive but ephemeral, constant turnover
-  { birth: new Set([2]), survive: new Set([]), recoveryRate: 0.5, period: 1400 },
+  { birth: new Set([2]), survive: new Set([]), recoveryRate: 0.35, period: 1100 },
   // L4: B34/S234 — Day & Night inspired; mirrors antipodal duality
-  { birth: new Set([3, 4]), survive: new Set([2, 3, 4]), recoveryRate: 0.15, period: 1600 },
+  { birth: new Set([3, 4]), survive: new Set([2, 3, 4]), recoveryRate: 0.12, period: 1000 },
   // L5: B12/S1234 — aggressive; spreads fast, very persistent, hard to kill
-  { birth: new Set([1, 2]), survive: new Set([1, 2, 3, 4]), recoveryRate: 0.1, period: 1000 },
+  { birth: new Set([1, 2]), survive: new Set([1, 2, 3, 4]), recoveryRate: 0.08, period: 800 },
 ];
 
 // Conway generation cadence per level (BASE ms between full-surface evaluations).
 // Actual period is scaled up by sizePenalty for larger cubes.
-export const conwayPeriodByLevel = [0, 2200, 1800, 1400, 1600, 1000];
+export const conwayPeriodByLevel = [0, 1600, 1300, 1100, 1000, 800];
 // Max births per Conway tick (absolute cap regardless of cube size)
-export const conwayBirthCapByLevel = [0, 3, 4, 5, 4, 6];
+export const conwayBirthCapByLevel = [0, 4, 4, 6, 5, 7];
 // Max recoveries per Conway tick
 export const conwayRecoveryCapByLevel = [0, 2, 2, 3, 2, 2];
 
 // Level profile (1..5):
 // L1-L2: sparse, exploratory spread
 // L3-L4: sustained chain movement
-// L5: high propagation, but fewer starts and longer cadence to avoid frame spikes
-export const numChainsByLevel = [0, 1, 1, 1, 2, 2];
-export const delayByLevel = [0, 420, 280, 220, 170, 190];
-export const basePropByLevel = [0, 0.35, 0.45, 0.55, 0.65, 0.80];
-export const decayByLevel = [0, 0.68, 0.74, 0.80, 0.86, 0.93];
-export const cooldownByLevel = [0, 1700, 1100, 850, 650, 520]; // ms — compared against cooldownAcc (real ms)
+// L5: high propagation with fast cadence
+export const numChainsByLevel = [0, 2, 2, 3, 3, 3];
+export const delayByLevel = [0, 280, 250, 180, 160, 110];
+export const basePropByLevel = [0, 0.50, 0.60, 0.70, 0.80, 0.88];
+export const decayByLevel = [0, 0.82, 0.82, 0.86, 0.90, 0.94];
+export const cooldownByLevel = [0, 800, 700, 550, 400, 260]; // ms — compared against cooldownAcc (real ms)
 export const chainCapByLevel = [0, 2, 3, 4, 5, 6];
 
 // Size penalty: slows tick frequency and caps chains on larger cubes.
@@ -77,7 +81,9 @@ export const computeSizeScale = (stickers) => {
 
 // Maximum total operations (flips + cascades) the chain tick can emit per cycle.
 // Prevents burst frames from overwhelming the main-thread React reconciler.
-export const MAX_OPS_PER_CHAIN_TICK = 6;
+// Raised 6 → 9 with the 2026-07 pacing retune so the extra chains aren't
+// starved by the budget; still a trivial per-commit batch for React.
+export const MAX_OPS_PER_CHAIN_TICK = 9;
 
 const DIR_TO_FACE = { PZ: 1, NX: 2, PY: 3, NZ: 4, PX: 5, NY: 6 };
 

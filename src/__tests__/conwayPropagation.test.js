@@ -6,15 +6,9 @@ import { describe, it, expect } from 'vitest';
  * drives birth/survival/recovery decisions in the chaos worker.
  */
 
-// Mirror the CONWAY_RULES from the worker (can't import worker directly in vitest/jsdom)
-const CONWAY_RULES = [
-  null,
-  { birth: new Set([3]), survive: new Set([1, 2]), recoveryRate: 0.3, period: 2200 },
-  { birth: new Set([2, 3]), survive: new Set([1, 2]), recoveryRate: 0.25, period: 1800 },
-  { birth: new Set([2]), survive: new Set([]), recoveryRate: 0.5, period: 1400 },
-  { birth: new Set([3, 4]), survive: new Set([2, 3, 4]), recoveryRate: 0.15, period: 1600 },
-  { birth: new Set([1, 2]), survive: new Set([1, 2, 3, 4]), recoveryRate: 0.1, period: 1000 },
-];
+// The real rules — the sim core is importable now (game/chaosSim.js), so no
+// more hand-maintained mirror that can drift from the engine.
+import { CONWAY_RULES } from '../game/chaosSim.js';
 
 describe('Conway Propagation Rules', () => {
   describe('Rule definitions', () => {
