@@ -51,12 +51,7 @@ const WelcomeScreen = ({ onEnter, introTime }) => {
           aria-label="Enter game"
           className="enter-btn"
           onClick={onEnter}
-          style={{
-            background: '#1e88e5',
-            border: 'none',
-            color: '#ffffff',
-            pointerEvents: 'auto',
-          }}
+          style={{ pointerEvents: 'auto' }}
         >
           ENTER
         </button>

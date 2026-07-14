@@ -1,5 +1,10 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
+// Bungee display face, self-hosted via Fontsource so it bundles with the app.
+// It previously loaded from the Google Fonts CDN, which silently fell back to
+// a default serif on any blocked/slow connection and destroyed the game's
+// typography — never reintroduce a CDN <link> for fonts.
+import '@fontsource/bungee'
 import App from './App.jsx'
 import './App.css' // Import App.css instead of index.css
 
