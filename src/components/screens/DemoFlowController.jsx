@@ -133,4 +133,35 @@ const DemoStepIntro = ({ step, onContinue }) => {
   );
 };
 
-export { DemoProgressBar, DemoStepIntro, DEMO_STEPS };
+const DEMO_LEVEL_CONFIGS = {
+  'baby-cube': {
+    cubeSize: 2,
+    scrambleSequence: [{ axis: 'row', sliceIndex: 0, dir: 1 }],
+    flipSequence: null,
+    features: { rotations: true, tunnels: false, flips: false },
+    chaosLevel: 0,
+  },
+  'twin-paradox': {
+    cubeSize: 2,
+    scrambleSequence: null,
+    flipSequence: [
+      { x: 0, y: 0, z: 1, dirKey: 'PZ' },
+    ],
+    features: { rotations: true, tunnels: true, flips: true },
+    chaosLevel: 0,
+  },
+  'flip-gateway': {
+    cubeSize: 3,
+    scrambleSequence: [
+      { axis: 'row', sliceIndex: 1, dir: 1 },
+      { axis: 'col', sliceIndex: 0, dir: -1 },
+    ],
+    flipSequence: [
+      { x: 1, y: 1, z: 2, dirKey: 'PZ' },
+    ],
+    features: { rotations: true, tunnels: true, flips: true },
+    chaosLevel: 0,
+  },
+};
+
+export { DemoProgressBar, DemoStepIntro, DEMO_STEPS, DEMO_LEVEL_CONFIGS };

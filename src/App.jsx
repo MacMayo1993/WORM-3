@@ -75,7 +75,7 @@ import { GREEN_SHOW_START, FULL_FLIP_START, EXPLOSION_START, EXPLOSION_END, IMPL
 const PlatformerWormMode = React.lazy(() => import('./worm/PlatformerWormMode.jsx'));
 const HollowVoidCube = React.lazy(() => import('./3d/HollowVoidCube.jsx'));
 const DemoEndScreen = React.lazy(() => import('./components/screens/DemoEndScreen.jsx'));
-import { DemoProgressBar, DemoStepIntro, DEMO_STEP_IDS } from './components/screens/DemoFlowController.jsx';
+import { DemoProgressBar, DemoStepIntro, DEMO_STEP_IDS, DEMO_LEVEL_CONFIGS } from './components/screens/DemoFlowController.jsx';
 
 
 const _clamp = (t, a = 0, b = 1) => Math.max(a, Math.min(b, t));
@@ -420,6 +420,39 @@ export default function WORM3() {
 
   const [demoStepIntroVisible, setDemoStepIntroVisible] = useState(false);
 
+  const applyDemoStepConfig = useCallback((stepId) => {
+    const config = DEMO_LEVEL_CONFIGS[stepId];
+    if (!config) return;
+    cancelShuffle();
+    const store = useGameStore.getState();
+
+    if (config.cubeSize !== store.size) {
+      changeSize(config.cubeSize);
+    }
+    store.setFlipMode(config.features.flips);
+    store.setShowTunnels(config.features.tunnels);
+    store.setVisualMode('classic');
+    store.setChaosLevel(config.chaosLevel);
+    store.clearLevel();
+
+    let state = makeCubies(config.cubeSize);
+    if (config.scrambleSequence) {
+      for (const { axis, sliceIndex, dir } of config.scrambleSequence) {
+        state = rotateSliceCubies(state, config.cubeSize, axis, sliceIndex, dir);
+      }
+    }
+    if (config.flipSequence) {
+      const flipMap = buildManifoldGridMap(state, config.cubeSize);
+      for (const { x, y, z, dirKey } of config.flipSequence) {
+        state = flipStickerPair(state, config.cubeSize, x, y, z, dirKey, flipMap);
+      }
+    }
+    setRotatedCubies(state);
+    store.resetGame();
+    clearRefractory();
+    store.setHasShuffled(true);
+  }, [cancelShuffle, changeSize, setRotatedCubies]);
+
   const handleStartDemo = useCallback(() => {
     useGameStore.getState().startDemo();
     setDemoStepIntroVisible(true);
@@ -427,7 +460,8 @@ export default function WORM3() {
 
   const handleDemoStepContinue = useCallback(() => {
     setDemoStepIntroVisible(false);
-  }, []);
+    applyDemoStepConfig(useGameStore.getState().demoStep);
+  }, [applyDemoStepConfig]);
 
   const handleDemoReplay = useCallback(() => {
     useGameStore.getState().startDemo();
@@ -442,6 +476,20 @@ export default function WORM3() {
   const handleExitDemo = useCallback(() => {
     useGameStore.getState().exitDemo();
   }, []);
+
+  // Advance demo step when the player solves a demo level
+  useEffect(() => {
+    if (!demoMode || !victory || !demoStep) return;
+    const idx = DEMO_STEP_IDS.indexOf(demoStep);
+    if (idx < 0) return;
+    const nextStep = DEMO_STEP_IDS[idx + 1] || 'end';
+    const timer = setTimeout(() => {
+      setVictory(null);
+      useGameStore.getState().setDemoStep(nextStep);
+      if (nextStep !== 'end') setDemoStepIntroVisible(true);
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [demoMode, victory, demoStep, setVictory]);
   const wormholePhaseActive = wormHealerMode && (
     wormPhase === 'entering' || wormPhase === 'tunnel' || wormPhase === 'exiting'
   );

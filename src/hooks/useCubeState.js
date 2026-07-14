@@ -4,7 +4,7 @@
  * Manages cube state, rotations, flips, and related operations.
  */
 
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useGameStore } from './useGameStore.js';
 import { makeCubies } from '../game/cubeState.js';
 import { rotateSliceCubies } from '../game/cubeRotation.js';
@@ -123,8 +123,17 @@ export function useCubeState() {
     updateMergeTiers();
   }, [size]);
 
+  // Pending first-flip highlight timer — when the player's very first flip is
+  // intercepted, the highlight rings + tether are shown for 800ms before the
+  // actual flip executes, so they see both linked tiles light up first.
+  const firstFlipTimerRef = useRef(null);
+  useEffect(() => () => { if (firstFlipTimerRef.current) clearTimeout(firstFlipTimerRef.current); }, []);
+
   // Flip sticker pair
   const flipSticker = useCallback((pos, dirKey) => {
+    // Block taps while the first-flip highlight is showing
+    if (firstFlipTimerRef.current) return;
+
     // Refractory period — tile can't flip again within 7 seconds
     if (isInRefractory(pos.x, pos.y, pos.z, dirKey)) return;
 
@@ -135,6 +144,31 @@ export function useCubeState() {
     // change cube geometry so the cached map is always valid here.
     const currentManifoldMap = manifoldMapRef.current;
     const sticker = currentCubies[pos.x]?.[pos.y]?.[pos.z]?.stickers?.[dirKey];
+
+    // ── First-flip interception ───────────────────────────────────────────
+    // Before the very first flip, show the antipodal pair highlight for 800ms
+    // so the player sees both linked tiles light up before the flip fires.
+    if (!hasFlippedOnce && sticker) {
+      const antipodalLoc = findAntipodalStickerByGrid(currentManifoldMap, sticker, currentSize);
+      if (antipodalLoc) {
+        const antSticker = currentCubies[antipodalLoc.x]?.[antipodalLoc.y]?.[antipodalLoc.z]?.stickers?.[antipodalLoc.dirKey];
+        useGameStore.getState().setFirstFlipHighlightPair({
+          source: { x: pos.x, y: pos.y, z: pos.z, dir: dirKey, faceId: sticker.curr },
+          antipodal: {
+            x: antipodalLoc.x, y: antipodalLoc.y, z: antipodalLoc.z,
+            dir: antipodalLoc.dirKey,
+            faceId: antSticker?.curr,
+          },
+        });
+        play('/sounds/rotate.mp3');
+        firstFlipTimerRef.current = setTimeout(() => {
+          firstFlipTimerRef.current = null;
+          flipSticker(pos, dirKey);
+        }, 800);
+        return;
+      }
+    }
+
     const origins = [];
 
     // Animation state vars — populated inside the if(sticker) block below
