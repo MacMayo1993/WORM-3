@@ -75,6 +75,7 @@ import { GREEN_SHOW_START, FULL_FLIP_START, EXPLOSION_START, EXPLOSION_END, IMPL
 const PlatformerWormMode = React.lazy(() => import('./worm/PlatformerWormMode.jsx'));
 const HollowVoidCube = React.lazy(() => import('./3d/HollowVoidCube.jsx'));
 const DemoEndScreen = React.lazy(() => import('./components/screens/DemoEndScreen.jsx'));
+const DemoForecastPicker = React.lazy(() => import('./components/screens/DemoForecastPicker.jsx'));
 import { DemoProgressBar, DemoStepIntro, DEMO_STEP_IDS, DEMO_LEVEL_CONFIGS } from './components/screens/DemoFlowController.jsx';
 
 
@@ -419,6 +420,8 @@ export default function WORM3() {
   })));
 
   const [demoStepIntroVisible, setDemoStepIntroVisible] = useState(false);
+  const [demoForecastVisible, setDemoForecastVisible] = useState(false);
+  const demoForecastPickRef = useRef(null);
 
   const applyDemoStepConfig = useCallback((stepId) => {
     const config = DEMO_LEVEL_CONFIGS[stepId];
@@ -440,6 +443,11 @@ export default function WORM3() {
         config.wormSpeed, config.wormOrbCount,
         config.wormholeInterval, config.wormColor,
       );
+      return;
+    }
+
+    if (config.type === 'chaos') {
+      setDemoForecastVisible(true);
       return;
     }
 
@@ -468,6 +476,23 @@ export default function WORM3() {
     clearRefractory();
     store.setHasShuffled(true);
   }, [cancelShuffle, changeSize, setRotatedCubies, reset, cancelDisparityRun]);
+
+  const handleDemoForecastPick = useCallback((pair) => {
+    setDemoForecastVisible(false);
+    demoForecastPickRef.current = pair;
+    const config = DEMO_LEVEL_CONFIGS['chaos-forecast'];
+    handleDisparitySetupComplete({
+      cubeSize: config.cubeSize,
+      disparityLevel: config.disparityLevel,
+      flipCap: config.flipCap,
+      gameLength: config.gameLength,
+      flipMode: true,
+      showTunnels: true,
+      visualMode: 'classic',
+      tileStyle: 'solid',
+    });
+    setTimeout(() => handleBetSkipped(), 100);
+  }, [handleDisparitySetupComplete, handleBetSkipped]);
 
   const handleStartDemo = useCallback(() => {
     useGameStore.getState().startDemo();
@@ -521,6 +546,29 @@ export default function WORM3() {
     }, 2000);
     return () => clearTimeout(timer);
   }, [demoMode, demoStep, wormGamePhase]);
+
+  // Advance demo step when the chaos forecast winner is dismissed
+  const handleDemoDisparityDismiss = useCallback(() => {
+    if (!demoMode || demoStep !== 'chaos-forecast') return;
+    const store = useGameStore.getState();
+    const pick = demoForecastPickRef.current;
+    const winner = store.disparityWinner;
+    const winnerFaceIds = winner?.pair?.map((gid) => {
+      const m = gid.match(/^M(\d+)-/);
+      return m ? parseInt(m[1], 10) : 0;
+    }) || [];
+    const correct = pick && pick.faceIds.some((f) => winnerFaceIds.includes(f));
+    const reward = correct ? 200 : 50;
+    store.earnCoins(reward);
+    store.clearDisparityGame();
+    store.setChaosLevel(0);
+    demoForecastPickRef.current = null;
+
+    const idx = DEMO_STEP_IDS.indexOf('chaos-forecast');
+    const nextStep = DEMO_STEP_IDS[idx + 1] || 'end';
+    useGameStore.getState().setDemoStep(nextStep);
+    if (nextStep !== 'end') setDemoStepIntroVisible(true);
+  }, [demoMode, demoStep]);
 
   const wormholePhaseActive = wormHealerMode && (
     wormPhase === 'entering' || wormPhase === 'tunnel' || wormPhase === 'exiting'
@@ -1439,6 +1487,7 @@ export default function WORM3() {
               onMenuComingSoon: handleMenuComingSoon,
               onMenuMobiusCubelet: handleMenuMobiusCubelet,
               onDemo: handleStartDemo,
+              onDemoDisparityDismiss: handleDemoDisparityDismiss,
               showMergeThemePicker,
               onMergeStart: handleMergeStart,
               onMergeCancel: handleMergeCancel,
@@ -1473,6 +1522,11 @@ export default function WORM3() {
       {demoMode && <DemoProgressBar currentStep={demoStep} />}
       {demoMode && demoStepIntroVisible && demoStep && demoStep !== 'end' && (
         <DemoStepIntro step={demoStep} onContinue={handleDemoStepContinue} />
+      )}
+      {demoMode && demoForecastVisible && (
+        <Suspense fallback={null}>
+          <DemoForecastPicker onPick={handleDemoForecastPick} />
+        </Suspense>
       )}
       {demoMode && demoStep === 'end' && (
         <Suspense fallback={null}>

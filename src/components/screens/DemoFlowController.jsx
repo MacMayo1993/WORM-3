@@ -173,6 +173,13 @@ const DEMO_LEVEL_CONFIGS = {
     wormholeInterval: 8,
     wormColor: '#33ff66',
   },
+  'chaos-forecast': {
+    type: 'chaos',
+    cubeSize: 3,
+    disparityLevel: 3,
+    flipCap: 12,
+    gameLength: 'short',
+  },
 };
 
 export { DemoProgressBar, DemoStepIntro, DEMO_STEPS, DEMO_LEVEL_CONFIGS };

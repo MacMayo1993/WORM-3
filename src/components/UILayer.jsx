@@ -123,6 +123,7 @@ export default function UILayer({
     onToggleHandsMode, onFaceRotate, onTileRotation, onTileFaceRotation,
     onVictoryContinue, onVictoryNewGame,
     onDemo,
+    onDemoDisparityDismiss,
   } = handlers;
 
   // ── Zustand store reads ──────────────────────────────────────────────────
@@ -138,7 +139,7 @@ export default function UILayer({
     showMainMenu, showTutorial, showLevelSelect, showSettings, showHelp,
     showFirstFlipTutorial, showCutscene, showLevelTutorial, showNetPanel,
     showLeaderboard, showMobileTouchHint, showDevConsole, solveModeActive,
-    showDisparityWinner, wormHealerMode,
+    showDisparityWinner, wormHealerMode, demoMode,
   } = useGameStore(useShallow(s => ({
     showMainMenu: s.showMainMenu,
     showTutorial: s.showTutorial,
@@ -155,6 +156,7 @@ export default function UILayer({
     solveModeActive: s.solveModeActive,
     showDisparityWinner: s.showDisparityWinner,
     wormHealerMode: s.wormHealerMode,
+    demoMode: s.demoMode,
   })));
 
   // Visual state — change on user preference changes
@@ -301,7 +303,7 @@ export default function UILayer({
         <ScreenTransition show={showDisparityWinner}>
           <Suspense fallback={null}>
             <DisparityWinnerScreen
-              onDismiss={() => {
+              onDismiss={demoMode && onDemoDisparityDismiss ? onDemoDisparityDismiss : () => {
                 useGameStore.getState().clearDisparityGame();
                 useGameStore.getState().clearLastBetResult();
                 useGameStore.getState().setChaosLevel(0);
