@@ -909,8 +909,8 @@ button:focus-visible,
   left: 50%;
   transform: translateX(-50%);
   padding: 18px 60px;
-  background: rgba(59, 130, 246, 0.85);
-  border: 1px solid rgba(96, 165, 250, 0.5);
+  background: rgba(249, 115, 22, 0.90);
+  border: 1px solid rgba(251, 146, 60, 0.55);
   color: #ffffff;
   font-family: 'Bungee', cursive;
   font-size: 20px;
@@ -923,14 +923,14 @@ button:focus-visible,
   z-index: 10000;
   border-radius: 12px;
   backdrop-filter: blur(12px);
-  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.4);
+  box-shadow: 0 4px 16px rgba(249, 115, 22, 0.4);
   animation: gentle-pulse 2.5s ease-in-out infinite;
 }
 
 .enter-btn:hover {
   transform: translateX(-50%) translateY(-2px);
-  background: rgba(59, 130, 246, 0.95);
-  box-shadow: 0 6px 24px rgba(59, 130, 246, 0.6);
+  background: rgba(249, 115, 22, 0.98);
+  box-shadow: 0 6px 24px rgba(249, 115, 22, 0.6);
 }
 
 
@@ -3435,13 +3435,15 @@ select.btn-compact:disabled {
   font-family: 'Bungee', cursive;
   font-size: 2.3rem;
   color: white;
-  background-color: #6b7280;
+  /* Brand-orange CTA — matches the mode carousel's PLAY accent so the primary
+     action speaks one language from the first screen onward (was grey). */
+  background-color: #f97316;
   padding: 17px 58px;
   border: 3px solid #000000;
   border-radius: 16px;
   cursor: pointer;
   outline: none;
-  box-shadow: 0 8px 0 #374151, 0 15px 20px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 8px 0 #9a3412, 0 15px 20px rgba(0, 0, 0, 0.4);
   transition: all 0.1s ease-in-out;
   animation: wormIdlePulse 2s infinite ease-in-out;
   -webkit-tap-highlight-color: transparent;
@@ -3454,7 +3456,7 @@ select.btn-compact:disabled {
 
 .worm-tactile-btn:active {
   transform: translateY(8px);
-  box-shadow: 0 0px 0 #374151, 0 5px 10px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 0px 0 #9a3412, 0 5px 10px rgba(0, 0, 0, 0.4);
   animation: none;
 }
 
