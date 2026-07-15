@@ -1653,29 +1653,23 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
             <cylinderGeometry args={[0.14, 0.14, 0.12, 20, 1, false, -Math.PI / 2, Math.PI]} />
             <meshStandardMaterial color={origColor} roughness={0.75} metalness={0.1} />
           </mesh>
-          {/* Cross engraving — on the +Y face of the body (XZ plane, just outside Y=0.06) */}
-          <mesh position={[0, 0.063, 0.18]}>
-            <boxGeometry args={[0.028, 0.003, 0.13]} />
-            <meshStandardMaterial color="#111111" roughness={0.9} />
-          </mesh>
-          <mesh position={[0, 0.063, 0.26]}>
-            <boxGeometry args={[0.09, 0.003, 0.028]} />
-            <meshStandardMaterial color="#111111" roughness={0.9} />
-          </mesh>
-          {/* Text — Billboard keeps labels facing the camera as the cube is orbited */}
-          {deadRank != null && (
-            <Billboard position={[0, 0, 0.27]}>
-              <Text position={[0, 0.12, 0]} fontSize={0.075} color={antipodalColor} anchorX="center" anchorY="middle" fontWeight={700} renderOrder={2} depthTest={false}>
-                RIP
-              </Text>
-              <Text position={[0, 0, 0]} fontSize={0.038} color={antipodalColor} anchorX="center" anchorY="middle" renderOrder={2} depthTest={false}>
-                {stickerGridIdRef.current}
-              </Text>
+          {/* Epitaph — RIP + tile ID engraved on the headstone (replaces the old
+              cross, which mis-rendered as a "T"). Death rank is added only when the
+              tile is ranked (disparity mode). Billboard keeps the text facing the
+              camera as the cube is orbited. */}
+          <Billboard position={[0, 0, 0.27]}>
+            <Text position={[0, deadRank != null ? 0.12 : 0.05, 0]} fontSize={0.075} color={antipodalColor} anchorX="center" anchorY="middle" fontWeight={700} renderOrder={2} depthTest={false}>
+              RIP
+            </Text>
+            <Text position={[0, deadRank != null ? 0 : -0.05, 0]} fontSize={0.04} color={antipodalColor} anchorX="center" anchorY="middle" renderOrder={2} depthTest={false}>
+              {stickerGridIdRef.current}
+            </Text>
+            {deadRank != null && (
               <Text position={[0, -0.13, 0]} fontSize={0.062} color={antipodalColor} anchorX="center" anchorY="middle" fontWeight={700} renderOrder={2} depthTest={false}>
                 #{deadRank}
               </Text>
-            </Billboard>
-          )}
+            )}
+          </Billboard>
           {/* Ghost worms orbit mid-tombstone height */}
           <TombstoneGhost />
         </group>
