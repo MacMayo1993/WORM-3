@@ -1202,7 +1202,11 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // In biome mode the ground texture IS the tile style — force solid so no
   // shader layer renders underneath the buildings.
   const _styleKey = biomeEnabled ? cityFace : meta?.orig;
-  const tileStyle = biomeGroundTexture
+  // Dead (capped) tiles render flat gray with no decorative style, so a board of
+  // spent tiles reads as spent and the surviving pair actually stands out.
+  const tileStyle = isDead
+    ? 'solid'
+    : biomeGroundTexture
     ? 'solid'
     : stableCity
       ? (CITY_CONFIG[stableCity]?.tileStyle ?? 'solid')
