@@ -77,7 +77,7 @@ const PlatformerWormMode = React.lazy(() => import('./worm/PlatformerWormMode.js
 const HollowVoidCube = React.lazy(() => import('./3d/HollowVoidCube.jsx'));
 const DemoEndScreen = React.lazy(() => import('./components/screens/DemoEndScreen.jsx'));
 const DemoForecastPicker = React.lazy(() => import('./components/screens/DemoForecastPicker.jsx'));
-import { DemoProgressBar, DemoStepIntro, DEMO_STEP_IDS, DEMO_LEVEL_CONFIGS } from './components/screens/DemoFlowController.jsx';
+import { DemoProgressBar, DemoStepIntro, DemoCoach, DEMO_STEP_IDS, DEMO_LEVEL_CONFIGS } from './components/screens/DemoFlowController.jsx';
 
 
 const _clamp = (t, a = 0, b = 1) => Math.max(a, Math.min(b, t));
@@ -420,7 +420,15 @@ export default function WORM3() {
 
   const [demoStepIntroVisible, setDemoStepIntroVisible] = useState(false);
   const [demoForecastVisible, setDemoForecastVisible] = useState(false);
+  const [demoTryVisible, setDemoTryVisible] = useState(false);
   const demoForecastPickRef = useRef(null);
+  const demoWatchTimers = useRef([]);
+  const onTapFlipRef = useRef(null);
+  const advanceDemoStepRef = useRef(null);
+  const clearDemoWatchTimers = useCallback(() => {
+    demoWatchTimers.current.forEach(clearTimeout);
+    demoWatchTimers.current = [];
+  }, []);
 
   const wormholePhaseActive = wormHealerMode && (
     wormPhase === 'entering' || wormPhase === 'tunnel' || wormPhase === 'exiting'
@@ -461,7 +469,14 @@ export default function WORM3() {
   }, []);
   const handleCloseStore = useCallback(() => {
     setShowStore(false);
-    useGameStore.getState().setShowMainMenu(true);
+    // During the demo's cosmetic-reward step, closing the store advances to the
+    // end screen instead of returning to the main menu.
+    const store = useGameStore.getState();
+    if (store.demoMode && store.demoStep === 'cosmetic-reward') {
+      advanceDemoStepRef.current?.('cosmetic-reward');
+      return;
+    }
+    store.setShowMainMenu(true);
   }, []);
 
   // Mode select carousel — lifted to App level to prevent WebGL bleed-through
@@ -558,60 +573,105 @@ export default function WORM3() {
   }, [cancelShuffle, changeSize, setRotatedCubies, reset, cancelDisparityRun]);
 
   const handleStartDemo = useCallback(() => {
+    clearDemoWatchTimers();
+    setDemoTryVisible(false);
     useGameStore.getState().startDemo();
     setDemoStepIntroVisible(true);
-  }, []);
+  }, [clearDemoWatchTimers]);
+
+  // Single guarded advance path — every step (cube coach, worm-solved,
+  // forecast-dismiss, store-close) routes through here, so nothing double-fires
+  // and no step can dead-end.
+  const advanceDemoStep = useCallback((fromStep) => {
+    const store = useGameStore.getState();
+    if (store.demoStep !== fromStep) return; // already moved on
+    clearDemoWatchTimers();
+    setDemoTryVisible(false);
+    const idx = DEMO_STEP_IDS.indexOf(fromStep);
+    const nextStep = DEMO_STEP_IDS[idx + 1] || 'end';
+    store.setDemoStep(nextStep);
+    if (nextStep !== 'end') setDemoStepIntroVisible(true);
+  }, [clearDemoWatchTimers]);
+  advanceDemoStepRef.current = advanceDemoStep;
 
   const handleDemoStepContinue = useCallback(() => {
     setDemoStepIntroVisible(false);
-    applyDemoStepConfig(useGameStore.getState().demoStep);
-  }, [applyDemoStepConfig]);
+    setDemoTryVisible(false);
+    clearDemoWatchTimers();
+    const step = useGameStore.getState().demoStep;
+
+    // Cosmetic reward has no cube level — it opens the Parity Store. Closing the
+    // store advances to the end screen (see handleCloseStore).
+    if (step === 'cosmetic-reward') {
+      handleOpenStore();
+      return;
+    }
+
+    applyDemoStepConfig(step);
+
+    // Cube steps run WATCH → TRY: auto-play the mechanic, then show the coach.
+    const config = DEMO_LEVEL_CONFIGS[step];
+    if (config && config.type === 'cube') {
+      const watch = config.watch;
+      if (watch?.type === 'rotate') {
+        demoWatchTimers.current.push(setTimeout(() => {
+          startAnimatedShuffle(watch.moves, () => {});
+        }, 700));
+      } else if (watch?.type === 'flip') {
+        demoWatchTimers.current.push(setTimeout(() => {
+          const t = watch.tile;
+          onTapFlipRef.current?.({ x: t.x, y: t.y, z: t.z }, t.dirKey);
+        }, 1000));
+      }
+      // Invite the hands-on try once the watch beat has played.
+      demoWatchTimers.current.push(setTimeout(() => setDemoTryVisible(true), 2800));
+    }
+  }, [applyDemoStepConfig, handleOpenStore, clearDemoWatchTimers, startAnimatedShuffle]);
 
   const handleDemoReplay = useCallback(() => {
+    clearDemoWatchTimers();
+    setDemoTryVisible(false);
     useGameStore.getState().startDemo();
     setDemoStepIntroVisible(true);
-  }, []);
+  }, [clearDemoWatchTimers]);
 
   const handleDemoFreeplay = useCallback(() => {
+    clearDemoWatchTimers();
+    setDemoTryVisible(false);
     useGameStore.getState().exitDemo();
     useGameStore.getState().setShowMainMenu(false);
     setShowFreeplayWizard(true);
-  }, []);
+  }, [clearDemoWatchTimers]);
 
   const handleExitDemo = useCallback(() => {
+    clearDemoWatchTimers();
+    setDemoTryVisible(false);
     useGameStore.getState().exitDemo();
-  }, []);
+  }, [clearDemoWatchTimers]);
 
-  // Advance demo step when the player solves a demo level
+  // In demo mode, advancement is explicit (coach Next / step-specific triggers),
+  // so a win must not pop the full VictoryScreen or hijack pacing — just clear it.
   useEffect(() => {
-    if (!demoMode || !victory || !demoStep) return;
-    const idx = DEMO_STEP_IDS.indexOf(demoStep);
-    if (idx < 0) return;
-    const nextStep = DEMO_STEP_IDS[idx + 1] || 'end';
-    const timer = setTimeout(() => {
-      setVictory(null);
-      useGameStore.getState().setDemoStep(nextStep);
-      if (nextStep !== 'end') setDemoStepIntroVisible(true);
-    }, 1200);
-    return () => clearTimeout(timer);
-  }, [demoMode, victory, demoStep, setVictory]);
+    if (!demoMode || !victory) return;
+    setVictory(null);
+  }, [demoMode, victory, setVictory]);
 
-  // Advance demo step when the worm mode completes (solved phase)
+  // Clear any pending demo watch/try timers on unmount.
+  useEffect(() => () => clearDemoWatchTimers(), [clearDemoWatchTimers]);
+
+  // Advance the worm step when the traversal completes (solved phase).
   const wormGamePhase = useGameStore((s) => s.wormGamePhase);
   useEffect(() => {
     if (!demoMode || demoStep !== 'worm-traversal') return;
     if (wormGamePhase !== 'solved') return;
-    const idx = DEMO_STEP_IDS.indexOf('worm-traversal');
-    const nextStep = DEMO_STEP_IDS[idx + 1] || 'end';
     const timer = setTimeout(() => {
       useGameStore.getState().clearDisparityGame();
-      useGameStore.getState().setDemoStep(nextStep);
-      if (nextStep !== 'end') setDemoStepIntroVisible(true);
+      advanceDemoStep('worm-traversal');
     }, 2000);
     return () => clearTimeout(timer);
-  }, [demoMode, demoStep, wormGamePhase]);
+  }, [demoMode, demoStep, wormGamePhase, advanceDemoStep]);
 
-  // Advance demo step when the chaos forecast winner is dismissed
+  // Advance the chaos step when the forecast winner is dismissed.
   const handleDemoDisparityDismiss = useCallback(() => {
     if (!demoMode || demoStep !== 'chaos-forecast') return;
     const store = useGameStore.getState();
@@ -627,12 +687,8 @@ export default function WORM3() {
     store.clearDisparityGame();
     store.setChaosLevel(0);
     demoForecastPickRef.current = null;
-
-    const idx = DEMO_STEP_IDS.indexOf('chaos-forecast');
-    const nextStep = DEMO_STEP_IDS[idx + 1] || 'end';
-    useGameStore.getState().setDemoStep(nextStep);
-    if (nextStep !== 'end') setDemoStepIntroVisible(true);
-  }, [demoMode, demoStep]);
+    advanceDemoStep('chaos-forecast');
+  }, [demoMode, demoStep, advanceDemoStep]);
 
   // ========================================================================
   // INTRO TIME — drives IntroBranch 3D content + WelcomeScreen DOM overlay
@@ -975,6 +1031,7 @@ export default function WORM3() {
   const onTapFlip = useCallback((pos, dirKey) => {
     flipSticker(pos, dirKey);
   }, [flipSticker]);
+  onTapFlipRef.current = onTapFlip;
 
   const onFlipWaveComplete = useCallback(() => {
     setFlipWaveOrigins([]);
@@ -1524,6 +1581,13 @@ export default function WORM3() {
       {demoMode && <DemoProgressBar currentStep={demoStep} />}
       {demoMode && demoStepIntroVisible && demoStep && demoStep !== 'end' && (
         <DemoStepIntro step={demoStep} onContinue={handleDemoStepContinue} />
+      )}
+      {demoMode && demoTryVisible && !demoStepIntroVisible && (
+        <DemoCoach
+          step={demoStep}
+          onNext={() => advanceDemoStep(demoStep)}
+          onExit={handleExitDemo}
+        />
       )}
       {demoMode && demoForecastVisible && (
         <Suspense fallback={null}>
