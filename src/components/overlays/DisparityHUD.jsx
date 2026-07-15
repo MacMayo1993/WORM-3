@@ -91,7 +91,6 @@ const WINNER_STYLE = {
   fontWeight: 'bold',
   textAlign: 'center',
   /* backdrop-filter removed — expensive compositor layer on mobile GPUs */
-  textShadow: '0 0 12px rgba(255, 215, 0, 0.7)',
   lineHeight: 1.5,
   marginBottom: '4px',
 };
@@ -217,14 +216,13 @@ const DisparityHUD = () => {
     fontWeight: 900,
     color: aliveCount <= 5 ? '#ef4444' : aliveCount <= 10 ? '#f97316' : CLEAN_CARD.text,
     transition: 'font-size 0.15s, color 0.3s',
-    textShadow: aliveCount <= 5 ? '0 0 12px rgba(239,68,68,0.8)' : 'none',
     lineHeight: 1,
   }), [counterFlash, aliveCount]);
 
   const parityScoreStyle = useMemo(() => ({
     ...PARITY_SCORE_BASE_STYLE,
-    boxShadow: scoreFlash ? '0 0 10px 3px rgba(99,102,241,0.4)' : 'none',
-    transition: 'box-shadow 0.3s',
+    borderColor: scoreFlash ? 'rgba(129,140,248,0.7)' : undefined,
+    transition: 'border-color 0.3s',
   }), [scoreFlash]);
 
   const parityNumStyle = useMemo(() => ({
@@ -232,7 +230,6 @@ const DisparityHUD = () => {
     fontWeight: 900,
     color: '#818cf8',
     transition: 'font-size 0.15s',
-    textShadow: scoreFlash ? '0 0 12px rgba(129,140,248,0.9)' : 'none',
     lineHeight: 1,
   }), [scoreFlash]);
 
@@ -242,8 +239,8 @@ const DisparityHUD = () => {
     <div style={CONTAINER_STYLE}>
       <style>{`
         @keyframes disparity-pulse-red {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
-          50% { box-shadow: 0 0 10px 3px rgba(239,68,68,0.35); }
+          0%, 100% { border-color: rgba(239,68,68,0.35); }
+          50% { border-color: rgba(239,68,68,0.9); }
         }
         @keyframes disparity-face-elim {
           0%   { transform: scale(0.8) translateY(8px); opacity: 0; }
@@ -321,7 +318,6 @@ const FaceEliminationName = React.memo(({ faceNum }) => {
   const style = useMemo(() => ({
     ...FACE_NAME_BASE_STYLE,
     color,
-    textShadow: `0 0 10px ${color}`,
   }), [color]);
   return <div style={style}>{FACE_NAMES[faceNum] ?? `FACE ${faceNum}`}</div>;
 });
