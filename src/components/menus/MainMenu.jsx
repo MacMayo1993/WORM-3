@@ -1,10 +1,18 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Edges, Text } from '@react-three/drei';
+import { preloadFont } from 'troika-three-text';
 import * as THREE from 'three';
 // Bundled Bungee for the 3D face-plate labels. Troika (drei's Text) parses
 // woff/ttf but not woff2, so point it at the woff build.
 import bungeeWoffUrl from '@fontsource/bungee/files/bungee-latin-400-normal.woff';
+
+// Warm troika's glyph atlas for the mode labels at module load so the first
+// face's label renders instantly instead of popping in a frame late.
+preloadFont(
+  { font: bungeeWoffUrl, characters: 'WORMCUBESTORYCHAOSRANDE' },
+  () => {}
+);
 import { makeCubies } from '../../game/cubeState.js';
 import { COLOR_SCHEMES } from '../../utils/colorSchemes.js';
 import { CLASSIC_STYLE_KEYS, ANTIPODAL_STYLE_KEYS, LIVING_STYLE_KEYS } from '../../utils/tileStyleCatalog.js';
@@ -120,6 +128,7 @@ import {
   setCarouselFace,
   getCarouselFace,
   subscribeCarouselActive,
+  subscribeCarouselFace,
   isCarouselActive,
   requestModeDive,
   consumeModeDive,
@@ -752,43 +761,58 @@ const _wobbleQ = new THREE.Quaternion();
 const _presentQ = new THREE.Quaternion();
 const DIVE_DURATION = 0.6; // seconds — PLAY accelerates the face into the camera
 
-const ModeFacePlates = () => (
-  <group>
-    {CAROUSEL_MODES.map((m) => {
-      const cfg = MODE_FACE_CFG[m.face];
-      return (
-        <group key={m.id} position={cfg.pos} rotation={cfg.rot}>
-          {/* Plates render in the transparent pass (depthWrite off): a truly
-              opaque, depth-writing plate here nukes the whole cube in this
-              menu render setup. Near-solid opacity keeps the sticker
-              flip-indicator dots behind from bleeding through. */}
-          <mesh renderOrder={30}>
-            <planeGeometry args={[3.08, 3.08]} />
-            <meshBasicMaterial color="#070a18" transparent opacity={0.97} depthWrite={false} />
-          </mesh>
-          {/* Mode color plate */}
-          <mesh position={[0, 0, 0.012]} renderOrder={31}>
-            <planeGeometry args={[2.9, 2.9]} />
-            <meshBasicMaterial color={m.tileColor} transparent opacity={0.97} toneMapped={false} depthWrite={false} />
-          </mesh>
-          <Text
-            position={[0, 0, 0.03]}
-            font={bungeeWoffUrl}
-            fontSize={m.label.length > 5 ? 0.58 : 0.74}
-            color="#ffffff"
-            anchorX="center"
-            anchorY="middle"
-            outlineWidth={0.04}
-            outlineColor="#141631"
-            renderOrder={32}
-          >
-            {m.label}
-          </Text>
-        </group>
-      );
-    })}
-  </group>
-);
+// Renders a solid colored tile on every cube face, but the mode LABEL only on
+// the face currently presented to the camera. Fully opaque, depth-writing
+// plates: the front face then occludes the back and adjacent faces, so no
+// other mode's letters read through or float over the cube (which looked
+// unfinished). Subscribes to the active face so the label follows navigation.
+const ModeFacePlates = () => {
+  const [activeFace, setActiveFace] = useState(getCarouselFace());
+  useEffect(() => subscribeCarouselFace(setActiveFace), []);
+  // Toggle visibility from the frame loop (not React state) so plates appear
+  // the instant the selector activates — no startup frame where the bare
+  // stickered cube flashes before React re-renders.
+  const rootRef = useRef();
+  useFrame(() => { if (rootRef.current) rootRef.current.visible = isCarouselActive(); });
+  return (
+    <group ref={rootRef}>
+      {CAROUSEL_MODES.map((m) => {
+        const cfg = MODE_FACE_CFG[m.face];
+        const isFront = m.face === activeFace;
+        return (
+          <group key={m.id} position={cfg.pos} rotation={cfg.rot}>
+            {/* Dark frame */}
+            <mesh renderOrder={30}>
+              <planeGeometry args={[3.12, 3.12]} />
+              <meshBasicMaterial color="#070a18" />
+            </mesh>
+            {/* Mode color plate */}
+            <mesh position={[0, 0, 0.01]} renderOrder={31}>
+              <planeGeometry args={[2.94, 2.94]} />
+              <meshBasicMaterial color={m.tileColor} toneMapped={false} />
+            </mesh>
+            {/* Label only on the presented face — keeps other faces clean tiles */}
+            {isFront && (
+              <Text
+                position={[0, 0, 0.03]}
+                font={bungeeWoffUrl}
+                fontSize={m.label.length > 5 ? 0.58 : 0.74}
+                color="#ffffff"
+                anchorX="center"
+                anchorY="middle"
+                outlineWidth={0.04}
+                outlineColor="#141631"
+                renderOrder={32}
+              >
+                {m.label}
+              </Text>
+            )}
+          </group>
+        );
+      })}
+    </group>
+  );
+};
 
 // ─── Rotating cube + worm mascot — exported for App.jsx's shared Canvas ───────
 export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
@@ -801,13 +825,9 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
   const onCubeClickRef = useRef(onCubeClick);
   onCubeClickRef.current = onCubeClick;
 
-  // Six-faces selector state: plates mount while the carousel is open. Init
-  // from the live getter (not false) so a component that mounts WHILE the
-  // carousel is already active — e.g. after a Canvas remount — shows plates
-  // immediately instead of waiting for a change event that never comes.
-  const [carouselOn, setCarouselOn] = useState(isCarouselActive());
+  // ModeFacePlates is always mounted and toggles its own visibility via
+  // useFrame, so RotatingBlackCube no longer needs carousel-active React state.
   const diveRef = useRef(null); // { t, onComplete, done } during a PLAY dive
-  useEffect(() => subscribeCarouselActive(setCarouselOn), []);
 
   useFrame((state, delta) => {
     if (!cubeRef.current) return;
@@ -925,7 +945,9 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
         onPointerLeave={handleCubeUp}
       >
         <ShufflingCube onFlip={onFlip} />
-        {carouselOn && <ModeFacePlates />}
+        {/* Always mounted; ModeFacePlates hides itself via useFrame when the
+            selector is inactive, so there is no mount-timing flash. */}
+        <ModeFacePlates />
       </group>
     </>
   );
