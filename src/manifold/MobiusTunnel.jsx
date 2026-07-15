@@ -50,12 +50,16 @@ const _up            = new THREE.Vector3(0, 1, 0);
 const _side          = new THREE.Vector3(0, 0, 1);
 const _portalPos     = new THREE.Vector3();
 
-// Vertex shader: pass UV and position through to fragment.
+// Vertex shader: pass UV + world position through to fragment.
+// vWorldPos feeds the fresnel silhouette glow (needs a view direction).
 const vertexShader = `
   varying vec2 vUv;
+  varying vec3 vWorldPos;
   void main() {
     vUv = uv;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    vec4 wp = modelMatrix * vec4(position, 1.0);
+    vWorldPos = wp.xyz;
+    gl_Position = projectionMatrix * viewMatrix * wp;
   }
 `;
 
@@ -72,7 +76,13 @@ const fragmentShader = `
   uniform float uScrollSpeed;
   uniform float uGrowT;
   uniform float uPulseBoost;
+  uniform float uSolitonProgress;  // 0→1 position of the flip pulse along the ribbon
+  uniform float uSolitonAmp;       // 0 when no pulse, sin-eased envelope while travelling
   varying vec2  vUv;
+  varying vec3  vWorldPos;
+
+  // Cheap hash for per-column parallax variation (streaks at different "radii").
+  float hash(float n) { return fract(sin(n * 91.3458) * 47453.5453); }
 
   void main() {
     // Tunnel birth grow-in: left beam from tile1 toward centre, right beam from tile2.
@@ -80,15 +90,29 @@ const fragmentShader = `
     float rightFront = 1.0 - uGrowT * 0.5;
     if (vUv.y > leftFront && vUv.y < rightFront) discard;
 
-    // Each half shows only its own tile's color.
+    // Each half shows its own tile's color …
     vec3 tileColor = vUv.y < 0.5 ? uColorA : uColorB;
+
+    // … but at the Möbius midpoint the two colors fuse into a bright plasma bridge —
+    // the visual statement that these two tiles are the SAME point in RP2. (#3)
+    float seam = 1.0 - smoothstep(0.0, 0.17, abs(vUv.y - 0.5));
+    seam *= seam;
+    float seamFlicker = 0.82 + 0.18 * sin(uTime * 6.0 + vUv.x * 12.0);
+    vec3  plasmaCol   = mix((uColorA + uColorB) * 0.7, vec3(1.0), 0.35);
+    tileColor = mix(tileColor, plasmaCol, seam * seamFlicker);
 
     // Scroll toward centre from each tile end (halfPos: 0=tile edge, 1=centre).
     float halfPos = vUv.y < 0.5 ? vUv.y * 2.0 : (1.0 - vUv.y) * 2.0;
-    float scroll  = fract(halfPos * 4.0 - uTime * uScrollSpeed);
 
-    // Leading-edge velocity spark
-    float spark = (1.0 - smoothstep(0.0, 0.08, scroll)) * 0.6;
+    // Near racing stripes.
+    float scroll = fract(halfPos * 4.0 - uTime * uScrollSpeed);
+    float spark  = (1.0 - smoothstep(0.0, 0.08, scroll)) * 0.6;
+
+    // Far parallax warp-streaks: finer, slower, per-column offset. Two speeds read
+    // as depth — you're looking INTO a shaft, not at a painted band. (#2)
+    float colOff    = hash(floor(vUv.x * 7.0));
+    float farScroll = fract(halfPos * 9.0 - uTime * uScrollSpeed * 0.42 + colOff);
+    float farStreak = (1.0 - smoothstep(0.0, 0.045, farScroll)) * 0.32;
 
     // Cylindrical depth illusion: ribbon reads as a 3D tube rather than a flat band.
     // centerBulge peaks at U=0.5 (ribbon centre) and falls off toward edges.
@@ -99,11 +123,29 @@ const fragmentShader = `
     // softer at tile-end portals so the tunnel has visual perspective depth.
     float depthFade = 0.32 + halfPos * 0.68;
 
-    float intensity  = (0.75 + spark + uPulseBoost * 0.3) * shading * depthFade;
-    vec3  col        = tileColor * intensity;
+    // Fresnel silhouette glow — reconstruct the flat ribbon normal from screen-space
+    // derivatives and glow at grazing angles, so the tunnel reads as a lit volume. (#1)
+    vec3  dpdx  = dFdx(vWorldPos);
+    vec3  dpdy  = dFdy(vWorldPos);
+    vec3  ncr   = cross(dpdx, dpdy);
+    vec3  N     = length(ncr) > 1e-6 ? normalize(ncr) : vec3(0.0, 0.0, 1.0);
+    vec3  V     = normalize(cameraPosition - vWorldPos);
+    float fres  = pow(1.0 - abs(dot(N, V)), 3.0);
 
-    float edgeFade    = smoothstep(0.0, 0.14, vUv.x) * smoothstep(1.0, 0.86, vUv.x);
-    float boostOpacity = uOpacity + uPulseBoost * 0.45;
+    // Travelling light-soliton: a flip fires a bright pulse from the entry tile,
+    // through the centre, out to its antipodal partner — the identification event. (#5)
+    float sol = exp(-pow((vUv.y - uSolitonProgress) / 0.055, 2.0)) * uSolitonAmp;
+
+    float intensity = (0.75 + spark + farStreak * depthFade + uPulseBoost * 0.3) * shading * depthFade;
+    intensity += seam * 0.85;   // plasma bridge blooms
+    intensity += fres * 0.9;    // rim glow
+    intensity += sol * 1.6;     // travelling pulse
+
+    vec3 col = tileColor * intensity;
+    col = mix(col, vec3(1.0), clamp(sol, 0.0, 0.85)); // soliton core reads white-hot
+
+    float edgeFade     = smoothstep(0.0, 0.14, vUv.x) * smoothstep(1.0, 0.86, vUv.x);
+    float boostOpacity = uOpacity + uPulseBoost * 0.45 + fres * 0.35 + sol * 0.5;
 
     // Black border along each ribbon edge
     float leftEdge    = 1.0 - smoothstep(0.0, 0.055, vUv.x);
@@ -380,6 +422,8 @@ const MobiusTunnel = ({
     uScrollSpeed: { value: 1.0 },
     uGrowT:       { value: 1.0 },
     uPulseBoost:  { value: 0.0 },
+    uSolitonProgress: { value: -1.0 },
+    uSolitonAmp:      { value: 0.0 },
   }), []);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -556,13 +600,24 @@ const MobiusTunnel = ({
       uniforms.uGrowT.value = 1.0;
     }
 
-    // Tunnel pulse: brightness burst on subsequent flips
+    // Tunnel pulse: on a flip, fire a travelling light-soliton from the entry tile
+    // (vUv.y=0) through the centre to its antipodal partner (vUv.y=1), plus a small
+    // overall brightness burst.
     const pulse = tunnelId ? tunnelPulses?.[tunnelId] : null;
     if (pulse) {
       const rawT = (performance.now() - pulse.startMs) / pulse.durationMs;
-      uniforms.uPulseBoost.value = rawT < 1 ? Math.sin(rawT * Math.PI) : 0;
+      if (rawT < 1) {
+        const env = Math.sin(rawT * Math.PI);
+        uniforms.uPulseBoost.value = env;
+        uniforms.uSolitonProgress.value = rawT; // entry → centre → exit
+        uniforms.uSolitonAmp.value = env;       // fade in/out over the trip
+      } else {
+        uniforms.uPulseBoost.value = 0;
+        uniforms.uSolitonAmp.value = 0;
+      }
     } else {
       uniforms.uPulseBoost.value = 0;
+      uniforms.uSolitonAmp.value = 0;
     }
 
   });
@@ -578,6 +633,7 @@ const MobiusTunnel = ({
           side={THREE.DoubleSide}
           transparent
           depthWrite={false}
+          extensions={{ derivatives: true }}
         />
       </mesh>
 
