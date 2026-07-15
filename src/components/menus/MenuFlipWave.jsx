@@ -45,6 +45,7 @@ const MenuFlipWave = ({ origins, startTime, onComplete }) => {
   // Single shared arc phase so both worms ride the same great circle, 180° apart.
   // Worm A uses +phase, worm B uses -phase → arcDir_B = -arcDir_A → antipodal on the circle.
   const sharedArcPhase = useMemo(() => Math.random() * Math.PI, []);
+  const rootRef = useRef();
   const progressRef = useRef(0);
   const ringsRef = useRef([]);
   const onCompleteCalledRef = useRef(false);
@@ -68,6 +69,9 @@ const MenuFlipWave = ({ origins, startTime, onComplete }) => {
   }, []);
 
   useFrame((_state, delta) => {
+    // Hide the whole wave while the six-faces selector owns the cube — a
+    // frozen mid-flight worm/ring floating over the mode plates reads as a bug.
+    if (rootRef.current) rootRef.current.visible = !isCarouselActive();
     if (isCarouselActive() || progressRef.current >= 1) return;
     progressRef.current = Math.min(1, progressRef.current + delta * 1.2);
     const easeOut = 1 - Math.pow(1 - progressRef.current, 3);
@@ -90,7 +94,7 @@ const MenuFlipWave = ({ origins, startTime, onComplete }) => {
   };
 
   return (
-    <group>
+    <group ref={rootRef}>
       {origins.map((origin, idx) => (
         <group key={idx} position={origin.position} rotation={origin.rotation || [0, 0, 0]}>
           {/* Expanding ring — hidden initially so no flash on mount */}
