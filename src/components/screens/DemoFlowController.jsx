@@ -133,12 +133,19 @@ const DemoStepIntro = ({ step, onContinue }) => {
   );
 };
 
+// Each cube step runs as WATCH → TRY:
+//   • `watch` is auto-performed by the app so the mechanic plays itself
+//     (a rotation via startAnimatedShuffle, or a live flip via onTapFlip that
+//     fires the tunnel birth + travelling soliton).
+//   • then the DemoCoach invites one optional hands-on interaction before the
+//     player advances with Next.
 const DEMO_LEVEL_CONFIGS = {
   'baby-cube': {
     type: 'cube',
     cubeSize: 2,
-    scrambleSequence: [{ axis: 'row', sliceIndex: 0, dir: 1 }],
+    scrambleSequence: null,
     flipSequence: null,
+    watch: { type: 'rotate', moves: [{ axis: 'row', sliceIndex: 0, dir: 1 }, { axis: 'col', sliceIndex: 1, dir: -1 }] },
     features: { rotations: true, tunnels: false, flips: false },
     chaosLevel: 0,
   },
@@ -146,9 +153,8 @@ const DEMO_LEVEL_CONFIGS = {
     type: 'cube',
     cubeSize: 2,
     scrambleSequence: null,
-    flipSequence: [
-      { x: 0, y: 0, z: 1, dirKey: 'PZ' },
-    ],
+    flipSequence: null,
+    watch: { type: 'flip', tile: { x: 0, y: 0, z: 1, dirKey: 'PZ' } },
     features: { rotations: true, tunnels: true, flips: true },
     chaosLevel: 0,
   },
@@ -159,9 +165,8 @@ const DEMO_LEVEL_CONFIGS = {
       { axis: 'row', sliceIndex: 1, dir: 1 },
       { axis: 'col', sliceIndex: 0, dir: -1 },
     ],
-    flipSequence: [
-      { x: 1, y: 1, z: 2, dirKey: 'PZ' },
-    ],
+    flipSequence: null,
+    watch: { type: 'flip', tile: { x: 1, y: 1, z: 2, dirKey: 'PZ' } },
     features: { rotations: true, tunnels: true, flips: true },
     chaosLevel: 0,
   },
@@ -182,4 +187,80 @@ const DEMO_LEVEL_CONFIGS = {
   },
 };
 
-export { DemoProgressBar, DemoStepIntro, DEMO_STEPS, DEMO_LEVEL_CONFIGS };
+// ── TRY phase ──────────────────────────────────────────────────────────────
+// After the WATCH beat auto-plays the mechanic, the coach invites one optional
+// hands-on interaction. "Next" is always available, so the demo can never hang.
+const TRY_COPY = {
+  'baby-cube': 'Your turn — drag a row or column to spin it.',
+  'twin-paradox': 'Your turn — tap any tile. Its twin on the far side flips too.',
+  'flip-gateway': 'Your turn — tap tiles to open wormholes between the pairs.',
+};
+
+const DemoCoach = ({ step, onNext, onExit }) => {
+  const copy = TRY_COPY[step];
+  if (!copy) return null;
+
+  return (
+    <div style={{
+      position: 'fixed',
+      left: '50%',
+      bottom: 'max(20px, env(safe-area-inset-bottom, 20px))',
+      transform: 'translateX(-50%)',
+      zIndex: 11400,
+      display: 'flex',
+      alignItems: 'center',
+      gap: 16,
+      padding: '12px 16px 12px 20px',
+      maxWidth: 'min(92vw, 520px)',
+      background: 'rgba(4,6,20,0.86)',
+      border: '1px solid rgba(255,255,255,0.12)',
+      borderRadius: 16,
+      backdropFilter: 'blur(14px)',
+      fontFamily: UI_FONT,
+    }}>
+      <span style={{ color: GLASS_TEXT, fontSize: 14, lineHeight: 1.4, flex: 1 }}>
+        {copy}
+      </span>
+      <button
+        type="button"
+        onClick={onNext}
+        style={{
+          flexShrink: 0,
+          padding: '10px 22px',
+          background: '#3b82f6',
+          color: '#fff',
+          border: 'none',
+          borderRadius: 10,
+          fontFamily: UI_FONT,
+          fontSize: 14,
+          fontWeight: 600,
+          cursor: 'pointer',
+          letterSpacing: '0.04em',
+        }}
+      >
+        Next ▶
+      </button>
+      {onExit && (
+        <button
+          type="button"
+          onClick={onExit}
+          aria-label="Exit demo"
+          style={{
+            flexShrink: 0,
+            padding: '10px 12px',
+            background: 'transparent',
+            color: GLASS_TEXT_MUTED,
+            border: 'none',
+            fontFamily: UI_FONT,
+            fontSize: 13,
+            cursor: 'pointer',
+          }}
+        >
+          Exit
+        </button>
+      )}
+    </div>
+  );
+};
+
+export { DemoProgressBar, DemoStepIntro, DemoCoach, TRY_COPY, DEMO_STEPS, DEMO_LEVEL_CONFIGS };
