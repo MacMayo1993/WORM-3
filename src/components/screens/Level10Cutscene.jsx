@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect, useMemo, Suspense } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { Environment, Html } from '@react-three/drei';
+import { Html } from '@react-three/drei';
+import SafeEnvironment from '../../3d/SafeEnvironment.jsx';
 import * as THREE from 'three';
 import { gsap } from 'gsap';
 import BlackHoleEnvironment from '../../3d/BlackHoleEnvironment.jsx';
@@ -352,7 +353,7 @@ const CutsceneScene = ({ progress, onComplete: _onComplete }) => {
       {/* Distortion overlay during hyperspace */}
       <DistortionOverlay intensity={phase === 'hyperspace' ? 0.8 : phase === 'eventHorizon' ? 0.4 : 0} />
 
-      <Environment preset="night" />
+      <SafeEnvironment preset="night" />
     </>
   );
 };

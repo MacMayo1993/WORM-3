@@ -4,7 +4,8 @@
 
 import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { Environment, TrackballControls, View, PerspectiveCamera } from '@react-three/drei';
+import { TrackballControls, View, PerspectiveCamera } from '@react-three/drei';
+import SafeEnvironment from '../3d/SafeEnvironment.jsx';
 import * as THREE from 'three';
 
 import SimpleCubeRenderer from './SimpleCubeRenderer.jsx';
@@ -177,7 +178,7 @@ function ManifoldScene({ cubies, size, faceColors, crawlerWorldPos, orbs, rotati
           rotateSpeed={1.2}
         />
       )}
-      <Environment preset="city" />
+      <SafeEnvironment preset="city" />
     </>
   );
 }
@@ -214,7 +215,7 @@ function CrawlerScene({ cubies, size, faceColors, crawlerState, orbs, rotationAn
       {/* Chase camera */}
       {crawlerState && <ChaseCam crawlerState={crawlerState} size={size} />}
 
-      <Environment preset="sunset" />
+      <SafeEnvironment preset="sunset" />
     </>
   );
 }

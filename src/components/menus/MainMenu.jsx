@@ -120,6 +120,7 @@ import {
   setCarouselFace,
   getCarouselFace,
   subscribeCarouselActive,
+  isCarouselActive,
   requestModeDive,
   consumeModeDive,
 } from './menuCarouselState.js';
@@ -207,11 +208,15 @@ function MenuLegoStud({ dir, color }) {
   );
 }
 
-const ShuffleCubie = React.memo(({ cubie }) => {
+const ShuffleCubie = React.memo(({ cubie, hideStickers = false }) => {
   const cx = cubie.x - 1, cy = cubie.y - 1, cz = cubie.z - 1;
   // Each cubelet wears its own whole-cube view style, same as Random Mode.
   const vmode = pickCubeletViewStyle(cubie.x, cubie.y, cubie.z, _menuViewEpoch, MENU_VIEW_STYLES);
-  const isWire = vmode === 'wireframe';
+  // While the six-faces selector presents its mode plates, drop the stickers,
+  // overlays, and studs: some tile styles draw discs that render in the
+  // transparent pass and bleed through the plates as stray dots. The bare dark
+  // cubie boxes stay so the cube keeps its silhouette behind the plates.
+  const isWire = vmode === 'wireframe' || hideStickers;
   const isLego = vmode === 'lego';
   const showEdges = LED_EDGE_MODES.has(vmode);
   const contentScale = vmode === 'gap' ? 0.82 : 1;
@@ -258,7 +263,7 @@ const ShuffleCubie = React.memo(({ cubie }) => {
         })}
 
         {/* Lego stud on each face */}
-        {isLego && STICKER_CFG.map(({ dir }) => {
+        {isLego && !hideStickers && STICKER_CFG.map(({ dir }) => {
           const sticker = cubie.stickers?.[dir];
           if (!sticker) return null;
           const colorHex = MENU_FACE_COLORS[sticker.curr] ?? '#888888';
@@ -283,6 +288,10 @@ const ShufflingCube = ({ onFlip }) => {
 
   const [flipWaves, setFlipWaves] = useState([]);
   const [styleVersion, setStyleVersion] = useState(0);
+  // Drop the cube's stickers/overlays while the six-faces selector presents
+  // its mode plates (prevents disc-drawing tile styles bleeding through them).
+  const [hideStickers, setHideStickers] = useState(isCarouselActive());
+  useEffect(() => subscribeCarouselActive(setHideStickers), []);
   const cubeStateRef = useRef(cubeState);
   cubeStateRef.current = cubeState;
   const sliceGroupRef = useRef();
@@ -406,11 +415,11 @@ const ShufflingCube = ({ onFlip }) => {
   return (
     <>
       {staticCubies.map(c => (
-        <ShuffleCubie key={`${c.x}-${c.y}-${c.z}-${styleVersion}`} cubie={c} />
+        <ShuffleCubie key={`${c.x}-${c.y}-${c.z}-${styleVersion}`} cubie={c} hideStickers={hideStickers} />
       ))}
       <group ref={sliceGroupRef}>
         {sliceCubies.map(c => (
-          <ShuffleCubie key={`${c.x}-${c.y}-${c.z}-${styleVersion}`} cubie={c} />
+          <ShuffleCubie key={`${c.x}-${c.y}-${c.z}-${styleVersion}`} cubie={c} hideStickers={hideStickers} />
         ))}
       </group>
       {flipWaves.map(wave => (
@@ -749,15 +758,18 @@ const ModeFacePlates = () => (
       const cfg = MODE_FACE_CFG[m.face];
       return (
         <group key={m.id} position={cfg.pos} rotation={cfg.rot}>
-          {/* Dark frame behind the color plate */}
+          {/* Plates render in the transparent pass (depthWrite off): a truly
+              opaque, depth-writing plate here nukes the whole cube in this
+              menu render setup. Near-solid opacity keeps the sticker
+              flip-indicator dots behind from bleeding through. */}
           <mesh renderOrder={30}>
-            <planeGeometry args={[3.04, 3.04]} />
-            <meshBasicMaterial color="#070a18" transparent opacity={0.94} depthWrite={false} />
+            <planeGeometry args={[3.08, 3.08]} />
+            <meshBasicMaterial color="#070a18" transparent opacity={0.97} depthWrite={false} />
           </mesh>
           {/* Mode color plate */}
           <mesh position={[0, 0, 0.012]} renderOrder={31}>
-            <planeGeometry args={[2.86, 2.86]} />
-            <meshBasicMaterial color={m.tileColor} transparent opacity={0.93} toneMapped={false} depthWrite={false} />
+            <planeGeometry args={[2.9, 2.9]} />
+            <meshBasicMaterial color={m.tileColor} transparent opacity={0.97} toneMapped={false} depthWrite={false} />
           </mesh>
           <Text
             position={[0, 0, 0.03]}
@@ -789,8 +801,11 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
   const onCubeClickRef = useRef(onCubeClick);
   onCubeClickRef.current = onCubeClick;
 
-  // Six-faces selector state: plates mount while the carousel is open.
-  const [carouselOn, setCarouselOn] = useState(false);
+  // Six-faces selector state: plates mount while the carousel is open. Init
+  // from the live getter (not false) so a component that mounts WHILE the
+  // carousel is already active — e.g. after a Canvas remount — shows plates
+  // immediately instead of waiting for a change event that never comes.
+  const [carouselOn, setCarouselOn] = useState(isCarouselActive());
   const diveRef = useRef(null); // { t, onComplete, done } during a PLAY dive
   useEffect(() => subscribeCarouselActive(setCarouselOn), []);
 
@@ -811,7 +826,14 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
       _wobbleQ.setFromEuler(_wobbleEuler);
       _presentQ.multiplyQuaternions(_wobbleQ, FACE_TARGET_QUAT[face] ?? FACE_TARGET_QUAT.PZ);
       cubeRef.current.quaternion.slerp(_presentQ, 1 - Math.exp(-6 * delta));
-      cubeRef.current.position.set(0, 0.45 + Math.sin(t * 0.8) * 0.045, 0);
+
+      // Lift the cube clear of the info panel/PLAY button below. On portrait
+      // (phone) screens the cube renders much larger and the panel eats more of
+      // the viewport, so raise it further and shrink it a touch there.
+      const portrait = state.size.height > state.size.width;
+      const presentY = portrait ? 2.4 : 1.2;
+      const presentScale = portrait ? 0.72 : 1.0;
+      cubeRef.current.position.set(0, presentY + Math.sin(t * 0.8) * 0.045, 0);
 
       // PLAY dive: the presented face accelerates into the camera.
       if (!diveRef.current) {
@@ -822,13 +844,13 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
         const dive = diveRef.current;
         dive.t += delta;
         const p = Math.min(1, dive.t / DIVE_DURATION);
-        cubeRef.current.scale.setScalar(1.022 + Math.pow(p, 3) * 7.5);
+        cubeRef.current.scale.setScalar((1.022 + Math.pow(p, 3) * 7.5) * presentScale);
         if (p >= 1 && !dive.done) {
           dive.done = true;
           dive.onComplete?.();
         }
       } else {
-        cubeCurrentScale.current += (1.022 - cubeCurrentScale.current) * Math.min(1, delta * 10);
+        cubeCurrentScale.current += (1.022 * presentScale - cubeCurrentScale.current) * Math.min(1, delta * 10);
         cubeRef.current.scale.setScalar(cubeCurrentScale.current);
       }
       return;

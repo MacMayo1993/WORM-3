@@ -7,7 +7,8 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Environment } from '@react-three/drei';
+import { OrbitControls } from '@react-three/drei';
+import SafeEnvironment from '../../3d/SafeEnvironment.jsx';
 import MobiusCubelet from '../../3d/MobiusCubelet.jsx';
 import { UI_FONT, GLASS_PANEL, GLASS_PANEL_BORDER } from '../../utils/uiTheme.js';
 
@@ -197,7 +198,7 @@ export default function MobiusCubeletScreen({ onBack }) {
           <pointLight position={[-4, -3, -4]} intensity={1.2} color="#6688ff" />
           <pointLight position={[0, 5, -3]}  intensity={0.8} color="#ffcc88" />
           <Suspense fallback={null}>
-            <Environment preset="city" />
+            <SafeEnvironment preset="city" />
           </Suspense>
           <MobiusCubelet autoRotate={autoRotate} />
           {!autoRotate && <OrbitControls enablePan={false} minDistance={3} maxDistance={10} />}
