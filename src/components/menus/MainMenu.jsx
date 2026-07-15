@@ -851,8 +851,10 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
       // (phone) screens the cube renders much larger and the panel eats more of
       // the viewport, so raise it further and shrink it a touch there.
       const portrait = state.size.height > state.size.width;
-      const presentY = portrait ? 2.4 : 1.2;
-      const presentScale = portrait ? 0.72 : 1.0;
+      // On portrait (phone) the presented mode cube sits higher with a large empty
+      // gap below it, so drop it down into that space and size it up ~10%.
+      const presentY = portrait ? 1.75 : 1.2;
+      const presentScale = portrait ? 0.79 : 1.0;
       cubeRef.current.position.set(0, presentY + Math.sin(t * 0.8) * 0.045, 0);
 
       // PLAY dive: the presented face accelerates into the camera.
@@ -1286,10 +1288,28 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
 // ─── Start button ─────────────────────────────────────────────────────────────
 const FEEDBACK_URL = 'https://docs.google.com/forms/d/e/1FAIpQLScYKKOXc6c3vdqpmWWv0J3lMd90-GOfp0TxxxHelxjIjMdrvw/viewform';
 
-const MenuStartButton = ({ visible, onClick, onDemo }) => (
+const MenuStartButton = ({ visible, onClick, onDemo }) => {
+  // On phones the cluster sat ~120px off the bottom, leaving a big dead gap.
+  // Drop it near the bottom in portrait; keep the roomier desktop spacing.
+  const [portrait, setPortrait] = React.useState(
+    typeof window !== 'undefined' ? window.innerHeight > window.innerWidth : false
+  );
+  React.useEffect(() => {
+    const onResize = () => setPortrait(window.innerHeight > window.innerWidth);
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', onResize);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('orientationchange', onResize);
+    };
+  }, []);
+  const padBottom = portrait
+    ? 'max(40px, env(safe-area-inset-bottom, 40px))'
+    : 'max(120px, env(safe-area-inset-bottom, 120px))';
+  return (
   <div style={{
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    paddingBottom: 'max(120px, env(safe-area-inset-bottom, 120px))',
+    paddingBottom: padBottom,
     display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
     gap: '14px',
     opacity: visible ? 1 : 0,
@@ -1342,7 +1362,8 @@ const MenuStartButton = ({ visible, onClick, onDemo }) => (
       onMouseLeave={(e) => { e.target.style.color = 'rgba(200, 220, 255, 0.5)'; e.target.style.borderColor = 'rgba(120, 160, 255, 0.18)'; }}
     >Give Feedback</button>
   </div>
-);
+  );
+};
 
 const MENU_FONT = UI_FONT;
 const menuStyles = {
