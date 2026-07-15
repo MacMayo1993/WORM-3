@@ -7,7 +7,8 @@
 
 import React, { Suspense, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Environment, Html } from '@react-three/drei';
+import { Html } from '@react-three/drei';
+import SafeEnvironment from './SafeEnvironment.jsx';
 import { EffectComposer, N8AO } from '@react-three/postprocessing';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
@@ -40,7 +41,7 @@ function InteractivePhotoBackground({ preset, files }) {
   });
 
   return (
-    <Environment
+    <SafeEnvironment
       preset={files ? undefined : preset}
       files={files}
       background
@@ -270,7 +271,7 @@ export default function GameScene({
           <BlackHoleEnvironment flipTrigger={blackHolePulse} />
         )}
         {/* Default lighting env for levels without a custom background */}
-        {currentLevelData && !currentLevelData.background && <Environment preset="city" />}
+        {currentLevelData && !currentLevelData.background && <SafeEnvironment preset="city" />}
 
         <WormholeWarpFX
           enabled={wormholePhaseActive}

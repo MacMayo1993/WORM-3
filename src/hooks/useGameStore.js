@@ -624,10 +624,10 @@ export const useGameStore = create(
     // ========================================================================
     // UI STATE
     // ========================================================================
-    // First visit: play the intro cinematic. Returning players land directly
-    // on the main menu (showMainMenu defaults true below) — replaying a 14 s
-    // intro on every load was demo/booth friction with no payoff.
-    showWelcome: !persistedState.introSeen,
+    // The intro cinematic plays on every visit (it is the game's opening
+    // statement). Returning players get the ENTER button immediately instead
+    // of waiting 10 s — see WelcomeScreen — so a replay costs one tap.
+    showWelcome: true,
     showTutorial: false,
     showFirstFlipTutorial: false,
     showHelp: false,

@@ -42,6 +42,12 @@ function makeNebulaFragmentShader(stepCount) {
     uniform vec3 uColorOuter;
     uniform vec3 uColorVein;
 
+    // 2x2 Bayer cell — composed twice below for an ordered 4x4 dither pattern.
+    float bayer2(vec2 a) {
+      a = floor(a);
+      return fract(a.x / 2.0 + a.y * a.y * 0.75);
+    }
+
     float hash31(vec3 p) {
       p = fract(p * 0.1031);
       p += dot(p, p.yzx + 33.33);
@@ -126,9 +132,10 @@ function makeNebulaFragmentShader(stepCount) {
       float t = max(bounds.x, 0.0);
       float endT = bounds.y;
       float stepSize = (endT - t) / float(${stepCount});
-      // Per-pixel jitter of the first sample hides the slice banding that fewer steps would
-      // otherwise reveal — a cheap dither that buys back most of the reduced-step quality.
-      float jitter = hash31(vec3(gl_FragCoord.xy, 1.0));
+      // Ordered 4x4 Bayer dither of the first sample hides slice banding without the
+      // film-grain speckle that per-pixel white-noise jitter produced (each pixel
+      // starting at a random depth read as a grainy background on the menu).
+      float jitter = fract(bayer2(0.5 * gl_FragCoord.xy) * 0.25 + bayer2(gl_FragCoord.xy));
       t += stepSize * jitter;
       vec3 accum = vec3(0.0);
       float alpha = 0.0;

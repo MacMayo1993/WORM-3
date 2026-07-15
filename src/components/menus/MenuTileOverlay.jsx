@@ -1,5 +1,6 @@
 import React, { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
+import { isCarouselActive } from './menuCarouselState.js';
 import * as THREE from 'three';
 
 // Shared time uniform — all overlay instances reference the same object so the
@@ -140,13 +141,19 @@ const MenuTileOverlay = ({ colorHex, antiColorHex }) => {
     uIntensity: { value: 1.0 },
   }));
 
+  const rootRef = React.useRef();
+
   useFrame((state) => {
     // All overlay instances write the same value — harmless duplication, cheap write.
     _menuOverlayT.value = state.clock.elapsedTime;
+    // These overlays render with depth testing relaxed, so they draw straight
+    // through the opaque six-faces mode plates — hide them while the selector
+    // owns the cube.
+    if (rootRef.current) rootRef.current.visible = !isCarouselActive();
   });
 
   return (
-    <>
+    <group ref={rootRef}>
       {/* Wispy double-helix ring — z=0.007 matching StickerPlane layout */}
       <mesh position={[0, 0, 0.007]} geometry={_sharedPlane} renderOrder={12}>
         <shaderMaterial
@@ -198,7 +205,7 @@ const MenuTileOverlay = ({ colorHex, antiColorHex }) => {
           blending={THREE.AdditiveBlending}
         />
       </mesh>
-    </>
+    </group>
   );
 };
 

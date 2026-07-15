@@ -8,7 +8,8 @@
 
 import React, { useState, useRef, useEffect, useCallback, useMemo, Suspense } from 'react';
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
-import { Environment, PerformanceMonitor } from '@react-three/drei';
+import { PerformanceMonitor } from '@react-three/drei';
+import SafeEnvironment from './3d/SafeEnvironment.jsx';
 import { EffectComposer, Bloom, Vignette, ChromaticAberration } from '@react-three/postprocessing';
 import { BlendFunction } from 'postprocessing';
 import { Vector2 } from 'three';
@@ -134,9 +135,7 @@ function IntroBranch({ time, onComplete, reducedMotion = false, performanceMode 
         performanceMode={performanceMode}
       />
       <IntroScene time={time} onComplete={onComplete} />
-      <Suspense fallback={null}>
-        <Environment preset="city" />
-      </Suspense>
+      <SafeEnvironment preset="city" />
       {!performanceMode && (
         <EffectComposer>
           <Bloom

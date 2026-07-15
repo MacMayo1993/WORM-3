@@ -10,6 +10,12 @@ import React, { useEffect } from 'react';
 import TextOverlay from '../intro/TextOverlay.jsx';
 
 const WelcomeScreen = ({ onEnter, introTime }) => {
+  // Returning players have seen the cinematic — give them ENTER immediately
+  // instead of making them wait 10 s for it to appear.
+  const [introSeen] = React.useState(() => {
+    try { return localStorage.getItem('worm3_intro_seen') === '1'; } catch { return false; }
+  });
+
   useEffect(() => {
     const onKeyDown = (event) => {
       const key = event.key.toLowerCase();
@@ -45,7 +51,7 @@ const WelcomeScreen = ({ onEnter, introTime }) => {
         Skip ►
       </button>
 
-      {introTime >= 10 && (
+      {(introSeen || introTime >= 10) && (
         <button
           type="button"
           aria-label="Enter game"
