@@ -12,7 +12,7 @@ import { getMirrorDimensions } from '../game/mirrorBlocks.js';
 import { resolveColors } from '../utils/colorSchemes.js';
 import { PER_CUBELET_VIEW_STYLES, LED_EDGE_MODES, pickCubeletViewStyle, bodyMaterialProps } from './cubeViewStyles.js';
 // Canonical Latin-square value (matches win detection in winDetection.js).
-import { faceValue as latinValue } from '../game/coordinates.js';
+import { faceValue as latinValue, getManifoldGridId, faceRCFor } from '../game/coordinates.js';
 
 // Hollow cube edge beams — 12 beams forming a skeletal cube frame
 const EDGE_H = 0.49; // half of cube size
@@ -118,25 +118,6 @@ function LegoStud({ dir, color, enableShadows = true }) {
 }
 
 // Helper functions for grid and sudokube modes
-const faceRCFor = (dirKey, x, y, z, size) => {
-  if (dirKey === 'PZ') {
-    return { r: size - 1 - y, c: x };
-  }
-  if (dirKey === 'NZ') {
-    return { r: size - 1 - y, c: size - 1 - x };
-  }
-  if (dirKey === 'PX') {
-    return { r: size - 1 - y, c: size - 1 - z };
-  }
-  if (dirKey === 'NX') {
-    return { r: size - 1 - y, c: z };
-  }
-  if (dirKey === 'PY') {
-    return { r: z, c: x };
-  }
-  // NY
-  return { r: size - 1 - z, c: x };
-};
 
 const Cubie = React.forwardRef(function Cubie({
   position, cubie, size, wormMode = false, hideBody = false, onPointerDown,
@@ -246,14 +227,12 @@ const Cubie = React.forwardRef(function Cubie({
   const overlay = (dirKey) => {
     const m = meta(dirKey); if (!m) return '';
     if (effectiveVisualMode === 'grid') {
-      const { r, c } = faceRCFor(m.origDir, m.origPos.x, m.origPos.y, m.origPos.z, size);
-      const idx = r * size + c + 1;
-      const idStr = String(idx).padStart(3, '0');
-      // Swap X/Z antipodal pairs (1↔4, 2↔5) so face IDs match user convention.
-      // Y-axis pair (3, 6) is already correct and is left unchanged.
-      const GRID_FACE = { 1: 4, 2: 5, 4: 1, 5: 2 };
-      const faceId = GRID_FACE[m.orig] ?? m.orig;
-      return `M${faceId}-${idStr}`;
+      // Use the ONE canonical grid ID (same function every flip/antipodal/worker
+      // path uses). The previous local formula had drifted for the NZ/NX/NY
+      // faces and a GRID_FACE swap hack was layered on top, so the on-screen
+      // label disagreed with the logic: flipping the tile labelled M1-001
+      // visibly flipped "M4-007" (its true same-index partner M4-001, mislabelled).
+      return getManifoldGridId(m, size);
     }
     if (effectiveVisualMode === 'sudokube') {
       // Show the sticker's IDENTITY value (from its original face + position),
