@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Edges } from '@react-three/drei';
+import { Edges, Text } from '@react-three/drei';
 import * as THREE from 'three';
+// Bundled Bungee for the 3D face-plate labels. Troika (drei's Text) parses
+// woff/ttf but not woff2, so point it at the woff build.
+import bungeeWoffUrl from '@fontsource/bungee/files/bungee-latin-400-normal.woff';
 import { makeCubies } from '../../game/cubeState.js';
 import { COLOR_SCHEMES } from '../../utils/colorSchemes.js';
 import { CLASSIC_STYLE_KEYS, ANTIPODAL_STYLE_KEYS, LIVING_STYLE_KEYS } from '../../utils/tileStyleCatalog.js';
@@ -112,7 +115,14 @@ const ScreenGlow = () => {
 };
 
 
-import { setCarouselActive } from './menuCarouselState.js';
+import {
+  setCarouselActive,
+  setCarouselFace,
+  getCarouselFace,
+  subscribeCarouselActive,
+  requestModeDive,
+  consumeModeDive,
+} from './menuCarouselState.js';
 
 // ─── Carousel-active flag — set by MainMenu, read by all useFrame hooks ────────
 // Shared via menuCarouselState.js so MenuFlipWave / MenuWormParticle can gate
@@ -469,7 +479,13 @@ export const MenuWorm = ({ onWormClick }) => {
   const smoothPtr = useRef({ x: 0, y: 0 });
 
   useFrame(({ clock, pointer }, delta) => {
-    if (_carouselActive || !groupRef.current) return;
+    if (!groupRef.current) return;
+    // Hide the mascot while the six-faces selector owns the cube.
+    if (_carouselActive) {
+      groupRef.current.visible = false;
+      return;
+    }
+    if (!groupRef.current.visible) groupRef.current.visible = true;
     const t = clock.elapsedTime;
 
     // Initialize blink timer on first frame
@@ -701,6 +717,67 @@ export const MenuWorm = ({ onWormClick }) => {
   );
 };
 
+// ─── Six-faces mode selector: face plates + presentation targets ──────────────
+// While the carousel is open, each mode's plate covers its cube face and the
+// cube slerps so the active mode's face looks at the camera. Plate rotations
+// and cube target orientations are chosen together so every label reads
+// upright when its face is presented.
+const MODE_FACE_CFG = {
+  PZ: { pos: [0, 0, 1.56], rot: [0, 0, 0] },
+  NZ: { pos: [0, 0, -1.56], rot: [0, Math.PI, 0] },
+  PX: { pos: [1.56, 0, 0], rot: [0, Math.PI / 2, 0] },
+  NX: { pos: [-1.56, 0, 0], rot: [0, -Math.PI / 2, 0] },
+  PY: { pos: [0, 1.56, 0], rot: [-Math.PI / 2, 0, 0] },
+  NY: { pos: [0, -1.56, 0], rot: [Math.PI / 2, 0, 0] },
+};
+const FACE_TARGET_QUAT = {
+  PZ: new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, 0)),
+  NZ: new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI, 0)),
+  PX: new THREE.Quaternion().setFromEuler(new THREE.Euler(0, -Math.PI / 2, 0)),
+  NX: new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI / 2, 0)),
+  PY: new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0)),
+  NY: new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0)),
+};
+const _wobbleEuler = new THREE.Euler();
+const _wobbleQ = new THREE.Quaternion();
+const _presentQ = new THREE.Quaternion();
+const DIVE_DURATION = 0.6; // seconds — PLAY accelerates the face into the camera
+
+const ModeFacePlates = () => (
+  <group>
+    {CAROUSEL_MODES.map((m) => {
+      const cfg = MODE_FACE_CFG[m.face];
+      return (
+        <group key={m.id} position={cfg.pos} rotation={cfg.rot}>
+          {/* Dark frame behind the color plate */}
+          <mesh renderOrder={30}>
+            <planeGeometry args={[3.04, 3.04]} />
+            <meshBasicMaterial color="#070a18" transparent opacity={0.94} depthWrite={false} />
+          </mesh>
+          {/* Mode color plate */}
+          <mesh position={[0, 0, 0.012]} renderOrder={31}>
+            <planeGeometry args={[2.86, 2.86]} />
+            <meshBasicMaterial color={m.tileColor} transparent opacity={0.93} toneMapped={false} depthWrite={false} />
+          </mesh>
+          <Text
+            position={[0, 0, 0.03]}
+            font={bungeeWoffUrl}
+            fontSize={m.label.length > 5 ? 0.58 : 0.74}
+            color="#ffffff"
+            anchorX="center"
+            anchorY="middle"
+            outlineWidth={0.04}
+            outlineColor="#141631"
+            renderOrder={32}
+          >
+            {m.label}
+          </Text>
+        </group>
+      );
+    })}
+  </group>
+);
+
 // ─── Rotating cube + worm mascot — exported for App.jsx's shared Canvas ───────
 export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
   const cubeRef = useRef();
@@ -712,9 +789,58 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
   const onCubeClickRef = useRef(onCubeClick);
   onCubeClickRef.current = onCubeClick;
 
+  // Six-faces selector state: plates mount while the carousel is open.
+  const [carouselOn, setCarouselOn] = useState(false);
+  const diveRef = useRef(null); // { t, onComplete, done } during a PLAY dive
+  useEffect(() => subscribeCarouselActive(setCarouselOn), []);
+
   useFrame((state, delta) => {
-    if (_carouselActive || !cubeRef.current) return;
+    if (!cubeRef.current) return;
     const t = state.clock.elapsedTime;
+
+    if (_carouselActive) {
+      updateSharedTime(t);
+      // Present the active mode's face: slerp toward its target orientation
+      // with a slow breathing wobble so the cube stays alive while parked.
+      const face = getCarouselFace() || 'PZ';
+      _wobbleEuler.set(
+        -0.13 + Math.sin(t * 0.9) * 0.035,
+        0.20 + Math.sin(t * 0.7 + 1.7) * 0.045,
+        0
+      );
+      _wobbleQ.setFromEuler(_wobbleEuler);
+      _presentQ.multiplyQuaternions(_wobbleQ, FACE_TARGET_QUAT[face] ?? FACE_TARGET_QUAT.PZ);
+      cubeRef.current.quaternion.slerp(_presentQ, 1 - Math.exp(-6 * delta));
+      cubeRef.current.position.set(0, 0.45 + Math.sin(t * 0.8) * 0.045, 0);
+
+      // PLAY dive: the presented face accelerates into the camera.
+      if (!diveRef.current) {
+        const req = consumeModeDive();
+        if (req) diveRef.current = { t: 0, onComplete: req.onComplete, done: false };
+      }
+      if (diveRef.current) {
+        const dive = diveRef.current;
+        dive.t += delta;
+        const p = Math.min(1, dive.t / DIVE_DURATION);
+        cubeRef.current.scale.setScalar(1.022 + Math.pow(p, 3) * 7.5);
+        if (p >= 1 && !dive.done) {
+          dive.done = true;
+          dive.onComplete?.();
+        }
+      } else {
+        cubeCurrentScale.current += (1.022 - cubeCurrentScale.current) * Math.min(1, delta * 10);
+        cubeRef.current.scale.setScalar(cubeCurrentScale.current);
+      }
+      return;
+    }
+
+    // Carousel closed — clear any finished dive so idle animation resumes clean.
+    if (diveRef.current) {
+      diveRef.current = null;
+      cubeCurrentScale.current = 1.022;
+      cubeTargetScale.current = 1.022;
+      cubeRef.current.scale.setScalar(1.022);
+    }
     updateSharedTime(t);
 
     if (_externalShakeNeeded && !shaking.current) {
@@ -777,6 +903,7 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
         onPointerLeave={handleCubeUp}
       >
         <ShufflingCube onFlip={onFlip} />
+        {carouselOn && <ModeFacePlates />}
       </group>
     </>
   );
@@ -784,185 +911,51 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
 
 // ─── Mode carousel constants ──────────────────────────────────────────────────
 
-// tileColor matches the game's 6 face colors; textColor ensures contrast on the tile
+// Six modes, six faces: each mode lives on the cube face whose canonical color
+// matches its tileColor (red PZ, green NX, white PY, orange NZ, blue PX,
+// yellow NY). Swiping the carousel rotates the live 3D menu cube to present
+// that mode's face; PLAY dives through the face into the mode.
 const CAROUSEL_MODES = [
   {
-    id: 'worm', label: 'WORM', tileColor: '#22c55e', textColor: '#fff',
+    id: 'worm', label: 'WORM', tileColor: '#22c55e', textColor: '#fff', face: 'NX',
     desc: 'Co-op worm healer mode on a living antipodal cube.',
     controls: ['Worm follows your cursor or touch', 'Healed tiles restore the cube face', 'Collect orbs scattered across faces', 'Avoid flipped chaos tiles'],
   },
   {
-    id: 'freeplay', label: 'CUBE', tileColor: '#eab308', textColor: '#fff',
+    id: 'freeplay', label: 'CUBE', tileColor: '#eab308', textColor: '#fff', face: 'NY',
     desc: "Classic Rubik's cube solving — your cube, your rules.",
     controls: ['Pick cube size 2×2 through 5×5', 'Choose color scheme and tile style', 'Drag face edges to rotate slices', 'Solve at your own pace'],
   },
   {
-    id: 'cube', label: 'STORY', tileColor: '#3b82f6', textColor: '#fff',
+    id: 'cube', label: 'STORY', tileColor: '#3b82f6', textColor: '#fff', face: 'PX',
     desc: 'The 10-level Life Journey campaign, from daycare to the singularity.',
     controls: ['Beat a level to unlock the next', 'Each level teaches a new mechanic', 'Mobi guides you along the way', 'Earn star ratings on every level'],
   },
   {
-    id: 'chaos', label: 'CHAOS', tileColor: '#f97316', textColor: '#fff',
+    id: 'chaos', label: 'CHAOS', tileColor: '#f97316', textColor: '#fff', face: 'NZ',
     desc: 'Antipodal flip survival with betting and chaos tuning.',
     controls: ['Tiles flip automatically over time', 'Bet Parity Points before the round', 'Set chaos level 1–5 in the wizard', 'Survive until the last tile falls'],
   },
   {
-    id: 'random', label: 'RANDOM', tileColor: '#ef4444', textColor: '#fff',
+    id: 'random', label: 'RANDOM', tileColor: '#ef4444', textColor: '#fff', face: 'PZ',
     desc: 'Randomized style cycling every 15 seconds.',
     controls: ['Color scheme changes every 15 s', 'Cube and tiles transform live', 'Keep solving through the shifts', 'Style variety makes every run fresh'],
   },
   {
-    id: 'store', label: 'STORE', tileColor: '#0891B2', textColor: '#fff',
+    id: 'store', label: 'STORE', tileColor: '#0891B2', textColor: '#fff', face: 'PY',
     desc: 'Spend Parity Points on skins, hats, palettes, and tile styles.',
     controls: ['Earn PP by collecting orbs in Worm mode', 'Win Disparity bets for extra points', 'Unlock worm skins, hats, and color schemes', 'Cosmetics carry across every game mode'],
   },
-  {
-    id: 'coming-soon', label: 'COMING SOON', tileColor: '#e8e8e0', textColor: 'rgba(0,0,0,0.70)',
-    desc: 'Holonomy, Biome, Merge — arriving soon.',
-    controls: ['Holonomy: loop visualization mode', 'Biome: city face-specific environments', 'Merge: block-merging puzzle variant'],
-  },
-  {
-    id: 'how-to-play', label: 'HOW TO PLAY', tileColor: '#a855f7', textColor: '#fff',
-    desc: 'Learn the rules and mechanics of WORM³.',
-    controls: ['Step-by-step algorithm teaching', 'Learn F, R, U and slice moves', 'Practice one layer at a time', 'Hints and solution previews'],
-  },
 ];
 
-// ─── How-to-play mini tutorial ───────────────────────────────────────────────
-
-const HOW_TO_PLAY_STEPS = [
-  {
-    title: 'Welcome to WORM³',
-    lines: [
-      "A Rubik's Cube puzzle built on real projective plane topology.",
-      'Opposite faces are linked — flip one sticker and its antipodal partner changes too.',
-      'Solve the cube while managing wormhole connections across all six faces.',
-    ],
-  },
-  {
-    title: 'Antipodal Pairs',
-    lines: [
-      'Red ↔ Orange  ·  Green ↔ Blue  ·  White ↔ Yellow',
-      'Each face is permanently paired with the face directly across from it.',
-      'Small dot on a sticker = its original color before any flips.',
-    ],
-  },
-  {
-    title: 'Wormhole Tunnels',
-    lines: [
-      'Flip any sticker and a glowing tunnel appears connecting it to its partner.',
-      'Tunnels grow thicker and spark with electricity as flips accumulate.',
-      'Tally marks on each sticker count its total wormhole journeys.',
-      'Press T to toggle tunnel visibility on or off.',
-    ],
-  },
-  {
-    title: 'Basic Controls',
-    lines: [
-      'Drag anywhere on the canvas — rotate the cube freely 360°',
-      'Drag on a sticker — twist that row, column, or depth slice',
-      'Hold Shift + drag on a face — rotate the entire face CW / CCW',
-      'Mobile: tap and drag for all interactions, full touch support',
-    ],
-  },
-  {
-    title: 'Flipping Stickers',
-    lines: [
-      'Press G or tap Flip to toggle Flip Mode — then tap any sticker',
-      'Right-click (desktop) or long-press (mobile) to flip without Flip Mode',
-      'Press F to flip the sticker under the keyboard cursor',
-    ],
-  },
-  {
-    title: 'Visual Modes',
-    lines: [
-      'Press V to cycle: Classic → Grid → Sudokube → Colors',
-      'Classic: solid face colors  ·  Grid: manifold IDs (M1-001)',
-      'Sudokube: Latin square numbers  ·  Colors: custom palette',
-      'X — explode view  ·  T — tunnels  ·  N — flat net panel',
-    ],
-  },
-  {
-    title: 'Chaos (Disparity) Mode',
-    lines: [
-      'Press C or tap Chaos to toggle Disparity Mode.',
-      'Flipped stickers spread instability to their neighbors over time.',
-      'Level 1–5: occasional cascades → deep-manifold surges.',
-      'AUTO: cube rotates automatically based on instability level.',
-    ],
-  },
-  {
-    title: 'Keyboard Shortcuts',
-    lines: [
-      'Arrow Keys — cursor  ·  W/S — column  ·  A/D — row  ·  Q/E — face',
-      'G — flip mode  ·  F — flip at cursor  ·  C — chaos  ·  V — visual mode',
-      'X — explode  ·  T — tunnels  ·  N — net panel',
-      'H or ? — help  ·  Esc — close menus',
-    ],
-  },
-  {
-    title: 'Victory Conditions',
-    lines: [
-      'Classic: all six faces show a single uniform color',
-      'Sudokube: valid Latin squares on all faces (no repeats per row/col)',
-      'Ultimate: Classic AND Sudokube simultaneously',
-      'WORM³: solve after every sticker has traveled through a wormhole at least once',
-    ],
-  },
+// Non-mode destinations live in a small utility row under the carousel — they
+// are not game modes and do not occupy cube faces.
+const UTILITY_MODES = [
+  { id: 'how-to-play', label: 'How to Play' },
+  { id: 'coming-soon', label: 'Coming Soon' },
 ];
 
-const HowToPlayMini = ({ tileColor }) => {
-  const [tutStep, setTutStep] = useState(0);
-  const total = HOW_TO_PLAY_STEPS.length;
-  const cur = HOW_TO_PLAY_STEPS[tutStep];
-  return (
-    <div style={{ padding: '1.5px', borderRadius: '18px', background: '#0c0c1a', boxShadow: '0 8px 24px rgba(0,0,0,0.40)' }}>
-      <div style={{
-        borderRadius: '16.5px',
-        background: GLASS_PANEL,
-        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.10)',
-        padding: '14px 16px 12px',
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '9px' }}>
-          <p style={{ margin: 0, fontSize: '9px', fontWeight: 800, letterSpacing: '0.24em', textTransform: 'uppercase', color: tileColor, fontFamily: MENU_FONT }}>{cur.title}</p>
-          <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.40)', fontFamily: MENU_FONT }}>{tutStep + 1} / {total}</span>
-        </div>
-        {cur.lines.map((line, i) => (
-          <div key={i} style={{ display: 'flex', gap: '7px', margin: '4px 0', alignItems: 'flex-start' }}>
-            <span style={{ color: tileColor, fontSize: '14px', flexShrink: 0, lineHeight: 1.4 }}>·</span>
-            <span style={{ fontSize: '12px', lineHeight: 1.5, color: 'rgba(230,238,255,0.82)', fontFamily: MENU_FONT }}>{line}</span>
-          </div>
-        ))}
-        <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', marginTop: '12px' }}>
-          <button
-            type="button"
-            disabled={tutStep === 0}
-            onClick={() => setTutStep(t => t - 1)}
-            style={{
-              background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.20)',
-              borderRadius: '100px', color: tutStep === 0 ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.75)',
-              fontSize: '14px', width: '28px', height: '28px', cursor: tutStep === 0 ? 'default' : 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: MENU_FONT,
-              WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
-            }}
-          >‹</button>
-          <button
-            type="button"
-            disabled={tutStep === total - 1}
-            onClick={() => setTutStep(t => t + 1)}
-            style={{
-              background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.20)',
-              borderRadius: '100px', color: tutStep === total - 1 ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.75)',
-              fontSize: '14px', width: '28px', height: '28px', cursor: tutStep === total - 1 ? 'default' : 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: MENU_FONT,
-              WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
-            }}
-          >›</button>
-        </div>
-      </div>
-    </div>
-  );
-};
+const LAST_MODE_KEY = 'worm3_last_mode_id';
 
 // ─── Mode carousel overlay ───────────────────────────────────────────────────
 // Clean, single-card implementation. No overlapping absolutely-positioned tiles,
@@ -970,66 +963,67 @@ const HowToPlayMini = ({ tileColor }) => {
 // issues on mobile Chrome.
 
 export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay, onRandom, onStore, onComingSoon, onHowToPlay }) => {
-  const [activeIndex, setActiveIndex] = useState(0);
+  // Open on the last-played mode so returning players are one tap from their game.
+  const [activeIndex, setActiveIndex] = useState(() => {
+    try {
+      const idx = CAROUSEL_MODES.findIndex(m => m.id === localStorage.getItem(LAST_MODE_KEY));
+      return idx >= 0 ? idx : 0;
+    } catch { return 0; }
+  });
   const [show, setShow] = useState(true);
-  const [imgError, setImgError] = useState(false);
-  const [imgLoaded, setImgLoaded] = useState(false);
+  const [diving, setDiving] = useState(false);
   const touchStartX = useRef(null);
   const mouseStartX = useRef(null);
   const animatingRef = useRef(false);
-  const activeIndexRef = useRef(0);
+  const activeIndexRef = useRef(activeIndex);
   const timerRef = useRef(null);
+  const fallbackTimerRef = useRef(null);
+  const divingRef = useRef(false);
   const N = CAROUSEL_MODES.length;
   activeIndexRef.current = activeIndex;
 
   useEffect(() => {
     _carouselActive = true;
     setCarouselActive(true);
+    setCarouselFace(CAROUSEL_MODES[activeIndexRef.current].face);
     return () => {
       _carouselActive = false;
       setCarouselActive(false);
+      setCarouselFace(null);
       if (timerRef.current) clearTimeout(timerRef.current);
+      if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
     };
   }, []);
 
+  // Rotate the live cube to the active mode's face; remember the pick.
+  useEffect(() => {
+    setCarouselFace(CAROUSEL_MODES[activeIndex].face);
+    try { localStorage.setItem(LAST_MODE_KEY, CAROUSEL_MODES[activeIndex].id); } catch { /* storage unavailable */ }
+  }, [activeIndex]);
+
   const navigate = useCallback((dir) => {
-    if (animatingRef.current) return;
+    if (animatingRef.current || divingRef.current) return;
     animatingRef.current = true;
     setShow(false);
     timerRef.current = setTimeout(() => {
       setActiveIndex(i => (i + dir + N) % N);
-      setImgError(false);
-      setImgLoaded(false);
       setShow(true);
       animatingRef.current = false;
-    }, 180);
+    }, 150);
   }, [N]);
 
   const selectIndex = useCallback((target) => {
-    if (animatingRef.current || target === activeIndexRef.current) return;
+    if (animatingRef.current || divingRef.current || target === activeIndexRef.current) return;
     animatingRef.current = true;
     setShow(false);
     timerRef.current = setTimeout(() => {
       setActiveIndex(target);
-      setImgError(false);
-      setImgLoaded(false);
       setShow(true);
       animatingRef.current = false;
-    }, 180);
+    }, 150);
   }, []);
 
-  useEffect(() => {
-    const fn = (e) => {
-      if (e.key === 'ArrowLeft') navigate(-1);
-      if (e.key === 'ArrowRight') navigate(1);
-      if (e.key === 'Escape') onBack();
-    };
-    window.addEventListener('keydown', fn);
-    return () => window.removeEventListener('keydown', fn);
-  }, [navigate, onBack]);
-
-  const handlePlay = useCallback(() => {
-    const id = CAROUSEL_MODES[activeIndexRef.current].id;
+  const launch = useCallback((id) => {
     if (id === 'cube')             onCubeSelect?.();
     else if (id === 'worm')        onWormSelect?.();
     else if (id === 'chaos')       onChaos?.();
@@ -1040,179 +1034,204 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
     else if (id === 'how-to-play') onHowToPlay?.();
   }, [onCubeSelect, onWormSelect, onChaos, onFreeplay, onRandom, onStore, onComingSoon, onHowToPlay]);
 
+  // PLAY: dive through the presented face, then launch. The 3D cube consumes
+  // the dive request and fires the callback when the face fills the screen;
+  // a fallback timer launches anyway if the canvas is unavailable.
+  const handlePlay = useCallback(() => {
+    if (divingRef.current) return;
+    divingRef.current = true;
+    setDiving(true);
+    vibrate(18);
+    const id = CAROUSEL_MODES[activeIndexRef.current].id;
+    let fired = false;
+    const fire = () => {
+      if (fired) return;
+      fired = true;
+      launch(id);
+    };
+    requestModeDive(fire);
+    fallbackTimerRef.current = setTimeout(fire, 850);
+  }, [launch]);
+
+  useEffect(() => {
+    const fn = (e) => {
+      if (e.key === 'ArrowLeft') navigate(-1);
+      if (e.key === 'ArrowRight') navigate(1);
+      if (e.key === 'Enter') handlePlay();
+      if (e.key === 'Escape') onBack();
+    };
+    window.addEventListener('keydown', fn);
+    return () => window.removeEventListener('keydown', fn);
+  }, [navigate, handlePlay, onBack]);
+
   const mode = CAROUSEL_MODES[activeIndex];
-  const imageId = mode.id === 'coming-soon' ? 'comingsoon' : mode.id;
-  const activeImageSrc = `${import.meta.env.BASE_URL}images/modes/${imageId}.jpg`;
   const opacity = show ? 1 : 0;
 
   const arrowStyle = {
     background: 'rgba(255,255,255,0.08)', border: '1.5px solid rgba(255,255,255,0.30)',
-    borderRadius: '50%', width: '40px', height: '40px', flexShrink: 0,
+    borderRadius: '50%', width: '44px', height: '44px', flexShrink: 0,
     color: '#fff', fontSize: '24px', lineHeight: 1,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     cursor: 'pointer', WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
+    pointerEvents: 'auto',
+  };
+
+  const swipeHandlers = {
+    onTouchStart: e => { touchStartX.current = e.touches[0].clientX; },
+    onTouchEnd: e => {
+      if (touchStartX.current === null) return;
+      const delta = e.changedTouches[0].clientX - touchStartX.current;
+      touchStartX.current = null;
+      if (Math.abs(delta) > 40) { e.preventDefault(); navigate(delta < 0 ? 1 : -1); }
+    },
+    onMouseDown: e => { mouseStartX.current = e.clientX; },
+    onMouseUp: e => {
+      if (mouseStartX.current === null) return;
+      const delta = e.clientX - mouseStartX.current;
+      mouseStartX.current = null;
+      if (Math.abs(delta) > 40) navigate(delta < 0 ? 1 : -1);
+    },
+    onMouseLeave: () => { mouseStartX.current = null; },
   };
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 10000, overflowY: 'auto' }}>
 
-      {/* Transparent cosmic wash — lets the shared R3F nebula show through behind the menu. */}
+      {/* Edge vignette only — the center stays clear so the live 3D cube
+          (rotating to the active mode's face) reads through the overlay. */}
       <div style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none',
-        background: 'radial-gradient(circle at 50% 28%, rgba(90,130,255,0.18), rgba(4,6,18,0.38) 62%, rgba(2,3,10,0.66) 100%)',
+        background: 'radial-gradient(circle at 50% 38%, rgba(0,0,0,0) 0%, rgba(0,0,0,0) 36%, rgba(2,3,10,0.50) 74%, rgba(2,3,10,0.85) 100%)',
       }} />
 
       <style>{`
         .mc-arrow:active { background: rgba(255,255,255,0.22) !important; }
         .mc-play:active  { opacity: 0.80 !important; transform: scale(0.98) !important; }
+        .mc-pill:hover   { border-color: rgba(255,255,255,0.45) !important; color: rgba(255,255,255,0.92) !important; }
       `}</style>
 
-      {/* Scroll column — everything in normal document flow, no stacking context tricks */}
+      {/* Scroll column — DOM fades out during the PLAY dive so the cube face
+          filling the screen is the only thing left on it. */}
       <div style={{
         position: 'relative', zIndex: 1,
         display: 'flex', flexDirection: 'column', alignItems: 'center',
         minHeight: '100%', boxSizing: 'border-box',
-        paddingTop: 'max(24px, env(safe-area-inset-top, 24px))',
-        paddingBottom: 'max(24px, env(safe-area-inset-bottom, 24px))',
+        paddingTop: 'max(20px, env(safe-area-inset-top, 20px))',
+        paddingBottom: 'max(20px, env(safe-area-inset-bottom, 20px))',
         paddingLeft: '12px', paddingRight: '12px',
+        opacity: diving ? 0 : 1,
+        transition: 'opacity 420ms ease',
+        pointerEvents: diving ? 'none' : 'auto',
       }}>
 
-        <p style={{ margin: '0 0 16px', fontSize: '9px', fontWeight: 800, letterSpacing: '0.30em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.55)', fontFamily: DISPLAY_FONT }}>
+        <p style={{ margin: '0 0 6px', fontSize: '9px', fontWeight: 800, letterSpacing: '0.30em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.55)', fontFamily: DISPLAY_FONT }}>
           Choose your mode
         </p>
 
-        {/* Mode tile — single card, no overlapping positioned siblings */}
+        {/* Cube window — transparent stage for the live 3D cube behind this
+            overlay. Swipe here (or use the arrows) to rotate the cube from
+            face to face; every mode owns one of the six faces. */}
         <div
+          {...swipeHandlers}
           style={{
-            width: 'min(360px, 92vw)',
-            borderRadius: '22px', overflow: 'hidden',
-            // Glossy candy sheen — a diagonal light→dark glaze over the face color gives the
-            // flat tile depth without needing per-color math.
-            background: `linear-gradient(157deg, rgba(255,255,255,0.20), rgba(0,0,0,0.08) 52%, rgba(0,0,0,0.24)), ${mode.tileColor}`,
-            boxShadow: 'inset 0 -8px 20px rgba(0,0,0,0.40), inset 4px 4px 16px rgba(255,255,255,0.18), 0 8px 32px rgba(0,0,0,0.50)',
-            padding: '36px 20px', textAlign: 'center',
-            opacity, transition: 'opacity 160ms ease',
-            userSelect: 'none',
+            position: 'relative', width: 'min(560px, 96vw)',
+            height: 'min(50vh, 440px)', flexShrink: 0,
+            userSelect: 'none', touchAction: 'pan-y',
           }}
-          onTouchStart={e => { touchStartX.current = e.touches[0].clientX; }}
-          onTouchEnd={e => {
-            if (touchStartX.current === null) return;
-            const delta = e.changedTouches[0].clientX - touchStartX.current;
-            touchStartX.current = null;
-            if (Math.abs(delta) > 40) { e.preventDefault(); navigate(delta < 0 ? 1 : -1); }
-          }}
-          onMouseDown={e => { mouseStartX.current = e.clientX; }}
-          onMouseUp={e => {
-            if (mouseStartX.current === null) return;
-            const delta = e.clientX - mouseStartX.current;
-            mouseStartX.current = null;
-            if (Math.abs(delta) > 40) navigate(delta < 0 ? 1 : -1);
-          }}
-          onMouseLeave={() => { mouseStartX.current = null; }}
         >
-          <div style={{ fontSize: 'clamp(28px,8vw,44px)', fontWeight: 900, fontFamily: DISPLAY_FONT, color: mode.textColor, lineHeight: 1, textShadow: '0 2px 10px rgba(0,0,0,0.45), 0 1px 2px rgba(0,0,0,0.40)' }}>
-            {mode.label}
-          </div>
-          <p style={{ margin: '10px 0 0', fontSize: '13px', lineHeight: 1.5, fontFamily: MENU_FONT, color: mode.textColor === '#fff' ? 'rgba(255,255,255,0.80)' : 'rgba(0,0,0,0.65)' }}>
-            {mode.desc}
-          </p>
+          <button type="button" className="mc-arrow" aria-label="Previous mode" onClick={() => navigate(-1)}
+            style={{ ...arrowStyle, position: 'absolute', left: '2px', top: '50%', transform: 'translateY(-50%)' }}>&lsaquo;</button>
+          <button type="button" className="mc-arrow" aria-label="Next mode" onClick={() => navigate(1)}
+            style={{ ...arrowStyle, position: 'absolute', right: '2px', top: '50%', transform: 'translateY(-50%)' }}>&rsaquo;</button>
         </div>
 
-        {/* Navigation: ← dots → */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '14px' }}>
-          <button type="button" className="mc-arrow" aria-label="Previous mode" onClick={() => navigate(-1)} style={arrowStyle}>‹</button>
-          <div style={{ display: 'flex', gap: '7px', alignItems: 'center' }}>
-            {CAROUSEL_MODES.map((_, i) => (
-              <button
-                key={i} type="button" aria-label={`Show ${CAROUSEL_MODES[i].label} mode`}
-                onClick={() => selectIndex(i)}
-                style={{
-                  width: i === activeIndex ? '20px' : '6px', height: '6px',
-                  borderRadius: '100px', border: 'none', cursor: 'pointer', padding: 0,
-                  background: i === activeIndex ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.30)',
-                  transition: 'width 300ms cubic-bezier(0.34,1.56,0.64,1), background 300ms ease',
-                  boxShadow: i === activeIndex ? '0 0 8px rgba(255,255,255,0.55)' : 'none',
-                  WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
-                }}
-              />
-            ))}
-          </div>
-          <button type="button" className="mc-arrow" aria-label="Next mode" onClick={() => navigate(1)} style={arrowStyle}>›</button>
+        {/* Face map — one colored tile per cube face, tap to jump */}
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '2px' }}>
+          {CAROUSEL_MODES.map((m, i) => (
+            <button
+              key={m.id} type="button" aria-label={`Show ${m.label} mode`} title={m.label}
+              onClick={() => selectIndex(i)}
+              style={{
+                width: i === activeIndex ? '26px' : '12px', height: '12px',
+                borderRadius: '4px', border: 'none', cursor: 'pointer', padding: 0,
+                background: m.tileColor,
+                opacity: i === activeIndex ? 1 : 0.45,
+                boxShadow: i === activeIndex ? `0 0 10px ${m.tileColor}` : 'none',
+                transition: 'width 300ms cubic-bezier(0.34,1.56,0.64,1), opacity 200ms ease',
+                WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
+              }}
+            />
+          ))}
         </div>
 
-        {/* Info section — screenshot + controls — plain block flow, no stacking games */}
-        <div style={{ width: 'min(360px, 92vw)', marginTop: '14px', opacity, transition: 'opacity 160ms ease' }}>
-
-          {mode.id === 'how-to-play' ? (
-            <HowToPlayMini tileColor={mode.tileColor} />
-          ) : mode.id === 'store' ? null : (
-            <div style={{ borderRadius: '16px', overflow: 'hidden', background: GLASS_PANEL }}>
-              <div style={{ width: '100%', aspectRatio: '16/9', position: 'relative', overflow: 'hidden', background: 'linear-gradient(135deg, rgba(14,18,42,0.95), rgba(4,6,20,0.98))' }}>
-                {!imgError && (
-                  <img
-                    key={mode.id} src={activeImageSrc} alt={`${mode.label} gameplay`}
-                    style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: imgLoaded ? 1 : 0, transition: 'opacity 200ms ease' }}
-                    onLoad={() => setImgLoaded(true)}
-                    onError={() => setImgError(true)}
-                  />
-                )}
-                {imgError && (
-                  <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: 700, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', fontFamily: MENU_FONT }}>
-                    screenshot coming soon
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
-
+        {/* Mode info panel */}
+        <div style={{ width: 'min(400px, 94vw)', marginTop: '14px', opacity, transition: 'opacity 150ms ease' }}>
           <div style={{
-            marginTop: '12px', borderRadius: '16px',
-            background: 'linear-gradient(180deg, rgba(13,17,40,0.96), rgba(4,6,20,0.97))',
+            borderRadius: '16px',
+            background: 'linear-gradient(180deg, rgba(13,17,40,0.94), rgba(4,6,20,0.96))',
             border: `1px solid ${GLASS_PANEL_BORDER}`,
-            padding: '15px 18px 17px', position: 'relative', overflow: 'hidden',
+            padding: '16px 18px', position: 'relative', overflow: 'hidden',
           }}>
-            {/* Mode-tinted accent edge along the top */}
             <div aria-hidden style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: `linear-gradient(90deg, ${mode.tileColor}, transparent 78%)` }} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 12px' }}>
-              <span aria-hidden style={{ width: '5px', height: '14px', borderRadius: '3px', background: mode.tileColor, boxShadow: `0 0 9px ${mode.tileColor}` }} />
-              <span style={{ fontSize: '9px', fontWeight: 800, letterSpacing: '0.24em', textTransform: 'uppercase', color: mode.tileColor, fontFamily: MENU_FONT }}>How to play</span>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '22px', fontWeight: 900, fontFamily: DISPLAY_FONT, color: mode.tileColor, lineHeight: 1, textShadow: `0 0 18px ${mode.tileColor}55` }}>
+                {mode.label}
+              </span>
+              <span style={{ fontSize: '12.5px', lineHeight: 1.5, color: GLASS_TEXT, fontFamily: MENU_FONT }}>{mode.desc}</span>
             </div>
-            {mode.controls.map((ctrl, i) => (
-              <div key={i} style={{ display: 'flex', gap: '11px', margin: '7px 0', alignItems: 'flex-start' }}>
-                <span aria-hidden style={{ width: '6px', height: '6px', borderRadius: '50%', background: mode.tileColor, boxShadow: `0 0 6px ${mode.tileColor}`, marginTop: '6px', flexShrink: 0 }} />
-                <span style={{ fontSize: '13px', lineHeight: 1.55, color: GLASS_TEXT, fontFamily: MENU_FONT }}>{ctrl}</span>
-              </div>
-            ))}
+            <div style={{ marginTop: '11px' }}>
+              {mode.controls.map((ctrl, i) => (
+                <div key={i} style={{ display: 'flex', gap: '10px', margin: '5px 0', alignItems: 'flex-start' }}>
+                  <span aria-hidden style={{ width: '5px', height: '5px', borderRadius: '50%', background: mode.tileColor, boxShadow: `0 0 6px ${mode.tileColor}`, marginTop: '7px', flexShrink: 0 }} />
+                  <span style={{ fontSize: '12.5px', lineHeight: 1.5, color: GLASS_TEXT, fontFamily: MENU_FONT }}>{ctrl}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
         {/* Action buttons */}
-        <div style={{ width: 'min(360px, 92vw)', marginTop: '14px' }}>
+        <div style={{ width: 'min(400px, 94vw)', marginTop: '12px' }}>
           <button
             type="button" className="mc-play" onClick={handlePlay}
             style={{
-              display: 'block', width: '100%', padding: '16px', borderRadius: '100px',
+              display: 'block', width: '100%', padding: '15px', borderRadius: '100px',
               border: '1.5px solid rgba(255,255,255,0.55)',
               background: mode.tileColor, color: mode.textColor,
               fontWeight: 800, fontSize: '14px', letterSpacing: '0.22em',
               textTransform: 'uppercase', cursor: 'pointer', fontFamily: DISPLAY_FONT,
               boxShadow: '0 2px 16px rgba(0,0,0,0.30)',
-              transition: 'opacity 160ms ease, transform 100ms ease',
+              transition: 'opacity 160ms ease, transform 100ms ease, background 200ms ease',
               WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
             }}
-          >PLAY →</button>
-          <button
-            type="button" onClick={onBack}
-            style={{
-              display: 'block', margin: '10px auto 0',
-              background: 'transparent', border: '1px solid rgba(255,255,255,0.28)',
-              borderRadius: '100px', padding: '9px 28px',
-              color: 'rgba(255,255,255,0.60)', fontSize: '12px', fontWeight: 600,
-              letterSpacing: '0.10em', cursor: 'pointer', fontFamily: MENU_FONT,
-              WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.55)'; e.currentTarget.style.color = 'rgba(255,255,255,0.90)'; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.28)'; e.currentTarget.style.color = 'rgba(255,255,255,0.60)'; }}
-          >← Back</button>
+          >PLAY</button>
+
+          {/* Utility row — destinations that are not game modes */}
+          <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginTop: '10px', flexWrap: 'wrap' }}>
+            {UTILITY_MODES.map((u) => (
+              <button
+                key={u.id} type="button" className="mc-pill" onClick={() => launch(u.id)}
+                style={{
+                  background: 'transparent', border: '1px solid rgba(255,255,255,0.24)',
+                  borderRadius: '100px', padding: '8px 18px',
+                  color: 'rgba(255,255,255,0.58)', fontSize: '11.5px', fontWeight: 600,
+                  letterSpacing: '0.08em', cursor: 'pointer', fontFamily: MENU_FONT,
+                  transition: 'border-color 160ms ease, color 160ms ease',
+                  WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
+                }}
+              >{u.label}</button>
+            ))}
+            <button
+              type="button" className="mc-pill" onClick={onBack}
+              style={{
+                background: 'transparent', border: '1px solid rgba(255,255,255,0.24)',
+                borderRadius: '100px', padding: '8px 18px',
+                color: 'rgba(255,255,255,0.58)', fontSize: '11.5px', fontWeight: 600,
+                letterSpacing: '0.08em', cursor: 'pointer', fontFamily: MENU_FONT,
+                transition: 'border-color 160ms ease, color 160ms ease',
+                WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
+              }}
+            >Back</button>
+          </div>
         </div>
 
       </div>

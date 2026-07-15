@@ -1157,10 +1157,12 @@ export default function WORM3() {
 
       {/* Single persistent Canvas — never unmounts, eliminates context loss on intro→game.
           Also renders the main-menu cube scene so there is never a second WebGL context.
-          Hidden (not unmounted) when mode selector is open so the WebGL compositor layer
-          cannot bleed through the mode selector overlay on mobile Chrome. */}
+          Stays VISIBLE while the mode selector is open: the carousel is a transparent
+          overlay and the live menu cube (rotating to the active mode's face) is its
+          centerpiece. The carousel deliberately avoids CSS transforms on positioned
+          elements so the old mobile-Chrome compositor bleed-through cannot recur. */}
       <CanvasErrorBoundary>
-      <div className="canvas-container" onContextMenu={(e) => e.preventDefault()} style={showModeSelect ? { display: 'none' } : undefined}>
+      <div className="canvas-container" onContextMenu={(e) => e.preventDefault()}>
         <Canvas
           camera={{ position: (showWelcome || showMainMenu) ? [0, 3, 12] : [0, 0, cameraZ], fov: 40 }}
           dpr={dpr}
@@ -1183,7 +1185,7 @@ export default function WORM3() {
             />
           ) : showMainMenu ? (
             // Stop the cube/worm animation when a full-screen overlay covers the menu
-            showSettings || showModeSelect ? <color attach="background" args={['#000005']} /> : (
+            showSettings ? <color attach="background" args={['#000005']} /> : (
               <MenuScene onCubeClick={handleMenuCube} />
             )
           ) : (
