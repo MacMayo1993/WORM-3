@@ -22,6 +22,7 @@ import { vibrate } from './utils/audio.js';
 import { makeCubies } from './game/cubeState.js';
 import { rotateSliceCubies } from './game/cubeRotation.js';
 import { flipStickerPair, buildManifoldGridMap } from './game/manifoldLogic.js';
+import { checkRubiksSolved } from './game/winDetection.js';
 import { getManifoldMap } from './game/manifoldMapStore.js';
 import { clearRefractory } from './game/refractoryMap.js';
 
@@ -256,6 +257,18 @@ class CanvasErrorBoundary extends React.Component {
   }
 }
 
+const allSurfaceStickersWrongParity = (cubies, size) => {
+  for (let x = 0; x < size; x++)
+    for (let y = 0; y < size; y++)
+      for (let z = 0; z < size; z++) {
+        if (x > 0 && x < size - 1 && y > 0 && y < size - 1 && z > 0 && z < size - 1) continue;
+        for (const st of Object.values(cubies[x][y][z].stickers)) {
+          if (st.curr === st.orig) return false;
+        }
+      }
+  return true;
+};
+
 export default function WORM3() {
   // ========================================================================
   // STATE FROM ZUSTAND STORE
@@ -425,6 +438,8 @@ export default function WORM3() {
   const demoWatchTimers = useRef([]);
   const onTapFlipRef = useRef(null);
   const advanceDemoStepRef = useRef(null);
+  const demoFlipPhaseRef = useRef(null);
+  const [demoCoachCopy, setDemoCoachCopy] = useState(null);
   const clearDemoWatchTimers = useCallback(() => {
     demoWatchTimers.current.forEach(clearTimeout);
     demoWatchTimers.current = [];
@@ -609,6 +624,10 @@ export default function WORM3() {
 
     applyDemoStepConfig(step);
 
+    // Flip-gateway two-phase: flip all → unflip all. Reset for other steps.
+    demoFlipPhaseRef.current = step === 'flip-gateway' ? 'flip-all' : null;
+    setDemoCoachCopy(null);
+
     // Cube steps run WATCH → TRY: auto-play the mechanic, then show the coach.
     const config = DEMO_LEVEL_CONFIGS[step];
     if (config && config.type === 'cube') {
@@ -623,8 +642,16 @@ export default function WORM3() {
           onTapFlipRef.current?.({ x: t.x, y: t.y, z: t.z }, t.dirKey);
         }, 1000));
       }
-      // Invite the hands-on try once the watch beat has played.
-      demoWatchTimers.current.push(setTimeout(() => setDemoTryVisible(true), 2800));
+      // Invite the hands-on try once the watch beat has played,
+      // or immediately if the step has no watch animation (e.g. pre-flipped).
+      const coachDelay = watch ? 2800 : 800;
+      demoWatchTimers.current.push(setTimeout(() => setDemoTryVisible(true), coachDelay));
+    }
+
+    // Worm step: show the skip coach after a grace period so it never dead-ends.
+    // The tunnel-traversal effect (below) can show it earlier.
+    if (config && config.type === 'worm') {
+      demoWatchTimers.current.push(setTimeout(() => setDemoTryVisible(true), 10000));
     }
   }, [applyDemoStepConfig, handleOpenStore, clearDemoWatchTimers, startAnimatedShuffle]);
 
@@ -656,6 +683,21 @@ export default function WORM3() {
     setVictory(null);
   }, [demoMode, victory, setVictory]);
 
+  // Flip-gateway two-phase detection: flip-all → unflip-all → advance.
+  useEffect(() => {
+    if (!demoMode || demoStep !== 'flip-gateway') return;
+    const phase = demoFlipPhaseRef.current;
+    if (!phase) return;
+    if (phase === 'flip-all' && allSurfaceStickersWrongParity(cubies, size)) {
+      demoFlipPhaseRef.current = 'unflip-all';
+      setDemoCoachCopy('Now flip them all back to normal parity.');
+    } else if (phase === 'unflip-all' && checkRubiksSolved(cubies, size)) {
+      demoFlipPhaseRef.current = null;
+      setDemoCoachCopy(null);
+      advanceDemoStep('flip-gateway');
+    }
+  }, [demoMode, demoStep, cubies, size, advanceDemoStep]);
+
   // Clear any pending demo watch/try timers on unmount.
   useEffect(() => () => clearDemoWatchTimers(), [clearDemoWatchTimers]);
 
@@ -670,6 +712,27 @@ export default function WORM3() {
     }, 2000);
     return () => clearTimeout(timer);
   }, [demoMode, demoStep, wormGamePhase, advanceDemoStep]);
+
+  // Show the skip coach as soon as the first wormhole tunnel is traversed.
+  const wormTunnelCount = useGameStore((s) => s.wormTunnelCount);
+  useEffect(() => {
+    if (!demoMode || demoStep !== 'worm-traversal') return;
+    if (wormTunnelCount < 1) return;
+    setDemoTryVisible(true);
+  }, [demoMode, demoStep, wormTunnelCount]);
+
+  // On death during the worm demo step, suppress the death screen and advance.
+  const wormAlive = useGameStore((s) => s.wormAlive);
+  useEffect(() => {
+    if (!demoMode || demoStep !== 'worm-traversal') return;
+    if (wormAlive !== false) return;
+    useGameStore.getState().setShowWormDeathMenu(false);
+    const timer = setTimeout(() => {
+      useGameStore.getState().clearDisparityGame();
+      advanceDemoStep('worm-traversal');
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [demoMode, demoStep, wormAlive, advanceDemoStep]);
 
   // Advance the chaos step when the forecast winner is dismissed.
   const handleDemoDisparityDismiss = useCallback(() => {
@@ -1585,6 +1648,7 @@ export default function WORM3() {
       {demoMode && demoTryVisible && !demoStepIntroVisible && (
         <DemoCoach
           step={demoStep}
+          copy={demoCoachCopy}
           onNext={() => advanceDemoStep(demoStep)}
           onExit={handleExitDemo}
         />
