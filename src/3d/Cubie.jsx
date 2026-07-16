@@ -214,7 +214,7 @@ const Cubie = React.forwardRef(function Cubie({
     const m = meta(dirKey);
     if (!m?.origPos) return `${dirKey}-empty`;
     const { x, y, z } = m.origPos;
-    return `${dirKey}-${m.orig}-${x}-${y}-${z}`;
+    return `${dirKey}-${m.orig}-${x}-${y}-${z}-${size}`;
   };
 
   const gridPos = (dirKey) => {
