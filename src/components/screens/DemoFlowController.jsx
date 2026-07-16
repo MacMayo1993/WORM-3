@@ -1,5 +1,5 @@
 import React from 'react';
-import { UI_FONT, DISPLAY_FONT, GLASS_TEXT, GLASS_TEXT_MUTED } from '../../utils/uiTheme.js';
+import { UI_FONT, DISPLAY_FONT } from '../../utils/uiTheme.js';
 
 const DEMO_STEPS = [
   { id: 'baby-cube', label: 'Baby Cube', num: 1 },
@@ -275,68 +275,31 @@ const TRY_COPY = {
 };
 
 const DemoCoach = ({ step, onNext, onExit }) => {
+  ensureDemoShellStyle();
   const copy = TRY_COPY[step];
   if (!copy) return null;
 
   return (
-    <div style={{
-      position: 'fixed',
-      left: '50%',
-      bottom: 'max(20px, env(safe-area-inset-bottom, 20px))',
-      transform: 'translateX(-50%)',
-      zIndex: 11400,
-      display: 'flex',
-      alignItems: 'center',
-      gap: 16,
-      padding: '12px 16px 12px 20px',
-      maxWidth: 'min(92vw, 520px)',
-      background: 'rgba(4,6,20,0.86)',
-      border: '1px solid rgba(255,255,255,0.12)',
-      borderRadius: 16,
-      backdropFilter: 'blur(14px)',
-      fontFamily: UI_FONT,
-    }}>
-      <span style={{ color: GLASS_TEXT, fontSize: 14, lineHeight: 1.4, flex: 1 }}>
-        {copy}
-      </span>
-      <button
-        type="button"
-        onClick={onNext}
-        style={{
-          flexShrink: 0,
-          padding: '10px 22px',
-          background: '#3b82f6',
-          color: '#fff',
-          border: 'none',
-          borderRadius: 10,
-          fontFamily: UI_FONT,
-          fontSize: 14,
-          fontWeight: 600,
-          cursor: 'pointer',
-          letterSpacing: '0.04em',
-        }}
-      >
-        Next ▶
-      </button>
-      {onExit && (
-        <button
-          type="button"
-          onClick={onExit}
-          aria-label="Exit demo"
-          style={{
-            flexShrink: 0,
-            padding: '10px 12px',
-            background: 'transparent',
-            color: GLASS_TEXT_MUTED,
-            border: 'none',
-            fontFamily: UI_FONT,
-            fontSize: 13,
-            cursor: 'pointer',
-          }}
-        >
-          Exit
-        </button>
-      )}
+    <div className="demo-intro-root">
+      <section className="demo-intro-card" aria-live="polite">
+        <p className="demo-intro-copy">{copy}</p>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 10 }}>
+          <button type="button" onClick={onNext} className="demo-intro-button">
+            Next ▶
+          </button>
+          {onExit && (
+            <button
+              type="button"
+              onClick={onExit}
+              aria-label="Exit demo"
+              className="demo-intro-button"
+              style={{ background: 'transparent', color: '#7b6f45', boxShadow: 'none' }}
+            >
+              Exit
+            </button>
+          )}
+        </div>
+      </section>
     </div>
   );
 };
