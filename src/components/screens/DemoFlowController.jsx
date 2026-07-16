@@ -277,8 +277,8 @@ const DemoCoach = ({ step, onNext, onExit, copy: copyOverride }) => {
   if (!copy) return null;
 
   return (
-    <div className="demo-intro-root">
-      <section className="demo-intro-card" aria-live="polite">
+    <div className="demo-intro-root" style={{ pointerEvents: 'none', background: 'none', backdropFilter: 'none' }}>
+      <section className="demo-intro-card" style={{ pointerEvents: 'auto' }} aria-live="polite">
         <p className="demo-intro-copy">{copy}</p>
         <div style={{ display: 'flex', justifyContent: 'center', gap: 10 }}>
           <button type="button" onClick={onNext} className="demo-intro-button">
