@@ -613,6 +613,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const ringRef = useRef();
   const spinT = useRef(0);
   const shakeT = useRef(0);
+  const shakeDurationRef = useRef(0.4);
   const pulseT = useRef(0);
   // Single boolean gate: skip the entire useFrame body on idle frames.
   // Cleared when all transient effects (flip, shake, tremor) finish, avoiding
@@ -1012,7 +1013,13 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           flipOverlayRef.current.scale.x = 1;
         }
         if (stickerGridIdRef.current) flipBurstMap.delete(stickerGridIdRef.current);
-        shakeT.current = 0.4;
+        // The more times this tile has already been flipped, the harder it shakes —
+        // a visible sense of accumulating damage as it nears its flip cap.
+        {
+          const dangerT = effectiveFlipCap > 0 ? Math.min(1, (meta?.flips ?? 0) / effectiveFlipCap) : 0;
+          shakeDurationRef.current = 0.4 + dangerT * 0.35;
+          shakeT.current = shakeDurationRef.current;
+        }
         flipFromColor.current = null;
         flipToColor.current = null;
         flipFromTexture.current = null;
@@ -1038,15 +1045,24 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       }
     }
 
-    // Shake animation for parity indicator
+    // Shake animation for parity indicator — amplitude and duration both grow
+    // with flip count (set at trigger via shakeDurationRef), so damaged tiles
+    // visibly rattle harder as they approach their flip cap.
     if (shakeT.current > 0 && groupRef.current) {
+      const duration = shakeDurationRef.current || 0.4;
+      const dangerT = Math.min(1, Math.max(0, (duration - 0.4) / 0.35));
       const dt = Math.min(delta * 2, shakeT.current);
       shakeT.current -= dt;
       const intensity = shakeT.current * 2; // Decay from 1 to 0
       const shakeFreq = 25;
       const shakeX = Math.sin(shakeT.current * shakeFreq * Math.PI) * 0.03 * intensity;
       const shakeZ = Math.cos(shakeT.current * shakeFreq * Math.PI * 1.3) * 0.02 * intensity;
+      // Bounce pop: a quick vertical hop that only appears as the tile nears
+      // death — undamaged tiles (dangerT 0) shake in place with no lift.
+      const bounceProgress = Math.min(1, 1 - shakeT.current / duration);
+      const bounce = Math.sin(bounceProgress * Math.PI) * 0.06 * dangerT;
       groupRef.current.position.x = pos[0] + shakeX;
+      groupRef.current.position.y = pos[1] + bounce;
       groupRef.current.position.z = pos[2] + shakeZ;
 
       if (shakeT.current <= 0) {

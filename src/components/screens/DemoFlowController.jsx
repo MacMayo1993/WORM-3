@@ -259,7 +259,7 @@ const DEMO_LEVEL_CONFIGS = {
     type: 'chaos',
     cubeSize: 3,
     disparityLevel: 3,
-    flipCap: 12,
+    flipCap: 6,
     gameLength: 'short',
   },
 };

@@ -80,8 +80,8 @@ export const DIR_TO_COLOR = { PZ: 1, NX: 2, PY: 3, NZ: 4, PX: 5, NY: 6 };
 // Face ID (1-6) → face direction
 export const COLOR_TO_DIR = { 1: 'PZ', 2: 'NX', 3: 'PY', 4: 'NZ', 5: 'PX', 6: 'NY' };
 
-// Flip cap — tiles "die" at this many flips
-export const FLIP_CAP = 25;
+// Flip cap — tiles "die" at this many flips (standard mode, outside Disparity/Chaos)
+export const FLIP_CAP = 6;
 
 // Distance from the cubie center to the outer face of a sticker (world units).
 // Used consistently across coordinates.js, crawlerPhysics.js, and any code that
@@ -117,7 +117,7 @@ export const MODES = {
 };
 
 // Half-life acceleration: each halving of remaining distance doubles the rate.
-// 0-12 = 1x, 13-18 = 2x, 19-21 = 4x, 22-23 = 8x, 24 = 16x
+// Scales automatically with FLIP_CAP — e.g. at FLIP_CAP=6: flips 0-2 = 1x, 3-4 = 2x, 5 = 4x.
 export const getHalfLifeMultiplier = (flips) => {
   if (flips >= FLIP_CAP) return 0; // dead tile
   const remaining = FLIP_CAP - flips;

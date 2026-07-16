@@ -482,6 +482,12 @@ export function createChaosSim({ cubies, size, chaosLevel, flipCap, explosionT =
         producedDeaths = true;
       }
 
+      // Contagion boost: the more times THIS tile has been flipped, the more
+      // readily it spreads to its neighbours — chaos snowballs as tiles take
+      // damage instead of propagating at a flat rate for the tile's whole life.
+      const currentSt = state[current.x]?.[current.y]?.[current.z]?.stickers?.[current.dirKey];
+      const sourceCapProximity = cap > 0 ? Math.min(1, (currentSt?.flips || 0) / cap) : 0;
+
       chain.strength *= strengthDecay;
       if (chain.strength < 0.1) {
         chain.tile = null;
@@ -527,9 +533,11 @@ export function createChaosSim({ cubies, size, chaosLevel, flipCap, explosionT =
         poolLen--;
         // Finisher boost: the closer a neighbour is to the flip cap, the more likely
         // the chain commits to it — so near-dead tiles get pushed over the edge
-        // instead of being abandoned one flip short of dying.
+        // instead of being abandoned one flip short of dying. Stacked with the
+        // source tile's own contagion boost (sourceCapProximity, above) so a
+        // heavily-flipped tile spreads faster regardless of which neighbour it hits.
         const capProximity = cap > 0 ? neighbor.flips / cap : 0;
-        const flipBoost = 1.0 + capProximity * 1.4;
+        const flipBoost = 1.0 + capProximity * 1.4 + sourceCapProximity * 1.0;
         const propagateChance = Math.min(1, chain.strength * basePropagation * flipBoost);
         if (Math.random() < propagateChance) {
           // Only emit a cascade bolt for hops between *different* cubies.

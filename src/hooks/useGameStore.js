@@ -449,10 +449,10 @@ export const useGameStore = create(
     holonomyMode: false,
 
     // Configurable flip cap for Disparity Mode (overrides FLIP_CAP constant).
-    // Default matches the setup wizard's "Standard / Balanced carnage" tier — 25
+    // Default matches the setup wizard's "Standard / Balanced carnage" tier — 13
     // is the "Endurance / Slow attrition" tier and made tiles feel unkillable when
     // chaos was started without going through the wizard.
-    disparityFlipCap: 15,
+    disparityFlipCap: 8,
     setDisparityFlipCap: (v) => set({ disparityFlipCap: v }),
 
     // Running parity score for the current disparity game session.

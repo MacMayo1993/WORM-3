@@ -28,10 +28,10 @@ const LEVEL_LABELS = { 1: 'Low', 2: 'Medium', 3: 'High', 4: 'Extreme', 5: 'Maxim
 const LEVEL_ACCENT = { 1: '#2d7a3a', 2: '#b58a00', 3: '#c45000', 4: '#c0392b', 5: '#7b2d8b' };
 
 const FLIP_CAP_PRESETS = [
-  { label: 'Fragile', value: 6, sub: 'Fast massacre' },
-  { label: 'Standard', value: 15, sub: 'Balanced carnage' },
-  { label: 'Endurance', value: 25, sub: 'Slow attrition' },
-  { label: 'Titan', value: 40, sub: 'War of attrition' },
+  { label: 'Fragile', value: 3, sub: 'Fast massacre' },
+  { label: 'Standard', value: 8, sub: 'Balanced carnage' },
+  { label: 'Endurance', value: 13, sub: 'Slow attrition' },
+  { label: 'Titan', value: 20, sub: 'War of attrition' },
 ];
 
 const GAME_LENGTH_OPTIONS = [
@@ -203,7 +203,7 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
     backgroundTheme: 'blackhole',
     perFaceStyles: null,
     disparityLevel: 3,
-    flipCap: 15,
+    flipCap: 8,
     visualMode: 'classic',
     flipMode: true,
     showTunnels: false,
