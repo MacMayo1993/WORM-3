@@ -9,13 +9,14 @@ const advance = (from) => {
 };
 
 describe('demo flow state machine', () => {
-  it('has the expected 7-step order ending in end', () => {
+  it('has the expected 8-step order ending in end', () => {
     expect(IDS).toEqual([
       'baby-cube',
       'twin-paradox',
       'flip-gateway',
       'worm-traversal',
       'chaos-forecast',
+      'random-showcase',
       'cosmetic-reward',
       'end',
     ]);
