@@ -535,6 +535,18 @@ export default function WORM3() {
     setTimeout(() => handleBetSkipped(), 100);
   }, [handleDisparitySetupComplete, handleBetSkipped]);
 
+  const handleDemoChaosSkip = useCallback(() => {
+    setDemoForecastVisible(false);
+    demoForecastPickRef.current = null;
+    const store = useGameStore.getState();
+    store.setShowDisparityWinner(false);
+    store.clearDisparityGame();
+    store.setChaosLevel(0);
+    cancelDisparityRun();
+    store.earnCoins(50);
+    advanceDemoStepRef.current?.('chaos-forecast');
+  }, [cancelDisparityRun]);
+
   const applyDemoSettings = useCallback(() => {
     const store = useGameStore.getState();
     const demoManifoldStyles = {};
@@ -553,6 +565,7 @@ export default function WORM3() {
     cancelShuffle();
     const store = useGameStore.getState();
     store.clearLevel();
+    store.setRandomMode(false);
     applyDemoSettings();
 
     if (config.type === 'worm') {
@@ -573,6 +586,20 @@ export default function WORM3() {
 
     if (config.type === 'chaos') {
       setDemoForecastVisible(true);
+      return;
+    }
+
+    if (config.type === 'random') {
+      const targetSize = config.cubeSize || 3;
+      if (targetSize !== store.size) changeSize(targetSize);
+      else {
+        store.setRotatedCubies(makeCubies(targetSize));
+        store.resetGame();
+      }
+      store.setFlipMode(false);
+      store.setShowTunnels(false);
+      store.setRandomMode(true);
+      animatedShuffle();
       return;
     }
 
@@ -600,7 +627,7 @@ export default function WORM3() {
     store.resetGame();
     clearRefractory();
     store.setHasShuffled(true);
-  }, [cancelShuffle, changeSize, setRotatedCubies, reset, cancelDisparityRun, applyDemoSettings]);
+  }, [cancelShuffle, changeSize, setRotatedCubies, reset, cancelDisparityRun, applyDemoSettings, animatedShuffle]);
 
   const handleStartDemo = useCallback(() => {
     clearDemoWatchTimers();
@@ -620,11 +647,15 @@ export default function WORM3() {
     if (store.demoStep !== fromStep) return; // already moved on
     clearDemoWatchTimers();
     setDemoTryVisible(false);
+    if (store.randomMode) {
+      store.setRandomMode(false);
+      applyDemoSettings();
+    }
     const idx = DEMO_STEP_IDS.indexOf(fromStep);
     const nextStep = DEMO_STEP_IDS[idx + 1] || 'end';
     store.setDemoStep(nextStep);
     if (nextStep !== 'end') setDemoStepIntroVisible(true);
-  }, [clearDemoWatchTimers]);
+  }, [clearDemoWatchTimers, applyDemoSettings]);
   advanceDemoStepRef.current = advanceDemoStep;
 
   const handleDemoStepContinue = useCallback(() => {
@@ -672,9 +703,14 @@ export default function WORM3() {
       demoWatchTimers.current.push(setTimeout(() => setDemoTryVisible(true), 10000));
     }
 
-    // Chaos step: show the skip coach after the chaos game has had time to finish.
+    // Chaos step: show a skip coach after a brief grace period.
     if (config && config.type === 'chaos') {
-      demoWatchTimers.current.push(setTimeout(() => setDemoTryVisible(true), 15000));
+      demoWatchTimers.current.push(setTimeout(() => setDemoTryVisible(true), 5000));
+    }
+
+    // Random step: let two style cycles play (~10s each), then show skip coach.
+    if (config && config.type === 'random') {
+      demoWatchTimers.current.push(setTimeout(() => setDemoTryVisible(true), 12000));
     }
   }, [applyDemoStepConfig, handleOpenStore, clearDemoWatchTimers, startAnimatedShuffle]);
 
@@ -690,6 +726,7 @@ export default function WORM3() {
     clearDemoWatchTimers();
     setDemoTryVisible(false);
     const store = useGameStore.getState();
+    store.setRandomMode(false);
     if (preDemoSettingsRef.current) {
       store.setSettings(preDemoSettingsRef.current);
       preDemoSettingsRef.current = null;
@@ -703,6 +740,7 @@ export default function WORM3() {
     clearDemoWatchTimers();
     setDemoTryVisible(false);
     const store = useGameStore.getState();
+    store.setRandomMode(false);
     if (preDemoSettingsRef.current) {
       store.setSettings(preDemoSettingsRef.current);
       preDemoSettingsRef.current = null;
@@ -1704,13 +1742,13 @@ export default function WORM3() {
         <DemoCoach
           step={demoStep}
           copy={demoCoachCopy}
-          onNext={() => advanceDemoStep(demoStep)}
+          onNext={demoStep === 'chaos-forecast' ? handleDemoChaosSkip : () => advanceDemoStep(demoStep)}
           onExit={handleExitDemo}
         />
       )}
       {demoMode && demoForecastVisible && (
         <Suspense fallback={null}>
-          <DemoForecastPicker onPick={handleDemoForecastPick} />
+          <DemoForecastPicker onPick={handleDemoForecastPick} onSkip={handleDemoChaosSkip} />
         </Suspense>
       )}
       {demoMode && demoStep === 'end' && (

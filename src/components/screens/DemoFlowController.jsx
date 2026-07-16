@@ -7,8 +7,9 @@ const DEMO_STEPS = [
   { id: 'flip-gateway', label: 'Flip Gateway', num: 3 },
   { id: 'worm-traversal', label: 'WORM Traversal', num: 4 },
   { id: 'chaos-forecast', label: 'Chaos Forecast', num: 5 },
-  { id: 'cosmetic-reward', label: 'Cosmetic Reward', num: 6 },
-  { id: 'end', label: 'Complete', num: 7 },
+  { id: 'random-showcase', label: 'Random Mode', num: 6 },
+  { id: 'cosmetic-reward', label: 'Cosmetic Reward', num: 7 },
+  { id: 'end', label: 'Complete', num: 8 },
 ];
 
 export const DEMO_STEP_IDS = DEMO_STEPS.map(s => s.id);
@@ -193,6 +194,7 @@ const DemoStepIntro = ({ step, onContinue }) => {
     'flip-gateway': 'Flip every tile, then flip them all back.',
     'worm-traversal': 'Travel through the wormholes you opened.',
     'chaos-forecast': 'Predict which pair survives.',
+    'random-showcase': 'The cube cycles through random styles every few seconds.',
     'cosmetic-reward': 'Spend your Parity Points.',
   };
 
@@ -259,6 +261,10 @@ const DEMO_LEVEL_CONFIGS = {
     flipCap: 6,
     gameLength: 'short',
   },
+  'random-showcase': {
+    type: 'random',
+    cubeSize: 3,
+  },
 };
 
 // ── TRY phase ──────────────────────────────────────────────────────────────
@@ -269,6 +275,8 @@ const TRY_COPY = {
   'twin-paradox': 'Your turn — tap any tile. Its twin on the far side flips too.',
   'flip-gateway': 'Tap every tile to flip it to wrong parity.',
   'worm-traversal': 'Nice! Skip ahead when you\'re ready.',
+  'chaos-forecast': 'Skip ahead when you\'re ready.',
+  'random-showcase': 'Watch the styles cycle, or skip ahead.',
 };
 
 const DemoCoach = ({ step, onNext, onExit, copy: copyOverride }) => {
