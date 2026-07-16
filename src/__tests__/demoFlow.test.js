@@ -43,15 +43,16 @@ describe('demo flow state machine', () => {
     expect(advance('cosmetic-reward')).toBe('end');
   });
 
-  it('every cube step is hybrid: has a watch action AND a try-phase instruction', () => {
+  it('every cube step has a try-phase instruction; watch steps also have a watch action', () => {
     for (const id of ['baby-cube', 'twin-paradox', 'flip-gateway']) {
       const cfg = DEMO_LEVEL_CONFIGS[id];
       expect(cfg?.type).toBe('cube');
-      expect(cfg.watch).toBeTruthy();
-      expect(['rotate', 'flip']).toContain(cfg.watch.type);
-      if (cfg.watch.type === 'rotate') expect(Array.isArray(cfg.watch.moves)).toBe(true);
-      if (cfg.watch.type === 'flip') expect(cfg.watch.tile).toBeTruthy();
       expect(TRY_COPY[id]).toBeTruthy();
+      if (cfg.watch) {
+        expect(['rotate', 'flip']).toContain(cfg.watch.type);
+        if (cfg.watch.type === 'rotate') expect(Array.isArray(cfg.watch.moves)).toBe(true);
+        if (cfg.watch.type === 'flip') expect(cfg.watch.tile).toBeTruthy();
+      }
     }
   });
 

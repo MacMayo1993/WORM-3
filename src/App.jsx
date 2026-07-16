@@ -623,8 +623,10 @@ export default function WORM3() {
           onTapFlipRef.current?.({ x: t.x, y: t.y, z: t.z }, t.dirKey);
         }, 1000));
       }
-      // Invite the hands-on try once the watch beat has played.
-      demoWatchTimers.current.push(setTimeout(() => setDemoTryVisible(true), 2800));
+      // Invite the hands-on try once the watch beat has played,
+      // or immediately if the step has no watch animation (e.g. pre-flipped).
+      const coachDelay = watch ? 2800 : 800;
+      demoWatchTimers.current.push(setTimeout(() => setDemoTryVisible(true), coachDelay));
     }
 
     // Worm step: show the skip coach after a grace period so it never dead-ends.

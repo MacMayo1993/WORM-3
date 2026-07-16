@@ -21,37 +21,23 @@ describe('demo flow configuration', () => {
     ]);
   });
 
-  it('stages flip-gateway solved, one watch-flip away from unsolved and back', () => {
+  it('stages flip-gateway with all tiles pre-flipped, flipping them all back solves', () => {
     const config = DEMO_LEVEL_CONFIGS['flip-gateway'];
-    const solveFlip = config.watch.tile;
-    const solved = makeCubies(config.cubeSize);
+    let state = makeCubies(config.cubeSize);
 
-    expect(checkRubiksSolved(solved, config.cubeSize)).toBe(true);
+    expect(checkRubiksSolved(state, config.cubeSize)).toBe(true);
 
-    const flipMap = buildManifoldGridMap(solved, config.cubeSize);
-    const brokenByWatch = flipStickerPair(
-      solved,
-      config.cubeSize,
-      solveFlip.x,
-      solveFlip.y,
-      solveFlip.z,
-      solveFlip.dirKey,
-      flipMap,
-    );
-    expect(checkRubiksSolved(brokenByWatch, config.cubeSize)).toBe(false);
+    const flipMap = buildManifoldGridMap(state, config.cubeSize);
+    for (const { x, y, z, dirKey } of config.flipSequence) {
+      state = flipStickerPair(state, config.cubeSize, x, y, z, dirKey, flipMap);
+    }
+    expect(checkRubiksSolved(state, config.cubeSize)).toBe(false);
 
-    // Flipping the same antipodal pair back is exactly what the player's TRY
-    // interaction re-solves.
-    const resolved = flipStickerPair(
-      brokenByWatch,
-      config.cubeSize,
-      solveFlip.x,
-      solveFlip.y,
-      solveFlip.z,
-      solveFlip.dirKey,
-      flipMap,
-    );
-    expect(checkRubiksSolved(resolved, config.cubeSize)).toBe(true);
+    // Flipping them all back restores solved parity.
+    for (const { x, y, z, dirKey } of config.flipSequence) {
+      state = flipStickerPair(state, config.cubeSize, x, y, z, dirKey, flipMap);
+    }
+    expect(checkRubiksSolved(state, config.cubeSize)).toBe(true);
   });
 
   it('stages baby-cube solved, then its watch moves break the solve', () => {
