@@ -435,6 +435,7 @@ export default function WORM3() {
   const [demoForecastVisible, setDemoForecastVisible] = useState(false);
   const [demoTryVisible, setDemoTryVisible] = useState(false);
   const demoForecastPickRef = useRef(null);
+  const preDemoSettingsRef = useRef(null);
   const demoWatchTimers = useRef([]);
   const onTapFlipRef = useRef(null);
   const advanceDemoStepRef = useRef(null);
@@ -527,11 +528,24 @@ export default function WORM3() {
       gameLength: config.gameLength,
       flipMode: true,
       showTunnels: true,
+      colorScheme: 'pastel',
       visualMode: 'classic',
-      tileStyle: 'solid',
+      tileStyle: 'topographic',
     });
     setTimeout(() => handleBetSkipped(), 100);
   }, [handleDisparitySetupComplete, handleBetSkipped]);
+
+  const applyDemoSettings = useCallback(() => {
+    const store = useGameStore.getState();
+    const demoManifoldStyles = {};
+    for (let i = 1; i <= 6; i++) demoManifoldStyles[i] = 'topographic';
+    store.setSettings({
+      ...store.settings,
+      colorScheme: 'pastel',
+      customColors: null,
+      manifoldStyles: demoManifoldStyles,
+    });
+  }, []);
 
   const applyDemoStepConfig = useCallback((stepId) => {
     const config = DEMO_LEVEL_CONFIGS[stepId];
@@ -539,6 +553,7 @@ export default function WORM3() {
     cancelShuffle();
     const store = useGameStore.getState();
     store.clearLevel();
+    applyDemoSettings();
 
     if (config.type === 'worm') {
       const targetSize = config.cubeSize || 3;
@@ -585,14 +600,17 @@ export default function WORM3() {
     store.resetGame();
     clearRefractory();
     store.setHasShuffled(true);
-  }, [cancelShuffle, changeSize, setRotatedCubies, reset, cancelDisparityRun]);
+  }, [cancelShuffle, changeSize, setRotatedCubies, reset, cancelDisparityRun, applyDemoSettings]);
 
   const handleStartDemo = useCallback(() => {
     clearDemoWatchTimers();
     setDemoTryVisible(false);
-    useGameStore.getState().startDemo();
+    const store = useGameStore.getState();
+    preDemoSettingsRef.current = { ...store.settings };
+    store.startDemo();
+    applyDemoSettings();
     setDemoStepIntroVisible(true);
-  }, [clearDemoWatchTimers]);
+  }, [clearDemoWatchTimers, applyDemoSettings]);
 
   // Single guarded advance path — every step (cube coach, worm-solved,
   // forecast-dismiss, store-close) routes through here, so nothing double-fires
@@ -664,21 +682,32 @@ export default function WORM3() {
     clearDemoWatchTimers();
     setDemoTryVisible(false);
     useGameStore.getState().startDemo();
+    applyDemoSettings();
     setDemoStepIntroVisible(true);
-  }, [clearDemoWatchTimers]);
+  }, [clearDemoWatchTimers, applyDemoSettings]);
 
   const handleDemoFreeplay = useCallback(() => {
     clearDemoWatchTimers();
     setDemoTryVisible(false);
-    useGameStore.getState().exitDemo();
-    useGameStore.getState().setShowMainMenu(false);
+    const store = useGameStore.getState();
+    if (preDemoSettingsRef.current) {
+      store.setSettings(preDemoSettingsRef.current);
+      preDemoSettingsRef.current = null;
+    }
+    store.exitDemo();
+    store.setShowMainMenu(false);
     setShowFreeplayWizard(true);
   }, [clearDemoWatchTimers]);
 
   const handleExitDemo = useCallback(() => {
     clearDemoWatchTimers();
     setDemoTryVisible(false);
-    useGameStore.getState().exitDemo();
+    const store = useGameStore.getState();
+    if (preDemoSettingsRef.current) {
+      store.setSettings(preDemoSettingsRef.current);
+      preDemoSettingsRef.current = null;
+    }
+    store.exitDemo();
   }, [clearDemoWatchTimers]);
 
   // In demo mode, advancement is explicit (coach Next / step-specific triggers),
