@@ -183,7 +183,7 @@ const DemoProgressBar = ({ currentStep }) => {
   );
 };
 
-const DemoStepIntro = ({ step, onContinue }) => {
+const DemoStepIntro = ({ step, onContinue, onSkip }) => {
   ensureDemoShellStyle();
   const info = DEMO_STEPS.find(s => s.id === step);
   if (!info) return null;
@@ -204,9 +204,22 @@ const DemoStepIntro = ({ step, onContinue }) => {
         <p className="demo-intro-step">Step {info.num}</p>
         <h2 className="demo-intro-title">{info.label}</h2>
         <p className="demo-intro-copy">{STEP_COPY[step]}</p>
-        <button type="button" onClick={onContinue} className="demo-intro-button">
-          Start Step
-        </button>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 10 }}>
+          <button type="button" onClick={onContinue} className="demo-intro-button">
+            Start Step
+          </button>
+          {onSkip && (
+            <button
+              type="button"
+              onClick={onSkip}
+              aria-label="Skip step"
+              className="demo-intro-button"
+              style={{ background: 'transparent', color: '#7b6f45', boxShadow: 'none' }}
+            >
+              Skip ▶
+            </button>
+          )}
+        </div>
       </section>
     </div>
   );
@@ -248,7 +261,7 @@ const DEMO_LEVEL_CONFIGS = {
   },
   'worm-traversal': {
     type: 'worm',
-    cubeSize: 3,
+    cubeSize: 6,
     wormSpeed: 0.8,
     wormOrbCount: 3,
     wormholeInterval: 8,

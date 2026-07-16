@@ -509,7 +509,7 @@ export default function WORM3() {
     showDisparityWizard, setShowDisparityWizard,
     showDisparityBetting, speedThresholdSec, disparityCountdown,
     handleDisparitySetupComplete, handleBetPlaced, handleBetSkipped,
-    cancelDisparityRun,
+    cancelDisparityRun, startDisparityGame,
   } = useDisparityGame({
     settings, setSettings, size, changeSize, reset,
     cancelShuffle, startAnimatedShuffle,
@@ -521,7 +521,7 @@ export default function WORM3() {
     setDemoForecastVisible(false);
     demoForecastPickRef.current = pair;
     const config = DEMO_LEVEL_CONFIGS['chaos-forecast'];
-    handleDisparitySetupComplete({
+    const wizardSettings = {
       cubeSize: config.cubeSize,
       disparityLevel: config.disparityLevel,
       flipCap: config.flipCap,
@@ -531,9 +531,11 @@ export default function WORM3() {
       colorScheme: 'pastel',
       visualMode: 'classic',
       tileStyle: 'topographic',
-    });
-    setTimeout(() => handleBetSkipped(), 100);
-  }, [handleDisparitySetupComplete, handleBetSkipped]);
+    };
+    useGameStore.getState().setRotatedCubies(makeCubies(useGameStore.getState().size));
+    useGameStore.getState().resetGame();
+    startDisparityGame(wizardSettings);
+  }, [startDisparityGame]);
 
   const handleDemoChaosSkip = useCallback(() => {
     setDemoForecastVisible(false);
@@ -585,6 +587,8 @@ export default function WORM3() {
     }
 
     if (config.type === 'chaos') {
+      store.clearDisparityGame();
+      cancelDisparityRun();
       setDemoForecastVisible(true);
       return;
     }
@@ -1736,7 +1740,7 @@ export default function WORM3() {
       {/* Demo mode overlays */}
       {demoMode && <DemoProgressBar currentStep={demoStep} />}
       {demoMode && demoStepIntroVisible && demoStep && demoStep !== 'end' && (
-        <DemoStepIntro step={demoStep} onContinue={handleDemoStepContinue} />
+        <DemoStepIntro step={demoStep} onContinue={handleDemoStepContinue} onSkip={() => advanceDemoStep(demoStep)} />
       )}
       {demoMode && demoTryVisible && !demoStepIntroVisible && (
         <DemoCoach

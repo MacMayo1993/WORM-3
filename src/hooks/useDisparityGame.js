@@ -313,5 +313,6 @@ export function useDisparityGame({
     handleBetPlaced,
     handleBetSkipped,
     cancelDisparityRun,
+    startDisparityGame,
   };
 }
