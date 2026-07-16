@@ -167,7 +167,7 @@ describe('resolveBet', () => {
       { timestamp: 1_000_000 + (seconds * 1000) / 2 },
       { timestamp: 1_000_000 + seconds * 1000 },
     ];
-    // L4 @ flip cap 6 has a measured median (threshold) of 40s.
+    // L4 @ flip cap 6 snaps to the nearest measured tier (8) — threshold 34s.
     const speedCtx = (over = {}) => ctx({ chaosLevel: 4, disparityFlipCap: 6, ...over });
 
     it('FAST wins when the round beats the settings-specific benchmark', () => {
@@ -215,8 +215,8 @@ describe('speedThresholdFor', () => {
     expect(speedThresholdFor(3, 9999)).toBe(speedThresholdFor(3, 40));
   });
 
-  it('defaults to level 3 / cap 15 when settings are missing', () => {
-    expect(speedThresholdFor(undefined, undefined)).toBe(speedThresholdFor(3, 15));
+  it('defaults to level 3 / cap 8 (Standard) when settings are missing', () => {
+    expect(speedThresholdFor(undefined, undefined)).toBe(speedThresholdFor(3, 8));
   });
 
   it('clamps out-of-range levels (0 counts as "not set" and takes the default)', () => {
