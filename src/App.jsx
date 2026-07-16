@@ -626,6 +626,12 @@ export default function WORM3() {
       // Invite the hands-on try once the watch beat has played.
       demoWatchTimers.current.push(setTimeout(() => setDemoTryVisible(true), 2800));
     }
+
+    // Worm step: show the skip coach after a grace period so it never dead-ends.
+    // The tunnel-traversal effect (below) can show it earlier.
+    if (config && config.type === 'worm') {
+      demoWatchTimers.current.push(setTimeout(() => setDemoTryVisible(true), 10000));
+    }
   }, [applyDemoStepConfig, handleOpenStore, clearDemoWatchTimers, startAnimatedShuffle]);
 
   const handleDemoReplay = useCallback(() => {
@@ -670,6 +676,27 @@ export default function WORM3() {
     }, 2000);
     return () => clearTimeout(timer);
   }, [demoMode, demoStep, wormGamePhase, advanceDemoStep]);
+
+  // Show the skip coach as soon as the first wormhole tunnel is traversed.
+  const wormTunnelCount = useGameStore((s) => s.wormTunnelCount);
+  useEffect(() => {
+    if (!demoMode || demoStep !== 'worm-traversal') return;
+    if (wormTunnelCount < 1) return;
+    setDemoTryVisible(true);
+  }, [demoMode, demoStep, wormTunnelCount]);
+
+  // On death during the worm demo step, suppress the death screen and advance.
+  const wormAlive = useGameStore((s) => s.wormAlive);
+  useEffect(() => {
+    if (!demoMode || demoStep !== 'worm-traversal') return;
+    if (wormAlive !== false) return;
+    useGameStore.getState().setShowWormDeathMenu(false);
+    const timer = setTimeout(() => {
+      useGameStore.getState().clearDisparityGame();
+      advanceDemoStep('worm-traversal');
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [demoMode, demoStep, wormAlive, advanceDemoStep]);
 
   // Advance the chaos step when the forecast winner is dismissed.
   const handleDemoDisparityDismiss = useCallback(() => {

@@ -271,6 +271,7 @@ const TRY_COPY = {
   'baby-cube': 'Your turn — drag a row or column to spin it.',
   'twin-paradox': 'Your turn — tap any tile. Its twin on the far side flips too.',
   'flip-gateway': 'Your turn — tap tiles to open wormholes between the pairs.',
+  'worm-traversal': 'Nice! Skip ahead when you\'re ready.',
 };
 
 const DemoCoach = ({ step, onNext, onExit }) => {

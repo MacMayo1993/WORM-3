@@ -55,8 +55,13 @@ describe('demo flow state machine', () => {
     }
   });
 
-  it('worm and chaos steps carry their own config types (they auto-advance, not via the coach)', () => {
+  it('worm and chaos steps carry their own config types', () => {
     expect(DEMO_LEVEL_CONFIGS['worm-traversal'].type).toBe('worm');
     expect(DEMO_LEVEL_CONFIGS['chaos-forecast'].type).toBe('chaos');
+  });
+
+  it('worm-traversal is skippable via the coach (has TRY_COPY + advances on death or solved)', () => {
+    expect(TRY_COPY['worm-traversal']).toBeTruthy();
+    expect(advance('worm-traversal')).toBe('chaos-forecast');
   });
 });
