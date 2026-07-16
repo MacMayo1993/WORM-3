@@ -50,7 +50,6 @@ const WinnerTile = ({ label, gridId, color }) => (
 export default function DisparityWinnerScreen({ onDismiss }) {
   const disparityWinner = useGameStore((s) => s.disparityWinner);
   const disparityDeaths = useGameStore((s) => s.disparityDeaths);
-  const clearDisparityGame = useGameStore((s) => s.clearDisparityGame);
   const lastBetResult = useGameStore((s) => s.lastBetResult);
 
   // Small mount delay before the screen accepts a dismiss tap, so the reveal
