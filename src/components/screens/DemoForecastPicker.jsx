@@ -7,7 +7,7 @@ const PAIRS = [
   { id: 'white-yellow', label: 'White ↔ Yellow', colors: ['#ffffff', '#eab308'], faceIds: [3, 6] },
 ];
 
-export default function DemoForecastPicker({ onPick }) {
+export default function DemoForecastPicker({ onPick, onSkip }) {
   const [selected, setSelected] = useState(null);
 
   return (
@@ -81,6 +81,22 @@ export default function DemoForecastPicker({ onPick }) {
       >
         Lock In
       </button>
+
+      {onSkip && (
+        <button
+          type="button"
+          onClick={onSkip}
+          style={{
+            marginTop: 14, padding: '10px 32px',
+            background: 'transparent',
+            color: GLASS_TEXT_MUTED, border: 'none', borderRadius: 10,
+            fontFamily: UI_FONT, fontSize: 13, fontWeight: 600,
+            cursor: 'pointer', letterSpacing: '0.04em',
+          }}
+        >
+          Skip ▶
+        </button>
+      )}
     </div>
   );
 }

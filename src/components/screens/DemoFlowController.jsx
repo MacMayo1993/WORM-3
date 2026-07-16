@@ -269,6 +269,7 @@ const TRY_COPY = {
   'twin-paradox': 'Your turn — tap any tile. Its twin on the far side flips too.',
   'flip-gateway': 'Tap every tile to flip it to wrong parity.',
   'worm-traversal': 'Nice! Skip ahead when you\'re ready.',
+  'chaos-forecast': 'Skip ahead when you\'re ready.',
 };
 
 const DemoCoach = ({ step, onNext, onExit, copy: copyOverride }) => {

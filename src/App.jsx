@@ -535,6 +535,18 @@ export default function WORM3() {
     setTimeout(() => handleBetSkipped(), 100);
   }, [handleDisparitySetupComplete, handleBetSkipped]);
 
+  const handleDemoChaosSkip = useCallback(() => {
+    setDemoForecastVisible(false);
+    demoForecastPickRef.current = null;
+    const store = useGameStore.getState();
+    store.setShowDisparityWinner(false);
+    store.clearDisparityGame();
+    store.setChaosLevel(0);
+    cancelDisparityRun();
+    store.earnCoins(50);
+    advanceDemoStepRef.current?.('chaos-forecast');
+  }, [cancelDisparityRun]);
+
   const applyDemoSettings = useCallback(() => {
     const store = useGameStore.getState();
     const demoManifoldStyles = {};
@@ -672,9 +684,9 @@ export default function WORM3() {
       demoWatchTimers.current.push(setTimeout(() => setDemoTryVisible(true), 10000));
     }
 
-    // Chaos step: show the skip coach after the chaos game has had time to finish.
+    // Chaos step: show a skip coach after a brief grace period.
     if (config && config.type === 'chaos') {
-      demoWatchTimers.current.push(setTimeout(() => setDemoTryVisible(true), 15000));
+      demoWatchTimers.current.push(setTimeout(() => setDemoTryVisible(true), 5000));
     }
   }, [applyDemoStepConfig, handleOpenStore, clearDemoWatchTimers, startAnimatedShuffle]);
 
@@ -1704,13 +1716,13 @@ export default function WORM3() {
         <DemoCoach
           step={demoStep}
           copy={demoCoachCopy}
-          onNext={() => advanceDemoStep(demoStep)}
+          onNext={demoStep === 'chaos-forecast' ? handleDemoChaosSkip : () => advanceDemoStep(demoStep)}
           onExit={handleExitDemo}
         />
       )}
       {demoMode && demoForecastVisible && (
         <Suspense fallback={null}>
-          <DemoForecastPicker onPick={handleDemoForecastPick} />
+          <DemoForecastPicker onPick={handleDemoForecastPick} onSkip={handleDemoChaosSkip} />
         </Suspense>
       )}
       {demoMode && demoStep === 'end' && (
