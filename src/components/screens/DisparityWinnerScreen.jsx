@@ -72,7 +72,6 @@ export default function DisparityWinnerScreen({ onDismiss }) {
 
   const handleDismiss = () => {
     if (!ready) return;
-    clearDisparityGame();
     onDismiss();
   };
 

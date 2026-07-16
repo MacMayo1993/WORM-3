@@ -653,6 +653,11 @@ export default function WORM3() {
     if (config && config.type === 'worm') {
       demoWatchTimers.current.push(setTimeout(() => setDemoTryVisible(true), 10000));
     }
+
+    // Chaos step: show the skip coach after the chaos game has had time to finish.
+    if (config && config.type === 'chaos') {
+      demoWatchTimers.current.push(setTimeout(() => setDemoTryVisible(true), 15000));
+    }
   }, [applyDemoStepConfig, handleOpenStore, clearDemoWatchTimers, startAnimatedShuffle]);
 
   const handleDemoReplay = useCallback(() => {
@@ -752,6 +757,27 @@ export default function WORM3() {
     demoForecastPickRef.current = null;
     advanceDemoStep('chaos-forecast');
   }, [demoMode, demoStep, advanceDemoStep]);
+
+  // Safety net: if the winner screen shows and is dismissed but
+  // handleDemoDisparityDismiss somehow didn't fire (e.g. DisparityWinnerScreen
+  // was unmounted by a state reset), advance the demo when showDisparityWinner
+  // goes false while we're still on the chaos-forecast step.
+  useEffect(() => {
+    if (!demoMode) return;
+    return useGameStore.subscribe(
+      (s) => s.showDisparityWinner,
+      (show, prev) => {
+        if (prev && !show) {
+          const s = useGameStore.getState();
+          if (s.demoMode && s.demoStep === 'chaos-forecast') {
+            s.clearDisparityGame();
+            s.setChaosLevel(0);
+            advanceDemoStepRef.current?.('chaos-forecast');
+          }
+        }
+      }
+    );
+  }, [demoMode]);
 
   // ========================================================================
   // INTRO TIME — drives IntroBranch 3D content + WelcomeScreen DOM overlay
