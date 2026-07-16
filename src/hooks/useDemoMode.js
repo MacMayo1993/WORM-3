@@ -157,15 +157,20 @@ export function useDemoMode({
     if (store.demoStep !== fromStep) return;
     clearDemoWatchTimers();
     setDemoTryVisible(false);
+    setDemoForecastVisible(false);
     if (store.randomMode) {
       store.setRandomMode(false);
       applyDemoSettings();
+    }
+    if (store.wormHealerMode) {
+      store.clearDisparityGame();
+      cancelDisparityRun();
     }
     const idx = DEMO_STEP_IDS.indexOf(fromStep);
     const nextStep = DEMO_STEP_IDS[idx + 1] || 'end';
     store.setDemoStep(nextStep);
     if (nextStep !== 'end') setDemoStepIntroVisible(true);
-  }, [clearDemoWatchTimers, applyDemoSettings]);
+  }, [clearDemoWatchTimers, applyDemoSettings, cancelDisparityRun]);
   advanceDemoStepRef.current = advanceDemoStep;
 
   const handleDemoStepContinue = useCallback(() => {
