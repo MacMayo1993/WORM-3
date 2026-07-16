@@ -13,47 +13,169 @@ const DEMO_STEPS = [
 
 export const DEMO_STEP_IDS = DEMO_STEPS.map(s => s.id);
 
+const DEMO_SHELL_STYLE_ID = 'worm3-demo-shell-style';
+
+const ensureDemoShellStyle = () => {
+  if (typeof document === 'undefined' || document.getElementById(DEMO_SHELL_STYLE_ID)) return;
+  const style = document.createElement('style');
+  style.id = DEMO_SHELL_STYLE_ID;
+  style.textContent = `
+    .demo-progress-pill {
+      position: fixed;
+      top: max(10px, env(safe-area-inset-top, 10px));
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 11000;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 7px 14px;
+      border-radius: 999px;
+      background: rgba(250, 246, 235, 0.88);
+      border: 1px solid rgba(89, 109, 74, 0.24);
+      box-shadow: 0 8px 24px rgba(43, 53, 35, 0.16);
+      color: #27351f;
+      backdrop-filter: blur(14px) saturate(1.08);
+      font-family: ${UI_FONT};
+      pointer-events: none;
+    }
+
+    .demo-progress-label {
+      color: #657156;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.11em;
+    }
+
+    .demo-progress-track {
+      width: 86px;
+      height: 5px;
+      background: rgba(92, 111, 76, 0.18);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .demo-progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #7b8f5a, #b88f4a);
+      border-radius: 999px;
+      transition: width 0.4s ease;
+    }
+
+    .demo-progress-count {
+      color: #35452a;
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .demo-intro-root {
+      position: fixed;
+      inset: 0;
+      z-index: 11500;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: max(62px, calc(env(safe-area-inset-top, 0px) + 52px)) 18px 24px;
+      background: linear-gradient(180deg, rgba(246, 241, 226, 0.50), rgba(246, 241, 226, 0.08) 38%, rgba(24, 31, 18, 0.10));
+      backdrop-filter: blur(4px) saturate(0.98);
+      font-family: ${UI_FONT};
+      text-align: center;
+    }
+
+    .demo-intro-card {
+      width: min(420px, calc(100vw - 32px));
+      padding: 16px 18px 18px;
+      border-radius: 22px;
+      background: rgba(250, 247, 238, 0.94);
+      border: 1px solid rgba(111, 126, 86, 0.25);
+      box-shadow: 0 14px 34px rgba(40, 48, 32, 0.18);
+      color: #26331f;
+    }
+
+    .demo-intro-step {
+      color: #7b6f45;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      margin: 0 0 6px;
+    }
+
+    .demo-intro-title {
+      font-family: ${DISPLAY_FONT};
+      font-size: clamp(24px, 7.2vw, 36px);
+      line-height: 0.96;
+      color: #24331e;
+      margin: 0 0 8px;
+      letter-spacing: 0.025em;
+    }
+
+    .demo-intro-copy {
+      color: #43513a;
+      font-size: clamp(14px, 3.8vw, 16px);
+      line-height: 1.38;
+      margin: 0 auto 16px;
+      max-width: 320px;
+    }
+
+    .demo-intro-button {
+      padding: 11px 26px;
+      background: #5f7f4a;
+      color: #fffdf5;
+      border: none;
+      border-radius: 999px;
+      font-family: ${UI_FONT};
+      font-size: 14px;
+      font-weight: 800;
+      cursor: pointer;
+      letter-spacing: 0.03em;
+      box-shadow: 0 7px 16px rgba(95, 127, 74, 0.24);
+    }
+
+    @media (max-width: 640px) {
+      .demo-progress-pill {
+        top: max(8px, env(safe-area-inset-top, 8px));
+        padding: 6px 12px;
+        background: rgba(250, 247, 238, 0.92);
+      }
+
+      .demo-intro-root {
+        padding-top: max(88px, calc(env(safe-area-inset-top, 0px) + 84px));
+        align-items: flex-start;
+        background: linear-gradient(180deg, rgba(246, 241, 226, 0.38), rgba(246, 241, 226, 0.04) 46%, transparent 72%);
+        backdrop-filter: blur(2px) saturate(0.95);
+      }
+
+      .demo-intro-card {
+        padding: 13px 14px 14px;
+        border-radius: 18px;
+      }
+
+      .demo-intro-title {
+        font-size: clamp(22px, 6.6vw, 30px);
+      }
+
+      .demo-intro-copy {
+        margin-bottom: 12px;
+      }
+    }
+  `;
+  document.head.appendChild(style);
+};
+
 const DemoProgressBar = ({ currentStep }) => {
+  ensureDemoShellStyle();
   const idx = DEMO_STEPS.findIndex(s => s.id === currentStep);
   const total = DEMO_STEPS.length - 1;
   const progress = idx >= 0 ? idx / total : 0;
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 'max(8px, env(safe-area-inset-top, 8px))',
-      left: '50%',
-      transform: 'translateX(-50%)',
-      zIndex: 11000,
-      display: 'flex',
-      alignItems: 'center',
-      gap: 8,
-      padding: '6px 16px',
-      background: 'rgba(4,6,20,0.80)',
-      borderRadius: 20,
-      backdropFilter: 'blur(12px)',
-      fontFamily: UI_FONT,
-      pointerEvents: 'none',
-    }}>
-      <span style={{ color: GLASS_TEXT_MUTED, fontSize: 11, fontWeight: 600, letterSpacing: '0.08em' }}>
-        DEMO
-      </span>
-      <div style={{
-        width: 80,
-        height: 4,
-        background: 'rgba(255,255,255,0.12)',
-        borderRadius: 2,
-        overflow: 'hidden',
-      }}>
-        <div style={{
-          width: `${progress * 100}%`,
-          height: '100%',
-          background: '#3b82f6',
-          borderRadius: 2,
-          transition: 'width 0.4s ease',
-        }} />
+    <div className="demo-progress-pill">
+      <span className="demo-progress-label">DEMO</span>
+      <div className="demo-progress-track">
+        <div className="demo-progress-fill" style={{ width: `${progress * 100}%` }} />
       </div>
-      <span style={{ color: GLASS_TEXT, fontSize: 11, fontWeight: 500 }}>
+      <span className="demo-progress-count">
         {idx + 1} / {total + 1}
       </span>
     </div>
@@ -61,74 +183,29 @@ const DemoProgressBar = ({ currentStep }) => {
 };
 
 const DemoStepIntro = ({ step, onContinue }) => {
+  ensureDemoShellStyle();
   const info = DEMO_STEPS.find(s => s.id === step);
   if (!info) return null;
 
   const STEP_COPY = {
-    'baby-cube': 'Learn to rotate the cube.',
+    'baby-cube': 'Solve this first twist. Drag the turned row back into place to continue.',
     'twin-paradox': 'Opposite faces are linked.',
-    'flip-gateway': 'One flip. Two linked tiles.',
+    'flip-gateway': 'The cube is one flip away from solved.',
     'worm-traversal': 'Travel through the wormholes you opened.',
     'chaos-forecast': 'Predict which pair survives.',
     'cosmetic-reward': 'Spend your Parity Points.',
   };
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 11500,
-      display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center',
-      background: 'rgba(2,3,10,0.85)',
-      backdropFilter: 'blur(16px)',
-      fontFamily: UI_FONT,
-      textAlign: 'center',
-      padding: 24,
-    }}>
-      <p style={{
-        color: GLASS_TEXT_MUTED,
-        fontSize: 12,
-        fontWeight: 700,
-        letterSpacing: '0.16em',
-        textTransform: 'uppercase',
-        margin: '0 0 8px',
-      }}>
-        Step {info.num}
-      </p>
-      <h2 style={{
-        fontFamily: DISPLAY_FONT,
-        fontSize: 32,
-        color: '#fff',
-        margin: '0 0 12px',
-        letterSpacing: '0.04em',
-      }}>
-        {info.label}
-      </h2>
-      <p style={{
-        color: GLASS_TEXT,
-        fontSize: 15,
-        margin: '0 0 32px',
-        maxWidth: 300,
-      }}>
-        {STEP_COPY[step]}
-      </p>
-      <button
-        type="button"
-        onClick={onContinue}
-        style={{
-          padding: '12px 40px',
-          background: '#3b82f6',
-          color: '#fff',
-          border: 'none',
-          borderRadius: 10,
-          fontFamily: UI_FONT,
-          fontSize: 15,
-          fontWeight: 600,
-          cursor: 'pointer',
-          letterSpacing: '0.04em',
-        }}
-      >
-        Continue
-      </button>
+    <div className="demo-intro-root">
+      <section className="demo-intro-card" aria-live="polite">
+        <p className="demo-intro-step">Step {info.num}</p>
+        <h2 className="demo-intro-title">{info.label}</h2>
+        <p className="demo-intro-copy">{STEP_COPY[step]}</p>
+        <button type="button" onClick={onContinue} className="demo-intro-button">
+          Start Step
+        </button>
+      </section>
     </div>
   );
 };
@@ -161,10 +238,10 @@ const DEMO_LEVEL_CONFIGS = {
   'flip-gateway': {
     type: 'cube',
     cubeSize: 3,
-    scrambleSequence: [
-      { axis: 'row', sliceIndex: 1, dir: 1 },
-      { axis: 'col', sliceIndex: 0, dir: -1 },
-    ],
+    // Stage starts solved; the watch beat flips this one antipodal center pair
+    // out of place live, so the cube is one flip away from solved and the TRY
+    // phase invites the player to flip it back and complete the solve.
+    scrambleSequence: null,
     flipSequence: null,
     watch: { type: 'flip', tile: { x: 1, y: 1, z: 2, dirKey: 'PZ' } },
     features: { rotations: true, tunnels: true, flips: true },
