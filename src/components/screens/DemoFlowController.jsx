@@ -190,7 +190,7 @@ const DemoStepIntro = ({ step, onContinue }) => {
   const STEP_COPY = {
     'baby-cube': 'Solve this first twist. Drag the turned row back into place to continue.',
     'twin-paradox': 'Opposite faces are linked.',
-    'flip-gateway': 'Every tile has been flipped to wrong parity. Tap them all back to restore normal.',
+    'flip-gateway': 'Flip every tile, then flip them all back.',
     'worm-traversal': 'Travel through the wormholes you opened.',
     'chaos-forecast': 'Predict which pair survives.',
     'cosmetic-reward': 'Spend your Parity Points.',
@@ -239,16 +239,7 @@ const DEMO_LEVEL_CONFIGS = {
     type: 'cube',
     cubeSize: 3,
     scrambleSequence: null,
-    flipSequence: (() => {
-      const seq = [];
-      for (let a = 0; a < 3; a++)
-        for (let b = 0; b < 3; b++) {
-          seq.push({ x: 2, y: a, z: b, dirKey: 'PX' });
-          seq.push({ x: a, y: 2, z: b, dirKey: 'PY' });
-          seq.push({ x: a, y: b, z: 2, dirKey: 'PZ' });
-        }
-      return seq;
-    })(),
+    flipSequence: null,
     watch: null,
     features: { rotations: true, tunnels: true, flips: true },
     chaosLevel: 0,
@@ -276,13 +267,13 @@ const DEMO_LEVEL_CONFIGS = {
 const TRY_COPY = {
   'baby-cube': 'Your turn — drag a row or column to spin it.',
   'twin-paradox': 'Your turn — tap any tile. Its twin on the far side flips too.',
-  'flip-gateway': 'Tap each tile to flip it back. Every flip fixes a pair.',
+  'flip-gateway': 'Tap every tile to flip it to wrong parity.',
   'worm-traversal': 'Nice! Skip ahead when you\'re ready.',
 };
 
-const DemoCoach = ({ step, onNext, onExit }) => {
+const DemoCoach = ({ step, onNext, onExit, copy: copyOverride }) => {
   ensureDemoShellStyle();
-  const copy = TRY_COPY[step];
+  const copy = copyOverride || TRY_COPY[step];
   if (!copy) return null;
 
   return (

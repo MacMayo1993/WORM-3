@@ -21,23 +21,30 @@ describe('demo flow configuration', () => {
     ]);
   });
 
-  it('stages flip-gateway with all tiles pre-flipped, flipping them all back solves', () => {
+  it('flip-gateway starts solved; flipping all surface stickers breaks it, flipping back solves', () => {
     const config = DEMO_LEVEL_CONFIGS['flip-gateway'];
-    let state = makeCubies(config.cubeSize);
+    const sz = config.cubeSize;
+    let state = makeCubies(sz);
 
-    expect(checkRubiksSolved(state, config.cubeSize)).toBe(true);
+    expect(checkRubiksSolved(state, sz)).toBe(true);
+    expect(config.flipSequence).toBeNull();
 
-    const flipMap = buildManifoldGridMap(state, config.cubeSize);
-    for (const { x, y, z, dirKey } of config.flipSequence) {
-      state = flipStickerPair(state, config.cubeSize, x, y, z, dirKey, flipMap);
-    }
-    expect(checkRubiksSolved(state, config.cubeSize)).toBe(false);
+    // Simulate the user flipping every positive-face sticker (one per antipodal pair).
+    const flipMap = buildManifoldGridMap(state, sz);
+    const flips = [];
+    for (let a = 0; a < sz; a++)
+      for (let b = 0; b < sz; b++) {
+        flips.push({ x: sz - 1, y: a, z: b, dirKey: 'PX' });
+        flips.push({ x: a, y: sz - 1, z: b, dirKey: 'PY' });
+        flips.push({ x: a, y: b, z: sz - 1, dirKey: 'PZ' });
+      }
+
+    for (const f of flips) state = flipStickerPair(state, sz, f.x, f.y, f.z, f.dirKey, flipMap);
+    expect(checkRubiksSolved(state, sz)).toBe(false);
 
     // Flipping them all back restores solved parity.
-    for (const { x, y, z, dirKey } of config.flipSequence) {
-      state = flipStickerPair(state, config.cubeSize, x, y, z, dirKey, flipMap);
-    }
-    expect(checkRubiksSolved(state, config.cubeSize)).toBe(true);
+    for (const f of flips) state = flipStickerPair(state, sz, f.x, f.y, f.z, f.dirKey, flipMap);
+    expect(checkRubiksSolved(state, sz)).toBe(true);
   });
 
   it('stages baby-cube solved, then its watch moves break the solve', () => {
