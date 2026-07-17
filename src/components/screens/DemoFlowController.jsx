@@ -174,6 +174,77 @@ const ensureDemoShellStyle = () => {
       50% { transform: translateX(-50%) translateY(-6px); }
     }
 
+    .demo-beat-root {
+      position: fixed;
+      inset: 0;
+      z-index: 11600;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      font-family: ${UI_FONT};
+      text-align: center;
+    }
+
+    .demo-beat-flash {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at center, rgba(255,255,255,0.30) 0%, rgba(184,143,74,0.14) 45%, transparent 72%);
+      animation: demo-beat-flash 0.7s ease-out forwards;
+    }
+
+    @keyframes demo-beat-flash {
+      0%   { opacity: 0.9; transform: scale(0.9); }
+      55%  { opacity: 0.35; transform: scale(1.03); }
+      100% { opacity: 0;   transform: scale(1.08); }
+    }
+
+    .demo-complete-stamp {
+      animation: demo-stamp-punch 1.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    .demo-launch-stamp {
+      animation: demo-stamp-punch 1.15s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    @keyframes demo-stamp-punch {
+      0%   { opacity: 0; transform: scale(2.3) rotate(-3deg); }
+      16%  { opacity: 1; transform: scale(0.96) rotate(0deg); }
+      24%  { transform: scale(1.02); }
+      30%  { transform: scale(1); }
+      78%  { opacity: 1; transform: scale(1); }
+      100% { opacity: 0; transform: scale(1.06); }
+    }
+
+    .demo-beat-title {
+      font-family: ${DISPLAY_FONT};
+      font-size: clamp(34px, 9.5vw, 62px);
+      line-height: 0.95;
+      letter-spacing: 0.03em;
+      color: #fffdf2;
+      text-shadow: 0 3px 0 rgba(43, 53, 35, 0.55), 0 10px 34px rgba(24, 31, 18, 0.6);
+      margin: 0;
+    }
+
+    .demo-beat-sub {
+      font-size: clamp(12px, 3.4vw, 15px);
+      font-weight: 900;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: #ffe9ad;
+      text-shadow: 0 2px 12px rgba(24, 31, 18, 0.7);
+      margin: 0 0 10px;
+    }
+
+    .demo-complete-check {
+      font-size: clamp(40px, 11vw, 72px);
+      line-height: 1;
+      color: #9fdb7a;
+      text-shadow: 0 4px 0 rgba(43, 53, 35, 0.5), 0 12px 38px rgba(24, 31, 18, 0.65);
+      margin: 0 0 6px;
+    }
+
     @media (max-width: 640px) {
       .demo-progress-pill {
         top: max(8px, env(safe-area-inset-top, 8px));
@@ -471,6 +542,45 @@ const VIEW_SHOWCASE_SEQUENCE = [
   },
 ];
 
+// ── Step beats ───────────────────────────────────────────────────────────────
+// Full-screen, non-interactive punches that bookend each demo step:
+//   • DemoStepComplete fires the moment a step's goal is achieved (cube
+//     re-solved, parity restored, worm through) — flash + "STEP COMPLETE"
+//     stamp, then the hook auto-advances.
+//   • DemoStepLaunch slams the new step's title over the freshly staged scene
+//     so the next stage arrives with energy instead of a silent swap.
+
+const DemoStepComplete = ({ step }) => {
+  ensureDemoShellStyle();
+  const info = DEMO_STEPS.find(s => s.id === step);
+  if (!info) return null;
+  return (
+    <div className="demo-beat-root" aria-live="assertive">
+      <div className="demo-beat-flash" />
+      <div className="demo-complete-stamp">
+        <p className="demo-complete-check">✓</p>
+        <p className="demo-beat-sub">Step {info.num} Complete</p>
+        <h2 className="demo-beat-title">{info.label}</h2>
+      </div>
+    </div>
+  );
+};
+
+const DemoStepLaunch = ({ step }) => {
+  ensureDemoShellStyle();
+  const info = DEMO_STEPS.find(s => s.id === step);
+  if (!info) return null;
+  return (
+    <div className="demo-beat-root" aria-live="polite">
+      <div className="demo-beat-flash" />
+      <div className="demo-launch-stamp">
+        <p className="demo-beat-sub">Step {info.num}</p>
+        <h2 className="demo-beat-title">{info.label}</h2>
+      </div>
+    </div>
+  );
+};
+
 // Shown before the view sequence starts: the Views tile on the bottom nav bar
 // pulses (see BottomNavBar `spotlightViews`) and this hint asks for the tap
 // that kicks off the first view.
@@ -537,6 +647,8 @@ export {
   DemoCoach,
   DemoViewShowcase,
   DemoViewSpotlightHint,
+  DemoStepComplete,
+  DemoStepLaunch,
   VIEW_SHOWCASE_SEQUENCE,
   TRY_COPY,
   DEMO_STEPS,
