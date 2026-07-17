@@ -1,12 +1,24 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { useGameStore } from './useGameStore.js';
+import { useGameStore, PRE_DEMO_SETTINGS_KEY } from './useGameStore.js';
 import { makeCubies } from '../game/cubeState.js';
 import { rotateSliceCubies } from '../game/cubeRotation.js';
 import { flipStickerPair, buildManifoldGridMap } from '../game/manifoldLogic.js';
 import { checkRubiksSolved } from '../game/winDetection.js';
 import { clearRefractory } from '../game/refractoryMap.js';
 import { DEMO_STEP_IDS, DEMO_LEVEL_CONFIGS, VIEW_SHOWCASE_SEQUENCE } from '../components/screens/DemoFlowController.jsx';
+
+export const DEMO_REWARD_CLAIMED_KEY = 'worm3_demo_reward_claimed';
+
+// Demo coins pay out once per player, not once per run — otherwise "Replay
+// Demo" is an infinite parity-point faucet.
+export const awardDemoCoinsOnce = (store, amount) => {
+  let claimed = false;
+  try { claimed = localStorage.getItem(DEMO_REWARD_CLAIMED_KEY) === '1'; } catch { }
+  if (claimed) return;
+  store.earnCoins(amount);
+  try { localStorage.setItem(DEMO_REWARD_CLAIMED_KEY, '1'); } catch { }
+};
 
 const allSurfaceStickersWrongParity = (cubies, size) => {
   for (let x = 0; x < size; x++)
@@ -169,6 +181,10 @@ export function useDemoMode({
     setDemoTryVisible(false);
     const store = useGameStore.getState();
     preDemoSettingsRef.current = { ...store.settings };
+    // Persist the snapshot too: demo settings overwrite the player's persisted
+    // settings immediately, so an interrupted demo (refresh/close) must be
+    // recoverable on next boot — see PRE_DEMO_SETTINGS_KEY in useGameStore.
+    try { localStorage.setItem(PRE_DEMO_SETTINGS_KEY, JSON.stringify(store.settings)); } catch { }
     store.startDemo();
     applyDemoSettings();
     setDemoStepIntroVisible(true);
@@ -282,27 +298,29 @@ export function useDemoMode({
     setDemoStepIntroVisible(true);
   }, [cleanupAllDemoState, applyDemoSettings]);
 
-  const handleDemoFreeplay = useCallback(() => {
-    const store = useGameStore.getState();
-    cleanupAllDemoState(store);
+  const restorePreDemoSettings = useCallback((store) => {
     if (preDemoSettingsRef.current) {
       store.setSettings(preDemoSettingsRef.current);
       preDemoSettingsRef.current = null;
     }
+    try { localStorage.removeItem(PRE_DEMO_SETTINGS_KEY); } catch { }
+  }, []);
+
+  const handleDemoFreeplay = useCallback(() => {
+    const store = useGameStore.getState();
+    cleanupAllDemoState(store);
+    restorePreDemoSettings(store);
     store.exitDemo();
     store.setShowMainMenu(false);
     setShowFreeplayWizard(true);
-  }, [cleanupAllDemoState, setShowFreeplayWizard]);
+  }, [cleanupAllDemoState, restorePreDemoSettings, setShowFreeplayWizard]);
 
   const handleExitDemo = useCallback(() => {
     const store = useGameStore.getState();
     cleanupAllDemoState(store);
-    if (preDemoSettingsRef.current) {
-      store.setSettings(preDemoSettingsRef.current);
-      preDemoSettingsRef.current = null;
-    }
+    restorePreDemoSettings(store);
     store.exitDemo();
-  }, [cleanupAllDemoState]);
+  }, [cleanupAllDemoState, restorePreDemoSettings]);
 
   const handleDemoForecastPick = useCallback((pair) => {
     setDemoForecastVisible(false);
@@ -361,7 +379,7 @@ export function useDemoMode({
     store.clearDisparityGame();
     store.setChaosLevel(0);
     cancelDisparityRun();
-    store.earnCoins(50);
+    awardDemoCoinsOnce(store, 50);
     advanceDemoStepRef.current?.('chaos-forecast');
   }, [cancelDisparityRun]);
 
@@ -376,7 +394,7 @@ export function useDemoMode({
     }) || [];
     const correct = pick && pick.faceIds.some((f) => winnerFaceIds.includes(f));
     const reward = correct ? 200 : 50;
-    store.earnCoins(reward);
+    awardDemoCoinsOnce(store, reward);
     store.clearDisparityGame();
     store.setChaosLevel(0);
     demoForecastPickRef.current = null;

@@ -21,6 +21,11 @@ const PARITY_POINTS_KEY = 'worm3_parity_points';
 const OWNED_ITEMS_KEY = 'worm3_owned_items';
 const BET_STREAK_KEY = 'worm3_bet_streak';
 const WORM_CHARACTER_KEY = 'worm3_character';
+// Snapshot of the player's settings taken when the demo starts. Present in
+// localStorage only while a demo is in flight — if it survives to the next
+// boot, the demo was interrupted (refresh/close) and the demo's pastel/desert
+// settings were persisted over the player's own; restore from the snapshot.
+export const PRE_DEMO_SETTINGS_KEY = 'worm3_pre_demo_settings';
 
 // Dev/preview builds get a padded wallet and a fully unlocked store so the
 // economy can be exercised without grinding. Production builds load the real
@@ -43,7 +48,15 @@ const migrateSettings = (rawSettings, version) => {
 // Load persisted state from localStorage
 const loadPersistedState = () => {
   try {
-    const settings = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    let settings = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    const preDemoSettings = localStorage.getItem(PRE_DEMO_SETTINGS_KEY);
+    if (preDemoSettings) {
+      // An interrupted demo left its settings persisted — recover the
+      // player's snapshot and make it the persisted value again.
+      settings = preDemoSettings;
+      localStorage.setItem(SETTINGS_STORAGE_KEY, preDemoSettings);
+      localStorage.removeItem(PRE_DEMO_SETTINGS_KEY);
+    }
     const settingsVersionRaw = localStorage.getItem(SETTINGS_VERSION_KEY);
     const settingsVersion = Number.parseInt(settingsVersionRaw ?? '0', 10) || 0;
     const introSeen = localStorage.getItem('worm3_intro_seen') === '1';
