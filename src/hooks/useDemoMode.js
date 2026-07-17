@@ -67,6 +67,7 @@ export function useDemoMode({
       ...store.settings,
       colorScheme: 'pastel',
       customColors: null,
+      backgroundTheme: 'desert',
       manifoldStyles: demoManifoldStyles,
     });
   }, []);
