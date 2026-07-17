@@ -6,7 +6,7 @@ import { rotateSliceCubies } from '../game/cubeRotation.js';
 import { flipStickerPair, buildManifoldGridMap } from '../game/manifoldLogic.js';
 import { checkRubiksSolved } from '../game/winDetection.js';
 import { clearRefractory } from '../game/refractoryMap.js';
-import { DEMO_STEP_IDS, DEMO_LEVEL_CONFIGS } from '../components/screens/DemoFlowController.jsx';
+import { DEMO_STEP_IDS, DEMO_LEVEL_CONFIGS, VIEW_SHOWCASE_SEQUENCE } from '../components/screens/DemoFlowController.jsx';
 
 const allSurfaceStickersWrongParity = (cubies, size) => {
   for (let x = 0; x < size; x++)
@@ -45,6 +45,7 @@ export function useDemoMode({
   const [demoForecastVisible, setDemoForecastVisible] = useState(false);
   const [demoTryVisible, setDemoTryVisible] = useState(false);
   const [demoCoachCopy, setDemoCoachCopy] = useState(null);
+  const [demoShowcaseSubStep, setDemoShowcaseSubStep] = useState(-1);
 
   const demoForecastPickRef = useRef(null);
   const preDemoSettingsRef = useRef(null);
@@ -116,6 +117,26 @@ export function useDemoMode({
       return;
     }
 
+    if (config.type === 'showcase') {
+      const targetSize = config.cubeSize || 3;
+      if (targetSize !== store.size) changeSize(targetSize);
+      else {
+        store.setRotatedCubies(makeCubies(targetSize));
+        store.resetGame();
+      }
+      store.setFlipMode(false);
+      store.setShowTunnels(false);
+      store.setVisualMode('classic');
+      store.setExploded(false);
+      store.setHollowMode(false);
+      store.setShowNetPanel(false);
+      store.setHasShuffled(true);
+      // Start with the first view in the sequence
+      setDemoShowcaseSubStep(0);
+      VIEW_SHOWCASE_SEQUENCE[0]?.apply(store);
+      return;
+    }
+
     if (config.cubeSize !== store.size) {
       changeSize(config.cubeSize);
     }
@@ -165,6 +186,13 @@ export function useDemoMode({
     if (store.wormHealerMode) {
       store.clearDisparityGame();
       cancelDisparityRun();
+    }
+    if (fromStep === 'view-showcase') {
+      store.setVisualMode('classic');
+      store.setExploded(false);
+      store.setHollowMode(false);
+      store.setShowNetPanel(false);
+      setDemoShowcaseSubStep(-1);
     }
     const idx = DEMO_STEP_IDS.indexOf(fromStep);
     const nextStep = DEMO_STEP_IDS[idx + 1] || 'end';
@@ -272,6 +300,35 @@ export function useDemoMode({
     useGameStore.getState().resetGame();
     startDisparityGame(wizardSettings);
   }, [startDisparityGame]);
+
+  const handleDemoShowcaseNext = useCallback(() => {
+    const store = useGameStore.getState();
+    const cur = demoShowcaseSubStep;
+    VIEW_SHOWCASE_SEQUENCE[cur]?.cleanup(store);
+    const next = cur + 1;
+    if (next < VIEW_SHOWCASE_SEQUENCE.length) {
+      setDemoShowcaseSubStep(next);
+      VIEW_SHOWCASE_SEQUENCE[next].apply(store);
+    } else {
+      store.setVisualMode('classic');
+      store.setExploded(false);
+      store.setHollowMode(false);
+      store.setShowNetPanel(false);
+      setDemoShowcaseSubStep(-1);
+      advanceDemoStep('view-showcase');
+    }
+  }, [demoShowcaseSubStep, advanceDemoStep]);
+
+  const handleDemoShowcaseSkip = useCallback(() => {
+    const store = useGameStore.getState();
+    VIEW_SHOWCASE_SEQUENCE[demoShowcaseSubStep]?.cleanup(store);
+    store.setVisualMode('classic');
+    store.setExploded(false);
+    store.setHollowMode(false);
+    store.setShowNetPanel(false);
+    setDemoShowcaseSubStep(-1);
+    advanceDemoStep('view-showcase');
+  }, [demoShowcaseSubStep, advanceDemoStep]);
 
   const handleDemoChaosSkip = useCallback(() => {
     setDemoForecastVisible(false);
@@ -397,5 +454,8 @@ export function useDemoMode({
     handleDemoForecastPick,
     handleDemoChaosSkip,
     handleDemoDisparityDismiss,
+    demoShowcaseSubStep,
+    handleDemoShowcaseNext,
+    handleDemoShowcaseSkip,
   };
 }

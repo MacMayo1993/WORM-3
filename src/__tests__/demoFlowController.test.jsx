@@ -9,11 +9,12 @@ import { checkRubiksSolved } from '../game/winDetection.js';
 // of that solved state before the player tries it themselves (see App.jsx
 // handleDemoStepContinue). These tests replay that same beat.
 describe('demo flow configuration', () => {
-  it('keeps the shipped demo in the intended seven-stage order plus end state', () => {
+  it('keeps the shipped demo in the intended eight-stage order plus end state', () => {
     expect(DEMO_STEP_IDS).toEqual([
       'baby-cube',
       'twin-paradox',
       'flip-gateway',
+      'view-showcase',
       'worm-traversal',
       'chaos-forecast',
       'random-showcase',
