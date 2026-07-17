@@ -11,7 +11,7 @@
  *   - `handlers` — all callbacks / action functions
  */
 
-import React, { Suspense } from 'react';
+import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { MONO_FONT } from '../utils/uiTheme.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
@@ -498,14 +498,14 @@ export default function UILayer({
 
       <FirstFlipCaption />
 
-      {showFirstFlipTutorial && (
+      <ScreenTransition show={showFirstFlipTutorial} freezeOnExit>
         <FirstFlipTutorial
           onClose={() => setShowFirstFlipTutorial(false)}
           onMainMenu={() => { setShowFirstFlipTutorial(false); onBackToMainMenu(); }}
         />
-      )}
+      </ScreenTransition>
 
-      {solveModeActive && (
+      <ScreenTransition show={solveModeActive} freezeOnExit>
         <Suspense fallback={null}>
           <SolveMode
             cubies={cubies} size={size}
@@ -514,9 +514,9 @@ export default function UILayer({
             focusedStep={solveFocusedStep} onFocusStep={setSolveFocusedStep}
           />
         </Suspense>
-      )}
+      </ScreenTransition>
 
-      {teachMode.active && (
+      <ScreenTransition show={teachMode.active} freezeOnExit>
         <Suspense fallback={null}>
           <TeachMode
             analysis={teachMode.analysis}
@@ -544,7 +544,7 @@ export default function UILayer({
             onClose={teachMode.exitTeachMode}
           />
         </Suspense>
-      )}
+      </ScreenTransition>
 
       <ScreenTransition show={!!victory}>
         <Suspense fallback={null}>
@@ -564,24 +564,26 @@ export default function UILayer({
         </Suspense>
       )}
 
-      {showLevelTutorial && currentLevelData && (
+      <ScreenTransition show={!!(showLevelTutorial && currentLevelData)} freezeOnExit>
         <Suspense fallback={null}>
-          <LevelTutorial
-            level={currentLevelData}
-            onClose={onTutorialClose}
-            onMainMenu={() => { onLevelTutorialClose(); onBackToMainMenu(); }}
-          />
+          {currentLevelData && (
+            <LevelTutorial
+              level={currentLevelData}
+              onClose={onTutorialClose}
+              onMainMenu={() => { onLevelTutorialClose(); onBackToMainMenu(); }}
+            />
+          )}
         </Suspense>
-      )}
+      </ScreenTransition>
 
-      {showNetPanel && (
+      <ScreenTransition show={showNetPanel} freezeOnExit>
         <Suspense fallback={null}>
           <CubeNet
             cubies={cubies} size={size} onTapFlip={onTapFlip} flipMode={flipMode}
             onClose={() => setShowNetPanel(false)} faceColors={resolvedColors} faceTextures={faceTextures}
           />
         </Suspense>
-      )}
+      </ScreenTransition>
 
       {isMobile && !wormHealerMode && !showTutorial && !showMainMenu && !showDisparityWizard && !showDisparityBetting && !showFreeplayWizard && !showRandomWizard && !showWormModeWizard && (
         <MobileControls
@@ -642,7 +644,7 @@ export default function UILayer({
       {!wormHealerMode && <AntipodalModeHUD />}
       {!wormHealerMode && <EchoRotationIndicator />}
 
-      {showDevConsole && (
+      <ScreenTransition show={showDevConsole} freezeOnExit>
         <Suspense fallback={null}>
           <DevConsole
             onClose={() => setShowDevConsole(false)}
@@ -652,10 +654,46 @@ export default function UILayer({
             moveHistory={moveHistory}
           />
         </Suspense>
-      )}
+      </ScreenTransition>
 
       <RandomStyleFlash />
+      <ViewModeFlash />
     </>
+  );
+}
+
+// Soft radial ripple whenever the cube's view changes — visual mode, explode,
+// or hollow — so switching views (Views sheet, demo showcase) reads as an
+// event instead of an instant material swap. Random mode has its own flash.
+function ViewModeFlash() {
+  const { visualMode, exploded, hollowMode } = useGameStore(useShallow(s => ({
+    visualMode: s.visualMode,
+    exploded: s.exploded,
+    hollowMode: s.hollowMode,
+  })));
+  const [tick, setTick] = useState(0);
+  const firstRun = useRef(true);
+
+  useEffect(() => {
+    if (firstRun.current) {
+      firstRun.current = false;
+      return;
+    }
+    if (useGameStore.getState().randomMode) return;
+    if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    setTick(t => t + 1);
+  }, [visualMode, exploded, hollowMode]);
+
+  if (tick === 0) return null;
+  return (
+    <div
+      key={tick}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 9990, pointerEvents: 'none',
+        background: 'radial-gradient(ellipse at center, rgba(255,255,255,0.16) 0%, rgba(120,180,255,0.09) 45%, transparent 70%)',
+        animation: 'viewModeFlash 0.45s ease-out forwards',
+      }}
+    />
   );
 }
 

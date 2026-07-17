@@ -1392,32 +1392,32 @@ export default function WORM3() {
 
       {/* Demo mode overlays */}
       {demoMode && <DemoProgressBar currentStep={demoStep} />}
-      {demoMode && demoStepIntroVisible && demoStep && demoStep !== 'end' && (
+      <ScreenTransition show={!!(demoMode && demoStepIntroVisible && demoStep && demoStep !== 'end')} freezeOnExit>
         <DemoStepIntro step={demoStep} onContinue={handleDemoStepContinue} onSkip={() => advanceDemoStep(demoStep)} />
-      )}
-      {demoMode && demoTryVisible && !demoStepIntroVisible && (
+      </ScreenTransition>
+      <ScreenTransition show={!!(demoMode && demoTryVisible && !demoStepIntroVisible)} freezeOnExit>
         <DemoCoach
           step={demoStep}
           copy={demoCoachCopy}
           onNext={demoStep === 'chaos-forecast' ? handleDemoChaosSkip : () => advanceDemoStep(demoStep)}
           onExit={handleExitDemo}
         />
-      )}
+      </ScreenTransition>
       {demoMode && demoForecastVisible && (
         <Suspense fallback={null}>
           <DemoForecastPicker onPick={handleDemoForecastPick} onSkip={handleDemoChaosSkip} />
         </Suspense>
       )}
-      {demoMode && demoStep === 'view-showcase' && demoViewSpotlight && !demoStepIntroVisible && (
+      <ScreenTransition show={!!(demoMode && demoStep === 'view-showcase' && demoViewSpotlight && !demoStepIntroVisible)} freezeOnExit>
         <DemoViewSpotlightHint onSkip={handleDemoShowcaseSkip} />
-      )}
-      {demoMode && demoStep === 'view-showcase' && demoShowcaseSubStep >= 0 && !demoStepIntroVisible && (
+      </ScreenTransition>
+      <ScreenTransition show={!!(demoMode && demoStep === 'view-showcase' && demoShowcaseSubStep >= 0 && !demoStepIntroVisible)} freezeOnExit>
         <DemoViewShowcase
           subStep={demoShowcaseSubStep}
           onNext={handleDemoShowcaseNext}
           onSkip={handleDemoShowcaseSkip}
         />
-      )}
+      </ScreenTransition>
       {demoMode && demoStep === 'end' && (
         <Suspense fallback={null}>
           <DemoEndScreen
