@@ -5,11 +5,12 @@ const DEMO_STEPS = [
   { id: 'baby-cube', label: 'Baby Cube', num: 1 },
   { id: 'twin-paradox', label: 'Twin Paradox', num: 2 },
   { id: 'flip-gateway', label: 'Flip Gateway', num: 3 },
-  { id: 'worm-traversal', label: 'WORM Traversal', num: 4 },
-  { id: 'chaos-forecast', label: 'Chaos Forecast', num: 5 },
-  { id: 'random-showcase', label: 'Random Mode', num: 6 },
-  { id: 'cosmetic-reward', label: 'Cosmetic Reward', num: 7 },
-  { id: 'end', label: 'Complete', num: 8 },
+  { id: 'view-showcase', label: 'View Modes', num: 4 },
+  { id: 'worm-traversal', label: 'WORM Traversal', num: 5 },
+  { id: 'chaos-forecast', label: 'Chaos Forecast', num: 6 },
+  { id: 'random-showcase', label: 'Random Mode', num: 7 },
+  { id: 'cosmetic-reward', label: 'Cosmetic Reward', num: 8 },
+  { id: 'end', label: 'Complete', num: 9 },
 ];
 
 export const DEMO_STEP_IDS = DEMO_STEPS.map(s => s.id);
@@ -192,6 +193,7 @@ const DemoStepIntro = ({ step, onContinue, onSkip }) => {
     'baby-cube': 'Solve this first twist. Drag the turned row back into place to continue.',
     'twin-paradox': 'Opposite faces are linked.',
     'flip-gateway': 'Flip every tile, then flip them all back.',
+    'view-showcase': 'See every way to view the cube.',
     'worm-traversal': 'Travel through the wormholes you opened.',
     'chaos-forecast': 'Predict which pair survives.',
     'random-showcase': 'The cube cycles through random styles every few seconds.',
@@ -259,6 +261,12 @@ const DEMO_LEVEL_CONFIGS = {
     features: { rotations: true, tunnels: true, flips: true },
     chaosLevel: 0,
   },
+  'view-showcase': {
+    type: 'showcase',
+    cubeSize: 3,
+    features: { rotations: true, tunnels: false, flips: false },
+    chaosLevel: 0,
+  },
   'worm-traversal': {
     type: 'worm',
     cubeSize: 6,
@@ -322,4 +330,122 @@ const DemoCoach = ({ step, onNext, onExit, copy: copyOverride }) => {
   );
 };
 
-export { DemoProgressBar, DemoStepIntro, DemoCoach, TRY_COPY, DEMO_STEPS, DEMO_LEVEL_CONFIGS };
+// ── View Showcase sequence ────────────────────────────────────────────────────
+// Each entry describes one beat of the view-showcase demo step.
+// `apply` is called with the store to activate the view; `cleanup` reverses it.
+const VIEW_SHOWCASE_SEQUENCE = [
+  {
+    key: 'grid',
+    title: 'Grid',
+    copy: 'Grid overlays coordinate lines on each face — useful for tracking tile positions.',
+    apply: (s) => s.setVisualMode('grid'),
+    cleanup: (s) => s.setVisualMode('classic'),
+  },
+  {
+    key: 'sudokube',
+    title: 'Sudoku',
+    copy: 'Sudoku mode shows unique numbers on every tile — a number-puzzle twist.',
+    apply: (s) => s.setVisualMode('sudokube'),
+    cleanup: (s) => s.setVisualMode('classic'),
+  },
+  {
+    key: 'wireframe',
+    title: 'Wireframe',
+    copy: 'Wireframe strips each tile down to its outline. Clean and minimal.',
+    apply: (s) => s.setVisualMode('wireframe'),
+    cleanup: (s) => s.setVisualMode('classic'),
+  },
+  {
+    key: 'glass',
+    title: 'Glass',
+    copy: 'Glass makes tiles transparent — see through the cube to the far side.',
+    apply: (s) => s.setVisualMode('glass'),
+    cleanup: (s) => s.setVisualMode('classic'),
+  },
+  {
+    key: 'chrome',
+    title: 'Chrome',
+    copy: 'Chrome gives each tile a reflective metallic surface.',
+    apply: (s) => s.setVisualMode('chrome'),
+    cleanup: (s) => s.setVisualMode('classic'),
+  },
+  {
+    key: 'neon',
+    title: 'Neon',
+    copy: 'Neon lights up every tile edge with a glowing outline.',
+    apply: (s) => s.setVisualMode('neon'),
+    cleanup: (s) => s.setVisualMode('classic'),
+  },
+  {
+    key: 'gap',
+    title: 'Gap',
+    copy: 'Gap adds visible spacing between tiles so you can see each one individually.',
+    apply: (s) => s.setVisualMode('gap'),
+    cleanup: (s) => s.setVisualMode('classic'),
+  },
+  {
+    key: 'lego',
+    title: 'Lego',
+    copy: 'Lego turns each tile into a brick-like stud.',
+    apply: (s) => s.setVisualMode('lego'),
+    cleanup: (s) => s.setVisualMode('classic'),
+  },
+  {
+    key: 'explode',
+    title: 'Explode',
+    copy: 'Explode separates every face outward so you can see all six sides at once.',
+    apply: (s) => s.setExploded(true),
+    cleanup: (s) => s.setExploded(false),
+  },
+  {
+    key: 'hollow',
+    title: 'Hollow',
+    copy: 'Hollow removes internal cubies, revealing the cube\'s skeletal structure.',
+    apply: (s) => s.setHollowMode(true),
+    cleanup: (s) => s.setHollowMode(false),
+  },
+  {
+    key: 'net',
+    title: 'Net',
+    copy: 'Net unfolds the cube flat — like paper craft. Great for spotting patterns.',
+    apply: (s) => s.setShowNetPanel(true),
+    cleanup: (s) => s.setShowNetPanel(false),
+  },
+];
+
+const DemoViewShowcase = ({ subStep, onNext, onSkip }) => {
+  ensureDemoShellStyle();
+  const entry = VIEW_SHOWCASE_SEQUENCE[subStep];
+  if (!entry) return null;
+  const progress = `${subStep + 1} / ${VIEW_SHOWCASE_SEQUENCE.length}`;
+
+  return (
+    <div className="demo-intro-root" style={{ pointerEvents: 'none', background: 'none', backdropFilter: 'none' }}>
+      <section className="demo-intro-card" style={{ pointerEvents: 'auto' }} aria-live="polite">
+        <p className="demo-intro-step" style={{ marginBottom: 2 }}>{progress}</p>
+        <h2 className="demo-intro-title" style={{ fontSize: 'clamp(20px, 5.5vw, 28px)', marginBottom: 6 }}>
+          {entry.title}
+        </h2>
+        <p className="demo-intro-copy">{entry.copy}</p>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 10 }}>
+          <button type="button" onClick={onNext} className="demo-intro-button">
+            {subStep < VIEW_SHOWCASE_SEQUENCE.length - 1 ? 'Next View' : 'Done'}
+          </button>
+          {onSkip && (
+            <button
+              type="button"
+              onClick={onSkip}
+              aria-label="Skip views"
+              className="demo-intro-button"
+              style={{ background: 'transparent', color: '#7b6f45', boxShadow: 'none' }}
+            >
+              Skip All ▶
+            </button>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+};
+
+export { DemoProgressBar, DemoStepIntro, DemoCoach, DemoViewShowcase, VIEW_SHOWCASE_SEQUENCE, TRY_COPY, DEMO_STEPS, DEMO_LEVEL_CONFIGS };
