@@ -3343,6 +3343,14 @@ select.btn-compact:disabled {
   100% { opacity: 0;    transform: scale(1.08); }
 }
 
+/* View-mode switch ripple — soft radial pulse when the cube's visual mode,
+   explode, or hollow state changes (Views sheet + demo view showcase). */
+@keyframes viewModeFlash {
+  0%   { opacity: 0.45; transform: scale(0.92); }
+  40%  { opacity: 0.18; transform: scale(1.02); }
+  100% { opacity: 0;    transform: scale(1.08); }
+}
+
 @keyframes randomShake {
   0%   { transform: translate(0, 0) rotate(0deg); }
   15%  { transform: translate(-5px, 2px) rotate(-0.4deg); }

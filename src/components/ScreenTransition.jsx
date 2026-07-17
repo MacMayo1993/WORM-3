@@ -2,10 +2,15 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 const DURATION = 180;
 
-export default function ScreenTransition({ show, children, duration = DURATION }) {
+// `freezeOnExit`: render a cached snapshot of the last shown children during the
+// exit fade. Use for surfaces whose props reset the moment they are dismissed
+// (TeachMode analysis, demo cards, etc.) so the fade-out never renders nulls.
+export default function ScreenTransition({ show, children, duration = DURATION, freezeOnExit = false }) {
   const [mounted, setMounted] = useState(false);
   const [phase, setPhase] = useState('idle');
   const timerRef = useRef(null);
+  const frozenRef = useRef(null);
+  if (show) frozenRef.current = children;
 
   const cleanup = useCallback(() => {
     if (timerRef.current) {
@@ -28,6 +33,7 @@ export default function ScreenTransition({ show, children, duration = DURATION }
       timerRef.current = setTimeout(() => {
         setMounted(false);
         setPhase('idle');
+        frozenRef.current = null;
       }, duration);
     }
 
@@ -42,5 +48,5 @@ export default function ScreenTransition({ show, children, duration = DURATION }
     willChange: 'opacity',
   };
 
-  return <div style={style}>{children}</div>;
+  return <div style={style}>{freezeOnExit && !show ? frozenRef.current : children}</div>;
 }
