@@ -1,5 +1,7 @@
 import React from 'react';
 import { UI_FONT, DISPLAY_FONT } from '../../utils/uiTheme.js';
+import { makeCubies } from '../../game/cubeState.js';
+import { flipStickerPair, buildManifoldGridMap } from '../../game/manifoldLogic.js';
 
 const DEMO_STEPS = [
   { id: 'baby-cube', label: 'Baby Cube', num: 1 },
@@ -155,7 +157,9 @@ const ensureDemoShellStyle = () => {
     .demo-spotlight-hint::after {
       content: '';
       position: absolute;
-      left: 50%;
+      /* Point at the Views tile: 4th of 5 space-around slots in a bar capped
+         at 420px wide, so its center sits ~20% of the bar width right of center. */
+      left: calc(50% + min(19vw, 76px));
       bottom: -8px;
       transform: translateX(-50%) rotate(45deg);
       width: 16px;
@@ -432,6 +436,24 @@ const VIEW_SHOWCASE_SEQUENCE = [
     copy: 'Explode separates every face outward so you can see all six sides at once.',
     apply: (s) => s.setExploded(true),
     cleanup: (s) => s.setExploded(false),
+  },
+  {
+    key: 'tunnels',
+    title: 'Tunnels',
+    copy: 'Flipping a tile opens a wormhole to its antipodal twin — watch the tunnel thread through the cube\'s core.',
+    // Flip the front-face center tile so exactly one antipodal tunnel lights up.
+    apply: (s) => {
+      s.setShowTunnels(true);
+      const mid = Math.floor(s.size / 2);
+      const map = buildManifoldGridMap(s.cubies, s.size);
+      s.setRotatedCubies(flipStickerPair(s.cubies, s.size, mid, mid, s.size - 1, 'PZ', map));
+    },
+    // Rebuild solved cubies rather than re-flipping: the user may have rotated
+    // the flipped tile away from where apply() put it.
+    cleanup: (s) => {
+      s.setShowTunnels(false);
+      s.setRotatedCubies(makeCubies(s.size));
+    },
   },
   {
     key: 'hollow',
