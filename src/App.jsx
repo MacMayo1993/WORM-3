@@ -78,7 +78,7 @@ const PlatformerWormMode = React.lazy(() => import('./worm/PlatformerWormMode.js
 const HollowVoidCube = React.lazy(() => import('./3d/HollowVoidCube.jsx'));
 const DemoEndScreen = React.lazy(() => import('./components/screens/DemoEndScreen.jsx'));
 const DemoForecastPicker = React.lazy(() => import('./components/screens/DemoForecastPicker.jsx'));
-import { DemoProgressBar, DemoStepIntro, DemoCoach, DemoViewShowcase } from './components/screens/DemoFlowController.jsx';
+import { DemoProgressBar, DemoStepIntro, DemoCoach, DemoViewShowcase, DemoViewSpotlightHint } from './components/screens/DemoFlowController.jsx';
 
 
 const _clamp = (t, a = 0, b = 1) => Math.max(a, Math.min(b, t));
@@ -483,6 +483,7 @@ export default function WORM3() {
     handleDemoReplay, handleDemoFreeplay, handleExitDemo,
     handleDemoForecastPick, handleDemoChaosSkip, handleDemoDisparityDismiss,
     demoShowcaseSubStep, handleDemoShowcaseNext, handleDemoShowcaseSkip,
+    demoViewSpotlight, handleDemoViewSpotlightClick,
   } = useDemoMode({
     cancelShuffle, changeSize, setRotatedCubies, reset,
     cancelDisparityRun, startDisparityGame,
@@ -1357,6 +1358,8 @@ export default function WORM3() {
               onMenuMobiusCubelet: handleMenuMobiusCubelet,
               onDemo: handleStartDemo,
               onDemoDisparityDismiss: handleDemoDisparityDismiss,
+              demoViewSpotlight,
+              onDemoViewSpotlightClick: handleDemoViewSpotlightClick,
               showMergeThemePicker,
               onMergeStart: handleMergeStart,
               onMergeCancel: handleMergeCancel,
@@ -1404,6 +1407,9 @@ export default function WORM3() {
         <Suspense fallback={null}>
           <DemoForecastPicker onPick={handleDemoForecastPick} onSkip={handleDemoChaosSkip} />
         </Suspense>
+      )}
+      {demoMode && demoStep === 'view-showcase' && demoViewSpotlight && !demoStepIntroVisible && (
+        <DemoViewSpotlightHint onSkip={handleDemoShowcaseSkip} />
       )}
       {demoMode && demoStep === 'view-showcase' && demoShowcaseSubStep >= 0 && !demoStepIntroVisible && (
         <DemoViewShowcase

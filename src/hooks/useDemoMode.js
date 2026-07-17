@@ -46,6 +46,7 @@ export function useDemoMode({
   const [demoTryVisible, setDemoTryVisible] = useState(false);
   const [demoCoachCopy, setDemoCoachCopy] = useState(null);
   const [demoShowcaseSubStep, setDemoShowcaseSubStep] = useState(-1);
+  const [demoViewSpotlight, setDemoViewSpotlight] = useState(false);
 
   const demoForecastPickRef = useRef(null);
   const preDemoSettingsRef = useRef(null);
@@ -132,9 +133,9 @@ export function useDemoMode({
       store.setHollowMode(false);
       store.setShowNetPanel(false);
       store.setHasShuffled(true);
-      // Start with the first view in the sequence
-      setDemoShowcaseSubStep(0);
-      VIEW_SHOWCASE_SEQUENCE[0]?.apply(store);
+      // Spotlight the Views button first — the user's tap starts the sequence.
+      setDemoShowcaseSubStep(-1);
+      setDemoViewSpotlight(true);
       return;
     }
 
@@ -194,6 +195,7 @@ export function useDemoMode({
       store.setHollowMode(false);
       store.setShowNetPanel(false);
       setDemoShowcaseSubStep(-1);
+      setDemoViewSpotlight(false);
     }
     const idx = DEMO_STEP_IDS.indexOf(fromStep);
     const nextStep = DEMO_STEP_IDS[idx + 1] || 'end';
@@ -255,6 +257,7 @@ export function useDemoMode({
     setDemoForecastVisible(false);
     setDemoCoachCopy(null);
     setDemoShowcaseSubStep(-1);
+    setDemoViewSpotlight(false);
     demoFlipPhaseRef.current = null;
     store.setRandomMode(false);
     store.setVisualMode('classic');
@@ -324,6 +327,15 @@ export function useDemoMode({
     startDisparityGame(wizardSettings);
   }, [startDisparityGame]);
 
+  // The spotlighted Views button was tapped — start the view sequence.
+  const handleDemoViewSpotlightClick = useCallback(() => {
+    if (!demoViewSpotlight) return;
+    setDemoViewSpotlight(false);
+    const store = useGameStore.getState();
+    setDemoShowcaseSubStep(0);
+    VIEW_SHOWCASE_SEQUENCE[0]?.apply(store);
+  }, [demoViewSpotlight]);
+
   const handleDemoShowcaseNext = useCallback(() => {
     const store = useGameStore.getState();
     const cur = demoShowcaseSubStep;
@@ -344,6 +356,7 @@ export function useDemoMode({
 
   const handleDemoShowcaseSkip = useCallback(() => {
     const store = useGameStore.getState();
+    setDemoViewSpotlight(false);
     VIEW_SHOWCASE_SEQUENCE[demoShowcaseSubStep]?.cleanup(store);
     store.setVisualMode('classic');
     store.setExploded(false);
@@ -478,6 +491,8 @@ export function useDemoMode({
     handleDemoChaosSkip,
     handleDemoDisparityDismiss,
     demoShowcaseSubStep,
+    demoViewSpotlight,
+    handleDemoViewSpotlightClick,
     handleDemoShowcaseNext,
     handleDemoShowcaseSkip,
   };

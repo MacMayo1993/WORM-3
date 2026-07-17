@@ -124,6 +124,8 @@ export default function UILayer({
     onVictoryContinue, onVictoryNewGame,
     onDemo,
     onDemoDisparityDismiss,
+    demoViewSpotlight,
+    onDemoViewSpotlightClick,
   } = handlers;
 
   // ── Zustand store reads ──────────────────────────────────────────────────
@@ -327,7 +329,11 @@ export default function UILayer({
             onToggleSolve={() => { setSolveModeActive(!solveModeActive); if (!solveModeActive) setSolveFocusedStep(null); else setSolveHighlights([]); }}
             onToggleTeach={() => { if (teachMode.active) teachMode.exitTeachMode(); else if (size === 3) teachMode.enterTeachMode(); }}
             hasActiveView={exploded || showTunnels || showNetPanel || hollowMode || showLeaderboard}
-            onToggleViews={() => { setSheetMode('views'); setSheetOpen(!sheetOpen || sheetMode !== 'views'); }}
+            onToggleViews={() => {
+              if (demoViewSpotlight) { onDemoViewSpotlightClick?.(); return; }
+              setSheetMode('views'); setSheetOpen(!sheetOpen || sheetMode !== 'views');
+            }}
+            spotlightViews={!!demoViewSpotlight}
             onToggleMore={() => { setSheetMode('more'); setSheetOpen(!sheetOpen || sheetMode !== 'more'); }}
             moreOpen={sheetOpen && sheetMode === 'more'}
             viewsOpen={sheetOpen && sheetMode === 'views'}
