@@ -248,14 +248,6 @@ export function useDemoMode({
     }
   }, [applyDemoStepConfig, handleOpenStore, clearDemoWatchTimers, startAnimatedShuffle]);
 
-  const handleDemoReplay = useCallback(() => {
-    const store = useGameStore.getState();
-    cleanupAllDemoState(store);
-    store.startDemo();
-    applyDemoSettings();
-    setDemoStepIntroVisible(true);
-  }, [cleanupAllDemoState, applyDemoSettings]);
-
   const cleanupAllDemoState = useCallback((store) => {
     clearDemoWatchTimers();
     setDemoTryVisible(false);
@@ -281,6 +273,14 @@ export function useDemoMode({
       cancelDisparityRun();
     }
   }, [clearDemoWatchTimers, cancelDisparityRun]);
+
+  const handleDemoReplay = useCallback(() => {
+    const store = useGameStore.getState();
+    cleanupAllDemoState(store);
+    store.startDemo();
+    applyDemoSettings();
+    setDemoStepIntroVisible(true);
+  }, [cleanupAllDemoState, applyDemoSettings]);
 
   const handleDemoFreeplay = useCallback(() => {
     const store = useGameStore.getState();
