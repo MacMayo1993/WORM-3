@@ -11,8 +11,31 @@ const COLORS = {
   white:  '#F0F0F0',
 };
 
-function CubeTile({ color, label, onClick, size = 42, elevated = false, lit = false }) {
+const SPOTLIGHT_STYLE_ID = 'worm3-nav-spotlight-style';
+
+const ensureSpotlightStyle = () => {
+  if (typeof document === 'undefined' || document.getElementById(SPOTLIGHT_STYLE_ID)) return;
+  const style = document.createElement('style');
+  style.id = SPOTLIGHT_STYLE_ID;
+  style.textContent = `
+    @keyframes cube-tile-spotlight-pulse {
+      0%, 100% { box-shadow: 0 0 0 3px rgba(255, 216, 110, 0.85), 0 0 18px 6px rgba(255, 200, 60, 0.55); opacity: 1; }
+      50% { box-shadow: 0 0 0 7px rgba(255, 216, 110, 0.35), 0 0 30px 14px rgba(255, 200, 60, 0.30); opacity: 0.8; }
+    }
+    .cube-tile-spotlight-halo {
+      position: absolute;
+      inset: -4px;
+      border-radius: 12px;
+      pointer-events: none;
+      animation: cube-tile-spotlight-pulse 1.2s ease-in-out infinite;
+    }
+  `;
+  document.head.appendChild(style);
+};
+
+function CubeTile({ color, label, onClick, size = 42, elevated = false, lit = false, spotlight = false }) {
   const [pressed, setPressed] = useState(false);
+  if (spotlight) ensureSpotlightStyle();
 
   const handlePress = useCallback(() => {
     setPressed(true);
@@ -42,6 +65,7 @@ function CubeTile({ color, label, onClick, size = 42, elevated = false, lit = fa
       <div
         className="cube-tile-face"
         style={{
+          position: 'relative',
           width: size,
           height: size,
           borderRadius: Math.round(size * 0.16),
@@ -54,7 +78,9 @@ function CubeTile({ color, label, onClick, size = 42, elevated = false, lit = fa
           transition: 'transform 0.06s ease, box-shadow 0.06s ease',
           flexShrink: 0,
         }}
-      />
+      >
+        {spotlight && <div className="cube-tile-spotlight-halo" style={{ borderRadius: Math.round(size * 0.16) + 4 }} />}
+      </div>
       <span className="cube-tile-label" style={{ color: lit ? '#fff' : undefined }}>
         {label}
       </span>
@@ -75,6 +101,7 @@ const BottomNavBar = ({
   moreOpen,
   viewsOpen,
   chaosMode,
+  spotlightViews = false,
 }) => {
   const centralState = solveModeActive ? 'solve' : teachModeActive ? 'teach' : 'idle';
 
@@ -103,6 +130,7 @@ const BottomNavBar = ({
         label="Views"
         onClick={onToggleViews}
         lit={viewsOpen || hasActiveView}
+        spotlight={spotlightViews}
       />
       <CubeTile
         color={COLORS.white}

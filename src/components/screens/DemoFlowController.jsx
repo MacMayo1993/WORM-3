@@ -134,6 +134,42 @@ const ensureDemoShellStyle = () => {
       box-shadow: 0 7px 16px rgba(95, 127, 74, 0.24);
     }
 
+    .demo-spotlight-hint {
+      position: fixed;
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 96px);
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 11500;
+      width: min(340px, calc(100vw - 40px));
+      padding: 13px 16px 14px;
+      border-radius: 18px;
+      background: rgba(250, 247, 238, 0.95);
+      border: 1px solid rgba(111, 126, 86, 0.25);
+      box-shadow: 0 14px 34px rgba(40, 48, 32, 0.2);
+      color: #26331f;
+      font-family: ${UI_FONT};
+      text-align: center;
+      animation: demo-spotlight-hint-bob 1.6s ease-in-out infinite;
+    }
+
+    .demo-spotlight-hint::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      bottom: -8px;
+      transform: translateX(-50%) rotate(45deg);
+      width: 16px;
+      height: 16px;
+      background: rgba(250, 247, 238, 0.95);
+      border-right: 1px solid rgba(111, 126, 86, 0.25);
+      border-bottom: 1px solid rgba(111, 126, 86, 0.25);
+    }
+
+    @keyframes demo-spotlight-hint-bob {
+      0%, 100% { transform: translateX(-50%) translateY(0); }
+      50% { transform: translateX(-50%) translateY(-6px); }
+    }
+
     @media (max-width: 640px) {
       .demo-progress-pill {
         top: max(8px, env(safe-area-inset-top, 8px));
@@ -413,6 +449,31 @@ const VIEW_SHOWCASE_SEQUENCE = [
   },
 ];
 
+// Shown before the view sequence starts: the Views tile on the bottom nav bar
+// pulses (see BottomNavBar `spotlightViews`) and this hint asks for the tap
+// that kicks off the first view.
+const DemoViewSpotlightHint = ({ onSkip }) => {
+  ensureDemoShellStyle();
+  return (
+    <div className="demo-spotlight-hint" role="status" aria-live="polite">
+      <p className="demo-intro-copy" style={{ marginBottom: 8 }}>
+        Tap the glowing <strong>Views</strong> button below to open the first view mode.
+      </p>
+      {onSkip && (
+        <button
+          type="button"
+          onClick={onSkip}
+          aria-label="Skip views"
+          className="demo-intro-button"
+          style={{ background: 'transparent', color: '#7b6f45', boxShadow: 'none', padding: '4px 12px' }}
+        >
+          Skip All ▶
+        </button>
+      )}
+    </div>
+  );
+};
+
 const DemoViewShowcase = ({ subStep, onNext, onSkip }) => {
   ensureDemoShellStyle();
   const entry = VIEW_SHOWCASE_SEQUENCE[subStep];
@@ -448,4 +509,14 @@ const DemoViewShowcase = ({ subStep, onNext, onSkip }) => {
   );
 };
 
-export { DemoProgressBar, DemoStepIntro, DemoCoach, DemoViewShowcase, VIEW_SHOWCASE_SEQUENCE, TRY_COPY, DEMO_STEPS, DEMO_LEVEL_CONFIGS };
+export {
+  DemoProgressBar,
+  DemoStepIntro,
+  DemoCoach,
+  DemoViewShowcase,
+  DemoViewSpotlightHint,
+  VIEW_SHOWCASE_SEQUENCE,
+  TRY_COPY,
+  DEMO_STEPS,
+  DEMO_LEVEL_CONFIGS
+};
