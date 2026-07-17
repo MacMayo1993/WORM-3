@@ -270,7 +270,7 @@ const DEMO_LEVEL_CONFIGS = {
   'worm-traversal': {
     type: 'worm',
     cubeSize: 6,
-    wormSpeed: 0.8,
+    wormSpeed: 2.5,
     wormOrbCount: 3,
     wormholeInterval: 8,
     wormColor: '#33ff66',
