@@ -67,6 +67,7 @@ export function useDemoMode({
       ...store.settings,
       colorScheme: 'pastel',
       customColors: null,
+      backgroundTheme: 'desert',
       manifoldStyles: demoManifoldStyles,
     });
   }, []);
@@ -248,18 +249,42 @@ export function useDemoMode({
   }, [applyDemoStepConfig, handleOpenStore, clearDemoWatchTimers, startAnimatedShuffle]);
 
   const handleDemoReplay = useCallback(() => {
-    clearDemoWatchTimers();
-    setDemoTryVisible(false);
-    useGameStore.getState().startDemo();
+    const store = useGameStore.getState();
+    cleanupAllDemoState(store);
+    store.startDemo();
     applyDemoSettings();
     setDemoStepIntroVisible(true);
-  }, [clearDemoWatchTimers, applyDemoSettings]);
+  }, [cleanupAllDemoState, applyDemoSettings]);
 
-  const handleDemoFreeplay = useCallback(() => {
+  const cleanupAllDemoState = useCallback((store) => {
     clearDemoWatchTimers();
     setDemoTryVisible(false);
-    const store = useGameStore.getState();
+    setDemoStepIntroVisible(false);
+    setDemoForecastVisible(false);
+    setDemoCoachCopy(null);
+    setDemoShowcaseSubStep(-1);
+    demoFlipPhaseRef.current = null;
     store.setRandomMode(false);
+    store.setVisualMode('classic');
+    store.setExploded(false);
+    store.setHollowMode(false);
+    store.setShowNetPanel(false);
+    store.setFlipMode(false);
+    store.setShowTunnels(false);
+    store.setShowDisparityWinner(false);
+    if (store.wormHealerMode) {
+      store.clearDisparityGame();
+      cancelDisparityRun();
+    }
+    if (store.disparityRunning) {
+      store.clearDisparityGame();
+      cancelDisparityRun();
+    }
+  }, [clearDemoWatchTimers, cancelDisparityRun]);
+
+  const handleDemoFreeplay = useCallback(() => {
+    const store = useGameStore.getState();
+    cleanupAllDemoState(store);
     if (preDemoSettingsRef.current) {
       store.setSettings(preDemoSettingsRef.current);
       preDemoSettingsRef.current = null;
@@ -267,19 +292,17 @@ export function useDemoMode({
     store.exitDemo();
     store.setShowMainMenu(false);
     setShowFreeplayWizard(true);
-  }, [clearDemoWatchTimers, setShowFreeplayWizard]);
+  }, [cleanupAllDemoState, setShowFreeplayWizard]);
 
   const handleExitDemo = useCallback(() => {
-    clearDemoWatchTimers();
-    setDemoTryVisible(false);
     const store = useGameStore.getState();
-    store.setRandomMode(false);
+    cleanupAllDemoState(store);
     if (preDemoSettingsRef.current) {
       store.setSettings(preDemoSettingsRef.current);
       preDemoSettingsRef.current = null;
     }
     store.exitDemo();
-  }, [clearDemoWatchTimers]);
+  }, [cleanupAllDemoState]);
 
   const handleDemoForecastPick = useCallback((pair) => {
     setDemoForecastVisible(false);
