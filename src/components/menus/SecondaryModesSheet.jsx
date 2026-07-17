@@ -25,7 +25,6 @@ const SecondaryModesSheet = ({
   onClose,
   mode, // 'more' or 'views'
   // Core toggles
-  flipMode, onToggleFlip, flipLocked,
   chaosMode, chaosLevel, onToggleChaos, onSetChaosLevel, chaosLocked, maxChaosLevel,
   autoRotateEnabled, onToggleAutoRotate,
   showTunnels, onToggleTunnels, tunnelsLocked,
@@ -35,6 +34,10 @@ const SecondaryModesSheet = ({
   hollowMode, onToggleHollow,
   visualMode, onCycleVisualMode,
   size, onChangeSize, sizeLocked,
+  // Solver (3×3 only — Flip moved to the main nav bar)
+  solveModeActive, onToggleSolve,
+  teachModeActive, onToggleTeach,
+  solverLocked,
   // Advanced
   handsMode, onToggleHands,
   // Leaderboard
@@ -105,7 +108,6 @@ const SecondaryModesSheet = ({
             <div className="sheet-group">
               <div className="sheet-group-title">Core Modes</div>
               <div className="sheet-grid">
-                <SheetItem label="Flip" active={flipMode} onClick={onToggleFlip} color="#3b82f6" locked={flipLocked} />
                 <SheetItem label="Disparity" active={chaosMode} onClick={onToggleChaos} color="#ef4444" locked={chaosLocked} />
                 {chaosMode && !chaosLocked && (
                   <>
@@ -122,6 +124,15 @@ const SecondaryModesSheet = ({
                     <SheetItem label="Auto" active={autoRotateEnabled} onClick={onToggleAutoRotate} color="#ef4444" />
                   </>
                 )}
+              </div>
+            </div>
+
+            {/* Solver — 3×3 only */}
+            <div className="sheet-group">
+              <div className="sheet-group-title">{solverLocked ? 'Solver (3×3 only)' : 'Solver'}</div>
+              <div className="sheet-grid">
+                <SheetItem label="Solve" active={solveModeActive} onClick={onToggleSolve} color="#0051A2" locked={solverLocked} />
+                <SheetItem label="Teach" active={teachModeActive} onClick={onToggleTeach} color="#FFD500" locked={solverLocked} />
               </div>
             </div>
 

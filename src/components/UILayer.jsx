@@ -324,10 +324,9 @@ export default function UILayer({
             onReset={onReset}
             onShuffle={currentLevelData ? onShuffleForLevel : onShuffle}
             chaosMode={chaosMode}
-            solveModeActive={solveModeActive}
-            teachModeActive={teachMode.active}
-            onToggleSolve={() => { setSolveModeActive(!solveModeActive); if (!solveModeActive) setSolveFocusedStep(null); else setSolveHighlights([]); }}
-            onToggleTeach={() => { if (teachMode.active) teachMode.exitTeachMode(); else if (size === 3) teachMode.enterTeachMode(); }}
+            flipMode={flipMode}
+            onToggleFlip={() => { if (!currentLevelData || currentLevelData.features.flips) setFlipMode(!flipMode); }}
+            flipLocked={!!(currentLevelData && !currentLevelData.features.flips)}
             hasActiveView={exploded || showTunnels || showNetPanel || hollowMode || showLeaderboard}
             onToggleViews={() => {
               if (demoViewSpotlight) { onDemoViewSpotlightClick?.(); return; }
@@ -346,9 +345,19 @@ export default function UILayer({
         open={sheetOpen}
         onClose={() => setSheetOpen(false)}
         mode={sheetMode}
-        flipMode={flipMode}
-        onToggleFlip={() => { if (!currentLevelData || currentLevelData.features.flips) setFlipMode(!flipMode); }}
-        flipLocked={!!(currentLevelData && !currentLevelData.features.flips)}
+        solveModeActive={solveModeActive}
+        onToggleSolve={() => {
+          setSolveModeActive(!solveModeActive);
+          if (!solveModeActive) setSolveFocusedStep(null); else setSolveHighlights([]);
+          setSheetOpen(false);
+        }}
+        teachModeActive={teachMode.active}
+        onToggleTeach={() => {
+          if (teachMode.active) teachMode.exitTeachMode();
+          else if (size === 3) teachMode.enterTeachMode();
+          setSheetOpen(false);
+        }}
+        solverLocked={size !== 3}
         chaosMode={chaosMode}
         chaosLevel={chaosLevel}
         onToggleChaos={() => { if (!currentLevelData || currentLevelData.features.chaos) onSetChaosLevel(l => l > 0 ? 0 : 1); }}

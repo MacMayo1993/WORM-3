@@ -33,22 +33,24 @@ const ensureSpotlightStyle = () => {
   document.head.appendChild(style);
 };
 
-function CubeTile({ color, label, onClick, size = 42, elevated = false, lit = false, spotlight = false }) {
+function CubeTile({ color, label, onClick, size = 42, elevated = false, lit = false, spotlight = false, disabled = false }) {
   const [pressed, setPressed] = useState(false);
   if (spotlight) ensureSpotlightStyle();
 
   const handlePress = useCallback(() => {
+    if (disabled) return;
     setPressed(true);
-  }, []);
+  }, [disabled]);
 
   const handleRelease = useCallback(() => {
     setPressed(false);
   }, []);
 
   const handleClick = useCallback(() => {
+    if (disabled) return;
     vibrate(12);
     onClick?.();
-  }, [onClick]);
+  }, [onClick, disabled]);
 
   const depth = pressed ? 1 : 5;
   const translateY = pressed ? 4 : 0;
@@ -56,11 +58,18 @@ function CubeTile({ color, label, onClick, size = 42, elevated = false, lit = fa
   return (
     <button
       className="cube-tile-btn"
-      style={{ '--tile-size': `${size}px`, marginTop: elevated ? -10 : 0 }}
+      style={{
+        '--tile-size': `${size}px`,
+        marginTop: elevated ? -10 : 0,
+        opacity: disabled ? 0.4 : 1,
+        filter: disabled ? 'grayscale(0.8)' : 'none',
+        cursor: disabled ? 'default' : undefined,
+      }}
       onPointerDown={handlePress}
       onPointerUp={handleRelease}
       onPointerLeave={handleRelease}
       onClick={handleClick}
+      aria-disabled={disabled}
     >
       <div
         className="cube-tile-face"
@@ -91,10 +100,9 @@ function CubeTile({ color, label, onClick, size = 42, elevated = false, lit = fa
 const BottomNavBar = ({
   onReset,
   onShuffle,
-  solveModeActive,
-  teachModeActive,
-  onToggleSolve,
-  onToggleTeach,
+  flipMode,
+  onToggleFlip,
+  flipLocked,
   hasActiveView,
   onToggleViews,
   onToggleMore,
@@ -103,14 +111,6 @@ const BottomNavBar = ({
   chaosMode,
   spotlightViews = false,
 }) => {
-  const centralState = solveModeActive ? 'solve' : teachModeActive ? 'teach' : 'idle';
-
-  const handleCentralTap = useCallback(() => {
-    if (centralState === 'idle') onToggleSolve();
-    else if (centralState === 'solve') { onToggleSolve(); onToggleTeach(); }
-    else onToggleTeach();
-  }, [centralState, onToggleSolve, onToggleTeach]);
-
   return (
     <div className="bottom-nav-bar">
       <CubeTile color={COLORS.red}    label="Reset"   onClick={onReset} />
@@ -118,12 +118,13 @@ const BottomNavBar = ({
         <CubeTile color={COLORS.green} label="Shuffle" onClick={onShuffle} />
       )}
       <CubeTile
-        color={centralState === 'teach' ? COLORS.yellow : COLORS.blue}
-        label={centralState === 'teach' ? 'Teach' : 'Solve'}
-        onClick={handleCentralTap}
+        color={flipMode ? COLORS.yellow : COLORS.blue}
+        label="Flip"
+        onClick={onToggleFlip}
         size={50}
         elevated
-        lit={centralState !== 'idle'}
+        lit={flipMode}
+        disabled={flipLocked}
       />
       <CubeTile
         color={COLORS.orange}
