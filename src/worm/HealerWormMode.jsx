@@ -13,6 +13,7 @@
 
 import { useRef, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
+import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { getStickerWorldPos } from '../game/coordinates.js';
 import { getActiveTunnels } from './wormLogic.js';
@@ -21,12 +22,16 @@ import { getManifoldMap } from '../game/manifoldMapStore.js';
 import {
     WORM_LIFT,
     FACE_NORMALS,
+    DIR_FORWARD,
     STEPS_PER_TILE,
     AUTO_ROTATE_WARNING,
     SCRAMBLE_STEPS,
     ACTIVE_ROTATE_INTERVAL,
     COUNTDOWN_STEP_DURATION,
+    BASE_TAIL_LENGTH,
+    BODY_BALL_SPACING,
 } from './healerWorm/constants.js';
+import { shPush } from './circularBuffers.js';
 import { feel, setFeelEnabled } from '../utils/feel.js';
 import { EARN_ORB_COLLECT } from '../utils/economyConstants.js';
 import { liveRotation } from './liveRotation.js';
@@ -47,6 +52,11 @@ import { PortalGlow, TunnelPortalFX } from './healerWorm/portalFx.jsx';
 import { ThunkEffect, CollisionGlow } from './healerWorm/impactFx.jsx';
 
 const SPAWN_DURATION = 0.75;
+
+// Scratch vectors used to seed synthetic body history during spawning.
+const _seedPos = new THREE.Vector3();
+const _seedNorm = new THREE.Vector3();
+const _seedBackDir = new THREE.Vector3();
 
 // ─── Main exported wrapper ────────────────────────────────────────────────────
 export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animState, onRotate, _onHeal, onAnimatedShuffle }) {
@@ -178,6 +188,24 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             const wp = getStickerWorldPos(x, y, z, dirKey, size, 0);
             worm.headInterpPos.current.set(wp[0], wp[1], wp[2]).addScaledVector(norm, WORM_LIFT + bounce);
             if (t >= 1) {
+                // Seed step history so the full worm body is visible during countdown.
+                // Push points trailing behind the head along the face surface (opposite
+                // to the initial move direction), spaced at BODY_BALL_SPACING intervals.
+                _seedNorm.copy(norm);
+                const fwd = DIR_FORWARD[dirKey]?.up ?? [0, 1, 0];
+                _seedBackDir.set(-fwd[0], -fwd[1], -fwd[2]);
+                const segCount = BASE_TAIL_LENGTH * STEPS_PER_TILE;
+                const stepSize = BODY_BALL_SPACING / STEPS_PER_TILE;
+                for (let i = segCount - 1; i >= 0; i--) {
+                    const d = (i + 1) * stepSize;
+                    _seedPos.set(
+                        wp[0] + _seedBackDir.x * d,
+                        wp[1] + _seedBackDir.y * d,
+                        wp[2] + _seedBackDir.z * d,
+                    );
+                    shPush(worm.stepHistory.current, _seedPos, _seedNorm, x, y, z);
+                }
+
                 gameModePhaseRef.current  = 'countdown';
                 countdownTimerRef.current = 0;
                 countdownStepRef.current  = -1;
@@ -190,6 +218,14 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         // ── Phase: countdown ──────────────────────────────────────────────────
         if (gameModePhaseRef.current === 'countdown') {
             countdownTimerRef.current += delta;
+
+            // Idle breathing animation — gentle bob on the surface normal
+            const { x, y, z, dirKey } = worm.pos.current;
+            const norm = FACE_NORMALS[dirKey] ?? FACE_NORMALS.PZ;
+            const wp = getStickerWorldPos(x, y, z, dirKey, size, 0);
+            const breathe = Math.sin(countdownTimerRef.current * 3.5) * 0.03;
+            worm.headInterpPos.current.set(wp[0], wp[1], wp[2]).addScaledVector(norm, WORM_LIFT + breathe);
+
             const step = Math.floor(countdownTimerRef.current / COUNTDOWN_STEP_DURATION);
             if (step !== countdownStepRef.current) {
                 countdownStepRef.current = step;
@@ -197,11 +233,12 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                 else if (step === 1) { useGameStore.setState({ wormCountdownStep: 2 }); feel('countdownBeat'); }
                 else if (step === 2) { useGameStore.setState({ wormCountdownStep: 1 }); feel('countdownBeat'); }
                 else if (step === 3) {
-                    // 'go' beat — HUD displays WORM! in the purple-glow countdown style.
-                    // No separate ThunkEffect pop here; the HUD text IS the cool WORM display.
                     useGameStore.setState({ wormCountdownStep: 'go' });
                     feel('countdownGo');
-                } else if (step >= 4) {
+                } else if (step === 4) {
+                    // Hold phase — "WORM" stays visible for one extra beat
+                    useGameStore.setState({ wormCountdownStep: 'hold' });
+                } else if (step >= 5) {
                     // Countdown done — release the worm
                     gameModePhaseRef.current = 'active';
                     autoTimerRef.current = 0;
