@@ -60,16 +60,6 @@ const undoButtonStyle = {
   position: 'relative'
 };
 
-const settingsButtonStyle = {
-  ...buttonStyle,
-  width: '54px',
-  height: '54px',
-  fontSize: '22px',
-  background: 'linear-gradient(135deg, rgba(30, 136, 229, 0.80), rgba(37, 99, 235, 0.80))',
-  borderColor: 'rgba(96, 165, 250, 0.40)',
-  boxShadow: '0 4px 20px rgba(30, 136, 229, 0.35)'
-};
-
 const toggleButtonStyle = {
   ...buttonStyle,
   width: '40px',
@@ -85,10 +75,11 @@ const undoContainerStyle = {
   pointerEvents: 'auto'
 };
 
-const rightContainerStyle = {
+// Docked below the 48dp top bar, on the right — the action menu opens downward.
+const topRightContainerStyle = {
   position: 'fixed',
-  bottom: 'calc(100px + env(safe-area-inset-bottom, 0px))',
-  right: '16px',
+  top: 'calc(56px + env(safe-area-inset-top, 0px))',
+  right: '12px',
   zIndex: 500,
   display: 'flex',
   flexDirection: 'column',
@@ -101,7 +92,7 @@ const expandedMenuStyle = {
   display: 'flex',
   flexDirection: 'column',
   gap: '8px',
-  animation: 'fadeInUp 0.2s ease'
+  animation: 'fadeInDown 0.2s ease'
 };
 
 const flipLabelStyle = { fontSize: '10px', fontWeight: 600, letterSpacing: '0.02em' };
@@ -130,7 +121,6 @@ const undoBadgeStyle = {
 };
 
 const MobileControls = React.memo(({
-  onShowSettings,
   onShowHelp,
   flipMode,
   onToggleFlip,
@@ -178,8 +168,17 @@ const MobileControls = React.memo(({
         </div>
       )}
 
-      {/* Right side - Settings FAB */}
-      <div style={rightContainerStyle}>
+      {/* Top right - action menu (☰) docked under the top bar */}
+      <div style={topRightContainerStyle}>
+        {/* Toggle expand button */}
+        <button
+          onClick={() => setExpanded(!expanded)}
+          style={toggleButtonStyle}
+          aria-label={expanded ? "Close menu" : "Open menu"}
+        >
+          {expanded ? '×' : '☰'}
+        </button>
+
         {/* Expanded menu */}
         {expanded && (
           <div style={expandedMenuStyle}>
@@ -336,34 +335,14 @@ const MobileControls = React.memo(({
           </div>
         )}
 
-        {/* Settings button (main FAB) */}
-        <button
-          onClick={() => { onShowSettings(); setExpanded(false); }}
-          style={settingsButtonStyle}
-          aria-label="Settings"
-        >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="3"/>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-          </svg>
-        </button>
-
-        {/* Toggle expand button */}
-        <button
-          onClick={() => setExpanded(!expanded)}
-          style={toggleButtonStyle}
-          aria-label={expanded ? "Close menu" : "Open menu"}
-        >
-          {expanded ? '×' : '☰'}
-        </button>
       </div>
 
       {/* Styles */}
       <style>{`
-        @keyframes fadeInUp {
+        @keyframes fadeInDown {
           from {
             opacity: 0;
-            transform: translateY(10px);
+            transform: translateY(-10px);
           }
           to {
             opacity: 1;
