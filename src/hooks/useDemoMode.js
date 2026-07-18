@@ -6,7 +6,14 @@ import { rotateSliceCubies } from '../game/cubeRotation.js';
 import { flipStickerPair, buildManifoldGridMap } from '../game/manifoldLogic.js';
 import { checkRubiksSolved } from '../game/winDetection.js';
 import { clearRefractory } from '../game/refractoryMap.js';
+import { DEFAULT_SETTINGS } from '../utils/colorSchemes.js';
 import { DEMO_STEP_IDS, DEMO_LEVEL_CONFIGS, VIEW_SHOWCASE_SEQUENCE } from '../components/screens/DemoFlowController.jsx';
+
+// The demo temporarily overwrites the player's persisted settings (pastel,
+// desert, topographic tiles). This key holds the pre-demo snapshot so an
+// unclean exit (refresh / tab close mid-demo) can be healed on next launch —
+// otherwise the shader-heavy demo look sticks to the device forever.
+const PRE_DEMO_SETTINGS_KEY = 'worm3_predemo_settings';
 
 const allSurfaceStickersWrongParity = (cubies, size) => {
   for (let x = 0; x < size; x++)
@@ -210,6 +217,7 @@ export function useDemoMode({
     setDemoTryVisible(false);
     const store = useGameStore.getState();
     preDemoSettingsRef.current = { ...store.settings };
+    try { localStorage.setItem(PRE_DEMO_SETTINGS_KEY, JSON.stringify(store.settings)); } catch { /* private mode */ }
     store.startDemo();
     applyDemoSettings();
     // Pre-stage the first step's cube so Mobi's intro blurs the right scene
@@ -355,6 +363,7 @@ export function useDemoMode({
       store.setSettings(preDemoSettingsRef.current);
       preDemoSettingsRef.current = null;
     }
+    try { localStorage.removeItem(PRE_DEMO_SETTINGS_KEY); } catch { /* private mode */ }
     store.exitDemo();
     store.setShowMainMenu(false);
     setShowFreeplayWizard(true);
@@ -367,8 +376,37 @@ export function useDemoMode({
       store.setSettings(preDemoSettingsRef.current);
       preDemoSettingsRef.current = null;
     }
+    try { localStorage.removeItem(PRE_DEMO_SETTINGS_KEY); } catch { /* private mode */ }
     store.exitDemo();
   }, [cleanupAllDemoState]);
+
+  // Heal an unclean demo exit from a previous session: if the pre-demo
+  // snapshot is still on disk at launch, the demo's temporary settings were
+  // persisted without ever being restored — put the player's settings back.
+  useEffect(() => {
+    if (useGameStore.getState().demoMode) return;
+    try {
+      const raw = localStorage.getItem(PRE_DEMO_SETTINGS_KEY);
+      if (raw) {
+        useGameStore.getState().setSettings(JSON.parse(raw));
+        localStorage.removeItem(PRE_DEMO_SETTINGS_KEY);
+        return;
+      }
+      // Devices tainted before the snapshot existed: if the persisted settings
+      // are exactly the demo signature, the demo left them behind — reset the
+      // demo-controlled fields to their defaults.
+      const s = useGameStore.getState().settings;
+      const allTopographic = s.manifoldStyles && [1, 2, 3, 4, 5, 6].every((i) => s.manifoldStyles[i] === 'topographic');
+      if (s.colorScheme === 'pastel' && s.backgroundTheme === 'desert' && !s.customColors && allTopographic) {
+        useGameStore.getState().setSettings({
+          ...s,
+          colorScheme: DEFAULT_SETTINGS.colorScheme,
+          backgroundTheme: DEFAULT_SETTINGS.backgroundTheme,
+          manifoldStyles: { ...DEFAULT_SETTINGS.manifoldStyles },
+        });
+      }
+    } catch { /* corrupt snapshot — leave current settings */ }
+  }, []);
 
   const handleDemoForecastPick = useCallback((pair) => {
     setDemoForecastVisible(false);
