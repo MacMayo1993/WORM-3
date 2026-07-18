@@ -355,7 +355,7 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
           <p style={{
             margin: 0,
             fontFamily: HAND_FONT,
-            fontSize: 'clamp(22px, 4vw, 30px)',
+            fontSize: 'clamp(30px, 7vw, 42px)',
             fontWeight: '400',
             color: pencilLead,
             lineHeight: 1.45,
