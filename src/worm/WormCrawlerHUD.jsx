@@ -249,6 +249,16 @@ const GLANCE_VALUE_STYLE = {
     lineHeight: 1,
 };
 
+// Persistent orb tracker — centered just below the glance strip
+const ORB_TRACKER_WRAP_STYLE = {
+    position: 'absolute',
+    top: 'calc(env(safe-area-inset-top, 0px) + 58px)',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    pointerEvents: 'none',
+    maxWidth: 'calc(100vw - 24px)',
+};
+
 // ─── Zone 3: Thumb Tray ──────────────────────────────────────────────────────
 
 const THUMB_TRAY_STYLE = {
@@ -1010,6 +1020,13 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                     )}
                 </div>
             </div>
+
+            {/* ── Persistent orb tracker — always visible while crawling ── */}
+            {wormAlive && (
+                <div style={ORB_TRACKER_WRAP_STYLE}>
+                    <OrbInventoryHUD orbInventory={wormOrbInventory} faceColors={fc} />
+                </div>
+            )}
 
             {/* ── Zone 2: Portal hint (contextual) ── */}
             {isPortalReady && (
