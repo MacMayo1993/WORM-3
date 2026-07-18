@@ -2,7 +2,7 @@
 // Uses GPU-based procedural textures to avoid memory overhead
 
 import * as THREE from 'three';
-import { baseVertexShader } from './shaders/shaderBase.js';
+import { baseVertexShader, eyeballBulgeVertexShader } from './shaders/shaderBase.js';
 import { basicShaders } from './shaders/basicShaders.js';
 import { techShaders } from './shaders/techShaders.js';
 import { natureShaders } from './shaders/natureShaders.js';
@@ -281,7 +281,8 @@ export function getTileStyleMaterial(style, colorHex, useTexture = false, textur
 
   const material = new THREE.ShaderMaterial({
     uniforms,
-    vertexShader: baseVertexShader,
+    // Eyeball tiles displace a tessellated plane so the eye bulges off the face
+    vertexShader: safeStyle === 'eyeball' ? eyeballBulgeVertexShader : baseVertexShader,
     fragmentShader: fragmentShader,
     side: isGlass ? THREE.DoubleSide : THREE.FrontSide,
     transparent: isGlass,

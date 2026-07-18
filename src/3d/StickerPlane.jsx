@@ -34,6 +34,9 @@ import { MergeTileOverlay } from '../modes/merge/index.js';
 
 // Shared geometries used only by StickerPlane itself (not by extracted sub-components).
 const _sharedStickerGeo = new THREE.PlaneGeometry(0.85, 0.85);
+// Tessellated plane for styles whose vertex shader displaces the surface — the
+// eyeball bulge needs interior vertices to bend (a 1×1-segment plane stays flat).
+const _bulgeStickerGeo = new THREE.PlaneGeometry(0.85, 0.85, 24, 24);
 // Slightly larger plane for the worm-mode rim glow — extends the halo beyond the tile edge.
 const _wormRimGlowGeo = new THREE.PlaneGeometry(1.05, 1.05);
 // Circular alpha map — clips the base sticker mesh to a disc matching the overlay shader
@@ -1472,12 +1475,15 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         )}
 
         {/* Main sticker quad — omitted when the InstancedMesh handles rendering */}
-        {!isInstanceable && <mesh ref={meshRef} key={hollow ? 'frame' : 'plane'}>
+        {!isInstanceable && <mesh ref={meshRef} key={hollow ? 'frame' : useShaderStyle && tileStyle === 'eyeball' ? 'bulge' : 'plane'}>
           {hollow ? (
             <shapeGeometry args={[_stickerFrameShape]} />
           ) : faceRow != null ? (
             // Face-texture mode (Sudokube): per-instance geometry so UVs can be patched.
             <planeGeometry ref={geoRef} args={[0.85, 0.85]} />
+          ) : useShaderStyle && tileStyle === 'eyeball' ? (
+            // Eyeball style: tessellated plane so the bulge vertex shader can dome it.
+            <primitive object={_bulgeStickerGeo} attach="geometry" />
           ) : (
             // No texture atlas — share the module-level geometry to avoid per-sticker alloc.
             <primitive object={_sharedStickerGeo} attach="geometry" />

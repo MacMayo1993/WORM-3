@@ -26,6 +26,37 @@ export const baseVertexShader = `
   }
 `;
 
+// Eyeball-style vertex shader: same varyings as baseVertexShader, but displaces
+// the (tessellated) sticker plane outward along its normal so the eye physically
+// bulges off the cube face — a sphere-cap dome over the eyeball plus a broader
+// flesh mound, both falling to zero before the tile edge so seams stay flush.
+// Requires a subdivided plane (StickerPlane swaps in one for the eyeball style);
+// on a 1×1-segment plane the corner vertices sit past the profile and it stays flat.
+export const eyeballBulgeVertexShader = `
+  varying vec2 vUv;
+  varying vec3 vNormal;
+  varying vec3 vViewPosition;
+  varying vec3 vTileCenter;
+  varying vec3 vWorldPos;
+  varying vec3 vWorldNormal;
+
+  void main() {
+    vUv = uv;
+    vNormal = normalize(normalMatrix * normal);
+    vTileCenter = modelMatrix[3].xyz;
+    vWorldNormal = normalize(mat3(modelMatrix) * normal);
+    float du = length(uv - 0.5);
+    float ball = sqrt(max(1.0 - pow(du / 0.36, 2.0), 0.0));
+    float mound = 1.0 - smoothstep(0.16, 0.44, du);
+    vec3 displaced = position + normal * (ball * 0.055 + mound * 0.045);
+    vec4 worldPos = modelMatrix * vec4(displaced, 1.0);
+    vWorldPos = worldPos.xyz;
+    vec4 mvPosition = modelViewMatrix * vec4(displaced, 1.0);
+    vViewPosition = -mvPosition.xyz;
+    gl_Position = projectionMatrix * mvPosition;
+  }
+`;
+
 // Utility functions shared across shaders (hash, noise, fbm)
 export const shaderUtils = `
   // Hash functions for procedural patterns
