@@ -72,6 +72,7 @@ const ModeCarousel = React.lazy(() =>
 );
 import { useTeachMode } from './teach/useTeachMode.js';
 import { isMobile } from './utils/device.js';
+import { preloadAppAssets } from './utils/preloadAssets.js';
 import { GREEN_SHOW_START, FULL_FLIP_START, EXPLOSION_START, EXPLOSION_END, IMPLODE_START, IMPLODE_END } from './components/intro/introTiming.js';
 // Lazy-loaded: not needed on initial render, deferred to reduce parse time
 const PlatformerWormMode = React.lazy(() => import('./worm/PlatformerWormMode.jsx'));
@@ -504,6 +505,14 @@ export default function WORM3() {
     }
     store.setShowMainMenu(true);
   }, [advanceDemoStep]);
+
+  // Warm lazy chunks, Mobi's portrait, and environment maps while the opening
+  // animation plays, so nothing pops in late on slow connections. Delayed a
+  // beat so it never competes with the critical boot path.
+  useEffect(() => {
+    const t = setTimeout(() => preloadAppAssets({ backgroundTheme: settings.backgroundTheme }), 1500);
+    return () => clearTimeout(t);
+  }, [settings.backgroundTheme]);
 
   // ========================================================================
   // INTRO TIME — drives IntroBranch 3D content + WelcomeScreen DOM overlay

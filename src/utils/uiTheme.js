@@ -17,7 +17,10 @@
 // Keep in sync with --ui-font in App.css.
 export const UI_FONT = "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif";
 // Chunky display font for big titles (mode carousel, headers).
-export const DISPLAY_FONT = "'Bungee', cursive";
+// Fallbacks are heavy sans faces — never `cursive`: on Android the generic
+// cursive is Dancing Script, which flashes wildly different text while the
+// webfont downloads.
+export const DISPLAY_FONT = "'Bungee', 'Arial Black', 'Franklin Gothic Bold', sans-serif";
 // Monospace is reserved for manifold grid IDs (M1-001) and algorithm notation.
 export const MONO_FONT = "'SF Mono', ui-monospace, 'Cascadia Code', Menlo, monospace";
 // Handwritten pencil font for Mobi's dialogue (self-hosted via
