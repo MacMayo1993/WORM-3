@@ -80,7 +80,7 @@ const LevelTutorial = ({ level, onClose, onMainMenu }) => {
   const accentSolid = isFinale ? '#a78bfa' : '#00d2f8';
   const PANEL_H = 'clamp(150px, 22vh, 200px)';
   const NAMEPLATE_H = 32;
-  const mobiImgSrc = `${import.meta.env.BASE_URL}Mobi.png`;
+  const mobiImgSrc = `${import.meta.env.BASE_URL}Mobi.webp`;
 
   const mobiAnim = isDismissing ? 'ltMobiOut 0.5s ease forwards' : 'ltMobiSlideIn 0.45s cubic-bezier(0.16,1,0.3,1) forwards';
   const uiAnim = isDismissing ? 'ltPanelDown 0.35s ease forwards' : 'ltPanelRise 0.4s cubic-bezier(0.16,1,0.3,1) forwards';

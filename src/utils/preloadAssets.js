@@ -32,7 +32,7 @@ export function preloadAppAssets({ backgroundTheme } = {}) {
 
   // 2. Mobi's portrait — used by every dialogue (mode intros + demo steps).
   const mobi = new Image();
-  mobi.src = `${import.meta.env.BASE_URL}Mobi.png`;
+  mobi.src = `${import.meta.env.BASE_URL}Mobi.webp`;
 
   // 3. Environment maps: the player's current background plus the demo's
   //    desert — the two the first session can actually hit.
