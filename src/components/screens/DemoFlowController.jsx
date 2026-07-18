@@ -561,9 +561,12 @@ const VIEW_SHOWCASE_SEQUENCE = [
   {
     key: 'tunnels',
     title: 'Tunnels',
-    copy: 'Flipping a tile opens a wormhole to its antipodal twin — watch the tunnel thread through the cube\'s core.',
-    // Flip the front-face center tile so exactly one antipodal tunnel lights up.
+    copy: 'Flipping a tile opens a wormhole to its antipodal twin — with the cube still exploded, watch the tunnel thread through its core.',
+    // Keep the previous beat's exploded view (the tunnel is invisible inside a
+    // closed cube) and flip the front-face center tile so exactly one
+    // antipodal tunnel lights up.
     apply: (s) => {
+      s.setExploded(true);
       s.setShowTunnels(true);
       const mid = Math.floor(s.size / 2);
       const map = buildManifoldGridMap(s.cubies, s.size);
@@ -572,6 +575,7 @@ const VIEW_SHOWCASE_SEQUENCE = [
     // Rebuild solved cubies rather than re-flipping: the user may have rotated
     // the flipped tile away from where apply() put it.
     cleanup: (s) => {
+      s.setExploded(false);
       s.setShowTunnels(false);
       s.setRotatedCubies(makeCubies(s.size));
     },
