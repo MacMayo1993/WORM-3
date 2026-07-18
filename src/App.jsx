@@ -1323,6 +1323,7 @@ export default function WORM3() {
               showComingSoon, onCloseComingSoon: () => { setShowComingSoon(false); useGameStore.getState().setShowMainMenu(true); },
               showMobiusCubelet, onCloseMobiusCubelet: () => { setShowMobiusCubelet(false); useGameStore.getState().setShowMainMenu(true); },
               onOpenModeSelect: () => setShowModeSelect(true),
+              demoDialogueVisible: demoMode && demoStepIntroVisible,
             }}
             handlers={{
               onReset: handleReset,

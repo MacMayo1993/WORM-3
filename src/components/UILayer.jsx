@@ -105,6 +105,7 @@ export default function UILayer({
     showComingSoon, onCloseComingSoon,
     showMobiusCubelet, onCloseMobiusCubelet,
     onOpenModeSelect,
+    demoDialogueVisible,
   } = ui;
 
   const {
@@ -318,8 +319,8 @@ export default function UILayer({
         {/* Tile Leaderboard — live flip stats in chaos mode, toggled via Views sheet */}
         <TileLeaderboard cubies={cubies} size={size} chaosMode={chaosMode} visible={showLeaderboard} onClose={toggleLeaderboard} />
 
-        {/* Bottom Navigation Bar */}
-        {showGameHUD && (
+        {/* Bottom Navigation Bar — hidden while a demo dialogue is presenting */}
+        {showGameHUD && !demoDialogueVisible && (
           <BottomNavBar
             onReset={onReset}
             onShuffle={currentLevelData ? onShuffleForLevel : onShuffle}

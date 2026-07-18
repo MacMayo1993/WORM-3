@@ -246,9 +246,13 @@ export function useCubeState() {
       ...(isFirstFlip ? { hasFlippedOnce: true, firstFlipHighlightPair: null } : {}),
     }));
 
-    if (isFirstFlip) {
+    // The guided demo narrates flips itself — don't stack the first-flip
+    // caption/tutorial on top of it (it lingers beneath the demo overlays).
+    if (isFirstFlip && !useGameStore.getState().demoMode) {
       setTimeout(() => useGameStore.getState().setShowFirstFlipCaption(true), 400);
-      setTimeout(() => setShowFirstFlipTutorial(true), 3000);
+      setTimeout(() => {
+        if (!useGameStore.getState().demoMode) setShowFirstFlipTutorial(true);
+      }, 3000);
     }
   }, [getRotationForDir, hasFlippedOnce, setShowFirstFlipTutorial]);
 
