@@ -212,8 +212,11 @@ export function useDemoMode({
     preDemoSettingsRef.current = { ...store.settings };
     store.startDemo();
     applyDemoSettings();
+    // Pre-stage the first step's cube so Mobi's intro blurs the right scene
+    // (otherwise the menu's 3×3 lingers behind the dialogue until Start).
+    applyDemoStepConfig('baby-cube');
     setDemoStepIntroVisible(true);
-  }, [clearDemoWatchTimers, applyDemoSettings]);
+  }, [clearDemoWatchTimers, applyDemoSettings, applyDemoStepConfig]);
 
   const advanceDemoStep = useCallback((fromStep) => {
     const store = useGameStore.getState();
@@ -242,8 +245,12 @@ export function useDemoMode({
     const idx = DEMO_STEP_IDS.indexOf(fromStep);
     const nextStep = DEMO_STEP_IDS[idx + 1] || 'end';
     store.setDemoStep(nextStep);
+    // Pre-stage plain cube steps so the intro dialogue blurs the upcoming
+    // scene. Other types (worm/chaos/showcase/random) start on Continue —
+    // pre-staging them would kick off gameplay or overlays behind the blur.
+    if (DEMO_LEVEL_CONFIGS[nextStep]?.type === 'cube') applyDemoStepConfig(nextStep);
     if (nextStep !== 'end') setDemoStepIntroVisible(true);
-  }, [clearDemoWatchTimers, applyDemoSettings, cancelDisparityRun, restoreWormCharacter]);
+  }, [clearDemoWatchTimers, applyDemoSettings, cancelDisparityRun, restoreWormCharacter, applyDemoStepConfig]);
   advanceDemoStepRef.current = advanceDemoStep;
 
   const handleDemoStepContinue = useCallback(() => {
@@ -337,8 +344,9 @@ export function useDemoMode({
     cleanupAllDemoState(store);
     store.startDemo();
     applyDemoSettings();
+    applyDemoStepConfig('baby-cube');
     setDemoStepIntroVisible(true);
-  }, [cleanupAllDemoState, applyDemoSettings]);
+  }, [cleanupAllDemoState, applyDemoSettings, applyDemoStepConfig]);
 
   const handleDemoFreeplay = useCallback(() => {
     const store = useGameStore.getState();
