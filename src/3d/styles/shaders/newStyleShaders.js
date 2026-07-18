@@ -1283,10 +1283,11 @@ export const newStyleShaders = {
       vec2 sn2 = ec / eyeR;
       float sn2Len = length(sn2);
 
-      // --- TV-style frame (antipodal colour keeps face identity) ---
-      float chamberR = 0.48;
-      float chamber = 1.0 - smoothstep(chamberR - 0.008, chamberR + 0.008, r);
-      vec3 frame = max(antipodalColor * 0.45, vec3(0.04));
+      // --- TV-bezel frame (antipodal colour keeps face identity) ---
+      float chamberR = 0.46;
+      vec3 frame = max(antipodalColor * 0.4, vec3(0.035));
+      // Inner edge of the bezel catches the light
+      frame *= 0.8 + 0.45 * smoothstep(chamberR + 0.06, chamberR, r);
 
       // --- Eyelid aperture: curved lid edges in eyeball-radius units ---
       float lx = clamp(ec.x / (eyeR * 1.08), -1.0, 1.0);
@@ -1301,20 +1302,39 @@ export const newStyleShaders = {
                      * smoothstep(loEdge - aa, loEdge + aa, eyY)
                      * step(abs(ec.x), eyeR * 1.08);
 
-      // --- Fleshy socket with radiating ridge folds ---
+      // --- Fleshy mass with radiating ridge folds, spilling over the bezel ---
       float fAngle = atan(ec.y, ec.x);
       float grain = eyeNoise(p * 10.0 + seed * 40.0);
       float fold = sin(fAngle * 7.0 + seed * 6.283 + eyeNoise(p * 4.0 + seed2 * 20.0) * 3.0);
       float foldOut = smoothstep(eyeR * 0.9, chamberR * 0.95, d);
+      // Organic silhouette: ridges push tendrils past the bezel onto the frame
+      float tent = smoothstep(0.0, 1.0, fold) * (0.09 + seed3 * 0.03);
+      float fleshR = chamberR - 0.015 + tent;
+      float fleshMask = 1.0 - smoothstep(fleshR - 0.006, fleshR + 0.006, d);
+
       vec3 flesh = mix(vec3(0.8, 0.58, 0.49), antipodalColor, 0.1);
       flesh *= 0.78 + grain * 0.22;
-      flesh += vec3(0.14, 0.08, 0.06) * smoothstep(0.25, 0.9, fold) * foldOut;
-      flesh -= vec3(0.12, 0.09, 0.08) * smoothstep(0.25, 0.9, -fold) * foldOut;
+      flesh += vec3(0.17, 0.1, 0.07) * smoothstep(0.25, 0.9, fold) * foldOut;
+      flesh -= vec3(0.15, 0.11, 0.1) * smoothstep(0.25, 0.9, -fold) * foldOut;
       // Puffy mound ringing the eye opening
       flesh += vec3(0.05, 0.025, 0.02) * smoothstep(eyeR * 1.7, eyeR * 1.05, d);
       // Top light + wet glisten on the ridges
       flesh *= 0.86 + 0.14 * smoothstep(-0.4, 0.4, p.y);
       flesh += vec3(0.2, 0.16, 0.14) * pow(grain, 4.0) * foldOut;
+
+      // Sculpted relief lit from upper-left so the mass bulges off the tile:
+      // outer slope faces away from center, inner slope drops into the socket
+      vec2 rd2 = ec / max(d, 0.001);
+      vec2 Ld2 = vec2(-0.496, 0.868);
+      float ndl = dot(rd2, Ld2);
+      float outerSlope = smoothstep(fleshR - 0.16, fleshR, d);
+      float innerSlope = smoothstep(eyeR * 1.4, eyeR * 1.02, d);
+      flesh *= 1.0 + ndl * (outerSlope * 0.4 - innerSlope * 0.28);
+      // Rolled-under lip at the silhouette edge
+      flesh *= 1.0 - smoothstep(fleshR - 0.05, fleshR, d) * 0.3;
+      // Sheen along the lit side of the lip
+      flesh += vec3(0.3, 0.24, 0.2) * pow(max(ndl, 0.0), 2.0) * outerSlope
+             * (1.0 - smoothstep(fleshR - 0.03, fleshR, d)) * 0.6;
 
       // --- Eyeball (2D sphere projection — reliable on all GPUs) ---
       vec3 eyeCol;
@@ -1364,12 +1384,17 @@ export const newStyleShaders = {
         irisCol += baseColor * fibers * 0.35;
         irisCol = mix(irisCol, baseColor * 0.08, limbal * 0.75);
 
-        // Hypno spiral: slow relentless inward crawl, spins up while twisting
+        // Hypno spiral blended into the iris palette: dark/light bands of the
+        // face colour instead of black/white, with the fiber texture showing
+        // through, so each face keeps its own tinted spiral
         float swirl = irisD / spiralR * 30.0 - irisAngle + time * (1.6 + sp * 6.0);
-        float bandMask = smoothstep(-0.4, 0.4, sin(swirl));
-        vec3 spiralCol = mix(vec3(0.03), vec3(0.96), bandMask);
-        spiralCol = mix(vec3(0.02), spiralCol, smoothstep(0.015, 0.06, irisD));
-        float spiralMask = 1.0 - smoothstep(spiralR - 0.02, spiralR + 0.01, irisD);
+        float bandMask = smoothstep(-0.6, 0.6, sin(swirl));
+        vec3 spiralDark = baseColor * 0.12 + vec3(0.01);
+        vec3 spiralLight = baseColor * 1.45 + vec3(0.18, 0.14, 0.1);
+        vec3 spiralCol = mix(spiralDark, spiralLight, bandMask);
+        spiralCol += baseColor * fibers * 0.15;
+        spiralCol = mix(vec3(0.02), spiralCol, smoothstep(0.02, 0.09, irisD));
+        float spiralMask = 1.0 - smoothstep(spiralR - 0.06, spiralR + 0.04, irisD);
         irisCol = mix(irisCol, spiralCol, spiralMask);
 
         eyeCol = mix(sclera, irisCol, irisMask);
@@ -1382,9 +1407,9 @@ export const newStyleShaders = {
 
         // Sphere lighting + rim darkening
         vec3 lightDir = normalize(vec3(0.3, 0.5, 1.0));
-        eyeCol *= 0.7 + max(dot(hn, lightDir), 0.0) * 0.36;
+        eyeCol *= 0.72 + max(dot(hn, lightDir), 0.0) * 0.38;
         float rimDark = pow(1.0 - nz, 2.0);
-        eyeCol *= 1.0 - rimDark * 0.35;
+        eyeCol *= 1.0 - rimDark * 0.45;
         eyeCol += vec3(0.09) * rimDark * irisMask;
 
         // Upper lid casts a soft shadow onto the ball
@@ -1396,12 +1421,18 @@ export const newStyleShaders = {
         eyeCol = mix(vec3(0.22, 0.09, 0.09), vec3(0.66, 0.34, 0.32), smoothstep(0.75, 1.0, abs(lx)));
       }
 
-      vec3 col = mix(flesh, eyeCol, aperture);
+      // Flesh casts a drop shadow onto the bezel (opposite the light)
+      float shD = length(ec - vec2(0.035, -0.05));
+      float dropSh = smoothstep(fleshR + 0.1, fleshR - 0.01, shD);
+      vec3 ground = frame * (1.0 - dropSh * 0.55);
+
+      vec3 col = mix(ground, flesh, fleshMask);
+      col = mix(col, eyeCol, aperture);
 
       // --- Lid margins: dark moist lash-line hugging the aperture edges ---
       float upD = eyY - upEdge;
       float loD = loEdge - eyY;
-      float inX = step(abs(ec.x), eyeR * 1.35);
+      float inX = 1.0 - smoothstep(0.92, 1.06, abs(ec.x / (eyeR * 1.08)));
       float upMargin = smoothstep(0.14, 0.0, upD) * step(0.0, upD) * inX;
       float loMargin = smoothstep(0.12, 0.0, loD) * step(0.0, loD) * inX;
       col = mix(col, vec3(0.42, 0.2, 0.18), (upMargin * 0.7 + loMargin * 0.5) * (1.0 - aperture));
@@ -1410,8 +1441,6 @@ export const newStyleShaders = {
       // Upper lid crease line above the moving lid edge
       float crease = smoothstep(0.04, 0.0, abs(eyY - (upEdge + 0.32 * lidArc + 0.18))) * inX;
       col -= vec3(0.07, 0.05, 0.04) * crease * (1.0 - aperture);
-
-      col = mix(frame, col, chamber);
 
       gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
     }
