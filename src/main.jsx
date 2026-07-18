@@ -15,10 +15,13 @@ import './App.css' // Import App.css instead of index.css
 // but at most twice per tab: right after a deploy the Pages CDN can keep serving the
 // stale index.html for several minutes, and an unguarded reload spins forever.
 const CHUNK_RELOAD_KEY = 'worm3_chunk_reload';
-window.addEventListener('vite:preloadError', () => {
+window.addEventListener('vite:preloadError', async () => {
   const attempts = Number(sessionStorage.getItem(CHUNK_RELOAD_KEY) || '0');
   if (attempts >= 2) return; // stop looping; the import error surfaces instead
   sessionStorage.setItem(CHUNK_RELOAD_KEY, String(attempts + 1));
+  // Re-fetch index.html bypassing the HTTP cache first — a plain reload happily
+  // reuses the stale cached index that references the deleted chunks.
+  try { await fetch(window.location.href, { cache: 'reload' }); } catch { /* offline — reload anyway */ }
   window.location.reload();
 });
 // App survived 30s — chunks are consistent; allow future deploys to reload again.
