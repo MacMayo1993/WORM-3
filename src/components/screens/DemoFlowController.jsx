@@ -2,6 +2,7 @@ import React from 'react';
 import { UI_FONT, DISPLAY_FONT } from '../../utils/uiTheme.js';
 import { makeCubies } from '../../game/cubeState.js';
 import { flipStickerPair, buildManifoldGridMap } from '../../game/manifoldLogic.js';
+import { useGameStore } from '../../hooks/useGameStore.js';
 
 const DEMO_STEPS = [
   { id: 'baby-cube', label: 'Baby Cube', num: 1 },
@@ -272,18 +273,28 @@ const ensureDemoShellStyle = () => {
         margin-bottom: 12px;
       }
     }
+
+    /* Worm mode owns the top edge with its glance strip — dock the pill at the
+       bottom, above the thumb tray. Declared last so it wins over the mobile
+       media-query top override. */
+    .demo-progress-pill--bottom {
+      top: auto;
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 100px);
+    }
   `;
   document.head.appendChild(style);
 };
 
 const DemoProgressBar = ({ currentStep }) => {
   ensureDemoShellStyle();
+  // Worm mode's glance strip owns the top edge — dock the pill at the bottom there.
+  const wormHealerMode = useGameStore((s) => s.wormHealerMode);
   const idx = DEMO_STEPS.findIndex(s => s.id === currentStep);
   const total = DEMO_STEPS.length - 1;
   const progress = idx >= 0 ? idx / total : 0;
 
   return (
-    <div className="demo-progress-pill">
+    <div className={`demo-progress-pill${wormHealerMode ? ' demo-progress-pill--bottom' : ''}`}>
       <span className="demo-progress-label">DEMO</span>
       <div className="demo-progress-track">
         <div className="demo-progress-fill" style={{ width: `${progress * 100}%` }} />

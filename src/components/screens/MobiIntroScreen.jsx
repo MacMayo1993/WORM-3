@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { UI_FONT } from '../../utils/uiTheme.js';
+import { UI_FONT, HAND_FONT } from '../../utils/uiTheme.js';
 
 // ── Dialogue banks ────────────────────────────────────────────────────────────
 
@@ -354,12 +354,12 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
         >
           <p style={{
             margin: 0,
-            fontFamily: '"Bradley Hand", "Segoe Print", "Comic Sans MS", cursive',
-            fontSize: 'clamp(18px, 3.2vw, 25px)',
-            fontWeight: '600',
+            fontFamily: HAND_FONT,
+            fontSize: 'clamp(22px, 4vw, 30px)',
+            fontWeight: '400',
             color: pencilLead,
-            lineHeight: 1.55,
-            letterSpacing: '0.015em',
+            lineHeight: 1.45,
+            letterSpacing: '0.02em',
             textShadow: '0.35px 0.35px 0 rgba(53,64,74,0.22), -0.25px 0 rgba(53,64,74,0.12)',
           }}>
             {lines[index]}

@@ -5,6 +5,8 @@ import ReactDOM from 'react-dom/client'
 // a default serif on any blocked/slow connection and destroyed the game's
 // typography — never reintroduce a CDN <link> for fonts.
 import '@fontsource/bungee'
+// Mobi's handwritten pencil dialogue face — same self-hosted rule as Bungee.
+import '@fontsource/annie-use-your-telescope'
 import App from './App.jsx'
 import './App.css' // Import App.css instead of index.css
 

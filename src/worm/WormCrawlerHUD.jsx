@@ -13,6 +13,7 @@ import ParityWallet from '../components/overlays/ParityWallet.jsx';
 import { callWormTurn } from './wormTurnBridge.js';
 import { wormClock } from './wormClock.js';
 import { BOOST_COOLDOWN } from './healerWorm/constants.js';
+import { isMobile } from '../utils/device.js';
 import DeathScreen from './DeathScreens.jsx';
 import { UI_FONT, DISPLAY_FONT } from '../utils/uiTheme.js';
 
@@ -249,14 +250,13 @@ const GLANCE_VALUE_STYLE = {
     lineHeight: 1,
 };
 
-// Persistent orb tracker — centered just below the glance strip
+// Persistent orb tracker — desktop only (the glance strip's ORBS chip covers
+// mobile), anchored bottom-left above the Jump/Boost cluster.
 const ORB_TRACKER_WRAP_STYLE = {
     position: 'absolute',
-    top: 'calc(env(safe-area-inset-top, 0px) + 58px)',
-    left: '50%',
-    transform: 'translateX(-50%)',
+    left: 16,
+    bottom: 'calc(env(safe-area-inset-bottom, 0px) + 96px)',
     pointerEvents: 'none',
-    maxWidth: 'calc(100vw - 24px)',
 };
 
 // ─── Zone 3: Thumb Tray ──────────────────────────────────────────────────────
@@ -1021,8 +1021,8 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                 </div>
             </div>
 
-            {/* ── Persistent orb tracker — always visible while crawling ── */}
-            {wormAlive && (
+            {/* ── Persistent orb tracker — desktop only, glance strip covers mobile ── */}
+            {wormAlive && !isMobile && (
                 <div style={ORB_TRACKER_WRAP_STYLE}>
                     <OrbInventoryHUD orbInventory={wormOrbInventory} faceColors={fc} />
                 </div>
