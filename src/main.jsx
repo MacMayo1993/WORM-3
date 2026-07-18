@@ -26,6 +26,12 @@ for (const href of [bungeeWoff2, annieWoff2]) {
 import App from './App.jsx'
 import './App.css' // Import App.css instead of index.css
 
+// Service worker: precaches the app shell so deploys are atomic and repeat
+// visits load from local cache (see VitePWA config). autoUpdate swaps in new
+// versions in the background.
+import { registerSW } from 'virtual:pwa-register'
+registerSW({ immediate: true })
+
 // After a GitHub Pages deploy, hashed chunk filenames change. If the browser has
 // cached the old HTML/JS, dynamic imports will 404. Reload to pick up fresh chunks —
 // but at most twice per tab: right after a deploy the Pages CDN can keep serving the
