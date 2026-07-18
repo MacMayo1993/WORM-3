@@ -601,7 +601,7 @@ export default function UILayer({
 
       {isMobile && !wormHealerMode && !showTutorial && !showMainMenu && !showDisparityWizard && !showDisparityBetting && !showFreeplayWizard && !showRandomWizard && !showWormModeWizard && (
         <MobileControls
-          onShowSettings={() => setShowSettings(true)} onShowHelp={() => setShowHelp(true)}
+          onShowHelp={() => setShowHelp(true)}
           flipMode={flipMode} onToggleFlip={() => setFlipMode(!flipMode)}
           exploded={exploded} onToggleExplode={() => setExploded(!exploded)}
           showTunnels={showTunnels} onToggleTunnels={() => setShowTunnels(!showTunnels)}
