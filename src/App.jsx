@@ -78,7 +78,10 @@ const PlatformerWormMode = React.lazy(() => import('./worm/PlatformerWormMode.js
 const HollowVoidCube = React.lazy(() => import('./3d/HollowVoidCube.jsx'));
 const DemoEndScreen = React.lazy(() => import('./components/screens/DemoEndScreen.jsx'));
 const DemoForecastPicker = React.lazy(() => import('./components/screens/DemoForecastPicker.jsx'));
-import { DemoProgressBar, DemoStepIntro, DemoCoach, DemoViewShowcase, DemoViewSpotlightHint } from './components/screens/DemoFlowController.jsx';
+import {
+  DemoProgressBar, DemoStepIntro, DemoCoach, DemoViewShowcase,
+  DemoViewSpotlightHint, DemoStepComplete, DemoStepLaunch
+} from './components/screens/DemoFlowController.jsx';
 
 
 const _clamp = (t, a = 0, b = 1) => Math.max(a, Math.min(b, t));
@@ -484,6 +487,7 @@ export default function WORM3() {
     handleDemoForecastPick, handleDemoChaosSkip, handleDemoDisparityDismiss,
     demoShowcaseSubStep, handleDemoShowcaseNext, handleDemoShowcaseSkip,
     demoViewSpotlight, handleDemoViewSpotlightClick,
+    demoCelebrationStep, demoLaunchStep,
   } = useDemoMode({
     cancelShuffle, changeSize, setRotatedCubies, reset,
     cancelDisparityRun, startDisparityGame,
@@ -1392,6 +1396,8 @@ export default function WORM3() {
 
       {/* Demo mode overlays */}
       {demoMode && <DemoProgressBar currentStep={demoStep} />}
+      {demoMode && demoCelebrationStep && <DemoStepComplete step={demoCelebrationStep} />}
+      {demoMode && demoLaunchStep && !demoCelebrationStep && <DemoStepLaunch step={demoLaunchStep} />}
       <ScreenTransition show={!!(demoMode && demoStepIntroVisible && demoStep && demoStep !== 'end')} freezeOnExit>
         <DemoStepIntro step={demoStep} onContinue={handleDemoStepContinue} onSkip={() => advanceDemoStep(demoStep)} />
       </ScreenTransition>

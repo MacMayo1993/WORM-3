@@ -47,6 +47,8 @@ export function useDemoMode({
   const [demoCoachCopy, setDemoCoachCopy] = useState(null);
   const [demoShowcaseSubStep, setDemoShowcaseSubStep] = useState(-1);
   const [demoViewSpotlight, setDemoViewSpotlight] = useState(false);
+  const [demoCelebrationStep, setDemoCelebrationStep] = useState(null);
+  const [demoLaunchStep, setDemoLaunchStep] = useState(null);
 
   const demoForecastPickRef = useRef(null);
   const preDemoSettingsRef = useRef(null);
@@ -54,10 +56,42 @@ export function useDemoMode({
   const onTapFlipRef = useRef(null);
   const advanceDemoStepRef = useRef(null);
   const demoFlipPhaseRef = useRef(null);
+  const celebrationTimerRef = useRef(null);
+  const babySolveArmedRef = useRef(false);
+  const preDemoWormCharacterRef = useRef(null);
 
   const clearDemoWatchTimers = useCallback(() => {
     demoWatchTimers.current.forEach(clearTimeout);
     demoWatchTimers.current = [];
+  }, []);
+
+  const clearCelebrationTimer = useCallback(() => {
+    if (celebrationTimerRef.current) {
+      clearTimeout(celebrationTimerRef.current);
+      celebrationTimerRef.current = null;
+    }
+  }, []);
+
+  // Fire the STEP COMPLETE burst, then auto-advance once it has played out.
+  const celebrateStep = useCallback((step) => {
+    if (useGameStore.getState().demoStep !== step) return;
+    if (celebrationTimerRef.current) return;
+    clearDemoWatchTimers();
+    setDemoTryVisible(false);
+    setDemoCoachCopy(null);
+    setDemoCelebrationStep(step);
+    celebrationTimerRef.current = setTimeout(() => {
+      celebrationTimerRef.current = null;
+      setDemoCelebrationStep(null);
+      advanceDemoStepRef.current?.(step);
+    }, 1600);
+  }, [clearDemoWatchTimers]);
+
+  const restoreWormCharacter = useCallback(() => {
+    if (preDemoWormCharacterRef.current != null) {
+      useGameStore.getState().setWormCharacter(preDemoWormCharacterRef.current);
+      preDemoWormCharacterRef.current = null;
+    }
   }, []);
 
   const applyDemoSettings = useCallback(() => {
@@ -86,6 +120,12 @@ export function useDemoMode({
       const targetSize = config.cubeSize || 3;
       if (targetSize !== store.size) changeSize(targetSize);
       else reset();
+      // Showcase a specific worm character; the player's own pick (persisted
+      // to localStorage) is restored when the step ends or the demo exits.
+      if (config.wormCharacter) {
+        if (preDemoWormCharacterRef.current == null) preDemoWormCharacterRef.current = store.wormCharacter;
+        store.setWormCharacter(config.wormCharacter);
+      }
       store.setFlipMode(true);
       store.setShowTunnels(true);
       store.setVisualMode('classic');
@@ -181,6 +221,7 @@ export function useDemoMode({
     clearDemoWatchTimers();
     setDemoTryVisible(false);
     setDemoForecastVisible(false);
+    setDemoLaunchStep(null);
     if (store.randomMode) {
       store.setRandomMode(false);
       applyDemoSettings();
@@ -189,6 +230,7 @@ export function useDemoMode({
       store.clearDisparityGame();
       cancelDisparityRun();
     }
+    if (fromStep === 'worm-traversal') restoreWormCharacter();
     if (fromStep === 'view-showcase') {
       store.setVisualMode('classic');
       store.setExploded(false);
@@ -201,7 +243,7 @@ export function useDemoMode({
     const nextStep = DEMO_STEP_IDS[idx + 1] || 'end';
     store.setDemoStep(nextStep);
     if (nextStep !== 'end') setDemoStepIntroVisible(true);
-  }, [clearDemoWatchTimers, applyDemoSettings, cancelDisparityRun]);
+  }, [clearDemoWatchTimers, applyDemoSettings, cancelDisparityRun, restoreWormCharacter]);
   advanceDemoStepRef.current = advanceDemoStep;
 
   const handleDemoStepContinue = useCallback(() => {
@@ -218,9 +260,18 @@ export function useDemoMode({
     applyDemoStepConfig(step);
 
     demoFlipPhaseRef.current = step === 'flip-gateway' ? 'flip-all' : null;
+    babySolveArmedRef.current = false;
     setDemoCoachCopy(null);
 
     const config = DEMO_LEVEL_CONFIGS[step];
+
+    // Launch punch: title stamp + flash over the freshly staged scene, with a
+    // camera orbit kick on the cube-centric steps.
+    setDemoLaunchStep(step);
+    demoWatchTimers.current.push(setTimeout(() => setDemoLaunchStep(null), 1250));
+    if (config && config.type !== 'worm' && config.type !== 'chaos') {
+      useGameStore.getState().triggerCameraOrbit?.('cw');
+    }
     if (config && config.type === 'cube') {
       const watch = config.watch;
       if (watch?.type === 'rotate') {
@@ -252,6 +303,10 @@ export function useDemoMode({
 
   const cleanupAllDemoState = useCallback((store) => {
     clearDemoWatchTimers();
+    clearCelebrationTimer();
+    restoreWormCharacter();
+    setDemoCelebrationStep(null);
+    setDemoLaunchStep(null);
     setDemoTryVisible(false);
     setDemoStepIntroVisible(false);
     setDemoForecastVisible(false);
@@ -275,7 +330,7 @@ export function useDemoMode({
       store.clearDisparityGame();
       cancelDisparityRun();
     }
-  }, [clearDemoWatchTimers, cancelDisparityRun]);
+  }, [clearDemoWatchTimers, clearCelebrationTimer, cancelDisparityRun, restoreWormCharacter]);
 
   const handleDemoReplay = useCallback(() => {
     const store = useGameStore.getState();
@@ -404,7 +459,21 @@ export function useDemoMode({
     useGameStore.getState().setVictory(null);
   }, [demoMode, victory]);
 
-  // Flip-gateway two-phase detection: flip-all → unflip-all → advance.
+  // Baby-cube solve detection: arm once the watch scramble breaks the solve,
+  // then celebrate the moment the user restores it.
+  useEffect(() => {
+    if (!demoMode || demoStep !== 'baby-cube') return;
+    if (!checkRubiksSolved(cubies, size)) {
+      babySolveArmedRef.current = true;
+      return;
+    }
+    if (babySolveArmedRef.current) {
+      babySolveArmedRef.current = false;
+      celebrateStep('baby-cube');
+    }
+  }, [demoMode, demoStep, cubies, size, celebrateStep]);
+
+  // Flip-gateway two-phase detection: flip-all → unflip-all → celebrate.
   useEffect(() => {
     if (!demoMode || demoStep !== 'flip-gateway') return;
     const phase = demoFlipPhaseRef.current;
@@ -415,24 +484,27 @@ export function useDemoMode({
     } else if (phase === 'unflip-all' && checkRubiksSolved(cubies, size)) {
       demoFlipPhaseRef.current = null;
       setDemoCoachCopy(null);
-      advanceDemoStep('flip-gateway');
+      celebrateStep('flip-gateway');
     }
-  }, [demoMode, demoStep, cubies, size, advanceDemoStep]);
+  }, [demoMode, demoStep, cubies, size, celebrateStep]);
 
   // Clean up timers on unmount.
-  useEffect(() => () => clearDemoWatchTimers(), [clearDemoWatchTimers]);
+  useEffect(() => () => {
+    clearDemoWatchTimers();
+    clearCelebrationTimer();
+  }, [clearDemoWatchTimers, clearCelebrationTimer]);
 
-  // Advance the worm step when the traversal completes (solved phase).
+  // Celebrate the worm step when the traversal completes (solved phase).
   const wormGamePhase = useGameStore((s) => s.wormGamePhase);
   useEffect(() => {
     if (!demoMode || demoStep !== 'worm-traversal') return;
     if (wormGamePhase !== 'solved') return;
     const timer = setTimeout(() => {
       useGameStore.getState().clearDisparityGame();
-      advanceDemoStep('worm-traversal');
-    }, 2000);
+      celebrateStep('worm-traversal');
+    }, 800);
     return () => clearTimeout(timer);
-  }, [demoMode, demoStep, wormGamePhase, advanceDemoStep]);
+  }, [demoMode, demoStep, wormGamePhase, celebrateStep]);
 
   // Show the skip coach as soon as the first wormhole tunnel is traversed.
   const wormTunnelCount = useGameStore((s) => s.wormTunnelCount);
@@ -491,6 +563,8 @@ export function useDemoMode({
     handleDemoChaosSkip,
     handleDemoDisparityDismiss,
     demoShowcaseSubStep,
+    demoCelebrationStep,
+    demoLaunchStep,
     demoViewSpotlight,
     handleDemoViewSpotlightClick,
     handleDemoShowcaseNext,
