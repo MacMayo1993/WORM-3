@@ -3,6 +3,7 @@ import { UI_FONT, DISPLAY_FONT } from '../../utils/uiTheme.js';
 import { makeCubies } from '../../game/cubeState.js';
 import { flipStickerPair, buildManifoldGridMap } from '../../game/manifoldLogic.js';
 import { useGameStore } from '../../hooks/useGameStore.js';
+import MobiIntroScreen from './MobiIntroScreen.jsx';
 
 const DEMO_STEPS = [
   { id: 'baby-cube', label: 'Baby Cube', num: 1 },
@@ -205,8 +206,24 @@ const ensureDemoShellStyle = () => {
       animation: demo-stamp-punch 1.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
 
+    /* Launch stamp lingers (~2.65s) so the step name registers; the root
+       modifier lifts it to the upper quarter of the screen. */
     .demo-launch-stamp {
-      animation: demo-stamp-punch 1.15s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      animation: demo-stamp-punch-long 2.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    .demo-beat-root--upper {
+      justify-content: flex-start;
+      padding-top: calc(25vh - 60px);
+    }
+
+    @keyframes demo-stamp-punch-long {
+      0%   { opacity: 0; transform: scale(2.3) rotate(-3deg); }
+      7%   { opacity: 1; transform: scale(0.96) rotate(0deg); }
+      10%  { transform: scale(1.02); }
+      13%  { transform: scale(1); }
+      90%  { opacity: 1; transform: scale(1); }
+      100% { opacity: 0; transform: scale(1.06); }
     }
 
     @keyframes demo-stamp-punch {
@@ -281,6 +298,34 @@ const ensureDemoShellStyle = () => {
       top: auto;
       bottom: calc(env(safe-area-inset-bottom, 0px) + 100px);
     }
+
+    /* Compact advance pill left behind after Mobi's coach dialogue dismisses */
+    .demo-coach-pill {
+      position: fixed;
+      top: calc(max(10px, env(safe-area-inset-top, 10px)) + 44px);
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 11000;
+    }
+
+    .demo-coach-pill--bottom {
+      top: auto;
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 144px);
+    }
+
+    .demo-coach-pill-btn {
+      padding: 8px 22px;
+      background: #5f7f4a;
+      color: #fffdf5;
+      border: none;
+      border-radius: 999px;
+      font-family: ${UI_FONT};
+      font-size: 13px;
+      font-weight: 800;
+      cursor: pointer;
+      letter-spacing: 0.03em;
+      box-shadow: 0 6px 14px rgba(95, 127, 74, 0.28);
+    }
   `;
   document.head.appendChild(style);
 };
@@ -306,46 +351,33 @@ const DemoProgressBar = ({ currentStep }) => {
   );
 };
 
+const STEP_COPY = {
+  'baby-cube': 'Solve this first twist. Drag the turned row back into place to continue.',
+  'twin-paradox': 'Opposite faces are linked.',
+  'flip-gateway': 'Flip every tile, then flip them all back.',
+  'view-showcase': 'See every way to view the cube.',
+  'worm-traversal': 'Travel through the wormholes you opened.',
+  'chaos-forecast': 'Predict which pair survives.',
+  'random-showcase': 'The cube cycles through random styles every few seconds.',
+  'cosmetic-reward': 'Spend your Parity Points.',
+};
+
+// Step intro: Mobi delivers the setup line AND the hands-on guidance in one
+// dialogue over the blurred live scene — the mid-step coach is just a pill.
 const DemoStepIntro = ({ step, onContinue, onSkip }) => {
-  ensureDemoShellStyle();
   const info = DEMO_STEPS.find(s => s.id === step);
   if (!info) return null;
-
-  const STEP_COPY = {
-    'baby-cube': 'Solve this first twist. Drag the turned row back into place to continue.',
-    'twin-paradox': 'Opposite faces are linked.',
-    'flip-gateway': 'Flip every tile, then flip them all back.',
-    'view-showcase': 'See every way to view the cube.',
-    'worm-traversal': 'Travel through the wormholes you opened.',
-    'chaos-forecast': 'Predict which pair survives.',
-    'random-showcase': 'The cube cycles through random styles every few seconds.',
-    'cosmetic-reward': 'Spend your Parity Points.',
-  };
-
+  const lines = [STEP_COPY[step], TRY_COPY[step]].filter(Boolean);
   return (
-    <div className="demo-intro-root">
-      <section className="demo-intro-card" aria-live="polite">
-        <p className="demo-intro-step">Step {info.num}</p>
-        <h2 className="demo-intro-title">{info.label}</h2>
-        <p className="demo-intro-copy">{STEP_COPY[step]}</p>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 10 }}>
-          <button type="button" onClick={onContinue} className="demo-intro-button">
-            Start Step
-          </button>
-          {onSkip && (
-            <button
-              type="button"
-              onClick={onSkip}
-              aria-label="Skip step"
-              className="demo-intro-button"
-              style={{ background: 'transparent', color: '#7b6f45', boxShadow: 'none' }}
-            >
-              Skip ▶
-            </button>
-          )}
-        </div>
-      </section>
-    </div>
+    <MobiIntroScreen
+      key={step}
+      lines={lines}
+      modeName={`Step ${info.num} · ${info.label}`}
+      primaryLabel="▶ Start"
+      onComplete={onContinue}
+      skipLabel="Skip Step ▶"
+      onSkip={onSkip}
+    />
   );
 };
 
@@ -423,32 +455,38 @@ const TRY_COPY = {
   'random-showcase': 'Watch the styles cycle, or skip ahead.',
 };
 
+// Coach: the guidance already played inside the step-intro dialogue, so the
+// default coach is just a compact "Next ▶" pill. Only a copy OVERRIDE
+// (flip-gateway's second phase) brings Mobi back — that line is new info.
 const DemoCoach = ({ step, onNext, onExit, copy: copyOverride }) => {
   ensureDemoShellStyle();
-  const copy = copyOverride || TRY_COPY[step];
-  if (!copy) return null;
+  const [overrideSeen, setOverrideSeen] = React.useState(false);
+  const wormHealerMode = useGameStore((s) => s.wormHealerMode);
+  React.useEffect(() => {
+    setOverrideSeen(false);
+  }, [copyOverride]);
+  if (!copyOverride && !TRY_COPY[step]) return null;
+
+  if (copyOverride && !overrideSeen) {
+    const info = DEMO_STEPS.find(s => s.id === step);
+    return (
+      <MobiIntroScreen
+        key={copyOverride}
+        lines={[copyOverride]}
+        modeName={info ? `Step ${info.num} · ${info.label}` : 'Demo'}
+        primaryLabel="▶ Got It"
+        onComplete={() => setOverrideSeen(true)}
+        skipLabel="Exit Demo"
+        onSkip={onExit}
+      />
+    );
+  }
 
   return (
-    <div className="demo-intro-root" style={{ pointerEvents: 'none', background: 'none', backdropFilter: 'none' }}>
-      <section className="demo-intro-card" style={{ pointerEvents: 'auto' }} aria-live="polite">
-        <p className="demo-intro-copy">{copy}</p>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 10 }}>
-          <button type="button" onClick={onNext} className="demo-intro-button">
-            Next ▶
-          </button>
-          {onExit && (
-            <button
-              type="button"
-              onClick={onExit}
-              aria-label="Exit demo"
-              className="demo-intro-button"
-              style={{ background: 'transparent', color: '#7b6f45', boxShadow: 'none' }}
-            >
-              Exit
-            </button>
-          )}
-        </div>
-      </section>
+    <div className={`demo-coach-pill${wormHealerMode ? ' demo-coach-pill--bottom' : ''}`}>
+      <button type="button" onClick={onNext} className="demo-coach-pill-btn">
+        Next ▶
+      </button>
     </div>
   );
 };
@@ -583,7 +621,7 @@ const DemoStepLaunch = ({ step }) => {
   const info = DEMO_STEPS.find(s => s.id === step);
   if (!info) return null;
   return (
-    <div className="demo-beat-root" aria-live="polite">
+    <div className="demo-beat-root demo-beat-root--upper" aria-live="polite">
       <div className="demo-beat-flash" />
       <div className="demo-launch-stamp">
         <p className="demo-beat-sub">Step {info.num}</p>

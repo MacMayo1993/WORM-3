@@ -160,7 +160,12 @@ if (typeof document !== 'undefined' && !document.getElementById(_STYLE_ID)) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
+// Optional props for reuse beyond mode intros (demo step dialogues):
+//   primaryLabel — overrides the last-line button label ('▶ Launch' default)
+//   skipLabel    — overrides the secondary button label ('Skip' default)
+//   onSkip       — alternate completion for the secondary button / Escape;
+//                  falls back to onComplete when absent
+const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete, primaryLabel, skipLabel, onSkip }) => {
   const [index, setIndex]           = useState(0);
   const [isDismissing, setDismissing] = useState(false);
   const isLast = index === lines.length - 1;
@@ -172,6 +177,13 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
     setDismissing(true);
     setTimeout(() => onComplete(), 750);
   }, [onComplete]);
+
+  const skip = useCallback(() => {
+    if (isDismissing) return;
+    setDismissing(true);
+    const done = onSkip || onComplete;
+    setTimeout(() => done(), 750);
+  }, [isDismissing, onSkip, onComplete]);
 
   const advance = useCallback(() => {
     if (isDismissing) return;
@@ -185,12 +197,12 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
         e.preventDefault();
         advance();
       } else if (e.key === 'Escape') {
-        dismiss();
+        skip();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [advance, dismiss]);
+  }, [advance, skip]);
 
   if (!lines || lines.length === 0) {
     onComplete();
@@ -355,7 +367,7 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
           <p style={{
             margin: 0,
             fontFamily: HAND_FONT,
-            fontSize: 'clamp(22px, 4vw, 30px)',
+            fontSize: 'clamp(30px, 7vw, 42px)',
             fontWeight: '400',
             color: pencilLead,
             lineHeight: 1.45,
@@ -393,7 +405,7 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); dismiss(); }}
+              onClick={(e) => { e.stopPropagation(); skip(); }}
               style={{
                 background: 'none',
                 border: '1px solid rgba(53,64,74,0.22)',
@@ -410,7 +422,7 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
               onMouseEnter={e => { e.currentTarget.style.color = pencilLead; e.currentTarget.style.borderColor = 'rgba(53,64,74,0.42)'; }}
               onMouseLeave={e => { e.currentTarget.style.color = 'rgba(53,64,74,0.58)'; e.currentTarget.style.borderColor = 'rgba(53,64,74,0.22)'; }}
             >
-              Skip
+              {skipLabel || 'Skip'}
             </button>
 
             <button
@@ -434,7 +446,7 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
               onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 7px 16px rgba(53,64,74,0.24)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
               onMouseLeave={e => { e.currentTarget.style.boxShadow = isLast ? '0 6px 14px rgba(53,64,74,0.20)' : '0 3px 8px rgba(53,64,74,0.08)'; e.currentTarget.style.transform = 'none'; }}
             >
-              {isLast ? '▶ Launch' : 'Next ▶'}
+              {isLast ? (primaryLabel || '▶ Launch') : 'Next ▶'}
             </button>
           </div>
         </div>
