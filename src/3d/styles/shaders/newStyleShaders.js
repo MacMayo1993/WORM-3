@@ -1266,134 +1266,181 @@ export const newStyleShaders = {
                    + sin(t2 * 1.4 + seed4 * 8.0) * 0.1;
       gazeX += sp * sin(seed3 * 31.0) * 0.1;
       gazeY += sp * cos(seed4 * 31.0) * 0.1;
+
+      // --- Blink cycle: fast close, slower open, occasional double blink ---
+      float cycleLen = 3.2 + seed2 * 2.8;
+      float bp = fract((time + seed * 100.0) / cycleLen) * cycleLen;
+      float blink1 = smoothstep(0.0, 0.09, bp) * (1.0 - smoothstep(0.13, 0.3, bp));
+      float blink2 = smoothstep(0.48, 0.57, bp) * (1.0 - smoothstep(0.61, 0.78, bp));
+      float blink = clamp(max(blink1, blink2 * step(0.6, seed4)), 0.0, 1.0);
+      // Reflex squint when this slice twists (partial, so the spiral stays visible)
+      blink = max(blink, smoothstep(0.25, 0.8, sp) * 0.55);
+
       // Eyeball shifts slightly in socket to follow gaze
-      float mx = gazeX * 0.06;
-      float my = gazeY * 0.06;
+      vec2 ec = p - vec2(gazeX, gazeY) * 0.05;
+      float eyeR = 0.35;
+      float d = length(ec);
+      vec2 sn2 = ec / eyeR;
+      float sn2Len = length(sn2);
 
-      // --- Chamber / frame ---
-      float chamberR = 0.48;
-      float chamber = 1.0 - smoothstep(chamberR - 0.008, chamberR + 0.008, r);
+      // --- TV-bezel frame (antipodal colour keeps face identity) ---
+      float chamberR = 0.46;
+      vec3 frame = max(antipodalColor * 0.4, vec3(0.035));
+      // Inner edge of the bezel catches the light
+      frame *= 0.8 + 0.45 * smoothstep(chamberR + 0.06, chamberR, r);
 
-      // Frame = antipodalColor
-      vec3 frame = antipodalColor * 0.45;
-      frame = max(frame, vec3(0.04));
+      // --- Eyelid aperture: curved lid edges in eyeball-radius units ---
+      float lx = clamp(ec.x / (eyeR * 1.08), -1.0, 1.0);
+      float lidArc = sqrt(max(1.0 - lx * lx, 0.0));
+      float eyY = ec.y / eyeR;
+      // Lids overlap the ball edge so flesh hugs it; upper lid travels past the
+      // lower edge on a blink so the aperture fully seals shut
+      float upEdge = mix(0.78, -0.3, blink) * lidArc;
+      float loEdge = mix(-0.8, -0.2, blink) * lidArc;
+      float aa = 0.05;
+      float aperture = smoothstep(upEdge + aa, upEdge - aa, eyY)
+                     * smoothstep(loEdge - aa, loEdge + aa, eyY)
+                     * step(abs(ec.x), eyeR * 1.08);
 
-      // Socket interior with radial gradient for depth illusion
-      float socketD = smoothstep(chamberR - 0.01, chamberR - 0.15, r);
-      vec3 socketDeep = antipodalColor * 0.12;
-      socketDeep = max(socketDeep, vec3(0.015));
-      vec3 socketRim = antipodalColor * 0.55;
-      socketRim = max(socketRim, vec3(0.04));
-      vec3 socketCol = mix(socketRim, socketDeep, socketD);
-      // Top-lit gradient for 3D depth
-      float topLight = smoothstep(-0.2, 0.3, p.y);
-      socketCol *= 0.7 + topLight * 0.3;
+      // --- Fleshy mass with radiating ridge folds, spilling over the bezel ---
+      float fAngle = atan(ec.y, ec.x);
+      float grain = eyeNoise(p * 10.0 + seed * 40.0);
+      float fold = sin(fAngle * 7.0 + seed * 6.283 + eyeNoise(p * 4.0 + seed2 * 20.0) * 3.0);
+      float foldOut = smoothstep(eyeR * 0.9, chamberR * 0.95, d);
+      // Organic silhouette: ridges push tendrils past the bezel onto the frame
+      float tent = smoothstep(0.0, 1.0, fold) * (0.09 + seed3 * 0.03);
+      float fleshR = chamberR - 0.015 + tent;
+      float fleshMask = 1.0 - smoothstep(fleshR - 0.006, fleshR + 0.006, d);
+
+      vec3 flesh = mix(vec3(0.8, 0.58, 0.49), antipodalColor, 0.1);
+      flesh *= 0.78 + grain * 0.22;
+      flesh += vec3(0.17, 0.1, 0.07) * smoothstep(0.25, 0.9, fold) * foldOut;
+      flesh -= vec3(0.15, 0.11, 0.1) * smoothstep(0.25, 0.9, -fold) * foldOut;
+      // Puffy mound ringing the eye opening
+      flesh += vec3(0.05, 0.025, 0.02) * smoothstep(eyeR * 1.7, eyeR * 1.05, d);
+      // Top light + wet glisten on the ridges
+      flesh *= 0.86 + 0.14 * smoothstep(-0.4, 0.4, p.y);
+      flesh += vec3(0.2, 0.16, 0.14) * pow(grain, 4.0) * foldOut;
+
+      // Sculpted relief lit from upper-left so the mass bulges off the tile:
+      // outer slope faces away from center, inner slope drops into the socket
+      vec2 rd2 = ec / max(d, 0.001);
+      vec2 Ld2 = vec2(-0.496, 0.868);
+      float ndl = dot(rd2, Ld2);
+      float outerSlope = smoothstep(fleshR - 0.16, fleshR, d);
+      float innerSlope = smoothstep(eyeR * 1.4, eyeR * 1.02, d);
+      flesh *= 1.0 + ndl * (outerSlope * 0.4 - innerSlope * 0.28);
+      // Rolled-under lip at the silhouette edge
+      flesh *= 1.0 - smoothstep(fleshR - 0.05, fleshR, d) * 0.3;
+      // Sheen along the lit side of the lip
+      flesh += vec3(0.3, 0.24, 0.2) * pow(max(ndl, 0.0), 2.0) * outerSlope
+             * (1.0 - smoothstep(fleshR - 0.03, fleshR, d)) * 0.6;
 
       // --- Eyeball (2D sphere projection — reliable on all GPUs) ---
-      float eyeR = 0.38;
-      vec2 ec = p - vec2(mx, my);
-      float d = length(ec);
-
-      vec3 col = socketCol;
-
+      vec3 eyeCol;
       if (d < eyeR) {
-        vec2 sn2 = ec / eyeR;
-        float sn2Len = length(sn2);
         float nz = sqrt(max(1.0 - sn2Len * sn2Len, 0.0));
         vec3 hn = vec3(sn2, nz);
 
-        // --- White sclera ---
-        vec3 sclera = vec3(1.0, 0.99, 0.97);
-        sclera *= 1.0 - smoothstep(0.4, 1.0, sn2Len) * 0.08;
+        // Sclera: warm white, pink tissue toward the edges
+        vec3 sclera = vec3(0.99, 0.97, 0.94);
+        sclera = mix(sclera, vec3(0.93, 0.72, 0.68), smoothstep(0.55, 1.0, sn2Len) * 0.45);
 
         // Blood vessels — radial lines from iris outward with wobble
         float vAngle = atan(sn2.y, sn2.x);
         float veinTime = time * 0.12;
         float veinLine = 0.0;
-        // Fade: vessels only visible from iris edge outward
         float vFade = smoothstep(0.42, 0.55, sn2Len) * (1.0 - smoothstep(0.92, 1.0, sn2Len));
         for (int i = 0; i < 7; i++) {
           float fi = float(i);
           float a0 = fi * 0.898 + seed * 6.283;
           float da = vAngle - a0;
           da = da - 6.2832 * floor((da + 3.1416) / 6.2832);
-          // Wobble the vein path sideways as it extends outward
           float wobble = sin(sn2Len * 14.0 + fi * 3.7 + veinTime * (0.8 + fi * 0.3)) * 0.025
                        + sin(sn2Len * 7.0 + fi * 1.3 + seed * 10.0) * 0.015;
-          // Thinner as they go outward
           float thickness = mix(0.035, 0.012, smoothstep(0.5, 0.95, sn2Len));
           float v = smoothstep(thickness, 0.0, abs(da + wobble)) * vFade;
           veinLine = max(veinLine, v);
         }
-        // Fine capillary noise overlay
         float capillary = eyeNoise(vec2(vAngle * 6.0 + seed * 8.0, sn2Len * 15.0 + veinTime));
         veinLine += smoothstep(0.6, 0.8, capillary) * vFade * 0.15;
-        // Subtle pulse
         float pulse = 0.75 + 0.25 * sin(time * 1.2 + seed * 5.0);
-        sclera = mix(sclera, vec3(0.75, 0.18, 0.14), veinLine * 0.5 * pulse);
-        sclera = mix(sclera, vec3(0.92, 0.78, 0.74), smoothstep(0.85, 1.0, sn2Len) * 0.12);
+        sclera = mix(sclera, vec3(0.72, 0.16, 0.13), veinLine * 0.55 * pulse);
 
-        // --- Iris (shifts with gaze direction) ---
+        // --- Iris ring (baseColor) around a hypnotic spiral pupil ---
         vec2 irisUV = sn2 - vec2(gazeX, gazeY) * 0.35;
         float irisD = length(irisUV);
         float irisAngle = atan(irisUV.y, irisUV.x);
-
-        float irisOuterR = 0.48;
-        float pupilR = 0.13 + sp * 0.03;
+        float irisOuterR = 0.55;
+        float spiralR = 0.36 + sp * 0.06;
         float irisMask = smoothstep(irisOuterR + 0.01, irisOuterR - 0.03, irisD);
-
-        float limbal = smoothstep(irisOuterR - 0.08, irisOuterR - 0.005, irisD);
+        float limbal = smoothstep(irisOuterR - 0.1, irisOuterR - 0.005, irisD);
 
         float f1 = sin(irisAngle * 55.0 + irisD * 18.0) * 0.5 + 0.5;
-        float f2 = sin(irisAngle * 80.0 - irisD * 12.0 + seed * 30.0) * 0.5 + 0.5;
-        float f3 = sin(irisAngle * 35.0 + irisD * 7.0 + seed2 * 20.0) * 0.5 + 0.5;
         float fn = eyeNoise(vec2(irisAngle * 8.0 + seed * 5.0, irisD * 22.0));
-        float fibers = f1 * 0.3 + f2 * 0.25 + f3 * 0.2 + fn * 0.25;
-
-        float coll = smoothstep(0.03, 0.0, abs(irisD - (pupilR + 0.08)));
-
-        float radialT = smoothstep(pupilR + 0.01, irisOuterR - 0.02, irisD);
-        vec3 irisInner = baseColor * 1.5 + vec3(0.1, 0.07, 0.02);
-        vec3 irisOuter = baseColor * 0.55;
-        vec3 irisCol = mix(irisInner, irisOuter, radialT);
+        float fibers = f1 * 0.5 + fn * 0.5;
+        float radialT = smoothstep(spiralR, irisOuterR - 0.02, irisD);
+        vec3 irisCol = mix(baseColor * 1.4 + vec3(0.08, 0.05, 0.02), baseColor * 0.5, radialT);
         irisCol += baseColor * fibers * 0.35;
-        irisCol += vec3(0.1, 0.07, 0.03) * coll;
-        irisCol = mix(irisCol, baseColor * 0.08, limbal * 0.7);
+        irisCol = mix(irisCol, baseColor * 0.08, limbal * 0.75);
 
-        float crypts = eyeNoise(vec2(irisAngle * 4.0 + seed * 7.0, irisD * 14.0 + seed2 * 5.0));
-        irisCol = mix(irisCol, baseColor * 0.15, smoothstep(0.6, 0.8, crypts) * 0.18 * (1.0 - limbal));
+        // Hypno spiral blended into the iris palette: dark/light bands of the
+        // face colour instead of black/white, with the fiber texture showing
+        // through, so each face keeps its own tinted spiral
+        float swirl = irisD / spiralR * 30.0 - irisAngle + time * (1.6 + sp * 6.0);
+        float bandMask = smoothstep(-0.6, 0.6, sin(swirl));
+        vec3 spiralDark = baseColor * 0.12 + vec3(0.01);
+        vec3 spiralLight = baseColor * 1.45 + vec3(0.18, 0.14, 0.1);
+        vec3 spiralCol = mix(spiralDark, spiralLight, bandMask);
+        spiralCol += baseColor * fibers * 0.15;
+        spiralCol = mix(vec3(0.02), spiralCol, smoothstep(0.02, 0.09, irisD));
+        float spiralMask = 1.0 - smoothstep(spiralR - 0.06, spiralR + 0.04, irisD);
+        irisCol = mix(irisCol, spiralCol, spiralMask);
 
-        float pupilMask = 1.0 - smoothstep(pupilR - 0.01, pupilR + 0.01, irisD);
-        irisCol = mix(irisCol, vec3(0.005), pupilMask);
+        eyeCol = mix(sclera, irisCol, irisMask);
 
-        col = mix(sclera, irisCol, irisMask);
+        // Cornea highlights — big soft + pinpoint = wet glass look
+        float hl1 = smoothstep(0.16, 0.0, length(sn2 - vec2(-0.18, 0.3)));
+        eyeCol += vec3(1.0) * hl1 * 0.8;
+        float hl2 = smoothstep(0.05, 0.0, length(sn2 - vec2(0.12, -0.1)));
+        eyeCol += vec3(1.0) * hl2 * 0.35;
 
-        // Specular highlights
-        float hl1 = smoothstep(0.1, 0.0, length(sn2 - vec2(-0.1, 0.14)));
-        col += vec3(1.0) * hl1 * 0.9;
-        float hl2 = smoothstep(0.04, 0.0, length(sn2 - vec2(0.06, -0.06)));
-        col += vec3(1.0) * hl2 * 0.3;
-
-        // 3D lighting
+        // Sphere lighting + rim darkening
         vec3 lightDir = normalize(vec3(0.3, 0.5, 1.0));
-        float diff = max(dot(hn, lightDir), 0.0);
-        col *= 0.68 + diff * 0.38;
-
-        // Rim darkening for sphere depth
+        eyeCol *= 0.72 + max(dot(hn, lightDir), 0.0) * 0.38;
         float rimDark = pow(1.0 - nz, 2.0);
-        col *= 1.0 - rimDark * 0.3;
+        eyeCol *= 1.0 - rimDark * 0.45;
+        eyeCol += vec3(0.09) * rimDark * irisMask;
 
-        // Fresnel sheen on iris
-        col += vec3(0.1) * rimDark * irisMask;
+        // Upper lid casts a soft shadow onto the ball
+        eyeCol *= 0.55 + 0.45 * smoothstep(0.0, 0.4, upEdge - eyY);
+        // Wet waterline glint along the lower lid edge
+        eyeCol += vec3(0.5) * smoothstep(0.1, 0.0, abs(eyY - loEdge)) * 0.35;
+      } else {
+        // Inside the aperture but off the ball: dark socket + pink canthus
+        eyeCol = mix(vec3(0.22, 0.09, 0.09), vec3(0.66, 0.34, 0.32), smoothstep(0.75, 1.0, abs(lx)));
       }
 
-      // Shadow halo around eyeball in socket
-      float haloD = length(ec);
-      float halo = smoothstep(eyeR + 0.06, eyeR + 0.003, haloD)
-                 * step(eyeR - 0.005, haloD);
-      col *= 1.0 - halo * 0.55;
+      // Flesh casts a drop shadow onto the bezel (opposite the light)
+      float shD = length(ec - vec2(0.035, -0.05));
+      float dropSh = smoothstep(fleshR + 0.1, fleshR - 0.01, shD);
+      vec3 ground = frame * (1.0 - dropSh * 0.55);
 
-      col = mix(frame, col, chamber);
+      vec3 col = mix(ground, flesh, fleshMask);
+      col = mix(col, eyeCol, aperture);
+
+      // --- Lid margins: dark moist lash-line hugging the aperture edges ---
+      float upD = eyY - upEdge;
+      float loD = loEdge - eyY;
+      float inX = 1.0 - smoothstep(0.92, 1.06, abs(ec.x / (eyeR * 1.08)));
+      float upMargin = smoothstep(0.14, 0.0, upD) * step(0.0, upD) * inX;
+      float loMargin = smoothstep(0.12, 0.0, loD) * step(0.0, loD) * inX;
+      col = mix(col, vec3(0.42, 0.2, 0.18), (upMargin * 0.7 + loMargin * 0.5) * (1.0 - aperture));
+      // Moist highlight right on the lid rims
+      col += vec3(0.35, 0.28, 0.25) * (smoothstep(0.035, 0.0, abs(upD)) + smoothstep(0.03, 0.0, abs(loD))) * inX * 0.5;
+      // Upper lid crease line above the moving lid edge
+      float crease = smoothstep(0.04, 0.0, abs(eyY - (upEdge + 0.32 * lidArc + 0.18))) * inX;
+      col -= vec3(0.07, 0.05, 0.04) * crease * (1.0 - aperture);
 
       gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
     }
