@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { UI_FONT, GLASS_PANEL_DEEP, GLASS_PANEL } from '../../utils/uiTheme.js';
+import { UI_FONT } from '../../utils/uiTheme.js';
 
 // ── Dialogue banks ────────────────────────────────────────────────────────────
 
@@ -139,12 +139,20 @@ if (typeof document !== 'undefined' && !document.getElementById(_STYLE_ID)) {
       to   { opacity: 0; transform: translateY(10px); }
     }
     @keyframes textFadeIn {
-      from { opacity: 0; }
-      to   { opacity: 1; }
+      from { opacity: 0; transform: translateY(2px); filter: blur(0.4px); }
+      to   { opacity: 1; transform: translateY(0); filter: blur(0); }
     }
     @keyframes cursorBlink {
       0%,100% { opacity: 1; }
       50%      { opacity: 0; }
+    }
+    @keyframes pencilCursorWiggle {
+      0%, 100% { transform: translateY(0) rotate(-7deg); }
+      50% { transform: translateY(-1px) rotate(-3deg); }
+    }
+    @keyframes paperSettle {
+      from { transform: translateY(16px) rotate(-0.4deg); opacity: 0; }
+      to { transform: translateY(0) rotate(0deg); opacity: 1; }
     }
   `;
   document.head.appendChild(s);
@@ -189,10 +197,14 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
     return null;
   }
 
-  const accent      = 'rgba(0, 210, 248, 0.85)';
-  const accentSolid = '#00d2f8';
-  const PANEL_H     = 'clamp(132px, 18vh, 172px)';
-  const NAMEPLATE_H = 32;
+  const accent      = 'rgba(98, 132, 164, 0.78)';
+  const accentSolid = '#486f95';
+  const pencilLead  = '#35404a';
+  const paperBase   = '#fbf7e9';
+  const graphLine   = 'rgba(80, 142, 190, 0.20)';
+  const graphMajor  = 'rgba(80, 142, 190, 0.32)';
+  const PANEL_H     = 'clamp(166px, 24vh, 230px)';
+  const NAMEPLATE_H = 34;
 
   const mobiAnim = isDismissing
     ? 'mobiDissolveOut 0.55s ease forwards'
@@ -209,7 +221,7 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
         position: 'fixed',
         inset: 0,
         zIndex: 900,
-        background: 'linear-gradient(to top, rgba(0,0,0,0.45) 0%, transparent 50%)',
+        background: 'linear-gradient(to top, rgba(34, 31, 25, 0.38) 0%, rgba(34, 31, 25, 0.10) 42%, transparent 68%)',
         pointerEvents: isDismissing ? 'none' : 'auto',
         cursor: isDismissing ? 'default' : 'pointer',
       }}
@@ -249,7 +261,7 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
         left: 0,
         zIndex: 905,
         pointerEvents: 'none',
-        animation: uiAnim,
+        animation: isDismissing ? uiAnim : 'paperSettle 0.48s cubic-bezier(0.16,1,0.3,1) forwards',
       }}>
         {/* Outer layer = border color */}
         <div style={{
@@ -260,12 +272,13 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
         }}>
           {/* Inner layer = fill */}
           <div style={{
-            background: GLASS_PANEL_DEEP,
+            background: paperBase,
             height: NAMEPLATE_H,
             padding: '0 22px 0 14px',
             display: 'flex',
             alignItems: 'center',
             gap: '10px',
+            boxShadow: 'inset 0 0 0 1px rgba(91, 72, 45, 0.10)',
           }}>
             <span style={{
               fontFamily: UI_FONT,
@@ -273,7 +286,7 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
               fontWeight: 700,
               letterSpacing: '0.1em',
               textTransform: 'uppercase',
-              color: '#fff',
+              color: pencilLead,
             }}>
               MOBI
             </span>
@@ -284,7 +297,7 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
               letterSpacing: '0.15em',
               textTransform: 'uppercase',
               color: accentSolid,
-              opacity: 0.85,
+              opacity: 0.78,
             }}>
               {modeName || 'WORM MODE'}
             </span>
@@ -300,11 +313,21 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
           left: 0,
           right: 0,
           minHeight: PANEL_H,
-          background: GLASS_PANEL,
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
+          backgroundColor: paperBase,
+          backgroundImage: `
+            linear-gradient(${graphLine} 1px, transparent 1px),
+            linear-gradient(90deg, ${graphLine} 1px, transparent 1px),
+            linear-gradient(${graphMajor} 1px, transparent 1px),
+            linear-gradient(90deg, ${graphMajor} 1px, transparent 1px),
+            radial-gradient(circle at 18% 24%, rgba(255,255,255,0.64), transparent 28%),
+            linear-gradient(115deg, rgba(255,255,255,0.34), rgba(219,205,176,0.20))
+          `,
+          backgroundSize: '18px 18px, 18px 18px, 90px 90px, 90px 90px, 100% 100%, 100% 100%',
+          backgroundPosition: '0 0, 0 0, -1px -1px, -1px -1px, 0 0, 0 0',
+          backdropFilter: 'blur(4px)',
+          WebkitBackdropFilter: 'blur(4px)',
           borderTop: `2px solid ${accent}`,
-          boxShadow: `0 -2px 40px rgba(0,200,240,0.08)`,
+          boxShadow: '0 -14px 42px rgba(48, 39, 28, 0.22), inset 0 1px 0 rgba(255,255,255,0.72)',
           zIndex: 903,
           pointerEvents: 'auto',
           display: 'flex',
@@ -331,23 +354,24 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
         >
           <p style={{
             margin: 0,
-            fontFamily: UI_FONT,
-            fontSize: 'clamp(14px, 2.8vw, 18px)',
-            fontWeight: '450',
-            color: '#e6f2ff',
-            lineHeight: 1.5,
-            letterSpacing: '0.005em',
+            fontFamily: '"Bradley Hand", "Segoe Print", "Comic Sans MS", cursive',
+            fontSize: 'clamp(18px, 3.2vw, 25px)',
+            fontWeight: '600',
+            color: pencilLead,
+            lineHeight: 1.55,
+            letterSpacing: '0.015em',
+            textShadow: '0.35px 0.35px 0 rgba(53,64,74,0.22), -0.25px 0 rgba(53,64,74,0.12)',
           }}>
             {lines[index]}
             <span style={{
               display: 'inline-block',
               width: '2px',
               height: '1em',
-              background: accentSolid,
-              marginLeft: '3px',
+              background: pencilLead,
+              marginLeft: '5px',
               verticalAlign: 'middle',
               opacity: 0.7,
-              animation: 'cursorBlink 1s step-end infinite',
+              animation: 'cursorBlink 1s step-end infinite, pencilCursorWiggle 1.4s ease-in-out infinite',
             }} />
           </p>
         </div>
@@ -360,7 +384,7 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
                 width: i === index ? '16px' : '5px',
                 height: '5px',
                 borderRadius: '3px',
-                background: i === index ? accentSolid : 'rgba(0,210,248,0.3)',
+                background: i === index ? accentSolid : 'rgba(72,111,149,0.24)',
                 transition: 'all 0.3s cubic-bezier(0.4,0,0.2,1)',
               }} />
             ))}
@@ -372,19 +396,19 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
               onClick={(e) => { e.stopPropagation(); dismiss(); }}
               style={{
                 background: 'none',
-                border: '1px solid rgba(255,255,255,0.18)',
-                color: 'rgba(255,255,255,0.45)',
+                border: '1px solid rgba(53,64,74,0.22)',
+                color: 'rgba(53,64,74,0.58)',
                 fontSize: '11px',
                 fontWeight: '500',
                 padding: '5px 12px',
-                borderRadius: '4px',
+                borderRadius: '999px',
                 cursor: 'pointer',
                 fontFamily: UI_FONT,
                 letterSpacing: '0.06em',
                 transition: 'all 0.15s',
               }}
-              onMouseEnter={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.8)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.4)'; }}
-              onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.45)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.18)'; }}
+              onMouseEnter={e => { e.currentTarget.style.color = pencilLead; e.currentTarget.style.borderColor = 'rgba(53,64,74,0.42)'; }}
+              onMouseLeave={e => { e.currentTarget.style.color = 'rgba(53,64,74,0.58)'; e.currentTarget.style.borderColor = 'rgba(53,64,74,0.22)'; }}
             >
               Skip
             </button>
@@ -393,22 +417,22 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete }) => {
               type="button"
               onClick={(e) => { e.stopPropagation(); advance(); }}
               style={{
-                background: isLast ? accentSolid : 'rgba(0,210,248,0.12)',
+                background: isLast ? pencilLead : 'rgba(251,247,233,0.72)',
                 border: `1px solid ${accentSolid}`,
-                color: isLast ? '#000e1a' : accentSolid,
+                color: isLast ? '#fbf7e9' : accentSolid,
                 fontSize: '12px',
                 fontWeight: '700',
                 padding: '5px 20px',
-                borderRadius: '4px',
+                borderRadius: '999px',
                 cursor: 'pointer',
                 fontFamily: UI_FONT,
                 letterSpacing: '0.08em',
                 textTransform: 'uppercase',
-                boxShadow: isLast ? `0 0 18px ${accentSolid}99` : `0 0 8px ${accentSolid}33`,
+                boxShadow: isLast ? '0 6px 14px rgba(53,64,74,0.20)' : '0 3px 8px rgba(53,64,74,0.08)',
                 transition: 'all 0.18s',
               }}
-              onMouseEnter={e => { e.currentTarget.style.boxShadow = `0 0 22px ${accentSolid}cc`; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-              onMouseLeave={e => { e.currentTarget.style.boxShadow = isLast ? `0 0 18px ${accentSolid}99` : `0 0 8px ${accentSolid}33`; e.currentTarget.style.transform = 'none'; }}
+              onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 7px 16px rgba(53,64,74,0.24)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+              onMouseLeave={e => { e.currentTarget.style.boxShadow = isLast ? '0 6px 14px rgba(53,64,74,0.20)' : '0 3px 8px rgba(53,64,74,0.08)'; e.currentTarget.style.transform = 'none'; }}
             >
               {isLast ? '▶ Launch' : 'Next ▶'}
             </button>
