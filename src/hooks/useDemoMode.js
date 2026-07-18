@@ -467,6 +467,14 @@ export function useDemoMode({
     useGameStore.getState().setVictory(null);
   }, [demoMode, victory]);
 
+  // Suppress the first-flip tutorial during demo — the demo narrates flips
+  // itself, and this full-screen overlay lingers beneath the demo shell.
+  const showFirstFlipTutorial = useGameStore((s) => s.showFirstFlipTutorial);
+  useEffect(() => {
+    if (!demoMode || !showFirstFlipTutorial) return;
+    useGameStore.getState().setShowFirstFlipTutorial(false);
+  }, [demoMode, showFirstFlipTutorial]);
+
   // Baby-cube solve detection: arm once the watch scramble breaks the solve,
   // then celebrate the moment the user restores it.
   useEffect(() => {
