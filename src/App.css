@@ -912,7 +912,7 @@ button:focus-visible,
   background: rgba(249, 115, 22, 0.90);
   border: 1px solid rgba(251, 146, 60, 0.55);
   color: #ffffff;
-  font-family: 'Bungee', cursive;
+  font-family: 'Bungee', 'Arial Black', 'Franklin Gothic Bold', sans-serif;
   font-size: 20px;
   font-weight: 400;
   letter-spacing: 0.10em;
@@ -941,7 +941,7 @@ button:focus-visible,
   transform: translateX(-50%);
   margin: 0;
   color: rgba(255, 255, 255, 0.80);
-  font-family: 'Bungee', cursive;
+  font-family: 'Bungee', 'Arial Black', 'Franklin Gothic Bold', sans-serif;
   font-size: 18px;
   letter-spacing: 0.08em;
   text-shadow: 0 0 20px rgba(255,255,255,0.3), 0 2px 6px rgba(0, 0, 0, 0.6);
@@ -3380,7 +3380,7 @@ select.btn-compact:disabled {
 
 .worm-title-letter {
   display: inline-block;
-  font-family: 'Bungee', cursive;
+  font-family: 'Bungee', 'Arial Black', 'Franklin Gothic Bold', sans-serif;
   font-size: clamp(95px, 26vw, 170px);
   letter-spacing: 5px;
   -webkit-text-stroke: 5px white;
@@ -3422,7 +3422,7 @@ select.btn-compact:disabled {
   width: 28px;
   height: 28px;
   border: 2px solid #1a1a2e;
-  font-family: 'Bungee', cursive;
+  font-family: 'Bungee', 'Arial Black', 'Franklin Gothic Bold', sans-serif;
   color: #eab308;
   display: flex;
   align-items: center;
@@ -3440,7 +3440,7 @@ select.btn-compact:disabled {
 .worm-cube-face--bottom { transform: rotateX(-90deg) translateZ(14px);   background: #cccccc; }
 
 .worm-tactile-btn {
-  font-family: 'Bungee', cursive;
+  font-family: 'Bungee', 'Arial Black', 'Franklin Gothic Bold', sans-serif;
   font-size: 2.3rem;
   color: white;
   /* Brand-orange CTA — matches the mode carousel's PLAY accent so the primary

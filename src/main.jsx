@@ -7,6 +7,22 @@ import ReactDOM from 'react-dom/client'
 import '@fontsource/bungee'
 // Mobi's handwritten pencil dialogue face — same self-hosted rule as Bungee.
 import '@fontsource/annie-use-your-telescope'
+import bungeeWoff2 from '@fontsource/bungee/files/bungee-latin-400-normal.woff2?url'
+import annieWoff2 from '@fontsource/annie-use-your-telescope/files/annie-use-your-telescope-latin-400-normal.woff2?url'
+
+// Preload both webfonts immediately — otherwise the browser only fetches a
+// font when the first styled element renders, and on slow networks the
+// fallback face is visible for seconds before swapping (ugly FOUT on the
+// title screen and Mobi dialogue).
+for (const href of [bungeeWoff2, annieWoff2]) {
+  const link = document.createElement('link')
+  link.rel = 'preload'
+  link.as = 'font'
+  link.type = 'font/woff2'
+  link.crossOrigin = 'anonymous'
+  link.href = href
+  document.head.appendChild(link)
+}
 import App from './App.jsx'
 import './App.css' // Import App.css instead of index.css
 
