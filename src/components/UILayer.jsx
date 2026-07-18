@@ -347,6 +347,8 @@ export default function UILayer({
         mode={sheetMode}
         solveModeActive={solveModeActive}
         onToggleSolve={() => {
+          // Solve and Teach are mutually exclusive — they share solveHighlights.
+          if (!solveModeActive && teachMode.active) teachMode.exitTeachMode();
           setSolveModeActive(!solveModeActive);
           if (!solveModeActive) setSolveFocusedStep(null); else setSolveHighlights([]);
           setSheetOpen(false);
@@ -354,7 +356,10 @@ export default function UILayer({
         teachModeActive={teachMode.active}
         onToggleTeach={() => {
           if (teachMode.active) teachMode.exitTeachMode();
-          else if (size === 3) teachMode.enterTeachMode();
+          else if (size === 3) {
+            if (solveModeActive) { setSolveModeActive(false); setSolveHighlights([]); }
+            teachMode.enterTeachMode();
+          }
           setSheetOpen(false);
         }}
         solverLocked={size !== 3}
