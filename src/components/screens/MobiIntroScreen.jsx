@@ -170,7 +170,9 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete, primaryLab
   const [isDismissing, setDismissing] = useState(false);
   const isLast = index === lines.length - 1;
 
-  const mobiImgSrc = `${import.meta.env.BASE_URL}Mobi.png`;
+  // webp is ~10x smaller than the source png; fall back to png on decode error.
+  const mobiImgSrc = `${import.meta.env.BASE_URL}Mobi.webp`;
+  const mobiImgFallback = `${import.meta.env.BASE_URL}Mobi.png`;
 
   // Trigger dissolve then hand off to parent after animation finishes
   const dismiss = useCallback(() => {
@@ -264,7 +266,10 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete, primaryLab
           src={mobiImgSrc}
           alt="Mobi"
           style={{ display: 'block', height: 'clamp(384px, 62vh, 672px)', width: 'auto' }}
-          onError={e => { e.currentTarget.style.display = 'none'; }}
+          onError={e => {
+            if (e.currentTarget.src !== mobiImgFallback) e.currentTarget.src = mobiImgFallback;
+            else e.currentTarget.style.display = 'none';
+          }}
         />
       </div>
 
