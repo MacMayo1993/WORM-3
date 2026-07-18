@@ -232,7 +232,9 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete, primaryLab
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 900,
+        // Above all in-game chrome (nav bar, HUD, mobile controls) — a Mobi
+        // dialogue is a blocking beat; only demo shell overlays sit higher.
+        zIndex: 10500,
         background: 'linear-gradient(to top, rgba(34, 31, 25, 0.38) 0%, rgba(34, 31, 25, 0.10) 42%, transparent 68%)',
         pointerEvents: isDismissing ? 'none' : 'auto',
         cursor: isDismissing ? 'default' : 'pointer',
