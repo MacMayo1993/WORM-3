@@ -382,9 +382,10 @@ const DEMO_LEVEL_CONFIGS = {
     type: 'worm',
     cubeSize: 6,
     wormSpeed: 2.5,
-    wormOrbCount: 3,
+    wormOrbCount: 25,
     wormholeInterval: 8,
     wormColor: '#33ff66',
+    wormCharacter: 'wiggle',
   },
   'chaos-forecast': {
     type: 'chaos',

@@ -58,6 +58,7 @@ export function useDemoMode({
   const demoFlipPhaseRef = useRef(null);
   const celebrationTimerRef = useRef(null);
   const babySolveArmedRef = useRef(false);
+  const preDemoWormCharacterRef = useRef(null);
 
   const clearDemoWatchTimers = useCallback(() => {
     demoWatchTimers.current.forEach(clearTimeout);
@@ -86,6 +87,13 @@ export function useDemoMode({
     }, 1600);
   }, [clearDemoWatchTimers]);
 
+  const restoreWormCharacter = useCallback(() => {
+    if (preDemoWormCharacterRef.current != null) {
+      useGameStore.getState().setWormCharacter(preDemoWormCharacterRef.current);
+      preDemoWormCharacterRef.current = null;
+    }
+  }, []);
+
   const applyDemoSettings = useCallback(() => {
     const store = useGameStore.getState();
     const demoManifoldStyles = {};
@@ -112,6 +120,12 @@ export function useDemoMode({
       const targetSize = config.cubeSize || 3;
       if (targetSize !== store.size) changeSize(targetSize);
       else reset();
+      // Showcase a specific worm character; the player's own pick (persisted
+      // to localStorage) is restored when the step ends or the demo exits.
+      if (config.wormCharacter) {
+        if (preDemoWormCharacterRef.current == null) preDemoWormCharacterRef.current = store.wormCharacter;
+        store.setWormCharacter(config.wormCharacter);
+      }
       store.setFlipMode(true);
       store.setShowTunnels(true);
       store.setVisualMode('classic');
@@ -216,6 +230,7 @@ export function useDemoMode({
       store.clearDisparityGame();
       cancelDisparityRun();
     }
+    if (fromStep === 'worm-traversal') restoreWormCharacter();
     if (fromStep === 'view-showcase') {
       store.setVisualMode('classic');
       store.setExploded(false);
@@ -228,7 +243,7 @@ export function useDemoMode({
     const nextStep = DEMO_STEP_IDS[idx + 1] || 'end';
     store.setDemoStep(nextStep);
     if (nextStep !== 'end') setDemoStepIntroVisible(true);
-  }, [clearDemoWatchTimers, applyDemoSettings, cancelDisparityRun]);
+  }, [clearDemoWatchTimers, applyDemoSettings, cancelDisparityRun, restoreWormCharacter]);
   advanceDemoStepRef.current = advanceDemoStep;
 
   const handleDemoStepContinue = useCallback(() => {
@@ -289,6 +304,7 @@ export function useDemoMode({
   const cleanupAllDemoState = useCallback((store) => {
     clearDemoWatchTimers();
     clearCelebrationTimer();
+    restoreWormCharacter();
     setDemoCelebrationStep(null);
     setDemoLaunchStep(null);
     setDemoTryVisible(false);
@@ -314,7 +330,7 @@ export function useDemoMode({
       store.clearDisparityGame();
       cancelDisparityRun();
     }
-  }, [clearDemoWatchTimers, clearCelebrationTimer, cancelDisparityRun]);
+  }, [clearDemoWatchTimers, clearCelebrationTimer, cancelDisparityRun, restoreWormCharacter]);
 
   const handleDemoReplay = useCallback(() => {
     const store = useGameStore.getState();
