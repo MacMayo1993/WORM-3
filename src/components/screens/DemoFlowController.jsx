@@ -206,8 +206,24 @@ const ensureDemoShellStyle = () => {
       animation: demo-stamp-punch 1.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
 
+    /* Launch stamp lingers (~2.65s) so the step name registers; the root
+       modifier lifts it to the upper quarter of the screen. */
     .demo-launch-stamp {
-      animation: demo-stamp-punch 1.15s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      animation: demo-stamp-punch-long 2.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    .demo-beat-root--upper {
+      justify-content: flex-start;
+      padding-top: calc(25vh - 60px);
+    }
+
+    @keyframes demo-stamp-punch-long {
+      0%   { opacity: 0; transform: scale(2.3) rotate(-3deg); }
+      7%   { opacity: 1; transform: scale(0.96) rotate(0deg); }
+      10%  { transform: scale(1.02); }
+      13%  { transform: scale(1); }
+      90%  { opacity: 1; transform: scale(1); }
+      100% { opacity: 0; transform: scale(1.06); }
     }
 
     @keyframes demo-stamp-punch {
@@ -346,14 +362,16 @@ const STEP_COPY = {
   'cosmetic-reward': 'Spend your Parity Points.',
 };
 
-// Step intro: Mobi delivers the setup line over the blurred live scene.
+// Step intro: Mobi delivers the setup line AND the hands-on guidance in one
+// dialogue over the blurred live scene — the mid-step coach is just a pill.
 const DemoStepIntro = ({ step, onContinue, onSkip }) => {
   const info = DEMO_STEPS.find(s => s.id === step);
   if (!info) return null;
+  const lines = [STEP_COPY[step], TRY_COPY[step]].filter(Boolean);
   return (
     <MobiIntroScreen
       key={step}
-      lines={[STEP_COPY[step]]}
+      lines={lines}
       modeName={`Step ${info.num} · ${info.label}`}
       primaryLabel="▶ Start"
       onComplete={onContinue}
@@ -437,29 +455,27 @@ const TRY_COPY = {
   'random-showcase': 'Watch the styles cycle, or skip ahead.',
 };
 
-// Coach: Mobi delivers the guidance over the blurred scene, then hands the
-// screen back — a compact "Next ▶" pill remains so the player can try the
-// mechanic and advance when ready. A copy change (flip-gateway's second
-// phase) brings Mobi back with the new line.
+// Coach: the guidance already played inside the step-intro dialogue, so the
+// default coach is just a compact "Next ▶" pill. Only a copy OVERRIDE
+// (flip-gateway's second phase) brings Mobi back — that line is new info.
 const DemoCoach = ({ step, onNext, onExit, copy: copyOverride }) => {
   ensureDemoShellStyle();
-  const copy = copyOverride || TRY_COPY[step];
-  const [seen, setSeen] = React.useState(false);
+  const [overrideSeen, setOverrideSeen] = React.useState(false);
   const wormHealerMode = useGameStore((s) => s.wormHealerMode);
   React.useEffect(() => {
-    setSeen(false);
-  }, [copy]);
-  if (!copy) return null;
+    setOverrideSeen(false);
+  }, [copyOverride]);
+  if (!copyOverride && !TRY_COPY[step]) return null;
 
-  if (!seen) {
+  if (copyOverride && !overrideSeen) {
     const info = DEMO_STEPS.find(s => s.id === step);
     return (
       <MobiIntroScreen
-        key={copy}
-        lines={[copy]}
+        key={copyOverride}
+        lines={[copyOverride]}
         modeName={info ? `Step ${info.num} · ${info.label}` : 'Demo'}
         primaryLabel="▶ Got It"
-        onComplete={() => setSeen(true)}
+        onComplete={() => setOverrideSeen(true)}
         skipLabel="Exit Demo"
         onSkip={onExit}
       />
@@ -605,7 +621,7 @@ const DemoStepLaunch = ({ step }) => {
   const info = DEMO_STEPS.find(s => s.id === step);
   if (!info) return null;
   return (
-    <div className="demo-beat-root" aria-live="polite">
+    <div className="demo-beat-root demo-beat-root--upper" aria-live="polite">
       <div className="demo-beat-flash" />
       <div className="demo-launch-stamp">
         <p className="demo-beat-sub">Step {info.num}</p>

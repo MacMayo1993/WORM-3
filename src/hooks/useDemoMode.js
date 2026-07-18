@@ -268,7 +268,7 @@ export function useDemoMode({
     // Launch punch: title stamp + flash over the freshly staged scene, with a
     // camera orbit kick on the cube-centric steps.
     setDemoLaunchStep(step);
-    demoWatchTimers.current.push(setTimeout(() => setDemoLaunchStep(null), 1250));
+    demoWatchTimers.current.push(setTimeout(() => setDemoLaunchStep(null), 2750));
     if (config && config.type !== 'worm' && config.type !== 'chaos') {
       useGameStore.getState().triggerCameraOrbit?.('cw');
     }
