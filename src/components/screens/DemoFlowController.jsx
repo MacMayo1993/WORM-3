@@ -3,6 +3,7 @@ import { UI_FONT, DISPLAY_FONT } from '../../utils/uiTheme.js';
 import { makeCubies } from '../../game/cubeState.js';
 import { flipStickerPair, buildManifoldGridMap } from '../../game/manifoldLogic.js';
 import { useGameStore } from '../../hooks/useGameStore.js';
+import MobiIntroScreen from './MobiIntroScreen.jsx';
 
 const DEMO_STEPS = [
   { id: 'baby-cube', label: 'Baby Cube', num: 1 },
@@ -281,6 +282,34 @@ const ensureDemoShellStyle = () => {
       top: auto;
       bottom: calc(env(safe-area-inset-bottom, 0px) + 100px);
     }
+
+    /* Compact advance pill left behind after Mobi's coach dialogue dismisses */
+    .demo-coach-pill {
+      position: fixed;
+      top: calc(max(10px, env(safe-area-inset-top, 10px)) + 44px);
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 11000;
+    }
+
+    .demo-coach-pill--bottom {
+      top: auto;
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 144px);
+    }
+
+    .demo-coach-pill-btn {
+      padding: 8px 22px;
+      background: #5f7f4a;
+      color: #fffdf5;
+      border: none;
+      border-radius: 999px;
+      font-family: ${UI_FONT};
+      font-size: 13px;
+      font-weight: 800;
+      cursor: pointer;
+      letter-spacing: 0.03em;
+      box-shadow: 0 6px 14px rgba(95, 127, 74, 0.28);
+    }
   `;
   document.head.appendChild(style);
 };
@@ -306,46 +335,31 @@ const DemoProgressBar = ({ currentStep }) => {
   );
 };
 
+const STEP_COPY = {
+  'baby-cube': 'Solve this first twist. Drag the turned row back into place to continue.',
+  'twin-paradox': 'Opposite faces are linked.',
+  'flip-gateway': 'Flip every tile, then flip them all back.',
+  'view-showcase': 'See every way to view the cube.',
+  'worm-traversal': 'Travel through the wormholes you opened.',
+  'chaos-forecast': 'Predict which pair survives.',
+  'random-showcase': 'The cube cycles through random styles every few seconds.',
+  'cosmetic-reward': 'Spend your Parity Points.',
+};
+
+// Step intro: Mobi delivers the setup line over the blurred live scene.
 const DemoStepIntro = ({ step, onContinue, onSkip }) => {
-  ensureDemoShellStyle();
   const info = DEMO_STEPS.find(s => s.id === step);
   if (!info) return null;
-
-  const STEP_COPY = {
-    'baby-cube': 'Solve this first twist. Drag the turned row back into place to continue.',
-    'twin-paradox': 'Opposite faces are linked.',
-    'flip-gateway': 'Flip every tile, then flip them all back.',
-    'view-showcase': 'See every way to view the cube.',
-    'worm-traversal': 'Travel through the wormholes you opened.',
-    'chaos-forecast': 'Predict which pair survives.',
-    'random-showcase': 'The cube cycles through random styles every few seconds.',
-    'cosmetic-reward': 'Spend your Parity Points.',
-  };
-
   return (
-    <div className="demo-intro-root">
-      <section className="demo-intro-card" aria-live="polite">
-        <p className="demo-intro-step">Step {info.num}</p>
-        <h2 className="demo-intro-title">{info.label}</h2>
-        <p className="demo-intro-copy">{STEP_COPY[step]}</p>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 10 }}>
-          <button type="button" onClick={onContinue} className="demo-intro-button">
-            Start Step
-          </button>
-          {onSkip && (
-            <button
-              type="button"
-              onClick={onSkip}
-              aria-label="Skip step"
-              className="demo-intro-button"
-              style={{ background: 'transparent', color: '#7b6f45', boxShadow: 'none' }}
-            >
-              Skip ▶
-            </button>
-          )}
-        </div>
-      </section>
-    </div>
+    <MobiIntroScreen
+      key={step}
+      lines={[STEP_COPY[step]]}
+      modeName={`Step ${info.num} · ${info.label}`}
+      primaryLabel="▶ Start"
+      onComplete={onContinue}
+      skipLabel="Skip Step ▶"
+      onSkip={onSkip}
+    />
   );
 };
 
@@ -423,32 +437,40 @@ const TRY_COPY = {
   'random-showcase': 'Watch the styles cycle, or skip ahead.',
 };
 
+// Coach: Mobi delivers the guidance over the blurred scene, then hands the
+// screen back — a compact "Next ▶" pill remains so the player can try the
+// mechanic and advance when ready. A copy change (flip-gateway's second
+// phase) brings Mobi back with the new line.
 const DemoCoach = ({ step, onNext, onExit, copy: copyOverride }) => {
   ensureDemoShellStyle();
   const copy = copyOverride || TRY_COPY[step];
+  const [seen, setSeen] = React.useState(false);
+  const wormHealerMode = useGameStore((s) => s.wormHealerMode);
+  React.useEffect(() => {
+    setSeen(false);
+  }, [copy]);
   if (!copy) return null;
 
+  if (!seen) {
+    const info = DEMO_STEPS.find(s => s.id === step);
+    return (
+      <MobiIntroScreen
+        key={copy}
+        lines={[copy]}
+        modeName={info ? `Step ${info.num} · ${info.label}` : 'Demo'}
+        primaryLabel="▶ Got It"
+        onComplete={() => setSeen(true)}
+        skipLabel="Exit Demo"
+        onSkip={onExit}
+      />
+    );
+  }
+
   return (
-    <div className="demo-intro-root" style={{ pointerEvents: 'none', background: 'none', backdropFilter: 'none' }}>
-      <section className="demo-intro-card" style={{ pointerEvents: 'auto' }} aria-live="polite">
-        <p className="demo-intro-copy">{copy}</p>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 10 }}>
-          <button type="button" onClick={onNext} className="demo-intro-button">
-            Next ▶
-          </button>
-          {onExit && (
-            <button
-              type="button"
-              onClick={onExit}
-              aria-label="Exit demo"
-              className="demo-intro-button"
-              style={{ background: 'transparent', color: '#7b6f45', boxShadow: 'none' }}
-            >
-              Exit
-            </button>
-          )}
-        </div>
-      </section>
+    <div className={`demo-coach-pill${wormHealerMode ? ' demo-coach-pill--bottom' : ''}`}>
+      <button type="button" onClick={onNext} className="demo-coach-pill-btn">
+        Next ▶
+      </button>
     </div>
   );
 };
