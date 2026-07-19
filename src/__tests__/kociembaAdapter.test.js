@@ -2,8 +2,16 @@ import { describe, it, expect } from 'vitest';
 import { makeCubies } from '../game/cubeState.js';
 import { rotateSliceCubies } from '../game/cubeRotation.js';
 import { cubiesToKociembaString } from '../game/kociembaAdapter.js';
+import { ANTIPODAL_COLOR } from '../utils/constants.js';
 
 const SOLVED = 'UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB';
+
+// Simulate a wormhole flip: recolour a sticker to its antipode, mark flipped.
+function flipSticker(cubies, x, y, z, dir) {
+  const st = cubies[x][y][z].stickers[dir];
+  st.curr = ANTIPODAL_COLOR[st.orig];
+  st.flips = (st.flips ?? 0) + 1;
+}
 
 describe('cubiesToKociembaString', () => {
   it('returns correct 54-char solved state', () => {
@@ -76,5 +84,44 @@ describe('cubiesToKociembaString', () => {
     }
     // F face center unchanged
     expect(str[22]).toBe('F');
+  });
+});
+
+describe('cubiesToKociembaString — antipodal flip tolerance', () => {
+  it('rejects a flipped cube by default (strict curr reading breaks 9-of-each)', () => {
+    const cubies = makeCubies(3);
+    flipSticker(cubies, 0, 0, 2, 'PZ'); // red → orange: now 10 B / 8 F
+    expect(cubiesToKociembaString(cubies)).toBeNull();
+  });
+
+  it('reads a flipped-but-solved cube as SOLVED when ignoreFlips is set', () => {
+    const cubies = makeCubies(3);
+    flipSticker(cubies, 0, 0, 2, 'PZ'); // F sticker
+    flipSticker(cubies, 2, 2, 2, 'PX'); // R sticker
+    flipSticker(cubies, 1, 2, 1, 'PY'); // U sticker
+    expect(cubiesToKociembaString(cubies, { ignoreFlips: true })).toBe(SOLVED);
+  });
+
+  it('flips are invisible to the position string (R-move + flips === plain R-move)', () => {
+    const plain = rotateSliceCubies(makeCubies(3), 3, 'col', 2, -1); // R
+    const flipped = rotateSliceCubies(makeCubies(3), 3, 'col', 2, -1); // R
+    flipSticker(flipped, 2, 2, 2, 'PX');
+    flipSticker(flipped, 0, 0, 0, 'NZ');
+    flipSticker(flipped, 1, 0, 2, 'NY');
+    expect(cubiesToKociembaString(flipped, { ignoreFlips: true }))
+      .toBe(cubiesToKociembaString(plain));
+  });
+
+  it('an even number of flips on one sticker reads as its home colour', () => {
+    const cubies = makeCubies(3);
+    flipSticker(cubies, 0, 0, 2, 'PZ');
+    flipSticker(cubies, 0, 0, 2, 'PZ'); // flipped back — curr === orig again
+    expect(cubiesToKociembaString(cubies, { ignoreFlips: true })).toBe(SOLVED);
+  });
+
+  it('still rejects a genuine non-flip recolour even with ignoreFlips', () => {
+    const cubies = makeCubies(3);
+    cubies[0][0][2].stickers.PZ.curr = 5; // red(1) → blue(5): not red's antipode(4)
+    expect(cubiesToKociembaString(cubies, { ignoreFlips: true })).toBeNull();
   });
 });

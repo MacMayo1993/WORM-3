@@ -1,11 +1,23 @@
 // src/game/winDetection.js
 // Win condition detection logic
 import { faceRCFor, faceValue } from './coordinates.js';
+import { ANTIPODAL_COLOR } from '../utils/constants.js';
 
-// Check if classic Rubik's cube is solved (all faces uniform color)
-export const checkRubiksSolved = (cubies, size) => {
-  // Map direction to expected face color
-  const DIR_TO_FACE = { PZ: 1, NX: 2, PY: 3, NZ: 4, PX: 5, NY: 6 };
+// Map direction to expected face color
+const DIR_TO_FACE = { PZ: 1, NX: 2, PY: 3, NZ: 4, PX: 5, NY: 6 };
+
+// Canonical representative of a colour's antipodal class (RP² quotient).
+// Red/Orange, Green/Blue and White/Yellow each collapse to a single class,
+// represented by the smaller of the pair. classOf(1)===classOf(4), etc.
+export const colorClass = (c) => Math.min(c, ANTIPODAL_COLOR[c]);
+
+// Check if classic Rubik's cube is solved (all faces uniform color).
+// When `antipodal` is true, stickers are compared up to antipodal
+// identification — a face is "solved" if every sticker belongs to that face's
+// antipodal class, so a tile flipped through a wormhole (showing its antipode)
+// still counts as solved. This is the RP² quotient notion of solved.
+export const checkRubiksSolved = (cubies, size, { antipodal = false } = {}) => {
+  const key = antipodal ? (c) => colorClass(c) : (c) => c;
 
   for (let x = 0; x < size; x++) {
     for (let y = 0; y < size; y++) {
@@ -14,14 +26,16 @@ export const checkRubiksSolved = (cubies, size) => {
         if (x > 0 && x < size - 1 && y > 0 && y < size - 1 && z > 0 && z < size - 1) continue;
         const c = cubies[x][y][z];
         for (const [dirKey, st] of Object.entries(c.stickers)) {
-          const expectedColor = DIR_TO_FACE[dirKey];
-          if (st.curr !== expectedColor) return false;
+          if (key(st.curr) !== key(DIR_TO_FACE[dirKey])) return false;
         }
       }
     }
   }
   return true;
 };
+
+// Convenience wrapper: solved up to antipodal identification (flips allowed).
+export const checkRubiksSolvedAntipodal = (cubies, size) => checkRubiksSolved(cubies, size, { antipodal: true });
 
 // Check if a single face is a valid Latin square (Sudokube condition)
 export const checkFaceLatinSquare = (faceGrid, size) => {
