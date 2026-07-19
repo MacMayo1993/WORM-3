@@ -18,6 +18,7 @@
 // residual patterns. See docs/antipodal-solving.md, Theorem 3.
 
 import { healSticker } from './cubeState.js';
+import { buildManifoldGridMap, findAntipodalStickerByGrid, flipStickerPair } from './manifoldLogic.js';
 
 const EXTERIOR = (x, y, z, size) =>
   x === 0 || x === size - 1 || y === 0 || y === size - 1 || z === 0 || z === size - 1;
@@ -70,4 +71,78 @@ export function applyStrictCompletion(cubies, size, plan = planStrictCompletion(
  */
 export function residualWeight(cubies, size) {
   return flipResiduals(cubies, size).length;
+}
+
+// ── Native paired-flip completion (the "antipodal commutator") ───────────────
+//
+// The game's native colour operator is the paired wormhole flip
+// (`flipStickerPair`): it toggles a sticker AND its antipodal partner together
+// (curr ↦ α(curr)) and moves no piece. That is exactly a clean single
+// *antipodal-pair* flip that changes nothing else — the commutator u·φ·u⁻¹
+// collapses to this primitive, because rotations never touch flip parity, so
+// conjugation can only reposition which pair is hit, never break antipodal
+// symmetry (docs/antipodal-solving.md, Theorem 5).
+//
+// Consequently the residual parity of any rotation+flip-reachable state is
+// β-symmetric: residual tiles come in antipodal pairs, and ONE native flip
+// clears each pair — half the operations of heal-based completion, in the
+// game's own moves. The only residuals a native flip cannot clear are
+// asymmetric ones (one member of a pair dirty, the other clean), which arise
+// only from an external single-sticker heal; those fall back to heal.
+
+/**
+ * Flip exactly one antipodal pair (the sticker at the given cell and its
+ * antipodal partner), leaving every other sticker and all piece positions
+ * unchanged. This is the clean single-pair operator; it is its own inverse.
+ * @returns {Array} new cubies
+ */
+export function antipodalPairFlip(cubies, size, x, y, z, dir) {
+  const map = buildManifoldGridMap(cubies, size);
+  return flipStickerPair(cubies, size, x, y, z, dir, map);
+}
+
+/**
+ * Phase-2 plan in native paired flips. Groups residual tiles into antipodal
+ * pairs and emits one flip per pair; any asymmetric residual (partner already
+ * home) falls back to a single heal.
+ * @returns {{flips:Array<{x,y,z,dir}>, heals:Array<{x,y,z,dir}>, asymmetric:boolean}}
+ */
+export function planNativeFlipCompletion(cubies, size) {
+  const map = buildManifoldGridMap(cubies, size);
+  const visited = new Set();
+  const flips = [];
+  const heals = [];
+
+  for (const r of flipResiduals(cubies, size)) {
+    const key = `${r.x},${r.y},${r.z},${r.dir}`;
+    if (visited.has(key)) continue;
+    visited.add(key);
+
+    const st = cubies[r.x][r.y][r.z].stickers[r.dir];
+    const partner = findAntipodalStickerByGrid(map, st, size);
+    const partnerResidual = partner && partner.sticker.curr !== partner.sticker.orig;
+
+    if (partnerResidual) {
+      visited.add(`${partner.x},${partner.y},${partner.z},${partner.dirKey}`);
+      flips.push({ x: r.x, y: r.y, z: r.z, dir: r.dir }); // one flip clears both
+    } else {
+      heals.push({ x: r.x, y: r.y, z: r.z, dir: r.dir }); // asymmetric → heal
+    }
+  }
+
+  return { flips, heals, asymmetric: heals.length > 0 };
+}
+
+/**
+ * Apply a native-flip completion plan: paired flips first, then any heal
+ * fallbacks. Piece positions never change, so the manifold map built once up
+ * front stays valid across all flips.
+ * @returns {Array} new cubies
+ */
+export function applyNativeFlipCompletion(cubies, size, plan = planNativeFlipCompletion(cubies, size)) {
+  const map = buildManifoldGridMap(cubies, size);
+  let next = cubies;
+  for (const f of plan.flips) next = flipStickerPair(next, size, f.x, f.y, f.z, f.dir, map);
+  for (const h of plan.heals) next = healSticker(next, size, h.x, h.y, h.z, h.dir);
+  return next;
 }
