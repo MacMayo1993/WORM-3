@@ -428,7 +428,12 @@ const DEMO_LEVEL_CONFIGS = {
     wormOrbCount: 25,
     wormholeInterval: 8,
     wormColor: '#33ff66',
-    wormCharacter: 'wiggle',
+    wormCharacter: 'glow',
+    wormSkin: 'lava',
+    // The worm demo swaps in a Shanghai skybox; tiles keep the demo-wide
+    // topographic look. applyDemoStepConfig's worm branch layers this over
+    // applyDemoSettings.
+    backgroundTheme: 'shanghai',
   },
   'chaos-forecast': {
     type: 'chaos',
