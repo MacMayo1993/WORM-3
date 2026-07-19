@@ -144,20 +144,32 @@ export function useChaosWorker({
       const { flips, cascades, recoveries, deaths, eliminatedFaces, winner, metrics } = e.data.payload;
 
       if (flips?.length > 0 || recoveries?.length > 0) {
-        // manifoldMapRef may have been invalidated (set to null) by the rotationEpoch
-        // effect below — rebuild lazily here, on the next flip, instead of eagerly on
-        // every rotation. This keeps the rotation-completion frame cheap.
-        if (!manifoldMapRef.current) {
-          manifoldMapRef.current = buildManifoldGridMap(cubiesRef.current, size);
-        }
-        let next = cubiesRef.current;
-        if (flips?.length > 0) {
-          next = applyChaosFlipsBatch(next, flips, size, manifoldMapRef.current, disparityFlipCapRef.current);
-        }
-        if (recoveries?.length > 0) {
-          next = applyChaosRecoveriesBatch(next, recoveries, size, manifoldMapRef.current, disparityFlipCapRef.current);
-        }
-        setCubies(next);
+        // Compose against the LATEST store state via the functional updater —
+        // NOT cubiesRef.current. The ref only catches up on a React re-render,
+        // so when two TICKs are handled before the next commit (the worker posts
+        // a chain tick and a Conway tick back-to-back every Conway cadence), the
+        // second handler read a stale ref and setCubies(value) clobbered the
+        // first tick's flips. Those flips never reached the visible cube even
+        // though the worker's authoritative state — where deaths are detected —
+        // kept them, so the winner fired while many tiles still looked alive.
+        // Reading state.cubies at apply time makes the batches accumulate.
+        setCubies((prev) => {
+          // manifoldMapRef may have been invalidated (set to null) by the
+          // rotationEpoch effect below — rebuild lazily here, on the next flip,
+          // instead of eagerly on every rotation. Flips never move stickers, so a
+          // map built from `prev` stays valid across composed flip-only updates.
+          if (!manifoldMapRef.current) {
+            manifoldMapRef.current = buildManifoldGridMap(prev, size);
+          }
+          let next = prev;
+          if (flips?.length > 0) {
+            next = applyChaosFlipsBatch(next, flips, size, manifoldMapRef.current, disparityFlipCapRef.current);
+          }
+          if (recoveries?.length > 0) {
+            next = applyChaosRecoveriesBatch(next, recoveries, size, manifoldMapRef.current, disparityFlipCapRef.current);
+          }
+          return next;
+        });
       }
 
       if (cascades?.length > 0) {
