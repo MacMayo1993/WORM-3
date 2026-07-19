@@ -66,6 +66,7 @@ export function useDemoMode({
   const celebrationTimerRef = useRef(null);
   const babySolveArmedRef = useRef(false);
   const preDemoWormCharacterRef = useRef(null);
+  const preDemoWormSkinRef = useRef(null);
 
   const clearDemoWatchTimers = useCallback(() => {
     demoWatchTimers.current.forEach(clearTimeout);
@@ -99,6 +100,10 @@ export function useDemoMode({
       useGameStore.getState().setWormCharacter(preDemoWormCharacterRef.current);
       preDemoWormCharacterRef.current = null;
     }
+    if (preDemoWormSkinRef.current != null) {
+      useGameStore.getState().setWormSkin(preDemoWormSkinRef.current);
+      preDemoWormSkinRef.current = null;
+    }
   }, []);
 
   const applyDemoSettings = useCallback(() => {
@@ -107,7 +112,7 @@ export function useDemoMode({
     for (let i = 1; i <= 6; i++) demoManifoldStyles[i] = 'topographic';
     store.setSettings({
       ...store.settings,
-      colorScheme: 'pastel',
+      colorScheme: 'noire',
       customColors: null,
       backgroundTheme: 'desert',
       manifoldStyles: demoManifoldStyles,
@@ -127,28 +132,26 @@ export function useDemoMode({
       const targetSize = config.cubeSize || 3;
       if (targetSize !== store.size) changeSize(targetSize);
       else reset();
-      // Lock the worm demo to its signature look, layered on top of the
-      // desert + topographic that applyDemoSettings() applied above. Read the
-      // settings fresh (the `store` snapshot predates that call) so we extend
-      // the demo settings rather than clobber them. Every other step re-runs
-      // applyDemoSettings() on entry, so this override never leaks past the
-      // worm step.
-      if (config.backgroundTheme || config.tileStyle) {
+      // The worm demo swaps in a Shanghai skybox, layered on top of the
+      // background applyDemoSettings() applied above. Read the settings fresh
+      // (the `store` snapshot predates that call) so we extend the demo
+      // settings rather than clobber them. Tiles keep the demo-wide topographic
+      // style. Every other step re-runs applyDemoSettings() on entry, so this
+      // override never leaks past the worm step.
+      if (config.backgroundTheme) {
         const fresh = useGameStore.getState();
-        const nextSettings = { ...fresh.settings };
-        if (config.backgroundTheme) nextSettings.backgroundTheme = config.backgroundTheme;
-        if (config.tileStyle) {
-          const wormStyles = {};
-          for (let i = 1; i <= 6; i++) wormStyles[i] = config.tileStyle;
-          nextSettings.manifoldStyles = wormStyles;
-        }
-        fresh.setSettings(nextSettings);
+        fresh.setSettings({ ...fresh.settings, backgroundTheme: config.backgroundTheme });
       }
-      // Showcase a specific worm character; the player's own pick (persisted
-      // to localStorage) is restored when the step ends or the demo exits.
+      // Showcase a specific worm character + skin; the player's own picks
+      // (persisted to localStorage) are restored when the step ends or the
+      // demo exits.
       if (config.wormCharacter) {
         if (preDemoWormCharacterRef.current == null) preDemoWormCharacterRef.current = store.wormCharacter;
         store.setWormCharacter(config.wormCharacter);
+      }
+      if (config.wormSkin) {
+        if (preDemoWormSkinRef.current == null) preDemoWormSkinRef.current = store.wormSkin;
+        store.setWormSkin(config.wormSkin);
       }
       store.setFlipMode(true);
       store.setShowTunnels(true);
@@ -436,7 +439,7 @@ export function useDemoMode({
       gameLength: config.gameLength,
       flipMode: true,
       showTunnels: true,
-      colorScheme: 'pastel',
+      colorScheme: 'noire',
       visualMode: 'classic',
       tileStyle: 'topographic',
     };

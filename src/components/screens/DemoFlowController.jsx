@@ -429,11 +429,11 @@ const DEMO_LEVEL_CONFIGS = {
     wormholeInterval: 8,
     wormColor: '#33ff66',
     wormCharacter: 'glow',
-    // The worm demo has a locked look distinct from the rest of the demo
-    // (which runs desert + topographic): Shanghai skybox and lava tiles.
-    // applyDemoStepConfig's worm branch layers these over applyDemoSettings.
+    wormSkin: 'lava',
+    // The worm demo swaps in a Shanghai skybox; tiles keep the demo-wide
+    // topographic look. applyDemoStepConfig's worm branch layers this over
+    // applyDemoSettings.
     backgroundTheme: 'shanghai',
-    tileStyle: 'lava',
   },
   'chaos-forecast': {
     type: 'chaos',
