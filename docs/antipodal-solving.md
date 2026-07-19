@@ -104,10 +104,19 @@ $\kappa(c)=\min(c,\alpha(c))$ its representative (`colorClass`). A cube is
 *quotient-solved* iff $\kappa(\mathrm{curr}(s))=\kappa(\text{home}(s))$ for all
 $s\in S$. (`checkRubiksSolvedAntipodal`.)
 
-The quotient notion is the honest RP² notion: on the projective plane a colour
-and its antipode are the *same point of the quotient manifold*, so a face is
+The quotient notion reflects the RP² topology on the *colour* fibre: a colour
+and its antipode are the same point of the quotient manifold, so a face is
 solved when it is uniform **up to** $\alpha$. Strict $\Rightarrow$ quotient; the
 converse fails exactly on flipped tiles.
+
+**Remark 3.1 (this is a half-quotient).** The definition divides the colour
+fibre by $\alpha$ but leaves the *position* set intact. A full state-level
+antipodal quotient would additionally identify a cube with its image under the
+antipodal echo action of `antipodalMode.js` (a CW face turn paired with its CCW
+echo). $\kappa$-solvedness is therefore a deliberate design choice for a
+playable win condition — the full quotient would call a cube solved when it is
+solved only up to a global antipodal relabelling, which reads as a bug to a
+player — and is presented here as a design choice, not as *the* RP² notion.
 
 ---
 
@@ -152,12 +161,26 @@ rotation of the solved cube). Kociemba returns $g$ solving that permutation;
 since rotations act identically on the flipped and unflipped cubes (Lemma 2),
 $g$ homes every piece of $x$ as well. $\square$
 
+### 4.1 Admissibility
+
+Reading `orig` is only meaningful when every sticker's paint is explained by
+flips. Call $x$ **admissible** iff
+$\mathrm{curr}(s)\in\{\mathrm{orig}(s),\alpha(\mathrm{orig}(s))\}$ for all
+$s\in S$. Admissibility is $O(|S|)$-decidable, is implied by reachability
+(Lemma 1), and is exactly the hypothesis Theorem 1 needs.
+
+The nine-of-each facelet count is **necessary but not sufficient** as a damage
+filter: two stickers cross-mispainted into each other's classes leave all six
+counts at nine while the state is not $\mathcal{R}\cup\{\varphi\}$-reachable.
+Guarding on the count alone would then read an incoherent mix of `orig` (for
+flipped tiles) and `curr` (for damaged tiles). (In normal play only flips ever
+recolour a sticker, so inadmissible states do not arise — this is defensive
+hardening, and makes the "forgives flips and nothing else" guarantee exact.)
+
 **Implementation.** `cubiesToKociembaString(cubies, { ignoreFlips: true })`
-computes $\rho$: it reads `orig` **only** when
-$\mathrm{curr}\in\{\mathrm{orig},\alpha(\mathrm{orig})\}$ (a genuine flip, by
-Lemma 1); any other paint — manifold recolouring, non-antipodal chaos damage —
-is read as `curr` and rejected by the nine-of-each check. Forgiveness is thus
-surgical: it forgives flips and nothing else.
+first tests `isAdmissible` and returns `null` on failure, **then** computes
+$\rho$ by reading `orig` throughout. The nine-of-each count is retained as a
+cheap redundancy check on $\rho$, not as the damage filter.
 
 ---
 
@@ -207,9 +230,12 @@ other sticker, so afterwards every sticker matches its home colour: strict
 solved. Each residual must change and $\eta$ changes one sticker, so no
 heal-only completion uses fewer than `residualWeight` ops. $\square$
 
-**Corollary.** WAS solves any cube reachable by rotations and wormhole flips,
-under the strict definition, in $|g|+|h|$ operations with $|g|\le 20$ (Kociemba
-bound) and $|h|=$ residual weight $\le |S|$.
+**Corollary.** WAS solves any admissible cube under the strict definition in
+$|g|+|h|$ operations, where $|h|=$ residual weight $\le|S|$ and $|g|$ is the
+length of a two-phase solution. (Note: $20$ HTM is *God's number* — the diameter
+of the cube group, Rokicki et al. — not a guarantee on a single two-phase pass.
+Plain two-phase typically returns $\le 22$ HTM and reaches optimal only under an
+iterated-deepening, optimality-seeking configuration.)
 
 ---
 
@@ -225,11 +251,33 @@ can actually produce, and characterise exactly when they cannot.
 
 Model residual flip parity after Phase 1 as a vector
 $f\in\mathbb{F}_2^{S}$, $f(s)=[\mathrm{curr}(s)\neq\mathrm{orig}(s)]$, **indexed
-by sticker identity, not position**. Strict completion needs $f=0$. The
-antipodal pairing is a fixed-point-free involution $\beta:S\to S$,
-$\beta(s)=\bar s$, with $|S/\beta|=|S|/2$ ($27$ pairs on a $3\times3$). A single
-paired flip adds the indicator $e_s+e_{\beta(s)}$ to $f$. Hence the parity
-vectors reachable by paired flips form
+by sticker identity, not position**. Strict completion needs $f=0$.
+
+> **Lemma 3.5 (The pairing $\beta$ is identity-based, hence rotation-invariant).**
+> The native flip's partner map (`findAntipodalStickerByGrid`) computes the
+> partner's grid id as $\texttt{M}\,\alpha(\mathrm{orig})\,\texttt{-}\,\iota$
+> where $\iota$ is derived from `origPos` and `origDir`
+> (`getManifoldGridId`, `gridIds.js`). All three inputs — `orig`, `origPos`,
+> `origDir` — are set once at cube construction and **never** written by
+> rotations (`cubeRotation.js` touches neither; the Sudokube identity test in
+> `winDetection.test.js` depends on this). Therefore $\beta$ is a fixed
+> fixed-point-free involution on sticker **identities**: $\beta(s)$ is the unique
+> identity with $\mathrm{orig}(\beta(s))=\alpha(\mathrm{orig}(s))$ at the same
+> original cell, independent of where either currently sits.
+
+*Consequence.* A native flip at any position $p$ toggles the identity currently
+at $p$ **and its fixed partner** — adding $e_s+e_{\beta(s)}$ for this fixed
+$\beta$. A rotation-conjugated flip $u\varphi u^{-1}$ leaves positions unchanged
+and still toggles some identity-pair $\{s',\beta(s')\}$; it only changes *which*
+pair, never the pairing. So conjugation stays inside $P_\beta$ (below) and adds
+no new generators — the commutator collapses to the primitive. (An analysis that
+reads $\beta$ as a *slot*-level involution conjugated by rotations,
+$\beta_x=\pi_x^{-1}\beta_0\pi_x$, misreads the code: the partner is looked up by
+*original* cell, not current slot.)
+
+With $\beta$ fixed, $|S/\beta|=|S|/2$ ($27$ pairs on a $3\times3$), and a single
+paired flip adds $e_s+e_{\beta(s)}$ to $f$. Hence the parity vectors reachable by
+paired flips form
 
 $$P_\beta=\big\langle\, e_s+e_{\beta(s)} : s\in S \,\big\rangle
         =\{\,f : f(s)=f(\beta(s))\ \forall s\,\}
@@ -304,12 +352,12 @@ parity power.
 ## 7. Complexity
 
 - **Phase 1:** one Kociemba solve, $O(1)$ amortised via its pruning tables;
-  $\le 20$ quarter/half turns.
+  typically $\le 22$ HTM (see the Corollary in §5).
 - **Phase 2:** one $O(|S|)$ scan for residuals; $|h|\le|S|$ heals ($\le 54$).
-- **Total moves:** $\le 20$ rotations $+\ \le 54$ heals. Move *count* is linear
-  in stickers only because heal is per-sticker; with a solved single-pair
-  antipodal commutator of length $\ell$ (§6.2), Phase 2 becomes
-  $\le \lceil|h|/2\rceil\cdot\ell$ rotations with no heals.
+- **Total moves:** $\le 22$-HTM rotations (typical) $+\ \le 54$ heals. The heal
+  count is per-sticker; using the native paired flip instead (§6) halves it to
+  $\lceil\lVert f\rVert/2\rceil$ flips, since one flip clears a whole antipodal
+  identity-pair.
 
 ---
 

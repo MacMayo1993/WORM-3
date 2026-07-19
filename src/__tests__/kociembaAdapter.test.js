@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { makeCubies } from '../game/cubeState.js';
 import { rotateSliceCubies } from '../game/cubeRotation.js';
-import { cubiesToKociembaString } from '../game/kociembaAdapter.js';
+import { cubiesToKociembaString, isAdmissible } from '../game/kociembaAdapter.js';
 import { ANTIPODAL_COLOR } from '../utils/constants.js';
 
 const SOLVED = 'UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB';
@@ -122,6 +122,17 @@ describe('cubiesToKociembaString — antipodal flip tolerance', () => {
   it('still rejects a genuine non-flip recolour even with ignoreFlips', () => {
     const cubies = makeCubies(3);
     cubies[0][0][2].stickers.PZ.curr = 5; // red(1) → blue(5): not red's antipode(4)
+    expect(cubiesToKociembaString(cubies, { ignoreFlips: true })).toBeNull();
+  });
+
+  it('rejects a COUNT-BALANCED cross-mispaint that slips past the 9-of-each check', () => {
+    // Two stickers swapped into each other's non-antipodal classes: face-letter
+    // counts stay at nine each, but the state is not flip-reachable. The
+    // admissibility gate must still reject it (the 9-of-each count would not).
+    const cubies = makeCubies(3);
+    cubies[0][0][2].stickers.PZ.curr = 2; // F-face tile (orig 1) painted green(2)
+    cubies[0][0][0].stickers.NX.curr = 1; // L-face tile (orig 2) painted red(1)
+    expect(isAdmissible(cubies)).toBe(false);
     expect(cubiesToKociembaString(cubies, { ignoreFlips: true })).toBeNull();
   });
 });
