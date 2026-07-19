@@ -47,7 +47,7 @@ const WinnerTile = ({ label, gridId, color }) => (
   </div>
 );
 
-export default function DisparityWinnerScreen({ onDismiss }) {
+export default function DisparityWinnerScreen({ onDismiss, primaryLabel = 'Play Again', onSecondary, secondaryLabel }) {
   const disparityWinner = useGameStore((s) => s.disparityWinner);
   const disparityDeaths = useGameStore((s) => s.disparityDeaths);
   const lastBetResult = useGameStore((s) => s.lastBetResult);
@@ -72,6 +72,11 @@ export default function DisparityWinnerScreen({ onDismiss }) {
   const handleDismiss = () => {
     if (!ready) return;
     onDismiss();
+  };
+
+  const handleSecondary = () => {
+    if (!ready) return;
+    onSecondary?.();
   };
 
   return (
@@ -232,7 +237,7 @@ export default function DisparityWinnerScreen({ onDismiss }) {
           </div>
         )}
 
-        {/* Play Again */}
+        {/* Primary action (Play Again / Continue) */}
         <button
           onClick={handleDismiss}
           style={{
@@ -250,8 +255,32 @@ export default function DisparityWinnerScreen({ onDismiss }) {
             fontFamily: UI_FONT,
           }}
         >
-          Play Again
+          {primaryLabel}
         </button>
+
+        {/* Secondary action (e.g. Main Menu) — a calm ghost button */}
+        {onSecondary && (
+          <button
+            onClick={handleSecondary}
+            style={{
+              width: '100%',
+              marginTop: 10,
+              padding: '12px 0',
+              fontSize: 14,
+              fontWeight: 600,
+              letterSpacing: '0.03em',
+              borderRadius: RADIUS_MD,
+              border: `1px solid ${GLASS_PANEL_BORDER}`,
+              background: 'transparent',
+              color: ready ? GLASS_TEXT : 'rgba(255,255,255,0.35)',
+              cursor: ready ? 'pointer' : 'default',
+              transition: 'color 0.3s',
+              fontFamily: UI_FONT,
+            }}
+          >
+            {secondaryLabel ?? 'Main Menu'}
+          </button>
+        )}
       </div>
     </div>
   );
