@@ -63,7 +63,6 @@ export function useDemoMode({
   const onTapFlipRef = useRef(null);
   const advanceDemoStepRef = useRef(null);
   const demoFlipPhaseRef = useRef(null);
-  const celebrationTimerRef = useRef(null);
   const babySolveArmedRef = useRef(false);
   const preDemoWormCharacterRef = useRef(null);
   const preDemoWormSkinRef = useRef(null);
@@ -73,27 +72,27 @@ export function useDemoMode({
     demoWatchTimers.current = [];
   }, []);
 
-  const clearCelebrationTimer = useCallback(() => {
-    if (celebrationTimerRef.current) {
-      clearTimeout(celebrationTimerRef.current);
-      celebrationTimerRef.current = null;
-    }
-  }, []);
-
-  // Fire the STEP COMPLETE burst, then auto-advance once it has played out.
+  // Fire the STEP COMPLETE burst and hold it on screen. It no longer
+  // auto-advances — the stamp stays over a blurred scene until the player taps
+  // it or presses Next Step (see dismissDemoCelebration), so the win registers.
   const celebrateStep = useCallback((step) => {
     if (useGameStore.getState().demoStep !== step) return;
-    if (celebrationTimerRef.current) return;
     clearDemoWatchTimers();
     setDemoTryVisible(false);
     setDemoCoachCopy(null);
-    setDemoCelebrationStep(step);
-    celebrationTimerRef.current = setTimeout(() => {
-      celebrationTimerRef.current = null;
-      setDemoCelebrationStep(null);
-      advanceDemoStepRef.current?.(step);
-    }, 1600);
+    // `cur || step` keeps an already-showing celebration intact so repeat
+    // detections (e.g. a cubies re-render) can't restart the fly-in.
+    setDemoCelebrationStep((cur) => cur || step);
   }, [clearDemoWatchTimers]);
+
+  // Player tapped the held STEP COMPLETE stamp (or its Next Step button):
+  // clear the celebration and advance to the next step.
+  const dismissDemoCelebration = useCallback(() => {
+    setDemoCelebrationStep((cur) => {
+      if (cur) advanceDemoStepRef.current?.(cur);
+      return null;
+    });
+  }, []);
 
   const restoreWormCharacter = useCallback(() => {
     if (preDemoWormCharacterRef.current != null) {
@@ -338,7 +337,6 @@ export function useDemoMode({
 
   const cleanupAllDemoState = useCallback((store) => {
     clearDemoWatchTimers();
-    clearCelebrationTimer();
     restoreWormCharacter();
     setDemoCelebrationStep(null);
     setDemoLaunchStep(null);
@@ -365,7 +363,7 @@ export function useDemoMode({
       store.clearDisparityGame();
       cancelDisparityRun();
     }
-  }, [clearDemoWatchTimers, clearCelebrationTimer, cancelDisparityRun, restoreWormCharacter]);
+  }, [clearDemoWatchTimers, cancelDisparityRun, restoreWormCharacter]);
 
   const handleDemoReplay = useCallback(() => {
     const store = useGameStore.getState();
@@ -565,8 +563,7 @@ export function useDemoMode({
   // Clean up timers on unmount.
   useEffect(() => () => {
     clearDemoWatchTimers();
-    clearCelebrationTimer();
-  }, [clearDemoWatchTimers, clearCelebrationTimer]);
+  }, [clearDemoWatchTimers]);
 
   // Celebrate the worm step when the traversal completes (solved phase).
   const wormGamePhase = useGameStore((s) => s.wormGamePhase);
@@ -638,6 +635,7 @@ export function useDemoMode({
     handleDemoDisparityDismiss,
     demoShowcaseSubStep,
     demoCelebrationStep,
+    dismissDemoCelebration,
     demoLaunchStep,
     demoViewSpotlight,
     handleDemoViewSpotlightClick,
