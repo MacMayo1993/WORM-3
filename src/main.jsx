@@ -27,10 +27,69 @@ import App from './App.jsx'
 import './App.css' // Import App.css instead of index.css
 
 // Service worker: precaches the app shell so deploys are atomic and repeat
-// visits load from local cache (see VitePWA config). autoUpdate swaps in new
-// versions in the background.
+// visits load from local cache (see VitePWA config). Registration is deferred
+// until after first paint (window load + idle) so precaching the ~3MB shell
+// never competes with the critical boot path. When a new deploy is ready we
+// show a dismissible "update" toast instead of force-reloading (registerType:
+// 'prompt' in vite.config.js) — the page only reloads if the user asks it to.
 import { registerSW } from 'virtual:pwa-register'
-registerSW({ immediate: true })
+
+const showUpdateToast = (reload) => {
+  if (document.getElementById('worm3-update-toast')) return
+  const toast = document.createElement('div')
+  toast.id = 'worm3-update-toast'
+  toast.setAttribute('role', 'status')
+  toast.style.cssText = [
+    'position:fixed', 'left:50%', 'bottom:20px', 'transform:translateX(-50%)',
+    'z-index:99999', 'display:flex', 'align-items:center', 'gap:12px',
+    'padding:10px 14px', 'border-radius:12px',
+    'background:rgba(10,16,36,0.94)', 'color:#e8eeff',
+    'border:1px solid rgba(120,160,255,0.28)',
+    'box-shadow:0 8px 28px rgba(0,0,0,0.45)',
+    'font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif',
+    'font-size:13px', 'max-width:min(92vw,420px)',
+  ].join(';')
+
+  const label = document.createElement('span')
+  label.textContent = 'A new version is ready.'
+  label.style.cssText = 'flex:1;line-height:1.3'
+
+  const refresh = document.createElement('button')
+  refresh.type = 'button'
+  refresh.textContent = 'Refresh'
+  refresh.style.cssText = [
+    'border:none', 'cursor:pointer', 'border-radius:8px',
+    'padding:6px 14px', 'font:inherit', 'font-weight:700', 'color:#fff',
+    'background:linear-gradient(135deg,#3b82f6,#6366f1)',
+  ].join(';')
+  refresh.addEventListener('click', () => reload())
+
+  const dismiss = document.createElement('button')
+  dismiss.type = 'button'
+  dismiss.setAttribute('aria-label', 'Dismiss')
+  dismiss.textContent = '✕'
+  dismiss.style.cssText = [
+    'border:none', 'cursor:pointer', 'background:transparent',
+    'color:#9fb2e0', 'font:inherit', 'font-size:15px', 'padding:2px 4px',
+  ].join(';')
+  dismiss.addEventListener('click', () => toast.remove())
+
+  toast.append(label, refresh, dismiss)
+  document.body.appendChild(toast)
+}
+
+const registerServiceWorker = () => {
+  const idle = window.requestIdleCallback || ((cb) => setTimeout(cb, 200))
+  idle(() => {
+    const updateSW = registerSW({
+      onNeedRefresh() {
+        showUpdateToast(() => updateSW(true))
+      },
+    })
+  })
+}
+if (document.readyState === 'complete') registerServiceWorker()
+else window.addEventListener('load', registerServiceWorker, { once: true })
 
 // After a GitHub Pages deploy, hashed chunk filenames change. If the browser has
 // cached the old HTML/JS, dynamic imports will 404. Reload to pick up fresh chunks —

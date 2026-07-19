@@ -20,6 +20,7 @@ import { rotateSliceCubies } from '../../game/cubeRotation.js';
 import { bodyMaterialProps, pickCubeletViewStyle, LED_EDGE_MODES, PER_CUBELET_VIEW_STYLES } from '../../3d/cubeViewStyles.js';
 import { updateSharedTime, getTileStyleMaterial } from '../../3d/styles/TileStyleMaterials.jsx';
 import { vibrate } from '../../utils/audio.js';
+import { warmDemoAssets } from '../../utils/preloadAssets.js';
 import MenuFlipWave from './MenuFlipWave.jsx';
 import MenuTileOverlay from './MenuTileOverlay.jsx';
 import { ANTIPODAL_COLOR } from '../../utils/constants.js';
@@ -1326,6 +1327,10 @@ const MenuStartButton = ({ visible, onClick, onDemo }) => {
       <button
         type="button"
         onClick={onDemo}
+        // Warm the demo's desert env map the instant the player signals intent,
+        // so it's cached by the time the demo scene mounts.
+        onPointerEnter={warmDemoAssets}
+        onPointerDown={warmDemoAssets}
         style={{
           background: 'linear-gradient(135deg, #3b82f6, #6366f1)',
           border: 'none',
