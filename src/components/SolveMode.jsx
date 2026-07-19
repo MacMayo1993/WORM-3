@@ -5,6 +5,7 @@
 import React, { useMemo, useRef, useEffect } from 'react';
 import { checkSolveProgress } from '../game/solveDetection.js';
 import { useKociembaSolver } from '../teach/useKociembaSolver.js';
+import { useAntipodalEngine } from '../hooks/useAntipodalEngine.js';
 import { UI_FONT, MONO_FONT, GLASS_PANEL, GLASS_PANEL_BORDER, GLASS_TEXT, GLASS_TEXT_MUTED } from '../utils/uiTheme.js';
 
 // ── CFOP mini progress strip ──────────────────────────────────────────────────
@@ -72,12 +73,66 @@ function MoveChip({ notation, state }) {
   );
 }
 
+// ── Antipodal fibre strip (Phase 2: paired-flip / heal repair) ───────────────
+//
+// Drives the central-quotient engine (game/antipodalEngine.js): after — or
+// independently of — the positional solve, clears residual wormhole-flip parity
+// toward the nearer quotient representative (all-home Z₀ or all-flipped Z₁).
+
+function FibreStrip({ fibre, disabled }) {
+  const { status, plan, costs, stepIndex, totalSteps, play, pause, stepForward } = fibre;
+  if (!plan || !costs) return null;
+
+  const playing = status === 'playing';
+  const done = status === 'done' || totalSteps === 0;
+  const summary = done
+    ? '✓ fibre clear'
+    : `${costs.dirtyPairs}/${costs.totalPairs} pairs dirty` +
+      (costs.asymmetricPairs ? ` · ${costs.asymmetricPairs} asym` : '') +
+      ` · →Z${plan.target === 1 ? '₁' : '₀'} in ${plan.totalCost}`;
+
+  return (
+    <div style={{ borderTop: `1px solid ${GLASS_PANEL_BORDER}` }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '6px 12px',
+      }}>
+        <span style={{ fontSize: 9, letterSpacing: '0.12em', opacity: 0.6, fontFamily: UI_FONT }}>
+          ANTIPODAL PAIRS
+        </span>
+        <span style={{ fontSize: 10, fontFamily: MONO_FONT, color: done ? '#00ff88' : '#c084fc' }}>
+          {playing ? `op ${stepIndex} / ${totalSteps}` : summary}
+        </span>
+      </div>
+      {!done && (
+        <div style={{ display: 'flex', gap: 6, padding: '0 10px 8px' }}>
+          <button
+            onClick={playing ? pause : play}
+            disabled={disabled}
+            style={ctrlBtn(playing ? '#00d9ff' : '#c084fc', disabled)}
+          >
+            {playing ? '⏸ PAUSE' : '▶ REPAIR'}
+          </button>
+          <button
+            onClick={stepForward}
+            disabled={disabled || playing}
+            style={ctrlBtn('#fbbf24', disabled || playing)}
+          >
+            ⏭ STEP
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function SolveMode({ cubies, size, onClose }) {
   const progress = useMemo(() => checkSolveProgress(cubies, size), [cubies, size]);
   const { status, moves, moveIndex, error, play, pause, stepForward } =
     useKociembaSolver(cubies, size);
+  const fibre = useAntipodalEngine(cubies, size);
 
   const scrollRef = useRef(null);
 
@@ -222,6 +277,9 @@ export default function SolveMode({ cubies, size, onClose }) {
             </button>
           </div>
         )}
+
+        {/* ── Antipodal fibre phase ──────────────────────── */}
+        <FibreStrip fibre={fibre} disabled={isPlaying} />
       </div>
     </>
   );

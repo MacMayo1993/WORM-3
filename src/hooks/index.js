@@ -35,6 +35,7 @@ export { useSettings } from './useSettings.js';
 export { useKeyboardControls } from './useKeyboardControls.js';
 export { useHandsMode } from './useHandsMode.js';
 export { useUndo } from './useUndo.js';
+export { useAntipodalEngine } from './useAntipodalEngine.js';
 export { useParityDecay } from './useParityDecay.js';
 export { useRandomMode } from './useRandomMode.js';
 export { useDemoMode } from './useDemoMode.js';
