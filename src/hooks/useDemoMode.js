@@ -112,7 +112,7 @@ export function useDemoMode({
     for (let i = 1; i <= 6; i++) demoManifoldStyles[i] = 'topographic';
     store.setSettings({
       ...store.settings,
-      colorScheme: 'noire',
+      colorScheme: 'neon',
       customColors: null,
       backgroundTheme: 'desert',
       manifoldStyles: demoManifoldStyles,
@@ -439,7 +439,7 @@ export function useDemoMode({
       gameLength: config.gameLength,
       flipMode: true,
       showTunnels: true,
-      colorScheme: 'noire',
+      colorScheme: 'neon',
       visualMode: 'classic',
       tileStyle: 'topographic',
     };
