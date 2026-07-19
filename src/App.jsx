@@ -488,7 +488,7 @@ export default function WORM3() {
     handleDemoForecastPick, handleDemoChaosSkip, handleDemoDisparityDismiss,
     demoShowcaseSubStep, handleDemoShowcaseNext, handleDemoShowcaseSkip,
     demoViewSpotlight, handleDemoViewSpotlightClick,
-    demoCelebrationStep, demoLaunchStep,
+    demoCelebrationStep, dismissDemoCelebration, demoLaunchStep,
   } = useDemoMode({
     cancelShuffle, changeSize, setRotatedCubies, reset,
     cancelDisparityRun, startDisparityGame,
@@ -1406,7 +1406,7 @@ export default function WORM3() {
 
       {/* Demo mode overlays */}
       {demoMode && <DemoProgressBar currentStep={demoStep} />}
-      {demoMode && demoCelebrationStep && <DemoStepComplete step={demoCelebrationStep} />}
+      {demoMode && demoCelebrationStep && <DemoStepComplete step={demoCelebrationStep} onDismiss={dismissDemoCelebration} />}
       {demoMode && demoLaunchStep && !demoCelebrationStep && <DemoStepLaunch step={demoLaunchStep} />}
       <ScreenTransition show={!!(demoMode && demoStepIntroVisible && demoStep && demoStep !== 'end')} freezeOnExit>
         <DemoStepIntro step={demoStep} onContinue={handleDemoStepContinue} onSkip={() => advanceDemoStep(demoStep)} />

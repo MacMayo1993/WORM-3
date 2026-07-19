@@ -263,6 +263,46 @@ const ensureDemoShellStyle = () => {
       margin: 0 0 6px;
     }
 
+    /* Persistent step-complete: the stamp flies in and HOLDS over a blurred
+       scene, waiting for a tap or the Next Step button instead of auto-advancing. */
+    .demo-beat-root--hold {
+      pointer-events: auto;
+      cursor: pointer;
+      background: radial-gradient(ellipse at center, rgba(24, 31, 18, 0.34), rgba(24, 31, 18, 0.62));
+      backdrop-filter: blur(9px) saturate(1.03);
+    }
+
+    .demo-complete-stamp--hold {
+      animation: demo-stamp-punch-hold 0.85s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    @keyframes demo-stamp-punch-hold {
+      0%   { opacity: 0; transform: scale(2.3) rotate(-3deg); }
+      55%  { opacity: 1; transform: scale(0.96) rotate(0deg); }
+      75%  { transform: scale(1.02); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+
+    .demo-complete-next {
+      margin-top: 20px;
+      animation: demo-complete-cta-in 0.5s ease 0.6s both;
+    }
+
+    .demo-complete-hint {
+      margin: 12px 0 0;
+      color: rgba(255, 253, 242, 0.72);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      animation: demo-complete-cta-in 0.5s ease 0.78s both;
+    }
+
+    @keyframes demo-complete-cta-in {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
     @media (max-width: 640px) {
       .demo-progress-pill {
         top: max(8px, env(safe-area-inset-top, 8px));
@@ -604,17 +644,45 @@ const VIEW_SHOWCASE_SEQUENCE = [
 //   • DemoStepLaunch slams the new step's title over the freshly staged scene
 //     so the next stage arrives with energy instead of a silent swap.
 
-const DemoStepComplete = ({ step }) => {
+// The step-complete stamp flies in and HOLDS over a blurred scene. It no longer
+// auto-advances — the player dismisses it by tapping anywhere or pressing the
+// Next Step button, so the win registers before the next stage arrives.
+const DemoStepComplete = ({ step, onDismiss }) => {
   ensureDemoShellStyle();
   const info = DEMO_STEPS.find(s => s.id === step);
   if (!info) return null;
+  const handleDismiss = () => onDismiss?.();
   return (
-    <div className="demo-beat-root" aria-live="assertive">
+    <div
+      className="demo-beat-root demo-beat-root--hold"
+      aria-live="assertive"
+      role="button"
+      tabIndex={0}
+      aria-label={`Step ${info.num} complete — tap to continue`}
+      onClick={handleDismiss}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handleDismiss();
+        }
+      }}
+    >
       <div className="demo-beat-flash" />
-      <div className="demo-complete-stamp">
+      <div className="demo-complete-stamp demo-complete-stamp--hold">
         <p className="demo-complete-check">✓</p>
         <p className="demo-beat-sub">Step {info.num} Complete</p>
         <h2 className="demo-beat-title">{info.label}</h2>
+        <button
+          type="button"
+          className="demo-intro-button demo-complete-next"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleDismiss();
+          }}
+        >
+          Next Step ▶
+        </button>
+        <p className="demo-complete-hint">Tap anywhere to continue</p>
       </div>
     </div>
   );
