@@ -89,8 +89,10 @@ export function useKociembaSolver(cubies, size) {
     try {
       const { solve: kociembaSolve } = await import('kociemba-wasm');
       if (sid !== solveIdRef.current) return; // a newer solve started while WASM was loading
-      const cubeStr = cubiesToKociembaString(cubies);
-      if (!cubeStr) throw new Error('Cannot solve: cube has modified stickers (chaos / flip / manifold mode). Reset to a clean state first.');
+      // ignoreFlips: wormhole-flipped tiles (showing their antipode) are read by
+      // their true identity, so a flipped cube still yields a solvable position.
+      const cubeStr = cubiesToKociembaString(cubies, { ignoreFlips: true });
+      if (!cubeStr) throw new Error('Cannot solve: cube has non-flip sticker damage (manifold / chaos recolour). Reset to a clean state first.');
       const sol = await kociembaSolve(cubeStr);
       if (sid !== solveIdRef.current) return; // a newer solve started while kociemba was computing
       const trimmed = (sol || '').trim();

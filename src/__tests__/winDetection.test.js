@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   checkRubiksSolved,
+  checkRubiksSolvedAntipodal,
+  colorClass,
   checkFaceLatinSquare,
   checkWormVictory,
   detectWinConditions,
@@ -9,6 +11,14 @@ import {
 } from '../game/winDetection.js';
 import { makeCubies } from '../game/cubeState.js';
 import { rotateSliceCubies } from '../game/cubeRotation.js';
+import { ANTIPODAL_COLOR } from '../utils/constants.js';
+
+// Simulate a wormhole flip: recolour a sticker to its antipode.
+function flipSticker(cubies, x, y, z, dir) {
+  const st = cubies[x][y][z].stickers[dir];
+  st.curr = ANTIPODAL_COLOR[st.curr]; // toggle, matching the real wormhole flip
+  st.flips = (st.flips ?? 0) + 1;
+}
 
 describe('checkRubiksSolved', () => {
   it('should return true for a freshly created cube', () => {
@@ -27,6 +37,12 @@ describe('checkRubiksSolved', () => {
     cubies = rotateSliceCubies(cubies, 3, 'col', 0, 1);
     cubies = rotateSliceCubies(cubies, 3, 'col', 0, -1);
     expect(checkRubiksSolved(cubies, 3)).toBe(true);
+  });
+
+  it('should return false for a solved cube with a flipped tile (strict mode)', () => {
+    const cubies = makeCubies(3);
+    flipSticker(cubies, 0, 0, 2, 'PZ');
+    expect(checkRubiksSolved(cubies, 3)).toBe(false);
   });
 
   it('should work for different cube sizes', () => {
@@ -174,5 +190,33 @@ describe('detectWinConditions', () => {
     expect(result.sudokube).toBe(false);
     expect(result.ultimate).toBe(false);
     expect(result.worm).toBe(false);
+  });
+});
+
+describe('antipodal (RP²) quotient solved detection', () => {
+  it('colorClass merges each antipodal pair and separates the three axes', () => {
+    expect(colorClass(1)).toBe(colorClass(4)); // Red / Orange
+    expect(colorClass(2)).toBe(colorClass(5)); // Green / Blue
+    expect(colorClass(3)).toBe(colorClass(6)); // White / Yellow
+    expect(colorClass(1)).not.toBe(colorClass(2));
+    expect(colorClass(2)).not.toBe(colorClass(3));
+  });
+
+  it('treats a solved cube with flipped tiles as solved up to antipodal identification', () => {
+    const cubies = makeCubies(3);
+    flipSticker(cubies, 0, 0, 2, 'PZ'); // F
+    flipSticker(cubies, 2, 2, 2, 'PX'); // R
+    flipSticker(cubies, 1, 2, 1, 'PY'); // U
+    expect(checkRubiksSolved(cubies, 3)).toBe(false);        // strict: no
+    expect(checkRubiksSolvedAntipodal(cubies, 3)).toBe(true); // quotient: yes
+  });
+
+  it('a fully solved cube is also antipodally solved', () => {
+    expect(checkRubiksSolvedAntipodal(makeCubies(3), 3)).toBe(true);
+  });
+
+  it('a scrambled cube is not antipodally solved', () => {
+    const cubies = rotateSliceCubies(makeCubies(3), 3, 'col', 0, 1);
+    expect(checkRubiksSolvedAntipodal(cubies, 3)).toBe(false);
   });
 });
