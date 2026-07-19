@@ -127,6 +127,23 @@ export function useDemoMode({
       const targetSize = config.cubeSize || 3;
       if (targetSize !== store.size) changeSize(targetSize);
       else reset();
+      // Lock the worm demo to its signature look, layered on top of the
+      // desert + topographic that applyDemoSettings() applied above. Read the
+      // settings fresh (the `store` snapshot predates that call) so we extend
+      // the demo settings rather than clobber them. Every other step re-runs
+      // applyDemoSettings() on entry, so this override never leaks past the
+      // worm step.
+      if (config.backgroundTheme || config.tileStyle) {
+        const fresh = useGameStore.getState();
+        const nextSettings = { ...fresh.settings };
+        if (config.backgroundTheme) nextSettings.backgroundTheme = config.backgroundTheme;
+        if (config.tileStyle) {
+          const wormStyles = {};
+          for (let i = 1; i <= 6; i++) wormStyles[i] = config.tileStyle;
+          nextSettings.manifoldStyles = wormStyles;
+        }
+        fresh.setSettings(nextSettings);
+      }
       // Showcase a specific worm character; the player's own pick (persisted
       // to localStorage) is restored when the step ends or the demo exits.
       if (config.wormCharacter) {
