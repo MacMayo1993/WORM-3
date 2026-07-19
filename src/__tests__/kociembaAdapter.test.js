@@ -9,7 +9,7 @@ const SOLVED = 'UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB';
 // Simulate a wormhole flip: recolour a sticker to its antipode, mark flipped.
 function flipSticker(cubies, x, y, z, dir) {
   const st = cubies[x][y][z].stickers[dir];
-  st.curr = ANTIPODAL_COLOR[st.orig];
+  st.curr = ANTIPODAL_COLOR[st.curr]; // toggle, matching the real wormhole flip
   st.flips = (st.flips ?? 0) + 1;
 }
 
