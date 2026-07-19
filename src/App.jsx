@@ -510,9 +510,9 @@ export default function WORM3() {
   // animation plays, so nothing pops in late on slow connections. Delayed a
   // beat so it never competes with the critical boot path.
   useEffect(() => {
-    const t = setTimeout(() => preloadAppAssets({ backgroundTheme: settings.backgroundTheme }), 1500);
+    const t = setTimeout(() => preloadAppAssets(), 1500);
     return () => clearTimeout(t);
-  }, [settings.backgroundTheme]);
+  }, []);
 
   // ========================================================================
   // INTRO TIME — drives IntroBranch 3D content + WelcomeScreen DOM overlay

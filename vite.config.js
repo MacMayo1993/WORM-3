@@ -14,7 +14,14 @@ export default defineConfig({
     // the local cache. Heavy media (environments, models, images) is NOT
     // precached — it's cached lazily on first use instead.
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'prompt', not 'autoUpdate': autoUpdate calls window.location.reload()
+      // the moment a new deploy's worker activates, yanking the page out from
+      // under whoever is mid-session (this repo deploys many times a day, so
+      // that reload fired constantly — the "double-boot" and vanishing-Mobi
+      // reports). 'prompt' downloads the new build quietly and lets us show a
+      // small "update ready" toast instead (see registerSW in main.jsx), so the
+      // page only ever reloads when the user asks it to.
+      registerType: 'prompt',
       manifest: {
         name: 'WORM³ — World of Rubik\'s Manifolds',
         short_name: 'WORM³',
@@ -39,7 +46,10 @@ export default defineConfig({
             handler: 'CacheFirst',
             options: {
               cacheName: 'worm3-media',
-              expiration: { maxEntries: 60, maxAgeSeconds: 30 * 24 * 3600, purgeOnQuotaError: true },
+              // Env maps run 20–26MB each, so 60 entries could pin ~1GB+ of
+              // Cache Storage. Cap at 8 — enough for a session's worth of
+              // backgrounds/models without letting the quota balloon.
+              expiration: { maxEntries: 8, maxAgeSeconds: 30 * 24 * 3600, purgeOnQuotaError: true },
               cacheableResponse: { statuses: [0, 200] },
             },
           },

@@ -14,7 +14,7 @@ let started = false;
 // Warm an HTTP cache entry without keeping the response.
 const warm = (url) => fetch(url, { credentials: 'same-origin' }).catch(() => { });
 
-export function preloadAppAssets({ backgroundTheme } = {}) {
+export function preloadAppAssets() {
   if (started) return;
   started = true;
 
@@ -34,10 +34,22 @@ export function preloadAppAssets({ backgroundTheme } = {}) {
   const mobi = new Image();
   mobi.src = `${import.meta.env.BASE_URL}Mobi.webp`;
 
-  // 3. Environment maps: the player's current background plus the demo's
-  //    desert — the two the first session can actually hit.
-  const wanted = new Set(['desert', backgroundTheme]);
-  for (const bg of BACKGROUNDS) {
-    if (bg.file && wanted.has(bg.id)) warm(getBackgroundUrl(bg.file));
-  }
+  // NOTE: environment maps are deliberately NOT warmed here. They're 20–26MB
+  // each, so a background warm on every cold session was fighting the critical
+  // boot path for bandwidth — and because CacheFirst doesn't dedupe in-flight
+  // requests, the warm fetch() raced the real EXR loader and pulled the same
+  // huge file twice. The real loader (InteractivePhotoBackground in GameScene)
+  // is now the only thing that fetches an env map; the demo's desert map is
+  // warmed on demand via warmDemoAssets() when the player signals intent.
+}
+
+// Warm the demo's desert environment map. Called on Start Demo hover/press so
+// the map is in cache by the time the demo scene mounts, without every cold
+// session paying for a 2.2MB fetch it will never use.
+let demoWarmed = false;
+export function warmDemoAssets() {
+  if (demoWarmed) return;
+  demoWarmed = true;
+  const desert = BACKGROUNDS.find((bg) => bg.id === 'desert');
+  if (desert?.file) warm(getBackgroundUrl(desert.file));
 }

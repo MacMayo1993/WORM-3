@@ -1,5 +1,14 @@
 // src/utils/audio.js
-// Audio and haptic feedback utilities with pooling for performance
+// Audio and haptic feedback utilities with pooling for performance.
+//
+// No sound assets currently ship with the app — there is no public/sounds/
+// directory, so every play('/sounds/*.mp3') call used to 404 (and the paths
+// also skipped BASE_URL, so they'd 404 under the /WORM-3/ base regardless).
+// That was pure console noise on every flip/rotate. Audio playback is gated
+// off until real assets land: flip this to `true` (and add the files under
+// public/sounds/, referenced via import.meta.env.BASE_URL) to re-enable.
+// Haptics (vibrate) are unaffected and stay live.
+const AUDIO_ENABLED = false;
 
 // Audio pool configuration
 const POOL_SIZE = 4; // Number of audio instances per sound
@@ -34,6 +43,7 @@ const getPool = (src) => {
  * Reuses Audio objects to avoid creating new ones on each play
  */
 export const play = (src) => {
+  if (!AUDIO_ENABLED) return; // no sound assets ship yet — avoid 404s
   try {
     const pool = getPool(src);
     const idx = poolIndex.get(src);
@@ -54,6 +64,7 @@ export const play = (src) => {
  * Preload audio files to avoid delay on first play
  */
 export const preload = (sources) => {
+  if (!AUDIO_ENABLED) return; // no sound assets ship yet — avoid 404s
   sources.forEach(src => getPool(src));
 };
 
