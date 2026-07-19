@@ -31,6 +31,35 @@ function readColor(st, ignoreFlips) {
   return st.curr;
 }
 
+// A sticker is *admissible* iff its paint is explained by wormhole flips alone:
+// curr ∈ {orig, α(orig)}. Any other colour (manifold recolour, non-antipodal
+// chaos damage, save corruption) is inadmissible.
+function stickerAdmissible(st) {
+  return !!st && (st.curr === st.orig || st.curr === ANTIPODAL_COLOR[st.orig]);
+}
+
+/**
+ * True iff every exterior sticker is flip-admissible. This is the exact
+ * hypothesis the flip-normalised solve needs, and it is STRICTLY stronger than
+ * the 54-char 9-of-each count: a count-balanced cross-mispaint (two stickers
+ * swapped into each other's classes) leaves all six counts at nine yet is not
+ * flip-reachable. Guarding on admissibility prevents reading an incoherent mix
+ * of orig (for flipped tiles) and curr (for genuinely-damaged tiles).
+ */
+export function isAdmissible(cubies) {
+  if (!cubies) return false;
+  for (const plane of cubies) {
+    for (const col of plane) {
+      for (const cubie of col) {
+        for (const dir in cubie.stickers) {
+          if (!stickerAdmissible(cubie.stickers[dir])) return false;
+        }
+      }
+    }
+  }
+  return true;
+}
+
 /**
  * Convert a 3x3 cubies array to the 54-char kociemba input string.
  *
@@ -45,6 +74,13 @@ export function cubiesToKociembaString(cubies, opts = {}) {
   if (!cubies || cubies.length !== 3) return null;
 
   const { ignoreFlips = false } = opts;
+
+  // On the flip-normalised path, reject inadmissible states up front so we never
+  // emit a string mixing orig (flipped tiles) and curr (genuinely-damaged tiles).
+  // The 9-of-each count below is retained as a cheap redundancy check on ρ, not
+  // as the damage filter (a count-balanced cross-mispaint would slip past it).
+  if (ignoreFlips && !isAdmissible(cubies)) return null;
+
   const n = 2; // size - 1
 
   // Returns '?' sentinel for unrecognised/missing sticker colours so validation catches it.

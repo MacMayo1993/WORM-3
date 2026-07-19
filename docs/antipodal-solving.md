@@ -1,6 +1,6 @@
 # Solving the WORM-3 Cube Under Antipodal Identification
 
-**A two-phase method for solving a Rubik's cube whose stickers may have been flipped through wormholes on the real projective plane (RP²).**
+**A two-phase method — unmodified Kociemba for piece positions, F₂-linear parity clearing for wormhole flips — with every implementation claim pinned to code.**
 
 *WORM-3 (World of Rubik's Manifolds) — technical note. Last updated 2026-07-19.*
 
@@ -8,23 +8,31 @@
 
 ## Abstract
 
-WORM-3 is a Rubik's cube built on RP² topology: opposite faces are glued by
-the antipodal map, and a sticker can travel through a *wormhole* that recolours
-it to its antipode. Standard Kociemba two-phase solving assumes six fixed,
-distinguishable colours and rejects any cube in which a sticker shows the
-"wrong" colour — so a single flipped tile makes the classical solver refuse to
-run. This note develops the **WORM Antipodal Solve (WAS)** method, which solves
-such cubes. We formalise the state model, prove that a wormhole flip is
-*invertible from stored state* (so piece positions are recoverable regardless of
-flip damage), introduce two distinct notions of "solved" — **strict** and
-**quotient** — and give a two-phase algorithm: Phase 1 recovers piece positions
-with unmodified Kociemba over normalised facelets, and Phase 2 clears residual
-flip parity. We prove correctness of both phases, then show (Theorem 5) that
-residual parity modulo the antipodal-symmetric subspace is conserved by all
-rotations and flips — so the "clean single-pair flip" is simply the game's
-native paired wormhole flip, every in-play residual is native-flip clearable in
-half the operations of healing, and the single-sticker heal is the unique
-operator that can break antipodal symmetry.
+WORM-3 is a Rubik's cube variant in which a ℤ₂ acts on the *colour state* rather
+than the underlying geometry: a sticker travelling through a *wormhole* is
+repainted by a fixed antipodal colour involution α, moving no piece. A classical
+solver assumes six fixed, distinguishable colours and rejects any facelet string
+whose colour counts are off, so a single flipped sticker makes an off-the-shelf
+Kociemba refuse to run. This note develops the **WORM Antipodal Solve (WAS)**: a
+two-phase method in which Phase 1 recovers all piece positions with an
+*unmodified* Kociemba two-phase solver over normalised facelets, and Phase 2
+clears residual flip parity using the game's native paired-flip operator.
+
+We prove that flips are invertible from stored identity (Lemmas 1–2), that Phase
+1 is correct on admissible states (Theorem 1) and solves the half-quotient puzzle
+outright (Theorem 2), and that Phase 2's reachability is governed by a conserved
+coset in an F₂-vector space of identity-indexed residuals (Theorem 3): a residual
+is clearable by native flips **iff** it is symmetric under the identity pairing
+β, in exactly ‖f‖/2 flips (provably optimal), with the single-sticker heal
+required exactly on the asymmetric component. The pairing's identity-indexed
+semantics — the fact on which the entire Phase-2 analysis stands — is established
+by direct code citation (Lemma 3), and a repository-wide audit (§8) discharges
+the two conditions the analysis depends on: identity fields are written only at
+construction, and every in-game colour mutation applies α to an antipodal pair.
+
+The contribution is a **solver-reuse decomposition**: lift a state-quotient
+puzzle to its classical cover, solve the base with commodity tools, and clear the
+fibre obstruction in a linear phase.
 
 ---
 
@@ -32,327 +40,446 @@ operator that can break antipodal symmetry.
 
 The classical adapter (`src/game/kociembaAdapter.js`) builds a 54-character
 facelet string from the painted colour `curr` of each sticker and validates that
-each of the six face letters appears exactly nine times. A wormhole flip
-recolours one sticker from a colour $c$ to its antipode $\alpha(c)$, so the count
-of one face letter rises to ten and its antipode drops to eight; validation
-fails and the solver returns `null` with *"cube has modified stickers… reset
-first."* The player is told an intrinsically legal, physically reachable cube is
-unsolvable. WAS removes that restriction.
+each of the six face letters appears exactly nine times. Under wormhole play this
+validation fails constantly: flips repaint stickers by α without moving any
+piece, so the cube can be position-solved yet colour-scrambled, or the reverse.
+The naive responses — resetting flip damage before solving, or forking the solver
+to understand flipped colours — either destroy game state or forfeit the
+engineering investment embodied in the classical two-phase solver and its pruning
+tables.
+
+The correct response is a decomposition. Flip damage and permutation damage live
+in independent coordinates of the state, and each has a native solving
+technology: Kociemba for the permutation factor, F₂-linear algebra for the flip
+factor. WAS is that decomposition made precise.
+
+## 2. Positioning
+
+Quotient-topology twisty puzzles are an established genre. Roice Nelson's
+*MagicTile* realises twisty puzzles on quotient surfaces — including the real
+projective plane and the Klein bottle — by choosing a fundamental domain of a
+covering tiling and identifying its edges. Independently, a "Rubik's real
+projective plane" is obtained from a physical cube by identifying antipodal
+cubies, so that turning the front face clockwise is automatically accompanied by
+turning the back face counterclockwise — equivalently, restricting to slice
+moves. These constructions quotient the **geometry**: the surface the stickers
+live on, and hence the move structure.
+
+The subsystem analysed here does something disjoint. In WAS's scope — the classic
+3×3 with the full face-turn generator set, plus wormhole flips — the move
+structure is entirely standard, and the ℤ₂ acts through the antipodal **colour**
+involution α applied dynamically to individual stickers. The group being
+quotiented acts on the colour fibre, not the base. (WORM-3 *also* ships a separate
+geometric antipodal mode, `src/game/antipodalMode.js`, in which a CW face turn
+induces a CCW antipodal echo; that mode is the geometric-quotient construction and
+is outside WAS's scope.)
+
+This changes which question is interesting. Geometric-quotient puzzles need
+bespoke solvers because their move structure is nonstandard. WAS's move structure
+is standard, so the natural question is the opposite: *how much of the classical
+solving stack survives the colour-state quotient unmodified?* The answer proved
+below — all of it for the position factor, with the flip factor reduced to a
+27-dimensional F₂-linear problem carrying a complete one-line invariant — is a
+solver-reuse theorem, and that, not the RP² framing, is the contribution.
+
+## 3. State model
+
+### 3.1 Stickers, identities, and the two involutions
+
+Let 𝒮 denote the set of the 54 sticker **identities**. Each sticker object
+carries immutable identity fields — `orig` (the solved-state colour), `origPos`,
+`origDir` (the solved-state grid position and facing) — and mutable state fields,
+including the painted colour `curr` and the flip count. Identity fields are
+assigned at construction and never rewritten (Lemma 3, discharged repo-wide in
+§8.1).
+
+Two involutions organise the structure:
+
+- **α — the antipodal colour involution** (`ANTIPODAL_COLOR`,
+  `src/utils/constants.js`): a fixed-point-free involution on the six colours
+  pairing each with its opposite-face colour,
+  $$1\leftrightarrow4,\quad 2\leftrightarrow5,\quad 3\leftrightarrow6,$$
+  i.e. F↔B, L↔R, U↔D. A wormhole flip repaints a sticker $s$ by
+  $\mathrm{curr}(s)\mapsto\alpha(\mathrm{curr}(s))$.
+- **β — the antipodal identity pairing**: the fixed-point-free involution on 𝒮
+  sending each identity to the identity whose home colour is α(orig) at the same
+  solved-state grid cell (`findAntipodalStickerByGrid`, `src/game/manifoldLogic.js`).
+  It partitions 𝒮 into 27 pairs. β is a well-defined involution because it is a
+  function of immutable identity fields only (Lemma 3); no claim is made here that
+  it coincides with exact geometric central inversion, and none is needed — the
+  Phase-2 theory uses only that β is a fixed, fixed-point-free involution with 27
+  orbits.
+
+### 3.2 Residuals
+
+Under the admissibility invariant of §4, every sticker satisfies
+$\mathrm{curr}(s)\in\{\mathrm{orig}(s),\alpha(\mathrm{orig}(s))\}$. The **flip
+residual** is the identity-indexed vector
+
+$$f\in\mathbb F_2^{\mathcal S},\qquad f(s)=\mathbf 1\{\mathrm{curr}(s)=\alpha(\mathrm{orig}(s))\}.$$
+
+Because $f$ is indexed by identity, not by current position, **rotations act
+trivially on residuals**: a face turn moves stickers but repaints nothing, so it
+permutes positions while fixing every value $f(s)$. This observation — legitimate
+precisely because β and $f$ are identity-indexed (Lemma 3) — is what makes the
+entire Phase-2 theory rotation-free.
+
+### 3.3 Two notions of solved
+
+**Strict solved:** every piece in solved position and $f=0$ (`checkRubiksSolved`).
+
+**κ-solved (half-quotient):** every piece in solved position, $f$ arbitrary;
+equivalently, solved in the per-sticker quotient of the colour fibre by ⟨α⟩
+(`checkRubiksSolvedAntipodal`, with `colorClass` = $\kappa(c)=\min(c,\alpha(c))$).
+
+κ-solved is a **design choice**, not "the" projective notion. It quotients the
+colour fibre but leaves the position set intact. A full state-level quotient — by
+the group generated by α together with the geometric antipodal action $A$ on
+slots, $X/\langle\alpha_{\mathrm{col}},A\rangle$ — identifies more states and is a
+genuinely different puzzle (Open Problem 1). The full quotient would declare a
+cube solved when it is solved only up to a global antipodal relabelling, which
+reads as a bug to a player; κ-solved is the deliberate, playable choice, and this
+note analyses that choice.
+
+### 3.4 Lemma 3 — the pairing is identity-indexed (code citations)
+
+> **Lemma 3.** The native pairing β used by the paired-flip operator is a fixed
+> involution on sticker identities. It is not conjugated by rotations: for every
+> face or whole-cube rotation $u$ and native paired flip $\varphi$,
+> $u\varphi u^{-1}=\varphi$ as operators on residuals.
+
+**Evidence.**
+
+1. *Partner computation is identity-based.* `getManifoldGridId`
+   (`src/game/gridIds.js:36–40`) builds a sticker's grid id from `sticker.orig`,
+   `sticker.origPos`, `sticker.origDir`; `findAntipodalStickerByGrid`
+   (`src/game/manifoldLogic.js:176–183`) derives the partner's id from those same
+   immutable fields. No mutable state field enters the computation.
+2. *Identity fields are immutable under rotation.* `src/game/cubeRotation.js`
+   reads but never writes `orig`, `origPos`, or `origDir` (§8.1 extends this
+   repo-wide).
+3. *Immutability is already load-bearing.* The Sudokube win test
+   (`src/__tests__/winDetection.test.js:150`, "proves values track sticker
+   identity") depends on `orig*` immutability under rotation; a mutation would
+   break the current suite independently of this note.
+
+**Proof.** Since β is a function of immutable fields only, it is a fixed
+involution on 𝒮. A rotation $u$ permutes positions and fixes all identity fields
+and all colours; a native flip $\varphi_s$ toggles `curr` on the identity pair
+$\{s,\beta(s)\}$ wherever those stickers currently sit. Hence $u\varphi_s u^{-1}$
+toggles the same identity pair: rotations and native flips commute on residuals.
+$\square$
+
+*(An analysis that reads β as a slot-level involution conjugated by rotations,
+$\beta_x=\pi_x^{-1}\beta_0\pi_x$, misreads the code: the partner is looked up by
+*original* cell, not current slot. This is the error corrected in the Revision
+history.)*
+
+## 4. Admissibility
+
+### 4.1 The predicate
+
+A state is **admissible** iff every sticker satisfies
+$\mathrm{curr}(s)\in\{\mathrm{orig}(s),\alpha(\mathrm{orig}(s))\}$. Admissibility
+is $O(|\mathcal S|)$-decidable, is implied by reachability (Lemma 1), and is
+exactly the hypothesis Theorem 1 needs.
 
----
-
-## 2. The state model
-
-### 2.1 Colours and the antipodal involution
-
-Faces carry six colours, encoded $1..6$:
-
-| id | 1 | 2 | 3 | 4 | 5 | 6 |
-|----|---|---|---|---|---|---|
-| colour | Red | Green | White | Orange | Blue | Yellow |
-| face | F (PZ) | L (NX) | U (PY) | B (NZ) | R (PX) | D (NY) |
-
-The **antipodal involution** $\alpha$ (`ANTIPODAL_COLOR` in
-`src/utils/constants.js`) pairs each colour with the colour of its opposite
-face:
-
-$$\alpha:\quad 1\leftrightarrow 4,\quad 2\leftrightarrow 5,\quad 3\leftrightarrow 6,
-\qquad \alpha=\alpha^{-1},\quad \alpha(c)\neq c.$$
-
-In Kociemba face letters these are exactly the opposite-face pairs
-$F\!\leftrightarrow\!B,\; L\!\leftrightarrow\!R,\; U\!\leftrightarrow\!D$.
-
-### 2.2 Stickers
-
-A sticker (`src/game/cubeState.js`) is a record
-
-$$s=(\mathrm{curr},\ \mathrm{orig},\ \mathrm{flips},\ \mathrm{origPos},\ \mathrm{origDir}),$$
-
-where `orig` $\in\{1..6\}$ is its **home colour**, fixed at construction and
-**never reassigned**; `curr` is the colour painted right now; and
-`flips` $\in\mathbb{Z}_{\ge 0}$ counts wormhole traversals. Let $S$ be the set of
-exterior stickers ($54$ on a $3\times3$).
-
-### 2.3 Generators
-
-Three families of operators act on a cube state:
-
-- **Rotations** $\mathcal{R}$ — the six face quarter-turns and their inverses
-  (`rotateSliceCubies`). A rotation permutes sticker *records* between grid
-  positions; it **does not read or write `curr`, `orig`, or `flips`**.
-- **Flip** $\varphi_s$ — a wormhole traversal (`flipStickerPair`,
-  `chaosSim.js`): $\mathrm{curr}\mapsto\alpha(\mathrm{curr})$,
-  $\mathrm{flips}\mathbin{+}{=}1$. It is applied to a sticker **and its
-  antipodal partner** $\bar s$ simultaneously (see §6.1). $\varphi_s$ is an
-  involution on `curr`.
-- **Heal** $\eta_s$ — `healSticker`: $\mathrm{curr}\mapsto\mathrm{orig}$,
-  $\mathrm{flips}\mapsto 0$. Acts on a **single** sticker.
-
----
-
-## 3. Two notions of "solved"
-
-Let $\text{home}(s)\in\{1..6\}$ be the colour the face occupied by $s$ should
-show (`DIR_TO_FACE` in `src/game/winDetection.js`).
-
-**Definition (Strict).** A cube is *strict-solved* iff
-$\mathrm{curr}(s)=\text{home}(s)$ for all $s\in S$.
-(`checkRubiksSolved`, classical Rubik victory.)
-
-**Definition (Quotient).** Let $[c]=\{c,\alpha(c)\}$ be the antipodal class and
-$\kappa(c)=\min(c,\alpha(c))$ its representative (`colorClass`). A cube is
-*quotient-solved* iff $\kappa(\mathrm{curr}(s))=\kappa(\text{home}(s))$ for all
-$s\in S$. (`checkRubiksSolvedAntipodal`.)
-
-The quotient notion is the honest RP² notion: on the projective plane a colour
-and its antipode are the *same point of the quotient manifold*, so a face is
-solved when it is uniform **up to** $\alpha$. Strict $\Rightarrow$ quotient; the
-converse fails exactly on flipped tiles.
-
----
-
-## 4. Flip invariance
-
-The engine keeps enough state to *undo* any flip, which is what makes position
-recovery possible.
-
-> **Lemma 1 (Reachable colours).** For every sticker of every state reachable
-> from a solved cube by $\mathcal{R}\cup\{\varphi\}$, we have
-> $\mathrm{curr}(s)\in\{\mathrm{orig}(s),\ \alpha(\mathrm{orig}(s))\}$, and
-> $\mathrm{curr}(s)=\mathrm{orig}(s)$ iff $\mathrm{flips}(s)$ is even.
-
-*Proof.* Induction on move count. Initially $\mathrm{curr}=\mathrm{orig}$,
-$\mathrm{flips}=0$. Rotations move the record intact, preserving the invariant.
-A flip sends $\mathrm{curr}\mapsto\alpha(\mathrm{curr})$ and toggles the parity
-of `flips`; since $\alpha$ is an involution and $\mathrm{orig}$ is untouched,
-$\mathrm{curr}$ stays in $\{\mathrm{orig},\alpha(\mathrm{orig})\}$ and matches
-$\mathrm{orig}$ exactly on even parity. $\square$
-
-> **Lemma 2 (`orig` is rotation-equivariant).** Rotations act on the sticker
-> records by a permutation $\pi\in\mathrm{Sym}(S)$ that is independent of
-> colours. Reading the field `orig` therefore commutes with rotations: the
-> facelet string built from `orig` is exactly the string the *unflipped* cube
-> would present.
-
-*Proof.* Immediate: rotations never read or write `orig`, so the multiset of
-`orig` values at each position transforms only by $\pi$, identically to a cube
-that was never flipped. $\square$
-
-> **Theorem 1 (Position recovery).** Let $x$ be any state reachable by
-> $\mathcal{R}\cup\{\varphi\}$. Define the **normalised facelet map**
-> $\rho(x)$ by reading each position's `orig` value. Then $\rho(x)$ is a legal
-> six-colour cube string, and applying stock Kociemba to $\rho(x)$ yields a
-> rotation word $g\in\mathcal{R}^\ast$ that returns every piece to its home
-> position.
-
-*Proof.* By Lemma 2, $\rho(x)$ is the facelet string of the flip-free cube with
-the same rotation history, which is a legal Kociemba input (exactly nine of each
-letter, valid permutation and orientation parity because it is a genuine
-rotation of the solved cube). Kociemba returns $g$ solving that permutation;
-since rotations act identically on the flipped and unflipped cubes (Lemma 2),
-$g$ homes every piece of $x$ as well. $\square$
-
-**Implementation.** `cubiesToKociembaString(cubies, { ignoreFlips: true })`
-computes $\rho$: it reads `orig` **only** when
-$\mathrm{curr}\in\{\mathrm{orig},\alpha(\mathrm{orig})\}$ (a genuine flip, by
-Lemma 1); any other paint — manifold recolouring, non-antipodal chaos damage —
-is read as `curr` and rejected by the nine-of-each check. Forgiveness is thus
-surgical: it forgives flips and nothing else.
-
----
-
-## 5. The WAS algorithm
-
-**Input.** A cube state $x$ reachable by $\mathcal{R}\cup\{\varphi\}$.
-**Output.** A word $w$ over $\mathcal{R}\cup\{\eta\}$ with $w\cdot x$
-strict-solved.
-
-```
-Phase 1 — position solve (rotations)
-  facelets ← cubiesToKociembaString(x, { ignoreFlips: true })   # ρ(x)
-  g        ← Kociemba(facelets)                                 # rotation word
-  x        ← g · x                                              # now quotient-solved
-
-Phase 2 — parity clearing (heals)
-  R ← flipResiduals(x)                 # stickers with curr ≠ orig
-  h ← [ η_s for s in R ]               # planStrictCompletion
-  x ← h · x                            # now strict-solved
-
-return  g ++ h
-```
-
-`src/game/antipodalSolver.js` implements Phase 2:
-`flipResiduals`, `planStrictCompletion`, `applyStrictCompletion`,
-`residualWeight`. Phase 1 is the existing Kociemba pipeline
-(`useKociembaSolver` now calls the adapter with `ignoreFlips: true`).
-
-> **Theorem 2 (Phase 1 solves the quotient puzzle).** After Phase 1, $x$ is
-> quotient-solved.
-
-*Proof.* By Theorem 1 every piece is home, so each sticker $s$ satisfies
-$\mathrm{orig}(s)=\text{home}(s)$. By Lemma 1,
-$\mathrm{curr}(s)\in\{\mathrm{orig}(s),\alpha(\mathrm{orig}(s))\}=[\text{home}(s)]$,
-hence $\kappa(\mathrm{curr}(s))=\kappa(\text{home}(s))$. $\square$
-
-> **Theorem 3 (Phase 2 completes to strict).** After Phase 2, $x$ is
-> strict-solved. Moreover $|h|=$ `residualWeight`$(x)$ heals suffice, and this
-> is minimal among heal-only completions.
-
-*Proof.* By Theorem 2 each piece is home, so for every $s$,
-$\text{home}(s)=\mathrm{orig}(s)$. A residual sticker has
-$\mathrm{curr}(s)=\alpha(\mathrm{orig}(s))\neq\text{home}(s)$; a non-residual has
-$\mathrm{curr}(s)=\mathrm{orig}(s)=\text{home}(s)$. Applying $\eta_s$ to each
-residual sets $\mathrm{curr}(s)=\mathrm{orig}(s)=\text{home}(s)$ and touches no
-other sticker, so afterwards every sticker matches its home colour: strict
-solved. Each residual must change and $\eta$ changes one sticker, so no
-heal-only completion uses fewer than `residualWeight` ops. $\square$
-
-**Corollary.** WAS solves any cube reachable by rotations and wormhole flips,
-under the strict definition, in $|g|+|h|$ operations with $|g|\le 20$ (Kociemba
-bound) and $|h|=$ residual weight $\le |S|$.
-
----
-
-## 6. Clearing parity in the game's native paired flips
-
-Phase 2 as first stated uses **heal**, a single-sticker operator. The game's
-*native* colour operator is the **paired wormhole flip**: flipping $s$ also
-flips its antipodal partner $\bar s$ (`findAntipodalStickerByGrid`,
-`flipStickerPair`). We now show that native flips clear every residual a player
-can actually produce, and characterise exactly when they cannot.
-
-### 6.1 The parity space
-
-Model residual flip parity after Phase 1 as a vector
-$f\in\mathbb{F}_2^{S}$, $f(s)=[\mathrm{curr}(s)\neq\mathrm{orig}(s)]$, **indexed
-by sticker identity, not position**. Strict completion needs $f=0$. The
-antipodal pairing is a fixed-point-free involution $\beta:S\to S$,
-$\beta(s)=\bar s$, with $|S/\beta|=|S|/2$ ($27$ pairs on a $3\times3$). A single
-paired flip adds the indicator $e_s+e_{\beta(s)}$ to $f$. Hence the parity
-vectors reachable by paired flips form
-
-$$P_\beta=\big\langle\, e_s+e_{\beta(s)} : s\in S \,\big\rangle
-        =\{\,f : f(s)=f(\beta(s))\ \forall s\,\}
-        \cong \mathbb{F}_2^{\,|S|/2},$$
-
-the **$\beta$-symmetric** vectors.
-
-> **Proposition 4.** A residual $f$ is clearable by paired wormhole flips alone
-> iff $f\in P_\beta$: each antipodal pair is flipped the same parity of times,
-> $f(s)=f(\beta(s))\ \forall s$.
-
-*Proof.* $P_\beta$ is spanned by the $e_s+e_{\beta(s)}$ and equals the
-$\beta$-symmetric subspace. Reaching $0$ from $f$ by adding generators is
-possible iff $f\in P_\beta$. $\square$
-
-### 6.2 The parity invariant — why commutators add nothing
-
-One might hope to escape $P_\beta$ with **rotation-conjugated flips**
-$u\varphi u^{-1}$. They cannot, and the reason is structural.
-
-> **Theorem 5 (Parity invariant).** Over the group generated by rotations and
-> paired flips, the coset $f + P_\beta \in \mathbb{F}_2^{S}/P_\beta$ is
-> invariant. Equivalently: rotations fix $f$ entirely, and every flip changes
-> $f$ by a $\beta$-symmetric vector.
-
-*Proof.* $f$ is defined on sticker *identities* through the fields
-$\mathrm{curr},\mathrm{orig}$. A rotation permutes sticker records between
-positions but reads and writes none of those fields (Lemma 2 setup), so it
-leaves $f$ pointwise unchanged. A paired flip adds $e_s+e_{\beta(s)}\in P_\beta$.
-Conjugation $u\varphi u^{-1}$ therefore adds a single $\beta$-symmetric vector
-(the rotations contribute $0$); it only changes *which* pair, via the piece
-that $u$ brought to the flip site — never the coset. $\square$
-
-**Consequences.**
-
-1. The clean **single antipodal-pair flip that changes nothing else** is not a
-   commutator to be discovered — it is the native primitive $\varphi$ itself
-   (`antipodalPairFlip`): it toggles exactly $\{s,\beta(s)\}$ and moves no
-   piece. The commutator $u\varphi u^{-1}$ collapses to $\varphi$ up to the
-   choice of target pair.
-2. **Every in-game flip is paired** (`flipStickerPair`, and the chaos worker
-   emits one op per pair), so starting from a solved cube the residual is always
-   $\beta$-symmetric: $f\in P_\beta$. By Proposition 4 it is *always* native-flip
-   clearable, in $\lVert f\rVert/2$ flips — **half** the heal count, in the
-   game's own moves, with no rotations required.
-3. **Heal is the unique symmetry-breaker.** The only way to leave $P_\beta$ (to
-   produce an asymmetric residual with one member of a pair dirty) is the
-   single-sticker heal $\eta$. Hence heal is needed in Phase 2 *only* to repair
-   externally-induced asymmetry, never for cubes reached by play.
-
-### 6.3 Implementation
-
-`src/game/antipodalSolver.js`:
-
-- `antipodalPairFlip(cubies, size, x, y, z, dir)` — the clean single-pair
-  operator; involution; moves no piece.
-- `planNativeFlipCompletion(cubies, size)` — groups residuals into antipodal
-  pairs via $\beta$ and emits one flip per pair; an asymmetric residual (partner
-  already home) falls back to a heal and sets `asymmetric: true`.
-- `applyNativeFlipCompletion(cubies, size, plan)` — applies paired flips then
-  heal fallbacks. Positions are fixed after Phase 1, so one manifold-grid map
-  serves all flips.
-
-The reversed-echo rotations in `src/game/antipodalMode.js` (a CW face turn
-induces a CCW antipodal echo, `getReverseDirection`, `getAntipodalSliceIndex`)
-remain the RP² orientation-reversal used to *reposition* a target pair to a
-preferred flip site, but by Theorem 5 they are a convenience, not a source of
-parity power.
-
----
-
-## 7. Complexity
-
-- **Phase 1:** one Kociemba solve, $O(1)$ amortised via its pruning tables;
-  $\le 20$ quarter/half turns.
-- **Phase 2:** one $O(|S|)$ scan for residuals; $|h|\le|S|$ heals ($\le 54$).
-- **Total moves:** $\le 20$ rotations $+\ \le 54$ heals. Move *count* is linear
-  in stickers only because heal is per-sticker; with a solved single-pair
-  antipodal commutator of length $\ell$ (§6.2), Phase 2 becomes
-  $\le \lceil|h|/2\rceil\cdot\ell$ rotations with no heals.
-
----
-
-## 8. Code map
+The naive predicate — each of the six face letters appears exactly nine times —
+is **necessary but not sufficient**. Counterexample: a *count-balanced
+cross-mispaint*, in which two stickers of different `orig` colours exchange
+painted colours outside their α-orbits. The nine-of-each count is preserved, yet
+no sequence of flips produces the state, and reading `orig` for the flipped tiles
+while reading `curr` for the damaged ones would emit an incoherent mixture to the
+solver — garbage in, confidently wrong solution out.
+
+### 4.2 Implementation
+
+`cubiesToKociembaString(cubies, { ignoreFlips: true })` tests `isAdmissible`
+first and returns `null` on failure, **then** reads `orig` throughout. The
+nine-of-each count is retained as a cheap redundancy check on the normalised
+string, not as the damage filter. The test suite includes the count-balanced
+rejection case (`src/__tests__/kociembaAdapter.test.js`).
+
+### 4.3 Status
+
+The audit of §8.2 shows every in-game colour mutation applies only α or heal, so
+inadmissible states **cannot arise from play** — `isAdmissible` is provably
+redundant in normal operation. It is retained as defensive hardening against
+save-file corruption, debug tooling, and future colour-mutating features, and it
+makes the "forgives flips and nothing else" guarantee exact rather than
+conditional.
+
+## 5. Phase 1 — position recovery by unmodified Kociemba
+
+### 5.1 Invertibility from stored state
+
+> **Lemma 1 (flips move nothing).** A wormhole flip changes `curr` on an identity
+> pair and changes no position field. Piece permutation and flip residual are
+> independent coordinates of the state.
+
+> **Lemma 2 (identity survives).** For every reachable state,
+> $\mathrm{curr}(s)\in\{\mathrm{orig}(s),\alpha(\mathrm{orig}(s))\}$, so `orig`
+> records the flip-invariant identity of each sticker; by Lemma 3 it also
+> survives all rotations. Hence the map state ↦ (piece permutation) is computable
+> from stored fields regardless of flip damage.
+
+*Proof of Lemma 2.* Induction on move count. Initially $\mathrm{curr}=\mathrm{orig}$.
+Rotations move the record intact; a flip sends $\mathrm{curr}\mapsto\alpha(\mathrm{curr})$,
+and since α is an involution fixing neither the fibre $\{\mathrm{orig},\alpha(\mathrm{orig})\}$,
+`curr` stays in that fibre. $\square$
+
+### 5.2 Correctness
+
+> **Theorem 1 (Phase 1 correctness).** On an admissible state, the facelet string
+> built from `orig` (the `ignoreFlips` normalisation) is exactly the facelet
+> string of the underlying permutation state, and unmodified Kociemba two-phase
+> applied to it returns a maneuver solving all piece positions.
+
+*Proof.* Admissibility makes `orig` the well-defined per-sticker identity, so by
+Lemma 2 the normalised string is that of the flip-free cube with the same
+rotation history — a legal classical state (nine of each letter; valid
+permutation and orientation parity, being a genuine rotation of the solved cube).
+Rotations act identically on the flipped and unflipped cubes (Lemma 3), so the
+returned word homes every piece of the actual state. $\square$
+
+> **Theorem 2 (half-quotient solve).** The Phase-1 output alone reaches a κ-solved
+> state; in the half-quotient puzzle of §3.3, WAS Phase 1 is a complete solver.
+
+*Proof.* After Phase 1 every piece is home, so $\mathrm{orig}(s)=\text{home}(s)$;
+by Lemma 2 $\mathrm{curr}(s)\in[\text{home}(s)]$, hence
+$\kappa(\mathrm{curr}(s))=\kappa(\text{home}(s))$. $\square$
+
+### 5.3 Length
+
+Kociemba two-phase output is **typically ≤ 22 HTM**. This is a statement about the
+algorithm's practical output distribution, not about God's Number: the diameter
+of the cube group in HTM is 20 (Rokicki et al.), but the two-phase algorithm does
+not promise, and does not need, optimality — it reaches the optimum only under an
+iterated-deepening configuration.
+
+## 6. Phase 2 — flip parity in the native operator
+
+### 6.1 The flip space
+
+The game's native Phase-2 generator is the **paired flip**: for an identity $s$,
+the operator $\varphi_s$ toggles $f$ on $\{s,\beta(s)\}$, i.e. adds $e_s+e_{\beta(s)}$
+to the residual (`flipStickerPair`, `src/game/manifoldLogic.js`). Let
+
+$$P_\beta:=\operatorname{span}_{\mathbb F_2}\{\,e_s+e_{\beta(s)}:s\in\mathcal S\,\}
+=\{\,f:f(s)=f(\beta(s))\ \forall s\,\},\qquad \dim P_\beta=27.$$
+
+By Lemma 3 the operators $\varphi_s$ are rotation-invariant, so $P_\beta$ is the
+*entire* reachable set from $0$ under game moves that touch colour: face turns act
+trivially on residuals, flips add pair vectors, and there is no conjugation
+enlargement. With the actual identity-indexed pairing, the naive $P_\beta$
+analysis is not naive — it is correct.
+
+### 6.2 The conserved coset
+
+Define the **asymmetry map** indexed by the 27 identity pairs,
+
+$$\Delta:\mathbb F_2^{\mathcal S}\to\mathbb F_2^{27},\qquad \Delta(f)_{[s]}=f(s)+f(\beta(s)),$$
+
+so that $\ker\Delta=P_\beta$.
+
+> **Theorem 3 (parity invariant).** For any admissible state with residual $f$:
+>
+> 1. Every game move (face turn, whole-cube rotation, native paired flip)
+>    preserves the coset $f+P_\beta$; equivalently, $\Delta(f)$ is conserved.
+> 2. $f$ is clearable to $0$ by native paired flips **iff** $\Delta(f)=0$ (i.e.
+>    $f$ is β-symmetric).
+> 3. When clearable, `planNativeFlipCompletion` — one flip per fully-flipped
+>    identity pair — clears $f$ in exactly $\lVert f\rVert/2$ flips, and this is
+>    optimal: each flip changes the residual on exactly two coordinates, and the
+>    27 pair-supports are disjoint.
+> 4. The single-sticker **heal** (`healSticker`, $\mathrm{curr}\mapsto\mathrm{orig}$)
+>    is the unique generator that changes $\Delta$. The minimum number of heals
+>    taking $f$ to a clearable residual is $\lVert\Delta(f)\rVert$, achieved by
+>    healing the dirty sticker in each asymmetric pair.
+
+*Proof.* (1) Face turns and rotations fix $f$ pointwise (§3.2, Lemma 3); flips add
+elements of $P_\beta=\ker\Delta$. (2) "If": a β-symmetric $f$ is the sum of its
+fully-flipped pair vectors, each killed by one flip. "Only if": (1) with target
+$0$. (3) The plan realises that decomposition; the lower bound is the
+two-coordinate observation together with disjointness of the 27 pair-supports,
+which forces at least one flip per dirty pair. (4) Heal toggles one coordinate of
+$f$, hence one coordinate of $\Delta$ (the pair $[s]$); an asymmetric pair needs
+exactly one such toggle, and flips cannot change $\Delta$, so $\lVert\Delta(f)\rVert$
+heals are necessary and sufficient. $\square$
+
+> **Corollary (heal semantics).** Heal fires exactly when $\Delta(f)\neq0$. By the
+> audit of §8.2 every in-game flip is β-symmetric, so $\Delta\equiv0$ invariantly
+> in play: **heal is dead code for any cube reached by normal play, and Phase 2 is
+> complete with native flips alone.**
+
+### 6.3 What is not needed
+
+Because β is identity-indexed, the following is objectless and is *not* part of
+WAS: rotation-conjugated flips as new parity generators, an orbit-type invariant
+finer than $\Delta$, setup-word minimisation over slot-pair stabilisers, and a
+minimum-weight-matching formulation of flip scheduling. Each is the correct theory
+of a *different* puzzle — one whose pairing rides on slots rather than identities
+— and is recorded here only so the distinction cannot be re-litigated (see
+Revision history).
+
+## 7. The WAS algorithm
+
+Given an arbitrary state:
+
+1. **Admissibility gate.** Reject if `isAdmissible` fails (§4).
+2. **Phase 1.** Build the `orig`-normalised facelet string; run unmodified
+   Kociemba; execute the returned maneuver. Result: κ-solved (Theorem 2),
+   typically ≤ 22 HTM.
+3. **Phase 2.** Compute $f$ and $\Delta(f)$. If $\Delta(f)\neq0$, heal the dirty
+   sticker in each asymmetric pair ($\lVert\Delta(f)\rVert$ heals — never triggered
+   in normal play, §8.2). Run `planNativeFlipCompletion` ($\lVert f'\rVert/2$ flips
+   on the post-heal residual $f'$). Result: strict solved (Theorem 3).
+
+Both phases are deterministic and Phase 2's cost is exact:
+$\lVert\Delta(f)\rVert$ heals $+\ \lVert f'\rVert/2$ flips.
+
+## 8. Implementation audit
+
+The Phase-2 theory rests on two empirical facts about the code. Both are here
+discharged repository-wide.
+
+### 8.1 Identity immutability (closes the Lemma 3 residual)
+
+A repository-wide search for writers of `orig`, `origPos`, `origDir` across
+`src/` finds exactly two, neither a mutation of an existing identity:
+
+- `src/game/cubeState.js:13–18` — construction (`makeCubies`), the sole assignment
+  of identity fields.
+- `src/game/cubeState.js:48` — `clone3D` copies `origPos` **by value**, preserving it.
+
+No reorientation, serialisation, undo, or scramble path rewrites identity fields.
+Whole-cube reorientation and undo operate by moving or deep-copying records
+(`clone3D` preserves `origPos`), never by rebasing identity. Lemma 3 therefore
+holds repository-wide, not merely within `src/game`.
+
+### 8.2 Colour-mutation coherence and β-pairing (closes admissibility and Δ≡0)
+
+A repository-wide search for writers of `curr` finds, outside tests, exactly these
+mutations — every one either heal or an α-flip on a β-pair:
+
+| Site | Operation | Coherent (α or heal) | β-paired |
+|---|---|---|---|
+| `cubeState.js:37` (`healSticker`) | `curr = orig` | heal | — |
+| `manifoldLogic.js:211` (`flipStickerPair`) | `curr = α(curr)` | α | yes (`findAntipodalStickerByGrid`) |
+| `chaosSim.js:160,181` | `curr = α(curr)` | α | yes (pair loop) |
+| `useChaosWorker.js:46,79` | `curr = α(curr)` | α | yes (`findAntipodalStickerByGrid`, :54–56) |
+| `MainMenu.jsx:382,385` | `curr = α(curr)` | α | yes (`MENU_FLIP_PAIRS`, antipodal) |
+
+Two consequences follow:
+
+- **Admissibility is invariant.** `curr` starts at `orig` and every mutation maps
+  the fibre $\{\mathrm{orig},\alpha(\mathrm{orig})\}$ to itself (heal → `orig`,
+  α-flip → the other member). So every reachable state is admissible, discharging
+  §4.3.
+- **Δ ≡ 0 is invariant.** Every flip toggles a full β-pair $\{s,\beta(s)\}$, an
+  element of $\ker\Delta$. So $\Delta(f)=0$ for every state reached by play, and by
+  the Corollary of §6.2 heal never fires in normal operation.
+
+Both facts are properties of the current code; a future colour-mutating feature
+that painted non-antipodally, or flipped a non-β pair, would reopen the
+corresponding item, which is why the `isAdmissible` gate and the $\Delta$
+computation in `planNativeFlipCompletion` are retained rather than optimised away.
+
+## 9. Open problems
+
+1. **Full quotient.** Whether the $X/\langle\alpha_{\mathrm{col}},A\rangle$ win
+   condition of §3.3 admits a two-phase solve, and what its Phase-2 invariant is.
+   The geometric action $A$ moves slots, so the identity-indexed triviality of
+   §3.2 does not transfer; this is the one setting where a
+   conjugation-style slot analysis genuinely applies.
+2. **Positioning follow-up.** A comparative note against MagicTile-class geometric
+   quotients (§2), stating the state-quotient / solver-reuse pattern as a general
+   recipe: lift to the classical cover, solve the base with commodity tools, clear
+   the fibre obstruction linearly.
+
+## 10. Summary
+
+Wormhole flips are not damage to be reset away but a second, structured generator
+acting on the colour fibre of a standard cube. Because flips move nothing (Lemma
+1) and identity fields survive everything (Lemma 2, Lemma 3, discharged repo-wide
+in §8.1), the state factors: unmodified Kociemba solves the permutation factor on
+`orig`-normalised facelets of any admissible state (Theorem 1), reaching the
+κ-solved half-quotient outright (Theorem 2), and the flip factor is a
+27-dimensional F₂-linear problem whose complete invariant is the per-pair
+asymmetry $\Delta(f)$ (Theorem 3): clearable iff symmetric, in exactly ‖f‖/2
+native flips, with heal required exactly and only on asymmetric pairs — and, by
+the audit of §8.2, never in normal play. The pairing's identity-indexed
+semantics, the single fact on which all of this stands, is pinned to the
+implementation by code citation.
+
+## Code map
 
 | Concept | Symbol | Code |
 |---|---|---|
-| Antipodal involution | $\alpha$ | `ANTIPODAL_COLOR` (`utils/constants.js`) |
-| Antipodal class rep. | $\kappa$ | `colorClass` (`game/winDetection.js`) |
-| Normalised facelets | $\rho$ | `cubiesToKociembaString(_, { ignoreFlips: true })` |
-| Strict solved | — | `checkRubiksSolved` |
-| Quotient solved | — | `checkRubiksSolvedAntipodal` |
+| Antipodal colour involution | α | `ANTIPODAL_COLOR` (`utils/constants.js`) |
+| κ-class representative | κ | `colorClass` (`game/winDetection.js`) |
+| Antipodal identity pairing | β | `findAntipodalStickerByGrid` (`game/manifoldLogic.js`) |
+| Admissibility predicate | — | `isAdmissible` (`game/kociembaAdapter.js`) |
+| Normalised facelets | ρ | `cubiesToKociembaString(_, { ignoreFlips: true })` |
+| Strict / κ solved | — | `checkRubiksSolved` / `checkRubiksSolvedAntipodal` |
 | Phase 1 (positions) | $g$ | `useKociembaSolver` → `kociemba-wasm` |
-| Residual set | $R$, $f$ | `flipResiduals` (`game/antipodalSolver.js`) |
-| Phase 2 plan | $h$ | `planStrictCompletion` / `applyStrictCompletion` |
-| Residual weight | $\lVert f\rVert$ | `residualWeight` |
-| Paired flip | $\varphi$, $\beta$ | `flipStickerPair` / `findAntipodalStickerByGrid` (`game/manifoldLogic.js`) |
-| Single-pair operator | $\varphi$ | `antipodalPairFlip` (`game/antipodalSolver.js`) |
+| Residual set / vector | $R$, $f$ | `flipResiduals` (`game/antipodalSolver.js`) |
+| Single-pair flip | $\varphi$ | `antipodalPairFlip` |
 | Native-flip Phase 2 | — | `planNativeFlipCompletion` / `applyNativeFlipCompletion` |
 | Heal | $\eta$ | `healSticker` (`game/cubeState.js`) |
-| Antipodal echo turns | — | `game/antipodalMode.js` |
 
-Tests: `src/__tests__/kociembaAdapter.test.js` (flip-tolerant $\rho$),
-`src/__tests__/winDetection.test.js` (quotient solved),
-`src/__tests__/antipodalSolver.test.js` (Phase 2 correctness).
+Tests: `src/__tests__/kociembaAdapter.test.js` (flip-tolerant ρ; admissibility
+rejection of count-balanced damage), `src/__tests__/winDetection.test.js`
+(κ-solved), `src/__tests__/antipodalSolver.test.js` (Phase 2 correctness; native
+paired-flip completion; asymmetric heal fallback).
 
 ---
 
-## 9. Summary
+## Appendix — Revision history
 
-Wormhole flips are not damage to be reset away but a second, structured
-generator of the cube's symmetry. Because a flip only toggles a sticker between
-`orig` and $\alpha(\mathrm{orig})$ and never moves a piece (Lemma 1) while
-`orig` records the flip-invariant identity (Lemma 2), piece positions survive
-any amount of flipping and are recoverable by unmodified Kociemba (Theorem 1).
-Phase 1 thereby solves the RP² quotient puzzle outright (Theorem 2); Phase 2
-clears residual parity to reach the classical strict solution (Theorem 3).
-Because residual parity modulo the antipodal-symmetric subspace is conserved by
-every rotation and flip (Theorem 5), Phase 2 also runs in the game's own
-moves: the native paired flip *is* the clean single-pair operator, it clears
-every in-play residual in half the ops of healing (Proposition 4), and the
-single-sticker heal is the only operator that can break antipodal symmetry —
-needed solely to repair externally-induced asymmetry. What remains genuinely
-open is purely optimisational: shortest native-move words (via the reversed-echo
-turns of `antipodalMode.js`) for repositioning a target pair to a preferred flip
-site.
+This paper was developed through an adversarial review process; the record is
+kept because one revision embedded a subtle, fully-rigorous error whose only
+detector was the source code.
+
+- **Initial draft.** Established the two-phase method: flip-invariance (Lemmas
+  1–2), position recovery by unmodified Kociemba (Theorem 1), the κ-solved
+  half-quotient (Theorem 2), and heal-based Phase 2 (Theorem 3, heal form). Three
+  defects, all corrected later: (a) admissibility was filtered by the
+  nine-of-each colour count, which is necessary but not sufficient; (b) the
+  Phase-1 length was stated as "≤ 20 (Kociemba bound)", conflating God's Number
+  (the group diameter) with single-pass two-phase output; (c) the κ notion was
+  called "the honest RP² notion", overstating a design choice.
+
+- **Adversarial review (retracted).** A review inferred, from the prose alone,
+  that the native pairing β was *position*-indexed and therefore conjugated by
+  rotations ($\beta_x=\pi_x^{-1}\beta_0\pi_x$), and built an internally consistent
+  correction on that premise: a (ℤ/2)⁵ orbit-type grading in place of the coset
+  invariant, a rotation-conjugated `conjugatedPairFlip`, a completeness theorem, a
+  setup-word minimisation problem, and a Blossom-matching formulation of flip
+  scheduling. Every proof was valid *conditional on that premise*. The premise is
+  an empirical claim about the code, and it is **false**:
+  `findAntipodalStickerByGrid` computes the partner from immutable identity fields
+  (`orig`, `origPos`, `origDir`), not from current position. The entire apparatus
+  is withdrawn (§6.3). The review's three secondary corrections were genuine and
+  are retained: the admissibility predicate (§4), the length claim (§5.3), and the
+  half-quotient framing (§3.3).
+
+- **Reconciliation and audit (this paper).** The identity-indexed parity theory is
+  restored and stated over identities, pinned to the implementation by Lemma 3
+  with file-and-line citations. The two conditions the theory depends on are
+  discharged repository-wide in §8: identity fields are written only at
+  construction (§8.1), and every in-game colour mutation is a heal or an α-flip on
+  a β-pair (§8.2), which makes admissibility invariant and heal dead code in
+  normal play. The remaining open items are the full state-level quotient (Open
+  Problem 1) and a positioning note (Open Problem 2).
+
+Two standing rules came out of this process and govern the paper:
+
+1. **Implementation claims carry code citations.** Any lemma whose truth depends
+   on what the code does cites file and line. A formalisation of a program that
+   does not cite the program is a formalisation of a guess.
+2. **Documents do not arbitrate documents.** When two rigorous analyses disagree
+   about implementation semantics, neither is evidence; the repository is. The
+   §8 audit is that arbitration carried out in full.
+
+*Test status at publication: 650/650 passing, lint clean.*
