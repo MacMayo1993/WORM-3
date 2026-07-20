@@ -48,6 +48,7 @@ export function useDemoMode({
   const size = useGameStore((s) => s.size);
   const victory = useGameStore((s) => s.victory);
 
+  const [demoColdOpenVisible, setDemoColdOpenVisible] = useState(false);
   const [demoStepIntroVisible, setDemoStepIntroVisible] = useState(false);
   const [demoForecastVisible, setDemoForecastVisible] = useState(false);
   const [demoTryVisible, setDemoTryVisible] = useState(false);
@@ -239,11 +240,19 @@ export function useDemoMode({
     try { localStorage.setItem(PRE_DEMO_SETTINGS_KEY, JSON.stringify(store.settings)); } catch { /* private mode */ }
     store.startDemo();
     applyDemoSettings();
-    // Pre-stage the first step's cube so Mobi's intro blurs the right scene
+    // Pre-stage the first step's cube so Mobi's cold-open blurs the right scene
     // (otherwise the menu's 3×3 lingers behind the dialogue until Start).
     applyDemoStepConfig('baby-cube');
-    setDemoStepIntroVisible(true);
+    // Cold open first: Mobi frames the "every tile has a twin" idea before the
+    // player touches anything, then hands off to the baby-cube step intro.
+    setDemoColdOpenVisible(true);
   }, [clearDemoWatchTimers, applyDemoSettings, applyDemoStepConfig]);
+
+  // Cold open dismissed → drop into the first step's intro.
+  const handleDemoColdOpenContinue = useCallback(() => {
+    setDemoColdOpenVisible(false);
+    setDemoStepIntroVisible(true);
+  }, []);
 
   const advanceDemoStep = useCallback((fromStep) => {
     const store = useGameStore.getState();
@@ -341,6 +350,7 @@ export function useDemoMode({
     setDemoCelebrationStep(null);
     setDemoLaunchStep(null);
     setDemoTryVisible(false);
+    setDemoColdOpenVisible(false);
     setDemoStepIntroVisible(false);
     setDemoForecastVisible(false);
     setDemoCoachCopy(null);
@@ -371,7 +381,7 @@ export function useDemoMode({
     store.startDemo();
     applyDemoSettings();
     applyDemoStepConfig('baby-cube');
-    setDemoStepIntroVisible(true);
+    setDemoColdOpenVisible(true);
   }, [cleanupAllDemoState, applyDemoSettings, applyDemoStepConfig]);
 
   const handleDemoFreeplay = useCallback(() => {
@@ -619,6 +629,8 @@ export function useDemoMode({
   return {
     demoMode,
     demoStep,
+    demoColdOpenVisible,
+    handleDemoColdOpenContinue,
     demoStepIntroVisible,
     demoTryVisible,
     demoForecastVisible,

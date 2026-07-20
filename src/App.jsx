@@ -54,10 +54,11 @@ import { setSharedRenderer, tickPreviews, hasActivePreviews } from './3d/TilePre
 // UI components
 import WelcomeScreen from './components/screens/WelcomeScreen.jsx';
 import Tutorial from './components/screens/Tutorial.jsx';
-import {
+import MobiIntroScreen, {
   MOBI_LINES_WORM, MOBI_LINES_FREEPLAY, MOBI_LINES_RANDOM,
   MOBI_LINES_TEACH, MOBI_LINES_HOLONOMY, MOBI_LINES_COOP,
   MOBI_LINES_BIOME, MOBI_LINES_MERGE, MOBI_LINES_CHAOS,
+  MOBI_LINES_DEMO_INTRO,
 } from './components/screens/MobiIntroScreen.jsx';
 import { UI_FONT } from './utils/uiTheme.js';
 import ScreenTransition from './components/ScreenTransition.jsx';
@@ -481,6 +482,7 @@ export default function WORM3() {
   // Demo mode — all state, handlers, and effects for the guided demo flow.
   const {
     demoMode, demoStep,
+    demoColdOpenVisible, handleDemoColdOpenContinue,
     demoStepIntroVisible, demoTryVisible, demoForecastVisible, demoCoachCopy,
     onTapFlipRef,
     handleStartDemo, handleDemoStepContinue, advanceDemoStep,
@@ -1409,9 +1411,20 @@ export default function WORM3() {
       )}
 
       {/* Demo mode overlays */}
-      {demoMode && <DemoProgressBar currentStep={demoStep} />}
+      {demoMode && !demoColdOpenVisible && <DemoProgressBar currentStep={demoStep} />}
       {demoMode && demoCelebrationStep && <DemoStepComplete step={demoCelebrationStep} onDismiss={dismissDemoCelebration} />}
       {demoMode && demoLaunchStep && !demoCelebrationStep && <DemoStepLaunch step={demoLaunchStep} />}
+      {/* Cold open: Mobi frames the twin concept before the first step. */}
+      <ScreenTransition show={!!(demoMode && demoColdOpenVisible)} freezeOnExit>
+        <MobiIntroScreen
+          lines={MOBI_LINES_DEMO_INTRO}
+          modeName="Demo"
+          primaryLabel="▶ Let's Go"
+          skipLabel="Skip Intro"
+          onComplete={handleDemoColdOpenContinue}
+          onSkip={handleDemoColdOpenContinue}
+        />
+      </ScreenTransition>
       <ScreenTransition show={!!(demoMode && demoStepIntroVisible && demoStep && demoStep !== 'end')} freezeOnExit>
         <DemoStepIntro step={demoStep} onContinue={handleDemoStepContinue} onSkip={() => advanceDemoStep(demoStep)} />
       </ScreenTransition>

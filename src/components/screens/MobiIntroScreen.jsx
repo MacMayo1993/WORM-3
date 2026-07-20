@@ -9,6 +9,16 @@ import { UI_FONT, HAND_FONT } from '../../utils/uiTheme.js';
 
 // ── Dialogue banks ────────────────────────────────────────────────────────────
 
+// Demo cold open — the framing beat before step 1. Sets up the game's one
+// core promise (opposite tiles are twins) so the player twists the first cube
+// knowing why, then hands off to the interactive steps.
+export const MOBI_LINES_DEMO_INTRO = [
+  "Aloha! I'm Mobi.",
+  "This looks like an ordinary cube — but it's hiding something.",
+  "Every tile has a secret twin on the opposite side.",
+  "Let me show you how it works. Then you pick where to play.",
+];
+
 export const MOBI_LINES_WORM = [
   "Aloha! I'm a Multi Orientable Block Intelligence...",
   "...but you can call me Mobi for short!",
