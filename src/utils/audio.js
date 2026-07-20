@@ -75,3 +75,26 @@ export const vibrate = (ms = 18) => {
     } catch (_) {}
   }
 };
+
+/**
+ * Layered flip haptic — a three-act pattern that mirrors the visual flip:
+ *   1. seize      a short grab tap the instant the tile is taken (t≈0)
+ *   2. crossing   a pulse as the tile collapses through the manifold seam (t≈250ms)
+ *   3. snap       the strongest pulse as it OVERSHOOTS back into place (t≈410ms)
+ *
+ * The pattern is [buzz, pause, buzz, pause, buzz] in ms, timed to the ~0.5s squish.
+ * The crossing and snap pulses grow with the tile's flip count, so a tile straining
+ * near its cap snaps back with a harder kick you can actually feel.
+ *
+ * navigator.vibrate cancels any in-flight pattern, so during a chaos burst the last
+ * flip's pattern wins rather than stacking — which reads as a single settling buzz.
+ */
+export const vibrateFlip = (flips = 0, flipCap = 6) => {
+  if (typeof navigator === 'undefined' || !('vibrate' in navigator)) return;
+  const danger = flipCap > 0 ? Math.min(1, Math.max(0, flips / flipCap)) : 0;
+  const cross = Math.round(14 + danger * 10); // 14 → 24 ms
+  const snap = Math.round(26 + danger * 24); //  26 → 50 ms
+  try {
+    navigator.vibrate([8, 235, cross, 150, snap]);
+  } catch (_) {}
+};
