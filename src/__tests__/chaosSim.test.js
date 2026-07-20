@@ -140,6 +140,33 @@ describe('createChaosSim', () => {
     expect(sim.getMetrics().deadTiles).toBe(52);
   });
 
+  it('emits an authoritative terminal snapshot containing only one live antipodal pair', () => {
+    const sim = createChaosSim({ cubies: makeCubies(3), size: 3, chaosLevel: 5, flipCap: 2 });
+    let terminal = null;
+
+    for (let i = 0; i < 2000 && !terminal; i++) {
+      const tick = sim.chainTick(250);
+      if (tick?.winner) terminal = tick;
+      sim.conwayTick();
+    }
+
+    expect(terminal?.winner).toHaveLength(2);
+    expect(terminal?.finalState).toBe(sim.getState());
+
+    const liveIds = [];
+    for (const layer of terminal.finalState) {
+      for (const row of layer) {
+        for (const cubie of row) {
+          for (const sticker of Object.values(cubie.stickers)) {
+            if ((sticker.flips || 0) < 2) liveIds.push(getManifoldGridId(sticker, 3));
+          }
+        }
+      }
+    }
+    expect(liveIds).toEqual(expect.arrayContaining(terminal.winner));
+    expect(liveIds).toHaveLength(2);
+  });
+
   it('survives mid-round rotations with the ledger intact', () => {
     const { sim, deaths, winner } = runRound({ level: 4, flipCap: 3, rotateEveryMs: 1500 });
     expect(sim.isFinished()).toBe(true);

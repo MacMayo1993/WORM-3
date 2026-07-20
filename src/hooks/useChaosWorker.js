@@ -141,7 +141,7 @@ export function useChaosWorker({
         return;
       }
       if (e.data.type !== 'TICK') return;
-      const { flips, cascades, recoveries, deaths, eliminatedFaces, winner, metrics } = e.data.payload;
+      const { flips, cascades, recoveries, deaths, eliminatedFaces, winner, finalState, metrics } = e.data.payload;
 
       if (flips?.length > 0 || recoveries?.length > 0) {
         // Compose against the LATEST store state via the functional updater —
@@ -202,6 +202,13 @@ export function useChaosWorker({
       }
 
       if (winner?.length) {
+        // Make the visible cube match the worker's authoritative terminal
+        // state before opening the result screen. Normal TICK operations are
+        // applied incrementally above for animation, but React can defer those
+        // commits under load; replacing with this final snapshot prevents the
+        // game from announcing one antipodal pair while stale live tiles are
+        // still rendered.
+        if (finalState) setCubies(finalState);
         // Flush any lingering bolt visuals when the winner pair is finalized.
         setCascades([]);
         const finalWinner = winner;
