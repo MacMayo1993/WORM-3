@@ -57,8 +57,10 @@ export function useDemoMode({
   const [demoViewSpotlight, setDemoViewSpotlight] = useState(false);
   const [demoCelebrationStep, setDemoCelebrationStep] = useState(null);
   const [demoLaunchStep, setDemoLaunchStep] = useState(null);
+  const [demoRewardStamp, setDemoRewardStamp] = useState(null);
 
   const demoForecastPickRef = useRef(null);
+  const demoRewardPendingRef = useRef(false);
   const preDemoSettingsRef = useRef(null);
   const demoWatchTimers = useRef([]);
   const onTapFlipRef = useRef(null);
@@ -347,6 +349,8 @@ export function useDemoMode({
   const cleanupAllDemoState = useCallback((store) => {
     clearDemoWatchTimers();
     restoreWormCharacter();
+    demoRewardPendingRef.current = false;
+    setDemoRewardStamp(null);
     setDemoCelebrationStep(null);
     setDemoLaunchStep(null);
     setDemoTryVisible(false);
@@ -495,17 +499,31 @@ export function useDemoMode({
     advanceDemoStep('view-showcase');
   }, [demoShowcaseSubStep, advanceDemoStep]);
 
-  const handleDemoChaosSkip = useCallback(() => {
-    setDemoForecastVisible(false);
-    demoForecastPickRef.current = null;
+  // Award the Parity Points, flash the reward stamp (same launch-stamp text
+  // treatment as a new step), then advance once it clears. The pending ref
+  // blocks the showDisparityWinner safety-net below from advancing early and
+  // stealing the stamp — this is the single path that closes the chaos step.
+  const finishChaosWithReward = useCallback((reward, correct) => {
     const store = useGameStore.getState();
+    demoRewardPendingRef.current = true;
+    setDemoForecastVisible(false);
+    setDemoRewardStamp({ amount: reward, correct });
+    store.earnCoins(reward);
     store.setShowDisparityWinner(false);
     store.clearDisparityGame();
     store.setChaosLevel(0);
     cancelDisparityRun();
-    store.earnCoins(50);
-    advanceDemoStepRef.current?.('chaos-forecast');
+    demoForecastPickRef.current = null;
+    demoWatchTimers.current.push(setTimeout(() => {
+      setDemoRewardStamp(null);
+      demoRewardPendingRef.current = false;
+      advanceDemoStepRef.current?.('chaos-forecast');
+    }, 2600));
   }, [cancelDisparityRun]);
+
+  const handleDemoChaosSkip = useCallback(() => {
+    finishChaosWithReward(50, false);
+  }, [finishChaosWithReward]);
 
   const handleDemoDisparityDismiss = useCallback(() => {
     if (!demoMode || demoStep !== 'chaos-forecast') return;
@@ -517,13 +535,8 @@ export function useDemoMode({
       return m ? parseInt(m[1], 10) : 0;
     }) || [];
     const correct = pick && pick.faceIds.some((f) => winnerFaceIds.includes(f));
-    const reward = correct ? 200 : 50;
-    store.earnCoins(reward);
-    store.clearDisparityGame();
-    store.setChaosLevel(0);
-    demoForecastPickRef.current = null;
-    advanceDemoStep('chaos-forecast');
-  }, [demoMode, demoStep, advanceDemoStep]);
+    finishChaosWithReward(correct ? 200 : 50, correct);
+  }, [demoMode, demoStep, finishChaosWithReward]);
 
   // ── Effects ──────────────────────────────────────────────────────────────
 
@@ -615,6 +628,9 @@ export function useDemoMode({
       (s) => s.showDisparityWinner,
       (show, prev) => {
         if (prev && !show) {
+          // The normal payout path (finishChaosWithReward) holds a reward
+          // stamp before advancing; don't race past it here.
+          if (demoRewardPendingRef.current) return;
           const s = useGameStore.getState();
           if (s.demoMode && s.demoStep === 'chaos-forecast') {
             s.clearDisparityGame();
@@ -649,6 +665,7 @@ export function useDemoMode({
     demoCelebrationStep,
     dismissDemoCelebration,
     demoLaunchStep,
+    demoRewardStamp,
     demoViewSpotlight,
     handleDemoViewSpotlightClick,
     handleDemoShowcaseNext,

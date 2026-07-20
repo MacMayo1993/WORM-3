@@ -740,6 +740,23 @@ const DemoStepLaunch = ({ step }) => {
   );
 };
 
+// Chaos payout: announces the Parity Points won using the same launch-stamp
+// text treatment as DemoStepLaunch, so the reward reads with the same weight
+// as a new step arriving. `correct` distinguishes a nailed forecast (200) from
+// the consolation grant (50).
+const DemoRewardStamp = ({ amount, correct }) => {
+  ensureDemoShellStyle();
+  return (
+    <div className="demo-beat-root demo-beat-root--upper" aria-live="polite">
+      <div className="demo-beat-flash" />
+      <div className="demo-launch-stamp">
+        <p className="demo-beat-sub">{correct ? 'Forecast Correct' : 'Parity Points Won'}</p>
+        <h2 className="demo-beat-title">+{amount} PP</h2>
+      </div>
+    </div>
+  );
+};
+
 // Shown before the view sequence starts: the Views tile on the bottom nav bar
 // pulses (see BottomNavBar `spotlightViews`) and this hint asks for the tap
 // that kicks off the first view.
@@ -821,6 +838,7 @@ export {
   DemoWormControlHint,
   DemoStepComplete,
   DemoStepLaunch,
+  DemoRewardStamp,
   VIEW_SHOWCASE_SEQUENCE,
   TRY_COPY,
   DEMO_STEPS,

@@ -82,7 +82,7 @@ const DemoEndScreen = React.lazy(() => import('./components/screens/DemoEndScree
 const DemoForecastPicker = React.lazy(() => import('./components/screens/DemoForecastPicker.jsx'));
 import {
   DemoProgressBar, DemoStepIntro, DemoCoach, DemoViewShowcase,
-  DemoViewSpotlightHint, DemoWormControlHint, DemoStepComplete, DemoStepLaunch
+  DemoViewSpotlightHint, DemoWormControlHint, DemoStepComplete, DemoStepLaunch, DemoRewardStamp
 } from './components/screens/DemoFlowController.jsx';
 
 
@@ -490,7 +490,7 @@ export default function WORM3() {
     handleDemoForecastPick, handleDemoChaosSkip, handleDemoDisparityDismiss,
     demoShowcaseSubStep, handleDemoShowcaseNext, handleDemoShowcaseSkip,
     demoViewSpotlight, handleDemoViewSpotlightClick,
-    demoCelebrationStep, dismissDemoCelebration, demoLaunchStep,
+    demoCelebrationStep, dismissDemoCelebration, demoLaunchStep, demoRewardStamp,
   } = useDemoMode({
     cancelShuffle, changeSize, setRotatedCubies, reset,
     cancelDisparityRun, startDisparityGame,
@@ -1414,6 +1414,7 @@ export default function WORM3() {
       {demoMode && !demoColdOpenVisible && <DemoProgressBar currentStep={demoStep} />}
       {demoMode && demoCelebrationStep && <DemoStepComplete step={demoCelebrationStep} onDismiss={dismissDemoCelebration} />}
       {demoMode && demoLaunchStep && !demoCelebrationStep && <DemoStepLaunch step={demoLaunchStep} />}
+      {demoMode && demoRewardStamp && <DemoRewardStamp amount={demoRewardStamp.amount} correct={demoRewardStamp.correct} />}
       {/* Cold open: Mobi frames the twin concept before the first step. */}
       <ScreenTransition show={!!(demoMode && demoColdOpenVisible)} freezeOnExit>
         <MobiIntroScreen
