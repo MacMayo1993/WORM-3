@@ -38,7 +38,7 @@ export function useUndo(startAnimation) {
       if (turns === 1) {
         // Single-turn: use the animation path so the visual snaps back smoothly.
         // isUndo:true tells handleAnimComplete to skip moves/history tracking.
-        startAnimation(axis, -dir, sliceIndex, false, true);
+        startAnimation(axis, -dir, sliceIndex, true);
         // Remove from history and decrement move counter now — handleAnimComplete
         // handles the cubie update later when the animation finishes.
         popFromHistory();

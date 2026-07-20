@@ -33,8 +33,6 @@ import RotationPreview from './overlays/RotationPreview.jsx';
 import FaceRotationButtons from './overlays/FaceRotationButtons.jsx';
 import TileRotationSelector from './overlays/TileRotationSelector.jsx';
 import HandsOverlay from './overlays/HandsOverlay.jsx';
-import AntipodalModeHUD from './overlays/AntipodalModeHUD.jsx';
-import EchoRotationIndicator from './overlays/EchoRotationIndicator.jsx';
 import DisparityHUD from './overlays/DisparityHUD.jsx';
 import HealerWormHUD from './overlays/HealerWormHUD.jsx';
 import MobiusHUD from '../worm/MobiusHUD.jsx';
@@ -656,8 +654,6 @@ export default function UILayer({
         />
       )}
 
-      {!wormHealerMode && <AntipodalModeHUD />}
-      {!wormHealerMode && <EchoRotationIndicator />}
 
       <ScreenTransition show={showDevConsole} freezeOnExit>
         <Suspense fallback={null}>

@@ -10,14 +10,6 @@ import { useGameStore } from './useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { rotateSliceCubies } from '../game/cubeRotation.js';
 import { play, vibrate } from '../utils/audio.js';
-import gsap from 'gsap';
-import {
-  getAntipodalSliceIndex,
-  getReverseDirection,
-  shouldTriggerEcho,
-  generateEchoId,
-  getAntipodalFaceInfo,
-} from '../game/antipodalMode.js';
 
 /**
  * Hook for animation management
@@ -30,10 +22,6 @@ export function useAnimation() {
     setAnimState,
     setPendingMove,
     clearAnimation,
-    antipodalMode,
-    echoDelay,
-    addPendingEchoRotation,
-    removePendingEchoRotation,
   } = useGameStore(
     useShallow(s => ({
       size: s.size,
@@ -42,16 +30,10 @@ export function useAnimation() {
       setAnimState: s.setAnimState,
       setPendingMove: s.setPendingMove,
       clearAnimation: s.clearAnimation,
-      antipodalMode: s.antipodalMode,
-      echoDelay: s.echoDelay,
-      addPendingEchoRotation: s.addPendingEchoRotation,
-      removePendingEchoRotation: s.removePendingEchoRotation,
     }))
   );
 
   const pendingMoveRef = useRef(null);
-  const echoTimeoutsRef = useRef([]);
-  const echoQueueRef = useRef([]);
 
   // Shuffle animation queue
   const shuffleQueueRef = useRef([]);
@@ -62,11 +44,11 @@ export function useAnimation() {
   const shuffleIdRef = useRef(0);
 
   // Start a new animation (atomic: animState and pendingMove set in one render)
-  const startAnimation = useCallback((axis, dir, sliceIndex, isEcho = false, isUndo = false) => {
-    const move = { axis, dir, sliceIndex, isEcho, isUndo };
+  const startAnimation = useCallback((axis, dir, sliceIndex, isUndo = false) => {
+    const move = { axis, dir, sliceIndex, isUndo };
     pendingMoveRef.current = move;
     useGameStore.setState({
-      animState: { axis, dir, sliceIndex, t: 0, isEcho },
+      animState: { axis, dir, sliceIndex, t: 0 },
       pendingMove: move,
     });
   }, []);
@@ -102,7 +84,7 @@ export function useAnimation() {
     // the ref is null — this is safe because getState() is always fresh.
     const pm = pendingMoveRef.current ?? useGameStore.getState().pendingMove;
     if (pm) {
-      const { axis, dir, sliceIndex, isEcho, isShuffle, isUndo } = pm;
+      const { axis, dir, sliceIndex, isShuffle, isUndo } = pm;
 
       if (isUndo) {
         // Undo rotation: apply the inverse move to cubies, clear animation.
@@ -126,7 +108,7 @@ export function useAnimation() {
           pendingMoveRef.current = null;
           return;
         }
-        // Shuffle move: commit silently — no moves counter, no undo history, no echo.
+        // Shuffle move: commit silently — no moves counter, no undo history.
         play('/sounds/rotate.mp3', 0.6);
         vibrate(12);
         useGameStore.setState((state) => ({
@@ -160,83 +142,21 @@ export function useAnimation() {
       // cubies update and the animation-end signal are atomic: no React render can fire
       // between them, preventing a frame where new sticker colours appear at old (rotated)
       // mesh positions (the "colour glitch after rotations").
-      if (!isEcho) {
-        const numTurns = pm.numTurns ?? 1;
-        play('/sounds/rotate.mp3');
-        useGameStore.setState((state) => {
-          let c = state.cubies;
-          for (let i = 0; i < numTurns; i++) c = rotateSliceCubies(c, size, axis, sliceIndex, dir);
-          return {
-            cubies: c,
-            rotationEpoch: state.rotationEpoch + 1,
-            lastRotation: { axis, sliceIndex, dir, numTurns },
-            moves: state.moves + numTurns,
-            moveHistory: [...state.moveHistory, { type: 'rotation', axis, dir, sliceIndex, numTurns, timestamp: Date.now() }].slice(-10),
-            animState: null,
-            pendingMove: null,
-          };
-        });
-      } else {
-        // Echo rotation - quieter sound; only bump cubies + reversalCount
-        play('/sounds/rotate.mp3', 0.7);
-        useGameStore.setState((state) => ({
-          cubies: rotateSliceCubies(state.cubies, size, axis, sliceIndex, dir),
+      const numTurns = pm.numTurns ?? 1;
+      play('/sounds/rotate.mp3');
+      useGameStore.setState((state) => {
+        let c = state.cubies;
+        for (let i = 0; i < numTurns; i++) c = rotateSliceCubies(c, size, axis, sliceIndex, dir);
+        return {
+          cubies: c,
           rotationEpoch: state.rotationEpoch + 1,
-          lastRotation: { axis, sliceIndex, dir },
-          reversalCount: state.reversalCount + 1,
+          lastRotation: { axis, sliceIndex, dir, numTurns },
+          moves: state.moves + numTurns,
+          moveHistory: [...state.moveHistory, { type: 'rotation', axis, dir, sliceIndex, numTurns, timestamp: Date.now() }].slice(-10),
           animState: null,
           pendingMove: null,
-        }));
-      }
-
-      // Trigger antipodal echo rotation if mode is enabled and this is NOT already an echo
-      if (!isEcho && antipodalMode && shouldTriggerEcho(axis, sliceIndex, size)) {
-        const antipodalSlice = getAntipodalSliceIndex(axis, sliceIndex, size);
-        const reverseDir = getReverseDirection(dir);
-        const echoId = generateEchoId();
-        const faceInfo = getAntipodalFaceInfo(axis, sliceIndex, size);
-
-        // Add to pending echo rotations (for visualization)
-        addPendingEchoRotation({
-          id: echoId,
-          axis,
-          dir: reverseDir,
-          sliceIndex: antipodalSlice,
-          originalSlice: sliceIndex,
-          faceInfo,
-          startTime: Date.now(),
-        });
-
-        // Schedule echo rotation ANIMATION with delay
-        const timeoutId = gsap.delayedCall(echoDelay, () => {
-          // Check CURRENT animation state (not closure-captured state)
-          const currentAnimState = useGameStore.getState().animState;
-
-          // If there's an active animation, queue this echo
-          if (currentAnimState) {
-            echoQueueRef.current.push({ axis, dir: reverseDir, sliceIndex: antipodalSlice, echoId });
-          } else {
-            // Start the echo animation
-            startAnimation(axis, reverseDir, antipodalSlice, true);
-            // Remove from pending after animation starts
-            setTimeout(() => removePendingEchoRotation(echoId), 100);
-          }
-
-          // Remove from timeouts list
-          echoTimeoutsRef.current = echoTimeoutsRef.current.filter(t => t !== timeoutId);
-        });
-
-        echoTimeoutsRef.current.push(timeoutId);
-      }
-
-      // Process queued echo if any
-      if (echoQueueRef.current.length > 0 && !isEcho) {
-        const nextEcho = echoQueueRef.current.shift();
-        setTimeout(() => {
-          startAnimation(nextEcho.axis, nextEcho.dir, nextEcho.sliceIndex, true);
-          removePendingEchoRotation(nextEcho.echoId);
-        }, 50);
-      }
+        };
+      });
     } else {
       // No pending move — clear animation state as a safety net.
       clearAnimation();
@@ -245,11 +165,6 @@ export function useAnimation() {
   }, [
     size,
     clearAnimation,
-    antipodalMode,
-    echoDelay,
-    addPendingEchoRotation,
-    removePendingEchoRotation,
-    startAnimation,
   ]);
 
   // Handle move initiation (from UI interactions).
@@ -277,7 +192,7 @@ export function useAnimation() {
         };
       });
     }
-  }, [startAnimation, size]);
+  }, [startAnimation]);
 
   return {
     // State

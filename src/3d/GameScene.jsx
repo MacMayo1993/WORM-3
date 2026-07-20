@@ -19,7 +19,6 @@ import NebulaEnvironment from './NebulaEnvironment.jsx';
 import { getLevelBackground } from './LifeJourneyBackgrounds.jsx';
 import { BACKGROUNDS, getBackgroundUrl } from '../utils/backgrounds.js';
 import LayerHighlight from '../teach/LayerHighlight.jsx';
-import AntipodalModeEffects from './AntipodalModeEffects.jsx';
 import AntipodalPairHighlight from './AntipodalPairHighlight.jsx';
 import WormholeWarpFX from './WormholeWarpFX.jsx';
 import AntipodalPiP from './AntipodalPiP.jsx';
@@ -314,7 +313,6 @@ export default function GameScene({
           />
         )}
 
-        <AntipodalModeEffects />
         <AntipodalPairHighlight />
 
         {wormHealerMode && (
