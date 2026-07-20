@@ -3,11 +3,13 @@ import { BACKGROUNDS, getBackgroundUrl } from '../../utils/backgrounds.js';
 import {
   UI_FONT,
   PAPER_BACKDROP, PAPER_BACKDROP_BLUR,
-  PAPER_SHEET, PAPER_SHEET_RAISED, PAPER_BORDER, PAPER_BORDER_SOFT,
+  PAPER_SHEET_RAISED, PAPER_BORDER, PAPER_BORDER_SOFT,
   PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT,
-  PAPER_FOOTER_BG, PAPER_BG_MUTED, PAPER_CARD_SHADOW, PAPER_SHADOW,
+  PAPER_BG_MUTED, PAPER_CARD_SHADOW, PAPER_SHADOW,
 } from '../../utils/uiTheme.js';
 import { BG_PREVIEWS } from '../../utils/bgPreviews.js';
+import { wizardPaperBackground, WIZARD_FOOTER_BG, WizardPreviewNote } from './WizardChrome.jsx';
+import { WIZARD_PREVIEW } from '../../utils/demoStepCopy.js';
 
 const BG_OPTIONS = BACKGROUNDS.map(bg => ({
   value: bg.id,
@@ -36,10 +38,10 @@ const S = {
     animation: 'modalBackdropIn 0.22s ease',
   },
   sheet: {
-    background: PAPER_SHEET, borderRadius: '20px', width: 'min(560px, 96vw)',
+    ...wizardPaperBackground, borderRadius: '20px', width: 'min(560px, 96vw)',
     maxHeight: '88vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
     boxShadow: PAPER_SHADOW,
-    border: '1px solid #cec8be', animation: 'modalSheetIn 0.30s cubic-bezier(0.22, 1, 0.36, 1)',
+    border: '1px solid #cec8be', borderTop: `3px solid ${ACCENT}`, animation: 'modalSheetIn 0.30s cubic-bezier(0.22, 1, 0.36, 1)',
   },
   header: { padding: '28px 32px 0', flexShrink: 0 },
   dot: (active, current) => ({
@@ -78,7 +80,7 @@ const S = {
   }),
   footer: {
     padding: '16px 32px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    flexShrink: 0, borderTop: '1px solid #d6d0c8', background: PAPER_FOOTER_BG,
+    flexShrink: 0, borderTop: '1px solid #d6d0c8', background: WIZARD_FOOTER_BG,
   },
   btnSecondary: {
     background: 'none', border: '1.5px solid #d6d0c8', fontSize: '15px', fontWeight: '500',
@@ -196,6 +198,7 @@ const RandomModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           </div>
           <h2 style={S.title}>{stepTitles[step]}</h2>
           <p style={S.subtitle}>{stepSubtitles[step]}</p>
+          <WizardPreviewNote accent={ACCENT} text={WIZARD_PREVIEW.random} />
         </div>
 
         <div style={S.body}>
