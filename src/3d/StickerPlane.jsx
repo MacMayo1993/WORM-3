@@ -39,6 +39,9 @@ const _sharedStickerGeo = new THREE.PlaneGeometry(0.85, 0.85);
 const _bulgeStickerGeo = new THREE.PlaneGeometry(0.85, 0.85, 24, 24);
 // Slightly larger plane for the worm-mode rim glow — extends the halo beyond the tile edge.
 const _wormRimGlowGeo = new THREE.PlaneGeometry(1.05, 1.05);
+// Neon worm-border plane — sits in the grid-line channel just outside the sticker so the
+// glowing square outline traces the tile's own perimeter (like the neon view mode).
+const _neonBorderGeo = new THREE.PlaneGeometry(0.94, 0.94);
 // Circular alpha map — clips the base sticker mesh to a disc matching the overlay shader
 // radius (smoothstep 0.44→0.50 in UV space).  Using alphaTest instead of transparent
 // avoids depth-sorting issues and is unaffected by the biome-mode code that explicitly
@@ -481,6 +484,82 @@ const wispyRingFragmentShader = `
 `;
 
 
+// ─── Neon worm-border shader ──────────────────────────────────────────────────
+// Replaces the old solid parity ring. Lights up the SQUARE outer edge of the tile
+// like the neon view mode, then sends a handful of bright "light-worms" chasing one
+// another around the perimeter. Each worm is a white-hot head with a trailing comet
+// tail; they wiggle as they slither and speed up as the tile's flip count climbs
+// toward its cap (uFlipRatio), so a strained tile's border races frantically.
+const neonBorderVertexShader = `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const neonBorderFragmentShader = `
+  uniform vec3  uColor;      // antipodal ("other side") color of the displaced tile
+  uniform float uTime;       // shared wispyTime — advances every frame
+  uniform float uFlipRatio;  // flips / cap → worms race faster & burn hotter near death
+  varying vec2  vUv;
+
+  #define TAU 6.28318530718
+
+  void main() {
+    vec2 p = vUv - 0.5;              // -0.5 .. 0.5
+    vec2 a = abs(p);
+    float m = max(a.x, a.y);
+    float edgeDist = 0.5 - m;        // 0 at the square edge, grows inward
+    if (edgeDist > 0.16) discard;    // only the border band is ever lit
+
+    // Perimeter coordinate s ∈ [0,1) running clockwise around the square.
+    float s;
+    if (p.y >= a.x)       s = (p.x + 0.5) * 0.25;          // top    L→R  0.00–0.25
+    else if (p.x >= a.y)  s = 0.25 + (0.5 - p.y) * 0.25;   // right  T→B  0.25–0.50
+    else if (-p.y >= a.x) s = 0.50 + (0.5 - p.x) * 0.25;   // bottom R→L  0.50–0.75
+    else                  s = 0.75 + (p.y + 0.5) * 0.25;   // left   B→T  0.75–1.00
+
+    // Band hugging the edge; its thickness wiggles along its length + over time so
+    // the tube looks alive rather than a static rectangle.
+    float wig = 1.0 + 0.35 * sin(s * TAU * 6.0 - uTime * 5.0);
+    float bw  = 0.052 * wig;
+    float band = 1.0 - smoothstep(0.0, bw, edgeDist);
+
+    // Dim continuous neon tube around the whole square.
+    float baseGlow = band * 0.28;
+
+    // Chasing light-worms: bright heads + comet tails racing around the loop. Each
+    // worm runs a touch faster than the one ahead so they visibly chase and bunch;
+    // the whole pack accelerates with flip count.
+    const int N = 3;
+    float speed   = 0.09 + uFlipRatio * 0.60;  // laps / sec: calm → frantic
+    float headLen = 0.045;
+    float tailLen = 0.10;
+    float worms = 0.0;
+    for (int i = 0; i < N; i++) {
+      float fi = float(i);
+      float sp = speed * (1.0 + fi * 0.10);                 // faster ⇒ catches the next
+      float head = fract(fi / float(N) + uTime * sp);
+      head = fract(head + 0.006 * sin(uTime * 9.0 + fi * 2.0)); // slither wiggle
+      float sd = fract(s - head + 0.5) - 0.5;               // signed wrap distance
+      float h = exp(-(sd * sd) / (headLen * headLen));      // glowing head
+      float tail = sd < 0.0 ? exp(sd / tailLen) * 0.55 : 0.0; // comet tail behind it
+      worms += max(h, tail);
+    }
+    worms = clamp(worms, 0.0, 1.4) * band;
+
+    float glow = baseGlow + worms;
+    // Colored tube, white-hot at the worm heads. Hotter overall as the tile nears death.
+    vec3 col = uColor * (0.9 + 0.7 * uFlipRatio);
+    col = mix(col, vec3(1.0), clamp(worms - 0.45, 0.0, 1.0) * 0.7);
+
+    float alpha = clamp(glow, 0.0, 1.0);
+    if (alpha < 0.004) discard;
+    gl_FragColor = vec4(col * 1.6, alpha);
+  }
+`;
+
 // Ghost worms that lazily orbit a dead tile's tombstone.
 // The orbit group sits at mid-tombstone height so the worms circle the stone body.
 function TombstoneGhost() {
@@ -575,6 +654,14 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     uLens: { value: 0.0 },
     uFlipRatio: { value: 0.0 }, // flips / flipCap — drives glow strength + pulse speed
   }));
+  // Neon worm-border — glowing square outline with light-worms chasing around it.
+  // Replaces the old solid parity ring. Shares wispyTime so it animates every frame.
+  const neonBorderMatRef = useRef();
+  const [neonBorderUniforms] = React.useState(() => ({
+    uColor: { value: new THREE.Color() },
+    uTime: wispyTime, // shared reference — updated once per frame externally
+    uFlipRatio: { value: 0.0 },
+  }));
   // Worm-mode rim glow — heartbeat ring on flipped tiles in worm healer mode
   const wormRimGroupRef = useRef();
   const wormRimMatRef = useRef();
@@ -596,6 +683,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       eyelidMatRef.current?.dispose(); // eslint-disable-line react-hooks/exhaustive-deps
       spinRevealMatRef.current?.dispose(); // eslint-disable-line react-hooks/exhaustive-deps
       wispyRingMatRef.current?.dispose(); // eslint-disable-line react-hooks/exhaustive-deps
+      neonBorderMatRef.current?.dispose(); // eslint-disable-line react-hooks/exhaustive-deps
       wormRimMatRef.current?.dispose(); // eslint-disable-line react-hooks/exhaustive-deps
     };
   }, []);
@@ -1436,6 +1524,11 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       wispyRingMatRef.current.uniforms.uLens.value = (meta?.flips > 0 && meta?.curr !== meta?.orig) ? 1.0 : 0.0;
       wispyRingMatRef.current.uniforms.uFlipRatio.value = effectiveFlipCap > 0 ? Math.min(1, (meta?.flips ?? 0) / effectiveFlipCap) : 0;
     }
+    // Keep neon worm-border color + speed/heat in sync with tile state.
+    if (neonBorderMatRef.current) {
+      neonBorderMatRef.current.uniforms.uColor.value.set(antipodalHexRef.current ?? materialColor);
+      neonBorderMatRef.current.uniforms.uFlipRatio.value = effectiveFlipCap > 0 ? Math.min(1, (meta?.flips ?? 0) / effectiveFlipCap) : 0;
+    }
   }, [isInstanceable, materialColor, renderTexture, tileStyle, meta?.curr, meta?.flips]);
   const isWormhole = meta?.flips > 0 && meta?.curr !== meta?.orig;
   const hasFlipHistory = meta?.flips > 0;
@@ -1613,21 +1706,24 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         />
       </mesh>
 
-      {/* Parity ring — only shown when flips is ODD (curr !== orig), meaning the tile is
-          currently showing its antipodal face. Even flips = back to origin = no ring.
-          Briefly flares bright at each flip midpoint.
-          Colored with the ANTIPODAL scheme color of the displayed face (= the tile's
-          origin color on odd flips) and normal-blended: the old same-color additive
-          ring saturated against its own tile and read as plain white. */}
+      {/* Neon worm-border — replaces the old solid parity ring. A glowing SQUARE outline
+          traced on the tile's own perimeter (like the neon view mode), with bright
+          light-worms chasing one another around it. They wiggle as they slither and race
+          faster as the tile nears its flip cap. Shown only while the tile is displaced
+          (odd parity). Additive so it reads as neon over the dark cube frame.
+          NOTE: ringRef stays declared — the flip midpoint/pulse code still references
+          ringRef.current under null guards, so those branches simply no-op. */}
       {!isDead && !isSudokube && isWormhole && (
-        <mesh ref={ringRef} position={[0, 0, 0.003]} renderOrder={2}>
-          <ringGeometry args={[0.40, 0.52, 48]} />
-          <meshBasicMaterial
-            color={antipodalHex ?? baseColor}
+        <mesh position={[0, 0, 0.006]} renderOrder={2}>
+          <primitive object={_neonBorderGeo} attach="geometry" />
+          <shaderMaterial
+            ref={neonBorderMatRef}
+            vertexShader={neonBorderVertexShader}
+            fragmentShader={neonBorderFragmentShader}
+            uniforms={neonBorderUniforms}
             transparent
-            opacity={0.85}
             depthWrite={false}
-            side={THREE.DoubleSide}
+            blending={THREE.AdditiveBlending}
           />
         </mesh>
       )}
