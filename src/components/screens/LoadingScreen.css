@@ -212,7 +212,13 @@
 .wl-sticker {
   position: relative;
   border-radius: 16%;
-  background: var(--wl-c);
+  /* Longhand (not the `background` shorthand) so an inline background-image — the
+     rendered tile-style texture — layers over the face colour without resetting
+     background-size. */
+  background-color: var(--wl-c);
+  background-size: cover;
+  background-position: center;
+  overflow: hidden;
   /* Glossy bevel: bright inner top-left, dark inner bottom-right + drop. */
   box-shadow: inset 0 2px 3px rgba(255, 255, 255, 0.45), inset 0 -3px 4px rgba(0, 0, 0, 0.32),
     0 1px 2px rgba(0, 0, 0, 0.4);

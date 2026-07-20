@@ -219,3 +219,27 @@ export function unregisterTilePreview(id) {
   registry.delete(id);
   maybeStopLoop();
 }
+
+/** True once the main R3F renderer has been shared (i.e. the <Canvas> is up). */
+export function hasSharedRenderer() {
+  return _usingShared && !!renderer;
+}
+
+/**
+ * One-shot: render a tile style to a PNG data URL using the shared main renderer.
+ * Returns null when the shared renderer isn't available yet (e.g. before the main
+ * <Canvas> mounts) so callers can fall back to a plain look. Never creates a
+ * second WebGL context, so it stays safe on mobile — unlike a standalone canvas.
+ */
+export function renderTileImage(styleKey, colorHex, size = 96) {
+  if (!hasSharedRenderer() || !_renderTarget) return null;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  try {
+    renderToCanvas(styleKey, colorHex, simTime, canvas);
+    return canvas.toDataURL();
+  } catch {
+    return null;
+  }
+}
