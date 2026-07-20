@@ -65,6 +65,9 @@ import ScreenTransition from './components/ScreenTransition.jsx';
 // Static (not lazy): a Suspense fallback must be present the instant a lazy
 // chunk starts loading, so the loading cube cannot itself live in a lazy chunk.
 import LoadingScreen from './components/screens/LoadingScreen.jsx';
+// Covers a mode transition with the loading cube while the scene's env map /
+// textures decode. Reads drei's useProgress, so it must stay outside <Canvas>.
+import SceneLoadingGate from './components/screens/SceneLoadingGate.jsx';
 const ParityStoreScreen = React.lazy(() => import('./components/screens/ParityStoreScreen.jsx'));
 const GameScene = React.lazy(() => import('./3d/GameScene.jsx'));
 const UILayer = React.lazy(() => import('./components/UILayer.jsx'));
@@ -413,6 +416,11 @@ export default function WORM3() {
   // load only: once dismissed it never returns.
   const [bootCover, setBootCover] = useState(true);
   const [bootCoverLeaving, setBootCoverLeaving] = useState(false);
+
+  // Mode-transition cover: bump this token when a mode is revealed to arm the
+  // SceneLoadingGate, which covers the scene with the loading cube while its
+  // environment map / textures decode (only if a decode is actually in flight).
+  const [sceneGateToken, setSceneGateToken] = useState(0);
   const bootStartRef = useRef(performance.now());
   const bootDoneRef = useRef(false);
   const finishBootCover = useCallback(() => {
@@ -800,6 +808,9 @@ export default function WORM3() {
     const action = pendingMobiAction.current;
     pendingMobiAction.current = null;
     action?.();
+    // Mode scene is now revealed — arm the gate so the cube covers any env-map /
+    // texture decode still in flight (it self-dismisses if nothing is loading).
+    setSceneGateToken((t) => t + 1);
   }, []);
 
   const handleWormWizardCancel = useCallback(() => {
@@ -1210,6 +1221,10 @@ export default function WORM3() {
           welcome overlay (9999) so it hides the WebGL warm-up and intro chrome
           until the scene is up, then fades. */}
       {bootCover && <LoadingScreen label="Loading WORM³" leaving={bootCoverLeaving} style={{ zIndex: 10000 }} />}
+      {/* Mode-transition cover: sits above the game HUD / FX (≤9990) but below the
+          Mobi dialogue (10500), so it fills the gap after Mobi while the scene's
+          background decodes. Self-dismisses when nothing is loading. */}
+      <SceneLoadingGate armToken={sceneGateToken} label={mobiModeName || 'Loading'} style={{ zIndex: 9996 }} />
       <ScreenTransition show={showTutorial && !showWelcome}>
         <Tutorial onClose={closeTutorial} onMainMenu={() => { closeTutorial(); handleBackToMainMenu(); }} />
       </ScreenTransition>

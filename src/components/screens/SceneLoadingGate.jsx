@@ -1,26 +1,20 @@
 // src/components/screens/SceneLoadingGate.jsx
 /**
- * SceneLoadingGate — drives <LoadingScreen> from live Three.js asset progress.
+ * SceneLoadingGate — covers the scene with the loading cube while its Three.js
+ * assets (the 20–26MB environment map, GLBs, textures) actually decode, then
+ * dissolves. This is the fix for "backgrounds loading in" on a mode transition.
  *
- * This is the reusable fix for "backgrounds loading in": the heavy pieces of a
- * mode entry are the environment map (a 20–26MB EXR) and any GLB/texture the
- * scene pulls. drei funnels every one of those through a global loading store
- * exposed by useProgress(), which is readable from ordinary DOM components — so
- * this gate can sit as a sibling of the <Canvas> and cover the scene until the
- * assets have actually decoded, then dissolve.
+ * drei funnels every texture/EXR/GLB load through a global store exposed by
+ * useProgress(), which is readable from ordinary DOM components — so this gate
+ * sits as a sibling of the <Canvas> and reads the decode progress directly.
  *
- * It is deliberately *armed* by the parent (`active`) rather than watching
- * useProgress() unconditionally. A blanket watcher would flash the cover every
- * time a tiny texture streams in mid-game; arming it only during an intended
- * transition keeps it to the moments the player expects a loading beat.
- *
- * Contract:
- *   - Parent sets `active` true when a scene transition begins (mode entry, a
- *     background swap, returning to a heavy scene).
- *   - Parent sets `active` false when the transition's own timeline ends (e.g.
- *     the Mobi intro completes, or a "scene mounted" callback fires). The gate
- *     then guarantees a minimum on-screen time and fades out.
- *   - `onHidden` fires after the fade, once the cover is fully gone.
+ * Arm it by bumping `armToken` to a new value at the moment the scene is
+ * revealed (e.g. when a Mobi intro finishes). On arm it PROBES briefly: it only
+ * commits to showing if a decode is genuinely in flight (or starts within
+ * probeMs). A transition whose assets are already cached therefore never flashes
+ * a redundant cover. Once shown it holds until the decode settles (with a
+ * min-show floor so it reads as intentional) or maxVisibleMs elapses — a hard
+ * cap so it can never get stuck on screen.
  */
 
 import React, { useEffect, useRef, useState } from 'react';
@@ -28,69 +22,106 @@ import { useProgress } from '@react-three/drei';
 import LoadingScreen from './LoadingScreen.jsx';
 
 export default function SceneLoadingGate({
-  active,
+  armToken,
   label = 'Loading',
   transparent = false,
   showTitle = true,
-  minVisibleMs = 450,
-  fadeMs = 450,
-  onHidden
+  minVisibleMs = 650,
+  probeMs = 500,
+  maxVisibleMs = 12000,
+  fadeMs = 480,
+  style
 }) {
-  const { progress, active: assetsLoading } = useProgress();
-  const [rendered, setRendered] = useState(active);
-  const [leaving, setLeaving] = useState(false);
-  const shownAtRef = useRef(0);
-  const timersRef = useRef([]);
+  const prog = useProgress();
+  const progRef = useRef(prog);
+  progRef.current = prog;
 
-  const clearTimers = () => {
-    timersRef.current.forEach(clearTimeout);
-    timersRef.current = [];
-  };
+  const [visible, setVisible] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const sess = useRef({ token: undefined, poll: null, fade: null, armedAt: 0, shownAt: 0, shown: false });
 
   useEffect(() => {
-    if (active) {
-      // Arm: show immediately and cancel any in-flight fade-out.
-      clearTimers();
-      setLeaving(false);
-      setRendered(true);
-      shownAtRef.current = performance.now();
-      return;
+    const s = sess.current;
+    // Falsy token (0/null/undefined) means "not armed yet" — only a fresh,
+    // truthy value starts a cover session.
+    if (!armToken || armToken === s.token) return;
+    s.token = armToken;
+    if (s.poll) clearInterval(s.poll);
+    if (s.fade) clearTimeout(s.fade);
+    s.fade = null;
+    s.armedAt = performance.now();
+    s.shownAt = 0;
+    s.shown = false;
+    setLeaving(false);
+    setVisible(false);
+
+    const end = () => {
+      if (s.poll) {
+        clearInterval(s.poll);
+        s.poll = null;
+      }
+      if (!s.shown) return; // never showed → nothing to fade out
+      setLeaving(true);
+      s.fade = setTimeout(() => {
+        setLeaving(false);
+        setVisible(false);
+      }, fadeMs);
+    };
+
+    // If a decode is already in flight at arm time (the common case — the env
+    // map started loading behind the wizard/Mobi dialogue), show immediately so
+    // there's no one-frame gap between the dialogue closing and the cover.
+    {
+      const { active, progress } = progRef.current;
+      if (active && progress < 100) {
+        s.shown = true;
+        s.shownAt = s.armedAt;
+        setVisible(true);
+      }
     }
-    if (!rendered) return;
-    // Disarm: honor the minimum visible window, then fade and unmount.
-    const elapsed = performance.now() - shownAtRef.current;
-    const wait = Math.max(0, minVisibleMs - elapsed);
-    clearTimers();
-    timersRef.current.push(
-      setTimeout(() => {
-        setLeaving(true);
-        timersRef.current.push(
-          setTimeout(() => {
-            setRendered(false);
-            setLeaving(false);
-            onHidden?.();
-          }, fadeMs)
-        );
-      }, wait)
-    );
+
+    // Poll drei's decode progress. Reading a ref avoids restarting the loop on
+    // every progress tick while still seeing the latest values.
+    s.poll = setInterval(() => {
+      const { active, progress } = progRef.current;
+      const now = performance.now();
+      if (!s.shown) {
+        if (active && progress < 100) {
+          // A real decode is in flight — commit to covering it.
+          s.shown = true;
+          s.shownAt = now;
+          setVisible(true);
+        } else if (now - s.armedAt >= probeMs) {
+          end(); // nothing to wait for; never flash the cover
+        }
+        return;
+      }
+      const elapsed = now - s.shownAt;
+      const settled = !active || progress >= 100;
+      if ((settled && elapsed >= minVisibleMs) || now - s.armedAt >= maxVisibleMs) end();
+    }, 100);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, rendered, minVisibleMs, fadeMs]);
+  }, [armToken]);
 
-  useEffect(() => clearTimers, []);
+  useEffect(
+    () => () => {
+      const s = sess.current;
+      if (s.poll) clearInterval(s.poll);
+      if (s.fade) clearTimeout(s.fade);
+    },
+    []
+  );
 
-  if (!rendered) return null;
-
-  // While assets are still streaming, show live progress; once decoded, switch to
-  // an indeterminate pulse so the bar never sticks at a number during the fade.
-  const showProgress = assetsLoading && progress < 100;
-
+  if (!visible) return null;
+  const { active, progress } = prog;
   return (
     <LoadingScreen
       label={label}
       showTitle={showTitle}
       transparent={transparent}
       leaving={leaving}
-      progress={showProgress ? progress : null}
+      progress={active && progress < 100 ? progress : null}
+      style={style}
     />
   );
 }
