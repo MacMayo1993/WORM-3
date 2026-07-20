@@ -1,21 +1,20 @@
 // src/components/screens/LoadingScreen.jsx
 /**
- * LoadingScreen — the WORM³ loading cube.
+ * LoadingScreen — the WORM³ loading cube levitating over a black-hole portal.
  *
- * A lightweight, full-screen cover shown while a heavy mode/scene loads, so the
- * player never watches chunks parse or a 20MB environment map "pop in". It is
- * intentionally pure CSS (see LoadingScreen.css): no second WebGL context to
- * collide with the app's single R3F <Canvas>, and no canvas RAF loop to steal
- * CPU from the very decode it is covering.
+ * A full-screen cover shown while a heavy mode/scene loads, so the player never
+ * watches chunks parse or a 20MB environment map "pop in". The 3D cube is pure
+ * CSS; beneath it, LoadingPortal draws a spinning vortex on a 2D <canvas> (2D,
+ * not WebGL, so it never competes for a WebGL context with the app's R3F canvas).
  *
- * The 3D CSS cube uses the real game palette and antipodal face layout
- * (Red↔Orange, Green↔Blue, White↔Yellow on opposite faces — see constants.js).
+ * The cube uses the real game palette and antipodal face layout (Red↔Orange,
+ * Green↔Blue, White↔Yellow on opposite faces — see constants.js).
  *
  * Props:
  *   label       — status line, e.g. "Entering Worm Mode". Default "Loading".
  *   sublabel    — kept for API symmetry; currently rendered as the label when set.
  *   progress    — 0–100 for a determinate bar; omit/null for an indeterminate one.
- *   showTitle   — render the WORM³ title card (default true).
+ *   showTitle   — render the WORM³ title card (default false).
  *   transparent — let the scene behind show through a blurred scrim (default false).
  *   leaving     — fade the cover out (parent drives this before unmount).
  *   style       — extra styles merged onto the root (z-index overrides, etc.).
@@ -23,6 +22,7 @@
 
 import React from 'react';
 import { UI_FONT, DISPLAY_FONT } from '../../utils/uiTheme.js';
+import LoadingPortal from './LoadingPortal.jsx';
 import './LoadingScreen.css';
 
 const FACES = ['f-white', 'f-yellow', 'f-red', 'f-orange', 'f-green', 'f-blue'];
@@ -41,7 +41,7 @@ export default function LoadingScreen({
   label = 'Loading',
   sublabel,
   progress = null,
-  showTitle = true,
+  showTitle = false,
   transparent = false,
   leaving = false,
   style
@@ -73,14 +73,16 @@ export default function LoadingScreen({
         </div>
       )}
 
-      <div className="wl-stage">
-        <div className="wl-cube">
-          {FACES.map((cls) => (
-            <Face key={cls} cls={cls} />
-          ))}
+      <div className="wl-scene">
+        <div className="wl-stage">
+          <div className="wl-cube">
+            {FACES.map((cls) => (
+              <Face key={cls} cls={cls} />
+            ))}
+          </div>
         </div>
+        <LoadingPortal />
       </div>
-      <div className="wl-shadow" />
 
       <div className="wl-status">
         <p className="wl-label">
