@@ -509,6 +509,10 @@ export function useDemoMode({
   // blocks the showDisparityWinner safety-net below from advancing early and
   // stealing the stamp — this is the single path that closes the chaos step.
   const finishChaosWithReward = useCallback((reward, correct) => {
+    // The stamp holds for 2.6s before the step advances, so the step guard no
+    // longer stops a second trigger (e.g. a double-click on the winner's
+    // Continue) from re-granting PP. The pending ref is the idempotency lock.
+    if (demoRewardPendingRef.current) return;
     const store = useGameStore.getState();
     demoRewardPendingRef.current = true;
     setDemoForecastVisible(false);
