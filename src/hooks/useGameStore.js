@@ -603,7 +603,7 @@ export const useGameStore = create(
     // ========================================================================
     // ANIMATION STATE
     // ========================================================================
-    animState: null, // { axis, dir, sliceIndex, t, isEcho? }
+    animState: null, // { axis, dir, sliceIndex, t }
     pendingMove: null,
 
     setAnimState: (animState) => set({ animState }),
@@ -726,46 +726,6 @@ export const useGameStore = create(
     teachModeActive: false,
 
     setTeachModeActive: (teachModeActive) => set({ teachModeActive }),
-
-    // ========================================================================
-    // ANTIPODAL MODE - "Mirror Quotient" (Enhanced RP² Dynamics)
-    // ========================================================================
-    antipodalMode: false,
-    echoDelay: 0.2,              // Delay before antipodal rotation (seconds)
-    reversalCount: 0,             // Total antipodal rotations triggered
-    echoSync: 100,                // Echo synchronization percentage
-    antipodalVizIntensity: 'medium', // 'low', 'medium', 'high'
-    pendingEchoRotations: [],     // Queue of pending echo rotations
-
-    setAntipodalMode: (antipodalMode) => set({ antipodalMode }),
-    setEchoDelay: (echoDelay) => set({ echoDelay }),
-    setReversalCount: (reversalCount) => set(typeof reversalCount === 'function'
-      ? (state) => ({ reversalCount: reversalCount(state.reversalCount) })
-      : { reversalCount }),
-    setEchoSync: (echoSync) => set({ echoSync }),
-    setAntipodalVizIntensity: (antipodalVizIntensity) => set({ antipodalVizIntensity }),
-    setPendingEchoRotations: (pendingEchoRotations) => set({ pendingEchoRotations }),
-
-    toggleAntipodalMode: () => set((state) => ({
-      antipodalMode: !state.antipodalMode,
-      reversalCount: !state.antipodalMode ? 0 : state.reversalCount,
-    })),
-
-    incrementReversalCount: () => set((state) => ({ reversalCount: state.reversalCount + 1 })),
-
-    addPendingEchoRotation: (rotation) => set((state) => ({
-      pendingEchoRotations: [...state.pendingEchoRotations, rotation]
-    })),
-
-    removePendingEchoRotation: (id) => set((state) => ({
-      pendingEchoRotations: state.pendingEchoRotations.filter(r => r.id !== id)
-    })),
-
-    resetAntipodalStats: () => set({
-      reversalCount: 0,
-      echoSync: 100,
-      pendingEchoRotations: [],
-    }),
 
     // ========================================================================
     // DEMO MODE

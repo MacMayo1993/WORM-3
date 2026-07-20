@@ -5,6 +5,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { cubiesToKociembaString } from '../game/kociembaAdapter.js';
+import { reorientToHome } from '../game/cubeReorient.js';
 import { parseAlgorithm } from './algorithms.js';
 
 export function useKociembaSolver(cubies, size) {
@@ -89,15 +90,21 @@ export function useKociembaSolver(cubies, size) {
     try {
       const { solve: kociembaSolve } = await import('kociemba-wasm');
       if (sid !== solveIdRef.current) return; // a newer solve started while WASM was loading
+      // Kociemba is a fixed-centre solver — its face turns can never move a
+      // centre. If the cube's centres have been rotated out of home (via slice
+      // moves or antipodal echo), first reorient the whole cube so centres are
+      // home, then solve. The reorientation slice moves are prepended to playback.
+      const { moves: reorientMoves, cubies: cubiesHome } = reorientToHome(cubies, 3);
       // ignoreFlips: wormhole-flipped tiles (showing their antipode) are read by
       // their true identity, so a flipped cube still yields a solvable position.
-      const cubeStr = cubiesToKociembaString(cubies, { ignoreFlips: true });
+      const cubeStr = cubiesToKociembaString(cubiesHome, { ignoreFlips: true });
       if (!cubeStr) throw new Error('Cannot solve: cube has non-flip sticker damage (manifold / chaos recolour). Reset to a clean state first.');
       const sol = await kociembaSolve(cubeStr);
       if (sid !== solveIdRef.current) return; // a newer solve started while kociemba was computing
       const trimmed = (sol || '').trim();
       // Filter identity moves (kociemba can return no-ops for solved cube)
-      const parsed = trimmed ? parseAlgorithm(trimmed, 3) : [];
+      const kociembaMoves = trimmed ? parseAlgorithm(trimmed, 3) : [];
+      const parsed = [...reorientMoves, ...kociembaMoves];
       setSolutionStr(trimmed);
       setMoves(parsed);
       movesRef.current = parsed;
