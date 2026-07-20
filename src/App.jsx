@@ -82,7 +82,7 @@ const DemoEndScreen = React.lazy(() => import('./components/screens/DemoEndScree
 const DemoForecastPicker = React.lazy(() => import('./components/screens/DemoForecastPicker.jsx'));
 import {
   DemoProgressBar, DemoStepIntro, DemoCoach, DemoViewShowcase,
-  DemoViewSpotlightHint, DemoStepComplete, DemoStepLaunch
+  DemoViewSpotlightHint, DemoWormControlHint, DemoStepComplete, DemoStepLaunch
 } from './components/screens/DemoFlowController.jsx';
 
 
@@ -1440,6 +1440,11 @@ export default function WORM3() {
         <Suspense fallback={null}>
           <DemoForecastPicker onPick={handleDemoForecastPick} onSkip={handleDemoChaosSkip} />
         </Suspense>
+      )}
+      {/* Worm-step steer hint — shows during active play, before the skip pill. */}
+      {demoMode && demoStep === 'worm-traversal' && !demoColdOpenVisible &&
+        !demoStepIntroVisible && !demoLaunchStep && !demoTryVisible && !demoCelebrationStep && (
+        <DemoWormControlHint />
       )}
       <ScreenTransition show={!!(demoMode && demoStep === 'view-showcase' && demoViewSpotlight && !demoStepIntroVisible)} freezeOnExit>
         <DemoViewSpotlightHint onSkip={handleDemoShowcaseSkip} />

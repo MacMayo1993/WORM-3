@@ -366,6 +366,38 @@ const ensureDemoShellStyle = () => {
       letter-spacing: 0.03em;
       box-shadow: 0 6px 14px rgba(95, 127, 74, 0.28);
     }
+
+    /* Worm control hint — non-blocking pill during early worm-step play.
+       Sits above the bottom-docked progress/coach pills; fades out once the
+       player makes progress (first tunnel) or the skip pill appears. */
+    .demo-worm-hint {
+      position: fixed;
+      left: 50%;
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 196px);
+      transform: translateX(-50%);
+      z-index: 11000;
+      width: min(320px, calc(100vw - 40px));
+      padding: 10px 16px;
+      border-radius: 14px;
+      background: rgba(250, 247, 238, 0.94);
+      border: 1px solid rgba(111, 126, 86, 0.25);
+      box-shadow: 0 10px 26px rgba(40, 48, 32, 0.22);
+      color: #26331f;
+      font-family: ${UI_FONT};
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.4;
+      text-align: center;
+      pointer-events: none;
+      animation: demo-worm-hint-in 0.4s ease both;
+    }
+
+    .demo-worm-hint strong { font-weight: 800; color: #3f5730; }
+
+    @keyframes demo-worm-hint-in {
+      from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+      to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
   `;
   document.head.appendChild(style);
 };
@@ -733,6 +765,18 @@ const DemoViewSpotlightHint = ({ onSkip }) => {
   );
 };
 
+// Worm-step control hint: the healer worm crawls on its own and shows no
+// controls of its own, so the demo names the steer gesture while the player
+// plays. Non-interactive; the parent unmounts it once the worm makes progress.
+const DemoWormControlHint = () => {
+  ensureDemoShellStyle();
+  return (
+    <div className="demo-worm-hint" role="status" aria-live="polite">
+      The worm crawls on its own — <strong>swipe ← →</strong> (or arrow keys) to steer it toward orbs and tunnels.
+    </div>
+  );
+};
+
 const DemoViewShowcase = ({ subStep, onNext, onSkip }) => {
   ensureDemoShellStyle();
   const entry = VIEW_SHOWCASE_SEQUENCE[subStep];
@@ -774,6 +818,7 @@ export {
   DemoCoach,
   DemoViewShowcase,
   DemoViewSpotlightHint,
+  DemoWormControlHint,
   DemoStepComplete,
   DemoStepLaunch,
   VIEW_SHOWCASE_SEQUENCE,
