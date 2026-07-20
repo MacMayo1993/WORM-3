@@ -54,10 +54,11 @@ import { setSharedRenderer, tickPreviews, hasActivePreviews } from './3d/TilePre
 // UI components
 import WelcomeScreen from './components/screens/WelcomeScreen.jsx';
 import Tutorial from './components/screens/Tutorial.jsx';
-import {
+import MobiIntroScreen, {
   MOBI_LINES_WORM, MOBI_LINES_FREEPLAY, MOBI_LINES_RANDOM,
   MOBI_LINES_TEACH, MOBI_LINES_HOLONOMY, MOBI_LINES_COOP,
   MOBI_LINES_BIOME, MOBI_LINES_MERGE, MOBI_LINES_CHAOS,
+  MOBI_LINES_DEMO_INTRO,
 } from './components/screens/MobiIntroScreen.jsx';
 import { UI_FONT } from './utils/uiTheme.js';
 import ScreenTransition from './components/ScreenTransition.jsx';
@@ -81,7 +82,7 @@ const DemoEndScreen = React.lazy(() => import('./components/screens/DemoEndScree
 const DemoForecastPicker = React.lazy(() => import('./components/screens/DemoForecastPicker.jsx'));
 import {
   DemoProgressBar, DemoStepIntro, DemoCoach, DemoViewShowcase,
-  DemoViewSpotlightHint, DemoStepComplete, DemoStepLaunch
+  DemoViewSpotlightHint, DemoWormControlHint, DemoFlipProgress, DemoStepComplete, DemoStepLaunch, DemoRewardStamp
 } from './components/screens/DemoFlowController.jsx';
 
 
@@ -481,6 +482,7 @@ export default function WORM3() {
   // Demo mode — all state, handlers, and effects for the guided demo flow.
   const {
     demoMode, demoStep,
+    demoColdOpenVisible, handleDemoColdOpenContinue,
     demoStepIntroVisible, demoTryVisible, demoForecastVisible, demoCoachCopy,
     onTapFlipRef,
     handleStartDemo, handleDemoStepContinue, advanceDemoStep,
@@ -488,7 +490,7 @@ export default function WORM3() {
     handleDemoForecastPick, handleDemoChaosSkip, handleDemoDisparityDismiss,
     demoShowcaseSubStep, handleDemoShowcaseNext, handleDemoShowcaseSkip,
     demoViewSpotlight, handleDemoViewSpotlightClick,
-    demoCelebrationStep, dismissDemoCelebration, demoLaunchStep,
+    demoCelebrationStep, dismissDemoCelebration, demoLaunchStep, demoRewardStamp, demoFlipProgress,
   } = useDemoMode({
     cancelShuffle, changeSize, setRotatedCubies, reset,
     cancelDisparityRun, startDisparityGame,
@@ -1409,9 +1411,21 @@ export default function WORM3() {
       )}
 
       {/* Demo mode overlays */}
-      {demoMode && <DemoProgressBar currentStep={demoStep} />}
+      {demoMode && !demoColdOpenVisible && <DemoProgressBar currentStep={demoStep} />}
       {demoMode && demoCelebrationStep && <DemoStepComplete step={demoCelebrationStep} onDismiss={dismissDemoCelebration} />}
       {demoMode && demoLaunchStep && !demoCelebrationStep && <DemoStepLaunch step={demoLaunchStep} />}
+      {demoMode && demoRewardStamp && <DemoRewardStamp amount={demoRewardStamp.amount} correct={demoRewardStamp.correct} />}
+      {/* Cold open: Mobi frames the twin concept before the first step. */}
+      <ScreenTransition show={!!(demoMode && demoColdOpenVisible)} freezeOnExit>
+        <MobiIntroScreen
+          lines={MOBI_LINES_DEMO_INTRO}
+          modeName="Demo"
+          primaryLabel="▶ Let's Go"
+          skipLabel="Skip Intro"
+          onComplete={handleDemoColdOpenContinue}
+          onSkip={handleDemoColdOpenContinue}
+        />
+      </ScreenTransition>
       <ScreenTransition show={!!(demoMode && demoStepIntroVisible && demoStep && demoStep !== 'end')} freezeOnExit>
         <DemoStepIntro step={demoStep} onContinue={handleDemoStepContinue} onSkip={() => advanceDemoStep(demoStep)} />
       </ScreenTransition>
@@ -1428,6 +1442,16 @@ export default function WORM3() {
           <DemoForecastPicker onPick={handleDemoForecastPick} onSkip={handleDemoChaosSkip} />
         </Suspense>
       )}
+      {/* Worm-step steer hint — shows during active play, before the skip pill. */}
+      {demoMode && demoStep === 'worm-traversal' && !demoColdOpenVisible &&
+        !demoStepIntroVisible && !demoLaunchStep && !demoTryVisible && !demoCelebrationStep && (
+        <DemoWormControlHint />
+      )}
+      {/* Flip-gateway progress — bounded front-face flip/restore counter. */}
+      {demoMode && demoStep === 'flip-gateway' && demoFlipProgress && !demoColdOpenVisible &&
+        !demoStepIntroVisible && !demoLaunchStep && !demoCelebrationStep && (
+        <DemoFlipProgress progress={demoFlipProgress} />
+      )}
       <ScreenTransition show={!!(demoMode && demoStep === 'view-showcase' && demoViewSpotlight && !demoStepIntroVisible)} freezeOnExit>
         <DemoViewSpotlightHint onSkip={handleDemoShowcaseSkip} />
       </ScreenTransition>
@@ -1441,8 +1465,13 @@ export default function WORM3() {
       {demoMode && demoStep === 'end' && (
         <Suspense fallback={null}>
           <DemoEndScreen
-            onReplay={handleDemoReplay}
+            onWorm={() => { handleExitDemo(); handleMenuWormHealer(); }}
+            onStory={() => { handleExitDemo(); handleStartCampaign(); }}
             onFreeplay={handleDemoFreeplay}
+            onChaos={() => { handleExitDemo(); handleMenuDisparity(); }}
+            onRandom={() => { handleExitDemo(); handleMenuRandomMode(); }}
+            onStore={() => { handleExitDemo(); handleOpenStore(); }}
+            onReplay={handleDemoReplay}
             onExit={handleExitDemo}
           />
         </Suspense>

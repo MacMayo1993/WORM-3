@@ -15,16 +15,18 @@ import { DEMO_STEP_IDS, DEMO_LEVEL_CONFIGS, VIEW_SHOWCASE_SEQUENCE } from '../co
 // otherwise the shader-heavy demo look sticks to the device forever.
 const PRE_DEMO_SETTINGS_KEY = 'worm3_predemo_settings';
 
-const allSurfaceStickersWrongParity = (cubies, size) => {
+// Flip-gateway targets only the front face (PZ, z = size-1) so the step is a
+// short, legible ~9-tap loop instead of flipping the whole 54-sticker surface.
+// Returns how many front-face tiles are currently on their twin side.
+const frontFaceFlipCount = (cubies, size) => {
+  let flipped = 0;
+  const z = size - 1;
   for (let x = 0; x < size; x++)
-    for (let y = 0; y < size; y++)
-      for (let z = 0; z < size; z++) {
-        if (x > 0 && x < size - 1 && y > 0 && y < size - 1 && z > 0 && z < size - 1) continue;
-        for (const st of Object.values(cubies[x][y][z].stickers)) {
-          if (st.curr === st.orig) return false;
-        }
-      }
-  return true;
+    for (let y = 0; y < size; y++) {
+      const st = cubies[x][y][z].stickers.PZ;
+      if (st && st.curr !== st.orig) flipped++;
+    }
+  return flipped;
 };
 
 export function useDemoMode({
@@ -48,6 +50,7 @@ export function useDemoMode({
   const size = useGameStore((s) => s.size);
   const victory = useGameStore((s) => s.victory);
 
+  const [demoColdOpenVisible, setDemoColdOpenVisible] = useState(false);
   const [demoStepIntroVisible, setDemoStepIntroVisible] = useState(false);
   const [demoForecastVisible, setDemoForecastVisible] = useState(false);
   const [demoTryVisible, setDemoTryVisible] = useState(false);
@@ -56,8 +59,11 @@ export function useDemoMode({
   const [demoViewSpotlight, setDemoViewSpotlight] = useState(false);
   const [demoCelebrationStep, setDemoCelebrationStep] = useState(null);
   const [demoLaunchStep, setDemoLaunchStep] = useState(null);
+  const [demoRewardStamp, setDemoRewardStamp] = useState(null);
+  const [demoFlipProgress, setDemoFlipProgress] = useState(null);
 
   const demoForecastPickRef = useRef(null);
+  const demoRewardPendingRef = useRef(false);
   const preDemoSettingsRef = useRef(null);
   const demoWatchTimers = useRef([]);
   const onTapFlipRef = useRef(null);
@@ -239,17 +245,26 @@ export function useDemoMode({
     try { localStorage.setItem(PRE_DEMO_SETTINGS_KEY, JSON.stringify(store.settings)); } catch { /* private mode */ }
     store.startDemo();
     applyDemoSettings();
-    // Pre-stage the first step's cube so Mobi's intro blurs the right scene
+    // Pre-stage the first step's cube so Mobi's cold-open blurs the right scene
     // (otherwise the menu's 3×3 lingers behind the dialogue until Start).
     applyDemoStepConfig('baby-cube');
-    setDemoStepIntroVisible(true);
+    // Cold open first: Mobi frames the "every tile has a twin" idea before the
+    // player touches anything, then hands off to the baby-cube step intro.
+    setDemoColdOpenVisible(true);
   }, [clearDemoWatchTimers, applyDemoSettings, applyDemoStepConfig]);
+
+  // Cold open dismissed → drop into the first step's intro.
+  const handleDemoColdOpenContinue = useCallback(() => {
+    setDemoColdOpenVisible(false);
+    setDemoStepIntroVisible(true);
+  }, []);
 
   const advanceDemoStep = useCallback((fromStep) => {
     const store = useGameStore.getState();
     if (store.demoStep !== fromStep) return;
     clearDemoWatchTimers();
     setDemoTryVisible(false);
+    setDemoFlipProgress(null);
     setDemoForecastVisible(false);
     setDemoLaunchStep(null);
     if (store.randomMode) {
@@ -338,9 +353,13 @@ export function useDemoMode({
   const cleanupAllDemoState = useCallback((store) => {
     clearDemoWatchTimers();
     restoreWormCharacter();
+    demoRewardPendingRef.current = false;
+    setDemoRewardStamp(null);
+    setDemoFlipProgress(null);
     setDemoCelebrationStep(null);
     setDemoLaunchStep(null);
     setDemoTryVisible(false);
+    setDemoColdOpenVisible(false);
     setDemoStepIntroVisible(false);
     setDemoForecastVisible(false);
     setDemoCoachCopy(null);
@@ -371,7 +390,7 @@ export function useDemoMode({
     store.startDemo();
     applyDemoSettings();
     applyDemoStepConfig('baby-cube');
-    setDemoStepIntroVisible(true);
+    setDemoColdOpenVisible(true);
   }, [cleanupAllDemoState, applyDemoSettings, applyDemoStepConfig]);
 
   const handleDemoFreeplay = useCallback(() => {
@@ -485,17 +504,35 @@ export function useDemoMode({
     advanceDemoStep('view-showcase');
   }, [demoShowcaseSubStep, advanceDemoStep]);
 
-  const handleDemoChaosSkip = useCallback(() => {
-    setDemoForecastVisible(false);
-    demoForecastPickRef.current = null;
+  // Award the Parity Points, flash the reward stamp (same launch-stamp text
+  // treatment as a new step), then advance once it clears. The pending ref
+  // blocks the showDisparityWinner safety-net below from advancing early and
+  // stealing the stamp — this is the single path that closes the chaos step.
+  const finishChaosWithReward = useCallback((reward, correct) => {
+    // The stamp holds for 2.6s before the step advances, so the step guard no
+    // longer stops a second trigger (e.g. a double-click on the winner's
+    // Continue) from re-granting PP. The pending ref is the idempotency lock.
+    if (demoRewardPendingRef.current) return;
     const store = useGameStore.getState();
+    demoRewardPendingRef.current = true;
+    setDemoForecastVisible(false);
+    setDemoRewardStamp({ amount: reward, correct });
+    store.earnCoins(reward);
     store.setShowDisparityWinner(false);
     store.clearDisparityGame();
     store.setChaosLevel(0);
     cancelDisparityRun();
-    store.earnCoins(50);
-    advanceDemoStepRef.current?.('chaos-forecast');
+    demoForecastPickRef.current = null;
+    demoWatchTimers.current.push(setTimeout(() => {
+      setDemoRewardStamp(null);
+      demoRewardPendingRef.current = false;
+      advanceDemoStepRef.current?.('chaos-forecast');
+    }, 2600));
   }, [cancelDisparityRun]);
+
+  const handleDemoChaosSkip = useCallback(() => {
+    finishChaosWithReward(50, false);
+  }, [finishChaosWithReward]);
 
   const handleDemoDisparityDismiss = useCallback(() => {
     if (!demoMode || demoStep !== 'chaos-forecast') return;
@@ -507,13 +544,8 @@ export function useDemoMode({
       return m ? parseInt(m[1], 10) : 0;
     }) || [];
     const correct = pick && pick.faceIds.some((f) => winnerFaceIds.includes(f));
-    const reward = correct ? 200 : 50;
-    store.earnCoins(reward);
-    store.clearDisparityGame();
-    store.setChaosLevel(0);
-    demoForecastPickRef.current = null;
-    advanceDemoStep('chaos-forecast');
-  }, [demoMode, demoStep, advanceDemoStep]);
+    finishChaosWithReward(correct ? 200 : 50, correct);
+  }, [demoMode, demoStep, finishChaosWithReward]);
 
   // ── Effects ──────────────────────────────────────────────────────────────
 
@@ -545,18 +577,29 @@ export function useDemoMode({
     }
   }, [demoMode, demoStep, cubies, size, celebrateStep]);
 
-  // Flip-gateway two-phase detection: flip-all → unflip-all → celebrate.
+  // Flip-gateway two-phase detection over the front face only (~9 tiles a
+  // phase): flip-all → unflip-all → celebrate, with a live progress count so
+  // the loop feels bounded instead of endless.
   useEffect(() => {
     if (!demoMode || demoStep !== 'flip-gateway') return;
     const phase = demoFlipPhaseRef.current;
-    if (!phase) return;
-    if (phase === 'flip-all' && allSurfaceStickersWrongParity(cubies, size)) {
-      demoFlipPhaseRef.current = 'unflip-all';
-      setDemoCoachCopy('Now flip them all back to normal parity.');
-    } else if (phase === 'unflip-all' && checkRubiksSolved(cubies, size)) {
-      demoFlipPhaseRef.current = null;
-      setDemoCoachCopy(null);
-      celebrateStep('flip-gateway');
+    if (!phase) { setDemoFlipProgress(null); return; }
+    const total = size * size;
+    const flipped = frontFaceFlipCount(cubies, size);
+    if (phase === 'flip-all') {
+      setDemoFlipProgress({ phase, done: flipped, total });
+      if (flipped >= total) {
+        demoFlipPhaseRef.current = 'unflip-all';
+        setDemoCoachCopy('The front face is on its twin side. Flip each tile back home to solve.');
+      }
+    } else if (phase === 'unflip-all') {
+      setDemoFlipProgress({ phase, done: total - flipped, total });
+      if (checkRubiksSolved(cubies, size)) {
+        demoFlipPhaseRef.current = null;
+        setDemoCoachCopy(null);
+        setDemoFlipProgress(null);
+        celebrateStep('flip-gateway');
+      }
     }
   }, [demoMode, demoStep, cubies, size, celebrateStep]);
 
@@ -605,6 +648,9 @@ export function useDemoMode({
       (s) => s.showDisparityWinner,
       (show, prev) => {
         if (prev && !show) {
+          // The normal payout path (finishChaosWithReward) holds a reward
+          // stamp before advancing; don't race past it here.
+          if (demoRewardPendingRef.current) return;
           const s = useGameStore.getState();
           if (s.demoMode && s.demoStep === 'chaos-forecast') {
             s.clearDisparityGame();
@@ -619,6 +665,8 @@ export function useDemoMode({
   return {
     demoMode,
     demoStep,
+    demoColdOpenVisible,
+    handleDemoColdOpenContinue,
     demoStepIntroVisible,
     demoTryVisible,
     demoForecastVisible,
@@ -637,6 +685,8 @@ export function useDemoMode({
     demoCelebrationStep,
     dismissDemoCelebration,
     demoLaunchStep,
+    demoRewardStamp,
+    demoFlipProgress,
     demoViewSpotlight,
     handleDemoViewSpotlightClick,
     handleDemoShowcaseNext,
