@@ -559,6 +559,13 @@ export function createChaosSim({ cubies, size, chaosLevel, flipCap, explosionT =
     }
 
     let winner = null;
+    // The worker is the authoritative simulation. When it finishes, include a
+    // complete final snapshot with the winner event so the render thread can
+    // reconcile any in-flight TICK batches before revealing the result. This
+    // is deliberately a snapshot (rather than just the final flip operations):
+    // a busy main thread can otherwise display an older cube even though the
+    // worker's death ledger has correctly narrowed the round to one pair.
+    let finalState = null;
     const aliveAfterDeaths = surfaceStickers - deadTileSet.size;
     if (!winnerAnnounced && aliveAfterDeaths <= 2 && aliveAfterDeaths > 0 && deathRank > 0) {
       winnerAnnounced = true;
@@ -574,6 +581,7 @@ export function createChaosSim({ cubies, size, chaosLevel, flipCap, explosionT =
           }
         }
       }
+      finalState = state;
     }
 
     // Only recompute the O(n) metrics scan when something actually changed this tick.
@@ -588,6 +596,7 @@ export function createChaosSim({ cubies, size, chaosLevel, flipCap, explosionT =
       deaths,
       eliminatedFaces: eliminatedFaces.length > 0 ? [...new Set(eliminatedFaces)] : eliminatedFaces,
       winner,
+      finalState,
       metrics: withFlipPct(cachedMetrics),
       didWork,
     };
@@ -663,6 +672,7 @@ export function createChaosSim({ cubies, size, chaosLevel, flipCap, explosionT =
       deaths,
       eliminatedFaces: [...new Set(eliminatedFaces)],
       winner: null, // winner detection stays with the next chain tick
+      finalState: null,
       metrics: withFlipPct(cachedMetrics),
       didWork: true,
     };
