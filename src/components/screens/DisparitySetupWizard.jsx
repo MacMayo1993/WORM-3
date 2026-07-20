@@ -9,11 +9,13 @@ import { extractColorsFromImage } from '../../utils/colorExtraction.js';
 import {
   UI_FONT,
   PAPER_BACKDROP, PAPER_BACKDROP_BLUR,
-  PAPER_SHEET, PAPER_SHEET_RAISED, PAPER_BORDER, PAPER_BORDER_SOFT,
+  PAPER_SHEET_RAISED, PAPER_BORDER, PAPER_BORDER_SOFT,
   PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT,
-  PAPER_FOOTER_BG, PAPER_BG_MUTED, PAPER_CARD_SHADOW, PAPER_SHADOW,
+  PAPER_BG_MUTED, PAPER_CARD_SHADOW, PAPER_SHADOW,
 } from '../../utils/uiTheme.js';
 import { BG_PREVIEWS } from '../../utils/bgPreviews.js';
+import { wizardPaperBackground, WIZARD_FOOTER_BG, WizardPreviewNote } from './WizardChrome.jsx';
+import { WIZARD_PREVIEW } from '../../utils/demoStepCopy.js';
 
 const BG_OPTIONS = BACKGROUNDS.map(bg => ({
   value: bg.id,
@@ -91,7 +93,7 @@ const S = {
     animation: 'modalBackdropIn 0.22s ease',
   },
   sheet: {
-    background: PAPER_SHEET,
+    ...wizardPaperBackground,
     borderRadius: isMobile ? '16px' : '20px',
     width: 'min(640px, 100%)',
     maxHeight: isMobile ? '92vh' : '88vh',
@@ -100,6 +102,7 @@ const S = {
     overflow: 'hidden',
     boxShadow: PAPER_SHADOW,
     border: '1px solid #cec8be',
+    borderTop: `3px solid ${ACCENT}`,
     animation: 'modalSheetIn 0.30s cubic-bezier(0.22, 1, 0.36, 1)',
   },
   header: { padding: isMobile ? '20px 20px 0' : '32px 36px 0', flexShrink: 0 },
@@ -166,7 +169,7 @@ const S = {
     alignItems: 'center',
     flexShrink: 0,
     borderTop: '1px solid #d6d0c8',
-    background: PAPER_FOOTER_BG,
+    background: WIZARD_FOOTER_BG,
   },
   btnSecondary: {
     background: 'none', border: '1.5px solid #d6d0c8', fontSize: '15px', fontWeight: '500', color: PAPER_TEXT_MUTED,
@@ -570,6 +573,7 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
           <div style={S.stepIndicator}>{STEPS.map((label, i) => <div key={label} style={S.dot(i <= step, i === step)} />)}</div>
           <h2 style={S.title}>{stepTitles[step]}</h2>
           <p style={S.subtitle}>{stepSubtitles[step]}</p>
+          <WizardPreviewNote accent={ACCENT} text={WIZARD_PREVIEW.disparity} />
         </div>
 
         <div style={S.body}><div style={{ paddingBottom: '24px' }}>{stepContent[step]()}</div></div>
