@@ -1441,8 +1441,13 @@ export default function WORM3() {
       {demoMode && demoStep === 'end' && (
         <Suspense fallback={null}>
           <DemoEndScreen
-            onReplay={handleDemoReplay}
+            onWorm={() => { handleExitDemo(); handleMenuWormHealer(); }}
+            onStory={() => { handleExitDemo(); handleStartCampaign(); }}
             onFreeplay={handleDemoFreeplay}
+            onChaos={() => { handleExitDemo(); handleMenuDisparity(); }}
+            onRandom={() => { handleExitDemo(); handleMenuRandomMode(); }}
+            onStore={() => { handleExitDemo(); handleOpenStore(); }}
+            onReplay={handleDemoReplay}
             onExit={handleExitDemo}
           />
         </Suspense>
