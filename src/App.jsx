@@ -421,6 +421,11 @@ export default function WORM3() {
   // SceneLoadingGate, which covers the scene with the loading cube while its
   // environment map / textures decode (only if a decode is actually in flight).
   const [sceneGateToken, setSceneGateToken] = useState(0);
+  const [sceneGateLabel, setSceneGateLabel] = useState('Loading');
+  const armSceneGate = useCallback((label = 'Loading') => {
+    setSceneGateLabel(label);
+    setSceneGateToken((t) => t + 1);
+  }, []);
   const bootStartRef = useRef(performance.now());
   const bootDoneRef = useRef(false);
   const finishBootCover = useCallback(() => {
@@ -531,6 +536,7 @@ export default function WORM3() {
     cancelDisparityRun, startDisparityGame,
     startAnimatedShuffle, animatedShuffle,
     handleOpenStore, setShowFreeplayWizard,
+    armSceneGate,
   });
 
   const handleCloseStore = useCallback(() => {
@@ -810,8 +816,8 @@ export default function WORM3() {
     action?.();
     // Mode scene is now revealed — arm the gate so the cube covers any env-map /
     // texture decode still in flight (it self-dismisses if nothing is loading).
-    setSceneGateToken((t) => t + 1);
-  }, []);
+    armSceneGate(mobiModeName || 'Loading');
+  }, [armSceneGate, mobiModeName]);
 
   const handleWormWizardCancel = useCallback(() => {
     setShowWormModeWizard(false);
@@ -1201,17 +1207,24 @@ export default function WORM3() {
 
   if (coopMode) {
     return (
-      <Suspense fallback={<LoadingScreen label="Waking the Co-op Crawler" />}>
-        <PlatformerWormMode
-          cubies={cubies}
-          size={size}
-          faceColors={resolvedColors}
-          onQuit={() => {
-            setCoopMode(false);
-            useGameStore.getState().setShowMainMenu(true);
-          }}
-        />
-      </Suspense>
+      <>
+        <Suspense fallback={<LoadingScreen label="Waking the Co-op Crawler" />}>
+          <PlatformerWormMode
+            cubies={cubies}
+            size={size}
+            faceColors={resolvedColors}
+            onQuit={() => {
+              setCoopMode(false);
+              useGameStore.getState().setShowMainMenu(true);
+            }}
+          />
+        </Suspense>
+        {/* The main-return gate never mounts on the co-op path (this early return),
+            and the Mobi intro finished before coopMode flipped — so PlatformerWormMode's
+            own city/sunset env maps would pop in uncovered. Cover them here. The probe
+            runs long because those maps only begin loading after the lazy chunk mounts. */}
+        <SceneLoadingGate armToken={sceneGateToken} label="Co-op Crawler" probeMs={6000} style={{ zIndex: 9996 }} />
+      </>
     );
   }
 
@@ -1224,7 +1237,7 @@ export default function WORM3() {
       {/* Mode-transition cover: sits above the game HUD / FX (≤9990) but below the
           Mobi dialogue (10500), so it fills the gap after Mobi while the scene's
           background decodes. Self-dismisses when nothing is loading. */}
-      <SceneLoadingGate armToken={sceneGateToken} label={mobiModeName || 'Loading'} style={{ zIndex: 9996 }} />
+      <SceneLoadingGate armToken={sceneGateToken} label={sceneGateLabel} style={{ zIndex: 9996 }} />
       <ScreenTransition show={showTutorial && !showWelcome}>
         <Tutorial onClose={closeTutorial} onMainMenu={() => { closeTutorial(); handleBackToMainMenu(); }} />
       </ScreenTransition>

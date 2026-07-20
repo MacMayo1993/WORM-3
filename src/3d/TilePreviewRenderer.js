@@ -233,6 +233,11 @@ export function hasSharedRenderer() {
  */
 export function renderTileImage(styleKey, colorHex, size = 96) {
   if (!hasSharedRenderer() || !_renderTarget) return null;
+  // The shared renderer belongs to the main <Canvas>. On the co-op path that
+  // Canvas has unmounted and its context is lost — rendering would spew WebGL
+  // errors — so bail to the flat-cube fallback.
+  const glCtx = renderer.getContext?.();
+  if (!glCtx || glCtx.isContextLost?.()) return null;
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
