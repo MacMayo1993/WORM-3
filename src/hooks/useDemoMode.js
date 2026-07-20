@@ -40,6 +40,7 @@ export function useDemoMode({
   animatedShuffle,
   handleOpenStore,
   setShowFreeplayWizard,
+  armSceneGate,
 }) {
   const { demoMode, demoStep } = useGameStore(useShallow((s) => ({
     demoMode: s.demoMode,
@@ -248,10 +249,14 @@ export function useDemoMode({
     // Pre-stage the first step's cube so Mobi's cold-open blurs the right scene
     // (otherwise the menu's 3×3 lingers behind the dialogue until Start).
     applyDemoStepConfig('baby-cube');
+    // Cover the demo's opening scene the same way mode entries do, so the desert
+    // environment map doesn't pop in behind Mobi's cold open (self-dismisses if
+    // it's already warm — warmDemoAssets() often pre-fetches it).
+    armSceneGate?.('Demo');
     // Cold open first: Mobi frames the "every tile has a twin" idea before the
     // player touches anything, then hands off to the baby-cube step intro.
     setDemoColdOpenVisible(true);
-  }, [clearDemoWatchTimers, applyDemoSettings, applyDemoStepConfig]);
+  }, [clearDemoWatchTimers, applyDemoSettings, applyDemoStepConfig, armSceneGate]);
 
   // Cold open dismissed → drop into the first step's intro.
   const handleDemoColdOpenContinue = useCallback(() => {
