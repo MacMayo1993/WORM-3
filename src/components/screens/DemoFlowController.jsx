@@ -398,6 +398,58 @@ const ensureDemoShellStyle = () => {
       from { opacity: 0; transform: translateX(-50%) translateY(8px); }
       to   { opacity: 1; transform: translateX(-50%) translateY(0); }
     }
+
+    /* Flip-gateway progress pill — bottom-center, above the nav bar. Shows how
+       many front-face tiles are flipped (or restored) so the loop feels bounded. */
+    .demo-flip-progress {
+      position: fixed;
+      left: 50%;
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 92px);
+      transform: translateX(-50%);
+      z-index: 11000;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 15px;
+      border-radius: 999px;
+      background: rgba(250, 247, 238, 0.94);
+      border: 1px solid rgba(111, 126, 86, 0.25);
+      box-shadow: 0 10px 26px rgba(40, 48, 32, 0.22);
+      color: #27351f;
+      font-family: ${UI_FONT};
+      pointer-events: none;
+      animation: demo-worm-hint-in 0.4s ease both;
+    }
+
+    .demo-flip-progress-label {
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #657156;
+    }
+
+    .demo-flip-progress-track {
+      width: 74px;
+      height: 5px;
+      background: rgba(92, 111, 76, 0.2);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .demo-flip-progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #7b8f5a, #b88f4a);
+      border-radius: 999px;
+      transition: width 0.25s ease;
+    }
+
+    .demo-flip-progress-count {
+      font-size: 12px;
+      font-weight: 800;
+      color: #35452a;
+      white-space: nowrap;
+    }
   `;
   document.head.appendChild(style);
 };
@@ -426,7 +478,7 @@ const DemoProgressBar = ({ currentStep }) => {
 const STEP_COPY = {
   'baby-cube': 'Solve this first twist. Drag the turned row back into place to continue.',
   'twin-paradox': 'Every tile has a twin on the opposite face — one tile, two addresses.',
-  'flip-gateway': 'A flip sends a tile through the cube to its twin. That counts as a solve move.',
+  'flip-gateway': 'A flip sends a tile through the cube to its twin. Flip the front face over, then back to solve.',
   'view-showcase': 'See every way to view the cube.',
   'worm-traversal': 'This is WORM mode — steer a worm through the cube to heal it.',
   'chaos-forecast': 'This is CHAOS — tiles flip at random until one antipodal pair is left.',
@@ -526,7 +578,7 @@ const DEMO_LEVEL_CONFIGS = {
 const TRY_COPY = {
   'baby-cube': 'Your turn — drag a row to twist it. Drag the space around the cube to orbit.',
   'twin-paradox': 'Your turn — tap any tile and watch its twin flip on the far side too.',
-  'flip-gateway': 'Flip the whole surface to the twin side, then flip it all back home to solve.',
+  'flip-gateway': 'Tap each front-face tile to send it to its twin, then tap them back home to solve.',
   'worm-traversal': 'Grab orbs, heal tiles, and dive through a glowing tunnel. Skip ahead anytime.',
   'chaos-forecast': 'Bet on the pair you think survives, then watch it play out. Skip anytime.',
   'random-showcase': 'Watch a few random cubes roll by, or skip ahead.',
@@ -794,6 +846,26 @@ const DemoWormControlHint = () => {
   );
 };
 
+// Flip-gateway progress: a bounded count of how many front-face tiles are
+// flipped ("flip-all") or restored ("unflip-all"), so the tap loop reads as a
+// short task with a finish line rather than an open-ended chore.
+const DemoFlipProgress = ({ progress }) => {
+  ensureDemoShellStyle();
+  if (!progress) return null;
+  const { phase, done, total } = progress;
+  const label = phase === 'unflip-all' ? 'Restored' : 'Flipped';
+  const pct = total > 0 ? Math.min(100, (done / total) * 100) : 0;
+  return (
+    <div className="demo-flip-progress" role="status" aria-live="polite">
+      <span className="demo-flip-progress-label">{label}</span>
+      <div className="demo-flip-progress-track">
+        <div className="demo-flip-progress-fill" style={{ width: `${pct}%` }} />
+      </div>
+      <span className="demo-flip-progress-count">{done} / {total}</span>
+    </div>
+  );
+};
+
 const DemoViewShowcase = ({ subStep, onNext, onSkip }) => {
   ensureDemoShellStyle();
   const entry = VIEW_SHOWCASE_SEQUENCE[subStep];
@@ -836,6 +908,7 @@ export {
   DemoViewShowcase,
   DemoViewSpotlightHint,
   DemoWormControlHint,
+  DemoFlipProgress,
   DemoStepComplete,
   DemoStepLaunch,
   DemoRewardStamp,

@@ -82,7 +82,7 @@ const DemoEndScreen = React.lazy(() => import('./components/screens/DemoEndScree
 const DemoForecastPicker = React.lazy(() => import('./components/screens/DemoForecastPicker.jsx'));
 import {
   DemoProgressBar, DemoStepIntro, DemoCoach, DemoViewShowcase,
-  DemoViewSpotlightHint, DemoWormControlHint, DemoStepComplete, DemoStepLaunch, DemoRewardStamp
+  DemoViewSpotlightHint, DemoWormControlHint, DemoFlipProgress, DemoStepComplete, DemoStepLaunch, DemoRewardStamp
 } from './components/screens/DemoFlowController.jsx';
 
 
@@ -490,7 +490,7 @@ export default function WORM3() {
     handleDemoForecastPick, handleDemoChaosSkip, handleDemoDisparityDismiss,
     demoShowcaseSubStep, handleDemoShowcaseNext, handleDemoShowcaseSkip,
     demoViewSpotlight, handleDemoViewSpotlightClick,
-    demoCelebrationStep, dismissDemoCelebration, demoLaunchStep, demoRewardStamp,
+    demoCelebrationStep, dismissDemoCelebration, demoLaunchStep, demoRewardStamp, demoFlipProgress,
   } = useDemoMode({
     cancelShuffle, changeSize, setRotatedCubies, reset,
     cancelDisparityRun, startDisparityGame,
@@ -1446,6 +1446,11 @@ export default function WORM3() {
       {demoMode && demoStep === 'worm-traversal' && !demoColdOpenVisible &&
         !demoStepIntroVisible && !demoLaunchStep && !demoTryVisible && !demoCelebrationStep && (
         <DemoWormControlHint />
+      )}
+      {/* Flip-gateway progress — bounded front-face flip/restore counter. */}
+      {demoMode && demoStep === 'flip-gateway' && demoFlipProgress && !demoColdOpenVisible &&
+        !demoStepIntroVisible && !demoLaunchStep && !demoCelebrationStep && (
+        <DemoFlipProgress progress={demoFlipProgress} />
       )}
       <ScreenTransition show={!!(demoMode && demoStep === 'view-showcase' && demoViewSpotlight && !demoStepIntroVisible)} freezeOnExit>
         <DemoViewSpotlightHint onSkip={handleDemoShowcaseSkip} />

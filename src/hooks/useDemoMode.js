@@ -15,16 +15,18 @@ import { DEMO_STEP_IDS, DEMO_LEVEL_CONFIGS, VIEW_SHOWCASE_SEQUENCE } from '../co
 // otherwise the shader-heavy demo look sticks to the device forever.
 const PRE_DEMO_SETTINGS_KEY = 'worm3_predemo_settings';
 
-const allSurfaceStickersWrongParity = (cubies, size) => {
+// Flip-gateway targets only the front face (PZ, z = size-1) so the step is a
+// short, legible ~9-tap loop instead of flipping the whole 54-sticker surface.
+// Returns how many front-face tiles are currently on their twin side.
+const frontFaceFlipCount = (cubies, size) => {
+  let flipped = 0;
+  const z = size - 1;
   for (let x = 0; x < size; x++)
-    for (let y = 0; y < size; y++)
-      for (let z = 0; z < size; z++) {
-        if (x > 0 && x < size - 1 && y > 0 && y < size - 1 && z > 0 && z < size - 1) continue;
-        for (const st of Object.values(cubies[x][y][z].stickers)) {
-          if (st.curr === st.orig) return false;
-        }
-      }
-  return true;
+    for (let y = 0; y < size; y++) {
+      const st = cubies[x][y][z].stickers.PZ;
+      if (st && st.curr !== st.orig) flipped++;
+    }
+  return flipped;
 };
 
 export function useDemoMode({
@@ -58,6 +60,7 @@ export function useDemoMode({
   const [demoCelebrationStep, setDemoCelebrationStep] = useState(null);
   const [demoLaunchStep, setDemoLaunchStep] = useState(null);
   const [demoRewardStamp, setDemoRewardStamp] = useState(null);
+  const [demoFlipProgress, setDemoFlipProgress] = useState(null);
 
   const demoForecastPickRef = useRef(null);
   const demoRewardPendingRef = useRef(false);
@@ -261,6 +264,7 @@ export function useDemoMode({
     if (store.demoStep !== fromStep) return;
     clearDemoWatchTimers();
     setDemoTryVisible(false);
+    setDemoFlipProgress(null);
     setDemoForecastVisible(false);
     setDemoLaunchStep(null);
     if (store.randomMode) {
@@ -351,6 +355,7 @@ export function useDemoMode({
     restoreWormCharacter();
     demoRewardPendingRef.current = false;
     setDemoRewardStamp(null);
+    setDemoFlipProgress(null);
     setDemoCelebrationStep(null);
     setDemoLaunchStep(null);
     setDemoTryVisible(false);
@@ -568,18 +573,29 @@ export function useDemoMode({
     }
   }, [demoMode, demoStep, cubies, size, celebrateStep]);
 
-  // Flip-gateway two-phase detection: flip-all → unflip-all → celebrate.
+  // Flip-gateway two-phase detection over the front face only (~9 tiles a
+  // phase): flip-all → unflip-all → celebrate, with a live progress count so
+  // the loop feels bounded instead of endless.
   useEffect(() => {
     if (!demoMode || demoStep !== 'flip-gateway') return;
     const phase = demoFlipPhaseRef.current;
-    if (!phase) return;
-    if (phase === 'flip-all' && allSurfaceStickersWrongParity(cubies, size)) {
-      demoFlipPhaseRef.current = 'unflip-all';
-      setDemoCoachCopy('Every tile is now on its twin side. Flip them all back home to solve the cube.');
-    } else if (phase === 'unflip-all' && checkRubiksSolved(cubies, size)) {
-      demoFlipPhaseRef.current = null;
-      setDemoCoachCopy(null);
-      celebrateStep('flip-gateway');
+    if (!phase) { setDemoFlipProgress(null); return; }
+    const total = size * size;
+    const flipped = frontFaceFlipCount(cubies, size);
+    if (phase === 'flip-all') {
+      setDemoFlipProgress({ phase, done: flipped, total });
+      if (flipped >= total) {
+        demoFlipPhaseRef.current = 'unflip-all';
+        setDemoCoachCopy('The front face is on its twin side. Flip each tile back home to solve.');
+      }
+    } else if (phase === 'unflip-all') {
+      setDemoFlipProgress({ phase, done: total - flipped, total });
+      if (checkRubiksSolved(cubies, size)) {
+        demoFlipPhaseRef.current = null;
+        setDemoCoachCopy(null);
+        setDemoFlipProgress(null);
+        celebrateStep('flip-gateway');
+      }
     }
   }, [demoMode, demoStep, cubies, size, celebrateStep]);
 
@@ -666,6 +682,7 @@ export function useDemoMode({
     dismissDemoCelebration,
     demoLaunchStep,
     demoRewardStamp,
+    demoFlipProgress,
     demoViewSpotlight,
     handleDemoViewSpotlightClick,
     handleDemoShowcaseNext,
