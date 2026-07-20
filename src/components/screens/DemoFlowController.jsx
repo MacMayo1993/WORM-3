@@ -393,13 +393,13 @@ const DemoProgressBar = ({ currentStep }) => {
 
 const STEP_COPY = {
   'baby-cube': 'Solve this first twist. Drag the turned row back into place to continue.',
-  'twin-paradox': 'Opposite faces are linked.',
-  'flip-gateway': 'Flip every tile, then flip them all back.',
+  'twin-paradox': 'Every tile has a twin on the opposite face — one tile, two addresses.',
+  'flip-gateway': 'A flip sends a tile through the cube to its twin. That counts as a solve move.',
   'view-showcase': 'See every way to view the cube.',
-  'worm-traversal': 'Travel through the wormholes you opened.',
-  'chaos-forecast': 'Predict which pair survives.',
-  'random-showcase': 'The cube cycles through random styles every few seconds.',
-  'cosmetic-reward': 'Spend your Parity Points.',
+  'worm-traversal': 'This is WORM mode — steer a worm through the cube to heal it.',
+  'chaos-forecast': 'This is CHAOS — tiles flip at random until one antipodal pair is left.',
+  'random-showcase': 'Random mode picks the rules and the look for you — a new cube every run.',
+  'cosmetic-reward': 'Spend the Parity Points you just won in the Store.',
 };
 
 // Step intro: Mobi delivers the setup line AND the hands-on guidance in one
@@ -492,12 +492,12 @@ const DEMO_LEVEL_CONFIGS = {
 // After the WATCH beat auto-plays the mechanic, the coach invites one optional
 // hands-on interaction. "Next" is always available, so the demo can never hang.
 const TRY_COPY = {
-  'baby-cube': 'Your turn — drag a row or column to spin it.',
-  'twin-paradox': 'Your turn — tap any tile. Its twin on the far side flips too.',
-  'flip-gateway': 'Tap every tile to flip it to wrong parity.',
-  'worm-traversal': 'Nice! Skip ahead when you\'re ready.',
-  'chaos-forecast': 'Skip ahead when you\'re ready.',
-  'random-showcase': 'Watch the styles cycle, or skip ahead.',
+  'baby-cube': 'Your turn — drag a row to twist it. Drag the space around the cube to orbit.',
+  'twin-paradox': 'Your turn — tap any tile and watch its twin flip on the far side too.',
+  'flip-gateway': 'Flip the whole surface to the twin side, then flip it all back home to solve.',
+  'worm-traversal': 'Grab orbs, heal tiles, and dive through a glowing tunnel. Skip ahead anytime.',
+  'chaos-forecast': 'Bet on the pair you think survives, then watch it play out. Skip anytime.',
+  'random-showcase': 'Watch a few random cubes roll by, or skip ahead.',
 };
 
 // Coach: the guidance already played inside the step-intro dialogue, so the

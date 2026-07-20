@@ -552,7 +552,7 @@ export function useDemoMode({
     if (!phase) return;
     if (phase === 'flip-all' && allSurfaceStickersWrongParity(cubies, size)) {
       demoFlipPhaseRef.current = 'unflip-all';
-      setDemoCoachCopy('Now flip them all back to normal parity.');
+      setDemoCoachCopy('Every tile is now on its twin side. Flip them all back home to solve the cube.');
     } else if (phase === 'unflip-all' && checkRubiksSolved(cubies, size)) {
       demoFlipPhaseRef.current = null;
       setDemoCoachCopy(null);
