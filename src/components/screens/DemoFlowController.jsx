@@ -476,12 +476,14 @@ const DemoProgressBar = ({ currentStep }) => {
   );
 };
 
-// Step intro: Mobi delivers the setup line AND the hands-on guidance in one
-// dialogue over the blurred live scene — the mid-step coach is just a pill.
+// Step intro: Mobi delivers just the setup line over the blurred live scene.
+// The hands-on guidance is surfaced by the staged UI (auto-played WATCH beat,
+// progress pills, the coach's Next pill), so repeating it here read as Mobi
+// talking twice — the intro stays to the single setup sentence.
 const DemoStepIntro = ({ step, onContinue, onSkip }) => {
   const info = DEMO_STEPS.find(s => s.id === step);
   if (!info) return null;
-  const lines = [STEP_COPY[step], TRY_COPY[step]].filter(Boolean);
+  const lines = [STEP_COPY[step]].filter(Boolean);
   return (
     <MobiIntroScreen
       key={step}
@@ -564,7 +566,10 @@ const DEMO_LEVEL_CONFIGS = {
 
 // ── TRY phase ──────────────────────────────────────────────────────────────
 // After the WATCH beat auto-plays the mechanic, the coach invites one optional
-// hands-on interaction. "Next" is always available, so the demo can never hang.
+// hands-on interaction via a "Next" pill, so the demo can never hang. These
+// lines are no longer shown to the player (the setup is Mobi's intro line and
+// the staged UI does the guiding) — a step's presence here is what keeps its
+// coach pill available; the text documents each step's intended interaction.
 const TRY_COPY = {
   'baby-cube': 'Your turn — drag a row to twist it. Drag the space around the cube to orbit.',
   'twin-paradox': 'Your turn — tap any tile and watch its twin flip on the far side too.',

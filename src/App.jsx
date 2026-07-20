@@ -1394,11 +1394,11 @@ export default function WORM3() {
               showComingSoon, onCloseComingSoon: () => { setShowComingSoon(false); useGameStore.getState().setShowMainMenu(true); },
               showMobiusCubelet, onCloseMobiusCubelet: () => { setShowMobiusCubelet(false); useGameStore.getState().setShowMainMenu(true); },
               onOpenModeSelect: () => setShowModeSelect(true),
-              // True whenever a Mobi dialogue panel is presenting — the step
-              // intro (DemoStepIntro) or the hands-on coach (DemoCoach). The HUD
-              // (bottom nav bar + undo button) is hidden underneath it so nothing
-              // overlaps the dialogue.
-              demoDialogueVisible: demoMode && (demoStepIntroVisible || demoTryVisible),
+              // True whenever a Mobi dialogue panel is presenting — the cold
+              // open (MobiIntroScreen), the step intro (DemoStepIntro), or the
+              // hands-on coach (DemoCoach). The HUD (bottom nav bar + undo
+              // button) is hidden underneath it so nothing overlaps the dialogue.
+              demoDialogueVisible: demoMode && (demoColdOpenVisible || demoStepIntroVisible || demoTryVisible),
             }}
             handlers={{
               onReset: handleReset,
