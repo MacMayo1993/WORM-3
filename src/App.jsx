@@ -62,6 +62,9 @@ import MobiIntroScreen, {
 } from './components/screens/MobiIntroScreen.jsx';
 import { UI_FONT } from './utils/uiTheme.js';
 import ScreenTransition from './components/ScreenTransition.jsx';
+// Static (not lazy): a Suspense fallback must be present the instant a lazy
+// chunk starts loading, so the loading cube cannot itself live in a lazy chunk.
+import LoadingScreen from './components/screens/LoadingScreen.jsx';
 const ParityStoreScreen = React.lazy(() => import('./components/screens/ParityStoreScreen.jsx'));
 const GameScene = React.lazy(() => import('./3d/GameScene.jsx'));
 const UILayer = React.lazy(() => import('./components/UILayer.jsx'));
@@ -1163,7 +1166,7 @@ export default function WORM3() {
 
   if (coopMode) {
     return (
-      <Suspense fallback={<div style={{ background: '#000', width: '100vw', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#60a5fa', fontFamily: UI_FONT }}>Loading Co-op Crawler...</div>}>
+      <Suspense fallback={<LoadingScreen label="Waking the Co-op Crawler" />}>
         <PlatformerWormMode
           cubies={cubies}
           size={size}
