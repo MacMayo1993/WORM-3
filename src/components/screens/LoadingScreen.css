@@ -130,6 +130,15 @@
   background: linear-gradient(to left, transparent, rgba(140, 180, 255, 0.55));
 }
 
+/* === Scene: cube levitating over the portal === */
+.wl-scene {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
 /* === Cube stage === */
 .wl-stage {
   position: relative;
@@ -145,25 +154,16 @@
   50% { transform: translateY(-18px); }
 }
 
-/* Portal glow pooled beneath / behind the cube. */
-.wl-stage::before {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: 52%;
-  width: 150%;
-  height: 150%;
-  transform: translate(-50%, -50%);
-  background: radial-gradient(circle at 50% 50%, rgba(90, 140, 255, 0.34) 0%, rgba(120, 90, 255, 0.16) 34%, transparent 66%);
-  filter: blur(4px);
-  animation: wl-portal-pulse 4s ease-in-out infinite;
+/* Spinning black-hole portal (2D canvas, LoadingPortal.jsx) pulled up so the
+   cube levitates over its mouth. Behind the cube (z below the stage). */
+.wl-portal {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: min(520px, 92vw);
+  height: auto;
+  margin-top: -30px;
   pointer-events: none;
-  z-index: -1;
-}
-
-@keyframes wl-portal-pulse {
-  0%, 100% { opacity: 0.7; transform: translate(-50%, -50%) scale(1); }
-  50% { opacity: 1; transform: translate(-50%, -50%) scale(1.12); }
 }
 
 .wl-cube {
@@ -243,23 +243,6 @@
 .f-white .wl-sticker { --wl-c: #fafafa; }
 .f-yellow .wl-sticker { --wl-c: #eab308; }
 
-/* === Ground shadow === */
-.wl-shadow {
-  position: relative;
-  z-index: 1;
-  width: calc(var(--wl-cube) * 0.62);
-  height: 18px;
-  margin-top: -6px;
-  border-radius: 50%;
-  background: radial-gradient(ellipse, rgba(0, 0, 0, 0.55) 0%, transparent 72%);
-  animation: wl-shadow-pulse 4s ease-in-out infinite;
-}
-
-@keyframes wl-shadow-pulse {
-  0%, 100% { transform: scaleX(1); opacity: 0.65; }
-  50% { transform: scaleX(0.62); opacity: 0.3; }
-}
-
 /* === Status line (label + progress) === */
 .wl-status {
   position: relative;
@@ -338,8 +321,6 @@
 @media (prefers-reduced-motion: reduce) {
   .wl-root::before,
   .wl-stage,
-  .wl-stage::before,
-  .wl-shadow,
   .wl-title,
   .wl-dots i,
   .wl-bar.indeterminate i {
