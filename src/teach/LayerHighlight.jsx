@@ -80,8 +80,32 @@ const layerFragmentShader = `
   }
 `;
 
+// Build one curved arrow (a tube arc + a cone head) lying in the local XY plane,
+// curving in `dir`. Returns the shaft geometry plus the head's local transform.
+function buildArrowArc(radius, span, dir, tubeR) {
+  const seg = 20;
+  const pts = [];
+  for (let i = 0; i <= seg; i++) {
+    const a = dir * (-span / 2 + span * (i / seg));
+    pts.push(new THREE.Vector3(Math.cos(a) * radius, Math.sin(a) * radius, 0));
+  }
+  const curve = new THREE.CatmullRomCurve3(pts);
+  const shaft = new THREE.TubeGeometry(curve, seg, tubeR, 8, false);
+  const p1 = pts[pts.length - 1];
+  const p0 = pts[pts.length - 2];
+  const tan = p1.clone().sub(p0).normalize();
+  // Cone geometry points +Y by default — rotate +Y onto the arc's end tangent.
+  const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), tan);
+  return {
+    shaft,
+    headPos: [p1.x + tan.x * 0.12, p1.y + tan.y * 0.12, p1.z + tan.z * 0.12],
+    headQuat: [quat.x, quat.y, quat.z, quat.w]
+  };
+}
+
 const LayerHighlight = ({ axis, sliceIndex, dir, size }) => {
   const matRef = useRef();
+  const spinnerRef = useRef();
 
   // Build a single merged geometry of all exposed cubie faces in the target slice.
   const geometry = useMemo(() => {
@@ -155,6 +179,24 @@ const LayerHighlight = ({ axis, sliceIndex, dir, size }) => {
   // Dispose the geometry when the slice changes / unmounts.
   React.useEffect(() => () => geometry.dispose(), [geometry]);
 
+  // Ring of curved arrows encircling the layer, oriented to the turn axis and
+  // positioned at the layer's slice. The ring spins in the turn direction so the
+  // arrows physically travel the way the layer will rotate.
+  const arrowRing = useMemo(() => {
+    const axisVec =
+      axis === 'col' ? new THREE.Vector3(1, 0, 0)
+        : axis === 'row' ? new THREE.Vector3(0, 1, 0)
+          : new THREE.Vector3(0, 0, 1);
+    const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), axisVec);
+    const axial = sliceIndex - (size - 1) / 2;
+    const pos = axisVec.clone().multiplyScalar(axial);
+    const radius = size / 2 + 0.42;
+    const arrow = buildArrowArc(radius, 1.25, dir === 1 ? 1 : -1, 0.05);
+    return { quaternion: [q.x, q.y, q.z, q.w], position: [pos.x, pos.y, pos.z], arrow };
+  }, [axis, sliceIndex, size, dir]);
+
+  React.useEffect(() => () => arrowRing.arrow.shaft.dispose(), [arrowRing]);
+
   const uniforms = useMemo(() => ({
     uColor: { value: new THREE.Color('#00e5ff') },
     uTime: { value: 0 },
@@ -166,23 +208,45 @@ const LayerHighlight = ({ axis, sliceIndex, dir, size }) => {
     uniforms.uDir.value = dir === 1 ? 1 : -1;
   }, [dir, uniforms]);
 
-  useFrame((state) => {
+  useFrame((state, delta) => {
     if (matRef.current) matRef.current.uniforms.uTime.value = state.clock.elapsedTime;
+    // Spin the arrow ring around the turn axis (local Z) in the turn direction.
+    if (spinnerRef.current) spinnerRef.current.rotation.z += delta * (dir === 1 ? 1 : -1) * 0.7;
   });
 
   return (
-    <mesh geometry={geometry}>
-      <shaderMaterial
-        ref={matRef}
-        vertexShader={layerVertexShader}
-        fragmentShader={layerFragmentShader}
-        uniforms={uniforms}
-        transparent
-        side={THREE.DoubleSide}
-        depthWrite={false}
-        blending={THREE.AdditiveBlending}
-      />
-    </mesh>
+    <group>
+      {/* Neon edge-worms on the layer's cubie faces */}
+      <mesh geometry={geometry}>
+        <shaderMaterial
+          ref={matRef}
+          vertexShader={layerVertexShader}
+          fragmentShader={layerFragmentShader}
+          uniforms={uniforms}
+          transparent
+          side={THREE.DoubleSide}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+        />
+      </mesh>
+
+      {/* Curved arrow ring encircling the layer, spinning in the turn direction */}
+      <group quaternion={arrowRing.quaternion} position={arrowRing.position}>
+        <group ref={spinnerRef}>
+          {[0, 1, 2, 3].map((i) => (
+            <group key={i} rotation={[0, 0, (i * Math.PI) / 2]}>
+              <mesh geometry={arrowRing.arrow.shaft}>
+                <meshBasicMaterial color="#3af0ff" toneMapped={false} />
+              </mesh>
+              <mesh position={arrowRing.arrow.headPos} quaternion={arrowRing.arrow.headQuat}>
+                <coneGeometry args={[0.14, 0.26, 14]} />
+                <meshBasicMaterial color="#3af0ff" toneMapped={false} />
+              </mesh>
+            </group>
+          ))}
+        </group>
+      </group>
+    </group>
   );
 };
 
