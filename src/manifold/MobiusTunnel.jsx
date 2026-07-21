@@ -404,8 +404,6 @@ const MobiusTunnel = ({
   const exitPortalGroupRef  = useRef();
   const exitPortalMatRef    = useRef();
   const exitPortalGlowRef   = useRef();
-  const exitPortalRing1Ref  = useRef();
-  const exitPortalRing2Ref  = useRef();
 
   const { tunnelBirths, tunnelPulses } = useGameStore(
     useShallow(s => ({ tunnelBirths: s.tunnelBirths, tunnelPulses: s.tunnelPulses }))
@@ -512,9 +510,6 @@ const MobiusTunnel = ({
           _portalPos.z - _faceNorm2.z
         );
         if (exitPortalMatRef.current) exitPortalMatRef.current.color.set(cB);
-        // Sync ring colors to antipodal pair
-        if (exitPortalRing1Ref.current) exitPortalRing1Ref.current.material.color.set(cA);
-        if (exitPortalRing2Ref.current) exitPortalRing2Ref.current.material.color.set(cB);
         if (exitPortalGlowRef.current)  exitPortalGlowRef.current.material.color.set(cB);
       }
 
@@ -581,14 +576,6 @@ const MobiusTunnel = ({
     }
     if (exitPortalGlowRef.current) {
       exitPortalGlowRef.current.material.opacity = (0.30 + 0.12 * Math.sin(ppt + 0.8)) * dim;
-    }
-    if (exitPortalRing1Ref.current) {
-      exitPortalRing1Ref.current.rotation.z += delta * 1.5;
-      exitPortalRing1Ref.current.material.opacity = (0.65 + 0.15 * Math.sin(ppt * 1.1)) * dim;
-    }
-    if (exitPortalRing2Ref.current) {
-      exitPortalRing2Ref.current.rotation.x += delta * 0.85;
-      exitPortalRing2Ref.current.material.opacity = (0.50 + 0.12 * Math.cos(ppt * 0.9)) * dim;
     }
 
     // Tunnel birth: grow-in from both portal ends toward centre (first flip only)
@@ -689,29 +676,10 @@ const MobiusTunnel = ({
           />
         </mesh>
 
-        {/* Ring 1 — color1 (entry side color), orbits at z=0 */}
-        <mesh ref={exitPortalRing1Ref}>
-          <torusGeometry args={[0.36, 0.020, 8, 32]} />
-          <meshBasicMaterial
-            color={color1}
-            transparent
-            opacity={0.65}
-            blending={THREE.AdditiveBlending}
-            depthWrite={false}
-          />
-        </mesh>
-
-        {/* Ring 2 — color2 (exit side color), tilted 45° and counter-orbits */}
-        <mesh ref={exitPortalRing2Ref} rotation={[Math.PI / 4, 0, 0]}>
-          <torusGeometry args={[0.46, 0.014, 8, 32]} />
-          <meshBasicMaterial
-            color={color2}
-            transparent
-            opacity={0.50}
-            blending={THREE.AdditiveBlending}
-            depthWrite={false}
-          />
-        </mesh>
+        {/* Orbiting torus rings removed — every tunnel's exit portal sits on the
+            central mini-cube face, so with many active tunnels the rings stacked
+            into a cluster of overlapping spinning circles at the cube's core.
+            The portal glow + face already read the tunnel mouth without the noise. */}
       </group>
 
     </>
