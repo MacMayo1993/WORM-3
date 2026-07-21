@@ -311,12 +311,12 @@ export function useDemoMode({
       return;
     }
 
-    // Step 4 (View Modes) swaps in a fresh cube and background that take a beat
-    // to decode. Hold the loading cube over it for a guaranteed 2.5s — eager, so
-    // it shows even though the rebuild isn't a clean asset load — above the demo
-    // chrome so the player never watches it pop in.
-    if (step === 'view-showcase') {
-      armSceneGate?.('View Modes', { eager: true, holdMs: 2500, z: 10600 });
+    // The WORM step swaps in the Shanghai skybox and jumps the cube to 6×6 —
+    // the heaviest transition in the demo. Hold the loading cube over it for a
+    // guaranteed 2.5s — eager, so it shows even though the rebuild isn't a clean
+    // asset load — above the demo chrome so the player never watches it pop in.
+    if (step === 'worm-traversal') {
+      armSceneGate?.('Worm Mode', { eager: true, holdMs: 2500, z: 10600 });
     }
 
     applyDemoStepConfig(step);
