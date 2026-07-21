@@ -910,6 +910,17 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           mat.map = flipFromTexture.current || null;
           mat.color.set(flipFromTexture.current ? '#ffffff' : flipFromColor.current);
           mat.needsUpdate = true;
+        } else if (mat?.uniforms?.baseColor && flipFromColor.current) {
+          // Shader tile-style: React already swapped the mesh to the antipodal (TO)
+          // style at frame 0, so the style "pops" while only color animates. Override
+          // it back to the FROM style for the first half; the midpoint swaps it to TO,
+          // so the antipodal style flips in with the animation. (Solid FROM has no
+          // style to show — leave the TO style visible in that case.)
+          const fromStyleName = manifoldStyles?.[prevVal] || 'solid';
+          if (fromStyleName !== 'solid') {
+            const fromAntiHex = fc[ANTIPODAL_COLOR[prevVal]] ?? null;
+            meshRef.current.material = getTileStyleMaterial(fromStyleName, flipFromColor.current, false, null, fromAntiHex);
+          }
         }
         meshRef.current.visible = true;
       }
@@ -1053,6 +1064,13 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         hitstopT.current = 0.05; // ~3 frames
         flashT.current = 0;
         flipFlashRef.current?.trigger();
+        // Swap the shader-style mesh to the antipodal (TO) style while it's squished
+        // shut, so the style reveals with the expand rather than popping at frame 0.
+        if (!isInstancedRef.current && meshRef.current?.material?.uniforms?.baseColor
+            && tileStyleRef.current && tileStyleRef.current !== 'solid') {
+          meshRef.current.material = getTileStyleMaterial(
+            tileStyleRef.current, baseColorRef.current, false, null, antipodalHexRef.current);
+        }
       }
 
       // Card-flip squish: compress to 0 at midpoint then expand back.
