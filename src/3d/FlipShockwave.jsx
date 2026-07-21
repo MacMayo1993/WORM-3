@@ -56,20 +56,24 @@ const FlipShockwave = React.forwardRef((_props, ref) => {
     uProgress: { value: 1 }, // idle = spent = transparent (must NOT start at 0)
   }));
   const matRef = useRef();
+  const meshRef = useRef();
 
   useImperativeHandle(ref, () => ({
     trigger(color) {
       if (color) uniforms.uColor.value.set(color);
       uniforms.uProgress.value = 0;
+      // Only draw while the burst is live — idle stickers skip this draw entirely.
+      if (meshRef.current) meshRef.current.visible = true;
     },
     // Advanced 0→1 by the parent tick (active-registry driven); ≥1 = transparent.
     setProgress(p) {
       uniforms.uProgress.value = p;
+      if (p >= 1 && meshRef.current) meshRef.current.visible = false;
     },
   }), [uniforms]);
 
   return (
-    <mesh position={[0, 0, 0.05]} renderOrder={12}>
+    <mesh ref={meshRef} position={[0, 0, 0.05]} renderOrder={12} visible={false}>
       <primitive object={_shockGeo} attach="geometry" />
       <shaderMaterial
         ref={matRef}

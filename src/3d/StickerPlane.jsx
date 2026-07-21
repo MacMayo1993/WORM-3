@@ -751,7 +751,6 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     uTime: { value: 0.0 },
   }));
   // Overlay ref for antipodal color bleed during flip transitions.
-  const flipOverlayRef = useRef();
   // Stable gridId for this sticker — written to flipBurstMap during flips so
   // WormholeTunnel can read the burst progress without prop drilling.
   // origPos/origDir/orig never change so this is computed once.
@@ -1178,10 +1177,6 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         groupRef.current.rotation.y = rot[1];
         groupRef.current.rotation.z = rot[2];
         groupRef.current.position.set(pos[0], pos[1], pos[2]);
-        if (flipOverlayRef.current) {
-          flipOverlayRef.current.material.opacity = 0;
-          flipOverlayRef.current.scale.x = 1;
-        }
         if (stickerGridIdRef.current) flipBurstMap.delete(stickerGridIdRef.current);
         // The more times this tile has already been flipped, the harder it shakes —
         // a visible sense of accumulating damage as it nears its flip cap.
@@ -1745,11 +1740,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         </group>
       </group>
 
-      {/* Color bleed overlay — both antipodal colors mix around the manifold crossing */}
-      <mesh ref={flipOverlayRef} position={[0, 0, 0.003]}>
-        <primitive object={_sharedStickerGeo} attach="geometry" />
-        <meshBasicMaterial transparent opacity={0} blending={THREE.AdditiveBlending} depthWrite={false} />
-      </mesh>
+      {/* Color-bleed overlay removed — it was mounted (and drawn) on every sticker but
+          only ever held at opacity 0; nothing ever animated it visible, so it was one
+          wasted transparent draw call per sticker (294 at 7×7). */}
 
       {/* Eyelid blink overlay — disparity flip: NormalBlending at 0.5 alpha over the
           FROM-color mesh gives a simultaneous 50/50 superposition of both colors.
