@@ -27,6 +27,7 @@ import { BIOME_GROUND_TEXTURES } from './BiomeGroundTextures.js';
 import { resolveColors } from '../utils/colorSchemes.js';
 import FlipParticles from './FlipParticles.jsx';
 import FlipShockwave from './FlipShockwave.jsx';
+import FlipFlash from './FlipFlash.jsx';
 import { fireFlipImpulse } from './flipImpulse.js';
 import HealParticles from './HealParticles.jsx';
 import ParityBreakthrough from './ParityBreakthrough.jsx';
@@ -798,6 +799,10 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // Shockwave progress (1 = idle/spent). Advanced in tickImpl so it rides the
   // active-sticker registry instead of a per-sticker useFrame.
   const shockT = useRef(1);
+  // Crossing bloom/chromatic flash (1 = idle) + hitstop freeze timer (seconds).
+  const flipFlashRef = useRef();
+  const flashT = useRef(1);
+  const hitstopT = useRef(0);
 
   // Register with the InstancedMesh batch manager.
   // useLayoutEffect so registration completes before the first WebGL frame —
@@ -905,6 +910,17 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           mat.map = flipFromTexture.current || null;
           mat.color.set(flipFromTexture.current ? '#ffffff' : flipFromColor.current);
           mat.needsUpdate = true;
+        } else if (mat?.uniforms?.baseColor && flipFromColor.current) {
+          // Shader tile-style: React already swapped the mesh to the antipodal (TO)
+          // style at frame 0, so the style "pops" while only color animates. Override
+          // it back to the FROM style for the first half; the midpoint swaps it to TO,
+          // so the antipodal style flips in with the animation. (Solid FROM has no
+          // style to show — leave the TO style visible in that case.)
+          const fromStyleName = manifoldStyles?.[prevVal] || 'solid';
+          if (fromStyleName !== 'solid') {
+            const fromAntiHex = fc[ANTIPODAL_COLOR[prevVal]] ?? null;
+            meshRef.current.material = getTileStyleMaterial(fromStyleName, flipFromColor.current, false, null, fromAntiHex);
+          }
         }
         meshRef.current.visible = true;
       }
@@ -1006,7 +1022,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     // Ensure we trigger animation if the tile is flipped (since ghost tile needs uTime updates).
     // If we need to transition the ghost tile (e.g. going from active to dormant), run at least one more frame.
     // wormhole keeps the loop alive so the indicator ring pulses while the tile is in disparity.
-    const anyActive = spinT.current > 0 || shakeT.current > 0 || showWormholeHazardFx || needsGhostUpdate || (spiderPlaneRef.current?.visible && !showGhostTile) || wormIntroT.current > 0 || healTRef.current >= 0 || shockT.current < 1 || (wormhole && !isSudokube);
+    const anyActive = spinT.current > 0 || shakeT.current > 0 || showWormholeHazardFx || needsGhostUpdate || (spiderPlaneRef.current?.visible && !showGhostTile) || wormIntroT.current > 0 || healTRef.current >= 0 || shockT.current < 1 || flashT.current < 1 || hitstopT.current > 0 || (wormhole && !isSudokube);
     if (!anyActive) {
       isActiveRef.current = false;
       deactivateSticker(stickerGridIdRef.current);
@@ -1031,10 +1047,31 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     }
 
     // Flip animation — X-axis scale squish (identity collapse, not card rotation)
-    if (spinT.current > 0 && groupRef.current) {
+    // Hitstop: at the manifold crossing the flip freezes for a few frames so the
+    // punch "lands" — meanwhile the shockwave / bloom-flash / camera-kick keep
+    // blasting. When the freeze bleeds out, the squish resumes from the crossing
+    // pose. (The existing flip body below is unchanged, just moved to else-if.)
+    if (spinT.current > 0 && groupRef.current && hitstopT.current > 0) {
+      hitstopT.current = Math.max(0, hitstopT.current - delta);
+    } else if (spinT.current > 0 && groupRef.current) {
       const dt = Math.min(delta * 2, spinT.current);
       spinT.current -= dt;
       const rawP = 1 - spinT.current;
+
+      // Crossing beat — fires once as the tile passes the seam (rawP crosses 0.5):
+      // start the hitstop freeze and the bloom/chromatic flash.
+      if (prevRawP.current < 0.5 && rawP >= 0.5) {
+        hitstopT.current = 0.05; // ~3 frames
+        flashT.current = 0;
+        flipFlashRef.current?.trigger();
+        // Swap the shader-style mesh to the antipodal (TO) style while it's squished
+        // shut, so the style reveals with the expand rather than popping at frame 0.
+        if (!isInstancedRef.current && meshRef.current?.material?.uniforms?.baseColor
+            && tileStyleRef.current && tileStyleRef.current !== 'solid') {
+          meshRef.current.material = getTileStyleMaterial(
+            tileStyleRef.current, baseColorRef.current, false, null, antipodalHexRef.current);
+        }
+      }
 
       // Card-flip squish: compress to 0 at midpoint then expand back.
       // Eyelid (disparity) → squish scale.y (vertical, top+bottom converge to center).
@@ -1234,6 +1271,12 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         innerGroupRef.current.position.z =
           u >= 1 ? 0 : -0.07 * Math.exp(-4.5 * u) * Math.sin(u * Math.PI * 3.0);
       }
+    }
+
+    // Crossing bloom/chromatic flash — advances faster than the shockwave (~0.2 s).
+    if (flashT.current < 1) {
+      flashT.current = Math.min(1, flashT.current + Math.min(delta, 0.05) * 5.0);
+      flipFlashRef.current?.setProgress(flashT.current);
     }
 
     pulseT.current += delta * 2.1;
@@ -1957,6 +2000,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
       {/* Neon shockwave ring — bursts across the tile face at the flip moment. */}
       <FlipShockwave ref={flipShockwaveRef} />
+
+      {/* Crossing bloom + chromatic flash — fires at the midpoint hitstop. */}
+      <FlipFlash ref={flipFlashRef} />
 
       {/* Heal seal overlay — golden convergence ring + color bloom on wormhole heal. */}
       <mesh ref={healSealRef} position={[0, 0, 0.004]} visible={false} renderOrder={11}>
