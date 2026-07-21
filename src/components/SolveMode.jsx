@@ -1,12 +1,29 @@
 // src/components/SolveMode.jsx
 // Compact floating solve panel — positioned bottom-right so the cube stays visible.
 // Shows Kociemba solution + animated layer highlights, plus a mini CFOP progress strip.
+//
+// Styled to match the demo step screens (the warm "paper" family): cream sheet,
+// sage-green + gold accents, UI_FONT chrome / DISPLAY_FONT title, MONO_FONT only
+// for the algorithm notation on the move chips.
 
 import React, { useMemo, useRef, useEffect } from 'react';
 import { checkSolveProgress } from '../game/solveDetection.js';
 import { useKociembaSolver } from '../teach/useKociembaSolver.js';
-import { useAntipodalEngine } from '../hooks/useAntipodalEngine.js';
-import { UI_FONT, MONO_FONT, GLASS_PANEL, GLASS_PANEL_BORDER, GLASS_TEXT, GLASS_TEXT_MUTED } from '../utils/uiTheme.js';
+import { UI_FONT, DISPLAY_FONT, MONO_FONT } from '../utils/uiTheme.js';
+
+// ── Demo-screen palette (warm paper / sage / gold) ─────────────────────────────
+const CARD_BG      = 'rgba(250, 247, 238, 0.97)';
+const CARD_BORDER  = 'rgba(111, 126, 86, 0.28)';
+const DIVIDER      = 'rgba(92, 111, 76, 0.20)';
+const INK_TITLE    = '#24331e'; // dark green display text
+const INK_BODY     = '#43513a'; // body copy
+const GOLD         = '#7b6f45'; // eyebrow / step labels
+const OLIVE_MUTED  = '#657156'; // muted olive
+const OLIVE_FAINT  = 'rgba(101, 113, 86, 0.5)';
+const SAGE         = '#5f7f4a'; // primary accent (buttons, done)
+const GOLD_ACCENT  = '#b88f4a'; // secondary accent (active step)
+const TERRACOTTA   = '#b0492f'; // muted error (replaces neon red)
+const CARD_SHADOW  = '0 14px 34px rgba(40, 48, 32, 0.20)';
 
 // ── CFOP mini progress strip ──────────────────────────────────────────────────
 
@@ -19,22 +36,23 @@ const STEPS = [
 
 function CfopStrip({ progress }) {
   return (
-    <div style={{ display: 'flex', gap: 4, padding: '6px 12px', borderBottom: `1px solid ${GLASS_PANEL_BORDER}` }}>
+    <div style={{ display: 'flex', gap: 6, padding: '8px 14px', borderBottom: `1px solid ${DIVIDER}` }}>
       {STEPS.map((s) => {
         const st = progress[s.id] || {};
         const done = st.complete;
         const active = progress.currentStep === s.id && !progress.solved;
+        const color = done ? SAGE : active ? GOLD_ACCENT : OLIVE_FAINT;
         return (
           <div key={s.id} style={{
-            flex: 1, textAlign: 'center', fontSize: 9,
-            fontFamily: MONO_FONT,
-            color: done ? '#00ff88' : active ? '#fefae0' : 'rgba(255,255,255,0.35)',
-            paddingBottom: 2,
-            borderBottom: `2px solid ${done ? '#00ff88' : active ? '#fefae0' : 'transparent'}`,
+            flex: 1, textAlign: 'center', fontSize: 9.5,
+            fontFamily: UI_FONT,
+            color,
+            paddingBottom: 3,
+            borderBottom: `2px solid ${done ? SAGE : active ? GOLD_ACCENT : 'transparent'}`,
             transition: 'all 0.3s',
           }}>
-            <div style={{ fontWeight: done || active ? 700 : 400 }}>{s.label}</div>
-            <div style={{ opacity: 0.7 }}>{st.solvedCount ?? 0}/{st.total ?? '?'}</div>
+            <div style={{ fontWeight: done || active ? 800 : 600, letterSpacing: '0.04em' }}>{s.label}</div>
+            <div style={{ opacity: 0.75, fontSize: 9 }}>{st.solvedCount ?? 0}/{st.total ?? '?'}</div>
           </div>
         );
       })}
@@ -46,26 +64,26 @@ function CfopStrip({ progress }) {
 
 function MoveChip({ notation, state }) {
   // state: 'done' | 'next' | 'upcoming'
-  const bg = state === 'done'     ? 'rgba(255,255,255,0.07)'
-           : state === 'next'     ? 'rgba(0,217,255,0.20)'
-           :                        'rgba(255,255,255,0.04)';
-  const border = state === 'next' ? '1px solid rgba(0,217,255,0.7)' : `1px solid ${GLASS_PANEL_BORDER}`;
-  const color  = state === 'done' ? 'rgba(255,255,255,0.35)'
-               : state === 'next' ? '#00d9ff'
-               :                    'rgba(255,255,255,0.75)';
+  const bg = state === 'done'     ? 'rgba(92, 111, 76, 0.08)'
+           : state === 'next'     ? 'rgba(95, 127, 74, 0.16)'
+           :                        'rgba(92, 111, 76, 0.04)';
+  const border = state === 'next' ? `1px solid ${SAGE}` : `1px solid ${CARD_BORDER}`;
+  const color  = state === 'done' ? 'rgba(101, 113, 86, 0.55)'
+               : state === 'next' ? '#35452a'
+               :                    INK_BODY;
   return (
     <span style={{
       display: 'inline-block',
-      padding: '3px 6px',
-      borderRadius: 4,
+      padding: '4px 7px',
+      borderRadius: 7,
       background: bg,
       border,
       color,
       fontSize: 11,
       fontFamily: MONO_FONT,
-      fontWeight: state === 'next' ? 700 : 400,
+      fontWeight: state === 'next' ? 800 : 500,
       whiteSpace: 'nowrap',
-      animation: state === 'next' ? 'kociemba-pulse 1s ease-in-out infinite' : 'none',
+      animation: state === 'next' ? 'kociemba-pulse 1.4s ease-in-out infinite' : 'none',
       flexShrink: 0,
     }}>
       {notation}
@@ -159,14 +177,14 @@ export default function SolveMode({ cubies, size, onClose }) {
     error:   'Error',
   }[status] ?? '';
 
-  const statusColor = isDone ? '#00ff88' : status === 'error' ? '#f87171' : GLASS_TEXT_MUTED;
+  const statusColor = isDone ? SAGE : status === 'error' ? TERRACOTTA : OLIVE_MUTED;
 
   return (
     <>
       <style>{`
         @keyframes kociemba-pulse {
-          0%,100% { box-shadow: 0 0 0 0 rgba(0,217,255,0.6); }
-          50%      { box-shadow: 0 0 8px 3px rgba(0,217,255,0.35); }
+          0%,100% { box-shadow: 0 0 0 0 rgba(95,127,74,0.0); }
+          50%      { box-shadow: 0 0 0 3px rgba(95,127,74,0.16); }
         }
       `}</style>
 
@@ -174,34 +192,45 @@ export default function SolveMode({ cubies, size, onClose }) {
         position: 'fixed',
         right: 16,
         bottom: 72,          /* sits just above the bottom nav bar */
-        width: 272,
-        background: GLASS_PANEL,
-        backdropFilter: 'blur(14px)',
-        WebkitBackdropFilter: 'blur(14px)',
-        borderRadius: 12,
-        border: `1px solid ${GLASS_PANEL_BORDER}`,
-        color: GLASS_TEXT,
+        width: 274,
+        background: CARD_BG,
+        backdropFilter: 'blur(14px) saturate(1.05)',
+        WebkitBackdropFilter: 'blur(14px) saturate(1.05)',
+        borderRadius: 18,
+        border: `1px solid ${CARD_BORDER}`,
+        color: INK_BODY,
         zIndex: 1000,
         overflow: 'hidden',
-        fontFamily: MONO_FONT,
+        fontFamily: UI_FONT,
         userSelect: 'none',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+        boxShadow: CARD_SHADOW,
       }}>
 
         {/* ── Header ─────────────────────────────────────── */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '8px 12px',
+          padding: '11px 14px 9px',
         }}>
-          <span style={{ fontSize: 10, letterSpacing: '0.12em', opacity: 0.6, fontFamily: UI_FONT }}>
-            KOCIEMBA SOLVER
-          </span>
-          <span style={{ fontSize: 11, color: statusColor, fontWeight: 600 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+            <span style={{
+              fontSize: 10, letterSpacing: '0.14em', fontWeight: 900,
+              textTransform: 'uppercase', color: GOLD, fontFamily: UI_FONT,
+            }}>
+              Kociemba
+            </span>
+            <span style={{
+              fontFamily: DISPLAY_FONT, fontSize: 16, lineHeight: 1, color: INK_TITLE,
+              letterSpacing: '0.01em',
+            }}>
+              Solver
+            </span>
+          </div>
+          <span style={{ fontSize: 12, color: statusColor, fontWeight: 800, whiteSpace: 'nowrap' }}>
             {statusLabel}
           </span>
-          <button onClick={onClose} style={{
-            background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)',
-            cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: '0 2px',
+          <button onClick={onClose} aria-label="Close solver" style={{
+            background: 'none', border: 'none', color: OLIVE_MUTED,
+            cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: '0 2px', marginLeft: 4,
           }}>✕</button>
         </div>
 
@@ -213,7 +242,7 @@ export default function SolveMode({ cubies, size, onClose }) {
           <div
             ref={scrollRef}
             style={{
-              display: 'flex', gap: 4, padding: '8px 10px',
+              display: 'flex', gap: 5, padding: '10px 12px',
               overflowX: 'auto', scrollbarWidth: 'none',
             }}
           >
@@ -230,27 +259,27 @@ export default function SolveMode({ cubies, size, onClose }) {
 
         {/* ── Status messages ────────────────────────────── */}
         {status === 'idle' && size !== 3 && (
-          <div style={{ padding: '10px 12px', fontSize: 11, color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>
+          <div style={{ padding: '11px 14px', fontSize: 12, color: OLIVE_MUTED, textAlign: 'center' }}>
             3×3 only
           </div>
         )}
         {status === 'idle' && size === 3 && !hasMoves && (
-          <div style={{ padding: '8px 12px', fontSize: 11, color: 'rgba(255,255,255,0.5)', textAlign: 'center' }}>
+          <div style={{ padding: '9px 14px', fontSize: 12, color: OLIVE_MUTED, textAlign: 'center' }}>
             Waiting for cube state…
           </div>
         )}
         {status === 'solving' && (
-          <div style={{ padding: '8px 12px', fontSize: 11, color: '#fefae0', textAlign: 'center' }}>
+          <div style={{ padding: '9px 14px', fontSize: 12, color: GOLD_ACCENT, textAlign: 'center', fontWeight: 700 }}>
             Computing optimal solution…
           </div>
         )}
         {status === 'error' && (
-          <div style={{ padding: '8px 12px', fontSize: 11, color: '#f87171' }}>
+          <div style={{ padding: '9px 14px', fontSize: 12, color: TERRACOTTA, lineHeight: 1.4 }}>
             {error}
           </div>
         )}
         {isDone && (
-          <div style={{ padding: '6px 12px', fontSize: 11, color: '#00ff88', textAlign: 'center', fontWeight: 600 }}>
+          <div style={{ padding: '8px 14px', fontSize: 12.5, color: SAGE, textAlign: 'center', fontWeight: 800 }}>
             {alreadySolved ? '✓ Already solved!' : '✓ Cube solved!'}
           </div>
         )}
@@ -258,22 +287,22 @@ export default function SolveMode({ cubies, size, onClose }) {
         {/* ── Controls ───────────────────────────────────── */}
         {size === 3 && (hasMoves || isPlaying) && (
           <div style={{
-            display: 'flex', gap: 6, padding: '8px 10px',
-            borderTop: `1px solid ${GLASS_PANEL_BORDER}`,
+            display: 'flex', gap: 8, padding: '10px 12px 12px',
+            borderTop: `1px solid ${DIVIDER}`,
           }}>
             <button
               onClick={isPlaying ? pause : play}
               disabled={!isPlaying && !canPlay}
-              style={ctrlBtn(isPlaying ? '#00d9ff' : '#00ff88', !isPlaying && !canPlay)}
+              style={primaryBtn(isPlaying ? GOLD_ACCENT : SAGE, !isPlaying && !canPlay)}
             >
-              {isPlaying ? '⏸ PAUSE' : isDone ? '↺ REPLAY' : '▶ PLAY'}
+              {isPlaying ? '⏸ Pause' : isDone ? '↺ Replay' : '▶ Play'}
             </button>
             <button
               onClick={stepForward}
               disabled={isPlaying || moveIndex >= moves.length}
-              style={ctrlBtn('#fbbf24', isPlaying || moveIndex >= moves.length)}
+              style={ghostBtn(isPlaying || moveIndex >= moves.length)}
             >
-              ⏭ STEP
+              ⏭ Step
             </button>
           </div>
         )}
@@ -285,33 +314,40 @@ export default function SolveMode({ cubies, size, onClose }) {
   );
 }
 
-function ctrlBtn(accent, disabled) {
+// Filled pill button (primary action) — matches the demo's sage CTA.
+function primaryBtn(accent, disabled) {
   return {
-    flex: 1, padding: '6px 0', borderRadius: 6,
-    background: disabled ? 'rgba(255,255,255,0.04)' : `rgba(${hexToRgb(accent)},0.14)`,
-    border: `1px solid ${disabled ? GLASS_PANEL_BORDER : accent}`,
-    color: disabled ? 'rgba(255,255,255,0.25)' : accent,
+    flex: 1, padding: '9px 0', borderRadius: 999,
+    background: disabled ? 'rgba(92, 111, 76, 0.12)' : accent,
+    border: 'none',
+    color: disabled ? 'rgba(101, 113, 86, 0.5)' : '#fffdf5',
     cursor: disabled ? 'default' : 'pointer',
-    fontSize: 11, fontFamily: MONO_FONT, fontWeight: 600,
+    fontSize: 12.5, fontFamily: UI_FONT, fontWeight: 800, letterSpacing: '0.02em',
+    boxShadow: disabled ? 'none' : '0 6px 14px rgba(95, 127, 74, 0.26)',
     transition: 'all 0.15s',
   };
 }
 
-function hexToRgb(hex) {
-  // accepts #rrggbb or rgb(...) strings
-  const m = hex.match(/^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
-  if (m) return `${parseInt(m[1],16)},${parseInt(m[2],16)},${parseInt(m[3],16)}`;
-  const r = hex.match(/\d+/g);
-  return r ? r.slice(0,3).join(',') : '255,255,255';
+// Ghost / outline pill button (secondary action).
+function ghostBtn(disabled) {
+  return {
+    flex: 1, padding: '9px 0', borderRadius: 999,
+    background: 'transparent',
+    border: `1px solid ${disabled ? 'rgba(92, 111, 76, 0.18)' : GOLD_ACCENT}`,
+    color: disabled ? 'rgba(101, 113, 86, 0.45)' : GOLD_ACCENT,
+    cursor: disabled ? 'default' : 'pointer',
+    fontSize: 12.5, fontFamily: UI_FONT, fontWeight: 800, letterSpacing: '0.02em',
+    transition: 'all 0.15s',
+  };
 }
 
-// Compact toggle used by BottomNavBar (unchanged)
+// Compact toggle used by BottomNavBar (restyled off neon green).
 export function SolveModeButton({ active, onClick }) {
   return (
     <button
       onClick={onClick}
       className={`btn-compact text ${active ? 'active' : ''}`}
-      style={{ color: active ? '#00ff88' : undefined, borderColor: active ? '#00ff88' : undefined }}
+      style={{ color: active ? SAGE : undefined, borderColor: active ? SAGE : undefined }}
     >
       SOLVE
     </button>
