@@ -311,6 +311,14 @@ export function useDemoMode({
       return;
     }
 
+    // Step 4 (View Modes) swaps in a fresh cube and background that take a beat
+    // to decode. Hold the loading cube over it for a guaranteed 2.5s — eager, so
+    // it shows even though the rebuild isn't a clean asset load — above the demo
+    // chrome so the player never watches it pop in.
+    if (step === 'view-showcase') {
+      armSceneGate?.('View Modes', { eager: true, holdMs: 2500, z: 10600 });
+    }
+
     applyDemoStepConfig(step);
 
     demoFlipPhaseRef.current = step === 'flip-gateway' ? 'flip-all' : null;
@@ -353,7 +361,7 @@ export function useDemoMode({
     if (config && config.type === 'random') {
       demoWatchTimers.current.push(setTimeout(() => setDemoTryVisible(true), 12000));
     }
-  }, [applyDemoStepConfig, handleOpenStore, clearDemoWatchTimers, startAnimatedShuffle]);
+  }, [applyDemoStepConfig, handleOpenStore, clearDemoWatchTimers, startAnimatedShuffle, armSceneGate]);
 
   const cleanupAllDemoState = useCallback((store) => {
     clearDemoWatchTimers();

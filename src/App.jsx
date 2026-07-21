@@ -422,8 +422,16 @@ export default function WORM3() {
   // environment map / textures decode (only if a decode is actually in flight).
   const [sceneGateToken, setSceneGateToken] = useState(0);
   const [sceneGateLabel, setSceneGateLabel] = useState('Loading');
-  const armSceneGate = useCallback((label = 'Loading') => {
+  const [sceneGateEager, setSceneGateEager] = useState(false);
+  const [sceneGateHold, setSceneGateHold] = useState(650);
+  const [sceneGateZ, setSceneGateZ] = useState(9996);
+  // opts.eager shows the cube at once and holds for opts.holdMs (vs. the default
+  // probe that only shows if a decode registers); opts.z overrides the layer.
+  const armSceneGate = useCallback((label = 'Loading', opts = {}) => {
     setSceneGateLabel(label);
+    setSceneGateEager(!!opts.eager);
+    setSceneGateHold(opts.holdMs ?? 650);
+    setSceneGateZ(opts.z ?? 9996);
     setSceneGateToken((t) => t + 1);
   }, []);
   const bootStartRef = useRef(performance.now());
@@ -1237,7 +1245,7 @@ export default function WORM3() {
       {/* Mode-transition cover: sits above the game HUD / FX (≤9990) but below the
           Mobi dialogue (10500), so it fills the gap after Mobi while the scene's
           background decodes. Self-dismisses when nothing is loading. */}
-      <SceneLoadingGate armToken={sceneGateToken} label={sceneGateLabel} style={{ zIndex: 9996 }} />
+      <SceneLoadingGate armToken={sceneGateToken} label={sceneGateLabel} eager={sceneGateEager} minVisibleMs={sceneGateHold} style={{ zIndex: sceneGateZ }} />
       <ScreenTransition show={showTutorial && !showWelcome}>
         <Tutorial onClose={closeTutorial} onMainMenu={() => { closeTutorial(); handleBackToMainMenu(); }} />
       </ScreenTransition>

@@ -25,7 +25,8 @@ export default function SceneLoadingGate({
   armToken,
   label = 'Loading',
   transparent = false,
-  showTitle = true,
+  showTitle = false,
+  eager = false,
   minVisibleMs = 650,
   probeMs = 500,
   maxVisibleMs = 12000,
@@ -68,10 +69,18 @@ export default function SceneLoadingGate({
       }, fadeMs);
     };
 
-    // If a decode is already in flight at arm time (the common case — the env
-    // map started loading behind the wizard/Mobi dialogue), show immediately so
-    // there's no one-frame gap between the dialogue closing and the cover.
-    {
+    if (eager) {
+      // Guaranteed cover: show at once and hold for at least minVisibleMs whether
+      // or not a decode registers (used where the work — e.g. a demo step's cube
+      // rebuild — isn't a clean asset load). It still extends until any decode
+      // settles and is capped by maxVisibleMs.
+      s.shown = true;
+      s.shownAt = s.armedAt;
+      setVisible(true);
+    } else {
+      // If a decode is already in flight at arm time (the common case — the env
+      // map started loading behind the wizard/Mobi dialogue), show immediately so
+      // there's no one-frame gap between the dialogue closing and the cover.
       const { active, progress } = progRef.current;
       if (active && progress < 100) {
         s.shown = true;
