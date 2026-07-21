@@ -26,6 +26,7 @@ import WoodVolume from './styles/WoodVolume.jsx';
 import { BIOME_GROUND_TEXTURES } from './BiomeGroundTextures.js';
 import { resolveColors } from '../utils/colorSchemes.js';
 import FlipParticles from './FlipParticles.jsx';
+import FlipShockwave from './FlipShockwave.jsx';
 import HealParticles from './HealParticles.jsx';
 import ParityBreakthrough from './ParityBreakthrough.jsx';
 import StickerWorm from './StickerWorm.jsx';
@@ -788,6 +789,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
   // Imperative ref to FlipParticles — avoids re-rendering StickerPlane on every flip.
   const flipParticlesRef = useRef();
+  // Imperative ref to FlipShockwave — the neon burst ring fired on each flip.
+  const flipShockwaveRef = useRef();
 
   // Register with the InstancedMesh batch manager.
   // useLayoutEffect so registration completes before the first WebGL frame —
@@ -904,6 +907,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         instanceColorRef.current.setStyle(flipFromColor.current);
       }
       flipParticlesRef.current?.trigger(fc[curr]);
+      flipShockwaveRef.current?.trigger(fc[curr]);
       play('/sounds/flip.mp3');
       vibrateFlip(flips, effectiveFlipCap);
     }
@@ -1918,6 +1922,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
       {/* Particle burst effect during flip (manual + chaos/disparity). */}
       <FlipParticles ref={flipParticlesRef} />
+
+      {/* Neon shockwave ring — bursts across the tile face at the flip moment. */}
+      <FlipShockwave ref={flipShockwaveRef} />
 
       {/* Heal seal overlay — golden convergence ring + color bloom on wormhole heal. */}
       <mesh ref={healSealRef} position={[0, 0, 0.004]} visible={false} renderOrder={11}>
