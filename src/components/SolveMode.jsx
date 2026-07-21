@@ -9,7 +9,8 @@
 import React, { useMemo, useRef, useEffect } from 'react';
 import { checkSolveProgress } from '../game/solveDetection.js';
 import { useKociembaSolver } from '../teach/useKociembaSolver.js';
-import { UI_FONT, DISPLAY_FONT, MONO_FONT } from '../utils/uiTheme.js';
+import { useAntipodalEngine } from '../hooks/useAntipodalEngine.js';
+import { UI_FONT, DISPLAY_FONT, MONO_FONT, GLASS_PANEL_BORDER } from '../utils/uiTheme.js';
 
 // ── Demo-screen palette (warm paper / sage / gold) ─────────────────────────────
 const CARD_BG      = 'rgba(250, 247, 238, 0.97)';
@@ -142,6 +143,27 @@ function FibreStrip({ fibre, disabled }) {
       )}
     </div>
   );
+}
+
+// Compact control-button style used by the antipodal fibre strip.
+function ctrlBtn(accent, disabled) {
+  return {
+    flex: 1, padding: '6px 0', borderRadius: 6,
+    background: disabled ? 'rgba(255,255,255,0.04)' : `rgba(${hexToRgb(accent)},0.14)`,
+    border: `1px solid ${disabled ? GLASS_PANEL_BORDER : accent}`,
+    color: disabled ? 'rgba(255,255,255,0.25)' : accent,
+    cursor: disabled ? 'default' : 'pointer',
+    fontSize: 11, fontFamily: MONO_FONT, fontWeight: 600,
+    transition: 'all 0.15s',
+  };
+}
+
+function hexToRgb(hex) {
+  // accepts #rrggbb or rgb(...) strings
+  const m = hex.match(/^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+  if (m) return `${parseInt(m[1], 16)},${parseInt(m[2], 16)},${parseInt(m[3], 16)}`;
+  const r = hex.match(/\d+/g);
+  return r ? r.slice(0, 3).join(',') : '255,255,255';
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
