@@ -1,0 +1,343 @@
+/* LoadingScreen.css — styles for the WORM³ loading cube.
+ *
+ * Design goals:
+ *  - Pure CSS/GPU-composited. No WebGL context (would collide with the app's
+ *    single R3F <Canvas>) and no requestAnimationFrame canvas loops — a loading
+ *    screen must be CHEAP, because it runs while heavy chunks/EXR maps decode.
+ *  - Face colors + antipodal layout mirror the real game (see utils/constants.js:
+ *    Red↔Orange, Green↔Blue, White↔Yellow sit on opposite faces).
+ *  - Fonts/panel come from uiTheme tokens, injected as CSS vars by the component.
+ *  - Fully respects prefers-reduced-motion (freezes to a lit 3/4 pose).
+ */
+
+.wl-root {
+  position: fixed;
+  inset: 0;
+  z-index: 4000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(18px, 4vh, 42px);
+  overflow: hidden;
+  /* GLASS-family dark field so it fully hides whatever is decoding behind it. */
+  background: radial-gradient(ellipse at 50% 38%, #101a33 0%, #060a18 62%, #03050e 100%);
+  --wl-cube: clamp(120px, 30vmin, 190px);
+  --wl-half: calc(var(--wl-cube) / 2);
+}
+
+/* Transparent variant — used when the loader overlays a scene that should show
+   through (e.g. a soft cover during a background swap rather than a full boot). */
+.wl-root.wl-transparent {
+  background: rgba(5, 8, 20, 0.72);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+/* RP2 grid field — faint drifting lines that fade out toward the centre, echoing
+   the projective-plane paper background without a shader. mask keeps it subtle. */
+.wl-root::before {
+  content: '';
+  position: absolute;
+  inset: -20%;
+  background-image: repeating-linear-gradient(0deg, rgba(120, 160, 255, 0.06) 0 1px, transparent 1px 46px),
+    repeating-linear-gradient(90deg, rgba(120, 160, 255, 0.06) 0 1px, transparent 1px 46px);
+  -webkit-mask-image: radial-gradient(ellipse at 50% 46%, transparent 0%, transparent 24%, #000 78%);
+  mask-image: radial-gradient(ellipse at 50% 46%, transparent 0%, transparent 24%, #000 78%);
+  animation: wl-grid-drift 26s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes wl-grid-drift {
+  0% { transform: translate(0, 0); }
+  100% { transform: translate(46px, 46px); }
+}
+
+/* === Title card (mirrors the main-menu WORM³ mark) === */
+.wl-title-card {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  padding: 16px 30px 14px;
+  border-radius: 22px;
+  background: rgba(6, 10, 24, 0.72);
+  border: 1px solid rgba(120, 160, 255, 0.14);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(120, 160, 255, 0.1);
+}
+
+.wl-title {
+  margin: 0;
+  font-family: var(--wl-display-font);
+  font-size: clamp(42px, 11vw, 82px);
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  background: linear-gradient(
+    100deg,
+    #ef4444 0%,
+    #f97316 18%,
+    #eab308 36%,
+    #22c55e 54%,
+    #3b82f6 72%,
+    #a855f7 90%,
+    #ef4444 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: wl-title-shimmer 6s linear infinite;
+}
+
+.wl-title sup {
+  font-size: 0.42em;
+  vertical-align: super;
+}
+
+@keyframes wl-title-shimmer {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+.wl-title-sub {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.wl-title-sub p {
+  margin: 0;
+  font-family: var(--wl-ui-font);
+  font-size: clamp(9px, 1.6vw, 12px);
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: rgba(200, 220, 255, 0.9);
+  text-shadow: 0 0 20px rgba(100, 160, 255, 0.5);
+}
+
+.wl-title-sub .wl-line {
+  width: 30px;
+  height: 1px;
+}
+.wl-title-sub .wl-line.left {
+  background: linear-gradient(to right, transparent, rgba(140, 180, 255, 0.55));
+}
+.wl-title-sub .wl-line.right {
+  background: linear-gradient(to left, transparent, rgba(140, 180, 255, 0.55));
+}
+
+/* === Scene: cube levitating over the portal === */
+.wl-scene {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* === Cube stage === */
+.wl-stage {
+  position: relative;
+  z-index: 2;
+  width: var(--wl-cube);
+  height: var(--wl-cube);
+  perspective: 900px;
+  animation: wl-levitate 4s ease-in-out infinite;
+}
+
+@keyframes wl-levitate {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-18px); }
+}
+
+/* Spinning black-hole portal (2D canvas, LoadingPortal.jsx) pulled up so the
+   cube levitates over its mouth. Behind the cube (z below the stage). */
+.wl-portal {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: min(520px, 92vw);
+  height: auto;
+  margin-top: -30px;
+  pointer-events: none;
+}
+
+.wl-cube {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  animation: wl-tumble 7s ease-in-out infinite;
+  will-change: transform;
+}
+
+/* Multi-axis tumble that reveals every antipodal pair over one cycle. */
+@keyframes wl-tumble {
+  0% { transform: rotateX(-20deg) rotateY(0deg) rotateZ(0deg); }
+  33% { transform: rotateX(18deg) rotateY(140deg) rotateZ(-10deg); }
+  66% { transform: rotateX(-26deg) rotateY(255deg) rotateZ(8deg); }
+  100% { transform: rotateX(-20deg) rotateY(360deg) rotateZ(0deg); }
+}
+
+.wl-face {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 4%;
+  padding: 6%;
+  border-radius: 12%;
+  /* Dark speedcube body — the gap/padding read as the plastic frame. */
+  background: #0a0b12;
+  border: 1px solid rgba(0, 0, 0, 0.6);
+  box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.55);
+  /* Directional wash baked per face so the cube reads as lit, not flat. */
+  backface-visibility: hidden;
+}
+
+.wl-face::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 12%;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.14), transparent 55%, rgba(0, 0, 0, 0.28));
+  pointer-events: none;
+}
+
+.wl-sticker {
+  position: relative;
+  border-radius: 16%;
+  /* Longhand (not the `background` shorthand) so an inline background-image — the
+     rendered tile-style texture — layers over the face colour without resetting
+     background-size. */
+  background-color: var(--wl-c);
+  background-size: cover;
+  background-position: center;
+  overflow: hidden;
+  /* Glossy bevel: bright inner top-left, dark inner bottom-right + drop. */
+  box-shadow: inset 0 2px 3px rgba(255, 255, 255, 0.45), inset 0 -3px 4px rgba(0, 0, 0, 0.32),
+    0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+.wl-sticker::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 16%;
+  background: radial-gradient(circle at 32% 26%, rgba(255, 255, 255, 0.5) 0%, transparent 46%);
+  pointer-events: none;
+}
+
+/* Face placement — opposite faces are antipodal twins (constants.js). half = cube/2. */
+.wl-face.f-red { transform: rotateY(0deg) translateZ(var(--wl-half)); }
+.wl-face.f-orange { transform: rotateY(180deg) translateZ(var(--wl-half)); }
+.wl-face.f-green { transform: rotateY(90deg) translateZ(var(--wl-half)); }
+.wl-face.f-blue { transform: rotateY(-90deg) translateZ(var(--wl-half)); }
+.wl-face.f-white { transform: rotateX(90deg) translateZ(var(--wl-half)); }
+.wl-face.f-yellow { transform: rotateX(-90deg) translateZ(var(--wl-half)); }
+
+/* Sticker colors — exact game palette (utils/constants.js COLORS). */
+.f-red .wl-sticker { --wl-c: #ef4444; }
+.f-orange .wl-sticker { --wl-c: #f97316; }
+.f-green .wl-sticker { --wl-c: #22c55e; }
+.f-blue .wl-sticker { --wl-c: #3b82f6; }
+.f-white .wl-sticker { --wl-c: #fafafa; }
+.f-yellow .wl-sticker { --wl-c: #eab308; }
+
+/* === Status line (label + progress) === */
+.wl-status {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  min-height: 40px;
+}
+
+.wl-label {
+  margin: 0;
+  font-family: var(--wl-ui-font);
+  font-size: clamp(12px, 1.9vw, 15px);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: rgba(210, 226, 255, 0.92);
+  text-shadow: 0 0 18px rgba(90, 140, 255, 0.45);
+  display: inline-flex;
+  align-items: baseline;
+}
+
+/* Animated ellipsis for indeterminate loads. */
+.wl-dots i {
+  display: inline-block;
+  width: 0.5em;
+  opacity: 0.25;
+  animation: wl-dot 1.4s infinite;
+}
+.wl-dots i:nth-child(2) { animation-delay: 0.2s; }
+.wl-dots i:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes wl-dot {
+  0%, 60%, 100% { opacity: 0.25; }
+  30% { opacity: 1; }
+}
+
+/* Progress bar — indeterminate by default, determinate when width is set. */
+.wl-bar {
+  width: min(240px, 56vw);
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+.wl-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #5a8cff, #9fdb7a);
+}
+.wl-bar.indeterminate i {
+  width: 40%;
+  animation: wl-bar-slide 1.15s ease-in-out infinite;
+}
+.wl-bar.determinate i {
+  width: var(--wl-progress, 0%);
+  transition: width 0.3s ease;
+}
+
+@keyframes wl-bar-slide {
+  0% { margin-left: -40%; }
+  100% { margin-left: 100%; }
+}
+
+/* Fade-out helper — parent toggles this to dissolve the cover when ready. */
+.wl-root.wl-leaving {
+  opacity: 0;
+  transition: opacity 0.45s ease;
+  pointer-events: none;
+}
+
+/* === Reduced motion: freeze to a lit 3/4 pose, kill every loop === */
+@media (prefers-reduced-motion: reduce) {
+  .wl-root::before,
+  .wl-stage,
+  .wl-title,
+  .wl-dots i,
+  .wl-bar.indeterminate i {
+    animation: none;
+  }
+  .wl-cube {
+    animation: none;
+    transform: rotateX(-24deg) rotateY(-34deg);
+  }
+  .wl-bar.indeterminate i {
+    width: 100%;
+    opacity: 0.7;
+  }
+}

@@ -234,7 +234,7 @@ export default function UILayer({
         />}
 
         {/* Undo Indicator — desktop only (mobile uses MobileControls) */}
-        {moveHistory.length > 0 && !isMobile && (
+        {moveHistory.length > 0 && !isMobile && !demoDialogueVisible && (
           <div
             style={{
               position: 'fixed', bottom: '20px', left: '20px',
@@ -303,14 +303,30 @@ export default function UILayer({
         {/* Disparity Winner — cinematic celebration screen */}
         <ScreenTransition show={showDisparityWinner}>
           <Suspense fallback={null}>
-            <DisparityWinnerScreen
-              onDismiss={demoMode && onDemoDisparityDismiss ? onDemoDisparityDismiss : () => {
-                useGameStore.getState().clearDisparityGame();
-                useGameStore.getState().clearLastBetResult();
-                useGameStore.getState().setChaosLevel(0);
-                setShowDisparityWizard(true);
-              }}
-            />
+            {demoMode && onDemoDisparityDismiss ? (
+              // In the demo there's no real replay — a single Continue advances
+              // to the next demo step.
+              <DisparityWinnerScreen onDismiss={onDemoDisparityDismiss} primaryLabel="Continue →" />
+            ) : (
+              // Normal play: Play Again re-opens the setup wizard; Main Menu
+              // leaves chaos entirely.
+              <DisparityWinnerScreen
+                onDismiss={() => {
+                  useGameStore.getState().clearDisparityGame();
+                  useGameStore.getState().clearLastBetResult();
+                  useGameStore.getState().setChaosLevel(0);
+                  setShowDisparityWizard(true);
+                }}
+                primaryLabel="Play Again"
+                secondaryLabel="Main Menu"
+                onSecondary={() => {
+                  useGameStore.getState().clearDisparityGame();
+                  useGameStore.getState().clearLastBetResult();
+                  useGameStore.getState().setChaosLevel(0);
+                  useGameStore.getState().setShowMainMenu(true);
+                }}
+              />
+            )}
           </Suspense>
         </ScreenTransition>
 
@@ -617,6 +633,7 @@ export default function UILayer({
             else performCursorRotation('ccw');
           }}
           onUndo={undo} canUndo={canUndo} undoCount={moveHistory.length}
+          showUndo={!demoDialogueVisible}
           teachModeActive={teachMode.active}
           onToggleTeachMode={() => { if (teachMode.active) teachMode.exitTeachMode(); else teachMode.enterTeachMode(); }}
           cubeSize={size}

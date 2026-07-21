@@ -8,11 +8,13 @@ import { extractColorsFromImage } from '../../utils/colorExtraction.js';
 import {
   UI_FONT,
   PAPER_BACKDROP, PAPER_BACKDROP_BLUR,
-  PAPER_SHEET, PAPER_SHEET_RAISED, PAPER_BORDER, PAPER_BORDER_SOFT,
+  PAPER_SHEET_RAISED, PAPER_BORDER, PAPER_BORDER_SOFT,
   PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT,
-  PAPER_FOOTER_BG, PAPER_BG_MUTED, PAPER_CARD_SHADOW, PAPER_SHADOW,
+  PAPER_BG_MUTED, PAPER_CARD_SHADOW, PAPER_SHADOW,
 } from '../../utils/uiTheme.js';
 import { BG_PREVIEWS } from '../../utils/bgPreviews.js';
+import { wizardPaperBackground, WIZARD_FOOTER_BG, WizardPreviewNote } from './WizardChrome.jsx';
+import { WIZARD_PREVIEW } from '../../utils/demoStepCopy.js';
 
 const BG_OPTIONS = BACKGROUNDS.map(bg => ({
   value: bg.id,
@@ -70,7 +72,7 @@ const S = {
   },
 
   sheet: {
-    background: PAPER_SHEET,
+    ...wizardPaperBackground,
     borderRadius: '20px',
     width: 'min(640px, 96vw)',
     maxHeight: '88vh',
@@ -79,6 +81,7 @@ const S = {
     overflow: 'hidden',
     boxShadow: PAPER_SHADOW,
     border: '1px solid #cec8be',
+    borderTop: `3px solid ${ACCENT}`,
     animation: 'modalSheetIn 0.30s cubic-bezier(0.22, 1, 0.36, 1)',
   },
 
@@ -198,7 +201,7 @@ const S = {
     alignItems: 'center',
     flexShrink: 0,
     borderTop: '1px solid #d6d0c8',
-    background: PAPER_FOOTER_BG,
+    background: WIZARD_FOOTER_BG,
   },
 
   btnSecondary: {
@@ -651,6 +654,7 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           </div>
           <h2 style={S.title}>{stepTitles[step]}</h2>
           <p style={S.subtitle}>{stepSubtitles[step]}</p>
+          <WizardPreviewNote accent={ACCENT} text={WIZARD_PREVIEW.freeplay} />
         </div>
 
         {/* Scrollable body */}

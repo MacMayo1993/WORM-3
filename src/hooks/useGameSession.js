@@ -22,6 +22,7 @@ export function useGameSession() {
   const victory = useGameStore((state) => state.victory);
   const achievedWins = useGameStore((state) => state.achievedWins);
   const chaosLevel = useGameStore((state) => state.chaosLevel);
+  const demoMode = useGameStore((state) => state.demoMode);
 
   const setGameTime = useGameStore((state) => state.setGameTime);
   const setVictory = useGameStore((state) => state.setVictory);
@@ -50,6 +51,12 @@ export function useGameSession() {
     // Skip during chaos/disparity mode — cubies update at 100+ Hz and traditional
     // win conditions don't apply. Re-runs once when chaosLevel drops back to 0.
     if (chaosLevel > 0) return;
+    // Skip during the demo: its steps deliberately stage solved cubes (the
+    // baby-cube step starts solved, before its watch scramble runs) with
+    // hasShuffled already true, so firing the victory screen here would flash it
+    // for a frame before the demo's own suppression clears it. Advancement in
+    // the demo is explicit, never via this screen.
+    if (demoMode) return;
 
     // Only two victories remain: the Worm secret win (rarest) and the classic
     // solve. The Sudokube / Ultimate (Latin-square) screens were removed — their
@@ -70,7 +77,7 @@ export function useGameSession() {
       setVictory(VICTORY.RUBIKS);
       setAchievedWins((prev) => ({ ...prev, rubiks: true }));
     }
-  }, [cubies, size, hasShuffled, victory, achievedWins, chaosLevel, setVictory, setAchievedWins]);
+  }, [cubies, size, hasShuffled, victory, achievedWins, chaosLevel, demoMode, setVictory, setAchievedWins]);
 
   // Format time for display
   const formatTime = useCallback((seconds) => {

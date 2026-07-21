@@ -137,6 +137,7 @@ const MobileControls = React.memo(({
   onUndo,
   canUndo,
   undoCount,
+  showUndo = true,
   teachModeActive,
   onToggleTeachMode,
   cubeSize,
@@ -147,8 +148,8 @@ const MobileControls = React.memo(({
 
   return (
     <>
-      {/* Left side - Undo button (always visible when available) */}
-      {canUndo && (
+      {/* Left side - Undo button (hidden while a demo dialogue is presenting) */}
+      {canUndo && showUndo && (
         <div style={undoContainerStyle}>
           <button
             onClick={onUndo}

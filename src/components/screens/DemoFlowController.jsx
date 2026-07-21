@@ -3,6 +3,7 @@ import { UI_FONT, DISPLAY_FONT } from '../../utils/uiTheme.js';
 import { makeCubies } from '../../game/cubeState.js';
 import { flipStickerPair, buildManifoldGridMap } from '../../game/manifoldLogic.js';
 import { useGameStore } from '../../hooks/useGameStore.js';
+import { STEP_COPY } from '../../utils/demoStepCopy.js';
 import MobiIntroScreen from './MobiIntroScreen.jsx';
 
 const DEMO_STEPS = [
@@ -366,6 +367,90 @@ const ensureDemoShellStyle = () => {
       letter-spacing: 0.03em;
       box-shadow: 0 6px 14px rgba(95, 127, 74, 0.28);
     }
+
+    /* Worm control hint — non-blocking pill during early worm-step play.
+       Sits above the bottom-docked progress/coach pills; fades out once the
+       player makes progress (first tunnel) or the skip pill appears. */
+    .demo-worm-hint {
+      position: fixed;
+      left: 50%;
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 196px);
+      transform: translateX(-50%);
+      z-index: 11000;
+      width: min(320px, calc(100vw - 40px));
+      padding: 10px 16px;
+      border-radius: 14px;
+      background: rgba(250, 247, 238, 0.94);
+      border: 1px solid rgba(111, 126, 86, 0.25);
+      box-shadow: 0 10px 26px rgba(40, 48, 32, 0.22);
+      color: #26331f;
+      font-family: ${UI_FONT};
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.4;
+      text-align: center;
+      pointer-events: none;
+      animation: demo-worm-hint-in 0.4s ease both;
+    }
+
+    .demo-worm-hint strong { font-weight: 800; color: #3f5730; }
+
+    @keyframes demo-worm-hint-in {
+      from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+      to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
+
+    /* Flip-gateway progress pill — bottom-center, above the nav bar. Shows how
+       many front-face tiles are flipped (or restored) so the loop feels bounded. */
+    .demo-flip-progress {
+      position: fixed;
+      left: 50%;
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 92px);
+      transform: translateX(-50%);
+      z-index: 11000;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 15px;
+      border-radius: 999px;
+      background: rgba(250, 247, 238, 0.94);
+      border: 1px solid rgba(111, 126, 86, 0.25);
+      box-shadow: 0 10px 26px rgba(40, 48, 32, 0.22);
+      color: #27351f;
+      font-family: ${UI_FONT};
+      pointer-events: none;
+      animation: demo-worm-hint-in 0.4s ease both;
+    }
+
+    .demo-flip-progress-label {
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #657156;
+    }
+
+    .demo-flip-progress-track {
+      width: 74px;
+      height: 5px;
+      background: rgba(92, 111, 76, 0.2);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .demo-flip-progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #7b8f5a, #b88f4a);
+      border-radius: 999px;
+      transition: width 0.25s ease;
+    }
+
+    .demo-flip-progress-count {
+      font-size: 12px;
+      font-weight: 800;
+      color: #35452a;
+      white-space: nowrap;
+    }
   `;
   document.head.appendChild(style);
 };
@@ -391,23 +476,14 @@ const DemoProgressBar = ({ currentStep }) => {
   );
 };
 
-const STEP_COPY = {
-  'baby-cube': 'Solve this first twist. Drag the turned row back into place to continue.',
-  'twin-paradox': 'Opposite faces are linked.',
-  'flip-gateway': 'Flip every tile, then flip them all back.',
-  'view-showcase': 'See every way to view the cube.',
-  'worm-traversal': 'Travel through the wormholes you opened.',
-  'chaos-forecast': 'Predict which pair survives.',
-  'random-showcase': 'The cube cycles through random styles every few seconds.',
-  'cosmetic-reward': 'Spend your Parity Points.',
-};
-
-// Step intro: Mobi delivers the setup line AND the hands-on guidance in one
-// dialogue over the blurred live scene — the mid-step coach is just a pill.
+// Step intro: Mobi delivers just the setup line over the blurred live scene.
+// The hands-on guidance is surfaced by the staged UI (auto-played WATCH beat,
+// progress pills, the coach's Next pill), so repeating it here read as Mobi
+// talking twice — the intro stays to the single setup sentence.
 const DemoStepIntro = ({ step, onContinue, onSkip }) => {
   const info = DEMO_STEPS.find(s => s.id === step);
   if (!info) return null;
-  const lines = [STEP_COPY[step], TRY_COPY[step]].filter(Boolean);
+  const lines = [STEP_COPY[step]].filter(Boolean);
   return (
     <MobiIntroScreen
       key={step}
@@ -490,14 +566,17 @@ const DEMO_LEVEL_CONFIGS = {
 
 // ── TRY phase ──────────────────────────────────────────────────────────────
 // After the WATCH beat auto-plays the mechanic, the coach invites one optional
-// hands-on interaction. "Next" is always available, so the demo can never hang.
+// hands-on interaction via a "Next" pill, so the demo can never hang. These
+// lines are no longer shown to the player (the setup is Mobi's intro line and
+// the staged UI does the guiding) — a step's presence here is what keeps its
+// coach pill available; the text documents each step's intended interaction.
 const TRY_COPY = {
-  'baby-cube': 'Your turn — drag a row or column to spin it.',
-  'twin-paradox': 'Your turn — tap any tile. Its twin on the far side flips too.',
-  'flip-gateway': 'Tap every tile to flip it to wrong parity.',
-  'worm-traversal': 'Nice! Skip ahead when you\'re ready.',
-  'chaos-forecast': 'Skip ahead when you\'re ready.',
-  'random-showcase': 'Watch the styles cycle, or skip ahead.',
+  'baby-cube': 'Your turn — drag a row to twist it. Drag the space around the cube to orbit.',
+  'twin-paradox': 'Your turn — tap any tile and watch its twin flip on the far side too.',
+  'flip-gateway': 'Tap each front-face tile to send it to its twin, then tap them back home to solve.',
+  'worm-traversal': 'Grab orbs, heal tiles, and dive through a glowing tunnel. Skip ahead anytime.',
+  'chaos-forecast': 'Bet on the pair you think survives, then watch it play out. Skip anytime.',
+  'random-showcase': 'Watch a few random cubes roll by, or skip ahead.',
 };
 
 // Coach: the guidance already played inside the step-intro dialogue, so the
@@ -708,6 +787,23 @@ const DemoStepLaunch = ({ step }) => {
   );
 };
 
+// Chaos payout: announces the Parity Points won using the same launch-stamp
+// text treatment as DemoStepLaunch, so the reward reads with the same weight
+// as a new step arriving. `correct` distinguishes a nailed forecast (200) from
+// the consolation grant (50).
+const DemoRewardStamp = ({ amount, correct }) => {
+  ensureDemoShellStyle();
+  return (
+    <div className="demo-beat-root demo-beat-root--upper" aria-live="polite">
+      <div className="demo-beat-flash" />
+      <div className="demo-launch-stamp">
+        <p className="demo-beat-sub">{correct ? 'Forecast Correct' : 'Parity Points Won'}</p>
+        <h2 className="demo-beat-title">+{amount} PP</h2>
+      </div>
+    </div>
+  );
+};
+
 // Shown before the view sequence starts: the Views tile on the bottom nav bar
 // pulses (see BottomNavBar `spotlightViews`) and this hint asks for the tap
 // that kicks off the first view.
@@ -729,6 +825,38 @@ const DemoViewSpotlightHint = ({ onSkip }) => {
           Skip All ▶
         </button>
       )}
+    </div>
+  );
+};
+
+// Worm-step control hint: the healer worm crawls on its own and shows no
+// controls of its own, so the demo names the steer gesture while the player
+// plays. Non-interactive; the parent unmounts it once the worm makes progress.
+const DemoWormControlHint = () => {
+  ensureDemoShellStyle();
+  return (
+    <div className="demo-worm-hint" role="status" aria-live="polite">
+      The worm crawls on its own — <strong>swipe ← →</strong> (or arrow keys) to steer it toward orbs and tunnels.
+    </div>
+  );
+};
+
+// Flip-gateway progress: a bounded count of how many front-face tiles are
+// flipped ("flip-all") or restored ("unflip-all"), so the tap loop reads as a
+// short task with a finish line rather than an open-ended chore.
+const DemoFlipProgress = ({ progress }) => {
+  ensureDemoShellStyle();
+  if (!progress) return null;
+  const { phase, done, total } = progress;
+  const label = phase === 'unflip-all' ? 'Restored' : 'Flipped';
+  const pct = total > 0 ? Math.min(100, (done / total) * 100) : 0;
+  return (
+    <div className="demo-flip-progress" role="status" aria-live="polite">
+      <span className="demo-flip-progress-label">{label}</span>
+      <div className="demo-flip-progress-track">
+        <div className="demo-flip-progress-fill" style={{ width: `${pct}%` }} />
+      </div>
+      <span className="demo-flip-progress-count">{done} / {total}</span>
     </div>
   );
 };
@@ -774,8 +902,11 @@ export {
   DemoCoach,
   DemoViewShowcase,
   DemoViewSpotlightHint,
+  DemoWormControlHint,
+  DemoFlipProgress,
   DemoStepComplete,
   DemoStepLaunch,
+  DemoRewardStamp,
   VIEW_SHOWCASE_SEQUENCE,
   TRY_COPY,
   DEMO_STEPS,

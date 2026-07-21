@@ -112,13 +112,14 @@ const WINNER_PAIR_STYLE = { fontSize: '15px', letterSpacing: '0.06em', marginTop
  * Rendered whenever Disparity Mode (chaos) is active.
  */
 const DisparityHUD = () => {
-  const { disparityDeaths, disparityWinner, disparityEliminatedFaces, size, disparityParityScore } = useGameStore(
+  const { disparityDeaths, disparityWinner, disparityEliminatedFaces, size, disparityParityScore, showDisparityWinner } = useGameStore(
     useShallow(s => ({
       disparityDeaths: s.disparityDeaths,
       disparityWinner: s.disparityWinner,
       disparityEliminatedFaces: s.disparityEliminatedFaces,
       size: s.size,
       disparityParityScore: s.disparityParityScore,
+      showDisparityWinner: s.showDisparityWinner,
     }))
   );
 
@@ -232,6 +233,11 @@ const DisparityHUD = () => {
     transition: 'font-size 0.15s',
     lineHeight: 1,
   }), [scoreFlash]);
+
+  // Once the full-screen results screen is up it shows the entire death ledger
+  // and the winning pair, so this bottom-right feed would just be a redundant
+  // copy poking out beside the card — hide it.
+  if (showDisparityWinner) return null;
 
   if (!sortedGroups.length && !disparityWinner && aliveCount === totalTiles && disparityParityScore === 0) return null;
 

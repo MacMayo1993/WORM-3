@@ -412,6 +412,45 @@ the audit of §8.2, never in normal play. The pairing's identity-indexed
 semantics, the single fact on which all of this stands, is pinned to the
 implementation by code citation.
 
+## 11. The central-quotient engine (monograph rev 4)
+
+The unified monograph ("The WORM-3 Antipodal Flip Cube", rev 4) extends the
+Phase-2 theory above with the central quotient, implemented in
+`src/game/antipodalEngine.js`:
+
+- **γ, the global colour flip (Lemma 5).** The all-one residual is the product
+  of all 27 paired flips, so it is reachable natively and central in the move
+  group. `globalColorFlip` applies it; on the strict solved state it produces
+  the fully-flipped solved state — the colour half of `checkWormVictory`.
+- **The solved orbit {(e, 0), (e, 1)} (Lemma 6).** Quotienting by ⟨γ⟩ makes
+  "all home" and "all flipped" the same class; `isFibreInSolvedOrbit` tests
+  the fibre side of it.
+- **The quotient planner (Theorem 4).** After the mandatory wt(Δ) heals
+  (`deltaInvariant`), reaching the orbit costs min(k, 27−k) paired flips for
+  k dirty pairs: `planQuotientCompletion` flips the dirty pairs toward the
+  zero residual or the clean pairs toward the all-one residual, whichever is
+  fewer (worst case 13, versus 27 for the strict target — Theorem 11's 33 vs
+  47 diameters once the positional 20 is added). `FLIP_CAP`-dead tiles fall
+  back to heals (target 0) or veto target 1.
+- **Cost accounting (Theorem 7).** `fibreCosts` reports a + b (strict) and
+  a + min(b, 27−b) (quotient) with a = asymmetric, b = dirty pairs.
+- **Observational aliasing (Theorem 9 / Appendix B).** Two paired flips on
+  the U-stickers of the UF and UB slots display the same facelet string as
+  the legal classical double swap UF↔DF, UB↔DB — a support-4 alias between a
+  pure-colour and a pure-positional state. The monograph's executable check
+  now lives in `src/__tests__/antipodalEngine.test.js`, discharging the
+  audited-pairing hypothesis against the shipped
+  `findAntipodalStickerByGrid` (which pairs through central inversion:
+  U-of-UF ↔ D-of-DB).
+
+The Three.js side is driven by `src/hooks/useAntipodalEngine.js`: it plays a
+quotient plan one operation at a time through the store, so each committed
+heal / paired flip re-renders only the affected `StickerPlane`s and fires
+their particle systems. `SolveMode.jsx` surfaces it as the "ANTIPODAL PAIRS"
+strip under the Kociemba panel; because fibre operations commute with face
+turns (Theorem 6), the repair can run before, after, or without the
+positional phase.
+
 ## Code map
 
 | Concept | Symbol | Code |
@@ -427,11 +466,18 @@ implementation by code citation.
 | Single-pair flip | $\varphi$ | `antipodalPairFlip` |
 | Native-flip Phase 2 | — | `planNativeFlipCompletion` / `applyNativeFlipCompletion` |
 | Heal | $\eta$ | `healSticker` (`game/cubeState.js`) |
+| β-pair enumeration / Δ | $\Delta$ | `enumerateBetaPairs` / `deltaInvariant` (`game/antipodalEngine.js`) |
+| Global colour flip | γ | `globalColorFlip` (`game/antipodalEngine.js`) |
+| Quotient Phase 2 | — | `planQuotientCompletion` / `applyQuotientCompletion` |
+| Fibre cost accounting | — | `fibreCosts` (`game/antipodalEngine.js`) |
+| 3D playback driver | — | `useAntipodalEngine` (`hooks/useAntipodalEngine.js`) |
 
 Tests: `src/__tests__/kociembaAdapter.test.js` (flip-tolerant ρ; admissibility
 rejection of count-balanced damage), `src/__tests__/winDetection.test.js`
 (κ-solved), `src/__tests__/antipodalSolver.test.js` (Phase 2 correctness; native
-paired-flip completion; asymmetric heal fallback).
+paired-flip completion; asymmetric heal fallback),
+`src/__tests__/antipodalEngine.test.js` (Δ invariance; γ; quotient planner
+min(k, 27−k); cost accounting; Theorem 9 aliasing check).
 
 ---
 

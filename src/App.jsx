@@ -54,13 +54,20 @@ import { setSharedRenderer, tickPreviews, hasActivePreviews } from './3d/TilePre
 // UI components
 import WelcomeScreen from './components/screens/WelcomeScreen.jsx';
 import Tutorial from './components/screens/Tutorial.jsx';
-import {
+import MobiIntroScreen, {
   MOBI_LINES_WORM, MOBI_LINES_FREEPLAY, MOBI_LINES_RANDOM,
   MOBI_LINES_TEACH, MOBI_LINES_HOLONOMY, MOBI_LINES_COOP,
   MOBI_LINES_BIOME, MOBI_LINES_MERGE, MOBI_LINES_CHAOS,
+  MOBI_LINES_DEMO_INTRO,
 } from './components/screens/MobiIntroScreen.jsx';
 import { UI_FONT } from './utils/uiTheme.js';
 import ScreenTransition from './components/ScreenTransition.jsx';
+// Static (not lazy): a Suspense fallback must be present the instant a lazy
+// chunk starts loading, so the loading cube cannot itself live in a lazy chunk.
+import LoadingScreen from './components/screens/LoadingScreen.jsx';
+// Covers a mode transition with the loading cube while the scene's env map /
+// textures decode. Reads drei's useProgress, so it must stay outside <Canvas>.
+import SceneLoadingGate from './components/screens/SceneLoadingGate.jsx';
 const ParityStoreScreen = React.lazy(() => import('./components/screens/ParityStoreScreen.jsx'));
 const GameScene = React.lazy(() => import('./3d/GameScene.jsx'));
 const UILayer = React.lazy(() => import('./components/UILayer.jsx'));
@@ -81,7 +88,7 @@ const DemoEndScreen = React.lazy(() => import('./components/screens/DemoEndScree
 const DemoForecastPicker = React.lazy(() => import('./components/screens/DemoForecastPicker.jsx'));
 import {
   DemoProgressBar, DemoStepIntro, DemoCoach, DemoViewShowcase,
-  DemoViewSpotlightHint, DemoStepComplete, DemoStepLaunch
+  DemoViewSpotlightHint, DemoWormControlHint, DemoFlipProgress, DemoStepComplete, DemoStepLaunch, DemoRewardStamp
 } from './components/screens/DemoFlowController.jsx';
 
 
@@ -403,6 +410,40 @@ export default function WORM3() {
   // Co-op Crawler mode
   const [coopMode, setCoopMode] = useState(false);
 
+  // Boot loading cover — the WORM³ cube shown over the very first load until the
+  // 3D scene's WebGL context is up (plus a short minimum) so players get a
+  // deliberate branded loading beat instead of the black-canvas warm-up. First
+  // load only: once dismissed it never returns.
+  const [bootCover, setBootCover] = useState(true);
+  const [bootCoverLeaving, setBootCoverLeaving] = useState(false);
+
+  // Mode-transition cover: bump this token when a mode is revealed to arm the
+  // SceneLoadingGate, which covers the scene with the loading cube while its
+  // environment map / textures decode (only if a decode is actually in flight).
+  const [sceneGateToken, setSceneGateToken] = useState(0);
+  const [sceneGateLabel, setSceneGateLabel] = useState('Loading');
+  const armSceneGate = useCallback((label = 'Loading') => {
+    setSceneGateLabel(label);
+    setSceneGateToken((t) => t + 1);
+  }, []);
+  const bootStartRef = useRef(performance.now());
+  const bootDoneRef = useRef(false);
+  const finishBootCover = useCallback(() => {
+    if (bootDoneRef.current) return;
+    bootDoneRef.current = true;
+    const MIN_MS = 700; // ensure the cube is actually seen, not a 1-frame flash
+    const wait = Math.max(0, MIN_MS - (performance.now() - bootStartRef.current));
+    setTimeout(() => {
+      setBootCoverLeaving(true);
+      setTimeout(() => setBootCover(false), 480); // matches the .wl-leaving fade
+    }, wait);
+  }, []);
+  // Safety net: never let the cover stick if onCreated is delayed or never fires.
+  useEffect(() => {
+    const t = setTimeout(finishBootCover, 6000);
+    return () => clearTimeout(t);
+  }, [finishBootCover]);
+
   // Antipodal PiP — second camera from opposite side of the cube
   const [showAntipodalPiP, setShowAntipodalPiP] = useState(false);
 
@@ -481,6 +522,7 @@ export default function WORM3() {
   // Demo mode — all state, handlers, and effects for the guided demo flow.
   const {
     demoMode, demoStep,
+    demoColdOpenVisible, handleDemoColdOpenContinue,
     demoStepIntroVisible, demoTryVisible, demoForecastVisible, demoCoachCopy,
     onTapFlipRef,
     handleStartDemo, handleDemoStepContinue, advanceDemoStep,
@@ -488,12 +530,13 @@ export default function WORM3() {
     handleDemoForecastPick, handleDemoChaosSkip, handleDemoDisparityDismiss,
     demoShowcaseSubStep, handleDemoShowcaseNext, handleDemoShowcaseSkip,
     demoViewSpotlight, handleDemoViewSpotlightClick,
-    demoCelebrationStep, dismissDemoCelebration, demoLaunchStep,
+    demoCelebrationStep, dismissDemoCelebration, demoLaunchStep, demoRewardStamp, demoFlipProgress,
   } = useDemoMode({
     cancelShuffle, changeSize, setRotatedCubies, reset,
     cancelDisparityRun, startDisparityGame,
     startAnimatedShuffle, animatedShuffle,
     handleOpenStore, setShowFreeplayWizard,
+    armSceneGate,
   });
 
   const handleCloseStore = useCallback(() => {
@@ -771,7 +814,10 @@ export default function WORM3() {
     const action = pendingMobiAction.current;
     pendingMobiAction.current = null;
     action?.();
-  }, []);
+    // Mode scene is now revealed — arm the gate so the cube covers any env-map /
+    // texture decode still in flight (it self-dismisses if nothing is loading).
+    armSceneGate(mobiModeName || 'Loading');
+  }, [armSceneGate, mobiModeName]);
 
   const handleWormWizardCancel = useCallback(() => {
     setShowWormModeWizard(false);
@@ -1161,22 +1207,37 @@ export default function WORM3() {
 
   if (coopMode) {
     return (
-      <Suspense fallback={<div style={{ background: '#000', width: '100vw', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#60a5fa', fontFamily: UI_FONT }}>Loading Co-op Crawler...</div>}>
-        <PlatformerWormMode
-          cubies={cubies}
-          size={size}
-          faceColors={resolvedColors}
-          onQuit={() => {
-            setCoopMode(false);
-            useGameStore.getState().setShowMainMenu(true);
-          }}
-        />
-      </Suspense>
+      <>
+        <Suspense fallback={<LoadingScreen label="Waking the Co-op Crawler" />}>
+          <PlatformerWormMode
+            cubies={cubies}
+            size={size}
+            faceColors={resolvedColors}
+            onQuit={() => {
+              setCoopMode(false);
+              useGameStore.getState().setShowMainMenu(true);
+            }}
+          />
+        </Suspense>
+        {/* The main-return gate never mounts on the co-op path (this early return),
+            and the Mobi intro finished before coopMode flipped — so PlatformerWormMode's
+            own city/sunset env maps would pop in uncovered. Cover them here. The probe
+            runs long because those maps only begin loading after the lazy chunk mounts. */}
+        <SceneLoadingGate armToken={sceneGateToken} label="Co-op Crawler" probeMs={6000} style={{ zIndex: 9996 }} />
+      </>
     );
   }
 
   return (
     <div className={`full-screen${settings.backgroundTheme === 'dark' ? ' bg-dark' : settings.backgroundTheme === 'midnight' ? ' bg-midnight' : ''}${randomShaking ? ' random-shake' : ''}`}>
+      {/* Boot cover: the loading cube over the very first load. z above the
+          welcome overlay (9999) so it hides the WebGL warm-up and intro chrome
+          until the scene is up, then fades. */}
+      {bootCover && <LoadingScreen label="Loading WORM³" leaving={bootCoverLeaving} style={{ zIndex: 10000 }} />}
+      {/* Mode-transition cover: sits above the game HUD / FX (≤9990) but below the
+          Mobi dialogue (10500), so it fills the gap after Mobi while the scene's
+          background decodes. Self-dismisses when nothing is loading. */}
+      <SceneLoadingGate armToken={sceneGateToken} label={sceneGateLabel} style={{ zIndex: 9996 }} />
       <ScreenTransition show={showTutorial && !showWelcome}>
         <Tutorial onClose={closeTutorial} onMainMenu={() => { closeTutorial(); handleBackToMainMenu(); }} />
       </ScreenTransition>
@@ -1210,6 +1271,7 @@ export default function WORM3() {
           gl={{ powerPreference: 'high-performance', antialias: true }}
           shadows
           frameloop="always"
+          onCreated={finishBootCover}
         >
           <PerformanceMonitor
             onDecline={() => { setDpr([0.75, 1]); setPerfReducedFX(true); }}
@@ -1332,7 +1394,11 @@ export default function WORM3() {
               showComingSoon, onCloseComingSoon: () => { setShowComingSoon(false); useGameStore.getState().setShowMainMenu(true); },
               showMobiusCubelet, onCloseMobiusCubelet: () => { setShowMobiusCubelet(false); useGameStore.getState().setShowMainMenu(true); },
               onOpenModeSelect: () => setShowModeSelect(true),
-              demoDialogueVisible: demoMode && demoStepIntroVisible,
+              // True whenever a Mobi dialogue panel is presenting — the cold
+              // open (MobiIntroScreen), the step intro (DemoStepIntro), or the
+              // hands-on coach (DemoCoach). The HUD (bottom nav bar + undo
+              // button) is hidden underneath it so nothing overlaps the dialogue.
+              demoDialogueVisible: demoMode && (demoColdOpenVisible || demoStepIntroVisible || demoTryVisible),
             }}
             handlers={{
               onReset: handleReset,
@@ -1405,9 +1471,21 @@ export default function WORM3() {
       )}
 
       {/* Demo mode overlays */}
-      {demoMode && <DemoProgressBar currentStep={demoStep} />}
+      {demoMode && !demoColdOpenVisible && <DemoProgressBar currentStep={demoStep} />}
       {demoMode && demoCelebrationStep && <DemoStepComplete step={demoCelebrationStep} onDismiss={dismissDemoCelebration} />}
       {demoMode && demoLaunchStep && !demoCelebrationStep && <DemoStepLaunch step={demoLaunchStep} />}
+      {demoMode && demoRewardStamp && <DemoRewardStamp amount={demoRewardStamp.amount} correct={demoRewardStamp.correct} />}
+      {/* Cold open: Mobi frames the twin concept before the first step. */}
+      <ScreenTransition show={!!(demoMode && demoColdOpenVisible)} freezeOnExit>
+        <MobiIntroScreen
+          lines={MOBI_LINES_DEMO_INTRO}
+          modeName="Demo"
+          primaryLabel="▶ Let's Go"
+          skipLabel="Skip Intro"
+          onComplete={handleDemoColdOpenContinue}
+          onSkip={handleDemoColdOpenContinue}
+        />
+      </ScreenTransition>
       <ScreenTransition show={!!(demoMode && demoStepIntroVisible && demoStep && demoStep !== 'end')} freezeOnExit>
         <DemoStepIntro step={demoStep} onContinue={handleDemoStepContinue} onSkip={() => advanceDemoStep(demoStep)} />
       </ScreenTransition>
@@ -1424,6 +1502,16 @@ export default function WORM3() {
           <DemoForecastPicker onPick={handleDemoForecastPick} onSkip={handleDemoChaosSkip} />
         </Suspense>
       )}
+      {/* Worm-step steer hint — shows during active play, before the skip pill. */}
+      {demoMode && demoStep === 'worm-traversal' && !demoColdOpenVisible &&
+        !demoStepIntroVisible && !demoLaunchStep && !demoTryVisible && !demoCelebrationStep && (
+        <DemoWormControlHint />
+      )}
+      {/* Flip-gateway progress — bounded front-face flip/restore counter. */}
+      {demoMode && demoStep === 'flip-gateway' && demoFlipProgress && !demoColdOpenVisible &&
+        !demoStepIntroVisible && !demoLaunchStep && !demoCelebrationStep && (
+        <DemoFlipProgress progress={demoFlipProgress} />
+      )}
       <ScreenTransition show={!!(demoMode && demoStep === 'view-showcase' && demoViewSpotlight && !demoStepIntroVisible)} freezeOnExit>
         <DemoViewSpotlightHint onSkip={handleDemoShowcaseSkip} />
       </ScreenTransition>
@@ -1437,8 +1525,13 @@ export default function WORM3() {
       {demoMode && demoStep === 'end' && (
         <Suspense fallback={null}>
           <DemoEndScreen
-            onReplay={handleDemoReplay}
+            onWorm={() => { handleExitDemo(); handleMenuWormHealer(); }}
+            onStory={() => { handleExitDemo(); handleStartCampaign(); }}
             onFreeplay={handleDemoFreeplay}
+            onChaos={() => { handleExitDemo(); handleMenuDisparity(); }}
+            onRandom={() => { handleExitDemo(); handleMenuRandomMode(); }}
+            onStore={() => { handleExitDemo(); handleOpenStore(); }}
+            onReplay={handleDemoReplay}
             onExit={handleExitDemo}
           />
         </Suspense>
