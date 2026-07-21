@@ -12,16 +12,15 @@ import {
 const MODES = [
   {
     id: 'worm',
-    icon: '🐛',
     name: 'WORM',
     blurb: 'Play the action-healing version of what you just learned.',
     primary: true,
   },
-  { id: 'story', icon: '🎯', name: 'STORY', blurb: 'Ten guided levels across three rule sets.' },
-  { id: 'freeplay', icon: '🧊', name: 'FREEPLAY', blurb: 'Solve the cube your way — no timer, no pressure.' },
-  { id: 'chaos', icon: '⚡', name: 'CHAOS', blurb: 'Bet on a pair and survive the flipping cube.' },
-  { id: 'random', icon: '🎲', name: 'RANDOM', blurb: 'Let the cube remix the rules and the look.' },
-  { id: 'store', icon: '🛍️', name: 'STORE', blurb: 'Spend Parity Points on cubes, skins, and worms.' },
+  { id: 'story', name: 'STORY', blurb: 'Ten guided levels across three rule sets.' },
+  { id: 'freeplay', name: 'FREEPLAY', blurb: 'Solve the cube your way — no timer, no pressure.' },
+  { id: 'chaos', name: 'CHAOS', blurb: 'Bet on a pair and survive the flipping cube.' },
+  { id: 'random', name: 'RANDOM', blurb: 'Let the cube remix the rules and the look.' },
+  { id: 'store', name: 'STORE', blurb: 'Spend Parity Points on cubes, skins, and worms.' },
 ];
 
 const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore, onReplay, onExit }) => {
@@ -92,7 +91,6 @@ const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore
               onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; }}
               onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; }}
             >
-              <span style={{ fontSize: 22, lineHeight: 1, flexShrink: 0 }} aria-hidden="true">{mode.icon}</span>
               <span style={{ flex: 1, minWidth: 0 }}>
                 <span style={{
                   display: 'flex', alignItems: 'center', gap: 8,
