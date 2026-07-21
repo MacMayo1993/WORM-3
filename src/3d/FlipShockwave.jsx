@@ -1,9 +1,14 @@
 // src/3d/FlipShockwave.jsx
 // A neon shockwave ring that bursts outward across the tile face at the moment of
 // a flip — the "punch through the manifold" beat. Additive, expanding + fading in
-// the tile's own plane. Drop-in API like FlipParticles: parent calls ref.trigger(color).
+// the tile's own plane.
+//
+// This component is intentionally PASSIVE: it owns no useFrame. Its progress is
+// driven by the parent StickerPlane's tick, which only runs while the sticker is
+// in the active-sticker registry (StickerAnimationManager) — so idle tiles cost
+// nothing. uProgress idles at 1 (spent → fully transparent); trigger() resets it
+// to 0 and setProgress() advances it 0→1.
 import React, { useRef, useImperativeHandle } from 'react';
-import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
 // Larger than the tile so the ring can travel past the edge before it fades.
@@ -19,7 +24,7 @@ const VERTEX_SHADER = `
 
 const FRAGMENT_SHADER = `
   uniform vec3  uColor;
-  uniform float uProgress; // 0 = birth, 1 = spent
+  uniform float uProgress; // 0 = birth, 1 = spent (transparent)
   varying vec2  vUv;
 
   void main() {
@@ -46,31 +51,28 @@ const FRAGMENT_SHADER = `
 `;
 
 const FlipShockwave = React.forwardRef((_props, ref) => {
-  const progressRef = useRef(1); // ≥1 = idle
   const [uniforms] = React.useState(() => ({
     uColor: { value: new THREE.Color() },
-    uProgress: { value: 0 },
+    uProgress: { value: 1 }, // idle = spent = transparent (must NOT start at 0)
   }));
+  const matRef = useRef();
 
   useImperativeHandle(ref, () => ({
     trigger(color) {
       if (color) uniforms.uColor.value.set(color);
-      progressRef.current = 0;
       uniforms.uProgress.value = 0;
     },
+    // Advanced 0→1 by the parent tick (active-registry driven); ≥1 = transparent.
+    setProgress(p) {
+      uniforms.uProgress.value = p;
+    },
   }), [uniforms]);
-
-  useFrame((_state, delta) => {
-    if (progressRef.current >= 1) return;
-    // ~0.45 s burst — overlaps the flip so the ring is mid-expansion at the crossing.
-    progressRef.current = Math.min(1, progressRef.current + Math.min(delta, 0.05) * 2.2);
-    uniforms.uProgress.value = progressRef.current;
-  });
 
   return (
     <mesh position={[0, 0, 0.05]} renderOrder={12}>
       <primitive object={_shockGeo} attach="geometry" />
       <shaderMaterial
+        ref={matRef}
         vertexShader={VERTEX_SHADER}
         fragmentShader={FRAGMENT_SHADER}
         uniforms={uniforms}

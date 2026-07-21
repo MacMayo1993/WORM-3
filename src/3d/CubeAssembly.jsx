@@ -15,6 +15,7 @@ import { vibrate } from '../utils/audio.js';
 import { updateSharedTime, updateSharedTremor, updateSharedSpin, updateDiceRoll, setDiceCellState, warmUpDefaultStyles } from './styles/TileStyleMaterials.jsx';
 import { StickerInstanceProvider } from './StickerInstances.jsx';
 import StickerAnimationDriver from './StickerAnimationDriver.jsx';
+import CameraFlipKick from './CameraFlipKick.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { resolveColors } from '../utils/colorSchemes.js';
@@ -1096,6 +1097,8 @@ const CubeAssembly = React.memo(({
             dynamicDampingFactor={isTouchDevice ? 0.15 : 0.08}
             rotateSpeed={isTouchDevice ? 0.8 : 1.2}
           />
+          {/* Micro-kicks the camera along the flipped tile's normal on each flip. */}
+          <CameraFlipKick controlsRef={controlsRef} />
         </group>
       </group>
     </StickerInstanceProvider>
