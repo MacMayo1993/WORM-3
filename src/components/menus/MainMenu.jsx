@@ -313,7 +313,11 @@ const ShufflingCube = ({ onFlip }) => {
   // 'rotating' → playing the middle-slice rotation animation
   const pipelineRef      = useRef('idle');
   const wormCompletedRef = useRef(false);
-  const nextSpawnAt      = useRef(INITIAL_WORM_DELAY);
+  // The shared Canvas clock keeps advancing while a game is running, even
+  // though this menu subtree is unmounted. Initialise against the first menu
+  // frame rather than an absolute 2.5-second timestamp so a returning menu
+  // does not immediately resume a long-overdue worm/rotation cycle.
+  const nextSpawnAt      = useRef(null);
 
   // Called by MenuFlipWave when the worm animation finishes
   const handleWormComplete = useCallback(() => {
@@ -333,7 +337,7 @@ const ShufflingCube = ({ onFlip }) => {
       setCubeState({ cubies, rotating: null });
       setFlipWaves([]);
       pipelineRef.current = 'idle';
-      nextSpawnAt.current = INITIAL_WORM_DELAY;
+      nextSpawnAt.current = null;
       setStyleVersion(v => v + 1);
     };
     return () => { _triggerStyleRefresh = null; };
@@ -342,6 +346,7 @@ const ShufflingCube = ({ onFlip }) => {
   useFrame(({ clock }) => {
     if (_carouselActive) return;
     const t = clock.elapsedTime;
+    if (nextSpawnAt.current === null) nextSpawnAt.current = t + INITIAL_WORM_DELAY;
     const { rotating, cubies } = cubeStateRef.current;
 
     // ── Slice rotation animation ─────────────────────────────────────────────
@@ -825,6 +830,11 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
   const cubeCurrentScale = useRef(1.022);
   const onCubeClickRef = useRef(onCubeClick);
   onCubeClickRef.current = onCubeClick;
+  // R3F's clock belongs to the persistent Canvas, not the menu. Keep a menu
+  // epoch so returning from a long play session restarts the idle cube motion
+  // instead of sampling an arbitrary point far along its animation path.
+  const menuClockStart = useRef(null);
+  const carouselWasActive = useRef(false);
 
   // ModeFacePlates is always mounted and toggles its own visibility via
   // useFrame, so RotatingBlackCube no longer needs carousel-active React state.
@@ -832,7 +842,9 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
 
   useFrame((state, delta) => {
     if (!cubeRef.current) return;
-    const t = state.clock.elapsedTime;
+    const elapsedTime = state.clock.elapsedTime;
+    if (menuClockStart.current === null) menuClockStart.current = elapsedTime;
+    const t = elapsedTime - menuClockStart.current;
 
     if (_carouselActive) {
       updateSharedTime(t);
@@ -856,6 +868,17 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
       // gap below it, so drop it down into that space and size it up ~10%.
       const presentY = portrait ? 1.75 : 1.2;
       const presentScale = portrait ? 0.79 : 1.0;
+
+      // The selector can open after the cube has been off-screen for a long
+      // game. Snap to the requested face on entry instead of showing a frame
+      // from the idle spin and slowly slerping across the viewport.
+      if (!carouselWasActive.current) {
+        cubeRef.current.quaternion.copy(_presentQ);
+        cubeCurrentScale.current = 1.022 * presentScale;
+        cubeTargetScale.current = cubeCurrentScale.current;
+        cubeRef.current.scale.setScalar(cubeCurrentScale.current);
+      }
+      carouselWasActive.current = true;
       cubeRef.current.position.set(0, presentY + Math.sin(t * 0.8) * 0.045, 0);
 
       // PLAY dive: the presented face accelerates into the camera.
@@ -878,6 +901,8 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
       }
       return;
     }
+
+    carouselWasActive.current = false;
 
     // Carousel closed — clear any finished dive so idle animation resumes clean.
     if (diveRef.current) {
