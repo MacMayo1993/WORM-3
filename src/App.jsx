@@ -434,6 +434,22 @@ export default function WORM3() {
     setSceneGateZ(opts.z ?? 9996);
     setSceneGateToken((t) => t + 1);
   }, []);
+
+  // Story-level transitions can change the cube size (e.g. 3×3 → 5×5). That
+  // geometry rebuild isn't an asset decode, so the probe gate can't see it and
+  // the level tutorial only blurs it — an eager cover cleanly hides the hitch.
+  // Fires only when the size actually changes (small→small levels stay instant),
+  // and is held shorter than the demo's 2.5s since a level loads no big skybox.
+  // z sits above the level tutorial (2500). Covers both level-select and
+  // next-level, which both set currentLevelData through useLevelSystem.
+  const prevLevelSizeRef = useRef(size);
+  useEffect(() => {
+    const lvlSize = currentLevelData?.cubeSize;
+    if (lvlSize && lvlSize !== prevLevelSizeRef.current) {
+      armSceneGate('Loading Level', { eager: true, holdMs: 1500, z: 2600 });
+    }
+    if (lvlSize) prevLevelSizeRef.current = lvlSize;
+  }, [currentLevelData, armSceneGate]);
   const bootStartRef = useRef(performance.now());
   const bootDoneRef = useRef(false);
   const finishBootCover = useCallback(() => {
