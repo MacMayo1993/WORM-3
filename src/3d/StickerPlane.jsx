@@ -26,6 +26,8 @@ import WoodVolume from './styles/WoodVolume.jsx';
 import { BIOME_GROUND_TEXTURES } from './BiomeGroundTextures.js';
 import { resolveColors } from '../utils/colorSchemes.js';
 import FlipParticles from './FlipParticles.jsx';
+import FlipShockwave from './FlipShockwave.jsx';
+import { fireFlipImpulse } from './flipImpulse.js';
 import HealParticles from './HealParticles.jsx';
 import ParityBreakthrough from './ParityBreakthrough.jsx';
 import StickerWorm from './StickerWorm.jsx';
@@ -82,6 +84,9 @@ const _discAlphaMap = (() => {
 // Scratch vectors for biome edge-on fade.
 const _normal = new THREE.Vector3();
 const _worldQuat = new THREE.Quaternion();
+// Scratch for the flip camera-impulse: the tile's outward normal in world space.
+const _flipWorldQuat = new THREE.Quaternion();
+const _flipWorldN = new THREE.Vector3();
 // Frame-shaped sticker Shape for hollow cube mode.
 const _stickerFrameShape = (() => {
   const outer = 0.425;
@@ -788,6 +793,11 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
   // Imperative ref to FlipParticles — avoids re-rendering StickerPlane on every flip.
   const flipParticlesRef = useRef();
+  // Imperative ref to FlipShockwave — the neon burst ring fired on each flip.
+  const flipShockwaveRef = useRef();
+  // Shockwave progress (1 = idle/spent). Advanced in tickImpl so it rides the
+  // active-sticker registry instead of a per-sticker useFrame.
+  const shockT = useRef(1);
 
   // Register with the InstancedMesh batch manager.
   // useLayoutEffect so registration completes before the first WebGL frame —
@@ -904,6 +914,16 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         instanceColorRef.current.setStyle(flipFromColor.current);
       }
       flipParticlesRef.current?.trigger(fc[curr]);
+      flipShockwaveRef.current?.trigger(fc[curr]);
+      shockT.current = 0;
+      // Camera micro-kick along the tile's outward normal (recoil out); the tile
+      // itself punches the other way in tickImpl (innerGroupRef −Z, into the cube).
+      if (groupRef.current) {
+        groupRef.current.getWorldQuaternion(_flipWorldQuat);
+        _flipWorldN.set(0, 0, 1).applyQuaternion(_flipWorldQuat);
+        const dangerT = effectiveFlipCap > 0 ? Math.min(1, flips / effectiveFlipCap) : 0;
+        fireFlipImpulse(_flipWorldN, 0.05 + dangerT * 0.035);
+      }
       play('/sounds/flip.mp3');
       vibrateFlip(flips, effectiveFlipCap);
     }
@@ -986,7 +1006,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     // Ensure we trigger animation if the tile is flipped (since ghost tile needs uTime updates).
     // If we need to transition the ghost tile (e.g. going from active to dormant), run at least one more frame.
     // wormhole keeps the loop alive so the indicator ring pulses while the tile is in disparity.
-    const anyActive = spinT.current > 0 || shakeT.current > 0 || showWormholeHazardFx || needsGhostUpdate || (spiderPlaneRef.current?.visible && !showGhostTile) || wormIntroT.current > 0 || healTRef.current >= 0 || (wormhole && !isSudokube);
+    const anyActive = spinT.current > 0 || shakeT.current > 0 || showWormholeHazardFx || needsGhostUpdate || (spiderPlaneRef.current?.visible && !showGhostTile) || wormIntroT.current > 0 || healTRef.current >= 0 || shockT.current < 1 || (wormhole && !isSudokube);
     if (!anyActive) {
       isActiveRef.current = false;
       deactivateSticker(stickerGridIdRef.current);
@@ -1198,6 +1218,22 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     if (wormIntroT.current > 0) {
       wormIntroT.current = Math.max(0, wormIntroT.current - delta);
       if (wormIntroT.current <= 0) setShowWormIntro(false);
+    }
+
+    // Flip shockwave — advance here (active-registry gated) rather than in a
+    // per-sticker useFrame. ~0.45 s burst, then idles transparent at 1.
+    if (shockT.current < 1) {
+      shockT.current = Math.min(1, shockT.current + Math.min(delta, 0.05) * 2.2);
+      flipShockwaveRef.current?.setProgress(shockT.current);
+      // Tile counter-kick: as the camera recoils OUT along the tile normal, the
+      // tile punches IN (local −Z, into the cube) with a quick damped shake. Driven
+      // on innerGroupRef so it never collides with the squish/shake/tremor writers
+      // on groupRef. Settles to exactly 0.
+      if (innerGroupRef.current) {
+        const u = shockT.current;
+        innerGroupRef.current.position.z =
+          u >= 1 ? 0 : -0.07 * Math.exp(-4.5 * u) * Math.sin(u * Math.PI * 3.0);
+      }
     }
 
     pulseT.current += delta * 2.1;
@@ -1918,6 +1954,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
       {/* Particle burst effect during flip (manual + chaos/disparity). */}
       <FlipParticles ref={flipParticlesRef} />
+
+      {/* Neon shockwave ring — bursts across the tile face at the flip moment. */}
+      <FlipShockwave ref={flipShockwaveRef} />
 
       {/* Heal seal overlay — golden convergence ring + color bloom on wormhole heal. */}
       <mesh ref={healSealRef} position={[0, 0, 0.004]} visible={false} renderOrder={11}>
