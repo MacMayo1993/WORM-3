@@ -11,8 +11,12 @@ let timerId = null;
 let tickAcc = 0;
 let conwayAcc = 0;
 let last = 0;
+// Generation stamp — set on START and on every full resync (SYNC_CUBIES). Echoed on
+// every TICK so the main thread can drop flip batches computed from a superseded cube
+// (e.g. TICKs already in flight when the player resets or shuffles the board).
+let workerGen = 0;
 
-const postTick = (payload) => self.postMessage({ type: 'TICK', payload });
+const postTick = (payload) => self.postMessage({ type: 'TICK', payload: { ...payload, gen: workerGen } });
 
 const schedule = () => {
   if (!running || !sim) return;
@@ -68,6 +72,7 @@ self.onmessage = (e) => {
 
   switch (type) {
     case 'START': {
+      workerGen = payload.gen ?? 0;
       sim = createChaosSim({
         cubies: payload.cubies,
         size: payload.size,
@@ -89,6 +94,10 @@ self.onmessage = (e) => {
     }
 
     case 'SYNC_CUBIES':
+      // Full resync (reset / shuffle / size change / loaded state): the cube was
+      // replaced out from under the sim, so advance the generation — any TICKs the
+      // main thread already has in flight carry the old gen and will be dropped.
+      if (payload.gen != null) workerGen = payload.gen;
       sim?.syncCubies(payload.cubies);
       break;
 

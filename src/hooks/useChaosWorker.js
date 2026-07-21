@@ -114,6 +114,11 @@ export function useChaosWorker({
   const disparityFlipCapRef = useRef(disparityFlipCap);
   const lastStatsFlushRef = useRef(0);
   const winnerTimeoutRef = useRef(null);
+  // Generation guard — bumped on START and on every full resync (reset/shuffle/size
+  // change). Stamped into those worker messages and echoed back on each TICK, so flip
+  // batches computed from a superseded cube (in flight when the player resets) are
+  // dropped instead of dirtying the freshly-reset board.
+  const genRef = useRef(0);
 
   useEffect(() => {
     disparityFlipCapRef.current = disparityFlipCap;
@@ -141,6 +146,9 @@ export function useChaosWorker({
         return;
       }
       if (e.data.type !== 'TICK') return;
+      // Drop flip batches from a superseded run — the cube was reset/shuffled/resized
+      // after the worker computed this TICK, so applying it would dirty the new board.
+      if (e.data.payload?.gen != null && e.data.payload.gen !== genRef.current) return;
       const { flips, cascades, recoveries, deaths, eliminatedFaces, winner, finalState, metrics } = e.data.payload;
 
       if (flips?.length > 0 || recoveries?.length > 0) {
@@ -263,6 +271,7 @@ export function useChaosWorker({
     if (chaosMode) {
       manifoldMapRef.current = buildManifoldGridMap(cubies, size);
       useGameStore.getState().clearDisparityGame();
+      genRef.current += 1;
       worker.postMessage({
         type: 'START',
         payload: {
@@ -272,6 +281,7 @@ export function useChaosWorker({
           disparityFlipCap,
           explosionT,
           animating: !!animState,
+          gen: genRef.current,
         },
       });
       return;
@@ -313,9 +323,14 @@ export function useChaosWorker({
       workerRef.current.postMessage({ type: 'ROTATE_SLICE', payload: lastRotation });
     } else {
       // Full resync (size change, shuffle reset, loaded state) — no single move to
-      // replay, so fall back to a full clone + eager rebuild.
+      // replay, so fall back to a full clone + eager rebuild. Bump the generation so
+      // any flip TICKs already in flight (computed from the pre-reset cube) are dropped
+      // instead of dirtying the board the player just reset. Rotations (ROTATE_SLICE
+      // above) deliberately keep their generation so in-flight flips stay in sync with
+      // the worker's replayed state.
+      genRef.current += 1;
       manifoldMapRef.current = buildManifoldGridMap(cubiesRef.current, size);
-      workerRef.current.postMessage({ type: 'SYNC_CUBIES', payload: { cubies: cubiesRef.current } });
+      workerRef.current.postMessage({ type: 'SYNC_CUBIES', payload: { cubies: cubiesRef.current, gen: genRef.current } });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chaosMode, rotationEpoch]);
