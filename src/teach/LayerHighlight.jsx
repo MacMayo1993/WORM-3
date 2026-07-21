@@ -1,151 +1,188 @@
 // src/teach/LayerHighlight.jsx
 // 3D layer highlight that shows which slice will be rotated next.
-// A dim translucent plane marks the slice body; a neon "worm-frame" lights up
-// all four edges of the layer with bright light-worms chasing around the
-// perimeter. The worms travel in the DIRECTION OF THE TURN, so the preview
-// reads the upcoming rotation at a glance (same wiggle language as the flipped-
-// tile neon border).
+//
+// Renders like the neon view mode, but only on the layer about to turn: every
+// exposed cubie face of the target slice gets a glowing neon edge-border drawn
+// flush on the cube surface, and bright light-worms sweep around the whole belt
+// in the DIRECTION OF THE TURN (uDir), so the preview reads which layer moves
+// and which way at a glance.
 
-import React, { useRef } from 'react';
+import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
-// ─── Worm-frame shader ────────────────────────────────────────────────────────
-// Lights the outer edge of the slice cross-section (a square hugging the cube in
-// the slice plane) and sends light-worms racing around it. uDir flips the travel
-// direction so it matches the physical turn (CW vs CCW around the rotation axis).
-const layerWormVertexShader = `
+// Face basis: outward normal + two in-plane tangents (u, v) for the quad.
+const FACE_DEFS = {
+  PX: { n: [1, 0, 0], u: [0, 0, 1], v: [0, 1, 0] },
+  NX: { n: [-1, 0, 0], u: [0, 0, 1], v: [0, 1, 0] },
+  PY: { n: [0, 1, 0], u: [1, 0, 0], v: [0, 0, 1] },
+  NY: { n: [0, -1, 0], u: [1, 0, 0], v: [0, 0, 1] },
+  PZ: { n: [0, 0, 1], u: [1, 0, 0], v: [0, 1, 0] },
+  NZ: { n: [0, 0, -1], u: [1, 0, 0], v: [0, 1, 0] }
+};
+
+const FACE_OFFSET = 0.52; // just proud of the sticker so the border reads as an edge glow
+const HALF = 0.49;        // cubie-face half-extent (matches the neon view-mode frame)
+
+const layerVertexShader = `
+  attribute float aPhase;
   varying vec2 vUv;
+  varying float vPhase;
   void main() {
     vUv = uv;
+    vPhase = aPhase;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   }
 `;
 
-const layerWormFragmentShader = `
+const layerFragmentShader = `
   uniform vec3  uColor;
   uniform float uTime;
-  uniform float uDir;   // +1 / -1 → worms travel with the turn direction
+  uniform float uDir;   // +1 / -1 → worms sweep with the turn direction
   varying vec2  vUv;
+  varying float vPhase; // this face's angular position around the turn axis, [0,1)
   #define TAU 6.28318530718
 
   void main() {
     vec2 p = vUv - 0.5;
     vec2 a = abs(p);
     float m = max(a.x, a.y);
-    float edgeDist = 0.5 - m;        // 0 at the square edge, grows inward
-    if (edgeDist > 0.14) discard;    // only the border band lights up
+    float edgeDist = 0.5 - m;
 
-    // Perimeter coordinate s ∈ [0,1) running around the square.
+    // Perimeter coordinate around the square edge (for the wiggle).
     float s;
     if (p.y >= a.x)       s = (p.x + 0.5) * 0.25;
     else if (p.x >= a.y)  s = 0.25 + (0.5 - p.y) * 0.25;
     else if (-p.y >= a.x) s = 0.50 + (0.5 - p.x) * 0.25;
     else                  s = 0.75 + (p.y + 0.5) * 0.25;
 
-    // Wiggling band thickness so the frame looks alive, not a static rectangle.
-    float wig = 1.0 + 0.30 * sin(s * TAU * 10.0 - uTime * 5.0);
-    float bw  = 0.040 * wig;
+    // Neon edge-border hugging the tile outline; thickness wiggles so it looks alive.
+    float wig  = 1.0 + 0.25 * sin(s * TAU * 4.0 - uTime * 4.0);
+    float bw   = 0.075 * wig;
     float band = 1.0 - smoothstep(0.0, bw, edgeDist);
+    if (band < 0.003) discard;
 
-    float baseGlow = band * 0.30;
+    float glow = band * 0.5;
 
-    // Chasing light-worms. Travel sign = uDir so the motion matches the turn.
-    const int N = 5;
-    float speed   = 0.16;
-    float headLen = 0.032;
-    float tailLen = 0.075;
+    // Light-worms sweep around the whole layer belt by angular phase, in the
+    // turn direction. Each face brightens as a worm passes its angular position.
     float worms = 0.0;
-    for (int i = 0; i < N; i++) {
-      float fi = float(i);
-      float sp = speed * (1.0 + fi * 0.06);
-      float head = fract(fi / float(N) + uDir * uTime * sp);
-      head = fract(head + 0.005 * sin(uTime * 9.0 + fi * 2.0)); // slither
-      float sd = fract(s - head + 0.5) - 0.5;
-      // Comet tail trails BEHIND the head relative to travel direction (uDir).
-      float behind = sd * uDir;
-      float h = exp(-(sd * sd) / (headLen * headLen));
-      float tail = behind < 0.0 ? exp(behind / tailLen) * 0.55 : 0.0;
-      worms += max(h, tail);
+    for (int i = 0; i < 3; i++) {
+      float wp = fract(float(i) / 3.0 + uDir * uTime * 0.14);
+      float d  = abs(fract(vPhase - wp + 0.5) - 0.5);
+      worms += exp(-(d * d) / (0.10 * 0.10));
     }
-    worms = clamp(worms, 0.0, 1.5) * band;
+    worms = clamp(worms, 0.0, 1.3);
 
-    float glow = baseGlow + worms;
-    vec3 col = mix(uColor, vec3(1.0), clamp(worms - 0.4, 0.0, 1.0) * 0.75);
-    float alpha = clamp(glow, 0.0, 1.0);
-    if (alpha < 0.004) discard;
-    gl_FragColor = vec4(col * 1.7, alpha);
+    glow += band * worms * 1.15;
+    vec3 col = mix(uColor, vec3(1.0), clamp(worms - 0.3, 0.0, 1.0) * 0.72);
+    gl_FragColor = vec4(col * 1.7, clamp(glow, 0.0, 1.0));
   }
 `;
 
 const LayerHighlight = ({ axis, sliceIndex, dir, size }) => {
-  const planeRef = useRef();
-  const wormMatRef = useRef();
+  const matRef = useRef();
 
-  const k = (size - 1) / 2;
-  const offset = sliceIndex - k;
+  // Build a single merged geometry of all exposed cubie faces in the target slice.
+  const geometry = useMemo(() => {
+    const k = (size - 1) / 2;
+    const positions = [];
+    const uvs = [];
+    const phases = [];
+    const indices = [];
+    let vBase = 0;
 
-  // Position and rotation based on axis
-  let position, rotation;
-  if (axis === 'col') {
-    position = [offset, 0, 0];
-    rotation = [0, 0, Math.PI / 2];
-  } else if (axis === 'row') {
-    position = [0, offset, 0];
-    rotation = [0, 0, 0];
-  } else {
-    position = [0, 0, offset];
-    rotation = [Math.PI / 2, 0, 0];
-  }
+    const inSlice = (x, y, z) =>
+      axis === 'col' ? x === sliceIndex : axis === 'row' ? y === sliceIndex : z === sliceIndex;
 
-  // Frame sits right at the cube's outer edge in the slice plane (half = size/2 = surface).
-  const framePlane = size + 0.06;
-  const bodyPlane = size * 0.95;
+    const exposed = {
+      PX: (x) => x === size - 1, NX: (x) => x === 0,
+      PY: (_x, y) => y === size - 1, NY: (_x, y) => y === 0,
+      PZ: (_x, _y, z) => z === size - 1, NZ: (_x, _y, z) => z === 0
+    };
+
+    for (let x = 0; x < size; x++) {
+      for (let y = 0; y < size; y++) {
+        for (let z = 0; z < size; z++) {
+          if (!inSlice(x, y, z)) continue;
+          const cx = x - k, cy = y - k, cz = z - k;
+
+          for (const dirKey of Object.keys(FACE_DEFS)) {
+            const test = exposed[dirKey];
+            if (!test(x, y, z)) continue;
+
+            const { n, u, v } = FACE_DEFS[dirKey];
+            const fx = cx + n[0] * FACE_OFFSET;
+            const fy = cy + n[1] * FACE_OFFSET;
+            const fz = cz + n[2] * FACE_OFFSET;
+
+            // Angular position of this face around the rotation axis → drives the
+            // directional worm sweep. In-plane coords depend on the turn axis.
+            let c1, c2;
+            if (axis === 'col') { c1 = fy; c2 = fz; }        // X axis
+            else if (axis === 'row') { c1 = fz; c2 = fx; }   // Y axis
+            else { c1 = fx; c2 = fy; }                        // Z axis
+            const phase = Math.atan2(c2, c1) / (Math.PI * 2) + 0.5;
+
+            // Four corners (uv 0,0 / 1,0 / 1,1 / 0,1)
+            const corners = [
+              [-1, -1, 0, 0], [1, -1, 1, 0], [1, 1, 1, 1], [-1, 1, 0, 1]
+            ];
+            for (const [su, sv, tu, tv] of corners) {
+              positions.push(
+                fx + (u[0] * su + v[0] * sv) * HALF,
+                fy + (u[1] * su + v[1] * sv) * HALF,
+                fz + (u[2] * su + v[2] * sv) * HALF
+              );
+              uvs.push(tu, tv);
+              phases.push(phase);
+            }
+            indices.push(vBase, vBase + 1, vBase + 2, vBase, vBase + 2, vBase + 3);
+            vBase += 4;
+          }
+        }
+      }
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    geo.setAttribute('aPhase', new THREE.Float32BufferAttribute(phases, 1));
+    geo.setIndex(indices);
+    return geo;
+  }, [axis, sliceIndex, size]);
+
+  // Dispose the geometry when the slice changes / unmounts.
+  React.useEffect(() => () => geometry.dispose(), [geometry]);
+
+  const uniforms = useMemo(() => ({
+    uColor: { value: new THREE.Color('#00e5ff') },
+    uTime: { value: 0 },
+    uDir: { value: dir === 1 ? 1 : -1 }
+  }), []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Keep direction in sync if the move flips between renders.
+  React.useEffect(() => {
+    uniforms.uDir.value = dir === 1 ? 1 : -1;
+  }, [dir, uniforms]);
 
   useFrame((state) => {
-    const t = state.clock.elapsedTime;
-    if (planeRef.current) {
-      planeRef.current.material.opacity = 0.06 + Math.sin(t * 3) * 0.03;
-    }
-    if (wormMatRef.current) {
-      wormMatRef.current.uniforms.uTime.value = t;
-    }
+    if (matRef.current) matRef.current.uniforms.uTime.value = state.clock.elapsedTime;
   });
 
   return (
-    <group position={position} rotation={rotation}>
-      {/* Dim slice body — shows WHICH layer will turn */}
-      <mesh ref={planeRef}>
-        <planeGeometry args={[bodyPlane, bodyPlane]} />
-        <meshBasicMaterial
-          color="#00d9ff"
-          transparent
-          opacity={0.08}
-          side={THREE.DoubleSide}
-          blending={THREE.AdditiveBlending}
-          depthWrite={false}
-        />
-      </mesh>
-
-      {/* Neon worm-frame — lights all four edges; worms chase in the turn direction */}
-      <mesh>
-        <planeGeometry args={[framePlane, framePlane]} />
-        <shaderMaterial
-          ref={wormMatRef}
-          vertexShader={layerWormVertexShader}
-          fragmentShader={layerWormFragmentShader}
-          uniforms={{
-            uColor: { value: new THREE.Color('#00e5ff') },
-            uTime: { value: 0 },
-            uDir: { value: dir === 1 ? 1 : -1 }
-          }}
-          transparent
-          side={THREE.DoubleSide}
-          depthWrite={false}
-          blending={THREE.AdditiveBlending}
-        />
-      </mesh>
-    </group>
+    <mesh geometry={geometry}>
+      <shaderMaterial
+        ref={matRef}
+        vertexShader={layerVertexShader}
+        fragmentShader={layerFragmentShader}
+        uniforms={uniforms}
+        transparent
+        side={THREE.DoubleSide}
+        depthWrite={false}
+        blending={THREE.AdditiveBlending}
+      />
+    </mesh>
   );
 };
 
