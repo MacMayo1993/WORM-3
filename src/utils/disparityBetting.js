@@ -9,13 +9,13 @@ export const FACE_INFO = {
   3: { name: 'White',  hex: '#e5e5e5', antipodalFace: 6 },
   4: { name: 'Orange', hex: '#f97316', antipodalFace: 1 },
   5: { name: 'Blue',   hex: '#3b82f6', antipodalFace: 2 },
-  6: { name: 'Yellow', hex: '#eab308', antipodalFace: 3 },
+  6: { name: 'Yellow', hex: '#FFD500', antipodalFace: 3 },
 };
 
 export const ANTIPODAL_PAIRS = [
   { id: 'RO', faces: [1, 4], label: 'Red – Orange', color: '#f97316' },
   { id: 'GB', faces: [2, 5], label: 'Green – Blue', color: '#22c55e' },
-  { id: 'WY', faces: [3, 6], label: 'White – Yellow', color: '#eab308' },
+  { id: 'WY', faces: [3, 6], label: 'White – Yellow', color: '#FFD500' },
 ];
 
 // ── Bet type definitions ──────────────────────────────────────────────────────

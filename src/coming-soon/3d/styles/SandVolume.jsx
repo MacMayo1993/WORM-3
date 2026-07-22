@@ -155,7 +155,7 @@ const dustFragmentShader = `
 
 export default function SandVolume({ faceColor }) {
   const sandCol = useMemo(() => {
-    const fc = new THREE.Color(faceColor || '#eab308');
+    const fc = new THREE.Color(faceColor || '#FFD500');
     const sc = new THREE.Color(0.80, 0.68, 0.42);
     sc.lerp(fc, 0.28);
     return sc;

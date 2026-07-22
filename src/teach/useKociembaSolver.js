@@ -1,6 +1,24 @@
-// Hook managing Kociemba two-phase solver: auto-solves on every cube change,
-// propagates the next-move layer highlight to the 3D scene via Zustand, and
-// drives animated solution playback using the same animation system as useTeachMode.
+// Hook managing Kociemba two-phase solver: keeps a live solution for the cube's
+// CURRENT position, propagates the next-move layer highlight to the 3D scene via
+// Zustand, and drives animated solution playback using the same animation system
+// as useTeachMode.
+//
+// Real-time model
+// ---------------
+// The solver must always reflect the cube's ACTIVE state. Two kinds of cube
+// change can happen while the panel is open:
+//
+//   1. Solver-initiated moves (Play / Step) — the precomputed maneuver already
+//      accounts for these, so we just walk the list and advance the pointer. No
+//      recompute (that would wipe the list mid-step and desync the pointer — the
+//      old "Step stops working" bug).
+//   2. External moves (the user manually turning the cube, e.g. performing the
+//      previewed move themselves) — the plan is now stale, so we re-solve from
+//      the live position. This is what makes the panel + on-cube preview flow in
+//      real time.
+//
+// We tell the two apart with `selfMovePendingRef`: set just before a solver move
+// animates, and consumed by the auto-resolve effect when that move lands.
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useGameStore } from '../hooks/useGameStore.js';
@@ -22,6 +40,9 @@ export function useKociembaSolver(cubies, size) {
 
   const isPlayingRef = useRef(false);
   const pendingNextRef = useRef(false);
+  // True while we're waiting for a cube change that WE caused (a solver move).
+  // The auto-resolve effect consumes it and skips recomputing for that change.
+  const selfMovePendingRef = useRef(false);
   const movesRef = useRef([]);
   const moveIndexRef = useRef(0);
   const solveIdRef = useRef(0);
@@ -47,15 +68,22 @@ export function useKociembaSolver(cubies, size) {
     }
     const move = list[idx];
     const numTurns = move.numTurns ?? 1;
+    const next = idx + 1;
+    const isFinal = next >= list.length;
+    // Mark intermediate moves as self-inflicted so the auto-resolve effect keeps
+    // walking the precomputed maneuver rather than recomputing on every turn.
+    // The FINAL move is intentionally left unmarked: letting its landing fall
+    // through to a real re-solve snaps the panel to the cube's true live state
+    // (solved → empty, or any residual the maneuver didn't clear).
+    if (!isFinal) selfMovePendingRef.current = true;
     setAnimState({ axis: move.axis, dir: move.dir, sliceIndex: move.sliceIndex, t: 0, numTurns });
     setPendingMove({ axis: move.axis, dir: move.dir, sliceIndex: move.sliceIndex, numTurns });
     pendingNextRef.current = true;
-    const next = idx + 1;
     moveIndexRef.current = next;
     setMoveIndex(next);
     // Highlight the NEXT upcoming move (after this one)
     pushLayerHighlight(next, list);
-    if (next >= list.length) {
+    if (isFinal) {
       isPlayingRef.current = false;
       setStatus('done');
     }
@@ -82,9 +110,13 @@ export function useKociembaSolver(cubies, size) {
     setSolutionStr('');
     setMoves([]);
     setMoveIndex(0);
+    // Clear the refs synchronously too: a Step click mid-solve must not fire an
+    // old move against the new cube state (state setters lag a render).
+    movesRef.current = [];
     moveIndexRef.current = 0;
     isPlayingRef.current = false;
     pendingNextRef.current = false;
+    selfMovePendingRef.current = false;
     setKociembaLayerHighlight(null);
 
     try {
@@ -108,6 +140,7 @@ export function useKociembaSolver(cubies, size) {
       setSolutionStr(trimmed);
       setMoves(parsed);
       movesRef.current = parsed;
+      moveIndexRef.current = 0;
       if (parsed.length === 0) {
         setStatus('done');
         setKociembaLayerHighlight(null);
@@ -123,12 +156,22 @@ export function useKociembaSolver(cubies, size) {
     }
   }, [cubies, size, setKociembaLayerHighlight, pushLayerHighlight]);
 
-  // Auto-re-solve whenever cubies changes (skips during playback so our own moves don't loop)
+  // Keep the solution live. Re-solve whenever the cube changes from an EXTERNAL
+  // move (a manual turn), but NOT when the change is a solver move we already
+  // planned for — that would wipe the list mid-step. Debounced so a burst of
+  // rapid turns settles before we compute.
   useEffect(() => {
     if (size !== 3) return;
+    if (selfMovePendingRef.current) {
+      // Our own Play/Step move just landed: consume the flag and keep walking the
+      // precomputed maneuver — the remaining list is still valid.
+      selfMovePendingRef.current = false;
+      return;
+    }
+    if (isPlayingRef.current) return; // never fight active playback
     const timer = setTimeout(() => {
-      if (!isPlayingRef.current) solve();
-    }, 180);
+      if (!isPlayingRef.current && !selfMovePendingRef.current) solve();
+    }, 160);
     return () => clearTimeout(timer);
   }, [cubies]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -157,6 +200,7 @@ export function useKociembaSolver(cubies, size) {
   const reset = useCallback(() => {
     isPlayingRef.current = false;
     pendingNextRef.current = false;
+    selfMovePendingRef.current = false;
     setStatus('idle');
     setSolutionStr('');
     setMoves([]);

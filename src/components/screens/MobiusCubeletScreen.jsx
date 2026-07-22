@@ -16,7 +16,7 @@ import { UI_FONT, GLASS_PANEL, GLASS_PANEL_BORDER } from '../../utils/uiTheme.js
 const LEGEND = [
   { colorA: '#ef4444', colorB: '#f97316', label: 'Front  ↔  Back', sub: 'Red  /  Orange · Z-axis' },
   { colorA: '#22c55e', colorB: '#3b82f6', label: 'Left  ↔  Right', sub: 'Green  /  Blue · X-axis' },
-  { colorA: '#f0f0f0', colorB: '#eab308', label: 'Top  ↔  Bottom', sub: 'White  /  Yellow · Y-axis' },
+  { colorA: '#f0f0f0', colorB: '#FFD500', label: 'Top  ↔  Bottom', sub: 'White  /  Yellow · Y-axis' },
 ];
 
 function LegendRow({ colorA, colorB, label, sub }) {
@@ -140,7 +140,7 @@ export default function MobiusCubeletScreen({ onBack }) {
               fontWeight: 900,
               fontFamily: UI_FONT,
               letterSpacing: '0.03em',
-              background: 'linear-gradient(100deg,#ef4444 0%,#f97316 30%,#3b82f6 65%,#eab308 100%)',
+              background: 'linear-gradient(100deg,#ef4444 0%,#f97316 30%,#3b82f6 65%,#FFD500 100%)',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
               backgroundClip: 'text',

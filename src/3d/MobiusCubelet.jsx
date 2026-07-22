@@ -17,7 +17,7 @@ import * as THREE from 'three';
 const ANTIPODAL_PAIRS = [
   { colorA: '#ef4444', colorB: '#f97316', axis: 'Z', label: 'Front ↔ Back' },   // Red ↔ Orange
   { colorA: '#22c55e', colorB: '#3b82f6', axis: 'X', label: 'Left ↔ Right' },   // Green ↔ Blue
-  { colorA: '#f8f8f8', colorB: '#eab308', axis: 'Y', label: 'Top ↔ Bottom' },   // White ↔ Yellow
+  { colorA: '#f8f8f8', colorB: '#FFD500', axis: 'Y', label: 'Top ↔ Bottom' },   // White ↔ Yellow
 ];
 
 // Face definitions for the 1x1 cube — position, rotation, color
@@ -27,7 +27,7 @@ const CUBE_FACES = [
   { pos: [-0.5, 0, 0], rot: [0, -Math.PI / 2, 0],  color: '#22c55e' }, // NX Left Green
   { pos: [0.5, 0, 0],  rot: [0, Math.PI / 2, 0],   color: '#3b82f6' }, // PX Right Blue
   { pos: [0, 0.5, 0],  rot: [-Math.PI / 2, 0, 0],  color: '#f8f8f8' }, // PY Top White
-  { pos: [0, -0.5, 0], rot: [Math.PI / 2, 0, 0],   color: '#eab308' }, // NY Bottom Yellow
+  { pos: [0, -0.5, 0], rot: [Math.PI / 2, 0, 0],   color: '#FFD500' }, // NY Bottom Yellow
 ];
 
 /**
