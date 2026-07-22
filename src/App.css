@@ -1097,7 +1097,7 @@ button:focus-visible,
   .top-app-bar {
     padding: 0 10px;
     height: 44px;
-    border-bottom: 1px solid rgba(103, 127, 184, 0.55);
+    border-bottom: 1px solid rgba(111, 126, 86, 0.25);
   }
 
   .top-bar-title {
@@ -1115,9 +1115,9 @@ button:focus-visible,
     max-width: 100%;
     border-radius: 0;
     height: 68px;
-    background: rgba(10, 12, 28, 0.97);
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
-    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.55);
+    background: rgba(250, 247, 238, 0.97);
+    border-top: 1px solid rgba(111, 126, 86, 0.25);
+    box-shadow: 0 -4px 20px rgba(43, 53, 35, 0.22);
   }
 
   .cube-tile-label {
