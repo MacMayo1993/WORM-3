@@ -599,12 +599,12 @@ export default function WORM3() {
     setShowWelcome(false);
     markIntroSeen();
     // The cinematic owns the first paint. Once the player enters/skips, hold
-    // the loading cube over the menu while the forest HDRI decodes instead of
-    // masking the opening animation with a boot cover.
-    armSceneGate('Entering the forest', { eager: true, holdMs: 1600, z: 10000 });
+    // the loading cube over the menu while this launch's randomly-selected
+    // panorama decodes instead of masking the opening animation with a boot cover.
+    armSceneGate(`Now entering ${menuBackground.label}`, { eager: true, holdMs: 1600, z: 10000 });
     // Show main menu after intro (not tutorial).
     useGameStore.getState().setShowMainMenu(true);
-  }, [setShowWelcome, markIntroSeen, armSceneGate]);
+  }, [setShowWelcome, markIntroSeen, armSceneGate, menuBackground]);
 
   // Main menu action handlers
   const handleStartCampaign = useCallback(() => {
