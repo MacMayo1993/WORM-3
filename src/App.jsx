@@ -50,7 +50,7 @@ import IntroScene from './components/intro/IntroScene.jsx';
 import NebulaEnvironment from './3d/NebulaEnvironment.jsx';
 import InteractivePhotoBackground from './3d/InteractivePhotoBackground.jsx';
 import { setSharedRenderer, tickPreviews, hasActivePreviews } from './3d/TilePreviewRenderer.js';
-import { getBackgroundUrl } from './utils/backgrounds.js';
+import { getBackgroundUrl, MENU_BACKGROUNDS } from './utils/backgrounds.js';
 
 // UI components
 import WelcomeScreen from './components/screens/WelcomeScreen.jsx';
@@ -199,11 +199,11 @@ function CameraManager({ showWelcome, showMainMenu, cameraZ }) {
  * MenuScene — the rotating black cube shown in the main menu.
  * Rendered inside the shared Canvas so there is never a second WebGL context.
  */
-function MenuScene({ onCubeClick }) {
+function MenuScene({ onCubeClick, background }) {
   return (
     <>
-      {/* The menu uses a recognisable forest panorama rather than an abstract
-          environment, while the warm field-guide controls stay readable above it.
+      {/* Each app launch chooses one photo panorama from MENU_BACKGROUNDS. The
+          warm field-guide controls stay readable regardless of the setting.
           SafeEnvironment keeps the solid backdrop if the HDRI cannot load. */}
       <color attach="background" args={['#38513d']} />
       <ambientLight intensity={1.7} color="#e8e3c5" />
@@ -212,7 +212,7 @@ function MenuScene({ onCubeClick }) {
       <pointLight position={[0, -6, -8]} intensity={1.0} color="#456556" />
       <Suspense fallback={null}>
         <InteractivePhotoBackground
-          files={getBackgroundUrl('forest.exr')}
+          files={getBackgroundUrl(background.file)}
           rotationSpeed={isMobile ? 0 : 0.006}
           intensity={isMobile ? 0.84 : 0.98}
           blurriness={0}
@@ -404,6 +404,12 @@ export default function WORM3() {
 
   // Intro time — drives IntroBranch (3D) and WelcomeScreen DOM overlay in sync
   const [introTime, setIntroTime] = useState(0);
+
+  // Stable for this app launch: never reroll while settings, menus, or overlays
+  // mount/unmount. MENU_BACKGROUNDS contains only file-backed photo panoramas.
+  const [menuBackground] = useState(() => (
+    MENU_BACKGROUNDS[Math.floor(Math.random() * MENU_BACKGROUNDS.length)]
+ ));
 
   // Co-op Crawler mode
   const [coopMode, setCoopMode] = useState(false);
@@ -1269,7 +1275,7 @@ export default function WORM3() {
           ) : showMainMenu ? (
             // Stop the cube/worm animation when a full-screen overlay covers the menu
             showSettings ? <color attach="background" args={['#000005']} /> : (
-              <MenuScene onCubeClick={handleMenuCube} />
+              <MenuScene onCubeClick={handleMenuCube} background={menuBackground} />
             )
           ) : (
             <Suspense fallback={null}>
