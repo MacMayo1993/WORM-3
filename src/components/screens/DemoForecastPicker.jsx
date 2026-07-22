@@ -6,7 +6,7 @@ import {
 const PAIRS = [
   { id: 'red-orange', label: 'Red ↔ Orange', colors: ['#ef4444', '#f97316'], faceIds: [1, 4] },
   { id: 'green-blue', label: 'Green ↔ Blue', colors: ['#22c55e', '#3b82f6'], faceIds: [2, 5] },
-  { id: 'white-yellow', label: 'White ↔ Yellow', colors: ['#ffffff', '#eab308'], faceIds: [3, 6] },
+  { id: 'white-yellow', label: 'White ↔ Yellow', colors: ['#ffffff', '#FFD500'], faceIds: [3, 6] },
 ];
 
 export default function DemoForecastPicker({ onPick, onSkip }) {

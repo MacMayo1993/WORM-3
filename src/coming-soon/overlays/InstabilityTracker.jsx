@@ -7,7 +7,7 @@ import React from 'react';
 const InstabilityTracker = ({ entropy, wormholes, chaosLevel: _chaosLevel }) => {
   const instability = Math.min(100, entropy + wormholes * 3);
   const level = instability < 25 ? 'STABLE' : instability < 50 ? 'UNSTABLE' : instability < 75 ? 'CRITICAL' : 'CHAOS';
-  const color = instability < 25 ? '#22c55e' : instability < 50 ? '#eab308' : instability < 75 ? '#f97316' : '#ef4444';
+  const color = instability < 25 ? '#22c55e' : instability < 50 ? '#FFD500' : instability < 75 ? '#f97316' : '#ef4444';
 
   return (
     <div className="instability-tracker">

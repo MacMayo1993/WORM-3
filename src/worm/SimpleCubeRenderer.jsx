@@ -24,7 +24,7 @@ const DEFAULT_COLORS = {
   3: '#f8fafc', // White (PY top)
   4: '#f97316', // Orange (NZ back)
   5: '#3b82f6', // Blue (PX right)
-  6: '#eab308', // Yellow (NY bottom)
+  6: '#FFD500', // Yellow (NY bottom)
 };
 
 const STICKER_CONFIG = {

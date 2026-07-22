@@ -48,7 +48,7 @@ const WormHat3D = React.memo(function WormHat3D({ type, scale = 0.28 }) {
         </mesh>
         <mesh position={[0, s * 1.45, 0]}>
           <torusGeometry args={[s * 0.42, s * 0.07, 6, 16]} />
-          <meshStandardMaterial color="#eab308" />
+          <meshStandardMaterial color="#FFD500" />
         </mesh>
         <mesh position={[0, s * 3.0, 0]}>
           <sphereGeometry args={[s * 0.2, 8, 8]} />
