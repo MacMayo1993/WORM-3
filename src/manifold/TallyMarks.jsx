@@ -11,7 +11,7 @@ const TallyMarks = ({ flips, radius, origColor }) => {
 
   // Determine contrasting color for tally marks
   // Use dark marks on light colors, light marks on dark colors
-  const isLightColor = ['#ffffff', '#eab308', '#f97316'].includes(origColor);
+  const isLightColor = ['#ffffff', '#FFD500', '#f97316'].includes(origColor);
   const tallyColor = isLightColor ? '#1a1a1a' : '#ffffff';
 
   // Scale tallies to fit within the tracker circle

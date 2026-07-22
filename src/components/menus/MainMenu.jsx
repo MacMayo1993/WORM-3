@@ -65,7 +65,7 @@ let _triggerStyleRefresh = null;
 const FACE_COLOR = {
   PX: '#3b82f6', NX: '#22c55e',
   PZ: '#ef4444', NZ: '#f97316',
-  PY: '#eeeeee', NY: '#eab308',
+  PY: '#eeeeee', NY: '#FFD500',
 };
 const FACE_KEYS = Object.keys(FACE_COLOR);
 
@@ -1052,7 +1052,7 @@ const CAROUSEL_MODES = [
     controls: ['Worm follows your cursor or touch', 'Healed tiles restore the cube face', 'Collect orbs scattered across faces', 'Avoid flipped chaos tiles'],
   },
   {
-    id: 'freeplay', label: 'CUBE', tileColor: '#eab308', textColor: '#fff', face: 'NY',
+    id: 'freeplay', label: 'CUBE', tileColor: '#FFD500', textColor: '#fff', face: 'NY',
     desc: "Classic Rubik's cube solving — your cube, your rules.",
     controls: ['Pick cube size 2×2 through 5×5', 'Choose color scheme and tile style', 'Drag face edges to rotate slices', 'Solve at your own pace'],
   },
@@ -1302,11 +1302,10 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
             padding: '16px 18px', position: 'relative', overflow: 'hidden',
           }}>
             <div aria-hidden style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: `linear-gradient(90deg, ${mode.tileColor}, transparent 78%)` }} />
-            <span style={{ display: 'block', fontSize: 'clamp(26px, 8vw, 34px)', fontWeight: 900, fontFamily: DISPLAY_FONT, color: '#fffdf2', lineHeight: 1, letterSpacing: '0.03em', textTransform: 'uppercase', textShadow: '0 3px 0 rgba(0,0,0,0.5), 0 10px 30px rgba(0,0,0,0.55)' }}>
+            <span style={{ display: 'block', textAlign: 'center', fontSize: 'clamp(26px, 8vw, 34px)', fontWeight: 900, fontFamily: DISPLAY_FONT, color: '#fffdf2', lineHeight: 1, letterSpacing: '0.03em', textTransform: 'uppercase', textShadow: '0 3px 0 rgba(0,0,0,0.5), 0 10px 30px rgba(0,0,0,0.55)' }}>
               {mode.label}
             </span>
-            <p style={{ margin: '10px 0 0', fontSize: 'clamp(11px, 3vw, 13px)', fontWeight: 800, letterSpacing: '0.06em', lineHeight: 1.5, textTransform: 'uppercase', color: '#ffe9ad', fontFamily: UI_FONT, textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>{mode.desc}</p>
-            <div style={{ marginTop: '11px' }}>
+            <div style={{ marginTop: '16px' }}>
               {mode.controls.map((ctrl, i) => (
                 <div key={i} style={{ display: 'flex', gap: '10px', margin: '6px 0', alignItems: 'flex-start' }}>
                   <span aria-hidden style={{ width: '6px', height: '6px', borderRadius: '2px', background: mode.tileColor, boxShadow: `0 0 6px ${mode.tileColor}`, marginTop: '5px', flexShrink: 0 }} />
