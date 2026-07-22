@@ -1,236 +1,60 @@
-// src/holonomy/HolonomyHUD.jsx
-// DOM overlay for Holonomy Mode — shows φ, parity, seam stats, and live 2×2 matrix.
+// DOM overlay for Holonomy Mode — a compact field note, not a separate sci-fi HUD.
+import React, { useEffect, useRef, useState } from 'react';
+import { MONO_FONT, UI_CREAM, UI_MOSS, UI_MOSS_LIGHT } from '../utils/uiTheme.js';
+import { FieldGuideButton, FieldGuideEyebrow, FieldGuideSheet, fieldGuide } from '../components/ui/FieldGuide.jsx';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { UI_FONT, MONO_FONT, GLASS_PANEL, GLASS_PANEL_BORDER, GLASS_TEXT } from '../utils/uiTheme.js';
+const fmt = (n) => `${n >= 0 ? '+' : ''}${n.toFixed(3)}`;
+const fmtDeg = (r) => `${((r * 180) / Math.PI).toFixed(1)}°`;
 
-const fmt = (n) => (n >= 0 ? '+' : '') + n.toFixed(3);
-const fmtDeg = (r) => ((r * 180) / Math.PI).toFixed(1) + '°';
+export default function HolonomyHUD({ holonomyAngle = 0, orientationParity = 1, holonomyMatrix, seamCount = 0, mobiusCount = 0, loopClosed = false, onReset, onTurnLeft, onTurnRight }) {
+  const [showMatrix, setShowMatrix] = useState(false);
+  const [loopFlash, setLoopFlash] = useState(false);
+  const prevLoop = useRef(false);
+  useEffect(() => {
+    if (loopClosed && !prevLoop.current) {
+      setLoopFlash(true);
+      const timer = setTimeout(() => setLoopFlash(false), 2500);
+      prevLoop.current = true;
+      return () => clearTimeout(timer);
+    }
+    if (!loopClosed) prevLoop.current = false;
+  }, [loopClosed]);
 
-export default function HolonomyHUD({
-    holonomyAngle = 0,
-    orientationParity = 1,
-    holonomyMatrix,
-    seamCount = 0,
-    mobiusCount = 0,
-    loopClosed = false,
-    onReset,
-    onTurnLeft,
-    onTurnRight,
-}) {
-    const [showMatrix, setShowMatrix] = useState(false);
-    const [loopFlash, setLoopFlash] = useState(false);
-    const prevLoop = useRef(false);
+  const isFlipped = orientationParity < 0;
+  const H = holonomyMatrix || [[1, 0], [0, 1]];
+  const metrics = [['Angle φ', fmtDeg(holonomyAngle)], ['Parity', isFlipped ? 'Flipped' : 'Oriented'], ['Seams', seamCount], ['Möbius', mobiusCount]];
 
-    // Animate the loop-closed badge
-    useEffect(() => {
-        if (loopClosed && !prevLoop.current) {
-            setLoopFlash(true);
-            const t = setTimeout(() => setLoopFlash(false), 2500);
-            prevLoop.current = true;
-            return () => clearTimeout(t);
-        }
-        if (!loopClosed) prevLoop.current = false;
-    }, [loopClosed]);
-
-    const isFlipped = orientationParity < 0;
-    const parityColor = isFlipped ? '#ff3366' : '#00ff88';
-    const parityLabel = isFlipped ? '⊗ FLIPPED' : '⊕ ORIENTED';
-
-    const H = holonomyMatrix || [[1, 0], [0, 1]];
-
-    return (
-        <div style={{
-            position: 'fixed', top: 0, left: 0, right: 0,
-            pointerEvents: 'none', zIndex: 500,
-            fontFamily: MONO_FONT,
-        }}>
-            {/* Top info bar */}
-            <div style={{
-                display: 'flex', justifyContent: 'center', padding: '10px 0 0',
-            }}>
-                <div style={{
-                    background: GLASS_PANEL,
-                    border: '1.5px solid rgba(0,245,255,0.3)',
-                    borderRadius: 12,
-                    padding: '8px 20px',
-                    display: 'flex', gap: 24, alignItems: 'center',
-                    backdropFilter: 'blur(12px)',
-                    pointerEvents: 'auto',
-                }}>
-                    {/* Title */}
-                    <span style={{ color: '#00f5ff', fontWeight: 900, fontSize: 13, letterSpacing: 2 }}>
-                        HOLONOMY MODE
-                    </span>
-
-                    {/* φ angle */}
-                    <div style={{ textAlign: 'center' }}>
-                        <div style={{ color: '#aaa', fontSize: 9, letterSpacing: 1 }}>ANGLE φ</div>
-                        <div style={{ color: '#fff', fontSize: 16, fontWeight: 700 }}>
-                            {fmtDeg(holonomyAngle)}
-                        </div>
-                    </div>
-
-                    {/* Orientation parity */}
-                    <div style={{ textAlign: 'center' }}>
-                        <div style={{ color: '#aaa', fontSize: 9, letterSpacing: 1 }}>PARITY</div>
-                        <div style={{
-                            color: parityColor, fontSize: 13, fontWeight: 800,
-                            textShadow: `0 0 8px ${parityColor}`,
-                        }}>
-                            {parityLabel}
-                        </div>
-                    </div>
-
-                    {/* Seams */}
-                    <div style={{ textAlign: 'center' }}>
-                        <div style={{ color: '#aaa', fontSize: 9, letterSpacing: 1 }}>SEAMS</div>
-                        <div style={{ color: '#fff', fontSize: 14 }}>{seamCount}</div>
-                    </div>
-
-                    {/* Möbius seams */}
-                    <div style={{ textAlign: 'center' }}>
-                        <div style={{ color: '#aaa', fontSize: 9, letterSpacing: 1 }}>MÖBIUS</div>
-                        <div style={{
-                            color: mobiusCount > 0 ? '#ff00ff' : '#555', fontSize: 14,
-                            textShadow: mobiusCount > 0 ? '0 0 8px #ff00ff' : 'none',
-                        }}>
-                            {mobiusCount}
-                        </div>
-                    </div>
-
-                    {/* Matrix toggle */}
-                    <button
-                        onClick={() => setShowMatrix(s => !s)}
-                        style={{
-                            background: 'rgba(0,245,255,0.1)',
-                            border: '1px solid rgba(0,245,255,0.4)',
-                            borderRadius: 6, color: '#00f5ff', fontSize: 10,
-                            padding: '3px 8px', cursor: 'pointer', letterSpacing: 1,
-                        }}
-                    >
-                        {showMatrix ? 'HIDE H' : 'SHOW H'}
-                    </button>
-
-                    {/* Reset */}
-                    <button
-                        onClick={onReset}
-                        style={{
-                            background: 'rgba(255,50,50,0.12)',
-                            border: '1px solid rgba(255,80,80,0.4)',
-                            borderRadius: 6, color: '#ff6666', fontSize: 10,
-                            padding: '3px 8px', cursor: 'pointer', letterSpacing: 1,
-                        }}
-                    >
-                        RESET
-                    </button>
-                </div>
-            </div>
-
-            {/* 2×2 matrix panel */}
-            {showMatrix && (
-                <div style={{
-                    display: 'flex', justifyContent: 'center', marginTop: 6,
-                    pointerEvents: 'auto',
-                }}>
-                    <div style={{
-                        background: GLASS_PANEL,
-                        border: '1px solid rgba(0,245,255,0.25)',
-                        borderRadius: 10, padding: '8px 20px',
-                        backdropFilter: 'blur(10px)',
-                    }}>
-                        <div style={{ color: '#00f5ff', fontSize: 9, letterSpacing: 2, textAlign: 'center', marginBottom: 4 }}>
-                            HOLONOMY MATRIX H
-                        </div>
-                        <table style={{ borderCollapse: 'collapse', color: '#fff', fontSize: 13 }}>
-                            <tbody>
-                                {H.map((row, ri) => (
-                                    <tr key={ri}>
-                                        {row.map((v, ci) => (
-                                            <td key={ci} style={{
-                                                padding: '2px 10px', textAlign: 'right',
-                                                color: Math.abs(v) > 0.01 ? '#00ff88' : '#444',
-                                            }}>
-                                                {fmt(v)}
-                                            </td>
-                                        ))}
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                        <div style={{ color: '#888', fontSize: 9, textAlign: 'center', marginTop: 4 }}>
-                            det(H) = {fmt(H[0][0] * H[1][1] - H[0][1] * H[1][0])}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Loop-closed banner */}
-            {loopFlash && (
-                <div style={{
-                    position: 'fixed', top: '50%', left: '50%',
-                    transform: 'translate(-50%,-50%)',
-                    background: isFlipped
-                        ? 'linear-gradient(135deg, rgba(80,0,100,0.92), rgba(200,0,255,0.7))'
-                        : 'linear-gradient(135deg, rgba(0,40,80,0.92), rgba(0,200,100,0.7))',
-                    border: `2px solid ${isFlipped ? '#cc44ff' : '#00ff88'}`,
-                    borderRadius: 20, padding: '24px 48px',
-                    textAlign: 'center', pointerEvents: 'none',
-                    boxShadow: `0 0 60px ${isFlipped ? '#cc44ff' : '#00ff88'}`,
-                    animation: 'holonomy-pop 0.4s cubic-bezier(0.22,1,0.36,1) forwards',
-                    zIndex: 6000,
-                }}>
-                    <div style={{
-                        fontSize: 36, fontWeight: 900, letterSpacing: 4,
-                        color: isFlipped ? '#ff88ff' : '#00ff88',
-                        textShadow: `0 0 20px ${isFlipped ? '#cc44ff' : '#00ff88'}`,
-                    }}>
-                        {isFlipped ? '⚡ LOOP CLOSED' : '✓ LOOP CLOSED'}
-                    </div>
-                    <div style={{ color: GLASS_TEXT, fontSize: 16, marginTop: 8, fontFamily: UI_FONT }}>
-                        {isFlipped
-                            ? `NON-TRIVIAL HOLONOMY — MÖBIUS LOOP DETECTED`
-                            : `Trivial loop — bundle is orientable here`}
-                    </div>
-                    <div style={{ color: '#ccc', fontSize: 13, marginTop: 4 }}>
-                        φ = {fmtDeg(holonomyAngle)} · det(H) = {orientationParity > 0 ? '+1' : '−1'}
-                    </div>
-                </div>
-            )}
-
-            {/* Mobile steer buttons */}
-            <div style={{
-                position: 'fixed', bottom: 140, left: '50%', transform: 'translateX(-50%)',
-                display: 'flex', gap: 12, pointerEvents: 'auto',
-            }}>
-                <button
-                    onPointerDown={() => onTurnLeft?.()}
-                    style={{
-                        width: 56, height: 56, borderRadius: '50%',
-                        background: 'rgba(0,245,255,0.15)',
-                        border: '2px solid rgba(0,245,255,0.5)',
-                        color: '#00f5ff', fontSize: 22, cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}
-                >↺</button>
-                <button
-                    onPointerDown={() => onTurnRight?.()}
-                    style={{
-                        width: 56, height: 56, borderRadius: '50%',
-                        background: 'rgba(0,245,255,0.15)',
-                        border: '2px solid rgba(0,245,255,0.5)',
-                        color: '#00f5ff', fontSize: 22, cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}
-                >↻</button>
-            </div>
-
-            <style>{`
-        @keyframes holonomy-pop {
-          from { transform: translate(-50%,-50%) scale(0.6); opacity: 0; }
-          to   { transform: translate(-50%,-50%) scale(1);   opacity: 1; }
-        }
-      `}</style>
+  return <div style={{ position: 'fixed', inset: 0, zIndex: 500, pointerEvents: 'none', fontFamily: MONO_FONT }}>
+    <div style={{ display: 'flex', justifyContent: 'center', padding: 'max(10px, env(safe-area-inset-top, 0px)) 12px 0' }}>
+      <FieldGuideSheet style={{ width: 'min(620px, calc(100vw - 24px))', padding: '10px 14px', pointerEvents: 'auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+          <FieldGuideEyebrow style={{ color: '#7b6f45' }}>Holonomy field notes</FieldGuideEyebrow>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <FieldGuideButton secondary onClick={() => setShowMatrix(v => !v)} style={{ padding: '6px 10px', fontSize: 10 }}>{showMatrix ? 'Hide matrix' : 'Matrix'}</FieldGuideButton>
+            <FieldGuideButton secondary onClick={onReset} style={{ padding: '6px 10px', fontSize: 10 }}>Reset</FieldGuideButton>
+          </div>
         </div>
-    );
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(62px, 1fr))', gap: 6, marginTop: 8 }}>
+          {metrics.map(([label, value]) => <div key={label} style={{ padding: '6px 4px', textAlign: 'center', borderLeft: '1px solid rgba(111,126,86,0.16)' }}>
+            <div style={{ color: fieldGuide.muted, fontSize: 9, letterSpacing: 1, textTransform: 'uppercase' }}>{label}</div>
+            <div style={{ color: label === 'Parity' && isFlipped ? '#9b4d3d' : fieldGuide.ink, fontSize: 13, fontWeight: 800 }}>{value}</div>
+          </div>)}
+        </div>
+      </FieldGuideSheet>
+    </div>
+    {showMatrix && <div style={{ display: 'flex', justifyContent: 'center', marginTop: 6, pointerEvents: 'auto' }}>
+      <FieldGuideSheet style={{ padding: '10px 18px', borderRadius: 12, textAlign: 'center' }}>
+        <FieldGuideEyebrow style={{ color: '#7b6f45', fontSize: 9 }}>Holonomy matrix H</FieldGuideEyebrow>
+        <table style={{ margin: '5px auto 0', borderCollapse: 'collapse', color: fieldGuide.ink, fontSize: 13 }}><tbody>{H.map((row, ri) => <tr key={ri}>{row.map((value, ci) => <td key={ci} style={{ padding: '2px 10px', textAlign: 'right', color: Math.abs(value) > 0.01 ? UI_MOSS : fieldGuide.muted }}>{fmt(value)}</td>)}</tr>)}</tbody></table>
+        <div style={{ color: fieldGuide.muted, fontSize: 9 }}>det(H) = {fmt(H[0][0] * H[1][1] - H[0][1] * H[1][0])}</div>
+      </FieldGuideSheet>
+    </div>}
+    {loopFlash && <div style={{ position: 'fixed', inset: 0, display: 'grid', placeItems: 'center', pointerEvents: 'none', background: 'radial-gradient(ellipse at center, rgba(24,31,18,0.34), rgba(24,31,18,0.62))' }}>
+      <div style={{ textAlign: 'center', color: UI_CREAM }}><FieldGuideEyebrow>{isFlipped ? 'Möbius loop detected' : 'Loop complete'}</FieldGuideEyebrow><div style={{ fontFamily: "'Bungee', 'Arial Black', sans-serif", fontSize: 'clamp(30px, 8vw, 52px)', textShadow: '0 3px 0 rgba(43,53,35,0.55), 0 10px 34px rgba(24,31,18,0.6)' }}>{isFlipped ? 'LOOP FLIPPED' : 'LOOP CLOSED'}</div><p style={{ margin: '8px 0 0', fontFamily: MONO_FONT, fontSize: 13 }}>{fmtDeg(holonomyAngle)} · det(H) = {orientationParity > 0 ? '+1' : '−1'}</p></div>
+    </div>}
+    <div style={{ position: 'fixed', bottom: 'calc(env(safe-area-inset-bottom, 0px) + 96px)', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 10, pointerEvents: 'auto' }}>
+      <FieldGuideButton aria-label="Turn left" onPointerDown={() => onTurnLeft?.()} style={{ width: 54, height: 54, padding: 0, fontSize: 22 }}>↺</FieldGuideButton>
+      <FieldGuideButton aria-label="Turn right" onPointerDown={() => onTurnRight?.()} style={{ width: 54, height: 54, padding: 0, fontSize: 22, background: UI_MOSS_LIGHT, color: '#26331f' }}>↻</FieldGuideButton>
+    </div>
+  </div>;
 }

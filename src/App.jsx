@@ -48,8 +48,9 @@ import {
 // 3D components
 import IntroScene from './components/intro/IntroScene.jsx';
 import NebulaEnvironment from './3d/NebulaEnvironment.jsx';
-import ShootingStars from './3d/ShootingStars.jsx';
+import InteractivePhotoBackground from './3d/InteractivePhotoBackground.jsx';
 import { setSharedRenderer, tickPreviews, hasActivePreviews } from './3d/TilePreviewRenderer.js';
+import { getBackgroundUrl, MENU_BACKGROUNDS } from './utils/backgrounds.js';
 
 // UI components
 import WelcomeScreen from './components/screens/WelcomeScreen.jsx';
@@ -198,35 +199,32 @@ function CameraManager({ showWelcome, showMainMenu, cameraZ }) {
  * MenuScene — the rotating black cube shown in the main menu.
  * Rendered inside the shared Canvas so there is never a second WebGL context.
  */
-function MenuScene({ onCubeClick }) {
-  const [menuFlipTrigger, setMenuFlipTrigger] = React.useState(0);
-  const handleMenuFlip = React.useCallback(() => setMenuFlipTrigger(p => p + 1), []);
-
+function MenuScene({ onCubeClick, background }) {
   return (
     <>
-      <color attach="background" args={['#05091a']} />
-      <ambientLight intensity={2.1} />
-      <pointLight position={[8, 8, 10]} intensity={5.5} color="#c0e4ff" />
-      <pointLight position={[-9, -8, 7]} intensity={2.8} color="#7aa3ff" />
-      <pointLight position={[0, -6, -8]} intensity={1.4} color="#4a90d9" />
+      {/* Each app launch chooses one photo panorama from MENU_BACKGROUNDS. The
+          warm field-guide controls stay readable regardless of the setting.
+          SafeEnvironment keeps the solid backdrop if the HDRI cannot load. */}
+      <color attach="background" args={['#38513d']} />
+      <ambientLight intensity={1.7} color="#e8e3c5" />
+      <pointLight position={[8, 8, 10]} intensity={4.0} color="#f0d89b" />
+      <pointLight position={[-9, -5, 7]} intensity={1.9} color="#78956b" />
+      <pointLight position={[0, -6, -8]} intensity={1.0} color="#456556" />
       <Suspense fallback={null}>
-        <NebulaEnvironment
-          variant="menu"
-          pulseTrigger={menuFlipTrigger}
-          speed={0.55}
-          density={isMobile ? 0.55 : 0.95}
-          structure={1.08}
-          performanceMode={isMobile}
+        <InteractivePhotoBackground
+          files={getBackgroundUrl(background.file)}
+          rotationSpeed={isMobile ? 0 : 0.006}
+          intensity={isMobile ? 0.84 : 0.98}
+          blurriness={0}
         />
       </Suspense>
-      <ShootingStars />
       <Suspense fallback={null}>
-        <RotatingBlackCube onCubeClick={onCubeClick} onFlip={handleMenuFlip} />
+        <RotatingBlackCube onCubeClick={onCubeClick} />
       </Suspense>
       {!isMobile && (
         <EffectComposer>
-          <Bloom intensity={0.70} luminanceThreshold={0.08} luminanceSmoothing={0.85} mipmapBlur />
-          <Vignette offset={0.38} darkness={0.82} />
+          <Bloom intensity={0.12} luminanceThreshold={0.86} luminanceSmoothing={0.92} mipmapBlur />
+          <Vignette offset={0.46} darkness={0.23} />
         </EffectComposer>
       )}
     </>
@@ -407,15 +405,14 @@ export default function WORM3() {
   // Intro time — drives IntroBranch (3D) and WelcomeScreen DOM overlay in sync
   const [introTime, setIntroTime] = useState(0);
 
+  // Stable for this app launch: never reroll while settings, menus, or overlays
+  // mount/unmount. MENU_BACKGROUNDS contains only file-backed photo panoramas.
+  const [menuBackground] = useState(() => (
+    MENU_BACKGROUNDS[Math.floor(Math.random() * MENU_BACKGROUNDS.length)]
+ ));
+
   // Co-op Crawler mode
   const [coopMode, setCoopMode] = useState(false);
-
-  // Boot loading cover — the WORM³ cube shown over the very first load until the
-  // 3D scene's WebGL context is up (plus a short minimum) so players get a
-  // deliberate branded loading beat instead of the black-canvas warm-up. First
-  // load only: once dismissed it never returns.
-  const [bootCover, setBootCover] = useState(true);
-  const [bootCoverLeaving, setBootCoverLeaving] = useState(false);
 
   // Mode-transition cover: bump this token when a mode is revealed to arm the
   // SceneLoadingGate, which covers the scene with the loading cube while its
@@ -434,24 +431,6 @@ export default function WORM3() {
     setSceneGateZ(opts.z ?? 9996);
     setSceneGateToken((t) => t + 1);
   }, []);
-  const bootStartRef = useRef(performance.now());
-  const bootDoneRef = useRef(false);
-  const finishBootCover = useCallback(() => {
-    if (bootDoneRef.current) return;
-    bootDoneRef.current = true;
-    const MIN_MS = 700; // ensure the cube is actually seen, not a 1-frame flash
-    const wait = Math.max(0, MIN_MS - (performance.now() - bootStartRef.current));
-    setTimeout(() => {
-      setBootCoverLeaving(true);
-      setTimeout(() => setBootCover(false), 480); // matches the .wl-leaving fade
-    }, wait);
-  }, []);
-  // Safety net: never let the cover stick if onCreated is delayed or never fires.
-  useEffect(() => {
-    const t = setTimeout(finishBootCover, 6000);
-    return () => clearTimeout(t);
-  }, [finishBootCover]);
-
   // Antipodal PiP — second camera from opposite side of the cube
   const [showAntipodalPiP, setShowAntipodalPiP] = useState(false);
 
@@ -619,9 +598,13 @@ export default function WORM3() {
   const handleWelcomeComplete = useCallback(() => {
     setShowWelcome(false);
     markIntroSeen();
-    // Show main menu after intro (not tutorial)
+    // The cinematic owns the first paint. Once the player enters/skips, hold
+    // the loading cube over the menu while the forest HDRI decodes instead of
+    // masking the opening animation with a boot cover.
+    armSceneGate('Entering the forest', { eager: true, holdMs: 1600, z: 10000 });
+    // Show main menu after intro (not tutorial).
     useGameStore.getState().setShowMainMenu(true);
-  }, [setShowWelcome, markIntroSeen]);
+  }, [setShowWelcome, markIntroSeen, armSceneGate]);
 
   // Main menu action handlers
   const handleStartCampaign = useCallback(() => {
@@ -1238,10 +1221,6 @@ export default function WORM3() {
 
   return (
     <div className={`full-screen${settings.backgroundTheme === 'dark' ? ' bg-dark' : settings.backgroundTheme === 'midnight' ? ' bg-midnight' : ''}${randomShaking ? ' random-shake' : ''}`}>
-      {/* Boot cover: the loading cube over the very first load. z above the
-          welcome overlay (9999) so it hides the WebGL warm-up and intro chrome
-          until the scene is up, then fades. */}
-      {bootCover && <LoadingScreen label="Loading WORM³" leaving={bootCoverLeaving} style={{ zIndex: 10000 }} />}
       {/* Mode-transition cover: sits above the game HUD / FX (≤9990) but below the
           Mobi dialogue (10500), so it fills the gap after Mobi while the scene's
           background decodes. Self-dismisses when nothing is loading. */}
@@ -1279,7 +1258,6 @@ export default function WORM3() {
           gl={{ powerPreference: 'high-performance', antialias: true }}
           shadows
           frameloop="always"
-          onCreated={finishBootCover}
         >
           <PerformanceMonitor
             onDecline={() => { setDpr([0.75, 1]); setPerfReducedFX(true); }}
@@ -1297,7 +1275,7 @@ export default function WORM3() {
           ) : showMainMenu ? (
             // Stop the cube/worm animation when a full-screen overlay covers the menu
             showSettings ? <color attach="background" args={['#000005']} /> : (
-              <MenuScene onCubeClick={handleMenuCube} />
+              <MenuScene onCubeClick={handleMenuCube} background={menuBackground} />
             )
           ) : (
             <Suspense fallback={null}>

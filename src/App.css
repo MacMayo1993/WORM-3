@@ -1,10 +1,10 @@
-/* Color Palette - Google Material Design + Rubik's Cube */
+/* WORM³ warm field-guide palette — shared by menu chrome, HUD, and overlays. */
 :root {
-  /* Primary Backgrounds */
-  --bg-primary: #ffffff;
-  --bg-secondary: #f8f9fa;
-  --bg-tertiary: #f1f3f4;
-  --bg-elevated: #ffffff;
+  /* Mobi's paper surfaces */
+  --bg-primary: #f6f1e2;
+  --bg-secondary: #eee7d7;
+  --bg-tertiary: #e4dbc8;
+  --bg-elevated: #faf7ee;
 
   /* Rubik's Cube Colors (Primary Accents) */
   --rubiks-red: #e53935;
@@ -15,34 +15,34 @@
   --rubiks-white: #fafafa;
 
   /* Text Colors */
-  --text-primary: #202124;
-  --text-secondary: #5f6368;
-  --text-tertiary: #80868b;
-  --text-disabled: #bdc1c6;
+  --text-primary: #26331f;
+  --text-secondary: #526046;
+  --text-tertiary: #738067;
+  --text-disabled: #a49d8d;
 
   /* UI Surfaces */
-  --surface-base: #ffffff;
-  --surface-overlay: rgba(255, 255, 255, 0.95);
-  --surface-dark: rgba(32, 33, 36, 0.95);
+  --surface-base: rgba(250, 247, 238, 0.94);
+  --surface-overlay: rgba(250, 247, 238, 0.90);
+  --surface-dark: rgba(43, 53, 35, 0.94);
 
   /* Borders & Dividers */
-  --border-light: #e8eaed;
-  --border-medium: #dadce0;
-  --border-focus: #1e88e5;
+  --border-light: rgba(111, 126, 86, 0.22);
+  --border-medium: rgba(95, 127, 74, 0.35);
+  --border-focus: #5f7f4a;
 
   /* Shadows */
-  --shadow-sm: 0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15);
-  --shadow-md: 0 1px 3px 0 rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15);
-  --shadow-lg: 0 2px 6px 2px rgba(60, 64, 67, 0.15), 0 8px 24px 4px rgba(60, 64, 67, 0.15);
-  --shadow-xl: 0 4px 16px 0 rgba(60, 64, 67, 0.15), 0 8px 32px 6px rgba(60, 64, 67, 0.15);
+  --shadow-sm: 0 3px 10px rgba(43, 53, 35, 0.16);
+  --shadow-md: 0 10px 24px rgba(43, 53, 35, 0.20);
+  --shadow-lg: 0 18px 42px rgba(43, 53, 35, 0.25);
+  --shadow-xl: 0 28px 72px rgba(43, 53, 35, 0.30);
 
-  /* Unified dark glass UI theme (Tetris Effect × Genshin Impact) */
+  /* Unified warm UI chrome — matches demo progress and setup cards. */
   --ui-font: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
-  --ui-panel: rgba(14, 17, 38, 0.88);
-  --ui-panel-strong: rgba(14, 17, 38, 0.94);
-  --ui-ink: #e8edf8;
-  --ui-ink-subtle: rgba(200, 220, 255, 0.60);
-  --ui-border: rgba(255, 255, 255, 0.08);
+  --ui-panel: rgba(250, 247, 238, 0.90);
+  --ui-panel-strong: rgba(250, 247, 238, 0.96);
+  --ui-ink: #26331f;
+  --ui-ink-subtle: #657156;
+  --ui-border: rgba(111, 126, 86, 0.25);
 
   /* Safe area insets for mobile browsers */
   --safe-area-inset-top: env(safe-area-inset-top, 0px);
@@ -109,7 +109,7 @@ body {
   font-family: var(--ui-font);
 }
 
-/* Base UI Element - Clean Material Design */
+/* Base UI element — Mobi's paper */
 .ui-element {
   pointer-events: auto;
   background: var(--surface-overlay);
@@ -121,7 +121,7 @@ body {
 }
 
 /* ========================================
-   TOP APP BAR — Google Material Design 48dp
+   TOP APP BAR — field-guide paper
    ======================================== */
 .top-app-bar {
   pointer-events: auto;
@@ -245,12 +245,12 @@ body {
   cursor: pointer;
   transition: background 0.2s ease, color 0.2s ease;
   padding: 0;
-  color: rgba(200, 220, 255, 0.80);
+  color: #43513a;
 }
 
 .top-bar-icon-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: #e8edf8;
+  background: rgba(95, 127, 74, 0.12);
+  color: #26331f;
 }
 
 .top-bar-icon-btn:focus-visible {
@@ -275,7 +275,7 @@ button:focus-visible,
 }
 
 /* ========================================
-   BOTTOM NAV BAR — Material Design 5-icon
+   BOTTOM NAV BAR — field-guide cube tiles
    ======================================== */
 .bottom-nav-bar {
   pointer-events: auto;
@@ -288,12 +288,12 @@ button:focus-visible,
   height: 72px;
   padding: 6px 16px;
   padding-bottom: calc(8px + var(--safe-area-inset-bottom));
-  background: rgba(10, 12, 28, 0.96);
+  background: rgba(250, 247, 238, 0.96);
   backdrop-filter: blur(20px);
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid rgba(111, 126, 86, 0.25);
   border-radius: 20px 20px 0 0;
   box-sizing: border-box;
-  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 -4px 24px rgba(43, 53, 35, 0.22);
   font-family: var(--ui-font);
   gap: 4px;
 }
@@ -324,7 +324,7 @@ button:focus-visible,
 .cube-tile-label {
   font-size: 10px;
   font-weight: 600;
-  color: rgba(200, 220, 255, 0.45);
+  color: #657156;
   letter-spacing: 0.04em;
   line-height: 1;
   text-transform: uppercase;
@@ -336,7 +336,7 @@ button:focus-visible,
 .sheet-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(8, 10, 22, 0.60);
+  background: rgba(43, 53, 35, 0.42);
   z-index: 500;
   animation: sheet-fade-in 0.2s ease;
 }
@@ -357,7 +357,7 @@ button:focus-visible,
   left: 0;
   right: 0;
   z-index: 501;
-  background: rgba(14, 17, 38, 0.96);
+  background: rgba(250, 247, 238, 0.97);
   backdrop-filter: blur(24px);
   border-radius: 20px 20px 0 0;
   padding: 8px 20px 24px;
@@ -366,8 +366,8 @@ button:focus-visible,
   overflow-y: auto;
   transform: translateY(100%);
   animation: sheet-slide-up 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.60);
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 -12px 40px rgba(43, 53, 35, 0.28);
+  border-top: 1px solid rgba(111, 126, 86, 0.25);
   font-family: var(--ui-font);
 }
 
@@ -404,7 +404,7 @@ button:focus-visible,
 .sheet-group-title {
   font-size: 11px;
   font-weight: 600;
-  color: rgba(180, 210, 255, 0.40);
+  color: #657156;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   margin-bottom: 10px;
@@ -422,9 +422,9 @@ button:focus-visible,
   gap: 6px;
   padding: 12px 16px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(200, 220, 255, 0.85);
+  border: 1px solid rgba(111, 126, 86, 0.20);
+  background: rgba(255, 255, 255, 0.56);
+  color: #43513a;
   font-size: 13px;
   font-weight: 500;
   font-family: var(--ui-font);
@@ -437,8 +437,8 @@ button:focus-visible,
 }
 
 .sheet-item:hover {
-  background: rgba(255, 255, 255, 0.09);
-  border-color: rgba(255, 255, 255, 0.16);
+  background: #fffdf5;
+  border-color: rgba(95, 127, 74, 0.50);
 }
 
 .sheet-item:active {
@@ -446,9 +446,9 @@ button:focus-visible,
 }
 
 .sheet-item-active {
-  background: rgba(30, 136, 229, 0.18);
-  border-color: rgba(30, 136, 229, 0.55);
-  color: #60a5fa;
+  background: rgba(95, 127, 74, 0.14);
+  border-color: rgba(95, 127, 74, 0.55);
+  color: #3f5730;
   font-weight: 600;
 }
 
@@ -515,11 +515,11 @@ button:focus-visible,
   opacity: 0;
 }
 
-/* Compact buttons - Material Design style */
+/* Compact buttons — shared secondary action treatment */
 .btn-compact {
   padding: 8px 16px;
   border: 1px solid var(--border-medium);
-  background: var(--surface-base);
+  background: rgba(250, 247, 238, 0.88);
   color: var(--text-primary);
   cursor: pointer;
   transition: all 0.2s ease;
@@ -532,8 +532,8 @@ button:focus-visible,
 }
 
 .btn-compact:hover {
-  background: var(--bg-tertiary);
-  border-color: var(--border-focus);
+  background: #fffdf5;
+  border-color: #5f7f4a;
   transform: translateY(-1px);
   box-shadow: var(--shadow-md);
 }
@@ -544,10 +544,10 @@ button:focus-visible,
 }
 
 .btn-compact.active {
-  background: rgba(30, 136, 229, 0.12);
-  border-color: var(--rubiks-blue);
-  color: var(--rubiks-blue);
-  box-shadow: 0 0 0 3px rgba(30, 136, 229, 0.12);
+  background: #5f7f4a;
+  border-color: #5f7f4a;
+  color: #fffdf2;
+  box-shadow: 0 0 0 3px rgba(95, 127, 74, 0.16);
 }
 
 /* Instability Tracker */
@@ -1097,7 +1097,7 @@ button:focus-visible,
   .top-app-bar {
     padding: 0 10px;
     height: 44px;
-    border-bottom: 1px solid rgba(103, 127, 184, 0.55);
+    border-bottom: 1px solid rgba(111, 126, 86, 0.25);
   }
 
   .top-bar-title {
@@ -1115,9 +1115,9 @@ button:focus-visible,
     max-width: 100%;
     border-radius: 0;
     height: 68px;
-    background: rgba(10, 12, 28, 0.97);
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
-    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.55);
+    background: rgba(250, 247, 238, 0.97);
+    border-top: 1px solid rgba(111, 126, 86, 0.25);
+    box-shadow: 0 -4px 20px rgba(43, 53, 35, 0.22);
   }
 
   .cube-tile-label {
