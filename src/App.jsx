@@ -215,7 +215,7 @@ function MenuScene({ onCubeClick }) {
           files={getBackgroundUrl('forest.exr')}
           rotationSpeed={isMobile ? 0 : 0.006}
           intensity={isMobile ? 0.84 : 0.98}
-          blurriness={isMobile ? 0.06 : 0.025}
+          blurriness={0}
         />
       </Suspense>
       <Suspense fallback={null}>
@@ -408,13 +408,6 @@ export default function WORM3() {
   // Co-op Crawler mode
   const [coopMode, setCoopMode] = useState(false);
 
-  // Boot loading cover — the WORM³ cube shown over the very first load until the
-  // 3D scene's WebGL context is up (plus a short minimum) so players get a
-  // deliberate branded loading beat instead of the black-canvas warm-up. First
-  // load only: once dismissed it never returns.
-  const [bootCover, setBootCover] = useState(true);
-  const [bootCoverLeaving, setBootCoverLeaving] = useState(false);
-
   // Mode-transition cover: bump this token when a mode is revealed to arm the
   // SceneLoadingGate, which covers the scene with the loading cube while its
   // environment map / textures decode (only if a decode is actually in flight).
@@ -432,24 +425,6 @@ export default function WORM3() {
     setSceneGateZ(opts.z ?? 9996);
     setSceneGateToken((t) => t + 1);
   }, []);
-  const bootStartRef = useRef(performance.now());
-  const bootDoneRef = useRef(false);
-  const finishBootCover = useCallback(() => {
-    if (bootDoneRef.current) return;
-    bootDoneRef.current = true;
-    const MIN_MS = 700; // ensure the cube is actually seen, not a 1-frame flash
-    const wait = Math.max(0, MIN_MS - (performance.now() - bootStartRef.current));
-    setTimeout(() => {
-      setBootCoverLeaving(true);
-      setTimeout(() => setBootCover(false), 480); // matches the .wl-leaving fade
-    }, wait);
-  }, []);
-  // Safety net: never let the cover stick if onCreated is delayed or never fires.
-  useEffect(() => {
-    const t = setTimeout(finishBootCover, 6000);
-    return () => clearTimeout(t);
-  }, [finishBootCover]);
-
   // Antipodal PiP — second camera from opposite side of the cube
   const [showAntipodalPiP, setShowAntipodalPiP] = useState(false);
 
@@ -617,9 +592,13 @@ export default function WORM3() {
   const handleWelcomeComplete = useCallback(() => {
     setShowWelcome(false);
     markIntroSeen();
-    // Show main menu after intro (not tutorial)
+    // The cinematic owns the first paint. Once the player enters/skips, hold
+    // the loading cube over the menu while the forest HDRI decodes instead of
+    // masking the opening animation with a boot cover.
+    armSceneGate('Entering the forest', { eager: true, holdMs: 1600, z: 10000 });
+    // Show main menu after intro (not tutorial).
     useGameStore.getState().setShowMainMenu(true);
-  }, [setShowWelcome, markIntroSeen]);
+  }, [setShowWelcome, markIntroSeen, armSceneGate]);
 
   // Main menu action handlers
   const handleStartCampaign = useCallback(() => {
@@ -1236,10 +1215,6 @@ export default function WORM3() {
 
   return (
     <div className={`full-screen${settings.backgroundTheme === 'dark' ? ' bg-dark' : settings.backgroundTheme === 'midnight' ? ' bg-midnight' : ''}${randomShaking ? ' random-shake' : ''}`}>
-      {/* Boot cover: the loading cube over the very first load. z above the
-          welcome overlay (9999) so it hides the WebGL warm-up and intro chrome
-          until the scene is up, then fades. */}
-      {bootCover && <LoadingScreen label="Loading WORM³" leaving={bootCoverLeaving} style={{ zIndex: 10000 }} />}
       {/* Mode-transition cover: sits above the game HUD / FX (≤9990) but below the
           Mobi dialogue (10500), so it fills the gap after Mobi while the scene's
           background decodes. Self-dismisses when nothing is loading. */}
@@ -1277,7 +1252,6 @@ export default function WORM3() {
           gl={{ powerPreference: 'high-performance', antialias: true }}
           shadows
           frameloop="always"
-          onCreated={finishBootCover}
         >
           <PerformanceMonitor
             onDecline={() => { setDpr([0.75, 1]); setPerfReducedFX(true); }}

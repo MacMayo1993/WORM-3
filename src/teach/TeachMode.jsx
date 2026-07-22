@@ -2,7 +2,7 @@
 // Teach Mode UI — Instructor panel with sub-modes: Guided, Demo, Quiz
 
 import React, { useState } from 'react';
-import { UI_FONT, MONO_FONT, UI_GOLD, UI_MOSS, UI_MOSS_LIGHT } from '../utils/uiTheme.js';
+import { UI_FONT, MONO_FONT, UI_MOSS, UI_MOSS_LIGHT } from '../utils/uiTheme.js';
 import { fieldGuide } from '../components/ui/FieldGuide.jsx';
 
 // ─── Module-level style constants (never reallocated) ─────────────────────────
@@ -43,7 +43,7 @@ const WHYCARD_ICON_STYLE = {
   justifyContent: 'center',
   fontSize: '10px',
   flexShrink: 0,
-  color: UI_GOLD,
+  color: fieldGuide.goldInk,
 };
 
 const WHYCARD_CHEVRON_STYLE_BASE = { marginLeft: 'auto', transition: 'transform 0.2s' };
@@ -132,7 +132,7 @@ const TM_ALGO_CARD_STYLE = {
 };
 
 const TM_ALGO_CARD_NAME_STYLE = { fontWeight: 'bold', color: UI_MOSS, fontSize: '10px' };
-const TM_ALGO_CARD_NOTATION_STYLE = { fontFamily: MONO_FONT, fontSize: '12px', color: UI_GOLD, margin: '2px 0' };
+const TM_ALGO_CARD_NOTATION_STYLE = { fontFamily: MONO_FONT, fontSize: '12px', color: fieldGuide.goldInk, margin: '2px 0' };
 const TM_ALGO_CARD_WHEN_STYLE = { fontSize: '10px', color: 'rgba(38,51,31,0.54)' };
 
 const TM_ALGO_LIST_LABEL_STYLE = { fontSize: '10px', color: 'rgba(38,51,31,0.54)', marginBottom: '8px' };
@@ -201,7 +201,7 @@ const WhyCard = ({ algo, open, onToggle }) => {
     }}>
       <button
         onClick={onToggle}
-        style={{ ...WHYCARD_OUTER_BUTTON_STYLE, color: open ? UI_GOLD : 'rgba(38,51,31,0.54)' }}
+        style={{ ...WHYCARD_OUTER_BUTTON_STYLE, color: open ? fieldGuide.goldInk : 'rgba(38,51,31,0.54)' }}
       >
         <span style={WHYCARD_ICON_STYLE}>?</span>
         WHY DOES THIS WORK?
@@ -393,7 +393,7 @@ const DemoBanner = () => (
     lineHeight: '1.5',
   }}>
     <span style={{ color: UI_MOSS, fontWeight: 'bold' }}>Demo mode: </span>
-    Select an algorithm below and press <span style={{ color: UI_GOLD }}>▶▶</span> to watch it
+    Select an algorithm below and press <span style={{ color: fieldGuide.goldInk }}>▶▶</span> to watch it
     execute automatically. Press <span style={{ color: '#ffa500' }}>⏸</span> to pause at any step.
   </div>
 );
@@ -436,7 +436,7 @@ const AlgorithmCard = ({
         <div style={{
           fontFamily: MONO_FONT,
           fontSize: '14px',
-          color: UI_GOLD,
+          color: fieldGuide.goldInk,
           margin: '4px 0',
           letterSpacing: '1px',
         }}>
