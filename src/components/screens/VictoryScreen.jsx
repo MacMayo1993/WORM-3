@@ -1,12 +1,26 @@
 import React, { useState, useMemo } from 'react';
 import { VICTORY } from '../../utils/constants.js';
-import { UI_FONT, GLASS_PANEL, GLASS_PANEL_BORDER, GLASS_TEXT, GLASS_TEXT_MUTED, GLASS_TEXT_SOFT, GLASS_SHADOW } from '../../utils/uiTheme.js';
+import { UI_FONT, DISPLAY_FONT } from '../../utils/uiTheme.js';
 
 /**
- * VictoryScreen — themed to match the dark "Mobi" UI (LevelTutorial / MobiIntro):
- * dark navy panel, accent glow per win type, system-ui type, accent-filled
- * primary actions. The standalone Sudokube victory was removed.
+ * VictoryScreen — themed to match the demo "STEP COMPLETE" beat: a warm dark
+ * backdrop (no black, no neon), a cream Bungee title with a soft drop shadow, a
+ * gold all-caps subtitle, and green pill actions. Per-win accents are warm, not
+ * neon. The standalone Sudokube victory was removed.
  */
+
+// ─── STEP COMPLETE palette ─────────────────────────────────────────────────────
+const BG_RADIAL = 'radial-gradient(ellipse at center, rgba(24,31,18,0.55) 0%, rgba(24,31,18,0.86) 100%)';
+const INK_CREAM = '#fffdf2';
+const GOLD = '#ffe9ad';
+const CREAM_SOFT = 'rgba(255,253,242,0.86)';
+const CREAM_MUTED = 'rgba(255,253,242,0.6)';
+const GREEN = '#5f7f4a';
+const GREEN_LIGHT = '#9fdb7a';
+const TITLE_SHADOW = '0 3px 0 rgba(43,53,35,0.55), 0 10px 34px rgba(24,31,18,0.6)';
+const SOFT_SHADOW = '0 2px 12px rgba(24,31,18,0.7)';
+const WARM_PANEL = 'rgba(250,247,238,0.08)';
+const WARM_BORDER = 'rgba(255,245,220,0.18)';
 
 const VictoryScreen = ({
   winType,
@@ -22,7 +36,8 @@ const VictoryScreen = ({
 }) => {
   const [showConfetti] = useState(true);
 
-  const CONFETTI_COLORS = ['#00d2f8', '#22c55e', '#3b82f6', '#eab308', '#f97316', '#ffffff', '#a855f7', '#ec4899'];
+  // Warm celebratory confetti — no neon cyan / magenta.
+  const CONFETTI_COLORS = ['#ffe9ad', '#9fdb7a', '#5f7f4a', '#e0b25c', '#d98a3d', '#fffdf2', '#c94f3d'];
   const confettiParticles = useMemo(() => {
     const count = 35;
     return Array.from({ length: count }).map((_, i) => {
@@ -58,40 +73,37 @@ const VictoryScreen = ({
 
   const levelWinMessage = levelData?.winMessage;
 
-  // Per-win theming — all share the dark Mobi panel, only the accent changes.
-  // Only the classic and worm victories remain (Sudokube/Ultimate were removed).
+  // Per-win theming — all share the warm STEP COMPLETE look; only the confetti
+  // mascot glyph color shifts. Only classic and worm victories remain.
   const winConfig = {
     rubiks: {
       title: 'Cube Solved!',
       subtitle: 'Classic Victory',
       description: "You've arranged every face with a single uniform color.",
-      accent: '#00d2f8',
     },
     worm: {
       title: 'WORM³ Complete!',
       subtitle: 'Secret Achievement',
       description: "You solved the entire cube through the WORMHOLES — every sticker traveled through antipodal space.",
-      accent: '#fb8c00',
     },
   };
 
   const config = winConfig[winType] || winConfig.rubiks;
-  const accent = config.accent;
 
   // Shared button styles ----------------------------------------------------
   const primaryBtn = {
-    background: accent,
-    border: `1px solid ${accent}`,
-    color: '#00121b',
+    background: GREEN,
+    border: 'none',
+    color: INK_CREAM,
     fontSize: '13px',
-    fontWeight: 700,
-    padding: '11px 26px',
-    borderRadius: '6px',
+    fontWeight: 800,
+    padding: '12px 26px',
+    borderRadius: '999px',
     cursor: 'pointer',
     fontFamily: UI_FONT,
-    letterSpacing: '0.06em',
+    letterSpacing: '0.08em',
     textTransform: 'uppercase',
-    boxShadow: `0 0 18px ${accent}66`,
+    boxShadow: '0 7px 16px rgba(95,127,74,0.30)',
     transition: 'all 0.18s',
     display: 'flex',
     alignItems: 'center',
@@ -99,15 +111,16 @@ const VictoryScreen = ({
   };
   const outlineBtn = {
     background: 'transparent',
-    border: '1px solid rgba(255,255,255,0.2)',
-    color: 'rgba(255,255,255,0.75)',
+    border: `1.5px solid ${WARM_BORDER}`,
+    color: CREAM_SOFT,
     fontSize: '13px',
-    fontWeight: 600,
-    padding: '11px 22px',
-    borderRadius: '6px',
+    fontWeight: 700,
+    padding: '12px 22px',
+    borderRadius: '999px',
     cursor: 'pointer',
     fontFamily: UI_FONT,
-    letterSpacing: '0.04em',
+    letterSpacing: '0.06em',
+    textTransform: 'uppercase',
     transition: 'all 0.18s',
   };
 
@@ -116,9 +129,9 @@ const VictoryScreen = ({
       position: 'fixed',
       inset: 0,
       height: '100dvh',
-      background: 'radial-gradient(120% 120% at 50% 0%, rgba(0,40,60,0.35) 0%, rgba(0,0,0,0.78) 60%)',
-      backdropFilter: 'blur(8px)',
-      WebkitBackdropFilter: 'blur(8px)',
+      background: BG_RADIAL,
+      backdropFilter: 'blur(9px) saturate(1.03)',
+      WebkitBackdropFilter: 'blur(9px) saturate(1.03)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -155,7 +168,7 @@ const VictoryScreen = ({
               fontSize: '24px',
               left: p.left,
               top: '-40px',
-              color: accent,
+              color: GREEN_LIGHT,
               animation: `vsWormWiggle ${p.duration}s linear infinite`,
               animationDelay: `${p.delay}s`,
             }}>◎</div>
@@ -168,59 +181,60 @@ const VictoryScreen = ({
         textAlign: 'center',
         maxWidth: '460px',
         width: '92%',
-        padding: 'clamp(28px, 5vw, 40px)',
+        padding: 'clamp(24px, 5vw, 36px)',
         maxHeight: 'calc(100dvh - 32px)',
         overflowY: 'auto',
-        background: GLASS_PANEL,
-        borderRadius: '16px',
-        border: `1px solid ${accent}`,
-        boxShadow: `${GLASS_SHADOW}, 0 0 60px ${accent}33`,
         boxSizing: 'border-box',
         animation: 'vsPanelRise 0.45s cubic-bezier(0.16,1,0.3,1)'
       }}>
-        {/* Accent top bar */}
+        {/* Green check — echoes the demo STEP COMPLETE stamp */}
         <div style={{
-          position: 'absolute',
-          top: 0, left: 0, right: 0,
-          height: '3px',
-          background: `linear-gradient(90deg, transparent, ${accent}, transparent)`,
-          borderRadius: '16px 16px 0 0'
-        }} />
+          fontSize: 'clamp(40px, 11vw, 64px)',
+          lineHeight: 1,
+          color: GREEN_LIGHT,
+          textShadow: '0 4px 0 rgba(43,53,35,0.5), 0 12px 38px rgba(24,31,18,0.65)',
+          margin: '0 0 8px'
+        }}>✓</div>
 
-        {/* Title */}
-        <h1 style={{
-          fontSize: 'clamp(26px, 6vw, 36px)',
-          fontWeight: 800,
-          margin: '0 0 6px 0',
-          color: accent,
-          fontFamily: UI_FONT,
-          letterSpacing: '0.01em',
-          textShadow: `0 0 24px ${accent}55`
-        }}>
-          {config.title}
-        </h1>
-
-        {/* Subtitle */}
+        {/* Subtitle (eyebrow) */}
         <p style={{
-          fontSize: '12px',
-          color: accent,
-          opacity: 0.85,
-          margin: '0 0 18px 0',
+          fontSize: 'clamp(12px, 3.4vw, 15px)',
+          color: GOLD,
+          margin: '0 0 8px 0',
           fontFamily: UI_FONT,
-          fontWeight: 700,
-          letterSpacing: '0.18em',
-          textTransform: 'uppercase'
+          fontWeight: 900,
+          letterSpacing: '0.22em',
+          textTransform: 'uppercase',
+          textShadow: SOFT_SHADOW
         }}>
           {config.subtitle}
         </p>
 
+        {/* Title */}
+        <h1 style={{
+          fontSize: 'clamp(30px, 8vw, 52px)',
+          fontWeight: 900,
+          margin: '0 0 14px 0',
+          color: INK_CREAM,
+          fontFamily: DISPLAY_FONT,
+          lineHeight: 0.95,
+          letterSpacing: '0.02em',
+          textTransform: 'uppercase',
+          textShadow: TITLE_SHADOW
+        }}>
+          {config.title}
+        </h1>
+
         {/* Description */}
         <p style={{
-          fontSize: '15px',
-          color: GLASS_TEXT_SOFT,
+          fontSize: '13px',
+          color: CREAM_SOFT,
           margin: '0 0 22px 0',
           lineHeight: 1.6,
-          fontFamily: UI_FONT
+          fontFamily: UI_FONT,
+          fontWeight: 700,
+          letterSpacing: '0.04em',
+          textTransform: 'uppercase'
         }}>
           {levelWinMessage || config.description}
         </p>
@@ -230,18 +244,18 @@ const VictoryScreen = ({
           <div style={{
             display: 'inline-block',
             marginBottom: '20px',
-            padding: '6px 16px',
-            background: `${accent}1a`,
-            borderRadius: '20px',
-            border: `1px solid ${accent}40`
+            padding: '7px 16px',
+            background: WARM_PANEL,
+            borderRadius: '999px',
+            border: `1px solid ${WARM_BORDER}`
           }}>
             <span style={{
               fontSize: '11px',
-              fontWeight: 700,
-              color: accent,
+              fontWeight: 800,
+              color: GOLD,
               fontFamily: UI_FONT,
               textTransform: 'uppercase',
-              letterSpacing: '0.12em'
+              letterSpacing: '0.14em'
             }}>
               Level {currentLevel} Complete
             </span>
@@ -260,18 +274,18 @@ const VictoryScreen = ({
               flex: 1,
               maxWidth: '150px',
               padding: '14px 10px',
-              background: 'rgba(255,255,255,0.04)',
-              borderRadius: '10px',
-              border: `1px solid ${GLASS_PANEL_BORDER}`
+              background: WARM_PANEL,
+              borderRadius: '14px',
+              border: `1px solid ${WARM_BORDER}`
             }}>
               <div style={{
-                fontSize: '10px', textTransform: 'uppercase', color: GLASS_TEXT_MUTED,
-                letterSpacing: '0.12em', marginBottom: '6px', fontWeight: 700,
+                fontSize: '10px', textTransform: 'uppercase', color: CREAM_MUTED,
+                letterSpacing: '0.14em', marginBottom: '6px', fontWeight: 800,
                 fontFamily: UI_FONT
               }}>{stat.label}</div>
               <div style={{
-                fontSize: '26px', fontWeight: 800, color: '#fff',
-                fontFamily: UI_FONT
+                fontSize: '26px', fontWeight: 900, color: INK_CREAM,
+                fontFamily: DISPLAY_FONT
               }}>{stat.value}</div>
             </div>
           ))}
@@ -282,8 +296,8 @@ const VictoryScreen = ({
           <button
             onClick={onContinue}
             style={outlineBtn}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.45)'; e.currentTarget.style.color = '#fff'; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)'; e.currentTarget.style.color = 'rgba(255,255,255,0.75)'; }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,245,220,0.42)'; e.currentTarget.style.color = INK_CREAM; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = WARM_BORDER; e.currentTarget.style.color = CREAM_SOFT; }}
           >
             Keep Playing
           </button>
@@ -292,8 +306,8 @@ const VictoryScreen = ({
             <button
               onClick={onNextLevel}
               style={primaryBtn}
-              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = `0 0 24px ${accent}aa`; }}
-              onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = `0 0 18px ${accent}66`; }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.background = '#6b8f53'; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.background = GREEN; }}
             >
               Next Level <span style={{ fontSize: '16px' }}>→</span>
             </button>
@@ -303,12 +317,12 @@ const VictoryScreen = ({
             onClick={onNewGame}
             style={hasNextLevel ? outlineBtn : primaryBtn}
             onMouseEnter={e => {
-              if (hasNextLevel) { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.45)'; e.currentTarget.style.color = '#fff'; }
-              else { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = `0 0 24px ${accent}aa`; }
+              if (hasNextLevel) { e.currentTarget.style.borderColor = 'rgba(255,245,220,0.42)'; e.currentTarget.style.color = INK_CREAM; }
+              else { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.background = '#6b8f53'; }
             }}
             onMouseLeave={e => {
-              if (hasNextLevel) { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)'; e.currentTarget.style.color = 'rgba(255,255,255,0.75)'; }
-              else { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = `0 0 18px ${accent}66`; }
+              if (hasNextLevel) { e.currentTarget.style.borderColor = WARM_BORDER; e.currentTarget.style.color = CREAM_SOFT; }
+              else { e.currentTarget.style.transform = 'none'; e.currentTarget.style.background = GREEN; }
             }}
           >
             {currentLevel ? 'Retry Level' : 'New Puzzle'}
@@ -322,11 +336,11 @@ const VictoryScreen = ({
               onClick={onMainMenu}
               style={{
                 background: 'transparent', border: 'none', cursor: 'pointer',
-                color: 'rgba(255,255,255,0.4)', fontSize: '12px', padding: '4px 8px',
-                fontFamily: UI_FONT, letterSpacing: '0.04em'
+                color: CREAM_MUTED, fontSize: '12px', padding: '4px 8px',
+                fontFamily: UI_FONT, letterSpacing: '0.06em', textTransform: 'uppercase', fontWeight: 700
               }}
-              onMouseEnter={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.75)'; }}
-              onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.4)'; }}
+              onMouseEnter={e => { e.currentTarget.style.color = INK_CREAM; }}
+              onMouseLeave={e => { e.currentTarget.style.color = CREAM_MUTED; }}
             >
               ← Main Menu
             </button>
@@ -338,19 +352,21 @@ const VictoryScreen = ({
           <div style={{
             marginTop: '22px',
             padding: '14px 18px',
-            background: `${accent}1a`,
-            borderRadius: '10px',
-            border: `1px solid ${accent}55`
+            background: WARM_PANEL,
+            borderRadius: '14px',
+            border: `1px solid ${WARM_BORDER}`
           }}>
             <p style={{
               margin: 0,
               fontSize: '13px',
-              color: '#ffd9b0',
-              fontWeight: 600,
-              fontFamily: UI_FONT
+              color: GOLD,
+              fontWeight: 800,
+              fontFamily: UI_FONT,
+              letterSpacing: '0.04em',
+              textTransform: 'uppercase'
             }}>
               You discovered the SECRET WORM VICTORY!<br/>
-              <span style={{ fontSize: '11px', fontWeight: 400, opacity: 0.85 }}>
+              <span style={{ fontSize: '11px', fontWeight: 600, color: CREAM_SOFT, letterSpacing: '0.03em' }}>
                 The rarest achievement — solving through pure manifold chaos.
               </span>
             </p>
