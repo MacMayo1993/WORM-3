@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Edges, Text } from '@react-three/drei';
 import { preloadFont } from 'troika-three-text';
@@ -129,7 +129,6 @@ import {
   setCarouselFace,
   getCarouselFace,
   subscribeCarouselActive,
-  subscribeCarouselFace,
   isCarouselActive,
   requestModeDive,
   consumeModeDive,
@@ -767,52 +766,111 @@ const _wobbleQ = new THREE.Quaternion();
 const _presentQ = new THREE.Quaternion();
 const DIVE_DURATION = 0.6; // seconds — PLAY accelerates the face into the camera
 
-// Renders a solid colored tile on every cube face, but the mode LABEL only on
-// the face currently presented to the camera. Fully opaque, depth-writing
-// plates: the front face then occludes the back and adjacent faces, so no
-// other mode's letters read through or float over the cube (which looked
-// unfinished). Subscribes to the active face so the label follows navigation.
+// Bevel overlay: a top-left highlight and bottom-right shadow baked into a
+// transparent texture, layered over the tile so the inset face reads as a
+// raised, chamfered cube sticker lit from the upper-left.
+function makeBevelTexture() {
+  if (typeof document === 'undefined') return null;
+  const s = 256;
+  const c = document.createElement('canvas');
+  c.width = c.height = s;
+  const ctx = c.getContext('2d');
+  if (!ctx) return null;
+  const edge = s * 0.16;
+  const strip = (grad, x, y, w, h) => { ctx.fillStyle = grad; ctx.fillRect(x, y, w, h); };
+  let g = ctx.createLinearGradient(0, 0, 0, edge);          // top highlight
+  g.addColorStop(0, 'rgba(255,255,255,0.60)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+  strip(g, 0, 0, s, edge);
+  g = ctx.createLinearGradient(0, 0, edge, 0);              // left highlight
+  g.addColorStop(0, 'rgba(255,255,255,0.40)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+  strip(g, 0, 0, edge, s);
+  g = ctx.createLinearGradient(0, s, 0, s - edge);          // bottom shadow
+  g.addColorStop(0, 'rgba(0,0,0,0.55)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+  strip(g, 0, s - edge, s, edge);
+  g = ctx.createLinearGradient(s, 0, s - edge, 0);          // right shadow
+  g.addColorStop(0, 'rgba(0,0,0,0.42)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+  strip(g, s - edge, 0, edge, s);
+  const tex = new THREE.CanvasTexture(c);
+  tex.needsUpdate = true;
+  return tex;
+}
+
+// Gloss overlay: a soft elliptical sheen near the top of the tile, blended
+// additively so the sticker looks glossy/wet without hiding the pattern.
+function makeGlossTexture() {
+  if (typeof document === 'undefined') return null;
+  const s = 256;
+  const c = document.createElement('canvas');
+  c.width = c.height = s;
+  const ctx = c.getContext('2d');
+  if (!ctx) return null;
+  const g = ctx.createRadialGradient(s * 0.5, s * 0.26, s * 0.04, s * 0.5, s * 0.3, s * 0.62);
+  g.addColorStop(0, 'rgba(255,255,255,0.45)');
+  g.addColorStop(0.5, 'rgba(255,255,255,0.11)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, s, s);
+  const tex = new THREE.CanvasTexture(c);
+  tex.needsUpdate = true;
+  return tex;
+}
+
+// Renders a beveled, glossy topographic-style tile on every cube face, with the
+// mode LABEL on all six faces so the words wrap the whole cube. Fully opaque,
+// depth-writing tiles occlude the faces behind them, so only the words on
+// visible faces read — hidden faces are naturally masked by the front tile.
 const ModeFacePlates = () => {
-  const [activeFace, setActiveFace] = useState(getCarouselFace());
-  useEffect(() => subscribeCarouselFace(setActiveFace), []);
   // Toggle visibility from the frame loop (not React state) so plates appear
   // the instant the selector activates — no startup frame where the bare
   // stickered cube flashes before React re-renders.
   const rootRef = useRef();
+  const bevelTex = useMemo(() => makeBevelTexture(), []);
+  const glossTex = useMemo(() => makeGlossTexture(), []);
   useFrame(() => { if (rootRef.current) rootRef.current.visible = isCarouselActive(); });
   return (
     <group ref={rootRef}>
       {CAROUSEL_MODES.map((m) => {
         const cfg = MODE_FACE_CFG[m.face];
-        const isFront = m.face === activeFace;
         return (
           <group key={m.id} position={cfg.pos} rotation={cfg.rot}>
-            {/* Dark frame */}
+            {/* Dark bevel frame */}
             <mesh renderOrder={30}>
               <planeGeometry args={[3.12, 3.12]} />
               <meshBasicMaterial color="#070a18" />
             </mesh>
-            {/* Mode color plate */}
+            {/* Mode color plate — topographic contour tile style */}
             <mesh position={[0, 0, 0.01]} renderOrder={31}>
               <planeGeometry args={[2.94, 2.94]} />
-              <meshBasicMaterial color={m.tileColor} toneMapped={false} />
+              <primitive object={getTileStyleMaterial('topographic', m.tileColor)} attach="material" />
             </mesh>
-            {/* Label only on the presented face — keeps other faces clean tiles */}
-            {isFront && (
-              <Text
-                position={[0, 0, 0.03]}
-                font={bungeeWoffUrl}
-                fontSize={m.label.length > 5 ? 0.58 : 0.74}
-                color="#ffffff"
-                anchorX="center"
-                anchorY="middle"
-                outlineWidth={0.04}
-                outlineColor="#141631"
-                renderOrder={32}
-              >
-                {m.label}
-              </Text>
+            {/* Bevel: top-left highlight / bottom-right shadow around the inset tile */}
+            {bevelTex && (
+              <mesh position={[0, 0, 0.018]} renderOrder={32}>
+                <planeGeometry args={[2.94, 2.94]} />
+                <meshBasicMaterial map={bevelTex} transparent depthWrite={false} toneMapped={false} />
+              </mesh>
             )}
+            {/* Gloss: soft sheen highlight across the upper face */}
+            {glossTex && (
+              <mesh position={[0, 0, 0.022]} renderOrder={33}>
+                <planeGeometry args={[2.94, 2.94]} />
+                <meshBasicMaterial map={glossTex} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+              </mesh>
+            )}
+            {/* Label on every face — the mode words wrap the whole cube */}
+            <Text
+              position={[0, 0, 0.03]}
+              font={bungeeWoffUrl}
+              fontSize={m.label.length > 5 ? 0.58 : 0.74}
+              color="#ffffff"
+              anchorX="center"
+              anchorY="middle"
+              outlineWidth={0.04}
+              outlineColor="#141631"
+              renderOrder={34}
+            >
+              {m.label}
+            </Text>
           </group>
         );
       })}
