@@ -31,7 +31,7 @@ const FACES = ['f-white', 'f-yellow', 'f-red', 'f-orange', 'f-green', 'f-blue'];
 // Each face's game color (utils/constants.js COLORS), used to tint its tile.
 const FACE_COLORS = {
   'f-white': '#fafafa',
-  'f-yellow': '#eab308',
+  'f-yellow': '#FFD500',
   'f-red': '#ef4444',
   'f-orange': '#f97316',
   'f-green': '#22c55e',

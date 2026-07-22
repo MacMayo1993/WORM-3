@@ -8,7 +8,7 @@ export const COLOR_SCHEMES = {
 
   // Pair logic: 1↔4  2↔5  3↔6 — each pair should be high contrast in hue or lightness
 
-  standard:   { 1: '#ef4444', 2: '#22c55e', 3: '#ffffff', 4: '#f97316', 5: '#3b82f6', 6: '#eab308' },
+  standard:   { 1: '#ef4444', 2: '#22c55e', 3: '#ffffff', 4: '#f97316', 5: '#3b82f6', 6: '#FFD500' },
 
   // Neon — red↔green / cyan↔magenta / white↔yellow
   neon:       { 1: '#FF1111', 2: '#00E5FF', 3: '#F0F0FF', 4: '#00FF55', 5: '#FF00CC', 6: '#FFE600' },

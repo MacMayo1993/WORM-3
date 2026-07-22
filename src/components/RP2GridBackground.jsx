@@ -139,7 +139,7 @@ function buildArrowGeometry(planeW, planeH) {
   const colLeft   = new THREE.Color('#3b82f6'); // blue  (left  → up)
   const colRight  = new THREE.Color('#22c55e'); // green (right → down) — antipodal to blue
   const colTop    = new THREE.Color('#eeeeee'); // white (top   → right)
-  const colBot    = new THREE.Color('#eab308'); // yellow(bot   → left)  — antipodal to white
+  const colBot    = new THREE.Color('#FFD500'); // yellow(bot   → left)  — antipodal to white
 
   function addChevron(x, y, dx, dy, col) {
     // A simple "<" shape oriented along (dx,dy)

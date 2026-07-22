@@ -76,7 +76,7 @@
     100deg,
     #ef4444 0%,
     #f97316 18%,
-    #eab308 36%,
+    #FFD500 36%,
     #22c55e 54%,
     #3b82f6 72%,
     #a855f7 90%,
@@ -247,7 +247,7 @@
 .f-green .wl-sticker { --wl-c: #22c55e; }
 .f-blue .wl-sticker { --wl-c: #3b82f6; }
 .f-white .wl-sticker { --wl-c: #fafafa; }
-.f-yellow .wl-sticker { --wl-c: #eab308; }
+.f-yellow .wl-sticker { --wl-c: #FFD500; }
 
 /* === Status line (label + progress) === */
 .wl-status {
