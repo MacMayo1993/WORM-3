@@ -61,6 +61,8 @@ const FlipParticles = React.forwardRef((_props, ref) => {
       if (isActiveRef.current) return;
       isActiveRef.current = true;
       progressRef.current = 0;
+      // Only draw the burst while it's live — idle stickers skip this instanced draw.
+      if (meshRef.current) meshRef.current.visible = true;
 
       uniformsRef.current.uColor.value.set(color);
       _baseBurstColor.set(color);
@@ -100,6 +102,7 @@ const FlipParticles = React.forwardRef((_props, ref) => {
       mesh.setMatrixAt(i, _particleDummy.matrix);
     }
     mesh.instanceMatrix.needsUpdate = true;
+    mesh.visible = false; // idle: not drawn until trigger()
   }, []);
 
   useFrame((_state, delta) => {
@@ -119,6 +122,7 @@ const FlipParticles = React.forwardRef((_props, ref) => {
         mesh.setMatrixAt(i, _particleDummy.matrix);
       }
       mesh.instanceMatrix.needsUpdate = true;
+      mesh.visible = false; // burst spent — stop drawing until next trigger
       return;
     }
 

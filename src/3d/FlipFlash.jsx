@@ -46,18 +46,22 @@ const FlipFlash = React.forwardRef((_props, ref) => {
     uProgress: { value: 1 } // idle = spent = transparent (must NOT start at 0)
   }));
   const matRef = useRef();
+  const meshRef = useRef();
 
   useImperativeHandle(ref, () => ({
     trigger() {
       uniforms.uProgress.value = 0;
+      // Only draw while the flash is live — idle stickers skip this draw entirely.
+      if (meshRef.current) meshRef.current.visible = true;
     },
     setProgress(p) {
       uniforms.uProgress.value = p;
+      if (p >= 1 && meshRef.current) meshRef.current.visible = false;
     }
   }), [uniforms]);
 
   return (
-    <mesh position={[0, 0, 0.055]} renderOrder={13}>
+    <mesh ref={meshRef} position={[0, 0, 0.055]} renderOrder={13} visible={false}>
       <primitive object={_flashGeo} attach="geometry" />
       <shaderMaterial
         ref={matRef}

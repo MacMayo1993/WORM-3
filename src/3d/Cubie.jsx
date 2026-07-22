@@ -7,7 +7,7 @@ import { getEdgeFlags } from '../game/cubeUtils.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import StickerPlane from './StickerPlane.jsx';
-import WireframeEdge from './WireframeEdge.jsx';
+import MergedLedEdges from './MergedLedEdges.jsx';
 import { getMirrorDimensions } from '../game/mirrorBlocks.js';
 import { resolveColors } from '../utils/colorSchemes.js';
 import { PER_CUBELET_VIEW_STYLES, LED_EDGE_MODES, pickCubeletViewStyle, bodyMaterialProps } from './cubeViewStyles.js';
@@ -464,17 +464,12 @@ const Cubie = React.forwardRef(function Cubie({
         </RoundedBox>
       )}
 
-      {/* LED edges for wireframe + neon (skip in hollow/mirror mode) */}
-      {showLedEdges && !hollowMode && !mirrorMode && wireframeEdges.map((edge, idx) => (
-        <WireframeEdge
-          key={idx}
-          start={edge.start}
-          end={edge.end}
-          color={edge.color}
-          intensity={edge.intensity}
-          pulsePhase={edge.pulsePhase}
-        />
-      ))}
+      {/* LED edges for wireframe + neon (skip in hollow/mirror mode).
+          All of this cubie's edges render as one segmented, vertex-colored line with a
+          single pulse subscription — one draw instead of up to 12. */}
+      {showLedEdges && !hollowMode && !mirrorMode && wireframeEdges.length > 0 && (
+        <MergedLedEdges edges={wireframeEdges} />
+      )}
 
       {/* Stickers — frame-shaped when hollow, solid plane otherwise; none in mirror/wireframe mode. */}
       {effectiveVisualMode !== 'wireframe' && !mirrorMode && (
