@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { UI_FONT, DISPLAY_FONT, GLASS_TEXT, GLASS_TEXT_MUTED } from '../../utils/uiTheme.js';
+import {
+  UI_FONT, DISPLAY_FONT, UI_CREAM, UI_GOLD, UI_MOSS, UI_MOSS_LIGHT, UI_ACTION_SHADOW,
+} from '../../utils/uiTheme.js';
 
 const PAIRS = [
   { id: 'red-orange', label: 'Red ↔ Orange', colors: ['#ef4444', '#f97316'], faceIds: [1, 4] },
@@ -15,24 +17,24 @@ export default function DemoForecastPicker({ onPick, onSkip }) {
       position: 'fixed', inset: 0, zIndex: 11500,
       display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center',
-      background: 'rgba(2,3,10,0.88)',
-      backdropFilter: 'blur(16px)',
+      background: 'radial-gradient(ellipse at center, rgba(24,31,18,0.34), rgba(24,31,18,0.62))',
+      backdropFilter: 'blur(9px) saturate(1.03)',
       fontFamily: UI_FONT, textAlign: 'center', padding: 24,
     }}>
       <p style={{
-        color: GLASS_TEXT_MUTED, fontSize: 12, fontWeight: 700,
+        color: UI_GOLD, fontSize: 12, fontWeight: 800,
         letterSpacing: '0.16em', textTransform: 'uppercase', margin: '0 0 8px',
       }}>
         Chaos Forecast
       </p>
       <h2 style={{
-        fontFamily: DISPLAY_FONT, fontSize: 28, color: '#fff',
+        fontFamily: DISPLAY_FONT, fontSize: 28, color: UI_CREAM,
         margin: '0 0 8px', letterSpacing: '0.04em',
       }}>
         Which pair survives?
       </h2>
       <p style={{
-        color: GLASS_TEXT, fontSize: 14, margin: '0 0 28px', maxWidth: 320,
+        color: 'rgba(255,253,242,0.86)', fontSize: 14, margin: '0 0 28px', maxWidth: 320,
       }}>
         Chaos will flip tiles at random. One antipodal pair will be the last standing.
       </p>
@@ -46,9 +48,10 @@ export default function DemoForecastPicker({ onPick, onSkip }) {
             style={{
               display: 'flex', alignItems: 'center', gap: 12,
               padding: '14px 20px',
-              background: selected === pair.id ? 'rgba(59,130,246,0.25)' : 'rgba(255,255,255,0.06)',
-              border: selected === pair.id ? '2px solid #3b82f6' : '2px solid rgba(255,255,255,0.10)',
+              background: selected === pair.id ? 'rgba(95,127,74,0.30)' : 'rgba(255,255,255,0.06)',
+              border: selected === pair.id ? `2px solid ${UI_MOSS_LIGHT}` : '1px solid rgba(255,245,220,0.18)',
               borderRadius: 12, cursor: 'pointer', fontFamily: UI_FONT,
+              boxShadow: selected === pair.id ? UI_ACTION_SHADOW : 'none',
               transition: 'all 0.2s ease',
             }}
           >
@@ -56,7 +59,7 @@ export default function DemoForecastPicker({ onPick, onSkip }) {
               <div style={{ width: 20, height: 20, borderRadius: 4, background: pair.colors[0] }} />
               <div style={{ width: 20, height: 20, borderRadius: 4, background: pair.colors[1] }} />
             </div>
-            <span style={{ color: '#fff', fontSize: 15, fontWeight: 600 }}>{pair.label}</span>
+            <span style={{ color: UI_CREAM, fontSize: 15, fontWeight: 700, letterSpacing: '0.03em' }}>{pair.label}</span>
           </button>
         ))}
       </div>
@@ -70,12 +73,12 @@ export default function DemoForecastPicker({ onPick, onSkip }) {
         }}
         style={{
           marginTop: 28, padding: '12px 44px',
-          background: selected ? '#3b82f6' : 'rgba(59,130,246,0.3)',
-          color: '#fff', border: 'none', borderRadius: 10,
-          fontFamily: UI_FONT, fontSize: 15, fontWeight: 600,
+          background: selected ? UI_MOSS : 'rgba(95,127,74,0.30)',
+          color: UI_CREAM, border: selected ? '1px solid rgba(159,219,122,0.55)' : '1px solid transparent', borderRadius: 999,
+          fontFamily: UI_FONT, fontSize: 13, fontWeight: 800,
           cursor: selected ? 'pointer' : 'default',
           opacity: selected ? 1 : 0.5,
-          letterSpacing: '0.04em',
+          letterSpacing: '0.1em', textTransform: 'uppercase',
           transition: 'all 0.2s ease',
         }}
       >
@@ -89,7 +92,7 @@ export default function DemoForecastPicker({ onPick, onSkip }) {
           style={{
             marginTop: 14, padding: '10px 32px',
             background: 'transparent',
-            color: GLASS_TEXT_MUTED, border: 'none', borderRadius: 10,
+            color: 'rgba(255,253,242,0.72)', border: 'none', borderRadius: 10,
             fontFamily: UI_FONT, fontSize: 13, fontWeight: 600,
             cursor: 'pointer', letterSpacing: '0.04em',
           }}
