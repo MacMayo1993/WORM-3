@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   UI_FONT, DISPLAY_FONT,
-  GLASS_PANEL, GLASS_PANEL_BORDER, GLASS_TEXT, GLASS_TEXT_MUTED, GLASS_SHADOW,
+  UI_CREAM, UI_MOSS, UI_ACTION_SHADOW,
 } from '../../utils/uiTheme.js';
 
 // Six-mode landing: the demo taught rotate → twin → flip → views → worm →
@@ -30,17 +30,17 @@ const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore
     <div style={{
       position: 'fixed', inset: 0, zIndex: 12000,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'rgba(2,3,10,0.88)',
-      backdropFilter: 'blur(18px)',
+      background: 'radial-gradient(ellipse at center, rgba(24,31,18,0.34), rgba(24,31,18,0.62))',
+      backdropFilter: 'blur(9px) saturate(1.03)',
       fontFamily: UI_FONT,
       padding: 16,
       overflowY: 'auto',
     }}>
       <div style={{
-        background: GLASS_PANEL,
-        border: `1px solid ${GLASS_PANEL_BORDER}`,
+        background: 'rgba(250,247,238,0.94)',
+        border: '1px solid rgba(111,126,86,0.25)',
         borderRadius: 20,
-        boxShadow: GLASS_SHADOW,
+        boxShadow: '0 14px 34px rgba(40,48,32,0.22)',
         padding: '32px 24px 24px',
         maxWidth: 460,
         width: '100%',
@@ -48,7 +48,7 @@ const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore
         textAlign: 'center',
       }}>
         <p style={{
-          color: GLASS_TEXT_MUTED, fontSize: 11, fontWeight: 700,
+          color: '#7b6f45', fontSize: 11, fontWeight: 800,
           letterSpacing: '0.18em', textTransform: 'uppercase', margin: '0 0 6px',
         }}>
           Demo Complete
@@ -56,14 +56,14 @@ const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore
         <h1 style={{
           fontFamily: DISPLAY_FONT,
           fontSize: 26,
-          color: '#fff',
+          color: '#24331e',
           margin: '0 0 8px',
           letterSpacing: '0.04em',
         }}>
           Pick where to go next
         </h1>
         <p style={{
-          color: GLASS_TEXT, fontSize: 13.5, lineHeight: 1.5,
+          color: '#43513a', fontSize: 13.5, lineHeight: 1.5,
           margin: '0 auto 22px', maxWidth: 360,
         }}>
           You learned the whole idea: opposite tiles are twins, and a flip travels
@@ -83,9 +83,9 @@ const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore
                 borderRadius: 13,
                 cursor: 'pointer',
                 fontFamily: UI_FONT,
-                background: mode.primary ? '#5f7f4a' : 'rgba(255,255,255,0.06)',
-                border: mode.primary ? '1px solid #6f9256' : `1px solid ${GLASS_PANEL_BORDER}`,
-                boxShadow: mode.primary ? '0 8px 20px rgba(95,127,74,0.32)' : 'none',
+                background: mode.primary ? UI_MOSS : 'rgba(255,255,255,0.56)',
+                border: mode.primary ? '1px solid #6f9256' : '1px solid rgba(111,126,86,0.20)',
+                boxShadow: mode.primary ? UI_ACTION_SHADOW : 'none',
                 transition: 'transform 0.12s ease, background 0.15s ease',
               }}
               onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; }}
@@ -94,7 +94,7 @@ const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore
               <span style={{ flex: 1, minWidth: 0 }}>
                 <span style={{
                   display: 'flex', alignItems: 'center', gap: 8,
-                  color: '#fff', fontSize: 15, fontWeight: 800, letterSpacing: '0.05em',
+                  color: mode.primary ? UI_CREAM : '#26331f', fontSize: 15, fontWeight: 800, letterSpacing: '0.05em',
                 }}>
                   {mode.name}
                   {mode.primary && (
@@ -110,7 +110,7 @@ const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore
                 </span>
                 <span style={{
                   display: 'block', marginTop: 2,
-                  color: mode.primary ? 'rgba(255,253,245,0.88)' : GLASS_TEXT_MUTED,
+                  color: mode.primary ? 'rgba(255,253,245,0.88)' : '#657156',
                   fontSize: 12.5, lineHeight: 1.35, fontWeight: 500,
                 }}>
                   {mode.blurb}
@@ -118,7 +118,7 @@ const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore
               </span>
               <span aria-hidden="true" style={{
                 flexShrink: 0, fontSize: 18,
-                color: mode.primary ? '#fffdf5' : GLASS_TEXT_MUTED,
+                color: mode.primary ? '#fffdf5' : '#657156',
               }}>
                 ›
               </span>
@@ -133,8 +133,8 @@ const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore
             style={{
               flex: 1, padding: '11px 0',
               background: 'transparent',
-              color: GLASS_TEXT,
-              border: `1px solid ${GLASS_PANEL_BORDER}`,
+              color: '#43513a',
+              border: '1px solid rgba(111,126,86,0.25)',
               borderRadius: 11,
               fontFamily: UI_FONT, fontSize: 13, fontWeight: 600,
               cursor: 'pointer', letterSpacing: '0.03em',
@@ -148,7 +148,7 @@ const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore
             style={{
               flex: 1, padding: '11px 0',
               background: 'transparent',
-              color: GLASS_TEXT_MUTED,
+              color: '#657156',
               border: 'none',
               borderRadius: 11,
               fontFamily: UI_FONT, fontSize: 13, fontWeight: 600,
