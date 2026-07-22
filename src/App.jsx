@@ -48,8 +48,10 @@ import {
 // 3D components
 import IntroScene from './components/intro/IntroScene.jsx';
 import NebulaEnvironment from './3d/NebulaEnvironment.jsx';
-import ShootingStars from './3d/ShootingStars.jsx';
+import InteractivePhotoBackground from './3d/InteractivePhotoBackground.jsx';
+import MenuDesertAtmosphere from './3d/MenuDesertAtmosphere.jsx';
 import { setSharedRenderer, tickPreviews, hasActivePreviews } from './3d/TilePreviewRenderer.js';
+import { getBackgroundUrl } from './utils/backgrounds.js';
 
 // UI components
 import WelcomeScreen from './components/screens/WelcomeScreen.jsx';
@@ -204,29 +206,30 @@ function MenuScene({ onCubeClick }) {
 
   return (
     <>
-      <color attach="background" args={['#05091a']} />
-      <ambientLight intensity={2.1} />
-      <pointLight position={[8, 8, 10]} intensity={5.5} color="#c0e4ff" />
-      <pointLight position={[-9, -8, 7]} intensity={2.8} color="#7aa3ff" />
-      <pointLight position={[0, -6, -8]} intensity={1.4} color="#4a90d9" />
+      {/* The menu shares the demo's desert world: warm, tactile, and compatible
+          with the field-guide UI. SafeEnvironment keeps the old solid backdrop
+          if the HDRI cannot load. */}
+      <color attach="background" args={['#6d5a3c']} />
+      <ambientLight intensity={1.85} color="#f7e6bf" />
+      <pointLight position={[8, 8, 10]} intensity={4.4} color="#ffe3a6" />
+      <pointLight position={[-9, -5, 7]} intensity={2.0} color="#c47c50" />
+      <pointLight position={[0, -6, -8]} intensity={1.1} color="#7a8f68" />
       <Suspense fallback={null}>
-        <NebulaEnvironment
-          variant="menu"
-          pulseTrigger={menuFlipTrigger}
-          speed={0.55}
-          density={isMobile ? 0.55 : 0.95}
-          structure={1.08}
-          performanceMode={isMobile}
+        <InteractivePhotoBackground
+          files={getBackgroundUrl('desert.exr')}
+          rotationSpeed={isMobile ? 0 : 0.006}
+          intensity={isMobile ? 0.88 : 1.02}
+          blurriness={isMobile ? 0.06 : 0.025}
         />
       </Suspense>
-      <ShootingStars />
+      <MenuDesertAtmosphere reduced={isMobile} pulseTrigger={menuFlipTrigger} />
       <Suspense fallback={null}>
         <RotatingBlackCube onCubeClick={onCubeClick} onFlip={handleMenuFlip} />
       </Suspense>
       {!isMobile && (
         <EffectComposer>
-          <Bloom intensity={0.70} luminanceThreshold={0.08} luminanceSmoothing={0.85} mipmapBlur />
-          <Vignette offset={0.38} darkness={0.82} />
+          <Bloom intensity={0.16} luminanceThreshold={0.82} luminanceSmoothing={0.92} mipmapBlur />
+          <Vignette offset={0.46} darkness={0.27} />
         </EffectComposer>
       )}
     </>
