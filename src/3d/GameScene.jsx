@@ -6,7 +6,6 @@
  */
 
 import React, { Suspense, useMemo } from 'react';
-import { useFrame } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import SafeEnvironment from './SafeEnvironment.jsx';
 import { EffectComposer, N8AO } from '@react-three/postprocessing';
@@ -22,6 +21,7 @@ import LayerHighlight from '../teach/LayerHighlight.jsx';
 import AntipodalPairHighlight from './AntipodalPairHighlight.jsx';
 import WormholeWarpFX from './WormholeWarpFX.jsx';
 import AntipodalPiP from './AntipodalPiP.jsx';
+import InteractivePhotoBackground from './InteractivePhotoBackground.jsx';
 
 const HealerWormMode3DWrapper = React.lazy(() =>
   import('../worm/HealerWormMode.jsx').then((mod) => ({ default: mod.HealerWormMode3DWrapper }))
@@ -32,24 +32,6 @@ const PHOTO_PRESETS = new Set([
   'sunset', 'forest', 'city', 'dawn', 'night',
   'apartment', 'studio', 'park', 'warehouse', 'lobby',
 ]);
-
-function InteractivePhotoBackground({ preset, files }) {
-  useFrame((state, delta) => {
-    if (state.scene.backgroundRotation) {
-      state.scene.backgroundRotation.y += delta * 0.1;
-    }
-  });
-
-  return (
-    <SafeEnvironment
-      preset={files ? undefined : preset}
-      files={files}
-      background
-      backgroundBlurriness={0}
-      backgroundIntensity={1.2}
-    />
-  );
-}
 
 class ErrorBoundary3D extends React.Component {
   constructor(props) {

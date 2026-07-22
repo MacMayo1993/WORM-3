@@ -36,6 +36,10 @@ export const BACKGROUNDS = [
     // { id: 'midnight', label: 'Midnight Blue', file: null },
 ];
 
+// Full photo panoramas only. Main-menu randomisation deliberately uses this
+// list so procedural Black Hole/Nebula scenes are never selected there.
+export const MENU_BACKGROUNDS = BACKGROUNDS.filter((background) => Boolean(background.file));
+
 export const getBackgroundUrl = (filename) => {
     if (!filename) return null;
     // Use Vite's BASE_URL to construct the correct path

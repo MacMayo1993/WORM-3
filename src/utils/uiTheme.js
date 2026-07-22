@@ -1,16 +1,15 @@
 /**
  * uiTheme.js — Central UI theme tokens shared by every screen, menu, and HUD.
  *
- * WORM³ has two deliberate visual families:
+ * WORM³ uses one warm field-guide visual system throughout the game. Mobi's
+ * cream paper is the default surface; moss green is the shared affirmative
+ * action; the STEP COMPLETE treatment is reserved for full-screen moments.
+ * Dark translucent glass is not a third visual family.
  *
- *  1. PAPER — warm cream modal sheets used by all pre-game setup surfaces
- *     (setup wizards, betting screen, store, help menu).
- *  2. GLASS — dark navy translucent panels used by all in-game overlays
- *     (tutorials, victory, cutscene chrome, coming soon, HUD cards, mode carousel).
- *
- * Every screen must pull its fonts and family colors from here rather than
- * hardcoding literals, so the two families stay uniform across game modes.
- * Accent colors (per-mode blues/greens/oranges) intentionally stay local.
+ * Every screen must pull its fonts and shared semantic colours from here rather
+ * than introducing a new visual language. Mode colours may identify a mode or
+ * cube face, but must not replace the shared hierarchy for titles, body copy,
+ * cards, and actions.
  */
 
 // ─── Fonts ────────────────────────────────────────────────────────────────────
@@ -42,7 +41,9 @@ export const PAPER_BG_MUTED = '#f0ebe2';
 export const PAPER_CARD_SHADOW = '#c4beb6';
 export const PAPER_SHADOW = '0 20px 56px rgba(0,0,0,0.22), 0 2px 8px rgba(0,0,0,0.10)';
 
-// ─── GLASS family (dark in-game overlays) ─────────────────────────────────────
+// ─── Legacy overlay values ────────────────────────────────────────────────────
+// Existing in-game overlays still consume these while they are migrated to the
+// warm field-guide system. Do not use them for new screens.
 export const GLASS_BACKDROP = 'rgba(6,8,22,0.80)';
 export const GLASS_BACKDROP_BLUR = 'blur(24px)';
 export const GLASS_PANEL = 'rgba(4,6,20,0.94)';
@@ -52,6 +53,14 @@ export const GLASS_TEXT = 'rgba(230,238,255,0.92)';
 export const GLASS_TEXT_MUTED = 'rgba(255,255,255,0.55)';
 export const GLASS_TEXT_SOFT = 'rgba(207,230,242,0.92)';
 export const GLASS_SHADOW = '0 24px 70px rgba(0,0,0,0.6)';
+
+// ─── Shared semantic accents ─────────────────────────────────────────────────
+// These are intentionally mode-neutral. Use FACE colours only for game state.
+export const UI_CREAM = '#fffdf2';
+export const UI_GOLD = '#ffe9ad';
+export const UI_MOSS = '#5f7f4a';
+export const UI_MOSS_LIGHT = '#9fdb7a';
+export const UI_ACTION_SHADOW = '0 8px 20px rgba(95,127,74,0.32)';
 
 // ─── Shared radii ─────────────────────────────────────────────────────────────
 export const RADIUS_SM = '8px';
