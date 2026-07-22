@@ -25,7 +25,7 @@ export function DaycareEnvironment({ flipTrigger = 0 }) {
     new THREE.Color('#ffffff'), // Top - White
     new THREE.Color('#f97316'), // Back - Orange
     new THREE.Color('#3b82f6'), // Right - Blue
-    new THREE.Color('#eab308'), // Bottom - Yellow
+    new THREE.Color('#FFD500'), // Bottom - Yellow
   ], []);
 
   // Stable crayon positions (6 crayons, one per cube face color, clustered near center)
@@ -479,7 +479,7 @@ export function DaycareEnvironment({ flipTrigger = 0 }) {
           { y: -1.5, z: -1.8, color: '#3b82f6', h: 2.3, w: 0.4 },
           { y: -1.5, z: -1.0, color: '#22c55e', h: 2.6, w: 0.3 },
           { y: -1.5, z: -0.3, color: '#f97316', h: 2.2, w: 0.35 },
-          { y: -1.5, z: 0.5, color: '#eab308', h: 2.4, w: 0.3 },
+          { y: -1.5, z: 0.5, color: '#FFD500', h: 2.4, w: 0.3 },
           { y: 1.5, z: -2.2, color: '#8B5CF6', h: 2.3, w: 0.35 },
           { y: 1.5, z: -1.4, color: '#ef4444', h: 2.5, w: 0.3 },
           { y: 1.5, z: -0.5, color: '#3b82f6', h: 2.1, w: 0.4 },

@@ -121,7 +121,7 @@ const TopMenuBar = ({
   }, [chaosMode, workerStats]);
 
   // Resolved face palette — safe fallbacks if faceColors not yet loaded
-  const fc = faceColors || { 1: '#ef4444', 2: '#22c55e', 3: '#ffffff', 4: '#f97316', 5: '#3b82f6', 6: '#eab308' };
+  const fc = faceColors || { 1: '#ef4444', 2: '#22c55e', 3: '#ffffff', 4: '#f97316', 5: '#3b82f6', 6: '#FFD500' };
 
   // Pick stat colors based on the cube's face palette:
   //   FLIPS     → face 5 (right/blue in standard) — a cool metric readout

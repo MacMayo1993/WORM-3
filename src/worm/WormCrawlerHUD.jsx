@@ -170,7 +170,7 @@ const PHASE_META = {
     exiting: { label: 'EXITING', faceId: 4 },
 };
 
-const FACE_FALLBACKS = { 1: '#ef4444', 2: '#22c55e', 3: '#ffffff', 4: '#f97316', 5: '#3b82f6', 6: '#eab308' };
+const FACE_FALLBACKS = { 1: '#ef4444', 2: '#22c55e', 3: '#ffffff', 4: '#f97316', 5: '#3b82f6', 6: '#FFD500' };
 
 const toRgb = (color) => {
     if (!color || typeof color !== 'string') return null;
