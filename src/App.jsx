@@ -48,8 +48,9 @@ import {
 // 3D components
 import IntroScene from './components/intro/IntroScene.jsx';
 import NebulaEnvironment from './3d/NebulaEnvironment.jsx';
-import ShootingStars from './3d/ShootingStars.jsx';
+import InteractivePhotoBackground from './3d/InteractivePhotoBackground.jsx';
 import { setSharedRenderer, tickPreviews, hasActivePreviews } from './3d/TilePreviewRenderer.js';
+import { getBackgroundUrl } from './utils/backgrounds.js';
 
 // UI components
 import WelcomeScreen from './components/screens/WelcomeScreen.jsx';
@@ -199,34 +200,31 @@ function CameraManager({ showWelcome, showMainMenu, cameraZ }) {
  * Rendered inside the shared Canvas so there is never a second WebGL context.
  */
 function MenuScene({ onCubeClick }) {
-  const [menuFlipTrigger, setMenuFlipTrigger] = React.useState(0);
-  const handleMenuFlip = React.useCallback(() => setMenuFlipTrigger(p => p + 1), []);
-
   return (
     <>
-      <color attach="background" args={['#05091a']} />
-      <ambientLight intensity={2.1} />
-      <pointLight position={[8, 8, 10]} intensity={5.5} color="#c0e4ff" />
-      <pointLight position={[-9, -8, 7]} intensity={2.8} color="#7aa3ff" />
-      <pointLight position={[0, -6, -8]} intensity={1.4} color="#4a90d9" />
+      {/* The menu uses a recognisable forest panorama rather than an abstract
+          environment, while the warm field-guide controls stay readable above it.
+          SafeEnvironment keeps the solid backdrop if the HDRI cannot load. */}
+      <color attach="background" args={['#38513d']} />
+      <ambientLight intensity={1.7} color="#e8e3c5" />
+      <pointLight position={[8, 8, 10]} intensity={4.0} color="#f0d89b" />
+      <pointLight position={[-9, -5, 7]} intensity={1.9} color="#78956b" />
+      <pointLight position={[0, -6, -8]} intensity={1.0} color="#456556" />
       <Suspense fallback={null}>
-        <NebulaEnvironment
-          variant="menu"
-          pulseTrigger={menuFlipTrigger}
-          speed={0.55}
-          density={isMobile ? 0.55 : 0.95}
-          structure={1.08}
-          performanceMode={isMobile}
+        <InteractivePhotoBackground
+          files={getBackgroundUrl('forest.exr')}
+          rotationSpeed={isMobile ? 0 : 0.006}
+          intensity={isMobile ? 0.84 : 0.98}
+          blurriness={isMobile ? 0.06 : 0.025}
         />
       </Suspense>
-      <ShootingStars />
       <Suspense fallback={null}>
-        <RotatingBlackCube onCubeClick={onCubeClick} onFlip={handleMenuFlip} />
+        <RotatingBlackCube onCubeClick={onCubeClick} />
       </Suspense>
       {!isMobile && (
         <EffectComposer>
-          <Bloom intensity={0.70} luminanceThreshold={0.08} luminanceSmoothing={0.85} mipmapBlur />
-          <Vignette offset={0.38} darkness={0.82} />
+          <Bloom intensity={0.12} luminanceThreshold={0.86} luminanceSmoothing={0.92} mipmapBlur />
+          <Vignette offset={0.46} darkness={0.23} />
         </EffectComposer>
       )}
     </>

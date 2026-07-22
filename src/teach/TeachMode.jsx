@@ -2,14 +2,15 @@
 // Teach Mode UI — Instructor panel with sub-modes: Guided, Demo, Quiz
 
 import React, { useState } from 'react';
-import { UI_FONT, MONO_FONT, GLASS_PANEL, GLASS_PANEL_DEEP, GLASS_PANEL_BORDER, GLASS_TEXT, GLASS_TEXT_MUTED } from '../utils/uiTheme.js';
+import { UI_FONT, MONO_FONT, UI_GOLD, UI_MOSS, UI_MOSS_LIGHT } from '../utils/uiTheme.js';
+import { fieldGuide } from '../components/ui/FieldGuide.jsx';
 
 // ─── Module-level style constants (never reallocated) ─────────────────────────
 const TABS_CONTAINER_STYLE = {
   display: 'flex',
   gap: '4px',
   padding: '8px 16px',
-  borderBottom: `1px solid ${GLASS_PANEL_BORDER}`,
+  borderBottom: '1px solid rgba(111,126,86,0.25)',
   flexShrink: 0,
 };
 
@@ -42,7 +43,7 @@ const WHYCARD_ICON_STYLE = {
   justifyContent: 'center',
   fontSize: '10px',
   flexShrink: 0,
-  color: '#fbbf24',
+  color: UI_GOLD,
 };
 
 const WHYCARD_CHEVRON_STYLE_BASE = { marginLeft: 'auto', transition: 'transform 0.2s' };
@@ -57,37 +58,37 @@ const TM_PANEL_STYLE = {
   maxWidth: 'calc(100vw - 20px)',
   height: '100%',
   maxHeight: '100dvh',
-  background: GLASS_PANEL_DEEP,
-  backdropFilter: 'blur(20px)',
-  borderRight: `1px solid ${GLASS_PANEL_BORDER}`,
+  background: 'rgba(250,247,238,0.97)',
+  boxShadow: '0 14px 34px rgba(40,48,32,0.22)',
+  borderRight: '1px solid rgba(111,126,86,0.25)',
   zIndex: 600,
   display: 'flex',
   flexDirection: 'column',
   fontFamily: UI_FONT,
-  color: '#e0e0e0',
+  color: fieldGuide.ink,
   overflowY: 'auto',
   WebkitOverflowScrolling: 'touch',
 };
 
 const TM_HEADER_STYLE = {
   padding: '16px',
-  borderBottom: `1px solid ${GLASS_PANEL_BORDER}`,
+  borderBottom: '1px solid rgba(111,126,86,0.25)',
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'center',
   flexShrink: 0,
 };
 
-const TM_TITLE_STYLE = { fontSize: '16px', fontWeight: 'bold', color: '#00d9ff' };
-const TM_SUBTITLE_STYLE = { fontSize: '10px', color: 'rgba(255,255,255,0.5)', marginTop: '2px' };
+const TM_TITLE_STYLE = { fontSize: '16px', fontWeight: 'bold', color: UI_MOSS };
+const TM_SUBTITLE_STYLE = { fontSize: '10px', color: 'rgba(38,51,31,0.68)', marginTop: '2px' };
 
 const TM_CLOSE_BTN_STYLE = {
-  background: 'rgba(255, 255, 255, 0.1)',
+  background: 'rgba(38,51,31,0.14)',
   border: '1px solid rgba(255, 255, 255, 0.2)',
   borderRadius: '50%',
   width: '32px',
   height: '32px',
-  color: '#fff',
+  color: fieldGuide.ink,
   fontSize: '16px',
   cursor: 'pointer',
   display: 'flex',
@@ -97,26 +98,26 @@ const TM_CLOSE_BTN_STYLE = {
 
 const TM_SECTION_STYLE = {
   padding: '12px 16px',
-  borderBottom: `1px solid ${GLASS_PANEL_BORDER}`,
+  borderBottom: '1px solid rgba(111,126,86,0.25)',
   flexShrink: 0,
 };
 
-const TM_SECTION_LABEL_STYLE = { fontSize: '11px', color: 'rgba(255,255,255,0.5)', marginBottom: '8px' };
+const TM_SECTION_LABEL_STYLE = { fontSize: '11px', color: 'rgba(38,51,31,0.68)', marginBottom: '8px' };
 const TM_STAGES_BAR_ROW_STYLE = { display: 'flex', gap: '3px', marginBottom: '6px' };
 
 const TM_ALL_STAGES_SECTION_STYLE = {
   padding: '12px 16px',
-  borderTop: `1px solid ${GLASS_PANEL_BORDER}`,
+  borderTop: '1px solid rgba(111,126,86,0.25)',
 };
 
-const TM_SECTION_SUB_LABEL_STYLE = { fontSize: '10px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px' };
+const TM_SECTION_SUB_LABEL_STYLE = { fontSize: '10px', color: 'rgba(38,51,31,0.54)', marginBottom: '8px' };
 
 const TM_STAGE_ITEM_STYLE = { marginBottom: '4px' };
 
 const TM_STAGE_EXPANDED_STYLE = {
   padding: '8px 10px 8px 36px',
   fontSize: '11px',
-  color: 'rgba(255,255,255,0.5)',
+  color: 'rgba(38,51,31,0.68)',
   lineHeight: '1.4',
 };
 
@@ -125,16 +126,16 @@ const TM_STAGE_GOAL_STYLE = { marginBottom: '6px' };
 const TM_ALGO_CARD_STYLE = {
   padding: '4px 8px',
   margin: '4px 0',
-  background: 'rgba(255, 255, 255, 0.03)',
+  background: 'rgba(38,51,31,0.05)',
   borderRadius: '4px',
-  borderLeft: '2px solid rgba(0, 217, 255, 0.3)',
+  borderLeft: '2px solid rgba(95,127,74,0.30)',
 };
 
-const TM_ALGO_CARD_NAME_STYLE = { fontWeight: 'bold', color: '#00d9ff', fontSize: '10px' };
-const TM_ALGO_CARD_NOTATION_STYLE = { fontFamily: MONO_FONT, fontSize: '12px', color: '#fbbf24', margin: '2px 0' };
-const TM_ALGO_CARD_WHEN_STYLE = { fontSize: '10px', color: 'rgba(255,255,255,0.4)' };
+const TM_ALGO_CARD_NAME_STYLE = { fontWeight: 'bold', color: UI_MOSS, fontSize: '10px' };
+const TM_ALGO_CARD_NOTATION_STYLE = { fontFamily: MONO_FONT, fontSize: '12px', color: UI_GOLD, margin: '2px 0' };
+const TM_ALGO_CARD_WHEN_STYLE = { fontSize: '10px', color: 'rgba(38,51,31,0.54)' };
 
-const TM_ALGO_LIST_LABEL_STYLE = { fontSize: '10px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px' };
+const TM_ALGO_LIST_LABEL_STYLE = { fontSize: '10px', color: 'rgba(38,51,31,0.54)', marginBottom: '8px' };
 
 // ---------------------------------------------------------------------------
 // Sub-mode tab bar
@@ -159,9 +160,9 @@ const SubModeTabs = ({ subMode, onSwitch }) => {
               flex: 1,
               padding: '6px 4px',
               borderRadius: '6px',
-              border: `1px solid ${active ? 'rgba(0,217,255,0.6)' : 'rgba(255,255,255,0.1)'}`,
-              background: active ? 'rgba(0,217,255,0.15)' : 'rgba(255,255,255,0.03)',
-              color: active ? '#00d9ff' : 'rgba(255,255,255,0.4)',
+              border: `1px solid ${active ? 'rgba(95,127,74,0.55)' : 'rgba(38,51,31,0.14)'}`,
+              background: active ? 'rgba(95,127,74,0.15)' : 'rgba(255,255,255,0.56)',
+              color: active ? UI_MOSS : 'rgba(38,51,31,0.54)',
               fontFamily: UI_FONT,
               fontSize: '11px',
               fontWeight: active ? 'bold' : 'normal',
@@ -193,14 +194,14 @@ const WhyCard = ({ algo, open, onToggle }) => {
     <div style={{
       margin: '8px 0 0',
       borderRadius: '6px',
-      border: `1px solid ${open ? 'rgba(251,191,36,0.4)' : 'rgba(255,255,255,0.08)'}`,
-      background: open ? 'rgba(251,191,36,0.06)' : 'rgba(255,255,255,0.02)',
+      border: `1px solid ${open ? 'rgba(123,111,69,0.40)' : 'rgba(255,255,255,0.62)'}`,
+      background: open ? 'rgba(255,233,173,0.34)' : 'rgba(255,255,255,0.48)',
       overflow: 'hidden',
       transition: 'border-color 0.2s',
     }}>
       <button
         onClick={onToggle}
-        style={{ ...WHYCARD_OUTER_BUTTON_STYLE, color: open ? '#fbbf24' : 'rgba(255,255,255,0.4)' }}
+        style={{ ...WHYCARD_OUTER_BUTTON_STYLE, color: open ? UI_GOLD : 'rgba(38,51,31,0.54)' }}
       >
         <span style={WHYCARD_ICON_STYLE}>?</span>
         WHY DOES THIS WORK?
@@ -212,7 +213,7 @@ const WhyCard = ({ algo, open, onToggle }) => {
           {algo.why && (
             <div style={{
               fontSize: '11px',
-              color: 'rgba(255,255,255,0.75)',
+              color: 'rgba(38,51,31,0.82)',
               lineHeight: '1.55',
               marginBottom: algo.topologyTip ? '10px' : 0,
             }}>
@@ -267,24 +268,24 @@ const QuizPanel = ({
 
   return (
     <div style={{ padding: '12px 16px' }}>
-      <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '4px' }}>
+      <div style={{ fontSize: '11px', color: 'rgba(38,51,31,0.54)', marginBottom: '4px' }}>
         QUIZ
       </div>
       <div style={{
         fontSize: '13px',
-        color: '#fff',
+        color: fieldGuide.ink,
         fontWeight: 'bold',
         marginBottom: '12px',
         lineHeight: '1.4',
       }}>
         Which algorithm should you use for<br />
-        <span style={{ color: '#00d9ff' }}>{currentStage.name}</span>?
+        <span style={{ color: UI_MOSS }}>{currentStage.name}</span>?
       </div>
 
       {quizOptions.map((opt, i) => {
-        let borderColor = 'rgba(255,255,255,0.12)';
-        let bgColor = 'rgba(255,255,255,0.03)';
-        let labelColor = 'rgba(255,255,255,0.7)';
+        let borderColor = 'rgba(111,126,86,0.20)';
+        let bgColor = 'rgba(255,255,255,0.56)';
+        let labelColor = 'rgba(38,51,31,0.76)';
         let showResult = false;
 
         if (quizAnswered !== null) {
@@ -292,7 +293,7 @@ const QuizPanel = ({
           if (opt.isCorrect) {
             borderColor = 'rgba(0,255,136,0.5)';
             bgColor = 'rgba(0,255,136,0.08)';
-            labelColor = '#00ff88';
+            labelColor = UI_MOSS_LIGHT;
           } else {
             borderColor = 'rgba(255,80,80,0.3)';
             bgColor = 'rgba(255,80,80,0.04)';
@@ -326,7 +327,7 @@ const QuizPanel = ({
             </div>
             <div style={{ fontSize: '10px', opacity: 0.7 }}>{opt.name}</div>
             {showResult && opt.isCorrect && (
-              <div style={{ fontSize: '10px', color: '#00ff88', marginTop: '4px' }}>
+              <div style={{ fontSize: '10px', color: UI_MOSS_LIGHT, marginTop: '4px' }}>
                 ✓ Correct!
               </div>
             )}
@@ -360,8 +361,8 @@ const QuizPanel = ({
               padding: '8px',
               borderRadius: '6px',
               border: '1px solid rgba(0,217,255,0.35)',
-              background: 'rgba(0,217,255,0.1)',
-              color: '#00d9ff',
+              background: 'rgba(95,127,74,0.10)',
+              color: UI_MOSS,
               fontFamily: UI_FONT,
               fontSize: '12px',
               fontWeight: 'bold',
@@ -385,14 +386,14 @@ const DemoBanner = () => (
     margin: '12px 16px 0',
     padding: '10px 12px',
     borderRadius: '7px',
-    background: 'rgba(0,217,255,0.06)',
+    background: 'rgba(95,127,74,0.06)',
     border: '1px solid rgba(0,217,255,0.2)',
     fontSize: '11px',
-    color: 'rgba(255,255,255,0.6)',
+    color: 'rgba(38,51,31,0.72)',
     lineHeight: '1.5',
   }}>
-    <span style={{ color: '#00d9ff', fontWeight: 'bold' }}>Demo mode: </span>
-    Select an algorithm below and press <span style={{ color: '#fbbf24' }}>▶▶</span> to watch it
+    <span style={{ color: UI_MOSS, fontWeight: 'bold' }}>Demo mode: </span>
+    Select an algorithm below and press <span style={{ color: UI_GOLD }}>▶▶</span> to watch it
     execute automatically. Press <span style={{ color: '#ffa500' }}>⏸</span> to pause at any step.
   </div>
 );
@@ -420,8 +421,8 @@ const AlgorithmCard = ({
     <div style={{
       marginBottom: '10px',
       borderRadius: '8px',
-      border: `1px solid ${isSelected ? 'rgba(0, 217, 255, 0.4)' : 'rgba(255,255,255,0.1)'}`,
-      background: isSelected ? 'rgba(0, 217, 255, 0.08)' : 'rgba(255, 255, 255, 0.03)',
+      border: `1px solid ${isSelected ? 'rgba(95,127,74,0.40)' : 'rgba(38,51,31,0.14)'}`,
+      background: isSelected ? 'rgba(95,127,74,0.08)' : 'rgba(38,51,31,0.05)',
       overflow: 'hidden',
     }}>
       {/* Card header */}
@@ -429,19 +430,19 @@ const AlgorithmCard = ({
         onClick={onSelect}
         style={{ padding: '10px 12px', cursor: 'pointer' }}
       >
-        <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#fff' }}>
+        <div style={{ fontSize: '12px', fontWeight: 'bold', color: fieldGuide.ink }}>
           {algo.name}
         </div>
         <div style={{
           fontFamily: MONO_FONT,
           fontSize: '14px',
-          color: '#fbbf24',
+          color: UI_GOLD,
           margin: '4px 0',
           letterSpacing: '1px',
         }}>
           {algo.notation}
         </div>
-        <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)' }}>
+        <div style={{ fontSize: '10px', color: 'rgba(38,51,31,0.54)' }}>
           {algo.when}
         </div>
       </div>
@@ -457,7 +458,7 @@ const AlgorithmCard = ({
       {isSelected && algoMoves.length > 0 && (subMode === 'guided' || subMode === 'demo') && (
         <div style={{
           padding: '8px 12px 12px',
-          borderTop: `1px solid ${GLASS_PANEL_BORDER}`,
+          borderTop: '1px solid rgba(111,126,86,0.25)',
           marginTop: '8px',
         }}>
           {/* Move sequence visualization */}
@@ -477,21 +478,21 @@ const AlgorithmCard = ({
                   fontFamily: MONO_FONT,
                   fontWeight: 'bold',
                   background: i < currentStep
-                    ? 'rgba(0, 255, 136, 0.2)'
+                    ? 'rgba(95,127,74,0.20)'
                     : i === currentStep
-                      ? 'rgba(0, 217, 255, 0.3)'
-                      : 'rgba(255, 255, 255, 0.05)',
+                      ? 'rgba(95,127,74,0.30)'
+                      : 'rgba(38,51,31,0.07)',
                   color: i < currentStep
-                    ? '#00ff88'
+                    ? UI_MOSS_LIGHT
                     : i === currentStep
-                      ? '#00d9ff'
-                      : 'rgba(255,255,255,0.3)',
+                      ? UI_MOSS
+                      : 'rgba(38,51,31,0.42)',
                   border: `1px solid ${
                     i < currentStep
-                      ? 'rgba(0, 255, 136, 0.3)'
+                      ? 'rgba(95,127,74,0.30)'
                       : i === currentStep
-                        ? 'rgba(0, 217, 255, 0.5)'
-                        : 'rgba(255,255,255,0.08)'
+                        ? 'rgba(95,127,74,0.50)'
+                        : 'rgba(255,255,255,0.62)'
                   }`,
                 }}
               >
@@ -505,11 +506,11 @@ const AlgorithmCard = ({
             <div style={{
               padding: '6px 8px',
               borderRadius: '5px',
-              background: 'rgba(0,217,255,0.08)',
+              background: 'rgba(95,127,74,0.08)',
               border: '1px solid rgba(0,217,255,0.2)',
               marginBottom: '8px',
               fontSize: '12px',
-              color: '#00d9ff',
+              color: UI_MOSS,
               fontWeight: 'bold',
               letterSpacing: '0.5px',
             }}>
@@ -520,7 +521,7 @@ const AlgorithmCard = ({
           {/* Progress indicator */}
           <div style={{
             fontSize: '10px',
-            color: 'rgba(255,255,255,0.4)',
+            color: 'rgba(38,51,31,0.54)',
             marginBottom: '8px',
           }}>
             {isAlgoComplete
@@ -540,9 +541,9 @@ const AlgorithmCard = ({
                   flex: 1,
                   padding: '8px',
                   borderRadius: '6px',
-                  border: '1px solid rgba(0, 217, 255, 0.4)',
-                  background: canExecute ? 'rgba(0, 217, 255, 0.2)' : 'rgba(255,255,255,0.05)',
-                  color: canExecute ? '#00d9ff' : 'rgba(255,255,255,0.2)',
+                  border: '1px solid rgba(95,127,74,0.40)',
+                  background: canExecute ? 'rgba(95,127,74,0.20)' : 'rgba(255,255,255,0.56)',
+                  color: canExecute ? UI_MOSS : 'rgba(38,51,31,0.24)',
                   fontSize: '12px',
                   fontWeight: 'bold',
                   fontFamily: UI_FONT,
@@ -563,9 +564,9 @@ const AlgorithmCard = ({
                 flex: subMode === 'demo' ? 2 : 1,
                 padding: '8px 12px',
                 borderRadius: '6px',
-                border: `1px solid ${isPlaying ? 'rgba(255, 165, 0, 0.5)' : 'rgba(0, 255, 136, 0.4)'}`,
-                background: isPlaying ? 'rgba(255, 165, 0, 0.2)' : 'rgba(0, 255, 136, 0.15)',
-                color: isPlaying ? '#ffa500' : '#00ff88',
+                border: `1px solid ${isPlaying ? 'rgba(255, 165, 0, 0.5)' : 'rgba(95,127,74,0.40)'}`,
+                background: isPlaying ? 'rgba(255, 165, 0, 0.2)' : 'rgba(95,127,74,0.15)',
+                color: isPlaying ? '#ffa500' : UI_MOSS_LIGHT,
                 fontSize: '12px',
                 fontWeight: 'bold',
                 fontFamily: UI_FONT,
@@ -584,8 +585,8 @@ const AlgorithmCard = ({
                 padding: '8px 12px',
                 borderRadius: '6px',
                 border: '1px solid rgba(255, 255, 255, 0.15)',
-                background: 'rgba(255, 255, 255, 0.05)',
-                color: 'rgba(255,255,255,0.5)',
+                background: 'rgba(38,51,31,0.07)',
+                color: 'rgba(38,51,31,0.68)',
                 fontSize: '12px',
                 fontWeight: 'bold',
                 fontFamily: UI_FONT,
@@ -670,24 +671,24 @@ const TeachMode = ({
                 height: '6px',
                 borderRadius: '3px',
                 background: i < analysis.stageIndex
-                  ? '#00ff88'
+                  ? UI_MOSS_LIGHT
                   : i === analysis.stageIndex
-                    ? 'linear-gradient(90deg, #00d9ff, rgba(0, 217, 255, 0.3))'
-                    : 'rgba(255, 255, 255, 0.1)',
+                    ? 'linear-gradient(90deg, #5f7f4a, rgba(95,127,74,0.30))'
+                    : 'rgba(38,51,31,0.14)',
                 transition: 'background 0.3s',
               }}
             />
           ))}
         </div>
         {isSolved ? (
-          <div style={{ color: '#00ff88', fontWeight: 'bold', fontSize: '14px' }}>
+          <div style={{ color: UI_MOSS_LIGHT, fontWeight: 'bold', fontSize: '14px' }}>
             Cube is solved!
           </div>
         ) : (
           <div style={{ fontSize: '12px' }}>
-            <span style={{ color: '#00d9ff' }}>{currentStage?.name}</span>
+            <span style={{ color: UI_MOSS }}>{currentStage?.name}</span>
             {analysis.progress.stepProgress && (
-              <span style={{ color: 'rgba(255,255,255,0.4)', marginLeft: '8px' }}>
+              <span style={{ color: 'rgba(38,51,31,0.54)', marginLeft: '8px' }}>
                 ({analysis.progress.stepProgress} pieces)
               </span>
             )}
@@ -717,28 +718,28 @@ const TeachMode = ({
         {currentStage && !isSolved && subMode !== 'quiz' && (
           <div style={{
             padding: '12px 16px',
-            borderBottom: `1px solid ${GLASS_PANEL_BORDER}`,
+            borderBottom: '1px solid rgba(111,126,86,0.25)',
           }}>
-            <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#fff', marginBottom: '8px' }}>
+            <div style={{ fontSize: '13px', fontWeight: 'bold', color: fieldGuide.ink, marginBottom: '8px' }}>
               {currentStage.goal}
             </div>
-            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', lineHeight: '1.5' }}>
+            <div style={{ fontSize: '11px', color: 'rgba(38,51,31,0.72)', lineHeight: '1.5' }}>
               {currentStage.explanation}
             </div>
 
             {/* Tips */}
             <div style={{ marginTop: '10px' }}>
-              <div style={{ fontSize: '10px', color: '#00d9ff', fontWeight: 'bold', marginBottom: '4px' }}>
+              <div style={{ fontSize: '10px', color: UI_MOSS, fontWeight: 'bold', marginBottom: '4px' }}>
                 TIPS:
               </div>
               {currentStage.tips.map((tip, i) => (
                 <div key={i} style={{
                   fontSize: '11px',
-                  color: 'rgba(255,255,255,0.5)',
+                  color: 'rgba(38,51,31,0.68)',
                   padding: '2px 0 2px 12px',
                   position: 'relative',
                 }}>
-                  <span style={{ position: 'absolute', left: 0, color: 'rgba(0, 217, 255, 0.5)' }}>·</span>
+                  <span style={{ position: 'absolute', left: 0, color: 'rgba(95,127,74,0.50)' }}>·</span>
                   {tip}
                 </div>
               ))}
@@ -795,11 +796,11 @@ const TeachMode = ({
                     padding: '8px 10px',
                     borderRadius: '6px',
                     background: isCurrent
-                      ? 'rgba(0, 217, 255, 0.1)'
+                      ? 'rgba(95,127,74,0.10)'
                       : isDone
-                        ? 'rgba(0, 255, 136, 0.05)'
-                        : 'rgba(255, 255, 255, 0.03)',
-                    border: `1px solid ${isCurrent ? 'rgba(0, 217, 255, 0.3)' : isDone ? 'rgba(0, 255, 136, 0.15)' : 'rgba(255,255,255,0.05)'}`,
+                        ? 'rgba(95,127,74,0.05)'
+                        : 'rgba(38,51,31,0.05)',
+                    border: `1px solid ${isCurrent ? 'rgba(95,127,74,0.30)' : isDone ? 'rgba(95,127,74,0.15)' : 'rgba(255,255,255,0.56)'}`,
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
@@ -810,8 +811,8 @@ const TeachMode = ({
                     width: '18px',
                     height: '18px',
                     borderRadius: '50%',
-                    background: isDone ? '#00ff88' : isCurrent ? '#00d9ff' : 'rgba(255,255,255,0.1)',
-                    color: isDone || isCurrent ? '#000' : 'rgba(255,255,255,0.3)',
+                    background: isDone ? UI_MOSS_LIGHT : isCurrent ? UI_MOSS : 'rgba(38,51,31,0.14)',
+                    color: isDone || isCurrent ? '#000' : 'rgba(38,51,31,0.42)',
                     fontSize: '10px',
                     fontWeight: 'bold',
                     display: 'flex',
@@ -823,14 +824,14 @@ const TeachMode = ({
                   </span>
                   <span style={{
                     fontSize: '11px',
-                    color: isDone ? '#00ff88' : isCurrent ? '#00d9ff' : 'rgba(255,255,255,0.4)',
+                    color: isDone ? UI_MOSS_LIGHT : isCurrent ? UI_MOSS : 'rgba(38,51,31,0.54)',
                     flex: 1,
                   }}>
                     {stage.name}
                   </span>
                   <span style={{
                     fontSize: '10px',
-                    color: 'rgba(255,255,255,0.3)',
+                    color: 'rgba(38,51,31,0.42)',
                     transform: isExpanded ? 'rotate(180deg)' : 'none',
                     transition: 'transform 0.2s',
                   }}>
