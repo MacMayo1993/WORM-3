@@ -24,7 +24,7 @@ import { warmDemoAssets } from '../../utils/preloadAssets.js';
 import MenuFlipWave from './MenuFlipWave.jsx';
 import MenuTileOverlay from './MenuTileOverlay.jsx';
 import { ANTIPODAL_COLOR } from '../../utils/constants.js';
-import { UI_FONT, GLASS_PANEL, GLASS_PANEL_BORDER, GLASS_TEXT, DISPLAY_FONT } from '../../utils/uiTheme.js';
+import { UI_FONT, GLASS_PANEL, GLASS_PANEL_BORDER, DISPLAY_FONT } from '../../utils/uiTheme.js';
 
 // ─── Randomizable style state — re-picked every time the user taps the cube ──
 // biome is now included so its face palette appears in the rotation.
@@ -1195,7 +1195,7 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
         pointerEvents: diving ? 'none' : 'auto',
       }}>
 
-        <p style={{ margin: '0 0 6px', fontSize: '9px', fontWeight: 800, letterSpacing: '0.30em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.55)', fontFamily: DISPLAY_FONT }}>
+        <p style={{ margin: '0 0 6px', fontSize: 'clamp(10px, 3vw, 13px)', fontWeight: 900, letterSpacing: '0.24em', textTransform: 'uppercase', color: '#ffe9ad', fontFamily: UI_FONT, textShadow: '0 2px 12px rgba(0,0,0,0.6)' }}>
           Choose your mode
         </p>
 
@@ -1244,17 +1244,15 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
             padding: '16px 18px', position: 'relative', overflow: 'hidden',
           }}>
             <div aria-hidden style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: `linear-gradient(90deg, ${mode.tileColor}, transparent 78%)` }} />
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '22px', fontWeight: 900, fontFamily: DISPLAY_FONT, color: mode.tileColor, lineHeight: 1, textShadow: `0 0 18px ${mode.tileColor}55` }}>
-                {mode.label}
-              </span>
-              <span style={{ fontSize: '12.5px', lineHeight: 1.5, color: GLASS_TEXT, fontFamily: MENU_FONT }}>{mode.desc}</span>
-            </div>
+            <span style={{ display: 'block', fontSize: 'clamp(26px, 8vw, 34px)', fontWeight: 900, fontFamily: DISPLAY_FONT, color: '#fffdf2', lineHeight: 1, letterSpacing: '0.03em', textTransform: 'uppercase', textShadow: '0 3px 0 rgba(0,0,0,0.5), 0 10px 30px rgba(0,0,0,0.55)' }}>
+              {mode.label}
+            </span>
+            <p style={{ margin: '10px 0 0', fontSize: 'clamp(11px, 3vw, 13px)', fontWeight: 800, letterSpacing: '0.06em', lineHeight: 1.5, textTransform: 'uppercase', color: '#ffe9ad', fontFamily: UI_FONT, textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>{mode.desc}</p>
             <div style={{ marginTop: '11px' }}>
               {mode.controls.map((ctrl, i) => (
-                <div key={i} style={{ display: 'flex', gap: '10px', margin: '5px 0', alignItems: 'flex-start' }}>
-                  <span aria-hidden style={{ width: '5px', height: '5px', borderRadius: '50%', background: mode.tileColor, boxShadow: `0 0 6px ${mode.tileColor}`, marginTop: '7px', flexShrink: 0 }} />
-                  <span style={{ fontSize: '12.5px', lineHeight: 1.5, color: GLASS_TEXT, fontFamily: MENU_FONT }}>{ctrl}</span>
+                <div key={i} style={{ display: 'flex', gap: '10px', margin: '6px 0', alignItems: 'flex-start' }}>
+                  <span aria-hidden style={{ width: '6px', height: '6px', borderRadius: '2px', background: mode.tileColor, boxShadow: `0 0 6px ${mode.tileColor}`, marginTop: '5px', flexShrink: 0 }} />
+                  <span style={{ fontSize: 'clamp(10.5px, 2.8vw, 12px)', fontWeight: 700, letterSpacing: '0.05em', lineHeight: 1.5, textTransform: 'uppercase', color: 'rgba(255,253,242,0.86)', fontFamily: UI_FONT }}>{ctrl}</span>
                 </div>
               ))}
             </div>
