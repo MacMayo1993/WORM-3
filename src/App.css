@@ -3397,6 +3397,20 @@ select.btn-compact:disabled {
   animation-delay: var(--bounce-delay, 0s);
 }
 
+/* On narrow screens the four 26vw letters plus the superscript cube overran the
+   viewport and clipped the ³ at the right edge. Trim the letter size and gaps a
+   touch below 480px so the whole wordmark fits with room to spare. */
+@media (max-width: 480px) {
+  .worm-title-letter {
+    font-size: clamp(74px, 21vw, 120px);
+    letter-spacing: 2px;
+    -webkit-text-stroke-width: 4px;
+  }
+  .worm-cube-sup {
+    margin-left: 4px;
+  }
+}
+
 .worm-cube-sup {
   width: 28px;
   height: 28px;
@@ -3442,16 +3456,18 @@ select.btn-compact:disabled {
 .worm-tactile-btn {
   font-family: 'Bungee', 'Arial Black', 'Franklin Gothic Bold', sans-serif;
   font-size: 2.3rem;
-  color: white;
-  /* Brand-orange CTA — matches the mode carousel's PLAY accent so the primary
-     action speaks one language from the first screen onward (was grey). */
-  background-color: #f97316;
-  padding: 17px 58px;
-  border: 3px solid #000000;
-  border-radius: 16px;
+  color: #08210f;
+  /* Green pill CTA — speaks the same action language as the mode carousel's
+     PLAY button, so the primary action is one continuous color from the first
+     screen into the game (was a competing orange). Keeps a chunky tactile press
+     via the stacked shadow, but reads as a modern pill, not a boxed key. */
+  background: linear-gradient(180deg, #7bd88a, #3fbf62);
+  padding: 16px 60px;
+  border: none;
+  border-radius: 100px;
   cursor: pointer;
   outline: none;
-  box-shadow: 0 8px 0 #9a3412, 0 15px 20px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 7px 0 #2f9d4d, 0 14px 26px rgba(0, 0, 0, 0.42), 0 0 24px rgba(63, 191, 98, 0.35);
   transition: all 0.1s ease-in-out;
   animation: wormIdlePulse 2s infinite ease-in-out;
   -webkit-tap-highlight-color: transparent;
@@ -3459,13 +3475,19 @@ select.btn-compact:disabled {
 }
 
 .worm-tactile-btn:hover {
-  filter: brightness(1.1);
+  filter: brightness(1.06);
 }
 
 .worm-tactile-btn:active {
-  transform: translateY(8px);
-  box-shadow: 0 0px 0 #9a3412, 0 5px 10px rgba(0, 0, 0, 0.4);
+  transform: translateY(7px);
+  box-shadow: 0 0px 0 #2f9d4d, 0 5px 12px rgba(0, 0, 0, 0.4);
   animation: none;
+}
+
+.worm-menu-ghost:hover {
+  border-color: rgba(230, 240, 255, 0.55) !important;
+  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.06) !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
