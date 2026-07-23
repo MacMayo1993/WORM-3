@@ -1036,22 +1036,22 @@ export default function WORM3() {
 
   // Victory handlers
   const handleVictoryContinue = useCallback(() => {
-    if (currentLevel) completeLevel(currentLevel);
+    if (currentLevel) completeLevel(currentLevel, { moves, time: gameTime });
     setVictory(null);
-  }, [currentLevel, setVictory]);
+  }, [currentLevel, moves, gameTime, setVictory]);
 
   const handleVictoryNewGame = useCallback(() => {
-    if (currentLevel) completeLevel(currentLevel);
+    if (currentLevel) completeLevel(currentLevel, { moves, time: gameTime });
     setVictory(null);
     if (currentLevelData) shuffleForLevel();
     else animatedShuffle();
-  }, [currentLevel, currentLevelData, setVictory, shuffleForLevel, animatedShuffle]);
+  }, [currentLevel, currentLevelData, moves, gameTime, setVictory, shuffleForLevel, animatedShuffle]);
 
   const handleNextLevel = useCallback(() => {
-    if (currentLevel) completeLevel(currentLevel);
+    if (currentLevel) completeLevel(currentLevel, { moves, time: gameTime });
     levelHandleNextLevel();
     setVictory(null);
-  }, [currentLevel, levelHandleNextLevel, setVictory]);
+  }, [currentLevel, moves, gameTime, levelHandleNextLevel, setVictory]);
 
   // Dev console handlers
   const handlePreset = useCallback((presetId) => {

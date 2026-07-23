@@ -72,6 +72,7 @@ const VictoryScreen = ({
   };
 
   const levelWinMessage = levelData?.winMessage;
+  const isCampaignFinale = Boolean(currentLevel && !hasNextLevel);
 
   // Per-win theming — all share the warm STEP COMPLETE look; only the confetti
   // mascot glyph color shifts. Only classic and worm victories remain.
@@ -88,7 +89,13 @@ const VictoryScreen = ({
     },
   };
 
-  const config = winConfig[winType] || winConfig.rubiks;
+  const config = isCampaignFinale
+    ? {
+      title: 'Life Journey Complete!',
+      subtitle: 'Topology Master',
+      description: 'You carried the cube from its first turn to the Singularity.',
+    }
+    : (winConfig[winType] || winConfig.rubiks);
 
   // Shared button styles ----------------------------------------------------
   const primaryBtn = {
@@ -260,6 +267,15 @@ const VictoryScreen = ({
               Level {currentLevel} Complete
             </span>
           </div>
+        )}
+
+        {isCampaignFinale && (
+          <p style={{
+            fontSize: '12px', color: GOLD, margin: '-8px 0 20px', lineHeight: 1.5,
+            fontFamily: UI_FONT, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase',
+          }}>
+            Every chapter is available to replay for more stars.
+          </p>
         )}
 
         {/* Stats */}

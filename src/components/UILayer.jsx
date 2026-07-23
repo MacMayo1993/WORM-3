@@ -29,6 +29,7 @@ import HelpMenu from './menus/HelpMenu.jsx';
 import MobileControls from './menus/MobileControls.jsx';
 import FirstFlipTutorial from './screens/FirstFlipTutorial.jsx';
 import FirstFlipCaption from './overlays/FirstFlipCaption.jsx';
+import StoryObjectiveHUD from './overlays/StoryObjectiveHUD.jsx';
 import RotationPreview from './overlays/RotationPreview.jsx';
 import FaceRotationButtons from './overlays/FaceRotationButtons.jsx';
 import TileRotationSelector from './overlays/TileRotationSelector.jsx';
@@ -419,6 +420,10 @@ export default function UILayer({
         </div>
       )}
 
+      {currentLevelData && !wormHealerMode && !showMainMenu && !showLevelSelect && !showLevelTutorial && !showCutscene && !victory && (
+        <StoryObjectiveHUD level={currentLevelData} />
+      )}
+
       {showMainMenu && !showModeSelect && (
         <MainMenu
           onOpenModeSelect={onOpenModeSelect}
@@ -587,7 +592,7 @@ export default function UILayer({
         </Suspense>
       </ScreenTransition>
 
-      {showCutscene && currentLevel === 10 && (
+      {showCutscene && currentLevelData && (
         <Suspense fallback={null}>
           <Level10Cutscene onComplete={onCutsceneComplete} onSkip={onCutsceneComplete} />
         </Suspense>

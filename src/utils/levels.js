@@ -59,6 +59,7 @@ export {
   BUILT_IN_PACKS,
   getPack,
   getPackIds,
+  cubeAcademy,
 
   // Validation
   validateLevel,

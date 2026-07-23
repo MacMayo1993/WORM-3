@@ -11,6 +11,10 @@ export default createLevel({
   description: 'Discover antipodal pairs',
 
   cubeSize: 2,
+  scrambleSequence: [
+    { axis: 'depth', sliceIndex: 0, dir: 1 },
+    { axis: 'col', sliceIndex: 1, dir: -1 },
+  ],
   chaosLevel: 0,
   mode: GAME_MODES.CLASSIC,
   background: BACKGROUNDS.ELEMENTARY,
@@ -28,7 +32,13 @@ export default createLevel({
   tutorial: {
     title: 'Elementary School 📚',
     text: 'Time to learn something cool! Every sticker has a TWIN on the opposite side. Press T to see the secret tunnels connecting them!',
+    objective: 'Use the tunnel view to study opposite faces, then restore the two mixed layers.',
     tip: 'Opposites are connected - just like in math class!',
+    mobiLines: [
+      'The daycare block had one answer. This school cube has a secret: every tile has a twin.',
+      'Press T and trace a tunnel from one face to its opposite. They are farther apart to your eyes, but adjacent in our world.',
+      'Use ordinary turns to bring the two mixed layers home. Keep the twin connection in mind—we will cross it next.',
+    ],
   },
 
   winCondition: WIN_CONDITIONS.CLASSIC,

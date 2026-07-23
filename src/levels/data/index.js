@@ -16,9 +16,22 @@ import level10 from './level-10-black-hole.js';
 import { CUBE_CAMPAIGN_LEVELS, getCubeCampaignLevel } from './cube-campaign.js';
 
 /**
- * All story campaign levels in order
+ * The canonical Life Journey story campaign. Keep this list explicit so the
+ * campaign order is obvious and the authored chapter files remain the single
+ * source of truth for the player-facing story.
  */
-export const STORY_LEVELS = CUBE_CAMPAIGN_LEVELS;
+export const STORY_LEVELS = [
+  level01,
+  level02,
+  level03,
+  level04,
+  level05,
+  level06,
+  level07,
+  level08,
+  level09,
+  level10,
+];
 
 /**
  * Individual level exports for direct access

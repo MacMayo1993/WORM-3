@@ -11,6 +11,15 @@ export default createLevel({
   description: 'Understand orientation',
 
   cubeSize: 3,
+  scrambleSequence: [
+    { axis: 'col', sliceIndex: 0, dir: 1 },
+    { axis: 'row', sliceIndex: 2, dir: -1 },
+    { axis: 'depth', sliceIndex: 0, dir: 1 },
+  ],
+  flipSequence: [
+    { x: 1, y: 1, z: 2, dirKey: 'PZ' },
+    { x: 1, y: 2, z: 1, dirKey: 'PY' },
+  ],
   chaosLevel: 1,
   mode: GAME_MODES.CLASSIC,
   background: BACKGROUNDS.COLLEGE,
@@ -28,7 +37,13 @@ export default createLevel({
   tutorial: {
     title: 'College 🎓',
     text: 'Time for advanced concepts! EVEN parity (cyan) = normal. ODD parity (purple) = you crossed a "seam". This is real topology!',
+    objective: 'Use parity as a compass: clear the two seam pairs, then restore the three layers.',
     tip: 'The sledgehammer algorithm fixes parity issues.',
+    mobiLines: [
+      'College lesson: the parity light remembers whether a path crossed the seam.',
+      'Use it as a compass, not a grade. Clear the two flipped center pairs, then return the three layers.',
+      'A purple path is not wrong—it tells you how the cube has been oriented.',
+    ],
   },
 
   winCondition: WIN_CONDITIONS.CLASSIC,

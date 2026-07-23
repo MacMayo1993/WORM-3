@@ -11,6 +11,13 @@ export default createLevel({
   description: 'Explore projective planes',
 
   cubeSize: 4,
+  scrambleSequence: [
+    { axis: 'row', sliceIndex: 1, dir: 1 },
+    { axis: 'col', sliceIndex: 2, dir: -1 },
+    { axis: 'depth', sliceIndex: 1, dir: 1 },
+    { axis: 'row', sliceIndex: 3, dir: -1 },
+  ],
+  flipSequence: [{ x: 1, y: 3, z: 2, dirKey: 'PY' }],
   chaosLevel: 2,
   mode: GAME_MODES.CLASSIC,
   background: BACKGROUNDS.JOB,
@@ -28,7 +35,13 @@ export default createLevel({
   tutorial: {
     title: 'First Job 💼',
     text: 'Welcome to the real world! Press X to EXPLODE the cube and see its internal structure. Time to think in 3D like a professional!',
+    objective: 'Open explode view, identify the seam marker, and reverse the four moved layers.',
     tip: 'Explode view reveals how the pieces connect.',
+    mobiLines: [
+      'At work, a problem is easier once you can see its structure.',
+      'Open explode view and find the four layers that moved. The top-center flip is the seam marker for this route.',
+      'Plan the inverse path before turning. The cube is large now, but its logic is still readable.',
+    ],
   },
 
   winCondition: WIN_CONDITIONS.CLASSIC,

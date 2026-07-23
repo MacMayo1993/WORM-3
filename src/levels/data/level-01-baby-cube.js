@@ -11,6 +11,9 @@ export default createLevel({
   description: 'Learn basic rotations',
 
   cubeSize: 2,
+  // A single, reversible turn lets the first chapter teach observation before
+  // asking the player to solve an open-ended scramble.
+  scrambleSequence: [{ axis: 'row', sliceIndex: 1, dir: 1 }],
   chaosLevel: 0,
   mode: GAME_MODES.CLASSIC,
   background: BACKGROUNDS.DAYCARE,
@@ -28,7 +31,13 @@ export default createLevel({
   tutorial: {
     title: 'Welcome to Daycare! 🧒',
     text: "Let's play with blocks! This colorful 2×2 cube has 6 faces. Drag to spin the pieces around!",
+    objective: 'Return the one mixed layer so every face is one color again.',
     tip: 'Match all the colors on each side. You got this!',
+    mobiLines: [
+      "Aloha! I'm Mobi. This little cube is our map.",
+      'Only one layer wandered away from home. Watch the colors, then turn that layer back.',
+      'No tricks yet: one clean turn restores the whole daycare block.',
+    ],
   },
 
   winCondition: WIN_CONDITIONS.CLASSIC,

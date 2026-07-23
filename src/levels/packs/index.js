@@ -4,12 +4,14 @@
  */
 
 import storyCampaign from './story-campaign.js';
+import cubeAcademy from './cube-academy.js';
 
 /**
  * All official level packs
  */
 export const OFFICIAL_PACKS = [
   storyCampaign,
+  cubeAcademy,
 ];
 
 /**
@@ -17,6 +19,7 @@ export const OFFICIAL_PACKS = [
  */
 export const BUILT_IN_PACKS = {
   'story-campaign': storyCampaign,
+  'cube-academy': cubeAcademy,
 };
 
 /**
@@ -36,4 +39,4 @@ export function getPackIds() {
   return Object.keys(BUILT_IN_PACKS);
 }
 
-export { storyCampaign };
+export { storyCampaign, cubeAcademy };
