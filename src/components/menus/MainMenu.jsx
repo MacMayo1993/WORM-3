@@ -1393,6 +1393,7 @@ const MenuStartButton = ({ visible, onClick, onDemo }) => {
     paddingBottom: padBottom,
     display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
     gap: '14px',
+    zIndex: 4,
     opacity: visible ? 1 : 0,
     transform: visible ? 'none' : 'translateY(16px)',
     transition: 'opacity 0.55s ease 0.1s, transform 0.55s cubic-bezier(0.22,1,0.36,1) 0.1s',
@@ -1411,19 +1412,22 @@ const MenuStartButton = ({ visible, onClick, onDemo }) => {
         // so it's cached by the time the demo scene mounts.
         onPointerEnter={warmDemoAssets}
         onPointerDown={warmDemoAssets}
+        // Secondary action — ghost pill so START stays the single loud CTA and
+        // the two buttons read as one system (was a competing blue gradient).
+        className="worm-menu-ghost"
         style={{
-          background: 'linear-gradient(135deg, #3b82f6, #6366f1)',
-          border: 'none',
-          borderRadius: '10px',
-          padding: '10px 28px',
-          color: '#fff',
+          background: 'transparent',
+          border: '1.5px solid rgba(230,240,255,0.30)',
+          borderRadius: '100px',
+          padding: '11px 30px',
+          color: 'rgba(233,242,255,0.88)',
           fontSize: '13px',
           fontWeight: 700,
           fontFamily: UI_FONT,
-          letterSpacing: '0.08em',
+          letterSpacing: '0.14em',
           cursor: 'pointer',
           textTransform: 'uppercase',
-          boxShadow: '0 2px 12px rgba(59,130,246,0.35)',
+          transition: 'border-color 0.2s, color 0.2s, background 0.2s',
         }}
       >Start Demo</button>
     )}
@@ -1457,16 +1461,8 @@ const menuStyles = {
     display: 'flex', flexDirection: 'column', alignItems: 'center',
     paddingTop: 'max(44px, env(safe-area-inset-top,44px))',
     paddingLeft: '16px', paddingRight: '16px',
+    zIndex: 4,
     transition: 'all 0.75s cubic-bezier(0.22,1,0.36,1)',
-  },
-  titleCard: {
-    display: 'inline-block',
-    background: 'rgba(6,10,24,0.72)',
-    backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
-    borderRadius: '24px',
-    padding: '18px 28px 16px',
-    border: '1px solid rgba(120,160,255,0.14)',
-    boxShadow: '0 4px 32px rgba(0,0,0,0.45), inset 0 1px 0 rgba(120,160,255,0.10)',
   },
 };
 
@@ -1507,6 +1503,28 @@ const ORB_LAYOUT = [
   { faceId: 6, top: '44%',   left: '28%',    size: '36vmax', anim: 'orbDrift2 40s ease-in-out infinite alternate',          opacity: 0.13 },
   { faceId: 1, bottom: '18%',right: '22%',   size: '52vmax', anim: 'orbDrift3 44s ease-in-out infinite alternate-reverse',  opacity: 0.18 },
 ];
+
+// ─── Cinema scrim ────────────────────────────────────────────────────────────
+// A controlled contrast layer between the live 3D scene (environment + cube +
+// worm, all rendered in the shared Canvas behind this overlay) and the menu UI.
+// The center stays clear so the cube reads through; the edges, top, and bottom
+// darken so the wordmark and buttons keep legibility on ANY loaded environment —
+// bright rooms no longer wash out the text. Purely a DOM overlay: it never
+// touches the cube state or the background scene.
+const MenuScrim = () => (
+  <div aria-hidden style={{ position: 'absolute', inset: 0, zIndex: 1, pointerEvents: 'none' }}>
+    {/* Edge vignette — clears the middle where the cube lives */}
+    <div style={{
+      position: 'absolute', inset: 0,
+      background: 'radial-gradient(78% 56% at 50% 43%, transparent 40%, rgba(4,6,14,0.74) 100%)',
+    }} />
+    {/* Top + bottom darkening for the wordmark and the action cluster */}
+    <div style={{
+      position: 'absolute', inset: 0,
+      background: 'linear-gradient(180deg, rgba(4,6,14,0.62) 0%, rgba(4,6,14,0.10) 22%, transparent 46%, transparent 58%, rgba(4,6,14,0.55) 82%, rgba(4,6,14,0.90) 100%)',
+    }} />
+  </div>
+);
 
 const MenuBackgroundOrbs = () => {
   const [_v, setV] = useState(_orbColorVersion);
@@ -1562,6 +1580,7 @@ const MainMenu = ({
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'transparent', zIndex: 9999, pointerEvents: 'none' }}>
       <MenuBackgroundOrbs />
+      <MenuScrim />
       <ScreenGlow />
       <MenuTitleCard visible={titleVisible} />
       <MenuStartButton visible={bottomVisible} onClick={() => { _externalShakeNeeded = true; }} onDemo={onDemo} />
