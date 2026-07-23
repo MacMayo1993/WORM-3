@@ -73,7 +73,9 @@ function PanoramaSky({ preset, files, rotationSpeed, intensity }) {
   );
 }
 
-export default function InteractivePhotoBackground({ preset, files, rotationSpeed = 0.1, intensity = 1.2, blurriness = 0 }) {
+// rotationSpeed defaults to 0 (static): only the main menu / mode-select scene
+// opts into the drift by passing a speed. In-game photo panoramas stay still.
+export default function InteractivePhotoBackground({ preset, files, rotationSpeed = 0, intensity = 1.2, blurriness = 0 }) {
   return (
     <>
       {/* Reflections / ambient IBL only (no `background`) so the rotating sphere
