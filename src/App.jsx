@@ -213,7 +213,10 @@ function MenuScene({ onCubeClick, background }) {
       <Suspense fallback={null}>
         <InteractivePhotoBackground
           files={getBackgroundUrl(background.file)}
-          rotationSpeed={isMobile ? 0 : 0.006}
+          // Counter-rotate the panorama against the menu cube. The faster but
+          // still gentle orbit lets a player read the whole environment instead
+          // of waiting on one static horizon.
+          rotationSpeed={isMobile ? -0.025 : -0.055}
           intensity={isMobile ? 0.84 : 0.98}
           blurriness={0}
         />
