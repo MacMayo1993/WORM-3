@@ -1,5 +1,6 @@
 import React from 'react';
 import './DevConsole.css';
+import { getStoryLevelIds } from '../../levels/index.js';
 
 export default function DevConsole({
   onClose,
@@ -12,6 +13,7 @@ export default function DevConsole({
   onInstantChaos,
   moveHistory
 }) {
+  const storyLevelIds = getStoryLevelIds();
   const presets = [
     { id: 'solved', name: 'Solved State', desc: 'Reset to solved cube' },
     { id: 'near-solved', name: 'Near Solved', desc: '3 moves from solved' },
@@ -111,7 +113,7 @@ export default function DevConsole({
           <section className="dev-section">
             <h3>Quick Level Jump</h3>
             <div className="level-grid">
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(level => (
+              {storyLevelIds.map(level => (
                 <button
                   key={level}
                   className="level-btn"

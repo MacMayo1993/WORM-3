@@ -1,20 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { LEVELS, isLevelUnlocked, loadProgress } from '../../utils/levels.js';
+import { LEVELS, isLevelUnlocked, loadProgress, progressManager } from '../../utils/levels.js';
 import { UI_FONT, GLASS_PANEL_BORDER } from '../../utils/uiTheme.js';
 
-// We only track completion (not per-level star tiers), so a completed level
-// shows a full row of gold stars and the counter is derived from that.
 const STARS_PER_LEVEL = 3;
 
-const StarRow = ({ count, lit }) => (
+const StarRow = ({ count, earned }) => (
   <div style={{ display: 'flex', gap: '1px', marginTop: '5px', lineHeight: 1 }}>
     {Array.from({ length: count }).map((_, i) => (
       <span
         key={i}
         style={{
           fontSize: '11px',
-          color: lit ? '#ffd23f' : 'rgba(40, 70, 110, 0.35)',
-          textShadow: lit ? '0 1px 1px rgba(150, 90, 0, 0.55)' : 'none',
+          color: i < earned ? '#ffd23f' : 'rgba(40, 70, 110, 0.35)',
+          textShadow: i < earned ? '0 1px 1px rgba(150, 90, 0, 0.55)' : 'none',
         }}
       >
         ★
@@ -25,14 +23,16 @@ const StarRow = ({ count, lit }) => (
 
 const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
   const [completedLevels, setCompletedLevels] = useState([]);
+  const [levelStats, setLevelStats] = useState({});
   const [hovered, setHovered] = useState(null);
 
   useEffect(() => {
     setCompletedLevels(loadProgress());
+    setLevelStats(progressManager.loadLevelStats());
   }, []);
 
   const totalStars = LEVELS.length * STARS_PER_LEVEL;
-  const earnedStars = completedLevels.length * STARS_PER_LEVEL;
+  const earnedStars = Object.values(levelStats).reduce((sum, stats) => sum + Math.min(stats.stars || 0, STARS_PER_LEVEL), 0);
 
   return (
     <div style={{
@@ -62,9 +62,19 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
       {/* Top bar — star counter */}
       <div style={{
         width: '100%', maxWidth: '540px',
-        display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '4px 6px 14px', boxSizing: 'border-box', position: 'relative', zIndex: 1,
       }}>
+        <div>
+          <div style={{
+            fontSize: '11px', fontWeight: 900, color: 'rgba(255,255,255,0.82)',
+            letterSpacing: '0.16em', textTransform: 'uppercase',
+          }}>Life Journey</div>
+          <div style={{
+            marginTop: '3px', fontSize: '10px', fontWeight: 700,
+            color: 'rgba(229,240,255,0.72)', letterSpacing: '0.07em', textTransform: 'uppercase',
+          }}>{completedLevels.length}/{LEVELS.length} chapters complete</div>
+        </div>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
           <span style={{
             fontSize: '20px', fontWeight: 800, color: '#fff',
@@ -83,13 +93,14 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
       }}>
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(5, 1fr)',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
           gap: '12px',
           paddingBottom: '90px',
         }}>
           {LEVELS.map((level) => {
             const unlocked = isLevelUnlocked(level.id, completedLevels);
             const completed = completedLevels.includes(level.id);
+            const stars = levelStats[level.id]?.stars || 0;
             const isHover = hovered === level.id && unlocked;
 
             return (
@@ -99,9 +110,10 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
                 onMouseEnter={() => setHovered(level.id)}
                 onMouseLeave={() => setHovered(null)}
                 disabled={!unlocked}
+                aria-label={`${unlocked ? 'Play' : 'Locked'} level ${level.id}: ${level.name}`}
                 style={{
                   position: 'relative',
-                  aspectRatio: '0.92',
+                  minHeight: '132px',
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
@@ -132,7 +144,15 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
                     }}>
                       {level.id}
                     </span>
-                    <StarRow count={STARS_PER_LEVEL} lit={completed} />
+                    <span style={{
+                      marginTop: '7px', padding: '0 8px',
+                      color: '#31578f', fontSize: '10px', fontWeight: 800,
+                      letterSpacing: '0.06em', lineHeight: 1.2, textAlign: 'center',
+                      textTransform: 'uppercase',
+                    }}>
+                      {level.name}
+                    </span>
+                    <StarRow count={STARS_PER_LEVEL} earned={stars} />
                   </>
                 ) : (
                   <svg width="22" height="26" viewBox="0 0 24 28" aria-hidden="true">

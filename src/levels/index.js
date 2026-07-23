@@ -76,7 +76,7 @@ export { STORY_LEVELS, getStoryLevel, getStoryLevelIds, CUBE_CAMPAIGN_LEVELS, ge
 // LEVEL PACKS
 // ============================================================================
 
-export { OFFICIAL_PACKS, BUILT_IN_PACKS, getPack, getPackIds, storyCampaign } from './packs/index.js';
+export { OFFICIAL_PACKS, BUILT_IN_PACKS, getPack, getPackIds, storyCampaign, cubeAcademy } from './packs/index.js';
 
 // ============================================================================
 // VALIDATION
@@ -135,8 +135,8 @@ export const saveProgress = (completedLevels) => progressManager.saveProgress(co
 /**
  * @deprecated Use progressManager.completeLevel(id) instead
  */
-export const completeLevel = (levelId) => {
-  progressManager.completeLevel(levelId);
+export const completeLevel = (levelId, stats = {}) => {
+  progressManager.completeLevel(levelId, stats);
   return progressManager.loadProgress();
 };
 

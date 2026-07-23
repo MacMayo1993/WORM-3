@@ -2381,6 +2381,100 @@ select.locked:hover {
   letter-spacing: 0.08em;
 }
 
+/* Story objective — the chapter briefing establishes the why; this compact
+   card keeps the next concrete action visible during play. */
+.story-objective-hud {
+  position: fixed;
+  top: 80px;
+  right: 24px;
+  width: min(330px, calc(100vw - 48px));
+  z-index: 150;
+  pointer-events: auto;
+  overflow: hidden;
+  border: 1px solid rgba(95, 127, 74, 0.48);
+  border-radius: 12px;
+  background: rgba(250, 247, 238, 0.94);
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(14px);
+  color: var(--ui-ink);
+}
+
+.story-objective-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 0;
+  border-bottom: 1px solid rgba(95, 127, 74, 0.18);
+  background: rgba(95, 127, 74, 0.12);
+  color: var(--ui-ink);
+  cursor: pointer;
+  font-family: var(--ui-font);
+}
+
+.story-objective-hud.is-collapsed .story-objective-toggle {
+  border-bottom: 0;
+}
+
+.story-objective-kicker {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.story-objective-chevron {
+  color: #5f7f4a;
+  font-size: 15px;
+}
+
+.story-objective-content {
+  padding: 11px 12px 12px;
+}
+
+.story-objective-chapter {
+  display: flex;
+  gap: 5px;
+  color: var(--ui-ink-subtle);
+  font-family: var(--ui-font);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.story-objective-content p {
+  margin: 8px 0 0;
+  font-family: var(--ui-font);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.42;
+}
+
+.story-objective-hint-button {
+  margin-top: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #426b2e;
+  cursor: pointer;
+  font-family: var(--ui-font);
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.story-objective-hint {
+  margin-top: 7px !important;
+  padding: 8px 9px;
+  border-left: 3px solid #9fdb7a;
+  background: rgba(159, 219, 122, 0.16);
+  color: #405334;
+  font-size: 12px !important;
+}
+
 /* Animation for feature unlock */
 @keyframes feature-unlock {
   0% {
@@ -2443,6 +2537,13 @@ select.btn-compact:disabled {
 
   .level-badge-name {
     font-size: 10px;
+  }
+
+  .story-objective-hud {
+    top: auto;
+    right: 12px;
+    bottom: calc(184px + env(safe-area-inset-bottom, 0px));
+    width: min(320px, calc(100vw - 24px));
   }
 }
 

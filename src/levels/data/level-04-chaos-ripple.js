@@ -11,6 +11,12 @@ export default createLevel({
   description: 'Survive the instability',
 
   cubeSize: 3,
+  scrambleSequence: [
+    { axis: 'row', sliceIndex: 0, dir: 1 },
+    { axis: 'col', sliceIndex: 2, dir: -1 },
+    { axis: 'depth', sliceIndex: 1, dir: 1 },
+  ],
+  flipSequence: [{ x: 1, y: 2, z: 1, dirKey: 'PY' }],
   chaosLevel: 1,
   mode: GAME_MODES.CLASSIC,
   background: BACKGROUNDS.HIGHSCHOOL,
@@ -28,7 +34,13 @@ export default createLevel({
   tutorial: {
     title: 'High School 🏫',
     text: 'Welcome to the chaos! Just like high school, things can get WILD. Flipped stickers might trigger chain reactions. Stay calm and solve fast!',
+    objective: 'Stabilize the flipped top center and repair the three mixed layers before chaos spreads.',
     tip: "Don't panic! Solve before the chaos spreads!",
+    mobiLines: [
+      'The manifold is reacting to every seam crossing now. That is chaos—not failure.',
+      'Start with the flipped top center, then repair the three visible layer disturbances before the ripple grows.',
+      'Slow observation beats panic. Stabilize one relationship at a time.',
+    ],
   },
 
   winCondition: WIN_CONDITIONS.CLASSIC,
