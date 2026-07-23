@@ -22,6 +22,7 @@ export function useGameSession() {
   const victory = useGameStore((state) => state.victory);
   const achievedWins = useGameStore((state) => state.achievedWins);
   const chaosLevel = useGameStore((state) => state.chaosLevel);
+  const currentLevelData = useGameStore((state) => state.currentLevelData);
   const demoMode = useGameStore((state) => state.demoMode);
 
   const setGameTime = useGameStore((state) => state.setGameTime);
@@ -48,9 +49,11 @@ export function useGameSession() {
     if (victory) return;
     // Guard: ensure cubies matches expected size
     if (cubies.length !== size) return;
-    // Skip during chaos/disparity mode — cubies update at 100+ Hz and traditional
-    // win conditions don't apply. Re-runs once when chaosLevel drops back to 0.
-    if (chaosLevel > 0) return;
+    // Skip during STANDALONE Disparity mode — cubies update at 100+ Hz and the
+    // classic win doesn't apply there. A story chaos level (e.g. level 4 "Chaos
+    // Ripple") is a classic solve with chaos layered on, so it must keep win
+    // detection or it could never be completed.
+    if (chaosLevel > 0 && !currentLevelData) return;
     // Skip during the demo: its steps deliberately stage solved cubes (the
     // baby-cube step starts solved, before its watch scramble runs) with
     // hasShuffled already true, so firing the victory screen here would flash it
@@ -82,7 +85,7 @@ export function useGameSession() {
       setVictory(VICTORY.RUBIKS);
       setAchievedWins((prev) => ({ ...prev, rubiks: true }));
     }
-  }, [cubies, size, hasShuffled, victory, achievedWins, chaosLevel, demoMode, setVictory, setAchievedWins]);
+  }, [cubies, size, hasShuffled, victory, achievedWins, chaosLevel, currentLevelData, demoMode, setVictory, setAchievedWins]);
 
   // Format time for display
   const formatTime = useCallback((seconds) => {
