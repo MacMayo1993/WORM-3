@@ -23,7 +23,7 @@ export default createLevel({
     { x: 2, y: 2, z: 4, dirKey: 'PZ' },
     { x: 2, y: 4, z: 2, dirKey: 'PY' },
   ],
-  chaosLevel: 3,
+  chaosLevel: 0,
   mode: GAME_MODES.ULTIMATE,
   background: BACKGROUNDS.MOON,
 
@@ -31,7 +31,7 @@ export default createLevel({
     rotations: true,
     tunnels: true,
     flips: true,
-    chaos: true,
+    chaos: false,
     explode: true,
     parity: true,
     net: true,

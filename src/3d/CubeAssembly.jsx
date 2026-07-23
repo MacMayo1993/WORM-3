@@ -327,10 +327,9 @@ const CubeAssembly = React.memo(({
       if (!liveDragRef.current && dist >= DRAG_THRESHOLD) {
         {
           // Standalone Disparity mode auto-shuffles and is played by healing tiles,
-          // not manual turns, so block manual rotation there. Story chaos levels
-          // (e.g. level 4 "Chaos Ripple") are classic solves with chaos layered on
-          // top — the player must still be able to rotate to repair the cube, so
-          // only block when no story level is active.
+          // not manual turns, so block manual rotation there. Story levels are
+          // always solved with real turns and flips (they no longer use chaos), so
+          // never block rotation while a story level is active.
           const _cs = useGameStore.getState();
           if (_cs.chaosLevel > 0 && !_cs.currentLevelData) return;
         }

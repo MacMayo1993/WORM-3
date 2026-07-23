@@ -20,7 +20,7 @@ export default createLevel({
     { x: 1, y: 1, z: 2, dirKey: 'PZ' },
     { x: 1, y: 2, z: 1, dirKey: 'PY' },
   ],
-  chaosLevel: 1,
+  chaosLevel: 0,
   mode: GAME_MODES.CLASSIC,
   background: BACKGROUNDS.COLLEGE,
 
@@ -28,7 +28,7 @@ export default createLevel({
     rotations: true,
     tunnels: true,
     flips: true,
-    chaos: true,
+    chaos: false,
     explode: false,
     parity: true,
     net: false,

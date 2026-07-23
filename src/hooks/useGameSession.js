@@ -49,10 +49,9 @@ export function useGameSession() {
     if (victory) return;
     // Guard: ensure cubies matches expected size
     if (cubies.length !== size) return;
-    // Skip during STANDALONE Disparity mode — cubies update at 100+ Hz and the
-    // classic win doesn't apply there. A story chaos level (e.g. level 4 "Chaos
-    // Ripple") is a classic solve with chaos layered on, so it must keep win
-    // detection or it could never be completed.
+    // Skip only during STANDALONE Disparity mode — cubies update at 100+ Hz there
+    // and the classic win doesn't apply. Story levels always keep win detection
+    // (they no longer use chaos), so a story level never lands in this early-out.
     if (chaosLevel > 0 && !currentLevelData) return;
     // Skip during the demo: its steps deliberately stage solved cubes (the
     // baby-cube step starts solved, before its watch scramble runs) with
