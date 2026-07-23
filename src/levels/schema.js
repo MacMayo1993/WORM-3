@@ -165,6 +165,9 @@ export function createLevel(overrides) {
     tutorial: {
       title: overrides.tutorial?.title || overrides.name || `Level ${overrides.id}`,
       text: overrides.tutorial?.text || '',
+      // A concise, persistent in-play instruction. Unlike the briefing copy,
+      // this should describe the next concrete action the player can take.
+      objective: overrides.tutorial?.objective || '',
       tip: overrides.tutorial?.tip || '',
       // Optional hand-authored Mobi dialogue lines for the level briefing.
       // When omitted, the level screen derives lines from text/tip.
@@ -242,6 +245,7 @@ export function createLevelPack(overrides) {
  * @typedef {Object} Tutorial
  * @property {string} title - Tutorial title
  * @property {string} text - Main tutorial text
+ * @property {string} objective - Persistent in-play objective
  * @property {string} tip - Helpful tip
  * @property {string[]|null} mobiLines - Optional Mobi dialogue lines for the briefing
  */

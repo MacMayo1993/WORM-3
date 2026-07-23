@@ -11,6 +11,20 @@ export default createLevel({
   description: 'Full antipodal topology',
 
   cubeSize: 5,
+  scrambleSequence: [
+    { axis: 'row', sliceIndex: 1, dir: 1 },
+    { axis: 'col', sliceIndex: 3, dir: -1 },
+    { axis: 'depth', sliceIndex: 2, dir: 1 },
+    { axis: 'row', sliceIndex: 4, dir: -1 },
+    { axis: 'col', sliceIndex: 0, dir: 1 },
+    { axis: 'depth', sliceIndex: 4, dir: -1 },
+    { axis: 'row', sliceIndex: 2, dir: 1 },
+  ],
+  flipSequence: [
+    { x: 2, y: 2, z: 4, dirKey: 'PZ' },
+    { x: 4, y: 2, z: 2, dirKey: 'PX' },
+    { x: 2, y: 4, z: 2, dirKey: 'PY' },
+  ],
   chaosLevel: 4,
   mode: GAME_MODES.ULTIMATE,
   background: BACKGROUNDS.BLACKHOLE,
@@ -28,7 +42,13 @@ export default createLevel({
   tutorial: {
     title: 'The Singularity 🕳️',
     text: "Maximum chaos. Maximum complexity. You're at the edge of a BLACK HOLE. Everything you've learned leads to this moment. Good luck.",
+    objective: 'Use parity and the net to clear three seam pairs and restore all seven layers.',
     tip: 'May the topology be with you.',
+    mobiLines: [
+      'This is the Singularity. Every tool you learned is part of the same map.',
+      'Three seams are inverted and seven layers have drifted. Read parity, unfold the net, and choose a calm route back.',
+      'You are not escaping the manifold. You understand it now.',
+    ],
   },
 
   winCondition: WIN_CONDITIONS.ULTIMATE,

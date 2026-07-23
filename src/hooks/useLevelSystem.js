@@ -71,8 +71,9 @@ export function useLevelSystem() {
       setShowTunnels(levelData.features.tunnels);
     }
 
-    // Level 10 has epic cutscene
-    if (levelId === 10 && levelData?.hasCutscene) {
+    // A campaign level can opt into an opening cutscene. This is data-driven so
+    // changing a pack's length or finale ID cannot make its cutscene unreachable.
+    if (levelData?.hasCutscene) {
       setShowCutscene(true);
     } else {
       setShowLevelTutorial(true);

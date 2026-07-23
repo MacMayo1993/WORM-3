@@ -265,8 +265,8 @@ class ProgressManager {
       newAchievements.push('first_steps');
     }
 
-    // Final level completed
-    if (levelId === 10 && isFirstCompletion && !achievements.includes('topology_master')) {
+    // Final story level completed
+    if (levelId === levelsManager.getLastLevel()?.id && isFirstCompletion && !achievements.includes('topology_master')) {
       newAchievements.push('topology_master');
     }
 

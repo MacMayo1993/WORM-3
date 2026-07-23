@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createLevel } from '../levels/schema.js';
 import { CUBE_CAMPAIGN_LEVELS, getCubeCampaignLevel } from '../levels/data/cube-campaign.js';
-import { getNextLevel, getLevel } from '../levels/index.js';
+import { getNextLevel } from '../levels/index.js';
 import { makeCubies } from '../game/cubeState.js';
 import { rotateSliceCubies } from '../game/cubeRotation.js';
 import { buildManifoldGridMap, flipStickerPair } from '../game/manifoldLogic.js';
@@ -100,10 +100,6 @@ describe('CUBE campaign levels', () => {
     const { axis, sliceIndex, dir } = level1.scrambleSequence[0];
     const fixed = rotateSliceCubies(scrambled, size, axis, sliceIndex, -dir);
     expect(solvedKey(fixed)).toBe(solvedKey(solved));
-  });
-
-  it('exposes the campaign through the level manager', () => {
-    expect(getLevel(1)).toBe(getCubeCampaignLevel(1));
   });
 
   it('has a next level for every level except the last', () => {

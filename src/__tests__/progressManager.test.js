@@ -25,4 +25,11 @@ describe('progressManager singleton', () => {
     pm.completeLevel(1);
     expect(pm.isLevelUnlocked(2)).toBe(true);
   });
+
+  it('persists earned stars from completion performance instead of treating completion as three stars', () => {
+    const pm = new ProgressManager({ testMode: false, autoSave: false });
+    expect(pm.completeLevel(1, { time: 999, moves: 999 }).stats.stars).toBe(1);
+    expect(pm.completeLevel(1, { time: 1, moves: 1 }).stats.stars).toBe(3);
+    expect(pm.loadLevelStats()[1].stars).toBe(3);
+  });
 });

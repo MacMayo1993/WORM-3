@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { getNewFeatures } from '../../utils/levels.js';
+import { getStoryLevelIds } from '../../levels/index.js';
 import { UI_FONT, GLASS_PANEL_DEEP, GLASS_PANEL } from '../../utils/uiTheme.js';
 
 /**
@@ -75,7 +76,8 @@ const LevelTutorial = ({ level, onClose, onMainMenu }) => {
 
   if (!level || !level.tutorial) return null;
 
-  const isFinale = level.id === 10;
+  const storyLevelIds = getStoryLevelIds();
+  const isFinale = level.id === storyLevelIds[storyLevelIds.length - 1];
   const accent = isFinale ? 'rgba(167, 139, 250, 0.9)' : 'rgba(0, 210, 248, 0.85)';
   const accentSolid = isFinale ? '#a78bfa' : '#00d2f8';
   const PANEL_H = 'clamp(150px, 22vh, 200px)';
