@@ -38,6 +38,10 @@ export {
   LevelsManager,
   ProgressManager,
 
+  // Scoring (Story-mode par / stars)
+  computeStars,
+  getLevelPar,
+
   // Schema and constants
   GAME_MODES,
   WIN_CONDITIONS,
