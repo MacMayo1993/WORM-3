@@ -1302,10 +1302,9 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
             padding: '16px 18px', position: 'relative', overflow: 'hidden',
           }}>
             <div aria-hidden style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: `linear-gradient(90deg, ${mode.tileColor}, transparent 78%)` }} />
-            <span style={{ display: 'block', textAlign: 'center', fontSize: 'clamp(26px, 8vw, 34px)', fontWeight: 900, fontFamily: DISPLAY_FONT, color: '#fffdf2', lineHeight: 1, letterSpacing: '0.03em', textTransform: 'uppercase', textShadow: '0 3px 0 rgba(0,0,0,0.5), 0 10px 30px rgba(0,0,0,0.55)' }}>
-              {mode.label}
-            </span>
-            <div style={{ marginTop: '16px' }}>
+            {/* Mode name omitted here — the presented cube face already labels the
+                mode, so a centered title in the panel is redundant. */}
+            <div>
               {mode.controls.map((ctrl, i) => (
                 <div key={i} style={{ display: 'flex', gap: '10px', margin: '6px 0', alignItems: 'flex-start' }}>
                   <span aria-hidden style={{ width: '6px', height: '6px', borderRadius: '2px', background: mode.tileColor, boxShadow: `0 0 6px ${mode.tileColor}`, marginTop: '5px', flexShrink: 0 }} />
