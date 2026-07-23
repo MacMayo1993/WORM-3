@@ -6,7 +6,7 @@
 
 import { useEffect, useCallback, useRef } from 'react';
 import { useGameStore } from './useGameStore.js';
-import { checkRubiksSolved, allStickersFlipped } from '../game/winDetection.js';
+import { checkRubiksWin, allStickersFlipped } from '../game/winDetection.js';
 import { VICTORY } from '../utils/constants.js';
 
 /**
@@ -65,9 +65,14 @@ export function useGameSession() {
     // Compute only what those two conditions need instead of detectWinConditions,
     // which also runs checkSudokubeSolved (six Latin-square face scans building a
     // size×size grid each) on every move just to feed the removed screens — pure
-    // wasted work in this hot path. checkRubiksSolved is shared by both live wins;
+    // wasted work in this hot path. checkRubiksWin is shared by both live wins;
     // allStickersFlipped only runs once the cube is already fully solved.
-    const rubiksSolved = checkRubiksSolved(cubies, size);
+    //
+    // checkRubiksWin is rotation-invariant for centreless cubes (2×2, 4×4), so a
+    // player who makes every face uniform in any orientation registers the solve
+    // — the strict home-orientation check would reject 23 of a 2×2's 24 solved
+    // states, leaving the cube visibly solved with no win.
+    const rubiksSolved = checkRubiksWin(cubies, size);
     const wormWin = rubiksSolved && allStickersFlipped(cubies, size);
 
     if (wormWin && !achievedWins.worm) {

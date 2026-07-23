@@ -210,7 +210,10 @@ export default function UILayer({
 
   const hasFullScreenOverlay = showFreeplayWizard || showRandomWizard || showWormModeWizard
     || showModeSelect || showDisparityWizard || showDisparityBetting || showCubeModeSelect || showLevelSelect
-    || showComingSoon || showMobiusCubelet || showMobiIntro || victory || showMergeThemePicker;
+    || showComingSoon || showMobiusCubelet || showMobiIntro || victory || showMergeThemePicker
+    // Mobi's level briefing and the finale cutscene are blocking beats — clear
+    // the game chrome (top bar, bottom nav, sheet) so nothing crowds him.
+    || showLevelTutorial || showCutscene;
 
   const showGameHUD = !wormHealerMode && !showMainMenu && !hasFullScreenOverlay;
 
@@ -412,8 +415,8 @@ export default function UILayer({
         onFreeplay={() => { useGameStore.getState().clearLevel(); setSheetOpen(false); }}
       />}
 
-      {/* Level Badge */}
-      {currentLevelData && !wormHealerMode && !showMainMenu && !showLevelSelect && !victory && (
+      {/* Level Badge — desktop only; on mobile the top bar + objective HUD already name the level */}
+      {currentLevelData && !wormHealerMode && !showMainMenu && !showLevelSelect && !showLevelTutorial && !showCutscene && !victory && (
         <div className="level-badge">
           <span className="level-badge-number">{currentLevel}</span>
           <span className="level-badge-name">{currentLevelData.name}</span>
@@ -619,7 +622,7 @@ export default function UILayer({
         </Suspense>
       </ScreenTransition>
 
-      {isMobile && !wormHealerMode && !showTutorial && !showMainMenu && !showDisparityWizard && !showDisparityBetting && !showFreeplayWizard && !showRandomWizard && !showWormModeWizard && (
+      {isMobile && !wormHealerMode && !showTutorial && !showMainMenu && !showDisparityWizard && !showDisparityBetting && !showFreeplayWizard && !showRandomWizard && !showWormModeWizard && !showLevelTutorial && !showCutscene && (
         <MobileControls
           onShowHelp={() => setShowHelp(true)}
           flipMode={flipMode} onToggleFlip={() => setFlipMode(!flipMode)}

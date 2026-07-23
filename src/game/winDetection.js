@@ -37,6 +37,44 @@ export const checkRubiksSolved = (cubies, size, { antipodal = false } = {}) => {
 // Convenience wrapper: solved up to antipodal identification (flips allowed).
 export const checkRubiksSolvedAntipodal = (cubies, size) => checkRubiksSolved(cubies, size, { antipodal: true });
 
+// Rotation-invariant solved check: every face shows a SINGLE colour, regardless
+// of which absolute face that colour "belongs" to. Because stickers are
+// conserved (exactly size² of each colour), all six faces being uniform means
+// the cube is genuinely solved — just possibly in a rotated orientation.
+//
+// This matters for cubes with no fixed centres (2×2, 4×4, …): they have 24
+// equivalent solved orientations, and the strict `checkRubiksSolved` only
+// accepts one of them, so a player who lines every face up in a rotated frame
+// would otherwise never register a win. For odd cubes the two checks agree in
+// practice, but this stays correct there too. Honours the same antipodal option.
+export const checkRubiksSolvedRotationInvariant = (cubies, size, { antipodal = false } = {}) => {
+  const key = antipodal ? (c) => colorClass(c) : (c) => c;
+  const faceColor = {}; // dirKey -> the colour class seen so far on that face
+
+  for (let x = 0; x < size; x++) {
+    for (let y = 0; y < size; y++) {
+      for (let z = 0; z < size; z++) {
+        // Interior cubies have no stickers — skip them
+        if (x > 0 && x < size - 1 && y > 0 && y < size - 1 && z > 0 && z < size - 1) continue;
+        const c = cubies[x][y][z];
+        for (const [dirKey, st] of Object.entries(c.stickers)) {
+          const v = key(st.curr);
+          if (faceColor[dirKey] === undefined) faceColor[dirKey] = v;
+          else if (faceColor[dirKey] !== v) return false;
+        }
+      }
+    }
+  }
+  return true;
+};
+
+// The solved check the live game should use for a win. Cubes without fixed
+// centres are judged rotation-invariantly (any of their 24 solved orientations
+// counts); cubes with centres keep the strict home-orientation check so
+// existing 3×3+ behaviour is unchanged.
+export const checkRubiksWin = (cubies, size, opts) =>
+  size % 2 === 0 ? checkRubiksSolvedRotationInvariant(cubies, size, opts) : checkRubiksSolved(cubies, size, opts);
+
 // Check if a single face is a valid Latin square (Sudokube condition)
 export const checkFaceLatinSquare = (faceGrid, size) => {
   // Check rows

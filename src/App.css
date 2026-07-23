@@ -2523,26 +2523,19 @@ select.btn-compact:disabled {
     /* Hide tooltip on mobile */
   }
 
+  /* On phones the top bar already reads "Level 1 — Baby Cube" and the objective
+     HUD repeats the chapter + name, so this bottom-left badge was pure
+     redundancy — and it collided with the undo button. Drop it on mobile. */
   .level-badge {
-    top: auto;
-    bottom: 140px;
-    bottom: calc(140px + env(safe-area-inset-bottom, 0px));
-    left: 12px;
-    padding: 6px 10px;
+    display: none;
   }
 
-  .level-badge-number {
-    font-size: 16px;
-  }
-
-  .level-badge-name {
-    font-size: 10px;
-  }
-
+  /* Sit just above the undo button (which tops out ~154px up) so the two never
+     collide, now that the level badge no longer occupies this corner. */
   .story-objective-hud {
     top: auto;
     right: 12px;
-    bottom: calc(184px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(160px + env(safe-area-inset-bottom, 0px));
     width: min(320px, calc(100vw - 24px));
   }
 }
