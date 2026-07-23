@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createLevel } from '../levels/schema.js';
 import { CUBE_CAMPAIGN_LEVELS, getCubeCampaignLevel } from '../levels/data/cube-campaign.js';
-import { getNextLevel } from '../levels/index.js';
 import { makeCubies } from '../game/cubeState.js';
 import { rotateSliceCubies } from '../game/cubeRotation.js';
 import { buildManifoldGridMap, flipStickerPair } from '../game/manifoldLogic.js';
@@ -102,14 +101,13 @@ describe('CUBE campaign levels', () => {
     expect(solvedKey(fixed)).toBe(solvedKey(solved));
   });
 
-  it('has a next level for every level except the last', () => {
-    const lastId = CUBE_CAMPAIGN_LEVELS[CUBE_CAMPAIGN_LEVELS.length - 1].id;
-    for (const level of CUBE_CAMPAIGN_LEVELS) {
-      if (level.id === lastId) {
-        expect(getNextLevel(level.id)).toBeNull();
-      } else {
-        expect(getNextLevel(level.id)).not.toBeNull();
-      }
-    }
+  it('chains every cube lesson to its predecessor (story ordering lives with the level manager)', () => {
+    // Cube Academy is a standalone practice pack, so its progression is defined
+    // by each level's own `previousLevel` link rather than the level manager's
+    // story getNextLevel (which walks the separate Life Journey campaign).
+    CUBE_CAMPAIGN_LEVELS.forEach((level, index) => {
+      const expectedPrev = index === 0 ? null : CUBE_CAMPAIGN_LEVELS[index - 1].id;
+      expect(level.requirements.previousLevel).toBe(expectedPrev);
+    });
   });
 });

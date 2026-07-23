@@ -4,6 +4,33 @@ import { UI_FONT, GLASS_PANEL_BORDER } from '../../utils/uiTheme.js';
 
 const STARS_PER_LEVEL = 3;
 
+// Persisted "best" values become null once they round-trip through JSON
+// (Infinity serializes to null), so treat anything non-positive as "unset".
+const isRecorded = (value) => typeof value === 'number' && Number.isFinite(value) && value > 0;
+
+const formatTime = (seconds) => {
+  const total = Math.round(seconds);
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+};
+
+const BestStats = ({ stats }) => {
+  if (!stats) return null;
+  const parts = [];
+  if (isRecorded(stats.bestMoves)) parts.push(`${stats.bestMoves} moves`);
+  if (isRecorded(stats.bestTime)) parts.push(formatTime(stats.bestTime));
+  if (parts.length === 0) return null;
+  return (
+    <div style={{
+      marginTop: '4px', fontSize: '9px', fontWeight: 700, letterSpacing: '0.04em',
+      color: 'rgba(33, 74, 134, 0.72)', textAlign: 'center', lineHeight: 1,
+    }}>
+      {parts.join(' · ')}
+    </div>
+  );
+};
+
 const StarRow = ({ count, earned }) => (
   <div style={{ display: 'flex', gap: '1px', marginTop: '5px', lineHeight: 1 }}>
     {Array.from({ length: count }).map((_, i) => (
@@ -99,7 +126,8 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
         }}>
           {LEVELS.map((level) => {
             const unlocked = isLevelUnlocked(level.id, completedLevels);
-            const stars = levelStats[level.id]?.stars || 0;
+            const stat = levelStats[level.id];
+            const stars = stat?.stars || 0;
             const isHover = hovered === level.id && unlocked;
 
             return (
@@ -152,6 +180,7 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
                       {level.name}
                     </span>
                     <StarRow count={STARS_PER_LEVEL} earned={stars} />
+                    <BestStats stats={stat} />
                   </>
                 ) : (
                   <svg width="22" height="26" viewBox="0 0 24 28" aria-hidden="true">
