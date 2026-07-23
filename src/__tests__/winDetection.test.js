@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   checkRubiksSolved,
   checkRubiksSolvedAntipodal,
+  checkRubiksSolvedRotationInvariant,
+  checkRubiksWin,
   colorClass,
   checkFaceLatinSquare,
   checkWormVictory,
@@ -51,6 +53,37 @@ describe('checkRubiksSolved', () => {
 
     const cubies4 = makeCubies(4);
     expect(checkRubiksSolved(cubies4, 4)).toBe(true);
+  });
+});
+
+describe('checkRubiksWin (rotation-invariant for centreless cubes)', () => {
+  // Level 1 (Baby Cube) scramble: one top-layer turn. Turning the BOTTOM layer
+  // instead makes every face uniform — a genuine solve in a rotated frame that
+  // a first-time player naturally reaches. Strict absolute checking rejects it;
+  // the win check must accept it.
+  it('accepts a 2×2 solved in a rotated orientation', () => {
+    let cubies = makeCubies(2);
+    cubies = rotateSliceCubies(cubies, 2, 'row', 1, 1); // scramble (level 1)
+    cubies = rotateSliceCubies(cubies, 2, 'row', 0, 1); // "solve" via the other layer
+
+    expect(checkRubiksSolved(cubies, 2)).toBe(false);              // strict: rejects the rotated frame
+    expect(checkRubiksSolvedRotationInvariant(cubies, 2)).toBe(true);
+    expect(checkRubiksWin(cubies, 2)).toBe(true);                  // the live win accepts it
+  });
+
+  it('still rejects a genuinely scrambled 2×2', () => {
+    let cubies = makeCubies(2);
+    cubies = rotateSliceCubies(cubies, 2, 'row', 1, 1);
+    expect(checkRubiksWin(cubies, 2)).toBe(false);
+  });
+
+  it('is unchanged from the strict check for odd cubes', () => {
+    const solved = makeCubies(3);
+    expect(checkRubiksWin(solved, 3)).toBe(true);
+
+    let scrambled = makeCubies(3);
+    scrambled = rotateSliceCubies(scrambled, 3, 'col', 0, 1);
+    expect(checkRubiksWin(scrambled, 3)).toBe(false);
   });
 });
 
