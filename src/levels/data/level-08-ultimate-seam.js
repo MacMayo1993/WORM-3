@@ -11,17 +11,14 @@ export default createLevel({
   description: 'Dual constraints collide',
 
   cubeSize: 4,
+  // Gentle 4×4 finale: three outer-face turns plus one seam flip. Still a step up
+  // from the earlier 4×4s, but no hard inner slices and a much shorter route.
   scrambleSequence: [
-    { axis: 'row', sliceIndex: 2, dir: 1 },
-    { axis: 'col', sliceIndex: 0, dir: -1 },
-    { axis: 'depth', sliceIndex: 1, dir: 1 },
-    { axis: 'row', sliceIndex: 0, dir: -1 },
-    { axis: 'col', sliceIndex: 3, dir: 1 },
+    { axis: 'row', sliceIndex: 0, dir: 1 },
+    { axis: 'col', sliceIndex: 3, dir: -1 },
+    { axis: 'depth', sliceIndex: 0, dir: 1 },
   ],
-  flipSequence: [
-    { x: 2, y: 2, z: 3, dirKey: 'PZ' },
-    { x: 3, y: 1, z: 2, dirKey: 'PX' },
-  ],
+  flipSequence: [{ x: 2, y: 2, z: 3, dirKey: 'PZ' }],
   chaosLevel: 0,
   mode: GAME_MODES.ULTIMATE,
   background: BACKGROUNDS.ROCKET,
@@ -39,11 +36,11 @@ export default createLevel({
   tutorial: {
     title: 'Rocket Launch 🚀',
     text: "3... 2... 1... LIFTOFF! Colors AND numbers must BOTH be correct! This is the ultimate challenge. You're leaving Earth!",
-    objective: 'Repair both seam pairs, then reverse the five-layer route while checking color and number rules.',
+    objective: 'Repair the seam, then reverse the three-layer route while checking color and number rules.',
     tip: 'Focus on one constraint first, then adjust.',
     mobiLines: [
       'Liftoff. Color and number rules are both live now, and neither can be ignored.',
-      'Clear the two seam markers first. Then retrace the five layers in reverse, checking each view when the route feels ambiguous.',
+      'Clear the seam marker first. Then retrace the three layers in reverse, checking each view when the route feels ambiguous.',
       'Ultimate does not mean faster. It means holding two true ideas at once.',
     ],
   },
@@ -52,7 +49,7 @@ export default createLevel({
   winMessage: 'WE HAVE LIFTOFF! Dual mastery achieved! 🔥',
   cutsceneText: 'Dual symmetries collide.',
 
-  difficulty: DIFFICULTY.EXPERT,
+  difficulty: DIFFICULTY.HARD,
   tags: [LEVEL_TAGS.STORY, LEVEL_TAGS.CHALLENGE],
 
   requirements: {
