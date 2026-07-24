@@ -33,7 +33,7 @@ export default createLevel({
 
   tutorial: {
     title: 'NASA Lab 🔬',
-    text: "You made it to NASA! Colors become numbers now. Each face needs digits 1-16 with no repeats in any row or column. It's Sudoku in SPACE!",
+    text: "You made it to NASA! Colors become numbers now. Each face needs every number 1-16, one of each. It's Sudoku in SPACE!",
     objective: 'Use the number view to inspect the pattern, clear the front seam, and restore the two layers.',
     tip: 'Press V to toggle between colors and numbers.',
     mobiLines: [

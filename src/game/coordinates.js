@@ -9,11 +9,12 @@ import { faceRCFor } from './gridIds.js';
 // coordinates.js keep working unchanged.
 export { faceRCFor, getGridRC, getManifoldGridId, getStickerWorldPos } from './gridIds.js';
 
-// Get face value for Latin square (Sudokube mode)
+// Get a sticker's Sudokube number (unique per home cell, 1..size²)
 export const faceValue = (dirKey, x, y, z, size) => {
   const { r, c } = faceRCFor(dirKey, x, y, z, size);
-  // Latin square: value = (row + col) mod size + 1
-  return ((r + c) % size) + 1;
+  // Sudoku numbering: each home cell gets a unique number 1..size² (1-9 on a
+  // 3×3, 1-16 on a 4×4). A face is "solved" when it shows every number once.
+  return r * size + c + 1;
 };
 
 // Cached vectors for getStickerWorldPosFromMesh - avoids GC pressure in hot paths

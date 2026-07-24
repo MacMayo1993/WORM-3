@@ -61,12 +61,12 @@ export function useGameSession() {
     if (demoMode) return;
 
     // Only two victories remain: the Worm secret win (rarest) and the classic
-    // solve. The Sudokube / Ultimate (Latin-square) screens were removed — their
-    // condition lines up incidentally during normal play and broke immersion.
+    // solve. The Sudokube / Ultimate screens were removed — their condition lines
+    // up incidentally during normal play and broke immersion.
     //
     // Compute only what those two conditions need instead of detectWinConditions,
-    // which also runs checkSudokubeSolved (six Latin-square face scans building a
-    // size×size grid each) on every move just to feed the removed screens — pure
+    // which also runs checkSudokubeSolved (six face scans building a size×size
+    // grid each) on every move just to feed the removed screens — pure
     // wasted work in this hot path. checkRubiksWin is shared by both live wins;
     // allStickersFlipped only runs once the cube is already fully solved.
     //

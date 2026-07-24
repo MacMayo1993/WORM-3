@@ -11,8 +11,8 @@ import MergedLedEdges from './MergedLedEdges.jsx';
 import { getMirrorDimensions } from '../game/mirrorBlocks.js';
 import { resolveColors } from '../utils/colorSchemes.js';
 import { PER_CUBELET_VIEW_STYLES, LED_EDGE_MODES, pickCubeletViewStyle, bodyMaterialProps } from './cubeViewStyles.js';
-// Canonical Latin-square value (matches win detection in winDetection.js).
-import { faceValue as latinValue, getManifoldGridId, faceRCFor } from '../game/coordinates.js';
+// Canonical Sudokube number (matches win detection in winDetection.js).
+import { faceValue as sudokuValue, getManifoldGridId, faceRCFor } from '../game/coordinates.js';
 
 // Hollow cube edge beams — 12 beams forming a skeletal cube frame
 const EDGE_H = 0.49; // half of cube size
@@ -235,13 +235,13 @@ const Cubie = React.forwardRef(function Cubie({
       return getManifoldGridId(m, size);
     }
     if (effectiveVisualMode === 'sudokube') {
-      // Show the sticker's IDENTITY value (from its original face + position),
-      // not its current cell. Using the current position made faceValue collapse
-      // to ((r+c)%size)+1 for every cell — a perfect Latin square at all times —
-      // so the numbers never tracked the stickers and the puzzle was unsolvable.
+      // Show the sticker's IDENTITY number (from its original face + position),
+      // not its current cell. Each home cell has a unique number 1..size² (1-9 on
+      // a 3×3), and the number travels with the sticker as it moves — using the
+      // current cell instead would show a fixed 1..size² grid that never changes.
       // This matches the value used by checkSudokubeSolved in win detection.
       if (!m.origPos) return '';
-      return String(latinValue(m.origDir, m.origPos.x, m.origPos.y, m.origPos.z, size));
+      return String(sudokuValue(m.origDir, m.origPos.x, m.origPos.y, m.origPos.z, size));
     }
     return '';
   };
