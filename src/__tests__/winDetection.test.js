@@ -192,6 +192,22 @@ describe('extractFaceGrid', () => {
   });
 });
 
+describe('Sudokube numbering range', () => {
+  // The number shown on each sticker is faceValue(origDir, origPos) — the same
+  // value extractFaceGrid collects — so a solved face must show exactly 1..size²:
+  // 1-4 on a 2×2, 1-9 on a 3×3, 1-16 on a 4×4.
+  for (const size of [2, 3, 4]) {
+    it(`numbers a solved ${size}×${size} face 1..${size * size} on every face`, () => {
+      const cubies = makeCubies(size);
+      const expected = Array.from({ length: size * size }, (_, i) => i + 1);
+      for (const dir of ['PZ', 'NZ', 'PX', 'NX', 'PY', 'NY']) {
+        const numbers = extractFaceGrid(cubies, size, dir).flat().sort((a, b) => a - b);
+        expect(numbers).toEqual(expected);
+      }
+    });
+  }
+});
+
 describe('detectWinConditions', () => {
   it('should detect all conditions for fresh cube', () => {
     const cubies = makeCubies(3);
