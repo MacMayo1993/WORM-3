@@ -25,7 +25,7 @@ export default createLevel({
     { x: 4, y: 2, z: 2, dirKey: 'PX' },
     { x: 2, y: 4, z: 2, dirKey: 'PY' },
   ],
-  chaosLevel: 4,
+  chaosLevel: 0,
   mode: GAME_MODES.ULTIMATE,
   background: BACKGROUNDS.BLACKHOLE,
 
@@ -33,7 +33,7 @@ export default createLevel({
     rotations: true,
     tunnels: true,
     flips: true,
-    chaos: true,
+    chaos: false,
     explode: true,
     parity: true,
     net: true,
@@ -41,7 +41,7 @@ export default createLevel({
 
   tutorial: {
     title: 'The Singularity 🕳️',
-    text: "Maximum chaos. Maximum complexity. You're at the edge of a BLACK HOLE. Everything you've learned leads to this moment. Good luck.",
+    text: "Maximum complexity. You're at the edge of a BLACK HOLE. Everything you've learned leads to this moment. Good luck.",
     objective: 'Use parity and the net to clear three seam pairs and restore all seven layers.',
     tip: 'May the topology be with you.',
     mobiLines: [

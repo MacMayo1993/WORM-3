@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { VICTORY } from '../../utils/constants.js';
 import { UI_FONT, DISPLAY_FONT } from '../../utils/uiTheme.js';
+import { computeStars, getLevelPar } from '../../levels/scoring.js';
 
 /**
  * VictoryScreen — themed to match the demo "STEP COMPLETE" beat: a warm dark
@@ -73,6 +74,14 @@ const VictoryScreen = ({
 
   const levelWinMessage = levelData?.winMessage;
   const isCampaignFinale = Boolean(currentLevel && !hasNextLevel);
+
+  // Golf-style scoring for authored chapters. Stars are computed the same way
+  // ProgressManager records them, so the reward shown here matches what's saved.
+  const isLevelWin = Boolean(currentLevel && levelData);
+  const par = getLevelPar(levelData);
+  const stars = isLevelWin ? computeStars(levelData, { moves, time }) : 0;
+  const underPar = par != null && typeof moves === 'number' && moves <= par;
+  const starVerdict = stars >= 3 ? 'Under par!' : stars === 2 ? 'Nicely done' : 'Cleared';
 
   // Per-win theming — all share the warm STEP COMPLETE look; only the confetti
   // mascot glyph color shifts. Only classic and worm victories remain.
@@ -269,9 +278,31 @@ const VictoryScreen = ({
           </div>
         )}
 
+        {/* Earned stars — the golf reward. Filled for stars earned this run. */}
+        {isLevelWin && (
+          <div style={{ marginBottom: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }} aria-label={`${stars} of 3 stars`}>
+              {[0, 1, 2].map((i) => (
+                <span key={i} style={{
+                  fontSize: '38px', lineHeight: 1,
+                  color: i < stars ? GOLD : 'rgba(255,245,220,0.16)',
+                  textShadow: i < stars ? '0 2px 10px rgba(224,178,92,0.55)' : 'none',
+                  transform: i < stars ? 'translateY(0)' : 'translateY(2px)',
+                }}>★</span>
+              ))}
+            </div>
+            <div style={{
+              marginTop: '7px', fontSize: '11px', fontWeight: 800, letterSpacing: '0.14em',
+              textTransform: 'uppercase', color: underPar ? GREEN_LIGHT : GOLD, fontFamily: UI_FONT,
+            }}>
+              {starVerdict}
+            </div>
+          </div>
+        )}
+
         {isCampaignFinale && (
           <p style={{
-            fontSize: '12px', color: GOLD, margin: '-8px 0 20px', lineHeight: 1.5,
+            fontSize: '12px', color: GOLD, margin: '-4px 0 20px', lineHeight: 1.5,
             fontFamily: UI_FONT, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase',
           }}>
             Every chapter is available to replay for more stars.
@@ -285,14 +316,18 @@ const VictoryScreen = ({
           gap: '12px',
           marginBottom: '26px',
         }}>
-          {[{ label: 'Moves', value: moves }, { label: 'Time', value: formatTime(time) }].map((stat) => (
+          {[
+            { label: 'Moves', value: moves, highlight: underPar },
+            ...(par != null ? [{ label: 'Par', value: par }] : []),
+            { label: 'Time', value: formatTime(time) },
+          ].map((stat) => (
             <div key={stat.label} style={{
               flex: 1,
               maxWidth: '150px',
               padding: '14px 10px',
               background: WARM_PANEL,
               borderRadius: '14px',
-              border: `1px solid ${WARM_BORDER}`
+              border: `1px solid ${stat.highlight ? 'rgba(159,219,122,0.5)' : WARM_BORDER}`
             }}>
               <div style={{
                 fontSize: '10px', textTransform: 'uppercase', color: CREAM_MUTED,
@@ -300,7 +335,7 @@ const VictoryScreen = ({
                 fontFamily: UI_FONT
               }}>{stat.label}</div>
               <div style={{
-                fontSize: '26px', fontWeight: 900, color: INK_CREAM,
+                fontSize: '26px', fontWeight: 900, color: stat.highlight ? GREEN_LIGHT : INK_CREAM,
                 fontFamily: DISPLAY_FONT
               }}>{stat.value}</div>
             </div>

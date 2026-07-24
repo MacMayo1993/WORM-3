@@ -22,7 +22,7 @@ export default createLevel({
     { x: 2, y: 2, z: 3, dirKey: 'PZ' },
     { x: 3, y: 1, z: 2, dirKey: 'PX' },
   ],
-  chaosLevel: 3,
+  chaosLevel: 0,
   mode: GAME_MODES.ULTIMATE,
   background: BACKGROUNDS.ROCKET,
 
@@ -30,7 +30,7 @@ export default createLevel({
     rotations: true,
     tunnels: true,
     flips: true,
-    chaos: true,
+    chaos: false,
     explode: true,
     parity: true,
     net: false,

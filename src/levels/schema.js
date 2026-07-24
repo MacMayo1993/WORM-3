@@ -152,6 +152,13 @@ export function createLevel(overrides) {
     // is enough. null = no setup flips.
     flipSequence: overrides.flipSequence ?? null,
 
+    // Golf-style "par" — the number of player actions in the intended solution:
+    // reverse each authored scramble turn (one move) and undo each authored flip
+    // (one tap). Used for Story-mode star scoring. An explicit override wins;
+    // otherwise it is derived from the authored sequences. null = no par (the
+    // level is graded by the cube-size heuristic instead).
+    par: overrides.par ?? (((overrides.scrambleSequence?.length || 0) + (overrides.flipSequence?.length || 0)) || null),
+
     // Visual settings
     background: overrides.background || BACKGROUNDS.ABSTRACT,
 

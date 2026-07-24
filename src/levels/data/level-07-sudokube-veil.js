@@ -18,7 +18,7 @@ export default createLevel({
     { axis: 'depth', sliceIndex: 3, dir: -1 },
   ],
   flipSequence: [{ x: 2, y: 1, z: 3, dirKey: 'PZ' }],
-  chaosLevel: 2,
+  chaosLevel: 0,
   mode: GAME_MODES.SUDOKUBE,
   background: BACKGROUNDS.NASA,
 
@@ -26,7 +26,7 @@ export default createLevel({
     rotations: true,
     tunnels: true,
     flips: true,
-    chaos: true,
+    chaos: false,
     explode: true,
     parity: true,
     net: false,

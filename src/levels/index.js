@@ -43,6 +43,7 @@
 // Manager instances (use these for most operations)
 export { levelsManager, LevelsManager } from './LevelsManager.js';
 export { progressManager, ProgressManager } from './ProgressManager.js';
+export { computeStars, getLevelPar, parSlack } from './scoring.js';
 
 // ============================================================================
 // SCHEMA & CONSTANTS

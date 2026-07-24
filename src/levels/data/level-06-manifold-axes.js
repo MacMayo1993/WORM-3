@@ -18,7 +18,7 @@ export default createLevel({
     { axis: 'row', sliceIndex: 3, dir: -1 },
   ],
   flipSequence: [{ x: 1, y: 3, z: 2, dirKey: 'PY' }],
-  chaosLevel: 2,
+  chaosLevel: 0,
   mode: GAME_MODES.CLASSIC,
   background: BACKGROUNDS.JOB,
 
@@ -26,7 +26,7 @@ export default createLevel({
     rotations: true,
     tunnels: true,
     flips: true,
-    chaos: true,
+    chaos: false,
     explode: true,
     parity: true,
     net: false,

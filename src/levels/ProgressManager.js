@@ -6,6 +6,7 @@
  */
 
 import { levelsManager } from './LevelsManager.js';
+import { computeStars } from './scoring.js';
 
 // Storage keys
 const STORAGE_KEYS = {
@@ -232,24 +233,7 @@ class ProgressManager {
    * @private
    */
   _calculateStars(levelId, stats) {
-    const level = levelsManager.getLevel(levelId);
-    if (!level) return 1;
-
-    let stars = 1; // Base star for completion
-
-    // Time-based star (if time limit exists or based on cube size)
-    const timeThreshold = level.timeLimit || (level.cubeSize * level.cubeSize * 30);
-    if (stats.time && stats.time < timeThreshold) {
-      stars++;
-    }
-
-    // Move-based star (based on cube size)
-    const moveThreshold = level.moveLimit || (level.cubeSize * level.cubeSize * 10);
-    if (stats.moves && stats.moves < moveThreshold) {
-      stars++;
-    }
-
-    return Math.min(stars, 3);
+    return computeStars(levelsManager.getLevel(levelId), stats);
   }
 
   /**
