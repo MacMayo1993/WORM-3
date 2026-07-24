@@ -5,7 +5,7 @@ import {
   checkRubiksSolvedRotationInvariant,
   checkRubiksWin,
   colorClass,
-  checkFaceLatinSquare,
+  checkFaceComplete,
   checkWormVictory,
   detectWinConditions,
   extractFaceGrid,
@@ -87,55 +87,46 @@ describe('checkRubiksWin (rotation-invariant for centreless cubes)', () => {
   });
 });
 
-describe('checkFaceLatinSquare', () => {
-  it('should return true for a valid 3x3 Latin square', () => {
+describe('checkFaceComplete', () => {
+  it('should return true when a 3x3 face shows every number 1-9 once', () => {
     const grid = [
       [1, 2, 3],
-      [2, 3, 1],
-      [3, 1, 2],
+      [4, 5, 6],
+      [7, 8, 9],
     ];
-    expect(checkFaceLatinSquare(grid, 3)).toBe(true);
+    expect(checkFaceComplete(grid, 3)).toBe(true);
   });
 
-  it('should return false for a grid with duplicate in row', () => {
+  it('should accept any ordering, not just sorted', () => {
     const grid = [
-      [1, 1, 3],
-      [2, 3, 1],
-      [3, 1, 2],
+      [9, 4, 7],
+      [2, 6, 1],
+      [8, 3, 5],
     ];
-    expect(checkFaceLatinSquare(grid, 3)).toBe(false);
+    expect(checkFaceComplete(grid, 3)).toBe(true);
   });
 
-  it('should return false for a grid with duplicate in column', () => {
+  it('should return false when a number repeats (and one is missing)', () => {
     const grid = [
       [1, 2, 3],
-      [1, 3, 2],
-      [3, 1, 2],
+      [4, 5, 6],
+      [7, 8, 1], // 1 twice, no 9
     ];
-    expect(checkFaceLatinSquare(grid, 3)).toBe(false);
+    expect(checkFaceComplete(grid, 3)).toBe(false);
   });
 
-  it('should return false for a grid with out-of-range values', () => {
+  it('should return false for out-of-range values', () => {
     const grid = [
-      [1, 2, 4], // 4 is out of range for 3x3
-      [2, 3, 1],
-      [3, 1, 2],
+      [1, 2, 3],
+      [4, 5, 6],
+      [7, 8, 10], // 10 is out of range for a 3x3 (1-9)
     ];
-    expect(checkFaceLatinSquare(grid, 3)).toBe(false);
+    expect(checkFaceComplete(grid, 3)).toBe(false);
   });
 
-  it('should work for 2x2 Latin square', () => {
-    const valid = [
-      [1, 2],
-      [2, 1],
-    ];
-    expect(checkFaceLatinSquare(valid, 2)).toBe(true);
-
-    const invalid = [
-      [1, 1],
-      [2, 2],
-    ];
-    expect(checkFaceLatinSquare(invalid, 2)).toBe(false);
+  it('should work for a 2x2 face (numbers 1-4)', () => {
+    expect(checkFaceComplete([[1, 2], [3, 4]], 2)).toBe(true);
+    expect(checkFaceComplete([[1, 1], [2, 2]], 2)).toBe(false);
   });
 });
 
@@ -173,28 +164,29 @@ describe('checkWormVictory', () => {
 
 describe('extractFaceGrid', () => {
   it('uses sticker identity (origDir/origPos) not current grid position', () => {
-    // A freshly made cube is solved — each sticker's origDir matches the face it sits on,
-    // and origPos matches current position, so values should form a valid Latin square.
+    // A freshly made cube is solved — each sticker sits on its home cell, so the
+    // face shows numbers 1-9 exactly once.
     const cubies = makeCubies(3);
     const grid = extractFaceGrid(cubies, 3, 'PZ');
-    expect(checkFaceLatinSquare(grid, 3)).toBe(true);
+    expect(grid).toEqual([[1, 2, 3], [4, 5, 6], [7, 8, 9]]);
+    expect(checkFaceComplete(grid, 3)).toBe(true);
   });
 
-  it('returns an invalid Latin square after scrambling (proves values track sticker identity)', () => {
-    // If extractFaceGrid mistakenly used positional faceValue(faceDir, x, y, z),
-    // it would always produce a valid Latin square regardless of cube state.
-    // After scrambling, sticker identities are mixed up — the grid must fail.
+  it('returns an incomplete face after scrambling (proves values track sticker identity)', () => {
+    // If extractFaceGrid mistakenly used the current position, the face would
+    // always show 1-9 regardless of cube state. After scrambling, sticker
+    // identities are mixed up — the front face must drop a number.
     let cubies = makeCubies(3);
     cubies = rotateSliceCubies(cubies, 3, 'row', 0, 1);
     const grid = extractFaceGrid(cubies, 3, 'PZ');
-    expect(checkFaceLatinSquare(grid, 3)).toBe(false);
+    expect(checkFaceComplete(grid, 3)).toBe(false);
   });
 
   it('is consistent with checkSudokubeSolved on a solved cube', () => {
     const cubies = makeCubies(3);
     for (const dir of ['PZ', 'NZ', 'PX', 'NX', 'PY', 'NY']) {
       const grid = extractFaceGrid(cubies, 3, dir);
-      expect(checkFaceLatinSquare(grid, 3)).toBe(true);
+      expect(checkFaceComplete(grid, 3)).toBe(true);
     }
     expect(checkSudokubeSolved(cubies, 3)).toBe(true);
   });

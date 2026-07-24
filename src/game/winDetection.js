@@ -75,35 +75,28 @@ export const checkRubiksSolvedRotationInvariant = (cubies, size, { antipodal = f
 export const checkRubiksWin = (cubies, size, opts) =>
   size % 2 === 0 ? checkRubiksSolvedRotationInvariant(cubies, size, opts) : checkRubiksSolved(cubies, size, opts);
 
-// Check if a single face is a valid Latin square (Sudokube condition)
-export const checkFaceLatinSquare = (faceGrid, size) => {
-  // Check rows
+// Sudokube condition for a single face: it shows every number 1..size² exactly
+// once (1-9 on a 3×3, 1-16 on a 4×4). With one distinct number per home cell,
+// a completed face is a full set of the numbers rather than a Latin square.
+export const checkFaceComplete = (faceGrid, size) => {
+  const target = size * size;
+  const seen = new Set();
   for (let r = 0; r < size; r++) {
-    const seen = new Set();
     for (let c = 0; c < size; c++) {
       const val = faceGrid[r][c];
-      if (val < 1 || val > size || seen.has(val)) return false;
+      if (val < 1 || val > target || seen.has(val)) return false;
       seen.add(val);
     }
   }
-  // Check columns
-  for (let c = 0; c < size; c++) {
-    const seen = new Set();
-    for (let r = 0; r < size; r++) {
-      const val = faceGrid[r][c];
-      if (val < 1 || val > size || seen.has(val)) return false;
-      seen.add(val);
-    }
-  }
-  return true;
+  return seen.size === target;
 };
 
 // Extract face grid for Sudokube checking.
 // Each cell value is the sticker's ORIGINAL identity (origDir + origPos), NOT a
-// function of its current grid position.  Using faceValue(faceDir, x, y, z) for
-// the current position would always produce a valid Latin square by construction
-// (faceValue is ((r+c) % size) + 1 which is inherently a Latin square pattern),
-// making the check trivially pass regardless of cube state.
+// function of its current grid position. Using the current position would give
+// every cell its own home number by construction, so the check would trivially
+// pass regardless of cube state — the identity value is what actually moves with
+// the sticker as it travels the cube.
 export const extractFaceGrid = (cubies, size, faceDir) => {
   const grid = Array.from({ length: size }, () => Array(size).fill(0));
 
@@ -134,11 +127,11 @@ export const extractFaceGrid = (cubies, size, faceDir) => {
   return grid;
 };
 
-// Check if Sudokube is solved (all faces are valid Latin squares based on current positions)
+// Check if Sudokube is solved (every face shows each number 1..size² exactly once)
 export const checkSudokubeSolved = (cubies, size) => {
   const FACE_DIRS = ['PZ', 'NZ', 'PX', 'NX', 'PY', 'NY'];
   for (const faceDir of FACE_DIRS) {
-    if (!checkFaceLatinSquare(extractFaceGrid(cubies, size, faceDir), size)) return false;
+    if (!checkFaceComplete(extractFaceGrid(cubies, size, faceDir), size)) return false;
   }
   return true;
 };

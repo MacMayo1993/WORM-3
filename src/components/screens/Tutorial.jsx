@@ -101,7 +101,7 @@ const Tutorial = ({ onClose, onMainMenu }) => {
           <ul style={{ margin: '8px 0', paddingLeft: '20px', fontSize: '14px', lineHeight: '1.8' }}>
             <li><b>Classic:</b> Standard face colors—the familiar Rubik's Cube look</li>
             <li><b>Grid:</b> Manifold IDs overlaid on each sticker (M1-001 format)</li>
-            <li><b>Sudokube:</b> Latin square numbers (1–3 for 3×3) on each face</li>
+            <li><b>Sudokube:</b> Numbers on each face (1–9 for 3×3, 1–16 for 4×4)</li>
             <li><b>Colors:</b> Custom color palette from your settings applied to the cube</li>
           </ul>
           <p><b>Explode (X):</b> Spread the cubies apart to see all wormhole tunnel connections clearly.</p>
@@ -161,7 +161,7 @@ const Tutorial = ({ onClose, onMainMenu }) => {
           <p>Four ways to win—mix and match for the ultimate challenge:</p>
           <ul style={{ margin: '8px 0', paddingLeft: '20px', fontSize: '14px', lineHeight: '1.8' }}>
             <li><b>Classic:</b> All six faces show a single uniform color</li>
-            <li><b>Sudokube:</b> Valid Latin squares on all faces — no repeated numbers in any row or column</li>
+            <li><b>Sudokube:</b> Every face shows all its numbers once — 1–9 on a 3×3, no repeats</li>
             <li><b>Ultimate:</b> Classic AND Sudokube simultaneously — the hardest challenge</li>
             <li><b>WORM³:</b> Solve the cube after every sticker has traveled through a wormhole at least once</li>
           </ul>

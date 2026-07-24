@@ -14,7 +14,7 @@
  */
 export const GAME_MODES = {
   CLASSIC: 'classic',      // Match all face colors
-  SUDOKUBE: 'sudokube',    // Latin squares on each face
+  SUDOKUBE: 'sudokube',    // Every number 1..size² once per face
   ULTIMATE: 'ultimate',    // Both color + sudoku constraints
 };
 
