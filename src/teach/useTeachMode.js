@@ -70,8 +70,11 @@ export function useTeachMode() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [layerHighlight, setLayerHighlight] = useState(null);
 
-  // Sub-mode: 'guided' | 'demo' | 'quiz'
+  // Sub-mode: 'guided' | 'demo' | 'quiz' | 'notation'
   const [subMode, setSubMode] = useState('guided');
+
+  // Notation tab: the token currently being demonstrated on the cube
+  const [notationToken, setNotationToken] = useState(null);
 
   // Quiz state
   const [quizOptions, setQuizOptions] = useState([]);
@@ -131,6 +134,7 @@ export function useTeachMode() {
     setWhyOpen(false);
     setQuizAnswered(null);
     setQuizHintShown(false);
+    setNotationToken(null);
     setQuizOptions(buildQuizOptions(result.stageIndex, BEGINNER_METHOD_3x3.stages));
   }, [cubies, size, setSolveHighlights]);
 
@@ -147,6 +151,7 @@ export function useTeachMode() {
     setWhyOpen(false);
     setQuizAnswered(null);
     setQuizHintShown(false);
+    setNotationToken(null);
   }, [setSolveHighlights]);
 
   // ---------------------------------------------------------------------------
@@ -159,6 +164,16 @@ export function useTeachMode() {
     setQuizAnswered(null);
     setQuizHintShown(false);
     setWhyOpen(false);
+
+    // The notation lesson drives the highlight itself, one token at a time —
+    // leaving an algorithm's highlight up would point at the wrong layer.
+    if (mode !== 'notation') setNotationToken(null);
+    else {
+      setSelectedAlgo(null);
+      setAlgoMoves([]);
+      setCurrentStep(0);
+      setLayerHighlight(null);
+    }
 
     if (mode === 'quiz' && analysis) {
       setQuizOptions(buildQuizOptions(analysis.stageIndex, BEGINNER_METHOD_3x3.stages));
@@ -208,8 +223,11 @@ export function useTeachMode() {
     if (animState) return;
 
     const move = algoMoves[currentStep];
-    setAnimState({ axis: move.axis, dir: move.dir, sliceIndex: move.sliceIndex, t: 0 });
-    setPendingMove({ axis: move.axis, dir: move.dir, sliceIndex: move.sliceIndex });
+    // numTurns carries half turns (F2, U2): one token in the algorithm, two
+    // quarter turns on the cube. Without it the demo teaches the wrong move.
+    const numTurns = move.numTurns ?? 1;
+    setAnimState({ axis: move.axis, dir: move.dir, sliceIndex: move.sliceIndex, t: 0, numTurns });
+    setPendingMove({ axis: move.axis, dir: move.dir, sliceIndex: move.sliceIndex, numTurns });
     pendingNextRef.current = true;
 
     const nextStep = currentStep + 1;
@@ -255,6 +273,30 @@ export function useTeachMode() {
       setLayerHighlight({ axis: algoMoves[0].axis, sliceIndex: algoMoves[0].sliceIndex, dir: algoMoves[0].dir });
     }
   }, [algoMoves]);
+
+  // ---------------------------------------------------------------------------
+  // Notation lesson actions
+  // ---------------------------------------------------------------------------
+  // Point the in-world gold guidance at the layer a token names, without
+  // turning anything — the player reads the letter and sees the layer light up.
+  const previewNotation = useCallback((token) => {
+    const [move] = parseAlgorithm(token, 3);
+    if (!move) return;
+    setNotationToken(token);
+    setLayerHighlight({ axis: move.axis, sliceIndex: move.sliceIndex, dir: move.dir });
+  }, []);
+
+  // Perform the token's turn so the letter, the highlighted layer and the
+  // motion all land together.
+  const playNotation = useCallback((token) => {
+    const [move] = parseAlgorithm(token, 3);
+    if (!move || animState) return;
+    const numTurns = move.numTurns ?? 1;
+    setNotationToken(token);
+    setLayerHighlight({ axis: move.axis, sliceIndex: move.sliceIndex, dir: move.dir });
+    setAnimState({ axis: move.axis, dir: move.dir, sliceIndex: move.sliceIndex, t: 0, numTurns });
+    setPendingMove({ axis: move.axis, dir: move.dir, sliceIndex: move.sliceIndex, numTurns });
+  }, [animState, setAnimState, setPendingMove]);
 
   // ---------------------------------------------------------------------------
   // Quiz actions
@@ -308,6 +350,11 @@ export function useTeachMode() {
     // Sub-mode
     subMode,
     switchSubMode,
+
+    // Notation lesson
+    notationToken,
+    previewNotation,
+    playNotation,
 
     // Why card
     whyOpen,
