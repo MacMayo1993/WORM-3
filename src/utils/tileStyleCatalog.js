@@ -22,8 +22,17 @@ export const LIVING_STYLE_KEYS = [
   'quantumScanlines', 'emberstorm', 'fractalPulse', 'bioLattice', 'stellarLensing',
 ];
 
+// Tiles drawn in geometries that are not the flat plane — hyperbolic, elliptic,
+// inversive, Minkowski, and the Thurston geometries. See nonEuclideanShaders.js.
+export const NON_EUCLIDEAN_STYLE_KEYS = [
+  'poincareDisk', 'hyperbolicWeave', 'apollonian', 'circleInversion',
+  'rp2Geodesics', 'solFlow', 'nilTwist', 'lightCone',
+  'metricBalls', 'gyroidSlice', 'hopfFibers', 'drosteSpiral',
+];
+
 export const TILE_STYLE_SECTIONS = [
   { key: 'classic', label: 'Classic', keys: CLASSIC_STYLE_KEYS },
   { key: 'antipodal', label: 'Antipodal Op Art', keys: ANTIPODAL_STYLE_KEYS },
   { key: 'living', label: 'Living', keys: LIVING_STYLE_KEYS },
+  { key: 'nonEuclidean', label: 'Non-Euclidean', keys: NON_EUCLIDEAN_STYLE_KEYS },
 ];

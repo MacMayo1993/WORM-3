@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { COLOR_SCHEMES, TILE_STYLES, SCHEME_LABELS } from '../../utils/colorSchemes.js';
-import { CLASSIC_STYLE_KEYS, ANTIPODAL_STYLE_KEYS, LIVING_STYLE_KEYS } from '../../utils/tileStyleCatalog.js';
+import { CLASSIC_STYLE_KEYS, ANTIPODAL_STYLE_KEYS, LIVING_STYLE_KEYS, NON_EUCLIDEAN_STYLE_KEYS } from '../../utils/tileStyleCatalog.js';
 import { BACKGROUNDS, getBackgroundUrl } from '../../utils/backgrounds.js';
 import { registerTilePreview, updateTilePreview, unregisterTilePreview } from '../../3d/TilePreviewRenderer.js';
 import { isMobile } from '../../utils/device.js';
@@ -404,6 +404,7 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
         <StyleGrid keys={CLASSIC_STYLE_KEYS} label="Classic" />
         <StyleGrid keys={ANTIPODAL_STYLE_KEYS} label="Antipodal Op Art" />
         <StyleGrid keys={LIVING_STYLE_KEYS} label="Living" />
+        <StyleGrid keys={NON_EUCLIDEAN_STYLE_KEYS} label="Non-Euclidean" />
 
         <div style={{ marginBottom: '8px' }}>
           <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: PAPER_TEXT_FAINT, marginBottom: '10px' }}>Per Face</div>
@@ -413,6 +414,7 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
               const ownedClassic = CLASSIC_STYLE_KEYS.filter(tileOwned);
               const ownedAntipodal = ANTIPODAL_STYLE_KEYS.filter(tileOwned);
               const ownedLiving = LIVING_STYLE_KEYS.filter(tileOwned);
+              const ownedNonEuclidean = NON_EUCLIDEAN_STYLE_KEYS.filter(tileOwned);
               return [1, 2, 3, 4, 5, 6].map(faceId => {
               const globalFallback = settings.tileStyle === 'random' ? 'solid' : (settings.tileStyle || 'solid');
               const rawStyle = perFace?.[faceId] || globalFallback;
@@ -429,6 +431,7 @@ const DisparitySetupWizard = ({ onStart, onCancel }) => {
                     <optgroup label="Classic">{ownedClassic.map(k => <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>)}</optgroup>
                     <optgroup label="Antipodal Op Art">{ownedAntipodal.map(k => <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>)}</optgroup>
                     <optgroup label="Living">{ownedLiving.map(k => <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>)}</optgroup>
+                    <optgroup label="Non-Euclidean">{ownedNonEuclidean.map(k => <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>)}</optgroup>
                   </select>
                 </div>
               );
