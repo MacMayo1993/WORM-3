@@ -40,6 +40,35 @@ export const BACKGROUNDS = [
 // list so procedural Black Hole/Nebula scenes are never selected there.
 export const MENU_BACKGROUNDS = BACKGROUNDS.filter((background) => Boolean(background.file));
 
+/**
+ * Which shipped environment each Story chapter plays against.
+ *
+ * The chapters used to render hand-built low-poly scenes (LifeJourneyBackgrounds)
+ * and — because GameScene only mounted a lighting environment for levels with NO
+ * background set — they also got no image-based lighting at all. So the story
+ * cube was both in front of weaker scenery and lit worse than every other mode,
+ * whose panoramas supply the reflections that make the tile materials read.
+ *
+ * Chapter identity stays semantic in the level data ('daycare', 'nasa', …);
+ * this table is the presentation layer, so re-casting a chapter is a one-line
+ * change here rather than an edit to the level definition.
+ *
+ * Chapters mapped to null keep a bespoke procedural scene (black hole, nebula) —
+ * those are real shader work, not placeholder geometry.
+ */
+export const STORY_ENVIRONMENTS = {
+    daycare:      'umbrella.exr',    // a canopy of primary-coloured umbrellas — a child's world, in cube colours
+    elementary:   'cobblestone.exr', // the walk to school, warm old-town stone
+    middleschool: 'forest.exr',      // old enough to wander off the path
+    highschool:   'stadium.exr',     // bright, open, everyone watching
+    college:      'paris.exr',       // the city you move to, and grow up in
+    job:          'shanghai.exr',    // towers, glass, adult scale
+    nasa:         'lounge.exr',      // the biggest engineered interior we ship
+    rocket:       'desert.exr',      // Milky Way over an empty launch plain
+    moon:         null,              // NebulaEnvironment
+    blackhole:    null,              // BlackHoleEnvironment
+};
+
 export const getBackgroundUrl = (filename) => {
     if (!filename) return null;
     // Use Vite's BASE_URL to construct the correct path

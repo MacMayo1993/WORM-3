@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { LEVELS, isLevelUnlocked, loadProgress, progressManager } from '../../utils/levels.js';
 import {
   UI_FONT, PAPER_SHEET_RAISED, PAPER_BORDER, PAPER_BORDER_SOFT, PAPER_TEXT,
-  PAPER_TEXT_MUTED, PAPER_TEXT_FAINT, PAPER_BG_MUTED, PAPER_CARD_SHADOW,
+  PAPER_TEXT_MUTED, PAPER_TEXT_FAINT, PAPER_BG_MUTED, PAPER_CARD_SHADOW, UI_MOSS,
 } from '../../utils/uiTheme.js';
 import { wizardPaperBackground } from './WizardChrome.jsx';
 
@@ -65,6 +65,12 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
     setCompletedLevels(loadProgress());
     setLevelStats(progressManager.loadLevelStats());
   }, []);
+
+  // The chapter the player is up to — first unlocked one they have not beaten.
+  // Computed once rather than per card so the grid stays O(n).
+  const nextChapterId = LEVELS.find(
+    (l) => isLevelUnlocked(l.id, completedLevels) && !completedLevels.includes(l.id)
+  )?.id ?? null;
 
   const totalStars = LEVELS.length * STARS_PER_LEVEL;
   const earnedStars = Object.values(levelStats).reduce((sum, stats) => sum + Math.min(stats.stars || 0, STARS_PER_LEVEL), 0);
@@ -135,9 +141,11 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
         }}>
           {LEVELS.map((level) => {
             const unlocked = isLevelUnlocked(level.id, completedLevels);
+            const beaten = completedLevels.includes(level.id);
             const stat = levelStats[level.id];
             const stars = stat?.stars || 0;
             const isHover = hovered === level.id && unlocked;
+            const isNext = level.id === nextChapterId;
 
             return (
               <button
@@ -146,7 +154,7 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
                 onMouseEnter={() => setHovered(level.id)}
                 onMouseLeave={() => setHovered(null)}
                 disabled={!unlocked}
-                aria-label={`${unlocked ? 'Play' : 'Locked'} level ${level.id}: ${level.name}`}
+                aria-label={`${unlocked ? (beaten ? 'Replay completed' : 'Play') : 'Locked'} level ${level.id}: ${level.name}`}
                 style={{
                   position: 'relative',
                   minHeight: '132px',
@@ -157,7 +165,7 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
                   padding: 0,
                   borderRadius: '14px',
                   cursor: unlocked ? 'pointer' : 'not-allowed',
-                  border: `1.5px solid ${unlocked ? PAPER_BORDER_SOFT : PAPER_BORDER}`,
+                  border: `1.5px solid ${isNext ? UI_MOSS : unlocked ? PAPER_BORDER_SOFT : PAPER_BORDER}`,
                   background: unlocked ? PAPER_SHEET_RAISED : PAPER_BG_MUTED,
                   // Chunky bottom edge for a physical "tile" feel; locked chapters
                   // sit flush and pressed-in instead of raised.
@@ -170,6 +178,28 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
               >
                 {unlocked ? (
                   <>
+                    {/* Completion was previously readable only by counting filled
+                        stars — and a 1-star clear looks much like an unplayed
+                        chapter at a glance. The badge states it outright. */}
+                    {beaten && (
+                      <span
+                        aria-hidden
+                        style={{
+                          position: 'absolute', top: '8px', right: '8px',
+                          width: '20px', height: '20px', borderRadius: '50%',
+                          background: UI_MOSS, color: '#fffdf5',
+                          fontSize: '12px', fontWeight: 900, lineHeight: '20px',
+                          textAlign: 'center',
+                        }}
+                      >✓</span>
+                    )}
+                    {isNext && (
+                      <span style={{
+                        position: 'absolute', top: '8px', left: '8px',
+                        fontSize: '8px', fontWeight: 900, letterSpacing: '0.14em',
+                        textTransform: 'uppercase', color: UI_MOSS,
+                      }}>Next</span>
+                    )}
                     <span style={{
                       fontSize: '26px',
                       fontWeight: 800,
