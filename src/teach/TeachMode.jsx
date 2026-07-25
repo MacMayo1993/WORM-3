@@ -1,9 +1,11 @@
 // src/teach/TeachMode.jsx
 // Teach Mode UI — Instructor panel with sub-modes: Guided, Demo, Quiz
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { UI_FONT, MONO_FONT, UI_MOSS, UI_MOSS_LIGHT } from '../utils/uiTheme.js';
 import { fieldGuide } from '../components/ui/FieldGuide.jsx';
+import { isMobile } from '../utils/device.js';
+import { FACE_TOKENS, MODIFIER_TOKENS, SLICE_TOKENS, EXAMPLE_SEQUENCE, NOTATION_LESSON, describeToken } from './notation.js';
 
 // ─── Module-level style constants (never reallocated) ─────────────────────────
 const TABS_CONTAINER_STYLE = {
@@ -52,11 +54,13 @@ const WHYCARD_CONTENT_STYLE = { padding: '2px 10px 10px' };
 
 const TM_PANEL_STYLE = {
   position: 'fixed',
-  top: 0,
+  // On a phone the game's top bar sits above everything, so start below it —
+  // otherwise the panel's own header (and its collapse control) is buried.
+  top: isMobile ? 'calc(48px + env(safe-area-inset-top, 0px))' : 0,
+  bottom: 0,
   left: 0,
   width: '340px',
   maxWidth: 'calc(100vw - 20px)',
-  height: '100%',
   maxHeight: '100dvh',
   background: 'rgba(250,247,238,0.97)',
   boxShadow: '0 14px 34px rgba(40,48,32,0.22)',
@@ -68,6 +72,53 @@ const TM_PANEL_STYLE = {
   color: fieldGuide.ink,
   overflowY: 'auto',
   WebkitOverflowScrolling: 'touch',
+};
+
+// Compact practice card (mobile). The full sheet covers a phone screen edge to
+// edge, which hides the very thing being taught — the cube and its gold layer
+// guidance. Once an algorithm or a notation token is in play the panel drops to
+// this card, pinned above the nav bar, and the cube is visible again.
+const TM_CARD_STYLE = {
+  position: 'fixed',
+  left: 12,
+  right: 12,
+  bottom: 'calc(72px + env(safe-area-inset-bottom, 0px))',
+  maxHeight: '46dvh',
+  background: 'rgba(250,247,238,0.97)',
+  boxShadow: '0 14px 34px rgba(40,48,32,0.22)',
+  border: '1px solid rgba(111,126,86,0.25)',
+  borderRadius: '18px',
+  zIndex: 600,
+  display: 'flex',
+  flexDirection: 'column',
+  fontFamily: UI_FONT,
+  color: fieldGuide.ink,
+  overflowY: 'auto',
+  WebkitOverflowScrolling: 'touch',
+};
+
+const TM_CARD_HEADER_STYLE = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '8px',
+  padding: '10px 12px 6px',
+};
+
+const TM_CARD_BODY_STYLE = { padding: '0 12px 12px' };
+
+const TM_CHEVRON_BTN_STYLE = {
+  background: 'rgba(38,51,31,0.08)',
+  border: '1px solid rgba(111,126,86,0.25)',
+  borderRadius: '999px',
+  padding: '4px 10px',
+  color: fieldGuide.ink,
+  fontFamily: UI_FONT,
+  fontSize: '11px',
+  fontWeight: 'bold',
+  cursor: 'pointer',
+  touchAction: 'manipulation',
+  WebkitTapHighlightColor: 'transparent',
+  flexShrink: 0,
 };
 
 const TM_HEADER_STYLE = {
@@ -142,9 +193,10 @@ const TM_ALGO_LIST_LABEL_STYLE = { fontSize: '10px', color: 'rgba(38,51,31,0.54)
 // ---------------------------------------------------------------------------
 const SubModeTabs = ({ subMode, onSwitch }) => {
   const tabs = [
-    { id: 'guided', label: 'Guided', icon: '▶', desc: 'Follow along' },
-    { id: 'demo',   label: 'Demo',   icon: '⏩', desc: 'Watch & learn' },
-    { id: 'quiz',   label: 'Quiz',   icon: '?',  desc: 'Test yourself' },
+    { id: 'guided',   label: 'Guided',   icon: '▶',  desc: 'Follow along' },
+    { id: 'demo',     label: 'Demo',     icon: '⏩', desc: 'Watch & learn' },
+    { id: 'notation', label: 'Notation', icon: 'ƒ',  desc: 'Read the letters' },
+    { id: 'quiz',     label: 'Quiz',     icon: '?',  desc: 'Test yourself' },
   ];
 
   return (
@@ -379,6 +431,132 @@ const QuizPanel = ({
 };
 
 // ---------------------------------------------------------------------------
+// Notation lesson
+// ---------------------------------------------------------------------------
+// Every token is live: tapping one lights the layer it names with the same gold
+// guidance the solver uses, and ↻ turns it. The letter, the layer and the
+// motion are taught as one thing rather than as a table to memorise.
+const NOTATION_PROSE_STYLE = { fontSize: '11px', color: 'rgba(38,51,31,0.72)', lineHeight: '1.55' };
+const NOTATION_GROUP_LABEL_STYLE = {
+  fontSize: '10px', color: UI_MOSS, fontWeight: 'bold',
+  letterSpacing: '0.06em', margin: '14px 0 6px',
+};
+
+const TokenRow = ({ token, title, hint, selected, onPreview, onPlay }) => (
+  <div
+    onClick={() => onPreview(token)}
+    style={{
+      display: 'flex', alignItems: 'center', gap: '10px',
+      padding: '7px 8px', marginBottom: '4px',
+      borderRadius: '7px',
+      border: `1px solid ${selected ? 'rgba(95,127,74,0.50)' : 'rgba(38,51,31,0.12)'}`,
+      background: selected ? 'rgba(95,127,74,0.12)' : 'rgba(255,255,255,0.52)',
+      cursor: 'pointer',
+      transition: 'all 0.15s',
+      touchAction: 'manipulation',
+    }}
+  >
+    <span style={{
+      minWidth: '34px', textAlign: 'center',
+      padding: '4px 0', borderRadius: '5px',
+      fontFamily: MONO_FONT, fontSize: '15px', fontWeight: 'bold',
+      color: fieldGuide.goldInk,
+      background: 'rgba(38,51,31,0.06)',
+      border: '1px solid rgba(123,111,69,0.22)',
+    }}>
+      {token}
+    </span>
+    <span style={{ flex: 1, minWidth: 0 }}>
+      <span style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: fieldGuide.ink }}>{title}</span>
+      <span style={{ display: 'block', fontSize: '10px', color: 'rgba(38,51,31,0.60)', lineHeight: '1.35' }}>{hint}</span>
+    </span>
+    <button
+      onClick={(e) => { e.stopPropagation(); onPlay(token); }}
+      title={`Turn ${token}`}
+      style={{
+        padding: '6px 10px', borderRadius: '999px',
+        border: '1px solid rgba(95,127,74,0.40)',
+        background: 'rgba(95,127,74,0.15)',
+        color: UI_MOSS,
+        fontFamily: UI_FONT, fontSize: '11px', fontWeight: 'bold',
+        cursor: 'pointer', flexShrink: 0,
+        touchAction: 'manipulation',
+        WebkitTapHighlightColor: 'transparent',
+      }}
+    >
+      ↻ Turn
+    </button>
+  </div>
+);
+
+const NotationPanel = ({ notationToken, onPreview, onPlay }) => {
+  const groups = [
+    { label: 'THE SIX FACES', items: FACE_TOKENS.map((f) => ({ token: f.token, title: f.face, hint: f.hint })) },
+    { label: 'MARKS AFTER THE LETTER', items: MODIFIER_TOKENS.map((m) => ({ token: m.token, title: m.name, hint: m.hint })) },
+    { label: 'MIDDLE SLICES', items: SLICE_TOKENS.map((s) => ({ token: s.token, title: s.name, hint: s.hint })) },
+  ];
+
+  return (
+    <div style={{ padding: '12px 16px' }}>
+      <div style={TM_ALGO_LIST_LABEL_STYLE}>NOTATION</div>
+      <div style={NOTATION_PROSE_STYLE}>{NOTATION_LESSON.intro}</div>
+      <div style={{ ...NOTATION_PROSE_STYLE, marginTop: '6px', color: 'rgba(38,51,31,0.60)' }}>
+        Tap a letter to light its layer on the cube; tap <span style={{ color: UI_MOSS, fontWeight: 'bold' }}>↻ Turn</span> to watch it move.
+      </div>
+
+      {groups.map((g) => (
+        <div key={g.label}>
+          <div style={NOTATION_GROUP_LABEL_STYLE}>{g.label}</div>
+          {g.items.map((item) => (
+            <TokenRow
+              key={item.token}
+              token={item.token}
+              title={item.title}
+              hint={item.hint}
+              selected={notationToken === item.token}
+              onPreview={onPreview}
+              onPlay={onPlay}
+            />
+          ))}
+        </div>
+      ))}
+
+      <div style={NOTATION_GROUP_LABEL_STYLE}>READING A SEQUENCE</div>
+      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '8px' }}>
+        {EXAMPLE_SEQUENCE.split(' ').map((tok, i) => (
+          <button
+            key={i}
+            onClick={() => onPlay(tok)}
+            style={{
+              padding: '4px 8px', borderRadius: '5px',
+              fontFamily: MONO_FONT, fontSize: '13px', fontWeight: 'bold',
+              border: `1px solid ${notationToken === tok ? 'rgba(95,127,74,0.50)' : 'rgba(255,255,255,0.62)'}`,
+              background: notationToken === tok ? 'rgba(95,127,74,0.20)' : 'rgba(38,51,31,0.07)',
+              color: notationToken === tok ? UI_MOSS : fieldGuide.goldInk,
+              cursor: 'pointer',
+              touchAction: 'manipulation',
+            }}
+          >
+            {tok}
+          </button>
+        ))}
+      </div>
+      <div style={NOTATION_PROSE_STYLE}>{NOTATION_LESSON.reading}</div>
+
+      <div style={NOTATION_GROUP_LABEL_STYLE}>ON THIS CUBE</div>
+      <div style={{
+        padding: '9px 10px', borderRadius: '6px',
+        background: 'rgba(139,92,246,0.08)',
+        border: '1px solid rgba(139,92,246,0.22)',
+        fontSize: '11px', color: 'rgba(38,51,31,0.78)', lineHeight: '1.55',
+      }}>
+        {NOTATION_LESSON.manifold}
+      </div>
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
 // Demo mode info banner
 // ---------------------------------------------------------------------------
 const DemoBanner = () => (
@@ -396,6 +574,163 @@ const DemoBanner = () => (
     Select an algorithm below and press <span style={{ color: fieldGuide.goldInk }}>▶▶</span> to watch it
     execute automatically. Press <span style={{ color: '#ffa500' }}>⏸</span> to pause at any step.
   </div>
+);
+
+// ---------------------------------------------------------------------------
+// Practice block — the move chips, the "next" callout and the transport
+// controls. Shared by the full algorithm card and the compact practice card,
+// so stepping through an algorithm works the same in both.
+// ---------------------------------------------------------------------------
+const PracticeBlock = ({
+  algoMoves,
+  currentStep,
+  isPlaying,
+  canExecute,
+  isAlgoComplete,
+  onExecuteStep,
+  onToggleAutoPlay,
+  onResetAlgorithm,
+  subMode,
+}) => (
+  <>
+    {/* Move sequence visualization */}
+    <div style={{
+      display: 'flex',
+      flexWrap: 'wrap',
+      gap: '4px',
+      marginBottom: '10px',
+    }}>
+      {algoMoves.map((move, i) => (
+        <span
+          key={i}
+          style={{
+            padding: '3px 6px',
+            borderRadius: '4px',
+            fontSize: '12px',
+            fontFamily: MONO_FONT,
+            fontWeight: 'bold',
+            background: i < currentStep
+              ? 'rgba(95,127,74,0.20)'
+              : i === currentStep
+                ? 'rgba(95,127,74,0.30)'
+                : 'rgba(38,51,31,0.07)',
+            color: i < currentStep
+              ? UI_MOSS_LIGHT
+              : i === currentStep
+                ? UI_MOSS
+                : 'rgba(38,51,31,0.42)',
+            border: `1px solid ${
+              i < currentStep
+                ? 'rgba(95,127,74,0.30)'
+                : i === currentStep
+                  ? 'rgba(95,127,74,0.50)'
+                  : 'rgba(255,255,255,0.62)'
+            }`,
+          }}
+        >
+          {move.notation}
+        </span>
+      ))}
+    </div>
+
+    {/* Current move callout */}
+    {!isAlgoComplete && currentStep < algoMoves.length && (
+      <div style={{
+        padding: '6px 8px',
+        borderRadius: '5px',
+        background: 'rgba(95,127,74,0.08)',
+        border: '1px solid rgba(0,217,255,0.2)',
+        marginBottom: '8px',
+        fontSize: '12px',
+        color: UI_MOSS,
+        fontWeight: 'bold',
+        letterSpacing: '0.5px',
+      }}>
+        NEXT: {algoMoves[currentStep].notation}
+      </div>
+    )}
+
+    {/* Progress indicator */}
+    <div style={{
+      fontSize: '10px',
+      color: 'rgba(38,51,31,0.54)',
+      marginBottom: '8px',
+    }}>
+      {isAlgoComplete
+        ? 'Algorithm complete — tap Reset to try again'
+        : `Move ${currentStep + 1} of ${algoMoves.length}`
+      }
+    </div>
+
+    {/* Control buttons */}
+    <div style={{ display: 'flex', gap: '6px' }}>
+      {/* Step button (guided only) */}
+      {subMode === 'guided' && (
+        <button
+          onClick={onExecuteStep}
+          disabled={!canExecute}
+          style={{
+            flex: 1,
+            padding: '8px',
+            borderRadius: '6px',
+            border: '1px solid rgba(95,127,74,0.40)',
+            background: canExecute ? 'rgba(95,127,74,0.20)' : 'rgba(255,255,255,0.56)',
+            color: canExecute ? UI_MOSS : 'rgba(38,51,31,0.24)',
+            fontSize: '12px',
+            fontWeight: 'bold',
+            fontFamily: UI_FONT,
+            cursor: canExecute ? 'pointer' : 'default',
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          STEP ▶
+        </button>
+      )}
+
+      {/* Auto-play button */}
+      <button
+        onClick={onToggleAutoPlay}
+        disabled={isAlgoComplete && !isPlaying}
+        style={{
+          flex: subMode === 'demo' ? 2 : 1,
+          padding: '8px 12px',
+          borderRadius: '6px',
+          border: `1px solid ${isPlaying ? 'rgba(255, 165, 0, 0.5)' : 'rgba(95,127,74,0.40)'}`,
+          background: isPlaying ? 'rgba(255, 165, 0, 0.2)' : 'rgba(95,127,74,0.15)',
+          color: isPlaying ? '#ffa500' : UI_MOSS_LIGHT,
+          fontSize: '12px',
+          fontWeight: 'bold',
+          fontFamily: UI_FONT,
+          cursor: 'pointer',
+          touchAction: 'manipulation',
+          WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        {isPlaying ? '⏸ Pause' : subMode === 'demo' ? '⏩ Auto-play' : '▶▶'}
+      </button>
+
+      {/* Reset button */}
+      <button
+        onClick={onResetAlgorithm}
+        style={{
+          padding: '8px 12px',
+          borderRadius: '6px',
+          border: '1px solid rgba(255, 255, 255, 0.15)',
+          background: 'rgba(38,51,31,0.07)',
+          color: 'rgba(38,51,31,0.68)',
+          fontSize: '12px',
+          fontWeight: 'bold',
+          fontFamily: UI_FONT,
+          cursor: 'pointer',
+          touchAction: 'manipulation',
+          WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        ↺
+      </button>
+    </div>
+  </>
 );
 
 // ---------------------------------------------------------------------------
@@ -461,143 +796,17 @@ const AlgorithmCard = ({
           borderTop: '1px solid rgba(111,126,86,0.25)',
           marginTop: '8px',
         }}>
-          {/* Move sequence visualization */}
-          <div style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '4px',
-            marginBottom: '10px',
-          }}>
-            {algoMoves.map((move, i) => (
-              <span
-                key={i}
-                style={{
-                  padding: '3px 6px',
-                  borderRadius: '4px',
-                  fontSize: '12px',
-                  fontFamily: MONO_FONT,
-                  fontWeight: 'bold',
-                  background: i < currentStep
-                    ? 'rgba(95,127,74,0.20)'
-                    : i === currentStep
-                      ? 'rgba(95,127,74,0.30)'
-                      : 'rgba(38,51,31,0.07)',
-                  color: i < currentStep
-                    ? UI_MOSS_LIGHT
-                    : i === currentStep
-                      ? UI_MOSS
-                      : 'rgba(38,51,31,0.42)',
-                  border: `1px solid ${
-                    i < currentStep
-                      ? 'rgba(95,127,74,0.30)'
-                      : i === currentStep
-                        ? 'rgba(95,127,74,0.50)'
-                        : 'rgba(255,255,255,0.62)'
-                  }`,
-                }}
-              >
-                {move.notation}
-              </span>
-            ))}
-          </div>
-
-          {/* Current move callout */}
-          {!isAlgoComplete && currentStep < algoMoves.length && (
-            <div style={{
-              padding: '6px 8px',
-              borderRadius: '5px',
-              background: 'rgba(95,127,74,0.08)',
-              border: '1px solid rgba(0,217,255,0.2)',
-              marginBottom: '8px',
-              fontSize: '12px',
-              color: UI_MOSS,
-              fontWeight: 'bold',
-              letterSpacing: '0.5px',
-            }}>
-              NEXT: {algoMoves[currentStep].notation}
-            </div>
-          )}
-
-          {/* Progress indicator */}
-          <div style={{
-            fontSize: '10px',
-            color: 'rgba(38,51,31,0.54)',
-            marginBottom: '8px',
-          }}>
-            {isAlgoComplete
-              ? 'Algorithm complete — tap Reset to try again'
-              : `Move ${currentStep + 1} of ${algoMoves.length}`
-            }
-          </div>
-
-          {/* Control buttons */}
-          <div style={{ display: 'flex', gap: '6px' }}>
-            {/* Step button (guided only) */}
-            {subMode === 'guided' && (
-              <button
-                onClick={onExecuteStep}
-                disabled={!canExecute}
-                style={{
-                  flex: 1,
-                  padding: '8px',
-                  borderRadius: '6px',
-                  border: '1px solid rgba(95,127,74,0.40)',
-                  background: canExecute ? 'rgba(95,127,74,0.20)' : 'rgba(255,255,255,0.56)',
-                  color: canExecute ? UI_MOSS : 'rgba(38,51,31,0.24)',
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                  fontFamily: UI_FONT,
-                  cursor: canExecute ? 'pointer' : 'default',
-                  touchAction: 'manipulation',
-                  WebkitTapHighlightColor: 'transparent',
-                }}
-              >
-                STEP ▶
-              </button>
-            )}
-
-            {/* Auto-play button */}
-            <button
-              onClick={onToggleAutoPlay}
-              disabled={isAlgoComplete && !isPlaying}
-              style={{
-                flex: subMode === 'demo' ? 2 : 1,
-                padding: '8px 12px',
-                borderRadius: '6px',
-                border: `1px solid ${isPlaying ? 'rgba(255, 165, 0, 0.5)' : 'rgba(95,127,74,0.40)'}`,
-                background: isPlaying ? 'rgba(255, 165, 0, 0.2)' : 'rgba(95,127,74,0.15)',
-                color: isPlaying ? '#ffa500' : UI_MOSS_LIGHT,
-                fontSize: '12px',
-                fontWeight: 'bold',
-                fontFamily: UI_FONT,
-                cursor: 'pointer',
-                touchAction: 'manipulation',
-                WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              {isPlaying ? '⏸ Pause' : subMode === 'demo' ? '⏩ Auto-play' : '▶▶'}
-            </button>
-
-            {/* Reset button */}
-            <button
-              onClick={onResetAlgorithm}
-              style={{
-                padding: '8px 12px',
-                borderRadius: '6px',
-                border: '1px solid rgba(255, 255, 255, 0.15)',
-                background: 'rgba(38,51,31,0.07)',
-                color: 'rgba(38,51,31,0.68)',
-                fontSize: '12px',
-                fontWeight: 'bold',
-                fontFamily: UI_FONT,
-                cursor: 'pointer',
-                touchAction: 'manipulation',
-                WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              ↺
-            </button>
-          </div>
+          <PracticeBlock
+            algoMoves={algoMoves}
+            currentStep={currentStep}
+            isPlaying={isPlaying}
+            canExecute={canExecute}
+            isAlgoComplete={isAlgoComplete}
+            onExecuteStep={onExecuteStep}
+            onToggleAutoPlay={onToggleAutoPlay}
+            onResetAlgorithm={onResetAlgorithm}
+            subMode={subMode}
+          />
         </div>
       )}
     </div>
@@ -630,14 +839,101 @@ const TeachMode = ({
   onResetAlgorithm,
   onAnswerQuiz,
   onRetryQuiz,
+  notationToken,
+  onPreviewNotation,
+  onPlayNotation,
   onClose,
 }) => {
   const [expandedStage, setExpandedStage] = useState(null);
+  const [collapsed, setCollapsed] = useState(false);
+
+  // Whatever the cube is currently being told to show. When this changes on a
+  // phone, drop to the compact card so the guidance is actually watchable.
+  const guidanceKey = selectedAlgo
+    ? `algo-${selectedAlgo.stageIndex}-${selectedAlgo.algoIndex}`
+    : notationToken ? `tok-${notationToken}` : null;
+
+  useEffect(() => {
+    if (isMobile && guidanceKey) setCollapsed(true);
+  }, [guidanceKey]);
 
   if (!analysis) return null;
 
   const currentStage = stages[analysis.stageIndex] || null;
   const isSolved = analysis.stageId === 'solved';
+  const compact = isMobile && collapsed;
+
+  if (compact) {
+    const tokenInfo = notationToken ? describeToken(notationToken) : null;
+    const practicing = algoMoves.length > 0 && (subMode === 'guided' || subMode === 'demo');
+
+    return (
+      <div style={TM_CARD_STYLE}>
+        <div style={TM_CARD_HEADER_STYLE}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: '10px', letterSpacing: '0.12em', color: 'rgba(38,51,31,0.54)', fontWeight: 'bold' }}>
+              TEACH MODE
+            </div>
+            <div style={{
+              fontSize: '13px', fontWeight: 'bold', color: UI_MOSS,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {tokenInfo ? tokenInfo.title : currentStage?.name ?? 'Cube is solved!'}
+            </div>
+          </div>
+          <button onClick={() => setCollapsed(false)} style={TM_CHEVRON_BTN_STYLE}>▲ Lesson</button>
+          <button onClick={onClose} style={{ ...TM_CHEVRON_BTN_STYLE, padding: '4px 9px' }}>×</button>
+        </div>
+
+        <div style={TM_CARD_BODY_STYLE}>
+          {notationToken ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{
+                minWidth: '46px', textAlign: 'center', padding: '8px 0', borderRadius: '7px',
+                fontFamily: MONO_FONT, fontSize: '20px', fontWeight: 'bold',
+                color: fieldGuide.goldInk,
+                background: 'rgba(38,51,31,0.06)',
+                border: '1px solid rgba(123,111,69,0.22)',
+              }}>
+                {notationToken}
+              </span>
+              <span style={{ flex: 1, fontSize: '11px', color: 'rgba(38,51,31,0.68)', lineHeight: '1.45' }}>
+                {tokenInfo?.hint || 'Watch the gold layer — that is the one this letter turns.'}
+              </span>
+              <button
+                onClick={() => onPlayNotation(notationToken)}
+                style={{
+                  padding: '8px 12px', borderRadius: '999px',
+                  border: '1px solid rgba(95,127,74,0.40)',
+                  background: 'rgba(95,127,74,0.18)',
+                  color: UI_MOSS, fontFamily: UI_FONT, fontSize: '12px', fontWeight: 'bold',
+                  cursor: 'pointer', flexShrink: 0, touchAction: 'manipulation',
+                }}
+              >
+                ↻ Turn
+              </button>
+            </div>
+          ) : practicing ? (
+            <PracticeBlock
+              algoMoves={algoMoves}
+              currentStep={currentStep}
+              isPlaying={isPlaying}
+              canExecute={canExecute}
+              isAlgoComplete={isAlgoComplete}
+              onExecuteStep={onExecuteStep}
+              onToggleAutoPlay={onToggleAutoPlay}
+              onResetAlgorithm={onResetAlgorithm}
+              subMode={subMode}
+            />
+          ) : (
+            <div style={{ fontSize: '11px', color: 'rgba(38,51,31,0.60)', lineHeight: '1.5' }}>
+              Tap <span style={{ fontWeight: 'bold' }}>▲ Lesson</span> for the full guide.
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={TM_PANEL_STYLE}>
@@ -649,9 +945,16 @@ const TeachMode = ({
             {methodName}
           </div>
         </div>
-        <button onClick={onClose} style={TM_CLOSE_BTN_STYLE}>
-          ×
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {isMobile && (
+            <button onClick={() => setCollapsed(true)} style={TM_CHEVRON_BTN_STYLE} title="Shrink the panel to watch the cube">
+              ▼ Watch cube
+            </button>
+          )}
+          <button onClick={onClose} style={TM_CLOSE_BTN_STYLE}>
+            ×
+          </button>
+        </div>
       </div>
 
       {/* Sub-mode tabs */}
@@ -696,8 +999,9 @@ const TeachMode = ({
         )}
       </div>
 
-      {/* Scrollable content */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '0' }}>
+      {/* Scrollable content — the mobile nav bar overlaps the panel's foot, so
+          leave room for it rather than letting the last row hide behind it. */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: 0, paddingBottom: isMobile ? 104 : 0 }}>
 
         {/* ── QUIZ sub-mode ── */}
         {subMode === 'quiz' && currentStage && !isSolved && (
@@ -711,11 +1015,20 @@ const TeachMode = ({
           />
         )}
 
+        {/* ── NOTATION sub-mode ── */}
+        {subMode === 'notation' && (
+          <NotationPanel
+            notationToken={notationToken}
+            onPreview={onPreviewNotation}
+            onPlay={onPlayNotation}
+          />
+        )}
+
         {/* ── DEMO banner ── */}
         {subMode === 'demo' && !isSolved && <DemoBanner />}
 
         {/* ── Current Stage Guidance (guided + demo) ── */}
-        {currentStage && !isSolved && subMode !== 'quiz' && (
+        {currentStage && !isSolved && subMode !== 'quiz' && subMode !== 'notation' && (
           <div style={{
             padding: '12px 16px',
             borderBottom: '1px solid rgba(111,126,86,0.25)',
@@ -748,7 +1061,7 @@ const TeachMode = ({
         )}
 
         {/* ── Algorithm Cards for Current Stage ── */}
-        {currentStage && !isSolved && subMode !== 'quiz' && (
+        {currentStage && !isSolved && subMode !== 'quiz' && subMode !== 'notation' && (
           <div style={{ padding: '12px 16px' }}>
             <div style={TM_ALGO_LIST_LABEL_STYLE}>
               ALGORITHMS FOR THIS STEP

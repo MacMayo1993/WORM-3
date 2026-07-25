@@ -592,6 +592,9 @@ export default function UILayer({
             onResetAlgorithm={teachMode.resetAlgorithm}
             onAnswerQuiz={teachMode.answerQuiz}
             onRetryQuiz={teachMode.retryQuiz}
+            notationToken={teachMode.notationToken}
+            onPreviewNotation={teachMode.previewNotation}
+            onPlayNotation={teachMode.playNotation}
             onClose={teachMode.exitTeachMode}
           />
         </Suspense>
@@ -655,7 +658,11 @@ export default function UILayer({
             else performCursorRotation('ccw');
           }}
           onUndo={undo} canUndo={canUndo} undoCount={moveHistory.length}
-          showUndo={!demoDialogueVisible}
+          showUndo={
+            // Teach mode's compact practice card occupies the same corner as the undo
+            // pill, and carries its own ↺ — keep a single control in that spot.
+            !demoDialogueVisible && !teachMode.active
+          }
           teachModeActive={teachMode.active}
           onToggleTeachMode={() => { if (teachMode.active) teachMode.exitTeachMode(); else teachMode.enterTeachMode(); }}
           cubeSize={size}
