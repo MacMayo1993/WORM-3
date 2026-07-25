@@ -14,38 +14,63 @@ import {
 
 const ACCENT = '#1565C0';
 
+// Every mode below is built and playable — this screen is the only place the
+// player can reach them. `soon: true` marks a genuinely unshipped idea; those
+// cards stay read-only. Anything without it gets a Play button.
 const MODES = [
   {
-    id: 'story',
-    label: 'Story Mode',
-    accent: '#b71c1c',
+    id: 'merge',
+    label: 'Merge Mode',
+    accent: '#6a1b9a',
     description:
-      'Ten levels. A cube that remembers every move. A narrative written in rotations — where solving the puzzle unlocks the next chapter of a world built on real projective plane topology.',
-    tags: ['Campaign', '10 Levels', 'Narrative'],
-  },
-  {
-    id: 'holonomy',
-    label: 'Holonomy',
-    accent: '#1565C0',
-    description:
-      'Move a vector around a closed loop on the cube surface and watch it come back rotated. A mode built on the mathematics of parallel transport and curvature in RP2.',
-    tags: ['Math Mode', 'Topology', 'Experimental'],
+      'Match neighbouring tiles to evolve them. Every tile you line up levels the whole patch up a tier — think 2048, except the board is a Rubik\'s Cube and it rotates under you.',
+    tags: ['Puzzle', 'Chill', 'Pick a theme'],
+    playLabel: 'Start merging',
   },
   {
     id: 'biome',
     label: 'Biome Mode',
     accent: '#2e7d32',
     description:
-      'A living world grows on the surface of the cube. Each face a different ecosystem — forests, deserts, oceans. Navigate a topology that breathes and changes as you solve.',
-    tags: ['Exploration', 'Procedural', 'Sandbox'],
+      'Six faces, six living ecosystems — grass, ice, sand, water, wood, stone. Same cube rules, but the surface breathes while you solve it. The prettiest way to play.',
+    tags: ['Sandbox', 'No pressure', 'Living tiles'],
+    playLabel: 'Grow a cube',
   },
   {
-    id: 'merge',
-    label: 'Merge Mode',
-    accent: '#6a1b9a',
+    id: 'coop',
+    label: 'Crawler',
+    accent: '#c2410c',
     description:
-      'Two cubes. One truth. Combine solved states across the manifold boundary to create something that has never existed — a cooperative puzzle of antipodal geometry.',
-    tags: ['Co-op', 'Puzzle', 'Manifold'],
+      'Drop off the cube entirely and platform along its surface as the worm. Run the seams, fall through a face, come out the antipodal side — the topology becomes the level.',
+    tags: ['Platformer', 'Action', 'Worm'],
+    playLabel: 'Take the leap',
+  },
+  {
+    id: 'holonomy',
+    label: 'Holonomy',
+    accent: '#1565C0',
+    description:
+      'Drag an arrow around a closed loop on the cube and watch it come back pointing somewhere else. No score, no timer — just the strangest fact about this shape, made playable.',
+    tags: ['Math toy', 'Topology', 'Experimental'],
+    playLabel: 'Trace a loop',
+  },
+  {
+    id: 'mobius',
+    label: 'Möbius Cubelet',
+    accent: '#0891B2',
+    description:
+      'A single cubelet with a Möbius band threaded through each antipodal pair. Spin it around to see exactly what a flip does to a tile before you rely on one mid-puzzle.',
+    tags: ['Explainer', 'Interactive', '1 minute'],
+    playLabel: 'Take a look',
+  },
+  {
+    id: 'mirror',
+    label: 'Mirror Blocks',
+    accent: '#78716c',
+    description:
+      'One colour, six faces, every cubelet a different size. You solve it by shape alone — the silhouette tells you everything the colours used to.',
+    tags: ['Puzzle', 'Shape-based'],
+    soon: true,
   },
 ];
 
@@ -69,8 +94,9 @@ const Tag = ({ label, accent }) => (
   </span>
 );
 
-const ModeCard = ({ item, isSelected, onClick }) => {
+const ModeCard = ({ item, isSelected, onClick, onPlay }) => {
   const [hovered, setHovered] = useState(false);
+  const playable = !item.soon && Boolean(onPlay);
 
   return (
     <button
@@ -129,20 +155,20 @@ const ModeCard = ({ item, isSelected, onClick }) => {
                 fontWeight: 700,
                 letterSpacing: '0.18em',
                 textTransform: 'uppercase',
-                color: PAPER_TEXT_FAINT,
-                background: `${PAPER_BORDER}60`,
-                border: `1px solid ${PAPER_BORDER}`,
+                color: playable ? item.accent : PAPER_TEXT_FAINT,
+                background: playable ? `${item.accent}14` : `${PAPER_BORDER}60`,
+                border: `1px solid ${playable ? `${item.accent}44` : PAPER_BORDER}`,
                 borderRadius: '4px',
                 padding: '2px 7px',
               }}
             >
-              Coming Soon
+              {playable ? 'Playable' : 'Coming Soon'}
             </span>
           </div>
 
           <div
             style={{
-              maxHeight: isSelected ? '240px' : '0px',
+              maxHeight: isSelected ? '300px' : '0px',
               overflow: 'hidden',
               transition: 'max-height 0.4s cubic-bezier(0.22,1,0.36,1)',
             }}
@@ -162,6 +188,36 @@ const ModeCard = ({ item, isSelected, onClick }) => {
                 <Tag key={tag} label={tag} accent={item.accent} />
               ))}
             </div>
+
+            {/* Nested interactive element: this card is itself a <button>, so the
+                play affordance is a focusable span with its own click handler. */}
+            {playable && (
+              <span
+                role="button"
+                tabIndex={0}
+                onClick={(e) => { e.stopPropagation(); onPlay(); }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onPlay(); }
+                }}
+                style={{
+                  display: 'inline-block',
+                  marginTop: '14px',
+                  padding: '9px 20px',
+                  borderRadius: '999px',
+                  background: item.accent,
+                  color: '#fff',
+                  fontSize: '12px',
+                  fontWeight: 800,
+                  letterSpacing: '0.1em',
+                  textTransform: 'uppercase',
+                  cursor: 'pointer',
+                  boxShadow: `0 3px 0 ${item.accent}88`,
+                  fontFamily: UI_FONT,
+                }}
+              >
+                {item.playLabel || 'Play'} →
+              </span>
+            )}
           </div>
 
           {!isSelected && (
@@ -173,7 +229,7 @@ const ModeCard = ({ item, isSelected, onClick }) => {
                 fontStyle: 'italic',
               }}
             >
-              Tap to learn more
+              {playable ? 'Tap to read it and play' : 'Tap to learn more'}
             </p>
           )}
         </div>
@@ -182,9 +238,19 @@ const ModeCard = ({ item, isSelected, onClick }) => {
   );
 };
 
-export default function ComingSoonScreen({ onBack }) {
+export default function ComingSoonScreen({ onBack, onHolonomy, onBiome, onMerge, onCoop, onMobiusCubelet }) {
   const [visible, setVisible] = useState(false);
-  const [selectedId, setSelectedId] = useState(null);
+  // Open on the first card so the screen never reads as a wall of closed rows —
+  // the player lands on something they can immediately play.
+  const [selectedId, setSelectedId] = useState(MODES[0].id);
+
+  const launchers = {
+    holonomy: onHolonomy,
+    biome: onBiome,
+    merge: onMerge,
+    coop: onCoop,
+    mobius: onMobiusCubelet,
+  };
 
   useEffect(() => {
     const t = setTimeout(() => setVisible(true), 30);
@@ -285,7 +351,7 @@ export default function ComingSoonScreen({ onBack }) {
               textTransform: 'uppercase',
             }}
           >
-            In development
+            Off the main menu
           </p>
           <h1
             style={{
@@ -297,7 +363,7 @@ export default function ComingSoonScreen({ onBack }) {
               lineHeight: 1.1,
             }}
           >
-            Coming Soon
+            More Modes
           </h1>
           <p
             style={{
@@ -307,14 +373,20 @@ export default function ComingSoonScreen({ onBack }) {
               lineHeight: 1.5,
             }}
           >
-            New game modes currently in development. Tap a card to see what's planned.
+            The odd corners of the cube. Most of these are playable right now — tap one to read it and jump straight in.
           </p>
         </div>
 
         {/* Mode cards */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {MODES.map((mode) => (
-            <ModeCard key={mode.id} item={mode} isSelected={selectedId === mode.id} onClick={() => handleSelect(mode.id)} />
+            <ModeCard
+              key={mode.id}
+              item={mode}
+              isSelected={selectedId === mode.id}
+              onClick={() => handleSelect(mode.id)}
+              onPlay={launchers[mode.id]}
+            />
           ))}
         </div>
 
@@ -328,7 +400,7 @@ export default function ComingSoonScreen({ onBack }) {
             letterSpacing: '0.08em',
           }}
         >
-          WORM3 — More modes unlocking soon
+          Nothing here is on a timer. Wander.
         </p>
       </div>
     </div>

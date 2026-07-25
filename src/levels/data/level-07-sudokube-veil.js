@@ -35,7 +35,7 @@ export default createLevel({
     title: 'NASA Lab 🔬',
     text: "You made it to NASA! Colors become numbers now. Each face needs every number 1-16, one of each. It's Sudoku in SPACE!",
     objective: 'Use the number view to inspect the pattern, clear the front seam, and restore the two layers.',
-    tip: 'Press V to toggle between colors and numbers.',
+    tip: 'Swap between numbers and colors from Views, or press V. Every face wants 1 through 16, one of each — no repeats.',
     mobiLines: [
       'NASA gave us a new instrument: every face now speaks in number patterns as well as color.',
       'Switch views when you need to inspect a row or column. The front flip marks the seam; the two turns restore the experiment.',

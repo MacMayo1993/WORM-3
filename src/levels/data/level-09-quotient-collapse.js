@@ -39,9 +39,9 @@ export default createLevel({
 
   tutorial: {
     title: 'The Moon 🌙',
-    text: 'One small step for cubes... Press N for the NET view - see everything unfolded! You can see Earth from here. One more challenge awaits...',
+    text: 'One small step for cubes... Open the NET view to see everything unfolded! You can see Earth from here. One more challenge awaits...',
     objective: 'Plan in net view, clear both center seams, and unwind the six-layer route.',
-    tip: 'The net shows all connections at once.',
+    tip: 'Open the Net — Views → Net, or press N — to lay all six faces out flat. Plan the whole route there before you turn anything.',
     mobiLines: [
       'On the Moon, distance finally looks different. Open the net and the whole surface becomes a route map.',
       'Two center seams and six layers are out of place. Plan their inverse order in the net before you touch the cube.',

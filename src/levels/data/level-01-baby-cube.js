@@ -32,7 +32,7 @@ export default createLevel({
     title: 'Welcome to Daycare! 🧒',
     text: "Let's play with blocks! This colorful 2×2 cube has 6 faces. Drag to spin the pieces around!",
     objective: 'Return the one mixed layer so every face is one color again.',
-    tip: 'Match all the colors on each side. You got this!',
+    tip: 'Spin the whole cube around and look for the one band of colors that does not line up. Turn it back the way it came.',
     mobiLines: [
       "Aloha! I'm Mobi. This little cube is our map.",
       'Only one layer wandered away from home. Watch the colors, then turn that layer back.',

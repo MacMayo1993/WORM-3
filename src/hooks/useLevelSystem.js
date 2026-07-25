@@ -4,16 +4,50 @@
  * Manages level selection, progression, and level-specific settings.
  */
 
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { useGameStore } from './useGameStore.js';
 import { getLevel, getNextLevel } from '../levels/index.js';
 import { makeCubies } from '../game/cubeState.js';
 import { clearRefractory } from '../game/refractoryMap.js';
 
+// ── Briefing memory ─────────────────────────────────────────────────────────
+// Which chapters have already played their Mobi intro. Persisted so a returning
+// player is not re-briefed on chapter 1 every session, and degrades to
+// "brief every time" if storage is unavailable, which is the safe direction.
+const BRIEFED_KEY = 'worm3_briefed_levels';
+
+const readBriefed = () => {
+  try {
+    const raw = localStorage.getItem(BRIEFED_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+export const hasSeenBriefing = (levelId) => readBriefed().includes(levelId);
+
+export const markBriefingSeen = (levelId) => {
+  try {
+    const seen = readBriefed();
+    if (seen.includes(levelId)) return;
+    localStorage.setItem(BRIEFED_KEY, JSON.stringify([...seen, levelId]));
+  } catch {
+    /* storage unavailable (private mode / quota) — non-fatal */
+  }
+};
+
 /**
  * Hook for level system management
  */
-export function useLevelSystem() {
+export function useLevelSystem({ onBriefingSkipped } = {}) {
+  // Called when a chapter opens with no briefing to close. The briefing's close
+  // handler is what scrambles the cube, so skipping it must still scramble —
+  // otherwise a replayed chapter would open already solved.
+  const skipRef = useRef(onBriefingSkipped);
+  skipRef.current = onBriefingSkipped;
+
   const currentLevel = useGameStore((state) => state.currentLevel);
   const currentLevelData = useGameStore((state) => state.currentLevelData);
   const setCurrentLevel = useGameStore((state) => state.setCurrentLevel);
@@ -71,13 +105,21 @@ export function useLevelSystem() {
       setShowTunnels(levelData.features.tunnels);
     }
 
+    // Briefings are a first-visit beat, not a toll booth. Replaying a chapter —
+    // which is exactly what a player does on a hard one — should drop straight
+    // into the cube; the objective and hint stay available in the story HUD.
+    const seen = hasSeenBriefing(levelId);
+
     // A campaign level can opt into an opening cutscene. This is data-driven so
     // changing a pack's length or finale ID cannot make its cutscene unreachable.
-    if (levelData?.hasCutscene) {
+    if (levelData?.hasCutscene && !seen) {
       setShowCutscene(true);
-    } else {
+    } else if (!seen) {
       setShowLevelTutorial(true);
+    } else {
+      skipRef.current?.();
     }
+    markBriefingSeen(levelId);
   }, [
     setCurrentLevel, setCurrentLevelData, setShowLevelSelect,
     setSize, setChaosLevel, setVisualMode, setFlipMode, setShowTunnels,

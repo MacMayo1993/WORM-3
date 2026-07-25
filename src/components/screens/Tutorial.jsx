@@ -111,10 +111,10 @@ const Tutorial = ({ onClose, onMainMenu }) => {
       )
     },
     7: {
-      title: "Disparity Mode",
+      title: "Chaos Mode",
       content: (
         <>
-          <p>Press <b>C</b> or use the Chaos button to toggle <b>Disparity (Chaos) Mode</b>. Flipped stickers become unstable and can cascade to neighboring stickers over time.</p>
+          <p>Press <b>C</b> or use the Chaos button to toggle <b>Chaos Mode</b>. Flipped stickers become unstable and can cascade to neighboring stickers over time.</p>
           <ul style={{ margin: '6px 0', paddingLeft: '20px', fontSize: '13px', lineHeight: '1.7' }}>
             <li><b>Level 1:</b> Gentle, occasional cascades</li>
             <li><b>Level 2:</b> Moderate, regular spreading</li>
@@ -144,7 +144,7 @@ const Tutorial = ({ onClose, onMainMenu }) => {
           <ul style={{ margin: '4px 0', paddingLeft: '20px', fontSize: '13px' }}>
             <li><b>F</b> — Flip sticker at cursor (requires Flip Mode on)</li>
             <li><b>G</b> — Toggle Flip Mode on / off</li>
-            <li><b>C</b> — Toggle Chaos (Disparity) Mode</li>
+            <li><b>C</b> — Toggle Chaos Mode</li>
             <li><b>V</b> — Cycle visual mode (Classic → Grid → Sudokube → Colors)</li>
             <li><b>X</b> — Toggle explode view</li>
             <li><b>T</b> — Toggle tunnel visibility</li>

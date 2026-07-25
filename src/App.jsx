@@ -346,11 +346,16 @@ export default function WORM3() {
 
   const { setShowCursor, cursorToCubePos, cubePosToCursor } = useCursor();
 
+  // When a chapter opens with no briefing to close, the scramble cannot run
+  // inline: shuffleForLevel reads currentLevelData, which is still the previous
+  // chapter's during that same tick. Bumping a token defers it to an effect,
+  // which fires on the next render — by then the new level data has landed.
+  const [briefingSkipToken, setBriefingSkipToken] = useState(0);
   const {
     currentLevel, currentLevelData, hasNextLevel, handleLevelSelect,
     handleCutsceneComplete, handleTutorialClose: levelTutorialClose,
     handleBackToMainMenu, handleNextLevel: levelHandleNextLevel
-  } = useLevelSystem();
+  } = useLevelSystem({ onBriefingSkipped: () => setBriefingSkipToken((t) => t + 1) });
 
   const { settings, faceImages, faceTextures, handleFaceImage, setSettings } = useSettings();
 
@@ -1028,6 +1033,14 @@ export default function WORM3() {
     useGameStore.getState().setHasShuffled(true);
   }, [cancelShuffle, currentLevelData, currentLevel, size, setRotatedCubies]);
 
+  // Scramble a chapter that opened without a briefing. Keyed on the token alone
+  // so a later shuffleForLevel identity change cannot re-scramble mid-play.
+  useEffect(() => {
+    if (briefingSkipToken === 0) return;
+    shuffleForLevel();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [briefingSkipToken]);
+
   // Tutorial close handler
   const handleTutorialClose = useCallback(() => {
     levelTutorialClose();
@@ -1242,7 +1255,10 @@ export default function WORM3() {
             onRandom={() => { setShowModeSelect(false); handleMenuRandomMode(); }}
             onStore={() => { setShowModeSelect(false); handleOpenStore(); }}
             onComingSoon={() => { setShowModeSelect(false); handleMenuComingSoon(); }}
-            onHowToPlay={() => { setShowModeSelect(false); handleMenuTeach(); }}
+            // "How to Play" opens the actual How to Play reference, not Teach
+            // Mode — Teach is a solver trainer and gets its own pill below.
+            onHowToPlay={() => { setShowModeSelect(false); useGameStore.getState().setShowHelp(true); }}
+            onLearnToSolve={() => { setShowModeSelect(false); handleMenuTeach(); }}
           />
         </Suspense>
       )}

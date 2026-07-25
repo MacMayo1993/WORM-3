@@ -1048,33 +1048,39 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
 const CAROUSEL_MODES = [
   {
     id: 'worm', label: 'WORM', tileColor: '#22c55e', textColor: '#fff', face: 'NX',
-    desc: 'Co-op worm healer mode on a living antipodal cube.',
-    controls: ['Worm follows your cursor or touch', 'Healed tiles restore the cube face', 'Collect orbs scattered across faces', 'Avoid flipped chaos tiles'],
+    desc: 'Steer a worm across a living cube and heal it one tile at a time.',
+    controls: ['Steer the worm with cursor or touch', 'Every tile it crosses gets healed', 'Eat orbs to grow — and to earn points', 'Touch a dead tile and the run ends'],
+    cta: 'PLAY',
   },
   {
     id: 'freeplay', label: 'CUBE', tileColor: '#FFD500', textColor: '#fff', face: 'NY',
-    desc: "Classic Rubik's cube solving — your cube, your rules.",
-    controls: ['Pick cube size 2×2 through 5×5', 'Choose color scheme and tile style', 'Drag face edges to rotate slices', 'Solve at your own pace'],
+    desc: "A real Rubik's cube, built how you like it. No timer, no objective.",
+    controls: ['Any size from 2×2 up to 7×7', 'Your palette, your tiles, your world', 'Drag a face edge to turn a slice', 'Tap a tile to send it through the cube'],
+    cta: 'PLAY',
   },
   {
     id: 'cube', label: 'STORY', tileColor: '#3b82f6', textColor: '#fff', face: 'PX',
-    desc: 'The 10-level Life Journey campaign, from daycare to the singularity.',
-    controls: ['Beat a level to unlock the next', 'Each level teaches a new mechanic', 'Mobi guides you along the way', 'Earn star ratings on every level'],
+    desc: 'Ten chapters, daycare to the singularity, one new trick at a time.',
+    controls: ['Ten chapters, each unlocking the next', 'One new idea per chapter', 'Mobi walks you in before every one', 'Beat par to take all three stars'],
+    cta: 'PLAY',
   },
   {
     id: 'chaos', label: 'CHAOS', tileColor: '#f97316', textColor: '#fff', face: 'NZ',
-    desc: 'Antipodal flip survival with betting and chaos tuning.',
-    controls: ['Tiles flip automatically over time', 'Bet Parity Points before the round', 'Set chaos level 1–5 in the wizard', 'Survive until the last tile falls'],
+    desc: 'The cube flips itself apart. Bet on how long you last.',
+    controls: ['Tiles start flipping on their own', 'Stake Parity Points before you start', 'Pick your chaos level, 1 to 5', 'Last pair standing ends the run'],
+    cta: 'PLAY',
   },
   {
     id: 'random', label: 'RANDOM', tileColor: '#ef4444', textColor: '#fff', face: 'PZ',
-    desc: 'Randomized style cycling every 15 seconds.',
-    controls: ['Color scheme changes every 15 s', 'Cube and tiles transform live', 'Keep solving through the shifts', 'Style variety makes every run fresh'],
+    desc: 'The cube redecorates itself mid-solve. Try to keep up.',
+    controls: ['New palette every 15 seconds', 'Tiles and cubelets morph as you play', 'Same puzzle, never the same twice', 'Solving through the churn is the point'],
+    cta: 'PLAY',
   },
   {
     id: 'store', label: 'STORE', tileColor: '#0891B2', textColor: '#fff', face: 'PY',
-    desc: 'Spend Parity Points on skins, hats, palettes, and tile styles.',
-    controls: ['Earn PP by collecting orbs in Worm mode', 'Win Disparity bets for extra points', 'Unlock worm skins, hats, and color schemes', 'Cosmetics carry across every game mode'],
+    desc: 'Turn Parity Points into worm skins, hats, palettes, and tiles.',
+    controls: ['Collect orbs in Worm mode to earn', 'Win a Chaos bet for a bigger purse', 'Skins, hats, palettes, and tile styles', 'Everything you buy works in every mode'],
+    cta: 'OPEN STORE',
   },
 ];
 
@@ -1082,7 +1088,8 @@ const CAROUSEL_MODES = [
 // are not game modes and do not occupy cube faces.
 const UTILITY_MODES = [
   { id: 'how-to-play', label: 'How to Play' },
-  { id: 'coming-soon', label: 'Coming Soon' },
+  { id: 'learn-to-solve', label: 'Learn to Solve' },
+  { id: 'coming-soon', label: 'More Modes' },
 ];
 
 const LAST_MODE_KEY = 'worm3_last_mode_id';
@@ -1092,7 +1099,7 @@ const LAST_MODE_KEY = 'worm3_last_mode_id';
 // no CSS transform transitions on positioned elements → no GPU compositor ordering
 // issues on mobile Chrome.
 
-export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay, onRandom, onStore, onComingSoon, onHowToPlay }) => {
+export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFreeplay, onRandom, onStore, onComingSoon, onHowToPlay, onLearnToSolve }) => {
   // Open on the last-played mode so returning players are one tap from their game.
   const [activeIndex, setActiveIndex] = useState(() => {
     try {
@@ -1162,7 +1169,8 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
     else if (id === 'store')       onStore?.();
     else if (id === 'coming-soon') onComingSoon?.();
     else if (id === 'how-to-play') onHowToPlay?.();
-  }, [onCubeSelect, onWormSelect, onChaos, onFreeplay, onRandom, onStore, onComingSoon, onHowToPlay]);
+    else if (id === 'learn-to-solve') onLearnToSolve?.();
+  }, [onCubeSelect, onWormSelect, onChaos, onFreeplay, onRandom, onStore, onComingSoon, onHowToPlay, onLearnToSolve]);
 
   // PLAY: dive through the presented face, then launch. The 3D cube consumes
   // the dive request and fires the callback when the face fills the screen;
@@ -1305,7 +1313,12 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
             <span style={{ display: 'block', textAlign: 'center', fontSize: 'clamp(26px, 8vw, 34px)', fontWeight: 900, fontFamily: DISPLAY_FONT, color: '#fffdf2', lineHeight: 1, letterSpacing: '0.03em', textTransform: 'uppercase', textShadow: '0 3px 0 rgba(0,0,0,0.5), 0 10px 30px rgba(0,0,0,0.55)' }}>
               {mode.label}
             </span>
-            <div style={{ marginTop: '16px' }}>
+            {/* The one-line hook: what this mode actually is, in plain sentence
+                case. The bullets below are the details, not the pitch. */}
+            <p style={{ margin: '9px 0 0', textAlign: 'center', fontSize: 'clamp(12px, 3.2vw, 13.5px)', lineHeight: 1.45, color: 'rgba(255,253,242,0.72)', fontFamily: UI_FONT, fontWeight: 500 }}>
+              {mode.desc}
+            </p>
+            <div style={{ marginTop: '14px' }}>
               {mode.controls.map((ctrl, i) => (
                 <div key={i} style={{ display: 'flex', gap: '10px', margin: '6px 0', alignItems: 'flex-start' }}>
                   <span aria-hidden style={{ width: '6px', height: '6px', borderRadius: '2px', background: mode.tileColor, boxShadow: `0 0 6px ${mode.tileColor}`, marginTop: '5px', flexShrink: 0 }} />
@@ -1330,7 +1343,7 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
               transition: 'opacity 160ms ease, transform 100ms ease, background 200ms ease',
               WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
             }}
-          >PLAY</button>
+          >{mode.cta || 'PLAY'}</button>
 
           {/* Utility row — destinations that are not game modes */}
           <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginTop: '10px', flexWrap: 'wrap' }}>

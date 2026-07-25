@@ -85,7 +85,7 @@ export const MOBI_LINES_MIRROR = [
 export const MOBI_LINES_CHAOS = [
   "Aloha! I'm a Multi Orientable Block Intelligence...",
   "...but you can call me Mobi for short!",
-  "Disparity Mode. Some tiles have already... wandered.",
+  "Chaos Mode. Some tiles have already... wandered.",
   "Your job is to restore order — but the manifold has other ideas.",
   "Every flip you make, the chaos counter rises. Flip smart.",
   "You've placed your bet. Time to earn it.",
