@@ -193,7 +193,9 @@ export default function SolveMode({ cubies, size, onClose }) {
   const statusLabel = {
     idle:    'Analyzing…',
     solving: 'Solving…',
-    ready:   `${moves.length} moves`,
+    // Once the player has performed some of the plan by hand, show their place
+    // in it — otherwise the header reads "26 moves" no matter how far they get.
+    ready:   moveIndex > 0 ? `Move ${moveIndex} / ${moves.length}` : `${moves.length} moves`,
     playing: `Move ${moveIndex} / ${moves.length}`,
     done:    alreadySolved ? 'Solved!' : 'Cube solved!',
     error:   'Error',
