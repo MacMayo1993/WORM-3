@@ -10,6 +10,7 @@ import React, { useMemo, useRef, useEffect } from 'react';
 import { checkSolveProgress } from '../game/solveDetection.js';
 import { useKociembaSolver } from '../teach/useKociembaSolver.js';
 import { useAntipodalEngine } from '../hooks/useAntipodalEngine.js';
+import { isMobile } from '../utils/device.js';
 import { UI_FONT, DISPLAY_FONT, MONO_FONT } from '../utils/uiTheme.js';
 
 // ── Demo-screen palette (warm paper / sage / gold) ─────────────────────────────
@@ -99,51 +100,30 @@ function MoveChip({ notation, state }) {
 // toward the nearer quotient representative (all-home Z₀ or all-flipped Z₁).
 
 function FibreStrip({ fibre, disabled }) {
-  const { status, plan, costs, stepIndex, totalSteps, play, pause, stepForward } = fibre;
+  const { status, plan, costs, totalSteps, play, pause, stepForward } = fibre;
   if (!plan || !costs) return null;
 
   const playing = status === 'playing';
   const done = status === 'done' || totalSteps === 0;
-  const summary = done
-    ? '✓ fibre clear'
-    : `${costs.dirtyPairs}/${costs.totalPairs} pairs dirty` +
-      (costs.asymmetricPairs ? ` · ${costs.asymmetricPairs} asym` : '') +
-      ` · →Z${plan.target === 1 ? '₁' : '₀'} in ${plan.totalCost}`;
+  // Nothing left to repair — the strip disappears rather than reporting itself.
+  if (done) return null;
 
   return (
-    <div style={{ borderTop: `1px solid ${DIVIDER}` }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '6px 12px',
-      }}>
-        <span style={{
-          fontSize: 9, letterSpacing: '0.12em', color: GOLD, fontWeight: 800,
-          textTransform: 'uppercase', fontFamily: UI_FONT,
-        }}>
-          Antipodal pairs
-        </span>
-        <span style={{ fontSize: 10, fontFamily: MONO_FONT, color: done ? SAGE : OLIVE_MUTED }}>
-          {playing ? `op ${stepIndex} / ${totalSteps}` : summary}
-        </span>
-      </div>
-      {!done && (
-        <div style={{ display: 'flex', gap: 6, padding: '0 10px 10px' }}>
-          <button
-            onClick={playing ? pause : play}
-            disabled={disabled}
-            style={ctrlBtn(playing ? GOLD_ACCENT : SAGE, disabled)}
-          >
-            {playing ? '⏸ Pause' : '▶ Repair'}
-          </button>
-          <button
-            onClick={stepForward}
-            disabled={disabled || playing}
-            style={ctrlBtn(GOLD_ACCENT, disabled || playing)}
-          >
-            ⏭ Step
-          </button>
-        </div>
-      )}
+    <div style={{ borderTop: `1px solid ${DIVIDER}`, display: 'flex', gap: 6, padding: '10px' }}>
+      <button
+        onClick={playing ? pause : play}
+        disabled={disabled}
+        style={ctrlBtn(playing ? GOLD_ACCENT : SAGE, disabled)}
+      >
+        {playing ? '⏸ Pause' : '▶ Repair'}
+      </button>
+      <button
+        onClick={stepForward}
+        disabled={disabled || playing}
+        style={ctrlBtn(GOLD_ACCENT, disabled || playing)}
+      >
+        ⏭ Step
+      </button>
     </div>
   );
 }
@@ -212,8 +192,12 @@ export default function SolveMode({ cubies, size, onClose }) {
 
       <div style={{
         position: 'fixed',
-        right: 16,
-        bottom: 72,          /* sits just above the bottom nav bar */
+        // Mobile docks the card into the empty band under the top bar, on the
+        // left so the top-right action menu stays clear; desktop keeps it
+        // bottom-right, just above the nav bar.
+        ...(isMobile
+          ? { top: 'calc(56px + env(safe-area-inset-top, 0px))', left: 12, maxWidth: 'calc(100vw - 80px)' }
+          : { right: 16, bottom: 72 }),
         width: 274,
         background: CARD_BG,
         backdropFilter: 'blur(14px) saturate(1.05)',
