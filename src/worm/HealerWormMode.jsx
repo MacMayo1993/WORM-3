@@ -379,7 +379,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             <HeartBurstSystem worm={worm} size={size} />
             <OrbFlashSystem worm={worm} />
             <PowerupOrbs size={size} />
-            <SliceWarningLights pendingRotRef={pendingRotRef} warningProgressRef={warningProgressRef} size={size} cubies={cubies} />
+            <SliceWarningLights pendingRotRef={pendingRotRef} size={size} />
             <ThunkEffect thunkRef={thunkRef} />
             <CollisionGlow size={size} />
         </>
