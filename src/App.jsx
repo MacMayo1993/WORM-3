@@ -98,6 +98,10 @@ const _ease = t => t < 0.5 ? 4 * t ** 3 : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const _prog = (t, s, e) => _clamp((t - s) / (e - s));
 const _chromaticVec = new Vector2(0, 0);
 
+// The shared Canvas camera's resting FOV. Modes that reframe the camera restore
+// this; CameraManager re-applies it on every screen transition.
+const DEFAULT_CAMERA_FOV = 40;
+
 /**
  * IntroBranch — 3D content rendered inside the Canvas during the welcome/intro.
  * Contains IntroScene, post-processing, and intro lights.
@@ -176,21 +180,53 @@ function IntroBranch({ time, onComplete, reducedMotion = false, performanceMode 
 }
 
 /**
+ * ClockContinuity — keeps the shared clock's timeline unbroken across a
+ * frameloop switch. R3F's setFrameloop zeroes clock.elapsedTime in both
+ * directions, and several loops (the menu cube's slice animation, worm spawn
+ * timers) hold absolute timestamps taken from it — a rewind to 0 would stall
+ * them until the clock caught back up. Restore the pre-pause reading on the
+ * first frame after the loop restarts. The negative priority sorts this ahead
+ * of every other subscriber (and, unlike a positive one, does not hand R3F's
+ * rendering over to us), so nothing else ever reads the zeroed value.
+ * Must live inside the Canvas.
+ */
+function ClockContinuity({ paused }) {
+  const clock = useThree((s) => s.clock);
+  const lastElapsed = useRef(0);
+  const resumeAt = useRef(null);
+  useFrame(() => {
+    if (resumeAt.current !== null) {
+      clock.elapsedTime = resumeAt.current;
+      resumeAt.current = null;
+    }
+    lastElapsed.current = clock.elapsedTime;
+  }, -1000);
+  useEffect(() => {
+    if (paused) resumeAt.current = lastElapsed.current;
+  }, [paused]);
+  return null;
+}
+
+/**
  * CameraManager — teleports the camera when transitioning intro → menu → game.
  * Must live inside the Canvas to access useThree().
  */
 function CameraManager({ showWelcome, showMainMenu, cameraZ }) {
   const { camera } = useThree();
   useEffect(() => {
-    if (showMainMenu) {
-      camera.position.set(0, 3, 12);
-      camera.lookAt(0, 0, 0);
-      camera.updateProjectionMatrix();
-    } else if (!showWelcome) {
-      camera.position.set(0, 0, cameraZ);
-      camera.lookAt(0, 0, 0);
-      camera.updateProjectionMatrix();
-    }
+    if (showWelcome) return; // the intro cinematic flies the camera itself
+    // Everything in the shared Canvas borrows this one camera, and modes are
+    // free to reframe it: the worm chase cam widens the FOV to 70–82° and rolls
+    // `up` around the cube as the worm crosses faces. Position alone is not
+    // enough to undo that — a leftover FOV renders the menu and mode-select
+    // cubes ~2.4× too small, and a leftover up vector rolls the whole scene.
+    // Restore the full framing, then aim.
+    camera.fov = DEFAULT_CAMERA_FOV;
+    camera.zoom = 1;
+    camera.up.set(0, 1, 0);
+    camera.position.set(0, showMainMenu ? 3 : 0, showMainMenu ? 12 : cameraZ);
+    camera.lookAt(0, 0, 0);
+    camera.updateProjectionMatrix();
   }, [showWelcome, showMainMenu, camera, cameraZ]);
   return null;
 }
@@ -468,6 +504,18 @@ export default function WORM3() {
     wormPhase === 'entering' || wormPhase === 'tunnel' || wormPhase === 'exiting'
   );
   const showAntipodalFrame = !showWelcome && (showAntipodalPiP && !wormholePhaseActive);
+
+  // Page visibility — the shared Canvas parks its render loop while the app is
+  // backgrounded (tab switched, screen off, another app on top). The scene is
+  // live every frame it is on screen, so there is no reason to keep drawing it
+  // when nobody can see it; ClockContinuity keeps the timeline intact.
+  const [pageHidden, setPageHidden] = useState(false);
+  useEffect(() => {
+    const onVisibility = () => setPageHidden(document.visibilityState === 'hidden');
+    onVisibility();
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, []);
 
   // Bottom sheet state for new nav bar
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -1284,16 +1332,17 @@ export default function WORM3() {
       <CanvasErrorBoundary>
       <div className="canvas-container" onContextMenu={(e) => e.preventDefault()}>
         <Canvas
-          camera={{ position: (showWelcome || showMainMenu) ? [0, 3, 12] : [0, 0, cameraZ], fov: 40 }}
+          camera={{ position: (showWelcome || showMainMenu) ? [0, 3, 12] : [0, 0, cameraZ], fov: DEFAULT_CAMERA_FOV }}
           dpr={dpr}
           gl={{ powerPreference: 'high-performance', antialias: true }}
           shadows
-          frameloop="always"
+          frameloop={pageHidden ? 'never' : 'always'}
         >
           <PerformanceMonitor
             onDecline={() => { setDpr([0.75, 1]); setPerfReducedFX(true); }}
             onIncline={() => { setDpr([1, 1.5]); setPerfReducedFX(false); }}
           />
+          <ClockContinuity paused={pageHidden} />
           <CameraManager showWelcome={showWelcome} showMainMenu={showMainMenu} cameraZ={cameraZ} />
           <TilePreviewHost />
           {showWelcome ? (
