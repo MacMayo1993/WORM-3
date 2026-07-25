@@ -29,17 +29,18 @@ describe('createLevel scrambleMoves', () => {
 
 describe('CUBE campaign levels', () => {
   it('carries each level scrambleMoves through createLevel', () => {
-    // Level 1 uses a deterministic scrambleSequence and level 2 a flipSequence,
-    // so neither carries a random scrambleMoves count.
-    const expected = { 3: 4, 4: 6, 5: 8, 6: 12 };
-    for (const level of CUBE_CAMPAIGN_LEVELS) {
-      if (level.id === 1 || level.id === 2) continue;
-      expect(level.scrambleMoves).toBe(expected[level.id]);
-    }
+    // Lesson 1 uses a deterministic scrambleSequence and lesson 2 a flipSequence,
+    // so neither carries a random scrambleMoves count. Indexed by position, not
+    // by id, so the pack can be renumbered into its own id range without this
+    // pinning the old numbers.
+    const expectedByIndex = [null, null, 4, 6, 8, 12];
+    CUBE_CAMPAIGN_LEVELS.forEach((level, i) => {
+      expect(level.scrambleMoves).toBe(expectedByIndex[i]);
+    });
   });
 
   it('level 2 flips all six centers to their antipodal and is solved by flipping them back', () => {
-    const level2 = getCubeCampaignLevel(2);
+    const level2 = getCubeCampaignLevel(CUBE_CAMPAIGN_LEVELS[1].id);
     const size = level2.cubeSize;
     expect(level2.features.flips).toBe(true);
     expect(level2.scrambleMoves).toBeNull();
@@ -74,19 +75,19 @@ describe('CUBE campaign levels', () => {
   });
 
   it('scrambles level 1 with a single middle-layer turn', () => {
-    const level1 = getCubeCampaignLevel(1);
+    const level1 = getCubeCampaignLevel(CUBE_CAMPAIGN_LEVELS[0].id);
     expect(level1.scrambleMoves).toBeNull();
     expect(level1.scrambleSequence).toEqual([{ axis: 'row', sliceIndex: 1, dir: 1 }]);
   });
 
   it('gives level 1 its own Mobi briefing lines', () => {
-    const level1 = getCubeCampaignLevel(1);
+    const level1 = getCubeCampaignLevel(CUBE_CAMPAIGN_LEVELS[0].id);
     expect(Array.isArray(level1.tutorial.mobiLines)).toBe(true);
     expect(level1.tutorial.mobiLines.length).toBeGreaterThan(0);
   });
 
   it("level 1's scramble is unsolved and reversible by one middle-layer turn", () => {
-    const level1 = getCubeCampaignLevel(1);
+    const level1 = getCubeCampaignLevel(CUBE_CAMPAIGN_LEVELS[0].id);
     const size = level1.cubeSize;
     const solved = makeCubies(size);
     let scrambled = makeCubies(size);

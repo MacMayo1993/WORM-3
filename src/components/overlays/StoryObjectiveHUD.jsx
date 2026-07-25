@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { getStoryLevelIds } from '../../levels/index.js';
+import { levelsManager } from '../../levels/index.js';
 import { getLevelPar } from '../../levels/scoring.js';
 import { useGameStore } from '../../hooks/useGameStore.js';
+import { MONO_FONT } from '../../utils/uiTheme.js';
 
 const COLLAPSE_KEY = 'worm3_objective_collapsed';
 
@@ -50,13 +51,13 @@ export default function StoryObjectiveHUD({ level }) {
 
   if (!level || !objective) return null;
 
-  // "Chapter X of N" reads from the live campaign list, so it stays correct if
-  // the story ever gains or loses chapters. Falls back to the raw id for any
-  // level that is not part of the ordered story campaign.
-  const storyIds = getStoryLevelIds();
-  const chapterIndex = storyIds.indexOf(levelId);
+  // "Chapter X of N" reads from the OWNING pack's ordered list, so it stays
+  // correct as packs gain or lose levels — and so a pack numbered in its own id
+  // range does not print its raw id ("Chapter 203") instead of its position.
+  const ownerLevels = levelsManager.getPackForLevel(levelId)?.levels ?? [];
+  const chapterIndex = ownerLevels.findIndex((l) => l.id === levelId);
   const chapterLabel =
-    chapterIndex >= 0 ? `Chapter ${chapterIndex + 1} of ${storyIds.length}` : `Chapter ${levelId}`;
+    chapterIndex >= 0 ? `Chapter ${chapterIndex + 1} of ${ownerLevels.length}` : `Chapter ${levelId}`;
 
   return (
     <aside className={`story-objective-hud ${collapsed ? 'is-collapsed' : ''}`} aria-label="Story objective">
@@ -88,6 +89,28 @@ export default function StoryObjectiveHUD({ level }) {
             <span>{level.name}</span>
           </div>
           <p>{objective}</p>
+
+          {/* Algorithm levels carry the sequence itself. Monospace is reserved
+              for grid ids and algorithm notation, so it belongs here. */}
+          {level.algorithm && (
+            <div style={{
+              marginTop: '9px', padding: '8px 10px', borderRadius: '8px',
+              background: 'rgba(30, 22, 18, 0.05)', border: '1px solid rgba(30, 22, 18, 0.10)',
+            }}>
+              <div style={{
+                fontSize: '9px', fontWeight: 800, letterSpacing: '0.14em',
+                textTransform: 'uppercase', color: '#7a6e62', marginBottom: '4px',
+              }}>
+                {level.name} · {level.algorithm.quarterTurns} turns
+              </div>
+              <div style={{
+                fontFamily: MONO_FONT, fontSize: '12.5px', fontWeight: 700,
+                letterSpacing: '0.04em', color: '#1e1612', lineHeight: 1.45,
+              }}>
+                {level.algorithm.notation}
+              </div>
+            </div>
+          )}
           {par != null && (
             <div style={{
               marginTop: '9px', display: 'flex', alignItems: 'center', gap: '6px',

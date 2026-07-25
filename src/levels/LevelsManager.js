@@ -6,6 +6,7 @@
  */
 
 import { STORY_LEVELS } from './data/index.js';
+import { BUILT_IN_PACKS } from './packs/index.js';
 import { FEATURE_NAMES, GAME_MODES } from './schema.js';
 
 /**
@@ -24,6 +25,14 @@ class LevelsManager {
 
     // Register story campaign levels
     this._registerLevels(this.storyCampaign, 'story');
+
+    // Register every built-in pack so cross-pack lookup, pack-relative
+    // next/previous, and the pack selector all see the same set. Without this
+    // the shipped packs existed only as exported data that nothing could reach.
+    for (const pack of Object.values(BUILT_IN_PACKS)) {
+      this.customPacks.set(pack.id, pack);
+      this._registerLevels(pack.levels, pack.id);
+    }
   }
 
   // ============================================================================
@@ -85,7 +94,34 @@ class LevelsManager {
    * @returns {LevelDefinition|null}
    */
   getLevel(id) {
-    return this.storyCampaign.find(l => l.id === id) || null;
+    const story = this.storyCampaign.find(l => l.id === id);
+    if (story) return story;
+    // Fall through to every registered pack. Level ids are globally unique
+    // across packs (see LEVEL_ID_RANGES in schema.js) precisely so this lookup —
+    // and the flat completed-levels array in ProgressManager — stay unambiguous.
+    for (const level of this.levelRegistry.values()) {
+      if (level.id === id) return level;
+    }
+    return null;
+  }
+
+  /**
+   * The pack a level belongs to, or null for an unregistered id.
+   * @param {number} id
+   * @returns {LevelPack|null}
+   */
+  getPackForLevel(id) {
+    if (this.storyCampaign.some(l => l.id === id)) return this.getPack('story-campaign');
+    for (const pack of this.customPacks.values()) {
+      if (pack.levels.some(l => l.id === id)) return pack;
+    }
+    return null;
+  }
+
+  /** Ordered level list of the pack containing `id` (story campaign by default). */
+  _siblingLevels(id) {
+    const pack = this.getPackForLevel(id);
+    return pack?.levels ?? this.storyCampaign;
   }
 
   /**
@@ -105,7 +141,11 @@ class LevelsManager {
    * @returns {LevelDefinition|null}
    */
   getNextLevel(currentId) {
-    return this.storyCampaign.find(l => l.id === currentId + 1) || null;
+    // Walk the containing pack's own ordering rather than assuming id + 1, so a
+    // pack numbered in its own range still advances correctly.
+    const siblings = this._siblingLevels(currentId);
+    const i = siblings.findIndex(l => l.id === currentId);
+    return i >= 0 ? (siblings[i + 1] ?? null) : null;
   }
 
   /**
@@ -114,7 +154,9 @@ class LevelsManager {
    * @returns {LevelDefinition|null}
    */
   getPreviousLevel(currentId) {
-    return this.storyCampaign.find(l => l.id === currentId - 1) || null;
+    const siblings = this._siblingLevels(currentId);
+    const i = siblings.findIndex(l => l.id === currentId);
+    return i > 0 ? siblings[i - 1] : null;
   }
 
   /**
@@ -147,7 +189,7 @@ class LevelsManager {
    * @returns {boolean}
    */
   hasLevel(id) {
-    return this.storyCampaign.some(l => l.id === id);
+    return this.getLevel(id) !== null;
   }
 
   // ============================================================================
@@ -210,9 +252,12 @@ class LevelsManager {
    */
   getNewFeatures(levelId) {
     const level = this.getLevel(levelId);
-    if (!level || levelId === 1) return [];
+    if (!level) return [];
 
-    const prevLevel = this.getLevel(levelId - 1);
+    // Pack-relative, not id - 1: a pack numbered in its own range has no level
+    // at id - 1, which previously made every one of its chapters report no new
+    // features at all.
+    const prevLevel = this.getPreviousLevel(levelId);
     if (!prevLevel) return [];
 
     const newFeatures = [];

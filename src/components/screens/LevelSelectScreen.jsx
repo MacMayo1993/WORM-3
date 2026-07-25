@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { LEVELS, isLevelUnlocked, loadProgress, progressManager } from '../../utils/levels.js';
+import { loadProgress, progressManager } from '../../utils/levels.js';
+import { getPack } from '../../levels/index.js';
 import {
   UI_FONT, PAPER_SHEET_RAISED, PAPER_BORDER, PAPER_BORDER_SOFT, PAPER_TEXT,
   PAPER_TEXT_MUTED, PAPER_TEXT_FAINT, PAPER_BG_MUTED, PAPER_CARD_SHADOW, UI_MOSS,
@@ -56,7 +57,9 @@ const StarRow = ({ count, earned }) => (
   </div>
 );
 
-const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
+const LevelSelectScreen = ({ onSelectLevel, onBack, packId = 'story-campaign' }) => {
+  const pack = getPack(packId) ?? getPack('story-campaign');
+  const LEVELS = pack.levels;
   const [completedLevels, setCompletedLevels] = useState([]);
   const [levelStats, setLevelStats] = useState({});
   const [hovered, setHovered] = useState(null);
@@ -68,12 +71,20 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
 
   // The chapter the player is up to — first unlocked one they have not beaten.
   // Computed once rather than per card so the grid stays O(n).
-  const nextChapterId = LEVELS.find(
-    (l) => isLevelUnlocked(l.id, completedLevels) && !completedLevels.includes(l.id)
-  )?.id ?? null;
+  const nextChapterId = LEVELS.find((l) => {
+    const prereq = l.requirements?.previousLevel ?? null;
+    return (prereq === null || completedLevels.includes(prereq)) && !completedLevels.includes(l.id);
+  })?.id ?? null;
 
+  // Both counters are scoped to THIS pack. Summing all of levelStats / all of
+  // completedLevels would fold other packs' progress into this pack's header
+  // now that three of them share one flat progress store.
+  const packIds = LEVELS.map((l) => l.id);
+  const completedInPack = packIds.filter((id) => completedLevels.includes(id)).length;
   const totalStars = LEVELS.length * STARS_PER_LEVEL;
-  const earnedStars = Object.values(levelStats).reduce((sum, stats) => sum + Math.min(stats.stars || 0, STARS_PER_LEVEL), 0);
+  const earnedStars = packIds.reduce(
+    (sum, id) => sum + Math.min(levelStats[id]?.stars || 0, STARS_PER_LEVEL), 0
+  );
 
   return (
     <div style={{
@@ -112,11 +123,11 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
           <div style={{
             fontSize: '11px', fontWeight: 900, color: PAPER_TEXT,
             letterSpacing: '0.16em', textTransform: 'uppercase',
-          }}>Life Journey</div>
+          }}>{pack.name}</div>
           <div style={{
             marginTop: '3px', fontSize: '10px', fontWeight: 700,
             color: PAPER_TEXT_MUTED, letterSpacing: '0.07em', textTransform: 'uppercase',
-          }}>{completedLevels.length}/{LEVELS.length} chapters complete</div>
+          }}>{completedInPack}/{LEVELS.length} chapters complete</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
           <span style={{
@@ -140,7 +151,11 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
           paddingBottom: '90px',
         }}>
           {LEVELS.map((level) => {
-            const unlocked = isLevelUnlocked(level.id, completedLevels);
+            // Pack-relative: a level is open when its declared prerequisite is
+            // done. isLevelUnlocked walks the story campaign, so it reported
+            // every level of another pack as locked.
+            const prereq = level.requirements?.previousLevel ?? null;
+            const unlocked = prereq === null || completedLevels.includes(prereq);
             const beaten = completedLevels.includes(level.id);
             const stat = levelStats[level.id];
             const stars = stat?.stars || 0;

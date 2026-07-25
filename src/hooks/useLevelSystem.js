@@ -140,6 +140,9 @@ export function useLevelSystem({ onBriefingSkipped } = {}) {
   // Handle back to main menu
   const handleBackToMainMenu = useCallback(() => {
     setShowLevelSelect(false);
+    // The campaign chooser sits in front of the map, so leaving for the menu has
+    // to close it too or it would still be up behind the main menu.
+    useGameStore.getState().setShowPackSelect(false);
     setShowMainMenu(true);
     // Fully reset cube and all game state so the next session starts clean.
     const { size: currentSize } = useGameStore.getState();
