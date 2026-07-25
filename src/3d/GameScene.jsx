@@ -5,8 +5,10 @@
  * Reads most state directly from useGameStore to reduce prop drilling.
  */
 
-import React, { Suspense, useMemo } from 'react';
+import React, { Suspense, useEffect, useMemo } from 'react';
 import { Html } from '@react-three/drei';
+import { useThree } from '@react-three/fiber';
+import { FogExp2 } from 'three';
 import SafeEnvironment from './SafeEnvironment.jsx';
 import { EffectComposer, N8AO } from '@react-three/postprocessing';
 import { useGameStore } from '../hooks/useGameStore.js';
@@ -15,8 +17,7 @@ import { isMobile } from '../utils/device.js';
 import CubeAssembly from './CubeAssembly.jsx';
 import BlackHoleEnvironment from './BlackHoleEnvironment.jsx';
 import NebulaEnvironment from './NebulaEnvironment.jsx';
-import { getLevelBackground } from './LifeJourneyBackgrounds.jsx';
-import { BACKGROUNDS, getBackgroundUrl } from '../utils/backgrounds.js';
+import { BACKGROUNDS, getBackgroundUrl, STORY_ENVIRONMENTS } from '../utils/backgrounds.js';
 import LayerHighlight from '../teach/LayerHighlight.jsx';
 import AntipodalPairHighlight from './AntipodalPairHighlight.jsx';
 import WormholeWarpFX from './WormholeWarpFX.jsx';
@@ -32,6 +33,26 @@ const PHOTO_PRESETS = new Set([
   'sunset', 'forest', 'city', 'dawn', 'night',
   'apartment', 'studio', 'park', 'warehouse', 'lobby',
 ]);
+
+/**
+ * Depth fog, owned imperatively.
+ *
+ * This was `{fogEnabled && <fogExp2 attach="fog" />}`, which attaches fine but
+ * does not reliably clear `scene.fog` when the flag flips back to false. Nothing
+ * caught it while only dark scenes were fogged, but the transition it breaks is
+ * common: the menu runs fogged, so entering ANY photo-panorama game from the
+ * menu kept the fog attached — and at density 0.028 the 100-unit sky sphere
+ * renders essentially 100% fog colour, i.e. a black background where a panorama
+ * should be. Setting scene.fog directly makes the off state real.
+ */
+function SceneFog({ enabled }) {
+  const scene = useThree((s) => s.scene);
+  useEffect(() => {
+    scene.fog = enabled ? new FogExp2('#05050f', 0.028) : null;
+    return () => { scene.fog = null; };
+  }, [scene, enabled]);
+  return null;
+}
 
 class ErrorBoundary3D extends React.Component {
   constructor(props) {
@@ -163,29 +184,32 @@ export default function GameScene({
     [settings.backgroundTheme]
   );
 
-  // Depth fog — only enabled over the dark black-hole space background. Photo-panorama
-  // and HDRI preset backgrounds render as a sharp image behind the scene, so fogging the
-  // cubies toward a flat color in front of them would look wrong; we gate it out for those.
-  // The black-hole path is the default fallback (see background selection below), so we
-  // mirror that condition: a level background that isn't a photo, or free-play with no
-  // photo/preset background resolving to the black hole.
+  // The panorama a Story chapter plays against, if it is cast to one. Chapters
+  // left null (moon, black hole) keep their bespoke procedural scene.
+  const storyEnvFile = currentLevelData?.background
+    ? STORY_ENVIRONMENTS[currentLevelData.background] ?? null
+    : null;
+
   const fogEnabled = useMemo(() => {
     if (currentLevelData) {
-      // Level scenes: fog the dark cosmic backgrounds, not bright HDRI 'city' lighting envs.
+      // Fog only the dark cosmic chapters. A photo panorama renders as a sharp
+      // image behind the scene, so fogging cubies toward a flat colour in front
+      // of it looks wrong — same reasoning as the free-play path below.
+      if (storyEnvFile) return false;
       return !currentLevelData.background || currentLevelData.background === 'blackhole';
     }
     if (settings.backgroundTheme === 'blackhole') return true;
     if (bgConfig?.file) return false; // user-selected photo panorama
     if (PHOTO_PRESETS.has(settings.backgroundTheme)) return false; // HDRI preset
     return true; // falls through to the black-hole default
-  }, [currentLevelData, settings.backgroundTheme, bgConfig]);
+  }, [currentLevelData, settings.backgroundTheme, bgConfig, storyEnvFile]);
 
   return (
     <>
       {/* Exp² depth fog over the dark space background. Density is low so the assembled
           cube stays crisp, but reads clearly once cubies spread apart in the explosion
           and during worm-tunnel travel, adding atmospheric depth at zero pipeline cost. */}
-      {fogEnabled && <fogExp2 attach="fog" args={['#05050f', 0.028]} />}
+      <SceneFog enabled={fogEnabled} />
       {/* Lights — intensity varies by visualMode */}
       <ambientLight intensity={visualMode === 'wireframe' ? 0.2 : visualMode === 'glass' ? 0.5 : 0.8} />
       <directionalLight
@@ -224,12 +248,18 @@ export default function GameScene({
       <Suspense fallback={null}>
         {/* Level-specific backgrounds */}
         {currentLevelData?.background === 'blackhole' && <BlackHoleEnvironment flipTrigger={blackHolePulse} />}
-        {currentLevelData?.background === 'nebula' && (
+        {(currentLevelData?.background === 'nebula' || currentLevelData?.background === 'moon') && (
           <NebulaEnvironment variant="game" pulseTrigger={blackHolePulse} speed={0.5}
             density={isMobile ? 0.55 : 0.85} structure={1.0} performanceMode={isMobile} />
         )}
-        {currentLevelData?.background && currentLevelData.background !== 'blackhole' && currentLevelData.background !== 'nebula' &&
-          getLevelBackground(currentLevelData.background, blackHolePulse)}
+        {/* Story chapters render against the same shipped panoramas as every
+            other mode, which also supplies the image-based lighting they never
+            had. See STORY_ENVIRONMENTS for the chapter → environment casting. */}
+        {storyEnvFile && (
+          <ErrorBoundary3D>
+            <InteractivePhotoBackground files={getBackgroundUrl(storyEnvFile)} />
+          </ErrorBoundary3D>
+        )}
         {/* Free play: Black Hole */}
         {!currentLevelData && settings.backgroundTheme === 'blackhole' && <BlackHoleEnvironment flipTrigger={blackHolePulse} />}
         {/* Free play: Nebula */}

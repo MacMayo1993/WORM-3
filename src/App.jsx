@@ -618,10 +618,12 @@ export default function WORM3() {
   const handleStartCampaign = useCallback(() => {
     useGameStore.getState().setShowMainMenu(false);
     setShowCubeModeSelect(false);
-    // Go straight into level 1 — Mobi greets the player on the level screen
-    // itself (see LevelTutorial), so no separate pre-campaign intro is needed.
-    handleLevelSelect(1);
-  }, [handleLevelSelect]);
+    // Open the chapter map rather than dropping straight into chapter 1. The map
+    // is where completion, stars and the locked ladder live; jumping past it
+    // meant a returning player never saw their own progress, and the only route
+    // to it was the in-game More sheet.
+    useGameStore.getState().setShowLevelSelect(true);
+  }, []);
 
   const handleMenuPlay = handleStartCampaign;
   const handleMenuCube = handleStartCampaign;
