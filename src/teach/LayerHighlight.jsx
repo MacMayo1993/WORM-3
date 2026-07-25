@@ -1,11 +1,16 @@
 // src/teach/LayerHighlight.jsx
-// 3D layer highlight that shows which slice will be rotated next.
+// The instructor's hint for "turn THIS layer, THIS way", drawn as light in the
+// world rather than as UI chrome pasted over it.
 //
-// Renders like the neon view mode, but only on the layer about to turn: every
-// exposed cubie face of the target slice gets a glowing neon edge-border drawn
-// flush on the cube surface, and bright light-worms sweep around the whole belt
-// in the DIRECTION OF THE TURN (uDir), so the preview reads which layer moves
-// and which way at a glance.
+// Three pieces, all the same warm gold:
+//   1. A soft gold rim that hugs every exposed tile of the target slice and
+//      bleeds a little off the tile edge, with brighter light sweeping around
+//      the belt in the direction of the turn.
+//   2. Wispy comet streamers orbiting the layer, tapering to a bright point at
+//      the leading tip so the shape itself reads as an arrowhead. They ride a
+//      belt wide enough to clear the cube's corner diagonal — nothing cuts
+//      through the cube.
+//   3. Gold motes drifting along the same belt, carried the way the layer turns.
 
 import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -21,10 +26,41 @@ const FACE_DEFS = {
   NZ: { n: [0, 0, -1], u: [1, 0, 0], v: [0, 1, 0] }
 };
 
-const FACE_OFFSET = 0.52; // just proud of the sticker so the border reads as an edge glow
-const HALF = 0.49;        // cubie-face half-extent (matches the neon view-mode frame)
+const FACE_OFFSET = 0.52; // just proud of the sticker so the rim reads as light on the surface
+const TILE_HALF = 0.49;   // the cubie face itself
+const QUAD_HALF = 0.64;   // oversized quad — the extra margin is where the glow bleeds out
+const EDGE_UV = 0.5 * (TILE_HALF / QUAD_HALF); // tile outline, in the quad's uv space
 
-const layerVertexShader = `
+// Warm gold, deep to pale. Deliberately richer than UI_GOLD: these colours are
+// additively blended over a live scene, so a pale token would wash out to white.
+const GOLD_DEEP = '#ff9c1c';
+const GOLD_CORE = '#ffe7ae';
+
+// Cheap value-noise fbm, shared by the rim and the streamers.
+const NOISE_GLSL = `
+  float hash21(vec2 p) {
+    p = fract(p * vec2(123.34, 456.21));
+    p += dot(p, p + 45.32);
+    return fract(p.x * p.y);
+  }
+  float vnoise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash21(i), hash21(i + vec2(1.0, 0.0)), f.x),
+               mix(hash21(i + vec2(0.0, 1.0)), hash21(i + vec2(1.0, 1.0)), f.x), f.y);
+  }
+  float fbm(vec2 p) {
+    float v = 0.0;
+    float amp = 0.5;
+    for (int i = 0; i < 3; i++) { v += amp * vnoise(p); p *= 2.03; amp *= 0.5; }
+    return v;
+  }
+`;
+
+// ─── 1. Layer rim ─────────────────────────────────────────────────────────────
+
+const rimVertexShader = `
   attribute float aPhase;
   varying vec2 vUv;
   varying float vPhase;
@@ -35,80 +71,238 @@ const layerVertexShader = `
   }
 `;
 
-const layerFragmentShader = `
-  uniform vec3  uColor;
+const rimFragmentShader = `
+  uniform vec3  uDeep;
+  uniform vec3  uCore;
   uniform float uTime;
-  uniform float uDir;   // +1 / -1 → worms sweep with the turn direction
+  uniform float uDir;    // +1 / -1 → the sweep travels with the turn
+  uniform float uEdge;   // tile outline in uv space
   varying vec2  vUv;
-  varying float vPhase; // this face's angular position around the turn axis, [0,1)
+  varying float vPhase;  // this face's angular position around the turn axis, [0,1)
   #define TAU 6.28318530718
+  ${NOISE_GLSL}
 
   void main() {
     vec2 p = vUv - 0.5;
     vec2 a = abs(p);
     float m = max(a.x, a.y);
-    float edgeDist = 0.5 - m;
+    float d = m - uEdge;   // <0 inside the tile, >0 out in the bleed margin
 
-    // Perimeter coordinate around the square edge (for the wiggle).
+    // Perimeter coordinate around the tile outline, for the wander.
     float s;
     if (p.y >= a.x)       s = (p.x + 0.5) * 0.25;
     else if (p.x >= a.y)  s = 0.25 + (0.5 - p.y) * 0.25;
     else if (-p.y >= a.x) s = 0.50 + (0.5 - p.x) * 0.25;
     else                  s = 0.75 + (p.y + 0.5) * 0.25;
 
-    // Neon edge-border hugging the tile outline; thickness wiggles so it looks alive.
-    float wig  = 1.0 + 0.25 * sin(s * TAU * 4.0 - uTime * 4.0);
-    float bw   = 0.075 * wig;
-    float band = 1.0 - smoothstep(0.0, bw, edgeDist);
-    if (band < 0.003) discard;
+    // The rim breathes and frays instead of sitting still.
+    float wander = 1.0 + 0.20 * sin(s * TAU * 3.0 - uTime * 2.0)
+                       + 0.45 * (fbm(vec2(s * 6.0, uTime * 0.5)) - 0.5);
+    float bw   = 0.052 * wander;
+    float line = exp(-pow(abs(d) / max(bw, 0.012), 1.7));       // filament on the outline
+    float halo = exp(-pow(max(d, 0.0) / (bw * 3.0), 2.0)) * 0.4; // soft bleed outward
+    float fill = 1.0 - smoothstep(uEdge - 0.03, uEdge, m);       // faint sheen inside the tile
 
-    float glow = band * 0.5;
-
-    // Light-worms sweep around the whole layer belt by angular phase, in the
-    // turn direction. Each face brightens as a worm passes its angular position.
-    float worms = 0.0;
+    // Light runs around the whole belt in the turn direction; each face lights
+    // up as it passes. This is what makes the layer read as *going somewhere*.
+    float sweep = 0.0;
     for (int i = 0; i < 3; i++) {
-      float wp = fract(float(i) / 3.0 + uDir * uTime * 0.14);
-      float d  = abs(fract(vPhase - wp + 0.5) - 0.5);
-      worms += exp(-(d * d) / (0.10 * 0.10));
+      float wp = fract(float(i) / 3.0 + uDir * uTime * 0.13);
+      float dd = abs(fract(vPhase - wp + 0.5) - 0.5);
+      sweep += exp(-(dd * dd) / (0.09 * 0.09));
     }
-    worms = clamp(worms, 0.0, 1.3);
+    sweep = clamp(sweep, 0.0, 1.25);
 
-    glow += band * worms * 1.15;
-    vec3 col = mix(uColor, vec3(1.0), clamp(worms - 0.3, 0.0, 1.0) * 0.72);
-    gl_FragColor = vec4(col * 1.7, clamp(glow, 0.0, 1.0));
+    float glow = (line * 0.40 + halo * 0.60) * (0.45 + sweep * 1.05) + fill * (0.03 + sweep * 0.055);
+    if (glow < 0.004) discard;
+
+    vec3 col = mix(uDeep, uCore, clamp(sweep * 0.6 + line * 0.3, 0.0, 1.0));
+    gl_FragColor = vec4(col * 1.15, clamp(glow, 0.0, 1.0));
   }
 `;
 
-// Build one curved arrow (a tube arc + a cone head) lying in the local XY plane,
-// curving in `dir`. Returns the shaft geometry plus the head's local transform.
-function buildArrowArc(radius, span, dir, tubeR) {
-  const seg = 20;
-  const pts = [];
-  for (let i = 0; i <= seg; i++) {
-    const a = dir * (-span / 2 + span * (i / seg));
-    pts.push(new THREE.Vector3(Math.cos(a) * radius, Math.sin(a) * radius, 0));
-  }
-  const curve = new THREE.CatmullRomCurve3(pts);
-  const shaft = new THREE.TubeGeometry(curve, seg, tubeR, 8, false);
-  const p1 = pts[pts.length - 1];
-  const p0 = pts[pts.length - 2];
-  const tan = p1.clone().sub(p0).normalize();
-  // Cone geometry points +Y by default — rotate +Y onto the arc's end tangent.
-  const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), tan);
-  return {
-    shaft,
-    headPos: [p1.x + tan.x * 0.12, p1.y + tan.y * 0.12, p1.z + tan.z * 0.12],
-    headQuat: [quat.x, quat.y, quat.z, quat.w]
+// ─── 2. Wisp streamers ────────────────────────────────────────────────────────
+
+// One tapered, gently wandering tube swept along an arc of the belt. The tip
+// (t = 1) is the leading end: it narrows to a point in the direction of travel.
+function buildWisp(radius, span, dir, maxR) {
+  const SEG = 72;
+  const RING = 8;
+  const positions = [];
+  const normals = [];
+  const ts = [];
+  const rings = [];
+  const indices = [];
+
+  const centre = (f) => {
+    const ang = dir * span * (f - 1.0);
+    const rad = radius + 0.09 * Math.sin(f * 8.5 + 0.7);
+    return [Math.cos(ang) * rad, Math.sin(ang) * rad, 0.14 * Math.sin(f * 5.3 + 1.9), Math.cos(ang), Math.sin(ang)];
   };
+
+  for (let i = 0; i <= SEG; i++) {
+    const f = i / SEG;
+    const [cx, cy, cz, nx, ny] = centre(f);
+    // Comet profile: nothing at the tail, mass around 2/3 along, a point at the tip.
+    const rr = maxR * Math.pow(Math.sin(Math.PI * Math.pow(f, 1.8)), 0.85);
+    for (let j = 0; j <= RING; j++) {
+      const th = (j / RING) * Math.PI * 2;
+      const ct = Math.cos(th);
+      const st = Math.sin(th);
+      // Flattened cross-section: taller along the turn axis than it is deep.
+      positions.push(cx + nx * ct * 0.8 * rr, cy + ny * ct * 0.8 * rr, cz + st * 1.15 * rr);
+      const len = Math.hypot(nx * ct, ny * ct, st) || 1;
+      normals.push((nx * ct) / len, (ny * ct) / len, st / len);
+      ts.push(f);
+      rings.push(j / RING);
+    }
+  }
+
+  for (let i = 0; i < SEG; i++) {
+    for (let j = 0; j < RING; j++) {
+      const a = i * (RING + 1) + j;
+      const b = a + RING + 1;
+      indices.push(a, b, a + 1, b, b + 1, a + 1);
+    }
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+  geo.setAttribute('aT', new THREE.Float32BufferAttribute(ts, 1));
+  geo.setAttribute('aRing', new THREE.Float32BufferAttribute(rings, 1));
+  geo.setIndex(indices);
+
+  const [tx, ty, tz] = centre(1);
+  return { geo, tip: [tx, ty, tz] };
 }
 
-const LayerHighlight = ({ axis, sliceIndex, dir, size }) => {
-  const matRef = useRef();
-  const spinnerRef = useRef();
+const wispVertexShader = `
+  attribute float aT;
+  attribute float aRing;
+  varying float vT;
+  varying float vRing;
+  varying vec3  vNrm;
+  varying vec3  vView;
+  void main() {
+    vT = aT;
+    vRing = aRing;
+    vNrm = normalize(normalMatrix * normal);
+    vec4 mv = modelViewMatrix * vec4(position, 1.0);
+    vView = -mv.xyz;
+    gl_Position = projectionMatrix * mv;
+  }
+`;
 
-  // Build a single merged geometry of all exposed cubie faces in the target slice.
-  const geometry = useMemo(() => {
+const wispFragmentShader = `
+  uniform vec3  uDeep;
+  uniform vec3  uCore;
+  uniform float uTime;
+  uniform float uSoft;  // 0 = the streamer itself, 1 = the haze around it
+  varying float vT;
+  varying float vRing;
+  varying vec3  vNrm;
+  varying vec3  vView;
+  #define TAU 6.28318530718
+  ${NOISE_GLSL}
+
+  void main() {
+    // Dense at the head, dissolving into nothing at the tail.
+    float body = smoothstep(0.0, 0.55, vT) * (0.35 + 0.65 * pow(vT, 1.6));
+
+    // Strands of smoke drifting backwards along the streamer. Sampling the ring
+    // coordinate through cos/sin keeps the noise seamless around the tube.
+    float n = fbm(vec2(vT * 9.0 - uTime * 1.15, 2.0 + cos(vRing * TAU) * 1.3))
+            + fbm(vec2(vT * 5.0 - uTime * 0.55, 7.0 + sin(vRing * TAU) * 1.3));
+    float strands = smoothstep(0.42, 0.86, n * 0.5);
+
+    // Grazing angles carry nearly all the light, so the tube reads as something
+    // gaseous seen through rather than a solid gold hose.
+    float fres = pow(1.0 - abs(dot(normalize(vNrm), normalize(vView))), 1.5);
+
+    float core = body * mix(0.05, 1.0, strands) * (0.12 + 1.05 * fres) * 1.9;
+    core += smoothstep(0.78, 1.0, vT) * 0.55 * (0.35 + fres); // hot leading tip
+    float haze = body * (0.10 + 0.55 * strands) * pow(fres, 1.4) * 0.45;
+
+    float alpha = mix(core, haze, uSoft);
+    if (alpha < 0.004) discard;
+
+    vec3 col = mix(uDeep, uCore, clamp(strands * 0.55 + pow(vT, 2.2) * 0.85, 0.0, 1.0));
+    gl_FragColor = vec4(col * mix(1.45, 0.85, uSoft), clamp(alpha, 0.0, 1.0));
+  }
+`;
+
+// ─── 3. Tip flares + drifting motes ───────────────────────────────────────────
+
+const flareVertexShader = `
+  uniform float uTime;
+  uniform float uSize;
+  attribute float aSeed;
+  varying float vFade;
+  void main() {
+    vFade = 1.0;
+    vec4 mv = modelViewMatrix * vec4(position, 1.0);
+    float pulse = 0.85 + 0.15 * sin(uTime * 3.0 + aSeed * 6.283);
+    gl_PointSize = clamp(uSize * pulse * (300.0 / -mv.z), 4.0, 190.0);
+    gl_Position = projectionMatrix * mv;
+  }
+`;
+
+// Motes ride the belt themselves: the orbit is computed here so they keep
+// drifting independently of the streamers' rotation.
+const moteVertexShader = `
+  uniform float uTime;
+  uniform float uDir;
+  uniform float uSize;
+  attribute float aSeed;
+  attribute float aAngle;
+  varying float vFade;
+  void main() {
+    float ang = aAngle + uDir * uTime * (0.30 + aSeed * 0.25);
+    float r = position.x + 0.10 * sin(uTime * 0.9 + aSeed * 6.283);
+    float z = position.z + 0.14 * sin(uTime * 0.7 + aSeed * 4.0);
+    vec4 mv = modelViewMatrix * vec4(cos(ang) * r, sin(ang) * r, z, 1.0);
+    vFade = 0.30 + 0.70 * pow(0.5 + 0.5 * sin(uTime * 1.4 + aSeed * 6.283), 2.0);
+    gl_PointSize = clamp(uSize * (300.0 / -mv.z), 1.0, 60.0);
+    gl_Position = projectionMatrix * mv;
+  }
+`;
+
+const sparkFragmentShader = `
+  uniform vec3 uDeep;
+  uniform vec3 uCore;
+  varying float vFade;
+  void main() {
+    vec2 uv = gl_PointCoord * 2.0 - 1.0;
+    float d = length(uv);
+    if (d > 1.0) discard;
+    float core = pow(1.0 - d, 2.4);
+    float halo = exp(-d * d * 3.2) * 0.5;
+    vec3 col = mix(uDeep, uCore, core);
+    gl_FragColor = vec4(col, clamp((core * 0.75 + halo) * vFade, 0.0, 1.0));
+  }
+`;
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+const STREAMERS = 3;
+
+const LayerHighlight = ({ axis, sliceIndex, dir, size }) => {
+  const spinnerRef = useRef();
+  const turn = dir === 1 ? 1 : -1;
+
+  // Shared clock + direction, so every material animates off one source.
+  const uTime = useMemo(() => ({ value: 0 }), []);
+  const uDir = useMemo(() => ({ value: turn }), []); // eslint-disable-line react-hooks/exhaustive-deps
+  React.useEffect(() => { uDir.value = turn; }, [turn, uDir]);
+
+  const palette = useMemo(() => ({
+    uDeep: { value: new THREE.Color(GOLD_DEEP) },
+    uCore: { value: new THREE.Color(GOLD_CORE) }
+  }), []);
+
+  // One merged geometry of every exposed cubie face in the target slice.
+  const rimGeometry = useMemo(() => {
     const k = (size - 1) / 2;
     const positions = [];
     const uvs = [];
@@ -141,7 +335,7 @@ const LayerHighlight = ({ axis, sliceIndex, dir, size }) => {
             const fz = cz + n[2] * FACE_OFFSET;
 
             // Angular position of this face around the rotation axis → drives the
-            // directional worm sweep. In-plane coords depend on the turn axis.
+            // directional sweep. In-plane coords depend on the turn axis.
             let c1, c2;
             if (axis === 'col') { c1 = fy; c2 = fz; }        // X axis
             else if (axis === 'row') { c1 = fz; c2 = fx; }   // Y axis
@@ -154,9 +348,9 @@ const LayerHighlight = ({ axis, sliceIndex, dir, size }) => {
             ];
             for (const [su, sv, tu, tv] of corners) {
               positions.push(
-                fx + (u[0] * su + v[0] * sv) * HALF,
-                fy + (u[1] * su + v[1] * sv) * HALF,
-                fz + (u[2] * su + v[2] * sv) * HALF
+                fx + (u[0] * su + v[0] * sv) * QUAD_HALF,
+                fy + (u[1] * su + v[1] * sv) * QUAD_HALF,
+                fz + (u[2] * su + v[2] * sv) * QUAD_HALF
               );
               uvs.push(tu, tv);
               phases.push(phase);
@@ -176,13 +370,15 @@ const LayerHighlight = ({ axis, sliceIndex, dir, size }) => {
     return geo;
   }, [axis, sliceIndex, size]);
 
-  // Dispose the geometry when the slice changes / unmounts.
-  React.useEffect(() => () => geometry.dispose(), [geometry]);
+  React.useEffect(() => () => rimGeometry.dispose(), [rimGeometry]);
 
-  // Ring of curved arrows encircling the layer, oriented to the turn axis and
-  // positioned at the layer's slice. The ring spins in the turn direction so the
-  // arrows physically travel the way the layer will rotate.
-  const arrowRing = useMemo(() => {
+  const rimUniforms = useMemo(() => ({
+    ...palette, uTime, uDir, uEdge: { value: EDGE_UV }
+  }), [palette, uTime, uDir]);
+
+  // The belt the streamers and motes ride: outside the layer's corner diagonal,
+  // so nothing ever clips through the cube however it is oriented.
+  const belt = useMemo(() => {
     const axisVec =
       axis === 'col' ? new THREE.Vector3(1, 0, 0)
         : axis === 'row' ? new THREE.Vector3(0, 1, 0)
@@ -190,39 +386,81 @@ const LayerHighlight = ({ axis, sliceIndex, dir, size }) => {
     const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), axisVec);
     const axial = sliceIndex - (size - 1) / 2;
     const pos = axisVec.clone().multiplyScalar(axial);
-    const radius = size / 2 + 0.42;
-    const arrow = buildArrowArc(radius, 1.25, dir === 1 ? 1 : -1, 0.05);
-    return { quaternion: [q.x, q.y, q.z, q.w], position: [pos.x, pos.y, pos.z], arrow };
-  }, [axis, sliceIndex, size, dir]);
+    // Corner diagonal of the slice, plus room for the streamers' full haze.
+    const radius = (size / 2) * Math.SQRT2 + 0.7;
+    return {
+      quaternion: [q.x, q.y, q.z, q.w],
+      position: [pos.x, pos.y, pos.z],
+      radius
+    };
+  }, [axis, sliceIndex, size]);
 
-  React.useEffect(() => () => arrowRing.arrow.shaft.dispose(), [arrowRing]);
+  // Streamer body, the haze around it, and a flare at each leading tip.
+  const streamers = useMemo(() => {
+    const thickness = 0.13 + size * 0.03;
+    const { geo, tip } = buildWisp(belt.radius, 1.5, turn, thickness);
+    const { geo: aura } = buildWisp(belt.radius, 1.5, turn, thickness * 2.4);
 
-  const uniforms = useMemo(() => ({
-    uColor: { value: new THREE.Color('#00e5ff') },
-    uTime: { value: 0 },
-    uDir: { value: dir === 1 ? 1 : -1 }
-  }), []); // eslint-disable-line react-hooks/exhaustive-deps
+    const flare = new THREE.BufferGeometry();
+    const pts = [];
+    const seeds = [];
+    for (let i = 0; i < STREAMERS; i++) {
+      const a = (i / STREAMERS) * Math.PI * 2;
+      const ca = Math.cos(a), sa = Math.sin(a);
+      pts.push(tip[0] * ca - tip[1] * sa, tip[0] * sa + tip[1] * ca, tip[2]);
+      seeds.push(i / STREAMERS);
+    }
+    flare.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+    flare.setAttribute('aSeed', new THREE.Float32BufferAttribute(seeds, 1));
+    return { geo, aura, flare };
+  }, [belt.radius, turn, size]);
 
-  // Keep direction in sync if the move flips between renders.
-  React.useEffect(() => {
-    uniforms.uDir.value = dir === 1 ? 1 : -1;
-  }, [dir, uniforms]);
+  React.useEffect(() => () => {
+    streamers.geo.dispose();
+    streamers.aura.dispose();
+    streamers.flare.dispose();
+  }, [streamers]);
+
+  // Loose motes scattered around the belt, always outside the cube.
+  const motes = useMemo(() => {
+    const COUNT = 44;
+    const pts = [];
+    const seeds = [];
+    const angles = [];
+    for (let i = 0; i < COUNT; i++) {
+      const t = (i + 0.5) / COUNT;
+      pts.push(belt.radius + 0.05 + Math.sin(i * 12.9898) * 0.3, 0, Math.sin(i * 78.233) * 0.45);
+      seeds.push(t);
+      angles.push(t * Math.PI * 2 + Math.sin(i * 4.1) * 0.4);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+    geo.setAttribute('aSeed', new THREE.Float32BufferAttribute(seeds, 1));
+    geo.setAttribute('aAngle', new THREE.Float32BufferAttribute(angles, 1));
+    return geo;
+  }, [belt.radius]);
+
+  React.useEffect(() => () => motes.dispose(), [motes]);
+
+  const wispUniforms = useMemo(() => ({ ...palette, uTime, uSoft: { value: 0 } }), [palette, uTime]);
+  const auraUniforms = useMemo(() => ({ ...palette, uTime, uSoft: { value: 1 } }), [palette, uTime]);
+  const flareUniforms = useMemo(() => ({ ...palette, uTime, uSize: { value: 0.26 } }), [palette, uTime]);
+  const moteUniforms = useMemo(() => ({ ...palette, uTime, uDir, uSize: { value: 0.075 } }), [palette, uTime, uDir]);
 
   useFrame((state, delta) => {
-    if (matRef.current) matRef.current.uniforms.uTime.value = state.clock.elapsedTime;
-    // Spin the arrow ring around the turn axis (local Z) in the turn direction.
-    if (spinnerRef.current) spinnerRef.current.rotation.z += delta * (dir === 1 ? 1 : -1) * 0.7;
+    uTime.value = state.clock.elapsedTime;
+    // Carry the streamers around the belt the way the layer will turn.
+    if (spinnerRef.current) spinnerRef.current.rotation.z += delta * turn * 0.85;
   });
 
   return (
     <group>
-      {/* Neon edge-worms on the layer's cubie faces */}
-      <mesh geometry={geometry}>
+      {/* Gold rim on the layer's own tiles, sweeping in the turn direction */}
+      <mesh geometry={rimGeometry} raycast={() => null}>
         <shaderMaterial
-          ref={matRef}
-          vertexShader={layerVertexShader}
-          fragmentShader={layerFragmentShader}
-          uniforms={uniforms}
+          vertexShader={rimVertexShader}
+          fragmentShader={rimFragmentShader}
+          uniforms={rimUniforms}
           transparent
           side={THREE.DoubleSide}
           depthWrite={false}
@@ -230,21 +468,60 @@ const LayerHighlight = ({ axis, sliceIndex, dir, size }) => {
         />
       </mesh>
 
-      {/* Curved arrow ring encircling the layer, spinning in the turn direction */}
-      <group quaternion={arrowRing.quaternion} position={arrowRing.position}>
+      <group quaternion={belt.quaternion} position={belt.position}>
+        {/* Streamers orbiting the layer, tips leading the way round */}
         <group ref={spinnerRef}>
-          {[0, 1, 2, 3].map((i) => (
-            <group key={i} rotation={[0, 0, (i * Math.PI) / 2]}>
-              <mesh geometry={arrowRing.arrow.shaft}>
-                <meshBasicMaterial color="#3af0ff" toneMapped={false} />
+          {Array.from({ length: STREAMERS }, (_, i) => (
+            <group key={i} rotation={[0, 0, (i / STREAMERS) * Math.PI * 2]}>
+              <mesh geometry={streamers.aura} raycast={() => null}>
+                <shaderMaterial
+                  vertexShader={wispVertexShader}
+                  fragmentShader={wispFragmentShader}
+                  uniforms={auraUniforms}
+                  transparent
+                  side={THREE.DoubleSide}
+                  depthWrite={false}
+                  blending={THREE.AdditiveBlending}
+                />
               </mesh>
-              <mesh position={arrowRing.arrow.headPos} quaternion={arrowRing.arrow.headQuat}>
-                <coneGeometry args={[0.14, 0.26, 14]} />
-                <meshBasicMaterial color="#3af0ff" toneMapped={false} />
+              <mesh geometry={streamers.geo} raycast={() => null}>
+                <shaderMaterial
+                  vertexShader={wispVertexShader}
+                  fragmentShader={wispFragmentShader}
+                  uniforms={wispUniforms}
+                  transparent
+                  side={THREE.DoubleSide}
+                  depthWrite={false}
+                  blending={THREE.AdditiveBlending}
+                />
               </mesh>
             </group>
           ))}
+
+          {/* Hot point at each streamer tip — the thing the eye follows */}
+          <points geometry={streamers.flare} raycast={() => null}>
+            <shaderMaterial
+              vertexShader={flareVertexShader}
+              fragmentShader={sparkFragmentShader}
+              uniforms={flareUniforms}
+              transparent
+              depthWrite={false}
+              blending={THREE.AdditiveBlending}
+            />
+          </points>
         </group>
+
+        {/* Motes carried along the same belt */}
+        <points geometry={motes} raycast={() => null} frustumCulled={false}>
+          <shaderMaterial
+            vertexShader={moteVertexShader}
+            fragmentShader={sparkFragmentShader}
+            uniforms={moteUniforms}
+            transparent
+            depthWrite={false}
+            blending={THREE.AdditiveBlending}
+          />
+        </points>
       </group>
     </group>
   );
