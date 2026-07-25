@@ -290,6 +290,14 @@ export const TILE_STYLES = {
   bioLattice:   { label: 'Bio-Lattice',   cost: 'med', type: 'animated' },
   stellarLensing: { label: 'Stellar Lensing', cost: 'med', type: 'animated' },
   eyeball:        { label: 'Eyeball',         cost: 'med', type: 'animated' },
+  // Craft materials — surfaces that read as a made object rather than a pattern
+  monolith:    { label: 'Monolith',   cost: 'low', type: 'procedural' },
+  patina:      { label: 'Patina',     cost: 'low', type: 'pattern' },
+  raku:        { label: 'Raku',       cost: 'low', type: 'pattern' },
+  cloisonne:   { label: 'Cloisonné',  cost: 'low', type: 'pattern' },
+  nacre:       { label: 'Nacre',      cost: 'med', type: 'animated' },
+  amber:       { label: 'Amber',      cost: 'med', type: 'procedural' },
+  terrarium:   { label: 'Terrarium',  cost: 'med', type: 'animated' },
 };
 
 export const DEFAULT_SETTINGS = {

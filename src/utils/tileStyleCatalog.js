@@ -3,6 +3,7 @@ export const CLASSIC_STYLE_KEYS = [
   'cafeWall', 'hermanGrid', 'opticSpin', 'ouchi', 'scintillatingGrid',
   'zoellner', 'kanizsa', 'fraserSpiral', 'muellerLyer', 'rotatingSnakes', 'poggendorff',
   'stainedGlass', 'fingerprint', 'topographic', 'mandelbrot', 'penrose',
+  'monolith', 'patina', 'raku', 'cloisonne',
 ];
 
 export const ANTIPODAL_STYLE_KEYS = [
@@ -20,6 +21,7 @@ export const LIVING_STYLE_KEYS = [
   'oilSlick', 'constellation', 'neonSign',
   'prismBloom', 'magnetFlux', 'liquidChrome', 'orbChamber', 'liquidTank', 'dice', 'sandChamber', 'lavaLamp', 'eyeball', 'auroraWeave', 'plasmaCells',
   'quantumScanlines', 'emberstorm', 'fractalPulse', 'bioLattice', 'stellarLensing',
+  'nacre', 'amber', 'terrarium',
 ];
 
 export const TILE_STYLE_SECTIONS = [

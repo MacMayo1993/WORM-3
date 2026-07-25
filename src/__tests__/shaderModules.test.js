@@ -4,6 +4,7 @@ import { techShaders } from '../3d/styles/shaders/techShaders.js';
 import { natureShaders } from '../3d/styles/shaders/natureShaders.js';
 import { opArtShaders } from '../3d/styles/shaders/opArtShaders.js';
 import { antipodalShaders } from '../3d/styles/shaders/antipodalShaders.js';
+import { craftShaders } from '../3d/styles/shaders/craftShaders.js';
 
 const modules = [
   ['basicShaders', basicShaders],
@@ -11,6 +12,7 @@ const modules = [
   ['natureShaders', natureShaders],
   ['opArtShaders', opArtShaders],
   ['antipodalShaders', antipodalShaders],
+  ['craftShaders', craftShaders],
 ];
 
 describe('shader modules', () => {

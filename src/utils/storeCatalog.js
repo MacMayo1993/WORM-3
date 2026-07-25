@@ -103,6 +103,8 @@ const TILE_PRICES = {
   // Animated style pack (dev request)
   prismBloom: 175, magnetFlux: 175, liquidChrome: 200, orbChamber: 175, liquidTank: 175, dice: 200, sandChamber: 175, lavaLamp: 200, eyeball: 200, auroraWeave: 175, plasmaCells: 175,
   quantumScanlines: 150, emberstorm: 175, fractalPulse: 175, bioLattice: 175, stellarLensing: 200,
+  // Craft materials
+  patina: 100, raku: 125, cloisonne: 150, monolith: 150, nacre: 175, amber: 200, terrarium: 200,
 };
 
 export const STORE_TILES = Object.keys(TILE_STYLES).map(k => ({
