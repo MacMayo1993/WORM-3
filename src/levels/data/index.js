@@ -14,6 +14,7 @@ import level08 from './level-08-ultimate-seam.js';
 import level09 from './level-09-quotient-collapse.js';
 import level10 from './level-10-black-hole.js';
 import { CUBE_CAMPAIGN_LEVELS, getCubeCampaignLevel } from './cube-campaign.js';
+import { ALGORITHM_CODEX_LEVELS, getAlgorithmLevel, getAlgorithmLevelIds } from './algorithm-codex.js';
 
 /**
  * The canonical Life Journey story campaign. Keep this list explicit so the
@@ -39,6 +40,9 @@ export const STORY_LEVELS = [
 export {
   CUBE_CAMPAIGN_LEVELS,
   getCubeCampaignLevel,
+  ALGORITHM_CODEX_LEVELS,
+  getAlgorithmLevel,
+  getAlgorithmLevelIds,
   level01,
   level02,
   level03,

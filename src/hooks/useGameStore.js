@@ -637,6 +637,9 @@ export const useGameStore = create(
     showSettings: false,
     showMainMenu: true,
     showLevelSelect: false,
+    // Campaign chooser, and which pack the chapter map is currently showing.
+    showPackSelect: false,
+    activePackId: 'story-campaign',
     showCutscene: false,
     showLevelTutorial: false,
     showMobileTouchHint: isMobile && !persistedState.mobileHintShown,
@@ -650,6 +653,8 @@ export const useGameStore = create(
     setShowSettings: (showSettings) => set({ showSettings }),
     setShowMainMenu: (showMainMenu) => set({ showMainMenu }),
     setShowLevelSelect: (showLevelSelect) => set({ showLevelSelect }),
+    setShowPackSelect: (showPackSelect) => set({ showPackSelect }),
+    setActivePackId: (activePackId) => set({ activePackId }),
     setShowCutscene: (showCutscene) => set({ showCutscene }),
     setShowLevelTutorial: (showLevelTutorial) => set({ showLevelTutorial }),
     setShowMobileTouchHint: (showMobileTouchHint) => set({ showMobileTouchHint }),

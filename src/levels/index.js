@@ -71,13 +71,13 @@ export {
 // LEVEL DATA
 // ============================================================================
 
-export { STORY_LEVELS, getStoryLevel, getStoryLevelIds, CUBE_CAMPAIGN_LEVELS, getCubeCampaignLevel, getCubeCampaignLevelIds } from './data/index.js';
+export { STORY_LEVELS, getStoryLevel, getStoryLevelIds, CUBE_CAMPAIGN_LEVELS, getCubeCampaignLevel, getCubeCampaignLevelIds, ALGORITHM_CODEX_LEVELS, getAlgorithmLevel, getAlgorithmLevelIds } from './data/index.js';
 
 // ============================================================================
 // LEVEL PACKS
 // ============================================================================
 
-export { OFFICIAL_PACKS, BUILT_IN_PACKS, getPack, getPackIds, storyCampaign, cubeAcademy } from './packs/index.js';
+export { OFFICIAL_PACKS, BUILT_IN_PACKS, getPack, getPackIds, storyCampaign, cubeAcademy, algorithmCodex } from './packs/index.js';
 
 // ============================================================================
 // VALIDATION

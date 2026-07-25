@@ -618,11 +618,24 @@ export default function WORM3() {
   const handleStartCampaign = useCallback(() => {
     useGameStore.getState().setShowMainMenu(false);
     setShowCubeModeSelect(false);
-    // Open the chapter map rather than dropping straight into chapter 1. The map
-    // is where completion, stars and the locked ladder live; jumping past it
-    // meant a returning player never saw their own progress, and the only route
-    // to it was the in-game More sheet.
-    useGameStore.getState().setShowLevelSelect(true);
+    // Open the campaign chooser. Story used to jump straight into chapter 1, so
+    // the chapter map (completion, stars, the locked ladder) was reachable only
+    // from the in-game More sheet, and two shipped packs had no entry at all.
+    useGameStore.getState().setShowPackSelect(true);
+  }, []);
+
+  const handleSelectPack = useCallback((packId) => {
+    const st = useGameStore.getState();
+    st.setActivePackId(packId);
+    st.setShowPackSelect(false);
+    st.setShowLevelSelect(true);
+  }, []);
+
+  // The chapter map's back button returns to the chooser, not all the way out.
+  const handleBackToPackSelect = useCallback(() => {
+    const st = useGameStore.getState();
+    st.setShowLevelSelect(false);
+    st.setShowPackSelect(true);
   }, []);
 
   const handleMenuPlay = handleStartCampaign;
@@ -1004,8 +1017,13 @@ export default function WORM3() {
     const scrambleSequence = currentLevelData?.scrambleSequence;
     if (scrambleSequence && scrambleSequence.length) {
       // Hand-authored deterministic scramble (e.g. a single middle-layer turn).
-      for (const { axis, sliceIndex, dir } of scrambleSequence) {
-        state = rotateSliceCubies(state, levelSize, axis, sliceIndex, dir);
+      // numTurns is honoured for completeness, though authored data emits one
+      // entry per quarter turn: getLevelPar counts entries, so a numTurns:2 kept
+      // as one entry would score par 1 for a move that costs the player two.
+      for (const { axis, sliceIndex, dir, numTurns } of scrambleSequence) {
+        for (let t = 0; t < (numTurns ?? 1); t++) {
+          state = rotateSliceCubies(state, levelSize, axis, sliceIndex, dir);
+        }
       }
     } else {
       const shuffleCount = currentLevelData ? (currentLevelData.scrambleMoves ?? Math.min(25, 10 + currentLevel * 2)) : 25;
@@ -1420,6 +1438,8 @@ export default function WORM3() {
               onTapFlip,
               onBackToMainMenu: handleBackToMainMenu,
               onLevelSelect: handleLevelSelect,
+              onSelectPack: handleSelectPack,
+              onBackToPackSelect: handleBackToPackSelect,
               onCutsceneComplete: handleCutsceneComplete,
               onTutorialClose: handleTutorialClose,
               onLevelTutorialClose: levelTutorialClose,

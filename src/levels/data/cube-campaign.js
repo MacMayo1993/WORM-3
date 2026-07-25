@@ -8,7 +8,7 @@ const cubeTags = [LEVEL_TAGS.TUTORIAL, LEVEL_TAGS.PUZZLE];
 
 export const CUBE_CAMPAIGN_LEVELS = [
   createLevel({
-    id: 1,
+    id: 101,
     name: 'The Middle Layer',
     description: 'One middle-layer turn is out of place. Spin it back.',
     cubeSize: 3,
@@ -39,7 +39,7 @@ export const CUBE_CAMPAIGN_LEVELS = [
     requirements: { previousLevel: null, stars: 0, achievements: [] },
   }),
   createLevel({
-    id: 2,
+    id: 102,
     name: 'Through the Cube',
     description: 'The middle tile of each side is wrong. Tap them to flip the colors back.',
     cubeSize: 3,
@@ -77,10 +77,10 @@ export const CUBE_CAMPAIGN_LEVELS = [
     winMessage: 'Three taps, six tiles fixed. Now you know how to flip!',
     difficulty: DIFFICULTY.TUTORIAL,
     tags: cubeTags,
-    requirements: { previousLevel: 1, stars: 0, achievements: [] },
+    requirements: { previousLevel: 101, stars: 0, achievements: [] },
   }),
   createLevel({
-    id: 3,
+    id: 103,
     name: 'First Flip',
     description: 'Introduce antipodal flips without chaos pressure.',
     cubeSize: 3,
@@ -98,10 +98,10 @@ export const CUBE_CAMPAIGN_LEVELS = [
     winMessage: 'You used the cube seam without getting lost.',
     difficulty: DIFFICULTY.EASY,
     tags: cubeTags,
-    requirements: { previousLevel: 2, stars: 0, achievements: [] },
+    requirements: { previousLevel: 102, stars: 0, achievements: [] },
   }),
   createLevel({
-    id: 4,
+    id: 104,
     name: 'Flip Pairs',
     description: 'Learn opposite-face relationships on a 3×3.',
     cubeSize: 3,
@@ -119,10 +119,10 @@ export const CUBE_CAMPAIGN_LEVELS = [
     winMessage: 'Flip pairs clicked into place.',
     difficulty: DIFFICULTY.EASY,
     tags: cubeTags,
-    requirements: { previousLevel: 3, stars: 0, achievements: [] },
+    requirements: { previousLevel: 103, stars: 0, achievements: [] },
   }),
   createLevel({
-    id: 5,
+    id: 105,
     name: 'Guided Mini Solve',
     description: 'A modest 3×3 solve with all learning views available.',
     cubeSize: 3,
@@ -140,10 +140,10 @@ export const CUBE_CAMPAIGN_LEVELS = [
     winMessage: 'That was a real 3×3 solve path.',
     difficulty: DIFFICULTY.MEDIUM,
     tags: cubeTags,
-    requirements: { previousLevel: 4, stars: 0, achievements: [] },
+    requirements: { previousLevel: 104, stars: 0, achievements: [] },
   }),
   createLevel({
-    id: 6,
+    id: 106,
     name: 'CUBE Graduation',
     description: 'A longer 3×3 practice level before freeplay.',
     cubeSize: 3,
@@ -161,7 +161,7 @@ export const CUBE_CAMPAIGN_LEVELS = [
     winMessage: 'CUBE Campaign complete. You are ready for Rubik\'s freeplay.',
     difficulty: DIFFICULTY.MEDIUM,
     tags: cubeTags,
-    requirements: { previousLevel: 5, stars: 0, achievements: [] },
+    requirements: { previousLevel: 105, stars: 0, achievements: [] },
   }),
 ];
 

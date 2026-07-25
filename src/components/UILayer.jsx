@@ -45,6 +45,7 @@ const ComingSoonScreen = React.lazy(() => import('./screens/ComingSoonScreen.jsx
 const MobiusCubeletScreen = React.lazy(() => import('./screens/MobiusCubeletScreen.jsx'));
 const VictoryScreen = React.lazy(() => import('./screens/VictoryScreen.jsx'));
 const LevelSelectScreen = React.lazy(() => import('./screens/LevelSelectScreen.jsx'));
+const PackSelectScreen = React.lazy(() => import('./screens/PackSelectScreen.jsx'));
 const Level10Cutscene = React.lazy(() => import('./screens/Level10Cutscene.jsx'));
 const LevelTutorial = React.lazy(() => import('./screens/LevelTutorial.jsx'));
 const FreeplaySetupWizard = React.lazy(() => import('./screens/FreeplaySetupWizard.jsx'));
@@ -111,7 +112,7 @@ export default function UILayer({
   const {
     onReset, onShuffle, onShuffleForLevel, onChangeSize,
     onSetChaosLevel, onSetAutoRotate, onSetSettings, onFaceImage, onSetVictory,
-    onTapFlip, onBackToMainMenu, onLevelSelect, onCutsceneComplete,
+    onTapFlip, onBackToMainMenu, onLevelSelect, onSelectPack, onBackToPackSelect, onCutsceneComplete,
     onTutorialClose, onLevelTutorialClose, onNextLevel,
     onPreset, onInstantChaos, onSaveState, onLoadState,
     onMenuPlay, onMenuLevels, onMenuFreeplay, onMenuRandomMode, onMenuCoop, onMenuTeach,
@@ -139,7 +140,7 @@ export default function UILayer({
 
   // UI visibility flags — change rarely, batched to minimise subscriptions
   const {
-    showMainMenu, showTutorial, showLevelSelect, showSettings, showHelp,
+    showMainMenu, showTutorial, showLevelSelect, showPackSelect, activePackId, showSettings, showHelp,
     showFirstFlipTutorial, showCutscene, showLevelTutorial, showNetPanel,
     showLeaderboard, showMobileTouchHint, showDevConsole, solveModeActive,
     showDisparityWinner, wormHealerMode, demoMode,
@@ -147,6 +148,8 @@ export default function UILayer({
     showMainMenu: s.showMainMenu,
     showTutorial: s.showTutorial,
     showLevelSelect: s.showLevelSelect,
+    showPackSelect: s.showPackSelect,
+    activePackId: s.activePackId,
     showSettings: s.showSettings,
     showHelp: s.showHelp,
     showFirstFlipTutorial: s.showFirstFlipTutorial,
@@ -210,7 +213,7 @@ export default function UILayer({
   })));
 
   const hasFullScreenOverlay = showFreeplayWizard || showRandomWizard || showWormModeWizard
-    || showModeSelect || showDisparityWizard || showDisparityBetting || showCubeModeSelect || showLevelSelect
+    || showModeSelect || showDisparityWizard || showDisparityBetting || showCubeModeSelect || showLevelSelect || showPackSelect
     || showComingSoon || showMobiusCubelet || showMobiIntro || victory || showMergeThemePicker
     // Mobi's level briefing and the finale cutscene are blocking beats — clear
     // the game chrome (top bar, bottom nav, sheet) so nothing crowds him.
@@ -475,9 +478,15 @@ export default function UILayer({
         </Suspense>
       </ScreenTransition>
 
+      <ScreenTransition show={showPackSelect}>
+        <Suspense fallback={null}>
+          <PackSelectScreen onSelectPack={onSelectPack} onBack={onBackToMainMenu} />
+        </Suspense>
+      </ScreenTransition>
+
       <ScreenTransition show={showLevelSelect}>
         <Suspense fallback={null}>
-          <LevelSelectScreen onSelectLevel={onLevelSelect} onBack={onBackToMainMenu} />
+          <LevelSelectScreen packId={activePackId} onSelectLevel={onLevelSelect} onBack={onBackToPackSelect} />
         </Suspense>
       </ScreenTransition>
 

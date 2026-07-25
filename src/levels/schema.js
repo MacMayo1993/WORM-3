@@ -30,6 +30,22 @@ export const WIN_CONDITIONS = {
 /**
  * Available background environments
  */
+/**
+ * Level id ranges, one block per pack.
+ *
+ * ProgressManager stores completion as a flat array of numeric level ids and
+ * stats in an object keyed by the same, with no pack qualifier. So ids must be
+ * unique ACROSS packs, not just within one — Cube Academy originally reused
+ * 1-6 alongside Story's 1-10, which meant beating Story chapter 3 also marked
+ * Academy lesson 3 complete. Nothing surfaced it only because Academy had no
+ * entry point. A new pack takes the next free hundred.
+ */
+export const LEVEL_ID_RANGES = {
+  'story-campaign': [1, 99],
+  'cube-academy': [101, 199],
+  'algorithm-codex': [201, 299],
+};
+
 export const BACKGROUNDS = {
   DAYCARE: 'daycare',
   ELEMENTARY: 'elementary',
@@ -158,6 +174,12 @@ export function createLevel(overrides) {
     // otherwise it is derived from the authored sequences. null = no par (the
     // level is graded by the cube-size heuristic instead).
     par: overrides.par ?? (((overrides.scrambleSequence?.length || 0) + (overrides.flipSequence?.length || 0)) || null),
+
+    // The named algorithm this level teaches, for levels built around one:
+    // { notation: "R U R' U'", quarterTurns: 4 }. The level is scrambled by the
+    // inverse of `notation`, so performing it solves the level and par equals
+    // quarterTurns. null for levels that are not algorithm lessons.
+    algorithm: overrides.algorithm ?? null,
 
     // Visual settings
     background: overrides.background || BACKGROUNDS.ABSTRACT,
