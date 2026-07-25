@@ -1,5 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { UI_FONT, GLASS_TEXT, GLASS_TEXT_MUTED } from '../../utils/uiTheme.js';
+import {
+  UI_FONT, DISPLAY_FONT, PAPER_SHEET_RAISED, PAPER_BORDER, PAPER_BORDER_SOFT,
+  PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT, PAPER_BG_MUTED,
+  PAPER_CARD_SHADOW, UI_MOSS,
+} from '../../utils/uiTheme.js';
+import { wizardPaperBackground } from '../../components/screens/WizardChrome.jsx';
 
 const THEMES = [
   { id: 'pokemon', label: 'Pokémon', color: '#FFCB05', accent: '#3B4CCA', emoji: '⚡', desc: 'Catch & evolve' },
@@ -29,16 +34,15 @@ const ThemeCard = ({ theme, selected, onSelect }) => {
         alignItems: 'center',
         gap: '8px',
         background: active
-          ? `linear-gradient(135deg, ${theme.color}22, ${theme.accent}18)`
-          : 'rgba(255,255,255,0.06)',
-        border: `1.5px solid ${active ? theme.color : 'rgba(255,255,255,0.12)'}`,
+          ? `linear-gradient(135deg, ${theme.color}20, ${theme.accent}14)`
+          : PAPER_SHEET_RAISED,
+        border: `1.5px solid ${active ? theme.color : PAPER_BORDER_SOFT}`,
         borderRadius: '16px',
         cursor: 'pointer',
         transition: 'all 0.22s cubic-bezier(0.4,0,0.2,1)',
-        backdropFilter: 'blur(12px)',
         boxShadow: active
-          ? `0 0 20px ${theme.color}30, 0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.12)`
-          : '0 2px 8px rgba(0,0,0,0.2)',
+          ? `0 4px 0 ${PAPER_CARD_SHADOW}, 0 8px 20px ${theme.color}28`
+          : `0 3px 0 ${PAPER_CARD_SHADOW}, 0 4px 10px rgba(60,48,34,0.10)`,
         transform: active ? 'translateY(-3px) scale(1.02)' : 'none',
         position: 'relative',
         overflow: 'hidden',
@@ -49,19 +53,23 @@ const ThemeCard = ({ theme, selected, onSelect }) => {
         <div style={{
           position: 'absolute', inset: 0, borderRadius: '15px',
           border: `2px solid ${theme.color}`,
-          boxShadow: `inset 0 0 12px ${theme.color}20`,
+          boxShadow: `inset 0 0 12px ${theme.color}18`,
           pointerEvents: 'none',
         }} />
       )}
       <span style={{ fontSize: '32px', lineHeight: 1 }}>{theme.emoji}</span>
       <span style={{
         fontSize: '12px', fontWeight: 700, letterSpacing: '0.08em',
-        textTransform: 'uppercase', color: active ? theme.color : 'rgba(200,220,255,0.8)',
+        // Brand colours are picked for contrast on dark; several of them (Pokémon
+        // yellow, Disney gold) vanish on cream. Only the active card wears its
+        // brand colour, where the tinted fill and border carry it — the rest take
+        // the readable paper ink.
+        textTransform: 'uppercase', color: active ? PAPER_TEXT : PAPER_TEXT_MUTED,
         transition: 'color 0.2s',
         fontFamily: UI_FONT,
       }}>{theme.label}</span>
       <span style={{
-        fontSize: '10px', color: 'rgba(160,190,230,0.55)',
+        fontSize: '10px', color: PAPER_TEXT_FAINT,
         fontFamily: UI_FONT,
         textAlign: 'center',
       }}>{theme.desc}</span>
@@ -73,14 +81,14 @@ const TierLegend = () => (
   <div style={{
     display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap',
     padding: '14px 20px',
-    background: 'rgba(255,255,255,0.04)',
-    border: '1px solid rgba(255,255,255,0.08)',
+    background: PAPER_BG_MUTED,
+    border: `1px solid ${PAPER_BORDER_SOFT}`,
     borderRadius: '12px',
   }}>
     {[
-      { tier: 1, label: 'Base form', desc: '1–2 tiles', color: 'rgba(160,200,255,0.7)' },
-      { tier: 2, label: 'Mid form', desc: '3+ tiles · pulses', color: '#a78bfa' },
-      { tier: 3, label: 'Final form', desc: 'Full face · pops out', color: '#fbbf24' },
+      { tier: 1, label: 'Base form', desc: '1–2 tiles', color: '#8a8175' },
+      { tier: 2, label: 'Mid form', desc: '3+ tiles · pulses', color: '#6a5b95' },
+      { tier: 3, label: 'Final form', desc: 'Full face · pops out', color: '#b88f4a' },
     ].map(({ tier, label, desc, color }) => (
       <div key={tier} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         <div style={{
@@ -91,8 +99,8 @@ const TierLegend = () => (
           fontSize: '11px', fontWeight: 700, color,
         }}>{tier}</div>
         <div>
-          <div style={{ fontSize: '11px', fontWeight: 600, color: GLASS_TEXT, fontFamily: UI_FONT }}>{label}</div>
-          <div style={{ fontSize: '10px', color: GLASS_TEXT_MUTED, fontFamily: UI_FONT }}>{desc}</div>
+          <div style={{ fontSize: '11px', fontWeight: 600, color: PAPER_TEXT, fontFamily: UI_FONT }}>{label}</div>
+          <div style={{ fontSize: '10px', color: PAPER_TEXT_MUTED, fontFamily: UI_FONT }}>{desc}</div>
         </div>
       </div>
     ))}
@@ -118,7 +126,7 @@ const MergeThemePicker = ({ onStart, onBack }) => {
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 9999,
-      background: 'radial-gradient(circle at 50% 35%, #0e1324 0%, #070b16 52%, #05050f 100%)',
+      ...wizardPaperBackground,
       display: 'flex', flexDirection: 'column', alignItems: 'center',
       justifyContent: 'center', padding: '24px',
       opacity: visible ? 1 : 0,
@@ -130,15 +138,14 @@ const MergeThemePicker = ({ onStart, onBack }) => {
       <div style={{ textAlign: 'center', marginBottom: '28px' }}>
         <div style={{
           fontSize: 'clamp(26px,6vw,42px)', fontWeight: 900,
-          letterSpacing: '0.12em', fontFamily: UI_FONT,
-          background: 'linear-gradient(100deg,#a78bfa,#60a5fa,#34d399)',
-          WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+          letterSpacing: '0.04em', fontFamily: DISPLAY_FONT,
+          color: PAPER_TEXT,
           marginBottom: '8px',
         }}>
           MERGE MODE
         </div>
         <p style={{
-          margin: 0, fontSize: '13px', color: 'rgba(150,180,220,0.65)',
+          margin: 0, fontSize: '13px', color: PAPER_TEXT_MUTED,
           letterSpacing: '0.18em', textTransform: 'uppercase',
           fontFamily: UI_FONT,
         }}>
@@ -174,16 +181,16 @@ const MergeThemePicker = ({ onStart, onBack }) => {
           onClick={onBack}
           style={{
             flex: 1, padding: '14px 20px',
-            background: 'rgba(255,255,255,0.07)',
-            border: '1.5px solid rgba(255,255,255,0.12)',
+            background: PAPER_BG_MUTED,
+            border: `1.5px solid ${PAPER_BORDER_SOFT}`,
             borderRadius: '100px', cursor: 'pointer',
             fontSize: '13px', fontWeight: 600, letterSpacing: '0.12em',
-            textTransform: 'uppercase', color: 'rgba(180,200,230,0.7)',
+            textTransform: 'uppercase', color: PAPER_TEXT_MUTED,
             fontFamily: UI_FONT,
             transition: 'all 0.2s',
           }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.12)'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; }}
+          onMouseEnter={e => { e.currentTarget.style.background = '#e8e2d8'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = PAPER_BG_MUTED; }}
         >
           ← Back
         </button>
@@ -191,17 +198,17 @@ const MergeThemePicker = ({ onStart, onBack }) => {
           onClick={() => onStart(selectedTheme)}
           style={{
             flex: 2, padding: '14px 20px',
-            background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+            background: UI_MOSS,
             border: 'none',
             borderRadius: '100px', cursor: 'pointer',
             fontSize: '13px', fontWeight: 700, letterSpacing: '0.14em',
-            textTransform: 'uppercase', color: '#ffffff',
+            textTransform: 'uppercase', color: '#fffdf5',
             fontFamily: UI_FONT,
-            boxShadow: '0 4px 20px rgba(99,102,241,0.4)',
+            boxShadow: '0 4px 18px rgba(95,127,74,0.32)',
             transition: 'all 0.2s',
           }}
-          onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 28px rgba(99,102,241,0.55)'; }}
-          onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 4px 20px rgba(99,102,241,0.4)'; }}
+          onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 24px rgba(95,127,74,0.44)'; }}
+          onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 4px 18px rgba(95,127,74,0.32)'; }}
         >
           Enter the Cube ✦
         </button>

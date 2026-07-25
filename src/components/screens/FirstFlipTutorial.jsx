@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { FACE_COLORS } from '../../utils/constants.js';
-import { UI_FONT, GLASS_PANEL, GLASS_BACKDROP } from '../../utils/uiTheme.js';
+import {
+  UI_FONT, PAPER_BACKDROP, PAPER_BACKDROP_BLUR, PAPER_SHEET, PAPER_BORDER,
+  PAPER_BORDER_SOFT, PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT,
+  PAPER_BG_MUTED, PAPER_CARD_SHADOW, PAPER_SHADOW, UI_MOSS,
+} from '../../utils/uiTheme.js';
 
 const FONT = UI_FONT;
 
@@ -16,7 +20,7 @@ const steps = [
         <p style={{ margin: '0 0 14px 0' }}>
           In WORM³, opposite faces of the cube are secretly linked. Flip a sticker on one face and its partner on the opposite face changes color simultaneously.
         </p>
-        <p style={{ margin: 0, color: 'rgba(200, 220, 255, 0.60)', fontStyle: 'italic' }}>
+        <p style={{ margin: 0, color: PAPER_TEXT_FAINT, fontStyle: 'italic' }}>
           "Walk far enough in any direction and you return from the other side—inverted."
         </p>
       </>
@@ -43,7 +47,7 @@ const steps = [
         <p style={{ margin: '0 0 10px 0' }}>
           When a sticker flips, it takes on its <strong>antipodal color</strong>. The small dot on a flipped sticker shows its original color—a breadcrumb of where it came from.
         </p>
-        <p style={{ margin: 0, color: 'rgba(200, 220, 255, 0.60)' }}>
+        <p style={{ margin: 0, color: PAPER_TEXT_FAINT }}>
           Every flip affects two stickers at once: one on each side of the cube.
         </p>
       </>
@@ -64,7 +68,7 @@ const steps = [
         <p style={{ margin: '0 0 14px 0' }}>
           <strong>Tally marks</strong> on each sticker count how many times it has traveled through the manifold. Two stickers showing the same color can have entirely different histories.
         </p>
-        <p style={{ margin: 0, color: 'rgba(200, 220, 255, 0.60)', fontStyle: 'italic' }}>
+        <p style={{ margin: 0, color: PAPER_TEXT_FAINT, fontStyle: 'italic' }}>
           This hidden memory of transformation is called <em>orientation</em>.
         </p>
       </>
@@ -86,7 +90,7 @@ const steps = [
           <li><strong>L4:</strong> Heavy sustained chaos</li>
           <li><strong>L5:</strong> Deep-manifold surges — strong hops with pacing control</li>
         </ul>
-        <p style={{ margin: 0, color: 'rgba(200, 220, 255, 0.60)' }}>
+        <p style={{ margin: 0, color: PAPER_TEXT_FAINT }}>
           Toggle Chaos Mode with the <strong>C</strong> key or the Chaos button in the menu.
         </p>
       </>
@@ -105,7 +109,7 @@ const steps = [
           <li>For WORM³ victory, ensure every sticker has flipped before your final solve</li>
           <li>Use <strong>Teach Mode</strong> (available for 3×3) to learn step-by-step algorithms</li>
         </ul>
-        <p style={{ margin: 0, color: 'rgba(200, 220, 255, 0.60)', fontStyle: 'italic' }}>
+        <p style={{ margin: 0, color: PAPER_TEXT_FAINT, fontStyle: 'italic' }}>
           The topology is your friend once you learn to see it. Good luck, explorer!
         </p>
       </>
@@ -122,8 +126,9 @@ const FirstFlipTutorial = ({ onClose, onMainMenu }) => {
     <div style={{
       position: 'fixed',
       inset: 0,
-      background: GLASS_BACKDROP,
-      backdropFilter: 'blur(24px)',
+      background: PAPER_BACKDROP,
+      backdropFilter: PAPER_BACKDROP_BLUR,
+      WebkitBackdropFilter: PAPER_BACKDROP_BLUR,
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
@@ -134,23 +139,23 @@ const FirstFlipTutorial = ({ onClose, onMainMenu }) => {
       boxSizing: 'border-box',
     }}>
       <div style={{
-        background: GLASS_PANEL,
-        border: '1px solid rgba(255, 255, 255, 0.10)',
+        background: PAPER_SHEET,
+        border: `1px solid ${PAPER_BORDER}`,
         borderRadius: '20px',
         padding: '32px 36px',
         maxWidth: '560px',
         width: '90%',
         maxHeight: 'calc(100dvh - 60px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))',
         overflow: 'auto',
-        boxShadow: '0 32px 80px rgba(0, 0, 0, 0.60), 0 0 0 1px rgba(255, 255, 255, 0.06)',
+        boxShadow: PAPER_SHADOW,
         boxSizing: 'border-box',
-        color: '#e8edf8',
+        color: PAPER_TEXT,
       }}>
         <h2 style={{
           margin: '0 0 4px 0',
           fontSize: '22px',
           fontWeight: 800,
-          color: '#e8edf8',
+          color: PAPER_TEXT,
           letterSpacing: '-0.01em',
         }}>
           {cur.title}
@@ -161,21 +166,21 @@ const FirstFlipTutorial = ({ onClose, onMainMenu }) => {
           fontSize: '11px',
           letterSpacing: '0.14em',
           textTransform: 'uppercase',
-          color: 'rgba(200, 220, 255, 0.50)',
+          color: PAPER_TEXT_FAINT,
           margin: '0 0 20px 0',
         }}>
           {cur.subtitle}
         </p>
 
         <div style={{
-          background: 'rgba(255, 255, 255, 0.04)',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
+          background: PAPER_BG_MUTED,
+          border: `1px solid ${PAPER_BORDER_SOFT}`,
           borderRadius: '12px',
           padding: '18px 20px',
           marginBottom: '22px',
           fontSize: '14px',
           lineHeight: 1.7,
-          color: 'rgba(200, 220, 255, 0.88)',
+          color: PAPER_TEXT_MUTED,
         }}>
           {cur.content}
         </div>
@@ -194,9 +199,9 @@ const FirstFlipTutorial = ({ onClose, onMainMenu }) => {
                 border: 'none',
                 cursor: 'pointer',
                 padding: 0,
-                background: i === step ? 'rgba(255,255,255,0.90)' : 'rgba(255,255,255,0.28)',
+                background: i === step ? UI_MOSS : PAPER_CARD_SHADOW,
                 transition: 'width 300ms cubic-bezier(0.34,1.56,0.64,1), background 300ms ease',
-                boxShadow: i === step ? '0 0 8px rgba(255,255,255,0.50)' : 'none',
+                boxShadow: 'none',
                 WebkitTapHighlightColor: 'transparent',
               }}
             />
@@ -209,9 +214,9 @@ const FirstFlipTutorial = ({ onClose, onMainMenu }) => {
             onClick={onClose}
             style={{
               padding: '10px 22px',
-              border: '1.5px solid rgba(255, 255, 255, 0.28)',
-              background: 'rgba(0, 0, 0, 0.20)',
-              color: 'rgba(255, 255, 255, 0.65)',
+              border: `1.5px solid ${PAPER_BORDER_SOFT}`,
+              background: PAPER_BG_MUTED,
+              color: PAPER_TEXT_MUTED,
               fontFamily: FONT,
               fontSize: '12px',
               fontWeight: 700,
@@ -222,8 +227,8 @@ const FirstFlipTutorial = ({ onClose, onMainMenu }) => {
               transition: 'background 0.15s ease, border-color 0.15s ease, color 0.15s ease',
               WebkitTapHighlightColor: 'transparent',
             }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.55)'; e.currentTarget.style.color = '#fff'; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.28)'; e.currentTarget.style.color = 'rgba(255,255,255,0.65)'; }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = '#b8b2aa'; e.currentTarget.style.color = PAPER_TEXT; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = PAPER_BORDER_SOFT; e.currentTarget.style.color = PAPER_TEXT_MUTED; }}
           >
             Skip
           </button>
@@ -234,9 +239,9 @@ const FirstFlipTutorial = ({ onClose, onMainMenu }) => {
               onClick={() => setStep(s => s + 1)}
               style={{
                 padding: '10px 28px',
-                border: '1.5px solid rgba(255, 255, 255, 0.55)',
-                background: 'rgba(0, 0, 0, 0.28)',
-                color: '#ffffff',
+                border: 'none',
+                background: UI_MOSS,
+                color: '#fffdf5',
                 fontFamily: FONT,
                 fontSize: '12px',
                 fontWeight: 700,
@@ -247,8 +252,8 @@ const FirstFlipTutorial = ({ onClose, onMainMenu }) => {
                 transition: 'background 0.15s ease, border-color 0.15s ease',
                 WebkitTapHighlightColor: 'transparent',
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.12)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.80)'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(0,0,0,0.28)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.55)'; }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#6b8f53'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = UI_MOSS; }}
             >
               Next →
             </button>
@@ -258,9 +263,9 @@ const FirstFlipTutorial = ({ onClose, onMainMenu }) => {
               onClick={onClose}
               style={{
                 padding: '10px 28px',
-                border: '1.5px solid rgba(168, 85, 247, 0.70)',
-                background: 'rgba(168, 85, 247, 0.18)',
-                color: '#ffffff',
+                border: 'none',
+                background: UI_MOSS,
+                color: '#fffdf5',
                 fontFamily: FONT,
                 fontSize: '12px',
                 fontWeight: 700,
@@ -271,8 +276,8 @@ const FirstFlipTutorial = ({ onClose, onMainMenu }) => {
                 transition: 'background 0.15s ease, border-color 0.15s ease',
                 WebkitTapHighlightColor: 'transparent',
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(168,85,247,0.32)'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(168,85,247,0.18)'; }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#6b8f53'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = UI_MOSS; }}
             >
               Start Exploring!
             </button>
@@ -288,15 +293,15 @@ const FirstFlipTutorial = ({ onClose, onMainMenu }) => {
                 background: 'transparent',
                 border: 'none',
                 cursor: 'pointer',
-                color: 'rgba(200, 220, 255, 0.40)',
+                color: PAPER_TEXT_FAINT,
                 fontSize: '12px',
                 fontFamily: FONT,
                 letterSpacing: '0.08em',
                 padding: '4px 8px',
                 transition: 'color 0.15s ease',
               }}
-              onMouseEnter={e => { e.currentTarget.style.color = 'rgba(200,220,255,0.75)'; }}
-              onMouseLeave={e => { e.currentTarget.style.color = 'rgba(200,220,255,0.40)'; }}
+              onMouseEnter={e => { e.currentTarget.style.color = PAPER_TEXT; }}
+              onMouseLeave={e => { e.currentTarget.style.color = PAPER_TEXT_FAINT; }}
             >
               ← Main Menu
             </button>

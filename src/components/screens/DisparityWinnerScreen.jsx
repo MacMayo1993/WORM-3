@@ -8,7 +8,7 @@ import { useGameStore } from '../../hooks/useGameStore.js';
 import { FACE_COLORS } from '../../utils/constants.js';
 import {
   UI_FONT, MONO_FONT,
-  GLASS_PANEL, GLASS_PANEL_BORDER, GLASS_TEXT, GLASS_TEXT_MUTED, GLASS_SHADOW,
+  NIGHT_SHEET, NIGHT_BORDER, NIGHT_TEXT, NIGHT_TEXT_MUTED, NIGHT_SHADOW, NIGHT_PANEL,
   RADIUS_MD, RADIUS_LG,
 } from '../../utils/uiTheme.js';
 
@@ -92,7 +92,7 @@ export default function DisparityWinnerScreen({ onDismiss, primaryLabel = 'Play 
         padding: 20,
         fontFamily: UI_FONT,
         // Calm dark wash — a whisper of the winner hue at the top, no glow.
-        background: `radial-gradient(120% 85% at 50% 22%, ${winnerColor}18 0%, rgba(6,8,20,0.94) 62%)`,
+        background: `radial-gradient(120% 85% at 50% 22%, ${winnerColor}18 0%, rgba(24,31,18,0.94) 62%)`,
         backdropFilter: 'blur(10px)',
         animation: 'dws-fade 0.45s ease-out both',
       }}
@@ -107,10 +107,10 @@ export default function DisparityWinnerScreen({ onDismiss, primaryLabel = 'Play 
           width: 'min(440px, 100%)',
           maxHeight: '92vh',
           overflowY: 'auto',
-          background: GLASS_PANEL,
-          border: `1px solid ${GLASS_PANEL_BORDER}`,
+          background: NIGHT_SHEET,
+          border: `1px solid ${NIGHT_BORDER}`,
           borderRadius: RADIUS_LG,
-          boxShadow: GLASS_SHADOW,
+          boxShadow: NIGHT_SHADOW,
           padding: '28px 26px 24px',
           display: 'flex',
           flexDirection: 'column',
@@ -121,7 +121,7 @@ export default function DisparityWinnerScreen({ onDismiss, primaryLabel = 'Play 
         {/* Eyebrow */}
         <div style={{
           fontSize: 11, fontWeight: 700, letterSpacing: '0.22em', textTransform: 'uppercase',
-          color: GLASS_TEXT_MUTED, marginBottom: 18,
+          color: NIGHT_TEXT_MUTED, marginBottom: 18,
         }}>
           Last Pair Standing
         </div>
@@ -131,7 +131,7 @@ export default function DisparityWinnerScreen({ onDismiss, primaryLabel = 'Play 
           <WinnerTile label="Winner" gridId={winnerGridId} color={winnerColor} />
           {antipodalGridId && (
             <>
-              <span style={{ color: GLASS_TEXT_MUTED, fontSize: '1.4rem', fontWeight: 300 }}>↔</span>
+              <span style={{ color: NIGHT_TEXT_MUTED, fontSize: '1.4rem', fontWeight: 300 }}>↔</span>
               <WinnerTile label="Antipodal" gridId={antipodalGridId} color={antipodalColor} />
             </>
           )}
@@ -139,7 +139,7 @@ export default function DisparityWinnerScreen({ onDismiss, primaryLabel = 'Play 
 
         {/* Survival stat */}
         <div style={{
-          fontSize: 14, color: GLASS_TEXT, textAlign: 'center', lineHeight: 1.5,
+          fontSize: 14, color: NIGHT_TEXT, textAlign: 'center', lineHeight: 1.5,
           marginBottom: lastBetResult || deathLog.length ? 20 : 24, maxWidth: 320,
         }}>
           Outlasted {observations} fallen tile{observations !== 1 ? 's' : ''}.
@@ -178,7 +178,7 @@ export default function DisparityWinnerScreen({ onDismiss, primaryLabel = 'Play 
                     ? `Won +${lastBetResult.net ?? lastBetResult.payout} PP`
                     : `Lost ${lastBetResult.wager} PP`}
               </div>
-              <div style={{ fontSize: 12, color: GLASS_TEXT_MUTED, lineHeight: 1.4 }}>
+              <div style={{ fontSize: 12, color: NIGHT_TEXT_MUTED, lineHeight: 1.4 }}>
                 {lastBetResult.description}
               </div>
             </div>
@@ -192,8 +192,8 @@ export default function DisparityWinnerScreen({ onDismiss, primaryLabel = 'Play 
               width: '100%',
               maxHeight: '30vh',
               overflowY: 'auto',
-              background: 'rgba(255,255,255,0.02)',
-              border: `1px solid ${GLASS_PANEL_BORDER}`,
+              background: 'rgba(250,247,238,0.03)',
+              border: `1px solid ${NIGHT_BORDER}`,
               borderRadius: RADIUS_MD,
               padding: 6,
               marginBottom: 24,
@@ -202,33 +202,33 @@ export default function DisparityWinnerScreen({ onDismiss, primaryLabel = 'Play 
             <div style={{
               display: 'flex', alignItems: 'center', gap: 8,
               padding: '7px 10px', borderRadius: 6,
-              background: 'rgba(255,255,255,0.04)', marginBottom: 4,
+              background: NIGHT_PANEL, marginBottom: 4,
             }}>
-              <span style={{ color: GLASS_TEXT_MUTED, fontSize: 11, minWidth: 26, fontWeight: 600 }}>1st</span>
+              <span style={{ color: NIGHT_TEXT_MUTED, fontSize: 11, minWidth: 26, fontWeight: 600 }}>1st</span>
               <span style={{ width: 10, height: 10, borderRadius: 2, background: winnerColor, flexShrink: 0 }} />
-              <span style={{ color: GLASS_TEXT, fontFamily: MONO_FONT, fontWeight: 600, fontSize: 13 }}>{winnerGridId}</span>
+              <span style={{ color: NIGHT_TEXT, fontFamily: MONO_FONT, fontWeight: 600, fontSize: 13 }}>{winnerGridId}</span>
               {antipodalGridId && (
                 <>
-                  <span style={{ color: GLASS_TEXT_MUTED, fontSize: 12 }}>↔</span>
+                  <span style={{ color: NIGHT_TEXT_MUTED, fontSize: 12 }}>↔</span>
                   <span style={{ width: 10, height: 10, borderRadius: 2, background: antipodalColor, flexShrink: 0 }} />
-                  <span style={{ color: GLASS_TEXT, fontFamily: MONO_FONT, fontWeight: 600, fontSize: 13 }}>{antipodalGridId}</span>
+                  <span style={{ color: NIGHT_TEXT, fontFamily: MONO_FONT, fontWeight: 600, fontSize: 13 }}>{antipodalGridId}</span>
                 </>
               )}
-              <span style={{ color: GLASS_TEXT_MUTED, fontSize: 10, letterSpacing: '0.1em', marginLeft: 'auto' }}>SURVIVED</span>
+              <span style={{ color: NIGHT_TEXT_MUTED, fontSize: 10, letterSpacing: '0.1em', marginLeft: 'auto' }}>SURVIVED</span>
             </div>
 
             {deathLog.map((entry) => {
               const eColor = FACE_COLORS[faceNumFromGridId(entry.gridId)] ?? '#888';
               return (
                 <div key={entry.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 10px' }}>
-                  <span style={{ color: 'rgba(255,255,255,0.32)', fontSize: 11, minWidth: 26, textAlign: 'right' }}>
+                  <span style={{ color: 'rgba(255,253,242,0.34)', fontSize: 11, minWidth: 26, textAlign: 'right' }}>
                     #{entry.rank}
                   </span>
                   <span style={{ width: 9, height: 9, borderRadius: 2, background: eColor, flexShrink: 0, opacity: 0.55 }} />
-                  <span style={{ color: GLASS_TEXT_MUTED, fontFamily: MONO_FONT, fontSize: 12.5 }}>
+                  <span style={{ color: NIGHT_TEXT_MUTED, fontFamily: MONO_FONT, fontSize: 12.5 }}>
                     {entry.gridId}
                     {entry.endGridId && entry.endGridId !== entry.gridId && (
-                      <span style={{ color: 'rgba(255,255,255,0.28)' }}> → {entry.endGridId}</span>
+                      <span style={{ color: 'rgba(255,253,242,0.30)' }}> → {entry.endGridId}</span>
                     )}
                   </span>
                 </div>
@@ -248,8 +248,8 @@ export default function DisparityWinnerScreen({ onDismiss, primaryLabel = 'Play 
             letterSpacing: '0.03em',
             borderRadius: RADIUS_MD,
             border: 'none',
-            background: ready ? winnerColor : 'rgba(255,255,255,0.08)',
-            color: ready ? '#0d0f18' : 'rgba(255,255,255,0.4)',
+            background: ready ? winnerColor : NIGHT_PANEL,
+            color: ready ? '#181f12' : 'rgba(255,253,242,0.40)',
             cursor: ready ? 'pointer' : 'default',
             transition: 'background 0.3s, color 0.3s',
             fontFamily: UI_FONT,
@@ -270,9 +270,9 @@ export default function DisparityWinnerScreen({ onDismiss, primaryLabel = 'Play 
               fontWeight: 600,
               letterSpacing: '0.03em',
               borderRadius: RADIUS_MD,
-              border: `1px solid ${GLASS_PANEL_BORDER}`,
+              border: `1px solid ${NIGHT_BORDER}`,
               background: 'transparent',
-              color: ready ? GLASS_TEXT : 'rgba(255,255,255,0.35)',
+              color: ready ? NIGHT_TEXT : 'rgba(255,253,242,0.35)',
               cursor: ready ? 'pointer' : 'default',
               transition: 'color 0.3s',
               fontFamily: UI_FONT,

@@ -1,6 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { LEVELS, isLevelUnlocked, loadProgress, progressManager } from '../../utils/levels.js';
-import { UI_FONT, GLASS_PANEL_BORDER } from '../../utils/uiTheme.js';
+import {
+  UI_FONT, PAPER_SHEET_RAISED, PAPER_BORDER, PAPER_BORDER_SOFT, PAPER_TEXT,
+  PAPER_TEXT_MUTED, PAPER_TEXT_FAINT, PAPER_BG_MUTED, PAPER_CARD_SHADOW,
+} from '../../utils/uiTheme.js';
+import { wizardPaperBackground } from './WizardChrome.jsx';
+
+// Warm amber that holds up on cream — the cream-on-blue gold used before is
+// invisible against paper.
+const STAR_GOLD = '#c8902a';
+const STAR_EMPTY = 'rgba(30, 22, 18, 0.16)';
 
 const STARS_PER_LEVEL = 3;
 
@@ -24,7 +33,7 @@ const BestStats = ({ stats }) => {
   return (
     <div style={{
       marginTop: '4px', fontSize: '9px', fontWeight: 700, letterSpacing: '0.04em',
-      color: 'rgba(33, 74, 134, 0.72)', textAlign: 'center', lineHeight: 1,
+      color: PAPER_TEXT_MUTED, textAlign: 'center', lineHeight: 1,
     }}>
       {parts.join(' · ')}
     </div>
@@ -38,8 +47,7 @@ const StarRow = ({ count, earned }) => (
         key={i}
         style={{
           fontSize: '11px',
-          color: i < earned ? '#ffd23f' : 'rgba(40, 70, 110, 0.35)',
-          textShadow: i < earned ? '0 1px 1px rgba(150, 90, 0, 0.55)' : 'none',
+          color: i < earned ? STAR_GOLD : STAR_EMPTY,
         }}
       >
         ★
@@ -67,8 +75,10 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
       inset: 0,
       height: '100dvh',
       zIndex: 2000,
-      // Bright steel-blue field with a soft vertical light beam, like the reference.
-      background: 'linear-gradient(180deg, #6f9fd8 0%, #4a7cb6 48%, #2f5b93 100%)',
+      // Mobi's graph paper — the same surface as the setup wizards and dialogue
+      // panel. Level Select is a decision screen, so it belongs to the paper
+      // half of the system, not a bespoke palette of its own.
+      ...wizardPaperBackground,
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
@@ -78,11 +88,11 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
       boxSizing: 'border-box',
       overflow: 'hidden',
     }}>
-      {/* Center light beam */}
+      {/* Soft page-light down the centre, warm rather than the old cool beam */}
       <div style={{
         position: 'absolute', top: 0, bottom: 0, left: '50%', width: '34%',
         transform: 'translateX(-50%)',
-        background: 'linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.02))',
+        background: 'linear-gradient(180deg, rgba(255,255,255,0.55), rgba(255,255,255,0.06))',
         filter: 'blur(24px)', pointerEvents: 'none',
       }} />
 
@@ -94,22 +104,21 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
       }}>
         <div>
           <div style={{
-            fontSize: '11px', fontWeight: 900, color: 'rgba(255,255,255,0.82)',
+            fontSize: '11px', fontWeight: 900, color: PAPER_TEXT,
             letterSpacing: '0.16em', textTransform: 'uppercase',
           }}>Life Journey</div>
           <div style={{
             marginTop: '3px', fontSize: '10px', fontWeight: 700,
-            color: 'rgba(229,240,255,0.72)', letterSpacing: '0.07em', textTransform: 'uppercase',
+            color: PAPER_TEXT_MUTED, letterSpacing: '0.07em', textTransform: 'uppercase',
           }}>{completedLevels.length}/{LEVELS.length} chapters complete</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
           <span style={{
-            fontSize: '20px', fontWeight: 800, color: '#fff',
-            textShadow: '0 2px 3px rgba(0, 30, 70, 0.45)', letterSpacing: '0.02em',
+            fontSize: '20px', fontWeight: 800, color: PAPER_TEXT, letterSpacing: '0.02em',
           }}>
             {earnedStars}/{totalStars}
           </span>
-          <span style={{ fontSize: '22px', color: '#ffd23f', textShadow: '0 1px 2px rgba(150,90,0,0.6)' }}>★</span>
+          <span style={{ fontSize: '22px', color: STAR_GOLD }}>★</span>
         </div>
       </div>
 
@@ -148,14 +157,13 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
                   padding: 0,
                   borderRadius: '14px',
                   cursor: unlocked ? 'pointer' : 'not-allowed',
-                  border: unlocked ? '1px solid rgba(255,255,255,0.85)' : '1px solid rgba(255,255,255,0.18)',
-                  background: unlocked
-                    ? 'linear-gradient(180deg, #f3f8ff 0%, #cddcf2 100%)'
-                    : 'linear-gradient(180deg, #3a608f 0%, #2b4a73 100%)',
-                  // Chunky bottom edge + soft drop shadow for a physical "tile" feel.
+                  border: `1.5px solid ${unlocked ? PAPER_BORDER_SOFT : PAPER_BORDER}`,
+                  background: unlocked ? PAPER_SHEET_RAISED : PAPER_BG_MUTED,
+                  // Chunky bottom edge for a physical "tile" feel; locked chapters
+                  // sit flush and pressed-in instead of raised.
                   boxShadow: unlocked
-                    ? `0 4px 0 rgba(26, 54, 96, ${isHover ? 0.55 : 0.4}), 0 7px 12px rgba(0, 20, 50, 0.3)`
-                    : 'inset 0 2px 6px rgba(0, 20, 50, 0.4)',
+                    ? `0 4px 0 ${PAPER_CARD_SHADOW}, 0 7px 14px rgba(60, 48, 34, ${isHover ? 0.18 : 0.12})`
+                    : 'inset 0 2px 6px rgba(60, 48, 34, 0.13)',
                   transform: isHover ? 'translateY(-2px)' : 'translateY(0)',
                   transition: 'transform 0.12s ease, box-shadow 0.12s ease',
                 }}
@@ -165,15 +173,14 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
                     <span style={{
                       fontSize: '26px',
                       fontWeight: 800,
-                      color: '#214a86',
-                      textShadow: '0 1px 0 rgba(255,255,255,0.7)',
+                      color: PAPER_TEXT,
                       lineHeight: 1,
                     }}>
                       {level.id}
                     </span>
                     <span style={{
                       marginTop: '7px', padding: '0 8px',
-                      color: '#31578f', fontSize: '10px', fontWeight: 800,
+                      color: PAPER_TEXT_MUTED, fontSize: '10px', fontWeight: 800,
                       letterSpacing: '0.06em', lineHeight: 1.2, textAlign: 'center',
                       textTransform: 'uppercase',
                     }}>
@@ -183,12 +190,30 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
                     <BestStats stats={stat} />
                   </>
                 ) : (
-                  <svg width="22" height="26" viewBox="0 0 24 28" aria-hidden="true">
-                    <path d="M7 11V8a5 5 0 0 1 10 0v3" fill="none" stroke="rgba(220,232,255,0.6)" strokeWidth="2.4" strokeLinecap="round" />
-                    <rect x="4.5" y="11" width="15" height="12.5" rx="2.6" fill="rgba(220,232,255,0.55)" />
-                    <circle cx="12" cy="16.5" r="1.7" fill="#2b4a73" />
-                    <rect x="11.2" y="17.5" width="1.6" height="3.6" rx="0.8" fill="#2b4a73" />
-                  </svg>
+                  /* Locked chapters used to render a bare padlock — no name, no
+                     number, nothing to want. Showing the chapter you are working
+                     toward makes the ladder visible. */
+                  <>
+                    <span style={{
+                      fontSize: '22px', fontWeight: 800, color: PAPER_TEXT_FAINT, lineHeight: 1,
+                    }}>
+                      {level.id}
+                    </span>
+                    <span style={{
+                      marginTop: '6px', padding: '0 8px',
+                      color: PAPER_TEXT_FAINT, fontSize: '10px', fontWeight: 800,
+                      letterSpacing: '0.06em', lineHeight: 1.2, textAlign: 'center',
+                      textTransform: 'uppercase', opacity: 0.85,
+                    }}>
+                      {level.name}
+                    </span>
+                    <svg width="17" height="20" viewBox="0 0 24 28" aria-hidden="true" style={{ marginTop: '7px' }}>
+                      <path d="M7 11V8a5 5 0 0 1 10 0v3" fill="none" stroke={PAPER_TEXT_FAINT} strokeWidth="2.4" strokeLinecap="round" />
+                      <rect x="4.5" y="11" width="15" height="12.5" rx="2.6" fill={PAPER_TEXT_FAINT} />
+                      <circle cx="12" cy="16.5" r="1.7" fill={PAPER_BG_MUTED} />
+                      <rect x="11.2" y="17.5" width="1.6" height="3.6" rx="0.8" fill={PAPER_BG_MUTED} />
+                    </svg>
+                  </>
                 )}
               </button>
             );
@@ -205,20 +230,20 @@ const LevelSelectScreen = ({ onSelectLevel, onBack }) => {
           left: 'max(18px, env(safe-area-inset-left, 0px))',
           bottom: 'max(18px, env(safe-area-inset-bottom, 0px))',
           width: '58px', height: '58px', borderRadius: '50%',
-          border: '2px solid rgba(255,255,255,0.85)',
-          background: 'radial-gradient(circle at 35% 30%, #ff5a5a 0%, #e23b3b 55%, #b81f1f 100%)',
-          boxShadow: '0 5px 0 rgba(120, 18, 18, 0.6), 0 8px 14px rgba(0,0,0,0.35)',
+          border: `1.5px solid ${PAPER_BORDER_SOFT}`,
+          background: PAPER_SHEET_RAISED,
+          boxShadow: `0 4px 0 ${PAPER_CARD_SHADOW}, 0 7px 14px rgba(60, 48, 34, 0.16)`,
           cursor: 'pointer', zIndex: 2,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           transition: 'transform 0.12s ease, box-shadow 0.12s ease',
         }}
         onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; }}
         onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; }}
-        onMouseDown={e => { e.currentTarget.style.transform = 'translateY(3px)'; e.currentTarget.style.boxShadow = '0 2px 0 rgba(120,18,18,0.6), 0 4px 8px rgba(0,0,0,0.35)'; }}
-        onMouseUp={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 5px 0 rgba(120,18,18,0.6), 0 8px 14px rgba(0,0,0,0.35)'; }}
+        onMouseDown={e => { e.currentTarget.style.transform = 'translateY(3px)'; e.currentTarget.style.boxShadow = `0 1px 0 ${PAPER_CARD_SHADOW}, 0 3px 8px rgba(60,48,34,0.16)`; }}
+        onMouseUp={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 4px 0 ${PAPER_CARD_SHADOW}, 0 7px 14px rgba(60,48,34,0.16)`; }}
       >
         <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M15 4 L7 12 L15 20" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M15 4 L7 12 L15 20" fill="none" stroke={PAPER_TEXT} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
 

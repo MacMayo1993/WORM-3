@@ -2,9 +2,11 @@
  * uiTheme.js — Central UI theme tokens shared by every screen, menu, and HUD.
  *
  * WORM³ uses one warm field-guide visual system throughout the game. Mobi's
- * cream paper is the default surface; moss green is the shared affirmative
- * action; the STEP COMPLETE treatment is reserved for full-screen moments.
- * Dark translucent glass is not a third visual family.
+ * cream paper (PAPER_*) is the default surface; the warm dark STEP COMPLETE
+ * treatment (NIGHT_*) covers moments layered over the live 3D scene; moss green
+ * is the shared affirmative action across both. Cold navy glass was a third
+ * family and has been removed — if a screen needs a dark surface it takes
+ * NIGHT_*, which is the same world as the paper rather than a different app.
  *
  * Every screen must pull its fonts and shared semantic colours from here rather
  * than introducing a new visual language. Mode colours may identify a mode or
@@ -41,18 +43,30 @@ export const PAPER_BG_MUTED = '#f0ebe2';
 export const PAPER_CARD_SHADOW = '#c4beb6';
 export const PAPER_SHADOW = '0 20px 56px rgba(0,0,0,0.22), 0 2px 8px rgba(0,0,0,0.10)';
 
-// ─── Legacy overlay values ────────────────────────────────────────────────────
-// Existing in-game overlays still consume these while they are migrated to the
-// warm field-guide system. Do not use them for new screens.
-export const GLASS_BACKDROP = 'rgba(6,8,22,0.80)';
-export const GLASS_BACKDROP_BLUR = 'blur(24px)';
-export const GLASS_PANEL = 'rgba(4,6,20,0.94)';
-export const GLASS_PANEL_DEEP = 'rgba(3,6,18,0.97)';
-export const GLASS_PANEL_BORDER = 'rgba(255,255,255,0.10)';
-export const GLASS_TEXT = 'rgba(230,238,255,0.92)';
-export const GLASS_TEXT_MUTED = 'rgba(255,255,255,0.55)';
-export const GLASS_TEXT_SOFT = 'rgba(207,230,242,0.92)';
-export const GLASS_SHADOW = '0 24px 70px rgba(0,0,0,0.6)';
+// ─── NIGHT family (the STEP COMPLETE treatment) ───────────────────────────────
+// The second half of the field-guide system: a warm, dark surface for moments
+// that sit over the live 3D scene — full-screen celebrations, in-scene viewers,
+// and the mode carousel. Warm charcoal-green rather than the old cold navy, so
+// it reads as the same world as Mobi's paper rather than a different app.
+//
+// Choosing between the two families:
+//   PAPER — the player is reading or deciding, and the panel owns the screen
+//           (setup wizards, the store, help, level select, teaching modals).
+//   NIGHT — the panel is a layer over something alive that must stay visible
+//           (victory, the carousel over the menu cube, in-scene viewers).
+//
+// These values were previously copied by hand into VictoryScreen and SolveMode;
+// they live here now so the treatment stays one thing.
+export const NIGHT_BACKDROP = 'radial-gradient(ellipse at center, rgba(24,31,18,0.55) 0%, rgba(24,31,18,0.86) 100%)';
+export const NIGHT_BACKDROP_BLUR = 'blur(9px) saturate(1.03)';
+export const NIGHT_SHEET = 'rgba(28,35,22,0.94)';
+export const NIGHT_PANEL = 'rgba(250,247,238,0.08)';
+export const NIGHT_BORDER = 'rgba(255,245,220,0.18)';
+export const NIGHT_TEXT = 'rgba(255,253,242,0.86)';
+export const NIGHT_TEXT_MUTED = 'rgba(255,253,242,0.60)';
+export const NIGHT_TITLE_SHADOW = '0 3px 0 rgba(43,53,35,0.55), 0 10px 34px rgba(24,31,18,0.6)';
+export const NIGHT_SOFT_SHADOW = '0 2px 12px rgba(24,31,18,0.7)';
+export const NIGHT_SHADOW = '0 24px 70px rgba(24,31,18,0.55)';
 
 // ─── Shared semantic accents ─────────────────────────────────────────────────
 // These are intentionally mode-neutral. Use FACE colours only for game state.

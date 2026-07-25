@@ -19,6 +19,7 @@ import ScreenTransition from './ScreenTransition.jsx';
 
 // Always-loaded UI components
 import TopMenuBar from './menus/TopMenuBar.jsx';
+import FlipScreenGlow from './overlays/FlipScreenGlow.jsx';
 import BottomNavBar from './menus/BottomNavBar.jsx';
 import SecondaryModesSheet from './menus/SecondaryModesSheet.jsx';
 import FloatingHUD from './menus/FloatingHUD.jsx';
@@ -220,6 +221,10 @@ export default function UILayer({
   return (
     <>
       <div className="ui-layer">
+        {/* Screen-space flip echo. Sits under every HUD element (zIndex 1) so it
+            tints the scene without washing out panels or controls. */}
+        {showGameHUD && <FlipScreenGlow />}
+
         {showGameHUD && <TopMenuBar
           metrics={metrics}
           size={size}

@@ -326,6 +326,7 @@ export const useGameStore = create(
       cascades: [],
       blackHolePulse: 0,
       flipWaveOrigins: [],
+      flipPulse: null,
       exploded: false,
       explosionT: 0,
       cubiePops: {},
@@ -411,6 +412,8 @@ export const useGameStore = create(
     rotationCountdown: 0,
     blackHolePulse: 0,
     flipWaveOrigins: [],
+    // Screen-space flip echo: { at, color, danger }. Null until the first flip.
+    flipPulse: null,
     cameraOrbitRequest: 0,  // epoch — increments each time the user requests a camera orbit
     cameraOrbitDir: null,   // 'cw' | 'ccw'
 

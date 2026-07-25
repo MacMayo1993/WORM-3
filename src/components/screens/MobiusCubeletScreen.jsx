@@ -10,7 +10,7 @@ import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import SafeEnvironment from '../../3d/SafeEnvironment.jsx';
 import MobiusCubelet from '../../3d/MobiusCubelet.jsx';
-import { UI_FONT, GLASS_PANEL, GLASS_PANEL_BORDER } from '../../utils/uiTheme.js';
+import { UI_FONT, NIGHT_SHEET, NIGHT_BORDER, NIGHT_PANEL, NIGHT_TEXT, NIGHT_TEXT_MUTED, UI_GOLD } from '../../utils/uiTheme.js';
 
 // Antipodal pair legend entries
 const LEGEND = [
@@ -28,8 +28,8 @@ function LegendRow({ colorA, colorB, label, sub }) {
         gap: '10px',
         padding: '8px 12px',
         borderRadius: '10px',
-        background: 'rgba(255,255,255,0.04)',
-        border: `1px solid ${GLASS_PANEL_BORDER}`,
+        background: NIGHT_PANEL,
+        border: `1px solid ${NIGHT_BORDER}`,
       }}
     >
       {/* Two-colour swatch */}
@@ -83,7 +83,7 @@ export default function MobiusCubeletScreen({ onBack }) {
         position: 'fixed',
         inset: 0,
         zIndex: 9999,
-        background: GLASS_PANEL,
+        background: NIGHT_SHEET,
         backdropFilter: 'blur(24px)',
         WebkitBackdropFilter: 'blur(24px)',
         display: 'flex',
@@ -112,21 +112,21 @@ export default function MobiusCubeletScreen({ onBack }) {
             alignItems: 'center',
             gap: '6px',
             padding: '8px 14px 8px 8px',
-            background: 'rgba(120,160,255,0.08)',
-            border: '1px solid rgba(120,160,255,0.18)',
+            background: NIGHT_PANEL,
+            border: `1px solid ${NIGHT_BORDER}`,
             borderRadius: '24px',
             cursor: 'pointer',
-            color: 'rgba(180,210,255,0.75)',
+            color: NIGHT_TEXT,
             fontSize: '13px',
             fontWeight: 600,
             fontFamily: UI_FONT,
             flexShrink: 0,
           }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(120,160,255,0.15)'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(120,160,255,0.08)'; }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(250,247,238,0.16)'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = NIGHT_PANEL; }}
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M10 3L5 8L10 13" stroke="rgba(180,210,255,0.75)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M10 3L5 8L10 13" stroke="rgba(255,253,242,0.86)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
           Back
         </button>
@@ -169,14 +169,14 @@ export default function MobiusCubeletScreen({ onBack }) {
             width: 36,
             height: 36,
             borderRadius: '50%',
-            background: autoRotate ? 'rgba(120,160,255,0.15)' : 'rgba(120,160,255,0.06)',
-            border: `1px solid ${autoRotate ? 'rgba(120,160,255,0.35)' : 'rgba(120,160,255,0.15)'}`,
+            background: autoRotate ? 'rgba(250,247,238,0.16)' : NIGHT_PANEL,
+            border: `1px solid ${autoRotate ? UI_GOLD : NIGHT_BORDER}`,
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             flexShrink: 0,
-            color: autoRotate ? 'rgba(160,210,255,0.85)' : 'rgba(120,160,255,0.4)',
+            color: autoRotate ? UI_GOLD : NIGHT_TEXT_MUTED,
             fontSize: '16px',
             transition: 'all 0.2s ease',
           }}
@@ -192,7 +192,7 @@ export default function MobiusCubeletScreen({ onBack }) {
           style={{ width: '100%', height: '100%' }}
           gl={{ antialias: true, alpha: true }}
         >
-          <color attach="background" args={['#03050f']} />
+          <color attach="background" args={['#141a0e']} />
           <ambientLight intensity={0.6} />
           <pointLight position={[4, 4, 6]}  intensity={2.5} color="#ffffff" />
           <pointLight position={[-4, -3, -4]} intensity={1.2} color="#6688ff" />

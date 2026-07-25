@@ -1,98 +1,102 @@
 // src/3d/AntipodalGlowFill.jsx
-// Antipodal glow fill effect — glows from the outside and fills inward
-// when a sticker crosses the manifold. Uses persistent meshes with shared
-// geometries so no per-sticker geometry allocations occur.
-import { useRef, useEffect } from 'react';
-import { useFrame } from '@react-three/fiber';
+// Antipodal glow fill — the crossing beat. An outer edge ring collapses inward
+// while a bright core fills outward, reading as the tile being drawn through the
+// manifold rather than merely recoloured. Sits under the shockwave, which throws
+// its ring the other way; together they read as "pulled in, punched out".
+//
+// PASSIVE, like FlipShockwave/FlipFlash: this component owns no useFrame. Every
+// sticker on the cube mounts one (150 of them on a 5×5), so a per-instance frame
+// callback would be paid on every idle tile forever. Progress is driven by the
+// parent StickerPlane tick, which only runs while the sticker is in the
+// active-sticker registry. trigger() starts a burst; setProgress() advances it
+// 0→1; at ≥1 the meshes hide so idle tiles skip the draw entirely.
+import React, { useRef, useImperativeHandle } from 'react';
 import * as THREE from 'three';
 
+// Shared across every instance — no per-sticker geometry allocation.
 const _sharedOuterRingGeometry = new THREE.RingGeometry(0.4, 0.5, 16);
 const _sharedMainRingGeometry = new THREE.RingGeometry(0.2, 0.45, 16);
 const _sharedInnerCircleGeometry = new THREE.CircleGeometry(0.48, 16);
 
-const AntipodalGlowFill = ({ active, color }) => {
-    const ringRef = useRef();
-    const innerGlowRef = useRef();
-    const outerRingRef = useRef();
-    const progressRef = useRef(0);
-    const isActiveRef = useRef(false);
+const AntipodalGlowFill = React.forwardRef((_props, ref) => {
+  const groupRef = useRef();
+  const ringRef = useRef();
+  const innerGlowRef = useRef();
+  const outerRingRef = useRef();
 
-    // Materials initialised immediately (not in useEffect) so meshes always
-    // have a valid material on the very first render.
-    const outerMatRef = useRef(new THREE.MeshBasicMaterial({
-        color: '#ffffff', transparent: true, opacity: 0,
-        blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
-    }));
-    const ringMatRef = useRef(new THREE.MeshBasicMaterial({
-        color: '#ffffff', transparent: true, opacity: 0,
-        blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
-    }));
-    const innerMatRef = useRef(new THREE.MeshBasicMaterial({
-        color: '#ffffff', transparent: true, opacity: 0,
-        blending: THREE.AdditiveBlending, depthWrite: false,
-    }));
+  // Materials are per-instance (each tile fades on its own schedule) but are
+  // created once and reused across every burst on this tile.
+  const [outerMat] = React.useState(() => new THREE.MeshBasicMaterial({
+    color: '#ffffff', transparent: true, opacity: 0,
+    blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+  }));
+  const [ringMat] = React.useState(() => new THREE.MeshBasicMaterial({
+    color: '#ffffff', transparent: true, opacity: 0,
+    blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+  }));
+  const [innerMat] = React.useState(() => new THREE.MeshBasicMaterial({
+    color: '#ffffff', transparent: true, opacity: 0,
+    blending: THREE.AdditiveBlending, depthWrite: false,
+  }));
 
-    useEffect(() => {
-        const outerMat = outerMatRef.current;
-        const ringMat = ringMatRef.current;
-        const innerMat = innerMatRef.current;
-        return () => {
-            outerMat?.dispose();
-            ringMat?.dispose();
-            innerMat?.dispose();
-        };
-    }, []);
+  React.useEffect(() => () => {
+    outerMat.dispose();
+    ringMat.dispose();
+    innerMat.dispose();
+  }, [outerMat, ringMat, innerMat]);
 
-    useEffect(() => {
-        if (active && !isActiveRef.current) {
-            isActiveRef.current = true;
-            progressRef.current = 0;
-            if (outerMatRef.current) outerMatRef.current.color.set(color);
-            if (ringMatRef.current) ringMatRef.current.color.set(color);
-            if (innerMatRef.current) innerMatRef.current.color.set(color);
-        } else if (!active) {
-            isActiveRef.current = false;
-            if (outerMatRef.current) outerMatRef.current.opacity = 0;
-            if (ringMatRef.current) ringMatRef.current.opacity = 0;
-            if (innerMatRef.current) innerMatRef.current.opacity = 0;
-        }
-    }, [active, color]);
+  useImperativeHandle(ref, () => ({
+    trigger(color) {
+      if (color) {
+        outerMat.color.set(color);
+        ringMat.color.set(color);
+        innerMat.color.set(color);
+      }
+      if (groupRef.current) groupRef.current.visible = true;
+    },
+    // Advanced 0→1 by the parent tick (active-registry driven); ≥1 = spent.
+    setProgress(p) {
+      if (p >= 1) {
+        outerMat.opacity = 0;
+        ringMat.opacity = 0;
+        innerMat.opacity = 0;
+        if (groupRef.current) groupRef.current.visible = false;
+        return;
+      }
+      const snappy = 1 - Math.pow(1 - p, 3);
 
-    useFrame((_, delta) => {
-        if (!isActiveRef.current) return;
+      // Main ring collapses inward, pulsing as it goes.
+      if (ringRef.current) {
+        const ringScale = Math.max(0.01, 1 - snappy);
+        ringRef.current.scale.set(ringScale, ringScale, 1);
+        const glowPulse = Math.sin(p * Math.PI * 4) * 0.3 + 0.7;
+        ringMat.opacity = (1 - snappy * 0.3) * glowPulse * 0.9;
+      }
 
-        progressRef.current = Math.min(1, progressRef.current + delta * 5);
-        const progress = progressRef.current;
-        const snappyProgress = 1 - Math.pow(1 - progress, 3);
+      // Outer edge ring rushes in from just beyond the tile border.
+      if (outerRingRef.current) {
+        const edgeScale = Math.max(0.01, 1.1 - snappy * 0.8);
+        outerRingRef.current.scale.set(edgeScale, edgeScale, 1);
+        outerMat.opacity = (1 - snappy) * 0.6;
+      }
 
-        if (ringRef.current) {
-            const ringScale = Math.max(0.01, 1 - snappyProgress);
-            ringRef.current.scale.set(ringScale, ringScale, 1);
-            const glowPulse = Math.sin(progress * Math.PI * 4) * 0.3 + 0.7;
-            ringMatRef.current.opacity = (1 - snappyProgress * 0.3) * glowPulse * 0.9;
-        }
+      // Core fills outward and fades — brightest at the crossing midpoint.
+      if (innerGlowRef.current) {
+        const fillScale = snappy * 0.95;
+        innerGlowRef.current.scale.set(fillScale, fillScale, 1);
+        innerMat.opacity = Math.sin(p * Math.PI) * 0.7;
+      }
+    },
+  }), [outerMat, ringMat, innerMat]);
 
-        if (outerRingRef.current) {
-            const edgeScale = Math.max(0.01, 1.1 - snappyProgress * 0.8);
-            outerRingRef.current.scale.set(edgeScale, edgeScale, 1);
-            outerMatRef.current.opacity = (1 - snappyProgress) * 0.6;
-        }
+  return (
+    <group ref={groupRef} position={[0, 0, 0.025]} visible={false} renderOrder={11}>
+      <mesh ref={outerRingRef} geometry={_sharedOuterRingGeometry} material={outerMat} scale={[0, 0, 0]} />
+      <mesh ref={ringRef} geometry={_sharedMainRingGeometry} material={ringMat} scale={[0, 0, 0]} />
+      <mesh ref={innerGlowRef} position={[0, 0, -0.005]} geometry={_sharedInnerCircleGeometry} material={innerMat} scale={[0, 0, 0]} />
+    </group>
+  );
+});
 
-        if (innerGlowRef.current) {
-            const fillScale = snappyProgress * 0.95;
-            innerGlowRef.current.scale.set(fillScale, fillScale, 1);
-            const fillOpacity = Math.sin(progress * Math.PI) * 0.7;
-            innerMatRef.current.opacity = fillOpacity;
-        }
-    });
-
-    return (
-        <group position={[0, 0, 0.025]}>
-            <mesh ref={outerRingRef} geometry={_sharedOuterRingGeometry} material={outerMatRef.current} scale={[0, 0, 0]} />
-            <mesh ref={ringRef} geometry={_sharedMainRingGeometry} material={ringMatRef.current} scale={[0, 0, 0]} />
-            <mesh ref={innerGlowRef} position={[0, 0, -0.005]} geometry={_sharedInnerCircleGeometry} material={innerMatRef.current} scale={[0, 0, 0]} />
-        </group>
-    );
-};
-
+AntipodalGlowFill.displayName = 'AntipodalGlowFill';
 export default AntipodalGlowFill;
