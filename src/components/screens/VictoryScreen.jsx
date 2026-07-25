@@ -1,6 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { VICTORY } from '../../utils/constants.js';
-import { UI_FONT, DISPLAY_FONT } from '../../utils/uiTheme.js';
+import {
+  UI_FONT, DISPLAY_FONT, UI_CREAM, UI_GOLD, UI_MOSS, UI_MOSS_LIGHT,
+  NIGHT_BACKDROP, NIGHT_BACKDROP_BLUR, NIGHT_PANEL, NIGHT_BORDER,
+  NIGHT_TEXT, NIGHT_TEXT_MUTED, NIGHT_TITLE_SHADOW, NIGHT_SOFT_SHADOW,
+} from '../../utils/uiTheme.js';
 import { computeStars, getLevelPar } from '../../levels/scoring.js';
 
 /**
@@ -11,17 +15,19 @@ import { computeStars, getLevelPar } from '../../levels/scoring.js';
  */
 
 // ─── STEP COMPLETE palette ─────────────────────────────────────────────────────
-const BG_RADIAL = 'radial-gradient(ellipse at center, rgba(24,31,18,0.55) 0%, rgba(24,31,18,0.86) 100%)';
-const INK_CREAM = '#fffdf2';
-const GOLD = '#ffe9ad';
-const CREAM_SOFT = 'rgba(255,253,242,0.86)';
-const CREAM_MUTED = 'rgba(255,253,242,0.6)';
-const GREEN = '#5f7f4a';
-const GREEN_LIGHT = '#9fdb7a';
-const TITLE_SHADOW = '0 3px 0 rgba(43,53,35,0.55), 0 10px 34px rgba(24,31,18,0.6)';
-const SOFT_SHADOW = '0 2px 12px rgba(24,31,18,0.7)';
-const WARM_PANEL = 'rgba(250,247,238,0.08)';
-const WARM_BORDER = 'rgba(255,245,220,0.18)';
+// This treatment is now the shared NIGHT family in uiTheme.js; these aliases
+// keep the local names readable while there is a single source of truth.
+const BG_RADIAL = NIGHT_BACKDROP;
+const INK_CREAM = UI_CREAM;
+const GOLD = UI_GOLD;
+const CREAM_SOFT = NIGHT_TEXT;
+const CREAM_MUTED = NIGHT_TEXT_MUTED;
+const GREEN = UI_MOSS;
+const GREEN_LIGHT = UI_MOSS_LIGHT;
+const TITLE_SHADOW = NIGHT_TITLE_SHADOW;
+const SOFT_SHADOW = NIGHT_SOFT_SHADOW;
+const WARM_PANEL = NIGHT_PANEL;
+const WARM_BORDER = NIGHT_BORDER;
 
 const VictoryScreen = ({
   winType,
@@ -146,8 +152,8 @@ const VictoryScreen = ({
       inset: 0,
       height: '100dvh',
       background: BG_RADIAL,
-      backdropFilter: 'blur(9px) saturate(1.03)',
-      WebkitBackdropFilter: 'blur(9px) saturate(1.03)',
+      backdropFilter: NIGHT_BACKDROP_BLUR,
+      WebkitBackdropFilter: NIGHT_BACKDROP_BLUR,
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',

@@ -24,7 +24,7 @@ import { warmDemoAssets } from '../../utils/preloadAssets.js';
 import MenuFlipWave from './MenuFlipWave.jsx';
 import MenuTileOverlay from './MenuTileOverlay.jsx';
 import { ANTIPODAL_COLOR } from '../../utils/constants.js';
-import { UI_FONT, GLASS_PANEL, GLASS_PANEL_BORDER, DISPLAY_FONT } from '../../utils/uiTheme.js';
+import { UI_FONT, DISPLAY_FONT, NIGHT_BORDER } from '../../utils/uiTheme.js';
 
 // ─── Randomizable style state — re-picked every time the user taps the cube ──
 // biome is now included so its face palette appears in the rotation.
@@ -1305,8 +1305,8 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
         <div style={{ width: 'min(400px, 94vw)', marginTop: '14px', opacity, transition: 'opacity 150ms ease' }}>
           <div style={{
             borderRadius: '16px',
-            background: 'linear-gradient(180deg, rgba(13,17,40,0.94), rgba(4,6,20,0.96))',
-            border: `1px solid ${GLASS_PANEL_BORDER}`,
+            background: 'linear-gradient(180deg, rgba(34,42,26,0.94), rgba(20,26,15,0.96))',
+            border: `1px solid ${NIGHT_BORDER}`,
             padding: '16px 18px', position: 'relative', overflow: 'hidden',
           }}>
             <div aria-hidden style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: `linear-gradient(90deg, ${mode.tileColor}, transparent 78%)` }} />
