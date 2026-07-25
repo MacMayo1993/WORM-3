@@ -28,6 +28,7 @@ import { resolveColors } from '../utils/colorSchemes.js';
 import FlipParticles from './FlipParticles.jsx';
 import FlipShockwave from './FlipShockwave.jsx';
 import FlipFlash from './FlipFlash.jsx';
+import AntipodalGlowFill from './AntipodalGlowFill.jsx';
 import { fireFlipImpulse } from './flipImpulse.js';
 import HealParticles from './HealParticles.jsx';
 import ParityBreakthrough from './ParityBreakthrough.jsx';
@@ -798,6 +799,10 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // Shockwave progress (1 = idle/spent). Advanced in tickImpl so it rides the
   // active-sticker registry instead of a per-sticker useFrame.
   const shockT = useRef(1);
+  // Antipodal glow fill — the inward crossing collapse. Runs slower than the
+  // shockwave so the "pulled through" read lands after the "punched out" one.
+  const glowFillRef = useRef();
+  const glowT = useRef(1);
   // Crossing bloom/chromatic flash (1 = idle) + hitstop freeze timer (seconds).
   const flipFlashRef = useRef();
   const flashT = useRef(1);
@@ -931,6 +936,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       flipParticlesRef.current?.trigger(fc[curr]);
       flipShockwaveRef.current?.trigger(fc[curr]);
       shockT.current = 0;
+      glowFillRef.current?.trigger(fc[curr]);
+      glowT.current = 0;
       // Camera micro-kick along the tile's outward normal (recoil out); the tile
       // itself punches the other way in tickImpl (innerGroupRef −Z, into the cube).
       if (groupRef.current) {
@@ -1266,6 +1273,13 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         innerGroupRef.current.position.z =
           u >= 1 ? 0 : -0.07 * Math.exp(-4.5 * u) * Math.sin(u * Math.PI * 3.0);
       }
+    }
+
+    // Antipodal glow fill — ~0.55 s, the slowest of the three so the collapse
+    // is still resolving as the shockwave ring leaves the tile.
+    if (glowT.current < 1) {
+      glowT.current = Math.min(1, glowT.current + Math.min(delta, 0.05) * 1.8);
+      glowFillRef.current?.setProgress(glowT.current);
     }
 
     // Crossing bloom/chromatic flash — advances faster than the shockwave (~0.2 s).
@@ -1996,6 +2010,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
       {/* Crossing bloom + chromatic flash — fires at the midpoint hitstop. */}
       <FlipFlash ref={flipFlashRef} />
+
+      {/* Antipodal glow fill — edge ring collapses in as the core fills out. */}
+      <AntipodalGlowFill ref={glowFillRef} />
 
       {/* Heal seal overlay — golden convergence ring + color bloom on wormhole heal. */}
       <mesh ref={healSealRef} position={[0, 0, 0.004]} visible={false} renderOrder={11}>

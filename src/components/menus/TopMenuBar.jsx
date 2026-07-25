@@ -33,8 +33,33 @@ const ChaosStatItem = ({ label, value, color, dimColor, title }) => (
  * When chaos mode is active a second row shows live flip stats and a
  * Chaos Pressure bar whose gradient is drawn from the cube's face colors.
  */
+/**
+ * A HUD stat that punch-scales whenever its value changes, so a flip registers
+ * outside the canvas as well as inside it. Re-keying the animation is done by
+ * toggling the class off for a frame — restarting a CSS animation otherwise
+ * requires a reflow hack, and this component re-renders only when its value
+ * actually moves.
+ */
+const FlipStat = ({ label, value, title }) => {
+  const [punch, setPunch] = useState(false);
+  const prev = useRef(value);
+  useEffect(() => {
+    if (value === prev.current) return;
+    prev.current = value;
+    setPunch(true);
+    const t = setTimeout(() => setPunch(false), 440);
+    return () => clearTimeout(t);
+  }, [value]);
+  return (
+    <span className={`flip-stat${punch ? ' flip-stat-punch' : ''}`} title={title} style={{ marginLeft: '10px' }}>
+      <span className="flip-stat-key">{label}</span>
+      {value}
+    </span>
+  );
+};
+
 const TopMenuBar = ({
-  metrics: _metrics,
+  metrics,
   size,
   visualMode,
   flipMode,
@@ -151,12 +176,15 @@ const TopMenuBar = ({
         <span className="top-bar-progress" style={{ marginLeft: '12px' }}>{faceStats.percent}%</span>
         {chaosMode && (
           <span className="chaos-pill" style={{ marginLeft: '12px' }}>
-            DISPARITY L{chaosLevel}
+            CHAOS L{chaosLevel}
           </span>
         )}
         {flipMode && (
           <span className="flip-pill" style={{ marginLeft: '12px' }}>FLIP</span>
         )}
+        {/* F / W were documented in Help but never rendered anywhere. */}
+        <FlipStat label="F" value={metrics?.flips ?? 0} title="Total colour flips" />
+        <FlipStat label="W" value={metrics?.wormholes ?? 0} title="Active wormhole pairs" />
       </div>
 
       {/* Center: WORM³ Title */}

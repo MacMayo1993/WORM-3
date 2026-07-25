@@ -226,6 +226,83 @@ body {
   letter-spacing: 0.02em;
 }
 
+/* ── Flip screen glow ─────────────────────────────────────────────────────
+   Screen-space echo of a flip: a symmetric coloured rim that rises fast and
+   rings out. Composited (opacity only) so it holds its timing during a chaos
+   cascade. No mix-blend-mode: .ui-layer carries z-index 100, which makes it a
+   stacking context and therefore a blend isolation boundary — a `screen` blend
+   would composite against .ui-layer's transparent backdrop, not the cube. The
+   gradients are edge-weighted and clear through the middle, so plain alpha
+   reads as a rim flash with the cube fully visible. */
+.flip-screen-glow {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0;
+  will-change: opacity;
+  animation: flip-screen-glow 620ms cubic-bezier(0.22, 1, 0.36, 1) 1;
+}
+
+@keyframes flip-screen-glow {
+  0%   { opacity: 0; }
+  15%  { opacity: var(--flip-glow-peak, 0.16); }
+  100% { opacity: 0; }
+}
+
+/* Reduced motion gets a shorter, gentler ring rather than nothing at all — the
+   colour cue is information, not decoration. Defined as its own keyframe name:
+   redefining `flip-screen-glow` inside the media block would rely on engines
+   scoping a nested @keyframes correctly, which is not worth betting on. */
+@keyframes flip-screen-glow-soft {
+  0%   { opacity: 0; }
+  20%  { opacity: calc(var(--flip-glow-peak, 0.16) * 0.5); }
+  100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flip-screen-glow {
+    animation: flip-screen-glow-soft 300ms ease-out 1;
+  }
+}
+
+/* ── Flip / wormhole readout ──────────────────────────────────────────────
+   A counter that never moves is not a reward. These punch-scale on change so
+   the flip registers in the HUD, not only inside the canvas. */
+.flip-stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--ui-ink-subtle);
+  transform-origin: center;
+}
+
+.flip-stat-key {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  opacity: 0.55;
+  text-transform: uppercase;
+}
+
+.flip-stat-punch {
+  animation: flip-stat-punch 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes flip-stat-punch {
+  0%   { transform: scale(1);    }
+  22%  { transform: scale(1.42); }
+  60%  { transform: scale(0.96); }
+  100% { transform: scale(1);    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flip-stat-punch { animation: none; }
+}
+
 .top-bar-right {
   display: flex;
   align-items: center;

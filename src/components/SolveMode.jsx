@@ -10,7 +10,7 @@ import React, { useMemo, useRef, useEffect } from 'react';
 import { checkSolveProgress } from '../game/solveDetection.js';
 import { useKociembaSolver } from '../teach/useKociembaSolver.js';
 import { useAntipodalEngine } from '../hooks/useAntipodalEngine.js';
-import { UI_FONT, DISPLAY_FONT, MONO_FONT, GLASS_PANEL_BORDER } from '../utils/uiTheme.js';
+import { UI_FONT, DISPLAY_FONT, MONO_FONT } from '../utils/uiTheme.js';
 
 // ── Demo-screen palette (warm paper / sage / gold) ─────────────────────────────
 const CARD_BG      = 'rgba(250, 247, 238, 0.97)';
@@ -111,33 +111,36 @@ function FibreStrip({ fibre, disabled }) {
       ` · →Z${plan.target === 1 ? '₁' : '₀'} in ${plan.totalCost}`;
 
   return (
-    <div style={{ borderTop: `1px solid ${GLASS_PANEL_BORDER}` }}>
+    <div style={{ borderTop: `1px solid ${DIVIDER}` }}>
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '6px 12px',
       }}>
-        <span style={{ fontSize: 9, letterSpacing: '0.12em', opacity: 0.6, fontFamily: UI_FONT }}>
-          ANTIPODAL PAIRS
+        <span style={{
+          fontSize: 9, letterSpacing: '0.12em', color: GOLD, fontWeight: 800,
+          textTransform: 'uppercase', fontFamily: UI_FONT,
+        }}>
+          Antipodal pairs
         </span>
-        <span style={{ fontSize: 10, fontFamily: MONO_FONT, color: done ? '#00ff88' : '#c084fc' }}>
+        <span style={{ fontSize: 10, fontFamily: MONO_FONT, color: done ? SAGE : OLIVE_MUTED }}>
           {playing ? `op ${stepIndex} / ${totalSteps}` : summary}
         </span>
       </div>
       {!done && (
-        <div style={{ display: 'flex', gap: 6, padding: '0 10px 8px' }}>
+        <div style={{ display: 'flex', gap: 6, padding: '0 10px 10px' }}>
           <button
             onClick={playing ? pause : play}
             disabled={disabled}
-            style={ctrlBtn(playing ? '#00d9ff' : '#c084fc', disabled)}
+            style={ctrlBtn(playing ? GOLD_ACCENT : SAGE, disabled)}
           >
-            {playing ? '⏸ PAUSE' : '▶ REPAIR'}
+            {playing ? '⏸ Pause' : '▶ Repair'}
           </button>
           <button
             onClick={stepForward}
             disabled={disabled || playing}
-            style={ctrlBtn('#fbbf24', disabled || playing)}
+            style={ctrlBtn(GOLD_ACCENT, disabled || playing)}
           >
-            ⏭ STEP
+            ⏭ Step
           </button>
         </div>
       )}
@@ -145,25 +148,20 @@ function FibreStrip({ fibre, disabled }) {
   );
 }
 
-// Compact control-button style used by the antipodal fibre strip.
+// Compact control-button style used by the antipodal fibre strip. Shares the
+// pill language of the panel's main controls so the whole card reads as one
+// surface — this strip was left on the old neon palette when the rest of
+// SolveMode moved to the warm field-guide system.
 function ctrlBtn(accent, disabled) {
   return {
-    flex: 1, padding: '6px 0', borderRadius: 6,
-    background: disabled ? 'rgba(255,255,255,0.04)' : `rgba(${hexToRgb(accent)},0.14)`,
-    border: `1px solid ${disabled ? GLASS_PANEL_BORDER : accent}`,
-    color: disabled ? 'rgba(255,255,255,0.25)' : accent,
+    flex: 1, padding: '7px 0', borderRadius: 999,
+    background: 'transparent',
+    border: `1px solid ${disabled ? 'rgba(92, 111, 76, 0.18)' : accent}`,
+    color: disabled ? 'rgba(101, 113, 86, 0.45)' : accent,
     cursor: disabled ? 'default' : 'pointer',
-    fontSize: 11, fontFamily: MONO_FONT, fontWeight: 600,
+    fontSize: 11.5, fontFamily: UI_FONT, fontWeight: 800, letterSpacing: '0.02em',
     transition: 'all 0.15s',
   };
-}
-
-function hexToRgb(hex) {
-  // accepts #rrggbb or rgb(...) strings
-  const m = hex.match(/^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
-  if (m) return `${parseInt(m[1], 16)},${parseInt(m[2], 16)},${parseInt(m[3], 16)}`;
-  const r = hex.match(/\d+/g);
-  return r ? r.slice(0, 3).join(',') : '255,255,255';
 }
 
 // ── Main component ────────────────────────────────────────────────────────────

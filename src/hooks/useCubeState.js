@@ -13,11 +13,29 @@ import { getManifoldMap } from '../game/manifoldMapStore.js';
 import { healSticker as healStickerState } from '../game/cubeState.js';
 import { getStickerWorldPos, getManifoldGridId } from '../game/coordinates.js';
 import { play } from '../utils/audio.js';
-import { ANTIPODAL_COLOR } from '../utils/constants.js';
+import { ANTIPODAL_COLOR, FLIP_CAP } from '../utils/constants.js';
 import { resolveColors } from '../utils/colorSchemes.js';
 import { isInRefractory, markFlipped, clearRefractory } from '../game/refractoryMap.js';
 import { computeMergeRegions } from '../modes/merge/index.js';
 import { pruneExpiredFx } from '../utils/transientFx.js';
+
+/**
+ * Should this flip be held back to show the antipodal pair highlight first?
+ *
+ * Pulled out as a pure function because the invariant is easy to break and the
+ * breakage is silent: the interception hands off to a timer that calls
+ * flipSticker again, and `hasFlippedOnce` is only set true by the setState at
+ * the very end of that second call. So the re-entrant call still observes
+ * `hasFlippedOnce === false`. Without `alreadyIntercepted`, it re-intercepts,
+ * re-arms the timer, and the first flip of a fresh profile never lands at all.
+ *
+ * @param {boolean} hasFlippedOnce     player has completed a flip before
+ * @param {boolean} alreadyIntercepted the highlight beat has already been shown
+ * @param {boolean} hasPair            the sticker resolved to an antipodal partner
+ */
+export function shouldInterceptFirstFlip(hasFlippedOnce, alreadyIntercepted, hasPair) {
+  return !hasFlippedOnce && !alreadyIntercepted && hasPair;
+}
 
 // Recompute merge region tiers from the current store state and persist them.
 // Called imperatively after every rotation/shuffle when merge mode is active.
@@ -127,6 +145,9 @@ export function useCubeState() {
   // intercepted, the highlight rings + tether are shown for 800ms before the
   // actual flip executes, so they see both linked tiles light up first.
   const firstFlipTimerRef = useRef(null);
+  // Set once the pair-highlight beat has been shown, so the re-entrant call that
+  // actually performs the flip skips the interception instead of re-arming it.
+  const firstFlipInterceptedRef = useRef(false);
   useEffect(() => () => { if (firstFlipTimerRef.current) clearTimeout(firstFlipTimerRef.current); }, []);
 
   // Flip sticker pair
@@ -148,7 +169,8 @@ export function useCubeState() {
     // ── First-flip interception ───────────────────────────────────────────
     // Before the very first flip, show the antipodal pair highlight for 800ms
     // so the player sees both linked tiles light up before the flip fires.
-    if (!hasFlippedOnce && sticker) {
+    // See shouldInterceptFirstFlip for why the one-shot ref is load-bearing.
+    if (shouldInterceptFirstFlip(hasFlippedOnce, firstFlipInterceptedRef.current, !!sticker)) {
       const antipodalLoc = findAntipodalStickerByGrid(currentManifoldMap, sticker, currentSize);
       if (antipodalLoc) {
         const antSticker = currentCubies[antipodalLoc.x]?.[antipodalLoc.y]?.[antipodalLoc.z]?.stickers?.[antipodalLoc.dirKey];
@@ -161,6 +183,7 @@ export function useCubeState() {
           },
         });
         play('/sounds/rotate.mp3');
+        firstFlipInterceptedRef.current = true;
         firstFlipTimerRef.current = setTimeout(() => {
           firstFlipTimerRef.current = null;
           flipSticker(pos, dirKey);
@@ -230,6 +253,15 @@ export function useCubeState() {
       moveHistory: [...state.moveHistory, { type: 'flip', pos: { ...pos }, dirKey, timestamp: ts }].slice(-10),
       flipWaveOrigins: origins,
       blackHolePulse: ts,
+      // Screen-space echo of the flip, consumed by FlipScreenGlow outside the
+      // canvas. `danger` rides the tile's distance to its cap so a tile about to
+      // die rings the screen harder — the same scaling the camera kick and the
+      // haptic already use.
+      flipPulse: {
+        at: ts,
+        color: origins[0]?.color ?? null,
+        danger: FLIP_CAP > 0 ? Math.min(1, (sticker?.flips ?? 0) / FLIP_CAP) : 0,
+      },
       cubiePops: {
         ...pruneExpiredFx(state.cubiePops, now),
         [srcKey]: { startMs: now, durationMs: popDuration },
