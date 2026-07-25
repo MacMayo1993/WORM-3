@@ -108,7 +108,7 @@ const SecondaryModesSheet = ({
             <div className="sheet-group">
               <div className="sheet-group-title">Core Modes</div>
               <div className="sheet-grid">
-                <SheetItem label="Disparity" active={chaosMode} onClick={onToggleChaos} color="#ef4444" locked={chaosLocked} />
+                <SheetItem label="Chaos" active={chaosMode} onClick={onToggleChaos} color="#ef4444" locked={chaosLocked} />
                 {chaosMode && !chaosLocked && (
                   <>
                     {[1, 2, 3, 4, 5].map((l) => (

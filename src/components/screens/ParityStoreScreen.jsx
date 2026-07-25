@@ -579,7 +579,7 @@ const ParityStoreScreen = ({ onClose }) => {
         background: PAPER_FOOTER_BG,
       }}>
         <span style={{ fontSize: '11px', color: PAPER_TEXT_FAINT, fontFamily: FONT }}>
-          Earn PP by collecting orbs in Worm mode and winning Disparity bets
+          Earn PP by collecting orbs in Worm mode and winning Chaos bets
         </span>
       </div>
 

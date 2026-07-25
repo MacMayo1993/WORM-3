@@ -279,7 +279,9 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     img.src = url;
   };
 
-  const STEPS = ['Scene', 'Style', 'Colors', 'Size'];
+  // Size leads: it is the only choice here that changes the puzzle rather than
+  // its looks, so a player who just wants a 3×3 makes one pick and can finish.
+  const STEPS = ['Size', 'Scene', 'Style', 'Colors'];
   const totalSteps = 4;
 
   const handleNext = () => {
@@ -631,13 +633,13 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
 
   // ── Step titles ─────────────────────────────────────────────────────────────
 
-  const stepContent = [renderBackgrounds, renderStyles, renderColors, renderSize];
-  const stepTitles = ['Background', 'Tile Style', 'Color Palette', 'Cube Size'];
+  const stepContent = [renderSize, renderBackgrounds, renderStyles, renderColors];
+  const stepTitles = ['Cube Size', 'Background', 'Tile Style', 'Color Palette'];
   const stepSubtitles = [
+    'How big a puzzle do you want? Everything after this is decoration',
     'Choose your play environment',
     'Choose how your tiles look and feel',
     'Pick a palette — see it applied to your chosen tile style',
-    'Pick your puzzle dimensions',
   ];
 
   return (
@@ -674,6 +676,19 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           >
             {step === 0 ? 'Cancel' : 'Back'}
           </button>
+
+          {/* The remaining steps are all cosmetic and every one has a sane
+              default, so a player who only cares about the cube can leave now. */}
+          {step < totalSteps - 1 && (
+            <button
+              style={{ ...S.btnSecondary, marginLeft: 'auto', marginRight: '10px' }}
+              onClick={() => onComplete({ ...settings, cubeSize })}
+              onMouseEnter={e => { e.currentTarget.style.color = PAPER_TEXT; e.currentTarget.style.borderColor = '#b8b2aa'; }}
+              onMouseLeave={e => { e.currentTarget.style.color = PAPER_TEXT_MUTED; e.currentTarget.style.borderColor = PAPER_BORDER_SOFT; }}
+            >
+              Just play
+            </button>
+          )}
 
           <button
             style={S.btnPrimary}

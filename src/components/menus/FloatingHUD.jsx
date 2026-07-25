@@ -31,7 +31,7 @@ const FloatingHUD = ({ metrics, chaosLevel, chaosMode }) => {
   useEffect(() => {
     if (chaosMode && chaosLevel !== prevChaosLevel.current) {
       prevChaosLevel.current = chaosLevel;
-      push(`Disparity Level ${chaosLevel}`);
+      push(`Chaos Level ${chaosLevel}`);
     }
   }, [chaosLevel, chaosMode, push]);
 

@@ -10,7 +10,7 @@ import { UI_FONT, HAND_FONT } from '../../utils/uiTheme.js';
  * behind a full-width cream graph-paper panel, a nameplate tab labels the
  * chapter, and a large hand-written line steps through the level's dialogue.
  * Keeping this visually identical to the demo intro (MobiIntroScreen) means
- * Mobi feels like the same character whether you meet him in the demo or a
+ * Mobi feels like the same character whether you meet them in the demo or a
  * story chapter.
  */
 
@@ -291,6 +291,24 @@ const LevelTutorial = ({ level, onClose, onMainMenu }) => {
                 onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(53,64,74,0.58)'; e.currentTarget.style.borderColor = 'rgba(53,64,74,0.22)'; }}
               >
                 ← Menu
+              </button>
+            )}
+            {/* Skip: a briefing should never stand between a player and the
+                cube. Hidden on the last line, where "Let's go" already is it. */}
+            {!isLast && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); dismiss(); }}
+                style={{
+                  background: 'none', border: '1px solid rgba(53,64,74,0.22)',
+                  color: 'rgba(53,64,74,0.58)', fontSize: '11px', fontWeight: 500,
+                  padding: '5px 12px', borderRadius: '999px', cursor: 'pointer',
+                  fontFamily: UI_FONT, letterSpacing: '0.06em', transition: 'all 0.15s',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = pencilLead; e.currentTarget.style.borderColor = 'rgba(53,64,74,0.42)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(53,64,74,0.58)'; e.currentTarget.style.borderColor = 'rgba(53,64,74,0.22)'; }}
+              >
+                Skip
               </button>
             )}
             <button

@@ -34,9 +34,9 @@ export default createLevel({
 
   tutorial: {
     title: 'First Job 💼',
-    text: 'Welcome to the real world! Press X to EXPLODE the cube and see its internal structure. Time to think in 3D like a professional!',
+    text: 'Welcome to the real world! Use Explode to blow the cube apart and see its internal structure. Time to think in 3D like a professional!',
     objective: 'Open explode view, identify the seam marker, and reverse the two moved layers.',
-    tip: 'Explode view reveals how the pieces connect.',
+    tip: 'Open Explode — Views → Explode, or press X — to pull the cubies apart and see exactly which two layers moved.',
     mobiLines: [
       'At work, a problem is easier once you can see its structure.',
       'Open explode view and find the two layers that moved. The top-center flip is the seam marker for this route.',

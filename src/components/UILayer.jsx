@@ -451,7 +451,16 @@ export default function UILayer({
 
       <ScreenTransition show={showComingSoon}>
         <Suspense fallback={null}>
-          <ComingSoonScreen onBack={onCloseComingSoon} />
+          {/* Each launcher closes this screen first, otherwise the sheet stays
+              mounted over the mode it just started. */}
+          <ComingSoonScreen
+            onBack={onCloseComingSoon}
+            onHolonomy={() => { onCloseComingSoon(); onMenuHolonomy?.(); }}
+            onBiome={() => { onCloseComingSoon(); onMenuBiome?.(); }}
+            onMerge={() => { onCloseComingSoon(); onMenuMerge?.(); }}
+            onCoop={() => { onCloseComingSoon(); onMenuCoop?.(); }}
+            onMobiusCubelet={() => { onCloseComingSoon(); onMenuMobiusCubelet?.(); }}
+          />
         </Suspense>
       </ScreenTransition>
 

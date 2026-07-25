@@ -40,7 +40,7 @@ const PENCIL_LEAD = '#35404a';
 /**
  * WizardPreviewNote — the demo's step-preview line for this mode, tabbed with the
  * wizard's accent and set in Mobi's pencil hand so the panel reads as a note in
- * her notebook. Renders nothing when `text` is empty.
+ * their notebook. Renders nothing when `text` is empty.
  */
 export function WizardPreviewNote({ accent, text }) {
   if (!text) return null;

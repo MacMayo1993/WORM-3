@@ -71,12 +71,12 @@ const steps = [
     ),
   },
   {
-    title: "Disparity Mode",
+    title: "Chaos Mode",
     subtitle: "When the manifold fights back",
     content: (
       <>
         <p style={{ margin: '0 0 14px 0' }}>
-          <strong>Disparity (Chaos) Mode</strong> introduces instability. Flipped stickers at the edges of face groups can spontaneously cascade to their neighbors.
+          <strong>Chaos Mode</strong> introduces instability. Flipped stickers at the edges of face groups can spontaneously cascade to their neighbors.
         </p>
         <p style={{ margin: '0 0 10px 0' }}>Levels 1–5 control how aggressively chaos spreads:</p>
         <ul style={{ margin: '0 0 14px 0', paddingLeft: '20px', fontSize: '13px', lineHeight: 1.7 }}>
@@ -87,7 +87,7 @@ const steps = [
           <li><strong>L5:</strong> Deep-manifold surges — strong hops with pacing control</li>
         </ul>
         <p style={{ margin: 0, color: 'rgba(200, 220, 255, 0.60)' }}>
-          Toggle Disparity Mode with the <strong>C</strong> key or the Chaos button in the menu.
+          Toggle Chaos Mode with the <strong>C</strong> key or the Chaos button in the menu.
         </p>
       </>
     ),
@@ -101,7 +101,7 @@ const steps = [
         <ul style={{ margin: '0 0 14px 0', paddingLeft: '20px', fontSize: '13px', lineHeight: 1.8 }}>
           <li>Use <strong>Explode view (X)</strong> to see all antipodal connections clearly</li>
           <li>Track parity — plan flips to stay on even parity when possible</li>
-          <li>In Disparity Mode, work from the center outward to minimize cascade spread</li>
+          <li>In Chaos Mode, work from the center outward to minimize cascade spread</li>
           <li>For WORM³ victory, ensure every sticker has flipped before your final solve</li>
           <li>Use <strong>Teach Mode</strong> (available for 3×3) to learn step-by-step algorithms</li>
         </ul>

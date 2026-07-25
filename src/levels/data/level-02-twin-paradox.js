@@ -31,9 +31,9 @@ export default createLevel({
 
   tutorial: {
     title: 'Elementary School 📚',
-    text: 'Time to learn something cool! Every sticker has a TWIN on the opposite side. Press T to see the secret tunnels connecting them!',
+    text: 'Time to learn something cool! Every sticker has a TWIN on the opposite side. Turn on Tunnels to see the secret threads connecting them!',
     objective: 'Use the tunnel view to study opposite faces, then restore the two mixed layers.',
-    tip: 'Opposites are connected - just like in math class!',
+    tip: 'Turn on Tunnels — Views → Tunnels, or press T — to see the threads joining each tile to its twin on the far side.',
     mobiLines: [
       'The daycare block had one answer. This school cube has a secret: every tile has a twin.',
       'Press T and trace a tunnel from one face to its opposite. They are farther apart to your eyes, but adjacent in our world.',

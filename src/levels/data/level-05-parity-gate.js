@@ -38,7 +38,7 @@ export default createLevel({
     title: 'College 🎓',
     text: 'Time for advanced concepts! EVEN parity (cyan) = normal. ODD parity (purple) = you crossed a "seam". This is real topology!',
     objective: 'Use parity as a compass: clear the two seam pairs, then restore the three layers.',
-    tip: 'The sledgehammer algorithm fixes parity issues.',
+    tip: 'Cyan means a tile never crossed the seam; purple means it did. Tap the two purple centers to send them home, then undo the three layer turns.',
     mobiLines: [
       'College lesson: the parity light remembers whether a path crossed the seam.',
       'Use it as a compass, not a grade. Clear the two flipped center pairs, then return the three layers.',

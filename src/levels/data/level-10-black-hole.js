@@ -43,7 +43,7 @@ export default createLevel({
     title: 'The Singularity 🕳️',
     text: "Maximum complexity. You're at the edge of a BLACK HOLE. Everything you've learned leads to this moment. Good luck.",
     objective: 'Use parity and the net to clear three seam pairs and restore all seven layers.',
-    tip: 'May the topology be with you.',
+    tip: 'Seams first: clear all three flipped pairs, then unwind the layer turns in reverse order. May the topology be with you.',
     mobiLines: [
       'This is the Singularity. Every tool you learned is part of the same map.',
       'Three seams are inverted and seven layers have drifted. Read parity, unfold the net, and choose a calm route back.',

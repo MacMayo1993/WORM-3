@@ -145,16 +145,32 @@ const HelpMenu = ({ onClose }) => (
       {/* Content */}
       <div style={{ padding: '20px 24px 24px' }}>
 
+        <Section title="The One Rule That Isn't Rubik's">
+          <Row label="Every tile has a twin" desc="Directly opposite it, through the middle of the cube" />
+          <Row label="Flipping" desc="Tap a tile to swap it with its twin — both change at once" />
+          <Row label="Why it matters" desc="Some tangles are far quicker to fix through the cube than around it" />
+        </Section>
+
         <Section title="Moving the Cube">
           <Row label="Drag" desc="Rotates a slice — just like a real Rubik's Cube" />
           <Row label="Shift + Drag" desc="Twists the entire face" />
           <Row label="Click a sticker" desc="Flips it to its antipodal (opposite) color" />
+          <Row label="Bottom bar" desc="Reset, Shuffle, Flip, Views and More — everything without a keyboard" />
+        </Section>
+
+        <Section title="Game Modes">
+          <Row label="Story" desc="Ten chapters, one new idea each. Start here if you're new" />
+          <Row label="Cube" desc="Freeplay — any size 2×2 to 7×7, your palette, no timer" />
+          <Row label="Worm" desc="Steer a worm across the cube to heal it. Eat orbs, earn points" />
+          <Row label="Chaos" desc="Tiles flip on their own. Stake points on how long you last" />
+          <Row label="Random" desc="The cube redecorates itself mid-solve" />
+          <Row label="More Modes" desc="Merge, Biome, Crawler, Holonomy — the odd corners" />
         </Section>
 
         <Section title="Special Features">
           <Row label="Tunnels" desc="Colorful tunnels show connections between antipodal points" />
           <Row label="Flip Mode" desc="Toggle color flipping on or off" />
-          <Row label="Disparity Mode" desc="Watch instability cascade across the cube!" />
+          <Row label="Chaos Mode" desc="Watch instability cascade across the cube!" />
         </Section>
 
         <Section title="Views">
@@ -172,7 +188,7 @@ const HelpMenu = ({ onClose }) => (
           <Row label="Pressure bar" desc="Shows chaos intensity" />
         </Section>
 
-        <Section title="Keyboard Controls">
+        <Section title="Keyboard Controls (optional)">
           <KeyRow keys="Arrow keys" desc="Move cursor to select a tile" />
           <KeyRow keys="W / S" desc="Rotate selected row up / down" />
           <KeyRow keys="A / D" desc="Rotate selected column left / right" />
@@ -205,7 +221,7 @@ const HelpMenu = ({ onClose }) => (
           <KeyRow keys="T" desc="Show / hide tunnels" />
           <KeyRow keys="X" desc="Toggle explosion view" />
           <KeyRow keys="V" desc="Cycle view mode" />
-          <KeyRow keys="C" desc="Toggle Disparity Mode" />
+          <KeyRow keys="C" desc="Toggle Chaos Mode" />
           <KeyRow keys="P" desc="Toggle Hands Mode" />
           <KeyRow keys="Esc" desc="Close menus / exit Hands Mode" />
         </Section>
