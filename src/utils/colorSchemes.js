@@ -290,6 +290,19 @@ export const TILE_STYLES = {
   bioLattice:   { label: 'Bio-Lattice',   cost: 'med', type: 'animated' },
   stellarLensing: { label: 'Stellar Lensing', cost: 'med', type: 'animated' },
   eyeball:        { label: 'Eyeball',         cost: 'med', type: 'animated' },
+  // Non-Euclidean
+  poincareDisk:    { label: 'Poincaré Disk',    cost: 'med', type: 'procedural' },
+  hyperbolicWeave: { label: 'Hyperbolic Weave', cost: 'med', type: 'animated' },
+  apollonian:      { label: 'Apollonian Gasket', cost: 'med', type: 'procedural' },
+  circleInversion: { label: 'Circle Inversion', cost: 'low', type: 'animated' },
+  rp2Geodesics:    { label: 'RP² Geodesics',    cost: 'med', type: 'animated' },
+  solFlow:         { label: 'Sol Geometry',     cost: 'low', type: 'animated' },
+  nilTwist:        { label: 'Nil Twist',        cost: 'low', type: 'animated' },
+  lightCone:       { label: 'Light Cone',       cost: 'low', type: 'animated' },
+  metricBalls:     { label: 'Metric Balls',     cost: 'low', type: 'animated' },
+  gyroidSlice:     { label: 'Gyroid Slice',     cost: 'low', type: 'animated' },
+  hopfFibers:      { label: 'Hopf Fibers',      cost: 'low', type: 'animated' },
+  drosteSpiral:    { label: 'Droste Spiral',    cost: 'low', type: 'animated' },
 };
 
 export const DEFAULT_SETTINGS = {

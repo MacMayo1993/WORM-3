@@ -4,6 +4,13 @@ import { techShaders } from '../3d/styles/shaders/techShaders.js';
 import { natureShaders } from '../3d/styles/shaders/natureShaders.js';
 import { opArtShaders } from '../3d/styles/shaders/opArtShaders.js';
 import { antipodalShaders } from '../3d/styles/shaders/antipodalShaders.js';
+import { newStyleShaders } from '../3d/styles/shaders/newStyleShaders.js';
+import { nonEuclideanShaders } from '../3d/styles/shaders/nonEuclideanShaders.js';
+import { isAnimatedStyle } from '../3d/styles/TileStyleMaterials.jsx';
+import { isAnimatedPreviewStyle } from '../3d/TilePreviewRenderer.js';
+import { TILE_STYLE_SECTIONS, NON_EUCLIDEAN_STYLE_KEYS } from '../utils/tileStyleCatalog.js';
+import { TILE_STYLES } from '../utils/colorSchemes.js';
+import { STORE_TILES } from '../utils/storeCatalog.js';
 
 const modules = [
   ['basicShaders', basicShaders],
@@ -11,7 +18,11 @@ const modules = [
   ['natureShaders', natureShaders],
   ['opArtShaders', opArtShaders],
   ['antipodalShaders', antipodalShaders],
+  ['newStyleShaders', newStyleShaders],
+  ['nonEuclideanShaders', nonEuclideanShaders],
 ];
+
+const allShaders = Object.assign({}, ...modules.map(([, mod]) => mod));
 
 describe('shader modules', () => {
   it('every key exports a non-empty GLSL string with a main()', () => {
@@ -61,5 +72,67 @@ describe('shader modules', () => {
       expect(shader, `${key} missing baseColor uniform`).toContain('uniform vec3 baseColor');
       expect(shader, `${key} missing antipodalColor uniform`).toContain('uniform vec3 antipodalColor');
     }
+  });
+});
+
+describe('tile style catalog', () => {
+  const sectionKeys = TILE_STYLE_SECTIONS.flatMap(s => s.keys);
+
+  // 'solar' is listed and sold but has never had a fragment shader, so it falls
+  // back to 'solid'. Pre-existing; listed here so the check below still guards
+  // everything else instead of being deleted.
+  const KNOWN_MISSING_SHADER = new Set(['solar']);
+
+  it('every catalog key has a shader, a label and a store entry', () => {
+    const priced = new Set(STORE_TILES.map(t => t.tileKey));
+    for (const key of sectionKeys) {
+      if (!KNOWN_MISSING_SHADER.has(key)) {
+        expect(allShaders[key], `${key} has no fragment shader`).toBeTruthy();
+      }
+      expect(TILE_STYLES[key]?.label, `${key} has no label`).toBeTruthy();
+      expect(priced.has(key), `${key} is not sold in the store`).toBe(true);
+    }
+  });
+
+  it('no style appears in two sections', () => {
+    expect(new Set(sectionKeys).size).toBe(sectionKeys.length);
+  });
+});
+
+describe('non-Euclidean shaders', () => {
+  it('are all registered in the catalog section', () => {
+    expect(Object.keys(nonEuclideanShaders).sort()).toEqual([...NON_EUCLIDEAN_STYLE_KEYS].sort());
+  });
+
+  it('are animated exactly when their fragment shader reads time', () => {
+    // These styles animate purely in the fragment shader (no companion meshes
+    // like the volume styles have), so the two registries must agree with the
+    // GLSL exactly: a style that samples `time` without being registered renders
+    // one frame and then freezes, and the reverse burns a per-frame update for
+    // nothing. Either way it stays invisible until someone equips the tile.
+    for (const [key, shader] of Object.entries(nonEuclideanShaders)) {
+      const usesTime = /\btime\b/.test(shader.replace(/uniform\s+float\s+time\s*;/g, ''));
+      expect(isAnimatedStyle(key), `${key}: shader/animated-set mismatch`).toBe(usesTime);
+      expect(isAnimatedPreviewStyle(key), `${key}: shader/preview-set mismatch`).toBe(usesTime);
+    }
+  });
+
+  it('tint from the face colour rather than hardcoding their own', () => {
+    for (const [key, shader] of Object.entries(nonEuclideanShaders)) {
+      expect(shader, `${key} missing baseColor uniform`).toContain('uniform vec3 baseColor');
+    }
+  });
+
+  it('keeps every hyperbolic mirror circle orthogonal to the circle at infinity', () => {
+    // A side circle at distance d with radius r bounds a hyperbolic geodesic only
+    // when d² = r² + 1. Get this wrong and the "tiling" is not a tiling — an
+    // earlier draft had ideal vertices that never met inside the disk.
+    const constants = [...nonEuclideanShaders.poincareDisk.matchAll(/_([DR])\s*=\s*([\d.]+)/g)];
+    const byName = Object.fromEntries(constants.map(([, n, v]) => [n, parseFloat(v)]));
+    expect(byName.D ** 2).toBeCloseTo(byName.R ** 2 + 1, 4);
+
+    const weave = [...nonEuclideanShaders.hyperbolicWeave.matchAll(/_([DR])\s*=\s*([\d.]+)/g)];
+    const w = Object.fromEntries(weave.map(([, n, v]) => [n, parseFloat(v)]));
+    expect(w.D ** 2).toBeCloseTo(w.R ** 2 + 1, 4);
   });
 });

@@ -22,6 +22,9 @@ const ANIMATED_STYLE_SET = new Set([
   'prismBloom', 'magnetFlux', 'liquidChrome', 'auroraWeave', 'plasmaCells',
   'quantumScanlines', 'emberstorm', 'fractalPulse', 'bioLattice', 'stellarLensing',
   'orbChamber', 'liquidTank', 'dice', 'sandChamber', 'lavaLamp', 'eyeball',
+  // Non-Euclidean (poincareDisk and apollonian are static — they stay out)
+  'hyperbolicWeave', 'circleInversion', 'rp2Geodesics', 'solFlow', 'nilTwist',
+  'lightCone', 'metricBalls', 'gyroidSlice', 'hopfFibers', 'drosteSpiral',
 ]);
 
 export function isAnimatedPreviewStyle(styleKey) {

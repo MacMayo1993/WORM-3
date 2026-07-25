@@ -9,6 +9,7 @@ import { natureShaders } from './shaders/natureShaders.js';
 import { opArtShaders } from './shaders/opArtShaders.js';
 import { antipodalShaders } from './shaders/antipodalShaders.js';
 import { newStyleShaders } from './shaders/newStyleShaders.js';
+import { nonEuclideanShaders } from './shaders/nonEuclideanShaders.js';
 
 // Shared time uniform updated by useFrame in parent
 export const sharedUniforms = {
@@ -119,12 +120,13 @@ const fragmentShaders = {
   ...opArtShaders,
   ...antipodalShaders,
   ...newStyleShaders,
+  ...nonEuclideanShaders,
 };
 
 // Dev-time guard: silent key collisions from spread merges are very hard to debug.
 // This throws immediately at module load so the problem is impossible to miss.
 if (import.meta.env.DEV) {
-  const _shaderModules = [basicShaders, techShaders, natureShaders, opArtShaders, antipodalShaders, newStyleShaders];
+  const _shaderModules = [basicShaders, techShaders, natureShaders, opArtShaders, antipodalShaders, newStyleShaders, nonEuclideanShaders];
   const _seen = new Map();
   for (const mod of _shaderModules) {
     for (const key of Object.keys(mod)) {
@@ -323,6 +325,9 @@ const ANIMATED_STYLES = new Set([
   'prismBloom', 'magnetFlux', 'liquidChrome', 'auroraWeave', 'plasmaCells',
   'quantumScanlines', 'emberstorm', 'fractalPulse', 'bioLattice', 'stellarLensing',
   'orbChamber', 'liquidTank', 'dice', 'sandChamber', 'lavaLamp', 'eyeball',
+  // Non-Euclidean (poincareDisk and apollonian are static — they stay out)
+  'hyperbolicWeave', 'circleInversion', 'rp2Geodesics', 'solFlow', 'nilTwist',
+  'lightCone', 'metricBalls', 'gyroidSlice', 'hopfFibers', 'drosteSpiral',
 ]);
 
 /**

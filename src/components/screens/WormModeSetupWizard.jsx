@@ -3,7 +3,7 @@ import { useGameStore } from '../../hooks/useGameStore.js';
 import { WORM_SKINS, WORM_HATS } from '../../worm/wormCosmeticsData.js';
 import { WORM_CHARACTERS } from '../../worm/wormCharacterData.js';
 import { COLOR_SCHEMES, TILE_STYLES, SCHEME_LABELS } from '../../utils/colorSchemes.js';
-import { CLASSIC_STYLE_KEYS, ANTIPODAL_STYLE_KEYS, LIVING_STYLE_KEYS } from '../../utils/tileStyleCatalog.js';
+import { CLASSIC_STYLE_KEYS, ANTIPODAL_STYLE_KEYS, LIVING_STYLE_KEYS, NON_EUCLIDEAN_STYLE_KEYS } from '../../utils/tileStyleCatalog.js';
 import { BACKGROUNDS, getBackgroundUrl } from '../../utils/backgrounds.js';
 import { registerTilePreview, updateTilePreview, unregisterTilePreview } from '../../3d/TilePreviewRenderer.js';
 import { isMobile } from '../../utils/device.js';
@@ -582,6 +582,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
         <StyleGrid keys={CLASSIC_STYLE_KEYS} label="Classic" />
         <StyleGrid keys={ANTIPODAL_STYLE_KEYS} label="Antipodal Op Art" />
         <StyleGrid keys={LIVING_STYLE_KEYS} label="Living" />
+        <StyleGrid keys={NON_EUCLIDEAN_STYLE_KEYS} label="Non-Euclidean" />
 
         {/* Per-face overrides */}
         <div style={{ marginBottom: '8px' }}>
@@ -622,6 +623,9 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                     </optgroup>
                     <optgroup label="Living">
                       {LIVING_STYLE_KEYS.filter(k => ownedItems.includes(`tile_${k}`)).map(k => <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>)}
+                    </optgroup>
+                    <optgroup label="Non-Euclidean">
+                      {NON_EUCLIDEAN_STYLE_KEYS.filter(k => ownedItems.includes(`tile_${k}`)).map(k => <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>)}
                     </optgroup>
                   </select>
                 </div>

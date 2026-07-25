@@ -103,6 +103,11 @@ const TILE_PRICES = {
   // Animated style pack (dev request)
   prismBloom: 175, magnetFlux: 175, liquidChrome: 200, orbChamber: 175, liquidTank: 175, dice: 200, sandChamber: 175, lavaLamp: 200, eyeball: 200, auroraWeave: 175, plasmaCells: 175,
   quantumScanlines: 150, emberstorm: 175, fractalPulse: 175, bioLattice: 175, stellarLensing: 200,
+  // Non-Euclidean — the heaviest shaders in the catalog (iterated inversion,
+  // Möbius transport), priced as the top tier.
+  poincareDisk: 200, hyperbolicWeave: 225, apollonian: 200, circleInversion: 150,
+  rp2Geodesics: 250, solFlow: 175, nilTwist: 175, lightCone: 200,
+  metricBalls: 150, gyroidSlice: 175, hopfFibers: 200, drosteSpiral: 200,
 };
 
 export const STORE_TILES = Object.keys(TILE_STYLES).map(k => ({
