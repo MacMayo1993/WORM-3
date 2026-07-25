@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { getSkins, getHats, getSchemes, getTiles } from '../../utils/storeCatalog.js';
+import { TILE_STYLE_SECTIONS } from '../../utils/tileStyleCatalog.js';
 import { COLOR_SCHEMES } from '../../utils/colorSchemes.js';
 import {
   registerTilePreview,
@@ -386,9 +387,16 @@ const TileSection = ({ label, items, renderItems }) => items.length === 0 ? null
   </div>
 );
 
-const classicOnlyTiles = TILES.filter(t => ['static', 'pattern', 'procedural'].includes(t.tileType) && t.price <= 100);
-const opArtOnlyTiles   = TILES.filter(t => t.tileType === 'pattern' && t.price >= 75 && t.price <= 125 && !classicOnlyTiles.includes(t));
-const livingOnlyTiles  = TILES.filter(t => t.tileType === 'animated' || t.tileType === '3d');
+// Store sections mirror the tile catalog exactly, so a style is purchasable the
+// moment it is added to a section and it sits under the same heading here as in
+// the settings panel. These used to be inferred from tileType and price, and any
+// tile matching none of those buckets silently vanished from the store — a
+// 'procedural' tile priced over 100 could never be bought.
+const TILE_BY_KEY = new Map(TILES.map(t => [t.tileKey, t]));
+const TILE_SECTIONS = TILE_STYLE_SECTIONS.map(section => ({
+  label: section.label,
+  items: section.keys.map(k => TILE_BY_KEY.get(k)).filter(Boolean),
+}));
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 const ParityStoreScreen = ({ onClose }) => {
@@ -563,13 +571,9 @@ const ParityStoreScreen = ({ onClose }) => {
         {tab === 'skins'   && renderItems(SKINS)}
         {tab === 'hats'    && renderItems(HATS)}
         {tab === 'schemes' && renderItems(SCHEMES)}
-        {tab === 'tiles' && (
-          <>
-            <TileSection label="Classic" items={classicOnlyTiles} renderItems={renderItems} />
-            <TileSection label="Op Art"  items={opArtOnlyTiles}   renderItems={renderItems} />
-            <TileSection label="Living"  items={livingOnlyTiles}  renderItems={renderItems} />
-          </>
-        )}
+        {tab === 'tiles' && TILE_SECTIONS.map(section => (
+          <TileSection key={section.label} label={section.label} items={section.items} renderItems={renderItems} />
+        ))}
       </div>
 
       {/* Footer hint */}
