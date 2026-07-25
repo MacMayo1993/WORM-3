@@ -2,10 +2,15 @@ import { describe, it, expect } from 'vitest';
 import { progressManager, ProgressManager } from '../levels/ProgressManager.js';
 
 describe('progressManager singleton', () => {
-  it('has testMode disabled — levels are not all unlocked by default', () => {
-    // testMode: true bypasses all progression and unlocks every level unconditionally.
-    // This must be false in production or the entire progression system is bypassed.
-    expect(progressManager.testMode).toBe(false);
+  it('ties testMode to the build, never hardcoding it on', () => {
+    // testMode bypasses all progression and unlocks every level unconditionally.
+    // Dev/preview builds want that so the campaign can be exercised without
+    // grinding; a shipped build must not have it, and Vite folds
+    // import.meta.env.DEV to false at bundle time to guarantee that. Asserting
+    // the link here catches the flag being pinned to a literal in either
+    // direction — which would either bypass progression in production or take
+    // the campaign away from dev.
+    expect(progressManager.testMode).toBe(!!import.meta.env.DEV);
   });
 
   it('level 1 is always unlocked regardless of testMode', () => {
