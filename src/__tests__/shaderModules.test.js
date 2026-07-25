@@ -97,6 +97,15 @@ describe('tile style catalog', () => {
   it('no style appears in two sections', () => {
     expect(new Set(sectionKeys).size).toBe(sectionKeys.length);
   });
+
+  it('every purchasable tile is reachable from a catalog section', () => {
+    // The store renders its shelves straight from TILE_STYLE_SECTIONS, so a tile
+    // that is priced but listed in no section cannot be bought at all — which is
+    // exactly how 'mandelbrot' sat unbuyable behind the old type/price buckets.
+    const storeKeys = STORE_TILES.map(t => t.tileKey);
+    const inASection = new Set(sectionKeys);
+    expect(storeKeys.filter(k => !inASection.has(k))).toEqual([]);
+  });
 });
 
 describe('non-Euclidean shaders', () => {
