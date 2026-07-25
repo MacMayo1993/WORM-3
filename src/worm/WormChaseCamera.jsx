@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
@@ -64,6 +64,21 @@ export default function WormChaseCamera({ worm, size }) {
     const lastForwardRef = useRef(new THREE.Vector3(0, 0, -1)); // blended forward from previous frame
     const prevTailLen = useRef(BASE_TAIL_LENGTH);   // detect new parity pickups
     const postTunnelEaseRef = useRef(0);  // seconds remaining of gentle re-framing after exiting a tunnel
+
+    // This camera is the app's shared one, and the chase view leaves it wide
+    // (FOV 70–82, wider still inside a tunnel) and rolled to whichever cube face
+    // the run ended on. Hand it back the way we found it so the next screen —
+    // menu, mode select, any other mode — frames from a clean camera even if it
+    // never re-runs its own setup.
+    useEffect(() => {
+        const restoreFov = camera.fov;
+        const restoreUp = camera.up.clone();
+        return () => {
+            camera.fov = restoreFov;
+            camera.up.copy(restoreUp);
+            camera.updateProjectionMatrix();
+        };
+    }, [camera]);
 
     useFrame((_, delta) => {
         const gamePhase = useGameStore.getState().wormGamePhase ?? 'active';

@@ -98,6 +98,10 @@ const _ease = t => t < 0.5 ? 4 * t ** 3 : 1 - Math.pow(-2 * t + 2, 3) / 2;
 const _prog = (t, s, e) => _clamp((t - s) / (e - s));
 const _chromaticVec = new Vector2(0, 0);
 
+// The shared Canvas camera's resting FOV. Modes that reframe the camera restore
+// this; CameraManager re-applies it on every screen transition.
+const DEFAULT_CAMERA_FOV = 40;
+
 /**
  * IntroBranch — 3D content rendered inside the Canvas during the welcome/intro.
  * Contains IntroScene, post-processing, and intro lights.
@@ -182,15 +186,19 @@ function IntroBranch({ time, onComplete, reducedMotion = false, performanceMode 
 function CameraManager({ showWelcome, showMainMenu, cameraZ }) {
   const { camera } = useThree();
   useEffect(() => {
-    if (showMainMenu) {
-      camera.position.set(0, 3, 12);
-      camera.lookAt(0, 0, 0);
-      camera.updateProjectionMatrix();
-    } else if (!showWelcome) {
-      camera.position.set(0, 0, cameraZ);
-      camera.lookAt(0, 0, 0);
-      camera.updateProjectionMatrix();
-    }
+    if (showWelcome) return; // the intro cinematic flies the camera itself
+    // Everything in the shared Canvas borrows this one camera, and modes are
+    // free to reframe it: the worm chase cam widens the FOV to 70–82° and rolls
+    // `up` around the cube as the worm crosses faces. Position alone is not
+    // enough to undo that — a leftover FOV renders the menu and mode-select
+    // cubes ~2.4× too small, and a leftover up vector rolls the whole scene.
+    // Restore the full framing, then aim.
+    camera.fov = DEFAULT_CAMERA_FOV;
+    camera.zoom = 1;
+    camera.up.set(0, 1, 0);
+    camera.position.set(0, showMainMenu ? 3 : 0, showMainMenu ? 12 : cameraZ);
+    camera.lookAt(0, 0, 0);
+    camera.updateProjectionMatrix();
   }, [showWelcome, showMainMenu, camera, cameraZ]);
   return null;
 }
@@ -1282,7 +1290,7 @@ export default function WORM3() {
       <CanvasErrorBoundary>
       <div className="canvas-container" onContextMenu={(e) => e.preventDefault()}>
         <Canvas
-          camera={{ position: (showWelcome || showMainMenu) ? [0, 3, 12] : [0, 0, cameraZ], fov: 40 }}
+          camera={{ position: (showWelcome || showMainMenu) ? [0, 3, 12] : [0, 0, cameraZ], fov: DEFAULT_CAMERA_FOV }}
           dpr={dpr}
           gl={{ powerPreference: 'high-performance', antialias: true }}
           shadows
