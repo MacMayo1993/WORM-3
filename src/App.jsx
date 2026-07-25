@@ -391,6 +391,16 @@ export default function WORM3() {
   // Teach Mode — step-by-step algorithm teaching
   const teachMode = useTeachMode();
 
+  // Leaving a mode must also close Teach Mode. Every exit path (quit, victory →
+  // main menu, back from a level) only flips showMainMenu, so without this the
+  // teach panel — a full-screen overlay — stayed mounted on top of the menu.
+  // The solver is 3×3-only, so a size change out of 3 closes it too.
+  const teachActive = teachMode.active;
+  const exitTeachMode = teachMode.exitTeachMode;
+  useEffect(() => {
+    if (teachActive && (showMainMenu || size !== 3)) exitTeachMode();
+  }, [teachActive, showMainMenu, size, exitTeachMode]);
+
   // Parity instability — flipped tiles spontaneously re-flip and propagate
   useParityDecay();
 

@@ -44,9 +44,6 @@ let _menuViewEpoch = Math.floor(Math.random() * 1e9);
 
 // Called by RotatingBlackCube after a direct cube-tap shake.
 // Also available externally so tests / storybook can reset state.
-let _orbColorVersion = 0;
-let _orbColorListener = null;
-
 function rerandomizeMenuStyle() {
   _menuSchemeKey  = _SCHEME_KEYS[Math.floor(Math.random() * _SCHEME_KEYS.length)];
   MENU_FACE_COLORS = COLOR_SCHEMES[_menuSchemeKey] ?? COLOR_SCHEMES['classic'];
@@ -54,75 +51,11 @@ function rerandomizeMenuStyle() {
     _menuFaceStyles[f] = _TILE_KEYS[Math.floor(Math.random() * _TILE_KEYS.length)];
   }
   _menuViewEpoch = Math.floor(Math.random() * 1e9);
-  _orbColorVersion++;
-  _orbColorListener?.(_orbColorVersion);
 }
 
 // Callback set by ShufflingCube so RotatingBlackCube can trigger a re-scramble
 // + re-render without prop drilling through multiple layers.
 let _triggerStyleRefresh = null;
-
-const FACE_COLOR = {
-  PX: '#3b82f6', NX: '#22c55e',
-  PZ: '#ef4444', NZ: '#f97316',
-  PY: '#eeeeee', NY: '#FFD500',
-};
-const FACE_KEYS = Object.keys(FACE_COLOR);
-
-// ─── Shared pulse state — written by FacePulses (WebGL), read by ScreenGlow (DOM) ──
-// Per-face rawP values (0→1) so all 6 colors are always independently visible.
-const _pulsePerFace = { PX: 0, NX: 0, PY: 0, NY: 0, PZ: 0, NZ: 0 };
-
-// Screen-edge gradient per face: each face maps to the screen region it faces.
-// PZ/NZ (front/back) use left/right edges since they have no top-bottom screen axis.
-const FACE_SCREEN_GRADIENT = {
-  PY: c => `radial-gradient(ellipse 120% 55% at 50% 0%,   ${c} 0%, transparent 68%)`,
-  NY: c => `radial-gradient(ellipse 120% 55% at 50% 100%, ${c} 0%, transparent 68%)`,
-  PX: c => `radial-gradient(ellipse 55% 120% at 100% 50%, ${c} 0%, transparent 68%)`,
-  NX: c => `radial-gradient(ellipse 55% 120% at 0%   50%, ${c} 0%, transparent 68%)`,
-  PZ: c => `radial-gradient(ellipse 55% 120% at 12%  50%, ${c} 0%, transparent 68%)`,
-  NZ: c => `radial-gradient(ellipse 55% 120% at 88%  50%, ${c} 0%, transparent 68%)`,
-};
-
-// DOM overlay — reads _pulsePerFace via rAF and updates div opacity directly (no React state)
-const ScreenGlow = () => {
-  const divRefs = useRef({});
-  useEffect(() => {
-    let raf;
-    // Track previous per-face values to skip no-op DOM writes
-    const prev = { PX: -1, NX: -1, PY: -1, NY: -1, PZ: -1, NZ: -1 };
-    const tick = () => {
-      FACE_KEYS.forEach(face => {
-        const rawP = _pulsePerFace[face];
-        if (rawP === prev[face]) return;
-        prev[face] = rawP;
-        const el = divRefs.current[face];
-        if (!el) return;
-        const bell = rawP < 0.30 ? rawP / 0.30 : (1 - rawP) / 0.70;
-        el.style.opacity = String(Math.max(0, bell) * 0.22);
-      });
-      raf = requestAnimationFrame(tick);
-    };
-    tick();
-    return () => cancelAnimationFrame(raf);
-  }, []);
-  return (
-    <>
-      {FACE_KEYS.map(face => (
-        <div
-          key={face}
-          ref={el => { divRefs.current[face] = el; }}
-          style={{
-            position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 2,
-            opacity: 0, willChange: 'opacity',
-            background: FACE_SCREEN_GRADIENT[face](FACE_COLOR[face]),
-          }}
-        />
-      ))}
-    </>
-  );
-};
-
 
 import {
   setCarouselActive,
@@ -134,10 +67,11 @@ import {
   consumeModeDive,
 } from './menuCarouselState.js';
 
-// ─── Carousel-active flag — set by MainMenu, read by all useFrame hooks ────────
-// Shared via menuCarouselState.js so MenuFlipWave / MenuWormParticle can gate
-// their useFrame loops without creating a circular import.
-let _carouselActive = false; // kept for the local reads below; setCarouselActive syncs the shared module
+// ─── Carousel-active flag ─────────────────────────────────────────────────────
+// menuCarouselState.js is the only home for it: every useFrame consumer here,
+// in MenuFlipWave and in MenuWormParticle reads isCarouselActive(). A second
+// copy of the flag in this module could fall out of step with the shared one
+// and leave the selector's face plates up on a free-spinning cube.
 
 // ─── Cube-shake bridge — Start button triggers 3D shake remotely ─────────────
 let _externalShakeNeeded = false;
@@ -343,7 +277,7 @@ const ShufflingCube = ({ onFlip }) => {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useFrame(({ clock }) => {
-    if (_carouselActive) return;
+    if (isCarouselActive()) return;
     const t = clock.elapsedTime;
     if (nextSpawnAt.current === null) nextSpawnAt.current = t + INITIAL_WORM_DELAY;
     const { rotating, cubies } = cubeStateRef.current;
@@ -504,7 +438,7 @@ export const MenuWorm = ({ onWormClick }) => {
   useFrame(({ clock, pointer }, delta) => {
     if (!groupRef.current) return;
     // Hide the mascot while the six-faces selector owns the cube.
-    if (_carouselActive) {
+    if (isCarouselActive()) {
       groupRef.current.visible = false;
       return;
     }
@@ -819,16 +753,17 @@ function makeGlossTexture() {
 // mode LABEL on all six faces so the words wrap the whole cube. Fully opaque,
 // depth-writing tiles occlude the faces behind them, so only the words on
 // visible faces read — hidden faces are naturally masked by the front tile.
-const ModeFacePlates = () => {
-  // Toggle visibility from the frame loop (not React state) so plates appear
-  // the instant the selector activates — no startup frame where the bare
-  // stickered cube flashes before React re-renders.
-  const rootRef = useRef();
+const ModeFacePlates = React.forwardRef((_props, rootRef) => {
+  // Visibility is owned by RotatingBlackCube's frame loop (not React state, and
+  // not a second useFrame here): the same frame that decides to present a mode
+  // face turns the plates on. Two independent readers of the carousel flag
+  // could disagree, and a frame with the plates up but the cube still in its
+  // free-spin pose is the glitch — labels sliced by neighbouring plates on a
+  // cube drifting off centre.
   const bevelTex = useMemo(() => makeBevelTexture(), []);
   const glossTex = useMemo(() => makeGlossTexture(), []);
-  useFrame(() => { if (rootRef.current) rootRef.current.visible = isCarouselActive(); });
   return (
-    <group ref={rootRef}>
+    <group ref={rootRef} visible={false}>
       {CAROUSEL_MODES.map((m) => {
         const cfg = MODE_FACE_CFG[m.face];
         return (
@@ -876,7 +811,8 @@ const ModeFacePlates = () => {
       })}
     </group>
   );
-};
+});
+ModeFacePlates.displayName = 'ModeFacePlates';
 
 // ─── Rotating cube + worm mascot — exported for App.jsx's shared Canvas ───────
 export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
@@ -894,8 +830,9 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
   const menuClockStart = useRef(null);
   const carouselWasActive = useRef(false);
 
-  // ModeFacePlates is always mounted and toggles its own visibility via
-  // useFrame, so RotatingBlackCube no longer needs carousel-active React state.
+  // ModeFacePlates is always mounted; this loop owns its visibility so the
+  // plates and the cube's pose can never disagree.
+  const platesRef = useRef();
   const diveRef = useRef(null); // { t, onComplete, done } during a PLAY dive
 
   useFrame((state, delta) => {
@@ -904,7 +841,12 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
     if (menuClockStart.current === null) menuClockStart.current = elapsedTime;
     const t = elapsedTime - menuClockStart.current;
 
-    if (_carouselActive) {
+    // One read per frame, shared by the pose below and the plates: the mode
+    // plates are only ever on in a frame that also presents a mode face.
+    const carouselActive = isCarouselActive();
+    if (platesRef.current) platesRef.current.visible = carouselActive;
+
+    if (carouselActive) {
       updateSharedTime(t);
       // Present the active mode's face: slerp toward its target orientation
       // with a slow breathing wobble so the cube stays alive while parked.
@@ -951,7 +893,13 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
         cubeRef.current.scale.setScalar((1.022 + Math.pow(p, 3) * 7.5) * presentScale);
         if (p >= 1 && !dive.done) {
           dive.done = true;
-          dive.onComplete?.();
+          // Launching a mode runs a lot of app code. If it throws, it must not
+          // take the rest of the frame loop's subscribers down with it.
+          try {
+            dive.onComplete?.();
+          } catch (err) {
+            console.error('[MainMenu] mode dive completion failed', err);
+          }
         }
       } else {
         cubeCurrentScale.current += (1.022 * presentScale - cubeCurrentScale.current) * Math.min(1, delta * 10);
@@ -1031,9 +979,9 @@ export const RotatingBlackCube = ({ onCubeClick, onFlip }) => {
         onPointerLeave={handleCubeUp}
       >
         <ShufflingCube onFlip={onFlip} />
-        {/* Always mounted; ModeFacePlates hides itself via useFrame when the
-            selector is inactive, so there is no mount-timing flash. */}
-        <ModeFacePlates />
+        {/* Always mounted (no mount-timing flash); the frame loop above shows
+            the plates only on frames where it presents a mode face. */}
+        <ModeFacePlates ref={platesRef} />
       </group>
     </>
   );
@@ -1120,13 +1068,17 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
   activeIndexRef.current = activeIndex;
 
   useEffect(() => {
-    _carouselActive = true;
+    // A dive left in the mailbox by a previous session — PLAY pressed while the
+    // frame loop was paused (backgrounded tab), so the fallback timer launched
+    // the mode and nothing ever consumed the request — would otherwise fire the
+    // instant this selector opens and blow the cube up to dive scale.
+    consumeModeDive();
     setCarouselActive(true);
     setCarouselFace(CAROUSEL_MODES[activeIndexRef.current].face);
     return () => {
-      _carouselActive = false;
       setCarouselActive(false);
       setCarouselFace(null);
+      consumeModeDive();
       if (timerRef.current) clearTimeout(timerRef.current);
       if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
     };
@@ -1507,16 +1459,6 @@ export const MenuTitleCard = ({ visible }) => (
 );
 
 
-// ─── Ambient background orbs ─────────────────────────────────────────────────
-const ORB_LAYOUT = [
-  { faceId: 5, top: '-18%',  left: '-12%',  size: '58vmax', anim: 'orbDrift1 30s ease-in-out infinite alternate',          opacity: 0.36 },
-  { faceId: 3, bottom: '-22%',right: '-16%', size: '62vmax', anim: 'orbDrift2 36s ease-in-out infinite alternate',          opacity: 0.28 },
-  { faceId: 4, top: '15%',   right: '-18%',  size: '46vmax', anim: 'orbDrift3 24s ease-in-out infinite alternate',          opacity: 0.20 },
-  { faceId: 2, bottom: '8%', left: '-14%',   size: '42vmax', anim: 'orbDrift1 28s ease-in-out infinite alternate-reverse',  opacity: 0.17 },
-  { faceId: 6, top: '44%',   left: '28%',    size: '36vmax', anim: 'orbDrift2 40s ease-in-out infinite alternate',          opacity: 0.13 },
-  { faceId: 1, bottom: '18%',right: '22%',   size: '52vmax', anim: 'orbDrift3 44s ease-in-out infinite alternate-reverse',  opacity: 0.18 },
-];
-
 // ─── Cinema scrim ────────────────────────────────────────────────────────────
 // A controlled contrast layer between the live 3D scene (environment + cube +
 // worm, all rendered in the shared Canvas behind this overlay) and the menu UI.
@@ -1538,35 +1480,6 @@ const MenuScrim = () => (
     }} />
   </div>
 );
-
-const MenuBackgroundOrbs = () => {
-  const [_v, setV] = useState(_orbColorVersion);
-  useEffect(() => {
-    _orbColorListener = setV;
-    return () => { _orbColorListener = null; };
-  }, []);
-
-  return (
-    <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', zIndex: 0, pointerEvents: 'none' }}>
-      {ORB_LAYOUT.map((orb, i) => {
-        const color = MENU_FACE_COLORS[orb.faceId] ?? '#888888';
-        return (
-          <div key={i} style={{
-            position: 'absolute',
-            width: orb.size, height: orb.size,
-            top: orb.top, left: orb.left, bottom: orb.bottom, right: orb.right,
-            borderRadius: '50%',
-            background: `radial-gradient(circle, ${color} 0%, transparent 70%)`,
-            filter: 'blur(72px)',
-            opacity: orb.opacity,
-            animation: orb.anim,
-            transition: 'background 1.2s ease',
-          }} />
-        );
-      })}
-    </div>
-  );
-};
 
 // ─── Main component ───────────────────────────────────────────────────────────
 const MainMenu = ({
@@ -1592,9 +1505,7 @@ const MainMenu = ({
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'transparent', zIndex: 9999, pointerEvents: 'none' }}>
-      <MenuBackgroundOrbs />
       <MenuScrim />
-      <ScreenGlow />
       <MenuTitleCard visible={titleVisible} />
       <MenuStartButton visible={bottomVisible} onClick={() => { _externalShakeNeeded = true; }} onDemo={onDemo} />
     </div>
