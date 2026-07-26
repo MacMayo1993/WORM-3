@@ -15,6 +15,7 @@
 
 export const STEP_COPY = {
   'baby-cube': 'Start easy: a cube that twists like any other. I turned two rows — drag them back to solve it.',
+  'control-tour': 'Five buttons run this whole game. Let me hand them to you one at a time — press each one as it lights up.',
   'twin-paradox': 'Every tile has a twin: the tile dead opposite it, straight through the middle of the cube. Touch one and both move.',
   'flip-gateway': 'Tapping a tile sends it through the middle to its twin. Send the whole front face across, then bring it home.',
   'view-showcase': 'Same cube, a dozen different looks. Try them on.',

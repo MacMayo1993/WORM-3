@@ -12,15 +12,16 @@ import MobiIntroScreen from './MobiIntroScreen.jsx';
 // sequence and know what they just did.
 const DEMO_STEPS = [
   { id: 'baby-cube', label: 'First Twist', num: 1 },
-  { id: 'twin-paradox', label: 'Meet the Twins', num: 2 },
-  { id: 'flip-gateway', label: 'Through the Middle', num: 3 },
-  { id: 'view-showcase', label: 'Every Look', num: 4 },
-  { id: 'make-it-yours', label: 'Make It Yours', num: 5 },
-  { id: 'worm-traversal', label: 'Worm Run', num: 6 },
-  { id: 'chaos-forecast', label: 'Call the Winner', num: 7 },
-  { id: 'random-showcase', label: 'Surprise Cube', num: 8 },
-  { id: 'cosmetic-reward', label: 'Spend Your Points', num: 9 },
-  { id: 'end', label: 'Complete', num: 10 },
+  { id: 'control-tour', label: 'Your Controls', num: 2 },
+  { id: 'twin-paradox', label: 'Meet the Twins', num: 3 },
+  { id: 'flip-gateway', label: 'Through the Middle', num: 4 },
+  { id: 'view-showcase', label: 'Every Look', num: 5 },
+  { id: 'make-it-yours', label: 'Make It Yours', num: 6 },
+  { id: 'worm-traversal', label: 'Worm Run', num: 7 },
+  { id: 'chaos-forecast', label: 'Call the Winner', num: 8 },
+  { id: 'random-showcase', label: 'Surprise Cube', num: 9 },
+  { id: 'cosmetic-reward', label: 'Spend Your Points', num: 10 },
+  { id: 'end', label: 'Complete', num: 11 },
 ];
 
 // Extra line held under a step's STEP COMPLETE stamp. Only the twin step has
@@ -187,6 +188,28 @@ const ensureDemoShellStyle = () => {
     /* Flip tile is the middle (3rd of 5) slot, so its pointer sits dead centre. */
     .demo-spotlight-hint--flip::after {
       left: 50%;
+    }
+
+    /* Control tour: same card, but the pointer is aimed per beat at whichever
+       of the five tiles is currently lit (--tour-pointer, set inline). */
+    .demo-tour-card {
+      animation: none;
+      padding-top: 11px;
+    }
+
+    .demo-tour-card::after {
+      left: var(--tour-pointer, 50%);
+    }
+
+    /* Views and More slide a sheet up over the bottom of the screen, so their
+       beats move the card to the top and drop the pointer entirely. */
+    .demo-tour-card--top {
+      top: calc(max(10px, env(safe-area-inset-top, 10px)) + 46px);
+      bottom: auto;
+    }
+
+    .demo-tour-card--top::after {
+      display: none;
     }
 
     @keyframes demo-spotlight-hint-bob {
@@ -571,6 +594,17 @@ const DEMO_LEVEL_CONFIGS = {
     features: { rotations: true, tunnels: false, flips: false },
     chaosLevel: 0,
   },
+  // Guided sweep of the bottom bar. Staged on a scrambled 3×3 so the first two
+  // buttons (Reset, Shuffle) visibly do something when pressed.
+  'control-tour': {
+    type: 'tour',
+    cubeSize: 3,
+    scrambleSequence: [
+      { axis: 'row', sliceIndex: 0, dir: 1 },
+      { axis: 'col', sliceIndex: 2, dir: -1 },
+      { axis: 'row', sliceIndex: 2, dir: 1 },
+    ],
+  },
   'twin-paradox': {
     type: 'cube',
     cubeSize: 2,
@@ -704,6 +738,97 @@ const DemoStepHint = ({ step }) => {
       // <strong> around button names.
       dangerouslySetInnerHTML={{ __html: copy }}
     />
+  );
+};
+
+// ── Control tour ─────────────────────────────────────────────────────────────
+// One beat per bottom-bar button, in bar order. Each beat pulses its tile and
+// waits for the player to press THAT tile — pressing it runs the button's real
+// action, so the tour teaches by consequence rather than description (Reset
+// visibly restores the scrambled cube, Shuffle re-scrambles it, Views and More
+// slide their sheets up).
+//
+// `sheetBeat` marks the two beats whose button opens a bottom sheet: the caption
+// card moves to the top of the screen for those, because the sheet fills the
+// space it normally occupies.
+//
+// `slot` is the tile's 1-based position in the five-slot bar, used to aim the
+// caption's pointer.
+const CONTROL_TOUR_SEQUENCE = [
+  {
+    key: 'reset',
+    slot: 1,
+    title: 'Reset',
+    copy: 'Puts the cube back exactly as you found it. Nothing you do here is unfixable — press it.',
+  },
+  {
+    key: 'shuffle',
+    slot: 2,
+    title: 'Shuffle',
+    copy: 'Mixes the cube up for a fresh puzzle whenever you want one. Give it a press.',
+  },
+  {
+    key: 'flip',
+    slot: 3,
+    title: 'Flip',
+    copy: 'The big one. With Flip on, tapping a tile sends it through the cube to its twin. Turn it on.',
+  },
+  {
+    key: 'views',
+    slot: 4,
+    sheetBeat: true,
+    title: 'Views',
+    copy: 'Every look the cube can wear, plus Explode, Net and Hollow. Open it, have a look, then close it again.',
+  },
+  {
+    key: 'more',
+    slot: 5,
+    sheetBeat: true,
+    title: 'More',
+    copy: 'Extra modes — and the two helpers: Solve does it for you, Teach shows you how. Open it, then close it to finish.',
+  },
+];
+
+const CONTROL_TOUR_KEYS = CONTROL_TOUR_SEQUENCE.map((b) => b.key);
+
+// Caption + pointer for one control-tour beat. Non-blocking apart from its own
+// Skip button: the player has to reach the real button underneath it.
+const DemoControlTour = ({ index, onSkip }) => {
+  ensureDemoShellStyle();
+  const beat = CONTROL_TOUR_SEQUENCE[index];
+  if (!beat) return null;
+  // Slots are evenly spaced around the middle tile (slot 3), one unit apart.
+  const offset = beat.slot - 3;
+  const pointer = offset === 0
+    ? '50%'
+    : `calc(50% ${offset < 0 ? '-' : '+'} ${Math.abs(offset)} * min(19vw, 76px))`;
+
+  return (
+    <div
+      className={`demo-spotlight-hint demo-tour-card${beat.sheetBeat ? ' demo-tour-card--top' : ''}`}
+      role="status"
+      aria-live="polite"
+      style={{ '--tour-pointer': pointer }}
+    >
+      <p className="demo-intro-step" style={{ marginBottom: 2 }}>
+        {index + 1} / {CONTROL_TOUR_SEQUENCE.length}
+      </p>
+      <h3 className="demo-intro-title" style={{ fontSize: 'clamp(18px, 5vw, 24px)', marginBottom: 4 }}>
+        {beat.title}
+      </h3>
+      <p className="demo-intro-copy" style={{ marginBottom: 8 }}>{beat.copy}</p>
+      {onSkip && (
+        <button
+          type="button"
+          onClick={onSkip}
+          aria-label="Skip the control tour"
+          className="demo-intro-button"
+          style={{ background: 'transparent', color: '#7b6f45', boxShadow: 'none', padding: '4px 12px' }}
+        >
+          Skip Tour ▶
+        </button>
+      )}
+    </div>
   );
 };
 
@@ -1044,6 +1169,9 @@ export {
   DemoStepIntro,
   DemoCoach,
   DemoStepHint,
+  DemoControlTour,
+  CONTROL_TOUR_SEQUENCE,
+  CONTROL_TOUR_KEYS,
   DemoViewShowcase,
   DemoViewSpotlightHint,
   DemoFlipSpotlightHint,

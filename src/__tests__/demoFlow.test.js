@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { DEMO_STEPS, DEMO_LEVEL_CONFIGS, TRY_COPY, STEP_COMPLETE_NOTE } from '../components/screens/DemoFlowController.jsx';
+import {
+  DEMO_STEPS, DEMO_LEVEL_CONFIGS, TRY_COPY, STEP_COMPLETE_NOTE, CONTROL_TOUR_SEQUENCE, CONTROL_TOUR_KEYS,
+} from '../components/screens/DemoFlowController.jsx';
 import { STEP_COPY } from '../utils/demoStepCopy.js';
 
 // Mirrors advanceDemoStep in useDemoMode.js: next id, or 'end' past the last.
@@ -10,9 +12,10 @@ const advance = (from) => {
 };
 
 describe('demo flow state machine', () => {
-  it('has the expected 10-step order ending in end', () => {
+  it('has the expected 11-step order ending in end', () => {
     expect(IDS).toEqual([
       'baby-cube',
+      'control-tour',
       'twin-paradox',
       'flip-gateway',
       'view-showcase',
@@ -64,10 +67,11 @@ describe('demo flow state machine', () => {
     }
   });
 
-  it('worm, chaos and settings steps carry their own config types', () => {
+  it('worm, chaos, settings and tour steps carry their own config types', () => {
     expect(DEMO_LEVEL_CONFIGS['worm-traversal'].type).toBe('worm');
     expect(DEMO_LEVEL_CONFIGS['chaos-forecast'].type).toBe('chaos');
     expect(DEMO_LEVEL_CONFIGS['make-it-yours'].type).toBe('settings');
+    expect(DEMO_LEVEL_CONFIGS['control-tour'].type).toBe('tour');
   });
 
   it('worm-traversal is skippable via the coach (has TRY_COPY + advances on death or solved)', () => {
@@ -87,9 +91,46 @@ describe('demo flow state machine', () => {
     // view-showcase drives its own dialogue cards, so it is the one hands-on
     // step without a hint pill; everything else must have one.
     for (const id of IDS) {
-      if (id === 'end' || id === 'view-showcase' || id === 'cosmetic-reward') continue;
+      // view-showcase and control-tour drive their own cards; the store step
+      // hands off to the Parity Store.
+      if (['end', 'view-showcase', 'control-tour', 'cosmetic-reward'].includes(id)) continue;
       expect(TRY_COPY[id], `missing TRY_COPY for ${id}`).toBeTruthy();
     }
+  });
+});
+
+// Step 2 hands the player the bottom bar one button at a time. Each beat waits
+// for a press of that specific tile, so the sequence has to name every tile
+// exactly once, in bar order, with no gaps.
+describe('control tour', () => {
+  const BAR_ORDER = ['reset', 'shuffle', 'flip', 'views', 'more'];
+
+  it('covers every bottom-bar button, in bar order, once each', () => {
+    expect(CONTROL_TOUR_KEYS).toEqual(BAR_ORDER);
+    expect(new Set(CONTROL_TOUR_KEYS).size).toBe(CONTROL_TOUR_KEYS.length);
+  });
+
+  it('numbers the tile slots 1..5 so each caption points at the right tile', () => {
+    expect(CONTROL_TOUR_SEQUENCE.map((b) => b.slot)).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it('gives every beat a title and copy that asks for the press', () => {
+    for (const beat of CONTROL_TOUR_SEQUENCE) {
+      expect(beat.title, `${beat.key} title`).toBeTruthy();
+      expect(beat.copy, `${beat.key} copy`).toBeTruthy();
+    }
+  });
+
+  it('marks exactly the two beats whose button opens a bottom sheet', () => {
+    // Those two move their caption to the top of the screen — the sheet fills
+    // the space it normally sits in.
+    const sheetBeats = CONTROL_TOUR_SEQUENCE.filter((b) => b.sheetBeat).map((b) => b.key);
+    expect(sheetBeats).toEqual(['views', 'more']);
+  });
+
+  it('stages a scrambled cube, so Reset and Shuffle visibly do something', () => {
+    const cfg = DEMO_LEVEL_CONFIGS['control-tour'];
+    expect(cfg.scrambleSequence?.length).toBeGreaterThan(0);
   });
 });
 

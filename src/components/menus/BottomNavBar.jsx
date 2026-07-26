@@ -109,14 +109,16 @@ const BottomNavBar = ({
   moreOpen,
   viewsOpen,
   chaosMode,
-  spotlightViews = false,
-  spotlightFlip = false,
+  // Which tile the demo is currently pointing at ('reset' | 'shuffle' | 'flip' |
+  // 'views' | 'more'), or null. One prop rather than one flag per tile, since
+  // the demo's control tour walks all five.
+  spotlightTile = null,
 }) => {
   return (
     <div className="bottom-nav-bar">
-      <CubeTile color={COLORS.red}    label="Reset"   onClick={onReset} />
+      <CubeTile color={COLORS.red}    label="Reset"   onClick={onReset} spotlight={spotlightTile === 'reset'} />
       {!chaosMode && (
-        <CubeTile color={COLORS.green} label="Shuffle" onClick={onShuffle} />
+        <CubeTile color={COLORS.green} label="Shuffle" onClick={onShuffle} spotlight={spotlightTile === 'shuffle'} />
       )}
       <CubeTile
         color={flipMode ? COLORS.yellow : COLORS.blue}
@@ -125,7 +127,7 @@ const BottomNavBar = ({
         size={50}
         elevated
         lit={flipMode}
-        spotlight={spotlightFlip}
+        spotlight={spotlightTile === 'flip'}
         disabled={flipLocked}
       />
       <CubeTile
@@ -133,13 +135,14 @@ const BottomNavBar = ({
         label="Views"
         onClick={onToggleViews}
         lit={viewsOpen || hasActiveView}
-        spotlight={spotlightViews}
+        spotlight={spotlightTile === 'views'}
       />
       <CubeTile
         color={COLORS.white}
         label="More"
         onClick={onToggleMore}
         lit={moreOpen}
+        spotlight={spotlightTile === 'more'}
       />
     </div>
   );

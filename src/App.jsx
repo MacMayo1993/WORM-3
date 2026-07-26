@@ -90,8 +90,8 @@ const DemoEndScreen = React.lazy(() => import('./components/screens/DemoEndScree
 const DemoForecastPicker = React.lazy(() => import('./components/screens/DemoForecastPicker.jsx'));
 import {
   DemoProgressBar, DemoStepIntro, DemoCoach, DemoStepHint, DemoViewShowcase,
-  DemoViewSpotlightHint, DemoFlipSpotlightHint, DemoWormControlHint, DemoFlipProgress,
-  DemoStepComplete, DemoStepLaunch, DemoRewardStamp
+  DemoViewSpotlightHint, DemoFlipSpotlightHint, DemoControlTour, CONTROL_TOUR_SEQUENCE,
+  DemoWormControlHint, DemoFlipProgress, DemoStepComplete, DemoStepLaunch, DemoRewardStamp
 } from './components/screens/DemoFlowController.jsx';
 
 
@@ -533,6 +533,9 @@ export default function WORM3() {
 
   // Bottom sheet state for new nav bar
   const [sheetOpen, setSheetOpen] = useState(false);
+  // Handed to the demo so its control tour can put away the Views / More sheet
+  // it asked the player to open.
+  const closeNavSheet = useCallback(() => setSheetOpen(false), []);
   const [sheetMode, setSheetMode] = useState('more'); // 'more' or 'views'
 
   // Cube mode selection + setup wizards
@@ -599,6 +602,7 @@ export default function WORM3() {
     demoShowcaseSubStep, handleDemoShowcaseNext, handleDemoShowcaseSkip,
     demoViewSpotlight, handleDemoViewSpotlightClick,
     demoFlipSpotlight, handleDemoFlipSpotlightSkip,
+    demoTourIndex, handleDemoNavTap, handleDemoTourSkip,
     demoCelebrationStep, dismissDemoCelebration, demoLaunchStep, demoRewardStamp, demoFlipProgress,
   } = useDemoMode({
     cancelShuffle, changeSize, setRotatedCubies, reset,
@@ -606,6 +610,7 @@ export default function WORM3() {
     startAnimatedShuffle, animatedShuffle,
     handleOpenStore, setShowFreeplayWizard,
     armSceneGate,
+    closeNavSheet, navSheetOpen: sheetOpen,
   });
 
   const handleCloseStore = useCallback(() => {
@@ -1563,7 +1568,12 @@ export default function WORM3() {
               onDemoDisparityDismiss: handleDemoDisparityDismiss,
               demoViewSpotlight,
               onDemoViewSpotlightClick: handleDemoViewSpotlightClick,
-              demoFlipSpotlight,
+              // Which nav tile the demo is pointing at right now: the control
+              // tour walks all five, the twin step lights Flip on its own.
+              demoSpotlightTile: demoTourIndex >= 0
+                ? CONTROL_TOUR_SEQUENCE[demoTourIndex]?.key
+                : (demoFlipSpotlight ? 'flip' : (demoViewSpotlight ? 'views' : null)),
+              onDemoNavTap: demoMode ? handleDemoNavTap : undefined,
               showMergeThemePicker,
               onMergeStart: handleMergeStart,
               onMergeCancel: handleMergeCancel,
@@ -1648,6 +1658,10 @@ export default function WORM3() {
       )}
       <ScreenTransition show={!!(demoMode && demoStep === 'view-showcase' && demoViewSpotlight && !demoStepIntroVisible && !demoChromeQuiet)} freezeOnExit>
         <DemoViewSpotlightHint onSkip={handleDemoShowcaseSkip} />
+      </ScreenTransition>
+      {/* Control tour: one card per bottom-bar button, waiting on that press. */}
+      <ScreenTransition show={!!(demoMode && demoTourIndex >= 0 && !demoStepIntroVisible && !demoChromeQuiet && !demoCelebrationStep)} freezeOnExit>
+        <DemoControlTour index={demoTourIndex} onSkip={handleDemoTourSkip} />
       </ScreenTransition>
       {/* Twin step: asks for the Flip button press that arms tile-flipping. */}
       <ScreenTransition show={!!(demoMode && demoFlipSpotlight && !demoStepIntroVisible && !demoChromeQuiet)} freezeOnExit>
