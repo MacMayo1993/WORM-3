@@ -7,6 +7,7 @@
 
 import { levelsManager } from './LevelsManager.js';
 import { computeStars } from './scoring.js';
+import { UNLOCK_ALL } from '../utils/testUnlock.js';
 
 // Storage keys
 const STORAGE_KEYS = {
@@ -515,12 +516,11 @@ class ProgressManager {
 
 // Dev/preview builds unlock the whole campaign so every level can be opened
 // without grinding up to it — the same bargain useGameStore strikes for the
-// store economy (DEV_FREE_ECONOMY). testMode bypasses every unlock requirement,
-// so it must never be on in a shipped build: Vite statically replaces
-// import.meta.env.DEV with false when bundling for production, which is what
-// guarantees that.
+// store economy (DEV_FREE_ECONOMY). A deployed build keeps real progression
+// unless this browser opted in with ?unlockall=1, since testMode bypasses every
+// unlock requirement and must not be on for players who did not ask for it.
 export const progressManager = new ProgressManager({
-  testMode: !!import.meta.env?.DEV,
+  testMode: !!import.meta.env?.DEV || UNLOCK_ALL,
 });
 
 // Also export the class for testing or custom instances
