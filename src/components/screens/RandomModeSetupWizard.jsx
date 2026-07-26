@@ -8,8 +8,7 @@ import {
   PAPER_BG_MUTED, PAPER_CARD_SHADOW, PAPER_SHADOW,
 } from '../../utils/uiTheme.js';
 import { BG_PREVIEWS } from '../../utils/bgPreviews.js';
-import { wizardPaperBackground, WIZARD_FOOTER_BG, WizardPreviewNote } from './WizardChrome.jsx';
-import { WIZARD_PREVIEW } from '../../utils/demoStepCopy.js';
+import { wizardLayout, WizardSteps } from './WizardChrome.jsx';
 
 const BG_OPTIONS = BACKGROUNDS.map(bg => ({
   value: bg.id,
@@ -30,29 +29,11 @@ const SIZES = [
 const ACCENT = '#C44B00';
 const ACCENT_SHADOW = '#7a2e00';
 
+const LAYOUT = wizardLayout(ACCENT, ACCENT_SHADOW);
+
 const S = {
-  overlay: {
-    position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-    background: PAPER_BACKDROP, backdropFilter: PAPER_BACKDROP_BLUR, WebkitBackdropFilter: PAPER_BACKDROP_BLUR,
-    zIndex: 1000, fontFamily: UI_FONT,
-    animation: 'modalBackdropIn 0.22s ease',
-  },
-  sheet: {
-    ...wizardPaperBackground, borderRadius: '20px', width: 'min(560px, 96vw)',
-    maxHeight: '88vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
-    boxShadow: PAPER_SHADOW,
-    border: '1px solid #cec8be', borderTop: `3px solid ${ACCENT}`, animation: 'modalSheetIn 0.30s cubic-bezier(0.22, 1, 0.36, 1)',
-  },
-  header: { padding: '28px 32px 0', flexShrink: 0 },
-  dot: (active, current) => ({
-    height: '8px', borderRadius: '3px',
-    background: current ? ACCENT : active ? `${ACCENT}66` : PAPER_BORDER,
-    flex: current ? '2' : '1', transition: 'all 0.35s cubic-bezier(0.4,0,0.2,1)',
-    boxShadow: current ? `0 1px 4px ${ACCENT}55` : 'none',
-  }),
-  title: { fontSize: '22px', fontWeight: '700', letterSpacing: '-0.5px', color: PAPER_TEXT, margin: '0 0 4px', lineHeight: 1.15 },
-  subtitle: { fontSize: '13px', color: PAPER_TEXT_MUTED, margin: '0 0 16px', fontWeight: '400' },
-  body: { padding: '0 32px', overflowY: 'auto', flex: 1, scrollbarWidth: 'thin', scrollbarColor: `${PAPER_CARD_SHADOW} transparent` },
+  ...LAYOUT,
+
   bgGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', paddingBottom: '8px' },
   bgCard: (selected) => ({
     borderRadius: '10px', overflow: 'hidden',
@@ -78,21 +59,6 @@ const S = {
     cursor: 'pointer', transition: 'all 0.18s ease', outline: 'none',
     WebkitTapHighlightColor: 'transparent', textAlign: 'left', fontFamily: 'inherit', position: 'relative',
   }),
-  footer: {
-    padding: '16px 32px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    flexShrink: 0, borderTop: '1px solid #d6d0c8', background: WIZARD_FOOTER_BG,
-  },
-  btnSecondary: {
-    background: 'none', border: '1.5px solid #d6d0c8', fontSize: '15px', fontWeight: '500',
-    color: PAPER_TEXT_MUTED, cursor: 'pointer', padding: '10px 16px',
-    borderRadius: '10px', transition: 'all 0.15s ease', fontFamily: 'inherit',
-  },
-  btnPrimary: {
-    background: ACCENT, border: 'none', fontSize: '15px',
-    fontWeight: '700', color: '#fff', cursor: 'pointer', padding: '12px 28px',
-    borderRadius: '10px', transition: 'all 0.12s ease',
-    fontFamily: 'inherit', boxShadow: `0 4px 0 ${ACCENT_SHADOW}, 0 6px 16px ${ACCENT}44`,
-  },
 };
 
 const RandomModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
@@ -193,12 +159,9 @@ const RandomModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
             <span style={{ fontSize: '13px' }}>🎲</span>
             <span style={{ fontSize: '11px', fontWeight: '800', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#fff' }}>Random Mode</span>
           </div>
-          <div style={{ display: 'flex', gap: '6px', marginBottom: '20px' }}>
-            {STEPS.map((_, i) => <div key={i} style={S.dot(i <= step, i === step)} />)}
-          </div>
+          <WizardSteps styles={S} steps={STEPS} step={step} />
           <h2 style={S.title}>{stepTitles[step]}</h2>
           <p style={S.subtitle}>{stepSubtitles[step]}</p>
-          <WizardPreviewNote accent={ACCENT} text={WIZARD_PREVIEW.random} />
         </div>
 
         <div style={S.body}>

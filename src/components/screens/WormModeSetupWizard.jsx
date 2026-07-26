@@ -3,7 +3,7 @@ import { useGameStore } from '../../hooks/useGameStore.js';
 import { WORM_SKINS, WORM_HATS } from '../../worm/wormCosmeticsData.js';
 import { WORM_CHARACTERS } from '../../worm/wormCharacterData.js';
 import { COLOR_SCHEMES, TILE_STYLES, SCHEME_LABELS } from '../../utils/colorSchemes.js';
-import { CLASSIC_STYLE_KEYS, ANTIPODAL_STYLE_KEYS, LIVING_STYLE_KEYS, NON_EUCLIDEAN_STYLE_KEYS } from '../../utils/tileStyleCatalog.js';
+import { CLASSIC_STYLE_KEYS, ANTIPODAL_STYLE_KEYS, LIVING_STYLE_KEYS, NON_EUCLIDEAN_STYLE_KEYS, TILE_STYLE_SECTIONS } from '../../utils/tileStyleCatalog.js';
 import { BACKGROUNDS, getBackgroundUrl } from '../../utils/backgrounds.js';
 import { registerTilePreview, updateTilePreview, unregisterTilePreview } from '../../3d/TilePreviewRenderer.js';
 import { isMobile } from '../../utils/device.js';
@@ -18,9 +18,8 @@ import {
   UI_CREAM,
 } from '../../utils/uiTheme.js';
 import { BG_PREVIEWS } from '../../utils/bgPreviews.js';
-import { wizardPaperBackground, WIZARD_FOOTER_BG, WizardPreviewNote } from './WizardChrome.jsx';
+import { wizardLayout, WizardSteps, WizardSection } from './WizardChrome.jsx';
 import WormPreviewCanvas from '../../3d/WormPreviewCanvas.jsx';
-import { WIZARD_PREVIEW } from '../../utils/demoStepCopy.js';
 
 const BG_OPTIONS = BACKGROUNDS.map(bg => ({
   value: bg.id,
@@ -62,80 +61,11 @@ function TilePreviewCanvas({ styleKey, colorHex = '#4a7fa5', size = 48, canvasSt
 const ACCENT = '#6A2C91';
 const ACCENT_SHADOW = '#3d1854';
 
+const LAYOUT = wizardLayout(ACCENT, ACCENT_SHADOW);
+
 const S = {
-  overlay: {
-    position: 'fixed',
-    inset: 0,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: PAPER_BACKDROP,
-    backdropFilter: PAPER_BACKDROP_BLUR,
-    WebkitBackdropFilter: PAPER_BACKDROP_BLUR,
-    zIndex: 1000,
-    fontFamily: UI_FONT,
-    padding: isMobile ? '12px' : '0',
-    boxSizing: 'border-box',
-    animation: 'modalBackdropIn 0.22s ease',
-  },
+  ...LAYOUT,
 
-  sheet: {
-    ...wizardPaperBackground,
-    borderRadius: isMobile ? '16px' : '20px',
-    width: 'min(640px, 100%)',
-    maxHeight: isMobile ? '92vh' : '88vh',
-    display: 'flex',
-    flexDirection: 'column',
-    overflow: 'hidden',
-    boxShadow: PAPER_SHADOW,
-    border: '1px solid #cec8be',
-    borderTop: `3px solid ${ACCENT}`,
-    animation: 'modalSheetIn 0.30s cubic-bezier(0.22, 1, 0.36, 1)',
-  },
-
-  header: {
-    padding: isMobile ? '20px 20px 0' : '32px 36px 0',
-    flexShrink: 0,
-  },
-
-  stepIndicator: {
-    display: 'flex',
-    gap: '6px',
-    marginBottom: '24px',
-  },
-
-  dot: (active, current) => ({
-    height: '8px',
-    borderRadius: '3px',
-    background: current ? ACCENT : active ? `${ACCENT}66` : PAPER_BORDER,
-    flex: current ? '2' : '1',
-    transition: 'all 0.35s cubic-bezier(0.4,0,0.2,1)',
-    boxShadow: current ? `0 1px 4px ${ACCENT}55` : 'none',
-  }),
-
-  title: {
-    fontSize: '24px',
-    fontWeight: '700',
-    letterSpacing: '-0.5px',
-    color: PAPER_TEXT,
-    margin: '0 0 4px',
-    lineHeight: 1.15,
-  },
-
-  subtitle: {
-    fontSize: '13px',
-    color: PAPER_TEXT_MUTED,
-    margin: '0 0 20px',
-    fontWeight: '400',
-  },
-
-  body: {
-    padding: isMobile ? '0 20px' : '0 36px',
-    overflowY: 'auto',
-    flex: 1,
-    scrollbarWidth: 'thin',
-    scrollbarColor: `${PAPER_CARD_SHADOW} transparent`,
-  },
 
   card: (selected) => ({
     display: 'flex',
@@ -200,43 +130,6 @@ const S = {
     fontWeight: '500',
     color: '#fff',
     textAlign: 'center',
-  },
-
-  footer: {
-    padding: isMobile ? '14px 20px 20px' : '18px 36px 24px',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    flexShrink: 0,
-    borderTop: '1px solid #d6d0c8',
-    background: WIZARD_FOOTER_BG,
-  },
-
-  btnSecondary: {
-    background: 'none',
-    border: '1.5px solid #d6d0c8',
-    fontSize: '15px',
-    fontWeight: '500',
-    color: PAPER_TEXT_MUTED,
-    cursor: 'pointer',
-    padding: '10px 16px',
-    borderRadius: '10px',
-    transition: 'all 0.15s ease',
-    fontFamily: 'inherit',
-  },
-
-  btnPrimary: {
-    background: ACCENT,
-    border: 'none',
-    fontSize: '15px',
-    fontWeight: '700',
-    color: '#fff',
-    cursor: 'pointer',
-    padding: '12px 28px',
-    borderRadius: '10px',
-    transition: 'all 0.12s ease',
-    fontFamily: 'inherit',
-    boxShadow: `0 4px 0 ${ACCENT_SHADOW}, 0 6px 16px ${ACCENT}44`,
   },
 };
 
@@ -325,6 +218,9 @@ function Checkmark() {
 // ── Component ─────────────────────────────────────────────────────────────────
 const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
   const [step, setStep] = useState(0);
+  // Which tile-style family is expanded. null means "whichever holds the style
+  // you are already using"; '' means you deliberately closed that one.
+  const [openSection, setOpenSection] = useState(null);
   const [cubeSize, setCubeSize] = useState(initialSettings?.size || 3);
   const [settings, setSettings] = useState({
     colorScheme: initialSettings?.colorScheme || 'standard',
@@ -597,12 +493,8 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       setSettings(s => ({ ...s, perFaceStyles: { ...current, [faceId]: key } }));
     };
 
-    const StyleGrid = ({ keys, label }) => (
-      <div style={{ marginBottom: '20px' }}>
-        <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: PAPER_TEXT_FAINT, marginBottom: '8px' }}>
-          {label}
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '7px' }}>
+    const StyleGrid = ({ keys }) => (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '7px' }}>
           {keys.map(key => {
             const owned = ownedItems.includes(`tile_${key}`);
             const sel = globalStyle === key;
@@ -632,9 +524,14 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
               </button>
             );
           })}
-        </div>
       </div>
     );
+
+    // The family holding your current style opens by default; picking a style
+    // keeps its family open. `openSection` of '' means you closed that one.
+    const currentFamily = TILE_STYLE_SECTIONS.find(sec => sec.keys.includes(globalStyle))?.key ?? 'classic';
+    const openKey = openSection ?? currentFamily;
+    const toggle = (key) => setOpenSection(openKey === key ? '' : key);
 
     return (
       <>
@@ -652,16 +549,32 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           </button>
         </div>
 
-        <StyleGrid keys={CLASSIC_STYLE_KEYS} label="Classic" />
-        <StyleGrid keys={ANTIPODAL_STYLE_KEYS} label="Antipodal Op Art" />
-        <StyleGrid keys={LIVING_STYLE_KEYS} label="Living" />
-        <StyleGrid keys={NON_EUCLIDEAN_STYLE_KEYS} label="Non-Euclidean" />
+        {TILE_STYLE_SECTIONS.map(section => {
+          const ownedCount = section.keys.filter(k => ownedItems.includes(`tile_${k}`)).length;
+          const holdsPick = section.keys.includes(globalStyle);
+          return (
+            <WizardSection
+              key={section.key}
+              label={section.label}
+              accent={ACCENT}
+              note={holdsPick ? TILE_STYLES[globalStyle]?.label : `${ownedCount}/${section.keys.length}`}
+              open={openKey === section.key}
+              onToggle={() => toggle(section.key)}
+            >
+              <StyleGrid keys={section.keys} />
+            </WizardSection>
+          );
+        })}
 
-        {/* Per-face overrides */}
-        <div style={{ marginBottom: '8px' }}>
-          <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '0.08em', textTransform: 'uppercase', color: PAPER_TEXT_FAINT, marginBottom: '10px' }}>
-            Per Face
-          </div>
+        {/* Per-face overrides — folded away by default; most players never
+            need a different style on each face. */}
+        <WizardSection
+          label="Per Face"
+          accent={ACCENT}
+          note={perFace ? 'Custom' : 'Advanced'}
+          open={openKey === 'perFace'}
+          onToggle={() => toggle('perFace')}
+        >
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
             {[1, 2, 3, 4, 5, 6].map(faceId => {
               const globalFallback = settings.tileStyle === 'random' ? 'solid' : (settings.tileStyle || 'solid');
@@ -705,7 +618,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
               );
             })}
           </div>
-        </div>
+        </WizardSection>
       </>
     );
   };
@@ -1058,14 +971,9 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           }}>
             WORM MODE
           </div>
-          <div style={S.stepIndicator}>
-            {STEPS.map((_, i) => (
-              <div key={i} style={S.dot(i <= step, i === step)} />
-            ))}
-          </div>
+          <WizardSteps styles={S} steps={STEPS} step={step} />
           <h2 style={S.title}>{stepTitles[step]}</h2>
           <p style={S.subtitle}>{stepSubtitles[step]}</p>
-          <WizardPreviewNote accent={ACCENT} text={WIZARD_PREVIEW.worm} />
         </div>
 
         {/* Scrollable body */}
