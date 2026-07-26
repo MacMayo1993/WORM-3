@@ -16,9 +16,12 @@ import { tunnelState } from '../worm/tunnelProgressBridge.js';
  *
  * This component draws the resting majority instead: one merged buffer, one
  * trivial shader, normal alpha blending (not additive, so overlapping cords
- * cannot accumulate to white), and an alpha ramp that fades each cord out
- * before it reaches the core. Both ends still visibly dive toward the centre,
- * so the topology reads, but the N² pile-up in the middle is simply not drawn.
+ * cannot accumulate to white), and a density-scaled alpha ramp that hollows
+ * each cord out before it reaches the core. That ramp is driven by how many
+ * cords are actually live: with a handful there is no pile-up to prevent and
+ * they cross the core intact, and only as the network fills does the middle
+ * drop out, so the N² pile-up is never drawn but a lone tunnel still visibly
+ * threads the centre.
  *
  * Full Möbius detail is reserved for the focus tier (see WormholeNetwork).
  *
@@ -37,13 +40,25 @@ const INDICES_PER_STRAND = (CORD_SEGS - 1) * 6;
 // ribbon for the same pair trace the same centerline (no jump on promotion).
 const FACE_OFFSET = 0.52;
 const MINI_FACE_R = 0.25;
-const TAPER_MIN   = 0.15;
+// Narrowing toward the core reads as "diving in", but 0.15 took the cord to
+// sub-pixel width exactly where it crosses the middle of the screen.
+const TAPER_MIN   = 0.35;
 
-// Width ramp by flip count. A resting cord is a hairline; a pair one flip from
+// Width ramp by flip count. A resting cord stays quiet; a pair one flip from
 // FLIP_CAP is visibly fat and hot. This is the visual rank the old render
 // lacked entirely — every strand looked identical regardless of its state.
-const CORD_W_MIN = 0.05;
-const CORD_W_MAX = 0.20;
+// The floor is what a freshly-opened pair gets, so it has to be legible on its
+// own: at 1 of 6 flips the previous 0.05/0.20 ramp produced a 0.075-wide
+// strand that was effectively invisible.
+const CORD_W_MIN = 0.15;
+const CORD_W_MAX = 0.30;
+
+// Density at which the core-crossing fade reaches full strength. The fade
+// exists to stop N cords piling up alpha on the one point they all share; with
+// only a handful active there is no pile-up to prevent, and hiding the crossing
+// throws away the very thing the tunnel is demonstrating.
+const MID_FADE_FROM = 3;   // at or below this many cords: no fade at all
+const MID_FADE_FULL = 12;  // at or above this many: full fade
 
 const REBUILD_EPS_SQ = 1e-4;
 
@@ -111,6 +126,7 @@ const vertexShader = `
 const fragmentShader = `
   uniform float uTime;
   uniform float uOpacity;
+  uniform float uMidFade;   // 0 = draw straight through the core, 1 = full fade
 
   varying float vSide;
   varying float vT;
@@ -118,11 +134,15 @@ const fragmentShader = `
   varying float vHeat;
 
   void main() {
-    // Fade to nothing before the core. This is what kills the starburst: the
-    // middle ~30% of every resting cord is simply never rasterised, so the one
-    // point all 27 strands share stops accumulating alpha.
+    // Fade out before the core. This is what kills the starburst: the middle
+    // ~30% of every resting cord is never rasterised, so the one point all 27
+    // strands share stops accumulating alpha.
+    //
+    // Scaled by density (uMidFade). At low tunnel counts there is no pile-up to
+    // prevent, and the crossing is the whole point of the mechanic — so the
+    // cord is drawn intact and only starts hollowing out as the network fills.
     float d       = abs(vT - 0.5);
-    float midFade = smoothstep(0.14, 0.34, d);
+    float midFade = mix(1.0, smoothstep(0.14, 0.34, d), uMidFade);
     if (midFade <= 0.001) discard;
 
     // Soft edges across the width so a thin cord reads as a filament rather
@@ -137,19 +157,21 @@ const fragmentShader = `
     float scroll  = fract(halfPos * 3.0 - uTime * 0.55);
     float spark   = (1.0 - smoothstep(0.0, 0.13, scroll)) * 0.5;
 
-    // Heat ladder: cold pairs sit desaturated and dim so they stay background,
-    // hot pairs saturate and brighten toward the cap.
+    // Heat ladder: cold pairs sit quieter and duller so they stay background,
+    // hot pairs saturate and brighten toward the cap. The floors here matter as
+    // much as the ramp — a pair at 1 of 6 flips still has to be a thing you can
+    // see, or the whole tier reads as switched off.
     float luma = dot(vColor, vec3(0.299, 0.587, 0.114));
-    vec3  col  = mix(vec3(luma), vColor, 0.35 + vHeat * 0.65);
+    vec3  col  = mix(vec3(luma), vColor, 0.55 + vHeat * 0.45);
 
     // One flip from death the cord becomes unstable and crackles.
     float danger  = smoothstep(0.72, 1.0, vHeat);
     float crackle = 1.0 + danger * 0.45 * sin(uTime * 26.0 + vT * 34.0);
 
-    float intensity = (0.55 + spark + vHeat * 0.7) * crackle;
+    float intensity = (0.80 + spark + vHeat * 0.6) * crackle;
     col *= intensity;
 
-    float alpha = (0.16 + vHeat * 0.34) * midFade * edgeFade * uOpacity;
+    float alpha = (0.42 + vHeat * 0.38) * midFade * edgeFade * uOpacity;
     gl_FragColor = vec4(col, alpha);
   }
 `;
@@ -267,6 +289,7 @@ const RestingCords = ({ tunnels, cubieRefs, focusIds, maxStrands }) => {
   const uniforms = useMemo(() => ({
     uTime:    { value: 0 },
     uOpacity: { value: IDLE_OPACITY },
+    uMidFade: { value: 0 },
   }), []);
 
   useEffect(() => {
@@ -351,6 +374,12 @@ const RestingCords = ({ tunnels, cubieRefs, focusIds, maxStrands }) => {
     }
 
     geo.setDrawRange(0, slot * INDICES_PER_STRAND);
+
+    // Density-driven core fade: only hollow the cords out once enough of them
+    // share the core for the pile-up to actually matter.
+    uniforms.uMidFade.value = Math.min(1, Math.max(0,
+      (slot - MID_FADE_FROM) / (MID_FADE_FULL - MID_FADE_FROM)
+    ));
   });
 
   return (

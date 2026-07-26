@@ -692,6 +692,10 @@ const VIEW_SHOWCASE_SEQUENCE = [
     apply: (s) => {
       s.setExploded(true);
       s.setShowTunnels(true);
+      // Force full detail. This beat opens exactly one pair and asks the player
+      // to watch it thread the core — at the default 'hints' density that pair
+      // renders as a single quiet cord, which is not what the copy promises.
+      s.setTunnelDetail('full');
       const mid = Math.floor(s.size / 2);
       const map = buildManifoldGridMap(s.cubies, s.size);
       s.setRotatedCubies(flipStickerPair(s.cubies, s.size, mid, mid, s.size - 1, 'PZ', map));
@@ -701,6 +705,7 @@ const VIEW_SHOWCASE_SEQUENCE = [
     cleanup: (s) => {
       s.setExploded(false);
       s.setShowTunnels(false);
+      s.setTunnelDetail('hints');
       s.setRotatedCubies(makeCubies(s.size));
     },
   },
