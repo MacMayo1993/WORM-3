@@ -132,6 +132,12 @@ export default function UILayer({
     onDemoNavTap,
   } = handlers;
 
+  // The top bar hosts the mobile ☰ action button in a slot beside the gear.
+  // Held as state (via TopMenuBar's callback ref) rather than a plain ref so
+  // MobileControls re-renders and portals into it the moment the bar mounts —
+  // and drops back to floating when the bar goes away (worm mode, menus).
+  const [topBarActionSlot, setTopBarActionSlot] = useState(null);
+
   // ── Zustand store reads ──────────────────────────────────────────────────
   // Batched with useShallow so UILayer only re-renders when a value in the
   // group actually changes — not once per selector subscription (previously
@@ -231,6 +237,7 @@ export default function UILayer({
         {showGameHUD && <FlipScreenGlow />}
 
         {showGameHUD && <TopMenuBar
+          actionSlotRef={setTopBarActionSlot}
           metrics={metrics}
           size={size}
           visualMode={visualMode}
@@ -665,6 +672,7 @@ export default function UILayer({
 
       {isMobile && !wormHealerMode && !showTutorial && !showMainMenu && !showDisparityWizard && !showDisparityBetting && !showFreeplayWizard && !showRandomWizard && !showWormModeWizard && !showLevelTutorial && !showCutscene && (
         <MobileControls
+          actionSlot={topBarActionSlot}
           onShowHelp={() => setShowHelp(true)}
           flipMode={flipMode} onToggleFlip={() => setFlipMode(!flipMode)}
           exploded={exploded} onToggleExplode={() => setExploded(!exploded)}

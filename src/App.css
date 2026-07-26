@@ -1,5 +1,10 @@
 /* WORM³ warm field-guide palette — shared by menu chrome, HUD, and overlays. */
 :root {
+  /* Height of the top app bar. Overlays that must sit UNDER it (Mobi's
+     dialogue, for one) offset themselves by this, so keep the two in step —
+     the media queries below override it alongside the bar's own height. */
+  --topbar-h: 56px;
+
   /* Mobi's paper surfaces */
   --bg-primary: #f6f1e2;
   --bg-secondary: #eee7d7;
@@ -129,7 +134,7 @@ body {
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  height: 56px;
+  height: var(--topbar-h);
   padding: 0 16px;
   background: var(--ui-panel);
   backdrop-filter: blur(18px);
@@ -323,6 +328,13 @@ body {
   transition: background 0.2s ease, color 0.2s ease;
   padding: 0;
   color: #43513a;
+}
+
+/* Host for the mobile ☰ action button, sitting inline after the gear. Collapses
+   to nothing on screens where no button is portaled in. */
+.top-bar-action-slot {
+  display: inline-flex;
+  align-items: center;
 }
 
 .top-bar-icon-btn:hover {
@@ -1162,6 +1174,10 @@ button:focus-visible,
 
 /* Responsive Adjustments */
 @media (max-width: 768px) {
+  :root {
+    --topbar-h: 44px;
+  }
+
   .ui-layer {
     padding: 0 0;
     gap: 0;
@@ -1169,7 +1185,7 @@ button:focus-visible,
 
   .top-app-bar {
     padding: 0 10px;
-    height: 44px;
+    height: var(--topbar-h);
     border-bottom: 1px solid rgba(111, 126, 86, 0.25);
   }
 
@@ -1335,7 +1351,9 @@ button:focus-visible,
   .top-bar-icon-btn {
     width: 34px;
     height: 34px;
-    color: rgba(200, 220, 255, 0.80);
+    /* Cream bar: these have to be near-black to read at all. The pale blue
+       they used to inherit was all but invisible against it. */
+    color: #111511;
   }
 
   .chaos-pill,
@@ -2313,12 +2331,16 @@ button:focus-visible,
 
 /* Landscape mode adjustments for mobile */
 @media (max-height: 500px) and (orientation: landscape) {
+  :root {
+    --topbar-h: 36px;
+  }
+
   .ui-layer {
     padding: 0;
   }
 
   .top-app-bar {
-    height: 36px;
+    height: var(--topbar-h);
     padding: 0 8px;
   }
 

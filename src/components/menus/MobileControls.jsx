@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 
 const buttonStyle = {
   width: '48px',
@@ -75,10 +76,14 @@ const undoContainerStyle = {
   pointerEvents: 'auto'
 };
 
-// Docked below the 48dp top bar, on the right — the action menu opens downward.
+// The action menu drops out of the top bar's ☰ button, so it hangs just below
+// the bar on the right. The ☰ itself lives IN the bar (portaled into the slot
+// TopMenuBar renders beside the gear); this container only holds the menu — and
+// the button too, as a floating fallback, when there is no bar to sit in (worm
+// mode and other bar-less screens).
 const topRightContainerStyle = {
   position: 'fixed',
-  top: 'calc(56px + env(safe-area-inset-top, 0px))',
+  top: 'calc(var(--topbar-h, 56px) + env(safe-area-inset-top, 0px) + 6px)',
   right: '12px',
   zIndex: 500,
   display: 'flex',
@@ -143,8 +148,25 @@ const MobileControls = React.memo(({
   cubeSize,
   onOrbitCW,
   onOrbitCCW,
+  // DOM node inside the top bar (beside the gear) to host the ☰ button. Null on
+  // screens with no top bar, where the button falls back to floating.
+  actionSlot,
 }) => {
   const [expanded, setExpanded] = useState(false);
+
+  // Sized and coloured to match the bar's other icon buttons when docked there.
+  const toggleButton = (
+    <button
+      onClick={() => setExpanded(!expanded)}
+      className={actionSlot ? 'top-bar-icon-btn' : undefined}
+      style={actionSlot ? { fontSize: '18px', lineHeight: 1 } : toggleButtonStyle}
+      aria-label={expanded ? 'Close menu' : 'Open menu'}
+      aria-expanded={expanded}
+      title={expanded ? 'Close menu' : 'More actions'}
+    >
+      {expanded ? '×' : '☰'}
+    </button>
+  );
 
   return (
     <>
@@ -169,16 +191,12 @@ const MobileControls = React.memo(({
         </div>
       )}
 
-      {/* Top right - action menu (☰) docked under the top bar */}
+      {/* ☰ lives in the top bar beside the gear when there is one to dock into */}
+      {actionSlot && createPortal(toggleButton, actionSlot)}
+
+      {/* Top right - action menu, hanging under the bar's ☰ */}
       <div style={topRightContainerStyle}>
-        {/* Toggle expand button */}
-        <button
-          onClick={() => setExpanded(!expanded)}
-          style={toggleButtonStyle}
-          aria-label={expanded ? "Close menu" : "Open menu"}
-        >
-          {expanded ? '×' : '☰'}
-        </button>
+        {!actionSlot && toggleButton}
 
         {/* Expanded menu */}
         {expanded && (
