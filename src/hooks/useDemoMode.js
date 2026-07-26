@@ -11,7 +11,9 @@ import { DEFAULT_SETTINGS } from '../utils/colorSchemes.js';
 import {
   applyDemoOverrides, looksLikeDemoSettings, mergeDemoSettings, demoLookChanged, DEMO_CONTROLLED_KEYS,
 } from '../utils/demoSettings.js';
-import { DEMO_STEP_IDS, DEMO_LEVEL_CONFIGS, VIEW_SHOWCASE_SEQUENCE } from '../components/screens/DemoFlowController.jsx';
+import {
+  DEMO_STEP_IDS, DEMO_LEVEL_CONFIGS, VIEW_SHOWCASE_SEQUENCE, CONTROL_TOUR_SEQUENCE,
+} from '../components/screens/DemoFlowController.jsx';
 
 // The demo temporarily overwrites the player's persisted settings (neon,
 // desert, topographic tiles — see utils/demoSettings.js). This key holds the
@@ -26,6 +28,10 @@ const PRE_DEMO_SETTINGS_KEY = 'worm3_predemo_settings';
 // the step either way.
 const FLIP_SPOTLIGHT_FALLBACK_MS = 12000;
 
+// Same idea for each beat of the control tour: it waits for the player to press
+// the lit button, but a demo left running unattended has to keep moving.
+const TOUR_BEAT_FALLBACK_MS = 15000;
+
 export function useDemoMode({
   cancelShuffle,
   changeSize,
@@ -38,6 +44,12 @@ export function useDemoMode({
   handleOpenStore,
   setShowFreeplayWizard,
   armSceneGate,
+  // Closes the bottom-bar sheet (Views / More). The control tour opens it on
+  // the player's behalf, so it has to be able to put it away again.
+  closeNavSheet,
+  // Whether that sheet is currently open — the tour's Views and More beats
+  // finish when the player closes it again, not when they open it.
+  navSheetOpen,
 }) {
   const { demoMode, demoStep } = useGameStore(useShallow((s) => ({
     demoMode: s.demoMode,
@@ -61,6 +73,8 @@ export function useDemoMode({
   const [demoFlipProgress, setDemoFlipProgress] = useState(null);
   const [demoFlipSpotlight, setDemoFlipSpotlight] = useState(false);
   const [demoHintStep, setDemoHintStep] = useState(null);
+  // Index into CONTROL_TOUR_SEQUENCE while the control tour runs; -1 when idle.
+  const [demoTourIndex, setDemoTourIndex] = useState(-1);
 
   const demoForecastPickRef = useRef(null);
   const demoRewardPendingRef = useRef(false);
@@ -80,6 +94,11 @@ export function useDemoMode({
   const advanceDemoStepRef = useRef(null);
   const demoFlipPhaseRef = useRef(null);
   const babySolveArmedRef = useRef(false);
+  // The control tour hands the player the Flip button by name. If they went
+  // through it, the twin step no longer withholds Flip — it would be asking for
+  // the same press twice inside a minute. If they skipped the tour, the twin
+  // step's own Flip gate is still the only place that button gets taught.
+  const tourCompletedRef = useRef(false);
   const twinFlipBaselineRef = useRef(null);
   const twinWatchFiredRef = useRef(false);
   const preDemoWormCharacterRef = useRef(null);
@@ -261,6 +280,29 @@ export function useDemoMode({
       return;
     }
 
+    // Control tour: a deliberately scrambled cube, so the first two buttons the
+    // player presses (Reset, then Shuffle) visibly change something.
+    if (config.type === 'tour') {
+      const targetSize = config.cubeSize || 3;
+      if (targetSize !== store.size) changeSize(targetSize);
+      store.setFlipMode(false);
+      store.setShowTunnels(false);
+      store.setVisualMode('classic');
+      store.setExploded(false);
+      store.setHollowMode(false);
+      store.setShowNetPanel(false);
+      store.setShowAntipodalPiP(false);
+      let tourState = makeCubies(targetSize);
+      for (const { axis, sliceIndex, dir } of config.scrambleSequence || []) {
+        tourState = rotateSliceCubies(tourState, targetSize, axis, sliceIndex, dir);
+      }
+      setRotatedCubies(tourState);
+      store.resetGame();
+      clearRefractory();
+      store.setHasShuffled(true);
+      return;
+    }
+
     if (config.type === 'showcase') {
       const targetSize = config.cubeSize || 3;
       if (targetSize !== store.size) changeSize(targetSize);
@@ -288,7 +330,7 @@ export function useDemoMode({
     // Steps that teach the Flip button start with it OFF and ask the player to
     // press it (see handleDemoStepContinue's spotlight); every other step gets
     // whatever its feature set declares.
-    store.setFlipMode(config.gateOnFlipToggle ? false : config.features.flips);
+    store.setFlipMode(config.gateOnFlipToggle && !tourCompletedRef.current ? false : config.features.flips);
     store.setShowTunnels(config.features.tunnels);
     store.setVisualMode('classic');
     store.setShowAntipodalPiP(false);
@@ -377,11 +419,83 @@ export function useDemoMode({
     armFlipAndContinue();
   }, [armFlipAndContinue]);
 
+  // ── Control tour ────────────────────────────────────────────────────────
+  // One beat per bottom-bar button. Each beat lights its tile and waits for
+  // that tile to be pressed; the press runs the button's real action first
+  // (see UILayer's onDemoNavTap), so the player learns what it does by seeing
+  // it happen, not by being told.
+
+  const advanceTourRef = useRef(null);
+  // Set when the player opens a sheet during its tour beat; the beat then waits
+  // for them to close it again.
+  const tourSheetOpenedRef = useRef(false);
+
+  // Move to a beat and arm its "nobody is home" fallback, so an unattended
+  // demo still finishes the tour.
+  const enterTourBeat = useCallback((index) => {
+    tourSheetOpenedRef.current = false;
+    setDemoTourIndex(index);
+    demoWatchTimers.current.push(setTimeout(() => {
+      // Re-read rather than close over the index: the player may have advanced
+      // it themselves by now, in which case this timer has nothing to do.
+      setDemoTourIndex((cur) => {
+        if (cur !== index) return cur;
+        advanceTourRef.current?.(index);
+        return cur;
+      });
+    }, TOUR_BEAT_FALLBACK_MS));
+  }, []);
+
+  const advanceTour = useCallback((fromIndex) => {
+    // Always put the sheet away on the way out of a beat: it covers the whole
+    // bottom bar, so leaving it up would hide the very button the next beat
+    // asks for.
+    if (CONTROL_TOUR_SEQUENCE[fromIndex]?.sheetBeat) closeNavSheet?.();
+    const next = fromIndex + 1;
+    if (next < CONTROL_TOUR_SEQUENCE.length) {
+      enterTourBeat(next);
+      return;
+    }
+    // Last button done — close whatever sheet the tour opened and celebrate.
+    setDemoTourIndex(-1);
+    closeNavSheet?.();
+    tourCompletedRef.current = true;
+    celebrateStep('control-tour');
+  }, [enterTourBeat, closeNavSheet, celebrateStep]);
+  advanceTourRef.current = advanceTour;
+
+  // A bottom-bar button was pressed. Only the lit one advances the tour;
+  // pressing anything else just does its normal job.
+  const handleDemoNavTap = useCallback((key) => {
+    setDemoTourIndex((cur) => {
+      const beat = CONTROL_TOUR_SEQUENCE[cur];
+      if (cur < 0 || beat?.key !== key) return cur;
+      // Views and More slide a sheet up over the bar. Opening it is only half
+      // the beat — the player has to close it again before the next button is
+      // reachable, so the effect below finishes those beats instead.
+      if (beat.sheetBeat) {
+        tourSheetOpenedRef.current = true;
+        return cur;
+      }
+      // Defer: this runs inside a state updater, and advancing touches more
+      // state (and the nav sheet) than belongs in one.
+      queueMicrotask(() => advanceTourRef.current?.(cur));
+      return cur;
+    });
+  }, []);
+
+  const handleDemoTourSkip = useCallback(() => {
+    setDemoTourIndex(-1);
+    closeNavSheet?.();
+    advanceDemoStepRef.current?.('control-tour');
+  }, [closeNavSheet]);
+
   const handleStartDemo = useCallback(() => {
     clearDemoWatchTimers();
     setDemoTryVisible(false);
     const store = useGameStore.getState();
     playerCustomizedRef.current = false;
+    tourCompletedRef.current = false;
     preDemoSettingsRef.current = { ...store.settings };
     try { localStorage.setItem(PRE_DEMO_SETTINGS_KEY, JSON.stringify(store.settings)); } catch { /* private mode */ }
     store.startDemo();
@@ -415,6 +529,10 @@ export function useDemoMode({
     setDemoFlipSpotlight(false);
     setDemoHintStep(null);
     setDemoCoachCopy(null);
+    if (fromStep === 'control-tour') {
+      setDemoTourIndex(-1);
+      closeNavSheet?.();
+    }
     twinFlipBaselineRef.current = null;
     twinWatchFiredRef.current = false;
     store.setFirstFlipHighlightPair(null);
@@ -488,6 +606,7 @@ export function useDemoMode({
     setDemoCoachCopy(null);
     setDemoFlipSpotlight(false);
     setDemoHintStep(null);
+    setDemoTourIndex(-1);
 
     const config = DEMO_LEVEL_CONFIGS[step];
 
@@ -498,8 +617,17 @@ export function useDemoMode({
     if (config && config.type !== 'worm' && config.type !== 'chaos') {
       useGameStore.getState().triggerCameraOrbit?.('cw');
     }
+    // Control tour: start the first beat once the launch stamp has cleared.
+    if (config && config.type === 'tour') {
+      demoWatchTimers.current.push(setTimeout(() => {
+        if (useGameStore.getState().demoStep === step) enterTourBeat(0);
+      }, 1500));
+    }
+
     if (config && config.type === 'cube') {
-      if (config.gateOnFlipToggle) {
+      // The tour already handed them the Flip button; don't take it away again
+      // just to ask for the same press.
+      if (config.gateOnFlipToggle && !tourCompletedRef.current) {
         // Hand the step over to the player: spotlight Flip on the nav bar once
         // the launch stamp has cleared, and keep a fallback so an unanswered
         // prompt can never stall the demo.
@@ -557,6 +685,8 @@ export function useDemoMode({
     setDemoViewSpotlight(false);
     setDemoFlipSpotlight(false);
     setDemoHintStep(null);
+    setDemoTourIndex(-1);
+    closeNavSheet?.();
     demoFlipPhaseRef.current = null;
     twinFlipBaselineRef.current = null;
     twinWatchFiredRef.current = false;
@@ -795,6 +925,17 @@ export function useDemoMode({
     beginCubeTryPhase(useGameStore.getState().demoStep);
   }, [demoMode, demoFlipSpotlight, flipMode, beginCubeTryPhase]);
 
+  // Sheet beats of the control tour finish on the sheet CLOSING: the player
+  // opens Views (or More), looks, and puts it away — which is also what leaves
+  // the next button on the bar reachable.
+  useEffect(() => {
+    if (!demoMode || demoTourIndex < 0) return;
+    if (!CONTROL_TOUR_SEQUENCE[demoTourIndex]?.sheetBeat) return;
+    if (!tourSheetOpenedRef.current || navSheetOpen) return;
+    tourSheetOpenedRef.current = false;
+    advanceTourRef.current?.(demoTourIndex);
+  }, [demoMode, demoTourIndex, navSheetOpen]);
+
   // Twin step: watching the demo's flip is not the lesson — doing one is. The
   // first board change after the watch flip is fired is the demo's own flip and
   // becomes the baseline; the next change is the player's, and closes the step.
@@ -952,6 +1093,9 @@ export function useDemoMode({
     handleDemoViewSpotlightClick,
     demoFlipSpotlight,
     handleDemoFlipSpotlightSkip,
+    demoTourIndex,
+    handleDemoNavTap,
+    handleDemoTourSkip,
     handleDemoShowcaseNext,
     handleDemoShowcaseSkip,
   };

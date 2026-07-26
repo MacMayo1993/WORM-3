@@ -128,7 +128,8 @@ export default function UILayer({
     onDemoDisparityDismiss,
     demoViewSpotlight,
     onDemoViewSpotlightClick,
-    demoFlipSpotlight,
+    demoSpotlightTile,
+    onDemoNavTap,
   } = handlers;
 
   // ── Zustand store reads ──────────────────────────────────────────────────
@@ -349,20 +350,32 @@ export default function UILayer({
         {/* Bottom Navigation Bar — hidden while a demo dialogue is presenting */}
         {showGameHUD && !demoDialogueVisible && (
           <BottomNavBar
-            onReset={onReset}
-            onShuffle={currentLevelData ? onShuffleForLevel : onShuffle}
+            // Every tile reports its press to the demo (onDemoNavTap) AFTER
+            // running its real action, so the control tour can advance on the
+            // press that actually did the thing. Outside the demo the callback
+            // is absent and these are ordinary buttons.
+            onReset={() => { onReset(); onDemoNavTap?.('reset'); }}
+            onShuffle={() => { (currentLevelData ? onShuffleForLevel : onShuffle)(); onDemoNavTap?.('shuffle'); }}
             chaosMode={chaosMode}
             flipMode={flipMode}
-            onToggleFlip={() => { if (!currentLevelData || currentLevelData.features.flips) setFlipMode(!flipMode); }}
+            onToggleFlip={() => {
+              if (!currentLevelData || currentLevelData.features.flips) setFlipMode(!flipMode);
+              onDemoNavTap?.('flip');
+            }}
             flipLocked={!!(currentLevelData && !currentLevelData.features.flips)}
             hasActiveView={exploded || showTunnels || showNetPanel || hollowMode || showLeaderboard}
             onToggleViews={() => {
+              // The view showcase runs its own scripted sequence, so there the
+              // Views press starts that instead of opening the sheet.
               if (demoViewSpotlight) { onDemoViewSpotlightClick?.(); return; }
               setSheetMode('views'); setSheetOpen(!sheetOpen || sheetMode !== 'views');
+              onDemoNavTap?.('views');
             }}
-            spotlightViews={!!demoViewSpotlight}
-            spotlightFlip={!!demoFlipSpotlight}
-            onToggleMore={() => { setSheetMode('more'); setSheetOpen(!sheetOpen || sheetMode !== 'more'); }}
+            spotlightTile={demoSpotlightTile || null}
+            onToggleMore={() => {
+              setSheetMode('more'); setSheetOpen(!sheetOpen || sheetMode !== 'more');
+              onDemoNavTap?.('more');
+            }}
             moreOpen={sheetOpen && sheetMode === 'more'}
             viewsOpen={sheetOpen && sheetMode === 'views'}
           />
