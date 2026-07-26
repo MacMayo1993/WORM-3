@@ -110,6 +110,7 @@ const BottomNavBar = ({
   viewsOpen,
   chaosMode,
   spotlightViews = false,
+  spotlightFlip = false,
 }) => {
   return (
     <div className="bottom-nav-bar">
@@ -124,6 +125,7 @@ const BottomNavBar = ({
         size={50}
         elevated
         lit={flipMode}
+        spotlight={spotlightFlip}
         disabled={flipLocked}
       />
       <CubeTile

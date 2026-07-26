@@ -208,7 +208,7 @@ const TopMenuBar = ({
           <button
             className="top-bar-icon-btn"
             onClick={onToggleAntipodalPiP}
-            title={showAntipodalPiP ? 'Hide antipodal view' : 'Show antipodal view (back of cube)'}
+            title={showAntipodalPiP ? 'Hide the far-side view' : 'Show the far side (the cube from exactly the opposite direction)'}
             style={{
               marginRight: '4px',
               color: showAntipodalPiP ? '#00d9ff' : undefined,

@@ -3,10 +3,12 @@ import {
   UI_FONT, DISPLAY_FONT, UI_CREAM, UI_GOLD, UI_MOSS, UI_MOSS_LIGHT, UI_ACTION_SHADOW,
 } from '../../utils/uiTheme.js';
 
+// The three twin pairs, named by the two colours a player can actually see on
+// opposite faces — "Red ↔ Orange", not "face 1 ↔ face 4".
 const PAIRS = [
-  { id: 'red-orange', label: 'Red ↔ Orange', colors: ['#ef4444', '#f97316'], faceIds: [1, 4] },
-  { id: 'green-blue', label: 'Green ↔ Blue', colors: ['#22c55e', '#3b82f6'], faceIds: [2, 5] },
-  { id: 'white-yellow', label: 'White ↔ Yellow', colors: ['#ffffff', '#FFD500'], faceIds: [3, 6] },
+  { id: 'red-orange', label: 'Red ↔ Orange', note: 'front and back', colors: ['#ef4444', '#f97316'], faceIds: [1, 4] },
+  { id: 'green-blue', label: 'Green ↔ Blue', note: 'left and right', colors: ['#22c55e', '#3b82f6'], faceIds: [2, 5] },
+  { id: 'white-yellow', label: 'White ↔ Yellow', note: 'top and bottom', colors: ['#ffffff', '#FFD500'], faceIds: [3, 6] },
 ];
 
 export default function DemoForecastPicker({ onPick, onSkip }) {
@@ -36,7 +38,8 @@ export default function DemoForecastPicker({ onPick, onSkip }) {
       <p style={{
         color: 'rgba(255,253,242,0.86)', fontSize: 14, margin: '0 0 28px', maxWidth: 320,
       }}>
-        Chaos will flip tiles at random. One antipodal pair will be the last standing.
+        Tiles are about to start jumping to their twins at random. Opposite faces
+        go down together — one pair of colours will outlast the rest. Pick it.
       </p>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%', maxWidth: 280 }}>
@@ -59,7 +62,14 @@ export default function DemoForecastPicker({ onPick, onSkip }) {
               <div style={{ width: 20, height: 20, borderRadius: 4, background: pair.colors[0] }} />
               <div style={{ width: 20, height: 20, borderRadius: 4, background: pair.colors[1] }} />
             </div>
-            <span style={{ color: UI_CREAM, fontSize: 15, fontWeight: 700, letterSpacing: '0.03em' }}>{pair.label}</span>
+            <span style={{ textAlign: 'left' }}>
+              <span style={{ display: 'block', color: UI_CREAM, fontSize: 15, fontWeight: 700, letterSpacing: '0.03em' }}>
+                {pair.label}
+              </span>
+              <span style={{ display: 'block', color: 'rgba(255,253,242,0.6)', fontSize: 11.5, fontWeight: 600 }}>
+                {pair.note}
+              </span>
+            </span>
           </button>
         ))}
       </div>
