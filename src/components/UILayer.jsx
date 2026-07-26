@@ -167,7 +167,7 @@ export default function UILayer({
 
   // Visual state — change on user preference changes
   const {
-    flipMode, visualMode, exploded, showTunnels, hollowMode,
+    flipMode, visualMode, exploded, showTunnels, tunnelDetail, hollowMode,
     disparityWinner,
     faceRotationTarget, selectedTileForRotation,
     savedCubeState, solveFocusedStep,
@@ -176,6 +176,7 @@ export default function UILayer({
     visualMode: s.visualMode,
     exploded: s.exploded,
     showTunnels: s.showTunnels,
+    tunnelDetail: s.tunnelDetail,
     hollowMode: s.hollowMode,
     disparityWinner: s.disparityWinner,
     faceRotationTarget: s.faceRotationTarget,
@@ -188,7 +189,7 @@ export default function UILayer({
   const {
     setShowLevelSelect, setShowSettings, setShowHelp, setShowFirstFlipTutorial,
     setShowNetPanel, toggleLeaderboard, setFlipMode, setVisualMode,
-    setExploded, setShowTunnels, setFaceRotationTarget, setSelectedTileForRotation,
+    setExploded, cycleTunnelDetail, setFaceRotationTarget, setSelectedTileForRotation,
     setShowDevConsole, setSolveModeActive, setSolveFocusedStep, setSolveHighlights,
     toggleHollowMode, triggerCameraOrbit,
   } = useGameStore(useShallow(s => ({
@@ -201,7 +202,7 @@ export default function UILayer({
     setFlipMode: s.setFlipMode,
     setVisualMode: s.setVisualMode,
     setExploded: s.setExploded,
-    setShowTunnels: s.setShowTunnels,
+    cycleTunnelDetail: s.cycleTunnelDetail,
     setFaceRotationTarget: s.setFaceRotationTarget,
     setSelectedTileForRotation: s.setSelectedTileForRotation,
     setShowDevConsole: s.setShowDevConsole,
@@ -399,7 +400,8 @@ export default function UILayer({
         autoRotateEnabled={autoRotateEnabled}
         onToggleAutoRotate={() => onSetAutoRotate(!autoRotateEnabled)}
         showTunnels={showTunnels}
-        onToggleTunnels={() => { if (!currentLevelData || currentLevelData.features.tunnels) setShowTunnels(!showTunnels); }}
+        tunnelDetail={tunnelDetail}
+        onToggleTunnels={() => { if (!currentLevelData || currentLevelData.features.tunnels) cycleTunnelDetail(); }}
         tunnelsLocked={!!(currentLevelData && !currentLevelData.features.tunnels)}
         exploded={exploded}
         onToggleExplode={() => { if (!currentLevelData || currentLevelData.features.explode) setExploded(!exploded); }}
@@ -653,7 +655,7 @@ export default function UILayer({
           onShowHelp={() => setShowHelp(true)}
           flipMode={flipMode} onToggleFlip={() => setFlipMode(!flipMode)}
           exploded={exploded} onToggleExplode={() => setExploded(!exploded)}
-          showTunnels={showTunnels} onToggleTunnels={() => setShowTunnels(!showTunnels)}
+          showTunnels={showTunnels} tunnelDetail={tunnelDetail} onToggleTunnels={cycleTunnelDetail}
           onShuffle={onShuffle} onReset={onReset}
           showNetPanel={showNetPanel} onToggleNet={() => setShowNetPanel(!showNetPanel)}
           onRotateCW={() => {

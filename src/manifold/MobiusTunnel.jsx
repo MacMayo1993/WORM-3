@@ -1,6 +1,4 @@
 import { useRef, useEffect, useMemo } from 'react';
-import { useGameStore } from '../hooks/useGameStore.js';
-import { useShallow } from 'zustand/react/shallow';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { FLIP_CAP } from '../utils/constants.js';
@@ -378,7 +376,13 @@ function createRibbonGeos(segs) {
 }
 
 /**
- * MobiusTunnel — one Möbius ribbon + two guard-rail bumpers per active antipodal sticker pair.
+ * MobiusTunnel — the FOCUS tier: one Möbius ribbon + two guard-rail bumpers + exit portal.
+ *
+ * This is the expensive, high-fidelity render, and it is deliberately rare. WormholeNetwork
+ * mounts at most FOCUS_BUDGET of these — the tunnel the worm is traversing plus the most
+ * recent flip events — while every other active pair is drawn by RestingCords as a single
+ * merged, cheaply-shaded strand. Nothing here should be made cheaper for density's sake;
+ * density is the resting tier's job.
  *
  * Racing stripes scroll toward the center mini-cube from both tile ends (Rainbow Road feel).
  * Scroll speed accelerates at the Möbius midpoint (t=0.5) when the worm is traversing,
@@ -392,6 +396,7 @@ function createRibbonGeos(segs) {
  */
 const MobiusTunnel = ({
   meshIdx1, meshIdx2, dirKey1, dirKey2, cubieRefs, flips, color1, color2, tunnelId,
+  tunnelBirths, tunnelPulses,
 }) => {
   const meshRef          = useRef();
   const pulseT           = useRef(Math.random() * Math.PI * 2);
@@ -404,10 +409,6 @@ const MobiusTunnel = ({
   const exitPortalGroupRef  = useRef();
   const exitPortalMatRef    = useRef();
   const exitPortalGlowRef   = useRef();
-
-  const { tunnelBirths, tunnelPulses } = useGameStore(
-    useShallow(s => ({ tunnelBirths: s.tunnelBirths, tunnelPulses: s.tunnelPulses }))
-  );
 
   const { geo, leftGeo, rightGeo } = useMemo(() => createRibbonGeos(RIBBON_SEGS), []);
 
@@ -611,8 +612,11 @@ const MobiusTunnel = ({
 
   return (
     <>
-      {/* Main ribbon — racing stripes scroll toward the mini-cube, speed ramps at midpoint */}
-      <mesh ref={meshRef} geometry={geo}>
+      {/* Main ribbon — racing stripes scroll toward the mini-cube, speed ramps at midpoint.
+          frustumCulled is off on all three meshes here: vertex positions are written in world
+          space into meshes parented at the origin, so the lazily-computed bounding sphere goes
+          stale on the first rebuild and culling against it pops the ribbon in and out. */}
+      <mesh ref={meshRef} geometry={geo} frustumCulled={false}>
         <shaderMaterial
           uniforms={uniforms}
           vertexShader={vertexShader}
@@ -625,7 +629,7 @@ const MobiusTunnel = ({
       </mesh>
 
       {/* Left guard rail — colorA; rotates to inverted at tile 2 via Möbius twist */}
-      <mesh geometry={leftGeo}>
+      <mesh geometry={leftGeo} frustumCulled={false}>
         <shaderMaterial
           uniforms={bumperUniformsL}
           vertexShader={bumperVertexShader}
@@ -637,7 +641,7 @@ const MobiusTunnel = ({
       </mesh>
 
       {/* Right guard rail — colorB; rotates to inverted at tile 2 via Möbius twist */}
-      <mesh geometry={rightGeo}>
+      <mesh geometry={rightGeo} frustumCulled={false}>
         <shaderMaterial
           uniforms={bumperUniformsR}
           vertexShader={bumperVertexShader}

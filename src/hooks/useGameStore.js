@@ -355,6 +355,15 @@ export const useGameStore = create(
     visualMode: 'classic', // 'classic', 'grid', 'sudokube', 'colors'
     flipMode: false,
     showTunnels: false,
+    // Tunnel density tier, applied only while showTunnels is true.
+    //   'hints' — every active pair is a thin merged cord; full Möbius detail is
+    //             reserved for the tunnel the worm is actually traversing.
+    //   'full'  — same cords, plus full ribbon detail on the most recent flip
+    //             events (capped, see FOCUS_BUDGET in WormholeNetwork).
+    // Together with showTunnels this makes the UI toggle three-state:
+    // Off → Hints → Full. 'hints' is the default because the old always-on
+    // full-detail render was unreadable past a handful of active pairs.
+    tunnelDetail: 'hints',
     exploded: false,
     explosionT: 0,
     showNetPanel: false,
@@ -369,6 +378,7 @@ export const useGameStore = create(
     setShowTunnels: (showTunnels) => set(typeof showTunnels === 'function'
       ? (state) => ({ showTunnels: showTunnels(state.showTunnels) })
       : { showTunnels }),
+    setTunnelDetail: (tunnelDetail) => set({ tunnelDetail }),
     setExploded: (exploded) => set(typeof exploded === 'function'
       ? (state) => ({ exploded: exploded(state.exploded) })
       : { exploded }),
@@ -386,6 +396,12 @@ export const useGameStore = create(
 
     toggleFlipMode: () => set((state) => ({ flipMode: !state.flipMode })),
     toggleTunnels: () => set((state) => ({ showTunnels: !state.showTunnels })),
+    // Three-state cycle for the Tunnels button: Off → Hints → Full → Off.
+    cycleTunnelDetail: () => set((state) => {
+      if (!state.showTunnels) return { showTunnels: true, tunnelDetail: 'hints' };
+      if (state.tunnelDetail === 'hints') return { tunnelDetail: 'full' };
+      return { showTunnels: false, tunnelDetail: 'hints' };
+    }),
     toggleExploded: () => set((state) => ({ exploded: !state.exploded })),
     toggleNetPanel: () => set((state) => ({ showNetPanel: !state.showNetPanel })),
 

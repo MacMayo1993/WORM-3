@@ -127,6 +127,7 @@ const MobileControls = React.memo(({
   exploded,
   onToggleExplode,
   showTunnels,
+  tunnelDetail,
   onToggleTunnels,
   onShuffle,
   onReset,
@@ -261,15 +262,16 @@ const MobileControls = React.memo(({
               <span style={flipLabelStyle}>FLIP</span>
             </button>
 
-            {/* Tunnels toggle */}
+            {/* Tunnels — three-state: Off → Hints → Full → Off. The ring around the
+                hub thickens on Full so the current tier is readable at a glance. */}
             <button
               onClick={onToggleTunnels}
               style={showTunnels ? activeSmallButtonStyle : smallButtonStyle}
-              aria-label="Toggle tunnels"
+              aria-label={`Tunnels: ${showTunnels ? (tunnelDetail === 'full' ? 'full' : 'hints') : 'off'} — tap to cycle`}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M12 2v20M2 12h20"/>
-                <circle cx="12" cy="12" r="4"/>
+                <circle cx="12" cy="12" r="4" strokeWidth={showTunnels && tunnelDetail === 'full' ? 4 : 2} />
               </svg>
             </button>
 
