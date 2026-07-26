@@ -52,6 +52,7 @@ import NebulaEnvironment from './3d/NebulaEnvironment.jsx';
 import InteractivePhotoBackground from './3d/InteractivePhotoBackground.jsx';
 import { setSharedRenderer, tickPreviews, hasActivePreviews } from './3d/TilePreviewRenderer.js';
 import { setWormSharedRenderer, tickWormPreviews, hasActiveWormPreviews } from './3d/WormPreviewRenderer.js';
+import { setCubeSharedRenderer, tickCubePreviews, hasActiveCubePreviews } from './3d/CubePreviewRenderer.js';
 import { getBackgroundUrl, MENU_BACKGROUNDS } from './utils/backgrounds.js';
 
 // UI components
@@ -283,10 +284,12 @@ function TilePreviewHost() {
   useEffect(() => {
     setSharedRenderer(gl);
     setWormSharedRenderer(gl);
+    setCubeSharedRenderer(gl);
   }, [gl]);
   useFrame((_, delta) => {
     if (hasActivePreviews()) tickPreviews(delta);
     if (hasActiveWormPreviews()) tickWormPreviews(delta);
+    if (hasActiveCubePreviews()) tickCubePreviews(delta);
   });
   return null;
 }

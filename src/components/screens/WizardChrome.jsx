@@ -238,9 +238,11 @@ export function WizardSectionHeading({ children, style }) {
  * family costs one tap.
  *
  * The header stays sticky while its own contents scroll, so a long open family
- * never leaves you wondering which one you are in.
+ * never leaves you wondering which one you are in. Pass `sticky={false}` where
+ * something else already owns the top of the scroller — the wizards' cube plate
+ * does — so two elements aren't competing for the same perch.
  */
-export function WizardSection({ label, note, accent, open, onToggle, children }) {
+export function WizardSection({ label, note, accent, open, onToggle, sticky = true, children }) {
   const ref = React.useRef(null);
   const wasOpen = React.useRef(open);
 
@@ -274,7 +276,7 @@ export function WizardSection({ label, note, accent, open, onToggle, children })
         onClick={onToggle}
         aria-expanded={open}
         style={{
-          position: 'sticky',
+          position: sticky ? 'sticky' : 'static',
           top: 0,
           zIndex: 2,
           width: '100%',
