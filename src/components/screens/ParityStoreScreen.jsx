@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { getSkins, getHats, getSchemes, getTiles } from '../../utils/storeCatalog.js';
@@ -10,10 +10,14 @@ import {
   unregisterTilePreview,
 } from '../../3d/TilePreviewRenderer.js';
 import {
-  UI_FONT, PAPER_BACKDROP, PAPER_BACKDROP_BLUR, PAPER_SHEET, PAPER_SHEET_RAISED,
-  PAPER_BORDER, PAPER_BORDER_SOFT, PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT,
-  PAPER_FOOTER_BG, PAPER_BG_MUTED, PAPER_CARD_SHADOW, PAPER_SHADOW,
+  UI_FONT, DISPLAY_FONT, HAND_FONT,
+  PAPER_BACKDROP, PAPER_BACKDROP_BLUR, PAPER_SHEET_RAISED,
+  PAPER_BORDER_SOFT, PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT,
+  PAPER_BG_MUTED, PAPER_CARD_SHADOW, PAPER_SHADOW, UI_CREAM,
 } from '../../utils/uiTheme.js';
+import { wizardPaperBackground, WIZARD_FOOTER_BG, PENCIL_LEAD } from './WizardChrome.jsx';
+import WormPreviewCanvas from '../../3d/WormPreviewCanvas.jsx';
+import './ParityStoreScreen.css';
 
 const ACCENT = '#0891B2';
 const ACCENT_SHADOW = '#0e6985';
@@ -26,11 +30,25 @@ const SCHEMES = getSchemes();
 const TILES   = getTiles();
 
 const TABS = [
-  { id: 'skins',   label: 'Skins',    accent: '#2D7A3A' },
-  { id: 'hats',    label: 'Hats',     accent: '#6A2C91' },
-  { id: 'schemes', label: 'Palettes', accent: '#1565C0' },
-  { id: 'tiles',   label: 'Tiles',    accent: '#C44B00' },
+  { id: 'skins',   label: 'Skins',    accent: '#2D7A3A', items: SKINS },
+  { id: 'hats',    label: 'Hats',     accent: '#6A2C91', items: HATS },
+  { id: 'schemes', label: 'Palettes', accent: '#1565C0', items: SCHEMES },
+  { id: 'tiles',   label: 'Tiles',    accent: '#C44B00', items: TILES },
 ];
+
+const ALL_ITEMS = [...SKINS, ...HATS, ...SCHEMES, ...TILES];
+
+// The store is full-bleed, but the collection itself is a column: past ~1000px
+// the cards stop spreading so the masthead, tabs, grid, and footnote stay in one
+// readable measure instead of drifting to opposite edges of a desktop screen.
+const COLUMN = { width: '100%', maxWidth: '1000px', margin: '0 auto', boxSizing: 'border-box' };
+
+const TYPE_LABEL = {
+  skin: 'Worm Skin',
+  hat: 'Hat',
+  scheme: 'Color Palette',
+  tile: 'Tile Style',
+};
 
 // Per-type accent for item cards
 const typeAccent = (item) => {
@@ -39,6 +57,34 @@ const typeAccent = (item) => {
   if (item.type === 'scheme') return '#1565C0';
   return '#C44B00';
 };
+
+// ── Parity point coin ─────────────────────────────────────────────────────────
+// One drawn coin everywhere a price or a balance appears, so PP reads as a
+// currency rather than two letters of body copy.
+// `ink` is the P and the inner ring: on a coloured button or badge the coin
+// itself goes light and the ink takes the surface's colour, otherwise a white
+// coin would strike white and read as a blank dot.
+const PPCoin = ({ size = 13, color = ACCENT, ink = '#fff' }) => (
+  <svg width={size} height={size} viewBox="0 0 16 16" style={{ display: 'block', flexShrink: 0 }} aria-hidden="true">
+    <circle cx="8" cy="8" r="7" fill={color} />
+    <circle cx="8" cy="8" r="5.2" fill="none" stroke={ink} strokeOpacity="0.45" strokeWidth="0.9" />
+    <path d="M6.5 11.2 V4.9 h2.2 a1.75 1.75 0 0 1 0 3.5 H6.5"
+      fill="none" stroke={ink} strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const LockIcon = ({ size = 11, color = PAPER_TEXT_FAINT }) => (
+  <svg width={size} height={size} viewBox="0 0 16 16" style={{ display: 'block', flexShrink: 0 }} aria-hidden="true">
+    <path d="M5 7V5a3 3 0 0 1 6 0v2" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
+    <rect x="3.2" y="7" width="9.6" height="7" rx="2" fill={color} />
+  </svg>
+);
+
+const CheckIcon = ({ size = 10, color = '#fff' }) => (
+  <svg width={size} height={size * 0.8} viewBox="0 0 10 8" fill="none" style={{ display: 'block' }} aria-hidden="true">
+    <path d="M1 4L3.5 6.5L9 1" stroke={color} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
 
 // ── Tile preview canvas ───────────────────────────────────────────────────────
 function TilePreviewCanvas({ styleKey, size = 44 }) {
@@ -59,222 +105,158 @@ function TilePreviewCanvas({ styleKey, size = 44 }) {
   return <canvas ref={canvasRef} width={size} height={size} style={{ borderRadius: 6, display: 'block' }} />;
 }
 
-// ── Worm body preview ─────────────────────────────────────────────────────────
-const WormBody = ({ skin, size = 46 }) => (
-  <svg width={size} height={size} viewBox="0 0 48 48">
-    <circle cx="35" cy="14" r="16" fill={skin.glow} opacity="0.18" />
-    <path d="M 9 41 Q 18 32 27 24 Q 31 19 35 14"
-      stroke={skin.body} strokeWidth="10" strokeLinecap="round" fill="none" opacity="0.45" />
-    <circle cx="9" cy="41" r="5" fill={skin.belly} opacity="0.8" />
-    <circle cx="18" cy="33" r="7.5" fill={skin.body} />
-    <ellipse cx="18" cy="35.5" rx="4" ry="2.8" fill={skin.belly} opacity="0.55" />
-    <circle cx="27" cy="24" r="9.5" fill={skin.body} />
-    <ellipse cx="27" cy="26.5" rx="5.5" ry="3.8" fill={skin.belly} opacity="0.55" />
-    <circle cx="35" cy="14" r="12" fill={skin.body} />
-    <ellipse cx="35" cy="17.5" rx="7.5" ry="5" fill={skin.belly} opacity="0.6" />
-    <circle cx="30.5" cy="10" r="3.1" fill="white" opacity="0.95" />
-    <circle cx="39" cy="9" r="3.1" fill="white" opacity="0.95" />
-    <circle cx="31.5" cy="10.5" r="1.7" fill="#0d0d1a" />
-    <circle cx="40" cy="9.5" r="1.7" fill="#0d0d1a" />
-    <circle cx="30.8" cy="9.2" r="0.85" fill="white" />
-    <circle cx="39.3" cy="8.2" r="0.85" fill="white" />
-    <path d="M 29.5 17 Q 35 22.5 40.5 17"
-      stroke="#0d0d1a" strokeWidth="1.5" fill="none" strokeLinecap="round" opacity="0.3" />
-  </svg>
-);
-
-// ── Hat icon ──────────────────────────────────────────────────────────────────
-const HatIcon = ({ hatId, color = PAPER_TEXT_FAINT, size = 30 }) => {
-  if (hatId === 'none') return (
-    <svg width={size} height={size} viewBox="0 0 32 32">
-      <circle cx="16" cy="16" r="12" stroke={color} strokeWidth="1.5" fill="none" strokeDasharray="4 3" opacity="0.5" />
-      <line x1="10" y1="10" x2="22" y2="22" stroke={color} strokeWidth="1.5" opacity="0.4" />
-    </svg>
-  );
-  if (hatId === 'tophat') return (
-    <svg width={size} height={size} viewBox="0 0 32 32">
-      <rect x="8" y="8" width="16" height="14" rx="1" fill={color} />
-      <rect x="4" y="21" width="24" height="4" rx="2" fill={color} />
-      <rect x="10" y="10" width="12" height="10" rx="1" fill="rgba(0,0,0,0.18)" />
-    </svg>
-  );
-  if (hatId === 'party') return (
-    <svg width={size} height={size} viewBox="0 0 32 32">
-      <polygon points="16,4 6,26 26,26" fill={color} />
-      <circle cx="9" cy="20" r="1.5" fill="#f59e0b" />
-      <circle cx="20" cy="15" r="1.5" fill="#ec4899" />
-      <circle cx="14" cy="22" r="1.5" fill="#06b6d4" />
-    </svg>
-  );
-  if (hatId === 'crown') return (
-    <svg width={size} height={size} viewBox="0 0 32 32">
-      <polygon points="4,22 4,12 10,18 16,8 22,18 28,12 28,22" fill={color} />
-      <rect x="4" y="22" width="24" height="4" rx="1" fill={color} />
-      <circle cx="16" cy="9" r="2" fill="#f59e0b" />
-    </svg>
-  );
-  if (hatId === 'halo') return (
-    <svg width={size} height={size} viewBox="0 0 32 32">
-      <ellipse cx="16" cy="13" rx="12" ry="4" fill="none" stroke={color} strokeWidth="2.5" />
-      <ellipse cx="16" cy="13" rx="12" ry="4" fill={color} opacity="0.15" />
-    </svg>
-  );
-  if (hatId === 'beanie') return (
-    <svg width={size} height={size} viewBox="0 0 32 32">
-      <path d="M 6 20 Q 16 2 26 20 Z" fill={color} />
-      <rect x="4" y="19" width="24" height="5" rx="2.5" fill={color} />
-      <rect x="4" y="19" width="24" height="5" rx="2.5" fill="rgba(0,0,0,0.18)" />
-      <circle cx="16" cy="4.5" r="2.6" fill={color} />
-    </svg>
-  );
-  if (hatId === 'wizard') return (
-    <svg width={size} height={size} viewBox="0 0 32 32">
-      <ellipse cx="16" cy="25" rx="12" ry="3" fill={color} />
-      <polygon points="16,3 8,25 24,25" fill={color} />
-      <circle cx="15" cy="17" r="1.6" fill="#fde68a" />
-      <circle cx="18" cy="11" r="1.2" fill="#fde68a" />
-    </svg>
-  );
-  if (hatId === 'flower') return (
-    <svg width={size} height={size} viewBox="0 0 32 32">
-      <line x1="16" y1="28" x2="16" y2="15" stroke={color} strokeWidth="2.5" strokeLinecap="round" />
-      {[0, 1, 2, 3, 4, 5].map(i => {
-        const a = (i / 6) * Math.PI * 2;
-        return <circle key={i} cx={16 + Math.cos(a) * 6} cy={13 + Math.sin(a) * 6} r="3.5" fill={color} />;
-      })}
-      <circle cx="16" cy="13" r="3.5" fill="#facc15" />
-    </svg>
-  );
-  if (hatId === 'grad') return (
-    <svg width={size} height={size} viewBox="0 0 32 32">
-      <path d="M 9 13 L 9 20 Q 16 24 23 20 L 23 13 Z" fill={color} />
-      <polygon points="16,6 29,12 16,18 3,12" fill={color} />
-      <line x1="26" y1="12" x2="26" y2="22" stroke="#fbbf24" strokeWidth="1.5" />
-      <circle cx="26" cy="23" r="2" fill="#fbbf24" />
-    </svg>
-  );
-  return null;
-};
-
 // ── Scheme preview tiles ──────────────────────────────────────────────────────
-const SchemeDots = ({ schemeKey }) => {
+const SchemeDots = ({ schemeKey, gap = '3px', radius = '3px' }) => {
   const colors = Object.values(COLOR_SCHEMES[schemeKey] || COLOR_SCHEMES.standard);
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '3px', width: '100%' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap, width: '100%' }}>
       {colors.slice(0, 6).map((c, i) => (
         <div key={i} style={{
-          aspectRatio: '1', borderRadius: '3px',
+          aspectRatio: '1', borderRadius: radius,
           background: c,
-          boxShadow: `0 1px 3px rgba(0,0,0,0.20)`,
+          boxShadow: '0 1px 3px rgba(0,0,0,0.20)',
         }} />
       ))}
     </div>
   );
 };
 
-// ── Lock badge ────────────────────────────────────────────────────────────────
-const LockBadge = () => (
-  <span style={{ position: 'absolute', top: 5, right: 5, fontSize: '9px', lineHeight: 1 }}>🔒</span>
+// ── Item artwork ──────────────────────────────────────────────────────────────
+// One renderer for both the grid card and the big preview, so an item is drawn
+// the same way at both sizes.
+const ItemArt = ({ item, size, characterId, skinId }) => {
+  // Skins and hats are drawn by the game's own worm renderer, so what you buy
+  // is what crawls: same clearcoat beads, same 3D hat, same face.
+  if (item.type === 'skin') return (
+    <WormPreviewCanvas characterId={characterId} skinId={item.skinId} size={size} />
+  );
+  if (item.type === 'hat') return (
+    <WormPreviewCanvas characterId={characterId} skinId={skinId} hatId={item.hatId} size={size} framing="head" />
+  );
+  if (item.type === 'scheme') return (
+    <div style={{ width: size * 0.92 }}>
+      <SchemeDots schemeKey={item.schemeKey} gap={size > 70 ? '6px' : '3px'} radius={size > 70 ? '5px' : '3px'} />
+    </div>
+  );
+  return <TilePreviewCanvas styleKey={item.tileKey} size={Math.round(size * 0.92)} />;
+};
+
+// ── Recessed specimen well ────────────────────────────────────────────────────
+// Item art always sits in the same inset frame — on the card and in the modal —
+// which is what makes a grid of very different artwork (worms, hats, colour
+// swatches, rendered tiles) read as one collection.
+const SpecimenWell = ({ children, height, locked, style }) => (
+  <div style={{
+    width: '100%', height,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    background: PAPER_SHEET_RAISED,
+    borderRadius: '10px',
+    border: `1px solid ${PAPER_BORDER_SOFT}`,
+    boxShadow: 'inset 0 1px 3px rgba(83,72,56,0.10)',
+    overflow: 'hidden',
+    filter: locked ? 'saturate(0.72)' : 'none',
+    opacity: locked ? 0.86 : 1,
+    transition: 'filter 0.2s ease, opacity 0.2s ease',
+    ...style,
+  }}>
+    {children}
+  </div>
 );
 
 // ── Purchase / preview modal ──────────────────────────────────────────────────
-const PreviewModal = ({ item, owned, pp, onClose, onBuy, onEquip }) => {
+const PreviewModal = ({ item, owned, pp, characterId, skinId, onClose, onBuy, onEquip }) => {
   const ac = typeAccent(item);
   const canAfford = pp >= item.price;
+
+  const actionStyle = {
+    ...TOUCH, width: '100%', padding: '14px', borderRadius: '12px',
+    background: ac, border: 'none',
+    color: '#fff', fontSize: '14px', fontWeight: 800, letterSpacing: '0.04em',
+    cursor: 'pointer', fontFamily: FONT,
+    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+    boxShadow: `0 4px 0 ${ac}aa, 0 6px 16px ${ac}44`,
+  };
 
   return (
     <div
       style={{
         position: 'fixed', inset: 0, zIndex: 100000,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px',
         background: PAPER_BACKDROP,
         backdropFilter: PAPER_BACKDROP_BLUR, WebkitBackdropFilter: PAPER_BACKDROP_BLUR,
+        animation: 'modalBackdropIn 0.22s ease',
       }}
       onClick={onClose}
     >
       <div
         style={{
-          background: PAPER_SHEET, border: `1px solid ${PAPER_BORDER}`,
-          borderRadius: '20px', padding: '28px 24px 22px',
-          width: 'min(300px, calc(100vw - 40px))',
+          ...wizardPaperBackground,
+          border: '1px solid #cec8be',
+          borderTop: `3px solid ${ac}`,
+          borderRadius: '20px', padding: '24px 22px 20px',
+          width: 'min(320px, 100%)',
           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px',
           boxShadow: PAPER_SHADOW,
           fontFamily: FONT,
+          animation: 'modalSheetIn 0.30s cubic-bezier(0.22, 1, 0.36, 1)',
         }}
         onClick={e => e.stopPropagation()}
       >
-        {/* Large preview */}
+        {/* Type eyebrow */}
         <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '130px',
-          background: PAPER_SHEET_RAISED, borderRadius: '14px', border: `1.5px solid ${PAPER_BORDER_SOFT}`,
-          width: '100%', boxShadow: `0 3px 0 ${PAPER_CARD_SHADOW}`,
+          alignSelf: 'stretch', display: 'flex', alignItems: 'center', gap: '8px',
+          fontSize: '9px', fontWeight: 800, letterSpacing: '0.18em', textTransform: 'uppercase',
+          color: ac,
         }}>
-          {item.type === 'skin' && <WormBody skin={item} size={120} />}
-          {item.type === 'hat' && (
-            <div style={{ width: 120, height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <HatIcon hatId={item.hatId} color={ac} size={80} />
-            </div>
-          )}
-          {item.type === 'scheme' && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', width: '150px', padding: '12px' }}>
-              {Object.values(COLOR_SCHEMES[item.schemeKey] || COLOR_SCHEMES.standard).slice(0, 6).map((c, i) => (
-                <div key={i} style={{ aspectRatio: '1', borderRadius: '6px', background: c, boxShadow: `0 2px 6px ${c}44` }} />
-              ))}
-            </div>
-          )}
-          {item.type === 'tile' && (
-            <div style={{ padding: '20px' }}>
-              <TilePreviewCanvas styleKey={item.tileKey} size={90} />
-            </div>
+          {TYPE_LABEL[item.type]}
+          <div style={{ flex: 1, height: '1px', background: `${ac}33` }} />
+          {owned && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: ac }}>
+              <CheckIcon size={9} color={ac} /> Owned
+            </span>
           )}
         </div>
 
-        {/* Name + type */}
+        {/* Large specimen */}
+        <SpecimenWell height="150px">
+          <ItemArt item={item} size={124} characterId={characterId} skinId={skinId} />
+        </SpecimenWell>
+
+        {/* Name plate */}
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '18px', fontWeight: 800, color: PAPER_TEXT, letterSpacing: '-0.03em' }}>{item.label}</div>
-          <div style={{ fontSize: '11px', color: PAPER_TEXT_FAINT, marginTop: '3px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-            {item.type === 'skin' ? 'Worm Skin' : item.type === 'hat' ? 'Hat' : item.type === 'scheme' ? 'Color Palette' : 'Tile Style'}
-          </div>
+          <div style={{ fontSize: '19px', fontWeight: 800, color: PAPER_TEXT, letterSpacing: '-0.03em' }}>{item.label}</div>
         </div>
 
         {/* Action */}
         {owned ? (
-          <button
-            style={{
-              ...TOUCH, width: '100%', padding: '13px', borderRadius: '10px',
-              background: ac, border: 'none',
-              color: '#fff', fontSize: '14px', fontWeight: 700,
-              cursor: 'pointer', fontFamily: FONT,
-              boxShadow: `0 3px 0 ${ac}99, 0 4px 12px ${ac}44`,
-            }}
-            onClick={onEquip}
-          >Equip</button>
+          <button style={actionStyle} onClick={onEquip}>Equip</button>
         ) : (
           <>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px' }}>
-              <span style={{ fontSize: '24px', fontWeight: 900, color: canAfford ? ac : PAPER_CARD_SHADOW, fontFamily: FONT }}>{item.price}</span>
-              <span style={{ fontSize: '14px', fontWeight: 700, color: canAfford ? ac : PAPER_CARD_SHADOW, fontFamily: FONT }}>PP</span>
-              <span style={{ fontSize: '11px', color: PAPER_TEXT_FAINT, marginLeft: '4px' }}>you have {pp}</span>
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px',
+              padding: '9px 16px', borderRadius: '999px',
+              background: canAfford ? `${ac}12` : PAPER_BG_MUTED,
+              border: `1.5px solid ${canAfford ? `${ac}44` : PAPER_BORDER_SOFT}`,
+            }}>
+              <PPCoin size={16} color={canAfford ? ac : PAPER_TEXT_FAINT} />
+              <span style={{ fontSize: '22px', fontWeight: 900, color: canAfford ? ac : PAPER_TEXT_FAINT, letterSpacing: '-0.03em', lineHeight: 1 }}>
+                {item.price}
+              </span>
+              <span style={{ fontSize: '11px', color: PAPER_TEXT_FAINT, fontWeight: 600 }}>· you have {pp}</span>
             </div>
             {canAfford ? (
-              <button
-                style={{
-                  ...TOUCH, width: '100%', padding: '13px', borderRadius: '10px',
-                  background: ac, border: 'none',
-                  color: '#fff', fontSize: '14px', fontWeight: 700,
-                  cursor: 'pointer', fontFamily: FONT,
-                  boxShadow: `0 3px 0 ${ac}99, 0 4px 12px ${ac}44`,
-                }}
-                onClick={onBuy}
-              >Buy — {item.price} PP</button>
+              <button style={actionStyle} onClick={onBuy}>
+                <PPCoin size={15} color={UI_CREAM} ink={ac} /> Unlock for {item.price}
+              </button>
             ) : (
               <div style={{
-                width: '100%', padding: '12px', borderRadius: '10px', textAlign: 'center',
-                background: PAPER_SHEET_RAISED, border: `1.5px solid ${PAPER_BORDER_SOFT}`,
-                color: PAPER_TEXT_FAINT, fontSize: '12px', fontWeight: 600, fontFamily: FONT,
-                boxShadow: `0 2px 0 ${PAPER_CARD_SHADOW}`,
+                width: '100%', padding: '13px', borderRadius: '12px', textAlign: 'center',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px',
+                background: 'rgba(255,255,255,0.5)', border: `1.5px dashed ${PAPER_BORDER_SOFT}`,
+                color: PAPER_TEXT_MUTED, fontSize: '12px', fontWeight: 600, fontFamily: FONT,
               }}>
-                Need {item.price - pp} more PP to unlock
+                <LockIcon size={12} color={PAPER_TEXT_MUTED} />
+                {item.price - pp} more PP to unlock
               </div>
             )}
           </>
@@ -283,91 +265,92 @@ const PreviewModal = ({ item, owned, pp, onClose, onBuy, onEquip }) => {
         <button
           style={{
             ...TOUCH, width: '100%', padding: '10px', borderRadius: '10px',
-            background: PAPER_BG_MUTED, border: `1.5px solid ${PAPER_BORDER_SOFT}`,
+            background: 'transparent', border: `1.5px solid ${PAPER_BORDER_SOFT}`,
             color: PAPER_TEXT_MUTED, fontSize: '13px', fontWeight: 600,
-            cursor: 'pointer', fontFamily: FONT, boxShadow: `0 2px 0 ${PAPER_CARD_SHADOW}`,
+            cursor: 'pointer', fontFamily: FONT,
           }}
           onClick={onClose}
-        >Cancel</button>
+        >Close</button>
       </div>
     </div>
   );
 };
 
 // ── Item card ─────────────────────────────────────────────────────────────────
-const ItemCard = ({ item, owned, equipped, pp, onPreview, onEquip }) => {
+const ItemCard = ({ item, owned, equipped, pp, index, characterId, skinId, onPreview, onEquip }) => {
   const ac = typeAccent(item);
   const canAfford = pp >= item.price;
   const locked = !owned;
 
   return (
     <div
+      className={`store-card store-card-enter${equipped ? ' is-equipped' : ''}`}
       onClick={owned ? onEquip : onPreview}
       style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '7px',
-        padding: '12px 8px 10px',
-        background: equipped ? `${ac}10` : PAPER_SHEET_RAISED,
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
+        padding: '10px 9px 9px',
+        background: equipped ? `${ac}12` : 'rgba(255,255,255,0.72)',
         border: equipped ? `2px solid ${ac}` : `2px solid ${PAPER_BORDER_SOFT}`,
-        borderRadius: '12px', cursor: 'pointer', position: 'relative',
+        borderRadius: '14px', cursor: 'pointer', position: 'relative',
         boxShadow: equipped
-          ? 'inset 0 2px 4px rgba(0,0,0,0.08)'
-          : `0 3px 0 ${PAPER_CARD_SHADOW}, 0 4px 8px rgba(0,0,0,0.06)`,
+          ? `inset 0 2px 5px rgba(83,72,56,0.13)`
+          : `0 3px 0 ${PAPER_CARD_SHADOW}, 0 5px 12px rgba(83,72,56,0.10)`,
         transform: equipped ? 'translateY(1px)' : 'none',
-        opacity: locked && !canAfford ? 0.6 : 1,
-        transition: 'all 0.15s ease',
         fontFamily: FONT,
+        animationDelay: `${Math.min(index, 14) * 22}ms`,
         ...TOUCH,
       }}
     >
-      {/* Equipped badge */}
-      {equipped && (
+      {/* Corner state marker */}
+      {equipped ? (
         <span style={{
-          position: 'absolute', top: 5, right: 5,
-          fontSize: '7px', fontWeight: 800, letterSpacing: '0.08em',
+          position: 'absolute', top: -7, right: -5, zIndex: 2,
+          display: 'flex', alignItems: 'center', gap: '3px',
+          fontSize: '7px', fontWeight: 900, letterSpacing: '0.1em',
           color: '#fff', background: ac,
-          borderRadius: '4px', padding: '2px 5px', fontFamily: FONT,
-          boxShadow: `0 1px 0 ${ac}99`,
-        }}>ON</span>
-      )}
-      {locked && <LockBadge />}
+          borderRadius: '999px', padding: '3px 7px', fontFamily: FONT,
+          boxShadow: `0 2px 5px ${ac}66`,
+        }}><CheckIcon size={7} /> ON</span>
+      ) : locked ? (
+        <span style={{
+          position: 'absolute', top: 6, right: 6, zIndex: 2,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          width: 18, height: 18, borderRadius: '50%',
+          background: 'rgba(255,255,255,0.9)',
+          boxShadow: `0 1px 3px rgba(83,72,56,0.22)`,
+        }}><LockIcon size={10} color={canAfford ? ac : PAPER_TEXT_FAINT} /></span>
+      ) : null}
 
-      {/* Preview */}
-      <div style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', opacity: locked ? 0.65 : 1 }}>
-        {item.type === 'skin' && <WormBody skin={item} size={46} />}
-        {item.type === 'hat' && (
-          <div style={{ width: 46, height: 46, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <HatIcon hatId={item.hatId} color={equipped ? ac : PAPER_TEXT_FAINT} size={30} />
-          </div>
-        )}
-        {item.type === 'scheme' && (
-          <div style={{ width: '100%', padding: '0 2px' }}>
-            <SchemeDots schemeKey={item.schemeKey} />
-          </div>
-        )}
-        {item.type === 'tile' && <TilePreviewCanvas styleKey={item.tileKey} size={44} />}
-      </div>
+      <SpecimenWell height="56px" locked={locked}>
+        <ItemArt item={item} size={52} characterId={characterId} skinId={skinId} />
+      </SpecimenWell>
 
       {/* Label */}
       <span style={{
-        fontSize: item.type === 'tile' ? '9px' : '10px',
-        fontWeight: 700, letterSpacing: '0.03em',
+        fontSize: '10px',
+        fontWeight: 700, letterSpacing: '0.01em',
         color: equipped ? PAPER_TEXT : PAPER_TEXT_MUTED,
         fontFamily: FONT, textAlign: 'center', lineHeight: 1.2,
       }}>{item.label}</span>
 
       {/* Price / status */}
       {owned ? (
-        <span style={{ fontSize: '9px', fontWeight: 600, color: equipped ? ac : PAPER_TEXT_FAINT, fontFamily: FONT }}>
-          {equipped ? 'Active' : 'Tap to equip'}
+        <span style={{
+          marginTop: 'auto',
+          fontSize: '9px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
+          color: equipped ? ac : PAPER_TEXT_FAINT, fontFamily: FONT,
+        }}>
+          {equipped ? 'Equipped' : 'Tap to equip'}
         </span>
       ) : (
         <div style={{
-          display: 'flex', alignItems: 'baseline', gap: '2px',
-          padding: '2px 7px', borderRadius: '6px',
-          background: canAfford ? `${ac}14` : PAPER_BG_MUTED,
-          border: `1px solid ${canAfford ? ac + '44' : PAPER_BORDER_SOFT}`,
+          marginTop: 'auto',
+          display: 'flex', alignItems: 'center', gap: '4px',
+          padding: '3px 8px', borderRadius: '999px',
+          background: canAfford ? `${ac}14` : 'rgba(255,255,255,0.6)',
+          border: `1px solid ${canAfford ? `${ac}44` : PAPER_BORDER_SOFT}`,
         }}>
-          <span style={{ fontSize: '9px', fontWeight: 700, color: canAfford ? ac : PAPER_TEXT_FAINT, fontFamily: FONT }}>PP</span>
+          <PPCoin size={10} color={canAfford ? ac : PAPER_TEXT_FAINT} />
           <span style={{ fontSize: '11px', fontWeight: 800, color: canAfford ? ac : PAPER_TEXT_FAINT, fontFamily: FONT }}>{item.price}</span>
         </div>
       )}
@@ -377,12 +360,17 @@ const ItemCard = ({ item, owned, equipped, pp, onPreview, onEquip }) => {
 
 // ── Tile category section ─────────────────────────────────────────────────────
 const TileSection = ({ label, items, renderItems }) => items.length === 0 ? null : (
-  <div style={{ marginBottom: '20px' }}>
+  <div style={{ marginBottom: '22px' }}>
     <div style={{
-      fontSize: '10px', fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase',
-      color: PAPER_TEXT_FAINT, fontFamily: FONT, marginBottom: '8px', paddingBottom: '6px',
-      borderBottom: '1px solid #e8e2d8',
-    }}>{label}</div>
+      display: 'flex', alignItems: 'center', gap: '10px',
+      marginBottom: '10px',
+    }}>
+      <span style={{
+        fontSize: '10px', fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase',
+        color: PAPER_TEXT_MUTED, fontFamily: FONT, whiteSpace: 'nowrap',
+      }}>{label}</span>
+      <div style={{ flex: 1, height: '1px', background: PAPER_BORDER_SOFT }} />
+    </div>
     {renderItems(items)}
   </div>
 );
@@ -402,12 +390,13 @@ const TILE_SECTIONS = TILE_STYLE_SECTIONS.map(section => ({
 const ParityStoreScreen = ({ onClose }) => {
   const [tab, setTab] = useState('skins');
 
-  const { parityPoints, ownedItems, wormSkin, wormHat, buyItem, setWormSkin, setWormHat } =
+  const { parityPoints, ownedItems, wormSkin, wormHat, wormCharacter, buyItem, setWormSkin, setWormHat } =
     useGameStore(useShallow(s => ({
       parityPoints: s.parityPoints,
       ownedItems: s.ownedItems,
       wormSkin: s.wormSkin,
       wormHat: s.wormHat,
+      wormCharacter: s.wormCharacter,
       buyItem: s.buyItem,
       setWormSkin: s.setWormSkin,
       setWormHat: s.setWormHat,
@@ -456,17 +445,29 @@ const ParityStoreScreen = ({ onClose }) => {
     return false;
   };
 
+  // Collection progress — the whole catalog, and per-tab for the tab chips.
+  const ownedCount = useMemo(
+    () => ALL_ITEMS.filter(i => ownedItems.includes(i.id)).length,
+    [ownedItems]
+  );
+  const tabOwned = useMemo(
+    () => Object.fromEntries(TABS.map(t => [t.id, t.items.filter(i => ownedItems.includes(i.id)).length])),
+    [ownedItems]
+  );
+  const collectedPct = Math.round((ownedCount / ALL_ITEMS.length) * 100);
+
   const renderItems = (items) => (
     <div style={{
       display: 'grid',
-      gridTemplateColumns: `repeat(auto-fill, minmax(${tab === 'tiles' ? '88px' : '100px'}, 1fr))`,
-      gap: '8px',
+      gridTemplateColumns: `repeat(auto-fill, minmax(${tab === 'tiles' ? '92px' : '104px'}, 1fr))`,
+      gap: '10px',
     }}>
-      {items.map(item => {
+      {items.map((item, i) => {
         const owned = ownedItems.includes(item.id);
         return (
           <ItemCard
-            key={item.id} item={item}
+            key={item.id} item={item} index={i}
+            characterId={wormCharacter} skinId={wormSkin}
             owned={owned} equipped={isEquipped(item)} pp={parityPoints}
             onPreview={() => setPreviewItem(item)}
             onEquip={() => { equip(item); showToast(`${item.label} applied`); }}
@@ -476,59 +477,88 @@ const ParityStoreScreen = ({ onClose }) => {
     </div>
   );
 
-  const activeTabAccent = TABS.find(t => t.id === tab)?.accent || ACCENT;
+  const activeTab = TABS.find(t => t.id === tab) || TABS[0];
+  const activeTabAccent = activeTab.accent;
 
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 99999,
       display: 'flex', flexDirection: 'column',
-      background: PAPER_SHEET,
+      ...wizardPaperBackground,
       fontFamily: FONT,
       pointerEvents: 'auto',
     }}>
 
       {/* Header */}
       <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '20px 20px 0', flexShrink: 0,
+        ...COLUMN,
+        display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px',
+        padding: '18px 20px 0', flexShrink: 0,
       }}>
-        <div>
+        <div style={{ minWidth: 0 }}>
           <div style={{
             display: 'inline-flex', alignItems: 'center', gap: '6px',
-            background: ACCENT, borderRadius: '6px', padding: '4px 12px',
-            marginBottom: '8px', boxShadow: `0 2px 0 ${ACCENT_SHADOW}`,
+            background: ACCENT, borderRadius: '6px', padding: '4px 11px',
+            marginBottom: '9px', boxShadow: `0 2px 0 ${ACCENT_SHADOW}`,
           }}>
-            <span style={{ fontSize: '11px' }}>🪙</span>
-            <span style={{ fontSize: '11px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#fff' }}>Parity Store</span>
+            <PPCoin size={12} color={UI_CREAM} ink={ACCENT} />
+            <span style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#fff' }}>Parity Store</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-            <span style={{ fontSize: '28px', fontWeight: 900, color: PAPER_TEXT, letterSpacing: '-0.04em', lineHeight: 1 }}>Your Collection</span>
+          <div style={{
+            fontFamily: DISPLAY_FONT,
+            fontSize: 'clamp(19px, 5.4vw, 26px)',
+            color: PAPER_TEXT, letterSpacing: '0.01em', lineHeight: 1,
+            textShadow: `0 2px 0 rgba(255,255,255,0.7)`,
+          }}>YOUR COLLECTION</div>
+
+          {/* Collection progress */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '9px', marginTop: '9px', maxWidth: '260px' }}>
+            <div style={{
+              flex: 1, height: '5px', borderRadius: '999px',
+              background: 'rgba(255,255,255,0.66)',
+              border: `1px solid ${PAPER_BORDER_SOFT}`, overflow: 'hidden',
+            }}>
+              <div style={{
+                width: `${collectedPct}%`, height: '100%',
+                background: `linear-gradient(90deg, ${ACCENT}, ${activeTabAccent})`,
+                borderRadius: '999px', transition: 'width 0.4s cubic-bezier(0.22,1,0.36,1), background 0.3s ease',
+              }} />
+            </div>
+            <span style={{ fontSize: '10px', fontWeight: 700, color: PAPER_TEXT_MUTED, whiteSpace: 'nowrap' }}>
+              {ownedCount}/{ALL_ITEMS.length} collected
+            </span>
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '9px', flexShrink: 0 }}>
           {/* PP balance */}
           <div style={{
-            padding: '8px 14px', borderRadius: '12px',
-            background: PAPER_SHEET_RAISED, border: `1.5px solid ${PAPER_BORDER_SOFT}`,
+            padding: '7px 13px', borderRadius: '12px',
+            background: 'rgba(255,255,255,0.82)', border: `1.5px solid ${PAPER_BORDER_SOFT}`,
             boxShadow: `0 3px 0 ${PAPER_CARD_SHADOW}`,
             textAlign: 'right',
           }}>
-            <div style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: PAPER_TEXT_FAINT }}>Balance</div>
-            <div style={{ fontSize: '20px', fontWeight: 900, color: ACCENT, letterSpacing: '-0.03em' }}>
-              {parityPoints} <span style={{ fontSize: '12px', fontWeight: 700, color: PAPER_TEXT_FAINT }}>PP</span>
+            <div style={{ fontSize: '8px', fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase', color: PAPER_TEXT_FAINT }}>Balance</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '2px' }}>
+              <PPCoin size={14} />
+              <span style={{ fontSize: '19px', fontWeight: 900, color: ACCENT, letterSpacing: '-0.03em', lineHeight: 1 }}>
+                {parityPoints}
+              </span>
+              <span style={{ fontSize: '10px', fontWeight: 800, color: PAPER_TEXT_FAINT }}>PP</span>
             </div>
           </div>
 
           {/* Close */}
           <button
+            className="store-icon-btn"
             onPointerDown={onClose}
+            aria-label="Close store"
             style={{
               ...TOUCH, width: 40, height: 40, borderRadius: '12px',
-              background: PAPER_SHEET_RAISED, border: `1.5px solid ${PAPER_BORDER_SOFT}`,
+              background: 'rgba(255,255,255,0.82)', border: `1.5px solid ${PAPER_BORDER_SOFT}`,
               color: PAPER_TEXT_MUTED, cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: `0 2px 0 ${PAPER_CARD_SHADOW}`, fontFamily: FONT,
+              boxShadow: `0 3px 0 ${PAPER_CARD_SHADOW}`, fontFamily: FONT,
             }}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
@@ -539,65 +569,90 @@ const ParityStoreScreen = ({ onClose }) => {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '6px', padding: '16px 20px 0', flexShrink: 0, overflowX: 'auto' }}>
+      <div style={{ ...COLUMN, display: 'flex', gap: '7px', padding: '16px 20px 2px', flexShrink: 0, overflowX: 'auto', scrollbarWidth: 'none' }}>
         {TABS.map(t => {
           const active = tab === t.id;
+          const total = t.items.length;
           return (
             <button
               key={t.id}
+              className={`store-tab${active ? ' is-active' : ''}`}
               onPointerDown={() => setTab(t.id)}
               style={{
                 ...TOUCH,
-                padding: '8px 18px', borderRadius: '10px', cursor: 'pointer',
-                background: active ? PAPER_SHEET_RAISED : 'transparent',
+                display: 'flex', alignItems: 'center', gap: '7px',
+                padding: '8px 14px', borderRadius: '999px', cursor: 'pointer',
+                background: active ? t.accent : 'rgba(255,255,255,0.72)',
                 border: active ? `2px solid ${t.accent}` : `2px solid ${PAPER_BORDER_SOFT}`,
-                color: active ? t.accent : PAPER_TEXT_MUTED,
-                fontSize: '12px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
+                color: active ? '#fff' : PAPER_TEXT_MUTED,
+                fontSize: '12px', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase',
                 fontFamily: FONT, whiteSpace: 'nowrap',
-                boxShadow: active ? `inset 0 2px 4px rgba(0,0,0,0.06)` : `0 2px 0 ${PAPER_CARD_SHADOW}`,
-                transform: active ? 'translateY(1px)' : 'none',
-                transition: 'all 0.15s ease',
+                boxShadow: active ? `0 3px 0 ${t.accent}88, 0 5px 14px ${t.accent}44` : `0 2px 0 ${PAPER_CARD_SHADOW}`,
               }}
-            >{t.label}</button>
+            >
+              {t.label}
+              <span style={{
+                fontSize: '9px', fontWeight: 800, letterSpacing: '0.02em',
+                padding: '2px 6px', borderRadius: '999px',
+                background: active ? 'rgba(255,255,255,0.24)' : PAPER_BG_MUTED,
+                color: active ? '#fff' : PAPER_TEXT_FAINT,
+              }}>{tabOwned[t.id]}/{total}</span>
+            </button>
           );
         })}
       </div>
 
-      {/* Divider */}
-      <div style={{ margin: '14px 20px 0', borderTop: `1px solid ${PAPER_BORDER_SOFT}`, flexShrink: 0 }} />
-
       {/* Content */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '14px 20px 16px', scrollbarWidth: 'thin', scrollbarColor: `${PAPER_CARD_SHADOW} transparent` }}>
-        {tab === 'skins'   && renderItems(SKINS)}
-        {tab === 'hats'    && renderItems(HATS)}
-        {tab === 'schemes' && renderItems(SCHEMES)}
-        {tab === 'tiles' && TILE_SECTIONS.map(section => (
-          <TileSection key={section.label} label={section.label} items={section.items} renderItems={renderItems} />
-        ))}
+      <div style={{ flex: 1, overflowY: 'auto', scrollbarWidth: 'thin', scrollbarColor: `${PAPER_CARD_SHADOW} transparent` }}>
+        <div style={{ ...COLUMN, padding: '16px 20px 18px' }}>
+          {tab === 'skins'   && renderItems(SKINS)}
+          {tab === 'hats'    && renderItems(HATS)}
+          {tab === 'schemes' && renderItems(SCHEMES)}
+          {tab === 'tiles' && TILE_SECTIONS.map(section => (
+            <TileSection key={section.label} label={section.label} items={section.items} renderItems={renderItems} />
+          ))}
+        </div>
       </div>
 
-      {/* Footer hint */}
+      {/* Footer — Mobi's note on where PP comes from, in the same pencil hand the
+          setup wizards use. */}
       <div style={{
-        padding: '10px 20px 18px', textAlign: 'center',
+        padding: '11px 20px 16px',
         borderTop: `1px solid ${PAPER_BORDER_SOFT}`, flexShrink: 0,
-        background: PAPER_FOOTER_BG,
+        background: WIZARD_FOOTER_BG,
       }}>
-        <span style={{ fontSize: '11px', color: PAPER_TEXT_FAINT, fontFamily: FONT }}>
-          Earn PP by collecting orbs in Worm mode and winning Chaos bets
-        </span>
+        <div style={{
+          ...COLUMN,
+          display: 'flex', gap: '11px', alignItems: 'center',
+          padding: '9px 13px', borderRadius: '10px',
+          borderLeft: `3px solid ${ACCENT}`,
+          background: 'rgba(255,255,255,0.5)',
+          boxShadow: 'inset 0 0 0 1px rgba(91,72,45,0.08)',
+        }}>
+          <span style={{
+            fontSize: '9px', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase',
+            color: ACCENT, opacity: 0.85, flexShrink: 0,
+          }}>Earning PP</span>
+          <span style={{ fontFamily: HAND_FONT, fontSize: '17px', lineHeight: 1.25, color: PENCIL_LEAD }}>
+            Collect orbs in Worm mode and win Chaos bets.
+          </span>
+        </div>
       </div>
 
       {/* Toast */}
       {toast && (
-        <div style={{
-          position: 'fixed', bottom: '80px', left: '50%', transform: 'translateX(-50%)',
-          background: PAPER_SHEET, border: `1.5px solid ${toast.ok ? activeTabAccent : '#c44b00'}`,
-          borderRadius: '12px', padding: '10px 20px',
-          color: toast.ok ? activeTabAccent : '#c44b00',
+        <div className="store-toast" style={{
+          position: 'fixed', bottom: '92px', left: '50%',
+          display: 'flex', alignItems: 'center', gap: '8px',
+          background: toast.ok ? activeTabAccent : '#c44b00',
+          border: 'none',
+          borderRadius: '999px', padding: '11px 20px',
+          color: '#fff',
           fontSize: '13px', fontWeight: 700, fontFamily: FONT,
-          boxShadow: '0 4px 20px rgba(0,0,0,0.14)',
+          boxShadow: `0 6px 22px rgba(0,0,0,0.24)`,
           pointerEvents: 'none', zIndex: 900,
         }}>
+          {toast.ok ? <CheckIcon size={11} /> : <LockIcon size={12} color="#fff" />}
           {toast.msg}
         </div>
       )}
@@ -608,6 +663,7 @@ const ParityStoreScreen = ({ onClose }) => {
           item={previewItem}
           owned={ownedItems.includes(previewItem.id)}
           pp={parityPoints}
+          characterId={wormCharacter} skinId={wormSkin}
           onClose={() => setPreviewItem(null)}
           onBuy={() => { handleBuy(previewItem); setPreviewItem(null); }}
           onEquip={() => { equip(previewItem); showToast(`${previewItem.label} applied`); setPreviewItem(null); }}

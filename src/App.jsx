@@ -50,6 +50,7 @@ import IntroScene from './components/intro/IntroScene.jsx';
 import NebulaEnvironment from './3d/NebulaEnvironment.jsx';
 import InteractivePhotoBackground from './3d/InteractivePhotoBackground.jsx';
 import { setSharedRenderer, tickPreviews, hasActivePreviews } from './3d/TilePreviewRenderer.js';
+import { setWormSharedRenderer, tickWormPreviews, hasActiveWormPreviews } from './3d/WormPreviewRenderer.js';
 import { getBackgroundUrl, MENU_BACKGROUNDS } from './utils/backgrounds.js';
 
 // UI components
@@ -273,13 +274,19 @@ function MenuScene({ onCubeClick, background }) {
 
 /**
  * TilePreviewHost — lives inside the Canvas so it can inject the main R3F
- * renderer into TilePreviewRenderer, eliminating the need for a second WebGL
- * context (which causes context loss on mobile).
+ * renderer into the thumbnail renderers (tile styles and worms), eliminating
+ * the need for a second WebGL context (which causes context loss on mobile).
  */
 function TilePreviewHost() {
   const { gl } = useThree();
-  useEffect(() => { setSharedRenderer(gl); }, [gl]);
-  useFrame((_, delta) => { if (hasActivePreviews()) tickPreviews(delta); });
+  useEffect(() => {
+    setSharedRenderer(gl);
+    setWormSharedRenderer(gl);
+  }, [gl]);
+  useFrame((_, delta) => {
+    if (hasActivePreviews()) tickPreviews(delta);
+    if (hasActiveWormPreviews()) tickWormPreviews(delta);
+  });
   return null;
 }
 
@@ -1668,8 +1675,11 @@ export default function WORM3() {
         </Suspense>
       )}
 
-      {/* Parity Store — mounted at app root so it's above every overlay */}
-      <ScreenTransition show={showStore}>
+      {/* Parity Store — mounted at app root so it's above every overlay. The
+          z-index lives on the fading wrapper: its will-change traps the store's
+          own z-index inside a stacking context, which left the top app bar
+          (.ui-layer, z-index 100) covering the store's masthead. */}
+      <ScreenTransition show={showStore} style={{ position: 'relative', zIndex: 100000 }}>
         <Suspense fallback={null}>
           <ParityStoreScreen onClose={handleCloseStore} />
         </Suspense>

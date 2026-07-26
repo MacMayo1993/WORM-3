@@ -1,0 +1,104 @@
+/* ParityStoreScreen.css — motion and hover states for the Parity Store.
+   The store's colours stay inline with the rest of the screens (they depend on
+   per-item accents); only the things inline styles cannot express live here:
+   hover lift, press feedback, and the staggered entrance of the grid. */
+
+.store-card {
+  transition:
+    transform 0.16s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.16s ease,
+    border-color 0.16s ease;
+}
+
+/* Owned-but-unequipped and affordable cards lift; an equipped card is already
+   pressed into the paper, so it stays put. */
+@media (hover: hover) {
+  .store-card:not(.is-equipped):hover {
+    transform: translateY(-3px);
+  }
+}
+
+.store-card:not(.is-equipped):active {
+  transform: translateY(2px);
+}
+
+.store-tab {
+  transition:
+    transform 0.16s cubic-bezier(0.22, 1, 0.36, 1),
+    background 0.16s ease,
+    color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+@media (hover: hover) {
+  .store-tab:not(.is-active):hover {
+    transform: translateY(-2px);
+  }
+}
+
+.store-icon-btn {
+  transition: transform 0.14s ease, box-shadow 0.14s ease, color 0.14s ease;
+}
+
+@media (hover: hover) {
+  .store-icon-btn:hover {
+    transform: translateY(-2px);
+  }
+}
+
+.store-icon-btn:active {
+  transform: translateY(2px);
+}
+
+/* Grid entrance — cards fade up as a wave when a tab is opened. The delay is set
+   inline per card so it can follow the item's index in the grid. */
+@keyframes storeCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.store-card-enter {
+  animation: storeCardIn 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes storeToastIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 12px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+.store-toast {
+  animation: storeToastIn 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .store-card,
+  .store-tab,
+  .store-icon-btn {
+    transition: none;
+  }
+
+  .store-card-enter,
+  .store-toast {
+    animation: none;
+  }
+
+  .store-card:not(.is-equipped):hover,
+  .store-card:not(.is-equipped):active,
+  .store-tab:not(.is-active):hover,
+  .store-icon-btn:hover,
+  .store-icon-btn:active {
+    transform: none;
+  }
+}

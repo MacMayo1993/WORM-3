@@ -5,7 +5,12 @@ const DURATION = 180;
 // `freezeOnExit`: render a cached snapshot of the last shown children during the
 // exit fade. Use for surfaces whose props reset the moment they are dismissed
 // (TeachMode analysis, demo cards, etc.) so the fade-out never renders nulls.
-export default function ScreenTransition({ show, children, duration = DURATION, freezeOnExit = false }) {
+//
+// `style`: extra styles for the fading wrapper. The wrapper sets `will-change:
+// opacity`, which makes it a stacking context, so a fixed child's own z-index
+// only competes inside it — the wrapper needs the z-index for the screen to
+// clear sibling chrome like `.ui-layer`.
+export default function ScreenTransition({ show, children, duration = DURATION, freezeOnExit = false, style: styleOverride }) {
   const [mounted, setMounted] = useState(false);
   const [phase, setPhase] = useState('idle');
   const timerRef = useRef(null);
@@ -46,6 +51,7 @@ export default function ScreenTransition({ show, children, duration = DURATION, 
     transition: `opacity ${duration}ms ease`,
     opacity: phase === 'entered' ? 1 : 0,
     willChange: 'opacity',
+    ...styleOverride,
   };
 
   return <div style={style}>{freezeOnExit && !show ? frozenRef.current : children}</div>;
