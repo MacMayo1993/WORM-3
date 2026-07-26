@@ -11,6 +11,7 @@ import { makeCubies } from '../game/cubeState.js';
 import { DEFAULT_SETTINGS } from '../utils/colorSchemes.js';
 import { isMobile } from '../utils/device.js';
 import { DEFAULT_OWNED, ALL_ITEMS_OWNED } from '../utils/storeCatalog.js';
+import { UNLOCK_ALL } from '../utils/testUnlock.js';
 import { STARTING_BANKROLL } from '../utils/economyConstants.js';
 import { MODES } from '../utils/constants.js';
 
@@ -24,8 +25,9 @@ const WORM_CHARACTER_KEY = 'worm3_character';
 
 // Dev/preview builds get a padded wallet and a fully unlocked store so the
 // economy can be exercised without grinding. Production builds load the real
-// persisted wallet and purchases.
-const DEV_FREE_ECONOMY = !!import.meta.env?.DEV;
+// persisted wallet and purchases — unless this browser has opted in with
+// ?unlockall=1, which is how a deployed build gets tested on a real device.
+const DEV_FREE_ECONOMY = !!import.meta.env?.DEV || UNLOCK_ALL;
 
 const migrateSettings = (rawSettings, version) => {
   if (!rawSettings || typeof rawSettings !== 'object') return { ...DEFAULT_SETTINGS };

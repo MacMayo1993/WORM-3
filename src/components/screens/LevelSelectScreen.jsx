@@ -153,9 +153,12 @@ const LevelSelectScreen = ({ onSelectLevel, onBack, packId = 'story-campaign' })
           {LEVELS.map((level) => {
             // Pack-relative: a level is open when its declared prerequisite is
             // done. isLevelUnlocked walks the story campaign, so it reported
-            // every level of another pack as locked.
+            // every level of another pack as locked. testMode still has to be
+            // honoured here — it is the one switch that opens the campaign for
+            // dev builds and for ?unlockall=1, and computing the prerequisite
+            // inline skips the check that used to apply it.
             const prereq = level.requirements?.previousLevel ?? null;
-            const unlocked = prereq === null || completedLevels.includes(prereq);
+            const unlocked = progressManager.testMode || prereq === null || completedLevels.includes(prereq);
             const beaten = completedLevels.includes(level.id);
             const stat = levelStats[level.id];
             const stars = stat?.stars || 0;
