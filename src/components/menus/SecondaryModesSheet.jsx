@@ -27,7 +27,7 @@ const SecondaryModesSheet = ({
   // Core toggles
   chaosMode, chaosLevel, onToggleChaos, onSetChaosLevel, chaosLocked, maxChaosLevel,
   autoRotateEnabled, onToggleAutoRotate,
-  showTunnels, onToggleTunnels, tunnelsLocked,
+  showTunnels, tunnelDetail, onToggleTunnels, tunnelsLocked,
   // View toggles
   exploded, onToggleExplode, explodeLocked,
   showNetPanel, onToggleNet, netLocked,
@@ -80,7 +80,16 @@ const SecondaryModesSheet = ({
                 <SheetItem label="Explode" active={exploded} onClick={onToggleExplode} color="#FF9800" locked={explodeLocked} />
                 <SheetItem label="Net" active={showNetPanel} onClick={onToggleNet} color="#FF9800" locked={netLocked} />
                 <SheetItem label="Hollow" active={hollowMode} onClick={onToggleHollow} color="#ff9500" />
-                <SheetItem label="Tunnels" active={showTunnels} onClick={onToggleTunnels} color="#FF9800" locked={tunnelsLocked} />
+                {/* Three-state: Off → Hints (thin cords only) → Full (cords + live ribbons) → Off.
+                    "Hints" is the useful middle the old binary toggle lacked — showing every
+                    pair at full detail made most players turn tunnels off entirely. */}
+                <SheetItem
+                  label={showTunnels ? (tunnelDetail === 'full' ? 'Tunnels: Full' : 'Tunnels: Hints') : 'Tunnels'}
+                  active={showTunnels}
+                  onClick={onToggleTunnels}
+                  color="#FF9800"
+                  locked={tunnelsLocked}
+                />
                 <SheetItem label="Leaders" active={showLeaderboard} onClick={onToggleLeaderboard} color="#764ba2" />
               </div>
             </div>
