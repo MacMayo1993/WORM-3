@@ -157,6 +157,14 @@ export function createChaosSim({ cubies, size, chaosLevel, flipCap, explosionT =
       const st = state[loc.x][loc.y][loc.z].stickers[loc.dirKey];
       const currentFlips = st.flips || 0;
       if (currentFlips >= cap) return;
+      // Reaching the cap IS the death, and collectDeathAt refuses to log a death
+      // once the round is down to its last pair — so the flip that would get
+      // them there has to be refused too. Otherwise a chain that kills the
+      // second-to-last pair and then walks onto a survivor in the same tick
+      // leaves the winners sitting at the cap: alive in the ledger, dead by
+      // every other measure (the metrics scan, the tiles you can see). The
+      // round is over at this point; the survivors just haven't been told yet.
+      if (currentFlips + 1 >= cap && surfaceStickers - deadTileSet.size <= 2) return;
       st.curr = ANTIPODAL_COLOR[st.curr];
       st.flips = Math.min(cap, currentFlips + 1);
       if (emitOp) outFlips.push([loc.x, loc.y, loc.z, loc.dirKey]);

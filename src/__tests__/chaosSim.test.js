@@ -4,6 +4,47 @@ import { makeCubies } from '../game/cubeState.js';
 import { getManifoldGridId } from '../game/gridIds.js';
 import { ANTIPODAL_COLOR, FACE_COLORS } from '../utils/constants.js';
 
+// Deterministic PRNG, so a round that once exposed a race can be replayed
+// exactly rather than waited for. mulberry32 — small, seedable, good enough for
+// reproducing a sequence of chain decisions.
+const mulberry32 = (seed) => () => {
+  seed |= 0;
+  seed = (seed + 0x6d2b79f5) | 0;
+  let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+};
+
+// Play one round out with a seeded PRNG and report what survived, by both of
+// the definitions the sim has to keep in agreement: the death ledger's winner
+// list, and the tiles that are actually still below the flip cap.
+const seededRound = (seed, { flipCap = 2, level = 5, size = 3 } = {}) => {
+  const realRandom = Math.random;
+  Math.random = mulberry32(seed);
+  try {
+    const sim = createChaosSim({ cubies: makeCubies(size), size, chaosLevel: level, flipCap });
+    let terminal = null;
+    for (let i = 0; i < 4000 && !terminal; i++) {
+      const tick = sim.chainTick(250);
+      if (tick?.winner) terminal = tick;
+      sim.conwayTick();
+    }
+    const belowCap = [];
+    for (const layer of terminal?.finalState ?? []) {
+      for (const row of layer) {
+        for (const cubie of row) {
+          for (const sticker of Object.values(cubie.stickers)) {
+            if ((sticker.flips || 0) < flipCap) belowCap.push(getManifoldGridId(sticker, size));
+          }
+        }
+      }
+    }
+    return { sim, terminal, belowCap };
+  } finally {
+    Math.random = realRandom;
+  }
+};
+
 // Drive a sim to completion on a virtual clock, replicating the worker's
 // scheduling (chain and Conway ticks at the sim's own cadence). Returns the
 // accumulated event streams plus the virtual duration.
@@ -165,6 +206,35 @@ describe('createChaosSim', () => {
     }
     expect(liveIds).toEqual(expect.arrayContaining(terminal.winner));
     expect(liveIds).toHaveLength(2);
+  });
+
+  // Reaching the flip cap is what kills a tile, and the ledger refuses to kill
+  // the last pair — but nothing used to stop a chain from flipping them to the
+  // cap anyway. A chain that killed the second-to-last pair and then walked onto
+  // a survivor in the same tick left the winners at the cap: alive in the
+  // ledger, dead on the cube and in the metrics. It surfaced as a test that
+  // failed about one run in twelve.
+  it('never leaves the winning pair sitting at the flip cap', () => {
+    // Seed 17 is one of the rounds that used to end this way.
+    const { terminal, belowCap } = seededRound(17);
+    expect(terminal?.winner).toHaveLength(2);
+    expect(belowCap).toEqual(expect.arrayContaining(terminal.winner));
+    expect(belowCap).toHaveLength(2);
+  });
+
+  it('agrees on who is alive across a spread of rounds', () => {
+    // The race showed up in roughly 2% of rounds, so one seed proves little on
+    // its own; these cover the seeds that used to reproduce it plus neighbours.
+    for (const seed of [17, 70, 99, 140, 225, 261, 284, 305]) {
+      const { sim, terminal, belowCap } = seededRound(seed);
+      expect(terminal?.winner, `seed ${seed} never finished`).toHaveLength(2);
+      expect(belowCap, `seed ${seed} disagreed on the survivors`).toEqual(
+        expect.arrayContaining(terminal.winner)
+      );
+      expect(belowCap, `seed ${seed} left a winner at the cap`).toHaveLength(2);
+      // The metrics scan counts caps too, so it has to land on 52 as well.
+      expect(sim.getMetrics().deadTiles, `seed ${seed} miscounted the dead`).toBe(52);
+    }
   });
 
   it('survives mid-round rotations with the ledger intact', () => {
