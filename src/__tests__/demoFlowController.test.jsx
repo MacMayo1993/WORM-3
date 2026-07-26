@@ -9,18 +9,26 @@ import { checkRubiksSolved } from '../game/winDetection.js';
 // of that solved state before the player tries it themselves (see App.jsx
 // handleDemoStepContinue). These tests replay that same beat.
 describe('demo flow configuration', () => {
-  it('keeps the shipped demo in the intended eight-stage order plus end state', () => {
+  it('keeps the shipped demo in the intended nine-stage order plus end state', () => {
     expect(DEMO_STEP_IDS).toEqual([
       'baby-cube',
       'twin-paradox',
       'flip-gateway',
       'view-showcase',
+      'make-it-yours',
       'worm-traversal',
       'chaos-forecast',
       'random-showcase',
       'cosmetic-reward',
       'end',
     ]);
+  });
+
+  it('holds the Flip button back on the twin step so the player has to press it', () => {
+    // The step teaches where Flip Mode lives; staging it pre-armed would rob the
+    // player of the one control they need to repeat the trick themselves.
+    expect(DEMO_LEVEL_CONFIGS['twin-paradox'].gateOnFlipToggle).toBe(true);
+    expect(DEMO_LEVEL_CONFIGS['baby-cube'].gateOnFlipToggle).toBeUndefined();
   });
 
   it('flip-gateway starts solved; flipping all surface stickers breaks it, flipping back solves', () => {

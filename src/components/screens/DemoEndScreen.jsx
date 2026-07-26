@@ -16,9 +16,9 @@ const MODES = [
     blurb: 'Play the action-healing version of what you just learned.',
     primary: true,
   },
-  { id: 'story', name: 'STORY', blurb: 'Ten guided levels across three rule sets.' },
+  { id: 'story', name: 'STORY', blurb: 'Ten guided levels that build up one rule at a time.' },
   { id: 'freeplay', name: 'FREEPLAY', blurb: 'Solve the cube your way — no timer, no pressure.' },
-  { id: 'chaos', name: 'CHAOS', blurb: 'Bet on a pair and survive the flipping cube.' },
+  { id: 'chaos', name: 'CHAOS', blurb: 'Call the surviving pair and ride out the flipping cube.' },
   { id: 'random', name: 'RANDOM', blurb: 'Let the cube remix the rules and the look.' },
   { id: 'store', name: 'STORE', blurb: 'Spend Parity Points on cubes, skins, and worms.' },
 ];
@@ -66,8 +66,9 @@ const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore
           color: '#43513a', fontSize: 13.5, lineHeight: 1.5,
           margin: '0 auto 22px', maxWidth: 360,
         }}>
-          You learned the whole idea: opposite tiles are twins, and a flip travels
-          between them. Every mode below is built on that.
+          You have the whole idea already: the tile dead opposite any other one is
+          its twin, and a tap sends a tile straight through the middle to it. Every
+          mode below is built on that.
         </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
@@ -125,6 +126,18 @@ const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore
             </button>
           ))}
         </div>
+
+        {/* The solver and the step-by-step teacher live behind the nav bar's
+            More button — the demo never opens that sheet, so name it here
+            rather than leave two of the game's biggest helps undiscovered. */}
+        <p style={{
+          color: '#657156', fontSize: 12, lineHeight: 1.45,
+          margin: '16px auto 0', maxWidth: 340,
+        }}>
+          Stuck in any mode? The <strong style={{ color: '#43513a' }}>More</strong> button on the
+          bottom bar has <strong style={{ color: '#43513a' }}>Solve</strong> (watch it solve itself)
+          and <strong style={{ color: '#43513a' }}>Teach</strong> (learn to do it yourself).
+        </p>
 
         <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
           <button

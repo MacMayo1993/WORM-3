@@ -3,20 +3,32 @@ import { UI_FONT, DISPLAY_FONT } from '../../utils/uiTheme.js';
 import { makeCubies } from '../../game/cubeState.js';
 import { flipStickerPair, buildManifoldGridMap } from '../../game/manifoldLogic.js';
 import { useGameStore } from '../../hooks/useGameStore.js';
-import { STEP_COPY } from '../../utils/demoStepCopy.js';
+import { STEP_COPY, TWIN_ASIDE } from '../../utils/demoStepCopy.js';
 import MobiIntroScreen from './MobiIntroScreen.jsx';
 
+// Step ids are permanent (configs, tests and save data key off them); the
+// labels are player-facing and stay in plain language — "Meet the Twins", not
+// "Twin Paradox". A first-timer should be able to read the whole progress
+// sequence and know what they just did.
 const DEMO_STEPS = [
-  { id: 'baby-cube', label: 'Baby Cube', num: 1 },
-  { id: 'twin-paradox', label: 'Twin Paradox', num: 2 },
-  { id: 'flip-gateway', label: 'Flip Gateway', num: 3 },
-  { id: 'view-showcase', label: 'View Modes', num: 4 },
-  { id: 'worm-traversal', label: 'WORM Traversal', num: 5 },
-  { id: 'chaos-forecast', label: 'Chaos Forecast', num: 6 },
-  { id: 'random-showcase', label: 'Random Mode', num: 7 },
-  { id: 'cosmetic-reward', label: 'Cosmetic Reward', num: 8 },
-  { id: 'end', label: 'Complete', num: 9 },
+  { id: 'baby-cube', label: 'First Twist', num: 1 },
+  { id: 'twin-paradox', label: 'Meet the Twins', num: 2 },
+  { id: 'flip-gateway', label: 'Through the Middle', num: 3 },
+  { id: 'view-showcase', label: 'Every Look', num: 4 },
+  { id: 'make-it-yours', label: 'Make It Yours', num: 5 },
+  { id: 'worm-traversal', label: 'Worm Run', num: 6 },
+  { id: 'chaos-forecast', label: 'Call the Winner', num: 7 },
+  { id: 'random-showcase', label: 'Surprise Cube', num: 8 },
+  { id: 'cosmetic-reward', label: 'Spend Your Points', num: 9 },
+  { id: 'end', label: 'Complete', num: 10 },
 ];
+
+// Extra line held under a step's STEP COMPLETE stamp. Only the twin step has
+// one: now that the player has felt two tiles move together, naming the formal
+// concept costs nothing and rewards the curious.
+const STEP_COMPLETE_NOTE = {
+  'twin-paradox': TWIN_ASIDE,
+};
 
 export const DEMO_STEP_IDS = DEMO_STEPS.map(s => s.id);
 
@@ -172,6 +184,11 @@ const ensureDemoShellStyle = () => {
       border-bottom: 1px solid rgba(111, 126, 86, 0.25);
     }
 
+    /* Flip tile is the middle (3rd of 5) slot, so its pointer sits dead centre. */
+    .demo-spotlight-hint--flip::after {
+      left: 50%;
+    }
+
     @keyframes demo-spotlight-hint-bob {
       0%, 100% { transform: translateX(-50%) translateY(0); }
       50% { transform: translateX(-50%) translateY(-6px); }
@@ -289,6 +306,19 @@ const ensureDemoShellStyle = () => {
       animation: demo-complete-cta-in 0.5s ease 0.6s both;
     }
 
+    /* Aside under the stamp (currently only the twin step's "antipodal pair"
+       footnote) — quieter than the label, so it reads as trivia, not homework. */
+    .demo-complete-note {
+      margin: 14px auto 0;
+      max-width: 300px;
+      color: rgba(255, 253, 242, 0.82);
+      font-size: 12.5px;
+      font-weight: 600;
+      line-height: 1.4;
+      font-style: italic;
+      animation: demo-complete-cta-in 0.5s ease 0.5s both;
+    }
+
     .demo-complete-hint {
       margin: 12px 0 0;
       color: rgba(255, 253, 242, 0.72);
@@ -400,12 +430,40 @@ const ensureDemoShellStyle = () => {
       to   { opacity: 1; transform: translateX(-50%) translateY(0); }
     }
 
-    /* Flip-gateway progress pill — bottom-center, above the nav bar. Shows how
-       many front-face tiles are flipped (or restored) so the loop feels bounded. */
-    .demo-flip-progress {
+    /* Per-step hint — the one-line "here's the gesture" pill that sits above the
+       bottom nav for the whole hands-on phase. Non-blocking: the nav bar, the
+       cube and the coach pill all stay usable while it's up. */
+    .demo-step-hint {
       position: fixed;
       left: 50%;
       bottom: calc(env(safe-area-inset-bottom, 0px) + 92px);
+      transform: translateX(-50%);
+      z-index: 10900;
+      width: min(340px, calc(100vw - 32px));
+      padding: 9px 15px;
+      border-radius: 14px;
+      background: rgba(250, 247, 238, 0.94);
+      border: 1px solid rgba(111, 126, 86, 0.25);
+      box-shadow: 0 10px 26px rgba(40, 48, 32, 0.22);
+      color: #26331f;
+      font-family: ${UI_FONT};
+      font-size: 12.5px;
+      font-weight: 600;
+      line-height: 1.38;
+      text-align: center;
+      pointer-events: none;
+      animation: demo-worm-hint-in 0.4s ease both;
+    }
+
+    .demo-step-hint strong { font-weight: 800; color: #3f5730; }
+
+    /* Flip-gateway progress pill — bottom-center, stacked above the step hint so
+       both read at once. Shows how many front-face tiles are flipped (or
+       restored) so the loop feels bounded. */
+    .demo-flip-progress {
+      position: fixed;
+      left: 50%;
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 148px);
       transform: translateX(-50%);
       z-index: 11000;
       display: flex;
@@ -521,6 +579,11 @@ const DEMO_LEVEL_CONFIGS = {
     watch: { type: 'flip', tile: { x: 0, y: 0, z: 1, dirKey: 'PZ' } },
     features: { rotations: true, tunnels: true, flips: true },
     chaosLevel: 0,
+    // Flip Mode is the switch that turns taps into twin travel, and it lives on
+    // the bottom nav — so this step withholds it and asks the player to press it
+    // themselves. The demo waits (with a timed fallback, see
+    // FLIP_SPOTLIGHT_FALLBACK_MS) rather than flipping the switch for them.
+    gateOnFlipToggle: true,
   },
   'flip-gateway': {
     type: 'cube',
@@ -536,6 +599,13 @@ const DEMO_LEVEL_CONFIGS = {
     cubeSize: 3,
     features: { rotations: true, tunnels: false, flips: false },
     chaosLevel: 0,
+  },
+  // Opens the real Settings menu on the real cube. Completion is the player
+  // closing it — whatever they changed in there survives the rest of the demo
+  // and the exit back to the menu (see useDemoMode's settings bookkeeping).
+  'make-it-yours': {
+    type: 'settings',
+    cubeSize: 3,
   },
   'worm-traversal': {
     type: 'worm',
@@ -565,33 +635,35 @@ const DEMO_LEVEL_CONFIGS = {
 };
 
 // ── TRY phase ──────────────────────────────────────────────────────────────
-// After the WATCH beat auto-plays the mechanic, the coach invites one optional
-// hands-on interaction via a "Next" pill, so the demo can never hang. These
-// lines are no longer shown to the player (the setup is Mobi's intro line and
-// the staged UI does the guiding) — a step's presence here is what keeps its
-// coach pill available; the text documents each step's intended interaction.
+// After the WATCH beat auto-plays the mechanic, the player gets:
+//   • a persistent hint pill (DemoStepHint) naming the exact gesture, and
+//   • a compact "Next ▶" coach pill, so the demo can never hang.
+// A step's presence in this map is what gives it a coach pill AND a hint, so
+// keep every hands-on step listed. Copy rules: name the gesture, not the
+// theory, and keep it to one breath — this pill has to read at a glance while
+// the player's thumb is already on the cube.
 const TRY_COPY = {
-  'baby-cube': 'Your turn — drag a row to twist it. Drag the space around the cube to orbit.',
-  'twin-paradox': 'Your turn — tap any tile and watch its twin flip on the far side too.',
-  'flip-gateway': 'Tap each front-face tile to send it to its twin, then tap them back home to solve.',
+  'baby-cube': 'Drag across a row to twist it. Drag the space around the cube to spin the whole thing. Red <strong>Reset</strong> undoes the mess.',
+  'twin-paradox': 'Tap any tile — the tile dead opposite it flips at the same moment.',
+  'flip-gateway': 'Tap the front tiles to send them through the middle, then tap them again to bring them home.',
+  'make-it-yours': 'Try the <strong>Colors</strong>, <strong>Tiles</strong> and <strong>Scene</strong> tabs. Close Settings when you like what you see.',
   'worm-traversal': 'Grab orbs, heal tiles, and dive through a glowing tunnel. Skip ahead anytime.',
-  'chaos-forecast': 'Bet on the pair you think survives, then watch it play out. Skip anytime.',
-  'random-showcase': 'Watch a few random cubes roll by, or skip ahead.',
+  'chaos-forecast': 'Watch the pairs die off — yours has to be the last one standing.',
+  'random-showcase': 'Every run rerolls the rules and the look. Skip when you have seen enough.',
 };
 
-// Coach: the guidance already played inside the step-intro dialogue, so the
-// default coach is just a compact "Next ▶" pill. Only a copy OVERRIDE
-// (flip-gateway's second phase) brings Mobi back — that line is new info.
-const DemoCoach = ({ step, onNext, onExit, copy: copyOverride }) => {
+// Coach: the guidance already played inside the step-intro dialogue and the hint
+// pill names the gesture, so the default coach is just a compact "Next ▶" pill.
+// Only a copy OVERRIDE (flip-gateway's second phase) brings Mobi back — that
+// line is new info. Dismissing the override clears it in the hook (onCopySeen)
+// rather than in local state, so the parent knows the blocking panel is gone and
+// can put the bottom nav back.
+const DemoCoach = ({ step, onNext, onExit, copy: copyOverride, onCopySeen }) => {
   ensureDemoShellStyle();
-  const [overrideSeen, setOverrideSeen] = React.useState(false);
   const wormHealerMode = useGameStore((s) => s.wormHealerMode);
-  React.useEffect(() => {
-    setOverrideSeen(false);
-  }, [copyOverride]);
   if (!copyOverride && !TRY_COPY[step]) return null;
 
-  if (copyOverride && !overrideSeen) {
+  if (copyOverride) {
     const info = DEMO_STEPS.find(s => s.id === step);
     return (
       <MobiIntroScreen
@@ -599,7 +671,7 @@ const DemoCoach = ({ step, onNext, onExit, copy: copyOverride }) => {
         lines={[copyOverride]}
         modeName={info ? `Step ${info.num} · ${info.label}` : 'Demo'}
         primaryLabel="▶ Got It"
-        onComplete={() => setOverrideSeen(true)}
+        onComplete={() => onCopySeen?.()}
         skipLabel="Exit Demo"
         onSkip={onExit}
       />
@@ -615,6 +687,26 @@ const DemoCoach = ({ step, onNext, onExit, copy: copyOverride }) => {
   );
 };
 
+// Per-step gesture hint. Rendered for the whole hands-on phase of a step (the
+// parent hides it behind blocking beats), so a player who looked away still has
+// the instruction in front of them. Copy comes from TRY_COPY and may contain
+// <strong> for the one word that names a button.
+const DemoStepHint = ({ step }) => {
+  ensureDemoShellStyle();
+  const copy = TRY_COPY[step];
+  if (!copy) return null;
+  return (
+    <div
+      className="demo-step-hint"
+      role="status"
+      aria-live="polite"
+      // TRY_COPY is authored in this file, never user input — the only markup is
+      // <strong> around button names.
+      dangerouslySetInnerHTML={{ __html: copy }}
+    />
+  );
+};
+
 // ── View Showcase sequence ────────────────────────────────────────────────────
 // Each entry describes one beat of the view-showcase demo step.
 // `apply` is called with the store to activate the view; `cleanup` reverses it.
@@ -622,70 +714,70 @@ const VIEW_SHOWCASE_SEQUENCE = [
   {
     key: 'grid',
     title: 'Grid',
-    copy: 'Grid overlays coordinate lines on each face — useful for tracking tile positions.',
+    copy: 'Guide lines on every face, so you can call out a tile by its row and column.',
     apply: (s) => s.setVisualMode('grid'),
     cleanup: (s) => s.setVisualMode('classic'),
   },
   {
     key: 'sudokube',
     title: 'Sudoku',
-    copy: 'Sudoku mode shows unique numbers on every tile — a number-puzzle twist.',
+    copy: 'Numbers instead of colors — every face has to end up with all nine, no repeats.',
     apply: (s) => s.setVisualMode('sudokube'),
     cleanup: (s) => s.setVisualMode('classic'),
   },
   {
     key: 'wireframe',
     title: 'Wireframe',
-    copy: 'Wireframe strips each tile down to its outline. Clean and minimal.',
+    copy: 'Tiles stripped back to their outlines. Clean and minimal.',
     apply: (s) => s.setVisualMode('wireframe'),
     cleanup: (s) => s.setVisualMode('classic'),
   },
   {
     key: 'glass',
     title: 'Glass',
-    copy: 'Glass makes tiles transparent — see through the cube to the far side.',
+    copy: 'See-through tiles, so you can look straight through the cube to the far side.',
     apply: (s) => s.setVisualMode('glass'),
     cleanup: (s) => s.setVisualMode('classic'),
   },
   {
     key: 'chrome',
     title: 'Chrome',
-    copy: 'Chrome gives each tile a reflective metallic surface.',
+    copy: 'Polished metal tiles that mirror whatever is around them.',
     apply: (s) => s.setVisualMode('chrome'),
     cleanup: (s) => s.setVisualMode('classic'),
   },
   {
     key: 'neon',
     title: 'Neon',
-    copy: 'Neon lights up every tile edge with a glowing outline.',
+    copy: 'Every tile edge lit up like a sign.',
     apply: (s) => s.setVisualMode('neon'),
     cleanup: (s) => s.setVisualMode('classic'),
   },
   {
     key: 'gap',
     title: 'Gap',
-    copy: 'Gap adds visible spacing between tiles so you can see each one individually.',
+    copy: 'Space between the tiles, so each one reads on its own.',
     apply: (s) => s.setVisualMode('gap'),
     cleanup: (s) => s.setVisualMode('classic'),
   },
   {
     key: 'lego',
     title: 'Lego',
-    copy: 'Lego turns each tile into a brick-like stud.',
+    copy: 'Every tile becomes a studded brick.',
     apply: (s) => s.setVisualMode('lego'),
     cleanup: (s) => s.setVisualMode('classic'),
   },
   {
     key: 'explode',
     title: 'Explode',
-    copy: 'Explode separates every face outward so you can see all six sides at once.',
+    copy: 'The faces float apart so you can see all six at once — including the ones facing away.',
     apply: (s) => s.setExploded(true),
     cleanup: (s) => s.setExploded(false),
   },
   {
     key: 'tunnels',
     title: 'Tunnels',
-    copy: 'Flipping a tile opens a wormhole to its antipodal twin — with the cube still exploded, watch the tunnel thread through its core.',
+    copy: 'Here is the twin link made visible: send a tile through and a tunnel opens between it and the tile dead opposite. With the cube apart, you can watch it thread through the middle.',
     // Keep the previous beat's exploded view (the tunnel is invisible inside a
     // closed cube) and flip the front-face center tile so exactly one
     // antipodal tunnel lights up.
@@ -705,16 +797,37 @@ const VIEW_SHOWCASE_SEQUENCE = [
     },
   },
   {
+    key: 'mirror',
+    title: 'Far Side',
+    copy: 'The little window watches the cube from exactly the opposite side. One tile is sent through here — find it in both pictures, and you are looking at one tile from two places at once.',
+    // The strongest twin-teaching view in the game: main camera and the picture
+    // -in-picture sit at opposite ends of the same line through the cube's
+    // centre, so a flipped pair shows up in both at once. Stage one flip so
+    // there is something to spot.
+    apply: (s) => {
+      s.setShowTunnels(true);
+      s.setShowAntipodalPiP(true);
+      const mid = Math.floor(s.size / 2);
+      const map = buildManifoldGridMap(s.cubies, s.size);
+      s.setRotatedCubies(flipStickerPair(s.cubies, s.size, mid, mid, s.size - 1, 'PZ', map));
+    },
+    cleanup: (s) => {
+      s.setShowAntipodalPiP(false);
+      s.setShowTunnels(false);
+      s.setRotatedCubies(makeCubies(s.size));
+    },
+  },
+  {
     key: 'hollow',
     title: 'Hollow',
-    copy: 'Hollow removes internal cubies, revealing the cube\'s skeletal structure.',
+    copy: 'The inside is gone — only the shell is left, so you can see right through the middle.',
     apply: (s) => s.setHollowMode(true),
     cleanup: (s) => s.setHollowMode(false),
   },
   {
     key: 'net',
     title: 'Net',
-    copy: 'Net unfolds the cube flat — like paper craft. Great for spotting patterns.',
+    copy: 'The cube unfolded flat, like a paper craft template. Handy for spotting patterns across faces.',
     apply: (s) => s.setShowNetPanel(true),
     cleanup: (s) => s.setShowNetPanel(false),
   },
@@ -756,6 +869,9 @@ const DemoStepComplete = ({ step, onDismiss }) => {
         <p className="demo-complete-check">✓</p>
         <p className="demo-beat-sub">Step {info.num} Complete</p>
         <h2 className="demo-beat-title">{info.label}</h2>
+        {STEP_COMPLETE_NOTE[step] && (
+          <p className="demo-complete-note">{STEP_COMPLETE_NOTE[step]}</p>
+        )}
         <button
           type="button"
           className="demo-intro-button demo-complete-next"
@@ -829,6 +945,33 @@ const DemoViewSpotlightHint = ({ onSkip }) => {
   );
 };
 
+// Shown at the top of the twin step: the Flip tile on the bottom nav pulses
+// (see BottomNavBar `spotlightFlip`) and this hint asks for the tap that arms
+// tile-flipping. The demo deliberately does not flip this switch for the
+// player — knowing where Flip Mode lives is the difference between "the demo
+// did something" and "I can do that again".
+const DemoFlipSpotlightHint = ({ onSkip }) => {
+  ensureDemoShellStyle();
+  return (
+    <div className="demo-spotlight-hint demo-spotlight-hint--flip" role="status" aria-live="polite">
+      <p className="demo-intro-copy" style={{ marginBottom: 8 }}>
+        Tap the glowing <strong>Flip</strong> button below to arm tile-flipping.
+      </p>
+      {onSkip && (
+        <button
+          type="button"
+          onClick={onSkip}
+          aria-label="Turn on flip mode for me"
+          className="demo-intro-button"
+          style={{ background: 'transparent', color: '#7b6f45', boxShadow: 'none', padding: '4px 12px' }}
+        >
+          Do It For Me ▶
+        </button>
+      )}
+    </div>
+  );
+};
+
 // Worm-step control hint: the healer worm crawls on its own and shows no
 // controls of its own, so the demo names the steer gesture while the player
 // plays. Non-interactive; the parent unmounts it once the worm makes progress.
@@ -841,14 +984,14 @@ const DemoWormControlHint = () => {
   );
 };
 
-// Flip-gateway progress: a bounded count of how many front-face tiles are
-// flipped ("flip-all") or restored ("unflip-all"), so the tap loop reads as a
-// short task with a finish line rather than an open-ended chore.
+// Flip-gateway progress: a bounded count of how many tile pairs have been sent
+// through ("flip-all") or brought home ("unflip-all"), so the tap loop reads as
+// a short task with a finish line rather than an open-ended chore.
 const DemoFlipProgress = ({ progress }) => {
   ensureDemoShellStyle();
   if (!progress) return null;
   const { phase, done, total } = progress;
-  const label = phase === 'unflip-all' ? 'Restored' : 'Flipped';
+  const label = phase === 'unflip-all' ? 'Home' : 'Sent Through';
   const pct = total > 0 ? Math.min(100, (done / total) * 100) : 0;
   return (
     <div className="demo-flip-progress" role="status" aria-live="polite">
@@ -900,8 +1043,10 @@ export {
   DemoProgressBar,
   DemoStepIntro,
   DemoCoach,
+  DemoStepHint,
   DemoViewShowcase,
   DemoViewSpotlightHint,
+  DemoFlipSpotlightHint,
   DemoWormControlHint,
   DemoFlipProgress,
   DemoStepComplete,
@@ -909,6 +1054,7 @@ export {
   DemoRewardStamp,
   VIEW_SHOWCASE_SEQUENCE,
   TRY_COPY,
+  STEP_COMPLETE_NOTE,
   DEMO_STEPS,
   DEMO_LEVEL_CONFIGS
 };

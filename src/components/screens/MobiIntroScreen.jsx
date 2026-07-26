@@ -12,11 +12,18 @@ import { UI_FONT, HAND_FONT } from '../../utils/uiTheme.js';
 // Demo cold open — the framing beat before step 1. Sets up the game's one
 // core promise (opposite tiles are twins) so the player twists the first cube
 // knowing why, then hands off to the interactive steps.
+//
+// Deliberately jargon-free: no "antipodal", no "manifold", no topology. The
+// idea a first-timer needs is spatial, not mathematical — "the tile dead
+// opposite this one is the same tile" — so every line points at the cube
+// instead of at the theory. The formal name shows up once, later, as an aside
+// (TWIN_ASIDE in demoStepCopy.js).
 export const MOBI_LINES_DEMO_INTRO = [
   "Aloha! I'm Mobi.",
-  "This looks like an ordinary cube — but it's hiding something.",
-  "Every tile has a secret twin on the opposite side.",
-  "Let me show you how it works. Then you pick where to play.",
+  "Looks like an ordinary Rubik's cube, right? Look again.",
+  "Pick a tile. Now find the tile dead opposite it — straight through the middle.",
+  "Those two are twins. Tap one and it travels through the cube to the other.",
+  "That's the whole trick. Let me show you, then you pick where to play.",
 ];
 
 export const MOBI_LINES_WORM = [

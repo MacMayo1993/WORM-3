@@ -128,6 +128,7 @@ export default function UILayer({
     onDemoDisparityDismiss,
     demoViewSpotlight,
     onDemoViewSpotlightClick,
+    demoFlipSpotlight,
   } = handlers;
 
   // ── Zustand store reads ──────────────────────────────────────────────────
@@ -361,6 +362,7 @@ export default function UILayer({
               setSheetMode('views'); setSheetOpen(!sheetOpen || sheetMode !== 'views');
             }}
             spotlightViews={!!demoViewSpotlight}
+            spotlightFlip={!!demoFlipSpotlight}
             onToggleMore={() => { setSheetMode('more'); setSheetOpen(!sheetOpen || sheetMode !== 'more'); }}
             moreOpen={sheetOpen && sheetMode === 'more'}
             viewsOpen={sheetOpen && sheetMode === 'views'}

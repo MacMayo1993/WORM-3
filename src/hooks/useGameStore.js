@@ -368,6 +368,11 @@ export const useGameStore = create(
     explosionT: 0,
     showNetPanel: false,
     showLeaderboard: false,
+    // Picture-in-picture camera parked at the antipodal point of the main one —
+    // the "far side" window. Lives in the store (rather than App-local state)
+    // so scripted sequences like the demo's view showcase can drive it with the
+    // same setters they use for every other view toggle.
+    showAntipodalPiP: false,
 
     setVisualMode: (visualMode) => set(typeof visualMode === 'function'
       ? (state) => ({ visualMode: visualMode(state.visualMode) })
@@ -393,6 +398,11 @@ export const useGameStore = create(
       ? (state) => ({ showLeaderboard: showLeaderboard(state.showLeaderboard) })
       : { showLeaderboard }),
     toggleLeaderboard: () => set((state) => ({ showLeaderboard: !state.showLeaderboard })),
+
+    setShowAntipodalPiP: (showAntipodalPiP) => set(typeof showAntipodalPiP === 'function'
+      ? (state) => ({ showAntipodalPiP: showAntipodalPiP(state.showAntipodalPiP) })
+      : { showAntipodalPiP }),
+    toggleAntipodalPiP: () => set((state) => ({ showAntipodalPiP: !state.showAntipodalPiP })),
 
     toggleFlipMode: () => set((state) => ({ flipMode: !state.flipMode })),
     toggleTunnels: () => set((state) => ({ showTunnels: !state.showTunnels })),

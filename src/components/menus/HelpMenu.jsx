@@ -154,7 +154,7 @@ const HelpMenu = ({ onClose }) => (
         <Section title="Moving the Cube">
           <Row label="Drag" desc="Rotates a slice — just like a real Rubik's Cube" />
           <Row label="Shift + Drag" desc="Twists the entire face" />
-          <Row label="Click a sticker" desc="Flips it to its antipodal (opposite) color" />
+          <Row label="Click a sticker" desc="Sends it through the middle to its twin — the tile dead opposite it" />
           <Row label="Bottom bar" desc="Reset, Shuffle, Flip, Views and More — everything without a keyboard" />
         </Section>
 
@@ -168,7 +168,7 @@ const HelpMenu = ({ onClose }) => (
         </Section>
 
         <Section title="Special Features">
-          <Row label="Tunnels" desc="Colorful tunnels show connections between antipodal points" />
+          <Row label="Tunnels" desc="Colored tunnels drawn between a tile and its twin on the far side" />
           <Row label="Flip Mode" desc="Toggle color flipping on or off" />
           <Row label="Chaos Mode" desc="Watch instability cascade across the cube!" />
         </Section>
@@ -193,7 +193,7 @@ const HelpMenu = ({ onClose }) => (
           <KeyRow keys="W / S" desc="Rotate selected row up / down" />
           <KeyRow keys="A / D" desc="Rotate selected column left / right" />
           <KeyRow keys="Q / E" desc="Rotate face counter-clockwise / clockwise" />
-          <KeyRow keys="F" desc="Flip the selected tile (antipodal)" />
+          <KeyRow keys="F" desc="Send the selected tile through to its twin" />
         </Section>
 
         <Section title="Hands Mode (P) — Speedcuber">

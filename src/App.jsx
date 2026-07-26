@@ -88,8 +88,9 @@ const HollowVoidCube = React.lazy(() => import('./3d/HollowVoidCube.jsx'));
 const DemoEndScreen = React.lazy(() => import('./components/screens/DemoEndScreen.jsx'));
 const DemoForecastPicker = React.lazy(() => import('./components/screens/DemoForecastPicker.jsx'));
 import {
-  DemoProgressBar, DemoStepIntro, DemoCoach, DemoViewShowcase,
-  DemoViewSpotlightHint, DemoWormControlHint, DemoFlipProgress, DemoStepComplete, DemoStepLaunch, DemoRewardStamp
+  DemoProgressBar, DemoStepIntro, DemoCoach, DemoStepHint, DemoViewShowcase,
+  DemoViewSpotlightHint, DemoFlipSpotlightHint, DemoWormControlHint, DemoFlipProgress,
+  DemoStepComplete, DemoStepLaunch, DemoRewardStamp
 } from './components/screens/DemoFlowController.jsx';
 
 
@@ -485,8 +486,14 @@ export default function WORM3() {
     setSceneGateZ(opts.z ?? 9996);
     setSceneGateToken((t) => t + 1);
   }, []);
-  // Antipodal PiP — second camera from opposite side of the cube
-  const [showAntipodalPiP, setShowAntipodalPiP] = useState(false);
+  // Open-modal flag used to stand the demo's floating pills down (see
+  // demoChromeSuppressed below).
+  const showHelp = useGameStore((s) => s.showHelp);
+
+  // Antipodal PiP — second camera from opposite side of the cube. Store-backed
+  // so scripted view sequences (the demo's "Far Side" beat) can open it.
+  const showAntipodalPiP = useGameStore((s) => s.showAntipodalPiP);
+  const toggleAntipodalPiP = useGameStore((s) => s.toggleAntipodalPiP);
 
   // Adaptive quality: PerformanceMonitor (rendered inside the Canvas below) adjusts
   // this DPR range and the store's perfReducedFX flag when the rolling-average frame
@@ -577,12 +584,14 @@ export default function WORM3() {
     demoMode, demoStep,
     demoColdOpenVisible, handleDemoColdOpenContinue,
     demoStepIntroVisible, demoTryVisible, demoForecastVisible, demoCoachCopy,
+    handleDemoCoachCopySeen, demoHintStep,
     onTapFlipRef,
     handleStartDemo, handleDemoStepContinue, advanceDemoStep,
     handleDemoReplay, handleDemoFreeplay, handleExitDemo,
     handleDemoForecastPick, handleDemoChaosSkip, handleDemoDisparityDismiss,
     demoShowcaseSubStep, handleDemoShowcaseNext, handleDemoShowcaseSkip,
     demoViewSpotlight, handleDemoViewSpotlightClick,
+    demoFlipSpotlight, handleDemoFlipSpotlightSkip,
     demoCelebrationStep, dismissDemoCelebration, demoLaunchStep, demoRewardStamp, demoFlipProgress,
   } = useDemoMode({
     cancelShuffle, changeSize, setRotatedCubies, reset,
@@ -601,6 +610,17 @@ export default function WORM3() {
     }
     store.setShowMainMenu(true);
   }, [advanceDemoStep]);
+
+  // The demo's floating pills stand down while a full modal owns the screen.
+  const demoChromeQuiet = showStore || showSettings || showHelp;
+
+  // Home during the demo is a real exit, not just a screen change: without this
+  // the demo's overlays kept rendering over the main menu and its borrowed look
+  // (neon / desert / topographic) stayed on the device.
+  const handleHomeFromGame = useCallback(() => {
+    if (useGameStore.getState().demoMode) handleExitDemo();
+    handleBackToMainMenu();
+  }, [handleExitDemo, handleBackToMainMenu]);
 
   // Warm lazy chunks, Mobi's portrait, and environment maps while the opening
   // animation plays, so nothing pops in late on slow connections. Delayed a
@@ -1429,7 +1449,9 @@ export default function WORM3() {
             textTransform: 'uppercase',
             pointerEvents: 'none',
           }}>
-            ↕ Antipodal
+            {/* Says what the window shows, not what the maths calls it — this
+                frame is most players' first meeting with the mechanic. */}
+            ↕ Far Side
           </span>
         </div>
       )}
@@ -1474,15 +1496,23 @@ export default function WORM3() {
               showDisparityWizard, setShowDisparityWizard,
               showDisparityBetting,
               disparityCountdown,
-              showAntipodalPiP, onToggleAntipodalPiP: () => setShowAntipodalPiP(v => !v),
+              showAntipodalPiP, onToggleAntipodalPiP: toggleAntipodalPiP,
               showComingSoon, onCloseComingSoon: () => { setShowComingSoon(false); useGameStore.getState().setShowMainMenu(true); },
               showMobiusCubelet, onCloseMobiusCubelet: () => { setShowMobiusCubelet(false); useGameStore.getState().setShowMainMenu(true); },
               onOpenModeSelect: () => setShowModeSelect(true),
-              // True whenever a Mobi dialogue panel is presenting — the cold
-              // open (MobiIntroScreen), the step intro (DemoStepIntro), or the
-              // hands-on coach (DemoCoach). The HUD (bottom nav bar + undo
-              // button) is hidden underneath it so nothing overlaps the dialogue.
-              demoDialogueVisible: demoMode && (demoColdOpenVisible || demoStepIntroVisible || demoTryVisible),
+              // True only while a Mobi dialogue PANEL is presenting — the cold
+              // open, the step intro, or the coach's mid-step aside. Those are
+              // bottom-docked panels, so the HUD (bottom nav bar + undo button)
+              // hides underneath them.
+              //
+              // The coach's ordinary "Next ▶" pill deliberately does NOT count:
+              // it lives at the top of the screen, and the hands-on phase is
+              // exactly when the player needs Reset, Flip and Views under their
+              // thumb — hiding the nav there used to make the demo's own
+              // mechanics unreachable while it was asking the player to try them.
+              demoDialogueVisible: demoMode && (
+                demoColdOpenVisible || demoStepIntroVisible || (demoTryVisible && !!demoCoachCopy)
+              ),
             }}
             handlers={{
               onReset: handleReset,
@@ -1495,7 +1525,7 @@ export default function WORM3() {
               onFaceImage: handleFaceImage,
               onSetVictory: setVictory,
               onTapFlip,
-              onBackToMainMenu: handleBackToMainMenu,
+              onBackToMainMenu: handleHomeFromGame,
               onLevelSelect: handleLevelSelect,
               onSelectPack: handleSelectPack,
               onBackToPackSelect: handleBackToPackSelect,
@@ -1526,6 +1556,7 @@ export default function WORM3() {
               onDemoDisparityDismiss: handleDemoDisparityDismiss,
               demoViewSpotlight,
               onDemoViewSpotlightClick: handleDemoViewSpotlightClick,
+              demoFlipSpotlight,
               showMergeThemePicker,
               onMergeStart: handleMergeStart,
               onMergeCancel: handleMergeCancel,
@@ -1556,8 +1587,11 @@ export default function WORM3() {
         </Suspense>
       )}
 
-      {/* Demo mode overlays */}
-      {demoMode && !demoColdOpenVisible && <DemoProgressBar currentStep={demoStep} />}
+      {/* Demo mode overlays.
+          `demoChromeQuiet` is the one gate every floating demo pill respects: a
+          full modal (Settings, Help, Store) owns the screen while it is open,
+          and the demo opens Settings itself during the "Make It Yours" step. */}
+      {demoMode && !demoColdOpenVisible && !demoChromeQuiet && <DemoProgressBar currentStep={demoStep} />}
       {demoMode && demoCelebrationStep && <DemoStepComplete step={demoCelebrationStep} onDismiss={dismissDemoCelebration} />}
       {demoMode && demoLaunchStep && !demoCelebrationStep && <DemoStepLaunch step={demoLaunchStep} />}
       {demoMode && demoRewardStamp && <DemoRewardStamp amount={demoRewardStamp.amount} correct={demoRewardStamp.correct} />}
@@ -1575,10 +1609,11 @@ export default function WORM3() {
       <ScreenTransition show={!!(demoMode && demoStepIntroVisible && demoStep && demoStep !== 'end')} freezeOnExit>
         <DemoStepIntro step={demoStep} onContinue={handleDemoStepContinue} onSkip={() => advanceDemoStep(demoStep)} />
       </ScreenTransition>
-      <ScreenTransition show={!!(demoMode && demoTryVisible && !demoStepIntroVisible)} freezeOnExit>
+      <ScreenTransition show={!!(demoMode && demoTryVisible && !demoStepIntroVisible && !demoChromeQuiet)} freezeOnExit>
         <DemoCoach
           step={demoStep}
           copy={demoCoachCopy}
+          onCopySeen={handleDemoCoachCopySeen}
           onNext={demoStep === 'chaos-forecast' ? handleDemoChaosSkip : () => advanceDemoStep(demoStep)}
           onExit={handleExitDemo}
         />
@@ -1588,18 +1623,28 @@ export default function WORM3() {
           <DemoForecastPicker onPick={handleDemoForecastPick} onSkip={handleDemoChaosSkip} />
         </Suspense>
       )}
+      {/* Per-step gesture hint — stays up for the whole hands-on phase so the
+          instruction is still there after the intro panel has gone. */}
+      {demoMode && demoHintStep && demoHintStep === demoStep && !demoChromeQuiet && !demoColdOpenVisible &&
+        !demoStepIntroVisible && !demoLaunchStep && !demoCelebrationStep && !demoViewSpotlight && !demoFlipSpotlight && (
+        <DemoStepHint step={demoHintStep} />
+      )}
       {/* Worm-step steer hint — shows during active play, before the skip pill. */}
-      {demoMode && demoStep === 'worm-traversal' && !demoColdOpenVisible &&
+      {demoMode && demoStep === 'worm-traversal' && !demoColdOpenVisible && !demoChromeQuiet &&
         !demoStepIntroVisible && !demoLaunchStep && !demoTryVisible && !demoCelebrationStep && (
         <DemoWormControlHint />
       )}
       {/* Flip-gateway progress — bounded front-face flip/restore counter. */}
-      {demoMode && demoStep === 'flip-gateway' && demoFlipProgress && !demoColdOpenVisible &&
+      {demoMode && demoStep === 'flip-gateway' && demoFlipProgress && !demoColdOpenVisible && !demoChromeQuiet &&
         !demoStepIntroVisible && !demoLaunchStep && !demoCelebrationStep && (
         <DemoFlipProgress progress={demoFlipProgress} />
       )}
-      <ScreenTransition show={!!(demoMode && demoStep === 'view-showcase' && demoViewSpotlight && !demoStepIntroVisible)} freezeOnExit>
+      <ScreenTransition show={!!(demoMode && demoStep === 'view-showcase' && demoViewSpotlight && !demoStepIntroVisible && !demoChromeQuiet)} freezeOnExit>
         <DemoViewSpotlightHint onSkip={handleDemoShowcaseSkip} />
+      </ScreenTransition>
+      {/* Twin step: asks for the Flip button press that arms tile-flipping. */}
+      <ScreenTransition show={!!(demoMode && demoFlipSpotlight && !demoStepIntroVisible && !demoChromeQuiet)} freezeOnExit>
+        <DemoFlipSpotlightHint onSkip={handleDemoFlipSpotlightSkip} />
       </ScreenTransition>
       <ScreenTransition show={!!(demoMode && demoStep === 'view-showcase' && demoShowcaseSubStep >= 0 && !demoStepIntroVisible)} freezeOnExit>
         <DemoViewShowcase
