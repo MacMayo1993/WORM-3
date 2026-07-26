@@ -182,7 +182,11 @@ if (typeof document !== 'undefined' && !document.getElementById(_STYLE_ID)) {
 //   skipLabel    — overrides the secondary button label ('Skip' default)
 //   onSkip       — alternate completion for the secondary button / Escape;
 //                  falls back to onComplete when absent
-const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete, primaryLabel, skipLabel, onSkip }) => {
+//   topInset     — CSS length to start the overlay below (e.g. the top app
+//                  bar's height). Dialogues that play while the in-game HUD is
+//                  up pass this so the bar stays above the dim + blur instead
+//                  of being buried under it.
+const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete, primaryLabel, skipLabel, onSkip, topInset }) => {
   const [index, setIndex]           = useState(0);
   const [isDismissing, setDismissing] = useState(false);
   const isLast = index === lines.length - 1;
@@ -251,6 +255,10 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete, primaryLab
       style={{
         position: 'fixed',
         inset: 0,
+        // Docked below the top app bar when the caller asks for it, so the bar
+        // (and its Home / Settings / far-side buttons) stays legible and
+        // reachable above the dialogue rather than under its dim and blur.
+        top: topInset || 0,
         // Above all in-game chrome (nav bar, HUD, mobile controls) — a Mobi
         // dialogue is a blocking beat; only demo shell overlays sit higher.
         zIndex: 10500,
@@ -290,58 +298,12 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete, primaryLab
         />
       </div>
 
-      {/* ── Nameplate tab — sits directly on top-left edge of the panel ── */}
-      <div style={{
-        position: 'absolute',
-        bottom: PANEL_H,
-        left: 0,
-        zIndex: 905,
-        pointerEvents: 'none',
-        animation: isDismissing ? uiAnim : 'paperSettle 0.48s cubic-bezier(0.16,1,0.3,1) forwards',
-      }}>
-        {/* Outer layer = border color */}
-        <div style={{
-          background: accent,
-          clipPath: 'polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%)',
-          padding: '2px',
-          display: 'inline-block',
-        }}>
-          {/* Inner layer = fill */}
-          <div style={{
-            background: paperBase,
-            height: NAMEPLATE_H,
-            padding: '0 22px 0 14px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            boxShadow: 'inset 0 0 0 1px rgba(91, 72, 45, 0.10)',
-          }}>
-            <span style={{
-              fontFamily: UI_FONT,
-              fontSize: 14,
-              fontWeight: 700,
-              letterSpacing: '0.1em',
-              textTransform: 'uppercase',
-              color: pencilLead,
-            }}>
-              MOBI
-            </span>
-            <span style={{
-              fontFamily: UI_FONT,
-              fontSize: 9,
-              fontWeight: 600,
-              letterSpacing: '0.15em',
-              textTransform: 'uppercase',
-              color: accentSolid,
-              opacity: 0.78,
-            }}>
-              {modeName || 'WORM MODE'}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Dialogue panel — full screen width, anchored at bottom ── */}
+      {/* ── Dialogue panel — full screen width, anchored at bottom ──
+          The nameplate tab is rendered INSIDE this element (below), pinned to
+          its top edge. It used to be a sibling positioned `bottom: PANEL_H`,
+          which assumed the panel was exactly that tall — a long line wraps to
+          more rows, the panel grows past PANEL_H, and the tab ended up sitting
+          on top of the first line of dialogue. */}
       <div
         style={{
           position: 'absolute',
@@ -378,6 +340,56 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete, primaryLab
         }}
         onClick={e => e.stopPropagation()}
       >
+        {/* Nameplate tab — pinned to this panel's top edge, whatever its height */}
+        <div style={{
+          position: 'absolute',
+          top: -(NAMEPLATE_H + 4),
+          left: 0,
+          pointerEvents: 'none',
+          animation: isDismissing ? uiAnim : 'paperSettle 0.48s cubic-bezier(0.16,1,0.3,1) forwards',
+        }}>
+          {/* Outer layer = border color */}
+          <div style={{
+            background: accent,
+            clipPath: 'polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%)',
+            padding: '2px',
+            display: 'inline-block',
+          }}>
+            {/* Inner layer = fill */}
+            <div style={{
+              background: paperBase,
+              height: NAMEPLATE_H,
+              padding: '0 22px 0 14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              boxShadow: 'inset 0 0 0 1px rgba(91, 72, 45, 0.10)',
+            }}>
+              <span style={{
+                fontFamily: UI_FONT,
+                fontSize: 14,
+                fontWeight: 700,
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+                color: pencilLead,
+              }}>
+                MOBI
+              </span>
+              <span style={{
+                fontFamily: UI_FONT,
+                fontSize: 9,
+                fontWeight: 600,
+                letterSpacing: '0.15em',
+                textTransform: 'uppercase',
+                color: accentSolid,
+                opacity: 0.78,
+              }}>
+                {modeName || 'WORM MODE'}
+              </span>
+            </div>
+          </div>
+        </div>
+
         {/* Dialogue text */}
         <div
           key={index}

@@ -358,10 +358,21 @@ const ensureDemoShellStyle = () => {
     }
 
     @media (max-width: 640px) {
+      /* Phone bars are crowded: the pill sat on top of the mode label and the
+         bar's icons. Drop it just below the bar instead of over it. */
       .demo-progress-pill {
-        top: max(8px, env(safe-area-inset-top, 8px));
+        top: calc(var(--topbar-h, 44px) + env(safe-area-inset-top, 0px) + 6px);
         padding: 6px 12px;
         background: rgba(250, 247, 238, 0.92);
+      }
+
+      /* Everything else that stacks below the pill moves down with it. */
+      .demo-coach-pill {
+        top: calc(var(--topbar-h, 44px) + env(safe-area-inset-top, 0px) + 52px);
+      }
+
+      .demo-tour-card--top {
+        top: calc(var(--topbar-h, 44px) + env(safe-area-inset-top, 0px) + 52px);
       }
 
       .demo-intro-root {
@@ -574,6 +585,8 @@ const DemoStepIntro = ({ step, onContinue, onSkip }) => {
       onComplete={onContinue}
       skipLabel="Skip Step ▶"
       onSkip={onSkip}
+      // The in-game top bar is up during the demo — keep the dialogue under it.
+      topInset="var(--topbar-h)"
     />
   );
 };
@@ -708,6 +721,7 @@ const DemoCoach = ({ step, onNext, onExit, copy: copyOverride, onCopySeen }) => 
         onComplete={() => onCopySeen?.()}
         skipLabel="Exit Demo"
         onSkip={onExit}
+        topInset="var(--topbar-h)"
       />
     );
   }

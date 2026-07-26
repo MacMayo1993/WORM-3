@@ -1630,6 +1630,7 @@ export default function WORM3() {
           skipLabel="Skip Intro"
           onComplete={handleDemoColdOpenContinue}
           onSkip={handleDemoColdOpenContinue}
+          topInset="var(--topbar-h)"
         />
       </ScreenTransition>
       <ScreenTransition show={!!(demoMode && demoStepIntroVisible && demoStep && demoStep !== 'end')} freezeOnExit>
