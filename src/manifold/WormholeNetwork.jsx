@@ -2,6 +2,7 @@ import React, { useMemo, useState, useDeferredValue } from 'react';
 import { useFrame } from '@react-three/fiber';
 import MobiusTunnel from './MobiusTunnel.jsx';
 import RestingCords from './RestingCords.jsx';
+import TunnelSnap from './TunnelSnap.jsx';
 import { FACE_COLORS, FLIP_CAP } from '../utils/constants.js';
 import { getManifoldGridId } from '../game/coordinates.js';
 import { findAntipodalStickerByGrid } from '../game/manifoldLogic.js';
@@ -32,7 +33,7 @@ const FOCUS_BUDGET = 3;
 const DIRS = ['PX', 'NX', 'PY', 'NY', 'PZ', 'NZ'];
 
 const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
-  const { cubies, size, showTunnels, tunnelDetail, settings, tunnelBirths, tunnelPulses } = useGameStore(
+  const { cubies, size, showTunnels, tunnelDetail, settings, tunnelBirths, tunnelPulses, tunnelDeaths } = useGameStore(
     useShallow(s => ({
       cubies: s.cubies,
       size: s.size,
@@ -43,6 +44,7 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
       // These maps are pruned to in-flight animations only, so they are small.
       tunnelBirths: s.tunnelBirths,
       tunnelPulses: s.tunnelPulses,
+      tunnelDeaths: s.tunnelDeaths,
     }))
   );
   // Narrow deps: only the two settings fields that affect face-color resolution.
@@ -204,6 +206,10 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
           tunnelPulses={tunnelPulses}
         />
       ))}
+
+      {/* Death tier — pairs severed at FLIP_CAP, which are already absent from
+          tunnelData above and so carry their own endpoint anchors. */}
+      <TunnelSnap deaths={tunnelDeaths} cubieRefs={cubieRefs} />
     </group>
   );
 };

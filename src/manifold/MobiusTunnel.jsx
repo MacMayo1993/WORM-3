@@ -47,15 +47,29 @@ const _surfaceNormal = new THREE.Vector3();
 const _up            = new THREE.Vector3(0, 1, 0);
 const _side          = new THREE.Vector3(0, 0, 1);
 const _portalPos     = new THREE.Vector3();
+const _whipAxis      = new THREE.Vector3();
 
 // Vertex shader: pass UV + world position through to fragment.
 // vWorldPos feeds the fresnel silhouette glow (needs a view direction).
 const vertexShader = `
+  uniform vec3  uWhipAxis;   // world-space direction the ribbon snaps along
+  uniform float uWhipAmp;    // 0 when idle; decaying envelope during a flip
+  uniform float uWhipPhase;  // advances with the soliton, so the wave travels
+
   varying vec2 vUv;
   varying vec3 vWorldPos;
+
   void main() {
     vUv = uv;
     vec4 wp = modelMatrix * vec4(position, 1.0);
+
+    // Whip: a travelling transverse wave along the ribbon, pinned to zero at
+    // both tile ends so the anchors stay welded to their stickers. This is what
+    // makes a flip read as a physical event rather than only a brightness pop —
+    // the ribbon snaps taut as the soliton runs through it.
+    float ends = sin(vUv.y * 3.14159265);
+    wp.xyz += uWhipAxis * (sin(vUv.y * 12.0 - uWhipPhase) * uWhipAmp * ends);
+
     vWorldPos = wp.xyz;
     gl_Position = projectionMatrix * viewMatrix * wp;
   }
@@ -159,14 +173,27 @@ const fragmentShader = `
 // Bumper vertex shader: passes height fraction and trip fraction to fragment.
 // vTripFrac (0→1 along ribbon length) lets the fragment highlight the Möbius flip point.
 const bumperVertexShader = `
+  uniform vec3  uWhipAxis;
+  uniform float uWhipAmp;
+  uniform float uWhipPhase;
+
   attribute float aHeightFrac;
   attribute float aTripFrac;
   varying  float vHeightFrac;
   varying  float vTripFrac;
+
   void main() {
     vHeightFrac = aHeightFrac;
     vTripFrac   = aTripFrac;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+
+    // Same whip displacement as the ribbon, driven by the SAME uniform objects
+    // (shared by reference below) — otherwise the guard rails would stay put
+    // while the ribbon snapped out from under them.
+    vec3  p    = position;
+    float ends = sin(aTripFrac * 3.14159265);
+    p += uWhipAxis * (sin(aTripFrac * 12.0 - uWhipPhase) * uWhipAmp * ends);
+
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
   }
 `;
 
@@ -412,6 +439,15 @@ const MobiusTunnel = ({
 
   const { geo, leftGeo, rightGeo } = useMemo(() => createRibbonGeos(RIBBON_SEGS), []);
 
+  // Whip uniforms are created once and spread BY REFERENCE into the ribbon and
+  // both bumper materials, so all three read the same {value} objects and stay
+  // welded together while the ribbon snaps.
+  const whipUniforms = useMemo(() => ({
+    uWhipAxis:  { value: new THREE.Vector3(0, 1, 0) },
+    uWhipAmp:   { value: 0.0 },
+    uWhipPhase: { value: 0.0 },
+  }), []);
+
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const uniforms = useMemo(() => ({
     uColorA:      { value: new THREE.Color(color1) },
@@ -423,18 +459,21 @@ const MobiusTunnel = ({
     uPulseBoost:  { value: 0.0 },
     uSolitonProgress: { value: -1.0 },
     uSolitonAmp:      { value: 0.0 },
+    ...whipUniforms,
   }), []);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const bumperUniformsL = useMemo(() => ({
     uColor:   { value: new THREE.Color(color1) },
     uOpacity: { value: 0.93 },
+    ...whipUniforms,
   }), []);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const bumperUniformsR = useMemo(() => ({
     uColor:   { value: new THREE.Color(color2) },
     uOpacity: { value: 0.93 },
+    ...whipUniforms,
   }), []);
 
   useEffect(() => {
@@ -492,6 +531,13 @@ const MobiusTunnel = ({
       if (_perpBase.lengthSq() < 0.001) _perpBase.crossVectors(_axis, _up);
       if (_perpBase.lengthSq() < 0.001) _perpBase.crossVectors(_axis, _side);
       _perpBase.normalize();
+
+      // Whip displacement runs perpendicular to the ribbon SURFACE (axis × width
+      // direction). Displacing along _perpBase itself would only widen the band.
+      _whipAxis.crossVectors(_axis, _perpBase);
+      if (_whipAxis.lengthSq() < 0.001) _whipAxis.set(0, 1, 0);
+      _whipAxis.normalize();
+      whipUniforms.uWhipAxis.value.copy(_whipAxis);
 
       const dead = flips >= FLIP_CAP;
       const cA = dead ? '#555555' : color1;
@@ -581,9 +627,18 @@ const MobiusTunnel = ({
 
     // Tunnel birth: grow-in from both portal ends toward centre (first flip only)
     const birth = tunnelId ? tunnelBirths?.[tunnelId] : null;
+    let whipAmp = 0;
+    let whipPhase = 0;
     if (birth) {
       const rawT = (performance.now() - birth.startMs) / birth.durationMs;
       uniforms.uGrowT.value = Math.min(1, Math.max(0, rawT));
+      // A pair's first identification snaps hardest — this happens at most once
+      // per pair, so it can afford to be the biggest movement in the scene.
+      if (rawT < 1) {
+        const env = Math.sin(Math.max(0, rawT) * Math.PI);
+        whipAmp = env * env * 0.30;
+        whipPhase = rawT * 26.0;
+      }
     } else {
       uniforms.uGrowT.value = 1.0;
     }
@@ -599,6 +654,11 @@ const MobiusTunnel = ({
         uniforms.uPulseBoost.value = env;
         uniforms.uSolitonProgress.value = rawT; // entry → centre → exit
         uniforms.uSolitonAmp.value = env;       // fade in/out over the trip
+        // The whip rides the soliton: peaks at mid-travel and dies at both ends,
+        // so the ribbon visibly snaps as the pulse runs through it. Squaring the
+        // envelope keeps the movement tight rather than a slow wobble.
+        whipAmp = Math.max(whipAmp, env * env * 0.16);
+        whipPhase = rawT * 22.0;
       } else {
         uniforms.uPulseBoost.value = 0;
         uniforms.uSolitonAmp.value = 0;
@@ -608,6 +668,9 @@ const MobiusTunnel = ({
       uniforms.uSolitonAmp.value = 0;
     }
 
+    // Shared by reference with both bumper materials — write once.
+    whipUniforms.uWhipAmp.value = whipAmp;
+    whipUniforms.uWhipPhase.value = whipPhase;
   });
 
   return (

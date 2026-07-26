@@ -13,6 +13,7 @@ import { getManifoldMap } from '../game/manifoldMapStore.js';
 import { healSticker as healStickerState } from '../game/cubeState.js';
 import { getStickerWorldPos, getManifoldGridId } from '../game/coordinates.js';
 import { play } from '../utils/audio.js';
+import { feel } from '../utils/feel.js';
 import { ANTIPODAL_COLOR, FLIP_CAP } from '../utils/constants.js';
 import { resolveColors } from '../utils/colorSchemes.js';
 import { isInRefractory, markFlipped, clearRefractory } from '../game/refractoryMap.js';
@@ -200,6 +201,10 @@ export function useCubeState() {
     let antKey = null;
     let isFirstFlipOnPair = false;
     let pairId = null;
+    // Flip count on the tapped tile AFTER this flip — drives the audio pitch ladder.
+    let flipsAfter = 0;
+    // Populated only when this flip pushes the pair to FLIP_CAP and severs it.
+    let pairDeath = null;
 
     if (sticker) {
       const antipodalLoc = findAntipodalStickerByGrid(currentManifoldMap, sticker, currentSize);
@@ -232,12 +237,35 @@ export function useCubeState() {
       // Compute animation keys
       antKey = antipodalLoc ? `${antipodalLoc.x},${antipodalLoc.y},${antipodalLoc.z}` : null;
       isFirstFlipOnPair = sticker.flips === 0;
+      flipsAfter = Math.min(FLIP_CAP, (sticker.flips || 0) + 1);
       if (antipodalLoc) {
         const antipodalSticker = currentCubies[antipodalLoc.x]?.[antipodalLoc.y]?.[antipodalLoc.z]?.stickers?.[antipodalLoc.dirKey];
         if (antipodalSticker) {
           const srcGridId = getManifoldGridId(sticker, currentSize);
           const antGridId = getManifoldGridId(antipodalSticker, currentSize);
           pairId = [srcGridId, antGridId].sort().join('|');
+
+          // A pair is severed the moment EITHER side reaches FLIP_CAP — that is the
+          // condition WormholeNetwork uses to drop it from the network. Detect the
+          // transition here (both sides live before, at least one capped after) so
+          // the tunnel can die visibly instead of just vanishing on the next render.
+          const s1Before = sticker.flips || 0;
+          const s2Before = antipodalSticker.flips || 0;
+          const s1After = Math.min(FLIP_CAP, s1Before + 1);
+          const s2After = Math.min(FLIP_CAP, s2Before + 1);
+          if (s1Before < FLIP_CAP && s2Before < FLIP_CAP && (s1After >= FLIP_CAP || s2After >= FLIP_CAP)) {
+            const meshIdx = (x, y, z) => ((x * currentSize) + y) * currentSize + z;
+            pairDeath = {
+              startMs: now,
+              durationMs: 900,
+              meshIdx1: meshIdx(pos.x, pos.y, pos.z),
+              meshIdx2: meshIdx(antipodalLoc.x, antipodalLoc.y, antipodalLoc.z),
+              dirKey1: dirKey,
+              dirKey2: antipodalLoc.dirKey,
+              color1: antipodalColor,
+              color2: resolvedColorsRef.current[ANTIPODAL_COLOR[antipodalSticker.curr]],
+            };
+          }
         }
       }
     }
@@ -275,8 +303,22 @@ export function useCubeState() {
         ...pruneExpiredFx(state.tunnelPulses, now),
         [pairId]: { startMs: now, durationMs: 400 },
       } : pruneExpiredFx(state.tunnelPulses, now),
+      tunnelDeaths: (pairDeath && pairId) ? {
+        ...pruneExpiredFx(state.tunnelDeaths, now),
+        [pairId]: pairDeath,
+      } : pruneExpiredFx(state.tunnelDeaths, now),
       ...(isFirstFlip ? { hasFlippedOnce: true, firstFlipHighlightPair: null } : {}),
     }));
+
+    // Audio/haptic beat for the identification event. Ordered by significance:
+    // a severed pair overrides its own pulse, since the snap is the thing that
+    // just happened. `combo` carries the flip count — the escalation level for
+    // this event — so working one pair toward its cap climbs in pitch.
+    if (pairId) {
+      if (pairDeath) feel('tunnelSnap');
+      else if (isFirstFlipOnPair) feel('tunnelBirth');
+      else feel('tunnelPulse', { combo: flipsAfter });
+    }
 
     // The guided demo narrates flips itself — don't stack the first-flip
     // caption/tutorial on top of it (it lingers beneath the demo overlays).

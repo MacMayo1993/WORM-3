@@ -334,6 +334,7 @@ export const useGameStore = create(
       cubiePops: {},
       tunnelBirths: {},
       tunnelPulses: {},
+      tunnelDeaths: {},
     }),
 
     // ========================================================================
@@ -414,6 +415,11 @@ export const useGameStore = create(
     tunnelBirths: {},
     // Per-tunnel pulse (subsequent flip) animations: { pairId: { startMs, durationMs } }
     tunnelPulses: {},
+    // Per-tunnel death animations, fired when a pair reaches FLIP_CAP and is severed.
+    // Carries its own endpoint anchors (mesh indices, dirKeys, colours) because by
+    // the time this renders the pair is already gone from the tunnel network.
+    // { pairId: { startMs, durationMs, meshIdx1, meshIdx2, dirKey1, dirKey2, color1, color2 } }
+    tunnelDeaths: {},
     cycleVisualMode: () => set((state) => {
       const modes = ['classic', 'grid', 'sudokube', 'wireframe', 'glass', 'chrome', 'neon', 'gap', 'lego'];
       const idx = modes.indexOf(state.visualMode);
