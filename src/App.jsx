@@ -1623,8 +1623,11 @@ export default function WORM3() {
         </Suspense>
       )}
 
-      {/* Parity Store — mounted at app root so it's above every overlay */}
-      <ScreenTransition show={showStore}>
+      {/* Parity Store — mounted at app root so it's above every overlay. The
+          z-index lives on the fading wrapper: its will-change traps the store's
+          own z-index inside a stacking context, which left the top app bar
+          (.ui-layer, z-index 100) covering the store's masthead. */}
+      <ScreenTransition show={showStore} style={{ position: 'relative', zIndex: 100000 }}>
         <Suspense fallback={null}>
           <ParityStoreScreen onClose={handleCloseStore} />
         </Suspense>

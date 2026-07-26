@@ -35,7 +35,9 @@ export const wizardPaperBackground = {
 export const WIZARD_FOOTER_BG = 'rgba(245, 238, 222, 0.82)';
 
 // Pencil-lead ink used for the handwritten preview line (matches Mobi's dialogue).
-const PENCIL_LEAD = '#35404a';
+// Exported so any screen writing on this paper — the store's footer note, for
+// one — uses the same lead rather than picking its own grey.
+export const PENCIL_LEAD = '#35404a';
 
 /**
  * WizardPreviewNote — the demo's step-preview line for this mode, tabbed with the

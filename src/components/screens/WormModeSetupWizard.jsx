@@ -9,14 +9,17 @@ import { registerTilePreview, updateTilePreview, unregisterTilePreview } from '.
 import { isMobile } from '../../utils/device.js';
 import { extractColorsFromImage } from '../../utils/colorExtraction.js';
 import {
-  UI_FONT,
+  UI_FONT, DISPLAY_FONT,
   PAPER_BACKDROP, PAPER_BACKDROP_BLUR,
   PAPER_SHEET_RAISED, PAPER_BORDER, PAPER_BORDER_SOFT,
   PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT,
   PAPER_BG_MUTED, PAPER_CARD_SHADOW, PAPER_SHADOW,
+  NIGHT_BORDER, NIGHT_TEXT, NIGHT_TEXT_MUTED, NIGHT_SHADOW, NIGHT_TITLE_SHADOW,
+  UI_CREAM,
 } from '../../utils/uiTheme.js';
 import { BG_PREVIEWS } from '../../utils/bgPreviews.js';
 import { wizardPaperBackground, WIZARD_FOOTER_BG, WizardPreviewNote } from './WizardChrome.jsx';
+import { WormSkinIcon, HatIcon } from '../ui/CosmeticIcons.jsx';
 import { WIZARD_PREVIEW } from '../../utils/demoStepCopy.js';
 
 const BG_OPTIONS = BACKGROUNDS.map(bg => ({
@@ -237,7 +240,98 @@ const S = {
   },
 };
 
+// ── Character plate (NIGHT family) ────────────────────────────────────────────
+// The character step is the one place in this wizard where the panel is showing
+// something alive rather than a setting, so it takes the warm dark STEP COMPLETE
+// surface: the same faint field-guide grid as the paper, drawn in lamplight, lit
+// by the selected skin's glow. It used to be a cold near-black left over from
+// the retired navy glass family, which read as a different app dropped into the
+// middle of Mobi's notebook.
+const plateSurface = (glow) => ({
+  // NIGHT_SHEET's rgb, opaque: the plate sits on cream paper rather than over the
+  // 3D scene, so it takes the colour without the transparency.
+  backgroundColor: '#1c2316',
+  backgroundImage: [
+    `radial-gradient(ellipse at 50% 44%, ${glow}2b 0%, transparent 62%)`,
+    'linear-gradient(rgba(255,245,220,0.05) 1px, transparent 1px)',
+    'linear-gradient(90deg, rgba(255,245,220,0.05) 1px, transparent 1px)',
+    'linear-gradient(165deg, rgba(255,245,220,0.07), rgba(12,16,9,0.55))'
+  ].join(','),
+  backgroundSize: '100% 100%, 22px 22px, 22px 22px, 100% 100%',
+  transition: 'background-image 0.4s ease',
+});
+
+const plateArrow = {
+  background: 'rgba(255,245,220,0.10)',
+  border: `1.5px solid ${NIGHT_BORDER}`,
+  color: UI_CREAM,
+  width: '38px',
+  height: '38px',
+  borderRadius: '50%',
+  cursor: 'pointer',
+  fontSize: '22px',
+  lineHeight: 1,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  flexShrink: 0,
+  fontFamily: 'inherit',
+  transition: 'all 0.15s ease',
+  paddingBottom: '2px',
+  WebkitTapHighlightColor: 'transparent',
+};
+
 // ── Sub-components ────────────────────────────────────────────────────────────
+
+// Character stat readout. The stats have always been in wormCharacterData but
+// were never drawn, so every worm looked interchangeable at selection time.
+function StatBar({ label, value, color }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <span style={{
+        width: '44px', flexShrink: 0,
+        fontSize: '8px', fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase',
+        color: NIGHT_TEXT_MUTED,
+      }}>{label}</span>
+      <div style={{ flex: 1, height: '5px', borderRadius: '999px', background: 'rgba(255,245,220,0.13)', overflow: 'hidden' }}>
+        <div style={{
+          width: `${value}%`, height: '100%', borderRadius: '999px',
+          background: color, boxShadow: `0 0 8px ${color}88`,
+          transition: 'width 0.42s cubic-bezier(0.22,1,0.36,1), background 0.4s ease',
+        }} />
+      </div>
+    </div>
+  );
+}
+
+// Small padlock for cosmetics that have to be bought in the Parity Store first.
+function LockPip({ size = 10, color = PAPER_TEXT_FAINT }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" style={{ display: 'block', flexShrink: 0 }} aria-hidden="true">
+      <path d="M5 7V5a3 3 0 0 1 6 0v2" fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
+      <rect x="3.2" y="7" width="9.6" height="7" rx="2" fill={color} />
+    </svg>
+  );
+}
+
+// Heading for the cosmetic pickers. Carries a live count of what is still locked
+// so the Parity Store has a visible reason to exist from inside the wizard.
+function PickerHeading({ label, hint, locked = 0 }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'baseline', gap: '9px', marginBottom: '8px' }}>
+      <span style={{ fontSize: '11px', fontWeight: 700, color: PAPER_TEXT_FAINT, letterSpacing: '0.14em', textTransform: 'uppercase' }}>{label}</span>
+      {hint && <span style={{ fontSize: '10px', color: PAPER_TEXT_FAINT }}>{hint}</span>}
+      {locked > 0 && (
+        <span style={{
+          marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: '5px',
+          fontSize: '9px', fontWeight: 700, letterSpacing: '0.06em', color: PAPER_TEXT_FAINT,
+        }}>
+          <LockPip size={9} /> {locked} in the store
+        </span>
+      )}
+    </div>
+  );
+}
 
 function Checkmark() {
   return (
@@ -732,9 +826,18 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       transition: 'all 0.18s ease', fontFamily: 'inherit',
     };
 
+    const lockedSkins = WORM_SKINS.filter(s => !ownedItems.includes(`skin_${s.id}`)).length;
+    const lockedHats = WORM_HATS.filter(h => !ownedItems.includes(`hat_${h.id}`)).length;
+
     const charIndex = WORM_CHARACTERS.findIndex(c => c.id === wormCharacterId);
     const prevChar = () => setWormCharacter(WORM_CHARACTERS[(charIndex - 1 + WORM_CHARACTERS.length) % WORM_CHARACTERS.length].id);
     const nextChar = () => setWormCharacter(WORM_CHARACTERS[(charIndex + 1) % WORM_CHARACTERS.length].id);
+
+    // "Steady Crawler — reliable healing on every cube size" → named trait plus
+    // its explanation, so the trait itself can be set apart from the prose.
+    const [rawTrait, ...traitRest] = activeCharacter.special.split('—');
+    const traitName = rawTrait.trim();
+    const traitDetail = traitRest.join('—').trim();
 
     const isInch = wormCharacterId === 'inch';
     const isGlow = wormCharacterId === 'glow';
@@ -934,79 +1037,112 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
-        {/* ── Hero-select card ── */}
+        {/* ── Character plate ── */}
         <div style={{
-          borderRadius: '16px',
+          borderRadius: '18px',
           overflow: 'hidden',
-          border: '1.5px solid rgba(255,255,255,0.10)',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.22)',
+          border: `1.5px solid ${NIGHT_BORDER}`,
+          boxShadow: NIGHT_SHADOW,
         }}>
           <div style={{
-            background: `radial-gradient(ellipse at 60% 50%, ${activeSkin.glow}22 0%, #0d0818 55%, #060410 100%)`,
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            padding: isMobile ? '24px 12px 20px' : '28px 16px 22px',
+            ...plateSurface(activeSkin.glow),
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            padding: isMobile ? '14px 14px 16px' : '16px 20px 18px',
             position: 'relative',
-            minHeight: isMobile ? '200px' : '240px',
             gap: '12px',
-            transition: 'background 0.4s ease',
           }}>
-            {/* Floor glow */}
-            <div style={{
-              position: 'absolute', bottom: '16px', left: '50%', transform: 'translateX(-50%)',
-              width: '160px', height: '16px',
-              background: `radial-gradient(ellipse, ${activeSkin.glow}44 0%, transparent 70%)`,
-              borderRadius: '50%', pointerEvents: 'none', transition: 'background 0.4s ease',
-            }} />
-
-            {/* Arrows + SVG worm */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '8px' : '14px', justifyContent: 'center', position: 'relative', zIndex: 1 }}>
-              <button onClick={prevChar} style={{
-                background: 'rgba(255,255,255,0.1)', border: '1.5px solid rgba(255,255,255,0.22)',
-                color: '#fff', width: '34px', height: '34px', borderRadius: '50%',
-                cursor: 'pointer', fontSize: '20px', lineHeight: '1',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                flexShrink: 0, fontFamily: 'inherit', transition: 'all 0.15s ease',
-                paddingBottom: '1px',
-              }}>‹</button>
-
-              {renderWormSVG()}
-
-              <button onClick={nextChar} style={{
-                background: 'rgba(255,255,255,0.1)', border: '1.5px solid rgba(255,255,255,0.22)',
-                color: '#fff', width: '34px', height: '34px', borderRadius: '50%',
-                cursor: 'pointer', fontSize: '20px', lineHeight: '1',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                flexShrink: 0, fontFamily: 'inherit', transition: 'all 0.15s ease',
-                paddingBottom: '1px',
-              }}>›</button>
+            {/* Plate caption + position in the set */}
+            <div style={{ alignSelf: 'stretch', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontSize: '9px', fontWeight: 800, letterSpacing: '0.18em', textTransform: 'uppercase', color: NIGHT_TEXT_MUTED }}>
+                Specimen
+              </span>
+              <div style={{ flex: 1, height: '1px', background: NIGHT_BORDER }} />
+              <span style={{ fontSize: '9px', fontWeight: 800, letterSpacing: '0.1em', color: NIGHT_TEXT_MUTED }}>
+                {charIndex + 1} / {WORM_CHARACTERS.length}
+              </span>
             </div>
 
-            {/* Name, type, special */}
-            <div style={{ textAlign: 'center', zIndex: 1 }}>
-              <div style={{ fontSize: isMobile ? '17px' : '20px', fontWeight: '800', color: '#fff', letterSpacing: '-0.2px', lineHeight: 1.1, marginBottom: '6px' }}>
+            {/* Arrows + SVG worm */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '10px',
+              justifyContent: 'center', position: 'relative', alignSelf: 'stretch',
+            }}>
+              {/* Floor glow, under the worm */}
+              <div style={{
+                position: 'absolute', bottom: '4px', left: '50%', transform: 'translateX(-50%)',
+                width: '170px', height: '18px',
+                background: `radial-gradient(ellipse, ${activeSkin.glow}4d 0%, transparent 70%)`,
+                borderRadius: '50%', pointerEvents: 'none', transition: 'background 0.4s ease',
+              }} />
+
+              <button onClick={prevChar} aria-label="Previous character" style={plateArrow}>‹</button>
+              <div style={{ zIndex: 1, display: 'flex', justifyContent: 'center', flex: 1 }}>{renderWormSVG()}</div>
+              <button onClick={nextChar} aria-label="Next character" style={plateArrow}>›</button>
+            </div>
+
+            {/* Name plate */}
+            <div style={{ textAlign: 'center' }}>
+              <div style={{
+                fontFamily: DISPLAY_FONT,
+                fontSize: isMobile ? '15px' : '18px',
+                color: UI_CREAM, letterSpacing: '0.02em', lineHeight: 1.15,
+                textShadow: NIGHT_TITLE_SHADOW, marginBottom: '7px',
+              }}>
                 {activeCharacter.label.toUpperCase()}
               </div>
               <div style={{
-                display: 'inline-flex', alignItems: 'center',
+                display: 'inline-flex', alignItems: 'center', gap: '6px',
                 background: `${activeSkin.glow}28`, border: `1px solid ${activeSkin.glow}55`,
                 color: activeSkin.glow, fontSize: '9px', fontWeight: '800',
-                letterSpacing: '0.16em', textTransform: 'uppercase', padding: '3px 10px', borderRadius: '20px',
-                marginBottom: '7px',
-              }}>{activeCharacter.type}</div>
-              <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.58)', fontStyle: 'italic', maxWidth: '280px', lineHeight: 1.5 }}>
-                {activeCharacter.special}
+                letterSpacing: '0.16em', textTransform: 'uppercase', padding: '3px 11px', borderRadius: '999px',
+                transition: 'all 0.4s ease',
+              }}>
+                {activeCharacter.type}
+                <span style={{ opacity: 0.5 }}>·</span>
+                <span style={{ letterSpacing: '0.06em', textTransform: 'none', fontWeight: 600, opacity: 0.85 }}>
+                  {activeCharacter.subtitle}
+                </span>
               </div>
+            </div>
+
+            {/* Stat readout */}
+            <div style={{
+              alignSelf: 'stretch',
+              display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+              gap: isMobile ? '7px' : '8px 20px',
+              padding: '12px 14px',
+              borderRadius: '12px',
+              background: 'rgba(255,245,220,0.05)',
+              border: `1px solid ${NIGHT_BORDER}`,
+            }}>
+              <StatBar label="Speed"   value={activeCharacter.stats.speed}   color={activeSkin.glow} />
+              <StatBar label="Heal"    value={activeCharacter.stats.healing} color={activeSkin.glow} />
+              <StatBar label="Agility" value={activeCharacter.stats.agility} color={activeSkin.glow} />
+              <StatBar label="Glow"    value={activeCharacter.stats.glow}    color={activeSkin.glow} />
+            </div>
+
+            {/* Signature trait */}
+            <div style={{
+              alignSelf: 'stretch', display: 'flex', gap: '9px', alignItems: 'flex-start',
+              paddingLeft: '2px',
+            }}>
+              <span style={{ color: activeSkin.glow, fontSize: '10px', lineHeight: 1.6, flexShrink: 0 }}>◆</span>
+              <span style={{ fontSize: '11px', color: NIGHT_TEXT_MUTED, lineHeight: 1.5 }}>
+                <span style={{ color: NIGHT_TEXT, fontWeight: 700 }}>{traitName}</span>
+                {traitDetail ? ` — ${traitDetail}` : ''}
+              </span>
             </div>
 
             {/* Page dots */}
             <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
               {WORM_CHARACTERS.map(c => (
-                <button key={c.id} onClick={() => setWormCharacter(c.id)} style={{
-                  width: c.id === wormCharacterId ? '20px' : '7px',
+                <button key={c.id} onClick={() => setWormCharacter(c.id)} aria-label={c.label} style={{
+                  width: c.id === wormCharacterId ? '22px' : '7px',
                   height: '7px', borderRadius: '4px',
-                  background: c.id === wormCharacterId ? '#fff' : 'rgba(255,255,255,0.3)',
+                  background: c.id === wormCharacterId ? UI_CREAM : 'rgba(255,245,220,0.28)',
                   border: 'none', cursor: 'pointer', padding: 0,
                   transition: 'all 0.28s cubic-bezier(0.4,0,0.2,1)',
+                  WebkitTapHighlightColor: 'transparent',
                 }} />
               ))}
             </div>
@@ -1015,7 +1151,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
 
         {/* ── Skin picker ── */}
         <div>
-          <div style={{ fontSize: '11px', fontWeight: 700, color: PAPER_TEXT_FAINT, letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: '8px' }}>Skin</div>
+          <PickerHeading label="Skin" locked={lockedSkins} />
           <div style={{ display: 'flex', gap: '7px', overflowX: 'auto', paddingBottom: '4px' }}>
             {WORM_SKINS.map(skin => {
               const owned = ownedItems.includes(`skin_${skin.id}`);
@@ -1023,20 +1159,26 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
               return (
                 <button key={skin.id} onClick={() => owned && setWormSkin(skin.id)} style={{
                   ...chipBase, flexShrink: 0,
-                  padding: '8px 10px 6px',
-                  background: selected ? PAPER_SHEET_RAISED : PAPER_BG_MUTED,
-                  border: selected ? `2px solid ${skin.body}` : '2px solid #d6d0c8',
-                  boxShadow: selected ? `0 3px 0 ${skin.body}66` : `0 2px 0 ${PAPER_CARD_SHADOW}`,
-                  transform: selected ? 'translateY(0)' : 'none',
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px',
-                  opacity: owned ? 1 : 0.4,
+                  padding: '7px 9px 6px',
+                  background: selected ? PAPER_SHEET_RAISED : 'rgba(255,255,255,0.62)',
+                  border: selected ? `2px solid ${skin.body}` : `2px solid ${PAPER_BORDER_SOFT}`,
+                  boxShadow: selected ? `0 3px 0 ${skin.body}66, 0 5px 14px ${skin.glow}3d` : `0 2px 0 ${PAPER_CARD_SHADOW}`,
+                  transform: selected ? 'translateY(-1px)' : 'none',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
+                  opacity: owned ? 1 : 0.5,
                   cursor: owned ? 'pointer' : 'not-allowed',
                   position: 'relative',
-                  minWidth: '58px',
+                  minWidth: '60px',
                 }}>
-                  <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: owned ? skin.body : '#bbb', boxShadow: owned ? `0 2px 4px ${skin.glow}66` : 'none' }} />
-                  <span style={{ fontSize: '9px', fontWeight: 700, color: selected ? skin.body : PAPER_TEXT_FAINT, letterSpacing: '0.06em' }}>{skin.label}</span>
-                  {!owned && <span style={{ position: 'absolute', top: '3px', right: '3px', fontSize: '8px' }}>🔒</span>}
+                  {/* Locked skins keep their colour, the same as in the store —
+                      a grey worm tells you nothing about what you'd be buying. */}
+                  <div style={{ filter: owned ? 'none' : 'saturate(0.5)' }}>
+                    <WormSkinIcon skin={skin} size={30} />
+                  </div>
+                  <span style={{ fontSize: '9px', fontWeight: 700, color: selected ? skin.body : PAPER_TEXT_FAINT, letterSpacing: '0.05em' }}>{skin.label}</span>
+                  {!owned && (
+                    <span style={{ position: 'absolute', top: '4px', right: '4px' }}><LockPip size={9} /></span>
+                  )}
                 </button>
               );
             })}
@@ -1045,27 +1187,31 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
 
         {/* ── Hat picker ── */}
         <div>
-          <div style={{ fontSize: '11px', fontWeight: 700, color: PAPER_TEXT_FAINT, letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: '8px' }}>Hat</div>
-          <div style={{ display: 'flex', gap: '7px', flexWrap: 'wrap' }}>
+          <PickerHeading label="Hat" locked={lockedHats} />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(66px, 1fr))', gap: '7px' }}>
             {WORM_HATS.map(hat => {
               const owned = ownedItems.includes(`hat_${hat.id}`);
               const selected = hat.id === wormHatId;
               return (
                 <button key={hat.id} onClick={() => owned && setWormHat(hat.id)} style={{
                   ...chipBase,
-                  padding: '9px 14px',
-                  background: selected ? `${ACCENT}12` : PAPER_BG_MUTED,
-                  border: selected ? `2px solid ${ACCENT}` : '2px solid #d6d0c8',
-                  boxShadow: selected ? `inset 0 2px 4px rgba(0,0,0,0.08)` : `0 2px 0 ${PAPER_CARD_SHADOW}`,
+                  padding: '8px 6px 6px',
+                  background: selected ? `${ACCENT}12` : 'rgba(255,255,255,0.62)',
+                  border: selected ? `2px solid ${ACCENT}` : `2px solid ${PAPER_BORDER_SOFT}`,
+                  boxShadow: selected ? 'inset 0 2px 4px rgba(83,72,56,0.12)' : `0 2px 0 ${PAPER_CARD_SHADOW}`,
                   transform: selected ? 'translateY(1px)' : 'none',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  minWidth: '60px',
-                  opacity: owned ? 1 : 0.4,
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
+                  opacity: owned ? 1 : 0.5,
                   cursor: owned ? 'pointer' : 'not-allowed',
+                  position: 'relative',
                 }}>
-                  <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', color: selected ? ACCENT : PAPER_TEXT_MUTED }}>
-                    {hat.label}{!owned ? ' 🔒' : ''}
+                  <HatIcon hatId={hat.id} color={selected ? ACCENT : PAPER_TEXT_FAINT} size={26} />
+                  <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.05em', color: selected ? ACCENT : PAPER_TEXT_MUTED, lineHeight: 1.2, textAlign: 'center' }}>
+                    {hat.label}
                   </span>
+                  {!owned && (
+                    <span style={{ position: 'absolute', top: '4px', right: '4px' }}><LockPip size={9} /></span>
+                  )}
                 </button>
               );
             })}
@@ -1074,8 +1220,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
 
         {/* ── Trail toggle ── */}
         <div>
-          <div style={{ fontSize: '11px', fontWeight: 700, color: PAPER_TEXT_FAINT, letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: '4px' }}>Trail</div>
-          <div style={{ fontSize: '10px', color: 'rgba(0,0,0,0.38)', marginBottom: '8px' }}>Mark tiles you've visited</div>
+          <PickerHeading label="Trail" hint="Mark tiles you've visited" />
           <div style={{ display: 'flex', gap: '7px' }}>
             {[{ val: true, label: 'On' }, { val: false, label: 'Off' }].map(({ val, label }) => {
               const selected = wormShowTrail === val;
@@ -1083,10 +1228,10 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
               return (
                 <button key={String(val)} onClick={() => setWormShowTrail(val)} style={{
                   ...chipBase,
-                  padding: '9px 22px',
-                  background: selected ? `${accent}18` : PAPER_BG_MUTED,
-                  border: selected ? `2px solid ${accent}` : '2px solid #d6d0c8',
-                  boxShadow: selected ? `inset 0 2px 4px rgba(0,0,0,0.08)` : `0 2px 0 ${PAPER_CARD_SHADOW}`,
+                  padding: '9px 24px',
+                  background: selected ? `${accent}18` : 'rgba(255,255,255,0.62)',
+                  border: selected ? `2px solid ${accent}` : `2px solid ${PAPER_BORDER_SOFT}`,
+                  boxShadow: selected ? 'inset 0 2px 4px rgba(83,72,56,0.12)' : `0 2px 0 ${PAPER_CARD_SHADOW}`,
                   transform: selected ? 'translateY(1px)' : 'none',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
