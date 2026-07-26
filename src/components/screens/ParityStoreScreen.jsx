@@ -16,7 +16,7 @@ import {
   PAPER_BG_MUTED, PAPER_CARD_SHADOW, PAPER_SHADOW, UI_CREAM,
 } from '../../utils/uiTheme.js';
 import { wizardPaperBackground, WIZARD_FOOTER_BG, PENCIL_LEAD } from './WizardChrome.jsx';
-import { WormSkinIcon, HatIcon } from '../ui/CosmeticIcons.jsx';
+import WormPreviewCanvas from '../../3d/WormPreviewCanvas.jsx';
 import './ParityStoreScreen.css';
 
 const ACCENT = '#0891B2';
@@ -124,9 +124,15 @@ const SchemeDots = ({ schemeKey, gap = '3px', radius = '3px' }) => {
 // ── Item artwork ──────────────────────────────────────────────────────────────
 // One renderer for both the grid card and the big preview, so an item is drawn
 // the same way at both sizes.
-const ItemArt = ({ item, size, accent }) => {
-  if (item.type === 'skin')   return <WormSkinIcon skin={item} size={size} />;
-  if (item.type === 'hat')    return <HatIcon hatId={item.hatId} color={accent} size={size * 0.66} />;
+const ItemArt = ({ item, size, characterId, skinId }) => {
+  // Skins and hats are drawn by the game's own worm renderer, so what you buy
+  // is what crawls: same clearcoat beads, same 3D hat, same face.
+  if (item.type === 'skin') return (
+    <WormPreviewCanvas characterId={characterId} skinId={item.skinId} size={size} />
+  );
+  if (item.type === 'hat') return (
+    <WormPreviewCanvas characterId={characterId} skinId={skinId} hatId={item.hatId} size={size} framing="head" />
+  );
   if (item.type === 'scheme') return (
     <div style={{ width: size * 0.92 }}>
       <SchemeDots schemeKey={item.schemeKey} gap={size > 70 ? '6px' : '3px'} radius={size > 70 ? '5px' : '3px'} />
@@ -158,7 +164,7 @@ const SpecimenWell = ({ children, height, locked, style }) => (
 );
 
 // ── Purchase / preview modal ──────────────────────────────────────────────────
-const PreviewModal = ({ item, owned, pp, onClose, onBuy, onEquip }) => {
+const PreviewModal = ({ item, owned, pp, characterId, skinId, onClose, onBuy, onEquip }) => {
   const ac = typeAccent(item);
   const canAfford = pp >= item.price;
 
@@ -213,7 +219,7 @@ const PreviewModal = ({ item, owned, pp, onClose, onBuy, onEquip }) => {
 
         {/* Large specimen */}
         <SpecimenWell height="150px">
-          <ItemArt item={item} size={120} accent={ac} />
+          <ItemArt item={item} size={124} characterId={characterId} skinId={skinId} />
         </SpecimenWell>
 
         {/* Name plate */}
@@ -271,7 +277,7 @@ const PreviewModal = ({ item, owned, pp, onClose, onBuy, onEquip }) => {
 };
 
 // ── Item card ─────────────────────────────────────────────────────────────────
-const ItemCard = ({ item, owned, equipped, pp, index, onPreview, onEquip }) => {
+const ItemCard = ({ item, owned, equipped, pp, index, characterId, skinId, onPreview, onEquip }) => {
   const ac = typeAccent(item);
   const canAfford = pp >= item.price;
   const locked = !owned;
@@ -315,8 +321,8 @@ const ItemCard = ({ item, owned, equipped, pp, index, onPreview, onEquip }) => {
         }}><LockIcon size={10} color={canAfford ? ac : PAPER_TEXT_FAINT} /></span>
       ) : null}
 
-      <SpecimenWell height="52px" locked={locked}>
-        <ItemArt item={item} size={46} accent={equipped ? ac : PAPER_TEXT_FAINT} />
+      <SpecimenWell height="56px" locked={locked}>
+        <ItemArt item={item} size={52} characterId={characterId} skinId={skinId} />
       </SpecimenWell>
 
       {/* Label */}
@@ -384,12 +390,13 @@ const TILE_SECTIONS = TILE_STYLE_SECTIONS.map(section => ({
 const ParityStoreScreen = ({ onClose }) => {
   const [tab, setTab] = useState('skins');
 
-  const { parityPoints, ownedItems, wormSkin, wormHat, buyItem, setWormSkin, setWormHat } =
+  const { parityPoints, ownedItems, wormSkin, wormHat, wormCharacter, buyItem, setWormSkin, setWormHat } =
     useGameStore(useShallow(s => ({
       parityPoints: s.parityPoints,
       ownedItems: s.ownedItems,
       wormSkin: s.wormSkin,
       wormHat: s.wormHat,
+      wormCharacter: s.wormCharacter,
       buyItem: s.buyItem,
       setWormSkin: s.setWormSkin,
       setWormHat: s.setWormHat,
@@ -460,6 +467,7 @@ const ParityStoreScreen = ({ onClose }) => {
         return (
           <ItemCard
             key={item.id} item={item} index={i}
+            characterId={wormCharacter} skinId={wormSkin}
             owned={owned} equipped={isEquipped(item)} pp={parityPoints}
             onPreview={() => setPreviewItem(item)}
             onEquip={() => { equip(item); showToast(`${item.label} applied`); }}
@@ -655,6 +663,7 @@ const ParityStoreScreen = ({ onClose }) => {
           item={previewItem}
           owned={ownedItems.includes(previewItem.id)}
           pp={parityPoints}
+          characterId={wormCharacter} skinId={wormSkin}
           onClose={() => setPreviewItem(null)}
           onBuy={() => { handleBuy(previewItem); setPreviewItem(null); }}
           onEquip={() => { equip(previewItem); showToast(`${previewItem.label} applied`); setPreviewItem(null); }}

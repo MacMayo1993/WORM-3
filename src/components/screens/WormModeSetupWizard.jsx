@@ -19,7 +19,7 @@ import {
 } from '../../utils/uiTheme.js';
 import { BG_PREVIEWS } from '../../utils/bgPreviews.js';
 import { wizardPaperBackground, WIZARD_FOOTER_BG, WizardPreviewNote } from './WizardChrome.jsx';
-import { WormSkinIcon, HatIcon } from '../ui/CosmeticIcons.jsx';
+import WormPreviewCanvas from '../../3d/WormPreviewCanvas.jsx';
 import { WIZARD_PREVIEW } from '../../utils/demoStepCopy.js';
 
 const BG_OPTIONS = BACKGROUNDS.map(bg => ({
@@ -282,27 +282,6 @@ const plateArrow = {
 };
 
 // ── Sub-components ────────────────────────────────────────────────────────────
-
-// Character stat readout. The stats have always been in wormCharacterData but
-// were never drawn, so every worm looked interchangeable at selection time.
-function StatBar({ label, value, color }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-      <span style={{
-        width: '44px', flexShrink: 0,
-        fontSize: '8px', fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase',
-        color: NIGHT_TEXT_MUTED,
-      }}>{label}</span>
-      <div style={{ flex: 1, height: '5px', borderRadius: '999px', background: 'rgba(255,245,220,0.13)', overflow: 'hidden' }}>
-        <div style={{
-          width: `${value}%`, height: '100%', borderRadius: '999px',
-          background: color, boxShadow: `0 0 8px ${color}88`,
-          transition: 'width 0.42s cubic-bezier(0.22,1,0.36,1), background 0.4s ease',
-        }} />
-      </div>
-    </div>
-  );
-}
 
 // Small padlock for cosmetics that have to be bought in the Parity Store first.
 function LockPip({ size = 10, color = PAPER_TEXT_FAINT }) {
@@ -839,200 +818,6 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     const traitName = rawTrait.trim();
     const traitDetail = traitRest.join('—').trim();
 
-    const isInch = wormCharacterId === 'inch';
-    const isGlow = wormCharacterId === 'glow';
-    const isBook = wormCharacterId === 'book';
-    const isWiggle = wormCharacterId === 'wiggle';
-    const isPrism = wormCharacterId === 'prism';
-    // ── SVG worm preview ────────────────────────────────────────────────────────
-    const renderWormSVG = () => {
-      const W = 224, H = 120;
-      const headCx = 170, headCy = 60, headR = 27;
-      const neckX = headCx - headR + 6; // 149
-      const neckY = headCy;             // 60
-
-      // Inchworm: quadratic arch. Wiggle: pronounced multi-wave slither. Others: gentle cubic S-curve.
-      const bodyPath = isInch
-        ? `M 58,72 Q 100,18 ${neckX},${neckY}`
-        : isWiggle
-        ? `M 30,60 Q 52,30 74,60 T 118,60 T ${neckX},${neckY}`
-        : `M 38,63 C 72,56 114,68 ${neckX},${neckY}`;
-      const bodyWidth = isInch ? 20 : isWiggle ? 21 : 27;
-
-      // Bezier helper for segment-ring positions along the cubic body path
-      const bezierPt = t => {
-        const [p0x, p0y, p1x, p1y, p2x, p2y, p3x, p3y] = [38, 63, 72, 56, 114, 68, neckX, neckY];
-        const mt = 1 - t;
-        return [
-          mt*mt*mt*p0x + 3*mt*mt*t*p1x + 3*mt*t*t*p2x + t*t*t*p3x,
-          mt*mt*mt*p0y + 3*mt*mt*t*p1y + 3*mt*t*t*p2y + t*t*t*p3y,
-        ];
-      };
-
-      return (
-        <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ overflow: 'visible', display: 'block', flexShrink: 0 }}>
-
-          {/* Prism rainbow gradient — used for body + head when the Prism Worm is selected */}
-          {isPrism && (
-            <defs>
-              <linearGradient id="prismGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#ef4444" />
-                <stop offset="20%" stopColor="#f59e0b" />
-                <stop offset="40%" stopColor="#facc15" />
-                <stop offset="60%" stopColor="#22c55e" />
-                <stop offset="80%" stopColor="#3b82f6" />
-                <stop offset="100%" stopColor="#a855f7" />
-              </linearGradient>
-            </defs>
-          )}
-
-          {/* Glow bloom behind body */}
-          {isGlow && (
-            <path d={bodyPath} stroke={activeSkin.glow} strokeWidth={bodyWidth + 18} fill="none" strokeLinecap="round" opacity={0.14} />
-          )}
-
-          {/* Body stroke — thick rounded path */}
-          <path d={bodyPath} stroke={isPrism ? 'url(#prismGrad)' : activeSkin.belly} strokeWidth={bodyWidth} fill="none" strokeLinecap="round" />
-
-          {/* Subtle segment rings along body (non-inchworm, non-wiggle — wiggle uses a wavy path) */}
-          {!isInch && !isWiggle && [0.25, 0.50, 0.72].map((t, idx) => {
-            const [bx, by] = bezierPt(t);
-            return (
-              <ellipse key={idx} cx={bx} cy={by} rx={5 + idx * 2} ry={bodyWidth / 2 + 1}
-                fill={activeSkin.body} opacity={0.22} style={{ pointerEvents: 'none' }} />
-            );
-          })}
-
-          {/* Glow worm bioluminescent rings */}
-          {isGlow && [0.28, 0.58].map((t, idx) => {
-            const [bx, by] = bezierPt(t);
-            return (
-              <ellipse key={idx} cx={bx} cy={by} rx={22} ry={17}
-                fill="none" stroke={activeSkin.glow} strokeWidth="2.5" opacity={0.45} />
-            );
-          })}
-
-          {/* Inchworm prolegs at arch base and near head */}
-          {isInch && (<>
-            <line x1={neckX - 5} y1={neckY + 7} x2={neckX - 14} y2={neckY + 19} stroke={activeSkin.belly} strokeWidth="3" strokeLinecap="round" />
-            <line x1={neckX + 3} y1={neckY + 7} x2={neckX + 5} y2={neckY + 19} stroke={activeSkin.belly} strokeWidth="3" strokeLinecap="round" />
-            <line x1="56" y1="72" x2="46" y2="84" stroke={activeSkin.belly} strokeWidth="3" strokeLinecap="round" />
-            <line x1="62" y1="72" x2="66" y2="84" stroke={activeSkin.belly} strokeWidth="3" strokeLinecap="round" />
-          </>)}
-
-          {/* Head circle */}
-          <circle cx={headCx} cy={headCy} r={headR} fill={isPrism ? 'url(#prismGrad)' : activeSkin.body} />
-          {isGlow && (
-            <circle cx={headCx} cy={headCy} r={headR + 7} fill="none" stroke={activeSkin.glow} strokeWidth="2.5" opacity={0.32} />
-          )}
-
-          {/* Book glasses lens fills (before eyes) */}
-          {isBook && (<>
-            <circle cx={headCx - 10} cy={headCy - 6} r={8} fill="rgba(255,255,255,0.88)" />
-            <circle cx={headCx + 10} cy={headCy - 6} r={8} fill="rgba(255,255,255,0.88)" />
-          </>)}
-
-          {/* Eyes */}
-          <circle cx={headCx - 10} cy={headCy - 6} r="7" fill="white" />
-          <circle cx={headCx + 10} cy={headCy - 6} r="7" fill="white" />
-          <circle cx={headCx - 8} cy={headCy - 6} r="4" fill="#111" />
-          <circle cx={headCx + 12} cy={headCy - 6} r="4" fill="#111" />
-          <circle cx={headCx - 6} cy={headCy - 8} r="1.5" fill="white" />
-          <circle cx={headCx + 14} cy={headCy - 8} r="1.5" fill="white" />
-
-          {/* Book glasses ring overlay */}
-          {isBook && (<>
-            <circle cx={headCx - 10} cy={headCy - 6} r={8} fill="none" stroke="#222" strokeWidth="1.8" />
-            <circle cx={headCx + 10} cy={headCy - 6} r={8} fill="none" stroke="#222" strokeWidth="1.8" />
-            <line x1={headCx - 2} y1={headCy - 6} x2={headCx + 2} y2={headCy - 6} stroke="#222" strokeWidth="1.5" />
-          </>)}
-
-          {/* Smile */}
-          <path d={`M ${headCx - 8},${headCy + 5} Q ${headCx},${headCy + 12} ${headCx + 8},${headCy + 5}`}
-            stroke="#222" strokeWidth="2" fill="none" strokeLinecap="round" opacity="0.75" />
-
-          {/* Antennae */}
-          {!isInch && (<>
-            <line x1={headCx - 8} y1={headCy - headR + 4} x2={headCx - 22} y2={headCy - headR - 17}
-              stroke={activeSkin.antenna} strokeWidth="2.5" strokeLinecap="round" />
-            <circle cx={headCx - 22} cy={headCy - headR - 17} r="4.5" fill={activeSkin.glow} />
-            <line x1={headCx + 8} y1={headCy - headR + 4} x2={headCx + 22} y2={headCy - headR - 17}
-              stroke={activeSkin.antenna} strokeWidth="2.5" strokeLinecap="round" />
-            <circle cx={headCx + 22} cy={headCy - headR - 17} r="4.5" fill={activeSkin.glow} />
-          </>)}
-          {isInch && (<>
-            <line x1={headCx - 5} y1={headCy - headR + 4} x2={headCx - 12} y2={headCy - headR - 9}
-              stroke={activeSkin.antenna} strokeWidth="2" strokeLinecap="round" />
-            <circle cx={headCx - 12} cy={headCy - headR - 9} r="3" fill={activeSkin.glow} />
-            <line x1={headCx + 5} y1={headCy - headR + 4} x2={headCx + 12} y2={headCy - headR - 9}
-              stroke={activeSkin.antenna} strokeWidth="2" strokeLinecap="round" />
-            <circle cx={headCx + 12} cy={headCy - headR - 9} r="3" fill={activeSkin.glow} />
-          </>)}
-
-          {/* Hats */}
-          {wormHatId === 'tophat' && (<>
-            <rect x={headCx - 13} y={headCy - headR - 26} width="26" height="21" rx="3" fill="#111" />
-            <rect x={headCx - 20} y={headCy - headR - 6} width="40" height="6" rx="2" fill="#111" />
-            <rect x={headCx - 12} y={headCy - headR - 8} width="24" height="4" fill="#ef4444" />
-          </>)}
-          {wormHatId === 'party' && (<>
-            <polygon points={`${headCx},${headCy - headR - 25} ${headCx - 17},${headCy - headR} ${headCx + 17},${headCy - headR}`} fill="#f97316" />
-            <line x1={headCx - 9} y1={headCy - headR - 14} x2={headCx + 9} y2={headCy - headR - 14} stroke="#ef4444" strokeWidth="1.5" />
-            <circle cx={headCx} cy={headCy - headR - 25} r="2.5" fill="white" />
-          </>)}
-          {wormHatId === 'crown' && (<>
-            <polygon points={`${headCx - 18},${headCy - headR} ${headCx - 10},${headCy - headR - 16} ${headCx},${headCy - headR - 8} ${headCx + 10},${headCy - headR - 16} ${headCx + 18},${headCy - headR}`} fill="#f59e0b" />
-            <rect x={headCx - 18} y={headCy - headR - 2} width="36" height="8" rx="2" fill="#f59e0b" />
-          </>)}
-          {wormHatId === 'halo' && (
-            <ellipse cx={headCx} cy={headCy - headR - 8} rx="19" ry="6"
-              fill="none" stroke="#fde68a" strokeWidth="3.5" opacity="0.9" />
-          )}
-          {wormHatId === 'beanie' && (<>
-            {/* Knit dome over the crown */}
-            <path d={`M ${headCx - 21},${headCy - headR + 7} Q ${headCx},${headCy - headR - 24} ${headCx + 21},${headCy - headR + 7} Z`} fill="#6d28d9" />
-            {/* Folded brim */}
-            <rect x={headCx - 22} y={headCy - headR + 2} width="44" height="9" rx="4.5" fill="#5b21b6" />
-            {/* Pom-pom */}
-            <circle cx={headCx} cy={headCy - headR - 22} r="5" fill="#ede9fe" />
-          </>)}
-          {wormHatId === 'wizard' && (<>
-            {/* Wide brim */}
-            <ellipse cx={headCx} cy={headCy - headR + 3} rx="25" ry="6" fill="#3b0764" />
-            {/* Tall pointed cone */}
-            <polygon points={`${headCx},${headCy - headR - 32} ${headCx - 16},${headCy - headR + 3} ${headCx + 16},${headCy - headR + 3}`} fill="#4c1d95" />
-            {/* Glowing stars */}
-            <circle cx={headCx - 4} cy={headCy - headR - 8} r="2.2" fill="#fde68a" />
-            <circle cx={headCx + 5} cy={headCy - headR - 19} r="1.7" fill="#fde68a" />
-          </>)}
-          {wormHatId === 'flower' && (<>
-            {/* Short stem */}
-            <line x1={headCx} y1={headCy - headR + 5} x2={headCx} y2={headCy - headR - 10} stroke="#16a34a" strokeWidth="3" strokeLinecap="round" />
-            {/* Petals */}
-            {[0, 1, 2, 3, 4, 5].map(i => {
-              const a = (i / 6) * Math.PI * 2;
-              return (
-                <circle key={i} cx={headCx + Math.cos(a) * 9} cy={(headCy - headR - 15) + Math.sin(a) * 9} r="4.5" fill="#f472b6" />
-              );
-            })}
-            {/* Pollen center */}
-            <circle cx={headCx} cy={headCy - headR - 15} r="5" fill="#facc15" />
-          </>)}
-          {wormHatId === 'grad' && (<>
-            {/* Cap band */}
-            <path d={`M ${headCx - 11},${headCy - headR - 4} Q ${headCx},${headCy - headR + 2} ${headCx + 11},${headCy - headR - 4} L ${headCx + 11},${headCy - headR - 11} L ${headCx - 11},${headCy - headR - 11} Z`} fill="#111827" />
-            {/* Mortarboard */}
-            <polygon points={`${headCx},${headCy - headR - 18} ${headCx + 22},${headCy - headR - 10} ${headCx},${headCy - headR - 2} ${headCx - 22},${headCy - headR - 10}`} fill="#1f2937" />
-            {/* Center button */}
-            <circle cx={headCx} cy={headCy - headR - 10} r="2.5" fill="#fbbf24" />
-            {/* Tassel cord + knob */}
-            <path d={`M ${headCx},${headCy - headR - 10} L ${headCx + 20},${headCy - headR - 8} L ${headCx + 20},${headCy - headR + 5}`}
-              stroke="#fbbf24" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-            <circle cx={headCx + 20} cy={headCy - headR + 7} r="3" fill="#fbbf24" />
-          </>)}
-        </svg>
-      );
-    };
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -1076,7 +861,15 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
               }} />
 
               <button onClick={prevChar} aria-label="Previous character" style={plateArrow}>‹</button>
-              <div style={{ zIndex: 1, display: 'flex', justifyContent: 'center', flex: 1 }}>{renderWormSVG()}</div>
+              <div style={{ zIndex: 1, display: 'flex', justifyContent: 'center', flex: 1 }}>
+                <WormPreviewCanvas
+                  characterId={wormCharacterId}
+                  skinId={wormSkinId}
+                  hatId={wormHatId}
+                  size={isMobile ? 168 : 200}
+                  animated
+                />
+              </div>
               <button onClick={nextChar} aria-label="Next character" style={plateArrow}>›</button>
             </div>
 
@@ -1103,22 +896,6 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                   {activeCharacter.subtitle}
                 </span>
               </div>
-            </div>
-
-            {/* Stat readout */}
-            <div style={{
-              alignSelf: 'stretch',
-              display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
-              gap: isMobile ? '7px' : '8px 20px',
-              padding: '12px 14px',
-              borderRadius: '12px',
-              background: 'rgba(255,245,220,0.05)',
-              border: `1px solid ${NIGHT_BORDER}`,
-            }}>
-              <StatBar label="Speed"   value={activeCharacter.stats.speed}   color={activeSkin.glow} />
-              <StatBar label="Heal"    value={activeCharacter.stats.healing} color={activeSkin.glow} />
-              <StatBar label="Agility" value={activeCharacter.stats.agility} color={activeSkin.glow} />
-              <StatBar label="Glow"    value={activeCharacter.stats.glow}    color={activeSkin.glow} />
             </div>
 
             {/* Signature trait */}
@@ -1173,7 +950,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                   {/* Locked skins keep their colour, the same as in the store —
                       a grey worm tells you nothing about what you'd be buying. */}
                   <div style={{ filter: owned ? 'none' : 'saturate(0.5)' }}>
-                    <WormSkinIcon skin={skin} size={30} />
+                    <WormPreviewCanvas characterId={wormCharacterId} skinId={skin.id} size={34} />
                   </div>
                   <span style={{ fontSize: '9px', fontWeight: 700, color: selected ? skin.body : PAPER_TEXT_FAINT, letterSpacing: '0.05em' }}>{skin.label}</span>
                   {!owned && (
@@ -1205,7 +982,11 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                   cursor: owned ? 'pointer' : 'not-allowed',
                   position: 'relative',
                 }}>
-                  <HatIcon hatId={hat.id} color={selected ? ACCENT : PAPER_TEXT_FAINT} size={26} />
+                  <WormPreviewCanvas
+                    characterId={wormCharacterId} skinId={wormSkinId} hatId={hat.id}
+                    size={34} framing="head"
+                    style={{ filter: owned ? 'none' : 'saturate(0.5)' }}
+                  />
                   <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.05em', color: selected ? ACCENT : PAPER_TEXT_MUTED, lineHeight: 1.2, textAlign: 'center' }}>
                     {hat.label}
                   </span>
