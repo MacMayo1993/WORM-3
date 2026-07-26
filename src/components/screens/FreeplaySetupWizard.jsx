@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { COLOR_SCHEMES, TILE_STYLES, SCHEME_LABELS } from '../../utils/colorSchemes.js';
-import { CLASSIC_STYLE_KEYS, ANTIPODAL_STYLE_KEYS, LIVING_STYLE_KEYS, NON_EUCLIDEAN_STYLE_KEYS } from '../../utils/tileStyleCatalog.js';
+import { CLASSIC_STYLE_KEYS, ANTIPODAL_STYLE_KEYS, LIVING_STYLE_KEYS, NON_EUCLIDEAN_STYLE_KEYS, TILE_STYLE_SECTIONS } from '../../utils/tileStyleCatalog.js';
 import { BACKGROUNDS, getBackgroundUrl } from '../../utils/backgrounds.js';
 import { registerTilePreview, updateTilePreview, unregisterTilePreview } from '../../3d/TilePreviewRenderer.js';
 import { useGameStore } from '../../hooks/useGameStore.js';
@@ -13,7 +13,7 @@ import {
   PAPER_BG_MUTED, PAPER_CARD_SHADOW, PAPER_SHADOW,
 } from '../../utils/uiTheme.js';
 import { BG_PREVIEWS } from '../../utils/bgPreviews.js';
-import { wizardLayout, WizardSteps, WizardSectionHeading } from './WizardChrome.jsx';
+import { wizardLayout, WizardSteps, WizardSection } from './WizardChrome.jsx';
 
 const BG_OPTIONS = BACKGROUNDS.map(bg => ({
   value: bg.id,
@@ -147,6 +147,9 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
   const tileOwned = (key) => ownedItems.includes(`tile_${key}`);
 
   const [step, setStep] = useState(0);
+  // Which tile-style family is expanded. null means "whichever holds the style
+  // you are already using"; '' means you deliberately closed that one.
+  const [openSection, setOpenSection] = useState(null);
   const [cubeSize, setCubeSize] = useState(initialSettings?.size || 3);
   const [settings, setSettings] = useState({
     colorScheme: initialSettings?.colorScheme || 'standard',
@@ -417,10 +420,8 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
       setSettings(s => ({ ...s, perFaceStyles: { ...current, [faceId]: key } }));
     };
 
-    const StyleGrid = ({ keys, label }) => (
-      <div style={{ marginBottom: '20px' }}>
-        <WizardSectionHeading>{label}</WizardSectionHeading>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '7px' }}>
+    const StyleGrid = ({ keys }) => (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '7px' }}>
           {keys.map(key => {
             const sel = globalStyle === key;
             const owned = tileOwned(key);
@@ -449,9 +450,14 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
               </button>
             );
           })}
-        </div>
       </div>
     );
+
+    // The family holding your current style opens by default; picking a style
+    // keeps its family open. `openSection` of '' means you closed that one.
+    const currentFamily = TILE_STYLE_SECTIONS.find(sec => sec.keys.includes(globalStyle))?.key ?? 'classic';
+    const openKey = openSection ?? currentFamily;
+    const toggle = (key) => setOpenSection(openKey === key ? '' : key);
 
     return (
       <>
@@ -469,14 +475,32 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           </button>
         </div>
 
-        <StyleGrid keys={CLASSIC_STYLE_KEYS} label="Classic" />
-        <StyleGrid keys={ANTIPODAL_STYLE_KEYS} label="Antipodal Op Art" />
-        <StyleGrid keys={LIVING_STYLE_KEYS} label="Living" />
-        <StyleGrid keys={NON_EUCLIDEAN_STYLE_KEYS} label="Non-Euclidean" />
+        {TILE_STYLE_SECTIONS.map(section => {
+          const ownedCount = section.keys.filter(k => tileOwned(k)).length;
+          const holdsPick = section.keys.includes(globalStyle);
+          return (
+            <WizardSection
+              key={section.key}
+              label={section.label}
+              accent={ACCENT}
+              note={holdsPick ? TILE_STYLES[globalStyle]?.label : `${ownedCount}/${section.keys.length}`}
+              open={openKey === section.key}
+              onToggle={() => toggle(section.key)}
+            >
+              <StyleGrid keys={section.keys} />
+            </WizardSection>
+          );
+        })}
 
-        {/* Per-face overrides */}
-        <div style={{ marginBottom: '8px' }}>
-          <WizardSectionHeading style={{ marginBottom: '10px' }}>Per Face</WizardSectionHeading>
+        {/* Per-face overrides — folded away by default; most players never
+            need a different style on each face. */}
+        <WizardSection
+          label="Per Face"
+          accent={ACCENT}
+          note={perFace ? 'Custom' : 'Advanced'}
+          open={openKey === 'perFace'}
+          onToggle={() => toggle('perFace')}
+        >
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
             {[1, 2, 3, 4, 5, 6].map(faceId => {
               const globalFallback = settings.tileStyle === 'random' ? 'solid' : (settings.tileStyle || 'solid');
@@ -521,7 +545,7 @@ const FreeplaySetupWizard = ({ onComplete, onCancel, initialSettings }) => {
               );
             })}
           </div>
-        </div>
+        </WizardSection>
       </>
     );
   };

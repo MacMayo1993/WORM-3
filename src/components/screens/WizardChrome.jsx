@@ -229,6 +229,104 @@ export function WizardSectionHeading({ children, style }) {
 }
 
 /**
+ * One collapsible family in a long grouped list.
+ *
+ * The tile catalogue is ~90 styles in four families; laid out flat it is about
+ * three thousand pixels of scrolling on a phone, and the family you actually
+ * want is usually the one you are already using. Collapsed, each family is a
+ * single tappable row, so the whole catalogue fits on one screen and opening a
+ * family costs one tap.
+ *
+ * The header stays sticky while its own contents scroll, so a long open family
+ * never leaves you wondering which one you are in.
+ */
+export function WizardSection({ label, note, accent, open, onToggle, children }) {
+  const ref = React.useRef(null);
+  const wasOpen = React.useRef(open);
+
+  // Opening a section that sits below the fold should bring it to you — the
+  // family you just asked for is otherwise off-screen, under the one that
+  // collapsed above it.
+  React.useEffect(() => {
+    if (open && !wasOpen.current) {
+      ref.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    }
+    wasOpen.current = open;
+  }, [open]);
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        marginBottom: '8px',
+        borderRadius: '12px',
+        border: `1.5px solid ${open ? `${accent}55` : '#ded7cb'}`,
+        background: open ? 'rgba(255,255,255,0.52)' : 'rgba(255,255,255,0.34)',
+        boxShadow: open ? 'none' : `0 2px 0 ${PAPER_CARD_SHADOW}`,
+        // Not `overflow: hidden` — that would trap the sticky header inside a
+        // box that scrolls away, which is the whole thing it exists to avoid.
+        // The header rounds its own corners instead.
+        transition: 'border-color 0.18s ease, background 0.18s ease'
+      }}
+    >
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        style={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 2,
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          padding: '13px 12px',
+          background: open ? 'rgba(252,249,241,0.97)' : 'transparent',
+          border: 'none',
+          borderRadius: open ? '11px 11px 0 0' : '11px',
+          borderBottom: open ? '1px solid #e4ddd0' : 'none',
+          cursor: 'pointer',
+          fontFamily: 'inherit',
+          textAlign: 'left',
+          WebkitTapHighlightColor: 'transparent'
+        }}
+      >
+        <svg
+          width="10"
+          height="10"
+          viewBox="0 0 10 10"
+          style={{
+            flexShrink: 0,
+            transform: open ? 'rotate(90deg)' : 'none',
+            transition: 'transform 0.2s cubic-bezier(0.22,1,0.36,1)'
+          }}
+          aria-hidden="true"
+        >
+          <path d="M3 1L7 5L3 9" fill="none" stroke={open ? accent : PAPER_TEXT_FAINT} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        <span
+          style={{
+            flex: 1,
+            fontSize: '11px',
+            fontWeight: 800,
+            letterSpacing: '0.1em',
+            textTransform: 'uppercase',
+            color: open ? accent : PAPER_TEXT_MUTED
+          }}
+        >
+          {label}
+        </span>
+        {note && (
+          <span style={{ fontSize: '10px', fontWeight: 600, color: PAPER_TEXT_FAINT, flexShrink: 0 }}>{note}</span>
+        )}
+      </button>
+      {open && <div style={{ padding: '10px 10px 12px' }}>{children}</div>}
+    </div>
+  );
+}
+
+/**
  * Progress bars plus a step count. The count is the part that survives on a
  * phone, where the bars get thin enough to read as decoration.
  */
