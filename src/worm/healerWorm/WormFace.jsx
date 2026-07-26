@@ -7,23 +7,28 @@ import { useGameStore } from '../../hooks/useGameStore.js';
 import { getStickerWorldPos } from '../../game/coordinates.js';
 import { getTunnelWorldPosInto, getWindWorldPosInto } from '../wormLogic.js';
 import WormHat3D from '../wormCosmetics.jsx';
+import { layoutWormFace, FACE_LAYOUT, MOUTH_ARC } from '../wormFaceLayout.js';
 import { _hatAlignQuat, _hatYUp } from '../wormCosmeticsData.js';
 import { WORM_LIFT, FACE_NORMALS, DIR_FORWARD } from './constants.js';
 
-// ─── Worm Face (eyes + smile) ─────────────────────────────────────────────────
+// Head radius, matching WormBody's head scale.
+const HEAD_RADIUS = 0.092;
+
+// Reused each frame so the layout never allocates.
+const _faceParts = { eyes: [null, null], pupils: [null, null], glasses: [null, null], mouth: null, hat: null };
+
+// ─── Worm Face (eyes + pupils + smile) ────────────────────────────────────────
 const _faceRight = new THREE.Vector3();
 const _faceForward = new THREE.Vector3();
 const _faceHeadPos = new THREE.Vector3();
 const _faceTunnelAhead = new THREE.Vector3(); // scratch for tunnel tangent during enter/exit
-// Glasses orientation — torus axis (Y) aligned to face-forward so ring appears circular
-const _glassAxisY = new THREE.Vector3(0, 1, 0);
-const _glassQuat = new THREE.Quaternion();
 
 export function WormFace({ worm, size }) {
     const leftEyeRef = useRef();
     const rightEyeRef = useRef();
-    const smile0 = useRef(), smile1 = useRef(), smile2 = useRef();
-    const smileRefs = [smile0, smile1, smile2];
+    const leftPupilRef = useRef();
+    const rightPupilRef = useRef();
+    const mouthRef = useRef();
     const hatGroupRef = useRef();
     const glassLeftRef = useRef();
     const glassRightRef = useRef();
@@ -39,7 +44,9 @@ export function WormFace({ worm, size }) {
         const faceVisible = faceOpacityRef.current > 0.05;
         if (leftEyeRef.current)  leftEyeRef.current.visible  = faceVisible;
         if (rightEyeRef.current) rightEyeRef.current.visible = faceVisible;
-        for (const ref of smileRefs) if (ref.current) ref.current.visible = faceVisible;
+        if (leftPupilRef.current)  leftPupilRef.current.visible  = faceVisible;
+        if (rightPupilRef.current) rightPupilRef.current.visible = faceVisible;
+        if (mouthRef.current)      mouthRef.current.visible      = faceVisible;
         if (hatGroupRef.current)    hatGroupRef.current.visible    = faceVisible;
         if (glassLeftRef.current)   glassLeftRef.current.visible   = faceVisible;
         if (glassRightRef.current)  glassRightRef.current.visible  = faceVisible;
@@ -75,8 +82,8 @@ export function WormFace({ worm, size }) {
                 _faceForward.normalize();
             }
 
-            // Head rides the ribbon/spiral centerline; 0.09 keeps face on the head sphere front.
-            _faceHeadPos.addScaledVector(normal, 0.09);
+            // Head rides the ribbon/spiral centerline; the layout places the face
+            // on the head sphere from its centre.
         } else {
             const { dirKey } = worm.pos.current;
             normal = FACE_NORMALS[dirKey] ?? FACE_NORMALS.PZ;
@@ -97,98 +104,68 @@ export function WormFace({ worm, size }) {
             }
             const jumpLiftVal = worm.isJumping.current
                 ? Math.sin(worm.jumpT.current * Math.PI) * 0.55 : 0;
-            _faceHeadPos.addScaledVector(normal, WORM_LIFT + jumpLiftVal + 0.09);
+            _faceHeadPos.addScaledVector(normal, WORM_LIFT + jumpLiftVal);
         }
 
-        // Rightward axis in the face plane
-        _faceRight.crossVectors(_faceForward, normal).normalize();
-        if (_faceRight.lengthSq() < 0.001) _faceRight.set(1, 0, 0);
+        // Eyes, pupils, smile, lenses and the hat seat all come from the shared
+        // face layout so the previews draw the same worm.
+        _faceParts.eyes[0] = leftEyeRef.current;
+        _faceParts.eyes[1] = rightEyeRef.current;
+        _faceParts.pupils[0] = leftPupilRef.current;
+        _faceParts.pupils[1] = rightPupilRef.current;
+        _faceParts.mouth = mouthRef.current;
+        _faceParts.glasses[0] = isBook ? glassLeftRef.current : null;
+        _faceParts.glasses[1] = isBook ? glassRightRef.current : null;
+        _faceParts.hat = hatGroupRef.current;
+        layoutWormFace(_faceHeadPos, _faceForward, normal, HEAD_RADIUS, _faceParts);
 
-        const S = 0.022;
-        if (leftEyeRef.current) {
-            leftEyeRef.current.position.copy(_faceHeadPos)
-                .addScaledVector(_faceRight, 0.028)
-                .addScaledVector(_faceForward, 0.025);
-            leftEyeRef.current.scale.setScalar(S);
-        }
-        if (rightEyeRef.current) {
-            rightEyeRef.current.position.copy(_faceHeadPos)
-                .addScaledVector(_faceRight, -0.028)
-                .addScaledVector(_faceForward, 0.025);
-            rightEyeRef.current.scale.setScalar(S);
-        }
-        const smileOffsets = [-0.022, 0, 0.022];
-        for (let i = 0; i < smileRefs.length; i++) {
-            const ref = smileRefs[i];
-            if (!ref.current) continue;
-            const xo = smileOffsets[i];
-            const yo = i === 1 ? -0.028 : -0.022;
-            ref.current.position.copy(_faceHeadPos)
-                .addScaledVector(_faceRight, xo)
-                .addScaledVector(normal, yo * 0.3)
-                .addScaledVector(_faceForward, 0.025);
-            ref.current.scale.setScalar(S * 0.55);
-        }
-
-        // Hat: position above head, orient Y to face normal
         if (hatGroupRef.current) {
-            hatGroupRef.current.position.copy(_faceHeadPos)
-                .addScaledVector(normal, 0.04);
             _hatAlignQuat.setFromUnitVectors(_hatYUp, normal);
             hatGroupRef.current.quaternion.copy(_hatAlignQuat);
         }
 
-        // Book worm glasses — torus rings in front of each eye, axis aligned to forward
-        if (isBook) {
-            _glassQuat.setFromUnitVectors(_glassAxisY, _faceForward);
-            const GS = 0.054;
-            if (glassLeftRef.current) {
-                glassLeftRef.current.position.copy(_faceHeadPos)
-                    .addScaledVector(_faceRight, 0.028)
-                    .addScaledVector(_faceForward, 0.029);
-                glassLeftRef.current.quaternion.copy(_glassQuat);
-                glassLeftRef.current.scale.setScalar(GS);
-            }
-            if (glassRightRef.current) {
-                glassRightRef.current.position.copy(_faceHeadPos)
-                    .addScaledVector(_faceRight, -0.028)
-                    .addScaledVector(_faceForward, 0.029);
-                glassRightRef.current.quaternion.copy(_glassQuat);
-                glassRightRef.current.scale.setScalar(GS);
-            }
-        }
     });
 
     return (
         <>
             <mesh ref={leftEyeRef}>
-                <sphereGeometry args={[1, 8, 8]} />
+                <sphereGeometry args={[1, 12, 12]} />
                 <meshBasicMaterial color="white" />
             </mesh>
             <mesh ref={rightEyeRef}>
-                <sphereGeometry args={[1, 8, 8]} />
+                <sphereGeometry args={[1, 12, 12]} />
                 <meshBasicMaterial color="white" />
             </mesh>
-            {smileRefs.map((ref, i) => (
-                <mesh key={i} ref={ref}>
-                    <sphereGeometry args={[1, 6, 6]} />
-                    <meshBasicMaterial color="#111" />
-                </mesh>
-            ))}
+            {/* Pupils — a blank white eye reads as no eye at all once the worm
+                is thumbnail-sized. */}
+            <mesh ref={leftPupilRef}>
+                <sphereGeometry args={[1, 10, 10]} />
+                <meshBasicMaterial color="#12131a" />
+            </mesh>
+            <mesh ref={rightPupilRef}>
+                <sphereGeometry args={[1, 10, 10]} />
+                <meshBasicMaterial color="#12131a" />
+            </mesh>
+            {/* Smile — one curved mouth. Three dots in a row disappeared at any
+                size a phone actually renders the worm at. */}
+            <mesh ref={mouthRef}>
+                <torusGeometry args={[1, FACE_LAYOUT.mouthTube / FACE_LAYOUT.mouthRadius, 8, 20, MOUTH_ARC]} />
+                <meshBasicMaterial color="#12131a" />
+            </mesh>
             {wormHatId !== 'none' && (
                 <group ref={hatGroupRef}>
-                    <WormHat3D type={wormHatId} scale={0.07} />
+                    <WormHat3D type={wormHatId} scale={HEAD_RADIUS * FACE_LAYOUT.hatScale} />
                 </group>
             )}
             {/* Book worm glasses — two torus rings, only rendered for book character */}
             {isBook && (
                 <>
                     <mesh ref={glassLeftRef}>
-                        <torusGeometry args={[1, 0.13, 8, 18]} />
+                        <torusGeometry args={[1, FACE_LAYOUT.glassTube / FACE_LAYOUT.glassRadius, 8, 18]} />
                         <meshStandardMaterial color="#1a1a1a" metalness={0.9} roughness={0.1} />
                     </mesh>
                     <mesh ref={glassRightRef}>
-                        <torusGeometry args={[1, 0.13, 8, 18]} />
+                        <torusGeometry args={[1, FACE_LAYOUT.glassTube / FACE_LAYOUT.glassRadius, 8, 18]} />
                         <meshStandardMaterial color="#1a1a1a" metalness={0.9} roughness={0.1} />
                     </mesh>
                 </>

@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { FACE_NORMALS } from './crawlerPhysics.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import WormHat3D from './wormCosmetics.jsx';
+import { MOUTH_ARC } from './wormFaceLayout.js';
 import { getSkin } from './wormCosmeticsData.js';
 import { getWormCharacter } from './wormCharacterData.js';
 
@@ -385,17 +386,11 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
                     <meshBasicMaterial color={PUPIL} />
                   </mesh>
 
-                  {/* Mouth — 3-dot smile */}
-                  <mesh position={[-0.07, 0.01, 0.27]}>
-                    <sphereGeometry args={[0.025, 6, 6]} />
-                    <meshBasicMaterial color={PUPIL} />
-                  </mesh>
-                  <mesh position={[0, -0.025, 0.27]}>
-                    <sphereGeometry args={[0.025, 6, 6]} />
-                    <meshBasicMaterial color={PUPIL} />
-                  </mesh>
-                  <mesh position={[0.07, 0.01, 0.27]}>
-                    <sphereGeometry args={[0.025, 6, 6]} />
+                  {/* Mouth — one curved smile, the same shape the healer worm
+                      and the previews draw. Three dots in a row read as nothing
+                      at the size a phone renders this at. */}
+                  <mesh position={[0, 0.03, 0.26]} rotation={[0, 0, Math.PI]}>
+                    <torusGeometry args={[0.085, 0.021, 8, 20, MOUTH_ARC]} />
                     <meshBasicMaterial color={PUPIL} />
                   </mesh>
 
