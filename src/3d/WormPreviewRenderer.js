@@ -19,6 +19,7 @@
 import * as THREE from 'three';
 import { getSkin } from '../worm/wormCosmeticsData.js';
 import { getHatParts } from '../worm/wormHatParts.js';
+import { layoutWormFace, FACE_LAYOUT, MOUTH_ARC } from '../worm/wormFaceLayout.js';
 
 // ─── Worm geometry constants ─────────────────────────────────────────────────
 // Straight from healerWorm/WormBody.jsx and WormFace.jsx so the preview worm is
@@ -30,18 +31,9 @@ const BOOK_BODY_SCALE = [0.088, 0.055, 0.1];
 const SPACING = 0.09;
 const INCH_SPACING = 0.095;
 const SEGMENTS = 9;          // head + 8 beads — a readable stretch of worm
-const FACE_LIFT = 0.09;      // face anchor above head centre
-const EYE_SCALE = 0.022;
-const EYE_SIDE = 0.028;
-const EYE_FWD = 0.025;
-const HAT_SCALE = 0.07;
-// In game the hat rides the face anchor (head + normal*0.09) plus another 0.04,
-// which at portrait range reads as a hat hovering over the worm. The preview
-// drops that lift and then some — but only so far: the worm's eyes are on the
-// crown of its head (it is drawn to be seen from above), so a hat seated flush
-// would sit across the face. This clears the eyes by a hair and no more.
-const HAT_LIFT = -0.03;
-const GLASS_SCALE = 0.054;
+// Face features and the hat seat come from the shared layout (wormFaceLayout),
+// which is also what the played worm uses.
+const HAT_SCALE = HEAD_SCALE * FACE_LAYOUT.hatScale;
 
 // Forward is +X, the surface normal (worm's "up") is +Y, so right is +Z —
 // the same basis WormFace derives on the cube surface.
@@ -94,16 +86,19 @@ function _buildRig() {
     beads.push(bead); boxes.push(box); glows.push(glow);
   }
 
-  // Face — white sphere eyes and a three-bead smile, as in WormFace.
-  const eyeGeo = new THREE.SphereGeometry(1, 10, 10);
-  const smileGeo = new THREE.SphereGeometry(1, 8, 8);
+  // Face — eyes with pupils and a curved smile, as in WormFace.
+  const eyeGeo = new THREE.SphereGeometry(1, 14, 14);
+  const pupilGeo = new THREE.SphereGeometry(1, 10, 10);
+  const mouthGeo = new THREE.TorusGeometry(1, FACE_LAYOUT.mouthTube / FACE_LAYOUT.mouthRadius, 8, 22, MOUTH_ARC);
   const eyes = [0, 1].map(() => new THREE.Mesh(eyeGeo, new THREE.MeshBasicMaterial({ color: 0xffffff })));
-  const smile = [0, 1, 2].map(() => new THREE.Mesh(smileGeo, new THREE.MeshBasicMaterial({ color: 0x111111 })));
+  const pupils = [0, 1].map(() => new THREE.Mesh(pupilGeo, new THREE.MeshBasicMaterial({ color: 0x12131a })));
+  const mouth = new THREE.Mesh(mouthGeo, new THREE.MeshBasicMaterial({ color: 0x12131a }));
   eyes.forEach(m => group.add(m));
-  smile.forEach(m => group.add(m));
+  pupils.forEach(m => group.add(m));
+  group.add(mouth);
 
   // Book worm glasses.
-  const glassGeo = new THREE.TorusGeometry(1, 0.13, 8, 18);
+  const glassGeo = new THREE.TorusGeometry(1, FACE_LAYOUT.glassTube / FACE_LAYOUT.glassRadius, 8, 18);
   const glasses = [0, 1].map(() => new THREE.Mesh(glassGeo, new THREE.MeshStandardMaterial({
     color: 0x1a1a1a, metalness: 0.9, roughness: 0.1,
   })));
@@ -115,7 +110,7 @@ function _buildRig() {
   const glowLight = new THREE.PointLight(0xffffff, 0, 1.2);
   group.add(glowLight);
 
-  return { group, beads, boxes, glows, eyes, smile, glasses, hatGroup, hatKey: null, glowLight };
+  return { group, beads, boxes, glows, eyes, pupils, mouth, glasses, hatGroup, hatKey: null, glowLight };
 }
 
 // Framing presets. In game the camera looks down at the cube face the worm is
@@ -237,6 +232,7 @@ function _segmentOffset(i, character, time, out) {
 
 const _off = new THREE.Vector3();
 const _anchor = new THREE.Vector3();
+const _faceParts = { eyes: [null, null], pupils: [null, null], glasses: [null, null], mouth: null, hat: null };
 
 function _poseWorm(opts, time) {
   const { characterId, skinId, hatId } = opts;
@@ -301,35 +297,25 @@ function _poseWorm(opts, time) {
     rig.glowLight.position.set(0, 0.14, 0);
   }
 
-  // Face anchor sits on top of the head, as on the cube surface.
-  _segmentOffset(0, characterId, time, _off);
-  _anchor.copy(_off).addScaledVector(UP, FACE_LIFT);
+  // Face — same layout the played worm uses.
+  _segmentOffset(0, characterId, time, _anchor);
+  rig.glasses.forEach(g => { g.visible = isBook; });
+  _faceParts.eyes[0] = rig.eyes[0];
+  _faceParts.eyes[1] = rig.eyes[1];
+  _faceParts.pupils[0] = rig.pupils[0];
+  _faceParts.pupils[1] = rig.pupils[1];
+  _faceParts.mouth = rig.mouth;
+  _faceParts.glasses[0] = isBook ? rig.glasses[0] : null;
+  _faceParts.glasses[1] = isBook ? rig.glasses[1] : null;
+  _faceParts.hat = rig.hatGroup;
+  layoutWormFace(_anchor, FWD, UP, HEAD_SCALE, _faceParts);
 
-  const blink = Math.sin(time * 0.9) > 0.985 ? 0.18 : 1;   // occasional blink
-  rig.eyes.forEach((eye, i) => {
-    const side = i === 0 ? EYE_SIDE : -EYE_SIDE;
-    eye.position.copy(_anchor).addScaledVector(RIGHT, side).addScaledVector(FWD, EYE_FWD);
-    eye.scale.set(EYE_SCALE, EYE_SCALE * blink, EYE_SCALE);
-  });
-
-  const smileOffsets = [-0.022, 0, 0.022];
-  rig.smile.forEach((bead, i) => {
-    const yo = i === 1 ? -0.028 : -0.022;
-    bead.position.copy(_anchor)
-      .addScaledVector(RIGHT, smileOffsets[i])
-      .addScaledVector(UP, yo * 0.3)
-      .addScaledVector(FWD, EYE_FWD);
-    bead.scale.setScalar(EYE_SCALE * 0.55);
-  });
-
-  rig.glasses.forEach((glass, i) => {
-    glass.visible = isBook;
-    if (!isBook) return;
-    const side = i === 0 ? EYE_SIDE : -EYE_SIDE;
-    glass.position.copy(_anchor).addScaledVector(RIGHT, side).addScaledVector(FWD, 0.029);
-    glass.quaternion.setFromUnitVectors(UP, FWD);
-    glass.scale.setScalar(GLASS_SCALE);
-  });
+  // An occasional blink, squashing the eye and its pupil together.
+  const blink = Math.sin(time * 0.9) > 0.985 ? 0.2 : 1;
+  if (blink !== 1) {
+    rig.eyes.forEach(eye => { eye.scale.y *= blink; });
+    rig.pupils.forEach(pupil => { pupil.scale.y *= blink; });
+  }
 
   // Hat — rebuilt only when the hat changes, then parked above the head.
   if (rig.hatKey !== hatId) {
@@ -351,7 +337,6 @@ function _poseWorm(opts, time) {
     }
     rig.hatKey = hatId;
   }
-  rig.hatGroup.position.copy(_anchor).addScaledVector(UP, HAT_LIFT);
 }
 
 function _geometry(name, args) {
