@@ -145,6 +145,30 @@ const SFX = {
   countdownGo() {
     chord([523.25, 659.25, 783.99, 1046.5, 1318.51], { dur: 0.42, type: 'triangle', gain: 0.33 });
   },
+
+  // ── Wormhole tunnel events ──────────────────────────────────────────────────
+  // A pair's FIRST flip: the two tiles are revealed as the same point in RP2.
+  // This happens at most once per pair, so it gets the biggest sound in the set —
+  // a rising sweep that resolves into an open fifth.
+  tunnelBirth() {
+    tone({ freq: 180, freqTo: 720, dur: 0.26, type: 'triangle', gain: 0.34 });
+    chord([523.25, 783.99], { dur: 0.38, type: 'sine', gain: 0.22, when: 0.18 });
+  },
+
+  // Subsequent flips on an existing pair. Pitch climbs the pentatonic scale with
+  // the tile's flip count, so working a single pair toward its cap arpeggiates
+  // upward and the danger is audible before it is visible.
+  tunnelPulse(flips = 0) {
+    const f = COMBO_SCALE[Math.min(Math.max(0, flips), COMBO_SCALE.length - 1)];
+    tone({ freq: f, freqTo: f * 1.25, dur: 0.11, type: 'triangle', gain: 0.38 });
+  },
+
+  // The pair hit FLIP_CAP and severed. Deliberately the ugliest sound here —
+  // a snapped cable, not a reward.
+  tunnelSnap() {
+    noise({ dur: 0.18, type: 'highpass', freq: 3000, gain: 0.5 });
+    tone({ freq: 320, freqTo: 48, dur: 0.42, type: 'sawtooth', gain: 0.34 });
+  },
 };
 
 // ── Haptic vocabulary ──────────────────────────────────────────────────────────
@@ -162,12 +186,18 @@ const HAPTICS = {
   nearMiss: 8,
   countdownBeat: 12,
   countdownGo: [0, 20, 30, 40],
+  tunnelBirth: [0, 12, 60, 30],
+  // Grows with the flip count, mirroring the pitch climb.
+  tunnelPulse: (flips = 0) => 10 + Math.min(flips, 6) * 4, // 10 → 34ms
+  tunnelSnap: [0, 60, 35, 90],
 };
 
 /**
  * Fire the feedback for a named game event.
  * @param {string} event  key into SFX/HAPTICS (e.g. 'orb', 'heal', 'death')
- * @param {object} [opts] { combo } for escalating events
+ * @param {object} [opts] { combo } for escalating events — the escalation level,
+ *                        whatever it counts for that event (orb pickups in a row
+ *                        for 'orb', a tile's flip count for 'tunnelPulse').
  */
 export function feel(event, opts = {}) {
   attachUnlock();

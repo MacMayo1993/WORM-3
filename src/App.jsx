@@ -19,6 +19,7 @@ import './App.css';
 import { resolveBiomeManifoldStyles } from './modes/CityBiomeMode.js';
 import { completeLevel } from './utils/levels.js';
 import { vibrate } from './utils/audio.js';
+import { setFeelEnabled } from './utils/feel.js';
 import { makeCubies } from './game/cubeState.js';
 import { rotateSliceCubies } from './game/cubeRotation.js';
 import { flipStickerPair, buildManifoldGridMap } from './game/manifoldLogic.js';
@@ -402,6 +403,14 @@ export default function WORM3() {
   } = useLevelSystem({ onBriefingSkipped: () => setBriefingSkipToken((t) => t + 1) });
 
   const { settings, faceImages, faceTextures, handleFaceImage, setSettings } = useSettings();
+
+  // Keep the feel layer's SFX/haptics channels in sync with the player's settings
+  // for the WHOLE app, not just worm mode. Tunnel flip feedback fires from the
+  // ordinary flip path, so gating it only inside HealerWormMode would let those
+  // sounds play with sfx turned off everywhere else.
+  useEffect(() => {
+    setFeelEnabled({ sfx: settings?.sfx ?? true, haptics: settings?.haptics ?? true });
+  }, [settings?.sfx, settings?.haptics]);
 
   const {
     handsMode, handsMoveHistory, handsTps, executeHandsMove,
