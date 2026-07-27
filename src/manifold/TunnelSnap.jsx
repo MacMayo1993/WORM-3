@@ -1,6 +1,7 @@
 import { useRef, useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import { TUNNEL_ANCHOR_OFFSET } from '../utils/constants.js';
 
 /**
  * TunnelSnap — the death of an antipodal pair, made visible.
@@ -23,14 +24,14 @@ const VERTS     = (SEGS + 1) * 2;
 const IDX_COUNT = (SEGS - 1) * 6;
 
 // Match MobiusTunnel / RestingCords so the snap starts exactly where the cord was.
-const FACE_OFFSET = 0.52;
 const MINI_FACE_R = 0.25;
 const SNAP_WIDTH  = 0.34;
 
-// Deliberately much fatter than the cord's TAPER_MIN (0.15). Both cord ends sit
-// FACE_OFFSET *inside* their cubie, so the only stretch of a tunnel actually on
-// screen is the middle — the exact part a 0.15 taper shrinks to sub-pixel width.
-// A dying cord has to stay legible where it can be seen.
+// Deliberately much fatter than the cord's taper. A tunnel's ends are anchored on
+// their tiles, so the first stretch out of each end runs through the opaque cubie
+// body and is occluded — the only span reliably on screen is the middle, which is
+// exactly what a tight taper shrinks to sub-pixel width. A dying cord has to stay
+// legible where it can actually be seen.
 const TAPER_MIN   = 0.55;
 
 const SHARDS = 14;
@@ -187,13 +188,13 @@ const SnapCord = ({ death, cubieRefs }) => {
     mesh1.getWorldQuaternion(_wQuat);
     const n1 = FACE_NORM_LOCAL[death.dirKey1];
     _faceNorm1.set(n1[0], n1[1], n1[2]).applyQuaternion(_wQuat);
-    _vStart.copy(_wPos).addScaledVector(_faceNorm1, -FACE_OFFSET);
+    _vStart.copy(_wPos).addScaledVector(_faceNorm1, TUNNEL_ANCHOR_OFFSET);
 
     mesh2.getWorldPosition(_wPos);
     mesh2.getWorldQuaternion(_wQuat);
     const n2 = FACE_NORM_LOCAL[death.dirKey2];
     _faceNorm2.set(n2[0], n2[1], n2[2]).applyQuaternion(_wQuat);
-    _vEnd.copy(_wPos).addScaledVector(_faceNorm2, -FACE_OFFSET);
+    _vEnd.copy(_wPos).addScaledVector(_faceNorm2, TUNNEL_ANCHOR_OFFSET);
 
     _midA.set(n1[0], n1[1], n1[2]).multiplyScalar(MINI_FACE_R);
     _midB.set(n2[0], n2[1], n2[2]).multiplyScalar(MINI_FACE_R);

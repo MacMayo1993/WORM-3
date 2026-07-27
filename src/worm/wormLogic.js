@@ -9,6 +9,7 @@ import { getStickerWorldPos, getManifoldGridId } from '../game/coordinates.js';
 import { isSurfaceSticker } from '../game/cubeState.js';
 import { rotateVec90 } from '../game/cubeRotation.js';
 import { DIR_FORWARD } from './healerWorm/constants.js';
+import { TUNNEL_ANCHOR_OFFSET } from '../utils/constants.js';
 import * as THREE from 'three';
 
 // ============================================================================
@@ -310,21 +311,21 @@ export const getTunnelWorldPosInto = (out, tunnel, t, size, explosionFactor = 0)
   );
 
   // Reconstruct the SAME centerline the ribbon mesh is built from (MobiusTunnel fillRibbon):
-  //   vStart = entryCenter − entryNormal·FACE_OFFSET ,  midA = entryNormal·MINI_FACE_R
-  //   vEnd   = exitCenter  − exitNormal·FACE_OFFSET  ,  midB = exitNormal·MINI_FACE_R
+  //   vStart = entryCenter + entryNormal·TUNNEL_ANCHOR_OFFSET , midA = entryNormal·MINI_FACE_R
+  //   vEnd   = exitCenter  + exitNormal·TUNNEL_ANCHOR_OFFSET  , midB = exitNormal·MINI_FACE_R
   // Path: vStart → midA over t∈[0,0.5], then midB → vEnd over t∈[0.5,1]. The mini-cube
   // docking points (midA/midB) stay fixed near the core regardless of the explosion scale.
   const en = TUNNEL_FACE_NORMALS[tunnel.entry.dirKey] || ZERO3;
   const xn = TUNNEL_FACE_NORMALS[tunnel.exit.dirKey] || ZERO3;
   _tunVStart.set(
-    _tunnelEntry.x - en[0] * TUNNEL_FACE_OFFSET,
-    _tunnelEntry.y - en[1] * TUNNEL_FACE_OFFSET,
-    _tunnelEntry.z - en[2] * TUNNEL_FACE_OFFSET
+    _tunnelEntry.x + en[0] * TUNNEL_ANCHOR_OFFSET,
+    _tunnelEntry.y + en[1] * TUNNEL_ANCHOR_OFFSET,
+    _tunnelEntry.z + en[2] * TUNNEL_ANCHOR_OFFSET
   );
   _tunVEnd.set(
-    _tunnelExit.x - xn[0] * TUNNEL_FACE_OFFSET,
-    _tunnelExit.y - xn[1] * TUNNEL_FACE_OFFSET,
-    _tunnelExit.z - xn[2] * TUNNEL_FACE_OFFSET
+    _tunnelExit.x + xn[0] * TUNNEL_ANCHOR_OFFSET,
+    _tunnelExit.y + xn[1] * TUNNEL_ANCHOR_OFFSET,
+    _tunnelExit.z + xn[2] * TUNNEL_ANCHOR_OFFSET
   );
   _tunMidA.set(en[0] * TUNNEL_MINI_FACE_R, en[1] * TUNNEL_MINI_FACE_R, en[2] * TUNNEL_MINI_FACE_R);
   _tunMidB.set(xn[0] * TUNNEL_MINI_FACE_R, xn[1] * TUNNEL_MINI_FACE_R, xn[2] * TUNNEL_MINI_FACE_R);
@@ -375,14 +376,14 @@ export const buildTunnelCenterlineInto = (cl, tunnel, size, explosionFactor = 0)
   const en = TUNNEL_FACE_NORMALS[tunnel.entry.dirKey] || ZERO3;
   const xn = TUNNEL_FACE_NORMALS[tunnel.exit.dirKey] || ZERO3;
   cl.vStart.set(
-    _tunnelEntry.x - en[0] * TUNNEL_FACE_OFFSET,
-    _tunnelEntry.y - en[1] * TUNNEL_FACE_OFFSET,
-    _tunnelEntry.z - en[2] * TUNNEL_FACE_OFFSET
+    _tunnelEntry.x + en[0] * TUNNEL_ANCHOR_OFFSET,
+    _tunnelEntry.y + en[1] * TUNNEL_ANCHOR_OFFSET,
+    _tunnelEntry.z + en[2] * TUNNEL_ANCHOR_OFFSET
   );
   cl.vEnd.set(
-    _tunnelExit.x - xn[0] * TUNNEL_FACE_OFFSET,
-    _tunnelExit.y - xn[1] * TUNNEL_FACE_OFFSET,
-    _tunnelExit.z - xn[2] * TUNNEL_FACE_OFFSET
+    _tunnelExit.x + xn[0] * TUNNEL_ANCHOR_OFFSET,
+    _tunnelExit.y + xn[1] * TUNNEL_ANCHOR_OFFSET,
+    _tunnelExit.z + xn[2] * TUNNEL_ANCHOR_OFFSET
   );
   cl.midA.set(en[0] * TUNNEL_MINI_FACE_R, en[1] * TUNNEL_MINI_FACE_R, en[2] * TUNNEL_MINI_FACE_R);
   cl.midB.set(xn[0] * TUNNEL_MINI_FACE_R, xn[1] * TUNNEL_MINI_FACE_R, xn[2] * TUNNEL_MINI_FACE_R);
@@ -428,8 +429,9 @@ const TUNNEL_FACE_NORMALS = {
   PZ: [0, 0, 1], NZ: [0, 0, -1]
 };
 const ZERO3 = [0, 0, 0];
-// Geometry constants — keep in sync with MobiusTunnel.jsx.
-const TUNNEL_FACE_OFFSET = 0.52;
+// Geometry constants. The anchor offset is imported rather than redeclared —
+// it used to be duplicated here and in three manifold components, which is how
+// it drifted onto the wrong side of the cubie in the first place.
 const TUNNEL_MINI_FACE_R = 0.25;
 
 // ── Wind-up / wind-out spiral flourish above a tunnel mouth ───────────────────

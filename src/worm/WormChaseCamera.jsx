@@ -261,11 +261,12 @@ export default function WormChaseCamera({ worm, size }) {
             tunnelState.activeTunnelId = tunnel.pairId ?? null;
 
             const entN = FACE_NORMALS[tunnel.entry.dirKey] ?? FACE_NORMALS.PY;
-            const ew = getStickerWorldPos(tunnel.entry.x, tunnel.entry.y, tunnel.entry.z, tunnel.entry.dirKey, size, 0);
-            // getStickerWorldPos returns cubieCenter + SURFACE_OFFSET·normal (outward sticker
-            // surface), but MobiusTunnel's vStart is cubieCenter − FACE_OFFSET·normal (inward) —
-            // subtract twice the offset to land exactly on the rendered ribbon's start point.
-            _ribVStart.set(ew[0], ew[1], ew[2]).addScaledVector(entN, -2 * SURFACE_OFFSET);
+            // Ask the centerline itself for its start rather than re-deriving it from the
+            // sticker position. The old hand-rolled correction (−2·SURFACE_OFFSET) existed
+            // only to reach the anchor's former spot on the far side of the cubie; now that
+            // tunnels anchor on their tiles there is nothing to correct, and reusing the one
+            // function that defines the path keeps camera and geometry from drifting apart.
+            getTunnelWorldPosInto(_ribVStart, tunnel, 0, size);
 
             const portalDist = 2.8 + size * 0.85;
             const portalUp   = 1.3 + size * 0.32;
@@ -370,9 +371,9 @@ export default function WormChaseCamera({ worm, size }) {
             tunnelState.activeTunnelId = tunnel.pairId ?? null;
 
             const extN = FACE_NORMALS[tunnel.exit.dirKey] ?? FACE_NORMALS.PY;
-            const xw = getStickerWorldPos(tunnel.exit.x, tunnel.exit.y, tunnel.exit.z, tunnel.exit.dirKey, size, 0);
-            // Same inward correction as the entry anchor above — match MobiusTunnel's vEnd.
-            _ribVEnd.set(xw[0], xw[1], xw[2]).addScaledVector(extN, -2 * SURFACE_OFFSET);
+            // Same reasoning as the entry anchor above — take the endpoint from the
+            // centerline rather than re-deriving it.
+            getTunnelWorldPosInto(_ribVEnd, tunnel, 1, size);
 
             const portalDist = 2.8 + size * 0.85;
             const portalUp   = 1.3 + size * 0.32;

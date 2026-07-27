@@ -30,13 +30,18 @@ const SIDES = 24;            // samples around the circumference — below ~20 t
                              // reads as a visible polygon from the inside
 const VERT_COUNT = (RINGS + 1) * (SIDES + 1);
 
-// The chase camera sits ~0.55 above the centerline and up to ~1.5 behind it, so
-// the bore has to clear that comfortably or the camera pops through the wall.
-// The mouth flare stays small on purpose: the centerline ends INSIDE the entry
-// and exit cubies, so a wide mouth balloons out through the neighbouring faces
-// and reads as smears hanging off the cube in the exterior shots.
-const R_CORE = 1.15;         // radius at the Möbius midpoint
-const R_FLARE = 0.22;        // extra radius added toward each mouth
+// Radius profile, tile → core → tile.
+//
+// The centerline is a polyline: an entry arm, a short crossing through the core,
+// then an exit arm. When the two tiles are on different axes the arms meet at a
+// sharp corner in the middle, and putting the tube's widest point on that corner
+// makes it read as two mismatched barrels butted together rather than one shaft.
+// So the bore pinches at the core as well as at each tile, and bulges over the
+// middle of each arm instead — the corner sits in the narrow part, and the
+// fragment shader fades the wall out across it entirely.
+const R_MOUTH  = 0.40;       // where the tunnel meets its tile (sticker is ~0.88 wide)
+const R_THROAT = 0.85;       // at the core crossing — still clears the camera's offset
+const R_CORE   = 1.15;       // widest point, over the middle of each arm
 
 // Opacity targets by phase. A faint presence during 'entering' foreshadows the
 // shaft while the camera is still outside watching the dive; the fade-out is
@@ -92,9 +97,17 @@ const fragmentShader = `
     float ribs = pow(abs(sin(vUv.x * 3.14159265 * 8.0)), 6.0) * 0.35;
 
     // The half-twist point — where the band's orientation inverts. The HUD marks
-    // it as ½π; this is the same moment in the world.
-    float seam = 1.0 - smoothstep(0.0, 0.06, abs(vUv.y - 0.5));
+    // it as ½π; this is the same moment in the world. Widened to span the stretch
+    // where the wall is faded out, so the crossing reads as a burst of light
+    // between two shafts rather than as a hole.
+    float dMid = abs(vUv.y - 0.5);
+    float seam = 1.0 - smoothstep(0.0, 0.15, dMid);
     seam *= 0.9 + 0.1 * sin(uTime * 8.0);
+
+    // Never draw the wall across the corner where the two arms meet — no frame
+    // can carry a cross-section smoothly through a sharp bend, and the result
+    // reads as two barrels that do not line up.
+    float coreFade = smoothstep(0.05, 0.15, dMid);
 
     // Light pooled around the worm, falling off ahead and behind, so the shaft
     // has depth instead of being uniformly lit end to end.
@@ -111,10 +124,13 @@ const fragmentShader = `
     graze = pow(clamp(graze, 0.0, 1.0), 2.0) * 0.5;
 
     float intensity = 0.30 + rings + ribs + headGlow + graze;
-    vec3  col = base * intensity + vec3(1.0) * seam * 0.8;
+    vec3  col = base * intensity + vec3(1.0) * seam * 0.9;
 
-    float alpha = (0.55 + rings * 0.35 + headGlow * 0.35 + seam * 0.4) * mouth * uOpacity;
-    gl_FragColor = vec4(col, clamp(alpha, 0.0, 1.0));
+    // Wall and seam are summed separately: the seam peaks exactly where coreFade
+    // removes the wall, so the shaft hands off to light and back without a gap.
+    float wall = (0.55 + rings * 0.35 + headGlow * 0.35) * coreFade;
+    float glow = seam * 0.55;
+    gl_FragColor = vec4(col, clamp((wall + glow) * mouth * uOpacity, 0.0, 1.0));
   }
 `;
 
@@ -135,10 +151,14 @@ function createTubeGeometry() {
   return geo;
 }
 
-/** Radius profile: narrow through the core, flaring open at both mouths. */
+/** Tight at both tile mouths and at the core, bulging over the middle of each arm. */
 function radiusAt(t) {
-  const d = Math.abs(2 * t - 1);       // 0 at midpoint, 1 at the mouths
-  return R_CORE + R_FLARE * d * d;
+  const c = Math.min(1, Math.max(0, t));
+  // Widens from each tile mouth toward the core crossing.
+  const base = R_MOUTH + (R_THROAT - R_MOUTH) * Math.sin(Math.PI * c);
+  // Peaks at t=0.25 and t=0.75, and is exactly zero at both mouths and the core.
+  const arm = Math.abs(Math.sin(2 * Math.PI * c));
+  return base + (R_CORE - R_THROAT) * arm;
 }
 
 export function TunnelTube({ worm, size }) {

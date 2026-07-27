@@ -88,6 +88,17 @@ export const FLIP_CAP = 6;
 // needs to position geometry on the cube surface.
 export const SURFACE_OFFSET = 0.52;
 
+// Where a wormhole ribbon anchors on its tile: a distance along the tile's face
+// normal from the cubie centre, POSITIVE meaning the tile side.
+//
+// This used to be −0.52 duplicated across five files, which put every tunnel
+// endpoint a full cubie width (1.04) away from the tile it belongs to, on the
+// opposite side of the cubie — tunnels visibly stopped short of their tiles and
+// the worm teleported that distance when its dive handed off to the ride.
+// Slightly inside SURFACE_OFFSET so the ribbon's end edge is not coplanar with
+// the sticker it meets. Every consumer imports this; nothing redefines it.
+export const TUNNEL_ANCHOR_OFFSET = 0.50;
+
 // Victory condition type constants (use instead of magic strings)
 export const VICTORY = {
   RUBIKS:   'rubiks',
