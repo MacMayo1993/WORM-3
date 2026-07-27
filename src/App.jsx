@@ -21,9 +21,10 @@ import { completeLevel } from './utils/levels.js';
 import { vibrate } from './utils/audio.js';
 import { makeCubies } from './game/cubeState.js';
 import { rotateSliceCubies } from './game/cubeRotation.js';
-import { flipStickerPair, buildManifoldGridMap } from './game/manifoldLogic.js';
+import { flipStickerPair } from './game/manifoldLogic.js';
 import { getManifoldMap } from './game/manifoldMapStore.js';
 import { clearRefractory } from './game/refractoryMap.js';
+import { buildLevelStartState } from './levels/levelStaging.js';
 
 // Hooks
 import { useShallow } from 'zustand/react/shallow';
@@ -1096,37 +1097,9 @@ export default function WORM3() {
     // Cancel any animated shuffle still playing from a previous game session.
     cancelShuffle();
     const levelSize = currentLevelData?.cubeSize || size;
-    let state = makeCubies(levelSize);
-    const scrambleSequence = currentLevelData?.scrambleSequence;
-    if (scrambleSequence && scrambleSequence.length) {
-      // Hand-authored deterministic scramble (e.g. a single middle-layer turn).
-      // numTurns is honoured for completeness, though authored data emits one
-      // entry per quarter turn: getLevelPar counts entries, so a numTurns:2 kept
-      // as one entry would score par 1 for a move that costs the player two.
-      for (const { axis, sliceIndex, dir, numTurns } of scrambleSequence) {
-        for (let t = 0; t < (numTurns ?? 1); t++) {
-          state = rotateSliceCubies(state, levelSize, axis, sliceIndex, dir);
-        }
-      }
-    } else {
-      const shuffleCount = currentLevelData ? (currentLevelData.scrambleMoves ?? Math.min(25, 10 + currentLevel * 2)) : 25;
-      for (let i = 0; i < shuffleCount; i++) {
-        const ax = ['row', 'col', 'depth'][Math.floor(Math.random() * 3)];
-        const slice = Math.floor(Math.random() * levelSize);
-        const dir = Math.random() > 0.5 ? 1 : -1;
-        state = rotateSliceCubies(state, levelSize, ax, slice, dir);
-      }
-    }
-    // Hand-authored antipodal flips (flip-teaching levels). flipStickerPair also flips the
-    // antipodal partner, so one entry per pair is enough. Flips don't move stickers, so a
-    // single manifold map built from the scrambled state is valid for the whole sequence.
-    const flipSequence = currentLevelData?.flipSequence;
-    if (flipSequence && flipSequence.length) {
-      const flipMap = buildManifoldGridMap(state, levelSize);
-      for (const { x, y, z, dirKey } of flipSequence) {
-        state = flipStickerPair(state, levelSize, x, y, z, dirKey, flipMap);
-      }
-    }
+    // Staging rules live in levels/levelStaging.js — see the note there on why a
+    // level that authors its own setup is never randomised on top.
+    const state = buildLevelStartState(currentLevelData, levelSize, { levelNumber: currentLevel });
     setRotatedCubies(state);
     // Save the level's chaos setting before resetGame() wipes it.
     const savedChaosLevel = currentLevelData?.chaosLevel ?? 0;
