@@ -398,7 +398,6 @@ const ParityStoreScreen = ({ onClose }) => {
 
   // What the cube on the plate wears when it is not the thing being sold.
   const currentColors = useMemo(() => resolveWizardColors(settings || {}), [settings]);
-  const currentFaceStyles = settings?.manifoldStyles || null;
   const cardTileColor = currentColors[1] || '#e53935';
 
   const renderItems = (list) => (
@@ -434,15 +433,18 @@ const ParityStoreScreen = ({ onClose }) => {
       return <WormPreviewCanvas characterId={wormCharacter} skinId={focused.skinId} hatId={wormHat} size={heroPx} animated />;
     }
     if (focused.type === 'hat') {
-      return <WormPreviewCanvas characterId={wormCharacter} skinId={wormSkin} hatId={focused.hatId} size={heroPx} animated framing="head" />;
+      return <WormPreviewCanvas characterId={wormCharacter} skinId={wormSkin} hatId={focused.hatId} size={heroPx} animated framing="portrait" />;
     }
     if (focused.type === 'scheme') {
+      // Palettes show on plain tiles, not on whatever style you have equipped.
+      // A palette card is answering "what are these six colours", and half the
+      // catalogue is dark ornate shaders that swallow a pale palette whole —
+      // pastel under a mandelbrot is six shades of near-black.
       return (
         <CubePreviewCanvas
           px={heroPx} size={3}
           colors={COLOR_SCHEMES[focused.schemeKey] || COLOR_SCHEMES.standard}
           tileStyle="solid"
-          perFaceStyles={currentFaceStyles}
         />
       );
     }

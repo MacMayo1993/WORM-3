@@ -57,7 +57,10 @@ export function getHatParts(type, s = 0.28) {
 
   if (type === 'halo') {
     return [
-      { geo: ['torus', [s * 0.8, s * 0.09, 8, 32]], pos: [0, s * 1.9, 0], mat: { color: '#fde68a', emissive: '#fde68a', emissiveIntensity: 1.4 } }
+      // Laid flat over the crown. A TorusGeometry stands in the XY plane by
+      // default, which pointed the ring at the camera like an archway — read as
+      // a yellow "U" behind the head rather than a halo hovering above it.
+      { geo: ['torus', [s * 0.8, s * 0.09, 8, 32]], pos: [0, s * 1.9, 0], rot: [Math.PI / 2, 0, 0], mat: { color: '#fde68a', emissive: '#fde68a', emissiveIntensity: 1.4 } }
     ];
   }
 

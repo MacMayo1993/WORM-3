@@ -104,7 +104,13 @@ export default function SpecimenPlate({
             one bleaches the name plate off the bottom of the plate. Dimming the
             image alone can't fix that — a pale photo at low opacity is still
             pale — so the darkness is painted on top and the photo reads through
-            it at whatever brightness it happens to be. */}
+            it at whatever brightness it happens to be.
+
+            It is weighted rather than flat: heavy across the bottom third where
+            the name and the action sit, and light through the middle, which is
+            the band the specimen occupies. A scrim strong enough to carry white
+            text everywhere leaves the whole plate looking like a lights-out
+            photo of a cube. */}
         {backdrop && (
           <div
             aria-hidden="true"
@@ -112,7 +118,7 @@ export default function SpecimenPlate({
               position: 'absolute',
               inset: 0,
               backgroundImage: [
-                'linear-gradient(180deg, rgba(14,18,10,0.58) 0%, rgba(14,18,10,0.70) 42%, rgba(14,18,10,0.93) 100%)',
+                'linear-gradient(180deg, rgba(14,18,10,0.46) 0%, rgba(14,18,10,0.34) 34%, rgba(14,18,10,0.62) 72%, rgba(14,18,10,0.93) 100%)',
                 backdrop.thumbnail ? `url("${backdrop.thumbnail}")` : backdrop.gradient
               ].join(','),
               backgroundSize: 'cover',
