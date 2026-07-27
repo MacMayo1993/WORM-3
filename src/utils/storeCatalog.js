@@ -3,6 +3,7 @@
 // price: 0 = free / default-owned.
 
 import { SCHEME_LABELS, TILE_STYLES } from './colorSchemes.js';
+import { WORM_TRAILS } from '../worm/wormCosmeticsData.js';
 
 // ── Worm Skins ────────────────────────────────────────────────────────────────
 export const STORE_SKINS = [
@@ -35,6 +36,26 @@ export const STORE_HATS = [
   { id: 'hat_wizard', type: 'hat', category: 'hats', hatId: 'wizard', label: 'Wizard',  price: 200 },
   { id: 'hat_grad',   type: 'hat', category: 'hats', hatId: 'grad',   label: 'Grad Cap', price: 200 },
 ];
+
+// ── Trails ────────────────────────────────────────────────────────────────────
+const TRAIL_PRICES = {
+  classic: 0,
+  comet: 200, bubble: 200,
+  circuit: 250, ember: 250,
+  frost: 200, nebula: 250,
+  prism: 300,
+};
+
+export const STORE_TRAILS = WORM_TRAILS.map(t => ({
+  id: `trail_${t.id}`,
+  type: 'trail',
+  category: 'trails',
+  trailId: t.id,
+  label: t.label,
+  price: TRAIL_PRICES[t.id] ?? 200,
+  body: t.body,
+  glow: t.glow,
+}));
 
 // ── Color Schemes ─────────────────────────────────────────────────────────────
 // standard and custom are always free.
@@ -124,6 +145,7 @@ export const STORE_TILES = Object.keys(TILE_STYLES).map(k => ({
 export const STORE_ITEMS = [
   ...STORE_SKINS,
   ...STORE_HATS,
+  ...STORE_TRAILS,
   ...STORE_SCHEMES,
   ...STORE_TILES,
 ];
@@ -140,5 +162,6 @@ export const getStoreItem = (id) => STORE_ITEMS.find(i => i.id === id) ?? null;
 
 export const getSkins   = () => STORE_SKINS;
 export const getHats    = () => STORE_HATS;
+export const getTrails  = () => STORE_TRAILS;
 export const getSchemes = () => STORE_SCHEMES;
 export const getTiles   = () => STORE_TILES;

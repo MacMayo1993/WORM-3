@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
-import { getSkins, getHats, getSchemes, getTiles } from '../../utils/storeCatalog.js';
+import { getSkins, getHats, getTrails, getSchemes, getTiles } from '../../utils/storeCatalog.js';
+import { getSkin } from '../../worm/wormCosmeticsData.js';
 import { TILE_STYLE_SECTIONS } from '../../utils/tileStyleCatalog.js';
 import { COLOR_SCHEMES } from '../../utils/colorSchemes.js';
 import {
@@ -30,17 +31,19 @@ const TOUCH = { touchAction: 'manipulation', WebkitTapHighlightColor: 'transpare
 
 const SKINS   = getSkins();
 const HATS    = getHats();
+const TRAILS  = getTrails();
 const SCHEMES = getSchemes();
 const TILES   = getTiles();
 
 const TABS = [
   { id: 'skins',   label: 'Skins',    accent: '#2D7A3A', items: SKINS },
   { id: 'hats',    label: 'Hats',     accent: '#6A2C91', items: HATS },
+  { id: 'trails',  label: 'Trails',   accent: '#0D9488', items: TRAILS },
   { id: 'schemes', label: 'Palettes', accent: '#1565C0', items: SCHEMES },
   { id: 'tiles',   label: 'Tiles',    accent: '#C44B00', items: TILES },
 ];
 
-const ALL_ITEMS = [...SKINS, ...HATS, ...SCHEMES, ...TILES];
+const ALL_ITEMS = [...SKINS, ...HATS, ...TRAILS, ...SCHEMES, ...TILES];
 
 // The store is full-bleed, but the collection itself is a column: past ~1000px
 // the cards stop spreading so the masthead, tabs, grid, and footnote stay in one
@@ -50,6 +53,7 @@ const COLUMN = { width: '100%', maxWidth: '1000px', margin: '0 auto', boxSizing:
 const TYPE_LABEL = {
   skin: 'Worm Skin',
   hat: 'Hat',
+  trail: 'Trail',
   scheme: 'Color Palette',
   tile: 'Tile Style',
 };
@@ -58,6 +62,7 @@ const TYPE_LABEL = {
 const typeAccent = (item) => {
   if (item.type === 'skin')   return item.glow || '#2D7A3A';
   if (item.type === 'hat')    return '#6A2C91';
+  if (item.type === 'trail')  return item.glow || item.body || '#0D9488';
   if (item.type === 'scheme') return '#1565C0';
   return '#C44B00';
 };
@@ -125,6 +130,27 @@ const SchemeDots = ({ schemeKey, gap = '3px', radius = '3px' }) => {
   );
 };
 
+// ── Trail preview ─────────────────────────────────────────────────────────────
+// A shrinking, wiggling run of daubs echoes the actual painted stroke WormTrail.jsx
+// leaves behind the worm in-game — same idea (bright/wide near the head, dim/thin
+// trailing off), just static and small enough for a store card.
+const TRAIL_DOT_STEPS = [1, 0.82, 0.64, 0.48, 0.34, 0.22];
+const TrailPreview = ({ body, glow, size = 44 }) => (
+  <svg width={size} height={size} viewBox="0 0 44 44" style={{ display: 'block' }} aria-hidden="true">
+    {TRAIL_DOT_STEPS.map((s, i) => {
+      const x = 5 + i * 6.4;
+      const y = 22 + Math.sin(i * 1.15) * 6.5;
+      const r = 5.4 * s;
+      return (
+        <g key={i}>
+          <circle cx={x} cy={y} r={r * 1.7} fill={glow} opacity={0.16 + s * 0.22} />
+          <circle cx={x} cy={y} r={r} fill={body} opacity={0.32 + s * 0.62} />
+        </g>
+      );
+    })}
+  </svg>
+);
+
 // ── Card artwork ──────────────────────────────────────────────────────────────
 // The grid stays cheap: real worms (one frame each, they don't animate here) and
 // flat shader tiles. The live, turning version of whatever you tapped is on the
@@ -136,6 +162,10 @@ const CardArt = ({ item, size, characterId, skinId, tileColor }) => {
   if (item.type === 'hat') return (
     <WormPreviewCanvas characterId={characterId} skinId={skinId} hatId={item.hatId} size={size} framing="head" />
   );
+  if (item.type === 'trail') {
+    const equippedSkin = getSkin(skinId);
+    return <TrailPreview body={item.body ?? equippedSkin.body} glow={item.glow ?? equippedSkin.glow} size={size * 0.9} />;
+  }
   if (item.type === 'scheme') return (
     <div style={{ width: size * 0.92 }}>
       <SchemeDots schemeKey={item.schemeKey} />
@@ -277,7 +307,7 @@ const TILE_SECTIONS = TILE_STYLE_SECTIONS.map(section => ({
 // catalogue order.
 const TILE_ORDER = TILE_SECTIONS.flatMap(s => s.items);
 
-const TAB_ITEMS = { skins: SKINS, hats: HATS, schemes: SCHEMES, tiles: TILE_ORDER };
+const TAB_ITEMS = { skins: SKINS, hats: HATS, trails: TRAILS, schemes: SCHEMES, tiles: TILE_ORDER };
 
 // ── Viewport ──────────────────────────────────────────────────────────────────
 // The plate is sized from the screen rather than a fixed px so a phone spends
@@ -308,16 +338,18 @@ const ParityStoreScreen = ({ onClose }) => {
   const [tab, setTab] = useState('skins');
   const heroPx = useHeroSize();
 
-  const { parityPoints, ownedItems, wormSkin, wormHat, wormCharacter, buyItem, setWormSkin, setWormHat } =
+  const { parityPoints, ownedItems, wormSkin, wormHat, wormTrail, wormCharacter, buyItem, setWormSkin, setWormHat, setWormTrail } =
     useGameStore(useShallow(s => ({
       parityPoints: s.parityPoints,
       ownedItems: s.ownedItems,
       wormSkin: s.wormSkin,
       wormHat: s.wormHat,
+      wormTrail: s.wormTrail,
       wormCharacter: s.wormCharacter,
       buyItem: s.buyItem,
       setWormSkin: s.setWormSkin,
       setWormHat: s.setWormHat,
+      setWormTrail: s.setWormTrail,
     })));
 
   const { settings, setSettings } = useGameStore(useShallow(s => ({
@@ -336,13 +368,14 @@ const ParityStoreScreen = ({ onClose }) => {
   const isEquipped = useCallback((item) => {
     if (item.type === 'skin')   return wormSkin === item.skinId;
     if (item.type === 'hat')    return wormHat === item.hatId;
+    if (item.type === 'trail')  return wormTrail === item.trailId;
     if (item.type === 'scheme') return settings?.colorScheme === item.schemeKey;
     if (item.type === 'tile') {
       const styles = settings?.manifoldStyles || {};
       return [1, 2, 3, 4, 5, 6].every(id => (styles[id] || 'solid') === item.tileKey);
     }
     return false;
-  }, [wormSkin, wormHat, settings]);
+  }, [wormSkin, wormHat, wormTrail, settings]);
 
   const items = TAB_ITEMS[tab];
 
@@ -361,6 +394,7 @@ const ParityStoreScreen = ({ onClose }) => {
   const equip = (item) => {
     if (item.type === 'skin') setWormSkin(item.skinId);
     else if (item.type === 'hat') setWormHat(item.hatId);
+    else if (item.type === 'trail') setWormTrail(item.trailId);
     else if (item.type === 'scheme') setSettings({ ...settings, colorScheme: item.schemeKey });
     else if (item.type === 'tile') {
       const s = {};
@@ -434,6 +468,10 @@ const ParityStoreScreen = ({ onClose }) => {
     }
     if (focused.type === 'hat') {
       return <WormPreviewCanvas characterId={wormCharacter} skinId={wormSkin} hatId={focused.hatId} size={heroPx} animated framing="portrait" />;
+    }
+    if (focused.type === 'trail') {
+      const equippedSkin = getSkin(wormSkin);
+      return <TrailPreview body={focused.body ?? equippedSkin.body} glow={focused.glow ?? equippedSkin.glow} size={heroPx * 0.7} />;
     }
     if (focused.type === 'scheme') {
       // Palettes show on plain tiles, not on whatever style you have equipped.

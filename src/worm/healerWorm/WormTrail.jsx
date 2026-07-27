@@ -7,7 +7,7 @@ import { useGameStore } from '../../hooks/useGameStore.js';
 import { SURFACE_OFFSET } from '../../utils/constants.js';
 import { liveCubies } from '../liveCubies.js';
 import { ttAt } from '../circularBuffers.js';
-import { getSkin } from '../wormCosmeticsData.js';
+import { getSkin, getTrail } from '../wormCosmeticsData.js';
 import { FACE_NORMALS, BODY_BALL_SPACING } from './constants.js';
 
 // ─── Worm Trail scratch — zero per-frame allocation ───────────────────────────
@@ -96,8 +96,13 @@ export function WormTrail({ worm, size: _size }) {
     const wormSkinId = useGameStore(s => s.wormSkin ?? 'slime');
     const wormShowTrail = useGameStore(s => s.wormShowTrail ?? true);
     const skin = getSkin(wormSkinId);
-    const skinRef = useRef(skin);
-    skinRef.current = skin;
+    // A trail's body/glow are null for "Classic", which paints the trail in the
+    // equipped skin's colors — the look every save already has. Any other
+    // equipped trail overrides both colors regardless of skin.
+    const wormTrailId = useGameStore(s => s.wormTrail ?? 'classic');
+    const equippedTrail = getTrail(wormTrailId);
+    const trailColorsRef = useRef({ body: equippedTrail.body ?? skin.body, glow: equippedTrail.glow ?? skin.glow });
+    trailColorsRef.current = { body: equippedTrail.body ?? skin.body, glow: equippedTrail.glow ?? skin.glow };
     const wormCharacterId = useGameStore(s => s.wormCharacter ?? 'classic');
     const gaitRef = useRef(trailGaitParams(wormCharacterId));
     gaitRef.current = trailGaitParams(wormCharacterId);
@@ -120,7 +125,7 @@ export function WormTrail({ worm, size: _size }) {
 
         const lSize = liveCubies.size;
         const capCount = count; // render the full retained route, not a fixed window
-        const currentSkin = skinRef.current;
+        const trailColors = trailColorsRef.current;
         const { amp, omega } = gaitRef.current;
 
         // Seed the spine just UNDER the last body orb so the slime appears to ooze straight
@@ -200,7 +205,7 @@ export function WormTrail({ worm, size: _size }) {
                     mesh.setMatrixAt(visible, _trailDummy.matrix);
 
                     // Encode fade as color brightness
-                    _trailColor.set(currentSkin.body).multiplyScalar(0.20 + fs * 0.80);
+                    _trailColor.set(trailColors.body).multiplyScalar(0.20 + fs * 0.80);
                     mesh.setColorAt(visible, _trailColor);
 
                     // Recent daubs also get a soft additive glow halo in the skin's glow colour,
@@ -209,7 +214,7 @@ export function WormTrail({ worm, size: _size }) {
                         _trailDummy.scale.multiplyScalar(TRAIL_GLOW_SCALE);
                         _trailDummy.updateMatrix();
                         glowMesh.setMatrixAt(visible, _trailDummy.matrix);
-                        _trailGlowColor.set(currentSkin.glow).multiplyScalar(0.14 + fs * 0.36);
+                        _trailGlowColor.set(trailColors.glow).multiplyScalar(0.14 + fs * 0.36);
                         glowMesh.setColorAt(visible, _trailGlowColor);
                         glowCount = visible + 1;
                     }
