@@ -5,7 +5,7 @@ import { TILE_STYLES, SCHEME_LABELS } from '../../../utils/colorSchemes.js';
 import { PAPER_TEXT_MUTED } from '../../../utils/uiTheme.js';
 import CubePlate from './CubePlate.jsx';
 import CubeSizeSlider from './CubeSizeSlider.jsx';
-import { MIN_CUBE_SIZE, MAX_CUBE_SIZE, sizeTier } from './shared.jsx';
+import { MIN_CUBE_SIZE, MAX_CUBE_SIZE, sizeTier, bgOptionFor } from './shared.jsx';
 
 export default function SizeStep({ cos }) {
   const { settings, cubeSize, setCubeSize, colors, accent, accentShadow } = cos;
@@ -28,6 +28,7 @@ export default function SizeStep({ cos }) {
         onNext={() => setCubeSize(clamp(cubeSize + 1))}
         cube={{ size: cubeSize, colors, tileStyle: settings.tileStyle, perFaceStyles: settings.perFaceStyles }}
         glow={colors[1]}
+        backdrop={bgOptionFor(settings.backgroundTheme)}
       />
 
       <CubeSizeSlider value={cubeSize} onChange={setCubeSize} accent={accent} accentShadow={accentShadow} />

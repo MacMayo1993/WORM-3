@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { getSkins, getHats, getSchemes, getTiles } from '../../utils/storeCatalog.js';
@@ -11,12 +11,16 @@ import {
 } from '../../3d/TilePreviewRenderer.js';
 import {
   UI_FONT, DISPLAY_FONT, HAND_FONT,
-  PAPER_BACKDROP, PAPER_BACKDROP_BLUR, PAPER_SHEET_RAISED,
+  PAPER_SHEET_RAISED,
   PAPER_BORDER_SOFT, PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT,
-  PAPER_BG_MUTED, PAPER_CARD_SHADOW, PAPER_SHADOW, UI_CREAM,
+  PAPER_BG_MUTED, PAPER_CARD_SHADOW, UI_CREAM,
+  NIGHT_TEXT_MUTED,
 } from '../../utils/uiTheme.js';
+import { isMobile } from '../../utils/device.js';
 import { wizardPaperBackground, WIZARD_FOOTER_BG, PENCIL_LEAD } from './WizardChrome.jsx';
 import WormPreviewCanvas from '../../3d/WormPreviewCanvas.jsx';
+import CubePreviewCanvas from '../../3d/CubePreviewCanvas.jsx';
+import { SpecimenPlate, resolveWizardColors, bgOptionFor } from './wizardSteps/index.jsx';
 import './ParityStoreScreen.css';
 
 const ACCENT = '#0891B2';
@@ -87,7 +91,7 @@ const CheckIcon = ({ size = 10, color = '#fff' }) => (
 );
 
 // ── Tile preview canvas ───────────────────────────────────────────────────────
-function TilePreviewCanvas({ styleKey, size = 44 }) {
+function TilePreviewCanvas({ styleKey, colorHex = '#e53935', size = 44 }) {
   const canvasRef = useRef(null);
   const idRef = useRef(null);
   useEffect(() => {
@@ -95,13 +99,13 @@ function TilePreviewCanvas({ styleKey, size = 44 }) {
     if (!canvas) return;
     canvas.width = size;
     canvas.height = size;
-    idRef.current = registerTilePreview(canvas, styleKey, '#e53935');
+    idRef.current = registerTilePreview(canvas, styleKey, colorHex);
     return () => { if (idRef.current !== null) unregisterTilePreview(idRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
-    if (idRef.current !== null) updateTilePreview(idRef.current, styleKey, '#e53935');
-  }, [styleKey]);
+    if (idRef.current !== null) updateTilePreview(idRef.current, styleKey, colorHex);
+  }, [styleKey, colorHex]);
   return <canvas ref={canvasRef} width={size} height={size} style={{ borderRadius: 6, display: 'block' }} />;
 }
 
@@ -121,12 +125,11 @@ const SchemeDots = ({ schemeKey, gap = '3px', radius = '3px' }) => {
   );
 };
 
-// ── Item artwork ──────────────────────────────────────────────────────────────
-// One renderer for both the grid card and the big preview, so an item is drawn
-// the same way at both sizes.
-const ItemArt = ({ item, size, characterId, skinId }) => {
-  // Skins and hats are drawn by the game's own worm renderer, so what you buy
-  // is what crawls: same clearcoat beads, same 3D hat, same face.
+// ── Card artwork ──────────────────────────────────────────────────────────────
+// The grid stays cheap: real worms (one frame each, they don't animate here) and
+// flat shader tiles. The live, turning version of whatever you tapped is on the
+// plate above — one animated preview for the whole screen.
+const CardArt = ({ item, size, characterId, skinId, tileColor }) => {
   if (item.type === 'skin') return (
     <WormPreviewCanvas characterId={characterId} skinId={item.skinId} size={size} />
   );
@@ -135,17 +138,17 @@ const ItemArt = ({ item, size, characterId, skinId }) => {
   );
   if (item.type === 'scheme') return (
     <div style={{ width: size * 0.92 }}>
-      <SchemeDots schemeKey={item.schemeKey} gap={size > 70 ? '6px' : '3px'} radius={size > 70 ? '5px' : '3px'} />
+      <SchemeDots schemeKey={item.schemeKey} />
     </div>
   );
-  return <TilePreviewCanvas styleKey={item.tileKey} size={Math.round(size * 0.92)} />;
+  return <TilePreviewCanvas styleKey={item.tileKey} colorHex={tileColor} size={Math.round(size * 0.92)} />;
 };
 
 // ── Recessed specimen well ────────────────────────────────────────────────────
-// Item art always sits in the same inset frame — on the card and in the modal —
-// which is what makes a grid of very different artwork (worms, hats, colour
-// swatches, rendered tiles) read as one collection.
-const SpecimenWell = ({ children, height, locked, style }) => (
+// Card art always sits in the same inset frame, which is what makes a grid of
+// very different artwork (worms, hats, colour swatches, rendered tiles) read as
+// one collection.
+const SpecimenWell = ({ children, height, locked }) => (
   <div style={{
     width: '100%', height,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -157,127 +160,13 @@ const SpecimenWell = ({ children, height, locked, style }) => (
     filter: locked ? 'saturate(0.72)' : 'none',
     opacity: locked ? 0.86 : 1,
     transition: 'filter 0.2s ease, opacity 0.2s ease',
-    ...style,
   }}>
     {children}
   </div>
 );
 
-// ── Purchase / preview modal ──────────────────────────────────────────────────
-const PreviewModal = ({ item, owned, pp, characterId, skinId, onClose, onBuy, onEquip }) => {
-  const ac = typeAccent(item);
-  const canAfford = pp >= item.price;
-
-  const actionStyle = {
-    ...TOUCH, width: '100%', padding: '14px', borderRadius: '12px',
-    background: ac, border: 'none',
-    color: '#fff', fontSize: '14px', fontWeight: 800, letterSpacing: '0.04em',
-    cursor: 'pointer', fontFamily: FONT,
-    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-    boxShadow: `0 4px 0 ${ac}aa, 0 6px 16px ${ac}44`,
-  };
-
-  return (
-    <div
-      style={{
-        position: 'fixed', inset: 0, zIndex: 100000,
-        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px',
-        background: PAPER_BACKDROP,
-        backdropFilter: PAPER_BACKDROP_BLUR, WebkitBackdropFilter: PAPER_BACKDROP_BLUR,
-        animation: 'modalBackdropIn 0.22s ease',
-      }}
-      onClick={onClose}
-    >
-      <div
-        style={{
-          ...wizardPaperBackground,
-          border: '1px solid #cec8be',
-          borderTop: `3px solid ${ac}`,
-          borderRadius: '20px', padding: '24px 22px 20px',
-          width: 'min(320px, 100%)',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px',
-          boxShadow: PAPER_SHADOW,
-          fontFamily: FONT,
-          animation: 'modalSheetIn 0.30s cubic-bezier(0.22, 1, 0.36, 1)',
-        }}
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Type eyebrow */}
-        <div style={{
-          alignSelf: 'stretch', display: 'flex', alignItems: 'center', gap: '8px',
-          fontSize: '9px', fontWeight: 800, letterSpacing: '0.18em', textTransform: 'uppercase',
-          color: ac,
-        }}>
-          {TYPE_LABEL[item.type]}
-          <div style={{ flex: 1, height: '1px', background: `${ac}33` }} />
-          {owned && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: ac }}>
-              <CheckIcon size={9} color={ac} /> Owned
-            </span>
-          )}
-        </div>
-
-        {/* Large specimen */}
-        <SpecimenWell height="150px">
-          <ItemArt item={item} size={124} characterId={characterId} skinId={skinId} />
-        </SpecimenWell>
-
-        {/* Name plate */}
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '19px', fontWeight: 800, color: PAPER_TEXT, letterSpacing: '-0.03em' }}>{item.label}</div>
-        </div>
-
-        {/* Action */}
-        {owned ? (
-          <button style={actionStyle} onClick={onEquip}>Equip</button>
-        ) : (
-          <>
-            <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px',
-              padding: '9px 16px', borderRadius: '999px',
-              background: canAfford ? `${ac}12` : PAPER_BG_MUTED,
-              border: `1.5px solid ${canAfford ? `${ac}44` : PAPER_BORDER_SOFT}`,
-            }}>
-              <PPCoin size={16} color={canAfford ? ac : PAPER_TEXT_FAINT} />
-              <span style={{ fontSize: '22px', fontWeight: 900, color: canAfford ? ac : PAPER_TEXT_FAINT, letterSpacing: '-0.03em', lineHeight: 1 }}>
-                {item.price}
-              </span>
-              <span style={{ fontSize: '11px', color: PAPER_TEXT_FAINT, fontWeight: 600 }}>· you have {pp}</span>
-            </div>
-            {canAfford ? (
-              <button style={actionStyle} onClick={onBuy}>
-                <PPCoin size={15} color={UI_CREAM} ink={ac} /> Unlock for {item.price}
-              </button>
-            ) : (
-              <div style={{
-                width: '100%', padding: '13px', borderRadius: '12px', textAlign: 'center',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px',
-                background: 'rgba(255,255,255,0.5)', border: `1.5px dashed ${PAPER_BORDER_SOFT}`,
-                color: PAPER_TEXT_MUTED, fontSize: '12px', fontWeight: 600, fontFamily: FONT,
-              }}>
-                <LockIcon size={12} color={PAPER_TEXT_MUTED} />
-                {item.price - pp} more PP to unlock
-              </div>
-            )}
-          </>
-        )}
-
-        <button
-          style={{
-            ...TOUCH, width: '100%', padding: '10px', borderRadius: '10px',
-            background: 'transparent', border: `1.5px solid ${PAPER_BORDER_SOFT}`,
-            color: PAPER_TEXT_MUTED, fontSize: '13px', fontWeight: 600,
-            cursor: 'pointer', fontFamily: FONT,
-          }}
-          onClick={onClose}
-        >Close</button>
-      </div>
-    </div>
-  );
-};
-
 // ── Item card ─────────────────────────────────────────────────────────────────
-const ItemCard = ({ item, owned, equipped, pp, index, characterId, skinId, onPreview, onEquip }) => {
+const ItemCard = ({ item, owned, equipped, focused, pp, index, characterId, skinId, tileColor, onTap }) => {
   const ac = typeAccent(item);
   const canAfford = pp >= item.price;
   const locked = !owned;
@@ -285,17 +174,21 @@ const ItemCard = ({ item, owned, equipped, pp, index, characterId, skinId, onPre
   return (
     <div
       className={`store-card store-card-enter${equipped ? ' is-equipped' : ''}`}
-      onClick={owned ? onEquip : onPreview}
+      onClick={onTap}
       style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
-        padding: '10px 9px 9px',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '7px',
+        padding: '9px 8px 8px',
         background: equipped ? `${ac}12` : 'rgba(255,255,255,0.72)',
-        border: equipped ? `2px solid ${ac}` : `2px solid ${PAPER_BORDER_SOFT}`,
+        // Focus is the loud state now: it is what the plate above is showing.
+        border: focused ? `2px solid ${ac}` : `2px solid ${PAPER_BORDER_SOFT}`,
         borderRadius: '14px', cursor: 'pointer', position: 'relative',
-        boxShadow: equipped
-          ? `inset 0 2px 5px rgba(83,72,56,0.13)`
-          : `0 3px 0 ${PAPER_CARD_SHADOW}, 0 5px 12px rgba(83,72,56,0.10)`,
-        transform: equipped ? 'translateY(1px)' : 'none',
+        boxShadow: focused
+          ? `0 0 0 3px ${ac}33, 0 4px 12px ${ac}33`
+          : equipped
+            ? 'inset 0 2px 5px rgba(83,72,56,0.13)'
+            : `0 3px 0 ${PAPER_CARD_SHADOW}, 0 5px 12px rgba(83,72,56,0.10)`,
+        transform: focused ? 'translateY(-2px)' : equipped ? 'translateY(1px)' : 'none',
+        transition: 'transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease',
         fontFamily: FONT,
         animationDelay: `${Math.min(index, 14) * 22}ms`,
         ...TOUCH,
@@ -317,30 +210,28 @@ const ItemCard = ({ item, owned, equipped, pp, index, characterId, skinId, onPre
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           width: 18, height: 18, borderRadius: '50%',
           background: 'rgba(255,255,255,0.9)',
-          boxShadow: `0 1px 3px rgba(83,72,56,0.22)`,
+          boxShadow: '0 1px 3px rgba(83,72,56,0.22)',
         }}><LockIcon size={10} color={canAfford ? ac : PAPER_TEXT_FAINT} /></span>
       ) : null}
 
-      <SpecimenWell height="56px" locked={locked}>
-        <ItemArt item={item} size={52} characterId={characterId} skinId={skinId} />
+      <SpecimenWell height="52px" locked={locked}>
+        <CardArt item={item} size={48} characterId={characterId} skinId={skinId} tileColor={tileColor} />
       </SpecimenWell>
 
-      {/* Label */}
       <span style={{
         fontSize: '10px',
         fontWeight: 700, letterSpacing: '0.01em',
-        color: equipped ? PAPER_TEXT : PAPER_TEXT_MUTED,
+        color: focused || equipped ? PAPER_TEXT : PAPER_TEXT_MUTED,
         fontFamily: FONT, textAlign: 'center', lineHeight: 1.2,
       }}>{item.label}</span>
 
-      {/* Price / status */}
       {owned ? (
         <span style={{
           marginTop: 'auto',
           fontSize: '9px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
           color: equipped ? ac : PAPER_TEXT_FAINT, fontFamily: FONT,
         }}>
-          {equipped ? 'Equipped' : 'Tap to equip'}
+          {equipped ? 'Equipped' : 'Owned'}
         </span>
       ) : (
         <div style={{
@@ -361,10 +252,7 @@ const ItemCard = ({ item, owned, equipped, pp, index, characterId, skinId, onPre
 // ── Tile category section ─────────────────────────────────────────────────────
 const TileSection = ({ label, items, renderItems }) => items.length === 0 ? null : (
   <div style={{ marginBottom: '22px' }}>
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: '10px',
-      marginBottom: '10px',
-    }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
       <span style={{
         fontSize: '10px', fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase',
         color: PAPER_TEXT_MUTED, fontFamily: FONT, whiteSpace: 'nowrap',
@@ -385,10 +273,40 @@ const TILE_SECTIONS = TILE_STYLE_SECTIONS.map(section => ({
   label: section.label,
   items: section.keys.map(k => TILE_BY_KEY.get(k)).filter(Boolean),
 }));
+// Arrow order through the Tiles tab follows the sections you see, not the raw
+// catalogue order.
+const TILE_ORDER = TILE_SECTIONS.flatMap(s => s.items);
+
+const TAB_ITEMS = { skins: SKINS, hats: HATS, schemes: SCHEMES, tiles: TILE_ORDER };
+
+// ── Viewport ──────────────────────────────────────────────────────────────────
+// The plate is sized from the screen rather than a fixed px so a phone spends
+// most of its height on the thing being sold.
+function useHeroSize() {
+  const measure = () => {
+    if (typeof window === 'undefined') return 200;
+    const { innerWidth: w, innerHeight: h } = window;
+    return isMobile
+      ? Math.round(Math.max(150, Math.min(h * 0.34, w * 0.66)))
+      : Math.round(Math.max(180, Math.min(h * 0.30, 280)));
+  };
+  const [size, setSize] = useState(measure);
+  useEffect(() => {
+    const onResize = () => setSize(measure());
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', onResize);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('orientationchange', onResize);
+    };
+  }, []);
+  return size;
+}
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 const ParityStoreScreen = ({ onClose }) => {
   const [tab, setTab] = useState('skins');
+  const heroPx = useHeroSize();
 
   const { parityPoints, ownedItems, wormSkin, wormHat, wormCharacter, buyItem, setWormSkin, setWormHat } =
     useGameStore(useShallow(s => ({
@@ -408,12 +326,37 @@ const ParityStoreScreen = ({ onClose }) => {
   })));
 
   const [toast, setToast] = useState(null);
-  const [previewItem, setPreviewItem] = useState(null);
+  const [focusedId, setFocusedId] = useState(null);
 
   const showToast = (msg, ok = true) => {
     setToast({ msg, ok });
     setTimeout(() => setToast(null), 1800);
   };
+
+  const isEquipped = useCallback((item) => {
+    if (item.type === 'skin')   return wormSkin === item.skinId;
+    if (item.type === 'hat')    return wormHat === item.hatId;
+    if (item.type === 'scheme') return settings?.colorScheme === item.schemeKey;
+    if (item.type === 'tile') {
+      const styles = settings?.manifoldStyles || {};
+      return [1, 2, 3, 4, 5, 6].every(id => (styles[id] || 'solid') === item.tileKey);
+    }
+    return false;
+  }, [wormSkin, wormHat, settings]);
+
+  const items = TAB_ITEMS[tab];
+
+  // Opening a tab lands on what you are already wearing, so the plate starts by
+  // showing your cube rather than an arbitrary first item.
+  const focusIndex = useMemo(() => {
+    const byId = items.findIndex(i => i.id === focusedId);
+    if (byId !== -1) return byId;
+    const equippedIdx = items.findIndex(isEquipped);
+    return equippedIdx === -1 ? 0 : equippedIdx;
+  }, [items, focusedId, isEquipped]);
+
+  const focused = items[focusIndex];
+  const stepFocus = delta => setFocusedId(items[(focusIndex + delta + items.length) % items.length].id);
 
   const equip = (item) => {
     if (item.type === 'skin') setWormSkin(item.skinId);
@@ -426,23 +369,20 @@ const ParityStoreScreen = ({ onClose }) => {
     }
   };
 
-  const handleBuy = (item) => {
-    if (ownedItems.includes(item.id)) { equip(item); showToast(`${item.label} applied`); return; }
+  const buy = (item) => {
     const ok = buyItem(item.id, item.price);
     if (!ok) { showToast(`Need ${item.price - parityPoints} more PP`, false); return; }
     equip(item);
     showToast(`${item.label} unlocked!`);
   };
 
-  const isEquipped = (item) => {
-    if (item.type === 'skin')   return wormSkin === item.skinId;
-    if (item.type === 'hat')    return wormHat === item.hatId;
-    if (item.type === 'scheme') return settings?.colorScheme === item.schemeKey;
-    if (item.type === 'tile') {
-      const styles = settings?.manifoldStyles || {};
-      return [1, 2, 3, 4, 5, 6].every(id => (styles[id] || 'solid') === item.tileKey);
-    }
-    return false;
+  // Tap to bring an item to the plate; tap the one already on the plate to act
+  // on it. Keeps the one-tap equip for something you are going straight back to
+  // without making every stray tap change your cube.
+  const tapCard = (item) => {
+    if (item.id !== focused?.id) { setFocusedId(item.id); return; }
+    if (ownedItems.includes(item.id)) { equip(item); showToast(`${item.label} applied`); }
+    else buy(item);
   };
 
   // Collection progress — the whole catalog, and per-tab for the tab chips.
@@ -456,29 +396,72 @@ const ParityStoreScreen = ({ onClose }) => {
   );
   const collectedPct = Math.round((ownedCount / ALL_ITEMS.length) * 100);
 
-  const renderItems = (items) => (
+  // What the cube on the plate wears when it is not the thing being sold.
+  const currentColors = useMemo(() => resolveWizardColors(settings || {}), [settings]);
+  const currentFaceStyles = settings?.manifoldStyles || null;
+  const cardTileColor = currentColors[1] || '#e53935';
+
+  const renderItems = (list) => (
     <div style={{
       display: 'grid',
-      gridTemplateColumns: `repeat(auto-fill, minmax(${tab === 'tiles' ? '92px' : '104px'}, 1fr))`,
-      gap: '10px',
+      gridTemplateColumns: `repeat(auto-fill, minmax(${tab === 'tiles' ? '88px' : '96px'}, 1fr))`,
+      gap: '9px',
     }}>
-      {items.map((item, i) => {
-        const owned = ownedItems.includes(item.id);
-        return (
-          <ItemCard
-            key={item.id} item={item} index={i}
-            characterId={wormCharacter} skinId={wormSkin}
-            owned={owned} equipped={isEquipped(item)} pp={parityPoints}
-            onPreview={() => setPreviewItem(item)}
-            onEquip={() => { equip(item); showToast(`${item.label} applied`); }}
-          />
-        );
-      })}
+      {list.map((item, i) => (
+        <ItemCard
+          key={item.id} item={item} index={i}
+          characterId={wormCharacter} skinId={wormSkin} tileColor={cardTileColor}
+          owned={ownedItems.includes(item.id)}
+          equipped={isEquipped(item)}
+          focused={focused?.id === item.id}
+          pp={parityPoints}
+          onTap={() => tapCard(item)}
+        />
+      ))}
     </div>
   );
 
   const activeTab = TABS.find(t => t.id === tab) || TABS[0];
   const activeTabAccent = activeTab.accent;
+
+  // ── The plate ───────────────────────────────────────────────────────────────
+  // Worm things are drawn by the worm renderer and cube things by the cube
+  // renderer, both the same ones the game uses — so what you are buying is
+  // exactly what you will be looking at afterwards.
+  const heroArt = () => {
+    if (!focused) return null;
+    if (focused.type === 'skin') {
+      return <WormPreviewCanvas characterId={wormCharacter} skinId={focused.skinId} hatId={wormHat} size={heroPx} animated />;
+    }
+    if (focused.type === 'hat') {
+      return <WormPreviewCanvas characterId={wormCharacter} skinId={wormSkin} hatId={focused.hatId} size={heroPx} animated framing="head" />;
+    }
+    if (focused.type === 'scheme') {
+      return (
+        <CubePreviewCanvas
+          px={heroPx} size={3}
+          colors={COLOR_SCHEMES[focused.schemeKey] || COLOR_SCHEMES.standard}
+          tileStyle="solid"
+          perFaceStyles={currentFaceStyles}
+        />
+      );
+    }
+    return <CubePreviewCanvas px={heroPx} size={3} colors={currentColors} tileStyle={focused.tileKey} />;
+  };
+
+  const heroOwned = focused ? ownedItems.includes(focused.id) : false;
+  const heroEquipped = focused ? isEquipped(focused) : false;
+  const heroAccent = focused ? typeAccent(focused) : ACCENT;
+  const canAfford = focused ? parityPoints >= focused.price : false;
+
+  const heroActionStyle = {
+    ...TOUCH, padding: '12px 26px', borderRadius: '12px',
+    background: heroAccent, border: 'none',
+    color: '#fff', fontSize: '14px', fontWeight: 800, letterSpacing: '0.04em',
+    cursor: 'pointer', fontFamily: FONT,
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+    boxShadow: `0 4px 0 ${heroAccent}aa, 0 6px 16px ${heroAccent}44`,
+  };
 
   return (
     <div style={{
@@ -489,30 +472,31 @@ const ParityStoreScreen = ({ onClose }) => {
       pointerEvents: 'auto',
     }}>
 
-      {/* Header */}
+      {/* Header — compact on a phone, where every row it gives up goes to the plate */}
       <div style={{
         ...COLUMN,
-        display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px',
-        padding: '18px 20px 0', flexShrink: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
+        padding: isMobile ? 'calc(10px + env(safe-area-inset-top)) 16px 0' : '18px 20px 0',
+        flexShrink: 0,
       }}>
         <div style={{ minWidth: 0 }}>
           <div style={{
             display: 'inline-flex', alignItems: 'center', gap: '6px',
             background: ACCENT, borderRadius: '6px', padding: '4px 11px',
-            marginBottom: '9px', boxShadow: `0 2px 0 ${ACCENT_SHADOW}`,
+            marginBottom: isMobile ? '6px' : '9px', boxShadow: `0 2px 0 ${ACCENT_SHADOW}`,
           }}>
             <PPCoin size={12} color={UI_CREAM} ink={ACCENT} />
             <span style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#fff' }}>Parity Store</span>
           </div>
           <div style={{
             fontFamily: DISPLAY_FONT,
-            fontSize: 'clamp(19px, 5.4vw, 26px)',
+            fontSize: isMobile ? '17px' : 'clamp(19px, 5.4vw, 26px)',
             color: PAPER_TEXT, letterSpacing: '0.01em', lineHeight: 1,
-            textShadow: `0 2px 0 rgba(255,255,255,0.7)`,
+            textShadow: '0 2px 0 rgba(255,255,255,0.7)',
           }}>YOUR COLLECTION</div>
 
           {/* Collection progress */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '9px', marginTop: '9px', maxWidth: '260px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '9px', marginTop: isMobile ? '6px' : '9px', maxWidth: '260px' }}>
             <div style={{
               flex: 1, height: '5px', borderRadius: '999px',
               background: 'rgba(255,255,255,0.66)',
@@ -533,7 +517,7 @@ const ParityStoreScreen = ({ onClose }) => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '9px', flexShrink: 0 }}>
           {/* PP balance */}
           <div style={{
-            padding: '7px 13px', borderRadius: '12px',
+            padding: isMobile ? '6px 11px' : '7px 13px', borderRadius: '12px',
             background: 'rgba(255,255,255,0.82)', border: `1.5px solid ${PAPER_BORDER_SOFT}`,
             boxShadow: `0 3px 0 ${PAPER_CARD_SHADOW}`,
             textAlign: 'right',
@@ -569,7 +553,11 @@ const ParityStoreScreen = ({ onClose }) => {
       </div>
 
       {/* Tabs */}
-      <div style={{ ...COLUMN, display: 'flex', gap: '7px', padding: '16px 20px 2px', flexShrink: 0, overflowX: 'auto', scrollbarWidth: 'none' }}>
+      <div style={{
+        ...COLUMN, display: 'flex', gap: '7px',
+        padding: isMobile ? '10px 16px 2px' : '16px 20px 2px',
+        flexShrink: 0, overflowX: 'auto', scrollbarWidth: 'none',
+      }}>
         {TABS.map(t => {
           const active = tab === t.id;
           const total = t.items.length;
@@ -577,7 +565,7 @@ const ParityStoreScreen = ({ onClose }) => {
             <button
               key={t.id}
               className={`store-tab${active ? ' is-active' : ''}`}
-              onPointerDown={() => setTab(t.id)}
+              onPointerDown={() => { setTab(t.id); setFocusedId(null); }}
               style={{
                 ...TOUCH,
                 display: 'flex', alignItems: 'center', gap: '7px',
@@ -602,22 +590,84 @@ const ParityStoreScreen = ({ onClose }) => {
         })}
       </div>
 
-      {/* Content */}
-      <div style={{ flex: 1, overflowY: 'auto', scrollbarWidth: 'thin', scrollbarColor: `${PAPER_CARD_SHADOW} transparent` }}>
-        <div style={{ ...COLUMN, padding: '16px 20px 18px' }}>
-          {tab === 'skins'   && renderItems(SKINS)}
-          {tab === 'hats'    && renderItems(HATS)}
-          {tab === 'schemes' && renderItems(SCHEMES)}
-          {tab === 'tiles' && TILE_SECTIONS.map(section => (
-            <TileSection key={section.label} label={section.label} items={section.items} renderItems={renderItems} />
-          ))}
+      {/* Content — the plate rides the top of the scroller, so whatever you scroll
+          down to is still landing on something you can see. */}
+      <div style={{ flex: 1, overflowY: 'auto', overscrollBehavior: 'contain', scrollbarWidth: 'thin', scrollbarColor: `${PAPER_CARD_SHADOW} transparent` }}>
+        <div style={{ ...COLUMN, padding: isMobile ? '10px 16px 18px' : '16px 20px 18px' }}>
+          {focused && (
+            <SpecimenPlate
+              sticky
+              caption={TYPE_LABEL[focused.type]}
+              index={focusIndex + 1}
+              total={items.length}
+              title={focused.label}
+              glow={heroAccent}
+              // Your chosen scene follows you in here too, so a skin is judged
+              // against the environment you actually play it in.
+              backdrop={bgOptionFor(settings?.backgroundTheme)}
+              onPrev={() => stepFocus(-1)}
+              onNext={() => stepFocus(1)}
+              art={heroArt()}
+              hint={focused.type === 'scheme' || focused.type === 'tile' ? 'drag the cube to turn it' : null}
+              subtitle={
+                heroEquipped ? (
+                  <div style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '6px',
+                    background: `${heroAccent}28`, border: `1px solid ${heroAccent}55`,
+                    color: heroAccent, fontSize: '9px', fontWeight: 800,
+                    letterSpacing: '0.14em', textTransform: 'uppercase',
+                    padding: '3px 11px', borderRadius: '999px',
+                  }}>
+                    <CheckIcon size={9} color={heroAccent} /> Equipped
+                  </div>
+                ) : null
+              }
+            >
+              {/* Action — the plate is the purchase counter now, so nothing has to
+                  open on top of the thing you are trying to look at. */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', zIndex: 1 }}>
+                {heroOwned ? (
+                  !heroEquipped && (
+                    <button style={heroActionStyle} onClick={() => { equip(focused); showToast(`${focused.label} applied`); }}>
+                      Equip
+                    </button>
+                  )
+                ) : canAfford ? (
+                  <button style={heroActionStyle} onClick={() => buy(focused)}>
+                    <PPCoin size={15} color={UI_CREAM} ink={heroAccent} /> Unlock for {focused.price}
+                  </button>
+                ) : (
+                  <div style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '7px',
+                    padding: '11px 20px', borderRadius: '12px',
+                    background: 'rgba(255,245,220,0.08)', border: '1.5px dashed rgba(255,245,220,0.28)',
+                    color: NIGHT_TEXT_MUTED, fontSize: '12px', fontWeight: 700,
+                  }}>
+                    <LockIcon size={12} color={NIGHT_TEXT_MUTED} />
+                    {focused.price - parityPoints} more PP to unlock
+                  </div>
+                )}
+                {!heroOwned && (
+                  <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: NIGHT_TEXT_MUTED }}>
+                    You have {parityPoints} PP
+                  </span>
+                )}
+              </div>
+            </SpecimenPlate>
+          )}
+
+          {tab === 'tiles'
+            ? TILE_SECTIONS.map(section => (
+              <TileSection key={section.label} label={section.label} items={section.items} renderItems={renderItems} />
+            ))
+            : renderItems(items)}
         </div>
       </div>
 
       {/* Footer — Mobi's note on where PP comes from, in the same pencil hand the
           setup wizards use. */}
       <div style={{
-        padding: '11px 20px 16px',
+        padding: isMobile ? '8px 16px calc(10px + env(safe-area-inset-bottom))' : '11px 20px 16px',
         borderTop: `1px solid ${PAPER_BORDER_SOFT}`, flexShrink: 0,
         background: WIZARD_FOOTER_BG,
       }}>
@@ -649,25 +699,12 @@ const ParityStoreScreen = ({ onClose }) => {
           borderRadius: '999px', padding: '11px 20px',
           color: '#fff',
           fontSize: '13px', fontWeight: 700, fontFamily: FONT,
-          boxShadow: `0 6px 22px rgba(0,0,0,0.24)`,
+          boxShadow: '0 6px 22px rgba(0,0,0,0.24)',
           pointerEvents: 'none', zIndex: 900,
         }}>
           {toast.ok ? <CheckIcon size={11} /> : <LockIcon size={12} color="#fff" />}
           {toast.msg}
         </div>
-      )}
-
-      {/* Preview modal */}
-      {previewItem && (
-        <PreviewModal
-          item={previewItem}
-          owned={ownedItems.includes(previewItem.id)}
-          pp={parityPoints}
-          characterId={wormCharacter} skinId={wormSkin}
-          onClose={() => setPreviewItem(null)}
-          onBuy={() => { handleBuy(previewItem); setPreviewItem(null); }}
-          onEquip={() => { equip(previewItem); showToast(`${previewItem.label} applied`); setPreviewItem(null); }}
-        />
       )}
     </div>
   );

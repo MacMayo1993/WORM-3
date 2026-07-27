@@ -12,7 +12,7 @@ import { TILE_STYLE_SECTIONS } from '../../../utils/tileStyleCatalog.js';
 import { PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT, PAPER_BG_MUTED, PAPER_CARD_SHADOW } from '../../../utils/uiTheme.js';
 import { WizardSection } from '../WizardChrome.jsx';
 import CubePlate from './CubePlate.jsx';
-import { Checkmark, LockPip, TilePreviewCanvas, cardStyle, sizeTier, FACE_LABELS } from './shared.jsx';
+import { Checkmark, LockPip, TilePreviewCanvas, cardStyle, sizeTier, bgOptionFor, FACE_LABELS } from './shared.jsx';
 
 export default function StyleStep({ cos }) {
   const {
@@ -63,6 +63,7 @@ export default function StyleStep({ cos }) {
         onNext={() => stepStyle(1)}
         cube={{ size: cubeSize, colors, tileStyle: settings.tileStyle, perFaceStyles: settings.perFaceStyles }}
         glow={swatchColor}
+        backdrop={bgOptionFor(settings.backgroundTheme)}
       />
 
       {/* Family tabs */}

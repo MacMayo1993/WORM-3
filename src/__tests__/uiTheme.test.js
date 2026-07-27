@@ -40,14 +40,28 @@ describe('uiTheme surfaces', () => {
     expect(store).toMatch(/wizardPaperBackground/);
   });
 
-  it('keeps the worm character plate on the night surface', () => {
-    // The character step shows a living worm rather than a setting, so its plate
-    // is the one dark surface in the wizard. It has to be the warm NIGHT family:
-    // it was built on the retired navy's near-blacks long after that family was
-    // supposed to be gone.
-    const wizard = readSource('../components/screens/WormModeSetupWizard.jsx');
-    expect(wizard).toMatch(/NIGHT_BORDER/);
-    expect(wizard).not.toMatch(/#0d0818|#060410/);
+  it('keeps the specimen plate on the night surface', () => {
+    // The plate shows a living thing rather than a setting — a worm in the worm
+    // wizard, a cube in the cosmetic steps, whatever the store is selling — so
+    // it is the one dark surface among the paper. It has to be the warm NIGHT
+    // family: it was built on the retired navy's near-blacks long after that
+    // family was supposed to be gone.
+    const plate = readSource('../components/screens/wizardSteps/SpecimenPlate.jsx');
+    expect(plate).toMatch(/NIGHT_BORDER/);
+    expect(plate).not.toMatch(/#0d0818|#060410/);
+  });
+
+  it('draws every plate from the one shared shell', () => {
+    // Three screens stand something on a plate. They share the furniture so the
+    // warm dark surface stays one thing rather than three hand-copied versions
+    // that drift apart — which is exactly how the wizards' step layouts drifted.
+    for (const src of [
+      '../components/screens/WormModeSetupWizard.jsx',
+      '../components/screens/wizardSteps/CubePlate.jsx',
+      '../components/screens/ParityStoreScreen.jsx'
+    ]) {
+      expect(readSource(src)).toMatch(/SpecimenPlate/);
+    }
   });
 
   it('keeps the night surface warm rather than cold-navy', () => {

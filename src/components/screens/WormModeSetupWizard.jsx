@@ -4,11 +4,10 @@ import { WORM_SKINS, WORM_HATS } from '../../worm/wormCosmeticsData.js';
 import { WORM_CHARACTERS } from '../../worm/wormCharacterData.js';
 import { isMobile } from '../../utils/device.js';
 import {
-  DISPLAY_FONT,
   PAPER_SHEET_RAISED, PAPER_BORDER_SOFT,
   PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT,
   PAPER_CARD_SHADOW,
-  NIGHT_BORDER, NIGHT_TEXT, NIGHT_TEXT_MUTED, NIGHT_SHADOW, NIGHT_TITLE_SHADOW,
+  NIGHT_TEXT, NIGHT_TEXT_MUTED,
   UI_CREAM
 } from '../../utils/uiTheme.js';
 import { wizardLayout, WizardSteps } from './WizardChrome.jsx';
@@ -16,9 +15,8 @@ import WormPreviewCanvas from '../../3d/WormPreviewCanvas.jsx';
 import {
   useWizardCosmetics, WizardImageInput,
   SceneStep, PaletteStep, StyleStep, SizeStep,
-  LockPip, PickerHeading
+  SpecimenPlate, LockPip, PickerHeading
 } from './wizardSteps/index.jsx';
-import { plateSurface, plateArrow } from './wizardSteps/CubePlate.jsx';
 
 const ACCENT = '#6A2C91';
 const ACCENT_SHADOW = '#3d1854';
@@ -93,105 +91,62 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
         {/* ── Character plate ── */}
-        <div style={{
-          borderRadius: '18px',
-          overflow: 'hidden',
-          border: `1.5px solid ${NIGHT_BORDER}`,
-          boxShadow: NIGHT_SHADOW
-        }}>
-          <div style={{
-            ...plateSurface(activeSkin.glow),
-            display: 'flex', flexDirection: 'column', alignItems: 'center',
-            padding: isMobile ? '14px 14px 16px' : '16px 20px 18px',
-            position: 'relative',
-            gap: '12px'
-          }}>
-            {/* Plate caption + position in the set */}
-            <div style={{ alignSelf: 'stretch', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span style={{ fontSize: '9px', fontWeight: 800, letterSpacing: '0.18em', textTransform: 'uppercase', color: NIGHT_TEXT_MUTED }}>
-                Specimen
-              </span>
-              <div style={{ flex: 1, height: '1px', background: NIGHT_BORDER }} />
-              <span style={{ fontSize: '9px', fontWeight: 800, letterSpacing: '0.1em', color: NIGHT_TEXT_MUTED }}>
-                {charIndex + 1} / {WORM_CHARACTERS.length}
-              </span>
-            </div>
-
-            {/* Arrows + worm */}
+        <SpecimenPlate
+          caption="Specimen"
+          index={charIndex + 1}
+          total={WORM_CHARACTERS.length}
+          title={activeCharacter.label}
+          glow={activeSkin.glow}
+          onPrev={prevChar}
+          onNext={nextChar}
+          art={
+            <WormPreviewCanvas
+              characterId={wormCharacterId}
+              skinId={wormSkinId}
+              hatId={wormHatId}
+              size={isMobile ? 168 : 200}
+              animated
+            />
+          }
+          subtitle={
             <div style={{
-              display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '10px',
-              justifyContent: 'center', position: 'relative', alignSelf: 'stretch'
+              display: 'inline-flex', alignItems: 'center', gap: '6px',
+              background: `${activeSkin.glow}28`, border: `1px solid ${activeSkin.glow}55`,
+              color: activeSkin.glow, fontSize: '9px', fontWeight: 800,
+              letterSpacing: '0.16em', textTransform: 'uppercase', padding: '3px 11px', borderRadius: '999px',
+              transition: 'all 0.4s ease'
             }}>
-              {/* Floor glow, under the worm */}
-              <div style={{
-                position: 'absolute', bottom: '4px', left: '50%', transform: 'translateX(-50%)',
-                width: '170px', height: '18px',
-                background: `radial-gradient(ellipse, ${activeSkin.glow}4d 0%, transparent 70%)`,
-                borderRadius: '50%', pointerEvents: 'none', transition: 'background 0.4s ease'
-              }} />
-
-              <button onClick={prevChar} aria-label="Previous character" style={plateArrow}>‹</button>
-              <div style={{ zIndex: 1, display: 'flex', justifyContent: 'center', flex: 1 }}>
-                <WormPreviewCanvas
-                  characterId={wormCharacterId}
-                  skinId={wormSkinId}
-                  hatId={wormHatId}
-                  size={isMobile ? 168 : 200}
-                  animated
-                />
-              </div>
-              <button onClick={nextChar} aria-label="Next character" style={plateArrow}>›</button>
-            </div>
-
-            {/* Name plate */}
-            <div style={{ textAlign: 'center' }}>
-              <div style={{
-                fontFamily: DISPLAY_FONT,
-                fontSize: isMobile ? '15px' : '18px',
-                color: UI_CREAM, letterSpacing: '0.02em', lineHeight: 1.15,
-                textShadow: NIGHT_TITLE_SHADOW, marginBottom: '7px'
-              }}>
-                {activeCharacter.label.toUpperCase()}
-              </div>
-              <div style={{
-                display: 'inline-flex', alignItems: 'center', gap: '6px',
-                background: `${activeSkin.glow}28`, border: `1px solid ${activeSkin.glow}55`,
-                color: activeSkin.glow, fontSize: '9px', fontWeight: 800,
-                letterSpacing: '0.16em', textTransform: 'uppercase', padding: '3px 11px', borderRadius: '999px',
-                transition: 'all 0.4s ease'
-              }}>
-                {activeCharacter.type}
-                <span style={{ opacity: 0.5 }}>·</span>
-                <span style={{ letterSpacing: '0.06em', textTransform: 'none', fontWeight: 600, opacity: 0.85 }}>
-                  {activeCharacter.subtitle}
-                </span>
-              </div>
-            </div>
-
-            {/* Signature trait */}
-            <div style={{ alignSelf: 'stretch', display: 'flex', gap: '9px', alignItems: 'flex-start', paddingLeft: '2px' }}>
-              <span style={{ color: activeSkin.glow, fontSize: '10px', lineHeight: 1.6, flexShrink: 0 }}>◆</span>
-              <span style={{ fontSize: '11px', color: NIGHT_TEXT_MUTED, lineHeight: 1.5 }}>
-                <span style={{ color: NIGHT_TEXT, fontWeight: 700 }}>{traitName}</span>
-                {traitDetail ? ` — ${traitDetail}` : ''}
+              {activeCharacter.type}
+              <span style={{ opacity: 0.5 }}>·</span>
+              <span style={{ letterSpacing: '0.06em', textTransform: 'none', fontWeight: 600, opacity: 0.85 }}>
+                {activeCharacter.subtitle}
               </span>
             </div>
-
-            {/* Page dots */}
-            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-              {WORM_CHARACTERS.map(c => (
-                <button key={c.id} onClick={() => setWormCharacter(c.id)} aria-label={c.label} style={{
-                  width: c.id === wormCharacterId ? '22px' : '7px',
-                  height: '7px', borderRadius: '4px',
-                  background: c.id === wormCharacterId ? UI_CREAM : 'rgba(255,245,220,0.28)',
-                  border: 'none', cursor: 'pointer', padding: 0,
-                  transition: 'all 0.28s cubic-bezier(0.4,0,0.2,1)',
-                  WebkitTapHighlightColor: 'transparent'
-                }} />
-              ))}
-            </div>
+          }
+        >
+          {/* Signature trait */}
+          <div style={{ alignSelf: 'stretch', display: 'flex', gap: '9px', alignItems: 'flex-start', paddingLeft: '2px', zIndex: 1 }}>
+            <span style={{ color: activeSkin.glow, fontSize: '10px', lineHeight: 1.6, flexShrink: 0 }}>◆</span>
+            <span style={{ fontSize: '11px', color: NIGHT_TEXT_MUTED, lineHeight: 1.5 }}>
+              <span style={{ color: NIGHT_TEXT, fontWeight: 700 }}>{traitName}</span>
+              {traitDetail ? ` — ${traitDetail}` : ''}
+            </span>
           </div>
-        </div>
+
+          {/* Page dots */}
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', zIndex: 1 }}>
+            {WORM_CHARACTERS.map(c => (
+              <button key={c.id} onClick={() => setWormCharacter(c.id)} aria-label={c.label} style={{
+                width: c.id === wormCharacterId ? '22px' : '7px',
+                height: '7px', borderRadius: '4px',
+                background: c.id === wormCharacterId ? UI_CREAM : 'rgba(255,245,220,0.28)',
+                border: 'none', cursor: 'pointer', padding: 0,
+                transition: 'all 0.28s cubic-bezier(0.4,0,0.2,1)',
+                WebkitTapHighlightColor: 'transparent'
+              }} />
+            ))}
+          </div>
+        </SpecimenPlate>
 
         {/* ── Skin picker ── */}
         <div>
