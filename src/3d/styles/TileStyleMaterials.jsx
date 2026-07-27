@@ -10,6 +10,8 @@ import { opArtShaders } from './shaders/opArtShaders.js';
 import { antipodalShaders } from './shaders/antipodalShaders.js';
 import { newStyleShaders } from './shaders/newStyleShaders.js';
 import { nonEuclideanShaders } from './shaders/nonEuclideanShaders.js';
+import { impossibleShaders } from './shaders/impossibleShaders.js';
+import { surrealShaders } from './shaders/surrealShaders.js';
 
 // Shared time uniform updated by useFrame in parent
 export const sharedUniforms = {
@@ -121,12 +123,14 @@ const fragmentShaders = {
   ...antipodalShaders,
   ...newStyleShaders,
   ...nonEuclideanShaders,
+  ...impossibleShaders,
+  ...surrealShaders,
 };
 
 // Dev-time guard: silent key collisions from spread merges are very hard to debug.
 // This throws immediately at module load so the problem is impossible to miss.
 if (import.meta.env.DEV) {
-  const _shaderModules = [basicShaders, techShaders, natureShaders, opArtShaders, antipodalShaders, newStyleShaders, nonEuclideanShaders];
+  const _shaderModules = [basicShaders, techShaders, natureShaders, opArtShaders, antipodalShaders, newStyleShaders, nonEuclideanShaders, impossibleShaders, surrealShaders];
   const _seen = new Map();
   for (const mod of _shaderModules) {
     for (const key of Object.keys(mod)) {
@@ -328,6 +332,10 @@ const ANIMATED_STYLES = new Set([
   // Non-Euclidean (poincareDisk and apollonian are static — they stay out)
   'hyperbolicWeave', 'circleInversion', 'rp2Geodesics', 'solFlow', 'nilTwist',
   'lightCone', 'metricBalls', 'gyroidSlice', 'hopfFibers', 'drosteSpiral',
+  // Impossible (triangle, fork and interlockingWings are static — they stay out)
+  'endlessStairs', 'neckerFlip', 'mobiusBand',
+  // Surreal (all six carry their own weather)
+  'bowlerRain', 'dayOverNight', 'skyCurtain', 'paintedWindow', 'falseReflection', 'skyBird',
 ]);
 
 /**

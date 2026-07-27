@@ -25,6 +25,10 @@ const ANIMATED_STYLE_SET = new Set([
   // Non-Euclidean (poincareDisk and apollonian are static — they stay out)
   'hyperbolicWeave', 'circleInversion', 'rp2Geodesics', 'solFlow', 'nilTwist',
   'lightCone', 'metricBalls', 'gyroidSlice', 'hopfFibers', 'drosteSpiral',
+  // Impossible (triangle, fork and interlockingWings are static — they stay out)
+  'endlessStairs', 'neckerFlip', 'mobiusBand',
+  // Surreal (all six carry their own weather)
+  'bowlerRain', 'dayOverNight', 'skyCurtain', 'paintedWindow', 'falseReflection', 'skyBird',
 ]);
 
 export function isAnimatedPreviewStyle(styleKey) {
