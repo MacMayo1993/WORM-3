@@ -38,9 +38,12 @@ const VERT_COUNT = (RINGS + 1) * (SIDES + 1);
 // So the bore pinches at the core as well as at each tile, and bulges over the
 // middle of each arm instead — the corner sits in the narrow part, and the
 // fragment shader fades the wall out across it entirely.
-const R_MOUTH  = 0.40;       // where the tunnel meets its tile (sticker is ~0.88 wide)
-const R_THROAT = 0.85;       // at the core crossing — still clears the camera's offset
-const R_CORE   = 1.15;       // widest point, over the middle of each arm
+// Kept deliberately snug. The camera rides 0.32 off the axis, so the bore only
+// has to clear that; anything wider fills the frame and swallows both the ribbon
+// and the cube around it.
+const R_MOUTH  = 0.34;       // where the tunnel meets its tile (sticker is ~0.88 wide)
+const R_THROAT = 0.58;       // at the core crossing — still clears the camera's offset
+const R_CORE   = 0.82;       // widest point, over the middle of each arm
 
 // Opacity targets by phase. A faint presence during 'entering' foreshadows the
 // shaft while the camera is still outside watching the dive; the fade-out is
@@ -133,7 +136,10 @@ const fragmentShader = `
 
     // Wall and seam are summed separately: the seam peaks exactly where coreFade
     // removes the wall, so the shaft hands off to light and back without a gap.
-    float wall = (0.60 + rings * 0.25 + headGlow * 0.25) * coreFade;
+    // Translucent on purpose: the Möbius ribbon runs down the middle of this
+    // shaft and the cube's interior sits beyond it, and both have to stay
+    // readable through the wall rather than being sealed off by it.
+    float wall = (0.34 + rings * 0.30 + headGlow * 0.22) * coreFade;
     float glow = seam * 0.55;
     gl_FragColor = vec4(col, clamp((wall + glow) * mouth * uOpacity, 0.0, 1.0));
   }
@@ -281,8 +287,6 @@ export function TunnelTube({ worm, size }) {
   });
 
   return (
-    // BackSide: the shaft is only ever meant to be seen from within, and this
-    // keeps it from becoming an opaque sausage in the exterior shots.
     // Positions are written in world space, so culling against the stale
     // bounding sphere would pop the tube out of view.
     <mesh ref={meshRef} geometry={geo} frustumCulled={false} renderOrder={2}>
@@ -290,13 +294,14 @@ export function TunnelTube({ worm, size }) {
         uniforms={uniforms}
         vertexShader={vertexShader}
         fragmentShader={fragmentShader}
-        // DoubleSide, not BackSide. Whether BackSide shows the bore from within
-        // depends on the winding this geometry happens to generate, and it was
-        // culling the inner surface — so the shaft was invisible from inside the
-        // ride and only showed up as an object when seen from outside it. The
-        // mesh is small and the fill is bounded by the mouth/core fades, so
-        // rendering both faces is the robust choice over relying on winding.
-        side={THREE.DoubleSide}
+        // This sweep's winding makes the INNER surface front-facing, which is why
+        // BackSide showed nothing from inside the ride. DoubleSide fixed that but
+        // overcorrected: drawing the near wall as well turned the shaft into a
+        // closed barrel that hid the Möbius ribbon inside it, blacked out the cube
+        // beyond it, and made the far arm read as a solid tube cutting across the
+        // view. FrontSide draws the bore you are looking down and culls the
+        // outside, so the ribbon and the cube stay visible through it.
+        side={THREE.FrontSide}
         transparent
         depthWrite={false}
       />

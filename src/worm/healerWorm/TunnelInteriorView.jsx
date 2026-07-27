@@ -18,7 +18,7 @@ import { getTileStyleMaterial } from '../../3d/styles/TileStyleMaterials.jsx';
 // How far down the interior faces are tinted while riding. High enough that the
 // tunnel is clearly the brightest thing in frame, low enough that the antipodal
 // tile colours — the reason this view exists — stay legible behind it.
-const DIM_STRENGTH = 0.55;
+const DIM_STRENGTH = 0.34;
 
 // Maps each face direction to its antipodal (opposite) face direction.
 
