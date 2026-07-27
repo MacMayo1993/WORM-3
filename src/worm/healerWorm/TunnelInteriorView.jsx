@@ -15,6 +15,11 @@ import { getTileStyleMaterial } from '../../3d/styles/TileStyleMaterials.jsx';
 // During wormhole traversal shows the coloured back-sides of every sticker on
 // all 6 faces so the camera looks like it is inside the cube.
 
+// How far down the interior faces are tinted while riding. High enough that the
+// tunnel is clearly the brightest thing in frame, low enough that the antipodal
+// tile colours — the reason this view exists — stay legible behind it.
+const DIM_STRENGTH = 0.72;
+
 // Maps each face direction to its antipodal (opposite) face direction.
 
 // Euler angles to rotate a PlaneGeometry (default +Z normal) so its front face
@@ -40,6 +45,7 @@ const _FACE_DEFS = [
 export function TunnelInteriorView({ worm, size }) {
     const wireMatRef = useRef();
     const backingMatRef = useRef();
+    const dimMatRef = useRef();
     const stickerMeshesRef = useRef([]);
     const opacityRef = useRef(0);
     const prevPhaseRef = useRef('crawling');
@@ -101,6 +107,16 @@ export function TunnelInteriorView({ worm, size }) {
         return new THREE.BoxGeometry(half * 2, half * 2, half * 2);
     }, [size]);
 
+    // Dimming shell — sits just INSIDE the sticker planes and is drawn after them,
+    // so it tints the whole interior down. Without it the six inner faces sit at
+    // full saturation and fill the frame during the ride, competing with the very
+    // thing the player is supposed to be looking at. Tinting rather than fading
+    // keeps the antipodal colours readable, which is the point of this view.
+    const dimGeo = useMemo(() => {
+        const half = (size - 1) / 2 + SURFACE_OFFSET - 0.02;
+        return new THREE.BoxGeometry(half * 2, half * 2, half * 2);
+    }, [size]);
+
     // Set static positions/rotations after mount (or size change).
     useEffect(() => {
         stickerLayout.forEach(({ px, py, pz, rx, ry, rz }, i) => {
@@ -111,12 +127,18 @@ export function TunnelInteriorView({ worm, size }) {
         });
     }, [stickerLayout]);
 
-    useEffect(() => () => { edgeGeo.dispose(); planeGeo.dispose(); backingGeo.dispose(); }, [edgeGeo, planeGeo, backingGeo]);
+    useEffect(() => () => {
+        edgeGeo.dispose(); planeGeo.dispose(); backingGeo.dispose(); dimGeo.dispose();
+    }, [edgeGeo, planeGeo, backingGeo, dimGeo]);
 
     useFrame((_, delta) => {
         const phase = worm.phase.current;
         const prevPhase = prevPhaseRef.current;
-        const active = phase === 'entering' || phase === 'tunnel' || phase === 'exiting';
+        // Only while the camera is genuinely inside. Including 'entering' meant the
+        // interior shell was drawn during the dive, which — with the real cube hidden
+        // at the same time — let the player see straight through the near walls to the
+        // far inner faces. The dive is an exterior shot; the cube must look solid.
+        const active = phase === 'tunnel' || phase === 'exiting';
 
         // Batch-assign sticker materials ONCE on tunnel entry (opacity still ~0, so no visible pop).
         // Avoids 54+ per-frame GPU state changes that caused hitching on the first visible frame.
@@ -154,6 +176,7 @@ export function TunnelInteriorView({ worm, size }) {
 
         if (wireMatRef.current) wireMatRef.current.opacity = opacity * 0.45;
         if (backingMatRef.current) backingMatRef.current.opacity = opacity;
+        if (dimMatRef.current) dimMatRef.current.opacity = opacity * DIM_STRENGTH;
 
         const meshes = stickerMeshesRef.current;
         if (!active || opacity < 0.01 || !stickerMatsAssigned.current) {
@@ -173,6 +196,12 @@ export function TunnelInteriorView({ worm, size }) {
             {/* Solid black backing — fills the gaps between tiles like real Rubik's plastic */}
             <mesh geometry={backingGeo} frustumCulled={false}>
                 <meshBasicMaterial ref={backingMatRef} color="#000000" side={THREE.BackSide} transparent opacity={0} depthWrite={true} />
+            </mesh>
+            {/* Interior dimmer. renderOrder 1 puts it after the sticker planes (0) so it
+                tints them, and before TunnelTube (2) so the shaft still reads at full
+                strength against a darkened room. */}
+            <mesh geometry={dimGeo} frustumCulled={false} renderOrder={1}>
+                <meshBasicMaterial ref={dimMatRef} color="#05060c" side={THREE.BackSide} transparent opacity={0} depthWrite={false} />
             </mesh>
             {/* Black plastic skeleton — all cubie edges in one draw call */}
             <lineSegments geometry={edgeGeo} frustumCulled={false}>

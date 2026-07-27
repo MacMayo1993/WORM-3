@@ -46,6 +46,13 @@ const _ribMidA   = new THREE.Vector3();
 const _ribMidB   = new THREE.Vector3();
 const _ribAxis   = new THREE.Vector3();
 const _ribPerp   = new THREE.Vector3();
+// Exit-beat scratch — the external framing the inside camera swings out to as the
+// worm reaches the exit tile.
+const _exitCamOut  = new THREE.Vector3();
+const _exitLookOut = new THREE.Vector3();
+const _exitSide    = new THREE.Vector3();
+const _exitUpOut   = new THREE.Vector3();
+const _WORLD_UP    = new THREE.Vector3(0, 1, 0);
 
 
 export default function WormChaseCamera({ worm, size }) {
@@ -290,12 +297,61 @@ export default function WormChaseCamera({ worm, size }) {
             if (_camTunnelTangent.lengthSq() < 1e-6) _camTunnelTangent.set(0, 0, -1);
             else _camTunnelTangent.normalize();
 
+            // ── Möbius roll ──────────────────────────────────────────────────────
+            // The band's cross-section rotates π across the traversal (see fillRibbon:
+            // perpCurrent.applyAxisAngle(axis, t * PI)). Pinning the camera to world-up
+            // meant the player watched that half-twist happen to the geometry instead of
+            // having it happen to them, which threw away the one thing that makes this a
+            // wormhole through RP2 rather than a pipe. Rolling the up-vector by the same
+            // angle inverts the world by the time you reach the far tile — the
+            // non-orientability, felt rather than observed.
             _camUp.set(0, 1, 0);
             if (Math.abs(_camTunnelTangent.y) > 0.95) _camUp.set(0, 0, 1);
+            _camUp.addScaledVector(_camTunnelTangent, -_camUp.dot(_camTunnelTangent));
+            if (_camUp.lengthSq() < 1e-6) _camUp.set(0, 0, 1);
+            _camUp.normalize().applyAxisAngle(_camTunnelTangent, tHead * Math.PI);
 
-            const back = 1.15 + size * 0.1, up = 0.55, lookAhead = 0.7;
+            // Sits nearer the centerline than a surface chase would: the offset rotates
+            // with the roll, so a large one walks the camera around the bore and pins it
+            // against one wall instead of leaving the shaft symmetric around the view.
+            const back = 1.15 + size * 0.1, up = 0.32, lookAhead = 0.7;
             _camTargetCam.copy(_camLookVec).addScaledVector(_camTunnelTangent, -back).addScaledVector(_camUp, up);
             _camTargetLook.copy(_camLookVec).addScaledVector(_camTunnelTangent, lookAhead);
+
+            // ── Exit beat ────────────────────────────────────────────────────────
+            // The moment the worm punches out through the flipped tile used to fall in
+            // the seam between this branch and 'windout', with nothing framing it. Over
+            // the last stretch of the exit arm the camera swings out past the tile and
+            // turns back to watch the worm burst through it, righting itself as it goes.
+            const exitBlend = phase === 'exiting'
+                ? THREE.MathUtils.smoothstep(tp, 0.60, 0.95)
+                : 0;
+            if (exitBlend > 0.001) {
+                const extN = FACE_NORMALS[tunnel.exit.dirKey] ?? FACE_NORMALS.PY;
+                const xw = getStickerWorldPos(tunnel.exit.x, tunnel.exit.y, tunnel.exit.z, tunnel.exit.dirKey, size, 0);
+                _exitLookOut.set(xw[0], xw[1], xw[2]);
+
+                // Offset to one side rather than dead-on: head-on, the worm emerges
+                // straight down the lens and reads as nothing.
+                _exitSide.crossVectors(extN, _WORLD_UP);
+                if (_exitSide.lengthSq() < 1e-6) _exitSide.set(1, 0, 0);
+                _exitSide.normalize();
+
+                _exitCamOut.copy(_exitLookOut)
+                    .addScaledVector(extN, 1.7 + size * 0.34)
+                    .addScaledVector(_exitSide, 1.2 + size * 0.22)
+                    .addScaledVector(_WORLD_UP, 0.7);
+
+                _camTargetCam.lerp(_exitCamOut, exitBlend);
+                _camTargetLook.lerp(_exitLookOut, exitBlend);
+
+                // Unwind the roll as we emerge, so the player lands upright.
+                _exitUpOut.copy(_WORLD_UP);
+                if (extN.y < -0.85) _exitUpOut.set(0, -1, 0);
+                _camUp.lerp(_exitUpOut, exitBlend);
+                if (_camUp.lengthSq() < 1e-6) _camUp.copy(_exitUpOut);
+                _camUp.normalize();
+            }
 
             const a = Math.min(1, 2.5 * delta);
             camPosRef.current.lerp(_camTargetCam, a);

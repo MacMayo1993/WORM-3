@@ -38,6 +38,7 @@ import HandsOverlay from './overlays/HandsOverlay.jsx';
 import DisparityHUD from './overlays/DisparityHUD.jsx';
 import HealerWormHUD from './overlays/HealerWormHUD.jsx';
 import MobiusHUD from '../worm/MobiusHUD.jsx';
+import TunnelTransitOverlay from '../worm/TunnelTransitOverlay.jsx';
 import { isMobile } from '../utils/device.js';
 
 // Lazy-loaded — deferred to reduce initial parse time
@@ -287,6 +288,9 @@ export default function UILayer({
         <HealerWormHUD onHome={onBackToMainMenu} onSettings={() => setShowSettings(true)} onToggleAntipodal={onToggleAntipodalPiP} antipodalActive={showAntipodalPiP} onRetry={onWormRetry} onNewGame={onWormNewGame} />
         {/* Möbius Band HUD — shows topology of active wormhole during tunnel traversal */}
         <MobiusHUD />
+        {/* Held for the whole traversal so the ride stays legible as one continuous
+            event across the three camera regimes it cuts between. */}
+        <TunnelTransitOverlay />
 
         {/* Disparity countdown — 3-2-1-GO overlay before chaos starts */}
         {disparityCountdown !== null && (

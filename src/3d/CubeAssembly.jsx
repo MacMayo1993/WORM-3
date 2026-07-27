@@ -116,13 +116,17 @@ const CubeAssembly = React.memo(({
       // antipodal back-face stickers render — only the opaque solid body needs to disappear so
       // it stops occluding them from the inside.
       wormExitRideActive: s.wormHealerMode && s.wormPhase === 'exiting',
-      // Hides the solid cube body (and unrelated interaction overlays) for the whole tunnel
-      // traversal so it doesn't z-fight with TunnelInteriorView's coincident antipodal stickers.
+      // Hides the solid cube body (and unrelated interaction overlays) so it doesn't z-fight
+      // with TunnelInteriorView's coincident antipodal stickers.
       // Deliberately does NOT cover WormholeNetwork/VoidCore below — the Möbius ribbons and the
       // void-core swirl are the wormhole's own visual and must stay visible through the trip.
-      wormholeBodyHidden: s.wormHealerMode && (
-        s.wormPhase === 'entering' || s.wormPhase === 'tunnel' || s.wormPhase === 'exiting'
-      ),
+      //
+      // Scoped to the phases where the camera is actually INSIDE. This used to include
+      // 'entering', which contradicted the wormTunnelActive comment three lines up ("the camera
+      // watches the entry hole from OUTSIDE, so the cube must stay visible") and was the reason
+      // the near walls vanished mid-dive: the real cube was hidden while TunnelInteriorView drew
+      // the interior, so from outside you saw straight through to the far inner walls.
+      wormholeBodyHidden: s.wormHealerMode && (s.wormPhase === 'tunnel' || s.wormPhase === 'exiting'),
       isBiomeMode: s.settings?.biomeMode?.enabled,
       rotationEpoch: s.rotationEpoch,
       settings: s.settings,
