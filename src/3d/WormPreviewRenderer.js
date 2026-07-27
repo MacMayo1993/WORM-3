@@ -23,7 +23,10 @@ import { layoutWormFace, FACE_LAYOUT, MOUTH_ARC } from '../worm/wormFaceLayout.j
 import { getSkinFX } from '../worm/wormSkinFX.js';
 import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMaterialTime } from '../worm/wormSkinMaterial.js';
 import { WormParticleSystem } from '../worm/wormSkinParticles.js';
-import { PAGE_GEO_ARGS, PAGE_HINGE_X, PAGE_HINGE_Y, SPINE_X_SCALE, pageHingeAngles } from '../worm/wormBookFX.js';
+import {
+  PAGE_GEO_ARGS, PAGE_HINGE_X, PAGE_HINGE_Y, PAGE_LAYER_COUNT, PAGE_LAYER_GAP,
+  FRONT_COVER_GEO_ARGS, SPINE_X_SCALE, pageHingeAngles,
+} from '../worm/wormBookFX.js';
 
 // ─── Worm geometry constants ─────────────────────────────────────────────────
 // Straight from healerWorm/WormBody.jsx and WormFace.jsx so the preview worm is
@@ -74,12 +77,15 @@ function _buildRig() {
   // Book Worm's page flaps — same geometry/hinge recipe as WormBody.jsx /
   // CrawlerCharacter.jsx, posed manually per-frame in _poseWorm() (an idle
   // sway stands in for the turn-force signal, since the preview never turns).
+  // PAGE_LAYER_COUNT thin layers per side per segment, so the stack reads as
+  // multiple pages instead of one flat slab.
   const pageGeo = new THREE.BoxGeometry(...PAGE_GEO_ARGS);
+  const frontCoverGeo = new THREE.BoxGeometry(...FRONT_COVER_GEO_ARGS);
 
   const beads = [];
   const boxes = [];
   const glows = [];
-  const leftPages = [];
+  const leftPages = [];  // leftPages[i] = [layer0Mesh, layer1Mesh, ...]
   const rightPages = [];
   for (let i = 0; i < SEGMENTS; i++) {
     // Same skin-themed material factory as gameplay (WormBody.jsx /
@@ -94,12 +100,24 @@ function _buildRig() {
       transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending,
       depthWrite: false, toneMapped: false,
     }));
-    const leftPage = new THREE.Mesh(pageGeo, new THREE.MeshStandardMaterial({ roughness: 0.8, metalness: 0, side: THREE.DoubleSide }));
-    const rightPage = new THREE.Mesh(pageGeo, new THREE.MeshStandardMaterial({ roughness: 0.8, metalness: 0, side: THREE.DoubleSide }));
-    group.add(bead, box, glow, leftPage, rightPage);
+    group.add(bead, box, glow);
     beads.push(bead); boxes.push(box); glows.push(glow);
-    leftPages.push(leftPage); rightPages.push(rightPage);
+
+    const leftLayers = [];
+    const rightLayers = [];
+    for (let layer = 0; layer < PAGE_LAYER_COUNT; layer++) {
+      const leftPage = new THREE.Mesh(pageGeo, new THREE.MeshStandardMaterial({ roughness: 0.8, metalness: 0, side: THREE.DoubleSide }));
+      const rightPage = new THREE.Mesh(pageGeo, new THREE.MeshStandardMaterial({ roughness: 0.8, metalness: 0, side: THREE.DoubleSide }));
+      group.add(leftPage, rightPage);
+      leftLayers.push(leftPage); rightLayers.push(rightPage);
+    }
+    leftPages.push(leftLayers); rightPages.push(rightLayers);
   }
+
+  // Head's standing front-cover panel (book worm only) — a single upright
+  // panel instead of a flat page stack, distinct from the pages behind it.
+  const frontCover = new THREE.Mesh(frontCoverGeo, new THREE.MeshStandardMaterial({ roughness: 0.5, metalness: 0.1 }));
+  group.add(frontCover);
 
   // Ambient skin FX (embers/bubbles/sparkle/...). Parented to an unscaled
   // anchor (not the head bead itself, whose own scale would otherwise shrink
@@ -134,7 +152,7 @@ function _buildRig() {
   const glowLight = new THREE.PointLight(0xffffff, 0, 1.2);
   group.add(glowLight);
 
-  return { group, beads, boxes, glows, leftPages, rightPages, eyes, pupils, mouth, glasses, hatGroup, hatKey: null, glowLight, particles, particlesAnchor, skinKey: null };
+  return { group, beads, boxes, glows, leftPages, rightPages, frontCover, eyes, pupils, mouth, glasses, hatGroup, hatKey: null, glowLight, particles, particlesAnchor, skinKey: null };
 }
 
 // Framing presets. In game the camera looks down at the cube face the worm is
@@ -309,8 +327,8 @@ function _poseWorm(opts, time) {
     const bead = rig.beads[i];
     const box = rig.boxes[i];
     const glow = rig.glows[i];
-    const leftPage = rig.leftPages[i];
-    const rightPage = rig.rightPages[i];
+    const leftLayers = rig.leftPages[i];
+    const rightLayers = rig.rightPages[i];
     const body = isBook ? box : bead;
 
     const shown = !headOnly || i <= 2;
@@ -318,8 +336,14 @@ function _poseWorm(opts, time) {
     box.visible = shown && isBook;
     glow.visible = shown && isGlow && i % 2 === 0;
     const pagesShown = shown && isBook && i !== 0;
-    leftPage.visible = pagesShown;
-    rightPage.visible = pagesShown;
+    const coverShown = shown && isBook && i === 0;
+    for (const l of leftLayers) l.visible = pagesShown;
+    for (const l of rightLayers) l.visible = pagesShown;
+    // frontCover is a single shared mesh, not one per segment — only the i===0
+    // iteration is ever allowed to touch its visibility, or every later i>0
+    // iteration (where coverShown is always false) would immediately hide it
+    // again right after the head iteration showed it.
+    if (i === 0) rig.frontCover.visible = coverShown;
 
     // Book worm rides on top of the ground, lifted by its own height, instead
     // of centered/embedded at it — mutates _off itself so the pages (which
@@ -376,26 +400,52 @@ function _poseWorm(opts, time) {
       _pbHingeQuat.setFromAxisAngle(_pbZAxisUnit, left);
       _pbPageQuat.copy(_pbQuat).multiply(_pbHingeQuat);
       _pbPageOffset.set(PAGE_GEO_ARGS[0] * 0.5, 0, 0).applyQuaternion(_pbPageQuat);
-      leftPage.position.copy(_off)
-        .addScaledVector(_pbX, PAGE_HINGE_X * pageScale)
-        .addScaledVector(_pbY, pageScale * PAGE_HINGE_Y)
-        .addScaledVector(_pbPageOffset, pageScale);
-      leftPage.quaternion.copy(_pbPageQuat);
-      leftPage.scale.setScalar(pageScale);
-      leftPage.material.color.set(skin.belly);
+      for (let layer = 0; layer < leftLayers.length; layer++) {
+        const l = leftLayers[layer];
+        l.position.copy(_off)
+          .addScaledVector(_pbX, PAGE_HINGE_X * pageScale)
+          .addScaledVector(_pbY, pageScale * (PAGE_HINGE_Y + layer * PAGE_LAYER_GAP))
+          .addScaledVector(_pbPageOffset, pageScale);
+        l.quaternion.copy(_pbPageQuat);
+        l.scale.setScalar(pageScale);
+        l.material.color.set(skin.belly);
+      }
 
       _pbHingeQuat.setFromAxisAngle(_pbZAxisUnit, right);
       _pbPageQuat.copy(_pbQuat).multiply(_pbHingeQuat);
       _pbPageOffset.set(-PAGE_GEO_ARGS[0] * 0.5, 0, 0).applyQuaternion(_pbPageQuat);
-      rightPage.position.copy(_off)
-        .addScaledVector(_pbX, -PAGE_HINGE_X * pageScale)
-        .addScaledVector(_pbY, pageScale * PAGE_HINGE_Y)
-        .addScaledVector(_pbPageOffset, pageScale);
-      rightPage.quaternion.copy(_pbPageQuat);
-      rightPage.scale.setScalar(pageScale);
-      rightPage.material.color.set(skin.belly);
+      for (let layer = 0; layer < rightLayers.length; layer++) {
+        const r = rightLayers[layer];
+        r.position.copy(_off)
+          .addScaledVector(_pbX, -PAGE_HINGE_X * pageScale)
+          .addScaledVector(_pbY, pageScale * (PAGE_HINGE_Y + layer * PAGE_LAYER_GAP))
+          .addScaledVector(_pbPageOffset, pageScale);
+        r.quaternion.copy(_pbPageQuat);
+        r.scale.setScalar(pageScale);
+        r.material.color.set(skin.belly);
+      }
     } else if (isBook) {
       body.quaternion.identity();
+    }
+
+    // Book Worm head: a single upright front-cover panel, standing vertical
+    // instead of lying flat like the page stack — same orientation basis as
+    // the body pages (computed against segment 1, since there's no "segment
+    // -1" to diff against), a box whose Y is its largest dimension.
+    if (coverShown) {
+      _segmentOffset(1, characterId, time, _pbPrevOff);
+      _pbPrevOff.y += BOOK_BODY_SCALE[0] * PAGE_HINGE_Y;
+      _pbZ.subVectors(_pbPrevOff, _off).normalize(); // toward segment 1 = backward, from the head's point of view
+      if (_pbZ.lengthSq() < 1e-8) _pbZ.set(0, 0, 1);
+      _pbX.crossVectors(UP, _pbZ).normalize();
+      _pbY.crossVectors(_pbZ, _pbX);
+      _pbBasisMat.makeBasis(_pbX, _pbY, _pbZ);
+      _pbQuat.setFromRotationMatrix(_pbBasisMat);
+      const coverScale = body.scale.x;
+      rig.frontCover.position.copy(_off).addScaledVector(_pbZ, -0.05 * coverScale);
+      rig.frontCover.quaternion.copy(_pbQuat);
+      rig.frontCover.scale.setScalar(coverScale);
+      rig.frontCover.material.color.set(skin.body);
     }
 
     if (glow.visible) {

@@ -20,7 +20,8 @@ import { getSkinFX } from '../wormSkinFX.js';
 import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMaterialTime } from '../wormSkinMaterial.js';
 import WormSkinParticles from '../WormSkinParticles.jsx';
 import {
-    PAGE_GEO_ARGS, PAGE_HINGE_X, PAGE_HINGE_Y, SPINE_X_SCALE, TURN_SIGNAL_GAIN,
+    PAGE_GEO_ARGS, PAGE_HINGE_X, PAGE_HINGE_Y, PAGE_LAYER_COUNT, PAGE_LAYER_GAP,
+    FRONT_COVER_GEO_ARGS, SPINE_X_SCALE, TURN_SIGNAL_GAIN,
     turnSignalFromDirections, smoothTurn, pageHingeAngles,
 } from '../wormBookFX.js';
 import {
@@ -49,6 +50,12 @@ const _bookHingeQuat = new THREE.Quaternion();
 const _bookPageQuat = new THREE.Quaternion();
 const _bookPageOffset = new THREE.Vector3();
 const _bookZAxisUnit = new THREE.Vector3(0, 0, 1);
+const _bookHeadQuat = new THREE.Quaternion();
+const _bookHeadBasisMat = new THREE.Matrix4();
+const _bookHeadX = new THREE.Vector3();
+const _bookHeadY = new THREE.Vector3();
+const _bookHeadZ = new THREE.Vector3();
+const _bookCoverDummy = new THREE.Object3D();
 const _bodyHeadPos = new THREE.Vector3();
 const _bodyNormal = new THREE.Vector3();
 const _bodyClonePos = new THREE.Vector3();
@@ -72,8 +79,9 @@ export function WormBody({ worm, size }) {
     const meshRef = useRef();       // sphere body (classic / inch / glow)
     const boxMeshRef = useRef();    // box body (book worm only)
     const glowAltRef = useRef();    // additive overlay — even glow segments only
-    const leftPageRef = useRef();   // book worm only — left page flap overlay
-    const rightPageRef = useRef();  // book worm only — right page flap overlay
+    const leftPageRef = useRef();   // book worm only — left page-stack overlay
+    const rightPageRef = useRef();  // book worm only — right page-stack overlay
+    const frontCoverRef = useRef(); // book worm only — head's standing cover panel
     const particlesGroupRef = useRef(); // ambient skin FX (embers/bubbles/sparkle/...), anchored to the head
     // Book Worm: turn force inferred from how fast the head's direction of
     // travel is swinging frame to frame (no continuous turn signal exists in
@@ -166,6 +174,39 @@ export function WormBody({ worm, size }) {
                 bookInitedRef.current = true;
             }
             prevHeadPosRef.current.copy(_bodyHeadPos);
+
+            // Front cover: a single upright panel at the head, standing
+            // vertical (perpendicular to the crawl surface) instead of lying
+            // flat like the page stack behind it. Reuses the head's own
+            // direction of travel (falling back to a fixed forward when the
+            // worm hasn't moved yet) for its orientation basis — same
+            // lookAt-style construction as the body segments below, so a box
+            // whose Y (height) is its largest dimension stands up on its own.
+            _bookHeadZ.copy(_bookHeadDir);
+            if (_bookHeadZ.lengthSq() < 1e-8) _bookHeadZ.set(0, 0, 1); else _bookHeadZ.negate();
+            _bookHeadZ.normalize();
+            _bookHeadX.crossVectors(_bodyNormal, _bookHeadZ);
+            if (_bookHeadX.lengthSq() < 1e-8) { _bookHeadZ.x += 1e-4; _bookHeadZ.normalize(); _bookHeadX.crossVectors(_bodyNormal, _bookHeadZ); }
+            _bookHeadX.normalize();
+            _bookHeadY.crossVectors(_bookHeadZ, _bookHeadX);
+            _bookHeadBasisMat.makeBasis(_bookHeadX, _bookHeadY, _bookHeadZ);
+            _bookHeadQuat.setFromRotationMatrix(_bookHeadBasisMat);
+
+            const coverMesh = frontCoverRef.current;
+            if (coverMesh) {
+                _bookCoverDummy.position.copy(_bodyHeadPos).addScaledVector(_bookHeadZ, -0.05);
+                _bookCoverDummy.quaternion.copy(_bookHeadQuat);
+                _bookCoverDummy.scale.setScalar(0.088);
+                _bookCoverDummy.updateMatrix();
+                coverMesh.setMatrixAt(0, _bookCoverDummy.matrix);
+                _bookPageColor.set(wormColorRef.current);
+                coverMesh.setColorAt(0, _bookPageColor);
+                coverMesh.count = 1;
+                coverMesh.instanceMatrix.needsUpdate = true;
+                if (coverMesh.instanceColor) coverMesh.instanceColor.needsUpdate = true;
+            }
+        } else if (frontCoverRef.current) {
+            frontCoverRef.current.count = 0;
         }
 
         const tLen = worm.tailLength.current;
@@ -529,9 +570,11 @@ export function WormBody({ worm, size }) {
                 mesh.setColorAt(writeIdx, _bodyColor);
             }
 
-            // Book Worm: two page flaps hinged along the cover's spine, propped
-            // open at rest and flung toward the outside of a turn (bookTurnRef,
-            // computed above from the head's frame-to-frame direction swing).
+            // Book Worm: a stack of thin page layers hinged along the cover's
+            // spine, propped open at rest and flung toward the outside of a
+            // turn (bookTurnRef, computed above from the head's frame-to-
+            // frame direction swing) — the whole stack banks together, layer
+            // count giving the body its visible "many pages" height.
             if (_isBook && i !== 0) {
                 const pageScale = _wormDummy.scale.x; // matches the cover's current (post transit/LOD) scale
                 const { left, right } = pageHingeAngles(bookTurnRef.current);
@@ -539,33 +582,39 @@ export function WormBody({ worm, size }) {
                 _bookHingeQuat.setFromAxisAngle(_bookZAxisUnit, left);
                 _bookPageQuat.copy(_bookQuat).multiply(_bookHingeQuat);
                 _bookPageOffset.set(PAGE_GEO_ARGS[0] * 0.5, 0, 0).applyQuaternion(_bookPageQuat);
-                _pageDummy.position.copy(_bodyClonePos)
-                    .addScaledVector(_bookX, PAGE_HINGE_X * pageScale)
-                    .addScaledVector(_bookY, pageScale * PAGE_HINGE_Y)
-                    .addScaledVector(_bookPageOffset, pageScale);
-                _pageDummy.quaternion.copy(_bookPageQuat);
-                _pageDummy.scale.setScalar(pageScale);
-                _pageDummy.updateMatrix();
-                if (leftPageRef.current) leftPageRef.current.setMatrixAt(pageWriteIdx, _pageDummy.matrix);
+                for (let layer = 0; layer < PAGE_LAYER_COUNT; layer++) {
+                    _pageDummy.position.copy(_bodyClonePos)
+                        .addScaledVector(_bookX, PAGE_HINGE_X * pageScale)
+                        .addScaledVector(_bookY, pageScale * (PAGE_HINGE_Y + layer * PAGE_LAYER_GAP))
+                        .addScaledVector(_bookPageOffset, pageScale);
+                    _pageDummy.quaternion.copy(_bookPageQuat);
+                    _pageDummy.scale.setScalar(pageScale);
+                    _pageDummy.updateMatrix();
+                    if (leftPageRef.current) leftPageRef.current.setMatrixAt(pageWriteIdx + layer, _pageDummy.matrix);
+                }
 
                 _bookHingeQuat.setFromAxisAngle(_bookZAxisUnit, right);
                 _bookPageQuat.copy(_bookQuat).multiply(_bookHingeQuat);
                 _bookPageOffset.set(-PAGE_GEO_ARGS[0] * 0.5, 0, 0).applyQuaternion(_bookPageQuat);
-                _pageDummy.position.copy(_bodyClonePos)
-                    .addScaledVector(_bookX, -PAGE_HINGE_X * pageScale)
-                    .addScaledVector(_bookY, pageScale * PAGE_HINGE_Y)
-                    .addScaledVector(_bookPageOffset, pageScale);
-                _pageDummy.quaternion.copy(_bookPageQuat);
-                _pageDummy.scale.setScalar(pageScale);
-                _pageDummy.updateMatrix();
-                if (rightPageRef.current) rightPageRef.current.setMatrixAt(pageWriteIdx, _pageDummy.matrix);
+                for (let layer = 0; layer < PAGE_LAYER_COUNT; layer++) {
+                    _pageDummy.position.copy(_bodyClonePos)
+                        .addScaledVector(_bookX, -PAGE_HINGE_X * pageScale)
+                        .addScaledVector(_bookY, pageScale * (PAGE_HINGE_Y + layer * PAGE_LAYER_GAP))
+                        .addScaledVector(_bookPageOffset, pageScale);
+                    _pageDummy.quaternion.copy(_bookPageQuat);
+                    _pageDummy.scale.setScalar(pageScale);
+                    _pageDummy.updateMatrix();
+                    if (rightPageRef.current) rightPageRef.current.setMatrixAt(pageWriteIdx + layer, _pageDummy.matrix);
+                }
 
                 if (colorDirty) {
                     _bookPageColor.set(bellyCol);
-                    if (leftPageRef.current) leftPageRef.current.setColorAt(pageWriteIdx, _bookPageColor);
-                    if (rightPageRef.current) rightPageRef.current.setColorAt(pageWriteIdx, _bookPageColor);
+                    for (let layer = 0; layer < PAGE_LAYER_COUNT; layer++) {
+                        if (leftPageRef.current) leftPageRef.current.setColorAt(pageWriteIdx + layer, _bookPageColor);
+                        if (rightPageRef.current) rightPageRef.current.setColorAt(pageWriteIdx + layer, _bookPageColor);
+                    }
                 }
-                pageWriteIdx++;
+                pageWriteIdx += PAGE_LAYER_COUNT;
             }
             writeIdx++;
         }
@@ -592,9 +641,11 @@ export function WormBody({ worm, size }) {
     return isBook ? (
         /* Book body — Book Worm only. Conditionally mounted so the sphere instancedMesh
            (MAX_TAIL=1200 instances) is not allocated in GPU memory when unused.
-           The cover is the existing flattened box; the two page-flap overlays
-           ride on top of it, hinged along its spine (see the isBook block in
-           the useFrame loop above and wormBookFX.js for the hinge math). */
+           The cover is the existing flattened box; the page-stack overlays
+           (PAGE_LAYER_COUNT thin layers per side) ride on top of it, hinged
+           along its spine (see the isBook block in the useFrame loop above
+           and wormBookFX.js for the hinge math). The head gets a single
+           standing front-cover panel instead of a page stack. */
         <>
             <instancedMesh ref={boxMeshRef} args={[undefined, undefined, MAX_TAIL]} frustumCulled={false}>
                 {/* Thin spine/binding — the pages (below) are the visible body now, not a
@@ -608,13 +659,17 @@ export function WormBody({ worm, size }) {
                     metalness={0.2}
                 />
             </instancedMesh>
-            <instancedMesh ref={leftPageRef} args={[undefined, undefined, MAX_TAIL]} frustumCulled={false}>
+            <instancedMesh ref={leftPageRef} args={[undefined, undefined, MAX_TAIL * PAGE_LAYER_COUNT]} frustumCulled={false}>
                 <boxGeometry args={PAGE_GEO_ARGS} />
                 <meshStandardMaterial color="white" roughness={0.8} metalness={0} side={THREE.DoubleSide} />
             </instancedMesh>
-            <instancedMesh ref={rightPageRef} args={[undefined, undefined, MAX_TAIL]} frustumCulled={false}>
+            <instancedMesh ref={rightPageRef} args={[undefined, undefined, MAX_TAIL * PAGE_LAYER_COUNT]} frustumCulled={false}>
                 <boxGeometry args={PAGE_GEO_ARGS} />
                 <meshStandardMaterial color="white" roughness={0.8} metalness={0} side={THREE.DoubleSide} />
+            </instancedMesh>
+            <instancedMesh ref={frontCoverRef} args={[undefined, undefined, 1]} frustumCulled={false}>
+                <boxGeometry args={FRONT_COVER_GEO_ARGS} />
+                <meshStandardMaterial color="white" roughness={0.5} metalness={0.1} side={THREE.DoubleSide} />
             </instancedMesh>
             <group ref={particlesGroupRef}>
                 <WormSkinParticles skinId={wormSkinId} glowColor={skin.glow} />

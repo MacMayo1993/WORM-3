@@ -13,23 +13,35 @@ import * as THREE from 'three';
 // along the spine (the segment's length), X is side/right (how far an open
 // page reaches out), Y is up/thickness.
 //
-// "Flat" means lying horizontal (PAGE_REST_ANGLE below), NOT paper-thin — a
-// page at 0.035 unit-thickness rendered at actual worm scale worked out to a
-// couple thousandths of a world unit, invisible as any kind of volume. 0.22
-// (a ~6x increase) gives it real, visible height instead.
-export const PAGE_GEO_ARGS = [0.85, 0.22, 0.86];
+// A single thick slab read as a flat cutout no matter how tall it got — a
+// real stack of paper reads as a stack because you can see the individual
+// sheets. PAGE_LAYER_COUNT thin layers, PAGE_LAYER_GAP apart, do that: each
+// layer is thinner than the gap between layers so there's a visible seam
+// between them, and the whole stack (layer count × gap) is the visible body
+// height.
+export const PAGE_GEO_ARGS = [0.85, 0.045, 0.86]; // one layer's footprint
+export const PAGE_LAYER_COUNT = 4;
+export const PAGE_LAYER_GAP = 0.075; // Y spacing between successive layer centers
 export const PAGE_HINGE_X = 0.11; // matches the thin spine's own half-width — pages hinge flush at its edge
 // The book segment's own box geometry is scaled by this factor on its X (side)
 // axis only, in all three renderers, so it reads as a spine/binding instead of
 // a square cubelet the pages are perched on top of.
 export const SPINE_X_SCALE = 0.22;
 // Half the spine's own unit-box height (its existing box geometry is
-// [SPINE_X_SCALE, 0.68, ...] in all three renderers) — pages hinge flush with
-// its top surface (not floating above it in a "V"), and the whole book is
-// lifted this much extra off the crawl surface so it visibly rests ON TOP of
-// the ground instead of being centered/embedded at it, standing up by its
-// own height.
+// [SPINE_X_SCALE, 0.68, ...] in all three renderers) — the page stack's
+// bottom layer sits flush with its top surface (not floating above it in a
+// "V"), and the whole book is lifted this much extra off the crawl surface so
+// it visibly rests ON TOP of the ground instead of being centered/embedded at
+// it, standing up by its own height.
 export const PAGE_HINGE_Y = 0.34;
+
+// The head segment gets a single upright cover panel instead of a flat page
+// stack — the front cover standing vertical, distinct from the flat pages
+// behind it. Same local-space convention as the pages: X side, Y up, Z spine.
+// A box whose Y (height) is its largest dimension, built from the SAME
+// orientation basis the pages use (where Y already points along the actual
+// surface-relative "up"), stands up on its own with no extra hinge rotation.
+export const FRONT_COVER_GEO_ARGS = [0.85, 0.9, 0.35];
 
 // At rest (no turn) the two pages lie flat, open to the middle on both sides
 // — a real open book lying down, not propped up. A turn banks BOTH pages the
