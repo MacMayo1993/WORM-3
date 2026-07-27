@@ -14,7 +14,12 @@ import { getWormCharacter } from './wormCharacterData.js';
 import { getSkinFX } from './wormSkinFX.js';
 import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMaterialTime } from './wormSkinMaterial.js';
 import WormSkinParticles from './WormSkinParticles.jsx';
-import { PAGE_GEO_ARGS, PAGE_HINGE_X, PAGE_HINGE_Y, SPINE_X_SCALE, turnSignalFromDirections, smoothTurn, pageHingeAngles } from './wormBookFX.js';
+import {
+  PAGE_GEO_ARGS, PAGE_HINGE_X, PAGE_HINGE_Y, PAGE_LAYER_COUNT, PAGE_LAYER_GAP,
+  FRONT_COVER_GEO_ARGS, SPINE_X_SCALE, turnSignalFromDirections, smoothTurn, pageHingeAngles,
+} from './wormBookFX.js';
+
+const PAGE_LAYERS = Array.from({ length: PAGE_LAYER_COUNT }, (_, i) => i);
 
 const EYE_WHITE = '#ffffff';
 const PUPIL = '#111111';
@@ -392,27 +397,47 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
                 <WormSkinParticles skinId={wormSkinId} glowColor={GLOW_COLOR} />
               )}
 
-              {/* Book Worm: two page flaps hinged along the cover's spine
-                  (local Z, the direction of travel in this component's
-                  lookAt-based frame — see the book orientation block below),
-                  lying flat open to the middle at rest and banking together
-                  toward whichever side the worm turns into. Nested groups so
-                  rotation.z pivots at the hinge edge, not the page's own center. */}
+              {/* Book Worm: a stack of thin page layers hinged along the
+                  cover's spine (local Z, the direction of travel in this
+                  component's lookAt-based frame — see the book orientation
+                  block below), lying flat open to the middle at rest and
+                  banking together toward whichever side the worm turns into.
+                  Nested groups so rotation.z pivots at the hinge edge, not
+                  the layers' own center — all layers are children of the
+                  same hinge group, so the whole stack rotates as one piece. */}
               {isBook && !isHead && (
                 <>
                   <group ref={el => (leftPageRefs.current[i] = el)} scale={segScale} position={[PAGE_HINGE_X * segScale, segScale * PAGE_HINGE_Y, 0]}>
-                    <mesh position={[PAGE_GEO_ARGS[0] / 2, 0, 0]}>
-                      <boxGeometry args={PAGE_GEO_ARGS} />
-                      <meshStandardMaterial color={BELLY_COLOR} roughness={0.78} metalness={0} />
-                    </mesh>
+                    {PAGE_LAYERS.map(layer => (
+                      <mesh key={layer} position={[PAGE_GEO_ARGS[0] / 2, layer * PAGE_LAYER_GAP, 0]}>
+                        <boxGeometry args={PAGE_GEO_ARGS} />
+                        <meshStandardMaterial color={BELLY_COLOR} roughness={0.78} metalness={0} />
+                      </mesh>
+                    ))}
                   </group>
                   <group ref={el => (rightPageRefs.current[i] = el)} scale={segScale} position={[-PAGE_HINGE_X * segScale, segScale * PAGE_HINGE_Y, 0]}>
-                    <mesh position={[-PAGE_GEO_ARGS[0] / 2, 0, 0]}>
-                      <boxGeometry args={PAGE_GEO_ARGS} />
-                      <meshStandardMaterial color={BELLY_COLOR} roughness={0.78} metalness={0} />
-                    </mesh>
+                    {PAGE_LAYERS.map(layer => (
+                      <mesh key={layer} position={[-PAGE_GEO_ARGS[0] / 2, layer * PAGE_LAYER_GAP, 0]}>
+                        <boxGeometry args={PAGE_GEO_ARGS} />
+                        <meshStandardMaterial color={BELLY_COLOR} roughness={0.78} metalness={0} />
+                      </mesh>
+                    ))}
                   </group>
                 </>
+              )}
+              {/* Book Worm head: a single upright front-cover panel, standing
+                  vertical (perpendicular to the ground) instead of lying flat
+                  like the page stack behind it — same local frame as the
+                  sphere head (bodyRootRef's Y already points along the
+                  surface-relative "up"), so a box whose Y is its largest
+                  dimension stands on its own with no extra rotation needed. */}
+              {isBook && isHead && (
+                <group position={[0, 0, 0.08 * segScale]}>
+                  <mesh scale={segScale}>
+                    <boxGeometry args={FRONT_COVER_GEO_ARGS} />
+                    <meshStandardMaterial color={BODY_COLOR} roughness={0.5} metalness={0.1} />
+                  </mesh>
+                </group>
               )}
 
               {/* Tiny legs on body segments — inch worm only has prolegs at the very back */}
