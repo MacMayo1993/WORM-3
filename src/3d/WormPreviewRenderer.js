@@ -23,7 +23,7 @@ import { layoutWormFace, FACE_LAYOUT, MOUTH_ARC } from '../worm/wormFaceLayout.j
 import { getSkinFX } from '../worm/wormSkinFX.js';
 import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMaterialTime } from '../worm/wormSkinMaterial.js';
 import { WormParticleSystem } from '../worm/wormSkinParticles.js';
-import { PAGE_GEO_ARGS, PAGE_HINGE_X, pageHingeAngles } from '../worm/wormBookFX.js';
+import { PAGE_GEO_ARGS, PAGE_HINGE_X, PAGE_HINGE_Y, SPINE_X_SCALE, pageHingeAngles } from '../worm/wormBookFX.js';
 
 // ─── Worm geometry constants ─────────────────────────────────────────────────
 // Straight from healerWorm/WormBody.jsx and WormFace.jsx so the preview worm is
@@ -66,7 +66,9 @@ function _buildRig() {
   // Body beads. Material colour carries the segment colour directly (the game
   // uses white + per-instance colour because it draws one instanced mesh).
   const sphereGeo = new THREE.SphereGeometry(1, 16, 16);
-  const boxGeo = new THREE.BoxGeometry(1, 0.68, 1.12);
+  // Thin spine/binding — the pages (below) are the visible body now, not a
+  // flat square slab the pages ride on top of.
+  const boxGeo = new THREE.BoxGeometry(SPINE_X_SCALE, 0.68, 1.12);
   const glowGeo = new THREE.SphereGeometry(1, 10, 10);
 
   // Book Worm's page flaps — same geometry/hinge recipe as WormBody.jsx /
@@ -236,6 +238,7 @@ function _bufferFor(size, ctx) {
 function _segmentOffset(i, character, time, out) {
   const inch = character === 'inch';
   const wiggle = character === 'wiggle';
+  const book = character === 'book';
   const spacing = inch ? INCH_SPACING : SPACING;
   const d = i * spacing;
 
@@ -249,6 +252,12 @@ function _segmentOffset(i, character, time, out) {
   } else if (wiggle) {
     z = Math.sin(d * 13 - time * 2.2) * 0.055 * Math.min(1, i / 1.5);
     y = Math.sin(d * 9 - time * 2.2) * 0.006;
+  } else if (book) {
+    // Straight spine, no wiggle: the per-segment orientation for the open-book
+    // body is derived from consecutive offsets (see _poseWorm's isBook block),
+    // and the general idle sine wiggle below reads as a rippled/jagged spine
+    // once amplified into a flat page's full 3D orientation — a stiff book
+    // doesn't undulate like a soft-bodied worm.
   } else {
     z = Math.sin(d * 5.2 - time * 1.1) * 0.022 * Math.min(1, i / 1.2);
     y = Math.sin(time * 1.4 + d * 3) * 0.004;
@@ -312,6 +321,11 @@ function _poseWorm(opts, time) {
     leftPage.visible = pagesShown;
     rightPage.visible = pagesShown;
 
+    // Book worm rides on top of the ground, lifted by its own height, instead
+    // of centered/embedded at it — mutates _off itself so the pages (which
+    // read _off below) inherit the same lift as the cover.
+    if (isBook) _off.y += BOOK_BODY_SCALE[0] * PAGE_HINGE_Y;
+
     body.position.copy(_off);
     if (i === 0) {
       body.scale.setScalar(HEAD_SCALE);
@@ -342,8 +356,9 @@ function _poseWorm(opts, time) {
 
     // Book Worm: orient the cover to face the direction of travel (derived
     // from consecutive segment offsets, since the preview has no real turn
-    // signal to read), then swing the page flaps with a gentle idle sway —
-    // showing off the same flip the pages do reacting to a turn in-game.
+    // signal to read). Pages stay at their flat rest pose here — no idle
+    // sway — so the preview shows the actual resting shape instead of a
+    // moment frozen mid-turn.
     if (pagesShown) {
       _segmentOffset(i - 1, characterId, time, _pbPrevOff);
       _pbZ.subVectors(_off, _pbPrevOff).normalize(); // backward = away from the segment ahead
@@ -354,8 +369,7 @@ function _poseWorm(opts, time) {
       _pbQuat.setFromRotationMatrix(_pbBasisMat);
       body.quaternion.copy(_pbQuat);
 
-      const idleTurn = Math.sin(time * 0.6) * 0.5;
-      const { left, right } = pageHingeAngles(idleTurn);
+      const { left, right } = pageHingeAngles(0);
       const pageScale = body.scale.x;
 
       _pbHingeQuat.setFromAxisAngle(_pbZAxisUnit, left);
@@ -363,7 +377,7 @@ function _poseWorm(opts, time) {
       _pbPageOffset.set(PAGE_GEO_ARGS[0] * 0.5, 0, 0).applyQuaternion(_pbPageQuat);
       leftPage.position.copy(_off)
         .addScaledVector(_pbX, PAGE_HINGE_X * pageScale)
-        .addScaledVector(_pbY, pageScale * 0.42)
+        .addScaledVector(_pbY, pageScale * PAGE_HINGE_Y)
         .addScaledVector(_pbPageOffset, pageScale);
       leftPage.quaternion.copy(_pbPageQuat);
       leftPage.scale.setScalar(pageScale);
@@ -374,7 +388,7 @@ function _poseWorm(opts, time) {
       _pbPageOffset.set(-PAGE_GEO_ARGS[0] * 0.5, 0, 0).applyQuaternion(_pbPageQuat);
       rightPage.position.copy(_off)
         .addScaledVector(_pbX, -PAGE_HINGE_X * pageScale)
-        .addScaledVector(_pbY, pageScale * 0.42)
+        .addScaledVector(_pbY, pageScale * PAGE_HINGE_Y)
         .addScaledVector(_pbPageOffset, pageScale);
       rightPage.quaternion.copy(_pbPageQuat);
       rightPage.scale.setScalar(pageScale);

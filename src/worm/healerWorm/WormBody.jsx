@@ -20,7 +20,7 @@ import { getSkinFX } from '../wormSkinFX.js';
 import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMaterialTime } from '../wormSkinMaterial.js';
 import WormSkinParticles from '../WormSkinParticles.jsx';
 import {
-    PAGE_GEO_ARGS, PAGE_HINGE_X, TURN_SIGNAL_GAIN,
+    PAGE_GEO_ARGS, PAGE_HINGE_X, PAGE_HINGE_Y, SPINE_X_SCALE, TURN_SIGNAL_GAIN,
     turnSignalFromDirections, smoothTurn, pageHingeAngles,
 } from '../wormBookFX.js';
 import {
@@ -337,6 +337,10 @@ export function WormBody({ worm, size }) {
                 // same shared scratch object for book worm, and the head never re-orients.
                 _wormDummy.quaternion.identity();
                 _wormDummy.position.copy(_bodyHeadPos);
+                // Book worm rides slightly higher off the surface — see the isBook
+                // lift below (matches the body segments so the head doesn't float
+                // at a different height than the rest of the book).
+                if (_isBook) _wormDummy.position.addScaledVector(_bodyNormal, 0.092 * PAGE_HINGE_Y);
                 _wormDummy.scale.setScalar(0.092);
             } else {
                 // Inch Worm: a single hump locked to the middle of the body (sin profile over
@@ -436,6 +440,15 @@ export function WormBody({ worm, size }) {
                     }
                 }
 
+                if (_isBook) {
+                    // Book worm rides on top of the surface, lifted by its own
+                    // height, instead of centered/embedded at the usual crawl
+                    // height — a real book resting on the ground, not floating
+                    // through it. Mutates _bodyClonePos itself (not just this
+                    // segment's dummy) so the page instances below, which read
+                    // _bodyClonePos directly, inherit the same lift.
+                    _bodyClonePos.addScaledVector(_bodyCloneNormal, 0.088 * PAGE_HINGE_Y);
+                }
                 _wormDummy.position.copy(_bodyClonePos);
                 if (_isBook) {
                     // Orient the cover to face the direction of travel, using the same
@@ -528,7 +541,7 @@ export function WormBody({ worm, size }) {
                 _bookPageOffset.set(PAGE_GEO_ARGS[0] * 0.5, 0, 0).applyQuaternion(_bookPageQuat);
                 _pageDummy.position.copy(_bodyClonePos)
                     .addScaledVector(_bookX, PAGE_HINGE_X * pageScale)
-                    .addScaledVector(_bookY, pageScale * 0.42)
+                    .addScaledVector(_bookY, pageScale * PAGE_HINGE_Y)
                     .addScaledVector(_bookPageOffset, pageScale);
                 _pageDummy.quaternion.copy(_bookPageQuat);
                 _pageDummy.scale.setScalar(pageScale);
@@ -540,7 +553,7 @@ export function WormBody({ worm, size }) {
                 _bookPageOffset.set(-PAGE_GEO_ARGS[0] * 0.5, 0, 0).applyQuaternion(_bookPageQuat);
                 _pageDummy.position.copy(_bodyClonePos)
                     .addScaledVector(_bookX, -PAGE_HINGE_X * pageScale)
-                    .addScaledVector(_bookY, pageScale * 0.42)
+                    .addScaledVector(_bookY, pageScale * PAGE_HINGE_Y)
                     .addScaledVector(_bookPageOffset, pageScale);
                 _pageDummy.quaternion.copy(_bookPageQuat);
                 _pageDummy.scale.setScalar(pageScale);
@@ -584,7 +597,9 @@ export function WormBody({ worm, size }) {
            the useFrame loop above and wormBookFX.js for the hinge math). */
         <>
             <instancedMesh ref={boxMeshRef} args={[undefined, undefined, MAX_TAIL]} frustumCulled={false}>
-                <boxGeometry args={[1, 0.68, 1.12]} />
+                {/* Thin spine/binding — the pages (below) are the visible body now, not a
+                    flat square slab the pages ride on top of. */}
+                <boxGeometry args={[SPINE_X_SCALE, 0.68, 1.12]} />
                 <meshStandardMaterial
                     color="white"
                     emissive="white"

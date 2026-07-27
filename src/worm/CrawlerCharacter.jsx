@@ -14,7 +14,7 @@ import { getWormCharacter } from './wormCharacterData.js';
 import { getSkinFX } from './wormSkinFX.js';
 import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMaterialTime } from './wormSkinMaterial.js';
 import WormSkinParticles from './WormSkinParticles.jsx';
-import { PAGE_GEO_ARGS, PAGE_HINGE_X, turnSignalFromDirections, smoothTurn, pageHingeAngles } from './wormBookFX.js';
+import { PAGE_GEO_ARGS, PAGE_HINGE_X, PAGE_HINGE_Y, SPINE_X_SCALE, turnSignalFromDirections, smoothTurn, pageHingeAngles } from './wormBookFX.js';
 
 const EYE_WHITE = '#ffffff';
 const PUPIL = '#111111';
@@ -366,11 +366,14 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
           const segBob = Math.sin(t * 6 + i * 0.8) * 0.02 * Math.min(1, velocity || 0);
           const segColor = isHead ? BODY_COLOR : BELLY_COLOR;
           const stretch = isInch && !isHead ? 1 + Math.sin(t * 8 + i) * 0.24 * Math.min(1, velocity || 0) : 1;
+          // Book worm rides on top of the ground, lifted by its own height,
+          // instead of centered/embedded at the usual crawl height.
+          const bookRaise = isBook ? segScale * PAGE_HINGE_Y : 0;
 
           return (
-            <group ref={el => (bodySegmentRefs.current[i] = el)} key={i} position={[0, segBob + bobble, zOff]}>
+            <group ref={el => (bodySegmentRefs.current[i] = el)} key={i} position={[0, segBob + bobble + bookRaise, zOff]}>
               <mesh scale={[segScale * breathe * stretch, segScale * breathe * (isBook ? 0.78 : 1), segScale * (isBook ? 1.15 : 1)]}>
-                {isBook && !isHead ? <boxGeometry args={[1, 0.8, 1.2]} /> : <sphereGeometry args={[1, 12, 12]} />}
+                {isBook && !isHead ? <boxGeometry args={[SPINE_X_SCALE, 0.8, 1.2]} /> : <sphereGeometry args={[1, 12, 12]} />}
                 {/* Skin-themed material (metalness/roughness/clearcoat/transmission/
                     iridescence/flatShading + surface displacement) drives the PBR
                     look; only color/emissive and the glow-worm's alternating
@@ -392,18 +395,18 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
               {/* Book Worm: two page flaps hinged along the cover's spine
                   (local Z, the direction of travel in this component's
                   lookAt-based frame — see the book orientation block below),
-                  propped open at rest and flung toward the outside of a turn.
-                  Nested groups so rotation.z pivots at the hinge edge, not the
-                  page's own center. */}
+                  lying flat open to the middle at rest and banking together
+                  toward whichever side the worm turns into. Nested groups so
+                  rotation.z pivots at the hinge edge, not the page's own center. */}
               {isBook && !isHead && (
                 <>
-                  <group ref={el => (leftPageRefs.current[i] = el)} scale={segScale} position={[PAGE_HINGE_X * segScale, segScale * 0.42, 0]}>
+                  <group ref={el => (leftPageRefs.current[i] = el)} scale={segScale} position={[PAGE_HINGE_X * segScale, segScale * PAGE_HINGE_Y, 0]}>
                     <mesh position={[PAGE_GEO_ARGS[0] / 2, 0, 0]}>
                       <boxGeometry args={PAGE_GEO_ARGS} />
                       <meshStandardMaterial color={BELLY_COLOR} roughness={0.78} metalness={0} />
                     </mesh>
                   </group>
-                  <group ref={el => (rightPageRefs.current[i] = el)} scale={segScale} position={[-PAGE_HINGE_X * segScale, segScale * 0.42, 0]}>
+                  <group ref={el => (rightPageRefs.current[i] = el)} scale={segScale} position={[-PAGE_HINGE_X * segScale, segScale * PAGE_HINGE_Y, 0]}>
                     <mesh position={[-PAGE_GEO_ARGS[0] / 2, 0, 0]}>
                       <boxGeometry args={PAGE_GEO_ARGS} />
                       <meshStandardMaterial color={BELLY_COLOR} roughness={0.78} metalness={0} />
