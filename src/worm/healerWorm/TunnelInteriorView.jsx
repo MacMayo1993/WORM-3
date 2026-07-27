@@ -134,11 +134,16 @@ export function TunnelInteriorView({ worm, size }) {
     useFrame((_, delta) => {
         const phase = worm.phase.current;
         const prevPhase = prevPhaseRef.current;
-        // Only while the camera is genuinely inside. Including 'entering' meant the
-        // interior shell was drawn during the dive, which — with the real cube hidden
-        // at the same time — let the player see straight through the near walls to the
-        // far inner faces. The dive is an exterior shot; the cube must look solid.
+        // Only DRAWN while the camera is genuinely inside. Including 'entering' meant
+        // the interior shell was drawn during the dive, which — with the real cube
+        // hidden at the same time — let the player see straight through the near walls
+        // to the far inner faces. The dive is an exterior shot; the cube must look solid.
         const active = phase === 'tunnel' || phase === 'exiting';
+        // ...but the traversal as a whole starts at 'entering', which is when the
+        // sticker materials get assigned. These have to be separate: keying the
+        // assignment's lifetime off `active` cleared it one frame after it was set,
+        // so the stickers were never revealed and the cube read as solid black.
+        const inTraversal = active || phase === 'entering';
 
         // Batch-assign sticker materials ONCE on tunnel entry (opacity still ~0, so no visible pop).
         // Avoids 54+ per-frame GPU state changes that caused hitching on the first visible frame.
@@ -166,8 +171,10 @@ export function TunnelInteriorView({ worm, size }) {
             }
             stickerMatsAssigned.current = true;
         }
-        // Clear assignment flag on tunnel exit so the next transit gets fresh sticker colors
-        if (!active && prevPhase !== 'crawling') stickerMatsAssigned.current = false;
+        // Clear assignment flag once the whole traversal is over, so the next transit
+        // gets fresh sticker colours. Gated on inTraversal, not active — 'entering' is
+        // part of the trip even though nothing is drawn yet.
+        if (!inTraversal && prevPhase !== 'crawling') stickerMatsAssigned.current = false;
 
         prevPhaseRef.current = phase;
 
