@@ -8,9 +8,8 @@
 // "I am in a tunnel" — the ribbon was a floor, and nothing enclosed the camera.
 //
 // TunnelTube sweeps a tube around the exact centerline the ribbon and the worm
-// already follow (getTunnelWorldPosInto), rendered BackSide so it is only ever
-// seen from the inside. The Möbius ribbon stays visible within it as the track
-// being ridden; the tube is the shaft around it.
+// already follow (getTunnelWorldPosInto). The Möbius ribbon stays visible within
+// it as the track being ridden; the tube is the shaft around it.
 //
 // The cross-section frame is parallel-transported along the path rather than
 // rebuilt from a fixed up-vector: the centerline turns a corner at the core
@@ -84,8 +83,11 @@ const fragmentShader = `
 
   void main() {
     // Each half carries its own tile's colour, fusing at the midpoint — the same
-    // language the ribbon uses, so tube and ribbon read as one object.
+    // language the ribbon uses, so tube and ribbon read as one object. Lifted
+    // toward white because face colours can be very dark (deep reds especially),
+    // and a shaft lit only by its own tile colour goes black.
     vec3 base = mix(uColorA, uColorB, smoothstep(0.35, 0.65, vUv.y));
+    base = mix(base, vec3(1.0), 0.10);
 
     // Rings racing past the camera. This is the speed cue: on a bare ribbon
     // there was nothing in the periphery to register motion against.
@@ -110,8 +112,10 @@ const fragmentShader = `
     float coreFade = smoothstep(0.05, 0.15, dMid);
 
     // Light pooled around the worm, falling off ahead and behind, so the shaft
-    // has depth instead of being uniformly lit end to end.
-    float headGlow = exp(-pow((vUv.y - uHead) / 0.13, 2.0)) * 0.85;
+    // has depth instead of being uniformly lit end to end. The falloff has to be
+    // wide: anchoring tunnels on their tiles made each arm ~5x longer, so a tight
+    // pool leaves almost the whole shaft unlit.
+    float headGlow = exp(-pow((vUv.y - uHead) / 0.32, 2.0)) * 0.75;
 
     // Both mouths open out to nothing so the tube never ends in a hard disc, and
     // so the ends do not read as geometry hanging outside the cube.
@@ -123,12 +127,13 @@ const fragmentShader = `
     float graze = 1.0 - abs(V.z);
     graze = pow(clamp(graze, 0.0, 1.0), 2.0) * 0.5;
 
-    float intensity = 0.30 + rings + ribs + headGlow + graze;
+    // The floor carries the whole shaft away from the worm, so it cannot be dim.
+    float intensity = 0.50 + rings * 0.8 + ribs + headGlow + graze;
     vec3  col = base * intensity + vec3(1.0) * seam * 0.9;
 
     // Wall and seam are summed separately: the seam peaks exactly where coreFade
     // removes the wall, so the shaft hands off to light and back without a gap.
-    float wall = (0.55 + rings * 0.35 + headGlow * 0.35) * coreFade;
+    float wall = (0.60 + rings * 0.25 + headGlow * 0.25) * coreFade;
     float glow = seam * 0.55;
     gl_FragColor = vec4(col, clamp((wall + glow) * mouth * uOpacity, 0.0, 1.0));
   }
@@ -285,7 +290,13 @@ export function TunnelTube({ worm, size }) {
         uniforms={uniforms}
         vertexShader={vertexShader}
         fragmentShader={fragmentShader}
-        side={THREE.BackSide}
+        // DoubleSide, not BackSide. Whether BackSide shows the bore from within
+        // depends on the winding this geometry happens to generate, and it was
+        // culling the inner surface — so the shaft was invisible from inside the
+        // ride and only showed up as an object when seen from outside it. The
+        // mesh is small and the fill is bounded by the mouth/core fades, so
+        // rendering both faces is the robust choice over relying on winding.
+        side={THREE.DoubleSide}
         transparent
         depthWrite={false}
       />
