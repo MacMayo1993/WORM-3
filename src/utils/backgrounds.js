@@ -74,6 +74,11 @@ export const getBackgroundUrl = (filename) => {
     // Use Vite's BASE_URL to construct the correct path
     // If BASE_URL is '/', this results in '/environments/filename'
     // If BASE_URL is '/WORM-3/', this results in '/WORM-3/environments/filename'
-    // Handle nested paths like 'thumbnails/file.png' correctly
-    return `${import.meta.env.BASE_URL}environments/${filename}`;
+    // Handle nested paths like 'thumbnails/file.png' correctly.
+    // Percent-encode each segment: some assets have spaces in their names
+    // ('Snow Field.png'), and while <img src> tolerates a raw space, CSS
+    // url(...) does not — an unencoded one silently drops the image wherever a
+    // thumbnail is used as a background.
+    const encoded = filename.split('/').map(encodeURIComponent).join('/');
+    return `${import.meta.env.BASE_URL}environments/${encoded}`;
 };

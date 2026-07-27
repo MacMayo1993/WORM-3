@@ -10,7 +10,7 @@ import { PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT, PAPER_BG_MUTED, PAPER_B
 import CubePlate from './CubePlate.jsx';
 import {
   WIZARD_SCHEME_KEYS, SORTED_SCHEME_COLORS,
-  Checkmark, LockPip, TilePreviewCanvas, cardStyle, sizeTier
+  Checkmark, LockPip, TilePreviewCanvas, cardStyle, sizeTier, bgOptionFor
 } from './shared.jsx';
 
 export default function PaletteStep({ cos }) {
@@ -45,6 +45,7 @@ export default function PaletteStep({ cos }) {
         onNext={() => step(1)}
         cube={{ size: cubeSize, colors, tileStyle: settings.tileStyle, perFaceStyles: settings.perFaceStyles }}
         glow={colors[1]}
+        backdrop={bgOptionFor(settings.backgroundTheme)}
         swatches={[1, 2, 3, 4, 5, 6].map(id => colors[id])}
       />
 

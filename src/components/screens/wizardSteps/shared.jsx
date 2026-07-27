@@ -24,6 +24,16 @@ export const BG_OPTIONS = BACKGROUNDS.map(bg => ({
 // `custom` only exists once you have uploaded an image, so neither is listed.
 export const WIZARD_SCHEME_KEYS = Object.keys(SCHEME_LABELS).filter(k => k !== 'biome' && k !== 'custom');
 
+/**
+ * The scene a background id names, ready to hang behind a specimen plate.
+ *
+ * Every plate takes it, not just the scene step's: once you have chosen where
+ * you are playing, the cube should keep standing there while you pick its
+ * colours, its tiles, and its size — otherwise the scene reads as a decision
+ * that only mattered on the screen you made it.
+ */
+export const bgOptionFor = id => BG_OPTIONS.find(o => o.value === id) || null;
+
 export const FACE_LABELS = { 1: 'Front', 2: 'Left', 3: 'Top', 4: 'Back', 5: 'Right', 6: 'Bottom' };
 
 // One row per stop on the size slider.

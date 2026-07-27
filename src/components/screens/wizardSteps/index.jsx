@@ -18,6 +18,7 @@ import { useGameStore } from '../../../hooks/useGameStore.js';
 import { extractColorsFromImage } from '../../../utils/colorExtraction.js';
 import { resolveWizardColors } from './shared.jsx';
 
+export { default as SpecimenPlate, plateSurface, plateArrow } from './SpecimenPlate.jsx';
 export { default as CubePlate } from './CubePlate.jsx';
 export { default as CubeSizeSlider } from './CubeSizeSlider.jsx';
 export { default as SceneStep } from './SceneStep.jsx';
