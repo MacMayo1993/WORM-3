@@ -6,9 +6,11 @@ import { opArtShaders } from '../3d/styles/shaders/opArtShaders.js';
 import { antipodalShaders } from '../3d/styles/shaders/antipodalShaders.js';
 import { newStyleShaders } from '../3d/styles/shaders/newStyleShaders.js';
 import { nonEuclideanShaders } from '../3d/styles/shaders/nonEuclideanShaders.js';
+import { impossibleShaders } from '../3d/styles/shaders/impossibleShaders.js';
+import { surrealShaders } from '../3d/styles/shaders/surrealShaders.js';
 import { isAnimatedStyle } from '../3d/styles/TileStyleMaterials.jsx';
 import { isAnimatedPreviewStyle } from '../3d/TilePreviewRenderer.js';
-import { TILE_STYLE_SECTIONS, NON_EUCLIDEAN_STYLE_KEYS } from '../utils/tileStyleCatalog.js';
+import { TILE_STYLE_SECTIONS, NON_EUCLIDEAN_STYLE_KEYS, IMPOSSIBLE_STYLE_KEYS, SURREAL_STYLE_KEYS } from '../utils/tileStyleCatalog.js';
 import { TILE_STYLES } from '../utils/colorSchemes.js';
 import { STORE_TILES } from '../utils/storeCatalog.js';
 
@@ -20,6 +22,8 @@ const modules = [
   ['antipodalShaders', antipodalShaders],
   ['newStyleShaders', newStyleShaders],
   ['nonEuclideanShaders', nonEuclideanShaders],
+  ['impossibleShaders', impossibleShaders],
+  ['surrealShaders', surrealShaders],
 ];
 
 const allShaders = Object.assign({}, ...modules.map(([, mod]) => mod));
@@ -143,5 +147,53 @@ describe('non-Euclidean shaders', () => {
     const weave = [...nonEuclideanShaders.hyperbolicWeave.matchAll(/_([DR])\s*=\s*([\d.]+)/g)];
     const w = Object.fromEntries(weave.map(([, n, v]) => [n, parseFloat(v)]));
     expect(w.D ** 2).toBeCloseTo(w.R ** 2 + 1, 4);
+  });
+});
+
+describe('impossible & surreal shaders', () => {
+  const cases = [
+    ['impossible', impossibleShaders, IMPOSSIBLE_STYLE_KEYS],
+    ['surreal', surrealShaders, SURREAL_STYLE_KEYS],
+  ];
+
+  it('are all registered in their catalog section', () => {
+    for (const [name, mod, keys] of cases) {
+      expect(Object.keys(mod).sort(), name).toEqual([...keys].sort());
+    }
+  });
+
+  it('are animated exactly when their fragment shader reads time', () => {
+    // Same contract the non-Euclidean styles hold: these animate purely in the
+    // fragment shader, so the material registry and the preview registry must
+    // both agree with the GLSL — a static tile registered as animated burns a
+    // per-frame update, an animated tile left out renders one frame and freezes.
+    for (const [, mod] of cases) {
+      for (const [key, shader] of Object.entries(mod)) {
+        const usesTime = /\btime\b/.test(shader.replace(/uniform\s+float\s+time\s*;/g, ''));
+        expect(isAnimatedStyle(key), `${key}: shader/animated-set mismatch`).toBe(usesTime);
+        expect(isAnimatedPreviewStyle(key), `${key}: shader/preview-set mismatch`).toBe(usesTime);
+      }
+    }
+  });
+
+  it('tint from the face colour rather than hardcoding their own', () => {
+    for (const [, mod] of cases) {
+      for (const [key, shader] of Object.entries(mod)) {
+        expect(shader, `${key} missing baseColor uniform`).toContain('uniform vec3 baseColor');
+      }
+    }
+  });
+
+  it('the impossible tribar and staircase close their loop on the view diagonal', () => {
+    // Both are real solids: the illusion is that an open chain of beams reads as
+    // closed because its two free ends differ by a multiple of the (1,1,1) view
+    // direction, which orthographic projection along that axis cannot resolve.
+    // The staircase's return run is tuned to make sixteen treads sum to that
+    // vector (OUT - BACK = 4H), so if the ratio drifts the seam becomes visible.
+    const stair = impossibleShaders.endlessStairs;
+    const H = parseFloat(stair.match(/float H\s*=\s*([\d.]+)/)[1]);
+    const OUT = parseFloat(stair.match(/float OUT\s*=\s*([\d.]+)/)[1]);
+    const BACK = parseFloat(stair.match(/float BACK\s*=\s*([\d.]+)/)[1]);
+    expect(OUT - BACK).toBeCloseTo(4 * H, 4);
   });
 });

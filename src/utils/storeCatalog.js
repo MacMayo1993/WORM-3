@@ -129,6 +129,13 @@ const TILE_PRICES = {
   poincareDisk: 200, hyperbolicWeave: 225, apollonian: 200, circleInversion: 150,
   rp2Geodesics: 250, solFlow: 175, nilTwist: 175, lightCone: 200,
   metricBalls: 150, gyroidSlice: 175, hopfFibers: 200, drosteSpiral: 200,
+  // Impossible objects — the tribar and endless staircase ray-cast a real solid
+  // per fragment, the priciest of the set.
+  impossibleTriangle: 225, endlessStairs: 250, impossibleFork: 150,
+  neckerFlip: 150, mobiusBand: 225, interlockingWings: 175,
+  // Surreal — full painted scenes with their own weather.
+  bowlerRain: 200, dayOverNight: 225, skyCurtain: 200,
+  paintedWindow: 250, falseReflection: 225, skyBird: 200,
 };
 
 export const STORE_TILES = Object.keys(TILE_STYLES).map(k => ({

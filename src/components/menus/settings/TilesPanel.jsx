@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { COLOR_SCHEMES, TILE_STYLES } from '../../../utils/colorSchemes.js';
-import { CLASSIC_STYLE_KEYS, ANTIPODAL_STYLE_KEYS, LIVING_STYLE_KEYS, NON_EUCLIDEAN_STYLE_KEYS } from '../../../utils/tileStyleCatalog.js';
+import { CLASSIC_STYLE_KEYS, ANTIPODAL_STYLE_KEYS, LIVING_STYLE_KEYS, NON_EUCLIDEAN_STYLE_KEYS, IMPOSSIBLE_STYLE_KEYS, SURREAL_STYLE_KEYS } from '../../../utils/tileStyleCatalog.js';
 import { useGameStore } from '../../../hooks/useGameStore.js';
 import {
   registerTilePreview,
@@ -100,7 +100,7 @@ export function TilesPanel({ settings, onSettingsChange }) {
 
   // Pick 6 unique styles (no repeats) from the owned pool and assign one per face
   const randomizeStyles = () => {
-    const pool = [...CLASSIC_STYLE_KEYS, ...ANTIPODAL_STYLE_KEYS, ...LIVING_STYLE_KEYS, ...NON_EUCLIDEAN_STYLE_KEYS]
+    const pool = [...CLASSIC_STYLE_KEYS, ...ANTIPODAL_STYLE_KEYS, ...LIVING_STYLE_KEYS, ...NON_EUCLIDEAN_STYLE_KEYS, ...IMPOSSIBLE_STYLE_KEYS, ...SURREAL_STYLE_KEYS]
       .filter(k => tileOwned(k));
     // Fisher-Yates shuffle then take first 6
     for (let i = pool.length - 1; i > 0; i--) {
@@ -118,6 +118,8 @@ export function TilesPanel({ settings, onSettingsChange }) {
       <StyleGrid keys={ANTIPODAL_STYLE_KEYS} label="Antipodal Op Art" globalStyle={globalStyle} onApply={applyToAll} tileOwned={tileOwned} />
       <StyleGrid keys={LIVING_STYLE_KEYS} label="Living" globalStyle={globalStyle} onApply={applyToAll} tileOwned={tileOwned} />
       <StyleGrid keys={NON_EUCLIDEAN_STYLE_KEYS} label="Non-Euclidean" globalStyle={globalStyle} onApply={applyToAll} tileOwned={tileOwned} />
+      <StyleGrid keys={IMPOSSIBLE_STYLE_KEYS} label="Impossible" globalStyle={globalStyle} onApply={applyToAll} tileOwned={tileOwned} />
+      <StyleGrid keys={SURREAL_STYLE_KEYS} label="Surreal" globalStyle={globalStyle} onApply={applyToAll} tileOwned={tileOwned} />
 
       {/* Randomize — assigns a unique style to each of the 6 faces */}
       <section className="settings-section">
@@ -167,6 +169,16 @@ export function TilesPanel({ settings, onSettingsChange }) {
                   </optgroup>
                   <optgroup label="Non-Euclidean">
                     {NON_EUCLIDEAN_STYLE_KEYS.filter(tileOwned).map(k => (
+                      <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Impossible">
+                    {IMPOSSIBLE_STYLE_KEYS.filter(tileOwned).map(k => (
+                      <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Surreal">
+                    {SURREAL_STYLE_KEYS.filter(tileOwned).map(k => (
                       <option key={k} value={k}>{TILE_STYLES[k]?.label}</option>
                     ))}
                   </optgroup>

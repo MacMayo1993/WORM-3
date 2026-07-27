@@ -303,6 +303,20 @@ export const TILE_STYLES = {
   gyroidSlice:     { label: 'Gyroid Slice',     cost: 'low', type: 'animated' },
   hopfFibers:      { label: 'Hopf Fibers',      cost: 'low', type: 'animated' },
   drosteSpiral:    { label: 'Droste Spiral',    cost: 'low', type: 'animated' },
+  // Impossible objects
+  impossibleTriangle: { label: 'Impossible Triangle', cost: 'med', type: 'procedural' },
+  endlessStairs:      { label: 'Endless Stairs',      cost: 'med', type: 'animated' },
+  impossibleFork:     { label: 'Impossible Fork',     cost: 'low', type: 'procedural' },
+  neckerFlip:         { label: 'Necker Flip',         cost: 'low', type: 'animated' },
+  mobiusBand:         { label: 'Möbius Band',         cost: 'med', type: 'animated' },
+  interlockingWings:  { label: 'Interlocking Wings',  cost: 'low', type: 'procedural' },
+  // Surreal
+  bowlerRain:      { label: 'Bowler Rain',      cost: 'med', type: 'animated' },
+  dayOverNight:    { label: 'Day Over Night',   cost: 'med', type: 'animated' },
+  skyCurtain:      { label: 'Sky Curtain',      cost: 'med', type: 'animated' },
+  paintedWindow:   { label: 'Painted Window',   cost: 'med', type: 'animated' },
+  falseReflection: { label: 'False Reflection', cost: 'med', type: 'animated' },
+  skyBird:         { label: 'Sky Bird',         cost: 'med', type: 'animated' },
 };
 
 export const DEFAULT_SETTINGS = {
