@@ -122,9 +122,14 @@ function _buildRig() {
 // Elevation is deliberately shallow (~27°): the eyes sit on the crown of the
 // head, right under where a hat lands, so a steeper angle puts the brim across
 // the face. Broadside-ish azimuth keeps the body stretched across the frame.
+// 'portrait' is 'head' pulled back far enough to hold the hat. The tight crop is
+// right on a 34px chip, where the hat has to fill the tile to be identifiable at
+// all, and wrong at hero size — a halo or a wizard's point sits well above the
+// crown and was being cut off by the top of the frame.
 const FRAMING = {
   body: { pos: [0.34, 0.66, 0.97], look: [-0.30, 0.05, -0.12], yaw: -0.38 },
   head: { pos: [0.20, 0.30, 0.40], look: [0.0, 0.05, -0.02], yaw: -0.55 },
+  portrait: { pos: [0.34, 0.52, 0.68], look: [0.0, 0.10, -0.02], yaw: -0.55 },
 };
 
 function _frameCamera(framing) {
