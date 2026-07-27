@@ -374,7 +374,10 @@ export const impossibleShaders = {
       float A = time * 0.55;
       vec3 rad = vec3(cos(A), sin(A), 0.0);
       vec3 M = rad * (MB_R + MB_W * 0.62 * cos(A * 0.5)) + vec3(0.0, 0.0, MB_W * 0.62 * sin(A * 0.5));
-      vec2 ms = vec2(dot(M - ro, rgt), dot(M - ro, up));
+      // Project M to screen space against the camera basis directly. Going
+      // through (M - ro) would fold this fragment's own uv into the result — ro
+      // already carries it — and detach the glow from the band.
+      vec2 ms = vec2(dot(M, rgt), dot(M, up));
       float mt = dot(M - ro, fwd);
       float ring = length(uv - ms);
       // Drawn only where it is in front of whatever the ray already found.
