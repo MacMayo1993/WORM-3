@@ -55,6 +55,7 @@ const loadPersistedState = () => {
     const parsedSettings = settings ? JSON.parse(settings) : null;
     const wormSkin = localStorage.getItem('worm3_skin') || 'slime';
     const wormHat = localStorage.getItem('worm3_hat') || 'none';
+    const wormTrail = localStorage.getItem('worm3_trail') || 'classic';
     const wormCharacter = localStorage.getItem(WORM_CHARACTER_KEY) || 'classic';
     const wormShowTrail = localStorage.getItem('worm3_show_trail') !== 'false'; // default true
     // A missing key means a brand-new player: seed the starting bankroll so the
@@ -75,8 +76,9 @@ const loadPersistedState = () => {
     const betStreak = Math.max(0, parseInt(localStorage.getItem(BET_STREAK_KEY) ?? '0', 10) || 0);
 
     // Guard: reset cosmetics/settings to defaults if the saved value isn't owned
-    const safeSkin = ownedItems.includes(`skin_${wormSkin}`) ? wormSkin : 'slime';
-    const safeHat  = ownedItems.includes(`hat_${wormHat}`) ? wormHat : 'none';
+    const safeSkin  = ownedItems.includes(`skin_${wormSkin}`) ? wormSkin : 'slime';
+    const safeHat   = ownedItems.includes(`hat_${wormHat}`) ? wormHat : 'none';
+    const safeTrail = ownedItems.includes(`trail_${wormTrail}`) ? wormTrail : 'classic';
 
     // Guard: reset color scheme if not owned
     const migratedSettings = migrateSettings(parsedSettings, settingsVersion);
@@ -101,6 +103,7 @@ const loadPersistedState = () => {
       mobileHintShown,
       wormSkin: safeSkin,
       wormHat: safeHat,
+      wormTrail: safeTrail,
       wormCharacter,
       wormShowTrail,
       parityPoints: safeParityPoints,
@@ -116,6 +119,7 @@ const loadPersistedState = () => {
       mobileHintShown: false,
       wormSkin: 'slime',
       wormHat: 'none',
+      wormTrail: 'classic',
       wormCharacter: 'classic',
       wormShowTrail: true,
       parityPoints: STARTING_BANKROLL, // storage unavailable — new-player experience
@@ -195,6 +199,11 @@ const createWormSlice = (set, _get) => ({
   setWormHat: (id) => {
     try { localStorage.setItem('worm3_hat', id); } catch { }
     set({ wormHat: id });
+  },
+  wormTrail: persistedState.wormTrail ?? 'classic',
+  setWormTrail: (id) => {
+    try { localStorage.setItem('worm3_trail', id); } catch { }
+    set({ wormTrail: id });
   },
   wormCharacter: persistedState.wormCharacter ?? 'classic',
   setWormCharacter: (id) => {

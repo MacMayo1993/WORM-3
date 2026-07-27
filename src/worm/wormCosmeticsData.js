@@ -33,12 +33,31 @@ export const WORM_HATS = [
   { id: 'grad',   label: 'Grad Cap' }
 ];
 
+// Trails recolor the surface stroke WormTrail.jsx paints behind the worm.
+// `body: null` / `glow: null` means "follow the equipped skin" — the look every
+// player already has today — so Classic stays the free default and existing
+// saves see no change until a player equips a different trail.
+export const WORM_TRAILS = [
+  { id: 'classic', label: 'Classic',  body: null,      glow: null },
+  { id: 'comet',   label: 'Comet',    body: '#f97316', glow: '#fbbf24' },
+  { id: 'bubble',  label: 'Bubble',   body: '#7dd3fc', glow: '#e0f2fe' },
+  { id: 'circuit', label: 'Circuit',  body: '#22d3ee', glow: '#a3e635' },
+  { id: 'ember',   label: 'Ember',    body: '#dc2626', glow: '#f97316' },
+  { id: 'frost',   label: 'Frost',    body: '#bae6fd', glow: '#ffffff' },
+  { id: 'nebula',  label: 'Nebula',   body: '#a855f7', glow: '#f472b6' },
+  { id: 'prism',   label: 'Prism',    body: '#818cf8', glow: '#34d399' },
+];
+
 export function getSkin(id) {
   return WORM_SKINS.find(s => s.id === id) ?? WORM_SKINS[0];
 }
 
 export function getHat(id) {
   return WORM_HATS.find(h => h.id === id) ?? WORM_HATS[0];
+}
+
+export function getTrail(id) {
+  return WORM_TRAILS.find(t => t.id === id) ?? WORM_TRAILS[0];
 }
 
 // Pre-allocated scratch for WormFace hat orientation — no per-frame allocations
