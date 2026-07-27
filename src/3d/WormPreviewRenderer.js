@@ -20,6 +20,10 @@ import * as THREE from 'three';
 import { getSkin } from '../worm/wormCosmeticsData.js';
 import { getHatParts } from '../worm/wormHatParts.js';
 import { layoutWormFace, FACE_LAYOUT, MOUTH_ARC } from '../worm/wormFaceLayout.js';
+import { getSkinFX } from '../worm/wormSkinFX.js';
+import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMaterialTime } from '../worm/wormSkinMaterial.js';
+import { WormParticleSystem } from '../worm/wormSkinParticles.js';
+import { PAGE_GEO_ARGS, PAGE_HINGE_X, pageHingeAngles } from '../worm/wormBookFX.js';
 
 // ─── Worm geometry constants ─────────────────────────────────────────────────
 // Straight from healerWorm/WormBody.jsx and WormFace.jsx so the preview worm is
@@ -65,16 +69,22 @@ function _buildRig() {
   const boxGeo = new THREE.BoxGeometry(1, 0.68, 1.12);
   const glowGeo = new THREE.SphereGeometry(1, 10, 10);
 
+  // Book Worm's page flaps — same geometry/hinge recipe as WormBody.jsx /
+  // CrawlerCharacter.jsx, posed manually per-frame in _poseWorm() (an idle
+  // sway stands in for the turn-force signal, since the preview never turns).
+  const pageGeo = new THREE.BoxGeometry(...PAGE_GEO_ARGS);
+
   const beads = [];
   const boxes = [];
   const glows = [];
+  const leftPages = [];
+  const rightPages = [];
   for (let i = 0; i < SEGMENTS; i++) {
-    // Wet-slime body: clearcoat + sheen, matching WormBody's meshPhysicalMaterial.
-    const bead = new THREE.Mesh(sphereGeo, new THREE.MeshPhysicalMaterial({
-      emissive: 0xffffff, emissiveIntensity: 0.22, roughness: 0.35, metalness: 0,
-      clearcoat: 1, clearcoatRoughness: 0.12, sheen: 0.4, sheenRoughness: 0.6,
-      sheenColor: new THREE.Color(0xffffff), toneMapped: false,
-    }));
+    // Same skin-themed material factory as gameplay (WormBody.jsx /
+    // CrawlerCharacter.jsx) — metalness/roughness/clearcoat/transmission/
+    // iridescence/flatShading + surface displacement all driven by the
+    // equipped skin's FX profile, applied per-bead in _poseWorm().
+    const bead = new THREE.Mesh(sphereGeo, createWormSkinMaterial());
     const box = new THREE.Mesh(boxGeo, new THREE.MeshStandardMaterial({
       emissive: 0xffffff, emissiveIntensity: 0.18, roughness: 0.58, metalness: 0.2,
     }));
@@ -82,9 +92,21 @@ function _buildRig() {
       transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending,
       depthWrite: false, toneMapped: false,
     }));
-    group.add(bead, box, glow);
+    const leftPage = new THREE.Mesh(pageGeo, new THREE.MeshStandardMaterial({ roughness: 0.8, metalness: 0, side: THREE.DoubleSide }));
+    const rightPage = new THREE.Mesh(pageGeo, new THREE.MeshStandardMaterial({ roughness: 0.8, metalness: 0, side: THREE.DoubleSide }));
+    group.add(bead, box, glow, leftPage, rightPage);
     beads.push(bead); boxes.push(box); glows.push(glow);
+    leftPages.push(leftPage); rightPages.push(rightPage);
   }
+
+  // Ambient skin FX (embers/bubbles/sparkle/...). Parented to an unscaled
+  // anchor (not the head bead itself, whose own scale would otherwise shrink
+  // every particle down with it) and repositioned to the head each frame in
+  // _poseWorm().
+  const particles = new WormParticleSystem();
+  const particlesAnchor = new THREE.Object3D();
+  particlesAnchor.add(particles.mesh);
+  group.add(particlesAnchor);
 
   // Face — eyes with pupils and a curved smile, as in WormFace.
   const eyeGeo = new THREE.SphereGeometry(1, 14, 14);
@@ -110,7 +132,7 @@ function _buildRig() {
   const glowLight = new THREE.PointLight(0xffffff, 0, 1.2);
   group.add(glowLight);
 
-  return { group, beads, boxes, glows, eyes, pupils, mouth, glasses, hatGroup, hatKey: null, glowLight };
+  return { group, beads, boxes, glows, leftPages, rightPages, eyes, pupils, mouth, glasses, hatGroup, hatKey: null, glowLight, particles, particlesAnchor, skinKey: null };
 }
 
 // Framing presets. In game the camera looks down at the cube face the worm is
@@ -239,6 +261,18 @@ const _off = new THREE.Vector3();
 const _anchor = new THREE.Vector3();
 const _faceParts = { eyes: [null, null], pupils: [null, null], glasses: [null, null], mouth: null, hat: null };
 
+// Book Worm page-flip scratch (preview only — see the isBook block in _poseWorm).
+const _pbPrevOff = new THREE.Vector3();
+const _pbZ = new THREE.Vector3();
+const _pbX = new THREE.Vector3();
+const _pbY = new THREE.Vector3();
+const _pbBasisMat = new THREE.Matrix4();
+const _pbQuat = new THREE.Quaternion();
+const _pbHingeQuat = new THREE.Quaternion();
+const _pbPageQuat = new THREE.Quaternion();
+const _pbPageOffset = new THREE.Vector3();
+const _pbZAxisUnit = new THREE.Vector3(0, 0, 1);
+
 function _poseWorm(opts, time) {
   const { characterId, skinId, hatId } = opts;
   const headOnly = opts.framing === 'head';
@@ -248,17 +282,35 @@ function _poseWorm(opts, time) {
   const isBook = characterId === 'book';
   const isPrism = characterId === 'prism';
 
+  // Skin FX (material personality + surface displacement + ambient particles)
+  // only need reapplying when the equipped/browsed skin actually changes —
+  // not every frame, so browsing the store doesn't force a shader-uniform
+  // rewrite on every render.
+  const skinChanged = rig.skinKey !== skinId;
+  if (skinChanged) {
+    const fx = getSkinFX(skinId);
+    for (let i = 0; i < SEGMENTS; i++) applySkinMaterialProfile(rig.beads[i].material, fx, i);
+    rig.particles.configure(fx.particle, skin.glow);
+    rig.skinKey = skinId;
+  }
+  for (let i = 0; i < SEGMENTS; i++) updateWormSkinMaterialTime(rig.beads[i].material, time);
+
   for (let i = 0; i < SEGMENTS; i++) {
     _segmentOffset(i, characterId, time, _off);
     const bead = rig.beads[i];
     const box = rig.boxes[i];
     const glow = rig.glows[i];
+    const leftPage = rig.leftPages[i];
+    const rightPage = rig.rightPages[i];
     const body = isBook ? box : bead;
 
     const shown = !headOnly || i <= 2;
     bead.visible = shown && !isBook;
     box.visible = shown && isBook;
     glow.visible = shown && isGlow && i % 2 === 0;
+    const pagesShown = shown && isBook && i !== 0;
+    leftPage.visible = pagesShown;
+    rightPage.visible = pagesShown;
 
     body.position.copy(_off);
     if (i === 0) {
@@ -288,12 +340,58 @@ function _poseWorm(opts, time) {
     }
     body.material.color.copy(_color);
 
+    // Book Worm: orient the cover to face the direction of travel (derived
+    // from consecutive segment offsets, since the preview has no real turn
+    // signal to read), then swing the page flaps with a gentle idle sway —
+    // showing off the same flip the pages do reacting to a turn in-game.
+    if (pagesShown) {
+      _segmentOffset(i - 1, characterId, time, _pbPrevOff);
+      _pbZ.subVectors(_off, _pbPrevOff).normalize(); // backward = away from the segment ahead
+      if (_pbZ.lengthSq() < 1e-8) _pbZ.set(0, 0, 1);
+      _pbX.crossVectors(UP, _pbZ).normalize();
+      _pbY.crossVectors(_pbZ, _pbX);
+      _pbBasisMat.makeBasis(_pbX, _pbY, _pbZ);
+      _pbQuat.setFromRotationMatrix(_pbBasisMat);
+      body.quaternion.copy(_pbQuat);
+
+      const idleTurn = Math.sin(time * 0.6) * 0.5;
+      const { left, right } = pageHingeAngles(idleTurn);
+      const pageScale = body.scale.x;
+
+      _pbHingeQuat.setFromAxisAngle(_pbZAxisUnit, left);
+      _pbPageQuat.copy(_pbQuat).multiply(_pbHingeQuat);
+      _pbPageOffset.set(PAGE_GEO_ARGS[0] * 0.5, 0, 0).applyQuaternion(_pbPageQuat);
+      leftPage.position.copy(_off)
+        .addScaledVector(_pbX, PAGE_HINGE_X * pageScale)
+        .addScaledVector(_pbY, pageScale * 0.42)
+        .addScaledVector(_pbPageOffset, pageScale);
+      leftPage.quaternion.copy(_pbPageQuat);
+      leftPage.scale.setScalar(pageScale);
+      leftPage.material.color.set(skin.belly);
+
+      _pbHingeQuat.setFromAxisAngle(_pbZAxisUnit, right);
+      _pbPageQuat.copy(_pbQuat).multiply(_pbHingeQuat);
+      _pbPageOffset.set(-PAGE_GEO_ARGS[0] * 0.5, 0, 0).applyQuaternion(_pbPageQuat);
+      rightPage.position.copy(_off)
+        .addScaledVector(_pbX, -PAGE_HINGE_X * pageScale)
+        .addScaledVector(_pbY, pageScale * 0.42)
+        .addScaledVector(_pbPageOffset, pageScale);
+      rightPage.quaternion.copy(_pbPageQuat);
+      rightPage.scale.setScalar(pageScale);
+      rightPage.material.color.set(skin.belly);
+    } else if (isBook) {
+      body.quaternion.identity();
+    }
+
     if (glow.visible) {
       glow.position.copy(_off);
       glow.scale.setScalar(body.scale.x * 1.4);
       glow.material.color.set(skin.glow);
     }
+
+    if (i === 0) rig.particlesAnchor.position.copy(_off);
   }
+  rig.particles.update(time);
 
   rig.glowLight.visible = isGlow;
   rig.glowLight.intensity = isGlow ? 0.5 + Math.sin(time * 2.4) * 0.15 : 0;
