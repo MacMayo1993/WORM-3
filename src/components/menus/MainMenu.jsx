@@ -1459,28 +1459,6 @@ export const MenuTitleCard = ({ visible }) => (
 );
 
 
-// ─── Cinema scrim ────────────────────────────────────────────────────────────
-// A controlled contrast layer between the live 3D scene (environment + cube +
-// worm, all rendered in the shared Canvas behind this overlay) and the menu UI.
-// The center stays clear so the cube reads through; the edges, top, and bottom
-// darken so the wordmark and buttons keep legibility on ANY loaded environment —
-// bright rooms no longer wash out the text. Purely a DOM overlay: it never
-// touches the cube state or the background scene.
-const MenuScrim = () => (
-  <div aria-hidden style={{ position: 'absolute', inset: 0, zIndex: 1, pointerEvents: 'none' }}>
-    {/* Edge vignette — clears the middle where the cube lives */}
-    <div style={{
-      position: 'absolute', inset: 0,
-      background: 'radial-gradient(78% 56% at 50% 43%, transparent 40%, rgba(4,6,14,0.74) 100%)',
-    }} />
-    {/* Top + bottom darkening for the wordmark and the action cluster */}
-    <div style={{
-      position: 'absolute', inset: 0,
-      background: 'linear-gradient(180deg, rgba(4,6,14,0.62) 0%, rgba(4,6,14,0.10) 22%, transparent 46%, transparent 58%, rgba(4,6,14,0.55) 82%, rgba(4,6,14,0.90) 100%)',
-    }} />
-  </div>
-);
-
 // ─── Main component ───────────────────────────────────────────────────────────
 const MainMenu = ({
   onPlay: _onPlay, onLevels: _onLevels, onFreeplay: _onFreeplay, onRandom: _onRandom, onCoop: _onCoop, onTeach: _onTeach,
@@ -1505,7 +1483,6 @@ const MainMenu = ({
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'transparent', zIndex: 9999, pointerEvents: 'none' }}>
-      <MenuScrim />
       <MenuTitleCard visible={titleVisible} />
       <MenuStartButton visible={bottomVisible} onClick={() => { _externalShakeNeeded = true; }} onDemo={onDemo} />
     </div>
