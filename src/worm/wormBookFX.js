@@ -1,10 +1,10 @@
 // src/worm/wormBookFX.js
 // Shared geometry constants + math helpers for the Book Worm's open-book body:
-// two page flaps hinged along the spine (the existing flattened "cover" box),
-// flung toward the outside of a turn by an inferred turn-force signal.
-// Framework-agnostic (plain three.js/math) so Healer mode's instanced body,
-// Platformer mode's per-segment body, and the store preview all animate the
-// same way.
+// lying flat, open to the middle on both sides, raised up off the crawl
+// surface by the book's own height, and banking its pages toward whichever
+// side the worm is turning into. Framework-agnostic (plain three.js/math) so
+// Healer mode's instanced body, Platformer mode's per-segment body, and the
+// store preview all animate the same way.
 import * as THREE from 'three';
 
 // Page footprint in the segment's own local space, using the same axis
@@ -13,22 +13,27 @@ import * as THREE from 'three';
 // along the spine (the segment's length), X is side/right (how far an open
 // page reaches out), Y is up/thickness.
 //
-// The segment's own box geometry (SPINE_GEO_X_SCALE below) is now a thin
-// binding rather than the full-width slab it used to be — the pages are the
-// visible body, not an add-on riding on top of a separate square block.
+// The segment's own box geometry (SPINE_X_SCALE below) is now a thin binding
+// rather than the full-width slab it used to be — the pages are the visible
+// body, not an add-on riding on top of a separate square block.
 export const PAGE_GEO_ARGS = [0.85, 0.035, 0.86];
 export const PAGE_HINGE_X = 0.11; // matches the thin spine's own half-width — pages hinge flush at its edge
 // The book segment's own box geometry is scaled by this factor on its X (side)
 // axis only, in all three renderers, so it reads as a spine/binding instead of
 // a square cubelet the pages are perched on top of.
 export const SPINE_X_SCALE = 0.22;
+// Half the spine's own unit-box height — pages hinge flush with its top
+// surface (not floating above it in a "V"), and the whole book is lifted this
+// much extra off the crawl surface so it visibly rests ON TOP of the ground
+// instead of being centered/embedded at it, standing up by its own height.
+export const PAGE_HINGE_Y = 0.34;
 
-// At rest (no turn) the two pages are propped open in a shallow "V"; a turn
-// swings BOTH pages the same rotational direction, so one side flattens
-// toward the spine while the other flips further over/past vertical toward
-// the opposite side — read as pages flung by the turn's inertia.
-export const PAGE_REST_ANGLE = 0.55;   // radians, ~31.5°
-export const PAGE_SWING_GAIN = 1.5;    // radians of extra swing at full turn force
+// At rest (no turn) the two pages lie flat, open to the middle on both sides
+// — a real open book lying down, not propped up. A turn banks BOTH pages the
+// SAME rotation, so the whole spread tips like a seesaw around the spine —
+// read as the pages flapping toward whichever side the worm turns into.
+export const PAGE_REST_ANGLE = 0;      // radians — flat
+export const PAGE_SWING_GAIN = 1.1;    // radians of bank at full turn force
 export const TURN_SMOOTH_RATE = 7;     // per-second exponential-follow rate
 export const TURN_SIGNAL_GAIN = 14;    // scales the raw per-frame direction-delta into a -1..1-ish force
 
@@ -54,11 +59,16 @@ export function smoothTurn(current, target, delta, rate = TURN_SMOOTH_RATE) {
 /**
  * Hinge angle for the left/right page, given the smoothed turn value
  * (roughly -1..1, unclamped at the extremes on purpose — a hard turn should
- * be able to fully fling a page past vertical).
+ * be able to bank a page fully past flat). Both pages get the SAME rotation
+ * around the shared spine axis; since they're mirrored (hinged at +X/-X),
+ * an identical rotation angle moves one up and the other down — the flat
+ * spread tips like a seesaw toward whichever side the worm turns into,
+ * rather than each page reacting independently.
  */
 export function pageHingeAngles(turn) {
+  const bank = turn * PAGE_SWING_GAIN;
   return {
-    left: PAGE_REST_ANGLE + turn * PAGE_SWING_GAIN,
-    right: -(PAGE_REST_ANGLE - turn * PAGE_SWING_GAIN),
+    left: PAGE_REST_ANGLE + bank,
+    right: -PAGE_REST_ANGLE + bank,
   };
 }
