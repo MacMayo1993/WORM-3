@@ -14,7 +14,7 @@ import { getWormCharacter } from './wormCharacterData.js';
 import { getSkinFX } from './wormSkinFX.js';
 import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMaterialTime } from './wormSkinMaterial.js';
 import WormSkinParticles from './WormSkinParticles.jsx';
-import { PAGE_GEO_ARGS, PAGE_HINGE_X, turnSignalFromDirections, smoothTurn, pageHingeAngles } from './wormBookFX.js';
+import { PAGE_GEO_ARGS, PAGE_HINGE_X, SPINE_X_SCALE, turnSignalFromDirections, smoothTurn, pageHingeAngles } from './wormBookFX.js';
 
 const EYE_WHITE = '#ffffff';
 const PUPIL = '#111111';
@@ -370,7 +370,7 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
           return (
             <group ref={el => (bodySegmentRefs.current[i] = el)} key={i} position={[0, segBob + bobble, zOff]}>
               <mesh scale={[segScale * breathe * stretch, segScale * breathe * (isBook ? 0.78 : 1), segScale * (isBook ? 1.15 : 1)]}>
-                {isBook && !isHead ? <boxGeometry args={[1, 0.8, 1.2]} /> : <sphereGeometry args={[1, 12, 12]} />}
+                {isBook && !isHead ? <boxGeometry args={[SPINE_X_SCALE, 0.8, 1.2]} /> : <sphereGeometry args={[1, 12, 12]} />}
                 {/* Skin-themed material (metalness/roughness/clearcoat/transmission/
                     iridescence/flatShading + surface displacement) drives the PBR
                     look; only color/emissive and the glow-worm's alternating

@@ -23,7 +23,7 @@ import { layoutWormFace, FACE_LAYOUT, MOUTH_ARC } from '../worm/wormFaceLayout.j
 import { getSkinFX } from '../worm/wormSkinFX.js';
 import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMaterialTime } from '../worm/wormSkinMaterial.js';
 import { WormParticleSystem } from '../worm/wormSkinParticles.js';
-import { PAGE_GEO_ARGS, PAGE_HINGE_X, pageHingeAngles } from '../worm/wormBookFX.js';
+import { PAGE_GEO_ARGS, PAGE_HINGE_X, SPINE_X_SCALE, pageHingeAngles } from '../worm/wormBookFX.js';
 
 // ─── Worm geometry constants ─────────────────────────────────────────────────
 // Straight from healerWorm/WormBody.jsx and WormFace.jsx so the preview worm is
@@ -66,7 +66,9 @@ function _buildRig() {
   // Body beads. Material colour carries the segment colour directly (the game
   // uses white + per-instance colour because it draws one instanced mesh).
   const sphereGeo = new THREE.SphereGeometry(1, 16, 16);
-  const boxGeo = new THREE.BoxGeometry(1, 0.68, 1.12);
+  // Thin spine/binding — the pages (below) are the visible body now, not a
+  // flat square slab the pages ride on top of.
+  const boxGeo = new THREE.BoxGeometry(SPINE_X_SCALE, 0.68, 1.12);
   const glowGeo = new THREE.SphereGeometry(1, 10, 10);
 
   // Book Worm's page flaps — same geometry/hinge recipe as WormBody.jsx /

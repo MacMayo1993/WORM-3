@@ -20,7 +20,7 @@ import { getSkinFX } from '../wormSkinFX.js';
 import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMaterialTime } from '../wormSkinMaterial.js';
 import WormSkinParticles from '../WormSkinParticles.jsx';
 import {
-    PAGE_GEO_ARGS, PAGE_HINGE_X, TURN_SIGNAL_GAIN,
+    PAGE_GEO_ARGS, PAGE_HINGE_X, SPINE_X_SCALE, TURN_SIGNAL_GAIN,
     turnSignalFromDirections, smoothTurn, pageHingeAngles,
 } from '../wormBookFX.js';
 import {
@@ -584,7 +584,9 @@ export function WormBody({ worm, size }) {
            the useFrame loop above and wormBookFX.js for the hinge math). */
         <>
             <instancedMesh ref={boxMeshRef} args={[undefined, undefined, MAX_TAIL]} frustumCulled={false}>
-                <boxGeometry args={[1, 0.68, 1.12]} />
+                {/* Thin spine/binding — the pages (below) are the visible body now, not a
+                    flat square slab the pages ride on top of. */}
+                <boxGeometry args={[SPINE_X_SCALE, 0.68, 1.12]} />
                 <meshStandardMaterial
                     color="white"
                     emissive="white"

@@ -11,10 +11,17 @@ import * as THREE from 'three';
 // convention as the existing book-segment orientation (THREE.Matrix4.lookAt
 // with the direction of travel as its target): local -Z is forward, so Z runs
 // along the spine (the segment's length), X is side/right (how far an open
-// page reaches out), Y is up/thickness. Sized to ride on top of the existing
-// book-cover box rather than replacing it.
-export const PAGE_GEO_ARGS = [0.42, 0.035, 0.86];
-export const PAGE_HINGE_X = 0.03; // hinge edge offset from center, toward the spine
+// page reaches out), Y is up/thickness.
+//
+// The segment's own box geometry (SPINE_GEO_X_SCALE below) is now a thin
+// binding rather than the full-width slab it used to be — the pages are the
+// visible body, not an add-on riding on top of a separate square block.
+export const PAGE_GEO_ARGS = [0.85, 0.035, 0.86];
+export const PAGE_HINGE_X = 0.11; // matches the thin spine's own half-width — pages hinge flush at its edge
+// The book segment's own box geometry is scaled by this factor on its X (side)
+// axis only, in all three renderers, so it reads as a spine/binding instead of
+// a square cubelet the pages are perched on top of.
+export const SPINE_X_SCALE = 0.22;
 
 // At rest (no turn) the two pages are propped open in a shallow "V"; a turn
 // swings BOTH pages the same rotational direction, so one side flattens
