@@ -1,7 +1,7 @@
 import { useRef, useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { FLIP_CAP } from '../utils/constants.js';
+import { FLIP_CAP, TUNNEL_ANCHOR_OFFSET } from '../utils/constants.js';
 import { tunnelState } from '../worm/tunnelProgressBridge.js';
 
 /**
@@ -38,7 +38,6 @@ const INDICES_PER_STRAND = (CORD_SEGS - 1) * 6;
 
 // Geometry constants — must match MobiusTunnel.jsx so a cord and the full
 // ribbon for the same pair trace the same centerline (no jump on promotion).
-const FACE_OFFSET = 0.52;
 const MINI_FACE_R = 0.25;
 // Narrowing toward the core reads as "diving in", but 0.15 took the cord to
 // sub-pixel width exactly where it crosses the middle of the screen.
@@ -332,8 +331,8 @@ const RestingCords = ({ tunnels, cubieRefs, focusIds, maxStrands }) => {
       _faceNorm1.set(n1[0], n1[1], n1[2]).applyQuaternion(_wQuat1);
       _faceNorm2.set(n2[0], n2[1], n2[2]).applyQuaternion(_wQuat2);
 
-      _vStart.copy(_wPos1).addScaledVector(_faceNorm1, -FACE_OFFSET);
-      _vEnd.copy(_wPos2).addScaledVector(_faceNorm2, -FACE_OFFSET);
+      _vStart.copy(_wPos1).addScaledVector(_faceNorm1, TUNNEL_ANCHOR_OFFSET);
+      _vEnd.copy(_wPos2).addScaledVector(_faceNorm2, TUNNEL_ANCHOR_OFFSET);
 
       // Dock on the mini-cube face in LOCAL colour direction, matching the ribbon.
       _midA.set(n1[0], n1[1], n1[2]).multiplyScalar(MINI_FACE_R);

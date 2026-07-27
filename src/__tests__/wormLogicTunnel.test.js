@@ -24,8 +24,15 @@ describe('tunnel arc-length sampling', () => {
 
   it('uniform-t sampling produces uneven world spacing (the bug)', () => {
     const pts = sample((out, t) => getTunnelWorldPosInto(out, tunnel, t, size), 20);
-    // Legs have unequal world length but equal t-spans, so spacing varies a lot.
-    expect(spread(spacings(pts))).toBeGreaterThan(1.5);
+    // Legs have unequal world length but equal t-spans, so spacing varies.
+    //
+    // The threshold used to be 1.5. Anchoring tunnels on their tiles rather than
+    // on the far side of the cubie lengthened both arms from 0.23 to 1.25 world
+    // units against an unchanged 0.5 core leg, so the arm/core ratio — and with
+    // it the unevenness — dropped to ~1.25. The bug this test characterises is
+    // milder now, not gone: uniform-t stepping is still not uniform in world
+    // space, which is why the arc-length sampler below exists.
+    expect(spread(spacings(pts))).toBeGreaterThan(1.15);
   });
 
   it('arc-length sampling keeps world spacing uniform (the fix)', () => {

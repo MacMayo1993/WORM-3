@@ -1,7 +1,7 @@
 import { useRef, useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { FLIP_CAP } from '../utils/constants.js';
+import { FLIP_CAP, TUNNEL_ANCHOR_OFFSET } from '../utils/constants.js';
 import { tunnelState } from '../worm/tunnelProgressBridge.js';
 
 // Opacity multiplier when the worm is traversing a different tunnel.
@@ -20,7 +20,6 @@ const FACE_NORM_LOCAL = {
   PZ: [0, 0, 1], NZ: [0, 0, -1],
 };
 
-const FACE_OFFSET    = 0.52;
 const RIBBON_WIDTH   = 0.85;
 const RIBBON_SEGS    = 64;   // must be even — doubled from 32 for smoother curves
 const REBUILD_EPS_SQ = 1e-4;
@@ -496,9 +495,10 @@ const MobiusTunnel = ({
     _faceNorm1.set(n1[0], n1[1], n1[2]).applyQuaternion(_wQuat1);
     _faceNorm2.set(n2[0], n2[1], n2[2]).applyQuaternion(_wQuat2);
 
-    // Ribbon anchors: just inside each sticker tile's back surface
-    _vStart.copy(_wPos1).addScaledVector(_faceNorm1, -FACE_OFFSET);
-    _vEnd  .copy(_wPos2).addScaledVector(_faceNorm2, -FACE_OFFSET);
+    // Ribbon anchors: just inside each sticker tile's own surface, so the ribbon
+    // reaches the tile the player flipped rather than the far side of its cubie.
+    _vStart.copy(_wPos1).addScaledVector(_faceNorm1, TUNNEL_ANCHOR_OFFSET);
+    _vEnd  .copy(_wPos2).addScaledVector(_faceNorm2, TUNNEL_ANCHOR_OFFSET);
 
     // Mini-cube face docking points — use LOCAL color direction so the tunnel
     // always routes through the correct colored face regardless of cube rotation.
