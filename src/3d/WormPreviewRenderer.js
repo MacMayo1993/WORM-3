@@ -20,6 +20,9 @@ import * as THREE from 'three';
 import { getSkin } from '../worm/wormCosmeticsData.js';
 import { getHatParts } from '../worm/wormHatParts.js';
 import { layoutWormFace, FACE_LAYOUT, MOUTH_ARC } from '../worm/wormFaceLayout.js';
+import { getSkinFX } from '../worm/wormSkinFX.js';
+import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMaterialTime } from '../worm/wormSkinMaterial.js';
+import { WormParticleSystem } from '../worm/wormSkinParticles.js';
 
 // ─── Worm geometry constants ─────────────────────────────────────────────────
 // Straight from healerWorm/WormBody.jsx and WormFace.jsx so the preview worm is
@@ -69,12 +72,11 @@ function _buildRig() {
   const boxes = [];
   const glows = [];
   for (let i = 0; i < SEGMENTS; i++) {
-    // Wet-slime body: clearcoat + sheen, matching WormBody's meshPhysicalMaterial.
-    const bead = new THREE.Mesh(sphereGeo, new THREE.MeshPhysicalMaterial({
-      emissive: 0xffffff, emissiveIntensity: 0.22, roughness: 0.35, metalness: 0,
-      clearcoat: 1, clearcoatRoughness: 0.12, sheen: 0.4, sheenRoughness: 0.6,
-      sheenColor: new THREE.Color(0xffffff), toneMapped: false,
-    }));
+    // Same skin-themed material factory as gameplay (WormBody.jsx /
+    // CrawlerCharacter.jsx) — metalness/roughness/clearcoat/transmission/
+    // iridescence/flatShading + surface displacement all driven by the
+    // equipped skin's FX profile, applied per-bead in _poseWorm().
+    const bead = new THREE.Mesh(sphereGeo, createWormSkinMaterial());
     const box = new THREE.Mesh(boxGeo, new THREE.MeshStandardMaterial({
       emissive: 0xffffff, emissiveIntensity: 0.18, roughness: 0.58, metalness: 0.2,
     }));
@@ -85,6 +87,15 @@ function _buildRig() {
     group.add(bead, box, glow);
     beads.push(bead); boxes.push(box); glows.push(glow);
   }
+
+  // Ambient skin FX (embers/bubbles/sparkle/...). Parented to an unscaled
+  // anchor (not the head bead itself, whose own scale would otherwise shrink
+  // every particle down with it) and repositioned to the head each frame in
+  // _poseWorm().
+  const particles = new WormParticleSystem();
+  const particlesAnchor = new THREE.Object3D();
+  particlesAnchor.add(particles.mesh);
+  group.add(particlesAnchor);
 
   // Face — eyes with pupils and a curved smile, as in WormFace.
   const eyeGeo = new THREE.SphereGeometry(1, 14, 14);
@@ -110,7 +121,7 @@ function _buildRig() {
   const glowLight = new THREE.PointLight(0xffffff, 0, 1.2);
   group.add(glowLight);
 
-  return { group, beads, boxes, glows, eyes, pupils, mouth, glasses, hatGroup, hatKey: null, glowLight };
+  return { group, beads, boxes, glows, eyes, pupils, mouth, glasses, hatGroup, hatKey: null, glowLight, particles, particlesAnchor, skinKey: null };
 }
 
 // Framing presets. In game the camera looks down at the cube face the worm is
@@ -248,6 +259,19 @@ function _poseWorm(opts, time) {
   const isBook = characterId === 'book';
   const isPrism = characterId === 'prism';
 
+  // Skin FX (material personality + surface displacement + ambient particles)
+  // only need reapplying when the equipped/browsed skin actually changes —
+  // not every frame, so browsing the store doesn't force a shader-uniform
+  // rewrite on every render.
+  const skinChanged = rig.skinKey !== skinId;
+  if (skinChanged) {
+    const fx = getSkinFX(skinId);
+    for (let i = 0; i < SEGMENTS; i++) applySkinMaterialProfile(rig.beads[i].material, fx, i);
+    rig.particles.configure(fx.particle, skin.glow);
+    rig.skinKey = skinId;
+  }
+  for (let i = 0; i < SEGMENTS; i++) updateWormSkinMaterialTime(rig.beads[i].material, time);
+
   for (let i = 0; i < SEGMENTS; i++) {
     _segmentOffset(i, characterId, time, _off);
     const bead = rig.beads[i];
@@ -293,7 +317,10 @@ function _poseWorm(opts, time) {
       glow.scale.setScalar(body.scale.x * 1.4);
       glow.material.color.set(skin.glow);
     }
+
+    if (i === 0) rig.particlesAnchor.position.copy(_off);
   }
+  rig.particles.update(time);
 
   rig.glowLight.visible = isGlow;
   rig.glowLight.intensity = isGlow ? 0.5 + Math.sin(time * 2.4) * 0.15 : 0;

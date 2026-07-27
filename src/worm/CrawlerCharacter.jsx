@@ -2,7 +2,7 @@
 // 3D worm character for the platformer mode.
 // Rendered as a segmented caterpillar-like creature with eyes and antennae.
 
-import React, { useRef, useMemo, useState } from 'react';
+import React, { useEffect, useRef, useMemo, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { FACE_NORMALS } from './crawlerPhysics.js';
@@ -11,6 +11,9 @@ import WormHat3D from './wormCosmetics.jsx';
 import { MOUTH_ARC } from './wormFaceLayout.js';
 import { getSkin } from './wormCosmeticsData.js';
 import { getWormCharacter } from './wormCharacterData.js';
+import { getSkinFX } from './wormSkinFX.js';
+import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMaterialTime } from './wormSkinMaterial.js';
+import WormSkinParticles from './WormSkinParticles.jsx';
 
 const EYE_WHITE = '#ffffff';
 const PUPIL = '#111111';
@@ -76,6 +79,20 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
   const segmentOffsets = isInch ? [0, -0.18, -0.38] : [0, -0.28, -0.52, -0.73];
   const historyStep = isInch ? 11 : HISTORY_STEP;
 
+  // One skin-themed material per body segment (metalness/roughness/clearcoat/
+  // transmission/iridescence/flatShading + surface displacement) — kept
+  // per-segment (not shared) so the existing per-segment prism/glow emissive
+  // animation below keeps mutating its own material untouched.
+  const skinMaterials = useMemo(
+    () => segmentOffsets.map(() => createWormSkinMaterial()),
+    [segmentOffsets.length] // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  useEffect(() => {
+    const fx = getSkinFX(wormSkinId);
+    skinMaterials.forEach((m, i) => applySkinMaterialProfile(m, fx, i));
+  }, [skinMaterials, wormSkinId]);
+  useEffect(() => () => skinMaterials.forEach(m => m.dispose()), [skinMaterials]);
+
   const groupRef = useRef();
   const bodyRootRef = useRef();
   const timeRef = useRef(0);
@@ -111,6 +128,7 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
   // Animate
   useFrame((_, delta) => {
     timeRef.current += delta;
+    skinMaterials.forEach(m => updateWormSkinMaterialTime(m, timeRef.current));
 
     if (!groupRef.current) return;
 
@@ -318,23 +336,23 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
             <group ref={el => (bodySegmentRefs.current[i] = el)} key={i} position={[0, segBob + bobble, zOff]}>
               <mesh scale={[segScale * breathe * stretch, segScale * breathe * (isBook ? 0.78 : 1), segScale * (isBook ? 1.15 : 1)]}>
                 {isBook && !isHead ? <boxGeometry args={[1, 0.8, 1.2]} /> : <sphereGeometry args={[1, 12, 12]} />}
-                <meshPhysicalMaterial
+                {/* Skin-themed material (metalness/roughness/clearcoat/transmission/
+                    iridescence/flatShading + surface displacement) drives the PBR
+                    look; only color/emissive and the glow-worm's alternating
+                    brightness stay as per-segment overrides here. */}
+                <primitive
+                  object={skinMaterials[i]}
+                  attach="material"
                   color={segColor}
                   emissive={segColor}
-                  emissiveIntensity={isGlow ? (isHead ? 2.4 : 1.6) : (isHead ? 0.4 : 0.12)}
-                  clearcoat={1}
-                  clearcoatRoughness={0.1}
-                  thickness={0.5}
-                  roughness={isBook ? 0.52 : 0.2}
-                  metalness={0}
-                  transmission={isGlow ? 0 : 0.2}
-                  ior={1.45}
-                  iridescence={0.16}
-                  iridescenceIOR={1.3}
+                  {...(isGlow ? { emissiveIntensity: isHead ? 2.4 : 1.6 } : {})}
                   transparent={!alive}
                   opacity={opacity}
                 />
               </mesh>
+              {isHead && (
+                <WormSkinParticles skinId={wormSkinId} glowColor={GLOW_COLOR} />
+              )}
 
               {/* Tiny legs on body segments — inch worm only has prolegs at the very back */}
               {!isHead && !isGlow && !(isInch && i < segmentOffsets.length - 1) && (

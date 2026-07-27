@@ -1,6 +1,6 @@
 // src/worm/healerWorm/WormBody.jsx
 // Extracted from HealerWormMode.jsx (2026-07 monolith split) — code unchanged.
-import { useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../../hooks/useGameStore.js';
@@ -16,6 +16,9 @@ import { liveRotation } from '../liveRotation.js';
 import { shAt } from '../circularBuffers.js';
 import { getSkin } from '../wormCosmeticsData.js';
 import { getWormCharacter } from '../wormCharacterData.js';
+import { getSkinFX } from '../wormSkinFX.js';
+import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMaterialTime } from '../wormSkinMaterial.js';
+import WormSkinParticles from '../WormSkinParticles.jsx';
 import {
     WORM_LIFT,
     ORB_SEGMENT_GROWTH,
@@ -52,6 +55,7 @@ export function WormBody({ worm, size }) {
     const meshRef = useRef();       // sphere body (classic / inch / glow)
     const boxMeshRef = useRef();    // box body (book worm only)
     const glowAltRef = useRef();    // additive overlay — even glow segments only
+    const particlesGroupRef = useRef(); // ambient skin FX (embers/bubbles/sparkle/...), anchored to the head
     const transitScaleRef = useRef(1); // dissolve: 1 on surface, 0 inside tunnel
     const wormSkinId = useGameStore(s => s.wormSkin ?? 'slime');
     const wormCharacterId = useGameStore(s => s.wormCharacter ?? 'classic');
@@ -64,6 +68,14 @@ export function WormBody({ worm, size }) {
     const skin = getSkin(wormSkinId);
     const wormColor = skin.body;
     const bellyColor = skin.belly;
+    // Skin-themed material (metalness/roughness/clearcoat/transmission/iridescence/
+    // flatShading + body-surface displacement) — one material shared by every
+    // instance of the sphere body, since only one skin is ever equipped at once.
+    const skinMaterial = useMemo(() => createWormSkinMaterial(), []);
+    useEffect(() => {
+        applySkinMaterialProfile(skinMaterial, getSkinFX(wormSkinId), 0);
+    }, [skinMaterial, wormSkinId]);
+    useEffect(() => () => skinMaterial.dispose(), [skinMaterial]);
     // Refs so useFrame always reads latest values without closure staleness
     const wormColorRef = useRef(wormColor);
     wormColorRef.current = wormColor;
@@ -113,6 +125,18 @@ export function WormBody({ worm, size }) {
         const tLen = worm.tailLength.current;
         const steps = worm.stepHistory.current;
         const time = state.clock.getElapsedTime();
+        updateWormSkinMaterialTime(skinMaterial, time);
+
+        // Ambient skin FX (embers/bubbles/sparkle/...) hover just off the head,
+        // and hide whenever the body itself is hidden (mid-tunnel dissolve, or
+        // the worm not on the surface at all).
+        if (particlesGroupRef.current) {
+            const _particlesVisible = worm.phase.current === 'crawling' && transitScaleRef.current >= 0.015;
+            particlesGroupRef.current.visible = _particlesVisible;
+            if (_particlesVisible) {
+                particlesGroupRef.current.position.copy(_bodyHeadPos).addScaledVector(_bodyNormal, 0.05);
+            }
+        }
 
         // ── Inch Worm accordion driver ─────────────────────────────────────────
         // interpT runs 0→1 within each tile step; its per-frame delta (with wrap) is the
@@ -460,23 +484,12 @@ export function WormBody({ worm, size }) {
         <>
             <instancedMesh ref={meshRef} args={[undefined, undefined, MAX_TAIL]} frustumCulled={false}>
                 <sphereGeometry args={[1, 16, 16]} />
-                {/* Wet-slime body: a clearcoat layer gives a glossy highlight that slides
-                    over each segment as the worm crawls, reading as a moist, jelly-like
-                    surface instead of a flat matte ball. color MUST stay white so the
-                    per-instance orb colours (setColorAt) pass through untinted. */}
-                <meshPhysicalMaterial
-                    color="white"
-                    emissive="white"
-                    emissiveIntensity={0.22}
-                    roughness={0.35}
-                    metalness={0}
-                    clearcoat={1}
-                    clearcoatRoughness={0.12}
-                    sheen={0.4}
-                    sheenRoughness={0.6}
-                    sheenColor="#ffffff"
-                    toneMapped={false}
-                />
+                {/* Wet-slime clearcoat is just the "slime" skin's starting point now —
+                    the skin's own FX profile (metalness/roughness/clearcoat/transmission/
+                    iridescence/flatShading + body-surface displacement) drives this
+                    material instead. color MUST stay white so the per-instance orb
+                    colours (setColorAt) pass through untinted. */}
+                <primitive object={skinMaterial} attach="material" />
             </instancedMesh>
             {isGlow && (
                 <instancedMesh ref={glowAltRef} args={[undefined, undefined, MAX_TAIL]} frustumCulled={false}>
@@ -485,6 +498,9 @@ export function WormBody({ worm, size }) {
                         blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
                 </instancedMesh>
             )}
+            <group ref={particlesGroupRef}>
+                <WormSkinParticles skinId={wormSkinId} glowColor={skin.glow} />
+            </group>
         </>
     );
 }
