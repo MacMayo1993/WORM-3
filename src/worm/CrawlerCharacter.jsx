@@ -14,6 +14,7 @@ import { getWormCharacter } from './wormCharacterData.js';
 import { getSkinFX } from './wormSkinFX.js';
 import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMaterialTime } from './wormSkinMaterial.js';
 import WormSkinParticles from './WormSkinParticles.jsx';
+import { PAGE_GEO_ARGS, PAGE_HINGE_X, turnSignalFromDirections, smoothTurn, pageHingeAngles } from './wormBookFX.js';
 
 const EYE_WHITE = '#ffffff';
 const PUPIL = '#111111';
@@ -38,6 +39,8 @@ const _localUp = new THREE.Vector3(0, 1, 0);
 // Connector cylinder scratch (avoids per-frame GC)
 const _connDir = new THREE.Vector3();
 const _connQuat = new THREE.Quaternion();
+// Book Worm page-flip scratch (avoids per-frame GC)
+const _bookFwd = new THREE.Vector3();
 
 // Circular buffer helpers — avoids per-frame unshift/clone allocations
 function makeCircularBuffer(capacity) {
@@ -96,6 +99,13 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
   const groupRef = useRef();
   const bodyRootRef = useRef();
   const timeRef = useRef(0);
+  // Book Worm: open-book body with page flaps flung toward the outside of a
+  // turn. Turn force is inferred from how fast `forward` is swinging frame to
+  // frame — no gameplay-side turn signal exists to read, so we derive one.
+  const prevForwardRef = useRef(new THREE.Vector3());
+  const bookTurnRef = useRef(0);
+  const leftPageRefs = useRef([]);
+  const rightPageRefs = useRef([]);
   // Inch Worm accordion gait — accumulates only while the worm is actually moving so the
   // bunch→extend cycle is synced to locomotion and freezes (spread out) when it stops.
   const inchGaitRef = useRef(0);
@@ -129,6 +139,31 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
   useFrame((_, delta) => {
     timeRef.current += delta;
     skinMaterials.forEach(m => updateWormSkinMaterialTime(m, timeRef.current));
+
+    // Book Worm: infer turn force from the frame-to-frame swing of `forward`
+    // (its sideways component relative to the worm's own facing, via the
+    // surface-normal "up" axis), then swing both page flaps together —
+    // reading as pages flung toward the outside of the turn by inertia.
+    if (isBook && forward) {
+      _bookFwd.copy(forward).normalize();
+      if (prevForwardRef.current.lengthSq() > 0) {
+        const up = FACE_NORMALS[face] || _localUp;
+        const rawTurn = turnSignalFromDirections(prevForwardRef.current, _bookFwd, up) * 14;
+        bookTurnRef.current = smoothTurn(bookTurnRef.current, THREE.MathUtils.clamp(rawTurn, -1, 1), delta);
+      }
+      prevForwardRef.current.copy(_bookFwd);
+
+      // Hinge axis is Z here (the spine/forward axis in this component's
+      // lookAt-based local frame — see the book orientation block below,
+      // where local -Z is the direction of travel).
+      const { left, right } = pageHingeAngles(bookTurnRef.current);
+      for (let i = 1; i < segmentOffsets.length; i++) {
+        const lp = leftPageRefs.current[i];
+        const rp = rightPageRefs.current[i];
+        if (lp) lp.rotation.z = left;
+        if (rp) rp.rotation.z = right;
+      }
+    }
 
     if (!groupRef.current) return;
 
@@ -354,6 +389,29 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
                 <WormSkinParticles skinId={wormSkinId} glowColor={GLOW_COLOR} />
               )}
 
+              {/* Book Worm: two page flaps hinged along the cover's spine
+                  (local Z, the direction of travel in this component's
+                  lookAt-based frame — see the book orientation block below),
+                  propped open at rest and flung toward the outside of a turn.
+                  Nested groups so rotation.z pivots at the hinge edge, not the
+                  page's own center. */}
+              {isBook && !isHead && (
+                <>
+                  <group ref={el => (leftPageRefs.current[i] = el)} scale={segScale} position={[PAGE_HINGE_X * segScale, segScale * 0.42, 0]}>
+                    <mesh position={[PAGE_GEO_ARGS[0] / 2, 0, 0]}>
+                      <boxGeometry args={PAGE_GEO_ARGS} />
+                      <meshStandardMaterial color={BELLY_COLOR} roughness={0.78} metalness={0} />
+                    </mesh>
+                  </group>
+                  <group ref={el => (rightPageRefs.current[i] = el)} scale={segScale} position={[-PAGE_HINGE_X * segScale, segScale * 0.42, 0]}>
+                    <mesh position={[-PAGE_GEO_ARGS[0] / 2, 0, 0]}>
+                      <boxGeometry args={PAGE_GEO_ARGS} />
+                      <meshStandardMaterial color={BELLY_COLOR} roughness={0.78} metalness={0} />
+                    </mesh>
+                  </group>
+                </>
+              )}
+
               {/* Tiny legs on body segments — inch worm only has prolegs at the very back */}
               {!isHead && !isGlow && !(isInch && i < segmentOffsets.length - 1) && (
                 <>
@@ -510,20 +568,6 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
             </mesh>
           );
         })}
-
-        {/* Book accessory */}
-        {isBook && (
-          <group position={[0, 0.08, -0.26]} rotation={[0.25, 0.2, 0]}>
-            <mesh>
-              <boxGeometry args={[0.22, 0.05, 0.32]} />
-              <meshStandardMaterial color="#4b2e20" />
-            </mesh>
-            <mesh position={[0, 0.001, 0]}>
-              <boxGeometry args={[0.18, 0.052, 0.28]} />
-              <meshStandardMaterial color="#f8f5dd" />
-            </mesh>
-          </group>
-        )}
 
         {/* Glow worm firefly butt — bright tail light */}
         {isGlow && (

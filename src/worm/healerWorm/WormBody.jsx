@@ -20,6 +20,10 @@ import { getSkinFX } from '../wormSkinFX.js';
 import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMaterialTime } from '../wormSkinMaterial.js';
 import WormSkinParticles from '../WormSkinParticles.jsx';
 import {
+    PAGE_GEO_ARGS, PAGE_HINGE_X, TURN_SIGNAL_GAIN,
+    turnSignalFromDirections, smoothTurn, pageHingeAngles,
+} from '../wormBookFX.js';
+import {
     WORM_LIFT,
     ORB_SEGMENT_GROWTH,
     STEPS_PER_TILE,
@@ -32,6 +36,19 @@ import {
 const _wormDummy = new THREE.Object3D();
 // Pre-allocated scratch objects — avoids per-frame GC pressure from WormBody loop
 const _bodyColor = new THREE.Color();
+// Book Worm page-flip scratch — see the isBook block in the segment loop below.
+const _pageDummy = new THREE.Object3D();
+const _bookPageColor = new THREE.Color();
+const _bookHeadDir = new THREE.Vector3();
+const _bookZ = new THREE.Vector3();
+const _bookX = new THREE.Vector3();
+const _bookY = new THREE.Vector3();
+const _bookBasisMat = new THREE.Matrix4();
+const _bookQuat = new THREE.Quaternion();
+const _bookHingeQuat = new THREE.Quaternion();
+const _bookPageQuat = new THREE.Quaternion();
+const _bookPageOffset = new THREE.Vector3();
+const _bookZAxisUnit = new THREE.Vector3(0, 0, 1);
 const _bodyHeadPos = new THREE.Vector3();
 const _bodyNormal = new THREE.Vector3();
 const _bodyClonePos = new THREE.Vector3();
@@ -55,7 +72,16 @@ export function WormBody({ worm, size }) {
     const meshRef = useRef();       // sphere body (classic / inch / glow)
     const boxMeshRef = useRef();    // box body (book worm only)
     const glowAltRef = useRef();    // additive overlay — even glow segments only
+    const leftPageRef = useRef();   // book worm only — left page flap overlay
+    const rightPageRef = useRef();  // book worm only — right page flap overlay
     const particlesGroupRef = useRef(); // ambient skin FX (embers/bubbles/sparkle/...), anchored to the head
+    // Book Worm: turn force inferred from how fast the head's direction of
+    // travel is swinging frame to frame (no continuous turn signal exists in
+    // Healer mode's tile-based movement, so we derive one from position deltas).
+    const prevHeadPosRef = useRef(new THREE.Vector3());
+    const prevHeadDirRef = useRef(new THREE.Vector3());
+    const bookInitedRef = useRef(false);
+    const bookTurnRef = useRef(0);
     const transitScaleRef = useRef(1); // dissolve: 1 on surface, 0 inside tunnel
     const wormSkinId = useGameStore(s => s.wormSkin ?? 'slime');
     const wormCharacterId = useGameStore(s => s.wormCharacter ?? 'classic');
@@ -121,6 +147,26 @@ export function WormBody({ worm, size }) {
         const _isPrism = isPrismRef.current;
         const mesh = _isBook ? boxMeshRef.current : meshRef.current;
         if (!mesh) return;
+
+        // Book Worm: infer turn force from how fast the head's direction of
+        // travel swings frame to frame, then swing both page flaps together —
+        // reading as pages flung toward the outside of the turn by inertia.
+        if (_isBook) {
+            if (bookInitedRef.current) {
+                _bookHeadDir.subVectors(_bodyHeadPos, prevHeadPosRef.current);
+                if (_bookHeadDir.lengthSq() > 1e-10) {
+                    _bookHeadDir.normalize();
+                    if (prevHeadDirRef.current.lengthSq() > 0) {
+                        const rawTurn = turnSignalFromDirections(prevHeadDirRef.current, _bookHeadDir, _bodyNormal) * TURN_SIGNAL_GAIN;
+                        bookTurnRef.current = smoothTurn(bookTurnRef.current, THREE.MathUtils.clamp(rawTurn, -1, 1), delta);
+                    }
+                    prevHeadDirRef.current.copy(_bookHeadDir);
+                }
+            } else {
+                bookInitedRef.current = true;
+            }
+            prevHeadPosRef.current.copy(_bodyHeadPos);
+        }
 
         const tLen = worm.tailLength.current;
         const steps = worm.stepHistory.current;
@@ -207,6 +253,8 @@ export function WormBody({ worm, size }) {
         if (transitScale < 0.015) {
             mesh.count = 0;
             if (glowAltRef.current) glowAltRef.current.count = 0;
+            if (leftPageRef.current) leftPageRef.current.count = 0;
+            if (rightPageRef.current) rightPageRef.current.count = 0;
             return;
         }
 
@@ -247,6 +295,7 @@ export function WormBody({ worm, size }) {
         let cumulativeDist = 0;
         let altIdx = 0; // index into glowAltRef (even glow segments)
         let writeIdx = 0; // compacted instance slot — advances only for segments actually drawn
+        let pageWriteIdx = 0; // book worm only — compacted slot into the page-flap overlays (body segments only, no head entry)
 
         const visibleCount = Math.min(MAX_TAIL, tLen);
 
@@ -284,7 +333,9 @@ export function WormBody({ worm, size }) {
             const fade = 1 - i / tLen;
 
             if (i === 0) {
-                // Head
+                // Head — reset quaternion every frame: body segments (below) rotate this
+                // same shared scratch object for book worm, and the head never re-orients.
+                _wormDummy.quaternion.identity();
                 _wormDummy.position.copy(_bodyHeadPos);
                 _wormDummy.scale.setScalar(0.092);
             } else {
@@ -386,6 +437,21 @@ export function WormBody({ worm, size }) {
                 }
 
                 _wormDummy.position.copy(_bodyClonePos);
+                if (_isBook) {
+                    // Orient the cover to face the direction of travel, using the same
+                    // lookAt convention CrawlerCharacter.jsx uses (local -Z = forward),
+                    // so the page-flap hinge math below (wormBookFX.js) matches exactly.
+                    _bookZ.copy(_bodySegForward).negate();
+                    if (_bookZ.lengthSq() < 1e-8) _bookZ.set(0, 0, 1);
+                    _bookZ.normalize();
+                    _bookX.crossVectors(_bodyCloneNormal, _bookZ);
+                    if (_bookX.lengthSq() < 1e-8) { _bookZ.x += 1e-4; _bookZ.normalize(); _bookX.crossVectors(_bodyCloneNormal, _bookZ); }
+                    _bookX.normalize();
+                    _bookY.crossVectors(_bookZ, _bookX);
+                    _bookBasisMat.makeBasis(_bookX, _bookY, _bookZ);
+                    _bookQuat.setFromRotationMatrix(_bookBasisMat);
+                    _wormDummy.quaternion.copy(_bookQuat);
+                }
                 if (_isInch) {
                     // Segments fatten at the hump's peak, thin elsewhere — only while moving.
                     const sc = 0.082 + _inchArch * _gaitPulse * 0.03; // 0.082 (rest/extended) → fatter at the hump
@@ -449,6 +515,45 @@ export function WormBody({ worm, size }) {
                 }
                 mesh.setColorAt(writeIdx, _bodyColor);
             }
+
+            // Book Worm: two page flaps hinged along the cover's spine, propped
+            // open at rest and flung toward the outside of a turn (bookTurnRef,
+            // computed above from the head's frame-to-frame direction swing).
+            if (_isBook && i !== 0) {
+                const pageScale = _wormDummy.scale.x; // matches the cover's current (post transit/LOD) scale
+                const { left, right } = pageHingeAngles(bookTurnRef.current);
+
+                _bookHingeQuat.setFromAxisAngle(_bookZAxisUnit, left);
+                _bookPageQuat.copy(_bookQuat).multiply(_bookHingeQuat);
+                _bookPageOffset.set(PAGE_GEO_ARGS[0] * 0.5, 0, 0).applyQuaternion(_bookPageQuat);
+                _pageDummy.position.copy(_bodyClonePos)
+                    .addScaledVector(_bookX, PAGE_HINGE_X * pageScale)
+                    .addScaledVector(_bookY, pageScale * 0.42)
+                    .addScaledVector(_bookPageOffset, pageScale);
+                _pageDummy.quaternion.copy(_bookPageQuat);
+                _pageDummy.scale.setScalar(pageScale);
+                _pageDummy.updateMatrix();
+                if (leftPageRef.current) leftPageRef.current.setMatrixAt(pageWriteIdx, _pageDummy.matrix);
+
+                _bookHingeQuat.setFromAxisAngle(_bookZAxisUnit, right);
+                _bookPageQuat.copy(_bookQuat).multiply(_bookHingeQuat);
+                _bookPageOffset.set(-PAGE_GEO_ARGS[0] * 0.5, 0, 0).applyQuaternion(_bookPageQuat);
+                _pageDummy.position.copy(_bodyClonePos)
+                    .addScaledVector(_bookX, -PAGE_HINGE_X * pageScale)
+                    .addScaledVector(_bookY, pageScale * 0.42)
+                    .addScaledVector(_bookPageOffset, pageScale);
+                _pageDummy.quaternion.copy(_bookPageQuat);
+                _pageDummy.scale.setScalar(pageScale);
+                _pageDummy.updateMatrix();
+                if (rightPageRef.current) rightPageRef.current.setMatrixAt(pageWriteIdx, _pageDummy.matrix);
+
+                if (colorDirty) {
+                    _bookPageColor.set(bellyCol);
+                    if (leftPageRef.current) leftPageRef.current.setColorAt(pageWriteIdx, _bookPageColor);
+                    if (rightPageRef.current) rightPageRef.current.setColorAt(pageWriteIdx, _bookPageColor);
+                }
+                pageWriteIdx++;
+            }
             writeIdx++;
         }
 
@@ -461,21 +566,45 @@ export function WormBody({ worm, size }) {
             const altMesh = glowAltRef.current;
             if (altMesh) { altMesh.count = altIdx; altMesh.instanceMatrix.needsUpdate = true; }
         }
+
+        // Update book worm page-flap overlay counts (meshes are only mounted when isBook)
+        if (_isBook) {
+            const lp = leftPageRef.current;
+            const rp = rightPageRef.current;
+            if (lp) { lp.count = pageWriteIdx; lp.instanceMatrix.needsUpdate = true; if (lp.instanceColor && colorDirty) lp.instanceColor.needsUpdate = true; }
+            if (rp) { rp.count = pageWriteIdx; rp.instanceMatrix.needsUpdate = true; if (rp.instanceColor && colorDirty) rp.instanceColor.needsUpdate = true; }
+        }
     });
 
     return isBook ? (
-        /* Box body — Book Worm only. Conditionally mounted so the sphere instancedMesh
-           (MAX_TAIL=1200 instances) is not allocated in GPU memory when unused. */
-        <instancedMesh ref={boxMeshRef} args={[undefined, undefined, MAX_TAIL]} frustumCulled={false}>
-            <boxGeometry args={[1, 0.68, 1.12]} />
-            <meshStandardMaterial
-                color="white"
-                emissive="white"
-                emissiveIntensity={0.18}
-                roughness={0.58}
-                metalness={0.2}
-            />
-        </instancedMesh>
+        /* Book body — Book Worm only. Conditionally mounted so the sphere instancedMesh
+           (MAX_TAIL=1200 instances) is not allocated in GPU memory when unused.
+           The cover is the existing flattened box; the two page-flap overlays
+           ride on top of it, hinged along its spine (see the isBook block in
+           the useFrame loop above and wormBookFX.js for the hinge math). */
+        <>
+            <instancedMesh ref={boxMeshRef} args={[undefined, undefined, MAX_TAIL]} frustumCulled={false}>
+                <boxGeometry args={[1, 0.68, 1.12]} />
+                <meshStandardMaterial
+                    color="white"
+                    emissive="white"
+                    emissiveIntensity={0.18}
+                    roughness={0.58}
+                    metalness={0.2}
+                />
+            </instancedMesh>
+            <instancedMesh ref={leftPageRef} args={[undefined, undefined, MAX_TAIL]} frustumCulled={false}>
+                <boxGeometry args={PAGE_GEO_ARGS} />
+                <meshStandardMaterial color="white" roughness={0.8} metalness={0} side={THREE.DoubleSide} />
+            </instancedMesh>
+            <instancedMesh ref={rightPageRef} args={[undefined, undefined, MAX_TAIL]} frustumCulled={false}>
+                <boxGeometry args={PAGE_GEO_ARGS} />
+                <meshStandardMaterial color="white" roughness={0.8} metalness={0} side={THREE.DoubleSide} />
+            </instancedMesh>
+            <group ref={particlesGroupRef}>
+                <WormSkinParticles skinId={wormSkinId} glowColor={skin.glow} />
+            </group>
+        </>
     ) : (
         /* Sphere body — Classic, Inch Worm, Glow Worm.
            IMPORTANT: material color must be white so per-instance colors (setColorAt)
