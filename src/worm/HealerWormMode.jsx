@@ -41,6 +41,7 @@ import { useWormCrawler } from './useWormCrawler.js';
 import WormChaseCamera from './WormChaseCamera.jsx';
 import WormSwipeControls from './WormSwipeControls.jsx';
 import { TunnelInteriorView } from './healerWorm/TunnelInteriorView.jsx';
+import { TunnelTube } from './healerWorm/TunnelTube.jsx';
 import { WormBody, GlowWormAura } from './healerWorm/WormBody.jsx';
 import { WormTrail } from './healerWorm/WormTrail.jsx';
 import { WormFace } from './healerWorm/WormFace.jsx';
@@ -361,6 +362,9 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             <WormChaseCamera worm={worm} size={size} />
             <WormSwipeControls onTurn={worm.queueTurn} worm={worm} />
             <TunnelInteriorView worm={worm} size={size} />
+            {/* The shaft the camera actually rides inside — encloses the view so the
+                trip reads as a tunnel rather than a ribbon crossing an empty room. */}
+            <TunnelTube worm={worm} size={size} />
             {/* Always mounted — each component handles its own dissolve via worm.phase.current */}
             {wormAlive && <WormTrail worm={worm} size={size} />}
             {wormAlive && <WormBody worm={worm} size={size} />}
