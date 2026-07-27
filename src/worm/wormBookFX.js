@@ -13,19 +13,22 @@ import * as THREE from 'three';
 // along the spine (the segment's length), X is side/right (how far an open
 // page reaches out), Y is up/thickness.
 //
-// The segment's own box geometry (SPINE_X_SCALE below) is now a thin binding
-// rather than the full-width slab it used to be — the pages are the visible
-// body, not an add-on riding on top of a separate square block.
-export const PAGE_GEO_ARGS = [0.85, 0.035, 0.86];
+// "Flat" means lying horizontal (PAGE_REST_ANGLE below), NOT paper-thin — a
+// page at 0.035 unit-thickness rendered at actual worm scale worked out to a
+// couple thousandths of a world unit, invisible as any kind of volume. 0.22
+// (a ~6x increase) gives it real, visible height instead.
+export const PAGE_GEO_ARGS = [0.85, 0.22, 0.86];
 export const PAGE_HINGE_X = 0.11; // matches the thin spine's own half-width — pages hinge flush at its edge
 // The book segment's own box geometry is scaled by this factor on its X (side)
 // axis only, in all three renderers, so it reads as a spine/binding instead of
 // a square cubelet the pages are perched on top of.
 export const SPINE_X_SCALE = 0.22;
-// Half the spine's own unit-box height — pages hinge flush with its top
-// surface (not floating above it in a "V"), and the whole book is lifted this
-// much extra off the crawl surface so it visibly rests ON TOP of the ground
-// instead of being centered/embedded at it, standing up by its own height.
+// Half the spine's own unit-box height (its existing box geometry is
+// [SPINE_X_SCALE, 0.68, ...] in all three renderers) — pages hinge flush with
+// its top surface (not floating above it in a "V"), and the whole book is
+// lifted this much extra off the crawl surface so it visibly rests ON TOP of
+// the ground instead of being centered/embedded at it, standing up by its
+// own height.
 export const PAGE_HINGE_Y = 0.34;
 
 // At rest (no turn) the two pages lie flat, open to the middle on both sides

@@ -361,6 +361,7 @@ function _poseWorm(opts, time) {
     // moment frozen mid-turn.
     if (pagesShown) {
       _segmentOffset(i - 1, characterId, time, _pbPrevOff);
+      _pbPrevOff.y += BOOK_BODY_SCALE[0] * PAGE_HINGE_Y; // same constant raise _off already has — a uniform lift shouldn't skew the segment-to-segment direction
       _pbZ.subVectors(_off, _pbPrevOff).normalize(); // backward = away from the segment ahead
       if (_pbZ.lengthSq() < 1e-8) _pbZ.set(0, 0, 1);
       _pbX.crossVectors(UP, _pbZ).normalize();
