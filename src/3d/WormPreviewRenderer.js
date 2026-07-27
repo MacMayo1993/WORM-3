@@ -238,6 +238,7 @@ function _bufferFor(size, ctx) {
 function _segmentOffset(i, character, time, out) {
   const inch = character === 'inch';
   const wiggle = character === 'wiggle';
+  const book = character === 'book';
   const spacing = inch ? INCH_SPACING : SPACING;
   const d = i * spacing;
 
@@ -251,6 +252,12 @@ function _segmentOffset(i, character, time, out) {
   } else if (wiggle) {
     z = Math.sin(d * 13 - time * 2.2) * 0.055 * Math.min(1, i / 1.5);
     y = Math.sin(d * 9 - time * 2.2) * 0.006;
+  } else if (book) {
+    // Straight spine, no wiggle: the per-segment orientation for the open-book
+    // body is derived from consecutive offsets (see _poseWorm's isBook block),
+    // and the general idle sine wiggle below reads as a rippled/jagged spine
+    // once amplified into a flat page's full 3D orientation — a stiff book
+    // doesn't undulate like a soft-bodied worm.
   } else {
     z = Math.sin(d * 5.2 - time * 1.1) * 0.022 * Math.min(1, i / 1.2);
     y = Math.sin(time * 1.4 + d * 3) * 0.004;
@@ -349,8 +356,9 @@ function _poseWorm(opts, time) {
 
     // Book Worm: orient the cover to face the direction of travel (derived
     // from consecutive segment offsets, since the preview has no real turn
-    // signal to read), then swing the page flaps with a gentle idle sway —
-    // showing off the same flip the pages do reacting to a turn in-game.
+    // signal to read). Pages stay at their flat rest pose here — no idle
+    // sway — so the preview shows the actual resting shape instead of a
+    // moment frozen mid-turn.
     if (pagesShown) {
       _segmentOffset(i - 1, characterId, time, _pbPrevOff);
       _pbZ.subVectors(_off, _pbPrevOff).normalize(); // backward = away from the segment ahead
@@ -361,8 +369,7 @@ function _poseWorm(opts, time) {
       _pbQuat.setFromRotationMatrix(_pbBasisMat);
       body.quaternion.copy(_pbQuat);
 
-      const idleTurn = Math.sin(time * 0.6) * 0.5;
-      const { left, right } = pageHingeAngles(idleTurn);
+      const { left, right } = pageHingeAngles(0);
       const pageScale = body.scale.x;
 
       _pbHingeQuat.setFromAxisAngle(_pbZAxisUnit, left);
