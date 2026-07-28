@@ -159,6 +159,11 @@ const SFX = {
     noise({ dur: 0.1, type: 'lowpass', freq: 420, gain: 0.32 });
     tone({ freq: 150, freqTo: 70, dur: 0.12, type: 'sine', gain: 0.24 });
   },
+  // A special timed out untouched. Deliberately soft and downward — informative,
+  // not punitive; missing one is a small shrug, not a failure state.
+  specialExpire() {
+    tone({ freq: 520, freqTo: 300, dur: 0.2, type: 'sine', gain: 0.14 });
+  },
   // Magnet engaging: a humming fifth that reads as a field switching on.
   magnet() {
     chord([392, 587.33], { dur: 0.36, type: 'triangle', gain: 0.24 });
@@ -207,6 +212,7 @@ const HAPTICS = {
   death: [0, 80, 40, 120],
   nearMiss: 8,
   specialSpawn: 10,
+  specialExpire: 6,
   rocket: [0, 40, 20, 60],
   rocketLand: 22,
   magnet: [0, 18, 25, 18, 25, 18],

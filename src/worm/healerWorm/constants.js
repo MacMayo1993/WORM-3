@@ -96,7 +96,8 @@ export const BOOST_COOLDOWN = 4.0;    // seconds before boost can be used again
 // over the orb's exact tile, which stacked three separate difficulties — steer onto
 // one precise tile, inside the lifetime, while jumping — and made specials
 // effectively unclaimable in real play. Jumping now only widens the claim radius.
-export const SPECIAL_TYPES = ['rocket', 'magnet'];
+// The canonical type list and all presentation metadata live in specialDefs.js,
+// which stays free of THREE/React so simulation tests can import it directly.
 export const SPECIAL_MAX_ON_BOARD = 1;
 export const SPECIAL_SPAWN_INTERVAL = 22;  // seconds between ambient special spawns
 export const SPECIAL_LIFETIME = 30;        // seconds a special stays on the board
@@ -109,6 +110,11 @@ export const SPECIAL_SPAWN_RADIUS = 4;
 // Claim radius while airborne — a jump toward a special that is a tile off still
 // lands it, instead of punishing a near-miss.
 export const SPECIAL_JUMP_REACH = 1;
+// Radius used for the reward a healed tunnel drops beside its exit.
+export const SPECIAL_TUNNEL_RADIUS = 2;
+// When the neighbourhood has no acceptable tile, the spawn is retried after this
+// long instead of falling back to an arbitrary tile somewhere on the cube.
+export const SPECIAL_SPAWN_RETRY = 2;
 
 // Rocket — a multi-tile jump. The worm launches off the surface, crosses
 // ROCKET_TILE_SPAN tiles in one arc at ROCKET_SPEED_MULT crawl speed, and is immune
@@ -116,12 +122,24 @@ export const SPECIAL_JUMP_REACH = 1;
 export const ROCKET_TILE_SPAN = 5;
 export const ROCKET_JUMP_HEIGHT = 2.6;
 export const ROCKET_SPEED_MULT = 2.8;
+// Seconds of protection after a rocket touches down, ≈ one tile at base speed. A
+// flight that ends on top of your own tail, a wormhole mouth or a turning slice
+// would otherwise punish the player for a landing they had no way to steer out of.
+// Deliberately short: the worm is vulnerable again almost immediately.
+export const ROCKET_LANDING_GRACE = 1.0;
 
 // Magnet — widens the pickup reach to MAGNET_RADIUS manifold rings for
 // MAGNET_DURATION seconds. Measured in manifold neighbors, not grid distance, so the
 // pull reaches around face edges and corners.
 export const MAGNET_DURATION = 8;
 export const MAGNET_RADIUS = 2;
+// Ceiling on queued attraction streaks. A sweep can only reach a dozen or so orbs,
+// but the cap keeps a pathological case from spawning unbounded geometry and React
+// state in a single frame.
+export const MAX_ORB_ATTRACTION_FX = 12;
+// Seconds an attraction streak takes to travel from the orb to the worm. Purely
+// visual — the orb is already banked when the streak starts.
+export const ORB_ATTRACTION_FX_DURATION = 0.32;
 
 // ─── Frame delta clamp ────────────────────────────────────────────────────────
 // Upper bound on the per-tick delta. A hitch (tab refocus, GC pause, alt-tab) can

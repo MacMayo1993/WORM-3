@@ -11,6 +11,8 @@ import { ANTIPODAL_COLOR } from '../utils/constants.js';
 import OrbInventoryHUD from './OrbInventoryHUD.jsx';
 import ParityWallet from '../components/overlays/ParityWallet.jsx';
 import { callWormTurn } from './wormTurnBridge.js';
+import { wormBuffs } from './wormBuffs.js';
+import { getSpecialDef } from './healerWorm/specialDefs.js';
 import { wormClock } from './wormClock.js';
 import { BOOST_COOLDOWN } from './healerWorm/constants.js';
 import { isMobile } from '../utils/device.js';
@@ -451,9 +453,17 @@ const PAUSE_MENU_BTN_STYLE = {
 // ─── Active buff strip (rocket / magnet) ─────────────────────────────────────
 // Sits just under the glance strip so it never collides with the thumb tray or the
 // portal hint. Only rendered while something is actually active.
+// Vertical stack under the glance strip. On mobile the persistent orb tracker
+// already occupies the band at +58px, so the buff pills and the special notice sit
+// below it; on desktop that tracker lives down beside the controls and the band is
+// free. Checked against the real layout — an earlier version put the pills directly
+// on top of the mobile tracker.
+const BUFF_STRIP_TOP = isMobile ? 112 : 56;
+const SPECIAL_NOTICE_TOP = BUFF_STRIP_TOP + 36;
+
 const BUFF_STRIP_STYLE = {
     position: 'absolute',
-    top: 'calc(env(safe-area-inset-top, 0px) + 56px)',
+    top: `calc(env(safe-area-inset-top, 0px) + ${BUFF_STRIP_TOP}px)`,
     left: '50%',
     transform: 'translateX(-50%)',
     display: 'flex',
@@ -480,6 +490,27 @@ const BUFF_FILL_STYLE = {
     position: 'absolute',
     left: 0, top: 0, bottom: 0,
     pointerEvents: 'none',
+};
+
+// Spawn/expiry notice — sits just under the buff strip, above the play area and
+// clear of the thumb tray and the mobile safe-area insets.
+const SPECIAL_NOTICE_STYLE = {
+    position: 'absolute',
+    top: `calc(env(safe-area-inset-top, 0px) + ${SPECIAL_NOTICE_TOP}px)`,
+    left: '50%',
+    transform: 'translateX(-50%)',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    padding: '5px 12px',
+    borderRadius: 999,
+    background: 'rgba(15, 23, 42, 0.78)',
+    fontSize: 11,
+    fontWeight: 800,
+    letterSpacing: 1.0,
+    boxShadow: SHADOW,
+    pointerEvents: 'none',
+    whiteSpace: 'nowrap',
 };
 
 const PORTAL_HINT_STYLE = {
@@ -765,53 +796,131 @@ function OrbPickupFlash() {
     );
 }
 
+// ─── Special icons ───────────────────────────────────────────────────────────
+// The same silhouettes the 3D orbs use, drawn from the shared definitions. Emoji
+// were the first cut and are wrong for a HUD: they render differently on every
+// platform, can't take the item's colour, and carry no accessible name.
+
+function SpecialIcon({ type, size = 14 }) {
+    const def = getSpecialDef(type);
+    return (
+        <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" focusable="false" style={{ display: 'block', flexShrink: 0 }}>
+            <path d={def.iconPath} fill="currentColor" />
+            {def.iconAccent && <path d={def.iconAccent} fill={def.accent} />}
+        </svg>
+    );
+}
+
 // ─── Active buff strip ───────────────────────────────────────────────────────
-// The sim publishes a buff only on its transitions (start / end), so this derives
-// the countdown itself from startedAt + duration — the same approach BoostButton
-// uses for its cooldown fill, and the reason neither one costs a store write per frame.
+// Mount/unmount is driven by store transitions; the countdown itself is read from
+// the wormBuffs bridge, which the crawler tick mirrors from the authoritative sim
+// clocks. One rAF loop writes the fill width and seconds text straight to the DOM,
+// so an active buff costs zero React renders per frame — and because the bridge only
+// advances when the sim does, the readout freezes during a pause or a tunnel transit
+// instead of draining against a wall clock.
 
 function BuffStrip() {
     const rocketActive = useGameStore(s => s.wormRocketActive ?? false);
-    const magnetBuff = useGameStore(s => s.wormMagnetBuff);
-    const [magnetLeft, setMagnetLeft] = useState(0);
+    const magnetActive = useGameStore(s => s.wormMagnetActive ?? false);
+    const magnetSeq = useGameStore(s => s.wormMagnetSeq ?? 0);
+    const fillRef = useRef(null);
+    const secondsRef = useRef(null);
 
     useEffect(() => {
-        if (!magnetBuff) {
-            setMagnetLeft(0);
-            return;
-        }
-        const { startedAt, duration } = magnetBuff;
-        const update = () => {
-            const left = duration - (Date.now() - startedAt) / 1000;
-            setMagnetLeft(Math.max(0, left));
-            return left;
+        if (!magnetActive) return;
+        let raf = 0;
+        const paint = () => {
+            const { magnetT, magnetMaxT } = wormBuffs;
+            const pct = magnetMaxT > 0 ? Math.max(0, Math.min(1, magnetT / magnetMaxT)) * 100 : 0;
+            if (fillRef.current) fillRef.current.style.width = `${pct}%`;
+            if (secondsRef.current) secondsRef.current.textContent = `${Math.max(0, magnetT).toFixed(1)}s`;
+            raf = requestAnimationFrame(paint);
         };
-        update();
-        const id = setInterval(() => { if (update() <= 0) clearInterval(id); }, 100);
-        return () => clearInterval(id);
-    }, [magnetBuff]);
+        paint();
+        return () => cancelAnimationFrame(raf);
+        // magnetSeq re-runs the loop on a refresh so the fill rescales to the new max.
+    }, [magnetActive, magnetSeq]);
 
-    const showMagnet = !!magnetBuff && magnetLeft > 0;
-    if (!rocketActive && !showMagnet) return null;
+    if (!rocketActive && !magnetActive) return null;
 
-    const magnetPct = showMagnet ? (magnetLeft / magnetBuff.duration) * 100 : 0;
+    const rocketDef = getSpecialDef('rocket');
+    const magnetDef = getSpecialDef('magnet');
 
     return (
-        <div style={BUFF_STRIP_STYLE}>
+        <div style={BUFF_STRIP_STYLE} role="status" aria-live="polite">
             {rocketActive && (
-                <div style={{ ...BUFF_PILL_STYLE, background: 'linear-gradient(135deg, #ff9d2e, #f4501e)', border: '1px solid #ffc078' }}>
-                    <span>🚀</span>
-                    <span>ROCKET</span>
+                <div
+                    style={{
+                        ...BUFF_PILL_STYLE,
+                        background: 'linear-gradient(135deg, #ff9d2e, #f4501e)',
+                        border: `1px solid ${rocketDef.accent}`,
+                        color: '#fff',
+                    }}
+                    aria-label="Rocket active"
+                >
+                    <SpecialIcon type="rocket" />
+                    <span>{rocketDef.label}</span>
                 </div>
             )}
-            {showMagnet && (
-                <div style={{ ...BUFF_PILL_STYLE, background: 'rgba(15, 23, 42, 0.72)', border: '1px solid #38e0ff' }}>
-                    <div style={{ ...BUFF_FILL_STYLE, width: `${magnetPct}%`, background: 'rgba(56, 224, 255, 0.38)' }} />
-                    <span style={{ position: 'relative', zIndex: 1 }}>🧲</span>
-                    <span style={{ position: 'relative', zIndex: 1 }}>MAGNET</span>
-                    <span style={{ position: 'relative', zIndex: 1, opacity: 0.85 }}>{magnetLeft.toFixed(1)}s</span>
+            {magnetActive && (
+                <div
+                    style={{
+                        ...BUFF_PILL_STYLE,
+                        background: 'rgba(15, 23, 42, 0.78)',
+                        border: `1px solid ${magnetDef.color}`,
+                        color: '#fff',
+                    }}
+                    aria-label="Magnet active"
+                >
+                    <div ref={fillRef} style={{ ...BUFF_FILL_STYLE, width: '100%', background: 'rgba(56, 224, 255, 0.38)' }} />
+                    <span style={{ position: 'relative', zIndex: 1, display: 'flex', color: magnetDef.color }}>
+                        <SpecialIcon type="magnet" />
+                    </span>
+                    <span style={{ position: 'relative', zIndex: 1 }}>{magnetDef.label}</span>
+                    <span ref={secondsRef} style={{ position: 'relative', zIndex: 1, opacity: 0.85, minWidth: 30, textAlign: 'right' }} />
                 </div>
             )}
+        </div>
+    );
+}
+
+// ─── Special spawn / expiry notice ───────────────────────────────────────────
+// A special can appear on a face the camera is not pointed at. This is the cue that
+// something is out there worth turning for — and, when it lapses, that it is gone.
+
+const NOTICE_MS = 2200;
+
+function SpecialNotice() {
+    const notice = useGameStore(s => s.wormSpecialNotice);
+    const [shown, setShown] = useState(null);
+    const timer = useRef(null);
+
+    useEffect(() => {
+        if (!notice) { setShown(null); return; }
+        setShown(notice);
+        clearTimeout(timer.current);
+        timer.current = setTimeout(() => setShown(null), NOTICE_MS);
+        return () => clearTimeout(timer.current);
+    }, [notice]);
+
+    if (!shown) return null;
+    const def = getSpecialDef(shown.type);
+    const expired = shown.kind === 'expire';
+
+    return (
+        <div
+            key={shown.seq}
+            style={{
+                ...SPECIAL_NOTICE_STYLE,
+                color: expired ? 'rgba(255,255,255,0.72)' : def.color,
+                border: `1px solid ${expired ? 'rgba(255,255,255,0.22)' : def.color}`,
+                opacity: expired ? 0.75 : 1,
+            }}
+            role="status"
+            aria-live="polite"
+        >
+            <SpecialIcon type={shown.type} size={13} />
+            <span>{expired ? `${def.label} GONE` : `${def.label} NEARBY`}</span>
         </div>
     );
 }
@@ -1189,6 +1298,9 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
 
             {/* ── Active buff pills (rocket / magnet) ── */}
             {wormAlive && <BuffStrip />}
+
+            {/* ── Special spawned / expired notice ── */}
+            {wormAlive && <SpecialNotice />}
 
             {/* ── Zone 2: Portal hint (contextual) ── */}
             {isPortalReady && (

@@ -2,9 +2,8 @@
 //
 // Same approach as wormSim.test.js: the sim is driven with fixed dt values and a
 // stubbed ctx port — no React, no store, no renderer. The rules under test are the
-// ones a player would notice: a special has to be jumped for, a rocket is a long
-// airborne arc that clears hazards, and the magnet's reach is measured in manifold
-// steps so it wraps around face edges.
+// ones a player would notice: where a special appears and which type it is, how a
+// rocket flies and lands, and how far the magnet reaches around the cube's faces.
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   makeWormSim,
@@ -21,8 +20,9 @@ import {
   SPECIAL_SPAWN_INTERVAL,
   SPECIAL_LIFETIME,
   SPECIAL_MAX_ON_BOARD,
-  SPECIAL_TYPES,
   SPECIAL_SPAWN_RADIUS,
+  SPECIAL_SPAWN_RETRY,
+  ROCKET_LANDING_GRACE,
   ROCKET_TILE_SPAN,
   ROCKET_JUMP_HEIGHT,
   MAGNET_DURATION,
@@ -30,10 +30,20 @@ import {
   SURFACE_JUMP_TILE_SPAN,
   BASE_TAIL_LENGTH,
 } from '../worm/healerWorm/constants.js';
+import { SPECIAL_TYPES } from '../worm/healerWorm/specialDefs.js';
+import {
+  makeSpecialPicker,
+  drawSpecialType,
+  rankSpecialSpawnCandidates,
+  buildSpawnCandidates,
+  pickSpawnTile,
+  countOrbsWithin,
+} from '../worm/healerWorm/specialSpawn.js';
+import { wormBuffs, buffReadout, resetWormBuffs } from '../worm/wormBuffs.js';
 import { collectManifoldRing } from '../worm/wormLogic.js';
 import { makeCubies } from '../game/cubeState.js';
 import { checkWormHitBySlice } from '../worm/wormHelpers.js';
-import { makeTileTrail, ttReset, ttPush } from '../worm/circularBuffers.js';
+import { makeTileTrail, ttReset, ttPush, ttAt } from '../worm/circularBuffers.js';
 import { liveRotation } from '../worm/liveRotation.js';
 
 const SIZE = 5;
@@ -73,6 +83,8 @@ function makeCtx(overrides = {}) {
     onSpecialsChanged: log('specials'),
     onRocketState: log('rocketState'),
     onMagnetState: log('magnetState'),
+    onSpecialSpawned: log('specialSpawned'),
+    onSpecialExpired: log('specialExpired'),
     ...overrides,
   };
 }
@@ -113,7 +125,6 @@ beforeEach(() => {
 
 // The worm spawns at the centre of PZ facing 'up' (+y), so on a 5×5 it walks
 // (2,2,4) → (2,3,4) → (2,4,4) before crossing onto PY.
-const START = { x: 2, y: 2, z: 4, dirKey: 'PZ' };
 
 describe('collectManifoldRing', () => {
   it('returns only the centre tile at depth 0', () => {
@@ -185,13 +196,16 @@ describe('special orb spawning', () => {
   it('never exceeds the on-board cap', () => {
     const sim = makeSim();
     const ctx = makeCtx();
-    run(sim, ctx, SPECIAL_SPAWN_INTERVAL * 4);
+    run(sim, ctx, Math.max(SPECIAL_SPAWN_INTERVAL, 6) * 4);
     expect(sim.specials.length).toBeLessThanOrEqual(SPECIAL_MAX_ON_BOARD);
   });
 
   it('despawns a special once its lifetime runs out', () => {
     const sim = makeSim();
     const ctx = makeCtx();
+    // Pin the ambient timer, or a replacement spawns into the freed slot before the
+    // assertion runs and the test reads as a failure to despawn.
+    sim.specialTimer = 9999;
     sim.specials = [special(0, 0, 4, 'PZ', 'magnet')];
     run(sim, ctx, SPECIAL_LIFETIME + 0.5);
     expect(sim.specials).toHaveLength(0);
@@ -431,5 +445,539 @@ describe('magnet', () => {
     stepUntilCommit(sim, ctx); // (2,4,4) — the edge tile
     expect(sim.pos).toMatchObject({ x: 2, y: 4, z: 4, dirKey: 'PZ' });
     expect(eventsOf(ctx, 'pickup')).toHaveLength(1);
+  });
+});
+
+// ─── Fair type selection ─────────────────────────────────────────────────────
+
+describe('special type chooser', () => {
+  // A counting RNG makes every draw reproducible without touching Math.random.
+  const seqRand = (values) => {
+    let i = 0;
+    return () => values[i++ % values.length];
+  };
+
+  it('produces every type over each pair of draws', () => {
+    const picker = makeSpecialPicker();
+    const rand = seqRand([0.1, 0.9]);
+    const drawn = [drawSpecialType(picker, { rand }), drawSpecialType(picker, { rand })];
+    expect(new Set(drawn).size).toBe(SPECIAL_TYPES.length);
+  });
+
+  it('never returns the same type three times in a row', () => {
+    const picker = makeSpecialPicker();
+    const rand = seqRand([0.99, 0.01, 0.5, 0.75, 0.25]);
+    let run = 1;
+    let prev = null;
+    for (let i = 0; i < 200; i++) {
+      const type = drawSpecialType(picker, { rand });
+      run = type === prev ? run + 1 : 1;
+      prev = type;
+      expect(run).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it('defers a magnet when there is nothing for it to pull', () => {
+    const picker = makeSpecialPicker();
+    picker.bag = ['magnet', 'rocket'];
+    const type = drawSpecialType(picker, { magnetUseful: false, rand: () => 0 });
+    expect(type).toBe('rocket');
+    // The magnet keeps its place in the bag and comes up next.
+    expect(picker.bag).toContain('magnet');
+  });
+
+  it('still draws a magnet when orbs are in range', () => {
+    const picker = makeSpecialPicker();
+    picker.bag = ['magnet', 'rocket'];
+    expect(drawSpecialType(picker, { magnetUseful: true, rand: () => 0 })).toBe('magnet');
+  });
+
+  it('counts only orbs inside the given manifold radius', () => {
+    const head = { x: 2, y: 2, z: 4, dirKey: 'PZ' };
+    const orbs = [apple(2, 3, 4, 'PZ'), apple(0, 2, 4, 'PZ'), apple(0, 0, 4, 'PZ')];
+    expect(countOrbsWithin(orbs, head, SIZE, 2)).toBe(2); // the third is 4 steps out
+    expect(countOrbsWithin([], head, SIZE, 2)).toBe(0);
+  });
+
+  it('is reset with the run', () => {
+    const sim = makeSim();
+    drawSpecialType(sim.specialPicker, { rand: () => 0 });
+    expect(sim.specialPicker.lastType).not.toBeNull();
+    resetWormSim(sim, SIZE, { orbCount: 0, wormholeInterval: 9999 });
+    expect(sim.specialPicker.lastType).toBeNull();
+    expect(sim.specialPicker.bag).toHaveLength(0);
+  });
+});
+
+// ─── Spawn placement ─────────────────────────────────────────────────────────
+
+describe('spawn candidate ranking', () => {
+  const head = { x: 2, y: 2, z: 4, dirKey: 'PZ' };
+  const baseArgs = (over = {}) => ({
+    candidates: buildSpawnCandidates(head, SIZE, SPECIAL_SPAWN_RADIUS),
+    head,
+    moveDir: 'up',
+    size: SIZE,
+    ...over,
+  });
+
+  it('never offers the head tile', () => {
+    const ranked = rankSpecialSpawnCandidates(baseArgs({
+      occupiedKeys: new Set([tileKey(head)]),
+    }));
+    expect(ranked.some(r => tileKey(r.tile) === tileKey(head))).toBe(false);
+  });
+
+  it('excludes occupied, trail and tunnel tiles', () => {
+    const orb = '2,3,4,PZ';
+    const body = '1,2,4,PZ';
+    const mouth = '3,2,4,PZ';
+    const ranked = rankSpecialSpawnCandidates(baseArgs({
+      occupiedKeys: new Set([orb]),
+      trailKeys: new Set([body]),
+      tunnelKeys: new Set([mouth]),
+    }));
+    const keys = ranked.map(r => tileKey(r.tile));
+    expect(keys).not.toContain(orb);
+    expect(keys).not.toContain(body);
+    expect(keys).not.toContain(mouth);
+  });
+
+  it('excludes anything already inside the live claim reach', () => {
+    const ranked = rankSpecialSpawnCandidates(baseArgs({ claimRadius: 2 }));
+    expect(ranked.every(r => r.dist > 2)).toBe(true);
+  });
+
+  it('ranks a forward tile on the current face above one behind the worm', () => {
+    const ranked = rankSpecialSpawnCandidates(baseArgs());
+    const score = (key) => ranked.find(r => tileKey(r.tile) === key)?.score ?? -1;
+    // Heading is 'up' (+y on PZ): (2,4,4) is two ahead, (2,0,4) is two behind.
+    expect(score('2,4,4,PZ')).toBeGreaterThan(score('2,0,4,PZ'));
+  });
+
+  it('ranks the 2–4 step band above an adjacent tile', () => {
+    const ranked = rankSpecialSpawnCandidates(baseArgs());
+    const score = (key) => ranked.find(r => tileKey(r.tile) === key)?.score ?? -1;
+    expect(score('2,4,4,PZ')).toBeGreaterThan(score('2,3,4,PZ'));
+  });
+
+  it('returns null rather than a far-side tile when the neighbourhood is unusable', () => {
+    const candidates = buildSpawnCandidates(head, SIZE, SPECIAL_SPAWN_RADIUS);
+    const allBlocked = new Set(candidates.map(c => tileKey(c.tile)));
+    const tile = pickSpawnTile(baseArgs({ candidates, occupiedKeys: allBlocked }), () => 0);
+    expect(tile).toBeNull();
+  });
+
+  it('picks at random among the tiles tied for best', () => {
+    const args = baseArgs();
+    const first = pickSpawnTile(args, () => 0);
+    const last = pickSpawnTile(args, () => 0.999);
+    expect(first).not.toBeNull();
+    expect(last).not.toBeNull();
+    expect(tileKey(first)).not.toBe(tileKey(last));
+  });
+});
+
+describe('spawn placement in the sim', () => {
+  it('defers instead of spawning somewhere arbitrary when nothing local works', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    // Fill every tile the ranker could offer.
+    const blocked = buildSpawnCandidates(sim.pos, SIZE, SPECIAL_SPAWN_RADIUS)
+      .map(c => ({ ...c.tile, type: 'apple' }));
+    sim.powerups = blocked;
+    sim.specialTimer = 0.01;
+    run(sim, ctx, 0.1);
+    expect(sim.specials).toHaveLength(0);
+    // Retried soon rather than skipping a whole interval.
+    expect(sim.specialTimer).toBeLessThanOrEqual(SPECIAL_SPAWN_RETRY);
+  });
+
+  it('drops the tunnel-heal reward close to the healed exit', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    const exit = { x: 0, y: 0, z: 4, dirKey: 'PZ' };
+    // Reach the private spawn path the way the sim does — via a heal.
+    sim.specialTimer = 9999;
+    sim.pos = { x: 4, y: 4, z: 4, dirKey: 'PZ' }; // worm far away, so locality must
+    sim.rand = () => 0;                           // come from the anchor, not the head
+    const near = collectManifoldRing(exit.x, exit.y, exit.z, exit.dirKey, SIZE, 2);
+    // Directly exercise the ranker with the tunnel anchor, mirroring spawnSpecial.
+    const tile = pickSpawnTile({
+      candidates: buildSpawnCandidates(exit, SIZE, 2),
+      head: sim.pos,
+      moveDir: sim.moveDir,
+      size: SIZE,
+    }, sim.rand);
+    expect(tile).not.toBeNull();
+    expect(near.has(tileKey(tile))).toBe(true);
+    void ctx;
+  });
+
+  it('publishes a spawn notice exactly once per orb', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    sim.specialTimer = 0.01;
+    run(sim, ctx, 0.2);
+    expect(sim.specials).toHaveLength(1);
+    expect(eventsOf(ctx, 'specialSpawned')).toHaveLength(1);
+    expect(eventsOf(ctx, 'specialSpawned')[0].args[0]).toBe(sim.specials[0].type);
+  });
+
+  it('publishes an expiry notice when one times out', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    sim.specialTimer = 9999;
+    sim.specials = [special(0, 0, 4, 'PZ', 'magnet')];
+    run(sim, ctx, SPECIAL_LIFETIME + 0.5);
+    expect(sim.specials).toHaveLength(0);
+    expect(eventsOf(ctx, 'specialExpired')).toHaveLength(1);
+    expect(eventsOf(ctx, 'specialExpired')[0].args[0]).toBe('magnet');
+  });
+});
+
+// ─── Rocket control, stacking and landing safety ─────────────────────────────
+
+describe('rocket steering', () => {
+  it('steers left and right during the flight', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    startRocket(sim, ctx);
+    expect(sim.moveDir).toBe('up');
+    queueTurn(sim, 'right');
+    run(sim, ctx, 0.1);
+    expect(sim.moveDir).toBe('right');
+    expect(sim.rocketActive).toBe(true);
+    queueTurn(sim, 'left');
+    run(sim, ctx, 0.1);
+    expect(sim.moveDir).toBe('up');
+  });
+
+  it('refuses a 180 mid-flight in relative steering', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    startRocket(sim, ctx);
+    queueTurn(sim, 'down'); // a 180 in non-oriented mode
+    run(sim, ctx, 0.1);
+    expect(sim.moveDir).toBe('up');
+  });
+
+  it('refuses a reversal mid-flight in oriented steering', () => {
+    const sim = makeSim();
+    const ctx = makeCtx({ getControlMode: () => 'oriented' });
+    startRocket(sim, ctx);
+    queueTurn(sim, 'down'); //直接 reversal of 'up'
+    run(sim, ctx, 0.1);
+    expect(sim.moveDir).toBe('up');
+    // A perpendicular heading is still allowed.
+    queueTurn(sim, 'left');
+    run(sim, ctx, 0.1);
+    expect(sim.moveDir).toBe('left');
+  });
+
+  it('allows a 180 once the flight has landed', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    startRocket(sim, ctx);
+    for (let i = 0; i < 400 && sim.rocketActive; i++) stepWormSim(sim, 0.05, SIZE, ctx);
+    expect(sim.rocketActive).toBe(false);
+    const before = sim.moveDir;
+    queueTurn(sim, 'down');
+    run(sim, ctx, 0.1);
+    expect(sim.moveDir).not.toBe(before);
+  });
+});
+
+describe('rocket stacking', () => {
+  it('extends an in-flight rocket once instead of restarting the arc', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    startRocket(sim, ctx);
+    run(sim, ctx, 0.4);
+    const midT = sim.jumpT;
+    const span = sim.jumpSpan;
+    expect(midT).toBeGreaterThan(0);
+
+    startRocket(sim, ctx); // second rocket claimed mid-flight
+    expect(sim.jumpT).toBe(midT);              // no snap back to the start of the arc
+    expect(sim.jumpSpan).toBe(span + ROCKET_TILE_SPAN);
+    expect(sim.rocketExtended).toBe(true);
+    // The HUD already has the pill mounted — no duplicate transition.
+    expect(eventsOf(ctx, 'rocketState').map(e => e.args[0])).toEqual([true]);
+
+    // Only one extension per flight.
+    const extendedSpan = sim.jumpSpan;
+    startRocket(sim, ctx);
+    expect(sim.jumpSpan).toBe(extendedSpan);
+  });
+
+  it('rebases an ordinary jump onto the rocket arc without dropping the worm', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    queueTurn(sim, 'jump');
+    run(sim, ctx, 0.35);
+    expect(sim.isJumping).toBe(true);
+    const liftBefore = jumpLiftOf(sim);
+    expect(liftBefore).toBeGreaterThan(0);
+
+    startRocket(sim, ctx);
+    // Height is continuous across the switch — no snap to the ground.
+    expect(jumpLiftOf(sim)).toBeCloseTo(liftBefore, 5);
+    expect(sim.jumpHeight).toBe(ROCKET_JUMP_HEIGHT);
+    expect(sim.jumpSpan).toBe(ROCKET_TILE_SPAN);
+  });
+
+  it('fires exactly one start and one end transition per flight', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    startRocket(sim, ctx);
+    for (let i = 0; i < 400 && sim.rocketActive; i++) stepWormSim(sim, 0.05, SIZE, ctx);
+    expect(eventsOf(ctx, 'rocketState').map(e => e.args[0])).toEqual([true, false]);
+  });
+});
+
+describe('rocket landing grace', () => {
+  const land = (sim, ctx) => {
+    startRocket(sim, ctx);
+    for (let i = 0; i < 400 && sim.rocketActive; i++) stepWormSim(sim, 0.05, SIZE, ctx);
+  };
+
+  it('opens a grace window on touchdown and closes it again', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    land(sim, ctx);
+    expect(sim.landingGraceT).toBeGreaterThan(0);
+    expect(sim.landingGraceT).toBeLessThanOrEqual(ROCKET_LANDING_GRACE);
+    run(sim, ctx, ROCKET_LANDING_GRACE + 0.2);
+    expect(sim.landingGraceT).toBe(0);
+  });
+
+  it('suppresses a self-collision that lands under the worm', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    land(sim, ctx);
+    sim.pendingSelfCollision = { key: tileKey(sim.pos) };
+    sim.interpT = 1;
+    stepWormSim(sim, 0.05, SIZE, ctx);
+    expect(sim.alive).toBe(true);
+    expect(sim.pendingSelfCollision).toBeNull();
+  });
+
+  it('holds off an instant wormhole dive on the landing tile', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    land(sim, ctx);
+    sim.pendingTunnelTrigger = { ...sim.pos };
+    sim.interpT = 1;
+    stepWormSim(sim, 0.05, SIZE, ctx);
+    expect(sim.phase).toBe('crawling');
+    expect(sim.pendingTunnelTrigger).toBeNull();
+  });
+
+  it('keeps the head clear of a slice that turns on the landing frame', () => {
+    const trail = makeTileTrail(100);
+    ttReset(trail, '0,0,4,PZ');
+    ttPush(trail, '1,1,4,PZ');
+    const worm = {
+      pos: { current: { x: 1, y: 1, z: 4, dirKey: 'PZ' } },
+      tileTrail: { current: trail },
+      tailLength: { current: 50 },
+      rocketActive: { current: false },
+      landingGraceT: { current: 0 },
+    };
+    expect(checkWormHitBySlice(worm, 'col', 1)).toEqual({ type: 'death' });
+    worm.landingGraceT.current = 0.4;
+    expect(checkWormHitBySlice(worm, 'col', 1)).not.toEqual({ type: 'death' });
+  });
+
+  it('does not protect the worm indefinitely after landing', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    land(sim, ctx);
+    run(sim, ctx, ROCKET_LANDING_GRACE + 0.2);
+    expect(sim.landingGraceT).toBe(0);
+
+    // A body long enough to actually occupy several tiles — at BASE_TAIL_LENGTH the
+    // collision window is a single tile and nothing can ever hit it.
+    sim.tailLength = 50;
+    sim.selfCollisionGraceSteps = 0;
+    sim.pendingSelfCollision = { key: ttAt(sim.tileTrail, 1) };
+    sim.interpT = 1;
+    stepWormSim(sim, 0.05, SIZE, ctx);
+    expect(sim.alive).toBe(false);
+    expect(eventsOf(ctx, 'death')[0].args[0].reason).toBe('self-collision');
+  });
+
+  it('still protects the worm inside the window with the same setup', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    land(sim, ctx);
+    expect(sim.landingGraceT).toBeGreaterThan(0);
+    sim.tailLength = 50;
+    sim.selfCollisionGraceSteps = 0;
+    sim.pendingSelfCollision = { key: ttAt(sim.tileTrail, 1) };
+    sim.interpT = 1;
+    stepWormSim(sim, 0.05, SIZE, ctx);
+    expect(sim.alive).toBe(true);
+  });
+});
+
+// ─── Magnet attraction payloads ──────────────────────────────────────────────
+
+describe('magnet attraction effects', () => {
+  it('emits an effect for each orb pulled from off the head tile', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    sim.powerups = [apple(0, 3, 4, 'PZ'), apple(1, 3, 4, 'PZ')];
+    sim.magnetT = 5;
+    stepUntilCommit(sim, ctx);
+    expect(sim.pendingOrbAttractions).toHaveLength(2);
+    for (const fx of sim.pendingOrbAttractions) {
+      expect(fx.from).toHaveLength(3);
+      expect(fx.to).toHaveLength(3);
+      expect(fx.color).toBeTruthy();
+      expect(fx.id).toMatch(/^att-/);
+    }
+    // Stable, unique ids so the renderer can pool slots safely.
+    const ids = sim.pendingOrbAttractions.map(f => f.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('emits nothing for an orb collected by ordinary contact', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    sim.powerups = [apple(2, 3, 4, 'PZ')]; // directly on the worm's path
+    stepUntilCommit(sim, ctx);
+    expect(eventsOf(ctx, 'pickup')).toHaveLength(1);
+    expect(sim.pendingOrbAttractions).toHaveLength(0);
+  });
+
+  it('records a cross-face pull with both endpoints', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    stepUntilCommit(sim, ctx); // (2,3,4)
+    const ring = collectManifoldRing(2, 4, 4, 'PZ', SIZE, 2);
+    const pyKey = [...ring].find(k => k.endsWith(',PY'));
+    const [px, py, pz] = pyKey.split(',').map(Number);
+    sim.powerups = [apple(px, py, pz, 'PY')];
+    sim.magnetT = 5;
+    stepUntilCommit(sim, ctx); // onto the edge tile
+    expect(sim.pendingOrbAttractions).toHaveLength(1);
+    expect(sim.pendingOrbAttractions[0].from).not.toEqual(sim.pendingOrbAttractions[0].to);
+  });
+
+  it('is cleared by a run reset', () => {
+    const sim = makeSim();
+    sim.pendingOrbAttractions = [{ id: 'x' }];
+    resetWormSim(sim, SIZE, { orbCount: 0, wormholeInterval: 9999 });
+    expect(sim.pendingOrbAttractions).toHaveLength(0);
+  });
+});
+
+// ─── Buff lifecycle ──────────────────────────────────────────────────────────
+
+describe('buff lifecycle', () => {
+  it('freezes the magnet clock while paused', () => {
+    const sim = makeSim();
+    startMagnet(sim, makeCtx());
+    const paused = makeCtx({ isPaused: () => true });
+    run(sim, paused, 3);
+    expect(sim.magnetT).toBe(MAGNET_DURATION);
+  });
+
+  it('freezes the magnet clock during tunnel travel', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    startMagnet(sim, ctx);
+    sim.phase = 'tunnel';
+    run(sim, ctx, 3);
+    expect(sim.magnetT).toBe(MAGNET_DURATION);
+  });
+
+  it('refreshes rather than stacking, and republishes the new maximum', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    startMagnet(sim, ctx);
+    run(sim, ctx, 3);
+    expect(sim.magnetT).toBeLessThan(MAGNET_DURATION);
+    startMagnet(sim, ctx);
+    expect(sim.magnetT).toBe(MAGNET_DURATION);
+    expect(sim.magnetMaxT).toBe(MAGNET_DURATION);
+    const published = eventsOf(ctx, 'magnetState');
+    expect(published).toHaveLength(2);
+    expect(published[1].args).toEqual([MAGNET_DURATION, MAGNET_DURATION]);
+  });
+
+  it('publishes a single expiry transition', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    startMagnet(sim, ctx);
+    run(sim, ctx, MAGNET_DURATION + 1.5);
+    const published = eventsOf(ctx, 'magnetState').map(e => e.args[0]);
+    expect(published).toEqual([MAGNET_DURATION, 0]);
+    expect(sim.magnetMaxT).toBe(0);
+  });
+
+  it('clears every buff on a run reset', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    startMagnet(sim, ctx);
+    startRocket(sim, ctx);
+    sim.landingGraceT = 0.5;
+    sim.specials = [special(0, 0, 4, 'PZ')];
+    resetWormSim(sim, SIZE, { orbCount: 0, wormholeInterval: 9999 });
+    expect(sim.magnetT).toBe(0);
+    expect(sim.magnetMaxT).toBe(0);
+    expect(sim.rocketActive).toBe(false);
+    expect(sim.rocketExtended).toBe(false);
+    expect(sim.landingGraceT).toBe(0);
+    expect(sim.specials).toHaveLength(0);
+  });
+});
+
+describe('buff readout (HUD presentation rules)', () => {
+  beforeEach(() => resetWormBuffs());
+
+  it('reports an inactive strip when nothing is running', () => {
+    const r = buffReadout(wormBuffs);
+    expect(r.magnetActive).toBe(false);
+    expect(r.rocketActive).toBe(false);
+    expect(r.magnetFraction).toBe(0);
+  });
+
+  it('reports a full bar at the start of a magnet', () => {
+    wormBuffs.magnetT = 8; wormBuffs.magnetMaxT = 8;
+    const r = buffReadout(wormBuffs);
+    expect(r.magnetActive).toBe(true);
+    expect(r.magnetFraction).toBe(1);
+    expect(r.magnetSeconds).toBe(8);
+  });
+
+  it('drains proportionally', () => {
+    wormBuffs.magnetT = 2; wormBuffs.magnetMaxT = 8;
+    expect(buffReadout(wormBuffs).magnetFraction).toBeCloseTo(0.25, 5);
+  });
+
+  it('rescales to the new maximum on a refresh', () => {
+    wormBuffs.magnetT = 2; wormBuffs.magnetMaxT = 8;
+    expect(buffReadout(wormBuffs).magnetFraction).toBeCloseTo(0.25, 5);
+    wormBuffs.magnetT = 8; wormBuffs.magnetMaxT = 8;
+    expect(buffReadout(wormBuffs).magnetFraction).toBe(1);
+  });
+
+  it('never reports a negative or overflowing bar', () => {
+    wormBuffs.magnetT = -3; wormBuffs.magnetMaxT = 8;
+    expect(buffReadout(wormBuffs).magnetFraction).toBe(0);
+    expect(buffReadout(wormBuffs).magnetActive).toBe(false);
+    wormBuffs.magnetT = 99; wormBuffs.magnetMaxT = 8;
+    expect(buffReadout(wormBuffs).magnetFraction).toBe(1);
+  });
+
+  it('is cleared by resetWormBuffs, so no pill survives a run', () => {
+    wormBuffs.magnetT = 5; wormBuffs.magnetMaxT = 8; wormBuffs.rocketActive = true;
+    resetWormBuffs();
+    const r = buffReadout(wormBuffs);
+    expect(r.magnetActive).toBe(false);
+    expect(r.rocketActive).toBe(false);
   });
 });
