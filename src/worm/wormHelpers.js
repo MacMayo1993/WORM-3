@@ -165,13 +165,16 @@ export function tileKeyCoordAt(key, idx) {
 //
 // A rocket-flying worm is well above the surface, so its HEAD is treated as clear of
 // the slice however the grid coordinates read — the flight passes over the turning
-// layer. The body left on the ground is still checked, so a badly timed launch can
-// still cost you a tail.
+// layer. The same applies through the brief landing-grace window, so a rotation that
+// fires on the exact frame a flight touches down doesn't kill a player who had no way
+// to steer out of it. The body left on the ground is still checked in both cases, so
+// a badly timed launch can still cost you a tail.
 export function checkWormHitBySlice(worm, axis, sliceIndex) {
     const head = worm.pos.current;
     const axisCoord = axis === 'col' ? 'x' : axis === 'row' ? 'y' : 'z';
     const coordIdx  = axis === 'col' ? 0 : axis === 'row' ? 1 : 2;
-    const headOnSlice = head[axisCoord] === sliceIndex && !worm.rocketActive?.current;
+    const airborne = !!worm.rocketActive?.current || (worm.landingGraceT?.current ?? 0) > 0;
+    const headOnSlice = head[axisCoord] === sliceIndex && !airborne;
     const trail = worm.tileTrail.current;
 
     const activeTiles = Math.max(1, Math.ceil(worm.tailLength.current * BODY_BALL_SPACING));

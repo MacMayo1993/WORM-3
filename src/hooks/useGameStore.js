@@ -160,8 +160,17 @@ const makeWormSessionDefaults = () => ({
   // wormMagnetBuff is { startedAt, duration } while active (null otherwise) so the
   // HUD can time its own countdown without the sim writing state every frame.
   wormSpecials: [],
+  // Buff TRANSITIONS only — enough to mount/unmount the HUD strip. Remaining time
+  // lives on the wormBuffs bridge (mirrored from the sim each tick), so a paused or
+  // mid-tunnel countdown freezes with the simulation instead of a wall clock.
   wormRocketActive: false,
-  wormMagnetBuff: null,
+  wormMagnetActive: false,
+  wormMagnetSeq: 0,
+  // { kind: 'spawn'|'expire', type, seq } — drives the HUD's special notice toast.
+  wormSpecialNotice: null,
+  // { color, combo, seq } for the most recent orb pickup — drives the HUD's
+  // screen-edge confirmation flash.
+  wormOrbFlash: null,
   wormAlive: true,
   showWormDeathMenu: false,
   wormDeathDetails: null,

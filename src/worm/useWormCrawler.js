@@ -40,6 +40,7 @@ import {
 } from './healerWorm/wormSim.js';
 import { ensureOrbContrast } from './wormHelpers.js';
 import { wormClock } from './wormClock.js';
+import { wormBuffs, resetWormBuffs } from './wormBuffs.js';
 
 export function useWormCrawler(size, cubies) {
     // Only the values that must RESET the run are subscribed reactively; everything
@@ -127,6 +128,10 @@ export function useWormCrawler(size, cubies) {
             // ── effects ─────────────────────────────────────────────────────────
             feel,
             onDeath: (details, timeAlive) => {
+                // A run ending mid-buff must not leave a pill stranded on the death
+                // screen — clear both the live readout and the store transitions.
+                resetWormBuffs();
+                useGameStore.setState({ wormRocketActive: false, wormMagnetActive: false, wormSpecialNotice: null });
                 if (deathMenuTimer.current) {
                     clearTimeout(deathMenuTimer.current);
                     deathMenuTimer.current = null;
@@ -189,10 +194,18 @@ export function useWormCrawler(size, cubies) {
                     },
                 }));
             },
-            onOrbPickup: (faceId, orbCount) => {
+            onOrbPickup: (faceId, orbCount, color, combo) => {
                 useGameStore.setState((state) => ({
                     wormBodyTiles: orbCount,
                     wormSessionOrbs: (state.wormSessionOrbs ?? 0) + 1,
+                    // Drives the HUD's screen-edge confirmation flash. `seq` is what the
+                    // HUD keys its animation off, so two pickups of the same colour still
+                    // replay it. A magnet sweep collects several orbs inside one tick and
+                    // React batches those writes, so the burst reads as one flash rather
+                    // than a stutter of them.
+                    wormOrbFlash: color
+                        ? { color, combo: combo ?? 0, seq: (state.wormOrbFlash?.seq ?? 0) + 1 }
+                        : state.wormOrbFlash,
                     ...(faceId ? {
                         wormOrbInventory: {
                             ...(state.wormOrbInventory ?? { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }),
@@ -203,13 +216,35 @@ export function useWormCrawler(size, cubies) {
             },
             onPowerupsChanged: (list) => useGameStore.getState().setWormPowerups(list),
             onSpecialsChanged: (list) => useGameStore.getState().setWormSpecials(list),
-            // Buff HUD state is published only on transitions — never per frame. The
-            // chip derives its own countdown from startedAt + duration, the same way
-            // the boost button times its cooldown fill.
-            onRocketState: (active) => useGameStore.setState({ wormRocketActive: active }),
-            onMagnetState: (seconds) => useGameStore.setState({
-                wormMagnetBuff: seconds > 0 ? { startedAt: Date.now(), duration: seconds } : null,
-            }),
+            // ── Buff publication ────────────────────────────────────────────────
+            // The store carries ONLY the transitions that mount/unmount HUD elements.
+            // Remaining time lives on the wormBuffs bridge, mirrored from the sim each
+            // tick, so the countdown freezes with the simulation during a pause or a
+            // tunnel transit instead of running off a wall clock.
+            onRocketState: (active) => {
+                wormBuffs.rocketActive = active;
+                if (useGameStore.getState().wormRocketActive !== active) {
+                    useGameStore.setState({ wormRocketActive: active });
+                }
+            },
+            // Called only on real transitions — start, refresh, expiry — so writing
+            // unconditionally is still two or three store writes per magnet. `seq`
+            // bumps on a refresh as well, which is what lets the strip rescale its
+            // fill to the new maximum immediately instead of at the next transition.
+            onMagnetState: (seconds, maxSeconds) => {
+                wormBuffs.magnetT = seconds;
+                wormBuffs.magnetMaxT = maxSeconds ?? seconds;
+                useGameStore.setState((state) => ({
+                    wormMagnetActive: seconds > 0,
+                    wormMagnetSeq: (state.wormMagnetSeq ?? 0) + 1,
+                }));
+            },
+            onSpecialSpawned: (type) => useGameStore.setState((state) => ({
+                wormSpecialNotice: { kind: 'spawn', type, seq: (state.wormSpecialNotice?.seq ?? 0) + 1 },
+            })),
+            onSpecialExpired: (type) => useGameStore.setState((state) => ({
+                wormSpecialNotice: { kind: 'expire', type, seq: (state.wormSpecialNotice?.seq ?? 0) + 1 },
+            })),
             applyHeal: (entry, exitTile, stableKey, healedCount) => {
                 const sz = sizeRef.current;
                 const st = useGameStore.getState();
@@ -240,9 +275,15 @@ export function useWormCrawler(size, cubies) {
 
     // ── Per-frame drive ──────────────────────────────────────────────────────────
     const tick = useCallback((delta) => {
-        stepWormSim(simRef.current, delta, sizeRef.current, ctxRef.current);
+        const sim = simRef.current;
+        stepWormSim(sim, delta, sizeRef.current, ctxRef.current);
         // Publish the wormhole countdown through the plain bridge (pause menu snapshot).
-        wormClock.countdown = simRef.current.wormholeCountdown;
+        wormClock.countdown = sim.wormholeCountdown;
+        // Mirror the authoritative buff clocks for the HUD. Plain field writes, so a
+        // per-frame refresh costs nothing and freezes whenever the sim does.
+        wormBuffs.magnetT = sim.magnetT;
+        wormBuffs.magnetMaxT = sim.magnetMaxT;
+        wormBuffs.rocketActive = sim.rocketActive;
     }, []);
 
     const queueTurn = useCallback((dir) => queueTurnSim(simRef.current, dir), []);
@@ -257,12 +298,16 @@ export function useWormCrawler(size, cubies) {
     useEffect(() => {
         const sim = simRef.current;
         resetWormSim(sim, size, { orbCount: wormOrbCount, wormholeInterval });
+        resetWormBuffs();
         useGameStore.getState().setWormBoostState('ready');
         useGameStore.setState({
             wormPowerups: sim.powerups,
             wormSpecials: [],
             wormRocketActive: false,
-            wormMagnetBuff: null,
+            wormMagnetActive: false,
+            wormMagnetSeq: 0,
+            wormSpecialNotice: null,
+            wormOrbFlash: null,
             wormBodyTiles: 0,
             wormOrbInventory: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
             wormHealingProgress: {},
@@ -286,6 +331,10 @@ export function useWormCrawler(size, cubies) {
             clearTimeout(deathMenuTimer.current);
             deathMenuTimer.current = null;
         }
+        // Leaving worm mode entirely: the bridge is module-level state that would
+        // otherwise still be holding the last run's buff when the mode remounts.
+        resetWormBuffs();
+        useGameStore.setState({ wormRocketActive: false, wormMagnetActive: false, wormSpecialNotice: null });
     }, []);
 
     // Track the last pending rotation so we can apply it to the sim when the
@@ -345,7 +394,9 @@ export function useWormCrawler(size, cubies) {
             jumpT: f('jumpT'),
             isJumping: f('isJumping'),
             rocketActive: f('rocketActive'),
+            landingGraceT: f('landingGraceT'),
             magnetT: f('magnetT'),
+            pendingOrbAttractionsRef: f('pendingOrbAttractions'),
             specials: f('specials'),
             pendingSpecialFlashRef: f('pendingSpecialFlash'),
             headInterpPos: f('headInterpPos'),

@@ -62,6 +62,8 @@ function makeCtx(overrides = {}) {
     onSpecialsChanged: log('specials'),
     onRocketState: log('rocketState'),
     onMagnetState: log('magnetState'),
+    onSpecialSpawned: log('specialSpawned'),
+    onSpecialExpired: log('specialExpired'),
     ...overrides,
   };
 }
