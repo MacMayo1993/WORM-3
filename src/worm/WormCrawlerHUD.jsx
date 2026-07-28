@@ -250,12 +250,23 @@ const GLANCE_VALUE_STYLE = {
     lineHeight: 1,
 };
 
-// Persistent orb tracker — desktop only (the glance strip's ORBS chip covers
-// mobile), anchored bottom-left above the Jump/Boost cluster.
+// Persistent orb tracker. Desktop keeps it beside the controls; mobile puts a
+// dense version directly below the glance strip so the counter is never lost
+// among the narrow top-row chips or covered by the thumb controls.
 const ORB_TRACKER_WRAP_STYLE = {
     position: 'absolute',
     left: 16,
     bottom: 'calc(env(safe-area-inset-bottom, 0px) + 96px)',
+    pointerEvents: 'none',
+};
+
+const MOBILE_ORB_TRACKER_WRAP_STYLE = {
+    position: 'absolute',
+    top: 'calc(env(safe-area-inset-top, 0px) + 58px)',
+    left: 8,
+    right: 8,
+    display: 'flex',
+    justifyContent: 'center',
     pointerEvents: 'none',
 };
 
@@ -1021,10 +1032,10 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                 </div>
             </div>
 
-            {/* ── Persistent orb tracker — desktop only, glance strip covers mobile ── */}
-            {wormAlive && !isMobile && (
-                <div style={ORB_TRACKER_WRAP_STYLE}>
-                    <OrbInventoryHUD orbInventory={wormOrbInventory} faceColors={fc} />
+            {/* ── Persistent orb tracker — compact but always visible on mobile ── */}
+            {wormAlive && (
+                <div style={isMobile ? MOBILE_ORB_TRACKER_WRAP_STYLE : ORB_TRACKER_WRAP_STYLE}>
+                    <OrbInventoryHUD orbInventory={wormOrbInventory} faceColors={fc} mobile={isMobile} />
                 </div>
             )}
 

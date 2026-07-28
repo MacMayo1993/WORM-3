@@ -49,7 +49,7 @@ const OrbCoin = ({ color, count, coinSize, fontSize }) => (
   </div>
 );
 
-export default function OrbInventoryHUD({ orbInventory, faceColors, compact = false }) {
+export default function OrbInventoryHUD({ orbInventory, faceColors, compact = false, mobile = false }) {
   if (!orbInventory || !faceColors) return null;
 
   const activeEntries = FACE_ORDER.filter((faceId) => (orbInventory[faceId] ?? 0) > 0);
@@ -103,16 +103,16 @@ export default function OrbInventoryHUD({ orbInventory, faceColors, compact = fa
   }
 
   // Persistent tracker card — parent handles positioning
-  const coinSize = 32;
-  const coinFont = 14;
+  const coinSize = mobile ? 26 : 32;
+  const coinFont = mobile ? 12 : 14;
 
   return (
     <div
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: 12,
-        padding: '8px 14px',
+        gap: mobile ? 7 : 12,
+        padding: mobile ? '6px 10px' : '8px 14px',
         background: PANEL_BG,
         borderRadius: 14,
         border: `1px solid ${PANEL_BORDER}`,
@@ -126,7 +126,7 @@ export default function OrbInventoryHUD({ orbInventory, faceColors, compact = fa
         <span style={{ fontSize: 9, color: TEXT_MUTED, letterSpacing: '0.16em', textTransform: 'uppercase', fontFamily: FONT, fontWeight: 700, marginBottom: 3 }}>
           Orb Reserve
         </span>
-        <span style={{ fontSize: 22, fontWeight: 800, fontFamily: FONT, color: TEXT_DARK }}>
+        <span style={{ fontSize: mobile ? 18 : 22, fontWeight: 800, fontFamily: FONT, color: TEXT_DARK }}>
           {total}
         </span>
       </div>
@@ -138,7 +138,7 @@ export default function OrbInventoryHUD({ orbInventory, faceColors, compact = fa
           collect orbs to heal tunnels
         </span>
       ) : (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: mobile ? 4 : 8 }}>
           {activeEntries.map((faceId) => (
             <OrbCoin
               key={faceId}
