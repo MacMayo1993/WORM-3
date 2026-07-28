@@ -36,6 +36,16 @@ const bentTunnel = (size) => {
   };
 };
 
+// The worst case for a route that heads straight for the core: a corner tile,
+// whose docking point is two tiles laterally away from the tile's own axis.
+const cornerTunnel = (size) => {
+  const n = size - 1;
+  return {
+    entry: { x: 0, y: n, z: 0, dirKey: 'PY' },
+    exit: { x: n, y: 0, z: n, dirKey: 'NY' }
+  };
+};
+
 /** World-space distance from the cube's surface plane on the entry face. */
 const heightAboveEntryFace = (pos, size) => pos.y - ((size - 1) / 2 + SURFACE_OFFSET);
 
@@ -96,26 +106,43 @@ describe('tunnelCamPoseInto', () => {
   });
 
   it('drives the lens through the dead centre of the entry tile', () => {
+    // The regression this pins: a camera that trails the head along its current
+    // TANGENT leaves the tile's axis the moment the route bends toward the core,
+    // and so crosses the cube's surface a tile or more to the side of the hole it
+    // is diving into. Trailing along the ROUTE (and opening each mouth with a
+    // straight throat) means every pose taken while the lens is still outside the
+    // cube sits on the entry tile's own centre axis.
     for (const size of [2, 3, 4, 5]) {
-      for (const tunnel of [straightTunnel(size), bentTunnel(size)]) {
+      for (const tunnel of [straightTunnel(size), bentTunnel(size), cornerTunnel(size)]) {
         const pose = makeTunnelCamPose();
         const entry = new THREE.Vector3();
         const normal = new THREE.Vector3(0, 1, 0);
         const lateral = new THREE.Vector3();
-
-        tunnelCamPoseInto(pose, tunnel, ENTER_END_T, size);
         entry.set(
           tunnel.entry.x - (size - 1) / 2,
           tunnel.entry.y - (size - 1) / 2 + SURFACE_OFFSET,
           tunnel.entry.z - (size - 1) / 2
         );
-        lateral.subVectors(pose.cam, entry)
-          .addScaledVector(normal, -lateral.dot(normal));
 
-        expect(cameraUpForHead(ENTER_END_T)).toBe(0);
-        expect(lateral.length()).toBeLessThan(1e-6);
+        let sawOutside = false;
+        for (let t = 0; t <= ENTER_END_T + 1e-9; t += 0.005) {
+          tunnelCamPoseInto(pose, tunnel, t, size);
+          if (heightAboveEntryFace(pose.cam, size) < 0) continue;
+          sawOutside = true;
+          lateral.subVectors(pose.cam, entry);
+          lateral.addScaledVector(normal, -lateral.dot(normal));
+          expect(lateral.length()).toBeLessThan(1e-6);
+        }
+        expect(sawOutside).toBe(true);
       }
     }
+  });
+
+  it('keeps the riding height off the lens until it is well inside', () => {
+    // Any lateral offset applied while the camera is still in the mouth walks it
+    // across the face of the entry sticker instead of through its centre.
+    expect(cameraUpForHead(0)).toBe(0);
+    expect(cameraUpForHead(ENTER_END_T)).toBe(0);
   });
 
   it('carries the camera through the entry face during the dive', () => {
@@ -191,13 +218,23 @@ describe('tunnelCamPoseInto', () => {
 
   it('looks ahead of the camera, down the tunnel', () => {
     const size = 3;
-    const tunnel = bentTunnel(size);
     const pose = makeTunnelCamPose();
     const view = new THREE.Vector3();
+    // Bent route: the aim point sits further along the ROUTE, so where the route
+    // turns the shot leads into the bend rather than staying pinned to the local
+    // tangent and staring at the wall beside the corner. It still always faces
+    // forward — the camera never ends up looking back the way it came.
     for (let t = 0; t <= 1.0001; t += 0.05) {
-      tunnelCamPoseInto(pose, tunnel, Math.min(1, t), size);
+      tunnelCamPoseInto(pose, bentTunnel(size), Math.min(1, t), size);
       view.subVectors(pose.look, pose.cam).normalize();
-      expect(view.dot(pose.tangent)).toBeGreaterThan(0.8);
+      expect(view.dot(pose.tangent)).toBeGreaterThan(0.5);
+    }
+    // Straight route through the middle of two faces: nothing to lead into, so
+    // the aim lies exactly down the direction of travel.
+    for (let t = 0; t <= 1.0001; t += 0.05) {
+      tunnelCamPoseInto(pose, straightTunnel(size), Math.min(1, t), size);
+      view.subVectors(pose.look, pose.cam).normalize();
+      expect(view.dot(pose.tangent)).toBeGreaterThan(0.999);
     }
   });
 });

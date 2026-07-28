@@ -8,7 +8,7 @@ import { tunnelState } from './tunnelProgressBridge.js';
 import {
     makeTunnelCamPose,
     tunnelCamPoseInto,
-    diveEase,
+    diveProgress,
     portalDist,
     portalUp,
     ENTER_END_T,
@@ -331,12 +331,14 @@ export default function WormChaseCamera({ worm, size }) {
             _diveInCam.copy(_rails.cam);
             _diveInLook.copy(_rails.look);
 
-            // Cubic, as in MainMenu's dive. Keeping the acceleration this
-            // back-loaded also means the camera only breaks the cube's surface over
-            // the last handful of frames of the phase — the frames in which the solid
-            // body is swapped for the interior view — so it never sits inside a cube
-            // that is still being drawn as solid.
-            const dive = diveEase(tp);
+            // Held on the exterior framing first (DIVE_HOLD — the beat in which the
+            // body is vacuumed off the surface and down the hole), then cubic, as in
+            // MainMenu's dive. Keeping the acceleration this back-loaded also means
+            // the camera only breaks the cube's surface over the last handful of
+            // frames of the phase — the frames in which the solid body is swapped for
+            // the interior view — so it never sits inside a cube that is still being
+            // drawn as solid.
+            const dive = diveProgress(tp);
             _camTargetCam.copy(_diveOutCam).lerp(_diveInCam, dive);
             _camTargetLook.copy(_diveOutLook).lerp(_diveInLook, dive);
 

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { getNextSurfacePosition, getTunnelWorldPosInto, makeTunnelCenterline, buildTunnelCenterlineInto, tunnelTToArc, getTunnelArcPosInto } from '../worm/wormLogic.js';
+import { ARM_A_END, ARM_B_START } from '../utils/tunnelPath.js';
 import * as THREE from 'three';
 
 // ─── arc-length tunnel sampling (worm body spacing in the wormhole) ───────────
@@ -46,8 +47,10 @@ describe('tunnel arc-length sampling', () => {
     const cl = buildTunnelCenterlineInto(makeTunnelCenterline(), tunnel, size);
     expect(tunnelTToArc(cl, 0)).toBeCloseTo(0);
     expect(tunnelTToArc(cl, 1)).toBeCloseTo(cl.total);
-    expect(tunnelTToArc(cl, 0.4)).toBeCloseTo(cl.l1);
-    expect(tunnelTToArc(cl, 0.6)).toBeCloseTo(cl.l1 + cl.l2);
+    // The arm/core landmarks are still where they always were — the entry arm is
+    // just subdivided into throat + run-to-the-core now (see utils/tunnelPath).
+    expect(tunnelTToArc(cl, ARM_A_END)).toBeCloseTo(cl.armALen);
+    expect(tunnelTToArc(cl, ARM_B_START)).toBeCloseTo(cl.armALen + cl.legLen[2]);
     // Strictly increasing
     let prev = -1;
     for (let t = 0; t <= 1.0001; t += 0.1) {

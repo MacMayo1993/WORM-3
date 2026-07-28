@@ -74,6 +74,11 @@ const _bodySideVec = new THREE.Vector3();
 const _bodyRideAxis = new THREE.Vector3();
 const _bodyEffA = new THREE.Vector3();
 const _bodyEffB = new THREE.Vector3();
+// Suck-in shaping: how much a segment necks down at the entry aperture, and over how
+// much arc-length inside the mouth it recovers. Deliberately shorter than the throat
+// (utils/tunnelPath) so the whole squeeze happens while the hole is still on screen.
+const MOUTH_SQUEEZE = 0.42;
+const MOUTH_SQUEEZE_ARC = 0.3;
 // Scratch for the suck-in / spit-out tunnel funnel (body segments streamed along the ribbon).
 // Centerline is sampled by world arc-length so segments stay evenly spaced (no stretched beads).
 const _funnelCenterline = makeTunnelCenterline();
@@ -514,6 +519,13 @@ export function WormBody({ worm, size }) {
                             // mouth (arc ≈ total), then settles back to normal size as it travels out.
                             const _d = Math.abs(_segArc - _funnelCenterline.total);
                             _funnelPop = 1 + 0.6 * Math.max(0, 1 - _d / 0.18);
+                        } else {
+                            // …and the mirror of it on the way in: a segment necks down as the
+                            // hole swallows it, so the body visibly *drains* through the
+                            // aperture instead of simply ceasing to be on the surface. Ends
+                            // (and is back to full size) within the throat, where the mouth
+                            // still frames it.
+                            _funnelPop = 1 - MOUTH_SQUEEZE * Math.max(0, 1 - _segArc / MOUTH_SQUEEZE_ARC);
                         }
                     } else if (_phase === 'exiting') {
                         // Tail hasn't emerged from the exit hole yet — keep it hidden rather than
