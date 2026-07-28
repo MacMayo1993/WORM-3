@@ -464,7 +464,9 @@ function applyOrbPickupGrowth(sim, ctx, color, faceId) {
     sim.orbPickupColors.push(color);
     sim.colorEpoch++;
     // PP are NOT awarded on pickup — only banked when the player wins (cube solved).
-    ctx.onOrbPickup(faceId, orbsCarried(sim.tailLength));
+    // Colour and combo ride along so the HUD can confirm the pickup on screen at the
+    // same intensity the pickup sound plays at.
+    ctx.onOrbPickup(faceId, orbsCarried(sim.tailLength), color, sim.orbCombo);
 }
 
 // Reusable scratch for the magnet's manifold reach — rebuilt in place per check.
@@ -504,12 +506,14 @@ function tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey) {
         if (tileIsFlipped && !sim.isJumping && !magnetActive) continue; // out of reach
         const pickedFaceId = pickedSticker ? pickedSticker.curr : 0;
         const pickedColor = ctx.getOrbColor(pickedFaceId);
-        applyOrbPickupGrowth(sim, ctx, pickedColor, pickedFaceId);
-        sim.pendingOrbFlash = { color: pickedColor, pos: sim.curWorldPos.toArray() };
         // Combo climbs when pickups come in quick succession (≤2s apart). A magnet
-        // sweep collecting several orbs in one step escalates the same way.
+        // sweep collecting several orbs in one step escalates the same way. Updated
+        // BEFORE the growth call so the pickup's sound, haptic and screen flash all
+        // read the same (new) combo level.
         sim.orbCombo = (sim.timeAlive - sim.lastOrbTime <= 2.0) ? sim.orbCombo + 1 : 0;
         sim.lastOrbTime = sim.timeAlive;
+        applyOrbPickupGrowth(sim, ctx, pickedColor, pickedFaceId);
+        sim.pendingOrbFlash = { color: pickedColor, pos: sim.curWorldPos.toArray() };
         ctx.feel('orb', { combo: sim.orbCombo });
         sim.powerups[puIdx] = { ...randomFreeTile(size, [...sim.powerups, sim.pos]), type: 'apple' };
         collectedAny = true;

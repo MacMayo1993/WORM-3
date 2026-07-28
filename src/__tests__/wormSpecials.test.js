@@ -385,6 +385,20 @@ describe('magnet', () => {
     expect(eventsOf(ctx, 'pickup')).toHaveLength(0);
   });
 
+  it('reports the pickup colour and combo so the HUD can flash', () => {
+    const sim = makeSim();
+    const ctx = makeCtx({ getOrbColor: () => '#ff00aa' });
+    sim.powerups = [apple(2, 3, 4, 'PZ'), apple(2, 4, 4, 'PZ')];
+    stepUntilCommit(sim, ctx); // first orb
+    stepUntilCommit(sim, ctx); // second orb, within the 2s combo window
+    const picks = eventsOf(ctx, 'pickup');
+    expect(picks).toHaveLength(2);
+    // args are (faceId, orbCount, color, combo)
+    expect(picks[0].args[2]).toBe('#ff00aa');
+    expect(picks[0].args[3]).toBe(0);
+    expect(picks[1].args[3]).toBe(1); // combo climbed on the quick second pickup
+  });
+
   it('sweeps up several orbs in one step', () => {
     const sim = makeSim();
     const ctx = makeCtx();

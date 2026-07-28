@@ -189,10 +189,18 @@ export function useWormCrawler(size, cubies) {
                     },
                 }));
             },
-            onOrbPickup: (faceId, orbCount) => {
+            onOrbPickup: (faceId, orbCount, color, combo) => {
                 useGameStore.setState((state) => ({
                     wormBodyTiles: orbCount,
                     wormSessionOrbs: (state.wormSessionOrbs ?? 0) + 1,
+                    // Drives the HUD's screen-edge confirmation flash. `seq` is what the
+                    // HUD keys its animation off, so two pickups of the same colour still
+                    // replay it. A magnet sweep collects several orbs inside one tick and
+                    // React batches those writes, so the burst reads as one flash rather
+                    // than a stutter of them.
+                    wormOrbFlash: color
+                        ? { color, combo: combo ?? 0, seq: (state.wormOrbFlash?.seq ?? 0) + 1 }
+                        : state.wormOrbFlash,
                     ...(faceId ? {
                         wormOrbInventory: {
                             ...(state.wormOrbInventory ?? { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }),
@@ -263,6 +271,7 @@ export function useWormCrawler(size, cubies) {
             wormSpecials: [],
             wormRocketActive: false,
             wormMagnetBuff: null,
+            wormOrbFlash: null,
             wormBodyTiles: 0,
             wormOrbInventory: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
             wormHealingProgress: {},

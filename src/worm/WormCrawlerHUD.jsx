@@ -3,7 +3,7 @@
 // Three-zone layout: Glance Strip (top, info-only) · Game Scene · Thumb Tray (bottom, all controls).
 // Colors derived from the cube's face palette in antipodal pairs.
 
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { resolveColors } from '../utils/colorSchemes.js';
@@ -705,6 +705,66 @@ function WinnerScreen({ wormBodyTiles, wormSessionOrbs, parityPoints, wormTimeAl
     );
 }
 
+// ─── Orb pickup flash ────────────────────────────────────────────────────────
+// Collecting an orb had no on-screen confirmation for any character except the Glow
+// Worm (which gets a 3D bloom at the orb) — the feedback was audio, haptics, a small
+// camera nudge and the body growing. This adds a brief tint of the orb's colour at
+// the screen edges.
+//
+// Deliberately a vignette rather than a full wash: it never sits over the cube, and
+// it stays faint (peak ≈ 0.14–0.26 alpha) because pickups can come a second apart —
+// or several at once under a magnet. prefers-reduced-motion softens it further.
+
+const ORB_FLASH_MS = 380;
+
+function OrbPickupFlash() {
+    const flash = useGameStore(s => s.wormOrbFlash);
+    const [shown, setShown] = useState(null);
+    const timer = useRef(null);
+
+    useEffect(() => {
+        if (!flash?.color) return;
+        setShown(flash);
+        clearTimeout(timer.current);
+        timer.current = setTimeout(() => setShown(null), ORB_FLASH_MS + 60);
+        return () => clearTimeout(timer.current);
+    }, [flash]);
+
+    if (!shown) return null;
+
+    // Escalates with the pickup combo, mirroring the rising pitch of the pickup sound.
+    const peak = Math.min(0.14 + Math.min(shown.combo ?? 0, 6) * 0.02, 0.26);
+
+    return (
+        <>
+            <style>{`
+                @keyframes wormOrbFlash {
+                    0%   { opacity: 0; }
+                    18%  { opacity: calc(var(--orb-flash-peak) * var(--orb-flash-scale, 1)); }
+                    100% { opacity: 0; }
+                }
+                .worm-orb-flash {
+                    animation: wormOrbFlash var(--orb-flash-dur, ${ORB_FLASH_MS}ms) ease-out forwards;
+                }
+                @media (prefers-reduced-motion: reduce) {
+                    .worm-orb-flash { --orb-flash-scale: 0.45; --orb-flash-dur: 520ms; }
+                }
+            `}</style>
+            <div
+                key={shown.seq}
+                className="worm-orb-flash"
+                style={{
+                    position: 'fixed', inset: 0,
+                    pointerEvents: 'none',
+                    opacity: 0,
+                    background: `radial-gradient(ellipse at center, transparent 38%, ${shown.color} 135%)`,
+                    '--orb-flash-peak': peak,
+                }}
+            />
+        </>
+    );
+}
+
 // ─── Active buff strip ───────────────────────────────────────────────────────
 // The sim publishes a buff only on its transitions (start / end), so this derives
 // the countdown itself from startedAt + duration — the same approach BoostButton
@@ -1071,6 +1131,9 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
 
     return (
         <div style={ROOT_STYLE}>
+
+            {/* ── Orb pickup confirmation (behind every panel — first child) ── */}
+            {wormAlive && <OrbPickupFlash />}
 
             {/* ── Zone 1: Glance Strip (info only, no touch targets) ── */}
             <div style={GLANCE_STRIP_STYLE}>

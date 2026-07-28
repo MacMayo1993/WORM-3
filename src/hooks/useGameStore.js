@@ -162,6 +162,9 @@ const makeWormSessionDefaults = () => ({
   wormSpecials: [],
   wormRocketActive: false,
   wormMagnetBuff: null,
+  // { color, combo, seq } for the most recent orb pickup — drives the HUD's
+  // screen-edge confirmation flash.
+  wormOrbFlash: null,
   wormAlive: true,
   showWormDeathMenu: false,
   wormDeathDetails: null,
