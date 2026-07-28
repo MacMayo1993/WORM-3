@@ -44,6 +44,21 @@ export const FACE_LAYOUT = {
 // below flips it to open upward.
 export const MOUTH_ARC = Math.PI;
 
+// A standing book is a flat portrait, not a sphere.  Its face therefore needs
+// its own planar measurements instead of projecting the regular worm layout
+// onto an invisible round head.
+export const BOOK_FACE_LAYOUT = {
+  eyeSide: 0.34,
+  eyeUp: 0.23,
+  eyeRadius: 0.18,
+  pupilRadius: 0.085,
+  pupilOut: 0.025,
+  mouthDown: 0.27,
+  mouthRadius: 0.24,
+  glassRadius: 0.235,
+  hatSeat: 0.88,
+};
+
 const _faceDir = new THREE.Vector3();
 const _right = new THREE.Vector3();
 const _faceUp = new THREE.Vector3();
@@ -128,5 +143,53 @@ export function layoutWormFace(center, forward, up, radius, parts) {
 
   if (parts.hat) {
     parts.hat.position.copy(center).addScaledVector(up, radius * L.hatSeat);
+  }
+}
+
+/** Places features directly on the broad paper face of the standing Book Worm. */
+export function layoutBookWormFace(center, forward, up, scale, parts) {
+  const L = BOOK_FACE_LAYOUT;
+  _faceDir.copy(forward).normalize();
+  _right.crossVectors(_faceDir, up).normalize();
+  _faceUp.copy(up).normalize();
+
+  const place = (side, vertical, depth = 0) => _pos.copy(center)
+    .addScaledVector(_right, side * scale)
+    .addScaledVector(_faceUp, vertical * scale)
+    .addScaledVector(_faceDir, depth * scale);
+
+  _matrix.makeBasis(_right, _faceUp, _faceDir);
+  _quat.setFromRotationMatrix(_matrix);
+  for (let i = 0; i < 2; i++) {
+    const side = i === 0 ? L.eyeSide : -L.eyeSide;
+    const eye = parts.eyes?.[i];
+    if (eye) {
+      eye.position.copy(place(side, L.eyeUp, 0.04));
+      eye.scale.setScalar(scale * L.eyeRadius);
+    }
+    const pupil = parts.pupils?.[i];
+    if (pupil && eye) {
+      pupil.position.copy(eye.position).addScaledVector(_faceDir, scale * L.pupilOut);
+      pupil.scale.setScalar(scale * L.pupilRadius);
+    }
+    const glass = parts.glasses?.[i];
+    if (glass) {
+      glass.position.copy(place(side, L.eyeUp, 0.075));
+      glass.quaternion.copy(_quat);
+      glass.scale.setScalar(scale * L.glassRadius);
+    }
+  }
+
+  if (parts.mouth) {
+    _basisY.copy(_faceUp).negate();
+    _basisZ.crossVectors(_right, _basisY);
+    _matrix.makeBasis(_right, _basisY, _basisZ);
+    parts.mouth.quaternion.setFromRotationMatrix(_matrix);
+    parts.mouth.position.copy(place(0, -L.mouthDown, 0.075));
+    parts.mouth.scale.setScalar(scale * L.mouthRadius);
+  }
+
+  if (parts.hat) {
+    parts.hat.position.copy(center).addScaledVector(_faceUp, scale * L.hatSeat);
   }
 }

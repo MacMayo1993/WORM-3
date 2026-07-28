@@ -19,13 +19,13 @@
 import * as THREE from 'three';
 import { getSkin } from '../worm/wormCosmeticsData.js';
 import { getHatParts } from '../worm/wormHatParts.js';
-import { layoutWormFace, FACE_LAYOUT, MOUTH_ARC } from '../worm/wormFaceLayout.js';
+import { layoutBookWormFace, layoutWormFace, FACE_LAYOUT, MOUTH_ARC } from '../worm/wormFaceLayout.js';
 import { getSkinFX } from '../worm/wormSkinFX.js';
 import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMaterialTime } from '../worm/wormSkinMaterial.js';
 import { WormParticleSystem } from '../worm/wormSkinParticles.js';
 import {
   PAGE_GEO_ARGS, PAGE_HINGE_X, PAGE_HINGE_Y, PAGE_LAYER_COUNT, PAGE_LAYER_GAP, PAGE_COLORS,
-  FRONT_COVER_GEO_ARGS, HEAD_PAGE_GEO_ARGS, HEAD_PAGE_ANGLE, SPINE_X_SCALE, pageHingeAngles,
+  BOOK_HEAD_FORWARD, BOOK_HEAD_UP, FRONT_COVER_GEO_ARGS, HEAD_PAGE_GEO_ARGS, HEAD_PAGE_ANGLE, SPINE_X_SCALE, pageHingeAngles,
 } from '../worm/wormBookFX.js';
 
 // ─── Worm geometry constants ─────────────────────────────────────────────────
@@ -131,7 +131,7 @@ function _buildRig() {
     const leaf = new THREE.Group();
     leaf.rotation.y = -side * HEAD_PAGE_ANGLE;
     const page = new THREE.Mesh(headPageGeo, new THREE.MeshStandardMaterial({ color: PAGE_COLORS[0], roughness: 0.92 }));
-    page.position.x = side * 0.36;
+    page.position.x = side * 0.41;
     leaf.add(page);
     BOOK_SCRIBBLE_Y.forEach((y, line) => {
       const ink = new THREE.Mesh(
@@ -480,15 +480,16 @@ function _poseWorm(opts, time) {
       _pbBasisMat.makeBasis(_pbX, _pbY, _pbZ);
       _pbQuat.setFromRotationMatrix(_pbBasisMat);
       const coverScale = body.scale.x;
-      rig.frontCover.position.copy(_off).addScaledVector(_pbZ, -0.05 * coverScale);
+      rig.frontCover.position.copy(_off)
+        .addScaledVector(_pbY, coverScale * BOOK_HEAD_UP)
+        .addScaledVector(_pbZ, -coverScale * BOOK_HEAD_FORWARD);
       rig.frontCover.quaternion.copy(_pbQuat);
       rig.frontCover.scale.setScalar(coverScale);
       rig.frontCover.material.color.set(skin.body);
-      rig.frontCover.scale.set(coverScale * 1.55, coverScale * 1.12, coverScale * 0.32);
 
       rig.bookFace.position.copy(_off)
-        .addScaledVector(_pbY, coverScale * 0.08)
-        .addScaledVector(_pbZ, -coverScale * 0.22);
+        .addScaledVector(_pbY, coverScale * BOOK_HEAD_UP)
+        .addScaledVector(_pbZ, -coverScale * BOOK_HEAD_FORWARD);
       rig.bookFace.quaternion.copy(_pbQuat);
       rig.bookFace.scale.setScalar(coverScale);
     }
@@ -521,7 +522,13 @@ function _poseWorm(opts, time) {
   _faceParts.glasses[0] = isBook ? rig.glasses[0] : null;
   _faceParts.glasses[1] = isBook ? rig.glasses[1] : null;
   _faceParts.hat = rig.hatGroup;
-  layoutWormFace(_anchor, FWD, UP, HEAD_SCALE, _faceParts);
+  if (isBook) {
+    _anchor.addScaledVector(UP, HEAD_SCALE * BOOK_HEAD_UP)
+      .addScaledVector(FWD, HEAD_SCALE * BOOK_HEAD_FORWARD);
+    layoutBookWormFace(_anchor, FWD, UP, HEAD_SCALE, _faceParts);
+  } else {
+    layoutWormFace(_anchor, FWD, UP, HEAD_SCALE, _faceParts);
+  }
 
   // An occasional blink, squashing the eye and its pupil together.
   const blink = Math.sin(time * 0.9) > 0.985 ? 0.2 : 1;

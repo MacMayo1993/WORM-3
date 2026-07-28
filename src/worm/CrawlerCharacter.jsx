@@ -16,7 +16,7 @@ import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMateria
 import WormSkinParticles from './WormSkinParticles.jsx';
 import {
   PAGE_GEO_ARGS, PAGE_HINGE_X, PAGE_HINGE_Y, PAGE_LAYER_COUNT, PAGE_LAYER_GAP, PAGE_COLORS,
-  FRONT_COVER_GEO_ARGS, HEAD_PAGE_GEO_ARGS, HEAD_PAGE_ANGLE, SPINE_X_SCALE, turnSignalFromDirections, smoothTurn, pageHingeAngles,
+  BOOK_HEAD_FORWARD, BOOK_HEAD_UP, FRONT_COVER_GEO_ARGS, HEAD_PAGE_GEO_ARGS, HEAD_PAGE_ANGLE, SPINE_X_SCALE, turnSignalFromDirections, smoothTurn, pageHingeAngles,
 } from './wormBookFX.js';
 
 const PAGE_LAYERS = Array.from({ length: PAGE_LAYER_COUNT }, (_, i) => i);
@@ -392,7 +392,7 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
 
           return (
             <group ref={el => (bodySegmentRefs.current[i] = el)} key={i} position={[0, segBob + bobble + bookRaise, zOff]}>
-              <mesh scale={[segScale * breathe * stretch, segScale * breathe * (isBook ? 0.78 : 1), segScale * (isBook ? 1.15 : 1)]}>
+              <mesh visible={!isBook || !isHead} scale={[segScale * breathe * stretch, segScale * breathe * (isBook ? 0.78 : 1), segScale * (isBook ? 1.15 : 1)]}>
                 {isBook && !isHead ? <boxGeometry args={[SPINE_X_SCALE, 0.8, 1.2]} /> : <sphereGeometry args={[1, 12, 12]} />}
                 {/* Skin-themed material (metalness/roughness/clearcoat/transmission/
                     iridescence/flatShading + surface displacement) drives the PBR
@@ -452,14 +452,14 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
                   and raised ink scribbles. The regular face meshes remain in
                   front, making the open book itself the character's face. */}
               {isBook && isHead && (
-                <group position={[0, 0.09, 0.15]} scale={segScale}>
-                  <mesh position={[0, 0, -0.07]}>
-                    <boxGeometry args={[1.55, 1.02, FRONT_COVER_GEO_ARGS[2]]} />
+                <group position={[0, segScale * BOOK_HEAD_UP, segScale * BOOK_HEAD_FORWARD]} scale={segScale}>
+                  <mesh>
+                    <boxGeometry args={FRONT_COVER_GEO_ARGS} />
                     <meshStandardMaterial color={BODY_COLOR} roughness={0.5} metalness={0.1} />
                   </mesh>
                   {[-1, 1].map(side => (
                     <group key={side} rotation={[0, -side * HEAD_PAGE_ANGLE, 0]}>
-                      <mesh position={[side * 0.36, 0, 0]}>
+                      <mesh position={[side * 0.41, 0, 0]}>
                         <boxGeometry args={HEAD_PAGE_GEO_ARGS} />
                         <meshStandardMaterial color={PAGE_COLORS[0]} roughness={0.92} metalness={0} />
                       </mesh>
@@ -507,19 +507,19 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
                   </group>
 
                   {/* Eyes — positioned on head sphere surface */}
-                  <mesh position={[0.10, 0.10, 0.22]}>
+                  <mesh position={[0.10, 0.24, 0.075]}>
                     <sphereGeometry args={[0.08, 8, 8]} />
                     <meshBasicMaterial color={EYE_WHITE} />
                   </mesh>
-                  <mesh position={[-0.10, 0.10, 0.22]}>
+                  <mesh position={[-0.10, 0.24, 0.075]}>
                     <sphereGeometry args={[0.08, 8, 8]} />
                     <meshBasicMaterial color={EYE_WHITE} />
                   </mesh>
-                  <mesh position={[0.10, 0.10, 0.27]}>
+                  <mesh position={[0.10, 0.24, 0.105]}>
                     <sphereGeometry args={[0.04, 8, 8]} />
                     <meshBasicMaterial color={PUPIL} />
                   </mesh>
-                  <mesh position={[-0.10, 0.10, 0.27]}>
+                  <mesh position={[-0.10, 0.24, 0.105]}>
                     <sphereGeometry args={[0.04, 8, 8]} />
                     <meshBasicMaterial color={PUPIL} />
                   </mesh>
@@ -527,7 +527,7 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
                   {/* Mouth — one curved smile, the same shape the healer worm
                       and the previews draw. Three dots in a row read as nothing
                       at the size a phone renders this at. */}
-                  <mesh position={[0, 0.03, 0.26]} rotation={[0, 0, Math.PI]}>
+                  <mesh position={[0, 0.10, 0.10]} rotation={[0, 0, Math.PI]}>
                     <torusGeometry args={[0.085, 0.021, 8, 20, MOUTH_ARC]} />
                     <meshBasicMaterial color={PUPIL} />
                   </mesh>
@@ -535,15 +535,15 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
                   {/* Book worm glasses */}
                   {isBook && (
                     <>
-                      <mesh position={[0.10, 0.10, 0.23]}>
+                      <mesh position={[0.10, 0.24, 0.095]}>
                         <torusGeometry args={[0.063, 0.013, 8, 18]} />
                         <meshStandardMaterial color="#1a1a1a" metalness={0.88} roughness={0.12} />
                       </mesh>
-                      <mesh position={[-0.10, 0.10, 0.23]}>
+                      <mesh position={[-0.10, 0.24, 0.095]}>
                         <torusGeometry args={[0.063, 0.013, 8, 18]} />
                         <meshStandardMaterial color="#1a1a1a" metalness={0.88} roughness={0.12} />
                       </mesh>
-                      <mesh position={[0, 0.10, 0.24]} rotation={[0, Math.PI / 2, 0]}>
+                      <mesh position={[0, 0.24, 0.10]} rotation={[0, Math.PI / 2, 0]}>
                         <capsuleGeometry args={[0.007, 0.074, 4, 4]} />
                         <meshStandardMaterial color="#1a1a1a" metalness={0.88} roughness={0.12} />
                       </mesh>
