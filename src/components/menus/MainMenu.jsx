@@ -1197,9 +1197,9 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
         .mc-arrow:active { background: rgba(255,255,255,0.22) !important; }
         .mc-play:active  { opacity: 0.80 !important; transform: scale(0.98) !important; }
         .mc-pill:hover   { border-color: rgba(255,255,255,0.45) !important; color: rgba(255,255,255,0.92) !important; }
-        .mc-cube-window { height: min(44vh, 390px); }
+        .mc-cube-window { height: min(47vh, 415px); }
         @media (max-width: 600px) {
-          .mc-cube-window { height: min(40vh, 350px); }
+          .mc-cube-window { height: min(45vh, 395px); }
         }
       `}</style>
 
