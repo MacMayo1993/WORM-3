@@ -7,7 +7,8 @@ import { useGameStore } from '../../hooks/useGameStore.js';
 import { getStickerWorldPos } from '../../game/coordinates.js';
 import { getTunnelWorldPosInto, getWindWorldPosInto } from '../wormLogic.js';
 import WormHat3D from '../wormCosmetics.jsx';
-import { layoutWormFace, FACE_LAYOUT, MOUTH_ARC } from '../wormFaceLayout.js';
+import { layoutBookWormFace, layoutWormFace, FACE_LAYOUT, MOUTH_ARC } from '../wormFaceLayout.js';
+import { BOOK_HEAD_FORWARD, BOOK_HEAD_UP } from '../wormBookFX.js';
 import { _hatAlignQuat, _hatYUp } from '../wormCosmeticsData.js';
 import { WORM_LIFT, FACE_NORMALS, DIR_FORWARD } from './constants.js';
 
@@ -117,7 +118,15 @@ export function WormFace({ worm, size }) {
         _faceParts.glasses[0] = isBook ? glassLeftRef.current : null;
         _faceParts.glasses[1] = isBook ? glassRightRef.current : null;
         _faceParts.hat = hatGroupRef.current;
-        layoutWormFace(_faceHeadPos, _faceForward, normal, HEAD_RADIUS, _faceParts);
+        if (isBook) {
+            // Put the expression on the upright paper portrait, rather than on
+            // the now-hidden spherical head at its feet.
+            _faceHeadPos.addScaledVector(normal, HEAD_RADIUS * BOOK_HEAD_UP)
+                .addScaledVector(_faceForward, HEAD_RADIUS * BOOK_HEAD_FORWARD);
+            layoutBookWormFace(_faceHeadPos, _faceForward, normal, HEAD_RADIUS, _faceParts);
+        } else {
+            layoutWormFace(_faceHeadPos, _faceForward, normal, HEAD_RADIUS, _faceParts);
+        }
 
         if (hatGroupRef.current) {
             _hatAlignQuat.setFromUnitVectors(_hatYUp, normal);

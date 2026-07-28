@@ -21,7 +21,7 @@ import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMateria
 import WormSkinParticles from '../WormSkinParticles.jsx';
 import {
     PAGE_GEO_ARGS, PAGE_HINGE_X, PAGE_HINGE_Y, PAGE_LAYER_COUNT, PAGE_LAYER_GAP, PAGE_COLORS,
-    FRONT_COVER_GEO_ARGS, HEAD_PAGE_GEO_ARGS, HEAD_PAGE_ANGLE, SPINE_X_SCALE, TURN_SIGNAL_GAIN,
+    BOOK_HEAD_FORWARD, BOOK_HEAD_UP, FRONT_COVER_GEO_ARGS, HEAD_PAGE_GEO_ARGS, HEAD_PAGE_ANGLE, SPINE_X_SCALE, TURN_SIGNAL_GAIN,
     turnSignalFromDirections, smoothTurn, pageHingeAngles,
 } from '../wormBookFX.js';
 import {
@@ -202,10 +202,10 @@ export function WormBody({ worm, size }) {
             const coverMesh = frontCoverRef.current;
             if (coverMesh) {
                 _bookCoverDummy.position.copy(_bodyHeadPos)
-                    .addScaledVector(_bookHeadY, 0.088 * 0.08)
-                    .addScaledVector(_bookHeadZ, -0.088 * 0.29);
+                    .addScaledVector(_bookHeadY, 0.088 * BOOK_HEAD_UP)
+                    .addScaledVector(_bookHeadZ, -0.088 * BOOK_HEAD_FORWARD);
                 _bookCoverDummy.quaternion.copy(_bookHeadQuat);
-                _bookCoverDummy.scale.set(0.088 * 1.55, 0.088 * 1.12, 0.088 * 0.32);
+                _bookCoverDummy.scale.setScalar(0.088);
                 _bookCoverDummy.updateMatrix();
                 coverMesh.setMatrixAt(0, _bookCoverDummy.matrix);
                 _bookPageColor.set(wormColorRef.current);
@@ -219,14 +219,14 @@ export function WormBody({ worm, size }) {
             const headScribbles = headScribbleRef.current;
             const headScale = 0.088;
             _bookHeadPageBase.copy(_bodyHeadPos)
-                .addScaledVector(_bookHeadY, headScale * 0.08)
-                .addScaledVector(_bookHeadZ, -headScale * 0.22);
+                .addScaledVector(_bookHeadY, headScale * BOOK_HEAD_UP)
+                .addScaledVector(_bookHeadZ, -headScale * BOOK_HEAD_FORWARD);
             let scribbleIndex = 0;
             for (const side of BOOK_HEAD_PAGE_SIDES) {
                 _bookHingeQuat.setFromAxisAngle(_bookYAxisUnit, -side * HEAD_PAGE_ANGLE);
                 _bookHeadPageQuat.copy(_bookHeadQuat).multiply(_bookHingeQuat);
 
-                _bookHeadPageOffset.set(side * 0.36, 0, 0).applyQuaternion(_bookHeadPageQuat);
+                _bookHeadPageOffset.set(side * 0.41, 0, 0).applyQuaternion(_bookHeadPageQuat);
                 _pageDummy.position.copy(_bookHeadPageBase).addScaledVector(_bookHeadPageOffset, headScale);
                 _pageDummy.quaternion.copy(_bookHeadPageQuat);
                 _pageDummy.scale.setScalar(headScale);

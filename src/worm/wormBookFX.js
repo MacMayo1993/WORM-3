@@ -47,9 +47,18 @@ export const PAGE_HINGE_Y = 0.34;
 // A box whose Y (height) is its largest dimension, built from the SAME
 // orientation basis the pages use (where Y already points along the actual
 // surface-relative "up"), stands up on its own with no extra hinge rotation.
-export const FRONT_COVER_GEO_ARGS = [0.85, 0.9, 0.35];
-export const HEAD_PAGE_GEO_ARGS = [0.72, 0.92, 0.055];
+// The head is deliberately much taller than a body segment.  At the old 0.9
+// height it looked like another flat body tile and left no honest room for a
+// pair of eyes, glasses and a mouth.  These proportions make it read as a
+// portrait-sized, standing book while retaining the two-leaf silhouette.
+export const FRONT_COVER_GEO_ARGS = [1.72, 1.62, 0.22];
+export const HEAD_PAGE_GEO_ARGS = [0.82, 1.48, 0.055];
 export const HEAD_PAGE_ANGLE = 0.2;
+
+// Placement of the standing book relative to the ordinary head centre.  Kept
+// here because gameplay, the platformer and picker previews all build it.
+export const BOOK_HEAD_UP = 0.72;
+export const BOOK_HEAD_FORWARD = 0.18;
 
 // At rest the two page blocks form a shallow open-book V around the middle.
 // A turn banks BOTH sides by the same extra rotation, so the whole spread
