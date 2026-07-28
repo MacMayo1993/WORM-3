@@ -22,6 +22,7 @@ import {
   SPECIAL_LIFETIME,
   SPECIAL_MAX_ON_BOARD,
   SPECIAL_TYPES,
+  SPECIAL_SPAWN_RADIUS,
   ROCKET_TILE_SPAN,
   ROCKET_JUMP_HEIGHT,
   MAGNET_DURATION,
@@ -160,10 +161,25 @@ describe('special orb spawning', () => {
     const sim = makeSim();
     const ctx = makeCtx();
     expect(sim.specials).toHaveLength(0);
-    run(sim, ctx, SPECIAL_SPAWN_INTERVAL + 0.5);
-    expect(sim.specials).toHaveLength(1);
-    expect(SPECIAL_TYPES).toContain(sim.specials[0].type);
+    // Step one at a time so the board can be inspected on the exact spawn frame,
+    // before the worm has crawled away from it.
+    // The spawn runs before the movement commit inside a frame, so the head it
+    // anchored to is the position from the START of that frame.
+    let spawned = null;
+    for (let i = 0; i < 2000 && !spawned; i++) {
+      const headBefore = { ...sim.pos };
+      stepWormSim(sim, 0.05, SIZE, ctx);
+      if (sim.specials.length) spawned = { orb: sim.specials[0], head: headBefore };
+    }
+    expect(spawned).not.toBeNull();
+    expect(SPECIAL_TYPES).toContain(spawned.orb.type);
     expect(eventsOf(ctx, 'specials').length).toBeGreaterThan(0);
+
+    // It landed near the worm, not on the far side of the cube where the player
+    // would never see it before it timed out.
+    const { head } = spawned;
+    const reachable = collectManifoldRing(head.x, head.y, head.z, head.dirKey, SIZE, SPECIAL_SPAWN_RADIUS);
+    expect(reachable.has(tileKey(spawned.orb))).toBe(true);
   });
 
   it('never exceeds the on-board cap', () => {
@@ -193,32 +209,50 @@ describe('special orb spawning', () => {
 });
 
 describe('claiming a special', () => {
-  it('is NOT claimed by crawling over it — the orb hovers out of reach', () => {
+  it('is claimed by crawling onto it — contact is enough', () => {
     const sim = makeSim();
     const ctx = makeCtx();
     sim.specials = [special(2, 3, 4, 'PZ')];
     stepUntilCommit(sim, ctx); // lands on (2,3,4)
     expect(sim.pos).toMatchObject({ x: 2, y: 3, z: 4, dirKey: 'PZ' });
-    expect(sim.specials).toHaveLength(1);
-    expect(sim.rocketActive).toBe(false);
+    expect(sim.specials).toHaveLength(0);
+    expect(sim.rocketActive).toBe(true);
+    expect(sim.pendingSpecialFlash).toMatchObject({ type: 'rocket' });
   });
 
-  it('is claimed when the worm is airborne over it', () => {
+  it('is claimed from an adjacent tile while airborne', () => {
     const sim = makeSim();
     const ctx = makeCtx();
-    stepUntilCommit(sim, ctx); // lands on (2,3,4)
-    sim.specials = [special(2, 4, 4, 'PZ', 'magnet')];
-    // Jump mid-step so the worm is still in the air when it commits onto the next tile.
+    // One tile to the side of the worm's path — a grounded worm walks straight past.
+    sim.specials = [special(1, 3, 4, 'PZ', 'magnet')];
     run(sim, ctx, 0.5);
     queueTurn(sim, 'jump');
     stepWormSim(sim, 0.05, SIZE, ctx);
     expect(sim.isJumping).toBe(true);
 
     stepUntilCommit(sim, ctx);
-    expect(sim.pos).toMatchObject({ x: 2, y: 4, z: 4, dirKey: 'PZ' });
+    expect(sim.pos).toMatchObject({ x: 2, y: 3, z: 4, dirKey: 'PZ' });
     expect(sim.specials).toHaveLength(0);
     expect(sim.magnetT).toBeGreaterThan(0);
-    expect(sim.pendingSpecialFlash).toMatchObject({ type: 'magnet' });
+  });
+
+  it('is left alone one tile off the path when grounded', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    sim.specials = [special(1, 3, 4, 'PZ', 'magnet')];
+    stepUntilCommit(sim, ctx);
+    expect(sim.specials).toHaveLength(1);
+    expect(sim.magnetT).toBe(0);
+  });
+
+  it('is pulled in by an active magnet', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    sim.specials = [special(0, 3, 4, 'PZ', 'rocket')]; // two steps away
+    sim.magnetT = 5;
+    stepUntilCommit(sim, ctx);
+    expect(sim.specials).toHaveLength(0);
+    expect(sim.rocketActive).toBe(true);
   });
 
   it('carries specials through a committed slice rotation', () => {
