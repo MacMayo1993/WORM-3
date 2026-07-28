@@ -74,6 +74,12 @@ const _bodySideVec = new THREE.Vector3();
 const _bodyRideAxis = new THREE.Vector3();
 const _bodyEffA = new THREE.Vector3();
 const _bodyEffB = new THREE.Vector3();
+// Camera-proximity cull while riding a wormhole: fully hidden inside CAM_CULL_HIDE
+// of the lens, back to full size by CAM_CULL_FULL. See the cull block in the
+// segment loop for why the camera ends up inside its own worm at all.
+const CAM_CULL_HIDE = 0.30;
+const CAM_CULL_FULL = 0.52;
+const _camWorldPos = new THREE.Vector3();
 // Suck-in shaping: how much a segment necks down at the entry aperture, and over how
 // much arc-length inside the mouth it recovers. Deliberately shorter than the throat
 // (utils/tunnelPath) so the whole squeeze happens while the hole is still on screen.
@@ -162,6 +168,11 @@ export function WormBody({ worm, size }) {
         // be added again here (face is already placed at headInterpPos + 0.09, consistent).
         const _bodyTransit = worm.phase.current === 'entering' || worm.phase.current === 'tunnel' || worm.phase.current === 'exiting' || worm.phase.current === 'windout';
         _bodyHeadPos.addScaledVector(_bodyNormal, _bodyTransit ? 0 : WORM_LIFT + currentJumpVal);
+        // Only the in-tunnel shots put the lens on the body's own line — the surface
+        // chase camera sits well above and behind it, so nothing there needs culling
+        // and gating on the phase keeps segments from blinking out during a jump.
+        const _transitCull = _bodyTransit || worm.phase.current === 'windup';
+        if (_transitCull) _camWorldPos.copy(state.camera.position);
 
         const _isInch = isInchRef.current;
         const _isGlow = isGlowRef.current;
@@ -597,6 +608,25 @@ export function WormBody({ worm, size }) {
             // Compensate for the longitudinal gap left by skipped neighbors so the tail
             // still reads as continuous instead of visibly beaded out at long lengths.
             if (lodStep > 1) _wormDummy.scale.multiplyScalar(lodStep);
+            // Camera-proximity cull, transit only.
+            //
+            // Inside a wormhole the camera trails the head along the very centerline
+            // the body is strung down, and at the entry mouth it has to be ON that
+            // line — that is what threading the hole means. So segments necessarily
+            // pass through the lens, and a 0.09 ball a hand's width from the near
+            // plane is a wall of colour across the frame: the shot reads as being
+            // inside the worm rather than behind it. Shrink whatever comes that
+            // close to nothing, over a band wide enough that it is a fade rather
+            // than a pop.
+            // The head is exempt: it is the subject of the shot, and the camera's
+            // own trailing distance keeps it clear of the lens anyway.
+            if (_transitCull && i !== 0) {
+                const _camD = _bodyClonePos.distanceTo(_camWorldPos);
+                if (_camD < CAM_CULL_HIDE) continue;
+                if (_camD < CAM_CULL_FULL) {
+                    _wormDummy.scale.multiplyScalar((_camD - CAM_CULL_HIDE) / (CAM_CULL_FULL - CAM_CULL_HIDE));
+                }
+            }
             _wormDummy.updateMatrix();
             mesh.setMatrixAt(writeIdx, _wormDummy.matrix);
 

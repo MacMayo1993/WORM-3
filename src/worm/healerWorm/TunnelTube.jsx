@@ -21,6 +21,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { getTunnelWorldPosInto } from '../wormLogic.js';
+import { tunnelBoreRadiusAt } from '../../utils/tunnelPath.js';
 import { FACE_COLORS } from '../../utils/constants.js';
 import { resolveColors } from '../../utils/colorSchemes.js';
 
@@ -29,21 +30,10 @@ const SIDES = 24;            // samples around the circumference — below ~20 t
                              // reads as a visible polygon from the inside
 const VERT_COUNT = (RINGS + 1) * (SIDES + 1);
 
-// Radius profile, tile → core → tile.
-//
-// The centerline is a polyline: an entry arm, a short crossing through the core,
-// then an exit arm. When the two tiles are on different axes the arms meet at a
-// sharp corner in the middle, and putting the tube's widest point on that corner
-// makes it read as two mismatched barrels butted together rather than one shaft.
-// So the bore pinches at the core as well as at each tile, and bulges over the
-// middle of each arm instead — the corner sits in the narrow part, and the
-// fragment shader fades the wall out across it entirely.
-// Kept deliberately snug. The camera rides 0.32 off the axis, so the bore only
-// has to clear that; anything wider fills the frame and swallows both the ribbon
-// and the cube around it.
-const R_MOUTH  = 0.34;       // where the tunnel meets its tile (sticker is ~0.88 wide)
-const R_THROAT = 0.58;       // at the core crossing — still clears the camera's offset
-const R_CORE   = 0.82;       // widest point, over the middle of each arm
+// The radius profile lives in utils/tunnelPath.js, alongside the centerline it is
+// swept around and the camera offset it has to clear — see tunnelBoreRadiusAt.
+// The corner where the two arms meet sits in the narrow part of that profile, and
+// the fragment shader fades the wall out across it entirely.
 
 // Opacity targets by phase. 'entering' starts at the faint value — a foreshadow
 // of the shaft while the camera is still hanging outside — and is driven up to
@@ -165,16 +155,6 @@ function createTubeGeometry() {
   return geo;
 }
 
-/** Tight at both tile mouths and at the core, bulging over the middle of each arm. */
-function radiusAt(t) {
-  const c = Math.min(1, Math.max(0, t));
-  // Widens from each tile mouth toward the core crossing.
-  const base = R_MOUTH + (R_THROAT - R_MOUTH) * Math.sin(Math.PI * c);
-  // Peaks at t=0.25 and t=0.75, and is exactly zero at both mouths and the core.
-  const arm = Math.abs(Math.sin(2 * Math.PI * c));
-  return base + (R_CORE - R_THROAT) * arm;
-}
-
 export function TunnelTube({ worm, size }) {
   const meshRef = useRef();
   const opacityRef = useRef(0);
@@ -233,7 +213,7 @@ export function TunnelTube({ worm, size }) {
       _bin.crossVectors(_tan, _nrm).normalize();
       _prevTan.copy(_tan);
 
-      const r = radiusAt(t);
+      const r = tunnelBoreRadiusAt(t);
       for (let j = 0; j <= SIDES; j++) {
         const a = (j / SIDES) * Math.PI * 2;
         const ca = Math.cos(a) * r;

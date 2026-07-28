@@ -18,10 +18,15 @@ import * as THREE from 'three';
 import { buildTunnelPathForTunnel } from './wormLogic.js';
 import { makeTunnelPath, tunnelPathTToArc, tunnelPathArcPointExtendedInto } from '../utils/tunnelPath.js';
 
-// Offset from the centerline. Deliberately small: it rotates with the Möbius roll,
-// so a large one walks the camera around the bore and pins it against one wall
-// instead of leaving the shaft symmetric around the view.
-export const TUNNEL_CAM_UP = 0.32;
+// Offset from the centerline while riding.
+//
+// The worm's body occupies that centerline — it is strung along the exact route
+// the camera trails down — so this offset is the only thing keeping the lens out
+// of it. At 0.32 the nearest segment passed a fifth of a unit under the lens and
+// filled a third of the frame, which reads as the camera being inside the worm
+// rather than following it. It has to stay under the bore's radius, though, or
+// the lens ends up outside the shaft looking back through its wall.
+export const TUNNEL_CAM_UP = 0.42;
 
 // The exterior framing used to watch a mouth from outside the cube — shared by
 // windup, the start of the dive, and windout, so the dive provably begins from
@@ -57,7 +62,13 @@ export function projectToTileCenterAxisInto(out, point, tileCenter, faceNormal) 
  * back in so the Möbius roll remains visible through the rest of the trip.
  */
 export function cameraUpForHead(tHead) {
-  return TUNNEL_CAM_UP * THREE.MathUtils.smoothstep(tHead, 0.38, 0.52);
+  // …and it eases back OUT again on the approach to the exit mouth, for the same
+  // reason it is held off the entry one: the bore narrows to the width of a tile
+  // there, and the shot of the worm bursting out wants to be straight up the exit
+  // tile's axis rather than nudged off to one side of it.
+  return TUNNEL_CAM_UP
+    * THREE.MathUtils.smoothstep(tHead, 0.38, 0.52)
+    * (1 - THREE.MathUtils.smoothstep(tHead, 0.80, 0.95));
 }
 
 /**
@@ -97,14 +108,20 @@ export const diveProgress = (tp) => diveEase((tp - DIVE_HOLD) / (1 - DIVE_HOLD))
  * shot never read as being inside anything.
  *
  * Holding the trail short through the entry arm puts the camera through the
- * mouth on the dive. The growth back to the settled deep-ride value is spread
- * over tHead 0.42→0.85 so that it is always slower than the head's own advance
- * along the path — ramp it faster and the camera drifts backwards out of the
- * tunnel while the worm pulls away from it.
+ * mouth on the dive — the entry value cannot grow much beyond this, because the
+ * head is only about a unit deep when 'entering' hands over to the ride and the
+ * cube's solid body is hidden at that moment. A trail longer than that depth
+ * leaves the lens outside a cube that has just stopped being drawn.
+ *
+ * The settled deep-ride value is where the shot has room to breathe, and 1.15 was
+ * not enough of it: the head sat close enough to fill the frame with its own back.
+ * The growth to it is spread over tHead 0.42→0.95 so that it is always slower
+ * than the head's own advance along the path — ramp it faster and the camera
+ * drifts backwards out of the tunnel while the worm pulls away from it.
  */
 export function backForHead(tHead, size) {
-  const deep = THREE.MathUtils.smoothstep(tHead, 0.42, 0.85);
-  return THREE.MathUtils.lerp(0.62 + size * 0.1, 1.15 + size * 0.1, deep);
+  const deep = THREE.MathUtils.smoothstep(tHead, 0.42, 0.95);
+  return THREE.MathUtils.lerp(0.62 + size * 0.1, 1.45 + size * 0.1, deep);
 }
 
 const _fwd = new THREE.Vector3();
