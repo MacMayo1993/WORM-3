@@ -76,7 +76,12 @@ export default function TunnelTransitOverlay() {
         if (seamRef.current) {
           // A brief bloom exactly at ½π — the identification moment.
           const seam = Math.max(0, 1 - Math.abs(t - 0.5) / 0.07);
-          seamRef.current.style.opacity = String(amp * seam * 0.5);
+          // ...and a second, sharper one at t ≈ 0.33, which is where the camera
+          // now punches through the entry hole. Passing through an opening is the
+          // beat this overlay exists to sell, and until the camera actually did it
+          // there was nothing at this point in the ride to mark.
+          const punch = Math.max(0, 1 - Math.abs(t - 0.33) / 0.045);
+          seamRef.current.style.opacity = String(amp * Math.max(seam, punch * punch * 0.85) * 0.5);
         }
       }
       rafRef.current = requestAnimationFrame(animate);

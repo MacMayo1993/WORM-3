@@ -5,7 +5,14 @@ import { useGameStore } from '../hooks/useGameStore.js';
 import { getStickerWorldPos } from '../game/coordinates.js';
 import { getTunnelWorldPosInto } from './wormLogic.js';
 import { tunnelState } from './tunnelProgressBridge.js';
-import { SURFACE_OFFSET } from '../utils/constants.js';
+import {
+    makeTunnelCamPose,
+    tunnelCamPoseInto,
+    diveEase,
+    portalDist,
+    portalUp,
+    ENTER_END_T,
+} from './tunnelCameraRails.js';
 import {
     CAM_HEIGHT_BASE,
     CAM_BACK_BASE,
@@ -28,24 +35,14 @@ const _camWormWorld = new THREE.Vector3();
 const _camNormal = new THREE.Vector3();
 const _camTargetCam = new THREE.Vector3();
 const _camTargetLook = new THREE.Vector3();
-const _camUpVec = new THREE.Vector3();
-const _camVec = new THREE.Vector3();
-const _camLookVec = new THREE.Vector3();
-const _camLookAheadVec = new THREE.Vector3();
 const _camTunnelTangent = new THREE.Vector3();
-const _camTunnelRight = new THREE.Vector3();
-const _camSurfCam = new THREE.Vector3();
 // Face-transition blend scratch — slerp normal and lerp forward over ~250ms
 const _rawNormal = new THREE.Vector3();
 const _rawForward = new THREE.Vector3();
 const FACE_TRANS_DURATION = 0.25;
-// Ribbon-camera scratch vectors — recomputed each frame from tunnel geometry
+// Tunnel-mouth scratch — the two centerline endpoints the exterior shots frame.
 const _ribVStart = new THREE.Vector3();
 const _ribVEnd   = new THREE.Vector3();
-const _ribMidA   = new THREE.Vector3();
-const _ribMidB   = new THREE.Vector3();
-const _ribAxis   = new THREE.Vector3();
-const _ribPerp   = new THREE.Vector3();
 // Exit-beat scratch — the external framing the inside camera swings out to as the
 // worm reaches the exit tile.
 const _exitCamOut  = new THREE.Vector3();
@@ -53,6 +50,15 @@ const _exitLookOut = new THREE.Vector3();
 const _exitSide    = new THREE.Vector3();
 const _exitUpOut   = new THREE.Vector3();
 const _WORLD_UP    = new THREE.Vector3(0, 1, 0);
+// Dive scratch — the two framings the 'entering' phase blends between as the
+// camera falls out of the exterior shot and through the entry hole.
+const _diveOutCam  = new THREE.Vector3();
+const _diveOutLook = new THREE.Vector3();
+const _diveInCam   = new THREE.Vector3();
+const _diveInLook  = new THREE.Vector3();
+const _diveUpOut   = new THREE.Vector3();
+// The on-rails pose, shared by the dive and the inside-ribbon branch.
+const _rails = makeTunnelCamPose();
 
 
 export default function WormChaseCamera({ worm, size }) {
@@ -139,8 +145,13 @@ export default function WormChaseCamera({ worm, size }) {
         // 'exiting' (the inside ribbon camera rides along for the full exit-arm traversal), then
         // eases back down once 'windout' takes over with the external view.
         const _tp = worm.tunnelProgress.current;
+        // During 'entering' the widening is squared rather than linear: the dive
+        // itself is cubic, so a linear FOV ramp finishes long before the camera
+        // moves and the two read as unrelated. Squared leads the rush by just
+        // enough to play as anticipation of it.
+        const _enterP = THREE.MathUtils.clamp(_tp, 0, 1);
         const tunnelMix = phase === 'tunnel' ? 1
-            : phase === 'entering' ? THREE.MathUtils.clamp(_tp, 0, 1)
+            : phase === 'entering' ? _enterP * _enterP
             : phase === 'exiting'  ? 1
             : 0;
         const targetFov = THREE.MathUtils.lerp(baseFov, baseFov + 16, tunnelMix); // widen for the portal/tunnel view
@@ -250,14 +261,13 @@ export default function WormChaseCamera({ worm, size }) {
             camUpRef.current.lerp(_camUp, Math.min(1, crawlK * delta)).normalize();
             camera.up.copy(camUpRef.current);
             camera.lookAt(lookAtRef.current);
-        } else if ((phase === 'windup' || phase === 'entering') && worm.activeTunnel.current) {
-            // Entry-side external view: windup spiral and entering dive are watched from outside
-            // so the player sees the worm swirl into the entry hole against the cube face.
-            const tp = worm.tunnelProgress.current;
+        } else if (phase === 'windup' && worm.activeTunnel.current) {
+            // Entry-side external view: the windup spiral is watched from outside so the
+            // player sees the worm swirl down onto the entry hole against the cube face.
             const tunnel = worm.activeTunnel.current;
 
             tunnelState.active = true;
-            tunnelState.t = phase === 'windup' ? 0 : tp * 0.33;
+            tunnelState.t = 0;
             tunnelState.activeTunnelId = tunnel.pairId ?? null;
 
             const entN = FACE_NORMALS[tunnel.entry.dirKey] ?? FACE_NORMALS.PY;
@@ -268,9 +278,8 @@ export default function WormChaseCamera({ worm, size }) {
             // function that defines the path keeps camera and geometry from drifting apart.
             getTunnelWorldPosInto(_ribVStart, tunnel, 0, size);
 
-            const portalDist = 2.8 + size * 0.85;
-            const portalUp   = 1.3 + size * 0.32;
-            _camTargetCam.copy(_ribVStart).addScaledVector(entN, portalDist); _camTargetCam.y += portalUp;
+            _camTargetCam.copy(_ribVStart).addScaledVector(entN, portalDist(size));
+            _camTargetCam.y += portalUp(size);
             _camTargetLook.copy(_ribVStart);
             _camUp.set(0, entN.y < -0.85 ? -1 : 1, 0);
 
@@ -279,6 +288,71 @@ export default function WormChaseCamera({ worm, size }) {
             lookAtRef.current.lerp(_camTargetLook, a);
             camera.position.copy(camPosRef.current);
             camUpRef.current.lerp(_camUp, a).normalize();
+            camera.up.copy(camUpRef.current);
+            camera.lookAt(lookAtRef.current);
+        } else if (phase === 'entering' && worm.activeTunnel.current) {
+            // ── The dive ─────────────────────────────────────────────────────────
+            // 'entering' used to be a second exterior shot: the camera hung where the
+            // windup left it and watched the worm disappear into the hole, then the
+            // next phase cut to a view already inside. The player never travelled
+            // through the opening, so the wormhole read as a place the worm went
+            // rather than a place they went — the one thing this mechanic is for.
+            //
+            // Now the camera falls from that exterior framing onto the tunnel's own
+            // rails and through the mouth, on the cubic acceleration curve the mode
+            // selector's cube dive uses: almost still at first, then a rush. Because
+            // the on-rails end of the blend is computed with the same math as the
+            // inside-ribbon branch below, at tp = 1 the two are the same pose and the
+            // phase change is invisible — no cut, one continuous move from outside the
+            // cube to inside the shaft.
+            const tp = worm.tunnelProgress.current;
+            const tunnel = worm.activeTunnel.current;
+
+            tunnelState.active = true;
+            const tHead = tp * ENTER_END_T;
+            tunnelState.t = tHead;
+            tunnelState.activeTunnelId = tunnel.pairId ?? null;
+
+            const entN = FACE_NORMALS[tunnel.entry.dirKey] ?? FACE_NORMALS.PY;
+            getTunnelWorldPosInto(_ribVStart, tunnel, 0, size);
+
+            // Where we are diving FROM — the windup framing, held so the fall starts
+            // from exactly where the previous phase parked the camera.
+            _diveOutCam.copy(_ribVStart).addScaledVector(entN, portalDist(size));
+            _diveOutCam.y += portalUp(size);
+            _diveOutLook.copy(_ribVStart);
+
+            // Where we are diving TO — the on-rails pose. Same call the ride branch
+            // below makes, so at tp = 1 the two poses are identical by construction.
+            tunnelCamPoseInto(_rails, tunnel, tHead, size);
+            _diveInCam.copy(_rails.cam);
+            _diveInLook.copy(_rails.look);
+
+            // Cubic, as in MainMenu's dive. Keeping the acceleration this
+            // back-loaded also means the camera only breaks the cube's surface over
+            // the last handful of frames of the phase — the frames in which the solid
+            // body is swapped for the interior view — so it never sits inside a cube
+            // that is still being drawn as solid.
+            const dive = diveEase(tp);
+            _camTargetCam.copy(_diveOutCam).lerp(_diveInCam, dive);
+            _camTargetLook.copy(_diveOutLook).lerp(_diveInLook, dive);
+
+            // Start level with the world, land in the Möbius roll.
+            _diveUpOut.set(0, entN.y < -0.85 ? -1 : 1, 0);
+            _camUp.copy(_rails.up).lerp(_diveUpOut, 1 - dive);
+            if (_camUp.lengthSq() < 1e-6) _camUp.copy(_diveUpOut);
+            _camUp.normalize();
+
+            // Exponential smoothing is a lag, and a lag at the aperture means the
+            // camera never actually arrives — it would hand over to the next branch
+            // still outside the hole, reintroducing the cut this whole branch exists
+            // to remove. The second pull converges on the target as the dive closes.
+            const a = Math.min(1, 3.0 * delta);
+            const snap = Math.max(a, dive * dive);
+            camPosRef.current.lerp(_camTargetCam, a).lerp(_camTargetCam, dive * dive);
+            lookAtRef.current.lerp(_camTargetLook, a).lerp(_camTargetLook, dive * dive);
+            camera.position.copy(camPosRef.current);
+            camUpRef.current.lerp(_camUp, snap).normalize();
             camera.up.copy(camUpRef.current);
             camera.lookAt(lookAtRef.current);
         } else if ((phase === 'tunnel' || phase === 'exiting') && worm.activeTunnel.current) {
@@ -292,32 +366,13 @@ export default function WormChaseCamera({ worm, size }) {
             tunnelState.t = tHead;
             tunnelState.activeTunnelId = tunnel.pairId ?? null;
 
-            getTunnelWorldPosInto(_camLookVec, tunnel, tHead, size);
-            getTunnelWorldPosInto(_camLookAheadVec, tunnel, Math.min(tHead + 0.05, 1), size);
-            _camTunnelTangent.subVectors(_camLookAheadVec, _camLookVec);
-            if (_camTunnelTangent.lengthSq() < 1e-6) _camTunnelTangent.set(0, 0, -1);
-            else _camTunnelTangent.normalize();
-
-            // ── Möbius roll ──────────────────────────────────────────────────────
-            // The band's cross-section rotates π across the traversal (see fillRibbon:
-            // perpCurrent.applyAxisAngle(axis, t * PI)). Pinning the camera to world-up
-            // meant the player watched that half-twist happen to the geometry instead of
-            // having it happen to them, which threw away the one thing that makes this a
-            // wormhole through RP2 rather than a pipe. Rolling the up-vector by the same
-            // angle inverts the world by the time you reach the far tile — the
-            // non-orientability, felt rather than observed.
-            _camUp.set(0, 1, 0);
-            if (Math.abs(_camTunnelTangent.y) > 0.95) _camUp.set(0, 0, 1);
-            _camUp.addScaledVector(_camTunnelTangent, -_camUp.dot(_camTunnelTangent));
-            if (_camUp.lengthSq() < 1e-6) _camUp.set(0, 0, 1);
-            _camUp.normalize().applyAxisAngle(_camTunnelTangent, tHead * Math.PI);
-
-            // Sits nearer the centerline than a surface chase would: the offset rotates
-            // with the roll, so a large one walks the camera around the bore and pins it
-            // against one wall instead of leaving the shaft symmetric around the view.
-            const back = 1.15 + size * 0.1, up = 0.32, lookAhead = 0.7;
-            _camTargetCam.copy(_camLookVec).addScaledVector(_camTunnelTangent, -back).addScaledVector(_camUp, up);
-            _camTargetLook.copy(_camLookVec).addScaledVector(_camTunnelTangent, lookAhead);
+            // The same pose the dive lands on — Möbius roll, trail distance and all —
+            // so the entering→tunnel boundary is a no-op rather than a cut.
+            tunnelCamPoseInto(_rails, tunnel, tHead, size);
+            _camTunnelTangent.copy(_rails.tangent);
+            _camUp.copy(_rails.up);
+            _camTargetCam.copy(_rails.cam);
+            _camTargetLook.copy(_rails.look);
 
             // ── Exit beat ────────────────────────────────────────────────────────
             // The moment the worm punches out through the flipped tile used to fall in
@@ -375,9 +430,8 @@ export default function WormChaseCamera({ worm, size }) {
             // centerline rather than re-deriving it.
             getTunnelWorldPosInto(_ribVEnd, tunnel, 1, size);
 
-            const portalDist = 2.8 + size * 0.85;
-            const portalUp   = 1.3 + size * 0.32;
-            _camTargetCam.copy(_ribVEnd).addScaledVector(extN, portalDist); _camTargetCam.y += portalUp;
+            _camTargetCam.copy(_ribVEnd).addScaledVector(extN, portalDist(size));
+            _camTargetCam.y += portalUp(size);
             _camTargetLook.copy(_ribVEnd);
             _camUp.set(0, extN.y < -0.85 ? -1 : 1, 0);
 
