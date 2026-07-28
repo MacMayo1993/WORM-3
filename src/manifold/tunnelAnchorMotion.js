@@ -24,7 +24,9 @@ const _alt = new THREE.Vector3(1, 0, 0);
  * sticker's world quaternion through, this builds any orthonormal pair spanning
  * the face plane from the world normal: the shake axes may be rotated relative
  * to the tile's own, but the motion is a vibration, so the difference is not
- * observable — and it is guaranteed to stay in the plane of the face.
+ * observable — and it is guaranteed to stay in the plane of the face. The blink
+ * bounce is the one component that leaves that plane, and it is applied along the
+ * world normal directly.
  *
  * @returns {number} flip progress 0→1 for this end, 0 when the tile is at rest.
  */
@@ -40,6 +42,9 @@ export function applyTileFlipMotion(anchor, worldNormal, gridId) {
   _p2.crossVectors(worldNormal, _p1).normalize();
 
   anchor.addScaledVector(_p1, m.jx ?? 0).addScaledVector(_p2, m.jy ?? 0);
+  // Parity blinks also shove the tile straight out of the cube along its normal —
+  // follow that too, or the tunnel would stay pinned to the face the tile left.
+  if (m.bounce) anchor.addScaledVector(worldNormal, m.bounce);
   return m.p ?? 0;
 }
 
