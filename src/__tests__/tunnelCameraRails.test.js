@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import {
   backForHead,
+  cameraUpForHead,
   diveEase,
   tunnelCamPoseInto,
   makeTunnelCamPose,
@@ -83,6 +84,29 @@ describe('backForHead', () => {
 });
 
 describe('tunnelCamPoseInto', () => {
+  it('drives the lens through the dead centre of the entry tile', () => {
+    for (const size of [2, 3, 4, 5]) {
+      for (const tunnel of [straightTunnel(size), bentTunnel(size)]) {
+        const pose = makeTunnelCamPose();
+        const entry = new THREE.Vector3();
+        const normal = new THREE.Vector3(0, 1, 0);
+        const lateral = new THREE.Vector3();
+
+        tunnelCamPoseInto(pose, tunnel, ENTER_END_T, size);
+        entry.set(
+          tunnel.entry.x - (size - 1) / 2,
+          tunnel.entry.y - (size - 1) / 2 + SURFACE_OFFSET,
+          tunnel.entry.z - (size - 1) / 2
+        );
+        lateral.subVectors(pose.cam, entry)
+          .addScaledVector(normal, -lateral.dot(normal));
+
+        expect(cameraUpForHead(ENTER_END_T)).toBe(0);
+        expect(lateral.length()).toBeLessThan(1e-6);
+      }
+    }
+  });
+
   it('carries the camera through the entry face during the dive', () => {
     for (const size of [3, 4, 5]) {
       const tunnel = straightTunnel(size);
