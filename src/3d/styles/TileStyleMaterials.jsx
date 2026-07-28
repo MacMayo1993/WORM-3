@@ -88,6 +88,20 @@ export const sharedTremorState = {
 // Entries are deleted when the flip completes (spinT hits 0).
 export const flipBurstMap = new Map();
 
+// ─── Sticker flip motion ──────────────────────────────────────────────────────
+// The live animated motion of a flipping tile, keyed by sticker gridId:
+//   { p, jx, jy, squash }
+//     p       flip progress 0→1
+//     jx, jy  in-plane vibration offset the tile is currently displaced by
+//     squash  the tile's main squish scale (1 at rest, → 0 at the crossing)
+//
+// Tunnel endpoints are derived from the CUBIE's transform, which knows nothing
+// about the sticker's own flip animation — so the tile would shake and squash
+// while the tunnel welded to it sat perfectly still. This publishes that motion
+// so the ribbon and the cords can ride it. Written every frame of a flip and
+// deleted when it completes; readers treat a missing entry as "at rest".
+export const stickerFlipMotion = new Map();
+
 // ─── Heal burst map ───────────────────────────────────────────────────────────
 // Written by HealerWormMode when a tunnel heals (key = sticker gridId, value = 1).
 // StickerPlane consumes + deletes the entry to trigger the heal seal animation.
