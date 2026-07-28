@@ -20,7 +20,7 @@ import { getSkinFX } from '../wormSkinFX.js';
 import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMaterialTime } from '../wormSkinMaterial.js';
 import WormSkinParticles from '../WormSkinParticles.jsx';
 import {
-    PAGE_GEO_ARGS, PAGE_HINGE_X, PAGE_HINGE_Y, PAGE_LAYER_COUNT, PAGE_LAYER_GAP,
+    PAGE_GEO_ARGS, PAGE_HINGE_X, PAGE_HINGE_Y, PAGE_LAYER_COUNT, PAGE_LAYER_GAP, PAGE_COLORS,
     FRONT_COVER_GEO_ARGS, SPINE_X_SCALE, TURN_SIGNAL_GAIN,
     turnSignalFromDirections, smoothTurn, pageHingeAngles,
 } from '../wormBookFX.js';
@@ -608,8 +608,8 @@ export function WormBody({ worm, size }) {
                 }
 
                 if (colorDirty) {
-                    _bookPageColor.set(bellyCol);
                     for (let layer = 0; layer < PAGE_LAYER_COUNT; layer++) {
+                        _bookPageColor.set(PAGE_COLORS[layer % PAGE_COLORS.length]);
                         if (leftPageRef.current) leftPageRef.current.setColorAt(pageWriteIdx + layer, _bookPageColor);
                         if (rightPageRef.current) rightPageRef.current.setColorAt(pageWriteIdx + layer, _bookPageColor);
                     }
