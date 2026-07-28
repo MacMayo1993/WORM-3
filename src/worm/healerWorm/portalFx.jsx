@@ -47,6 +47,21 @@ const _fxQuat = new THREE.Quaternion();
 const _fxRingUp = new THREE.Vector3(0, 0, 1); // ring/torus geometry lies in XY → flat normal is +Z
 const VORTEX_RINGS = 4;
 
+/**
+ * Overall traversal progress, 0 at the wind-up spiral to 1 as the worm clears the
+ * exit hole. The per-phase progress value restarts at 0 each phase, so on its own
+ * it cannot say how close the worm is to surfacing. Same mapping WormChaseCamera
+ * uses for tunnelState.t, so the exit mouth charges in step with the ride.
+ */
+function traversalProgress(phase, prog) {
+    const p = Math.min(1, Math.max(0, prog ?? 0));
+    if (phase === 'windup') return 0;
+    if (phase === 'entering') return p * 0.33;
+    if (phase === 'tunnel') return 0.33 + p * 0.34;
+    if (phase === 'exiting') return 0.67 + p * 0.33;
+    return 1;
+}
+
 export function TunnelPortalFX({ worm, size }) {
     const colors = useGameStore(s => s.wormActiveTunnelColors);
     const entryColor = colors?.entryColor ?? '#33ddff';
@@ -56,6 +71,10 @@ export function TunnelPortalFX({ worm, size }) {
     const vortexRingRefs = useRef([]);
     const exitVortexRef = useRef();
     const exitVortexRingRefs = useRef([]);
+    const exitMouthRef = useRef();
+    const exitMouthIrisRef = useRef();
+    const exitMouthGlowRef = useRef();
+    const exitMouthArcRefs = useRef([]);
     const burstRef = useRef();
     const burstFlashRef = useRef();
     const burstTRef = useRef(-1);   // -1 idle, else 0..1 burst progress
@@ -93,6 +112,64 @@ export function TunnelPortalFX({ worm, size }) {
                     r.scale.setScalar(Math.max(0.02, baseR * shrink));
                     r.position.z = -i * 0.16 * (0.6 + shrink); // recede into the hole (−normal)
                     if (r.material) r.material.opacity = Math.max(0, envelope * (0.55 - i * 0.09));
+                }
+            }
+        }
+
+        // ── Exit mouth (held open for the whole traversal) ────────────────────
+        // The destination tile used to have nothing on it until 'windout': the exit
+        // vortex only ran at the very end and the burst was a one-shot. For the whole
+        // dive and ride it looked like an ordinary tile, so there was no sign the worm
+        // was still inside a wormhole, and no clue where it was going to surface.
+        // This marks it as an open, active hole from the moment the trip starts, and
+        // charges up as the worm approaches so the arrival is telegraphed.
+        const mouth = exitMouthRef.current;
+        if (mouth) {
+            const showMouth = !!tunnel && (
+                phase === 'windup' || phase === 'entering' || phase === 'tunnel' || phase === 'exiting'
+            );
+            mouth.visible = showMouth;
+            if (showMouth) {
+                const xwp = getStickerWorldPos(tunnel.exit.x, tunnel.exit.y, tunnel.exit.z, tunnel.exit.dirKey, size, 0);
+                _fxNormal.copy(FACE_NORMALS[tunnel.exit.dirKey] ?? FACE_NORMALS.PY);
+                // Just proud of the sticker so it reads as sitting on the tile without
+                // z-fighting against it.
+                _fxPos.set(xwp[0], xwp[1], xwp[2]).addScaledVector(_fxNormal, 0.06);
+                _fxQuat.setFromUnitVectors(_fxRingUp, _fxNormal);
+                mouth.position.copy(_fxPos);
+                mouth.quaternion.copy(_fxQuat);
+
+                const trip = traversalProgress(phase, prog);
+                // Idle breathing the whole time, plus a rising charge as the worm nears.
+                const breathe = 0.5 + 0.5 * Math.sin(t * 3.4);
+                const charge = Math.pow(trip, 2.2);          // stays low, then ramps late
+                const imminent = Math.pow(Math.max(0, (trip - 0.6) / 0.4), 2); // last stretch only
+
+                if (exitMouthIrisRef.current) {
+                    // The iris widens as the worm approaches — the hole opening up for it.
+                    const s = 0.82 + charge * 0.5 + breathe * 0.06;
+                    exitMouthIrisRef.current.scale.setScalar(s);
+                    exitMouthIrisRef.current.rotation.z = t * 0.9;
+                    if (exitMouthIrisRef.current.material) {
+                        exitMouthIrisRef.current.material.opacity = 0.35 + breathe * 0.18 + charge * 0.4;
+                    }
+                }
+                if (exitMouthGlowRef.current) {
+                    exitMouthGlowRef.current.scale.setScalar(0.7 + charge * 0.55 + breathe * 0.05);
+                    if (exitMouthGlowRef.current.material) {
+                        // Bright enough late that the tile visibly announces the arrival.
+                        exitMouthGlowRef.current.material.opacity = 0.12 + charge * 0.3 + imminent * 0.35;
+                    }
+                }
+                // Counter-rotating arcs: cheap way to read as "spinning up" rather than
+                // a static decal stuck on the face.
+                for (let i = 0; i < exitMouthArcRefs.current.length; i++) {
+                    const a = exitMouthArcRefs.current[i];
+                    if (!a) continue;
+                    const dir = i % 2 === 0 ? 1 : -1;
+                    a.rotation.z = dir * (t * (1.4 + i * 0.5) + charge * 6);
+                    a.scale.setScalar(1.05 + i * 0.16 + charge * 0.35);
+                    if (a.material) a.material.opacity = 0.20 + charge * 0.35 + breathe * 0.08;
                 }
             }
         }
@@ -177,6 +254,31 @@ export function TunnelPortalFX({ worm, size }) {
                     <mesh key={i} ref={el => (vortexRingRefs.current[i] = el)}>
                         <torusGeometry args={[0.5, 0.045, 8, 36]} />
                         <meshBasicMaterial color={entryColor} transparent opacity={0}
+                            blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+                    </mesh>
+                ))}
+            </group>
+
+            {/* Exit mouth — held open on the destination tile for the whole traversal,
+                so the tile stays visibly an active wormhole until the worm is out. */}
+            <group ref={exitMouthRef} visible={false}>
+                {/* Iris rim */}
+                <mesh ref={exitMouthIrisRef}>
+                    <torusGeometry args={[0.40, 0.045, 8, 36]} />
+                    <meshBasicMaterial color={exitColor} transparent opacity={0}
+                        blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+                </mesh>
+                {/* Throat glow — the hole itself */}
+                <mesh ref={exitMouthGlowRef} position={[0, 0, -0.01]}>
+                    <circleGeometry args={[0.40, 32]} />
+                    <meshBasicMaterial color={exitColor} transparent opacity={0}
+                        blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+                </mesh>
+                {/* Counter-rotating arcs */}
+                {[0, 1].map(i => (
+                    <mesh key={i} ref={el => (exitMouthArcRefs.current[i] = el)}>
+                        <torusGeometry args={[0.50, 0.022, 6, 28, Math.PI * 1.15]} />
+                        <meshBasicMaterial color={exitColor} transparent opacity={0}
                             blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
                     </mesh>
                 ))}
