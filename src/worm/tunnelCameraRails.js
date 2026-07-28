@@ -15,13 +15,13 @@
 // start pose.
 
 import * as THREE from 'three';
-import { getTunnelWorldPosInto } from './wormLogic.js';
+import { buildTunnelPathForTunnel } from './wormLogic.js';
+import { makeTunnelPath, tunnelPathTToArc, tunnelPathArcPointExtendedInto } from '../utils/tunnelPath.js';
 
-// Offsets from the centerline. Deliberately small: they rotate with the Möbius
-// roll, so a large one walks the camera around the bore and pins it against one
-// wall instead of leaving the shaft symmetric around the view.
+// Offset from the centerline. Deliberately small: it rotates with the Möbius roll,
+// so a large one walks the camera around the bore and pins it against one wall
+// instead of leaving the shaft symmetric around the view.
 export const TUNNEL_CAM_UP = 0.32;
-export const TUNNEL_LOOK_AHEAD = 0.7;
 
 // The exterior framing used to watch a mouth from outside the cube — shared by
 // windup, the start of the dive, and windout, so the dive provably begins from
@@ -61,18 +61,6 @@ export function cameraUpForHead(tHead) {
 }
 
 /**
- * Lateral camera offset from the tunnel centerline.
- *
- * The entry arm must stay at zero: even a small cinematic "up" offset moves
- * the lens across the face of the entry sticker instead of through its centre.
- * Once the camera is safely beyond the mouth, ease the usual riding height
- * back in so the Möbius roll remains visible through the rest of the trip.
- */
-export function cameraUpForHead(tHead) {
-  return TUNNEL_CAM_UP * THREE.MathUtils.smoothstep(tHead, 0.38, 0.52);
-}
-
-/**
  * Ease for the dive through the entry hole: cubic, so the camera is nearly
  * still for most of the phase and then rushes. Same curve as the mode
  * selector's cube dive (MainMenu), which is the feel this is modelled on.
@@ -81,6 +69,22 @@ export const diveEase = (p) => {
   const c = p < 0 ? 0 : p > 1 ? 1 : p;
   return c * c * c;
 };
+
+/**
+ * Fraction of the 'entering' phase spent held on the exterior framing before the
+ * dive begins at all.
+ *
+ * The suck-in is the beat the hold exists for: the head is already through the
+ * aperture from the first frame of the phase, and the body streams in behind it
+ * over the whole of it. A camera that leaves immediately takes the tail — which is
+ * still out on the surface, BEHIND the lens — off screen before any of that
+ * happens, so the worm merely stopped existing. Held here, the player watches the
+ * body drain into the hole from outside, and only then falls in after it.
+ */
+export const DIVE_HOLD = 0.34;
+
+/** Dive progress (0→1) for a given 'entering' phase progress, including the hold. */
+export const diveProgress = (tp) => diveEase((tp - DIVE_HOLD) / (1 - DIVE_HOLD));
 
 /**
  * How far behind the head the camera trails.
@@ -104,9 +108,36 @@ export function backForHead(tHead, size) {
 }
 
 const _fwd = new THREE.Vector3();
+const _camPath = makeTunnelPath();
+
+// How far apart the two samples used to differentiate the route are, in world
+// units. Small enough to read as the local direction of travel, large enough not
+// to be swamped by float noise at the throat/diagonal corner.
+const TANGENT_EPS = 0.05;
+
+// How far ahead of the LENS the aim point sits, in world units along the route.
+// The head is backForHead() ahead of the lens (0.8–1.2 across the supported cube
+// sizes), so this lands just past it — the worm stays in frame with the route it
+// is about to take opening up beyond it.
+const LOOK_AHEAD_ARC = 1.6;
+
+// How much of the aim direction comes from the local direction of travel versus
+// from where the route runs LOOK_AHEAD_ARC further on. Keeping the tangent in the
+// majority bounds how far the shot can swing at the core's right-angle bend.
+const LEAD_TANGENT_MIX = 0.62;
+
+const _lead = new THREE.Vector3();
 
 /**
  * Write the on-rails camera pose at `tHead` into `out`.
+ *
+ * The lens rides the route itself: it sits a fixed distance BEHIND the head
+ * measured along the centerline — through the throat, round the bend, out the far
+ * mouth — rather than a fixed distance back along the head's current tangent. The
+ * distinction is the whole ballgame at the aperture. A tangent-trailing camera
+ * leaves the tile's axis the instant the path bends and crosses the cube's surface
+ * through whichever tile happens to be over there; a route-trailing one goes where
+ * the head went, which is down the middle of the hole.
  *
  * @param {{cam: THREE.Vector3, look: THREE.Vector3, up: THREE.Vector3, tangent: THREE.Vector3}} out
  * @param {Object} tunnel  active tunnel descriptor (entry/exit tiles)
@@ -115,19 +146,19 @@ const _fwd = new THREE.Vector3();
  * @returns {typeof out}
  */
 export function tunnelCamPoseInto(out, tunnel, tHead, size) {
-  getTunnelWorldPosInto(out.look, tunnel, tHead, size);
-  getTunnelWorldPosInto(_fwd, tunnel, Math.min(tHead + 0.05, 1), size);
-  out.tangent.subVectors(_fwd, out.look);
-  if (out.tangent.lengthSq() < 1e-6) {
-    // At the very end of the path the forward sample clamps onto the current
-    // one and the difference collapses. Look backwards instead of falling back
-    // to an arbitrary world axis, which would flick the camera around on the
-    // last frames of the exit.
-    getTunnelWorldPosInto(_fwd, tunnel, Math.max(tHead - 0.05, 0), size);
-    out.tangent.subVectors(out.look, _fwd);
-  }
-  if (out.tangent.lengthSq() < 1e-6) out.tangent.set(0, 0, -1);
-  else out.tangent.normalize();
+  buildTunnelPathForTunnel(_camPath, tunnel, size);
+  const headArc = tunnelPathTToArc(_camPath, tHead);
+  const camArc = headArc - backForHead(tHead, size);
+
+  tunnelPathArcPointExtendedInto(out.cam, _camPath, camArc);
+
+  // Direction of travel AT THE CAMERA, not at the head: it is what the camera's
+  // own up-vector and look-ahead are built from, and while the head is already
+  // round the bend the camera is still coming down the throat.
+  tunnelPathArcPointExtendedInto(_fwd, _camPath, camArc + TANGENT_EPS);
+  out.tangent.subVectors(_fwd, out.cam);
+  if (out.tangent.lengthSq() < 1e-12) out.tangent.copy(_camPath.nStart).negate();
+  out.tangent.normalize();
 
   // ── Möbius roll ──────────────────────────────────────────────────────────
   // The band's cross-section rotates π across the traversal (see fillRibbon:
@@ -143,12 +174,30 @@ export function tunnelCamPoseInto(out, tunnel, tHead, size) {
   if (out.up.lengthSq() < 1e-6) out.up.set(0, 0, 1);
   out.up.normalize().applyAxisAngle(out.tangent, tHead * Math.PI);
 
-  const back = backForHead(tHead, size);
-  out.cam
-    .copy(out.look)
-    .addScaledVector(out.tangent, -back)
-    .addScaledVector(out.up, cameraUpForHead(tHead));
-  out.look.addScaledVector(out.tangent, TUNNEL_LOOK_AHEAD);
+  // Aim: mostly straight down the direction of travel, leaned toward where the
+  // route goes next. Aiming *only* at the route point ahead swings the shot into a
+  // corner well before reaching it (the core bend can be a right angle); aiming
+  // only along the tangent stares at the wall beside that corner. The blend leans
+  // in the way a headlight does, and on a straight run the two agree exactly, so
+  // nothing is disturbed on the tunnels that do not bend.
+  //
+  // Measured from the camera's position ON the route, before the riding height is
+  // applied below — so the offset lens looks parallel down the shaft rather than
+  // converging back onto the centerline.
+  tunnelPathArcPointExtendedInto(_lead, _camPath, camArc + LOOK_AHEAD_ARC);
+  _lead.sub(out.cam);
+  if (_lead.lengthSq() < 1e-12) _lead.copy(out.tangent);
+  else _lead.normalize();
+  out.look.copy(out.tangent).multiplyScalar(LEAD_TANGENT_MIX)
+    .addScaledVector(_lead, 1 - LEAD_TANGENT_MIX)
+    .normalize()
+    .multiplyScalar(LOOK_AHEAD_ARC);
+
+  // Riding height comes on only once the lens is well clear of the mouth — see
+  // cameraUpForHead. Both the lens and its aim move together, so the shot keeps
+  // pointing down the tunnel instead of tipping toward the centerline.
+  out.cam.addScaledVector(out.up, cameraUpForHead(tHead));
+  out.look.add(out.cam);
   return out;
 }
 

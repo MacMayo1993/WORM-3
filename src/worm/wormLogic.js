@@ -10,6 +10,13 @@ import { isSurfaceSticker } from '../game/cubeState.js';
 import { rotateVec90 } from '../game/cubeRotation.js';
 import { DIR_FORWARD } from './healerWorm/constants.js';
 import { TUNNEL_ANCHOR_OFFSET } from '../utils/constants.js';
+import {
+  makeTunnelPath,
+  buildTunnelPathInto,
+  tunnelPathPointInto,
+  tunnelPathTToArc,
+  tunnelPathArcPointInto
+} from '../utils/tunnelPath.js';
 import * as THREE from 'three';
 
 // ============================================================================
@@ -295,6 +302,19 @@ export function updateTunnelLookupIncremental(lookup, cubies, prevCubies, size, 
  * @returns {THREE.Vector3} The `out` vector
  */
 export const getTunnelWorldPosInto = (out, tunnel, t, size, explosionFactor = 0) => {
+  buildTunnelPathForTunnel(_scratchPath, tunnel, size, explosionFactor);
+  return tunnelPathPointInto(out, _scratchPath, t);
+};
+
+/**
+ * Fill a tunnelPath from a tunnel descriptor's grid coordinates.
+ *
+ * Reconstructs the SAME anchors the ribbon mesh hangs off (MobiusTunnel builds its
+ * from the live cubie meshes), then hands both the throat geometry and the
+ * parameterisation to the shared module — so the worm rides the band it can see
+ * instead of a private copy of the route.
+ */
+export const buildTunnelPathForTunnel = (path, tunnel, size, explosionFactor = 0) => {
   const k = (size - 1) / 2;
   const scale = 1 + explosionFactor * 1.8;
 
@@ -310,37 +330,16 @@ export const getTunnelWorldPosInto = (out, tunnel, t, size, explosionFactor = 0)
     (tunnel.exit.z - k) * scale
   );
 
-  // Reconstruct the SAME centerline the ribbon mesh is built from (MobiusTunnel fillRibbon):
-  //   vStart = entryCenter + entryNormal·TUNNEL_ANCHOR_OFFSET , midA = entryNormal·MINI_FACE_R
-  //   vEnd   = exitCenter  + exitNormal·TUNNEL_ANCHOR_OFFSET  , midB = exitNormal·MINI_FACE_R
-  // Path: vStart → midA over t∈[0,0.5], then midB → vEnd over t∈[0.5,1]. The mini-cube
-  // docking points (midA/midB) stay fixed near the core regardless of the explosion scale.
   const en = TUNNEL_FACE_NORMALS[tunnel.entry.dirKey] || ZERO3;
   const xn = TUNNEL_FACE_NORMALS[tunnel.exit.dirKey] || ZERO3;
-  _tunVStart.set(
-    _tunnelEntry.x + en[0] * TUNNEL_ANCHOR_OFFSET,
-    _tunnelEntry.y + en[1] * TUNNEL_ANCHOR_OFFSET,
-    _tunnelEntry.z + en[2] * TUNNEL_ANCHOR_OFFSET
-  );
-  _tunVEnd.set(
-    _tunnelExit.x + xn[0] * TUNNEL_ANCHOR_OFFSET,
-    _tunnelExit.y + xn[1] * TUNNEL_ANCHOR_OFFSET,
-    _tunnelExit.z + xn[2] * TUNNEL_ANCHOR_OFFSET
-  );
-  _tunMidA.set(en[0] * TUNNEL_MINI_FACE_R, en[1] * TUNNEL_MINI_FACE_R, en[2] * TUNNEL_MINI_FACE_R);
-  _tunMidB.set(xn[0] * TUNNEL_MINI_FACE_R, xn[1] * TUNNEL_MINI_FACE_R, xn[2] * TUNNEL_MINI_FACE_R);
+  _tunEntryNormal.set(en[0], en[1], en[2]);
+  _tunExitNormal.set(xn[0], xn[1], xn[2]);
+  _tunVStart.copy(_tunnelEntry).addScaledVector(_tunEntryNormal, TUNNEL_ANCHOR_OFFSET);
+  _tunVEnd.copy(_tunnelExit).addScaledVector(_tunExitNormal, TUNNEL_ANCHOR_OFFSET);
 
-  // Continuous 3-part route so there is no teleport across the core:
-  //   t∈[0,0.4]  vStart → midA  (entry ribbon arm — matches the rendered mesh)
-  //   t∈[0.4,0.6] midA  → midB  (through the mini-cube void core)
-  //   t∈[0.6,1]  midB  → vEnd   (exit ribbon arm — matches the rendered mesh)
-  if (t <= 0.4) {
-    return out.lerpVectors(_tunVStart, _tunMidA, Math.max(0, t) / 0.4);
-  }
-  if (t <= 0.6) {
-    return out.lerpVectors(_tunMidA, _tunMidB, (t - 0.4) / 0.2);
-  }
-  return out.lerpVectors(_tunMidB, _tunVEnd, (Math.min(1, t) - 0.6) / 0.4);
+  // The docking points near the core stay put regardless of the explosion scale —
+  // buildTunnelPathInto derives them from the normals alone.
+  return buildTunnelPathInto(path, _tunVStart, _tunEntryNormal, _tunVEnd, _tunExitNormal);
 };
 
 // ── Arc-length-aware tunnel sampling ──────────────────────────────────────────
@@ -353,74 +352,36 @@ export const getTunnelWorldPosInto = (out, tunnel, t, size, explosionFactor = 0)
 // on-surface body spacing) all the way through the tunnel.
 
 /** Allocate a reusable centerline scratch object. Fill via buildTunnelCenterlineInto. */
-export const makeTunnelCenterline = () => ({
-  vStart: new THREE.Vector3(),
-  midA: new THREE.Vector3(),
-  midB: new THREE.Vector3(),
-  vEnd: new THREE.Vector3(),
-  l1: 0,
-  l2: 0,
-  l3: 0,
-  total: 0
-});
+export const makeTunnelCenterline = () => makeTunnelPath();
 
 /**
  * Fill `cl` (from makeTunnelCenterline) with the tunnel's centerline control
  * points and per-leg world lengths. Reuses module scratch — call once per frame.
  */
-export const buildTunnelCenterlineInto = (cl, tunnel, size, explosionFactor = 0) => {
-  const k = (size - 1) / 2;
-  const scale = 1 + explosionFactor * 1.8;
-  _tunnelEntry.set((tunnel.entry.x - k) * scale, (tunnel.entry.y - k) * scale, (tunnel.entry.z - k) * scale);
-  _tunnelExit.set((tunnel.exit.x - k) * scale, (tunnel.exit.y - k) * scale, (tunnel.exit.z - k) * scale);
-  const en = TUNNEL_FACE_NORMALS[tunnel.entry.dirKey] || ZERO3;
-  const xn = TUNNEL_FACE_NORMALS[tunnel.exit.dirKey] || ZERO3;
-  cl.vStart.set(
-    _tunnelEntry.x + en[0] * TUNNEL_ANCHOR_OFFSET,
-    _tunnelEntry.y + en[1] * TUNNEL_ANCHOR_OFFSET,
-    _tunnelEntry.z + en[2] * TUNNEL_ANCHOR_OFFSET
-  );
-  cl.vEnd.set(
-    _tunnelExit.x + xn[0] * TUNNEL_ANCHOR_OFFSET,
-    _tunnelExit.y + xn[1] * TUNNEL_ANCHOR_OFFSET,
-    _tunnelExit.z + xn[2] * TUNNEL_ANCHOR_OFFSET
-  );
-  cl.midA.set(en[0] * TUNNEL_MINI_FACE_R, en[1] * TUNNEL_MINI_FACE_R, en[2] * TUNNEL_MINI_FACE_R);
-  cl.midB.set(xn[0] * TUNNEL_MINI_FACE_R, xn[1] * TUNNEL_MINI_FACE_R, xn[2] * TUNNEL_MINI_FACE_R);
-  cl.l1 = cl.vStart.distanceTo(cl.midA);
-  cl.l2 = cl.midA.distanceTo(cl.midB);
-  cl.l3 = cl.midB.distanceTo(cl.vEnd);
-  cl.total = cl.l1 + cl.l2 + cl.l3;
-  return cl;
-};
+export const buildTunnelCenterlineInto = (cl, tunnel, size, explosionFactor = 0) =>
+  buildTunnelPathForTunnel(cl, tunnel, size, explosionFactor);
 
 /** Convert a parametric position t (0..1) to world arc-length along a built centerline. */
-export const tunnelTToArc = (cl, t) => {
-  if (t <= 0.4) return (Math.max(0, t) / 0.4) * cl.l1;
-  if (t <= 0.6) return cl.l1 + ((t - 0.4) / 0.2) * cl.l2;
-  return cl.l1 + cl.l2 + ((Math.min(1, t) - 0.6) / 0.4) * cl.l3;
-};
+export const tunnelTToArc = (cl, t) => tunnelPathTToArc(cl, t);
 
 /** Write the world position at a given world arc-length (clamped to [0,total]) into `out`. */
-export const getTunnelArcPosInto = (out, cl, arc) => {
-  const a = arc < 0 ? 0 : arc > cl.total ? cl.total : arc;
-  if (a <= cl.l1) return out.lerpVectors(cl.vStart, cl.midA, cl.l1 > 0 ? a / cl.l1 : 0);
-  if (a <= cl.l1 + cl.l2) return out.lerpVectors(cl.midA, cl.midB, cl.l2 > 0 ? (a - cl.l1) / cl.l2 : 0);
-  return out.lerpVectors(cl.midB, cl.vEnd, cl.l3 > 0 ? (a - cl.l1 - cl.l2) / cl.l3 : 0);
-};
+export const getTunnelArcPosInto = (out, cl, arc) => tunnelPathArcPointInto(out, cl, arc);
 
-// Module-level scratch vectors for getTunnelWorldPosInto / buildTunnelCenterlineInto.
+// Module-level scratch for getTunnelWorldPosInto / buildTunnelCenterlineInto.
 // These run for every rendered worm segment every frame, so allocating new Vector3s
 // on each call would create significant GC pressure. Safe to reuse because all
 // callers run synchronously on the main thread.
 const _tunnelEntry = new THREE.Vector3();
 const _tunnelExit = new THREE.Vector3();
-// Ribbon-centerline anchors — must match MobiusTunnel.jsx fillRibbon exactly so the worm
-// rides the rendered Möbius band rather than a separate straight core path.
+// Ribbon-centerline anchors — must match MobiusTunnel.jsx exactly so the worm rides
+// the rendered Möbius band rather than a separate route of its own.
 const _tunVStart = new THREE.Vector3();
 const _tunVEnd = new THREE.Vector3();
-const _tunMidA = new THREE.Vector3();
-const _tunMidB = new THREE.Vector3();
+const _tunEntryNormal = new THREE.Vector3();
+const _tunExitNormal = new THREE.Vector3();
+// One-shot path used by the single-sample getTunnelWorldPosInto. Callers that
+// sample repeatedly should build their own path once per frame instead.
+const _scratchPath = makeTunnelPath();
 // Face outward normals keyed by dirKey (plain arrays — avoids importing the THREE.Vector3
 // table from healerWorm/constants and the circular dependency that would create).
 const TUNNEL_FACE_NORMALS = {
@@ -429,10 +390,9 @@ const TUNNEL_FACE_NORMALS = {
   PZ: [0, 0, 1], NZ: [0, 0, -1]
 };
 const ZERO3 = [0, 0, 0];
-// Geometry constants. The anchor offset is imported rather than redeclared —
-// it used to be duplicated here and in three manifold components, which is how
-// it drifted onto the wrong side of the cubie in the first place.
-const TUNNEL_MINI_FACE_R = 0.25;
+// Geometry constants are imported rather than redeclared — the anchor offset and the
+// mini-cube radius used to be duplicated here and in three manifold components, which
+// is how the anchor drifted onto the wrong side of the cubie in the first place.
 
 // ── Wind-up / wind-out spiral flourish above a tunnel mouth ───────────────────
 // The worm orbits in a shrinking circle above the hole and descends into it (wind-up),

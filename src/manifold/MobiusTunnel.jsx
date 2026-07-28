@@ -2,6 +2,13 @@ import { useRef, useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { FLIP_CAP, TUNNEL_ANCHOR_OFFSET } from '../utils/constants.js';
+import {
+  makeTunnelPath,
+  buildTunnelPathInto,
+  tunnelPathRibbonInto,
+  tunnelPathRibbonTangentInto,
+  TUNNEL_MINI_FACE_R
+} from '../utils/tunnelPath.js';
 import { makeTileGuard, setTileGuard, tileRoom } from './tunnelTileGuard.js';
 import { tunnelState } from '../worm/tunnelProgressBridge.js';
 import { applyTileFlipMotion, flipWidthPulse } from './tunnelAnchorMotion.js';
@@ -25,7 +32,7 @@ const FACE_NORM_LOCAL = {
 const RIBBON_WIDTH   = 0.85;
 const RIBBON_SEGS    = 64;   // must be even — doubled from 32 for smoother curves
 const REBUILD_EPS_SQ = 1e-4;
-const MINI_FACE_R    = 0.25; // must match MINI_S in VoidCore.jsx
+const MINI_FACE_R    = TUNNEL_MINI_FACE_R; // must match MINI_S in VoidCore.jsx
 const TAPER_MIN      = 0.15; // narrowest fraction of full width at the mini-cube
 const BUMPER_HEIGHT  = 0.30; // guard-rail height at full width — increased from 0.22
 
@@ -49,8 +56,14 @@ const _up            = new THREE.Vector3(0, 1, 0);
 const _side          = new THREE.Vector3(0, 0, 1);
 const _portalPos     = new THREE.Vector3();
 const _whipAxis      = new THREE.Vector3();
+const _ribbonPt      = new THREE.Vector3();
+const _dockNorm1     = new THREE.Vector3();
+const _dockNorm2     = new THREE.Vector3();
 // Half-space pair keeping ribbon and rails behind the two stickers they hang off.
 const _tileGuard     = makeTileGuard();
+// The shared centerline this tunnel's band is swept along. One per module is enough:
+// every rebuild fills it and consumes it synchronously inside the same useFrame.
+const _tunnelPath    = makeTunnelPath();
 
 // Vertex shader: pass UV + world position through to fragment.
 // vWorldPos feeds the fresnel silhouette glow (needs a view direction).
@@ -243,13 +256,17 @@ const bumperFragmentShader = `
 
 /**
  * Fill position + UV buffers for the Möbius ribbon.
- * Path: startPos → midAPos (first arm) | gap (mini-cube interior) | midBPos → endPos (second arm).
+ *
+ * Path: the shared tunnel centerline (src/utils/tunnelPath.js) — a straight throat
+ * out of each tile before the arms bend toward the mini-cube, with the core
+ * interior skipped at u = 0.5. Sampling the same module the worm and camera ride
+ * is what keeps the band welded to the route they take through it.
+ *
  * Width tapers from full at tile ends to TAPER_MIN fraction at the mini-cube crossing.
  * Cross-section direction (_perpCurrent) rotates π via applyAxisAngle — the Möbius half-twist.
  */
-function fillRibbon(posArray, uvArray, startPos, midAPos, midBPos, endPos, axis, perpStart, segs, width, guard, flipP1 = 0, flipP2 = 0) {
+function fillRibbon(posArray, uvArray, path, axis, perpStart, segs, width, guard, flipP1 = 0, flipP2 = 0) {
   const halfW    = width / 2;
-  const halfSegs = segs / 2;
 
   for (let i = 0; i <= segs; i++) {
     const t     = i / segs;
@@ -257,18 +274,8 @@ function fillRibbon(posArray, uvArray, startPos, midAPos, midBPos, endPos, axis,
     // Swells at whichever end is mid-flip so the ribbon pulses with its tile.
     let w       = halfW * taper * flipWidthPulse(t, flipP1, flipP2);
 
-    let cx, cy, cz;
-    if (i <= halfSegs) {
-      const s = i / halfSegs;
-      cx = startPos.x + (midAPos.x - startPos.x) * s;
-      cy = startPos.y + (midAPos.y - startPos.y) * s;
-      cz = startPos.z + (midAPos.z - startPos.z) * s;
-    } else {
-      const s = (i - halfSegs) / halfSegs;
-      cx = midBPos.x + (endPos.x - midBPos.x) * s;
-      cy = midBPos.y + (endPos.y - midBPos.y) * s;
-      cz = midBPos.z + (endPos.z - midBPos.z) * s;
-    }
+    tunnelPathRibbonInto(_ribbonPt, path, t);
+    const cx = _ribbonPt.x, cy = _ribbonPt.y, cz = _ribbonPt.z;
 
     // Never wider than it is deep — see tunnelTileGuard. The flip pulse above
     // multiplies the width, so this has to come after it or a swelling tile
@@ -302,22 +309,9 @@ function fillRibbon(posArray, uvArray, startPos, midAPos, midBPos, endPos, axis,
  */
 function fillBumpers(
   leftPosArr, rightPosArr, leftHFArr, rightHFArr, leftTFArr, rightTFArr,
-  startPos, midAPos, midBPos, endPos,
-  axis, perpStart, segs, width, guard
+  path, axis, perpStart, segs, width, guard
 ) {
   const halfW    = width / 2;
-  const halfSegs = segs / 2;
-
-  // Segment tangents for each arm (constant within each half)
-  const tAx = midAPos.x - startPos.x;
-  const tAy = midAPos.y - startPos.y;
-  const tAz = midAPos.z - startPos.z;
-  const tALen = Math.sqrt(tAx * tAx + tAy * tAy + tAz * tAz) || 1;
-
-  const tBx = endPos.x - midBPos.x;
-  const tBy = endPos.y - midBPos.y;
-  const tBz = endPos.z - midBPos.z;
-  const tBLen = Math.sqrt(tBx * tBx + tBy * tBy + tBz * tBz) || 1;
 
   for (let i = 0; i <= segs; i++) {
     const t     = i / segs;
@@ -325,19 +319,10 @@ function fillBumpers(
     let w       = halfW * taper;
     let bh      = BUMPER_HEIGHT * taper;
 
-    // Centre position (same piecewise formula as fillRibbon)
-    let cx, cy, cz;
-    if (i <= halfSegs) {
-      const s = i / halfSegs;
-      cx = startPos.x + (midAPos.x - startPos.x) * s;
-      cy = startPos.y + (midAPos.y - startPos.y) * s;
-      cz = startPos.z + (midAPos.z - startPos.z) * s;
-    } else {
-      const s = (i - halfSegs) / halfSegs;
-      cx = midBPos.x + (endPos.x - midBPos.x) * s;
-      cy = midBPos.y + (endPos.y - midBPos.y) * s;
-      cz = midBPos.z + (endPos.z - midBPos.z) * s;
-    }
+    // Centre position — the same sampler fillRibbon uses, so the rails sit on the
+    // band's edges through the throat bend instead of cutting the corner.
+    tunnelPathRibbonInto(_ribbonPt, path, t);
+    const cx = _ribbonPt.x, cy = _ribbonPt.y, cz = _ribbonPt.z;
 
     // The rails are the reason this bug was visible at all: they stand off the
     // ribbon along its surface normal, and where the two tiles sit on different
@@ -352,12 +337,10 @@ function fillBumpers(
     // Width (cross-section) direction with Möbius half-twist
     _perpCurrent.copy(perpStart).applyAxisAngle(axis, t * Math.PI);
 
-    // Segment tangent for this arm
-    if (i <= halfSegs) {
-      _segTangent.set(tAx / tALen, tAy / tALen, tAz / tALen);
-    } else {
-      _segTangent.set(tBx / tBLen, tBy / tBLen, tBz / tBLen);
-    }
+    // Segment tangent — per leg now, not per arm: the throat and the run to the
+    // core point in different directions, and rails built off a single per-arm
+    // tangent would lean out of the band at the mouth.
+    tunnelPathRibbonTangentInto(_segTangent, path, t);
 
     // Surface normal: tangent × perpCurrent — rotates 180° over the ribbon length
     _surfaceNormal.crossVectors(_segTangent, _perpCurrent);
@@ -539,8 +522,10 @@ const MobiusTunnel = ({
 
     // Mini-cube face docking points — use LOCAL color direction so the tunnel
     // always routes through the correct colored face regardless of cube rotation.
-    _midA.set(n1[0], n1[1], n1[2]).multiplyScalar(MINI_FACE_R);
-    _midB.set(n2[0], n2[1], n2[2]).multiplyScalar(MINI_FACE_R);
+    _dockNorm1.set(n1[0], n1[1], n1[2]);
+    _dockNorm2.set(n2[0], n2[1], n2[2]);
+    _midA.copy(_dockNorm1).multiplyScalar(MINI_FACE_R);
+    _midB.copy(_dockNorm2).multiplyScalar(MINI_FACE_R);
 
     const moved = tileFlipping ||
       lastStartRef.current.distanceToSquared(_vStart) > REBUILD_EPS_SQ ||
@@ -559,6 +544,10 @@ const MobiusTunnel = ({
     if (moved) {
       lastStartRef.current.copy(_vStart);
       lastEndRef  .current.copy(_vEnd);
+
+      // The route itself — throats along each tile's own world normal, docks on the
+      // colour-correct mini-cube faces. Everything below sweeps this.
+      buildTunnelPathInto(_tunnelPath, _vStart, _faceNorm1, _vEnd, _faceNorm2, _dockNorm1, _dockNorm2);
 
       // Twist axis: overall start-to-end direction
       _axis.subVectors(_vEnd, _vStart).normalize();
@@ -604,7 +593,7 @@ const MobiusTunnel = ({
       fillRibbon(
         geo.attributes.position.array,
         geo.attributes.uv.array,
-        _vStart, _midA, _midB, _vEnd,
+        _tunnelPath,
         _axis, _perpBase,
         RIBBON_SEGS, RIBBON_WIDTH, _tileGuard, flipP1, flipP2
       );
@@ -618,7 +607,7 @@ const MobiusTunnel = ({
         rightGeo.attributes.aHeightFrac.array,
         leftGeo.attributes.aTripFrac.array,
         rightGeo.attributes.aTripFrac.array,
-        _vStart, _midA, _midB, _vEnd,
+        _tunnelPath,
         _axis, _perpBase,
         RIBBON_SEGS, RIBBON_WIDTH, _tileGuard
       );
