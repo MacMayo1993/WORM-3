@@ -21,6 +21,8 @@ import {
   MAX_JUMPS,
   BASE_TAIL_LENGTH,
   ORB_SEGMENT_GROWTH,
+  WINDOUT_SEGMENT_DT,
+  windoutHeadS,
 } from '../worm/healerWorm/constants.js';
 import { makeCubies } from '../game/cubeState.js';
 import { liveRotation } from '../worm/liveRotation.js';
@@ -261,6 +263,13 @@ describe('wormhole spawn clock', () => {
 });
 
 describe('flipped tiles and tunnel traversal', () => {
+  it('keeps windout active until the last body segment clears the portal', () => {
+    const tailLength = 40;
+    const finalHeadS = windoutHeadS(1, tailLength);
+    const finalTailS = finalHeadS + (tailLength - 1) * WINDOUT_SEGMENT_DT;
+    expect(finalTailS).toBeCloseTo(0, 10);
+  });
+
   // Flip the tile directly above the spawn point (the first tile the worm reaches)
   // and give it an antipodal partner on the back face.
   function makeFlippedWorld() {
@@ -320,6 +329,11 @@ describe('flipped tiles and tunnel traversal', () => {
       resolveTunnel: () => ({ tunnel, tunnelKey }),
       getHealingProgress: () => ({ [stableKey]: { deposited: 4, faceId: 4 } }),
     });
+    const reachedWindout = runUntil(sim, ctx, () => sim.phase === 'windout');
+    expect(reachedWindout).toBe(true);
+    expect(eventsOf(ctx, 'heal')).toHaveLength(0);
+    expect(sim.pendingTunnelHeal?.tunnel).toBe(tunnel);
+
     const healedInTime = runUntil(sim, ctx, () => eventsOf(ctx, 'heal').length > 0);
     expect(healedInTime).toBe(true);
     expect(eventsOf(ctx, 'heal')).toHaveLength(1);

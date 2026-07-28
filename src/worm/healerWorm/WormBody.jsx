@@ -31,6 +31,8 @@ import {
     BODY_BALL_SPACING,
     BASE_TAIL_LENGTH,
     MAX_TAIL,
+    WINDOUT_SEGMENT_DT,
+    windoutHeadS,
 } from './constants.js';
 
 // ─── Worm Body (head = smooth lerp; body = per-step tile history) ─────────────
@@ -380,12 +382,13 @@ export function WormBody({ worm, size }) {
         const _windSegDt = 0.07; // spacing between segments in spiral-s units
         const _windHeadS = _windOn ? Math.min(1, worm.tunnelProgress.current) : 0;
 
-        // Wind-out: mirror of _windOn — segments emerge from exit hole one by one as head rises.
-        // s = 1-progress (1.0 at hole → 0.0 at surface), segments behind head have larger s.
-        // _segS > 1 means still inside the tunnel → hidden until they pop out.
+        // Wind-out: segments emerge from the exit one by one. The head continues
+        // virtually past s=0 (getWindWorldPosInto clamps it on the surface) until
+        // even the final segment reaches s=0 and has cleared the aperture.
         const _windOutOn = _phase === 'windout' && !!_funnelTunnel;
-        const _windOutSegDt = 0.07;
-        const _windOutHeadS = _windOutOn ? (1.0 - Math.min(1, worm.tunnelProgress.current)) : 0;
+        const _windOutHeadS = _windOutOn
+            ? windoutHeadS(worm.tunnelProgress.current, tLen)
+            : 0;
 
         let walkIndex = 0;
         let cumulativeDist = 0;
@@ -528,7 +531,7 @@ export function WormBody({ worm, size }) {
                 } else if (_windOutOn) {
                     // Exit spiral: segments emerge from hole one by one as the head rises.
                     // _segS > 1 means not yet surfaced — hide until they pop out.
-                    const _segS = _windOutHeadS + i * _windOutSegDt;
+                    const _segS = _windOutHeadS + i * WINDOUT_SEGMENT_DT;
                     if (_segS <= 1.0) {
                         getWindWorldPosInto(_bodyClonePos, _funnelTunnel, 'exit', _segS, size);
                     } else {

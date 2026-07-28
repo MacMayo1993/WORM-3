@@ -72,6 +72,16 @@ export const WORMHOLE_MAX_TRAVERSALS = 3;
 // Tail segments needed to visually cover all tiles: totalTiles / (0.14 unit spacing / ~1 unit per tile)
 // For 5×5 (150 tiles): ~1100 segments. Round up generously.
 export const MAX_TAIL = 1200;
+
+// Exit-spiral spacing in normalized wind-path units. The head travels far
+// enough past the surface position for the final body segment to clear the
+// portal before a tunnel is allowed to heal closed.
+export const WINDOUT_SEGMENT_DT = 0.07;
+export const windoutHeadS = (progress, tailLength) => {
+    const visibleSegments = Math.min(MAX_TAIL, Math.max(1, tailLength));
+    const tailSpan = (visibleSegments - 1) * WINDOUT_SEGMENT_DT;
+    return 1 - Math.min(1, Math.max(0, progress)) * (1 + tailSpan);
+};
 export const HEAL_COST = 4; // worm segments (balls) required to fully heal one tunnel
 
 // Render-only full-route trail history: how many tiles of the worm's path are retained for

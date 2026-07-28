@@ -71,6 +71,7 @@ import {
     STEPS_PER_TILE,
     BODY_BALL_SPACING,
     BASE_TAIL_LENGTH,
+    windoutHeadS,
     DEFAULT_WORMHOLE_FLIP_INTERVAL,
     MAX_JUMPS,
     TUNNEL_TRIGGER_PROGRESS,
@@ -204,6 +205,7 @@ export function makeWormSim(size) {
         pendingVoidKill: null,
         currentTunnelStableKey: null, // stable key of the tunnel being traversed
         currentTunnelKey: null,       // canonical key (for use-count cleanup on heal)
+        pendingTunnelHeal: null,      // resolved only after the tail clears the exit
 
         // ── Collision ──────────────────────────────────────────────────────────
         pendingSelfCollision: null,
@@ -308,6 +310,7 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.pendingVoidKill = null;
     sim.currentTunnelStableKey = null;
     sim.currentTunnelKey = null;
+    sim.pendingTunnelHeal = null;
     sim.willHeal = false;
     sim.healFired = false;
     sim.pendingHealBurst = null;
@@ -1171,43 +1174,22 @@ const PHASE_HANDLERS = {
                     sim.pendingVoidKill = { ...voidKillState, armed: true };
                 }
 
-                // Heal immediately at exit completion (not deferred) when enough orbs
-                // were deposited.
+                // Arm the heal now, but leave both flipped tiles and the tunnel intact
+                // until windout has streamed the worm's final segment through the exit.
                 const exitProgress = exitStableKey ? (ctx.getHealingProgress()?.[exitStableKey]) : null;
                 const didHeal = isHealReady(exitProgress?.deposited) && !!exitedTunnel;
                 if (didHeal) {
-                    const { entry, exit: exitTile } = exitedTunnel;
-                    sim.healFired = true;
-                    sim.healed += 1;
-                    // Store writes + heal-burst FX (both tiles) happen in the adapter.
-                    ctx.applyHeal(entry, exitTile, exitStableKey, sim.healed);
-                    sim.pendingHealBurst = { exitTile: exitedTunnel.exit, entryTile: exitedTunnel.entry };
-                    // A collapsing tunnel coughs up a special orb next to its exit —
-                    // ties the reward to the mode's actual objective rather than to
-                    // wandering. Skipped when the board is already at the cap.
-                    spawnSpecial(sim, size, ctx, exitedTunnel.exit);
-                    // Tunnel fully healed → it disappears from the board. Drop its traversal
-                    // bookkeeping so a future antipodal flip that lands on the same
-                    // coordinates starts fresh, instead of inheriting this tunnel's (possibly
-                    // critical) use count or void flag and collapsing the worm prematurely on
-                    // first re-entry.
-                    if (exitTunnelKey) {
-                        sim.tunnelUseCounts.delete(exitTunnelKey);
-                        sim.voidTunnelKeys.delete(exitTunnelKey);
-                        // If this heal landed on the void traversal, a void kill was armed
-                        // for this same tunnel just above. The tunnel is now healed and gone,
-                        // so cancel that pending kill — otherwise the crawling handler still
-                        // collapses the worm the moment it leaves the exit tile.
-                        if (sim.pendingVoidKill?.tunnelKey === exitTunnelKey) {
-                            sim.pendingVoidKill = null;
-                        }
-                    }
+                    sim.pendingTunnelHeal = {
+                        tunnel: exitedTunnel,
+                        stableKey: exitStableKey,
+                        tunnelKey: exitTunnelKey,
+                    };
                 }
                 // else: partial/no deposit — tunnel stays flipped, progress persists
 
                 // One resolution cue per traversal: triumphant chime on a heal, otherwise
                 // a plain pop as the worm bursts back out of the exit hole.
-                ctx.feel(didHeal ? 'heal' : 'exit');
+                if (!didHeal) ctx.feel('exit');
 
                 // Tunnel travel complete — windout spiral plays before resuming crawl.
                 // sim.activeTunnel stays alive so windout can animate the exit spiral.
@@ -1225,15 +1207,31 @@ const PHASE_HANDLERS = {
         enter(_sim, _size, ctx) {
             ctx.onPhase('windout');
         },
-        update(sim, size, _ctx, delta) {
+        update(sim, size, ctx, delta) {
             sim.tunnelProgress += delta * (1.5 * TUNNEL_SPEED_SCALE);
             if (sim.activeTunnel) {
-                const s = 1.0 - Math.min(1, sim.tunnelProgress);
+                const s = windoutHeadS(sim.tunnelProgress, sim.tailLength);
                 getWindWorldPosInto(sim.headInterpPos, sim.activeTunnel, 'exit', s, size);
                 const exitN = FACE_NORMALS[sim.activeTunnel.exit.dirKey];
                 if (exitN) sim.currentNormal.copy(exitN);
             }
             if (sim.tunnelProgress >= 1) {
+                const pending = sim.pendingTunnelHeal;
+                if (pending) {
+                    const { tunnel, stableKey, tunnelKey } = pending;
+                    sim.healFired = true;
+                    sim.healed += 1;
+                    ctx.applyHeal(tunnel.entry, tunnel.exit, stableKey, sim.healed);
+                    sim.pendingHealBurst = { exitTile: tunnel.exit, entryTile: tunnel.entry };
+                    spawnSpecial(sim, size, ctx, tunnel.exit);
+                    if (tunnelKey) {
+                        sim.tunnelUseCounts.delete(tunnelKey);
+                        sim.voidTunnelKeys.delete(tunnelKey);
+                        if (sim.pendingVoidKill?.tunnelKey === tunnelKey) sim.pendingVoidKill = null;
+                    }
+                    ctx.feel('heal');
+                    sim.pendingTunnelHeal = null;
+                }
                 sim.tunnelProgress = 0;
                 sim.activeTunnel = null;
                 sim.phase = 'crawling';
