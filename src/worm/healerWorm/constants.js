@@ -88,6 +88,30 @@ export const BOOST_MULTIPLIER = 2.4;  // crawl-speed multiplier while boosting
 export const BOOST_DURATION = 1.5;    // seconds the boost lasts
 export const BOOST_COOLDOWN = 4.0;    // seconds before boost can be used again
 
+// ─── Special power-ups (rocket / magnet) ──────────────────────────────────────
+// Special orbs are a separate spawn track from the colored parity orbs: they never
+// grow the body or enter the color inventory, they always hover (so the worm has to
+// jump to claim one), and only one is on the board at a time.
+export const SPECIAL_TYPES = ['rocket', 'magnet'];
+export const SPECIAL_MAX_ON_BOARD = 1;
+export const SPECIAL_SPAWN_INTERVAL = 22;  // seconds between ambient special spawns
+export const SPECIAL_LIFETIME = 14;        // seconds a special stays on the board
+export const SPECIAL_FADE_TIME = 3;        // trailing seconds of the lifetime spent fading out
+export const SPECIAL_HOVER_HEIGHT = 0.55;  // world units above the tile surface
+
+// Rocket — a multi-tile jump. The worm launches off the surface, crosses
+// ROCKET_TILE_SPAN tiles in one arc at ROCKET_SPEED_MULT crawl speed, and is immune
+// to its own body and to the slice hazard while airborne.
+export const ROCKET_TILE_SPAN = 5;
+export const ROCKET_JUMP_HEIGHT = 2.6;
+export const ROCKET_SPEED_MULT = 2.8;
+
+// Magnet — widens the pickup reach to MAGNET_RADIUS manifold rings for
+// MAGNET_DURATION seconds. Measured in manifold neighbors, not grid distance, so the
+// pull reaches around face edges and corners.
+export const MAGNET_DURATION = 8;
+export const MAGNET_RADIUS = 2;
+
 // ─── Frame delta clamp ────────────────────────────────────────────────────────
 // Upper bound on the per-tick delta. A hitch (tab refocus, GC pause, alt-tab) can
 // hand useFrame a delta of several hundred ms; feeding that straight into the

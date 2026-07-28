@@ -45,7 +45,7 @@ import { TunnelTube } from './healerWorm/TunnelTube.jsx';
 import { WormBody, GlowWormAura } from './healerWorm/WormBody.jsx';
 import { WormTrail } from './healerWorm/WormTrail.jsx';
 import { WormFace } from './healerWorm/WormFace.jsx';
-import { PowerupOrbs, OrbFlashSystem } from './healerWorm/orbSystems.jsx';
+import { PowerupOrbs, OrbFlashSystem, SpecialOrbs, SpecialFlashSystem } from './healerWorm/orbSystems.jsx';
 import { HeartBurstSystem, TunnelHealProgress } from './healerWorm/healFx.jsx';
 import { WormholeRings } from './healerWorm/WormholeRings.jsx';
 import { SliceWarningLights } from './healerWorm/SliceWarningLights.jsx';
@@ -382,7 +382,9 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             <TunnelHealProgress size={size} />
             <HeartBurstSystem worm={worm} size={size} />
             <OrbFlashSystem worm={worm} />
+            <SpecialFlashSystem worm={worm} />
             <PowerupOrbs size={size} />
+            {!wormInTunnel && <SpecialOrbs size={size} />}
             <SliceWarningLights pendingRotRef={pendingRotRef} size={size} />
             <ThunkEffect thunkRef={thunkRef} />
             <CollisionGlow size={size} />

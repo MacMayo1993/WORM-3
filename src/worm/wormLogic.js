@@ -636,6 +636,48 @@ export const getNextSurfacePosition = (pos, moveDir, size) => {
 };
 
 /**
+ * Collect every surface tile within `depth` manifold steps of a tile, as tileKeys.
+ *
+ * Distance is measured in manifold neighbors (getManifoldNeighbors), NOT grid
+ * coordinates, so the ring wraps around face edges and corners the same way the
+ * worm's own crawling does — a radius-2 ring from a tile on the edge of PZ reaches
+ * onto PY/NX/etc. The magnet power-up uses this for its pickup reach.
+ *
+ * The centre tile is included. `out` is cleared and returned, so callers can hand in
+ * a reusable Set instead of allocating one per step.
+ *
+ * @param {number} x @param {number} y @param {number} z
+ * @param {string} dirKey - face of the centre tile
+ * @param {number} size - cube size
+ * @param {number} depth - how many manifold steps to expand (0 = centre only)
+ * @param {Set<string>} [out] - destination set (cleared first)
+ * @returns {Set<string>} tileKeys ("x,y,z,dirKey") within `depth` steps
+ */
+export function collectManifoldRing(x, y, z, dirKey, size, depth, out = new Set()) {
+  out.clear();
+  out.add(`${x},${y},${z},${dirKey}`);
+  if (depth <= 0) return out;
+  // Breadth-first expansion, one ring per pass. `frontier` holds the tiles added by
+  // the previous pass — only those can produce new tiles at the next depth.
+  let frontier = [{ x, y, z, dirKey }];
+  for (let d = 0; d < depth; d++) {
+    const next = [];
+    for (const t of frontier) {
+      const neighbors = getManifoldNeighbors(t.x, t.y, t.z, t.dirKey, size);
+      for (const n of neighbors) {
+        const key = `${n.x},${n.y},${n.z},${n.dirKey}`;
+        if (out.has(key)) continue;
+        out.add(key);
+        next.push(n);
+      }
+    }
+    if (next.length === 0) break;
+    frontier = next;
+  }
+  return out;
+}
+
+/**
  * Turn the worm left or right
  * @param {string} currentDir - Current movement direction
  * @param {string} turn - 'left' or 'right'

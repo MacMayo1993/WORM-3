@@ -59,6 +59,9 @@ function makeCtx(overrides = {}) {
     onOrbPickup: log('pickup'),
     onPowerupsChanged: log('powerups'),
     applyHeal: log('heal'),
+    onSpecialsChanged: log('specials'),
+    onRocketState: log('rocketState'),
+    onMagnetState: log('magnetState'),
     ...overrides,
   };
 }
