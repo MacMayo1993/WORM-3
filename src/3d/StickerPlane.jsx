@@ -30,6 +30,7 @@ import FlipShockwave from './FlipShockwave.jsx';
 import FlipFlash from './FlipFlash.jsx';
 import AntipodalGlowFill from './AntipodalGlowFill.jsx';
 import { fireFlipImpulse } from './flipImpulse.js';
+import { blinkCountForFlips, blinkFlipRate, blinkPhase, blinkBounce, BLINK_BASE_DUR } from './parityBlink.js';
 import HealParticles from './HealParticles.jsx';
 import ParityBreakthrough from './ParityBreakthrough.jsx';
 import StickerWorm from './StickerWorm.jsx';
@@ -608,6 +609,16 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const effectiveFlipCap = chaosLevel > 0 ? disparityFlipCap : FLIP_CAP;
   // Dead tiles (at flip cap) are inert gray — used in useFrame and rendering
   const isDead = (meta?.flips ?? 0) >= effectiveFlipCap;
+  // The tile's outward normal expressed in the parent (cubie) frame. groupRef holds
+  // the tile's own rotation, so "out of the cube" is local +Z rotated by `rot` — the
+  // blink bounce offsets groupRef.position along this.
+  const rotX = rot[0] ?? 0;
+  const rotY = rot[1] ?? 0;
+  const rotZ = rot[2] ?? 0;
+  const outwardNormal = useMemo(
+    () => new THREE.Vector3(0, 0, 1).applyEuler(new THREE.Euler(rotX, rotY, rotZ)),
+    [rotX, rotY, rotZ]
+  );
   const groupRef = useRef();
   const innerGroupRef = useRef(); // inner UV-rotation group — used for InstancedMesh world matrix
   const meshRef = useRef();
@@ -635,6 +646,12 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   }));
   // Whether the current in-progress flip is a disparity (eyelid) flip.
   const isDisparityFlipRef = useRef(false);
+  // How many eyelid blinks this flip plays (1 for a normal flip), how fast the
+  // flip timer runs (progress per second — slower when there are more blinks to
+  // fit in), and how far each blink shoves the tile out of the cube.
+  const blinkCountRef = useRef(1);
+  const spinRateRef = useRef(1 / BLINK_BASE_DUR); // 2 = the original single-beat flip
+  const blinkBounceRef = useRef(0);
   // Eyelid blink overlay — used instead of spinReveal for disparity flips.
   const eyelidOverlayRef = useRef();
   const eyelidMatRef = useRef();
@@ -729,7 +746,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // Track if we're currently in a flip animation - prevents race condition
   // between React state updates and Three.js imperative rendering
   const isFlipping = useRef(false);
-  // Previous rawP value — used to detect the exact frame the midpoint is crossed.
+  // Previous blink-phase value — used to detect the exact frame the midpoint is
+  // crossed. On a multi-blink parity flip it wraps once per blink, so each blink
+  // gets its own crossing.
   const prevRawP = useRef(0);
   // Death animation: -1 = not started (idle), 0–1 = imploding, 1 = done (show headstone)
   // Start at 1 so tiles that load already-dead show headstone immediately without animation.
@@ -892,6 +911,12 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       // Disparity flip (odd flip count → tile enters wormhole state) → eyelid blink.
       // Normal flip → spinning rim reveal.
       isDisparityFlipRef.current = flips % 2 === 1;
+      // One blink per flip the tile is carrying (capped), and the flip timer is
+      // stretched to fit them: the first blink keeps its normal length, the extra
+      // ones are quicker. Normal flips stay a single 0.5 s beat exactly as before.
+      blinkCountRef.current = blinkCountForFlips(flips, isDisparityFlipRef.current);
+      spinRateRef.current = blinkFlipRate(blinkCountRef.current);
+      blinkBounceRef.current = 0;
       if (isDisparityFlipRef.current) {
         // Overlay shows TO color at 0.5 alpha (NormalBlending) over the FROM mesh.
         // Both colors simultaneously visible = superposition blend.
@@ -1063,16 +1088,27 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     if (spinT.current > 0 && groupRef.current && hitstopT.current > 0) {
       hitstopT.current = Math.max(0, hitstopT.current - delta);
     } else if (spinT.current > 0 && groupRef.current) {
-      const dt = Math.min(delta * 2, spinT.current);
+      const dt = Math.min(delta * spinRateRef.current, spinT.current);
       spinT.current -= dt;
       const rawP = 1 - spinT.current;
 
-      // Crossing beat — fires once as the tile passes the seam (rawP crosses 0.5):
-      // start the hitstop freeze and the bloom/chromatic flash.
-      if (prevRawP.current < 0.5 && rawP >= 0.5) {
-        hitstopT.current = 0.05; // ~3 frames
+      // Blink phase: rawP is the progress of the whole flip, `p` is the progress of
+      // the blink currently playing. A single-blink flip has p === rawP, so nothing
+      // downstream changes for normal flips; a multi-blink parity flip replays the
+      // same 0→1 squish once per blink.
+      const { blinkIdx, p } = blinkPhase(rawP, blinkCountRef.current);
+
+      // Crossing beat — fires as the tile passes the seam (p crosses 0.5). The first
+      // crossing is the real identification event (hitstop + style swap); the extra
+      // blinks of a damaged tile re-fire the bloom flash only, so they read as
+      // after-shocks rather than repeated crossings.
+      const atCrossing = prevRawP.current < 0.5 && p >= 0.5;
+      if (atCrossing) {
         flashT.current = 0;
         flipFlashRef.current?.trigger();
+      }
+      if (atCrossing && blinkIdx === 0) {
+        hitstopT.current = 0.05; // ~3 frames
         // Swap the shader-style mesh to the antipodal (TO) style while it's squished
         // shut, so the style reveals with the expand rather than popping at frame 0.
         if (!isInstancedRef.current && meshRef.current?.material?.uniforms?.baseColor
@@ -1085,10 +1121,10 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       // Card-flip squish: compress to 0 at midpoint then expand back.
       // Eyelid (disparity) → squish scale.y (vertical, top+bottom converge to center).
       // Normal flip → squish scale.x (horizontal card rotation).
-      const halfT = rawP < 0.5 ? rawP * 2.0 : (rawP - 0.5) * 2.0;
+      const halfT = p < 0.5 ? p * 2.0 : (p - 0.5) * 2.0;
       const easedHalf = halfT * halfT * (3.0 - 2.0 * halfT);
       // Shader-facing squish stays a clean 0→1 (drives dissolve / eyelid uniforms below).
-      const flipSquish = Math.max(0.001, rawP < 0.5 ? 1.0 - easedHalf : easedHalf);
+      const flipSquish = Math.max(0.001, p < 0.5 ? 1.0 - easedHalf : easedHalf);
 
       // ── The snap ────────────────────────────────────────────────────────────
       // First half collapses cleanly to the seam. Second half does NOT ease flat to
@@ -1098,7 +1134,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       // conserves apparent volume (bulge while thin, pinch on the overshoot) so the
       // whole tile reads as a physical membrane snapping, not a flat scale tween.
       let mainScale;
-      if (rawP < 0.5) {
+      if (p < 0.5) {
         mainScale = flipSquish;
       } else {
         const dangerT = effectiveFlipCap > 0 ? Math.min(1, (meta?.flips ?? 0) / effectiveFlipCap) : 0;
@@ -1122,17 +1158,27 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       if (stickerGridIdRef.current) flipBurstMap.set(stickerGridIdRef.current, rawP);
 
       // Vibration: tile strains against the manifold crossing, peaks at midpoint.
-      const vibEnv = Math.sin(rawP * Math.PI);
-      const jX = Math.sin(rawP * Math.PI * 18) * 0.022 * vibEnv;
-      const jY = Math.cos(rawP * Math.PI * 13) * 0.014 * vibEnv;
-      groupRef.current.position.x = pos[0] + jX;
-      groupRef.current.position.y = pos[1] + jY;
+      const vibEnv = Math.sin(p * Math.PI);
+      const jX = Math.sin(p * Math.PI * 18) * 0.022 * vibEnv;
+      const jY = Math.cos(p * Math.PI * 13) * 0.014 * vibEnv;
+
+      // Blink bounce: the tile physically shoves out of the cube along its own
+      // outward normal as the eyelid shuts, peaking with the lids closed and
+      // settling back as they open — the sine bell a manual flip pops the cubie
+      // with. Reach grows with the flip count and eases off over a blink burst.
+      if (isDisparityFlipRef.current) {
+        blinkBounceRef.current = blinkBounce(p, meta?.flips ?? 1, blinkIdx);
+      }
+      const b = blinkBounceRef.current;
+      groupRef.current.position.x = pos[0] + jX + outwardNormal.x * b;
+      groupRef.current.position.y = pos[1] + jY + outwardNormal.y * b;
+      groupRef.current.position.z = pos[2] + outwardNormal.z * b;
 
       // Publish the live motion so anything welded to this tile can ride it —
       // the wormhole ribbon and cords anchor here and would otherwise stay rigid
       // while the tile shakes and squashes underneath them.
       if (stickerGridIdRef.current) {
-        stickerFlipMotion.set(stickerGridIdRef.current, { p: rawP, jx: jX, jy: jY, squash });
+        stickerFlipMotion.set(stickerGridIdRef.current, { p: rawP, jx: jX, jy: jY, squash, bounce: b });
       }
 
       if (isDisparityFlipRef.current) {
@@ -1143,20 +1189,21 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         }
         // Midpoint: ring flash only. Mesh keeps FROM color — overlay is already showing
         // TO at 0.5 alpha, so both colors remain blended until the animation ends.
-        if (prevRawP.current < 0.5 && rawP >= 0.5) {
+        // Every blink in the burst flashes the ring, not just the first.
+        if (atCrossing) {
           if (ringRef.current) { ringRef.current.material.opacity = 0.9; ringFlashRef.current = 1; }
         }
       } else {
         // Normal flip — spinning rim reveal.
         // First half: contract FROM colour disc into glass (progress 1.0 → 0.0 as tile squishes).
-        if (rawP < 0.5 && spinRevealRef.current && spinRevealMatRef.current) {
-          const contractProgress = Math.max(0.0, 1.0 - rawP / 0.5);
+        if (p < 0.5 && spinRevealRef.current && spinRevealMatRef.current) {
+          const contractProgress = Math.max(0.0, 1.0 - p / 0.5);
           spinRevealMatRef.current.uniforms.uProgress.value = contractProgress;
           spinRevealMatRef.current.uniforms.uTime.value = state.clock.elapsedTime;
           spinRevealMatRef.current.uniforms.uDissolve.value = flipSquish;
         }
         // Midpoint: switch rim glow and mesh to TO color.
-        if (prevRawP.current < 0.5 && rawP >= 0.5) {
+        if (atCrossing) {
           if (spinRevealRef.current && spinRevealMatRef.current && flipToColor.current) {
             spinRevealMatRef.current.uniforms.uColor.value.set(flipToColor.current);
             spinRevealMatRef.current.uniforms.uProgress.value = 0.0;
@@ -1175,15 +1222,15 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
           if (ringRef.current) { ringRef.current.material.opacity = 0.9; ringFlashRef.current = 1; }
         }
         // Second half: drive the spin-reveal inward as the tile expands back.
-        if (rawP >= 0.5 && spinRevealRef.current && spinRevealMatRef.current) {
-          const revealProgress = Math.min(1.0, (rawP - 0.5) * 2.0);
+        if (p >= 0.5 && spinRevealRef.current && spinRevealMatRef.current) {
+          const revealProgress = Math.min(1.0, (p - 0.5) * 2.0);
           spinRevealMatRef.current.uniforms.uProgress.value = revealProgress;
           spinRevealMatRef.current.uniforms.uTime.value = state.clock.elapsedTime;
           spinRevealMatRef.current.uniforms.uDissolve.value = flipSquish;
         }
       }
 
-      prevRawP.current = rawP;
+      prevRawP.current = p;
 
       if (spinT.current <= 0) {
         isFlipping.current = false;
@@ -1210,6 +1257,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         flipFromTexture.current = null;
         flipToTexture.current = null;
         prevRawP.current = 0;
+        blinkBounceRef.current = 0;
         // Restore the main disc with the final TO color/texture, then make it visible.
         // InstancedMesh path: restore the final base colour.
         if (isInstancedRef.current && baseColorRef.current) {
