@@ -1197,6 +1197,10 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
         .mc-arrow:active { background: rgba(255,255,255,0.22) !important; }
         .mc-play:active  { opacity: 0.80 !important; transform: scale(0.98) !important; }
         .mc-pill:hover   { border-color: rgba(255,255,255,0.45) !important; color: rgba(255,255,255,0.92) !important; }
+        .mc-cube-window { height: min(47vh, 415px); }
+        @media (max-width: 600px) {
+          .mc-cube-window { height: min(45vh, 395px); }
+        }
       `}</style>
 
       {/* Scroll column — DOM fades out during the PLAY dive so the cube face
@@ -1222,9 +1226,10 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
             face to face; every mode owns one of the six faces. */}
         <div
           {...swipeHandlers}
+          className="mc-cube-window"
           style={{
             position: 'relative', width: 'min(560px, 96vw)',
-            height: 'min(50vh, 440px)', flexShrink: 0,
+            flexShrink: 0,
             userSelect: 'none', touchAction: 'pan-y',
           }}
         >
@@ -1235,7 +1240,7 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
         </div>
 
         {/* Face map — one colored tile per cube face, tap to jump */}
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '2px' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: 0 }}>
           {CAROUSEL_MODES.map((m, i) => (
             <button
               key={m.id} type="button" aria-label={`Show ${m.label} mode`} title={m.label}
@@ -1254,20 +1259,17 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
         </div>
 
         {/* Mode info panel */}
-        <div style={{ width: 'min(400px, 94vw)', marginTop: '14px', opacity, transition: 'opacity 150ms ease' }}>
+        <div style={{ width: 'min(400px, 94vw)', marginTop: '10px', opacity, transition: 'opacity 150ms ease' }}>
           <div style={{
             borderRadius: '16px',
             background: 'linear-gradient(180deg, rgba(34,42,26,0.94), rgba(20,26,15,0.96))',
             border: `1px solid ${NIGHT_BORDER}`,
-            padding: '16px 18px', position: 'relative', overflow: 'hidden',
-          }}>
+            padding: '14px 18px', position: 'relative', overflow: 'hidden',
+          }} aria-label={`${mode.label} mode details`}>
             <div aria-hidden style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: `linear-gradient(90deg, ${mode.tileColor}, transparent 78%)` }} />
-            <span style={{ display: 'block', textAlign: 'center', fontSize: 'clamp(26px, 8vw, 34px)', fontWeight: 900, fontFamily: DISPLAY_FONT, color: '#fffdf2', lineHeight: 1, letterSpacing: '0.03em', textTransform: 'uppercase', textShadow: '0 3px 0 rgba(0,0,0,0.5), 0 10px 30px rgba(0,0,0,0.55)' }}>
-              {mode.label}
-            </span>
             {/* The one-line hook: what this mode actually is, in plain sentence
                 case. The bullets below are the details, not the pitch. */}
-            <p style={{ margin: '9px 0 0', textAlign: 'center', fontSize: 'clamp(12px, 3.2vw, 13.5px)', lineHeight: 1.45, color: 'rgba(255,253,242,0.72)', fontFamily: UI_FONT, fontWeight: 500 }}>
+            <p style={{ margin: 0, textAlign: 'center', fontSize: 'clamp(12px, 3.2vw, 13.5px)', lineHeight: 1.45, color: 'rgba(255,253,242,0.72)', fontFamily: UI_FONT, fontWeight: 500 }}>
               {mode.desc}
             </p>
             <div style={{ marginTop: '14px' }}>
