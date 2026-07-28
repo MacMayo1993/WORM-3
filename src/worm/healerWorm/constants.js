@@ -90,14 +90,25 @@ export const BOOST_COOLDOWN = 4.0;    // seconds before boost can be used again
 
 // ─── Special power-ups (rocket / magnet) ──────────────────────────────────────
 // Special orbs are a separate spawn track from the colored parity orbs: they never
-// grow the body or enter the color inventory, they always hover (so the worm has to
-// jump to claim one), and only one is on the board at a time.
+// grow the body or enter the color inventory, and only one is on the board at a time.
+//
+// They are claimed on CONTACT. An earlier version required the worm to be airborne
+// over the orb's exact tile, which stacked three separate difficulties — steer onto
+// one precise tile, inside the lifetime, while jumping — and made specials
+// effectively unclaimable in real play. Jumping now only widens the claim radius.
 export const SPECIAL_TYPES = ['rocket', 'magnet'];
 export const SPECIAL_MAX_ON_BOARD = 1;
 export const SPECIAL_SPAWN_INTERVAL = 22;  // seconds between ambient special spawns
-export const SPECIAL_LIFETIME = 14;        // seconds a special stays on the board
-export const SPECIAL_FADE_TIME = 3;        // trailing seconds of the lifetime spent fading out
-export const SPECIAL_HOVER_HEIGHT = 0.55;  // world units above the tile surface
+export const SPECIAL_LIFETIME = 30;        // seconds a special stays on the board
+export const SPECIAL_FADE_TIME = 4;        // trailing seconds of the lifetime spent fading out
+export const SPECIAL_HOVER_HEIGHT = 0.45;  // world units above the tile surface
+// Ambient specials spawn within this many manifold steps of the worm's head, so one
+// always appears somewhere the player can see and reach rather than on the far side
+// of the cube where it just times out unseen.
+export const SPECIAL_SPAWN_RADIUS = 4;
+// Claim radius while airborne — a jump toward a special that is a tile off still
+// lands it, instead of punishing a near-miss.
+export const SPECIAL_JUMP_REACH = 1;
 
 // Rocket — a multi-tile jump. The worm launches off the surface, crosses
 // ROCKET_TILE_SPAN tiles in one arc at ROCKET_SPEED_MULT crawl speed, and is immune

@@ -85,6 +85,8 @@ import {
     ROCKET_SPEED_MULT,
     MAGNET_DURATION,
     MAGNET_RADIUS,
+    SPECIAL_SPAWN_RADIUS,
+    SPECIAL_JUMP_REACH,
 } from './constants.js';
 
 // Axis scratch for baking a committed turn into the worm's position history.
@@ -516,24 +518,40 @@ function tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey) {
     if (collectedAny) ctx.onPowerupsChanged(sim.powerups.slice());
 }
 
-// Claim a special orb sitting on the given tile. Specials hover well above the
-// surface, so the worm has to be airborne (jump or an in-flight rocket) to take one —
-// the magnet does NOT reach them; they are the prize, not the pickup.
+// Reusable scratch for the special-claim reach.
+const _specialReach = new Set();
+
+// Claim a special orb reachable from the given tile.
+//
+// Contact is enough: crawling onto the orb's tile takes it. Being airborne widens
+// the claim by SPECIAL_JUMP_REACH, and an active magnet widens it further — both are
+// help, not requirements, so a special is never gated behind a second skill check on
+// top of steering onto its tile inside its lifetime.
 function trySpecialPickupAt(sim, size, ctx, x, y, z, dirKey) {
     if (sim.specials.length === 0) return;
-    const idx = sim.specials.findIndex(s => s.x === x && s.y === y && s.z === z && s.dirKey === dirKey);
+    const radius = Math.max(
+        sim.isJumping ? SPECIAL_JUMP_REACH : 0,
+        sim.magnetT > 0 ? MAGNET_RADIUS : 0,
+    );
+    const reach = radius > 0
+        ? collectManifoldRing(x, y, z, dirKey, size, radius, _specialReach)
+        : null;
+    const headKey = `${x},${y},${z},${dirKey}`;
+    const idx = sim.specials.findIndex(s => {
+        const key = `${s.x},${s.y},${s.z},${s.dirKey}`;
+        return reach ? reach.has(key) : key === headKey;
+    });
     if (idx === -1) return;
-    if (!sim.isJumping) return;
     const [claimed] = sim.specials.splice(idx, 1);
     sim.pendingSpecialFlash = { type: claimed.type, pos: sim.curWorldPos.toArray() };
     ctx.onSpecialsChanged(sim.specials.slice());
     activateSpecial(sim, ctx, claimed.type);
 }
 
-// Pick a free surface tile within 2 manifold steps of `tile`, or null if the
-// neighbourhood is fully occupied. Used for the drop a healed tunnel leaves behind.
-function freeTileNear(size, tile, occupiedKeys) {
-    const ring = collectManifoldRing(tile.x, tile.y, tile.z, tile.dirKey, size, 2);
+// Pick a free surface tile within `radius` manifold steps of `tile`, or null if that
+// whole neighbourhood is occupied.
+function freeTileNear(size, tile, occupiedKeys, radius) {
+    const ring = collectManifoldRing(tile.x, tile.y, tile.z, tile.dirKey, size, radius);
     const candidates = [];
     for (const key of ring) {
         if (occupiedKeys.has(key)) continue;
@@ -545,20 +563,23 @@ function freeTileNear(size, tile, occupiedKeys) {
 }
 
 /**
- * Put a special orb on the board, if there is room under the cap. `nearTile` biases
- * the placement into that tile's neighbourhood (a healed tunnel dropping its reward);
- * without it the orb lands anywhere free on the surface.
+ * Put a special orb on the board, if there is room under the cap.
+ *
+ * Placement is always local to something the player is looking at: `nearTile` drops
+ * it beside a tunnel that just healed, and otherwise it lands within
+ * SPECIAL_SPAWN_RADIUS steps of the worm's head. Spawning anywhere on the surface
+ * (the first version) mostly put orbs on faces the player could not see, where they
+ * timed out untouched.
  *
  * @returns {boolean} whether an orb was actually placed
  */
 function spawnSpecial(sim, size, ctx, nearTile = null) {
     if (sim.specials.length >= SPECIAL_MAX_ON_BOARD) return false;
     const occupied = [...sim.powerups, ...sim.specials, sim.pos];
-    let tile = null;
-    if (nearTile) {
-        const occupiedKeys = new Set(occupied.map(t => `${t.x},${t.y},${t.z},${t.dirKey}`));
-        tile = freeTileNear(size, nearTile, occupiedKeys);
-    }
+    const occupiedKeys = new Set(occupied.map(t => `${t.x},${t.y},${t.z},${t.dirKey}`));
+    const anchor = nearTile ?? sim.pos;
+    const radius = nearTile ? 2 : SPECIAL_SPAWN_RADIUS;
+    let tile = freeTileNear(size, anchor, occupiedKeys, radius);
     if (!tile) tile = randomFreeTile(size, occupied);
     if (!tile) return false;
     const type = SPECIAL_TYPES[Math.floor(Math.random() * SPECIAL_TYPES.length)];
