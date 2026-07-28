@@ -61,6 +61,18 @@ export function cameraUpForHead(tHead) {
 }
 
 /**
+ * Lateral camera offset from the tunnel centerline.
+ *
+ * The entry arm must stay at zero: even a small cinematic "up" offset moves
+ * the lens across the face of the entry sticker instead of through its centre.
+ * Once the camera is safely beyond the mouth, ease the usual riding height
+ * back in so the Möbius roll remains visible through the rest of the trip.
+ */
+export function cameraUpForHead(tHead) {
+  return TUNNEL_CAM_UP * THREE.MathUtils.smoothstep(tHead, 0.38, 0.52);
+}
+
+/**
  * Ease for the dive through the entry hole: cubic, so the camera is nearly
  * still for most of the phase and then rushes. Same curve as the mode
  * selector's cube dive (MainMenu), which is the feel this is modelled on.
