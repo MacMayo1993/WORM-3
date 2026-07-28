@@ -12,6 +12,7 @@ import {
     portalDist,
     portalUp,
     ENTER_END_T,
+    projectToTileCenterAxisInto,
 } from './tunnelCameraRails.js';
 import {
     CAM_HEIGHT_BASE,
@@ -41,8 +42,8 @@ const _rawNormal = new THREE.Vector3();
 const _rawForward = new THREE.Vector3();
 const FACE_TRANS_DURATION = 0.25;
 // Tunnel-mouth scratch — the two centerline endpoints the exterior shots frame.
-const _ribVStart = new THREE.Vector3();
 const _ribVEnd   = new THREE.Vector3();
+const _entryTileCenter = new THREE.Vector3();
 // Exit-beat scratch — the external framing the inside camera swings out to as the
 // worm reaches the exit tile.
 const _exitCamOut  = new THREE.Vector3();
@@ -271,20 +272,21 @@ export default function WormChaseCamera({ worm, size }) {
             tunnelState.activeTunnelId = tunnel.pairId ?? null;
 
             const entN = FACE_NORMALS[tunnel.entry.dirKey] ?? FACE_NORMALS.PY;
-            // Ask the centerline itself for its start rather than re-deriving it from the
-            // sticker position. The old hand-rolled correction (−2·SURFACE_OFFSET) existed
-            // only to reach the anchor's former spot on the far side of the cubie; now that
-            // tunnels anchor on their tiles there is nothing to correct, and reusing the one
-            // function that defines the path keeps camera and geometry from drifting apart.
-            getTunnelWorldPosInto(_ribVStart, tunnel, 0, size);
+            // Frame the physical sticker centre, not the tunnel mesh anchor.
+            const entryWorld = getStickerWorldPos(
+                tunnel.entry.x, tunnel.entry.y, tunnel.entry.z, tunnel.entry.dirKey, size, 0
+            );
+            _entryTileCenter.fromArray(entryWorld);
 
-            _camTargetCam.copy(_ribVStart).addScaledVector(entN, portalDist(size));
-            _camTargetLook.copy(_ribVStart);
+            _camTargetCam.copy(_entryTileCenter).addScaledVector(entN, portalDist(size));
+            _camTargetLook.copy(_entryTileCenter);
             _camUp.set(0, entN.y < -0.85 ? -1 : 1, 0);
 
             const a = Math.min(1, 3.0 * delta);
             camPosRef.current.lerp(_camTargetCam, a);
             lookAtRef.current.lerp(_camTargetLook, a);
+            projectToTileCenterAxisInto(camPosRef.current, camPosRef.current, _entryTileCenter, entN);
+            projectToTileCenterAxisInto(lookAtRef.current, lookAtRef.current, _entryTileCenter, entN);
             camera.position.copy(camPosRef.current);
             camUpRef.current.lerp(_camUp, a).normalize();
             camera.up.copy(camUpRef.current);
@@ -313,12 +315,15 @@ export default function WormChaseCamera({ worm, size }) {
             tunnelState.activeTunnelId = tunnel.pairId ?? null;
 
             const entN = FACE_NORMALS[tunnel.entry.dirKey] ?? FACE_NORMALS.PY;
-            getTunnelWorldPosInto(_ribVStart, tunnel, 0, size);
+            const entryWorld = getStickerWorldPos(
+                tunnel.entry.x, tunnel.entry.y, tunnel.entry.z, tunnel.entry.dirKey, size, 0
+            );
+            _entryTileCenter.fromArray(entryWorld);
 
             // Where we are diving FROM — the windup framing, held so the fall starts
             // from exactly where the previous phase parked the camera.
-            _diveOutCam.copy(_ribVStart).addScaledVector(entN, portalDist(size));
-            _diveOutLook.copy(_ribVStart);
+            _diveOutCam.copy(_entryTileCenter).addScaledVector(entN, portalDist(size));
+            _diveOutLook.copy(_entryTileCenter);
 
             // Where we are diving TO — the on-rails pose. Same call the ride branch
             // below makes, so at tp = 1 the two poses are identical by construction.
@@ -349,6 +354,11 @@ export default function WormChaseCamera({ worm, size }) {
             const snap = Math.max(a, dive * dive);
             camPosRef.current.lerp(_camTargetCam, a).lerp(_camTargetCam, dive * dive);
             lookAtRef.current.lerp(_camTargetLook, a).lerp(_camTargetLook, dive * dive);
+            // Remove any lateral residue inherited from the pre-windup chase
+            // camera. The lens and its aim now cross the physical sticker-centre
+            // axis regardless of smoothing history or which cube face owns it.
+            projectToTileCenterAxisInto(camPosRef.current, camPosRef.current, _entryTileCenter, entN);
+            projectToTileCenterAxisInto(lookAtRef.current, lookAtRef.current, _entryTileCenter, entN);
             camera.position.copy(camPosRef.current);
             camUpRef.current.lerp(_camUp, snap).normalize();
             camera.up.copy(camUpRef.current);

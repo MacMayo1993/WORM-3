@@ -8,7 +8,8 @@ import {
   makeTunnelCamPose,
   portalDist,
   portalUp,
-  ENTER_END_T
+  ENTER_END_T,
+  projectToTileCenterAxisInto
 } from '../worm/tunnelCameraRails.js';
 import { SURFACE_OFFSET } from '../utils/constants.js';
 
@@ -84,6 +85,16 @@ describe('backForHead', () => {
 });
 
 describe('tunnelCamPoseInto', () => {
+  it('projects inherited camera drift onto the physical tile-centre axis', () => {
+    const center = new THREE.Vector3(2, -1, 4);
+    const normal = new THREE.Vector3(0, 0, -1);
+    const projected = new THREE.Vector3();
+    projectToTileCenterAxisInto(projected, new THREE.Vector3(99, 23, -5), center, normal);
+    expect(projected.x).toBe(center.x);
+    expect(projected.y).toBe(center.y);
+    expect(projected.z).toBe(-5);
+  });
+
   it('drives the lens through the dead centre of the entry tile', () => {
     for (const size of [2, 3, 4, 5]) {
       for (const tunnel of [straightTunnel(size), bentTunnel(size)]) {
