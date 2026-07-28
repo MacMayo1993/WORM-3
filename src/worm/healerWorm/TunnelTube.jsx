@@ -45,9 +45,12 @@ const R_MOUTH  = 0.34;       // where the tunnel meets its tile (sticker is ~0.8
 const R_THROAT = 0.58;       // at the core crossing — still clears the camera's offset
 const R_CORE   = 0.82;       // widest point, over the middle of each arm
 
-// Opacity targets by phase. A faint presence during 'entering' foreshadows the
-// shaft while the camera is still outside watching the dive; the fade-out is
-// quick so the tube is gone by the time the exterior exit shot settles.
+// Opacity targets by phase. 'entering' starts at the faint value — a foreshadow
+// of the shaft while the camera is still hanging outside — and is driven up to
+// the full ride value by the dive, so the bore is at full strength at the exact
+// moment the camera passes through the mouth rather than snapping on afterwards.
+// The fade-out is quick so the tube is gone by the time the exterior exit shot
+// settles.
 const OP_RIDE = 1.0;
 const OP_ENTER = 0.20;
 const OP_LERP_IN = 6;
@@ -253,7 +256,11 @@ export function TunnelTube({ worm, size }) {
     const riding = phase === 'tunnel' || phase === 'exiting';
     const entering = phase === 'entering';
 
-    const target = riding ? OP_RIDE : entering ? OP_ENTER : 0;
+    // Same cubic the camera dives on (WormChaseCamera), so wall strength and
+    // approach speed are the same curve.
+    const enterP = Math.min(1, Math.max(0, worm.tunnelProgress.current ?? 0));
+    const dive = enterP * enterP * enterP;
+    const target = riding ? OP_RIDE : entering ? OP_ENTER + (OP_RIDE - OP_ENTER) * dive : 0;
     const lerp = target > opacityRef.current ? OP_LERP_IN : OP_LERP_OUT;
     opacityRef.current += (target - opacityRef.current) * Math.min(1, delta * lerp);
 
