@@ -24,7 +24,7 @@ import { getSkinFX } from '../worm/wormSkinFX.js';
 import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMaterialTime } from '../worm/wormSkinMaterial.js';
 import { WormParticleSystem } from '../worm/wormSkinParticles.js';
 import {
-  PAGE_GEO_ARGS, PAGE_HINGE_X, PAGE_HINGE_Y, PAGE_LAYER_COUNT, PAGE_LAYER_GAP,
+  PAGE_GEO_ARGS, PAGE_HINGE_X, PAGE_HINGE_Y, PAGE_LAYER_COUNT, PAGE_LAYER_GAP, PAGE_COLORS,
   FRONT_COVER_GEO_ARGS, SPINE_X_SCALE, pageHingeAngles,
 } from '../worm/wormBookFX.js';
 
@@ -106,8 +106,9 @@ function _buildRig() {
     const leftLayers = [];
     const rightLayers = [];
     for (let layer = 0; layer < PAGE_LAYER_COUNT; layer++) {
-      const leftPage = new THREE.Mesh(pageGeo, new THREE.MeshStandardMaterial({ roughness: 0.8, metalness: 0, side: THREE.DoubleSide }));
-      const rightPage = new THREE.Mesh(pageGeo, new THREE.MeshStandardMaterial({ roughness: 0.8, metalness: 0, side: THREE.DoubleSide }));
+      const paperColor = PAGE_COLORS[layer % PAGE_COLORS.length];
+      const leftPage = new THREE.Mesh(pageGeo, new THREE.MeshStandardMaterial({ color: paperColor, roughness: 0.9, metalness: 0, side: THREE.DoubleSide }));
+      const rightPage = new THREE.Mesh(pageGeo, new THREE.MeshStandardMaterial({ color: paperColor, roughness: 0.9, metalness: 0, side: THREE.DoubleSide }));
       group.add(leftPage, rightPage);
       leftLayers.push(leftPage); rightLayers.push(rightPage);
     }
@@ -408,7 +409,6 @@ function _poseWorm(opts, time) {
           .addScaledVector(_pbPageOffset, pageScale);
         l.quaternion.copy(_pbPageQuat);
         l.scale.setScalar(pageScale);
-        l.material.color.set(skin.belly);
       }
 
       _pbHingeQuat.setFromAxisAngle(_pbZAxisUnit, right);
@@ -422,7 +422,6 @@ function _poseWorm(opts, time) {
           .addScaledVector(_pbPageOffset, pageScale);
         r.quaternion.copy(_pbPageQuat);
         r.scale.setScalar(pageScale);
-        r.material.color.set(skin.belly);
       }
     } else if (isBook) {
       body.quaternion.identity();
