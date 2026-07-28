@@ -15,7 +15,7 @@ import { getSkinFX } from './wormSkinFX.js';
 import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMaterialTime } from './wormSkinMaterial.js';
 import WormSkinParticles from './WormSkinParticles.jsx';
 import {
-  PAGE_GEO_ARGS, PAGE_HINGE_X, PAGE_HINGE_Y, PAGE_LAYER_COUNT, PAGE_LAYER_GAP,
+  PAGE_GEO_ARGS, PAGE_HINGE_X, PAGE_HINGE_Y, PAGE_LAYER_COUNT, PAGE_LAYER_GAP, PAGE_COLORS,
   FRONT_COVER_GEO_ARGS, SPINE_X_SCALE, turnSignalFromDirections, smoothTurn, pageHingeAngles,
 } from './wormBookFX.js';
 
@@ -411,7 +411,7 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
                     {PAGE_LAYERS.map(layer => (
                       <mesh key={layer} position={[PAGE_GEO_ARGS[0] / 2, layer * PAGE_LAYER_GAP, 0]}>
                         <boxGeometry args={PAGE_GEO_ARGS} />
-                        <meshStandardMaterial color={BELLY_COLOR} roughness={0.78} metalness={0} />
+                        <meshStandardMaterial color={PAGE_COLORS[layer % PAGE_COLORS.length]} roughness={0.9} metalness={0} />
                       </mesh>
                     ))}
                   </group>
@@ -419,7 +419,7 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
                     {PAGE_LAYERS.map(layer => (
                       <mesh key={layer} position={[-PAGE_GEO_ARGS[0] / 2, layer * PAGE_LAYER_GAP, 0]}>
                         <boxGeometry args={PAGE_GEO_ARGS} />
-                        <meshStandardMaterial color={BELLY_COLOR} roughness={0.78} metalness={0} />
+                        <meshStandardMaterial color={PAGE_COLORS[layer % PAGE_COLORS.length]} roughness={0.9} metalness={0} />
                       </mesh>
                     ))}
                   </group>
