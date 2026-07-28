@@ -11,7 +11,7 @@ import { FACE_CITIES, CITY_CONFIG } from '../modes/CityBiomeMode.js';
 import CityBuildings from './CityBuildings.jsx';
 import { BiomeGLBCluster, isGLBActive, isGLBFullFace } from './BiomeGLBCluster.jsx';
 import { SeamPulseOverlay } from './SeamPulseOverlay.jsx';
-import { getTileStyleMaterial, getGlassMaterial, sharedTremorState, flipBurstMap, healBurstMap, healParticleMap } from './styles/TileStyleMaterials.jsx';
+import { getTileStyleMaterial, getGlassMaterial, sharedTremorState, flipBurstMap, stickerFlipMotion, healBurstMap, healParticleMap } from './styles/TileStyleMaterials.jsx';
 import { useStickerInstances } from './StickerInstances.jsx';
 import { registerSticker, unregisterSticker, activateSticker, deactivateSticker, wispyTime } from './StickerAnimationManager.js';
 import { getManifoldGridId } from '../game/coordinates.js';
@@ -772,7 +772,10 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // Ensure transient flip-burst artifacts never leak across mode/home transitions.
   useEffect(() => {
     return () => {
-      if (stickerGridIdRef.current) flipBurstMap.delete(stickerGridIdRef.current);
+      if (stickerGridIdRef.current) {
+        flipBurstMap.delete(stickerGridIdRef.current);
+        stickerFlipMotion.delete(stickerGridIdRef.current);
+      }
     };
   }, []);
 
@@ -1125,6 +1128,13 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       groupRef.current.position.x = pos[0] + jX;
       groupRef.current.position.y = pos[1] + jY;
 
+      // Publish the live motion so anything welded to this tile can ride it —
+      // the wormhole ribbon and cords anchor here and would otherwise stay rigid
+      // while the tile shakes and squashes underneath them.
+      if (stickerGridIdRef.current) {
+        stickerFlipMotion.set(stickerGridIdRef.current, { p: rawP, jx: jX, jy: jY, squash });
+      }
+
       if (isDisparityFlipRef.current) {
         // Eyelid overlay: uProgress tracks flipSquish directly (1=open, 0=closed).
         if (eyelidOverlayRef.current && eyelidMatRef.current) {
@@ -1184,7 +1194,10 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         groupRef.current.rotation.y = rot[1];
         groupRef.current.rotation.z = rot[2];
         groupRef.current.position.set(pos[0], pos[1], pos[2]);
-        if (stickerGridIdRef.current) flipBurstMap.delete(stickerGridIdRef.current);
+        if (stickerGridIdRef.current) {
+          flipBurstMap.delete(stickerGridIdRef.current);
+          stickerFlipMotion.delete(stickerGridIdRef.current);
+        }
         // The more times this tile has already been flipped, the harder it shakes —
         // a visible sense of accumulating damage as it nears its flip cap.
         {
