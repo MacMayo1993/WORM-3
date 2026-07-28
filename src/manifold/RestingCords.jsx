@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { FLIP_CAP, TUNNEL_ANCHOR_OFFSET } from '../utils/constants.js';
 import { tunnelState } from '../worm/tunnelProgressBridge.js';
+import { applyTileFlipMotion, flipWidthPulse } from './tunnelAnchorMotion.js';
 
 /**
  * RestingCords — the whole wormhole network as ONE draw call.
@@ -218,7 +219,7 @@ function createCordGeometry(maxStrands) {
  * midB → endPos (second arm), with the same TAPER_MIN narrowing toward the
  * core. Tangents are piecewise constant, so each arm needs one normalize.
  */
-function fillCord(attrs, slot, startPos, midAPos, midBPos, endPos, width, colorA, colorB, heat) {
+function fillCord(attrs, slot, startPos, midAPos, midBPos, endPos, width, colorA, colorB, heat, flipP1 = 0, flipP2 = 0) {
   const { pos, tan, col, side, tt, wid, heatArr } = attrs;
   const halfSegs = CORD_SEGS / 2;
   const base = slot * VERTS_PER_STRAND;
@@ -231,7 +232,9 @@ function fillCord(attrs, slot, startPos, midAPos, midBPos, endPos, width, colorA
   for (let i = 0; i <= CORD_SEGS; i++) {
     const t     = i / CORD_SEGS;
     const taper = TAPER_MIN + (1.0 - TAPER_MIN) * Math.abs(2.0 * t - 1.0);
-    const w     = width * taper;
+    // Swell at whichever end is mid-flip, so the cord pulses with the tile
+    // rather than only being dragged around by it.
+    const w     = width * taper * flipWidthPulse(t, flipP1, flipP2);
 
     let cx, cy, cz, nx, ny, nz;
     if (i <= halfSegs) {
@@ -334,6 +337,13 @@ const RestingCords = ({ tunnels, cubieRefs, focusIds, maxStrands }) => {
       _vStart.copy(_wPos1).addScaledVector(_faceNorm1, TUNNEL_ANCHOR_OFFSET);
       _vEnd.copy(_wPos2).addScaledVector(_faceNorm2, TUNNEL_ANCHOR_OFFSET);
 
+      // Ride the tiles' own flip animation. The anchors move every frame while a
+      // flip runs, so the movement check below sees them and rebuilds — the cord
+      // shakes in lockstep with the tile instead of staying welded to a still point.
+      const flipP1 = applyTileFlipMotion(_vStart, _faceNorm1, t.id);
+      const flipP2 = applyTileFlipMotion(_vEnd, _faceNorm2, t.gridId2);
+      if (flipP1 > 0 || flipP2 > 0) moved = true;
+
       // Dock on the mini-cube face in LOCAL colour direction, matching the ribbon.
       _midA.set(n1[0], n1[1], n1[2]).multiplyScalar(MINI_FACE_R);
       _midB.set(n2[0], n2[1], n2[2]).multiplyScalar(MINI_FACE_R);
@@ -356,7 +366,7 @@ const RestingCords = ({ tunnels, cubieRefs, focusIds, maxStrands }) => {
         const width = CORD_W_MIN + (CORD_W_MAX - CORD_W_MIN) * heat;
         _colorA.set(t.color1);
         _colorB.set(t.color2);
-        fillCord(attrs, slot, _vStart, _midA, _midB, _vEnd, width, _colorA, _colorB, heat);
+        fillCord(attrs, slot, _vStart, _midA, _midB, _vEnd, width, _colorA, _colorB, heat, flipP1, flipP2);
       }
       slot++;
     }
