@@ -2,6 +2,7 @@ import { useRef, useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { FLIP_CAP, TUNNEL_ANCHOR_OFFSET } from '../utils/constants.js';
+import { makeTileGuard, setTileGuard, tileRoom } from './tunnelTileGuard.js';
 import { tunnelState } from '../worm/tunnelProgressBridge.js';
 import { applyTileFlipMotion, flipWidthPulse } from './tunnelAnchorMotion.js';
 
@@ -87,6 +88,8 @@ const _midA      = new THREE.Vector3();
 const _midB      = new THREE.Vector3();
 const _colorA    = new THREE.Color();
 const _colorB    = new THREE.Color();
+// Half-space pair keeping each cord behind the two stickers it hangs off.
+const _tileGuard = makeTileGuard();
 
 const vertexShader = `
   attribute float aSide;      // -1 / +1 across the strip width
@@ -219,7 +222,7 @@ function createCordGeometry(maxStrands) {
  * midB → endPos (second arm), with the same TAPER_MIN narrowing toward the
  * core. Tangents are piecewise constant, so each arm needs one normalize.
  */
-function fillCord(attrs, slot, startPos, midAPos, midBPos, endPos, width, colorA, colorB, heat, flipP1 = 0, flipP2 = 0) {
+function fillCord(attrs, slot, startPos, midAPos, midBPos, endPos, width, colorA, colorB, heat, guard, flipP1 = 0, flipP2 = 0) {
   const { pos, tan, col, side, tt, wid, heatArr } = attrs;
   const halfSegs = CORD_SEGS / 2;
   const base = slot * VERTS_PER_STRAND;
@@ -234,7 +237,7 @@ function fillCord(attrs, slot, startPos, midAPos, midBPos, endPos, width, colorA
     const taper = TAPER_MIN + (1.0 - TAPER_MIN) * Math.abs(2.0 * t - 1.0);
     // Swell at whichever end is mid-flip, so the cord pulses with the tile
     // rather than only being dragged around by it.
-    const w     = width * taper * flipWidthPulse(t, flipP1, flipP2);
+    let w       = width * taper * flipWidthPulse(t, flipP1, flipP2);
 
     let cx, cy, cz, nx, ny, nz;
     if (i <= halfSegs) {
@@ -250,6 +253,14 @@ function fillCord(attrs, slot, startPos, midAPos, midBPos, endPos, width, colorA
       cz = midBPos.z + (endPos.z - midBPos.z) * s;
       nx = tBx / tBLen; ny = tBy / tBLen; nz = tBz / tBLen;
     }
+
+    // The strip is expanded camera-facing in the vertex shader, so which way it
+    // spreads is not known here — but the offset is always aWidth/2 long, and a
+    // displacement of that length can breach a plane by at most that much. Cap
+    // it against the clearance to the tiles (see tunnelTileGuard) and the cord
+    // cannot cross its own sticker from any viewing angle.
+    const room = 2 * tileRoom(guard, cx, cy, cz);
+    if (w > room) w = room;
 
     // Each half carries its own tile's colour — same convention as the ribbon.
     const c = i <= halfSegs ? colorA : colorB;
@@ -366,7 +377,9 @@ const RestingCords = ({ tunnels, cubieRefs, focusIds, maxStrands }) => {
         const width = CORD_W_MIN + (CORD_W_MAX - CORD_W_MIN) * heat;
         _colorA.set(t.color1);
         _colorB.set(t.color2);
-        fillCord(attrs, slot, _vStart, _midA, _midB, _vEnd, width, _colorA, _colorB, heat, flipP1, flipP2);
+        // Anchors after flip motion, so a shaking tile carries its guard plane.
+        setTileGuard(_tileGuard, _vStart, _faceNorm1, _vEnd, _faceNorm2);
+        fillCord(attrs, slot, _vStart, _midA, _midB, _vEnd, width, _colorA, _colorB, heat, _tileGuard, flipP1, flipP2);
       }
       slot++;
     }

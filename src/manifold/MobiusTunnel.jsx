@@ -2,6 +2,7 @@ import { useRef, useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { FLIP_CAP, TUNNEL_ANCHOR_OFFSET } from '../utils/constants.js';
+import { makeTileGuard, setTileGuard, tileRoom } from './tunnelTileGuard.js';
 import { tunnelState } from '../worm/tunnelProgressBridge.js';
 import { applyTileFlipMotion, flipWidthPulse } from './tunnelAnchorMotion.js';
 
@@ -48,6 +49,8 @@ const _up            = new THREE.Vector3(0, 1, 0);
 const _side          = new THREE.Vector3(0, 0, 1);
 const _portalPos     = new THREE.Vector3();
 const _whipAxis      = new THREE.Vector3();
+// Half-space pair keeping ribbon and rails behind the two stickers they hang off.
+const _tileGuard     = makeTileGuard();
 
 // Vertex shader: pass UV + world position through to fragment.
 // vWorldPos feeds the fresnel silhouette glow (needs a view direction).
@@ -67,7 +70,15 @@ const vertexShader = `
     // both tile ends so the anchors stay welded to their stickers. This is what
     // makes a flip read as a physical event rather than only a brightness pop —
     // the ribbon snaps taut as the soliton runs through it.
-    float ends = sin(vUv.y * 3.14159265);
+    //
+    // sin() alone is not enough of a pin. It leaves ~8% of the amplitude one
+    // segment in from the anchor, and uWhipAxis is the ribbon's surface normal
+    // — the same direction that leans out of the tile — so a whip near the
+    // mouth wags the band through its own sticker. The CPU-side clearance
+    // budget (tunnelTileGuard) cannot see this term, so hold it off the last
+    // stretch entirely and let the pin be real.
+    float ends = sin(vUv.y * 3.14159265)
+               * smoothstep(0.0, 0.14, vUv.y) * smoothstep(1.0, 0.86, vUv.y);
     wp.xyz += uWhipAxis * (sin(vUv.y * 12.0 - uWhipPhase) * uWhipAmp * ends);
 
     vWorldPos = wp.xyz;
@@ -190,7 +201,8 @@ const bumperVertexShader = `
     // (shared by reference below) — otherwise the guard rails would stay put
     // while the ribbon snapped out from under them.
     vec3  p    = position;
-    float ends = sin(aTripFrac * 3.14159265);
+    float ends = sin(aTripFrac * 3.14159265)
+               * smoothstep(0.0, 0.14, aTripFrac) * smoothstep(1.0, 0.86, aTripFrac);
     p += uWhipAxis * (sin(aTripFrac * 12.0 - uWhipPhase) * uWhipAmp * ends);
 
     gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
@@ -235,7 +247,7 @@ const bumperFragmentShader = `
  * Width tapers from full at tile ends to TAPER_MIN fraction at the mini-cube crossing.
  * Cross-section direction (_perpCurrent) rotates π via applyAxisAngle — the Möbius half-twist.
  */
-function fillRibbon(posArray, uvArray, startPos, midAPos, midBPos, endPos, axis, perpStart, segs, width, flipP1 = 0, flipP2 = 0) {
+function fillRibbon(posArray, uvArray, startPos, midAPos, midBPos, endPos, axis, perpStart, segs, width, guard, flipP1 = 0, flipP2 = 0) {
   const halfW    = width / 2;
   const halfSegs = segs / 2;
 
@@ -243,7 +255,7 @@ function fillRibbon(posArray, uvArray, startPos, midAPos, midBPos, endPos, axis,
     const t     = i / segs;
     const taper = TAPER_MIN + (1.0 - TAPER_MIN) * Math.abs(2.0 * t - 1.0);
     // Swells at whichever end is mid-flip so the ribbon pulses with its tile.
-    const w     = halfW * taper * flipWidthPulse(t, flipP1, flipP2);
+    let w       = halfW * taper * flipWidthPulse(t, flipP1, flipP2);
 
     let cx, cy, cz;
     if (i <= halfSegs) {
@@ -257,6 +269,12 @@ function fillRibbon(posArray, uvArray, startPos, midAPos, midBPos, endPos, axis,
       cy = midBPos.y + (endPos.y - midBPos.y) * s;
       cz = midBPos.z + (endPos.z - midBPos.z) * s;
     }
+
+    // Never wider than it is deep — see tunnelTileGuard. The flip pulse above
+    // multiplies the width, so this has to come after it or a swelling tile
+    // punches the band straight through its own sticker.
+    const room = tileRoom(guard, cx, cy, cz);
+    if (w > room) w = room;
 
     _perpCurrent.copy(perpStart).applyAxisAngle(axis, t * Math.PI);
 
@@ -285,7 +303,7 @@ function fillRibbon(posArray, uvArray, startPos, midAPos, midBPos, endPos, axis,
 function fillBumpers(
   leftPosArr, rightPosArr, leftHFArr, rightHFArr, leftTFArr, rightTFArr,
   startPos, midAPos, midBPos, endPos,
-  axis, perpStart, segs, width
+  axis, perpStart, segs, width, guard
 ) {
   const halfW    = width / 2;
   const halfSegs = segs / 2;
@@ -304,8 +322,8 @@ function fillBumpers(
   for (let i = 0; i <= segs; i++) {
     const t     = i / segs;
     const taper = TAPER_MIN + (1.0 - TAPER_MIN) * Math.abs(2.0 * t - 1.0);
-    const w     = halfW * taper;
-    const bh    = BUMPER_HEIGHT * taper;
+    let w       = halfW * taper;
+    let bh      = BUMPER_HEIGHT * taper;
 
     // Centre position (same piecewise formula as fillRibbon)
     let cx, cy, cz;
@@ -320,6 +338,16 @@ function fillBumpers(
       cy = midBPos.y + (endPos.y - midBPos.y) * s;
       cz = midBPos.z + (endPos.z - midBPos.z) * s;
     }
+
+    // The rails are the reason this bug was visible at all: they stand off the
+    // ribbon along its surface normal, and where the two tiles sit on different
+    // axes that normal leans OUT of the face. Spend the available clearance on
+    // the band first, then give the rails whatever is left — at the mouth that
+    // is nothing, so they emerge from inside the tile instead of straddling it.
+    const room = tileRoom(guard, cx, cy, cz);
+    if (w > room) w = room;
+    const railRoom = room - w;
+    if (bh > railRoom) bh = railRoom;
 
     // Width (cross-section) direction with Möbius half-twist
     _perpCurrent.copy(perpStart).applyAxisAngle(axis, t * Math.PI);
@@ -548,6 +576,10 @@ const MobiusTunnel = ({
       _whipAxis.normalize();
       whipUniforms.uWhipAxis.value.copy(_whipAxis);
 
+      // Anchors after flip motion, so a shaking tile carries its own guard plane
+      // with it rather than letting the band slip out from behind the sticker.
+      setTileGuard(_tileGuard, _vStart, _faceNorm1, _vEnd, _faceNorm2);
+
       const dead = flips >= FLIP_CAP;
       const cA = dead ? '#555555' : color1;
       const cB = dead ? '#444444' : color2;
@@ -574,7 +606,7 @@ const MobiusTunnel = ({
         geo.attributes.uv.array,
         _vStart, _midA, _midB, _vEnd,
         _axis, _perpBase,
-        RIBBON_SEGS, RIBBON_WIDTH, flipP1, flipP2
+        RIBBON_SEGS, RIBBON_WIDTH, _tileGuard, flipP1, flipP2
       );
       geo.attributes.position.needsUpdate = true;
       geo.attributes.uv.needsUpdate = true;
@@ -588,7 +620,7 @@ const MobiusTunnel = ({
         rightGeo.attributes.aTripFrac.array,
         _vStart, _midA, _midB, _vEnd,
         _axis, _perpBase,
-        RIBBON_SEGS, RIBBON_WIDTH
+        RIBBON_SEGS, RIBBON_WIDTH, _tileGuard
       );
       leftGeo.attributes.position.needsUpdate    = true;
       leftGeo.attributes.aHeightFrac.needsUpdate  = true;
