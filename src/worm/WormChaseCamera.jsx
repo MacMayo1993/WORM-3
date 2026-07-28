@@ -279,7 +279,6 @@ export default function WormChaseCamera({ worm, size }) {
             getTunnelWorldPosInto(_ribVStart, tunnel, 0, size);
 
             _camTargetCam.copy(_ribVStart).addScaledVector(entN, portalDist(size));
-            _camTargetCam.y += portalUp(size);
             _camTargetLook.copy(_ribVStart);
             _camUp.set(0, entN.y < -0.85 ? -1 : 1, 0);
 
@@ -319,7 +318,6 @@ export default function WormChaseCamera({ worm, size }) {
             // Where we are diving FROM — the windup framing, held so the fall starts
             // from exactly where the previous phase parked the camera.
             _diveOutCam.copy(_ribVStart).addScaledVector(entN, portalDist(size));
-            _diveOutCam.y += portalUp(size);
             _diveOutLook.copy(_ribVStart);
 
             // Where we are diving TO — the on-rails pose. Same call the ride branch
