@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import {
   backForHead,
   cameraUpForHead,
+  TUNNEL_CAM_UP,
   diveEase,
   tunnelCamPoseInto,
   makeTunnelCamPose,
@@ -12,6 +13,7 @@ import {
   projectToTileCenterAxisInto
 } from '../worm/tunnelCameraRails.js';
 import { SURFACE_OFFSET } from '../utils/constants.js';
+import { tunnelBoreRadiusAt as tubeRadiusAt } from '../utils/tunnelPath.js';
 
 // A tunnel joining the middle tile of +Y to the middle tile of −Y on an n×n
 // cube: the antipodal pair with the longest, straightest path, so distances
@@ -76,7 +78,16 @@ describe('backForHead', () => {
 
   it('reaches the settled deep-ride trail by the exit arm', () => {
     for (const size of [2, 3, 4, 5]) {
-      expect(backForHead(0.9, size)).toBeCloseTo(1.15 + size * 0.1, 6);
+      expect(backForHead(0.95, size)).toBeCloseTo(1.45 + size * 0.1, 6);
+    }
+  });
+
+  it('settles far enough back that the head is not filling the frame', () => {
+    // At 1.15 + size·0.1 the worm's own back took up most of the shot. The ride
+    // value has to stay well clear of the head, which is one segment (0.09) long
+    // and about that wide.
+    for (const size of [2, 3, 4, 5]) {
+      expect(backForHead(0.95, size)).toBeGreaterThan(1.5);
     }
   });
 
@@ -138,11 +149,27 @@ describe('tunnelCamPoseInto', () => {
     }
   });
 
-  it('keeps the riding height off the lens until it is well inside', () => {
-    // Any lateral offset applied while the camera is still in the mouth walks it
-    // across the face of the entry sticker instead of through its centre.
+  it('keeps the riding height off the lens at both mouths', () => {
+    // Any lateral offset applied while the camera is in a mouth walks it across
+    // the face of that sticker instead of through its centre — and the bore is
+    // only a tile wide there, so an offset lens would be outside the shaft.
     expect(cameraUpForHead(0)).toBe(0);
     expect(cameraUpForHead(ENTER_END_T)).toBe(0);
+    expect(cameraUpForHead(1)).toBe(0);
+    // Full height for the ride between them, where the body has to pass under it.
+    expect(cameraUpForHead(0.6)).toBeCloseTo(TUNNEL_CAM_UP, 6);
+  });
+
+  it('rides far enough off the centerline to keep the body out of the lens', () => {
+    // The worm is strung along the very centerline the camera trails down, so
+    // this offset is the entire clearance between the lens and the segment
+    // passing beneath it. Segments are 0.09 in radius.
+    expect(TUNNEL_CAM_UP - 0.09).toBeGreaterThan(0.3);
+    // …but never wider than the bore it rides inside, or the lens ends up
+    // outside the shaft looking back in through the wall.
+    for (let t = 0; t <= 1.0001; t += 0.02) {
+      expect(cameraUpForHead(Math.min(1, t))).toBeLessThan(tubeRadiusAt(Math.min(1, t)));
+    }
   });
 
   it('carries the camera through the entry face during the dive', () => {

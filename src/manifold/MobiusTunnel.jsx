@@ -29,12 +29,15 @@ const FACE_NORM_LOCAL = {
   PZ: [0, 0, 1], NZ: [0, 0, -1],
 };
 
-const RIBBON_WIDTH   = 0.85;
+// Band width and rail height, both taken down 15% from 0.85 / 0.30: at the old
+// size the ribbon and its rails crowded the bore they hang inside, and from the
+// riding camera the tunnel filled the frame instead of framing the worm in it.
+const RIBBON_WIDTH   = 0.72;
 const RIBBON_SEGS    = 64;   // must be even — doubled from 32 for smoother curves
 const REBUILD_EPS_SQ = 1e-4;
 const MINI_FACE_R    = TUNNEL_MINI_FACE_R; // must match MINI_S in VoidCore.jsx
 const TAPER_MIN      = 0.15; // narrowest fraction of full width at the mini-cube
-const BUMPER_HEIGHT  = 0.30; // guard-rail height at full width — increased from 0.22
+const BUMPER_HEIGHT  = 0.255; // guard-rail height at full width
 
 // Module-level cached objects — no per-frame allocation.
 const _wPos1         = new THREE.Vector3();

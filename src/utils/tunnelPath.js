@@ -64,6 +64,35 @@ export const TUNNEL_THROAT_T_SHARE = 0.45;
 export const ARM_A_END = 0.4;
 export const ARM_B_START = 0.6;
 
+// ── Bore profile ─────────────────────────────────────────────────────────────
+// The radius of the shaft swept around this centerline (TunnelTube). It lives
+// here, next to the path itself, because it is in a fixed relationship with two
+// other numbers: the camera's offset from the axis (tunnelCameraRails —
+// TUNNEL_CAM_UP) must stay inside it for the whole ride, and the ribbon's width
+// (MobiusTunnel) has to fit within it too. When these lived in three files the
+// bore was quietly sized around a camera offset that had since changed.
+//
+// Kept deliberately snug: anything wider fills the frame and swallows both the
+// ribbon and the cube around it.
+export const BORE_MOUTH = 0.29;  // where the tunnel meets its tile (sticker is ~0.88 wide)
+export const BORE_THROAT = 0.49; // at the core crossing — the wall fades out across it
+export const BORE_CORE = 0.70;   // widest point, over the middle of each arm
+
+/**
+ * Bore radius at traversal parameter t.
+ *
+ * The bore pinches at both tiles AND at the core, bulging over the middle of each
+ * arm instead: where the two arms meet at a sharp corner, putting the widest point
+ * on the corner makes it read as two mismatched barrels butted together rather
+ * than one shaft.
+ */
+export function tunnelBoreRadiusAt(t) {
+  const c = t < 0 ? 0 : t > 1 ? 1 : t;
+  const base = BORE_MOUTH + (BORE_THROAT - BORE_MOUTH) * Math.sin(Math.PI * c);
+  const arm = Math.abs(Math.sin(2 * Math.PI * c));
+  return base + (BORE_CORE - BORE_THROAT) * arm;
+}
+
 const LEG_COUNT = 5;
 const _axial = new THREE.Vector3();
 
