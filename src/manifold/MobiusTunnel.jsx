@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { FLIP_CAP, TUNNEL_ANCHOR_OFFSET } from '../utils/constants.js';
 import { tunnelState } from '../worm/tunnelProgressBridge.js';
+import { applyTileFlipMotion, flipWidthPulse } from './tunnelAnchorMotion.js';
 
 // Opacity multiplier when the worm is traversing a different tunnel.
 // While a traversal is underway, tunnels the worm is NOT in recede to this
@@ -234,14 +235,15 @@ const bumperFragmentShader = `
  * Width tapers from full at tile ends to TAPER_MIN fraction at the mini-cube crossing.
  * Cross-section direction (_perpCurrent) rotates π via applyAxisAngle — the Möbius half-twist.
  */
-function fillRibbon(posArray, uvArray, startPos, midAPos, midBPos, endPos, axis, perpStart, segs, width) {
+function fillRibbon(posArray, uvArray, startPos, midAPos, midBPos, endPos, axis, perpStart, segs, width, flipP1 = 0, flipP2 = 0) {
   const halfW    = width / 2;
   const halfSegs = segs / 2;
 
   for (let i = 0; i <= segs; i++) {
     const t     = i / segs;
     const taper = TAPER_MIN + (1.0 - TAPER_MIN) * Math.abs(2.0 * t - 1.0);
-    const w     = halfW * taper;
+    // Swells at whichever end is mid-flip so the ribbon pulses with its tile.
+    const w     = halfW * taper * flipWidthPulse(t, flipP1, flipP2);
 
     let cx, cy, cz;
     if (i <= halfSegs) {
@@ -422,7 +424,7 @@ function createRibbonGeos(segs) {
  */
 const MobiusTunnel = ({
   meshIdx1, meshIdx2, dirKey1, dirKey2, cubieRefs, flips, color1, color2, tunnelId,
-  tunnelBirths, tunnelPulses,
+  gridId1, gridId2, tunnelBirths, tunnelPulses,
 }) => {
   const meshRef          = useRef();
   const pulseT           = useRef(Math.random() * Math.PI * 2);
@@ -500,12 +502,19 @@ const MobiusTunnel = ({
     _vStart.copy(_wPos1).addScaledVector(_faceNorm1, TUNNEL_ANCHOR_OFFSET);
     _vEnd  .copy(_wPos2).addScaledVector(_faceNorm2, TUNNEL_ANCHOR_OFFSET);
 
+    // Ride each tile's own flip animation — vibration into the anchors, squash
+    // into the width. The anchors change every frame during a flip, so the
+    // movement check below rebuilds and the ribbon shakes along with the tile.
+    const flipP1 = applyTileFlipMotion(_vStart, _faceNorm1, gridId1);
+    const flipP2 = applyTileFlipMotion(_vEnd, _faceNorm2, gridId2);
+    const tileFlipping = flipP1 > 0 || flipP2 > 0;
+
     // Mini-cube face docking points — use LOCAL color direction so the tunnel
     // always routes through the correct colored face regardless of cube rotation.
     _midA.set(n1[0], n1[1], n1[2]).multiplyScalar(MINI_FACE_R);
     _midB.set(n2[0], n2[1], n2[2]).multiplyScalar(MINI_FACE_R);
 
-    const moved =
+    const moved = tileFlipping ||
       lastStartRef.current.distanceToSquared(_vStart) > REBUILD_EPS_SQ ||
       lastEndRef  .current.distanceToSquared(_vEnd)   > REBUILD_EPS_SQ;
 
@@ -565,7 +574,7 @@ const MobiusTunnel = ({
         geo.attributes.uv.array,
         _vStart, _midA, _midB, _vEnd,
         _axis, _perpBase,
-        RIBBON_SEGS, RIBBON_WIDTH
+        RIBBON_SEGS, RIBBON_WIDTH, flipP1, flipP2
       );
       geo.attributes.position.needsUpdate = true;
       geo.attributes.uv.needsUpdate = true;

@@ -194,6 +194,8 @@ const WormholeNetwork = ({ manifoldMap, cubieRefs }) => {
         <MobiusTunnel
           key={t.id}
           tunnelId={t.pairId}
+          gridId1={t.id}
+          gridId2={t.gridId2}
           meshIdx1={t.meshIdx1}
           meshIdx2={t.meshIdx2}
           dirKey1={t.dirKey1}
