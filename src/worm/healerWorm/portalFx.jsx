@@ -1,6 +1,5 @@
 // src/worm/healerWorm/portalFx.jsx
-// Extracted from HealerWormMode.jsx (2026-07 monolith split) — code unchanged.
-import { useRef } from 'react';
+import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../../hooks/useGameStore.js';
@@ -35,23 +34,29 @@ export function PortalGlow({ worm, size }) {
 }
 
 // ─── Tunnel Portal FX ─────────────────────────────────────────────────────────
-// Punchy moment effects layered on the wormhole transition:
-//   • Entry vortex — a stack of concentric rings forming a funnel mouth at the entry hole.
-//     They spin (faster as the worm dives) and pull inward, so the worm is visibly *sucked*
-//     down a swirling throat.
-//   • Exit burst — a one-shot shockwave ring + flash that fires the instant the worm breaks
-//     out of the exit hole, so it reads as being *spat out*.
+// A wormhole's defining property is that it is an OPENING, and until now nothing
+// on either tile ever opened. Entry and exit were both dressed with stacks of
+// spinning torus rings drawn on top of a solid, unbroken sticker — decoration
+// sitting on a closed surface, and a large part of why the traversal moments read
+// as cluttered rather than dramatic.
+//
+// Both tiles now punch an actual hole: an iris that irises open into a dark
+// throat with a lit cut edge and rings receding down it. That replaces all three
+// former ring layers (entry vortex, exit vortex, and the exit mouth) — the hole
+// says "portal" on its own, so the decoration that was standing in for it is gone.
+//
+// The exit burst survives as the one-shot impact when the worm breaks out; it is
+// punctuation, not a persistent layer.
 const _fxPos = new THREE.Vector3();
 const _fxNormal = new THREE.Vector3();
 const _fxQuat = new THREE.Quaternion();
-const _fxRingUp = new THREE.Vector3(0, 0, 1); // ring/torus geometry lies in XY → flat normal is +Z
-const VORTEX_RINGS = 4;
+const _fxRingUp = new THREE.Vector3(0, 0, 1); // ring/disc geometry lies in XY → flat normal is +Z
 
 /**
  * Overall traversal progress, 0 at the wind-up spiral to 1 as the worm clears the
  * exit hole. The per-phase progress value restarts at 0 each phase, so on its own
  * it cannot say how close the worm is to surfacing. Same mapping WormChaseCamera
- * uses for tunnelState.t, so the exit mouth charges in step with the ride.
+ * uses for tunnelState.t, so the holes charge in step with the ride.
  */
 function traversalProgress(phase, prog) {
     const p = Math.min(1, Math.max(0, prog ?? 0));
@@ -62,146 +67,136 @@ function traversalProgress(phase, prog) {
     return 1;
 }
 
+// Radius of a fully open hole. The sticker is 0.88 across, so this is the largest
+// circle that stays inside the tile.
+const HOLE_R = 0.44;
+
+const holeVertexShader = `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+// Opaque on purpose: this stands in for the tile surface it replaces, so it has to
+// occlude the sticker underneath rather than tint it.
+const holeFragmentShader = `
+  uniform vec3  uColor;
+  uniform float uOpen;    // 0 = closed, 1 = fully open
+  uniform float uCharge;  // 0→1, how close the worm is to this end
+  uniform float uTime;
+  varying vec2  vUv;
+
+  void main() {
+    vec2  p = vUv * 2.0 - 1.0;
+    float r = length(p);
+    if (r > uOpen) discard;               // the aperture itself
+
+    float d = r / max(uOpen, 0.0001);     // 0 at the centre of the hole, 1 at the cut edge
+
+    // Looking down a shaft: near-black deep in, picking up the tunnel's colour
+    // toward the mouth. This is what makes it read as depth rather than a
+    // black sticker.
+    vec3 col = mix(vec3(0.012, 0.012, 0.022), uColor * 0.5, pow(d, 2.6));
+
+    // The cut edge catches light — the single strongest "this is a hole" cue.
+    float rim = smoothstep(0.86, 1.0, d);
+    col += uColor * rim * (1.3 + uCharge * 1.8);
+
+    // A few rings receding down the throat, drifting inward. Deliberately faint:
+    // these replace four spinning torus rings that used to sit on the surface.
+    float rings = smoothstep(0.87, 1.0, fract(d * 3.0 - uTime * 0.5)) * 0.16 * (1.0 - d);
+    col += uColor * rings;
+
+    // Glow from something arriving.
+    col += uColor * uCharge * 0.35 * (1.0 - d);
+
+    gl_FragColor = vec4(col, 1.0);
+  }
+`;
+
+function useHoleUniforms(color) {
+    return useMemo(() => ({
+        uColor:  { value: new THREE.Color(color) },
+        uOpen:   { value: 0 },
+        uCharge: { value: 0 },
+        uTime:   { value: 0 },
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }), []);
+}
+
 export function TunnelPortalFX({ worm, size }) {
     const colors = useGameStore(s => s.wormActiveTunnelColors);
     const entryColor = colors?.entryColor ?? '#33ddff';
     const exitColor = colors?.exitColor ?? '#ff8833';
 
-    const vortexRef = useRef();
-    const vortexRingRefs = useRef([]);
-    const exitVortexRef = useRef();
-    const exitVortexRingRefs = useRef([]);
-    const exitMouthRef = useRef();
-    const exitMouthIrisRef = useRef();
-    const exitMouthGlowRef = useRef();
-    const exitMouthArcRefs = useRef([]);
+    const entryHoleRef = useRef();
+    const exitHoleRef = useRef();
+    const entryOpenRef = useRef(0);
+    const exitOpenRef = useRef(0);
     const burstRef = useRef();
     const burstFlashRef = useRef();
     const burstTRef = useRef(-1);   // -1 idle, else 0..1 burst progress
     const firedRef = useRef(false); // one-shot guard per traversal
 
-    useFrame(({ clock }, delta) => {
+    const entryUniforms = useHoleUniforms(entryColor);
+    const exitUniforms = useHoleUniforms(exitColor);
+
+    useFrame((_state, delta) => {
         const phase = worm.phase.current;
         const tunnel = worm.activeTunnel.current;
         const prog = worm.tunnelProgress.current;
-        const t = clock.elapsedTime;
 
-        // ── Entry vortex (sucked in) ───────────────────────────────────────────
-        const vGroup = vortexRef.current;
-        if (vGroup) {
-            const showVortex = (phase === 'windup' || phase === 'entering') && !!tunnel;
-            vGroup.visible = showVortex;
-            if (showVortex) {
-                // Sit the swirl on the entry FACE SURFACE (just outside) so it is visible from
-                // outside the cube as the worm is sucked down through it.
+        entryUniforms.uTime.value += delta;
+        exitUniforms.uTime.value += delta;
+        entryUniforms.uColor.value.set(entryColor);
+        exitUniforms.uColor.value.set(exitColor);
+
+        // Both holes are open for the whole traversal — the pair is one point in
+        // RP2, and the worm is inside it the entire time. They are only DRAWN in
+        // the phases where the camera is outside and the cube body is visible:
+        // through 'tunnel' and 'exiting' the body is hidden and the camera is
+        // within the shaft, so a disc pinned to a tile would just be a slab
+        // floating in the middle of the ride.
+        const openTarget = tunnel && phase !== 'crawling' ? 1 : 0;
+        const drawable = !!tunnel && (phase === 'windup' || phase === 'entering' || phase === 'windout');
+
+        const trip = traversalProgress(phase, prog);
+        entryOpenRef.current += (openTarget - entryOpenRef.current) * Math.min(1, delta * 7);
+        exitOpenRef.current += (openTarget - exitOpenRef.current) * Math.min(1, delta * 7);
+
+        // ── Entry hole ────────────────────────────────────────────────────────
+        const eh = entryHoleRef.current;
+        if (eh) {
+            eh.visible = drawable && entryOpenRef.current > 0.02;
+            if (eh.visible) {
                 const ewp = getStickerWorldPos(tunnel.entry.x, tunnel.entry.y, tunnel.entry.z, tunnel.entry.dirKey, size, 0);
                 _fxNormal.copy(FACE_NORMALS[tunnel.entry.dirKey] ?? FACE_NORMALS.PY);
-                _fxPos.set(ewp[0], ewp[1], ewp[2]).addScaledVector(_fxNormal, 0.08);
+                _fxPos.set(ewp[0], ewp[1], ewp[2]).addScaledVector(_fxNormal, 0.012);
                 _fxQuat.setFromUnitVectors(_fxRingUp, _fxNormal);
-                vGroup.position.copy(_fxPos);
-                vGroup.quaternion.copy(_fxQuat);
-
-                const spin = t * 7 + prog * 14;           // accelerates as the worm dives
-                const shrink = 1 - Math.min(1, prog) * 0.65; // funnel narrows inward
-                const envelope = Math.sin(Math.min(1, prog * 1.15) * Math.PI); // fade in then out
-                for (let i = 0; i < VORTEX_RINGS; i++) {
-                    const r = vortexRingRefs.current[i];
-                    if (!r) continue;
-                    r.rotation.z = spin * (1 + i * 0.35);
-                    const baseR = 1 - i * 0.2;
-                    r.scale.setScalar(Math.max(0.02, baseR * shrink));
-                    r.position.z = -i * 0.16 * (0.6 + shrink); // recede into the hole (−normal)
-                    if (r.material) r.material.opacity = Math.max(0, envelope * (0.55 - i * 0.09));
-                }
+                eh.position.copy(_fxPos);
+                eh.quaternion.copy(_fxQuat);
+                entryUniforms.uOpen.value = entryOpenRef.current;
+                // Hottest as the worm goes in, cooling as it travels away.
+                entryUniforms.uCharge.value = Math.max(0, 1 - trip * 2.0);
             }
         }
 
-        // ── Exit mouth (held open for the whole traversal) ────────────────────
-        // The destination tile used to have nothing on it until 'windout': the exit
-        // vortex only ran at the very end and the burst was a one-shot. For the whole
-        // dive and ride it looked like an ordinary tile, so there was no sign the worm
-        // was still inside a wormhole, and no clue where it was going to surface.
-        // This marks it as an open, active hole from the moment the trip starts, and
-        // charges up as the worm approaches so the arrival is telegraphed.
-        const mouth = exitMouthRef.current;
-        if (mouth) {
-            const showMouth = !!tunnel && (
-                phase === 'windup' || phase === 'entering' || phase === 'tunnel' || phase === 'exiting'
-            );
-            mouth.visible = showMouth;
-            if (showMouth) {
+        // ── Exit hole ─────────────────────────────────────────────────────────
+        const xh = exitHoleRef.current;
+        if (xh) {
+            xh.visible = drawable && exitOpenRef.current > 0.02;
+            if (xh.visible) {
                 const xwp = getStickerWorldPos(tunnel.exit.x, tunnel.exit.y, tunnel.exit.z, tunnel.exit.dirKey, size, 0);
                 _fxNormal.copy(FACE_NORMALS[tunnel.exit.dirKey] ?? FACE_NORMALS.PY);
-                // Just proud of the sticker so it reads as sitting on the tile without
-                // z-fighting against it.
-                _fxPos.set(xwp[0], xwp[1], xwp[2]).addScaledVector(_fxNormal, 0.06);
+                _fxPos.set(xwp[0], xwp[1], xwp[2]).addScaledVector(_fxNormal, 0.012);
                 _fxQuat.setFromUnitVectors(_fxRingUp, _fxNormal);
-                mouth.position.copy(_fxPos);
-                mouth.quaternion.copy(_fxQuat);
-
-                const trip = traversalProgress(phase, prog);
-                // Idle breathing the whole time, plus a rising charge as the worm nears.
-                const breathe = 0.5 + 0.5 * Math.sin(t * 3.4);
-                const charge = Math.pow(trip, 2.2);          // stays low, then ramps late
-                const imminent = Math.pow(Math.max(0, (trip - 0.6) / 0.4), 2); // last stretch only
-
-                if (exitMouthIrisRef.current) {
-                    // The iris widens as the worm approaches — the hole opening up for it.
-                    const s = 0.82 + charge * 0.5 + breathe * 0.06;
-                    exitMouthIrisRef.current.scale.setScalar(s);
-                    exitMouthIrisRef.current.rotation.z = t * 0.9;
-                    if (exitMouthIrisRef.current.material) {
-                        exitMouthIrisRef.current.material.opacity = 0.35 + breathe * 0.18 + charge * 0.4;
-                    }
-                }
-                if (exitMouthGlowRef.current) {
-                    exitMouthGlowRef.current.scale.setScalar(0.7 + charge * 0.55 + breathe * 0.05);
-                    if (exitMouthGlowRef.current.material) {
-                        // Bright enough late that the tile visibly announces the arrival.
-                        exitMouthGlowRef.current.material.opacity = 0.12 + charge * 0.3 + imminent * 0.35;
-                    }
-                }
-                // Counter-rotating arcs: cheap way to read as "spinning up" rather than
-                // a static decal stuck on the face.
-                for (let i = 0; i < exitMouthArcRefs.current.length; i++) {
-                    const a = exitMouthArcRefs.current[i];
-                    if (!a) continue;
-                    const dir = i % 2 === 0 ? 1 : -1;
-                    a.rotation.z = dir * (t * (1.4 + i * 0.5) + charge * 6);
-                    a.scale.setScalar(1.05 + i * 0.16 + charge * 0.35);
-                    if (a.material) a.material.opacity = 0.20 + charge * 0.35 + breathe * 0.08;
-                }
-            }
-        }
-
-        // ── Exit vortex (windout — spiraling back up to the surface) ──────────
-        // Mirror of the entry vortex: rings EXPAND outward from the exit hole as the
-        // worm corkscrews up. Counter-spins so it visually reads as "unwinding."
-        const exGroup = exitVortexRef.current;
-        if (exGroup) {
-            const showExitVortex = phase === 'windout' && !!tunnel;
-            exGroup.visible = showExitVortex;
-            if (showExitVortex) {
-                const xwp = getStickerWorldPos(tunnel.exit.x, tunnel.exit.y, tunnel.exit.z, tunnel.exit.dirKey, size, 0);
-                _fxNormal.copy(FACE_NORMALS[tunnel.exit.dirKey] ?? FACE_NORMALS.PY);
-                _fxPos.set(xwp[0], xwp[1], xwp[2]).addScaledVector(_fxNormal, 0.08);
-                _fxQuat.setFromUnitVectors(_fxRingUp, _fxNormal);
-                exGroup.position.copy(_fxPos);
-                exGroup.quaternion.copy(_fxQuat);
-
-                // prog 0→1 over windout: rings expand and fade as the worm rises and settles
-                const expand = 0.35 + Math.min(1, prog) * 1.2; // grow outward
-                const envelope = Math.sin(Math.min(1, prog * 1.15) * Math.PI);
-                const spin = -t * 6 - prog * 10; // counter-spin vs entry
-                for (let i = 0; i < VORTEX_RINGS; i++) {
-                    const r = exitVortexRingRefs.current[i];
-                    if (!r) continue;
-                    r.rotation.z = spin * (1 + i * 0.35);
-                    const baseR = 0.5 + i * 0.18; // outer rings larger than entry (spreading out)
-                    r.scale.setScalar(baseR * expand);
-                    r.position.z = i * 0.12 * expand; // extend above the hole (+normal)
-                    if (r.material) r.material.opacity = Math.max(0, envelope * (0.50 - i * 0.08));
-                }
+                xh.position.copy(_fxPos);
+                xh.quaternion.copy(_fxQuat);
+                exitUniforms.uOpen.value = exitOpenRef.current;
+                // Builds as the worm approaches, so the arrival is telegraphed.
+                exitUniforms.uCharge.value = Math.pow(trip, 2.0);
             }
         }
 
@@ -210,7 +205,6 @@ export function TunnelPortalFX({ worm, size }) {
         if (phase === 'exiting' && tunnel && !firedRef.current && prog > 0.55) {
             firedRef.current = true;
             burstTRef.current = 0;
-            // Burst on the exit FACE SURFACE (just outside) so the spit-out reads from outside.
             const xwp = getStickerWorldPos(tunnel.exit.x, tunnel.exit.y, tunnel.exit.z, tunnel.exit.dirKey, size, 0);
             _fxNormal.copy(FACE_NORMALS[tunnel.exit.dirKey] ?? FACE_NORMALS.PY);
             _fxPos.set(xwp[0], xwp[1], xwp[2]).addScaledVector(_fxNormal, 0.12);
@@ -248,54 +242,29 @@ export function TunnelPortalFX({ worm, size }) {
 
     return (
         <>
-            {/* Entry vortex — concentric funnel rings */}
-            <group ref={vortexRef} visible={false}>
-                {Array.from({ length: VORTEX_RINGS }, (_, i) => (
-                    <mesh key={i} ref={el => (vortexRingRefs.current[i] = el)}>
-                        <torusGeometry args={[0.5, 0.045, 8, 36]} />
-                        <meshBasicMaterial color={entryColor} transparent opacity={0}
-                            blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
-                    </mesh>
-                ))}
-            </group>
+            {/* Entry hole — the tile opens and the worm goes down it */}
+            <mesh ref={entryHoleRef} visible={false}>
+                <circleGeometry args={[HOLE_R, 48]} />
+                <shaderMaterial
+                    uniforms={entryUniforms}
+                    vertexShader={holeVertexShader}
+                    fragmentShader={holeFragmentShader}
+                    toneMapped={false}
+                />
+            </mesh>
 
-            {/* Exit mouth — held open on the destination tile for the whole traversal,
-                so the tile stays visibly an active wormhole until the worm is out. */}
-            <group ref={exitMouthRef} visible={false}>
-                {/* Iris rim */}
-                <mesh ref={exitMouthIrisRef}>
-                    <torusGeometry args={[0.40, 0.045, 8, 36]} />
-                    <meshBasicMaterial color={exitColor} transparent opacity={0}
-                        blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
-                </mesh>
-                {/* Throat glow — the hole itself */}
-                <mesh ref={exitMouthGlowRef} position={[0, 0, -0.01]}>
-                    <circleGeometry args={[0.40, 32]} />
-                    <meshBasicMaterial color={exitColor} transparent opacity={0}
-                        blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
-                </mesh>
-                {/* Counter-rotating arcs */}
-                {[0, 1].map(i => (
-                    <mesh key={i} ref={el => (exitMouthArcRefs.current[i] = el)}>
-                        <torusGeometry args={[0.50, 0.022, 6, 28, Math.PI * 1.15]} />
-                        <meshBasicMaterial color={exitColor} transparent opacity={0}
-                            blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
-                    </mesh>
-                ))}
-            </group>
+            {/* Exit hole — held open, brightening as the worm nears the surface */}
+            <mesh ref={exitHoleRef} visible={false}>
+                <circleGeometry args={[HOLE_R, 48]} />
+                <shaderMaterial
+                    uniforms={exitUniforms}
+                    vertexShader={holeVertexShader}
+                    fragmentShader={holeFragmentShader}
+                    toneMapped={false}
+                />
+            </mesh>
 
-            {/* Exit vortex — concentric expanding rings that unwind as the worm spirals out */}
-            <group ref={exitVortexRef} visible={false}>
-                {Array.from({ length: VORTEX_RINGS }, (_, i) => (
-                    <mesh key={i} ref={el => (exitVortexRingRefs.current[i] = el)}>
-                        <torusGeometry args={[0.5, 0.045, 8, 36]} />
-                        <meshBasicMaterial color={exitColor} transparent opacity={0}
-                            blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
-                    </mesh>
-                ))}
-            </group>
-
-            {/* Exit shockwave ring */}
+            {/* Exit shockwave ring — the one-shot impact, kept */}
             <mesh ref={burstRef} visible={false}>
                 <ringGeometry args={[0.46, 0.6, 44]} />
                 <meshBasicMaterial color={exitColor} transparent opacity={0} side={THREE.DoubleSide}
