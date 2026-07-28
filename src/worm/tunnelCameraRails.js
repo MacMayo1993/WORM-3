@@ -35,6 +35,31 @@ export const portalUp = (size) => 1.3 + size * 0.32;
 // portalFx's traversalProgress, tunnelState.t).
 export const ENTER_END_T = 0.33;
 
+const _axisDelta = new THREE.Vector3();
+
+/**
+ * Project a world-space point onto the face-normal line through a sticker's
+ * physical centre. This is intentionally tile-based rather than tunnel-based:
+ * render smoothing may leave a camera pose carrying lateral error from the
+ * previous chase shot even when the tunnel centerline itself is correct.
+ */
+export function projectToTileCenterAxisInto(out, point, tileCenter, faceNormal) {
+  _axisDelta.subVectors(point, tileCenter);
+  return out.copy(tileCenter).addScaledVector(faceNormal, _axisDelta.dot(faceNormal));
+}
+
+/**
+ * Lateral camera offset from the tunnel centerline.
+ *
+ * The entry arm must stay at zero: even a small cinematic "up" offset moves
+ * the lens across the face of the entry sticker instead of through its centre.
+ * Once the camera is safely beyond the mouth, ease the usual riding height
+ * back in so the Möbius roll remains visible through the rest of the trip.
+ */
+export function cameraUpForHead(tHead) {
+  return TUNNEL_CAM_UP * THREE.MathUtils.smoothstep(tHead, 0.38, 0.52);
+}
+
 /**
  * Ease for the dive through the entry hole: cubic, so the camera is nearly
  * still for most of the phase and then rushes. Same curve as the mode
@@ -110,7 +135,7 @@ export function tunnelCamPoseInto(out, tunnel, tHead, size) {
   out.cam
     .copy(out.look)
     .addScaledVector(out.tangent, -back)
-    .addScaledVector(out.up, TUNNEL_CAM_UP);
+    .addScaledVector(out.up, cameraUpForHead(tHead));
   out.look.addScaledVector(out.tangent, TUNNEL_LOOK_AHEAD);
   return out;
 }
