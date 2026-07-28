@@ -142,6 +142,28 @@ const SFX = {
   countdownBeat() {
     tone({ freq: 440, dur: 0.12, type: 'square', gain: 0.28 });
   },
+
+  // ── Special power-ups ───────────────────────────────────────────────────────
+  // A special orb appearing: a soft two-note chime, quiet enough not to compete
+  // with a pickup, distinct enough to look up for.
+  specialSpawn() {
+    chord([880, 1318.51], { dur: 0.22, type: 'sine', gain: 0.16 });
+  },
+  // Launch: thrust noise under a rising sweep.
+  rocket() {
+    noise({ dur: 0.42, type: 'lowpass', freq: 1400, gain: 0.34 });
+    tone({ freq: 180, freqTo: 1200, dur: 0.42, type: 'sawtooth', gain: 0.26 });
+  },
+  // Touchdown at the end of the flight — a short, dry thud.
+  rocketLand() {
+    noise({ dur: 0.1, type: 'lowpass', freq: 420, gain: 0.32 });
+    tone({ freq: 150, freqTo: 70, dur: 0.12, type: 'sine', gain: 0.24 });
+  },
+  // Magnet engaging: a humming fifth that reads as a field switching on.
+  magnet() {
+    chord([392, 587.33], { dur: 0.36, type: 'triangle', gain: 0.24 });
+    tone({ freq: 96, freqTo: 196, dur: 0.36, type: 'sine', gain: 0.2 });
+  },
   countdownGo() {
     chord([523.25, 659.25, 783.99, 1046.5, 1318.51], { dur: 0.42, type: 'triangle', gain: 0.33 });
   },
@@ -184,6 +206,10 @@ const HAPTICS = {
   cut: [0, 50, 30, 50],
   death: [0, 80, 40, 120],
   nearMiss: 8,
+  specialSpawn: 10,
+  rocket: [0, 40, 20, 60],
+  rocketLand: 22,
+  magnet: [0, 18, 25, 18, 25, 18],
   countdownBeat: 12,
   countdownGo: [0, 20, 30, 40],
   tunnelBirth: [0, 12, 60, 30],

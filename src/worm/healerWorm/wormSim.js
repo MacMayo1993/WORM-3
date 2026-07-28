@@ -16,7 +16,8 @@
 //            onBoostState(state), onSurvivalTick(), spawnWormholePair(tile),
 //            onFlippedTile(bool), applyDeposit(deposit, stableKey, faceId),
 //            onOrbPickup(faceId, orbCount), onPowerupsChanged(list),
-//            applyHeal(entry, exitTile, stableKey, healedCount)
+//            applyHeal(entry, exitTile, stableKey, healedCount),
+//            onSpecialsChanged(list), onRocketState(bool), onMagnetState(seconds)
 //
 // Each ctx write method corresponds 1:1 to a store/feel call-site in the
 // pre-extraction hook, so the control flow in here is a verbatim translation of
@@ -41,6 +42,7 @@ import {
     isTileInSlice,
     nextRestRead,
     rotateMoveDir,
+    collectManifoldRing,
 } from '../wormLogic.js';
 import { liveRotation } from '../liveRotation.js';
 import { rotateTilePosition, parseTileKey, _parseTile } from '../wormHelpers.js';
@@ -74,6 +76,15 @@ import {
     BOOST_COOLDOWN,
     MAX_TICK_DELTA,
     TRAIL_HISTORY_CAP,
+    SPECIAL_TYPES,
+    SPECIAL_MAX_ON_BOARD,
+    SPECIAL_SPAWN_INTERVAL,
+    SPECIAL_LIFETIME,
+    ROCKET_TILE_SPAN,
+    ROCKET_JUMP_HEIGHT,
+    ROCKET_SPEED_MULT,
+    MAGNET_DURATION,
+    MAGNET_RADIUS,
 } from './constants.js';
 
 // Axis scratch for baking a committed turn into the worm's position history.
@@ -139,10 +150,24 @@ export function makeWormSim(size) {
         jumpT: 0,                 // 0 = grounded, >0 = in air
         isJumping: false,
         jumpCount: 0,
+        // Span (in tiles) and apex height of the CURRENT flight. A normal jump uses the
+        // SURFACE_* defaults; a rocket swaps in a longer, taller arc and restores these
+        // on landing. Everything downstream (jumpT advance rate, the chain-fountain lift
+        // baked into stepHistory, jumpLiftOf) reads these rather than the constants, so a
+        // rocket is "a jump with different numbers" instead of a parallel code path.
+        jumpSpan: SURFACE_JUMP_TILE_SPAN,
+        jumpHeight: SURFACE_JUMP_HEIGHT,
 
         // ── Boost ──────────────────────────────────────────────────────────────
         boostActiveT: 0,
         boostCooldownT: 0,
+
+        // ── Special power-ups (rocket / magnet) ────────────────────────────────
+        specials: [],             // hovering rocket/magnet orbs on the board
+        specialTimer: SPECIAL_SPAWN_INTERVAL,
+        specialSeq: 0,            // monotonic id source for spawned specials
+        rocketActive: false,      // mid rocket flight (implies isJumping)
+        magnetT: 0,               // seconds of magnet reach remaining
 
         // ── Tunnels / wormholes ────────────────────────────────────────────────
         tunnelProgress: 0,
@@ -185,6 +210,7 @@ export function makeWormSim(size) {
         healFired: false,
         pendingHealBurst: null,
         pendingOrbFlash: null,
+        pendingSpecialFlash: null,
     };
     sim.curWorldPos = sim._curWP;
     return sim;
@@ -233,6 +259,12 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.isJumping = false;
     sim.jumpT = 0;
     sim.jumpCount = 0;
+    sim.jumpSpan = SURFACE_JUMP_TILE_SPAN;
+    sim.jumpHeight = SURFACE_JUMP_HEIGHT;
+    sim.specials = [];
+    sim.specialTimer = SPECIAL_SPAWN_INTERVAL;
+    sim.rocketActive = false;
+    sim.magnetT = 0;
     sim.pendingTunnelTrigger = null;
     sim.pendingSelfCollision = null;
     sim.selfCollisionGraceSteps = 0;
@@ -251,6 +283,7 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.healFired = false;
     sim.pendingHealBurst = null;
     sim.pendingOrbFlash = null;
+    sim.pendingSpecialFlash = null;
     sim.orbCombo = 0;
     sim.lastOrbTime = -999;
 
@@ -267,17 +300,56 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
 
 /** Jump offset height at current jumpT. */
 export const jumpLiftOf = (sim) => sim.isJumping
-    ? Math.sin(sim.jumpT * Math.PI) * SURFACE_JUMP_HEIGHT
+    ? Math.sin(sim.jumpT * Math.PI) * sim.jumpHeight
     : 0;
 
 export function startJump(sim, ctx) {
+    // A rocket flight owns the arc until it lands — a mid-flight jump press would
+    // reset jumpT and cut the launch short.
+    if (sim.rocketActive) return;
     if (sim.jumpCount >= MAX_JUMPS) return;
     sim.isJumping = true;
     sim.jumpT = 0.001;
     sim.jumpCount += 1;
+    sim.jumpSpan = SURFACE_JUMP_TILE_SPAN;
+    sim.jumpHeight = SURFACE_JUMP_HEIGHT;
     ctx.feel('jump');
     // If the player jumps early on a flipped tile, don't auto-enter the tunnel.
     sim.pendingTunnelTrigger = null;
+}
+
+/**
+ * Launch a rocket flight: a jump that spans ROCKET_TILE_SPAN tiles at a taller apex
+ * and a faster crawl speed. Being airborne already grants immunity to the worm's own
+ * body and skips wormhole mouths (both keyed off sim.isJumping), and the slice hazard
+ * check treats an airborne head as clear — so the rocket clears every hazard it flies
+ * over, while the tail left on the ground can still be cut.
+ */
+export function startRocket(sim, ctx) {
+    sim.rocketActive = true;
+    sim.isJumping = true;
+    sim.jumpT = 0.001;
+    // Spend the whole jump allowance: no double-jump out of a rocket flight.
+    sim.jumpCount = MAX_JUMPS;
+    sim.jumpSpan = ROCKET_TILE_SPAN;
+    sim.jumpHeight = ROCKET_JUMP_HEIGHT;
+    sim.pendingTunnelTrigger = null;
+    sim.pendingSelfCollision = null;
+    ctx.feel('rocket');
+    ctx.onRocketState(true);
+}
+
+/** Start (or refresh) the magnet's widened pickup reach. */
+export function startMagnet(sim, ctx) {
+    sim.magnetT = MAGNET_DURATION;
+    ctx.feel('magnet');
+    ctx.onMagnetState(MAGNET_DURATION);
+}
+
+/** Apply a claimed special orb's effect. */
+export function activateSpecial(sim, ctx, type) {
+    if (type === 'rocket') startRocket(sim, ctx);
+    else if (type === 'magnet') startMagnet(sim, ctx);
 }
 
 export function queueTurn(sim, dir) {
@@ -393,32 +465,116 @@ function applyOrbPickupGrowth(sim, ctx, color, faceId) {
     ctx.onOrbPickup(faceId, orbsCarried(sim.tailLength));
 }
 
-// Attempt to pick up a powerup sitting on the given tile (the worm's current cell).
+// Reusable scratch for the magnet's manifold reach — rebuilt in place per check.
+const _magnetReach = new Set();
+
+// Attempt to pick up powerups reachable from the given tile (the worm's current cell).
 // Shared by the step-commit path and the rotation-commit path — a rest-read landing
 // defers pickup until the slice commits, then re-checks here so an orb that rode the
 // rotating slice into the cell the worm occupies is still collected on contact.
+//
+// Normally "reachable" means the tile directly under the head. While the magnet is
+// active the reach widens to a MAGNET_RADIUS manifold ring, which wraps around face
+// edges — and the pull also plucks hovering orbs off flipped tiles that would
+// otherwise need a jump.
 function tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey) {
-    const puIdx = sim.powerups.findIndex(p => p.x === x && p.y === y && p.z === z && p.dirKey === dirKey);
-    if (puIdx === -1) return;
-    const pickedUp = sim.powerups[puIdx];
-    // Read fresh cubies rather than any tick-scope snapshot: spawnWormholePair() may
-    // have flipped a sticker pair earlier in the same tick, and a rotation commit may
-    // have just replaced the cubies array — a stale read would misjudge the hover rule.
-    const liveCubies = ctx.getCubies();
-    const pickedSticker = getStickerSafe(liveCubies, pickedUp.x, pickedUp.y, pickedUp.z, pickedUp.dirKey);
-    // Orbs on flipped tiles hover above the surface — worm must jump to reach them.
-    const tileIsFlipped = !!(pickedSticker && pickedSticker.curr !== pickedSticker.orig);
-    if (tileIsFlipped && !sim.isJumping) return; // crawled on without jumping — out of reach
-    const pickedFaceId = pickedSticker ? pickedSticker.curr : 0;
-    const pickedColor = ctx.getOrbColor(pickedFaceId);
-    applyOrbPickupGrowth(sim, ctx, pickedColor, pickedFaceId);
-    sim.pendingOrbFlash = { color: pickedColor, pos: sim.curWorldPos.toArray() };
-    // Combo climbs when pickups come in quick succession (≤2s apart).
-    sim.orbCombo = (sim.timeAlive - sim.lastOrbTime <= 2.0) ? sim.orbCombo + 1 : 0;
-    sim.lastOrbTime = sim.timeAlive;
-    ctx.feel('orb', { combo: sim.orbCombo });
-    sim.powerups[puIdx] = { ...randomFreeTile(size, [...sim.powerups, sim.pos]), type: 'apple' };
-    ctx.onPowerupsChanged(sim.powerups.slice());
+    if (sim.powerups.length === 0) return;
+    const magnetActive = sim.magnetT > 0;
+    const reach = magnetActive
+        ? collectManifoldRing(x, y, z, dirKey, size, MAGNET_RADIUS, _magnetReach)
+        : null;
+    const headKey = `${x},${y},${z},${dirKey}`;
+    let collectedAny = false;
+
+    for (let puIdx = 0; puIdx < sim.powerups.length; puIdx++) {
+        const pickedUp = sim.powerups[puIdx];
+        const puKey = `${pickedUp.x},${pickedUp.y},${pickedUp.z},${pickedUp.dirKey}`;
+        if (reach ? !reach.has(puKey) : puKey !== headKey) continue;
+
+        // Read fresh cubies rather than any tick-scope snapshot: spawnWormholePair() may
+        // have flipped a sticker pair earlier in the same tick, and a rotation commit may
+        // have just replaced the cubies array — a stale read would misjudge the hover rule.
+        const liveCubies = ctx.getCubies();
+        const pickedSticker = getStickerSafe(liveCubies, pickedUp.x, pickedUp.y, pickedUp.z, pickedUp.dirKey);
+        // Orbs on flipped tiles hover above the surface — worm must jump to reach them,
+        // unless the magnet is dragging them down.
+        const tileIsFlipped = !!(pickedSticker && pickedSticker.curr !== pickedSticker.orig);
+        if (tileIsFlipped && !sim.isJumping && !magnetActive) continue; // out of reach
+        const pickedFaceId = pickedSticker ? pickedSticker.curr : 0;
+        const pickedColor = ctx.getOrbColor(pickedFaceId);
+        applyOrbPickupGrowth(sim, ctx, pickedColor, pickedFaceId);
+        sim.pendingOrbFlash = { color: pickedColor, pos: sim.curWorldPos.toArray() };
+        // Combo climbs when pickups come in quick succession (≤2s apart). A magnet
+        // sweep collecting several orbs in one step escalates the same way.
+        sim.orbCombo = (sim.timeAlive - sim.lastOrbTime <= 2.0) ? sim.orbCombo + 1 : 0;
+        sim.lastOrbTime = sim.timeAlive;
+        ctx.feel('orb', { combo: sim.orbCombo });
+        sim.powerups[puIdx] = { ...randomFreeTile(size, [...sim.powerups, sim.pos]), type: 'apple' };
+        collectedAny = true;
+    }
+
+    if (collectedAny) ctx.onPowerupsChanged(sim.powerups.slice());
+}
+
+// Claim a special orb sitting on the given tile. Specials hover well above the
+// surface, so the worm has to be airborne (jump or an in-flight rocket) to take one —
+// the magnet does NOT reach them; they are the prize, not the pickup.
+function trySpecialPickupAt(sim, size, ctx, x, y, z, dirKey) {
+    if (sim.specials.length === 0) return;
+    const idx = sim.specials.findIndex(s => s.x === x && s.y === y && s.z === z && s.dirKey === dirKey);
+    if (idx === -1) return;
+    if (!sim.isJumping) return;
+    const [claimed] = sim.specials.splice(idx, 1);
+    sim.pendingSpecialFlash = { type: claimed.type, pos: sim.curWorldPos.toArray() };
+    ctx.onSpecialsChanged(sim.specials.slice());
+    activateSpecial(sim, ctx, claimed.type);
+}
+
+// Pick a free surface tile within 2 manifold steps of `tile`, or null if the
+// neighbourhood is fully occupied. Used for the drop a healed tunnel leaves behind.
+function freeTileNear(size, tile, occupiedKeys) {
+    const ring = collectManifoldRing(tile.x, tile.y, tile.z, tile.dirKey, size, 2);
+    const candidates = [];
+    for (const key of ring) {
+        if (occupiedKeys.has(key)) continue;
+        parseTileKey(key, _parseTile);
+        candidates.push({ x: _parseTile.x, y: _parseTile.y, z: _parseTile.z, dirKey: _parseTile.dirKey });
+    }
+    if (candidates.length === 0) return null;
+    return candidates[Math.floor(Math.random() * candidates.length)];
+}
+
+/**
+ * Put a special orb on the board, if there is room under the cap. `nearTile` biases
+ * the placement into that tile's neighbourhood (a healed tunnel dropping its reward);
+ * without it the orb lands anywhere free on the surface.
+ *
+ * @returns {boolean} whether an orb was actually placed
+ */
+function spawnSpecial(sim, size, ctx, nearTile = null) {
+    if (sim.specials.length >= SPECIAL_MAX_ON_BOARD) return false;
+    const occupied = [...sim.powerups, ...sim.specials, sim.pos];
+    let tile = null;
+    if (nearTile) {
+        const occupiedKeys = new Set(occupied.map(t => `${t.x},${t.y},${t.z},${t.dirKey}`));
+        tile = freeTileNear(size, nearTile, occupiedKeys);
+    }
+    if (!tile) tile = randomFreeTile(size, occupied);
+    if (!tile) return false;
+    const type = SPECIAL_TYPES[Math.floor(Math.random() * SPECIAL_TYPES.length)];
+    // ttl is mutated in place each tick and the published array shares these objects,
+    // so the renderer can read a live countdown for its despawn fade without the sim
+    // writing to the store every frame.
+    sim.specials.push({
+        x: tile.x, y: tile.y, z: tile.z, dirKey: tile.dirKey,
+        type,
+        ttl: SPECIAL_LIFETIME,
+        id: `sp-${sim.specialSeq++}`,
+    });
+    sim.specialTimer = SPECIAL_SPAWN_INTERVAL;
+    ctx.onSpecialsChanged(sim.specials.slice());
+    ctx.feel('specialSpawn');
+    return true;
 }
 
 // Writes the interpolated ground position into outPos (module-level scratch or a
@@ -596,10 +752,14 @@ const PHASE_HANDLERS = {
                 // positions before the jump started or after it ended. Body segments then
                 // inherit the arc as they travel through this stored lift — exactly like
                 // beads lifting off one-by-one in a chain fountain.
+                // jumpT advances at (delta/STEP_SEC)/jumpSpan while interpT advances at
+                // delta/STEP_SEC, so the lookback is scaled by the span — a 1-tile jump
+                // behaves exactly as before, and a 5-tile rocket stretches one arc across
+                // the whole flight instead of repeating it per tile.
                 const jumpTAtR = sim.isJumping
-                    ? Math.max(0, Math.min(1, sim.jumpT - (sim.interpT - sim.lastRecordedT)))
+                    ? Math.max(0, Math.min(1, sim.jumpT - (sim.interpT - sim.lastRecordedT) / sim.jumpSpan))
                     : 0;
-                const ptJump = jumpTAtR > 0 ? Math.sin(jumpTAtR * Math.PI) * SURFACE_JUMP_HEIGHT : 0;
+                const ptJump = jumpTAtR > 0 ? Math.sin(jumpTAtR * Math.PI) * sim.jumpHeight : 0;
                 // Compute lifted pos into module-level scratch, then copy into the ring slot.
                 _evalLiftedPos.copy(_evalHPos).addScaledVector(ptNorm, WORM_LIFT + ptJump);
                 // Tag the point with the grid cell it occupies, derived from the pre-lift
@@ -714,7 +874,10 @@ const PHASE_HANDLERS = {
                 // re-runs both on the landed contents.
                 const destMidRotation = !!(sim.restReadSlice &&
                     isTileInSlice(sim.restReadSlice.axis, sim.restReadSlice.sliceIndex, x, y, z));
-                if (!destMidRotation) tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey);
+                if (!destMidRotation) {
+                    tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey);
+                    trySpecialPickupAt(sim, size, ctx, x, y, z, dirKey);
+                }
 
                 // Flipped tile detection
                 const sticker = destMidRotation ? null : ctx.getCubies()?.[x]?.[y]?.[z]?.stickers?.[dirKey];
@@ -859,6 +1022,10 @@ const PHASE_HANDLERS = {
                     // Store writes + heal-burst FX (both tiles) happen in the adapter.
                     ctx.applyHeal(entry, exitTile, exitStableKey, sim.healed);
                     sim.pendingHealBurst = { exitTile: exitedTunnel.exit, entryTile: exitedTunnel.entry };
+                    // A collapsing tunnel coughs up a special orb next to its exit —
+                    // ties the reward to the mode's actual objective rather than to
+                    // wandering. Skipped when the board is already at the cap.
+                    spawnSpecial(sim, size, ctx, exitedTunnel.exit);
                     // Tunnel fully healed → it disappears from the board. Drop its traversal
                     // bookkeeping so a future antipodal flip that lands on the same
                     // coordinates starts fresh, instead of inheriting this tunnel's (possibly
@@ -955,8 +1122,21 @@ export function stepWormSim(sim, delta, size, ctx) {
             }
         }
     }
+    // ── Magnet: drain the reach window. Frozen outside crawling for the same reason
+    // boost is — there is nothing to pick up during a wormhole transit, so the buff
+    // shouldn't burn while the worm is inside one.
+    if (sim.phase === 'crawling' && sim.magnetT > 0) {
+        sim.magnetT -= delta;
+        if (sim.magnetT <= 0) {
+            sim.magnetT = 0;
+            ctx.onMagnetState(0);
+        }
+    }
+
     const boostMult = sim.boostActiveT > 0 ? BOOST_MULTIPLIER : 1;
-    const STEP_SEC = 1.0 / (ctx.getSpeed() * boostMult);
+    // A rocket flight sets its own floor on crawl speed; boosting into one doesn't stack.
+    const speedMult = sim.rocketActive ? Math.max(ROCKET_SPEED_MULT, boostMult) : boostMult;
+    const STEP_SEC = 1.0 / (ctx.getSpeed() * speedMult);
 
     // If the crawl speed changed since last frame, rescale the in-progress step
     // accumulator so its fraction (== interpT) is preserved across the change. Without
@@ -994,15 +1174,44 @@ export function stepWormSim(sim, delta, size, ctx) {
     }
     sim.wormholeCountdown = noMoreSpawns ? 0 : Math.max(0, Math.ceil(sim.wormholeTimer * 10) / 10);
 
+    // ── Special orbs: ambient spawn clock + lifetime ageing. Both run only while
+    // crawling, so a special can't appear (or expire unseen) during a tunnel transit.
+    if (sim.phase === 'crawling') {
+        sim.specialTimer -= delta;
+        if (sim.specialTimer <= 0) {
+            // spawnSpecial resets the timer on success; on a failure (board already at
+            // the cap) reset it here so the next attempt is a full interval away.
+            if (!spawnSpecial(sim, size, ctx)) sim.specialTimer = SPECIAL_SPAWN_INTERVAL;
+        }
+        if (sim.specials.length > 0) {
+            let expired = false;
+            for (let i = sim.specials.length - 1; i >= 0; i--) {
+                sim.specials[i].ttl -= delta;
+                if (sim.specials[i].ttl <= 0) {
+                    sim.specials.splice(i, 1);
+                    expired = true;
+                }
+            }
+            if (expired) ctx.onSpecialsChanged(sim.specials.slice());
+        }
+    }
+
     // Always advance jump
     if (sim.isJumping) {
         // Tie jump progress to tile-traverse progress so the speed slider never changes
-        // jump distance.
-        sim.jumpT += (delta / STEP_SEC) / SURFACE_JUMP_TILE_SPAN;
+        // jump distance. jumpSpan is 1 for a normal jump, ROCKET_TILE_SPAN in flight.
+        sim.jumpT += (delta / STEP_SEC) / sim.jumpSpan;
         if (sim.jumpT >= 1) {
             sim.jumpT = 0;
             sim.isJumping = false;
             sim.jumpCount = 0;
+            sim.jumpSpan = SURFACE_JUMP_TILE_SPAN;
+            sim.jumpHeight = SURFACE_JUMP_HEIGHT;
+            if (sim.rocketActive) {
+                sim.rocketActive = false;
+                ctx.feel('rocketLand');
+                ctx.onRocketState(false);
+            }
         }
     }
 
@@ -1041,6 +1250,14 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
         const pu = sim.powerups;
         for (let i = 0; i < pu.length; i++) pu[i] = rotateTilePosition(pu[i], axis, sliceIndex, dir, size);
         ctx.onPowerupsChanged(pu.slice());
+    }
+
+    // Rotate special orbs the same way, so a rocket/magnet stays on its tile through
+    // the hazard turn (rotateTilePosition carries type/ttl/id across on the copy).
+    if (sim.specials.length) {
+        const sp = sim.specials;
+        for (let i = 0; i < sp.length; i++) sp[i] = rotateTilePosition(sp[i], axis, sliceIndex, dir, size);
+        ctx.onSpecialsChanged(sp.slice());
     }
 
     // Rotate the worm's logical grid position so it stays on its tile.
@@ -1109,6 +1326,7 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
         isTileInSlice(axis, sliceIndex, sim.pos.x, sim.pos.y, sim.pos.z)) {
         const { x, y, z, dirKey } = sim.pos;
         tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey);
+        trySpecialPickupAt(sim, size, ctx, x, y, z, dirKey);
         const landed = ctx.getCubies()?.[x]?.[y]?.[z]?.stickers?.[dirKey];
         const landedFlipped = !!(landed && landed.curr !== landed.orig);
         sim.onFlippedTile = landedFlipped;

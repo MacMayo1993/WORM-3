@@ -162,11 +162,16 @@ export function tileKeyCoordAt(key, idx) {
 }
 
 // Returns null | { type:'death' } | { type:'cut', cutTrailIdx }
+//
+// A rocket-flying worm is well above the surface, so its HEAD is treated as clear of
+// the slice however the grid coordinates read — the flight passes over the turning
+// layer. The body left on the ground is still checked, so a badly timed launch can
+// still cost you a tail.
 export function checkWormHitBySlice(worm, axis, sliceIndex) {
     const head = worm.pos.current;
     const axisCoord = axis === 'col' ? 'x' : axis === 'row' ? 'y' : 'z';
     const coordIdx  = axis === 'col' ? 0 : axis === 'row' ? 1 : 2;
-    const headOnSlice = head[axisCoord] === sliceIndex;
+    const headOnSlice = head[axisCoord] === sliceIndex && !worm.rocketActive?.current;
     const trail = worm.tileTrail.current;
 
     const activeTiles = Math.max(1, Math.ceil(worm.tailLength.current * BODY_BALL_SPACING));

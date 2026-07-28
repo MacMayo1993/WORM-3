@@ -156,6 +156,12 @@ const makeWormSessionDefaults = () => ({
   wormOnFlippedTile: false,
   wormBodyTiles: 0,
   wormPowerups: [],
+  // Hovering rocket/magnet orbs currently on the board, plus the buffs they grant.
+  // wormMagnetBuff is { startedAt, duration } while active (null otherwise) so the
+  // HUD can time its own countdown without the sim writing state every frame.
+  wormSpecials: [],
+  wormRocketActive: false,
+  wormMagnetBuff: null,
   wormAlive: true,
   showWormDeathMenu: false,
   wormDeathDetails: null,
@@ -230,6 +236,7 @@ const createWormSlice = (set, _get) => ({
   setWormOnFlippedTile: (v) => set({ wormOnFlippedTile: v }),
   setWormBodyTiles: (v) => set({ wormBodyTiles: v }),
   setWormPowerups: (v) => set({ wormPowerups: v }),
+  setWormSpecials: (v) => set({ wormSpecials: v }),
   setWormAlive: (v) => set({ wormAlive: v }),
   setShowWormDeathMenu: (v) => set({ showWormDeathMenu: v }),
   setWormDeathDetails: (v) => set({ wormDeathDetails: v }),

@@ -202,6 +202,14 @@ export function useWormCrawler(size, cubies) {
                 }));
             },
             onPowerupsChanged: (list) => useGameStore.getState().setWormPowerups(list),
+            onSpecialsChanged: (list) => useGameStore.getState().setWormSpecials(list),
+            // Buff HUD state is published only on transitions — never per frame. The
+            // chip derives its own countdown from startedAt + duration, the same way
+            // the boost button times its cooldown fill.
+            onRocketState: (active) => useGameStore.setState({ wormRocketActive: active }),
+            onMagnetState: (seconds) => useGameStore.setState({
+                wormMagnetBuff: seconds > 0 ? { startedAt: Date.now(), duration: seconds } : null,
+            }),
             applyHeal: (entry, exitTile, stableKey, healedCount) => {
                 const sz = sizeRef.current;
                 const st = useGameStore.getState();
@@ -252,6 +260,9 @@ export function useWormCrawler(size, cubies) {
         useGameStore.getState().setWormBoostState('ready');
         useGameStore.setState({
             wormPowerups: sim.powerups,
+            wormSpecials: [],
+            wormRocketActive: false,
+            wormMagnetBuff: null,
             wormBodyTiles: 0,
             wormOrbInventory: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
             wormHealingProgress: {},
@@ -333,6 +344,10 @@ export function useWormCrawler(size, cubies) {
             crossingCorner: f('crossingCorner'),
             jumpT: f('jumpT'),
             isJumping: f('isJumping'),
+            rocketActive: f('rocketActive'),
+            magnetT: f('magnetT'),
+            specials: f('specials'),
+            pendingSpecialFlashRef: f('pendingSpecialFlash'),
             headInterpPos: f('headInterpPos'),
             currentNormal: f('currentNormal'),
             tailLength: f('tailLength'),

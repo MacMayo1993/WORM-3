@@ -448,6 +448,40 @@ const PAUSE_MENU_BTN_STYLE = {
 
 // ─── Portal hint, Examine, Countdown ─────────────────────────────────────────
 
+// ─── Active buff strip (rocket / magnet) ─────────────────────────────────────
+// Sits just under the glance strip so it never collides with the thumb tray or the
+// portal hint. Only rendered while something is actually active.
+const BUFF_STRIP_STYLE = {
+    position: 'absolute',
+    top: 'calc(env(safe-area-inset-top, 0px) + 56px)',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    display: 'flex',
+    gap: 6,
+    pointerEvents: 'none',
+};
+
+const BUFF_PILL_STYLE = {
+    position: 'relative',
+    overflow: 'hidden',
+    borderRadius: 999,
+    padding: '5px 12px',
+    fontSize: 11,
+    fontWeight: 800,
+    letterSpacing: 1.0,
+    color: '#fff',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    boxShadow: SHADOW,
+};
+
+const BUFF_FILL_STYLE = {
+    position: 'absolute',
+    left: 0, top: 0, bottom: 0,
+    pointerEvents: 'none',
+};
+
 const PORTAL_HINT_STYLE = {
     position: 'absolute', bottom: 148, left: '50%', transform: 'translateX(-50%)',
     pointerEvents: 'none',
@@ -667,6 +701,57 @@ function WinnerScreen({ wormBodyTiles, wormSessionOrbs, parityPoints, wormTimeAl
                 <button onPointerDown={onRetry} style={WINNER_PLAY_AGAIN_STYLE}>Play Again</button>
                 <button onPointerDown={onNewGame} style={WINNER_NEW_GAME_STYLE}>New Game</button>
             </div>
+        </div>
+    );
+}
+
+// ─── Active buff strip ───────────────────────────────────────────────────────
+// The sim publishes a buff only on its transitions (start / end), so this derives
+// the countdown itself from startedAt + duration — the same approach BoostButton
+// uses for its cooldown fill, and the reason neither one costs a store write per frame.
+
+function BuffStrip() {
+    const rocketActive = useGameStore(s => s.wormRocketActive ?? false);
+    const magnetBuff = useGameStore(s => s.wormMagnetBuff);
+    const [magnetLeft, setMagnetLeft] = useState(0);
+
+    useEffect(() => {
+        if (!magnetBuff) {
+            setMagnetLeft(0);
+            return;
+        }
+        const { startedAt, duration } = magnetBuff;
+        const update = () => {
+            const left = duration - (Date.now() - startedAt) / 1000;
+            setMagnetLeft(Math.max(0, left));
+            return left;
+        };
+        update();
+        const id = setInterval(() => { if (update() <= 0) clearInterval(id); }, 100);
+        return () => clearInterval(id);
+    }, [magnetBuff]);
+
+    const showMagnet = !!magnetBuff && magnetLeft > 0;
+    if (!rocketActive && !showMagnet) return null;
+
+    const magnetPct = showMagnet ? (magnetLeft / magnetBuff.duration) * 100 : 0;
+
+    return (
+        <div style={BUFF_STRIP_STYLE}>
+            {rocketActive && (
+                <div style={{ ...BUFF_PILL_STYLE, background: 'linear-gradient(135deg, #ff9d2e, #f4501e)', border: '1px solid #ffc078' }}>
+                    <span>🚀</span>
+                    <span>ROCKET</span>
+                </div>
+            )}
+            {showMagnet && (
+                <div style={{ ...BUFF_PILL_STYLE, background: 'rgba(15, 23, 42, 0.72)', border: '1px solid #38e0ff' }}>
+                    <div style={{ ...BUFF_FILL_STYLE, width: `${magnetPct}%`, background: 'rgba(56, 224, 255, 0.38)' }} />
+                    <span style={{ position: 'relative', zIndex: 1 }}>🧲</span>
+                    <span style={{ position: 'relative', zIndex: 1 }}>MAGNET</span>
+                    <span style={{ position: 'relative', zIndex: 1, opacity: 0.85 }}>{magnetLeft.toFixed(1)}s</span>
+                </div>
+            )}
         </div>
     );
 }
@@ -1038,6 +1123,9 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
                     <OrbInventoryHUD orbInventory={wormOrbInventory} faceColors={fc} mobile={isMobile} />
                 </div>
             )}
+
+            {/* ── Active buff pills (rocket / magnet) ── */}
+            {wormAlive && <BuffStrip />}
 
             {/* ── Zone 2: Portal hint (contextual) ── */}
             {isPortalReady && (
