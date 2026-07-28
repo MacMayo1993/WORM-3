@@ -20,7 +20,7 @@ import { getSkinFX } from '../wormSkinFX.js';
 import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMaterialTime } from '../wormSkinMaterial.js';
 import WormSkinParticles from '../WormSkinParticles.jsx';
 import {
-    PAGE_GEO_ARGS, PAGE_HINGE_X, PAGE_HINGE_Y, PAGE_LAYER_COUNT, PAGE_LAYER_GAP,
+    PAGE_GEO_ARGS, PAGE_HINGE_X, PAGE_HINGE_Y, PAGE_LAYER_COUNT, PAGE_LAYER_GAP, PAGE_COLORS,
     FRONT_COVER_GEO_ARGS, SPINE_X_SCALE, TURN_SIGNAL_GAIN,
     turnSignalFromDirections, smoothTurn, pageHingeAngles,
 } from '../wormBookFX.js';
@@ -588,6 +588,12 @@ export function WormBody({ worm, size }) {
                         .addScaledVector(_bookY, pageScale * (PAGE_HINGE_Y + layer * PAGE_LAYER_GAP))
                         .addScaledVector(_bookPageOffset, pageScale);
                     _pageDummy.quaternion.copy(_bookPageQuat);
+                    if (layer === PAGE_LAYER_COUNT - 1) {
+                        const flutter = time * 3.1 + i * 1.37;
+                        _pageDummy.position.addScaledVector(_bookY, pageScale * (0.12 + (Math.sin(flutter) * 0.5 + 0.5) * 0.24));
+                        _pageDummy.rotateX(Math.sin(flutter * 0.7) * 0.42);
+                        _pageDummy.rotateY(Math.cos(flutter) * 0.32);
+                    }
                     _pageDummy.scale.setScalar(pageScale);
                     _pageDummy.updateMatrix();
                     if (leftPageRef.current) leftPageRef.current.setMatrixAt(pageWriteIdx + layer, _pageDummy.matrix);
@@ -602,14 +608,20 @@ export function WormBody({ worm, size }) {
                         .addScaledVector(_bookY, pageScale * (PAGE_HINGE_Y + layer * PAGE_LAYER_GAP))
                         .addScaledVector(_bookPageOffset, pageScale);
                     _pageDummy.quaternion.copy(_bookPageQuat);
+                    if (layer === PAGE_LAYER_COUNT - 1) {
+                        const flutter = time * 3.1 + i * 1.37;
+                        _pageDummy.position.addScaledVector(_bookY, pageScale * (0.1 + (Math.cos(flutter) * 0.5 + 0.5) * 0.22));
+                        _pageDummy.rotateX(-Math.sin(flutter * 0.8) * 0.38);
+                        _pageDummy.rotateY(-Math.cos(flutter * 0.9) * 0.3);
+                    }
                     _pageDummy.scale.setScalar(pageScale);
                     _pageDummy.updateMatrix();
                     if (rightPageRef.current) rightPageRef.current.setMatrixAt(pageWriteIdx + layer, _pageDummy.matrix);
                 }
 
                 if (colorDirty) {
-                    _bookPageColor.set(bellyCol);
                     for (let layer = 0; layer < PAGE_LAYER_COUNT; layer++) {
+                        _bookPageColor.set(PAGE_COLORS[layer % PAGE_COLORS.length]);
                         if (leftPageRef.current) leftPageRef.current.setColorAt(pageWriteIdx + layer, _bookPageColor);
                         if (rightPageRef.current) rightPageRef.current.setColorAt(pageWriteIdx + layer, _bookPageColor);
                     }
