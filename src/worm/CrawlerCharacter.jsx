@@ -16,10 +16,11 @@ import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMateria
 import WormSkinParticles from './WormSkinParticles.jsx';
 import {
   PAGE_GEO_ARGS, PAGE_HINGE_X, PAGE_HINGE_Y, PAGE_LAYER_COUNT, PAGE_LAYER_GAP, PAGE_COLORS,
-  FRONT_COVER_GEO_ARGS, SPINE_X_SCALE, turnSignalFromDirections, smoothTurn, pageHingeAngles,
+  FRONT_COVER_GEO_ARGS, HEAD_PAGE_GEO_ARGS, HEAD_PAGE_ANGLE, SPINE_X_SCALE, turnSignalFromDirections, smoothTurn, pageHingeAngles,
 } from './wormBookFX.js';
 
 const PAGE_LAYERS = Array.from({ length: PAGE_LAYER_COUNT }, (_, i) => i);
+const SCRIBBLE_LINES = [-0.22, -0.06, 0.10, 0.26];
 
 const EYE_WHITE = '#ffffff';
 const PUPIL = '#111111';
@@ -111,6 +112,8 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
   const bookTurnRef = useRef(0);
   const leftPageRefs = useRef([]);
   const rightPageRefs = useRef([]);
+  const leftLoosePageRefs = useRef([]);
+  const rightLoosePageRefs = useRef([]);
   // Inch Worm accordion gait — accumulates only while the worm is actually moving so the
   // bunch→extend cycle is synced to locomotion and freezes (spread out) when it stops.
   const inchGaitRef = useRef(0);
@@ -167,6 +170,18 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
         const rp = rightPageRefs.current[i];
         if (lp) lp.rotation.z = left;
         if (rp) rp.rotation.z = right;
+        const flutter = timeRef.current * 3.2 + i * 1.37;
+        const lift = 0.12 + (Math.sin(flutter) * 0.5 + 0.5) * 0.24;
+        const looseLeft = leftLoosePageRefs.current[i];
+        const looseRight = rightLoosePageRefs.current[i];
+        if (looseLeft) {
+          looseLeft.position.y = (PAGE_LAYER_COUNT - 1) * PAGE_LAYER_GAP + lift;
+          looseLeft.rotation.set(Math.sin(flutter * 0.7) * 0.42, Math.cos(flutter) * 0.32, Math.sin(flutter * 0.9) * 0.22);
+        }
+        if (looseRight) {
+          looseRight.position.y = (PAGE_LAYER_COUNT - 1) * PAGE_LAYER_GAP + lift * 0.8;
+          looseRight.rotation.set(-Math.sin(flutter * 0.8) * 0.38, -Math.cos(flutter * 0.9) * 0.3, -Math.sin(flutter) * 0.2);
+        }
       }
     }
 
@@ -414,6 +429,10 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
                         <meshStandardMaterial color={PAGE_COLORS[layer % PAGE_COLORS.length]} roughness={0.9} metalness={0} />
                       </mesh>
                     ))}
+                    <mesh ref={el => (leftLoosePageRefs.current[i] = el)} position={[PAGE_GEO_ARGS[0] / 2, PAGE_LAYER_COUNT * PAGE_LAYER_GAP, 0]}>
+                      <boxGeometry args={PAGE_GEO_ARGS} />
+                      <meshStandardMaterial color={PAGE_COLORS[0]} roughness={0.92} metalness={0} />
+                    </mesh>
                   </group>
                   <group ref={el => (rightPageRefs.current[i] = el)} scale={segScale} position={[-PAGE_HINGE_X * segScale, segScale * PAGE_HINGE_Y, 0]}>
                     {PAGE_LAYERS.map(layer => (
@@ -422,21 +441,36 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
                         <meshStandardMaterial color={PAGE_COLORS[layer % PAGE_COLORS.length]} roughness={0.9} metalness={0} />
                       </mesh>
                     ))}
+                    <mesh ref={el => (rightLoosePageRefs.current[i] = el)} position={[-PAGE_GEO_ARGS[0] / 2, PAGE_LAYER_COUNT * PAGE_LAYER_GAP, 0]}>
+                      <boxGeometry args={PAGE_GEO_ARGS} />
+                      <meshStandardMaterial color={PAGE_COLORS[0]} roughness={0.92} metalness={0} />
+                    </mesh>
                   </group>
                 </>
               )}
-              {/* Book Worm head: a single upright front-cover panel, standing
-                  vertical (perpendicular to the ground) instead of lying flat
-                  like the page stack behind it — same local frame as the
-                  sphere head (bodyRootRef's Y already points along the
-                  surface-relative "up"), so a box whose Y is its largest
-                  dimension stands on its own with no extra rotation needed. */}
+              {/* Book Worm head: a vertical cover with two open paper leaves
+                  and raised ink scribbles. The regular face meshes remain in
+                  front, making the open book itself the character's face. */}
               {isBook && isHead && (
-                <group position={[0, 0, 0.08 * segScale]}>
-                  <mesh scale={segScale}>
-                    <boxGeometry args={FRONT_COVER_GEO_ARGS} />
+                <group position={[0, 0.09, 0.15]} scale={segScale}>
+                  <mesh position={[0, 0, -0.07]}>
+                    <boxGeometry args={[1.55, 1.02, FRONT_COVER_GEO_ARGS[2]]} />
                     <meshStandardMaterial color={BODY_COLOR} roughness={0.5} metalness={0.1} />
                   </mesh>
+                  {[-1, 1].map(side => (
+                    <group key={side} rotation={[0, -side * HEAD_PAGE_ANGLE, 0]}>
+                      <mesh position={[side * 0.36, 0, 0]}>
+                        <boxGeometry args={HEAD_PAGE_GEO_ARGS} />
+                        <meshStandardMaterial color={PAGE_COLORS[0]} roughness={0.92} metalness={0} />
+                      </mesh>
+                      {SCRIBBLE_LINES.map((y, line) => (
+                        <mesh key={y} position={[side * (0.30 + (line % 2) * 0.03), y, 0.034]}>
+                          <boxGeometry args={[0.34 - (line % 2) * 0.08, 0.025, 0.012]} />
+                          <meshBasicMaterial color="#6b5a3e" />
+                        </mesh>
+                      ))}
+                    </group>
+                  ))}
                 </group>
               )}
 

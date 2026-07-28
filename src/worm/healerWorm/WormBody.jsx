@@ -588,6 +588,12 @@ export function WormBody({ worm, size }) {
                         .addScaledVector(_bookY, pageScale * (PAGE_HINGE_Y + layer * PAGE_LAYER_GAP))
                         .addScaledVector(_bookPageOffset, pageScale);
                     _pageDummy.quaternion.copy(_bookPageQuat);
+                    if (layer === PAGE_LAYER_COUNT - 1) {
+                        const flutter = time * 3.1 + i * 1.37;
+                        _pageDummy.position.addScaledVector(_bookY, pageScale * (0.12 + (Math.sin(flutter) * 0.5 + 0.5) * 0.24));
+                        _pageDummy.rotateX(Math.sin(flutter * 0.7) * 0.42);
+                        _pageDummy.rotateY(Math.cos(flutter) * 0.32);
+                    }
                     _pageDummy.scale.setScalar(pageScale);
                     _pageDummy.updateMatrix();
                     if (leftPageRef.current) leftPageRef.current.setMatrixAt(pageWriteIdx + layer, _pageDummy.matrix);
@@ -602,6 +608,12 @@ export function WormBody({ worm, size }) {
                         .addScaledVector(_bookY, pageScale * (PAGE_HINGE_Y + layer * PAGE_LAYER_GAP))
                         .addScaledVector(_bookPageOffset, pageScale);
                     _pageDummy.quaternion.copy(_bookPageQuat);
+                    if (layer === PAGE_LAYER_COUNT - 1) {
+                        const flutter = time * 3.1 + i * 1.37;
+                        _pageDummy.position.addScaledVector(_bookY, pageScale * (0.1 + (Math.cos(flutter) * 0.5 + 0.5) * 0.22));
+                        _pageDummy.rotateX(-Math.sin(flutter * 0.8) * 0.38);
+                        _pageDummy.rotateY(-Math.cos(flutter * 0.9) * 0.3);
+                    }
                     _pageDummy.scale.setScalar(pageScale);
                     _pageDummy.updateMatrix();
                     if (rightPageRef.current) rightPageRef.current.setMatrixAt(pageWriteIdx + layer, _pageDummy.matrix);

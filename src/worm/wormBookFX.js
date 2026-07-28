@@ -19,11 +19,11 @@ import * as THREE from 'three';
 // layer is thinner than the gap between layers so there's a visible seam
 // between them, and the whole stack (layer count × gap) is the visible body
 // height.
-export const PAGE_GEO_ARGS = [0.85, 0.028, 0.86]; // one sheet's footprint
-export const PAGE_LAYER_COUNT = 6;
+export const PAGE_GEO_ARGS = [0.85, 0.032, 0.86]; // one sheet's footprint
+export const PAGE_LAYER_COUNT = 8;
 // Keep the sheets close enough to read as one page block. The earlier wide
 // air gaps made four floating shelves, rather than the fore-edge of a book.
-export const PAGE_LAYER_GAP = 0.034;
+export const PAGE_LAYER_GAP = 0.048;
 // Paper stays paper-coloured regardless of the equipped skin. The skin colour
 // belongs to the binding; alternating warm whites make the individual page
 // edges legible without turning the stack into stripes.
@@ -41,19 +41,21 @@ export const SPINE_X_SCALE = 0.22;
 // it, standing up by its own height.
 export const PAGE_HINGE_Y = 0.34;
 
-// The head segment gets a single upright cover panel instead of a flat page
-// stack — the front cover standing vertical, distinct from the flat pages
-// behind it. Same local-space convention as the pages: X side, Y up, Z spine.
+// The head segment gets an upright cover behind two open page panels instead
+// of the horizontal page stack used by its body. Same local-space convention
+// as the pages: X side, Y up, Z spine.
 // A box whose Y (height) is its largest dimension, built from the SAME
 // orientation basis the pages use (where Y already points along the actual
 // surface-relative "up"), stands up on its own with no extra hinge rotation.
 export const FRONT_COVER_GEO_ARGS = [0.85, 0.9, 0.35];
+export const HEAD_PAGE_GEO_ARGS = [0.72, 0.92, 0.055];
+export const HEAD_PAGE_ANGLE = 0.2;
 
 // At rest the two page blocks form a shallow open-book V around the middle.
 // A turn banks BOTH sides by the same extra rotation, so the whole spread
 // tips like a seesaw around the spine and reads as pages flapping toward the
 // side the worm turns into.
-export const PAGE_REST_ANGLE = 0.14;   // radians — a shallow, readable open-book V
+export const PAGE_REST_ANGLE = 0.22;   // radians — a chunky, readable open-book V
 export const PAGE_SWING_GAIN = 1.1;    // radians of bank at full turn force
 export const TURN_SMOOTH_RATE = 7;     // per-second exponential-follow rate
 export const TURN_SIGNAL_GAIN = 14;    // scales the raw per-frame direction-delta into a -1..1-ish force

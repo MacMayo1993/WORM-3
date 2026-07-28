@@ -25,7 +25,7 @@ import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMateria
 import { WormParticleSystem } from '../worm/wormSkinParticles.js';
 import {
   PAGE_GEO_ARGS, PAGE_HINGE_X, PAGE_HINGE_Y, PAGE_LAYER_COUNT, PAGE_LAYER_GAP, PAGE_COLORS,
-  FRONT_COVER_GEO_ARGS, SPINE_X_SCALE, pageHingeAngles,
+  FRONT_COVER_GEO_ARGS, HEAD_PAGE_GEO_ARGS, HEAD_PAGE_ANGLE, SPINE_X_SCALE, pageHingeAngles,
 } from '../worm/wormBookFX.js';
 
 // ─── Worm geometry constants ─────────────────────────────────────────────────
@@ -60,6 +60,7 @@ let camera = null;
 let rig = null;             // built lazily, reconfigured per render
 
 const _color = new THREE.Color();
+const BOOK_SCRIBBLE_Y = [-0.22, -0.06, 0.10, 0.26];
 
 // ─── Scene ────────────────────────────────────────────────────────────────────
 
@@ -120,6 +121,31 @@ function _buildRig() {
   const frontCover = new THREE.Mesh(frontCoverGeo, new THREE.MeshStandardMaterial({ roughness: 0.5, metalness: 0.1 }));
   group.add(frontCover);
 
+  // The head is an upright open book: two paper leaves sit in front of the
+  // skin-coloured cover, with raised ink strokes that remain readable in tiny
+  // store thumbnails.
+  const bookFace = new THREE.Group();
+  const headPageGeo = new THREE.BoxGeometry(...HEAD_PAGE_GEO_ARGS);
+  const bookFacePages = [];
+  for (const side of [-1, 1]) {
+    const leaf = new THREE.Group();
+    leaf.rotation.y = -side * HEAD_PAGE_ANGLE;
+    const page = new THREE.Mesh(headPageGeo, new THREE.MeshStandardMaterial({ color: PAGE_COLORS[0], roughness: 0.92 }));
+    page.position.x = side * 0.36;
+    leaf.add(page);
+    BOOK_SCRIBBLE_Y.forEach((y, line) => {
+      const ink = new THREE.Mesh(
+        new THREE.BoxGeometry(0.34 - (line % 2) * 0.08, 0.025, 0.012),
+        new THREE.MeshBasicMaterial({ color: 0x6b5a3e }),
+      );
+      ink.position.set(side * (0.30 + (line % 2) * 0.03), y, 0.034);
+      leaf.add(ink);
+    });
+    bookFace.add(leaf);
+    bookFacePages.push(page);
+  }
+  group.add(bookFace);
+
   // Ambient skin FX (embers/bubbles/sparkle/...). Parented to an unscaled
   // anchor (not the head bead itself, whose own scale would otherwise shrink
   // every particle down with it) and repositioned to the head each frame in
@@ -153,7 +179,7 @@ function _buildRig() {
   const glowLight = new THREE.PointLight(0xffffff, 0, 1.2);
   group.add(glowLight);
 
-  return { group, beads, boxes, glows, leftPages, rightPages, frontCover, eyes, pupils, mouth, glasses, hatGroup, hatKey: null, glowLight, particles, particlesAnchor, skinKey: null };
+  return { group, beads, boxes, glows, leftPages, rightPages, frontCover, bookFace, bookFacePages, eyes, pupils, mouth, glasses, hatGroup, hatKey: null, glowLight, particles, particlesAnchor, skinKey: null };
 }
 
 // Framing presets. In game the camera looks down at the cube face the worm is
@@ -345,6 +371,7 @@ function _poseWorm(opts, time) {
     // iteration (where coverShown is always false) would immediately hide it
     // again right after the head iteration showed it.
     if (i === 0) rig.frontCover.visible = coverShown;
+    if (i === 0) rig.bookFace.visible = coverShown;
 
     // Book worm rides on top of the ground, lifted by its own height, instead
     // of centered/embedded at it — mutates _off itself so the pages (which
@@ -409,6 +436,12 @@ function _poseWorm(opts, time) {
           .addScaledVector(_pbPageOffset, pageScale);
         l.quaternion.copy(_pbPageQuat);
         l.scale.setScalar(pageScale);
+        if (layer === leftLayers.length - 1) {
+          const flutter = time * 3.1 + i * 1.37;
+          l.position.addScaledVector(_pbY, pageScale * (0.12 + (Math.sin(flutter) * 0.5 + 0.5) * 0.24));
+          l.rotateX(Math.sin(flutter * 0.7) * 0.42);
+          l.rotateY(Math.cos(flutter) * 0.32);
+        }
       }
 
       _pbHingeQuat.setFromAxisAngle(_pbZAxisUnit, right);
@@ -422,13 +455,19 @@ function _poseWorm(opts, time) {
           .addScaledVector(_pbPageOffset, pageScale);
         r.quaternion.copy(_pbPageQuat);
         r.scale.setScalar(pageScale);
+        if (layer === rightLayers.length - 1) {
+          const flutter = time * 3.1 + i * 1.37;
+          r.position.addScaledVector(_pbY, pageScale * (0.1 + (Math.cos(flutter) * 0.5 + 0.5) * 0.22));
+          r.rotateX(-Math.sin(flutter * 0.8) * 0.38);
+          r.rotateY(-Math.cos(flutter * 0.9) * 0.3);
+        }
       }
     } else if (isBook) {
       body.quaternion.identity();
     }
 
-    // Book Worm head: a single upright front-cover panel, standing vertical
-    // instead of lying flat like the page stack — same orientation basis as
+    // Book Worm head: an upright cover and open page face, standing vertical
+    // instead of lying flat like the body stack — same orientation basis as
     // the body pages (computed against segment 1, since there's no "segment
     // -1" to diff against), a box whose Y is its largest dimension.
     if (coverShown) {
@@ -445,6 +484,13 @@ function _poseWorm(opts, time) {
       rig.frontCover.quaternion.copy(_pbQuat);
       rig.frontCover.scale.setScalar(coverScale);
       rig.frontCover.material.color.set(skin.body);
+      rig.frontCover.scale.set(coverScale * 1.55, coverScale * 1.12, coverScale * 0.32);
+
+      rig.bookFace.position.copy(_off)
+        .addScaledVector(_pbY, coverScale * 0.08)
+        .addScaledVector(_pbZ, -coverScale * 0.22);
+      rig.bookFace.quaternion.copy(_pbQuat);
+      rig.bookFace.scale.setScalar(coverScale);
     }
 
     if (glow.visible) {
