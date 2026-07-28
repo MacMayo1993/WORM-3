@@ -20,8 +20,8 @@ import { getSkinFX } from '../wormSkinFX.js';
 import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMaterialTime } from '../wormSkinMaterial.js';
 import WormSkinParticles from '../WormSkinParticles.jsx';
 import {
-    PAGE_GEO_ARGS, PAGE_HINGE_X, PAGE_HINGE_Y, PAGE_LAYER_COUNT, PAGE_LAYER_GAP,
-    FRONT_COVER_GEO_ARGS, SPINE_X_SCALE, TURN_SIGNAL_GAIN,
+    PAGE_GEO_ARGS, PAGE_HINGE_X, PAGE_HINGE_Y, PAGE_LAYER_COUNT, PAGE_LAYER_GAP, PAGE_COLORS,
+    FRONT_COVER_GEO_ARGS, HEAD_PAGE_GEO_ARGS, HEAD_PAGE_ANGLE, SPINE_X_SCALE, TURN_SIGNAL_GAIN,
     turnSignalFromDirections, smoothTurn, pageHingeAngles,
 } from '../wormBookFX.js';
 import {
@@ -56,6 +56,12 @@ const _bookHeadX = new THREE.Vector3();
 const _bookHeadY = new THREE.Vector3();
 const _bookHeadZ = new THREE.Vector3();
 const _bookCoverDummy = new THREE.Object3D();
+const _bookHeadPageBase = new THREE.Vector3();
+const _bookHeadPageOffset = new THREE.Vector3();
+const _bookYAxisUnit = new THREE.Vector3(0, 1, 0);
+const _bookHeadPageQuat = new THREE.Quaternion();
+const BOOK_SCRIBBLE_Y = [-0.22, -0.06, 0.10, 0.26];
+const BOOK_HEAD_PAGE_SIDES = [-1, 1];
 const _bodyHeadPos = new THREE.Vector3();
 const _bodyNormal = new THREE.Vector3();
 const _bodyClonePos = new THREE.Vector3();
@@ -82,6 +88,8 @@ export function WormBody({ worm, size }) {
     const leftPageRef = useRef();   // book worm only — left page-stack overlay
     const rightPageRef = useRef();  // book worm only — right page-stack overlay
     const frontCoverRef = useRef(); // book worm only — head's standing cover panel
+    const headPageRef = useRef();   // book worm only — two upright open head leaves
+    const headScribbleRef = useRef(); // book worm only — ink lines on the head leaves
     const particlesGroupRef = useRef(); // ambient skin FX (embers/bubbles/sparkle/...), anchored to the head
     // Book Worm: turn force inferred from how fast the head's direction of
     // travel is swinging frame to frame (no continuous turn signal exists in
@@ -175,9 +183,8 @@ export function WormBody({ worm, size }) {
             }
             prevHeadPosRef.current.copy(_bodyHeadPos);
 
-            // Front cover: a single upright panel at the head, standing
-            // vertical (perpendicular to the crawl surface) instead of lying
-            // flat like the page stack behind it. Reuses the head's own
+            // Head book: an upright skin-coloured cover with two open paper
+            // leaves and ink strokes. Reuses the head's own
             // direction of travel (falling back to a fixed forward when the
             // worm hasn't moved yet) for its orientation basis — same
             // lookAt-style construction as the body segments below, so a box
@@ -194,9 +201,11 @@ export function WormBody({ worm, size }) {
 
             const coverMesh = frontCoverRef.current;
             if (coverMesh) {
-                _bookCoverDummy.position.copy(_bodyHeadPos).addScaledVector(_bookHeadZ, -0.05);
+                _bookCoverDummy.position.copy(_bodyHeadPos)
+                    .addScaledVector(_bookHeadY, 0.088 * 0.08)
+                    .addScaledVector(_bookHeadZ, -0.088 * 0.29);
                 _bookCoverDummy.quaternion.copy(_bookHeadQuat);
-                _bookCoverDummy.scale.setScalar(0.088);
+                _bookCoverDummy.scale.set(0.088 * 1.55, 0.088 * 1.12, 0.088 * 0.32);
                 _bookCoverDummy.updateMatrix();
                 coverMesh.setMatrixAt(0, _bookCoverDummy.matrix);
                 _bookPageColor.set(wormColorRef.current);
@@ -205,8 +214,51 @@ export function WormBody({ worm, size }) {
                 coverMesh.instanceMatrix.needsUpdate = true;
                 if (coverMesh.instanceColor) coverMesh.instanceColor.needsUpdate = true;
             }
-        } else if (frontCoverRef.current) {
-            frontCoverRef.current.count = 0;
+
+            const headPages = headPageRef.current;
+            const headScribbles = headScribbleRef.current;
+            const headScale = 0.088;
+            _bookHeadPageBase.copy(_bodyHeadPos)
+                .addScaledVector(_bookHeadY, headScale * 0.08)
+                .addScaledVector(_bookHeadZ, -headScale * 0.22);
+            let scribbleIndex = 0;
+            for (const side of BOOK_HEAD_PAGE_SIDES) {
+                _bookHingeQuat.setFromAxisAngle(_bookYAxisUnit, -side * HEAD_PAGE_ANGLE);
+                _bookHeadPageQuat.copy(_bookHeadQuat).multiply(_bookHingeQuat);
+
+                _bookHeadPageOffset.set(side * 0.36, 0, 0).applyQuaternion(_bookHeadPageQuat);
+                _pageDummy.position.copy(_bookHeadPageBase).addScaledVector(_bookHeadPageOffset, headScale);
+                _pageDummy.quaternion.copy(_bookHeadPageQuat);
+                _pageDummy.scale.setScalar(headScale);
+                _pageDummy.updateMatrix();
+                if (headPages) headPages.setMatrixAt(side < 0 ? 0 : 1, _pageDummy.matrix);
+
+                for (let line = 0; line < BOOK_SCRIBBLE_Y.length; line++) {
+                    _bookHeadPageOffset.set(
+                        side * (0.30 + (line % 2) * 0.03),
+                        BOOK_SCRIBBLE_Y[line],
+                        0.034,
+                    ).applyQuaternion(_bookHeadPageQuat);
+                    _pageDummy.position.copy(_bookHeadPageBase).addScaledVector(_bookHeadPageOffset, headScale);
+                    _pageDummy.quaternion.copy(_bookHeadPageQuat);
+                    _pageDummy.scale.set(headScale * (line % 2 ? 0.76 : 1), headScale, headScale);
+                    _pageDummy.updateMatrix();
+                    if (headScribbles) headScribbles.setMatrixAt(scribbleIndex, _pageDummy.matrix);
+                    scribbleIndex++;
+                }
+            }
+            if (headPages) {
+                headPages.count = 2;
+                headPages.instanceMatrix.needsUpdate = true;
+            }
+            if (headScribbles) {
+                headScribbles.count = scribbleIndex;
+                headScribbles.instanceMatrix.needsUpdate = true;
+            }
+        } else {
+            if (frontCoverRef.current) frontCoverRef.current.count = 0;
+            if (headPageRef.current) headPageRef.current.count = 0;
+            if (headScribbleRef.current) headScribbleRef.current.count = 0;
         }
 
         const tLen = worm.tailLength.current;
@@ -296,6 +348,9 @@ export function WormBody({ worm, size }) {
             if (glowAltRef.current) glowAltRef.current.count = 0;
             if (leftPageRef.current) leftPageRef.current.count = 0;
             if (rightPageRef.current) rightPageRef.current.count = 0;
+            if (frontCoverRef.current) frontCoverRef.current.count = 0;
+            if (headPageRef.current) headPageRef.current.count = 0;
+            if (headScribbleRef.current) headScribbleRef.current.count = 0;
             return;
         }
 
@@ -588,6 +643,12 @@ export function WormBody({ worm, size }) {
                         .addScaledVector(_bookY, pageScale * (PAGE_HINGE_Y + layer * PAGE_LAYER_GAP))
                         .addScaledVector(_bookPageOffset, pageScale);
                     _pageDummy.quaternion.copy(_bookPageQuat);
+                    if (layer === PAGE_LAYER_COUNT - 1) {
+                        const flutter = time * 3.1 + i * 1.37;
+                        _pageDummy.position.addScaledVector(_bookY, pageScale * (0.12 + (Math.sin(flutter) * 0.5 + 0.5) * 0.24));
+                        _pageDummy.rotateX(Math.sin(flutter * 0.7) * 0.42);
+                        _pageDummy.rotateY(Math.cos(flutter) * 0.32);
+                    }
                     _pageDummy.scale.setScalar(pageScale);
                     _pageDummy.updateMatrix();
                     if (leftPageRef.current) leftPageRef.current.setMatrixAt(pageWriteIdx + layer, _pageDummy.matrix);
@@ -602,14 +663,20 @@ export function WormBody({ worm, size }) {
                         .addScaledVector(_bookY, pageScale * (PAGE_HINGE_Y + layer * PAGE_LAYER_GAP))
                         .addScaledVector(_bookPageOffset, pageScale);
                     _pageDummy.quaternion.copy(_bookPageQuat);
+                    if (layer === PAGE_LAYER_COUNT - 1) {
+                        const flutter = time * 3.1 + i * 1.37;
+                        _pageDummy.position.addScaledVector(_bookY, pageScale * (0.1 + (Math.cos(flutter) * 0.5 + 0.5) * 0.22));
+                        _pageDummy.rotateX(-Math.sin(flutter * 0.8) * 0.38);
+                        _pageDummy.rotateY(-Math.cos(flutter * 0.9) * 0.3);
+                    }
                     _pageDummy.scale.setScalar(pageScale);
                     _pageDummy.updateMatrix();
                     if (rightPageRef.current) rightPageRef.current.setMatrixAt(pageWriteIdx + layer, _pageDummy.matrix);
                 }
 
                 if (colorDirty) {
-                    _bookPageColor.set(bellyCol);
                     for (let layer = 0; layer < PAGE_LAYER_COUNT; layer++) {
+                        _bookPageColor.set(PAGE_COLORS[layer % PAGE_COLORS.length]);
                         if (leftPageRef.current) leftPageRef.current.setColorAt(pageWriteIdx + layer, _bookPageColor);
                         if (rightPageRef.current) rightPageRef.current.setColorAt(pageWriteIdx + layer, _bookPageColor);
                     }
@@ -644,8 +711,8 @@ export function WormBody({ worm, size }) {
            The cover is the existing flattened box; the page-stack overlays
            (PAGE_LAYER_COUNT thin layers per side) ride on top of it, hinged
            along its spine (see the isBook block in the useFrame loop above
-           and wormBookFX.js for the hinge math). The head gets a single
-           standing front-cover panel instead of a page stack. */
+           and wormBookFX.js for the hinge math). The head gets a standing
+           open-book face with inked paper leaves instead of a page stack. */
         <>
             <instancedMesh ref={boxMeshRef} args={[undefined, undefined, MAX_TAIL]} frustumCulled={false}>
                 {/* Thin spine/binding — the pages (below) are the visible body now, not a
@@ -670,6 +737,14 @@ export function WormBody({ worm, size }) {
             <instancedMesh ref={frontCoverRef} args={[undefined, undefined, 1]} frustumCulled={false}>
                 <boxGeometry args={FRONT_COVER_GEO_ARGS} />
                 <meshStandardMaterial color="white" roughness={0.5} metalness={0.1} side={THREE.DoubleSide} />
+            </instancedMesh>
+            <instancedMesh ref={headPageRef} args={[undefined, undefined, 2]} frustumCulled={false}>
+                <boxGeometry args={HEAD_PAGE_GEO_ARGS} />
+                <meshStandardMaterial color={PAGE_COLORS[0]} roughness={0.92} metalness={0} side={THREE.DoubleSide} />
+            </instancedMesh>
+            <instancedMesh ref={headScribbleRef} args={[undefined, undefined, 8]} frustumCulled={false}>
+                <boxGeometry args={[0.34, 0.025, 0.012]} />
+                <meshBasicMaterial color="#6b5a3e" />
             </instancedMesh>
             <group ref={particlesGroupRef}>
                 <WormSkinParticles skinId={wormSkinId} glowColor={skin.glow} />
