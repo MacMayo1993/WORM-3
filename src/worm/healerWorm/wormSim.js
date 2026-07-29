@@ -1511,11 +1511,45 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
     }
 
     // If mid-tunnel, rotate active tunnel endpoints so exit snap lands on the correct tile
-    if (sim.activeTunnel) {
-        sim.activeTunnel = {
-            ...sim.activeTunnel,
-            entry: rotateTilePosition(sim.activeTunnel.entry, axis, sliceIndex, dir, size),
-            exit: rotateTilePosition(sim.activeTunnel.exit, axis, sliceIndex, dir, size),
+    const rotateTunnel = (t) => ({
+        ...t,
+        entry: rotateTilePosition(t.entry, axis, sliceIndex, dir, size),
+        exit: rotateTilePosition(t.exit, axis, sliceIndex, dir, size),
+    });
+    const preRotationTunnel = sim.activeTunnel;
+    if (sim.activeTunnel) sim.activeTunnel = rotateTunnel(sim.activeTunnel);
+
+    // ── Deferred work still holding tile coordinates ───────────────────────────
+    // These outlive the phase that created them, so a hazard turn can land between
+    // the decision and the act. They were the one set of tile references NOT
+    // carried through a rotation, and the heal is the expensive one to get wrong:
+    // it is applied by grid position, so a stale entry/exit pair resets two
+    // bystander tiles to unflipped instead of the pair actually traversed. The
+    // traversed pair stays flipped, and a bystander that was itself half of another
+    // wormhole gets orphaned from its partner — after which the two ends' flip
+    // counters drift apart, and the orphan can be picked for new wormholes over and
+    // over until it hits the flip cap and turns into a permanently dead tile.
+    //
+    // pendingTunnelHeal normally holds the very object activeTunnel does (it is
+    // captured from it at the end of 'exiting' and consumed at the end of
+    // 'windout'), so re-point it rather than rotating the same coordinates twice.
+    if (sim.pendingTunnelHeal?.tunnel) {
+        sim.pendingTunnelHeal = {
+            ...sim.pendingTunnelHeal,
+            tunnel: sim.pendingTunnelHeal.tunnel === preRotationTunnel
+                ? sim.activeTunnel
+                : rotateTunnel(sim.pendingTunnelHeal.tunnel),
         };
+    }
+
+    // The armed void kill compares the head's CURRENT tile against the exit tile it
+    // must step off before collapsing. Left un-rotated, the comparison is against a
+    // slot the exit no longer occupies, so the collapse fires a step early or late.
+    if (sim.pendingVoidKill?.exitTileKey) {
+        parseTileKey(sim.pendingVoidKill.exitTileKey, _parseTile);
+        const rotated = rotateTilePosition(_parseTile, axis, sliceIndex, dir, size);
+        if (rotated !== _parseTile) {
+            sim.pendingVoidKill = { ...sim.pendingVoidKill, exitTileKey: tileKey(rotated) };
+        }
     }
 }

@@ -515,13 +515,20 @@ const wispyRingFragmentShader = `
 // style, and in the worm's own skin colour so the glow reads as coming from the
 // creature rather than from the cube.
 //
-// The rail is only half of it. A tile that merely lights up reads as flat; what
-// sells a tile being PRESSED is that its edges are now walls. So the band inside
-// the rail darkens — the shadow of a rim that is suddenly above you — and the rail
-// itself burns brighter and spills further inward the deeper the tile goes, as if
-// light were escaping up the widening gap around it. uPress carries the spring's
-// value, and it goes slightly negative on the rebound, which brightens nothing and
-// simply lets the shading fall away as the tile pops back level.
+// Two things this deliberately does NOT do, both learned the hard way:
+//
+// The rail's colour and brightness do not vary with how hard the tile is pressed.
+// They did, and the result was that a tile under the head and a tile under the
+// body lit in visibly different colours — one washing toward white, the other
+// staying saturated — so a line of touched tiles read as a mess of mismatched
+// squares rather than as one lit path. Depth is still allowed to vary; light is
+// not. `lit` crosses to full as soon as there is any real contact.
+//
+// And the inner shadow is slight. A recess wants some shading against the rim
+// that is now above it, but at any strength the eye notices it stops being shade
+// and becomes the tile's colour — a dark square where a coloured one used to be,
+// which is exactly what a dead tile looks like in this game. It stays a thin
+// gradient hugging the rim and never reaches the middle of the tile.
 const wormFootprintFragmentShader = `
   uniform vec3  uColor;   // worm's skin colour
   uniform float uPress;   // 0 = flat, 1 = fully under the worm
@@ -547,7 +554,7 @@ const wormFootprintFragmentShader = `
     float shade = wall * press * 0.88;
 
     // A slow breath so a tile held under a resting worm is not perfectly static.
-    float breath = 0.92 + 0.08 * sin(uTime * 2.6);
+    float breath = 0.94 + 0.06 * sin(uTime * 2.6);
 
     float glow  = (rail * (1.05 + press * 0.95) + spill * press) * breath;
     float alpha = clamp(max(glow, shade), 0.0, 1.0) * smoothstep(0.0, 0.09, press);
