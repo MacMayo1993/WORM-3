@@ -527,21 +527,31 @@ export default function WORM3() {
   // at its current factor and has no reason to emit another callback.
   const adaptiveReducedFXRef = useRef(false);
   const megaReducedFXOverrideRef = useRef(false);
+  // Resolve the render DPR from both quality signals. A 15×15 Mega shell is
+  // fill-rate bound (1,350 shaded quads covering the viewport), so it must render
+  // at the reduced ceiling *immediately* — not only after the PerformanceMonitor
+  // notices the drop several seconds in. Layering both sources here also stops a
+  // perf-incline callback from raising DPR back up while Mega is still mounted.
+  const applyEffectiveDpr = useCallback(() => {
+    const reduced = adaptiveReducedFXRef.current || megaReducedFXOverrideRef.current;
+    setDpr(reduced ? [0.75, 1] : [1, 1.5]);
+  }, []);
   const handlePerformanceDecline = useCallback(() => {
     adaptiveReducedFXRef.current = true;
-    setDpr([0.75, 1]);
+    applyEffectiveDpr();
     setPerfReducedFX(true);
-  }, [setPerfReducedFX]);
+  }, [setPerfReducedFX, applyEffectiveDpr]);
   const handlePerformanceIncline = useCallback(() => {
     adaptiveReducedFXRef.current = false;
-    setDpr([1, 1.5]);
+    applyEffectiveDpr();
     setPerfReducedFX(megaReducedFXOverrideRef.current);
-  }, [setPerfReducedFX]);
+  }, [setPerfReducedFX, applyEffectiveDpr]);
   const clearMegaReducedFXOverride = useCallback(() => {
     if (!megaReducedFXOverrideRef.current) return;
     megaReducedFXOverrideRef.current = false;
+    applyEffectiveDpr();
     setPerfReducedFX(adaptiveReducedFXRef.current);
-  }, [setPerfReducedFX]);
+  }, [setPerfReducedFX, applyEffectiveDpr]);
 
   const { wormHealerMode, wormPhase } = useGameStore(useShallow((s) => ({
     wormHealerMode: s.wormHealerMode,
@@ -932,6 +942,7 @@ export default function WORM3() {
     // Mobi completion means the entire intro pays for full-size effects, and New
     // Game can re-enter the wizard with size 15 still mounted.
     megaReducedFXOverrideRef.current = !!wizardSettings.megaMode;
+    applyEffectiveDpr();
     useGameStore.getState().setPerfReducedFX(
       adaptiveReducedFXRef.current || megaReducedFXOverrideRef.current
     );
@@ -970,7 +981,7 @@ export default function WORM3() {
         wormParams.wormColor
       );
     });
-  }, [settings, setSettings, reset, size, changeSize, cancelDisparityRun, launchWithMobi]);
+  }, [settings, setSettings, reset, size, changeSize, cancelDisparityRun, launchWithMobi, applyEffectiveDpr]);
 
   const handleMobiIntroComplete = useCallback(() => {
     setShowMobiIntro(false);

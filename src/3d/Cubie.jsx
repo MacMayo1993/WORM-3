@@ -14,6 +14,19 @@ import { PER_CUBELET_VIEW_STYLES, LED_EDGE_MODES, pickCubeletViewStyle, bodyMate
 // Canonical Sudokube number (matches win detection in winDetection.js).
 import { faceValue as sudokuValue, getManifoldGridId, faceRCFor } from '../game/coordinates.js';
 
+// Cube-pop bursts (the little outward hops on a disparity heal tap) touch only a
+// handful of cubies and never fire in Worm/Mega mode at all. Rather than have
+// every one of Mega's ~1,350 cubies read the store and index cubiePops on every
+// frame, a single module-level subscription flips this flag whenever the pop map
+// gains or loses entries. Idle cubies then leave the pop useFrame on one cheap
+// boolean check. subscribeWithSelector (used by the store) fires the listener
+// only when the cubiePops reference actually changes, so Object.keys runs rarely.
+let _anyCubiePops = false;
+useGameStore.subscribe(
+  (s) => s.cubiePops,
+  (pops) => { _anyCubiePops = !!pops && Object.keys(pops).length > 0; }
+);
+
 // Hollow cube edge beams — 12 beams forming a skeletal cube frame
 const EDGE_H = 0.49; // half of cube size
 const BEAM_T = 0.04;  // beam half-thickness — slimmer for a more open cage
@@ -405,6 +418,9 @@ const Cubie = React.forwardRef(function Cubie({
   const poppedRef = useRef(false);
 
   useFrame(() => {
+    // Fast path: no pops anywhere and this cubie is already home — the common
+    // case, and the *only* case in Worm/Mega mode. Bail before any store read.
+    if (!_anyCubiePops && !poppedRef.current) return;
     if (!popGroupRef.current) return;
     // Read imperatively — avoids re-rendering all cubies whenever cubiePops changes.
     const entry = useGameStore.getState().cubiePops[popKey];
