@@ -59,7 +59,11 @@ const PRESS_DEPTH = 0.017;
 // …and how much it narrows at full press, opening the grid channel around it.
 // This is the cue that survives being looked at head-on, where two hundredths of
 // depth is a couple of pixels; it reads as the tile dropping into its socket.
-const PRESS_SHRINK = 0.06;
+//
+// Restrained on purpose. What it exposes is the dark cubie body underneath, so
+// too much of it draws a thick black frame around the tile — which, next to its
+// neighbours, stops reading as a socket and starts reading as a hole in the cube.
+const PRESS_SHRINK = 0.03;
 // Circular alpha map — clips the base sticker mesh to a disc matching the overlay shader
 // radius (smoothstep 0.44→0.50 in UV space).  Using alphaTest instead of transparent
 // avoids depth-sorting issues and is unaffected by the biome-mode code that explicitly
@@ -513,13 +517,20 @@ const wispyRingFragmentShader = `
 // style, and in the worm's own skin colour so the glow reads as coming from the
 // creature rather than from the cube.
 //
-// The rail is only half of it. A tile that merely lights up reads as flat; what
-// sells a tile being PRESSED is that its edges are now walls. So the band inside
-// the rail darkens — the shadow of a rim that is suddenly above you — and the rail
-// itself burns brighter and spills further inward the deeper the tile goes, as if
-// light were escaping up the widening gap around it. uPress carries the spring's
-// value, and it goes slightly negative on the rebound, which brightens nothing and
-// simply lets the shading fall away as the tile pops back level.
+// Two things this deliberately does NOT do, both learned the hard way:
+//
+// The rail's colour and brightness do not vary with how hard the tile is pressed.
+// They did, and the result was that a tile under the head and a tile under the
+// body lit in visibly different colours — one washing toward white, the other
+// staying saturated — so a line of touched tiles read as a mess of mismatched
+// squares rather than as one lit path. Depth is still allowed to vary; light is
+// not. `lit` crosses to full as soon as there is any real contact.
+//
+// And the inner shadow is slight. A recess wants some shading against the rim
+// that is now above it, but at any strength the eye notices it stops being shade
+// and becomes the tile's colour — a dark square where a coloured one used to be,
+// which is exactly what a dead tile looks like in this game. It stays a thin
+// gradient hugging the rim and never reaches the middle of the tile.
 const wormFootprintFragmentShader = `
   uniform vec3  uColor;   // worm's skin colour
   uniform float uPress;   // 0 = flat, 1 = fully under the worm
@@ -532,27 +543,31 @@ const wormFootprintFragmentShader = `
     float edge = 0.5 - max(a.x, a.y);   // 0 at the tile's rim, grows inward
     float press = clamp(uPress, 0.0, 1.0);
 
-    // The lit rail, hugging the perimeter. It fattens as the tile sinks.
-    float bw   = 0.030 + press * 0.022;
-    float rail = 1.0 - smoothstep(bw * 0.55, bw, edge);
+    // Contact, not depth: every tile the worm is actually on lights the same.
+    float lit = smoothstep(0.04, 0.30, press);
+
+    // The lit rail, hugging the perimeter.
+    float bw   = 0.034;
+    float rail = 1.0 - smoothstep(bw * 0.5, bw, edge);
 
     // Light spilling inward from the rail, over the tile's shoulder.
-    float spill = (1.0 - smoothstep(bw, 0.20 + press * 0.10, edge)) * 0.30;
+    float spill = (1.0 - smoothstep(bw, 0.17, edge)) * 0.26;
 
-    // Inner shadow: the recess the worm is standing in. Strongest right against
-    // the rim (where the wall is highest) and gone by the middle of the tile.
-    float shade = (1.0 - smoothstep(0.02, 0.26, edge)) * press * 0.55;
+    // Inner shadow: the rim is above the tile now, so it shades what is under it.
+    // Confined to a thin band and kept faint — see the note above.
+    float shade = (1.0 - smoothstep(0.03, 0.13, edge)) * press * 0.16;
 
     // A slow breath so a tile held under a resting worm is not perfectly static.
-    float breath = 0.92 + 0.08 * sin(uTime * 2.6);
+    float breath = 0.94 + 0.06 * sin(uTime * 2.6);
 
-    float glow  = (rail * (0.85 + press * 0.75) + spill * press) * breath;
-    float alpha = clamp(glow + shade, 0.0, 1.0) * smoothstep(0.0, 0.12, press);
+    float glow  = (rail * 1.45 + spill) * lit * breath;
+    float alpha = clamp(glow + shade * lit, 0.0, 1.0);
 
-    // Rail runs hot toward white at the centre of the stroke; the shadow band is
-    // the same hue taken almost to black, so the whole square stays one colour.
-    vec3 col = mix(uColor * 0.06, mix(uColor, vec3(1.0), rail * 0.45 * press), glow);
-    gl_FragColor = vec4(col, alpha);
+    // Hot toward white through the middle of the stroke, the worm's own colour
+    // either side of it. Brightness lives here rather than in alpha, which is
+    // already saturated along the rail.
+    vec3 col = mix(uColor * 1.25, vec3(1.0), rail * 0.5) * (1.0 + rail * 0.55);
+    gl_FragColor = vec4(mix(uColor * 0.12, col, clamp(glow, 0.0, 1.0)), alpha);
   }
 `;
 
