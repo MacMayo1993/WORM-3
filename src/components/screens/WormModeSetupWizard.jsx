@@ -330,7 +330,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     <PaletteStep key="palette" cos={cos} />,
     <StyleStep key="style" cos={cos} />,
     renderGameplay(),
-    <SizeStep key="size" cos={cos} />
+    <SizeStep key="size" cos={cos} allowMega />
   ];
 
   return (

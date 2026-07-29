@@ -6,7 +6,6 @@
 // rocket flies and lands, and how far the magnet reaches around the cube's faces.
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
-  makeWormSim,
   resetWormSim,
   stepWormSim,
   applyRotationToSim,
@@ -45,76 +44,20 @@ import { makeCubies } from '../game/cubeState.js';
 import { checkWormHitBySlice } from '../worm/wormHelpers.js';
 import { makeTileTrail, ttReset, ttPush, ttAt } from '../worm/circularBuffers.js';
 import { liveRotation } from '../worm/liveRotation.js';
+import { makeWormCtx, makeWormSimFor, makeWormRunner, eventsOf } from './helpers/wormHarness.js';
 
 const SIZE = 5;
 
-function makeCtx(overrides = {}) {
-  const events = [];
-  const log = (type) => (...args) => { events.push({ type, args }); };
-  // A real solved cube — the pickup path reads the sticker under an orb to decide
-  // its colour and whether it is hovering on a flipped tile.
-  const cubies = makeCubies(SIZE);
-  return {
-    events,
-    getCubies: () => cubies,
-    getGamePhase: () => 'active',
-    isPaused: () => false,
-    getSpeed: () => 1.0,
-    getControlMode: () => 'non-oriented',
-    getWormholeInterval: () => 9999,
-    isPrismCharacter: () => false,
-    getOrbInventory: () => ({ 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }),
-    getHealingProgress: () => ({}),
-    getOrbColor: () => '#22ff88',
-    resolveTunnel: () => null,
-    feel: log('feel'),
-    onDeath: log('death'),
-    onTunnelEnter: log('tunnelEnter'),
-    onCrawlResume: log('crawlResume'),
-    onPhase: log('phase'),
-    onBoostState: log('boost'),
-    onSurvivalTick: log('survival'),
-    spawnWormholePair: log('spawn'),
-    onFlippedTile: log('flipped'),
-    applyDeposit: log('deposit'),
-    onOrbPickup: log('pickup'),
-    onPowerupsChanged: log('powerups'),
-    applyHeal: log('heal'),
-    onSpecialsChanged: log('specials'),
-    onRocketState: log('rocketState'),
-    onMagnetState: log('magnetState'),
-    onSpecialSpawned: log('specialSpawned'),
-    onSpecialExpired: log('specialExpired'),
-    ...overrides,
-  };
-}
+// A real solved cube — the pickup path reads the sticker under an orb to decide
+// its colour and whether it is hovering on a flipped tile.
+const _specialsCubies = makeCubies(SIZE);
+const makeCtx = (overrides = {}) => makeWormCtx({ getCubies: () => _specialsCubies, ...overrides });
 
-function makeSim() {
-  const sim = makeWormSim(SIZE);
-  // No parity orbs and no wormhole spawns by default, so each test controls exactly
-  // what is on the board.
-  resetWormSim(sim, SIZE, { orbCount: 0, wormholeInterval: 9999 });
-  return sim;
-}
+// No parity orbs and no wormhole spawns by default, so each test controls exactly
+// what is on the board.
+const makeSim = () => makeWormSimFor(SIZE);
 
-const run = (sim, ctx, seconds, dt = 0.05) => {
-  const steps = Math.round(seconds / dt);
-  for (let i = 0; i < steps; i++) stepWormSim(sim, dt, SIZE, ctx);
-};
-
-// Step until the worm commits onto a new tile (or maxSeconds elapse). Returns the
-// tile it landed on.
-function stepUntilCommit(sim, ctx, maxSeconds = 10, dt = 0.05) {
-  const from = tileKey(sim.pos);
-  const steps = Math.round(maxSeconds / dt);
-  for (let i = 0; i < steps; i++) {
-    stepWormSim(sim, dt, SIZE, ctx);
-    if (tileKey(sim.pos) !== from) return sim.pos;
-  }
-  return null;
-}
-
-const eventsOf = (ctx, type) => ctx.events.filter(e => e.type === type);
+const { run, stepUntilCommit } = makeWormRunner(SIZE);
 const apple = (x, y, z, dirKey) => ({ x, y, z, dirKey, type: 'apple' });
 const special = (x, y, z, dirKey, type = 'rocket') =>
   ({ x, y, z, dirKey, type, ttl: SPECIAL_LIFETIME, id: 'test-special' });

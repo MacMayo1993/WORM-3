@@ -7,7 +7,7 @@
 import { useCallback } from 'react';
 import { useGameStore } from './useGameStore.js';
 import { buildManifoldGridMap, flipStickerPair } from '../game/manifoldLogic.js';
-import { rotateSliceCubies } from '../game/cubeRotation.js';
+import { singlePlaneWave, applyWaveToCubies } from '../game/rotationWave.js';
 
 /**
  * Hook for undo functionality.
@@ -48,11 +48,11 @@ export function useUndo(startAnimation) {
         // No animation pass — the visual snaps immediately, matching how the
         // forward move was applied in onMove's numTurns > 1 branch.
         useGameStore.setState((state) => {
-          let c = state.cubies;
-          for (let i = 0; i < turns; i++) c = rotateSliceCubies(c, state.size, axis, sliceIndex, -dir);
+          const wave = singlePlaneWave(axis, sliceIndex, -dir, turns);
           return {
-            cubies: c,
+            cubies: applyWaveToCubies(state.cubies, state.size, wave),
             rotationEpoch: state.rotationEpoch + 1,
+            lastWave: { axis: wave.axis, rotations: wave.rotations },
             lastRotation: { axis, sliceIndex, dir: -dir, numTurns: turns },
             moves: Math.max(0, state.moves - turns),
             moveHistory: state.moveHistory.slice(0, -1),

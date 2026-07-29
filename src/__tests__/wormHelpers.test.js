@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { rotateTilePosition, ensureOrbContrast, checkWormHitBySlice, parseTileKey, _parseTile, tileKeyCoordAt, getSliceSurfaceStickers } from '../worm/wormHelpers.js';
+import { rotateTilePosition, ensureOrbContrast, checkWormHitBySlice, checkWormHitByWave, parseTileKey, _parseTile, tileKeyCoordAt, getSliceSurfaceStickers } from '../worm/wormHelpers.js';
 import { makeTileTrail, ttPush, ttReset } from '../worm/circularBuffers.js';
 
 describe('rotateTilePosition', () => {
@@ -164,5 +164,98 @@ describe('checkWormHitBySlice', () => {
     );
     const result = checkWormHitBySlice(worm, 'col', 1);
     expect(result).toEqual({ type: 'cut', cutTrailIdx: 1 });
+  });
+
+  // ── Multi-plane waves ──────────────────────────────────────────────────────
+  //
+  // The rule the single-plane cases above encode is really about RIGID CLASS:
+  // the worm survives while every part of it is being carried by the same
+  // motion. With up to three parallel planes turning at once, "the same motion"
+  // stops meaning "the same plane".
+  describe('as a wave', () => {
+    const wave = (axis, ...rotations) => ({ axis, rotations });
+    const plane = (sliceIndex, dir = 1, numTurns = 1) => ({ sliceIndex, dir, numTurns });
+
+    it('is identical to checkWormHitBySlice for a one-plane wave', () => {
+      const cases = [
+        [{ x: 0, y: 0, z: 2, dirKey: 'PZ' }, ['0,0,1,PZ', '0,0,0,NZ']],
+        [{ x: 1, y: 0, z: 2, dirKey: 'PZ' }, ['0,0,2,PZ']],
+        [{ x: 1, y: 0, z: 2, dirKey: 'PZ' }, ['1,0,1,PZ', '1,0,0,NZ']],
+        [{ x: 0, y: 0, z: 2, dirKey: 'PZ' }, ['1,0,2,PZ', '0,0,1,PZ']],
+      ];
+      for (const [head, body] of cases) {
+        const a = checkWormHitBySlice(makeWorm(head, body), 'col', 1);
+        const b = checkWormHitByWave(makeWorm(head, body), wave('col', plane(1)));
+        expect(b).toEqual(a);
+      }
+    });
+
+    it('spares a worm spanning two planes turning the same way', () => {
+      // Head on slice 1, tail on slice 3. Both sweep +1 quarter turn about the
+      // same axis, so the worm is carried rigidly and stays in one piece.
+      const worm = makeWorm(
+        { x: 1, y: 0, z: 2, dirKey: 'PZ' },
+        ['3,0,2,PZ', '3,0,1,PZ'],
+      );
+      expect(checkWormHitByWave(worm, wave('col', plane(1, 1), plane(3, 1)))).toBeNull();
+    });
+
+    it('kills a worm spanning two planes turning opposite ways', () => {
+      const worm = makeWorm(
+        { x: 1, y: 0, z: 2, dirKey: 'PZ' },
+        ['3,0,2,PZ', '3,0,1,PZ'],
+      );
+      expect(checkWormHitByWave(worm, wave('col', plane(1, 1), plane(3, -1))))
+        .toEqual({ type: 'death' });
+    });
+
+    it('kills a worm spanning planes turning the same way by different amounts', () => {
+      // Same direction is not enough — a quarter turn and a half turn separate.
+      const worm = makeWorm(
+        { x: 1, y: 0, z: 2, dirKey: 'PZ' },
+        ['3,0,2,PZ', '3,0,1,PZ'],
+      );
+      expect(checkWormHitByWave(worm, wave('col', plane(1, 1, 1), plane(3, 1, 2))))
+        .toEqual({ type: 'death' });
+    });
+
+    it('kills a worm whose head turns while any part stays on static ground', () => {
+      const worm = makeWorm(
+        { x: 1, y: 0, z: 2, dirKey: 'PZ' },
+        ['3,0,2,PZ', '2,0,2,PZ'],
+      );
+      expect(checkWormHitByWave(worm, wave('col', plane(1), plane(3))))
+        .toEqual({ type: 'death' });
+    });
+
+    it('cuts at the nearest mismatch when several planes clip the tail', () => {
+      // Head is static; slices 2 and 4 both turn and both hold body segments.
+      // Exactly one cut, at the segment closest to the head — never a cascade.
+      const worm = makeWorm(
+        { x: 0, y: 0, z: 2, dirKey: 'PZ' },
+        ['4,0,2,PZ', '2,0,2,PZ', '0,0,1,PZ'],
+      );
+      expect(checkWormHitByWave(worm, wave('col', plane(2), plane(4))))
+        .toEqual({ type: 'cut', cutTrailIdx: 1 });
+    });
+
+    it('does not care which order the planes are listed in', () => {
+      const head = { x: 0, y: 0, z: 2, dirKey: 'PZ' };
+      const body = ['4,0,2,PZ', '2,0,2,PZ', '0,0,1,PZ'];
+      const forward = checkWormHitByWave(makeWorm(head, body), wave('col', plane(2), plane(4)));
+      const reverse = checkWormHitByWave(makeWorm(head, body), wave('col', plane(4), plane(2)));
+      expect(reverse).toEqual(forward);
+    });
+
+    it('treats a rocket-flying head as clear of every plane', () => {
+      const worm = makeWorm(
+        { x: 1, y: 0, z: 2, dirKey: 'PZ' },
+        ['0,0,2,PZ'],
+      );
+      worm.rocketActive = { current: true };
+      // Head would be on slice 1 and the body off it — grounded, that is death.
+      // Airborne it is a cut at worst, and here the body is on no plane at all.
+      expect(checkWormHitByWave(worm, wave('col', plane(1)))).toBeNull();
+    });
   });
 });

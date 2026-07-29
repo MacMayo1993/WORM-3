@@ -1,50 +1,58 @@
 // src/worm/liveRotation.js
 //
-// Shared mutable singleton written by CubeAssembly every frame during any
-// cube rotation (both GSAP-driven animations and live finger/mouse drags).
-// Read by worm-mode renderers (ParityOrbs, and eventually WormBody) so they
-// can track mid-tween positions without Zustand reactivity overhead.
+// COMPATIBILITY ADAPTER over `liveRotations` (plural), the multi-plane bridge
+// that actually carries the in-flight rotation.
 //
-// Contract:
-//   • CubeAssembly sets `active = true` and fills all fields at the START of
-//     each frame while a rotation is in progress, BEFORE priority-0 useFrames run.
-//   • CubeAssembly sets `active = false` on any frame where no rotation is live.
-//   • Consumers treat every field as read-only.
-//   • `angle` is the TOTAL signed angle (radians) to pass to applyAxisAngle
-//     from the resting world position — NOT an incremental delta.
-//     Range: live drag → arbitrary; GSAP animation → 0 … ±π/2.
+// Rotations used to be strictly one slice at a time, and a dozen consumers read
+// that assumption straight off this object: `if (liveRotation.active) rotate my
+// tile by liveRotation.angle`. Mega Worm turns up to three parallel planes at
+// once, which makes "the axis and slice being rotated" ambiguous.
+//
+// Rather than let those consumers read a wave and silently pick plane 0 — which
+// would glue a worm segment to a plane that isn't the one under it — this
+// adapter reports `active` ONLY when the live wave holds exactly one plane. For
+// a two- or three-plane wave every legacy reader sees `active: false` and falls
+// back to grid-math rest positions: a stiffer-looking ride for one turn, never a
+// wrong one. Consumers are migrated to `liveRotations` one at a time, and this
+// file goes away when the last one has.
+//
+// Contract for readers (unchanged from before):
+//   • `angle` is the TOTAL signed angle (radians) from the resting world
+//     position, not an incremental delta.
+//   • Every field is read-only.
+
+import { liveRotations, resetLiveRotations } from './liveRotations.js';
 
 export const liveRotation = {
-  active: false,
-  axis: null,       // 'col' | 'row' | 'depth'
-  sliceIndex: 0,    // which slice index on that axis (0..size-1)
-  angle: 0,         // total signed rotation angle in radians
+  get active() {
+    // Single-plane waves only — see the file header.
+    return liveRotations.active && liveRotations.count === 1;
+  },
+  get axis() {
+    return this.active ? liveRotations.axis : null;
+  },
+  get sliceIndex() {
+    return this.active ? liveRotations.planes[0].sliceIndex : 0;
+  },
+  get angle() {
+    return this.active ? liveRotations.planes[0].angle : 0;
+  },
 
-  // After a rotation animation completes, the final rotation is held here for
-  // a couple of extra frames while React re-renders with updated powerup grid
-  // coordinates. Without this, orbs on the rotating slice snap back to their
-  // pre-rotation world positions for one frame before the new positions arrive.
-  completedFrames: 0,     // frames remaining to apply the completed rotation
-  completedAxis: null,
-  completedSliceIndex: 0,
-  completedAngle: 0,
+  // Tests drive the sim without a renderer, so they need to force the bridge
+  // idle. Assigning `false` clears the underlying wave; assigning `true` is
+  // meaningless without plane data and is ignored.
+  set active(v) {
+    if (!v) {
+      liveRotations.active = false;
+      liveRotations.count = 0;
+      liveRotations.axis = null;
+      liveRotations.bySlice.fill(-1);
+    }
+  },
 };
 
 /**
- * Reset liveRotation to its idle state.
- * Saves the just-completed rotation into the `completed*` fields so that
- * ParityOrbs can hold the final position for a couple of frames while React
- * state catches up with the new rotated powerup coordinates.
+ * Reset to idle, holding the just-completed rotation for a couple of frames.
+ * Delegates to the multi-plane bridge, which owns the holdover.
  */
-export const resetLiveRotation = () => {
-  // Preserve the final rotation for the holdover mechanism
-  liveRotation.completedAxis = liveRotation.axis;
-  liveRotation.completedSliceIndex = liveRotation.sliceIndex;
-  liveRotation.completedAngle = liveRotation.angle;
-  liveRotation.completedFrames = 2;
-  // Clear active state
-  liveRotation.active = false;
-  liveRotation.axis = null;
-  liveRotation.sliceIndex = 0;
-  liveRotation.angle = 0;
-};
+export const resetLiveRotation = resetLiveRotations;

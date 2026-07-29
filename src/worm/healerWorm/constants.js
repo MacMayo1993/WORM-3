@@ -69,8 +69,18 @@ export const SELF_COLLISION_TRIGGER_PROGRESS = 0.4;
 export const SELF_COLLISION_GRACE_STEPS_AFTER_TUNNEL = 4;
 export const WORMHOLE_MAX_TRAVERSALS = 3;
 
-// Tail segments needed to visually cover all tiles: totalTiles / (0.14 unit spacing / ~1 unit per tile)
-// For 5×5 (150 tiles): ~1100 segments. Round up generously.
+// Hard cap on body length, in visible balls.
+//
+// This is a BODY-LENGTH cap, not a surface-coverage budget. The original comment
+// derived it as "enough segments to cover every tile of a 5×5" using a 0.14 world-unit
+// ball spacing; BODY_BALL_SPACING was later cut to 0.09, so 1200 balls actually span
+// ~108 tiles — already short of a 5×5's 150, let alone a 7×7's 294 or the Mega Worm
+// 15×15's 1350. Nothing depended on the coverage reading: the run is won by healing
+// every tunnel, never by covering the cube, so no cube size needs a longer worm.
+//
+// What the number really buys is the ceiling on the pre-allocated rings —
+// stepHistory is MAX_TAIL × STEPS_PER_TILE = 60,000 slots, each holding two Vector3s
+// — so raising it is a memory decision, not a correctness one.
 export const MAX_TAIL = 1200;
 
 // Exit-spiral spacing in normalized wind-path units. The head travels far

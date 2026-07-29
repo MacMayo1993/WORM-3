@@ -19,9 +19,12 @@ import CameraFlipKick from './CameraFlipKick.jsx';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { resolveColors } from '../utils/colorSchemes.js';
-import { liveRotation, resetLiveRotation } from '../worm/liveRotation.js';
+import { resetLiveRotation } from '../worm/liveRotation.js';
+import { liveRotations, setLiveWave, setPlaneAngle } from '../worm/liveRotations.js';
 import { liveCubies } from '../worm/liveCubies.js';
 import { healSticker } from '../game/cubeState.js';
+import { getSliceLinearIndices, forEachSliceCoordinate, MEGA_SIZE } from '../game/sliceIndex.js';
+import { MAX_WAVE_PLANES } from '../game/rotationWave.js';
 import { buildManifoldGridMap, findAntipodalStickerByGrid, getManifoldNeighbors } from '../game/manifoldLogic.js';
 import { EARN_DISPARITY_TILE_RESTORE } from '../utils/economyConstants.js';
 import { pruneExpiredFx } from '../utils/transientFx.js';
@@ -47,12 +50,24 @@ const _normalMat3 = new THREE.Matrix3();
 const _identityMat4 = new THREE.Matrix4();
 
 // Pre-allocated pool for live drag base positions/rotations.
-// Max supported cube size is 7, so a rotated slice can contain up to 7² = 49 cubies.
-const _MAX_SLICE = 49;
+// A rotated slice holds size² cubies, so the pool is sized for the largest cube
+// any mode can build — the Mega Worm 15², not the 7² the standard tiers stop at.
+// The fill loop below also bounds-checks against this, because the previous
+// version silently indexed past a 49-slot pool and threw on `.copy()` of
+// undefined the moment anything larger reached it.
+const _MAX_SLICE = MEGA_SIZE * MEGA_SIZE;
 const _dragPosPool = Array.from({ length: _MAX_SLICE }, () => new THREE.Vector3());
 const _dragRotPool = Array.from({ length: _MAX_SLICE }, () => new THREE.Quaternion());
 const _dragBasePositions = new Map();
 const _dragBaseRotations = new Map();
+
+// Pre-allocated resting-pose snapshot for an animated rotation wave: up to three
+// parallel planes of size² cubies each. Allocated once at module load rather than
+// per wave — a hazard turn every ten seconds that minted 675 Vector3s and 675
+// Quaternions would be a steady GC drip through a whole run.
+const _MAX_WAVE_CUBIES = MAX_WAVE_PLANES * _MAX_SLICE;
+const _wavePosPool = Array.from({ length: _MAX_WAVE_CUBIES }, () => new THREE.Vector3());
+const _waveRotPool = Array.from({ length: _MAX_WAVE_CUBIES }, () => new THREE.Quaternion());
 
 // Mobile detection
 const isTouchDevice = typeof window !== 'undefined' && (
@@ -72,7 +87,9 @@ const MAX_DISTANCE_BY_SIZE = { 2: 28, 3: 28, 4: 38, 5: 52, 6: 68, 7: 85 };
 const PIXELS_PER_90DEG = 100;
 
 const CubeAssembly = React.memo(({
-  size, cubies, onMove, onTapFlip, animState, onAnimComplete,
+  // `animState` is still passed by GameScene for other consumers; this component
+  // reads the authoritative `animWave` from the store instead.
+  size, cubies, onMove, onTapFlip, animState: _animState, onAnimComplete,
   onCascadeComplete, manifoldMap,
   onSelectTile, onClearTileSelection, onFlipWaveComplete,
   solveHighlights,
@@ -93,6 +110,7 @@ const CubeAssembly = React.memo(({
     wormholeBodyHidden,
     isBiomeMode,
     rotationEpoch,
+    animWave,
     settings,
     _chaosLevel,
     cameraOrbitRequest,
@@ -129,6 +147,10 @@ const CubeAssembly = React.memo(({
       wormholeBodyHidden: s.wormHealerMode && (s.wormPhase === 'tunnel' || s.wormPhase === 'exiting'),
       isBiomeMode: s.settings?.biomeMode?.enabled,
       rotationEpoch: s.rotationEpoch,
+      // The wave in flight: 1–3 parallel same-axis planes. The `animState` prop is
+      // the single-plane view of the same event, non-null only for a one-plane
+      // wave, so this is the authoritative source for the transform loop.
+      animWave: s.animWave,
       settings: s.settings,
       _chaosLevel: s.chaosLevel,
       cameraOrbitRequest: s.cameraOrbitRequest,
@@ -160,6 +182,29 @@ const CubeAssembly = React.memo(({
   // Computed ONCE when animation starts from the canonical grid positions,
   // so it's immune to floating-point drift from incremental rotations.
   const sliceIndicesRef = useRef(null);
+
+  // ── Rotation-wave animation state ───────────────────────────────────────────
+  // `waveIdRef` is the "have I set this wave up yet" latch; the index lists and
+  // resting-pose snapshots below are rebuilt only when it changes.
+  const waveIdRef = useRef(null);
+  const waveIndicesRef = useRef(null);
+  const waveBaseRef = useRef(null);
+  // The frame loop runs at priority −1 and must see the wave React committed
+  // this frame, not the one captured when the callback was created.
+  const animWaveRef = useRef(animWave);
+  animWaveRef.current = animWave;
+
+  // Park the live bridge without disturbing the completed-wave holdover, which
+  // consumers positioned from React state are still reading for a frame or two.
+  const resetLiveWaveIdle = useCallback(() => {
+    if (liveRotations.active) {
+      liveRotations.active = false;
+      liveRotations.count = 0;
+      liveRotations.axis = null;
+      liveRotations.bySlice.fill(-1);
+    }
+    if (liveRotations.completedFrames > 0) liveRotations.completedFrames--;
+  }, []);
 
   const getBasis = () => {
     camera.getWorldDirection(_basisF).normalize();
@@ -213,9 +258,7 @@ const CubeAssembly = React.memo(({
 
   // Stable callback ref pattern: avoids recreating the function on every render,
   // which would defeat React.memo on all Cubie children.
-  const animStateRef = useRef(animState);
-  animStateRef.current = animState;
-  const prevAnimStateRef = useRef(null); // tracks last frame's animState for transition detection
+  const prevAnimStateRef = useRef(null); // tracks last frame's wave for transition detection
   const prevRotationEpochRef = useRef(rotationEpoch);
   const flipModeRef = useRef(flipMode);
   flipModeRef.current = flipMode;
@@ -233,7 +276,8 @@ const CubeAssembly = React.memo(({
   handsModeRef.current = handsMode;
 
   const onPointerDown = useCallback(({ pos, worldPos, event }) => {
-    if (animStateRef.current) return;
+    // Any wave in flight blocks input, single-plane or not.
+    if (animWaveRef.current) return;
     if (gsapAnimRef.current) return;
 
     // Get the native event - R3F wraps it
@@ -342,24 +386,18 @@ const CubeAssembly = React.memo(({
         if (m) {
           if (onClearTileSelectionRef.current) onClearTileSelectionRef.current();
           const sliceIndex = ds.pos[m.axis === 'col' ? 'x' : m.axis === 'row' ? 'y' : 'z'];
-          const sliceIndices = new Set();
-          const n = sizeRef.current * sizeRef.current * sizeRef.current;
-          for (let idx = 0; idx < n; idx++) {
-            const z = idx % sizeRef.current;
-            const y = Math.floor(idx / sizeRef.current) % sizeRef.current;
-            const x = Math.floor(idx / (sizeRef.current * sizeRef.current));
-            if ((m.axis === 'col' && x === sliceIndex) ||
-              (m.axis === 'row' && y === sliceIndex) ||
-              (m.axis === 'depth' && z === sliceIndex)) {
-              sliceIndices.add(idx);
-            }
-          }
+          // Slice membership comes straight from the shared index helper — no
+          // size³ walk, and the same definition the logical rotation uses.
+          const sliceIndices = new Set(getSliceLinearIndices(sizeRef.current, m.axis, sliceIndex));
           _dragBasePositions.clear();
           _dragBaseRotations.clear();
           let _poolIdx = 0;
           sliceIndices.forEach(idx => {
             const g = cubieRefs.current[idx];
-            if (g) {
+            // The pool is sized for the largest cube any mode builds; the guard is
+            // here so an unexpected size degrades to "some cubies don't drag"
+            // rather than throwing inside a pointer handler.
+            if (g && _poolIdx < _MAX_SLICE) {
               _dragPosPool[_poolIdx].copy(g.position);
               _dragRotPool[_poolIdx].copy(g.quaternion);
               _dragBasePositions.set(idx, _dragPosPool[_poolIdx]);
@@ -728,12 +766,20 @@ const CubeAssembly = React.memo(({
   // Track the previous animation progress for incremental rotation
   const prevProgressRef = useRef(0);
 
-  // Start GSAP animation when animState changes
+  // Start the GSAP tween when a new wave arrives.
+  //
+  // Keyed on the wave, not on `animState`: a two- or three-plane wave leaves
+  // `animState` null by design, so keying on it would leave multi-plane waves
+  // with no tween at all — the cube would jump to its committed state with no
+  // animation and the worm would never get to ride the turn.
   useEffect(() => {
-    if (!animState) {
+    if (!animWave) {
       // Reset progress refs when animation ends
       animProgressRef.current.value = 0;
       prevProgressRef.current = 0;
+      waveIdRef.current = null;
+      waveIndicesRef.current = null;
+      waveBaseRef.current = null;
       return;
     }
 
@@ -762,8 +808,8 @@ const CubeAssembly = React.memo(({
     // Use GSAP to animate the progress value with snappy easing
     // Hands mode and shuffle moves use faster, crisper animations
     const isHands = handsModeRef.current;
-    const isShuffle = !!animState?.isShuffle;
-    const isWormScramble = !!animState?.wormScramble;
+    const isShuffle = !!animWave?.isShuffle;
+    const isWormScramble = !!animWave?.wormScramble;
     // The worm-mode opening scramble plays at the exact same speed/ease as a normal
     // in-game turn (not the snappy hands/shuffle speed), so each move reads clearly
     // instead of blurring past.
@@ -782,6 +828,9 @@ const CubeAssembly = React.memo(({
       onComplete: () => {
         gsapAnimRef.current = null;
         sliceIndicesRef.current = null;
+        waveIdRef.current = null;
+        waveIndicesRef.current = null;
+        waveBaseRef.current = null;
         resetLiveRotation();
         vibrate(isFast ? 8 : 14);
         onAnimCompleteRef.current();
@@ -794,7 +843,7 @@ const CubeAssembly = React.memo(({
         gsapAnimRef.current = null;
       }
     };
-  }, [animState]);
+  }, [animWave]);
 
   // Priority -2: earliest possible hook — detects state changes (via rotationEpoch)
   // or animState transitions and snaps all cubies to their grid positions
@@ -808,11 +857,14 @@ const CubeAssembly = React.memo(({
   // matrixWorld, producing a one-frame flash of new colours at wrong positions.
 
   useFrame(() => {
+    // Tracks the wave, not `animState` — a multi-plane wave leaves `animState`
+    // null, so watching that would miss the end of every multi-plane rotation and
+    // skip the snap-to-grid this guard exists to perform.
     const wasAnimating = prevAnimStateRef.current !== null;
-    const nowAnimating = animStateRef.current !== null;
+    const nowAnimating = animWaveRef.current !== null;
     const epochChanged = rotationEpoch !== prevRotationEpochRef.current;
 
-    prevAnimStateRef.current = animStateRef.current;
+    prevAnimStateRef.current = animWaveRef.current;
     prevRotationEpochRef.current = rotationEpoch;
 
     // Snap if we just finished an animation OR if the logical state jumped (drag snap)
@@ -852,29 +904,28 @@ const CubeAssembly = React.memo(({
       const now = state.clock.elapsedTime;
       const dt = Math.max(1e-3, now - prevSpinTimeRef.current);
       prevSpinTimeRef.current = now;
-      const rotActive = liveRotation.active;
+      const rotActive = liveRotations.active;
+      // Plane 0's sweep stands in for the whole wave here: every plane shares an
+      // axis and a tween, so they build spin energy at the same rate.
+      const leadAngle = rotActive ? liveRotations.planes[0].angle : 0;
       let angSpeed = 0;
       if (rotActive && wasRotActiveRef.current) {
-        angSpeed = Math.abs(liveRotation.angle - prevRotAngleRef.current) / dt;
+        angSpeed = Math.abs(leadAngle - prevRotAngleRef.current) / dt;
       }
-      prevRotAngleRef.current = rotActive ? liveRotation.angle : 0;
+      prevRotAngleRef.current = leadAngle;
       // Dice: on the frame a turn begins, bump the roll count of every cell in
-      // the rotating slice so their dice re-roll to a fresh face and a returning
+      // every rotating slice so their dice re-roll to a fresh face and a returning
       // cell never repeats. Non-rotated cells are untouched → they hold.
       if (rotActive && !wasRotActiveRef.current && cellRollDataRef.current) {
         const data = cellRollDataRef.current;
         const n = size;
-        const ax = liveRotation.axis;
-        const si = liveRotation.sliceIndex;
-        for (let a = 0; a < n; a++) {
-          for (let b = 0; b < n; b++) {
-            let cx, cy, cz;
-            if (ax === 'col') { cx = si; cy = a; cz = b; }
-            else if (ax === 'row') { cx = a; cy = si; cz = b; }
-            else { cx = a; cy = b; cz = si; }
+        const ax = liveRotations.axis;
+        for (let p = 0; p < liveRotations.count; p++) {
+          const si = liveRotations.planes[p].sliceIndex;
+          forEachSliceCoordinate(n, ax, si, (cx, cy, cz) => {
             const off = (cz * (n * n) + cx + cy * n) * 4;
             data[off] = (data[off] + 1) & 255;
-          }
+          });
         }
         cellRollTexRef.current.needsUpdate = true;
       }
@@ -891,11 +942,14 @@ const CubeAssembly = React.memo(({
       // exactly the tiles that moved.
       if (rotActive) {
         latchedSpinAxisRef.current =
-          liveRotation.axis === 'row' ? 1 : liveRotation.axis === 'depth' ? 2 : 0;
+          liveRotations.axis === 'row' ? 1 : liveRotations.axis === 'depth' ? 2 : 0;
         const kCenter = (size - 1) / 2;
         const expMult = size >= 4 ? 1.53 : 1.8;
         const exp = 1 + explosionFactorRef.current * expMult;
-        latchedSpinSliceRef.current = (liveRotation.sliceIndex - kCenter) * exp;
+        // The shader latch carries one slice coordinate, so a multi-plane wave
+        // jostles the tiles of its first plane. Extending the uniform to three
+        // slices is cosmetic-only and belongs with the Mega renderer work.
+        latchedSpinSliceRef.current = (liveRotations.planes[0].sliceIndex - kCenter) * exp;
       }
       updateSharedSpin(spinEnergyRef.current, latchedSpinAxisRef.current, latchedSpinSliceRef.current);
       updateDiceRoll(dt, spinEnergyRef.current);
@@ -920,57 +974,84 @@ const CubeAssembly = React.memo(({
           g.quaternion.premultiply(_rotQuat);
         }
       });
-      liveRotation.active = true;
-      liveRotation.axis = ld.axis;
-      liveRotation.sliceIndex = ld.sliceIndex;
-      liveRotation.angle = angle;
-      return; // Skip animState processing during live drag
-    }
-
-    // Handle GSAP snap animation (completing rotation after release)
-    if (!animState) { liveRotation.active = false; return; }
-
-    const { axis, dir, sliceIndex } = animState;
-    const worldAxis = axis === 'col' ? _axisCol : axis === 'row' ? _axisRow : _axisDepth;
-
-    // On animation start, pre-compute which ref indices are in the slice
-    if (!sliceIndicesRef.current) {
-      const indices = new Set();
-      const n = size * size * size;
-      for (let idx = 0; idx < n; idx++) {
-        const z = idx % size;
-        const y = Math.floor(idx / size) % size;
-        const x = Math.floor(idx / (size * size));
-        const inSlice = (axis === 'col' && x === sliceIndex) ||
-          (axis === 'row' && y === sliceIndex) ||
-          (axis === 'depth' && z === sliceIndex);
-        if (inSlice) indices.add(idx);
+      // A finger drags exactly one slice, so a drag is always a one-plane wave.
+      // Re-seeding only when the slice changes keeps the per-frame cost to the
+      // single angle write.
+      if (liveRotations.count !== 1 || liveRotations.planes[0].sliceIndex !== ld.sliceIndex || liveRotations.axis !== ld.axis) {
+        setLiveWave(-1, ld.axis, [{ sliceIndex: ld.sliceIndex, dir: 1, numTurns: 1 }]);
       }
-      sliceIndicesRef.current = indices;
+      setPlaneAngle(0, angle);
+      return; // Skip wave processing during live drag
     }
 
-    // Calculate incremental rotation from GSAP progress
+    // Handle GSAP snap animation (completing rotation after release).
+    //
+    // The wave is authoritative; `animState` is only its single-plane shadow. A
+    // wave of two or three parallel planes has no meaningful `animState`, so
+    // reading that instead would animate nothing at all.
+    const wave = animWaveRef.current;
+    if (!wave) { resetLiveWaveIdle(); return; }
+
+    const worldAxis = wave.axis === 'col' ? _axisCol : wave.axis === 'row' ? _axisRow : _axisDepth;
+    const planes = wave.rotations;
+
+    // On wave start, cache each plane's cubie indices and snapshot its resting
+    // pose. Rotating from a snapshot every frame (rather than accumulating a
+    // per-frame delta) means three planes advancing at different rates can't
+    // drift apart, and a dropped frame costs nothing.
+    if (waveIdRef.current !== wave.id) {
+      waveIdRef.current = wave.id;
+      waveIndicesRef.current = planes.map(p => getSliceLinearIndices(size, wave.axis, p.sliceIndex));
+      let poolIdx = 0;
+      waveBaseRef.current = waveIndicesRef.current.map(indices => {
+        const basePos = new Map();
+        const baseRot = new Map();
+        for (let i = 0; i < indices.length; i++) {
+          const idx = indices[i];
+          const g = cubieRefs.current[idx];
+          if (!g || poolIdx >= _MAX_WAVE_CUBIES) continue;
+          _wavePosPool[poolIdx].copy(g.position);
+          _waveRotPool[poolIdx].copy(g.quaternion);
+          basePos.set(idx, _wavePosPool[poolIdx]);
+          baseRot.set(idx, _waveRotPool[poolIdx]);
+          poolIdx++;
+        }
+        return { basePos, baseRot };
+      });
+      setLiveWave(wave.id, wave.axis, planes);
+    }
+
     const currentProgress = animProgressRef.current.value;
-    const animTurns = animState.numTurns ?? 1;
-    const quarterTurns = (Math.PI / 2) * animTurns;
-    liveRotation.active = true;
-    liveRotation.axis = axis;
-    liveRotation.sliceIndex = sliceIndex;
-    liveRotation.angle = currentProgress * quarterTurns * dir;
-    const deltaProgress = currentProgress - prevProgressRef.current;
     prevProgressRef.current = currentProgress;
 
-    const dRot = deltaProgress * quarterTurns;
+    const bases = waveBaseRef.current;
+    for (let p = 0; p < planes.length; p++) {
+      const plane = planes[p];
+      // A plane may lag the wave by a fraction of the tween. Every plane still
+      // reaches 1 at the same moment, so the logical commit stays atomic however
+      // the sweeps are staggered.
+      const delay = plane.delay ?? 0;
+      const t = delay > 0 && delay < 1
+        ? Math.min(1, Math.max(0, (currentProgress - delay) / (1 - delay)))
+        : currentProgress;
+      const angle = t * (Math.PI / 2) * (plane.numTurns ?? 1) * plane.dir;
+      setPlaneAngle(p, angle);
 
-    // Apply rotation only to cubies in the slice (avoid iterating all 125 to skip 88%)
-    const sliceSet = sliceIndicesRef.current;
-    if (sliceSet && Math.abs(dRot) > 0.0001) {
-      sliceSet.forEach(idx => {
+      const indices = waveIndicesRef.current[p];
+      const base = bases?.[p];
+      if (!indices || !base) continue;
+      _rotQuat.setFromAxisAngle(worldAxis, angle);
+      for (let i = 0; i < indices.length; i++) {
+        const idx = indices[i];
         const g = cubieRefs.current[idx];
-        if (!g) return;
-        g.position.applyAxisAngle(worldAxis, dRot * dir);
-        g.rotateOnWorldAxis(worldAxis, dRot * dir);
-      });
+        if (!g) continue;
+        const bp = base.basePos.get(idx);
+        const br = base.baseRot.get(idx);
+        if (!bp) continue;
+        g.position.copy(bp).applyAxisAngle(worldAxis, angle);
+        g.quaternion.copy(br);
+        g.quaternion.premultiply(_rotQuat);
+      }
     }
   }, -1);
 
@@ -1013,7 +1094,7 @@ const CubeAssembly = React.memo(({
   // Uses useLayoutEffect so the reset happens BEFORE the browser paints,
   // preventing a 1-frame glitch where cubies show new colors at old positions.
   useLayoutEffect(() => {
-    if (!animState) {
+    if (!animWave) {
       sliceIndicesRef.current = null;
       // Reduce explosion distance by 15% for larger cubes (4x4, 5x5)
       const explosionMultiplier = size >= 4 ? 1.53 : 1.8;
@@ -1030,7 +1111,7 @@ const CubeAssembly = React.memo(({
         }
       });
     }
-  }, [animState, items, explosionFactor]);
+  }, [animWave, items, explosionFactor]);
 
   return (
     <StickerInstanceProvider>
@@ -1103,7 +1184,7 @@ const CubeAssembly = React.memo(({
             noRotate={handsMode ? true : false}
             minDistance={5}
             maxDistance={MAX_DISTANCE_BY_SIZE[size] || 28}
-            enabled={!wormHealerMode && (!handsMode || explosionFactor > 0) && !animState && !dragStart && controlsEnabledRef.current && !wormTunnelActive}
+            enabled={!wormHealerMode && (!handsMode || explosionFactor > 0) && !animWave && !dragStart && controlsEnabledRef.current && !wormTunnelActive}
             staticMoving={false}
             dynamicDampingFactor={isTouchDevice ? 0.15 : 0.08}
             rotateSpeed={isTouchDevice ? 0.8 : 1.2}

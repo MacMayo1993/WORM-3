@@ -66,6 +66,8 @@ import MobiIntroScreen, {
   MOBI_LINES_DEMO_INTRO,
 } from './components/screens/MobiIntroScreen.jsx';
 import { UI_FONT } from './utils/uiTheme.js';
+import { MEGA_WORM_ENABLED } from './utils/megaFlag.js';
+import { MEGA_SIZE } from './game/sliceIndex.js';
 import ScreenTransition from './components/ScreenTransition.jsx';
 // Static (not lazy): a Suspense fallback must be present the instant a lazy
 // chunk starts loading, so the loading cube cannot itself live in a lazy chunk.
@@ -75,6 +77,9 @@ import LoadingScreen from './components/screens/LoadingScreen.jsx';
 import SceneLoadingGate from './components/screens/SceneLoadingGate.jsx';
 const ParityStoreScreen = React.lazy(() => import('./components/screens/ParityStoreScreen.jsx'));
 const GameScene = React.lazy(() => import('./3d/GameScene.jsx'));
+// Mega Worm measurement harness — only ever mounted behind the ?megaworm flag,
+// so it stays out of everyone else's bundle.
+const PerfProbe = React.lazy(() => import('./dev/PerfProbe.jsx'));
 const UILayer = React.lazy(() => import('./components/UILayer.jsx'));
 const RotatingBlackCube = React.lazy(() =>
   import('./components/menus/MainMenu.jsx').then((mod) => ({ default: mod.RotatingBlackCube }))
@@ -384,7 +389,7 @@ export default function WORM3() {
   const { moves, gameTime, victory, achievedWins: _achievedWins, setVictory } = useGameSession();
 
   const {
-    animState, startAnimation, handleAnimComplete, onMove, startAnimatedShuffle, cancelShuffle
+    animState, startAnimation, startWave, handleAnimComplete, onMove, startAnimatedShuffle, cancelShuffle
   } = useAnimation();
 
   const {
@@ -900,7 +905,12 @@ export default function WORM3() {
     // Switch to game scene (showMainMenu already false), reset cube so it's
     // visible and styled before the worm gameplay starts.
     const targetSize = wizardSettings.cubeSize || 3;
-    if (targetSize !== size) {
+    if (targetSize === MEGA_SIZE) {
+      // Mega Worm goes through its own constructor, not changeSize — that path
+      // is shared with levels and restored settings and deliberately still
+      // refuses anything above 7.
+      useGameStore.getState().setMegaWormSize();
+    } else if (targetSize !== size) {
       changeSize(targetSize);
     } else {
       reset();
@@ -1377,6 +1387,14 @@ export default function WORM3() {
             onDecline={() => { setDpr([0.75, 1]); setPerfReducedFX(true); }}
             onIncline={() => { setDpr([1, 1.5]); setPerfReducedFX(false); }}
           />
+          {MEGA_WORM_ENABLED && (
+            <Suspense fallback={null}>
+              <PerfProbe
+                cubeSize={size}
+                label={showWelcome ? 'intro' : showMainMenu ? 'menu' : wormHealerMode ? 'worm' : 'game'}
+              />
+            </Suspense>
+          )}
           <ClockContinuity paused={pageHidden} />
           <CameraManager showWelcome={showWelcome} showMainMenu={showMainMenu} cameraZ={cameraZ} />
           <TilePreviewHost />
@@ -1408,7 +1426,7 @@ export default function WORM3() {
                 teachModeActive={teachMode.active}
                 layerHighlight={teachMode.layerHighlight}
                 onHeal={healSticker}
-                onRotate={startAnimation}
+                onRotate={startWave}
                 onAnimatedShuffle={startAnimatedShuffle}
                 showAntipodalPiP={showAntipodalPiP}
               />

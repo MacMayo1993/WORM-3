@@ -13,6 +13,7 @@
 
 import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { MONO_FONT } from '../utils/uiTheme.js';
+import { MEGA_WORM_ENABLED } from '../utils/megaFlag.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import ScreenTransition from './ScreenTransition.jsx';
@@ -62,6 +63,9 @@ const CubeNet = React.lazy(() => import('./CubeNet.jsx'));
 const SolveMode = React.lazy(() => import('./SolveMode.jsx'));
 const DevConsole = React.lazy(() => import('./menus/DevConsole.jsx'));
 const TeachMode = React.lazy(() => import('../teach/TeachMode.jsx'));
+// Mega Worm measurement harness — the DOM half. Gated on the ?megaworm flag so
+// it never reaches a normal build's bundle or screen.
+const PerfHud = React.lazy(() => import('../dev/PerfHud.jsx'));
 
 
 export default function UILayer({
@@ -750,6 +754,12 @@ export default function UILayer({
           />
         </Suspense>
       </ScreenTransition>
+
+      {MEGA_WORM_ENABLED && (
+        <Suspense fallback={null}>
+          <PerfHud />
+        </Suspense>
+      )}
 
       <RandomStyleFlash />
       <ViewModeFlash />

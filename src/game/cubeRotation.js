@@ -1,6 +1,7 @@
 // src/game/cubeRotation.js
 // Cube rotation logic
 import { DIR_TO_VEC, VEC_TO_DIR } from '../utils/constants.js';
+import { forEachSliceCoordinate } from './sliceIndex.js';
 
 // Rotate a vector 90 degrees around an axis
 export const rotateVec90 = (vx, vy, vz, axis, dir) => {
@@ -45,30 +46,24 @@ export const rotateSliceCubies = (cubies, size, axis, sliceIndex, dir) => {
   // without mutating the original state.  Non-slice cubies are shared by reference.
   const next = cubies.map(L => L.map(R => R.slice()));
 
-  for (let x = 0; x < size; x++) {
-    for (let y = 0; y < size; y++) {
-      for (let z = 0; z < size; z++) {
-        const inSlice = (axis === 'col' && x === sliceIndex) ||
-          (axis === 'row' && y === sliceIndex) ||
-          (axis === 'depth' && z === sliceIndex);
-        if (!inSlice) continue;
-
-        let cx = x - k, cy = y - k, cz = z - k;
-        if (axis === 'col') {
-          const ny = -dir * cz, nz = dir * cy;
-          cy = ny; cz = nz;
-        } else if (axis === 'row') {
-          const nx = dir * cz, nz = -dir * cx;
-          cx = nx; cz = nz;
-        } else {
-          const nx = -dir * cy, ny = dir * cx;
-          cx = nx; cy = ny;
-        }
-        const nxI = Math.round(cx + k), nyI = Math.round(cy + k), nzI = Math.round(cz + k);
-        moves.push({ from: [x, y, z], to: [nxI, nyI, nzI] });
-      }
+  // Generate the slice's cells directly instead of walking the whole lattice and
+  // discarding the misses: O(size²) rather than O(size³). At size 7 that is 49
+  // iterations instead of 343; at the Mega Worm size of 15, 225 instead of 3,375.
+  forEachSliceCoordinate(size, axis, sliceIndex, (x, y, z) => {
+    let cx = x - k, cy = y - k, cz = z - k;
+    if (axis === 'col') {
+      const ny = -dir * cz, nz = dir * cy;
+      cy = ny; cz = nz;
+    } else if (axis === 'row') {
+      const nx = dir * cz, nz = -dir * cx;
+      cx = nx; cz = nz;
+    } else {
+      const nx = -dir * cy, ny = dir * cx;
+      cx = nx; cy = ny;
     }
-  }
+    const nxI = Math.round(cx + k), nyI = Math.round(cy + k), nzI = Math.round(cz + k);
+    moves.push({ from: [x, y, z], to: [nxI, nyI, nzI] });
+  });
 
   // Snapshot each cubie's original reference before any writes happen
   for (const m of moves) {

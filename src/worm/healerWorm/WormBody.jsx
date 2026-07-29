@@ -5,14 +5,13 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import {
-    isTileInSlice,
     makeTunnelCenterline,
     buildTunnelCenterlineInto,
     tunnelTToArc,
     getTunnelArcPosInto,
     getWindWorldPosInto,
 } from '../wormLogic.js';
-import { liveRotation } from '../liveRotation.js';
+import { liveRotations, planeAngleFor } from '../liveRotations.js';
 import { shAt } from '../circularBuffers.js';
 import { getSkin } from '../wormCosmeticsData.js';
 import { getWormCharacter } from '../wormCharacterData.js';
@@ -340,18 +339,21 @@ export function WormBody({ worm, size }) {
         // scratch vectors, never mutating the ring) by the exact signed angle CubeAssembly
         // applies to the cubies — so the body stays glued to the surface through the tween and,
         // because commit bakes the same turn into history, there is no snap when it lands.
-        const _ride = liveRotation.active;
-        const _rAxis = liveRotation.axis;
-        const _rSlice = liveRotation.sliceIndex;
-        const _rAngle = liveRotation.angle;
+        //
+        // Resolved per point against the WAVE, not one slice: with up to three
+        // parallel planes turning at once a long body can straddle two of them,
+        // and each of its points has to follow whichever plane it is actually on
+        // — at that plane's own angle, since the directions can differ.
+        const _ride = liveRotations.active;
+        const _rAxis = liveRotations.axis;
         if (_ride) _bodyRideAxis.set(_rAxis === 'col' ? 1 : 0, _rAxis === 'row' ? 1 : 0, _rAxis === 'depth' ? 1 : 0);
         // Returns the effective (possibly ridden) world position for a path point, writing into
         // `out` only when a rotation is applied; otherwise returns the point's own vector.
         const effPos = (pt, out) => {
-            if (_ride && pt.tx >= 0 && isTileInSlice(_rAxis, _rSlice, pt.tx, pt.ty, pt.tz)) {
-                return out.copy(pt.pos).applyAxisAngle(_bodyRideAxis, _rAngle);
-            }
-            return pt.pos;
+            if (!_ride || pt.tx < 0) return pt.pos;
+            const angle = planeAngleFor(pt.tx, pt.ty, pt.tz);
+            if (angle === 0) return pt.pos;
+            return out.copy(pt.pos).applyAxisAngle(_bodyRideAxis, angle);
         };
 
         // Worm stays visible through the whole Möbius ride now (the tunnel camera rides inside on
@@ -483,8 +485,9 @@ export function WormBody({ worm, size }) {
                         _bodyCloneNormal.lerpVectors(ptA.normal, ptB.normal, t).normalize();
                         // Keep the surface normal consistent with a ridden segment so the
                         // wiggle/orientation track the rotating face rather than the old one.
-                        if (_ride && ptA.tx >= 0 && isTileInSlice(_rAxis, _rSlice, ptA.tx, ptA.ty, ptA.tz)) {
-                            _bodyCloneNormal.applyAxisAngle(_bodyRideAxis, _rAngle).normalize();
+                        if (_ride && ptA.tx >= 0) {
+                            const _nAngle = planeAngleFor(ptA.tx, ptA.ty, ptA.tz);
+                            if (_nAngle !== 0) _bodyCloneNormal.applyAxisAngle(_bodyRideAxis, _nAngle).normalize();
                         }
 
                         // Calculate forward/side vector for the wiggle at this exact localized point

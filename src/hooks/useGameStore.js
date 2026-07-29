@@ -8,6 +8,7 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { makeCubies } from '../game/cubeState.js';
+import { MEGA_SIZE } from '../game/sliceIndex.js';
 import { DEFAULT_SETTINGS } from '../utils/colorSchemes.js';
 import { isMobile } from '../utils/device.js';
 import { DEFAULT_OWNED, ALL_ITEMS_OWNED } from '../utils/storeCatalog.js';
@@ -293,8 +294,32 @@ export const useGameStore = create(
     // so consumers (e.g. the chaos worker sync) must fall back to a full resync
     // instead of replaying a single-slice move.
     lastRotation: null,
+    // Describes the parallel rotation wave that produced the latest rotationEpoch
+    // bump: { axis, rotations: [{ sliceIndex, dir, numTurns }] }, up to three
+    // same-axis disjoint planes. `lastRotation` above is the single-plane view of
+    // the same event, kept non-null only when the wave holds exactly one plane —
+    // see rotationWave.js for why that split exists.
+    lastWave: null,
 
-    setSize: (size) => set((state) => ({ size, cubies: makeCubies(size), rotationEpoch: state.rotationEpoch + 1, lastRotation: null })),
+    // True only while the Mega Worm tier is the live cube. Nothing but Mega Worm
+    // may set it, and no persisted state carries it, so a normal session can
+    // never come back up at size 15.
+    megaWorm: false,
+
+    setSize: (size) => set((state) => ({ size, cubies: makeCubies(size), rotationEpoch: state.rotationEpoch + 1, lastRotation: null, lastWave: null, megaWorm: false })),
+
+    // The one sanctioned way to build a 15×15 cube. Deliberately separate from
+    // setSize rather than a flag on it: setSize is reached from level data, the
+    // setup wizard and restored settings, none of which have been validated for
+    // Mega, and all of which should keep failing loudly on an out-of-range size.
+    setMegaWormSize: () => set((state) => ({
+      size: MEGA_SIZE,
+      cubies: makeCubies(MEGA_SIZE, { allowMega: true }),
+      rotationEpoch: state.rotationEpoch + 1,
+      lastRotation: null,
+      lastWave: null,
+      megaWorm: true,
+    })),
     setCubies: (cubies) => set(typeof cubies === 'function'
       ? (state) => ({ cubies: cubies(state.cubies) })
       : { cubies }),
@@ -665,12 +690,20 @@ export const useGameStore = create(
     // ========================================================================
     // ANIMATION STATE
     // ========================================================================
+    // The rotation wave being animated: { id, axis, rotations: [{sliceIndex, dir,
+    // numTurns}] }, one to three parallel same-axis planes. This is the
+    // authoritative animation state — CubeAssembly transforms from it and the
+    // commit applies it.
+    animWave: null,
+    // Single-plane view of animWave, non-null ONLY when the wave has exactly one
+    // plane. Components that can only express one turn read this and correctly
+    // see nothing during a multi-plane wave rather than a misleading first plane.
     animState: null, // { axis, dir, sliceIndex, t }
     pendingMove: null,
 
     setAnimState: (animState) => set({ animState }),
     setPendingMove: (pendingMove) => set({ pendingMove }),
-    clearAnimation: () => set({ animState: null, pendingMove: null }),
+    clearAnimation: () => set({ animWave: null, animState: null, pendingMove: null }),
 
     // ========================================================================
     // CURSOR STATE
