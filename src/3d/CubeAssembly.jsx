@@ -1045,6 +1045,24 @@ const CubeAssembly = React.memo(({
         {/* Solid body + interaction overlays only — hidden for the whole tunnel traversal so they
             don't z-fight with TunnelInteriorView, while the Möbius ribbons and VoidCore above stay visible. */}
         <group visible={!wormholeBodyHidden}>
+          {wormHealerMode && size >= 15 && (
+            /* Mega omits 1,178 individual rounded cubie bodies for performance,
+               but still needs a continuous dark chassis beneath the sticker grid.
+               One inset box restores the black seams, silhouette, and Rubik's-cube
+               volume for a single draw call; this parent group hides it during
+               tunnel transit just like the old per-cubie bodies. */
+            <mesh castShadow={false} receiveShadow={false}>
+              <boxGeometry args={[size - 0.02, size - 0.02, size - 0.02]} />
+              <meshStandardMaterial
+                color="#07080c"
+                roughness={0.82}
+                metalness={0.08}
+                transparent
+                opacity={0.92}
+                depthWrite
+              />
+            </mesh>
+          )}
           {!isBiomeMode && cascades.map(c =>
             c?.from && c?.to ? (
               <ChaosWave

@@ -644,8 +644,12 @@ export default function WORM3() {
   // (neon / desert / topographic) stayed on the device.
   const handleHomeFromGame = useCallback(() => {
     if (useGameStore.getState().demoMode) handleExitDemo();
+    // Mega Mode forces reduced effects up front; returning home must release
+    // that override even if PerformanceMonitor is already at its max factor and
+    // therefore never emits a later onIncline callback.
+    if (useGameStore.getState().wormHealerMode) setPerfReducedFX(false);
     handleBackToMainMenu();
-  }, [handleExitDemo, handleBackToMainMenu]);
+  }, [handleExitDemo, handleBackToMainMenu, setPerfReducedFX]);
 
   // Warm lazy chunks, Mobi's portrait, and environment maps while the opening
   // animation plays, so nothing pops in late on slow connections. Delayed a
@@ -926,7 +930,10 @@ export default function WORM3() {
       // A 15×15 shell contains 1,178 rendered cubelets. Start it in the lighter
       // effects tier immediately instead of waiting for the frame monitor to
       // notice the drop and react several seconds into play.
-      if (wizardSettings.megaMode) useGameStore.getState().setPerfReducedFX(true);
+      // Mega owns this forced quality override. Clear it just as explicitly for
+      // ordinary Worm runs so leaving a 15×15 session cannot strand the rest of
+      // the app without shadows and volume effects.
+      useGameStore.getState().setPerfReducedFX(!!wizardSettings.megaMode);
       useGameStore.getState().initWormMode(
         undefined, undefined,
         wormParams.wormSpeed,
@@ -1313,7 +1320,13 @@ export default function WORM3() {
   // ========================================================================
   // RENDER
   // ========================================================================
-  const cameraZ = (isMobile ? { 2: 10, 3: 14, 4: 20, 5: 30, 6: 42, 7: 54 } : { 2: 8, 3: 11, 4: 16, 5: 24, 6: 34, 7: 44 })[size] || 11;
+  // Size 15 is installed before the Mobi overlay opens, so this distance also
+  // has to frame Mega Mode during its intro rather than falling back to the 3×3
+  // camera position. Mobile needs extra room for its narrower portrait viewport.
+  const cameraZ = (isMobile
+    ? { 2: 10, 3: 14, 4: 20, 5: 30, 6: 42, 7: 54, 15: 116 }
+    : { 2: 8, 3: 11, 4: 16, 5: 24, 6: 34, 7: 44, 15: 94 }
+  )[size] || 11;
   const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const introPerformanceMode = isMobile || prefersReducedMotion;
 
