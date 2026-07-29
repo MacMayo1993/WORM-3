@@ -67,8 +67,14 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (!id.includes('node_modules')) return;
-          if (id.includes('/node_modules/react/')) return 'vendor-react3d';
-          if (id.includes('/node_modules/react-dom/')) return 'vendor-react3d';
+          // React and the state layer ride in their own chunk rather than with the
+          // r3f/drei stack. Together they were one 740 KB asset — over the size
+          // guard in scripts/check-bundle-size.mjs, and the two halves have nothing
+          // to do with each other: React changes on its own release cadence, while
+          // drei is the half that actually grows as this app uses more of it.
+          if (id.includes('/node_modules/react/')) return 'vendor-react';
+          if (id.includes('/node_modules/react-dom/')) return 'vendor-react';
+          if (id.includes('/node_modules/scheduler/')) return 'vendor-react';
           if (id.includes('/node_modules/@react-three/fiber/')) return 'vendor-react3d';
           if (id.includes('/node_modules/@react-three/drei/')) return 'vendor-react3d';
           if (id.includes('/node_modules/@react-three/postprocessing/')) return 'vendor-react3d';
@@ -85,8 +91,8 @@ export default defineConfig({
           }
           if (id.includes('/node_modules/three/')) return 'vendor-three';
           if (id.includes('/node_modules/gsap/')) return 'vendor-gsap';
-          if (id.includes('/node_modules/use-sync-external-store/')) return 'vendor-react3d';
-          if (id.includes('/node_modules/zustand/')) return 'vendor-react3d';
+          if (id.includes('/node_modules/use-sync-external-store/')) return 'vendor-react';
+          if (id.includes('/node_modules/zustand/')) return 'vendor-react';
           if (id.includes('/node_modules/kociemba-wasm/')) return 'vendor-kociemba';
         },
       },
