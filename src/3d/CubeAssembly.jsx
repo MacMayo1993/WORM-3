@@ -1052,7 +1052,11 @@ const CubeAssembly = React.memo(({
                volume for a single draw call; this parent group hides it during
                tunnel transit just like the old per-cubie bodies. */
             <mesh castShadow={false} receiveShadow={false}>
-              <boxGeometry args={[size - 0.02, size - 0.02, size - 0.02]} />
+              {/* The sticker face begins 0.51 units from its cubie centre and its
+                  footprint can sink 0.0285 units (tile + perimeter offset). Keep
+                  the chassis face at 0.46 so depressed tiles remain in front of
+                  its depth buffer instead of vanishing at the start of a run. */}
+              <boxGeometry args={[size - 0.08, size - 0.08, size - 0.08]} />
               <meshStandardMaterial
                 color="#07080c"
                 roughness={0.82}
