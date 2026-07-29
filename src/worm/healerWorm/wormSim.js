@@ -46,6 +46,7 @@ import {
 } from '../wormLogic.js';
 import { liveRotation } from '../liveRotation.js';
 import { rotateTilePosition, parseTileKey, _parseTile } from '../wormHelpers.js';
+import { remapWormPress } from '../tilePressBridge.js';
 import {
     makeStepHistory, shPush, shReset,
     makeTileTrail, ttPush, ttAt, ttReset, ttMapInPlace, ttFilterInPlace,
@@ -1454,6 +1455,9 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
     };
     ttMapInPlace(sim.tileTrail, _remapTileKey);
     ttMapInPlace(sim.pathHistory, _remapTileKey);
+    // Pressure uses the same positional keys as the trail, so its displacement
+    // and velocity must ride the slice instead of rebounding in the vacated cell.
+    remapWormPress(_remapTileKey);
     restKeys.clear();
 
     // Deferred pickup + flipped-tile detection for a rest-read landing: the step

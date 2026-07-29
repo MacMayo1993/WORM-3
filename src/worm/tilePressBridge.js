@@ -103,6 +103,19 @@ export function getWormPress(gridId) {
   return gridId ? (tiles.get(gridId)?.p ?? 0) : 0;
 }
 
+/** Move every live spring through the same surface-key transform as the worm trail. */
+export function remapWormPress(remapKey) {
+  if (typeof remapKey !== 'function' || tiles.size === 0) return;
+  const moved = new Map();
+  for (const [key, entry] of tiles) {
+    const nextKey = remapKey(key);
+    const existing = moved.get(nextKey);
+    if (!existing || Math.abs(entry.p) > Math.abs(existing.p)) moved.set(nextKey, entry);
+  }
+  tiles.clear();
+  for (const [key, entry] of moved) tiles.set(key, entry);
+}
+
 /** Whether any tile is still moving — cheap enough to call per frame. */
 export function anyWormPress() {
   return tiles.size > 0;

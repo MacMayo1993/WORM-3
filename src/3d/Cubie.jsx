@@ -135,6 +135,9 @@ const Cubie = React.forwardRef(function Cubie({
     }))
   );
   const enableShadows = !perfReducedFX;
+  // Hollow's 12-beam-per-cubie representation would create more than 14,000
+  // meshes on a 15×15 shell. Mega disables that view and keeps its optimized chassis.
+  const effectiveHollowMode = hollowMode && size < 15;
   // faceColors needed locally for wireframe edge coloring
   const faceColors = useMemo(() => resolveColors(settings, settings?.biomeMode?.faceAssignment), [settings]);
 
@@ -436,7 +439,7 @@ const Cubie = React.forwardRef(function Cubie({
           <boxGeometry args={mirrorDims} />
           <meshStandardMaterial color="#c8c8c8" roughness={0.08} metalness={0.92} envMapIntensity={1.2} />
         </mesh>
-      ) : hollowMode ? (
+      ) : effectiveHollowMode ? (
         <>
           {/* Invisible hit box for pointer events */}
           <mesh onPointerDown={handleDown} visible={false}>
@@ -467,24 +470,24 @@ const Cubie = React.forwardRef(function Cubie({
       {/* LED edges for wireframe + neon (skip in hollow/mirror mode).
           All of this cubie's edges render as one segmented, vertex-colored line with a
           single pulse subscription — one draw instead of up to 12. */}
-      {showLedEdges && !hollowMode && !mirrorMode && wireframeEdges.length > 0 && (
+      {showLedEdges && !effectiveHollowMode && !mirrorMode && wireframeEdges.length > 0 && (
         <MergedLedEdges edges={wireframeEdges} />
       )}
 
       {/* Stickers — frame-shaped when hollow, solid plane otherwise; none in mirror/wireframe mode. */}
       {effectiveVisualMode !== 'wireframe' && !mirrorMode && (
         <>
-          {isEdge(position[2], (size - 1) / 2) && meta('PZ') && <StickerPlane key={stickerKey('PZ')} currentDir="PZ" surfaceTileKey={`${cubie.x},${cubie.y},${cubie.z},PZ`} meta={meta('PZ')} pos={STICKER_POS.PZ} rot={STICKER_ROT.PZ} mode={effectiveVisualMode} overlay={overlay('PZ')} faceSize={size} {...gridPos('PZ')} hollow={hollowMode} />}
-          {isEdge(position[2], -(size - 1) / 2) && meta('NZ') && <StickerPlane key={stickerKey('NZ')} currentDir="NZ" surfaceTileKey={`${cubie.x},${cubie.y},${cubie.z},NZ`} meta={meta('NZ')} pos={STICKER_POS.NZ} rot={STICKER_ROT.NZ} mode={effectiveVisualMode} overlay={overlay('NZ')} faceSize={size} {...gridPos('NZ')} hollow={hollowMode} />}
-          {isEdge(position[0], (size - 1) / 2) && meta('PX') && <StickerPlane key={stickerKey('PX')} currentDir="PX" surfaceTileKey={`${cubie.x},${cubie.y},${cubie.z},PX`} meta={meta('PX')} pos={STICKER_POS.PX} rot={STICKER_ROT.PX} mode={effectiveVisualMode} overlay={overlay('PX')} faceSize={size} {...gridPos('PX')} hollow={hollowMode} />}
-          {isEdge(position[0], -(size - 1) / 2) && meta('NX') && <StickerPlane key={stickerKey('NX')} currentDir="NX" surfaceTileKey={`${cubie.x},${cubie.y},${cubie.z},NX`} meta={meta('NX')} pos={STICKER_POS.NX} rot={STICKER_ROT.NX} mode={effectiveVisualMode} overlay={overlay('NX')} faceSize={size} {...gridPos('NX')} hollow={hollowMode} />}
-          {isEdge(position[1], (size - 1) / 2) && meta('PY') && <StickerPlane key={stickerKey('PY')} currentDir="PY" surfaceTileKey={`${cubie.x},${cubie.y},${cubie.z},PY`} meta={meta('PY')} pos={STICKER_POS.PY} rot={STICKER_ROT.PY} mode={effectiveVisualMode} overlay={overlay('PY')} faceSize={size} {...gridPos('PY')} hollow={hollowMode} />}
-          {isEdge(position[1], -(size - 1) / 2) && meta('NY') && <StickerPlane key={stickerKey('NY')} currentDir="NY" surfaceTileKey={`${cubie.x},${cubie.y},${cubie.z},NY`} meta={meta('NY')} pos={STICKER_POS.NY} rot={STICKER_ROT.NY} mode={effectiveVisualMode} overlay={overlay('NY')} faceSize={size} {...gridPos('NY')} hollow={hollowMode} />}
+          {isEdge(position[2], (size - 1) / 2) && meta('PZ') && <StickerPlane key={stickerKey('PZ')} currentDir="PZ" surfaceTileKey={`${cubie.x},${cubie.y},${cubie.z},PZ`} meta={meta('PZ')} pos={STICKER_POS.PZ} rot={STICKER_ROT.PZ} mode={effectiveVisualMode} overlay={overlay('PZ')} faceSize={size} {...gridPos('PZ')} hollow={effectiveHollowMode} />}
+          {isEdge(position[2], -(size - 1) / 2) && meta('NZ') && <StickerPlane key={stickerKey('NZ')} currentDir="NZ" surfaceTileKey={`${cubie.x},${cubie.y},${cubie.z},NZ`} meta={meta('NZ')} pos={STICKER_POS.NZ} rot={STICKER_ROT.NZ} mode={effectiveVisualMode} overlay={overlay('NZ')} faceSize={size} {...gridPos('NZ')} hollow={effectiveHollowMode} />}
+          {isEdge(position[0], (size - 1) / 2) && meta('PX') && <StickerPlane key={stickerKey('PX')} currentDir="PX" surfaceTileKey={`${cubie.x},${cubie.y},${cubie.z},PX`} meta={meta('PX')} pos={STICKER_POS.PX} rot={STICKER_ROT.PX} mode={effectiveVisualMode} overlay={overlay('PX')} faceSize={size} {...gridPos('PX')} hollow={effectiveHollowMode} />}
+          {isEdge(position[0], -(size - 1) / 2) && meta('NX') && <StickerPlane key={stickerKey('NX')} currentDir="NX" surfaceTileKey={`${cubie.x},${cubie.y},${cubie.z},NX`} meta={meta('NX')} pos={STICKER_POS.NX} rot={STICKER_ROT.NX} mode={effectiveVisualMode} overlay={overlay('NX')} faceSize={size} {...gridPos('NX')} hollow={effectiveHollowMode} />}
+          {isEdge(position[1], (size - 1) / 2) && meta('PY') && <StickerPlane key={stickerKey('PY')} currentDir="PY" surfaceTileKey={`${cubie.x},${cubie.y},${cubie.z},PY`} meta={meta('PY')} pos={STICKER_POS.PY} rot={STICKER_ROT.PY} mode={effectiveVisualMode} overlay={overlay('PY')} faceSize={size} {...gridPos('PY')} hollow={effectiveHollowMode} />}
+          {isEdge(position[1], -(size - 1) / 2) && meta('NY') && <StickerPlane key={stickerKey('NY')} currentDir="NY" surfaceTileKey={`${cubie.x},${cubie.y},${cubie.z},NY`} meta={meta('NY')} pos={STICKER_POS.NY} rot={STICKER_ROT.NY} mode={effectiveVisualMode} overlay={overlay('NY')} faceSize={size} {...gridPos('NY')} hollow={effectiveHollowMode} />}
         </>
       )}
 
       {/* Lego stud — one detailed stud on each visible face, colored by the face's current sticker */}
-      {isLego && !mirrorMode && !hollowMode && (
+      {isLego && !mirrorMode && !effectiveHollowMode && (
         <>
           {isEdge(position[2], (size - 1) / 2) && meta('PZ') && <LegoStud dir="PZ" color={getEdgeColor('PZ')} enableShadows={enableShadows} />}
           {isEdge(position[2], -(size - 1) / 2) && meta('NZ') && <LegoStud dir="NZ" color={getEdgeColor('NZ')} enableShadows={enableShadows} />}

@@ -6,6 +6,7 @@ import {
   getWormPress,
   anyWormPress,
   resetWormPress,
+  remapWormPress,
   MAX_PRESSED_TILES,
   pressedTileCount
 } from '../worm/tilePressBridge.js';
@@ -122,6 +123,14 @@ describe('tilePressBridge', () => {
     resetWormPress();
     expect(anyWormPress()).toBe(false);
     expect(getWormPress('M1-001')).toBe(0);
+  });
+
+  it('moves spring displacement and velocity with a rotating tile', () => {
+    hold('1,2,6,PZ', 0.4);
+    const before = getWormPress('1,2,6,PZ');
+    remapWormPress(key => key === '1,2,6,PZ' ? '6,2,5,PX' : key);
+    expect(getWormPress('1,2,6,PZ')).toBe(0);
+    expect(getWormPress('6,2,5,PX')).toBe(before);
   });
 
   it('publishes a colour for the lit squares', () => {
