@@ -163,17 +163,14 @@ export function tileKeyCoordAt(key, idx) {
 
 // Returns null | { type:'death' } | { type:'cut', cutTrailIdx }
 //
-// A rocket-flying worm is well above the surface, so its HEAD is treated as clear of
-// the slice however the grid coordinates read — the flight passes over the turning
-// layer. The same applies through the brief landing-grace window, so a rotation that
-// fires on the exact frame a flight touches down doesn't kill a player who had no way
-// to steer out of it. The body left on the ground is still checked in both cases, so
-// a badly timed launch can still cost you a tail.
+// Rocket overdrive makes the entire worm impenetrable. Landing grace only clears the
+// head, while still allowing the normal tail-cut behavior.
 export function checkWormHitBySlice(worm, axis, sliceIndex) {
+    if (worm.rocketActive?.current) return null;
     const head = worm.pos.current;
     const axisCoord = axis === 'col' ? 'x' : axis === 'row' ? 'y' : 'z';
     const coordIdx  = axis === 'col' ? 0 : axis === 'row' ? 1 : 2;
-    const airborne = !!worm.rocketActive?.current || (worm.landingGraceT?.current ?? 0) > 0;
+    const airborne = (worm.landingGraceT?.current ?? 0) > 0;
     const headOnSlice = head[axisCoord] === sliceIndex && !airborne;
     const trail = worm.tileTrail.current;
 

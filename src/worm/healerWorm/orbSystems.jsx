@@ -78,6 +78,8 @@ const _specialGeos = {
     glow: new THREE.SphereGeometry(0.36, 16, 12),
     // Countdown ring — scales down as the orb's lifetime runs out.
     timer: new THREE.TorusGeometry(0.34, 0.022, 8, 32),
+    rocketBeacon: new THREE.ConeGeometry(0.42, 0.72, 3, 1, true),
+    magnetField: new THREE.TorusGeometry(0.48, 0.018, 8, 40),
 };
 
 const _spPos = new THREE.Vector3();
@@ -129,7 +131,9 @@ function SpecialOrb({ special, size }) {
             ? 0.72 + 0.28 * Math.sin(t * (6 + (1 - fade) * 16))
             : 1;
         const alpha = Math.max(FADE_FLOOR, fade) * blink;
-        group.scale.setScalar(0.9 + 0.1 * Math.max(FADE_FLOOR, fade));
+        // Specials are deliberately much larger than parity gems. Their silhouettes,
+        // not a shared glowing sphere, should be the first thing the player reads.
+        group.scale.setScalar(1.28 + 0.12 * Math.max(FADE_FLOOR, fade));
         group.traverse((o) => {
             if (o.material && o.material.transparent) o.material.opacity = (o.userData.baseOpacity ?? 1) * alpha;
         });
@@ -201,6 +205,25 @@ function SpecialOrb({ special, size }) {
                     </>
                 )}
             </group>
+
+            {special.type === 'rocket' ? (
+                /* Tall triangular exhaust beacon: points along the rocket and cannot
+                   be confused with the round orbit rings on parity orbs. */
+                <mesh geometry={_specialGeos.rocketBeacon} position={[0, -0.36, 0]} rotation={[0, 0, Math.PI]} ref={tag(0.34)}>
+                    <meshBasicMaterial color="#ff5a16" transparent opacity={0.34} wireframe depthWrite={false} toneMapped={false} />
+                </mesh>
+            ) : (
+                /* Two perpendicular cyan field loops give the magnet a wide, unmistakable
+                   crosshair footprint instead of another compact floating gem. */
+                <group>
+                    <mesh geometry={_specialGeos.magnetField} rotation={[Math.PI / 2, 0, 0]} ref={tag(0.55)}>
+                        <meshBasicMaterial color={look.color} transparent opacity={0.55} depthWrite={false} toneMapped={false} />
+                    </mesh>
+                    <mesh geometry={_specialGeos.magnetField} rotation={[0, Math.PI / 2, 0]} ref={tag(0.4)}>
+                        <meshBasicMaterial color={look.accent} transparent opacity={0.4} depthWrite={false} toneMapped={false} />
+                    </mesh>
+                </group>
+            )}
 
             {/* Lifetime ring — shrinks toward the orb as its time runs out. */}
             <mesh ref={timerRef} geometry={_specialGeos.timer} rotation={[Math.PI / 2, 0, 0]}>
