@@ -51,7 +51,14 @@ import { BODY_BALL_SPACING } from './healerWorm/constants.js';
 // covers as many of them as its length reaches — the same span the self-collision
 // check walks. Each covered tile is pressed, hardest under the head, so the dent
 // tapers off down the body instead of every tile carrying the full weight.
-const PRESS_TAIL_FALLOFF = 0.55; // tail-end tiles press at (1 − this) of the head's
+//
+// Gentle on purpose. At 0.55 the tail end sank to less than half depth, and since
+// the tile's light is gated on contact it left a line of touched tiles visibly
+// lighting to different degrees — the worm looked like it was pressing some tiles
+// and merely brushing others. The taper is now enough to feel the weight fall off
+// toward the tail, and not enough to split the lit path into strong and weak
+// halves.
+const PRESS_TAIL_FALLOFF = 0.22; // tail-end tiles press at (1 − this) of the head's
 
 // Cached so the skin's colour is only looked up when the player actually changes it.
 let _pressSkinId = null;

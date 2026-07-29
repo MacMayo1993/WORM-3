@@ -406,6 +406,77 @@ describe('applyRotationToSim', () => {
     expect(rotated.dirKey).not.toBe(undefined);
   });
 
+  it('carries a pending heal through the turn, so it heals the pair it traversed', () => {
+    // The heal is applied by GRID POSITION at the end of the wind-out spiral, and a
+    // hazard turn can land in that window. Left behind, it resets two bystander
+    // tiles to unflipped instead of the pair the worm actually went through — and a
+    // bystander that was half of another wormhole is orphaned from its partner,
+    // after which the two ends' flip counts drift and the orphan can be re-flipped
+    // over and over until it hits the cap and is permanently dead.
+    const sim = makeSim();
+    const ctx = makeCtx();
+    const tunnel = {
+      entry: { x: 0, y: 1, z: 2, dirKey: 'PZ' },
+      exit: { x: 2, y: 1, z: 0, dirKey: 'NZ' },
+    };
+    sim.activeTunnel = tunnel;
+    sim.pendingTunnelHeal = { tunnel, stableKey: 'PZ-0-1-2', tunnelKey: 'k' };
+
+    applyRotationToSim(sim, SIZE, ctx, { axis: 'depth', sliceIndex: 2, dir: 1 }, {
+      inOpeningScramble: false,
+      paused: false,
+    });
+
+    // The entry tile rode the z=2 slice; the pending heal must point at where it
+    // landed, which is exactly where the active tunnel now points.
+    expect(sim.pendingTunnelHeal.tunnel.entry).toEqual(sim.activeTunnel.entry);
+    expect(sim.pendingTunnelHeal.tunnel.entry).not.toEqual(tunnel.entry);
+    // …and the far endpoint, which sat outside the slice, must NOT have moved.
+    expect(sim.pendingTunnelHeal.tunnel.exit).toEqual(tunnel.exit);
+  });
+
+  it('rotates a pending heal that no longer aliases the active tunnel', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    sim.activeTunnel = null;
+    sim.pendingTunnelHeal = {
+      tunnel: { entry: { x: 0, y: 1, z: 2, dirKey: 'PZ' }, exit: { x: 2, y: 1, z: 0, dirKey: 'NZ' } },
+      stableKey: 'PZ-0-1-2',
+      tunnelKey: 'k',
+    };
+    applyRotationToSim(sim, SIZE, ctx, { axis: 'depth', sliceIndex: 2, dir: 1 }, {
+      inOpeningScramble: false,
+      paused: false,
+    });
+    expect(sim.pendingTunnelHeal.tunnel.entry).not.toEqual({ x: 0, y: 1, z: 2, dirKey: 'PZ' });
+  });
+
+  it('carries an armed void kill\'s exit tile through the turn', () => {
+    // The collapse fires once the head steps OFF the exit tile; comparing against a
+    // slot the exit no longer occupies fires it a step early or late.
+    const sim = makeSim();
+    const ctx = makeCtx();
+    sim.pendingVoidKill = { tunnelKey: 'k', exitTileKey: tileKey({ x: 0, y: 1, z: 2, dirKey: 'PZ' }), armed: true };
+    applyRotationToSim(sim, SIZE, ctx, { axis: 'depth', sliceIndex: 2, dir: 1 }, {
+      inOpeningScramble: false,
+      paused: false,
+    });
+    expect(sim.pendingVoidKill.exitTileKey).not.toBe(tileKey({ x: 0, y: 1, z: 2, dirKey: 'PZ' }));
+    expect(sim.pendingVoidKill.armed).toBe(true);
+  });
+
+  it('leaves an armed void kill alone when its exit tile was not in the slice', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    const key = tileKey({ x: 0, y: 1, z: 0, dirKey: 'NZ' });
+    sim.pendingVoidKill = { tunnelKey: 'k', exitTileKey: key, armed: true };
+    applyRotationToSim(sim, SIZE, ctx, { axis: 'depth', sliceIndex: 2, dir: 1 }, {
+      inOpeningScramble: false,
+      paused: false,
+    });
+    expect(sim.pendingVoidKill.exitTileKey).toBe(key);
+  });
+
   it('preserves the pre-game heading during the opening scramble', () => {
     const sim = makeSim();
     const ctx = makeCtx();
