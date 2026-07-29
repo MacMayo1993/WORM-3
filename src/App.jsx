@@ -644,8 +644,12 @@ export default function WORM3() {
   // (neon / desert / topographic) stayed on the device.
   const handleHomeFromGame = useCallback(() => {
     if (useGameStore.getState().demoMode) handleExitDemo();
+    // Mega Mode forces reduced effects up front; returning home must release
+    // that override even if PerformanceMonitor is already at its max factor and
+    // therefore never emits a later onIncline callback.
+    if (useGameStore.getState().wormHealerMode) setPerfReducedFX(false);
     handleBackToMainMenu();
-  }, [handleExitDemo, handleBackToMainMenu]);
+  }, [handleExitDemo, handleBackToMainMenu, setPerfReducedFX]);
 
   // Warm lazy chunks, Mobi's portrait, and environment maps while the opening
   // animation plays, so nothing pops in late on slow connections. Delayed a
@@ -899,16 +903,27 @@ export default function WORM3() {
 
     // Switch to game scene (showMainMenu already false), reset cube so it's
     // visible and styled before the worm gameplay starts.
-    const targetSize = wizardSettings.cubeSize || 3;
+    // Mega Mode is the dedicated 15×15 Worm preset. Keep the explicit mode flag
+    // authoritative so future wizard changes cannot accidentally launch it on
+    // the last ordinary slider value.
+    const targetSize = wizardSettings.megaMode ? 15 : (wizardSettings.cubeSize || 3);
+    // Establish the Mega quality tier before mounting the new cube. Waiting for
+    // Mobi completion means the entire intro pays for full-size effects, and New
+    // Game can re-enter the wizard with size 15 still mounted.
+    useGameStore.getState().setPerfReducedFX(!!wizardSettings.megaMode);
     if (targetSize !== size) {
       changeSize(targetSize);
     } else {
       reset();
     }
 
+    // Keep the same orb density as a normal large Worm board. A 15×15 face has
+    // roughly 4.6× the area of a 7×7 face, so using the unscaled wizard count
+    // makes Mega Mode feel almost empty.
+    const megaAreaScale = wizardSettings.megaMode ? (15 * 15) / (7 * 7) : 1;
     const wormParams = {
       wormSpeed: wizardSettings.wormSpeed ?? 1.0,
-      wormOrbCount: wizardSettings.wormOrbCount ?? 5,
+      wormOrbCount: Math.round((wizardSettings.wormOrbCount ?? 5) * megaAreaScale),
       wormholeInterval: wizardSettings.wormholeInterval ?? 10,
       wormColor: wizardSettings.wormColor ?? '#33ff66',
     };
@@ -1302,7 +1317,13 @@ export default function WORM3() {
   // ========================================================================
   // RENDER
   // ========================================================================
-  const cameraZ = (isMobile ? { 2: 10, 3: 14, 4: 20, 5: 30, 6: 42, 7: 54 } : { 2: 8, 3: 11, 4: 16, 5: 24, 6: 34, 7: 44 })[size] || 11;
+  // Size 15 is installed before the Mobi overlay opens, so this distance also
+  // has to frame Mega Mode during its intro rather than falling back to the 3×3
+  // camera position. Mobile needs extra room for its narrower portrait viewport.
+  const cameraZ = (isMobile
+    ? { 2: 10, 3: 14, 4: 20, 5: 30, 6: 42, 7: 54, 15: 116 }
+    : { 2: 8, 3: 11, 4: 16, 5: 24, 6: 34, 7: 44, 15: 94 }
+  )[size] || 11;
   const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const introPerformanceMode = isMobile || prefersReducedMotion;
 

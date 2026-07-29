@@ -899,10 +899,11 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // hazard fx start running without waiting for a flip event.
   useEffect(() => {
     const key = stickerGridIdRef.current;
-    registerSticker(key, (state, delta) => tickImplRef.current?.(state, delta));
+    const tickSticker = (state, delta) => tickImplRef.current?.(state, delta);
+    registerSticker(key, tickSticker);
     const hasFlipsAtMount = (meta?.flips ?? 0) > 0;
     if (hasFlipsAtMount && meta?.curr !== meta?.orig) activateSticker(key);
-    return () => unregisterSticker(key);
+    return () => unregisterSticker(key, tickSticker);
   }, []);
 
   // Death rank from Disparity Mode — null if not in disparity game or tile not yet dead

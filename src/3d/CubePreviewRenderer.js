@@ -234,7 +234,13 @@ function renderToCanvas(opts, time, targetCanvas) {
   const size = targetCanvas.width;
   if (!size) return;
 
-  const n = Math.max(2, Math.min(7, Math.round(opts.size || 3)));
+  // The setup preview is deliberately representative for Mega Mode. Building a
+  // literal 15×15 rig here creates 1,350 independent sticker meshes and redraws
+  // them at 24 FPS while the player is still in the wizard — often more expensive
+  // than the optimized game scene itself. A 7×7 proxy preserves the selected
+  // palette/style and large-cube read without that transition-screen GPU spike.
+  const requestedN = Math.max(2, Math.round(opts.size || 3));
+  const n = Math.min(7, requestedN);
   if (!rig || rig.n !== n) {
     _disposeRig();
     rig = _buildRig(n);
