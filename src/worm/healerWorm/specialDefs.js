@@ -21,7 +21,7 @@ export const SPECIAL_DEFS = {
     iconPath: 'M12 1.5c2.9 2.6 4.4 6.2 4.4 9.7v4.3l2.1 3.2h-4.3L12 22l-2.2-3.3H5.5l2.1-3.2v-4.3c0-3.5 1.5-7.1 4.4-9.7z',
     // Cockpit dot, drawn in the accent colour.
     iconAccent: 'M12 8.6a2 2 0 1 1 0 4 2 2 0 0 1 0-4z',
-    description: 'Launches the worm over five tiles, clearing its own body and any turning slice.',
+    description: 'Doubles your current speed for three seconds; fire marks immunity to collisions and wormholes.',
   },
   magnet: {
     label: 'MAGNET',
