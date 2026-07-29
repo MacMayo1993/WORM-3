@@ -55,6 +55,10 @@ export function RocketTailFire({ worm }) {
         if (!active) return;
 
         const history = worm.stepHistory.current;
+        if (history.count < 2) {
+            group.visible = false;
+            return;
+        }
         const tailSteps = Math.min(history.count - 1, Math.max(0, Math.round(worm.tailLength.current * BODY_BALL_SPACING * STEPS_PER_TILE)));
         const tail = shAt(history, tailSteps);
         const inner = shAt(history, Math.max(0, tailSteps - 4));
