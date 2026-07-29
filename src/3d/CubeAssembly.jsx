@@ -304,6 +304,27 @@ const CubeAssembly = React.memo(({
     if (controlsRef.current) controlsRef.current.enabled = false;
   }, []);
 
+  // Mega replaces 1,178 individual body meshes with one chassis. Convert a hit
+  // on that box back into the same grid coordinate a Cubie would have supplied,
+  // retaining tile taps and slice drags without rebuilding per-cubie hit meshes.
+  const onMegaChassisPointerDown = useCallback((event) => {
+    if (!cubeGroupRef.current || !event.point || !event.face?.normal) return;
+    const s = sizeRef.current;
+    const k = (s - 1) / 2;
+    const local = cubeGroupRef.current.worldToLocal(event.point.clone());
+    const clampIndex = value => Math.max(0, Math.min(s - 1, Math.round(value + k)));
+    const pos = {
+      x: clampIndex(local.x),
+      y: clampIndex(local.y),
+      z: clampIndex(local.z),
+    };
+    const n = event.face.normal;
+    if (Math.abs(n.x) > 0.5) pos.x = n.x > 0 ? s - 1 : 0;
+    else if (Math.abs(n.y) > 0.5) pos.y = n.y > 0 ? s - 1 : 0;
+    else pos.z = n.z > 0 ? s - 1 : 0;
+    onPointerDown({ pos, worldPos: event.point, event });
+  }, [onPointerDown]);
+
 
   // Set up global move/up listeners once - use refs for immediate access
   useEffect(() => {
@@ -1053,20 +1074,21 @@ const CubeAssembly = React.memo(({
                tunnel transit just like the old per-cubie bodies. This is keyed
                to size—not the delayed Worm flag—so the Mobi intro and New Game
                wizard never build the expensive body shell first. */
-            <mesh castShadow={false} receiveShadow={false}>
+            <mesh
+              castShadow={false}
+              receiveShadow={false}
+              onPointerDown={onMegaChassisPointerDown}
+            >
               {/* The sticker face begins 0.51 units from its cubie centre and its
                   footprint can sink 0.0285 units (tile + perimeter offset). Keep
                   the chassis face at 0.46 so depressed tiles remain in front of
                   its depth buffer instead of vanishing at the start of a run. */}
               <boxGeometry args={[size - 0.08, size - 0.08, size - 0.08]} />
-              <meshStandardMaterial
-                color="#07080c"
-                roughness={0.82}
-                metalness={0.08}
-                transparent
-                opacity={0.92}
-                depthWrite
-              />
+              {/* Unlit + opaque is intentional: this is the Rubik's-cube plastic
+                  visible in the grid channels, not another shaded face. Ambient
+                  light and background bleed made the previous transparent standard
+                  material read gray and erased the black cubie perimeter. */}
+              <meshBasicMaterial color="#000000" />
             </mesh>
           )}
           {!isBiomeMode && cascades.map(c =>

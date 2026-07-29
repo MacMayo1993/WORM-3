@@ -526,6 +526,17 @@ function cubiePropsAreEqual(prev, next) {
     if (ps === ns) continue;
     if (!ps || !ns) return false;
     if (ps.curr !== ns.curr || ps.flips !== ns.flips) return false;
+    // Two same-colour stickers can exchange grid slots during a rotation. Their
+    // visible state is identical, but their animation registration and manifold
+    // identity are not. Treating them as equal strands StickerPlane with stale
+    // metadata/surface wiring, so Worm pressure wakes a callback in a different
+    // slot and apparently random body tiles stay flat and dark.
+    if (ps.orig !== ns.orig || ps.origDir !== ns.origDir) return false;
+    if (
+      ps.origPos?.x !== ns.origPos?.x ||
+      ps.origPos?.y !== ns.origPos?.y ||
+      ps.origPos?.z !== ns.origPos?.z
+    ) return false;
   }
   return true;
 }
