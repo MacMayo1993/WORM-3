@@ -11,6 +11,7 @@ import { resolveBet, calcPayout, speedThresholdFor } from '../utils/disparityBet
 import { DISPARITY_GAME_LENGTHS } from '../utils/economyConstants.js';
 import { makeCubies } from '../game/cubeState.js';
 import { vibrate } from '../utils/audio.js';
+import { resolveWizardTileStyles } from '../utils/wizardTileStyles.js';
 
 export function useDisparityGame({
   settings,
@@ -199,18 +200,7 @@ export function useDisparityGame({
     if (wizardSettings.flipCap != null) useGameStore.getState().setDisparityFlipCap(wizardSettings.flipCap);
     if (wizardSettings.gameLength != null) useGameStore.getState().setDisparityGameLength(wizardSettings.gameLength);
 
-    const _allStyles = ['solid', 'glossy', 'matte', 'metallic', 'carbonFiber', 'hexGrid', 'comic', 'cafeWall', 'hermanGrid', 'opticSpin', 'ouchi', 'scintillatingGrid', 'zoellner', 'kanizsa', 'grass', 'ice', 'sand', 'water', 'wood', 'circuit', 'holographic', 'pulse', 'lava', 'galaxy', 'neural'];
-    const manifoldStyles = {};
-    [1, 2, 3, 4, 5, 6].forEach((id) => {
-      const perFace = wizardSettings.perFaceStyles?.[id];
-      if (perFace && perFace !== 'random') {
-        manifoldStyles[id] = perFace;
-      } else if (wizardSettings.tileStyle === 'random' || perFace === 'random') {
-        manifoldStyles[id] = _allStyles[Math.floor(Math.random() * _allStyles.length)];
-      } else {
-        manifoldStyles[id] = wizardSettings.tileStyle || 'solid';
-      }
-    });
+    const manifoldStyles = resolveWizardTileStyles(wizardSettings);
 
     const newSettings = {
       ...settings,

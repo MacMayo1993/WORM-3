@@ -18,6 +18,7 @@
 import * as THREE from 'three';
 import { getTileStyleMaterial, sharedUniforms } from './styles/TileStyleMaterials.jsx';
 import { COLOR_SCHEMES } from '../utils/colorSchemes.js';
+import { ALL_TILE_STYLE_KEYS } from '../utils/tileStyleCatalog.js';
 
 // ─── Cube geometry constants ─────────────────────────────────────────────────
 // The preview cube is normalised to one unit across whatever its piece count, so
@@ -43,16 +44,6 @@ const FACES = [
 // tile styles bake the partner colour into their material, so the preview has to
 // pass the same pairing the played cube uses or the op-art reads wrong.
 const ANTIPODE = { 1: 4, 2: 5, 3: 6, 4: 1, 5: 2, 6: 3 };
-
-// Styles offered when the player picked "Random Mix". The played cube draws from
-// this same pool (see useDisparityGame); the preview picks deterministically per
-// face so the plate doesn't reshuffle itself on every re-render.
-const RANDOM_POOL = [
-  'solid', 'glossy', 'matte', 'metallic', 'carbonFiber', 'hexGrid', 'comic',
-  'cafeWall', 'hermanGrid', 'opticSpin', 'ouchi', 'scintillatingGrid',
-  'grass', 'ice', 'sand', 'water', 'wood', 'circuit', 'holographic', 'pulse',
-  'lava', 'galaxy', 'neural'
-];
 
 // ─── Renderer state ───────────────────────────────────────────────────────────
 
@@ -179,7 +170,7 @@ function _bufferFor(size, ctx) {
 
 /** Deterministic style for a face under "Random Mix" — stable across renders. */
 function _randomStyleFor(faceId) {
-  return RANDOM_POOL[(faceId * 7 + 3) % RANDOM_POOL.length];
+  return ALL_TILE_STYLE_KEYS[(faceId * 7 + 3) % ALL_TILE_STYLE_KEYS.length];
 }
 
 /** The style a given face should wear, honouring per-face overrides and Random Mix. */
