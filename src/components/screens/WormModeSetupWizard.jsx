@@ -15,11 +15,16 @@ import WormPreviewCanvas from '../../3d/WormPreviewCanvas.jsx';
 import {
   useWizardCosmetics, WizardImageInput,
   SceneStep, PaletteStep, StyleStep, SizeStep,
-  SpecimenPlate, LockPip, PickerHeading
+  SpecimenPlate, LockPip, PickerHeading, SIZE_TIERS
 } from './wizardSteps/index.jsx';
 
 const ACCENT = '#6A2C91';
 const ACCENT_SHADOW = '#3d1854';
+const MEGA_CUBE_SIZE = 15;
+const WORM_SIZE_TIERS = [
+  ...SIZE_TIERS.map(tier => tier.n === 6 ? { ...tier, tag: 'Giant' } : tier),
+  { n: MEGA_CUBE_SIZE, name: '15×15×15', tag: 'Mega', desc: '1,350 stickers of mayhem' }
+];
 
 const S = wizardLayout(ACCENT, ACCENT_SHADOW);
 
@@ -63,7 +68,11 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
 
   const handleNext = () => {
     if (step < STEPS.length - 1) setStep(step + 1);
-    else onComplete({ ...settings, cubeSize: cos.cubeSize });
+    else onComplete({
+      ...settings,
+      cubeSize: cos.cubeSize,
+      megaMode: cos.cubeSize === MEGA_CUBE_SIZE
+    });
   };
   const handleBack = () => (step > 0 ? setStep(step - 1) : onCancel());
 
@@ -330,7 +339,37 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     <PaletteStep key="palette" cos={cos} />,
     <StyleStep key="style" cos={cos} />,
     renderGameplay(),
-    <SizeStep key="size" cos={cos} />
+    <div key="size">
+      <SizeStep cos={cos} tiers={WORM_SIZE_TIERS} />
+      <button
+        type="button"
+        aria-pressed={cos.cubeSize === MEGA_CUBE_SIZE}
+        onClick={() => cos.setCubeSize(MEGA_CUBE_SIZE)}
+        style={{
+          width: '100%', marginTop: '10px', padding: '15px 18px', borderRadius: '12px',
+          border: cos.cubeSize === MEGA_CUBE_SIZE ? `2px solid ${ACCENT}` : `2px solid ${ACCENT}77`,
+          background: cos.cubeSize === MEGA_CUBE_SIZE
+            ? `linear-gradient(135deg, ${ACCENT}, #9b4dca)`
+            : `linear-gradient(135deg, ${ACCENT}12, ${ACCENT}24)`,
+          color: cos.cubeSize === MEGA_CUBE_SIZE ? '#fff' : ACCENT,
+          boxShadow: cos.cubeSize === MEGA_CUBE_SIZE
+            ? `0 4px 0 ${ACCENT_SHADOW}, 0 8px 20px ${ACCENT}44`
+            : `0 3px 0 ${ACCENT}33`,
+          cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.18s ease',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px'
+        }}
+      >
+        <span style={{ fontSize: '14px', fontWeight: 900, letterSpacing: '0.12em' }}>MEGA MODE</span>
+        <span style={{ fontSize: '11px', fontWeight: 700, opacity: 0.85 }}>
+          {cos.cubeSize === MEGA_CUBE_SIZE ? '15×15×15 selected' : 'Play on 15×15×15'}
+        </span>
+      </button>
+      {cos.cubeSize === MEGA_CUBE_SIZE && (
+        <p style={{ margin: '9px 4px 0', fontSize: '10px', color: PAPER_TEXT_MUTED, lineHeight: 1.45 }}>
+          Mega Mode automatically scales orb density to fill the larger surface and uses optimized effects for smoother play.
+        </p>
+      )}
+    </div>
   ];
 
   return (
