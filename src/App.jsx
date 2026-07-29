@@ -521,6 +521,22 @@ export default function WORM3() {
   // instead of only being gated by a static cube-size threshold.
   const [dpr, setDpr] = useState([1, 1.5]);
   const setPerfReducedFX = useGameStore((s) => s.setPerfReducedFX);
+  // PerformanceMonitor owns the adaptive decision; Mega is a separate temporary
+  // override layered on top. Keeping both sources distinct prevents an ordinary
+  // Worm setup from clearing a sustained low-FPS decision when the monitor stays
+  // at its current factor and has no reason to emit another callback.
+  const adaptiveReducedFXRef = useRef(false);
+  const megaReducedFXOverrideRef = useRef(false);
+  const handlePerformanceDecline = useCallback(() => {
+    adaptiveReducedFXRef.current = true;
+    setDpr([0.75, 1]);
+    setPerfReducedFX(true);
+  }, [setPerfReducedFX]);
+  const handlePerformanceIncline = useCallback(() => {
+    adaptiveReducedFXRef.current = false;
+    setDpr([1, 1.5]);
+    setPerfReducedFX(megaReducedFXOverrideRef.current);
+  }, [setPerfReducedFX]);
 
   const { wormHealerMode, wormPhase } = useGameStore(useShallow((s) => ({
     wormHealerMode: s.wormHealerMode,
@@ -647,7 +663,10 @@ export default function WORM3() {
     // Mega Mode forces reduced effects up front; returning home must release
     // that override even if PerformanceMonitor is already at its max factor and
     // therefore never emits a later onIncline callback.
-    if (useGameStore.getState().wormHealerMode) setPerfReducedFX(false);
+    if (useGameStore.getState().wormHealerMode && megaReducedFXOverrideRef.current) {
+      megaReducedFXOverrideRef.current = false;
+      setPerfReducedFX(adaptiveReducedFXRef.current);
+    }
     handleBackToMainMenu();
   }, [handleExitDemo, handleBackToMainMenu, setPerfReducedFX]);
 
@@ -910,7 +929,10 @@ export default function WORM3() {
     // Establish the Mega quality tier before mounting the new cube. Waiting for
     // Mobi completion means the entire intro pays for full-size effects, and New
     // Game can re-enter the wizard with size 15 still mounted.
-    useGameStore.getState().setPerfReducedFX(!!wizardSettings.megaMode);
+    megaReducedFXOverrideRef.current = !!wizardSettings.megaMode;
+    useGameStore.getState().setPerfReducedFX(
+      adaptiveReducedFXRef.current || megaReducedFXOverrideRef.current
+    );
     if (targetSize !== size) {
       changeSize(targetSize);
     } else {
@@ -1402,8 +1424,8 @@ export default function WORM3() {
           frameloop={pageHidden ? 'never' : 'always'}
         >
           <PerformanceMonitor
-            onDecline={() => { setDpr([0.75, 1]); setPerfReducedFX(true); }}
-            onIncline={() => { setDpr([1, 1.5]); setPerfReducedFX(false); }}
+            onDecline={handlePerformanceDecline}
+            onIncline={handlePerformanceIncline}
           />
           <ClockContinuity paused={pageHidden} />
           <CameraManager showWelcome={showWelcome} showMainMenu={showMainMenu} cameraZ={cameraZ} />

@@ -1059,14 +1059,11 @@ const CubeAssembly = React.memo(({
                   the chassis face at 0.46 so depressed tiles remain in front of
                   its depth buffer instead of vanishing at the start of a run. */}
               <boxGeometry args={[size - 0.08, size - 0.08, size - 0.08]} />
-              <meshStandardMaterial
-                color="#07080c"
-                roughness={0.82}
-                metalness={0.08}
-                transparent
-                opacity={0.92}
-                depthWrite
-              />
+              {/* Unlit + opaque is intentional: this is the Rubik's-cube plastic
+                  visible in the grid channels, not another shaded face. Ambient
+                  light and background bleed made the previous transparent standard
+                  material read gray and erased the black cubie perimeter. */}
+              <meshBasicMaterial color="#000000" />
             </mesh>
           )}
           {!isBiomeMode && cascades.map(c =>
