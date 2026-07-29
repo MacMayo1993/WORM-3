@@ -161,10 +161,17 @@ const CubeAssembly = React.memo(({
   // so it's immune to floating-point drift from incremental rotations.
   const sliceIndicesRef = useRef(null);
 
-  // Mega Mode only: the chassis box beneath the rotating band spins in lock-step
-  // with the slice so the swept side-stickers always stay in front of their black
-  // backing. Its quaternion is written every frame by the priority -1 useFrame.
-  const megaBandRef = useRef(null);
+  // Mega Mode only: the chassis boxes beneath each rotating plane spin in lock-step
+  // with that plane (in ITS own direction — the two hazard planes turn opposite
+  // ways) so the swept side-stickers always stay in front of their black backing.
+  // One group ref per rotating plane; their quaternions are written every frame by
+  // the priority -1 useFrame. megaChassisRef mirrors the current chassis descriptor
+  // so that frame loop can read the per-band directions without a stale closure.
+  const megaBandRefs = useRef([]);
+  const megaChassisRef = useRef(null);
+  // Per-cubie-index turn direction for the active animation (a slice pair can turn
+  // its two planes in opposite directions), built alongside sliceIndicesRef.
+  const sliceDirByIdxRef = useRef(null);
 
   const getBasis = () => {
     camera.getWorldDirection(_basisF).normalize();
@@ -790,15 +797,15 @@ const CubeAssembly = React.memo(({
     const isHands = handsModeRef.current;
     const isShuffle = !!animState?.isShuffle;
     const isWormScramble = !!animState?.wormScramble;
-    // The worm-mode opening scramble plays at the exact same speed/ease as a normal
-    // in-game turn (not the snappy hands/shuffle speed), so each move reads clearly
-    // instead of blurring past.
-    const isFast = (isHands || isShuffle) && !isWormScramble;
+    // The worm-mode opening scramble now plays fast (like hands/shuffle): 20 parallel
+    // pair-moves would drag if each ran at full in-game turn length, so they snap
+    // through crisply to get the player into the game sooner.
+    const isFast = isHands || isShuffle;
     // Worm-mode hazard rotations (the auto inverse-turns that grind through the worm)
-    // run far slower than a normal turn so the slice menacingly creeps through instead
+    // run far slower than a normal turn so the planes menacingly creep through instead
     // of snapping — the slow execution itself is the "looming danger" payoff after the
-    // warning beam counts down. The opening scramble and normal cube solving keep
-    // their standard timing.
+    // warning beam counts down. Only the live hazard turns qualify (not the fast
+    // opening scramble, not normal solving).
     const isWormHazard = !isFast && !isWormScramble && useGameStore.getState().wormHealerMode;
     const baseDuration = isFast ? 0.12 : 0.35;
     gsapAnimRef.current = gsap.to(animProgressRef.current, {
@@ -958,49 +965,62 @@ const CubeAssembly = React.memo(({
 
     const { axis, dir, sliceIndex } = animState;
     const animatedSlices = animState.sliceIndices?.length ? animState.sliceIndices : [sliceIndex];
+    // Per-plane directions (parallel to animatedSlices). A worm hazard turn spins two
+    // non-adjacent planes in OPPOSITE directions, so each cubie must rotate by its own
+    // plane's direction rather than a single shared `dir`.
+    const animatedDirs = animState.sliceDirs?.length ? animState.sliceDirs : animatedSlices.map(() => dir);
     const worldAxis = axis === 'col' ? _axisCol : axis === 'row' ? _axisRow : _axisDepth;
 
-    // On animation start, pre-compute which ref indices are in the slice
+    // On animation start, pre-compute each in-slice ref index → its plane direction.
     if (!sliceIndicesRef.current) {
       const indices = new Set();
+      const dirByIdx = new Map();
       const n = size * size * size;
       for (let idx = 0; idx < n; idx++) {
         const z = idx % size;
         const y = Math.floor(idx / size) % size;
         const x = Math.floor(idx / (size * size));
         const coord = axis === 'col' ? x : axis === 'row' ? y : z;
-        const inSlice = animatedSlices.includes(coord);
-        if (inSlice) indices.add(idx);
+        const li = animatedSlices.indexOf(coord);
+        if (li !== -1) { indices.add(idx); dirByIdx.set(idx, animatedDirs[li]); }
       }
       sliceIndicesRef.current = indices;
+      sliceDirByIdxRef.current = dirByIdx;
     }
 
     // Calculate incremental rotation from GSAP progress
     const currentProgress = animProgressRef.current.value;
     const animTurns = animState.numTurns ?? 1;
     const quarterTurns = (Math.PI / 2) * animTurns;
+    const baseAngle = currentProgress * quarterTurns; // unsigned; each plane applies its own sign
     liveRotation.active = true;
     liveRotation.axis = axis;
     liveRotation.sliceIndex = sliceIndex;
-    liveRotation.angle = currentProgress * quarterTurns * dir;
-    // Mega: spin the band chassis with the slice (same axis, same total angle) so
-    // it backs the rotating tiles instead of the static full box occluding them.
-    if (megaBandRef.current) {
-      megaBandRef.current.quaternion.setFromAxisAngle(worldAxis, liveRotation.angle);
+    liveRotation.angle = baseAngle * dir; // anchor plane's signed angle (the one the worm rides)
+    // Mega: spin each band chassis with its own plane so it backs the rotating tiles
+    // (in the right direction) instead of the static full box occluding them.
+    const mc = megaChassisRef.current;
+    if (mc && !mc.rest && mc.bands) {
+      for (let bi = 0; bi < mc.bands.length; bi++) {
+        const bg = megaBandRefs.current[bi];
+        if (bg) bg.quaternion.setFromAxisAngle(worldAxis, baseAngle * mc.bands[bi].dir);
+      }
     }
     const deltaProgress = currentProgress - prevProgressRef.current;
     prevProgressRef.current = currentProgress;
 
     const dRot = deltaProgress * quarterTurns;
 
-    // Apply rotation only to cubies in the slice (avoid iterating all 125 to skip 88%)
+    // Apply rotation only to cubies in the slice, each by its own plane direction.
     const sliceSet = sliceIndicesRef.current;
+    const dirByIdx = sliceDirByIdxRef.current;
     if (sliceSet && Math.abs(dRot) > 0.0001) {
       sliceSet.forEach(idx => {
         const g = cubieRefs.current[idx];
         if (!g) return;
-        g.position.applyAxisAngle(worldAxis, dRot * dir);
-        g.rotateOnWorldAxis(worldAxis, dRot * dir);
+        const sdir = dirByIdx?.get(idx) ?? dir;
+        g.position.applyAxisAngle(worldAxis, dRot * sdir);
+        g.rotateOnWorldAxis(worldAxis, dRot * sdir);
       });
     }
   }, -1);
@@ -1046,6 +1066,7 @@ const CubeAssembly = React.memo(({
   useLayoutEffect(() => {
     if (!animState) {
       sliceIndicesRef.current = null;
+      sliceDirByIdxRef.current = null;
       // Reduce explosion distance by 15% for larger cubes (4x4, 5x5)
       const explosionMultiplier = size >= 4 ? 1.53 : 1.8;
       const expansionFactor = 1 + explosionFactor * explosionMultiplier;
@@ -1079,12 +1100,9 @@ const CubeAssembly = React.memo(({
     if (!animState) return { rest: true, full };
     const axisI = animState.axis === 'col' ? 0 : animState.axis === 'row' ? 1 : 2;
     const k = (size - 1) / 2;
-    const slices = animState.sliceIndices?.length ? animState.sliceIndices : [animState.sliceIndex];
-    const lo = Math.min(...slices);
-    const hi = Math.max(...slices);
-    const bandLo = lo - k - 0.5;   // band spans the rotating slice(s) along the axis
-    const bandHi = hi - k + 0.5;
-    // Build an [x,y,z] size + centre pair for a slab that is `full` on the two
+    const layers = animState.sliceIndices?.length ? animState.sliceIndices : [animState.sliceIndex];
+    const dirs = animState.sliceDirs?.length ? animState.sliceDirs : layers.map(() => animState.dir);
+    // Build an [x,y,z] size + centre pair for a box that is `full` on the two
     // perpendicular axes and [from..to] along the rotation axis.
     const boxAlong = (from, to) => {
       const args = [full, full, full];
@@ -1093,14 +1111,28 @@ const CubeAssembly = React.memo(({
       pos[axisI] = (from + to) / 2;
       return { args, pos };
     };
-    return {
-      rest: false,
-      axisI,
-      band: boxAlong(bandLo, bandHi),
-      slabLo: bandLo > -half ? boxAlong(-half, bandLo) : null,
-      slabHi: bandHi < half ? boxAlong(bandHi, half) : null,
-    };
+    // Each rotating plane gets a one-layer-thick band box that spins with it (in its
+    // own direction). The stationary regions between/around the planes are filled by
+    // static slabs so the resting silhouette stays a solid cube and the seams opening
+    // mid-turn read as interior. Works for one plane or several non-adjacent ones.
+    const sorted = layers
+      .map((idx, i) => ({ idx, dir: dirs[i] }))
+      .sort((a, b) => a.idx - b.idx);
+    const bands = [];
+    const slabs = [];
+    let cursor = -half;
+    for (const { idx, dir } of sorted) {
+      const bandLo = idx - k - 0.5;
+      const bandHi = idx - k + 0.5;
+      if (bandLo > cursor) slabs.push(boxAlong(cursor, bandLo)); // stationary gap before this plane
+      bands.push({ dir, ...boxAlong(bandLo, bandHi) });
+      cursor = Math.max(cursor, bandHi);
+    }
+    if (cursor < half) slabs.push(boxAlong(cursor, half));
+    return { rest: false, axisI, bands, slabs };
   }, [size, animState]);
+  // Mirror into a ref so the priority -1 useFrame can read per-band directions.
+  megaChassisRef.current = megaChassis;
 
   return (
     <StickerInstanceProvider>
@@ -1141,29 +1173,26 @@ const CubeAssembly = React.memo(({
             </mesh>
           )}
           {megaChassis && !megaChassis.rest && (
-            /* Rotation: two stationary slabs on either side of the turning band,
-               plus a band box that spins with the slice (megaBandRef). DoubleSide
-               keeps every inner wall opaque black so the seam that opens mid-turn
-               reads as cube interior, never a hole to the background. */
+            /* Rotation: static slabs fill the stationary regions between/around the
+               turning planes, and each turning plane gets a band box that spins with
+               it (megaBandRefs[i], in that plane's own direction). DoubleSide keeps
+               every inner wall opaque black so the seams that open mid-turn read as
+               cube interior, never a hole to the background. */
             <>
-              {megaChassis.slabLo && (
-                <mesh castShadow={false} receiveShadow={false} position={megaChassis.slabLo.pos}>
-                  <boxGeometry args={megaChassis.slabLo.args} />
+              {megaChassis.slabs.map((s, si) => (
+                <mesh key={`slab-${si}`} castShadow={false} receiveShadow={false} position={s.pos}>
+                  <boxGeometry args={s.args} />
                   <meshBasicMaterial color="#000000" side={THREE.DoubleSide} />
                 </mesh>
-              )}
-              {megaChassis.slabHi && (
-                <mesh castShadow={false} receiveShadow={false} position={megaChassis.slabHi.pos}>
-                  <boxGeometry args={megaChassis.slabHi.args} />
-                  <meshBasicMaterial color="#000000" side={THREE.DoubleSide} />
-                </mesh>
-              )}
-              <group ref={megaBandRef} position={megaChassis.band.pos}>
-                <mesh castShadow={false} receiveShadow={false}>
-                  <boxGeometry args={megaChassis.band.args} />
-                  <meshBasicMaterial color="#000000" side={THREE.DoubleSide} />
-                </mesh>
-              </group>
+              ))}
+              {megaChassis.bands.map((b, bi) => (
+                <group key={`band-${bi}`} ref={(el) => { megaBandRefs.current[bi] = el; }} position={b.pos}>
+                  <mesh castShadow={false} receiveShadow={false}>
+                    <boxGeometry args={b.args} />
+                    <meshBasicMaterial color="#000000" side={THREE.DoubleSide} />
+                  </mesh>
+                </group>
+              ))}
             </>
           )}
           {!isBiomeMode && cascades.map(c =>

@@ -97,27 +97,55 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     useEffect(() => {
         const generateScramble = () => {
             const axes = ['col', 'row', 'depth'];
-            // Standard scramble-generator rule (as used by WCA-style scramblers): never turn
-            // the same layer (axis + sliceIndex) twice in a row. Without this, a random pick
-            // can re-select the same layer immediately — most visibly when the direction also
-            // flips, which just turns the previous move straight back (clockwise then
-            // counterclockwise cancelling out to nothing).
+            // Each move is a PARALLEL-PLANAR PAIR: two non-adjacent layers on the same
+            // axis turning opposite ways (one clockwise, one counter-clockwise). Two
+            // independent spinning planes read as much harder to track than a single
+            // slab of adjacent layers, and because the layers never touch, neither turn
+            // masks the other. `sliceIndices`/`sliceDirs` are parallel arrays; the scalar
+            // `sliceIndex`/`dir` mirror the first layer so any single-move code path still
+            // has a sensible anchor (also the layer the worm rides when it sits on it).
+            const pickPair = () => {
+                const a = Math.floor(Math.random() * size);
+                let b = Math.floor(Math.random() * size);
+                // Non-adjacent: at least one full layer of gap between the two planes.
+                // (size < 3 can't satisfy this — fall back to a lone layer.)
+                let guard = 0;
+                while (Math.abs(a - b) < 2 && guard++ < 50) b = Math.floor(Math.random() * size);
+                if (Math.abs(a - b) < 2) return { indices: [a], dirs: [Math.random() < 0.5 ? 1 : -1] };
+                const d = Math.random() < 0.5 ? 1 : -1;
+                return { indices: [a, b], dirs: [d, -d] };
+            };
+            // Never repeat the same axis + same layer set twice in a row: a straight
+            // repeat would just double-turn (or, if the random dirs flip, cancel) those
+            // exact planes, wasting a scramble step.
             const seq = [];
             let prevAxis = null;
-            let prevSlice = null;
+            let prevKey = null;
             for (let i = 0; i < SCRAMBLE_STEPS; i++) {
-                let axis, sliceIndex;
+                let axis, pair, key;
                 do {
                     axis = axes[Math.floor(Math.random() * 3)];
-                    sliceIndex = Math.floor(Math.random() * size);
-                } while (axis === prevAxis && sliceIndex === prevSlice);
-                seq.push({ axis, dir: Math.random() < 0.5 ? 1 : -1, sliceIndex, wormScramble: true });
+                    pair = pickPair();
+                    key = [...pair.indices].sort((p, q) => p - q).join(',');
+                } while (axis === prevAxis && key === prevKey);
+                seq.push({
+                    axis,
+                    sliceIndices: pair.indices,
+                    sliceDirs: pair.dirs,
+                    sliceIndex: pair.indices[0],
+                    dir: pair.dirs[0],
+                    wormScramble: true,
+                });
                 prevAxis = axis;
-                prevSlice = sliceIndex;
+                prevKey = key;
             }
             scrambleSeqRef.current  = seq;
-            // Inverse = reversed sequence with each dir flipped
-            inverseQueueRef.current = [...seq].reverse().map(m => ({ ...m, dir: -m.dir }));
+            // Inverse = reversed sequence with every layer's direction flipped, so playing
+            // the queue out grinds the cube exactly back to solved.
+            inverseQueueRef.current = [...seq].reverse().map(m => {
+                const sliceDirs = m.sliceDirs.map(d => -d);
+                return { ...m, sliceDirs, dir: sliceDirs[0] };
+            });
 
             // Reset all phase state
             gameModePhaseRef.current  = 'scrambling';
@@ -302,13 +330,8 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                 useGameStore.setState({ wormGamePhase: 'finalHealing' });
                 return;
             }
-            const next = inverseQueueRef.current[0]; // peek
-            if (size >= 15) {
-                const start = Math.max(0, Math.min(size - 3, next.sliceIndex - 1));
-                pendingRotRef.current = { ...next, sliceIndices: [start, start + 1, start + 2] };
-            } else {
-                pendingRotRef.current = next;
-            }
+            // Peek the next inverse pair-move (two non-adjacent opposite-spinning planes).
+            pendingRotRef.current = inverseQueueRef.current[0];
         }
 
         // Update warning progress (0→1)
@@ -325,12 +348,13 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                 return;
             }
 
-            const { axis, dir, sliceIndex, sliceIndices } = pendingRotRef.current;
+            const { axis, dir, sliceIndex, sliceIndices, sliceDirs } = pendingRotRef.current;
             inverseQueueRef.current.shift(); // now dequeue
 
-            // Hit detection
+            // Hit detection — the worm can be caught by EITHER spinning plane.
+            const layers = sliceIndices?.length ? sliceIndices : [sliceIndex];
             let hit = null;
-            for (const layer of (sliceIndices?.length ? sliceIndices : [sliceIndex])) {
+            for (const layer of layers) {
                 hit = checkWormHitBySlice(worm, axis, layer);
                 if (hit) break;
             }
@@ -356,15 +380,17 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             }
 
             if (onRotate) {
-                // liveRotation exposes one anchor slice to the chase/body bridge.
-                // When the head is on one of Mega's three parallel layers, make
-                // that layer the anchor so the worm rides the tween instead of
-                // snapping only when the batch commits.
+                // liveRotation exposes ONE anchor slice (+ its direction) to the
+                // chase/body bridge. If the head sits on one of the two spinning
+                // planes, anchor to that plane — and its own turn direction — so the
+                // worm rides the correct tween instead of snapping when the move commits.
                 const axisCoord = axis === 'col' ? worm.pos.current.x
                     : axis === 'row' ? worm.pos.current.y
                     : worm.pos.current.z;
-                const anchorSlice = sliceIndices?.includes(axisCoord) ? axisCoord : sliceIndex;
-                onRotate(axis, dir, anchorSlice, false, sliceIndices);
+                const anchorAt = layers.indexOf(axisCoord);
+                const anchorSlice = anchorAt !== -1 ? axisCoord : sliceIndex;
+                const anchorDir = anchorAt !== -1 && sliceDirs?.length ? sliceDirs[anchorAt] : dir;
+                onRotate(axis, anchorDir, anchorSlice, false, sliceIndices, sliceDirs);
             }
 
             // Reset for next cycle (fixed interval — no randomisation)

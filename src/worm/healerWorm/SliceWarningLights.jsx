@@ -22,18 +22,22 @@ export function SliceWarningLights({ pendingRotRef, size }) {
 
     useFrame(() => {
         const p = pendingRotRef.current;
-        const key = p ? `${p.axis}-${p.sliceIndex}-${p.dir}` : null;
+        const key = p ? `${p.axis}-${(p.sliceIndices ?? [p.sliceIndex]).join(',')}-${(p.sliceDirs ?? [p.dir]).join(',')}` : null;
         if (key === lastKeyRef.current) return;
         lastKeyRef.current = key;
-        setPending(p ? { axis: p.axis, sliceIndex: p.sliceIndex, sliceIndices: p.sliceIndices, dir: p.dir } : null);
+        setPending(p ? { axis: p.axis, sliceIndex: p.sliceIndex, sliceIndices: p.sliceIndices, sliceDirs: p.sliceDirs, dir: p.dir } : null);
     });
 
     if (!pending) return null;
 
+    // One gold rim per threatened plane, each streaming in the direction that plane
+    // will turn (the two hazard planes turn opposite ways).
+    const indices = pending.sliceIndices?.length ? pending.sliceIndices : [pending.sliceIndex];
+    const dirs = pending.sliceDirs?.length ? pending.sliceDirs : indices.map(() => pending.dir);
     return (
         <>
-            {(pending.sliceIndices?.length ? pending.sliceIndices : [pending.sliceIndex]).map(sliceIndex => (
-                <LayerHighlight key={sliceIndex} axis={pending.axis} sliceIndex={sliceIndex} dir={pending.dir} size={size} />
+            {indices.map((sliceIndex, i) => (
+                <LayerHighlight key={sliceIndex} axis={pending.axis} sliceIndex={sliceIndex} dir={dirs[i]} size={size} />
             ))}
         </>
     );
