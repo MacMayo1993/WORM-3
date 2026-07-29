@@ -38,6 +38,53 @@ import {
 const _wormDummy = new THREE.Object3D();
 // Pre-allocated scratch objects — avoids per-frame GC pressure from WormBody loop
 const _bodyColor = new THREE.Color();
+const _fireTail = new THREE.Vector3();
+const _fireInner = new THREE.Vector3();
+const _fireDirection = new THREE.Vector3();
+const _fireUp = new THREE.Vector3(0, 1, 0);
+
+/** Flame fixed to the final visible orb while rocket overdrive is active. */
+export function RocketTailFire({ worm }) {
+    const groupRef = useRef();
+    useFrame((state) => {
+        const group = groupRef.current;
+        if (!group) return;
+        const active = worm.rocketActive.current && worm.phase.current === 'crawling';
+        group.visible = active;
+        if (!active) return;
+
+        const history = worm.stepHistory.current;
+        if (history.count < 2) {
+            group.visible = false;
+            return;
+        }
+        const tailSteps = Math.min(history.count - 1, Math.max(0, Math.round(worm.tailLength.current * BODY_BALL_SPACING * STEPS_PER_TILE)));
+        const tail = shAt(history, tailSteps);
+        const inner = shAt(history, Math.max(0, tailSteps - 4));
+        if (!tail || !inner) return;
+        _fireTail.copy(tail.pos);
+        _fireInner.copy(inner.pos);
+        _fireDirection.subVectors(_fireTail, _fireInner).normalize();
+        group.position.copy(_fireTail).addScaledVector(_fireDirection, 0.12);
+        group.quaternion.setFromUnitVectors(_fireUp, _fireDirection);
+        const pulse = 0.9 + Math.sin(state.clock.elapsedTime * 24) * 0.16;
+        group.scale.set(pulse, pulse * 1.25, pulse);
+    });
+
+    return (
+        <group ref={groupRef} visible={false}>
+            <mesh position={[0, 0.16, 0]}>
+                <coneGeometry args={[0.18, 0.52, 12]} />
+                <meshBasicMaterial color="#ff5a16" transparent opacity={0.8} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+            </mesh>
+            <mesh position={[0, 0.11, 0]}>
+                <coneGeometry args={[0.1, 0.34, 10]} />
+                <meshBasicMaterial color="#ffe96a" blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+            </mesh>
+            <pointLight color="#ff7b24" intensity={1.8} distance={2.2} decay={2} />
+        </group>
+    );
+}
 // Book Worm page-flip scratch — see the isBook block in the segment loop below.
 const _pageDummy = new THREE.Object3D();
 const _bookPageColor = new THREE.Color();

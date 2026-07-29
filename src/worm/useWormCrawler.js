@@ -43,7 +43,7 @@ import { wormClock } from './wormClock.js';
 import { wormBuffs, resetWormBuffs } from './wormBuffs.js';
 import { ttAt } from './circularBuffers.js';
 import { getSkin } from './wormCosmeticsData.js';
-import { wormPress, pressTile, tickWormPress, resetWormPress, MAX_PRESSED_TILES } from './tilePressBridge.js';
+import { wormPress, pressTile, tickWormPress, resetWormPress, pressedTileCount } from './tilePressBridge.js';
 import { BODY_BALL_SPACING } from './healerWorm/constants.js';
 
 // ── Tile press: the worm's weight, handed to the cube's stickers ──────────────
@@ -51,7 +51,14 @@ import { BODY_BALL_SPACING } from './healerWorm/constants.js';
 // covers as many of them as its length reaches — the same span the self-collision
 // check walks. Each covered tile is pressed, hardest under the head, so the dent
 // tapers off down the body instead of every tile carrying the full weight.
-const PRESS_TAIL_FALLOFF = 0.55; // tail-end tiles press at (1 − this) of the head's
+//
+// Gentle on purpose. At 0.55 the tail end sank to less than half depth, and since
+// the tile's light is gated on contact it left a line of touched tiles visibly
+// lighting to different degrees — the worm looked like it was pressing some tiles
+// and merely brushing others. The taper is now enough to feel the weight fall off
+// toward the tail, and not enough to split the lit path into strong and weak
+// halves.
+const PRESS_TAIL_FALLOFF = 0.22; // tail-end tiles press at (1 − this) of the head's
 
 // Cached so the skin's colour is only looked up when the player actually changes it.
 let _pressSkinId = null;
@@ -67,11 +74,7 @@ function publishTilePress(sim, size, ctx, delta) {
         }
 
         const cubies = ctx.getCubies();
-        const covered = Math.min(
-            MAX_PRESSED_TILES,
-            sim.tileTrail.count,
-            Math.max(1, Math.ceil(sim.tailLength * BODY_BALL_SPACING))
-        );
+        const covered = pressedTileCount(sim.tailLength * BODY_BALL_SPACING, sim.tileTrail.count);
         const span = covered > 1 ? covered - 1 : 1;
         for (let i = 0; i < covered; i++) {
             const key = ttAt(sim.tileTrail, i);
@@ -449,6 +452,7 @@ export function useWormCrawler(size, cubies) {
             jumpT: f('jumpT'),
             isJumping: f('isJumping'),
             rocketActive: f('rocketActive'),
+            rocketT: f('rocketT'),
             landingGraceT: f('landingGraceT'),
             magnetT: f('magnetT'),
             pendingOrbAttractionsRef: f('pendingOrbAttractions'),

@@ -81,6 +81,9 @@ const _orbGeos = {
     ringB:        new THREE.TorusGeometry(0.370 * 0.92, 0.009, 6, 18),
     electron:     new THREE.SphereGeometry(0.042, 7, 7),
     glow:         new THREE.SphereGeometry(0.52, 40, 28),          // outer ambient aura — smooth round glow (was octagonal at 8 segs)
+    parityCage:   new THREE.OctahedronGeometry(0.31, 0),           // unmistakable diamond frame around the round gem
+    parityNode:   new THREE.SphereGeometry(0.055, 12, 10),         // antipodal pair at opposite cage poles
+    parityAxis:   new THREE.CylinderGeometry(0.012, 0.012, 0.54, 8),
   },
   target: {
     shell:        new THREE.SphereGeometry(0.27, 36, 36),          // larger smooth gem for target
@@ -94,6 +97,9 @@ const _orbGeos = {
     electronGlow: new THREE.SphereGeometry(0.088, 6, 6),
     glow:         new THREE.SphereGeometry(0.66, 40, 28),          // outer ambient aura — smooth round glow (was decagonal at 10 segs)
     lockRing:     new THREE.TorusGeometry(0.56, 0.03, 8, 36),
+    parityCage:   new THREE.OctahedronGeometry(0.39, 0),
+    parityNode:   new THREE.SphereGeometry(0.068, 12, 10),
+    parityAxis:   new THREE.CylinderGeometry(0.015, 0.015, 0.68, 8),
   },
 };
 
@@ -120,6 +126,7 @@ function SingleOrb({
   const electronRefs     = useRef([]);
   const electronGlowRefs = useRef([]); // target only
   const outlineRef     = useRef();
+  const parityMarkRef  = useRef();
 
   const timeOffset = useMemo(() => Math.random() * Math.PI * 2, []);
 
@@ -150,6 +157,7 @@ function SingleOrb({
       get electrons()     { return electronRefs.current; },
       get electronGlows() { return electronGlowRefs.current; },
       get outline()       { return outlineRef.current; },
+      get parityMark()    { return parityMarkRef.current; },
       get isTarget()      { return isTargetRef.current; },
       get elevated()      { return elevatedRef.current; },
       get position()      { return positionRef.current; },
@@ -218,6 +226,27 @@ function SingleOrb({
           toneMapped={false}
         />
       </mesh>
+
+      {/* Parity signature: a sharp diamond cage and two opposite poles connected
+          through the core. It reads as "antipodal pair" even when tile colours are
+          close, and its angular outline cannot be mistaken for either special. */}
+      <group ref={parityMarkRef} rotation={[Math.PI / 4, 0, Math.PI / 4]}>
+        <mesh geometry={g.parityCage}>
+          <meshBasicMaterial
+            color="#e8fbff" transparent opacity={isTarget ? 0.6 : 0.46}
+            wireframe blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false}
+          />
+        </mesh>
+        <mesh geometry={g.parityAxis}>
+          <meshBasicMaterial color="#ffffff" transparent opacity={0.72} depthWrite={false} toneMapped={false} />
+        </mesh>
+        <mesh geometry={g.parityNode} position={[0, isTarget ? 0.34 : 0.27, 0]}>
+          <meshBasicMaterial color={color} toneMapped={false} />
+        </mesh>
+        <mesh geometry={g.parityNode} position={[0, isTarget ? -0.34 : -0.27, 0]}>
+          <meshBasicMaterial color={antipodalColor} toneMapped={false} />
+        </mesh>
+      </group>
 
       {/* Möbius strip — antipodal-color accent orbiting the sphere. DoubleSide so the twist reads clearly. */}
       <mesh ref={coreRef} geometry={g.core}>
@@ -294,7 +323,7 @@ export default function ParityOrbs({
       const {
         group, core, innerCore, innerGlow, shell, glow, targetGlow,
         orbitSystem, ringA, ringB, ringC,
-        electrons, electronGlows, outline,
+        electrons, electronGlows, outline, parityMark,
         isTarget, position, dirKey, gridX, gridY, gridZ, timeOffset,
       } = refs;
       if (!group || !core) continue;
@@ -363,6 +392,11 @@ export default function ParityOrbs({
       if (ringA) ringA.rotation.z = time * 1.5;
       if (ringB) ringB.rotation.x = time * 1.2;
       if (isTarget && ringC) ringC.rotation.y = time * 1.35;
+      if (parityMark) {
+        parityMark.rotation.y = -time * (isTarget ? 1.15 : 0.8);
+        parityMark.rotation.z = Math.PI / 4 + Math.sin(time * 1.4) * 0.12;
+        parityMark.scale.setScalar(1 + Math.sin(time * 4.2) * 0.045);
+      }
 
       // ── Electrons + halos ──────────────────────────────────────────────────
       const elRadius    = isTarget ? 0.43 : 0.36;

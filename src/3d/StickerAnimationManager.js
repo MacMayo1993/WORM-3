@@ -19,6 +19,7 @@
 
 const tickFns = new Map(); // gridId -> tick(state, delta)
 const activeKeys = new Set(); // gridId currently being ticked each frame
+const pendingKeys = new Set(); // activated before its StickerPlane registered
 
 // Shared time value for the persistent wispy-ring shader on every flipped tile.
 // All wispy ring materials reference this single object so only one value
@@ -28,16 +29,24 @@ export const wispyTime = { value: 0.0 };
 export function registerSticker(key, tick) {
   if (!key) return;
   tickFns.set(key, tick);
+  if (pendingKeys.delete(key)) activeKeys.add(key);
 }
 
 export function unregisterSticker(key) {
   if (!key) return;
   tickFns.delete(key);
   activeKeys.delete(key);
+  pendingKeys.delete(key);
 }
 
 export function activateSticker(key) {
-  if (key && tickFns.has(key)) activeKeys.add(key);
+  // Keep an activation requested during scene startup even if the sticker's effect
+  // has not registered yet. On a 7×7 the worm can begin ticking while hundreds of
+  // StickerPlane effects are still mounting; dropping that request leaves the first
+  // footprint squares asleep. unregisterSticker explicitly clears real stale keys.
+  if (!key) return;
+  if (tickFns.has(key)) activeKeys.add(key);
+  else pendingKeys.add(key);
 }
 
 export function deactivateSticker(key) {
@@ -48,7 +57,7 @@ export function runActiveStickers(state, delta) {
   for (const key of activeKeys) {
     const tick = tickFns.get(key);
     if (tick) tick(state, delta);
-    else activeKeys.delete(key); // stale entry (shouldn't happen) — self-heal
+    else activeKeys.delete(key); // defensive: unregister normally removes this first
   }
 }
 

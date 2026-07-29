@@ -136,12 +136,11 @@ export const SPECIAL_TUNNEL_RADIUS = 2;
 // long instead of falling back to an arbitrary tile somewhere on the cube.
 export const SPECIAL_SPAWN_RETRY = 2;
 
-// Rocket — a multi-tile jump. The worm launches off the surface, crosses
-// ROCKET_TILE_SPAN tiles in one arc at ROCKET_SPEED_MULT crawl speed, and is immune
-// to its own body and to the slice hazard while airborne.
-export const ROCKET_TILE_SPAN = 5;
-export const ROCKET_JUMP_HEIGHT = 2.6;
-export const ROCKET_SPEED_MULT = 2.8;
+// Rocket — a short, grounded overdrive. It doubles the player's configured speed
+// (rather than replacing it with a jump), ignores collisions and wormhole mouths,
+// and advertises the protected window with a flame at the tail.
+export const ROCKET_DURATION = 3;
+export const ROCKET_SPEED_MULT = 2;
 // Seconds of protection after a rocket touches down, ≈ one tile at base speed. A
 // flight that ends on top of your own tail, a wormhole mouth or a turning slice
 // would otherwise punish the player for a landing they had no way to steer out of.

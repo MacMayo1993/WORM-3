@@ -6,7 +6,8 @@ import {
   getWormPress,
   anyWormPress,
   resetWormPress,
-  MAX_PRESSED_TILES
+  MAX_PRESSED_TILES,
+  pressedTileCount
 } from '../worm/tilePressBridge.js';
 
 const FRAME = 1 / 60;
@@ -132,5 +133,15 @@ describe('tilePressBridge', () => {
     // per-frame tick and draws a border, and a 600-segment worm covers the cube.
     expect(MAX_PRESSED_TILES).toBeGreaterThan(8);
     expect(MAX_PRESSED_TILES).toBeLessThanOrEqual(96);
+  });
+
+  it('includes both cells when the starting worm straddles a tile boundary', () => {
+    expect(pressedTileCount(0.36, 2)).toBe(2);
+    expect(pressedTileCount(0.36, 1)).toBe(1);
+  });
+
+  it('includes the partially occupied tail cell for longer worms', () => {
+    expect(pressedTileCount(2, 10)).toBe(3);
+    expect(pressedTileCount(2.01, 10)).toBe(4);
   });
 });
