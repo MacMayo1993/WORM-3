@@ -931,6 +931,13 @@ export default function WORM3() {
       vibrate([50, 30, 100]);
       cancelDisparityRun();
       useGameStore.getState().clearLevel();
+      // A 15×15 shell contains 1,178 rendered cubelets. Start it in the lighter
+      // effects tier immediately instead of waiting for the frame monitor to
+      // notice the drop and react several seconds into play.
+      // Mega owns this forced quality override. Clear it just as explicitly for
+      // ordinary Worm runs so leaving a 15×15 session cannot strand the rest of
+      // the app without shadows and volume effects.
+      useGameStore.getState().setPerfReducedFX(!!wizardSettings.megaMode);
       useGameStore.getState().initWormMode(
         undefined, undefined,
         wormParams.wormSpeed,
