@@ -32,8 +32,14 @@ export function registerSticker(key, tick) {
   if (pendingKeys.delete(key)) activeKeys.add(key);
 }
 
-export function unregisterSticker(key) {
+export function unregisterSticker(key, tick) {
   if (!key) return;
+  // During a size change React can mount the replacement sticker before an old
+  // effect cleanup for the same manifold key runs. Never let that stale cleanup
+  // delete the new tick function; doing so leaves an apparently random set of
+  // starting tiles unable to receive worm press/perimeter-light activations until
+  // a later rotation remounts them.
+  if (tick && tickFns.get(key) !== tick) return;
   tickFns.delete(key);
   activeKeys.delete(key);
   pendingKeys.delete(key);

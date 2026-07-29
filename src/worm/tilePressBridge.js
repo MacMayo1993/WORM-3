@@ -9,9 +9,13 @@
 // plain module-level map instead — the same pattern liveRotation and liveCubies
 // already use to hand the worm's world to the cube's renderer.
 //
-// Keyed by manifold grid id (`M<face>-<idx>`), which is derived from a sticker's
-// ORIGINAL home and so names the physical tile rather than a grid slot: a dent
-// stays with the tile it was made on when a slice turns underneath it.
+// Keyed by the crawler's canonical surface-cell key (`x,y,z,dirKey`). The worm
+// simulation and rendered StickerPlane now use that same key directly. Previously
+// this bridge converted through a sticker's original manifold ID; after turns and
+// size-transition remounts that unnecessary second identity system could wake one
+// physical sticker while another grid cell held the body, leaving most of a long
+// worm visually unsupported. Rotation commit remaps the trail keys and rendered
+// cubie coordinates together, so the positional key remains exact.
 //
 // The press itself is a real spring rather than an ease, because the thing being
 // modelled is weight: it sinks fast under the worm and rebounds past level once
