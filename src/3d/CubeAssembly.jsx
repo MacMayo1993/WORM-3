@@ -161,6 +161,11 @@ const CubeAssembly = React.memo(({
   // so it's immune to floating-point drift from incremental rotations.
   const sliceIndicesRef = useRef(null);
 
+  // Mega Mode only: the chassis box beneath the rotating band spins in lock-step
+  // with the slice so the swept side-stickers always stay in front of their black
+  // backing. Its quaternion is written every frame by the priority -1 useFrame.
+  const megaBandRef = useRef(null);
+
   const getBasis = () => {
     camera.getWorldDirection(_basisF).normalize();
     _basisR.crossVectors(camera.up, _basisF).normalize();
@@ -978,6 +983,11 @@ const CubeAssembly = React.memo(({
     liveRotation.axis = axis;
     liveRotation.sliceIndex = sliceIndex;
     liveRotation.angle = currentProgress * quarterTurns * dir;
+    // Mega: spin the band chassis with the slice (same axis, same total angle) so
+    // it backs the rotating tiles instead of the static full box occluding them.
+    if (megaBandRef.current) {
+      megaBandRef.current.quaternion.setFromAxisAngle(worldAxis, liveRotation.angle);
+    }
     const deltaProgress = currentProgress - prevProgressRef.current;
     prevProgressRef.current = currentProgress;
 
@@ -1053,6 +1063,45 @@ const CubeAssembly = React.memo(({
     }
   }, [animState, items, explosionFactor]);
 
+  // ── Mega Mode chassis geometry ────────────────────────────────────────────
+  // A single 15×15 shell would cost >1,100 individual rounded bodies, so Mega
+  // backs its sticker grid with one dark box instead. At rest that box is fine,
+  // but a static box CANNOT back a *rotating* slice: its corners reach
+  // √2·(size/2) ≈ 10.5 from centre, so a side-sticker sweeping at radius ~7.5
+  // dips inside the solid box around 45° and is occluded — the "black layers on
+  // rotate" bug. The fix: during a turn, carve the box into the two stationary
+  // slabs on either side of the rotating band plus one band box that spins WITH
+  // the slice (megaBandRef), so the swept tiles always stay in front of it.
+  const megaChassis = useMemo(() => {
+    if (size < 15) return null;
+    const full = size - 0.08;      // outer extent (leaves a hairline gap at edges)
+    const half = full / 2;
+    if (!animState) return { rest: true, full };
+    const axisI = animState.axis === 'col' ? 0 : animState.axis === 'row' ? 1 : 2;
+    const k = (size - 1) / 2;
+    const slices = animState.sliceIndices?.length ? animState.sliceIndices : [animState.sliceIndex];
+    const lo = Math.min(...slices);
+    const hi = Math.max(...slices);
+    const bandLo = lo - k - 0.5;   // band spans the rotating slice(s) along the axis
+    const bandHi = hi - k + 0.5;
+    // Build an [x,y,z] size + centre pair for a slab that is `full` on the two
+    // perpendicular axes and [from..to] along the rotation axis.
+    const boxAlong = (from, to) => {
+      const args = [full, full, full];
+      const pos = [0, 0, 0];
+      args[axisI] = to - from;
+      pos[axisI] = (from + to) / 2;
+      return { args, pos };
+    };
+    return {
+      rest: false,
+      axisI,
+      band: boxAlong(bandLo, bandHi),
+      slabLo: bandLo > -half ? boxAlong(-half, bandLo) : null,
+      slabHi: bandHi < half ? boxAlong(bandHi, half) : null,
+    };
+  }, [size, animState]);
+
   return (
     <StickerInstanceProvider>
       <StickerAnimationDriver />
@@ -1066,7 +1115,7 @@ const CubeAssembly = React.memo(({
         {/* Solid body + interaction overlays only — hidden for the whole tunnel traversal so they
             don't z-fight with TunnelInteriorView, while the Möbius ribbons and VoidCore above stay visible. */}
         <group visible={!wormholeBodyHidden}>
-          {size >= 15 && (
+          {megaChassis && megaChassis.rest && (
             /* Mega omits 1,178 individual rounded cubie bodies for performance,
                but still needs a continuous dark chassis beneath the sticker grid.
                One inset box restores the black seams, silhouette, and Rubik's-cube
@@ -1083,13 +1132,39 @@ const CubeAssembly = React.memo(({
                   footprint can sink 0.0285 units (tile + perimeter offset). Keep
                   the chassis face at 0.46 so depressed tiles remain in front of
                   its depth buffer instead of vanishing at the start of a run. */}
-              <boxGeometry args={[size - 0.08, size - 0.08, size - 0.08]} />
+              <boxGeometry args={[megaChassis.full, megaChassis.full, megaChassis.full]} />
               {/* Unlit + opaque is intentional: this is the Rubik's-cube plastic
                   visible in the grid channels, not another shaded face. Ambient
                   light and background bleed made the previous transparent standard
                   material read gray and erased the black cubie perimeter. */}
               <meshBasicMaterial color="#000000" />
             </mesh>
+          )}
+          {megaChassis && !megaChassis.rest && (
+            /* Rotation: two stationary slabs on either side of the turning band,
+               plus a band box that spins with the slice (megaBandRef). DoubleSide
+               keeps every inner wall opaque black so the seam that opens mid-turn
+               reads as cube interior, never a hole to the background. */
+            <>
+              {megaChassis.slabLo && (
+                <mesh castShadow={false} receiveShadow={false} position={megaChassis.slabLo.pos}>
+                  <boxGeometry args={megaChassis.slabLo.args} />
+                  <meshBasicMaterial color="#000000" side={THREE.DoubleSide} />
+                </mesh>
+              )}
+              {megaChassis.slabHi && (
+                <mesh castShadow={false} receiveShadow={false} position={megaChassis.slabHi.pos}>
+                  <boxGeometry args={megaChassis.slabHi.args} />
+                  <meshBasicMaterial color="#000000" side={THREE.DoubleSide} />
+                </mesh>
+              )}
+              <group ref={megaBandRef} position={megaChassis.band.pos}>
+                <mesh castShadow={false} receiveShadow={false}>
+                  <boxGeometry args={megaChassis.band.args} />
+                  <meshBasicMaterial color="#000000" side={THREE.DoubleSide} />
+                </mesh>
+              </group>
+            </>
           )}
           {!isBiomeMode && cascades.map(c =>
             c?.from && c?.to ? (
@@ -1130,14 +1205,13 @@ const CubeAssembly = React.memo(({
                   hideBody={wormExitRideActive}
                   // Mega Mode's individual rounded bodies account for more than
                   // a thousand transparent draw calls and R3F geometry nodes. The
-                  // stickers remain the complete surface; key this to size so the
-                  // pre-Worm Mobi intro and setup re-entry are optimized as well.
-                  omitBody={size >= 15 && !(
-                    animState &&
-                    (animState.sliceIndices?.length ? animState.sliceIndices : [animState.sliceIndex]).includes(
-                      animState.axis === 'col' ? it.cubie.x : animState.axis === 'row' ? it.cubie.y : it.cubie.z
-                    )
-                  )}
+                  // stickers remain the complete surface; the chassis (and its
+                  // spinning band box during a turn) supplies the black backing, so
+                  // no cubie ever needs its own body. Keying this to size alone —
+                  // rather than restoring bodies for the rotating slice every turn —
+                  // stops ~170 RoundedBox mounts/unmounts per rotation, which was the
+                  // main source of the mid-turn stutter.
+                  omitBody={size >= 15}
                   onPointerDown={onPointerDown}
                 />
               );
