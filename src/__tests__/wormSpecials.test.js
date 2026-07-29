@@ -13,7 +13,6 @@ import {
   startRocket,
   startMagnet,
   queueTurn,
-  jumpLiftOf,
   tileKey,
 } from '../worm/healerWorm/wormSim.js';
 import {
@@ -22,9 +21,7 @@ import {
   SPECIAL_MAX_ON_BOARD,
   SPECIAL_SPAWN_RADIUS,
   SPECIAL_SPAWN_RETRY,
-  ROCKET_LANDING_GRACE,
-  ROCKET_TILE_SPAN,
-  ROCKET_JUMP_HEIGHT,
+  ROCKET_DURATION,
   MAGNET_DURATION,
   SURFACE_JUMP_HEIGHT,
   SURFACE_JUMP_TILE_SPAN,
@@ -282,80 +279,6 @@ describe('claiming a special', () => {
     expect(moved.type).toBe('rocket');
     expect(moved.ttl).toBe(SPECIAL_LIFETIME);
     expect(eventsOf(ctx, 'specials').length).toBeGreaterThan(0);
-  });
-});
-
-describe('rocket', () => {
-  it('launches a long, tall arc and reports the state change', () => {
-    const sim = makeSim();
-    const ctx = makeCtx();
-    startRocket(sim, ctx);
-    expect(sim.rocketActive).toBe(true);
-    expect(sim.isJumping).toBe(true);
-    expect(sim.jumpSpan).toBe(ROCKET_TILE_SPAN);
-    expect(sim.jumpHeight).toBe(ROCKET_JUMP_HEIGHT);
-    expect(eventsOf(ctx, 'rocketState')[0].args[0]).toBe(true);
-  });
-
-  it('crosses about ROCKET_TILE_SPAN tiles before landing, then restores jump defaults', () => {
-    const sim = makeSim();
-    const ctx = makeCtx();
-    stepUntilCommit(sim, ctx); // start the flight from a fresh step boundary
-    startRocket(sim, ctx);
-
-    let commits = 0;
-    let lastKey = tileKey(sim.pos);
-    let peakLift = 0;
-    for (let i = 0; i < 400 && sim.rocketActive; i++) {
-      stepWormSim(sim, 0.05, SIZE, ctx);
-      peakLift = Math.max(peakLift, jumpLiftOf(sim));
-      const key = tileKey(sim.pos);
-      if (key !== lastKey) { commits++; lastKey = key; }
-    }
-
-    expect(sim.rocketActive).toBe(false);
-    expect(commits).toBeGreaterThanOrEqual(ROCKET_TILE_SPAN - 1);
-    expect(commits).toBeLessThanOrEqual(ROCKET_TILE_SPAN + 1);
-    // The arc peaks near the rocket's apex, well above a normal jump.
-    expect(peakLift).toBeGreaterThan(SURFACE_JUMP_HEIGHT);
-    expect(peakLift).toBeLessThanOrEqual(ROCKET_JUMP_HEIGHT + 1e-6);
-    // Back to a normal jump for the next press.
-    expect(sim.isJumping).toBe(false);
-    expect(sim.jumpSpan).toBe(SURFACE_JUMP_TILE_SPAN);
-    expect(sim.jumpHeight).toBe(SURFACE_JUMP_HEIGHT);
-    expect(eventsOf(ctx, 'rocketState').map(e => e.args[0])).toEqual([true, false]);
-  });
-
-  it('cannot be cut short by a jump press mid-flight', () => {
-    const sim = makeSim();
-    const ctx = makeCtx();
-    startRocket(sim, ctx);
-    run(sim, ctx, 0.3);
-    const airborneT = sim.jumpT;
-    queueTurn(sim, 'jump');
-    stepWormSim(sim, 0.05, SIZE, ctx);
-    expect(sim.rocketActive).toBe(true);
-    expect(sim.jumpSpan).toBe(ROCKET_TILE_SPAN);
-    expect(sim.jumpT).toBeGreaterThan(airborneT); // kept advancing, was not reset
-  });
-
-  it('flies over a rotating slice that would otherwise kill the worm', () => {
-    const head = { x: 1, y: 1, z: 4, dirKey: 'PZ' };
-    const trail = makeTileTrail(100);
-    // Body entirely off the slice, head on it → a grounded worm is sliced in half.
-    ttReset(trail, '0,0,4,PZ');
-    ttPush(trail, head.x + ',' + head.y + ',' + head.z + ',' + head.dirKey);
-    const worm = {
-      pos: { current: head },
-      tileTrail: { current: trail },
-      tailLength: { current: 50 },
-      rocketActive: { current: false },
-    };
-    expect(checkWormHitBySlice(worm, 'col', 1)).toEqual({ type: 'death' });
-
-    worm.rocketActive.current = true;
-    // Airborne: the head is clear, so the turn no longer kills.
-    expect(checkWormHitBySlice(worm, 'col', 1)).not.toEqual({ type: 'death' });
   });
 });
 
@@ -636,145 +559,33 @@ describe('spawn placement in the sim', () => {
   });
 });
 
-// ─── Rocket control, stacking and landing safety ─────────────────────────────
+// ─── Rocket overdrive ────────────────────────────────────────────────────────
 
-describe('rocket steering', () => {
-  it('steers left and right during the flight', () => {
+describe('rocket overdrive', () => {
+  it('runs on the surface for three seconds and publishes one start/end pair', () => {
     const sim = makeSim();
     const ctx = makeCtx();
     startRocket(sim, ctx);
-    expect(sim.moveDir).toBe('up');
-    queueTurn(sim, 'right');
-    run(sim, ctx, 0.1);
-    expect(sim.moveDir).toBe('right');
     expect(sim.rocketActive).toBe(true);
-    queueTurn(sim, 'left');
-    run(sim, ctx, 0.1);
-    expect(sim.moveDir).toBe('up');
-  });
-
-  it('refuses a 180 mid-flight in relative steering', () => {
-    const sim = makeSim();
-    const ctx = makeCtx();
-    startRocket(sim, ctx);
-    queueTurn(sim, 'down'); // a 180 in non-oriented mode
-    run(sim, ctx, 0.1);
-    expect(sim.moveDir).toBe('up');
-  });
-
-  it('refuses a reversal mid-flight in oriented steering', () => {
-    const sim = makeSim();
-    const ctx = makeCtx({ getControlMode: () => 'oriented' });
-    startRocket(sim, ctx);
-    queueTurn(sim, 'down'); //直接 reversal of 'up'
-    run(sim, ctx, 0.1);
-    expect(sim.moveDir).toBe('up');
-    // A perpendicular heading is still allowed.
-    queueTurn(sim, 'left');
-    run(sim, ctx, 0.1);
-    expect(sim.moveDir).toBe('left');
-  });
-
-  it('allows a 180 once the flight has landed', () => {
-    const sim = makeSim();
-    const ctx = makeCtx();
-    startRocket(sim, ctx);
-    for (let i = 0; i < 400 && sim.rocketActive; i++) stepWormSim(sim, 0.05, SIZE, ctx);
+    expect(sim.isJumping).toBe(false);
+    expect(sim.rocketT).toBe(ROCKET_DURATION);
+    run(sim, ctx, ROCKET_DURATION + 0.1);
     expect(sim.rocketActive).toBe(false);
-    const before = sim.moveDir;
-    queueTurn(sim, 'down');
-    run(sim, ctx, 0.1);
-    expect(sim.moveDir).not.toBe(before);
-  });
-});
-
-describe('rocket stacking', () => {
-  it('extends an in-flight rocket once instead of restarting the arc', () => {
-    const sim = makeSim();
-    const ctx = makeCtx();
-    startRocket(sim, ctx);
-    run(sim, ctx, 0.4);
-    const midT = sim.jumpT;
-    const span = sim.jumpSpan;
-    expect(midT).toBeGreaterThan(0);
-
-    startRocket(sim, ctx); // second rocket claimed mid-flight
-    expect(sim.jumpT).toBe(midT);              // no snap back to the start of the arc
-    expect(sim.jumpSpan).toBe(span + ROCKET_TILE_SPAN);
-    expect(sim.rocketExtended).toBe(true);
-    // The HUD already has the pill mounted — no duplicate transition.
-    expect(eventsOf(ctx, 'rocketState').map(e => e.args[0])).toEqual([true]);
-
-    // Only one extension per flight.
-    const extendedSpan = sim.jumpSpan;
-    startRocket(sim, ctx);
-    expect(sim.jumpSpan).toBe(extendedSpan);
-  });
-
-  it('rebases an ordinary jump onto the rocket arc without dropping the worm', () => {
-    const sim = makeSim();
-    const ctx = makeCtx();
-    queueTurn(sim, 'jump');
-    run(sim, ctx, 0.35);
-    expect(sim.isJumping).toBe(true);
-    const liftBefore = jumpLiftOf(sim);
-    expect(liftBefore).toBeGreaterThan(0);
-
-    startRocket(sim, ctx);
-    // Height is continuous across the switch — no snap to the ground.
-    expect(jumpLiftOf(sim)).toBeCloseTo(liftBefore, 5);
-    expect(sim.jumpHeight).toBe(ROCKET_JUMP_HEIGHT);
-    expect(sim.jumpSpan).toBe(ROCKET_TILE_SPAN);
-  });
-
-  it('fires exactly one start and one end transition per flight', () => {
-    const sim = makeSim();
-    const ctx = makeCtx();
-    startRocket(sim, ctx);
-    for (let i = 0; i < 400 && sim.rocketActive; i++) stepWormSim(sim, 0.05, SIZE, ctx);
+    expect(sim.rocketT).toBe(0);
     expect(eventsOf(ctx, 'rocketState').map(e => e.args[0])).toEqual([true, false]);
   });
-});
 
-describe('rocket landing grace', () => {
-  const land = (sim, ctx) => {
+  it('refreshes its duration without publishing a duplicate start', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
     startRocket(sim, ctx);
-    for (let i = 0; i < 400 && sim.rocketActive; i++) stepWormSim(sim, 0.05, SIZE, ctx);
-  };
-
-  it('opens a grace window on touchdown and closes it again', () => {
-    const sim = makeSim();
-    const ctx = makeCtx();
-    land(sim, ctx);
-    expect(sim.landingGraceT).toBeGreaterThan(0);
-    expect(sim.landingGraceT).toBeLessThanOrEqual(ROCKET_LANDING_GRACE);
-    run(sim, ctx, ROCKET_LANDING_GRACE + 0.2);
-    expect(sim.landingGraceT).toBe(0);
+    run(sim, ctx, 1);
+    startRocket(sim, ctx);
+    expect(sim.rocketT).toBe(ROCKET_DURATION);
+    expect(eventsOf(ctx, 'rocketState').map(e => e.args[0])).toEqual([true]);
   });
 
-  it('suppresses a self-collision that lands under the worm', () => {
-    const sim = makeSim();
-    const ctx = makeCtx();
-    land(sim, ctx);
-    sim.pendingSelfCollision = { key: tileKey(sim.pos) };
-    sim.interpT = 1;
-    stepWormSim(sim, 0.05, SIZE, ctx);
-    expect(sim.alive).toBe(true);
-    expect(sim.pendingSelfCollision).toBeNull();
-  });
-
-  it('holds off an instant wormhole dive on the landing tile', () => {
-    const sim = makeSim();
-    const ctx = makeCtx();
-    land(sim, ctx);
-    sim.pendingTunnelTrigger = { ...sim.pos };
-    sim.interpT = 1;
-    stepWormSim(sim, 0.05, SIZE, ctx);
-    expect(sim.phase).toBe('crawling');
-    expect(sim.pendingTunnelTrigger).toBeNull();
-  });
-
-  it('keeps the head clear of a slice that turns on the landing frame', () => {
+  it('protects the head from a rotating slice', () => {
     const trail = makeTileTrail(100);
     ttReset(trail, '0,0,4,PZ');
     ttPush(trail, '1,1,4,PZ');
@@ -783,42 +594,10 @@ describe('rocket landing grace', () => {
       tileTrail: { current: trail },
       tailLength: { current: 50 },
       rocketActive: { current: false },
-      landingGraceT: { current: 0 },
     };
     expect(checkWormHitBySlice(worm, 'col', 1)).toEqual({ type: 'death' });
-    worm.landingGraceT.current = 0.4;
+    worm.rocketActive.current = true;
     expect(checkWormHitBySlice(worm, 'col', 1)).not.toEqual({ type: 'death' });
-  });
-
-  it('does not protect the worm indefinitely after landing', () => {
-    const sim = makeSim();
-    const ctx = makeCtx();
-    land(sim, ctx);
-    run(sim, ctx, ROCKET_LANDING_GRACE + 0.2);
-    expect(sim.landingGraceT).toBe(0);
-
-    // A body long enough to actually occupy several tiles — at BASE_TAIL_LENGTH the
-    // collision window is a single tile and nothing can ever hit it.
-    sim.tailLength = 50;
-    sim.selfCollisionGraceSteps = 0;
-    sim.pendingSelfCollision = { key: ttAt(sim.tileTrail, 1) };
-    sim.interpT = 1;
-    stepWormSim(sim, 0.05, SIZE, ctx);
-    expect(sim.alive).toBe(false);
-    expect(eventsOf(ctx, 'death')[0].args[0].reason).toBe('self-collision');
-  });
-
-  it('still protects the worm inside the window with the same setup', () => {
-    const sim = makeSim();
-    const ctx = makeCtx();
-    land(sim, ctx);
-    expect(sim.landingGraceT).toBeGreaterThan(0);
-    sim.tailLength = 50;
-    sim.selfCollisionGraceSteps = 0;
-    sim.pendingSelfCollision = { key: ttAt(sim.tileTrail, 1) };
-    sim.interpT = 1;
-    stepWormSim(sim, 0.05, SIZE, ctx);
-    expect(sim.alive).toBe(true);
   });
 });
 
@@ -929,7 +708,7 @@ describe('buff lifecycle', () => {
     expect(sim.magnetT).toBe(0);
     expect(sim.magnetMaxT).toBe(0);
     expect(sim.rocketActive).toBe(false);
-    expect(sim.rocketExtended).toBe(false);
+    expect(sim.rocketT).toBe(0);
     expect(sim.landingGraceT).toBe(0);
     expect(sim.specials).toHaveLength(0);
   });

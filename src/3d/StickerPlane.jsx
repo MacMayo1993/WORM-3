@@ -55,11 +55,13 @@ const _neonBorderGeo = new THREE.PlaneGeometry(0.94, 0.94);
 // piece it is stuck to. Sink it past that and the body's own face — which writes
 // depth even in worm mode, where it is only partly transparent — swallows it, and
 // the tile does not read as pressed, it reads as gone.
-const PRESS_DEPTH = 0.017;
+const PRESS_DEPTH = 0.019;
 // …and how much it narrows at full press, opening the grid channel around it.
 // This is the cue that survives being looked at head-on, where two hundredths of
 // depth is a couple of pixels; it reads as the tile dropping into its socket.
-const PRESS_SHRINK = 0.06;
+// 14% is intentional: depth alone is almost invisible from the chase camera, while
+// this exposes a broad socket around the pressed face without making it look detached.
+const PRESS_SHRINK = 0.14;
 // Circular alpha map — clips the base sticker mesh to a disc matching the overlay shader
 // radius (smoothstep 0.44→0.50 in UV space).  Using alphaTest instead of transparent
 // avoids depth-sorting issues and is unaffected by the biome-mode code that explicitly
@@ -533,25 +535,28 @@ const wormFootprintFragmentShader = `
     float press = clamp(uPress, 0.0, 1.0);
 
     // The lit rail, hugging the perimeter. It fattens as the tile sinks.
-    float bw   = 0.030 + press * 0.022;
+    float bw   = 0.038 + press * 0.034;
     float rail = 1.0 - smoothstep(bw * 0.55, bw, edge);
 
     // Light spilling inward from the rail, over the tile's shoulder.
-    float spill = (1.0 - smoothstep(bw, 0.20 + press * 0.10, edge)) * 0.30;
+    float spill = (1.0 - smoothstep(bw, 0.22 + press * 0.12, edge)) * 0.42;
 
     // Inner shadow: the recess the worm is standing in. Strongest right against
     // the rim (where the wall is highest) and gone by the middle of the tile.
-    float shade = (1.0 - smoothstep(0.02, 0.26, edge)) * press * 0.55;
+    float wall = 1.0 - smoothstep(0.015, 0.19, edge);
+    float shade = wall * press * 0.88;
 
     // A slow breath so a tile held under a resting worm is not perfectly static.
     float breath = 0.92 + 0.08 * sin(uTime * 2.6);
 
-    float glow  = (rail * (0.85 + press * 0.75) + spill * press) * breath;
-    float alpha = clamp(glow + shade, 0.0, 1.0) * smoothstep(0.0, 0.12, press);
+    float glow  = (rail * (1.05 + press * 0.95) + spill * press) * breath;
+    float alpha = clamp(max(glow, shade), 0.0, 1.0) * smoothstep(0.0, 0.09, press);
 
     // Rail runs hot toward white at the centre of the stroke; the shadow band is
     // the same hue taken almost to black, so the whole square stays one colour.
-    vec3 col = mix(uColor * 0.06, mix(uColor, vec3(1.0), rail * 0.45 * press), glow);
+    vec3 socket = uColor * 0.025;
+    vec3 hotRail = mix(uColor, vec3(1.0), rail * 0.62 * press);
+    vec3 col = mix(socket, hotRail, clamp(glow, 0.0, 1.0));
     gl_FragColor = vec4(col, alpha);
   }
 `;
