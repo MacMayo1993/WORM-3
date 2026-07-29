@@ -865,10 +865,17 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     uTime: { value: 0.0 },
   }));
   // Overlay ref for antipodal color bleed during flip transitions.
-  // Stable gridId for this sticker — written to flipBurstMap during flips so
-  // WormholeTunnel can read the burst progress without prop drilling.
-  // origPos/origDir/orig never change so this is computed once.
-  const stickerGridIdRef = useRef(meta ? getManifoldGridId(meta, faceSize) : null);
+  // Physical-piece manifold id — written to flipBurstMap during flips, and the key
+  // the shared animation manager ticks/activates this sticker under (the worm
+  // wakes tiles by gridId). In every mode except Worm, StickerPlane is keyed by
+  // this identity so it remounts when a turn moves a different piece into its slot,
+  // and the id is effectively constant for the component's life. Worm mode instead
+  // keys by grid slot (StickerPlane persists across turns to avoid the rotation-end
+  // remount storm), so the id can change under a live component — recompute it every
+  // render and keep the ref (read by the tick + FX-map cleanup) in sync.
+  const stickerGridId = meta ? getManifoldGridId(meta, faceSize) : null;
+  const stickerGridIdRef = useRef(stickerGridId);
+  stickerGridIdRef.current = stickerGridId;
   // Per-sticker dynamic selectors — subscribe only to this sticker's own derived values.
   // When disparityDeathByGridId grows (a tile dies) Zustand re-runs all selectors, but
   // only the sticker whose primitive return value actually changed triggers a re-render.
@@ -897,14 +904,21 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // is reassigned every render. Tiles that already sit in a persistent wormhole state at
   // mount (loaded mid-game, or surviving a re-mount) activate immediately so their ring/
   // hazard fx start running without waiting for a flip event.
+  // Re-runs when the physical identity changes. In non-Worm modes stickerGridId is
+  // constant for the component's life (remount-on-turn), so this fires exactly once
+  // like the old []-deps version. In Worm mode the component persists across turns,
+  // so a turn that swaps a new piece into this slot re-keys the tick to the incoming
+  // piece's gridId — the manager's stale-tick guard makes the unregister/register
+  // pair safe regardless of the order sibling stickers run their effects in.
   useEffect(() => {
-    const key = stickerGridIdRef.current;
+    const key = stickerGridId;
+    if (!key) return undefined;
     const tickSticker = (state, delta) => tickImplRef.current?.(state, delta);
     registerSticker(key, tickSticker);
-    const hasFlipsAtMount = (meta?.flips ?? 0) > 0;
-    if (hasFlipsAtMount && meta?.curr !== meta?.orig) activateSticker(key);
+    if ((meta?.flips ?? 0) > 0 && meta?.curr !== meta?.orig) activateSticker(key);
     return () => unregisterSticker(key, tickSticker);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- meta read only at (re)register time
+  }, [stickerGridId]);
 
   // Death rank from Disparity Mode — null if not in disparity game or tile not yet dead
   const deadRank = isDead ? deadRankRaw : null;
@@ -964,6 +978,48 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
   const prevCurr = useRef(meta?.curr ?? 0);
   const prevFlips = useRef(meta?.flips ?? 0);
+
+  // Identity-swap reset (Worm mode only in practice). Worm mode keys StickerPlane by
+  // grid slot so it persists across turns — see Cubie's stickerKey — which means a
+  // turn can move a DIFFERENT physical piece into this live component rather than
+  // remounting it. That is the whole point (remounting ~150 stickers per turn is the
+  // rotation-end lag on the 15x15 board), but it means the flip trackers and any
+  // in-flight flip/heal visuals still belong to the OUTGOING piece. Re-sync them to
+  // the incoming piece so the swap is not misread as a flip (which would fire a
+  // spurious squish) and no overlay lingers from the piece that left. Runs as a
+  // layout effect BEFORE the materialColor sync below, so that effect sees the reset
+  // prevCurr and paints the incoming color rather than a stale flip-pending color.
+  // In every other mode the physical-identity key forces a remount, so stickerGridId
+  // never changes under a mounted component and this effect is inert after mount.
+  const prevGridIdRef = useRef(stickerGridId);
+  useLayoutEffect(() => {
+    if (prevGridIdRef.current === stickerGridId) return; // mount, or no identity change
+    prevGridIdRef.current = stickerGridId;
+    prevCurr.current = meta?.curr ?? 0;
+    prevFlips.current = meta?.flips ?? 0;
+    isFlipping.current = false;
+    spinT.current = 0;
+    shakeT.current = 0;
+    shockT.current = 1;
+    glowT.current = 1;
+    flashT.current = 1;
+    hitstopT.current = 0;
+    healTRef.current = -1;
+    wormIntroT.current = 0;
+    ringFlashRef.current = 0;
+    prevRawP.current = 0;
+    blinkBounceRef.current = 0;
+    innerShockZ.current = 0;
+    innerPressZ.current = 0;
+    applyInnerZ();
+    if (eyelidOverlayRef.current) eyelidOverlayRef.current.visible = false;
+    if (spinRevealRef.current) spinRevealRef.current.visible = false;
+    if (spiderPlaneRef.current) spiderPlaneRef.current.visible = false;
+    if (healSealRef.current) healSealRef.current.visible = false;
+    setShowWormIntro(false); // React bails out when already false — no extra render
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- meta read only on identity change
+  }, [stickerGridId]);
+
   useEffect(() => {
     const curr = meta?.curr ?? 0;
     const flips = meta?.flips ?? 0;
@@ -2299,9 +2355,15 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 // Custom memo comparator — prevents un-flipped stickers on the same cubie from
 // re-rendering when a sibling sticker gets a chaos flip. Default memo uses reference
 // equality on `meta`, which always fails (new cubies state = new sticker objects).
-// We only care about the two volatile fields: curr (color) and flips (count).
-// All other meta fields (orig, origPos, origDir) are frozen after cube creation.
-// pos/rot are stable module-level constants so reference equality is sufficient.
+// We care about the volatile fields curr (color) and flips (count) AND — for Worm
+// mode's grid-slot keying — the physical identity (orig/origDir/origPos): there the
+// same keyed component is reused as pieces turn through its slot, so a turn can hand
+// it a different physical piece that happens to share curr/flips (very common on a
+// solid Mega face where 225 tiles are one color). Without the identity check that
+// swap would bail here, leaving stickerGridId — and the worm's gridId activation —
+// bound to the piece that left. In non-Worm modes identity is frozen per key, so
+// these extra checks never fire (no added re-renders). pos/rot are stable module
+// constants so reference equality is sufficient.
 function stickerPropsAreEqual(prev, next) {
   if (prev.pos !== next.pos || prev.rot !== next.rot) return false;
   if (prev.mode !== next.mode || prev.hollow !== next.hollow) return false;
@@ -2312,7 +2374,11 @@ function stickerPropsAreEqual(prev, next) {
   const pm = prev.meta, nm = next.meta;
   if (pm === nm) return true;
   if (!pm || !nm) return pm === nm;
-  return pm.curr === nm.curr && pm.flips === nm.flips;
+  if (pm.curr !== nm.curr || pm.flips !== nm.flips) return false;
+  if (pm.orig !== nm.orig || pm.origDir !== nm.origDir) return false;
+  return pm.origPos?.x === nm.origPos?.x
+    && pm.origPos?.y === nm.origPos?.y
+    && pm.origPos?.z === nm.origPos?.z;
 }
 
 export default React.memo(StickerPlane, stickerPropsAreEqual);

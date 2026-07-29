@@ -227,6 +227,16 @@ const Cubie = React.forwardRef(function Cubie({
   // so refs initialized from `meta` (gridId, flip timeline, etc.) never stay bound
   // to the previous sticker and bleed styles onto the wrong corner tile.
   const stickerKey = (dirKey) => {
+    // Worm mode: key by GRID SLOT (this cubie's current position, which cubeRotation
+    // writes as the destination coords, so it is stable as pieces turn through the
+    // slot). The StickerPlane then persists across turns and updates its meta in
+    // place instead of unmounting + remounting — eliminating the ~150-sticker remount
+    // storm that makes the 15x15 Mega board lag at the end of every rotation.
+    // StickerPlane re-syncs its physical identity in place (see its stickerGridId
+    // handling), so ref-bleed is still prevented without the remount.
+    if (wormMode) return `${dirKey}-slot-${cubie.x}-${cubie.y}-${cubie.z}-${size}`;
+    // All other modes keep the physical-piece identity key, which forces the remount
+    // that resets meta-derived refs when a turn swaps which sticker fills this slot.
     const m = meta(dirKey);
     if (!m?.origPos) return `${dirKey}-empty`;
     const { x, y, z } = m.origPos;
