@@ -47,8 +47,8 @@ const _normalMat3 = new THREE.Matrix3();
 const _identityMat4 = new THREE.Matrix4();
 
 // Pre-allocated pool for live drag base positions/rotations.
-// Max supported cube size is 7, so a rotated slice can contain up to 7² = 49 cubies.
-const _MAX_SLICE = 49;
+// Mega Mode supports size 15, so a rotated slice can contain up to 15² = 225 cubies.
+const _MAX_SLICE = 225;
 const _dragPosPool = Array.from({ length: _MAX_SLICE }, () => new THREE.Vector3());
 const _dragRotPool = Array.from({ length: _MAX_SLICE }, () => new THREE.Quaternion());
 const _dragBasePositions = new Map();
@@ -66,7 +66,7 @@ const DRAG_THRESHOLD = isTouchDevice ? 8 : 5;
 
 // Max camera distance per cube size — defined once at module scope to avoid
 // creating a new object literal on every CubeAssembly render.
-const MAX_DISTANCE_BY_SIZE = { 2: 28, 3: 28, 4: 38, 5: 52, 6: 68, 7: 85 };
+const MAX_DISTANCE_BY_SIZE = { 2: 28, 3: 28, 4: 38, 5: 52, 6: 68, 7: 85, 15: 175 };
 
 // Pixels of drag to complete a 90° rotation
 const PIXELS_PER_90DEG = 100;
@@ -303,6 +303,27 @@ const CubeAssembly = React.memo(({
     controlsEnabledRef.current = false;
     if (controlsRef.current) controlsRef.current.enabled = false;
   }, []);
+
+  // Mega replaces 1,178 individual body meshes with one chassis. Convert a hit
+  // on that box back into the same grid coordinate a Cubie would have supplied,
+  // retaining tile taps and slice drags without rebuilding per-cubie hit meshes.
+  const onMegaChassisPointerDown = useCallback((event) => {
+    if (!cubeGroupRef.current || !event.point || !event.face?.normal) return;
+    const s = sizeRef.current;
+    const k = (s - 1) / 2;
+    const local = cubeGroupRef.current.worldToLocal(event.point.clone());
+    const clampIndex = value => Math.max(0, Math.min(s - 1, Math.round(value + k)));
+    const pos = {
+      x: clampIndex(local.x),
+      y: clampIndex(local.y),
+      z: clampIndex(local.z),
+    };
+    const n = event.face.normal;
+    if (Math.abs(n.x) > 0.5) pos.x = n.x > 0 ? s - 1 : 0;
+    else if (Math.abs(n.y) > 0.5) pos.y = n.y > 0 ? s - 1 : 0;
+    else pos.z = n.z > 0 ? s - 1 : 0;
+    onPointerDown({ pos, worldPos: event.point, event });
+  }, [onPointerDown]);
 
 
   // Set up global move/up listeners once - use refs for immediate access
@@ -1045,6 +1066,31 @@ const CubeAssembly = React.memo(({
         {/* Solid body + interaction overlays only — hidden for the whole tunnel traversal so they
             don't z-fight with TunnelInteriorView, while the Möbius ribbons and VoidCore above stay visible. */}
         <group visible={!wormholeBodyHidden}>
+          {size >= 15 && (
+            /* Mega omits 1,178 individual rounded cubie bodies for performance,
+               but still needs a continuous dark chassis beneath the sticker grid.
+               One inset box restores the black seams, silhouette, and Rubik's-cube
+               volume for a single draw call; this parent group hides it during
+               tunnel transit just like the old per-cubie bodies. This is keyed
+               to size—not the delayed Worm flag—so the Mobi intro and New Game
+               wizard never build the expensive body shell first. */
+            <mesh
+              castShadow={false}
+              receiveShadow={false}
+              onPointerDown={onMegaChassisPointerDown}
+            >
+              {/* The sticker face begins 0.51 units from its cubie centre and its
+                  footprint can sink 0.0285 units (tile + perimeter offset). Keep
+                  the chassis face at 0.46 so depressed tiles remain in front of
+                  its depth buffer instead of vanishing at the start of a run. */}
+              <boxGeometry args={[size - 0.08, size - 0.08, size - 0.08]} />
+              {/* Unlit + opaque is intentional: this is the Rubik's-cube plastic
+                  visible in the grid channels, not another shaded face. Ambient
+                  light and background bleed made the previous transparent standard
+                  material read gray and erased the black cubie perimeter. */}
+              <meshBasicMaterial color="#000000" />
+            </mesh>
+          )}
           {!isBiomeMode && cascades.map(c =>
             c?.from && c?.to ? (
               <ChaosWave
@@ -1082,6 +1128,11 @@ const CubeAssembly = React.memo(({
                   size={size}
                   wormMode={wormHealerMode}
                   hideBody={wormExitRideActive}
+                  // Mega Mode's individual rounded bodies account for more than
+                  // a thousand transparent draw calls and R3F geometry nodes. The
+                  // stickers remain the complete surface; key this to size so the
+                  // pre-Worm Mobi intro and setup re-entry are optimized as well.
+                  omitBody={size >= 15}
                   onPointerDown={onPointerDown}
                 />
               );

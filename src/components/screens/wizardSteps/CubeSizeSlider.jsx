@@ -11,7 +11,7 @@
 
 import React from 'react';
 import { PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT, PAPER_CARD_SHADOW } from '../../../utils/uiTheme.js';
-import { SIZE_TIERS, MIN_CUBE_SIZE, MAX_CUBE_SIZE, sizeTier } from './shared.jsx';
+import { SIZE_TIERS, sizeTier } from './shared.jsx';
 
 const KNOB = 30;
 const DEFAULT_SIZE = 3;
@@ -19,14 +19,15 @@ const DEFAULT_SIZE = 3;
 // Where a stop sits along the rail. The knob's travel is inset by half its own
 // width at each end so it never hangs off, and the detents and their labels have
 // to use the same curve or they drift away from the knob they belong to.
-const stopAt = n => {
-  const p = (n - MIN_CUBE_SIZE) / (MAX_CUBE_SIZE - MIN_CUBE_SIZE);
+const stopAt = (n, tiers) => {
+  const index = Math.max(0, tiers.findIndex(tier => tier.n === n));
+  const p = tiers.length > 1 ? index / (tiers.length - 1) : 0;
   return `calc(${p * 100}% + ${(0.5 - p) * KNOB}px)`;
 };
 
-export default function CubeSizeSlider({ value, onChange, accent, accentShadow }) {
-  const tier = sizeTier(value);
-  const knobLeft = stopAt(value);
+export default function CubeSizeSlider({ value, onChange, accent, accentShadow, tiers = SIZE_TIERS }) {
+  const tier = sizeTier(value, tiers);
+  const knobLeft = stopAt(value, tiers);
 
   return (
     <div style={{ padding: '4px 2px 0' }}>
@@ -50,13 +51,13 @@ export default function CubeSizeSlider({ value, onChange, accent, accentShadow }
         }} />
 
         {/* Detents */}
-        {SIZE_TIERS.map(({ n }) => (
+        {tiers.map(({ n }) => (
           <div
             key={n}
             aria-hidden="true"
             style={{
               position: 'absolute',
-              left: stopAt(n),
+              left: stopAt(n, tiers),
               transform: 'translateX(-50%)',
               width: '4px', height: '4px', borderRadius: '50%',
               background: n <= value ? 'rgba(255,255,255,0.75)' : '#a89f92',
@@ -84,11 +85,11 @@ export default function CubeSizeSlider({ value, onChange, accent, accentShadow }
 
         <input
           type="range"
-          min={MIN_CUBE_SIZE}
-          max={MAX_CUBE_SIZE}
+          min={0}
+          max={tiers.length - 1}
           step={1}
-          value={value}
-          onChange={e => onChange(parseInt(e.target.value, 10))}
+          value={Math.max(0, tiers.findIndex(option => option.n === value))}
+          onChange={e => onChange(tiers[parseInt(e.target.value, 10)].n)}
           aria-label="Cube size"
           aria-valuetext={`${tier.name}, ${tier.tag}`}
           style={{
@@ -103,7 +104,7 @@ export default function CubeSizeSlider({ value, onChange, accent, accentShadow }
           Positioned on the same curve as the detents so each number sits under
           the notch it selects. */}
       <div style={{ position: 'relative', height: '30px', marginTop: '2px' }}>
-        {SIZE_TIERS.map(({ n }) => {
+        {tiers.map(({ n }) => {
           const selected = n === value;
           return (
             <button
@@ -111,7 +112,7 @@ export default function CubeSizeSlider({ value, onChange, accent, accentShadow }
               onClick={() => onChange(n)}
               aria-label={`${n} by ${n}`}
               style={{
-                position: 'absolute', left: stopAt(n), transform: 'translateX(-50%)',
+                position: 'absolute', left: stopAt(n, tiers), transform: 'translateX(-50%)',
                 background: 'none', border: 'none', padding: '4px 8px 0',
                 cursor: 'pointer', fontFamily: 'inherit', WebkitTapHighlightColor: 'transparent',
                 display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px'

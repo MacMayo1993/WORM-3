@@ -83,7 +83,11 @@ function publishTilePress(sim, size, ctx, delta) {
             const sticker = cubies?.[_parseTile.x]?.[_parseTile.y]?.[_parseTile.z]?.stickers?.[_parseTile.dirKey];
             if (!sticker) continue;
             const gridId = getManifoldGridId(sticker, size);
-            pressTile(gridId, 1 - PRESS_TAIL_FALLOFF * (i / span));
+            // Pressure follows the occupied grid cell—the same canonical key the
+            // body trail and StickerPlane use. The manifold ID is still the right
+            // key for the animation registry because it identifies that sticker's
+            // mounted tick callback.
+            pressTile(key, 1 - PRESS_TAIL_FALLOFF * (i / span));
             // The sticker's own per-frame tick is opt-in (StickerAnimationManager),
             // so a tile has to be woken before it can sink. It puts itself back to
             // sleep once it has finished rebounding.
