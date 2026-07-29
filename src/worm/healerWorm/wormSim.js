@@ -88,8 +88,7 @@ import {
     SPECIAL_MAX_ON_BOARD,
     SPECIAL_SPAWN_INTERVAL,
     SPECIAL_LIFETIME,
-    ROCKET_TILE_SPAN,
-    ROCKET_JUMP_HEIGHT,
+    ROCKET_DURATION,
     ROCKET_SPEED_MULT,
     MAGNET_DURATION,
     MAGNET_RADIUS,
@@ -97,7 +96,6 @@ import {
     SPECIAL_JUMP_REACH,
     SPECIAL_TUNNEL_RADIUS,
     SPECIAL_SPAWN_RETRY,
-    ROCKET_LANDING_GRACE,
     MAX_ORB_ATTRACTION_FX,
 } from './constants.js';
 
@@ -181,8 +179,8 @@ export function makeWormSim(size) {
         specialTimer: SPECIAL_SPAWN_INTERVAL,
         specialSeq: 0,            // monotonic id source for spawned specials
         specialPicker: makeSpecialPicker(),
-        rocketActive: false,      // mid rocket flight (implies isJumping)
-        rocketExtended: false,    // a second rocket already refreshed this flight
+        rocketActive: false,      // protected three-second overdrive
+        rocketT: 0,
         magnetT: 0,               // seconds of magnet reach remaining
         magnetMaxT: 0,            // duration of the active magnet, for the HUD's fill
         landingGraceT: 0,         // post-rocket window where a landing can't kill
@@ -292,7 +290,7 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.specialTimer = SPECIAL_SPAWN_INTERVAL;
     sim.specialPicker = makeSpecialPicker();
     sim.rocketActive = false;
-    sim.rocketExtended = false;
+    sim.rocketT = 0;
     sim.magnetT = 0;
     sim.magnetMaxT = 0;
     sim.landingGraceT = 0;
@@ -351,47 +349,15 @@ export function startJump(sim, ctx) {
     sim.pendingTunnelTrigger = null;
 }
 
-/**
- * Launch a rocket flight: a jump that spans ROCKET_TILE_SPAN tiles at a taller apex
- * and a faster crawl speed. Being airborne already grants immunity to the worm's own
- * body and skips wormhole mouths (both keyed off sim.isJumping), and the slice hazard
- * check treats an airborne head as clear — so the rocket clears every hazard it flies
- * over, while the tail left on the ground can still be cut.
- *
- * Two stacking cases matter:
- *   • Claimed mid-flight — the flight is EXTENDED once (a longer span, so the
- *     remaining arc covers more ground) rather than restarted. Resetting jumpT would
- *     drop the worm back to the start of the arc, a visible snap, and would re-fire a
- *     transition the HUD has already mounted.
- *   • Claimed during an ordinary jump — the arc is rebased so the worm's current
- *     height carries into the taller rocket arc instead of snapping to the ground.
- */
+/** Start or refresh the grounded, protected rocket overdrive. */
 export function startRocket(sim, ctx) {
     if (sim.rocketActive) {
-        if (sim.rocketExtended) return;      // one extension per flight
-        sim.rocketExtended = true;
-        sim.jumpSpan += ROCKET_TILE_SPAN;    // lengthen without touching the lift curve
+        sim.rocketT = ROCKET_DURATION;
         ctx.feel('rocket');
-        return;                              // no duplicate onRocketState(true)
+        return;
     }
-
-    // Rebase an in-progress jump onto the rocket's taller arc at equal height, so the
-    // switch is continuous. asin picks the ascending branch — the worm keeps climbing.
-    let startT = 0.001;
-    if (sim.isJumping) {
-        const currentLift = Math.sin(sim.jumpT * Math.PI) * sim.jumpHeight;
-        const ratio = Math.min(1, Math.max(0, currentLift / ROCKET_JUMP_HEIGHT));
-        startT = Math.max(0.001, Math.asin(ratio) / Math.PI);
-    }
-
     sim.rocketActive = true;
-    sim.rocketExtended = false;
-    sim.isJumping = true;
-    sim.jumpT = startT;
-    // Spend the whole jump allowance: no double-jump out of a rocket flight.
-    sim.jumpCount = MAX_JUMPS;
-    sim.jumpSpan = ROCKET_TILE_SPAN;
-    sim.jumpHeight = ROCKET_JUMP_HEIGHT;
+    sim.rocketT = ROCKET_DURATION;
     sim.pendingTunnelTrigger = null;
     sim.pendingSelfCollision = null;
     ctx.feel('rocket');
@@ -844,7 +810,7 @@ const PHASE_HANDLERS = {
                 // Landing grace also holds off an instant wormhole dive: a rocket that
                 // happens to touch down on a mouth shouldn't swallow the player before
                 // they can react to where they landed.
-                if (sim.landingGraceT > 0) {
+                if (sim.rocketActive || sim.landingGraceT > 0) {
                     sim.pendingTunnelTrigger = null;
                 } else if (sim.interpT >= TUNNEL_TRIGGER_PROGRESS && !sim.isJumping) {
                     beginTunnelTransition(sim, size, ctx, x, y, z, dirKey);
@@ -855,8 +821,8 @@ const PHASE_HANDLERS = {
             if (headOnSurface && sim.pendingSelfCollision) {
                 if (sim.selfCollisionGraceSteps > 0) {
                     sim.pendingSelfCollision = null;
-                } else if (sim.landingGraceT > 0) {
-                    // Just touched down from a rocket — see ROCKET_LANDING_GRACE.
+                } else if (sim.rocketActive || sim.landingGraceT > 0) {
+                    // Protected buffs and post-jump grace both suppress a pending hit.
                     sim.pendingSelfCollision = null;
                 } else if (sim.isJumping) {
                     // Allow jumping over your own body tile before impact threshold.
@@ -991,7 +957,7 @@ const PHASE_HANDLERS = {
                         if (ttAt(sim.tileTrail, ti) === nextKey) { bodyHit = true; break; }
                     }
                     const nextOnSurface = isSurfaceTilePos(nextPos, size);
-                    const selfHit = nextOnSurface && sim.selfCollisionGraceSteps <= 0 && bodyHit;
+                    const selfHit = nextOnSurface && !sim.rocketActive && sim.selfCollisionGraceSteps <= 0 && bodyHit;
                     if (selfHit) {
                         // Defer self-hit until we've penetrated the tile by 40%.
                         // This gives players a short reaction window to jump over their body.
@@ -1056,7 +1022,7 @@ const PHASE_HANDLERS = {
                     ctx.onFlippedTile(sim.onFlippedTile);
                 }
 
-                if (isFlipped) {
+                if (isFlipped && !sim.rocketActive) {
                     sim.pendingTunnelTrigger = { x, y, z, dirKey };
                     // Swept-entry guard: if the step accumulator remainder indicates the worm
                     // has already spent ≥ TUNNEL_TRIGGER_PROGRESS of this tile's step time on
@@ -1296,10 +1262,20 @@ export function stepWormSim(sim, delta, size, ctx) {
     if (sim.phase === 'crawling' && sim.landingGraceT > 0) {
         sim.landingGraceT = Math.max(0, sim.landingGraceT - delta);
     }
+    if (sim.phase === 'crawling' && sim.rocketT > 0) {
+        sim.rocketT = Math.max(0, sim.rocketT - delta);
+        if (sim.rocketT === 0) {
+            sim.rocketActive = false;
+            sim.pendingSelfCollision = null;
+            sim.pendingTunnelTrigger = null;
+            ctx.feel('rocketLand');
+            ctx.onRocketState(false);
+        }
+    }
 
     const boostMult = sim.boostActiveT > 0 ? BOOST_MULTIPLIER : 1;
-    // A rocket flight sets its own floor on crawl speed; boosting into one doesn't stack.
-    const speedMult = sim.rocketActive ? Math.max(ROCKET_SPEED_MULT, boostMult) : boostMult;
+    // Rocket is exactly 2× the user's current speed; the normal boost does not stack.
+    const speedMult = sim.rocketActive ? ROCKET_SPEED_MULT : boostMult;
     const STEP_SEC = 1.0 / (ctx.getSpeed() * speedMult);
 
     // If the crawl speed changed since last frame, rescale the in-progress step
@@ -1369,7 +1345,7 @@ export function stepWormSim(sim, delta, size, ctx) {
     // Always advance jump
     if (sim.isJumping) {
         // Tie jump progress to tile-traverse progress so the speed slider never changes
-        // jump distance. jumpSpan is 1 for a normal jump, ROCKET_TILE_SPAN in flight.
+        // jump distance. Rocket overdrive no longer changes the ordinary jump arc.
         sim.jumpT += (delta / STEP_SEC) / sim.jumpSpan;
         if (sim.jumpT >= 1) {
             sim.jumpT = 0;
@@ -1377,19 +1353,6 @@ export function stepWormSim(sim, delta, size, ctx) {
             sim.jumpCount = 0;
             sim.jumpSpan = SURFACE_JUMP_TILE_SPAN;
             sim.jumpHeight = SURFACE_JUMP_HEIGHT;
-            if (sim.rocketActive) {
-                sim.rocketActive = false;
-                sim.rocketExtended = false;
-                // A brief window where the touchdown itself can't kill. The player
-                // cannot see what is under a five-tile flight until it lands, so dying
-                // on the landing frame is unfair rather than difficult. Short by
-                // design — the worm is vulnerable again about a tile later.
-                sim.landingGraceT = ROCKET_LANDING_GRACE;
-                sim.pendingSelfCollision = null;
-                sim.pendingTunnelTrigger = null;
-                ctx.feel('rocketLand');
-                ctx.onRocketState(false);
-            }
         }
     }
 
@@ -1512,7 +1475,7 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
             sim.lastFlipped = landedFlipped;
             ctx.onFlippedTile(landedFlipped);
         }
-        if (landedFlipped) sim.pendingTunnelTrigger = { x, y, z, dirKey };
+        if (landedFlipped && !sim.rocketActive) sim.pendingTunnelTrigger = { x, y, z, dirKey };
     }
 
     // Bake the committed turn into the body's position history: rotate the world
