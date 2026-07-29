@@ -40,7 +40,7 @@ import { wormBuffs, buffReadout, resetWormBuffs } from '../worm/wormBuffs.js';
 import { collectManifoldRing } from '../worm/wormLogic.js';
 import { makeCubies } from '../game/cubeState.js';
 import { checkWormHitBySlice } from '../worm/wormHelpers.js';
-import { makeTileTrail, ttReset, ttPush, ttAt } from '../worm/circularBuffers.js';
+import { makeTileTrail, ttReset, ttPush } from '../worm/circularBuffers.js';
 import { liveRotation } from '../worm/liveRotation.js';
 
 const SIZE = 5;
