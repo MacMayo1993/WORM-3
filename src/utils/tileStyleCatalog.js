@@ -54,3 +54,8 @@ export const TILE_STYLE_SECTIONS = [
   { key: 'impossible', label: 'Impossible', keys: IMPOSSIBLE_STYLE_KEYS },
   { key: 'surreal', label: 'Surreal', keys: SURREAL_STYLE_KEYS },
 ];
+
+// The canonical pool for features that operate across the whole catalogue
+// (notably every wizard's Random Mix). Derive it from the sections so adding a
+// style to the picker automatically makes it eligible everywhere else too.
+export const ALL_TILE_STYLE_KEYS = TILE_STYLE_SECTIONS.flatMap(section => section.keys);
