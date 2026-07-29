@@ -1082,6 +1082,11 @@ const CubeAssembly = React.memo(({
                   size={size}
                   wormMode={wormHealerMode}
                   hideBody={wormExitRideActive}
+                  // Mega Mode's individual rounded bodies account for more than
+                  // a thousand transparent draw calls and R3F geometry nodes. The
+                  // stickers remain the complete playable surface, and Worm Mode
+                  // does not use cubie pointer-dragging, so omit the underlays.
+                  omitBody={wormHealerMode && size >= 15}
                   onPointerDown={onPointerDown}
                 />
               );

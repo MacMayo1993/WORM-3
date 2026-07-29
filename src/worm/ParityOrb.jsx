@@ -110,7 +110,7 @@ function SingleOrb({
   collected = false, isTarget = false, elevated = false,
   dirKey = 'PY', orbKey, type = 'parity',
   registerAnim, unregisterAnim,
-  gridX = -1, gridY = -1, gridZ = -1, isGlowWorm = false,
+  gridX = -1, gridY = -1, gridZ = -1, isGlowWorm = false, reducedDetail = false,
 }) {
   const orbGroupRef    = useRef();
   const coreRef        = useRef();
@@ -175,6 +175,27 @@ function SingleOrb({
   if (collected) return null;
 
   const g = isTarget ? _orbGeos.target : _orbGeos.normal;
+
+  // Mega Mode can carry more than a hundred pickups. Rendering the full gem,
+  // cage, Möbius strip, and orbital system for every one turns those pickups
+  // into hundreds of draw calls. A single emissive gem keeps them readable at
+  // the much smaller on-screen tile size while preserving movement and pickup.
+  if (reducedDetail) {
+    return (
+      <group ref={orbGroupRef} position={[position[0], position[1], position[2]]}>
+        <mesh ref={coreRef} geometry={g.shell}>
+          <meshStandardMaterial
+            color={color}
+            emissive={color}
+            emissiveIntensity={1.4}
+            roughness={0.18}
+            metalness={0.05}
+            toneMapped={false}
+          />
+        </mesh>
+      </group>
+    );
+  }
 
   return (
     <group ref={orbGroupRef} position={[position[0], position[1], position[2]]}>
@@ -549,6 +570,7 @@ export default function ParityOrbs({
           isGlowWorm={isGlowWorm}
           registerAnim={registerAnim}
           unregisterAnim={unregisterAnim}
+          reducedDetail={size >= 15 && !isTunnelMode}
         />
       ))}
     </group>

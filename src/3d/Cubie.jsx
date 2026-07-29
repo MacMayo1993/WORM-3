@@ -120,7 +120,7 @@ function LegoStud({ dir, color, enableShadows = true }) {
 // Helper functions for grid and sudokube modes
 
 const Cubie = React.forwardRef(function Cubie({
-  position, cubie, size, wormMode = false, hideBody = false, onPointerDown,
+  position, cubie, size, wormMode = false, hideBody = false, omitBody = false, onPointerDown,
 }, ref) {
   const { hollowMode, mirrorMode, visualMode, explosionFactor, settings, randomMode, randomStyleTick, perfReducedFX } = useGameStore(
     useShallow(s => ({
@@ -451,7 +451,7 @@ const Cubie = React.forwardRef(function Cubie({
             </mesh>
           ))}
         </>
-      ) : hideBody ? (
+      ) : omitBody ? null : hideBody ? (
         // Exit-arm ride: camera is inside the cube and the solid body would occlude the
         // antipodal back-face stickers, so swap it for an invisible hit box (pointer
         // interaction stays intact, but nothing opaque sits between camera and stickers).
@@ -511,7 +511,7 @@ const _DIRS = ['PX', 'NX', 'PY', 'NY', 'PZ', 'NZ'];
 // comparison element-wise so future refactors can't silently regress it.
 function cubiePropsAreEqual(prev, next) {
   if (prev.size !== next.size || prev.onPointerDown !== next.onPointerDown) return false;
-  if (prev.wormMode !== next.wormMode || prev.hideBody !== next.hideBody) return false;
+  if (prev.wormMode !== next.wormMode || prev.hideBody !== next.hideBody || prev.omitBody !== next.omitBody) return false;
   if (
     prev.position[0] !== next.position[0] ||
     prev.position[1] !== next.position[1] ||

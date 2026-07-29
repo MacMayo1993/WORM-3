@@ -909,9 +909,13 @@ export default function WORM3() {
       reset();
     }
 
+    // Keep the same orb density as a normal large Worm board. A 15×15 face has
+    // roughly 4.6× the area of a 7×7 face, so using the unscaled wizard count
+    // makes Mega Mode feel almost empty.
+    const megaAreaScale = wizardSettings.megaMode ? (15 * 15) / (7 * 7) : 1;
     const wormParams = {
       wormSpeed: wizardSettings.wormSpeed ?? 1.0,
-      wormOrbCount: wizardSettings.wormOrbCount ?? 5,
+      wormOrbCount: Math.round((wizardSettings.wormOrbCount ?? 5) * megaAreaScale),
       wormholeInterval: wizardSettings.wormholeInterval ?? 10,
       wormColor: wizardSettings.wormColor ?? '#33ff66',
     };
@@ -919,6 +923,10 @@ export default function WORM3() {
       vibrate([50, 30, 100]);
       cancelDisparityRun();
       useGameStore.getState().clearLevel();
+      // A 15×15 shell contains 1,178 rendered cubelets. Start it in the lighter
+      // effects tier immediately instead of waiting for the frame monitor to
+      // notice the drop and react several seconds into play.
+      if (wizardSettings.megaMode) useGameStore.getState().setPerfReducedFX(true);
       useGameStore.getState().initWormMode(
         undefined, undefined,
         wormParams.wormSpeed,

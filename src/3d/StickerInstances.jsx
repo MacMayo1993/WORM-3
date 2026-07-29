@@ -143,6 +143,10 @@ export function StickerInstanceProvider({ children }) {
     }
     const id = nextIdRef.current++;
     registryRef.current.set(id, { groupRef, colorRef, isInstancedRef, slot });
+    // Only submit slots that can contain a live sticker. Keeping mesh.count at
+    // the 2,048-slot capacity made the GPU process hundreds of empty instances
+    // every frame on ordinary cubes and almost 700 empty instances in Mega Mode.
+    instanceMesh.count = Math.max(instanceMesh.count === MAX_INSTANCES ? 0 : instanceMesh.count, slot + 1);
     // Seed the per-instance color so the first frame shows the correct colour.
     if (colorRef.current) {
       instanceMesh.setColorAt(slot, colorRef.current);
@@ -166,6 +170,13 @@ export function StickerInstanceProvider({ children }) {
     zeroedSlotsRef.current.delete(entry.slot);
     registryRef.current.delete(id);
     freeSlotsRef.current.push(entry.slot);
+    if (entry.slot === instanceMesh.count - 1) {
+      let highestSlot = -1;
+      for (const registered of registryRef.current.values()) {
+        if (registered.slot > highestSlot) highestSlot = registered.slot;
+      }
+      instanceMesh.count = highestSlot + 1;
+    }
     // Invalidate the cached color so the recycled slot uploads correctly on first use.
     const base = entry.slot * 3;
     lastColorsRef.current[base] = NaN;

@@ -364,6 +364,11 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           {cos.cubeSize === MEGA_CUBE_SIZE ? '15×15×15 selected' : 'Play on 15×15×15'}
         </span>
       </button>
+      {cos.cubeSize === MEGA_CUBE_SIZE && (
+        <p style={{ margin: '9px 4px 0', fontSize: '10px', color: PAPER_TEXT_MUTED, lineHeight: 1.45 }}>
+          Mega Mode automatically scales orb density to fill the larger surface and uses optimized effects for smoother play.
+        </p>
+      )}
     </div>
   ];
 
