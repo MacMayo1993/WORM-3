@@ -1045,12 +1045,14 @@ const CubeAssembly = React.memo(({
         {/* Solid body + interaction overlays only — hidden for the whole tunnel traversal so they
             don't z-fight with TunnelInteriorView, while the Möbius ribbons and VoidCore above stay visible. */}
         <group visible={!wormholeBodyHidden}>
-          {wormHealerMode && size >= 15 && (
+          {size >= 15 && (
             /* Mega omits 1,178 individual rounded cubie bodies for performance,
                but still needs a continuous dark chassis beneath the sticker grid.
                One inset box restores the black seams, silhouette, and Rubik's-cube
                volume for a single draw call; this parent group hides it during
-               tunnel transit just like the old per-cubie bodies. */
+               tunnel transit just like the old per-cubie bodies. This is keyed
+               to size—not the delayed Worm flag—so the Mobi intro and New Game
+               wizard never build the expensive body shell first. */
             <mesh castShadow={false} receiveShadow={false}>
               {/* The sticker face begins 0.51 units from its cubie centre and its
                   footprint can sink 0.0285 units (tile + perimeter offset). Keep
@@ -1106,9 +1108,9 @@ const CubeAssembly = React.memo(({
                   hideBody={wormExitRideActive}
                   // Mega Mode's individual rounded bodies account for more than
                   // a thousand transparent draw calls and R3F geometry nodes. The
-                  // stickers remain the complete playable surface, and Worm Mode
-                  // does not use cubie pointer-dragging, so omit the underlays.
-                  omitBody={wormHealerMode && size >= 15}
+                  // stickers remain the complete surface; key this to size so the
+                  // pre-Worm Mobi intro and setup re-entry are optimized as well.
+                  omitBody={size >= 15}
                   onPointerDown={onPointerDown}
                 />
               );

@@ -907,6 +907,10 @@ export default function WORM3() {
     // authoritative so future wizard changes cannot accidentally launch it on
     // the last ordinary slider value.
     const targetSize = wizardSettings.megaMode ? 15 : (wizardSettings.cubeSize || 3);
+    // Establish the Mega quality tier before mounting the new cube. Waiting for
+    // Mobi completion means the entire intro pays for full-size effects, and New
+    // Game can re-enter the wizard with size 15 still mounted.
+    useGameStore.getState().setPerfReducedFX(!!wizardSettings.megaMode);
     if (targetSize !== size) {
       changeSize(targetSize);
     } else {
