@@ -47,8 +47,8 @@ const _normalMat3 = new THREE.Matrix3();
 const _identityMat4 = new THREE.Matrix4();
 
 // Pre-allocated pool for live drag base positions/rotations.
-// Max supported cube size is 7, so a rotated slice can contain up to 7² = 49 cubies.
-const _MAX_SLICE = 49;
+// Mega Mode supports size 15, so a rotated slice can contain up to 15² = 225 cubies.
+const _MAX_SLICE = 225;
 const _dragPosPool = Array.from({ length: _MAX_SLICE }, () => new THREE.Vector3());
 const _dragRotPool = Array.from({ length: _MAX_SLICE }, () => new THREE.Quaternion());
 const _dragBasePositions = new Map();
@@ -66,7 +66,7 @@ const DRAG_THRESHOLD = isTouchDevice ? 8 : 5;
 
 // Max camera distance per cube size — defined once at module scope to avoid
 // creating a new object literal on every CubeAssembly render.
-const MAX_DISTANCE_BY_SIZE = { 2: 28, 3: 28, 4: 38, 5: 52, 6: 68, 7: 85 };
+const MAX_DISTANCE_BY_SIZE = { 2: 28, 3: 28, 4: 38, 5: 52, 6: 68, 7: 85, 15: 175 };
 
 // Pixels of drag to complete a 90° rotation
 const PIXELS_PER_90DEG = 100;
