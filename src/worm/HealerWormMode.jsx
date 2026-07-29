@@ -302,7 +302,13 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                 useGameStore.setState({ wormGamePhase: 'finalHealing' });
                 return;
             }
-            pendingRotRef.current = inverseQueueRef.current[0]; // peek
+            const next = inverseQueueRef.current[0]; // peek
+            if (size >= 15) {
+                const start = Math.max(0, Math.min(size - 3, next.sliceIndex - 1));
+                pendingRotRef.current = { ...next, sliceIndices: [start, start + 1, start + 2] };
+            } else {
+                pendingRotRef.current = next;
+            }
         }
 
         // Update warning progress (0→1)
@@ -319,11 +325,15 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                 return;
             }
 
-            const { axis, dir, sliceIndex } = pendingRotRef.current;
+            const { axis, dir, sliceIndex, sliceIndices } = pendingRotRef.current;
             inverseQueueRef.current.shift(); // now dequeue
 
             // Hit detection
-            const hit = checkWormHitBySlice(worm, axis, sliceIndex);
+            let hit = null;
+            for (const layer of (sliceIndices?.length ? sliceIndices : [sliceIndex])) {
+                hit = checkWormHitBySlice(worm, axis, layer);
+                if (hit) break;
+            }
             if (hit) {
                 const histEntry = hit.type === 'cut'
                     ? shAt(worm.stepHistory.current, hit.cutTrailIdx * STEPS_PER_TILE)
@@ -345,7 +355,17 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                 }
             }
 
-            if (onRotate) onRotate(axis, dir, sliceIndex);
+            if (onRotate) {
+                // liveRotation exposes one anchor slice to the chase/body bridge.
+                // When the head is on one of Mega's three parallel layers, make
+                // that layer the anchor so the worm rides the tween instead of
+                // snapping only when the batch commits.
+                const axisCoord = axis === 'col' ? worm.pos.current.x
+                    : axis === 'row' ? worm.pos.current.y
+                    : worm.pos.current.z;
+                const anchorSlice = sliceIndices?.includes(axisCoord) ? axisCoord : sliceIndex;
+                onRotate(axis, dir, anchorSlice, false, sliceIndices);
+            }
 
             // Reset for next cycle (fixed interval — no randomisation)
             pendingRotRef.current = null;

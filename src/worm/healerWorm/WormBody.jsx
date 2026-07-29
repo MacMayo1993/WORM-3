@@ -487,8 +487,8 @@ export function WormBody({ worm, size }) {
             // gameplay camera distance, so thin them out — every segment near the head,
             // every 2nd beyond 200, every 4th beyond 600. Skipped segments never run the
             // curve-walk math below; the walk's cumulative distance naturally catches up to
-            // the next rendered segment's (larger) target distance. The rendered segment is
-            // scaled up to fill the gap left by its skipped neighbors.
+            // the next rendered segment's (larger) target distance. Surviving segments keep
+            // their normal scale so orb growth never changes body-ball size at an LOD boundary.
             const lodStep = i < 200 ? 1 : (i < 600 ? 2 : 4);
             if (i !== 0 && i % lodStep !== 0) continue;
 
@@ -652,9 +652,9 @@ export function WormBody({ worm, size }) {
             }
 
             if (transitScale < 1) _wormDummy.scale.multiplyScalar(transitScale);
-            // Compensate for the longitudinal gap left by skipped neighbors so the tail
-            // still reads as continuous instead of visibly beaded out at long lengths.
-            if (lodStep > 1) _wormDummy.scale.multiplyScalar(lodStep);
+            // LOD removes distant instances to control cost, but must never make
+            // the survivors larger: that produced an abrupt size jump at segment
+            // 200/600 and made collected-orb growth look non-uniform.
             // Camera-proximity cull, transit only.
             //
             // Inside a wormhole the camera trails the head along the very centerline
