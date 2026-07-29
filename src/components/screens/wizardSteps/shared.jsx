@@ -49,7 +49,7 @@ export const SIZE_TIERS = [
 export const MIN_CUBE_SIZE = SIZE_TIERS[0].n;
 export const MAX_CUBE_SIZE = SIZE_TIERS[SIZE_TIERS.length - 1].n;
 
-export const sizeTier = n => SIZE_TIERS.find(t => t.n === n) || SIZE_TIERS[1];
+export const sizeTier = (n, tiers = SIZE_TIERS) => tiers.find(t => t.n === n) || tiers[1];
 
 // ─── Colour helpers ───────────────────────────────────────────────────────────
 

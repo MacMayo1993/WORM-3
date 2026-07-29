@@ -47,8 +47,8 @@ const _normalMat3 = new THREE.Matrix3();
 const _identityMat4 = new THREE.Matrix4();
 
 // Pre-allocated pool for live drag base positions/rotations.
-// Max supported cube size is 7, so a rotated slice can contain up to 7² = 49 cubies.
-const _MAX_SLICE = 49;
+// Mega Mode supports size 15, so a rotated slice can contain up to 15² = 225 cubies.
+const _MAX_SLICE = 225;
 const _dragPosPool = Array.from({ length: _MAX_SLICE }, () => new THREE.Vector3());
 const _dragRotPool = Array.from({ length: _MAX_SLICE }, () => new THREE.Quaternion());
 const _dragBasePositions = new Map();
@@ -66,7 +66,7 @@ const DRAG_THRESHOLD = isTouchDevice ? 8 : 5;
 
 // Max camera distance per cube size — defined once at module scope to avoid
 // creating a new object literal on every CubeAssembly render.
-const MAX_DISTANCE_BY_SIZE = { 2: 28, 3: 28, 4: 38, 5: 52, 6: 68, 7: 85 };
+const MAX_DISTANCE_BY_SIZE = { 2: 28, 3: 28, 4: 38, 5: 52, 6: 68, 7: 85, 15: 175 };
 
 // Pixels of drag to complete a 90° rotation
 const PIXELS_PER_90DEG = 100;
@@ -1045,6 +1045,28 @@ const CubeAssembly = React.memo(({
         {/* Solid body + interaction overlays only — hidden for the whole tunnel traversal so they
             don't z-fight with TunnelInteriorView, while the Möbius ribbons and VoidCore above stay visible. */}
         <group visible={!wormholeBodyHidden}>
+          {wormHealerMode && size >= 15 && (
+            /* Mega omits 1,178 individual rounded cubie bodies for performance,
+               but still needs a continuous dark chassis beneath the sticker grid.
+               One inset box restores the black seams, silhouette, and Rubik's-cube
+               volume for a single draw call; this parent group hides it during
+               tunnel transit just like the old per-cubie bodies. */
+            <mesh castShadow={false} receiveShadow={false}>
+              {/* The sticker face begins 0.51 units from its cubie centre and its
+                  footprint can sink 0.0285 units (tile + perimeter offset). Keep
+                  the chassis face at 0.46 so depressed tiles remain in front of
+                  its depth buffer instead of vanishing at the start of a run. */}
+              <boxGeometry args={[size - 0.08, size - 0.08, size - 0.08]} />
+              <meshStandardMaterial
+                color="#07080c"
+                roughness={0.82}
+                metalness={0.08}
+                transparent
+                opacity={0.92}
+                depthWrite
+              />
+            </mesh>
+          )}
           {!isBiomeMode && cascades.map(c =>
             c?.from && c?.to ? (
               <ChaosWave
@@ -1082,6 +1104,11 @@ const CubeAssembly = React.memo(({
                   size={size}
                   wormMode={wormHealerMode}
                   hideBody={wormExitRideActive}
+                  // Mega Mode's individual rounded bodies account for more than
+                  // a thousand transparent draw calls and R3F geometry nodes. The
+                  // stickers remain the complete playable surface, and Worm Mode
+                  // does not use cubie pointer-dragging, so omit the underlays.
+                  omitBody={wormHealerMode && size >= 15}
                   onPointerDown={onPointerDown}
                 />
               );
