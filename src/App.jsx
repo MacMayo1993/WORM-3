@@ -1312,7 +1312,12 @@ export default function WORM3() {
   // ========================================================================
   // RENDER
   // ========================================================================
-  const cameraZ = (isMobile ? { 2: 10, 3: 14, 4: 20, 5: 30, 6: 42, 7: 54 } : { 2: 8, 3: 11, 4: 16, 5: 24, 6: 34, 7: 44 })[size] || 11;
+  // Framing distance per cube size. The tables cover the standard 2-7 tiers; any
+  // size beyond them (the Mega Worm 15) extrapolates from the same ~7.3/6.1 units
+  // per cubie the top of each table settles on. The old `|| 11` fallback framed a
+  // 15-cube at the distance meant for a 3-cube, i.e. from inside it.
+  const cameraZ = (isMobile ? { 2: 10, 3: 14, 4: 20, 5: 30, 6: 42, 7: 54 } : { 2: 8, 3: 11, 4: 16, 5: 24, 6: 34, 7: 44 })[size]
+    ?? Math.round(size * (isMobile ? 7.7 : 6.3));
   const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const introPerformanceMode = isMobile || prefersReducedMotion;
 

@@ -81,7 +81,11 @@ const DRAG_THRESHOLD = isTouchDevice ? 8 : 5;
 
 // Max camera distance per cube size — defined once at module scope to avoid
 // creating a new object literal on every CubeAssembly render.
+// Zoom-out ceiling per cube size. Sizes past the standard tiers extrapolate
+// rather than falling back to the size-2 value, which would pin a large cube
+// closer than its own framing distance.
 const MAX_DISTANCE_BY_SIZE = { 2: 28, 3: 28, 4: 38, 5: 52, 6: 68, 7: 85 };
+const maxDistanceFor = (size) => MAX_DISTANCE_BY_SIZE[size] ?? Math.round(size * 12);
 
 // Pixels of drag to complete a 90° rotation
 const PIXELS_PER_90DEG = 100;
@@ -1183,7 +1187,7 @@ const CubeAssembly = React.memo(({
             noZoom={handsMode && explosionFactor === 0}
             noRotate={handsMode ? true : false}
             minDistance={5}
-            maxDistance={MAX_DISTANCE_BY_SIZE[size] || 28}
+            maxDistance={maxDistanceFor(size)}
             enabled={!wormHealerMode && (!handsMode || explosionFactor > 0) && !animWave && !dragStart && controlsEnabledRef.current && !wormTunnelActive}
             staticMoving={false}
             dynamicDampingFactor={isTouchDevice ? 0.15 : 0.08}

@@ -34,6 +34,11 @@ export const perfBridge = {
   // Scene context, set by whoever mounts the probe
   label: '',
   cubeSize: 0,
+
+  // The live Three.js scene, published so a measurement session can attribute
+  // cost per object rather than guessing from a single total. Only ever set
+  // behind the Mega Worm flag, and never read by gameplay code.
+  _scene: null,
 };
 
 // Scratch buffer for the percentile sort. Reused so the publish step allocates

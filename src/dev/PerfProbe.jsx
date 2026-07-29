@@ -28,7 +28,7 @@ import { perfBridge, pushFrameSample, refreshFrameStats } from './perfBridge.js'
 const PUBLISH_INTERVAL = 0.25;
 
 export default function PerfProbe({ label = '', cubeSize = 0 }) {
-  const { gl } = useThree();
+  const { gl, scene } = useThree();
   const lastRef = useRef(0);
   const publishRef = useRef(0);
 
@@ -40,6 +40,7 @@ export default function PerfProbe({ label = '', cubeSize = 0 }) {
     // First frame has no predecessor to measure against.
     if (last === 0) {
       perfBridge.active = true;
+      perfBridge._scene = scene;
       perfBridge.label = label;
       perfBridge.cubeSize = cubeSize;
       return;
@@ -53,6 +54,7 @@ export default function PerfProbe({ label = '', cubeSize = 0 }) {
 
     refreshFrameStats();
 
+    perfBridge._scene = scene;
     const info = gl.info;
     perfBridge.drawCalls = info.render.calls;
     perfBridge.triangles = info.render.triangles;
