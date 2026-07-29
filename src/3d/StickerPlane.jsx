@@ -1824,18 +1824,27 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
   return (
     <group position={pos} rotation={rot} ref={groupRef}>
-      {/* Ghost spider web on the back of flipped tiles */}
-      <mesh ref={spiderPlaneRef} position={[0, 0, -1.01]} rotation={[0, Math.PI, 0]} visible={false}>
-        <planeGeometry args={[0.92, 0.92]} />
-        <shaderMaterial
-          ref={spiderMatRef}
-          vertexShader={spiderVertexShader}
-          fragmentShader={spiderFragmentShader}
-          uniforms={spiderUniforms}
-          transparent
-          depthWrite={false}
-        />
-      </mesh>
+      {/* Ghost spider web on the back of flipped tiles. Mounted only once a tile has
+          any flip history — a never-flipped tile can never show it, so on a 15×15
+          Mega shell the ~1,300 untouched tiles skip this mesh (and every transient
+          flip/heal mesh below) entirely, shrinking the per-frame scene-graph walk.
+          These meshes are visible={false} until an effect fires, so their shaders
+          already compiled lazily on first use — gating changes node count, not
+          compile timing. hasFlipHistory latches true on the flip that mounts them,
+          the same commit whose flip-start effect then wires their refs. */}
+      {hasFlipHistory && (
+        <mesh ref={spiderPlaneRef} position={[0, 0, -1.01]} rotation={[0, Math.PI, 0]} visible={false}>
+          <planeGeometry args={[0.92, 0.92]} />
+          <shaderMaterial
+            ref={spiderMatRef}
+            vertexShader={spiderVertexShader}
+            fragmentShader={spiderFragmentShader}
+            uniforms={spiderUniforms}
+            transparent
+            depthWrite={false}
+          />
+        </mesh>
+      )}
 
       {/* Antipodal back face — visible from inside the cube; shows the RP² partner tile
           at 80% scale so the interior reads as distinct from the front face. */}
@@ -1952,37 +1961,43 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
       {/* Eyelid blink overlay — disparity flip: NormalBlending at 0.5 alpha over the
           FROM-color mesh gives a simultaneous 50/50 superposition of both colors.
-          Scale.y eyelid squish + lid-edge gleam ride on top of the blend. */}
-      <mesh ref={eyelidOverlayRef} position={[0, 0, 0.002]} visible={false} renderOrder={10}>
-        <primitive object={_sharedStickerGeo} attach="geometry" />
-        <shaderMaterial
-          ref={eyelidMatRef}
-          vertexShader={eyelidVertexShader}
-          fragmentShader={eyelidFragmentShader}
-          uniforms={eyelidUniforms}
-          transparent
-          depthTest={true}
-          depthWrite={false}
-          blending={THREE.NormalBlending}
-        />
-      </mesh>
+          Scale.y eyelid squish + lid-edge gleam ride on top of the blend.
+          Gated on flip history (see spider-web note) — only ever fires on a flip. */}
+      {hasFlipHistory && (
+        <mesh ref={eyelidOverlayRef} position={[0, 0, 0.002]} visible={false} renderOrder={10}>
+          <primitive object={_sharedStickerGeo} attach="geometry" />
+          <shaderMaterial
+            ref={eyelidMatRef}
+            vertexShader={eyelidVertexShader}
+            fragmentShader={eyelidFragmentShader}
+            uniforms={eyelidUniforms}
+            transparent
+            depthTest={true}
+            depthWrite={false}
+            blending={THREE.NormalBlending}
+          />
+        </mesh>
+      )}
 
       {/* Flip rim glow — additive edge ring that fires during the card-flip squish.
           Transparent in the center so living/patterned tile styles show through.
-          AdditiveBlending adds energy to the tile surface rather than covering it. */}
-      <mesh ref={spinRevealRef} position={[0, 0, 0.002]} visible={false} renderOrder={10}>
-        <primitive object={_sharedStickerGeo} attach="geometry" />
-        <shaderMaterial
-          ref={spinRevealMatRef}
-          vertexShader={spinRevealVertexShader}
-          fragmentShader={spinRevealFragmentShader}
-          uniforms={spinRevealUniforms}
-          transparent
-          blending={THREE.AdditiveBlending}
-          depthTest={true}
-          depthWrite={false}
-        />
-      </mesh>
+          AdditiveBlending adds energy to the tile surface rather than covering it.
+          Gated on flip history (see spider-web note). */}
+      {hasFlipHistory && (
+        <mesh ref={spinRevealRef} position={[0, 0, 0.002]} visible={false} renderOrder={10}>
+          <primitive object={_sharedStickerGeo} attach="geometry" />
+          <shaderMaterial
+            ref={spinRevealMatRef}
+            vertexShader={spinRevealVertexShader}
+            fragmentShader={spinRevealFragmentShader}
+            uniforms={spinRevealUniforms}
+            transparent
+            blending={THREE.AdditiveBlending}
+            depthTest={true}
+            depthWrite={false}
+          />
+        </mesh>
+      )}
 
       {/* Neon worm-border — replaces the old solid parity ring. A glowing SQUARE outline
           traced on the tile's own perimeter (like the neon view mode), with bright
@@ -2218,19 +2233,34 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         </>
       )}
 
-      {/* Particle burst effect during flip (manual + chaos/disparity). */}
-      <FlipParticles ref={flipParticlesRef} />
+      {/* Flip burst effects. Each fires only on a flip, which increments the tile's
+          (monotonic) flip count, so a never-flipped Mega tile carries none of them.
+          They mount on the flip that latches hasFlipHistory — the same commit whose
+          flip-start effect wires the refs below — and every ref read is optional-
+          chained, so an unmounted effect is simply a no-op. NOTE: the two HEAL
+          effects below are intentionally NOT in this gate: healSticker resets flips
+          to 0, and the heal seal/particles are picked up (from healBurstMap) only
+          AFTER that reset, when hasFlipHistory is already false — gating them here
+          would unmount them exactly when the heal needs to play. */}
+      {hasFlipHistory && (
+        <>
+          {/* Particle burst effect during flip (manual + chaos/disparity). */}
+          <FlipParticles ref={flipParticlesRef} />
 
-      {/* Neon shockwave ring — bursts across the tile face at the flip moment. */}
-      <FlipShockwave ref={flipShockwaveRef} />
+          {/* Neon shockwave ring — bursts across the tile face at the flip moment. */}
+          <FlipShockwave ref={flipShockwaveRef} />
 
-      {/* Crossing bloom + chromatic flash — fires at the midpoint hitstop. */}
-      <FlipFlash ref={flipFlashRef} />
+          {/* Crossing bloom + chromatic flash — fires at the midpoint hitstop. */}
+          <FlipFlash ref={flipFlashRef} />
 
-      {/* Antipodal glow fill — edge ring collapses in as the core fills out. */}
-      <AntipodalGlowFill ref={glowFillRef} />
+          {/* Antipodal glow fill — edge ring collapses in as the core fills out. */}
+          <AntipodalGlowFill ref={glowFillRef} />
+        </>
+      )}
 
-      {/* Heal seal overlay — golden convergence ring + color bloom on wormhole heal. */}
+      {/* Heal seal overlay — golden convergence ring + color bloom on wormhole heal.
+          Kept mounted regardless of flip history: the heal resets flips to 0 before
+          this animation is picked up (see note above). */}
       <mesh ref={healSealRef} position={[0, 0, 0.004]} visible={false} renderOrder={11}>
         <primitive object={_sharedStickerGeo} attach="geometry" />
         <shaderMaterial
@@ -2244,7 +2274,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         />
       </mesh>
 
-      {/* Double-density golden particle burst on heal. */}
+      {/* Double-density golden particle burst on heal. Kept mounted for the same
+          reason as the heal seal above. */}
       <HealParticles ref={healParticlesRef} />
 
       {overlay && (
