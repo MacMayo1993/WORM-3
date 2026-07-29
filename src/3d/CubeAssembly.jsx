@@ -952,6 +952,7 @@ const CubeAssembly = React.memo(({
     if (!animState) { liveRotation.active = false; return; }
 
     const { axis, dir, sliceIndex } = animState;
+    const animatedSlices = animState.sliceIndices?.length ? animState.sliceIndices : [sliceIndex];
     const worldAxis = axis === 'col' ? _axisCol : axis === 'row' ? _axisRow : _axisDepth;
 
     // On animation start, pre-compute which ref indices are in the slice
@@ -962,9 +963,8 @@ const CubeAssembly = React.memo(({
         const z = idx % size;
         const y = Math.floor(idx / size) % size;
         const x = Math.floor(idx / (size * size));
-        const inSlice = (axis === 'col' && x === sliceIndex) ||
-          (axis === 'row' && y === sliceIndex) ||
-          (axis === 'depth' && z === sliceIndex);
+        const coord = axis === 'col' ? x : axis === 'row' ? y : z;
+        const inSlice = animatedSlices.includes(coord);
         if (inSlice) indices.add(idx);
       }
       sliceIndicesRef.current = indices;
@@ -1132,7 +1132,12 @@ const CubeAssembly = React.memo(({
                   // a thousand transparent draw calls and R3F geometry nodes. The
                   // stickers remain the complete surface; key this to size so the
                   // pre-Worm Mobi intro and setup re-entry are optimized as well.
-                  omitBody={size >= 15}
+                  omitBody={size >= 15 && !(
+                    animState &&
+                    (animState.sliceIndices?.length ? animState.sliceIndices : [animState.sliceIndex]).includes(
+                      animState.axis === 'col' ? it.cubie.x : animState.axis === 'row' ? it.cubie.y : it.cubie.z
+                    )
+                  )}
                   onPointerDown={onPointerDown}
                 />
               );

@@ -44,11 +44,11 @@ export function useAnimation() {
   const shuffleIdRef = useRef(0);
 
   // Start a new animation (atomic: animState and pendingMove set in one render)
-  const startAnimation = useCallback((axis, dir, sliceIndex, isUndo = false) => {
-    const move = { axis, dir, sliceIndex, isUndo };
+  const startAnimation = useCallback((axis, dir, sliceIndex, isUndo = false, sliceIndices = null) => {
+    const move = { axis, dir, sliceIndex, isUndo, sliceIndices };
     pendingMoveRef.current = move;
     useGameStore.setState({
-      animState: { axis, dir, sliceIndex, t: 0 },
+      animState: { axis, dir, sliceIndex, sliceIndices, t: 0 },
       pendingMove: move,
     });
   }, []);
@@ -84,7 +84,7 @@ export function useAnimation() {
     // the ref is null — this is safe because getState() is always fresh.
     const pm = pendingMoveRef.current ?? useGameStore.getState().pendingMove;
     if (pm) {
-      const { axis, dir, sliceIndex, isShuffle, isUndo } = pm;
+      const { axis, dir, sliceIndex, sliceIndices, isShuffle, isUndo } = pm;
 
       if (isUndo) {
         // Undo rotation: apply the inverse move to cubies, clear animation.
@@ -146,11 +146,14 @@ export function useAnimation() {
       play('/sounds/rotate.mp3');
       useGameStore.setState((state) => {
         let c = state.cubies;
-        for (let i = 0; i < numTurns; i++) c = rotateSliceCubies(c, size, axis, sliceIndex, dir);
+        const layers = sliceIndices?.length ? sliceIndices : [sliceIndex];
+        for (const layer of layers) {
+          for (let i = 0; i < numTurns; i++) c = rotateSliceCubies(c, size, axis, layer, dir);
+        }
         return {
           cubies: c,
           rotationEpoch: state.rotationEpoch + 1,
-          lastRotation: { axis, sliceIndex, dir, numTurns },
+          lastRotation: { axis, sliceIndex, sliceIndices, dir, numTurns },
           moves: state.moves + numTurns,
           moveHistory: [...state.moveHistory, { type: 'rotation', axis, dir, sliceIndex, numTurns, timestamp: Date.now() }].slice(-10),
           animState: null,

@@ -419,10 +419,13 @@ export function useWormCrawler(size, cubies) {
                 const rot = lastPendingMoveRef.current;
                 if (!rot) return;
                 const st = useGameStore.getState();
-                applyRotationToSim(simRef.current, sizeRef.current, ctxRef.current, rot, {
-                    inOpeningScramble: st.wormGamePhase === 'scrambling',
-                    paused: st.wormPaused ?? false,
-                });
+                const layers = rot.sliceIndices?.length ? rot.sliceIndices : [rot.sliceIndex];
+                for (const sliceIndex of layers) {
+                    applyRotationToSim(simRef.current, sizeRef.current, ctxRef.current, { ...rot, sliceIndex, sliceIndices: null }, {
+                        inOpeningScramble: st.wormGamePhase === 'scrambling',
+                        paused: st.wormPaused ?? false,
+                    });
+                }
             }
         );
         return unsub;

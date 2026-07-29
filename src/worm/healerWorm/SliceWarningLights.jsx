@@ -25,17 +25,16 @@ export function SliceWarningLights({ pendingRotRef, size }) {
         const key = p ? `${p.axis}-${p.sliceIndex}-${p.dir}` : null;
         if (key === lastKeyRef.current) return;
         lastKeyRef.current = key;
-        setPending(p ? { axis: p.axis, sliceIndex: p.sliceIndex, dir: p.dir } : null);
+        setPending(p ? { axis: p.axis, sliceIndex: p.sliceIndex, sliceIndices: p.sliceIndices, dir: p.dir } : null);
     });
 
     if (!pending) return null;
 
     return (
-        <LayerHighlight
-            axis={pending.axis}
-            sliceIndex={pending.sliceIndex}
-            dir={pending.dir}
-            size={size}
-        />
+        <>
+            {(pending.sliceIndices?.length ? pending.sliceIndices : [pending.sliceIndex]).map(sliceIndex => (
+                <LayerHighlight key={sliceIndex} axis={pending.axis} sliceIndex={sliceIndex} dir={pending.dir} size={size} />
+            ))}
+        </>
     );
 }
