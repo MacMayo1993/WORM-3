@@ -660,7 +660,7 @@ function TombstoneGhost() {
   );
 }
 
-const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay, mode, faceRow, faceCol, faceSize, hollow, currentDir: _currentDir }) {
+const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay, mode, faceRow, faceCol, faceSize, hollow, currentDir: _currentDir, surfaceTileKey }) {
   // Static game config — set once at game start, rarely changes during active play.
   // Kept in one shallow selector so tile-style/palette changes still reach all stickers.
   const { biomeEnabled, chaosLevel, disparityFlipCap, settings, faceTextures, mergeMode, mergeTheme, wormHealerMode, perfReducedFX } = useGameStore(
@@ -1160,7 +1160,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     // frame at press 0 to put itself back flat before it goes to sleep.
     let pressBusy = false;
     if (wormHealerMode) {
-      const press = getWormPress(stickerGridIdRef.current);
+      const press = getWormPress(surfaceTileKey);
       pressBusy = press !== 0 || innerPressZ.current !== 0;
       if (pressBusy) {
         innerPressZ.current = -press * PRESS_DEPTH;
@@ -2275,6 +2275,7 @@ function stickerPropsAreEqual(prev, next) {
   if (prev.pos !== next.pos || prev.rot !== next.rot) return false;
   if (prev.mode !== next.mode || prev.hollow !== next.hollow) return false;
   if (prev.faceSize !== next.faceSize) return false;
+  if (prev.surfaceTileKey !== next.surfaceTileKey) return false;
   if (prev.faceRow !== next.faceRow || prev.faceCol !== next.faceCol) return false;
   if (prev.overlay !== next.overlay) return false;
   const pm = prev.meta, nm = next.meta;
