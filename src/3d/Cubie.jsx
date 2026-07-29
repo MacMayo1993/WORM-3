@@ -120,7 +120,7 @@ function LegoStud({ dir, color, enableShadows = true }) {
 // Helper functions for grid and sudokube modes
 
 const Cubie = React.forwardRef(function Cubie({
-  position, cubie, size, wormMode = false, hideBody = false, onPointerDown,
+  position, cubie, size, wormMode = false, hideBody = false, omitBody = false, onPointerDown,
 }, ref) {
   const { hollowMode, mirrorMode, visualMode, explosionFactor, settings, randomMode, randomStyleTick, perfReducedFX } = useGameStore(
     useShallow(s => ({
@@ -451,7 +451,7 @@ const Cubie = React.forwardRef(function Cubie({
             </mesh>
           ))}
         </>
-      ) : hideBody ? (
+      ) : omitBody ? null : hideBody ? (
         // Exit-arm ride: camera is inside the cube and the solid body would occlude the
         // antipodal back-face stickers, so swap it for an invisible hit box (pointer
         // interaction stays intact, but nothing opaque sits between camera and stickers).
@@ -474,12 +474,12 @@ const Cubie = React.forwardRef(function Cubie({
       {/* Stickers — frame-shaped when hollow, solid plane otherwise; none in mirror/wireframe mode. */}
       {effectiveVisualMode !== 'wireframe' && !mirrorMode && (
         <>
-          {isEdge(position[2], (size - 1) / 2) && meta('PZ') && <StickerPlane key={stickerKey('PZ')} currentDir="PZ" meta={meta('PZ')} pos={STICKER_POS.PZ} rot={STICKER_ROT.PZ} mode={effectiveVisualMode} overlay={overlay('PZ')} faceSize={size} {...gridPos('PZ')} hollow={hollowMode} />}
-          {isEdge(position[2], -(size - 1) / 2) && meta('NZ') && <StickerPlane key={stickerKey('NZ')} currentDir="NZ" meta={meta('NZ')} pos={STICKER_POS.NZ} rot={STICKER_ROT.NZ} mode={effectiveVisualMode} overlay={overlay('NZ')} faceSize={size} {...gridPos('NZ')} hollow={hollowMode} />}
-          {isEdge(position[0], (size - 1) / 2) && meta('PX') && <StickerPlane key={stickerKey('PX')} currentDir="PX" meta={meta('PX')} pos={STICKER_POS.PX} rot={STICKER_ROT.PX} mode={effectiveVisualMode} overlay={overlay('PX')} faceSize={size} {...gridPos('PX')} hollow={hollowMode} />}
-          {isEdge(position[0], -(size - 1) / 2) && meta('NX') && <StickerPlane key={stickerKey('NX')} currentDir="NX" meta={meta('NX')} pos={STICKER_POS.NX} rot={STICKER_ROT.NX} mode={effectiveVisualMode} overlay={overlay('NX')} faceSize={size} {...gridPos('NX')} hollow={hollowMode} />}
-          {isEdge(position[1], (size - 1) / 2) && meta('PY') && <StickerPlane key={stickerKey('PY')} currentDir="PY" meta={meta('PY')} pos={STICKER_POS.PY} rot={STICKER_ROT.PY} mode={effectiveVisualMode} overlay={overlay('PY')} faceSize={size} {...gridPos('PY')} hollow={hollowMode} />}
-          {isEdge(position[1], -(size - 1) / 2) && meta('NY') && <StickerPlane key={stickerKey('NY')} currentDir="NY" meta={meta('NY')} pos={STICKER_POS.NY} rot={STICKER_ROT.NY} mode={effectiveVisualMode} overlay={overlay('NY')} faceSize={size} {...gridPos('NY')} hollow={hollowMode} />}
+          {isEdge(position[2], (size - 1) / 2) && meta('PZ') && <StickerPlane key={stickerKey('PZ')} currentDir="PZ" surfaceTileKey={`${cubie.x},${cubie.y},${cubie.z},PZ`} meta={meta('PZ')} pos={STICKER_POS.PZ} rot={STICKER_ROT.PZ} mode={effectiveVisualMode} overlay={overlay('PZ')} faceSize={size} {...gridPos('PZ')} hollow={hollowMode} />}
+          {isEdge(position[2], -(size - 1) / 2) && meta('NZ') && <StickerPlane key={stickerKey('NZ')} currentDir="NZ" surfaceTileKey={`${cubie.x},${cubie.y},${cubie.z},NZ`} meta={meta('NZ')} pos={STICKER_POS.NZ} rot={STICKER_ROT.NZ} mode={effectiveVisualMode} overlay={overlay('NZ')} faceSize={size} {...gridPos('NZ')} hollow={hollowMode} />}
+          {isEdge(position[0], (size - 1) / 2) && meta('PX') && <StickerPlane key={stickerKey('PX')} currentDir="PX" surfaceTileKey={`${cubie.x},${cubie.y},${cubie.z},PX`} meta={meta('PX')} pos={STICKER_POS.PX} rot={STICKER_ROT.PX} mode={effectiveVisualMode} overlay={overlay('PX')} faceSize={size} {...gridPos('PX')} hollow={hollowMode} />}
+          {isEdge(position[0], -(size - 1) / 2) && meta('NX') && <StickerPlane key={stickerKey('NX')} currentDir="NX" surfaceTileKey={`${cubie.x},${cubie.y},${cubie.z},NX`} meta={meta('NX')} pos={STICKER_POS.NX} rot={STICKER_ROT.NX} mode={effectiveVisualMode} overlay={overlay('NX')} faceSize={size} {...gridPos('NX')} hollow={hollowMode} />}
+          {isEdge(position[1], (size - 1) / 2) && meta('PY') && <StickerPlane key={stickerKey('PY')} currentDir="PY" surfaceTileKey={`${cubie.x},${cubie.y},${cubie.z},PY`} meta={meta('PY')} pos={STICKER_POS.PY} rot={STICKER_ROT.PY} mode={effectiveVisualMode} overlay={overlay('PY')} faceSize={size} {...gridPos('PY')} hollow={hollowMode} />}
+          {isEdge(position[1], -(size - 1) / 2) && meta('NY') && <StickerPlane key={stickerKey('NY')} currentDir="NY" surfaceTileKey={`${cubie.x},${cubie.y},${cubie.z},NY`} meta={meta('NY')} pos={STICKER_POS.NY} rot={STICKER_ROT.NY} mode={effectiveVisualMode} overlay={overlay('NY')} faceSize={size} {...gridPos('NY')} hollow={hollowMode} />}
         </>
       )}
 
@@ -511,7 +511,7 @@ const _DIRS = ['PX', 'NX', 'PY', 'NY', 'PZ', 'NZ'];
 // comparison element-wise so future refactors can't silently regress it.
 function cubiePropsAreEqual(prev, next) {
   if (prev.size !== next.size || prev.onPointerDown !== next.onPointerDown) return false;
-  if (prev.wormMode !== next.wormMode || prev.hideBody !== next.hideBody) return false;
+  if (prev.wormMode !== next.wormMode || prev.hideBody !== next.hideBody || prev.omitBody !== next.omitBody) return false;
   if (
     prev.position[0] !== next.position[0] ||
     prev.position[1] !== next.position[1] ||
@@ -526,6 +526,17 @@ function cubiePropsAreEqual(prev, next) {
     if (ps === ns) continue;
     if (!ps || !ns) return false;
     if (ps.curr !== ns.curr || ps.flips !== ns.flips) return false;
+    // Two same-colour stickers can exchange grid slots during a rotation. Their
+    // visible state is identical, but their animation registration and manifold
+    // identity are not. Treating them as equal strands StickerPlane with stale
+    // metadata/surface wiring, so Worm pressure wakes a callback in a different
+    // slot and apparently random body tiles stay flat and dark.
+    if (ps.orig !== ns.orig || ps.origDir !== ns.origDir) return false;
+    if (
+      ps.origPos?.x !== ns.origPos?.x ||
+      ps.origPos?.y !== ns.origPos?.y ||
+      ps.origPos?.z !== ns.origPos?.z
+    ) return false;
   }
   return true;
 }
