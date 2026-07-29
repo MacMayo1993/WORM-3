@@ -32,9 +32,9 @@ export const useStickerInstances = () => useContext(StickerInstanceContext);
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-// 7×7 cube has 6×49 = 294 exterior stickers; 512 gives comfortable headroom for
-// transitions where old and new instances briefly coexist, and supports cubes up to 9×9.
-const MAX_INSTANCES = 512;
+// 15×15 Mega Mode has 6×225 = 1,350 exterior stickers; 2,048 leaves headroom
+// for transitions where old and new instances briefly coexist.
+const MAX_INSTANCES = 2048;
 
 // Reusable zero-scale matrix for hiding unused / non-instanced slots.
 const _zeroMatrix = new THREE.Matrix4().makeScale(0, 0, 0);

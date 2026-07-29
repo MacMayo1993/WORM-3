@@ -899,7 +899,10 @@ export default function WORM3() {
 
     // Switch to game scene (showMainMenu already false), reset cube so it's
     // visible and styled before the worm gameplay starts.
-    const targetSize = wizardSettings.cubeSize || 3;
+    // Mega Mode is the dedicated 15×15 Worm preset. Keep the explicit mode flag
+    // authoritative so future wizard changes cannot accidentally launch it on
+    // the last ordinary slider value.
+    const targetSize = wizardSettings.megaMode ? 15 : (wizardSettings.cubeSize || 3);
     if (targetSize !== size) {
       changeSize(targetSize);
     } else {
