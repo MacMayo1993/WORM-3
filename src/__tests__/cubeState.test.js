@@ -70,8 +70,9 @@ describe('makeCubies', () => {
     expect(() => makeCubies(-1)).toThrow(RangeError);
   });
 
-  it('throws RangeError for size above 7', () => {
-    expect(() => makeCubies(8)).toThrow(RangeError);
+  it('supports Mega Mode and throws RangeError above size 15', () => {
+    expect(makeCubies(15)).toHaveLength(15);
+    expect(() => makeCubies(16)).toThrow(RangeError);
     expect(() => makeCubies(100)).toThrow(RangeError);
   });
 

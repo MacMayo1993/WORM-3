@@ -25,7 +25,7 @@ const DRAG_PITCH = 0.008;
 const PITCH_LIMIT = 1.1;
 
 /**
- * @param size          cubies per edge (2–7)
+ * @param size          cubies per edge (2–15)
  * @param colors        face id → hex, as returned by resolveColors
  * @param tileStyle     global tile style key, or 'random'
  * @param perFaceStyles optional face id → style overrides
