@@ -43,7 +43,7 @@ import { wormClock } from './wormClock.js';
 import { wormBuffs, resetWormBuffs } from './wormBuffs.js';
 import { ttAt } from './circularBuffers.js';
 import { getSkin } from './wormCosmeticsData.js';
-import { wormPress, pressTile, tickWormPress, resetWormPress, MAX_PRESSED_TILES } from './tilePressBridge.js';
+import { wormPress, pressTile, tickWormPress, resetWormPress, pressedTileCount } from './tilePressBridge.js';
 import { BODY_BALL_SPACING } from './healerWorm/constants.js';
 
 // ── Tile press: the worm's weight, handed to the cube's stickers ──────────────
@@ -74,11 +74,7 @@ function publishTilePress(sim, size, ctx, delta) {
         }
 
         const cubies = ctx.getCubies();
-        const covered = Math.min(
-            MAX_PRESSED_TILES,
-            sim.tileTrail.count,
-            Math.max(1, Math.ceil(sim.tailLength * BODY_BALL_SPACING))
-        );
+        const covered = pressedTileCount(sim.tailLength * BODY_BALL_SPACING, sim.tileTrail.count);
         const span = covered > 1 ? covered - 1 : 1;
         for (let i = 0; i < covered; i++) {
             const key = ttAt(sim.tileTrail, i);

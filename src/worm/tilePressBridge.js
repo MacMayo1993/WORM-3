@@ -32,6 +32,19 @@ const REST_V_EPS = 0.02;
 // do not light — the head end is what anyone is looking at.
 export const MAX_PRESSED_TILES = 64;
 
+/**
+ * Number of consecutive trail cells touched by a body of `worldReach` units.
+ *
+ * A reach shorter than one tile can still straddle TWO cells while the head moves
+ * from the previous cell into the current one. The old `ceil(worldReach)` formula
+ * omitted that source cell, which was most visible for a short starting worm and
+ * produced dark gaps whenever the tail ended part-way through a square.
+ */
+export function pressedTileCount(worldReach, trailCount, cap = MAX_PRESSED_TILES) {
+  if (trailCount <= 0 || cap <= 0) return 0;
+  return Math.min(cap, trailCount, 1 + Math.ceil(Math.max(0, worldReach)));
+}
+
 /** Colour the lit squares burn in — the equipped worm skin's body colour. */
 export const wormPress = {
   color: '#33ff66'
