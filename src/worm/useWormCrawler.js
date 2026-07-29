@@ -38,9 +38,60 @@ import {
     queueTurn as queueTurnSim,
     jumpLiftOf,
 } from './healerWorm/wormSim.js';
-import { ensureOrbContrast } from './wormHelpers.js';
+import { ensureOrbContrast, parseTileKey, _parseTile } from './wormHelpers.js';
 import { wormClock } from './wormClock.js';
 import { wormBuffs, resetWormBuffs } from './wormBuffs.js';
+import { ttAt } from './circularBuffers.js';
+import { getSkin } from './wormCosmeticsData.js';
+import { wormPress, pressTile, tickWormPress, resetWormPress, MAX_PRESSED_TILES } from './tilePressBridge.js';
+import { BODY_BALL_SPACING } from './healerWorm/constants.js';
+
+// ── Tile press: the worm's weight, handed to the cube's stickers ──────────────
+// The body lies along the tiles in sim.tileTrail (index 0 = the head's tile), and
+// covers as many of them as its length reaches — the same span the self-collision
+// check walks. Each covered tile is pressed, hardest under the head, so the dent
+// tapers off down the body instead of every tile carrying the full weight.
+const PRESS_TAIL_FALLOFF = 0.55; // tail-end tiles press at (1 − this) of the head's
+
+// Cached so the skin's colour is only looked up when the player actually changes it.
+let _pressSkinId = null;
+
+function publishTilePress(sim, size, ctx, delta) {
+    // Only while the worm is out on the surface: mid-traversal it is inside the
+    // cube, and the tiles it *was* on should be springing back, not held down.
+    if (sim.alive && sim.phase === 'crawling') {
+        const skinId = useGameStore.getState().wormSkin ?? 'slime';
+        if (skinId !== _pressSkinId) {
+            _pressSkinId = skinId;
+            wormPress.color = getSkin(skinId).body;
+        }
+
+        const cubies = ctx.getCubies();
+        const covered = Math.min(
+            MAX_PRESSED_TILES,
+            sim.tileTrail.count,
+            Math.max(1, Math.ceil(sim.tailLength * BODY_BALL_SPACING))
+        );
+        const span = covered > 1 ? covered - 1 : 1;
+        for (let i = 0; i < covered; i++) {
+            const key = ttAt(sim.tileTrail, i);
+            if (!key) continue;
+            parseTileKey(key, _parseTile);
+            const sticker = cubies?.[_parseTile.x]?.[_parseTile.y]?.[_parseTile.z]?.stickers?.[_parseTile.dirKey];
+            if (!sticker) continue;
+            const gridId = getManifoldGridId(sticker, size);
+            pressTile(gridId, 1 - PRESS_TAIL_FALLOFF * (i / span));
+            // The sticker's own per-frame tick is opt-in (StickerAnimationManager),
+            // so a tile has to be woken before it can sink. It puts itself back to
+            // sleep once it has finished rebounding.
+            activateSticker(gridId);
+        }
+    }
+
+    // Runs even when the worm is not on the surface — that is exactly when the
+    // tiles it just left need to be springing back.
+    tickWormPress(delta);
+}
 
 export function useWormCrawler(size, cubies) {
     // Only the values that must RESET the run are subscribed reactively; everything
@@ -284,6 +335,7 @@ export function useWormCrawler(size, cubies) {
         wormBuffs.magnetT = sim.magnetT;
         wormBuffs.magnetMaxT = sim.magnetMaxT;
         wormBuffs.rocketActive = sim.rocketActive;
+        publishTilePress(sim, sizeRef.current, ctxRef.current, delta);
     }, []);
 
     const queueTurn = useCallback((dir) => queueTurnSim(simRef.current, dir), []);
@@ -299,6 +351,7 @@ export function useWormCrawler(size, cubies) {
         const sim = simRef.current;
         resetWormSim(sim, size, { orbCount: wormOrbCount, wormholeInterval });
         resetWormBuffs();
+        resetWormPress();
         useGameStore.getState().setWormBoostState('ready');
         useGameStore.setState({
             wormPowerups: sim.powerups,
@@ -331,9 +384,11 @@ export function useWormCrawler(size, cubies) {
             clearTimeout(deathMenuTimer.current);
             deathMenuTimer.current = null;
         }
-        // Leaving worm mode entirely: the bridge is module-level state that would
-        // otherwise still be holding the last run's buff when the mode remounts.
+        // Leaving worm mode entirely: the bridges are module-level state that would
+        // otherwise still be holding the last run's buff (and its dents) when the
+        // mode remounts.
         resetWormBuffs();
+        resetWormPress();
         useGameStore.setState({ wormRocketActive: false, wormMagnetActive: false, wormSpecialNotice: null });
     }, []);
 
