@@ -14,6 +14,7 @@ import { SeamPulseOverlay } from './SeamPulseOverlay.jsx';
 import { getTileStyleMaterial, getGlassMaterial, sharedTremorState, flipBurstMap, stickerFlipMotion, healBurstMap, healParticleMap } from './styles/TileStyleMaterials.jsx';
 import { useStickerInstances } from './StickerInstances.jsx';
 import { registerSticker, unregisterSticker, activateSticker, deactivateSticker, wispyTime } from './StickerAnimationManager.js';
+import { getWormPress, wormPress } from '../worm/tilePressBridge.js';
 import { getManifoldGridId } from '../game/coordinates.js';
 import GrassBlades from './styles/GrassBlades.jsx';
 import WaterVolume from './styles/WaterVolume.jsx';
@@ -47,6 +48,18 @@ const _wormRimGlowGeo = new THREE.PlaneGeometry(1.05, 1.05);
 // Neon worm-border plane — sits in the grid-line channel just outside the sticker so the
 // glowing square outline traces the tile's own perimeter (like the neon view mode).
 const _neonBorderGeo = new THREE.PlaneGeometry(0.94, 0.94);
+// How far into the cube a tile sinks under the worm, in world units.
+//
+// The ceiling here is not taste, it is clearance: a sticker sits at 0.51 on a
+// cubie body that is 0.98 across (face at 0.49), so it floats 0.02 proud of the
+// piece it is stuck to. Sink it past that and the body's own face — which writes
+// depth even in worm mode, where it is only partly transparent — swallows it, and
+// the tile does not read as pressed, it reads as gone.
+const PRESS_DEPTH = 0.017;
+// …and how much it narrows at full press, opening the grid channel around it.
+// This is the cue that survives being looked at head-on, where two hundredths of
+// depth is a couple of pixels; it reads as the tile dropping into its socket.
+const PRESS_SHRINK = 0.06;
 // Circular alpha map — clips the base sticker mesh to a disc matching the overlay shader
 // radius (smoothstep 0.44→0.50 in UV space).  Using alphaTest instead of transparent
 // avoids depth-sorting issues and is unaffected by the biome-mode code that explicitly
@@ -492,6 +505,57 @@ const wispyRingFragmentShader = `
 `;
 
 
+// ─── Worm footprint shader ────────────────────────────────────────────────────
+// The tile's own grid square, lit up under the worm's weight.
+//
+// Same square-outline vocabulary the neon view mode uses for cubie edges (a bright
+// rail traced right on the perimeter), but driven by contact rather than by view
+// style, and in the worm's own skin colour so the glow reads as coming from the
+// creature rather than from the cube.
+//
+// The rail is only half of it. A tile that merely lights up reads as flat; what
+// sells a tile being PRESSED is that its edges are now walls. So the band inside
+// the rail darkens — the shadow of a rim that is suddenly above you — and the rail
+// itself burns brighter and spills further inward the deeper the tile goes, as if
+// light were escaping up the widening gap around it. uPress carries the spring's
+// value, and it goes slightly negative on the rebound, which brightens nothing and
+// simply lets the shading fall away as the tile pops back level.
+const wormFootprintFragmentShader = `
+  uniform vec3  uColor;   // worm's skin colour
+  uniform float uPress;   // 0 = flat, 1 = fully under the worm
+  uniform float uTime;
+  varying vec2  vUv;
+
+  void main() {
+    vec2  p = vUv - 0.5;
+    vec2  a = abs(p);
+    float edge = 0.5 - max(a.x, a.y);   // 0 at the tile's rim, grows inward
+    float press = clamp(uPress, 0.0, 1.0);
+
+    // The lit rail, hugging the perimeter. It fattens as the tile sinks.
+    float bw   = 0.030 + press * 0.022;
+    float rail = 1.0 - smoothstep(bw * 0.55, bw, edge);
+
+    // Light spilling inward from the rail, over the tile's shoulder.
+    float spill = (1.0 - smoothstep(bw, 0.20 + press * 0.10, edge)) * 0.30;
+
+    // Inner shadow: the recess the worm is standing in. Strongest right against
+    // the rim (where the wall is highest) and gone by the middle of the tile.
+    float shade = (1.0 - smoothstep(0.02, 0.26, edge)) * press * 0.55;
+
+    // A slow breath so a tile held under a resting worm is not perfectly static.
+    float breath = 0.92 + 0.08 * sin(uTime * 2.6);
+
+    float glow  = (rail * (0.85 + press * 0.75) + spill * press) * breath;
+    float alpha = clamp(glow + shade, 0.0, 1.0) * smoothstep(0.0, 0.12, press);
+
+    // Rail runs hot toward white at the centre of the stroke; the shadow band is
+    // the same hue taken almost to black, so the whole square stays one colour.
+    vec3 col = mix(uColor * 0.06, mix(uColor, vec3(1.0), rail * 0.45 * press), glow);
+    gl_FragColor = vec4(col, alpha);
+  }
+`;
+
 // ─── Neon worm-border shader ──────────────────────────────────────────────────
 // Replaces the old solid parity ring. Lights up the SQUARE outer edge of the tile
 // like the neon view mode, then sends a handful of bright "light-worms" chasing one
@@ -694,6 +758,23 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     uTime: { value: 0 },
     uIntensity: { value: 0 },
   }));
+  // Worm footprint — the tile's grid square lit up while the worm's weight is on it.
+  // The group carries the lit square down with the tile; the sticker itself sinks on
+  // innerGroupRef (see the press block in tickImpl).
+  const footprintGroupRef = useRef();
+  const footprintMatRef = useRef();
+  const [footprintUniforms] = React.useState(() => ({
+    uColor: { value: new THREE.Color('#33ff66') },
+    uPress: { value: 0 },
+    uTime: wispyTime, // shared reference — advanced once per frame externally
+  }));
+  // Split so the press and the flip counter-kick can both drive innerGroupRef.position.z
+  // without either clobbering the other; applyInnerZ() writes their sum.
+  const innerShockZ = useRef(0);
+  const innerPressZ = useRef(0);
+  const applyInnerZ = () => {
+    if (innerGroupRef.current) innerGroupRef.current.position.z = innerShockZ.current + innerPressZ.current;
+  };
 
   // Dispose shader materials on unmount to prevent GPU program / texture leaks.
   // These are imperative Three.js material refs (not React DOM refs), assigned
@@ -709,6 +790,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       wispyRingMatRef.current?.dispose(); // eslint-disable-line react-hooks/exhaustive-deps
       neonBorderMatRef.current?.dispose(); // eslint-disable-line react-hooks/exhaustive-deps
       wormRimMatRef.current?.dispose(); // eslint-disable-line react-hooks/exhaustive-deps
+      footprintMatRef.current?.dispose(); // eslint-disable-line react-hooks/exhaustive-deps
     };
   }, []);
 
@@ -1052,11 +1134,48 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       healParticlesRef.current?.trigger(origHealColor);
     }
 
+    // ── Worm footprint: the tile carrying the worm's weight ────────────────────
+    // press comes from the shared spring (worm/tilePressBridge) and can overshoot
+    // slightly negative as the tile rebounds. Three cues, because a 0.03-unit
+    // displacement on its own is nearly invisible head-on and only reads at a
+    // glancing angle: the tile sinks, it narrows a little so the grid channel
+    // around it opens up (which is what carries the effect when you are looking
+    // straight down at the face), and its square lights up.
+    //
+    // Sits ahead of the idle gate, and feeds it: a tile whose only activity is
+    // being stood on has to run, and — just as important — has to get one last
+    // frame at press 0 to put itself back flat before it goes to sleep.
+    let pressBusy = false;
+    if (wormHealerMode) {
+      const press = getWormPress(stickerGridIdRef.current);
+      pressBusy = press !== 0 || innerPressZ.current !== 0;
+      if (pressBusy) {
+        innerPressZ.current = -press * PRESS_DEPTH;
+        applyInnerZ();
+        if (innerGroupRef.current) {
+          const shrink = 1 - Math.max(0, press) * PRESS_SHRINK;
+          innerGroupRef.current.scale.set(shrink, shrink, 1);
+        }
+        const fpGroup = footprintGroupRef.current;
+        if (fpGroup) {
+          const lit = press > 0.01;
+          fpGroup.visible = lit;
+          if (lit) {
+            // Half the tile's own sink: the lit square lives in the channel wall
+            // between this tile and its neighbours, not on the tile's face.
+            fpGroup.position.z = -press * PRESS_DEPTH * 0.5;
+            footprintUniforms.uPress.value = press;
+            footprintUniforms.uColor.value.set(wormPress.color);
+          }
+        }
+      }
+    }
+
     // Single-boolean gate: skip the entire body on idle frames.
     // Ensure we trigger animation if the tile is flipped (since ghost tile needs uTime updates).
     // If we need to transition the ghost tile (e.g. going from active to dormant), run at least one more frame.
     // wormhole keeps the loop alive so the indicator ring pulses while the tile is in disparity.
-    const anyActive = spinT.current > 0 || shakeT.current > 0 || showWormholeHazardFx || needsGhostUpdate || (spiderPlaneRef.current?.visible && !showGhostTile) || wormIntroT.current > 0 || healTRef.current >= 0 || shockT.current < 1 || flashT.current < 1 || hitstopT.current > 0 || (wormhole && !isSudokube);
+    const anyActive = pressBusy || spinT.current > 0 || shakeT.current > 0 || showWormholeHazardFx || needsGhostUpdate || (spiderPlaneRef.current?.visible && !showGhostTile) || wormIntroT.current > 0 || healTRef.current >= 0 || shockT.current < 1 || flashT.current < 1 || hitstopT.current > 0 || (wormhole && !isSudokube);
     if (!anyActive) {
       isActiveRef.current = false;
       deactivateSticker(stickerGridIdRef.current);
@@ -1329,11 +1448,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       // tile punches IN (local −Z, into the cube) with a quick damped shake. Driven
       // on innerGroupRef so it never collides with the squish/shake/tremor writers
       // on groupRef. Settles to exactly 0.
-      if (innerGroupRef.current) {
-        const u = shockT.current;
-        innerGroupRef.current.position.z =
-          u >= 1 ? 0 : -0.07 * Math.exp(-4.5 * u) * Math.sin(u * Math.PI * 3.0);
-      }
+      const u = shockT.current;
+      innerShockZ.current = u >= 1 ? 0 : -0.07 * Math.exp(-4.5 * u) * Math.sin(u * Math.PI * 3.0);
+      applyInnerZ();
     }
 
     // Antipodal glow fill — ~0.55 s, the slowest of the three so the collapse
@@ -1416,6 +1533,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       groupRef.current.position.y = pos[1] + jY * mult;
       groupRef.current.position.z = pos[2] + jZ * mult;
     }
+
   };
 
   const isSudokube = mode === 'sudokube';
@@ -1873,6 +1991,30 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
             blending={THREE.AdditiveBlending}
           />
         </mesh>
+      )}
+
+      {/* Worm footprint — the tile's grid square lit up under the worm's weight, in the
+          worm's own skin colour. Mounted for every tile in worm mode and left invisible
+          until something stands on it: the alternative is mounting a mesh mid-crawl on
+          the exact frame it first needs to be seen, which is a shader compile in the
+          middle of a step. Sits a hair below the parity border's z so a flipped tile the
+          worm is standing on shows both without them fighting.
+          Normal blending, not additive: the inner shadow is the half of this that makes a
+          tile look pressed rather than merely lit, and additive cannot darken. */}
+      {wormHealerMode && !isDead && (
+        <group ref={footprintGroupRef} visible={false}>
+          <mesh position={[0, 0, 0.005]} renderOrder={2}>
+            <primitive object={_neonBorderGeo} attach="geometry" />
+            <shaderMaterial
+              ref={footprintMatRef}
+              vertexShader={neonBorderVertexShader}
+              fragmentShader={wormFootprintFragmentShader}
+              uniforms={footprintUniforms}
+              transparent
+              depthWrite={false}
+            />
+          </mesh>
+        </group>
       )}
 
       {/* City Biome buildings — kept mounted during rotation so they don't pop/glitch */}
