@@ -234,7 +234,7 @@ function renderToCanvas(opts, time, targetCanvas) {
   const size = targetCanvas.width;
   if (!size) return;
 
-  const n = Math.max(2, Math.min(7, Math.round(opts.size || 3)));
+  const n = Math.max(2, Math.min(15, Math.round(opts.size || 3)));
   if (!rig || rig.n !== n) {
     _disposeRig();
     rig = _buildRig(n);
