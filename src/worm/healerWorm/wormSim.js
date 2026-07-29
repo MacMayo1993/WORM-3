@@ -44,7 +44,7 @@ import {
     rotateMoveDir,
     collectManifoldRing,
 } from '../wormLogic.js';
-import { liveRotation } from '../liveRotation.js';
+import { liveRotations, planeSliceForCell } from '../liveRotations.js';
 import { rotateTilePosition, parseTileKey, _parseTile } from '../wormHelpers.js';
 import {
     makeStepHistory, shPush, shReset,
@@ -939,8 +939,19 @@ const PHASE_HANDLERS = {
                     // End-of-rotation read: a step crossing onto a mid-rotation slice
                     // targets the cell's committed state instead of chasing the tile
                     // that is currently rotating away.
+                    // Resolve which plane of the live wave this step interacts with:
+                    // the one the destination cell sits on, or failing that the one
+                    // the source cell is leaving. Planes are disjoint, so at most one
+                    // of them can claim a given cell and there is nothing to arbitrate.
+                    const _rideSlice = liveRotations.active
+                        ? (planeSliceForCell(nextPos.x, nextPos.y, nextPos.z) ??
+                           (sim.prevTile ? planeSliceForCell(sim.prevTile.x, sim.prevTile.y, sim.prevTile.z) : null))
+                        : null;
                     sim.restReadSlice = nextRestRead(
-                        sim.restReadSlice, liveRotation.active, liveRotation.axis, liveRotation.sliceIndex,
+                        sim.restReadSlice,
+                        liveRotations.active && _rideSlice !== null,
+                        liveRotations.axis,
+                        _rideSlice ?? -1,
                         sim.prevTile, nextPos
                     );
                     if (!sim.restReadSlice) sim.restReadTileKeys.clear();
@@ -1367,23 +1378,23 @@ export function stepWormSim(sim, delta, size, ctx) {
 }
 
 /**
- * Apply a committed cube rotation to the sim — the exact logic that previously
- * lived in useWormCrawler's rotationEpoch subscription. Transforms the worm's
+ * Apply ONE committed quarter turn to the sim. Transforms the worm's
  * position/heading, powerups, both trails, the step-history bake, and any
  * in-flight tunnel so everything stays glued to the surface through the turn.
  *
- * @param {object} rot - { axis, dir, sliceIndex } of the committed move
- * @param {object} opts - { inOpeningScramble, paused } snapshot flags
+ * Callers go through `applyWaveToSim` — a wave of parallel planes must resolve
+ * rest-read state once for the whole wave, not once per plane, which is why
+ * `restMatches` is passed in rather than derived here.
+ *
+ * @param {object} rot - { axis, dir, sliceIndex } of the committed turn
+ * @param {object} opts - { inOpeningScramble, paused, restMatches } snapshot flags
  */
-export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, paused }) {
+function applyPlaneToSim(sim, size, ctx, rot, { inOpeningScramble, paused, restMatches }) {
     const { axis, dir, sliceIndex } = rot;
 
     // Steps taken in rest-read mode did NOT ride this slice: the worm targeted its
     // cells' committed rest positions, so its position, heading, lerp source and the
     // trail entries it laid down stay put at commit instead of being carried 90°.
-    const restRead = sim.restReadSlice;
-    const restMatches = !!(restRead && restRead.axis === axis && restRead.sliceIndex === sliceIndex);
-    sim.restReadSlice = null;
     const restKeys = sim.restReadTileKeys;
 
     // Rotate powerups
@@ -1454,7 +1465,9 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
     };
     ttMapInPlace(sim.tileTrail, _remapTileKey);
     ttMapInPlace(sim.pathHistory, _remapTileKey);
-    restKeys.clear();
+    // NOTE: restKeys is cleared by applyWaveToSim once the whole wave has landed.
+    // Clearing it here would strip the protection from every plane after the
+    // first, dragging rest-read trail entries around with a slice they sat out.
 
     // Deferred pickup + flipped-tile detection for a rest-read landing: the step
     // onto this cell couldn't read its contents (the occupant was mid-flight). Now
@@ -1552,4 +1565,56 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
             sim.pendingVoidKill = { ...sim.pendingVoidKill, exitTileKey: tileKey(rotated) };
         }
     }
+}
+
+/**
+ * Apply a committed rotation WAVE — one to three parallel same-axis planes — to
+ * the sim.
+ *
+ * Applying the planes one after another is exact, not an approximation: a slice
+ * rotation maps its own slice onto itself, so a cell in plane A can never move
+ * into plane B, and B can never observe A's writes. Every ordering therefore
+ * produces the same sim, which is what makes "they turned at the same time" a
+ * well-defined statement (see game/rotationWave.js for the same argument on the
+ * cube itself).
+ *
+ * Two things must NOT be per-plane, and are hoisted here:
+ *   • rest-read state — the worm sat out at most one plane, and that plane may
+ *     not be the first one applied;
+ *   • the rest-read key set — cleared once the whole wave has landed.
+ *
+ * @param {object} wave - { axis, rotations: [{ sliceIndex, dir, numTurns }] }
+ * @param {object} opts - { inOpeningScramble, paused } snapshot flags
+ */
+export function applyWaveToSim(sim, size, ctx, wave, { inOpeningScramble, paused }) {
+    const restRead = sim.restReadSlice;
+    sim.restReadSlice = null;
+
+    for (const r of wave.rotations) {
+        const restMatches = !!(restRead && restRead.axis === wave.axis && restRead.sliceIndex === r.sliceIndex);
+        const rot = { axis: wave.axis, dir: r.dir, sliceIndex: r.sliceIndex };
+        // A half turn is two quarter turns; every transform below is written for
+        // one, so repeat rather than special-case each of them. Rest-read holds
+        // for the whole turn — sitting out a rotation means sitting out all of it.
+        const turns = r.numTurns ?? 1;
+        for (let t = 0; t < turns; t++) {
+            applyPlaneToSim(sim, size, ctx, rot, { inOpeningScramble, paused, restMatches });
+        }
+    }
+
+    sim.restReadTileKeys.clear();
+}
+
+/**
+ * Single-plane compatibility wrapper. Existing callers and tests that speak in
+ * one `{ axis, dir, sliceIndex }` move keep working unchanged.
+ */
+export function applyRotationToSim(sim, size, ctx, rot, opts) {
+    applyWaveToSim(
+        sim,
+        size,
+        ctx,
+        { axis: rot.axis, rotations: [{ sliceIndex: rot.sliceIndex, dir: rot.dir, numTurns: rot.numTurns ?? 1 }] },
+        opts
+    );
 }

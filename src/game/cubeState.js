@@ -1,10 +1,22 @@
 // src/game/cubeState.js
 // Cube state initialization and utilities
+import { MAX_STANDARD_SIZE, MEGA_SIZE } from './sliceIndex.js';
 
-// Create initial cube state with all stickers in solved position
-export const makeCubies = (size) => {
-  if (!Number.isInteger(size) || size < 2 || size > 7) {
-    throw new RangeError(`makeCubies: size must be an integer 2–7, got ${size}`);
+// Create initial cube state with all stickers in solved position.
+//
+// The 2–7 bound is the default and stays the default: it is the range every
+// general mode's renderer, camera table, capacity budget and save path is built
+// for, so a stray `setSize(15)` from a level, a wizard or a restored setting must
+// still fail loudly rather than construct a cube nothing downstream can draw.
+//
+// Mega Worm needs 15, so it opts in explicitly with `{ allowMega: true }`. That
+// keeps the widening to the one call site that has actually been validated for
+// it (the store's setMegaWormSize) instead of removing the guard globally and
+// hoping every other consumer copes.
+export const makeCubies = (size, { allowMega = false } = {}) => {
+  const max = allowMega ? MEGA_SIZE : MAX_STANDARD_SIZE;
+  if (!Number.isInteger(size) || size < 2 || size > max) {
+    throw new RangeError(`makeCubies: size must be an integer 2–${max}, got ${size}`);
   }
   return Array.from({ length: size }, (_, x) =>
     Array.from({ length: size }, (_, y) =>

@@ -8,6 +8,7 @@ import { getManifoldNeighbors, findAntipodalStickerByGrid, buildManifoldGridMap 
 import { getStickerWorldPos, getManifoldGridId } from '../game/coordinates.js';
 import { isSurfaceSticker } from '../game/cubeState.js';
 import { rotateVec90 } from '../game/cubeRotation.js';
+import { isTileInSlice } from '../game/sliceIndex.js';
 import { DIR_FORWARD } from './healerWorm/constants.js';
 import { TUNNEL_ANCHOR_OFFSET } from '../utils/constants.js';
 import {
@@ -23,20 +24,10 @@ import * as THREE from 'three';
 // TUNNELS - Antipodal wormhole tunnels through the cube interior
 // ============================================================================
 
-/**
- * Whether a grid cell lies in the slice being rotated.
- *
- * The axis names map to grid coordinates the same way they do everywhere in the
- * rotation pipeline (CubeAssembly, cubeRotation): 'col' → x, 'row' → y, 'depth' → z.
- * Used to decide whether the worm (or any tile-anchored object) should ride a slice
- * that is mid-rotation so it turns with the cube instead of snapping at commit time.
- */
-export function isTileInSlice(axis, sliceIndex, x, y, z) {
-  if (axis === 'col') return x === sliceIndex;
-  if (axis === 'row') return y === sliceIndex;
-  if (axis === 'depth') return z === sliceIndex;
-  return false;
-}
+// Slice membership now has one definition, in game/sliceIndex.js, shared with the
+// rotation pipeline and the renderer. Re-exported here so the worm modules that
+// have always imported it from wormLogic keep working unchanged.
+export { isTileInSlice };
 
 /**
  * Advance the worm's "rest-read" state at a step commit.

@@ -1,10 +1,9 @@
 import * as THREE from 'three';
 import { rotateVec90 } from '../game/cubeRotation.js';
 import { DIR_TO_VEC, VEC_TO_DIR } from '../utils/constants.js';
-import { isTileInSlice } from './wormLogic.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { liveCubies } from './liveCubies.js';
-import { liveRotation } from './liveRotation.js';
+import { liveRotations, planeAngleFor, planeSlotForSlice } from './liveRotations.js';
 import { ttAt, ttTrimTo, shTrimTo } from './circularBuffers.js';
 import {
     FACE_NORMALS,
@@ -49,15 +48,22 @@ export function rideLiveRotation(worm) {
     // end-of-rotation positions, so skip live anchoring entirely — following the live
     // meshes here would chase the outgoing tile (a visible teleport onto the rotating
     // layer) and then snap when the rotation commits.
+    //
+    // Resolved against the WAVE: the head may be sitting out any one of up to
+    // three planes turning at once, not just "the" rotating slice.
     const rr = worm.restReadSlice?.current;
-    if (rr && liveRotation.active && rr.axis === liveRotation.axis && rr.sliceIndex === liveRotation.sliceIndex) {
+    if (rr && liveRotations.active && rr.axis === liveRotations.axis &&
+        planeSlotForSlice(rr.sliceIndex) >= 0) {
         return false;
     }
 
     if (worm.crossingCorner.current) {
-        if (!liveRotation.active) return false;
-        const { axis, sliceIndex, angle } = liveRotation;
-        if (!isTileInSlice(axis, sliceIndex, cur.x, cur.y, cur.z)) return false;
+        if (!liveRotations.active) return false;
+        // Only the plane under the head matters; the other planes of the wave are
+        // disjoint from it by construction.
+        const angle = planeAngleFor(cur.x, cur.y, cur.z);
+        if (angle === 0) return false;
+        const axis = liveRotations.axis;
         _liveAxis.set(axis === 'col' ? 1 : 0, axis === 'row' ? 1 : 0, axis === 'depth' ? 1 : 0);
         worm.headInterpPos.current.applyAxisAngle(_liveAxis, angle);
         worm.currentNormal.current.applyAxisAngle(_liveAxis, angle).normalize();
@@ -166,30 +172,76 @@ export function tileKeyCoordAt(key, idx) {
 // Rocket overdrive makes the entire worm impenetrable. Landing grace only clears the
 // head, while still allowing the normal tail-cut behavior.
 export function checkWormHitBySlice(worm, axis, sliceIndex) {
-    if (worm.rocketActive?.current) return null;
+    return checkWormHitByWave(worm, {
+        axis,
+        rotations: [{ sliceIndex, dir: 1, numTurns: 1 }],
+    });
+}
+
+// The "rigid class" of a tile under a wave: which set of tiles it stays rigid
+// with. Parallel planes turning the same direction by the same number of turns
+// sweep through identical angles about the same axis, so tiles across them keep
+// their exact relative geometry — a worm spanning two such planes is carried
+// intact and must NOT be treated as sheared. Tiles on no plane share the
+// `static` class. Any two different classes are moving apart.
+const STATIC_CLASS = 0;
+function rigidClassOf(wave, coord) {
+    const rots = wave.rotations;
+    for (let i = 0; i < rots.length; i++) {
+        if (rots[i].sliceIndex === coord) {
+            // Encode (dir, numTurns) as one small integer so the comparison in the
+            // scan below is a plain === with no allocation.
+            const turns = ((rots[i].numTurns ?? 1) % 4 + 4) % 4;
+            return turns === 0 ? STATIC_CLASS : (rots[i].dir > 0 ? 1 : -1) * turns * 8 + 1;
+        }
+    }
+    return STATIC_CLASS;
+}
+
+/**
+ * Resolve a whole rotation wave against the worm in one deterministic pass.
+ *
+ * Returns null | { type:'death' } | { type:'cut', cutTrailIdx }.
+ *
+ * The rule generalises the single-plane one exactly. Classify the head and every
+ * body sample by rigid class, then walk head-to-tail and stop at the FIRST
+ * sample whose class differs from the head's — that is where the worm is being
+ * pulled apart:
+ *
+ *   • head on a turning plane, body elsewhere → the body anchors it while its
+ *     own tile is swept away: death.
+ *   • head static, body on a turning plane → the tail is dragged off: cut there.
+ *
+ * Evaluating every plane against ONE pre-wave snapshot and taking the first
+ * mismatch is what makes the outcome independent of plane order — three planes
+ * clipping different parts of the tail produce one cut at the nearest one, never
+ * a cascade of cuts against a trail that a previous plane already trimmed.
+ *
+ * A rocket-flying worm is well above the surface, so its HEAD is treated as clear
+ * of every plane however the grid coordinates read — the flight passes over the
+ * turning layers. The same applies through the brief landing-grace window, so a
+ * rotation that fires on the exact frame a flight touches down doesn't kill a
+ * player who had no way to steer out of it. The body left on the ground is still
+ * checked in both cases, so a badly timed launch can still cost you a tail.
+ */
+export function checkWormHitByWave(worm, wave) {
+    const axis = wave.axis;
     const head = worm.pos.current;
     const axisCoord = axis === 'col' ? 'x' : axis === 'row' ? 'y' : 'z';
-    const coordIdx  = axis === 'col' ? 0 : axis === 'row' ? 1 : 2;
-    const airborne = (worm.landingGraceT?.current ?? 0) > 0;
-    const headOnSlice = head[axisCoord] === sliceIndex && !airborne;
+    const coordIdx = axis === 'col' ? 0 : axis === 'row' ? 1 : 2;
+    const airborne = !!worm.rocketActive?.current || (worm.landingGraceT?.current ?? 0) > 0;
+    const headClass = airborne ? STATIC_CLASS : rigidClassOf(wave, head[axisCoord]);
     const trail = worm.tileTrail.current;
 
     const activeTiles = Math.max(1, Math.ceil(worm.tailLength.current * BODY_BALL_SPACING));
     const bodyEnd = Math.min(activeTiles, trail.count);
 
-    if (!headOnSlice) {
-        for (let i = 1; i < bodyEnd; i++) {
-            if (tileKeyCoordAt(ttAt(trail, i), coordIdx) === sliceIndex) {
-                return { type: 'cut', cutTrailIdx: i };
-            }
-        }
-        return null;
-    }
-
     for (let i = 1; i < bodyEnd; i++) {
-        if (tileKeyCoordAt(ttAt(trail, i), coordIdx) !== sliceIndex) {
-            return { type: 'death' };
-        }
+        const bodyClass = rigidClassOf(wave, tileKeyCoordAt(ttAt(trail, i), coordIdx));
+        if (bodyClass === headClass) continue;
+        return headClass === STATIC_CLASS
+            ? { type: 'cut', cutTrailIdx: i }
+            : { type: 'death' };
     }
     return null;
 }

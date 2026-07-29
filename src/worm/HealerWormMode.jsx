@@ -36,7 +36,9 @@ import { feel, setFeelEnabled } from '../utils/feel.js';
 import { EARN_ORB_COLLECT } from '../utils/economyConstants.js';
 import { liveRotation } from './liveRotation.js';
 import { shAt } from './circularBuffers.js';
-import { rideLiveRotation, checkWormHitBySlice, cutWormTail } from './wormHelpers.js';
+import { rideLiveRotation, checkWormHitByWave, cutWormTail } from './wormHelpers.js';
+import { generateScrambleWaves, buildInverseQueue, splitFairWave } from './healerWorm/waveScramble.js';
+import { MAX_WAVE_PLANES } from '../game/rotationWave.js';
 import { useWormCrawler } from './useWormCrawler.js';
 import WormChaseCamera from './WormChaseCamera.jsx';
 import WormSwipeControls from './WormSwipeControls.jsx';
@@ -66,8 +68,8 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     // ── Game phase + scramble state ────────────────────────────────────────────
     // gameModePhaseRef: 'scrambling'|'spawning'|'countdown'|'active'|'finalHealing'|'solved'
     const gameModePhaseRef  = useRef('scrambling');
-    const scrambleSeqRef    = useRef([]);   // [{axis,dir,sliceIndex}] × SCRAMBLE_STEPS
-    const inverseQueueRef   = useRef([]);   // remaining inverse moves (consumed each rotation)
+    const scrambleSeqRef    = useRef([]);   // scramble waves × SCRAMBLE_STEPS
+    const inverseQueueRef   = useRef([]);   // remaining inverse waves (consumed each rotation)
     const spawnTimerRef     = useRef(0);    // seconds elapsed in spawning entrance animation
     const countdownTimerRef = useRef(0);    // seconds elapsed in countdown phase
     const countdownStepRef  = useRef(-1);   // last store-synced step (avoids redundant setState)
@@ -84,7 +86,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
 
     // ── Auto-rotation hazard state ─────────────────────────────────────────────
     const autoTimerRef      = useRef(0);
-    const pendingRotRef     = useRef(null);   // {axis,dir,sliceIndex} during warning window
+    const pendingWaveRef    = useRef(null);   // the rotation wave being warned about
     const warningProgressRef = useRef(0);     // 0→1 through warning window
     const thunkRef = useRef({ active: false, pos: [0, 0, 0], colors: [] });
 
@@ -96,28 +98,15 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     // Build a fresh scramble whenever a new run starts (or on first mount).
     useEffect(() => {
         const generateScramble = () => {
-            const axes = ['col', 'row', 'depth'];
-            // Standard scramble-generator rule (as used by WCA-style scramblers): never turn
-            // the same layer (axis + sliceIndex) twice in a row. Without this, a random pick
-            // can re-select the same layer immediately — most visibly when the direction also
-            // flips, which just turns the previous move straight back (clockwise then
-            // counterclockwise cancelling out to nothing).
-            const seq = [];
-            let prevAxis = null;
-            let prevSlice = null;
-            for (let i = 0; i < SCRAMBLE_STEPS; i++) {
-                let axis, sliceIndex;
-                do {
-                    axis = axes[Math.floor(Math.random() * 3)];
-                    sliceIndex = Math.floor(Math.random() * size);
-                } while (axis === prevAxis && sliceIndex === prevSlice);
-                seq.push({ axis, dir: Math.random() < 0.5 ? 1 : -1, sliceIndex, wormScramble: true });
-                prevAxis = axis;
-                prevSlice = sliceIndex;
-            }
+            // Mega Worm turns up to three parallel planes at a time; every other
+            // size stays strictly one plane per wave, so its scramble and hazard
+            // stream are unchanged from before waves existed.
+            const maxPlanes = useGameStore.getState().megaWorm ? MAX_WAVE_PLANES : 1;
+            const seq = generateScrambleWaves(size, SCRAMBLE_STEPS, maxPlanes);
             scrambleSeqRef.current  = seq;
-            // Inverse = reversed sequence with each dir flipped
-            inverseQueueRef.current = [...seq].reverse().map(m => ({ ...m, dir: -m.dir }));
+            // The hazard stream is the scramble undone from the end. Disjoint
+            // parallel planes commute, so a wave's inverse needs no reordering.
+            inverseQueueRef.current = buildInverseQueue(seq);
 
             // Reset all phase state
             gameModePhaseRef.current  = 'scrambling';
@@ -125,7 +114,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             countdownTimerRef.current = 0;
             countdownStepRef.current  = -1;
             autoTimerRef.current      = 0;
-            pendingRotRef.current     = null;
+            pendingWaveRef.current     = null;
             warningProgressRef.current = 0;
             // Freeze the worm until the countdown completes
             useGameStore.setState({ wormGamePhase: 'scrambling', wormCountdownStep: null, wormPaused: true });
@@ -243,7 +232,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                     // Countdown done — release the worm
                     gameModePhaseRef.current = 'active';
                     autoTimerRef.current = 0;
-                    pendingRotRef.current = null;
+                    pendingWaveRef.current = null;
                     warningProgressRef.current = 0;
                     useGameStore.setState({ wormGamePhase: 'active', wormCountdownStep: null, wormPaused: false });
                 }
@@ -290,40 +279,51 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         const warningStart = ACTIVE_ROTATE_INTERVAL - AUTO_ROTATE_WARNING;
 
         // Arm warning with the NEXT inverse move (peek, don't dequeue yet)
-        if (autoTimerRef.current >= warningStart && !pendingRotRef.current) {
+        if (autoTimerRef.current >= warningStart && !pendingWaveRef.current) {
             if (inverseQueueRef.current.length === 0) {
                 // All inverse moves exhausted — enter final healing phase.
                 // Wormhole spawning is now blocked (checked in worm.tick).
                 // Game ends only when the player heals all remaining tunnels.
                 gameModePhaseRef.current = 'finalHealing';
                 finalHealCheckTimer.current = 0.5; // check immediately next frame batch
-                pendingRotRef.current = null;
+                pendingWaveRef.current = null;
                 warningProgressRef.current = 0;
                 useGameStore.setState({ wormGamePhase: 'finalHealing' });
                 return;
             }
-            pendingRotRef.current = inverseQueueRef.current[0]; // peek
+            // Narrow the wave, if needed, so the player has a survivable option
+            // from where they are standing right now. Done at ARM time, not fire
+            // time, so what the warning lights show is exactly what turns.
+            //
+            // Anything dropped goes back on the front of the queue rather than
+            // being discarded: the run still works through the whole scramble,
+            // just spread over one more turn.
+            const { fire, deferred } = splitFairWave(inverseQueueRef.current[0], worm.pos.current);
+            if (deferred) inverseQueueRef.current.splice(1, 0, deferred);
+            pendingWaveRef.current = fire;
         }
 
         // Update warning progress (0→1)
-        if (pendingRotRef.current) {
+        if (pendingWaveRef.current) {
             const elapsed = autoTimerRef.current - warningStart;
             warningProgressRef.current = Math.min(1, Math.max(0, elapsed / AUTO_ROTATE_WARNING));
         }
 
         // Fire rotation at the fixed 10-second mark
-        if (autoTimerRef.current >= ACTIVE_ROTATE_INTERVAL && pendingRotRef.current) {
+        if (autoTimerRef.current >= ACTIVE_ROTATE_INTERVAL && pendingWaveRef.current) {
             // Delay if mid-tunnel
             if (worm.phase.current !== 'crawling') {
                 autoTimerRef.current = ACTIVE_ROTATE_INTERVAL - 1.5;
                 return;
             }
 
-            const { axis, dir, sliceIndex } = pendingRotRef.current;
+            const wave = pendingWaveRef.current;
             inverseQueueRef.current.shift(); // now dequeue
 
-            // Hit detection
-            const hit = checkWormHitBySlice(worm, axis, sliceIndex);
+            // Hit detection — resolved for the whole wave against one pre-wave
+            // snapshot, so three planes clipping different parts of the tail
+            // produce one deterministic outcome rather than a cascade of cuts.
+            const hit = checkWormHitByWave(worm, wave);
             if (hit) {
                 const histEntry = hit.type === 'cut'
                     ? shAt(worm.stepHistory.current, hit.cutTrailIdx * STEPS_PER_TILE)
@@ -338,17 +338,21 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                     colors: cutColors.length ? cutColors : ['#ffdd44', '#ff8800'],
                 };
                 if (hit.type === 'death') {
-                    worm.killWorm({ reason: 'slice-rotation', axis, sliceIndex });
+                    worm.killWorm({
+                        reason: 'slice-rotation',
+                        axis: wave.axis,
+                        sliceIndex: wave.rotations[0].sliceIndex,
+                    });
                 } else {
                     cutWormTail(worm, hit.cutTrailIdx);
                     feel('cut');
                 }
             }
 
-            if (onRotate) onRotate(axis, dir, sliceIndex);
+            if (onRotate) onRotate(wave);
 
             // Reset for next cycle (fixed interval — no randomisation)
-            pendingRotRef.current = null;
+            pendingWaveRef.current = null;
             warningProgressRef.current = 0;
             autoTimerRef.current = 0;
         }
@@ -387,7 +391,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             {wormAlive && <MagnetFX worm={worm} />}
             <PowerupOrbs size={size} />
             {!wormInTunnel && <SpecialOrbs size={size} />}
-            <SliceWarningLights pendingRotRef={pendingRotRef} size={size} />
+            <SliceWarningLights pendingWaveRef={pendingWaveRef} size={size} />
             <ThunkEffect thunkRef={thunkRef} />
             <CollisionGlow size={size} />
         </>

@@ -15,6 +15,9 @@ import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { isMobile } from '../utils/device.js';
 import CubeAssembly from './CubeAssembly.jsx';
+// The Mega shell renderer. Only ever mounted for the Mega Worm cube, where the
+// per-cubie/per-sticker component tree is ~4x over the draw-call budget.
+const MegaCubeAssembly = React.lazy(() => import('./MegaCubeAssembly.jsx'));
 import BlackHoleEnvironment from './BlackHoleEnvironment.jsx';
 import NebulaEnvironment from './NebulaEnvironment.jsx';
 import { BACKGROUNDS, getBackgroundUrl, STORY_ENVIRONMENTS } from '../utils/backgrounds.js';
@@ -135,6 +138,7 @@ export default function GameScene({
     wormHealerMode,
     wormPhase,
     wormPaused,
+    megaWorm,
     holonomyMode,
     wormHealedCount,
     perfReducedFX,
@@ -152,6 +156,7 @@ export default function GameScene({
     wormHealerMode: s.wormHealerMode,
     wormPhase: s.wormPhase,
     wormPaused: s.wormPaused ?? false,
+    megaWorm: s.megaWorm ?? false,
     holonomyMode: s.holonomyMode,
     wormHealedCount: s.wormHealedCount ?? 0,
     perfReducedFX: s.perfReducedFX ?? false,
@@ -291,21 +296,34 @@ export default function GameScene({
           healMoment={wormHealedCount}
         />
 
-        <CubeAssembly
-          size={size}
-          cubies={cubies}
-          onMove={wormHealerMode && wormPaused ? null : onMove}
-          onTapFlip={onTapFlip}
-          animState={animState}
-          onAnimComplete={onAnimComplete}
-          onCascadeComplete={onCascadeComplete}
-          manifoldMap={manifoldMap}
-          onSelectTile={onSelectTile}
-          onClearTileSelection={onClearTileSelection}
-          onFlipWaveComplete={onFlipWaveComplete}
-          solveHighlights={solveModeActive || teachModeActive ? solveHighlights : []}
-          onFaceRotationMode={onFaceRotationMode}
-        />
+        {megaWorm ? (
+          <Suspense fallback={null}>
+            <MegaCubeAssembly
+              size={size}
+              cubies={cubies}
+              onMove={wormHealerMode && wormPaused ? null : onMove}
+              onTapFlip={onTapFlip}
+              onAnimComplete={onAnimComplete}
+              onSelectTile={onSelectTile}
+            />
+          </Suspense>
+        ) : (
+          <CubeAssembly
+            size={size}
+            cubies={cubies}
+            onMove={wormHealerMode && wormPaused ? null : onMove}
+            onTapFlip={onTapFlip}
+            animState={animState}
+            onAnimComplete={onAnimComplete}
+            onCascadeComplete={onCascadeComplete}
+            manifoldMap={manifoldMap}
+            onSelectTile={onSelectTile}
+            onClearTileSelection={onClearTileSelection}
+            onFlipWaveComplete={onFlipWaveComplete}
+            solveHighlights={solveModeActive || teachModeActive ? solveHighlights : []}
+            onFaceRotationMode={onFaceRotationMode}
+          />
+        )}
 
         {teachModeActive && layerHighlight && (
           <LayerHighlight

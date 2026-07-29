@@ -27,72 +27,13 @@ import {
 import { makeCubies } from '../game/cubeState.js';
 import { liveRotation } from '../worm/liveRotation.js';
 import { ttAt } from '../worm/circularBuffers.js';
+import { makeWormCtx, makeWormSimFor, makeWormRunner, eventsOf } from './helpers/wormHarness.js';
 
 const SIZE = 3;
 
-// Stub ctx port: read defaults are overridable per test; every effect method
-// records an event so tests can assert on what the sim asked the outside world to do.
-function makeCtx(overrides = {}) {
-  const events = [];
-  const log = (type) => (...args) => { events.push({ type, args }); };
-  return {
-    events,
-    getCubies: () => null,
-    getGamePhase: () => 'active',
-    isPaused: () => false,
-    getSpeed: () => 1.0,
-    getControlMode: () => 'non-oriented',
-    getWormholeInterval: () => 9999,
-    isPrismCharacter: () => false,
-    getOrbInventory: () => ({ 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }),
-    getHealingProgress: () => ({}),
-    getOrbColor: () => '#22ff88',
-    resolveTunnel: () => null,
-    feel: log('feel'),
-    onDeath: log('death'),
-    onTunnelEnter: log('tunnelEnter'),
-    onCrawlResume: log('crawlResume'),
-    onPhase: log('phase'),
-    onBoostState: log('boost'),
-    onSurvivalTick: log('survival'),
-    spawnWormholePair: log('spawn'),
-    onFlippedTile: log('flipped'),
-    applyDeposit: log('deposit'),
-    onOrbPickup: log('pickup'),
-    onPowerupsChanged: log('powerups'),
-    applyHeal: log('heal'),
-    onSpecialsChanged: log('specials'),
-    onRocketState: log('rocketState'),
-    onMagnetState: log('magnetState'),
-    onSpecialSpawned: log('specialSpawned'),
-    onSpecialExpired: log('specialExpired'),
-    ...overrides,
-  };
-}
-
-function makeSim() {
-  const sim = makeWormSim(SIZE);
-  resetWormSim(sim, SIZE, { orbCount: 0, wormholeInterval: 9999 });
-  return sim;
-}
-
-// Advance the sim by `seconds` of wall time in fixed sub-clamp increments.
-function run(sim, ctx, seconds, dt = 0.05) {
-  const steps = Math.round(seconds / dt);
-  for (let i = 0; i < steps; i++) stepWormSim(sim, dt, SIZE, ctx);
-}
-
-// Step until `predicate()` holds (checked after every step) or maxSeconds elapse.
-function runUntil(sim, ctx, predicate, maxSeconds = 30, dt = 0.05) {
-  const steps = Math.round(maxSeconds / dt);
-  for (let i = 0; i < steps; i++) {
-    stepWormSim(sim, dt, SIZE, ctx);
-    if (predicate()) return true;
-  }
-  return false;
-}
-
-const eventsOf = (ctx, type) => ctx.events.filter(e => e.type === type);
+const makeCtx = (overrides = {}) => makeWormCtx(overrides);
+const makeSim = () => makeWormSimFor(SIZE);
+const { run, runUntil } = makeWormRunner(SIZE);
 
 beforeEach(() => {
   liveRotation.active = false;

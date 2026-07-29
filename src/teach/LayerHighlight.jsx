@@ -287,7 +287,11 @@ const sparkFragmentShader = `
 
 const STREAMERS = 3;
 
-const LayerHighlight = ({ axis, sliceIndex, dir, size }) => {
+// `deep`/`core` default to the instructor gold. They are overridable because a
+// Mega Worm hazard can warn about up to three layers at once: identical gold on
+// all three would say "these three are about to turn" but not which streamer
+// belongs to which layer, and the directions can differ per layer.
+const LayerHighlight = ({ axis, sliceIndex, dir, size, deep = GOLD_DEEP, core = GOLD_CORE }) => {
   const spinnerRef = useRef();
   const turn = dir === 1 ? 1 : -1;
 
@@ -297,9 +301,9 @@ const LayerHighlight = ({ axis, sliceIndex, dir, size }) => {
   React.useEffect(() => { uDir.value = turn; }, [turn, uDir]);
 
   const palette = useMemo(() => ({
-    uDeep: { value: new THREE.Color(GOLD_DEEP) },
-    uCore: { value: new THREE.Color(GOLD_CORE) }
-  }), []);
+    uDeep: { value: new THREE.Color(deep) },
+    uCore: { value: new THREE.Color(core) }
+  }), [deep, core]);
 
   // One merged geometry of every exposed cubie face in the target slice.
   const rimGeometry = useMemo(() => {

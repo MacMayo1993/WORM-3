@@ -91,8 +91,22 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
         return tex;
     }, []);
 
-    // Stable random seeds per (position × bubble) slot — no per-frame allocation
-    const MAX_RINGS = 6 * size * size;
+    // Instance capacity, in tiles.
+    //
+    // This used to be `6 * size²` — one slot for every surface tile, on the
+    // theory that in principle they could all be wormholes at once. In practice
+    // a handful are live at a time, because the run is about healing them. On a
+    // 15³ cube the theoretical bound is 1,350 tiles, and the pools below expand
+    // that by up to 7× (sparks) — 2.5 million triangles of capacity for a
+    // typical live count in the single digits. Even with `count` set per frame,
+    // that is a large permanent allocation, and it dwarfed the entire Mega cube
+    // (33k triangles) in the frame budget.
+    //
+    // Capped instead at a fixed ceiling, well above anything observed in play.
+    // Tiles past the cap simply don't get decoration; the tunnels themselves are
+    // unaffected because they are gameplay state, not these meshes.
+    const MAX_DECORATED_TILES = 96;
+    const MAX_RINGS = Math.min(6 * size * size, MAX_DECORATED_TILES);
     const bubbleSeeds = React.useMemo(() => {
         const s = new Float32Array(MAX_RINGS * Math.max(BUBBLES_PER_VOID, SPARKS_PER_CRITICAL, Math.max(POLES_PER_TILE, TAPES_PER_TILE)) * 3);
         for (let i = 0; i < s.length / 3; i++) {
@@ -109,15 +123,27 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
     // phases (entering/tunnel/exiting) keep the tighter delay for the 60 Hz ring cadence.
     const [debouncedCubies, setDebouncedCubies] = useState(cubies);
     useEffect(() => {
+        // A size change is not a flip: the snapshot must follow it immediately.
+        // Debouncing it leaves this component holding an N-cube while being told
+        // the cube is M, and the scan below then walks off the end of the array.
+        // (Reproduced by switching to the Mega 15³ cube mid-run.)
+        if (cubies?.length !== debouncedCubies?.length) {
+            setDebouncedCubies(cubies);
+            return undefined;
+        }
         const phase = worm?.phase?.current ?? 'crawling';
         const delayMs = phase === 'crawling' ? 400 : 200;
         const timer = setTimeout(() => setDebouncedCubies(cubies), delayMs);
         return () => clearTimeout(timer);
-    }, [cubies, worm]);
+    }, [cubies, worm, debouncedCubies]);
 
     // All flipped surface positions, augmented with canonical tunnel key so
     // WormholeRings can tell live vs void without re-running manifold logic per frame.
     const allPositions = React.useMemo(() => {
+        // Belt and braces alongside the effect above: React can render with the
+        // new `size` before the state update lands, and every scan below indexes
+        // by `size` into this array.
+        if (!debouncedCubies || debouncedCubies.length !== size) return [];
         const manifoldMap = buildManifoldGridMapIncremental(debouncedCubies, size, manifoldMapCacheRef.current);
         const tunnels = getActiveTunnels(debouncedCubies, size, manifoldMap);
         // Build tile-key → canonical-tunnel-key lookup (covers both entry and exit)
@@ -216,7 +242,11 @@ export function WormholeRings({ cubies, size, worm, voidTunnelKeysRef, tunnelUse
         let tapeIdx = 0;
         let frameIdx = 0;
 
-        for (let i = 0; i < allPositions.length; i++) {
+        // Bounded by the instance capacity, not by how many tiles happen to be
+        // flipped: past the cap there is nowhere to write, and an unbounded loop
+        // here would run off the end of every pool on a large cube.
+        const drawn = Math.min(allPositions.length, MAX_RINGS);
+        for (let i = 0; i < drawn; i++) {
             const { tunnelKey, wp, normal: n } = allPositions[i];
             const isVoid = !!(tunnelKey && voidKeys.has(tunnelKey));
             const traversals = tunnelKey ? (useCounts.get(tunnelKey) ?? 0) : 0;

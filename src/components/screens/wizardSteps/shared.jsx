@@ -10,6 +10,8 @@ import { BACKGROUNDS, getBackgroundUrl } from '../../../utils/backgrounds.js';
 import { BG_PREVIEWS } from '../../../utils/bgPreviews.js';
 import { registerTilePreview, updateTilePreview, unregisterTilePreview } from '../../../3d/TilePreviewRenderer.js';
 import { PAPER_SHEET_RAISED, PAPER_TEXT_FAINT, PAPER_CARD_SHADOW } from '../../../utils/uiTheme.js';
+import { MEGA_SIZE } from '../../../game/sliceIndex.js';
+import { MEGA_WORM_ENABLED } from '../../../utils/megaFlag.js';
 
 // ─── Catalogue data ───────────────────────────────────────────────────────────
 
@@ -37,19 +39,40 @@ export const bgOptionFor = id => BG_OPTIONS.find(o => o.value === id) || null;
 export const FACE_LABELS = { 1: 'Front', 2: 'Left', 3: 'Top', 4: 'Back', 5: 'Right', 6: 'Bottom' };
 
 // One row per stop on the size slider.
+//
+// The 6×6 tier used to be tagged "Mega". That name now belongs to the 15×15
+// experimental tier below, which is a different performance class entirely
+// rather than one more notch — two "Mega"s in one picker would be a genuinely
+// misleading thing to put in front of a player choosing a cube.
 export const SIZE_TIERS = [
   { n: 2, name: '2×2×2', tag: 'Mini', desc: 'Fast & approachable' },
   { n: 3, name: '3×3×3', tag: 'Classic', desc: 'The original challenge' },
   { n: 4, name: '4×4×4', tag: 'Master', desc: 'Expert territory' },
   { n: 5, name: '5×5×5', tag: 'Ultra', desc: '150 stickers of chaos' },
-  { n: 6, name: '6×6×6', tag: 'Mega', desc: '216 stickers of madness' },
+  { n: 6, name: '6×6×6', tag: 'Colossus', desc: '216 stickers of madness' },
   { n: 7, name: '7×7×7', tag: 'Titan', desc: '294 stickers of insanity' }
 ];
+
+// The experimental Mega Worm tier, appended only when the ?megaworm flag is on.
+// Kept out of SIZE_TIERS proper so MIN/MAX_CUBE_SIZE — which clamp the slider in
+// every other mode — stay at 2–7 no matter what the flag says.
+export const MEGA_WORM_TIER = {
+  n: MEGA_SIZE,
+  name: `${MEGA_SIZE}×${MEGA_SIZE}×${MEGA_SIZE}`,
+  tag: 'Mega Worm',
+  desc: '1,350 stickers · up to three layers turning at once',
+  experimental: true,
+};
 
 export const MIN_CUBE_SIZE = SIZE_TIERS[0].n;
 export const MAX_CUBE_SIZE = SIZE_TIERS[SIZE_TIERS.length - 1].n;
 
-export const sizeTier = n => SIZE_TIERS.find(t => t.n === n) || SIZE_TIERS[1];
+/** Size tiers offered for a given mode. Mega Worm is worm-only and flag-gated. */
+export const sizeTiersFor = ({ worm = false } = {}) =>
+  (worm && MEGA_WORM_ENABLED) ? [...SIZE_TIERS, MEGA_WORM_TIER] : SIZE_TIERS;
+
+export const sizeTier = n =>
+  SIZE_TIERS.find(t => t.n === n) || (n === MEGA_SIZE ? MEGA_WORM_TIER : SIZE_TIERS[1]);
 
 // ─── Colour helpers ───────────────────────────────────────────────────────────
 
