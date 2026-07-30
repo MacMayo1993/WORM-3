@@ -100,6 +100,7 @@ import {
     SPECIAL_TUNNEL_RADIUS,
     SPECIAL_SPAWN_RETRY,
     MAX_ORB_ATTRACTION_FX,
+    activeTunnelCap,
 } from './constants.js';
 
 // Axis scratch for baking a committed turn into the worm's position history.
@@ -591,13 +592,19 @@ const _ringOccupied = new Set();
 // footprint spring, whose intentional rebound would otherwise count departed tiles.
 function tryWormholeRingHeal(sim, size, ctx) {
     const tunnels = ctx.getActiveTunnels?.() ?? [];
-    const activeKeys = new Set(tunnels.map(t => t.tunnelKey).filter(Boolean));
-    for (const key of sim.ringHealedTunnelKeys) {
-        if (!activeKeys.has(key)) sim.ringHealedTunnelKeys.delete(key);
+    // Prune stale healed keys, but only when there are any — the common case is an
+    // empty set, and materialising an active-key Set every crawl step just to iterate
+    // an empty prune list was pure allocation churn on mega cubes with many tunnels.
+    // Pruning must still happen when the last tunnel was just healed (tunnels empty):
+    // an empty active-key set retires every stale key, so its canonical key no longer
+    // survives the empty-list frame to block a later tunnel at the same coordinate pair.
+    if (sim.ringHealedTunnelKeys.size > 0) {
+        const activeKeys = new Set();
+        for (const t of tunnels) if (t.tunnelKey) activeKeys.add(t.tunnelKey);
+        for (const key of sim.ringHealedTunnelKeys) {
+            if (!activeKeys.has(key)) sim.ringHealedTunnelKeys.delete(key);
+        }
     }
-    // Pruning must also happen when the last tunnel was healed. Otherwise its
-    // canonical key survives the empty-list frame and blocks a later tunnel that
-    // happens to spawn at the same coordinate pair.
     if (tunnels.length === 0) return false;
     _ringOccupied.clear();
     const bodyReach = Math.min(MAX_TAIL, sim.tailLength) * BODY_BALL_SPACING;
@@ -1428,7 +1435,13 @@ export function stepWormSim(sim, delta, size, ctx) {
     if (sim.phase === 'crawling') {
         sim.wormholeTimer -= delta;
         if (sim.wormholeTimer <= 0) {
-            if (!noMoreSpawns) {
+            // Hold at the active-pair ceiling: skip the spawn (but still reset the timer)
+            // whenever the board is already at its cap, so a fresh pair only appears once
+            // the player has healed one back down. This bounds both the difficulty and the
+            // per-step heal scan on large boards. The timer resets regardless, so the first
+            // interval after a heal refills the slot.
+            const atCap = (ctx.getActiveTunnels?.() ?? []).length >= activeTunnelCap(size);
+            if (!noMoreSpawns && !atCap) {
                 const tile = randomUnflippedTile(ctx.getCubies(), size, [sim.pos]);
                 if (tile) ctx.spawnWormholePair(tile);
             }

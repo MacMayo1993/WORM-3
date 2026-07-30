@@ -69,6 +69,16 @@ export const SELF_COLLISION_TRIGGER_PROGRESS = 0.4;
 export const SELF_COLLISION_GRACE_STEPS_AFTER_TUNNEL = 4;
 export const WORMHOLE_MAX_TRAVERSALS = 3;
 
+// Hard ceiling on how many tunnel pairs may be active at once. A pair is one antipodal
+// wormhole (two flipped surface stickers), which is exactly what getActiveTunnels counts
+// and what the per-step heal scan iterates. Mega (size 15) has room for 675 pairs and
+// used to accumulate toward it unbounded, spiking both difficulty and the scan cost — it
+// now caps at 10. Smaller boards scale down from there (edge length + 2, clamped to the
+// same ceiling) so they inherit the same guarantee without an unplayably sparse board:
+// 2×2→4, 3×3→5, 4×4→6, 5×5→7, 15×15→10.
+export const MAX_ACTIVE_TUNNEL_PAIRS = 10;
+export const activeTunnelCap = (size) => Math.min(MAX_ACTIVE_TUNNEL_PAIRS, size + 2);
+
 // Tail segments needed to visually cover all tiles: totalTiles / (0.14 unit spacing / ~1 unit per tile)
 // For 5×5 (150 tiles): ~1100 segments. Round up generously.
 export const MAX_TAIL = 1200;
