@@ -266,11 +266,11 @@ describe('wormhole spawn clock', () => {
 
 describe('active tunnel pair cap', () => {
   it('scales down for smaller boards and clamps mega to the ceiling', () => {
-    expect(activeTunnelCap(2)).toBe(4);
-    expect(activeTunnelCap(3)).toBe(5);
-    expect(activeTunnelCap(4)).toBe(6);
+    expect(activeTunnelCap(2)).toBe(3);
+    expect(activeTunnelCap(3)).toBe(4);
+    expect(activeTunnelCap(4)).toBe(5);
     expect(activeTunnelCap(5)).toBe(7);
-    expect(activeTunnelCap(15)).toBe(10);
+    expect(activeTunnelCap(15)).toBe(20);
     expect(activeTunnelCap(15)).toBe(MAX_ACTIVE_TUNNEL_PAIRS);
   });
 
