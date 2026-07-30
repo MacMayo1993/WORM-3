@@ -72,6 +72,22 @@ export function nextRestRead(current, rotationActive, axis, sliceIndex, prevTile
 }
 
 /**
+ * Detect a rotation that starts after an inter-tile step has already begun.
+ *
+ * Step destinations are chosen at the previous step boundary, so only calling
+ * nextRestRead there misses a slice that starts rotating midway through the
+ * traversal. A completed traversal must not be reclassified: at that point the
+ * worm was already standing on the tile when the turn began and should ride it.
+ */
+export function nextRestReadDuringStep(current, rotationActive, axis, sliceIndex, interpT, prevTile, nextTile) {
+  if (!rotationActive) return null;
+  if (interpT >= 1) {
+    return current && current.axis === axis && current.sliceIndex === sliceIndex ? current : null;
+  }
+  return nextRestRead(current, rotationActive, axis, sliceIndex, prevTile, nextTile);
+}
+
+/**
  * Returns a rotation-stable key for a surface sticker using origPos + origDir.
  * The key survives cube rotations because origPos/origDir never change.
  * Returns null if the sticker cannot be found.
@@ -695,4 +711,3 @@ export const rotateMoveDir = (moveDir, oldDirKey, newDirKey, axis, dir) => {
 export const getSegmentWorldPos = (seg, size, explosionFactor = 0) => {
   return getStickerWorldPos(seg.x, seg.y, seg.z, seg.dirKey, size, explosionFactor);
 };
-
