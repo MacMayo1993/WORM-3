@@ -1025,13 +1025,17 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     const flips = meta?.flips ?? 0;
     const prevVal = prevCurr.current;
     const prevFlipCount = prevFlips.current;
-    const didFlip = flips > prevFlipCount;
+    const didNewFlip = flips > prevFlipCount;
+    const didHeal = flips < prevFlipCount;
 
     // Standardize all flip sources (manual + chaos/disparity) to use the same visual pipeline.
     // In disparity bursts a tile can be flipped multiple times between React commits, so curr can
     // end up unchanged while flips still increased; we still run the manual-style squish/reveal.
     const didAntipodalColorSwap = curr !== prevVal && ANTIPODAL_COLOR[prevVal] === curr;
-    if (didFlip && (didAntipodalColorSwap || curr === prevVal)) {
+    // Healing restores odd flip parity to zero. Give that color restoration the
+    // same squish/reveal motion as a manual flip instead of snapping immediately.
+    if ((didNewFlip && (didAntipodalColorSwap || curr === prevVal))
+        || (didHeal && didAntipodalColorSwap)) {
       // Mark as animating to prevent React state from interrupting
       isFlipping.current = true;
       activateSticker(stickerGridIdRef.current);
@@ -1813,9 +1817,11 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     // the mesh to start showing the OLD color so the "collapse → color-swap → expand" plays
     // correctly. Without this guard useLayoutEffect would set new color before useEffect
     // even gets a chance to set isFlipping=true, causing a one-frame new-color flash.
-    const isFlipPending = (meta?.curr ?? 0) !== prevCurr.current
-      && (meta?.flips ?? 0) > 0
-      && ANTIPODAL_COLOR[prevCurr.current] === (meta?.curr ?? 0);
+    const nextCurr = meta?.curr ?? 0;
+    const nextFlips = meta?.flips ?? 0;
+    const isFlipPending = nextFlips !== prevFlips.current
+      && nextCurr !== prevCurr.current
+      && ANTIPODAL_COLOR[prevCurr.current] === nextCurr;
     // Always keep the instanced-mesh color ref current, even when this sticker is
     // temporarily non-instanceable (the manager will zero its slot; the ref stays
     // ready for when it becomes instanceable again without a re-register).
