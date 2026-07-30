@@ -2,12 +2,14 @@
 // Extracted from HealerWormMode.jsx (2026-07 monolith split) — code unchanged.
 import { useRef, useState, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
+import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { getStickerWorldPos } from '../../game/coordinates.js';
 import { buildManifoldGridMap } from '../../game/manifoldLogic.js';
 import { findStickerByStableKey } from '../wormLogic.js';
 import { resolveColors } from '../../utils/colorSchemes.js';
+import { isMobile as _isMobile } from '../../utils/device.js';
 import { UI_FONT } from '../../utils/uiTheme.js';
 import { liveCubies } from '../liveCubies.js';
 import { FACE_NORMALS, HEAL_COST } from './constants.js';
