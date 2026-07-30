@@ -195,7 +195,7 @@ const createWormSlice = (set, _get) => ({
 
   // ── Config (persists across sessions or set by wizard) ────────────────────
   wormRunId: 0,
-  wormSpeed: 1.0,
+  wormSpeed: 2.0,
   setWormSpeed: (v) => set({ wormSpeed: v }),
   wormBoostState: 'ready',
   setWormBoostState: (v) => set({ wormBoostState: v }),
@@ -272,7 +272,7 @@ const createWormSlice = (set, _get) => ({
     chaosLevel: 0,
     wormRunId: (state.wormRunId ?? 0) + 1,
     wormPaused: true,
-    wormSpeed: speed !== null ? Math.max(0.5, Math.min(3.0, speed)) : state.wormSpeed,
+    wormSpeed: speed !== null ? Math.max(0.5, Math.min(3.5, speed)) : state.wormSpeed,
     wormOrbCount: orbCount !== null ? Math.max(1, Math.min(144, Math.round(orbCount))) : state.wormOrbCount,
     wormholeInterval: interval !== null ? Math.max(2, Math.min(30, Number(interval))) : state.wormholeInterval,
     wormColor: color !== null ? (color || '#33ff66') : state.wormColor,

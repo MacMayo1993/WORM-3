@@ -26,6 +26,7 @@ import { flipStickerPair } from './game/manifoldLogic.js';
 import { getManifoldMap } from './game/manifoldMapStore.js';
 import { clearRefractory } from './game/refractoryMap.js';
 import { buildLevelStartState } from './levels/levelStaging.js';
+import { resolveWizardTileStyles } from './utils/wizardTileStyles.js';
 
 // Hooks
 import { useShallow } from 'zustand/react/shallow';
@@ -817,23 +818,11 @@ export default function WORM3() {
   const handleWizardComplete = useCallback((wizardSettings) => {
     setShowFreeplayWizard(false);
     useGameStore.getState().setRandomMode(false);
-    const allStyles = ['solid', 'glossy', 'matte', 'metallic', 'carbonFiber', 'hexGrid', 'comic', 'cafeWall', 'hermanGrid', 'opticSpin', 'ouchi', 'scintillatingGrid', 'zoellner', 'kanizsa', 'grass', 'ice', 'sand', 'water', 'wood', 'circuit', 'holographic', 'pulse', 'lava', 'galaxy', 'neural'];
-
     // Build manifoldStyles — explicit per-face overrides take precedence.
     // Treat 'random' as unset: a per-face entry of 'random' is not a real style key
     // and would reach the renderer as an unknown style (renders as solid).  This can
     // happen if a stale perFaceStyles object was seeded from a 'random' global style.
-    const manifoldStyles = {};
-    [1, 2, 3, 4, 5, 6].forEach(id => {
-      const perFace = wizardSettings.perFaceStyles?.[id];
-      if (perFace && perFace !== 'random') {
-        manifoldStyles[id] = perFace;
-      } else if (wizardSettings.tileStyle === 'random' || perFace === 'random') {
-        manifoldStyles[id] = allStyles[Math.floor(Math.random() * allStyles.length)];
-      } else {
-        manifoldStyles[id] = wizardSettings.tileStyle || 'solid';
-      }
-    });
+    const manifoldStyles = resolveWizardTileStyles(wizardSettings);
 
     const newSettings = {
       ...settings,
@@ -909,18 +898,7 @@ export default function WORM3() {
 
     // Apply visual settings immediately so the game scene shows the user's
     // chosen background and cube behind the Mobi intro overlay.
-    const allStyles = ['solid', 'glossy', 'matte', 'metallic', 'carbonFiber', 'hexGrid', 'comic', 'cafeWall', 'hermanGrid', 'opticSpin', 'ouchi', 'scintillatingGrid', 'zoellner', 'kanizsa', 'grass', 'ice', 'sand', 'water', 'wood', 'circuit', 'holographic', 'pulse', 'lava', 'galaxy', 'neural'];
-    const manifoldStyles = {};
-    [1, 2, 3, 4, 5, 6].forEach(id => {
-      const perFace = wizardSettings.perFaceStyles?.[id];
-      if (perFace && perFace !== 'random') {
-        manifoldStyles[id] = perFace;
-      } else if (wizardSettings.tileStyle === 'random' || perFace === 'random') {
-        manifoldStyles[id] = allStyles[Math.floor(Math.random() * allStyles.length)];
-      } else {
-        manifoldStyles[id] = wizardSettings.tileStyle || 'solid';
-      }
-    });
+    const manifoldStyles = resolveWizardTileStyles(wizardSettings);
 
     const newSettings = {
       ...settings,
@@ -957,7 +935,7 @@ export default function WORM3() {
     // makes Mega Mode feel almost empty.
     const megaAreaScale = wizardSettings.megaMode ? (15 * 15) / (7 * 7) : 1;
     const wormParams = {
-      wormSpeed: wizardSettings.wormSpeed ?? 1.0,
+      wormSpeed: wizardSettings.wormSpeed ?? 2.0,
       wormOrbCount: Math.round((wizardSettings.wormOrbCount ?? 5) * megaAreaScale),
       wormholeInterval: wizardSettings.wormholeInterval ?? 10,
       wormColor: wizardSettings.wormColor ?? '#33ff66',

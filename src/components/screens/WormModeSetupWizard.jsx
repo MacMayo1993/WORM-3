@@ -12,6 +12,7 @@ import {
 } from '../../utils/uiTheme.js';
 import { wizardLayout, WizardSteps } from './WizardChrome.jsx';
 import WormPreviewCanvas from '../../3d/WormPreviewCanvas.jsx';
+import { WORM_SPEED_OPTIONS } from '../../worm/healerWorm/constants.js';
 import {
   useWizardCosmetics, WizardImageInput,
   SceneStep, PaletteStep, StyleStep, SizeStep,
@@ -301,11 +302,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           accent="#1565C0"
           value={settings.wormSpeed}
           onChange={v => select('wormSpeed', v)}
-          options={[
-            { value: 1.0, label: 'Slow', hint: '1.0×' },
-            { value: 2.0, label: 'Average', hint: '2.0×' },
-            { value: 2.75, label: 'Fast', hint: '2.75×' }
-          ]}
+          options={WORM_SPEED_OPTIONS}
         />
         <OptionGroup
           label="Orb Count"
