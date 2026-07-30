@@ -12,6 +12,7 @@ import {
 } from '../../utils/uiTheme.js';
 import { wizardLayout, WizardSteps } from './WizardChrome.jsx';
 import WormPreviewCanvas from '../../3d/WormPreviewCanvas.jsx';
+import { WORM_SPEED_OPTIONS } from '../../worm/healerWorm/constants.js';
 import {
   useWizardCosmetics, WizardImageInput,
   SceneStep, PaletteStep, StyleStep, SizeStep,
@@ -28,15 +29,14 @@ const WORM_SIZE_TIERS = [
 
 const S = wizardLayout(ACCENT, ACCENT_SHADOW);
 
-const STEPS = ['Character', 'Scene', 'Colors', 'Style', 'Gameplay', 'Size'];
-const STEP_TITLES = ['Pick Worm Type', 'Background', 'Color Palette', 'Tile Style', 'Gameplay', 'Cube Size'];
+const STEPS = ['Character', 'Scene', 'Colors', 'Style', 'Size'];
+const STEP_TITLES = ['Pick Worm Type', 'Background', 'Color Palette', 'Tile Style', 'Cube Size & Gameplay'];
 const STEP_SUBTITLES = [
   'Select your character, then customize skin & hat',
   'Choose your play environment',
   'Pick a palette — the cube wears it as you go',
   'Choose how your tiles look and feel',
-  'Tune how fast and chaotic your worm run feels',
-  'Slide to size — this is the cube your worm will crawl'
+  'Choose your cube, then tune how fast and chaotic your worm run feels'
 ];
 
 const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
@@ -257,7 +257,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     );
   };
 
-  // ── Step 4: Gameplay ────────────────────────────────────────────────────────
+  // ── Final step: cube size and gameplay ─────────────────────────────────────
 
   const renderGameplay = () => {
     const OptionGroup = ({ label, options, value, onChange, accent }) => (
@@ -271,8 +271,8 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                 key={opt.value}
                 onClick={() => onChange(opt.value)}
                 style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
-                  padding: '14px 8px 12px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  padding: '14px 8px',
                   borderRadius: '10px',
                   border: selected ? `2px solid ${accent}` : '2px solid #d6d0c8',
                   background: selected ? `${accent}14` : PAPER_SHEET_RAISED,
@@ -286,7 +286,6 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
                 }}
               >
                 <span style={{ fontSize: '13px', fontWeight: 700, color: selected ? accent : PAPER_TEXT_MUTED, letterSpacing: '-0.2px' }}>{opt.label}</span>
-                <span style={{ fontSize: '10px', color: selected ? accent : PAPER_TEXT_FAINT, fontWeight: 500 }}>{opt.hint}</span>
               </button>
             );
           })}
@@ -301,11 +300,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           accent="#1565C0"
           value={settings.wormSpeed}
           onChange={v => select('wormSpeed', v)}
-          options={[
-            { value: 1.0, label: 'Slow', hint: '1.0×' },
-            { value: 2.0, label: 'Average', hint: '2.0×' },
-            { value: 2.75, label: 'Fast', hint: '2.75×' }
-          ]}
+          options={WORM_SPEED_OPTIONS}
         />
         <OptionGroup
           label="Orb Count"
@@ -313,9 +308,9 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           value={settings.wormOrbCount}
           onChange={v => select('wormOrbCount', v)}
           options={[
-            { value: 5, label: 'Less', hint: '5 orbs' },
-            { value: 15, label: 'Average', hint: '15 orbs' },
-            { value: 25, label: 'More', hint: '25 orbs' }
+            { value: 5, label: 'Less' },
+            { value: 15, label: 'Average' },
+            { value: 25, label: 'More' }
           ]}
         />
         <OptionGroup
@@ -324,9 +319,9 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           value={settings.wormholeInterval}
           onChange={v => select('wormholeInterval', v)}
           options={[
-            { value: 20, label: 'Slow', hint: '20s' },
-            { value: 10, label: 'Average', hint: '10s' },
-            { value: 5, label: 'Fast', hint: '5s' }
+            { value: 20, label: 'Slow' },
+            { value: 10, label: 'Average' },
+            { value: 5, label: 'Fast' }
           ]}
         />
       </div>
@@ -338,7 +333,6 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     <SceneStep key="scene" cos={cos} />,
     <PaletteStep key="palette" cos={cos} />,
     <StyleStep key="style" cos={cos} />,
-    renderGameplay(),
     <div key="size">
       <SizeStep cos={cos} tiers={WORM_SIZE_TIERS} />
       <button
@@ -369,6 +363,9 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           Mega Mode automatically scales orb density to fill the larger surface and uses optimized effects for smoother play.
         </p>
       )}
+      <div style={{ marginTop: '24px' }}>
+        {renderGameplay()}
+      </div>
     </div>
   ];
 

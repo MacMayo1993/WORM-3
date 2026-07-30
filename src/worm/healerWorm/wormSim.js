@@ -1275,7 +1275,7 @@ export function stepWormSim(sim, delta, size, ctx) {
     }
 
     const boostMult = sim.boostActiveT > 0 ? BOOST_MULTIPLIER : 1;
-    // Rocket is exactly 2× the user's current speed; the normal boost does not stack.
+    // Rocket is 4× the user's current speed; the normal boost does not stack.
     const speedMult = sim.rocketActive ? ROCKET_SPEED_MULT : boostMult;
     const STEP_SEC = 1.0 / (ctx.getSpeed() * speedMult);
 
