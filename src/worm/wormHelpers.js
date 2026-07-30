@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { rotateVec90 } from '../game/cubeRotation.js';
-import { DIR_TO_VEC, VEC_TO_DIR } from '../utils/constants.js';
+import { ANTIPODAL_COLOR, DIR_TO_VEC, VEC_TO_DIR } from '../utils/constants.js';
 import { isTileInSlice } from './wormLogic.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { liveCubies } from './liveCubies.js';
@@ -90,6 +90,16 @@ export function ensureOrbContrast(hex) {
     const ng = Math.min(255, Math.round(g * factor * 255));
     const nb = Math.min(255, Math.round(b * factor * 255));
     return `#${nr.toString(16).padStart(2, '0')}${ng.toString(16).padStart(2, '0')}${nb.toString(16).padStart(2, '0')}`;
+}
+
+/**
+ * Resolve a parity orb's primary color from the antipode of its host manifold.
+ * Keeping this in the shared worm layer ensures the board orb, pickup flash, and
+ * colors added to the worm's body all use the same palette lookup.
+ */
+export function getAntipodalOrbColor(faceId, faceColors, fallback = '#22ff88') {
+    const antipodalFaceId = ANTIPODAL_COLOR[faceId];
+    return ensureOrbContrast((antipodalFaceId && faceColors?.[antipodalFaceId]) ?? fallback);
 }
 
 // Transforms a {x, y, z, dirKey} surface tile through a cube slice rotation.
