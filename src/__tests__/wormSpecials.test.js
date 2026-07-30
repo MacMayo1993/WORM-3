@@ -27,6 +27,7 @@ import {
   SURFACE_JUMP_HEIGHT,
   SURFACE_JUMP_TILE_SPAN,
   BASE_TAIL_LENGTH,
+  MAX_ORB_ATTRACTION_FX,
 } from '../worm/healerWorm/constants.js';
 import { SPECIAL_TYPES } from '../worm/healerWorm/specialDefs.js';
 import {
@@ -369,6 +370,62 @@ describe('magnet', () => {
     stepUntilCommit(sim, ctx); // (2,4,4) — the edge tile
     expect(sim.pos).toMatchObject({ x: 2, y: 4, z: 4, dirKey: 'PZ' });
     expect(eventsOf(ctx, 'pickup')).toHaveLength(1);
+  });
+});
+
+// ─── Magnet attraction FX queue ──────────────────────────────────────────────
+// The queue is the correctness boundary between gameplay (immediate, authoritative)
+// and presentation (a bead the renderer flies to the worm). The flight itself is a
+// browser concern; these lock in what the sim hands the renderer.
+
+describe('magnet attraction FX queue', () => {
+  it('queues a streak for a magnet-dragged orb, and still banks it immediately', () => {
+    const sim = makeSim();
+    const ctx = makeCtx({ getOrbColor: () => '#ff00aa' });
+    sim.powerups = [apple(0, 3, 4, 'PZ')]; // two steps left of the landing tile
+    sim.magnetT = 5;
+    stepUntilCommit(sim, ctx); // lands (2,3,4); magnet drags the off-head orb in
+    // Gameplay is authoritative and immediate — growth is not gated on the visual.
+    expect(sim.tailLength).toBeGreaterThan(BASE_TAIL_LENGTH);
+    // Exactly one attraction, carrying what the renderer needs to draw the streak.
+    expect(sim.pendingOrbAttractions).toHaveLength(1);
+    const att = sim.pendingOrbAttractions[0];
+    expect(att.color).toBe('#ff00aa');
+    expect(att.elevated).toBe(false); // solid cube, orb sat flat on its tile
+    expect(Array.isArray(att.from)).toBe(true);
+    expect(att.from).toHaveLength(3);
+  });
+
+  it('does not queue a streak for an orb taken on the head tile', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    sim.powerups = [apple(2, 3, 4, 'PZ')]; // the tile the worm lands on
+    sim.magnetT = 5;
+    stepUntilCommit(sim, ctx);
+    // Collected (it grew), but a head-tile pickup isn't "dragged" — nothing flies.
+    expect(sim.tailLength).toBeGreaterThan(BASE_TAIL_LENGTH);
+    expect(sim.pendingOrbAttractions).toHaveLength(0);
+  });
+
+  it('never queues past the cap, and the pickup still lands when it is full', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    // Pre-fill the queue to the ceiling (renderer has not drained it yet).
+    sim.pendingOrbAttractions = Array.from({ length: MAX_ORB_ATTRACTION_FX }, (_, i) => ({
+      id: `seed-${i}`, from: [0, 0, 0], to: [0, 0, 0], color: '#fff', elevated: false,
+    }));
+    sim.powerups = [apple(0, 3, 4, 'PZ')];
+    sim.magnetT = 5;
+    stepUntilCommit(sim, ctx);
+    expect(sim.pendingOrbAttractions).toHaveLength(MAX_ORB_ATTRACTION_FX); // no overflow
+    expect(sim.tailLength).toBeGreaterThan(BASE_TAIL_LENGTH); // gameplay unaffected
+  });
+
+  it('clears pending attractions on reset', () => {
+    const sim = makeSim();
+    sim.pendingOrbAttractions = [{ id: 'x', from: [0, 0, 0], to: [0, 0, 0], color: '#fff', elevated: false }];
+    resetWormSim(sim, SIZE, { orbCount: 0, wormholeInterval: 9999 });
+    expect(sim.pendingOrbAttractions).toHaveLength(0);
   });
 });
 
