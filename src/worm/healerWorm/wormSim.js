@@ -100,6 +100,7 @@ import {
     SPECIAL_TUNNEL_RADIUS,
     SPECIAL_SPAWN_RETRY,
     MAX_ORB_ATTRACTION_FX,
+    activeTunnelCap,
 } from './constants.js';
 
 // Axis scratch for baking a committed turn into the worm's position history.
@@ -1434,7 +1435,13 @@ export function stepWormSim(sim, delta, size, ctx) {
     if (sim.phase === 'crawling') {
         sim.wormholeTimer -= delta;
         if (sim.wormholeTimer <= 0) {
-            if (!noMoreSpawns) {
+            // Hold at the active-pair ceiling: skip the spawn (but still reset the timer)
+            // whenever the board is already at its cap, so a fresh pair only appears once
+            // the player has healed one back down. This bounds both the difficulty and the
+            // per-step heal scan on large boards. The timer resets regardless, so the first
+            // interval after a heal refills the slot.
+            const atCap = (ctx.getActiveTunnels?.() ?? []).length >= activeTunnelCap(size);
+            if (!noMoreSpawns && !atCap) {
                 const tile = randomUnflippedTile(ctx.getCubies(), size, [sim.pos]);
                 if (tile) ctx.spawnWormholePair(tile);
             }

@@ -47,7 +47,7 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
     accentShadow: ACCENT_SHADOW,
     extra: {
       wormSpeed: 2.0,
-      wormOrbCount: 15,
+      wormOrbCount: 8,
       wormholeInterval: 10,
       wormColor: '#33ff66'
     }
@@ -308,9 +308,9 @@ const WormModeSetupWizard = ({ onComplete, onCancel, initialSettings }) => {
           value={settings.wormOrbCount}
           onChange={v => select('wormOrbCount', v)}
           options={[
-            { value: 5, label: 'Less' },
-            { value: 15, label: 'Average' },
-            { value: 25, label: 'More' }
+            { value: 3, label: 'Less' },
+            { value: 8, label: 'Average' },
+            { value: 15, label: 'More' }
           ]}
         />
         <OptionGroup

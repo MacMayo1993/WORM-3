@@ -23,6 +23,8 @@ import {
   ORB_SEGMENT_GROWTH,
   WINDOUT_SEGMENT_DT,
   windoutHeadS,
+  activeTunnelCap,
+  MAX_ACTIVE_TUNNEL_PAIRS,
 } from '../worm/healerWorm/constants.js';
 import { makeCubies } from '../game/cubeState.js';
 import { liveRotation } from '../worm/liveRotation.js';
@@ -259,6 +261,37 @@ describe('wormhole spawn clock', () => {
     const ctx = makeCtx();
     run(sim, ctx, 10.5);
     expect(eventsOf(ctx, 'survival').length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('active tunnel pair cap', () => {
+  it('scales down for smaller boards and clamps mega to the ceiling', () => {
+    expect(activeTunnelCap(2)).toBe(4);
+    expect(activeTunnelCap(3)).toBe(5);
+    expect(activeTunnelCap(4)).toBe(6);
+    expect(activeTunnelCap(5)).toBe(7);
+    expect(activeTunnelCap(15)).toBe(10);
+    expect(activeTunnelCap(15)).toBe(MAX_ACTIVE_TUNNEL_PAIRS);
+  });
+
+  it('holds spawning while the board is at the cap, then refills after a heal', () => {
+    const sim = makeWormSim(SIZE);
+    resetWormSim(sim, SIZE, { orbCount: 0, wormholeInterval: 0.5 });
+    const cubies = makeCubies(SIZE);
+    // Report the board as already at its cap (5 pairs at SIZE 3).
+    let activeCount = activeTunnelCap(SIZE);
+    const ctx = makeCtx({
+      getCubies: () => cubies,
+      getWormholeInterval: () => 0.5,
+      getActiveTunnels: () => new Array(activeCount).fill({ tunnelKey: 'x' }),
+    });
+    run(sim, ctx, 1.2);
+    expect(eventsOf(ctx, 'spawn')).toHaveLength(0);
+
+    // A heal drops the count below the cap — the next interval refills the slot.
+    activeCount = activeTunnelCap(SIZE) - 1;
+    run(sim, ctx, 1.2);
+    expect(eventsOf(ctx, 'spawn').length).toBeGreaterThanOrEqual(1);
   });
 });
 
