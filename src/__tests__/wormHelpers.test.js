@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { rotateTilePosition, ensureOrbContrast, checkWormHitBySlice, parseTileKey, _parseTile, tileKeyCoordAt, getSliceSurfaceStickers } from '../worm/wormHelpers.js';
+import { rotateTilePosition, ensureOrbContrast, getAntipodalOrbColor, checkWormHitBySlice, parseTileKey, _parseTile, tileKeyCoordAt, getSliceSurfaceStickers } from '../worm/wormHelpers.js';
 import { makeTileTrail, ttPush, ttReset } from '../worm/circularBuffers.js';
 
 describe('rotateTilePosition', () => {
@@ -47,6 +47,23 @@ describe('ensureOrbContrast', () => {
   it('returns a valid 7-char hex string', () => {
     const result = ensureOrbContrast('#ffff00');
     expect(result).toMatch(/^#[0-9a-f]{6}$/);
+  });
+});
+
+describe('getAntipodalOrbColor', () => {
+  const palette = {
+    1: '#880000', 2: '#006600', 3: '#777777',
+    4: '#884400', 5: '#000088', 6: '#777700',
+  };
+
+  it('uses the configured antipodal manifold color', () => {
+    expect(getAntipodalOrbColor(1, palette)).toBe(palette[4]);
+    expect(getAntipodalOrbColor(2, palette)).toBe(palette[5]);
+    expect(getAntipodalOrbColor(3, palette)).toBe(palette[6]);
+  });
+
+  it('falls back safely when the host manifold is unknown', () => {
+    expect(getAntipodalOrbColor(0, palette, '#123456')).toBe('#123456');
   });
 });
 

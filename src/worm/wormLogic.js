@@ -72,6 +72,22 @@ export function nextRestRead(current, rotationActive, axis, sliceIndex, prevTile
 }
 
 /**
+ * Detect a rotation that starts after an inter-tile step has already begun.
+ *
+ * Step destinations are chosen at the previous step boundary, so only calling
+ * nextRestRead there misses a slice that starts rotating midway through the
+ * traversal. A completed traversal must not be reclassified: at that point the
+ * worm was already standing on the tile when the turn began and should ride it.
+ */
+export function nextRestReadDuringStep(current, rotationActive, axis, sliceIndex, interpT, prevTile, nextTile) {
+  if (!rotationActive) return null;
+  if (interpT >= 1) {
+    return current && current.axis === axis && current.sliceIndex === sliceIndex ? current : null;
+  }
+  return nextRestRead(current, rotationActive, axis, sliceIndex, prevTile, nextTile);
+}
+
+/**
  * Returns a rotation-stable key for a surface sticker using origPos + origDir.
  * The key survives cube rotations because origPos/origDir never change.
  * Returns null if the sticker cannot be found.
@@ -637,6 +653,73 @@ export function collectManifoldRing(x, y, z, dirKey, size, depth, out = new Set(
   return out;
 }
 
+// Scratch-free direction lookup used by the square wormhole-heal neighbourhood.
+// A face transition changes the local up/right labels, while the perpendicular
+// tangent keeps pointing in the same world direction.
+const _moveDirForWorldVector = (dirKey, worldVector) => {
+  let best = null;
+  let bestDot = -Infinity;
+  for (const moveDir of ['up', 'right', 'down', 'left']) {
+    const v = DIR_FORWARD[dirKey]?.[moveDir];
+    if (!v) continue;
+    const dot = v[0] * worldVector[0] + v[1] * worldVector[1] + v[2] * worldVector[2];
+    if (dot > bestDot) { bestDot = dot; best = moveDir; }
+  }
+  return best;
+};
+
+/**
+ * Return the eight cells in the face-local 3x3 square around a wormhole mouth.
+ * The square folds across cube seams using the same movement transitions as the
+ * crawler. The mouth itself is deliberately excluded: surrounding the dangerous
+ * portal, rather than entering it, completes the healing circuit.
+ */
+export function getWormholeHealRing(tile, size, out = new Set()) {
+  out.clear();
+  const verticals = [-1, 0, 1];
+  const horizontals = [-1, 0, 1];
+  for (const vy of verticals) {
+    for (const hx of horizontals) {
+      if (vy === 0 && hx === 0) continue;
+      let cell = tile;
+      if (vy !== 0) {
+        cell = getNextSurfacePosition(cell, vy > 0 ? 'up' : 'down', size);
+        if (!cell) continue;
+      }
+      if (hx !== 0) {
+        const originalHorizontal = DIR_FORWARD[tile.dirKey]?.[hx > 0 ? 'right' : 'left'];
+        const moveDir = _moveDirForWorldVector(cell.dirKey, originalHorizontal);
+        cell = moveDir ? getNextSurfacePosition(cell, moveDir, size) : null;
+        if (!cell) continue;
+      }
+      out.add(`${cell.x},${cell.y},${cell.z},${cell.dirKey}`);
+    }
+  }
+  return out;
+}
+
+/** Return the first tunnel whose entry or exit is fully encircled by the body. */
+export function findCoveredWormholeRing(tunnels, occupiedTileKeys, size) {
+  if (!tunnels || !occupiedTileKeys || occupiedTileKeys.size === 0) return null;
+  const ring = new Set();
+  for (const record of tunnels) {
+    const tunnel = record?.tunnel ?? record;
+    if (!tunnel?.entry || !tunnel?.exit) continue;
+    for (const mouth of [tunnel.entry, tunnel.exit]) {
+      getWormholeHealRing(mouth, size, ring);
+      // At a cube vertex, two face-local diagonal routes can identify the same
+      // surface cell. Requiring ring.size === 8 made those perfectly valid edge/
+      // corner wormholes impossible to heal. Cover every UNIQUE cell produced by
+      // the folded 3x3 neighbourhood instead.
+      if (ring.size === 0) continue;
+      let covered = true;
+      for (const key of ring) if (!occupiedTileKeys.has(key)) { covered = false; break; }
+      if (covered) return { ...record, tunnel, mouth };
+    }
+  }
+  return null;
+}
+
 /**
  * Turn the worm left or right
  * @param {string} currentDir - Current movement direction
@@ -695,4 +778,3 @@ export const rotateMoveDir = (moveDir, oldDirKey, newDirKey, axis, dir) => {
 export const getSegmentWorldPos = (seg, size, explosionFactor = 0) => {
   return getStickerWorldPos(seg.x, seg.y, seg.z, seg.dirKey, size, explosionFactor);
 };
-

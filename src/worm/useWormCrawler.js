@@ -38,7 +38,7 @@ import {
     queueTurn as queueTurnSim,
     jumpLiftOf,
 } from './healerWorm/wormSim.js';
-import { ensureOrbContrast, parseTileKey, _parseTile } from './wormHelpers.js';
+import { getAntipodalOrbColor, parseTileKey, _parseTile } from './wormHelpers.js';
 import { wormClock } from './wormClock.js';
 import { wormBuffs, resetWormBuffs } from './wormBuffs.js';
 import { ttAt } from './circularBuffers.js';
@@ -169,7 +169,14 @@ export function useWormCrawler(size, cubies) {
             getHealingProgress: () => useGameStore.getState().wormHealingProgress ?? {},
             getOrbColor: (faceId) => {
                 const liveColors = resolveColors(useGameStore.getState().settings);
-                return ensureOrbContrast((faceId && liveColors[faceId]) ?? '#22ff88');
+                return getAntipodalOrbColor(faceId, liveColors);
+            },
+            getActiveTunnels: () => {
+                const tunnels = [];
+                for (const hit of tunnelLookupRef.current.values()) {
+                    if (!hit.reversed) tunnels.push(hit);
+                }
+                return tunnels;
             },
             resolveTunnel: (x, y, z, dirKey) => {
                 const hit = tunnelLookupRef.current.get(`${x},${y},${z},${dirKey}`);
@@ -323,7 +330,8 @@ export function useWormCrawler(size, cubies) {
                 healed = healSticker(healed, sz, exitTile.x, exitTile.y, exitTile.z, exitTile.dirKey);
                 st.setCubies(healed);
                 const newProgress = { ...(st.wormHealingProgress ?? {}) };
-                delete newProgress[stableKey];
+                const healedProgressKeys = Array.isArray(stableKey) ? stableKey : [stableKey];
+                for (const key of healedProgressKeys) if (key) delete newProgress[key];
                 st.setWormHealingProgress(newProgress);
                 st.setWormHealedCount(healedCount);
                 useGameStore.getState().earnCoins(EARN_WORM_HEALED_FACE);
