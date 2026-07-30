@@ -420,12 +420,23 @@ export function useWormCrawler(size, cubies) {
                 if (!rot) return;
                 const st = useGameStore.getState();
                 const layers = rot.sliceIndices?.length ? rot.sliceIndices : [rot.sliceIndex];
-                for (const sliceIndex of layers) {
-                    applyRotationToSim(simRef.current, sizeRef.current, ctxRef.current, { ...rot, sliceIndex, sliceIndices: null }, {
-                        inOpeningScramble: st.wormGamePhase === 'scrambling',
-                        paused: st.wormPaused ?? false,
-                    });
-                }
+                // Each plane can turn a DIFFERENT direction (the hazard spins two
+                // non-adjacent planes opposite ways). Remap every layer's cells —
+                // worm, trail, powerups — by THAT plane's own direction, not the
+                // shared anchor `dir`; otherwise the opposite-spinning plane is
+                // remapped backwards and whatever sits on it teleports.
+                const dirs = rot.sliceDirs?.length ? rot.sliceDirs : layers.map(() => rot.dir);
+                const opts = {
+                    inOpeningScramble: st.wormGamePhase === 'scrambling',
+                    paused: st.wormPaused ?? false,
+                };
+                layers.forEach((sliceIndex, li) => {
+                    applyRotationToSim(
+                        simRef.current, sizeRef.current, ctxRef.current,
+                        { ...rot, sliceIndex, dir: dirs[li], sliceIndices: null, sliceDirs: null },
+                        opts
+                    );
+                });
             }
         );
         return unsub;
