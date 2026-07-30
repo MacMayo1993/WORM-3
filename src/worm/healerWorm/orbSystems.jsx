@@ -275,7 +275,6 @@ const _mfxGeos = {
     field: new THREE.TorusGeometry(0.62, 0.018, 8, 40),
 };
 const _mfxHead = new THREE.Vector3();
-const _mfxFrom = new THREE.Vector3();
 
 export function MagnetFX({ worm }) {
     const beadRefs = useRef([]);
@@ -306,11 +305,14 @@ export function MagnetFX({ worm }) {
             slot.t = 0;
             slot.from.fromArray(next.from);
             // Lift the origin to where the gem actually floated — orbs on flipped tiles
-            // hover much higher. The hover is along the surface normal, which for a cube
-            // centred on the origin is just the radial direction of the tile. Bake it in
-            // once here so the per-frame flight loop stays allocation-free.
-            _mfxFrom.copy(slot.from).normalize();
-            slot.from.addScaledVector(_mfxFrom, next.elevated ? ORB_ELEVATED_HOVER_HEIGHT : ORB_HOVER_HEIGHT);
+            // hover much higher. Lift along the tile's FACE normal (the same axis-aligned
+            // normal ParityOrb's BOB_NORMALS uses to place the gem), NOT the radial
+            // direction of the world position: for an orb off the face centre those two
+            // diverge, and normalising slot.from would shove the streak's start sideways
+            // off the gem — worst near corners, where the large elevated lift magnifies it.
+            // Baked in once here so the per-frame flight loop stays allocation-free.
+            const faceNormal = FACE_NORMALS[next.dirKey] ?? FACE_NORMALS.PZ;
+            slot.from.addScaledVector(faceNormal, next.elevated ? ORB_ELEVATED_HOVER_HEIGHT : ORB_HOVER_HEIGHT);
             const mesh = beadRefs.current[slotIndex];
             if (mesh) {
                 mesh.visible = true;
