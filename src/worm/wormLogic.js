@@ -668,14 +668,19 @@ const _moveDirForWorldVector = (dirKey, worldVector) => {
   return best;
 };
 
-/**
- * Return the eight cells in the face-local 3x3 square around a wormhole mouth.
- * The square folds across cube seams using the same movement transitions as the
- * crawler. The mouth itself is deliberately excluded: surrounding the dangerous
- * portal, rather than entering it, completes the healing circuit.
- */
-export function getWormholeHealRing(tile, size, out = new Set()) {
-  out.clear();
+// The folded 3x3 neighbourhood around a mouth is pure geometry: it depends only on
+// the mouth's grid cell and the cube size, both cube-topology constants that never
+// change mid-run. Building it walks up to sixteen surface transitions (each of which
+// can allocate a manifold-neighbour array), and the heal scan re-checks every active
+// mouth on every crawl step — on a 15x15 mega cube with dozens of open tunnels that
+// recompute dominated the step cost. Memoise the ring per (size, mouth) so each unique
+// mouth is walked exactly once and every later lookup is an O(1) map hit. The cache is
+// bounded by 6·size² entries per size and never needs invalidation.
+const _healRingKeyCache = new Map();
+
+function computeWormholeHealRingKeys(tile, size) {
+  const seen = new Set();
+  const keys = [];
   const verticals = [-1, 0, 1];
   const horizontals = [-1, 0, 1];
   for (const vy of verticals) {
@@ -692,28 +697,59 @@ export function getWormholeHealRing(tile, size, out = new Set()) {
         cell = moveDir ? getNextSurfacePosition(cell, moveDir, size) : null;
         if (!cell) continue;
       }
-      out.add(`${cell.x},${cell.y},${cell.z},${cell.dirKey}`);
+      const key = `${cell.x},${cell.y},${cell.z},${cell.dirKey}`;
+      // De-dupe here so corner mouths, whose diagonal routes can name the same cell
+      // twice, still yield a clean unique-cell list.
+      if (seen.has(key)) continue;
+      seen.add(key);
+      keys.push(key);
     }
   }
+  return keys;
+}
+
+/**
+ * Cached list of the unique face-local ring cells around a mouth, as tileKeys.
+ * The returned array is shared and MUST NOT be mutated. Callers that need an owned,
+ * mutable collection use getWormholeHealRing, which copies into a fresh Set.
+ */
+function getWormholeHealRingKeys(tile, size) {
+  const cacheKey = `${size}|${tile.x},${tile.y},${tile.z},${tile.dirKey}`;
+  let keys = _healRingKeyCache.get(cacheKey);
+  if (keys) return keys;
+  keys = computeWormholeHealRingKeys(tile, size);
+  _healRingKeyCache.set(cacheKey, keys);
+  return keys;
+}
+
+/**
+ * Return the eight cells in the face-local 3x3 square around a wormhole mouth.
+ * The square folds across cube seams using the same movement transitions as the
+ * crawler. The mouth itself is deliberately excluded: surrounding the dangerous
+ * portal, rather than entering it, completes the healing circuit.
+ */
+export function getWormholeHealRing(tile, size, out = new Set()) {
+  out.clear();
+  const keys = getWormholeHealRingKeys(tile, size);
+  for (const key of keys) out.add(key);
   return out;
 }
 
 /** Return the first tunnel whose entry or exit is fully encircled by the body. */
 export function findCoveredWormholeRing(tunnels, occupiedTileKeys, size) {
   if (!tunnels || !occupiedTileKeys || occupiedTileKeys.size === 0) return null;
-  const ring = new Set();
   for (const record of tunnels) {
     const tunnel = record?.tunnel ?? record;
     if (!tunnel?.entry || !tunnel?.exit) continue;
     for (const mouth of [tunnel.entry, tunnel.exit]) {
-      getWormholeHealRing(mouth, size, ring);
+      const ringKeys = getWormholeHealRingKeys(mouth, size);
       // At a cube vertex, two face-local diagonal routes can identify the same
-      // surface cell. Requiring ring.size === 8 made those perfectly valid edge/
-      // corner wormholes impossible to heal. Cover every UNIQUE cell produced by
-      // the folded 3x3 neighbourhood instead.
-      if (ring.size === 0) continue;
+      // surface cell. Requiring exactly eight cells made those perfectly valid edge/
+      // corner wormholes impossible to heal. Cover every UNIQUE cell produced by the
+      // folded 3x3 neighbourhood instead (already de-duped in the cached key list).
+      if (ringKeys.length === 0) continue;
       let covered = true;
-      for (const key of ring) if (!occupiedTileKeys.has(key)) { covered = false; break; }
+      for (const key of ringKeys) if (!occupiedTileKeys.has(key)) { covered = false; break; }
       if (covered) return { ...record, tunnel, mouth };
     }
   }

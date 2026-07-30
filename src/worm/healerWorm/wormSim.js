@@ -591,13 +591,19 @@ const _ringOccupied = new Set();
 // footprint spring, whose intentional rebound would otherwise count departed tiles.
 function tryWormholeRingHeal(sim, size, ctx) {
     const tunnels = ctx.getActiveTunnels?.() ?? [];
-    const activeKeys = new Set(tunnels.map(t => t.tunnelKey).filter(Boolean));
-    for (const key of sim.ringHealedTunnelKeys) {
-        if (!activeKeys.has(key)) sim.ringHealedTunnelKeys.delete(key);
+    // Prune stale healed keys, but only when there are any — the common case is an
+    // empty set, and materialising an active-key Set every crawl step just to iterate
+    // an empty prune list was pure allocation churn on mega cubes with many tunnels.
+    // Pruning must still happen when the last tunnel was just healed (tunnels empty):
+    // an empty active-key set retires every stale key, so its canonical key no longer
+    // survives the empty-list frame to block a later tunnel at the same coordinate pair.
+    if (sim.ringHealedTunnelKeys.size > 0) {
+        const activeKeys = new Set();
+        for (const t of tunnels) if (t.tunnelKey) activeKeys.add(t.tunnelKey);
+        for (const key of sim.ringHealedTunnelKeys) {
+            if (!activeKeys.has(key)) sim.ringHealedTunnelKeys.delete(key);
+        }
     }
-    // Pruning must also happen when the last tunnel was healed. Otherwise its
-    // canonical key survives the empty-list frame and blocks a later tunnel that
-    // happens to spawn at the same coordinate pair.
     if (tunnels.length === 0) return false;
     _ringOccupied.clear();
     const bodyReach = Math.min(MAX_TAIL, sim.tailLength) * BODY_BALL_SPACING;
