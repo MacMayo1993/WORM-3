@@ -935,7 +935,7 @@ export default function WORM3() {
     // makes Mega Mode feel almost empty.
     const megaAreaScale = wizardSettings.megaMode ? (15 * 15) / (7 * 7) : 1;
     const wormParams = {
-      wormSpeed: wizardSettings.wormSpeed ?? 1.0,
+      wormSpeed: wizardSettings.wormSpeed ?? 2.0,
       wormOrbCount: Math.round((wizardSettings.wormOrbCount ?? 5) * megaAreaScale),
       wormholeInterval: wizardSettings.wormholeInterval ?? 10,
       wormColor: wizardSettings.wormColor ?? '#33ff66',

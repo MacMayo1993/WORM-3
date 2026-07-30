@@ -161,7 +161,7 @@ export function useWormCrawler(size, cubies) {
             getCubies: () => useGameStore.getState().cubies,
             getGamePhase: () => useGameStore.getState().wormGamePhase,
             isPaused: () => useGameStore.getState().wormPaused ?? false,
-            getSpeed: () => useGameStore.getState().wormSpeed ?? 1.0,
+            getSpeed: () => useGameStore.getState().wormSpeed ?? 2.0,
             getControlMode: () => useGameStore.getState().wormControlMode ?? 'non-oriented',
             getWormholeInterval: () => useGameStore.getState().wormholeInterval ?? DEFAULT_WORMHOLE_FLIP_INTERVAL,
             isPrismCharacter: () => (useGameStore.getState().wormCharacter ?? 'classic') === 'prism',

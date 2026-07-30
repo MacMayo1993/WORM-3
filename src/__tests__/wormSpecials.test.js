@@ -22,6 +22,7 @@ import {
   SPECIAL_SPAWN_RADIUS,
   SPECIAL_SPAWN_RETRY,
   ROCKET_DURATION,
+  ROCKET_SPEED_MULT,
   MAGNET_DURATION,
   SURFACE_JUMP_HEIGHT,
   SURFACE_JUMP_TILE_SPAN,
@@ -562,6 +563,10 @@ describe('spawn placement in the sim', () => {
 // ─── Rocket overdrive ────────────────────────────────────────────────────────
 
 describe('rocket overdrive', () => {
+  it('runs at double its former speed and clearly outruns boost', () => {
+    expect(ROCKET_SPEED_MULT).toBe(4);
+  });
+
   it('runs on the surface for three seconds and publishes one start/end pair', () => {
     const sim = makeSim();
     const ctx = makeCtx();

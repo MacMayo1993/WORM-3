@@ -14,7 +14,7 @@ import { callWormTurn } from './wormTurnBridge.js';
 import { wormBuffs } from './wormBuffs.js';
 import { getSpecialDef } from './healerWorm/specialDefs.js';
 import { wormClock } from './wormClock.js';
-import { BOOST_COOLDOWN } from './healerWorm/constants.js';
+import { BOOST_COOLDOWN, WORM_SPEED_OPTIONS } from './healerWorm/constants.js';
 import { isMobile } from '../utils/device.js';
 import DeathScreen from './DeathScreens.jsx';
 import { UI_FONT, DISPLAY_FONT } from '../utils/uiTheme.js';
@@ -1035,15 +1035,31 @@ function PauseMenu({ onResume, onHome, onSettings, onToggleAntipodal, antipodalA
                     ))}
                 </div>
 
-                {/* Speed slider */}
+                {/* Named speed presets — keep the underlying multipliers out of the UI. */}
                 <div style={{ ...PAUSE_ROW_STYLE, gap: 10 }}>
                     <span style={PAUSE_ROW_LABEL_STYLE}>Speed</span>
-                    <input
-                        type="range" min="0.3" max="3.0" step="0.1" value={wormSpeed}
-                        onChange={e => wormAlive && setWormSpeed(parseFloat(e.target.value))}
-                        style={{ flex: 1, accentColor: fc[5] || FACE_FALLBACKS[5] }}
-                    />
-                    <span style={PAUSE_ROW_VALUE_STYLE}>{wormSpeed.toFixed(1)}x</span>
+                    <div style={{ display: 'flex', gap: 5, flex: 1 }}>
+                        {WORM_SPEED_OPTIONS.map(option => {
+                            const selected = wormSpeed === option.value;
+                            return (
+                                <button
+                                    key={option.label}
+                                    type="button"
+                                    disabled={!wormAlive}
+                                    onPointerDown={() => wormAlive && setWormSpeed(option.value)}
+                                    style={{
+                                        flex: 1, padding: '7px 4px', borderRadius: 8,
+                                        border: `1px solid ${selected ? (fc[5] || FACE_FALLBACKS[5]) : BORDER}`,
+                                        background: selected ? `${fc[5] || FACE_FALLBACKS[5]}22` : 'rgba(255,255,255,0.5)',
+                                        color: '#0f172a', font: 'inherit', fontSize: 10, fontWeight: selected ? 800 : 600,
+                                        cursor: wormAlive ? 'pointer' : 'default', opacity: wormAlive ? 1 : 0.55,
+                                    }}
+                                >
+                                    {option.label}
+                                </button>
+                            );
+                        })}
+                    </div>
                 </div>
 
                 {/* Control mode toggle */}
@@ -1128,7 +1144,7 @@ export default function WormCrawlerHUD({ phase, onFlippedTile, cubeSize: _cubeSi
 
     const { wormSpeed, wormHealedCount, wormBodyTiles, wormControlMode, wormTimeAlive, wormTunnelCount, wormColor, wormOrbInventory, settings, setWormSpeed, toggleWormControlMode, setWormPaused, wormGamePhase, wormCountdownStep, wormSessionOrbs, parityPoints } = useGameStore(
         useShallow(s => ({
-            wormSpeed: s.wormSpeed ?? 1.0,
+            wormSpeed: s.wormSpeed ?? WORM_SPEED_OPTIONS[0].value,
             wormHealedCount: s.wormHealedCount ?? 0,
             wormBodyTiles: s.wormBodyTiles ?? 0,
             // NOTE: the wormhole countdown lives in the wormClock bridge (not the store) —

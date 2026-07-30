@@ -94,6 +94,11 @@ export const SURFACE_JUMP_HEIGHT = 1.5;   // tall arc — astronaut bounding in 
 export const SURFACE_JUMP_TILE_SPAN = 1;  // jump distance is fixed to one traversed tile regardless of speed
 
 // ─── Speed boost (HUD button beside JUMP) ─────────────────────────────────────
+export const WORM_SPEED_OPTIONS = [
+  { value: 2.0, label: 'Slow' },
+  { value: 2.75, label: 'Medium' },
+  { value: 3.5, label: 'Fast' },
+];
 export const BOOST_MULTIPLIER = 2.4;  // crawl-speed multiplier while boosting
 export const BOOST_DURATION = 1.5;    // seconds the boost lasts
 export const BOOST_COOLDOWN = 4.0;    // seconds before boost can be used again
@@ -126,11 +131,11 @@ export const SPECIAL_TUNNEL_RADIUS = 2;
 // long instead of falling back to an arbitrary tile somewhere on the cube.
 export const SPECIAL_SPAWN_RETRY = 2;
 
-// Rocket — a short, grounded overdrive. It doubles the player's configured speed
+// Rocket — a short, grounded overdrive. It quadruples the player's configured speed
 // (rather than replacing it with a jump), ignores collisions and wormhole mouths,
 // and advertises the protected window with a flame at the tail.
 export const ROCKET_DURATION = 3;
-export const ROCKET_SPEED_MULT = 2;
+export const ROCKET_SPEED_MULT = 4;
 // Seconds of protection after a rocket touches down, ≈ one tile at base speed. A
 // flight that ends on top of your own tail, a wormhole mouth or a turning slice
 // would otherwise punish the player for a landing they had no way to steer out of.
