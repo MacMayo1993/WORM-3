@@ -207,6 +207,7 @@ export function makeWormSim(size) {
         currentTunnelStableKey: null, // stable key of the tunnel being traversed
         currentTunnelKey: null,       // canonical key (for use-count cleanup on heal)
         pendingTunnelHeal: null,      // resolved only after the tail clears the exit
+        windoutTailCleared: false,    // holds one rendered frame at full emergence before heal FX
         ringHealedTunnelKeys: new Set(), // suppress repeat fires while the healed lookup retires
 
         // ── Collision ──────────────────────────────────────────────────────────
@@ -221,6 +222,7 @@ export function makeWormSim(size) {
         // Render-only full-route history for the persistent worm trail.
         pathHistory: makeTileTrail(TRAIL_HISTORY_CAP),
         orbPickupColors: [],
+        orbPickupFaceIds: [],
         colorEpoch: 0,
 
         // ── Session counters ───────────────────────────────────────────────────
@@ -303,6 +305,7 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.selfCollisionGraceSteps = 0;
     sim.tailLength = BASE_TAIL_LENGTH;
     sim.orbPickupColors = [];
+    sim.orbPickupFaceIds = [];
     sim.colorEpoch++;
     shReset(sim.stepHistory);
     sim.lastRecordedT = 0;
@@ -313,6 +316,7 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.currentTunnelStableKey = null;
     sim.currentTunnelKey = null;
     sim.pendingTunnelHeal = null;
+    sim.windoutTailCleared = false;
     sim.ringHealedTunnelKeys.clear();
     sim.willHeal = false;
     sim.healFired = false;
@@ -470,6 +474,7 @@ function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey) {
         if (deposit) {
             sim.tailLength = deposit.nextTailLength;
             sim.orbPickupColors.length = Math.max(0, sim.orbPickupColors.length - deposit.colorsToDrop);
+            sim.orbPickupFaceIds.length = Math.max(0, sim.orbPickupFaceIds.length - deposit.colorsToDrop);
             sim.colorEpoch++;
             ctx.applyDeposit(deposit, stableKey, entryFaceId);
         }
@@ -499,6 +504,7 @@ function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey) {
 function applyOrbPickupGrowth(sim, ctx, color, faceId) {
     sim.tailLength = Math.min(sim.tailLength + ORB_SEGMENT_GROWTH, MAX_TAIL);
     sim.orbPickupColors.push(color);
+    sim.orbPickupFaceIds.push(faceId);
     sim.colorEpoch++;
     // PP are NOT awarded on pickup — only banked when the player wins (cube solved).
     // Colour and combo ride along so the HUD can confirm the pickup on screen at the
@@ -1275,8 +1281,9 @@ const PHASE_HANDLERS = {
     // s runs 1→0: start at exit hole (s=1, env=0), rise to peak orbit (s=0.5, env=1),
     // settle on surface tile (s=0, env=0).
     windout: {
-        enter(_sim, _size, ctx) {
+        enter(sim, _size, ctx) {
             ctx.onPhase('windout');
+            sim.windoutTailCleared = false;
         },
         update(sim, size, ctx, delta) {
             sim.tunnelProgress += delta * (1.5 * TUNNEL_SPEED_SCALE);
@@ -1287,6 +1294,16 @@ const PHASE_HANDLERS = {
                 if (exitN) sim.currentNormal.copy(exitN);
             }
             if (sim.tunnelProgress >= 1) {
+                // Do not close the tunnel on the same simulation tick that brings
+                // the tail to the surface. Clamp here for one complete rendered
+                // frame so WormBody can draw the very last segment fully out while
+                // both endpoint stickers remain flipped. The following tick starts
+                // the manual flip + cubie-pop heal animation.
+                if (!sim.windoutTailCleared) {
+                    sim.tunnelProgress = 1;
+                    sim.windoutTailCleared = true;
+                    return false;
+                }
                 const pending = sim.pendingTunnelHeal;
                 if (pending) {
                     const { tunnel, stableKey, tunnelKey } = pending;
@@ -1304,6 +1321,7 @@ const PHASE_HANDLERS = {
                     sim.pendingTunnelHeal = null;
                 }
                 sim.tunnelProgress = 0;
+                sim.windoutTailCleared = false;
                 sim.activeTunnel = null;
                 sim.phase = 'crawling';
                 // crawling.enter() fires next tick → grace steps + crawl-resume publish

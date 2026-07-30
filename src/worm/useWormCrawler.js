@@ -17,12 +17,12 @@ import { getManifoldGridId } from '../game/coordinates.js';
 import { buildTunnelLookup, updateTunnelLookupIncremental } from './wormLogic.js';
 import { flipStickerPair } from '../game/manifoldLogic.js';
 import { getManifoldMap } from '../game/manifoldMapStore.js';
-import { healSticker, getStickerSafe } from '../game/cubeState.js';
+import { healSticker } from '../game/cubeState.js';
 import { resolveColors } from '../utils/colorSchemes.js';
 import { FACE_COLORS } from '../utils/constants.js';
-import { healBurstMap } from '../3d/styles/TileStyleMaterials.jsx';
-import { activateSticker } from '../3d/StickerAnimationManager.js';
 import { EARN_WORM_SURVIVAL_TICK, EARN_WORM_HEALED_FACE } from '../utils/economyConstants.js';
+import { pruneExpiredFx } from '../utils/transientFx.js';
+import { activateSticker } from '../3d/StickerAnimationManager.js';
 import { feel } from '../utils/feel.js';
 import {
     ORB_SEGMENT_GROWTH,
@@ -313,22 +313,19 @@ export function useWormCrawler(size, cubies) {
             applyHeal: (entry, exitTile, stableKey, healedCount) => {
                 const sz = sizeRef.current;
                 const st = useGameStore.getState();
-                // Write healBurstMap for both tiles BEFORE healing (sticker orig fields intact)
-                const entrySticker = getStickerSafe(st.cubies, entry.x, entry.y, entry.z, entry.dirKey);
-                const exitStickerData = getStickerSafe(st.cubies, exitTile.x, exitTile.y, exitTile.z, exitTile.dirKey);
-                if (entrySticker) {
-                    const entryGridId = getManifoldGridId(entrySticker, sz);
-                    healBurstMap.set(entryGridId, 1);
-                    activateSticker(entryGridId);
-                }
-                if (exitStickerData) {
-                    const exitGridId = getManifoldGridId(exitStickerData, sz);
-                    healBurstMap.set(exitGridId, 1);
-                    activateSticker(exitGridId);
-                }
                 let healed = healSticker(st.cubies, sz, entry.x, entry.y, entry.z, entry.dirKey);
                 healed = healSticker(healed, sz, exitTile.x, exitTile.y, exitTile.z, exitTile.dirKey);
-                st.setCubies(healed);
+                // Match a manual cube-mode flip: both antipodal endpoint cubies hop
+                // outward while their stickers animate back to the restored color.
+                const now = performance.now();
+                const pops = {
+                    [`${entry.x},${entry.y},${entry.z}`]: { startMs: now, durationMs: 500 },
+                    [`${exitTile.x},${exitTile.y},${exitTile.z}`]: { startMs: now, durationMs: 500 },
+                };
+                useGameStore.setState((state) => ({
+                    cubies: healed,
+                    cubiePops: { ...pruneExpiredFx(state.cubiePops, now), ...pops },
+                }));
                 const newProgress = { ...(st.wormHealingProgress ?? {}) };
                 const healedProgressKeys = Array.isArray(stableKey) ? stableKey : [stableKey];
                 for (const key of healedProgressKeys) if (key) delete newProgress[key];
@@ -498,6 +495,7 @@ export function useWormCrawler(size, cubies) {
             tailLength: f('tailLength'),
             stepHistory: f('stepHistory'),
             orbPickupColorsRef: f('orbPickupColors'),
+            orbPickupFaceIdsRef: f('orbPickupFaceIds'),
             colorEpochRef: f('colorEpoch'),
             voidTunnelKeysRef: f('voidTunnelKeys'),
             tunnelUseCountsRef: f('tunnelUseCounts'),

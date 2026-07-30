@@ -46,7 +46,7 @@ import { WormBody, RocketTailFire, GlowWormAura } from './healerWorm/WormBody.js
 import { WormTrail } from './healerWorm/WormTrail.jsx';
 import { WormFace } from './healerWorm/WormFace.jsx';
 import { PowerupOrbs, OrbFlashSystem, SpecialOrbs, SpecialFlashSystem, MagnetFX } from './healerWorm/orbSystems.jsx';
-import { HeartBurstSystem, TunnelHealProgress } from './healerWorm/healFx.jsx';
+import { HealBurstSystem, TunnelHealProgress } from './healerWorm/healFx.jsx';
 import { WormholeRings } from './healerWorm/WormholeRings.jsx';
 import { SliceWarningLights } from './healerWorm/SliceWarningLights.jsx';
 import { PortalGlow, TunnelPortalFX } from './healerWorm/portalFx.jsx';
@@ -382,7 +382,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                 tunnelUseCountsRef={worm.tunnelUseCountsRef}
             />}
             <TunnelHealProgress size={size} />
-            <HeartBurstSystem worm={worm} size={size} />
+            <HealBurstSystem worm={worm} size={size} />
             <OrbFlashSystem worm={worm} />
             <SpecialFlashSystem worm={worm} />
             {wormAlive && <MagnetFX worm={worm} />}

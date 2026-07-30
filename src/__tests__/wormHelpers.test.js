@@ -1,6 +1,16 @@
 import { describe, it, expect } from 'vitest';
-import { rotateTilePosition, ensureOrbContrast, getAntipodalOrbColor, checkWormHitBySlice, parseTileKey, _parseTile, tileKeyCoordAt, getSliceSurfaceStickers } from '../worm/wormHelpers.js';
+import { rotateTilePosition, ensureOrbContrast, getAntipodalOrbColor, checkWormHitBySlice, parseTileKey, _parseTile, tileKeyCoordAt, getSliceSurfaceStickers, reconcileOrbInventoryAfterCut } from '../worm/wormHelpers.js';
 import { makeTileTrail, ttPush, ttReset } from '../worm/circularBuffers.js';
+
+describe('reconcileOrbInventoryAfterCut', () => {
+  it('removes sliced orb colors and caps the reserve to current tail capacity', () => {
+    const inventory = { 1: 3, 2: 6, 3: 0, 4: 0, 5: 0, 6: 0 };
+    expect(reconcileOrbInventoryAfterCut(inventory, [2], 4)).toEqual({
+      1: 1, 2: 3, 3: 0, 4: 0, 5: 0, 6: 0,
+    });
+    expect(inventory).toEqual({ 1: 3, 2: 6, 3: 0, 4: 0, 5: 0, 6: 0 });
+  });
+});
 
 describe('rotateTilePosition', () => {
   it('returns the tile unchanged when not in the slice', () => {
