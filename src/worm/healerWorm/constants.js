@@ -73,11 +73,12 @@ export const WORMHOLE_MAX_TRAVERSALS = 3;
 // wormhole (two flipped surface stickers), which is exactly what getActiveTunnels counts
 // and what the per-step heal scan iterates. Mega (size 15) has room for 675 pairs and
 // used to accumulate toward it unbounded, spiking both difficulty and the scan cost — it
-// now caps at 10. Smaller boards scale down from there (edge length + 2, clamped to the
-// same ceiling) so they inherit the same guarantee without an unplayably sparse board:
-// 2×2→4, 3×3→5, 4×4→6, 5×5→7, 15×15→10.
-export const MAX_ACTIVE_TUNNEL_PAIRS = 10;
-export const activeTunnelCap = (size) => Math.min(MAX_ACTIVE_TUNNEL_PAIRS, size + 2);
+// now holds at 20. Smaller boards scale down proportionally with edge length so they
+// inherit the same bound while staying denser on the smaller face: round(size/15 · 20),
+// i.e. 2×2→3, 3×3→4, 4×4→5, 5×5→7, 15×15→20.
+export const MAX_ACTIVE_TUNNEL_PAIRS = 20;
+export const activeTunnelCap = (size) =>
+  Math.min(MAX_ACTIVE_TUNNEL_PAIRS, Math.round((size * MAX_ACTIVE_TUNNEL_PAIRS) / 15));
 
 // Tail segments needed to visually cover all tiles: totalTiles / (0.14 unit spacing / ~1 unit per tile)
 // For 5×5 (150 tiles): ~1100 segments. Round up generously.
