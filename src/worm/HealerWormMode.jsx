@@ -51,6 +51,7 @@ import { WormholeRings } from './healerWorm/WormholeRings.jsx';
 import { SliceWarningLights } from './healerWorm/SliceWarningLights.jsx';
 import { PortalGlow, TunnelPortalFX } from './healerWorm/portalFx.jsx';
 import { ThunkEffect, CollisionGlow } from './healerWorm/impactFx.jsx';
+import { buildWormScramble, invertWormScramble } from './healerWorm/scramble.js';
 
 const SPAWN_DURATION = 0.75;
 
@@ -96,56 +97,10 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     // Build a fresh scramble whenever a new run starts (or on first mount).
     useEffect(() => {
         const generateScramble = () => {
-            const axes = ['col', 'row', 'depth'];
-            // Each move is a PARALLEL-PLANAR PAIR: two non-adjacent layers on the same
-            // axis turning opposite ways (one clockwise, one counter-clockwise). Two
-            // independent spinning planes read as much harder to track than a single
-            // slab of adjacent layers, and because the layers never touch, neither turn
-            // masks the other. `sliceIndices`/`sliceDirs` are parallel arrays; the scalar
-            // `sliceIndex`/`dir` mirror the first layer so any single-move code path still
-            // has a sensible anchor (also the layer the worm rides when it sits on it).
-            const pickPair = () => {
-                const a = Math.floor(Math.random() * size);
-                let b = Math.floor(Math.random() * size);
-                // Non-adjacent: at least one full layer of gap between the two planes.
-                // (size < 3 can't satisfy this — fall back to a lone layer.)
-                let guard = 0;
-                while (Math.abs(a - b) < 2 && guard++ < 50) b = Math.floor(Math.random() * size);
-                if (Math.abs(a - b) < 2) return { indices: [a], dirs: [Math.random() < 0.5 ? 1 : -1] };
-                const d = Math.random() < 0.5 ? 1 : -1;
-                return { indices: [a, b], dirs: [d, -d] };
-            };
-            // Never repeat the same axis + same layer set twice in a row: a straight
-            // repeat would just double-turn (or, if the random dirs flip, cancel) those
-            // exact planes, wasting a scramble step.
-            const seq = [];
-            let prevAxis = null;
-            let prevKey = null;
-            for (let i = 0; i < SCRAMBLE_STEPS; i++) {
-                let axis, pair, key;
-                do {
-                    axis = axes[Math.floor(Math.random() * 3)];
-                    pair = pickPair();
-                    key = [...pair.indices].sort((p, q) => p - q).join(',');
-                } while (axis === prevAxis && key === prevKey);
-                seq.push({
-                    axis,
-                    sliceIndices: pair.indices,
-                    sliceDirs: pair.dirs,
-                    sliceIndex: pair.indices[0],
-                    dir: pair.dirs[0],
-                    wormScramble: true,
-                });
-                prevAxis = axis;
-                prevKey = key;
-            }
+            const seq = buildWormScramble(size, SCRAMBLE_STEPS);
             scrambleSeqRef.current  = seq;
-            // Inverse = reversed sequence with every layer's direction flipped, so playing
-            // the queue out grinds the cube exactly back to solved.
-            inverseQueueRef.current = [...seq].reverse().map(m => {
-                const sliceDirs = m.sliceDirs.map(d => -d);
-                return { ...m, sliceDirs, dir: sliceDirs[0] };
-            });
+            // Reverse the sequence and every turn so the timed hazard solves the board.
+            inverseQueueRef.current = invertWormScramble(seq);
 
             // Reset all phase state
             gameModePhaseRef.current  = 'scrambling';
@@ -330,7 +285,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                 useGameStore.setState({ wormGamePhase: 'finalHealing' });
                 return;
             }
-            // Peek the next inverse pair-move (two non-adjacent opposite-spinning planes).
+            // Peek the next inverse move (a parallel pair only in Mega Mode).
             pendingRotRef.current = inverseQueueRef.current[0];
         }
 
