@@ -837,6 +837,10 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   const flipToColor = useRef(null);
   const flipFromTexture = useRef(null);
   const flipToTexture = useRef(null);
+  // Healing resets meta.flips before its flip animation starts. Keep the dedicated
+  // mesh and reveal FX mounted across that state change; refs alone cannot influence
+  // the render-time instancing decision.
+  const [keepFlipMeshMounted, setKeepFlipMeshMounted] = useState(false);
   // Track if we're currently in a flip animation - prevents race condition
   // between React state updates and Three.js imperative rendering
   const isFlipping = useRef(false);
@@ -998,6 +1002,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     prevCurr.current = meta?.curr ?? 0;
     prevFlips.current = meta?.flips ?? 0;
     isFlipping.current = false;
+    setKeepFlipMeshMounted(false);
     spinT.current = 0;
     shakeT.current = 0;
     shockT.current = 1;
@@ -1038,6 +1043,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         || (didHeal && didAntipodalColorSwap)) {
       // Mark as animating to prevent React state from interrupting
       isFlipping.current = true;
+      if (didHeal) setKeepFlipMeshMounted(true);
       activateSticker(stickerGridIdRef.current);
       // Store the colors for the flip animation
       // flipToColor is the ANTIPODAL color (what we're flipping TO)
@@ -1426,6 +1432,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
 
       if (spinT.current <= 0) {
         isFlipping.current = false;
+        setKeepFlipMeshMounted(false);
         // Hide overlays and commit the final face color/texture to the mesh.
         if (spinRevealRef.current) spinRevealRef.current.visible = false;
         if (eyelidOverlayRef.current) eyelidOverlayRef.current.visible = false;
@@ -1784,6 +1791,11 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   // they modify groupRef / innerGroupRef, and the manager samples matrixWorld.
   // Declared here (before the useLayoutEffect) so it is available in both the
   // effect body and its deps array — the ref write still lands in the commit phase.
+  const nextCurr = meta?.curr ?? 0;
+  const nextFlips = meta?.flips ?? 0;
+  const hasPendingFlipAnimation = nextFlips !== prevFlips.current
+    && nextCurr !== prevCurr.current
+    && ANTIPODAL_COLOR[prevCurr.current] === nextCurr;
   const isInstanceable = (
     !!instanceCtx &&
     instancedSlotValid &&
@@ -1793,7 +1805,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     !biomeEnabled &&
     !currTexture &&
     tileStyle === 'solid' &&
-    !(meta?.flips > 0) // Cannot instance if it has a ghost tile spider web (active or dormant)
+    !(meta?.flips > 0) && // Cannot instance if it has a ghost tile spider web (active or dormant)
+    !hasPendingFlipAnimation &&
+    !keepFlipMeshMounted
   );
 
   // Sync material color/texture when meta.curr changes (e.g., during cube rotation).
@@ -1817,9 +1831,7 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     // the mesh to start showing the OLD color so the "collapse → color-swap → expand" plays
     // correctly. Without this guard useLayoutEffect would set new color before useEffect
     // even gets a chance to set isFlipping=true, causing a one-frame new-color flash.
-    const isFlipPending = (meta?.curr ?? 0) !== prevCurr.current
-      && (meta?.flips ?? 0) > 0
-      && ANTIPODAL_COLOR[prevCurr.current] === (meta?.curr ?? 0);
+    const isFlipPending = hasPendingFlipAnimation;
     // Always keep the instanced-mesh color ref current, even when this sticker is
     // temporarily non-instanceable (the manager will zero its slot; the ref stays
     // ready for when it becomes instanceable again without a re-register).
@@ -1869,9 +1881,9 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
       neonBorderMatRef.current.uniforms.uColor.value.set(antipodalHexRef.current ?? materialColor);
       neonBorderMatRef.current.uniforms.uFlipRatio.value = effectiveFlipCap > 0 ? Math.min(1, (meta?.flips ?? 0) / effectiveFlipCap) : 0;
     }
-  }, [isInstanceable, materialColor, renderTexture, tileStyle, meta?.curr, meta?.flips]);
+  }, [isInstanceable, materialColor, renderTexture, tileStyle, meta?.curr, meta?.flips, hasPendingFlipAnimation]);
   const isWormhole = meta?.flips > 0 && meta?.curr !== meta?.orig;
-  const hasFlipHistory = meta?.flips > 0;
+  const hasFlipHistory = meta?.flips > 0 || hasPendingFlipAnimation || keepFlipMeshMounted;
 
   const trackerRadius = Math.min(0.25, 0.06 + (meta?.flips ?? 0) * 0.012);
   const origColor = meta?.orig ? fc[meta.orig] : COLORS.black;
@@ -2293,15 +2305,13 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
         </>
       )}
 
-      {/* Flip burst effects. Each fires only on a flip, which increments the tile's
-          (monotonic) flip count, so a never-flipped Mega tile carries none of them.
+      {/* Flip burst effects. Each fires only on a flip or animated heal transition,
+          so a never-flipped Mega tile carries none of them.
           They mount on the flip that latches hasFlipHistory — the same commit whose
           flip-start effect wires the refs below — and every ref read is optional-
           chained, so an unmounted effect is simply a no-op. NOTE: the two HEAL
-          effects below are intentionally NOT in this gate: healSticker resets flips
-          to 0, and the heal seal/particles are picked up (from healBurstMap) only
-          AFTER that reset, when hasFlipHistory is already false — gating them here
-          would unmount them exactly when the heal needs to play. */}
+          effects below are intentionally NOT in this gate because their independent
+          one-shot triggers may arrive without a flip transition. */}
       {hasFlipHistory && (
         <>
           {/* Particle burst effect during flip (manual + chaos/disparity). */}

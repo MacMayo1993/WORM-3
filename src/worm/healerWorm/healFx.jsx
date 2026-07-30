@@ -8,6 +8,7 @@ import { getStickerWorldPos } from '../../game/coordinates.js';
 import { buildManifoldGridMap } from '../../game/manifoldLogic.js';
 import { findStickerByStableKey } from '../wormLogic.js';
 import { resolveColors } from '../../utils/colorSchemes.js';
+import { isMobile } from '../../utils/device.js';
 import { UI_FONT } from '../../utils/uiTheme.js';
 import { liveCubies } from '../liveCubies.js';
 import { FACE_NORMALS, HEAL_COST } from './constants.js';
@@ -167,13 +168,13 @@ export function TunnelHealProgress({ size }) {
                         <div style={{
                             background: color,
                             color: '#ffffff',
-                            width: _isMobile ? '32px' : '26px',
-                            height: _isMobile ? '32px' : '26px',
+                            width: isMobile ? '32px' : '26px',
+                            height: isMobile ? '32px' : '26px',
                             borderRadius: '50%',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            fontSize: _isMobile ? '15px' : '13px',
+                            fontSize: isMobile ? '15px' : '13px',
                             fontWeight: 900,
                             fontFamily: UI_FONT,
                             border: '2.5px solid #ffffff',
