@@ -1817,9 +1817,11 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     // the mesh to start showing the OLD color so the "collapse → color-swap → expand" plays
     // correctly. Without this guard useLayoutEffect would set new color before useEffect
     // even gets a chance to set isFlipping=true, causing a one-frame new-color flash.
-    const isFlipPending = (meta?.curr ?? 0) !== prevCurr.current
-      && (meta?.flips ?? 0) > 0
-      && ANTIPODAL_COLOR[prevCurr.current] === (meta?.curr ?? 0);
+    const nextCurr = meta?.curr ?? 0;
+    const nextFlips = meta?.flips ?? 0;
+    const isFlipPending = nextFlips !== prevFlips.current
+      && nextCurr !== prevCurr.current
+      && ANTIPODAL_COLOR[prevCurr.current] === nextCurr;
     // Always keep the instanced-mesh color ref current, even when this sticker is
     // temporarily non-instanceable (the manager will zero its slot; the ref stays
     // ready for when it becomes instanceable again without a re-register).

@@ -334,8 +334,15 @@ describe('flipped tiles and tunnel traversal', () => {
     expect(eventsOf(ctx, 'heal')).toHaveLength(0);
     expect(sim.pendingTunnelHeal?.tunnel).toBe(tunnel);
 
-    const healedInTime = runUntil(sim, ctx, () => eventsOf(ctx, 'heal').length > 0);
-    expect(healedInTime).toBe(true);
+    // Reaching full windout only exposes the last segment. The tunnel remains
+    // flipped for that rendered frame; healing fires on the following sim tick.
+    const tailCleared = runUntil(sim, ctx, () => sim.windoutTailCleared);
+    expect(tailCleared).toBe(true);
+    expect(sim.phase).toBe('windout');
+    expect(sim.tunnelProgress).toBe(1);
+    expect(eventsOf(ctx, 'heal')).toHaveLength(0);
+    stepWormSim(sim, 0.05, SIZE, ctx);
+
     expect(eventsOf(ctx, 'heal')).toHaveLength(1);
     expect(sim.healed).toBe(1);
     expect(sim.healFired).toBe(true);

@@ -17,11 +17,12 @@ import { getManifoldGridId } from '../game/coordinates.js';
 import { buildTunnelLookup, updateTunnelLookupIncremental } from './wormLogic.js';
 import { flipStickerPair } from '../game/manifoldLogic.js';
 import { getManifoldMap } from '../game/manifoldMapStore.js';
-import { healSticker, getStickerSafe } from '../game/cubeState.js';
+import { healSticker } from '../game/cubeState.js';
 import { resolveColors } from '../utils/colorSchemes.js';
 import { FACE_COLORS } from '../utils/constants.js';
 import { EARN_WORM_SURVIVAL_TICK, EARN_WORM_HEALED_FACE } from '../utils/economyConstants.js';
 import { pruneExpiredFx } from '../utils/transientFx.js';
+import { activateSticker } from '../3d/StickerAnimationManager.js';
 import { feel } from '../utils/feel.js';
 import {
     ORB_SEGMENT_GROWTH,
