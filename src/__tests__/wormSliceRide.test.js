@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
-import { isTileInSlice, nextRestRead, rotateMoveDir } from '../worm/wormLogic.js';
+import { isTileInSlice, nextRestRead, nextRestReadDuringStep, rotateMoveDir } from '../worm/wormLogic.js';
 import { rotateVec90 } from '../game/cubeRotation.js';
 import { DIR_FORWARD } from '../worm/healerWorm/constants.js';
 import { DIR_TO_VEC, VEC_TO_DIR } from '../utils/constants.js';
@@ -70,6 +70,25 @@ describe('nextRestRead — end-of-rotation read for steps crossing a mid-rotatio
     // And crossing into the NEW rotating slice re-arms for that rotation.
     expect(nextRestRead(armed, true, 'col', 0, { x: 1, y: 2, z: 4 }, { x: 0, y: 2, z: 4 }))
       .toEqual({ axis: 'col', sliceIndex: 0 });
+  });
+});
+
+describe('nextRestReadDuringStep — rotations that begin mid-traversal', () => {
+  const staticTile = { x: 0, y: 1, z: 4 };
+  const sliceTile = { x: 0, y: 2, z: 4 };
+
+  it('arms a static-to-slice crossing when rotation begins 60% through the step', () => {
+    expect(nextRestReadDuringStep(null, true, 'row', 2, 0.6, staticTile, sliceTile))
+      .toEqual({ axis: 'row', sliceIndex: 2 });
+  });
+
+  it('does not reclassify a completed step because the worm is already a slice rider', () => {
+    expect(nextRestReadDuringStep(null, true, 'row', 2, 1, staticTile, sliceTile)).toBeNull();
+  });
+
+  it('clears a crossing if the live rotation is cancelled before commit', () => {
+    const armed = { axis: 'row', sliceIndex: 2 };
+    expect(nextRestReadDuringStep(armed, false, 'row', 2, 0.7, staticTile, sliceTile)).toBeNull();
   });
 });
 

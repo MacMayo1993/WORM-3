@@ -41,6 +41,7 @@ import {
     getStableKey,
     isTileInSlice,
     nextRestRead,
+    nextRestReadDuringStep,
     rotateMoveDir,
     collectManifoldRing,
 } from '../wormLogic.js';
@@ -753,6 +754,40 @@ const PHASE_HANDLERS = {
             if (!headOnSurface) {
                 sim.pendingSelfCollision = null;
                 sim.pendingTunnelTrigger = null;
+            }
+
+            // A hazard turn can begin after this traversal's destination was chosen.
+            // Re-evaluate the live crossing every tick so stepping from static ground
+            // onto a slice at (for example) 60% rotation reads the cell where it will
+            // land, rather than attaching the head to the outgoing cubie and teleporting
+            // there. The step-boundary check below remains necessary for turns already
+            // active when a new traversal begins.
+            const previousRestRead = sim.restReadSlice;
+            sim.restReadSlice = nextRestReadDuringStep(
+                previousRestRead, liveRotation.active, liveRotation.axis, liveRotation.sliceIndex,
+                sim.interpT, sim.prevTile, sim.pos
+            );
+            if (sim.restReadSlice && sim.restReadSlice !== previousRestRead) {
+                sim.restReadTileKeys.add(tileKey(sim.pos));
+                // Some samples from this same traversal may have been recorded before
+                // the rotation began. Re-tag just those recent samples as rest-space;
+                // otherwise the body (though not the head) still gets baked toward the
+                // outgoing tile when the turn commits.
+                const samplesInStep = Math.min(
+                    sim.stepHistory.count,
+                    Math.ceil(sim.lastRecordedT * STEPS_PER_TILE) + 1
+                );
+                for (let i = 0; i < samplesInStep; i++) {
+                    const sample = shAt(sim.stepHistory, i);
+                    if (sample.tx >= 0 && isTileInSlice(
+                        sim.restReadSlice.axis, sim.restReadSlice.sliceIndex,
+                        sample.tx, sample.ty, sample.tz
+                    )) {
+                        sample.tx = sample.ty = sample.tz = -1;
+                    }
+                }
+            } else if (!sim.restReadSlice) {
+                sim.restReadTileKeys.clear();
             }
 
             // Apply pending turn — RELATIVE to current heading
