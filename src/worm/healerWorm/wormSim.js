@@ -577,21 +577,27 @@ function tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey) {
 
 // Reusable scratch for the special-claim reach.
 const _specialReach = new Set();
+const _specialClaimExclusion = new Set();
 const _ringOccupied = new Set();
 
 // Heal a tunnel when the currently visible body simultaneously covers all eight
 // cells around either mouth. Occupancy comes from the logical trail, not the
 // footprint spring, whose intentional rebound would otherwise count departed tiles.
 function tryWormholeRingHeal(sim, size, ctx) {
-    const tunnels = ctx.getActiveTunnels?.();
-    if (!tunnels?.length) return false;
+    const tunnels = ctx.getActiveTunnels?.() ?? [];
     const activeKeys = new Set(tunnels.map(t => t.tunnelKey).filter(Boolean));
     for (const key of sim.ringHealedTunnelKeys) {
         if (!activeKeys.has(key)) sim.ringHealedTunnelKeys.delete(key);
     }
+    // Pruning must also happen when the last tunnel was healed. Otherwise its
+    // canonical key survives the empty-list frame and blocks a later tunnel that
+    // happens to spawn at the same coordinate pair.
+    if (tunnels.length === 0) return false;
     _ringOccupied.clear();
     const bodyReach = Math.min(MAX_TAIL, sim.tailLength) * BODY_BALL_SPACING;
-    const occupiedCount = Math.min(sim.tileTrail.count, 1 + Math.ceil(Math.max(0, bodyReach)));
+    // ceil(bodyReach) is the TOTAL number of occupied trail cells and already
+    // includes index 0 (the head), matching bodyTrailKeys and self-collision.
+    const occupiedCount = Math.min(sim.tileTrail.count, Math.max(1, Math.ceil(bodyReach)));
     for (let i = 0; i < occupiedCount; i++) _ringOccupied.add(ttAt(sim.tileTrail, i));
     const hit = findCoveredWormholeRing(tunnels, _ringOccupied, size);
     if (!hit || (hit.tunnelKey && sim.ringHealedTunnelKeys.has(hit.tunnelKey))) return false;
@@ -697,13 +703,20 @@ function spawnSpecial(sim, size, ctx, nearTile = null) {
         [...sim.powerups, ...sim.specials, sim.pos].map(tileKeyOf)
     );
     // An orb inside the worm's live reach would be swallowed on the tick it appears.
-    // Candidate distances are measured from `anchor`, which equals the head in both
-    // cases that reach here: the ambient spawn anchors on sim.pos, and the heal drop
-    // fires from the exiting phase, which has already snapped sim.pos to the exit tile.
+    // Heal-ring rewards search around a mouth that may be several cells from the
+    // head, so candidate `dist` (measured from anchor) cannot enforce this exclusion.
+    // Build the pickup reach from sim.pos independently and merge it into occupancy.
     const claimRadius = Math.max(
         sim.isJumping ? SPECIAL_JUMP_REACH : 0,
         sim.magnetT > 0 ? MAGNET_RADIUS : 0,
     );
+    if (claimRadius > 0) {
+        collectManifoldRing(
+            sim.pos.x, sim.pos.y, sim.pos.z, sim.pos.dirKey,
+            size, claimRadius, _specialClaimExclusion
+        );
+        for (const key of _specialClaimExclusion) occupiedKeys.add(key);
+    }
 
     const tile = pickSpawnTile({
         candidates,
@@ -713,7 +726,8 @@ function spawnSpecial(sim, size, ctx, nearTile = null) {
         occupiedKeys,
         trailKeys: bodyTrailKeys(sim),
         tunnelKeys: tunnelMouthKeys(candidates, ctx),
-        claimRadius,
+        // Live claim reach was excluded above in the head's coordinate frame.
+        claimRadius: 0,
     }, sim.rand);
     if (!tile) return false;
 
