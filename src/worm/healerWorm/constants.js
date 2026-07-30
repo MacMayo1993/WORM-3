@@ -169,10 +169,9 @@ export const AUTO_ROTATE_INTERVAL_MAX = 15;
 export const AUTO_ROTATE_WARNING = 3.75;     // seconds of beam warning before rotation fires (longer telegraph so the turn looms)
 
 // ─── Scramble-solve game mode ─────────────────────────────────────────────────
-// Each step is a parallel-planar PAIR: two non-adjacent layers on one axis turning
-// opposite ways (one CW, one CCW). The hazard phase plays the inverse of these 20
-// pair-moves, in reverse, to grind the cube back to solved.
-export const SCRAMBLE_STEPS = 20;            // pair-moves in the opening scramble
+// Mega turns two non-adjacent planes per step; regular 2x2-7x7 boards turn one.
+// The hazard phase plays the inverse of these moves to return the cube to solved.
+export const SCRAMBLE_STEPS = 20;            // moves in the opening scramble
 export const SCRAMBLE_MOVE_INTERVAL = 0.55;  // seconds between each scramble move during opening
 export const ACTIVE_ROTATE_INTERVAL = 10;    // fixed interval during gameplay (20 moves × 10s = 200s)
 export const COUNTDOWN_STEP_DURATION = 0.85; // seconds per beat of the 3-2-1-WORM countdown
