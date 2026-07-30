@@ -171,6 +171,13 @@ export function useWormCrawler(size, cubies) {
                 const liveColors = resolveColors(useGameStore.getState().settings);
                 return getAntipodalOrbColor(faceId, liveColors);
             },
+            getActiveTunnels: () => {
+                const tunnels = [];
+                for (const hit of tunnelLookupRef.current.values()) {
+                    if (!hit.reversed) tunnels.push(hit);
+                }
+                return tunnels;
+            },
             resolveTunnel: (x, y, z, dirKey) => {
                 const hit = tunnelLookupRef.current.get(`${x},${y},${z},${dirKey}`);
                 if (!hit) return null;
@@ -323,7 +330,8 @@ export function useWormCrawler(size, cubies) {
                 healed = healSticker(healed, sz, exitTile.x, exitTile.y, exitTile.z, exitTile.dirKey);
                 st.setCubies(healed);
                 const newProgress = { ...(st.wormHealingProgress ?? {}) };
-                delete newProgress[stableKey];
+                const healedProgressKeys = Array.isArray(stableKey) ? stableKey : [stableKey];
+                for (const key of healedProgressKeys) if (key) delete newProgress[key];
                 st.setWormHealingProgress(newProgress);
                 st.setWormHealedCount(healedCount);
                 useGameStore.getState().earnCoins(EARN_WORM_HEALED_FACE);
@@ -419,6 +427,15 @@ export function useWormCrawler(size, cubies) {
                 const rot = lastPendingMoveRef.current;
                 if (!rot) return;
                 const st = useGameStore.getState();
+                // Keep coordinate readers synchronous with the committed cubies.
+                // applyRotationToSim may immediately re-check a rest-read ring; waiting
+                // for the React effect below would expose the pre-commit tunnel mouths.
+                const committedMap = getManifoldMap(st.cubies, sizeRef.current, st.rotationEpoch);
+                tunnelLookupRef.current = buildTunnelLookup(st.cubies, sizeRef.current, committedMap);
+                const lookupCache = tunnelLookupCacheRef.current;
+                lookupCache.prevCubies = st.cubies;
+                lookupCache.prevEpoch = st.rotationEpoch;
+                lookupCache.size = sizeRef.current;
                 const layers = rot.sliceIndices?.length ? rot.sliceIndices : [rot.sliceIndex];
                 // Each plane can turn a DIFFERENT direction (the hazard spins two
                 // non-adjacent planes opposite ways). Remap every layer's cells —
