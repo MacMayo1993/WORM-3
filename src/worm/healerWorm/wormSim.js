@@ -44,6 +44,7 @@ import {
     nextRestReadDuringStep,
     rotateMoveDir,
     collectManifoldRing,
+    findCoveredWormholeRing,
 } from '../wormLogic.js';
 import { liveRotation } from '../liveRotation.js';
 import { rotateTilePosition, parseTileKey, _parseTile } from '../wormHelpers.js';
@@ -206,6 +207,7 @@ export function makeWormSim(size) {
         currentTunnelStableKey: null, // stable key of the tunnel being traversed
         currentTunnelKey: null,       // canonical key (for use-count cleanup on heal)
         pendingTunnelHeal: null,      // resolved only after the tail clears the exit
+        ringHealedTunnelKeys: new Set(), // suppress repeat fires while the healed lookup retires
 
         // ── Collision ──────────────────────────────────────────────────────────
         pendingSelfCollision: null,
@@ -311,6 +313,7 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.currentTunnelStableKey = null;
     sim.currentTunnelKey = null;
     sim.pendingTunnelHeal = null;
+    sim.ringHealedTunnelKeys.clear();
     sim.willHeal = false;
     sim.healFired = false;
     sim.pendingHealBurst = null;
@@ -574,6 +577,49 @@ function tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey) {
 
 // Reusable scratch for the special-claim reach.
 const _specialReach = new Set();
+const _ringOccupied = new Set();
+
+// Heal a tunnel when the currently visible body simultaneously covers all eight
+// cells around either mouth. Occupancy comes from the logical trail, not the
+// footprint spring, whose intentional rebound would otherwise count departed tiles.
+function tryWormholeRingHeal(sim, size, ctx) {
+    const tunnels = ctx.getActiveTunnels?.();
+    if (!tunnels?.length) return false;
+    const activeKeys = new Set(tunnels.map(t => t.tunnelKey).filter(Boolean));
+    for (const key of sim.ringHealedTunnelKeys) {
+        if (!activeKeys.has(key)) sim.ringHealedTunnelKeys.delete(key);
+    }
+    _ringOccupied.clear();
+    const bodyReach = Math.min(MAX_TAIL, sim.tailLength) * BODY_BALL_SPACING;
+    const occupiedCount = Math.min(sim.tileTrail.count, 1 + Math.ceil(Math.max(0, bodyReach)));
+    for (let i = 0; i < occupiedCount; i++) _ringOccupied.add(ttAt(sim.tileTrail, i));
+    const hit = findCoveredWormholeRing(tunnels, _ringOccupied, size);
+    if (!hit || (hit.tunnelKey && sim.ringHealedTunnelKeys.has(hit.tunnelKey))) return false;
+
+    const { tunnel, tunnelKey } = hit;
+    if (tunnelKey) sim.ringHealedTunnelKeys.add(tunnelKey);
+    const cubies = ctx.getCubies();
+    const entryStableKey = getStableKey(
+        tunnel.entry.x, tunnel.entry.y, tunnel.entry.z, tunnel.entry.dirKey, cubies
+    );
+    const exitStableKey = getStableKey(
+        tunnel.exit.x, tunnel.exit.y, tunnel.exit.z, tunnel.exit.dirKey, cubies
+    );
+    sim.healFired = true;
+    sim.healed += 1;
+    // Deposits can be keyed from either traversal direction. Ring healing seals the
+    // whole pair, so retire partial progress stored against both stable endpoints.
+    ctx.applyHeal(tunnel.entry, tunnel.exit, [entryStableKey, exitStableKey].filter(Boolean), sim.healed);
+    sim.pendingHealBurst = { exitTile: tunnel.exit, entryTile: tunnel.entry };
+    spawnSpecial(sim, size, ctx, hit.mouth);
+    if (tunnelKey) {
+        sim.tunnelUseCounts.delete(tunnelKey);
+        sim.voidTunnelKeys.delete(tunnelKey);
+        if (sim.pendingVoidKill?.tunnelKey === tunnelKey) sim.pendingVoidKill = null;
+    }
+    ctx.feel('heal');
+    return true;
+}
 
 // Claim a special orb reachable from the given tile.
 //
@@ -1008,6 +1054,7 @@ const PHASE_HANDLERS = {
                         if (_rr && isTileInSlice(_rr.axis, _rr.sliceIndex, nextPos.x, nextPos.y, nextPos.z)) {
                             sim.restReadTileKeys.add(nextKey);
                         }
+                        tryWormholeRingHeal(sim, size, ctx);
                     }
                     if (next.moveDir) sim.moveDir = next.moveDir;
 

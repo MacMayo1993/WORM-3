@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
-import { isTileInSlice, nextRestRead, nextRestReadDuringStep, rotateMoveDir } from '../worm/wormLogic.js';
+import { findCoveredWormholeRing, getWormholeHealRing, isTileInSlice, nextRestRead, nextRestReadDuringStep, rotateMoveDir } from '../worm/wormLogic.js';
 import { rotateVec90 } from '../game/cubeRotation.js';
 import { DIR_FORWARD } from '../worm/healerWorm/constants.js';
 import { DIR_TO_VEC, VEC_TO_DIR } from '../utils/constants.js';
@@ -89,6 +89,34 @@ describe('nextRestReadDuringStep — rotations that begin mid-traversal', () => 
   it('clears a crossing if the live rotation is cancelled before commit', () => {
     const armed = { axis: 'row', sliceIndex: 2 };
     expect(nextRestReadDuringStep(armed, false, 'row', 2, 0.7, staticTile, sliceTile)).toBeNull();
+  });
+});
+
+describe('wormhole healing ring', () => {
+  it('builds the eight face-local neighbours around a centre mouth', () => {
+    const ring = getWormholeHealRing({ x: 2, y: 2, z: 4, dirKey: 'PZ' }, 5);
+    expect(ring.size).toBe(8);
+    expect(ring.has('2,2,4,PZ')).toBe(false);
+    expect(ring.has('1,1,4,PZ')).toBe(true);
+    expect(ring.has('3,3,4,PZ')).toBe(true);
+  });
+
+  it('folds an edge mouth neighbourhood onto the adjacent face', () => {
+    const ring = getWormholeHealRing({ x: 2, y: 4, z: 4, dirKey: 'PZ' }, 5);
+    expect(ring.size).toBe(8);
+    expect([...ring].some(key => key.endsWith(',PY'))).toBe(true);
+  });
+
+  it('requires all eight cells to be occupied simultaneously', () => {
+    const tunnel = {
+      entry: { x: 2, y: 2, z: 4, dirKey: 'PZ' },
+      exit: { x: 2, y: 2, z: 0, dirKey: 'NZ' },
+    };
+    const occupied = getWormholeHealRing(tunnel.entry, 5, new Set());
+    expect(findCoveredWormholeRing([{ tunnel, tunnelKey: 'pair' }], occupied, 5))
+      .toMatchObject({ tunnelKey: 'pair', mouth: tunnel.entry });
+    occupied.delete(occupied.values().next().value);
+    expect(findCoveredWormholeRing([{ tunnel, tunnelKey: 'pair' }], occupied, 5)).toBeNull();
   });
 });
 
