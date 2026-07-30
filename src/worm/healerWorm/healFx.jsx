@@ -1,100 +1,16 @@
 // src/worm/healerWorm/healFx.jsx
 // Extracted from HealerWormMode.jsx (2026-07 monolith split) — code unchanged.
-import React, { useRef, useEffect, useState, useMemo } from 'react';
+import { useRef, useState, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { getStickerWorldPos } from '../../game/coordinates.js';
 import { buildManifoldGridMap } from '../../game/manifoldLogic.js';
 import { findStickerByStableKey } from '../wormLogic.js';
 import { resolveColors } from '../../utils/colorSchemes.js';
-import { isMobile as _isMobile } from '../../utils/device.js';
 import { UI_FONT } from '../../utils/uiTheme.js';
 import { liveCubies } from '../liveCubies.js';
 import { FACE_NORMALS, HEAL_COST } from './constants.js';
-
-// ─── Heart Burst Effect — green hearts fly out of healed tiles ────────────────
-// Emits a burst of 💚 hearts when the worm exits a healed tunnel.
-// Each heart gets its own CSS @keyframes rule injected once so the browser handles
-// the smooth per-heart arc entirely on the compositor thread.
-
-const HEART_COUNT = 10;
-const HEART_LIFETIME_MS = 1800;
-
-function HeartBurst({ id, wp, onDone }) {
-    // Generate stable per-heart motion data once (spread outward, biased upward)
-    // Generate stable random motion data once per burst. Using useRef so the data is
-    // computed exactly once on mount — useMemo with Math.random() is unsafe because
-    // React may evict the cache and recompute, which would re-inject duplicate <style> tags.
-    const heartsRef = useRef(null);
-    if (heartsRef.current === null) {
-        heartsRef.current = Array.from({ length: HEART_COUNT }, (_, i) => {
-            const baseAngle = (i / HEART_COUNT) * Math.PI * 2;
-            const angle = baseAngle + (Math.random() - 0.5) * 0.7;
-            const dist = 50 + Math.random() * 40;
-            const dx = Math.cos(angle) * dist;
-            const dy = -Math.abs(Math.sin(angle) * dist) - 25 - Math.random() * 30;
-            const delay = i * 55 + Math.random() * 40;
-            const scale = 0.85 + Math.random() * 0.5;
-            const heartId = `wh-${id}-${i}`;
-            const cssText = `@keyframes ${heartId}{` +
-                `0%{transform:translate(-50%,-50%) scale(0) rotate(-20deg);opacity:0;}` +
-                `18%{transform:translate(-50%,-50%) scale(${(scale * 1.6).toFixed(2)}) rotate(10deg);opacity:1;}` +
-                `100%{transform:translate(calc(-50% + ${dx.toFixed(1)}px),calc(-50% + ${dy.toFixed(1)}px)) ` +
-                `scale(${(scale * 0.25).toFixed(2)}) rotate(${Math.round((Math.random() - 0.5) * 40)}deg);opacity:0;}}`;
-            return { heartId, delay, cssText };
-        });
-    }
-    const hearts = heartsRef.current;
-
-    // DOM mutations in useEffect so they are guarded by mount and always cleaned up.
-    // useMemo must not mutate the DOM — React may rerun it without a corresponding cleanup.
-    useEffect(() => {
-        const styleEls = hearts.map(({ heartId, cssText }) => {
-            const el = document.createElement('style');
-            el.setAttribute('data-worm-heart', heartId);
-            el.textContent = cssText;
-            document.head.appendChild(el);
-            return el;
-        });
-        const timer = setTimeout(() => {
-            styleEls.forEach(el => el.remove());
-            onDone();
-        }, HEART_LIFETIME_MS + 300);
-        return () => {
-            clearTimeout(timer);
-            styleEls.forEach(el => el.remove());
-        };
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-    const fontSize = _isMobile ? '22px' : '18px';
-    return (
-        <Html position={wp} center>
-            <div style={{ position: 'relative', width: 0, height: 0, pointerEvents: 'none' }}>
-                {hearts.map(h => (
-                    <div
-                        key={h.heartId}
-                        style={{
-                            position: 'absolute',
-                            left: 0,
-                            top: 0,
-                            fontSize,
-                            animation: `${h.heartId} ${HEART_LIFETIME_MS}ms ease-out ${h.delay}ms both`,
-                            willChange: 'transform, opacity',
-                            textShadow: '0 0 6px #22ff66, 0 0 12px #00cc44',
-                            lineHeight: 1,
-                            userSelect: 'none',
-                            filter: 'drop-shadow(0 0 4px #00ff55)',
-                        }}
-                    >
-                        💚
-                    </div>
-                ))}
-            </div>
-        </Html>
-    );
-}
 
 // 3D heal burst — an expanding shockwave + flash on the tile the worm emerges from, so the
 // wormhole exit reads as a pop of healing energy instead of the worm just sliding through a
@@ -168,8 +84,8 @@ function HealBurst3D({ wp, normal, color = '#3affb0', onDone }) {
 }
 
 // Watches for heal events from the worm hook and manages active burst instances (the 3D
-// emergence shockwave plus the floating hearts).
-export function HeartBurstSystem({ worm, size }) {
+// emergence shockwave; tile flip and cubie-pop feedback is driven by applyHeal.
+export function HealBurstSystem({ worm, size }) {
     const [bursts, setBursts] = useState([]);
 
     useFrame(() => {
@@ -200,14 +116,12 @@ export function HeartBurstSystem({ worm, size }) {
     return (
         <>
             {bursts.map(burst => (
-                <React.Fragment key={burst.id}>
-                    <HealBurst3D wp={burst.wp} normal={burst.normal} />
-                    <HeartBurst
-                        id={burst.id}
-                        wp={burst.wp}
-                        onDone={() => setBursts(prev => prev.filter(b => b.id !== burst.id))}
-                    />
-                </React.Fragment>
+                <HealBurst3D
+                    key={burst.id}
+                    wp={burst.wp}
+                    normal={burst.normal}
+                    onDone={() => setBursts(prev => prev.filter(b => b.id !== burst.id))}
+                />
             ))}
         </>
     );

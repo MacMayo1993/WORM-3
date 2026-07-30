@@ -1025,13 +1025,17 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
     const flips = meta?.flips ?? 0;
     const prevVal = prevCurr.current;
     const prevFlipCount = prevFlips.current;
-    const didFlip = flips > prevFlipCount;
+    const didNewFlip = flips > prevFlipCount;
+    const didHeal = flips < prevFlipCount;
 
     // Standardize all flip sources (manual + chaos/disparity) to use the same visual pipeline.
     // In disparity bursts a tile can be flipped multiple times between React commits, so curr can
     // end up unchanged while flips still increased; we still run the manual-style squish/reveal.
     const didAntipodalColorSwap = curr !== prevVal && ANTIPODAL_COLOR[prevVal] === curr;
-    if (didFlip && (didAntipodalColorSwap || curr === prevVal)) {
+    // Healing restores odd flip parity to zero. Give that color restoration the
+    // same squish/reveal motion as a manual flip instead of snapping immediately.
+    if ((didNewFlip && (didAntipodalColorSwap || curr === prevVal))
+        || (didHeal && didAntipodalColorSwap)) {
       // Mark as animating to prevent React state from interrupting
       isFlipping.current = true;
       activateSticker(stickerGridIdRef.current);
