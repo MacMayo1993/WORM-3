@@ -495,6 +495,7 @@ export function useWormCrawler(size, cubies) {
             tailLength: f('tailLength'),
             stepHistory: f('stepHistory'),
             orbPickupColorsRef: f('orbPickupColors'),
+            orbPickupFaceIdsRef: f('orbPickupFaceIds'),
             colorEpochRef: f('colorEpoch'),
             voidTunnelKeysRef: f('voidTunnelKeys'),
             tunnelUseCountsRef: f('tunnelUseCounts'),

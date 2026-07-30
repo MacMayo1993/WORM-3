@@ -222,6 +222,7 @@ export function makeWormSim(size) {
         // Render-only full-route history for the persistent worm trail.
         pathHistory: makeTileTrail(TRAIL_HISTORY_CAP),
         orbPickupColors: [],
+        orbPickupFaceIds: [],
         colorEpoch: 0,
 
         // ── Session counters ───────────────────────────────────────────────────
@@ -304,6 +305,7 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.selfCollisionGraceSteps = 0;
     sim.tailLength = BASE_TAIL_LENGTH;
     sim.orbPickupColors = [];
+    sim.orbPickupFaceIds = [];
     sim.colorEpoch++;
     shReset(sim.stepHistory);
     sim.lastRecordedT = 0;
@@ -472,6 +474,7 @@ function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey) {
         if (deposit) {
             sim.tailLength = deposit.nextTailLength;
             sim.orbPickupColors.length = Math.max(0, sim.orbPickupColors.length - deposit.colorsToDrop);
+            sim.orbPickupFaceIds.length = Math.max(0, sim.orbPickupFaceIds.length - deposit.colorsToDrop);
             sim.colorEpoch++;
             ctx.applyDeposit(deposit, stableKey, entryFaceId);
         }
@@ -501,6 +504,7 @@ function beginTunnelTransition(sim, size, ctx, x, y, z, dirKey) {
 function applyOrbPickupGrowth(sim, ctx, color, faceId) {
     sim.tailLength = Math.min(sim.tailLength + ORB_SEGMENT_GROWTH, MAX_TAIL);
     sim.orbPickupColors.push(color);
+    sim.orbPickupFaceIds.push(faceId);
     sim.colorEpoch++;
     // PP are NOT awarded on pickup — only banked when the player wins (cube solved).
     // Colour and combo ride along so the HUD can confirm the pickup on screen at the
