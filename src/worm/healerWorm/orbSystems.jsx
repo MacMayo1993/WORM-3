@@ -411,7 +411,7 @@ export function SpecialFlashSystem({ worm }) {
 }
 
 // Watches for orb pickups by the glow worm and renders a color bloom at the collect point.
-// Follows the same pendingRef + useFrame polling pattern as HeartBurstSystem.
+// Follows the same pendingRef + useFrame polling pattern as HealBurstSystem.
 export function OrbFlashSystem({ worm }) {
     const wormCharacterId = useGameStore(s => s.wormCharacter ?? 'classic');
     const [flashes, setFlashes] = useState([]);
