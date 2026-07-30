@@ -163,8 +163,15 @@ export const MAGNET_RADIUS = 2;
 // state in a single frame.
 export const MAX_ORB_ATTRACTION_FX = 12;
 // Seconds an attraction streak takes to travel from the orb to the worm. Purely
-// visual — the orb is already banked when the streak starts.
-export const ORB_ATTRACTION_FX_DURATION = 0.32;
+// visual — the orb is already banked when the streak starts. Long enough that the
+// gem visibly rushes in rather than blinking out on the spot.
+export const ORB_ATTRACTION_FX_DURATION = 0.42;
+// How high a parity orb visually floats above its tile. Mirrors ParityOrb's HOVER_ABOVE
+// (0.28) and the extra lift flipped-tile orbs get, so a dragged orb's streak starts
+// exactly where the gem was hovering instead of down on the tile surface — the old
+// origin mismatch was a big part of why the pull read as "the orb just vanished".
+export const ORB_HOVER_HEIGHT = 0.28;
+export const ORB_ELEVATED_HOVER_HEIGHT = 0.28 + 1.2;
 
 // ─── Frame delta clamp ────────────────────────────────────────────────────────
 // Upper bound on the per-tick delta. A hitch (tab refocus, GC pause, alt-tab) can

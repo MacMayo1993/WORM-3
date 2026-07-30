@@ -9,7 +9,7 @@ import { getStickerSafe } from '../../game/cubeState.js';
 import { getStickerWorldPos } from '../../game/coordinates.js';
 import { resolveColors } from '../../utils/colorSchemes.js';
 import { ensureOrbContrast, getAntipodalOrbColor, readLiveTile } from '../wormHelpers.js';
-import { FACE_NORMALS, SPECIAL_HOVER_HEIGHT, SPECIAL_FADE_TIME, ORB_ATTRACTION_FX_DURATION, MAX_ORB_ATTRACTION_FX } from './constants.js';
+import { FACE_NORMALS, SPECIAL_HOVER_HEIGHT, SPECIAL_FADE_TIME, ORB_ATTRACTION_FX_DURATION, MAX_ORB_ATTRACTION_FX, ORB_HOVER_HEIGHT, ORB_ELEVATED_HOVER_HEIGHT } from './constants.js';
 import { getSpecialDef } from './specialDefs.js';
 import { prefersReducedMotion } from '../../utils/device.js';
 import ParityOrbs, { OrbCollectEffect } from '../ParityOrb.jsx';
@@ -269,7 +269,9 @@ export function SpecialOrbs({ size }) {
 // orbs costs zero React renders and allocates nothing.
 
 const _mfxGeos = {
-    bead: new THREE.SphereGeometry(0.075, 10, 8),
+    // Sized to read like the parity gem it stands in for (shell 0.21, inner glow 0.30),
+    // not the dim 0.075 speck it used to be — a big reason the pull was easy to miss.
+    bead: new THREE.SphereGeometry(0.18, 12, 10),
     field: new THREE.TorusGeometry(0.62, 0.018, 8, 40),
 };
 const _mfxHead = new THREE.Vector3();
@@ -285,7 +287,6 @@ export function MagnetFX({ worm }) {
         Array.from({ length: MAX_ORB_ATTRACTION_FX }, () => ({
             active: false, t: 0,
             from: new THREE.Vector3(),
-            lift: 0,
         }))
     );
     const pulseRef = useRef(0);
@@ -295,15 +296,22 @@ export function MagnetFX({ worm }) {
         // Drain newly collected orbs into free slots.
         while (queue && queue.length > 0) {
             const next = queue.shift();
-            const slot = slots.current.find(s => !s.active);
-            if (!slot) break;
+            let slotIndex = -1;
+            for (let k = 0; k < slots.current.length; k++) {
+                if (!slots.current[k].active) { slotIndex = k; break; }
+            }
+            if (slotIndex === -1) break;
+            const slot = slots.current[slotIndex];
             slot.active = true;
             slot.t = 0;
             slot.from.fromArray(next.from);
-            // Orbs sitting on flipped tiles hover; start the streak where the orb
-            // visually was, not on the tile beneath it.
-            slot.lift = next.elevated ? 0.32 : 0;
-            const mesh = beadRefs.current[slots.current.indexOf(slot)];
+            // Lift the origin to where the gem actually floated — orbs on flipped tiles
+            // hover much higher. The hover is along the surface normal, which for a cube
+            // centred on the origin is just the radial direction of the tile. Bake it in
+            // once here so the per-frame flight loop stays allocation-free.
+            _mfxFrom.copy(slot.from).normalize();
+            slot.from.addScaledVector(_mfxFrom, next.elevated ? ORB_ELEVATED_HOVER_HEIGHT : ORB_HOVER_HEIGHT);
+            const mesh = beadRefs.current[slotIndex];
             if (mesh) {
                 mesh.visible = true;
                 mesh.material.color.set(next.color);
@@ -325,15 +333,16 @@ export function MagnetFX({ worm }) {
                 mesh.visible = false;
                 continue;
             }
-            // Ease-in: slow release, then snapped in — reads as attraction rather
-            // than as a projectile fired at the worm.
-            const e = reducedRef.current ? 0 : slot.t * slot.t;
-            _mfxFrom.copy(slot.from);
-            if (slot.lift) _mfxFrom.addScaledVector(_mfxFrom.clone().normalize(), slot.lift);
-            mesh.position.lerpVectors(_mfxFrom, _mfxHead, e);
-            const s = 1 - 0.55 * slot.t;
-            mesh.scale.setScalar(s);
-            mesh.material.opacity = 1 - slot.t * slot.t;
+            const t = slot.t;
+            // Ease-out: the gem leaves the tile at once and rushes into the worm, so it
+            // reads as the magnet yanking it in rather than a speck fading on the spot.
+            // Reduced motion keeps it parked where the orb was and simply fades.
+            const e = reducedRef.current ? 0 : t * (2 - t);
+            mesh.position.lerpVectors(slot.from, _mfxHead, e);
+            // Hold full brightness through most of the flight, then fade as the worm
+            // swallows it — the streak stays legible the whole way in.
+            mesh.material.opacity = Math.min(1, 2.4 * (1 - t));
+            mesh.scale.setScalar(1 - 0.5 * t);
         }
 
         // Field ring around the head while the magnet is up, pulsing on each catch.
