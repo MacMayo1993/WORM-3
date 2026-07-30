@@ -392,6 +392,7 @@ describe('magnet attraction FX queue', () => {
     const att = sim.pendingOrbAttractions[0];
     expect(att.color).toBe('#ff00aa');
     expect(att.elevated).toBe(false); // solid cube, orb sat flat on its tile
+    expect(att.dirKey).toBe('PZ'); // renderer lifts along this face normal, not the radial
     expect(Array.isArray(att.from)).toBe(true);
     expect(att.from).toHaveLength(3);
   });

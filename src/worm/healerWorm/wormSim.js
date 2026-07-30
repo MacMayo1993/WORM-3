@@ -571,6 +571,7 @@ function tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey) {
                     to: sim.curWorldPos.toArray(),
                     color: pickedColor,
                     elevated: tileIsFlipped,
+                    dirKey: pickedUp.dirKey,
                 });
             }
         }
