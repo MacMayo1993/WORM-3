@@ -147,12 +147,21 @@ export const SPECIAL_SPAWN_RETRY = 2;
 // and advertises the protected window with a flame at the tail.
 export const ROCKET_DURATION = 3;
 export const ROCKET_SPEED_MULT = 4;
-// Picking up a rocket blasts the worm off in a big parabolic launch arc before it
-// settles into the overdrive flight. The jump's sin(t·π) profile is exactly the path of
-// a projectile launched and landing at one height, so it reads as a real ballistic
-// take-off. Span/height are far beyond a normal hop (1 tile / 1.5 units).
-export const ROCKET_LAUNCH_SPAN = 4;     // tiles the launch arc spans
-export const ROCKET_LAUNCH_HEIGHT = 3.4; // arc apex in world units
+// A rocket doesn't just speed the worm up — it lifts it off the surface to FLY for the
+// whole overdrive: the worm rises to ROCKET_FLIGHT_HEIGHT, cruises there, then settles
+// back down as the burn ends. Purely visual (the rocket's speed + hazard immunity are
+// the gameplay). rocketFlightLift maps the burn countdown to a height with a takeoff and
+// a landing ramp so the worm lifts and lands smoothly instead of popping.
+export const ROCKET_FLIGHT_HEIGHT = 1.4;   // world units the worm cruises above the tiles
+export const ROCKET_FLIGHT_TAKEOFF = 0.35; // seconds to rise at launch
+export const ROCKET_FLIGHT_LANDING = 0.5;  // seconds to settle before the burn ends
+export const rocketFlightLift = (active, rocketT) => {
+  if (!active) return 0;
+  const elapsed = ROCKET_DURATION - rocketT;
+  const up = Math.min(1, elapsed / ROCKET_FLIGHT_TAKEOFF);
+  const down = Math.min(1, rocketT / ROCKET_FLIGHT_LANDING);
+  return Math.max(0, Math.min(up, down)) * ROCKET_FLIGHT_HEIGHT;
+};
 // Seconds of protection after a rocket touches down, ≈ one tile at base speed. A
 // flight that ends on top of your own tail, a wormhole mouth or a turning slice
 // would otherwise punish the player for a landing they had no way to steer out of.

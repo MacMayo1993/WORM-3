@@ -10,7 +10,7 @@ import WormHat3D from '../wormCosmetics.jsx';
 import { layoutBookWormFace, layoutWormFace, FACE_LAYOUT, MOUTH_ARC } from '../wormFaceLayout.js';
 import { BOOK_HEAD_FORWARD, BOOK_HEAD_UP } from '../wormBookFX.js';
 import { _hatAlignQuat, _hatYUp } from '../wormCosmeticsData.js';
-import { WORM_LIFT, FACE_NORMALS, DIR_FORWARD } from './constants.js';
+import { WORM_LIFT, FACE_NORMALS, DIR_FORWARD, rocketFlightLift } from './constants.js';
 
 // Head radius, matching WormBody's head scale.
 const HEAD_RADIUS = 0.092;
@@ -105,7 +105,9 @@ export function WormFace({ worm, size }) {
             }
             const jumpLiftVal = worm.isJumping.current
                 ? Math.sin(worm.jumpT.current * Math.PI) * 0.55 : 0;
-            _faceHeadPos.addScaledVector(normal, WORM_LIFT + jumpLiftVal);
+            // Fly with the body during a rocket burn so the face stays on the risen head.
+            const flightLift = rocketFlightLift(worm.rocketActive.current, worm.rocketT.current);
+            _faceHeadPos.addScaledVector(normal, WORM_LIFT + jumpLiftVal + flightLift);
         }
 
         // Eyes, pupils, smile, lenses and the hat seat all come from the shared
