@@ -49,7 +49,6 @@ import { PowerupOrbs, OrbFlashSystem, SpecialOrbs, SpecialFlashSystem, MagnetFX 
 import { HealBurstSystem, TunnelHealProgress } from './healerWorm/healFx.jsx';
 import { WormholeRings } from './healerWorm/WormholeRings.jsx';
 import { SliceWarningLights } from './healerWorm/SliceWarningLights.jsx';
-import { RampMarkers } from './healerWorm/RampMarkers.jsx';
 import { PortalGlow, TunnelPortalFX } from './healerWorm/portalFx.jsx';
 import { ThunkEffect, CollisionGlow } from './healerWorm/impactFx.jsx';
 import { buildWormScramble, invertWormScramble } from './healerWorm/scramble.js';
@@ -388,7 +387,6 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             <SpecialFlashSystem worm={worm} />
             {wormAlive && <MagnetFX worm={worm} />}
             <PowerupOrbs size={size} />
-            {!wormInTunnel && <RampMarkers worm={worm} size={size} />}
             {!wormInTunnel && <SpecialOrbs size={size} />}
             <SliceWarningLights pendingRotRef={pendingRotRef} size={size} />
             <ThunkEffect thunkRef={thunkRef} />

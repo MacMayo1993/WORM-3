@@ -80,18 +80,6 @@ export const MAX_ACTIVE_TUNNEL_PAIRS = 20;
 export const activeTunnelCap = (size) =>
   Math.min(MAX_ACTIVE_TUNNEL_PAIRS, Math.round((size * MAX_ACTIVE_TUNNEL_PAIRS) / 15));
 
-// ── Ramp launch pads (prototype, gated) ──────────────────────────────────────
-// A ramp tile fires a rocket-powered launch: the worm arcs high and far under the
-// rocket's overdrive speed, fire trail, and hazard immunity, then lands back on the
-// surface span-tiles ahead along its heading. Purely a surface feature (rides tiles
-// like orbs do) plus a jump/rocket trigger — it never touches the sticker or heal
-// model. Flip RAMPS_ENABLED to false to yank the whole thing.
-export const RAMPS_ENABLED = true;
-export const RAMP_LAUNCH_SPAN = 4;     // tiles the launch arc spans (a hop is 1)
-export const RAMP_LAUNCH_HEIGHT = 3.4; // arc apex in world units (a hop is 1.5)
-// A few pads per run, scaled with the board: 3×3→1, 5×5→2, 7×7→2, 15×15→5.
-export const rampCountFor = (size) => Math.max(1, Math.round(size * 0.35));
-
 // Tail segments needed to visually cover all tiles: totalTiles / (0.14 unit spacing / ~1 unit per tile)
 // For 5×5 (150 tiles): ~1100 segments. Round up generously.
 export const MAX_TAIL = 1200;
@@ -159,6 +147,12 @@ export const SPECIAL_SPAWN_RETRY = 2;
 // and advertises the protected window with a flame at the tail.
 export const ROCKET_DURATION = 3;
 export const ROCKET_SPEED_MULT = 4;
+// Picking up a rocket blasts the worm off in a big parabolic launch arc before it
+// settles into the overdrive flight. The jump's sin(t·π) profile is exactly the path of
+// a projectile launched and landing at one height, so it reads as a real ballistic
+// take-off. Span/height are far beyond a normal hop (1 tile / 1.5 units).
+export const ROCKET_LAUNCH_SPAN = 4;     // tiles the launch arc spans
+export const ROCKET_LAUNCH_HEIGHT = 3.4; // arc apex in world units
 // Seconds of protection after a rocket touches down, ≈ one tile at base speed. A
 // flight that ends on top of your own tail, a wormhole mouth or a turning slice
 // would otherwise punish the player for a landing they had no way to steer out of.

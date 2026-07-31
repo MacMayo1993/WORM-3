@@ -93,6 +93,8 @@ import {
     SPECIAL_LIFETIME,
     ROCKET_DURATION,
     ROCKET_SPEED_MULT,
+    ROCKET_LAUNCH_SPAN,
+    ROCKET_LAUNCH_HEIGHT,
     MAGNET_DURATION,
     MAGNET_RADIUS,
     SPECIAL_SPAWN_RADIUS,
@@ -101,9 +103,6 @@ import {
     SPECIAL_SPAWN_RETRY,
     MAX_ORB_ATTRACTION_FX,
     activeTunnelCap,
-    RAMP_LAUNCH_SPAN,
-    RAMP_LAUNCH_HEIGHT,
-    rampCountFor,
 } from './constants.js';
 
 // Axis scratch for baking a committed turn into the worm's position history.
@@ -180,9 +179,6 @@ export function makeWormSim(size) {
         // ── Boost ──────────────────────────────────────────────────────────────
         boostActiveT: 0,
         boostCooldownT: 0,
-
-        // ── Ramp launch pads ───────────────────────────────────────────────────
-        ramps: [],                // { x,y,z,dirKey } tiles that fire a rocket launch
 
         // ── Special power-ups (rocket / magnet) ────────────────────────────────
         specials: [],             // hovering rocket/magnet orbs on the board
@@ -264,16 +260,12 @@ const setCurWorldPosFromTile = (sim, size) => {
  * Full run reset (retry / new setup / size change). Spawns the initial powerups
  * into sim.powerups; the caller publishes them to the store.
  */
-export function resetWormSim(sim, size, { orbCount, wormholeInterval, ramps = false }) {
+export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     const startPos = INITIAL_POS(size);
     const initial = [];
     for (let i = 0; i < orbCount; i++) {
         initial.push({ ...randomFreeTile(size, [...initial, startPos]), type: 'apple' });
     }
-
-    // Ramp pads are opt-in (the caller passes ramps: true for real runs) so headless
-    // tests and other modes keep a clean board unless they ask for them.
-    sim.ramps = ramps ? makeRamps(size, [startPos, ...initial]) : [];
 
     sim.pos = startPos;
     sim.moveDir = INITIAL_DIR;
@@ -369,49 +361,6 @@ export function startJump(sim, ctx) {
     sim.pendingTunnelTrigger = null;
 }
 
-// Place the run's ramp pads on distinct free tiles, clear of the start and the orbs.
-function makeRamps(size, exclude) {
-    const out = [];
-    const n = rampCountFor(size);
-    for (let i = 0; i < n; i++) {
-        const t = randomFreeTile(size, [...exclude, ...out]);
-        if (!t) break;
-        out.push({ x: t.x, y: t.y, z: t.z, dirKey: t.dirKey });
-    }
-    return out;
-}
-
-/**
- * Fire a ramp launch: hand the flight to the rocket (overdrive speed, fire trail, and
- * hazard immunity) and lay a big, high jump arc over it. The jump's sin(t·π) profile is
- * a symmetric parabola — exactly the path of a projectile launched and landing at one
- * height — so the worm reads as shooting off the pad and arcing back down span tiles
- * ahead. Set the jump fields directly rather than via startJump, which refuses to fire
- * while a rocket owns the arc.
- */
-export function startRampLaunch(sim, ctx) {
-    startRocket(sim, ctx);
-    sim.isJumping = true;
-    sim.jumpT = 0.001;
-    sim.jumpCount = MAX_JUMPS;        // the arc is committed — no air-jumps mid-launch
-    sim.jumpSpan = RAMP_LAUNCH_SPAN;
-    sim.jumpHeight = RAMP_LAUNCH_HEIGHT;
-    sim.pendingTunnelTrigger = null;  // launching off a flipped tile doesn't dive it
-}
-
-// Fire the launch when the worm crawls onto a ramp pad. Only from the ground — a pad
-// crossed mid-arc just refreshes the rocket rather than resetting the launch.
-function applyRampAt(sim, size, ctx, x, y, z, dirKey) {
-    if (sim.ramps.length === 0) return;
-    for (let i = 0; i < sim.ramps.length; i++) {
-        const r = sim.ramps[i];
-        if (r.x !== x || r.y !== y || r.z !== z || r.dirKey !== dirKey) continue;
-        if (sim.isJumping) startRocket(sim, ctx); // already airborne — just extend the burn
-        else startRampLaunch(sim, ctx);
-        break;
-    }
-}
-
 /** Start or refresh the grounded, protected rocket overdrive. */
 export function startRocket(sim, ctx) {
     if (sim.rocketActive) {
@@ -441,8 +390,23 @@ export function startMagnet(sim, ctx) {
 
 /** Apply a claimed special orb's effect. */
 export function activateSpecial(sim, ctx, type) {
-    if (type === 'rocket') startRocket(sim, ctx);
-    else if (type === 'magnet') startMagnet(sim, ctx);
+    if (type === 'rocket') {
+        // A fresh rocket blasts off into a big parabolic launch arc, then settles into the
+        // overdrive flight. The jump's sin(t·π) profile is exactly a projectile launched and
+        // landing at one height, so the take-off reads as ballistic. Only from the ground —
+        // a rocket grabbed mid-air just adds the overdrive rather than resetting the arc.
+        const grounded = !sim.isJumping;
+        startRocket(sim, ctx);
+        if (grounded) {
+            sim.isJumping = true;
+            sim.jumpT = 0.001;
+            sim.jumpCount = MAX_JUMPS;
+            sim.jumpSpan = ROCKET_LAUNCH_SPAN;
+            sim.jumpHeight = ROCKET_LAUNCH_HEIGHT;
+        }
+    } else if (type === 'magnet') {
+        startMagnet(sim, ctx);
+    }
 }
 
 /** Whether `next` is a 180° reversal of the current heading. */
@@ -1178,7 +1142,6 @@ const PHASE_HANDLERS = {
                 if (!destMidRotation) {
                     tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey);
                     trySpecialPickupAt(sim, size, ctx, x, y, z, dirKey);
-                    applyRampAt(sim, size, ctx, x, y, z, dirKey);
                 }
 
                 // Flipped tile detection
@@ -1592,12 +1555,6 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
         ctx.onSpecialsChanged(sp.slice());
     }
 
-    // Ramp pads ride the slice too, so a pad stays glued to its tile through the turn.
-    if (sim.ramps.length) {
-        const rp = sim.ramps;
-        for (let i = 0; i < rp.length; i++) rp[i] = rotateTilePosition(rp[i], axis, sliceIndex, dir, size);
-    }
-
     // Rotate the worm's logical grid position so it stays on its tile.
     // rotateTilePosition returns the SAME object when the tile wasn't in the slice,
     // so `newPos !== oldPos` is an exact "did this tile ride the slice" test.
@@ -1668,7 +1625,6 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
         const { x, y, z, dirKey } = sim.pos;
         tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey);
         trySpecialPickupAt(sim, size, ctx, x, y, z, dirKey);
-        applyRampAt(sim, size, ctx, x, y, z, dirKey);
         const landed = ctx.getCubies()?.[x]?.[y]?.[z]?.stickers?.[dirKey];
         const landedFlipped = !!(landed && landed.curr !== landed.orig);
         sim.onFlippedTile = landedFlipped;

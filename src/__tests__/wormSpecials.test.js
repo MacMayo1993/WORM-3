@@ -28,8 +28,8 @@ import {
   SURFACE_JUMP_TILE_SPAN,
   BASE_TAIL_LENGTH,
   MAX_ORB_ATTRACTION_FX,
-  RAMP_LAUNCH_HEIGHT,
-  RAMP_LAUNCH_SPAN,
+  ROCKET_LAUNCH_HEIGHT,
+  ROCKET_LAUNCH_SPAN,
 } from '../worm/healerWorm/constants.js';
 import { SPECIAL_TYPES } from '../worm/healerWorm/specialDefs.js';
 import {
@@ -235,6 +235,34 @@ describe('claiming a special', () => {
     expect(sim.pendingSpecialFlash).toMatchObject({ type: 'rocket' });
   });
 
+  it('a rocket pickup blasts off into a big launch arc', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    sim.specials = [special(2, 3, 4, 'PZ', 'rocket')];
+    expect(sim.isJumping).toBe(false);
+    stepUntilCommit(sim, ctx); // grabs the rocket on the ground
+    expect(sim.rocketActive).toBe(true);
+    expect(sim.isJumping).toBe(true);
+    expect(sim.jumpHeight).toBe(ROCKET_LAUNCH_HEIGHT);
+    expect(sim.jumpSpan).toBe(ROCKET_LAUNCH_SPAN);
+  });
+
+  it('a rocket grabbed mid-air adds overdrive without resetting the arc', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    // Airborne on a long arc, then a magnet drags in a rocket from the side.
+    sim.isJumping = true;
+    sim.jumpT = 0.3;
+    sim.jumpSpan = ROCKET_LAUNCH_SPAN;
+    sim.jumpHeight = SURFACE_JUMP_HEIGHT;
+    sim.specials = [special(0, 3, 4, 'PZ', 'rocket')];
+    sim.magnetT = 5;
+    stepUntilCommit(sim, ctx);
+    expect(sim.rocketActive).toBe(true);
+    expect(sim.jumpT).toBeGreaterThan(0.3);        // arc kept advancing, not reset to 0.001
+    expect(sim.jumpHeight).toBe(SURFACE_JUMP_HEIGHT); // untouched — no fresh launch
+  });
+
   it('is claimed from an adjacent tile while airborne', () => {
     const sim = makeSim();
     const ctx = makeCtx();
@@ -429,58 +457,6 @@ describe('magnet attraction FX queue', () => {
     sim.pendingOrbAttractions = [{ id: 'x', from: [0, 0, 0], to: [0, 0, 0], color: '#fff', elevated: false }];
     resetWormSim(sim, SIZE, { orbCount: 0, wormholeInterval: 9999 });
     expect(sim.pendingOrbAttractions).toHaveLength(0);
-  });
-});
-
-// ─── Ramp launch pads ────────────────────────────────────────────────────────
-// The worm spawns at (2,2,4,PZ) facing 'up' and steps to (2,3,4), so a pad parked
-// at (2,3,4,PZ) is the one it launches off first.
-
-describe('ramp launch pads', () => {
-  it('stays off the board unless a run opts in', () => {
-    const sim = makeSim(); // makeSim resets with no ramps
-    expect(sim.ramps).toHaveLength(0);
-    const seeded = makeWormSim(SIZE);
-    resetWormSim(seeded, SIZE, { orbCount: 0, wormholeInterval: 9999, ramps: true });
-    expect(seeded.ramps.length).toBeGreaterThan(0);
-  });
-
-  it('fires a rocket-powered launch when the worm crosses a pad', () => {
-    const sim = makeSim();
-    const ctx = makeCtx();
-    sim.ramps = [{ x: 2, y: 3, z: 4, dirKey: 'PZ' }];
-    expect(sim.rocketActive).toBe(false);
-    stepUntilCommit(sim, ctx); // lands on the pad
-    // Rocket owns the flight (immunity + overdrive + fire trail)…
-    expect(sim.rocketActive).toBe(true);
-    expect(eventsOf(ctx, 'rocketState')[0].args[0]).toBe(true);
-    // …and it's a big, high arc, not an ordinary hop.
-    expect(sim.isJumping).toBe(true);
-    expect(sim.jumpHeight).toBe(RAMP_LAUNCH_HEIGHT);
-    expect(sim.jumpSpan).toBe(RAMP_LAUNCH_SPAN);
-  });
-
-  it('a pad crossed mid-arc extends the burn without resetting the launch', () => {
-    const sim = makeSim();
-    const ctx = makeCtx();
-    // Already mid-launch (a long arc), so the worm is still airborne when it commits
-    // onto the pad one tile later.
-    sim.isJumping = true;
-    sim.jumpT = 0.2;
-    sim.jumpSpan = RAMP_LAUNCH_SPAN;
-    sim.jumpHeight = RAMP_LAUNCH_HEIGHT;
-    sim.ramps = [{ x: 2, y: 3, z: 4, dirKey: 'PZ' }];
-    stepUntilCommit(sim, ctx);
-    expect(sim.rocketActive).toBe(true);        // burn extended
-    expect(sim.jumpT).toBeGreaterThan(0.2);     // arc kept advancing, not reset to 0.001
-    expect(sim.jumpSpan).toBe(RAMP_LAUNCH_SPAN); // same launch, not a fresh one
-  });
-
-  it('carries a pad across a slice rotation', () => {
-    const sim = makeSim();
-    sim.ramps = [{ x: 0, y: 2, z: 4, dirKey: 'PZ' }];
-    applyRotationToSim(sim, SIZE, makeCtx(), { axis: 'col', sliceIndex: 0, dir: 1 }, { inOpeningScramble: false, paused: false });
-    expect(sim.ramps).toHaveLength(1);
   });
 });
 
