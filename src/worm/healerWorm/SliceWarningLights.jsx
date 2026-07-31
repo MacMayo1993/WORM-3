@@ -12,8 +12,13 @@
 import { useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import LayerHighlight from '../../teach/LayerHighlight.jsx';
+import { useGameStore } from '../../hooks/useGameStore.js';
 
 export function SliceWarningLights({ pendingRotRef, size }) {
+    // Tint the turn warning with the player's chosen worm colour instead of the
+    // solver's gold, and run it a touch softer (10% less opaque) so it reads as an
+    // ambient hazard cue rather than an instructor's hint.
+    const wormColor = useGameStore((s) => s.wormColor ?? '#33ff66');
     // The warning lives in a ref (written from the mode's own frame loop), but
     // LayerHighlight is declarative — mirror the ref into state, and only when the
     // threatened slice actually changes so we re-render once per warning, not per frame.
@@ -37,7 +42,15 @@ export function SliceWarningLights({ pendingRotRef, size }) {
     return (
         <>
             {indices.map((sliceIndex, i) => (
-                <LayerHighlight key={sliceIndex} axis={pending.axis} sliceIndex={sliceIndex} dir={dirs[i]} size={size} />
+                <LayerHighlight
+                    key={sliceIndex}
+                    axis={pending.axis}
+                    sliceIndex={sliceIndex}
+                    dir={dirs[i]}
+                    size={size}
+                    color={wormColor}
+                    opacity={0.9}
+                />
             ))}
         </>
     );

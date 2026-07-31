@@ -77,6 +77,7 @@ const rimFragmentShader = `
   uniform float uTime;
   uniform float uDir;    // +1 / -1 → the sweep travels with the turn
   uniform float uEdge;   // tile outline in uv space
+  uniform float uOpacity;
   varying vec2  vUv;
   varying float vPhase;  // this face's angular position around the turn axis, [0,1)
   #define TAU 6.28318530718
@@ -117,7 +118,7 @@ const rimFragmentShader = `
     if (glow < 0.004) discard;
 
     vec3 col = mix(uDeep, uCore, clamp(sweep * 0.6 + line * 0.3, 0.0, 1.0));
-    gl_FragColor = vec4(col * 1.15, clamp(glow, 0.0, 1.0));
+    gl_FragColor = vec4(col * 1.15, clamp(glow, 0.0, 1.0) * uOpacity);
   }
 `;
 
@@ -199,6 +200,7 @@ const wispFragmentShader = `
   uniform vec3  uCore;
   uniform float uTime;
   uniform float uSoft;  // 0 = the streamer itself, 1 = the haze around it
+  uniform float uOpacity;
   varying float vT;
   varying float vRing;
   varying vec3  vNrm;
@@ -228,7 +230,7 @@ const wispFragmentShader = `
     if (alpha < 0.004) discard;
 
     vec3 col = mix(uDeep, uCore, clamp(strands * 0.55 + pow(vT, 2.2) * 0.85, 0.0, 1.0));
-    gl_FragColor = vec4(col * mix(1.45, 0.85, uSoft), clamp(alpha, 0.0, 1.0));
+    gl_FragColor = vec4(col * mix(1.45, 0.85, uSoft), clamp(alpha, 0.0, 1.0) * uOpacity);
   }
 `;
 
@@ -271,6 +273,7 @@ const moteVertexShader = `
 const sparkFragmentShader = `
   uniform vec3 uDeep;
   uniform vec3 uCore;
+  uniform float uOpacity;
   varying float vFade;
   void main() {
     vec2 uv = gl_PointCoord * 2.0 - 1.0;
@@ -279,7 +282,7 @@ const sparkFragmentShader = `
     float core = pow(1.0 - d, 2.4);
     float halo = exp(-d * d * 3.2) * 0.5;
     vec3 col = mix(uDeep, uCore, core);
-    gl_FragColor = vec4(col, clamp((core * 0.75 + halo) * vFade, 0.0, 1.0));
+    gl_FragColor = vec4(col, clamp((core * 0.75 + halo) * vFade, 0.0, 1.0) * uOpacity);
   }
 `;
 
@@ -287,7 +290,7 @@ const sparkFragmentShader = `
 
 const STREAMERS = 3;
 
-const LayerHighlight = ({ axis, sliceIndex, dir, size }) => {
+const LayerHighlight = ({ axis, sliceIndex, dir, size, color = null, opacity = 1 }) => {
   const spinnerRef = useRef();
   const turn = dir === 1 ? 1 : -1;
 
@@ -296,10 +299,19 @@ const LayerHighlight = ({ axis, sliceIndex, dir, size }) => {
   const uDir = useMemo(() => ({ value: turn }), []); // eslint-disable-line react-hooks/exhaustive-deps
   React.useEffect(() => { uDir.value = turn; }, [turn, uDir]);
 
-  const palette = useMemo(() => ({
-    uDeep: { value: new THREE.Color(GOLD_DEEP) },
-    uCore: { value: new THREE.Color(GOLD_CORE) }
-  }), []);
+  // Global alpha scale, shared by every material so callers can dim the whole
+  // effect (worm mode runs it a touch softer than the solver's hints).
+  const uOpacity = useMemo(() => ({ value: opacity }), []); // eslint-disable-line react-hooks/exhaustive-deps
+  React.useEffect(() => { uOpacity.value = opacity; }, [opacity, uOpacity]);
+
+  // Gold by default (the instructor's hint). When a caller passes a colour — worm
+  // mode hands in the player's chosen worm colour — use it for the deep tone and a
+  // whiter version of it for the hot core, preserving the deep→pale gradient.
+  const palette = useMemo(() => {
+    const deep = new THREE.Color(color ?? GOLD_DEEP);
+    const core = color ? deep.clone().lerp(new THREE.Color('#ffffff'), 0.55) : new THREE.Color(GOLD_CORE);
+    return { uDeep: { value: deep }, uCore: { value: core } };
+  }, [color]);
 
   // One merged geometry of every exposed cubie face in the target slice.
   const rimGeometry = useMemo(() => {
@@ -373,8 +385,8 @@ const LayerHighlight = ({ axis, sliceIndex, dir, size }) => {
   React.useEffect(() => () => rimGeometry.dispose(), [rimGeometry]);
 
   const rimUniforms = useMemo(() => ({
-    ...palette, uTime, uDir, uEdge: { value: EDGE_UV }
-  }), [palette, uTime, uDir]);
+    ...palette, uTime, uDir, uOpacity, uEdge: { value: EDGE_UV }
+  }), [palette, uTime, uDir, uOpacity]);
 
   // The belt the streamers and motes ride: outside the layer's corner diagonal,
   // so nothing ever clips through the cube however it is oriented.
@@ -442,10 +454,10 @@ const LayerHighlight = ({ axis, sliceIndex, dir, size }) => {
 
   React.useEffect(() => () => motes.dispose(), [motes]);
 
-  const wispUniforms = useMemo(() => ({ ...palette, uTime, uSoft: { value: 0 } }), [palette, uTime]);
-  const auraUniforms = useMemo(() => ({ ...palette, uTime, uSoft: { value: 1 } }), [palette, uTime]);
-  const flareUniforms = useMemo(() => ({ ...palette, uTime, uSize: { value: 0.26 } }), [palette, uTime]);
-  const moteUniforms = useMemo(() => ({ ...palette, uTime, uDir, uSize: { value: 0.075 } }), [palette, uTime, uDir]);
+  const wispUniforms = useMemo(() => ({ ...palette, uTime, uOpacity, uSoft: { value: 0 } }), [palette, uTime, uOpacity]);
+  const auraUniforms = useMemo(() => ({ ...palette, uTime, uOpacity, uSoft: { value: 1 } }), [palette, uTime, uOpacity]);
+  const flareUniforms = useMemo(() => ({ ...palette, uTime, uOpacity, uSize: { value: 0.26 } }), [palette, uTime, uOpacity]);
+  const moteUniforms = useMemo(() => ({ ...palette, uTime, uDir, uOpacity, uSize: { value: 0.075 } }), [palette, uTime, uDir, uOpacity]);
 
   useFrame((state, delta) => {
     uTime.value = state.clock.elapsedTime;
