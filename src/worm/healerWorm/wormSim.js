@@ -101,6 +101,9 @@ import {
     SPECIAL_SPAWN_RETRY,
     MAX_ORB_ATTRACTION_FX,
     activeTunnelCap,
+    TURBO_SPEED_MULT,
+    TURBO_DURATION,
+    terrainCountFor,
 } from './constants.js';
 
 // Axis scratch for baking a committed turn into the worm's position history.
@@ -177,6 +180,11 @@ export function makeWormSim(size) {
         // ── Boost ──────────────────────────────────────────────────────────────
         boostActiveT: 0,
         boostCooldownT: 0,
+
+        // ── Terrain markers (turbo pads / turn arrows / slip ice) ──────────────
+        terrain: [],              // { x,y,z,dirKey, type, dir? } surface features
+        turboT: 0,                // seconds of turbo-pad speed remaining
+        onSlip: false,            // head is standing on a slip (ice) tile → steering locked
 
         // ── Special power-ups (rocket / magnet) ────────────────────────────────
         specials: [],             // hovering rocket/magnet orbs on the board
@@ -258,12 +266,18 @@ const setCurWorldPosFromTile = (sim, size) => {
  * Full run reset (retry / new setup / size change). Spawns the initial powerups
  * into sim.powerups; the caller publishes them to the store.
  */
-export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
+export function resetWormSim(sim, size, { orbCount, wormholeInterval, terrain = false }) {
     const startPos = INITIAL_POS(size);
     const initial = [];
     for (let i = 0; i < orbCount; i++) {
         initial.push({ ...randomFreeTile(size, [...initial, startPos]), type: 'apple' });
     }
+
+    // Terrain is opt-in (the caller passes terrain: true for real runs) so headless
+    // tests and other modes keep a clean board unless they ask for it.
+    sim.terrain = terrain ? makeTerrain(size, [startPos, ...initial]) : [];
+    sim.turboT = 0;
+    sim.onSlip = false;
 
     sim.pos = startPos;
     sim.moveDir = INITIAL_DIR;
@@ -511,6 +525,48 @@ function applyOrbPickupGrowth(sim, ctx, color, faceId) {
     // Colour and combo ride along so the HUD can confirm the pickup on screen at the
     // same intensity the pickup sound plays at.
     ctx.onOrbPickup(faceId, orbsCarried(sim.tailLength), color, sim.orbCombo);
+}
+
+// Place the run's terrain markers on distinct free tiles, avoiding the worm's start
+// cell and the orbs. Turn arrows alternate left/right so a run always has both.
+function makeTerrain(size, exclude) {
+    const out = [];
+    const n = terrainCountFor(size);
+    const place = (type, extra) => {
+        const t = randomFreeTile(size, [...exclude, ...out]);
+        if (!t) return;
+        out.push({ x: t.x, y: t.y, z: t.z, dirKey: t.dirKey, type, ...extra });
+    };
+    for (let i = 0; i < n; i++) place('turbo');
+    for (let i = 0; i < n; i++) place('turn', { dir: i % 2 === 0 ? 'left' : 'right' });
+    for (let i = 0; i < n; i++) place('slip');
+    return out;
+}
+
+// Apply the terrain feature (if any) under the cell the worm just committed onto.
+// Called from both commit paths, exactly like the pickup checks. Purely a movement/
+// speed modifier — it reads nothing from and writes nothing to the sticker/heal model.
+function applyTerrainAt(sim, size, ctx, x, y, z, dirKey) {
+    // Recomputed every commit: the head is only "on ice" while it sits on a slip tile.
+    sim.onSlip = false;
+    if (sim.terrain.length === 0) return;
+    for (let i = 0; i < sim.terrain.length; i++) {
+        const m = sim.terrain[i];
+        if (m.x !== x || m.y !== y || m.z !== z || m.dirKey !== dirKey) continue;
+        if (m.type === 'turbo') {
+            sim.turboT = TURBO_DURATION;   // refreshes on every pad, so a lane sustains it
+            ctx.feel('boost');
+        } else if (m.type === 'turn') {
+            // Force a relative turn. turnWorm rotates within up/right/down/left, so this
+            // is a true 90° turn on either control scheme and survives face crossings.
+            sim.moveDir = turnWorm(sim.moveDir, m.dir === 'right' ? 'right' : 'left');
+            sim.pendingTurns.length = 0;   // the arrow wins over any stale queued input
+            ctx.feel('turn');
+        } else if (m.type === 'slip') {
+            sim.onSlip = true;             // steering is dropped until the head leaves
+        }
+        break; // one marker per tile
+    }
 }
 
 // Reusable scratch for the magnet's manifold reach — rebuilt in place per check.
@@ -876,6 +932,9 @@ const PHASE_HANDLERS = {
                     }
                 } else if (t === 'jump') {
                     startJump(sim, ctx);
+                } else if (sim.onSlip) {
+                    // On ice the worm slides straight — directional inputs are dropped
+                    // (boost and jump above still fire, so the player can escape).
                 } else if (ctx.getControlMode() === 'oriented') {
                     // Steering stays live during a rocket — the flight is aimable, which
                     // is most of what makes it a tool rather than a firework. A reversal
@@ -1125,6 +1184,7 @@ const PHASE_HANDLERS = {
                 if (!destMidRotation) {
                     tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey);
                     trySpecialPickupAt(sim, size, ctx, x, y, z, dirKey);
+                    applyTerrainAt(sim, size, ctx, x, y, z, dirKey);
                 }
 
                 // Flipped tile detection
@@ -1376,6 +1436,8 @@ export function stepWormSim(sim, delta, size, ctx) {
                 ctx.onBoostState('ready');
             }
         }
+        // Turbo coasts down after the last pad — no cooldown, so a pad lane keeps it lit.
+        if (sim.turboT > 0) sim.turboT = Math.max(0, sim.turboT - delta);
     }
     // ── Magnet: drain the reach window. Frozen outside crawling for the same reason
     // boost is — there is nothing to pick up during a wormhole transit, so the buff
@@ -1405,8 +1467,10 @@ export function stepWormSim(sim, delta, size, ctx) {
     }
 
     const boostMult = sim.boostActiveT > 0 ? BOOST_MULTIPLIER : 1;
-    // Rocket is 4× the user's current speed; the normal boost does not stack.
-    const speedMult = sim.rocketActive ? ROCKET_SPEED_MULT : boostMult;
+    const turboMult = sim.turboT > 0 ? TURBO_SPEED_MULT : 1;
+    // Rocket is 4× the user's current speed and owns the worm outright; on the ground the
+    // stronger of a tap-boost and a turbo pad applies (they don't stack into a blur).
+    const speedMult = sim.rocketActive ? ROCKET_SPEED_MULT : Math.max(boostMult, turboMult);
     const STEP_SEC = 1.0 / (ctx.getSpeed() * speedMult);
 
     // If the crawl speed changed since last frame, rescale the in-progress step
@@ -1538,6 +1602,13 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
         ctx.onSpecialsChanged(sp.slice());
     }
 
+    // Terrain markers ride the slice too (rotateTilePosition carries type/dir across),
+    // so a turbo pad or arrow stays glued to its tile through the turn.
+    if (sim.terrain.length) {
+        const tr = sim.terrain;
+        for (let i = 0; i < tr.length; i++) tr[i] = rotateTilePosition(tr[i], axis, sliceIndex, dir, size);
+    }
+
     // Rotate the worm's logical grid position so it stays on its tile.
     // rotateTilePosition returns the SAME object when the tile wasn't in the slice,
     // so `newPos !== oldPos` is an exact "did this tile ride the slice" test.
@@ -1608,6 +1679,7 @@ export function applyRotationToSim(sim, size, ctx, rot, { inOpeningScramble, pau
         const { x, y, z, dirKey } = sim.pos;
         tryPickupPowerupAt(sim, size, ctx, x, y, z, dirKey);
         trySpecialPickupAt(sim, size, ctx, x, y, z, dirKey);
+        applyTerrainAt(sim, size, ctx, x, y, z, dirKey);
         const landed = ctx.getCubies()?.[x]?.[y]?.[z]?.stickers?.[dirKey];
         const landedFlipped = !!(landed && landed.curr !== landed.orig);
         sim.onFlippedTile = landedFlipped;
