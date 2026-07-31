@@ -321,6 +321,42 @@ describe('rocket flight lift', () => {
   });
 });
 
+describe('reverse guard (two quick same-direction turns)', () => {
+  // Worm starts at (2,2,4) facing up; a first 'left' sends it crawling along the PZ
+  // face (x: 2→1→0), so these steps never cross an edge and moveDir is unambiguous.
+  it('drops a rapid same-direction second turn instead of U-turning into itself', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    queueTurn(sim, 'left');
+    stepUntilCommit(sim, ctx);       // up → left
+    expect(sim.moveDir).toBe('left');
+    queueTurn(sim, 'left');          // immediate second left
+    stepUntilCommit(sim, ctx);
+    expect(sim.moveDir).toBe('left'); // blocked — NOT reversed to 'down'
+  });
+
+  it('allows an opposite turn (S-bend) right away', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    queueTurn(sim, 'left');
+    stepUntilCommit(sim, ctx);       // up → left
+    queueTurn(sim, 'right');
+    stepUntilCommit(sim, ctx);       // left → up (opposite, allowed)
+    expect(sim.moveDir).toBe('up');
+  });
+
+  it('allows the same direction again after clearing the guard distance', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    queueTurn(sim, 'left');
+    stepUntilCommit(sim, ctx);       // up → left (tilesSinceTurn → 1)
+    stepUntilCommit(sim, ctx);       // travel on (tilesSinceTurn → 2)
+    queueTurn(sim, 'left');
+    stepUntilCommit(sim, ctx);       // now allowed: left → down
+    expect(sim.moveDir).toBe('down');
+  });
+});
+
 describe('magnet', () => {
   it('sets the reach window and publishes its duration', () => {
     const sim = makeSim();

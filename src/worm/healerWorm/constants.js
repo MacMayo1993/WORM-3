@@ -63,6 +63,11 @@ export const BODY_BALL_SPACING = 0.09;
 export const BASE_TAIL_LENGTH = 4;
 export const DEFAULT_WORMHOLE_FLIP_INTERVAL = 10; // seconds between guaranteed antipodal wormhole spawns
 export const MAX_JUMPS = 2;
+// Tiles the worm must travel between two turns in the SAME direction. Two quick lefts
+// (or two rights) fold it into a 180° U-turn straight back into its own neck — an instant
+// self-kill from a fumbled double-tap. Requiring a couple of tiles between same-direction
+// turns blocks that while leaving opposite turns (S-bends) and spaced-out turns free.
+export const REVERSE_GUARD_TILES = 2;
 export const MAX_POWERUP_RENDER = 24;
 export const TUNNEL_TRIGGER_PROGRESS = 1 / 3;
 export const SELF_COLLISION_TRIGGER_PROGRESS = 0.4;
