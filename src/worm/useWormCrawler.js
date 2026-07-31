@@ -361,7 +361,7 @@ export function useWormCrawler(size, cubies) {
     // ── Run reset (retry / new setup / size change) ─────────────────────────────
     useEffect(() => {
         const sim = simRef.current;
-        resetWormSim(sim, size, { orbCount: wormOrbCount, wormholeInterval });
+        resetWormSim(sim, size, { orbCount: wormOrbCount, wormholeInterval, terrain: true });
         resetWormBuffs();
         resetWormPress();
         useGameStore.getState().setWormBoostState('ready');
@@ -488,6 +488,7 @@ export function useWormCrawler(size, cubies) {
             landingGraceT: f('landingGraceT'),
             magnetT: f('magnetT'),
             pendingOrbAttractionsRef: f('pendingOrbAttractions'),
+            terrain: f('terrain'),
             specials: f('specials'),
             pendingSpecialFlashRef: f('pendingSpecialFlash'),
             headInterpPos: f('headInterpPos'),

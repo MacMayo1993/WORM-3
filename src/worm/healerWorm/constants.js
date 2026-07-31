@@ -80,6 +80,19 @@ export const MAX_ACTIVE_TUNNEL_PAIRS = 20;
 export const activeTunnelCap = (size) =>
   Math.min(MAX_ACTIVE_TUNNEL_PAIRS, Math.round((size * MAX_ACTIVE_TUNNEL_PAIRS) / 15));
 
+// ── Terrain markers (turbo pads / turn arrows / slip ice) ────────────────────
+// Surface features that ride on tiles like orbs do — they never touch the sticker or
+// heal model. Placed once per run and carried through slice rotations. Three kinds:
+//   turbo  — a boost pad: while on it (and for a short coast after) the crawl speeds up.
+//   turn   — a one-way arrow: forces a relative left/right turn as you cross it.
+//   slip   — ice: steering is dropped while you stand on it, so you slide straight.
+export const TERRAIN_TYPES = ['turbo', 'turn', 'slip'];
+export const TURBO_SPEED_MULT = 1.8;   // crawl multiplier while turbo is live
+export const TURBO_DURATION = 0.6;     // seconds a pad keeps you fast; refreshes on each pad
+// Per-type marker count, scaled with the board so a bigger cube stays lively without
+// crowding: 3×3→2, 4×4→2, 5×5→3, 7×7→4, 15×15→9.
+export const terrainCountFor = (size) => Math.max(2, Math.round(size * 0.6));
+
 // Tail segments needed to visually cover all tiles: totalTiles / (0.14 unit spacing / ~1 unit per tile)
 // For 5×5 (150 tiles): ~1100 segments. Round up generously.
 export const MAX_TAIL = 1200;
