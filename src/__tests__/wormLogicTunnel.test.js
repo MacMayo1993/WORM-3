@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getNextSurfacePosition, getTunnelWorldPosInto, makeTunnelCenterline, buildTunnelCenterlineInto, tunnelTToArc, getTunnelArcPosInto } from '../worm/wormLogic.js';
+import { getNextSurfacePosition, getTunnelWorldPosInto, makeTunnelCenterline, buildTunnelCenterlineInto, tunnelTToArc, getTunnelArcPosInto, getTunnelArcPosSmoothInto } from '../worm/wormLogic.js';
 import { ARM_A_END, ARM_B_START } from '../utils/tunnelPath.js';
 import * as THREE from 'three';
 
@@ -58,6 +58,36 @@ describe('tunnel arc-length sampling', () => {
       expect(a).toBeGreaterThanOrEqual(prev);
       prev = a;
     }
+  });
+});
+
+// ─── corner smoothing (the worm's motion, not the tube/camera) ────────────────
+describe('tunnel corner smoothing', () => {
+  const size = 3;
+  // Off-centre on both mouths, so the entry/exit arms run diagonally into the core
+  // and there are real bends where the legs meet.
+  const tunnel = {
+    entry: { x: 0, y: 2, z: 0, dirKey: 'PY' },
+    exit: { x: 2, y: 0, z: 2, dirKey: 'NY' }
+  };
+  const cl = buildTunnelCenterlineInto(makeTunnelCenterline(), tunnel, size);
+  const sharp = new THREE.Vector3();
+  const smooth = new THREE.Vector3();
+
+  it('rounds an interior corner — the smoothed point sits off the sharp vertex', () => {
+    const corner = cl.armALen; // where the entry diagonal meets the core crossing
+    getTunnelArcPosInto(sharp, cl, corner);
+    getTunnelArcPosSmoothInto(smooth, cl, corner);
+    expect(smooth.distanceTo(sharp)).toBeGreaterThan(0.01);
+  });
+
+  it('fades to the exact route at the mouths so the throat still threads the hole', () => {
+    getTunnelArcPosInto(sharp, cl, 0.001);
+    getTunnelArcPosSmoothInto(smooth, cl, 0.001);
+    expect(smooth.distanceTo(sharp)).toBeLessThan(1e-3);
+    getTunnelArcPosInto(sharp, cl, cl.total - 0.001);
+    getTunnelArcPosSmoothInto(smooth, cl, cl.total - 0.001);
+    expect(smooth.distanceTo(sharp)).toBeLessThan(1e-3);
   });
 });
 

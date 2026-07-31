@@ -383,6 +383,40 @@ export const tunnelTToArc = (cl, t) => tunnelPathTToArc(cl, t);
 /** Write the world position at a given world arc-length (clamped to [0,total]) into `out`. */
 export const getTunnelArcPosInto = (out, cl, arc) => tunnelPathArcPointInto(out, cl, arc);
 
+// ── Worm-only centerline smoothing ────────────────────────────────────────────
+// The centerline is piecewise-linear, so the worm's head and body snap through the
+// hard corner at each throat→core→throat junction — the rigid, right-angled look. Round
+// those bends for the WORM ONLY (the tube shell and the camera keep sampling the exact
+// route, so the throat still threads the aperture dead-centre): take a short window of
+// arc either side of the point and average it, which cuts the sharp vertex into a smooth
+// bend while leaving a straight run untouched. The window fades to nothing at both mouths,
+// so the head still dives straight down its hole and rises straight out of the far one.
+const TUNNEL_SMOOTH_WINDOW = 0.34; // world units sampled either side of the point
+const TUNNEL_SMOOTH_FADE = 0.6;    // arc distance from a mouth over which it ramps in
+const _tsA = new THREE.Vector3();
+const _tsB = new THREE.Vector3();
+const _tsC = new THREE.Vector3();
+
+/** Corner-rounded position at world arc-length `arc` along a built centerline. */
+export function getTunnelArcPosSmoothInto(out, cl, arc) {
+  const total = cl.total || 0;
+  const edge = Math.min(arc, total - arc);
+  const d = TUNNEL_SMOOTH_WINDOW * Math.min(1, Math.max(0, edge / TUNNEL_SMOOTH_FADE));
+  if (!(d > 1e-4)) return getTunnelArcPosInto(out, cl, arc);
+  getTunnelArcPosInto(_tsA, cl, arc - d);
+  getTunnelArcPosInto(_tsB, cl, arc);
+  getTunnelArcPosInto(_tsC, cl, arc + d);
+  // 3-tap corner cut: the flanking samples pull the middle off the sharp vertex.
+  return out.copy(_tsB).multiplyScalar(0.5).addScaledVector(_tsA, 0.25).addScaledVector(_tsC, 0.25);
+}
+
+/** Corner-rounded position at traversal parameter `t` (0=entry mouth, 1=exit mouth). */
+export function getTunnelWorldPosSmoothInto(out, tunnel, t, size, explosionFactor = 0) {
+  buildTunnelPathForTunnel(_scratchPath, tunnel, size, explosionFactor);
+  const arc = tunnelPathTToArc(_scratchPath, t);
+  return getTunnelArcPosSmoothInto(out, _scratchPath, arc);
+}
+
 // Module-level scratch for getTunnelWorldPosInto / buildTunnelCenterlineInto.
 // These run for every rendered worm segment every frame, so allocating new Vector3s
 // on each call would create significant GC pressure. Safe to reuse because all

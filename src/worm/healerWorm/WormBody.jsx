@@ -9,7 +9,7 @@ import {
     makeTunnelCenterline,
     buildTunnelCenterlineInto,
     tunnelTToArc,
-    getTunnelArcPosInto,
+    getTunnelArcPosSmoothInto,
     getWindWorldPosInto,
 } from '../wormLogic.js';
 import { liveRotation } from '../liveRotation.js';
@@ -583,7 +583,7 @@ export function WormBody({ worm, size }) {
                     const _segArc = _headTunArc - i * 0.09;
                     if (_segArc >= 0) {
                         // In the tunnel — ride the ribbon one spacing behind the segment ahead.
-                        getTunnelArcPosInto(_bodyClonePos, _funnelCenterline, _segArc);
+                        getTunnelArcPosSmoothInto(_bodyClonePos, _funnelCenterline, _segArc);
                         if (_phase === 'exiting') {
                             // Squash-and-pop: each segment bulges as it bursts out of the exit
                             // mouth (arc ≈ total), then settles back to normal size as it travels out.

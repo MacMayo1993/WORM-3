@@ -35,7 +35,7 @@ import { getStickerSafe } from '../../game/cubeState.js';
 import { rotateVec90 } from '../../game/cubeRotation.js';
 import {
     getNextSurfacePosition,
-    getTunnelWorldPosInto,
+    getTunnelWorldPosSmoothInto,
     getWindWorldPosInto,
     turnWorm,
     getStableKey,
@@ -1189,7 +1189,7 @@ const PHASE_HANDLERS = {
             if (sim.activeTunnel) {
                 // Head travels first third of the tunnel (entry face → cube interior)
                 const tunnelT = sim.tunnelProgress * 0.33;
-                getTunnelWorldPosInto(sim.headInterpPos, sim.activeTunnel, tunnelT, size);
+                getTunnelWorldPosSmoothInto(sim.headInterpPos, sim.activeTunnel, tunnelT, size);
                 const entryN = FACE_NORMALS[sim.activeTunnel.entry.dirKey];
                 if (entryN) sim.currentNormal.copy(entryN);
             }
@@ -1211,7 +1211,7 @@ const PHASE_HANDLERS = {
             if (sim.activeTunnel) {
                 // Head travels middle third of the tunnel (through cube core)
                 const tunnelT = 0.33 + sim.tunnelProgress * 0.34;
-                getTunnelWorldPosInto(sim.headInterpPos, sim.activeTunnel, tunnelT, size);
+                getTunnelWorldPosSmoothInto(sim.headInterpPos, sim.activeTunnel, tunnelT, size);
                 // Switch normal to exit face at the midpoint
                 const n = sim.tunnelProgress > 0.5
                     ? FACE_NORMALS[sim.activeTunnel.exit.dirKey]
@@ -1243,7 +1243,7 @@ const PHASE_HANDLERS = {
             if (sim.activeTunnel) {
                 // Head travels final third of the tunnel (cube interior → exit face)
                 const tunnelT = 0.67 + sim.tunnelProgress * 0.33;
-                getTunnelWorldPosInto(sim.headInterpPos, sim.activeTunnel, tunnelT, size);
+                getTunnelWorldPosSmoothInto(sim.headInterpPos, sim.activeTunnel, tunnelT, size);
                 const exitN = FACE_NORMALS[sim.activeTunnel.exit.dirKey];
                 if (exitN) sim.currentNormal.copy(exitN);
             }
