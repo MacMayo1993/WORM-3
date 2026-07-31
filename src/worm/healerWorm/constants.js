@@ -99,6 +99,11 @@ export const windoutHeadS = (progress, tailLength) => {
     return 1 - Math.min(1, Math.max(0, progress)) * (1 + tailSpan);
 };
 export const HEAL_COST = 4; // worm segments (balls) required to fully heal one tunnel
+// When a ring heal completes, hold the worm still for this long so the tile visibly pops
+// out and heals — a beat of payoff for surrounding it, and long enough to actually see on
+// a mega board where the tile is small. Matches the cubiePop animation (~0.5s) plus a
+// short settle. Purely a crawl freeze; the pop FX are store-driven and play through it.
+export const HEAL_PAUSE_DURATION = 0.85;
 
 // Render-only full-route trail history: how many tiles of the worm's path are retained for
 // painting the persistent "where I've been" trail (see useWormCrawler's pathHistory ring).
