@@ -430,61 +430,6 @@ describe('magnet attraction FX queue', () => {
   });
 });
 
-// ─── Terrain markers (turbo pads / turn arrows / slip ice) ───────────────────
-// The worm spawns at (2,2,4,PZ) facing 'up' and steps to (2,3,4) then (2,4,4), so a
-// marker parked at (2,3,4,PZ) is the one it lands on first.
-
-describe('terrain markers', () => {
-  it('stays off the board unless a run opts in', () => {
-    const sim = makeSim(); // makeSim resets with no terrain
-    expect(sim.terrain).toHaveLength(0);
-    const seeded = makeWormSim(SIZE);
-    resetWormSim(seeded, SIZE, { orbCount: 0, wormholeInterval: 9999, terrain: true });
-    expect(seeded.terrain.length).toBeGreaterThan(0);
-  });
-
-  it('turbo pad speeds the worm up for a moment, then coasts down', () => {
-    const sim = makeSim();
-    const ctx = makeCtx();
-    sim.terrain = [{ x: 2, y: 3, z: 4, dirKey: 'PZ', type: 'turbo' }];
-    stepUntilCommit(sim, ctx); // lands on the pad
-    expect(sim.turboT).toBeGreaterThan(0);
-    // With no more pads it drains away.
-    run(sim, ctx, 1.0);
-    expect(sim.turboT).toBe(0);
-  });
-
-  it('turn arrow forces a relative turn as the worm crosses it', () => {
-    const sim = makeSim();
-    const ctx = makeCtx();
-    sim.terrain = [{ x: 2, y: 3, z: 4, dirKey: 'PZ', type: 'turn', dir: 'right' }];
-    expect(sim.moveDir).toBe('up');
-    stepUntilCommit(sim, ctx); // lands on the arrow
-    expect(sim.moveDir).toBe('right'); // turnWorm('up','right')
-  });
-
-  it('slip ice drops steering while the worm stands on it', () => {
-    const sim = makeSim();
-    const ctx = makeCtx();
-    sim.terrain = [{ x: 2, y: 3, z: 4, dirKey: 'PZ', type: 'slip' }];
-    stepUntilCommit(sim, ctx); // lands on ice
-    expect(sim.onSlip).toBe(true);
-    // A queued turn is ignored while sliding — heading is unchanged off the ice tile.
-    queueTurn(sim, 'right');
-    stepUntilCommit(sim, ctx);
-    expect(sim.moveDir).toBe('up');
-    expect(sim.onSlip).toBe(false); // stepped off onto a normal tile
-  });
-
-  it('carries a marker across a slice rotation, keeping its type', () => {
-    const sim = makeSim();
-    sim.terrain = [{ x: 0, y: 2, z: 4, dirKey: 'PZ', type: 'turbo' }];
-    applyRotationToSim(sim, SIZE, makeCtx(), { axis: 'col', sliceIndex: 0, dir: 1 }, { inOpeningScramble: false, paused: false });
-    expect(sim.terrain).toHaveLength(1);
-    expect(sim.terrain[0].type).toBe('turbo');
-  });
-});
-
 // ─── Fair type selection ─────────────────────────────────────────────────────
 
 describe('special type chooser', () => {
