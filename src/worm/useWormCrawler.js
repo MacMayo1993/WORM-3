@@ -28,6 +28,7 @@ import {
     ORB_SEGMENT_GROWTH,
     DEFAULT_POWERUP_COUNT,
     DEFAULT_WORMHOLE_FLIP_INTERVAL,
+    RAMPS_ENABLED,
 } from './healerWorm/constants.js';
 import {
     makeWormSim,
@@ -361,7 +362,7 @@ export function useWormCrawler(size, cubies) {
     // ── Run reset (retry / new setup / size change) ─────────────────────────────
     useEffect(() => {
         const sim = simRef.current;
-        resetWormSim(sim, size, { orbCount: wormOrbCount, wormholeInterval });
+        resetWormSim(sim, size, { orbCount: wormOrbCount, wormholeInterval, ramps: RAMPS_ENABLED });
         resetWormBuffs();
         resetWormPress();
         useGameStore.getState().setWormBoostState('ready');
@@ -488,6 +489,7 @@ export function useWormCrawler(size, cubies) {
             landingGraceT: f('landingGraceT'),
             magnetT: f('magnetT'),
             pendingOrbAttractionsRef: f('pendingOrbAttractions'),
+            ramps: f('ramps'),
             specials: f('specials'),
             pendingSpecialFlashRef: f('pendingSpecialFlash'),
             headInterpPos: f('headInterpPos'),
