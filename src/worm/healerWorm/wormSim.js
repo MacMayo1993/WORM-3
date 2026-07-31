@@ -77,6 +77,7 @@ import {
     windoutHeadS,
     DEFAULT_WORMHOLE_FLIP_INTERVAL,
     MAX_JUMPS,
+    REVERSE_GUARD_TILES,
     TUNNEL_TRIGGER_PROGRESS,
     SELF_COLLISION_TRIGGER_PROGRESS,
     SELF_COLLISION_GRACE_STEPS_AFTER_TUNNEL,
@@ -131,6 +132,11 @@ export function makeWormSim(size) {
         alive: true,
         stepAcc: 0,
         pendingTurns: [],
+        // Reverse-guard: the last direction the worm turned and how many tiles it has
+        // crawled since, so a rapid same-direction second turn (a self-killing U-turn)
+        // can be dropped. Starts "long ago" so the first turn of a run is never blocked.
+        lastTurnDir: null,
+        tilesSinceTurn: REVERSE_GUARD_TILES,
         // Tracks the previous frame's STEP_SEC so stepAcc can be rescaled when the crawl
         // speed changes mid-step (boost toggling, or the speed slider) — keeps
         // stepAcc/STEP_SEC (which equals interpT) consistent so a speed change never
@@ -273,6 +279,8 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.activeTunnel = null;
     sim.stepAcc = 0;
     sim.pendingTurns = [];
+    sim.lastTurnDir = null;
+    sim.tilesSinceTurn = REVERSE_GUARD_TILES;
     sim.boostActiveT = 0;
     sim.boostCooldownT = 0;
     sim.prevStepSec = null;
@@ -887,7 +895,15 @@ const PHASE_HANDLERS = {
                     }
                 } else {
                     if (t === 'left' || t === 'right') {
-                        sim.moveDir = turnWorm(sim.moveDir, t);
+                        // Drop a rapid same-direction second turn: two lefts (or two rights)
+                        // before the worm has cleared a couple of tiles fold it into a 180°
+                        // U-turn back into its own neck and kill it. An opposite turn (an
+                        // S-bend) or one made after travelling on is always allowed.
+                        if (!(t === sim.lastTurnDir && sim.tilesSinceTurn < REVERSE_GUARD_TILES)) {
+                            sim.moveDir = turnWorm(sim.moveDir, t);
+                            sim.lastTurnDir = t;
+                            sim.tilesSinceTurn = 0;
+                        }
                     }
                     // 'down' is a 180 in relative steering — same reversal rule.
                     if (t === 'down' && !sim.rocketActive) {
@@ -1076,6 +1092,7 @@ const PHASE_HANDLERS = {
 
                     sim.pos = nextPos;
                     if (nextOnSurface) {
+                        sim.tilesSinceTurn++;
                         ttPush(sim.tileTrail, nextKey);
                         ttPush(sim.pathHistory, nextKey);
                         const _rr = sim.restReadSlice;
