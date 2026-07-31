@@ -246,6 +246,7 @@ export function makeWormSim(size) {
         healFired: false,
         pendingHealBurst: null,
         healPauseT: 0,            // seconds the crawl is frozen to show a ring-heal pop
+        healFocusTile: null,      // the surrounded tile the camera pushes in on during that pause
         pendingOrbFlash: null,
         pendingSpecialFlash: null,
         // Queue of magnet attraction visuals awaiting a renderer; drained each frame.
@@ -333,6 +334,7 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.healFired = false;
     sim.pendingHealBurst = null;
     sim.healPauseT = 0;
+    sim.healFocusTile = null;
     sim.pendingOrbFlash = null;
     sim.pendingSpecialFlash = null;
     sim.pendingOrbAttractions = [];
@@ -645,6 +647,7 @@ function tryWormholeRingHeal(sim, size, ctx) {
     // Hold the worm still for a beat so the tile visibly pops out and heals — the reward
     // for surrounding it, and the only way it reads on a mega board where the tile is tiny.
     sim.healPauseT = HEAL_PAUSE_DURATION;
+    sim.healFocusTile = hit.mouth; // the tile the camera pushes in on during the pause
     spawnSpecial(sim, size, ctx, hit.mouth);
     if (tunnelKey) {
         sim.tunnelUseCounts.delete(tunnelKey);

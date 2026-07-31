@@ -27,6 +27,7 @@ import {
     DIR_FORWARD,
     BASE_TAIL_LENGTH,
     ORB_SEGMENT_GROWTH,
+    HEAL_PAUSE_DURATION,
 } from './healerWorm/constants.js';
 
 // Pre-allocated scratch vectors for WormChaseCamera — avoids per-frame allocations
@@ -60,6 +61,11 @@ const _diveInLook  = new THREE.Vector3();
 const _diveUpOut   = new THREE.Vector3();
 // The on-rails pose, shared by the dive and the inside-ribbon branch.
 const _rails = makeTunnelCamPose();
+// Heal-focus scratch — the push-in framing while a ring heal freezes the worm.
+const _healFocusLook = new THREE.Vector3();
+const _healFocusCam = new THREE.Vector3();
+const _healFocusN = new THREE.Vector3();
+const _healSide = new THREE.Vector3();
 
 
 export default function WormChaseCamera({ worm, size }) {
@@ -239,6 +245,33 @@ export default function WormChaseCamera({ worm, size }) {
             // Pull the look target partway toward the cube centre (origin) so the whole cube
             // stays framed rather than drifting off-screen as the camera tracks the worm.
             _camTargetLook.multiplyScalar(1 - CAM_CENTER_BIAS);
+
+            // Heal focus: while a ring heal freezes the worm (worm.healPauseT), push the
+            // camera in on the surrounded tile with a gentle orbital sway, then ease back to
+            // the chase framing as the pause ends — so the pop reads even on a mega board.
+            const healPauseT = worm.healPauseT?.current ?? 0;
+            const focusTile = worm.healFocusTile?.current;
+            if (healPauseT > 0 && focusTile) {
+                const elapsed = HEAL_PAUSE_DURATION - healPauseT;
+                const rampIn = THREE.MathUtils.smoothstep(elapsed, 0, 0.22);
+                const rampOut = THREE.MathUtils.smoothstep(healPauseT, 0, 0.28);
+                const focusBlend = Math.min(rampIn, rampOut);
+                if (focusBlend > 0.001) {
+                    const tw = getStickerWorldPos(focusTile.x, focusTile.y, focusTile.z, focusTile.dirKey, size, 0);
+                    _healFocusLook.set(tw[0], tw[1], tw[2]);
+                    _healFocusN.copy(FACE_NORMALS[focusTile.dirKey] ?? FACE_NORMALS.PZ);
+                    _healSide.crossVectors(_healFocusN, _WORLD_UP);
+                    if (_healSide.lengthSq() < 1e-6) _healSide.set(1, 0, 0);
+                    _healSide.normalize();
+                    const orbit = Math.sin(elapsed * 3.2) * 0.5; // gentle orbital sway
+                    _healFocusCam.copy(_healFocusLook)
+                        .addScaledVector(_healFocusN, 1.2 + size * 0.05) // in close, just off the tile
+                        .addScaledVector(_camForward, -1.1)               // stay a touch behind the heading
+                        .addScaledVector(_healSide, 0.8 + orbit);
+                    _camTargetCam.lerp(_healFocusCam, focusBlend);
+                    _camTargetLook.lerp(_healFocusLook, focusBlend);
+                }
+            }
 
             // Camera UP: always world-Y so the horizon stays level.
             // Bottom face is the only case where Y-up would flip the view.
