@@ -147,6 +147,12 @@ export const SPECIAL_SPAWN_RETRY = 2;
 // and advertises the protected window with a flame at the tail.
 export const ROCKET_DURATION = 3;
 export const ROCKET_SPEED_MULT = 4;
+// Picking up a rocket blasts the worm off in a big parabolic launch arc before it
+// settles into the overdrive flight. The jump's sin(t·π) profile is exactly the path of
+// a projectile launched and landing at one height, so it reads as a real ballistic
+// take-off. Span/height are far beyond a normal hop (1 tile / 1.5 units).
+export const ROCKET_LAUNCH_SPAN = 4;     // tiles the launch arc spans
+export const ROCKET_LAUNCH_HEIGHT = 3.4; // arc apex in world units
 // Seconds of protection after a rocket touches down, ≈ one tile at base speed. A
 // flight that ends on top of your own tail, a wormhole mouth or a turning slice
 // would otherwise punish the player for a landing they had no way to steer out of.

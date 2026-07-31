@@ -93,6 +93,8 @@ import {
     SPECIAL_LIFETIME,
     ROCKET_DURATION,
     ROCKET_SPEED_MULT,
+    ROCKET_LAUNCH_SPAN,
+    ROCKET_LAUNCH_HEIGHT,
     MAGNET_DURATION,
     MAGNET_RADIUS,
     SPECIAL_SPAWN_RADIUS,
@@ -388,8 +390,23 @@ export function startMagnet(sim, ctx) {
 
 /** Apply a claimed special orb's effect. */
 export function activateSpecial(sim, ctx, type) {
-    if (type === 'rocket') startRocket(sim, ctx);
-    else if (type === 'magnet') startMagnet(sim, ctx);
+    if (type === 'rocket') {
+        // A fresh rocket blasts off into a big parabolic launch arc, then settles into the
+        // overdrive flight. The jump's sin(t·π) profile is exactly a projectile launched and
+        // landing at one height, so the take-off reads as ballistic. Only from the ground —
+        // a rocket grabbed mid-air just adds the overdrive rather than resetting the arc.
+        const grounded = !sim.isJumping;
+        startRocket(sim, ctx);
+        if (grounded) {
+            sim.isJumping = true;
+            sim.jumpT = 0.001;
+            sim.jumpCount = MAX_JUMPS;
+            sim.jumpSpan = ROCKET_LAUNCH_SPAN;
+            sim.jumpHeight = ROCKET_LAUNCH_HEIGHT;
+        }
+    } else if (type === 'magnet') {
+        startMagnet(sim, ctx);
+    }
 }
 
 /** Whether `next` is a 180° reversal of the current heading. */

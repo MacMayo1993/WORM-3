@@ -28,6 +28,8 @@ import {
   SURFACE_JUMP_TILE_SPAN,
   BASE_TAIL_LENGTH,
   MAX_ORB_ATTRACTION_FX,
+  ROCKET_LAUNCH_HEIGHT,
+  ROCKET_LAUNCH_SPAN,
 } from '../worm/healerWorm/constants.js';
 import { SPECIAL_TYPES } from '../worm/healerWorm/specialDefs.js';
 import {
@@ -231,6 +233,34 @@ describe('claiming a special', () => {
     expect(sim.specials).toHaveLength(0);
     expect(sim.rocketActive).toBe(true);
     expect(sim.pendingSpecialFlash).toMatchObject({ type: 'rocket' });
+  });
+
+  it('a rocket pickup blasts off into a big launch arc', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    sim.specials = [special(2, 3, 4, 'PZ', 'rocket')];
+    expect(sim.isJumping).toBe(false);
+    stepUntilCommit(sim, ctx); // grabs the rocket on the ground
+    expect(sim.rocketActive).toBe(true);
+    expect(sim.isJumping).toBe(true);
+    expect(sim.jumpHeight).toBe(ROCKET_LAUNCH_HEIGHT);
+    expect(sim.jumpSpan).toBe(ROCKET_LAUNCH_SPAN);
+  });
+
+  it('a rocket grabbed mid-air adds overdrive without resetting the arc', () => {
+    const sim = makeSim();
+    const ctx = makeCtx();
+    // Airborne on a long arc, then a magnet drags in a rocket from the side.
+    sim.isJumping = true;
+    sim.jumpT = 0.3;
+    sim.jumpSpan = ROCKET_LAUNCH_SPAN;
+    sim.jumpHeight = SURFACE_JUMP_HEIGHT;
+    sim.specials = [special(0, 3, 4, 'PZ', 'rocket')];
+    sim.magnetT = 5;
+    stepUntilCommit(sim, ctx);
+    expect(sim.rocketActive).toBe(true);
+    expect(sim.jumpT).toBeGreaterThan(0.3);        // arc kept advancing, not reset to 0.001
+    expect(sim.jumpHeight).toBe(SURFACE_JUMP_HEIGHT); // untouched — no fresh launch
   });
 
   it('is claimed from an adjacent tile while airborne', () => {
