@@ -33,6 +33,7 @@ import {
     MAX_TAIL,
     WINDOUT_SEGMENT_DT,
     windoutHeadS,
+    rocketFlightLift,
 } from './constants.js';
 
 // ─── Worm Body (head = smooth lerp; body = per-step tile history) ─────────────
@@ -65,6 +66,12 @@ export function RocketTailFire({ worm }) {
         if (!tail || !inner) return;
         _fireTail.copy(tail.pos);
         _fireInner.copy(inner.pos);
+        // Lift with the flying body so the flame stays glued to the risen tail.
+        const flightLift = rocketFlightLift(true, worm.rocketT.current);
+        if (flightLift) {
+            _fireTail.addScaledVector(tail.normal, flightLift);
+            _fireInner.addScaledVector(inner.normal, flightLift);
+        }
         _fireDirection.subVectors(_fireTail, _fireInner).normalize();
         group.position.copy(_fireTail).addScaledVector(_fireDirection, 0.12);
         group.quaternion.setFromUnitVectors(_fireUp, _fireDirection);
@@ -209,6 +216,10 @@ export function WormBody({ worm, size }) {
         _bodyNormal.copy(worm.currentNormal.current);
 
         const currentJumpVal = worm.isJumping.current ? Math.sin(worm.jumpT.current * Math.PI) * 0.55 : 0;
+        // Rocket flight: the whole worm cruises above the surface for the burn. Added to the
+        // rendered head and every body segment below (not to the path-walk anchor), so the
+        // worm rises level and flies rather than rearing up from a lifted head.
+        const flightLift = rocketFlightLift(worm.rocketActive.current, worm.rocketT.current);
         // During transit (entering/tunnel/exiting) and the windout spiral the body segments ride
         // the ribbon/spiral centerline exactly — no face-normal lift, or the head floats off.
         // windout uses getWindWorldPosInto which supplies its own lift, so WORM_LIFT must not
@@ -499,6 +510,7 @@ export function WormBody({ worm, size }) {
                 // same shared scratch object for book worm, and the head never re-orients.
                 _wormDummy.quaternion.identity();
                 _wormDummy.position.copy(_bodyHeadPos);
+                if (flightLift) _wormDummy.position.addScaledVector(_bodyNormal, flightLift);
                 // Book worm rides slightly higher off the surface — see the isBook
                 // lift below (matches the body segments so the head doesn't float
                 // at a different height than the rest of the book).
@@ -618,6 +630,9 @@ export function WormBody({ worm, size }) {
                     // _bodyClonePos directly, inherit the same lift.
                     _bodyClonePos.addScaledVector(_bodyCloneNormal, 0.088 * PAGE_HINGE_Y);
                 }
+                // Rocket flight lifts every surface segment by the same amount as the head,
+                // so the body flies level. Skipped in transit (tunnel/wind own their path).
+                if (flightLift && !_bodyTransit) _bodyClonePos.addScaledVector(_bodyCloneNormal, flightLift);
                 _wormDummy.position.copy(_bodyClonePos);
                 if (_isBook) {
                     // Orient the cover to face the direction of travel, using the same
@@ -888,7 +903,7 @@ export function GlowWormAura({ worm }) {
         // Kept below the 0.82 bloom threshold so nearby cube tiles don't bloom.
         if (lightRef.current) {
             lightRef.current.position.copy(worm.headInterpPos.current)
-                .addScaledVector(worm.currentNormal.current, WORM_LIFT + 0.1);
+                .addScaledVector(worm.currentNormal.current, WORM_LIFT + 0.1 + rocketFlightLift(worm.rocketActive.current, worm.rocketT.current));
             // Zero out only while inside the Möbius ribbon — worm is visible during entering/exiting
             const inTunnel = worm.phase.current === 'tunnel';
             lightRef.current.intensity = inTunnel ? 0 : 1.2 + Math.sin(t * 4.0) * 0.4;

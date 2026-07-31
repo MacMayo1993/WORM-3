@@ -28,8 +28,8 @@ import {
   SURFACE_JUMP_TILE_SPAN,
   BASE_TAIL_LENGTH,
   MAX_ORB_ATTRACTION_FX,
-  ROCKET_LAUNCH_HEIGHT,
-  ROCKET_LAUNCH_SPAN,
+  ROCKET_FLIGHT_HEIGHT,
+  rocketFlightLift,
 } from '../worm/healerWorm/constants.js';
 import { SPECIAL_TYPES } from '../worm/healerWorm/specialDefs.js';
 import {
@@ -235,32 +235,18 @@ describe('claiming a special', () => {
     expect(sim.pendingSpecialFlash).toMatchObject({ type: 'rocket' });
   });
 
-  it('a rocket pickup blasts off into a big launch arc', () => {
+  it('a rocket pickup lifts the worm into flight for the burn', () => {
     const sim = makeSim();
     const ctx = makeCtx();
     sim.specials = [special(2, 3, 4, 'PZ', 'rocket')];
-    expect(sim.isJumping).toBe(false);
     stepUntilCommit(sim, ctx); // grabs the rocket on the ground
     expect(sim.rocketActive).toBe(true);
-    expect(sim.isJumping).toBe(true);
-    expect(sim.jumpHeight).toBe(ROCKET_LAUNCH_HEIGHT);
-    expect(sim.jumpSpan).toBe(ROCKET_LAUNCH_SPAN);
-  });
-
-  it('a rocket grabbed mid-air adds overdrive without resetting the arc', () => {
-    const sim = makeSim();
-    const ctx = makeCtx();
-    // Airborne on a long arc, then a magnet drags in a rocket from the side.
-    sim.isJumping = true;
-    sim.jumpT = 0.3;
-    sim.jumpSpan = ROCKET_LAUNCH_SPAN;
-    sim.jumpHeight = SURFACE_JUMP_HEIGHT;
-    sim.specials = [special(0, 3, 4, 'PZ', 'rocket')];
-    sim.magnetT = 5;
-    stepUntilCommit(sim, ctx);
+    expect(sim.isJumping).toBe(false); // rocket flight is a lift, not a hop
+    // Once the burn is under way the flight height (a pure function of the countdown,
+    // applied to the whole worm in WormBody/WormFace) is above the surface.
+    run(sim, ctx, 0.5);
     expect(sim.rocketActive).toBe(true);
-    expect(sim.jumpT).toBeGreaterThan(0.3);        // arc kept advancing, not reset to 0.001
-    expect(sim.jumpHeight).toBe(SURFACE_JUMP_HEIGHT); // untouched — no fresh launch
+    expect(rocketFlightLift(sim.rocketActive, sim.rocketT)).toBeGreaterThan(0);
   });
 
   it('is claimed from an adjacent tile while airborne', () => {
@@ -311,6 +297,27 @@ describe('claiming a special', () => {
     expect(moved.type).toBe('rocket');
     expect(moved.ttl).toBe(SPECIAL_LIFETIME);
     expect(eventsOf(ctx, 'specials').length).toBeGreaterThan(0);
+  });
+});
+
+describe('rocket flight lift', () => {
+  it('is zero when the rocket is not active', () => {
+    expect(rocketFlightLift(false, 0)).toBe(0);
+    expect(rocketFlightLift(false, ROCKET_DURATION)).toBe(0);
+  });
+
+  it('cruises at full height through the middle of the burn', () => {
+    // Mid-burn: past the takeoff ramp and before the landing ramp.
+    expect(rocketFlightLift(true, ROCKET_DURATION / 2)).toBe(ROCKET_FLIGHT_HEIGHT);
+  });
+
+  it('ramps up at launch and down before the burn ends', () => {
+    const justLaunched = rocketFlightLift(true, ROCKET_DURATION - 0.1); // 0.1s in
+    const almostDone = rocketFlightLift(true, 0.1);                     // 0.1s left
+    expect(justLaunched).toBeGreaterThan(0);
+    expect(justLaunched).toBeLessThan(ROCKET_FLIGHT_HEIGHT);
+    expect(almostDone).toBeGreaterThan(0);
+    expect(almostDone).toBeLessThan(ROCKET_FLIGHT_HEIGHT);
   });
 });
 
