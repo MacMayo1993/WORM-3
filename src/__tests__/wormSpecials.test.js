@@ -324,15 +324,15 @@ describe('rocket flight lift', () => {
 describe('reverse guard (two quick same-direction turns)', () => {
   // Worm starts at (2,2,4) facing up; a first 'left' sends it crawling along the PZ
   // face (x: 2→1→0), so these steps never cross an edge and moveDir is unambiguous.
-  it('drops a rapid same-direction second turn instead of U-turning into itself', () => {
+  it('allows a fast staircase — same direction one tile apart', () => {
     const sim = makeSim();
     const ctx = makeCtx();
     queueTurn(sim, 'left');
     stepUntilCommit(sim, ctx);       // up → left
     expect(sim.moveDir).toBe('left');
-    queueTurn(sim, 'left');          // immediate second left
-    stepUntilCommit(sim, ctx);
-    expect(sim.moveDir).toBe('left'); // blocked — NOT reversed to 'down'
+    queueTurn(sim, 'left');          // a tile has passed → the second turn fires
+    stepUntilCommit(sim, ctx);       // left → down (the intended L-turn)
+    expect(sim.moveDir).toBe('down');
   });
 
   it('allows an opposite turn (S-bend) right away', () => {
@@ -345,15 +345,20 @@ describe('reverse guard (two quick same-direction turns)', () => {
     expect(sim.moveDir).toBe('up');
   });
 
-  it('allows the same direction again after clearing the guard distance', () => {
+  it('holds a same-direction 180 taken within one tile, then fires it on the next tile', () => {
     const sim = makeSim();
     const ctx = makeCtx();
+    stepUntilCommit(sim, ctx);            // crawling 'up', now interpolating (interpT≈0)
     queueTurn(sim, 'left');
-    stepUntilCommit(sim, ctx);       // up → left (tilesSinceTurn → 1)
-    stepUntilCommit(sim, ctx);       // travel on (tilesSinceTurn → 2)
+    stepWormSim(sim, 0.001, SIZE, ctx);   // first left applies (tiny dt → no new tile)
+    expect(sim.moveDir).toBe('left');
     queueTurn(sim, 'left');
-    stepUntilCommit(sim, ctx);       // now allowed: left → down
-    expect(sim.moveDir).toBe('down');
+    stepWormSim(sim, 0.001, SIZE, ctx);   // second left within the same tile
+    expect(sim.moveDir).toBe('left');      // NOT an instant 180 into the neck
+    expect(sim.pendingTurns).toContain('left'); // held, not dropped
+    stepUntilCommit(sim, ctx);            // reach the next tile
+    stepWormSim(sim, 0.001, SIZE, ctx);   // held turn now fires
+    expect(sim.moveDir).toBe('down');      // the L-turn completes a tile later
   });
 });
 
