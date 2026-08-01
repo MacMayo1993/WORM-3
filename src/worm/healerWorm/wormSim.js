@@ -78,6 +78,7 @@ import {
     DEFAULT_WORMHOLE_FLIP_INTERVAL,
     MAX_JUMPS,
     REVERSE_GUARD_TILES,
+    HEAL_PAUSE_DURATION,
     TUNNEL_TRIGGER_PROGRESS,
     SELF_COLLISION_TRIGGER_PROGRESS,
     SELF_COLLISION_GRACE_STEPS_AFTER_TUNNEL,
@@ -244,6 +245,8 @@ export function makeWormSim(size) {
         willHeal: false,
         healFired: false,
         pendingHealBurst: null,
+        healPauseT: 0,            // seconds the crawl is frozen to show a ring-heal pop
+        healFocusTile: null,      // the surrounded tile the camera pushes in on during that pause
         pendingOrbFlash: null,
         pendingSpecialFlash: null,
         // Queue of magnet attraction visuals awaiting a renderer; drained each frame.
@@ -330,6 +333,8 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.willHeal = false;
     sim.healFired = false;
     sim.pendingHealBurst = null;
+    sim.healPauseT = 0;
+    sim.healFocusTile = null;
     sim.pendingOrbFlash = null;
     sim.pendingSpecialFlash = null;
     sim.pendingOrbAttractions = [];
@@ -639,6 +644,10 @@ function tryWormholeRingHeal(sim, size, ctx) {
     // whole pair, so retire partial progress stored against both stable endpoints.
     ctx.applyHeal(tunnel.entry, tunnel.exit, [entryStableKey, exitStableKey].filter(Boolean), sim.healed);
     sim.pendingHealBurst = { exitTile: tunnel.exit, entryTile: tunnel.entry };
+    // Hold the worm still for a beat so the tile visibly pops out and heals — the reward
+    // for surrounding it, and the only way it reads on a mega board where the tile is tiny.
+    sim.healPauseT = HEAL_PAUSE_DURATION;
+    sim.healFocusTile = hit.mouth; // the tile the camera pushes in on during the pause
     spawnSpecial(sim, size, ctx, hit.mouth);
     if (tunnelKey) {
         sim.tunnelUseCounts.delete(tunnelKey);
@@ -1364,6 +1373,14 @@ const PHASE_HANDLERS = {
 export function stepWormSim(sim, delta, size, ctx) {
     if (!sim.alive) return;
     if (ctx.isPaused()) return;
+
+    // Heal pause: freeze the whole crawl for a beat after a ring heal so the tile pops out
+    // and heals in view. The pop/particle FX are store- and clock-driven, so they play on
+    // through the freeze. Clamp delta first so a hitch can't skip most of the pause.
+    if (sim.healPauseT > 0) {
+        sim.healPauseT = Math.max(0, sim.healPauseT - Math.min(delta, MAX_TICK_DELTA));
+        return;
+    }
 
     // Clamp the frame delta so a hitch can't advance the simulation by a huge jump.
     // Without this, one long frame inflates interpT and the step accumulator at once,

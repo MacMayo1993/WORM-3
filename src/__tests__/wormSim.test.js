@@ -264,6 +264,21 @@ describe('wormhole spawn clock', () => {
   });
 });
 
+describe('heal pause', () => {
+  it('freezes the crawl while the healed tile pops, then resumes', () => {
+    const sim = makeSim();
+    const ctx = makeCtx({ getSpeed: () => 20 }); // fast, so a resumed crawl moves at once
+    const start = tileKey(sim.pos);
+    sim.healPauseT = 0.2;
+    run(sim, ctx, 0.15); // still inside the pause
+    expect(tileKey(sim.pos)).toBe(start); // frozen — the worm did not move
+    expect(sim.healPauseT).toBeCloseTo(0.05, 5);
+    run(sim, ctx, 0.3); // pause elapses, crawl resumes
+    expect(sim.healPauseT).toBe(0);
+    expect(tileKey(sim.pos)).not.toBe(start); // it crawled again
+  });
+});
+
 describe('active tunnel pair cap', () => {
   it('scales down for smaller boards and clamps mega to the ceiling', () => {
     expect(activeTunnelCap(2)).toBe(3);

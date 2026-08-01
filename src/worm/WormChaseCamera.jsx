@@ -27,6 +27,7 @@ import {
     DIR_FORWARD,
     BASE_TAIL_LENGTH,
     ORB_SEGMENT_GROWTH,
+    HEAL_PAUSE_DURATION,
 } from './healerWorm/constants.js';
 
 // Pre-allocated scratch vectors for WormChaseCamera — avoids per-frame allocations
@@ -41,6 +42,8 @@ const _camTunnelTangent = new THREE.Vector3();
 const _rawNormal = new THREE.Vector3();
 const _rawForward = new THREE.Vector3();
 const FACE_TRANS_DURATION = 0.25;
+// Victory flourish: radians/sec the camera orbits the solved cube (~10s per revolution).
+const SOLVED_ORBIT_SPEED = 0.6;
 // Tunnel-mouth scratch — the two centerline endpoints the exterior shots frame.
 const _ribVEnd   = new THREE.Vector3();
 const _entryTileCenter = new THREE.Vector3();
@@ -60,6 +63,11 @@ const _diveInLook  = new THREE.Vector3();
 const _diveUpOut   = new THREE.Vector3();
 // The on-rails pose, shared by the dive and the inside-ribbon branch.
 const _rails = makeTunnelCamPose();
+// Heal-focus scratch — the push-in framing while a ring heal freezes the worm.
+const _healFocusLook = new THREE.Vector3();
+const _healFocusCam = new THREE.Vector3();
+const _healFocusN = new THREE.Vector3();
+const _healSide = new THREE.Vector3();
 
 
 export default function WormChaseCamera({ worm, size }) {
@@ -78,6 +86,7 @@ export default function WormChaseCamera({ worm, size }) {
     const lastForwardRef = useRef(new THREE.Vector3(0, 0, -1)); // blended forward from previous frame
     const prevTailLen = useRef(BASE_TAIL_LENGTH);   // detect new parity pickups
     const postTunnelEaseRef = useRef(0);  // seconds remaining of gentle re-framing after exiting a tunnel
+    const solvedAngleRef = useRef(0);     // accumulated azimuth of the victory orbit
 
     // This camera is the app's shared one, and the chase view leaves it wide
     // (FOV 70–82, wider still inside a tunnel) and rolled to whichever cube face
@@ -130,6 +139,35 @@ export default function WormChaseCamera({ worm, size }) {
                 camPosRef.current.lerp(_camTargetCam, Math.min(1, delta * 2.5));
                 lookAtRef.current.lerp(_camTargetLook, Math.min(1, delta * 2.5));
             }
+            camera.position.copy(camPosRef.current);
+            camera.up.set(0, 1, 0);
+            camUpRef.current.set(0, 1, 0);
+            camera.lookAt(lookAtRef.current);
+            prevGamePhaseRef.current = gamePhase;
+            return;
+        }
+
+        // Board solved — the big finish. Pull out to an overview and orbit the whole cube
+        // (the one place a full 360 belongs: the run is over, so there's no heading to lose
+        // and nothing to disorient). Runs behind the winner overlay as a live backdrop.
+        if (gamePhase === 'solved') {
+            const dist = 5 + size * 3.6;
+            const height = 2 + size * 1.2;
+            if (prevGamePhaseRef.current !== 'solved') {
+                // Seed the orbit at the camera's current azimuth so it swings on smoothly
+                // from wherever the run ended instead of snapping to a fixed start angle.
+                solvedAngleRef.current = Math.atan2(camPosRef.current.z, camPosRef.current.x);
+            }
+            solvedAngleRef.current += delta * SOLVED_ORBIT_SPEED;
+            _camTargetCam.set(
+                Math.cos(solvedAngleRef.current) * dist,
+                height,
+                Math.sin(solvedAngleRef.current) * dist
+            );
+            _camTargetLook.set(0, 0, 0);
+            const a = Math.min(1, delta * 2.0);
+            camPosRef.current.lerp(_camTargetCam, a);
+            lookAtRef.current.lerp(_camTargetLook, a);
             camera.position.copy(camPosRef.current);
             camera.up.set(0, 1, 0);
             camUpRef.current.set(0, 1, 0);
@@ -239,6 +277,33 @@ export default function WormChaseCamera({ worm, size }) {
             // Pull the look target partway toward the cube centre (origin) so the whole cube
             // stays framed rather than drifting off-screen as the camera tracks the worm.
             _camTargetLook.multiplyScalar(1 - CAM_CENTER_BIAS);
+
+            // Heal focus: while a ring heal freezes the worm (worm.healPauseT), push the
+            // camera in on the surrounded tile with a gentle orbital sway, then ease back to
+            // the chase framing as the pause ends — so the pop reads even on a mega board.
+            const healPauseT = worm.healPauseT?.current ?? 0;
+            const focusTile = worm.healFocusTile?.current;
+            if (healPauseT > 0 && focusTile) {
+                const elapsed = HEAL_PAUSE_DURATION - healPauseT;
+                const rampIn = THREE.MathUtils.smoothstep(elapsed, 0, 0.22);
+                const rampOut = THREE.MathUtils.smoothstep(healPauseT, 0, 0.28);
+                const focusBlend = Math.min(rampIn, rampOut);
+                if (focusBlend > 0.001) {
+                    const tw = getStickerWorldPos(focusTile.x, focusTile.y, focusTile.z, focusTile.dirKey, size, 0);
+                    _healFocusLook.set(tw[0], tw[1], tw[2]);
+                    _healFocusN.copy(FACE_NORMALS[focusTile.dirKey] ?? FACE_NORMALS.PZ);
+                    _healSide.crossVectors(_healFocusN, _WORLD_UP);
+                    if (_healSide.lengthSq() < 1e-6) _healSide.set(1, 0, 0);
+                    _healSide.normalize();
+                    const orbit = Math.sin(elapsed * 3.2) * 0.5; // gentle orbital sway
+                    _healFocusCam.copy(_healFocusLook)
+                        .addScaledVector(_healFocusN, 1.2 + size * 0.05) // in close, just off the tile
+                        .addScaledVector(_camForward, -1.1)               // stay a touch behind the heading
+                        .addScaledVector(_healSide, 0.8 + orbit);
+                    _camTargetCam.lerp(_healFocusCam, focusBlend);
+                    _camTargetLook.lerp(_healFocusLook, focusBlend);
+                }
+            }
 
             // Camera UP: always world-Y so the horizon stays level.
             // Bottom face is the only case where Y-up would flip the view.
