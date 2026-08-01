@@ -68,6 +68,11 @@ const _healFocusLook = new THREE.Vector3();
 const _healFocusCam = new THREE.Vector3();
 const _healFocusN = new THREE.Vector3();
 const _healSide = new THREE.Vector3();
+const _healForward = new THREE.Vector3();
+// Keep the ring-heal camera deliberately slower than the solved-board flourish.
+// This is a tracking move, not a victory spin: it should reveal the surrounded
+// tile without making the player lose the worm's heading.
+const HEAL_ORBIT_SPEED = 0.34;
 
 
 export default function WormChaseCamera({ worm, size }) {
@@ -104,10 +109,23 @@ export default function WormChaseCamera({ worm, size }) {
     }, [camera]);
 
     useFrame((_, delta) => {
-        const gamePhase = useGameStore.getState().wormGamePhase ?? 'active';
+        const gameState = useGameStore.getState();
+        const gamePhase = gameState.wormGamePhase ?? 'active';
         const phase = worm.phase.current;
         const tailLen = worm.tailLength.current;
         const viewportAspect = viewportSize.width / Math.max(1, viewportSize.height);
+
+        // A layer slice is staged as a comic-book freeze frame: leave the camera
+        // at the exact impact pose while ThunkEffect plays WORM'D. In particular,
+        // do not let an in-progress ring-heal orbit or the normal chase lerp drift
+        // away from the severed worm before the death card arrives.
+        if (!gameState.wormAlive && gameState.wormDeathDetails?.reason === 'slice-rotation') {
+            camera.position.copy(camPosRef.current);
+            camera.up.copy(camUpRef.current);
+            camera.lookAt(lookAtRef.current);
+            prevGamePhaseRef.current = gamePhase;
+            return;
+        }
 
         // Only use the overview during the INITIAL scramble. wormGamePhase is set to
         // 'scrambling' exactly once, at game start (mid-game auto-rotation hazards only
@@ -279,7 +297,7 @@ export default function WormChaseCamera({ worm, size }) {
             _camTargetLook.multiplyScalar(1 - CAM_CENTER_BIAS);
 
             // Heal focus: while a ring heal freezes the worm (worm.healPauseT), push the
-            // camera in on the surrounded tile with a gentle orbital sway, then ease back to
+            // camera in on the surrounded tile with a slow circular track, then ease back to
             // the chase framing as the pause ends — so the pop reads even on a mega board.
             const healPauseT = worm.healPauseT?.current ?? 0;
             const focusTile = worm.healFocusTile?.current;
@@ -295,11 +313,18 @@ export default function WormChaseCamera({ worm, size }) {
                     _healSide.crossVectors(_healFocusN, _WORLD_UP);
                     if (_healSide.lengthSq() < 1e-6) _healSide.set(1, 0, 0);
                     _healSide.normalize();
-                    const orbit = Math.sin(elapsed * 3.2) * 0.5; // gentle orbital sway
+                    // Track around the heal in a true 360-capable circle rather than
+                    // rocking side-to-side. Only a short, slow arc is shown during the
+                    // pause; retaining the previous heading makes the return to play
+                    // legible. Both axes stay tangent to the healed face.
+                    _healForward.crossVectors(_healSide, _healFocusN).normalize();
+                    const orbitAngle = elapsed * HEAL_ORBIT_SPEED;
+                    const orbitRadius = 0.85;
                     _healFocusCam.copy(_healFocusLook)
                         .addScaledVector(_healFocusN, 1.2 + size * 0.05) // in close, just off the tile
-                        .addScaledVector(_camForward, -1.1)               // stay a touch behind the heading
-                        .addScaledVector(_healSide, 0.8 + orbit);
+                        .addScaledVector(_healSide, Math.cos(orbitAngle) * orbitRadius)
+                        .addScaledVector(_healForward, Math.sin(orbitAngle) * orbitRadius)
+                        .addScaledVector(_camForward, -0.35); // retain a hint of the worm's heading
                     _camTargetCam.lerp(_healFocusCam, focusBlend);
                     _camTargetLook.lerp(_healFocusLook, focusBlend);
                 }
