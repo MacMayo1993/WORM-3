@@ -270,6 +270,12 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         // clock and the warning beam so nothing charges or fires until it emerges (crawling).
         if (worm.phase.current !== 'crawling') return;
 
+        // Freeze the hazard clock in lockstep with the body-cut freeze frame: the sim is
+        // frozen for this beat (see stepWormSim), so hold the auto-rotate timer and warning
+        // beam steady too — otherwise the clock keeps charging behind the camera swing and
+        // the next turn can fire the instant the worm resumes.
+        if (worm.cutFocusT.current > 0) return;
+
         autoTimerRef.current += delta;
         const warningStart = ACTIVE_ROTATE_INTERVAL - AUTO_ROTATE_WARNING;
 

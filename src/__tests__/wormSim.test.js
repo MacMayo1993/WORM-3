@@ -279,6 +279,24 @@ describe('heal pause', () => {
   });
 });
 
+describe('body-cut freeze', () => {
+  it('freezes the crawl while the camera swings to the cut, then resumes', () => {
+    const sim = makeSim();
+    const ctx = makeCtx({ getSpeed: () => 20 }); // fast, so a resumed crawl moves at once
+    const start = tileKey(sim.pos);
+    sim.cutFocusT = 0.2;
+    sim.cutFocusPos = [1, 2, 3];
+    run(sim, ctx, 0.15); // still inside the freeze
+    expect(tileKey(sim.pos)).toBe(start); // frozen — the worm did not move
+    expect(sim.cutFocusT).toBeCloseTo(0.05, 5);
+    expect(sim.cutFocusPos).toEqual([1, 2, 3]); // impact point held for the camera
+    run(sim, ctx, 0.3); // freeze elapses, crawl resumes
+    expect(sim.cutFocusT).toBe(0);
+    expect(sim.cutFocusPos).toBe(null); // released when the beat ends
+    expect(tileKey(sim.pos)).not.toBe(start); // it crawled again
+  });
+});
+
 describe('active tunnel pair cap', () => {
   it('scales down for smaller boards and clamps mega to the ceiling', () => {
     expect(activeTunnelCap(2)).toBe(3);
