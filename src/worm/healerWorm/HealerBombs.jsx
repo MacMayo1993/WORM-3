@@ -8,6 +8,12 @@
 // runs out. Detonations are pushed imperatively through blastApiRef.spawn() and
 // drawn as flame-shaped, flickering, rising fire that shoots out along the blast
 // arms — a plus of flames that flare over every covered tile.
+//
+// Performance: every mesh reuses a module-level shared geometry (the same
+// pattern as orbSystems/ParityOrb) so a spawn never allocates or GPU-uploads new
+// geometry mid-crawl, and a hidden <WarmUp> compiles all the bomb/flame/sprite
+// shader programs (sprites are used nowhere else, so they'd otherwise compile the
+// first time a bomb appears — a visible hitch) during the frozen scramble phase.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -44,6 +50,26 @@ function makeFlameTexture() {
 }
 const FLAME_TEX = makeFlameTexture();
 
+// ─── Shared geometries (created once, reused by every bomb + flame) ─────────────
+const GEO = {
+  body: new THREE.SphereGeometry(BOMB_RADIUS, 24, 24),
+  highlight: new THREE.SphereGeometry(BOMB_RADIUS * 0.22, 12, 12),
+  ring: new THREE.TorusGeometry(BOMB_RADIUS + 0.24, 0.05, 10, 40),
+  disc: new THREE.CircleGeometry(BOMB_RADIUS + 0.5, 28),
+  fuse: new THREE.CylinderGeometry(0.03, 0.045, 0.32, 8),
+  spark: new THREE.SphereGeometry(0.09, 10, 10),
+  ember: new THREE.SphereGeometry(0.05, 6, 6),
+  flameCore: new THREE.SphereGeometry(0.3, 14, 14)
+};
+// Static (non-animated) shared materials — safe to reuse; R3F never disposes
+// objects passed by prop (only ones it creates from JSX intrinsics).
+const MAT = {
+  body: new THREE.MeshStandardMaterial({ color: '#0f1116', roughness: 0.25, metalness: 0.75 }),
+  highlight: new THREE.MeshBasicMaterial({ color: '#8a93a8', transparent: true, opacity: 0.5, toneMapped: false }),
+  fuse: new THREE.MeshStandardMaterial({ color: '#6b5330', roughness: 0.9 }),
+  spark: new THREE.MeshBasicMaterial({ color: '#fff0a0', toneMapped: false })
+};
+
 // ─── Floating countdown number (canvas-texture sprite, always faces camera) ────
 function makeCountdownCanvas() {
   const canvas = document.createElement('canvas');
@@ -58,7 +84,6 @@ function drawCountdown(canvas, sec, urgency) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   const color = urgency > 0.66 ? '#ff3b30' : urgency > 0.33 ? '#ffcc33' : '#ffffff';
-  // glow
   ctx.shadowColor = urgency > 0.5 ? 'rgba(255,60,20,0.9)' : 'rgba(255,200,80,0.7)';
   ctx.shadowBlur = 18;
   ctx.lineWidth = 12;
@@ -95,7 +120,6 @@ function Bomb({ bomb, size }) {
     const u = DIR_FORWARD[dirKey]?.up ?? [0, 1, 0];
     return new THREE.Quaternion().setFromUnitVectors(_UP, new THREE.Vector3(u[0], u[1], u[2]).normalize());
   }, [dirKey]);
-  // Countdown floats above the bomb along the face "up", lifted off the surface.
   const labelPos = [up[0] * 1.15 + normal.x * 0.35, up[1] * 1.15 + normal.y * 0.35, up[2] * 1.15 + normal.z * 0.35];
   const fuseTipY = BOMB_RADIUS + 0.34;
 
@@ -106,7 +130,6 @@ function Bomb({ bomb, size }) {
     bomb._blink = (bomb._blink ?? 0) + delta * (2 + urgency * 14);
     const pulse = 0.5 + 0.5 * Math.sin(bomb._blink);
 
-    // Danger ring on the tile: pulses and reddens as the fuse burns down.
     if (ringRef.current) ringRef.current.scale.setScalar(1 + pulse * (0.08 + urgency * 0.3));
     if (ringMatRef.current) {
       ringMatRef.current.color.setRGB(0.35 + urgency * 0.65, Math.max(0.06, frac * 0.7), 0.12);
@@ -114,14 +137,12 @@ function Bomb({ bomb, size }) {
     }
     if (glowMatRef.current) glowMatRef.current.opacity = 0.1 + urgency * 0.28 * (0.6 + 0.4 * pulse);
 
-    // Burning fuse spark + tiny flame flicker at the tip.
     const flick = 0.7 + 0.5 * Math.sin(bomb._blink * 2.7);
     if (fuseSparkRef.current) fuseSparkRef.current.scale.setScalar(0.5 + flick * (0.5 + urgency * 0.6));
     if (fuseFlameRef.current) {
       fuseFlameRef.current.scale.set(0.18 + 0.05 * flick, 0.3 + 0.14 * flick, 1);
       fuseFlameRef.current.material.opacity = 0.8;
     }
-    // Rising embers off the fuse tip.
     emberRefs.current.forEach((e, i) => {
       if (!e) return;
       const t = (bomb._blink * (0.5 + i * 0.13) + i * 1.7) % 3;
@@ -131,7 +152,6 @@ function Bomb({ bomb, size }) {
       e.material.opacity = (1 - k) * 0.9;
     });
 
-    // Update the countdown only when the whole-second value changes.
     const sec = Math.max(0, Math.ceil(bomb.fuse ?? 0));
     if (sec !== lastSecRef.current) {
       lastSecRef.current = sec;
@@ -143,50 +163,29 @@ function Bomb({ bomb, size }) {
   return (
     <group position={pos}>
       {/* bomb body — dark metal sphere */}
-      <mesh>
-        <sphereGeometry args={[BOMB_RADIUS, 24, 24]} />
-        <meshStandardMaterial color="#0f1116" roughness={0.25} metalness={0.75} />
-      </mesh>
+      <mesh geometry={GEO.body} material={MAT.body} />
       {/* glossy highlight cap */}
-      <mesh position={[-BOMB_RADIUS * 0.35, BOMB_RADIUS * 0.5, BOMB_RADIUS * 0.55]}>
-        <sphereGeometry args={[BOMB_RADIUS * 0.22, 12, 12]} />
-        <meshBasicMaterial color="#8a93a8" transparent opacity={0.5} toneMapped={false} />
-      </mesh>
+      <mesh geometry={GEO.highlight} material={MAT.highlight} position={[-BOMB_RADIUS * 0.35, BOMB_RADIUS * 0.5, BOMB_RADIUS * 0.55]} />
 
       {/* flat furniture on the tile: danger ring + underglow (aligned to normal) */}
       <group quaternion={quatFlat}>
-        {/* danger ring flat on the tile */}
-        <mesh ref={ringRef} position={[0, -BOMB_LIFT + 0.03, 0]} rotation={[Math.PI / 2, 0, 0]}>
-          <torusGeometry args={[BOMB_RADIUS + 0.24, 0.05, 10, 40]} />
+        <mesh ref={ringRef} geometry={GEO.ring} position={[0, -BOMB_LIFT + 0.03, 0]} rotation={[Math.PI / 2, 0, 0]}>
           <meshBasicMaterial ref={ringMatRef} color="#ff8a1e" transparent opacity={0.8} toneMapped={false} depthWrite={false} />
         </mesh>
-        {/* soft underglow disc */}
-        <mesh position={[0, -BOMB_LIFT + 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <circleGeometry args={[BOMB_RADIUS + 0.5, 28]} />
+        <mesh geometry={GEO.disc} position={[0, -BOMB_LIFT + 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <meshBasicMaterial ref={glowMatRef} color="#ff5a1e" transparent opacity={0.2} blending={THREE.AdditiveBlending} toneMapped={false} depthWrite={false} />
         </mesh>
       </group>
 
       {/* upright furniture: fuse + spark + flame + embers (aligned to face "up") */}
       <group quaternion={quatUp}>
-        {/* fuse cord */}
-        <mesh position={[0, BOMB_RADIUS + 0.14, 0]} rotation={[0, 0, 0.25]}>
-          <cylinderGeometry args={[0.03, 0.045, 0.32, 8]} />
-          <meshStandardMaterial color="#6b5330" roughness={0.9} />
-        </mesh>
-        {/* fuse spark */}
-        <mesh ref={fuseSparkRef} position={[0.06, fuseTipY, 0]}>
-          <sphereGeometry args={[0.09, 10, 10]} />
-          <meshBasicMaterial color="#fff0a0" toneMapped={false} />
-        </mesh>
-        {/* fuse flame */}
+        <mesh geometry={GEO.fuse} material={MAT.fuse} position={[0, BOMB_RADIUS + 0.14, 0]} rotation={[0, 0, 0.25]} />
+        <mesh ref={fuseSparkRef} geometry={GEO.spark} material={MAT.spark} position={[0.06, fuseTipY, 0]} />
         <sprite ref={fuseFlameRef} position={[0.06, fuseTipY + 0.12, 0]} scale={[0.2, 0.32, 1]}>
           <spriteMaterial map={FLAME_TEX} transparent opacity={0.85} blending={THREE.AdditiveBlending} toneMapped={false} depthWrite={false} />
         </sprite>
-        {/* rising embers */}
         {[0, 1, 2].map((i) => (
-          <mesh key={i} ref={(el) => { emberRefs.current[i] = el; }} position={[0, fuseTipY, 0]}>
-            <sphereGeometry args={[0.05, 6, 6]} />
+          <mesh key={i} ref={(el) => { emberRefs.current[i] = el; }} geometry={GEO.ember} position={[0, fuseTipY, 0]}>
             <meshBasicMaterial color="#ffb347" transparent opacity={0.9} blending={THREE.AdditiveBlending} toneMapped={false} depthWrite={false} />
           </mesh>
         ))}
@@ -218,7 +217,7 @@ function FlameCluster({ position, up, delay }) {
       jx: (Math.random() - 0.5) * 0.4,
       jz: (Math.random() - 0.5) * 0.4,
       w: 0.42 + Math.random() * 0.25,
-      h: 0.7 + Math.random() * 0.5,
+      h: 0.7 + Math.random() * 0.5
     })),
     []
   );
@@ -233,7 +232,6 @@ function FlameCluster({ position, up, delay }) {
     const life = Math.min(1, t / FLAME_LIFE);
     const fade = 1 - life;
     const grow = t < 0.08 ? t / 0.08 : 1;
-    // The whole cluster rises off the surface along the face normal.
     g.position.set(
       position[0] + upV.x * life * 0.5,
       position[1] + upV.y * life * 0.5,
@@ -247,7 +245,6 @@ function FlameCluster({ position, up, delay }) {
         child.scale.set(s.w * grow * (0.85 + 0.25 * flick), s.h * grow * (1.25 - life * 0.5) * (0.8 + 0.4 * flick), 1);
         child.material.opacity = fade * 0.92;
       } else if (child.material) {
-        // hot core
         child.scale.setScalar(grow * (1.25 - life * 0.7) * (0.9 + 0.15 * Math.sin(t * 34)));
         child.material.opacity = fade * 0.95;
       }
@@ -257,8 +254,7 @@ function FlameCluster({ position, up, delay }) {
   return (
     <group ref={groupRef} position={position}>
       {/* hot white-orange core */}
-      <mesh>
-        <sphereGeometry args={[0.3, 14, 14]} />
+      <mesh geometry={GEO.flameCore}>
         <meshBasicMaterial color="#ffdf9a" transparent blending={THREE.AdditiveBlending} toneMapped={false} depthWrite={false} />
       </mesh>
       {/* flame tongues */}
@@ -282,6 +278,35 @@ function BlastBurst({ points, onDone }) {
     <>
       {points.map((p, i) => <FlameCluster key={i} position={p.pos} up={p.up} delay={p.delay} />)}
     </>
+  );
+}
+
+// Hidden, tiny group rendered for the first ~1.2s so the GPU compiles every
+// bomb/flame shader program and uploads the flame texture during the frozen
+// scramble phase — not the first time a bomb pops up next to the crawling worm.
+function WarmUp() {
+  const [done, setDone] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setDone(true), 1200);
+    return () => clearTimeout(t);
+  }, []);
+  if (done) return null;
+  return (
+    <group position={[0, 0, 0]} scale={0.02} frustumCulled={false}>
+      <mesh geometry={GEO.body} material={MAT.body} />
+      <mesh geometry={GEO.flameCore}>
+        <meshBasicMaterial color="#ffdf9a" transparent blending={THREE.AdditiveBlending} toneMapped={false} depthWrite={false} />
+      </mesh>
+      <mesh geometry={GEO.ring}>
+        <meshBasicMaterial color="#ff8a1e" transparent opacity={0.01} toneMapped={false} depthWrite={false} />
+      </mesh>
+      <sprite scale={[0.5, 0.5, 1]}>
+        <spriteMaterial map={FLAME_TEX} transparent opacity={0.01} blending={THREE.AdditiveBlending} toneMapped={false} depthWrite={false} />
+      </sprite>
+      <sprite scale={[0.5, 0.5, 1]}>
+        <spriteMaterial map={FLAME_TEX} transparent opacity={0.01} depthTest={false} depthWrite={false} toneMapped={false} />
+      </sprite>
+    </group>
   );
 }
 
@@ -327,6 +352,7 @@ export function HealerBombs({ bombsRef, blastApiRef, size }) {
   const live = bombsRef.current ?? [];
   return (
     <>
+      <WarmUp />
       {ids.map((id) => {
         const bomb = live.find((b) => b.id === id);
         return bomb ? <Bomb key={id} bomb={bomb} size={size} /> : null;
