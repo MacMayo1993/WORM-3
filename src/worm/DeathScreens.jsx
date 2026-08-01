@@ -8,6 +8,7 @@ import { UI_FONT, DISPLAY_FONT, MONO_FONT } from '../utils/uiTheme.js';
 function classifyDeath(reason) {
     if (reason === 'voided' || reason === 'void-zone' || reason === 'void-tunnel-exhausted') return 'event-horizon';
     if (reason === 'slice-rotation') return 'sliced';
+    if (reason === 'bomb') return 'blasted';
     return 'tail-bite'; // self-collision, plus any legacy/unknown reason
 }
 
@@ -328,6 +329,48 @@ function SlicedDeathScreen({ deathDetails, stats, onRetry, onNewGame }) {
     );
 }
 
+// ─── Blasted (caught in a bomb detonation) ──────────────────────────────────────
+function BombedDeathScreen({ stats, onRetry, onNewGame }) {
+    return (
+        <div style={{
+            ...OVERLAY_BASE_STYLE,
+            background: 'radial-gradient(circle at 50% 42%, #7c2d12 0%, #1a0a05 55%, #050302 100%)',
+        }}>
+            <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+                <div style={{
+                    position: 'absolute', top: '42%', left: '50%', width: 40, height: 40,
+                    marginLeft: -20, marginTop: -20, borderRadius: '50%',
+                    background: 'radial-gradient(circle, #fff 0%, #fde68a 30%, #f97316 60%, transparent 72%)',
+                    animation: 'bm-flash 0.7s ease-out 1 forwards',
+                }} />
+            </div>
+
+            <div style={cardStyle('rgba(249,115,22,0.35)')}>
+                <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 3, color: 'rgba(253,186,116,0.75)', textTransform: 'uppercase' }}>Direct Hit</div>
+                <div style={{
+                    fontFamily: DISPLAY_FONT,
+                    fontSize: 'clamp(44px, 10vw, 80px)', fontWeight: 900, letterSpacing: '-1px',
+                    color: '#fed7aa', marginTop: 4,
+                    textShadow: '-3px -3px 0 #7c2d12, 3px -3px 0 #7c2d12, -3px 3px 0 #7c2d12, 3px 3px 0 #7c2d12, 0 0 34px rgba(249,115,22,0.6)',
+                }}>DETONATED</div>
+                <div style={{ fontSize: 13, color: 'rgba(253,186,116,0.7)', marginTop: 8 }}>The fuse ran out. Surround the next one to disarm it.</div>
+
+                <StatsList accent="rgba(253,186,116,0.65)" valueColor="#fff" stats={[
+                    ['Time alive', stats.timeAlive],
+                    ['Tiles healed', stats.healed],
+                    ['Wormholes used', stats.tunnels],
+                    ['Orbs on worm', stats.bodyTiles],
+                ]} />
+
+                <ButtonRow>
+                    <button onPointerDown={onRetry} style={retryBtnStyle('#ea580c', '#1e293b', 'rgba(249,115,22,0.45)')}>Retry</button>
+                    <button onPointerDown={onNewGame} style={NEW_GAME_BTN_STYLE}>New Game</button>
+                </ButtonRow>
+            </div>
+        </div>
+    );
+}
+
 // ─── Entry point ────────────────────────────────────────────────────────────────
 export default function DeathScreen({
     deathDetails, wormTimeAlive, wormHealedCount, wormTunnelCount, wormBodyTiles,
@@ -352,7 +395,15 @@ export default function DeathScreen({
             {kind === 'sliced' && (
                 <SlicedDeathScreen deathDetails={deathDetails} stats={stats} onRetry={onRetry} onNewGame={onNewGame} />
             )}
+            {kind === 'blasted' && (
+                <BombedDeathScreen deathDetails={deathDetails} stats={stats} onRetry={onRetry} onNewGame={onNewGame} />
+            )}
             <style>{`
+                @keyframes bm-flash {
+                    0% { transform: scale(0.3); opacity: 1; }
+                    60% { transform: scale(26); opacity: 0.85; }
+                    100% { transform: scale(40); opacity: 0; }
+                }
                 @keyframes tb-shake {
                     0% { transform: translate(0,0); }
                     10% { transform: translate(-6px,3px); }
