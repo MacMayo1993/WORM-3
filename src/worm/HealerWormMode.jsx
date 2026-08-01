@@ -30,6 +30,7 @@ import {
     COUNTDOWN_STEP_DURATION,
     BASE_TAIL_LENGTH,
     BODY_BALL_SPACING,
+    CUT_FOCUS_DURATION,
 } from './healerWorm/constants.js';
 import { shPush } from './circularBuffers.js';
 import { feel, setFeelEnabled } from '../utils/feel.js';
@@ -331,6 +332,10 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                 } else {
                     cutWormTail(worm, hit.cutTrailIdx);
                     feel('cut');
+                    // Cue the chase camera to swing out to the impact for the WORM'D
+                    // beat, then ease back to the chase (see WormChaseCamera).
+                    worm.cutFocusT.current = CUT_FOCUS_DURATION;
+                    worm.cutFocusPos.current = hitPos;
                 }
             }
 

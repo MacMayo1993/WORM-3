@@ -504,6 +504,8 @@ export function useWormCrawler(size, cubies) {
             pendingHealBurstRef: f('pendingHealBurst'),
             healPauseT: f('healPauseT'),
             healFocusTile: f('healFocusTile'),
+            cutFocusT: f('cutFocusT'),
+            cutFocusPos: f('cutFocusPos'),
             pendingOrbFlashRef: f('pendingOrbFlash'),
             tileTrail: f('tileTrail'),
             pathHistory: f('pathHistory'),

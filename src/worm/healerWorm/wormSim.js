@@ -247,6 +247,8 @@ export function makeWormSim(size) {
         pendingHealBurst: null,
         healPauseT: 0,            // seconds the crawl is frozen to show a ring-heal pop
         healFocusTile: null,      // the surrounded tile the camera pushes in on during that pause
+        cutFocusT: 0,             // seconds remaining of the "WORM'D" body-cut camera beat
+        cutFocusPos: null,        // world-space impact point the camera swings out to watch
         pendingOrbFlash: null,
         pendingSpecialFlash: null,
         // Queue of magnet attraction visuals awaiting a renderer; drained each frame.
@@ -335,6 +337,8 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.pendingHealBurst = null;
     sim.healPauseT = 0;
     sim.healFocusTile = null;
+    sim.cutFocusT = 0;
+    sim.cutFocusPos = null;
     sim.pendingOrbFlash = null;
     sim.pendingSpecialFlash = null;
     sim.pendingOrbAttractions = [];
@@ -1396,6 +1400,14 @@ export function stepWormSim(sim, delta, size, ctx) {
     // clock in this tick (jump, wormhole spawn, boost, movement) reads this value, so
     // they all pause together through a stall and resume cleanly instead of lurching.
     if (delta > MAX_TICK_DELTA) delta = MAX_TICK_DELTA;
+
+    // Body-cut camera beat: unlike a ring heal this does NOT freeze the crawl (the
+    // worm keeps running while the camera swings out to show the hit), so it just
+    // bleeds down alongside the sim and pauses with it.
+    if (sim.cutFocusT > 0) {
+        sim.cutFocusT = Math.max(0, sim.cutFocusT - delta);
+        if (sim.cutFocusT === 0) sim.cutFocusPos = null;
+    }
 
     // ── Speed boost: drain the active window, then run the cooldown, publishing
     // each state transition so the HUD button reflects ready/active/cooldown.

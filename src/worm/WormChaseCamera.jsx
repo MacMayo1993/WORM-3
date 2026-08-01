@@ -28,6 +28,7 @@ import {
     BASE_TAIL_LENGTH,
     ORB_SEGMENT_GROWTH,
     HEAL_PAUSE_DURATION,
+    CUT_FOCUS_DURATION,
 } from './healerWorm/constants.js';
 
 // Pre-allocated scratch vectors for WormChaseCamera — avoids per-frame allocations
@@ -84,6 +85,16 @@ const _freezeTargetCam = new THREE.Vector3();
 const _freezeTargetLook = new THREE.Vector3();
 const SLICE_FREEZE_SETTLE = 0.42; // seconds to snap-zoom onto the impact
 const SLICE_FREEZE_FOV_PUNCH = 7; // degrees the lens dollies in on the hit
+
+// Body-cut ("WORM'D" survives) beat scratch. The worm keeps crawling; the chase
+// framing swings out to an exterior shot of the impact side of the cube so the
+// player sees the hit, then eases back to the chase as the beat expires.
+const _cutFocusPos = new THREE.Vector3();
+const _cutN = new THREE.Vector3();
+const _cutSide = new THREE.Vector3();
+const _cutCam = new THREE.Vector3();
+const _cutUp = new THREE.Vector3();
+const CUT_FOCUS_PEAK = 0.9; // how far toward the impact shot the swing goes (0..1)
 
 
 export default function WormChaseCamera({ worm, size }) {
@@ -382,6 +393,45 @@ export default function WormChaseCamera({ worm, size }) {
             // Camera UP: always world-Y so the horizon stays level.
             // Bottom face is the only case where Y-up would flip the view.
             _camUp.set(0, _camNormal.y < -0.8 ? -1 : 1, 0);
+
+            // Body-cut beat: a rotating layer sheared off part of the tail but the
+            // worm lived. Swing the framing out to an exterior shot of the impact
+            // side of the cube — level and pulled back so the hit and the WORM'D
+            // card read — then ease back to the chase as the beat expires ("he
+            // comes back"). The worm keeps crawling underneath the whole time.
+            const cutFocusT = worm.cutFocusT?.current ?? 0;
+            const cutPos = worm.cutFocusPos?.current;
+            if (cutFocusT > 0 && cutPos) {
+                const elapsed = CUT_FOCUS_DURATION - cutFocusT;
+                const rampIn = THREE.MathUtils.smoothstep(elapsed, 0, 0.28);
+                const rampOut = THREE.MathUtils.smoothstep(cutFocusT, 0, 0.4);
+                const cutBlend = Math.min(rampIn, rampOut) * CUT_FOCUS_PEAK;
+                if (cutBlend > 0.001) {
+                    _cutFocusPos.fromArray(cutPos);
+                    // Face normal from the impact's dominant axis — the side of the
+                    // cube the cut landed on — so the shot squares up on that face.
+                    const ax = Math.abs(_cutFocusPos.x);
+                    const ay = Math.abs(_cutFocusPos.y);
+                    const az = Math.abs(_cutFocusPos.z);
+                    if (ax >= ay && ax >= az) _cutN.set(Math.sign(_cutFocusPos.x) || 1, 0, 0);
+                    else if (ay >= az) _cutN.set(0, Math.sign(_cutFocusPos.y) || 1, 0);
+                    else _cutN.set(0, 0, Math.sign(_cutFocusPos.z) || 1);
+                    _cutSide.crossVectors(_cutN, _WORLD_UP);
+                    if (_cutSide.lengthSq() < 1e-6) _cutSide.set(1, 0, 0);
+                    _cutSide.normalize();
+                    _cutCam.copy(_cutFocusPos)
+                        .addScaledVector(_cutN, 2.4 + size * 0.55)     // off the face to see the side
+                        .addScaledVector(_cutSide, 1.3 + size * 0.28)  // offset so the hit isn't dead-on
+                        .addScaledVector(_WORLD_UP, 0.9 + size * 0.12);
+                    _camTargetCam.lerp(_cutCam, cutBlend);
+                    _camTargetLook.lerp(_cutFocusPos, cutBlend);
+                    // Level the horizon for the exterior shot (flip under a bottom face).
+                    _cutUp.set(0, _cutN.y < -0.85 ? -1 : 1, 0);
+                    _camUp.lerp(_cutUp, cutBlend);
+                    if (_camUp.lengthSq() < 1e-6) _camUp.copy(_cutUp);
+                    _camUp.normalize();
+                }
+            }
 
             // Just resumed crawling after a tunnel: ease the camera back to the chase framing
             // over ~0.7s instead of yanking it, so the worm doesn't pop straight to gameplay.
