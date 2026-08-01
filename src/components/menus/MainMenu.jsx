@@ -1037,7 +1037,6 @@ const CAROUSEL_MODES = [
 const UTILITY_MODES = [
   { id: 'how-to-play', label: 'How to Play' },
   { id: 'learn-to-solve', label: 'Learn to Solve' },
-  { id: 'coming-soon', label: 'More Modes' },
 ];
 
 const LAST_MODE_KEY = 'worm3_last_mode_id';
