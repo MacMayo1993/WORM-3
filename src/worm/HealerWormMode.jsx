@@ -16,7 +16,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { getStickerWorldPos } from '../game/coordinates.js';
-import { getActiveTunnels } from './wormLogic.js';
+import { getActiveTunnels, collectManifoldRing } from './wormLogic.js';
 import { setWormTurnCallback } from './wormTurnBridge.js';
 import { getManifoldMap } from '../game/manifoldMapStore.js';
 import {
@@ -303,6 +303,9 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
 
         // ── Bomb hazard: spawn → fuse → disarm-by-encircle → detonation ────────
         {
+            // Clamp the timestep so a render stall (tab switch, GC pause) can't burn a
+            // whole fuse — or the spawn clock — in one giant frame.
+            const bdelta = Math.min(delta, 0.1);
             // Tiles the visible body currently covers — the same reach the wormhole
             // ring-heal uses, so surrounding a bomb reads identically to sealing a hole.
             const trail = worm.tileTrail.current;
@@ -312,11 +315,22 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             for (let i = 0; i < occupiedCount; i++) occupied.add(ttAt(trail, i));
 
             // Spawn clock — one attempt per interval, capped by board size.
-            bombTimerRef.current -= delta;
+            bombTimerRef.current -= bdelta;
             if (bombTimerRef.current <= 0) {
                 bombTimerRef.current = BOMB_SPAWN_INTERVAL;
                 if (bombsRef.current.length < bombCap(size)) {
-                    const exclude = [worm.pos.current, ...bombsRef.current.map((b) => b.tile)];
+                    // Never spawn on or right next to the worm: exclude a no-spawn ring
+                    // around the head (size-scaled), the visible body, and live bombs, so
+                    // every bomb lands with room to react and detonates in open view.
+                    const head = worm.pos.current;
+                    const safeRadius = size <= 3 ? 1 : 2;
+                    const exclSet = collectManifoldRing(head.x, head.y, head.z, head.dirKey, size, safeRadius);
+                    for (const key of occupied) exclSet.add(key);
+                    for (const b of bombsRef.current) exclSet.add(`${b.tile.x},${b.tile.y},${b.tile.z},${b.tile.dirKey}`);
+                    const exclude = [...exclSet].map((k) => {
+                        const [x, y, z, dirKey] = k.split(',');
+                        return { x: +x, y: +y, z: +z, dirKey };
+                    });
                     const tile = randomFreeTile(size, exclude);
                     if (tile) {
                         bombsRef.current = [
@@ -338,20 +352,25 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                         feel('heal');
                         continue;
                     }
-                    bomb.fuse -= delta;
+                    bomb.fuse -= bdelta;
                     if (bomb.fuse > 0) { survivors.push(bomb); continue; }
 
-                    // Detonate: draw the burst, then resolve the hit on the worm.
+                    // Detonate: shoot fire out along the arms, then resolve the hit.
+                    // Flames ignite staggered by distance so the blast reads as
+                    // bursting outward from the bomb (Bomberman-style).
                     const { keys, arms, center } = computeBlastTiles(bomb, size);
-                    const pts = [];
-                    const pushPoint = (t) => {
+                    const flames = [];
+                    const pushFlame = (t, delay) => {
                         const wp = getStickerWorldPos(t.x, t.y, t.z, t.dirKey, size, 0);
                         const n = FACE_NORMALS[t.dirKey] ?? FACE_NORMALS.PZ;
-                        pts.push([wp[0] + n.x * 0.25, wp[1] + n.y * 0.25, wp[2] + n.z * 0.25]);
+                        // Flames sit just off the surface (along the normal) but lick UP
+                        // along the face's "up" so they read as flames, not blobs.
+                        const u = DIR_FORWARD[t.dirKey]?.up ?? [0, 1, 0];
+                        flames.push({ pos: [wp[0] + n.x * 0.35, wp[1] + n.y * 0.35, wp[2] + n.z * 0.35], up: u, delay });
                     };
-                    pushPoint(center);
-                    for (const arm of arms) for (const t of arm) pushPoint(t);
-                    blastApiRef.current?.spawn(pts, '#ff7b2e');
+                    pushFlame(center, 0);
+                    for (const arm of arms) arm.forEach((t, idx) => pushFlame(t, (idx + 1) * 0.05));
+                    blastApiRef.current?.spawn(flames);
                     feel('cut');
 
                     const hit = checkBlastHitWorm(worm, keys);
