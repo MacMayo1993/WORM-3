@@ -363,7 +363,10 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                     const pushFlame = (t, delay) => {
                         const wp = getStickerWorldPos(t.x, t.y, t.z, t.dirKey, size, 0);
                         const n = FACE_NORMALS[t.dirKey] ?? FACE_NORMALS.PZ;
-                        flames.push({ pos: [wp[0] + n.x * 0.35, wp[1] + n.y * 0.35, wp[2] + n.z * 0.35], delay });
+                        // Flames sit just off the surface (along the normal) but lick UP
+                        // along the face's "up" so they read as flames, not blobs.
+                        const u = DIR_FORWARD[t.dirKey]?.up ?? [0, 1, 0];
+                        flames.push({ pos: [wp[0] + n.x * 0.35, wp[1] + n.y * 0.35, wp[2] + n.z * 0.35], up: u, delay });
                     };
                     pushFlame(center, 0);
                     for (const arm of arms) arm.forEach((t, idx) => pushFlame(t, (idx + 1) * 0.05));
