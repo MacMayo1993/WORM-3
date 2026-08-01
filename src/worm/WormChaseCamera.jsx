@@ -74,6 +74,17 @@ const _healForward = new THREE.Vector3();
 // tile without making the player lose the worm's heading.
 const HEAL_ORBIT_SPEED = 0.34;
 
+// Slice-death freeze frame ("WORM'D") scratch + tuning. On the hit we ease once
+// into a tight, centred framing of the severed head — a comic-book impact beat —
+// then hold that pose dead still. Computed a single time on entry; the settled
+// hold does no per-frame target math or projection-matrix work.
+const _freezeStartCam = new THREE.Vector3();
+const _freezeStartLook = new THREE.Vector3();
+const _freezeTargetCam = new THREE.Vector3();
+const _freezeTargetLook = new THREE.Vector3();
+const SLICE_FREEZE_SETTLE = 0.42; // seconds to snap-zoom onto the impact
+const SLICE_FREEZE_FOV_PUNCH = 7; // degrees the lens dollies in on the hit
+
 
 export default function WormChaseCamera({ worm, size }) {
     const { camera, size: viewportSize } = useThree();
@@ -92,6 +103,9 @@ export default function WormChaseCamera({ worm, size }) {
     const prevTailLen = useRef(BASE_TAIL_LENGTH);   // detect new parity pickups
     const postTunnelEaseRef = useRef(0);  // seconds remaining of gentle re-framing after exiting a tunnel
     const solvedAngleRef = useRef(0);     // accumulated azimuth of the victory orbit
+    const sliceFreezeActiveRef = useRef(false); // are we mid slice-death freeze frame?
+    const sliceFreezeTRef = useRef(0);          // elapsed settle time of that freeze
+    const sliceFreezeFovRef = useRef(70);       // FOV captured the instant the freeze began
 
     // This camera is the app's shared one, and the chase view leaves it wide
     // (FOV 70–82, wider still inside a tunnel) and rolled to whichever cube face
@@ -115,17 +129,52 @@ export default function WormChaseCamera({ worm, size }) {
         const tailLen = worm.tailLength.current;
         const viewportAspect = viewportSize.width / Math.max(1, viewportSize.height);
 
-        // A layer slice is staged as a comic-book freeze frame: leave the camera
-        // at the exact impact pose while ThunkEffect plays WORM'D. In particular,
-        // do not let an in-progress ring-heal orbit or the normal chase lerp drift
-        // away from the severed worm before the death card arrives.
+        // A layer slice is staged as a comic-book freeze frame while ThunkEffect
+        // plays WORM'D. Rather than merely holding wherever the smoothed chase lens
+        // happened to lag to, we ease ONCE — over SLICE_FREEZE_SETTLE — into a
+        // tight framing centred on the severed head, with a small FOV dolly-punch,
+        // so the hit reads as a deliberate beat. After that it holds perfectly
+        // still (no per-frame target math, no projection-matrix churn) so the death
+        // card sits on a rock-steady plate.
         if (!gameState.wormAlive && gameState.wormDeathDetails?.reason === 'slice-rotation') {
+            if (!sliceFreezeActiveRef.current) {
+                sliceFreezeActiveRef.current = true;
+                sliceFreezeTRef.current = 0;
+                sliceFreezeFovRef.current = camera.fov;
+                _freezeStartCam.copy(camPosRef.current);
+                _freezeStartLook.copy(lookAtRef.current);
+                // The sim has stopped, so the head interp holds the exact impact
+                // point; lastNormal/Forward carry the surface orientation at death.
+                _camWormWorld.copy(worm.headInterpPos.current);
+                _camNormal.copy(lastNormalRef.current);
+                _camForward.copy(lastForwardRef.current);
+                // Pull tighter than the live chase and drop the look-ahead / centre
+                // bias so the worm sits dead-centre in the frozen card.
+                _freezeTargetCam.copy(_camWormWorld)
+                    .addScaledVector(_camNormal, CAM_HEIGHT_BASE * 0.85 + size * 0.04)
+                    .addScaledVector(_camForward, -CAM_BACK_BASE * 0.72);
+                _freezeTargetLook.copy(_camWormWorld);
+            }
+            if (sliceFreezeTRef.current < SLICE_FREEZE_SETTLE) {
+                sliceFreezeTRef.current = Math.min(SLICE_FREEZE_SETTLE, sliceFreezeTRef.current + delta);
+                const ft = sliceFreezeTRef.current / SLICE_FREEZE_SETTLE;
+                const eased = ft * ft * (3 - 2 * ft); // smoothstep
+                camPosRef.current.copy(_freezeStartCam).lerp(_freezeTargetCam, eased);
+                lookAtRef.current.copy(_freezeStartLook).lerp(_freezeTargetLook, eased);
+                const punchedFov = sliceFreezeFovRef.current - SLICE_FREEZE_FOV_PUNCH * eased;
+                if (Math.abs(punchedFov - camera.fov) > 0.01) {
+                    camera.fov = punchedFov;
+                    camera.updateProjectionMatrix();
+                }
+            }
             camera.position.copy(camPosRef.current);
             camera.up.copy(camUpRef.current);
             camera.lookAt(lookAtRef.current);
             prevGamePhaseRef.current = gamePhase;
             return;
         }
+        // Left the freeze (retry/reset) — re-arm so the next slice death re-snaps.
+        if (sliceFreezeActiveRef.current) sliceFreezeActiveRef.current = false;
 
         // Only use the overview during the INITIAL scramble. wormGamePhase is set to
         // 'scrambling' exactly once, at game start (mid-game auto-rotation hazards only
