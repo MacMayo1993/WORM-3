@@ -105,6 +105,13 @@ export const HEAL_COST = 4; // worm segments (balls) required to fully heal one 
 // short settle. Purely a crawl freeze; the pop FX are store-driven and play through it.
 export const HEAL_PAUSE_DURATION = 0.85;
 
+// When a rotating layer severs part of the worm's body (a cut, not a kill), the
+// chase camera swings out to the impact so the player sees the hit while the
+// WORM'D card plays, then eases back to the chase. The worm keeps crawling
+// throughout — this is a camera beat only. Long enough to read the hit and the
+// card, short enough not to strand the player away from their heading.
+export const CUT_FOCUS_DURATION = 1.15;
+
 // Render-only full-route trail history: how many tiles of the worm's path are retained for
 // painting the persistent "where I've been" trail (see useWormCrawler's pathHistory ring).
 // Decoupled from the gameplay body trail (tileTrail), which is bounded by MAX_TAIL.
