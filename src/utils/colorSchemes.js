@@ -6,7 +6,10 @@ import { CITY_CONFIG, FACE_CITIES } from '../modes/CityBiomeMode.js';
 
 export const COLOR_SCHEMES = {
 
-  // Pair logic: 1↔4  2↔5  3↔6 — each pair should be high contrast in hue or lightness
+  // Pair logic: 1↔4  2↔5  3↔6 — each antipodal pair is high contrast in hue or lightness
+  // (the manifold flip reveals the opposite face), AND all six faces of a single cube
+  // are mutually distinguishable. Every palette below is also visually distinct from
+  // every other — near-duplicate themes were removed rather than left to confuse.
 
   standard:   { 1: '#ef4444', 2: '#22c55e', 3: '#ffffff', 4: '#f97316', 5: '#3b82f6', 6: '#FFD500' },
 
@@ -14,7 +17,7 @@ export const COLOR_SCHEMES = {
   neon:       { 1: '#FF1111', 2: '#00E5FF', 3: '#F0F0FF', 4: '#00FF55', 5: '#FF00CC', 6: '#FFE600' },
 
   // Pastel — blush↔mint / periwinkle↔peach / white↔lilac
-  pastel:     { 1: '#F9B3B3', 2: '#B3C6FF', 3: '#FAFAF5', 4: '#A8EDD0', 5: '#FFDDB3', 6: '#E8B3F9' },
+  pastel:     { 1: '#F9B3B3', 2: '#A6C2FF', 3: '#FAFAF5', 4: '#A8EDD0', 5: '#FFC98F', 6: '#EFA6E8' },
 
   // Sunset — crimson↔deep violet / coral↔soft lavender / pale gold sky↔warm amber
   sunset:     { 1: '#C82848', 2: '#FF7040', 3: '#FFF0B8', 4: '#5C1A88', 5: '#C0A8E0', 6: '#F0B840' },
@@ -31,56 +34,38 @@ export const COLOR_SCHEMES = {
   // Forest — autumn red↔bright leaf / deep forest↔mist blue / birch cream↔bark gold
   forest:     { 1: '#C03020', 2: '#1A5830', 3: '#EEE8D8', 4: '#5AAA38', 5: '#8898D0', 6: '#C49040' },
 
-  // Candy — cherry↔lime / blueberry↔lemon / white↔grape
-  candy:      { 1: '#FF2244', 2: '#4488FF', 3: '#FFFFFF', 4: '#22DD44', 5: '#FFCC00', 6: '#CC44FF' },
-
   // Cyberpunk — hot pink↔electric cyan / neon violet↔neon lime / chrome↔amber
   cyberpunk:  { 1: '#FF0066', 2: '#9900FF', 3: '#C8D4E8', 4: '#00FFDD', 5: '#88FF00', 6: '#FFB800' },
 
-  // Cosmic — nebula crimson↔quasar orange / deep space↔star gold / starfield↔nebula purple
-  cosmic:     { 1: '#CC1050', 2: '#0818C0', 3: '#F8F8FF', 4: '#FF7800', 5: '#E8D030', 6: '#8010D0' },
+  // Cosmic — nebula crimson↔quasar orange / azure↔star gold / starfield↔magenta nebula
+  cosmic:     { 1: '#CC1050', 2: '#1840E8', 3: '#F8F8FF', 4: '#FF7800', 5: '#E8D030', 6: '#B01CC8' },
 
   // Sakura — cherry crimson↔spring green / sky blue↔warm gold / petal white↔wisteria
   sakura:     { 1: '#D82848', 2: '#4878C8', 3: '#FFF0F4', 4: '#70B848', 5: '#F0D880', 6: '#A860D0' },
 
-  // Autumn — maple red↔forest green / burnt orange↔autumn sky / harvest cream↔golden yellow
-  autumn:     { 1: '#C82010', 2: '#D06020', 3: '#F0E4C0', 4: '#2A6020', 5: '#6098C8', 6: '#E8B820' },
-
-  // Tropical — hibiscus↔ocean blue / sunset orange↔palm green / sandy white↔sunshine
-  tropical:   { 1: '#E02028', 2: '#FF6820', 3: '#FFF0D0', 4: '#1878C0', 5: '#28A040', 6: '#F8D020' },
-
-  // Desert — canyon rust↔turquoise sky / sage↔dusk purple / bleached bone↔sand gold
-  desert:     { 1: '#C04020', 2: '#60A068', 3: '#F4E8D0', 4: '#4888A8', 5: '#7048A0', 6: '#D8B060' },
+  // Tropical — hibiscus↔ocean blue / turquoise↔palm green / sandy white↔sunshine
+  tropical:   { 1: '#E51E4B', 2: '#00B8A0', 3: '#FFF3D8', 4: '#0E7CC0', 5: '#4CB020', 6: '#F8CE1C' },
 
   // Aurora — magenta↔electric green / deep violet↔electric cyan / polar sky↔aurora gold
   aurora:     { 1: '#D010A0', 2: '#5020C8', 3: '#E8F4FF', 4: '#00EE80', 5: '#30E8F0', 6: '#FFD020' },
 
-  // Halloween — crimson↔forest green / pumpkin↔witch purple / bone white↔candle gold
-  halloween:  { 1: '#C02010', 2: '#F07020', 3: '#F0EED0', 4: '#286820', 5: '#7020A0', 6: '#F0C030' },
+  // Halloween — deep crimson↔forest green / pumpkin↔witch purple / bone white↔candle gold
+  halloween:  { 1: '#A81808', 2: '#F58020', 3: '#F0EED0', 4: '#286820', 5: '#7020A0', 6: '#F0C030' },
 
   // Retro 70s — burnt sienna↔avocado / dusty mauve↔harvest gold / cream↔steel teal
   retro:      { 1: '#C84020', 2: '#805888', 3: '#F0E4C0', 4: '#789020', 5: '#D4B050', 6: '#385060' },
 
   // Midnight — deep royal blue↔star gold / violet↔pale silver / bright blue↔dark midnight
-  midnight:   { 1: '#2020A8', 2: '#9030C0', 3: '#4888D8', 4: '#E8D040', 5: '#C0C8E8', 6: '#201848' },
+  midnight:   { 1: '#1C1CA8', 2: '#A030D0', 3: '#4C90E0', 4: '#E8D040', 5: '#C0C8E8', 6: '#201848' },
 
   // Gemstone — ruby↔emerald / sapphire↔amethyst / diamond↔topaz
-  gemstone:   { 1: '#CC1830', 2: '#1840A8', 3: '#F0F4FF', 4: '#1A8040', 5: '#8028B0', 6: '#E0A020' },
+  gemstone:   { 1: '#CC1830', 2: '#0E48D4', 3: '#F0F4FF', 4: '#1A8040', 5: '#A81CBE', 6: '#E0A020' },
 
-  // Sunrise — dawn rose↔deep sky / coral orange↔soft lavender / pale sky↔warm gold
-  sunrise:    { 1: '#E84878', 2: '#FF7048', 3: '#E8F4FF', 4: '#2870C8', 5: '#B898D0', 6: '#F0C030' },
+  // Mondrian — primary red↔primary blue / cadmium yellow↔slate grey / off-white↔charcoal
+  mondrian:   { 1: '#D01818', 2: '#F0C800', 3: '#F4F4F4', 4: '#1848C8', 5: '#7A7A7A', 6: '#303030' },
 
-  // Watercolor — soft rose↔sage green / sky wash↔warm buff / washed white↔muted plum
-  watercolor: { 1: '#E09898', 2: '#88B8E0', 3: '#F8F4EE', 4: '#90B878', 5: '#E8C898', 6: '#8A6898' },
-
-  // Mondrian — primary red↔primary blue / cadmium yellow↔medium grey / off-white↔charcoal
-  mondrian:   { 1: '#D01818', 2: '#F0C800', 3: '#F4F4F4', 4: '#1848C8', 5: '#A8A8A8', 6: '#303030' },
-
-  // Art Deco — gold↔jade / ivory↔rich purple / platinum pearl↔dark midnight
-  artdeco:    { 1: '#D4A020', 2: '#F0E0C0', 3: '#B8C8D8', 4: '#1A7060', 5: '#7038A0', 6: '#303050' },
-
-  // Ghibli — warm rose↔forest green / sky blue↔golden wheat / soft white↔spirit lavender
-  ghibli:     { 1: '#E88888', 2: '#58A0D0', 3: '#F4F0E8', 4: '#68AA58', 5: '#E8C870', 6: '#A898D4' },
+  // Art Deco — gold↔jade / warm ivory↔rich purple / cool silver↔dark midnight
+  artdeco:    { 1: '#D4A020', 2: '#EFD69C', 3: '#A8BCD0', 4: '#1A7060', 5: '#7038A0', 6: '#303050' },
 
   // Noire — film noir: blood red↔antique gold / near-black↔steel blue / warm cream↔deep plum
   noire:        { 1: '#8B0000', 2: '#121212', 3: '#F0EDE4', 4: '#C4943A', 5: '#4A7A9B', 6: '#5C2A6A' },
@@ -88,20 +73,14 @@ export const COLOR_SCHEMES = {
   // Vaporwave — 80s retro-future: hot pink↔neon cyan / electric purple↔yellow / soft pink↔deep purple
   vaporwave:    { 1: '#FF2D78', 2: '#9D00FF', 3: '#FFB3D9', 4: '#00FFCC', 5: '#FFE556', 6: '#3A0CA3' },
 
-  // Terracotta — earth & pottery: burnt sienna↔sage / clay orange↔muted blue / sandy cream↔dark clay
-  terracotta:   { 1: '#C4622D', 2: '#E8956D', 3: '#F2DFC8', 4: '#5C8A6B', 5: '#3D6B8A', 6: '#7B4B3A' },
+  // Terracotta — earth & pottery: dark sienna↔sage / clay orange↔muted blue / sandy cream↔dark clay
+  terracotta:   { 1: '#A84A18', 2: '#EC9868', 3: '#F6E8D2', 4: '#5C8A6B', 5: '#3D6B8A', 6: '#7B4B3A' },
 
   // Bioluminescence — deep-sea glow: phosphor cyan↔coral / deep navy↔neon green / electric teal↔deep violet
   bioluminescence: { 1: '#00FFC8', 2: '#0A0A2A', 3: '#4DEEEA', 4: '#FF2D6B', 5: '#39FF14', 6: '#7B2FBE' },
 
-  // Nordic — Scandinavian winter: fjord blue↔birch amber / pine green↔nordic blue / snow↔bark brown
-  nordic:       { 1: '#3B5998', 2: '#2D6A4F', 3: '#F0EFE8', 4: '#E8C98A', 5: '#7898B8', 6: '#6B5040' },
-
-  // Saffron — Indian spice market: saffron orange↔deep indigo / deep red↔turmeric gold / golden yellow↔burgundy
-  saffron:      { 1: '#FF6B35', 2: '#C8102E', 3: '#FF9F1C', 4: '#1A3C6E', 5: '#F5C518', 6: '#7B0D1E' },
-
-  // Patina — aged metal oxidation: verdigris↔copper / bronze↔oxide blue / tarnished gold↔oxidized green
-  patina:       { 1: '#2A9D8F', 2: '#8B5E3C', 3: '#E8D5A3', 4: '#C97B3A', 5: '#5B7FA6', 6: '#3D5A3E' },
+  // Saffron — Indian spice market: saffron orange↔deep indigo / deep red↔marigold / pale saffron↔burgundy
+  saffron:      { 1: '#FF6B35', 2: '#C8102E', 3: '#FFE3A0', 4: '#1A3C6E', 5: '#F2B01A', 6: '#7B0D1E' },
 
   // Eclipse — solar corona at totality: deep space↔corona gold / eclipse red↔royal blue / solar white↔plasma violet
   eclipse:      { 1: '#1A1A2E', 2: '#E94560', 3: '#F8F9FA', 4: '#FFB627', 5: '#1060AA', 6: '#C77DFF' },
@@ -109,38 +88,8 @@ export const COLOR_SCHEMES = {
   // Inkwell — calligraphy & ink wash: ink black↔rice paper / ink blue↔vermillion / sienna↔malachite
   inkwell:      { 1: '#0D0D0D', 2: '#1B3A6B', 3: '#C2855F', 4: '#E8E0D5', 5: '#D64045', 6: '#3A5A3A' },
 
-  // Reef — shallow tropical coral reef: coral pink↔ocean blue / turquoise↔sandy beach / sea-foam↔sea coral
-  reef:         { 1: '#FF6B81', 2: '#00B4D8', 3: '#90E0EF', 4: '#0077B6', 5: '#F7C59F', 6: '#E76F51' },
-
-  // Manuscript — illuminated books: carmine↔viridian / ultramarine↔gold leaf / parchment↔royal purple
-  manuscript:   { 1: '#9B1B30', 2: '#1B4A8A', 3: '#F8F0DC', 4: '#2D7A3A', 5: '#D4A520', 6: '#6B1F78' },
-
-  // Carnival — bright fairground: cherry red↔royal blue / carnival gold↔deep purple / white↔carnival green
-  carnival:     { 1: '#E8192C', 2: '#F5A820', 3: '#F8F8F8', 4: '#1050CC', 5: '#8A00AB', 6: '#0AAF4A' },
-
-  // Wabi-Sabi — Japanese aesthetics: clay red↔indigo / moss↔sand / rice paper↔wisteria
-  wabisabi:     { 1: '#8B3A2A', 2: '#4A6840', 3: '#F0E8D8', 4: '#2A4A5A', 5: '#C8A878', 6: '#5A3A6A' },
-
-  // Tidepool — coastal: starfish red↔sandy orange / ocean blue↔anemone teal / sea foam↔urchin purple
-  tidepool:     { 1: '#C8183C', 2: '#0070B8', 3: '#F0F8E8', 4: '#E88020', 5: '#1A8878', 6: '#6838A8' },
-
-  // Hammam — Turkish mosaic: ruby↔emerald / turquoise↔copper / ivory↔deep purple
-  hammam:       { 1: '#B01830', 2: '#1A6898', 3: '#F4E8C0', 4: '#28784A', 5: '#C8701C', 6: '#5A2878' },
-
-  // Savanna — African plains: red earth↔waterhole blue / savanna green↔golden grass / bleached bone↔dusk purple
-  savanna:      { 1: '#C43C1C', 2: '#507830', 3: '#F8F0D8', 4: '#1A4060', 5: '#E8A830', 6: '#5A2060' },
-
-  // Studio — artist's palette: cadmium red↔sap green / ultramarine↔yellow ochre / titanium white↔dioxazine purple
-  studio:       { 1: '#C01830', 2: '#1A5490', 3: '#F2EDD8', 4: '#4A8828', 5: '#F0A020', 6: '#6A2888' },
-
-  // Deepspace — cosmic: nebula crimson↔solar flare / deep space↔exoplanet teal / starlight↔nebula purple
-  deepspace:    { 1: '#CC1040', 2: '#0D1B3A', 3: '#F8F8FF', 4: '#FF8C14', 5: '#00C8A0', 6: '#8C30C8' },
-
-  // Stormfront — dramatic weather: storm red↔amber alert / navy↔storm green / pale cloud↔storm violet
-  stormfront:   { 1: '#8C1A24', 2: '#2A4070', 3: '#E8F0F4', 4: '#D06820', 5: '#5AAA38', 6: '#5C2A8C' },
-
-  // Ember — glowing fire: deep ember↔cold midnight / molten orange↔smoke teal / pale ash↔ember purple
-  ember:        { 1: '#B81C1C', 2: '#E87720', 3: '#FCF0D8', 4: '#0E2B4A', 5: '#2A8A7A', 6: '#6B2D8B' },
+  // Reef — shallow tropical coral reef: coral pink↔deep reef blue / lagoon blue↔sandy beach / seafoam↔sea coral
+  reef:         { 1: '#FF6B81', 2: '#00A8DC', 3: '#E6F7EC', 4: '#004A78', 5: '#F7C59F', 6: '#E9673F' },
 
   // ── BIOME SCHEME ─────────────────────────────────────────────────────────────
   biome: {
@@ -164,44 +113,26 @@ export const SCHEME_LABELS = {
   lava:       'Lava',
   arctic:     'Arctic',
   forest:     'Forest',
-  candy:      'Candy',
   cyberpunk:  'Cyberpunk',
   cosmic:     'Cosmic',
   sakura:     'Sakura',
-  autumn:     'Autumn',
   tropical:   'Tropical',
-  desert:     'Desert',
   aurora:     'Aurora',
   halloween:  'Halloween',
   retro:      'Retro',
   midnight:   'Midnight',
   gemstone:   'Gemstone',
-  sunrise:    'Sunrise',
-  watercolor: 'Watercolor',
   mondrian:   'Mondrian',
   artdeco:    'Art Deco',
-  ghibli:     'Ghibli',
-  manuscript: 'Manuscript',
-  carnival:   'Carnival',
-  wabisabi:   'Wabi-Sabi',
-  tidepool:   'Tidepool',
-  hammam:     'Hammam',
-  savanna:    'Savanna',
-  studio:     'Studio',
-  deepspace:  'Deep Space',
-  stormfront: 'Stormfront',
-  ember:      'Ember',
-  biome:      'City Biome',
   noire:      'Noire',
   vaporwave:  'Vaporwave',
   terracotta: 'Terracotta',
   bioluminescence: 'Bioluminescence',
-  nordic:     'Nordic',
   saffron:    'Saffron',
-  patina:     'Patina',
   eclipse:    'Eclipse',
   inkwell:    'Inkwell',
   reef:       'Reef',
+  biome:      'City Biome',
   custom:     'Custom Upload',
 };
 

@@ -61,22 +61,16 @@ export const STORE_TRAILS = WORM_TRAILS.map(t => ({
 // standard and custom are always free.
 const SCHEME_PRICES = {
   standard:   0,   custom:     0,
-  pastel:     100, forest:     100, candy:      100, watercolor: 100,
-  ghibli:     100, autumn:     100, tropical:   100, desert:     100,
+  pastel:     100, forest:     100, tropical:   100,
   sakura:     100, sunset:     125,
   neon:       150, lava:       150, arctic:     150, cosmic:     150,
   aurora:     150, halloween:  150, retro:      150, gemstone:   150,
-  sunrise:    150, mondrian:   150, artdeco:    150,
+  mondrian:   150, artdeco:    150,
   deepsea:    200, cyberpunk:  200, midnight:   200,
   biome:      300,
-  // New palettes
   noire:      150, vaporwave:  150, terracotta: 100,
-  bioluminescence: 200, nordic: 100, saffron:  125,
-  patina:     150, eclipse:    175, inkwell:   125, reef: 100,
-  // New distinct palettes
-  manuscript: 150, carnival:   125, wabisabi:  125,
-  tidepool:   125, hammam:     150, savanna:   125,
-  studio:     100, deepspace:  150, stormfront: 125, ember: 125,
+  bioluminescence: 200, saffron:  125,
+  eclipse:    175, inkwell:   125, reef: 100,
 };
 
 export const STORE_SCHEMES = Object.keys(SCHEME_LABELS)
