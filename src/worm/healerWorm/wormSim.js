@@ -1393,6 +1393,19 @@ export function stepWormSim(sim, delta, size, ctx) {
         return;
     }
 
+    // Body-cut freeze: a rotating layer sheared off part of the tail but the worm lived.
+    // Freeze the whole crawl for the beat — HealerWormMode freezes the rotation hazard
+    // clock in lockstep — so the game stops on a freeze frame while the camera swings out
+    // and the severing slice spins into view (the slice rotation is a GSAP tween, so it
+    // plays on through the freeze). When the beat expires the worm resumes exactly where
+    // it was rather than having crawled off blind while the camera was turned away. Clamp
+    // delta first so a hitch can't skip most of the freeze.
+    if (sim.cutFocusT > 0) {
+        sim.cutFocusT = Math.max(0, sim.cutFocusT - Math.min(delta, MAX_TICK_DELTA));
+        if (sim.cutFocusT === 0) sim.cutFocusPos = null;
+        return;
+    }
+
     // Clamp the frame delta so a hitch can't advance the simulation by a huge jump.
     // Without this, one long frame inflates interpT and the step accumulator at once,
     // teleporting the head several tiles forward — which in a snake-like mode scatters
@@ -1400,14 +1413,6 @@ export function stepWormSim(sim, delta, size, ctx) {
     // clock in this tick (jump, wormhole spawn, boost, movement) reads this value, so
     // they all pause together through a stall and resume cleanly instead of lurching.
     if (delta > MAX_TICK_DELTA) delta = MAX_TICK_DELTA;
-
-    // Body-cut camera beat: unlike a ring heal this does NOT freeze the crawl (the
-    // worm keeps running while the camera swings out to show the hit), so it just
-    // bleeds down alongside the sim and pauses with it.
-    if (sim.cutFocusT > 0) {
-        sim.cutFocusT = Math.max(0, sim.cutFocusT - delta);
-        if (sim.cutFocusT === 0) sim.cutFocusPos = null;
-    }
 
     // ── Speed boost: drain the active window, then run the cooldown, publishing
     // each state transition so the HUD button reflects ready/active/cooldown.

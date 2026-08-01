@@ -101,11 +101,13 @@ export const HEAL_COST = 4; // worm segments (balls) required to fully heal one 
 export const HEAL_PAUSE_DURATION = 0.85;
 
 // When a rotating layer severs part of the worm's body (a cut, not a kill), the
-// chase camera swings out to the impact so the player sees the hit while the
-// WORM'D card plays, then eases back to the chase. The worm keeps crawling
-// throughout — this is a camera beat only. Long enough to read the hit and the
-// card, short enough not to strand the player away from their heading.
-export const CUT_FOCUS_DURATION = 1.15;
+// game freezes for this beat: the worm sim and the rotation hazard clock both
+// stop while the chase camera swings out to the impact and the severing slice
+// spins into view (the slice rotation is a GSAP tween, so it plays on through
+// the freeze), then the camera eases back and the worm resumes exactly where it
+// was. Long enough to cover the hazard turn (~1.4s, see CubeAssembly's isWormHazard
+// GSAP duration) plus a short hold so the hit reads and the WORM'D card plays.
+export const CUT_FOCUS_DURATION = 1.6;
 
 // Render-only full-route trail history: how many tiles of the worm's path are retained for
 // painting the persistent "where I've been" trail (see useWormCrawler's pathHistory ring).

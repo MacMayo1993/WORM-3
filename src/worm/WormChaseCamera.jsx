@@ -395,10 +395,12 @@ export default function WormChaseCamera({ worm, size }) {
             _camUp.set(0, _camNormal.y < -0.8 ? -1 : 1, 0);
 
             // Body-cut beat: a rotating layer sheared off part of the tail but the
-            // worm lived. Swing the framing out to an exterior shot of the impact
-            // side of the cube — level and pulled back so the hit and the WORM'D
-            // card read — then ease back to the chase as the beat expires ("he
-            // comes back"). The worm keeps crawling underneath the whole time.
+            // worm lived. The game freezes for this beat (the sim and the rotation
+            // hazard clock both stop — see stepWormSim / HealerWormMode), so swing
+            // the framing out to an exterior shot of the impact side of the cube —
+            // level and pulled back so the hit and the WORM'D card read, while the
+            // severing slice spins into view — then ease back to the chase as the
+            // beat expires ("he comes back") and the frozen worm resumes.
             const cutFocusT = worm.cutFocusT?.current ?? 0;
             const cutPos = worm.cutFocusPos?.current;
             if (cutFocusT > 0 && cutPos) {
