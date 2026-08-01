@@ -77,7 +77,6 @@ import {
     windoutHeadS,
     DEFAULT_WORMHOLE_FLIP_INTERVAL,
     MAX_JUMPS,
-    REVERSE_GUARD_TILES,
     HEAL_PAUSE_DURATION,
     TUNNEL_TRIGGER_PROGRESS,
     SELF_COLLISION_TRIGGER_PROGRESS,
@@ -134,10 +133,11 @@ export function makeWormSim(size) {
         stepAcc: 0,
         pendingTurns: [],
         // Reverse-guard: the last direction the worm turned and how many tiles it has
-        // crawled since, so a rapid same-direction second turn (a self-killing U-turn)
-        // can be dropped. Starts "long ago" so the first turn of a run is never blocked.
+        // crawled since, so a same-direction second turn taken before the worm has moved
+        // (which would fold into a 180 into its own neck) can be HELD to the next tile
+        // instead of firing in place. Starts ≥1 so the first turn of a run fires at once.
         lastTurnDir: null,
-        tilesSinceTurn: REVERSE_GUARD_TILES,
+        tilesSinceTurn: 1,
         // Tracks the previous frame's STEP_SEC so stepAcc can be rescaled when the crawl
         // speed changes mid-step (boost toggling, or the speed slider) — keeps
         // stepAcc/STEP_SEC (which equals interpT) consistent so a speed change never
@@ -283,7 +283,7 @@ export function resetWormSim(sim, size, { orbCount, wormholeInterval }) {
     sim.stepAcc = 0;
     sim.pendingTurns = [];
     sim.lastTurnDir = null;
-    sim.tilesSinceTurn = REVERSE_GUARD_TILES;
+    sim.tilesSinceTurn = 1;
     sim.boostActiveT = 0;
     sim.boostCooldownT = 0;
     sim.prevStepSec = null;
@@ -883,40 +883,47 @@ const PHASE_HANDLERS = {
 
             // Apply pending turn — RELATIVE to current heading
             if (sim.pendingTurns.length > 0) {
-                const t = sim.pendingTurns.shift();
-                if (t === 'boost') {
-                    // Ignore if already boosting or recharging.
-                    if (sim.boostActiveT <= 0 && sim.boostCooldownT <= 0) {
-                        sim.boostActiveT = BOOST_DURATION;
-                        ctx.onBoostState('active');
-                        ctx.feel('boost');
-                    }
-                } else if (t === 'jump') {
-                    startJump(sim, ctx);
-                } else if (ctx.getControlMode() === 'oriented') {
-                    // Steering stays live during a rocket — the flight is aimable, which
-                    // is most of what makes it a tool rather than a firework. A reversal
-                    // is refused mid-flight though: the worm would fly back down its own
-                    // launch path, which reads as a bug even though being airborne makes
-                    // it survivable.
-                    if (t === 'up' || t === 'down' || t === 'left' || t === 'right') {
-                        if (!(sim.rocketActive && isReversal(sim.moveDir, t))) sim.moveDir = t;
-                    }
-                } else {
-                    if (t === 'left' || t === 'right') {
-                        // Drop a rapid same-direction second turn: two lefts (or two rights)
-                        // before the worm has cleared a couple of tiles fold it into a 180°
-                        // U-turn back into its own neck and kill it. An opposite turn (an
-                        // S-bend) or one made after travelling on is always allowed.
-                        if (!(t === sim.lastTurnDir && sim.tilesSinceTurn < REVERSE_GUARD_TILES)) {
+                const t = sim.pendingTurns[0]; // peek — a held turn stays queued
+                // Two same-direction turns are a 180 relative to the original heading: fine
+                // as a staircase if the worm moved a tile between them, but an instant kill
+                // (straight back into the neck) if both land before it has moved. The input
+                // is identical, so don't drop the second — HOLD it until the next tile, so a
+                // fast right-right becomes the L-turn the player meant instead of a self-kill
+                // or a skipped layer.
+                const holdReversal = (t === 'left' || t === 'right')
+                    && ctx.getControlMode() !== 'oriented'
+                    && t === sim.lastTurnDir
+                    && sim.tilesSinceTurn < 1;
+                if (!holdReversal) {
+                    sim.pendingTurns.shift();
+                    if (t === 'boost') {
+                        // Ignore if already boosting or recharging.
+                        if (sim.boostActiveT <= 0 && sim.boostCooldownT <= 0) {
+                            sim.boostActiveT = BOOST_DURATION;
+                            ctx.onBoostState('active');
+                            ctx.feel('boost');
+                        }
+                    } else if (t === 'jump') {
+                        startJump(sim, ctx);
+                    } else if (ctx.getControlMode() === 'oriented') {
+                        // Steering stays live during a rocket — the flight is aimable, which
+                        // is most of what makes it a tool rather than a firework. A reversal
+                        // is refused mid-flight though: the worm would fly back down its own
+                        // launch path, which reads as a bug even though being airborne makes
+                        // it survivable.
+                        if (t === 'up' || t === 'down' || t === 'left' || t === 'right') {
+                            if (!(sim.rocketActive && isReversal(sim.moveDir, t))) sim.moveDir = t;
+                        }
+                    } else {
+                        if (t === 'left' || t === 'right') {
                             sim.moveDir = turnWorm(sim.moveDir, t);
                             sim.lastTurnDir = t;
                             sim.tilesSinceTurn = 0;
                         }
-                    }
-                    // 'down' is a 180 in relative steering — same reversal rule.
-                    if (t === 'down' && !sim.rocketActive) {
-                        sim.moveDir = turnWorm(turnWorm(sim.moveDir, 'left'), 'left');
+                        // 'down' is a 180 in relative steering — same reversal rule.
+                        if (t === 'down' && !sim.rocketActive) {
+                            sim.moveDir = turnWorm(turnWorm(sim.moveDir, 'left'), 'left');
+                        }
                     }
                 }
             }
