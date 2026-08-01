@@ -31,8 +31,9 @@ import {
     BASE_TAIL_LENGTH,
     BODY_BALL_SPACING,
     CUT_FOCUS_DURATION,
+    MAX_TAIL,
 } from './healerWorm/constants.js';
-import { shPush } from './circularBuffers.js';
+import { shPush, ttAt } from './circularBuffers.js';
 import { feel, setFeelEnabled } from '../utils/feel.js';
 import { EARN_ORB_COLLECT } from '../utils/economyConstants.js';
 import { liveRotation } from './liveRotation.js';
@@ -49,6 +50,17 @@ import { WormFace } from './healerWorm/WormFace.jsx';
 import { PowerupOrbs, OrbFlashSystem, SpecialOrbs, SpecialFlashSystem, MagnetFX } from './healerWorm/orbSystems.jsx';
 import { HealBurstSystem, TunnelHealProgress } from './healerWorm/healFx.jsx';
 import { WormholeRings } from './healerWorm/WormholeRings.jsx';
+import { HealerBombs } from './healerWorm/HealerBombs.jsx';
+import { randomFreeTile } from './healerWorm/surfaceTiles.js';
+import {
+    BOMB_FUSE_SECONDS,
+    BOMB_SPAWN_INTERVAL,
+    BOMB_DISARM_REWARD,
+    bombCap,
+    computeBlastTiles,
+    isBombDisarmed,
+    checkBlastHitWorm,
+} from './healerWorm/bombs.js';
 import { SliceWarningLights } from './healerWorm/SliceWarningLights.jsx';
 import { PortalGlow, TunnelPortalFX } from './healerWorm/portalFx.jsx';
 import { ThunkEffect, CollisionGlow } from './healerWorm/impactFx.jsx';
@@ -90,6 +102,14 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
     const warningProgressRef = useRef(0);     // 0→1 through warning window
     const thunkRef = useRef({ active: false, pos: [0, 0, 0], colors: [] });
 
+    // ── Bomb hazard state ──────────────────────────────────────────────────────
+    // Bombs are a separate scheduled hazard, kept in a ref (written from the frame
+    // loop, read by <HealerBombs>). Each: { id, tile:{x,y,z,dirKey}, fuse, maxFuse }.
+    const bombsRef      = useRef([]);
+    const bombTimerRef  = useRef(BOMB_SPAWN_INTERVAL);
+    const bombSeqRef    = useRef(0);          // monotonic bomb id source
+    const blastApiRef   = useRef(null);       // imperative detonation-flash handle from HealerBombs
+
     useEffect(() => {
         setWormTurnCallback(worm.queueTurn);
         return () => { setWormTurnCallback(null); };
@@ -111,6 +131,8 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
             autoTimerRef.current      = 0;
             pendingRotRef.current     = null;
             warningProgressRef.current = 0;
+            bombsRef.current          = [];
+            bombTimerRef.current      = BOMB_SPAWN_INTERVAL;
             // Freeze the worm until the countdown completes
             useGameStore.setState({ wormGamePhase: 'scrambling', wormCountdownStep: null, wormPaused: true });
 
@@ -229,6 +251,9 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                     autoTimerRef.current = 0;
                     pendingRotRef.current = null;
                     warningProgressRef.current = 0;
+                    // Give the player a full interval of breathing room before the
+                    // first bomb spawns (the rotation hazard already ramps in slowly).
+                    bombTimerRef.current = BOMB_SPAWN_INTERVAL;
                     useGameStore.setState({ wormGamePhase: 'active', wormCountdownStep: null, wormPaused: false });
                 }
             }
@@ -275,6 +300,80 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
         // beam steady too — otherwise the clock keeps charging behind the camera swing and
         // the next turn can fire the instant the worm resumes.
         if (worm.cutFocusT.current > 0) return;
+
+        // ── Bomb hazard: spawn → fuse → disarm-by-encircle → detonation ────────
+        {
+            // Tiles the visible body currently covers — the same reach the wormhole
+            // ring-heal uses, so surrounding a bomb reads identically to sealing a hole.
+            const trail = worm.tileTrail.current;
+            const bodyReach = Math.min(MAX_TAIL, worm.tailLength.current) * BODY_BALL_SPACING;
+            const occupiedCount = Math.min(trail.count, Math.max(1, Math.ceil(bodyReach)));
+            const occupied = new Set();
+            for (let i = 0; i < occupiedCount; i++) occupied.add(ttAt(trail, i));
+
+            // Spawn clock — one attempt per interval, capped by board size.
+            bombTimerRef.current -= delta;
+            if (bombTimerRef.current <= 0) {
+                bombTimerRef.current = BOMB_SPAWN_INTERVAL;
+                if (bombsRef.current.length < bombCap(size)) {
+                    const exclude = [worm.pos.current, ...bombsRef.current.map((b) => b.tile)];
+                    const tile = randomFreeTile(size, exclude);
+                    if (tile) {
+                        bombsRef.current = [
+                            ...bombsRef.current,
+                            { id: bombSeqRef.current++, tile, fuse: BOMB_FUSE_SECONDS, maxFuse: BOMB_FUSE_SECONDS }
+                        ];
+                    }
+                }
+            }
+
+            // Fuse / disarm / detonate. Rebuild the list from the survivors so a
+            // disarmed or detonated bomb is removed in the same pass.
+            if (bombsRef.current.length > 0) {
+                const survivors = [];
+                for (const bomb of bombsRef.current) {
+                    // Disarm: body fully encircles the bomb — reward and remove it.
+                    if (isBombDisarmed(bomb, occupied, size)) {
+                        useGameStore.getState().earnCoins(BOMB_DISARM_REWARD);
+                        feel('heal');
+                        continue;
+                    }
+                    bomb.fuse -= delta;
+                    if (bomb.fuse > 0) { survivors.push(bomb); continue; }
+
+                    // Detonate: draw the burst, then resolve the hit on the worm.
+                    const { keys, arms, center } = computeBlastTiles(bomb, size);
+                    const pts = [];
+                    const pushPoint = (t) => {
+                        const wp = getStickerWorldPos(t.x, t.y, t.z, t.dirKey, size, 0);
+                        const n = FACE_NORMALS[t.dirKey] ?? FACE_NORMALS.PZ;
+                        pts.push([wp[0] + n.x * 0.25, wp[1] + n.y * 0.25, wp[2] + n.z * 0.25]);
+                    };
+                    pushPoint(center);
+                    for (const arm of arms) for (const t of arm) pushPoint(t);
+                    blastApiRef.current?.spawn(pts, '#ff7b2e');
+                    feel('cut');
+
+                    const hit = checkBlastHitWorm(worm, keys);
+                    if (hit) {
+                        const histEntry = hit.type === 'cut'
+                            ? shAt(worm.stepHistory.current, hit.cutTrailIdx * STEPS_PER_TILE)
+                            : null;
+                        const hitPos = histEntry ? histEntry.pos.toArray() : worm.headInterpPos.current.toArray();
+                        thunkRef.current = { active: true, pos: hitPos, colors: ['#ff7b2e', '#ffd23f'] };
+                        if (hit.type === 'death') {
+                            worm.killWorm({ reason: 'bomb', bombId: bomb.id });
+                        } else {
+                            cutWormTail(worm, hit.cutTrailIdx);
+                            worm.cutFocusT.current = CUT_FOCUS_DURATION;
+                            worm.cutFocusPos.current = hitPos;
+                        }
+                    }
+                    // bomb consumed — not carried into survivors
+                }
+                bombsRef.current = survivors;
+            }
+        }
 
         autoTimerRef.current += delta;
         const warningStart = ACTIVE_ROTATE_INTERVAL - AUTO_ROTATE_WARNING;
@@ -392,6 +491,7 @@ export function HealerWormMode3DWrapper({ cubies, size, _explosionFactor, _animS
                 voidTunnelKeysRef={worm.voidTunnelKeysRef}
                 tunnelUseCountsRef={worm.tunnelUseCountsRef}
             />}
+            {!wormInTunnel && <HealerBombs bombsRef={bombsRef} blastApiRef={blastApiRef} size={size} />}
             <TunnelHealProgress size={size} />
             <HealBurstSystem worm={worm} size={size} />
             <OrbFlashSystem worm={worm} />
