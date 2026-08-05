@@ -38,7 +38,7 @@ import {
     queueTurn as queueTurnSim,
     jumpLiftOf,
 } from './healerWorm/wormSim.js';
-import { getAntipodalOrbColor, parseTileKey, _parseTile } from './wormHelpers.js';
+import { getOrbColor, parseTileKey, _parseTile } from './wormHelpers.js';
 import { wormClock } from './wormClock.js';
 import { wormBuffs, resetWormBuffs } from './wormBuffs.js';
 import { ttAt } from './circularBuffers.js';
@@ -169,7 +169,7 @@ export function useWormCrawler(size, cubies) {
             getHealingProgress: () => useGameStore.getState().wormHealingProgress ?? {},
             getOrbColor: (faceId) => {
                 const liveColors = resolveColors(useGameStore.getState().settings);
-                return getAntipodalOrbColor(faceId, liveColors);
+                return getOrbColor(faceId, liveColors);
             },
             getActiveTunnels: () => {
                 const tunnels = [];

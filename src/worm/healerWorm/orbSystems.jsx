@@ -8,15 +8,15 @@ import { useShallow } from 'zustand/react/shallow';
 import { getStickerSafe } from '../../game/cubeState.js';
 import { getStickerWorldPos } from '../../game/coordinates.js';
 import { resolveColors } from '../../utils/colorSchemes.js';
-import { ensureOrbContrast, getAntipodalOrbColor, readLiveTile } from '../wormHelpers.js';
+import { ensureOrbContrast, getOrbColor, readLiveTile } from '../wormHelpers.js';
 import { FACE_NORMALS, SPECIAL_HOVER_HEIGHT, SPECIAL_FADE_TIME, ORB_ATTRACTION_FX_DURATION, MAX_ORB_ATTRACTION_FX, ORB_HOVER_HEIGHT, ORB_ELEVATED_HOVER_HEIGHT } from './constants.js';
 import { getSpecialDef } from './specialDefs.js';
 import { prefersReducedMotion } from '../../utils/device.js';
 import ParityOrbs, { OrbCollectEffect } from '../ParityOrb.jsx';
 
 // ─── Powerup Orbs ─────────────────────────────────────────────────────────────
-// Each orb uses the antipodal color of the manifold it sits on, keeping it distinct
-// from its host tile, and follows that tile through cube rotations.
+// Each orb uses the exact color of the face it represents, matching the
+// tracker/inventory HUD, and follows that tile through cube rotations.
 export function PowerupOrbs({ size }) {
     const { wormPowerups, cubies, settings, wormCharacter } = useGameStore(useShallow(s => ({
         wormPowerups: s.wormPowerups,
@@ -48,12 +48,12 @@ export function PowerupOrbs({ size }) {
             const sticker = getStickerSafe(cubies, p.x, p.y, p.z, p.dirKey);
             const faceId = sticker?.curr ?? 0;
             const manifoldColor = ensureOrbContrast((faceId && faceColors[faceId]) ?? '#22ff88');
-            const color = getAntipodalOrbColor(faceId, faceColors);
+            const color = getOrbColor(faceId, faceColors);
             // Orbs on flipped tiles hover above the surface — worm must jump to collect
             const elevated = !!(sticker && sticker.curr !== sticker.orig);
             // ParityOrb uses `color` for the dominant gem and `antipodalColor` for
-            // its Möbius accent; invert that old pairing so the gem contrasts with
-            // the manifold while retaining the host color as a small visual link.
+            // its Möbius accent. Keep the dominant gem identical to the collected
+            // face/tracker color instead of showing the antipodal partner.
             return { ...p, color, antipodalColor: manifoldColor, elevated };
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
