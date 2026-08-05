@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { rotateVec90 } from '../game/cubeRotation.js';
-import { DIR_TO_VEC, VEC_TO_DIR } from '../utils/constants.js';
+import { ANTIPODAL_COLOR, DIR_TO_VEC, VEC_TO_DIR } from '../utils/constants.js';
 import { isTileInSlice } from './wormLogic.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { liveCubies } from './liveCubies.js';
@@ -100,6 +100,15 @@ export function ensureOrbContrast(hex) {
  */
 export function getOrbColor(faceId, faceColors, fallback = '#22ff88') {
     return ensureOrbContrast((faceId && faceColors?.[faceId]) ?? fallback);
+}
+
+/**
+ * Resolve the contrasting antipodal color for callers that still need the
+ * opposite manifold color (for example legacy tests and non-tracker accents).
+ */
+export function getAntipodalOrbColor(faceId, faceColors, fallback = '#22ff88') {
+    const antipodalFaceId = ANTIPODAL_COLOR[faceId];
+    return ensureOrbContrast((antipodalFaceId && faceColors?.[antipodalFaceId]) ?? fallback);
 }
 
 // Transforms a {x, y, z, dirKey} surface tile through a cube slice rotation.
