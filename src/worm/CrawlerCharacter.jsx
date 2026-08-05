@@ -16,11 +16,10 @@ import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMateria
 import WormSkinParticles from './WormSkinParticles.jsx';
 import {
   PAGE_GEO_ARGS, PAGE_HINGE_X, PAGE_HINGE_Y, PAGE_LAYER_COUNT, PAGE_LAYER_GAP, PAGE_COLORS,
-  BOOK_HEAD_FORWARD, BOOK_HEAD_UP, FRONT_COVER_GEO_ARGS, HEAD_PAGE_GEO_ARGS, HEAD_PAGE_ANGLE, SPINE_X_SCALE, turnSignalFromDirections, smoothTurn, pageHingeAngles,
+  SPINE_X_SCALE, turnSignalFromDirections, smoothTurn, pageHingeAngles,
 } from './wormBookFX.js';
 
 const PAGE_LAYERS = Array.from({ length: PAGE_LAYER_COUNT }, (_, i) => i);
-const SCRIBBLE_LINES = [-0.22, -0.06, 0.10, 0.26];
 
 const EYE_WHITE = '#ffffff';
 const PUPIL = '#111111';
@@ -386,13 +385,13 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
           const segBob = Math.sin(t * 6 + i * 0.8) * 0.02 * Math.min(1, velocity || 0);
           const segColor = isHead ? BODY_COLOR : BELLY_COLOR;
           const stretch = isInch && !isHead ? 1 + Math.sin(t * 8 + i) * 0.24 * Math.min(1, velocity || 0) : 1;
-          // Book worm rides on top of the ground, lifted by its own height,
-          // instead of centered/embedded at the usual crawl height.
-          const bookRaise = isBook ? segScale * PAGE_HINGE_Y : 0;
+          // Book body segments ride on top of the ground, lifted by their page height,
+          // while the head keeps the same spherical placement as the other worms.
+          const bookRaise = isBook && !isHead ? segScale * PAGE_HINGE_Y : 0;
 
           return (
             <group ref={el => (bodySegmentRefs.current[i] = el)} key={i} position={[0, segBob + bobble + bookRaise, zOff]}>
-              <mesh visible={!isBook || !isHead} scale={[segScale * breathe * stretch, segScale * breathe * (isBook ? 0.78 : 1), segScale * (isBook ? 1.15 : 1)]}>
+              <mesh scale={[segScale * breathe * stretch, segScale * breathe * (isBook && !isHead ? 0.78 : 1), segScale * (isBook && !isHead ? 1.15 : 1)]}>
                 {isBook && !isHead ? <boxGeometry args={[SPINE_X_SCALE, 0.8, 1.2]} /> : <sphereGeometry args={[1, 12, 12]} />}
                 {/* Skin-themed material (metalness/roughness/clearcoat/transmission/
                     iridescence/flatShading + surface displacement) drives the PBR
@@ -448,32 +447,6 @@ export default function CrawlerCharacter({ position, forward, face, jumpHeight, 
                   </group>
                 </>
               )}
-              {/* Book Worm head: a vertical cover with two open paper leaves
-                  and raised ink scribbles. The regular face meshes remain in
-                  front, making the open book itself the character's face. */}
-              {isBook && isHead && (
-                <group position={[0, segScale * BOOK_HEAD_UP, segScale * BOOK_HEAD_FORWARD]} scale={segScale}>
-                  <mesh>
-                    <boxGeometry args={FRONT_COVER_GEO_ARGS} />
-                    <meshStandardMaterial color={BODY_COLOR} roughness={0.5} metalness={0.1} />
-                  </mesh>
-                  {[-1, 1].map(side => (
-                    <group key={side} rotation={[0, -side * HEAD_PAGE_ANGLE, 0]}>
-                      <mesh position={[side * 0.41, 0, 0]}>
-                        <boxGeometry args={HEAD_PAGE_GEO_ARGS} />
-                        <meshStandardMaterial color={PAGE_COLORS[0]} roughness={0.92} metalness={0} />
-                      </mesh>
-                      {SCRIBBLE_LINES.map((y, line) => (
-                        <mesh key={y} position={[side * (0.30 + (line % 2) * 0.03), y, 0.034]}>
-                          <boxGeometry args={[0.34 - (line % 2) * 0.08, 0.025, 0.012]} />
-                          <meshBasicMaterial color="#6b5a3e" />
-                        </mesh>
-                      ))}
-                    </group>
-                  ))}
-                </group>
-              )}
-
               {/* Tiny legs on body segments — inch worm only has prolegs at the very back */}
               {!isHead && !isGlow && !(isInch && i < segmentOffsets.length - 1) && (
                 <>

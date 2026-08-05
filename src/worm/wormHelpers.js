@@ -94,9 +94,17 @@ export function ensureOrbContrast(hex) {
 }
 
 /**
- * Resolve a parity orb's primary color from the antipode of its host manifold.
+ * Resolve a parity orb's primary color from the exact face it represents.
  * Keeping this in the shared worm layer ensures the board orb, pickup flash, and
  * colors added to the worm's body all use the same palette lookup.
+ */
+export function getOrbColor(faceId, faceColors, fallback = '#22ff88') {
+    return ensureOrbContrast((faceId && faceColors?.[faceId]) ?? fallback);
+}
+
+/**
+ * Resolve the contrasting antipodal color for callers that still need the
+ * opposite manifold color (for example legacy tests and non-tracker accents).
  */
 export function getAntipodalOrbColor(faceId, faceColors, fallback = '#22ff88') {
     const antipodalFaceId = ANTIPODAL_COLOR[faceId];
