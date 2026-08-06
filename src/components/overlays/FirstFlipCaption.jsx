@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useGameStore } from '../../hooks/useGameStore.js';
-import { UI_FONT } from '../../utils/uiTheme.js';
+import { UI_FONT, Z } from '../../utils/uiTheme.js';
 
 const FirstFlipCaption = () => {
   const show = useGameStore((s) => s.showFirstFlipCaption);
@@ -29,7 +29,7 @@ const FirstFlipCaption = () => {
       right: 0,
       display: 'flex',
       justifyContent: 'center',
-      zIndex: 9000,
+      zIndex: Z.CAPTION,
       pointerEvents: 'none',
     }}>
       <div style={{

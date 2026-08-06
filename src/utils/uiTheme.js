@@ -81,3 +81,74 @@ export const RADIUS_SM = '8px';
 export const RADIUS_MD = '12px';
 export const RADIUS_LG = '20px';
 export const RADIUS_PILL = '999px';
+
+// ─── Type scale ───────────────────────────────────────────────────────────────
+// Before this existed the game shipped twenty distinct inline `fontSize` values
+// between 7px and 54px, most of them clustered in the 9–13px range where the
+// difference between two steps is invisible but the inconsistency is not.
+//
+// These are the sanctioned steps. TEXT_MICRO is deliberately the floor: it is
+// for uppercase letter-spaced eyebrows and tabular counters only, never for
+// prose. If body copy wants to be smaller than TEXT_SM, the panel is too full.
+//
+// Numbers, not strings, so callers can do arithmetic (`TEXT_LG * 1.5`) and pass
+// them straight to React's style prop, which appends `px` for bare numbers.
+export const TEXT_MICRO = 10; // eyebrows, step counters, badge numerals
+export const TEXT_XS = 11; // dense labels, tile captions
+export const TEXT_SM = 13; // secondary copy, list rows
+export const TEXT_MD = 15; // body copy, buttons — the default
+export const TEXT_LG = 18; // card titles, section headings
+export const TEXT_XL = 24; // panel titles
+export const TEXT_2XL = 34; // screen titles
+export const TEXT_DISPLAY = 54; // celebration headlines
+
+// Fluid variants for the big steps, so a screen title does not overflow a
+// 360px-wide phone and does not look undersized on a desktop monitor. Strings
+// (they carry their own units) — use these where the text owns a full-width row.
+export const TEXT_XL_FLUID = 'clamp(20px, 5vw, 24px)';
+export const TEXT_2XL_FLUID = 'clamp(26px, 7vw, 34px)';
+export const TEXT_DISPLAY_FLUID = 'clamp(34px, 11vw, 54px)';
+
+// ─── Layer scale (z-index) ────────────────────────────────────────────────────
+// The game had 75 distinct z-index literals spread across 40 files, ranging from
+// 0 to 100000 with no ordering scheme — which is how you end up with a countdown
+// rendering under a tutorial, and no way to reason about it short of grepping.
+//
+// These values are the ones already in use, named. Adopting a token is therefore
+// a no-op at runtime; the win is that the ordering is now written down in one
+// place and a new overlay picks a layer instead of inventing a bigger number.
+//
+// Only for elements that escape their parent's flow (`position: fixed`, or a
+// portal). Small local values — a sticky heading at `zIndex: 2` inside its own
+// scroller — stay local and are not part of this scale.
+export const Z = {
+  // In-scene chrome, drawn over the 3D canvas but under everything else.
+  SCENE_FX: 50, // screen-space flip glow, scene loading tint
+  HUD: 100, // undo pill, platformer stat readouts
+  HUD_RAISED: 200, // floating parity/chaos notifications, RIP log
+  CONTROLS: 500, // mobile control cluster, holonomy HUD
+  PANEL: 600, // teach-mode panel
+  NAV: 900, // Möbius HUD, dimmers behind a briefing panel
+
+  // Panels the player interacts with while the scene stays alive underneath.
+  MODAL: 1000, // setup wizards, help, solve mode, rotation selectors
+  MODAL_RAISED: 2000, // first-flip tutorial, level & pack select
+  BRIEFING: 2500, // Mobi's level briefing (its own 2500–2502 band)
+  CELEBRATION: 3000, // victory screen, finale cutscene
+
+  // Transient full-screen beats. Nothing routine belongs above here.
+  COUNTDOWN: 8000, // 3-2-1-GO
+  CAPTION: 9000, // first-flip caption
+  FLASH: 9990, // view-change and random-style ripples
+  FULLSCREEN: 9998, // mode screens that replace the whole view
+  MENU: 10000, // main menu
+  // A dialog opened *from* the main menu has to clear it. Help is the case that
+  // exists today: the mode carousel's "How to Play" closes the carousel and
+  // opens Help, which drops you back to the menu — and at MODAL the panel
+  // rendered underneath it, fully obscured by the logo and START button.
+  MENU_DIALOG: 10200,
+  INTRO: 10500, // Mobi's intro screen
+  DEMO: 12000, // guided demo chrome, above the UI it is pointing at
+  TOAST: 99999, // store purchase confirmations
+  DEBUG: 100000 // dev console — always on top, by definition
+};

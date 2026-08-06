@@ -3,7 +3,7 @@ import {
   UI_FONT, DISPLAY_FONT, PAPER_SHEET_RAISED, PAPER_BORDER, PAPER_BORDER_SOFT,
   PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT, PAPER_BG_MUTED,
   PAPER_CARD_SHADOW, UI_MOSS,
-} from '../../utils/uiTheme.js';
+ Z } from '../../utils/uiTheme.js';
 import { wizardPaperBackground } from '../../components/screens/WizardChrome.jsx';
 
 const THEMES = [
@@ -125,7 +125,7 @@ const MergeThemePicker = ({ onStart, onBack }) => {
 
   return (
     <div style={{
-      position: 'fixed', inset: 0, zIndex: 9999,
+      position: 'fixed', inset: 0, zIndex: Z.FULLSCREEN,
       ...wizardPaperBackground,
       display: 'flex', flexDirection: 'column', alignItems: 'center',
       justifyContent: 'center', padding: '24px',

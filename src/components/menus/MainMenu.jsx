@@ -24,7 +24,7 @@ import { warmDemoAssets } from '../../utils/preloadAssets.js';
 import MenuFlipWave from './MenuFlipWave.jsx';
 import MenuTileOverlay from './MenuTileOverlay.jsx';
 import { ANTIPODAL_COLOR } from '../../utils/constants.js';
-import { UI_FONT, DISPLAY_FONT, NIGHT_BORDER } from '../../utils/uiTheme.js';
+import { UI_FONT, DISPLAY_FONT, NIGHT_BORDER, Z } from '../../utils/uiTheme.js';
 
 // ─── Randomizable style state — re-picked every time the user taps the cube ──
 // biome is now included so its face palette appears in the rotation.
@@ -1184,7 +1184,7 @@ export const ModeCarousel = ({ onBack, onCubeSelect, onWormSelect, onChaos, onFr
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 10000, overflowY: 'auto' }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: Z.MENU, overflowY: 'auto' }}>
 
       {/* Edge vignette only — the center stays clear so the live 3D cube
           (rotating to the active mode's face) reads through the overlay. */}

@@ -1,4 +1,5 @@
 import React from 'react';
+import { Z } from '../../utils/uiTheme.js';
 
 /**
  * Face Rotation Buttons - Appears on long-press to allow CW/CCW face rotation
@@ -15,7 +16,7 @@ const OVERLAY_STYLE = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  zIndex: 1000,
+  zIndex: Z.MODAL,
   pointerEvents: 'auto',
 };
 

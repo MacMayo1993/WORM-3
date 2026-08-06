@@ -1,6 +1,6 @@
 // DOM overlay for Holonomy Mode — a compact field note, not a separate sci-fi HUD.
 import React, { useEffect, useRef, useState } from 'react';
-import { MONO_FONT, UI_CREAM, UI_MOSS, UI_MOSS_LIGHT } from '../utils/uiTheme.js';
+import { MONO_FONT, UI_CREAM, UI_MOSS, UI_MOSS_LIGHT, Z } from '../utils/uiTheme.js';
 import { FieldGuideButton, FieldGuideEyebrow, FieldGuideSheet, fieldGuide } from '../components/ui/FieldGuide.jsx';
 
 const fmt = (n) => `${n >= 0 ? '+' : ''}${n.toFixed(3)}`;
@@ -24,7 +24,7 @@ export default function HolonomyHUD({ holonomyAngle = 0, orientationParity = 1, 
   const H = holonomyMatrix || [[1, 0], [0, 1]];
   const metrics = [['Angle φ', fmtDeg(holonomyAngle)], ['Parity', isFlipped ? 'Flipped' : 'Oriented'], ['Seams', seamCount], ['Möbius', mobiusCount]];
 
-  return <div style={{ position: 'fixed', inset: 0, zIndex: 500, pointerEvents: 'none', fontFamily: MONO_FONT }}>
+  return <div style={{ position: 'fixed', inset: 0, zIndex: Z.CONTROLS, pointerEvents: 'none', fontFamily: MONO_FONT }}>
     <div style={{ display: 'flex', justifyContent: 'center', padding: 'max(10px, env(safe-area-inset-top, 0px)) 12px 0' }}>
       <FieldGuideSheet style={{ width: 'min(620px, calc(100vw - 24px))', padding: '10px 14px', pointerEvents: 'auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>

@@ -8,7 +8,8 @@
 // at once. Each wizard still owns its accent and its own content styles.
 
 import React from 'react';
-import { UI_FONT, PAPER_BACKDROP, PAPER_BACKDROP_BLUR, PAPER_BORDER, PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT, PAPER_CARD_SHADOW, PAPER_SHADOW } from '../../utils/uiTheme.js';
+import { UI_FONT, PAPER_BACKDROP, PAPER_BACKDROP_BLUR, PAPER_BORDER, PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT, PAPER_CARD_SHADOW, PAPER_SHADOW, TEXT_MICRO, TEXT_XS, TEXT_SM, TEXT_MD, TEXT_XL, Z } from '../../utils/uiTheme.js';
+import { TOUCH_TARGET } from '../ui/index.js';
 import { isMobile } from '../../utils/device.js';
 
 // Graph-paper panel background — the exact recipe from the Mobi dialogue panel
@@ -66,7 +67,7 @@ export function wizardLayout(accent, accentShadow = `${accent}99`) {
       background: PAPER_BACKDROP,
       backdropFilter: PAPER_BACKDROP_BLUR,
       WebkitBackdropFilter: PAPER_BACKDROP_BLUR,
-      zIndex: 1000,
+      zIndex: Z.MODAL,
       fontFamily: UI_FONT,
       // dvh tracks the collapsing mobile URL bar; browsers without it fall back
       // to the inset:0 box, which is what this used to rely on entirely.
@@ -118,7 +119,7 @@ export function wizardLayout(accent, accentShadow = `${accent}99`) {
     stepCount: {
       flexShrink: 0,
       marginLeft: '4px',
-      fontSize: '9px',
+      fontSize: TEXT_MICRO,
       fontWeight: 800,
       letterSpacing: '0.12em',
       color: PAPER_TEXT_FAINT,
@@ -126,7 +127,7 @@ export function wizardLayout(accent, accentShadow = `${accent}99`) {
     },
 
     title: {
-      fontSize: isMobile ? '21px' : '24px',
+      fontSize: isMobile ? TEXT_XL - 3 : TEXT_XL,
       fontWeight: '700',
       letterSpacing: '-0.5px',
       color: PAPER_TEXT,
@@ -135,7 +136,7 @@ export function wizardLayout(accent, accentShadow = `${accent}99`) {
     },
 
     subtitle: {
-      fontSize: isMobile ? '12px' : '13px',
+      fontSize: isMobile ? TEXT_SM - 1 : TEXT_SM,
       color: PAPER_TEXT_MUTED,
       margin: isMobile ? '0 0 12px' : '0 0 18px',
       fontWeight: '400',
@@ -172,10 +173,13 @@ export function wizardLayout(accent, accentShadow = `${accent}99`) {
     btnSecondary: {
       background: 'none',
       border: '1.5px solid #d6d0c8',
-      fontSize: isMobile ? '14px' : '15px',
+      fontSize: TEXT_MD,
       fontWeight: '500',
       color: PAPER_TEXT_MUTED,
       cursor: 'pointer',
+      // Both footer buttons clear the 44px comfortable-tap floor; the secondary
+      // one (Back) was the smaller of the two and the easier one to fat-finger.
+      minHeight: TOUCH_TARGET,
       padding: isMobile ? '11px 14px' : '10px 16px',
       borderRadius: '10px',
       transition: 'all 0.15s ease',
@@ -186,10 +190,11 @@ export function wizardLayout(accent, accentShadow = `${accent}99`) {
     btnPrimary: {
       background: accent,
       border: 'none',
-      fontSize: isMobile ? '15px' : '15px',
+      fontSize: TEXT_MD,
       fontWeight: '700',
       color: '#fff',
       cursor: 'pointer',
+      minHeight: TOUCH_TARGET,
       padding: isMobile ? '13px 24px' : '12px 28px',
       borderRadius: '10px',
       transition: 'all 0.12s ease',
@@ -214,7 +219,7 @@ export function WizardSectionHeading({ children, style }) {
         zIndex: 2,
         margin: '0 0 8px',
         padding: '6px 0',
-        fontSize: '10px',
+        fontSize: TEXT_MICRO,
         fontWeight: '700',
         letterSpacing: '0.08em',
         textTransform: 'uppercase',
@@ -275,6 +280,7 @@ export function WizardSection({ label, note, accent, open, onToggle, sticky = tr
         type="button"
         onClick={onToggle}
         aria-expanded={open}
+        className="ui-focusable"
         style={{
           position: sticky ? 'sticky' : 'static',
           top: 0,
@@ -283,6 +289,7 @@ export function WizardSection({ label, note, accent, open, onToggle, sticky = tr
           display: 'flex',
           alignItems: 'center',
           gap: '10px',
+          minHeight: TOUCH_TARGET,
           padding: '13px 12px',
           background: open ? 'rgba(252,249,241,0.97)' : 'transparent',
           border: 'none',
@@ -310,7 +317,7 @@ export function WizardSection({ label, note, accent, open, onToggle, sticky = tr
         <span
           style={{
             flex: 1,
-            fontSize: '11px',
+            fontSize: TEXT_XS,
             fontWeight: 800,
             letterSpacing: '0.1em',
             textTransform: 'uppercase',
@@ -320,7 +327,7 @@ export function WizardSection({ label, note, accent, open, onToggle, sticky = tr
           {label}
         </span>
         {note && (
-          <span style={{ fontSize: '10px', fontWeight: 600, color: PAPER_TEXT_FAINT, flexShrink: 0 }}>{note}</span>
+          <span style={{ fontSize: TEXT_MICRO, fontWeight: 600, color: PAPER_TEXT_FAINT, flexShrink: 0 }}>{note}</span>
         )}
       </button>
       {open && <div style={{ padding: '10px 10px 12px' }}>{children}</div>}

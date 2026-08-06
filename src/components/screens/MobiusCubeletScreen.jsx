@@ -10,7 +10,7 @@ import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import SafeEnvironment from '../../3d/SafeEnvironment.jsx';
 import MobiusCubelet from '../../3d/MobiusCubelet.jsx';
-import { UI_FONT, NIGHT_SHEET, NIGHT_BORDER, NIGHT_PANEL, NIGHT_TEXT, NIGHT_TEXT_MUTED, UI_GOLD } from '../../utils/uiTheme.js';
+import { UI_FONT, NIGHT_SHEET, NIGHT_BORDER, NIGHT_PANEL, NIGHT_TEXT, NIGHT_TEXT_MUTED, UI_GOLD, Z } from '../../utils/uiTheme.js';
 
 // Antipodal pair legend entries
 const LEGEND = [
@@ -82,7 +82,7 @@ export default function MobiusCubeletScreen({ onBack }) {
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 9999,
+        zIndex: Z.FULLSCREEN,
         background: NIGHT_SHEET,
         backdropFilter: 'blur(24px)',
         WebkitBackdropFilter: 'blur(24px)',

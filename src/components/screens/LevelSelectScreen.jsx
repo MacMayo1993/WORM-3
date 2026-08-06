@@ -4,7 +4,7 @@ import { getPack } from '../../levels/index.js';
 import {
   UI_FONT, PAPER_SHEET_RAISED, PAPER_BORDER, PAPER_BORDER_SOFT, PAPER_TEXT,
   PAPER_TEXT_MUTED, PAPER_TEXT_FAINT, PAPER_BG_MUTED, PAPER_CARD_SHADOW, UI_MOSS,
-} from '../../utils/uiTheme.js';
+ Z } from '../../utils/uiTheme.js';
 import { wizardPaperBackground } from './WizardChrome.jsx';
 
 // Warm amber that holds up on cream — the cream-on-blue gold used before is
@@ -91,7 +91,7 @@ const LevelSelectScreen = ({ onSelectLevel, onBack, packId = 'story-campaign' })
       position: 'fixed',
       inset: 0,
       height: '100dvh',
-      zIndex: 2000,
+      zIndex: Z.MODAL_RAISED,
       // Mobi's graph paper — the same surface as the setup wizards and dialogue
       // panel. Level Select is a decision screen, so it belongs to the paper
       // half of the system, not a bespoke palette of its own.

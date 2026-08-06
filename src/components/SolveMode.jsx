@@ -11,7 +11,7 @@ import { checkSolveProgress } from '../game/solveDetection.js';
 import { useKociembaSolver } from '../teach/useKociembaSolver.js';
 import { useAntipodalEngine } from '../hooks/useAntipodalEngine.js';
 import { isMobile } from '../utils/device.js';
-import { UI_FONT, DISPLAY_FONT, MONO_FONT } from '../utils/uiTheme.js';
+import { UI_FONT, DISPLAY_FONT, MONO_FONT, Z } from '../utils/uiTheme.js';
 
 // ── Demo-screen palette (warm paper / sage / gold) ─────────────────────────────
 const CARD_BG      = 'rgba(250, 247, 238, 0.97)';
@@ -205,7 +205,7 @@ export default function SolveMode({ cubies, size, onClose }) {
         borderRadius: 18,
         border: `1px solid ${CARD_BORDER}`,
         color: INK_BODY,
-        zIndex: 1000,
+        zIndex: Z.MODAL,
         overflow: 'hidden',
         fontFamily: UI_FONT,
         userSelect: 'none',

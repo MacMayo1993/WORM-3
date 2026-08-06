@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Z } from '../../utils/uiTheme.js';
 
 const FloatingHUD = ({ metrics, chaosLevel, chaosMode }) => {
   const [queue, setQueue] = useState([]);
@@ -47,7 +48,7 @@ const FloatingHUD = ({ metrics, chaosLevel, chaosMode }) => {
       flexDirection: 'column-reverse',
       alignItems: 'center',
       gap: '6px',
-      zIndex: 200,
+      zIndex: Z.HUD_RAISED,
       pointerEvents: 'none',
     }}>
       {queue.map((item, i) => (

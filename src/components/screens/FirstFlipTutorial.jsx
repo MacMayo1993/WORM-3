@@ -4,7 +4,7 @@ import {
   UI_FONT, PAPER_BACKDROP, PAPER_BACKDROP_BLUR, PAPER_SHEET, PAPER_BORDER,
   PAPER_BORDER_SOFT, PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT,
   PAPER_BG_MUTED, PAPER_CARD_SHADOW, PAPER_SHADOW, UI_MOSS,
-} from '../../utils/uiTheme.js';
+ Z } from '../../utils/uiTheme.js';
 
 const FONT = UI_FONT;
 
@@ -132,7 +132,7 @@ const FirstFlipTutorial = ({ onClose, onMainMenu }) => {
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
-      zIndex: 2000,
+      zIndex: Z.MODAL_RAISED,
       fontFamily: FONT,
       height: '100dvh',
       padding: 'env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px)',

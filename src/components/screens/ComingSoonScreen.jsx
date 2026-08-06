@@ -10,7 +10,7 @@ import {
   PAPER_TEXT,
   PAPER_TEXT_MUTED,
   PAPER_TEXT_FAINT,
-} from '../../utils/uiTheme.js';
+ Z } from '../../utils/uiTheme.js';
 
 const ACCENT = '#1565C0';
 
@@ -271,7 +271,7 @@ export default function ComingSoonScreen({ onBack, onHolonomy, onBiome, onMerge,
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 9999,
+        zIndex: Z.FULLSCREEN,
         background: PAPER_BACKDROP,
         backdropFilter: PAPER_BACKDROP_BLUR,
         WebkitBackdropFilter: PAPER_BACKDROP_BLUR,

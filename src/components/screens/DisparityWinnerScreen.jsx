@@ -10,7 +10,7 @@ import {
   UI_FONT, MONO_FONT,
   NIGHT_SHEET, NIGHT_BORDER, NIGHT_TEXT, NIGHT_TEXT_MUTED, NIGHT_SHADOW, NIGHT_PANEL,
   RADIUS_MD, RADIUS_LG,
-} from '../../utils/uiTheme.js';
+ Z } from '../../utils/uiTheme.js';
 
 const faceNumFromGridId = (gridId) => {
   if (!gridId) return 1;
@@ -84,7 +84,7 @@ export default function DisparityWinnerScreen({ onDismiss, primaryLabel = 'Play 
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 9999,
+        zIndex: Z.FULLSCREEN,
         pointerEvents: 'auto',
         display: 'flex',
         alignItems: 'center',

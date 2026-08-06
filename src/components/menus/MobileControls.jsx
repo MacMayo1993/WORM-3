@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
+import { Z } from '../../utils/uiTheme.js';
 
 const buttonStyle = {
   width: '48px',
@@ -72,7 +73,7 @@ const undoContainerStyle = {
   position: 'fixed',
   bottom: 'calc(100px + env(safe-area-inset-bottom, 0px))',
   left: '16px',
-  zIndex: 500,
+  zIndex: Z.CONTROLS,
   pointerEvents: 'auto'
 };
 
@@ -85,7 +86,7 @@ const topRightContainerStyle = {
   position: 'fixed',
   top: 'calc(var(--topbar-h, 56px) + env(safe-area-inset-top, 0px) + 6px)',
   right: '12px',
-  zIndex: 500,
+  zIndex: Z.CONTROLS,
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
