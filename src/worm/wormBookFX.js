@@ -41,24 +41,20 @@ export const SPINE_X_SCALE = 0.22;
 // it, standing up by its own height.
 export const PAGE_HINGE_Y = 0.34;
 
-// The head segment gets an upright cover behind two open page panels instead
-// of the horizontal page stack used by its body. Same local-space convention
-// as the pages: X side, Y up, Z spine.
-// A box whose Y (height) is its largest dimension, built from the SAME
-// orientation basis the pages use (where Y already points along the actual
-// surface-relative "up"), stands up on its own with no extra hinge rotation.
-// The head is deliberately much taller than a body segment.  At the old 0.9
-// height it looked like another flat body tile and left no honest room for a
-// pair of eyes, glasses and a mouth.  These proportions make it read as a
-// portrait-sized, standing book while retaining the two-leaf silhouette.
-export const FRONT_COVER_GEO_ARGS = [1.72, 1.62, 0.22];
-export const HEAD_PAGE_GEO_ARGS = [0.82, 1.48, 0.055];
-export const HEAD_PAGE_ANGLE = 0.2;
+// The head is a round orb, like every other worm's.  It used to be an upright
+// cover panel behind two open paper leaves — a book standing on end, which at
+// gameplay size read as a rectangle with a face stuck on it rather than as a
+// head.  Only the head changed; the body is still a stack of books.
+//
+// Kept here because gameplay and the picker previews both build it, and they
+// must agree or the preview stops matching the worm you get.
+export const BOOK_HEAD_RADIUS = 0.092; // matches HEAD_RADIUS / the sphere worms' head
 
-// Placement of the standing book relative to the ordinary head centre.  Kept
-// here because gameplay, the platformer and picker previews all build it.
-export const BOOK_HEAD_UP = 0.72;
-export const BOOK_HEAD_FORWARD = 0.18;
+// The book body floats a little off the surface (PAGE_HINGE_Y lifts the page
+// stack clear of the tile).  The head rides at the same height so it sits on
+// the body's line rather than sunk below it — and WormFace applies the same
+// lift, so the eyes stay on the orb.
+export const BOOK_HEAD_LIFT = BOOK_HEAD_RADIUS * PAGE_HINGE_Y;
 
 // At rest the two page blocks form a shallow open-book V around the middle.
 // A turn banks BOTH sides by the same extra rotation, so the whole spread

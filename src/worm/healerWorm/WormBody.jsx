@@ -21,7 +21,7 @@ import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMateria
 import WormSkinParticles from '../WormSkinParticles.jsx';
 import {
     PAGE_GEO_ARGS, PAGE_HINGE_X, PAGE_HINGE_Y, PAGE_LAYER_COUNT, PAGE_LAYER_GAP, PAGE_COLORS,
-    BOOK_HEAD_FORWARD, BOOK_HEAD_UP, FRONT_COVER_GEO_ARGS, HEAD_PAGE_GEO_ARGS, HEAD_PAGE_ANGLE, SPINE_X_SCALE, TURN_SIGNAL_GAIN,
+    BOOK_HEAD_RADIUS, BOOK_HEAD_LIFT, SPINE_X_SCALE, TURN_SIGNAL_GAIN,
     turnSignalFromDirections, smoothTurn, pageHingeAngles,
 } from '../wormBookFX.js';
 import {
@@ -106,18 +106,7 @@ const _bookHingeQuat = new THREE.Quaternion();
 const _bookPageQuat = new THREE.Quaternion();
 const _bookPageOffset = new THREE.Vector3();
 const _bookZAxisUnit = new THREE.Vector3(0, 0, 1);
-const _bookHeadQuat = new THREE.Quaternion();
-const _bookHeadBasisMat = new THREE.Matrix4();
-const _bookHeadX = new THREE.Vector3();
-const _bookHeadY = new THREE.Vector3();
-const _bookHeadZ = new THREE.Vector3();
-const _bookCoverDummy = new THREE.Object3D();
-const _bookHeadPageBase = new THREE.Vector3();
-const _bookHeadPageOffset = new THREE.Vector3();
-const _bookYAxisUnit = new THREE.Vector3(0, 1, 0);
-const _bookHeadPageQuat = new THREE.Quaternion();
-const BOOK_SCRIBBLE_Y = [-0.22, -0.06, 0.10, 0.26];
-const BOOK_HEAD_PAGE_SIDES = [-1, 1];
+const _bookHeadDummy = new THREE.Object3D();
 const _bodyHeadPos = new THREE.Vector3();
 const _bodyNormal = new THREE.Vector3();
 const _bodyClonePos = new THREE.Vector3();
@@ -154,9 +143,7 @@ export function WormBody({ worm, size }) {
     const glowAltRef = useRef();    // additive overlay — even glow segments only
     const leftPageRef = useRef();   // book worm only — left page-stack overlay
     const rightPageRef = useRef();  // book worm only — right page-stack overlay
-    const frontCoverRef = useRef(); // book worm only — head's standing cover panel
-    const headPageRef = useRef();   // book worm only — two upright open head leaves
-    const headScribbleRef = useRef(); // book worm only — ink lines on the head leaves
+    const bookHeadRef = useRef();   // book worm only — the round head orb
     const particlesGroupRef = useRef(); // ambient skin FX (embers/bubbles/sparkle/...), anchored to the head
     // Book Worm: turn force inferred from how fast the head's direction of
     // travel is swinging frame to frame (no continuous turn signal exists in
@@ -259,82 +246,27 @@ export function WormBody({ worm, size }) {
             }
             prevHeadPosRef.current.copy(_bodyHeadPos);
 
-            // Head book: an upright skin-coloured cover with two open paper
-            // leaves and ink strokes. Reuses the head's own
-            // direction of travel (falling back to a fixed forward when the
-            // worm hasn't moved yet) for its orientation basis — same
-            // lookAt-style construction as the body segments below, so a box
-            // whose Y (height) is its largest dimension stands up on its own.
-            _bookHeadZ.copy(_bookHeadDir);
-            if (_bookHeadZ.lengthSq() < 1e-8) _bookHeadZ.set(0, 0, 1); else _bookHeadZ.negate();
-            _bookHeadZ.normalize();
-            _bookHeadX.crossVectors(_bodyNormal, _bookHeadZ);
-            if (_bookHeadX.lengthSq() < 1e-8) { _bookHeadZ.x += 1e-4; _bookHeadZ.normalize(); _bookHeadX.crossVectors(_bodyNormal, _bookHeadZ); }
-            _bookHeadX.normalize();
-            _bookHeadY.crossVectors(_bookHeadZ, _bookHeadX);
-            _bookHeadBasisMat.makeBasis(_bookHeadX, _bookHeadY, _bookHeadZ);
-            _bookHeadQuat.setFromRotationMatrix(_bookHeadBasisMat);
-
-            const coverMesh = frontCoverRef.current;
-            if (coverMesh) {
-                _bookCoverDummy.position.copy(_bodyHeadPos)
-                    .addScaledVector(_bookHeadY, 0.088 * BOOK_HEAD_UP)
-                    .addScaledVector(_bookHeadZ, -0.088 * BOOK_HEAD_FORWARD);
-                _bookCoverDummy.quaternion.copy(_bookHeadQuat);
-                _bookCoverDummy.scale.setScalar(0.088);
-                _bookCoverDummy.updateMatrix();
-                coverMesh.setMatrixAt(0, _bookCoverDummy.matrix);
+            // Head: a round orb, the same shape every other worm wears. The
+            // head used to be a flat standing cover panel with two paper leaves
+            // and inked scribbles — a book seen edge-on, which at gameplay size
+            // read as a rectangle with a face stuck on it rather than a head.
+            // The body keeps its books; only the head is round now.
+            const headMesh = bookHeadRef.current;
+            if (headMesh) {
+                _bookHeadDummy.position.copy(_bodyHeadPos)
+                    .addScaledVector(_bodyNormal, BOOK_HEAD_LIFT);
+                _bookHeadDummy.quaternion.identity();
+                _bookHeadDummy.scale.setScalar(BOOK_HEAD_RADIUS);
+                _bookHeadDummy.updateMatrix();
+                headMesh.setMatrixAt(0, _bookHeadDummy.matrix);
                 _bookPageColor.set(wormColorRef.current);
-                coverMesh.setColorAt(0, _bookPageColor);
-                coverMesh.count = 1;
-                coverMesh.instanceMatrix.needsUpdate = true;
-                if (coverMesh.instanceColor) coverMesh.instanceColor.needsUpdate = true;
+                headMesh.setColorAt(0, _bookPageColor);
+                headMesh.count = 1;
+                headMesh.instanceMatrix.needsUpdate = true;
+                if (headMesh.instanceColor) headMesh.instanceColor.needsUpdate = true;
             }
-
-            const headPages = headPageRef.current;
-            const headScribbles = headScribbleRef.current;
-            const headScale = 0.088;
-            _bookHeadPageBase.copy(_bodyHeadPos)
-                .addScaledVector(_bookHeadY, headScale * BOOK_HEAD_UP)
-                .addScaledVector(_bookHeadZ, -headScale * BOOK_HEAD_FORWARD);
-            let scribbleIndex = 0;
-            for (const side of BOOK_HEAD_PAGE_SIDES) {
-                _bookHingeQuat.setFromAxisAngle(_bookYAxisUnit, -side * HEAD_PAGE_ANGLE);
-                _bookHeadPageQuat.copy(_bookHeadQuat).multiply(_bookHingeQuat);
-
-                _bookHeadPageOffset.set(side * 0.41, 0, 0).applyQuaternion(_bookHeadPageQuat);
-                _pageDummy.position.copy(_bookHeadPageBase).addScaledVector(_bookHeadPageOffset, headScale);
-                _pageDummy.quaternion.copy(_bookHeadPageQuat);
-                _pageDummy.scale.setScalar(headScale);
-                _pageDummy.updateMatrix();
-                if (headPages) headPages.setMatrixAt(side < 0 ? 0 : 1, _pageDummy.matrix);
-
-                for (let line = 0; line < BOOK_SCRIBBLE_Y.length; line++) {
-                    _bookHeadPageOffset.set(
-                        side * (0.30 + (line % 2) * 0.03),
-                        BOOK_SCRIBBLE_Y[line],
-                        0.034,
-                    ).applyQuaternion(_bookHeadPageQuat);
-                    _pageDummy.position.copy(_bookHeadPageBase).addScaledVector(_bookHeadPageOffset, headScale);
-                    _pageDummy.quaternion.copy(_bookHeadPageQuat);
-                    _pageDummy.scale.set(headScale * (line % 2 ? 0.76 : 1), headScale, headScale);
-                    _pageDummy.updateMatrix();
-                    if (headScribbles) headScribbles.setMatrixAt(scribbleIndex, _pageDummy.matrix);
-                    scribbleIndex++;
-                }
-            }
-            if (headPages) {
-                headPages.count = 2;
-                headPages.instanceMatrix.needsUpdate = true;
-            }
-            if (headScribbles) {
-                headScribbles.count = scribbleIndex;
-                headScribbles.instanceMatrix.needsUpdate = true;
-            }
-        } else {
-            if (frontCoverRef.current) frontCoverRef.current.count = 0;
-            if (headPageRef.current) headPageRef.current.count = 0;
-            if (headScribbleRef.current) headScribbleRef.current.count = 0;
+        } else if (bookHeadRef.current) {
+            bookHeadRef.current.count = 0;
         }
 
         const tLen = worm.tailLength.current;
@@ -424,9 +356,7 @@ export function WormBody({ worm, size }) {
             if (glowAltRef.current) glowAltRef.current.count = 0;
             if (leftPageRef.current) leftPageRef.current.count = 0;
             if (rightPageRef.current) rightPageRef.current.count = 0;
-            if (frontCoverRef.current) frontCoverRef.current.count = 0;
-            if (headPageRef.current) headPageRef.current.count = 0;
-            if (headScribbleRef.current) headScribbleRef.current.count = 0;
+            if (bookHeadRef.current) bookHeadRef.current.count = 0;
             return;
         }
 
@@ -516,6 +446,9 @@ export function WormBody({ worm, size }) {
                 // at a different height than the rest of the book).
                 if (_isBook) _wormDummy.position.addScaledVector(_bodyNormal, 0.092 * PAGE_HINGE_Y);
                 _wormDummy.scale.setScalar(0.092);
+                // Book Worm draws its head as the orb above, so the spine box
+                // must not also be drawn here — two heads, one inside the other.
+                if (_isBook) _wormDummy.scale.setScalar(0.00001);
             } else {
                 // Inch Worm: a single hump locked to the middle of the body (sin profile over
                 // the whole length → 0 at head & tail, peak at centre). It rears up and the
@@ -841,17 +774,15 @@ export function WormBody({ worm, size }) {
                 <boxGeometry args={PAGE_GEO_ARGS} />
                 <meshStandardMaterial color="white" roughness={0.8} metalness={0} side={THREE.DoubleSide} />
             </instancedMesh>
-            <instancedMesh ref={frontCoverRef} args={[undefined, undefined, 1]} frustumCulled={false}>
-                <boxGeometry args={FRONT_COVER_GEO_ARGS} />
-                <meshStandardMaterial color="white" roughness={0.5} metalness={0.1} side={THREE.DoubleSide} />
-            </instancedMesh>
-            <instancedMesh ref={headPageRef} args={[undefined, undefined, 2]} frustumCulled={false}>
-                <boxGeometry args={HEAD_PAGE_GEO_ARGS} />
-                <meshStandardMaterial color={PAGE_COLORS[0]} roughness={0.92} metalness={0} side={THREE.DoubleSide} />
-            </instancedMesh>
-            <instancedMesh ref={headScribbleRef} args={[undefined, undefined, 8]} frustumCulled={false}>
-                <boxGeometry args={[0.34, 0.025, 0.012]} />
-                <meshBasicMaterial color="#6b5a3e" />
+            {/* Round head orb — the same sphere the other worms wear, so the
+                Book Worm reads as a worm carrying books rather than as a
+                rectangle. Shares the skin material, so skins and their FX
+                (metalness, transmission, iridescence…) apply here exactly as
+                they do on the sphere-bodied characters. Material colour must
+                stay white for setColorAt to pass through untinted. */}
+            <instancedMesh ref={bookHeadRef} args={[undefined, undefined, 1]} frustumCulled={false}>
+                <sphereGeometry args={[1, 16, 16]} />
+                <primitive object={skinMaterial} attach="material" />
             </instancedMesh>
             <group ref={particlesGroupRef}>
                 <WormSkinParticles skinId={wormSkinId} glowColor={skin.glow} />

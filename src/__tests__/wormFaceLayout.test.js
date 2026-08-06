@@ -6,7 +6,7 @@
 
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
-import { layoutBookWormFace, layoutWormFace, BOOK_FACE_LAYOUT, FACE_LAYOUT } from '../worm/wormFaceLayout.js';
+import { layoutWormFace, FACE_LAYOUT } from '../worm/wormFaceLayout.js';
 
 const RADIUS = 0.092;
 
@@ -95,15 +95,20 @@ describe('worm face layout', () => {
 });
 
 describe('book worm face layout', () => {
-  it('lays the whole expression out on a broad upright plane', () => {
+  // The Book Worm's head used to be a flat standing book with its own planar
+  // face layout. It is a sphere now, like every other worm's, so it goes
+  // through the shared layout — including the lenses, which are its one
+  // remaining distinguishing feature.
+  it('places the book worm on the shared spherical layout, lenses included', () => {
     const parts = {
       eyes: [new THREE.Object3D(), new THREE.Object3D()],
       pupils: [new THREE.Object3D(), new THREE.Object3D()],
       glasses: [new THREE.Object3D(), new THREE.Object3D()],
       mouth: new THREE.Object3D(),
     };
-    layoutBookWormFace(
-      new THREE.Vector3(0, 1, 0),
+    const center = new THREE.Vector3(0, 1, 0);
+    layoutWormFace(
+      center,
       new THREE.Vector3(1, 0, 0),
       new THREE.Vector3(0, 1, 0),
       RADIUS,
@@ -111,12 +116,12 @@ describe('book worm face layout', () => {
     );
 
     expect(parts.eyes[0].position.y).toBeGreaterThan(parts.mouth.position.y);
-    expect(parts.eyes[0].position.z).toBeCloseTo(-parts.eyes[1].position.z, 9);
-    expect(parts.glasses[0].scale.x).toBeCloseTo(RADIUS * BOOK_FACE_LAYOUT.glassRadius, 9);
-    expect(parts.mouth.scale.x).toBeCloseTo(RADIUS * BOOK_FACE_LAYOUT.mouthRadius, 9);
-    // All features project toward the viewer from the same flat page face.
-    for (const feature of [...parts.eyes, ...parts.glasses, parts.mouth]) {
-      expect(feature.position.x).toBeGreaterThan(0);
+    expect(parts.glasses[0].scale.x).toBeCloseTo(RADIUS * FACE_LAYOUT.glassRadius, 9);
+
+    // Every feature sits on the head sphere, not on a flat plane in front of
+    // it — that is the whole point of the change.
+    for (const eye of parts.eyes) {
+      expect(eye.position.distanceTo(center)).toBeCloseTo(RADIUS, 6);
     }
   });
 });

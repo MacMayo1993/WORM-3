@@ -19,13 +19,13 @@
 import * as THREE from 'three';
 import { getSkin } from '../worm/wormCosmeticsData.js';
 import { getHatParts } from '../worm/wormHatParts.js';
-import { layoutBookWormFace, layoutWormFace, FACE_LAYOUT, MOUTH_ARC } from '../worm/wormFaceLayout.js';
+import { layoutWormFace, FACE_LAYOUT, MOUTH_ARC } from '../worm/wormFaceLayout.js';
 import { getSkinFX } from '../worm/wormSkinFX.js';
 import { createWormSkinMaterial, applySkinMaterialProfile, updateWormSkinMaterialTime } from '../worm/wormSkinMaterial.js';
 import { WormParticleSystem } from '../worm/wormSkinParticles.js';
 import {
   PAGE_GEO_ARGS, PAGE_HINGE_X, PAGE_HINGE_Y, PAGE_LAYER_COUNT, PAGE_LAYER_GAP, PAGE_COLORS,
-  BOOK_HEAD_FORWARD, BOOK_HEAD_UP, FRONT_COVER_GEO_ARGS, HEAD_PAGE_GEO_ARGS, HEAD_PAGE_ANGLE, SPINE_X_SCALE, pageHingeAngles,
+  SPINE_X_SCALE, pageHingeAngles,
 } from '../worm/wormBookFX.js';
 
 // ─── Worm geometry constants ─────────────────────────────────────────────────
@@ -60,7 +60,6 @@ let camera = null;
 let rig = null;             // built lazily, reconfigured per render
 
 const _color = new THREE.Color();
-const BOOK_SCRIBBLE_Y = [-0.22, -0.06, 0.10, 0.26];
 
 // ─── Scene ────────────────────────────────────────────────────────────────────
 
@@ -81,7 +80,6 @@ function _buildRig() {
   // PAGE_LAYER_COUNT thin layers per side per segment, so the stack reads as
   // multiple pages instead of one flat slab.
   const pageGeo = new THREE.BoxGeometry(...PAGE_GEO_ARGS);
-  const frontCoverGeo = new THREE.BoxGeometry(...FRONT_COVER_GEO_ARGS);
 
   const beads = [];
   const boxes = [];
@@ -116,36 +114,9 @@ function _buildRig() {
     leftPages.push(leftLayers); rightPages.push(rightLayers);
   }
 
-  // Head's standing front-cover panel (book worm only) — a single upright
-  // panel instead of a flat page stack, distinct from the pages behind it.
-  const frontCover = new THREE.Mesh(frontCoverGeo, new THREE.MeshStandardMaterial({ roughness: 0.5, metalness: 0.1 }));
-  group.add(frontCover);
-
-  // The head is an upright open book: two paper leaves sit in front of the
-  // skin-coloured cover, with raised ink strokes that remain readable in tiny
-  // store thumbnails.
-  const bookFace = new THREE.Group();
-  const headPageGeo = new THREE.BoxGeometry(...HEAD_PAGE_GEO_ARGS);
-  const bookFacePages = [];
-  for (const side of [-1, 1]) {
-    const leaf = new THREE.Group();
-    leaf.rotation.y = -side * HEAD_PAGE_ANGLE;
-    const page = new THREE.Mesh(headPageGeo, new THREE.MeshStandardMaterial({ color: PAGE_COLORS[0], roughness: 0.92 }));
-    page.position.x = side * 0.41;
-    leaf.add(page);
-    BOOK_SCRIBBLE_Y.forEach((y, line) => {
-      const ink = new THREE.Mesh(
-        new THREE.BoxGeometry(0.34 - (line % 2) * 0.08, 0.025, 0.012),
-        new THREE.MeshBasicMaterial({ color: 0x6b5a3e }),
-      );
-      ink.position.set(side * (0.30 + (line % 2) * 0.03), y, 0.034);
-      leaf.add(ink);
-    });
-    bookFace.add(leaf);
-    bookFacePages.push(page);
-  }
-  group.add(bookFace);
-
+  // The Book Worm's head is the ordinary sphere bead (see _poseWorm), not a
+  // standing cover panel with paper leaves — it reads as a head at thumbnail
+  // size, where the flat book did not.
   // Ambient skin FX (embers/bubbles/sparkle/...). Parented to an unscaled
   // anchor (not the head bead itself, whose own scale would otherwise shrink
   // every particle down with it) and repositioned to the head each frame in
@@ -179,7 +150,7 @@ function _buildRig() {
   const glowLight = new THREE.PointLight(0xffffff, 0, 1.2);
   group.add(glowLight);
 
-  return { group, beads, boxes, glows, leftPages, rightPages, frontCover, bookFace, bookFacePages, eyes, pupils, mouth, glasses, hatGroup, hatKey: null, glowLight, particles, particlesAnchor, skinKey: null };
+  return { group, beads, boxes, glows, leftPages, rightPages, eyes, pupils, mouth, glasses, hatGroup, hatKey: null, glowLight, particles, particlesAnchor, skinKey: null };
 }
 
 // Framing presets. In game the camera looks down at the cube face the worm is
@@ -356,22 +327,18 @@ function _poseWorm(opts, time) {
     const glow = rig.glows[i];
     const leftLayers = rig.leftPages[i];
     const rightLayers = rig.rightPages[i];
-    const body = isBook ? box : bead;
+    // The Book Worm's head is a sphere bead like every other worm's; only its
+    // body segments are books.
+    const bookBodySeg = isBook && i !== 0;
+    const body = bookBodySeg ? box : bead;
 
     const shown = !headOnly || i <= 2;
-    bead.visible = shown && !isBook;
-    box.visible = shown && isBook;
+    bead.visible = shown && !bookBodySeg;
+    box.visible = shown && bookBodySeg;
     glow.visible = shown && isGlow && i % 2 === 0;
-    const pagesShown = shown && isBook && i !== 0;
-    const coverShown = shown && isBook && i === 0;
+    const pagesShown = shown && bookBodySeg;
     for (const l of leftLayers) l.visible = pagesShown;
     for (const l of rightLayers) l.visible = pagesShown;
-    // frontCover is a single shared mesh, not one per segment — only the i===0
-    // iteration is ever allowed to touch its visibility, or every later i>0
-    // iteration (where coverShown is always false) would immediately hide it
-    // again right after the head iteration showed it.
-    if (i === 0) rig.frontCover.visible = coverShown;
-    if (i === 0) rig.bookFace.visible = coverShown;
 
     // Book worm rides on top of the ground, lifted by its own height, instead
     // of centered/embedded at it — mutates _off itself so the pages (which
@@ -381,7 +348,6 @@ function _poseWorm(opts, time) {
     body.position.copy(_off);
     if (i === 0) {
       body.scale.setScalar(HEAD_SCALE);
-      if (isBook) body.scale.set(BOOK_BODY_SCALE[0], BOOK_BODY_SCALE[1], BOOK_BODY_SCALE[2]);
     } else if (isBook) {
       body.scale.set(BOOK_BODY_SCALE[0], BOOK_BODY_SCALE[1], BOOK_BODY_SCALE[2]);
     } else if (isInch) {
@@ -470,30 +436,6 @@ function _poseWorm(opts, time) {
     // instead of lying flat like the body stack — same orientation basis as
     // the body pages (computed against segment 1, since there's no "segment
     // -1" to diff against), a box whose Y is its largest dimension.
-    if (coverShown) {
-      _segmentOffset(1, characterId, time, _pbPrevOff);
-      _pbPrevOff.y += BOOK_BODY_SCALE[0] * PAGE_HINGE_Y;
-      _pbZ.subVectors(_pbPrevOff, _off).normalize(); // toward segment 1 = backward, from the head's point of view
-      if (_pbZ.lengthSq() < 1e-8) _pbZ.set(0, 0, 1);
-      _pbX.crossVectors(UP, _pbZ).normalize();
-      _pbY.crossVectors(_pbZ, _pbX);
-      _pbBasisMat.makeBasis(_pbX, _pbY, _pbZ);
-      _pbQuat.setFromRotationMatrix(_pbBasisMat);
-      const coverScale = body.scale.x;
-      rig.frontCover.position.copy(_off)
-        .addScaledVector(_pbY, coverScale * BOOK_HEAD_UP)
-        .addScaledVector(_pbZ, -coverScale * BOOK_HEAD_FORWARD);
-      rig.frontCover.quaternion.copy(_pbQuat);
-      rig.frontCover.scale.setScalar(coverScale);
-      rig.frontCover.material.color.set(skin.body);
-
-      rig.bookFace.position.copy(_off)
-        .addScaledVector(_pbY, coverScale * BOOK_HEAD_UP)
-        .addScaledVector(_pbZ, -coverScale * BOOK_HEAD_FORWARD);
-      rig.bookFace.quaternion.copy(_pbQuat);
-      rig.bookFace.scale.setScalar(coverScale);
-    }
-
     if (glow.visible) {
       glow.position.copy(_off);
       glow.scale.setScalar(body.scale.x * 1.4);
@@ -522,13 +464,10 @@ function _poseWorm(opts, time) {
   _faceParts.glasses[0] = isBook ? rig.glasses[0] : null;
   _faceParts.glasses[1] = isBook ? rig.glasses[1] : null;
   _faceParts.hat = rig.hatGroup;
-  if (isBook) {
-    _anchor.addScaledVector(UP, HEAD_SCALE * BOOK_HEAD_UP)
-      .addScaledVector(FWD, HEAD_SCALE * BOOK_HEAD_FORWARD);
-    layoutBookWormFace(_anchor, FWD, UP, HEAD_SCALE, _faceParts);
-  } else {
-    layoutWormFace(_anchor, FWD, UP, HEAD_SCALE, _faceParts);
-  }
+  // The Book Worm's head is a sphere now, so every character shares one layout.
+  // Its head rides at the book body's height, matching WormFace in gameplay.
+  if (isBook) _anchor.y += BOOK_BODY_SCALE[0] * PAGE_HINGE_Y;
+  layoutWormFace(_anchor, FWD, UP, HEAD_SCALE, _faceParts);
 
   // An occasional blink, squashing the eye and its pupil together.
   const blink = Math.sin(time * 0.9) > 0.985 ? 0.2 : 1;
