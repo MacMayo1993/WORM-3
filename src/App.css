@@ -49,6 +49,26 @@
   --ui-ink-subtle: #657156;
   --ui-border: rgba(111, 126, 86, 0.25);
 
+  /* NIGHT family — keep in sync with NIGHT_* in src/utils/uiTheme.js.
+     The warm dark surface for panels that layer over the live 3D scene.
+     Mirrored here because CSS-styled screens (Settings) need the same
+     tokens the JS-styled ones import, and previously invented their own. */
+  --night-backdrop: radial-gradient(ellipse at center, rgba(24, 31, 18, 0.55) 0%, rgba(24, 31, 18, 0.86) 100%);
+  --night-sheet: rgba(28, 35, 22, 0.94);
+  --night-panel: rgba(250, 247, 238, 0.08);
+  --night-border: rgba(255, 245, 220, 0.18);
+  --night-text: rgba(255, 253, 242, 0.86);
+  --night-text-muted: rgba(255, 253, 242, 0.60);
+  --night-shadow: 0 24px 70px rgba(24, 31, 18, 0.55);
+
+  /* Shared semantic accents — mirror UI_MOSS / UI_MOSS_LIGHT / UI_GOLD.
+     Moss is the affirmative action across both surface families; it replaces
+     the Rubik's blue that the settings panel was using as a UI accent, which
+     collided with blue as a cube-face colour. */
+  --ui-moss: #5f7f4a;
+  --ui-moss-light: #9fdb7a;
+  --ui-gold: #ffe9ad;
+
   /* Safe area insets for mobile browsers */
   --safe-area-inset-top: env(safe-area-inset-top, 0px);
   --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
@@ -1253,7 +1273,7 @@ button:focus-visible,
     padding: 16px 18px;
     position: sticky;
     top: 0;
-    background: rgba(14, 17, 38, 0.96);
+    background: var(--night-sheet);
     backdrop-filter: blur(24px);
     z-index: 1;
   }
@@ -1520,8 +1540,8 @@ button:focus-visible,
   right: 0;
   bottom: 0;
   height: 100dvh;
-  background: rgba(8, 10, 22, 0.72);
-  backdrop-filter: blur(24px);
+  background: var(--night-backdrop);
+  backdrop-filter: blur(9px) saturate(1.03);
   animation: modalBackdropIn 0.22s ease;
   display: flex;
   align-items: center;
@@ -1532,8 +1552,8 @@ button:focus-visible,
 }
 
 .settings-panel {
-  background: rgba(14, 17, 38, 0.96);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--night-sheet);
+  border: 1px solid var(--night-border);
   border-radius: 20px;
   padding: 0;
   max-width: 480px;
@@ -1541,7 +1561,7 @@ button:focus-visible,
   max-height: calc(100dvh - 60px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
   overflow-y: auto;
   backdrop-filter: blur(24px);
-  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.60), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  box-shadow: var(--night-shadow);
   animation: modalSheetIn 0.30s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -1550,16 +1570,16 @@ button:focus-visible,
   justify-content: space-between;
   align-items: center;
   padding: 20px 24px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(14, 17, 38, 0.94);
+  border-bottom: 1px solid var(--night-border);
+  background: var(--night-sheet);
   border-radius: 20px 20px 0 0;
 }
 
 .settings-title {
   margin: 0;
   font-size: 20px;
-  font-weight: 500;
-  color: #e8edf8;
+  font-weight: 600;
+  color: var(--night-text);
   font-family: var(--ui-font);
   letter-spacing: 0.01em;
 }
@@ -1567,9 +1587,9 @@ button:focus-visible,
 .settings-close-btn {
   background: transparent;
   border: none;
-  color: rgba(200, 220, 255, 0.55);
-  width: 40px;
-  height: 40px;
+  color: var(--night-text-muted);
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   cursor: pointer;
   font-size: 20px;
@@ -1581,8 +1601,8 @@ button:focus-visible,
 }
 
 .settings-close-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: #e8edf8;
+  background: var(--night-panel);
+  color: var(--night-text);
 }
 
 .settings-body {
@@ -1636,14 +1656,14 @@ button:focus-visible,
 }
 
 .settings-radio.active {
-  background: rgba(30, 136, 229, 0.08);
+  background: rgba(159, 219, 122, 0.10);
 }
 
 .settings-radio input[type="radio"] {
   appearance: none;
   width: 18px;
   height: 18px;
-  border: 2px solid var(--border-medium);
+  border: 2px solid var(--night-border);
   border-radius: 50%;
   flex-shrink: 0;
   position: relative;
@@ -1652,7 +1672,7 @@ button:focus-visible,
 }
 
 .settings-radio input[type="radio"]:checked {
-  border-color: var(--rubiks-blue);
+  border-color: var(--ui-moss-light);
 }
 
 .settings-radio input[type="radio"]:checked::after {
@@ -1663,7 +1683,7 @@ button:focus-visible,
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--rubiks-blue);
+  background: var(--ui-moss-light);
 }
 
 .scheme-info {
@@ -1675,7 +1695,7 @@ button:focus-visible,
 
 .settings-radio-label {
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.87);
+  color: var(--night-text);
   font-family: var(--ui-font);
 }
 
@@ -1713,8 +1733,8 @@ button:focus-visible,
 }
 
 .scheme-grid .settings-radio.active {
-  background: rgba(30, 136, 229, 0.12);
-  border-color: rgba(30, 136, 229, 0.7);
+  background: rgba(159, 219, 122, 0.12);
+  border-color: rgba(159, 219, 122, 0.7);
 }
 
 /* Hide the actual radio bullet — the whole card is the selector */
@@ -3359,15 +3379,15 @@ select.btn-compact:disabled {
 }
 
 .settings-section-title {
-  color: rgba(180, 210, 255, 0.40) !important;
+  color: var(--night-text-muted) !important;
   text-shadow: none;
   font-family: var(--ui-font);
 }
 
 .settings-radio,
 .scheme-grid .settings-radio {
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--night-border);
+  background: var(--night-panel);
 }
 
 .settings-radio:hover,
@@ -3376,124 +3396,132 @@ select.btn-compact:disabled {
   border-color: rgba(255, 255, 255, 0.14);
 }
 
-.settings-radio-label,
-.settings-hint,
-.settings-label,
+/* These labels resolved to --ui-ink (#26331f) — near-black text on the
+   near-black settings panel, about 1.1:1 contrast and effectively invisible.
+   The rule is shared with .wizard-option, which sits on cream paper where
+   --ui-ink is correct, so the settings cases are scoped off it here. */
 .wizard-option.compact .wizard-option-label {
   color: var(--ui-ink);
   font-family: var(--ui-font);
 }
 
+.settings-radio-label,
+.settings-hint,
+.settings-label {
+  color: var(--night-text);
+  font-family: var(--ui-font);
+}
+
 .settings-tab {
-  color: rgba(200, 220, 255, 0.50);
+  color: var(--night-text-muted);
   border-bottom-color: transparent;
   font-family: var(--ui-font);
 }
 
 .settings-tab:hover {
-  color: rgba(200, 220, 255, 0.85);
+  color: var(--night-text);
 }
 
 .settings-tab.active {
-  background: rgba(255, 255, 255, 0.06);
-  color: #e8edf8;
-  border-bottom-color: #3b82f6;
+  background: var(--night-panel);
+  color: var(--night-text);
+  border-bottom-color: var(--ui-moss-light);
 }
 
 .settings-tabs {
-  border-bottom-color: rgba(255, 255, 255, 0.08) !important;
+  border-bottom-color: var(--night-border) !important;
 }
 
 .toggle-label {
-  color: rgba(200, 220, 255, 0.85) !important;
+  color: var(--night-text) !important;
   font-family: var(--ui-font) !important;
 }
 
 .settings-toggle-row:hover {
-  background: rgba(255, 255, 255, 0.06) !important;
+  background: var(--night-panel) !important;
 }
 
 /* Style cards — Tiles panel */
 .style-card {
-  background: rgba(255, 255, 255, 0.05) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  background: var(--night-panel) !important;
+  border: 1px solid var(--night-border) !important;
 }
 
 .style-card:hover {
-  background: rgba(255, 255, 255, 0.10) !important;
-  border-color: rgba(255, 255, 255, 0.18) !important;
+  background: rgba(250, 247, 238, 0.14) !important;
+  border-color: rgba(255, 245, 220, 0.30) !important;
 }
 
 .style-card.selected {
-  background: rgba(30, 136, 229, 0.18) !important;
-  border-color: rgba(30, 136, 229, 0.55) !important;
+  background: rgba(159, 219, 122, 0.18) !important;
+  border-color: rgba(159, 219, 122, 0.55) !important;
 }
 
 .style-card-label {
-  color: rgba(200, 220, 255, 0.72) !important;
+  color: var(--night-text-muted) !important;
 }
 
 .style-card.selected .style-card-label {
-  color: #60a5fa !important;
+  color: var(--ui-moss-light) !important;
 }
 
 /* Per-face and tile selects */
 .per-face-select,
 .tile-style-select {
-  background: rgba(20, 24, 48, 0.95) !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  color: rgba(200, 220, 255, 0.85) !important;
+  background: var(--night-sheet) !important;
+  border: 1px solid var(--night-border) !important;
+  color: var(--night-text) !important;
 }
 
 .per-face-select option,
 .tile-style-select option,
 .per-face-select optgroup,
 .tile-style-select optgroup {
-  background: #1a1e3a;
+  background: #1c2316;
   color: #e8edf8;
 }
 
 .per-face-preview-wrap {
-  border-color: rgba(255, 255, 255, 0.15) !important;
+  border-color: var(--night-border) !important;
 }
 
 /* Color picker labels */
 .color-picker-label {
-  color: rgba(200, 220, 255, 0.55) !important;
+  color: var(--night-text-muted) !important;
 }
 
 /* Image upload */
 .image-upload-btn {
-  border: 1px dashed rgba(255, 255, 255, 0.20) !important;
-  background: rgba(255, 255, 255, 0.04) !important;
-  color: rgba(200, 220, 255, 0.60) !important;
+  border: 1px dashed var(--night-border) !important;
+  background: var(--night-panel) !important;
+  color: var(--night-text-muted) !important;
 }
 
 .image-upload-btn:hover {
-  background: rgba(30, 136, 229, 0.12) !important;
-  border-color: rgba(30, 136, 229, 0.40) !important;
-  color: rgba(200, 220, 255, 0.90) !important;
+  background: rgba(159, 219, 122, 0.12) !important;
+  border-color: rgba(159, 219, 122, 0.40) !important;
+  color: var(--night-text) !important;
 }
 
 /* Face texture upload */
 .face-texture-upload {
-  background: rgba(255, 255, 255, 0.04) !important;
-  border: 1px dashed rgba(255, 255, 255, 0.18) !important;
+  background: var(--night-panel) !important;
+  border: 1px dashed var(--night-border) !important;
 }
 
 .face-texture-plus {
-  color: rgba(200, 220, 255, 0.35) !important;
+  color: var(--night-text-muted) !important;
 }
 
 /* Color input border */
 .color-input {
-  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border: 1px solid var(--night-border) !important;
 }
 
 /* Settings radio active state */
 .settings-radio.active {
-  background: rgba(30, 136, 229, 0.14) !important;
-  border-color: rgba(30, 136, 229, 0.45) !important;
+  background: rgba(159, 219, 122, 0.16) !important;
+  border-color: rgba(159, 219, 122, 0.45) !important;
 }
 
 /* Scheme dots ring */
