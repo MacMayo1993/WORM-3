@@ -3742,3 +3742,16 @@ select.btn-compact:disabled {
     transform: none;
   }
 }
+
+/* Spinner for ScreenFallback (src/components/ui/ScreenFallback.jsx). Reduced
+   motion gets a static ring rather than nothing, so the indicator is still
+   present — it just does not rotate. */
+@keyframes screenFallbackSpin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .screen-fallback-spinner {
+    animation: none !important;
+  }
+}

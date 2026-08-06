@@ -13,7 +13,7 @@
 
 import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { MONO_FONT, UI_FONT, NIGHT_SHEET, NIGHT_BORDER, NIGHT_TEXT, TEXT_SM, RADIUS_PILL, Z } from '../utils/uiTheme.js';
-import { TOUCH_TARGET } from './ui/index.js';
+import { TOUCH_TARGET, ScreenFallback } from './ui/index.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import ScreenTransition from './ScreenTransition.jsx';
@@ -332,14 +332,14 @@ export default function UILayer({
 
         {/* Disparity Betting Screen — intercepts before chaos starts */}
         <ScreenTransition show={showDisparityBetting}>
-          <Suspense fallback={null}>
+          <Suspense fallback={<ScreenFallback label="Loading" />}>
             <DisparityBettingScreen onBetPlaced={onBetPlaced} onSkip={onBetSkipped} speedThresholdSec={speedThresholdSec} />
           </Suspense>
         </ScreenTransition>
 
         {/* Disparity Winner — cinematic celebration screen */}
         <ScreenTransition show={showDisparityWinner}>
-          <Suspense fallback={null}>
+          <Suspense fallback={<ScreenFallback label="Loading" />}>
             {demoMode && onDemoDisparityDismiss ? (
               // In the demo there's no real replay — a single Continue advances
               // to the next demo step.
@@ -497,7 +497,7 @@ export default function UILayer({
       )}
 
       <ScreenTransition show={showComingSoon}>
-        <Suspense fallback={null}>
+        <Suspense fallback={<ScreenFallback label="Loading" />}>
           {/* Each launcher closes this screen first, otherwise the sheet stays
               mounted over the mode it just started. */}
           <ComingSoonScreen
@@ -512,19 +512,19 @@ export default function UILayer({
       </ScreenTransition>
 
       <ScreenTransition show={showMobiusCubelet}>
-        <Suspense fallback={null}>
+        <Suspense fallback={<ScreenFallback label="Loading" />}>
           <MobiusCubeletScreen onBack={onCloseMobiusCubelet} />
         </Suspense>
       </ScreenTransition>
 
       <ScreenTransition show={showPackSelect}>
-        <Suspense fallback={null}>
+        <Suspense fallback={<ScreenFallback label="Loading chapters" />}>
           <PackSelectScreen onSelectPack={onSelectPack} onBack={onBackToMainMenu} />
         </Suspense>
       </ScreenTransition>
 
       <ScreenTransition show={showLevelSelect}>
-        <Suspense fallback={null}>
+        <Suspense fallback={<ScreenFallback label="Loading levels" />}>
           <LevelSelectScreen packId={activePackId} onSelectLevel={onLevelSelect} onBack={onBackToPackSelect} />
         </Suspense>
       </ScreenTransition>
@@ -546,7 +546,7 @@ export default function UILayer({
       </ScreenTransition>
 
       <ScreenTransition show={showCubeModeSelect}>
-        <Suspense fallback={null}>
+        <Suspense fallback={<ScreenFallback label="Loading" />}>
           <CubeModeSelectScreen
             onRubiks={onCubeModeRubiks}
             onDisparity={onCubeModeDisparity}
@@ -556,19 +556,19 @@ export default function UILayer({
       </ScreenTransition>
 
       <ScreenTransition show={showFreeplayWizard}>
-        <Suspense fallback={null}>
+        <Suspense fallback={<ScreenFallback label="Loading setup" />}>
           <FreeplaySetupWizard onComplete={onWizardComplete} onCancel={onWizardCancel} initialSettings={settings} />
         </Suspense>
       </ScreenTransition>
 
       <ScreenTransition show={showRandomWizard}>
-        <Suspense fallback={null}>
+        <Suspense fallback={<ScreenFallback label="Loading setup" />}>
           <RandomModeSetupWizard onComplete={onRandomWizardComplete} onCancel={onRandomWizardCancel} initialSettings={settings} />
         </Suspense>
       </ScreenTransition>
 
       <ScreenTransition show={showWormModeWizard}>
-        <Suspense fallback={null}>
+        <Suspense fallback={<ScreenFallback label="Loading setup" />}>
           <WormModeSetupWizard onComplete={onWormSetupComplete} onCancel={onWormWizardCancel} initialSettings={settings} />
         </Suspense>
       </ScreenTransition>
@@ -582,13 +582,13 @@ export default function UILayer({
       )}
 
       <ScreenTransition show={showMergeThemePicker}>
-        <Suspense fallback={null}>
+        <Suspense fallback={<ScreenFallback label="Loading themes" />}>
           <MergeThemePicker onStart={onMergeStart} onBack={onMergeCancel} />
         </Suspense>
       </ScreenTransition>
 
       <ScreenTransition show={showDisparityWizard}>
-        <Suspense fallback={null}>
+        <Suspense fallback={<ScreenFallback label="Loading setup" />}>
           <DisparitySetupWizard
             onStart={onDisparitySetupComplete}
             onCancel={() => { setShowDisparityWizard(false); useGameStore.getState().setShowMainMenu(true); }}
@@ -655,7 +655,7 @@ export default function UILayer({
       </ScreenTransition>
 
       <ScreenTransition show={!!victory}>
-        <Suspense fallback={null}>
+        <Suspense fallback={<ScreenFallback label="Loading" />}>
           <VictoryScreen
             winType={victory} moves={moves} time={gameTime}
             onContinue={onVictoryContinue} onNewGame={onVictoryNewGame}
@@ -667,13 +667,13 @@ export default function UILayer({
       </ScreenTransition>
 
       {showCutscene && currentLevelData && (
-        <Suspense fallback={null}>
+        <Suspense fallback={<ScreenFallback label="Loading" />}>
           <Level10Cutscene onComplete={onCutsceneComplete} onSkip={onCutsceneComplete} />
         </Suspense>
       )}
 
       <ScreenTransition show={!!(showLevelTutorial && currentLevelData)} freezeOnExit>
-        <Suspense fallback={null}>
+        <Suspense fallback={<ScreenFallback label="Loading briefing" />}>
           {currentLevelData && (
             <LevelTutorial
               level={currentLevelData}

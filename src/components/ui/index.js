@@ -8,6 +8,8 @@ export {
 
 export { ActionButton, IconButton, CloseButton, TOUCH_TARGET } from './Button.jsx';
 
+export { default as ScreenFallback } from './ScreenFallback.jsx';
+
 export {
   FieldGuideSheet, FieldGuideEyebrow, FieldGuideButton, fieldGuide,
   FIELD_GUIDE_PAPER, FIELD_GUIDE_BORDER, FIELD_GUIDE_INK, FIELD_GUIDE_MUTED, FIELD_GUIDE_GOLD_INK
