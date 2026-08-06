@@ -2,7 +2,7 @@
 // Teach Mode UI — Instructor panel with sub-modes: Guided, Demo, Quiz
 
 import React, { useState, useEffect } from 'react';
-import { UI_FONT, MONO_FONT, UI_MOSS, UI_MOSS_LIGHT } from '../utils/uiTheme.js';
+import { UI_FONT, MONO_FONT, UI_MOSS, UI_MOSS_LIGHT, Z } from '../utils/uiTheme.js';
 import { fieldGuide } from '../components/ui/FieldGuide.jsx';
 import { isMobile } from '../utils/device.js';
 import { FACE_TOKENS, MODIFIER_TOKENS, SLICE_TOKENS, EXAMPLE_SEQUENCE, NOTATION_LESSON, describeToken } from './notation.js';
@@ -65,7 +65,7 @@ const TM_PANEL_STYLE = {
   background: 'rgba(250,247,238,0.97)',
   boxShadow: '0 14px 34px rgba(40,48,32,0.22)',
   borderRight: '1px solid rgba(111,126,86,0.25)',
-  zIndex: 600,
+  zIndex: Z.PANEL,
   display: 'flex',
   flexDirection: 'column',
   fontFamily: UI_FONT,
@@ -88,7 +88,7 @@ const TM_CARD_STYLE = {
   boxShadow: '0 14px 34px rgba(40,48,32,0.22)',
   border: '1px solid rgba(111,126,86,0.25)',
   borderRadius: '18px',
-  zIndex: 600,
+  zIndex: Z.PANEL,
   display: 'flex',
   flexDirection: 'column',
   fontFamily: UI_FONT,

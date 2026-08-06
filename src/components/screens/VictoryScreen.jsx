@@ -4,7 +4,7 @@ import {
   UI_FONT, DISPLAY_FONT, UI_CREAM, UI_GOLD, UI_MOSS, UI_MOSS_LIGHT,
   NIGHT_BACKDROP, NIGHT_BACKDROP_BLUR, NIGHT_PANEL, NIGHT_BORDER,
   NIGHT_TEXT, NIGHT_TEXT_MUTED, NIGHT_TITLE_SHADOW, NIGHT_SOFT_SHADOW,
-} from '../../utils/uiTheme.js';
+ Z } from '../../utils/uiTheme.js';
 import { computeStars, getLevelPar } from '../../levels/scoring.js';
 
 /**
@@ -157,7 +157,7 @@ const VictoryScreen = ({
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      zIndex: 3000,
+      zIndex: Z.CELEBRATION,
       animation: 'vsFadeIn 0.45s ease-out',
       padding: 'max(16px, env(safe-area-inset-top, 0px)) 16px max(16px, env(safe-area-inset-bottom, 0px))',
       boxSizing: 'border-box'

@@ -3,12 +3,12 @@ import {
   UI_FONT, PAPER_BACKDROP, PAPER_BACKDROP_BLUR, PAPER_SHEET, PAPER_SHEET_RAISED,
   PAPER_BORDER, PAPER_BORDER_SOFT, PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT,
   PAPER_BG_MUTED, PAPER_CARD_SHADOW, PAPER_SHADOW,
-} from '../../utils/uiTheme.js';
+ Z } from '../../utils/uiTheme.js';
 
 const panelStyle = {
   position: 'fixed',
   inset: 0,
-  zIndex: 9998,
+  zIndex: Z.FULLSCREEN,
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',

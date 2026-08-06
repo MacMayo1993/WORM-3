@@ -16,7 +16,7 @@ import {
   PAPER_BORDER_SOFT, PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT,
   PAPER_BG_MUTED, PAPER_CARD_SHADOW, UI_CREAM,
   NIGHT_TEXT_MUTED,
-} from '../../utils/uiTheme.js';
+ Z } from '../../utils/uiTheme.js';
 import { isMobile } from '../../utils/device.js';
 import { wizardPaperBackground, WIZARD_FOOTER_BG, PENCIL_LEAD } from './WizardChrome.jsx';
 import WormPreviewCanvas from '../../3d/WormPreviewCanvas.jsx';
@@ -505,7 +505,7 @@ const ParityStoreScreen = ({ onClose }) => {
 
   return (
     <div style={{
-      position: 'fixed', inset: 0, zIndex: 99999,
+      position: 'fixed', inset: 0, zIndex: Z.TOAST,
       display: 'flex', flexDirection: 'column',
       ...wizardPaperBackground,
       fontFamily: FONT,

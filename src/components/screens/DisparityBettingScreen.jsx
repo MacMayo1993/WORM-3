@@ -8,7 +8,7 @@ import {
   UI_FONT, PAPER_BACKDROP, PAPER_BACKDROP_BLUR, PAPER_SHEET, PAPER_SHEET_RAISED,
   PAPER_BORDER, PAPER_BORDER_SOFT, PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT,
   PAPER_FOOTER_BG, PAPER_BG_MUTED, PAPER_CARD_SHADOW, PAPER_SHADOW,
-} from '../../utils/uiTheme.js';
+ Z } from '../../utils/uiTheme.js';
 
 const ACCENT = '#C44B00';
 const ACCENT_SHADOW = '#7a2e00';
@@ -16,7 +16,7 @@ const WAGER_PRESETS = [10, 25, 50, 100, 250, 500];
 
 const S = {
   overlay: {
-    position: 'fixed', inset: 0, zIndex: 9998,
+    position: 'fixed', inset: 0, zIndex: Z.FULLSCREEN,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     background: PAPER_BACKDROP, backdropFilter: PAPER_BACKDROP_BLUR, WebkitBackdropFilter: PAPER_BACKDROP_BLUR,
     padding: '12px',

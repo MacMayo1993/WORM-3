@@ -12,7 +12,8 @@
  */
 
 import React, { Suspense, useEffect, useRef, useState } from 'react';
-import { MONO_FONT } from '../utils/uiTheme.js';
+import { MONO_FONT, UI_FONT, NIGHT_SHEET, NIGHT_BORDER, NIGHT_TEXT, TEXT_SM, RADIUS_PILL, Z } from '../utils/uiTheme.js';
+import { TOUCH_TARGET } from './ui/index.js';
 import { useGameStore } from '../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import ScreenTransition from './ScreenTransition.jsx';
@@ -256,21 +257,31 @@ export default function UILayer({
           onToggleAntipodalPiP={onToggleAntipodalPiP}
         />}
 
-        {/* Undo Indicator — desktop only (mobile uses MobileControls) */}
+        {/* Undo Indicator — desktop only (mobile uses MobileControls).
+            Was hardcoded black-on-white monospace, predating the field-guide
+            system; now the NIGHT surface, and a real <button> so it is
+            reachable by keyboard and announces its move count. */}
         {moveHistory.length > 0 && !isMobile && !demoDialogueVisible && (
-          <div
+          <button
+            type="button"
+            className="ui-focusable"
             style={{
               position: 'fixed', bottom: '20px', left: '20px',
-              background: 'rgba(0, 0, 0, 0.80)', border: '2px solid rgba(255, 255, 255, 0.25)',
-              borderRadius: '8px', padding: '8px 16px', color: '#ffffff',
-              fontFamily: MONO_FONT, fontSize: '14px', fontWeight: 'bold',
-              zIndex: 100, backdropFilter: 'blur(10px)', cursor: 'pointer',
+              display: 'inline-flex', alignItems: 'center', gap: '8px',
+              minHeight: TOUCH_TARGET,
+              background: NIGHT_SHEET, border: `1px solid ${NIGHT_BORDER}`,
+              borderRadius: RADIUS_PILL, padding: '8px 18px', color: NIGHT_TEXT,
+              fontFamily: UI_FONT, fontSize: TEXT_SM, fontWeight: 700,
+              zIndex: Z.HUD, backdropFilter: 'blur(10px)', cursor: 'pointer',
             }}
             onClick={undo}
             title="Click or press Z to undo"
+            aria-label={`Undo last move. ${moveHistory.length} ${moveHistory.length === 1 ? 'move' : 'moves'} available.`}
           >
-            Z: Undo ({moveHistory.length})
-          </div>
+            <span aria-hidden="true">↺</span>
+            Undo
+            <span style={{ fontFamily: MONO_FONT, opacity: 0.65, fontVariantNumeric: 'tabular-nums' }}>{moveHistory.length}</span>
+          </button>
         )}
 
         {/* Auto-rotate Preview */}
@@ -295,7 +306,7 @@ export default function UILayer({
         {/* Disparity countdown — 3-2-1-GO overlay before chaos starts */}
         {disparityCountdown !== null && (
           <div style={{
-            position: 'fixed', inset: 0, zIndex: 8000,
+            position: 'fixed', inset: 0, zIndex: Z.COUNTDOWN,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             pointerEvents: 'none',
           }}>
@@ -518,7 +529,13 @@ export default function UILayer({
         </Suspense>
       </ScreenTransition>
 
-      <ScreenTransition show={showSettings}>
+      {/* Settings and Help are both reachable from the main menu, which sits at
+          Z.MENU. ScreenTransition's wrapper sets `will-change: opacity` and so
+          becomes a stacking context — the panel's own z-index only competes
+          inside it, and at `auto` the wrapper lost to the menu. Both were
+          opening fully hidden behind the logo. The layer belongs on the
+          wrapper, which is what ScreenTransition's `style` prop is for. */}
+      <ScreenTransition show={showSettings} style={{ position: 'relative', zIndex: Z.MENU_DIALOG }}>
         <SettingsMenu
           onClose={() => setShowSettings(false)}
           settings={settings}
@@ -580,7 +597,7 @@ export default function UILayer({
       </ScreenTransition>
 
 
-      <ScreenTransition show={showHelp}>
+      <ScreenTransition show={showHelp} style={{ position: 'relative', zIndex: Z.MENU_DIALOG }}>
         <HelpMenu onClose={() => setShowHelp(false)} />
       </ScreenTransition>
 
@@ -784,7 +801,7 @@ function ViewModeFlash() {
     <div
       key={tick}
       style={{
-        position: 'fixed', inset: 0, zIndex: 9990, pointerEvents: 'none',
+        position: 'fixed', inset: 0, zIndex: Z.FLASH, pointerEvents: 'none',
         background: 'radial-gradient(ellipse at center, rgba(255,255,255,0.16) 0%, rgba(120,180,255,0.09) 45%, transparent 70%)',
         animation: 'viewModeFlash 0.45s ease-out forwards',
       }}
@@ -799,7 +816,7 @@ function RandomStyleFlash() {
     <div
       key={tick}
       style={{
-        position: 'fixed', inset: 0, zIndex: 9990, pointerEvents: 'none',
+        position: 'fixed', inset: 0, zIndex: Z.FLASH, pointerEvents: 'none',
         background: 'radial-gradient(ellipse at center, rgba(255,255,255,0.18) 0%, rgba(180,120,255,0.10) 45%, transparent 72%)',
         animation: 'randomFlash 0.5s ease-out forwards',
       }}

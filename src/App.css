@@ -3678,3 +3678,39 @@ select.btn-compact:disabled {
     animation: none !important;
   }
 }
+
+/* =====================================================================
+   Shared focus + interaction states for the UI primitives
+   (src/components/ui/). These live in CSS because :focus-visible and
+   :hover cannot be expressed in a React style object — which is exactly
+   why the game's 200-odd inline-styled buttons had no focus ring at all.
+   ===================================================================== */
+
+.ui-focusable:focus {
+  outline: none;
+}
+
+/* Keyboard users get a ring; mouse and touch users do not. Two rings so the
+   inner cream keeps it visible against moss green and dark night panels
+   alike, where a single dark ring would disappear into the button. */
+.ui-focusable:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px rgba(255, 253, 242, 0.92),
+    0 0 0 5px var(--border-focus, #5f7f4a);
+}
+
+.ui-focusable:hover:not(:disabled) {
+  filter: brightness(1.07);
+}
+
+.ui-focusable:active:not(:disabled) {
+  transform: translateY(1px);
+  filter: brightness(0.96);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-focusable:active:not(:disabled) {
+    transform: none;
+  }
+}

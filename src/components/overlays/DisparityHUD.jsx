@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useGameStore } from '../../hooks/useGameStore.js';
 import { useShallow } from 'zustand/react/shallow';
 import { FACE_COLORS } from '../../utils/constants.js';
-import { UI_FONT } from '../../utils/uiTheme.js';
+import { UI_FONT, Z } from '../../utils/uiTheme.js';
 
 const FACE_NAMES = { 1: 'RED', 2: 'GREEN', 3: 'WHITE', 4: 'ORANGE', 5: 'BLUE', 6: 'YELLOW' };
 const FACE_ELIMINATION_LIFETIME = 2500; // ms to show the face elimination banner
@@ -24,7 +24,7 @@ const CONTAINER_STYLE = {
   display: 'flex',
   flexDirection: 'column-reverse',
   gap: '5px',
-  zIndex: 200,
+  zIndex: Z.HUD_RAISED,
   pointerEvents: 'none',
   maxWidth: '260px',
 };

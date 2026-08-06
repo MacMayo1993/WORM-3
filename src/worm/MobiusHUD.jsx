@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useGameStore } from '../hooks/useGameStore.js';
-import { MONO_FONT } from '../utils/uiTheme.js';
+import { MONO_FONT, Z } from '../utils/uiTheme.js';
 import { useShallow } from 'zustand/react/shallow';
 import { tunnelState } from './tunnelProgressBridge.js';
 
@@ -64,7 +64,7 @@ export default function MobiusHUD() {
             left: '50%',
             transform: `translateX(-50%) translateY(${isActive ? '0' : '-20px'})`,
             pointerEvents: 'none',
-            zIndex: 900,
+            zIndex: Z.NAV,
             opacity: isActive ? 1 : 0,
             transition: 'opacity 0.3s ease, transform 0.3s ease',
         }}>

@@ -14,7 +14,7 @@ import {
   UI_FONT, DISPLAY_FONT, PAPER_SHEET_RAISED, PAPER_BORDER, PAPER_BORDER_SOFT,
   PAPER_TEXT, PAPER_TEXT_MUTED, PAPER_TEXT_FAINT, PAPER_BG_MUTED,
   PAPER_CARD_SHADOW, UI_MOSS,
-} from '../../utils/uiTheme.js';
+ Z } from '../../utils/uiTheme.js';
 import { wizardPaperBackground } from './WizardChrome.jsx';
 
 const STARS_PER_LEVEL = 3;
@@ -36,7 +36,7 @@ export default function PackSelectScreen({ onSelectPack, onBack }) {
 
   return (
     <div style={{
-      position: 'fixed', inset: 0, height: '100dvh', zIndex: 2000,
+      position: 'fixed', inset: 0, height: '100dvh', zIndex: Z.MODAL_RAISED,
       ...wizardPaperBackground,
       display: 'flex', flexDirection: 'column', alignItems: 'center',
       fontFamily: UI_FONT, animation: 'lvSelIn 0.3s ease',

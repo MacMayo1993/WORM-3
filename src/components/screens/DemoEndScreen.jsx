@@ -2,7 +2,7 @@ import React from 'react';
 import {
   UI_FONT, DISPLAY_FONT,
   UI_CREAM, UI_MOSS, UI_ACTION_SHADOW,
-} from '../../utils/uiTheme.js';
+ Z } from '../../utils/uiTheme.js';
 
 // Six-mode landing: the demo taught rotate → twin → flip → views → worm →
 // chaos → random → store, and this screen sends the player into the real mode
@@ -28,7 +28,7 @@ const DemoEndScreen = ({ onWorm, onStory, onFreeplay, onChaos, onRandom, onStore
 
   return (
     <div style={{
-      position: 'fixed', inset: 0, zIndex: 12000,
+      position: 'fixed', inset: 0, zIndex: Z.DEMO,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       background: 'radial-gradient(ellipse at center, rgba(24,31,18,0.34), rgba(24,31,18,0.62))',
       backdropFilter: 'blur(9px) saturate(1.03)',

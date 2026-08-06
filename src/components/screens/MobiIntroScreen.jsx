@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { UI_FONT, HAND_FONT } from '../../utils/uiTheme.js';
+import { UI_FONT, HAND_FONT, Z } from '../../utils/uiTheme.js';
 
 // ── Dialogue banks ────────────────────────────────────────────────────────────
 
@@ -261,7 +261,7 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete, primaryLab
         top: topInset || 0,
         // Above all in-game chrome (nav bar, HUD, mobile controls) — a Mobi
         // dialogue is a blocking beat; only demo shell overlays sit higher.
-        zIndex: 10500,
+        zIndex: Z.INTRO,
         background: 'linear-gradient(to top, rgba(34, 31, 25, 0.38) 0%, rgba(34, 31, 25, 0.10) 42%, transparent 68%)',
         pointerEvents: isDismissing ? 'none' : 'auto',
         cursor: isDismissing ? 'default' : 'pointer',

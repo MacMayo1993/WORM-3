@@ -1,150 +1,74 @@
+// HelpMenu — "How to Play".
+//
+// This screen was the last holdout of the cold navy glass family that
+// uiTheme.js records as removed: a #080a16 backdrop, #e8edf8 ink, and blue-grey
+// muted text, all hardcoded. Over the warm field-guide game it read as a
+// different app. It now takes the NIGHT surface (it layers over the live scene,
+// so PAPER would be wrong) via the shared primitives, which also gives it the
+// Escape handling, focus trap, and dialog semantics it never had.
+
 import React from 'react';
-import { UI_FONT } from '../../utils/uiTheme.js';
+import { UI_FONT, NIGHT_TEXT, NIGHT_TEXT_MUTED, NIGHT_PANEL, NIGHT_BORDER, UI_GOLD, UI_MOSS_LIGHT, TEXT_XS, TEXT_SM, RADIUS_SM, RADIUS_MD, Z } from '../../utils/uiTheme.js';
+import { Overlay, Panel, PanelHeader, PanelBody, PanelSectionTitle } from '../ui/index.js';
+
+const ROW_STYLE = {
+  display: 'flex',
+  gap: '10px',
+  padding: '7px 10px',
+  borderRadius: RADIUS_SM,
+  background: NIGHT_PANEL,
+  border: `1px solid ${NIGHT_BORDER}`
+};
 
 const Section = ({ title, children }) => (
   <section style={{ marginBottom: '24px' }}>
-    <h3 style={{
-      margin: '0 0 10px',
-      fontSize: '11px',
-      fontWeight: 700,
-      color: 'rgba(180, 210, 255, 0.40)',
-      textTransform: 'uppercase',
-      letterSpacing: '0.10em',
-    }}>{title}</h3>
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-      {children}
-    </div>
+    <PanelSectionTitle surface="night">{title}</PanelSectionTitle>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>{children}</div>
   </section>
 );
 
 const Row = ({ label, desc }) => (
-  <div style={{
-    display: 'flex',
-    alignItems: 'baseline',
-    gap: '10px',
-    padding: '6px 10px',
-    borderRadius: '8px',
-    background: 'rgba(255, 255, 255, 0.05)',
-    border: '1px solid rgba(255, 255, 255, 0.08)',
-    fontSize: '13px',
-    lineHeight: 1.5,
-  }}>
-    <span style={{ fontWeight: 600, color: '#e8edf8', whiteSpace: 'nowrap', flexShrink: 0 }}>{label}</span>
-    <span style={{ color: 'rgba(200, 220, 255, 0.60)' }}>{desc}</span>
+  <div style={{ ...ROW_STYLE, alignItems: 'baseline', fontSize: TEXT_SM, lineHeight: 1.5 }}>
+    <span style={{ fontWeight: 600, color: NIGHT_TEXT, whiteSpace: 'nowrap', flexShrink: 0 }}>{label}</span>
+    <span style={{ color: NIGHT_TEXT_MUTED }}>{desc}</span>
   </div>
 );
 
 const KeyRow = ({ keys, desc }) => (
-  <div style={{
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-    padding: '6px 10px',
-    borderRadius: '8px',
-    background: 'rgba(255, 255, 255, 0.05)',
-    border: '1px solid rgba(255, 255, 255, 0.08)',
-  }}>
+  <div style={{ ...ROW_STYLE, alignItems: 'center' }}>
     <span style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
       {keys.split('/').map((k, i) => (
-        <kbd key={i} style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '2px 7px',
-          background: 'rgba(255, 255, 255, 0.08)',
-          border: '1px solid rgba(255, 255, 255, 0.16)',
-          borderRadius: '5px',
-          fontSize: '11px',
-          fontWeight: 600,
-          fontFamily: UI_FONT,
-          color: '#e8edf8',
-          minWidth: '22px',
-        }}>{k.trim()}</kbd>
+        <kbd
+          key={i}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '2px 7px',
+            background: 'rgba(255,253,242,0.10)',
+            border: `1px solid ${NIGHT_BORDER}`,
+            borderRadius: '5px',
+            fontSize: TEXT_XS,
+            fontWeight: 600,
+            fontFamily: UI_FONT,
+            color: NIGHT_TEXT,
+            minWidth: '22px'
+          }}
+        >
+          {k.trim()}
+        </kbd>
       ))}
     </span>
-    <span style={{ fontSize: '13px', color: 'rgba(200, 220, 255, 0.60)', lineHeight: 1.4 }}>{desc}</span>
+    <span style={{ fontSize: TEXT_SM, color: NIGHT_TEXT_MUTED, lineHeight: 1.4 }}>{desc}</span>
   </div>
 );
 
 const HelpMenu = ({ onClose }) => (
-  <div
-    onClick={onClose}
-    style={{
-      position: 'fixed',
-      top: 0, left: 0, right: 0, bottom: 0,
-      height: '100dvh',
-      background: 'rgba(8, 10, 22, 0.72)',
-      backdropFilter: 'blur(24px)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1000,
-      padding: 'env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px)',
-      boxSizing: 'border-box',
-      animation: 'modalBackdropIn 0.22s ease',
-    }}
-  >
-    <div
-      onClick={e => e.stopPropagation()}
-      style={{
-        background: 'rgba(14, 17, 38, 0.94)',
-        border: '1px solid rgba(255, 255, 255, 0.06)',
-        borderRadius: '20px',
-        padding: '0',
-        maxWidth: '560px',
-        width: '92%',
-        maxHeight: 'calc(100dvh - 48px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))',
-        overflowY: 'auto',
-        boxShadow: '0 32px 80px rgba(0,0,0,0.60), 0 0 0 1px rgba(255,255,255,0.06)',
-        backdropFilter: 'blur(24px)',
-        boxSizing: 'border-box',
-        fontFamily: UI_FONT,
-        animation: 'modalSheetIn 0.30s cubic-bezier(0.22, 1, 0.36, 1)',
-      }}
-    >
-      {/* Header */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: '20px 24px',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-        position: 'sticky',
-        top: 0,
-        background: 'rgba(14, 17, 38, 0.96)',
-        backdropFilter: 'blur(24px)',
-        borderRadius: '20px 20px 0 0',
-        zIndex: 1,
-      }}>
-        <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 600, color: '#e8edf8', letterSpacing: '0.01em' }}>
-          How to Play
-        </h2>
-        <button
-          onClick={onClose}
-          style={{
-            background: 'transparent',
-            border: 'none',
-            color: 'rgba(200, 220, 255, 0.45)',
-            width: '36px',
-            height: '36px',
-            borderRadius: '50%',
-            cursor: 'pointer',
-            fontSize: '20px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transition: 'background 0.15s ease, color 0.15s ease',
-          }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#e8edf8'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(200,220,255,0.45)'; }}
-        >
-          &times;
-        </button>
-      </div>
+  <Overlay surface="night" zIndex={Z.MENU_DIALOG} onClose={onClose} labelledBy="help-title">
+    <Panel surface="night" width={560}>
+      <PanelHeader surface="night" title="How to Play" titleId="help-title" onClose={onClose} />
 
-      {/* Content */}
-      <div style={{ padding: '20px 24px 24px' }}>
-
+      <PanelBody>
         <Section title="The One Rule That Isn't Rubik's">
           <Row label="Every tile has a twin" desc="Directly opposite it, through the middle of the cube" />
           <Row label="Flipping" desc="Tap a tile to swap it with its twin — both change at once" />
@@ -197,11 +121,7 @@ const HelpMenu = ({ onClose }) => (
         </Section>
 
         <Section title="Hands Mode (P) — Speedcuber">
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '6px',
-          }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
             <KeyRow keys="I / K" desc="U / U'" />
             <KeyRow keys="O" desc="U2" />
             <KeyRow keys="J / L" desc="R / R'" />
@@ -226,24 +146,27 @@ const HelpMenu = ({ onClose }) => (
           <KeyRow keys="Esc" desc="Close menus / exit Hands Mode" />
         </Section>
 
-        {/* Footnote */}
-        <div style={{
-          marginTop: '8px',
-          padding: '14px 16px',
-          background: 'rgba(30, 136, 229, 0.10)',
-          borderRadius: '12px',
-          fontSize: '13px',
-          color: 'rgba(200, 220, 255, 0.65)',
-          lineHeight: 1.6,
-          border: '1px solid rgba(30, 136, 229, 0.22)',
-        }}>
-          <strong style={{ color: '#60a5fa' }}>What you're learning:</strong> This puzzle demonstrates a special mathematical space —
-          the real projective plane — where opposite points are the same location.
-          When you flip a color you're creating a connection through this space. That's what the tunnels represent.
+        {/* Footnote — the one place this screen earns an accent, so it reads as
+            an aside rather than another row. Gold on moss, not the old blue. */}
+        <div
+          style={{
+            marginTop: '8px',
+            padding: '14px 16px',
+            background: 'rgba(159,219,122,0.08)',
+            borderRadius: RADIUS_MD,
+            fontSize: TEXT_SM,
+            color: NIGHT_TEXT_MUTED,
+            lineHeight: 1.6,
+            border: `1px solid ${UI_MOSS_LIGHT}33`
+          }}
+        >
+          <strong style={{ color: UI_GOLD }}>What you're learning:</strong> This puzzle demonstrates a special mathematical space —
+          the real projective plane — where opposite points are the same location. When you flip a color you're creating a connection
+          through this space. That's what the tunnels represent.
         </div>
-      </div>
-    </div>
-  </div>
+      </PanelBody>
+    </Panel>
+  </Overlay>
 );
 
 export default HelpMenu;

@@ -1,4 +1,5 @@
 import React from 'react';
+import { Z } from '../../utils/uiTheme.js';
 
 /**
  * Tile Rotation Selector - Shows directional arrows when a tile is tapped
@@ -14,7 +15,7 @@ const TileRotationSelector = ({ onRotate, onCancel, onRotateFaceCW, onRotateFace
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 1000,
+    zIndex: Z.MODAL,
     pointerEvents: 'auto'
   };
 
