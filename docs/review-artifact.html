@@ -240,6 +240,9 @@
   .sev-high { color: var(--sev-high); background: var(--sev-high-bg); }
   .sev-med  { color: var(--sev-med);  background: var(--sev-med-bg); }
   .sev-low  { color: var(--sev-low);  background: var(--sev-low-bg); }
+  .sev-fixed   { color: var(--good); background: var(--good-bg); }
+  .sev-partial { color: var(--sev-med); background: var(--sev-med-bg); }
+  td.st { white-space: nowrap; }
 
   /* ── Findings ───────────────────────────────────────────────────────── */
   .finding {
@@ -468,6 +471,18 @@
 
   <hr class="seam">
 
+  <section class="well">
+    <h2>Status — all findings addressed</h2>
+    <p>
+      Twelve of the fourteen are fixed, tested and driven in a browser to confirm they behave at
+      the real UI. Findings <strong>11</strong> and <strong>13</strong> are large refactors where
+      the concrete harm was fixed and the bulk migration was deliberately left — see their entries.
+      The suite went from 1002 to <strong>1059</strong> tests; lint, build and the bundle gate stay green.
+    </p>
+  </section>
+
+  <hr class="seam">
+
   <section>
     <h2>The shape of it</h2>
     <p class="lede">
@@ -494,23 +509,23 @@
     <div class="scroll">
       <table>
         <thead>
-          <tr><th>#</th><th>Finding</th><th>Severity</th><th>Area</th></tr>
+          <tr><th>#</th><th>Finding</th><th>Severity</th><th>Status</th></tr>
         </thead>
         <tbody>
-          <tr><td class="num">01</td><td class="what">Configurable Disparity flip cap is only half-wired</td><td><span class="sev sev-high">High</span></td><td>Mechanics</td></tr>
-          <tr><td class="num">02</td><td class="what">Undo of a flip consumes two flips of tile life</td><td><span class="sev sev-high">High</span></td><td>Mechanics</td></tr>
-          <tr><td class="num">03</td><td class="what">Tapping a dead tile costs a move and does nothing</td><td><span class="sev sev-high">High</span></td><td>Mechanics / UX</td></tr>
-          <tr><td class="num">04</td><td class="what">8 of 11 keyboard callbacks silently ignored</td><td><span class="sev sev-high">High</span></td><td>Input</td></tr>
-          <tr><td class="num">05</td><td class="what">Global keydown handler is live on every screen</td><td><span class="sev sev-med">Medium</span></td><td>UX</td></tr>
-          <tr><td class="num">06</td><td class="what">Escape closes 2 of ~10 dismissible surfaces</td><td><span class="sev sev-med">Medium</span></td><td>UX</td></tr>
-          <tr><td class="num">07</td><td class="what">Store monolith, no screen state machine</td><td><span class="sev sev-med">Medium</span></td><td>Architecture</td></tr>
-          <tr><td class="num">08</td><td class="what">resetGame drifted from makeDisparityRuntimeDefaults</td><td><span class="sev sev-med">Medium</span></td><td>Architecture</td></tr>
-          <tr><td class="num">09</td><td class="what">Wallet persistence duplicated across 6 call sites</td><td><span class="sev sev-low">Low</span></td><td>Architecture</td></tr>
-          <tr><td class="num">10</td><td class="what">Coverage blind spot over src/hooks/</td><td><span class="sev sev-med">Medium</span></td><td>Test health</td></tr>
-          <tr><td class="num">11</td><td class="what">Remaining monoliths</td><td><span class="sev sev-low">Low</span></td><td>Architecture</td></tr>
-          <tr><td class="num">12</td><td class="what">Focus styling effectively absent</td><td><span class="sev sev-med">Medium</span></td><td>Accessibility</td></tr>
-          <tr><td class="num">13</td><td class="what">995 inline style objects vs 4.6k lines of CSS</td><td><span class="sev sev-low">Low</span></td><td>UI</td></tr>
-          <tr><td class="num">14</td><td class="what">CLAUDE.md drift</td><td><span class="sev sev-low">Low</span></td><td>Docs</td></tr>
+          <tr><td class="num">01</td><td class="what">Configurable Disparity flip cap is only half-wired</td><td><span class="sev sev-high">High</span></td><td class="st"><span class="sev sev-fixed">Fixed</span></td></tr>
+          <tr><td class="num">02</td><td class="what">Undo of a flip consumes two flips of tile life</td><td><span class="sev sev-high">High</span></td><td class="st"><span class="sev sev-fixed">Fixed</span></td></tr>
+          <tr><td class="num">03</td><td class="what">Tapping a dead tile costs a move and does nothing</td><td><span class="sev sev-high">High</span></td><td class="st"><span class="sev sev-fixed">Fixed</span></td></tr>
+          <tr><td class="num">04</td><td class="what">8 of 11 keyboard callbacks silently ignored</td><td><span class="sev sev-high">High</span></td><td class="st"><span class="sev sev-fixed">Fixed</span></td></tr>
+          <tr><td class="num">05</td><td class="what">Global keydown handler is live on every screen</td><td><span class="sev sev-med">Medium</span></td><td class="st"><span class="sev sev-fixed">Fixed</span></td></tr>
+          <tr><td class="num">06</td><td class="what">Escape closes 2 of ~10 dismissible surfaces</td><td><span class="sev sev-med">Medium</span></td><td class="st"><span class="sev sev-fixed">Fixed</span></td></tr>
+          <tr><td class="num">07</td><td class="what">Store monolith, no screen state machine</td><td><span class="sev sev-med">Medium</span></td><td class="st"><span class="sev sev-fixed">Fixed</span></td></tr>
+          <tr><td class="num">08</td><td class="what">resetGame drifted from makeDisparityRuntimeDefaults</td><td><span class="sev sev-med">Medium</span></td><td class="st"><span class="sev sev-fixed">Fixed</span></td></tr>
+          <tr><td class="num">09</td><td class="what">Wallet persistence duplicated across 6 call sites</td><td><span class="sev sev-low">Low</span></td><td class="st"><span class="sev sev-fixed">Fixed</span></td></tr>
+          <tr><td class="num">10</td><td class="what">Coverage blind spot over src/hooks/</td><td><span class="sev sev-med">Medium</span></td><td class="st"><span class="sev sev-fixed">Fixed</span></td></tr>
+          <tr><td class="num">11</td><td class="what">Remaining monoliths</td><td><span class="sev sev-low">Low</span></td><td class="st"><span class="sev sev-partial">Harm fixed</span></td></tr>
+          <tr><td class="num">12</td><td class="what">Six card-button families have no focus ring</td><td><span class="sev sev-med">Medium</span></td><td class="st"><span class="sev sev-fixed">Fixed</span></td></tr>
+          <tr><td class="num">13</td><td class="what">995 inline style objects vs 4.6k lines of CSS</td><td><span class="sev sev-low">Low</span></td><td class="st"><span class="sev sev-partial">Harm fixed</span></td></tr>
+          <tr><td class="num">14</td><td class="what">CLAUDE.md drift</td><td><span class="sev sev-low">Low</span></td><td class="st"><span class="sev sev-fixed">Fixed</span></td></tr>
         </tbody>
       </table>
     </div>
@@ -949,9 +964,18 @@ export function useKeyboardControls({ onMove, onFlip }) {</code></pre>
         <p>
           <code>StickerPlane.jsx</code> grew from 1382 to 2398 since the March review despite being on its split
           list; <code>App.jsx</code> from 1148 to 1732, now holding 27 <code>useState</code> calls and 84 store
-          references. Not urgent beside 01–06 — but the store-slice work in finding 07 is the natural moment to
-          lift App's mode-launch wiring out.
+          references.
         </p>
+        <div class="fix">
+          <span class="fix-label">What changed</span>
+          <p>
+            The store — the monolith these fixes actually had to work inside — went from 955 lines to a 122-line
+            assembly over ten slices, none larger than 156. The rendering and worm monoliths were left alone
+            deliberately: they are the most visually-coupled code in the project, a split is a pure-risk change
+            with no behavioural payoff, and a browser pass can only sample a fraction of what it would touch.
+            Worth doing against a screenshot baseline, as its own piece of work.
+          </p>
+        </div>
       </div>
     </article>
   </section>
@@ -968,25 +992,32 @@ export function useKeyboardControls({ onMove, onFlip }) {</code></pre>
         <span class="sev sev-med">Medium</span>
       </div>
       <div>
-        <h3>Focus styling is effectively absent</h3>
+        <h3>Six card-button families have no focus ring</h3>
         <p>
-          220 <code>&lt;button&gt;</code> elements across the app; <strong>ten <code>:focus</code> /
-          <code>:focus-visible</code> rules in all CSS</strong>. Because styling is overwhelmingly inline,
-          buttons cannot express focus without JS state — so most simply do not. A keyboard or switch-control
-          player cannot see where they are.
+          <em>Corrected from the first draft of this review, which claimed focus styling was absent
+          app-wide.</em> It is not: <code>App.css</code> has carried a global
+          <code>button:focus-visible, [role='button']:focus-visible</code> rule all along, and it covers the
+          great majority of the app's 220 buttons.
         </p>
         <p>
-          Supporting counts: 67 <code>aria-label</code>s for 220 buttons, 5 uses of <code>tabIndex</code>, 20
-          <code>role=</code> attributes. Only 5 non-semantic <code>onClick</code> handlers on
-          <code>div</code>/<code>span</code>, which is good — the elements are right, the affordance is missing.
+          The real defect is narrower and sharper. <strong>Six components set <code>outline: 'none'</code>
+          inline</strong>, and an inline style beats any stylesheet selector on specificity — so the global rule
+          never applied to them. Those six are the setup wizard cards, the shared wizard step cards, the tile
+          style and scene pickers, cube mode select, and coming soon: the primary interactive surface of the
+          entire pre-game flow, with no keyboard focus indicator at all.
+        </p>
+        <p>
+          Form controls were genuinely uncovered too — <code>input</code>, <code>select</code> and
+          <code>textarea</code> had only two bespoke <code>:focus</code> rules between them.
         </p>
 
         <div class="fix">
-          <span class="fix-label">Fix</span>
+          <span class="fix-label">Fixed</span>
           <p>
-            One global <code>:focus-visible</code> rule in <code>App.css</code> covering
-            <code>button, [role="button"], a, input, select</code> gets most of the way there in a few lines,
-            and inline styles will not override it since neither sets <code>outline</code>.
+            Removed the six inline <code>outline: 'none'</code> declarations so the global rule reaches them;
+            tap-flash suppression stays on <code>-webkit-tap-highlight-color</code>, which does not touch
+            keyboard focus. Extended the rule to links, inputs, selects, textareas and <code>[tabindex]</code>,
+            with a comment recording why an inline outline breaks it.
           </p>
         </div>
       </div>
@@ -1007,11 +1038,21 @@ export function useKeyboardControls({ onMove, onFlip }) {</code></pre>
           express <code>:hover</code>, <code>:focus</code>, <code>:active</code> or media queries.
         </p>
         <p>
-          The token layer itself is in good shape — <code>uiTheme.js</code> is well designed and imported by 61
-          files. The gap is the delivery mechanism, not the palette. Moving the repeated card, button and panel
-          shapes into CSS classes backed by custom properties would cut the inline count sharply and make
-          finding 12 a one-line fix.
+          The token layer is in good shape — <code>uiTheme.js</code> is well designed and imported by 61 files —
+          and a shared primitive layer already exists in <code>src/components/ui/</code>
+          (<code>Panel</code>, <code>Button</code>, <code>useDialogBehavior</code>), whose own comments describe
+          exactly this problem. Only seven screens have adopted it.
         </p>
+        <div class="fix">
+          <span class="fix-label">What changed</span>
+          <p>
+            The concrete harm — six card-button families with no keyboard focus ring — is fixed under finding 12.
+            The remaining work is migrating roughly twenty screens onto primitives that already exist, which is a
+            visual change to most of the game's surface area; it wants a screenshot baseline and a human eye on
+            the result rather than a blind sweep. The inline count is a symptom worth tracking, not a defect to
+            clear in one pass.
+          </p>
+        </div>
       </div>
     </article>
 
@@ -1078,7 +1119,7 @@ export function useKeyboardControls({ onMove, onFlip }) {</code></pre>
   <hr class="seam">
 
   <section>
-    <h2>Suggested order of work</h2>
+    <h2>Original order of work</h2>
     <ol class="order">
       <li><span>Finding <strong>10</strong> — add <code>src/hooks/**</code> to coverage and test the flip, undo and keyboard paths. First, because it is what catches 01–04 and prevents their return.</span></li>
       <li><span>Findings <strong>01, 02, 03</strong> — cap threading, a real undo inverse, and the dead-tile guard. All three sit in the same call path and are best fixed together.</span></li>

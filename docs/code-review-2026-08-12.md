@@ -6,6 +6,15 @@
 
 The previous review (`CODE_REVIEW.md`, 2026-03-17) covered ~49,600 LOC. The tree has since grown ~83%. Several of that review's structural recommendations were carried out — the setup-wizard duplication is gone, shaders are extracted into `src/3d/styles/shaders/`, and `HealerWormMode` was split into `useWormCrawler` + `healerWorm/*`. This review is fresh and focuses on defects that the green CI does not catch.
 
+> **Status (2026-08-12, same day):** all fourteen findings addressed. Twelve are fixed, tested
+> and driven in a browser to confirm behaviour at the real UI. Findings 11 and 13 are large
+> refactors where the concrete harm was fixed and the bulk migration was deliberately left —
+> see the note at the end of each. Suite grew 1002 → 1059 tests; lint, build and bundle gate green.
+>
+> **Correction:** finding 12 as first written claimed focus styling was absent app-wide. That was
+> wrong — `App.css` has always carried a global `button:focus-visible` rule. The real defect is
+> six components whose inline `outline: 'none'` beat it on specificity. Corrected in place below.
+
 ---
 
 ## Executive summary
