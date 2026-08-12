@@ -311,11 +311,12 @@ function WarmUp() {
 }
 
 /**
- * @param {{ bombsRef: {current: Array}, blastApiRef: {current: any}, size: number }} props
+ * @param {{ bombsRef: {current: Array}, membershipRef: {current: number},
+ *          blastApiRef: {current: any}, size: number }} props
  */
-export function HealerBombs({ bombsRef, blastApiRef, size }) {
+export function HealerBombs({ bombsRef, membershipRef, blastApiRef, size }) {
   const [ids, setIds] = useState([]);
-  const lastKeyRef = useRef('');
+  const lastMembershipRef = useRef(-1);
   const [bursts, setBursts] = useState([]);
   const burstSeq = useRef(0);
 
@@ -340,13 +341,16 @@ export function HealerBombs({ bombsRef, blastApiRef, size }) {
     return () => { if (blastApiRef.current) blastApiRef.current = null; };
   }, [blastApiRef]);
 
-  // Detect add/remove of bombs once per change (not per frame).
+  // Detect add/remove of bombs once per change (not per frame). The mode's frame
+  // loop bumps a counter whenever the live set actually gains or loses a bomb, so
+  // the steady state — which is nearly every frame of a run — is one integer
+  // compare. This used to map the ids into an array and join them into a string
+  // on every single frame just to find out that nothing had changed.
   useFrame(() => {
-    const live = bombsRef.current ?? [];
-    const key = live.map((b) => b.id).join(',');
-    if (key === lastKeyRef.current) return;
-    lastKeyRef.current = key;
-    setIds(live.map((b) => b.id));
+    const membership = membershipRef?.current ?? 0;
+    if (membership === lastMembershipRef.current) return;
+    lastMembershipRef.current = membership;
+    setIds((bombsRef.current ?? []).map((b) => b.id));
   });
 
   const live = bombsRef.current ?? [];
