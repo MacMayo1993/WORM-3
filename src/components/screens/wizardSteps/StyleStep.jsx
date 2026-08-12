@@ -127,7 +127,7 @@ export default function StyleStep({ cos }) {
                 transform: sel ? 'translateY(1px)' : 'none',
                 cursor: unlocked ? 'pointer' : 'not-allowed',
                 opacity: unlocked ? 1 : 0.42,
-                outline: 'none', WebkitTapHighlightColor: 'transparent',
+                WebkitTapHighlightColor: 'transparent',
                 transition: 'all 0.15s ease', fontFamily: 'inherit', overflow: 'hidden'
               }}
             >

@@ -6,7 +6,7 @@
 
 import { useCallback } from 'react';
 import { useGameStore } from './useGameStore.js';
-import { buildManifoldGridMap, flipStickerPair } from '../game/manifoldLogic.js';
+import { buildManifoldGridMap, unflipStickerPair, canUnflipStickerPair } from '../game/manifoldLogic.js';
 import { rotateSliceCubies } from '../game/cubeRotation.js';
 
 /**
@@ -60,12 +60,24 @@ export function useUndo(startAnimation) {
         });
       }
     } else if (lastMove.type === 'flip') {
-      // Flip is its own inverse — just flip again.
+      // A flip is its own inverse in COLOUR only. Re-running flipStickerPair
+      // restores the colour but spends another flip from both members of the
+      // pair, so flip-then-undo used to cost the tile two flips of its life
+      // instead of none — and on a capped tile it did nothing at all while this
+      // function still dropped the history entry and decremented the counter.
+      // unflipStickerPair hands the life back; canUnflipStickerPair tells us
+      // whether there is a flip to give back before we touch the counter.
       const { pos, dirKey } = lastMove;
-      setCubies((prev) => {
-        const freshManifoldMap = buildManifoldGridMap(prev, prev.length);
-        return flipStickerPair(prev, prev.length, pos.x, pos.y, pos.z, dirKey, freshManifoldMap);
-      });
+      const cubies = useGameStore.getState().cubies;
+      const manifoldMap = buildManifoldGridMap(cubies, cubies.length);
+      if (!canUnflipStickerPair(cubies, cubies.length, pos.x, pos.y, pos.z, dirKey, manifoldMap)) {
+        // Nothing to reverse (the pair was already unflipped, or a chaos tick
+        // healed it out from under us). Drop the stale entry but leave the move
+        // counter alone — no move is being taken back.
+        popFromHistory();
+        return;
+      }
+      setCubies(unflipStickerPair(cubies, cubies.length, pos.x, pos.y, pos.z, dirKey, manifoldMap));
       // Remove from history and decrement move counter.
       popFromHistory();
       setMoves((m) => Math.max(0, m - 1));

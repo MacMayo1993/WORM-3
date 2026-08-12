@@ -128,9 +128,12 @@ export const MODES = {
 };
 
 // Half-life acceleration: each halving of remaining distance doubles the rate.
-// Scales automatically with FLIP_CAP — e.g. at FLIP_CAP=6: flips 0-2 = 1x, 3-4 = 2x, 5 = 4x.
-export const getHalfLifeMultiplier = (flips) => {
-  if (flips >= FLIP_CAP) return 0; // dead tile
-  const remaining = FLIP_CAP - flips;
-  return Math.pow(2, Math.max(0, Math.floor(Math.log2(FLIP_CAP / remaining))));
+// Scales with the cap in force — e.g. at cap 6: flips 0-2 = 1x, 3-4 = 2x, 5 = 4x.
+// Disparity/Chaos sessions pass their configured cap (selectEffectiveFlipCap) so
+// decay accelerates against the tile life those sessions actually grant, rather
+// than against the standard-play constant.
+export const getHalfLifeMultiplier = (flips, flipCap = FLIP_CAP) => {
+  if (flips >= flipCap) return 0; // dead tile
+  const remaining = flipCap - flips;
+  return Math.pow(2, Math.max(0, Math.floor(Math.log2(flipCap / remaining))));
 };

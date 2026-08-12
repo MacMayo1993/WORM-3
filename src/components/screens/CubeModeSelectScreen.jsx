@@ -45,7 +45,6 @@ const optionButtonBase = {
   padding: '24px',
   cursor: 'pointer',
   transition: 'all 0.15s ease',
-  outline: 'none',
   fontFamily: 'inherit',
 };
 

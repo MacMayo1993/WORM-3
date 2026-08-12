@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react';
 import { getManifoldGridId } from '../../game/coordinates.js';
 import { isOnEdge } from '../../game/cubeUtils.js';
-import { ANTIPODAL_COLOR, FLIP_CAP } from '../../utils/constants.js';
+import { ANTIPODAL_COLOR } from '../../utils/constants.js';
+import { useGameStore, selectEffectiveFlipCap } from '../../hooks/useGameStore.js';
 import './TileLeaderboard.css';
 
 const faceNames = {
@@ -28,6 +29,7 @@ const faceColors = {
  * Sorted by the higher of the two flip counts, top 5.
  */
 const TileLeaderboard = ({ cubies, size, chaosMode, visible, onClose }) => {
+  const flipCap = useGameStore(selectEffectiveFlipCap);
   const topPairs = useMemo(() => {
     if (!cubies) return [];
 
@@ -43,7 +45,7 @@ const TileLeaderboard = ({ cubies, size, chaosMode, visible, onClose }) => {
               const manifoldId = getManifoldGridId(sticker, size);
               byId[manifoldId] = {
                 manifoldId,
-                flips: Math.min(sticker.flips, FLIP_CAP),
+                flips: Math.min(sticker.flips, flipCap),
                 face: sticker.orig
               };
             }
@@ -92,7 +94,7 @@ const TileLeaderboard = ({ cubies, size, chaosMode, visible, onClose }) => {
       .map((p) => ({ ...p, maxFlips: Math.max(p.flipsA, p.flipsB) }))
       .sort((a, b) => b.maxFlips - a.maxFlips)
       .slice(0, 5);
-  }, [cubies, size]);
+  }, [cubies, size, flipCap]);
 
   if (!visible) return null;
 
@@ -111,8 +113,8 @@ const TileLeaderboard = ({ cubies, size, chaosMode, visible, onClose }) => {
       ) : (
         <div className="leaderboard-entries">
           {topPairs.map((pair, idx) => {
-            const deadA = pair.flipsA >= FLIP_CAP;
-            const deadB = pair.flipsB >= FLIP_CAP;
+            const deadA = pair.flipsA >= flipCap;
+            const deadB = pair.flipsB >= flipCap;
             const bothDead = deadA && deadB;
             const eitherDead = deadA || deadB;
             return (

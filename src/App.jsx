@@ -1321,6 +1321,16 @@ export default function WORM3() {
     if (savedChaosLevel > 0) useGameStore.getState().setChaosLevel(savedChaosLevel);
   }, [reset, cancelDisparityRun, currentLevelData]);
 
+  // Surfaces that own the screen but live in App's local state rather than the
+  // store, so selectCubeInputBlocked cannot see them. Co-op is here too: the
+  // crawler reads WASD/arrows itself, and App early-returns into it below —
+  // which unmounts nothing, since this hook has already attached its listener.
+  const keyboardDisabled = coopMode
+    || showStore || showModeSelect || showCubeModeSelect || showComingSoon
+    || showMobiusCubelet || showMobiIntro || showMergeThemePicker
+    || showFreeplayWizard || showRandomWizard || showWormModeWizard
+    || showDisparityWizard || showDisparityBetting;
+
   const { performCursorRotation } = useKeyboardControls({
     onMove,
     onFlip: onTapFlip,
@@ -1332,7 +1342,7 @@ export default function WORM3() {
     onLevelJump: handleLevelSelect,
     onExecuteHandsMove: executeHandsMove,
     onToggleHandsMode: handleToggleHandsMode,
-    disabled: coopMode,
+    disabled: keyboardDisabled,
   });
 
 

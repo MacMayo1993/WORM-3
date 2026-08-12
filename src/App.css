@@ -372,10 +372,20 @@ body {
    Uses :focus-visible so touch users are unaffected.
    ======================================== */
 button:focus-visible,
-[role='button']:focus-visible {
+[role='button']:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
   outline: 2px solid var(--border-focus);
   outline-offset: 2px;
 }
+
+/* An inline `outline: 'none'` beats this rule on specificity, so a component
+   that sets one has no focus ring at all — which is what happened to the setup
+   wizard, cube-mode and coming-soon card buttons. Suppress the tap flash with
+   -webkit-tap-highlight-color instead; it does not touch keyboard focus. */
 
 /* Bottom nav items need a slightly larger offset to clear the icon */
 .nav-item:focus-visible {

@@ -119,7 +119,6 @@ const ModeCard = ({ item, isSelected, onClick, onPlay }) => {
             : `0 3px 0 #c4beb6, 0 4px 10px rgba(0,0,0,0.06)`,
         transform: isSelected ? 'translateY(1px)' : hovered ? 'translateY(-1px)' : 'none',
         fontFamily: UI_FONT,
-        outline: 'none',
         WebkitTapHighlightColor: 'transparent',
         position: 'relative',
       }}

@@ -682,6 +682,8 @@ const StickerPlane = function StickerPlane({ meta, pos, rot = [0, 0, 0], overlay
   );
   const manifoldStyles = settings?.manifoldStyles;
   // In Disparity Mode (chaosLevel > 0), use the configurable flip cap; otherwise the global constant
+  // Same decision as selectEffectiveFlipCap, kept local because both inputs are
+  // already in this component's batched subscription above.
   const effectiveFlipCap = chaosLevel > 0 ? disparityFlipCap : FLIP_CAP;
   // Dead tiles (at flip cap) are inert gray — used in useFrame and rendering
   const isDead = (meta?.flips ?? 0) >= effectiveFlipCap;

@@ -1,7 +1,8 @@
 import { useRef, useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { FLIP_CAP, TUNNEL_ANCHOR_OFFSET } from '../utils/constants.js';
+import { TUNNEL_ANCHOR_OFFSET } from '../utils/constants.js';
+import { useGameStore, selectEffectiveFlipCap } from '../hooks/useGameStore.js';
 import { makeTileGuard, setTileGuard, tileRoom } from './tunnelTileGuard.js';
 import { tunnelState } from '../worm/tunnelProgressBridge.js';
 import { applyTileFlipMotion, flipWidthPulse } from './tunnelAnchorMotion.js';
@@ -97,7 +98,7 @@ const vertexShader = `
   attribute vec3  aTangent;   // strand direction (piecewise constant per arm)
   attribute float aWidth;     // world-space strip width for this vertex
   attribute vec3  aColor;
-  attribute float aHeat;      // flips / FLIP_CAP
+  attribute float aHeat;      // flips / effective flip cap
 
   varying float vSide;
   varying float vT;
@@ -280,6 +281,7 @@ function fillCord(attrs, slot, startPos, midAPos, midBPos, endPos, width, colorA
 }
 
 const RestingCords = ({ tunnels, cubieRefs, focusIds, maxStrands }) => {
+  const flipCap = useGameStore(selectEffectiveFlipCap);
   const meshRef = useRef();
   const dimRef  = useRef(IDLE_OPACITY);
   // Cached endpoints keyed by slot-independent strand index, so we can skip the
@@ -373,7 +375,7 @@ const RestingCords = ({ tunnels, cubieRefs, focusIds, maxStrands }) => {
         cache[c]     = _vStart.x; cache[c + 1] = _vStart.y; cache[c + 2] = _vStart.z;
         cache[c + 3] = _vEnd.x;   cache[c + 4] = _vEnd.y;   cache[c + 5] = _vEnd.z;
 
-        const heat  = Math.min(1, t.flips / FLIP_CAP);
+        const heat  = Math.min(1, t.flips / flipCap);
         const width = CORD_W_MIN + (CORD_W_MAX - CORD_W_MIN) * heat;
         _colorA.set(t.color1);
         _colorB.set(t.color2);

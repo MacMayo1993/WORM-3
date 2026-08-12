@@ -91,7 +91,6 @@ export const cardStyle = (selected, accent) => ({
   transform: selected ? 'translateY(1px)' : 'none',
   cursor: 'pointer',
   transition: 'all 0.15s ease',
-  outline: 'none',
   WebkitTapHighlightColor: 'transparent',
   textAlign: 'left',
   width: '100%',
