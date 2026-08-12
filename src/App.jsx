@@ -670,6 +670,15 @@ export default function WORM3() {
 
   // The demo's floating pills stand down while a full modal owns the screen.
   const demoChromeQuiet = showStore || showSettings || showHelp;
+  // …except on the Settings step, where the demo opened Settings itself. There
+  // an open panel is the expected state, not an interruption, so suppressing
+  // the coach pill would leave that step as the only one in the demo with no
+  // visible way out — which is exactly what used to strand an unattended demo
+  // on it. Closing Settings still completes the step; this is the escape hatch
+  // for a player who does not want to.
+  const demoCoachQuiet = demoStep === 'make-it-yours'
+    ? (showStore || showHelp)
+    : demoChromeQuiet;
 
   // Home during the demo is a real exit, not just a screen change: without this
   // the demo's overlays kept rendering over the main menu and its borrowed look
@@ -1655,8 +1664,8 @@ export default function WORM3() {
         <MobiIntroScreen
           lines={MOBI_LINES_DEMO_INTRO}
           modeName="Demo"
-          primaryLabel="▶ Let's Go"
-          skipLabel="Skip Intro"
+          primaryLabel="Let's Go ▶"
+          skipLabel="Skip Intro ▶"
           onComplete={handleDemoColdOpenContinue}
           onSkip={handleDemoColdOpenContinue}
           topInset="var(--topbar-h)"
@@ -1665,7 +1674,7 @@ export default function WORM3() {
       <ScreenTransition show={!!(demoMode && demoStepIntroVisible && demoStep && demoStep !== 'end')} freezeOnExit>
         <DemoStepIntro step={demoStep} onContinue={handleDemoStepContinue} onSkip={() => advanceDemoStep(demoStep)} />
       </ScreenTransition>
-      <ScreenTransition show={!!(demoMode && demoTryVisible && !demoStepIntroVisible && !demoChromeQuiet)} freezeOnExit>
+      <ScreenTransition show={!!(demoMode && demoTryVisible && !demoStepIntroVisible && !demoCoachQuiet)} freezeOnExit>
         <DemoCoach
           step={demoStep}
           copy={demoCoachCopy}

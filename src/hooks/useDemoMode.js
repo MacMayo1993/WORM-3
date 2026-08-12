@@ -32,6 +32,24 @@ const FLIP_SPOTLIGHT_FALLBACK_MS = 12000;
 // the lit button, but a demo left running unattended has to keep moving.
 const TOUR_BEAT_FALLBACK_MS = 15000;
 
+// How long each kind of step waits before offering the "Next ▶" coach pill.
+//
+// One table rather than a magic number per branch. These used to be scattered
+// through the step-entry switch (worm 10s, chaos 5s, random 12s, cube via
+// beginCubeTryPhase) — and the settings step had none at all, which made it the
+// only step in the demo with no way to recover on its own: an unattended demo
+// parked on it forever while every other step moved along.
+//
+// The values differ on purpose — a step whose mechanic takes longer to read
+// should not be interrupted by an escape hatch too early — but every step type
+// must have one. Add a step type here when you add one to DEMO_LEVEL_CONFIGS.
+const COACH_DELAY_MS = {
+  chaos: 5000,      // the winner-call is quick to grasp
+  worm: 10000,      // let the worm actually get moving first
+  settings: 12000,  // give them a beat to open a tab before offering the exit
+  random: 12000,    // a full reroll cycle is ~15s; offer out just before one lands
+};
+
 export function useDemoMode({
   cancelShuffle,
   changeSize,
@@ -644,24 +662,26 @@ export function useDemoMode({
 
     // Settings step: let the launch stamp read, then open the real menu.
     if (config && config.type === 'settings') {
-      setDemoHintStep(step);
       demoWatchTimers.current.push(setTimeout(() => {
         if (useGameStore.getState().demoStep === step) useGameStore.getState().setShowSettings(true);
       }, 1600));
     }
 
-    if (config && config.type === 'worm') {
-      demoWatchTimers.current.push(setTimeout(() => setDemoTryVisible(true), 10000));
-    }
-
-    if (config && config.type === 'chaos') {
+    // Every non-cube step gets the same chrome: the gesture hint, then the coach
+    // pill after its configured delay. `cube` steps are the exception only
+    // because beginCubeTryPhase already sequences both around their WATCH beat.
+    if (config && config.type !== 'cube' && config.type !== 'tour') {
       setDemoHintStep(step);
-      demoWatchTimers.current.push(setTimeout(() => setDemoTryVisible(true), 5000));
-    }
-
-    if (config && config.type === 'random') {
-      setDemoHintStep(step);
-      demoWatchTimers.current.push(setTimeout(() => setDemoTryVisible(true), 12000));
+      const delay = COACH_DELAY_MS[config.type];
+      if (delay != null) {
+        demoWatchTimers.current.push(setTimeout(() => {
+          // The settings step opens a full modal over the scene, and the coach
+          // pill is suppressed while one is open (demoChromeQuiet). Arming it
+          // anyway means the escape hatch is already there the moment they
+          // close Settings — and if they never open it, the pill is visible.
+          if (useGameStore.getState().demoStep === step) setDemoTryVisible(true);
+        }, delay));
+      }
     }
   }, [applyDemoStepConfig, handleOpenStore, clearDemoWatchTimers, armSceneGate, armFlipAndContinue, beginCubeTryPhase]);
 

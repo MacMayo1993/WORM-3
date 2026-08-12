@@ -482,7 +482,7 @@ const MobiIntroScreen = ({ lines, modeName, _accentColor, onComplete, primaryLab
               onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 7px 16px rgba(53,64,74,0.24)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
               onMouseLeave={e => { e.currentTarget.style.boxShadow = isLast ? '0 6px 14px rgba(53,64,74,0.20)' : '0 3px 8px rgba(53,64,74,0.08)'; e.currentTarget.style.transform = 'none'; }}
             >
-              {isLast ? (primaryLabel || '▶ Launch') : 'Next ▶'}
+              {isLast ? (primaryLabel || 'Launch ▶') : 'Next ▶'}
             </button>
           </div>
         </div>

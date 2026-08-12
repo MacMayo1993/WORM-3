@@ -107,7 +107,7 @@ export default function DemoForecastPicker({ onPick, onSkip }) {
             cursor: 'pointer', letterSpacing: '0.04em',
           }}
         >
-          Skip ▶
+          Skip Step ▶
         </button>
       )}
     </div>

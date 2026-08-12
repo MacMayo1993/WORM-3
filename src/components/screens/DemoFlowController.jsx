@@ -581,7 +581,7 @@ const DemoStepIntro = ({ step, onContinue, onSkip }) => {
       key={step}
       lines={lines}
       modeName={`Step ${info.num} · ${info.label}`}
-      primaryLabel="▶ Start"
+      primaryLabel="Start ▶"
       onComplete={onContinue}
       skipLabel="Skip Step ▶"
       onSkip={onSkip}
@@ -717,7 +717,7 @@ const DemoCoach = ({ step, onNext, onExit, copy: copyOverride, onCopySeen }) => 
         key={copyOverride}
         lines={[copyOverride]}
         modeName={info ? `Step ${info.num} · ${info.label}` : 'Demo'}
-        primaryLabel="▶ Got It"
+        primaryLabel="Got It ▶"
         onComplete={() => onCopySeen?.()}
         skipLabel="Exit Demo"
         onSkip={onExit}
@@ -835,11 +835,11 @@ const DemoControlTour = ({ index, onSkip }) => {
         <button
           type="button"
           onClick={onSkip}
-          aria-label="Skip the control tour"
+          aria-label="Skip Step"
           className="demo-intro-button"
           style={{ background: 'transparent', color: '#7b6f45', boxShadow: 'none', padding: '4px 12px' }}
         >
-          Skip Tour ▶
+          Skip Step ▶
         </button>
       )}
     </div>
@@ -1078,11 +1078,11 @@ const DemoViewSpotlightHint = ({ onSkip }) => {
         <button
           type="button"
           onClick={onSkip}
-          aria-label="Skip views"
+          aria-label="Skip Step"
           className="demo-intro-button"
           style={{ background: 'transparent', color: '#7b6f45', boxShadow: 'none', padding: '4px 12px' }}
         >
-          Skip All ▶
+          Skip Step ▶
         </button>
       )}
     </div>
@@ -1170,11 +1170,11 @@ const DemoViewShowcase = ({ subStep, onNext, onSkip }) => {
             <button
               type="button"
               onClick={onSkip}
-              aria-label="Skip views"
+              aria-label="Skip Step"
               className="demo-intro-button"
               style={{ background: 'transparent', color: '#7b6f45', boxShadow: 'none' }}
             >
-              Skip All ▶
+              Skip Step ▶
             </button>
           )}
         </div>
